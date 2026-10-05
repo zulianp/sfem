@@ -1,0 +1,40 @@
+# The higher-order (deferred-correction) convective flux at the paper's size and layout.
+#
+# Produced by jobs/paper_kernel_table.sbatch's companion jobs/paper_ho_table.sbatch, job 4985427.
+# 72 threads, OMP_PROC_BIND=true, --n 100 = 4,121,204 dofs, medians of 5.
+#
+# docs/CVFEM_NSE.tex's cost table has no higher-order row: every operator in it runs the
+# first-order upwind flux. These are the rows it is missing.
+#
+# A HIGHER-ORDER PACKED RATE IS NOT COMPARABLE WITH A FIRST-ORDER ONE. The correction runs
+# through the SCALAR sum-factored kernel -- the only one that accepts the nodal velocity
+# gradient -- while the first-order packed residual is 16-wide SIMD. The `vs_first_order`
+# column is therefore the ratio within one layout against that layout's first-order rate on the
+# same operation, and it mixes the two kernels; it is a cost ratio for the scheme, not a
+# measure of the correction's arithmetic alone. flops_per_element is the driver's model and is
+# the honest indicator of how much more work the correction is.
+#
+# jac_ho_venk and jac_ho_venk_bnd_dt on the PACKED layout are rejected by the driver's own
+# packed-versus-atomic oracle, not unsupported: see jobs/paper_ho_table.sbatch for the bisection.
+# Pre-existing, Grace-only, non-power-of-two sizes only, and only the two smooth limiters.
+key,row,operation,layout,limiter,ndof,mdof_s,flops_per_element,vs_first_order
+res_fo,"residual, first-order upwind (reference)",residual,packed,,4121204,1830.7,754,1.00
+res_ho_unlim,"deferred correction, unlimited",residual,packed,0,4121204,945.8,1426,1.94
+res_ho_clip,"deferred correction, bounded-face clip",residual,packed,1,4121204,741.8,1570,2.47
+res_ho_venk,"deferred correction, Venkatakrishnan",residual,packed,2,4121204,618.1,2506,2.96
+res_ho_dm,"deferred correction, Darwish-Moukalled",residual,packed,3,4121204,683.6,2146,2.68
+res_ho_venk_bnd_dt,"Venkatakrishnan, boundary and transient",residual,packed,2,4121204,569.6,2506,3.21
+jac_fo,"Jacobian action, first-order upwind (reference)",jac_action,packed,,4121204,931.6,850,1.00
+jac_ho_unlim,"deferred correction, unlimited",jac_action,packed,0,4121204,440.0,2098,2.12
+jac_ho_venk,"deferred correction, Venkatakrishnan",jac_action,packed,2,4121204,,5554,
+jac_ho_venk_bnd_dt,"Venkatakrishnan, boundary and transient",jac_action,packed,2,4121204,,5554,
+res_fo,"residual, first-order upwind (reference)",residual,atomic,,4121204,920.5,754,1.00
+res_ho_unlim,"deferred correction, unlimited",residual,atomic,0,4121204,644.2,1426,1.43
+res_ho_clip,"deferred correction, bounded-face clip",residual,atomic,1,4121204,546.6,1570,1.68
+res_ho_venk,"deferred correction, Venkatakrishnan",residual,atomic,2,4121204,484.7,2506,1.90
+res_ho_dm,"deferred correction, Darwish-Moukalled",residual,atomic,3,4121204,513.5,2146,1.79
+res_ho_venk_bnd_dt,"Venkatakrishnan, boundary and transient",residual,atomic,2,4121204,461.1,2506,2.00
+jac_fo,"Jacobian action, first-order upwind (reference)",jac_action,atomic,,4121204,421.6,850,1.00
+jac_ho_unlim,"deferred correction, unlimited",jac_action,atomic,0,4121204,158.1,2098,2.67
+jac_ho_venk,"deferred correction, Venkatakrishnan",jac_action,atomic,2,4121204,144.9,5554,2.91
+jac_ho_venk_bnd_dt,"Venkatakrishnan, boundary and transient",jac_action,atomic,2,4121204,142.5,5554,2.96

@@ -466,8 +466,16 @@ int main(int argc, char **argv) {
     int         rhie_chow  = 0;
     scalar_t    rc_scale   = 1;
     int         boundary   = 0;
-    // Deferred-correction higher-order convective flux, and which limiter arm. Residual only,
-    // and only on the atomic sum-factored sweep; see the --conv-ho help text.
+    // Deferred-correction higher-order convective flux, and which limiter arm. Reaches the
+    // residual and the Jacobian action, on the atomic and packed sum-factored sweeps; see the
+    // --conv-ho help text.
+    //
+    // This said "Residual only, and only on the atomic sum-factored sweep" until the exact
+    // higher-order Jacobian action was added -- which is implemented immediately below it, and
+    // which the gate has measured in two configurations since. A stale restriction here reads
+    // as a statement that jac_action_packed_ho_unlim and _ho_venk measure nothing, and the flop
+    // model disproves that: the action goes from 850 to 2098 flops per element unlimited and to
+    // 5554 with the Venkatakrishnan limiter.
     int         conv_ho      = 0;
     int         conv_limiter = 0;
     // The higher-order correction in the JACOBIAN ACTION. Exact by default when --conv-ho is on,
@@ -647,7 +655,10 @@ int main(int argc, char **argv) {
                     "                 single stores float and still accumulates in double\n"
                     "  --conv-ho [L]    deferred-correction higher-order convective flux, limiter L\n"
                     "                   (0 unlimited, 1 bounded-face clip, 2 Venkatakrishnan,\n"
-                    "                   3 Darwish-Moukalled; default 0). Residual only. Runs on\n"
+                    "                   3 Darwish-Moukalled; default 0). Reaches the residual AND\n"
+                    "                   the Jacobian action, which differentiates the correction\n"
+                    "                   exactly by default -- --lagged-ho drops that derivative.\n"
+                    "                   Runs on\n"
                     "                   --layout atomic and --layout packed, both through the\n"
                     "                   SCALAR sum-factored kernel, which is the only one that\n"
                     "                   accepts ugrad8: so packed-vs-atomic here isolates the\n"
@@ -664,6 +675,13 @@ int main(int argc, char **argv) {
                     "                   matrix cannot carry that term without widening its\n"
                     "                   one-ring sparsity, so it lags it. Use this for a\n"
                     "                   like-for-like comparison against --bsr-apply.\n"
+                    "  --lagged-ho      the same, for the higher-order correction: drop the\n"
+                    "                   correction's own derivative from the Jacobian action and\n"
+                    "                   keep only its first-order part. That is the operator an\n"
+                    "                   assembled first-order matrix holds, so it is the\n"
+                    "                   like-for-like partner for --bsr-apply once --conv-ho is\n"
+                    "                   on, and it is what this driver computed before the exact\n"
+                    "                   form existed. Had no help entry at all until now.\n"
                     "  --rhie-chow [S]  include the Rhie-Chow pressure-velocity coupling at scale\n"
                     "                 S (default 1), and the nodal pressure gradient it needs.\n"
                     "                 sumfact only -- the hand-written and generated kernels carry\n"
