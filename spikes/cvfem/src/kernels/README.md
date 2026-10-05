@@ -25,35 +25,57 @@ written here is the part a test cannot state: which reading of a clause the code
   emitted instructions are counted; a kernel that goes scalar fails the build, not a test. Two
   Jacobian arms are exempt by name under clang and the exemption is checked in both directions.
 
-## The readings this code takes
+## Where DESIGN.md's clauses stand
 
-**"Templated types."** The leaf element kernels are templated on the scalar type — 64 of them,
-and the CUDA smoke test instantiates them at both `float` and `double`, which is what makes the
-templating real rather than decorative. The **sweeps** are not: they take the build's `scalar_t`
-through the alias the including translation unit supplies (`support/cvfem_default_types.hpp` for
-a unit without a family header).
+Three of the readings this file used to defend were overruled by the corrections at the end of
+DESIGN.md. They are recorded here as superseded rather than deleted, because each was wrong in a
+way worth not repeating.
 
-That is not laziness, it is the lane blocking. `CVFEM_HEX8_VEC_SIZE` is
-`VEC_BYTES / sizeof(scalar_t)` at namespace scope, so a sweep templated on the scalar type could
-be instantiated at `float` while the lane width stayed the one computed for `double`. Templating
-the sweeps therefore means making the lane width a template-dependent quantity first — a
-redesign of the lane blocking rather than a signature change.
+**"Templated types."** NOT DONE. The leaf element kernels are templated on the scalar type — 64
+of them, instantiated at both `float` and `double` by the CUDA smoke test, which is what makes
+the templating real rather than decorative. The **sweeps** are not: they take the build's types
+through the aliases the including translation unit supplies
+(`support/cvfem_default_types.hpp` for a unit without a family header).
 
-**"Only the SIMD version is kept, the rest is moved to subpar."** Ten scalar matrix-free sweeps
-remain and none of them can move. Eight are verification oracles that run in the default build,
-one is reached from the solver family's own core, and one was explicitly declined by a recorded
-earlier decision. `subpar/README.md` has the table, the oracle each one serves, and the Grace
-measurements taken while settling it.
+This file argued that the lane blocking exempted them: `CVFEM_HEX8_VEC_SIZE` is
+`VEC_BYTES / sizeof(scalar_t)` at namespace scope, so a sweep instantiated at `float` would keep
+the lane width computed for `double`. The correction: **"the kernels should be templated as well.
+They should support different types for the computation, template scalar_t, geom_t, idx_t, etc...
+(in a short time we would like to try single precision kernels as well)."** The obstacle is real
+but it is the work, not an exemption — the lane width has to become template-dependent, and the
+lane-blocked pack structs with it, so that an `f32` instantiation gets twice the lanes. `geom_t`
+and `idx_t` are named explicitly because the coordinate precision and the index width are
+separate choices from the accumulation precision.
 
-**"The threading model for atomics free kernels is abstract outside the function."** Every
+**"Only the SIMD version is kept, the rest is moved to subpar."** DONE, and this file's survey
+was overruled. It had found that eight of the ten scalar matrix-free sweeps were verification
+oracles running in the default build and concluded that none could move. Serving as an oracle is
+not a reason to keep a second variant in the tree; `subpar/README.md` records what happened to
+each oracle, which was milder than the survey predicted — one had been aborting, one had become
+a duplicate of the row above it, and two were strengthened by the retirement. The one place a
+scalar sweep stays is the CUDA verify driver's host reference, because the device kernels call
+the scalar `SFEM_HOST_DEVICE` leaf templates and so run the same arithmetic.
+
+**"affine / isoparametric / axis_aligned logically separated."** DONE for `packed`, `store`,
+`standard` and `colored` (the element colouring). This file argued that `template <bool ISO>`
+satisfied the clause; the correction is that the folders meant folders. See
+`packed/affine/README.md` for what the split bought beyond the structure — a templated sweep has
+to take the union of both geometries' inputs, so neither half could have a lean signature.
+
+Outstanding: the **pack-coloured** sweeps, which still test `GeomKind` inside their pack loop and
+still live in `frontend/staging/` rather than here, and the **semi-structured** sweeps, which
+branch on `curved_e` per macro-element. Both need their shared loop factored out first, the way
+the packed layout's staging and drain were, so that splitting duplicates nothing.
+
+**"The threading model for atomics free kernels is abstract outside the function."** DONE. Every
 atomics-free kernel takes a `cvfem_range` and owns no parallel region: the packed, element-
 coloured, store and semi-structured sweeps, the shared and ghost reductions, and the boundary
 shell's gather. The **atomic** layout keeps its own `#pragma omp parallel for`, which the clause
 excludes by its own words, as do three zeroing and mask-building utilities that the atomic
-sweeps call from inside their regions.
+sweeps call from inside their regions. The pack-coloured sweeps are the exception and are listed
+as outstanding above.
 
-**"affine / isoparametric / axis_aligned logically separated."** Settled per format, by moving
-functions where the two geometries were already separate and by a stated finding where they were
-not. Each format's `affine/`, `isoparametric/` and `axis_aligned/` carries a README with its own
-answer; `packed/affine/README.md` and `semistructured/affine/README.md` are the two that explain
-why a folder split would duplicate a sweep.
+**"No user level option flags are propagated down here."** DONE for the micro-kernel selector —
+`--kernel` and `KernelKind` are gone, and what chooses a kernel is the layout, the geometry and
+which terms the operator carries. Two globals remain: `g_kernel_only` and `g_dense_flush`, both
+read inside sweeps, both set by a driver flag.
