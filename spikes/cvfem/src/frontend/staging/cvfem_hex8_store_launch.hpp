@@ -12,6 +12,8 @@
 // the bench's staging header.
 #include "frontend/staging/cvfem_hex8_best_common.hpp"
 #include "kernels/packed/cvfem_hex8_best_store.hpp"
+#include "kernels/packed/affine/cvfem_hex8_best_packed_affine.hpp"
+#include "kernels/packed/isoparametric/cvfem_hex8_best_packed_isoparam.hpp"
 
 static void build_pack_store_crs(PackedData           &p,
                                  const ptrdiff_t       nelements,
@@ -135,12 +137,13 @@ static void build_pack_store_crs(PackedData           &p,
     }
 }
 
-template <bool ISO>
+// The front end chooses the geometry's sweep; see apply_residual_packed.
 static SFEM_NOINLINE void assemble_jacobian_store(MeshData        &d,
                                                   PackedData      &p,
                                                   BSR4            &b,
                                                   const scalar_t   rho,
-                                                  const scalar_t   mu) {
+                                                  const scalar_t   mu,
+                                                  const GeomKind   geom) {
     const size_t u_n   = packed_scratch_n(p.max_actual_nodes_per_pack);
     const size_t bsr_n = 16 * (size_t)std::max<ptrdiff_t>(p.st_max_local_nnz, 1);
 
@@ -156,24 +159,20 @@ static SFEM_NOINLINE void assemble_jacobian_store(MeshData        &d,
         CVFEM_PHASE_ACC(acc);
         scalar_t *const SFEM_RESTRICT pack_u     = thread_scratch<scalar_t>(0, u_n);
         scalar_t *const SFEM_RESTRICT local_vals = thread_scratch<scalar_t>(2, bsr_n);
-        scalar_t *const SFEM_RESTRICT pack_xyz =
-                (ISO || with_rc)
-                        ? thread_scratch<scalar_t>(3, with_rc ? packed_rc_n(p.max_actual_nodes_per_pack) : packed_xyz_n(p.max_actual_nodes_per_pack))
-                        : nullptr;
-        const ptrdiff_t               xyz_n  = p.max_actual_nodes_per_pack > 0 ? p.max_actual_nodes_per_pack : 1;
-        scalar_t *const SFEM_RESTRICT pack_x = pack_xyz;
-        scalar_t *const SFEM_RESTRICT pack_y = pack_xyz ? pack_xyz + xyz_n : nullptr;
-        scalar_t *const SFEM_RESTRICT pack_z = pack_xyz ? pack_xyz + 2 * xyz_n : nullptr;
-        scalar_t *const SFEM_RESTRICT pack_pgx = with_rc ? pack_xyz + 3 * xyz_n : nullptr;
-        scalar_t *const SFEM_RESTRICT pack_pgy = with_rc ? pack_xyz + 4 * xyz_n : nullptr;
-        scalar_t *const SFEM_RESTRICT pack_pgz = with_rc ? pack_xyz + 5 * xyz_n : nullptr;
+        const Hex8PackCoords pk = cvfem_hex8_pack_coords(
+                geom == GeomKind::Isoparam, with_rc, p.max_actual_nodes_per_pack);
 
 #pragma omp for schedule(dynamic, 1)
         for (ptrdiff_t pack = 0; pack < p.n_packs; ++pack)
-            assemble_jacobian_store_range<ISO>(cvfem_range{pack, pack + 1},
+            if (geom == GeomKind::Isoparam)
+                assemble_jacobian_store_isoparam_range(cvfem_range{pack, pack + 1},
+                                               d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_idx, p.ghost_ptr, p.n_elements_per_pack, p.owned_nodes_ptr, p.st_element_slot.data(), p.st_ghost_ptr.data(), p.st_ghost_val.data(), p.st_local_nnz.data(), p.st_owned_nnz.data(), b.rowptr, rho, mu, gvalues, with_rc,
+                                               CVFEM_PHASE_ACC_ARG pack_u, local_vals, pk,
+            cvfem_hex8_rc_config_for(d));
+            else
+                assemble_jacobian_store_affine_range(cvfem_range{pack, pack + 1},
                                                d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_idx, p.ghost_ptr, p.n_elements_per_pack, p.owned_nodes_ptr, p.st_element_slot.data(), p.st_ghost_ptr.data(), p.st_ghost_val.data(), p.st_local_nnz.data(), p.st_owned_nnz.data(), b.rowptr, rho, mu, gvalues, with_rc,
-                                               CVFEM_PHASE_ACC_ARG pack_u, local_vals, pack_x, pack_y, pack_z,
-                                               pack_pgx, pack_pgy, pack_pgz,
+                                               CVFEM_PHASE_ACC_ARG pack_u, local_vals, pk,
             cvfem_hex8_rc_config_for(d));
         CVFEM_PHASE_FLUSH(acc);
     }

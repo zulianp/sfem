@@ -18,6 +18,7 @@
 // rhie_chow_scale and the staging call that filled a pressure gradient nothing read.
 
 #include "kernels/packed/cvfem_hex8_best_packed.hpp"
+#include "kernels/packed/cvfem_hex8_best_store.hpp"
 
 static SFEM_NOINLINE void apply_residual_packed_isoparam_range(
         const cvfem_range packs,
@@ -281,6 +282,96 @@ static SFEM_NOINLINE void assemble_jacobian_packed_isoparam_range(
             CVFEM_PHASE_MARK_LAST(acc, _t, PH_LOCAL_TO_GLOBAL);
     }
         CVFEM_PHASE_FLUSH(acc);
+}
+
+// The STORE layout's isoparametric assembly. Same two-geometry split as the packed one;
+// the store's difference is its drain, not its element kernel.
+static SFEM_NOINLINE void assemble_jacobian_store_isoparam_range(
+        const cvfem_range packs,
+        const ptrdiff_t nelements,
+        const scalar_t *const SFEM_RESTRICT pres,
+        const scalar_t *const SFEM_RESTRICT pgx,
+        const scalar_t *const SFEM_RESTRICT pgy,
+        const scalar_t *const SFEM_RESTRICT pgz,
+        geom_t **const SFEM_RESTRICT points,
+        const scalar_t rhie_chow_scale,
+        const scalar_t *const SFEM_RESTRICT ux,
+        const scalar_t *const SFEM_RESTRICT uy,
+        const scalar_t *const SFEM_RESTRICT uz,
+        pack_idx_t **const SFEM_RESTRICT pack_elems,
+        const idx_t *const SFEM_RESTRICT ghost_idx,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
+        const int *const SFEM_RESTRICT st_element_slot,
+        const ptrdiff_t *const SFEM_RESTRICT st_ghost_ptr,
+        scalar_t *const SFEM_RESTRICT st_ghost_val,
+        const int *const SFEM_RESTRICT st_local_nnz,
+        const int *const SFEM_RESTRICT st_owned_nnz,
+        // BSR4 is a staging type (it owns a SharedBuffer and a graph); the kernel reads one
+        // array out of it, so that is what it takes.
+        const count_t *const SFEM_RESTRICT rowptr,
+        const scalar_t   rho,
+        const scalar_t   mu,
+        scalar_t *const SFEM_RESTRICT gvalues,
+        const int                     with_rc,
+        CVFEM_PHASE_ACC_PARAM
+        scalar_t *const SFEM_RESTRICT pack_u,
+        scalar_t *const SFEM_RESTRICT local_vals,
+        // The pack's staged coordinates and pressure gradient, carved out of slot 3 by the
+        // launcher. One object rather than six pointers that have to be offset consistently.
+        const Hex8PackCoords &pk,
+        // Resolved once per solve, in the launcher, not per element here. This parameter replaced
+        // the cvfem_hex8_rc_config_for(d) call that used to sit in this body: that function takes
+        // the mesh, which a kernel is not meant to name.
+        const Hex8RcConfig &rc_cfg) {
+    for (ptrdiff_t pack = packs.begin; pack < packs.end; ++pack) {
+            const ptrdiff_t                         e_start      = pack * n_elements_per_pack;
+            const ptrdiff_t                         e_end        = MIN(nelements, (pack + 1) * n_elements_per_pack);
+            const ptrdiff_t                         owned        = owned_nodes_ptr[pack];
+            const ptrdiff_t                         n_contiguous = owned_nodes_ptr[pack + 1] - owned;
+            const ptrdiff_t                         n_ghost      = ghost_ptr[pack + 1] - ghost_ptr[pack];
+            const idx_t *const SFEM_RESTRICT ghosts       = &ghost_idx[ghost_ptr[pack]];
+            const int                               owned_nnz    = st_owned_nnz[(size_t)pack];
+            const int                               local_nnz    = st_local_nnz[(size_t)pack];
+
+            CVFEM_PHASE_CLOCK(_t);
+            std::memset(local_vals, 0, (size_t)local_nnz * 16 * sizeof(scalar_t));
+            CVFEM_PHASE_MARK(acc, _t, PH_LOCAL_MEMSET);
+
+            fill_pack_fields(owned_nodes_ptr, ux, uy, uz, pres, pack, n_contiguous, n_ghost, ghosts, pack_u);
+            if (with_rc)
+                cvfem_hex8_fill_pack_xyz_pgrad(owned_nodes_ptr, points, pgx, pgy, pgz, with_rc, pack, n_contiguous, n_ghost, ghosts, pk.x, pk.y, pk.z,
+                                               pk.pgx, pk.pgy, pk.pgz);
+            // Coordinates always: this geometry derives its Jacobian from them.
+            fill_pack_xyz(owned_nodes_ptr, points, pack, n_contiguous, n_ghost, ghosts, pk.x, pk.y, pk.z);
+            CVFEM_PHASE_MARK(acc, _t, PH_GATHER);
+
+            for (ptrdiff_t e = e_start; e < e_end; ++e) {
+                Hex8PackElement el;
+                cvfem_hex8_stage_pack_element(pack_elems, pack_u, pk, e, with_rc, rc_cfg, el);
+                const int *const SFEM_RESTRICT slots = st_element_slot + (size_t)e * 64;
+                scalar_t x[8], y[8], z[8];
+                gather_hex8_coords_from_pack(pack_elems, pk.x, pk.y, pk.z, e, x, y, z);
+                cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam<false>(
+                        rho, mu, x, y, z, el.ux, el.uy, el.uz, slots, local_vals, el.rc, el.rc_p);
+            }
+            CVFEM_PHASE_MARK(acc, _t, PH_KERNEL);
+
+            // owned rows: one streaming store over a contiguous global slice
+            std::memcpy(gvalues + (ptrdiff_t)rowptr[owned] * 16, local_vals, (size_t)owned_nnz * 16 * sizeof(scalar_t));
+
+            // ghost rows: park for the reduction below
+            const ptrdiff_t ghost_off = ghost_ptr[pack];
+            if (n_ghost > 0) {
+                const ptrdiff_t dest = st_ghost_ptr[(size_t)ghost_off];
+                const ptrdiff_t n    = st_ghost_ptr[(size_t)ghost_off + (size_t)n_ghost] - dest;
+                std::memcpy(st_ghost_val + dest * 16,
+                            local_vals + (ptrdiff_t)owned_nnz * 16,
+                            (size_t)n * 16 * sizeof(scalar_t));
+            }
+            CVFEM_PHASE_MARK_LAST(acc, _t, PH_LOCAL_TO_GLOBAL);
+    }
 }
 
 #endif  // CVFEM_HEX8_BEST_PACKED_ISOPARAM_HPP

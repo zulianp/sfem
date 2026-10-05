@@ -1,25 +1,29 @@
-# `packed/affine/` and `../isoparametric/` — empty, because the separation is the template parameter
+# `packed/isoparametric/` — the packed and store layouts' isoparametric sweeps
 
-The packed layout's three sweeps — `apply_residual_packed_range`,
-`assemble_jacobian_packed_range`, `apply_jacobian_action_packed_range` — and the store layout's
-`assemble_jacobian_store_range` are each **one sweep templated on `bool ISO`**, and that is the
-separation DESIGN.md asks for rather than a substitute for it.
+Every sweep here derives the Jacobian **per sub-control surface from the element's node
+coordinates**, which the pack stages for it. None of them takes an adjugate table.
 
-The clause reads "logically separated (now they are mixed in with enum and booleans)". The
-parenthetical names what was wrong: `GeomKind` arrived as an argument and was tested per pack,
-inside the sweep. That is gone — no `GeomKind` argument and no geometry boolean survives in any
-signature under `src/kernels/` — and the caller now picks the instantiation, so the geometry is
-fixed at the point where it matters, the lane loop. The sweeps' own notes record the 1.83x that
-guard cost when it was not.
+| sweep | operation |
+|---|---|
+| `apply_residual_packed_isoparam_range` | the first-order residual, 16-wide over elements |
+| `apply_jacobian_action_packed_isoparam_range` | the matrix-free Jacobian action |
+| `assemble_jacobian_packed_isoparam_range` | the assembled Jacobian, pack-local then drained |
+| `assemble_jacobian_store_isoparam_range` | the same assembly with the store layout's drain |
 
-**Why not folders as well.** The two geometries share the pack staging, the owned-node drain, the
-ghost staging and the ghost reduction; they differ in the element loop between them. A folder
-split would either duplicate all of that per geometry, which the one-path rule forbids, or
-extract the element loop out of the `#pragma omp parallel` region in the spike's headline kernel
-— a change that can move inlining and so would need a Grace measurement to justify, for a
-structural gain the template parameter already delivers.
+There is no higher-order or partially assembled sweep here: both read the adjugate table and
+exist only in `../affine/`.
 
-Where a format's two geometries ARE separate sweeps, they are in folders: see
-`../../standard/affine/` and `../../standard/isoparametric/`, which were split by moving whole
-functions with nothing duplicated, and `../../microkernels/hex8/affine/` and
-`../../microkernels/hex8/isoparametric/`.
+## What these take that the templated sweeps could not
+
+Six parameters fewer on the residual and twelve on the Jacobian action, because a sweep
+templated on `bool ISO` has to accept the union of both geometries' inputs. The isoparametric
+SIMD kernels carry no Rhie-Chow term — it was never put into them, which is why the driver
+refuses `--rhie-chow` on this geometry for any pack-based layout — so `with_rc`, the pressure
+and direction gradients, the coefficient table, the scale and the Rhie-Chow config were all
+dead in this half and had to be in the signature regardless.
+
+The assemblies are the exception on the term: they are scalar per element and the
+isoparametric assembly kernel does carry Rhie-Chow, so those two keep it.
+
+See `../affine/README.md` for the correction that produced this split, for what this folder
+used to claim instead, and for where the shared pack machinery lives.

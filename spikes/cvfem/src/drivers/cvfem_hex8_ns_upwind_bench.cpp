@@ -1683,7 +1683,7 @@ int main(int argc, char **argv) {
     auto jac_fn = [&]() {
         if (geom_kind == GeomKind::Isoparam) {
             if (layout == "store")
-                assemble_jacobian_store<true>(d, packed, bsr, rho, mu);
+                assemble_jacobian_store(d, packed, bsr, rho, mu, GeomKind::Isoparam);
             else if (layout == "colored")
                 assemble_jacobian_colored(d, packed, colors, bsr, rho, mu, GeomKind::Isoparam);
             else if (layout == "packed")
@@ -1705,7 +1705,7 @@ int main(int argc, char **argv) {
             else
                 assemble_jacobian_atomic_isoparam(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), bsr.element_slots.empty() ? nullptr : bsr.element_slots.data(), bsr.nnz, bsr.values->data(), rho, mu);
         } else if (layout == "store") {
-            assemble_jacobian_store<false>(d, packed, bsr, rho, mu);
+            assemble_jacobian_store(d, packed, bsr, rho, mu, GeomKind::Affine);
         } else if (layout == "colored") {
             assemble_jacobian_colored(d, packed, colors, bsr, rho, mu, GeomKind::Affine);
         } else if (layout == "packed") {
