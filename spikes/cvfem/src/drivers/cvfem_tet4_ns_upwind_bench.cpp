@@ -48,7 +48,7 @@ static constexpr int ALIGN_BYTES = 64;
 
 // KernelKind, parse_kernel and kernel_is_sympy_residual stood here: thirteen arms selected by
 // --kernel. DESIGN.md's correction leaves one micro-kernel per kernel, the one Grace measured
-// fastest, and jobs/tet4_arms.sbatch measured all thirteen across all three operations for the
+// fastest, and subpar/jobs/tet4_arms.sbatch measured all thirteen across all three operations for the
 // first time -- perf/ had no TET4 row at all. The losers are in subpar/cvfem_tet4_retired.hpp
 // with the numbers; perf/tet4_arms_grace.txt is the record.
 //
@@ -1214,7 +1214,7 @@ static SFEM_NOINLINE void cvfem_tet4_ns_upwind_apply_packed(MeshData &d, PackedD
         }
     }
 }
-// THE RETIRED TET4 SWEEPS. Seventeen of them, quarantined by jobs/tet4_arms.sbatch (Grace job
+// THE RETIRED TET4 SWEEPS. Seventeen of them, quarantined by subpar/jobs/tet4_arms.sbatch (Grace job
 // 4982357) -- the first measurement of this element on this hardware: perf/ held no TET4 row at
 // all, so all thirteen arms of the --kernel flag were unmeasured, the default included. See
 // perf/tet4_arms_grace.txt. They are included back here, where they were defined, because they

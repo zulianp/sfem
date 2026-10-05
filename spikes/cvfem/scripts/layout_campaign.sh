@@ -80,14 +80,18 @@ esac
 
 # ------------------------------------------------------------------ the configurations
 #
-# key|operation|layout|kernel|extra
+# key|operation|layout|extra
 #
 # The driver REFUSES some combinations, and it is right to: --assemble-diag dispatches on
-# geometry alone and would record a --layout it never used; --kernel sympy carries no
-# Rhie-Chow term and a row would claim one it did not compute. A sweep that emitted them
-# anyway would spend its allocation collecting non-zero exit codes and would leave holes in
-# the table that look like measurements that failed. So the refusals are encoded here and a
-# refused combination is absent by construction rather than filtered out afterwards.
+# geometry alone and would record a --layout it never used, and --layout ecolor implements no
+# assembly. A sweep that emitted them anyway would spend its allocation collecting non-zero
+# exit codes and would leave holes in the table that look like measurements that failed. So the
+# refusals are encoded here and a refused combination is absent by construction rather than
+# filtered out afterwards.
+#
+# There is no kernel column. DESIGN.md's second correction leaves one micro-kernel per kernel,
+# so what this sweep varies is the layout, the operation and the scheme -- which is what its
+# name has always said it was for.
 #
 # Ordering matters as much as membership. The layouts alternate ADJACENTLY within each
 # operator, so that the pair of readings a ratio is computed from sits as close together in
@@ -96,26 +100,23 @@ esac
 # for, and the reps run in alternating direction to balance what is left.
 CONFIGS=(
     # -- the bare element kernel, both layouts ------------------------------------------
-    "residual_bare|residual|packed|sumfact|"
-    "residual_bare|residual|ecolor|sumfact|"
-    "residual_bare|residual|atomic|sumfact|"
-    "jac_bare|jac_action|packed|sumfact|"
-    "jac_bare|jac_action|ecolor|sumfact|"
-    "jac_bare|jac_action|atomic|sumfact|"
+    "residual_bare|residual|packed|"
+    "residual_bare|residual|ecolor|"
+    "residual_bare|residual|atomic|"
+    "jac_bare|jac_action|packed|"
+    "jac_bare|jac_action|ecolor|"
+    "jac_bare|jac_action|atomic|"
 
-    # -- the one micro-kernel comparison that is a real tie and not one call site twice ----
-    #
-    # `sumfact` and `current` are different functions on the atomic sweep --
-    # apply_residual_atomic_sumfact against apply_residual_atomic -- and were recorded at 887
-    # and 888 MDOF/s, which decides nothing. They are here to be decided at saturation.
+    # The `sumfact`-against-`current` pair stood here: two different functions on the atomic
+    # sweep, recorded at 887 and 888 MDOF/s, which decided nothing and was never decided at
+    # saturation either. One micro-kernel per kernel settles it instead of a measurement, and
+    # `current` is in subpar/.
     #
     # --layout store is deliberately ABSENT from every residual and jac_action row above: its
     # branch reads `layout == "packed" || layout == "store"` and calls the packed sweep, so a
     # store row would be the packed row measured a second time. The recorded 2929-against-2940
     # "tie" between them was exactly that. Store appears once, under assembly, which is the
     # only operation it implements.
-    "residual_current|residual|atomic|current|"
-    "residual_current|residual|packed|current|"
 
     # -- the generated arrangements are GONE from this sweep, and that is the result ------
     #
@@ -128,7 +129,7 @@ CONFIGS=(
     # The measurement that retired them is perf/campaign_generated_arms.csv, and re-running it
     # needs -DCVFEM_ENABLE_SUBPAR=ON plus these five lines back:
     #
-    #   "residual_sympy|residual|packed|sympy|"          "residual_sympy|residual|atomic|sympy|"
+    #   "residual_sympy|residual|packed|"          "residual_sympy|residual|atomic|"
     #   "jac_sympy_action{,_node,_comp,_face,_geom,_geomface}|jac_action|atomic|sympy_action{...}|"
 
     # -- the operator the solver actually evaluates, in stages --------------------------
@@ -137,27 +138,27 @@ CONFIGS=(
     # the bare kernel is a smaller operator than anything the Newton loop sees. Then the
     # boundary closure, then the transient term: each row adds one term to the row above
     # it, so a difference between adjacent rows is that term's cost.
-    "residual_rc|residual|packed|sumfact|--rhie-chow"
-    "residual_rc|residual|ecolor|sumfact|--rhie-chow"
-    "residual_rc|residual|atomic|sumfact|--rhie-chow"
-    "residual_rc_bnd|residual|packed|sumfact|--rhie-chow --boundary"
-    "residual_rc_bnd|residual|ecolor|sumfact|--rhie-chow --boundary"
-    "residual_rc_bnd|residual|atomic|sumfact|--rhie-chow --boundary"
+    "residual_rc|residual|packed|--rhie-chow"
+    "residual_rc|residual|ecolor|--rhie-chow"
+    "residual_rc|residual|atomic|--rhie-chow"
+    "residual_rc_bnd|residual|packed|--rhie-chow --boundary"
+    "residual_rc_bnd|residual|ecolor|--rhie-chow --boundary"
+    "residual_rc_bnd|residual|atomic|--rhie-chow --boundary"
     # --transient takes the timestep. Its value does not change the cost -- the term adds
     # the same mass contribution whatever dt is -- so any non-zero one measures it.
-    "residual_rc_bnd_dt|residual|packed|sumfact|--rhie-chow --boundary --transient 1e-2"
-    "residual_rc_bnd_dt|residual|ecolor|sumfact|--rhie-chow --boundary --transient 1e-2"
-    "residual_rc_bnd_dt|residual|atomic|sumfact|--rhie-chow --boundary --transient 1e-2"
+    "residual_rc_bnd_dt|residual|packed|--rhie-chow --boundary --transient 1e-2"
+    "residual_rc_bnd_dt|residual|ecolor|--rhie-chow --boundary --transient 1e-2"
+    "residual_rc_bnd_dt|residual|atomic|--rhie-chow --boundary --transient 1e-2"
     # The nodal pressure gradient rebuilt inside every apply instead of hoisted out of the
     # Krylov solve. A full element sweep either way, so it is a stage in its own right.
-    "residual_rc_perapply|residual|packed|sumfact|--rhie-chow --pgrad-per-apply"
-    "residual_rc_perapply|residual|atomic|sumfact|--rhie-chow --pgrad-per-apply"
-    "jac_rc|jac_action|packed|sumfact|--rhie-chow"
-    "jac_rc|jac_action|ecolor|sumfact|--rhie-chow"
-    "jac_rc|jac_action|atomic|sumfact|--rhie-chow"
-    "jac_rc_bnd|jac_action|packed|sumfact|--rhie-chow --boundary"
-    "jac_rc_bnd|jac_action|ecolor|sumfact|--rhie-chow --boundary"
-    "jac_rc_bnd|jac_action|atomic|sumfact|--rhie-chow --boundary"
+    "residual_rc_perapply|residual|packed|--rhie-chow --pgrad-per-apply"
+    "residual_rc_perapply|residual|atomic|--rhie-chow --pgrad-per-apply"
+    "jac_rc|jac_action|packed|--rhie-chow"
+    "jac_rc|jac_action|ecolor|--rhie-chow"
+    "jac_rc|jac_action|atomic|--rhie-chow"
+    "jac_rc_bnd|jac_action|packed|--rhie-chow --boundary"
+    "jac_rc_bnd|jac_action|ecolor|--rhie-chow --boundary"
+    "jac_rc_bnd|jac_action|atomic|--rhie-chow --boundary"
 
     # -- assembly, where the layout ranking is not the one above ------------------------
     #
@@ -165,26 +166,23 @@ CONFIGS=(
     # operation it wins and because it is the layout the solver assembles with whenever a
     # colouring exists (cvfem_hex8_ns_core.hpp). Leaving it out would make the layout the
     # solver runs the one layout nothing measures.
-    "assemble|assemble|packed|sumfact|"
-    "assemble|assemble|atomic|sumfact|"
-    "assemble|assemble|colored|sumfact|"
-    "assemble|assemble|store|sumfact|"
-    # The assembly micro-kernel ranking inverts with the layout -- generated wins on atomic,
-    # hand-written on colored -- so both kernels are measured on both, and neither ranking
-    # is assumed from the other. No --rhie-chow on these: the generated kernel carries no
-    # such term and the driver refuses the pair.
-    "assemble_sympy|assemble|atomic|sympy|"
-    "assemble_sympy|assemble|colored|sympy|"
+    "assemble|assemble|packed|"
+    "assemble|assemble|atomic|"
+    "assemble|assemble|colored|"
+    "assemble|assemble|store|"
+    # The generated assembly arrangements stood here, on both layouts, because their ranking
+    # inverted with the layout -- generated won on atomic, hand-written on colored. That is
+    # recorded in subpar/README.md; the surviving kernel is the hand-written one.
     # --assemble-diag is the atomic diagonal whatever --layout says, so it appears once.
-    "assemble_diag|assemble_diag|atomic|sumfact|"
+    "assemble_diag|assemble_diag|atomic|"
 
     # -- the third way to apply the same Jacobian --------------------------------------
     #
     # The SpMV has no layout: it reads a matrix. --layout is passed only because the driver
     # needs one to build with, and the report ignores it for these rows. The two storage
     # precisions are the measurement.
-    "spmv_f64|bsr_apply|packed|sumfact|--bsr-precision double"
-    "spmv_f32|bsr_apply|packed|sumfact|--bsr-precision single"
+    "spmv_f64|bsr_apply|packed|--bsr-precision double"
+    "spmv_f32|bsr_apply|packed|--bsr-precision single"
 )
 
 op_flag() {
@@ -230,15 +228,15 @@ echo "### runs   : $(( ${#CONFIGS[@]} * $(echo $SIZES | wc -w) * REPS ))"
 if [ "$MODE" = run ]; then
     echo "### discarding one warm-up invocation"
     OMP_NUM_THREADS="$THREADS" OMP_PROC_BIND=true OMP_PLACES=cores \
-        "$BIN" --n 96 --repeat 3 --warmup 1 --layout packed --kernel sumfact >/dev/null 2>&1
+        "$BIN" --n 96 --repeat 3 --warmup 1 --layout packed >/dev/null 2>&1
 fi
 
-measure() {  # key operation layout kernel n extra
-    local key=$1 op=$2 layout=$3 kernel=$4 n=$5 extra=${6:-}
+measure() {  # key operation layout n extra
+    local key=$1 op=$2 layout=$3 n=$4 extra=${5:-}
     # shellcheck disable=SC2046,SC2086
     local -a cmd=(env OMP_NUM_THREADS="$THREADS" OMP_PROC_BIND=true OMP_PLACES=cores
                   "$BIN" --n "$n" --repeat 20 --warmup 3
-                  --layout "$layout" --kernel "$kernel" $(op_flag "$op") $extra
+                  --layout "$layout" $(op_flag "$op") $extra
                   --csv "$CSV" --tag "${key}_n${n}")
     if [ "$MODE" = dry ]; then
         printf '%s\n' "${cmd[*]}"
@@ -264,9 +262,9 @@ for rep in $(seq 1 "$REPS"); do
             order=$(seq $(( ${#CONFIGS[@]} - 1 )) -1 0)
         fi
         for i in $order; do
-            IFS='|' read -r key op layout kernel extra <<<"${CONFIGS[$i]}"
+            IFS='|' read -r key op layout extra <<<"${CONFIGS[$i]}"
             [ "$MODE" = run ] && echo "### rep $rep  n=$n  $key  $layout"
-            measure "$key" "$op" "$layout" "$kernel" "$n" "$extra"
+            measure "$key" "$op" "$layout" "$n" "$extra"
         done
     done
 done

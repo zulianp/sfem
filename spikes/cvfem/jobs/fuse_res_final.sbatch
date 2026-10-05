@@ -69,9 +69,9 @@ echo "### host $(hostname)  n=$N repeat=$REPEAT passes=$PASSES  $(date '+%F %T')
 echo
 printf '%-18s %-8s %11s %11s %7s %11s %7s %11s\n' arm layout "$LABEL_A" "$LABEL_B" ratio - - dofs
 
-run_arm residual_fo   packed "$SHAPE_A $SHAPE_B" "--kernel sumfact --rhie-chow"
-run_arm residual_fo   atomic "$SHAPE_A $SHAPE_B" "--kernel sumfact --rhie-chow"
-run_arm jac_exact     packed "$SHAPE_A $SHAPE_B" "--kernel sumfact --jac-action --rhie-chow"
+run_arm residual_fo   packed "$SHAPE_A $SHAPE_B" "--rhie-chow"
+run_arm residual_fo   atomic "$SHAPE_A $SHAPE_B" "--rhie-chow"
+run_arm jac_exact     packed "$SHAPE_A $SHAPE_B" "--jac-action --rhie-chow"
 
 echo
 echo "jac_exact is the control: its face loop was not touched here, so it should read ~1.00."

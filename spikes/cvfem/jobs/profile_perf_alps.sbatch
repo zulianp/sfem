@@ -66,7 +66,6 @@ N="${N:-64}"
 REPEAT="${REPEAT:-}"
 WARMUP="${WARMUP:-}"
 LAYOUT="${LAYOUT:-packed}"
-KERNEL="${KERNEL:-sympy_row_simd}"
 PACK_SIZE="${PACK_SIZE:-}"
 NO_SFC="${NO_SFC:-0}"
 
@@ -180,7 +179,7 @@ mode_extra_arg() {
 }
 
 bench_base_args() {
-    local -a args=(--n "${N}" --repeat "${REPEAT}" --warmup "${WARMUP}" --layout "${LAYOUT}" --kernel "${KERNEL}")
+    local -a args=(--n "${N}" --repeat "${REPEAT}" --warmup "${WARMUP}" --layout "${LAYOUT}")
     if [[ -n "${PACK_SIZE}" ]]; then
         args+=(--pack-size "${PACK_SIZE}")
     fi
@@ -262,7 +261,7 @@ fi
 
 if [[ "${VERIFY}" == "1" ]]; then
     echo "==> verifying matrix-free Jacobian action on n=${VERIFY_N}"
-    run_step "${BENCH}" --n "${VERIFY_N}" --repeat 1 --warmup 0 --layout packed --kernel "${KERNEL}" --verify-jac \
+    run_step "${BENCH}" --n "${VERIFY_N}" --repeat 1 --warmup 0 --layout packed --verify-jac \
         >"${OUT_DIR}/verify.stdout.txt" 2>"${OUT_DIR}/verify.stderr.txt"
 fi
 
@@ -275,7 +274,7 @@ echo "  work_dir:       ${SCRIPT_DIR}"
 echo "  bench:          ${BENCH}"
 echo "  out_dir:        ${OUT_DIR}"
 echo "  n/repeat/warm:  ${N}/${REPEAT}/${WARMUP}"
-echo "  layout/kernel:  ${LAYOUT}/${KERNEL}"
+echo "  layout:         ${LAYOUT}"
 echo "  modes:          ${MODES}"
 echo "  threads:        ${OMP_NUM_THREADS}, bind=${CPU_BIND}, OMP_PROC_BIND=${OMP_PROC_BIND}, OMP_PLACES=${OMP_PLACES}"
 echo "  perf repeats:   ${PERF_STAT_REPEAT}"

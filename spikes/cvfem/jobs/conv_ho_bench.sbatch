@@ -74,26 +74,27 @@ printf '%-22s %-8s %10s %10s %10s %10s %14s\n' arm layout MDOF_s dofs elems flop
 # and nothing said why. The pressure-velocity coupling is part of the operator a solver applies,
 # so it is on here as it is everywhere else; the bare rates remain in the completeness ladder,
 # which is the table whose subject they are.
+#
+# Five arms selected a higher-order micro-kernel through --ho-scalar / --ho-simd. DESIGN.md's
+# second correction leaves one per kernel: the hand-written lane-blocked one won all seven pairs
+# in subpar/jobs/defcor_arms.sbatch, the other two are in subpar/, and the flags went with them.
+# The paper never read those arms -- its convho macros are the three layouts of each limiter --
+# so what is left is what it consumes.
 for arm in "first_order|atomic|--rhie-chow" \
            "first_order|packed|--rhie-chow" \
            "first_order|ecolor|--rhie-chow" \
            "ho_unlimited|atomic|--rhie-chow --conv-ho 0" \
            "ho_unlimited|packed|--rhie-chow --conv-ho 0" \
            "ho_unlimited|ecolor|--rhie-chow --conv-ho 0" \
-           "ho_unlim_scalar|packed|--rhie-chow --conv-ho 0 --ho-scalar" \
-           "ho_unlim_simd|packed|--rhie-chow --conv-ho 0 --ho-simd" \
            "ho_clip|atomic|--rhie-chow --conv-ho 1" \
            "ho_clip|packed|--rhie-chow --conv-ho 1" \
            "ho_clip|ecolor|--rhie-chow --conv-ho 1" \
-           "ho_clip_scalar|packed|--rhie-chow --conv-ho 1 --ho-scalar" \
            "ho_venkatakrishnan|atomic|--rhie-chow --conv-ho 2" \
            "ho_venkatakrishnan|packed|--rhie-chow --conv-ho 2" \
            "ho_venkatakrishnan|ecolor|--rhie-chow --conv-ho 2" \
-           "ho_venk_scalar|packed|--rhie-chow --conv-ho 2 --ho-scalar" \
            "ho_darwish_moukalled|atomic|--rhie-chow --conv-ho 3" \
            "ho_darwish_moukalled|packed|--rhie-chow --conv-ho 3" \
-           "ho_darwish_moukalled|ecolor|--rhie-chow --conv-ho 3" \
-           "ho_dm_scalar|packed|--rhie-chow --conv-ho 3 --ho-scalar"; do
+           "ho_darwish_moukalled|ecolor|--rhie-chow --conv-ho 3"; do
     IFS='|' read -r lbl lay extra <<<"$arm"
     best=""; dofs=""; ck=""; elems=""; fpe=""
     # Best of three passes: one pass cannot separate this band -- the residual carries a large
@@ -102,7 +103,7 @@ for arm in "first_order|atomic|--rhie-chow" \
         log=$OUT/${lbl}_${lay}_p${pass}.log
         timeout "${RUN_TIMEOUT:-360}" \
           srun -u --ntasks=1 --cpus-per-task=72 --uenv="$CVFEM_UENV" --view="$CVFEM_VIEW" \
-          bash -lc "cd $PWD && OMP_NUM_THREADS=72 OMP_PROC_BIND=true OMP_PLACES=cores $B --n $N --repeat $REPEAT --warmup 3 --layout $lay --kernel sumfact $extra --csv $CSV --tag ${lbl}_${lay}_p${pass}" \
+          bash -lc "cd $PWD && OMP_NUM_THREADS=72 OMP_PROC_BIND=true OMP_PLACES=cores $B --n $N --repeat $REPEAT --warmup 3 --layout $lay $extra --csv $CSV --tag ${lbl}_${lay}_p${pass}" \
           > "$log" 2>&1
         val() { sed -n "s|^  $1: \(.*\)$|\1|p" "$log" | head -1; }
         v=$(val 'MDOF/s'); [ -n "$v" ] || continue

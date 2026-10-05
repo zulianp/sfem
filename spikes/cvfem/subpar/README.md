@@ -361,7 +361,7 @@ So it is not adopted: it buys nothing where it counts, since face-wise is both f
 emission arrangement matters while live ranges are long and stops mattering once they are
 short, which is the same thing the scope sweep says from the other direction.
 
-Reproduce with `jobs/cse_action.sbatch`. Correctness is pinned by
+Reproduce with `subpar/jobs/cse_action.sbatch`. Correctness is pinned by
 `tests/cvfem_sympy_action_test.cpp`, which holds all four against the hand-written action
 and against each other at 1e-16, so these remain measurable rather than merely present.
 
@@ -405,7 +405,7 @@ moves the packed number is entitled to reopen it.
 
 `cvfem_hex8_ns_upwind_sympy_residual_isoparam` is NOT retired, and it is now measured rather
 than merely unretired. This campaign covered affine geometry only, so for a while the sentence
-here was "nothing here is evidence about it"; `jobs/scalar_arms.sbatch` (Grace job 4982167)
+here was "nothing here is evidence about it"; `subpar/jobs/scalar_arms.sbatch` (Grace job 4982167)
 supplied the evidence, and the generated isoparametric residual wins — 449.8 against the
 hand-written 399.8 MDOF/s, 1.13x. Its generated assembly twin wins by more, 47.7 against 21.1.
 
@@ -439,7 +439,7 @@ compared the wrong pair. The generated lane-blocked family was the DEFAULT becau
 "1.39x the scalar one it replaced" — against the SCALAR arm, never against the hand-written
 LANE-BLOCKED kernel sitting beside it in the same sweep.
 
-`jobs/defcor_arms.sbatch`, Grace job 4981920, 8,586,756 dof, 72 threads, packed, best of three
+`subpar/jobs/defcor_arms.sbatch`, Grace job 4981920, 8,586,756 dof, 72 threads, packed, best of three
 (generated / hand-written MDOF/s). `perf/defcor_arms_grace.csv` is the record:
 
 | limiter | bare | with Rhie-Chow |
@@ -493,7 +493,7 @@ touches) and never timed against the thing it replaces.
 ## `cvfem_tet4_retired.hpp` — seventeen TET4 sweeps
 
 `perf/` held no TET4 row at all, so all thirteen arms of that driver's `--kernel` flag were
-unmeasured on this hardware, the default included. `jobs/tet4_arms.sbatch` (Grace job 4982357,
+unmeasured on this hardware, the default included. `subpar/jobs/tet4_arms.sbatch` (Grace job 4982357,
 packed, n=96 = 10,616,832 elements, 72 threads) measured every arm across all three operations;
 `perf/tet4_arms_grace.txt` is the record.
 
@@ -554,9 +554,9 @@ wrong comparison, and one element had never been measured on this hardware at al
 
 | job | question | answer |
 |---|---|---|
-| `jobs/defcor_arms.sbatch` (4981920) | the packed higher-order residual's three kernels | the hand-written lane-blocked one wins **all seven pairs**, 0.775x–0.976x. The generated family was the DEFAULT, on a number measured against the *scalar* arm. |
-| `jobs/scalar_arms.sbatch` (4982167) | the isoparametric atomic pair, and `split` | generated 1.13x on the residual, 2.26x on the assembly; `split` is **2.7x slower** than the assembly it replaces and had never been measured. |
-| `jobs/tet4_arms.sbatch` (4982357) | all thirteen TET4 arms, three operations | the generated arrangements win only the ASSEMBLY (1.23x) and lose both matrix-free operations. The default was wrong on two of three. |
+| `subpar/jobs/defcor_arms.sbatch` (4981920) | the packed higher-order residual's three kernels | the hand-written lane-blocked one wins **all seven pairs**, 0.775x–0.976x. The generated family was the DEFAULT, on a number measured against the *scalar* arm. |
+| `subpar/jobs/scalar_arms.sbatch` (4982167) | the isoparametric atomic pair, and `split` | generated 1.13x on the residual, 2.26x on the assembly; `split` is **2.7x slower** than the assembly it replaces and had never been measured. |
+| `subpar/jobs/tet4_arms.sbatch` (4982357) | all thirteen TET4 arms, three operations | the generated arrangements win only the ASSEMBLY (1.23x) and lose both matrix-free operations. The default was wrong on two of three. |
 
 The pattern worth keeping: **every one of these defaults was set by a comparison against something
 other than its real competitor.** The generated higher-order kernel beat the scalar sweep and was

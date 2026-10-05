@@ -3,7 +3,7 @@
 #
 # Examples:
 #   ./profile_xctrace.sh
-#   ./profile_xctrace.sh --n 48 --layout packed --kernel sympy --open
+#   ./profile_xctrace.sh --n 48 --layout packed --open
 #   ./profile_xctrace.sh --mode residual --template 'CPU Counters'
 #   ./scripts/profile_xctrace.sh --bench ./build/cvfem_tet4_ns_upwind_bench --out /tmp/cvfem-traces
 #   ./profile_xctrace.sh --n 48 --analyze
@@ -24,7 +24,6 @@ N=48
 REPEAT=20
 WARMUP=3
 LAYOUT="packed"
-KERNEL="current"
 PACK_SIZE=""
 NO_SFC=0
 OPEN_TRACES=0
@@ -46,7 +45,6 @@ usage: profile_xctrace.sh [options]
   --repeat N           Timed repetitions (default: 20)
   --warmup N           Warmup repetitions (default: 3)
   --layout NAME        packed | atomic (default: packed)
-  --kernel NAME        current | sympy (default: current)
   --pack-size N        Elements per pack (forwarded if set)
   --no-sfc             Disable SFC reorder
   --time-limit T       Cap recording (e.g. 30s, 2m); optional
@@ -115,11 +113,6 @@ while [[ $# -gt 0 ]]; do
             LAYOUT="$2"
             shift 2
             ;;
-        --kernel)
-            [[ $# -ge 2 ]] || die "--kernel needs a value"
-            KERNEL="$2"
-            shift 2
-            ;;
         --pack-size)
             [[ $# -ge 2 ]] || die "--pack-size needs a value"
             PACK_SIZE="$2"
@@ -174,10 +167,10 @@ fi
 
 stamp="$(date +%Y%m%d-%H%M%S)"
 safe_template="$(echo "$TEMPLATE" | tr ' /' '__')"
-run_tag="n${N}_${LAYOUT}_${KERNEL}_${safe_template}_${stamp}"
+run_tag="n${N}_${LAYOUT}_${safe_template}_${stamp}"
 mkdir -p "$OUT_DIR"
 
-bench_args=(--n "$N" --repeat "$REPEAT" --warmup "$WARMUP" --layout "$LAYOUT" --kernel "$KERNEL")
+bench_args=(--n "$N" --repeat "$REPEAT" --warmup "$WARMUP" --layout "$LAYOUT")
 if [[ -n "$PACK_SIZE" ]]; then
     bench_args+=(--pack-size "$PACK_SIZE")
 fi

@@ -56,7 +56,7 @@ capture() {  # op-flags layout repeat -> "bytes dofs"
     out=$(srun -u --ntasks=1 --cpus-per-task=72 --uenv="$CVFEM_UENV" --view="$CVFEM_VIEW" \
             bash -lc "cd $PWD && OMP_NUM_THREADS=72 OMP_PROC_BIND=true OMP_PLACES=cores \
                       perf stat -x, -e $EV -- \
-                      $B --n $N --repeat $rep --warmup 3 $layflag --kernel sumfact $extra" 2>&1)
+                      $B --n $N --repeat $rep --warmup 3 $layflag $extra" 2>&1)
     local rd wr dofs
     rd=$(printf '%s\n' "$out"  | awk -F, '$3 ~ /cmem_rd_data/        {print $1; exit}')
     wr=$(printf '%s\n' "$out"  | awk -F, '$3 ~ /cmem_wr_total_bytes/ {print $1; exit}')

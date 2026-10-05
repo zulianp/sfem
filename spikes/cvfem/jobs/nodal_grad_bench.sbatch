@@ -49,7 +49,7 @@ for lay in packed atomic; do
         log=$OUT/nf${nf}_${lay}_p${pass}.log
         timeout "${RUN_TIMEOUT:-420}" \
           srun -u --ntasks=1 --cpus-per-task=72 --uenv="$CVFEM_UENV" --view="$CVFEM_VIEW" \
-          bash -lc "cd $PWD && OMP_NUM_THREADS=72 OMP_PROC_BIND=true OMP_PLACES=cores $B --n $N --repeat $REPEAT --warmup 3 --layout $lay --kernel sumfact $PACKFLAG --nodal-grad $nf --csv $CSV --tag ngrad_nf${nf}_${lay}_p${pass}" \
+          bash -lc "cd $PWD && OMP_NUM_THREADS=72 OMP_PROC_BIND=true OMP_PLACES=cores $B --n $N --repeat $REPEAT --warmup 3 --layout $lay $PACKFLAG --nodal-grad $nf --csv $CSV --tag ngrad_nf${nf}_${lay}_p${pass}" \
           > "$log" 2>&1
         val() { sed -n "s|^  $1: \(.*\)$|\1|p" "$log" | head -1; }
         v=$(val 'MDOF/s_nodal_grad'); [ -n "$v" ] || continue

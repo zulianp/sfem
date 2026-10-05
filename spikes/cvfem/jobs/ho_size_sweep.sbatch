@@ -66,7 +66,7 @@ for n in $SIZES; do
         timeout "${RUN_TIMEOUT:-420}" \
           srun -u --ntasks=1 --cpus-per-task=72 --uenv="$CVFEM_UENV" --view="$CVFEM_VIEW" \
           bash -lc "cd $PWD && OMP_NUM_THREADS=72 OMP_PROC_BIND=true OMP_PLACES=cores \
-                    $B --n $n --repeat $REPEAT --warmup 3 $layflag --kernel sumfact $extra" \
+                    $B --n $n --repeat $REPEAT --warmup 3 $layflag $extra" \
           > "$log" 2>&1
         val() { sed -n "s|^  $1: \(.*\)$|\1|p" "$log" | head -1; }
         v=$(val 'MDOF/s'); [ -n "$v" ] || continue

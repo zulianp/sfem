@@ -71,17 +71,17 @@ echo
 echo "### verification first -- a throughput row for an unverified operator is not a result"
 for L in 0 1 2 3; do
     srun -u --ntasks=1 --cpus-per-task=72 --uenv="$CVFEM_UENV" --view="$CVFEM_VIEW" \
-      bash -lc "cd $PWD && OMP_NUM_THREADS=72 $B --n 24 --repeat 1 --warmup 0 --layout packed --kernel sumfact --jac-action --conv-ho $L --verify-jac-ho" \
+      bash -lc "cd $PWD && OMP_NUM_THREADS=72 $B --n 24 --repeat 1 --warmup 0 --layout packed --jac-action --conv-ho $L --verify-jac-ho" \
       2>&1 | sed -n 's/^verify_jac_ho: /  /p'
 done
 echo
 
 printf '%-34s %10s %10s %10s\n' arm MDOF_s dofs frac_hograd
-run jac_first_order            --layout packed --kernel sumfact --jac-action --rhie-chow
-run jac_ho_lagged_packed       --layout packed --kernel sumfact --jac-action --rhie-chow --conv-ho 2 --lagged-ho
-run jac_ho_exact_packed        --layout packed --kernel sumfact --jac-action --rhie-chow --conv-ho 2
-run jac_ho_lagged_atomic       --layout atomic --kernel sumfact --jac-action --rhie-chow --conv-ho 2 --lagged-ho
-run jac_ho_exact_atomic        --layout atomic --kernel sumfact --jac-action --rhie-chow --conv-ho 2
-run jac_ho_exact_packed_unlim  --layout packed --kernel sumfact --jac-action --rhie-chow --conv-ho 0
+run jac_first_order            --layout packed --jac-action --rhie-chow
+run jac_ho_lagged_packed       --layout packed --jac-action --rhie-chow --conv-ho 2 --lagged-ho
+run jac_ho_exact_packed        --layout packed --jac-action --rhie-chow --conv-ho 2
+run jac_ho_lagged_atomic       --layout atomic --jac-action --rhie-chow --conv-ho 2 --lagged-ho
+run jac_ho_exact_atomic        --layout atomic --jac-action --rhie-chow --conv-ho 2
+run jac_ho_exact_packed_unlim  --layout packed --jac-action --rhie-chow --conv-ho 0
 echo
 echo "csv: $CSV"

@@ -76,7 +76,6 @@ NCORES="${NCORES:-${SLURM_CPUS_PER_TASK:-72}}"
 N="${N:-64}"
 REPEAT="${REPEAT:-10}"
 WARMUP="${WARMUP:-3}"
-KERNEL="${KERNEL:-sumfact}"
 OPS="${OPS:-residual jac-action assemble bsr-apply}"
 LAYOUTS="${LAYOUTS:-packed colored}"
 PACK_packed="${PACK_packed:-2048}"
@@ -251,7 +250,7 @@ echo "  layouts:  ${LAYOUTS}"
 echo "  groups:   ${PERF_GROUPS}"
 echo
 
-printf "config,operation,layout,kernel,pack_size,threads,cube_n,group,event,count,run_seconds\n" >"${CSV}"
+printf "config,operation,layout,pack_size,threads,cube_n,group,event,count,run_seconds\n" >"${CSV}"
 
 for op in ${OPS}; do
     flag="$(op_flag "${op}")"
@@ -262,7 +261,7 @@ for op in ${OPS}; do
         cfg="${cfg//-/_}"
 
         cmd=("${BENCH}" --n "${N}" --repeat "${REPEAT}" --warmup "${WARMUP}"
-             --layout "${layout}" --kernel "${KERNEL}")
+             --layout "${layout}")
         # Unquoted on purpose: op_flag may return several words (see residual-ho above), and
         # one quoted argument would reach the driver as a single unknown option.
         # shellcheck disable=SC2206
@@ -289,14 +288,14 @@ for op in ${OPS}; do
                 continue
             fi
             # perf -x, rows are: count,unit,event,runtime,pct[,...]
-            awk -F, -v cfg="${cfg}" -v op="${op}" -v lay="${layout}" -v k="${KERNEL}" \
+            awk -F, -v cfg="${cfg}" -v op="${op}" -v lay="${layout}" \
                     -v ps="${ps}" -v th="${OMP_NUM_THREADS}" -v n="${N}" -v grp="${grp}" -v s="${secs}" '
                 /^#/ || NF < 3 { next }
                 {
                     count = $1; ev = $3
                     gsub(/^[ \t]+|[ \t]+$/, "", count); gsub(/^[ \t]+|[ \t]+$/, "", ev)
                     if (count == "<not counted>" || count == "<not supported>" || count == "") next
-                    printf "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n", cfg, op, lay, k, ps, th, n, grp, ev, count, s
+                    printf "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n", cfg, op, lay, ps, th, n, grp, ev, count, s
                 }' "${raw}" >>"${CSV}"
             echo "    -> ${raw}"
         done

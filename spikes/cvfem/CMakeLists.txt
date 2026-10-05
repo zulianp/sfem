@@ -317,6 +317,15 @@ if(CVFEM_REPORT_PYTHON)
     add_test(NAME cvfem_kernels_are_templated
              COMMAND ${CVFEM_REPORT_PYTHON}
                      ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/compile/cvfem_kernels_are_templated.py)
+
+    # Every option a job script hands a driver must still be one that driver parses. Removing
+    # the micro-kernel selector took --kernel with it and broke twenty-six job scripts in
+    # silence, thirteen of which feed the paper's generated macros: a driver rejects an unknown
+    # option and exits, and the jobs scrape its stdout with sed, so the failure arrived as an
+    # empty table cell rather than as a non-zero exit.
+    add_test(NAME cvfem_jobs_use_live_flags
+             COMMAND ${CVFEM_REPORT_PYTHON}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/compile/cvfem_jobs_use_live_flags.py)
 endif()
 
 if(CVFEM_REPORT_PYTHON)

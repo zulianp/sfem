@@ -42,7 +42,7 @@ run_one() {  # run_one <label> <binary> <pass> <extra...>
     timeout "${RUN_TIMEOUT:-360}" \
       srun -u --ntasks=1 --cpus-per-task=72 --uenv="$U" --view=default \
       bash -lc "cd $PWD && OMP_NUM_THREADS=72 OMP_PROC_BIND=true OMP_PLACES=cores \
-                $bin --n $N --repeat $REPEAT --warmup 3 --layout packed --kernel sumfact $*" \
+                $bin --n $N --repeat $REPEAT --warmup 3 --layout packed $*" \
       > "$log" 2>&1
     sed -n 's|^  MDOF/s: \(.*\)$|\1|p' "$log" | head -1
 }

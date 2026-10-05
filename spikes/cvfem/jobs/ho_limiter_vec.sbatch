@@ -53,7 +53,7 @@ for lay in packed atomic; do
             log=$OUT/lim${L}_${lay}_p${pass}.log
             timeout "${RUN_TIMEOUT:-360}" \
               srun -u --ntasks=1 --cpus-per-task=72 --uenv="$CVFEM_UENV" --view="$CVFEM_VIEW" \
-              bash -lc "cd $PWD && OMP_NUM_THREADS=72 OMP_PROC_BIND=true OMP_PLACES=cores $B --n $N --repeat $REPEAT --warmup 3 $layflag --kernel sumfact --rhie-chow --conv-ho $L --csv $CSV --tag ho_lim${L}_${lay}_p${pass}" \
+              bash -lc "cd $PWD && OMP_NUM_THREADS=72 OMP_PROC_BIND=true OMP_PLACES=cores $B --n $N --repeat $REPEAT --warmup 3 $layflag --rhie-chow --conv-ho $L --csv $CSV --tag ho_lim${L}_${lay}_p${pass}" \
               > "$log" 2>&1
             v=$(sed -n 's|^  MDOF/s: \(.*\)$|\1|p' "$log" | head -1)
             [ -n "$v" ] || continue

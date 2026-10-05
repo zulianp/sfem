@@ -135,34 +135,21 @@ run spmv                $SMALL --layout packed --bsr-apply
 
 # ------------------------------------------------------------- the variant sweep
 echo
-echo "== residual, layout x kernel =="
-for lay in packed atomic colored store; do
-    for k in sumfact sympy current; do run "res_${lay}_${k}" $BIG --layout $lay --kernel $k; done
-done
-run res_packed_isoparam  $BIG --layout packed --geom isoparam --kernel current
-run res_atomic_isoparam  $BIG --layout atomic --geom isoparam --kernel current
-run res_atomic_iso_sympy $BIG --layout atomic --geom isoparam --kernel sympy
+echo "== residual, layout x geometry =="
+for lay in packed atomic colored store; do run "res_${lay}" $BIG --layout $lay; done
+run res_packed_isoparam  $BIG --layout packed --geom isoparam
+run res_atomic_isoparam  $BIG --layout atomic --geom isoparam
 
 echo
 echo "== Jacobian action, layout x geometry =="
 for lay in packed atomic colored store; do run "jac_${lay}" $BIG --layout $lay --jac-action; done
 run jac_atomic_isoparam  $BIG --layout atomic --jac-action --geom isoparam
 run jac_packed_isoparam  $BIG --layout packed --jac-action --geom isoparam
-# The generated arrangements. Scalar kernels, so the atomic layout is the only one that can
-# call them -- see subpar/README.md for what the arrangement is worth.
-for k in sympy_action sympy_action_node sympy_action_comp sympy_action_face \
-         sympy_action_geom sympy_action_geomface; do
-    run "jac_$k" $BIG --layout atomic --jac-action --kernel $k
-done
 
 echo
-echo "== assembly, layout x kernel =="
-for lay in atomic packed colored store; do
-    for k in sumfact sympy sympy_block; do run "asm_${lay}_${k}" $BIG --layout $lay --assemble --kernel $k; done
-done
-run asm_atomic_fd        $BIG --layout atomic --assemble --kernel fd
-run asm_atomic_split     $BIG --layout atomic --assemble --kernel split
-run asm_atomic_isoparam  $BIG --layout atomic --assemble --geom isoparam --kernel current
+echo "== assembly, layout x geometry =="
+for lay in atomic packed colored store; do run "asm_${lay}" $BIG --layout $lay --assemble; done
+run asm_atomic_isoparam  $BIG --layout atomic --assemble --geom isoparam
 run asm_atomic_rc        $BIG --layout atomic --assemble --rhie-chow
 run asm_atomic_rc_bnd    $BIG --layout atomic --assemble --rhie-chow --boundary
 run asm_packed_rc_bnd    $BIG --layout packed --assemble --rhie-chow --boundary

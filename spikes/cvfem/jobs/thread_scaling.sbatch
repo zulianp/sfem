@@ -92,7 +92,7 @@ printf '%-10s %-5s %8s %9s %8s %10s %9s\n' layout op threads MDOF_s packs dofs s
 if [ -z "${PACK:-}" ]; then
     probe=$OUT/pack_probe.log
     srun -u --ntasks=1 --cpus-per-task=72 --uenv="$CVFEM_UENV" --view="$CVFEM_VIEW" \
-      bash -lc "cd $PWD && OMP_NUM_THREADS=72 $B --n $N --repeat 1 --warmup 0 --layout packed --kernel sumfact" \
+      bash -lc "cd $PWD && OMP_NUM_THREADS=72 $B --n $N --repeat 1 --warmup 0 --layout packed" \
       > "$probe" 2>&1
     PACK=$(sed -n 's|^  pack_size: ||p' "$probe" | head -1)
 fi

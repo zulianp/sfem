@@ -79,7 +79,7 @@ for arm in "lim0_gen|--conv-ho 0" \
         # A PER-ARM TIMEOUT, so one wedged arm cannot take the whole wall clock with it.
         timeout "${RUN_TIMEOUT:-360}" \
           srun -u --ntasks=1 --cpus-per-task=72 --uenv="$CVFEM_UENV" --view="$CVFEM_VIEW" \
-          bash -lc "cd $PWD && OMP_NUM_THREADS=72 OMP_PROC_BIND=true OMP_PLACES=cores $B --n $N --repeat $REPEAT --warmup 3 --layout packed --kernel sumfact $extra --csv $CSV --tag ${lbl}_p${pass}" \
+          bash -lc "cd $PWD && OMP_NUM_THREADS=72 OMP_PROC_BIND=true OMP_PLACES=cores $B --n $N --repeat $REPEAT --warmup 3 --layout packed $extra --csv $CSV --tag ${lbl}_p${pass}" \
           > "$log" 2>&1
         val() { sed -n "s|^  $1: \(.*\)$|\1|p" "$log" | head -1; }
         v=$(val 'MDOF/s'); [ -n "$v" ] || continue

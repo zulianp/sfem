@@ -63,7 +63,7 @@ run_group() {   # layout, perf event list, scheme flags
     srun -u --ntasks=1 --cpus-per-task=72 --uenv="$CVFEM_UENV" --view="$CVFEM_VIEW" \
       bash -lc "cd $PWD && OMP_NUM_THREADS=72 OMP_PROC_BIND=true OMP_PLACES=cores \
                 perf stat -x, -e $events -- \
-                $B --n $N --repeat $REPEAT --warmup 3 $layflag --kernel sumfact --rhie-chow $extra" 2>&1
+                $B --n $N --repeat $REPEAT --warmup 3 $layflag --rhie-chow $extra" 2>&1
 }
 
 for arm in "|" "_ho|--conv-ho 3"; do
@@ -75,7 +75,7 @@ for arm in "|" "_ho|--conv-ho 3"; do
     out=$(srun -u --ntasks=1 --cpus-per-task=72 --uenv="$CVFEM_UENV" --view="$CVFEM_VIEW" \
             bash -lc "cd $PWD && OMP_NUM_THREADS=72 OMP_PROC_BIND=true OMP_PLACES=cores \
                       $B --n $N --repeat $REPEAT --warmup 3 --layout $lay \
-                      $([ "$lay" = packed ] && echo "--pack-size $PACK") --kernel sumfact --rhie-chow $extra" 2>&1)
+                      $([ "$lay" = packed ] && echo "--pack-size $PACK") --rhie-chow $extra" 2>&1)
     mdof=$(printf '%s\n' "$out" | sed -n 's/^  MDOF\/s: \(.*\)$/\1/p' | head -1)
     [ -n "$mdof" ] && echo "kmix $key mdof $mdof"
 
@@ -88,7 +88,7 @@ for arm in "|" "_ho|--conv-ho 3"; do
     outk=$(srun -u --ntasks=1 --cpus-per-task=72 --uenv="$CVFEM_UENV" --view="$CVFEM_VIEW" \
              bash -lc "cd $PWD && OMP_NUM_THREADS=72 OMP_PROC_BIND=true OMP_PLACES=cores \
                        $B --n $N --repeat $REPEAT --warmup 3 --layout $lay \
-                       $([ "$lay" = packed ] && echo "--pack-size $PACK") --kernel sumfact --rhie-chow $extra --kernel-only" 2>&1)
+                       $([ "$lay" = packed ] && echo "--pack-size $PACK") --rhie-chow $extra --kernel-only" 2>&1)
     mdofk=$(printf '%s\n' "$outk" | sed -n 's/^  MDOF\/s: \(.*\)$/\1/p' | head -1)
     [ -n "$mdofk" ] && echo "kmix $key mdof_kernel_only $mdofk"
 

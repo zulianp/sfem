@@ -16,7 +16,7 @@
 set -u
 export OMP_NUM_THREADS=72 OMP_PROC_BIND=true OMP_PLACES=cores
 UENV_ARGS=$(grep '^uenv start' ~/init.sh | sed 's/^uenv start //')
-ARGS="--n 128 --repeat 20 --warmup 3 --layout packed --kernel sumfact --jac-action --rhie-chow"
+ARGS="--n 128 --repeat 20 --warmup 3 --layout packed --jac-action --rhie-chow"
 OUT=${OUT:-$SCRATCH/cvfem_rcjac_packed_ab/$SLURM_JOB_ID}; mkdir -p $OUT
 for rep in 1 2 3 4 5 6 7; do
   for nb in ref=$BENCH_REF new=$BENCH_NEW; do
