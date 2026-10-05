@@ -2193,7 +2193,7 @@ int main(int argc, char **argv) {
                                               conv_limiter, scalar_t(0));
         }
         else
-            apply_jacobian_action_atomic(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, dir_v, jac_out.data(), kernel_kind,
+            apply_jacobian_action_atomic(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, dir_v, jac_out.data(),
                                          with_hograd ? ugrad.data() : nullptr,
                                          with_hograd ? vgrad.data() : nullptr,
                                          conv_limiter, scalar_t(0));
@@ -2477,7 +2477,7 @@ int main(int argc, char **argv) {
         // The reference carries whatever the timed sweep carried, including the exact
         // higher-order correction. Comparing a packed sweep that has the term against an atomic
         // reference that does not is not a layout check -- it reports the term as a defect.
-        apply_jacobian_action_atomic(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, last_dir, jv_ref.data(), KernelKind::Sumfact,
+        apply_jacobian_action_atomic(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, last_dir, jv_ref.data(),
                                      with_hograd ? ugrad.data() : nullptr,
                                      with_hograd ? vgrad.data() : nullptr,
                                      conv_limiter, scalar_t(0));

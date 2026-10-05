@@ -134,17 +134,16 @@ CVFEM_SUBPAR_STUB(cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots_rowwise)
 CVFEM_SUBPAR_STUB(cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots_facewise)
 CVFEM_SUBPAR_STUB(cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots_rowwise)
 CVFEM_SUBPAR_STUB(cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots_facewise)
-// The generated affine residual and all six generated Jacobian-action arrangements,
-// measured on Grace at 8,586,756 dof (perf/campaign_generated_arms.csv). The actions
-// reach 0.37x to 0.57x of the hand-written atomic action; the residual gives up 21.6%
-// on the packed layout and ties sumfact on the atomic one. None is fastest anywhere.
+// The generated affine residual, measured on Grace at 8,586,756 dof
+// (perf/campaign_generated_arms.csv): it gives up 21.6% on the packed layout and ties
+// sumfact on the atomic one.
+//
+// The six generated Jacobian-action arrangements -- 0.37x to 0.57x of the hand-written
+// atomic action in the same campaign -- need no stub any more. They had one while the
+// atomic sweep still carried an `if constexpr` arm per arrangement; that selector is gone
+// (DESIGN.md's correction: one micro-kernel per kernel), so nothing names them outside
+// subpar/ and the default build does not have to declare them to compile.
 CVFEM_SUBPAR_STUB(cvfem_hex8_ns_upwind_sympy_residual)
-CVFEM_SUBPAR_STUB(cvfem_hex8_ns_upwind_sympy_jacobian_action)
-CVFEM_SUBPAR_STUB(cvfem_hex8_ns_upwind_sympy_jacobian_action_nodewise)
-CVFEM_SUBPAR_STUB(cvfem_hex8_ns_upwind_sympy_jacobian_action_componentwise)
-CVFEM_SUBPAR_STUB(cvfem_hex8_ns_upwind_sympy_jacobian_action_facewise)
-CVFEM_SUBPAR_STUB(cvfem_hex8_ns_upwind_sympy_jacobian_action_geom)
-CVFEM_SUBPAR_STUB(cvfem_hex8_ns_upwind_sympy_jacobian_action_geomface)
 #undef CVFEM_SUBPAR_STUB
 #endif
 
