@@ -87,8 +87,11 @@ What the splits shared rather than copied, each extracted before the format was 
 * the pack staging, extent, element preamble and four drains (`cvfem_pack_scratch.hpp`,
   `cvfem_hex8_pack_staging.hpp`) — three for the packed layouts, one for the coloured ones,
   which accumulate straight into the globals because colouring removes the reduction pass;
-* the lane loops, one per operation per geometry, because the contiguous and pack-coloured
-  sweeps differ in the drain and in nothing else;
+* the **Jacobian action's** lane loop, one per geometry, because the contiguous and
+  pack-coloured sweeps differ in the drain and in nothing else. The residual's is deliberately
+  NOT shared: sharing it measured −8% to −20% on Grace across two A/B runs, and
+  `packed/affine/README.md` carries the table. The numerical gates were silent throughout,
+  which is the argument for running the throughput A/B after any kernel restructuring;
 * `cvfem_hex8_assemble_element_{affine,isoparam}<ATOMIC>`, because the coloured assembly is the
   ATOMIC assembly's element body with the colouring standing in for the atomics — that sweep is
   element-indexed with global gathers, not a packed sweep, and the split is what made it plain.
