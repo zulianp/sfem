@@ -96,28 +96,37 @@ static SFEM_NOINLINE void apply_residual_colored(MeshData           &d,
 
 #pragma omp parallel
     {
-        const int n_parts = cvfem_n_threads();
-        const int part    = cvfem_thread_index();
         for (int color = 0; color < c.n_colors; ++color) {
-            const cvfem_range r = cvfem_range_split(c.color_ptr[(size_t)color],
-                                                    c.color_ptr[(size_t)color + 1], 1,
-                                                    part, n_parts);
-            if (geom == GeomKind::Isoparam)
-                apply_residual_packcolored_isoparam_range(
-                        r, c.pack_order.data(), d.nelements, d.p.data(), d.points, d.ux.data(),
-                        d.uy.data(), d.uz.data(), p.elems, p.ghost_idx, p.ghost_ptr,
-                        p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.owned_nodes_ptr,
-                        rho, mu, rx, ry, rz, rc, scratch_n);
-            else
-                apply_residual_packcolored_affine_range(
-                        r, c.pack_order.data(), d.adj_ptr, d.det_ptr, d.nelements, d.p.data(),
-                        d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale,
-                        d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_idx, p.ghost_ptr,
-                        p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.owned_nodes_ptr,
-                        rho, mu, rx, ry, rz, rc, scratch_n, with_rc);
-            // No two packs of a colour share a node, so the slices above need no
-            // synchronisation between them. The next colour does.
-            cvfem_thread_barrier();
+            // ONE PACK PER ITERATION, DYNAMICALLY SCHEDULED, and that is measured rather than
+            // stylistic. The colour loop used to be `#pragma omp for schedule(dynamic, 1)` over
+            // the colour's packs; handing each thread an EQUAL SLICE instead -- which is what
+            // cvfem_range_split does, and it says so: it "reproduces #pragma omp for
+            // schedule(static)" -- cost the pack-coloured residual 9.4% on Grace, reproduced in
+            // three separate allocations on three nodes while the twenty other rows of the gate
+            // stayed inside 1.5%. A colour's packs are not equal work and the residual is the
+            // cheapest kernel per pack, so it is the one that waits at each of the twelve to
+            // sixteen barriers.
+            //
+            // The implicit barrier at the end of `omp for` is the barrier BETWEEN COLOURS, which
+            // is why there is no cvfem_thread_barrier() here. The sweeps stay range-driven and
+            // own no parallel region; what they get is a range of one.
+#pragma omp for schedule(dynamic, 1)
+            for (ptrdiff_t _k = c.color_ptr[(size_t)color]; _k < c.color_ptr[(size_t)color + 1]; ++_k) {
+                const cvfem_range r{_k, _k + 1};
+                if (geom == GeomKind::Isoparam)
+                    apply_residual_packcolored_isoparam_range(
+                            r, c.pack_order.data(), d.nelements, d.p.data(), d.points, d.ux.data(),
+                            d.uy.data(), d.uz.data(), p.elems, p.ghost_idx, p.ghost_ptr,
+                            p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.owned_nodes_ptr,
+                            rho, mu, rx, ry, rz, rc, scratch_n);
+                else
+                    apply_residual_packcolored_affine_range(
+                            r, c.pack_order.data(), d.adj_ptr, d.det_ptr, d.nelements, d.p.data(),
+                            d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale,
+                            d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_idx, p.ghost_ptr,
+                            p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.owned_nodes_ptr,
+                            rho, mu, rx, ry, rz, rc, scratch_n, with_rc);
+            }
         }
     }
 }
@@ -150,28 +159,39 @@ static SFEM_NOINLINE void apply_jacobian_action_colored(MeshData                
 
 #pragma omp parallel
     {
-        const int n_parts = cvfem_n_threads();
-        const int part    = cvfem_thread_index();
         for (int color = 0; color < c.n_colors; ++color) {
-            const cvfem_range r = cvfem_range_split(c.color_ptr[(size_t)color],
-                                                    c.color_ptr[(size_t)color + 1], 1,
-                                                    part, n_parts);
-            if (geom == GeomKind::Isoparam)
-                apply_jacobian_action_packcolored_isoparam_range(
-                        r, c.pack_order.data(), d.nelements, d.p.data(), d.points, d.ux.data(),
-                        d.uy.data(), d.uz.data(), p.elems, p.ghost_idx, p.ghost_ptr,
-                        p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.owned_nodes_ptr,
-                        rho, mu, dir, jv, scratch_n);
-            else
-                apply_jacobian_action_packcolored_affine_range(
-                        r, c.pack_order.data(), d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.p.data(), d.pgx.data(),
-                        d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(),
-                        d.qgz.data(), d.rc_coeff.data(), d.rc_w.data(), d.rhie_chow_scale,
-                        d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_idx, p.ghost_ptr,
-                        p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.owned_nodes_ptr,
-                        rho, mu, dir, jv, scratch_n, with_rc, with_qg,
-                        cvfem_hex8_rc_config_for(d));
-            cvfem_thread_barrier();
+            // ONE PACK PER ITERATION, DYNAMICALLY SCHEDULED, and that is measured rather than
+            // stylistic. The colour loop used to be `#pragma omp for schedule(dynamic, 1)` over
+            // the colour's packs; handing each thread an EQUAL SLICE instead -- which is what
+            // cvfem_range_split does, and it says so: it "reproduces #pragma omp for
+            // schedule(static)" -- cost the pack-coloured residual 9.4% on Grace, reproduced in
+            // three separate allocations on three nodes while the twenty other rows of the gate
+            // stayed inside 1.5%. A colour's packs are not equal work and the residual is the
+            // cheapest kernel per pack, so it is the one that waits at each of the twelve to
+            // sixteen barriers.
+            //
+            // The implicit barrier at the end of `omp for` is the barrier BETWEEN COLOURS, which
+            // is why there is no cvfem_thread_barrier() here. The sweeps stay range-driven and
+            // own no parallel region; what they get is a range of one.
+#pragma omp for schedule(dynamic, 1)
+            for (ptrdiff_t _k = c.color_ptr[(size_t)color]; _k < c.color_ptr[(size_t)color + 1]; ++_k) {
+                const cvfem_range r{_k, _k + 1};
+                if (geom == GeomKind::Isoparam)
+                    apply_jacobian_action_packcolored_isoparam_range(
+                            r, c.pack_order.data(), d.nelements, d.p.data(), d.points, d.ux.data(),
+                            d.uy.data(), d.uz.data(), p.elems, p.ghost_idx, p.ghost_ptr,
+                            p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.owned_nodes_ptr,
+                            rho, mu, dir, jv, scratch_n);
+                else
+                    apply_jacobian_action_packcolored_affine_range(
+                            r, c.pack_order.data(), d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.p.data(), d.pgx.data(),
+                            d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(),
+                            d.qgz.data(), d.rc_coeff.data(), d.rc_w.data(), d.rhie_chow_scale,
+                            d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_idx, p.ghost_ptr,
+                            p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.owned_nodes_ptr,
+                            rho, mu, dir, jv, scratch_n, with_rc, with_qg,
+                            cvfem_hex8_rc_config_for(d));
+            }
         }
     }
 }
@@ -204,27 +224,38 @@ static SFEM_NOINLINE void assemble_jacobian_colored(MeshData           &d,
 
 #pragma omp parallel
     {
-        const int n_parts = cvfem_n_threads();
-        const int part    = cvfem_thread_index();
         for (int color = 0; color < c.n_colors; ++color) {
-            const cvfem_range r = cvfem_range_split(c.color_ptr[(size_t)color],
-                                                    c.color_ptr[(size_t)color + 1], 1,
-                                                    part, n_parts);
-            if (geom == GeomKind::Isoparam)
-                assemble_jacobian_packcolored_isoparam_range(
-                        r, c.pack_order.data(), d.elems, d.points, d.face_mask.data(), d.adj_ptr,
-                        d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(),
-                        d.pgz.data(), d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(),
-                        d.uy.data(), d.uz.data(), opt, gslots, p.n_elements_per_pack, rho, mu,
-                        values);
-            else
-                assemble_jacobian_packcolored_affine_range(
-                        r, c.pack_order.data(), d.elems, d.points, d.face_mask.data(), d.adj_ptr,
-                        d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(),
-                        d.pgz.data(), d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(),
-                        d.uy.data(), d.uz.data(), opt, gslots, p.n_elements_per_pack, rho, mu,
-                        values);
-            cvfem_thread_barrier();
+            // ONE PACK PER ITERATION, DYNAMICALLY SCHEDULED, and that is measured rather than
+            // stylistic. The colour loop used to be `#pragma omp for schedule(dynamic, 1)` over
+            // the colour's packs; handing each thread an EQUAL SLICE instead -- which is what
+            // cvfem_range_split does, and it says so: it "reproduces #pragma omp for
+            // schedule(static)" -- cost the pack-coloured residual 9.4% on Grace, reproduced in
+            // three separate allocations on three nodes while the twenty other rows of the gate
+            // stayed inside 1.5%. A colour's packs are not equal work and the residual is the
+            // cheapest kernel per pack, so it is the one that waits at each of the twelve to
+            // sixteen barriers.
+            //
+            // The implicit barrier at the end of `omp for` is the barrier BETWEEN COLOURS, which
+            // is why there is no cvfem_thread_barrier() here. The sweeps stay range-driven and
+            // own no parallel region; what they get is a range of one.
+#pragma omp for schedule(dynamic, 1)
+            for (ptrdiff_t _k = c.color_ptr[(size_t)color]; _k < c.color_ptr[(size_t)color + 1]; ++_k) {
+                const cvfem_range r{_k, _k + 1};
+                if (geom == GeomKind::Isoparam)
+                    assemble_jacobian_packcolored_isoparam_range(
+                            r, c.pack_order.data(), d.elems, d.points, d.face_mask.data(), d.adj_ptr,
+                            d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(),
+                            d.pgz.data(), d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(),
+                            d.uy.data(), d.uz.data(), opt, gslots, p.n_elements_per_pack, rho, mu,
+                            values);
+                else
+                    assemble_jacobian_packcolored_affine_range(
+                            r, c.pack_order.data(), d.elems, d.points, d.face_mask.data(), d.adj_ptr,
+                            d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(),
+                            d.pgz.data(), d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(),
+                            d.uy.data(), d.uz.data(), opt, gslots, p.n_elements_per_pack, rho, mu,
+                            values);
+            }
         }
     }
 }
