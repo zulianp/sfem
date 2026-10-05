@@ -255,8 +255,24 @@ cat > "$OUT/analyse.py" <<'PY'
 import csv, os, statistics as st, sys, subprocess, datetime
 from pathlib import Path
 
-configs = [l.split('|') for l in os.environ["CONFIG_SPEC"].splitlines()
-           if l.strip() and not l.strip().startswith('#')]
+# PARSED BY NAME, NOT BY POSITION. These rows used to be unpacked positionally into seven
+# names, which meant that removing one field -- the `kernel` column, when the micro-kernel
+# selector went -- shifted every field after it by one. The 12-band rows survived by luck
+# (`5|12|` shifted to `12|`), and the first row whose against-band is "-" shifted a "-" into
+# the numeric band and killed the summary at that point. The A/B then printed the six rows it
+# had reached, showed them all "ok", and exited 1 -- with fifteen configurations measured,
+# present in both CSVs, and silently absent from the verdict.
+#
+# A named parse cannot do that: a missing or extra field is a KeyError at the top, not a
+# plausible-looking number further down.
+FIELDS = ("key", "op", "layout", "n", "ab_band", "bband", "extra")
+configs = []
+for _l in os.environ["CONFIG_SPEC"].splitlines():
+    if not _l.strip() or _l.strip().startswith('#'):
+        continue
+    _f = _l.split('|')
+    assert len(_f) == len(FIELDS), f"config row has {len(_f)} fields, expected {len(FIELDS)}: {_l}"
+    configs.append(dict(zip(FIELDS, _f)))
 raw_dir, baseline_path = Path(os.environ["CSV_DIR"]), Path(os.environ["BASELINE"])
 mode = os.environ["MODE"]
 
@@ -283,8 +299,16 @@ if mode == "against":
     fail = 0
     failing = []
     only = {k for k in os.environ.get("CONFIRM_ONLY", "").split() if k}
-    for key, op, layout, kernel, n, band, bband, *_ in configs:
+    for _c in configs:
+        key, band = _c["key"], _c["ab_band"]
         if only and key not in only: continue
+        if band == "-":
+            # Recorded but not gated here; the absolute mode's band is the one that is "-".
+            r, m = med("ref_" + key), med("new_" + key)
+            if r is not None and m is not None:
+                print(f"{key:<28}{dofs['new_'+key]:>10}{r:>9.1f}{m:>9.1f}"
+                      f"{(m - r) / r * 100:>8.1f}%{'--':>7}  info only (not gated here)")
+            continue
         r, m, b = med("ref_" + key), med("new_" + key), float(band)
         if r is None or m is None:
             print(f"{key:<28}{'':>10}{'':>9}{'':>9}{'':>9}{'':>7}  MISSING"); fail += 1; continue
@@ -337,15 +361,20 @@ if mode == "record":
         # rows describing themselves as the same measurement. It is quoted because it
         # contains spaces.
         f.write("key,operation,layout,kernel,cube_n,extra,ndof,mdof_s,band_pct,observed_spread_pct\n")
-        for key, op, layout, kernel, n, ab_band, bband, *rest in configs:
+        for _c in configs:
+            key, op, layout, n, bband = (_c["key"], _c["op"], _c["layout"], _c["n"], _c["bband"])
             if med(key) is None:
                 print(f"  {key}: MISSING, not recorded", file=sys.stderr); continue
-            extra = (rest[0] if rest else "") or ""
-            f.write(f"{key},{op},{layout},{kernel},{n},\"{extra}\",{dofs[key]},"
+            extra = _c["extra"]
+            # The `kernel` column stays in the recorded baseline so old files remain readable
+            # against new ones; with the selector gone there is one kernel per configuration and
+            # the layout, geometry and extra flags name it.
+            f.write(f"{key},{op},{layout},n/a,{n},\"{extra}\",{dofs[key]},"
                     f"{med(key):.1f},{bband},{spread(key):.1f}\n")
     print(f"\nwrote {baseline_path}")
     print(f"{'config':<28}{'ndof':>10}{'MDOF/s':>10}{'spread':>9}  baseline band")
-    for key, op, layout, kernel, n, ab_band, bband, *_ in configs:
+    for _c in configs:
+        key, bband = _c["key"], _c["bband"]
         if med(key) is not None:
             b = f"{bband}%" if bband != "-" else "not gated (too noisy)"
             print(f"{key:<28}{dofs[key]:>10}{med(key):>10.1f}{spread(key):>8.1f}%  {b}")
@@ -364,7 +393,8 @@ with baseline_path.open() as f:
 print()
 print(f"{'config':<28}{'ndof':>10}{'ref':>9}{'now':>9}{'delta':>9}{'band':>7}  verdict")
 fail = notes = 0
-for key, op, layout, kernel, n, ab_band, bband, *_ in configs:
+for _c in configs:
+    key = _c["key"]
     if key not in ref:
         print(f"{key:<28}{'':>10}{'':>9}{'':>9}{'':>9}{'':>7}  no baseline entry"); notes += 1; continue
     if med(key) is None:
