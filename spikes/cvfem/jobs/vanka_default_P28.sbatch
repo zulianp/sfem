@@ -30,8 +30,12 @@ run() {
     echo "--- $tag exit $?"
     grep -E "ndof:|vanka stencil vs bsr|newton_converged|t_solve" "$OUT/$tag/out.log" | head -6
 }
+# THE with_mg TIMEOUT IS MEASURED, not guessed. At 300 s this arm could never pass: job 4986186
+# reached stage 8 of the nine-stage Reynolds continuation and was killed, having converged every
+# stage it started (Newton 5 at rel 7.3e-09). That is about 40 s a stage, so 360 s plus setup for
+# the whole schedule, and the arm reported exit 124 as though the solver were at fault.
 run gate_check 300 SFEM_GMG=1 SFEM_NL_MAX_IT=3 SFEM_VANKA_CHECK=1
-run with_mg    300 SFEM_GMG=1
+run with_mg    600 SFEM_GMG=1
 run without_mg 600 SFEM_GMG=0
 echo "== ctest"
 cd "$B" && ctest --output-on-failure -j 8 2>&1 | tail -12
