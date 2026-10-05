@@ -1203,7 +1203,8 @@ into pack-local order, so measured DRAM traffic rises from \foBytesPacked{} to
 \foBytesAtomic{} to \hoBytesAtomic{} atomic. The traffic outruns the arithmetic at the
 unlimited arm, which sits at \hoAiPackedLo{}~FLOP/byte against the first-order point's
 \rlResidualPackedAi{}, to its left; a limiter carries enough arithmetic to move the operator
-back to the right, reaching \hoAiPackedHi{}, still short of the measured ridge of \rlRidge{}.
+back to the right, and Venkatakrishnan's reaches the measured ridge of \rlRidge{} itself
+(\hoAiPackedHi{}).
 Every arm stays far from the roof, so the correction changes where an operator sits on the
 intensity axis and leaves its distance from the machine where it was.
 
@@ -1243,10 +1244,10 @@ higher-order points in Figure~\ref{fig:roofline}, and they move as the residual'
 rises by $\hoJacBytesRatioPacked\times$ packed (\foJacBytesPacked{} to
 \hoJacBytesPacked{}~bytes per degree of freedom), because $\Gop u(v)$ is read on top of
 $\Gop u(u)$, and that outruns the arithmetic until a limiter is
-added: the unlimited arm sits at \hoJacAiPackedLo{}~FLOP/byte against $\Jex$'s
-\rlJacobianPackedAi{}, to the \emph{left} of it, and Venkatakrishnan's derivative is the one
-that carries enough to pass it, at \hoJacAiPackedHi{}, Darwish--Moukalled's stopping just
-short. In both operators the correction is a traffic change first and an arithmetic change
+added --- and here it outruns it at every limiter. All four arms sit to the \emph{left} of
+$\Jex$'s \rlJacobianPackedAi{}~FLOP/byte: \hoJacAiPackedLo{} unlimited, \hoJacAiPackedHi{} for
+Venkatakrishnan's derivative, which carries the most arithmetic of the four and still does not
+reach it. In both operators the correction is a traffic change first and an arithmetic change
 second, which is the same statement as the reconstruction's cost below.
 
 \paragraph{The reconstruction.} Timed on its own it is the sweep the format helps \emph{most}:
@@ -1294,8 +1295,10 @@ of freedom packed against \SI{7.8}{} flat, so the two layouts do not share an in
 coordinates, which such a model naturally reaches for, are not read by the bare affine kernel at
 all. We therefore place the points using DRAM traffic read from the memory-system counters, with
 two captures differenced across the number of timed applies so that setup and warmup cancel. The
-measured traffic is \rlTrafficRatioLo{} to \rlTrafficRatioHi{} times the compulsory bound, the balance being node
-re-reads at pack boundaries and partial-line writes.
+measured traffic is \rlTrafficRatioLo{} to \rlTrafficRatioHi{} times the compulsory bound. The lower
+end is the standard and packed sweeps, where the balance is node re-reads at pack boundaries and
+partial-line writes; the upper end is element colouring, which accumulates into the global arrays
+and so reads every destination back.
 
 The same captures price the coloured layout's scatter. On the identical decomposition it moves
 \colBytesPctResRc\% more per degree of freedom on $\Fres$, \colBytesPctJac\% on the bare
@@ -1395,8 +1398,8 @@ than $\jfLaggedVsF\times$, understating the matrix-free side by more than a quar
 appearing to favour it; both are given because they answer different questions.
 
 The $\Jhoex$ rows are where the comparison stops being one. Packed $\Jhoex$ lands
-below the double-precision SpMV under both limiters, at $\jfClipExactVsF\times$ for
-Barth--Jespersen and $\jfHoExactVsF\times$ for Darwish--Moukalled, the latter costing
+below the double-precision SpMV under both limiters: $\jfClipExactVsF\times$
+(Barth--Jespersen), $\jfHoExactVsF\times$ (Darwish--Moukalled), the latter costing
 $\jfHoCostExact\times$ its first-order self. Read as a throughput ratio that
 is a loss, and it would be, if the matrix held the same operator. It cannot: the higher-order
 correction differentiates through a nodal reconstruction, so the coupling it induces reaches
