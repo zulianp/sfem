@@ -411,6 +411,37 @@ static SFEM_INLINE SFEM_HOST_DEVICE scalar_t cvfem_venkata_inc_d(const scalar_t 
     const scalar_t ddp = (inc >= scalar_t(0)) ? (dhi - dbase) : (dlo - dbase);
     const scalar_t num = dp * dp + scalar_t(2) * inc * dp + eps2;
     const scalar_t den = dp * dp + scalar_t(2) * inc * inc + inc * dp + eps2;
+    // THE inc >= 0 BRANCH NEEDS A BAND, and the note that used to sit beside this function
+    // claiming otherwise was wrong in one case -- the common one.
+    //
+    // The claim was: "at inc == 0 its psi is exactly 1 and every term carrying the branch is
+    // multiplied by inc, so the discontinuity cancels". That holds when dp is nonzero on both
+    // sides of the branch. It fails when the base IS the bound the branch selects, which is
+    // whenever the node is the local extremum: with eps2 = 0 and dp = hi - base = 0, num is 0,
+    // so psi is 0 and not 1, and the result collapses to ddp -- while the other side of the
+    // branch, where dp = lo - base is nonzero, gives dinc. The derivative therefore JUMPS by
+    // dinc across inc = 0, and an ulp of movement in inc picks a side.
+    //
+    // eps2 is what normally prevents this: with eps2 > 0, num -> eps2 and den -> eps2 as
+    // inc -> 0, so psi -> 1 and the cancellation is restored. That is why K > 0 is clean. But
+    // K = 0 is a legitimate limiter for the VALUE and was every caller's default, so the
+    // derivative cannot rely on K.
+    //
+    // Measured: the packed and atomic layouts, whose nodal-gradient reconstructions sum in
+    // different orders and so reach this with inc differing in the last bits, disagreed on the
+    // Jacobian action by 1.4e-04 to 2.8e-04 at K = 0 across every non-power-of-two cube size,
+    // at one thread as well as 72, and agreed to 7.5e-16 at K = 0.01. The residual was clean
+    // throughout, which is what identifies the derivative rather than the limiter.
+    //
+    // Inside the band dinc is returned: it is the psi = 1 limit, it is continuous with the
+    // unlimited branch, and it is a valid subgradient where the limiter has none. Same choice
+    // the clip makes, for the same reason.
+    const scalar_t ainc  = inc < scalar_t(0) ? -inc : inc;
+    const scalar_t scale = (hi - lo < scalar_t(0) ? lo - hi : hi - lo) + ainc +
+                           (base < scalar_t(0) ? -base : base);
+    if (ainc <= scale * scalar_t(8) * scalar_t(2.220446049250313e-16)) return dinc;
+    // Reachable only with dp, inc and eps2 all exactly zero, which the band above already
+    // covers; kept so the division is guarded on its own terms.
     if (den == scalar_t(0)) return dinc;
     const scalar_t dnum = scalar_t(2) * dp * ddp + scalar_t(2) * (dinc * dp + inc * ddp);
     const scalar_t dden = scalar_t(2) * dp * ddp + scalar_t(4) * inc * dinc + (dinc * dp + inc * ddp);
@@ -444,11 +475,27 @@ static SFEM_INLINE SFEM_HOST_DEVICE scalar_t cvfem_darwish_moukalled_inc_d(const
     // inc == 0 its psi is exactly 1 and every term carrying the branch is multiplied by inc, so
     // the discontinuity cancels and the derivative is continuous there. That was checked rather
     // than assumed.
-    const scalar_t tol = (aa + ab) * scalar_t(8) * scalar_t(2.220446049250313e-16);
+    // THE BAND HAS TO BE RELATIVE TO THE FIELD, NOT TO THE QUANTITY IT IS TESTING. It was
+    // (aa + ab) * 8 ulp, which cannot fire when aa and ab are comparable -- the common case --
+    // because the tolerance then shrinks with the very numbers it is bounding. And `den == 0` is
+    // an equality test on a denominator this expression divides by twice, so a small den
+    // amplifies a rounding of dnum into an O(1) change, exactly as Venkatakrishnan's does above.
+    //
+    // Measured the same way: the packed and atomic layouts disagreed on the Jacobian action by
+    // 2.80e-05 with this limiter, on Grace, at non-power-of-two sizes, at one thread, while the
+    // residual agreed. Venkatakrishnan's cure is its eps^2; this limiter has none -- its
+    // denominator vanishes only where its numerator does, which makes the VALUE well behaved and
+    // says nothing about the derivative -- so the floor is what it gets.
+    //
+    // The scale is the field's: the two nodal values and the reconstructed increment. None of
+    // them vanishes with a or b, which is the property the old tolerance lacked.
+    const scalar_t sc   = (phi_c < scalar_t(0) ? -phi_c : phi_c) + (phi_d < scalar_t(0) ? -phi_d : phi_d) +
+                          (grad_dot_d < scalar_t(0) ? -grad_dot_d : grad_dot_d);
+    const scalar_t tol = sc * scalar_t(8) * scalar_t(2.220446049250313e-16);
     const scalar_t daa = aa <= tol ? scalar_t(0) : (a < scalar_t(0) ? -da : da);
     const scalar_t dab = ab <= tol ? scalar_t(0) : (b < scalar_t(0) ? -db : db);
     const scalar_t den = scalar_t(2) * (aa + ab);
-    if (den == scalar_t(0)) return scalar_t(0);
+    if (den <= scalar_t(2) * tol) return scalar_t(0);
     const scalar_t num  = a * ab + aa * b;
     const scalar_t dnum = da * ab + a * dab + daa * b + aa * db;
     const scalar_t dden = scalar_t(2) * (daa + dab);

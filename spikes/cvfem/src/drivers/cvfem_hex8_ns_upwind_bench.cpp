@@ -478,6 +478,17 @@ int main(int argc, char **argv) {
     // 5554 with the Venkatakrishnan limiter.
     int         conv_ho      = 0;
     int         conv_limiter = 0;
+    // Venkatakrishnan's K, the dimensionless knob his limiter is written around. It sets
+    // eps^2 = uref^2 (K/lref)^3 h^3, which bounds the limiter's denominator below and switches
+    // it off where the field is smooth.
+    //
+    // THE BENCH COULD NOT SET IT AT ALL until now: every call site passed a literal
+    // scalar_t(0), so --conv-ho 2 only ever ran the K = 0 form -- the degenerate one, which
+    // alters 99.3% of faces against K = 5's 65.8% (see the table in the limiter header) and
+    // leaves eps^2 = 0, so nothing bounds the denominator of the limiter's DERIVATIVE. The
+    // front end has always computed it from the case (cvfem_hex8_ns_core.hpp), so the bench was
+    // the only caller stuck at zero.
+    scalar_t    venkat_k     = 0;
     // The higher-order correction in the JACOBIAN ACTION. Exact by default when --conv-ho is on,
     // matching --rhie-chow, whose exact form is also the default: both differentiate through a
     // reconstructed nodal gradient and both pay for it with a pass over the direction. --lagged-ho
@@ -573,6 +584,8 @@ int main(int argc, char **argv) {
             }
         } else if (arg == "--verify-jac-ho") {
             verify_ho_jac = 1;
+        } else if (arg == "--venkat-k") {
+            if (i + 1 < argc) venkat_k = (scalar_t)std::atof(argv[++i]);
         } else if (arg == "--lagged-ho") {
             lagged_ho = 1;
         } else if (arg == "--conv-ho") {
@@ -675,6 +688,20 @@ int main(int argc, char **argv) {
                     "                   matrix cannot carry that term without widening its\n"
                     "                   one-ring sparsity, so it lags it. Use this for a\n"
                     "                   like-for-like comparison against --bsr-apply.\n"
+                    "  --venkat-k K     Venkatakrishnan's dimensionless K for --conv-ho 2,\n"
+                    "                   giving eps^2 = uref^2 (K/lref)^3 h^3 (default 0). K = 0 is\n"
+                    "                   the degenerate form: it alters 99.3%% of faces and leaves\n"
+                    "                   eps^2 = 0, so nothing bounds the denominator of the\n"
+                    "                   limiter's derivative from below. K = 5 is the value the\n"
+                    "                   limiter header's bound study used.\n"
+                    "  --venkat-k K     Venkatakrishnan's dimensionless K for --conv-ho 2,\n"
+                    "                   giving eps^2 = uref^2 (K/lref)^3 h^3 (default 0).\n"
+                    "                   K = 0 is the degenerate form: it alters 99.3% of\n"
+                    "                   faces and leaves eps^2 = 0, so nothing bounds the\n"
+                    "                   denominator of the limiter's DERIVATIVE from below.\n"
+                    "                   K = 5 is the value the limiter header's bound study\n"
+                    "                   used. The front end has always set this from the\n"
+                    "                   case; the bench passed a literal zero until now.\n"
                     "  --lagged-ho      the same, for the higher-order correction: drop the\n"
                     "                   correction's own derivative from the Jacobian action and\n"
                     "                   keep only its first-order part. That is the operator an\n"
@@ -1012,6 +1039,11 @@ int main(int argc, char **argv) {
 
     MeshData d;
     d.mesh = smesh::Mesh::create_hex8_cube(smesh::Communicator::self(), n, n, n, 0, 0, 0, 1, 1, 1);
+
+    // Venkatakrishnan's eps^2, with the box's scales restored because the kernel has neither.
+    // The cube above is the unit cube and the reference velocity is 1, which is the front end's
+    // default; K = 0 gives eps^2 = 0 and is the zero-severity control.
+    const scalar_t venkat_c = cvfem_venkata_eps2_coeff(venkat_k, (scalar_t)1, (scalar_t)1);
     if (!d.mesh || d.mesh->element_type(0) != smesh::HEX8) {
         std::fprintf(stderr, "failed to create HEX8 mesh\n");
         if (own_mpi) MPI_Finalize();
@@ -1387,11 +1419,11 @@ int main(int argc, char **argv) {
         const scalar_t       *srcs[3] = {d.ux.data(), d.uy.data(), d.uz.data()};
         cvfem_hex8_assemble_nodal_grads_atomic(d, 0, srcs, 3, ug);
 
-        apply_residual_atomic_sumfact_simd(d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rc.data(), d.rhie_chow_scale, d.rx.data(), d.ry.data(), d.rz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, ug.data(), conv_limiter, scalar_t(0));
+        apply_residual_atomic_sumfact_simd(d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rc.data(), d.rhie_chow_scale, d.rx.data(), d.ry.data(), d.rz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, ug.data(), conv_limiter, venkat_c);
         std::vector<scalar_t> rc_atomic_r;
         pack_residual(d, rc_atomic_r);
 
-        apply_residual_packed_defcor(d, packed, rho, mu, ug.data(), conv_limiter, scalar_t(0));
+        apply_residual_packed_defcor(d, packed, rho, mu, ug.data(), conv_limiter, venkat_c);
         std::vector<scalar_t> rc_packed_r;
         pack_residual(d, rc_packed_r);
 
@@ -1505,11 +1537,11 @@ int main(int argc, char **argv) {
             const scalar_t       *srcs[3] = {d.ux.data(), d.uy.data(), d.uz.data()};
             cvfem_hex8_assemble_nodal_grads_atomic(d, 0, srcs, 3, ug);
 
-            apply_residual_atomic_sumfact_simd(d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rc.data(), d.rhie_chow_scale, d.rx.data(), d.ry.data(), d.rz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, ug.data(), conv_limiter, scalar_t(0));
+            apply_residual_atomic_sumfact_simd(d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rc.data(), d.rhie_chow_scale, d.rx.data(), d.ry.data(), d.rz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, ug.data(), conv_limiter, venkat_c);
             std::vector<scalar_t> ho_atomic_r;
             pack_residual(d, ho_atomic_r);
 
-            apply_residual_packed_defcor(d, packed, rho, mu, ug.data(), conv_limiter, scalar_t(0));
+            apply_residual_packed_defcor(d, packed, rho, mu, ug.data(), conv_limiter, venkat_c);
             std::vector<scalar_t> ho_packed_r;
             pack_residual(d, ho_packed_r);
 
@@ -1680,11 +1712,11 @@ int main(int argc, char **argv) {
             // family (the default), this hand-written lane-blocked one, and a scalar sweep.
             // Grace job 4981920 measured this one fastest in all seven pairs, so the other two
             // are in subpar/ and --ho-simd/--ho-scalar are gone with them.
-            apply_residual_packed_defcor(d, packed, rho, mu, ugrad.data(), conv_limiter, scalar_t(0));
+            apply_residual_packed_defcor(d, packed, rho, mu, ugrad.data(), conv_limiter, venkat_c);
         else if (layout == "packed" || layout == "store")
             apply_residual_packed(d, packed, rho, mu, GeomKind::Affine);
         else if (conv_ho)
-            apply_residual_atomic_sumfact_simd(d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rc.data(), d.rhie_chow_scale, d.rx.data(), d.ry.data(), d.rz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, ugrad.data(), conv_limiter, scalar_t(0));
+            apply_residual_atomic_sumfact_simd(d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rc.data(), d.rhie_chow_scale, d.rx.data(), d.ry.data(), d.rz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, ugrad.data(), conv_limiter, venkat_c);
         else
             // THE LANE-BLOCKED SWEEP, UNCONDITIONALLY. Three scalar arms used to reach this
             // ladder -- the hand-written `current` residual, the generated one and a scalar
@@ -1955,14 +1987,14 @@ int main(int argc, char **argv) {
             apply_jacobian_action_ecolored(d, ecolors, rho, mu, dir_v, jac_out.data(),
                                            with_hograd ? ugrad.data() : nullptr,
                                            with_hograd ? vgrad.data() : nullptr,
-                                           conv_limiter, scalar_t(0));
+                                           conv_limiter, venkat_c);
         else if (layout == "colored")
             apply_jacobian_action_colored(d, packed, colors, rho, mu, dir_v, jac_out.data(), geom_kind);
         else if (layout == "packed" || layout == "store")
             apply_jacobian_action_packed(d, packed, rho, mu, geom_kind, dir_v, jac_out.data(),
                                          with_hograd ? ugrad.data() : nullptr,
                                          with_hograd ? vgrad.data() : nullptr,
-                                         conv_limiter, scalar_t(0));
+                                         conv_limiter, venkat_c);
         else if (geom_kind == GeomKind::Isoparam)
             apply_jacobian_action_atomic_isoparam(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, dir_v, jac_out.data());
         // The lane-blocked sweep wherever it applies, for the reason the residual gives: the
@@ -1978,7 +2010,7 @@ int main(int argc, char **argv) {
             apply_jacobian_action_atomic_simd(d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.rc_coeff.data(), d.rc_w.data(), d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, dir_v, jac_out.data(),
                                               with_hograd ? ugrad.data() : nullptr,
                                               with_hograd ? vgrad.data() : nullptr,
-                                              conv_limiter, scalar_t(0));
+                                              conv_limiter, venkat_c);
         }
 
         if (boundary)
@@ -2242,7 +2274,7 @@ int main(int argc, char **argv) {
         apply_jacobian_action_atomic(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, last_dir, jv_ref.data(),
                                      with_hograd ? ugrad.data() : nullptr,
                                      with_hograd ? vgrad.data() : nullptr,
-                                     conv_limiter, scalar_t(0));
+                                     conv_limiter, venkat_c);
         // The reference has to carry everything the timed apply carried, or the check
         // reports the boundary closure and the transient term as staging errors. It did:
         // `--jac-action --rhie-chow --boundary --layout packed` failed here at 8.3e-1, and

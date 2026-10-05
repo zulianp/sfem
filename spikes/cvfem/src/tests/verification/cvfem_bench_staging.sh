@@ -305,6 +305,49 @@ ok_ho "residual + ho, Darwish-Moukalled"        --conv-ho 3
 ok_ho_rc "residual + ho + rc, generated vs scalar" --conv-ho 0 --rhie-chow
 echo
 
+# THE HIGHER-ORDER JACOBIAN ACTION, PACKED AGAINST ATOMIC, AT A NON-POWER-OF-TWO SIZE.
+#
+# Every check above runs the residual, and every check in this file runs --n 8. Both choices hid
+# a real defect for as long as the higher-order Jacobian action has existed:
+#
+#   * the limiters' DERIVATIVES had branches guarded against quantities that vanish with the
+#     thing being tested -- Venkatakrishnan's inc >= 0 select, where psi is 0 rather than 1
+#     when the base is the bound, and Darwish-Moukalled's band, which was relative to the sum it
+#     was bounding. The packed and atomic layouts reach them with inc differing in the last bits,
+#     because their nodal-gradient reconstructions sum in different orders, so an ulp picked a
+#     side and the two answers differed by 1e-04 to 3e-04.
+#   * it is invisible at a POWER-OF-TWO cube size. Measured on Grace with the pre-fix binary:
+#     n=6 clean, then n=10, 12, 18, 20, 24, 36, 40, 48, 72 through 112 all failing, and 64 and
+#     128 clean again. --n 8 is the one size this file used.
+#   * and the residual never sees it, because the limiter's VALUE is continuous where its
+#     derivative is not.
+#
+# The driver's own packed-versus-atomic oracle catches it and exits non-zero. It had simply
+# never been run anywhere that it fires. n=10 is the cheapest size that does.
+#
+# This arm passes trivially on the development machine -- the defect did not reproduce there at
+# any size -- so it earns its keep in the Alps ctest run rather than locally.
+echo "== the higher-order Jacobian action, packed against atomic, off a power of two"
+ho_jac_ok() {
+    desc="$1"; shift
+    if out=$("$BENCH" --n 10 --repeat 1 --warmup 0 --layout packed --jac-action --rhie-chow "$@" 2>&1); then
+        printf '%-62s OK   %s\n' "$desc" \
+            "$(printf '%s\n' "$out" | grep -oE 'jac_action_rc_vs_atomic_rel: [0-9.e+-]*' | tr '\n' ' ')"
+    else
+        printf '%-62s FAIL\n' "$desc"
+        printf '%s\n' "$out" | grep -E 'disagrees|_rel:' | sed 's/^/    /'
+        FAIL=$((FAIL + 1))
+    fi
+}
+ho_jac_ok "jac-action + ho, unlimited"            --conv-ho 0
+ho_jac_ok "jac-action + ho, bounded-face clip"    --conv-ho 1
+ho_jac_ok "jac-action + ho, Venkatakrishnan"      --conv-ho 2
+ho_jac_ok "jac-action + ho, Darwish-Moukalled"    --conv-ho 3
+# And with Venkatakrishnan's eps^2 on, which is the other route to a well-conditioned
+# derivative and the one the front end takes.
+ho_jac_ok "jac-action + ho, Venkatakrishnan K=5"  --conv-ho 2 --venkat-k 5
+echo
+
 echo "== the partially assembled Jacobian action"
 # Measured and lost -- 17-19% slower than direct evaluation, see subpar/README.md -- so the
 # default build refuses it by name, the way it refuses every other retired kernel.
