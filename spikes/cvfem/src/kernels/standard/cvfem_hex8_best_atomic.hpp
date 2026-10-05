@@ -15,7 +15,6 @@
 // sweeps in this file stopped taking MeshData and BSR4 the only names left were the ones the
 // includer supplies by contract (scalar_t, idx_t, count_t, geom_t and the SFEM_ spellings) and
 // MIN, which now lives beside the scatter helpers that use it.
-#include "kernels/cvfem_kernel_kind.hpp"
 
 // ---------------------------------------------------------------------------
 // Block diagonal only, for the block-Jacobi preconditioner.

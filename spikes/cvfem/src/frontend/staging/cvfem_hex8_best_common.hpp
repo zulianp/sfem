@@ -85,7 +85,6 @@ using geom_t  = smesh::geom_t;
 #include "kernels/microkernels/hex8/isoparametric/cvfem_hex8_ns_upwind_isoparam.hpp"
 #include "kernels/cvfem_bdf.hpp"
 #include "kernels/cvfem_hex8_flags.hpp"
-#include "kernels/cvfem_kernel_kind.hpp"  // KernelKind
 #include "kernels/cvfem_scatter.hpp"      // atomic_add, find_bsr_slot, reset_residual, MIN
 #include "kernels/cvfem_hex8_element_gather.hpp"   // Hex8RcConfig, Hex8Extras
 
@@ -119,6 +118,9 @@ static constexpr int N_FIELDS = 4;
 // than being carved up with preprocessor branches. Reaching one is a bug, and says so.
 #ifdef CVFEM_ENABLE_SUBPAR
 #include "cvfem_hex8_ns_upwind_sympy_subpar.hpp"
+// The standard layout's retired sweeps. They are included from the DRIVER rather than here --
+// they need kernels/standard/, which this header does not pull in -- so this note is a pointer:
+// subpar/cvfem_hex8_atomic_retired.hpp.
 #else
 #define CVFEM_SUBPAR_STUB(name)                                                        \
     template <typename... Args>                                                        \
@@ -160,50 +162,16 @@ CVFEM_SUBPAR_STUB(apply_residual_packed_defcor_scalar)
 #undef CVFEM_SUBPAR_STUB
 #endif
 
-// KernelKind moved to kernels/cvfem_kernel_kind.hpp, so that the sweeps can be TEMPLATED on
-// it rather than branching on it per element. parse_kernel and the predicates below stay:
-// turning --kernel into a value is front-end work.
-
-static KernelKind parse_kernel(const std::string &name) {
-    if (name == "current") return KernelKind::Current;
-    if (name == "fd") return KernelKind::Fd;
-    if (name == "sumfact") return KernelKind::Sumfact;
-    if (name == "sympy") return KernelKind::Sympy;
-    if (name == "sympy_block") return KernelKind::SympyBlock;
-    if (name == "sympy_row") return KernelKind::SympyRow;
-    if (name == "sympy_face") return KernelKind::SympyFace;
-    if (name == "split") return KernelKind::Split;
-    // The generated Jacobian-action arrangements. These exist only for the action -- the
-    // residual and the assembly have their own arrangements under the names above -- so
-    // the driver refuses them for any other operation rather than mapping them onto
-    // something that did run.
-    if (name == "sympy_action") return KernelKind::SympyAction;
-    if (name == "sympy_action_node") return KernelKind::SympyActionNode;
-    if (name == "sympy_action_comp") return KernelKind::SympyActionComp;
-    if (name == "sympy_action_face") return KernelKind::SympyActionFace;
-    if (name == "sympy_action_geom") return KernelKind::SympyActionGeom;
-    if (name == "sympy_action_geomface") return KernelKind::SympyActionGeomFace;
-    return KernelKind::Sumfact;
-}
-
-// kernel_uses_sympy_residual moved to kernels/cvfem_kernel_kind.hpp: it is a pure function of
-// the enum, and the sweeps need it as a compile-time test on their template argument.
-
-static bool kernel_is_valid(const std::string &name) {
-    return name == "current" || name == "fd" || name == "sumfact" || name == "sympy" || name == "sympy_block" ||
-           name == "sympy_row" || name == "sympy_face" || name == "split" || name == "sympy_action" ||
-           name == "sympy_action_node" || name == "sympy_action_comp" ||
-           name == "sympy_action_face" || name == "sympy_action_geom" ||
-           name == "sympy_action_geomface";
-}
-
-// The three generated Jacobian-action CSE arrangements, which are the only kernels the
-// action dispatches on. Everything else ignores --kernel for that operation.
-static bool kernel_is_action_only(const KernelKind k) {
-    return k == KernelKind::SympyAction || k == KernelKind::SympyActionNode ||
-           k == KernelKind::SympyActionComp || k == KernelKind::SympyActionFace ||
-           k == KernelKind::SympyActionGeom || k == KernelKind::SympyActionGeomFace;
-}
+// KernelKind, parse_kernel, kernel_is_valid, kernel_uses_sympy_residual and
+// kernel_is_action_only are gone, with kernels/cvfem_kernel_kind.hpp. DESIGN.md's correction:
+// "the micro-kernel selector must be removed. Only the best micro-kernels need to be used
+// (given the results in Grace), so there should be only one per kernel. The rest is moved to
+// subpar". What chooses a kernel now is the layout, the geometry and which terms the operator
+// carries -- all of which are properties of the run, not names a caller supplies.
+//
+// GeomKind stays, and is the shape the correction asks for on the geometry axis: a front-end
+// enum, overridable at run time by --geom, that selects a kernel rather than being tested
+// inside one.
 
 enum class GeomKind { Affine, Isoparam };
 

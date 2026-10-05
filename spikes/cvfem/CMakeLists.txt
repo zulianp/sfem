@@ -224,6 +224,14 @@ endforeach()
 # of both: a red suite that means nothing, training people to ignore it.
 set_tests_properties(cvfem_sympy_action_test PROPERTIES SKIP_RETURN_CODE 77)
 
+# cvfem_subpar_compiles is the quarantine's own gate: it includes every subpar/ header so that
+# a retired kernel cannot stop compiling unnoticed. Nothing else includes them -- that is the
+# whole reason they rot -- and two of them had, each dating from the commit that made the
+# change it missed. Same SKIP, for the same reason: without the option the headers are not on
+# the include path.
+set_tests_properties(cvfem_subpar_compiles PROPERTIES SKIP_RETURN_CODE 77)
+set_tests_properties(cvfem_subpar_ss_compiles PROPERTIES SKIP_RETURN_CODE 77)
+
 # ------------------------------------------------------------ verification report machinery
 #
 # The report generator draws the conclusions -- it fits the convergence rates, decides which

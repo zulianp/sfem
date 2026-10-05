@@ -340,7 +340,7 @@ struct CsvRow {
     // look like separate implementations that happened to agree to 0.4%, when they are one
     // call site measured twice -- the same misattribution the ran_* columns exist to stop.
     const char *ran_layout;
-    const char *ran_kernel;    // the kernel that executed, or "n/a" where the operation ignores --kernel
+    const char *ran_kernel;    // the kernel the layout, geometry and term set selected
     const char *ran_rc;        // "exact" | "frozen" | "off"
     const char *ran_boundary;  // "on" | "off"
     int         exact_rc;      // the direction's reconstructed gradient was staged
@@ -464,7 +464,6 @@ int main(int argc, char **argv) {
     scalar_t    rho        = 1.0;
     scalar_t    mu         = 0.01;
     std::string layout     = "atomic";
-    std::string kernel     = "sumfact";
     std::string geom       = "affine";
     std::string csv_path;
     std::string csv_tag    = "run";
@@ -526,8 +525,6 @@ int main(int argc, char **argv) {
             rho = std::atof(argv[++i]);
         else if (arg == "--mu" && i + 1 < argc)
             mu = std::atof(argv[++i]);
-        else if (arg == "--kernel" && i + 1 < argc)
-            kernel = argv[++i];
         else if (arg == "--geom" && i + 1 < argc)
             geom = argv[++i];
         else if (arg == "--warp" && i + 1 < argc)
@@ -612,7 +609,6 @@ int main(int argc, char **argv) {
             std::printf(
                     "usage: %s [--n N] [--repeat N] [--warmup N] [--assemble] [--jac-action] [--bsr-apply]\n"
                     "          [--verify] [--verify-jac] [--layout packed|atomic|colored|store]\n"
-                    "          [--kernel sumfact|current|fd|sympy|sympy_block|sympy_row|sympy_face|split]\n"
                      "          [--assemble-diag]  block diagonal only, for block-Jacobi\n"
                     "          [--geom affine|isoparam] [--warp EPS] [--pack-size N] [--no-sfc]\n"
                     "          [--nodal-grad 1|3]\n"
@@ -655,7 +651,6 @@ int main(int argc, char **argv) {
                     "  --csv FILE     append one machine-readable row per run (header written if\n"
                     "                 the file is new); pairs with python/cvfem_kernel_report.py\n"
                     "  --tag NAME     free-form label carried into the csv (e.g. the machine)\n"
-                    "  --kernel NAME  residual/Jacobian micro-kernel variant (default sumfact)\n"
                     "  --geom NAME    affine (constant J) or isoparam (12 SCS trilinear J)\n"
                     "  --warp EPS     x += EPS * sin(pi y) nodal perturbation\n"
                     "  --bsr-apply    assemble once, then time BSR SpMV y = J(u) v\n"
@@ -760,7 +755,7 @@ int main(int argc, char **argv) {
     // mesh. What decides is the KERNEL, and rc_kernel_ok below is where that is settled.
     // Measured and lost: 17-19% SLOWER than direct evaluation at 4.1M and 8.6M dof on
     // Grace, in two independent implementations. Rejected by name here for the reason
-    // --kernel sympy_row and sympy_face are -- a run must not report a throughput under a
+    // the retired micro-kernels are -- a run must not report a throughput under a
     // configuration that was shown not to be worth using -- and kept compiling so the
     // measurement stays repeatable if the hardware changes. See subpar/README.md.
 #ifndef CVFEM_ENABLE_SUBPAR
@@ -847,13 +842,6 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    if (!kernel_is_valid(kernel)) {
-        std::fprintf(stderr,
-                     "invalid --kernel '%s' (expected sumfact, current, fd, sympy, sympy_block, sympy_row, sympy_face, or split)\n",
-                     kernel.c_str());
-        if (own_mpi) MPI_Finalize();
-        return 1;
-    }
     if ((assemble ? 1 : 0) + (jac_action ? 1 : 0) + (bsr_apply ? 1 : 0) + (assemble_diag ? 1 : 0) +
                 (nodal_grad ? 1 : 0) >
         1) {
@@ -863,70 +851,17 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    const KernelKind kernel_kind = parse_kernel(kernel);
-    // ------------------------------------------------- what this build cannot honour
-    //
-    // Each of these was ACCEPTED before, ran different code than it named, and wrote a row
-    // claiming the configuration it was asked for. That is the failure this driver already
-    // rejects by name elsewhere ("a run cannot report a throughput under a kernel name that
-    // did not execute", above) -- these are the combinations that slipped through the same
-    // net on a different axis.
-
-    // The generated Jacobian-action arrangements run only for that operation, and only on
-    // the atomic layout: they are scalar kernels, so the packed and colored sweeps -- which
-    // are SIMD over a pack -- have nothing to call them from. Refused elsewhere rather than
-    // mapped onto whatever would have run.
-    if (kernel_is_action_only(kernel_kind) && !(jac_action && layout == "atomic")) {
-        std::fprintf(stderr,
-                     "--kernel %s is a Jacobian-action arrangement: it needs --jac-action "
-                     "--layout atomic (got %s/%s)\n",
-                     kernel.c_str(), jac_action ? "--jac-action" : "another operation", layout.c_str());
-        if (own_mpi) MPI_Finalize();
-        return 1;
-    }
-    // They carry no Rhie-Chow term, so a row would claim one it did not compute.
-    if (kernel_is_action_only(kernel_kind) && rhie_chow) {
-        std::fprintf(stderr, "--kernel %s carries no Rhie-Chow term\n", kernel.c_str());
-        if (own_mpi) MPI_Finalize();
-        return 1;
-    }
-
-    // `split` is assembly-only by construction and `fd` is a Jacobian reference with no
-    // residual form; both fall through to the hand-written `current` residual and would be
-    // recorded under their own name.
+    // THE --kernel FLAG IS GONE, and with it eight refusals that existed only because it
+    // did. Each one guarded against a row that named a kernel other than the one which ran:
+    // an action arrangement asked for on a layout that cannot call it, `split` or `fd` asked
+    // for as a residual, a quarantined arrangement asked for by name. With one kernel per
+    // operation there is nothing left to misname -- the row records what the layout, the
+    // geometry and the term set select, which is the only thing that was ever true.
     const bool residual_op = !(assemble || assemble_diag || jac_action || bsr_apply || nodal_grad);
-    if (residual_op && (kernel_kind == KernelKind::Split || kernel_kind == KernelKind::Fd)) {
-        std::fprintf(stderr,
-                     "--kernel %s has no residual form; it would run and report the "
-                     "hand-written `current` kernel\n",
-                     kernel.c_str());
-        if (own_mpi) MPI_Finalize();
-        return 1;
-    }
-
-    // The verification chains compare against `current` and against a finite difference of
-    // it, and neither carries Rhie-Chow. With the term on they report a mismatch that is
-    // the missing term in the reference, not a defect in what is being verified.
-    //
-    // With one exception, and it is the one that matters here. The block diagonal and the
-    // split both work by handing the FULL element kernel a modified slot array, so their
-    // check is against this driver's own assembly rather than against a Rhie-Chow-free
-    // reference -- both sides carry whatever the run asked for. That check is the only
-    // thing that can show the new staging is right, so it must be allowed to run with the
-    // term on. The chains that cannot are skipped rather than refused; see below.
-    // Each verification block now decides for itself which of its comparisons Rhie-Chow
-    // invalidates and skips those, rather than the whole run being refused: the checks that
-    // go against a Rhie-Chow-free reference are skipped, and the ones that go across this
-    // driver's own implementations -- packed against atomic against colored, the block
-    // diagonal against the full assembly, linear-plus-nonlinear against the whole -- run
-    // with the term on, which is what makes them the oracle for the staging work.
 
     // Read only inside the sumfact branch of the colored and store assemblies.
-    if (g_dense_flush && !(assemble && kernel_kind == KernelKind::Sumfact &&
-                           (layout == "colored" || layout == "store"))) {
-        std::fprintf(stderr,
-                     "--dense-flush is read only by --assemble --kernel sumfact on "
-                     "--layout colored|store\n");
+    if (g_dense_flush && !(assemble && (layout == "colored" || layout == "store"))) {
+        std::fprintf(stderr, "--dense-flush is read only by --assemble on --layout colored|store\n");
         if (own_mpi) MPI_Finalize();
         return 1;
     }
@@ -953,99 +888,43 @@ int main(int argc, char **argv) {
     //
     // One gate, because the answer depends on the kernel, the geometry, the layout AND the
     // operation together. The three scattered rules this replaces got it wrong in both
-    // directions: "--rhie-chow requires --kernel sumfact" refused the isoparametric
+    // directions: "--rhie-chow requires the sum-factored kernel" refused the isoparametric
     // hand-written kernels, which do take a Hex8RhieChow and are what --geom isoparam runs
     // on the atomic layout; and nothing at all stopped `--rhie-chow --assemble --kernel
     // sympy`, which ran a generated arrangement with no such term and wrote rhie_chow=1
     // and ran_rc=frozen into the CSV.
     //
-    // What carries it, read off the element kernels rather than off the flags:
+    // What carries it, read off the element kernels. The --kernel column is gone from this
+    // table because there is one kernel per row now:
     //
-    //   affine    sumfact   residual / action / assembly    add_slots, *_sumfact_simd
-    //   affine    split     assembly, nonlinear half        add_slots_nonlinear
-    //   isoparam  current   residual / action / assembly    the SCALAR isoparam kernels
-    //   either    n/a       block diagonal                  add_slots{,_isoparam}
+    //   affine    residual / action / assembly         add_slots, *_sumfact_simd
+    //   isoparam  residual / action / assembly, atomic the hand-written SCALAR kernels
+    //   isoparam  assembly, pack-based layouts         add_slots_isoparam
+    //   either    block diagonal                       add_slots{,_isoparam}
     //
-    // What does not: every generated kernel, because the term was never put into the SymPy
-    // expressions; the finite-difference reference, because it differences a residual that
-    // takes no pressure gradient; the hand-written affine `current` residual; and the
-    // isoparametric SIMD kernels -- which is what confines the isoparametric case to
-    // --layout atomic.
-    const bool iso_scalar_kernel = kernel_kind == KernelKind::Current || kernel_kind == KernelKind::Split;
+    // What does not: the isoparametric SIMD kernels, which is what confines the
+    // isoparametric residual and action to --layout atomic; and the generated kernels,
+    // because the term was never put into the SymPy -- which is why the isoparametric atomic
+    // arms dispatch on the term rather than on a name, taking the hand-written kernel when it
+    // is on and the faster generated one when it is not.
     const bool rc_kernel_ok =
-            // These two do not consult --kernel: they run the hand-written scalar kernels,
-            // which take the term on both geometries.
-            assemble_diag || (jac_action && (geom == "affine" || layout == "atomic")) ||
-            (geom == "affine" && (kernel_kind == KernelKind::Sumfact || kernel_kind == KernelKind::Split)) ||
-            // Isoparametric geometry splits by OPERATION, not by layout. The residual and
-            // the action on a pack-based layout run the isoparametric SIMD kernels, which
-            // carry no term -- hence --layout atomic there. Assembly is scalar per element
-            // on every layout and runs the isoparametric kernel that does carry it.
-            (geom == "isoparam" && layout == "atomic" && iso_scalar_kernel) ||
-            (geom == "isoparam" && (assemble || bsr_apply) && iso_scalar_kernel);
+            assemble_diag || geom == "affine" ||
+            // Isoparametric geometry splits by OPERATION, not by layout. The residual and the
+            // action on a pack-based layout run the isoparametric SIMD kernels, which carry no
+            // term -- hence --layout atomic there. Assembly is scalar per element on every
+            // layout and runs the isoparametric kernel that does carry it.
+            (geom == "isoparam" && layout == "atomic") ||
+            (geom == "isoparam" && (assemble || bsr_apply));
     if (rhie_chow && !rc_kernel_ok) {
         std::fprintf(stderr,
-                     "--rhie-chow is carried by: --kernel sumfact|split on --geom affine, "
-                     "--kernel current|split on --geom isoparam --layout atomic, and by "
-                     "--jac-action and --assemble-diag, which run the hand-written kernels "
-                     "whatever --kernel says (got '%s'/%s/%s)\n",
-                     kernel.c_str(), geom.c_str(), layout.c_str());
+                     "--rhie-chow is carried on --geom affine by every layout, on --geom "
+                     "isoparam by --layout atomic and by --assemble/--bsr-apply on any "
+                     "layout, and by --assemble-diag. The isoparametric SIMD residual and "
+                     "action do not carry it (got %s/%s)\n",
+                     geom.c_str(), layout.c_str());
         if (own_mpi) MPI_Finalize();
         return 1;
     }
-    // sympy_row and sympy_face lost the saturated evaluation and were moved to subpar/.
-    // Rejected by name here, which is what keeps the stubs in cvfem_hex8_best_common.hpp
-    // unreachable -- and, more to the point, means a run cannot report a throughput under
-    // a kernel name that did not execute. This spike has produced that failure three
-    // times; a rejection is cheap insurance against a fourth.
-#ifndef CVFEM_ENABLE_SUBPAR
-    if (kernel_kind == KernelKind::SympyRow || kernel_kind == KernelKind::SympyFace) {
-        std::fprintf(stderr,
-                     "--kernel %s was moved to subpar/: it is not the fastest kernel in any "
-                     "measured configuration (see subpar/README.md).\n"
-                     "Rebuild with -DCVFEM_ENABLE_SUBPAR=ON to measure it again.\n",
-                     kernel.c_str());
-        if (own_mpi) MPI_Finalize();
-        return 1;
-    }
-    // The six generated Jacobian-action arrangements, all of them. Measured on Grace at
-    // 8,586,756 dof they reach 0.37x to 0.57x of the hand-written atomic action and 0.16x to
-    // 0.25x of the packed one (perf/campaign_generated_arms.csv).
-    if (kernel_is_action_only(kernel_kind)) {
-        std::fprintf(stderr,
-                     "--kernel %s was moved to subpar/: every generated Jacobian-action "
-                     "arrangement is between 0.37x and 0.57x of the hand-written one "
-                     "(see subpar/README.md).\n"
-                     "Rebuild with -DCVFEM_ENABLE_SUBPAR=ON to measure it again.\n",
-                     kernel.c_str());
-        if (own_mpi) MPI_Finalize();
-        return 1;
-    }
-    // AFFINE ONLY. KernelKind::Sympy names two different generated functions and the geometry
-    // picks between them: the affine `_sympy_residual`, which is quarantined, and
-    // `_sympy_residual_isoparam`, which is the isoparametric scalar WINNER and stays. A
-    // rejection that ignored --geom would retire a winner along with a loser, which is the
-    // same conflation the split rule in the generator was just hardened against.
-    // RESIDUAL ONLY, and affine only. KernelKind::Sympy selects a different generated
-    // function for each operation: the retired affine `_sympy_residual` for the residual, and
-    // `_jacobian_add_bsr_slots` for --assemble, which is the atomic-assembly WINNER and stays.
-    // A rejection on the kernel name alone takes the winner down with the loser -- exactly the
-    // conflation the generator's split rule was hardened against a few lines of work earlier,
-    // reproduced here. cvfem_bench_staging is what caught it.
-    const bool sympy_residual_run = kernel_kind == KernelKind::Sympy && geom == "affine" &&
-                                    !assemble && !assemble_diag && !jac_action && !bsr_apply;
-    if (sympy_residual_run) {
-        std::fprintf(stderr,
-                     "--kernel sympy --geom affine was moved to subpar/: it gives up 21.6%% "
-                     "on the packed layout and ties sumfact on the atomic one, so it is "
-                     "fastest nowhere (see subpar/README.md).\n"
-                     "Its isoparametric form is NOT retired -- `--kernel sympy --geom "
-                     "isoparam` still runs. Rebuild with -DCVFEM_ENABLE_SUBPAR=ON for the "
-                     "affine one.\n");
-        if (own_mpi) MPI_Finalize();
-        return 1;
-    }
-#endif
     if (geom != "affine" && geom != "isoparam") {
         std::fprintf(stderr, "invalid --geom '%s' (expected affine or isoparam)\n", geom.c_str());
         if (own_mpi) MPI_Finalize();
@@ -1074,19 +953,7 @@ int main(int argc, char **argv) {
     // this list for the same reason.
     // ...with one exception since the action gained generated kernels: the three
     // `sympy_action*` arrangements ARE dispatched by --jac-action on the atomic layout.
-    const bool kernel_is_consulted =
-            !(jac_action || bsr_apply || assemble_diag) || kernel_is_action_only(kernel_kind);
-    if (kernel_is_consulted && geom_kind == GeomKind::Isoparam &&
-        kernel_kind != KernelKind::Current && kernel_kind != KernelKind::Sympy &&
-        kernel_kind != KernelKind::Fd && kernel_kind != KernelKind::Split) {
-        std::fprintf(stderr,
-                     "--geom isoparam supports --kernel current|sympy|fd|split; '%s' has no "
-                     "isoparametric form\n",
-                     kernel.c_str());
-        if (own_mpi) MPI_Finalize();
-        return 1;
-    }
-    if (layout != "packed" && layout != "atomic" && layout != "colored" && layout != "ecolor" &&
+     if (layout != "packed" && layout != "atomic" && layout != "colored" && layout != "ecolor" &&
         layout != "store") {
         std::fprintf(stderr, "invalid --layout '%s' (expected packed, atomic, colored, ecolor or store)\n",
                      layout.c_str());
@@ -1133,11 +1000,6 @@ int main(int argc, char **argv) {
     // than letting them fall through to the layout's default kernel: a silent
     // fallback here reports a throughput and a verification result for a kernel
     // that never ran.
-    if (kernel_kind == KernelKind::Split && layout != "atomic") {
-        std::fprintf(stderr, "--kernel split requires --layout atomic (got '%s')\n", layout.c_str());
-        if (own_mpi) MPI_Finalize();
-        return 1;
-    }
 
     for (int i = 0; i < 64; ++i) g_identity_slots[i] = i;
 
@@ -1392,21 +1254,11 @@ int main(int argc, char **argv) {
     }
 
     BSR4                  bsr;
-    std::vector<scalar_t> jac_linear;
     if (assemble || verify_jac || bsr_apply) bsr = make_bsr4(d.mesh);
     if (assemble || verify_jac || bsr_apply) {
         if (layout == "packed" || verify_jac || bsr_apply)
             build_pack_local_crs(packed, d.nelements, bsr.rowptr, bsr.colidx);
         if (layout == "atomic" || layout == "colored") precompute_element_bsr_slots(d, bsr);
-        if (kernel_kind == KernelKind::Split) {
-            // One-time cost in a Newton loop, so it is built before the timed region.
-            precompute_element_bsr_slots(d, bsr);
-            jac_linear.assign((size_t)(bsr.nnz * 16), scalar_t(0));
-            if (geom_kind == GeomKind::Isoparam)
-                assemble_jacobian_atomic_linear_isoparam(d.elems, d.nelements, d.p.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(), bsr.element_slots.empty() ? nullptr : bsr.element_slots.data(), mu, jac_linear.data());
-            else
-                assemble_jacobian_atomic_linear(d.adj_ptr, d.det_ptr, d.nelements, bsr.element_slots.empty() ? nullptr : bsr.element_slots.data(), mu, jac_linear.data());
-        }
         if (layout == "store") build_pack_store_crs(packed, d.nelements, bsr.rowptr, bsr.colidx);
     }
 
@@ -1514,10 +1366,6 @@ int main(int argc, char **argv) {
         }
     }
 
-    // The higher-order kernels WITH Rhie-Chow. The block below is gated off when Rhie-Chow is on,
-    // because most of its comparisons are between kernels that do not all carry the term -- but the
-    // generated higher-order kernel does carry it, in its own variant, and shipping that unverified
-    // is exactly what these oracles exist to prevent. So this one runs here instead.
     // The higher-order kernel WITH Rhie-Chow. The block below is gated off when Rhie-Chow is
     // on, because most of its comparisons are between kernels that do not all carry the term --
     // but the higher-order kernel does carry it, and shipping that unverified is what these
@@ -1703,18 +1551,10 @@ int main(int argc, char **argv) {
                 return 1;
             }
 
-            apply_residual_colored(d, packed, colors, rho, mu, GeomKind::Affine);
-            std::vector<scalar_t> colored_sympy_r;
-            pack_residual(d, colored_sympy_r);
-            const scalar_t colored_sympy_err =
-                    max_abs_diff(current_r.data(), colored_sympy_r.data(), (ptrdiff_t)current_r.size());
-            std::printf("verify_colored_sympy_residual_vs_atomic_abs: %.6e\n", colored_sympy_err);
-            if (colored_sympy_err > 1.0e-10) {
-                std::fprintf(stderr, "HEX8 colored SymPy residual mismatch\n");
-                if (own_mpi) MPI_Finalize();
-                return 1;
-            }
-
+            // verify_colored_sympy_residual_vs_atomic_abs stood here. The coloured sweep used
+            // to run the generated residual when asked for it; with one kernel per sweep it
+            // runs the same call as the row above, so this compared the identical result to
+            // the identical reference and printed the identical number.
             apply_residual_colored(d, packed, colors, rho, mu, GeomKind::Isoparam);
             std::vector<scalar_t> colored_iso_r;
             pack_residual(d, colored_iso_r);
@@ -1728,19 +1568,13 @@ int main(int argc, char **argv) {
             }
         }
 
-        if (layout == "packed")
-            apply_residual_packed<false>(d, packed, rho, mu);
-        else
-            apply_residual_atomic_sympy(d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.nnodes, d.p.data(), d.rc.data(), d.rx.data(), d.ry.data(), d.rz.data(), d.ux.data(), d.uy.data(), d.uz.data(), rho, mu);
-        std::vector<scalar_t> sympy_r;
-        pack_residual(d, sympy_r);
-        const scalar_t max_err = max_abs_diff(current_r.data(), sympy_r.data(), (ptrdiff_t)current_r.size());
-        std::printf("verify_sympy_residual_vs_current_abs: %.6e\n", max_err);
-        if (max_err > 1.0e-10) {
-            std::fprintf(stderr, "HEX8 SymPy residual mismatch\n");
-            if (own_mpi) MPI_Finalize();
-            return 1;
-        }
+        // verify_sympy_residual_vs_current_abs stood here. On the atomic layout it called the
+        // generated affine residual, whose micro-kernel is quarantined, so it aborted -- the
+        // verification block reached the sweep without passing the flag's refusal, and that
+        // was already true at d0eb4c53e with -DCVFEM_ENABLE_SUBPAR=OFF. On the packed layout
+        // it compared the sum-factored kernel against `current`, which
+        // verify_packed_sumfact_residual_vs_current_abs covers. Neither branch was earning
+        // anything, so it goes with the sweep.
     }
 
     // The boundary closure is one extra element sweep after the layout's own, which is
@@ -1818,7 +1652,14 @@ int main(int argc, char **argv) {
                 apply_residual_colored(d, packed, colors, rho, mu, GeomKind::Isoparam);
             else if (layout == "packed" || layout == "store")
                 apply_residual_packed<true>(d, packed, rho, mu);
-            else if (kernel_kind == KernelKind::Sympy)
+            // THE GENERATED KERNEL IS THE FASTER ONE AND THE HAND-WRITTEN ONE CARRIES THE
+            // TERM IT CANNOT. Grace job 4982167, 8,586,756 dof, 72 threads: generated 449.8
+            // against hand-written 399.8 MDOF/s, 1.13x. The generated expressions have no
+            // Rhie-Chow term in them -- it was never put into the SymPy -- so the choice is
+            // made by what the operator needs rather than by a kernel name the user supplies.
+            // This is not the selector DESIGN.md's correction removes: the two compute
+            // different things, and nothing here asks which arrangement to use.
+            else if (!rhie_chow)
                 apply_residual_atomic_isoparam_sympy(d.elems, d.nelements, d.nnodes, d.p.data(), d.points, d.rc.data(), d.rx.data(), d.ry.data(), d.rz.data(), d.ux.data(), d.uy.data(), d.uz.data(), rho, mu);
             else
                 apply_residual_atomic_isoparam(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.rc.data(), d.rx.data(), d.ry.data(), d.rz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu);
@@ -1835,19 +1676,18 @@ int main(int argc, char **argv) {
             apply_residual_packed_defcor(d, packed, rho, mu, ugrad.data(), conv_limiter, scalar_t(0));
         else if (layout == "packed" || layout == "store")
             apply_residual_packed<false>(d, packed, rho, mu);
-        else if (kernel_uses_sympy_residual(kernel_kind))
-            apply_residual_atomic_sympy(d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.nnodes, d.p.data(), d.rc.data(), d.rx.data(), d.ry.data(), d.rz.data(), d.ux.data(), d.uy.data(), d.uz.data(), rho, mu);
-        else if (kernel_kind == KernelKind::Sumfact && conv_ho)
+        else if (conv_ho)
             apply_residual_atomic_sumfact_simd(d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rc.data(), d.rhie_chow_scale, d.rx.data(), d.ry.data(), d.rz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, ugrad.data(), conv_limiter, scalar_t(0));
-        else if (kernel_kind == KernelKind::Sumfact)
-            // The lane-blocked sweep, unconditionally. The scalar one is not an option the
-            // standard layout should be measured on: it issues 0.1% vector instructions where
-            // this issues 23%, and reporting it would credit the packed format with a
-            // vectorisation difference that has nothing to do with the format.
-            apply_residual_atomic_sumfact_simd(d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rc.data(), d.rhie_chow_scale, d.rx.data(), d.ry.data(), d.rz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu);
         else
-            apply_residual_atomic(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.rc.data(), d.rx.data(), d.ry.data(), d.rz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu);
-
+            // THE LANE-BLOCKED SWEEP, UNCONDITIONALLY. Three scalar arms used to reach this
+            // ladder -- the hand-written `current` residual, the generated one and a scalar
+            // sum-factored sweep -- chosen by --kernel. On the packed layout the lane-blocked
+            // sweep is the fastest of them by 1.22x and 1.27x (639 against 518 and 505
+            // MELEM/s at 28,756k dof), and on this layout it issues 23% vector instructions
+            // where the scalar sweeps issue 0.1%: reporting one of those would credit the
+            // packed format with a vectorisation difference that is not the format's. All
+            // three are in subpar/.
+            apply_residual_atomic_sumfact_simd(d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rc.data(), d.rhie_chow_scale, d.rx.data(), d.ry.data(), d.rz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu);
         if (boundary) apply_boundary_scs_residual_pass(d, rho, mu, geom_kind == GeomKind::Isoparam ? 1 : 0);
         apply_transient_pass(d, rho);
     };
@@ -1859,15 +1699,21 @@ int main(int argc, char **argv) {
                 assemble_jacobian_colored(d, packed, colors, bsr, rho, mu, GeomKind::Isoparam);
             else if (layout == "packed")
                 assemble_jacobian_packed<true>(d, packed, bsr, rho, mu);
-            else if (kernel_kind == KernelKind::Split)
-                assemble_jacobian_atomic_nonlinear_isoparam(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), bsr.element_slots.empty() ? nullptr : bsr.element_slots.data(), bsr.nnz, bsr.values->data(), rho, mu, jac_linear.data());
-            else if (kernel_kind == KernelKind::Sympy)
+            // THE SAME TWO-WAY CHOICE AS THE RESIDUAL ABOVE, and for the same reason.
+            // Grace job 4982167, 8,586,756 dof, 72 threads: the generated kernel assembles at
+            // 47.7 MDOF/s against the hand-written 21.1, a 2.26x gap -- and it carries no
+            // Rhie-Chow term, which the hand-written one does. So the term decides, not a
+            // kernel name.
+            //
+            // Two other arms reached here and are in subpar/. `--kernel fd` differenced the
+            // residual, which is a correctness reference and never a performance arm; and
+            // `--kernel split` reused a frozen geometry-only half, which the same job measures
+            // at 14.1 MDOF/s -- 3.4x SLOWER than the generated assembly it was meant to beat,
+            // because the half it saves is the cheap one and restoring it costs a full pass
+            // over the values.
+            else if (!rhie_chow)
                 assemble_jacobian_atomic_isoparam_sympy(d.elems, d.nelements, d.p.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(), bsr.element_slots.empty() ? nullptr : bsr.element_slots.data(), bsr.nnz, bsr.values->data(), rho, mu);
-            else if (kernel_kind == KernelKind::Fd)
-                assemble_jacobian_atomic_fd_isoparam(d.elems, d.nelements, d.p.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(), bsr.colidx, bsr.element_slots.empty() ? nullptr : bsr.element_slots.data(), bsr.nnz, bsr.rowptr, bsr.values->data(), rho, mu);
             else
-                // Current: the hand-written isoparametric kernel. Every other name is
-                // rejected during validation, so this is not a fallback.
                 assemble_jacobian_atomic_isoparam(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), bsr.element_slots.empty() ? nullptr : bsr.element_slots.data(), bsr.nnz, bsr.values->data(), rho, mu);
         } else if (layout == "store") {
             assemble_jacobian_store<false>(d, packed, bsr, rho, mu);
@@ -1875,30 +1721,18 @@ int main(int argc, char **argv) {
             assemble_jacobian_colored(d, packed, colors, bsr, rho, mu, GeomKind::Affine);
         } else if (layout == "packed") {
             assemble_jacobian_packed<false>(d, packed, bsr, rho, mu);
-        } else if (kernel_kind == KernelKind::Sumfact)
+        } else
+            // ONE ASSEMBLY KERNEL. Six arms reached this ladder through --kernel: the
+            // sum-factored one, four generated CSE arrangements, and a split that reused a
+            // frozen linear half. Grace, 28,756k dof: the sum-factored kernel is the fastest
+            // assembly anywhere in the spike on the coloured layout (28 MELEM/s), and the
+            // generated arrangement's only win is here on the atomic layout, where its 14
+            // merely ties the packed sum-factored rate and is half the coloured one. The split
+            // is 2.7x slower than this kernel outright (14.3 against 39.0 MDOF/s, job
+            // 4982167). The finite-difference kernel was never a performance arm -- it is the
+            // correctness reference, and `--kernel current --assemble` silently measured it,
+            // which is one of the reports that made this flag a liability.
             assemble_jacobian_atomic_sumfact(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), bsr.element_slots.empty() ? nullptr : bsr.element_slots.data(), bsr.nnz, bsr.values->data(), rho, mu);
-        else if (kernel_kind == KernelKind::Sympy)
-            assemble_jacobian_atomic_sympy(d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.p.data(), d.ux.data(), d.uy.data(), d.uz.data(), bsr.element_slots.empty() ? nullptr : bsr.element_slots.data(), bsr.nnz, bsr.values->data(), rho, mu);
-        else if (kernel_kind == KernelKind::SympyBlock)
-            assemble_jacobian_atomic_sympy_block(d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.p.data(), d.ux.data(), d.uy.data(), d.uz.data(), bsr.element_slots.empty() ? nullptr : bsr.element_slots.data(), bsr.nnz, bsr.values->data(), rho, mu);
-        else if (kernel_kind == KernelKind::SympyRow)
-            assemble_jacobian_atomic_sympy_row(d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.p.data(), d.ux.data(), d.uy.data(), d.uz.data(), bsr.element_slots.empty() ? nullptr : bsr.element_slots.data(), bsr.nnz, bsr.values->data(), rho, mu);
-        else if (kernel_kind == KernelKind::SympyFace)
-            assemble_jacobian_atomic_sympy_face(d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.p.data(), d.ux.data(), d.uy.data(), d.uz.data(), bsr.element_slots.empty() ? nullptr : bsr.element_slots.data(), bsr.nnz, bsr.values->data(), rho, mu);
-        else if (kernel_kind == KernelKind::Split)
-            // Restore the geometry-only half built once at setup, then add only
-            // the velocity-dependent half. The linear half is not rebuilt here:
-            // that is the whole point of the split.
-            assemble_jacobian_atomic_nonlinear(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), bsr.element_slots.empty() ? nullptr : bsr.element_slots.data(), bsr.nnz, bsr.values->data(), rho, mu, jac_linear.data());
-        else
-            // Current and Fd both land here. There is no dedicated `current`
-            // assembly kernel -- the loop residual kernel has no assembled
-            // counterpart -- so `--kernel current --assemble` measures the
-            // finite-difference kernel. Kept as the fallback rather than
-            // rejected, because fd is also the correctness reference, but the
-            // two rows are the same kernel and should not be read as distinct.
-            assemble_jacobian_atomic_fd(d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.p.data(), d.ux.data(), d.uy.data(), d.uz.data(), bsr.colidx, bsr.element_slots.empty() ? nullptr : bsr.element_slots.data(), bsr.nnz, bsr.rowptr, bsr.values->data(), rho, mu);
-
         if (boundary)
             assemble_boundary_scs_jacobian_pass(d, bsr, rho, mu, geom_kind == GeomKind::Isoparam ? 1 : 0);
         assemble_transient_diag_pass(d, rho, bsr);
@@ -2130,7 +1964,7 @@ int main(int argc, char **argv) {
         // and the EXACT higher-order action -- the SIMD kernel takes ho and hov, which is what
         // the packed Jacobian passes it. Only the generated kernel arrangements are outside it,
         // and the recorded row says which one ran.
-        else if (kernel_kind == KernelKind::Sumfact) {
+        else {
             // Braced on purpose: the build below is a second statement in this branch, and an
             // unbraced one would attach the else that follows to the wrong call.
             if (cvfem_hex8_extras_of(d).with_rc) cvfem_hex8_build_rc_coeff(d, rho, mu);
@@ -2139,11 +1973,6 @@ int main(int argc, char **argv) {
                                               with_hograd ? vgrad.data() : nullptr,
                                               conv_limiter, scalar_t(0));
         }
-        else
-            apply_jacobian_action_atomic(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, dir_v, jac_out.data(),
-                                         with_hograd ? ugrad.data() : nullptr,
-                                         with_hograd ? vgrad.data() : nullptr,
-                                         conv_limiter, scalar_t(0));
 
         if (boundary)
             apply_boundary_scs_jacobian_action_pass(d, rho, mu, geom_kind == GeomKind::Isoparam ? 1 : 0, dir_v,
@@ -2282,12 +2111,10 @@ int main(int argc, char **argv) {
             if (own_mpi) MPI_Finalize();
             return 1;
         }
-        // `fd` assembles the matrix by central differences with eps=1e-6, so it agrees with
-        // the analytic action only to the truncation error of that -- about 5e-4 here, and
-        // the same figure with the boundary closure on or off. Comparing it at 1e-8 was
-        // measuring the reference against itself and failing every time; the looser bound
-        // is the right yardstick for a finite-difference matrix, not a concession.
-        const scalar_t mf_tol = kernel_kind == KernelKind::Fd ? scalar_t(1.0e-3) : scalar_t(1.0e-8);
+        // 1e-8 flat. This used to loosen to 1e-3 for `--kernel fd`, whose matrix is central
+        // differences with eps=1e-6 and so agrees with the analytic action only to about
+        // 5e-4. That kernel is in subpar/ now, so the bound no longer has to accommodate it.
+        const scalar_t mf_tol = scalar_t(1.0e-8);
         if (mf_err > mf_tol || atomic_err > 1.0e-12) {
             std::fprintf(stderr, "HEX8 Jacobian-action mismatch\n");
             if (own_mpi) MPI_Finalize();
@@ -2295,9 +2122,10 @@ int main(int argc, char **argv) {
         }
     }
 
-    // Verify the two strategies that reuse the full element kernel through a modified
-    // slot array: they must reproduce the full assembly exactly, not approximately.
-    if (verify_jac && (assemble_diag || kernel_kind == KernelKind::Split)) {
+    // Verify the strategy that reuses the full element kernel through a modified slot
+    // array: it must reproduce the full assembly exactly, not approximately. The split was
+    // the other one and is in subpar/, 2.7x slower than the assembly it replaced.
+    if (verify_jac && assemble_diag) {
         if (geom_kind == GeomKind::Isoparam)
             assemble_jacobian_atomic_isoparam(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), bsr.element_slots.empty() ? nullptr : bsr.element_slots.data(), bsr.nnz, bsr.values->data(), rho, mu);
         else
@@ -2327,26 +2155,6 @@ int main(int argc, char **argv) {
             std::printf("verify_diag_vs_full_assembly_rel: %.6e\n", rel);
             if (rel > 1.0e-12) {
                 std::fprintf(stderr, "HEX8 block-diagonal mismatch\n");
-                if (own_mpi) MPI_Finalize();
-                return 1;
-            }
-        } else if (geom_kind == GeomKind::Isoparam) {
-            // Isoparametric split: linear + nonlinear must reproduce the full assembly.
-            std::vector<scalar_t> full(ref, ref + (size_t)bsr.nnz * 16);
-            scalar_t              fmax = 0;
-            for (scalar_t v : full) fmax = std::max(fmax, std::fabs(v));
-            jac_linear.assign((size_t)(bsr.nnz * 16), scalar_t(0));
-            assemble_jacobian_atomic_linear_isoparam(d.elems, d.nelements, d.p.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(), bsr.element_slots.empty() ? nullptr : bsr.element_slots.data(), mu, jac_linear.data());
-            assemble_jacobian_atomic_nonlinear_isoparam(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), bsr.element_slots.empty() ? nullptr : bsr.element_slots.data(), bsr.nnz, bsr.values->data(), rho, mu, jac_linear.data());
-            if (boundary)
-                assemble_boundary_scs_jacobian_pass(d, bsr, rho, mu, 1);
-            assemble_transient_diag_pass(d, rho, bsr);
-            const scalar_t rel =
-                    max_abs_diff(full.data(), bsr.values->data(), (ptrdiff_t)full.size()) /
-                    (fmax > 0 ? fmax : scalar_t(1));
-            std::printf("verify_split_isoparam_vs_full_rel: %.6e\n", rel);
-            if (rel > 1.0e-12) {
-                std::fprintf(stderr, "HEX8 isoparametric split mismatch\n");
                 if (own_mpi) MPI_Finalize();
                 return 1;
             }
@@ -2552,8 +2360,33 @@ int main(int argc, char **argv) {
                 : assemble_diag ? "jacobian_block_diagonal"
                 : nodal_grad   ? "nodal_gradient"
                                : "residual");
+    // WHICH KERNEL RAN. This MUST mirror the dispatch in apply_fn / jac_fn /
+    // jac_action_fn / diag_fn; it is the one place where the report describes the code
+    // that executed rather than the flags that were passed, and
+    // tests/cvfem_bench_coverage_test checks the mapping.
+    // --kernel is gone, so this is no longer a check that the row names the kernel the user
+    // asked for; it is the only statement of WHICH kernel the configuration selected. The
+    // names are the ones the campaign CSVs already carry, so old rows stay comparable.
+    const char *const ran_kernel_name =
+                partial_assembly ? "pa_sumfact"
+                // The SpMV has no element kernel at all.
+                : bsr_apply ? "n/a"
+                // The isoparametric residual and action on a pack-based layout run the
+                // isoparametric SIMD kernel.
+                : (geom_kind == GeomKind::Isoparam && layout != "atomic" && !assemble) ? "isoparam_simd"
+                // Isoparametric assembly runs the hand-written scalar kernel on a pack-based
+                // layout, and on the atomic layout the generated one unless Rhie-Chow is on --
+                // which is the dispatch jac_fn makes, mirrored here.
+                : (geom_kind == GeomKind::Isoparam && assemble)
+                          ? ((layout == "atomic" && !rhie_chow) ? "sympy" : "current")
+                // The isoparametric atomic residual, same two-way choice.
+                : (geom_kind == GeomKind::Isoparam && layout == "atomic")
+                          ? (rhie_chow ? "current" : "sympy")
+                // Everything affine: the sum-factored kernel, lane-blocked where the
+                // operation has a lane-blocked form.
+                                                                   : "sumfact";
     std::printf("  layout: %s\n", layout.c_str());
-    std::printf("  kernel: %s\n", kernel.c_str());
+    std::printf("  kernel: %s\n", ran_kernel_name);
     std::printf("  geom: %s\n", geom.c_str());
     std::printf("  warp: %.6e\n", warp);
     std::printf("  OpenMP_threads: %d\n", threads_active());
@@ -2733,7 +2566,6 @@ int main(int argc, char **argv) {
                                  : assemble      ? layout.c_str()
                                  : (layout == "store") ? "packed"
                                                        : layout.c_str();
-        row.kernel               = kernel.c_str();
         row.geom                 = geom.c_str();
         row.threads              = threads_active();
         row.pack_size            = (layout == "atomic") ? 0 : pack_size;
@@ -2770,25 +2602,13 @@ int main(int argc, char **argv) {
         // now either refused at the top of main or covered by a case here, and
         // tests/cvfem_bench_coverage_test checks the mapping.
         //
-        // Three operations ignore --kernel entirely -- no apply_jacobian_action_* or
-        // assemble_diag_* takes a KernelKind, and the SpMV takes nothing at all -- so the
-        // requested name says nothing about what ran and "n/a" is the honest entry.
-        const bool kernel_ran = !(jac_action || bsr_apply || assemble_diag) ||
-                                kernel_is_action_only(kernel_kind);
-        row.ran_kernel =
-                partial_assembly ? "pa_sumfact"
-                : !kernel_ran ? "n/a"
-                // The isoparametric residual on a pack-based layout always runs the
-                // isoparametric SIMD kernel; the requested name is not consulted.
-                : (geom_kind == GeomKind::Isoparam && layout != "atomic" && !assemble) ? "isoparam_simd"
-                // Isoparametric assembly on a pack-based layout runs the hand-written
-                // scalar kernel for every name but `fd`: the branch there tests only for
-                // fd, so `sympy` reaches the same code `current` does.
-                : (geom_kind == GeomKind::Isoparam && layout != "atomic" && assemble &&
-                   kernel_kind != KernelKind::Fd)                  ? "current"
-                // There is no dedicated `current` assembly kernel, so it lands on fd.
-                : (assemble && kernel_kind == KernelKind::Current) ? "fd"
-                                                                   : kernel.c_str();
+        row.ran_kernel = ran_kernel_name;
+        // The `kernel` column used to carry the REQUESTED name and ran_kernel the one that
+        // executed; the pair existed so a row could be caught claiming a kernel it had not
+        // run. With no --kernel there is no request, so both carry what ran. The column stays
+        // rather than being dropped from the middle of the header, which would silently
+        // shift every positional reader of the campaign CSVs.
+        row.kernel = row.ran_kernel;
         // The exact form -- differentiating through the nodal gradient reconstruction --
         // is staged only by the Jacobian action. The assembled Jacobian keeps the frozen
         // form deliberately: the exact term couples pressures beyond nearest neighbours

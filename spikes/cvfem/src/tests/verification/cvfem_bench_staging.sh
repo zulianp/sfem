@@ -56,18 +56,18 @@ ok() {
 # oracles read exactly 0.0 at n=8 -- one pack, so the layouts see the same element order and
 # the same arithmetic -- and an agreement of zero would also hold if the correction were
 # silently skipped in both. So agreement is checked AND the answer is checked to have moved.
-FO_CK=$("$BENCH" --n 8 --repeat 1 --warmup 0 --layout packed --kernel sumfact 2>&1 \
+FO_CK=$("$BENCH" --n 8 --repeat 1 --warmup 0 --layout packed 2>&1 \
         | sed -n 's|^  checksum: \(.*\)$|\1|p' | head -1)
 
 ok_ho() {
     desc="$1"; shift
-    if ! out=$("$BENCH" --n 8 --repeat 1 --warmup 0 --verify-ho --layout atomic --kernel sumfact "$@" 2>&1); then
+    if ! out=$("$BENCH" --n 8 --repeat 1 --warmup 0 --verify-ho --layout atomic "$@" 2>&1); then
         printf '%-62s FAIL\n' "$desc"
         printf '%s\n' "$out" | sed 's/^/    /'
         FAIL=$((FAIL + 1))
         return
     fi
-    ck=$("$BENCH" --n 8 --repeat 1 --warmup 0 --layout packed --kernel sumfact "$@" 2>&1 \
+    ck=$("$BENCH" --n 8 --repeat 1 --warmup 0 --layout packed "$@" 2>&1 \
          | sed -n 's|^  checksum: \(.*\)$|\1|p' | head -1)
     if [ -z "$ck" ] || [ "$ck" = "$FO_CK" ]; then
         printf '%-62s FAIL (checksum equals first order: correction not applied)\n' "$desc"
@@ -83,7 +83,7 @@ ok_ho() {
 # both sides here carry the correction, so what is being tested is that the two KERNELS agree.
 ok_ho_rc() {
     desc="$1"; shift
-    if out=$("$BENCH" --n 8 --repeat 1 --warmup 0 --verify-ho --layout packed --kernel sumfact "$@" 2>&1); then
+    if out=$("$BENCH" --n 8 --repeat 1 --warmup 0 --verify-ho --layout packed "$@" 2>&1); then
         printf '%-62s OK   %s\n' "$desc" \
             "$(printf '%s\n' "$out" | grep -oE 'verify_packed_ho_rc_sympy_vs_scalar_abs: [0-9.e+-]*')"
     else
@@ -160,14 +160,11 @@ differs() {
 
 echo "== the boundary closure now reaches every assembly kernel and geometry"
 ok "assemble, no terms"                        --assemble
-ok "assemble + boundary, sumfact"              --assemble --boundary --kernel sumfact
-ok "assemble + boundary, sympy"                --assemble --boundary --kernel sympy
-ok "assemble + boundary, sympy_block"          --assemble --boundary --kernel sympy_block
-ok "assemble + boundary, split"                --assemble --boundary --kernel split
-ok "assemble + boundary, fd"                   --assemble --boundary --kernel fd
-ok "assemble + boundary, isoparam current"     --assemble --boundary --geom isoparam --kernel current
-ok "assemble + boundary, isoparam sympy"       --assemble --boundary --geom isoparam --kernel sympy
-ok "assemble + boundary, isoparam split"       --assemble --boundary --geom isoparam --kernel split
+ok "assemble + boundary, sumfact"              --assemble --boundary
+# Two rows, not eight. Seven of them named a micro-kernel variant; DESIGN.md's correction
+# leaves one assembly kernel per geometry, so what is left to check is that the boundary
+# closure reaches both of them.
+ok "assemble + boundary, isoparam"             --assemble --boundary --geom isoparam
 ok "bsr-apply + boundary"                      --bsr-apply --boundary
 
 echo "== the block diagonal carries both terms, on both geometries"
@@ -184,12 +181,13 @@ echo "== Rhie-Chow on the atomic isoparametric paths"
 # would actually have been wrong, is that the term reaches the kernel at all: a run with it
 # on must not produce the same answer as a run with it off. An argument that is accepted,
 # forwarded and then defaulted away is exactly the silent failure this whole stage is about.
-ok "assemble, isoparam split + rc"             --assemble --geom isoparam --kernel split --rhie-chow
-differs "residual, isoparam current"           --geom isoparam --kernel current
+# `split` is gone (2.7x slower, Grace job 4982167) and `current` is no longer a name but the
+# kernel the isoparametric atomic arms select WHEN RHIE-CHOW IS ON -- which is exactly the
+# dispatch these rows now exercise: the term has to reach it, or the run with it on would
+# answer the same as the run with it off.
+differs "residual, isoparam atomic"            --geom isoparam
 differs "jac-action, isoparam"                 --jac-action --geom isoparam
-differs "assemble, isoparam current"           --assemble --geom isoparam --kernel current
-differs "assemble, isoparam split"             --assemble --geom isoparam --kernel split
-differs "assemble, affine split"               --assemble --kernel split
+differs "assemble, isoparam atomic"            --assemble --geom isoparam
 differs "block diagonal, affine"               --assemble-diag
 differs "block diagonal, isoparam"             --assemble-diag --geom isoparam
 
@@ -277,7 +275,7 @@ ok "assemble + transient"                      --assemble --transient 0.01
 ok "assemble + transient + boundary"           --assemble --transient 0.01 --boundary
 ok "diag + transient"                          --assemble-diag --transient 0.01
 ok "diag + transient + rc + boundary"          --assemble-diag --transient 0.01 --rhie-chow --boundary
-ok "split + transient, isoparam"               --assemble --geom isoparam --kernel split --transient 0.01
+ok "assemble + transient, isoparam"            --assemble --geom isoparam --transient 0.01
 transient_reaches() {
     desc="$1"; shift
     off=$("$BENCH" --n 8 --repeat 1 --warmup 0 --layout "$@" 2>&1 | sed -n 's/^ *checksum: //p')
@@ -309,31 +307,23 @@ echo
 
 echo "== the partially assembled Jacobian action"
 # Measured and lost -- 17-19% slower than direct evaluation, see subpar/README.md -- so the
-# default build refuses it by name, the way it refuses --kernel sympy_row and sympy_face.
+# default build refuses it by name, the way it refuses every other retired kernel.
 # Its correctness is still covered, by cvfem_pa_tangent_test, which calls the kernels
 # directly and so keeps the quarantined path from rotting.
 refused_unless_subpar "PA (quarantined, needs -DCVFEM_ENABLE_SUBPAR=ON)"  --jac-action --layout packed --rhie-chow --partial-assembly
 
 echo "== still refused, and must stay so"
-# No generated kernel carries Rhie-Chow: the term was never put into the SymPy expressions.
-refused "assemble + rc, sympy"                 --assemble --rhie-chow --kernel sympy
-refused "assemble + rc, sympy_block"           --assemble --rhie-chow --kernel sympy_block
-refused "assemble + rc, isoparam sympy"        --assemble --rhie-chow --geom isoparam --kernel sympy
-# The finite-difference reference differences a residual that takes no pressure gradient.
-refused "assemble + rc, fd"                    --assemble --rhie-chow --kernel fd
-# The hand-written affine residual takes no Hex8RhieChow.
-refused "residual + rc, current"               --rhie-chow --kernel current
-# The isoparametric SIMD kernels take none either, which is what confines the
-# isoparametric case to the atomic layout.
-refused "residual + rc, isoparam packed"       --rhie-chow --geom isoparam --kernel current --layout packed
+# Eleven rows stood here. Seven refused a configuration by the NAME of a micro-kernel -- a
+# generated arrangement or the finite-difference reference asked for with --rhie-chow, which
+# none of them carries -- and those names no longer exist: the atomic arms now select the
+# kernel that does carry the term, so there is nothing left to refuse. What remains is the
+# refusal that is about a LAYOUT rather than a name, and it is the one that still bites: the
+# isoparametric residual and action on a pack-based layout run the SIMD kernels, which carry
+# no term, so the term cannot be honoured there whatever kernel is chosen.
+refused "residual + rc, isoparam packed"       --rhie-chow --geom isoparam --layout packed
 refused "jac-action + rc, isoparam packed"     --rhie-chow --jac-action --geom isoparam --layout packed
-# Assembly on the pack-based layouts has no Rhie-Chow staging at all yet.
-# Isoparametric residual and action on a pack-based layout run the SIMD kernels, which
-# carry no term. Assembly there is scalar and does, which is why only these two are refused.
-refused "residual + rc, isoparam store"        --rhie-chow --geom isoparam --kernel current --layout store
+refused "residual + rc, isoparam store"        --rhie-chow --geom isoparam --layout store
 refused "jac-action + rc, isoparam colored"    --rhie-chow --jac-action --geom isoparam --layout colored
-# The generated action arrangements carry no boundary or Rhie-Chow term.
-refused "jac-action + rc, sympy_action"        --jac-action --rhie-chow --kernel sympy_action
 
 if [ "$FAIL" -ne 0 ]; then
     echo "cvfem_bench_staging: $FAIL configuration(s) failed"

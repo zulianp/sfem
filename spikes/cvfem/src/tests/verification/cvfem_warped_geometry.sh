@@ -37,7 +37,7 @@ check() { # label value
 for warp in 0 0.05 0.2; do
     echo "warp=$warp"
 
-    out=$("$BENCH" --n "$N" --repeat 1 --warmup 0 --layout packed --kernel sumfact \
+    out=$("$BENCH" --n "$N" --repeat 1 --warmup 0 --layout packed \
                    --jac-action --rhie-chow --warp "$warp" 2>&1)
     rel=$(printf '%s\n' "$out" | sed -n 's/.*jac_action_rc_vs_atomic_rel: \([0-9.e+-]*\).*/\1/p' | head -1)
     if [ -z "$rel" ]; then
@@ -48,7 +48,7 @@ for warp in 0 0.05 0.2; do
         check "Jacobian vs the scalar reference" "$rel" || fail=1
     fi
 
-    out=$("$BENCH" --n 24 --layout packed --kernel sumfact --rhie-chow --warp "$warp" --verify 2>&1)
+    out=$("$BENCH" --n 24 --layout packed --rhie-chow --warp "$warp" --verify 2>&1)
     abs=$(printf '%s\n' "$out" | sed -n 's/.*verify_rc_packed_residual_vs_atomic_abs: \([0-9.e+-]*\).*/\1/p' | head -1)
     if [ -z "$abs" ]; then
         echo "  residual packed vs atomic                       (no value)   FAIL"
@@ -62,7 +62,7 @@ for warp in 0 0.05 0.2; do
     # first and permuted after, or not permuted at all -- the kernel and its inputs describe
     # different elements, and on a cube that is invisible because the adjugate is the same for
     # every element. Here it is not.
-    out=$("$BENCH" --n 24 --layout ecolor --kernel sumfact --rhie-chow --warp "$warp" --verify 2>&1)
+    out=$("$BENCH" --n 24 --layout ecolor --rhie-chow --warp "$warp" --verify 2>&1)
     abs=$(printf '%s\n' "$out" | sed -n 's/.*verify_ecolor_residual_vs_atomic_abs: \([0-9.e+-]*\).*/\1/p' | head -1)
     if [ -z "$abs" ]; then
         echo "  residual ecolor vs atomic                       (no value)   FAIL"
