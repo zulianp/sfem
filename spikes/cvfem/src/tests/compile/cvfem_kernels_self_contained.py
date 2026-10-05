@@ -116,12 +116,22 @@ def main():
     # reads the INDEX rather than the filesystem, because that is what a fresh clone gets.
     cml = (ROOT.parent / "CMakeLists.txt").read_text()
     want = sorted(set(re.findall(r"COMMAND \$\{CMAKE_CURRENT_SOURCE_DIR\}/(\S+\.sh)", cml)))
+    #
+    # This is the one check here that needs a git checkout, and the spike is routinely run from a
+    # tree that is not one: every Alps run works from an rsync'd copy with no .git, where
+    # `git ls-files` exits 128. Treating that as a layout failure made this gate fail on the
+    # cluster while passing locally on the same commit -- a red gate saying nothing about the
+    # code. So the check is LOST rather than failed, and lost loudly: the summary line says what
+    # it could not do instead of claiming a check it never made. It is not weakened where it can
+    # run, which is every local ctest and therefore every commit.
+    skipped = ""
     if want:
         try:
             idx = subprocess.run(["git", "ls-files", "-s", "--", *want], cwd=ROOT.parent,
                                  capture_output=True, text=True, check=True).stdout
-        except (OSError, subprocess.CalledProcessError) as e:
-            bad.append(f"could not read the git index to check script modes: {e}")
+        except (OSError, subprocess.CalledProcessError):
+            skipped = (f"script modes NOT CHECKED: no readable git index at {ROOT.parent} "
+                       f"-- expected in an rsync'd or exported tree, a real failure in a clone")
         else:
             modes = {}
             for line in idx.splitlines():
@@ -203,10 +213,12 @@ def main():
             print("  " + b, file=sys.stderr)
         return 1
     n_hdr = sum(1 for _ in kernels.rglob("*.hpp"))
+    modes = (skipped if skipped
+             else f"all {len(want)} shell tests ctest runs are executable in the index")
     print(f"PASSED: {n_hdr} headers under src/kernels/, none reaching outside it by "
           f"include or by call; "
           f"src/ has only the directories this layout names; "
-          f"all {len(want)} shell tests ctest runs are executable in the index")
+          f"{modes}")
     return 0
 
 
