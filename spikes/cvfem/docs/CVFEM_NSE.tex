@@ -245,6 +245,46 @@ matters: an entropy-fix style band that saturates $|\mdot|$ at a floor $\varepsi
 which in a unidirectional flow is most of the mesh. Taking $\varepsilon = 0$ recovers the hard
 switch exactly.
 
+\subsection{Second order by deferred correction}
+\label{sec:defcor}
+
+The upwinded state in \eqref{eq:flux} is the donor node's value, which is first order. The
+scheme reaches second order by a deferred correction: the donor value is extrapolated to the
+sub-control surface along the reconstructed nodal gradient,
+\begin{equation}
+  \phi_{\mathrm{up}} \;=\; \phi_C \;+\; \Psi \, \nabla \phi_C \cdot \bd_{C \to s} ,
+  \label{eq:defcor}
+\end{equation}
+with $\bd_{C \to s}$ the offset from the donor node to the surface centroid and $\Psi$ a
+limiter. The gradient is the same nodal reconstruction the Rhie--Chow term uses
+(Section~\ref{sec:nodalgrad}), so the correction adds no sweep of its own; it is lagged one
+Newton step, which is what ``deferred'' means here.
+
+Four choices of $\Psi$ are carried, because the limiter is the part of the reconstruction with
+data-dependent selects in it and each behaves differently:
+
+\begin{itemize}
+  \item $\Psi = 1$, unlimited, which is second order and not bounded;
+  \item a bounded-face clip, which pins $\phi_{\mathrm{up}}$ into the interval spanned by the
+        two nodes of the surface;
+  \item Venkatakrishnan's limiter, with his dimensionless $K$ setting
+        $\varepsilon^2 = u_{\mathrm{ref}}^2 (K/L)^3 h^3$ so that the limiter switches itself off
+        where the field is smooth;
+  \item Darwish and Moukalled's, which rebuilds the one-dimensional TVD stencil by placing a
+        virtual upwind node, so the classical limiter family applies with no neighbour min/max.
+\end{itemize}
+
+Two properties matter for the Jacobian rather than for the solution. The limited increment is
+continuous but not differentiable: a clip is non-smooth where it engages, and both remaining
+limiters branch on a sign. The Jacobian action differentiates \eqref{eq:defcor} exactly, which
+means differentiating through the reconstruction --- the same second pass the exact Rhie--Chow
+term pays for --- and means choosing a subgradient where the limiter has none. Those choices
+have to be made against a rounding of the data and not against a quantity that vanishes with
+the one being tested, or two implementations of the same operator disagree by far more than
+round-off: the measured consequence of getting it wrong was $10^{-4}$ between two mesh layouts,
+on a limiter whose value agreed to the last bit. And $K = 0$, which is a legitimate limiter for
+the value, is the case in which Venkatakrishnan's $\varepsilon^2$ stops bounding that choice.
+
 \section{Pressure--velocity coupling}
 \label{sec:rc}
 
@@ -555,6 +595,53 @@ The frozen-Rhie--Chow row is there because the assembled matrix carries that for
 exact one: it cannot carry the exact term without widening its one-ring sparsity. It is
 therefore the matrix-free operator to compare against $Jv$, and the only row in this table that
 is not part of the cumulative sequence above it.
+
+\subsection{The higher-order convective flux}
+
+Every row above runs the first-order upwind flux. The deferred correction of
+Section~\ref{sec:defcor} is what the scheme runs when accuracy matters, and it is the one part of
+the operator family the table said nothing about. Measured in one allocation at the same size,
+medians of seven, with the first-order Rhie--Chow operator as the reference because that is what
+each correction is added to --- $1844$ and $944$ here, which agree with the corresponding rows
+above to within $0.6\%$.
+
+\begin{center}
+\begin{tabular}{lrrr}
+\toprule
+Operator & MDOF/s & vs.\ first order & flops/element \\
+\midrule
+Residual, first order $+$ Rhie--Chow                  & 1844 & 1.00 &  754 \\
+\quad $+$ correction, unlimited                       &  958 & 1.93 & 1426 \\
+\quad $+$ correction, bounded-face clip               &  755 & 2.44 & 1570 \\
+\quad $+$ correction, Venkatakrishnan                 &  649 & 2.84 & 2506 \\
+\quad $+$ correction, Darwish--Moukalled              &  697 & 2.65 & 2146 \\
+\quad $+$ Venkatakrishnan, boundary and transient     &  599 & 3.08 & 2506 \\
+\midrule
+Jacobian action, first order $+$ exact Rhie--Chow     &  944 & 1.00 &  850 \\
+\quad $+$ correction, unlimited                       &  455 & 2.07 & 2098 \\
+\quad $+$ correction, Venkatakrishnan                 &  339 & 2.78 & 5554 \\
+\quad $+$ Venkatakrishnan, boundary and transient     &  326 & 2.89 & 5554 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The flop column is in the table because the throughput ratio alone would be read as the
+correction's arithmetic cost and it is not. The correction runs through the \emph{scalar}
+sum-factored kernel --- the only one that accepts the nodal velocity gradient --- while the
+first-order packed residual is sixteen lanes wide, so a ratio of $2.84$ against a flop ratio of
+$3.3$ is measuring a change of kernel as much as a change of scheme. The same thing read off the
+standard layout, where both are scalar, gives $1.89$.
+
+That is also why the packed layout's advantage shrinks here: $1.99$ over the standard layout for
+the first-order residual and $1.32$ for the Venkatakrishnan one. Where the kernel is scalar on
+both layouts, what is left is the scatter.
+
+The derivative is the expensive half, and by more than the residual's factor: the correction
+costs the Jacobian action $2.78$ against the residual's $2.84$ on the same limiter, but it does
+so on top of an operator that was already $2.18$ times the bare sweep, and its flop count rises
+from $850$ to $5554$ --- a factor of $6.5$, against the residual's $3.3$. The limiter has to be
+differentiated through the nodal gradient reconstruction, and that reconstruction is what the
+exact Rhie--Chow term already pays for once.
 
 Three readings of this table bear on the design rather than on the implementation.
 
