@@ -18,12 +18,19 @@
 
 #include <cstddef>
 
-struct BdfCoeffs {
+// Templated with the build's scalar as the alias, like every other type in src/kernels/: a
+// sweep instantiated at single precision carries its own coefficients, and a struct fixed at
+// the build's scalar would have been one more thing in the chain that was not.
+template <typename scalar_t>
+struct BdfCoeffsT {
     scalar_t a0, a1, a2;
     int      order;
 };
 
-static inline BdfCoeffs cvfem_bdf_coeffs(const int      bdf_order,
+using BdfCoeffs = BdfCoeffsT<scalar_t>;
+
+template <typename scalar_t>
+static inline BdfCoeffsT<scalar_t> cvfem_bdf_coeffs(const int      bdf_order,
                                          const scalar_t dt,
                                          const scalar_t dt_prev,
                                          const bool     history_has_two_levels) {

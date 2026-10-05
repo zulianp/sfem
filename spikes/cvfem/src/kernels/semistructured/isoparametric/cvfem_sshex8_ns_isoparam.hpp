@@ -16,6 +16,7 @@
 #include "kernels/semistructured/cvfem_sshex8_ns.hpp"
 
 // The naive apply over CURVED macro elements. The affine half is sscvfem_apply_naive_affine.
+template <typename scalar_t, typename geom_t, typename idx_t>
 inline SFEM_NOINLINE void sscvfem_apply_naive_isoparam(
         // The range this call is to cover, as positions in macro_order. DESIGN.md: the
         // threading is abstract outside the sweep and what arrives is a range, so the sweep
@@ -39,7 +40,7 @@ inline SFEM_NOINLINE void sscvfem_apply_naive_isoparam(
         const scalar_t *const SFEM_RESTRICT ux_src,
         const scalar_t *const SFEM_RESTRICT uy_src,
         const scalar_t *const SFEM_RESTRICT uz_src,
-        const Hex8RcConfig rcfg, const scalar_t rho, const scalar_t mu,
+        const Hex8RcConfigT<scalar_t> rcfg, const scalar_t rho, const scalar_t mu,
                                               const scalar_t *const SFEM_RESTRICT dir,
                                               scalar_t *const SFEM_RESTRICT       jv) {
     const int L = level;
@@ -57,6 +58,7 @@ inline SFEM_NOINLINE void sscvfem_apply_naive_isoparam(
 
 // The macro-local apply over CURVED macro elements: every micro cell derives its own geometry,
 // and nothing hoists.
+template <typename scalar_t, typename geom_t, typename idx_t>
 inline SFEM_NOINLINE void sscvfem_apply_macro_local_isoparam(
         // The range this call is to cover, as positions in macro_order. DESIGN.md: the
         // threading is abstract outside the sweep and what arrives is a range, so the sweep
@@ -81,7 +83,7 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_isoparam(
         const scalar_t *const SFEM_RESTRICT ux_src,
         const scalar_t *const SFEM_RESTRICT uy_src,
         const scalar_t *const SFEM_RESTRICT uz_src,
-        const Hex8RcConfig rcfg, const scalar_t rho, const scalar_t mu,
+        const Hex8RcConfigT<scalar_t> rcfg, const scalar_t rho, const scalar_t mu,
                                                     const scalar_t *const SFEM_RESTRICT dir,
                                                     scalar_t *const SFEM_RESTRICT       jv) {
     const int L   = level;
@@ -89,23 +91,24 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_isoparam(
     int       off[8];
     sscvfem_corner_offsets(L, off);
 
-    const SSMacroScratch s = sscvfem_macro_scratch(nxe, CVFEM_HEX8_N_FIELDS, true, false, false);
+    const SSMacroScratchT<scalar_t, idx_t> s = sscvfem_macro_scratch<scalar_t, idx_t>(nxe, CVFEM_HEX8_N_FIELDS, true, false, false);
 
     for (ptrdiff_t i = r.begin; i < r.end; ++i) {
         const ptrdiff_t e = macro_order ? macro_order[i] : i;
-        sscvfem_macro_gather(s, elems, points, pres, pgx_src, pgy_src, pgz_src, nullptr, nullptr,
-                             nullptr, nullptr, ux_src, uy_src, uz_src, dir, e, nxe,
+        sscvfem_macro_gather(s, elems, points, pres, pgx_src, pgy_src, pgz_src, static_cast<const scalar_t *>(nullptr), static_cast<const scalar_t *>(nullptr),
+                             static_cast<const scalar_t *>(nullptr), static_cast<const scalar_t *>(nullptr), ux_src, uy_src, uz_src, dir, e, nxe,
                              CVFEM_HEX8_N_FIELDS);
 
         sscvfem_apply_macro_local_curved_macro(box_lx, box_ly, box_lz, rcfg, rho, mu, upwind_eps, s,
                                                level, off);
-        sscvfem_macro_drain(s, nullptr, nullptr, nxe, e, jv);
+        sscvfem_macro_drain(s, static_cast<const int *>(nullptr), static_cast<scalar_t *>(nullptr), nxe, e, jv);
     }
 }
 
 
 // The naive residual over CURVED macro elements: every micro cell derives its own geometry, and
 // nothing hoists.
+template <typename scalar_t, typename geom_t, typename idx_t>
 inline SFEM_NOINLINE void sscvfem_residual_naive_isoparam(
         // The range this call is to cover, as positions in macro_order. DESIGN.md: the
         // threading is abstract outside the sweep and what arrives is a range, so the sweep
@@ -131,7 +134,7 @@ inline SFEM_NOINLINE void sscvfem_residual_naive_isoparam(
         const scalar_t *const SFEM_RESTRICT ux_src,
         const scalar_t *const SFEM_RESTRICT uy_src,
         const scalar_t *const SFEM_RESTRICT uz_src,
-        const Hex8RcConfig rcfg, const scalar_t rho, const scalar_t mu,
+        const Hex8RcConfigT<scalar_t> rcfg, const scalar_t rho, const scalar_t mu,
                                                  scalar_t *const SFEM_RESTRICT res) {
     // The destination arrives ZEROED. It used to be zeroed here, which was correct while this
     // sweep owned its parallel region and ran once; driven by a range it runs once per thread,
@@ -153,6 +156,7 @@ inline SFEM_NOINLINE void sscvfem_residual_naive_isoparam(
 
 // The naive block diagonal over CURVED macro elements: every micro cell derives its own
 // geometry, and nothing hoists.
+template <typename scalar_t, typename geom_t, typename idx_t>
 inline SFEM_NOINLINE void sscvfem_block_diag_naive_isoparam(
         // The range this call is to cover, as positions in macro_order. DESIGN.md: the
         // threading is abstract outside the sweep and what arrives is a range, so the sweep
@@ -176,7 +180,7 @@ inline SFEM_NOINLINE void sscvfem_block_diag_naive_isoparam(
         const scalar_t *const SFEM_RESTRICT ux_src,
         const scalar_t *const SFEM_RESTRICT uy_src,
         const scalar_t *const SFEM_RESTRICT uz_src,
-        const Hex8RcConfig rcfg, const scalar_t rho, const scalar_t mu,
+        const Hex8RcConfigT<scalar_t> rcfg, const scalar_t rho, const scalar_t mu,
                                                    scalar_t *const SFEM_RESTRICT out) {
 
     const int L = level;
@@ -198,6 +202,7 @@ inline SFEM_NOINLINE void sscvfem_block_diag_naive_isoparam(
 // gathered the macro element's eight corners and evaluated its Jacobian for every macro element,
 // and on a curved one used neither -- the only thing it took from them was the degenerate-
 // determinant guard, and a curved cell carries its own.
+template <typename scalar_t, typename geom_t, typename idx_t>
 inline void sscvfem_nodal_grad_scatter_isoparam(
         // The staging object is gone; what this sweep reads out of it is what it takes.
         idx_t **const SFEM_RESTRICT elems,
@@ -256,7 +261,7 @@ inline void sscvfem_nodal_grad_scatter_isoparam(
             for (int yi = 0; yi < L; ++yi)
                 for (int xi = 0; xi < L; ++xi)
                     sscvfem_nodal_grad_cell(elems, points, lp, lg, slot, lacc, e, L, xi, yi, zi, off,
-                                            nullptr, scalar_t(0), ogx, ogy, ogz);
+                                            static_cast<const scalar_t *>(nullptr), scalar_t(0), ogx, ogy, ogz);
 
         if (slot) {
             scalar_t *dst[SSCVFEM_NGRAD] = {ogx, ogy, ogz};
@@ -275,6 +280,7 @@ inline void sscvfem_nodal_grad_scatter_isoparam(
 // The hoisted Jacobian action over CURVED macro elements: every micro cell builds its own
 // SSMacroGeom, and the macro element's is never built at all -- the branching sweep built one
 // per macro element and the curved branch overwrote it in the first cell.
+template <typename scalar_t, typename geom_t, typename idx_t>
 inline SFEM_NOINLINE void sscvfem_apply_macro_hoisted_isoparam(
         // The range this call is to cover, as positions in macro_order. DESIGN.md: the
         // threading is abstract outside the sweep and what arrives is a range, so the sweep
@@ -310,7 +316,7 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_hoisted_isoparam(
         const scalar_t *const SFEM_RESTRICT ux_src,
         const scalar_t *const SFEM_RESTRICT uy_src,
         const scalar_t *const SFEM_RESTRICT uz_src,
-        const Hex8RcConfig rcfg,
+        const Hex8RcConfigT<scalar_t> rcfg,
         
         // The staging object is gone; what this sweep reads out of it is what it takes.
         const ptrdiff_t *const SFEM_RESTRICT red_idx,
@@ -329,18 +335,18 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_hoisted_isoparam(
     // Whether the direction's pressure gradient is there at all. Above the scratch because the
     // scratch is sized from it.
     const bool           has_qg = qgx_src;
-    const SSMacroScratch s = sscvfem_macro_scratch(nxe, CVFEM_HEX8_N_FIELDS, true, has_qg, false);
+    const SSMacroScratchT<scalar_t, idx_t> s = sscvfem_macro_scratch<scalar_t, idx_t>(nxe, CVFEM_HEX8_N_FIELDS, true, has_qg, false);
 
     for (ptrdiff_t i = r.begin; i < r.end; ++i) {
         const ptrdiff_t e = macro_order ? macro_order[i] : i;
         sscvfem_macro_gather(s, elems, points, pres, pgx_src, pgy_src, pgz_src, qgx_src, qgy_src,
-                             qgz_src, nullptr, ux_src, uy_src, uz_src, dir, e, nxe,
+                             qgz_src, static_cast<const scalar_t *>(nullptr), ux_src, uy_src, uz_src, dir, e, nxe,
                              CVFEM_HEX8_N_FIELDS);
 
         // Per macro element, and the curved sweep reads the same one: a call per micro cell
         // there took this unit past the point where GCC inlines sscvfem_rc_config, which then
         // became a call in every cell of the block diagonal, 9% slower on boxes.
-        const Hex8RcConfig rc_macro = rcfg;
+        const Hex8RcConfigT<scalar_t> rc_macro = rcfg;
         sscvfem_action_hoisted_curved_macro(box_lx, box_ly, box_lz, bc_p, bc_tx, bc_ty, bc_tz,
                                             face_mask, natural_mask, pressure_mask, traction_mask,
                                             rc_macro, rho, mu, upwind_eps, s, has_qg, e, level, off);
@@ -356,6 +362,7 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_hoisted_isoparam(
 // The residual over CURVED macro elements: every micro cell builds its own geometry and takes
 // its Rhie-Chow distances from its own corners, which is what keeps it consistent with the
 // Jacobian action's.
+template <typename scalar_t, typename geom_t, typename idx_t>
 inline SFEM_NOINLINE void sscvfem_residual_isoparam(
         // The range this call is to cover, as positions in macro_order. DESIGN.md: the
         // threading is abstract outside the sweep and what arrives is a range, so the sweep
@@ -394,7 +401,7 @@ inline SFEM_NOINLINE void sscvfem_residual_isoparam(
         const scalar_t *const SFEM_RESTRICT ux_src,
         const scalar_t *const SFEM_RESTRICT uy_src,
         const scalar_t *const SFEM_RESTRICT uz_src,
-        const Hex8RcConfig rcfg,
+        const Hex8RcConfigT<scalar_t> rcfg,
         
         // The staging object is gone; what this sweep reads out of it is what it takes.
         const ptrdiff_t *const SFEM_RESTRICT red_idx,
@@ -410,18 +417,18 @@ inline SFEM_NOINLINE void sscvfem_residual_isoparam(
     int       off[8];
     sscvfem_corner_offsets(L, off);
 
-    const SSMacroScratch s = sscvfem_macro_scratch(nxe, CVFEM_HEX8_N_FIELDS, false, false, conv_ho != 0);
+    const SSMacroScratchT<scalar_t, idx_t> s = sscvfem_macro_scratch<scalar_t, idx_t>(nxe, CVFEM_HEX8_N_FIELDS, false, false, conv_ho != 0);
 
     for (ptrdiff_t i = r.begin; i < r.end; ++i) {
         const ptrdiff_t e = macro_order ? macro_order[i] : i;
-        sscvfem_macro_gather(s, elems, points, pres, pgx_src, pgy_src, pgz_src, nullptr, nullptr,
-                             nullptr, ugrad_f, ux_src, uy_src, uz_src, nullptr, e, nxe,
+        sscvfem_macro_gather(s, elems, points, pres, pgx_src, pgy_src, pgz_src, static_cast<const scalar_t *>(nullptr), static_cast<const scalar_t *>(nullptr),
+                             static_cast<const scalar_t *>(nullptr), ugrad_f, ux_src, uy_src, uz_src, static_cast<const scalar_t *>(nullptr), e, nxe,
                              CVFEM_HEX8_N_FIELDS);
 
         // Per macro element, and the curved sweep reads the same one: a call per micro cell
         // there took this unit past the point where GCC inlines sscvfem_rc_config, which then
         // became a call in every cell of the block diagonal, 9% slower on boxes.
-        const Hex8RcConfig rc_macro = rcfg;
+        const Hex8RcConfigT<scalar_t> rc_macro = rcfg;
         sscvfem_residual_curved_macro(box_lx, box_ly, box_lz, bc_p, bc_tx, bc_ty, bc_tz, conv_ho,
                                       conv_limiter, peclet, conv_venkat_c, limiter_stats, face_mask,
                                       natural_mask, pressure_mask, traction_mask, upwind_eps, rcfg,
@@ -437,7 +444,7 @@ inline SFEM_NOINLINE void sscvfem_residual_isoparam(
 
 // The 2x2 field-block apply over CURVED macro elements: every micro cell builds its own
 // geometry, and the macro element's is never built.
-template <int Blocks>
+template <int Blocks, typename scalar_t, typename geom_t, typename idx_t>
 inline SFEM_NOINLINE void sscvfem_apply_blocks_isoparam(
         // The range this call is to cover, as positions in macro_order. DESIGN.md: the
         // threading is abstract outside the sweep and what arrives is a range, so the sweep
@@ -473,7 +480,7 @@ inline SFEM_NOINLINE void sscvfem_apply_blocks_isoparam(
         const scalar_t *const SFEM_RESTRICT ux_src,
         const scalar_t *const SFEM_RESTRICT uy_src,
         const scalar_t *const SFEM_RESTRICT uz_src,
-        const Hex8RcConfig rcfg,
+        const Hex8RcConfigT<scalar_t> rcfg,
         
         // The staging object is gone; what this sweep reads out of it is what it takes.
         const ptrdiff_t *const SFEM_RESTRICT red_idx,
@@ -495,7 +502,7 @@ inline SFEM_NOINLINE void sscvfem_apply_blocks_isoparam(
     // The direction's pressure gradient is read only where a pressure column is wanted, so a
     // momentum-row block skips this gather along with the rest of the pressure work.
     const bool           has_qg = (up || pp) && qgx_src;
-    const SSMacroScratch s = sscvfem_macro_scratch(nxe, CVFEM_HEX8_N_FIELDS, true, has_qg, false);
+    const SSMacroScratchT<scalar_t, idx_t> s = sscvfem_macro_scratch<scalar_t, idx_t>(nxe, CVFEM_HEX8_N_FIELDS, true, has_qg, false);
 
     for (ptrdiff_t i = r.begin; i < r.end; ++i) {
         const ptrdiff_t e = macro_order ? macro_order[i] : i;
@@ -506,7 +513,7 @@ inline SFEM_NOINLINE void sscvfem_apply_blocks_isoparam(
         // Per macro element, and the curved sweep reads the same one: a call per micro cell
         // there took this unit past the point where GCC inlines sscvfem_rc_config, which then
         // became a call in every cell of the block diagonal, 9% slower on boxes.
-        const Hex8RcConfig rc_macro = rcfg;
+        const Hex8RcConfigT<scalar_t> rc_macro = rcfg;
         sscvfem_blocks_curved_macro<Blocks>(box_lx, box_ly, box_lz, bc_p, bc_tx, bc_ty, bc_tz,
                                             face_mask, natural_mask, pressure_mask, traction_mask,
                                             upwind_eps, rc_macro, rho, mu, s, has_qg, e, level, off);
@@ -521,6 +528,7 @@ inline SFEM_NOINLINE void sscvfem_apply_blocks_isoparam(
 
 // The block diagonal over CURVED macro elements: every micro cell with its own geometry, and no
 // hoisted geometry built at all.
+template <typename scalar_t, typename geom_t, typename idx_t>
 inline SFEM_NOINLINE void sscvfem_block_diag_isoparam(
         // The range this call is to cover, as positions in macro_order. DESIGN.md: the
         // threading is abstract outside the sweep and what arrives is a range, so the sweep
@@ -552,7 +560,7 @@ inline SFEM_NOINLINE void sscvfem_block_diag_isoparam(
         const scalar_t *const SFEM_RESTRICT ux,
         const scalar_t *const SFEM_RESTRICT uy,
         const scalar_t *const SFEM_RESTRICT uz,
-        const Hex8RcConfig rcfg,
+        const Hex8RcConfigT<scalar_t> rcfg,
         
         // The staging object is gone; what this sweep reads out of it is what it takes.
         const ptrdiff_t *const SFEM_RESTRICT red_idx,
@@ -568,12 +576,12 @@ inline SFEM_NOINLINE void sscvfem_block_diag_isoparam(
     sscvfem_corner_offsets(L, off);
 
     // Sixteen wide: this destination is a 4x4 block per node, not a residual.
-    const SSMacroScratch s = sscvfem_macro_scratch(nxe, 16, false, false, false);
+    const SSMacroScratchT<scalar_t, idx_t> s = sscvfem_macro_scratch<scalar_t, idx_t>(nxe, 16, false, false, false);
 
     for (ptrdiff_t i = r.begin; i < r.end; ++i) {
         const ptrdiff_t e = macro_order ? macro_order[i] : i;
-        sscvfem_macro_gather(s, elems, points, pres, pgx, pgy, pgz, nullptr, nullptr, nullptr,
-                             nullptr, ux, uy, uz, nullptr, e, nxe, 16);
+        sscvfem_macro_gather(s, elems, points, pres, pgx, pgy, pgz, static_cast<const scalar_t *>(nullptr), static_cast<const scalar_t *>(nullptr), static_cast<const scalar_t *>(nullptr),
+                             static_cast<const scalar_t *>(nullptr), ux, uy, uz, static_cast<const scalar_t *>(nullptr), e, nxe, 16);
         sscvfem_block_diag_curved_macro(box_lx, box_ly, box_lz, bc_p, bc_tx, bc_ty, bc_tz, level,
                                         face_mask, natural_mask, pressure_mask, traction_mask, rcfg,
                                         rho, mu, s, e, off);
@@ -592,6 +600,7 @@ inline SFEM_NOINLINE void sscvfem_block_diag_isoparam(
 // The same volume sum over CURVED macro elements: every micro cell's own determinant, and no
 // macro geometry built at all. See sscvfem_cell_volume_affine for what the two callers are and
 // why `scale` is a parameter.
+template <typename scalar_t, typename geom_t, typename idx_t>
 static SFEM_NOINLINE void sscvfem_cell_volume_isoparam(
         // The staging object is gone; what this kernel reads out of it is what it takes.
         idx_t **const SFEM_RESTRICT elems,

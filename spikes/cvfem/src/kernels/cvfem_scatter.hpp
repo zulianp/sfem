@@ -21,6 +21,7 @@
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #endif
 
+template <typename scalar_t>
 static void reset_residual(const ptrdiff_t nnodes,
                            scalar_t *const SFEM_RESTRICT rx,
                            scalar_t *const SFEM_RESTRICT ry,
@@ -35,10 +36,15 @@ static void reset_residual(const ptrdiff_t nnodes,
     }
 }
 
+// Templated on both types, which is what DESIGN.md's third correction asks of every kernel: a
+// sweep instantiated at single precision reaches this with a `float *`, and an untemplated
+// scatter would have been the one thing in the chain still binding to the build's scalar.
+template <typename scalar_t, typename idx_t>
 static SFEM_INLINE void atomic_add(scalar_t *const SFEM_RESTRICT f, const idx_t id, const scalar_t value) {
     CVFEM_ATOMIC_ADD(f[id], value);
 }
 
+template <typename count_t, typename idx_t>
 static SFEM_INLINE count_t find_bsr_slot(const count_t *const SFEM_RESTRICT rowptr,
                                                 const idx_t *const SFEM_RESTRICT   colidx,
                                                 const idx_t                        row,
