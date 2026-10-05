@@ -339,6 +339,16 @@ static SFEM_INLINE double phase_now() { return g_breakdown ? wall_time() : 0.0; 
 static int g_dense_flush = 0;  // --dense-flush: stage ke densely, then flush 64 contiguous blocks
 static int g_kernel_only = 0;  // --kernel-only: element kernel writes to a dense stack buffer (no scatter)
 static int g_identity_slots[64];
+
+// WHAT THE ASSEMBLY SWEEPS GET INSTEAD OF THESE GLOBALS. The sweeps used to read
+// g_kernel_only, g_dense_flush and g_identity_slots directly, which is the clause DESIGN.md
+// states outright: "No user level option flags are propgated down here (like now), they are
+// handled outside in the front-end". They take one pointer now, and this is the front end that
+// resolves it -- null when neither flag is set, which is what makes the branch fold away for
+// every run that does not ask.
+static SFEM_INLINE const int *cvfem_hex8_identity_slots_or_null() {
+    return (g_kernel_only || g_dense_flush) ? g_identity_slots : nullptr;
+}
 // PH_QGRAD is not a phase of an element sweep like the others: it is the separate
 // reconstruction pass that the exact Rhie-Chow Jacobian action runs before the sweep, and it
 // is the largest single item in that matvec -- 5.06 ms of 7.34 at 4,121,204 dof on Grace,

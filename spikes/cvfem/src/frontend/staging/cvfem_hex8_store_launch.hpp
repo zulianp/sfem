@@ -173,7 +173,8 @@ static SFEM_NOINLINE void assemble_jacobian_store(MeshData        &d,
                 assemble_jacobian_store_affine_range(cvfem_range{pack, pack + 1},
                                                d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_idx, p.ghost_ptr, p.n_elements_per_pack, p.owned_nodes_ptr, p.st_element_slot.data(), p.st_ghost_ptr.data(), p.st_ghost_val.data(), p.st_local_nnz.data(), p.st_owned_nnz.data(), b.rowptr, rho, mu, gvalues, with_rc,
                                                CVFEM_PHASE_ACC_ARG pack_u, local_vals, pk,
-            cvfem_hex8_rc_config_for(d));
+            cvfem_hex8_rc_config_for(d),
+                cvfem_hex8_identity_slots_or_null());
         CVFEM_PHASE_FLUSH(acc);
     }
 

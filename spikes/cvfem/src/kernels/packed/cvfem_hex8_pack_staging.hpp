@@ -22,6 +22,7 @@
 
 #include "kernels/microkernels/hex8/cvfem_hex8_ns_upwind_kernels.hpp"
 #include "kernels/packed/cvfem_pack_scratch.hpp"
+#include "kernels/cvfem_hex8_flags.hpp"
 
 
 template <typename scalar_t, typename pack_idx_t>
@@ -61,7 +62,7 @@ static SFEM_INLINE void fill_pack_fields(const ptrdiff_t *const SFEM_RESTRICT   
                                          scalar_t *const SFEM_RESTRICT           pack_u) {
     const ptrdiff_t                     owned = owned_nodes_ptr[pack];
     for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-        scalar_t *const SFEM_RESTRICT dst = pack_u + k * N_FIELDS;
+        scalar_t *const SFEM_RESTRICT dst = pack_u + k * CVFEM_HEX8_N_FIELDS;
         const ptrdiff_t               g   = owned + k;
         dst[0]                            = ux[g];
         dst[1]                            = uy[g];
@@ -69,7 +70,7 @@ static SFEM_INLINE void fill_pack_fields(const ptrdiff_t *const SFEM_RESTRICT   
         dst[3]                            = pr[g];
     }
     for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-        scalar_t *const SFEM_RESTRICT dst = pack_u + (n_contiguous + k) * N_FIELDS;
+        scalar_t *const SFEM_RESTRICT dst = pack_u + (n_contiguous + k) * CVFEM_HEX8_N_FIELDS;
         const idx_t            g   = ghosts[k];
         dst[0]                            = ux[g];
         dst[1]                            = uy[g];
@@ -196,7 +197,7 @@ static SFEM_INLINE void cvfem_hex8_fill_pack_qgrad(const ptrdiff_t *const SFEM_R
 template <typename scalar_t>
 static SFEM_INLINE void cvfem_hex8_gather_rc_coeff(const scalar_t *const SFEM_RESTRICT src,
                                                    const scalar_t *const SFEM_RESTRICT srcw,
-                                                   const Hex8RcConfig &cfg,
+                                                   const Hex8RcConfigT<scalar_t> &cfg,
                                                    const ptrdiff_t   begin,
                                                    const int         nlanes,
                                                    Hex8RhieChowPackT<scalar_t> &rc) {
@@ -250,7 +251,7 @@ static SFEM_INLINE void gather_hex8_simd_from_pack(pack_idx_t **const SFEM_RESTR
         if (lane < nlanes) {
             const ptrdiff_t e = begin + lane;
             for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                const scalar_t *const SFEM_RESTRICT u = pack_u + (ptrdiff_t)elems[a][e] * N_FIELDS;
+                const scalar_t *const SFEM_RESTRICT u = pack_u + (ptrdiff_t)elems[a][e] * CVFEM_HEX8_N_FIELDS;
                 in.ux[a][lane]                        = u[0];
                 in.uy[a][lane]                        = u[1];
                 in.uz[a][lane]                        = u[2];
@@ -280,7 +281,7 @@ static SFEM_INLINE void gather_hex8_isoparam_simd_from_pack(pack_idx_t **const S
             const ptrdiff_t e = begin + lane;
             for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
                 const pack_idx_t                    loc = elems[a][e];
-                const scalar_t *const SFEM_RESTRICT u   = pack_u + (ptrdiff_t)loc * N_FIELDS;
+                const scalar_t *const SFEM_RESTRICT u   = pack_u + (ptrdiff_t)loc * CVFEM_HEX8_N_FIELDS;
                 in.ux[a][lane]                          = u[0];
                 in.uy[a][lane]                          = u[1];
                 in.uz[a][lane]                          = u[2];
@@ -348,12 +349,12 @@ static SFEM_INLINE void fill_pack_interleaved(const ptrdiff_t *const SFEM_RESTRI
                                               scalar_t *const SFEM_RESTRICT           pack_v) {
     const ptrdiff_t owned = owned_nodes_ptr[pack];
     for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-        std::memcpy(pack_v + k * N_FIELDS, src + (owned + k) * N_FIELDS, N_FIELDS * sizeof(scalar_t));
+        std::memcpy(pack_v + k * CVFEM_HEX8_N_FIELDS, src + (owned + k) * CVFEM_HEX8_N_FIELDS, CVFEM_HEX8_N_FIELDS * sizeof(scalar_t));
     }
     for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-        std::memcpy(pack_v + (n_contiguous + k) * N_FIELDS,
-                    src + (ptrdiff_t)ghosts[k] * N_FIELDS,
-                    N_FIELDS * sizeof(scalar_t));
+        std::memcpy(pack_v + (n_contiguous + k) * CVFEM_HEX8_N_FIELDS,
+                    src + (ptrdiff_t)ghosts[k] * CVFEM_HEX8_N_FIELDS,
+                    CVFEM_HEX8_N_FIELDS * sizeof(scalar_t));
     }
 }
 
@@ -384,7 +385,7 @@ static SFEM_INLINE void gather_hex8_action_simd_from_pack(pack_idx_t **const SFE
         if (lane < nlanes) {
             const ptrdiff_t e = begin + lane;
             for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                const scalar_t *const SFEM_RESTRICT dvec = pack_dir + (ptrdiff_t)elems[a][e] * N_FIELDS;
+                const scalar_t *const SFEM_RESTRICT dvec = pack_dir + (ptrdiff_t)elems[a][e] * CVFEM_HEX8_N_FIELDS;
                 du.ux[a][lane]                           = dvec[0];
                 du.uy[a][lane]                           = dvec[1];
                 du.uz[a][lane]                           = dvec[2];
@@ -416,8 +417,8 @@ static SFEM_INLINE void gather_hex8_isoparam_action_simd_from_pack(pack_idx_t **
             const ptrdiff_t e = begin + lane;
             for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
                 const pack_idx_t                    loc  = elems[a][e];
-                const scalar_t *const SFEM_RESTRICT usrc = pack_u + (ptrdiff_t)loc * N_FIELDS;
-                const scalar_t *const SFEM_RESTRICT dsrc = pack_dir + (ptrdiff_t)loc * N_FIELDS;
+                const scalar_t *const SFEM_RESTRICT usrc = pack_u + (ptrdiff_t)loc * CVFEM_HEX8_N_FIELDS;
+                const scalar_t *const SFEM_RESTRICT dsrc = pack_dir + (ptrdiff_t)loc * CVFEM_HEX8_N_FIELDS;
                 u.ux[a][lane]                            = usrc[0];
                 u.uy[a][lane]                            = usrc[1];
                 u.uz[a][lane]                            = usrc[2];
@@ -516,7 +517,7 @@ static SFEM_INLINE void scatter_hex8_simd_to_pack(pack_idx_t **const SFEM_RESTRI
     for (int lane = 0; lane < nlanes; ++lane) {
         const ptrdiff_t e = begin + lane;
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-            scalar_t *const SFEM_RESTRICT dst = pack_out + (ptrdiff_t)elems[a][e] * N_FIELDS;
+            scalar_t *const SFEM_RESTRICT dst = pack_out + (ptrdiff_t)elems[a][e] * CVFEM_HEX8_N_FIELDS;
             dst[0] += out.rx[a][lane];
             dst[1] += out.ry[a][lane];
             dst[2] += out.rz[a][lane];

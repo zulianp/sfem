@@ -261,12 +261,14 @@ static SFEM_NOINLINE void assemble_jacobian_packed(MeshData        &d,
 #pragma omp parallel
         assemble_jacobian_packed_isoparam_range(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
             d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_idx, p.ghost_mat_ptr.data(), p.ghost_mat_val.data(), p.ghost_ptr, p.local_element_slot.data(), p.local_global_slot_ptr.data(), p.local_rowptr_ptr.data(), p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.owned_nodes_ptr, b.values->data(), rho, mu, u_n, bsr_n, with_rc,
-            cvfem_hex8_rc_config_for(d));
+            cvfem_hex8_rc_config_for(d),
+                cvfem_hex8_identity_slots_or_null());
     } else {
 #pragma omp parallel
         assemble_jacobian_packed_affine_range(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
             d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_idx, p.ghost_mat_ptr.data(), p.ghost_mat_val.data(), p.ghost_ptr, p.local_element_slot.data(), p.local_global_slot_ptr.data(), p.local_rowptr_ptr.data(), p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.owned_nodes_ptr, b.values->data(), rho, mu, u_n, bsr_n, with_rc,
-            cvfem_hex8_rc_config_for(d));
+            cvfem_hex8_rc_config_for(d),
+                cvfem_hex8_identity_slots_or_null());
     }
 
     CVFEM_PHASE_CLOCK(_tg);

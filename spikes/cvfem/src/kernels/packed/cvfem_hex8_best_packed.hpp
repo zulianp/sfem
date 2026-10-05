@@ -17,6 +17,7 @@
 #include "kernels/cvfem_phases.hpp"
 #include "kernels/cvfem_range.hpp"
 #include "kernels/packed/cvfem_hex8_pack_staging.hpp"
+#include "kernels/cvfem_hex8_flags.hpp"
 
 
 

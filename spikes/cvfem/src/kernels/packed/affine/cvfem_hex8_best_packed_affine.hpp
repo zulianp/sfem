@@ -35,6 +35,7 @@
 // nodes this part owns -- that is what the packed layout is for -- so the parts need no
 // synchronisation between them, and the ghost rows they do share are reduced afterwards in the
 // launcher, which is the second and independent parallel loop.
+template <typename scalar_t, typename idx_t, typename pack_idx_t, typename geom_t>
 static SFEM_NOINLINE void apply_residual_packed_affine_range(
         const cvfem_range packs,
         // The mesh and the pack are staging objects -- they own vectors and a shared_ptr to a
@@ -70,12 +71,12 @@ static SFEM_NOINLINE void apply_residual_packed_affine_range(
         const int with_rc) {
         scalar_t *const SFEM_RESTRICT pack_u   = thread_scratch<scalar_t>(0, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(1, scratch_n);
-        const Hex8PackCoords pk =
+        const Hex8PackCoordsT<scalar_t> pk =
                 cvfem_hex8_pack_coords<scalar_t>(with_rc != 0, with_rc, max_actual_nodes_per_pack);
 
 
     for (ptrdiff_t pack = packs.begin; pack < packs.end; ++pack) {
-            const Hex8PackExtent x = cvfem_hex8_pack_extent<idx_t>(
+            const Hex8PackExtentT<idx_t> x = cvfem_hex8_pack_extent<idx_t>(
                     pack, nelements, n_elements_per_pack, owned_nodes_ptr, ghost_idx, ghost_ptr);
 
             std::memset(pack_out, 0, (size_t)x.n_pack_nodes * (size_t)CVFEM_HEX8_N_FIELDS * sizeof(scalar_t));
@@ -89,9 +90,9 @@ static SFEM_NOINLINE void apply_residual_packed_affine_range(
             alignas(ALIGN_BYTES) scalar_t cof3[CVFEM_HEX8_VEC_SIZE], cof4[CVFEM_HEX8_VEC_SIZE], cof5[CVFEM_HEX8_VEC_SIZE];
             alignas(ALIGN_BYTES) scalar_t cof6[CVFEM_HEX8_VEC_SIZE], cof7[CVFEM_HEX8_VEC_SIZE], cof8[CVFEM_HEX8_VEC_SIZE];
             alignas(ALIGN_BYTES) scalar_t det[CVFEM_HEX8_VEC_SIZE];
-            Hex8InputPack    in;
-            Hex8ResidualPack outp;
-            Hex8RhieChowPack rcp;
+            Hex8InputPackT<scalar_t>    in;
+            Hex8ResidualPackT<scalar_t> outp;
+            Hex8RhieChowPackT<scalar_t> rcp;
             for (ptrdiff_t begin = x.e_start; begin < x.e_end; begin += CVFEM_HEX8_VEC_SIZE) {
                 const int nlanes = int(MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, x.e_end - begin));
                 gather_hex8_simd_from_pack(pack_elems,
@@ -140,6 +141,7 @@ static SFEM_NOINLINE void apply_residual_packed_affine_range(
 // nodes this part owns -- that is what the packed layout is for -- so the parts need no
 // synchronisation between them, and the ghost rows they do share are reduced afterwards in the
 // launcher, which is the second and independent parallel loop.
+template <typename scalar_t, typename idx_t, typename pack_idx_t, typename geom_t>
 static SFEM_NOINLINE void apply_jacobian_action_packed_affine_range(
         const cvfem_range packs,
         // The mesh and the pack are staging objects -- they own vectors and a shared_ptr to a
@@ -185,7 +187,7 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_affine_range(
         // Resolved once per solve, in the launcher, not per element here. This parameter replaced
         // the cvfem_hex8_rc_config_for(d) call that used to sit in this body: that function takes
         // the mesh, which a kernel is not meant to name.
-        const Hex8RcConfig &rc_cfg,
+        const Hex8RcConfigT<scalar_t> &rc_cfg,
         // The affine geometry, which this kernel forwards to the pack gather. It used to hand
         // that gather the mesh instead, so the promotion did not see adj_ptr in the body and
         // did not add it here.
@@ -198,13 +200,13 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_affine_range(
         scalar_t *const SFEM_RESTRICT pack_u   = thread_scratch<scalar_t>(0, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_dir = thread_scratch<scalar_t>(1, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(2, scratch_n);
-        const Hex8PackCoords pk =
+        const Hex8PackCoordsT<scalar_t> pk =
                 cvfem_hex8_pack_coords<scalar_t>(with_rc != 0, with_rc, max_actual_nodes_per_pack);
-        const Hex8PackQGrad qg = cvfem_hex8_pack_qgrad<scalar_t>(with_qg, max_actual_nodes_per_pack);
+        const Hex8PackQGradT<scalar_t> qg = cvfem_hex8_pack_qgrad<scalar_t>(with_qg, max_actual_nodes_per_pack);
 
 
     for (ptrdiff_t pack = packs.begin; pack < packs.end; ++pack) {
-            const Hex8PackExtent x = cvfem_hex8_pack_extent<idx_t>(
+            const Hex8PackExtentT<idx_t> x = cvfem_hex8_pack_extent<idx_t>(
                     pack, nelements, n_elements_per_pack, owned_nodes_ptr, ghost_idx, ghost_ptr);
 
             CVFEM_PHASE_CLOCK(_t);
@@ -214,15 +216,15 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_affine_range(
             fill_pack_fields(owned_nodes_ptr, ux, uy, uz, pres, pack, x.n_contiguous, x.n_ghost, x.ghosts, pack_u);
             fill_pack_interleaved(owned_nodes_ptr, pack, x.n_contiguous, x.n_ghost, x.ghosts, dir, pack_dir);
 
-            Hex8InputPack    u_pack;
-            Hex8InputPack    du_pack;
-            Hex8ResidualPack outp;
-            Hex8CoordPack    xyz;
-            Hex8RhieChowPack rcp;
+            Hex8InputPackT<scalar_t>    u_pack;
+            Hex8InputPackT<scalar_t>    du_pack;
+            Hex8ResidualPackT<scalar_t> outp;
+            Hex8CoordPackT<scalar_t>    xyz;
+            Hex8RhieChowPackT<scalar_t> rcp;
             // The two gradient packs, staged exactly as apply_residual_packed_defcor stages its
             // one. The limiter and eps^2 live on the state pack because that is where the
             // correction's own kernel reads them; the direction pack carries only the field.
-            Hex8UGradPack    hop, hovp;
+            Hex8UGradPackT<scalar_t>    hop, hovp;
             hop.limiter  = limiter;
             hop.venkat_c = venkat_c;
             if (with_rc)
@@ -330,6 +332,7 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_affine_range(
 // nodes this part owns -- that is what the packed layout is for -- so the parts need no
 // synchronisation between them, and the ghost rows they do share are reduced afterwards in the
 // launcher, which is the second and independent parallel loop.
+template <typename scalar_t, typename idx_t, typename pack_idx_t, typename geom_t, typename count_t>
 static SFEM_NOINLINE void assemble_jacobian_packed_affine_range(
         const cvfem_range packs,
         // The mesh and the pack are staging objects -- they own vectors and a shared_ptr to a
@@ -369,18 +372,24 @@ static SFEM_NOINLINE void assemble_jacobian_packed_affine_range(
         // Resolved once per solve, in the launcher, not per element here. This parameter replaced
         // the cvfem_hex8_rc_config_for(d) call that used to sit in this body: that function takes
         // the mesh, which a kernel is not meant to name.
-        const Hex8RcConfig &rc_cfg) {
+        const Hex8RcConfigT<scalar_t> &rc_cfg,
+        // --kernel-only / --dense-flush, resolved by the front end: the identity slot array when
+        // the caller wants the element kernel to write a dense stack buffer instead of scattering
+        // into pack-local storage, and null otherwise. It replaced three globals the sweep used
+        // to read -- DESIGN.md: "No user level option flags are propgated down here ... they are
+        // handled outside in the front-end".
+        const int *const SFEM_RESTRICT identity_slots) {
         CVFEM_PHASE_ACC(acc);
         alignas(ALIGN_BYTES) scalar_t dense_ke[64 * 16];
         std::memset(dense_ke, 0, sizeof(dense_ke));
         scalar_t *const SFEM_RESTRICT pack_u          = thread_scratch<scalar_t>(0, u_n);
         scalar_t *const SFEM_RESTRICT local_vals_pack = thread_scratch<scalar_t>(2, bsr_n);
-        const Hex8PackCoords pk =
+        const Hex8PackCoordsT<scalar_t> pk =
                 cvfem_hex8_pack_coords<scalar_t>(with_rc != 0, with_rc, max_actual_nodes_per_pack);
 
 
     for (ptrdiff_t pack = packs.begin; pack < packs.end; ++pack) {
-            const Hex8PackExtent x = cvfem_hex8_pack_extent<idx_t>(
+            const Hex8PackExtentT<idx_t> x = cvfem_hex8_pack_extent<idx_t>(
                     pack, nelements, n_elements_per_pack, owned_nodes_ptr, ghost_idx, ghost_ptr);
             const auto                             &lrowptr      = local_rowptr[(size_t)pack];
             const auto                             &lslots       = local_global_slot[(size_t)pack];
@@ -401,11 +410,11 @@ static SFEM_NOINLINE void assemble_jacobian_packed_affine_range(
             CVFEM_PHASE_MARK(acc, _t, PH_GATHER);
 
             for (ptrdiff_t e = x.e_start; e < x.e_end; ++e) {
-                Hex8PackElement el;
+                Hex8PackElementT<scalar_t> el;
                 cvfem_hex8_stage_pack_element(pack_elems, pack_u, pk, e, with_rc, rc_cfg, el);
                 const int *const SFEM_RESTRICT slots =
-                        g_kernel_only ? g_identity_slots : local_element_slot + (size_t)e * 64;
-                scalar_t *const SFEM_RESTRICT local_vals = g_kernel_only ? dense_ke : local_vals_pack;
+                        identity_slots ? identity_slots : local_element_slot + (size_t)e * 64;
+                scalar_t *const SFEM_RESTRICT local_vals = identity_slots ? dense_ke : local_vals_pack;
                 // THE GEOMETRY: one adjugate and determinant per element, read from the
                 // precomputed table. This is the whole of what distinguishes this sweep from
                 // its isoparametric twin, which derives them per sub-control surface from the
@@ -418,7 +427,7 @@ static SFEM_NOINLINE void assemble_jacobian_packed_affine_range(
 
             CVFEM_PHASE_MARK(acc, _t, PH_KERNEL);
             const int                     owned_nnz = x.n_contiguous > 0 ? lrowptr[(size_t)x.n_contiguous] : 0;
-            if (!g_kernel_only)
+            if (!identity_slots)
                 for (int t = 0; t < owned_nnz; ++t)
                     bsr4_add16(&gvalues[(ptrdiff_t)lslots[(size_t)t] * 16], local_vals_pack + (ptrdiff_t)t * 16);
 
@@ -453,6 +462,7 @@ static SFEM_NOINLINE void assemble_jacobian_packed_affine_range(
 // re-acquired once per pack rather than once per thread. It stays in the launcher's parallel
 // region and is passed, which is what DESIGN.md's "only arguments that are actually used" asks
 // for and what leaves no hidden per-thread state in the kernel.
+template <typename scalar_t, typename idx_t, typename pack_idx_t, typename geom_t, typename count_t>
 static SFEM_NOINLINE void assemble_jacobian_store_affine_range(
         const cvfem_range packs,
         // The mesh and the pack are staging objects -- they own vectors and a shared_ptr to a
@@ -492,11 +502,17 @@ static SFEM_NOINLINE void assemble_jacobian_store_affine_range(
         scalar_t *const SFEM_RESTRICT local_vals,
         // The pack's staged coordinates and pressure gradient, carved out of slot 3 by the
         // launcher. One object rather than six pointers that have to be offset consistently.
-        const Hex8PackCoords &pk,
+        const Hex8PackCoordsT<scalar_t> &pk,
         // Resolved once per solve, in the launcher, not per element here. This parameter replaced
         // the cvfem_hex8_rc_config_for(d) call that used to sit in this body: that function takes
         // the mesh, which a kernel is not meant to name.
-        const Hex8RcConfig &rc_cfg) {
+        const Hex8RcConfigT<scalar_t> &rc_cfg,
+        // --kernel-only / --dense-flush, resolved by the front end: the identity slot array when
+        // the caller wants the element kernel to write a dense stack buffer instead of scattering
+        // into pack-local storage, and null otherwise. It replaced three globals the sweep used
+        // to read -- DESIGN.md: "No user level option flags are propgated down here ... they are
+        // handled outside in the front-end".
+        const int *const SFEM_RESTRICT identity_slots) {
     for (ptrdiff_t pack = packs.begin; pack < packs.end; ++pack) {
             const ptrdiff_t                         e_start      = pack * n_elements_per_pack;
             const ptrdiff_t                         e_end        = MIN(nelements, (pack + 1) * n_elements_per_pack);
@@ -518,15 +534,15 @@ static SFEM_NOINLINE void assemble_jacobian_store_affine_range(
             CVFEM_PHASE_MARK(acc, _t, PH_GATHER);
 
             for (ptrdiff_t e = e_start; e < e_end; ++e) {
-                Hex8PackElement el;
+                Hex8PackElementT<scalar_t> el;
                 cvfem_hex8_stage_pack_element(pack_elems, pack_u, pk, e, with_rc, rc_cfg, el);
                 const int *const SFEM_RESTRICT slots = st_element_slot + (size_t)e * 64;
                 scalar_t adj[9], det;
                 load_hex8_adj(adj_ptr, det_ptr, e, adj, &det);
-                if (g_dense_flush) {
+                if (identity_slots) {
                     alignas(ALIGN_BYTES) scalar_t ke[64 * 16] = {};
                     cvfem_hex8_ns_upwind_jacobian_add_slots<false>(
-                            rho, mu, adj, det, el.ux, el.uy, el.uz, g_identity_slots, ke, el.rc, el.rc_p);
+                            rho, mu, adj, det, el.ux, el.uy, el.uz, identity_slots, ke, el.rc, el.rc_p);
                     hex8_blocks_to_slots(slots, ke, local_vals);
                 } else {
                     cvfem_hex8_ns_upwind_jacobian_add_slots<false>(
@@ -565,6 +581,7 @@ static SFEM_NOINLINE void assemble_jacobian_store_affine_range(
 // nodes this part owns -- that is what the packed layout is for -- so the parts need no
 // synchronisation between them, and the ghost rows they do share are reduced afterwards in the
 // launcher, which is the second and independent parallel loop.
+template <typename scalar_t, typename idx_t, typename pack_idx_t, typename geom_t>
 static SFEM_NOINLINE void apply_residual_packed_defcor_range(
         const cvfem_range packs,
         // The mesh and the pack are staging objects -- they own vectors and a shared_ptr to a
@@ -606,11 +623,11 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_range(
         scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(1, scratch_n);
         // Coordinates always, and the pressure gradient when Rhie-Chow is on: the same
         // six-array slot the first-order SIMD path uses, so no new scratch shape appears.
-        const Hex8PackCoords pk =
+        const Hex8PackCoordsT<scalar_t> pk =
                 cvfem_hex8_pack_coords<scalar_t>(true, with_rc, max_actual_nodes_per_pack);
 
     for (ptrdiff_t pack = packs.begin; pack < packs.end; ++pack) {
-            const Hex8PackExtent x = cvfem_hex8_pack_extent<idx_t>(
+            const Hex8PackExtentT<idx_t> x = cvfem_hex8_pack_extent<idx_t>(
                     pack, nelements, n_elements_per_pack, owned_nodes_ptr, ghost_idx, ghost_ptr);
 
             std::memset(pack_out, 0, (size_t)x.n_pack_nodes * (size_t)CVFEM_HEX8_N_FIELDS * sizeof(scalar_t));
@@ -625,10 +642,10 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_range(
                     cof2[CVFEM_HEX8_VEC_SIZE], cof3[CVFEM_HEX8_VEC_SIZE], cof4[CVFEM_HEX8_VEC_SIZE],
                     cof5[CVFEM_HEX8_VEC_SIZE], cof6[CVFEM_HEX8_VEC_SIZE], cof7[CVFEM_HEX8_VEC_SIZE],
                     cof8[CVFEM_HEX8_VEC_SIZE], detv[CVFEM_HEX8_VEC_SIZE];
-            Hex8InputPack    in;
-            Hex8ResidualPack outp;
-            Hex8RhieChowPack rcp;
-            Hex8UGradPack    hop;
+            Hex8InputPackT<scalar_t>    in;
+            Hex8ResidualPackT<scalar_t> outp;
+            Hex8RhieChowPackT<scalar_t> rcp;
+            Hex8UGradPackT<scalar_t>    hop;
             hop.limiter  = limiter;
             hop.venkat_c = venkat_c;
             for (ptrdiff_t begin = x.e_start; begin < x.e_end; begin += CVFEM_HEX8_VEC_SIZE) {
@@ -687,6 +704,7 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_range(
 // nodes this part owns -- that is what the packed layout is for -- so the parts need no
 // synchronisation between them, and the ghost rows they do share are reduced afterwards in the
 // launcher, which is the second and independent parallel loop.
+template <typename scalar_t, typename idx_t, typename pack_idx_t, typename geom_t>
 static SFEM_NOINLINE void apply_jacobian_action_packed_pa_range(
         const cvfem_range packs,
         // The mesh and the pack are staging objects -- they own vectors and a shared_ptr to a
@@ -721,18 +739,18 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_pa_range(
         // Resolved once per solve, in the launcher, not per element here. This parameter replaced
         // the cvfem_hex8_rc_config_for(d) call that used to sit in this body: that function takes
         // the mesh, which a kernel is not meant to name.
-        const Hex8RcConfig &rc_cfg) {
+        const Hex8RcConfigT<scalar_t> &rc_cfg) {
         CVFEM_PHASE_ACC(acc);
         scalar_t *const SFEM_RESTRICT pack_dir = thread_scratch<scalar_t>(1, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(2, scratch_n);
         // Three arrays in slot 3, not six: the nodal pressure gradient is inside the store.
-        const Hex8PackCoords pk =
+        const Hex8PackCoordsT<scalar_t> pk =
                 cvfem_hex8_pack_coords<scalar_t>(with_qg, /*with_rc=*/0, max_actual_nodes_per_pack);
-        const Hex8PackQGrad qg = cvfem_hex8_pack_qgrad<scalar_t>(with_qg, max_actual_nodes_per_pack);
+        const Hex8PackQGradT<scalar_t> qg = cvfem_hex8_pack_qgrad<scalar_t>(with_qg, max_actual_nodes_per_pack);
 
 
     for (ptrdiff_t pack = packs.begin; pack < packs.end; ++pack) {
-            const Hex8PackExtent x = cvfem_hex8_pack_extent<idx_t>(
+            const Hex8PackExtentT<idx_t> x = cvfem_hex8_pack_extent<idx_t>(
                     pack, nelements, n_elements_per_pack, owned_nodes_ptr, ghost_idx, ghost_ptr);
 
             CVFEM_PHASE_CLOCK(_t);
@@ -746,9 +764,9 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_pa_range(
             }
             CVFEM_PHASE_MARK(acc, _t, PH_GATHER);
 
-            Hex8InputPack    du_pack;
-            Hex8ResidualPack outp;
-            Hex8RhieChowPack rcp;
+            Hex8InputPackT<scalar_t>    du_pack;
+            Hex8ResidualPackT<scalar_t> outp;
+            Hex8RhieChowPackT<scalar_t> rcp;
             for (ptrdiff_t begin = x.e_start; begin < x.e_end; begin += CVFEM_HEX8_VEC_SIZE) {
                 const int nlanes = int(MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, x.e_end - begin));
                 alignas(ALIGN_BYTES) scalar_t cof0[CVFEM_HEX8_VEC_SIZE], cof1[CVFEM_HEX8_VEC_SIZE],

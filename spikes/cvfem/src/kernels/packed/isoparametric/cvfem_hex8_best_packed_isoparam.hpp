@@ -20,6 +20,7 @@
 #include "kernels/packed/cvfem_hex8_best_packed.hpp"
 #include "kernels/packed/cvfem_hex8_best_store.hpp"
 
+template <typename scalar_t, typename idx_t, typename pack_idx_t, typename geom_t>
 static SFEM_NOINLINE void apply_residual_packed_isoparam_range(
         const cvfem_range packs,
         // The mesh and the pack are staging objects -- they own vectors and a shared_ptr to a
@@ -49,11 +50,11 @@ static SFEM_NOINLINE void apply_residual_packed_isoparam_range(
         scalar_t *const SFEM_RESTRICT pack_u   = thread_scratch<scalar_t>(0, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(1, scratch_n);
         // Coordinates always: this geometry derives its Jacobian from them.
-        const Hex8PackCoords pk = cvfem_hex8_pack_coords<scalar_t>(true, 0, max_actual_nodes_per_pack);
+        const Hex8PackCoordsT<scalar_t> pk = cvfem_hex8_pack_coords<scalar_t>(true, 0, max_actual_nodes_per_pack);
 
 
     for (ptrdiff_t pack = packs.begin; pack < packs.end; ++pack) {
-            const Hex8PackExtent x = cvfem_hex8_pack_extent<idx_t>(
+            const Hex8PackExtentT<idx_t> x = cvfem_hex8_pack_extent<idx_t>(
                     pack, nelements, n_elements_per_pack, owned_nodes_ptr, ghost_idx, ghost_ptr);
 
             std::memset(pack_out, 0, (size_t)x.n_pack_nodes * (size_t)CVFEM_HEX8_N_FIELDS * sizeof(scalar_t));
@@ -61,9 +62,9 @@ static SFEM_NOINLINE void apply_residual_packed_isoparam_range(
             fill_pack_fields(owned_nodes_ptr, ux, uy, uz, pres, pack, x.n_contiguous, x.n_ghost, x.ghosts, pack_u);
 
             fill_pack_xyz(owned_nodes_ptr, points, pack, x.n_contiguous, x.n_ghost, x.ghosts, pk.x, pk.y, pk.z);
-            Hex8InputPack    in;
-            Hex8CoordPack    xyz;
-            Hex8ResidualPack outp;
+            Hex8InputPackT<scalar_t>    in;
+            Hex8CoordPackT<scalar_t>    xyz;
+            Hex8ResidualPackT<scalar_t> outp;
             for (ptrdiff_t begin = x.e_start; begin < x.e_end; begin += CVFEM_HEX8_VEC_SIZE) {
                 const int nlanes = int(MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, x.e_end - begin));
                 gather_hex8_isoparam_simd_from_pack(
@@ -86,6 +87,7 @@ static SFEM_NOINLINE void apply_residual_packed_isoparam_range(
 // pack-based layout), no staged direction gradient, no adjugate table, no boundary extras. All
 // of that was dead in this half of the `if constexpr` and had to be in the signature anyway,
 // because a sweep templated on the geometry takes the union of both halves' needs.
+template <typename scalar_t, typename idx_t, typename pack_idx_t, typename geom_t>
 static SFEM_NOINLINE void apply_jacobian_action_packed_isoparam_range(
         const cvfem_range packs,
         // The mesh and the pack are staging objects -- they own vectors and a shared_ptr to a
@@ -124,12 +126,12 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_isoparam_range(
         scalar_t *const SFEM_RESTRICT pack_u   = thread_scratch<scalar_t>(0, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_dir = thread_scratch<scalar_t>(1, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(2, scratch_n);
-        const Hex8PackCoords pk =
+        const Hex8PackCoordsT<scalar_t> pk =
                 cvfem_hex8_pack_coords<scalar_t>(/*want_xyz=*/true, /*with_rc=*/0, max_actual_nodes_per_pack);
 
 
     for (ptrdiff_t pack = packs.begin; pack < packs.end; ++pack) {
-            const Hex8PackExtent x = cvfem_hex8_pack_extent<idx_t>(
+            const Hex8PackExtentT<idx_t> x = cvfem_hex8_pack_extent<idx_t>(
                     pack, nelements, n_elements_per_pack, owned_nodes_ptr, ghost_idx, ghost_ptr);
 
             CVFEM_PHASE_CLOCK(_t);
@@ -139,15 +141,15 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_isoparam_range(
             fill_pack_fields(owned_nodes_ptr, ux, uy, uz, pres, pack, x.n_contiguous, x.n_ghost, x.ghosts, pack_u);
             fill_pack_interleaved(owned_nodes_ptr, pack, x.n_contiguous, x.n_ghost, x.ghosts, dir, pack_dir);
 
-            Hex8InputPack    u_pack;
-            Hex8InputPack    du_pack;
-            Hex8ResidualPack outp;
-            Hex8CoordPack    xyz;
-            Hex8RhieChowPack rcp;
+            Hex8InputPackT<scalar_t>    u_pack;
+            Hex8InputPackT<scalar_t>    du_pack;
+            Hex8ResidualPackT<scalar_t> outp;
+            Hex8CoordPackT<scalar_t>    xyz;
+            Hex8RhieChowPackT<scalar_t> rcp;
             // The two gradient packs, staged exactly as apply_residual_packed_defcor stages its
             // one. The limiter and eps^2 live on the state pack because that is where the
             // correction's own kernel reads them; the direction pack carries only the field.
-            Hex8UGradPack    hop, hovp;
+            Hex8UGradPackT<scalar_t>    hop, hovp;
             hop.limiter  = limiter;
             hop.venkat_c = venkat_c;
             // Coordinates always: this geometry derives its Jacobian from them.
@@ -185,6 +187,7 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_isoparam_range(
 //
 // It takes no adjugate table: the Jacobian comes per sub-control surface from the node
 // coordinates the pack stages.
+template <typename scalar_t, typename idx_t, typename pack_idx_t, typename geom_t, typename count_t>
 static SFEM_NOINLINE void assemble_jacobian_packed_isoparam_range(
         const cvfem_range packs,
         const ptrdiff_t nelements,
@@ -219,18 +222,24 @@ static SFEM_NOINLINE void assemble_jacobian_packed_isoparam_range(
         // Resolved once per solve, in the launcher, not per element here. This parameter replaced
         // the cvfem_hex8_rc_config_for(d) call that used to sit in this body: that function takes
         // the mesh, which a kernel is not meant to name.
-        const Hex8RcConfig &rc_cfg) {
+        const Hex8RcConfigT<scalar_t> &rc_cfg,
+        // --kernel-only / --dense-flush, resolved by the front end: the identity slot array when
+        // the caller wants the element kernel to write a dense stack buffer instead of scattering
+        // into pack-local storage, and null otherwise. It replaced three globals the sweep used
+        // to read -- DESIGN.md: "No user level option flags are propgated down here ... they are
+        // handled outside in the front-end".
+        const int *const SFEM_RESTRICT identity_slots) {
         CVFEM_PHASE_ACC(acc);
         alignas(ALIGN_BYTES) scalar_t dense_ke[64 * 16];
         std::memset(dense_ke, 0, sizeof(dense_ke));
         scalar_t *const SFEM_RESTRICT pack_u          = thread_scratch<scalar_t>(0, u_n);
         scalar_t *const SFEM_RESTRICT local_vals_pack = thread_scratch<scalar_t>(2, bsr_n);
-        const Hex8PackCoords pk =
+        const Hex8PackCoordsT<scalar_t> pk =
                 cvfem_hex8_pack_coords<scalar_t>(/*want_xyz=*/true, with_rc, max_actual_nodes_per_pack);
 
 
     for (ptrdiff_t pack = packs.begin; pack < packs.end; ++pack) {
-            const Hex8PackExtent x = cvfem_hex8_pack_extent<idx_t>(
+            const Hex8PackExtentT<idx_t> x = cvfem_hex8_pack_extent<idx_t>(
                     pack, nelements, n_elements_per_pack, owned_nodes_ptr, ghost_idx, ghost_ptr);
             const auto                             &lrowptr      = local_rowptr[(size_t)pack];
             const auto                             &lslots       = local_global_slot[(size_t)pack];
@@ -253,11 +262,11 @@ static SFEM_NOINLINE void assemble_jacobian_packed_isoparam_range(
             CVFEM_PHASE_MARK(acc, _t, PH_GATHER);
 
             for (ptrdiff_t e = x.e_start; e < x.e_end; ++e) {
-                Hex8PackElement el;
+                Hex8PackElementT<scalar_t> el;
                 cvfem_hex8_stage_pack_element(pack_elems, pack_u, pk, e, with_rc, rc_cfg, el);
                 const int *const SFEM_RESTRICT slots =
-                        g_kernel_only ? g_identity_slots : local_element_slot + (size_t)e * 64;
-                scalar_t *const SFEM_RESTRICT local_vals = g_kernel_only ? dense_ke : local_vals_pack;
+                        identity_slots ? identity_slots : local_element_slot + (size_t)e * 64;
+                scalar_t *const SFEM_RESTRICT local_vals = identity_slots ? dense_ke : local_vals_pack;
                 scalar_t x[8], y[8], z[8];
                 gather_hex8_coords_from_pack(pack_elems, pk.x, pk.y, pk.z, e, x, y, z);
                 cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam<false>(
@@ -266,7 +275,7 @@ static SFEM_NOINLINE void assemble_jacobian_packed_isoparam_range(
 
             CVFEM_PHASE_MARK(acc, _t, PH_KERNEL);
             const int                     owned_nnz = x.n_contiguous > 0 ? lrowptr[(size_t)x.n_contiguous] : 0;
-            if (!g_kernel_only)
+            if (!identity_slots)
                 for (int t = 0; t < owned_nnz; ++t)
                     bsr4_add16(&gvalues[(ptrdiff_t)lslots[(size_t)t] * 16], local_vals_pack + (ptrdiff_t)t * 16);
 
@@ -286,6 +295,7 @@ static SFEM_NOINLINE void assemble_jacobian_packed_isoparam_range(
 
 // The STORE layout's isoparametric assembly. Same two-geometry split as the packed one;
 // the store's difference is its drain, not its element kernel.
+template <typename scalar_t, typename idx_t, typename pack_idx_t, typename geom_t, typename count_t>
 static SFEM_NOINLINE void assemble_jacobian_store_isoparam_range(
         const cvfem_range packs,
         const ptrdiff_t nelements,
@@ -320,11 +330,11 @@ static SFEM_NOINLINE void assemble_jacobian_store_isoparam_range(
         scalar_t *const SFEM_RESTRICT local_vals,
         // The pack's staged coordinates and pressure gradient, carved out of slot 3 by the
         // launcher. One object rather than six pointers that have to be offset consistently.
-        const Hex8PackCoords &pk,
+        const Hex8PackCoordsT<scalar_t> &pk,
         // Resolved once per solve, in the launcher, not per element here. This parameter replaced
         // the cvfem_hex8_rc_config_for(d) call that used to sit in this body: that function takes
         // the mesh, which a kernel is not meant to name.
-        const Hex8RcConfig &rc_cfg) {
+        const Hex8RcConfigT<scalar_t> &rc_cfg) {
     for (ptrdiff_t pack = packs.begin; pack < packs.end; ++pack) {
             const ptrdiff_t                         e_start      = pack * n_elements_per_pack;
             const ptrdiff_t                         e_end        = MIN(nelements, (pack + 1) * n_elements_per_pack);
@@ -348,7 +358,7 @@ static SFEM_NOINLINE void assemble_jacobian_store_isoparam_range(
             CVFEM_PHASE_MARK(acc, _t, PH_GATHER);
 
             for (ptrdiff_t e = e_start; e < e_end; ++e) {
-                Hex8PackElement el;
+                Hex8PackElementT<scalar_t> el;
                 cvfem_hex8_stage_pack_element(pack_elems, pack_u, pk, e, with_rc, rc_cfg, el);
                 const int *const SFEM_RESTRICT slots = st_element_slot + (size_t)e * 64;
                 scalar_t x[8], y[8], z[8];
