@@ -27,8 +27,26 @@ static constexpr int CVFEM_HEX8_N_FIELDS = 4;
 static constexpr int CVFEM_HEX8_N_NODES  = 8;
 static constexpr int CVFEM_HEX8_N_DOF    = CVFEM_HEX8_N_FIELDS * CVFEM_HEX8_N_NODES;
 static constexpr int CVFEM_HEX8_N_SCS    = 12;
-static constexpr int CVFEM_HEX8_VEC_SIZE = VEC_BYTES / int(sizeof(scalar_t));
+// THE LANE WIDTH IS A FUNCTION OF THE SCALAR TYPE, not of the build's. DESIGN.md's
+// correction: "the kernels should be templated as well. They should support different types for
+// the computation, template scalar_t, geom_t, idx_t, etc... (in a short time we would like to
+// try single precision kernels as well)."
+//
+// This was the obstacle that made the sweeps untemplatable, and the reason is worth keeping:
+// CVFEM_HEX8_VEC_SIZE was `VEC_BYTES / sizeof(scalar_t)` at NAMESPACE scope, so a sweep
+// instantiated at `float` would have kept the lane width computed for `double` -- sixteen
+// lanes' worth of work in an eight-lane pack, read past the end of every staged array. The
+// width has to travel with the type, which is what this does: an f32 instantiation gets
+// twice the lanes, which is the point of trying f32 at all.
+template <typename S>
+static constexpr int cvfem_hex8_vec_size = VEC_BYTES / int(sizeof(S));
+
+// The build's own width, for the many places that work in the including translation unit's
+// scalar_t. It is the same number it always was.
+static constexpr int CVFEM_HEX8_VEC_SIZE = cvfem_hex8_vec_size<scalar_t>;
 static_assert(CVFEM_HEX8_VEC_SIZE >= 1, "invalid HEX8 vector size");
+static_assert(cvfem_hex8_vec_size<float> == 2 * cvfem_hex8_vec_size<double>,
+              "a single-precision lane group must hold twice as many elements");
 
 struct Hex8Face {
     int    i;
@@ -36,25 +54,43 @@ struct Hex8Face {
     double ar[3];
 };
 
-struct Hex8InputPack {
-    alignas(ALIGN_BYTES) scalar_t ux[CVFEM_HEX8_N_NODES][CVFEM_HEX8_VEC_SIZE];
-    alignas(ALIGN_BYTES) scalar_t uy[CVFEM_HEX8_N_NODES][CVFEM_HEX8_VEC_SIZE];
-    alignas(ALIGN_BYTES) scalar_t uz[CVFEM_HEX8_N_NODES][CVFEM_HEX8_VEC_SIZE];
-    alignas(ALIGN_BYTES) scalar_t p[CVFEM_HEX8_N_NODES][CVFEM_HEX8_VEC_SIZE];
+template <typename scalar_t>
+struct Hex8InputPackT {
+    alignas(ALIGN_BYTES) scalar_t ux[CVFEM_HEX8_N_NODES][cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t uy[CVFEM_HEX8_N_NODES][cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t uz[CVFEM_HEX8_N_NODES][cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t p[CVFEM_HEX8_N_NODES][cvfem_hex8_vec_size<scalar_t>];
 };
 
-struct Hex8ResidualPack {
-    alignas(ALIGN_BYTES) scalar_t rx[CVFEM_HEX8_N_NODES][CVFEM_HEX8_VEC_SIZE];
-    alignas(ALIGN_BYTES) scalar_t ry[CVFEM_HEX8_N_NODES][CVFEM_HEX8_VEC_SIZE];
-    alignas(ALIGN_BYTES) scalar_t rz[CVFEM_HEX8_N_NODES][CVFEM_HEX8_VEC_SIZE];
-    alignas(ALIGN_BYTES) scalar_t rc[CVFEM_HEX8_N_NODES][CVFEM_HEX8_VEC_SIZE];
+// The build's own instantiation. Every existing caller spells the plain name and
+// keeps working; a single-precision sweep spells Hex8InputPackT<float> and gets a
+// pack with twice the lanes.
+using Hex8InputPack = Hex8InputPackT<scalar_t>;
+
+template <typename scalar_t>
+struct Hex8ResidualPackT {
+    alignas(ALIGN_BYTES) scalar_t rx[CVFEM_HEX8_N_NODES][cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t ry[CVFEM_HEX8_N_NODES][cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t rz[CVFEM_HEX8_N_NODES][cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t rc[CVFEM_HEX8_N_NODES][cvfem_hex8_vec_size<scalar_t>];
 };
 
-struct Hex8CoordPack {
-    alignas(ALIGN_BYTES) scalar_t x[CVFEM_HEX8_N_NODES][CVFEM_HEX8_VEC_SIZE];
-    alignas(ALIGN_BYTES) scalar_t y[CVFEM_HEX8_N_NODES][CVFEM_HEX8_VEC_SIZE];
-    alignas(ALIGN_BYTES) scalar_t z[CVFEM_HEX8_N_NODES][CVFEM_HEX8_VEC_SIZE];
+// The build's own instantiation. Every existing caller spells the plain name and
+// keeps working; a single-precision sweep spells Hex8ResidualPackT<float> and gets a
+// pack with twice the lanes.
+using Hex8ResidualPack = Hex8ResidualPackT<scalar_t>;
+
+template <typename scalar_t>
+struct Hex8CoordPackT {
+    alignas(ALIGN_BYTES) scalar_t x[CVFEM_HEX8_N_NODES][cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t y[CVFEM_HEX8_N_NODES][cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t z[CVFEM_HEX8_N_NODES][cvfem_hex8_vec_size<scalar_t>];
 };
+
+// The build's own instantiation. Every existing caller spells the plain name and
+// keeps working; a single-precision sweep spells Hex8CoordPackT<float> and gets a
+// pack with twice the lanes.
+using Hex8CoordPack = Hex8CoordPackT<scalar_t>;
 
 // What the Rhie-Chow time scale needs beyond the element's own geometry. Resolved once per
 // Newton step from the mesh state, never rediscovered per element, and carried as one object
@@ -73,32 +109,39 @@ struct Hex8RcTau {
 // The nodal velocity gradient for the deferred correction, lane-major like every other pack:
 // nine components per node (du_c/dx_k, c and k both fastest-to-slowest as the scalar kernel
 // packs them), one column per element in the SIMD batch.
-struct Hex8UGradPack {
-    alignas(ALIGN_BYTES) scalar_t g[CVFEM_HEX8_N_NODES][9][CVFEM_HEX8_VEC_SIZE];
+template <typename scalar_t>
+struct Hex8UGradPackT {
+    alignas(ALIGN_BYTES) scalar_t g[CVFEM_HEX8_N_NODES][9][cvfem_hex8_vec_size<scalar_t>];
     // Element node coordinates. The reconstruction works in physical space and needs them even
     // when Rhie-Chow is off, which is exactly the case that made the first packed higher-order
     // sweep read uninitialised memory.
-    alignas(ALIGN_BYTES) scalar_t x[CVFEM_HEX8_N_NODES][CVFEM_HEX8_VEC_SIZE];
-    alignas(ALIGN_BYTES) scalar_t y[CVFEM_HEX8_N_NODES][CVFEM_HEX8_VEC_SIZE];
-    alignas(ALIGN_BYTES) scalar_t z[CVFEM_HEX8_N_NODES][CVFEM_HEX8_VEC_SIZE];
+    alignas(ALIGN_BYTES) scalar_t x[CVFEM_HEX8_N_NODES][cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t y[CVFEM_HEX8_N_NODES][cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t z[CVFEM_HEX8_N_NODES][cvfem_hex8_vec_size<scalar_t>];
     int      limiter{0};
     scalar_t venkat_c{0};
 };
 
-struct Hex8RhieChowPack {
+// The build's own instantiation. Every existing caller spells the plain name and
+// keeps working; a single-precision sweep spells Hex8UGradPackT<float> and gets a
+// pack with twice the lanes.
+using Hex8UGradPack = Hex8UGradPackT<scalar_t>;
+
+template <typename scalar_t>
+struct Hex8RhieChowPackT {
     // No node coordinates. Every face on this path takes its edge vector from the element
     // Jacobian (cvfem_hex8_affine_edge_cols), so the three arrays that used to stage eight nodes'
     // coordinates per lane group -- 3 KB of stack and twenty-four indexed gathers per element --
     // have no reader left. The isoparametric kernels keep their own Hex8CoordPack.
-    alignas(ALIGN_BYTES) scalar_t pgx[CVFEM_HEX8_N_NODES][CVFEM_HEX8_VEC_SIZE];
-    alignas(ALIGN_BYTES) scalar_t pgy[CVFEM_HEX8_N_NODES][CVFEM_HEX8_VEC_SIZE];
-    alignas(ALIGN_BYTES) scalar_t pgz[CVFEM_HEX8_N_NODES][CVFEM_HEX8_VEC_SIZE];
+    alignas(ALIGN_BYTES) scalar_t pgx[CVFEM_HEX8_N_NODES][cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t pgy[CVFEM_HEX8_N_NODES][cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t pgz[CVFEM_HEX8_N_NODES][cvfem_hex8_vec_size<scalar_t>];
     // The DIRECTION's reconstructed gradient, for the Jacobian action. Only the packed
     // Jacobian fills these; the residual has no use for them and leaves them untouched,
     // which is why the kernels take them behind a template flag rather than a null check.
-    alignas(ALIGN_BYTES) scalar_t qgx[CVFEM_HEX8_N_NODES][CVFEM_HEX8_VEC_SIZE];
-    alignas(ALIGN_BYTES) scalar_t qgy[CVFEM_HEX8_N_NODES][CVFEM_HEX8_VEC_SIZE];
-    alignas(ALIGN_BYTES) scalar_t qgz[CVFEM_HEX8_N_NODES][CVFEM_HEX8_VEC_SIZE];
+    alignas(ALIGN_BYTES) scalar_t qgx[CVFEM_HEX8_N_NODES][cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t qgy[CVFEM_HEX8_N_NODES][cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t qgz[CVFEM_HEX8_N_NODES][cvfem_hex8_vec_size<scalar_t>];
     // The Rhie-Chow mass-flux coefficient, one per sub-control surface, computed outside
     // the element loop and read here. It is pure geometry (times rho, mu and the scale),
     // so it changes only when those do -- once per Newton step, not once per matvec.
@@ -126,10 +169,10 @@ struct Hex8RhieChowPack {
     // zero here, which is what the scalar and isoparametric paths get from calling the
     // function directly. This is the arrangement the semi-structured path has always used
     // (SSMacroGeom::coeff, kernels/semistructured/cvfem_sshex8_ns.hpp) -- which is why it never paid this.
-    alignas(ALIGN_BYTES) scalar_t coeff[CVFEM_HEX8_N_SCS][CVFEM_HEX8_VEC_SIZE];
+    alignas(ALIGN_BYTES) scalar_t coeff[CVFEM_HEX8_N_SCS][cvfem_hex8_vec_size<scalar_t>];
     // The coefficient's velocity-sensitivity weight, tabulated beside it because it is purely
     // geometric: see cvfem_hex8_build_rc_coeff.
-    alignas(ALIGN_BYTES) scalar_t wdu[CVFEM_HEX8_N_SCS][CVFEM_HEX8_VEC_SIZE];
+    alignas(ALIGN_BYTES) scalar_t wdu[CVFEM_HEX8_N_SCS][cvfem_hex8_vec_size<scalar_t>];
     // The part of the time scale that belongs to the solve rather than to the element.
     // Only the isoparametric path reads it; the affine path has the finished coefficient in
     // the table above.
@@ -139,6 +182,11 @@ struct Hex8RhieChowPack {
     // by cvfem_hex8_gather_rc_coeff, which also makes tau hold what the table was built with.
     scalar_t scale{0};
 };
+
+// The build's own instantiation. Every existing caller spells the plain name and
+// keeps working; a single-precision sweep spells Hex8RhieChowPackT<float> and gets a
+// pack with twice the lanes.
+using Hex8RhieChowPack = Hex8RhieChowPackT<scalar_t>;
 
 // The partially assembled element tangent: the complete state dependence of one element's
 // Jacobian action, five scalars per sub-control surface.
