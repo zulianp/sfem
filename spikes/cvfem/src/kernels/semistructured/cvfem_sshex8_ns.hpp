@@ -1212,10 +1212,15 @@ static SFEM_INLINE void sscvfem_action_hoisted(const scalar_t rho, const scalar_
     }
 }
 
-inline SFEM_NOINLINE void sscvfem_apply_macro_local_hoisted(
-        // The range this call is to cover. DESIGN.md: the threading is abstract outside the
-        // sweep and what arrives is a range, so the sweep owns no parallel region.
-        const cvfem_range r,
+// One micro cell of the hoisted Jacobian action: gather at a constant offset, the action, the
+// boundary closure, accumulate into the macro-local destination.
+//
+// The geometry arrives as an SSMacroGeom REFERENCE and this kernel does not choose it: the
+// affine sweep hands it the macro element's, built once outside the loop, and the isoparametric
+// sweep hands it this cell's own. That is the whole of the split, and it is why there is no
+// nullable pointer here as there is in the simpler cells -- the object is the same type either
+// way.
+static SFEM_INLINE void sscvfem_action_hoisted_cell(
         // The staging object is gone; what this sweep reads out of it is what it takes.
         const scalar_t box_lx,
         const scalar_t box_ly,
@@ -1224,191 +1229,105 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_hoisted(
         const scalar_t bc_tx,
         const scalar_t bc_ty,
         const scalar_t bc_tz,
-        idx_t **const SFEM_RESTRICT elems,
-        const int level,
-        const uint8_t *const SFEM_RESTRICT macro_curved,
         const uint8_t *const SFEM_RESTRICT face_mask,
         const uint8_t *const SFEM_RESTRICT natural_mask,
         const uint8_t *const SFEM_RESTRICT pressure_mask,
         const uint8_t *const SFEM_RESTRICT traction_mask,
-        const int nxe_src,
-        const scalar_t *const SFEM_RESTRICT pres,
-        const scalar_t *const SFEM_RESTRICT pgx_src,
-        const scalar_t *const SFEM_RESTRICT pgy_src,
-        const scalar_t *const SFEM_RESTRICT pgz_src,
-        geom_t **const SFEM_RESTRICT points,
-        const scalar_t *const SFEM_RESTRICT qgx_src,
-        const scalar_t *const SFEM_RESTRICT qgy_src,
-        const scalar_t *const SFEM_RESTRICT qgz_src,
-        const scalar_t upwind_eps,
-        const scalar_t *const SFEM_RESTRICT ux_src,
-        const scalar_t *const SFEM_RESTRICT uy_src,
-        const scalar_t *const SFEM_RESTRICT uz_src,
-        const Hex8RcConfig rcfg,
-        
-        // The staging object is gone; what this sweep reads out of it is what it takes.
-        const ptrdiff_t *const SFEM_RESTRICT red_idx,
-        const ptrdiff_t *const SFEM_RESTRICT red_ptr,
-        const idx_t *const SFEM_RESTRICT shared_node,
-        const int *const SFEM_RESTRICT slot,
-        scalar_t *const SFEM_RESTRICT stage,
-        const ptrdiff_t n_shared, const scalar_t rho, const scalar_t mu,
-                                                            const scalar_t *const SFEM_RESTRICT dir,
-                                                            scalar_t *const SFEM_RESTRICT       jv) {
-    const int L   = level;
-    const int nxe = nxe_src;
-    int       off[8];
-    sscvfem_corner_offsets(L, off);
+        const scalar_t rho, const scalar_t mu, const scalar_t upwind_eps,
+        const SSMacroScratch &s, const SSMacroGeom &g, const bool has_qg, const ptrdiff_t e,
+        const int L, const int xi, const int yi, const int zi, const int off[8]) {
+    const int base = sscvfem_lidx(L, xi, yi, zi);
 
-
-    {
-        // Whether the direction's pressure gradient is there at all. Above the scratch because
-        // the scratch is sized from it.
-        const bool                has_qg = qgx_src;
-        // Per-thread scratch from the kernels' own arena, not std::vector locals: slots 5/6 are the semi-structured element sweeps',
-        // shared between them because only one is live inside a parallel region and
-        // they all want the same macro-element size.
-        scalar_t *const SFEM_RESTRICT _arena5 = thread_scratch<scalar_t>(5, ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)(has_qg ? nxe : 0)) + ((size_t)(has_qg ? nxe : 0)) + ((size_t)(has_qg ? nxe : 0)) + ((size_t)nxe * CVFEM_HEX8_N_FIELDS));
-        scalar_t *const SFEM_RESTRICT lx = _arena5;
-        scalar_t *const SFEM_RESTRICT ly = _arena5 + ((size_t)nxe);
-        scalar_t *const SFEM_RESTRICT lz = _arena5 + ((size_t)nxe) + ((size_t)nxe);
-        scalar_t *const SFEM_RESTRICT lux = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
-        scalar_t *const SFEM_RESTRICT luy = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
-        scalar_t *const SFEM_RESTRICT luz = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
-        scalar_t *const SFEM_RESTRICT lp = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
-        scalar_t *const SFEM_RESTRICT lvx = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
-        scalar_t *const SFEM_RESTRICT lvy = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
-        scalar_t *const SFEM_RESTRICT lvz = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
-        scalar_t *const SFEM_RESTRICT lq = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
-        scalar_t *const SFEM_RESTRICT lpgx = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
-        scalar_t *const SFEM_RESTRICT lpgy = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
-        scalar_t *const SFEM_RESTRICT lpgz = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
-        scalar_t *const SFEM_RESTRICT lqgx = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
-        scalar_t *const SFEM_RESTRICT lqgy = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)(has_qg ? nxe : 0));
-        scalar_t *const SFEM_RESTRICT lqgz = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)(has_qg ? nxe : 0)) + ((size_t)(has_qg ? nxe : 0));
-        scalar_t *const SFEM_RESTRICT lout = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)(has_qg ? nxe : 0)) + ((size_t)(has_qg ? nxe : 0)) + ((size_t)(has_qg ? nxe : 0));
-        idx_t *const SFEM_RESTRICT _arena6 = thread_scratch<idx_t>(6, ((size_t)nxe));
-        idx_t *const SFEM_RESTRICT lg = _arena6;
-
-        for (ptrdiff_t e = r.begin; e < r.end; ++e) {
-            for (int a = 0; a < nxe; ++a) {
-                const idx_t g = elems[a][e];
-                lg[(size_t)a]        = g;
-                lx[(size_t)a]        = (scalar_t)points[0][g];
-                ly[(size_t)a]        = (scalar_t)points[1][g];
-                lz[(size_t)a]        = (scalar_t)points[2][g];
-                lux[(size_t)a]       = ux_src[(size_t)g];
-                luy[(size_t)a]       = uy_src[(size_t)g];
-                luz[(size_t)a]       = uz_src[(size_t)g];
-                lp[(size_t)a]        = pres[(size_t)g];
-                lvx[(size_t)a]       = dir[(size_t)g * 4 + 0];
-                lvy[(size_t)a]       = dir[(size_t)g * 4 + 1];
-                lvz[(size_t)a]       = dir[(size_t)g * 4 + 2];
-                lq[(size_t)a]        = dir[(size_t)g * 4 + 3];
-                lpgx[(size_t)a]      = pgx_src[(size_t)g];
-                lpgy[(size_t)a]      = pgy_src[(size_t)g];
-                lpgz[(size_t)a]      = pgz_src[(size_t)g];
-                if (has_qg) {
-                    lqgx[(size_t)a] = qgx_src[(size_t)g];
-                    lqgy[(size_t)a] = qgy_src[(size_t)g];
-                    lqgz[(size_t)a] = qgz_src[(size_t)g];
-                }
-            }
-            std::fill(lout, lout + ((size_t)nxe * CVFEM_HEX8_N_FIELDS), scalar_t(0));
-
-            // Per macro element, and the curved branch below reads the same one: a call per
-            // micro cell there took this unit past the point where GCC inlines sscvfem_rc_config,
-            // which then became a call in every cell of the block diagonal, 9% slower on boxes.
-            const Hex8RcConfig rc_macro = rcfg;
-            SSMacroGeom mg;
-            {
-                scalar_t ex[8], ey[8], ez[8];
-                int ext[8];
-                sscvfem_macro_corner_offsets(L, ext);
-                for (int a = 0; a < 8; ++a) {
-                    const int l = ext[a];
-                    ex[a]       = lx[(size_t)l];
-                    ey[a]       = ly[(size_t)l];
-                    ez[a]       = lz[(size_t)l];
-                }
-                sscvfem_hoisted_cell(ex, ey, ez, L, ex, ey, ez);
-                sscvfem_macro_geom(ex, ey, ez, rho, mu, rc_macro.scale, rc_macro.tau, mg);
-            }
-
-            const bool curved_e = sscvfem_macro_curved(macro_curved, e);
-            for (int zi = 0; zi < L; ++zi) {
-                for (int yi = 0; yi < L; ++yi) {
-                    for (int xi = 0; xi < L; ++xi) {
-                        const int base = sscvfem_lidx(L, xi, yi, zi);
-
-                        scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8];
-                        scalar_t vx[8], vy[8], vz[8], q[8], pgx[8], pgy[8], pgz[8];
-                        scalar_t qgx[8], qgy[8], qgz[8];
-                        scalar_t r[CVFEM_HEX8_N_DOF];
-                        for (int a = 0; a < 8; ++a) {
-                            const int l = base + off[a];
-                            x[a]        = lx[(size_t)l];
-                            y[a]        = ly[(size_t)l];
-                            z[a]        = lz[(size_t)l];
-                            ux[a]       = lux[(size_t)l];
-                            uy[a]       = luy[(size_t)l];
-                            uz[a]       = luz[(size_t)l];
-                            p[a]        = lp[(size_t)l];
-                            vx[a]       = lvx[(size_t)l];
-                            vy[a]       = lvy[(size_t)l];
-                            vz[a]       = lvz[(size_t)l];
-                            q[a]        = lq[(size_t)l];
-                            pgx[a]      = lpgx[(size_t)l];
-                            pgy[a]      = lpgy[(size_t)l];
-                            pgz[a]      = lpgz[(size_t)l];
-                            if (has_qg) {
-                                qgx[a] = lqgx[(size_t)l];
-                                qgy[a] = lqgy[(size_t)l];
-                                qgz[a] = lqgz[(size_t)l];
-                            }
-                        }
-                        // A curved macro element: this cell's own geometry, not the hoisted one.
-                        if (curved_e) {
-                            sscvfem_macro_geom_cell(x, y, z, rho, mu, rc_macro, mg);
-                        }
-
-                        sscvfem_action_hoisted(rho, mu, mg, ux, uy, uz, vx, vy, vz, q, p, pgx, pgy, pgz,
-                                               has_qg ? qgx : nullptr, has_qg ? qgy : nullptr,
-                                               has_qg ? qgz : nullptr, r, upwind_eps);
-                        boundary_scs_add_jacobian_action<false>(rho, mu, mg.adj, mg.det, box_lx, box_ly, box_lz, x, y, z,
-                                                         ux, uy, uz, vx, vy, vz, q, r,
-                                                         !face_mask
-                                                          ? -1
-                                                          : sscvfem_micro_face_mask(
-                                                                    (int)face_mask[(size_t)e],
-                                                                    L, xi, yi, zi),
-                                                  sscvfem_micro_face_mask(
-                                                          !natural_mask ? 0
-                                                              : (int)natural_mask[(size_t)e],
-                                                          L, xi, yi, zi),
-                                                  sscvfem_bd(bc_p, bc_tx, bc_ty, bc_tz, pressure_mask, traction_mask, e, L, xi, yi, zi));
-
-                        for (int a = 0; a < 8; ++a) {
-                            const int l = base + off[a];
-                            for (int c = 0; c < CVFEM_HEX8_N_FIELDS; ++c) lout[(size_t)l * CVFEM_HEX8_N_FIELDS + c] += r[a * 4 + c];
-                        }
-                    }
-                }
-            }
-
-            if (slot)
-                sscvfem_scatter_element(slot, const_cast<scalar_t *>(stage), nxe, e, lg, lout, jv);
-            else
-                for (int a = 0; a < nxe; ++a) {
-                    const idx_t g = lg[(size_t)a];
-                    for (int c = 0; c < CVFEM_HEX8_N_FIELDS; ++c)
-                        atomic_add(jv + (ptrdiff_t)g * CVFEM_HEX8_N_FIELDS + c, 0, lout[(size_t)a * CVFEM_HEX8_N_FIELDS + c]);
-                }
+    scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8];
+    scalar_t vx[8], vy[8], vz[8], q[8], pgx[8], pgy[8], pgz[8];
+    scalar_t qgx[8], qgy[8], qgz[8];
+    scalar_t r[CVFEM_HEX8_N_DOF];
+    for (int a = 0; a < 8; ++a) {
+        const int l = base + off[a];
+        x[a]        = s.lx[(size_t)l];
+        y[a]        = s.ly[(size_t)l];
+        z[a]        = s.lz[(size_t)l];
+        ux[a]       = s.lux[(size_t)l];
+        uy[a]       = s.luy[(size_t)l];
+        uz[a]       = s.luz[(size_t)l];
+        p[a]        = s.lp[(size_t)l];
+        vx[a]       = s.lvx[(size_t)l];
+        vy[a]       = s.lvy[(size_t)l];
+        vz[a]       = s.lvz[(size_t)l];
+        q[a]        = s.lq[(size_t)l];
+        pgx[a]      = s.lpgx[(size_t)l];
+        pgy[a]      = s.lpgy[(size_t)l];
+        pgz[a]      = s.lpgz[(size_t)l];
+        if (has_qg) {
+            qgx[a] = s.lqgx[(size_t)l];
+            qgy[a] = s.lqgy[(size_t)l];
+            qgz[a] = s.lqgz[(size_t)l];
         }
     }
 
-    // The shared reduction is the caller's: a second, independent loop over the reduction
-    // rows, run after this sweep's threads have joined. See sscvfem_drain_shared.
+    sscvfem_action_hoisted(rho, mu, g, ux, uy, uz, vx, vy, vz, q, p, pgx, pgy, pgz,
+                           has_qg ? qgx : nullptr, has_qg ? qgy : nullptr,
+                           has_qg ? qgz : nullptr, r, upwind_eps);
+    boundary_scs_add_jacobian_action<false>(rho, mu, g.adj, g.det, box_lx, box_ly, box_lz, x, y, z,
+                                     ux, uy, uz, vx, vy, vz, q, r,
+                                     !face_mask
+                                      ? -1
+                                      : sscvfem_micro_face_mask(
+                                                (int)face_mask[(size_t)e],
+                                                L, xi, yi, zi),
+                              sscvfem_micro_face_mask(
+                                      !natural_mask ? 0
+                                          : (int)natural_mask[(size_t)e],
+                                      L, xi, yi, zi),
+                              sscvfem_bd(bc_p, bc_tx, bc_ty, bc_tz, pressure_mask, traction_mask, e, L, xi, yi, zi));
+
+    for (int a = 0; a < 8; ++a) {
+        const int l = base + off[a];
+        for (int c = 0; c < CVFEM_HEX8_N_FIELDS; ++c)
+            s.lout[(size_t)l * CVFEM_HEX8_N_FIELDS + c] += r[a * 4 + c];
+    }
+}
+
+// The hoisted action's micro cells for ONE CURVED macro element, each with its own geometry.
+// Out of line for the reason sscvfem_block_diag_curved_macro is, and the note there is from
+// measurement: inlined, the per-cell geometry construction grew the unit past the point where
+// gcc still inlined the small per-cell helpers the affine sweeps depend on, and
+// sscvfem_rc_config became a call in every micro cell of the block diagonal -- 9% slower on
+// meshes with no curved element at all.
+static SFEM_NOINLINE void sscvfem_action_hoisted_curved_macro(
+        // The staging object is gone; what this sweep reads out of it is what it takes.
+        const scalar_t box_lx,
+        const scalar_t box_ly,
+        const scalar_t box_lz,
+        const scalar_t bc_p,
+        const scalar_t bc_tx,
+        const scalar_t bc_ty,
+        const scalar_t bc_tz,
+        const uint8_t *const SFEM_RESTRICT face_mask,
+        const uint8_t *const SFEM_RESTRICT natural_mask,
+        const uint8_t *const SFEM_RESTRICT pressure_mask,
+        const uint8_t *const SFEM_RESTRICT traction_mask,
+        const Hex8RcConfig rc_macro, const scalar_t rho, const scalar_t mu,
+        const scalar_t upwind_eps, const SSMacroScratch &s, const bool has_qg,
+        const ptrdiff_t e, const int level, const int off[8]) {
+    const int L = level;
+    for (int zi = 0; zi < L; ++zi)
+        for (int yi = 0; yi < L; ++yi)
+            for (int xi = 0; xi < L; ++xi) {
+                const int base = sscvfem_lidx(L, xi, yi, zi);
+                scalar_t  cx[8], cy[8], cz[8];
+                for (int a = 0; a < 8; ++a) {
+                    const int l = base + off[a];
+                    cx[a]       = s.lx[(size_t)l];
+                    cy[a]       = s.ly[(size_t)l];
+                    cz[a]       = s.lz[(size_t)l];
+                }
+                SSMacroGeom cg;
+                sscvfem_macro_geom_cell(cx, cy, cz, rho, mu, rc_macro, cg);
+                sscvfem_action_hoisted_cell(box_lx, box_ly, box_lz, bc_p, bc_tx, bc_ty, bc_tz,
+                                            face_mask, natural_mask, pressure_mask, traction_mask,
+                                            rho, mu, upwind_eps, s, cg, has_qg, e, L, xi, yi, zi, off);
+            }
 }
 
 // ---------------------------------------------------------------------------

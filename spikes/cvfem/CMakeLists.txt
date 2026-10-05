@@ -286,6 +286,20 @@ if(CVFEM_REPORT_PYTHON)
     add_test(NAME cvfem_null_tested_args
              COMMAND ${CVFEM_REPORT_PYTHON}
                      ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/compile/cvfem_null_tested_args.py)
+
+    # A SWEEP CALL LEFT OUTSIDE ITS PARALLEL REGION, which nothing else can see.
+    #
+    # `#pragma omp parallel` applies to the one statement after it. A split sweep pair is two
+    # statements, and without braces the second runs after the region closes -- once, on the
+    # encountering thread. The answer is still right, every element is processed once, and the
+    # fingerprints are taken at one thread, so the whole suite passes while half of a pair runs
+    # serially. On a box the curved half is empty and there is nothing to notice at all.
+    #
+    # Found the hard way: the naive residual pair went in unbraced and was caught by a brace pass
+    # run for a different sweep, with six more in the benchmark.
+    add_test(NAME cvfem_parallel_region_pairs
+             COMMAND ${CVFEM_REPORT_PYTHON}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/compile/cvfem_parallel_region_pairs.py)
 endif()
 
 if(CVFEM_REPORT_PYTHON)

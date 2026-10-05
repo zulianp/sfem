@@ -444,4 +444,97 @@ inline void sscvfem_nodal_grad_scatter_affine(
     // sscvfem_nodal_grad_normalize.
 }
 
+
+// Mirrors cvfem_hex8_ns_upwind_jacobian_action with the macro element's invariants hoisted out
+// of the micro-cell loop: the adjugate, the determinant, the sub-control-surface areas, the
+// difference vectors and the Rhie-Chow coefficient are all built once per macro element. Over
+// STRAIGHT macro elements, where that is exact.
+inline SFEM_NOINLINE void sscvfem_apply_macro_hoisted_affine(
+        // The range this call is to cover, as positions in macro_order. DESIGN.md: the
+        // threading is abstract outside the sweep and what arrives is a range, so the sweep
+        // owns no parallel region.
+        const cvfem_range r,
+        // The curvature partition; null means the identity, which is a mesh with nothing
+        // curved. See SSMeshData::macro_order.
+        const ptrdiff_t *const SFEM_RESTRICT macro_order,
+        // The staging object is gone; what this sweep reads out of it is what it takes.
+        const scalar_t box_lx,
+        const scalar_t box_ly,
+        const scalar_t box_lz,
+        const scalar_t bc_p,
+        const scalar_t bc_tx,
+        const scalar_t bc_ty,
+        const scalar_t bc_tz,
+        idx_t **const SFEM_RESTRICT elems,
+        const int level,
+        const uint8_t *const SFEM_RESTRICT face_mask,
+        const uint8_t *const SFEM_RESTRICT natural_mask,
+        const uint8_t *const SFEM_RESTRICT pressure_mask,
+        const uint8_t *const SFEM_RESTRICT traction_mask,
+        const int nxe_src,
+        const scalar_t *const SFEM_RESTRICT pres,
+        const scalar_t *const SFEM_RESTRICT pgx_src,
+        const scalar_t *const SFEM_RESTRICT pgy_src,
+        const scalar_t *const SFEM_RESTRICT pgz_src,
+        geom_t **const SFEM_RESTRICT points,
+        const scalar_t *const SFEM_RESTRICT qgx_src,
+        const scalar_t *const SFEM_RESTRICT qgy_src,
+        const scalar_t *const SFEM_RESTRICT qgz_src,
+        const scalar_t upwind_eps,
+        const scalar_t *const SFEM_RESTRICT ux_src,
+        const scalar_t *const SFEM_RESTRICT uy_src,
+        const scalar_t *const SFEM_RESTRICT uz_src,
+        const Hex8RcConfig rcfg,
+        
+        // The staging object is gone; what this sweep reads out of it is what it takes.
+        const ptrdiff_t *const SFEM_RESTRICT red_idx,
+        const ptrdiff_t *const SFEM_RESTRICT red_ptr,
+        const idx_t *const SFEM_RESTRICT shared_node,
+        const int *const SFEM_RESTRICT slot,
+        scalar_t *const SFEM_RESTRICT stage,
+        const ptrdiff_t n_shared, const scalar_t rho, const scalar_t mu,
+                                                            const scalar_t *const SFEM_RESTRICT dir,
+                                                            scalar_t *const SFEM_RESTRICT       jv) {
+    const int L   = level;
+    const int nxe = nxe_src;
+    int       off[8];
+    sscvfem_corner_offsets(L, off);
+
+    // Whether the direction's pressure gradient is there at all. Above the scratch because the
+    // scratch is sized from it.
+    const bool           has_qg = qgx_src;
+    const SSMacroScratch s = sscvfem_macro_scratch(nxe, CVFEM_HEX8_N_FIELDS, true, has_qg, false);
+
+    for (ptrdiff_t i = r.begin; i < r.end; ++i) {
+        const ptrdiff_t e = macro_order ? macro_order[i] : i;
+        sscvfem_macro_gather(s, elems, points, pres, pgx_src, pgy_src, pgz_src, qgx_src, qgy_src,
+                             qgz_src, nullptr, ux_src, uy_src, uz_src, dir, e, nxe,
+                             CVFEM_HEX8_N_FIELDS);
+
+        // Per macro element, and the curved sweep reads the same one: a call per micro cell
+        // there took this unit past the point where GCC inlines sscvfem_rc_config, which then
+        // became a call in every cell of the block diagonal, 9% slower on boxes.
+        const Hex8RcConfig rc_macro = rcfg;
+        SSMacroGeom mg;
+        {
+            scalar_t ex[8], ey[8], ez[8];
+            sscvfem_macro_hoisted_corners(s, L, ex, ey, ez);
+            sscvfem_macro_geom(ex, ey, ez, rho, mu, rc_macro.scale, rc_macro.tau, mg);
+        }
+
+        for (int zi = 0; zi < L; ++zi)
+            for (int yi = 0; yi < L; ++yi)
+                for (int xi = 0; xi < L; ++xi)
+                    sscvfem_action_hoisted_cell(box_lx, box_ly, box_lz, bc_p, bc_tx, bc_ty, bc_tz,
+                                                face_mask, natural_mask, pressure_mask, traction_mask,
+                                                rho, mu, upwind_eps, s, mg, has_qg, e, L, xi, yi, zi,
+                                                off);
+
+        sscvfem_macro_drain(s, slot, const_cast<scalar_t *>(stage), nxe, e, jv);
+    }
+
+    // The shared reduction is the caller's: a second, independent loop over the reduction
+    // rows, run after this sweep's threads have joined. See sscvfem_drain_shared.
+}
+
 #endif  // CVFEM_SSHEX8_NS_AFFINE_HPP
