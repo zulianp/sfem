@@ -1,53 +1,58 @@
-# `semistructured/isoparametric/` — empty, and the split it is waiting for
+# `semistructured/isoparametric/` — every micro cell derives its own geometry
 
-There is no geometry split to make in this format, and it is not for want of trying: **every one
-of its ten sweeps branches on `curved_e` per macro-element.** The count, from the sweeps
-themselves:
+Ten sweeps, each the curved half of a pair. None tests whether its macro element is curved: the
+range it is handed holds nothing else.
 
-| sweep | branches on curvature |
+| sweep | what it derives per micro cell |
 |---|---|
-| `sscvfem_apply_macro_local_affine` | 7 |
-| `sscvfem_apply_naive`, `_macro_local`, `_residual_naive_sweep`, `_block_diag_naive_sweep` | 4 each |
-| `sscvfem_nodal_grad_packed_sweep`, `_scatter_range` | 3 each |
-| `sscvfem_apply_macro_local_hoisted`, `_apply_blocks_impl`, `_residual_sweep` | 2 each |
+| `sscvfem_apply_naive_isoparam` | the adjugate and determinant, from the cell's own corners |
+| `sscvfem_apply_macro_local_isoparam` | the same — and this is also the curved half of the *lifted* variant |
+| `sscvfem_apply_macro_hoisted_isoparam` | a whole `SSMacroGeom` per cell |
+| `sscvfem_apply_blocks_isoparam<Blocks>` | the same, with the unwanted field blocks compiled out |
+| `sscvfem_residual_isoparam` | the `SSMacroGeom`, and the Rhie–Chow distances from the same corners |
+| `sscvfem_residual_naive_isoparam` | the adjugate and determinant |
+| `sscvfem_block_diag_isoparam` | the adjugate, via `sscvfem_block_diag_curved_macro` |
+| `sscvfem_block_diag_naive_isoparam` | the adjugate and determinant |
+| `sscvfem_nodal_grad_scatter_isoparam` | the adjugate and the sign of its determinant |
+| `sscvfem_nodal_grad_pack_element_isoparam` | the same, inside a pack |
 
-`sscvfem_apply_macro_local_affine` is named for **affine hoisting**, not for an affine-only
-assumption: it lifts the macro-element's invariants out of the micro-cell loop and still gives a
-curved macro-element its own per-cell geometry. That is what the seven branches are.
+Ten and not eleven, because `sscvfem_apply_macro_lifted_affine` has no twin here: lifting the
+Jacobian out of the micro-cell loop is precisely what a curved macro element cannot do. Its
+curved range runs `sscvfem_apply_macro_local_isoparam`, which is also the curved range of the
+macro-local variant — as branches inside those two sweeps the paths were bit-identical, and two
+paths for one operation is what the one-path rule forbids.
 
-**Why it cannot be separated.** `macro_curved` is mesh data, not a configuration: one mesh has
-curved and straight macro-elements side by side, and which is which is known only per element at
-run time. So the branch cannot become a template parameter the way `bool ISO` did for the packed
-layout, and a folder split would mean two copies of every sweep — the gather, the hoisting, the
-scatter and the shared reduction — with the one-path rule broken for a distinction the data does
-not make.
+## Why a curved macro element cannot be hoisted
 
-**And that is not an exemption — it is a partition, and the partition is owed.** This file used
-to end by reading DESIGN.md's clause as satisfied by its own parenthetical ("now they are mixed
-in with enum and booleans"): no enum, no user-level boolean, just a per-element fact about the
-mesh that both sweeps answer. The correction rules that out — **"I indicated separate folders for
-geometry affine vs isoparametric. This implies that the kernels should be separated. Quite
-obvious isn't it?"** — and the standing rule for a precondition that holds for only part of the
-data is to split the work, not to abandon the fast path for all of it.
+Hoisting one geometry over a macro element's micro cells is exact when the macro element is
+affine: its cells are translates of one another. For a curved one it is not merely inaccurate.
+Neighbouring macro elements hoist *different* geometries, so the sub-control surfaces a node's
+control volume is assembled from no longer close, and a uniform velocity acquires a discrete
+divergence. Measured on the FDA nozzle as the continuity row of u = (1,0,0), p = 0, relative to
+the flux scale: **1.39** at macro core 2 / L 2 and **1.49** at L 4 — not falling with the level —
+against 0.085 for the flat mesh. That spurious source drove a backward flow fifty times the
+physical velocity and stalled Newton with an exact Jacobian and a dense LU.
 
-So the design this folder is waiting for is:
+`sscvfem_residual_isoparam` carries the second half of the same requirement. Its Rhie–Chow
+distances come from the cell's own corners, because they have to agree with the geometry the
+Jacobian action differences — and a cell's own coordinates agree with the hoisted ones only on an
+affine macro element. On a curved one they did not, and the residual and its Jacobian action
+disagreed in every continuity row: 6.0e-02 by `SFEM_FD_CHECK` at macro core 2 / L 2, 3.2e-02 at
+L 4, and exact with Rhie–Chow off.
 
-1. **Order the macro-elements by curvature, once per level.** Which are straight is mesh data
-   and does not change between applies, so the partition is setup work, like the pack ordering
-   and the element colouring already are.
-2. **Two sweeps over two ranges.** The straight range runs a sweep with no curvature branch at
-   all, hoisting the macro-element's geometry once for every micro-cell; the curved range runs
-   the sweep that derives it per cell. Each lands in its folder, and neither tests the other's
-   case.
-3. **The shared parts stay shared**, the way the packed layout's staging, extent and drain went
-   into `../../packed/cvfem_pack_scratch.hpp` before that format was split. Here that is the
-   gather, the scatter and the shared reduction — which is most of each sweep, and the reason a
-   naive folder split would have duplicated ten sweeps.
+## What these sweeps do *not* do, which is the second thing the split bought
 
-What this buys beyond the structure is the same thing it bought the packed layout, and more of
-it: the straight sweep loses seven runtime branches from inside its micro-cell loop in
-`sscvfem_apply_macro_local_affine` alone, and a branch inside a lane loop is the shape of guard
-this spike has measured at 1.83x.
+They build no macro geometry at all. The branching sweeps these came from gathered the macro
+element's eight corners and evaluated its Jacobian for **every** macro element, and a curved one
+then threw the result away — in the hoisted apply it was overwritten in the first micro cell. In
+the nodal gradient the only thing the curved path took from it was a degenerate-determinant
+guard, and a curved cell carries its own.
 
-Until then the two folders hold this note and the sweeps branch per macro-element, which is the
-honest state rather than a reading of the clause.
+## Where the rest of it is documented
+
+`../affine/README.md` has the parts the two halves share: how the curvature partition is built
+and handed out, what moved into `../cvfem_sshex8_ns.hpp` before the split so that nothing is
+duplicated between the folders, the two measured conventions the micro-cell kernels depend on
+(the geometry choice as a pointer, the curved loop out of line), and what gates the split —
+`cvfem_flat_vs_ss_test`'s warped arms, together with the reason the semi-structured bench's
+four-variant agreement is not a gate for it.
