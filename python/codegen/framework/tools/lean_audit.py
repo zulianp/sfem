@@ -54,10 +54,19 @@ _LANE_LOOP = re.compile(
 )
 
 
-def source_files(generated):
+#: What a survey reads, keyed on the tree it is asked about.  The device sources
+#: are the same generated kernels under a different suffix, so they are the same
+#: measurement over a different file set rather than a second audit: leaving them
+#: out is why 278 device kernels named a work-item count nothing read while the
+#: host budget stood at zero.
+_SOURCE_SUFFIXES = {False: ("*.cpp", "*.hpp"), True: ("*.cu", "*.cuh")}
+
+
+def source_files(generated, device=False):
     return sorted(
-        glob.glob(os.path.join(generated, "**", "*.cpp"), recursive=True)
-        + glob.glob(os.path.join(generated, "**", "*.hpp"), recursive=True)
+        path
+        for suffix in _SOURCE_SUFFIXES[bool(device)]
+        for path in glob.glob(os.path.join(generated, "**", suffix), recursive=True)
     )
 
 
@@ -91,10 +100,19 @@ _PARAMETER = re.compile(r"(\w+)\s*(?:\[[^\]]*\])?\s*$")
 #: The trailing identifier of an *unnamed* parameter is its type, and a local
 #: declaration picked up by the signature pattern carries an initializer, so
 #: neither is a named parameter that nothing reads.
+#:
+#: `RSTR` is here because a pointer parameter ends in the restrict macro rather
+#: than in its type, so an unnamed one reads as a parameter called `RSTR`.  That
+#: went unseen while every such signature also had a body mentioning `RSTR` --
+#: `const g_t *const RSTR x = points[0];` in an isoparametric kernel -- because
+#: the word-boundary search below then found the macro and called the parameter
+#: read.  A kernel that stopped aliasing coordinates lost the token and the
+#: audit reported five placeholders per file as ignored parameters, which is
+#: the opposite of what leaving them unnamed means.
 _TYPE_NAMES = frozenset(
     """void bool char short int long float double unsigned signed size_t
     ptrdiff_t idx_t geom_t real_t count_t element_idx_t int16_t uint16_t
-    s_t g_t compressed_t metric_tensor_t""".split()
+    s_t g_t compressed_t metric_tensor_t RSTR""".split()
 )
 
 
@@ -179,6 +197,55 @@ def unused_parameters(source):
                 continue
             if not re.search(r"\b%s\b" % re.escape(name), body):
                 yield name
+
+
+#: The names an emitter spells by hand for the loop structure around a kernel,
+#: rather than deriving from a stream or a field.  A body that reads one of them
+#: without declaring it or taking it as a parameter does not compile, and no
+#: measurement here saw that: `unused_parameters` is its mirror and catches only
+#: the declared-and-unread direction.
+#:
+#: The list is closed rather than a free-variable analysis, which would have to
+#: know every type, global and helper name in scope.  These five are the ones
+#: the loop lowering owns, so they are the ones a change to the loop lowering
+#: can leave dangling -- as removing the work-item count did: `ageom_stream`
+#: kept taking `ne` after the SIMT mesh loop stopped declaring it, and 11 device
+#: translation units failed on `identifier "ne" is undefined` while every host
+#: gate was green, because the host mesh loop still declares it.
+#: `VS` is deliberately absent: it is a template parameter, and a member
+#: function of a class template reads the enclosing struct's parameter list,
+#: which a signature-local search cannot see -- 14 false positives in the two
+#: shared micro-kernel headers.  The names here are locals the loop lowering
+#: declares in the body itself.
+_WORK_ITEM_NAMES = ("ne", "evb", "lane", "q")
+
+
+def undeclared_work_item_names(source):
+    """Loop-structure names a body reads but neither declares nor is given."""
+    for match in _SIGNATURE.finditer(source):
+        open_brace = source.index("{", match.start())
+        depth, index = 0, open_brace
+        while index < len(source):
+            if source[index] == "{":
+                depth += 1
+            elif source[index] == "}":
+                depth -= 1
+                if depth == 0:
+                    break
+            index += 1
+        body = source[open_brace : index + 1]
+        given = match.group("params") + match.group(0)
+        for name in _WORK_ITEM_NAMES:
+            word = r"\b%s\b" % name
+            if not re.search(word, body):
+                continue
+            if re.search(word, given):
+                continue
+            # A declaration, a `for (int name = ...)` head or a template
+            # parameter all introduce it; only a bare read is the defect.
+            if re.search(r"(?:\w+|>)\s+\**%s\b\s*(?:=|;|\)|\[)" % name, body):
+                continue
+            yield name
 
 
 _DISCARD = re.compile(r"^\s*\(void\)(\w+);\s*$", re.M)
@@ -331,6 +398,88 @@ def lane_loop_runs(source):
     return runs
 
 
+_WORK_ITEM_LOOP_OPEN = re.compile(
+    r"for \(int (lane|scatter) = 0; \1 < ne; \+\+\1\) \{"
+)
+_INNER_LOOP_OPEN = re.compile(r"for \(\w[\w ]* (\w+) = ")
+_INNER_DECLARATION = re.compile(
+    r"(?:const )?(?:[\w:]+ )*?\**(?:const )?(?:RSTR )?(\w+)\s*(?:\[[^\]]*\])?\s*="
+)
+_SUBSCRIPT = re.compile(r"([A-Za-z_]\w*)\[([^\[\]]+)\]")
+
+
+_DECLARED_TYPES = (
+    "s_t double float int idx_t ptrdiff_t count_t real_t geom_t uint16_t"
+    " compressed_t g_t"
+).split()
+
+
+def _declares_extent(line, name):
+    """Whether this line declares `name` with an extent rather than reading it."""
+    return re.search(
+        r"\b(?:%s)\s+(?:\*\s*)?(?:const\s+)?(?:RSTR\s+)?%s\s*\["
+        % ("|".join(_DECLARED_TYPES), re.escape(name)),
+        line,
+    ) is not None
+
+
+def lane_loop_invariants(body):
+    """Index arithmetic inside a work-item loop that does not depend on it.
+
+    The lane loop is the vectorised inner loop, so everything in it is paid once
+    per element.  A subscript the lane does not enter is the same address every
+    iteration: `grad_ref_x[q * NS + test]` is one value and
+    `bout_data[shape * NC + d]` is one row, and both belong above the loop --
+    named once, leaving `gx` and `bout_row[lane]` inside.  The compiler will
+    usually hoist them, but the generated text is what is read and reviewed, and
+    the standing shape rule for this tree is that the offsets are hoisted.
+
+    An expression that mentions a name introduced *inside* the work-item loop is
+    not invariant and is not counted -- a loop opened there, or a value read
+    there.  A packed gather's `pk_u[d * max_nodes_per_pack + packed_node]` looks
+    invariant until one notices that `packed_node` is the element's own node,
+    read from the connectivity a line above.
+    """
+    found = []
+    lines = body.split("\n")
+    depth = None
+    index = None
+    inner = set()
+    for line in lines:
+        opening = _WORK_ITEM_LOOP_OPEN.search(line)
+        if opening is not None and depth is None:
+            index = opening.group(1)
+            depth = line.count("{") - line.count("}")
+            inner = set()
+            continue
+        if depth is None:
+            continue
+        for match in _INNER_LOOP_OPEN.finditer(line):
+            inner.add(match.group(1))
+        for name, expression in _SUBSCRIPT.findall(line):
+            # `s_t jac[ND * ND];` is a declaration: the brackets are the extent,
+            # not an address computed per element, and there is nothing to hoist.
+            if _declares_extent(line, name):
+                continue
+            symbols = set(_IDENTIFIER.findall(expression))
+            if index in symbols or symbols & inner:
+                continue
+            # A bare constant or a bare name is already one address.
+            if re.fullmatch(r"\s*\d+\s*", expression):
+                continue
+            if re.fullmatch(r"\s*[A-Za-z_]\w*\s*", expression):
+                continue
+            found.append("%s[%s]" % (name, expression.strip()))
+        declaration = _INNER_DECLARATION.search(line)
+        if declaration is not None:
+            inner.add(declaration.group(1))
+        depth += line.count("{") - line.count("}")
+        if depth <= 0:
+            depth = None
+            index = None
+    return found
+
+
 #: Wrappers that took a `KernelDiagnostics` record and called a free function
 #: on it, once per kernel per precision.  Nothing referenced them.
 WRAPPED_HELPER_SUFFIXES = ("_print_rate", "_arithmetic_intensity")
@@ -349,26 +498,35 @@ def wrapped_helper_entry_points(source):
     return names
 
 
-def survey(generated):
-    """Every measurement, over one generated tree."""
+def survey(generated, device=False):
+    """Every measurement, over one generated tree -- its host sources, or its device ones."""
     dead = []
     runs = collections.Counter()
     wrappers = []
     constants = []
     parameters = []
+    undeclared = []
     discards = []
     permutations = []
-    for path in source_files(generated):
+    invariants = []
+    for path in source_files(generated, device=device):
         with open(path, encoding="utf-8") as stream:
             source = stream.read()
         relative = os.path.relpath(path, generated)
         for name, body in function_bodies(source):
             for symbol, statement in dead_assignments(body):
                 dead.append((relative, name, symbol, statement))
+            invariants.extend(
+                (relative, name, subscript)
+                for subscript in lane_loop_invariants(body)
+            )
         constants.extend(
             (relative, name, line) for name, line in unused_constants(source)
         )
         parameters.extend((relative, name) for name in unused_parameters(source))
+        undeclared.extend(
+            (relative, name) for name in undeclared_work_item_names(source)
+        )
         discards.extend((relative, name) for name in void_discards(source))
         permutations.extend(
             (relative, name, extent) for name, extent in kernel_permutations(source)
@@ -382,8 +540,10 @@ def survey(generated):
         "wrapped_helpers": wrappers,
         "unused_constants": constants,
         "unused_parameters": parameters,
+        "undeclared_work_item_names": undeclared,
         "void_discards": discards,
         "kernel_permutations": permutations,
+        "lane_loop_invariants": invariants,
     }
 
 
@@ -391,9 +551,14 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("generated", help="a generated tree")
     parser.add_argument("--limit", type=int, default=15)
+    parser.add_argument(
+        "--device",
+        action="store_true",
+        help="survey the .cu/.cuh sources instead of the host ones",
+    )
     args = parser.parse_args(argv)
 
-    result = survey(args.generated)
+    result = survey(args.generated, device=args.device)
     print("kernel permutations:         %d" % len(result["kernel_permutations"]))
     for row in result["kernel_permutations"][: args.limit]:
         print("    %s: %s[%d]" % row)
@@ -405,6 +570,9 @@ def main(argv=None):
         print("    %s:%d: %s" % (row[0], row[2], row[1]))
     print("unused parameters:           %d" % len(result["unused_parameters"]))
     for row in result["unused_parameters"][: args.limit]:
+        print("    %s: %s" % row)
+    print("undeclared loop names:       %d" % len(result["undeclared_work_item_names"]))
+    for row in result["undeclared_work_item_names"][: args.limit]:
         print("    %s: %s" % row)
     print("dead assignments:            %d" % len(result["dead"]))
     for row in result["dead"][: args.limit]:

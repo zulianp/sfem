@@ -1,8 +1,6 @@
 #include <type_traits>
 #include <cuda_runtime.h>
 #include "../../cuda/neohookean_ogden_d3_simplex_local.cuh"
-#include "../../../../reference/cuda/quad_tet_q1.hpp"
-#include "../../../../reference/cuda/tet4_q1.hpp"
 #include "../../../../cuda/geometry_kernels.cuh"
 #include "../../../../cuda/kernel_diagnostics.cuh"
 #include <cstdint>
@@ -11,18 +9,16 @@
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, typename g_t, int VS>
+template <typename s_t, typename g_t>
 __host__ __device__ __forceinline__ const s_t *ageom_stream(
-    const int,
     const g_t *const RSTR source,
     s_t *const RSTR,
     std::true_type) {
   return source;
 }
 
-template <typename s_t, typename g_t, int VS>
+template <typename s_t, typename g_t>
 __host__ __device__ __forceinline__ const s_t *ageom_stream(
-    const int,
     const g_t *const RSTR source,
     s_t *const RSTR converted,
     std::false_type) {
@@ -91,7 +87,7 @@ extern "C" const sfem::codegen::KernelDiagnostics *cu_neohookean_ogden_tet4_obje
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, typename g_t, int VS>
+template <typename s_t, typename g_t>
 __global__ void neohookean_ogden_tet4_objective_steps_a_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
@@ -121,19 +117,16 @@ __global__ void neohookean_ogden_tet4_objective_steps_a_msoa_impl(
         s_t *const RSTR value
 ) {
   static constexpr int NC = 3;
-  static constexpr int NQ = 1;
   static constexpr int NS = 4;
-  const s_t *const affine_q_weight = sfem::codegen::quad_tet_q1<s_t>::q_weight();
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const int ne = 1;
-    idx_t ev[VS * NS];
-    s_t bu_data[NS * NC][VS];
-    s_t bh_data[NS * NC][VS];
+    idx_t ev[NS];
+    s_t bu_data[NS * NC];
+    s_t bh_data[NS * NC];
 
     for (int element_node = 0; element_node < NS; ++element_node) {
       const idx_t *const RSTR element_shape = elements[element_node] + evb;
-      idx_t *const RSTR ev_node = &ev[element_node * VS];
+      idx_t *const RSTR ev_node = &ev[element_node];
       {
         ev_node[0] = element_shape[0];
       }
@@ -143,53 +136,53 @@ __global__ void neohookean_ogden_tet4_objective_steps_a_msoa_impl(
     const s_t *const h_components[NC] = {hx, hy, hz};
     const s_t *bu_streams[NS * NC];
     for (int stream = 0; stream < NS * NC; ++stream) {
-      bu_streams[stream] = bu_data[stream];
+      bu_streams[stream] = &bu_data[stream];
     }
     const s_t *bh_streams[NS * NC];
     for (int stream = 0; stream < NS * NC; ++stream) {
-      bh_streams[stream] = bh_data[stream];
+      bh_streams[stream] = &bh_data[stream];
     }
 
     for (int shape = 0; shape < NS; ++shape) {
-      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      const idx_t *const RSTR ev_shape = &ev[shape];
       for (int d = 0; d < NC; ++d) {
         {
           const idx_t node = ev_shape[0];
-          bu_data[shape * NC + d][0] = u_components[d][node * u_stride];
-          bh_data[shape * NC + d][0] = h_components[d][node * h_stride];
+          bu_data[shape * NC + d] = u_components[d][node * u_stride];
+          bh_data[shape * NC + d] = h_components[d][node * h_stride];
         }
       }
     }
-    s_t badj0_data[VS];
-    const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj0 + evb, badj0_data, std::is_same<g_t, s_t>());
-    s_t badj1_data[VS];
-    const s_t *const badj1 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj1 + evb, badj1_data, std::is_same<g_t, s_t>());
-    s_t badj2_data[VS];
-    const s_t *const badj2 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj2 + evb, badj2_data, std::is_same<g_t, s_t>());
-    s_t badj3_data[VS];
-    const s_t *const badj3 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj3 + evb, badj3_data, std::is_same<g_t, s_t>());
-    s_t badj4_data[VS];
-    const s_t *const badj4 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj4 + evb, badj4_data, std::is_same<g_t, s_t>());
-    s_t badj5_data[VS];
-    const s_t *const badj5 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj5 + evb, badj5_data, std::is_same<g_t, s_t>());
-    s_t badj6_data[VS];
-    const s_t *const badj6 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj6 + evb, badj6_data, std::is_same<g_t, s_t>());
-    s_t badj7_data[VS];
-    const s_t *const badj7 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj7 + evb, badj7_data, std::is_same<g_t, s_t>());
-    s_t badj8_data[VS];
-    const s_t *const badj8 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj8 + evb, badj8_data, std::is_same<g_t, s_t>());
-    s_t bdet0_data[VS];
-    const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
-        ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
+    s_t badj0_data;
+    const s_t *const badj0 = ageom_stream<s_t, g_t>(
+        g_adj0 + evb, &badj0_data, std::is_same<g_t, s_t>());
+    s_t badj1_data;
+    const s_t *const badj1 = ageom_stream<s_t, g_t>(
+        g_adj1 + evb, &badj1_data, std::is_same<g_t, s_t>());
+    s_t badj2_data;
+    const s_t *const badj2 = ageom_stream<s_t, g_t>(
+        g_adj2 + evb, &badj2_data, std::is_same<g_t, s_t>());
+    s_t badj3_data;
+    const s_t *const badj3 = ageom_stream<s_t, g_t>(
+        g_adj3 + evb, &badj3_data, std::is_same<g_t, s_t>());
+    s_t badj4_data;
+    const s_t *const badj4 = ageom_stream<s_t, g_t>(
+        g_adj4 + evb, &badj4_data, std::is_same<g_t, s_t>());
+    s_t badj5_data;
+    const s_t *const badj5 = ageom_stream<s_t, g_t>(
+        g_adj5 + evb, &badj5_data, std::is_same<g_t, s_t>());
+    s_t badj6_data;
+    const s_t *const badj6 = ageom_stream<s_t, g_t>(
+        g_adj6 + evb, &badj6_data, std::is_same<g_t, s_t>());
+    s_t badj7_data;
+    const s_t *const badj7 = ageom_stream<s_t, g_t>(
+        g_adj7 + evb, &badj7_data, std::is_same<g_t, s_t>());
+    s_t badj8_data;
+    const s_t *const badj8 = ageom_stream<s_t, g_t>(
+        g_adj8 + evb, &badj8_data, std::is_same<g_t, s_t>());
+    s_t bdet0_data;
+    const s_t *const bdet0 = ageom_stream<s_t, g_t>(
+        g_det0 + evb, &bdet0_data, std::is_same<g_t, s_t>());
 
     for (int step = 0; step < nsteps; ++step) {
       {
@@ -197,7 +190,7 @@ __global__ void neohookean_ogden_tet4_objective_steps_a_msoa_impl(
       }
     }
 
-    neohookean_ogden_d3_simplex_tet4_objective_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_q_weight, lmbda, mu, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
+    neohookean_ogden_d3_simplex_tet4_objective_block<s_t, NS>(badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
   }
 
 }
@@ -239,13 +232,13 @@ extern "C" int cu_neohookean_ogden_tet4_objective_steps_a_msoa(
     case (int)sizeof(double): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::neohookean_ogden_tet4_objective_steps_a_msoa_impl<double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
+        sfem::codegen::neohookean_ogden_tet4_objective_steps_a_msoa_impl<double, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
         return sfem::codegen::launch_status("neohookean_ogden_tet4_objective_steps_a_msoa_impl");
     }
     case (int)sizeof(float): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::neohookean_ogden_tet4_objective_steps_a_msoa_impl<float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
+        sfem::codegen::neohookean_ogden_tet4_objective_steps_a_msoa_impl<float, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
         return sfem::codegen::launch_status("neohookean_ogden_tet4_objective_steps_a_msoa_impl");
     }
     default:
@@ -313,7 +306,7 @@ extern "C" const sfem::codegen::KernelDiagnostics *cu_neohookean_ogden_tet4_grad
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, typename g_t, int VS>
+template <typename s_t, typename g_t>
 __global__ void neohookean_ogden_tet4_gradient_a_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
@@ -340,19 +333,16 @@ __global__ void neohookean_ogden_tet4_gradient_a_msoa_impl(
         s_t *const RSTR outz
 ) {
   static constexpr int NC = 3;
-  static constexpr int NQ = 1;
   static constexpr int NS = 4;
-  const s_t *const affine_q_weight = sfem::codegen::quad_tet_q1<s_t>::q_weight();
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const int ne = 1;
-    idx_t ev[VS * NS];
-    s_t bu_data[NS * NC][VS];
-    s_t bout_data[NS * NC][VS];
+    idx_t ev[NS];
+    s_t bu_data[NS * NC];
+    s_t bout_data[NS * NC];
 
     for (int element_node = 0; element_node < NS; ++element_node) {
       const idx_t *const RSTR element_shape = elements[element_node] + evb;
-      idx_t *const RSTR ev_node = &ev[element_node * VS];
+      idx_t *const RSTR ev_node = &ev[element_node];
       {
         ev_node[0] = element_shape[0];
       }
@@ -360,67 +350,67 @@ __global__ void neohookean_ogden_tet4_gradient_a_msoa_impl(
     const s_t *const u_components[NC] = {ux, uy, uz};
 
     for (int shape = 0; shape < NS; ++shape) {
-      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      const idx_t *const RSTR ev_shape = &ev[shape];
       for (int d = 0; d < NC; ++d) {
         {
           const idx_t node = ev_shape[0];
-          bu_data[shape * NC + d][0] = u_components[d][node * u_stride];
+          bu_data[shape * NC + d] = u_components[d][node * u_stride];
         }
       }
     }
     for (int stream = 0; stream < NS * NC; ++stream) {
       {
-        bout_data[stream][0] = s_t(0);
+        bout_data[stream] = s_t(0);
       }
     }
 
     const s_t *bu_streams[NS * NC];
     for (int stream = 0; stream < NS * NC; ++stream) {
-      bu_streams[stream] = bu_data[stream];
+      bu_streams[stream] = &bu_data[stream];
     }
     s_t *bout_streams[NS * NC];
     for (int stream = 0; stream < NS * NC; ++stream) {
-      bout_streams[stream] = bout_data[stream];
+      bout_streams[stream] = &bout_data[stream];
     }
-    s_t badj0_data[VS];
-    const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj0 + evb, badj0_data, std::is_same<g_t, s_t>());
-    s_t badj1_data[VS];
-    const s_t *const badj1 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj1 + evb, badj1_data, std::is_same<g_t, s_t>());
-    s_t badj2_data[VS];
-    const s_t *const badj2 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj2 + evb, badj2_data, std::is_same<g_t, s_t>());
-    s_t badj3_data[VS];
-    const s_t *const badj3 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj3 + evb, badj3_data, std::is_same<g_t, s_t>());
-    s_t badj4_data[VS];
-    const s_t *const badj4 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj4 + evb, badj4_data, std::is_same<g_t, s_t>());
-    s_t badj5_data[VS];
-    const s_t *const badj5 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj5 + evb, badj5_data, std::is_same<g_t, s_t>());
-    s_t badj6_data[VS];
-    const s_t *const badj6 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj6 + evb, badj6_data, std::is_same<g_t, s_t>());
-    s_t badj7_data[VS];
-    const s_t *const badj7 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj7 + evb, badj7_data, std::is_same<g_t, s_t>());
-    s_t badj8_data[VS];
-    const s_t *const badj8 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj8 + evb, badj8_data, std::is_same<g_t, s_t>());
-    s_t bdet0_data[VS];
-    const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
-        ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
+    s_t badj0_data;
+    const s_t *const badj0 = ageom_stream<s_t, g_t>(
+        g_adj0 + evb, &badj0_data, std::is_same<g_t, s_t>());
+    s_t badj1_data;
+    const s_t *const badj1 = ageom_stream<s_t, g_t>(
+        g_adj1 + evb, &badj1_data, std::is_same<g_t, s_t>());
+    s_t badj2_data;
+    const s_t *const badj2 = ageom_stream<s_t, g_t>(
+        g_adj2 + evb, &badj2_data, std::is_same<g_t, s_t>());
+    s_t badj3_data;
+    const s_t *const badj3 = ageom_stream<s_t, g_t>(
+        g_adj3 + evb, &badj3_data, std::is_same<g_t, s_t>());
+    s_t badj4_data;
+    const s_t *const badj4 = ageom_stream<s_t, g_t>(
+        g_adj4 + evb, &badj4_data, std::is_same<g_t, s_t>());
+    s_t badj5_data;
+    const s_t *const badj5 = ageom_stream<s_t, g_t>(
+        g_adj5 + evb, &badj5_data, std::is_same<g_t, s_t>());
+    s_t badj6_data;
+    const s_t *const badj6 = ageom_stream<s_t, g_t>(
+        g_adj6 + evb, &badj6_data, std::is_same<g_t, s_t>());
+    s_t badj7_data;
+    const s_t *const badj7 = ageom_stream<s_t, g_t>(
+        g_adj7 + evb, &badj7_data, std::is_same<g_t, s_t>());
+    s_t badj8_data;
+    const s_t *const badj8 = ageom_stream<s_t, g_t>(
+        g_adj8 + evb, &badj8_data, std::is_same<g_t, s_t>());
+    s_t bdet0_data;
+    const s_t *const bdet0 = ageom_stream<s_t, g_t>(
+        g_det0 + evb, &bdet0_data, std::is_same<g_t, s_t>());
 
-    neohookean_ogden_d3_simplex_tet4_gradient_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_q_weight, lmbda, mu, bu_streams, bout_streams);
+    neohookean_ogden_d3_simplex_tet4_gradient_block<s_t, NS>(badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bout_streams);
 
     s_t *const out_components[NC] = {outx, outy, outz};
 
     for (int shape = 0; shape < NS; ++shape) {
-      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      const idx_t *const RSTR ev_shape = &ev[shape];
       for (int d = 0; d < NC; ++d) {
-        atomicAdd(&(out_components[d][ev_shape[0] * out_stride]), bout_data[shape * NC + d][0]);
+        atomicAdd(&(out_components[d][ev_shape[0] * out_stride]), bout_data[shape * NC + d]);
       }
     }
   }
@@ -461,13 +451,13 @@ extern "C" int cu_neohookean_ogden_tet4_gradient_a_msoa(
     case (int)sizeof(double): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::neohookean_ogden_tet4_gradient_a_msoa_impl<double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+        sfem::codegen::neohookean_ogden_tet4_gradient_a_msoa_impl<double, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
         return sfem::codegen::launch_status("neohookean_ogden_tet4_gradient_a_msoa_impl");
     }
     case (int)sizeof(float): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::neohookean_ogden_tet4_gradient_a_msoa_impl<float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+        sfem::codegen::neohookean_ogden_tet4_gradient_a_msoa_impl<float, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
         return sfem::codegen::launch_status("neohookean_ogden_tet4_gradient_a_msoa_impl");
     }
     default:
@@ -535,7 +525,7 @@ extern "C" const sfem::codegen::KernelDiagnostics *cu_neohookean_ogden_tet4_appl
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, typename g_t, int VS>
+template <typename s_t, typename g_t>
 __global__ void neohookean_ogden_tet4_apply_a_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
@@ -566,20 +556,17 @@ __global__ void neohookean_ogden_tet4_apply_a_msoa_impl(
         s_t *const RSTR outz
 ) {
   static constexpr int NC = 3;
-  static constexpr int NQ = 1;
   static constexpr int NS = 4;
-  const s_t *const affine_q_weight = sfem::codegen::quad_tet_q1<s_t>::q_weight();
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const int ne = 1;
-    idx_t ev[VS * NS];
-    s_t bu_data[NS * NC][VS];
-    s_t bh_data[NS * NC][VS];
-    s_t bout_data[NS * NC][VS];
+    idx_t ev[NS];
+    s_t bu_data[NS * NC];
+    s_t bh_data[NS * NC];
+    s_t bout_data[NS * NC];
 
     for (int element_node = 0; element_node < NS; ++element_node) {
       const idx_t *const RSTR element_shape = elements[element_node] + evb;
-      idx_t *const RSTR ev_node = &ev[element_node * VS];
+      idx_t *const RSTR ev_node = &ev[element_node];
       {
         ev_node[0] = element_shape[0];
       }
@@ -588,72 +575,72 @@ __global__ void neohookean_ogden_tet4_apply_a_msoa_impl(
     const s_t *const h_components[NC] = {hx, hy, hz};
 
     for (int shape = 0; shape < NS; ++shape) {
-      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      const idx_t *const RSTR ev_shape = &ev[shape];
       for (int d = 0; d < NC; ++d) {
         {
           const idx_t node = ev_shape[0];
-          bu_data[shape * NC + d][0] = u_components[d][node * u_stride];
-          bh_data[shape * NC + d][0] = h_components[d][node * h_stride];
+          bu_data[shape * NC + d] = u_components[d][node * u_stride];
+          bh_data[shape * NC + d] = h_components[d][node * h_stride];
         }
       }
     }
     for (int stream = 0; stream < NS * NC; ++stream) {
       {
-        bout_data[stream][0] = s_t(0);
+        bout_data[stream] = s_t(0);
       }
     }
 
     const s_t *bu_streams[NS * NC];
     for (int stream = 0; stream < NS * NC; ++stream) {
-      bu_streams[stream] = bu_data[stream];
+      bu_streams[stream] = &bu_data[stream];
     }
     const s_t *bh_streams[NS * NC];
     for (int stream = 0; stream < NS * NC; ++stream) {
-      bh_streams[stream] = bh_data[stream];
+      bh_streams[stream] = &bh_data[stream];
     }
     s_t *bout_streams[NS * NC];
     for (int stream = 0; stream < NS * NC; ++stream) {
-      bout_streams[stream] = bout_data[stream];
+      bout_streams[stream] = &bout_data[stream];
     }
-    s_t badj0_data[VS];
-    const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj0 + evb, badj0_data, std::is_same<g_t, s_t>());
-    s_t badj1_data[VS];
-    const s_t *const badj1 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj1 + evb, badj1_data, std::is_same<g_t, s_t>());
-    s_t badj2_data[VS];
-    const s_t *const badj2 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj2 + evb, badj2_data, std::is_same<g_t, s_t>());
-    s_t badj3_data[VS];
-    const s_t *const badj3 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj3 + evb, badj3_data, std::is_same<g_t, s_t>());
-    s_t badj4_data[VS];
-    const s_t *const badj4 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj4 + evb, badj4_data, std::is_same<g_t, s_t>());
-    s_t badj5_data[VS];
-    const s_t *const badj5 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj5 + evb, badj5_data, std::is_same<g_t, s_t>());
-    s_t badj6_data[VS];
-    const s_t *const badj6 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj6 + evb, badj6_data, std::is_same<g_t, s_t>());
-    s_t badj7_data[VS];
-    const s_t *const badj7 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj7 + evb, badj7_data, std::is_same<g_t, s_t>());
-    s_t badj8_data[VS];
-    const s_t *const badj8 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj8 + evb, badj8_data, std::is_same<g_t, s_t>());
-    s_t bdet0_data[VS];
-    const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
-        ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
+    s_t badj0_data;
+    const s_t *const badj0 = ageom_stream<s_t, g_t>(
+        g_adj0 + evb, &badj0_data, std::is_same<g_t, s_t>());
+    s_t badj1_data;
+    const s_t *const badj1 = ageom_stream<s_t, g_t>(
+        g_adj1 + evb, &badj1_data, std::is_same<g_t, s_t>());
+    s_t badj2_data;
+    const s_t *const badj2 = ageom_stream<s_t, g_t>(
+        g_adj2 + evb, &badj2_data, std::is_same<g_t, s_t>());
+    s_t badj3_data;
+    const s_t *const badj3 = ageom_stream<s_t, g_t>(
+        g_adj3 + evb, &badj3_data, std::is_same<g_t, s_t>());
+    s_t badj4_data;
+    const s_t *const badj4 = ageom_stream<s_t, g_t>(
+        g_adj4 + evb, &badj4_data, std::is_same<g_t, s_t>());
+    s_t badj5_data;
+    const s_t *const badj5 = ageom_stream<s_t, g_t>(
+        g_adj5 + evb, &badj5_data, std::is_same<g_t, s_t>());
+    s_t badj6_data;
+    const s_t *const badj6 = ageom_stream<s_t, g_t>(
+        g_adj6 + evb, &badj6_data, std::is_same<g_t, s_t>());
+    s_t badj7_data;
+    const s_t *const badj7 = ageom_stream<s_t, g_t>(
+        g_adj7 + evb, &badj7_data, std::is_same<g_t, s_t>());
+    s_t badj8_data;
+    const s_t *const badj8 = ageom_stream<s_t, g_t>(
+        g_adj8 + evb, &badj8_data, std::is_same<g_t, s_t>());
+    s_t bdet0_data;
+    const s_t *const bdet0 = ageom_stream<s_t, g_t>(
+        g_det0 + evb, &bdet0_data, std::is_same<g_t, s_t>());
 
-    neohookean_ogden_d3_simplex_tet4_apply_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_q_weight, lmbda, mu, bu_streams, bh_streams, bout_streams);
+    neohookean_ogden_d3_simplex_tet4_apply_block<s_t, NS>(badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bh_streams, bout_streams);
 
     s_t *const out_components[NC] = {outx, outy, outz};
 
     for (int shape = 0; shape < NS; ++shape) {
-      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      const idx_t *const RSTR ev_shape = &ev[shape];
       for (int d = 0; d < NC; ++d) {
-        atomicAdd(&(out_components[d][ev_shape[0] * out_stride]), bout_data[shape * NC + d][0]);
+        atomicAdd(&(out_components[d][ev_shape[0] * out_stride]), bout_data[shape * NC + d]);
       }
     }
   }
@@ -698,13 +685,13 @@ extern "C" int cu_neohookean_ogden_tet4_apply_a_msoa(
     case (int)sizeof(double): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::neohookean_ogden_tet4_apply_a_msoa_impl<double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+        sfem::codegen::neohookean_ogden_tet4_apply_a_msoa_impl<double, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
         return sfem::codegen::launch_status("neohookean_ogden_tet4_apply_a_msoa_impl");
     }
     case (int)sizeof(float): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::neohookean_ogden_tet4_apply_a_msoa_impl<float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+        sfem::codegen::neohookean_ogden_tet4_apply_a_msoa_impl<float, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
         return sfem::codegen::launch_status("neohookean_ogden_tet4_apply_a_msoa_impl");
     }
     default:

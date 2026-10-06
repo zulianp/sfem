@@ -2,8 +2,6 @@
 #include <type_traits>
 #include "../modified_mooney_rivlin_d3_simplex_local.hpp"
 #include "../modified_mooney_rivlin_d3_simplex_hessian.hpp"
-#include "../../../reference/quad_tet_q1.hpp"
-#include "../../../reference/tet4_q1.hpp"
 #include "../../../geometry_kernels.hpp"
 #include "../../../kernel_diagnostics.hpp"
 #ifdef _OPENMP
@@ -18,7 +16,7 @@ namespace codegen {
 
 template <typename s_t, typename g_t, int VS>
 SFEM_INLINE const s_t *ageom_stream(
-    const int,
+    const int ne,
     const g_t *const RSTR source,
     s_t *const RSTR,
     std::true_type) {
@@ -130,9 +128,7 @@ static SFEM_INLINE int modified_mooney_rivlin_tet4_objective_steps_a_msoa_impl(
         s_t *const RSTR value
 ) {
   static constexpr int NC = 3;
-  static constexpr int NQ = 1;
   static constexpr int NS = 4;
-  const s_t *const affine_q_weight = sfem::codegen::quad_tet_q1<s_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -164,11 +160,13 @@ static SFEM_INLINE int modified_mooney_rivlin_tet4_objective_steps_a_msoa_impl(
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t *const RSTR ev_shape = &ev[shape * VS];
       for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR bu_row = bu_data[shape * NC + d];
+        s_t *const RSTR bh_row = bh_data[shape * NC + d];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
           const idx_t node = ev_shape[lane];
-          bu_data[shape * NC + d][lane] = u_components[d][node * u_stride];
-          bh_data[shape * NC + d][lane] = h_components[d][node * h_stride];
+          bu_row[lane] = u_components[d][node * u_stride];
+          bh_row[lane] = h_components[d][node * h_stride];
         }
       }
     }
@@ -210,7 +208,7 @@ static SFEM_INLINE int modified_mooney_rivlin_tet4_objective_steps_a_msoa_impl(
       }
     }
 
-    modified_mooney_rivlin_d3_simplex_tet4_objective_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_q_weight, c1, c2, kappa, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
+    modified_mooney_rivlin_d3_simplex_tet4_objective_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, c1, c2, kappa, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
   }
 
   return SFEM_SUCCESS;
@@ -303,14 +301,9 @@ static SFEM_INLINE int modified_mooney_rivlin_tet4_objective_steps_packed_a_msoa
     s_t *const RSTR value
 ) {
   static constexpr int NC = 3;
-  static constexpr int NQ = 1;
   static constexpr int NS = 4;
   static constexpr int VS = 16;
 
-  const s_t *const affine_grad_ref_x = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_x();
-  const s_t *const affine_grad_ref_y = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_y();
-  const s_t *const affine_grad_ref_z = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_z();
-  const s_t *const affine_q_weight = sfem::codegen::quad_tet_q1<s_t>::q_weight();
 
 #pragma omp parallel
   {
@@ -354,11 +347,13 @@ static SFEM_INLINE int modified_mooney_rivlin_tet4_objective_steps_packed_a_msoa
         for (int shape = 0; shape < NS; ++shape) {
           const uint16_t *const RSTR element_shape = elements[shape];
           for (int d = 0; d < NC; ++d) {
+            s_t *const RSTR bu_row = bu_data[shape * NC + d];
+            s_t *const RSTR bh_row = bh_data[shape * NC + d];
             #pragma omp simd
             for (int lane = 0; lane < ne; ++lane) {
               const uint16_t packed_node = element_shape[evb + lane];
-              bu_data[shape * NC + d][lane] = pk_u_base[d * max_nodes_per_pack + packed_node];
-              bh_data[shape * NC + d][lane] = pk_h[d * max_nodes_per_pack + packed_node];
+              bu_row[lane] = pk_u_base[d * max_nodes_per_pack + packed_node];
+              bh_row[lane] = pk_h[d * max_nodes_per_pack + packed_node];
             }
           }
         }
@@ -401,7 +396,7 @@ static SFEM_INLINE int modified_mooney_rivlin_tet4_objective_steps_packed_a_msoa
           }
         }
 
-        modified_mooney_rivlin_d3_simplex_tet4_objective_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_q_weight, c1, c2, kappa, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
+        modified_mooney_rivlin_d3_simplex_tet4_objective_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, c1, c2, kappa, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
       }
     }
   }
@@ -548,9 +543,7 @@ static SFEM_INLINE int modified_mooney_rivlin_tet4_gradient_a_msoa_impl(
         s_t *const RSTR outz
 ) {
   static constexpr int NC = 3;
-  static constexpr int NQ = 1;
   static constexpr int NS = 4;
-  const s_t *const affine_q_weight = sfem::codegen::quad_tet_q1<s_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -572,10 +565,11 @@ static SFEM_INLINE int modified_mooney_rivlin_tet4_gradient_a_msoa_impl(
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t *const RSTR ev_shape = &ev[shape * VS];
       for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR bu_row = bu_data[shape * NC + d];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
           const idx_t node = ev_shape[lane];
-          bu_data[shape * NC + d][lane] = u_components[d][node * u_stride];
+          bu_row[lane] = u_components[d][node * u_stride];
         }
       }
     }
@@ -625,17 +619,18 @@ static SFEM_INLINE int modified_mooney_rivlin_tet4_gradient_a_msoa_impl(
     const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
         ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
 
-    modified_mooney_rivlin_d3_simplex_tet4_gradient_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_q_weight, c1, c2, kappa, bu_streams, bout_streams);
+    modified_mooney_rivlin_d3_simplex_tet4_gradient_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, c1, c2, kappa, bu_streams, bout_streams);
 
     s_t *const out_components[NC] = {outx, outy, outz};
 
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t *const RSTR ev_shape = &ev[shape * VS];
       for (int d = 0; d < NC; ++d) {
+        const s_t *const RSTR bout_row = bout_data[shape * NC + d];
         {
           for (int scatter = 0; scatter < ne; ++scatter) {
             #pragma omp atomic update
-            out_components[d][ev_shape[scatter] * out_stride] += bout_data[shape * NC + d][scatter];
+            out_components[d][ev_shape[scatter] * out_stride] += bout_row[scatter];
           }
         }
       }
@@ -726,14 +721,9 @@ static SFEM_INLINE int modified_mooney_rivlin_tet4_gradient_packed_a_msoa_impl(
     s_t *const RSTR outz
 ) {
   static constexpr int NC = 3;
-  static constexpr int NQ = 1;
   static constexpr int NS = 4;
   static constexpr int VS = 16;
 
-  const s_t *const affine_grad_ref_x = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_x();
-  const s_t *const affine_grad_ref_y = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_y();
-  const s_t *const affine_grad_ref_z = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_z();
-  const s_t *const affine_q_weight = sfem::codegen::quad_tet_q1<s_t>::q_weight();
 
 #pragma omp parallel
   {
@@ -785,11 +775,13 @@ static SFEM_INLINE int modified_mooney_rivlin_tet4_gradient_packed_a_msoa_impl(
         for (int shape = 0; shape < NS; ++shape) {
           const uint16_t *const RSTR element_shape = elements[shape];
           for (int d = 0; d < NC; ++d) {
+            s_t *const RSTR bu_row = bu_data[shape * NC + d];
+            s_t *const RSTR bout_row = bout_data[shape * NC + d];
             #pragma omp simd
             for (int lane = 0; lane < ne; ++lane) {
               const uint16_t packed_node = element_shape[evb + lane];
-              bu_data[shape * NC + d][lane] = pk_u[d * max_nodes_per_pack + packed_node];
-              bout_data[shape * NC + d][lane] = s_t(0);
+              bu_row[lane] = pk_u[d * max_nodes_per_pack + packed_node];
+              bout_row[lane] = s_t(0);
             }
           }
         }
@@ -825,14 +817,15 @@ static SFEM_INLINE int modified_mooney_rivlin_tet4_gradient_packed_a_msoa_impl(
         const s_t *const bdet0 = ageom_stream<s_t, geom_t, VS>(
             ne, g_det0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
 
-        modified_mooney_rivlin_d3_simplex_tet4_gradient_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_q_weight, c1, c2, kappa, bu_streams, bout_streams);
+        modified_mooney_rivlin_d3_simplex_tet4_gradient_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, c1, c2, kappa, bu_streams, bout_streams);
 
         for (int shape = 0; shape < NS; ++shape) {
           const uint16_t *const RSTR element_shape = elements[shape];
           for (int d = 0; d < NC; ++d) {
             s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+            const s_t *const RSTR bout_row = bout_data[shape * NC + d];
             for (int lane = 0; lane < ne; ++lane) {
-              pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
+              pk_component_out[element_shape[evb + lane]] += bout_row[lane];
             }
           }
         }
@@ -949,14 +942,9 @@ static SFEM_INLINE int modified_mooney_rivlin_tet4_gradient_packed_two_pass_a_ms
     s_t *const RSTR outz
 ) {
   static constexpr int NC = 3;
-  static constexpr int NQ = 1;
   static constexpr int NS = 4;
   static constexpr int VS = 16;
 
-  const s_t *const affine_grad_ref_x = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_x();
-  const s_t *const affine_grad_ref_y = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_y();
-  const s_t *const affine_grad_ref_z = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_z();
-  const s_t *const affine_q_weight = sfem::codegen::quad_tet_q1<s_t>::q_weight();
 
 #pragma omp parallel
   {
@@ -1007,11 +995,13 @@ static SFEM_INLINE int modified_mooney_rivlin_tet4_gradient_packed_two_pass_a_ms
         for (int shape = 0; shape < NS; ++shape) {
           const uint16_t *const RSTR element_shape = elements[shape];
           for (int d = 0; d < NC; ++d) {
+            s_t *const RSTR bu_row = bu_data[shape * NC + d];
+            s_t *const RSTR bout_row = bout_data[shape * NC + d];
             #pragma omp simd
             for (int lane = 0; lane < ne; ++lane) {
               const uint16_t packed_node = element_shape[evb + lane];
-              bu_data[shape * NC + d][lane] = pk_u[d * max_nodes_per_pack + packed_node];
-              bout_data[shape * NC + d][lane] = s_t(0);
+              bu_row[lane] = pk_u[d * max_nodes_per_pack + packed_node];
+              bout_row[lane] = s_t(0);
             }
           }
         }
@@ -1047,14 +1037,15 @@ static SFEM_INLINE int modified_mooney_rivlin_tet4_gradient_packed_two_pass_a_ms
         const s_t *const bdet0 = ageom_stream<s_t, geom_t, VS>(
             ne, g_det0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
 
-        modified_mooney_rivlin_d3_simplex_tet4_gradient_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_q_weight, c1, c2, kappa, bu_streams, bout_streams);
+        modified_mooney_rivlin_d3_simplex_tet4_gradient_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, c1, c2, kappa, bu_streams, bout_streams);
 
         for (int shape = 0; shape < NS; ++shape) {
           const uint16_t *const RSTR element_shape = elements[shape];
           for (int d = 0; d < NC; ++d) {
             s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+            const s_t *const RSTR bout_row = bout_data[shape * NC + d];
             for (int lane = 0; lane < ne; ++lane) {
-              pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
+              pk_component_out[element_shape[evb + lane]] += bout_row[lane];
             }
           }
         }
@@ -1241,9 +1232,7 @@ static SFEM_INLINE int modified_mooney_rivlin_tet4_apply_a_msoa_impl(
         s_t *const RSTR outz
 ) {
   static constexpr int NC = 3;
-  static constexpr int NQ = 1;
   static constexpr int NS = 4;
-  const s_t *const affine_q_weight = sfem::codegen::quad_tet_q1<s_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -1267,11 +1256,13 @@ static SFEM_INLINE int modified_mooney_rivlin_tet4_apply_a_msoa_impl(
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t *const RSTR ev_shape = &ev[shape * VS];
       for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR bu_row = bu_data[shape * NC + d];
+        s_t *const RSTR bh_row = bh_data[shape * NC + d];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
           const idx_t node = ev_shape[lane];
-          bu_data[shape * NC + d][lane] = u_components[d][node * u_stride];
-          bh_data[shape * NC + d][lane] = h_components[d][node * h_stride];
+          bu_row[lane] = u_components[d][node * u_stride];
+          bh_row[lane] = h_components[d][node * h_stride];
         }
       }
     }
@@ -1325,17 +1316,18 @@ static SFEM_INLINE int modified_mooney_rivlin_tet4_apply_a_msoa_impl(
     const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
         ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
 
-    modified_mooney_rivlin_d3_simplex_tet4_apply_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_q_weight, c1, c2, kappa, bu_streams, bh_streams, bout_streams);
+    modified_mooney_rivlin_d3_simplex_tet4_apply_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, c1, c2, kappa, bu_streams, bh_streams, bout_streams);
 
     s_t *const out_components[NC] = {outx, outy, outz};
 
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t *const RSTR ev_shape = &ev[shape * VS];
       for (int d = 0; d < NC; ++d) {
+        const s_t *const RSTR bout_row = bout_data[shape * NC + d];
         {
           for (int scatter = 0; scatter < ne; ++scatter) {
             #pragma omp atomic update
-            out_components[d][ev_shape[scatter] * out_stride] += bout_data[shape * NC + d][scatter];
+            out_components[d][ev_shape[scatter] * out_stride] += bout_row[scatter];
           }
         }
       }
@@ -1434,14 +1426,9 @@ static SFEM_INLINE int modified_mooney_rivlin_tet4_apply_packed_a_msoa_impl(
     s_t *const RSTR outz
 ) {
   static constexpr int NC = 3;
-  static constexpr int NQ = 1;
   static constexpr int NS = 4;
   static constexpr int VS = 16;
 
-  const s_t *const affine_grad_ref_x = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_x();
-  const s_t *const affine_grad_ref_y = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_y();
-  const s_t *const affine_grad_ref_z = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_z();
-  const s_t *const affine_q_weight = sfem::codegen::quad_tet_q1<s_t>::q_weight();
 
 #pragma omp parallel
   {
@@ -1504,12 +1491,15 @@ static SFEM_INLINE int modified_mooney_rivlin_tet4_apply_packed_a_msoa_impl(
         for (int shape = 0; shape < NS; ++shape) {
           const uint16_t *const RSTR element_shape = elements[shape];
           for (int d = 0; d < NC; ++d) {
+            s_t *const RSTR bu_row = bu_data[shape * NC + d];
+            s_t *const RSTR bh_row = bh_data[shape * NC + d];
+            s_t *const RSTR bout_row = bout_data[shape * NC + d];
             #pragma omp simd
             for (int lane = 0; lane < ne; ++lane) {
               const uint16_t packed_node = element_shape[evb + lane];
-              bu_data[shape * NC + d][lane] = pk_u[d * max_nodes_per_pack + packed_node];
-              bh_data[shape * NC + d][lane] = pk_h[d * max_nodes_per_pack + packed_node];
-              bout_data[shape * NC + d][lane] = s_t(0);
+              bu_row[lane] = pk_u[d * max_nodes_per_pack + packed_node];
+              bh_row[lane] = pk_h[d * max_nodes_per_pack + packed_node];
+              bout_row[lane] = s_t(0);
             }
           }
         }
@@ -1545,14 +1535,15 @@ static SFEM_INLINE int modified_mooney_rivlin_tet4_apply_packed_a_msoa_impl(
         const s_t *const bdet0 = ageom_stream<s_t, geom_t, VS>(
             ne, g_det0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
 
-        modified_mooney_rivlin_d3_simplex_tet4_apply_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_q_weight, c1, c2, kappa, bu_streams, bh_streams, bout_streams);
+        modified_mooney_rivlin_d3_simplex_tet4_apply_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, c1, c2, kappa, bu_streams, bh_streams, bout_streams);
 
         for (int shape = 0; shape < NS; ++shape) {
           const uint16_t *const RSTR element_shape = elements[shape];
           for (int d = 0; d < NC; ++d) {
             s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+            const s_t *const RSTR bout_row = bout_data[shape * NC + d];
             for (int lane = 0; lane < ne; ++lane) {
-              pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
+              pk_component_out[element_shape[evb + lane]] += bout_row[lane];
             }
           }
         }
@@ -1677,14 +1668,9 @@ static SFEM_INLINE int modified_mooney_rivlin_tet4_apply_packed_two_pass_a_msoa_
     s_t *const RSTR outz
 ) {
   static constexpr int NC = 3;
-  static constexpr int NQ = 1;
   static constexpr int NS = 4;
   static constexpr int VS = 16;
 
-  const s_t *const affine_grad_ref_x = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_x();
-  const s_t *const affine_grad_ref_y = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_y();
-  const s_t *const affine_grad_ref_z = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_z();
-  const s_t *const affine_q_weight = sfem::codegen::quad_tet_q1<s_t>::q_weight();
 
 #pragma omp parallel
   {
@@ -1746,12 +1732,15 @@ static SFEM_INLINE int modified_mooney_rivlin_tet4_apply_packed_two_pass_a_msoa_
         for (int shape = 0; shape < NS; ++shape) {
           const uint16_t *const RSTR element_shape = elements[shape];
           for (int d = 0; d < NC; ++d) {
+            s_t *const RSTR bu_row = bu_data[shape * NC + d];
+            s_t *const RSTR bh_row = bh_data[shape * NC + d];
+            s_t *const RSTR bout_row = bout_data[shape * NC + d];
             #pragma omp simd
             for (int lane = 0; lane < ne; ++lane) {
               const uint16_t packed_node = element_shape[evb + lane];
-              bu_data[shape * NC + d][lane] = pk_u[d * max_nodes_per_pack + packed_node];
-              bh_data[shape * NC + d][lane] = pk_h[d * max_nodes_per_pack + packed_node];
-              bout_data[shape * NC + d][lane] = s_t(0);
+              bu_row[lane] = pk_u[d * max_nodes_per_pack + packed_node];
+              bh_row[lane] = pk_h[d * max_nodes_per_pack + packed_node];
+              bout_row[lane] = s_t(0);
             }
           }
         }
@@ -1787,14 +1776,15 @@ static SFEM_INLINE int modified_mooney_rivlin_tet4_apply_packed_two_pass_a_msoa_
         const s_t *const bdet0 = ageom_stream<s_t, geom_t, VS>(
             ne, g_det0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
 
-        modified_mooney_rivlin_d3_simplex_tet4_apply_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_q_weight, c1, c2, kappa, bu_streams, bh_streams, bout_streams);
+        modified_mooney_rivlin_d3_simplex_tet4_apply_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, c1, c2, kappa, bu_streams, bh_streams, bout_streams);
 
         for (int shape = 0; shape < NS; ++shape) {
           const uint16_t *const RSTR element_shape = elements[shape];
           for (int d = 0; d < NC; ++d) {
             s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+            const s_t *const RSTR bout_row = bout_data[shape * NC + d];
             for (int lane = 0; lane < ne; ++lane) {
-              pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
+              pk_component_out[element_shape[evb + lane]] += bout_row[lane];
             }
           }
         }
@@ -1898,7 +1888,7 @@ extern "C" int modified_mooney_rivlin_tet4_apply_packed_two_pass_a_msoa(
 namespace sfem {
 namespace codegen {
 
-static SFEM_INLINE void modified_mooney_rivlin_tet4_hessian_i_msoa_find_cols(
+static SFEM_INLINE void modified_mooney_rivlin_tet4_hessian_a_msoa_find_cols(
     const idx_t *const RSTR targets,
     const idx_t *const RSTR row,
     const int lenrow,
@@ -1916,7 +1906,7 @@ static SFEM_INLINE void modified_mooney_rivlin_tet4_hessian_i_msoa_find_cols(
 }
 
 template <typename s_t>
-static SFEM_INLINE void modified_mooney_rivlin_tet4_hessian_i_msoa_scatter_bsr(
+static SFEM_INLINE void modified_mooney_rivlin_tet4_hessian_a_msoa_scatter_bsr(
     const idx_t *const RSTR ev,
     const s_t *const RSTR element_matrix,
     const count_t *const RSTR rowptr,
@@ -1931,7 +1921,7 @@ static SFEM_INLINE void modified_mooney_rivlin_tet4_hessian_i_msoa_scatter_bsr(
     const count_t row_begin = rowptr[dof_i];
     const int lenrow = (int)(rowptr[dof_i + 1] - row_begin);
     const idx_t *const RSTR cols = &colidx[row_begin];
-    modified_mooney_rivlin_tet4_hessian_i_msoa_find_cols(ev, cols, lenrow, ks);
+    modified_mooney_rivlin_tet4_hessian_a_msoa_find_cols(ev, cols, lenrow, ks);
     for (int j = 0; j < NS; ++j) {
       entries[i * NS + j] = row_begin + ks[j];
     }
@@ -1952,11 +1942,20 @@ static SFEM_INLINE void modified_mooney_rivlin_tet4_hessian_i_msoa_scatter_bsr(
 }
 
 template <typename s_t, typename g_t, int FORMAT>
-static int modified_mooney_rivlin_tet4_hessian_i_msoa_assemble_impl(
+static int modified_mooney_rivlin_tet4_hessian_a_msoa_assemble_impl(
     const ptrdiff_t nelements,
     const ptrdiff_t,
     idx_t **const RSTR elements,
-    const g_t *const *const RSTR points,
+    const g_t *const RSTR g_adj0,
+    const g_t *const RSTR g_adj1,
+    const g_t *const RSTR g_adj2,
+    const g_t *const RSTR g_adj3,
+    const g_t *const RSTR g_adj4,
+    const g_t *const RSTR g_adj5,
+    const g_t *const RSTR g_adj6,
+    const g_t *const RSTR g_adj7,
+    const g_t *const RSTR g_adj8,
+    const g_t *const RSTR g_det0,
     const s_t c1,
     const s_t c2,
     const s_t kappa,
@@ -1978,16 +1977,8 @@ static int modified_mooney_rivlin_tet4_hessian_i_msoa_assemble_impl(
   static constexpr int ND = 3;
   static constexpr int NQ = 1;
   static constexpr int NS = 4;
-  static constexpr int VS = 1;
   static constexpr int NDOFS = NC * NS;
   const s_t *const u_components[NC] = {ux, uy, uz};
-  const g_t *const RSTR x = points[0];
-  const g_t *const RSTR y = points[1];
-  const g_t *const RSTR z = points[2];
-  const s_t *const isoparametric_grad_ref_x = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_x();
-  const s_t *const isoparametric_grad_ref_y = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_y();
-  const s_t *const isoparametric_grad_ref_z = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_z();
-  const s_t *const isoparametric_q_weight = sfem::codegen::quad_tet_q1<s_t>::q_weight();
 
   static_assert(FORMAT == 1,
                 "this kernel has no scatter for the requested matrix format");
@@ -1995,93 +1986,42 @@ static int modified_mooney_rivlin_tet4_hessian_i_msoa_assemble_impl(
   for (ptrdiff_t element = 0; element < nelements; ++element) {
     idx_t ev[NS];
     s_t element_matrix[NDOFS * NDOFS];
-    s_t bcoordinate_data[NS * ND][VS];
-    static constexpr int ne = VS;
-    s_t bu_data[NS * NC][VS];
-    s_t badj0[NQ * VS];
-    s_t badj1[NQ * VS];
-    s_t badj2[NQ * VS];
-    s_t badj3[NQ * VS];
-    s_t badj4[NQ * VS];
-    s_t badj5[NQ * VS];
-    s_t badj6[NQ * VS];
-    s_t badj7[NQ * VS];
-    s_t badj8[NQ * VS];
-    s_t bdet0[NQ * VS];
-    s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
+    s_t bu_data[NS * NC];
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t badj4[NQ];
+    s_t badj5[NQ];
+    s_t badj6[NQ];
+    s_t badj7[NQ];
+    s_t badj8[NQ];
+    s_t bdet0[NQ];
 
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t node = elements[shape][element];
       ev[shape] = node;
       for (int d = 0; d < ND; ++d) {
-        bcoordinate_data[shape * ND + d][0] = s_t(points[d][node]);
-        bu_data[shape * NC + d][0] = u_components[d][node * u_stride];
+        bu_data[shape * NC + d] = u_components[d][node * u_stride];
       }
     }
 
 
-    {
-        const int q = 0;  // TET4 evaluates in closed form
-      s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
-      s_t J00_values[VS];
-      s_t J01_values[VS];
-      s_t J02_values[VS];
-      s_t J10_values[VS];
-      s_t J11_values[VS];
-      s_t J12_values[VS];
-      s_t J20_values[VS];
-      s_t J21_values[VS];
-      s_t J22_values[VS];
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        J00_values[lane] = s_t(0);
-        J01_values[lane] = s_t(0);
-        J02_values[lane] = s_t(0);
-        J10_values[lane] = s_t(0);
-        J11_values[lane] = s_t(0);
-        J12_values[lane] = s_t(0);
-        J20_values[lane] = s_t(0);
-        J21_values[lane] = s_t(0);
-        J22_values[lane] = s_t(0);
-      }
-      for (int shape = 0; shape < NS; ++shape) {
-        const s_t g0 = isoparametric_grad_ref_x[q * NS + shape];
-        const s_t g1 = isoparametric_grad_ref_y[q * NS + shape];
-        const s_t g2 = isoparametric_grad_ref_z[q * NS + shape];
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          J00_values[lane] += bcoordinate_data[3 * shape][lane] * g0;
-          J01_values[lane] += bcoordinate_data[3 * shape][lane] * g1;
-          J02_values[lane] += bcoordinate_data[3 * shape][lane] * g2;
-          J10_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g0;
-          J11_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g1;
-          J12_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g2;
-          J20_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g0;
-          J21_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g1;
-          J22_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g2;
-        }
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const s_t J00 = J00_values[lane];
-        const s_t J01 = J01_values[lane];
-        const s_t J02 = J02_values[lane];
-        const s_t J10 = J10_values[lane];
-        const s_t J11 = J11_values[lane];
-        const s_t J12 = J12_values[lane];
-        const s_t J20 = J20_values[lane];
-        const s_t J21 = J21_values[lane];
-        const s_t J22 = J22_values[lane];
-        geometry_jacobian_adjugate_and_determinant_3<s_t>(
-            J00, J01, J02, J10, J11, J12, J20, J21, J22,
-            badj_streams, bdet0, q * VS + lane);
-      }
-    }
+    badj0[0] = s_t(g_adj0[element]);
+    badj1[0] = s_t(g_adj1[element]);
+    badj2[0] = s_t(g_adj2[element]);
+    badj3[0] = s_t(g_adj3[element]);
+    badj4[0] = s_t(g_adj4[element]);
+    badj5[0] = s_t(g_adj5[element]);
+    badj6[0] = s_t(g_adj6[element]);
+    badj7[0] = s_t(g_adj7[element]);
+    badj8[0] = s_t(g_adj8[element]);
+    bdet0[0] = s_t(g_det0[element]);
 
-    modified_mooney_rivlin_d3_simplex_tet4_direct_hessian_element_matrix<s_t, NQ, NS, VS>(badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, c1, c2, kappa, bu_data, element_matrix);
+    modified_mooney_rivlin_d3_simplex_tet4_direct_hessian_element_matrix<s_t, NS>(badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, c1, c2, kappa, bu_data, element_matrix);
 
     if constexpr (FORMAT == 1) {
-      modified_mooney_rivlin_tet4_hessian_i_msoa_scatter_bsr(ev, element_matrix, rowptr, colidx, values);
+      modified_mooney_rivlin_tet4_hessian_a_msoa_scatter_bsr(ev, element_matrix, rowptr, colidx, values);
     }
   }
 
@@ -2091,12 +2031,21 @@ static int modified_mooney_rivlin_tet4_hessian_i_msoa_assemble_impl(
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int modified_mooney_rivlin_tet4_hessian_bsr_i_msoa(
+extern "C" int modified_mooney_rivlin_tet4_hessian_bsr_a_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
         const real_t c1,
         const real_t c2,
         const real_t kappa,
@@ -2110,13 +2059,13 @@ extern "C" int modified_mooney_rivlin_tet4_hessian_bsr_i_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        return sfem::codegen::modified_mooney_rivlin_tet4_hessian_i_msoa_assemble_impl<double, geom_t, 1>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, rowptr, colidx, (double *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+        return sfem::codegen::modified_mooney_rivlin_tet4_hessian_a_msoa_assemble_impl<double, geom_t, 1>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, c1, c2, kappa, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, rowptr, colidx, (double *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
     }
     case (int)sizeof(float): {
-        return sfem::codegen::modified_mooney_rivlin_tet4_hessian_i_msoa_assemble_impl<float, geom_t, 1>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, rowptr, colidx, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+        return sfem::codegen::modified_mooney_rivlin_tet4_hessian_a_msoa_assemble_impl<float, geom_t, 1>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, c1, c2, kappa, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, rowptr, colidx, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
     }
     default:
       break;
   }
-  return sfem::codegen::unsupported_dispatch("modified_mooney_rivlin_tet4_hessian_bsr_i_msoa", -1, (int)scalar_bytes);
+  return sfem::codegen::unsupported_dispatch("modified_mooney_rivlin_tet4_hessian_bsr_a_msoa", -1, (int)scalar_bytes);
 }

@@ -66,15 +66,16 @@ static SFEM_INLINE void laplace_d2_simplex_objective_block(
         grad_h_ref1_values[lane] = s_t(0);
       }
       for (int shape = 0; shape < NS; ++shape) {
+        const s_t gref0 = grad_ref_x[q * NS + shape];
+        const s_t gref1 = grad_ref_y[q * NS + shape];
+        const s_t *const RSTR u_shape0 = u_streams[shape];
+        const s_t *const RSTR h_shape0 = h_streams[shape];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          gu_ref0_values[lane] += u_streams[shape][lane] * grad_ref_x[q * NS + shape];
-          grad_h_ref0_values[lane] += h_streams[shape][lane] * grad_ref_x[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          gu_ref1_values[lane] += u_streams[shape][lane] * grad_ref_y[q * NS + shape];
-          grad_h_ref1_values[lane] += h_streams[shape][lane] * grad_ref_y[q * NS + shape];
+          gu_ref0_values[lane] += u_shape0[lane] * gref0;
+          grad_h_ref0_values[lane] += h_shape0[lane] * gref0;
+          gu_ref1_values[lane] += u_shape0[lane] * gref1;
+          grad_h_ref1_values[lane] += h_shape0[lane] * gref1;
         }
       }
       s_t gu_base_v[2 * VS];
@@ -111,16 +112,14 @@ static SFEM_INLINE void laplace_d2_simplex_objective_block(
     }
 }
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NS, int VS>
 static SFEM_INLINE void laplace_d2_simplex_tri3_objective_block(
         const int ne,
-        const ptrdiff_t geometry_stride,
         const s_t *const RSTR adj0,
         const s_t *const RSTR adj1,
         const s_t *const RSTR adj2,
         const s_t *const RSTR adj3,
         const s_t *const RSTR det0,
-        const s_t *const RSTR q_weight,
         const s_t kappa,
         const s_t *const RSTR u_streams[NS * 1],
         const s_t *const RSTR h_streams[NS * 1],
@@ -129,15 +128,14 @@ static SFEM_INLINE void laplace_d2_simplex_tri3_objective_block(
         const ptrdiff_t value_stride,
         s_t *const RSTR value
 ) {
-  static_assert(NQ > 0, "NQ must be positive");
   static_assert(VS > 0, "VS must be positive");
-    { const int q = 0;  // constant-P1 simplex
-      const s_t qw = q_weight[q];
+    {
+      const s_t qw = (s_t(1) / s_t(2));
       s_t gu_base_v[2 * VS];
       s_t trial_grad_v[2 * VS];
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
-      const ptrdiff_t goff = q * geometry_stride + lane;
+      const ptrdiff_t goff = lane;
       const s_t adj_lane0 = adj0[goff];
       const s_t adj_lane1 = adj1[goff];
       const s_t adj_lane2 = adj2[goff];
@@ -157,7 +155,7 @@ static SFEM_INLINE void laplace_d2_simplex_tri3_objective_block(
         const s_t alpha = steps[step];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          const ptrdiff_t goff = q * geometry_stride + lane;
+          const ptrdiff_t goff = lane;
           const s_t det_lane0 = det0[goff];
           const s_t gu0 = gu_base_v[0 * VS + lane] + alpha * trial_grad_v[0 * VS + lane];
           const s_t gu1 = gu_base_v[1 * VS + lane] + alpha * trial_grad_v[1 * VS + lane];
@@ -167,14 +165,12 @@ static SFEM_INLINE void laplace_d2_simplex_tri3_objective_block(
     }
 }
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NS, int VS>
 static SFEM_INLINE void laplace_d2_simplex_tri3_metric_objective_block(
         const int ne,
-        const ptrdiff_t geometry_stride,
         const s_t *const RSTR geom_metric0,
         const s_t *const RSTR geom_metric1,
         const s_t *const RSTR geom_metric2,
-        const s_t *const RSTR q_weight,
         const s_t kappa,
         const s_t *const RSTR u_streams[NS * 1],
         const s_t *const RSTR h_streams[NS * 1],
@@ -183,7 +179,6 @@ static SFEM_INLINE void laplace_d2_simplex_tri3_metric_objective_block(
         const ptrdiff_t value_stride,
         s_t *const RSTR value
 ) {
-  static_assert(NQ > 0, "NQ must be positive");
   static_assert(VS > 0, "VS must be positive");
     for (int step = 0; step < nsteps; ++step) {
       const s_t alpha = steps[step];
@@ -235,13 +230,13 @@ static SFEM_INLINE void laplace_d2_simplex_gradient_block(
         gu_ref1_values[lane] = s_t(0);
       }
       for (int shape = 0; shape < NS; ++shape) {
+        const s_t gref0 = grad_ref_x[q * NS + shape];
+        const s_t gref1 = grad_ref_y[q * NS + shape];
+        const s_t *const RSTR u_shape0 = u_streams[shape];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          gu_ref0_values[lane] += u_streams[shape][lane] * grad_ref_x[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          gu_ref1_values[lane] += u_streams[shape][lane] * grad_ref_y[q * NS + shape];
+          gu_ref0_values[lane] += u_shape0[lane] * gref0;
+          gu_ref1_values[lane] += u_shape0[lane] * gref1;
         }
       }
       #pragma omp simd
@@ -259,41 +254,39 @@ static SFEM_INLINE void laplace_d2_simplex_gradient_block(
     const s_t gu1 = (gu_ref0 * adj_lane1 + gu_ref1 * adj_lane3) * idet;
     const s_t material0 = gu0*kappa;
     const s_t material1 = gu1*kappa;
-    const s_t loperand0 = qw * (material0 * adj_lane0 + material1 * adj_lane1);
-    const s_t loperand1 = qw * (material0 * adj_lane2 + material1 * adj_lane3);
-      loperand0_values[lane] = loperand0;
-      loperand1_values[lane] = loperand1;
+      loperand0_values[lane] = qw * (material0 * adj_lane0 + material1 * adj_lane1);
+      loperand1_values[lane] = qw * (material0 * adj_lane2 + material1 * adj_lane3);
       }
       for (int shape = 0; shape < NS; ++shape) {
+        const s_t tref0 = grad_ref_x[q * NS + shape];
+        const s_t tref1 = grad_ref_y[q * NS + shape];
+        s_t *const RSTR out_shape0 = out_streams[shape];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          out_streams[shape][lane] += loperand0_values[lane] * grad_ref_x[q * NS + shape] + loperand1_values[lane] * grad_ref_y[q * NS + shape];
+          out_shape0[lane] += loperand0_values[lane] * tref0 + loperand1_values[lane] * tref1;
         }
       }
     }
 }
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NS, int VS>
 static SFEM_INLINE void laplace_d2_simplex_tri3_gradient_block(
         const int ne,
-        const ptrdiff_t geometry_stride,
         const s_t *const RSTR adj0,
         const s_t *const RSTR adj1,
         const s_t *const RSTR adj2,
         const s_t *const RSTR adj3,
         const s_t *const RSTR det0,
-        const s_t *const RSTR q_weight,
         const s_t kappa,
         const s_t *const RSTR u_streams[NS * 1],
         s_t *const RSTR out_streams[NS * 1]
 ) {
-  static_assert(NQ > 0, "NQ must be positive");
   static_assert(VS > 0, "VS must be positive");
-    { const int q = 0;  // constant-P1 simplex
-      const s_t qw = q_weight[q];
+    {
+      const s_t qw = (s_t(1) / s_t(2));
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
-      const ptrdiff_t goff = q * geometry_stride + lane;
+      const ptrdiff_t goff = lane;
       const s_t adj_lane0 = adj0[goff];
       const s_t adj_lane1 = adj1[goff];
       const s_t adj_lane2 = adj2[goff];
@@ -315,19 +308,16 @@ static SFEM_INLINE void laplace_d2_simplex_tri3_gradient_block(
     }
 }
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NS, int VS>
 static SFEM_INLINE void laplace_d2_simplex_tri3_metric_gradient_block(
         const int ne,
-        const ptrdiff_t geometry_stride,
         const s_t *const RSTR geom_metric0,
         const s_t *const RSTR geom_metric1,
         const s_t *const RSTR geom_metric2,
-        const s_t *const RSTR q_weight,
         const s_t kappa,
         const s_t *const RSTR u_streams[NS * 1],
         s_t *const RSTR out_streams[NS * 1]
 ) {
-  static_assert(NQ > 0, "NQ must be positive");
   static_assert(VS > 0, "VS must be positive");
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
@@ -375,13 +365,13 @@ static SFEM_INLINE void laplace_d2_simplex_apply_block(
         grad_h_ref1_values[lane] = s_t(0);
       }
       for (int shape = 0; shape < NS; ++shape) {
+        const s_t gref0 = grad_ref_x[q * NS + shape];
+        const s_t gref1 = grad_ref_y[q * NS + shape];
+        const s_t *const RSTR h_shape0 = h_streams[shape];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          grad_h_ref0_values[lane] += h_streams[shape][lane] * grad_ref_x[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          grad_h_ref1_values[lane] += h_streams[shape][lane] * grad_ref_y[q * NS + shape];
+          grad_h_ref0_values[lane] += h_shape0[lane] * gref0;
+          grad_h_ref1_values[lane] += h_shape0[lane] * gref1;
         }
       }
       #pragma omp simd
@@ -399,41 +389,39 @@ static SFEM_INLINE void laplace_d2_simplex_apply_block(
     const s_t trial_grad1 = (grad_h_ref0 * adj_lane1 + grad_h_ref1 * adj_lane3) * idet;
     const s_t material0 = kappa*trial_grad0;
     const s_t material1 = kappa*trial_grad1;
-    const s_t loperand0 = qw * (material0 * adj_lane0 + material1 * adj_lane1);
-    const s_t loperand1 = qw * (material0 * adj_lane2 + material1 * adj_lane3);
-      loperand0_values[lane] = loperand0;
-      loperand1_values[lane] = loperand1;
+      loperand0_values[lane] = qw * (material0 * adj_lane0 + material1 * adj_lane1);
+      loperand1_values[lane] = qw * (material0 * adj_lane2 + material1 * adj_lane3);
       }
       for (int shape = 0; shape < NS; ++shape) {
+        const s_t tref0 = grad_ref_x[q * NS + shape];
+        const s_t tref1 = grad_ref_y[q * NS + shape];
+        s_t *const RSTR out_shape0 = out_streams[shape];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          out_streams[shape][lane] += loperand0_values[lane] * grad_ref_x[q * NS + shape] + loperand1_values[lane] * grad_ref_y[q * NS + shape];
+          out_shape0[lane] += loperand0_values[lane] * tref0 + loperand1_values[lane] * tref1;
         }
       }
     }
 }
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NS, int VS>
 static SFEM_INLINE void laplace_d2_simplex_tri3_apply_block(
         const int ne,
-        const ptrdiff_t geometry_stride,
         const s_t *const RSTR adj0,
         const s_t *const RSTR adj1,
         const s_t *const RSTR adj2,
         const s_t *const RSTR adj3,
         const s_t *const RSTR det0,
-        const s_t *const RSTR q_weight,
         const s_t kappa,
         const s_t *const RSTR h_streams[NS * 1],
         s_t *const RSTR out_streams[NS * 1]
 ) {
-  static_assert(NQ > 0, "NQ must be positive");
   static_assert(VS > 0, "VS must be positive");
-    { const int q = 0;  // constant-P1 simplex
-      const s_t qw = q_weight[q];
+    {
+      const s_t qw = (s_t(1) / s_t(2));
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
-      const ptrdiff_t goff = q * geometry_stride + lane;
+      const ptrdiff_t goff = lane;
       const s_t adj_lane0 = adj0[goff];
       const s_t adj_lane1 = adj1[goff];
       const s_t adj_lane2 = adj2[goff];
@@ -455,19 +443,16 @@ static SFEM_INLINE void laplace_d2_simplex_tri3_apply_block(
     }
 }
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NS, int VS>
 static SFEM_INLINE void laplace_d2_simplex_tri3_metric_apply_block(
         const int ne,
-        const ptrdiff_t geometry_stride,
         const s_t *const RSTR geom_metric0,
         const s_t *const RSTR geom_metric1,
         const s_t *const RSTR geom_metric2,
-        const s_t *const RSTR q_weight,
         const s_t kappa,
         const s_t *const RSTR h_streams[NS * 1],
         s_t *const RSTR out_streams[NS * 1]
 ) {
-  static_assert(NQ > 0, "NQ must be positive");
   static_assert(VS > 0, "VS must be positive");
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {

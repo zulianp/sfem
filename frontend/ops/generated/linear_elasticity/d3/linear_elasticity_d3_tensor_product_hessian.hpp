@@ -30,7 +30,7 @@ typedef double geom_t;
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NQ, int NS>
 static SFEM_INLINE void linear_elasticity_d3_tensor_product_direct_hessian_tensor_product_element_matrix(
     const s_t *const RSTR badj0,
     const s_t *const RSTR badj1,
@@ -51,7 +51,6 @@ static SFEM_INLINE void linear_elasticity_d3_tensor_product_direct_hessian_tenso
 ) {
   static_assert(NQ > 0, "NQ must be positive");
   static_assert(NS > 0, "NS must be positive");
-  static_assert(VS > 0, "VS must be positive");
   static constexpr int NC = 3;
   static constexpr int ND = 3;
   static constexpr int NDOFS = NC * NS;
@@ -74,8 +73,7 @@ static SFEM_INLINE void linear_elasticity_d3_tensor_product_direct_hessian_tenso
         const int qy = (q / NQ1) % NQ1;
         const int qz = q / (NQ1 * NQ1);
         const s_t qw = q_weight_1d[qx] * q_weight_1d[qy] * q_weight_1d[qz];
-        const int lane = 0;
-        const ptrdiff_t goff = q * VS + lane;
+        const ptrdiff_t goff = q;
         const s_t adj_lane0 = badj0[goff];
         const s_t adj_lane1 = badj1[goff];
         const s_t adj_lane2 = badj2[goff];
@@ -129,11 +127,11 @@ static SFEM_INLINE void linear_elasticity_d3_tensor_product_direct_hessian_tenso
         column[out_shape * NC + 1] = &element_matrix[(1 * NS + out_shape) * NDOFS + trial_component * NS + trial_shape];
         column[out_shape * NC + 2] = &element_matrix[(2 * NS + out_shape) * NDOFS + trial_component * NS + trial_shape];
       }
-      tensor_test_scalar<s_t, NQ, NS, VS, 3, NC>(
+      tensor_test_scalar<s_t, NQ, NS, 3, NC>(
           shape_1d, grad_1d, flux + 0, column, 0);
-      tensor_test_scalar<s_t, NQ, NS, VS, 3, NC>(
+      tensor_test_scalar<s_t, NQ, NS, 3, NC>(
           shape_1d, grad_1d, flux + NQ * ND, column, 1);
-      tensor_test_scalar<s_t, NQ, NS, VS, 3, NC>(
+      tensor_test_scalar<s_t, NQ, NS, 3, NC>(
           shape_1d, grad_1d, flux + 2 * NQ * ND, column, 2);
     }
   }

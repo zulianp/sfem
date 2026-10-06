@@ -109,21 +109,30 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
             "neohookean_ogden_d3_tensor_product_apply_block<s_t, NQ, NS, VS>",
             hessian_source,
         )
+        # The element-matrix kernel holds one element, on every target, so it
+        # carries no work-item width: `plans` says assembly has one element in
+        # hand and the scatter that reads the matrix has no lane index to give
+        # it.  The apply beside it still takes the width, and that is the
+        # distinction this pair of assertions holds.
         self.assertIn(
-            "neohookean_ogden_d3_tensor_product_direct_hessian_tensor_product_element_matrix<s_t, NQ, NS, VS>",
+            "neohookean_ogden_d3_tensor_product_direct_hessian_tensor_product_element_matrix<s_t, NQ, NS>",
             hessian_source,
         )
         self.assertIn(
             "neohookean_ogden_d3_tensor_product_apply_block<s_t, NQ, NS, VS>",
             source,
         )
-        self.assertIn("static constexpr int VS = 1;", hessian_source)
+        # And it declares no width, not a width of one.  A block of one lane is
+        # the lane dimension surviving under another name: the kernel holds one
+        # element, so it stages flat buffers and calls the scalar rendering of
+        # every micro-kernel it uses.
+        self.assertNotIn("VS", hessian_source)
         self.assertNotIn("ordered_shape_index", hessian_source)
         self.assertNotIn("matrix_coordinate_streams", hessian_source)
         self.assertNotIn("bcoordinate_streams", hessian_source)
         self.assertNotIn("coordinate_value", hessian_source)
         self.assertIn(
-            "tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>",
+            "tensor_gradient_contiguous_scalar<s_t, NQ, NS, 3>",
             hessian_source,
         )
         self.assertIn("isoparametric_grad_1d, bcoordinate_data,", hessian_source)
@@ -250,8 +259,12 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
                         (root / "op" / ("sfem_%s_manifest.json" % op_name)).read_text()
                     )
 
-                    assembly_base = "%s_tet4_hessian_i_msoa" % material_name
-                    public_name = "%s_hessian_block_diag_sym_3d_i_msoa" % material_name
+                    # TET4 assembles through its affine kernel, because it has
+                    # no isoparametric one: its Jacobian is constant and the
+                    # affine kernel computes the same numbers from the cached
+                    # adjugate instead of rebuilding it from the coordinates.
+                    assembly_base = "%s_tet4_hessian_a_msoa" % material_name
+                    public_name = "%s_hessian_block_diag_sym_3d_a_msoa" % material_name
                     self.assertIn("%s_scatter_block_diag_sym" % assembly_base, source)
                     self.assertIn("static constexpr int SYM_DIM = (NC * (NC + 1)) / 2;", source)
                     self.assertIn("values[(ptrdiff_t)ev[i] * SYM_DIM]", source)
@@ -456,11 +469,11 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
 
             c_abi_header = (Path(out_dir) / "op/sfem_GeneratedTwoPhaseFlow_c_abi.hpp").read_text()
             self.assertIn(
-                "two_phase_flow_form_2_p_w_p_w_hessian_bsr_2d_i_msoa",
+                "two_phase_flow_form_2_p_w_p_w_hessian_bsr_2d_a_msoa",
                 c_abi_header,
             )
             declaration_begin = c_abi_header.index(
-                "extern \"C\" int two_phase_flow_form_2_p_w_p_w_hessian_bsr_2d_i_msoa"
+                "extern \"C\" int two_phase_flow_form_2_p_w_p_w_hessian_bsr_2d_a_msoa"
             )
             declaration_end = c_abi_header.index(");", declaration_begin)
             bsr_declaration = c_abi_header[declaration_begin:declaration_end]
@@ -472,11 +485,21 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
             ).read_text()
             wrapper = (Path(out_dir) / "op/sfem_GeneratedTwoPhaseFlow.cpp").read_text()
             self.assertIn("static constexpr int NC = 2;", source)
-            self.assertIn("static constexpr int N_ROW_STREAMS = 3;", source)
+            # The column extent is the row stride and is read; the row extent is
+            # not, because a row is reached as `bi * NS + row_shape` and never
+            # as a count, so the prologue drops it.
+            self.assertNotIn("N_ROW_STREAMS", source)
             self.assertIn("static constexpr int N_COL_STREAMS = 3;", source)
-            self.assertIn("bcurrent[0 * NS + shape][0] = p_w[node * current_stride];", source)
-            self.assertIn("bcurrent[1 * NS + shape][0] = p_c[node * current_stride];", source)
-            self.assertIn("block[bi * NC + bj] += element_matrix[row_stream * N_COL_STREAMS + col_stream];", source)
+            # Flat staging and no lane slot: this assembly holds one element.
+            self.assertIn("bcurrent[shape * NC + 0] = p_w[node * current_stride];", source)
+            self.assertIn("bcurrent[shape * NC + 1] = p_c[node * current_stride];", source)
+            # And the row address is named once above the column loop rather
+            # than recomputed per entry.
+            self.assertIn(
+                "const s_t *const RSTR row = &element_matrix[(bi * NS + row_shape) * N_COL_STREAMS];",
+                source,
+            )
+            self.assertIn("block[bi * NC + bj] += row[bj * NS + col_shape];", source)
             self.assertNotIn("ROW_STREAMS[", source)
             self.assertNotIn("COL_STREAMS[", source)
             self.assertNotIn("ROW_TENSOR_STREAMS[", source)
@@ -564,8 +587,10 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
             c_abi_header = (Path(out_dir) / "op/sfem_GeneratedLaplace_c_abi.hpp").read_text()
             for matrix_format in ("crs", "bsr", "block_diag_sym"):
                 with self.subTest(matrix_format=matrix_format):
+                    # TRI3 is a constant-P1 simplex, so 2D assembly is affine
+                    # for the same reason its matrix-free kernels are.
                     self.assertIn(
-                        "laplace_hessian_%s_2d_i_msoa" % matrix_format,
+                        "laplace_hessian_%s_2d_a_msoa" % matrix_format,
                         c_abi_header,
                     )
             # The formats that were removed must not come back by accident.
@@ -831,6 +856,14 @@ class NoProbingAssemblyRatchetTest(unittest.TestCase):
     #: written as an energy, assembles directly on the same elements -- which is
     #: what says this is the path and not the mathematics.
     #:
+    #: The unit those kernels belonged to is gone: a material mixing an energy
+    #: with a residual now publishes one combined unit, `total`, and none of
+    #: its parts, so there is no longer an `elastic` unit to stand beside a
+    #: `viscous` one as the counter-example.  The test that pinned that
+    #: counter-example is retired rather than kept up to date, because the
+    #: empty list below says something strictly stronger about every element in
+    #: the tree than "the energy path assembles directly" said about one.
+    #:
     #: Empty, and it stays empty.  Every element in the tree now builds its
     #: matrix from the substituted flux, in the shape its own evaluation
     #: strategy asks for: entry by entry with no loop where the element
@@ -866,7 +899,18 @@ class NoProbingAssemblyRatchetTest(unittest.TestCase):
             r"for \(int trial_local = 0; trial_local < (\d+); \+\+trial_local\)"
         )
         found = {}
-        for path in sorted(self._shipped_tree().rglob("*_operator.cpp")):
+        # Every target's mesh source, not just the host's.  Scanning `.cpp`
+        # alone left the device tree unread, and the device tree was where the
+        # probing lived: the mesh-order elements never delegated to their
+        # PROTEUS twins there, so their assemblies fell back to recovering the
+        # matrix one column at a time -- invisible to this gate for as long as
+        # it only knew one extension.
+        paths = sorted(
+            path
+            for suffix in ("cpp", "cu", "hip")
+            for path in self._shipped_tree().rglob("*_operator.%s" % suffix)
+        )
+        for path in paths:
             source = path.read_text()
             if not unit_direction.search(source):
                 continue
@@ -899,29 +943,6 @@ class NoProbingAssemblyRatchetTest(unittest.TestCase):
                     % (name, found[name], self.PROBING[name]),
                 )
 
-    def test_the_energy_path_assembles_directly_on_the_same_elements(self):
-        """The counter-example, pinned, because it is what makes the case.
-
-        Mooney-Rivlin Kelvin-Voigt Newmark carries both an energy unit and a
-        residual one.  If the elastic unit ever started probing too, the
-        argument that this is fixable would have quietly stopped being true.
-        """
-        import re
-
-        direct = re.compile(r"direct_hessian[a-z_]*element_matrix<")
-        for path in sorted(self._shipped_tree().rglob("*elastic*_operator.cpp")):
-            source = path.read_text()
-            if "element_matrix" not in source:
-                continue
-            with self.subTest(kernel=path.name):
-                self.assertTrue(
-                    direct.search(source),
-                    "%s assembles without calling a direct element-matrix "
-                    "kernel" % path.name,
-                )
-                self.assertNotIn("bdirection[trial][0] = s_t(1);", source)
-
-
 class ElementMatrixAgreesWithTheApplyTest(unittest.TestCase):
     """The element matrix and the operator it assembles are one bilinear form.
 
@@ -947,59 +968,59 @@ class ElementMatrixAgreesWithTheApplyTest(unittest.TestCase):
     CASES = (
         {
             'element': 'TET4',
-            'header': 'mooney_rivlin_kelvin_voigt_viscous_d3_simplex_local.hpp',
+            'header': 'mooney_rivlin_kelvin_voigt_total_d3_simplex_local.hpp',
             'dim': 3,
             'n_fields': 3,
             'n_qp': 1,
             'n_shape': 4,
-            'assembly': 'mooney_rivlin_kelvin_voigt_viscous_d3_simplex_tet4_hessian_block',
-            'apply': 'mooney_rivlin_kelvin_voigt_viscous_d3_simplex_tet4_jacobian_action_block_contiguous',
+            'assembly': 'mooney_rivlin_kelvin_voigt_total_d3_simplex_tet4_hessian_block',
+            'apply': 'mooney_rivlin_kelvin_voigt_total_d3_simplex_tet4_jacobian_action_block_contiguous',
             'reference': 'ref_tet4_q1',
             'quadrature': 'quad_tet_q1',
             'includes': ('tet4_q1.hpp', 'quad_tet_q1.hpp'),
         },
         {
             'element': 'TET10',
-            'header': 'mooney_rivlin_kelvin_voigt_viscous_d3_simplex_local.hpp',
+            'header': 'mooney_rivlin_kelvin_voigt_total_d3_simplex_local.hpp',
             'dim': 3,
             'n_fields': 3,
             'n_qp': 11,
             'n_shape': 10,
-            'assembly': 'mooney_rivlin_kelvin_voigt_viscous_d3_simplex_hessian_block',
-            'apply': 'mooney_rivlin_kelvin_voigt_viscous_d3_simplex_jacobian_action_block_contiguous',
+            'assembly': 'mooney_rivlin_kelvin_voigt_total_d3_simplex_hessian_block',
+            'apply': 'mooney_rivlin_kelvin_voigt_total_d3_simplex_jacobian_action_block_contiguous',
             'reference': 'ref_tet10_q11',
             'quadrature': 'quad_tet_q11',
             'includes': ('tet10_q11.hpp', 'quad_tet_q11.hpp'),
         },
         {
             'element': 'PROTEUS_HEX8',
-            'header': 'mooney_rivlin_kelvin_voigt_viscous_d3_tensor_product_local.hpp',
+            'header': 'mooney_rivlin_kelvin_voigt_total_d3_tensor_product_local.hpp',
             'dim': 3,
             'n_fields': 3,
             'n_qp': 8,
             'n_shape': 8,
-            'assembly': 'mooney_rivlin_kelvin_voigt_viscous_d3_tensor_product_hessian_block',
-            'apply': 'mooney_rivlin_kelvin_voigt_viscous_d3_tensor_product_jacobian_action_block_contiguous',
+            'assembly': 'mooney_rivlin_kelvin_voigt_total_d3_tensor_product_hessian_block',
+            'apply': 'mooney_rivlin_kelvin_voigt_total_d3_tensor_product_jacobian_action_block_contiguous',
             'reference': 'ref_line_p1_q2',
             'quadrature': 'quad_line_q2',
             'includes': ('line_p1_q2.hpp', 'quad_line_q2.hpp'),
         },
         {
             'element': 'PROTEUS_QUAD4',
-            'header': 'mooney_rivlin_kelvin_voigt_viscous_d2_tensor_product_local.hpp',
+            'header': 'mooney_rivlin_kelvin_voigt_total_d2_tensor_product_local.hpp',
             'dim': 2,
             'n_fields': 2,
             'n_qp': 4,
             'n_shape': 4,
-            'assembly': 'mooney_rivlin_kelvin_voigt_viscous_d2_tensor_product_hessian_block',
-            'apply': 'mooney_rivlin_kelvin_voigt_viscous_d2_tensor_product_jacobian_action_block_contiguous',
+            'assembly': 'mooney_rivlin_kelvin_voigt_total_d2_tensor_product_hessian_block',
+            'apply': 'mooney_rivlin_kelvin_voigt_total_d2_tensor_product_jacobian_action_block_contiguous',
             'reference': 'ref_line_p1_q2',
             'quadrature': 'quad_line_q2',
             'includes': ('line_p1_q2.hpp', 'quad_line_q2.hpp'),
         },
     )
 
-    DRIVER = '// Does the element matrix agree with the operator it assembles?\n//\n// The matrix is built from the flux with a trial basis function substituted for\n// the direction; the apply evaluates the same flux with a real direction in it.\n// They are one bilinear form, so `A * v` must equal `apply(v)` for every `v`.\n// That is the property probing had by construction -- the column *was* an apply\n// -- and the property the substitution has to earn.\n//\n// Checked over every basis direction and one dense one, on a perturbed identity\n// geometry and a random state, so a defect in one column cannot hide behind the\n// zeros of the next.\n#include <cstdio>\n#include <cmath>\n#include <cstdlib>\n#include <cmath>\n#include "@LOCAL_HEADER@"\n@INCLUDES@\n\nusing s_t = double;\nstatic constexpr int NQ = @NQ@;\nstatic constexpr int NS = @NS@;\nstatic constexpr int NC = @NC@;\nstatic constexpr int ND = @ND@;\nstatic constexpr int VS = 1;\n\n// Which fields this matrix has rows and columns for.  A coupled system\n// publishes one matrix per Jacobian block as well as the whole square, and the\n// two are the same check with different field lists.\nstatic constexpr int ROW_FIELDS[] = {@ROW_FIELDS@};\nstatic constexpr int COL_FIELDS[] = {@COLUMN_FIELDS@};\nstatic constexpr int N_ROWS = (int)(sizeof(ROW_FIELDS) / sizeof(int)) * NS;\nstatic constexpr int N_COLS = (int)(sizeof(COL_FIELDS) / sizeof(int)) * NS;\n\n// A matrix row or column is `field position * NS + shape`; a kernel stream is\n// `shape * NC + field`.  Both orders appear below because the apply speaks\n// streams and the matrix speaks its own rows and columns.\nstatic int row_stream(int row) { return (row % NS) * NC + ROW_FIELDS[row / NS]; }\nstatic int col_stream(int col) { return (col % NS) * NC + COL_FIELDS[col / NS]; }\n\nstatic double rnd() { return (double)rand() / RAND_MAX - 0.5; }\n\nint main() {\n  srand(20260915);\n  // The material\'s parameters, in the order its kernels take them.  Values\n  // chosen to be ordinary rather than special: a zero or a one can hide a term.\n@PARAM_DECLS@\n\n  s_t det[NQ * VS], adj_data[ND * ND][NQ * VS];\n  const s_t *adj[ND * ND];\n  for (int c = 0; c < ND * ND; ++c) adj[c] = adj_data[c];\n  for (int q = 0; q < NQ; ++q) {\n    for (int c = 0; c < ND * ND; ++c)\n      adj_data[c][q] = (c % (ND + 1) == 0 ? 1.0 : 0.0) + 0.2 * rnd();\n    det[q] = 1.0 + 0.1 * rnd();\n  }\n\n  // Both state roles are filled whether or not the kernels take both; which\n  // ones cross the boundary is the form\'s answer and `@STATE@` carries it.\n  s_t current[NC * NS][VS], previous[NC * NS][VS];\n  for (int i = 0; i < NC * NS; ++i) {\n    // `field` is which of the system\'s fields this stream carries; a material\n    // whose state has to satisfy an inequality reads it.\n    const int field = i % NC;\n    (void)field;\n    current[i][0] = @STATE_INIT@;\n    previous[i][0] = @STATE_INIT@;\n  }\n\n  s_t element_matrix[N_ROWS * N_COLS];\n  sfem::codegen::@ASSEMBLY@<s_t, NQ, NS, VS>(\n      1, 1, det, adj, @ASSEMBLY_ARGS@element_matrix);\n\n  // Checked before anything is compared.  `fmax` returns its non-NaN operand,\n  // so a NaN entry would leave `worst` at zero and read as perfect agreement --\n  // which is how a state outside a material\'s domain, where a fractional power\n  // of a negative number is taken, would pass this test silently.\n  for (int i = 0; i < N_ROWS * N_COLS; ++i) {\n    if (!std::isfinite(element_matrix[i])) {\n      printf("nan %d\\n", i);\n      return 1;\n    }\n  }\n\n  double worst = 0.0, scale = 0.0;\n  for (int i = 0; i < N_ROWS * N_COLS; ++i) scale = fmax(scale, fabs(element_matrix[i]));\n\n  for (int trial_local = 0; trial_local <= N_COLS; ++trial_local) {\n    s_t direction[NC * NS][VS], out[NC * NS][VS];\n    for (int i = 0; i < NC * NS; ++i) { direction[i][0] = 0.0; out[i][0] = 0.0; }\n    if (trial_local < N_COLS) {\n      direction[col_stream(trial_local)][0] = 1.0;\n    } else {\n      // A dense direction, confined to the columns this matrix has: anything\n      // outside them is not in the matrix and the apply would answer for it.\n      for (int col = 0; col < N_COLS; ++col) direction[col_stream(col)][0] = rnd();\n    }\n    sfem::codegen::@APPLY@<s_t, NQ, NS, VS>(\n        1, 1, det, adj, @APPLY_ARGS@out);\n\n    for (int test_local = 0; test_local < N_ROWS; ++test_local) {\n      double from_matrix = 0.0;\n      for (int j = 0; j < N_COLS; ++j) {\n        from_matrix += element_matrix[test_local * N_COLS + j]\n                     * direction[col_stream(j)][0];\n      }\n      worst = fmax(worst, fabs(from_matrix - out[row_stream(test_local)][0]));\n    }\n  }\n  printf("%.17e %.17e\\n", worst, scale);\n  return 0;\n}\n'
+    DRIVER = '// Does the element matrix agree with the operator it assembles?\n//\n// The matrix is built from the flux with a trial basis function substituted for\n// the direction; the apply evaluates the same flux with a real direction in it.\n// They are one bilinear form, so `A * v` must equal `apply(v)` for every `v`.\n// That is the property probing had by construction -- the column *was* an apply\n// -- and the property the substitution has to earn.\n//\n// Checked over every basis direction and one dense one, on a perturbed identity\n// geometry and a random state, so a defect in one column cannot hide behind the\n// zeros of the next.\n#include <cstdio>\n#include <cmath>\n#include <cstdlib>\n#include <cmath>\n#include "@LOCAL_HEADER@"\n@INCLUDES@\n\nusing s_t = double;\nstatic constexpr int NQ = @NQ@;\nstatic constexpr int NS = @NS@;\nstatic constexpr int NC = @NC@;\nstatic constexpr int ND = @ND@;\nstatic constexpr int VS = 1;\n\n// Which fields this matrix has rows and columns for.  A coupled system\n// publishes one matrix per Jacobian block as well as the whole square, and the\n// two are the same check with different field lists.\nstatic constexpr int ROW_FIELDS[] = {@ROW_FIELDS@};\nstatic constexpr int COL_FIELDS[] = {@COLUMN_FIELDS@};\nstatic constexpr int N_ROWS = (int)(sizeof(ROW_FIELDS) / sizeof(int)) * NS;\nstatic constexpr int N_COLS = (int)(sizeof(COL_FIELDS) / sizeof(int)) * NS;\n\n// A matrix row or column is `field position * NS + shape`; a kernel stream is\n// `shape * NC + field`.  Both orders appear below because the apply speaks\n// streams and the matrix speaks its own rows and columns.\nstatic int row_stream(int row) { return (row % NS) * NC + ROW_FIELDS[row / NS]; }\nstatic int col_stream(int col) { return (col % NS) * NC + COL_FIELDS[col / NS]; }\n\nstatic double rnd() { return (double)rand() / RAND_MAX - 0.5; }\n\nint main() {\n  srand(20260915);\n  // The material\'s parameters, in the order its kernels take them.  Values\n  // chosen to be ordinary rather than special: a zero or a one can hide a term.\n@PARAM_DECLS@\n\n  s_t det[NQ * VS], adj_data[ND * ND][NQ * VS];\n  const s_t *adj[ND * ND];\n  for (int c = 0; c < ND * ND; ++c) adj[c] = adj_data[c];\n  for (int q = 0; q < NQ; ++q) {\n    for (int c = 0; c < ND * ND; ++c)\n      adj_data[c][q] = (c % (ND + 1) == 0 ? 1.0 : 0.0) + 0.2 * rnd();\n    det[q] = 1.0 + 0.1 * rnd();\n  }\n\n  // Both state roles are filled whether or not the kernels take both; which\n  // ones cross the boundary is the form\'s answer and `@STATE@` carries it.\n  s_t current[NC * NS][VS], previous[NC * NS][VS];\n  for (int i = 0; i < NC * NS; ++i) {\n    // `field` is which of the system\'s fields this stream carries; a material\n    // whose state has to satisfy an inequality reads it.\n    const int field = i % NC;\n    (void)field;\n    current[i][0] = @STATE_INIT@;\n    previous[i][0] = @STATE_INIT@;\n  }\n\n  // The element-matrix kernel holds one element, so its state crosses the\n  // boundary flat and it takes no work-item count -- only the geometry stride.\n  s_t current_flat[NC * NS], previous_flat[NC * NS];\n  for (int i = 0; i < NC * NS; ++i) {\n    current_flat[i] = current[i][0];\n    previous_flat[i] = previous[i][0];\n  }\n\n  s_t element_matrix[N_ROWS * N_COLS];\n  sfem::codegen::@ASSEMBLY@<s_t, NQ, NS>(\n      @ASSEMBLY_ARGS@element_matrix);\n\n  // Checked before anything is compared.  `fmax` returns its non-NaN operand,\n  // so a NaN entry would leave `worst` at zero and read as perfect agreement --\n  // which is how a state outside a material\'s domain, where a fractional power\n  // of a negative number is taken, would pass this test silently.\n  for (int i = 0; i < N_ROWS * N_COLS; ++i) {\n    if (!std::isfinite(element_matrix[i])) {\n      printf("nan %d\\n", i);\n      return 1;\n    }\n  }\n\n  double worst = 0.0, scale = 0.0;\n  for (int i = 0; i < N_ROWS * N_COLS; ++i) scale = fmax(scale, fabs(element_matrix[i]));\n\n  for (int trial_local = 0; trial_local <= N_COLS; ++trial_local) {\n    s_t direction[NC * NS][VS], out[NC * NS][VS];\n    for (int i = 0; i < NC * NS; ++i) { direction[i][0] = 0.0; out[i][0] = 0.0; }\n    if (trial_local < N_COLS) {\n      direction[col_stream(trial_local)][0] = 1.0;\n    } else {\n      // A dense direction, confined to the columns this matrix has: anything\n      // outside them is not in the matrix and the apply would answer for it.\n      for (int col = 0; col < N_COLS; ++col) direction[col_stream(col)][0] = rnd();\n    }\n    sfem::codegen::@APPLY@<s_t, NQ, NS, VS>(\n        @APPLY_ARGS@out);\n\n    for (int test_local = 0; test_local < N_ROWS; ++test_local) {\n      double from_matrix = 0.0;\n      for (int j = 0; j < N_COLS; ++j) {\n        from_matrix += element_matrix[test_local * N_COLS + j]\n                     * direction[col_stream(j)][0];\n      }\n      worst = fmax(worst, fabs(from_matrix - out[row_stream(test_local)][0]));\n    }\n  }\n  printf("%.17e %.17e\\n", worst, scale);\n  return 0;\n}\n'
 
     @staticmethod
     def _shipped_tree():
@@ -1071,16 +1092,33 @@ class ElementMatrixAgreesWithTheApplyTest(unittest.TestCase):
     }
     STATE_ARGUMENTS = ("current", "previous", "direction")
 
+    #: The leading parameters, as the driver spells them.  One element, one
+    #: work item, an identity-ish geometry and its determinant.
+    LEADING_ARGUMENTS = {
+        "ne": "1",
+        "geometry_stride": "1",
+        "determinant": "det",
+        "adjugate": "adj",
+    }
+
     @classmethod
     def _call_arguments(cls, header, kernel, case, defaults):
         """The argument list this kernel is called with, and the values it needs."""
         spelling = {"ref": case["reference"], "quad": case["quadrature"]}
         arguments, parameters = [], []
-        # The first four and the last are what the driver spells itself: the
-        # work-item count, the geometry stride, the geometry, and whatever the
-        # kernel writes -- `element_matrix` for an assembly, `output` for an
-        # apply, which is why the last is dropped by position and not by name.
-        for name in cls._parameter_names(header, kernel)[4:-1]:
+        # Only the last is what the driver spells itself: whatever the kernel
+        # writes -- `element_matrix` for an assembly, `output` for an apply,
+        # which is why it is dropped by position and not by name.
+        #
+        # Everything before the geometry is spelled from the name rather than
+        # counted, because how many of them there are is the kernel's own
+        # answer: an assembly kernel holds one element and takes no work-item
+        # count, and a closed-form kernel indexes no quadrature point and takes
+        # no stride between them.
+        names = cls._parameter_names(header, kernel)
+        lead = names.index("adjugate") + 1
+        arguments.extend(cls.LEADING_ARGUMENTS[name] for name in names[:lead])
+        for name in names[lead:-1]:
             if name in cls.REFERENCE_ACCESSORS:
                 arguments.append(
                     "sfem::codegen::" + cls.REFERENCE_ACCESSORS[name] % spelling
@@ -1123,7 +1161,12 @@ class ElementMatrixAgreesWithTheApplyTest(unittest.TestCase):
                  for name, value in parameters
              )),
             ("@ASSEMBLY@", case["assembly"]),
-            ("@ASSEMBLY_ARGS@", "".join("%s, " % a for a in assembly_args)),
+            # The assembly kernel reads flat state, so the names it asks for
+            # point at the flat copies rather than the lane tiles.
+            ("@ASSEMBLY_ARGS@", "".join(
+                "%s, " % ("%s_flat" % a if a in self.STATE_ARGUMENTS else a)
+                for a in assembly_args
+            )),
             ("@APPLY@", case["apply"]),
             ("@APPLY_ARGS@", "".join("%s, " % a for a in apply_args)),
         ):

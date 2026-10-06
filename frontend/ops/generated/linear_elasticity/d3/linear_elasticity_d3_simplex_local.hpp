@@ -101,50 +101,35 @@ static SFEM_INLINE void linear_elasticity_d3_simplex_objective_block(
         grad_h_ref8_values[lane] = s_t(0);
       }
       for (int shape = 0; shape < NS; ++shape) {
+        const s_t gref0 = grad_ref_x[q * NS + shape];
+        const s_t gref1 = grad_ref_y[q * NS + shape];
+        const s_t gref2 = grad_ref_z[q * NS + shape];
+        const s_t *const RSTR u_shape0 = u_streams[3 * shape];
+        const s_t *const RSTR u_shape1 = u_streams[3 * shape + 1];
+        const s_t *const RSTR u_shape2 = u_streams[3 * shape + 2];
+        const s_t *const RSTR h_shape0 = h_streams[3 * shape];
+        const s_t *const RSTR h_shape1 = h_streams[3 * shape + 1];
+        const s_t *const RSTR h_shape2 = h_streams[3 * shape + 2];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          gu_ref0_values[lane] += u_streams[3 * shape][lane] * grad_ref_x[q * NS + shape];
-          grad_h_ref0_values[lane] += h_streams[3 * shape][lane] * grad_ref_x[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          gu_ref1_values[lane] += u_streams[3 * shape][lane] * grad_ref_y[q * NS + shape];
-          grad_h_ref1_values[lane] += h_streams[3 * shape][lane] * grad_ref_y[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          gu_ref2_values[lane] += u_streams[3 * shape][lane] * grad_ref_z[q * NS + shape];
-          grad_h_ref2_values[lane] += h_streams[3 * shape][lane] * grad_ref_z[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          gu_ref3_values[lane] += u_streams[3 * shape + 1][lane] * grad_ref_x[q * NS + shape];
-          grad_h_ref3_values[lane] += h_streams[3 * shape + 1][lane] * grad_ref_x[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          gu_ref4_values[lane] += u_streams[3 * shape + 1][lane] * grad_ref_y[q * NS + shape];
-          grad_h_ref4_values[lane] += h_streams[3 * shape + 1][lane] * grad_ref_y[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          gu_ref5_values[lane] += u_streams[3 * shape + 1][lane] * grad_ref_z[q * NS + shape];
-          grad_h_ref5_values[lane] += h_streams[3 * shape + 1][lane] * grad_ref_z[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          gu_ref6_values[lane] += u_streams[3 * shape + 2][lane] * grad_ref_x[q * NS + shape];
-          grad_h_ref6_values[lane] += h_streams[3 * shape + 2][lane] * grad_ref_x[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          gu_ref7_values[lane] += u_streams[3 * shape + 2][lane] * grad_ref_y[q * NS + shape];
-          grad_h_ref7_values[lane] += h_streams[3 * shape + 2][lane] * grad_ref_y[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          gu_ref8_values[lane] += u_streams[3 * shape + 2][lane] * grad_ref_z[q * NS + shape];
-          grad_h_ref8_values[lane] += h_streams[3 * shape + 2][lane] * grad_ref_z[q * NS + shape];
+          gu_ref0_values[lane] += u_shape0[lane] * gref0;
+          grad_h_ref0_values[lane] += h_shape0[lane] * gref0;
+          gu_ref1_values[lane] += u_shape0[lane] * gref1;
+          grad_h_ref1_values[lane] += h_shape0[lane] * gref1;
+          gu_ref2_values[lane] += u_shape0[lane] * gref2;
+          grad_h_ref2_values[lane] += h_shape0[lane] * gref2;
+          gu_ref3_values[lane] += u_shape1[lane] * gref0;
+          grad_h_ref3_values[lane] += h_shape1[lane] * gref0;
+          gu_ref4_values[lane] += u_shape1[lane] * gref1;
+          grad_h_ref4_values[lane] += h_shape1[lane] * gref1;
+          gu_ref5_values[lane] += u_shape1[lane] * gref2;
+          grad_h_ref5_values[lane] += h_shape1[lane] * gref2;
+          gu_ref6_values[lane] += u_shape2[lane] * gref0;
+          grad_h_ref6_values[lane] += h_shape2[lane] * gref0;
+          gu_ref7_values[lane] += u_shape2[lane] * gref1;
+          grad_h_ref7_values[lane] += h_shape2[lane] * gref1;
+          gu_ref8_values[lane] += u_shape2[lane] * gref2;
+          grad_h_ref8_values[lane] += h_shape2[lane] * gref2;
         }
       }
       s_t gu_base_v[9 * VS];
@@ -221,10 +206,9 @@ static SFEM_INLINE void linear_elasticity_d3_simplex_objective_block(
     }
 }
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NS, int VS>
 static SFEM_INLINE void linear_elasticity_d3_simplex_tet4_objective_block(
         const int ne,
-        const ptrdiff_t geometry_stride,
         const s_t *const RSTR adj0,
         const s_t *const RSTR adj1,
         const s_t *const RSTR adj2,
@@ -235,7 +219,6 @@ static SFEM_INLINE void linear_elasticity_d3_simplex_tet4_objective_block(
         const s_t *const RSTR adj7,
         const s_t *const RSTR adj8,
         const s_t *const RSTR det0,
-        const s_t *const RSTR q_weight,
         const s_t lmbda,
         const s_t mu,
         const s_t *const RSTR u_streams[NS * 3],
@@ -245,15 +228,14 @@ static SFEM_INLINE void linear_elasticity_d3_simplex_tet4_objective_block(
         const ptrdiff_t value_stride,
         s_t *const RSTR value
 ) {
-  static_assert(NQ > 0, "NQ must be positive");
   static_assert(VS > 0, "VS must be positive");
-    { const int q = 0;  // constant-P1 simplex
-      const s_t qw = q_weight[q];
+    {
+      const s_t qw = (s_t(1) / s_t(6));
       s_t gu_base_v[9 * VS];
       s_t trial_grad_v[9 * VS];
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
-      const ptrdiff_t goff = q * geometry_stride + lane;
+      const ptrdiff_t goff = lane;
       const s_t adj_lane0 = adj0[goff];
       const s_t adj_lane1 = adj1[goff];
       const s_t adj_lane2 = adj2[goff];
@@ -306,7 +288,7 @@ static SFEM_INLINE void linear_elasticity_d3_simplex_tet4_objective_block(
         const s_t alpha = steps[step];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          const ptrdiff_t goff = q * geometry_stride + lane;
+          const ptrdiff_t goff = lane;
           const s_t det_lane0 = det0[goff];
           const s_t gu0 = gu_base_v[0 * VS + lane] + alpha * trial_grad_v[0 * VS + lane];
           const s_t gu1 = gu_base_v[1 * VS + lane] + alpha * trial_grad_v[1 * VS + lane];
@@ -381,41 +363,23 @@ static SFEM_INLINE void linear_elasticity_d3_simplex_gradient_block(
         gu_ref8_values[lane] = s_t(0);
       }
       for (int shape = 0; shape < NS; ++shape) {
+        const s_t gref0 = grad_ref_x[q * NS + shape];
+        const s_t gref1 = grad_ref_y[q * NS + shape];
+        const s_t gref2 = grad_ref_z[q * NS + shape];
+        const s_t *const RSTR u_shape0 = u_streams[3 * shape];
+        const s_t *const RSTR u_shape1 = u_streams[3 * shape + 1];
+        const s_t *const RSTR u_shape2 = u_streams[3 * shape + 2];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          gu_ref0_values[lane] += u_streams[3 * shape][lane] * grad_ref_x[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          gu_ref1_values[lane] += u_streams[3 * shape][lane] * grad_ref_y[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          gu_ref2_values[lane] += u_streams[3 * shape][lane] * grad_ref_z[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          gu_ref3_values[lane] += u_streams[3 * shape + 1][lane] * grad_ref_x[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          gu_ref4_values[lane] += u_streams[3 * shape + 1][lane] * grad_ref_y[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          gu_ref5_values[lane] += u_streams[3 * shape + 1][lane] * grad_ref_z[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          gu_ref6_values[lane] += u_streams[3 * shape + 2][lane] * grad_ref_x[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          gu_ref7_values[lane] += u_streams[3 * shape + 2][lane] * grad_ref_y[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          gu_ref8_values[lane] += u_streams[3 * shape + 2][lane] * grad_ref_z[q * NS + shape];
+          gu_ref0_values[lane] += u_shape0[lane] * gref0;
+          gu_ref1_values[lane] += u_shape0[lane] * gref1;
+          gu_ref2_values[lane] += u_shape0[lane] * gref2;
+          gu_ref3_values[lane] += u_shape1[lane] * gref0;
+          gu_ref4_values[lane] += u_shape1[lane] * gref1;
+          gu_ref5_values[lane] += u_shape1[lane] * gref2;
+          gu_ref6_values[lane] += u_shape2[lane] * gref0;
+          gu_ref7_values[lane] += u_shape2[lane] * gref1;
+          gu_ref8_values[lane] += u_shape2[lane] * gref2;
         }
       }
       #pragma omp simd
@@ -466,46 +430,36 @@ static SFEM_INLINE void linear_elasticity_d3_simplex_gradient_block(
     const s_t material6 = weak_mat_tmp5;
     const s_t material7 = weak_mat_tmp6;
     const s_t material8 = mu*weak_mat_tmp2 + weak_mat_tmp3;
-    const s_t loperand0 = qw * (material0 * adj_lane0 + material1 * adj_lane1 + material2 * adj_lane2);
-    const s_t loperand1 = qw * (material0 * adj_lane3 + material1 * adj_lane4 + material2 * adj_lane5);
-    const s_t loperand2 = qw * (material0 * adj_lane6 + material1 * adj_lane7 + material2 * adj_lane8);
-    const s_t loperand3 = qw * (material3 * adj_lane0 + material4 * adj_lane1 + material5 * adj_lane2);
-    const s_t loperand4 = qw * (material3 * adj_lane3 + material4 * adj_lane4 + material5 * adj_lane5);
-    const s_t loperand5 = qw * (material3 * adj_lane6 + material4 * adj_lane7 + material5 * adj_lane8);
-    const s_t loperand6 = qw * (material6 * adj_lane0 + material7 * adj_lane1 + material8 * adj_lane2);
-    const s_t loperand7 = qw * (material6 * adj_lane3 + material7 * adj_lane4 + material8 * adj_lane5);
-    const s_t loperand8 = qw * (material6 * adj_lane6 + material7 * adj_lane7 + material8 * adj_lane8);
-      loperand0_values[lane] = loperand0;
-      loperand1_values[lane] = loperand1;
-      loperand2_values[lane] = loperand2;
-      loperand3_values[lane] = loperand3;
-      loperand4_values[lane] = loperand4;
-      loperand5_values[lane] = loperand5;
-      loperand6_values[lane] = loperand6;
-      loperand7_values[lane] = loperand7;
-      loperand8_values[lane] = loperand8;
+      loperand0_values[lane] = qw * (material0 * adj_lane0 + material1 * adj_lane1 + material2 * adj_lane2);
+      loperand1_values[lane] = qw * (material0 * adj_lane3 + material1 * adj_lane4 + material2 * adj_lane5);
+      loperand2_values[lane] = qw * (material0 * adj_lane6 + material1 * adj_lane7 + material2 * adj_lane8);
+      loperand3_values[lane] = qw * (material3 * adj_lane0 + material4 * adj_lane1 + material5 * adj_lane2);
+      loperand4_values[lane] = qw * (material3 * adj_lane3 + material4 * adj_lane4 + material5 * adj_lane5);
+      loperand5_values[lane] = qw * (material3 * adj_lane6 + material4 * adj_lane7 + material5 * adj_lane8);
+      loperand6_values[lane] = qw * (material6 * adj_lane0 + material7 * adj_lane1 + material8 * adj_lane2);
+      loperand7_values[lane] = qw * (material6 * adj_lane3 + material7 * adj_lane4 + material8 * adj_lane5);
+      loperand8_values[lane] = qw * (material6 * adj_lane6 + material7 * adj_lane7 + material8 * adj_lane8);
       }
       for (int shape = 0; shape < NS; ++shape) {
+        const s_t tref0 = grad_ref_x[q * NS + shape];
+        const s_t tref1 = grad_ref_y[q * NS + shape];
+        const s_t tref2 = grad_ref_z[q * NS + shape];
+        s_t *const RSTR out_shape0 = out_streams[3 * shape];
+        s_t *const RSTR out_shape1 = out_streams[3 * shape + 1];
+        s_t *const RSTR out_shape2 = out_streams[3 * shape + 2];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          out_streams[3 * shape][lane] += loperand0_values[lane] * grad_ref_x[q * NS + shape] + loperand1_values[lane] * grad_ref_y[q * NS + shape] + loperand2_values[lane] * grad_ref_z[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          out_streams[3 * shape + 1][lane] += loperand3_values[lane] * grad_ref_x[q * NS + shape] + loperand4_values[lane] * grad_ref_y[q * NS + shape] + loperand5_values[lane] * grad_ref_z[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          out_streams[3 * shape + 2][lane] += loperand6_values[lane] * grad_ref_x[q * NS + shape] + loperand7_values[lane] * grad_ref_y[q * NS + shape] + loperand8_values[lane] * grad_ref_z[q * NS + shape];
+          out_shape0[lane] += loperand0_values[lane] * tref0 + loperand1_values[lane] * tref1 + loperand2_values[lane] * tref2;
+          out_shape1[lane] += loperand3_values[lane] * tref0 + loperand4_values[lane] * tref1 + loperand5_values[lane] * tref2;
+          out_shape2[lane] += loperand6_values[lane] * tref0 + loperand7_values[lane] * tref1 + loperand8_values[lane] * tref2;
         }
       }
     }
 }
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NS, int VS>
 static SFEM_INLINE void linear_elasticity_d3_simplex_tet4_gradient_block(
         const int ne,
-        const ptrdiff_t geometry_stride,
         const s_t *const RSTR adj0,
         const s_t *const RSTR adj1,
         const s_t *const RSTR adj2,
@@ -516,19 +470,17 @@ static SFEM_INLINE void linear_elasticity_d3_simplex_tet4_gradient_block(
         const s_t *const RSTR adj7,
         const s_t *const RSTR adj8,
         const s_t *const RSTR det0,
-        const s_t *const RSTR q_weight,
         const s_t lmbda,
         const s_t mu,
         const s_t *const RSTR u_streams[NS * 3],
         s_t *const RSTR out_streams[NS * 3]
 ) {
-  static_assert(NQ > 0, "NQ must be positive");
   static_assert(VS > 0, "VS must be positive");
-    { const int q = 0;  // constant-P1 simplex
-      const s_t qw = q_weight[q];
+    {
+      const s_t qw = (s_t(1) / s_t(6));
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
-      const ptrdiff_t goff = q * geometry_stride + lane;
+      const ptrdiff_t goff = lane;
       const s_t adj_lane0 = adj0[goff];
       const s_t adj_lane1 = adj1[goff];
       const s_t adj_lane2 = adj2[goff];
@@ -657,41 +609,23 @@ static SFEM_INLINE void linear_elasticity_d3_simplex_apply_block(
         grad_h_ref8_values[lane] = s_t(0);
       }
       for (int shape = 0; shape < NS; ++shape) {
+        const s_t gref0 = grad_ref_x[q * NS + shape];
+        const s_t gref1 = grad_ref_y[q * NS + shape];
+        const s_t gref2 = grad_ref_z[q * NS + shape];
+        const s_t *const RSTR h_shape0 = h_streams[3 * shape];
+        const s_t *const RSTR h_shape1 = h_streams[3 * shape + 1];
+        const s_t *const RSTR h_shape2 = h_streams[3 * shape + 2];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          grad_h_ref0_values[lane] += h_streams[3 * shape][lane] * grad_ref_x[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          grad_h_ref1_values[lane] += h_streams[3 * shape][lane] * grad_ref_y[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          grad_h_ref2_values[lane] += h_streams[3 * shape][lane] * grad_ref_z[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          grad_h_ref3_values[lane] += h_streams[3 * shape + 1][lane] * grad_ref_x[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          grad_h_ref4_values[lane] += h_streams[3 * shape + 1][lane] * grad_ref_y[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          grad_h_ref5_values[lane] += h_streams[3 * shape + 1][lane] * grad_ref_z[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          grad_h_ref6_values[lane] += h_streams[3 * shape + 2][lane] * grad_ref_x[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          grad_h_ref7_values[lane] += h_streams[3 * shape + 2][lane] * grad_ref_y[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          grad_h_ref8_values[lane] += h_streams[3 * shape + 2][lane] * grad_ref_z[q * NS + shape];
+          grad_h_ref0_values[lane] += h_shape0[lane] * gref0;
+          grad_h_ref1_values[lane] += h_shape0[lane] * gref1;
+          grad_h_ref2_values[lane] += h_shape0[lane] * gref2;
+          grad_h_ref3_values[lane] += h_shape1[lane] * gref0;
+          grad_h_ref4_values[lane] += h_shape1[lane] * gref1;
+          grad_h_ref5_values[lane] += h_shape1[lane] * gref2;
+          grad_h_ref6_values[lane] += h_shape2[lane] * gref0;
+          grad_h_ref7_values[lane] += h_shape2[lane] * gref1;
+          grad_h_ref8_values[lane] += h_shape2[lane] * gref2;
         }
       }
       #pragma omp simd
@@ -742,46 +676,36 @@ static SFEM_INLINE void linear_elasticity_d3_simplex_apply_block(
     const s_t material6 = weak_mat_tmp5;
     const s_t material7 = weak_mat_tmp6;
     const s_t material8 = mu*weak_mat_tmp2 + weak_mat_tmp3;
-    const s_t loperand0 = qw * (material0 * adj_lane0 + material1 * adj_lane1 + material2 * adj_lane2);
-    const s_t loperand1 = qw * (material0 * adj_lane3 + material1 * adj_lane4 + material2 * adj_lane5);
-    const s_t loperand2 = qw * (material0 * adj_lane6 + material1 * adj_lane7 + material2 * adj_lane8);
-    const s_t loperand3 = qw * (material3 * adj_lane0 + material4 * adj_lane1 + material5 * adj_lane2);
-    const s_t loperand4 = qw * (material3 * adj_lane3 + material4 * adj_lane4 + material5 * adj_lane5);
-    const s_t loperand5 = qw * (material3 * adj_lane6 + material4 * adj_lane7 + material5 * adj_lane8);
-    const s_t loperand6 = qw * (material6 * adj_lane0 + material7 * adj_lane1 + material8 * adj_lane2);
-    const s_t loperand7 = qw * (material6 * adj_lane3 + material7 * adj_lane4 + material8 * adj_lane5);
-    const s_t loperand8 = qw * (material6 * adj_lane6 + material7 * adj_lane7 + material8 * adj_lane8);
-      loperand0_values[lane] = loperand0;
-      loperand1_values[lane] = loperand1;
-      loperand2_values[lane] = loperand2;
-      loperand3_values[lane] = loperand3;
-      loperand4_values[lane] = loperand4;
-      loperand5_values[lane] = loperand5;
-      loperand6_values[lane] = loperand6;
-      loperand7_values[lane] = loperand7;
-      loperand8_values[lane] = loperand8;
+      loperand0_values[lane] = qw * (material0 * adj_lane0 + material1 * adj_lane1 + material2 * adj_lane2);
+      loperand1_values[lane] = qw * (material0 * adj_lane3 + material1 * adj_lane4 + material2 * adj_lane5);
+      loperand2_values[lane] = qw * (material0 * adj_lane6 + material1 * adj_lane7 + material2 * adj_lane8);
+      loperand3_values[lane] = qw * (material3 * adj_lane0 + material4 * adj_lane1 + material5 * adj_lane2);
+      loperand4_values[lane] = qw * (material3 * adj_lane3 + material4 * adj_lane4 + material5 * adj_lane5);
+      loperand5_values[lane] = qw * (material3 * adj_lane6 + material4 * adj_lane7 + material5 * adj_lane8);
+      loperand6_values[lane] = qw * (material6 * adj_lane0 + material7 * adj_lane1 + material8 * adj_lane2);
+      loperand7_values[lane] = qw * (material6 * adj_lane3 + material7 * adj_lane4 + material8 * adj_lane5);
+      loperand8_values[lane] = qw * (material6 * adj_lane6 + material7 * adj_lane7 + material8 * adj_lane8);
       }
       for (int shape = 0; shape < NS; ++shape) {
+        const s_t tref0 = grad_ref_x[q * NS + shape];
+        const s_t tref1 = grad_ref_y[q * NS + shape];
+        const s_t tref2 = grad_ref_z[q * NS + shape];
+        s_t *const RSTR out_shape0 = out_streams[3 * shape];
+        s_t *const RSTR out_shape1 = out_streams[3 * shape + 1];
+        s_t *const RSTR out_shape2 = out_streams[3 * shape + 2];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          out_streams[3 * shape][lane] += loperand0_values[lane] * grad_ref_x[q * NS + shape] + loperand1_values[lane] * grad_ref_y[q * NS + shape] + loperand2_values[lane] * grad_ref_z[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          out_streams[3 * shape + 1][lane] += loperand3_values[lane] * grad_ref_x[q * NS + shape] + loperand4_values[lane] * grad_ref_y[q * NS + shape] + loperand5_values[lane] * grad_ref_z[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          out_streams[3 * shape + 2][lane] += loperand6_values[lane] * grad_ref_x[q * NS + shape] + loperand7_values[lane] * grad_ref_y[q * NS + shape] + loperand8_values[lane] * grad_ref_z[q * NS + shape];
+          out_shape0[lane] += loperand0_values[lane] * tref0 + loperand1_values[lane] * tref1 + loperand2_values[lane] * tref2;
+          out_shape1[lane] += loperand3_values[lane] * tref0 + loperand4_values[lane] * tref1 + loperand5_values[lane] * tref2;
+          out_shape2[lane] += loperand6_values[lane] * tref0 + loperand7_values[lane] * tref1 + loperand8_values[lane] * tref2;
         }
       }
     }
 }
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NS, int VS>
 static SFEM_INLINE void linear_elasticity_d3_simplex_tet4_apply_block(
         const int ne,
-        const ptrdiff_t geometry_stride,
         const s_t *const RSTR adj0,
         const s_t *const RSTR adj1,
         const s_t *const RSTR adj2,
@@ -792,19 +716,17 @@ static SFEM_INLINE void linear_elasticity_d3_simplex_tet4_apply_block(
         const s_t *const RSTR adj7,
         const s_t *const RSTR adj8,
         const s_t *const RSTR det0,
-        const s_t *const RSTR q_weight,
         const s_t lmbda,
         const s_t mu,
         const s_t *const RSTR h_streams[NS * 3],
         s_t *const RSTR out_streams[NS * 3]
 ) {
-  static_assert(NQ > 0, "NQ must be positive");
   static_assert(VS > 0, "VS must be positive");
-    { const int q = 0;  // constant-P1 simplex
-      const s_t qw = q_weight[q];
+    {
+      const s_t qw = (s_t(1) / s_t(6));
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
-      const ptrdiff_t goff = q * geometry_stride + lane;
+      const ptrdiff_t goff = lane;
       const s_t adj_lane0 = adj0[goff];
       const s_t adj_lane1 = adj1[goff];
       const s_t adj_lane2 = adj2[goff];

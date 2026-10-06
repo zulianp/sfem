@@ -11,7 +11,7 @@ namespace sfem {
 namespace codegen {
 
 
-template <typename s_t, int VS>
+template <typename s_t>
 static __host__ __device__ __forceinline__ int neohookean_ogden_proteus_quad4_energy_egeometry_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR adj,
@@ -26,8 +26,7 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_proteus_quad4_en
   static constexpr int NQ = 4;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
-  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+  for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       bu_streams[stream] = u_streams[stream] + evb;
@@ -37,21 +36,21 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_proteus_quad4_en
       bvalue[0] = s_t(0);
     }
     const s_t objective_step = s_t(0);
-    s_t badj0[NQ * VS];
-    s_t badj1[NQ * VS];
-    s_t badj2[NQ * VS];
-    s_t badj3[NQ * VS];
-    s_t bdet0[NQ * VS];
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t bdet0[NQ];
     for (int q = 0; q < NQ; ++q) {
-      s_t *const RSTR badj0_q = &badj0[q * VS];
+      s_t *const RSTR badj0_q = &badj0[q];
       const s_t *const RSTR adj0_q = adj[0] + q * nelements + evb;
-      s_t *const RSTR badj1_q = &badj1[q * VS];
+      s_t *const RSTR badj1_q = &badj1[q];
       const s_t *const RSTR adj1_q = adj[1] + q * nelements + evb;
-      s_t *const RSTR badj2_q = &badj2[q * VS];
+      s_t *const RSTR badj2_q = &badj2[q];
       const s_t *const RSTR adj2_q = adj[2] + q * nelements + evb;
-      s_t *const RSTR badj3_q = &badj3[q * VS];
+      s_t *const RSTR badj3_q = &badj3[q];
       const s_t *const RSTR adj3_q = adj[3] + q * nelements + evb;
-      s_t *const RSTR bdet0_q = &bdet0[q * VS];
+      s_t *const RSTR bdet0_q = &bdet0[q];
       const s_t *const RSTR det_q = det + q * nelements + evb;
       {
         badj0_q[0] = adj0_q[0];
@@ -61,12 +60,12 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_proteus_quad4_en
         bdet0_q[0] = det_q[0];
       }
     }
-    neohookean_ogden_d2_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    neohookean_ogden_d2_tensor_product_objective_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
 
-template <typename s_t, int VS>
+template <typename s_t>
 static __host__ __device__ __forceinline__ int neohookean_ogden_proteus_quad4_energy_ecoords_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -81,8 +80,7 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_proteus_quad4_en
   static constexpr int NQ = 4;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
-  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+  for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       bu_streams[stream] = u_streams[stream] + evb;
@@ -92,28 +90,28 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_proteus_quad4_en
       bvalue[0] = s_t(0);
     }
     const s_t objective_step = s_t(0);
-    s_t bcoordinate_data[NDOFS][VS];
+    s_t bcoordinate_data[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       {
-        bcoordinate_data[stream][0] = coords[stream][evb + 0];
+        bcoordinate_data[stream] = coords[stream][evb + 0];
       }
     }
-    s_t badj0[NQ * VS];
-    s_t badj1[NQ * VS];
-    s_t badj2[NQ * VS];
-    s_t badj3[NQ * VS];
-    s_t bdet0[NQ * VS];
-    s_t coordinate_grad_ref[ND * NQ * ND * VS];
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0);
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + NQ * ND * VS);
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t bdet0[NQ];
+    s_t coordinate_grad_ref[ND * NQ * ND];
+    tensor_gradient_contiguous_scalar<s_t, NQ, NS, 2>(sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0);
+    tensor_gradient_contiguous_scalar<s_t, NQ, NS, 2>(sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + NQ * ND);
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3};
-    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
-    neohookean_ogden_d2_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    geometry_jacobian_adjugate_and_determinant_scalar<s_t, ND, NQ>(coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
+    neohookean_ogden_d2_tensor_product_objective_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
 
-template <typename s_t, int VS>
+template <typename s_t>
 static __host__ __device__ __forceinline__ int neohookean_ogden_proteus_quad4_energy_esoa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -128,8 +126,7 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_proteus_quad4_en
   static constexpr int NQ = 4;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
-  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+  for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       bu_streams[stream] = u_streams[stream] + evb;
@@ -139,29 +136,29 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_proteus_quad4_en
       bvalue[0] = s_t(0);
     }
     const s_t objective_step = s_t(0);
-    s_t bcoordinate_data[NDOFS][VS];
+    s_t bcoordinate_data[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       {
-        bcoordinate_data[stream][0] = coords[stream][evb + 0];
+        bcoordinate_data[stream] = coords[stream][evb + 0];
       }
     }
-    s_t badj0[NQ * VS];
-    s_t badj1[NQ * VS];
-    s_t badj2[NQ * VS];
-    s_t badj3[NQ * VS];
-    s_t bdet0[NQ * VS];
-    s_t coordinate_grad_ref[ND * NQ * ND * VS];
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0);
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + NQ * ND * VS);
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t bdet0[NQ];
+    s_t coordinate_grad_ref[ND * NQ * ND];
+    tensor_gradient_contiguous_scalar<s_t, NQ, NS, 2>(sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0);
+    tensor_gradient_contiguous_scalar<s_t, NQ, NS, 2>(sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + NQ * ND);
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3};
-    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
-    neohookean_ogden_d2_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    geometry_jacobian_adjugate_and_determinant_scalar<s_t, ND, NQ>(coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
+    neohookean_ogden_d2_tensor_product_objective_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
 
 
-template <typename s_t, int VS>
+template <typename s_t>
 static __host__ __device__ __forceinline__ int neohookean_ogden_proteus_quad4_gradient_egeometry_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR adj,
@@ -176,8 +173,7 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_proteus_quad4_gr
   static constexpr int NQ = 4;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
-  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+  for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       bu_streams[stream] = u_streams[stream] + evb;
@@ -189,21 +185,21 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_proteus_quad4_gr
         bout_streams[stream][0] = s_t(0);
       }
     }
-    s_t badj0[NQ * VS];
-    s_t badj1[NQ * VS];
-    s_t badj2[NQ * VS];
-    s_t badj3[NQ * VS];
-    s_t bdet0[NQ * VS];
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t bdet0[NQ];
     for (int q = 0; q < NQ; ++q) {
-      s_t *const RSTR badj0_q = &badj0[q * VS];
+      s_t *const RSTR badj0_q = &badj0[q];
       const s_t *const RSTR adj0_q = adj[0] + q * nelements + evb;
-      s_t *const RSTR badj1_q = &badj1[q * VS];
+      s_t *const RSTR badj1_q = &badj1[q];
       const s_t *const RSTR adj1_q = adj[1] + q * nelements + evb;
-      s_t *const RSTR badj2_q = &badj2[q * VS];
+      s_t *const RSTR badj2_q = &badj2[q];
       const s_t *const RSTR adj2_q = adj[2] + q * nelements + evb;
-      s_t *const RSTR badj3_q = &badj3[q * VS];
+      s_t *const RSTR badj3_q = &badj3[q];
       const s_t *const RSTR adj3_q = adj[3] + q * nelements + evb;
-      s_t *const RSTR bdet0_q = &bdet0[q * VS];
+      s_t *const RSTR bdet0_q = &bdet0[q];
       const s_t *const RSTR det_q = det + q * nelements + evb;
       {
         badj0_q[0] = adj0_q[0];
@@ -213,12 +209,12 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_proteus_quad4_gr
         bdet0_q[0] = det_q[0];
       }
     }
-    neohookean_ogden_d2_tensor_product_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bout_streams);
+    neohookean_ogden_d2_tensor_product_gradient_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
 
-template <typename s_t, int VS>
+template <typename s_t>
 static __host__ __device__ __forceinline__ int neohookean_ogden_proteus_quad4_gradient_ecoords_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -233,8 +229,7 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_proteus_quad4_gr
   static constexpr int NQ = 4;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
-  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+  for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       bu_streams[stream] = u_streams[stream] + evb;
@@ -246,28 +241,28 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_proteus_quad4_gr
         bout_streams[stream][0] = s_t(0);
       }
     }
-    s_t bcoordinate_data[NDOFS][VS];
+    s_t bcoordinate_data[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       {
-        bcoordinate_data[stream][0] = coords[stream][evb + 0];
+        bcoordinate_data[stream] = coords[stream][evb + 0];
       }
     }
-    s_t badj0[NQ * VS];
-    s_t badj1[NQ * VS];
-    s_t badj2[NQ * VS];
-    s_t badj3[NQ * VS];
-    s_t bdet0[NQ * VS];
-    s_t coordinate_grad_ref[ND * NQ * ND * VS];
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0);
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + NQ * ND * VS);
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t bdet0[NQ];
+    s_t coordinate_grad_ref[ND * NQ * ND];
+    tensor_gradient_contiguous_scalar<s_t, NQ, NS, 2>(sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0);
+    tensor_gradient_contiguous_scalar<s_t, NQ, NS, 2>(sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + NQ * ND);
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3};
-    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
-    neohookean_ogden_d2_tensor_product_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bout_streams);
+    geometry_jacobian_adjugate_and_determinant_scalar<s_t, ND, NQ>(coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
+    neohookean_ogden_d2_tensor_product_gradient_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
 
-template <typename s_t, int VS>
+template <typename s_t>
 static __host__ __device__ __forceinline__ int neohookean_ogden_proteus_quad4_gradient_esoa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -282,8 +277,7 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_proteus_quad4_gr
   static constexpr int NQ = 4;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
-  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+  for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       bu_streams[stream] = u_streams[stream] + evb;
@@ -295,29 +289,29 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_proteus_quad4_gr
         bout_streams[stream][0] = s_t(0);
       }
     }
-    s_t bcoordinate_data[NDOFS][VS];
+    s_t bcoordinate_data[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       {
-        bcoordinate_data[stream][0] = coords[stream][evb + 0];
+        bcoordinate_data[stream] = coords[stream][evb + 0];
       }
     }
-    s_t badj0[NQ * VS];
-    s_t badj1[NQ * VS];
-    s_t badj2[NQ * VS];
-    s_t badj3[NQ * VS];
-    s_t bdet0[NQ * VS];
-    s_t coordinate_grad_ref[ND * NQ * ND * VS];
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0);
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + NQ * ND * VS);
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t bdet0[NQ];
+    s_t coordinate_grad_ref[ND * NQ * ND];
+    tensor_gradient_contiguous_scalar<s_t, NQ, NS, 2>(sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0);
+    tensor_gradient_contiguous_scalar<s_t, NQ, NS, 2>(sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + NQ * ND);
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3};
-    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
-    neohookean_ogden_d2_tensor_product_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bout_streams);
+    geometry_jacobian_adjugate_and_determinant_scalar<s_t, ND, NQ>(coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
+    neohookean_ogden_d2_tensor_product_gradient_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
 
 
-template <typename s_t, int VS>
+template <typename s_t>
 static __host__ __device__ __forceinline__ int neohookean_ogden_proteus_quad4_hessian_egeometry_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR adj,
@@ -332,25 +326,24 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_proteus_quad4_he
   static constexpr int NQ = 4;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
-  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+  for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) bu_streams[stream] = u_streams[stream] + evb;
-    s_t badj0[NQ * VS];
-    s_t badj1[NQ * VS];
-    s_t badj2[NQ * VS];
-    s_t badj3[NQ * VS];
-    s_t bdet0[NQ * VS];
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t bdet0[NQ];
     for (int q = 0; q < NQ; ++q) {
-      s_t *const RSTR badj0_q = &badj0[q * VS];
+      s_t *const RSTR badj0_q = &badj0[q];
       const s_t *const RSTR adj0_q = adj[0] + q * nelements + evb;
-      s_t *const RSTR badj1_q = &badj1[q * VS];
+      s_t *const RSTR badj1_q = &badj1[q];
       const s_t *const RSTR adj1_q = adj[1] + q * nelements + evb;
-      s_t *const RSTR badj2_q = &badj2[q * VS];
+      s_t *const RSTR badj2_q = &badj2[q];
       const s_t *const RSTR adj2_q = adj[2] + q * nelements + evb;
-      s_t *const RSTR badj3_q = &badj3[q * VS];
+      s_t *const RSTR badj3_q = &badj3[q];
       const s_t *const RSTR adj3_q = adj[3] + q * nelements + evb;
-      s_t *const RSTR bdet0_q = &bdet0[q * VS];
+      s_t *const RSTR bdet0_q = &bdet0[q];
       const s_t *const RSTR det_q = det + q * nelements + evb;
       {
         badj0_q[0] = adj0_q[0];
@@ -360,26 +353,26 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_proteus_quad4_he
         bdet0_q[0] = det_q[0];
       }
     }
-    s_t bh_data[NDOFS][VS];
-    s_t bout_data[NDOFS][VS];
+    s_t bh_data[NDOFS];
+    s_t bout_data[NDOFS];
     const s_t *bh_streams[NDOFS];
     s_t *bout_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
-      bh_streams[stream] = bh_data[stream];
-      bout_streams[stream] = bout_data[stream];
+      bh_streams[stream] = &bh_data[stream];
+      bout_streams[stream] = &bout_data[stream];
     }
     for (int col = 0; col < NDOFS; ++col) {
       for (int stream = 0; stream < NDOFS; ++stream) {
         {
-          bh_data[stream][0] = stream == col ? s_t(1) : s_t(0);
-          bout_data[stream][0] = s_t(0);
+          bh_data[stream] = stream == col ? s_t(1) : s_t(0);
+          bout_data[stream] = s_t(0);
         }
       }
-      neohookean_ogden_d2_tensor_product_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bh_streams, bout_streams);
+      neohookean_ogden_d2_tensor_product_apply_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         {
-          matrix_stream[0] = bout_data[row][0];
+          matrix_stream[0] = bout_data[row];
         }
       }
     }
@@ -387,7 +380,7 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_proteus_quad4_he
   return SFEM_SUCCESS;
 }
 
-template <typename s_t, int VS>
+template <typename s_t>
 static __host__ __device__ __forceinline__ int neohookean_ogden_proteus_quad4_hessian_ecoords_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -402,46 +395,45 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_proteus_quad4_he
   static constexpr int NQ = 4;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
-  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+  for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) bu_streams[stream] = u_streams[stream] + evb;
-    s_t bcoordinate_data[NDOFS][VS];
+    s_t bcoordinate_data[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       {
-        bcoordinate_data[stream][0] = coords[stream][evb + 0];
+        bcoordinate_data[stream] = coords[stream][evb + 0];
       }
     }
-    s_t badj0[NQ * VS];
-    s_t badj1[NQ * VS];
-    s_t badj2[NQ * VS];
-    s_t badj3[NQ * VS];
-    s_t bdet0[NQ * VS];
-    s_t coordinate_grad_ref[ND * NQ * ND * VS];
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0);
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + NQ * ND * VS);
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t bdet0[NQ];
+    s_t coordinate_grad_ref[ND * NQ * ND];
+    tensor_gradient_contiguous_scalar<s_t, NQ, NS, 2>(sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0);
+    tensor_gradient_contiguous_scalar<s_t, NQ, NS, 2>(sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + NQ * ND);
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3};
-    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
-    s_t bh_data[NDOFS][VS];
-    s_t bout_data[NDOFS][VS];
+    geometry_jacobian_adjugate_and_determinant_scalar<s_t, ND, NQ>(coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
+    s_t bh_data[NDOFS];
+    s_t bout_data[NDOFS];
     const s_t *bh_streams[NDOFS];
     s_t *bout_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
-      bh_streams[stream] = bh_data[stream];
-      bout_streams[stream] = bout_data[stream];
+      bh_streams[stream] = &bh_data[stream];
+      bout_streams[stream] = &bout_data[stream];
     }
     for (int col = 0; col < NDOFS; ++col) {
       for (int stream = 0; stream < NDOFS; ++stream) {
         {
-          bh_data[stream][0] = stream == col ? s_t(1) : s_t(0);
-          bout_data[stream][0] = s_t(0);
+          bh_data[stream] = stream == col ? s_t(1) : s_t(0);
+          bout_data[stream] = s_t(0);
         }
       }
-      neohookean_ogden_d2_tensor_product_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bh_streams, bout_streams);
+      neohookean_ogden_d2_tensor_product_apply_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         {
-          matrix_stream[0] = bout_data[row][0];
+          matrix_stream[0] = bout_data[row];
         }
       }
     }
@@ -449,7 +441,7 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_proteus_quad4_he
   return SFEM_SUCCESS;
 }
 
-template <typename s_t, int VS>
+template <typename s_t>
 static __host__ __device__ __forceinline__ int neohookean_ogden_proteus_quad4_hessian_esoa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -464,46 +456,45 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_proteus_quad4_he
   static constexpr int NQ = 4;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
-  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+  for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) bu_streams[stream] = u_streams[stream] + evb;
-    s_t bcoordinate_data[NDOFS][VS];
+    s_t bcoordinate_data[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       {
-        bcoordinate_data[stream][0] = coords[stream][evb + 0];
+        bcoordinate_data[stream] = coords[stream][evb + 0];
       }
     }
-    s_t badj0[NQ * VS];
-    s_t badj1[NQ * VS];
-    s_t badj2[NQ * VS];
-    s_t badj3[NQ * VS];
-    s_t bdet0[NQ * VS];
-    s_t coordinate_grad_ref[ND * NQ * ND * VS];
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0);
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + NQ * ND * VS);
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t bdet0[NQ];
+    s_t coordinate_grad_ref[ND * NQ * ND];
+    tensor_gradient_contiguous_scalar<s_t, NQ, NS, 2>(sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0);
+    tensor_gradient_contiguous_scalar<s_t, NQ, NS, 2>(sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + NQ * ND);
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3};
-    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
-    s_t bh_data[NDOFS][VS];
-    s_t bout_data[NDOFS][VS];
+    geometry_jacobian_adjugate_and_determinant_scalar<s_t, ND, NQ>(coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
+    s_t bh_data[NDOFS];
+    s_t bout_data[NDOFS];
     const s_t *bh_streams[NDOFS];
     s_t *bout_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
-      bh_streams[stream] = bh_data[stream];
-      bout_streams[stream] = bout_data[stream];
+      bh_streams[stream] = &bh_data[stream];
+      bout_streams[stream] = &bout_data[stream];
     }
     for (int col = 0; col < NDOFS; ++col) {
       for (int stream = 0; stream < NDOFS; ++stream) {
         {
-          bh_data[stream][0] = stream == col ? s_t(1) : s_t(0);
-          bout_data[stream][0] = s_t(0);
+          bh_data[stream] = stream == col ? s_t(1) : s_t(0);
+          bout_data[stream] = s_t(0);
         }
       }
-      neohookean_ogden_d2_tensor_product_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bh_streams, bout_streams);
+      neohookean_ogden_d2_tensor_product_apply_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         {
-          matrix_stream[0] = bout_data[row][0];
+          matrix_stream[0] = bout_data[row];
         }
       }
     }

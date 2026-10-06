@@ -17,8 +17,6 @@ extern "C" int mooney_rivlin_kelvin_voigt_total_tri3_merit_patch_a_msoa(
     const uint8_t *const RSTR n2e_local,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
-    const void *const RSTR grad_ref[2],
-    const void *const RSTR q_weight,
     const real_t eta_b,
     const real_t eta_s,
     const real_t lmbda,
@@ -40,8 +38,6 @@ extern "C" int mooney_rivlin_kelvin_voigt_total_tet4_merit_patch_a_msoa(
     const uint8_t *const RSTR n2e_local,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
-    const void *const RSTR grad_ref[3],
-    const void *const RSTR q_weight,
     const real_t eta_b,
     const real_t eta_s,
     const real_t lmbda,
@@ -65,8 +61,6 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_total_merit_
         const uint8_t *const RSTR n2e_local,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
-        const void *const RSTR grad_ref[2],
-        const void *const RSTR q_weight,
         const real_t eta_b,
         const real_t eta_s,
         const real_t lmbda,
@@ -86,7 +80,7 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_total_merit_
           : real_type;
   switch (element_type) {
     case smesh::TRI3:
-      return mooney_rivlin_kelvin_voigt_total_tri3_merit_patch_a_msoa((int)resolved_real_type, n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, grad_ref, q_weight, eta_b, eta_s, lmbda, mu, u_dt_shift, nsteps, steps, x, h, p, accumulator, merit);
+      return mooney_rivlin_kelvin_voigt_total_tri3_merit_patch_a_msoa((int)resolved_real_type, n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, nsteps, steps, x, h, p, accumulator, merit);
     default:
       break;
   }
@@ -103,8 +97,6 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_total_merit_
         const uint8_t *const RSTR n2e_local,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
-        const void *const RSTR grad_ref[3],
-        const void *const RSTR q_weight,
         const real_t eta_b,
         const real_t eta_s,
         const real_t lmbda,
@@ -124,7 +116,7 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_total_merit_
           : real_type;
   switch (element_type) {
     case smesh::TET4:
-      return mooney_rivlin_kelvin_voigt_total_tet4_merit_patch_a_msoa((int)resolved_real_type, n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, grad_ref, q_weight, eta_b, eta_s, lmbda, mu, u_dt_shift, nsteps, steps, x, h, p, accumulator, merit);
+      return mooney_rivlin_kelvin_voigt_total_tet4_merit_patch_a_msoa((int)resolved_real_type, n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, nsteps, steps, x, h, p, accumulator, merit);
     default:
       break;
   }

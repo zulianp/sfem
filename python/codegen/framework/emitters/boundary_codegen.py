@@ -438,6 +438,16 @@ def _boundary_source(function, element_type, surface, components, parameters, co
         for i in range(components)
         if component_uses_coordinates[i] or component_uses_current[i]
     ]
+    # A constant integrand collapses: the same coefficients everywhere, one
+    # area however many points the rule carries, and every basis function
+    # integrating to the same number.  Anything else -- a traction that varies
+    # in space, a facet that is not flat -- keeps its loop.
+    uniform_integral = _uniform_shape_integral(data)
+    constant_integrand = bool(
+        not qp_coeff_lines
+        and _facet_measure_is_constant(data)
+        and uniform_integral is not None
+    )
     scatter_streams = ", ".join("out%d" % i for i in range(components))
     out_params = "\n".join(
         "    s_t *const RSTR out%d%s" % (i, "," if i + 1 < components else "")
@@ -465,38 +475,14 @@ namespace codegen {{
 template <typename s_t>
 struct {function}_reference_data {{
   static constexpr int NS = {n_shape};
-  static constexpr int NQ = {n_qp};
-
-  {table_accessor} const s_t *shape() {{
-    static const s_t data[{shape_count}] = {{
-{shape_values}
-    }};
-    return data;
-  }}
-
-  {table_accessor} const s_t *grad() {{
-    static const s_t data[{grad_count}] = {{
-{grad_values}
-    }};
-    return data;
-  }}
-
-  {table_accessor} const s_t *weight() {{
-    static const s_t data[{weight_count}] = {{
-{weight_values}
-    }};
-    return data;
-  }}
+{quadrature_members}{grad_member}
 }};
 
 template <typename s_t>
-{function_qualifier} s_t {function}_measure(
-    const int q,
+{function_qualifier} s_t {function}_measure({measure_point}
     const idx_t *const RSTR ev,
     const geom_t *const *const RSTR points) {{
-  const s_t *const grad = {function}_reference_data<s_t>::grad();
-  const int n_shape = {function}_reference_data<s_t>::NS;
-{measure_body}
+{measure_preamble}{measure_body}
 }}
 
 {function_qualifier} const int *{function}_side_nodes() {{
@@ -523,23 +509,11 @@ template <typename s_t>
     const idx_t *const RSTR ev,
     const geom_t *const *const RSTR points{current_decls}{param_decls},
     s_t element_vector[{components}][{n_shape}]) {{
-  const s_t *const shape = {function}_reference_data<s_t>::shape();
-  const s_t *const weight = {function}_reference_data<s_t>::weight();
-  const int n_shape = {function}_reference_data<s_t>::NS;
-  const int n_qp = {function}_reference_data<s_t>::NQ;
+{reference_aliases}  const int n_shape = {function}_reference_data<s_t>::NS;
 
 {coeff_lines}
 
-  for (int q = 0; q < n_qp; ++q) {{
-    const s_t dS = {function}_measure<s_t>(q, ev, points);
-    const s_t qw = weight[q] * dS;
-{qp_coeff_lines}
-{vectorize_pragma}
-    for (int i = 0; i < n_shape; ++i) {{
-      const s_t test = shape[q * n_shape + i] * qw;
-{accum_lines}
-    }}
-  }}
+{integration_body}
 }}
 
 template <typename s_t>
@@ -695,7 +669,15 @@ extern "C" int {public_sideset_function_float}(
         shape_values=_cpp_array_values(data["shape"]),
         grad_values=_cpp_array_values(data["grad"]),
         weight_values=_cpp_array_values(data["weight"]),
-        measure_body=_measure_body(ref_dim, physical_dim),
+        measure_body=_MEASURE_BODY[_facet_measure_is_constant(data)](
+            data, ref_dim, physical_dim
+        ),
+        measure_point=_MEASURE_POINT[_facet_measure_is_constant(data)],
+        measure_preamble=_MEASURE_PREAMBLE[_facet_measure_is_constant(data)](function),
+        grad_member=_GRAD_MEMBER[_facet_measure_is_constant(data)](
+            _table_accessor_qualifier(), len(data["grad"]),
+            _cpp_array_values(data["grad"]),
+        ),
         current_decls=current_decls,
         extern_current_decls=extern_current_decls,
         extern_float_current_decls=extern_float_current_decls,
@@ -708,11 +690,34 @@ extern "C" int {public_sideset_function_float}(
         extern_out_params=extern_out_params,
         extern_float_out_params=extern_float_out_params,
         coeff_lines="\n".join(coeff_lines),
-        qp_coeff_lines="\n".join(qp_coeff_lines),
         components=components,
-        accum_lines="\n".join(
-            "        element_vector[{c}][i] += coeff{c} * test;".format(c=c)
-            for c in range(components)
+        quadrature_members=(
+            ""
+            if constant_integrand
+            else _QUADRATURE_MEMBERS.format(
+                n_qp=n_qp,
+                table_accessor=_table_accessor_qualifier(),
+                shape_count=len(data["shape"]),
+                shape_values=_cpp_array_values(data["shape"]),
+                weight_count=len(data["weight"]),
+                weight_values=_cpp_array_values(data["weight"]),
+            )
+        ),
+        reference_aliases="".join(
+            "  %s\n" % alias
+            for alias in _REFERENCE_ALIASES[constant_integrand](function)
+        ),
+        integration_body="\n".join(
+            _INTEGRATION_BODY[constant_integrand](function, data, uniform_integral, "  ")
+            + list(qp_coeff_lines)
+            + [_vectorize_pragma() or ""]
+            + ["    for (int i = 0; i < n_shape; ++i) {"]
+            + _TEST_VALUE_LINES[constant_integrand]
+            + [
+                "        element_vector[{c}][i] += coeff{c} * test;".format(c=c)
+                for c in range(components)
+            ]
+            + ["    }", "  }"]
         ),
         scatter_lines="\n".join(
             line
@@ -726,6 +731,116 @@ extern "C" int {public_sideset_function_float}(
         ),
         scatter_streams=scatter_streams,
     )
+
+
+def _facet_measure_is_constant(data):
+    """Whether this facet's measure is the same at every quadrature point.
+
+    The measure is built from the facet's reference gradients, so it varies
+    over the points exactly when they do.  A flat facet -- a straight edge, a
+    triangle -- has constant ones and therefore one area, however many points
+    its rule carries.
+    """
+    per_point = data["n_shape"] * data["ref_dim"]
+    first = tuple(data["grad"][:per_point])
+    return all(
+        tuple(data["grad"][q * per_point:(q + 1) * per_point]) == first
+        for q in range(data["n_qp"])
+    )
+
+
+#: The point a measure call passes, which is the same answer that shaped the
+#: signature.  A varying integrand on a flat facet is a real combination --
+#: `neumann_general` with a coordinate-dependent traction on a triangle -- so the
+#: quadrature body has to ask this too rather than assume it has a `q` to give.
+_MEASURE_ARGUMENT = {True: "", False: "q, "}
+
+
+def _measure_argument(data):
+    return _MEASURE_ARGUMENT[_facet_measure_is_constant(data)]
+
+
+def _uniform_shape_integral(data):
+    """`integral phi_i` over the reference facet, when every `i` gives the same.
+
+    Returns the common value, or `None` where the shape functions do not share
+    one.  They do on a lowest-order simplex -- each vertex function integrates
+    to the facet's reference area divided by the number of vertices -- which is
+    what makes the whole quadrature sum collapse to a single constant.
+    """
+    n_shape, n_qp = data["n_shape"], data["n_qp"]
+    integrals = [
+        sum(
+            (
+                sp.nsimplify(data["weight"][q]) * sp.nsimplify(data["shape"][q * n_shape + i])
+                for q in range(n_qp)
+            ),
+            sp.S.Zero,
+        )
+        for i in range(n_shape)
+    ]
+    return integrals[0] if len(set(integrals)) == 1 else None
+
+
+#: How the facet integral is written, keyed on whether its integrand is
+#: constant over the facet.  A table because the answer is read off the facet
+#: and the coefficients rather than decided at the call site.
+_INTEGRATION_BODY = {
+    True: lambda function, data, integral, indent: [
+        "  {",
+        "    const s_t test = %s * %s_measure<s_t>(%sev, points);"
+        % (_sfem_ccode(integral), function, _measure_argument(data)),
+    ],
+    False: lambda function, data, integral, indent: [
+        "  for (int q = 0; q < n_qp; ++q) {",
+        "    const s_t dS = %s_measure<s_t>(%sev, points);"
+        % (function, _measure_argument(data)),
+        "    const s_t qw = weight[q] * dS;",
+    ],
+}
+
+
+#: The reference tables the body above reads.  The constant integrand reads
+#: none: its weights and shape values are folded into one number.
+#: What the reference-data struct carries beyond the shape count.  A kernel
+#: that folded its quadrature into one constant reads none of it: no point
+#: count, no shape values, no weights.  Only `grad`, which the measure needs
+#: whatever the integrand looks like, stays outside this.
+_QUADRATURE_MEMBERS = """  static constexpr int NQ = {n_qp};
+
+  {table_accessor} const s_t *shape() {{
+    static const s_t data[{shape_count}] = {{
+{shape_values}
+    }};
+    return data;
+  }}
+
+  {table_accessor} const s_t *weight() {{
+    static const s_t data[{weight_count}] = {{
+{weight_values}
+    }};
+    return data;
+  }}
+"""
+
+
+#: The per-shape test value, where it still has to be looked up.  The constant
+#: integrand already named `test` above the loop, because it is the same for
+#: every shape function.
+_TEST_VALUE_LINES = {
+    True: [],
+    False: ["      const s_t test = shape[q * n_shape + i] * qw;"],
+}
+
+
+_REFERENCE_ALIASES = {
+    True: lambda function: (),
+    False: lambda function: (
+        "const s_t *const shape = %s_reference_data<s_t>::shape();" % function,
+        "const s_t *const weight = %s_reference_data<s_t>::weight();" % function,
+        "const int n_qp = %s_reference_data<s_t>::NQ;" % function,
+    ),
+}
 
 
 def _coordinate_symbol_tuple(physical_dim):
@@ -1312,7 +1427,119 @@ def _quad_shape_index(n, sx, sy, proteus):
     return sx + n * sy
 
 
-def _measure_body(ref_dim, physical_dim):
+#: The axis each reference direction contributes to, and how the measure closes.
+#: A straight edge's tangent is the vector between its ends; a flat triangle's
+#: normal is the cross product of its two edge vectors, and the facet area is
+#: its length.
+_MEASURE_CLOSE = {
+    1: lambda: "  return sqrt(%s);" % " + ".join(
+        "dx%d * dx%d" % (axis, axis) for axis in range(2)
+    ),
+    2: lambda: "\n".join(
+        [
+            "  const s_t c0 = dxdr1 * dxds2 - dxdr2 * dxds1;",
+            "  const s_t c1 = dxdr2 * dxds0 - dxdr0 * dxds2;",
+            "  const s_t c2 = dxdr0 * dxds1 - dxdr1 * dxds0;",
+            "  return sqrt(c0 * c0 + c1 * c1 + c2 * c2);",
+        ]
+    ),
+}
+
+#: What each reference direction's accumulator is called, per reference dimension.
+_MEASURE_ACCUMULATORS = {1: ("dx",), 2: ("dxdr", "dxds")}
+
+
+def _constant_measure_terms(data, direction, axis):
+    """`points[axis][ev[i]] * g` summed over the nodes, with the constants folded.
+
+    The gradients are the same at every point, so the first point's are the
+    facet's, and a gradient of zero contributes nothing to write down.
+    """
+    weighted = []
+    for node in range(data["n_shape"]):
+        gradient = sp.nsimplify(
+            data["grad"][node * data["ref_dim"] + direction]
+            if data["ref_dim"] > 1
+            else data["grad"][node]
+        )
+        sign = float(gradient)
+        if sign == 0.0:
+            continue
+        coordinate = "s_t(points[%d][ev[%d]])" % (axis, node)
+        weighted.append((
+            sign,
+            coordinate if abs(sign) == 1.0
+            else "%s * %s" % (_sfem_ccode(abs(gradient)), coordinate),
+        ))
+    # Positive contributions first, so the expression reads `x1 - x0` rather than
+    # opening with a negation.  The value is the same either way: this sum has
+    # one positive and one negative term on every flat facet, and `a - b` is the
+    # same operation as `-b + a`.
+    weighted.sort(key=lambda item: item[0] < 0.0)
+    if not weighted:
+        return "s_t(0)"
+    head = weighted[0]
+    text = ("-%s" if head[0] < 0.0 else "%s") % head[1]
+    for sign, term in weighted[1:]:
+        text += " %s %s" % ("-" if sign < 0.0 else "+", term)
+    return text
+
+
+def _constant_measure_body(data, physical_dim):
+    """The facet's measure, with its constant reference gradients expanded.
+
+    A flat facet's gradients are the same at every quadrature point, so the loop
+    that accumulated them was a loop over constants and the table it read held
+    `n_qp` identical copies of one row -- 18 numbers for the 6 a triangle has.
+    Expanding it is ISSUES.md item 11: on a device the table was a function-local
+    `static const s_t data[18]`, which is a per-thread array where the expansion
+    has immediate operands, and the parameter `q` selected between rows that were
+    all the same.
+    """
+    lines = []
+    for direction, accumulator in enumerate(_MEASURE_ACCUMULATORS[data["ref_dim"]]):
+        for axis in range(physical_dim):
+            lines.append(
+                "  const s_t %s%d = %s;"
+                % (accumulator, axis, _constant_measure_terms(data, direction, axis))
+            )
+    lines.append(_MEASURE_CLOSE[data["ref_dim"]]())
+    return "\n".join(lines)
+
+
+#: The three things a constant measure does not need: the point it selects
+#: between identical rows, the table those rows live in, and the two aliases
+#: that read it.  Keyed on the one plan answer, `_facet_measure_is_constant`.
+_MEASURE_POINT = {True: "", False: "\n    const int q,"}
+
+_MEASURE_PREAMBLE = {
+    True: lambda function: "",
+    False: lambda function: (
+        "  const s_t *const grad = %s_reference_data<s_t>::grad();\n"
+        "  const int n_shape = %s_reference_data<s_t>::NS;\n" % (function, function)
+    ),
+}
+
+_GRAD_MEMBER = {
+    True: lambda accessor, count, values: "",
+    False: lambda accessor, count, values: (
+        "\n  %s const s_t *grad() {\n"
+        "    static const s_t data[%d] = {\n%s\n    };\n"
+        "    return data;\n  }\n" % (accessor, count, values)
+    ),
+}
+
+_MEASURE_BODY = {
+    True: lambda data, ref_dim, physical_dim: _constant_measure_body(
+        data, physical_dim
+    ),
+    False: lambda data, ref_dim, physical_dim: _quadrature_measure_body(
+        ref_dim, physical_dim
+    ),
+}
+
+
+def _quadrature_measure_body(ref_dim, physical_dim):
     if ref_dim == 1:
         return """    s_t dx0 = s_t(0);
   s_t dx1 = s_t(0);

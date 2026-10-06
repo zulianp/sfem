@@ -30,9 +30,8 @@ typedef double geom_t;
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, int NQ, int CELL_NS, int VS>
+template <typename s_t, int NQ, int CELL_NS>
 __host__ __device__ __forceinline__ void navier_stokes_form_1_p_d3_simplex_mixed_residual_block(
-    const int ne,
     const ptrdiff_t geometry_stride,
     const s_t *const RSTR determinant,
     const s_t *const RSTR adjugate[9],
@@ -202,17 +201,16 @@ __host__ __device__ __forceinline__ void navier_stokes_form_1_p_d3_simplex_mixed
   }
 }
 
-template <typename s_t, int NQ, int CELL_NS, int VS>
+template <typename s_t, int NQ, int CELL_NS>
 __host__ __device__ __forceinline__ void navier_stokes_form_1_p_d3_simplex_mixed_residual_block_contiguous(
-    const int ne,
     const ptrdiff_t geometry_stride,
     const s_t *const RSTR determinant,
     const s_t *const RSTR adjugate[9],
     const s_t *const RSTR field_shape[2],
     const s_t *const RSTR fgref[6],
     const s_t *const RSTR q_weight,
-    const s_t current[34][VS],
-    s_t output[34][VS]
+    const s_t current[34],
+    s_t output[34]
 ) {
   static constexpr int U_NS = 10;
   static constexpr int P_NS = 4;
@@ -232,43 +230,43 @@ __host__ __device__ __forceinline__ void navier_stokes_form_1_p_d3_simplex_mixed
       s_t u0_grad_0_ref = s_t(0);
       s_t u0_grad_1_ref = s_t(0);
       s_t u0_grad_2_ref = s_t(0);
-      const s_t coeff_current_u0_0 = current[0][0];
+      const s_t coeff_current_u0_0 = current[0];
       u0_grad_0_ref += coeff_current_u0_0 * fgref[0][q * U_NS];
       u0_grad_1_ref += coeff_current_u0_0 * fgref[1][q * U_NS];
       u0_grad_2_ref += coeff_current_u0_0 * fgref[2][q * U_NS];
-      const s_t coeff_current_u0_1 = current[1][0];
+      const s_t coeff_current_u0_1 = current[1];
       u0_grad_0_ref += coeff_current_u0_1 * fgref[0][q * U_NS + 1];
       u0_grad_1_ref += coeff_current_u0_1 * fgref[1][q * U_NS + 1];
       u0_grad_2_ref += coeff_current_u0_1 * fgref[2][q * U_NS + 1];
-      const s_t coeff_current_u0_2 = current[2][0];
+      const s_t coeff_current_u0_2 = current[2];
       u0_grad_0_ref += coeff_current_u0_2 * fgref[0][q * U_NS + 2];
       u0_grad_1_ref += coeff_current_u0_2 * fgref[1][q * U_NS + 2];
       u0_grad_2_ref += coeff_current_u0_2 * fgref[2][q * U_NS + 2];
-      const s_t coeff_current_u0_3 = current[3][0];
+      const s_t coeff_current_u0_3 = current[3];
       u0_grad_0_ref += coeff_current_u0_3 * fgref[0][q * U_NS + 3];
       u0_grad_1_ref += coeff_current_u0_3 * fgref[1][q * U_NS + 3];
       u0_grad_2_ref += coeff_current_u0_3 * fgref[2][q * U_NS + 3];
-      const s_t coeff_current_u0_4 = current[4][0];
+      const s_t coeff_current_u0_4 = current[4];
       u0_grad_0_ref += coeff_current_u0_4 * fgref[0][q * U_NS + 4];
       u0_grad_1_ref += coeff_current_u0_4 * fgref[1][q * U_NS + 4];
       u0_grad_2_ref += coeff_current_u0_4 * fgref[2][q * U_NS + 4];
-      const s_t coeff_current_u0_5 = current[5][0];
+      const s_t coeff_current_u0_5 = current[5];
       u0_grad_0_ref += coeff_current_u0_5 * fgref[0][q * U_NS + 5];
       u0_grad_1_ref += coeff_current_u0_5 * fgref[1][q * U_NS + 5];
       u0_grad_2_ref += coeff_current_u0_5 * fgref[2][q * U_NS + 5];
-      const s_t coeff_current_u0_6 = current[6][0];
+      const s_t coeff_current_u0_6 = current[6];
       u0_grad_0_ref += coeff_current_u0_6 * fgref[0][q * U_NS + 6];
       u0_grad_1_ref += coeff_current_u0_6 * fgref[1][q * U_NS + 6];
       u0_grad_2_ref += coeff_current_u0_6 * fgref[2][q * U_NS + 6];
-      const s_t coeff_current_u0_7 = current[7][0];
+      const s_t coeff_current_u0_7 = current[7];
       u0_grad_0_ref += coeff_current_u0_7 * fgref[0][q * U_NS + 7];
       u0_grad_1_ref += coeff_current_u0_7 * fgref[1][q * U_NS + 7];
       u0_grad_2_ref += coeff_current_u0_7 * fgref[2][q * U_NS + 7];
-      const s_t coeff_current_u0_8 = current[8][0];
+      const s_t coeff_current_u0_8 = current[8];
       u0_grad_0_ref += coeff_current_u0_8 * fgref[0][q * U_NS + 8];
       u0_grad_1_ref += coeff_current_u0_8 * fgref[1][q * U_NS + 8];
       u0_grad_2_ref += coeff_current_u0_8 * fgref[2][q * U_NS + 8];
-      const s_t coeff_current_u0_9 = current[9][0];
+      const s_t coeff_current_u0_9 = current[9];
       u0_grad_0_ref += coeff_current_u0_9 * fgref[0][q * U_NS + 9];
       u0_grad_1_ref += coeff_current_u0_9 * fgref[1][q * U_NS + 9];
       u0_grad_2_ref += coeff_current_u0_9 * fgref[2][q * U_NS + 9];
@@ -276,43 +274,43 @@ __host__ __device__ __forceinline__ void navier_stokes_form_1_p_d3_simplex_mixed
       s_t u1_grad_0_ref = s_t(0);
       s_t u1_grad_1_ref = s_t(0);
       s_t u1_grad_2_ref = s_t(0);
-      const s_t coeff_current_u1_0 = current[10][0];
+      const s_t coeff_current_u1_0 = current[10];
       u1_grad_0_ref += coeff_current_u1_0 * fgref[0][q * U_NS];
       u1_grad_1_ref += coeff_current_u1_0 * fgref[1][q * U_NS];
       u1_grad_2_ref += coeff_current_u1_0 * fgref[2][q * U_NS];
-      const s_t coeff_current_u1_1 = current[11][0];
+      const s_t coeff_current_u1_1 = current[11];
       u1_grad_0_ref += coeff_current_u1_1 * fgref[0][q * U_NS + 1];
       u1_grad_1_ref += coeff_current_u1_1 * fgref[1][q * U_NS + 1];
       u1_grad_2_ref += coeff_current_u1_1 * fgref[2][q * U_NS + 1];
-      const s_t coeff_current_u1_2 = current[12][0];
+      const s_t coeff_current_u1_2 = current[12];
       u1_grad_0_ref += coeff_current_u1_2 * fgref[0][q * U_NS + 2];
       u1_grad_1_ref += coeff_current_u1_2 * fgref[1][q * U_NS + 2];
       u1_grad_2_ref += coeff_current_u1_2 * fgref[2][q * U_NS + 2];
-      const s_t coeff_current_u1_3 = current[13][0];
+      const s_t coeff_current_u1_3 = current[13];
       u1_grad_0_ref += coeff_current_u1_3 * fgref[0][q * U_NS + 3];
       u1_grad_1_ref += coeff_current_u1_3 * fgref[1][q * U_NS + 3];
       u1_grad_2_ref += coeff_current_u1_3 * fgref[2][q * U_NS + 3];
-      const s_t coeff_current_u1_4 = current[14][0];
+      const s_t coeff_current_u1_4 = current[14];
       u1_grad_0_ref += coeff_current_u1_4 * fgref[0][q * U_NS + 4];
       u1_grad_1_ref += coeff_current_u1_4 * fgref[1][q * U_NS + 4];
       u1_grad_2_ref += coeff_current_u1_4 * fgref[2][q * U_NS + 4];
-      const s_t coeff_current_u1_5 = current[15][0];
+      const s_t coeff_current_u1_5 = current[15];
       u1_grad_0_ref += coeff_current_u1_5 * fgref[0][q * U_NS + 5];
       u1_grad_1_ref += coeff_current_u1_5 * fgref[1][q * U_NS + 5];
       u1_grad_2_ref += coeff_current_u1_5 * fgref[2][q * U_NS + 5];
-      const s_t coeff_current_u1_6 = current[16][0];
+      const s_t coeff_current_u1_6 = current[16];
       u1_grad_0_ref += coeff_current_u1_6 * fgref[0][q * U_NS + 6];
       u1_grad_1_ref += coeff_current_u1_6 * fgref[1][q * U_NS + 6];
       u1_grad_2_ref += coeff_current_u1_6 * fgref[2][q * U_NS + 6];
-      const s_t coeff_current_u1_7 = current[17][0];
+      const s_t coeff_current_u1_7 = current[17];
       u1_grad_0_ref += coeff_current_u1_7 * fgref[0][q * U_NS + 7];
       u1_grad_1_ref += coeff_current_u1_7 * fgref[1][q * U_NS + 7];
       u1_grad_2_ref += coeff_current_u1_7 * fgref[2][q * U_NS + 7];
-      const s_t coeff_current_u1_8 = current[18][0];
+      const s_t coeff_current_u1_8 = current[18];
       u1_grad_0_ref += coeff_current_u1_8 * fgref[0][q * U_NS + 8];
       u1_grad_1_ref += coeff_current_u1_8 * fgref[1][q * U_NS + 8];
       u1_grad_2_ref += coeff_current_u1_8 * fgref[2][q * U_NS + 8];
-      const s_t coeff_current_u1_9 = current[19][0];
+      const s_t coeff_current_u1_9 = current[19];
       u1_grad_0_ref += coeff_current_u1_9 * fgref[0][q * U_NS + 9];
       u1_grad_1_ref += coeff_current_u1_9 * fgref[1][q * U_NS + 9];
       u1_grad_2_ref += coeff_current_u1_9 * fgref[2][q * U_NS + 9];
@@ -320,56 +318,56 @@ __host__ __device__ __forceinline__ void navier_stokes_form_1_p_d3_simplex_mixed
       s_t u2_grad_0_ref = s_t(0);
       s_t u2_grad_1_ref = s_t(0);
       s_t u2_grad_2_ref = s_t(0);
-      const s_t coeff_current_u2_0 = current[20][0];
+      const s_t coeff_current_u2_0 = current[20];
       u2_grad_0_ref += coeff_current_u2_0 * fgref[0][q * U_NS];
       u2_grad_1_ref += coeff_current_u2_0 * fgref[1][q * U_NS];
       u2_grad_2_ref += coeff_current_u2_0 * fgref[2][q * U_NS];
-      const s_t coeff_current_u2_1 = current[21][0];
+      const s_t coeff_current_u2_1 = current[21];
       u2_grad_0_ref += coeff_current_u2_1 * fgref[0][q * U_NS + 1];
       u2_grad_1_ref += coeff_current_u2_1 * fgref[1][q * U_NS + 1];
       u2_grad_2_ref += coeff_current_u2_1 * fgref[2][q * U_NS + 1];
-      const s_t coeff_current_u2_2 = current[22][0];
+      const s_t coeff_current_u2_2 = current[22];
       u2_grad_0_ref += coeff_current_u2_2 * fgref[0][q * U_NS + 2];
       u2_grad_1_ref += coeff_current_u2_2 * fgref[1][q * U_NS + 2];
       u2_grad_2_ref += coeff_current_u2_2 * fgref[2][q * U_NS + 2];
-      const s_t coeff_current_u2_3 = current[23][0];
+      const s_t coeff_current_u2_3 = current[23];
       u2_grad_0_ref += coeff_current_u2_3 * fgref[0][q * U_NS + 3];
       u2_grad_1_ref += coeff_current_u2_3 * fgref[1][q * U_NS + 3];
       u2_grad_2_ref += coeff_current_u2_3 * fgref[2][q * U_NS + 3];
-      const s_t coeff_current_u2_4 = current[24][0];
+      const s_t coeff_current_u2_4 = current[24];
       u2_grad_0_ref += coeff_current_u2_4 * fgref[0][q * U_NS + 4];
       u2_grad_1_ref += coeff_current_u2_4 * fgref[1][q * U_NS + 4];
       u2_grad_2_ref += coeff_current_u2_4 * fgref[2][q * U_NS + 4];
-      const s_t coeff_current_u2_5 = current[25][0];
+      const s_t coeff_current_u2_5 = current[25];
       u2_grad_0_ref += coeff_current_u2_5 * fgref[0][q * U_NS + 5];
       u2_grad_1_ref += coeff_current_u2_5 * fgref[1][q * U_NS + 5];
       u2_grad_2_ref += coeff_current_u2_5 * fgref[2][q * U_NS + 5];
-      const s_t coeff_current_u2_6 = current[26][0];
+      const s_t coeff_current_u2_6 = current[26];
       u2_grad_0_ref += coeff_current_u2_6 * fgref[0][q * U_NS + 6];
       u2_grad_1_ref += coeff_current_u2_6 * fgref[1][q * U_NS + 6];
       u2_grad_2_ref += coeff_current_u2_6 * fgref[2][q * U_NS + 6];
-      const s_t coeff_current_u2_7 = current[27][0];
+      const s_t coeff_current_u2_7 = current[27];
       u2_grad_0_ref += coeff_current_u2_7 * fgref[0][q * U_NS + 7];
       u2_grad_1_ref += coeff_current_u2_7 * fgref[1][q * U_NS + 7];
       u2_grad_2_ref += coeff_current_u2_7 * fgref[2][q * U_NS + 7];
-      const s_t coeff_current_u2_8 = current[28][0];
+      const s_t coeff_current_u2_8 = current[28];
       u2_grad_0_ref += coeff_current_u2_8 * fgref[0][q * U_NS + 8];
       u2_grad_1_ref += coeff_current_u2_8 * fgref[1][q * U_NS + 8];
       u2_grad_2_ref += coeff_current_u2_8 * fgref[2][q * U_NS + 8];
-      const s_t coeff_current_u2_9 = current[29][0];
+      const s_t coeff_current_u2_9 = current[29];
       u2_grad_0_ref += coeff_current_u2_9 * fgref[0][q * U_NS + 9];
       u2_grad_1_ref += coeff_current_u2_9 * fgref[1][q * U_NS + 9];
       u2_grad_2_ref += coeff_current_u2_9 * fgref[2][q * U_NS + 9];
       const s_t u2_grad_2 = (u2_grad_0_ref * adj2 + u2_grad_1_ref * adj5 + u2_grad_2_ref * adj8) / det;
       const s_t value_coeff3 = u0_grad_0 + u1_grad_1 + u2_grad_2;
       const s_t test_value_p_0 = field_shape[1][q * P_NS];
-      output[30][0] += q_weight[q] * det * (value_coeff3 * test_value_p_0);
+      output[30] += q_weight[q] * det * (value_coeff3 * test_value_p_0);
       const s_t test_value_p_1 = field_shape[1][q * P_NS + 1];
-      output[31][0] += q_weight[q] * det * (value_coeff3 * test_value_p_1);
+      output[31] += q_weight[q] * det * (value_coeff3 * test_value_p_1);
       const s_t test_value_p_2 = field_shape[1][q * P_NS + 2];
-      output[32][0] += q_weight[q] * det * (value_coeff3 * test_value_p_2);
+      output[32] += q_weight[q] * det * (value_coeff3 * test_value_p_2);
       const s_t test_value_p_3 = field_shape[1][q * P_NS + 3];
-      output[33][0] += q_weight[q] * det * (value_coeff3 * test_value_p_3);
+      output[33] += q_weight[q] * det * (value_coeff3 * test_value_p_3);
     }
   }
 }

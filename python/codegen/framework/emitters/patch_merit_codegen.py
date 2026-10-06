@@ -43,6 +43,13 @@ from codegen.framework.plans.residual_structure import (
     patch_merit_staged_quantities,
     patch_merit_staged_roles,
 )
+import sympy as sp
+
+from codegen.framework.emitters.cprinter import _sfem_ccode
+from codegen.framework.fem.reference import (
+    sfem_element_quadrature_rule,
+    sfem_shape_data_for_element_at_cell_rule,
+)
 from codegen.framework.fem.patch_orientation import (
     patch_orientation_permutations,
     supports_patch_orientation,
@@ -101,10 +108,41 @@ _QUANTITY_BUFFER_SUFFIX = {"value": "_value", "gradient": "_grad"}
 #: quantities, and how wide it is.  One slot for the value, one per direction
 #: for the gradient: the node's own basis function, and only that one, because
 #: the orientation permutation put it at local slot 0.
+#: The value entry is absent: the fixed basis function's *value* at the one
+#: quadrature point is a constant of the element, so it is folded into the
+#: contraction rather than interpolated into a buffer and read back.  Only the
+#: gradient varies, because it is mapped through the element's own adjugate.
 _TEST_QUANTITY_BUFFER = {
-    "value": ("pm_test", lambda dim: 1),
     "gradient": ("pm_test_grad", lambda dim: dim),
 }
+
+
+def _reference_constants(rule):
+    """This element's reference basis at its one quadrature point.
+
+    A lowest-order simplex has a single point and constant basis gradients, so
+    the shape values, the gradients and the weight are three tuples of exact
+    rationals rather than three tables the caller has to supply.  The patch
+    kernel exists only for TET4 and TRI3, so there is no other case to carry.
+    """
+    shape, gradients = sfem_shape_data_for_element_at_cell_rule(
+        rule.element_type, rule
+    )
+    return (
+        tuple(sp.nsimplify(value) for value in shape),
+        tuple(sp.nsimplify(value) for value in gradients),
+        sp.nsimplify(rule.weights[0]),
+    )
+
+
+def _reference_gradient(gradients, dim, shape_index, direction):
+    """`grad_ref[direction][shape_index]`, as the constant it is."""
+    return gradients[shape_index * dim + direction]
+
+
+def _folded(expression):
+    """The C spelling of an expression whose coefficients are exact."""
+    return _sfem_ccode(sp.sympify(expression))
 
 
 #: How loop 1 fills each of them.  Both are the same function in every lane and
@@ -116,19 +154,34 @@ _TEST_QUANTITY_BUFFER = {
 #: gradients and fills no value buffer; a body force is the opposite, and its
 #: whole residual is the value term.
 _TEST_QUANTITY_FILL = {
-    "value": lambda indent, dim: [
-        "%s    pm_test[q * VS + %s] = shape[q * NS + 0];" % (indent, _lane()),
-    ],
-    "gradient": lambda indent, dim: [
-        "%s    for (int d = 0; d < ND; ++d) {" % indent,
-        "%s      s_t mapped = s_t(0);" % indent,
-        "%s      for (int k = 0; k < ND; ++k) {" % indent,
-        "%s        mapped += grad_ref[k][q * NS + 0] * adj[k * ND + d];" % indent,
-        "%s      }" % indent,
-        "%s      pm_test_grad[%s] = mapped / det;" % (indent, _buffer_index("d", dim)),
-        "%s    }" % indent,
-    ],
+    "gradient": lambda indent, dim, rule: _test_gradient_fill_lines(
+        indent, dim, rule
+    ),
 }
+
+
+def _test_gradient_fill_lines(indent, dim, rule):
+    """The fixed basis function's physical gradient, with the reference
+    gradient folded in.
+
+    `phi_0`'s reference gradient is a constant row, so the sum over reference
+    directions is a fixed combination of the element's adjugate and the loop
+    over `k` collapses into it.
+    """
+    _, gradients, _ = _reference_constants(rule)
+    lines = ["%s    for (int d = 0; d < ND; ++d) {" % indent]
+    terms = [
+        "%s * adj[%d * ND + d]"
+        % (_folded(_reference_gradient(gradients, dim, 0, k)), k)
+        for k in range(dim)
+        if _reference_gradient(gradients, dim, 0, k) != 0
+    ]
+    lines.append("%s      const s_t mapped = %s;" % (indent, " + ".join(terms)))
+    lines.append(
+        "%s      pm_test_grad[%s] = mapped / det;" % (indent, _buffer_index("d", dim))
+    )
+    lines.append("%s    }" % indent)
+    return lines
 
 
 #: The reference table each contracted test quantity is read from.  Named in
@@ -136,18 +189,17 @@ _TEST_QUANTITY_FILL = {
 #: touches makes its caller produce data for a computation that does not
 #: happen, and every hyperelastic material in the tree was asking for `shape`
 #: to contract nothing against it.
-_TEST_QUANTITY_PARAMETER = {
-    "value": lambda dim: "const s_t *const RSTR shape",
-    "gradient": lambda dim: "const s_t *const RSTR grad_ref[%d]" % dim,
-}
+#: No entry for either: an expanded element's reference basis is folded into
+#: the body, so the kernel names no table and its caller produces none.
+_TEST_QUANTITY_PARAMETER = {}
 
 
 #: The factor loop 2 multiplies a coefficient by, per kind.
 #: `live_test_coefficients` names the coefficient and says which kind it is;
 #: this is the other half of the product.
 _TEST_FACTOR = {
-    "value": lambda dim, axis: "pm_test[q * VS + lane_e]",
-    "gradient": lambda dim, axis: "pm_test_grad[%s]"
+    "value": lambda dim, axis, rule: _folded(_reference_constants(rule)[0][0]),
+    "gradient": lambda dim, axis, rule: "pm_test_grad[%s]"
     % _buffer_index("%d" % axis, dim, lane="lane_e"),
 }
 
@@ -158,6 +210,7 @@ def patch_loop_one_buffers(dim, n_field_components, dependencies):
         for name, width in (
             _TEST_QUANTITY_BUFFER[quantity]
             for quantity in contracted_test_quantities(dependencies)
+            if quantity in _TEST_QUANTITY_BUFFER
         )
     ]
     buffers.append(("pm_weight", 1))
@@ -283,7 +336,7 @@ def _lane():
 
 
 def _buffer_index(offset, count, lane=None):
-    """`(q * count + offset) * VS + <element lane>`.
+    """`offset * VS + <element lane>`.
 
     The lane axis of every loop-1 buffer is the *element*, in both loops.  That
     is worth being explicit about, because loop 2's own lane variable is the
@@ -291,24 +344,63 @@ def _buffer_index(offset, count, lane=None):
     element's value for another's, which is why the lane is a parameter here
     rather than the word `lane` written into the format string.
     """
-    return "(q * %d + %s) * VS + %s" % (count, offset, lane or _lane())
+    # Parenthesised, because the offset is not always an atom: the staged
+    # gradient passes `c * ND + d`, and `c * ND + d * VS + lane` binds the
+    # stride to the wrong term.  The quadrature index that used to supply these
+    # parentheses is gone, so they are written here.
+    return "(%s) * VS + %s" % (offset, lane or _lane())
 
 
-def _stage_value_lines(indent, name, dim, n_fields):
+def _stage_value_lines(indent, name, dim, n_fields, rule):
+    """The interpolated value, with the shape values folded in.
+
+    They are constants of the element, so the sum over shape functions is a
+    fixed combination and the loop over `j` collapses into it.
+    """
+    shape, _, _ = _reference_constants(rule)
     target = "pm_%s_value" % name
+    terms = [
+        "%s * %s[%d * NC + c]" % (_folded(shape[j]), name, j)
+        for j in range(len(shape))
+        if shape[j] != 0
+    ]
     return [
         "%s    // interpolated %s value" % (indent, name),
         "%s    for (int c = 0; c < NC; ++c) {" % indent,
-        "%s      s_t acc = s_t(0);" % indent,
-        "%s      for (int j = 0; j < NS; ++j) {" % indent,
-        "%s        acc += %s[j * NC + c] * shape[q * NS + j];" % (indent, name),
-        "%s      }" % indent,
-        "%s      %s[%s] = acc;" % (indent, target, _buffer_index("c", n_fields)),
+        "%s      %s[%s] = %s;"
+        % (indent, target, _buffer_index("c", n_fields), " + ".join(terms)),
         "%s    }" % indent,
     ]
 
 
-def _stage_gradient_lines(indent, name, dim, n_fields):
+def _folded_reference_sum(name, dim, rule):
+    """`sum_k (sum_j x[j] * grad_ref[k][j]) * adj[k]`, with the table folded.
+
+    Both inner sums are over constants, so what is left is one expression in
+    the gathered values and the element's adjugate -- the two loops the
+    reference table used to require are gone with it.
+    """
+    _, gradients, _ = _reference_constants(rule)
+    n_shape = len(gradients) // dim
+    terms = []
+    for k in range(dim):
+        reference = sum(
+            (
+                _reference_gradient(gradients, dim, j, k)
+                * sp.Symbol("%s[%d * NC + c]" % (name, j))
+                for j in range(n_shape)
+            ),
+            sp.S.Zero,
+        )
+        terms.extend(
+            "(%s) * adj[%d * ND + d]" % (_folded(reference), k)
+            for _ in (reference,)
+            if reference != 0
+        )
+    return " + ".join(terms)
+
+
+def _stage_gradient_lines(indent, name, dim, n_fields, rule):
     target = "pm_%s_grad" % name
     return [
         "%s    // physical gradient of the %s: summed over shape functions," % (indent, name),
@@ -316,14 +408,7 @@ def _stage_gradient_lines(indent, name, dim, n_fields):
         "%s    // is linear and does not depend on the step length." % indent,
         "%s    for (int c = 0; c < NC; ++c) {" % indent,
         "%s      for (int d = 0; d < ND; ++d) {" % indent,
-        "%s        s_t mapped = s_t(0);" % indent,
-        "%s        for (int k = 0; k < ND; ++k) {" % indent,
-        "%s          s_t acc = s_t(0);" % indent,
-        "%s          for (int j = 0; j < NS; ++j) {" % indent,
-        "%s            acc += %s[j * NC + c] * grad_ref[k][q * NS + j];" % (indent, name),
-        "%s          }" % indent,
-        "%s          mapped += acc * adj[k * ND + d];" % indent,
-        "%s        }" % indent,
+        "%s        const s_t mapped = %s;" % (indent, _folded_reference_sum(name, dim, rule)),
         "%s        %s[%s] = mapped / det;"
         % (indent, target, _buffer_index("c * ND + d", n_fields * dim)),
         "%s      }" % indent,
@@ -401,7 +486,7 @@ def patch_loop_one_lines(system, rule, dependencies, indent="  "):
         for name, _ in _ROLE_SPELLING[role]["gathers"]:
             for quantity in patch_merit_staged_quantities(dependencies, role):
                 lines.extend(
-                    _STAGE_QUANTITY[quantity](indent, name, dim, n_fields)
+                    _STAGE_QUANTITY[quantity](indent, name, dim, n_fields, rule)
                 )
     lines.extend(
         [
@@ -412,10 +497,18 @@ def patch_loop_one_lines(system, rule, dependencies, indent="  "):
         ]
     )
     for quantity in contracted_test_quantities(dependencies):
-        lines.extend(_TEST_QUANTITY_FILL[quantity](indent, dim))
+        # A quantity that needs no buffer needs no fill either: the value is a
+        # folded constant, so only the gradient has an entry here.
+        lines.extend(
+            line
+            for fill in (_TEST_QUANTITY_FILL.get(quantity),)
+            if fill is not None
+            for line in fill(indent, dim, rule)
+        )
     lines.extend(
         [
-            "%s    pm_weight[q * VS + %s] = q_weight[q] * det;" % (indent, _lane()),
+            "%s    pm_weight[%s] = %s * det;"
+            % (indent, _lane(), _folded(_reference_constants(rule)[2])),
             "%s  }" % indent,
             "%s}" % indent,
         ]
@@ -513,7 +606,7 @@ def patch_loop_two_lines(system, coefficients, dependencies, material_lines,
                 )
     lines.extend("%s      %s" % (indent, line) for line in material_lines)
     lines.append(
-        "%s      const s_t weight = pm_weight[q * VS + lane_e];" % indent
+        "%s      const s_t weight = pm_weight[lane_e];" % indent
     )
     # Every coefficient the row has live, against the test quantity it
     # multiplies -- the value as well as the gradient.  This used to spell the
@@ -524,7 +617,8 @@ def patch_loop_two_lines(system, coefficients, dependencies, material_lines,
     # has always answered this, for every other contraction in the tree.
     for row in range(n_fields):
         terms = [
-            "%s * %s" % (name, _TEST_FACTOR[kind](dim, axis))
+            "%s * %s"
+            % (name, _TEST_FACTOR[kind](dim, axis, sfem_element_quadrature_rule(element_type)))
             for kind, axis, name in live_test_coefficients(dependencies, row, dim)
         ]
         # A row whose coefficients are all structurally zero contracts nothing
@@ -601,11 +695,14 @@ def patch_merit_kernel_parameters(system, rule, dependencies, parameters=()):
         # pointer type is garbage, and the merit comes out NaN.
         "const g_t *const *const RSTR points",
     ]
+    # No reference tables and no weight: all three are constants of a
+    # lowest-order simplex and are folded into the body, so the kernel names
+    # none of them and its callers produce none.
     params.extend(
         _TEST_QUANTITY_PARAMETER[quantity](dim)
         for quantity in contracted_test_quantities(dependencies)
+        if quantity in _TEST_QUANTITY_PARAMETER
     )
-    params.append("const s_t *const RSTR q_weight")
     params.extend("const s_t %s" % parameter for parameter in parameters)
     params.extend(["const int nsteps", "const s_t *const RSTR steps"])
     params.extend(
@@ -675,7 +772,7 @@ def patch_merit_kernel_lines(system, rule, coefficients, dependencies,
         ]
     )
     lines.extend(
-        "    s_t %s[NQ * %d * VS];" % (name, count) for name, count in buffers
+        "    s_t %s[%d * VS];" % (name, count) for name, count in buffers
     )
     lines.extend(
         [

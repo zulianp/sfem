@@ -75,11 +75,15 @@ def _generated_tree():
 #: deletions and no insertions, and `reproducibility --all` returned all 53
 #: digests and 28 parity pairs unchanged.
 #:
-#: The 10 left are a different defect: 8 are `const ptrdiff_t evb = element;`
-#: and `const int ne = 1;` in the MRKV viscous operators, a single-element path
-#: declaring the block-loop variables it does not use, and 2 are stragglers in
-#: one tensor-product body.
-DEAD_ASSIGNMENT_BUDGET = 10
+#: 10 -> 2.  The 8 were `const ptrdiff_t evb = element;` and `const int ne = 1;`
+#: in the MRKV viscous operators, a single-element path declaring the block-loop
+#: variables it does not use -- and the count became dead in two more of them
+#: once the assembly kernels stopped taking a work-item count, which is how a
+#: tolerated defect turned into one that had to be fixed.  Both now go through
+#: `kernel_local`, so the existing liveness pass over deferred declarations
+#: drops them wherever the scope never mentions them, rather than a predicate
+#: per declaration shape.  The 2 left are stragglers in one tensor-product body.
+DEAD_ASSIGNMENT_BUDGET = 2
 
 #: Runs of back-to-back single-statement `#pragma omp simd` lane loops.  A run
 #: longer than one is N loops and N pragmas where one loop with N statements
@@ -87,8 +91,20 @@ DEAD_ASSIGNMENT_BUDGET = 10
 #: three; the Jacobian zero-fill and accumulation account for almost all of
 #: them and are now fused, leaving 7 nines and 7 fours in paths that build the
 #: same values a different way.  A ratchet, not a target that has been met.
-LONGEST_LANE_LOOP_RUN = 9
-LANE_LOOP_RUNS_LONGER_THAN_ONE = 32
+#: 9 -> 3 and 36 -> 20 when the reference-gradient accumulation stopped opening
+#: a lane loop per component.  A 3D vector field contracted nine products of a
+#: stream and a reference gradient, each in its own `#pragma omp simd` region;
+#: the nine share a bound, a pragma and a trip count, so they are now nine
+#: statements in one region.  The same change hoisted `grad_ref_*[q * NS +
+#: shape]` and the stream's base address above the loop, which is ISSUES.md
+#: item 3 -- the two are one defect seen from either end, and fixing the loop
+#: structure is what made the hoist possible.
+#: 3 -> 1 and 20 -> 0 when the contraction onto the test functions followed --
+#: the snippet ISSUES.md item 3 actually quotes.  Nothing in the generated tree
+#: now opens a second single-statement lane loop where the first would do, so
+#: this is a floor that has been reached rather than a ratchet with room left.
+LONGEST_LANE_LOOP_RUN = 1
+LANE_LOOP_RUNS_LONGER_THAN_ONE = 0
 
 #: `(void)name;` statements, and the declarations that made them necessary.
 #:
@@ -152,7 +168,26 @@ UNUSED_CONSTANT_BUDGET = 0
 #: they cannot disagree about which tables the kernel wants.
 #: What remains is `geometry_stride` and `q_weight`, 6 each, which are a
 #: different shape and still a ratchet to drive down.
-UNUSED_PARAMETER_BUDGET = 12
+UNUSED_PARAMETER_BUDGET = 0
+
+#: Index arithmetic inside a work-item loop that the work item does not enter.
+#:
+#: The work-item loop is the vectorised inner loop, so an address it does not
+#: appear in is the same address every iteration: `grad_ref_x[q * NS + test]` is
+#: one value and `bout_data[shape * NC + d]` is one row of the tile.  Both belong
+#: above the loop, named once -- which is the standing shape rule for this tree,
+#: and was Patrick's `q * NS + should be done outside`.
+#:
+#: There were 4923, in 112 files.  What is left has a shape rather than a site:
+#: ten in the shared micro-kernel templates, whose scalar rendering is produced
+#: by a textual expansion that rewrites `streams[..][0]` and would have to
+#: rewrite a hoisted pointer with it.
+#: 23 -> 10 when the thirteen writes into `element_matrix` went away with the
+#: loop around them.  They were the shape this comment said should be fixed by
+#: removing the loop rather than the address: an assembly kernel holds one
+#: element, so it is emitted for a target that holds one element and opens no
+#: work-item loop at all.
+LANE_LOOP_INVARIANT_BUDGET = 10
 
 #: Node-ordering permutations built inside a kernel.
 #:
@@ -183,9 +218,69 @@ KERNEL_PERMUTATION_BUDGET = 0
 WRAPPED_HELPER_BUDGET = 0
 
 
+#: The device sources held their own copy of every measurement here, unmeasured,
+#: because the survey read only `.cpp` and `.hpp`.  278 device kernels named a
+#: work-item count nothing read and 88 declared `ne = 1` for a block that is one
+#: thread, all while the host budgets stood at zero -- so the budget was not
+#: being met, it was being applied to half the tree.  Both are now the same
+#: numbers as the host: the `ne` the lane loop read is gone wherever there is no
+#: lane loop, and what remains is the two `det` stragglers in one Navier-Stokes
+#: body, which the host survey counts too.
+DEVICE_DEAD_ASSIGNMENT_BUDGET = 2
+DEVICE_UNUSED_PARAMETER_BUDGET = 0
+
+#: Loop-structure names a body reads without declaring them or being given them.
+#:
+#: A floor, not a ratchet: source that reads an undeclared name does not
+#: compile, so the only correct number is zero.  It exists because nothing here
+#: measured that direction -- `unused_parameters` catches declared-and-unread,
+#: and its mirror had no instrument.  Removing the work-item count left
+#: `ageom_stream` taking an `ne` the SIMT mesh loop no longer declares, and 11
+#: device translation units failed on nvcc while every host gate was green,
+#: because the host mesh loop still declares it.  Adding this measurement then
+#: found 42 more reads in the mixed-order device operators that the failing
+#: build had not yet reached.
+UNDECLARED_LOOP_NAME_BUDGET = 0
+
+
 class KernelsAreLeanTest(unittest.TestCase):
     def setUp(self):
         self.survey = survey(_generated_tree())
+        self.device_survey = survey(_generated_tree(), device=True)
+
+    def test_no_device_kernel_computes_a_value_nothing_reads(self):
+        dead = self.device_survey["dead"]
+        self.assertLessEqual(
+            len(dead),
+            DEVICE_DEAD_ASSIGNMENT_BUDGET,
+            "these device assignments are never read:\n%s"
+            % "\n".join(
+                "  %s: %s: %s" % (row[0], row[1], row[3][:100]) for row in dead[:20]
+            ),
+        )
+
+    def test_no_kernel_reads_a_loop_name_it_was_never_given(self):
+        for label, measured in (
+            ("host", self.survey),
+            ("device", self.device_survey),
+        ):
+            names = measured["undeclared_work_item_names"]
+            with self.subTest(sources=label):
+                self.assertLessEqual(
+                    len(names),
+                    UNDECLARED_LOOP_NAME_BUDGET,
+                    "these %s bodies read a loop name nothing declares:\n%s"
+                    % (label, "\n".join("  %s: %s" % row for row in names[:20])),
+                )
+
+    def test_no_device_kernel_names_a_parameter_it_ignores(self):
+        parameters = self.device_survey["unused_parameters"]
+        self.assertLessEqual(
+            len(parameters),
+            DEVICE_UNUSED_PARAMETER_BUDGET,
+            "these device parameters are named and never read:\n%s"
+            % "\n".join("  %s: %s" % row for row in parameters[:20]),
+        )
 
     def test_no_kernel_computes_a_value_nothing_reads(self):
         dead = self.survey["dead"]
@@ -236,6 +331,16 @@ class KernelsAreLeanTest(unittest.TestCase):
             UNUSED_PARAMETER_BUDGET,
             "these parameters are named and never read:\n%s"
             % "\n".join("  %s: %s" % row for row in parameters[:20]),
+        )
+
+    def test_no_lane_loop_computes_an_address_it_could_hoist(self):
+        invariants = self.survey["lane_loop_invariants"]
+        self.assertLessEqual(
+            len(invariants),
+            LANE_LOOP_INVARIANT_BUDGET,
+            "these subscripts are computed inside a work-item loop and do not "
+            "depend on it:\n%s"
+            % "\n".join("  %s: %s: %s" % row for row in invariants[:20]),
         )
 
     def test_no_kernel_reorders_its_own_nodes(self):

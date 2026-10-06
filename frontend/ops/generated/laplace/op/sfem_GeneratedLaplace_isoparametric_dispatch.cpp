@@ -151,17 +151,6 @@ extern "C" int laplace_quad4_hessian_bsr_i_msoa(
         const idx_t *const RSTR colidx,
         void *const RSTR values
 );
-extern "C" int laplace_tri3_hessian_bsr_i_msoa(
-        const int scalar_bytes,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const real_t kappa,
-        const count_t *const RSTR rowptr,
-        const idx_t *const RSTR colidx,
-        void *const RSTR values
-);
 extern "C" int laplace_hex8_hessian_bsr_i_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
@@ -195,17 +184,6 @@ extern "C" int laplace_tet10_hessian_bsr_i_msoa(
         const idx_t *const RSTR colidx,
         void *const RSTR values
 );
-extern "C" int laplace_tet4_hessian_bsr_i_msoa(
-        const int scalar_bytes,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const real_t kappa,
-        const count_t *const RSTR rowptr,
-        const idx_t *const RSTR colidx,
-        void *const RSTR values
-);
 extern "C" int laplace_proteus_quad4_hessian_crs_i_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
@@ -218,17 +196,6 @@ extern "C" int laplace_proteus_quad4_hessian_crs_i_msoa(
         void *const RSTR values
 );
 extern "C" int laplace_quad4_hessian_crs_i_msoa(
-        const int scalar_bytes,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const real_t kappa,
-        const count_t *const RSTR rowptr,
-        const idx_t *const RSTR colidx,
-        void *const RSTR values
-);
-extern "C" int laplace_tri3_hessian_crs_i_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -262,17 +229,6 @@ extern "C" int laplace_proteus_hex8_hessian_crs_i_msoa(
         void *const RSTR values
 );
 extern "C" int laplace_tet10_hessian_crs_i_msoa(
-        const int scalar_bytes,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const real_t kappa,
-        const count_t *const RSTR rowptr,
-        const idx_t *const RSTR colidx,
-        void *const RSTR values
-);
-extern "C" int laplace_tet4_hessian_crs_i_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -500,8 +456,6 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_hessian_bsr_2d_i_msoa(
       return laplace_proteus_quad4_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, kappa, rowptr, colidx, values);
     case smesh::QUAD4:
       return laplace_quad4_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, kappa, rowptr, colidx, values);
-    case smesh::TRI3:
-      return laplace_tri3_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, kappa, rowptr, colidx, values);
     default:
       break;
   }
@@ -532,8 +486,6 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_hessian_bsr_3d_i_msoa(
       return laplace_proteus_hex8_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, kappa, rowptr, colidx, values);
     case smesh::TET10:
       return laplace_tet10_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, kappa, rowptr, colidx, values);
-    case smesh::TET4:
-      return laplace_tet4_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, kappa, rowptr, colidx, values);
     default:
       break;
   }
@@ -562,8 +514,6 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_hessian_crs_2d_i_msoa(
       return laplace_proteus_quad4_hessian_crs_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, kappa, rowptr, colidx, values);
     case smesh::QUAD4:
       return laplace_quad4_hessian_crs_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, kappa, rowptr, colidx, values);
-    case smesh::TRI3:
-      return laplace_tri3_hessian_crs_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, kappa, rowptr, colidx, values);
     default:
       break;
   }
@@ -594,8 +544,6 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_hessian_crs_3d_i_msoa(
       return laplace_proteus_hex8_hessian_crs_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, kappa, rowptr, colidx, values);
     case smesh::TET10:
       return laplace_tet10_hessian_crs_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, kappa, rowptr, colidx, values);
-    case smesh::TET4:
-      return laplace_tet4_hessian_crs_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, kappa, rowptr, colidx, values);
     default:
       break;
   }

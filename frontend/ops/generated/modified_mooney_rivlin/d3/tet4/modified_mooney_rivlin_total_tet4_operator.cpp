@@ -11,8 +11,6 @@
 #include "../../../geometry_kernels.hpp"
 #include "../../../kernel_diagnostics.hpp"
 #include "../../../packed_thread_scratch.hpp"
-#include "../../../reference/quad_tet_q1.hpp"
-#include "../../../reference/tet4_q1.hpp"
 #if defined(__has_include)
 #if __has_include("smesh_types.hpp")
 #include "smesh_types.hpp"
@@ -29,7 +27,7 @@ namespace codegen {
 
 template <typename s_t, typename g_t, int VS>
 SFEM_INLINE const s_t *ageom_stream(
-    const int,
+    const int ne,
     const g_t *const RSTR source,
     s_t *const RSTR,
     std::true_type) {
@@ -65,8 +63,6 @@ static int modified_mooney_rivlin_total_tet4_merit_patch(
     const uint8_t *const RSTR n2e_local,
     idx_t **const RSTR elements,
     const g_t *const *const RSTR points,
-    const s_t *const RSTR grad_ref[3],
-    const s_t *const RSTR q_weight,
     const s_t c1,
     const s_t c2,
     const s_t kappa,
@@ -88,10 +84,10 @@ static int modified_mooney_rivlin_total_tet4_merit_patch(
     s_t merit_local[VS];
     for (int lane = 0; lane < VS; ++lane) merit_local[lane] = s_t(0);
     s_t rho[NC * VS];
-    s_t pm_test_grad[NQ * 3 * VS];
-    s_t pm_weight[NQ * 1 * VS];
-    s_t pm_state_grad[NQ * 9 * VS];
-    s_t pm_direction_grad[NQ * 9 * VS];
+    s_t pm_test_grad[3 * VS];
+    s_t pm_weight[1 * VS];
+    s_t pm_state_grad[9 * VS];
+    s_t pm_direction_grad[9 * VS];
     element_idx_t pm_incident[VS];
     uint8_t pm_local_node[VS];
 
@@ -114,8 +110,7 @@ static int modified_mooney_rivlin_total_tet4_merit_patch(
           pm_local_node[lane] = n2e_local[block + lane];
         }
         // loop 1 -- lanes are the elements incident on this node.
-        {
-            const int q = 0;  // TET4 evaluates in closed form
+        {  // TET4 evaluates in closed form
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
             const idx_t element = pm_incident[lane];
@@ -157,15 +152,8 @@ static int modified_mooney_rivlin_total_tet4_merit_patch(
             // is linear and does not depend on the step length.
             for (int c = 0; c < NC; ++c) {
               for (int d = 0; d < ND; ++d) {
-                s_t mapped = s_t(0);
-                for (int k = 0; k < ND; ++k) {
-                  s_t acc = s_t(0);
-                  for (int j = 0; j < NS; ++j) {
-                    acc += state[j * NC + c] * grad_ref[k][q * NS + j];
-                  }
-                  mapped += acc * adj[k * ND + d];
-                }
-                pm_state_grad[(q * 9 + c * ND + d) * VS + lane] = mapped / det;
+                const s_t mapped = (-state[0 * NC + c] + state[1 * NC + c]) * adj[0 * ND + d] + (-state[0 * NC + c] + state[2 * NC + c]) * adj[1 * ND + d] + (-state[0 * NC + c] + state[3 * NC + c]) * adj[2 * ND + d];
+                pm_state_grad[(c * ND + d) * VS + lane] = mapped / det;
               }
             }
             // physical gradient of the direction: summed over shape functions,
@@ -173,15 +161,8 @@ static int modified_mooney_rivlin_total_tet4_merit_patch(
             // is linear and does not depend on the step length.
             for (int c = 0; c < NC; ++c) {
               for (int d = 0; d < ND; ++d) {
-                s_t mapped = s_t(0);
-                for (int k = 0; k < ND; ++k) {
-                  s_t acc = s_t(0);
-                  for (int j = 0; j < NS; ++j) {
-                    acc += direction[j * NC + c] * grad_ref[k][q * NS + j];
-                  }
-                  mapped += acc * adj[k * ND + d];
-                }
-                pm_direction_grad[(q * 9 + c * ND + d) * VS + lane] = mapped / det;
+                const s_t mapped = (-direction[0 * NC + c] + direction[1 * NC + c]) * adj[0 * ND + d] + (-direction[0 * NC + c] + direction[2 * NC + c]) * adj[1 * ND + d] + (-direction[0 * NC + c] + direction[3 * NC + c]) * adj[2 * ND + d];
+                pm_direction_grad[(c * ND + d) * VS + lane] = mapped / det;
               }
             }
             // the fixed basis function's quantities, and the
@@ -189,31 +170,27 @@ static int modified_mooney_rivlin_total_tet4_merit_patch(
             // `phi_0` is the same function in every element and at
             // every step, so this leaves the step loop entirely.
             for (int d = 0; d < ND; ++d) {
-              s_t mapped = s_t(0);
-              for (int k = 0; k < ND; ++k) {
-                mapped += grad_ref[k][q * NS + 0] * adj[k * ND + d];
-              }
-              pm_test_grad[(q * 3 + d) * VS + lane] = mapped / det;
+              const s_t mapped = s_t(-1) * adj[0 * ND + d] + s_t(-1) * adj[1 * ND + d] + s_t(-1) * adj[2 * ND + d];
+              pm_test_grad[(d) * VS + lane] = mapped / det;
             }
-            pm_weight[q * VS + lane] = q_weight[q] * det;
+            pm_weight[lane] = (s_t(1) / s_t(6)) * det;
           }
         }
         // loop 2 -- lanes are the sampled step lengths.
         for (int lane_e = 0; lane_e < ne; ++lane_e) {
-          {
-              const int q = 0;  // TET4 evaluates in closed form
+          {  // TET4 evaluates in closed form
             #pragma omp simd
             for (int lane = 0; lane < nsteps; ++lane) {
               const s_t alpha = steps[lane];
-              const s_t u0_grad_0 = pm_state_grad[(q * 9 + 0) * VS + lane_e] + alpha * pm_direction_grad[(q * 9 + 0) * VS + lane_e];
-              const s_t u0_grad_1 = pm_state_grad[(q * 9 + 1) * VS + lane_e] + alpha * pm_direction_grad[(q * 9 + 1) * VS + lane_e];
-              const s_t u0_grad_2 = pm_state_grad[(q * 9 + 2) * VS + lane_e] + alpha * pm_direction_grad[(q * 9 + 2) * VS + lane_e];
-              const s_t u1_grad_0 = pm_state_grad[(q * 9 + 3) * VS + lane_e] + alpha * pm_direction_grad[(q * 9 + 3) * VS + lane_e];
-              const s_t u1_grad_1 = pm_state_grad[(q * 9 + 4) * VS + lane_e] + alpha * pm_direction_grad[(q * 9 + 4) * VS + lane_e];
-              const s_t u1_grad_2 = pm_state_grad[(q * 9 + 5) * VS + lane_e] + alpha * pm_direction_grad[(q * 9 + 5) * VS + lane_e];
-              const s_t u2_grad_0 = pm_state_grad[(q * 9 + 6) * VS + lane_e] + alpha * pm_direction_grad[(q * 9 + 6) * VS + lane_e];
-              const s_t u2_grad_1 = pm_state_grad[(q * 9 + 7) * VS + lane_e] + alpha * pm_direction_grad[(q * 9 + 7) * VS + lane_e];
-              const s_t u2_grad_2 = pm_state_grad[(q * 9 + 8) * VS + lane_e] + alpha * pm_direction_grad[(q * 9 + 8) * VS + lane_e];
+              const s_t u0_grad_0 = pm_state_grad[(0) * VS + lane_e] + alpha * pm_direction_grad[(0) * VS + lane_e];
+              const s_t u0_grad_1 = pm_state_grad[(1) * VS + lane_e] + alpha * pm_direction_grad[(1) * VS + lane_e];
+              const s_t u0_grad_2 = pm_state_grad[(2) * VS + lane_e] + alpha * pm_direction_grad[(2) * VS + lane_e];
+              const s_t u1_grad_0 = pm_state_grad[(3) * VS + lane_e] + alpha * pm_direction_grad[(3) * VS + lane_e];
+              const s_t u1_grad_1 = pm_state_grad[(4) * VS + lane_e] + alpha * pm_direction_grad[(4) * VS + lane_e];
+              const s_t u1_grad_2 = pm_state_grad[(5) * VS + lane_e] + alpha * pm_direction_grad[(5) * VS + lane_e];
+              const s_t u2_grad_0 = pm_state_grad[(6) * VS + lane_e] + alpha * pm_direction_grad[(6) * VS + lane_e];
+              const s_t u2_grad_1 = pm_state_grad[(7) * VS + lane_e] + alpha * pm_direction_grad[(7) * VS + lane_e];
+              const s_t u2_grad_2 = pm_state_grad[(8) * VS + lane_e] + alpha * pm_direction_grad[(8) * VS + lane_e];
               const s_t residual_tmp0 = u1_grad_2*u2_grad_1;
               const s_t residual_tmp1 = u1_grad_1 + s_t(1);
               const s_t residual_tmp2 = u2_grad_2 + s_t(1);
@@ -263,10 +240,10 @@ static int modified_mooney_rivlin_total_tet4_merit_patch(
               const s_t grad_coeff2_0 = c1*(residual_tmp15*(((s_t(2) / s_t(3)))*residual_tmp1*u0_grad_2 - (s_t(2) / s_t(3))*residual_tmp33) + residual_tmp34*residual_tmp8) + c2*(residual_tmp16*(-residual_tmp11*residual_tmp34 + s_t(2)*residual_tmp14*u2_grad_0 - residual_tmp17*residual_tmp35 - residual_tmp19*residual_tmp36) + residual_tmp22*(((s_t(4) / s_t(3)))*residual_tmp1*u0_grad_2 - (s_t(4) / s_t(3))*residual_tmp33)) + residual_tmp7*(-residual_tmp1*u0_grad_2 + residual_tmp33);
               const s_t grad_coeff2_1 = c1*(residual_tmp15*(-(s_t(2) / s_t(3))*residual_tmp37 + ((s_t(2) / s_t(3)))*residual_tmp5*u1_grad_2) + residual_tmp35*residual_tmp8) + c2*(residual_tmp16*(-residual_tmp12*residual_tmp35 + s_t(2)*residual_tmp14*u2_grad_1 - residual_tmp17*residual_tmp34 - residual_tmp21*residual_tmp36) + residual_tmp22*(-(s_t(4) / s_t(3))*residual_tmp37 + ((s_t(4) / s_t(3)))*residual_tmp5*u1_grad_2)) + residual_tmp7*(residual_tmp37 - residual_tmp5*u1_grad_2);
               const s_t grad_coeff2_2 = c1*(residual_tmp15*(((s_t(2) / s_t(3)))*residual_tmp38 - (s_t(2) / s_t(3))*residual_tmp39) + residual_tmp36*residual_tmp8) + c2*(residual_tmp16*(-residual_tmp13*residual_tmp36 + s_t(2)*residual_tmp14*residual_tmp2 - residual_tmp19*residual_tmp34 - residual_tmp21*residual_tmp35) + residual_tmp22*(((s_t(4) / s_t(3)))*residual_tmp38 - (s_t(4) / s_t(3))*residual_tmp39)) + residual_tmp7*(residual_tmp1*residual_tmp5 - residual_tmp38);
-              const s_t weight = pm_weight[q * VS + lane_e];
-              rho[0 * VS + lane] += weight * (grad_coeff0_0 * pm_test_grad[(q * 3 + 0) * VS + lane_e] + grad_coeff0_1 * pm_test_grad[(q * 3 + 1) * VS + lane_e] + grad_coeff0_2 * pm_test_grad[(q * 3 + 2) * VS + lane_e]);
-              rho[1 * VS + lane] += weight * (grad_coeff1_0 * pm_test_grad[(q * 3 + 0) * VS + lane_e] + grad_coeff1_1 * pm_test_grad[(q * 3 + 1) * VS + lane_e] + grad_coeff1_2 * pm_test_grad[(q * 3 + 2) * VS + lane_e]);
-              rho[2 * VS + lane] += weight * (grad_coeff2_0 * pm_test_grad[(q * 3 + 0) * VS + lane_e] + grad_coeff2_1 * pm_test_grad[(q * 3 + 1) * VS + lane_e] + grad_coeff2_2 * pm_test_grad[(q * 3 + 2) * VS + lane_e]);
+              const s_t weight = pm_weight[lane_e];
+              rho[0 * VS + lane] += weight * (grad_coeff0_0 * pm_test_grad[(0) * VS + lane_e] + grad_coeff0_1 * pm_test_grad[(1) * VS + lane_e] + grad_coeff0_2 * pm_test_grad[(2) * VS + lane_e]);
+              rho[1 * VS + lane] += weight * (grad_coeff1_0 * pm_test_grad[(0) * VS + lane_e] + grad_coeff1_1 * pm_test_grad[(1) * VS + lane_e] + grad_coeff1_2 * pm_test_grad[(2) * VS + lane_e]);
+              rho[2 * VS + lane] += weight * (grad_coeff2_0 * pm_test_grad[(0) * VS + lane_e] + grad_coeff2_1 * pm_test_grad[(1) * VS + lane_e] + grad_coeff2_2 * pm_test_grad[(2) * VS + lane_e]);
             }
           }
         }
@@ -304,8 +281,6 @@ extern "C" int modified_mooney_rivlin_total_tet4_merit_patch_a_msoa(
     const uint8_t *const RSTR n2e_local,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
-    const void *const RSTR grad_ref[3],
-    const void *const RSTR q_weight,
     const real_t c1,
     const real_t c2,
     const real_t kappa,
@@ -318,10 +293,10 @@ extern "C" int modified_mooney_rivlin_total_tet4_merit_patch_a_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        return sfem::codegen::modified_mooney_rivlin_total_tet4_merit_patch<double, geom_t, 1, 4, 16>(n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, (const double *const *)grad_ref, (const double *)q_weight, c1, c2, kappa, nsteps, (const double *)steps, (const double *)x, (const double *)h, (const double *)accumulator, (double *)merit);
+        return sfem::codegen::modified_mooney_rivlin_total_tet4_merit_patch<double, geom_t, 1, 4, 16>(n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, c1, c2, kappa, nsteps, (const double *)steps, (const double *)x, (const double *)h, (const double *)accumulator, (double *)merit);
     }
     case (int)sizeof(float): {
-        return sfem::codegen::modified_mooney_rivlin_total_tet4_merit_patch<float, geom_t, 1, 4, 16>(n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, (const float *const *)grad_ref, (const float *)q_weight, c1, c2, kappa, nsteps, (const float *)steps, (const float *)x, (const float *)h, (const float *)accumulator, (float *)merit);
+        return sfem::codegen::modified_mooney_rivlin_total_tet4_merit_patch<float, geom_t, 1, 4, 16>(n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, c1, c2, kappa, nsteps, (const float *)steps, (const float *)x, (const float *)h, (const float *)accumulator, (float *)merit);
     }
     default:
       break;

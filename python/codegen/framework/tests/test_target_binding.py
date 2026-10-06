@@ -336,11 +336,12 @@ class MeshLoweringAccessorTest(unittest.TestCase):
 
     def test_cuda_walks_the_mesh_with_a_grid_of_threads(self):
         target = CUDATarget()
-        loop, extent = mesh_loop_lines(target)
+        (loop,) = mesh_loop_lines(target)
         self.assertIn("blockIdx.x * blockDim.x + threadIdx.x", loop)
         self.assertIn("evb += (ptrdiff_t)blockDim.x * gridDim.x", loop)
-        # one element per thread, so the block's tail count is not a count
-        self.assertEqual(extent, "    const int ne = 1;")
+        # and no count beside the loop: one element per thread, so there is no
+        # block to count and every kernel this pass calls takes no count.
+        self.assertEqual(len(mesh_loop_lines(target)), 1)
         self.assertEqual(target.mesh_function_line("k"), "__global__ void k(")
         # a `__global__` kernel returns void, so there is no status to give
         self.assertEqual(target.success_return_lines(), ())
@@ -471,15 +472,24 @@ class WorkItemAccessorTest(unittest.TestCase):
         for target in (CUDATarget(), HIPTarget()):
             with self.subTest(target=target.name):
                 self.assertEqual(target.work_item_index(), "0")
-                self.assertEqual(target.work_item_subscript(), "[0]")
+                # A staged buffer has no slot per work item here, because the
+                # work item *is* the element -- so there is no subscript to
+                # write.  `[0]` would be the lane dimension surviving under
+                # another name, and the buffer it indexes is a scalar.
+                self.assertEqual(target.work_item_subscript(), "")
+                self.assertEqual(target.work_item_extent(), "")
+                self.assertEqual(target.staged_buffer_address("bdet0"), "&bdet0")
                 # The stride survives; only the `+ lane` term goes.  Four of the
                 # seven offset sites stride by `geometry_stride`, a runtime mesh
                 # parameter, so dropping the stride would be wrong arithmetic.
-                self.assertEqual(target.work_item_offset("q", "VS"), "q * VS")
                 self.assertEqual(
                     target.work_item_offset("q", "geometry_stride"),
                     "q * geometry_stride",
                 )
+                # The block offset is the other case: its stride *is* the width,
+                # and with no width there is no block to stride over either.
+                self.assertEqual(target.work_item_block_offset("q"), "q")
+                self.assertEqual(target.work_item_block_offset_at(3, "scatter"), "3")
                 self.assertEqual(target.element_index(), "evb")
                 self.assertEqual(target.work_item_prologue_lines("  "), ())
 

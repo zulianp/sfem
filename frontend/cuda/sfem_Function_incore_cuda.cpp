@@ -205,6 +205,7 @@ namespace sfem {
         }
 
         const char *name() const override { return "gpu:NeumannConditions"; }
+        bool        energy_or_potential_based() const override { return true; }
 
         int hessian_crs(const real_t *const  x,
                         const count_t *const rowptr,
@@ -568,6 +569,7 @@ namespace sfem {
         }
 
         const char *name() const override { return "gpu:Laplacian"; }
+        bool        energy_or_potential_based() const override { return true; }
         inline bool is_linear() const override { return true; }
         ptrdiff_t   n_dofs_domain() const override { return space->n_dofs(); }
         ptrdiff_t   n_dofs_image() const override { return space->n_dofs(); }
@@ -880,6 +882,7 @@ namespace sfem {
         const char *name() const override {
             return "gpu:LinearElasticity";
         }
+        bool energy_or_potential_based() const override { return true; }
         inline bool is_linear() const override { return true; }
         ptrdiff_t   n_dofs_domain() const override { return space->n_dofs(); }
         ptrdiff_t   n_dofs_image() const override { return space->n_dofs(); }
@@ -1173,6 +1176,8 @@ namespace sfem {
         const char *name() const override {
             return "gpu:KelvinVoigtNewmark";
         }
+        //! a viscous stress has no stored energy, as on the host
+        bool energy_or_potential_based() const override { return false; }
         inline bool is_linear() const override { return true; }
         ptrdiff_t   n_dofs_domain() const override { return space->n_dofs(); }
         ptrdiff_t   n_dofs_image() const override { return space->n_dofs(); }
@@ -1586,6 +1591,7 @@ namespace sfem {
         ExecutionSpace execution_space() const override { return EXECUTION_SPACE_DEVICE; }
 
         const char *name() const override { return "gpu:em:Laplacian"; }
+        bool        energy_or_potential_based() const override { return true; }
         inline bool is_linear() const override { return true; }
         ptrdiff_t   n_dofs_domain() const override { return space->n_dofs(); }
         ptrdiff_t   n_dofs_image() const override { return space->n_dofs(); }
@@ -1726,6 +1732,7 @@ namespace sfem {
         ExecutionSpace execution_space() const override { return EXECUTION_SPACE_DEVICE; }
 
         const char *name() const override { return "gpu:EMWarpOp"; }
+        bool        energy_or_potential_based() const override { return true; }
         inline bool is_linear() const override { return true; }
         ptrdiff_t   n_dofs_domain() const override { return space->n_dofs(); }
         ptrdiff_t   n_dofs_image() const override { return space->n_dofs(); }
@@ -1871,6 +1878,7 @@ namespace sfem {
         ExecutionSpace execution_space() const override { return EXECUTION_SPACE_DEVICE; }
 
         const char *name() const override { return "gpu:EMMultiVectorWarpOp"; }
+        bool        energy_or_potential_based() const override { return true; }
         inline bool is_linear() const override { return true; }
         ptrdiff_t   n_dofs_domain() const override { return space->n_dofs(); }
         ptrdiff_t   n_dofs_image() const override { return space->n_dofs(); }
@@ -2130,6 +2138,7 @@ namespace sfem {
         ExecutionSpace execution_space() const override { return EXECUTION_SPACE_DEVICE; }
 
         const char *name() const override { return "gpu:em:LinearElasticity"; }
+        bool        energy_or_potential_based() const override { return true; }
         inline bool is_linear() const override { return true; }
         ptrdiff_t   n_dofs_domain() const override { return space->n_dofs(); }
         ptrdiff_t   n_dofs_image() const override { return space->n_dofs(); }

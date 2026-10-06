@@ -17,8 +17,6 @@ extern "C" int saint_venant_kirchhoff_total_tri3_merit_patch_a_msoa(
     const uint8_t *const RSTR n2e_local,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
-    const void *const RSTR grad_ref[2],
-    const void *const RSTR q_weight,
     const real_t lmbda,
     const real_t mu,
     const int nsteps,
@@ -36,8 +34,6 @@ extern "C" int saint_venant_kirchhoff_total_tet4_merit_patch_a_msoa(
     const uint8_t *const RSTR n2e_local,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
-    const void *const RSTR grad_ref[3],
-    const void *const RSTR q_weight,
     const real_t lmbda,
     const real_t mu,
     const int nsteps,
@@ -57,8 +53,6 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int saint_venant_kirchhoff_total_merit_patc
         const uint8_t *const RSTR n2e_local,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
-        const void *const RSTR grad_ref[2],
-        const void *const RSTR q_weight,
         const real_t lmbda,
         const real_t mu,
         const int nsteps,
@@ -74,7 +68,7 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int saint_venant_kirchhoff_total_merit_patc
           : real_type;
   switch (element_type) {
     case smesh::TRI3:
-      return saint_venant_kirchhoff_total_tri3_merit_patch_a_msoa((int)resolved_real_type, n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, grad_ref, q_weight, lmbda, mu, nsteps, steps, x, h, accumulator, merit);
+      return saint_venant_kirchhoff_total_tri3_merit_patch_a_msoa((int)resolved_real_type, n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, lmbda, mu, nsteps, steps, x, h, accumulator, merit);
     default:
       break;
   }
@@ -91,8 +85,6 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int saint_venant_kirchhoff_total_merit_patc
         const uint8_t *const RSTR n2e_local,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
-        const void *const RSTR grad_ref[3],
-        const void *const RSTR q_weight,
         const real_t lmbda,
         const real_t mu,
         const int nsteps,
@@ -108,7 +100,7 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int saint_venant_kirchhoff_total_merit_patc
           : real_type;
   switch (element_type) {
     case smesh::TET4:
-      return saint_venant_kirchhoff_total_tet4_merit_patch_a_msoa((int)resolved_real_type, n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, grad_ref, q_weight, lmbda, mu, nsteps, steps, x, h, accumulator, merit);
+      return saint_venant_kirchhoff_total_tet4_merit_patch_a_msoa((int)resolved_real_type, n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, lmbda, mu, nsteps, steps, x, h, accumulator, merit);
     default:
       break;
   }

@@ -164,17 +164,20 @@ static SFEM_INLINE int modified_mooney_rivlin_tet10_energy_ecoords_soa(
         const s_t g0 = grad_ref_x[q * NS + shape];
         const s_t g1 = grad_ref_y[q * NS + shape];
         const s_t g2 = grad_ref_z[q * NS + shape];
+        const s_t *const RSTR coordinate_row0 = bcoordinate_data[3 * shape];
+        const s_t *const RSTR coordinate_row1 = bcoordinate_data[3 * shape + 1];
+        const s_t *const RSTR coordinate_row2 = bcoordinate_data[3 * shape + 2];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J00_values[lane] += bcoordinate_data[3 * shape][lane] * g0;
-          J01_values[lane] += bcoordinate_data[3 * shape][lane] * g1;
-          J02_values[lane] += bcoordinate_data[3 * shape][lane] * g2;
-          J10_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g0;
-          J11_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g1;
-          J12_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g2;
-          J20_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g0;
-          J21_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g1;
-          J22_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g2;
+          J00_values[lane] += coordinate_row0[lane] * g0;
+          J01_values[lane] += coordinate_row0[lane] * g1;
+          J02_values[lane] += coordinate_row0[lane] * g2;
+          J10_values[lane] += coordinate_row1[lane] * g0;
+          J11_values[lane] += coordinate_row1[lane] * g1;
+          J12_values[lane] += coordinate_row1[lane] * g2;
+          J20_values[lane] += coordinate_row2[lane] * g0;
+          J21_values[lane] += coordinate_row2[lane] * g1;
+          J22_values[lane] += coordinate_row2[lane] * g2;
         }
       }
       #pragma omp simd
@@ -273,17 +276,20 @@ static SFEM_INLINE int modified_mooney_rivlin_tet10_energy_esoa(
         const s_t g0 = grad_ref_x[q * NS + shape];
         const s_t g1 = grad_ref_y[q * NS + shape];
         const s_t g2 = grad_ref_z[q * NS + shape];
+        const s_t *const RSTR coordinate_row0 = bcoordinate_data[3 * shape];
+        const s_t *const RSTR coordinate_row1 = bcoordinate_data[3 * shape + 1];
+        const s_t *const RSTR coordinate_row2 = bcoordinate_data[3 * shape + 2];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J00_values[lane] += bcoordinate_data[3 * shape][lane] * g0;
-          J01_values[lane] += bcoordinate_data[3 * shape][lane] * g1;
-          J02_values[lane] += bcoordinate_data[3 * shape][lane] * g2;
-          J10_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g0;
-          J11_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g1;
-          J12_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g2;
-          J20_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g0;
-          J21_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g1;
-          J22_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g2;
+          J00_values[lane] += coordinate_row0[lane] * g0;
+          J01_values[lane] += coordinate_row0[lane] * g1;
+          J02_values[lane] += coordinate_row0[lane] * g2;
+          J10_values[lane] += coordinate_row1[lane] * g0;
+          J11_values[lane] += coordinate_row1[lane] * g1;
+          J12_values[lane] += coordinate_row1[lane] * g2;
+          J20_values[lane] += coordinate_row2[lane] * g0;
+          J21_values[lane] += coordinate_row2[lane] * g1;
+          J22_values[lane] += coordinate_row2[lane] * g2;
         }
       }
       #pragma omp simd
@@ -465,17 +471,20 @@ static SFEM_INLINE int modified_mooney_rivlin_tet10_gradient_ecoords_soa(
         const s_t g0 = grad_ref_x[q * NS + shape];
         const s_t g1 = grad_ref_y[q * NS + shape];
         const s_t g2 = grad_ref_z[q * NS + shape];
+        const s_t *const RSTR coordinate_row0 = bcoordinate_data[3 * shape];
+        const s_t *const RSTR coordinate_row1 = bcoordinate_data[3 * shape + 1];
+        const s_t *const RSTR coordinate_row2 = bcoordinate_data[3 * shape + 2];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J00_values[lane] += bcoordinate_data[3 * shape][lane] * g0;
-          J01_values[lane] += bcoordinate_data[3 * shape][lane] * g1;
-          J02_values[lane] += bcoordinate_data[3 * shape][lane] * g2;
-          J10_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g0;
-          J11_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g1;
-          J12_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g2;
-          J20_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g0;
-          J21_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g1;
-          J22_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g2;
+          J00_values[lane] += coordinate_row0[lane] * g0;
+          J01_values[lane] += coordinate_row0[lane] * g1;
+          J02_values[lane] += coordinate_row0[lane] * g2;
+          J10_values[lane] += coordinate_row1[lane] * g0;
+          J11_values[lane] += coordinate_row1[lane] * g1;
+          J12_values[lane] += coordinate_row1[lane] * g2;
+          J20_values[lane] += coordinate_row2[lane] * g0;
+          J21_values[lane] += coordinate_row2[lane] * g1;
+          J22_values[lane] += coordinate_row2[lane] * g2;
         }
       }
       #pragma omp simd
@@ -576,17 +585,20 @@ static SFEM_INLINE int modified_mooney_rivlin_tet10_gradient_esoa(
         const s_t g0 = grad_ref_x[q * NS + shape];
         const s_t g1 = grad_ref_y[q * NS + shape];
         const s_t g2 = grad_ref_z[q * NS + shape];
+        const s_t *const RSTR coordinate_row0 = bcoordinate_data[3 * shape];
+        const s_t *const RSTR coordinate_row1 = bcoordinate_data[3 * shape + 1];
+        const s_t *const RSTR coordinate_row2 = bcoordinate_data[3 * shape + 2];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J00_values[lane] += bcoordinate_data[3 * shape][lane] * g0;
-          J01_values[lane] += bcoordinate_data[3 * shape][lane] * g1;
-          J02_values[lane] += bcoordinate_data[3 * shape][lane] * g2;
-          J10_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g0;
-          J11_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g1;
-          J12_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g2;
-          J20_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g0;
-          J21_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g1;
-          J22_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g2;
+          J00_values[lane] += coordinate_row0[lane] * g0;
+          J01_values[lane] += coordinate_row0[lane] * g1;
+          J02_values[lane] += coordinate_row0[lane] * g2;
+          J10_values[lane] += coordinate_row1[lane] * g0;
+          J11_values[lane] += coordinate_row1[lane] * g1;
+          J12_values[lane] += coordinate_row1[lane] * g2;
+          J20_values[lane] += coordinate_row2[lane] * g0;
+          J21_values[lane] += coordinate_row2[lane] * g1;
+          J22_values[lane] += coordinate_row2[lane] * g2;
         }
       }
       #pragma omp simd
@@ -772,17 +784,20 @@ static SFEM_INLINE int modified_mooney_rivlin_tet10_hessian_ecoords_soa(
         const s_t g0 = grad_ref_x[q * NS + shape];
         const s_t g1 = grad_ref_y[q * NS + shape];
         const s_t g2 = grad_ref_z[q * NS + shape];
+        const s_t *const RSTR coordinate_row0 = bcoordinate_data[3 * shape];
+        const s_t *const RSTR coordinate_row1 = bcoordinate_data[3 * shape + 1];
+        const s_t *const RSTR coordinate_row2 = bcoordinate_data[3 * shape + 2];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J00_values[lane] += bcoordinate_data[3 * shape][lane] * g0;
-          J01_values[lane] += bcoordinate_data[3 * shape][lane] * g1;
-          J02_values[lane] += bcoordinate_data[3 * shape][lane] * g2;
-          J10_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g0;
-          J11_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g1;
-          J12_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g2;
-          J20_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g0;
-          J21_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g1;
-          J22_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g2;
+          J00_values[lane] += coordinate_row0[lane] * g0;
+          J01_values[lane] += coordinate_row0[lane] * g1;
+          J02_values[lane] += coordinate_row0[lane] * g2;
+          J10_values[lane] += coordinate_row1[lane] * g0;
+          J11_values[lane] += coordinate_row1[lane] * g1;
+          J12_values[lane] += coordinate_row1[lane] * g2;
+          J20_values[lane] += coordinate_row2[lane] * g0;
+          J21_values[lane] += coordinate_row2[lane] * g1;
+          J22_values[lane] += coordinate_row2[lane] * g2;
         }
       }
       #pragma omp simd
@@ -897,17 +912,20 @@ static SFEM_INLINE int modified_mooney_rivlin_tet10_hessian_esoa(
         const s_t g0 = grad_ref_x[q * NS + shape];
         const s_t g1 = grad_ref_y[q * NS + shape];
         const s_t g2 = grad_ref_z[q * NS + shape];
+        const s_t *const RSTR coordinate_row0 = bcoordinate_data[3 * shape];
+        const s_t *const RSTR coordinate_row1 = bcoordinate_data[3 * shape + 1];
+        const s_t *const RSTR coordinate_row2 = bcoordinate_data[3 * shape + 2];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J00_values[lane] += bcoordinate_data[3 * shape][lane] * g0;
-          J01_values[lane] += bcoordinate_data[3 * shape][lane] * g1;
-          J02_values[lane] += bcoordinate_data[3 * shape][lane] * g2;
-          J10_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g0;
-          J11_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g1;
-          J12_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g2;
-          J20_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g0;
-          J21_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g1;
-          J22_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g2;
+          J00_values[lane] += coordinate_row0[lane] * g0;
+          J01_values[lane] += coordinate_row0[lane] * g1;
+          J02_values[lane] += coordinate_row0[lane] * g2;
+          J10_values[lane] += coordinate_row1[lane] * g0;
+          J11_values[lane] += coordinate_row1[lane] * g1;
+          J12_values[lane] += coordinate_row1[lane] * g2;
+          J20_values[lane] += coordinate_row2[lane] * g0;
+          J21_values[lane] += coordinate_row2[lane] * g1;
+          J22_values[lane] += coordinate_row2[lane] * g2;
         }
       }
       #pragma omp simd

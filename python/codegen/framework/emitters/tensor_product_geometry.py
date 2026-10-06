@@ -1,6 +1,11 @@
 from codegen.framework.emitters.cprinter import c_group, c_product, c_sum, kernel_status_macro_lines
+from codegen.framework.emitters.tensor_product_kernels import (
+    micro_kernel,
+    micro_kernel_count,
+    micro_kernel_template,
+)
 from codegen.framework.plans.conventions import restrict_prelude
-from codegen.framework.targets import current_target
+from codegen.framework.targets import current_target, use_target
 from codegen.framework.fem.tensor_product import (
     streams_in_shape_order,
     tensor_product_cartesian_shape_order,
@@ -11,6 +16,50 @@ from codegen.framework.fem.tensor_product import (
 def _default_target():
     """The target this emission prints for -- bound by the backend, not chosen here."""
     return current_target()
+
+
+#: Which evaluator a contiguous stream layout calls; the name the target then
+#: renders, blocked or scalar, comes from `micro_kernel`.
+_TENSOR_EVALUATE_KERNEL = {
+    True: "tensor_evaluate_contiguous",
+    False: "tensor_evaluate",
+}
+
+
+def _width_factors():
+    """The work-item width, as template/product factors -- none where there is none."""
+    width = _default_target().kernel_vector_width()
+    return (width,) if width is not None else ()
+
+
+def _width_parameters():
+    """The same, spelled as template parameters."""
+    return tuple("int %s" % name for name in _width_factors())
+
+
+def _width_suffix():
+    """` * VS` where a work item is a lane of a block, and nothing where it is one element."""
+    return "".join(" * %s" % name for name in _width_factors())
+
+
+def _block_offset(outer):
+    """`q * VS + lane`, or `q` alone where a work item is the element."""
+    return _default_target().work_item_block_offset(outer)
+
+
+#: The work-item count, as a parameter line and as a call argument.  A kernel that
+#: holds one element counts nothing: `ne` was read only by the work-item loop that
+#: spelling does not open, so carrying it would leave an unused parameter behind.
+_COUNT_PARAMETER = {True: lambda indent: ("%sconst int ne," % indent,), False: lambda indent: ()}
+_COUNT_ARGUMENT = {True: ("ne",), False: ()}
+
+
+def _count_parameter_lines(indent):
+    return _COUNT_PARAMETER[bool(_width_factors())](indent)
+
+
+def _count_arguments():
+    return _COUNT_ARGUMENT[bool(_width_factors())]
 
 
 def _target_simd_lines(simd_lines=None):
@@ -148,9 +197,62 @@ def sfem_geometry_kernels_header_source(
             "namespace sfem {",
             "namespace codegen {",
             "",
-            "template <typename s_t, int ND, int NQ, int VS>",
-            "struct GeometryJacobianAdjugateDeterminant;",
+            *_geometry_kernel_spellings(inline_qualifier, simd_lines, single_work_item),
             "",
+            "} // namespace codegen",
+            "} // namespace sfem",
+            "",
+            "#endif",
+            "",
+        ]
+    )
+
+
+#: Which spellings of the geometry kernels a header carries, keyed on whether the
+#: target has a work-item width.  A host header needs both: its mesh kernels walk
+#: a block and call the blocked spelling, while its assembly kernels hold one
+#: element and call the scalar one.  A device header needs only the scalar, which
+#: is all its kernels can call.
+_GEOMETRY_SPELLINGS = {
+    True: lambda target: (target,),
+    False: lambda target: (target, target.holding_one_element()),
+}
+
+
+def _geometry_struct_name():
+    """The Jacobian struct's name for the spelling being rendered."""
+    return micro_kernel("GeometryJacobianAdjugateDeterminant")
+
+
+def _geometry_dispatcher_name():
+    """And the free function in front of it."""
+    return micro_kernel("geometry_jacobian_adjugate_and_determinant")
+
+
+def _geometry_kernel_spellings(inline_qualifier, simd_lines, single_work_item):
+    """The geometry kernels, once per spelling this target needs.
+
+    The two renderings are this one body under two targets, so the scalar one
+    cannot drift from the blocked one -- the same reason
+    `tensor_product_kernels` renders its micro-kernels twice.  The two free
+    adjugate helpers take an offset and no width, so they are emitted once.
+    """
+    target = _default_target()
+    lines = list(_geometry_free_helper_lines(inline_qualifier))
+    for spelling in _GEOMETRY_SPELLINGS[
+        target.kernel_vector_width() is None
+    ](target):
+        with use_target(spelling):
+            lines.extend(
+                _geometry_jacobian_lines(
+                    inline_qualifier, simd_lines, single_work_item
+                )
+            )
+    return lines
+
+
+def _geometry_free_helper_lines(inline_qualifier):
+    return [
             "template <typename s_t>",
             "static %s void geometry_jacobian_adjugate_and_determinant_2(" % inline_qualifier,
             "    const s_t J00,",
@@ -195,20 +297,40 @@ def sfem_geometry_kernels_header_source(
             "      + J02 * (J10 * J21 - J11 * J20);",
             "}",
             "",
-            "template <typename s_t, int NQ, int VS>",
-            "struct GeometryJacobianAdjugateDeterminant<s_t, 2, NQ, VS> {",
+    ]
+
+
+def _geometry_jacobian_lines(inline_qualifier, simd_lines, single_work_item):
+    work_item = _target_work_item_index()
+    work_loop = _work_item_loop_lines(
+        "      ",
+        work_item_index=work_item,
+        simd_lines=simd_lines,
+        single_work_item=single_work_item or not _width_factors(),
+    )
+    return [
+            "template <%s>" % ", ".join(("typename s_t", "int ND", "int NQ") + _width_parameters()),
+            "struct %s;" % _geometry_struct_name(),
+            "",
+            "template <%s>" % ", ".join(("typename s_t", "int NQ") + _width_parameters()),
+            "struct %s<%s> {"
+            % (_geometry_struct_name(), ", ".join(("s_t", "2", "NQ") + _width_factors())),
             "  static %s void eval(" % inline_qualifier,
-            "      const int ne,",
+            *_count_parameter_lines("      "),
             "      const s_t *const RSTR coordinate_grad_ref,",
             "      s_t *const *const RSTR adjugate,",
             "      s_t *const RSTR determinant) {",
             "    for (int q = 0; q < NQ; ++q) {",
-            "      const s_t *const RSTR J00_q = &coordinate_grad_ref[((0 * NQ + q) * 2 + 0) * VS];",
-            "      const s_t *const RSTR J01_q = &coordinate_grad_ref[((0 * NQ + q) * 2 + 1) * VS];",
-            "      const s_t *const RSTR J10_q = &coordinate_grad_ref[((1 * NQ + q) * 2 + 0) * VS];",
-            "      const s_t *const RSTR J11_q = &coordinate_grad_ref[((1 * NQ + q) * 2 + 1) * VS];",
+            "      const s_t *const RSTR J00_q = &coordinate_grad_ref[((0 * NQ + q) * 2 + 0)%s];"
+            % _width_suffix(),
+            "      const s_t *const RSTR J01_q = &coordinate_grad_ref[((0 * NQ + q) * 2 + 1)%s];"
+            % _width_suffix(),
+            "      const s_t *const RSTR J10_q = &coordinate_grad_ref[((1 * NQ + q) * 2 + 0)%s];"
+            % _width_suffix(),
+            "      const s_t *const RSTR J11_q = &coordinate_grad_ref[((1 * NQ + q) * 2 + 1)%s];"
+            % _width_suffix(),
             *work_loop,
-            "        const ptrdiff_t offset = q * VS + %s;" % work_item,
+            "        const ptrdiff_t offset = %s;" % _block_offset("q"),
             "        const s_t J00 = J00_q[%s];" % work_item,
             "        const s_t J01 = J01_q[%s];" % work_item,
             "        const s_t J10 = J10_q[%s];" % work_item,
@@ -220,25 +342,35 @@ def sfem_geometry_kernels_header_source(
             "  }",
             "};",
             "",
-            "template <typename s_t, int NQ, int VS>",
-            "struct GeometryJacobianAdjugateDeterminant<s_t, 3, NQ, VS> {",
+            "template <%s>" % ", ".join(("typename s_t", "int NQ") + _width_parameters()),
+            "struct %s<%s> {"
+            % (_geometry_struct_name(), ", ".join(("s_t", "3", "NQ") + _width_factors())),
             "  static %s void eval(" % inline_qualifier,
-            "      const int ne,",
+            *_count_parameter_lines("      "),
             "      const s_t *const RSTR coordinate_grad_ref,",
             "      s_t *const *const RSTR adjugate,",
             "      s_t *const RSTR determinant) {",
             "    for (int q = 0; q < NQ; ++q) {",
-            "      const s_t *const RSTR J00_q = &coordinate_grad_ref[((0 * NQ + q) * 3 + 0) * VS];",
-            "      const s_t *const RSTR J01_q = &coordinate_grad_ref[((0 * NQ + q) * 3 + 1) * VS];",
-            "      const s_t *const RSTR J02_q = &coordinate_grad_ref[((0 * NQ + q) * 3 + 2) * VS];",
-            "      const s_t *const RSTR J10_q = &coordinate_grad_ref[((1 * NQ + q) * 3 + 0) * VS];",
-            "      const s_t *const RSTR J11_q = &coordinate_grad_ref[((1 * NQ + q) * 3 + 1) * VS];",
-            "      const s_t *const RSTR J12_q = &coordinate_grad_ref[((1 * NQ + q) * 3 + 2) * VS];",
-            "      const s_t *const RSTR J20_q = &coordinate_grad_ref[((2 * NQ + q) * 3 + 0) * VS];",
-            "      const s_t *const RSTR J21_q = &coordinate_grad_ref[((2 * NQ + q) * 3 + 1) * VS];",
-            "      const s_t *const RSTR J22_q = &coordinate_grad_ref[((2 * NQ + q) * 3 + 2) * VS];",
+            "      const s_t *const RSTR J00_q = &coordinate_grad_ref[((0 * NQ + q) * 3 + 0)%s];"
+            % _width_suffix(),
+            "      const s_t *const RSTR J01_q = &coordinate_grad_ref[((0 * NQ + q) * 3 + 1)%s];"
+            % _width_suffix(),
+            "      const s_t *const RSTR J02_q = &coordinate_grad_ref[((0 * NQ + q) * 3 + 2)%s];"
+            % _width_suffix(),
+            "      const s_t *const RSTR J10_q = &coordinate_grad_ref[((1 * NQ + q) * 3 + 0)%s];"
+            % _width_suffix(),
+            "      const s_t *const RSTR J11_q = &coordinate_grad_ref[((1 * NQ + q) * 3 + 1)%s];"
+            % _width_suffix(),
+            "      const s_t *const RSTR J12_q = &coordinate_grad_ref[((1 * NQ + q) * 3 + 2)%s];"
+            % _width_suffix(),
+            "      const s_t *const RSTR J20_q = &coordinate_grad_ref[((2 * NQ + q) * 3 + 0)%s];"
+            % _width_suffix(),
+            "      const s_t *const RSTR J21_q = &coordinate_grad_ref[((2 * NQ + q) * 3 + 1)%s];"
+            % _width_suffix(),
+            "      const s_t *const RSTR J22_q = &coordinate_grad_ref[((2 * NQ + q) * 3 + 2)%s];"
+            % _width_suffix(),
             *work_loop,
-            "        const ptrdiff_t offset = q * VS + %s;" % work_item,
+            "        const ptrdiff_t offset = %s;" % _block_offset("q"),
             "        const s_t J00 = J00_q[%s];" % work_item,
             "        const s_t J01 = J01_q[%s];" % work_item,
             "        const s_t J02 = J02_q[%s];" % work_item,
@@ -256,23 +388,20 @@ def sfem_geometry_kernels_header_source(
             "  }",
             "};",
             "",
-            "template <typename s_t, int ND, int NQ, int VS>",
-            "static %s void geometry_jacobian_adjugate_and_determinant(" % inline_qualifier,
-            "    const int ne,",
+            "template <%s>" % ", ".join(("typename s_t", "int ND", "int NQ") + _width_parameters()),
+            "static %s void %s(" % (inline_qualifier, _geometry_dispatcher_name()),
+            *_count_parameter_lines("    "),
             "    const s_t *const RSTR coordinate_grad_ref,",
             "    s_t *const *const RSTR adjugate,",
             "    s_t *const RSTR determinant) {",
-            "  GeometryJacobianAdjugateDeterminant<s_t, ND, NQ, VS>::eval(",
-            "      ne, coordinate_grad_ref, adjugate, determinant);",
+            "  %s<%s>::eval(" % (_geometry_struct_name(), ", ".join(("s_t", "ND", "NQ") + _width_factors())),
+            "      %s);" % ", ".join(
+                _count_arguments()
+                + ("coordinate_grad_ref", "adjugate", "determinant")
+            ),
             "}",
             "",
-            "} // namespace codegen",
-            "} // namespace sfem",
-            "",
-            "#endif",
-            "",
-        ]
-    )
+    ]
 
 
 def isoparametric_adjugate_stream_array_lines(
@@ -384,8 +513,12 @@ def tensor_product_isoparametric_geometry_lines(
         )
         evaluator_streams = stream_array_name
     lines.extend([
-        "%ss_t %s[%s * NQ * %s * VS];"
-        % (indent, gradient_name, dim_name, dim_name),
+        "%ss_t %s[%s];"
+        % (
+            indent,
+            gradient_name,
+            c_product(dim_name, "NQ", dim_name, *_width_factors()),
+        ),
     ])
     lines.extend(
         evaluator_lines(
@@ -461,18 +594,18 @@ def tensor_product_evaluated_isoparametric_geometry_lines(
     dim_name="ND",
 ):
     def evaluator_lines(streams, gradient, evaluator_indent):
-        tensor_evaluate = (
-            "tensor_evaluate_contiguous"
-            if contiguous_coordinate_streams
-            else "tensor_evaluate"
-        )
+        tensor_evaluate = _TENSOR_EVALUATE_KERNEL[bool(contiguous_coordinate_streams)]
         return [
-            "%ss_t coordinate_value[ND * NQ * VS];"
-            % evaluator_indent,
-            "%s%s<s_t, NQ, NS, VS, ND, ND>("
-            % (evaluator_indent, tensor_evaluate),
-            "%s    ne, %s, %s, %s,"
-            % (evaluator_indent, shape_name, grad_name, streams),
+            "%ss_t coordinate_value[%s];"
+            % (evaluator_indent, c_product("ND", "NQ", *_width_factors())),
+            "%s%s%s("
+            % (
+                evaluator_indent,
+                micro_kernel(tensor_evaluate),
+                micro_kernel_template("ND", "ND"),
+            ),
+            "%s    %s%s, %s, %s,"
+            % (evaluator_indent, micro_kernel_count(), shape_name, grad_name, streams),
             "%s    coordinate_value, %s);" % (evaluator_indent, gradient),
         ]
 
@@ -521,18 +654,33 @@ def tensor_product_coordinate_gradient_lines(
         evaluator_streams = stream_array_name
         tensor_gradient = "tensor_gradient"
     lines.extend([
-        "%ss_t %s[%s * NQ * %s * VS];"
-        % (indent, gradient_name, dim_name, dim_name),
+        "%ss_t %s[%s];"
+        % (
+            indent,
+            gradient_name,
+            c_product(dim_name, "NQ", dim_name, *_width_factors()),
+        ),
     ])
     for component in range(dim):
         lines.extend(
             [
-                "%s%s<s_t, NQ, NS, VS, %d>("
-                % (indent, tensor_gradient, dim),
-                "%s    ne, %s, %s, %s, %d,"
-                % (indent, shape_name, grad_name, evaluator_streams, component),
+                "%s%s%s("
+                % (indent, micro_kernel(tensor_gradient), micro_kernel_template(dim)),
+                "%s    %s%s, %s, %s, %d,"
+                % (
+                    indent,
+                    micro_kernel_count(),
+                    shape_name,
+                    grad_name,
+                    evaluator_streams,
+                    component,
+                ),
                 "%s    %s + %s);"
-                % (indent, gradient_name, c_product(component, "NQ", dim_name, "VS")),
+                % (
+                    indent,
+                    gradient_name,
+                    c_product(component, "NQ", dim_name, *_width_factors()),
+                ),
             ]
         )
     return lines
@@ -564,14 +712,22 @@ def tensor_product_current_q_isoparametric_geometry_lines(
     for row in range(dim):
         for col in range(dim):
             lines.append(
-                "%sconst s_t J%d%d = %s[%s * VS + %s];"
+                "%sconst s_t J%d%d = %s[%s];"
                 % (
                     body_indent,
                     row,
                     col,
                     gradient_name,
-                    c_group(c_sum(c_product(c_group(c_sum(c_product(row, "NQ"), "q")), "ND"), col)),
-                    work_item,
+                    _block_offset(
+                        c_group(
+                            c_sum(
+                                c_product(
+                                    c_group(c_sum(c_product(row, "NQ"), "q")), "ND"
+                                ),
+                                col,
+                            )
+                        )
+                    ),
                 )
             )
     lines.extend(
@@ -670,10 +826,20 @@ def tensor_product_adjugate_determinant_lines(
             "",
             "%ss_t *%s_adjugate_streams[%s * %s] = {%s};"
             % (indent, gradient_name, dim_name, dim_name, ", ".join(adjugate_streams)),
-            "%sgeometry_jacobian_adjugate_and_determinant<s_t, %s, NQ, VS>("
-            % (indent, dim_name),
-            "%s    ne, %s, %s_adjugate_streams, %s);"
-            % (indent, gradient_name, gradient_name, determinant_stream),
+            "%s%s<%s>("
+            % (
+                indent,
+                micro_kernel("geometry_jacobian_adjugate_and_determinant"),
+                ", ".join(("s_t", dim_name, "NQ") + _width_factors()),
+            ),
+            "%s    %s%s, %s_adjugate_streams, %s);"
+            % (
+                indent,
+                micro_kernel_count(),
+                gradient_name,
+                gradient_name,
+                determinant_stream,
+            ),
         ]
 
     lines = ["", "%sfor (int q = 0; q < NQ; ++q) {" % indent]
@@ -691,21 +857,29 @@ def tensor_product_adjugate_determinant_lines(
         for row in range(dim):
             for col in range(dim):
                 lines.append(
-                    "%sconst s_t J%d%d = %s[%s * VS + %s];"
+                    "%sconst s_t J%d%d = %s[%s];"
                     % (
                         body_indent,
                         row,
                         col,
                         gradient_name,
-                        c_group(c_sum(c_product(c_group(c_sum(c_product(row, "NQ"), "q")), "ND"), col)),
-                        work_item,
+                        _block_offset(
+                            c_group(
+                                c_sum(
+                                    c_product(
+                                        c_group(c_sum(c_product(row, "NQ"), "q")), "ND"
+                                    ),
+                                    col,
+                                )
+                            )
+                        ),
                     )
                 )
         lines.extend(
             isoparametric_adjugate_lines(
                 dim,
                 body_indent,
-                "q * VS + %s" % work_item,
+                _block_offset("q"),
                 adjugate_target,
                 determinant_target,
             )
@@ -719,7 +893,7 @@ def tensor_product_adjugate_determinant_lines(
                 indent=indent + "  ",
                 adjugate_target=adjugate_target,
                 determinant_target=determinant_target,
-                output_index="q * VS + %s" % work_item,
+                output_index=_block_offset("q"),
                 work_item_index=work_item,
                 simd_lines=simd_lines,
                 single_work_item=single_work_item,

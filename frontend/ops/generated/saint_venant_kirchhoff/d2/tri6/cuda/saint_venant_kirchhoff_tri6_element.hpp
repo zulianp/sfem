@@ -11,7 +11,7 @@ namespace sfem {
 namespace codegen {
 
 
-template <typename s_t, int VS>
+template <typename s_t>
 static __host__ __device__ __forceinline__ int saint_venant_kirchhoff_tri6_energy_egeometry_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR adj,
@@ -26,8 +26,7 @@ static __host__ __device__ __forceinline__ int saint_venant_kirchhoff_tri6_energ
   static constexpr int NQ = 6;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
-  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+  for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       bu_streams[stream] = u_streams[stream] + evb;
@@ -37,21 +36,21 @@ static __host__ __device__ __forceinline__ int saint_venant_kirchhoff_tri6_energ
       bvalue[0] = s_t(0);
     }
     const s_t objective_step = s_t(0);
-    s_t badj0[NQ * VS];
-    s_t badj1[NQ * VS];
-    s_t badj2[NQ * VS];
-    s_t badj3[NQ * VS];
-    s_t bdet0[NQ * VS];
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t bdet0[NQ];
     for (int q = 0; q < NQ; ++q) {
-      s_t *const RSTR badj0_q = &badj0[q * VS];
+      s_t *const RSTR badj0_q = &badj0[q];
       const s_t *const RSTR adj0_q = adj[0] + q * nelements + evb;
-      s_t *const RSTR badj1_q = &badj1[q * VS];
+      s_t *const RSTR badj1_q = &badj1[q];
       const s_t *const RSTR adj1_q = adj[1] + q * nelements + evb;
-      s_t *const RSTR badj2_q = &badj2[q * VS];
+      s_t *const RSTR badj2_q = &badj2[q];
       const s_t *const RSTR adj2_q = adj[2] + q * nelements + evb;
-      s_t *const RSTR badj3_q = &badj3[q * VS];
+      s_t *const RSTR badj3_q = &badj3[q];
       const s_t *const RSTR adj3_q = adj[3] + q * nelements + evb;
-      s_t *const RSTR bdet0_q = &bdet0[q * VS];
+      s_t *const RSTR bdet0_q = &bdet0[q];
       const s_t *const RSTR det_q = det + q * nelements + evb;
       {
         badj0_q[0] = adj0_q[0];
@@ -61,12 +60,12 @@ static __host__ __device__ __forceinline__ int saint_venant_kirchhoff_tri6_energ
         bdet0_q[0] = det_q[0];
       }
     }
-    saint_venant_kirchhoff_d2_simplex_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_tri6_q6<s_t>::grad_ref_x(), sfem::codegen::ref_tri6_q6<s_t>::grad_ref_y(), sfem::codegen::quad_tri_q6<s_t>::q_weight(), lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    saint_venant_kirchhoff_d2_simplex_objective_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_tri6_q6<s_t>::grad_ref_x(), sfem::codegen::ref_tri6_q6<s_t>::grad_ref_y(), sfem::codegen::quad_tri_q6<s_t>::q_weight(), lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
 
-template <typename s_t, int VS>
+template <typename s_t>
 static __host__ __device__ __forceinline__ int saint_venant_kirchhoff_tri6_energy_ecoords_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -81,8 +80,7 @@ static __host__ __device__ __forceinline__ int saint_venant_kirchhoff_tri6_energ
   static constexpr int NQ = 6;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
-  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+  for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       bu_streams[stream] = u_streams[stream] + evb;
@@ -92,56 +90,56 @@ static __host__ __device__ __forceinline__ int saint_venant_kirchhoff_tri6_energ
       bvalue[0] = s_t(0);
     }
     const s_t objective_step = s_t(0);
-    s_t bcoordinate_data[NDOFS][VS];
+    s_t bcoordinate_data[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       {
-        bcoordinate_data[stream][0] = coords[stream][evb + 0];
+        bcoordinate_data[stream] = coords[stream][evb + 0];
       }
     }
-    s_t badj0[NQ * VS];
-    s_t badj1[NQ * VS];
-    s_t badj2[NQ * VS];
-    s_t badj3[NQ * VS];
-    s_t bdet0[NQ * VS];
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t bdet0[NQ];
     const s_t *const grad_ref_x = sfem::codegen::ref_tri6_q6<s_t>::grad_ref_x();
     const s_t *const grad_ref_y = sfem::codegen::ref_tri6_q6<s_t>::grad_ref_y();
     for (int q = 0; q < NQ; ++q) {
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
-      s_t J00_values[VS];
-      s_t J01_values[VS];
-      s_t J10_values[VS];
-      s_t J11_values[VS];
+      s_t J00_values;
+      s_t J01_values;
+      s_t J10_values;
+      s_t J11_values;
       {
-        J00_values[0] = s_t(0);
-        J01_values[0] = s_t(0);
-        J10_values[0] = s_t(0);
-        J11_values[0] = s_t(0);
+        J00_values = s_t(0);
+        J01_values = s_t(0);
+        J10_values = s_t(0);
+        J11_values = s_t(0);
       }
       for (int shape = 0; shape < NS; ++shape) {
         const s_t g0 = grad_ref_x[q * NS + shape];
         const s_t g1 = grad_ref_y[q * NS + shape];
         {
-          J00_values[0] += bcoordinate_data[2 * shape][0] * g0;
-          J01_values[0] += bcoordinate_data[2 * shape][0] * g1;
-          J10_values[0] += bcoordinate_data[2 * shape + 1][0] * g0;
-          J11_values[0] += bcoordinate_data[2 * shape + 1][0] * g1;
+          J00_values += bcoordinate_data[2 * shape] * g0;
+          J01_values += bcoordinate_data[2 * shape] * g1;
+          J10_values += bcoordinate_data[2 * shape + 1] * g0;
+          J11_values += bcoordinate_data[2 * shape + 1] * g1;
         }
       }
       {
-        const s_t J00 = J00_values[0];
-        const s_t J01 = J01_values[0];
-        const s_t J10 = J10_values[0];
-        const s_t J11 = J11_values[0];
+        const s_t J00 = J00_values;
+        const s_t J01 = J01_values;
+        const s_t J10 = J10_values;
+        const s_t J11 = J11_values;
         geometry_jacobian_adjugate_and_determinant_2<s_t>(
-            J00, J01, J10, J11, badj_streams, bdet0, q * VS + 0);
+            J00, J01, J10, J11, badj_streams, bdet0, q);
       }
     }
-    saint_venant_kirchhoff_d2_simplex_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_tri6_q6<s_t>::grad_ref_x(), sfem::codegen::ref_tri6_q6<s_t>::grad_ref_y(), sfem::codegen::quad_tri_q6<s_t>::q_weight(), lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    saint_venant_kirchhoff_d2_simplex_objective_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_tri6_q6<s_t>::grad_ref_x(), sfem::codegen::ref_tri6_q6<s_t>::grad_ref_y(), sfem::codegen::quad_tri_q6<s_t>::q_weight(), lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
 
-template <typename s_t, int VS>
+template <typename s_t>
 static __host__ __device__ __forceinline__ int saint_venant_kirchhoff_tri6_energy_esoa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -156,8 +154,7 @@ static __host__ __device__ __forceinline__ int saint_venant_kirchhoff_tri6_energ
   static constexpr int NQ = 6;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
-  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+  for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       bu_streams[stream] = u_streams[stream] + evb;
@@ -167,57 +164,57 @@ static __host__ __device__ __forceinline__ int saint_venant_kirchhoff_tri6_energ
       bvalue[0] = s_t(0);
     }
     const s_t objective_step = s_t(0);
-    s_t bcoordinate_data[NDOFS][VS];
+    s_t bcoordinate_data[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       {
-        bcoordinate_data[stream][0] = coords[stream][evb + 0];
+        bcoordinate_data[stream] = coords[stream][evb + 0];
       }
     }
-    s_t badj0[NQ * VS];
-    s_t badj1[NQ * VS];
-    s_t badj2[NQ * VS];
-    s_t badj3[NQ * VS];
-    s_t bdet0[NQ * VS];
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t bdet0[NQ];
     const s_t *const grad_ref_x = sfem::codegen::ref_tri6_q6<s_t>::grad_ref_x();
     const s_t *const grad_ref_y = sfem::codegen::ref_tri6_q6<s_t>::grad_ref_y();
     for (int q = 0; q < NQ; ++q) {
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
-      s_t J00_values[VS];
-      s_t J01_values[VS];
-      s_t J10_values[VS];
-      s_t J11_values[VS];
+      s_t J00_values;
+      s_t J01_values;
+      s_t J10_values;
+      s_t J11_values;
       {
-        J00_values[0] = s_t(0);
-        J01_values[0] = s_t(0);
-        J10_values[0] = s_t(0);
-        J11_values[0] = s_t(0);
+        J00_values = s_t(0);
+        J01_values = s_t(0);
+        J10_values = s_t(0);
+        J11_values = s_t(0);
       }
       for (int shape = 0; shape < NS; ++shape) {
         const s_t g0 = grad_ref_x[q * NS + shape];
         const s_t g1 = grad_ref_y[q * NS + shape];
         {
-          J00_values[0] += bcoordinate_data[2 * shape][0] * g0;
-          J01_values[0] += bcoordinate_data[2 * shape][0] * g1;
-          J10_values[0] += bcoordinate_data[2 * shape + 1][0] * g0;
-          J11_values[0] += bcoordinate_data[2 * shape + 1][0] * g1;
+          J00_values += bcoordinate_data[2 * shape] * g0;
+          J01_values += bcoordinate_data[2 * shape] * g1;
+          J10_values += bcoordinate_data[2 * shape + 1] * g0;
+          J11_values += bcoordinate_data[2 * shape + 1] * g1;
         }
       }
       {
-        const s_t J00 = J00_values[0];
-        const s_t J01 = J01_values[0];
-        const s_t J10 = J10_values[0];
-        const s_t J11 = J11_values[0];
+        const s_t J00 = J00_values;
+        const s_t J01 = J01_values;
+        const s_t J10 = J10_values;
+        const s_t J11 = J11_values;
         geometry_jacobian_adjugate_and_determinant_2<s_t>(
-            J00, J01, J10, J11, badj_streams, bdet0, q * VS + 0);
+            J00, J01, J10, J11, badj_streams, bdet0, q);
       }
     }
-    saint_venant_kirchhoff_d2_simplex_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_tri6_q6<s_t>::grad_ref_x(), sfem::codegen::ref_tri6_q6<s_t>::grad_ref_y(), sfem::codegen::quad_tri_q6<s_t>::q_weight(), lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    saint_venant_kirchhoff_d2_simplex_objective_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_tri6_q6<s_t>::grad_ref_x(), sfem::codegen::ref_tri6_q6<s_t>::grad_ref_y(), sfem::codegen::quad_tri_q6<s_t>::q_weight(), lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
 
 
-template <typename s_t, int VS>
+template <typename s_t>
 static __host__ __device__ __forceinline__ int saint_venant_kirchhoff_tri6_gradient_egeometry_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR adj,
@@ -232,8 +229,7 @@ static __host__ __device__ __forceinline__ int saint_venant_kirchhoff_tri6_gradi
   static constexpr int NQ = 6;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
-  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+  for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       bu_streams[stream] = u_streams[stream] + evb;
@@ -245,21 +241,21 @@ static __host__ __device__ __forceinline__ int saint_venant_kirchhoff_tri6_gradi
         bout_streams[stream][0] = s_t(0);
       }
     }
-    s_t badj0[NQ * VS];
-    s_t badj1[NQ * VS];
-    s_t badj2[NQ * VS];
-    s_t badj3[NQ * VS];
-    s_t bdet0[NQ * VS];
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t bdet0[NQ];
     for (int q = 0; q < NQ; ++q) {
-      s_t *const RSTR badj0_q = &badj0[q * VS];
+      s_t *const RSTR badj0_q = &badj0[q];
       const s_t *const RSTR adj0_q = adj[0] + q * nelements + evb;
-      s_t *const RSTR badj1_q = &badj1[q * VS];
+      s_t *const RSTR badj1_q = &badj1[q];
       const s_t *const RSTR adj1_q = adj[1] + q * nelements + evb;
-      s_t *const RSTR badj2_q = &badj2[q * VS];
+      s_t *const RSTR badj2_q = &badj2[q];
       const s_t *const RSTR adj2_q = adj[2] + q * nelements + evb;
-      s_t *const RSTR badj3_q = &badj3[q * VS];
+      s_t *const RSTR badj3_q = &badj3[q];
       const s_t *const RSTR adj3_q = adj[3] + q * nelements + evb;
-      s_t *const RSTR bdet0_q = &bdet0[q * VS];
+      s_t *const RSTR bdet0_q = &bdet0[q];
       const s_t *const RSTR det_q = det + q * nelements + evb;
       {
         badj0_q[0] = adj0_q[0];
@@ -269,12 +265,12 @@ static __host__ __device__ __forceinline__ int saint_venant_kirchhoff_tri6_gradi
         bdet0_q[0] = det_q[0];
       }
     }
-    saint_venant_kirchhoff_d2_simplex_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_tri6_q6<s_t>::grad_ref_x(), sfem::codegen::ref_tri6_q6<s_t>::grad_ref_y(), sfem::codegen::quad_tri_q6<s_t>::q_weight(), lmbda, mu, bu_streams, bout_streams);
+    saint_venant_kirchhoff_d2_simplex_gradient_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_tri6_q6<s_t>::grad_ref_x(), sfem::codegen::ref_tri6_q6<s_t>::grad_ref_y(), sfem::codegen::quad_tri_q6<s_t>::q_weight(), lmbda, mu, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
 
-template <typename s_t, int VS>
+template <typename s_t>
 static __host__ __device__ __forceinline__ int saint_venant_kirchhoff_tri6_gradient_ecoords_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -289,8 +285,7 @@ static __host__ __device__ __forceinline__ int saint_venant_kirchhoff_tri6_gradi
   static constexpr int NQ = 6;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
-  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+  for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       bu_streams[stream] = u_streams[stream] + evb;
@@ -302,56 +297,56 @@ static __host__ __device__ __forceinline__ int saint_venant_kirchhoff_tri6_gradi
         bout_streams[stream][0] = s_t(0);
       }
     }
-    s_t bcoordinate_data[NDOFS][VS];
+    s_t bcoordinate_data[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       {
-        bcoordinate_data[stream][0] = coords[stream][evb + 0];
+        bcoordinate_data[stream] = coords[stream][evb + 0];
       }
     }
-    s_t badj0[NQ * VS];
-    s_t badj1[NQ * VS];
-    s_t badj2[NQ * VS];
-    s_t badj3[NQ * VS];
-    s_t bdet0[NQ * VS];
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t bdet0[NQ];
     const s_t *const grad_ref_x = sfem::codegen::ref_tri6_q6<s_t>::grad_ref_x();
     const s_t *const grad_ref_y = sfem::codegen::ref_tri6_q6<s_t>::grad_ref_y();
     for (int q = 0; q < NQ; ++q) {
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
-      s_t J00_values[VS];
-      s_t J01_values[VS];
-      s_t J10_values[VS];
-      s_t J11_values[VS];
+      s_t J00_values;
+      s_t J01_values;
+      s_t J10_values;
+      s_t J11_values;
       {
-        J00_values[0] = s_t(0);
-        J01_values[0] = s_t(0);
-        J10_values[0] = s_t(0);
-        J11_values[0] = s_t(0);
+        J00_values = s_t(0);
+        J01_values = s_t(0);
+        J10_values = s_t(0);
+        J11_values = s_t(0);
       }
       for (int shape = 0; shape < NS; ++shape) {
         const s_t g0 = grad_ref_x[q * NS + shape];
         const s_t g1 = grad_ref_y[q * NS + shape];
         {
-          J00_values[0] += bcoordinate_data[2 * shape][0] * g0;
-          J01_values[0] += bcoordinate_data[2 * shape][0] * g1;
-          J10_values[0] += bcoordinate_data[2 * shape + 1][0] * g0;
-          J11_values[0] += bcoordinate_data[2 * shape + 1][0] * g1;
+          J00_values += bcoordinate_data[2 * shape] * g0;
+          J01_values += bcoordinate_data[2 * shape] * g1;
+          J10_values += bcoordinate_data[2 * shape + 1] * g0;
+          J11_values += bcoordinate_data[2 * shape + 1] * g1;
         }
       }
       {
-        const s_t J00 = J00_values[0];
-        const s_t J01 = J01_values[0];
-        const s_t J10 = J10_values[0];
-        const s_t J11 = J11_values[0];
+        const s_t J00 = J00_values;
+        const s_t J01 = J01_values;
+        const s_t J10 = J10_values;
+        const s_t J11 = J11_values;
         geometry_jacobian_adjugate_and_determinant_2<s_t>(
-            J00, J01, J10, J11, badj_streams, bdet0, q * VS + 0);
+            J00, J01, J10, J11, badj_streams, bdet0, q);
       }
     }
-    saint_venant_kirchhoff_d2_simplex_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_tri6_q6<s_t>::grad_ref_x(), sfem::codegen::ref_tri6_q6<s_t>::grad_ref_y(), sfem::codegen::quad_tri_q6<s_t>::q_weight(), lmbda, mu, bu_streams, bout_streams);
+    saint_venant_kirchhoff_d2_simplex_gradient_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_tri6_q6<s_t>::grad_ref_x(), sfem::codegen::ref_tri6_q6<s_t>::grad_ref_y(), sfem::codegen::quad_tri_q6<s_t>::q_weight(), lmbda, mu, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
 
-template <typename s_t, int VS>
+template <typename s_t>
 static __host__ __device__ __forceinline__ int saint_venant_kirchhoff_tri6_gradient_esoa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -366,8 +361,7 @@ static __host__ __device__ __forceinline__ int saint_venant_kirchhoff_tri6_gradi
   static constexpr int NQ = 6;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
-  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+  for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       bu_streams[stream] = u_streams[stream] + evb;
@@ -379,57 +373,57 @@ static __host__ __device__ __forceinline__ int saint_venant_kirchhoff_tri6_gradi
         bout_streams[stream][0] = s_t(0);
       }
     }
-    s_t bcoordinate_data[NDOFS][VS];
+    s_t bcoordinate_data[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       {
-        bcoordinate_data[stream][0] = coords[stream][evb + 0];
+        bcoordinate_data[stream] = coords[stream][evb + 0];
       }
     }
-    s_t badj0[NQ * VS];
-    s_t badj1[NQ * VS];
-    s_t badj2[NQ * VS];
-    s_t badj3[NQ * VS];
-    s_t bdet0[NQ * VS];
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t bdet0[NQ];
     const s_t *const grad_ref_x = sfem::codegen::ref_tri6_q6<s_t>::grad_ref_x();
     const s_t *const grad_ref_y = sfem::codegen::ref_tri6_q6<s_t>::grad_ref_y();
     for (int q = 0; q < NQ; ++q) {
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
-      s_t J00_values[VS];
-      s_t J01_values[VS];
-      s_t J10_values[VS];
-      s_t J11_values[VS];
+      s_t J00_values;
+      s_t J01_values;
+      s_t J10_values;
+      s_t J11_values;
       {
-        J00_values[0] = s_t(0);
-        J01_values[0] = s_t(0);
-        J10_values[0] = s_t(0);
-        J11_values[0] = s_t(0);
+        J00_values = s_t(0);
+        J01_values = s_t(0);
+        J10_values = s_t(0);
+        J11_values = s_t(0);
       }
       for (int shape = 0; shape < NS; ++shape) {
         const s_t g0 = grad_ref_x[q * NS + shape];
         const s_t g1 = grad_ref_y[q * NS + shape];
         {
-          J00_values[0] += bcoordinate_data[2 * shape][0] * g0;
-          J01_values[0] += bcoordinate_data[2 * shape][0] * g1;
-          J10_values[0] += bcoordinate_data[2 * shape + 1][0] * g0;
-          J11_values[0] += bcoordinate_data[2 * shape + 1][0] * g1;
+          J00_values += bcoordinate_data[2 * shape] * g0;
+          J01_values += bcoordinate_data[2 * shape] * g1;
+          J10_values += bcoordinate_data[2 * shape + 1] * g0;
+          J11_values += bcoordinate_data[2 * shape + 1] * g1;
         }
       }
       {
-        const s_t J00 = J00_values[0];
-        const s_t J01 = J01_values[0];
-        const s_t J10 = J10_values[0];
-        const s_t J11 = J11_values[0];
+        const s_t J00 = J00_values;
+        const s_t J01 = J01_values;
+        const s_t J10 = J10_values;
+        const s_t J11 = J11_values;
         geometry_jacobian_adjugate_and_determinant_2<s_t>(
-            J00, J01, J10, J11, badj_streams, bdet0, q * VS + 0);
+            J00, J01, J10, J11, badj_streams, bdet0, q);
       }
     }
-    saint_venant_kirchhoff_d2_simplex_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_tri6_q6<s_t>::grad_ref_x(), sfem::codegen::ref_tri6_q6<s_t>::grad_ref_y(), sfem::codegen::quad_tri_q6<s_t>::q_weight(), lmbda, mu, bu_streams, bout_streams);
+    saint_venant_kirchhoff_d2_simplex_gradient_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_tri6_q6<s_t>::grad_ref_x(), sfem::codegen::ref_tri6_q6<s_t>::grad_ref_y(), sfem::codegen::quad_tri_q6<s_t>::q_weight(), lmbda, mu, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
 
 
-template <typename s_t, int VS>
+template <typename s_t>
 static __host__ __device__ __forceinline__ int saint_venant_kirchhoff_tri6_hessian_egeometry_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR adj,
@@ -444,25 +438,24 @@ static __host__ __device__ __forceinline__ int saint_venant_kirchhoff_tri6_hessi
   static constexpr int NQ = 6;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
-  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+  for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) bu_streams[stream] = u_streams[stream] + evb;
-    s_t badj0[NQ * VS];
-    s_t badj1[NQ * VS];
-    s_t badj2[NQ * VS];
-    s_t badj3[NQ * VS];
-    s_t bdet0[NQ * VS];
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t bdet0[NQ];
     for (int q = 0; q < NQ; ++q) {
-      s_t *const RSTR badj0_q = &badj0[q * VS];
+      s_t *const RSTR badj0_q = &badj0[q];
       const s_t *const RSTR adj0_q = adj[0] + q * nelements + evb;
-      s_t *const RSTR badj1_q = &badj1[q * VS];
+      s_t *const RSTR badj1_q = &badj1[q];
       const s_t *const RSTR adj1_q = adj[1] + q * nelements + evb;
-      s_t *const RSTR badj2_q = &badj2[q * VS];
+      s_t *const RSTR badj2_q = &badj2[q];
       const s_t *const RSTR adj2_q = adj[2] + q * nelements + evb;
-      s_t *const RSTR badj3_q = &badj3[q * VS];
+      s_t *const RSTR badj3_q = &badj3[q];
       const s_t *const RSTR adj3_q = adj[3] + q * nelements + evb;
-      s_t *const RSTR bdet0_q = &bdet0[q * VS];
+      s_t *const RSTR bdet0_q = &bdet0[q];
       const s_t *const RSTR det_q = det + q * nelements + evb;
       {
         badj0_q[0] = adj0_q[0];
@@ -472,26 +465,26 @@ static __host__ __device__ __forceinline__ int saint_venant_kirchhoff_tri6_hessi
         bdet0_q[0] = det_q[0];
       }
     }
-    s_t bh_data[NDOFS][VS];
-    s_t bout_data[NDOFS][VS];
+    s_t bh_data[NDOFS];
+    s_t bout_data[NDOFS];
     const s_t *bh_streams[NDOFS];
     s_t *bout_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
-      bh_streams[stream] = bh_data[stream];
-      bout_streams[stream] = bout_data[stream];
+      bh_streams[stream] = &bh_data[stream];
+      bout_streams[stream] = &bout_data[stream];
     }
     for (int col = 0; col < NDOFS; ++col) {
       for (int stream = 0; stream < NDOFS; ++stream) {
         {
-          bh_data[stream][0] = stream == col ? s_t(1) : s_t(0);
-          bout_data[stream][0] = s_t(0);
+          bh_data[stream] = stream == col ? s_t(1) : s_t(0);
+          bout_data[stream] = s_t(0);
         }
       }
-      saint_venant_kirchhoff_d2_simplex_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_tri6_q6<s_t>::grad_ref_x(), sfem::codegen::ref_tri6_q6<s_t>::grad_ref_y(), sfem::codegen::quad_tri_q6<s_t>::q_weight(), lmbda, mu, bu_streams, bh_streams, bout_streams);
+      saint_venant_kirchhoff_d2_simplex_apply_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_tri6_q6<s_t>::grad_ref_x(), sfem::codegen::ref_tri6_q6<s_t>::grad_ref_y(), sfem::codegen::quad_tri_q6<s_t>::q_weight(), lmbda, mu, bu_streams, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         {
-          matrix_stream[0] = bout_data[row][0];
+          matrix_stream[0] = bout_data[row];
         }
       }
     }
@@ -499,7 +492,7 @@ static __host__ __device__ __forceinline__ int saint_venant_kirchhoff_tri6_hessi
   return SFEM_SUCCESS;
 }
 
-template <typename s_t, int VS>
+template <typename s_t>
 static __host__ __device__ __forceinline__ int saint_venant_kirchhoff_tri6_hessian_ecoords_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -514,74 +507,73 @@ static __host__ __device__ __forceinline__ int saint_venant_kirchhoff_tri6_hessi
   static constexpr int NQ = 6;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
-  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+  for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) bu_streams[stream] = u_streams[stream] + evb;
-    s_t bcoordinate_data[NDOFS][VS];
+    s_t bcoordinate_data[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       {
-        bcoordinate_data[stream][0] = coords[stream][evb + 0];
+        bcoordinate_data[stream] = coords[stream][evb + 0];
       }
     }
-    s_t badj0[NQ * VS];
-    s_t badj1[NQ * VS];
-    s_t badj2[NQ * VS];
-    s_t badj3[NQ * VS];
-    s_t bdet0[NQ * VS];
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t bdet0[NQ];
     const s_t *const grad_ref_x = sfem::codegen::ref_tri6_q6<s_t>::grad_ref_x();
     const s_t *const grad_ref_y = sfem::codegen::ref_tri6_q6<s_t>::grad_ref_y();
     for (int q = 0; q < NQ; ++q) {
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
-      s_t J00_values[VS];
-      s_t J01_values[VS];
-      s_t J10_values[VS];
-      s_t J11_values[VS];
+      s_t J00_values;
+      s_t J01_values;
+      s_t J10_values;
+      s_t J11_values;
       {
-        J00_values[0] = s_t(0);
-        J01_values[0] = s_t(0);
-        J10_values[0] = s_t(0);
-        J11_values[0] = s_t(0);
+        J00_values = s_t(0);
+        J01_values = s_t(0);
+        J10_values = s_t(0);
+        J11_values = s_t(0);
       }
       for (int shape = 0; shape < NS; ++shape) {
         const s_t g0 = grad_ref_x[q * NS + shape];
         const s_t g1 = grad_ref_y[q * NS + shape];
         {
-          J00_values[0] += bcoordinate_data[2 * shape][0] * g0;
-          J01_values[0] += bcoordinate_data[2 * shape][0] * g1;
-          J10_values[0] += bcoordinate_data[2 * shape + 1][0] * g0;
-          J11_values[0] += bcoordinate_data[2 * shape + 1][0] * g1;
+          J00_values += bcoordinate_data[2 * shape] * g0;
+          J01_values += bcoordinate_data[2 * shape] * g1;
+          J10_values += bcoordinate_data[2 * shape + 1] * g0;
+          J11_values += bcoordinate_data[2 * shape + 1] * g1;
         }
       }
       {
-        const s_t J00 = J00_values[0];
-        const s_t J01 = J01_values[0];
-        const s_t J10 = J10_values[0];
-        const s_t J11 = J11_values[0];
+        const s_t J00 = J00_values;
+        const s_t J01 = J01_values;
+        const s_t J10 = J10_values;
+        const s_t J11 = J11_values;
         geometry_jacobian_adjugate_and_determinant_2<s_t>(
-            J00, J01, J10, J11, badj_streams, bdet0, q * VS + 0);
+            J00, J01, J10, J11, badj_streams, bdet0, q);
       }
     }
-    s_t bh_data[NDOFS][VS];
-    s_t bout_data[NDOFS][VS];
+    s_t bh_data[NDOFS];
+    s_t bout_data[NDOFS];
     const s_t *bh_streams[NDOFS];
     s_t *bout_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
-      bh_streams[stream] = bh_data[stream];
-      bout_streams[stream] = bout_data[stream];
+      bh_streams[stream] = &bh_data[stream];
+      bout_streams[stream] = &bout_data[stream];
     }
     for (int col = 0; col < NDOFS; ++col) {
       for (int stream = 0; stream < NDOFS; ++stream) {
         {
-          bh_data[stream][0] = stream == col ? s_t(1) : s_t(0);
-          bout_data[stream][0] = s_t(0);
+          bh_data[stream] = stream == col ? s_t(1) : s_t(0);
+          bout_data[stream] = s_t(0);
         }
       }
-      saint_venant_kirchhoff_d2_simplex_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_tri6_q6<s_t>::grad_ref_x(), sfem::codegen::ref_tri6_q6<s_t>::grad_ref_y(), sfem::codegen::quad_tri_q6<s_t>::q_weight(), lmbda, mu, bu_streams, bh_streams, bout_streams);
+      saint_venant_kirchhoff_d2_simplex_apply_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_tri6_q6<s_t>::grad_ref_x(), sfem::codegen::ref_tri6_q6<s_t>::grad_ref_y(), sfem::codegen::quad_tri_q6<s_t>::q_weight(), lmbda, mu, bu_streams, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         {
-          matrix_stream[0] = bout_data[row][0];
+          matrix_stream[0] = bout_data[row];
         }
       }
     }
@@ -589,7 +581,7 @@ static __host__ __device__ __forceinline__ int saint_venant_kirchhoff_tri6_hessi
   return SFEM_SUCCESS;
 }
 
-template <typename s_t, int VS>
+template <typename s_t>
 static __host__ __device__ __forceinline__ int saint_venant_kirchhoff_tri6_hessian_esoa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -604,74 +596,73 @@ static __host__ __device__ __forceinline__ int saint_venant_kirchhoff_tri6_hessi
   static constexpr int NQ = 6;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
-  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+  for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) bu_streams[stream] = u_streams[stream] + evb;
-    s_t bcoordinate_data[NDOFS][VS];
+    s_t bcoordinate_data[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       {
-        bcoordinate_data[stream][0] = coords[stream][evb + 0];
+        bcoordinate_data[stream] = coords[stream][evb + 0];
       }
     }
-    s_t badj0[NQ * VS];
-    s_t badj1[NQ * VS];
-    s_t badj2[NQ * VS];
-    s_t badj3[NQ * VS];
-    s_t bdet0[NQ * VS];
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t bdet0[NQ];
     const s_t *const grad_ref_x = sfem::codegen::ref_tri6_q6<s_t>::grad_ref_x();
     const s_t *const grad_ref_y = sfem::codegen::ref_tri6_q6<s_t>::grad_ref_y();
     for (int q = 0; q < NQ; ++q) {
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
-      s_t J00_values[VS];
-      s_t J01_values[VS];
-      s_t J10_values[VS];
-      s_t J11_values[VS];
+      s_t J00_values;
+      s_t J01_values;
+      s_t J10_values;
+      s_t J11_values;
       {
-        J00_values[0] = s_t(0);
-        J01_values[0] = s_t(0);
-        J10_values[0] = s_t(0);
-        J11_values[0] = s_t(0);
+        J00_values = s_t(0);
+        J01_values = s_t(0);
+        J10_values = s_t(0);
+        J11_values = s_t(0);
       }
       for (int shape = 0; shape < NS; ++shape) {
         const s_t g0 = grad_ref_x[q * NS + shape];
         const s_t g1 = grad_ref_y[q * NS + shape];
         {
-          J00_values[0] += bcoordinate_data[2 * shape][0] * g0;
-          J01_values[0] += bcoordinate_data[2 * shape][0] * g1;
-          J10_values[0] += bcoordinate_data[2 * shape + 1][0] * g0;
-          J11_values[0] += bcoordinate_data[2 * shape + 1][0] * g1;
+          J00_values += bcoordinate_data[2 * shape] * g0;
+          J01_values += bcoordinate_data[2 * shape] * g1;
+          J10_values += bcoordinate_data[2 * shape + 1] * g0;
+          J11_values += bcoordinate_data[2 * shape + 1] * g1;
         }
       }
       {
-        const s_t J00 = J00_values[0];
-        const s_t J01 = J01_values[0];
-        const s_t J10 = J10_values[0];
-        const s_t J11 = J11_values[0];
+        const s_t J00 = J00_values;
+        const s_t J01 = J01_values;
+        const s_t J10 = J10_values;
+        const s_t J11 = J11_values;
         geometry_jacobian_adjugate_and_determinant_2<s_t>(
-            J00, J01, J10, J11, badj_streams, bdet0, q * VS + 0);
+            J00, J01, J10, J11, badj_streams, bdet0, q);
       }
     }
-    s_t bh_data[NDOFS][VS];
-    s_t bout_data[NDOFS][VS];
+    s_t bh_data[NDOFS];
+    s_t bout_data[NDOFS];
     const s_t *bh_streams[NDOFS];
     s_t *bout_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
-      bh_streams[stream] = bh_data[stream];
-      bout_streams[stream] = bout_data[stream];
+      bh_streams[stream] = &bh_data[stream];
+      bout_streams[stream] = &bout_data[stream];
     }
     for (int col = 0; col < NDOFS; ++col) {
       for (int stream = 0; stream < NDOFS; ++stream) {
         {
-          bh_data[stream][0] = stream == col ? s_t(1) : s_t(0);
-          bout_data[stream][0] = s_t(0);
+          bh_data[stream] = stream == col ? s_t(1) : s_t(0);
+          bout_data[stream] = s_t(0);
         }
       }
-      saint_venant_kirchhoff_d2_simplex_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_tri6_q6<s_t>::grad_ref_x(), sfem::codegen::ref_tri6_q6<s_t>::grad_ref_y(), sfem::codegen::quad_tri_q6<s_t>::q_weight(), lmbda, mu, bu_streams, bh_streams, bout_streams);
+      saint_venant_kirchhoff_d2_simplex_apply_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_tri6_q6<s_t>::grad_ref_x(), sfem::codegen::ref_tri6_q6<s_t>::grad_ref_y(), sfem::codegen::quad_tri_q6<s_t>::q_weight(), lmbda, mu, bu_streams, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         {
-          matrix_stream[0] = bout_data[row][0];
+          matrix_stream[0] = bout_data[row];
         }
       }
     }

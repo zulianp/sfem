@@ -17,9 +17,6 @@ extern "C" int two_phase_flow_total_tri3_merit_patch_a_msoa(
     const uint8_t *const RSTR n2e_local,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
-    const void *const RSTR shape,
-    const void *const RSTR grad_ref[2],
-    const void *const RSTR q_weight,
     const real_t P_r,
     const real_t S_res,
     const real_t dt,
@@ -57,9 +54,6 @@ extern "C" int two_phase_flow_total_tet4_merit_patch_a_msoa(
     const uint8_t *const RSTR n2e_local,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
-    const void *const RSTR shape,
-    const void *const RSTR grad_ref[3],
-    const void *const RSTR q_weight,
     const real_t P_r,
     const real_t S_res,
     const real_t dt,
@@ -104,9 +98,6 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_total_merit_patch_2d_a_m
         const uint8_t *const RSTR n2e_local,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
-        const void *const RSTR shape,
-        const void *const RSTR grad_ref[2],
-        const void *const RSTR q_weight,
         const real_t P_r,
         const real_t S_res,
         const real_t dt,
@@ -142,7 +133,7 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_total_merit_patch_2d_a_m
           : real_type;
   switch (element_type) {
     case smesh::TRI3:
-      return two_phase_flow_total_tri3_merit_patch_a_msoa((int)resolved_real_type, n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, shape, grad_ref, q_weight, P_r, S_res, dt, kappa_T, m, p_wr, porosity, rho_w0, C_kw1, K_0, K_1, mu_w, K_2, K_3, M_c, R, T, Z, C_ka1, C_ka2, mu_c, nsteps, steps, x, h, p, accumulator, merit);
+      return two_phase_flow_total_tri3_merit_patch_a_msoa((int)resolved_real_type, n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, P_r, S_res, dt, kappa_T, m, p_wr, porosity, rho_w0, C_kw1, K_0, K_1, mu_w, K_2, K_3, M_c, R, T, Z, C_ka1, C_ka2, mu_c, nsteps, steps, x, h, p, accumulator, merit);
     default:
       break;
   }
@@ -159,9 +150,6 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_total_merit_patch_3d_a_m
         const uint8_t *const RSTR n2e_local,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
-        const void *const RSTR shape,
-        const void *const RSTR grad_ref[3],
-        const void *const RSTR q_weight,
         const real_t P_r,
         const real_t S_res,
         const real_t dt,
@@ -202,7 +190,7 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_total_merit_patch_3d_a_m
           : real_type;
   switch (element_type) {
     case smesh::TET4:
-      return two_phase_flow_total_tet4_merit_patch_a_msoa((int)resolved_real_type, n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, shape, grad_ref, q_weight, P_r, S_res, dt, kappa_T, m, p_wr, porosity, rho_w0, C_kw1, K_0, K_1, K_2, mu_w, K_3, K_4, K_5, K_6, K_7, K_8, M_c, R, T, Z, C_ka1, C_ka2, mu_c, nsteps, steps, x, h, p, accumulator, merit);
+      return two_phase_flow_total_tet4_merit_patch_a_msoa((int)resolved_real_type, n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, P_r, S_res, dt, kappa_T, m, p_wr, porosity, rho_w0, C_kw1, K_0, K_1, K_2, mu_w, K_3, K_4, K_5, K_6, K_7, K_8, M_c, R, T, Z, C_ka1, C_ka2, mu_c, nsteps, steps, x, h, p, accumulator, merit);
     default:
       break;
   }

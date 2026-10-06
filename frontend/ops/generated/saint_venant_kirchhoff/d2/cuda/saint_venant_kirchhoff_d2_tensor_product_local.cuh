@@ -27,9 +27,8 @@ typedef double geom_t;
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NQ, int NS>
 static __host__ __device__ __forceinline__ void saint_venant_kirchhoff_d2_tensor_product_objective_block(
-        const int ne,
         const ptrdiff_t geometry_stride,
         const s_t *const RSTR adj0,
         const s_t *const RSTR adj1,
@@ -49,36 +48,35 @@ static __host__ __device__ __forceinline__ void saint_venant_kirchhoff_d2_tensor
         s_t *const RSTR value
 ) {
   static_assert(NQ > 0, "NQ must be positive");
-  static_assert(VS > 0, "VS must be positive");
   static constexpr int NQ1 = integer_root(NQ, 2);
   static constexpr int NS1 = integer_root(NS, 2);
   static_assert(ipow(NQ1, 2) == NQ, "NQ must be tensor-product compatible");
   static_assert(ipow(NS1, 2) == NS, "NS must be tensor-product compatible");
-  s_t gu_ref_q[NQ * 4 * VS];
-  s_t grad_h_ref_q[NQ * 4 * VS];
-  tensor_gradient<s_t, NQ, NS, VS, 2, 2>(ne, shape_1d, grad_1d, u_streams, 0, &gu_ref_q[0]);
-  tensor_gradient<s_t, NQ, NS, VS, 2, 2>(ne, shape_1d, grad_1d, h_streams, 0, &grad_h_ref_q[0]);
-  tensor_gradient<s_t, NQ, NS, VS, 2, 2>(ne, shape_1d, grad_1d, u_streams, 1, &gu_ref_q[2 * NQ * VS]);
-  tensor_gradient<s_t, NQ, NS, VS, 2, 2>(ne, shape_1d, grad_1d, h_streams, 1, &grad_h_ref_q[2 * NQ * VS]);
+  s_t gu_ref_q[4 * NQ];
+  s_t grad_h_ref_q[4 * NQ];
+  tensor_gradient_scalar<s_t, NQ, NS, 2, 2>(shape_1d, grad_1d, u_streams, 0, &gu_ref_q[0]);
+  tensor_gradient_scalar<s_t, NQ, NS, 2, 2>(shape_1d, grad_1d, h_streams, 0, &grad_h_ref_q[0]);
+  tensor_gradient_scalar<s_t, NQ, NS, 2, 2>(shape_1d, grad_1d, u_streams, 1, &gu_ref_q[2 * NQ]);
+  tensor_gradient_scalar<s_t, NQ, NS, 2, 2>(shape_1d, grad_1d, h_streams, 1, &grad_h_ref_q[2 * NQ]);
   for (int q = 0; q < NQ; ++q) {
     const int qx = q % NQ1;
     const int qy = q / NQ1;
     const s_t qw = q_weight_1d[qx] * q_weight_1d[qy];
-    const s_t *const RSTR gu_ref0 = &gu_ref_q[(2 * q) * VS];
-    const s_t *const RSTR gu_ref1 = &gu_ref_q[(2 * q + 1) * VS];
-    const s_t *const RSTR gu_ref2 = &gu_ref_q[(2 * (NQ + q)) * VS];
-    const s_t *const RSTR gu_ref3 = &gu_ref_q[(2 * (NQ + q) + 1) * VS];
-    const s_t *const RSTR grad_h_ref0 = &grad_h_ref_q[(2 * q) * VS];
-    const s_t *const RSTR grad_h_ref1 = &grad_h_ref_q[(2 * q + 1) * VS];
-    const s_t *const RSTR grad_h_ref2 = &grad_h_ref_q[(2 * (NQ + q)) * VS];
-    const s_t *const RSTR grad_h_ref3 = &grad_h_ref_q[(2 * (NQ + q) + 1) * VS];
+    const s_t *const RSTR gu_ref0 = &gu_ref_q[(2 * q)];
+    const s_t *const RSTR gu_ref1 = &gu_ref_q[(2 * q + 1)];
+    const s_t *const RSTR gu_ref2 = &gu_ref_q[(2 * (NQ + q))];
+    const s_t *const RSTR gu_ref3 = &gu_ref_q[(2 * (NQ + q) + 1)];
+    const s_t *const RSTR grad_h_ref0 = &grad_h_ref_q[(2 * q)];
+    const s_t *const RSTR grad_h_ref1 = &grad_h_ref_q[(2 * q + 1)];
+    const s_t *const RSTR grad_h_ref2 = &grad_h_ref_q[(2 * (NQ + q))];
+    const s_t *const RSTR grad_h_ref3 = &grad_h_ref_q[(2 * (NQ + q) + 1)];
     const s_t *const RSTR adj_q0 = adj0 + q * geometry_stride;
     const s_t *const RSTR adj_q1 = adj1 + q * geometry_stride;
     const s_t *const RSTR adj_q2 = adj2 + q * geometry_stride;
     const s_t *const RSTR adj_q3 = adj3 + q * geometry_stride;
     const s_t *const RSTR det_q0 = det0 + q * geometry_stride;
-    s_t gu_base_v[4 * VS];
-    s_t trial_grad_v[4 * VS];
+    s_t gu_base_v[4];
+    s_t trial_grad_v[4];
     {
       const s_t adj_value0 = adj_q0[0];
       const s_t adj_value1 = adj_q1[0];
@@ -86,24 +84,24 @@ static __host__ __device__ __forceinline__ void saint_venant_kirchhoff_d2_tensor
       const s_t adj_value3 = adj_q3[0];
       const s_t det_value0 = det_q0[0];
       const s_t idet = s_t(1) / det_value0;
-      gu_base_v[0 * VS + 0] = (gu_ref0[0] * adj_value0 + gu_ref1[0] * adj_value2) * idet;
-      trial_grad_v[0 * VS + 0] = (grad_h_ref0[0] * adj_value0 + grad_h_ref1[0] * adj_value2) * idet;
-      gu_base_v[1 * VS + 0] = (gu_ref0[0] * adj_value1 + gu_ref1[0] * adj_value3) * idet;
-      trial_grad_v[1 * VS + 0] = (grad_h_ref0[0] * adj_value1 + grad_h_ref1[0] * adj_value3) * idet;
-      gu_base_v[2 * VS + 0] = (gu_ref2[0] * adj_value0 + gu_ref3[0] * adj_value2) * idet;
-      trial_grad_v[2 * VS + 0] = (grad_h_ref2[0] * adj_value0 + grad_h_ref3[0] * adj_value2) * idet;
-      gu_base_v[3 * VS + 0] = (gu_ref2[0] * adj_value1 + gu_ref3[0] * adj_value3) * idet;
-      trial_grad_v[3 * VS + 0] = (grad_h_ref2[0] * adj_value1 + grad_h_ref3[0] * adj_value3) * idet;
+      gu_base_v[0] = (gu_ref0[0] * adj_value0 + gu_ref1[0] * adj_value2) * idet;
+      trial_grad_v[0] = (grad_h_ref0[0] * adj_value0 + grad_h_ref1[0] * adj_value2) * idet;
+      gu_base_v[1] = (gu_ref0[0] * adj_value1 + gu_ref1[0] * adj_value3) * idet;
+      trial_grad_v[1] = (grad_h_ref0[0] * adj_value1 + grad_h_ref1[0] * adj_value3) * idet;
+      gu_base_v[2] = (gu_ref2[0] * adj_value0 + gu_ref3[0] * adj_value2) * idet;
+      trial_grad_v[2] = (grad_h_ref2[0] * adj_value0 + grad_h_ref3[0] * adj_value2) * idet;
+      gu_base_v[3] = (gu_ref2[0] * adj_value1 + gu_ref3[0] * adj_value3) * idet;
+      trial_grad_v[3] = (grad_h_ref2[0] * adj_value1 + grad_h_ref3[0] * adj_value3) * idet;
     }
     for (int step = 0; step < nsteps; ++step) {
       const s_t alpha = steps[step];
       {
         const s_t det_value0 = det_q0[0];
         s_t gu[4];
-        gu[0] = gu_base_v[0 * VS + 0] + alpha * trial_grad_v[0 * VS + 0];
-        gu[1] = gu_base_v[1 * VS + 0] + alpha * trial_grad_v[1 * VS + 0];
-        gu[2] = gu_base_v[2 * VS + 0] + alpha * trial_grad_v[2 * VS + 0];
-        gu[3] = gu_base_v[3 * VS + 0] + alpha * trial_grad_v[3 * VS + 0];
+        gu[0] = gu_base_v[0] + alpha * trial_grad_v[0];
+        gu[1] = gu_base_v[1] + alpha * trial_grad_v[1];
+        gu[2] = gu_base_v[2] + alpha * trial_grad_v[2];
+        gu[3] = gu_base_v[3] + alpha * trial_grad_v[3];
     const s_t weak_obj_tmp0 = ((s_t(1) / s_t(2)))*pow_2(gu[0]) + gu[0] + ((s_t(1) / s_t(2)))*pow_2(gu[2]);
     const s_t weak_obj_tmp1 = ((s_t(1) / s_t(2)))*pow_2(gu[1]) + ((s_t(1) / s_t(2)))*pow_2(gu[3]) + gu[3];
     value[step * value_stride + 0] += qw * det_value0 * (((s_t(1) / s_t(2)))*lmbda*pow_2(weak_obj_tmp0 + weak_obj_tmp1) + mu*(pow_2(weak_obj_tmp0) + pow_2(weak_obj_tmp1) + s_t(2)*pow_2(((s_t(1) / s_t(2)))*gu[1]*(gu[0] + s_t(1)) + ((s_t(1) / s_t(2)))*gu[2]*(gu[3] + s_t(1)))));
@@ -112,9 +110,8 @@ static __host__ __device__ __forceinline__ void saint_venant_kirchhoff_d2_tensor
   }
 }
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NQ, int NS>
 static __host__ __device__ __forceinline__ void saint_venant_kirchhoff_d2_tensor_product_gradient_block(
-        const int ne,
         const ptrdiff_t geometry_stride,
         const s_t *const RSTR adj0,
         const s_t *const RSTR adj1,
@@ -130,27 +127,26 @@ static __host__ __device__ __forceinline__ void saint_venant_kirchhoff_d2_tensor
         s_t *const RSTR out_streams[NS * 2]
 ) {
   static_assert(NQ > 0, "NQ must be positive");
-  static_assert(VS > 0, "VS must be positive");
   static constexpr int NQ1 = integer_root(NQ, 2);
   static constexpr int NS1 = integer_root(NS, 2);
   static_assert(ipow(NQ1, 2) == NQ, "NQ must be tensor-product compatible");
   static_assert(ipow(NS1, 2) == NS, "NS must be tensor-product compatible");
-  s_t gu_ref_q[NQ * 4 * VS];
-  s_t loperand_q[NQ * 4 * VS];
-  tensor_gradient<s_t, NQ, NS, VS, 2, 2>(ne, shape_1d, grad_1d, u_streams, 0, &gu_ref_q[0]);
-  tensor_gradient<s_t, NQ, NS, VS, 2, 2>(ne, shape_1d, grad_1d, u_streams, 1, &gu_ref_q[2 * NQ * VS]);
+  s_t gu_ref_q[4 * NQ];
+  s_t loperand_q[4 * NQ];
+  tensor_gradient_scalar<s_t, NQ, NS, 2, 2>(shape_1d, grad_1d, u_streams, 0, &gu_ref_q[0]);
+  tensor_gradient_scalar<s_t, NQ, NS, 2, 2>(shape_1d, grad_1d, u_streams, 1, &gu_ref_q[2 * NQ]);
   for (int q = 0; q < NQ; ++q) {
     const int qx = q % NQ1;
     const int qy = q / NQ1;
     const s_t qw = q_weight_1d[qx] * q_weight_1d[qy];
-    const s_t *const RSTR gu_ref0 = &gu_ref_q[(2 * q) * VS];
-    const s_t *const RSTR gu_ref1 = &gu_ref_q[(2 * q + 1) * VS];
-    const s_t *const RSTR gu_ref2 = &gu_ref_q[(2 * (NQ + q)) * VS];
-    const s_t *const RSTR gu_ref3 = &gu_ref_q[(2 * (NQ + q) + 1) * VS];
-    s_t *const RSTR loperand0 = &loperand_q[(2 * q) * VS];
-    s_t *const RSTR loperand1 = &loperand_q[(2 * q + 1) * VS];
-    s_t *const RSTR loperand2 = &loperand_q[(2 * (NQ + q)) * VS];
-    s_t *const RSTR loperand3 = &loperand_q[(2 * (NQ + q) + 1) * VS];
+    const s_t *const RSTR gu_ref0 = &gu_ref_q[(2 * q)];
+    const s_t *const RSTR gu_ref1 = &gu_ref_q[(2 * q + 1)];
+    const s_t *const RSTR gu_ref2 = &gu_ref_q[(2 * (NQ + q))];
+    const s_t *const RSTR gu_ref3 = &gu_ref_q[(2 * (NQ + q) + 1)];
+    s_t *const RSTR loperand0 = &loperand_q[(2 * q)];
+    s_t *const RSTR loperand1 = &loperand_q[(2 * q + 1)];
+    s_t *const RSTR loperand2 = &loperand_q[(2 * (NQ + q))];
+    s_t *const RSTR loperand3 = &loperand_q[(2 * (NQ + q) + 1)];
     const s_t *const RSTR adj_q0 = adj0 + q * geometry_stride;
     const s_t *const RSTR adj_q1 = adj1 + q * geometry_stride;
     const s_t *const RSTR adj_q2 = adj2 + q * geometry_stride;
@@ -168,8 +164,6 @@ static __host__ __device__ __forceinline__ void saint_venant_kirchhoff_d2_tensor
       gu[1] = (gu_ref0[0] * adj_value1 + gu_ref1[0] * adj_value3) * idet;
       gu[2] = (gu_ref2[0] * adj_value0 + gu_ref3[0] * adj_value2) * idet;
       gu[3] = (gu_ref2[0] * adj_value1 + gu_ref3[0] * adj_value3) * idet;
-      s_t loperand[4];
-    s_t material[4];
     const s_t weak_mat_tmp0 = gu[0] + s_t(1);
     const s_t weak_mat_tmp1 = ((s_t(1) / s_t(2)))*pow_2(gu[0]) + gu[0] + ((s_t(1) / s_t(2)))*pow_2(gu[2]);
     const s_t weak_mat_tmp2 = ((s_t(1) / s_t(2)))*pow_2(gu[1]) + ((s_t(1) / s_t(2)))*pow_2(gu[3]) + gu[3];
@@ -180,27 +174,22 @@ static __host__ __device__ __forceinline__ void saint_venant_kirchhoff_d2_tensor
     const s_t weak_mat_tmp7 = s_t(2)*weak_mat_tmp0;
     const s_t weak_mat_tmp8 = s_t(2)*gu[2];
     const s_t weak_mat_tmp9 = s_t(2)*weak_mat_tmp4;
-    material[0] = mu*(weak_mat_tmp1*weak_mat_tmp7 + weak_mat_tmp5*weak_mat_tmp6) + weak_mat_tmp0*weak_mat_tmp3;
-    material[1] = gu[1]*weak_mat_tmp3 + mu*(weak_mat_tmp2*weak_mat_tmp6 + weak_mat_tmp5*weak_mat_tmp7);
-    material[2] = gu[2]*weak_mat_tmp3 + mu*(weak_mat_tmp1*weak_mat_tmp8 + weak_mat_tmp5*weak_mat_tmp9);
-    material[3] = mu*(weak_mat_tmp2*weak_mat_tmp9 + weak_mat_tmp5*weak_mat_tmp8) + weak_mat_tmp3*weak_mat_tmp4;
-    loperand[0] = qw * (material[0] * adj_value0 + material[1] * adj_value1);
-    loperand[1] = qw * (material[0] * adj_value2 + material[1] * adj_value3);
-    loperand[2] = qw * (material[2] * adj_value0 + material[3] * adj_value1);
-    loperand[3] = qw * (material[2] * adj_value2 + material[3] * adj_value3);
-      loperand0[0] = loperand[0];
-      loperand1[0] = loperand[1];
-      loperand2[0] = loperand[2];
-      loperand3[0] = loperand[3];
+    const s_t material0 = mu*(weak_mat_tmp1*weak_mat_tmp7 + weak_mat_tmp5*weak_mat_tmp6) + weak_mat_tmp0*weak_mat_tmp3;
+    const s_t material1 = gu[1]*weak_mat_tmp3 + mu*(weak_mat_tmp2*weak_mat_tmp6 + weak_mat_tmp5*weak_mat_tmp7);
+    const s_t material2 = gu[2]*weak_mat_tmp3 + mu*(weak_mat_tmp1*weak_mat_tmp8 + weak_mat_tmp5*weak_mat_tmp9);
+    const s_t material3 = mu*(weak_mat_tmp2*weak_mat_tmp9 + weak_mat_tmp5*weak_mat_tmp8) + weak_mat_tmp3*weak_mat_tmp4;
+      loperand0[0] = qw * (material0 * adj_value0 + material1 * adj_value1);
+      loperand1[0] = qw * (material0 * adj_value2 + material1 * adj_value3);
+      loperand2[0] = qw * (material2 * adj_value0 + material3 * adj_value1);
+      loperand3[0] = qw * (material2 * adj_value2 + material3 * adj_value3);
     }
   }
-  tensor_test<s_t, NQ, NS, VS, 2, 2>(ne, shape_1d, grad_1d, &loperand_q[0], out_streams, 0);
-  tensor_test<s_t, NQ, NS, VS, 2, 2>(ne, shape_1d, grad_1d, &loperand_q[2 * NQ * VS], out_streams, 1);
+  tensor_test_scalar<s_t, NQ, NS, 2, 2>(shape_1d, grad_1d, &loperand_q[0], out_streams, 0);
+  tensor_test_scalar<s_t, NQ, NS, 2, 2>(shape_1d, grad_1d, &loperand_q[2 * NQ], out_streams, 1);
 }
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NQ, int NS>
 static __host__ __device__ __forceinline__ void saint_venant_kirchhoff_d2_tensor_product_apply_block(
-        const int ne,
         const ptrdiff_t geometry_stride,
         const s_t *const RSTR adj0,
         const s_t *const RSTR adj1,
@@ -217,34 +206,33 @@ static __host__ __device__ __forceinline__ void saint_venant_kirchhoff_d2_tensor
         s_t *const RSTR out_streams[NS * 2]
 ) {
   static_assert(NQ > 0, "NQ must be positive");
-  static_assert(VS > 0, "VS must be positive");
   static constexpr int NQ1 = integer_root(NQ, 2);
   static constexpr int NS1 = integer_root(NS, 2);
   static_assert(ipow(NQ1, 2) == NQ, "NQ must be tensor-product compatible");
   static_assert(ipow(NS1, 2) == NS, "NS must be tensor-product compatible");
-  s_t gu_ref_q[NQ * 4 * VS];
-  s_t grad_h_ref_q[NQ * 4 * VS];
-  s_t loperand_q[NQ * 4 * VS];
-  tensor_gradient<s_t, NQ, NS, VS, 2, 2>(ne, shape_1d, grad_1d, u_streams, 0, &gu_ref_q[0]);
-  tensor_gradient<s_t, NQ, NS, VS, 2, 2>(ne, shape_1d, grad_1d, h_streams, 0, &grad_h_ref_q[0]);
-  tensor_gradient<s_t, NQ, NS, VS, 2, 2>(ne, shape_1d, grad_1d, u_streams, 1, &gu_ref_q[2 * NQ * VS]);
-  tensor_gradient<s_t, NQ, NS, VS, 2, 2>(ne, shape_1d, grad_1d, h_streams, 1, &grad_h_ref_q[2 * NQ * VS]);
+  s_t gu_ref_q[4 * NQ];
+  s_t grad_h_ref_q[4 * NQ];
+  s_t loperand_q[4 * NQ];
+  tensor_gradient_scalar<s_t, NQ, NS, 2, 2>(shape_1d, grad_1d, u_streams, 0, &gu_ref_q[0]);
+  tensor_gradient_scalar<s_t, NQ, NS, 2, 2>(shape_1d, grad_1d, h_streams, 0, &grad_h_ref_q[0]);
+  tensor_gradient_scalar<s_t, NQ, NS, 2, 2>(shape_1d, grad_1d, u_streams, 1, &gu_ref_q[2 * NQ]);
+  tensor_gradient_scalar<s_t, NQ, NS, 2, 2>(shape_1d, grad_1d, h_streams, 1, &grad_h_ref_q[2 * NQ]);
   for (int q = 0; q < NQ; ++q) {
     const int qx = q % NQ1;
     const int qy = q / NQ1;
     const s_t qw = q_weight_1d[qx] * q_weight_1d[qy];
-    const s_t *const RSTR gu_ref0 = &gu_ref_q[(2 * q) * VS];
-    const s_t *const RSTR gu_ref1 = &gu_ref_q[(2 * q + 1) * VS];
-    const s_t *const RSTR gu_ref2 = &gu_ref_q[(2 * (NQ + q)) * VS];
-    const s_t *const RSTR gu_ref3 = &gu_ref_q[(2 * (NQ + q) + 1) * VS];
-    const s_t *const RSTR grad_h_ref0 = &grad_h_ref_q[(2 * q) * VS];
-    const s_t *const RSTR grad_h_ref1 = &grad_h_ref_q[(2 * q + 1) * VS];
-    const s_t *const RSTR grad_h_ref2 = &grad_h_ref_q[(2 * (NQ + q)) * VS];
-    const s_t *const RSTR grad_h_ref3 = &grad_h_ref_q[(2 * (NQ + q) + 1) * VS];
-    s_t *const RSTR loperand0 = &loperand_q[(2 * q) * VS];
-    s_t *const RSTR loperand1 = &loperand_q[(2 * q + 1) * VS];
-    s_t *const RSTR loperand2 = &loperand_q[(2 * (NQ + q)) * VS];
-    s_t *const RSTR loperand3 = &loperand_q[(2 * (NQ + q) + 1) * VS];
+    const s_t *const RSTR gu_ref0 = &gu_ref_q[(2 * q)];
+    const s_t *const RSTR gu_ref1 = &gu_ref_q[(2 * q + 1)];
+    const s_t *const RSTR gu_ref2 = &gu_ref_q[(2 * (NQ + q))];
+    const s_t *const RSTR gu_ref3 = &gu_ref_q[(2 * (NQ + q) + 1)];
+    const s_t *const RSTR grad_h_ref0 = &grad_h_ref_q[(2 * q)];
+    const s_t *const RSTR grad_h_ref1 = &grad_h_ref_q[(2 * q + 1)];
+    const s_t *const RSTR grad_h_ref2 = &grad_h_ref_q[(2 * (NQ + q))];
+    const s_t *const RSTR grad_h_ref3 = &grad_h_ref_q[(2 * (NQ + q) + 1)];
+    s_t *const RSTR loperand0 = &loperand_q[(2 * q)];
+    s_t *const RSTR loperand1 = &loperand_q[(2 * q + 1)];
+    s_t *const RSTR loperand2 = &loperand_q[(2 * (NQ + q))];
+    s_t *const RSTR loperand3 = &loperand_q[(2 * (NQ + q) + 1)];
     const s_t *const RSTR adj_q0 = adj0 + q * geometry_stride;
     const s_t *const RSTR adj_q1 = adj1 + q * geometry_stride;
     const s_t *const RSTR adj_q2 = adj2 + q * geometry_stride;
@@ -267,8 +255,6 @@ static __host__ __device__ __forceinline__ void saint_venant_kirchhoff_d2_tensor
       trial_grad[2] = (grad_h_ref2[0] * adj_value0 + grad_h_ref3[0] * adj_value2) * idet;
       gu[3] = (gu_ref2[0] * adj_value1 + gu_ref3[0] * adj_value3) * idet;
       trial_grad[3] = (grad_h_ref2[0] * adj_value1 + grad_h_ref3[0] * adj_value3) * idet;
-      s_t loperand[4];
-    s_t material[4];
     const s_t weak_mat_tmp0 = gu[1]*gu[2];
     const s_t weak_mat_tmp1 = gu[3] + s_t(1);
     const s_t weak_mat_tmp2 = gu[0] + s_t(1);
@@ -290,22 +276,18 @@ static __host__ __device__ __forceinline__ void saint_venant_kirchhoff_d2_tensor
     const s_t weak_mat_tmp18 = pow_2(weak_mat_tmp1);
     const s_t weak_mat_tmp19 = weak_mat_tmp11 + weak_mat_tmp18 + s_t(-1);
     const s_t weak_mat_tmp20 = lmbda*weak_mat_tmp6 + mu*(weak_mat_tmp5 + s_t(2)*weak_mat_tmp6);
-    material[0] = trial_grad[0]*(lmbda*weak_mat_tmp11 + mu*(s_t(3)*weak_mat_tmp11 + weak_mat_tmp14) + weak_mat_tmp15) + trial_grad[1]*weak_mat_tmp7 + trial_grad[2]*weak_mat_tmp10 + trial_grad[3]*weak_mat_tmp4;
-    material[1] = trial_grad[0]*weak_mat_tmp7 + trial_grad[1]*(lmbda*weak_mat_tmp12 + mu*(s_t(3)*weak_mat_tmp12 + weak_mat_tmp19) + weak_mat_tmp15) + trial_grad[2]*weak_mat_tmp16 + trial_grad[3]*weak_mat_tmp17;
-    material[2] = trial_grad[0]*weak_mat_tmp10 + trial_grad[1]*weak_mat_tmp16 + trial_grad[2]*(lmbda*weak_mat_tmp13 + mu*(s_t(3)*weak_mat_tmp13 + weak_mat_tmp19) + weak_mat_tmp15) + trial_grad[3]*weak_mat_tmp20;
-    material[3] = trial_grad[0]*weak_mat_tmp4 + trial_grad[1]*weak_mat_tmp17 + trial_grad[2]*weak_mat_tmp20 + trial_grad[3]*(lmbda*weak_mat_tmp18 + mu*(weak_mat_tmp14 + s_t(3)*weak_mat_tmp18) + weak_mat_tmp15);
-    loperand[0] = qw * (material[0] * adj_value0 + material[1] * adj_value1);
-    loperand[1] = qw * (material[0] * adj_value2 + material[1] * adj_value3);
-    loperand[2] = qw * (material[2] * adj_value0 + material[3] * adj_value1);
-    loperand[3] = qw * (material[2] * adj_value2 + material[3] * adj_value3);
-      loperand0[0] = loperand[0];
-      loperand1[0] = loperand[1];
-      loperand2[0] = loperand[2];
-      loperand3[0] = loperand[3];
+    const s_t material0 = trial_grad[0]*(lmbda*weak_mat_tmp11 + mu*(s_t(3)*weak_mat_tmp11 + weak_mat_tmp14) + weak_mat_tmp15) + trial_grad[1]*weak_mat_tmp7 + trial_grad[2]*weak_mat_tmp10 + trial_grad[3]*weak_mat_tmp4;
+    const s_t material1 = trial_grad[0]*weak_mat_tmp7 + trial_grad[1]*(lmbda*weak_mat_tmp12 + mu*(s_t(3)*weak_mat_tmp12 + weak_mat_tmp19) + weak_mat_tmp15) + trial_grad[2]*weak_mat_tmp16 + trial_grad[3]*weak_mat_tmp17;
+    const s_t material2 = trial_grad[0]*weak_mat_tmp10 + trial_grad[1]*weak_mat_tmp16 + trial_grad[2]*(lmbda*weak_mat_tmp13 + mu*(s_t(3)*weak_mat_tmp13 + weak_mat_tmp19) + weak_mat_tmp15) + trial_grad[3]*weak_mat_tmp20;
+    const s_t material3 = trial_grad[0]*weak_mat_tmp4 + trial_grad[1]*weak_mat_tmp17 + trial_grad[2]*weak_mat_tmp20 + trial_grad[3]*(lmbda*weak_mat_tmp18 + mu*(weak_mat_tmp14 + s_t(3)*weak_mat_tmp18) + weak_mat_tmp15);
+      loperand0[0] = qw * (material0 * adj_value0 + material1 * adj_value1);
+      loperand1[0] = qw * (material0 * adj_value2 + material1 * adj_value3);
+      loperand2[0] = qw * (material2 * adj_value0 + material3 * adj_value1);
+      loperand3[0] = qw * (material2 * adj_value2 + material3 * adj_value3);
     }
   }
-  tensor_test<s_t, NQ, NS, VS, 2, 2>(ne, shape_1d, grad_1d, &loperand_q[0], out_streams, 0);
-  tensor_test<s_t, NQ, NS, VS, 2, 2>(ne, shape_1d, grad_1d, &loperand_q[2 * NQ * VS], out_streams, 1);
+  tensor_test_scalar<s_t, NQ, NS, 2, 2>(shape_1d, grad_1d, &loperand_q[0], out_streams, 0);
+  tensor_test_scalar<s_t, NQ, NS, 2, 2>(shape_1d, grad_1d, &loperand_q[2 * NQ], out_streams, 1);
 }
 
 } // namespace codegen

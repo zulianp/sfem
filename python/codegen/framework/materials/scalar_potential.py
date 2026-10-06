@@ -52,7 +52,7 @@ for dim in (2, 3):
 material = gen.CodeGenerator(
     "scalar_potential",
     systems,
-    elements=("TRI3", "QUAD4", "TET4", "HEX8"),
+    elements=gen.sfem_default_element_types(),
     op_name="GeneratedScalarPotential",
     parameter_defaults=(("kappa", 1.0),),
 )
