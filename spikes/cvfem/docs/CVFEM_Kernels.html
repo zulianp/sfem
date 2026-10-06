@@ -1,0 +1,1717 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CVFEM kernels</title>
+<link rel="stylesheet" href="style.cscs.css">
+</head>
+<body>
+<div class="report-head"><span class="mark">CVFEM</span><span>kernel variants</span></div>
+<h1>CVFEM kernel variants and what they measure</h1>
+<p>Throughput of the CVFEM element kernels, with the operator each number was
+measured on shown beside it.</p>
+<p>The benchmark measures kernels in isolation, which is a deliberate and useful
+thing to do -- it is how a change to the arithmetic is seen without the rest of
+the solve moving underneath it. It is not the operator the Newton loop
+evaluates. Both appear here, labelled, because the difference between them has
+been mistaken for a speedup before.</p>
+<h2>What each variant computes</h2>
+<p>Read from the <code>ran_*</code> columns, which the benchmark sets where it dispatches --
+not from the flags it was passed. A variant that asked for a term and did not
+get it shows a dash here. <code>frozen by design</code> is the assembled Jacobian, which
+keeps the frozen Rhie-Chow form deliberately: the exact term couples pressures
+beyond nearest neighbours and would widen the BSR pattern, and that operator
+exists only to build the preconditioner.</p>
+<table>
+<thead>
+<tr>
+<th>operation</th>
+<th>variant</th>
+<th>Rhie-Chow</th>
+<th>exact-RC J</th>
+<th>state ∇p</th>
+<th>boundary</th>
+<th>upwind band</th>
+<th>transient</th>
+<th>completeness</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>assemble</td>
+<td>atomic / fd</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>element kernel</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>atomic / fd / isoparam</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>element kernel</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>atomic / split</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>element kernel</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>atomic / sumfact</td>
+<td>frozen by design</td>
+<td>frozen by design</td>
+<td>hoisted</td>
+<td>carried</td>
+<td>–</td>
+<td>–</td>
+<td>partial</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>atomic / sumfact</td>
+<td>frozen by design</td>
+<td>frozen by design</td>
+<td>hoisted</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>frozen-RC</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>atomic / sumfact</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>element kernel</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>atomic / sympy</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>element kernel</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>atomic / sympy_block</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>element kernel</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>colored / sumfact</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>element kernel</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>colored / sympy</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>element kernel</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>colored / sympy_block</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>element kernel</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>packed / sumfact</td>
+<td>frozen by design</td>
+<td>frozen by design</td>
+<td>hoisted</td>
+<td>carried</td>
+<td>–</td>
+<td>–</td>
+<td>partial</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>packed / sumfact</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>element kernel</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>packed / sympy</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>element kernel</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>packed / sympy_block</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>element kernel</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>store / sumfact</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>element kernel</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>store / sympy</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>element kernel</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>store / sympy_block</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>element kernel</td>
+</tr>
+<tr>
+<td>assemble_diag</td>
+<td>atomic / (kernel n/a)</td>
+<td>frozen by design</td>
+<td>frozen by design</td>
+<td>hoisted</td>
+<td>carried</td>
+<td>–</td>
+<td>carried</td>
+<td>partial</td>
+</tr>
+<tr>
+<td>assemble_diag</td>
+<td>atomic / (kernel n/a)</td>
+<td>frozen by design</td>
+<td>frozen by design</td>
+<td>hoisted</td>
+<td>carried</td>
+<td>–</td>
+<td>–</td>
+<td>partial</td>
+</tr>
+<tr>
+<td>assemble_diag</td>
+<td>atomic / (kernel n/a)</td>
+<td>frozen by design</td>
+<td>frozen by design</td>
+<td>hoisted</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>frozen-RC</td>
+</tr>
+<tr>
+<td>assemble_diag</td>
+<td>atomic / (kernel n/a)</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>element kernel</td>
+</tr>
+<tr>
+<td>assemble_diag</td>
+<td>atomic / (kernel n/a) / isoparam</td>
+<td>frozen by design</td>
+<td>frozen by design</td>
+<td>hoisted</td>
+<td>carried</td>
+<td>–</td>
+<td>–</td>
+<td>partial</td>
+</tr>
+<tr>
+<td>bsr_apply</td>
+<td>packed / (kernel n/a)</td>
+<td>frozen by design</td>
+<td>frozen by design</td>
+<td>hoisted</td>
+<td>carried</td>
+<td>–</td>
+<td>–</td>
+<td>partial</td>
+</tr>
+<tr>
+<td>bsr_apply</td>
+<td>packed / (kernel n/a)</td>
+<td>frozen by design</td>
+<td>frozen by design</td>
+<td>hoisted</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>frozen-RC</td>
+</tr>
+<tr>
+<td>bsr_apply</td>
+<td>packed / (kernel n/a)</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>element kernel</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>atomic / (kernel n/a)</td>
+<td>carried</td>
+<td>carried</td>
+<td>hoisted</td>
+<td>carried</td>
+<td>–</td>
+<td>–</td>
+<td>solver operator</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>atomic / (kernel n/a)</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>element kernel</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>atomic / (kernel n/a) / isoparam</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>element kernel</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>atomic / sympy_action</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>element kernel</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>atomic / sympy_action_comp</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>element kernel</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>atomic / sympy_action_face</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>element kernel</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>atomic / sympy_action_geom</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>element kernel</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>atomic / sympy_action_geomface</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>element kernel</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>atomic / sympy_action_node</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>element kernel</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>colored / (kernel n/a)</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>element kernel</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>packed / (kernel n/a)</td>
+<td>carried</td>
+<td>carried</td>
+<td>hoisted</td>
+<td>carried</td>
+<td>–</td>
+<td>carried</td>
+<td>solver operator</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>packed / (kernel n/a)</td>
+<td>carried</td>
+<td>carried</td>
+<td>hoisted</td>
+<td>carried</td>
+<td>–</td>
+<td>–</td>
+<td>solver operator</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>packed / (kernel n/a)</td>
+<td>carried</td>
+<td>carried</td>
+<td>hoisted</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>partial</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>packed / (kernel n/a)</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>element kernel</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>packed / (kernel n/a) / isoparam</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>element kernel</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>store / (kernel n/a)</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>element kernel</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>atomic / current</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>element kernel</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>atomic / current / isoparam</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>element kernel</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>atomic / sumfact</td>
+<td>carried</td>
+<td>–</td>
+<td>hoisted</td>
+<td>carried</td>
+<td>–</td>
+<td>–</td>
+<td>solver operator</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>atomic / sumfact</td>
+<td>carried</td>
+<td>–</td>
+<td>hoisted</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>partial</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>atomic / sumfact</td>
+<td>carried</td>
+<td>–</td>
+<td>per apply</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>partial</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>atomic / sumfact</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>element kernel</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>atomic / sympy</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>element kernel</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>atomic / sympy / isoparam</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>element kernel</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>colored / current</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>element kernel</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>colored / sumfact</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>element kernel</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>colored / sympy</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>element kernel</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>packed / current</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>element kernel</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>packed / isoparam_simd / isoparam</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>element kernel</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>packed / sumfact</td>
+<td>carried</td>
+<td>–</td>
+<td>hoisted</td>
+<td>carried</td>
+<td>–</td>
+<td>carried</td>
+<td>solver operator</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>packed / sumfact</td>
+<td>carried</td>
+<td>–</td>
+<td>hoisted</td>
+<td>carried</td>
+<td>–</td>
+<td>–</td>
+<td>solver operator</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>packed / sumfact</td>
+<td>carried</td>
+<td>–</td>
+<td>hoisted</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>partial</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>packed / sumfact</td>
+<td>carried</td>
+<td>–</td>
+<td>per apply</td>
+<td>carried</td>
+<td>–</td>
+<td>carried</td>
+<td>solver operator</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>packed / sumfact</td>
+<td>carried</td>
+<td>–</td>
+<td>per apply</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>partial</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>packed / sumfact</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>element kernel</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>packed / sympy</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>element kernel</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>store / current</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>element kernel</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>store / sumfact</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>element kernel</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>store / sympy</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>element kernel</td>
+</tr>
+</tbody>
+</table>
+<h2>Throughput</h2>
+<p>Best observed rate per configuration, in MDOF/s. Best rather than mean because
+background load can only make a run slower. The completeness column is the one
+from the table above: two rows are comparable only when it matches.</p>
+<table>
+<thead>
+<tr>
+<th>operation</th>
+<th>variant</th>
+<th>dof</th>
+<th>MDOF/s</th>
+<th>completeness</th>
+<th>working set</th>
+<th>threads</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>assemble</td>
+<td>colored / sumfact</td>
+<td>4,121,204</td>
+<td>87</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>colored / sympy</td>
+<td>4,121,204</td>
+<td>79</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>colored / sympy_block</td>
+<td>4,121,204</td>
+<td>77</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>store / sumfact</td>
+<td>4,121,204</td>
+<td>72</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>store / sympy</td>
+<td>4,121,204</td>
+<td>71</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>store / sympy_block</td>
+<td>4,121,204</td>
+<td>70</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>atomic / sympy_block</td>
+<td>4,121,204</td>
+<td>57</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>packed / sumfact</td>
+<td>4,121,204</td>
+<td>56</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>packed / sympy</td>
+<td>4,121,204</td>
+<td>56</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>atomic / sympy</td>
+<td>4,121,204</td>
+<td>56</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>packed / sympy_block</td>
+<td>4,121,204</td>
+<td>55</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>packed / sumfact</td>
+<td>4,121,204</td>
+<td>53</td>
+<td>partial</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>atomic / sumfact</td>
+<td>4,121,204</td>
+<td>39</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>atomic / sumfact</td>
+<td>4,121,204</td>
+<td>34</td>
+<td>frozen-RC</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>atomic / sumfact</td>
+<td>4,121,204</td>
+<td>34</td>
+<td>partial</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>atomic / fd / isoparam</td>
+<td>4,121,204</td>
+<td>21</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>atomic / fd</td>
+<td>4,121,204</td>
+<td>21</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>atomic / split</td>
+<td>4,121,204</td>
+<td>14</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>assemble_diag</td>
+<td>atomic / (kernel n/a)</td>
+<td>4,121,204</td>
+<td>112</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>assemble_diag</td>
+<td>atomic / (kernel n/a)</td>
+<td>4,121,204</td>
+<td>92</td>
+<td>frozen-RC</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>assemble_diag</td>
+<td>atomic / (kernel n/a)</td>
+<td>4,121,204</td>
+<td>91</td>
+<td>partial</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>assemble_diag</td>
+<td>atomic / (kernel n/a)</td>
+<td>4,121,204</td>
+<td>89</td>
+<td>partial</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>assemble_diag</td>
+<td>atomic / (kernel n/a) / isoparam</td>
+<td>4,121,204</td>
+<td>68</td>
+<td>partial</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>bsr_apply</td>
+<td>packed / (kernel n/a)</td>
+<td>1,098,500</td>
+<td>484</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>bsr_apply</td>
+<td>packed / (kernel n/a)</td>
+<td>4,121,204</td>
+<td>458</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>bsr_apply</td>
+<td>packed / (kernel n/a)</td>
+<td>4,121,204</td>
+<td>457</td>
+<td>frozen-RC</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>bsr_apply</td>
+<td>packed / (kernel n/a)</td>
+<td>4,121,204</td>
+<td>451</td>
+<td>partial</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>packed / (kernel n/a)</td>
+<td>4,121,204</td>
+<td>2071</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>store / (kernel n/a)</td>
+<td>4,121,204</td>
+<td>2057</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>packed / (kernel n/a)</td>
+<td>1,098,500</td>
+<td>2013</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>packed / (kernel n/a)</td>
+<td>1,098,500</td>
+<td>1043</td>
+<td>solver operator</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>packed / (kernel n/a)</td>
+<td>4,121,204</td>
+<td>963</td>
+<td>partial</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>colored / (kernel n/a)</td>
+<td>4,121,204</td>
+<td>905</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>packed / (kernel n/a)</td>
+<td>4,121,204</td>
+<td>892</td>
+<td>solver operator</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>packed / (kernel n/a)</td>
+<td>4,121,204</td>
+<td>860</td>
+<td>solver operator</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>packed / (kernel n/a)</td>
+<td>4,121,204</td>
+<td>845</td>
+<td>solver operator</td>
+<td>cold, 7 live</td>
+<td>72</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>atomic / (kernel n/a)</td>
+<td>4,121,204</td>
+<td>844</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>packed / (kernel n/a) / isoparam</td>
+<td>4,121,204</td>
+<td>810</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>atomic / (kernel n/a)</td>
+<td>4,121,204</td>
+<td>500</td>
+<td>solver operator</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>atomic / sympy_action_geomface</td>
+<td>4,121,204</td>
+<td>461</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>atomic / sympy_action_face</td>
+<td>4,121,204</td>
+<td>425</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>atomic / (kernel n/a) / isoparam</td>
+<td>4,121,204</td>
+<td>397</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>atomic / sympy_action_geom</td>
+<td>4,121,204</td>
+<td>360</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>atomic / sympy_action_node</td>
+<td>4,121,204</td>
+<td>333</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>atomic / sympy_action_comp</td>
+<td>4,121,204</td>
+<td>310</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>atomic / sympy_action</td>
+<td>4,121,204</td>
+<td>308</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>store / sumfact</td>
+<td>4,121,204</td>
+<td>2940</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>packed / sumfact</td>
+<td>4,121,204</td>
+<td>2929</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>packed / sumfact</td>
+<td>1,098,500</td>
+<td>2775</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>packed / current</td>
+<td>4,121,204</td>
+<td>2205</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>store / current</td>
+<td>4,121,204</td>
+<td>2194</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>store / sympy</td>
+<td>4,121,204</td>
+<td>2142</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>packed / sympy</td>
+<td>4,121,204</td>
+<td>2108</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>packed / sumfact</td>
+<td>4,121,204</td>
+<td>1761</td>
+<td>partial</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>packed / sumfact</td>
+<td>1,098,500</td>
+<td>1623</td>
+<td>solver operator</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>packed / sumfact</td>
+<td>4,121,204</td>
+<td>1545</td>
+<td>solver operator</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>packed / sumfact</td>
+<td>4,121,204</td>
+<td>1454</td>
+<td>partial</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>packed / sumfact</td>
+<td>4,121,204</td>
+<td>1422</td>
+<td>solver operator</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>colored / sumfact</td>
+<td>4,121,204</td>
+<td>1267</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>packed / sumfact</td>
+<td>4,121,204</td>
+<td>1206</td>
+<td>solver operator</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>colored / current</td>
+<td>4,121,204</td>
+<td>976</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>colored / sympy</td>
+<td>4,121,204</td>
+<td>939</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>atomic / current</td>
+<td>4,121,204</td>
+<td>888</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>atomic / sumfact</td>
+<td>4,121,204</td>
+<td>887</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>packed / isoparam_simd / isoparam</td>
+<td>4,121,204</td>
+<td>886</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>atomic / sympy</td>
+<td>4,121,204</td>
+<td>861</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>atomic / sumfact</td>
+<td>4,121,204</td>
+<td>700</td>
+<td>partial</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>atomic / sumfact</td>
+<td>4,121,204</td>
+<td>681</td>
+<td>solver operator</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>atomic / sumfact</td>
+<td>4,121,204</td>
+<td>480</td>
+<td>partial</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>atomic / sympy / isoparam</td>
+<td>4,121,204</td>
+<td>461</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>atomic / current / isoparam</td>
+<td>4,121,204</td>
+<td>413</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+</tbody>
+</table>
+<h2>What the physics costs</h2>
+<p>The element kernel alone against the same kernel carrying what the solver
+needs, one operation and one size at a time so that only the operator varies.
+The bare-kernel row is the number the regression gate tracks and the one every
+quoted figure has historically meant; the solver does not run it.</p>
+<p><code>spread</code> is how far apart that configuration's repeated measurements were, as a
+percentage of the best. Two rows differ meaningfully only when the gap between
+them is larger than that -- which is not true of every pair here, and saying so
+is cheaper than inviting the reader to over-read a 3% difference.</p>
+<h3>residual, 4,121,204 dof</h3>
+<table>
+<thead>
+<tr>
+<th>operator</th>
+<th>terms carried</th>
+<th>working set</th>
+<th>MDOF/s</th>
+<th>spread</th>
+<th>cost vs bare kernel</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>element kernel</td>
+<td>none</td>
+<td>warm</td>
+<td>2929</td>
+<td>2% of 6</td>
+<td>1.00x</td>
+</tr>
+<tr>
+<td>partial</td>
+<td>Rhie-Chow, state ∇p (hoisted)</td>
+<td>warm</td>
+<td>1761</td>
+<td>1% of 3</td>
+<td>1.66x</td>
+</tr>
+<tr>
+<td>solver operator</td>
+<td>Rhie-Chow, state ∇p (hoisted), boundary</td>
+<td>warm</td>
+<td>1545</td>
+<td>4% of 3</td>
+<td>1.90x</td>
+</tr>
+<tr>
+<td>partial</td>
+<td>Rhie-Chow, state ∇p (per apply)</td>
+<td>warm</td>
+<td>1454</td>
+<td>1% of 3</td>
+<td>2.01x</td>
+</tr>
+<tr>
+<td>solver operator</td>
+<td>Rhie-Chow, state ∇p (hoisted), boundary, transient</td>
+<td>warm</td>
+<td>1422</td>
+<td>10% of 3</td>
+<td>2.06x</td>
+</tr>
+<tr>
+<td>solver operator</td>
+<td>Rhie-Chow, state ∇p (per apply), boundary, transient</td>
+<td>warm</td>
+<td>1206</td>
+<td>1% of 3</td>
+<td>2.43x</td>
+</tr>
+</tbody>
+</table>
+<h3>jac_action, 4,121,204 dof</h3>
+<table>
+<thead>
+<tr>
+<th>operator</th>
+<th>terms carried</th>
+<th>working set</th>
+<th>MDOF/s</th>
+<th>spread</th>
+<th>cost vs bare kernel</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>element kernel</td>
+<td>none</td>
+<td>warm</td>
+<td>2071</td>
+<td>1% of 6</td>
+<td>1.00x</td>
+</tr>
+<tr>
+<td>partial</td>
+<td>Rhie-Chow, exact-RC J, state ∇p (hoisted)</td>
+<td>warm</td>
+<td>963</td>
+<td>1% of 3</td>
+<td>2.15x</td>
+</tr>
+<tr>
+<td>solver operator</td>
+<td>Rhie-Chow, exact-RC J, state ∇p (hoisted), boundary</td>
+<td>warm</td>
+<td>892</td>
+<td>1% of 3</td>
+<td>2.32x</td>
+</tr>
+<tr>
+<td>solver operator</td>
+<td>Rhie-Chow, exact-RC J, state ∇p (hoisted), boundary, transient</td>
+<td>warm</td>
+<td>860</td>
+<td>0% of 3</td>
+<td>2.41x</td>
+</tr>
+<tr>
+<td>solver operator</td>
+<td>Rhie-Chow, exact-RC J, state ∇p (hoisted), boundary</td>
+<td>cold, 7 live</td>
+<td>845</td>
+<td>2% of 3</td>
+<td>2.45x</td>
+</tr>
+<tr>
+<td>assembled matrix</td>
+<td>SpMV of the assembled BSR — 3 term sets, 1.5% apart</td>
+<td>warm</td>
+<td>458</td>
+<td>n=3</td>
+<td>4.52x</td>
+</tr>
+</tbody>
+</table>
+<h2>What the headline number leaves out</h2>
+<p>The throughput this spike quotes is measured on an operator the solver never runs. That is
+a deliberate and useful thing to measure — it isolates the element kernel from everything
+around it, which is how a change to the arithmetic is seen without the rest of the solve
+moving underneath it — but it is not the cost of an apply in the Newton loop.
+<code>src/hex8/cvfem_hex8_ns_core.hpp:5</code> says the two families "differ in physics, not just in
+layout"; the tables above are what that sentence costs.</p>
+<p><strong>The residual's headline overstates the real operator by 2.11x</strong>, 2912 MDOF/s against 1377
+for the same kernel carrying Rhie–Chow, the boundary closure and the transient term. <strong>For
+the Jacobian action it is 2.43x</strong>, 2018 against 830.</p>
+<p>That second figure used to be 3.68x, and the difference is the point of the most recent
+work rather than a change in the physics. The exact Rhie–Chow Jacobian differentiates
+through the nodal pressure-gradient reconstruction, so every matvec rebuilds that
+reconstruction for the Krylov direction — a term that cannot be hoisted out of anything,
+because the direction changes with every iteration. That pass used to take 5.06 ms of a
+7.34 ms matvec, 69% of it, for arithmetic that amounts to one small gradient per element.
+It now takes 1.04 ms: the denominator it was recomputing every time is pure geometry and is
+cached, and the sweep runs over packs with a ghost reduction instead of over the flat mesh
+with 24 atomics per element. <strong>The operator the solver's Krylov loop applies is 1.57x faster
+as a result</strong> — 576 to 906 MDOF/s at 8,586,756 dof, measured against the previous binary in
+one allocation.</p>
+<p>What is left of the exact term's cost is now in the element sweep rather than beside it:
+turning Rhie–Chow on takes the action from 2018 to 936, and the boundary closure and the
+transient term account for the rest. That is where a stored element tangent would act, and
+it is the next thing worth measuring.</p>
+<h2>Caching the nodal pressure gradient is worth much less than it was</h2>
+<p>1656 MDOF/s with the gradient hoisted out of the timed loop against 1351 with it rebuilt
+inside every apply, on the packed residual — a factor of <strong>1.23</strong>. On the atomic layout,
+where the reconstruction is still the flat atomic sweep, the same pair reads 618 against
+452, a factor of 1.37.</p>
+<p>Both of those used to be far larger: 2.41 and 1.60 on the same two configurations, and
+<code>docs/README_alps.md</code> records the corresponding solver option (<code>SFEM_PGRAD_CACHE</code>) as worth
+1.26x off the whole linear solve. Nothing about the caching changed. What changed is the
+thing being cached: the reconstruction is 4.9x cheaper than it was, so avoiding it buys
+proportionally less.</p>
+<p>That is worth stating plainly because it inverts a recommendation. When a pass is slow,
+hoisting it out of the inner loop is the obvious lever and it was the right one; once the
+pass is fast, the hoist is a modest optimisation carrying a real cost — the cached gradient
+has to be invalidated when the state changes, and a stale one is a wrong operator rather
+than a slow one. The measurement that justified paying that price no longer says what it
+said.</p>
+<p>The general lesson is the one this spike keeps re-learning: an optimisation's value is a
+property of the code around it, not of the optimisation, and it has to be re-measured after
+anything nearby moves.</p>
+<h2>The packed layout's advantage shrinks as the physics is added</h2>
+<p>Against the atomic layout at 4,121,204 dof:</p>
+<table>
+<thead>
+<tr>
+<th>operator</th>
+<th align="right">packed</th>
+<th align="right">atomic</th>
+<th align="right">packed / atomic</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>residual, element kernel only</td>
+<td align="right">2912</td>
+<td align="right">826</td>
+<td align="right"><strong>3.53x</strong></td>
+</tr>
+<tr>
+<td>+ Rhie–Chow, gradient hoisted</td>
+<td align="right">1656</td>
+<td align="right">618</td>
+<td align="right">2.68x</td>
+</tr>
+<tr>
+<td>+ Rhie–Chow + boundary</td>
+<td align="right">1490</td>
+<td align="right">624</td>
+<td align="right">2.39x</td>
+</tr>
+<tr>
+<td>Jacobian action, element kernel only</td>
+<td align="right">1837</td>
+<td align="right">785</td>
+<td align="right">2.34x</td>
+</tr>
+<tr>
+<td>+ Rhie–Chow + boundary</td>
+<td align="right">888</td>
+<td align="right">453</td>
+<td align="right">1.96x</td>
+</tr>
+</tbody>
+</table>
+<p>The packed layout is still the right choice — it wins in every row — but a layout
+comparison made on the bare kernel overstates the margin by roughly 1.5 to 2. The reason is
+structural rather than incidental: packing buys its advantage in the element sweep, through
+SIMD over a pack and a ghost reduction in place of atomics, and most of what is added here
+is either a separate pass over the mesh or arithmetic that vectorises less well.</p>
+<p>One row deserves a caveat rather than a reading. With the gradient rebuilt inside every
+apply the ratio reads 2.99x, <em>higher</em> than the bare kernel's — but that is an artefact of
+where the reconstruction runs. It now sweeps over packs, and the benchmark builds no pack
+for a plain <code>--layout atomic</code> residual, so the atomic side of that particular row is still
+paying for the old flat atomic sweep while the packed side is not. The solver has a pack in
+both cases and would not show the same gap.</p>
+<p>The same caution applies to any two rows in the tables above: they are comparable only when
+the completeness column matches, and only when the gap between them exceeds the <code>spread</code>
+each was measured with.</p>
+<h2>The other way to apply the Jacobian</h2>
+<p>An SpMV of the assembled BSR is the alternative to the matrix-free action, so it belongs in
+the cascade rather than in a table of its own — the question "what does a matvec cost" has
+two answers and only one of them is matrix-free.</p>
+<p><strong>446 MDOF/s at 4,121,204 dof, against 888 for the matrix-free action carrying the same
+physics.</strong> Matrix-free wins by 1.99x on the apply alone, and that is before counting the
+assembly that produced the matrix: 83 MDOF/s on the colored layout and 38 on the atomic
+one, which is 5 and 12 SpMVs' worth of work respectively, spent to build something that is
+then slower to apply than not building it at all. The assembled operator earns its place as
+a preconditioner — it is what block-Jacobi and the Schur diagonal are read out of — and not
+as an apply.</p>
+<p>That margin was 1.25x until recently, and it widened without the SpMV moving at all: the
+matrix-free operator got faster. Which is the shape of this comparison in general — the
+SpMV's cost is set by the matrix and does not respond to anything done to the kernel, so
+every improvement on the matrix-free side is a full improvement in the ratio.</p>
+<p><strong>One row per problem size is enough, because the cost does not depend on the physics.</strong>
+The sparsity pattern is the mesh's node-to-node graph whatever terms the values carry, and
+it stays that way by design: the exact Rhie–Chow term is deliberately kept out of the
+assembled matrix precisely because it would couple pressures beyond nearest neighbours and
+widen the pattern (<code>cvfem_hex8_ns_upwind_kernels.hpp:135</code>). That is an argument, though, not
+a measurement, so the job measures it — bare, with Rhie–Chow, and with Rhie–Chow and the
+boundary closure — and the three read 446, 445 and 444 MDOF/s, 0.5% apart. If they ever
+stop agreeing, the pattern has widened and something more interesting than a throughput has
+changed.</p>
+<p>It barely varies with size — 447 MDOF/s at 1,098,500 dof against 446 at 4,121,204, inside
+the spread of either. That is itself worth a sentence, because the obvious explanation for
+any size dependence would be cache residency and it is not available here: the values are
+about 840 bytes per dof at both sizes (878 MiB and 3329 MiB), so both matrices are far past
+the 117 MiB of L3 and the SpMV streams from DRAM in both cases.</p>
+<p>That 840 bytes per dof is the durable point about this operator. The matrix-free action
+reads the state and the mesh and recomputes everything else, so it moves a small constant
+per dof no matter how much physics it carries; the SpMV moves the whole matrix every time.
+That is why the SpMV's cost is flat across the physics — the traffic is the same — and why
+adding arithmetic to the matrix-free operator narrows the gap between them from 4.5x on
+the bare kernel to 2.0x, without ever closing it.</p>
+<h2>Provenance</h2>
+<table>
+<thead>
+<tr>
+<th>field</th>
+<th>value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>generated</td>
+<td>2026-09-11 10:44:43</td>
+</tr>
+<tr>
+<td>rows</td>
+<td>71</td>
+</tr>
+<tr>
+<td>machines</td>
+<td>nid006567</td>
+</tr>
+<tr>
+<td>sources</td>
+<td>kernels-det-4644425.csv</td>
+</tr>
+</tbody>
+</table>
+<p>Regenerate with <code>python3 python/cvfem_kernel_report.py &lt;csv&gt; -o docs/CVFEM_Kernels.md --html</code>.</p>
+</body>
+</html>

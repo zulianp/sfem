@@ -40,6 +40,10 @@ namespace sfem {
     public:
 
         const char *name() const override { return "PackedLaplacian"; }
+
+        //! the Dirichlet energy
+
+        bool energy_or_potential_based() const override { return true; }
         inline bool is_linear() const override { return true; }
         ptrdiff_t  n_dofs_domain() const override;
         ptrdiff_t  n_dofs_image() const override;

@@ -2,7 +2,20 @@ import math
 
 import sympy as sp
 
-from codegen.framework.symbolic.core import GeneratedKernelFile, _sfem_ccode, _sfem_math_header_source
+from codegen.framework.plans.conventions import (
+    optional_sfem_include,
+    restrict_prelude,
+    sfem_scalar_type_fallback,
+    sfem_scalar_type_prelude,
+)
+
+from codegen.framework.emitters.artifacts import (
+    GeneratedKernelFile,
+)
+from codegen.framework.emitters.cprinter import (
+    _sfem_ccode,
+    _sfem_math_header_source,
+)
 from codegen.framework.emitters.energy_codegen import _sfem_soa_diagnostics_header
 from codegen.framework.fem.reference import (
     sfem_is_proteus_hex_element,
@@ -12,11 +25,18 @@ from codegen.framework.fem.reference import (
     _sfem_unit_interval_gauss_rule,
     _tri6_reference_gradients,
 )
-from codegen.framework.backends.targets import OpenMPTarget
+from codegen.framework.targets import current_target
+from codegen.framework.emitters.ast_printer import element_loop_lines
+from codegen.framework.plans.boundary_usage import (
+    boundary_coefficient_usage,
+    coordinate_symbols as _coordinate_candidates,
+)
+from codegen.framework.plans.residual_model import residual_emission_model
 
 
 def _target():
-    return OpenMPTarget()
+    """The target this emission prints for -- bound by the backend, not chosen here."""
+    return current_target()
 
 
 def _function_qualifier():
@@ -73,9 +93,7 @@ def generate_boundary_residual_sfem_files(
         raise ValueError("boundary residual codegen requires measure 'ds'")
     if len(tuple(collection.fields)) != 1:
         raise ValueError("boundary residual codegen currently supports one field")
-    system = collection.source
-    if system is None:
-        raise ValueError("boundary residual form collection requires a lowered residual system")
+    system = residual_emission_model(collection)
     field = tuple(collection.fields)[0]
     components = int(field.components)
     coefficients = _boundary_coefficients_from_expression_plan(system, expression_plan)
@@ -93,11 +111,114 @@ def generate_boundary_residual_sfem_files(
         system,
         use_tensor_product=_uses_tensor_product_boundary_surface(surface),
     )
+    target = current_target()
+    inline_qualifier = target.inline_qualifier()
     return (
-        GeneratedKernelFile("kernel_math.hpp", _sfem_math_header_source()),
-        GeneratedKernelFile("kernel_diagnostics.hpp", "\n".join(_sfem_soa_diagnostics_header())),
-        GeneratedKernelFile("%s_boundary_operator.cpp" % prefix, source),
+        GeneratedKernelFile(
+            target.header_name("kernel_math"),
+            _sfem_math_header_source(
+                target.header_guard_suffix(),
+                inline_qualifier,
+                inline_qualifier == "SFEM_INLINE",
+            ),
+        ),
+        GeneratedKernelFile(
+            target.header_name("kernel_diagnostics"),
+            "\n".join(
+                _sfem_soa_diagnostics_header(
+                    target.diagnostic_work_item(),
+                    target.header_guard_suffix(),
+                    inline_qualifier,
+                    inline_qualifier == "SFEM_INLINE",
+                    host_qualifier=target.host_function_qualifier(),
+                )
+            ),
+        ),
+        GeneratedKernelFile(
+            "%s_boundary_operator.%s" % (prefix, _boundary_operator_extension(target)),
+            source,
+        ),
     )
+
+
+def _table_accessor_qualifier():
+    """`static`, plus whatever a kernel needs in order to call it here."""
+    qualifier = current_target().kernel_callable_qualifier()
+    return "static %s" % qualifier if qualifier else "static"
+
+
+def _boundary_target_lines(function, sideset_function, current_args, param_args, scatter_streams):
+    """The five things about a boundary kernel that the target decides.
+
+    Same set the mesh kernels take -- how the pass is opened, how the kernel is
+    declared, how it returns, how the entry point reaches it -- and the same
+    reason: written down here they were the CPU's answers, and a device
+    generation produced an `extern "C"` host function containing
+    `#pragma omp parallel for` and a serial walk of every element.
+    """
+    target = current_target()
+    #: The leading break is this family's own wrapping, preserved for the
+    #: reason the counter name is.
+    element_arguments = (
+        "\n      nelements, nnodes, elements, points%s%s, out_stride, %s"
+        % (current_args, param_args, scatter_streams)
+    )
+    sideset_arguments = (
+        "\n      nsides, nnodes, elements, parent, side_idx, points%s%s, out_stride, %s"
+        % (current_args, param_args, scatter_streams)
+    )
+    suffix = target.entry_point_suffix_parameters()
+    return {
+        "public_function": target.entry_point_name(function),
+        "public_function_float": target.entry_point_name("%s_float" % function),
+        "public_sideset_function": target.entry_point_name(sideset_function),
+        "public_sideset_function_float": target.entry_point_name(
+            "%s_float" % sideset_function
+        ),
+        #: The declaration's tail.  It has to be a suffix rather than a
+        #: parameter in the list, because these four parameter lists are
+        #: assembled from the form's own components and end wherever they end.
+        "entry_point_suffix": "".join(",\n    %s" % parameter for parameter in suffix),
+        "element_kernel_line": target.mesh_function_line("%s_impl" % function),
+        "sideset_kernel_line": target.mesh_function_line("%s_impl" % sideset_function),
+        #: `index="e"` and no schedule: this family has always spelled its
+        #: counter `e` and its pragma without one, and the point of routing it
+        #: through the target is the device lowering, not a tidy-up that moves
+        #: bytes in thirteen tracked files.
+        "element_loop": "\n".join(
+            element_loop_lines(target, index="e", schedule=None)
+        ),
+        "sideset_loop": "\n".join(
+            element_loop_lines(target, index="s", extent="nsides", schedule=None)
+        ),
+        "success_return": "\n".join(target.success_return_lines()),
+        "element_launch_real": "\n".join(
+            target.mesh_launch_lines("%s_impl" % function, "real_t", (element_arguments,))
+        ),
+        "element_launch_float": "\n".join(
+            target.mesh_launch_lines("%s_impl" % function, "float", (element_arguments,))
+        ),
+        "sideset_launch_real": "\n".join(
+            target.mesh_launch_lines(
+                "%s_impl" % sideset_function, "real_t", (sideset_arguments,), extent="nsides"
+            )
+        ),
+        "sideset_launch_float": "\n".join(
+            target.mesh_launch_lines(
+                "%s_impl" % sideset_function, "float", (sideset_arguments,), extent="nsides"
+            )
+        ),
+    }
+
+
+def _boundary_operator_extension(target):
+    """The boundary operator's translation unit, named by the target.
+
+    The mesh kernels take theirs from the backend, which is handed down through
+    `MeshKernelPlan`; this emitter builds its own filename from a prefix, so it
+    asks the bound target directly.
+    """
+    return {"cuda": "cu", "hip": "hip"}.get(target.language.value, "cpp")
 
 
 def _surface_element(element_type):
@@ -295,259 +416,246 @@ def _boundary_source(function, element_type, surface, components, parameters, co
             % (element_type, n_shape)
         )
     side_node_values = tuple(node for side in side_nodes for node in side)
-    sideset_function = function.replace("_boundary_residual_soa", "_boundary_residual_sideset_soa")
-    param_decls = "".join(", const scalar_t %s" % parameter for parameter in parameters)
+    sideset_function = function.replace("_boundary_residual_soa", "_boundary_residual_ss_soa")
+    param_decls = "".join(", const s_t %s" % parameter for parameter in parameters)
     extern_param_decls = "".join(", const real_t %s" % parameter for parameter in parameters)
     extern_float_param_decls = "".join(", const float %s" % parameter for parameter in parameters)
     param_args = "".join(", %s" % parameter for parameter in parameters)
-    current_decls = _current_declarations(current_symbols, "scalar_t")
+    current_decls = _current_declarations(current_symbols, "s_t")
     extern_current_decls = _current_declarations(current_symbols, "real_t")
     extern_float_current_decls = _current_declarations(current_symbols, "float")
     current_args = "".join(", %s" % symbol for symbol in current_symbols)
-    component_uses_coordinates = tuple(
-        bool(sp.sympify(coefficient).free_symbols.intersection(coordinate_symbols))
-        for coefficient in coefficients
-    )
-    component_uses_current = tuple(
-        bool(sp.sympify(coefficient).free_symbols.intersection(current_symbols))
-        for coefficient in coefficients
-    )
+    _usage = boundary_coefficient_usage(coefficients, coordinate_symbols, current_symbols)
+    component_uses_coordinates = _usage.component_uses_coordinates
+    component_uses_current = _usage.component_uses_current
     coeff_lines = [
-        "        const scalar_t coeff%d = %s;" % (i, _sfem_ccode(codegen_coefficients[i]))
+        "    const s_t coeff%d = %s;" % (i, _sfem_ccode(codegen_coefficients[i]))
         for i in range(components)
         if not component_uses_coordinates[i] and not component_uses_current[i]
     ]
     qp_coeff_lines = _value_eval_lines(coordinate_symbols, current_symbols) + [
-        "        const scalar_t coeff%d = %s;" % (i, _sfem_ccode(codegen_coefficients[i]))
+        "    const s_t coeff%d = %s;" % (i, _sfem_ccode(codegen_coefficients[i]))
         for i in range(components)
         if component_uses_coordinates[i] or component_uses_current[i]
     ]
+    # A constant integrand collapses: the same coefficients everywhere, one
+    # area however many points the rule carries, and every basis function
+    # integrating to the same number.  Anything else -- a traction that varies
+    # in space, a facet that is not flat -- keeps its loop.
+    uniform_integral = _uniform_shape_integral(data)
+    constant_integrand = bool(
+        not qp_coeff_lines
+        and _facet_measure_is_constant(data)
+        and uniform_integral is not None
+    )
     scatter_streams = ", ".join("out%d" % i for i in range(components))
     out_params = "\n".join(
-        "        scalar_t *const SFEM_RESTRICT out%d%s" % (i, "," if i + 1 < components else "")
+        "    s_t *const RSTR out%d%s" % (i, "," if i + 1 < components else "")
         for i in range(components)
     )
     extern_out_params = "\n".join(
-        "        real_t *const SFEM_RESTRICT out%d%s" % (i, "," if i + 1 < components else "")
+        "    real_t *const RSTR out%d%s" % (i, "," if i + 1 < components else "")
         for i in range(components)
     )
     extern_float_out_params = "\n".join(
-        "        float *const SFEM_RESTRICT out%d%s" % (i, "," if i + 1 < components else "")
+        "    float *const RSTR out%d%s" % (i, "," if i + 1 < components else "")
         for i in range(components)
     )
-    return """#include "sfem_base.hpp"
-#include "sfem_macros.hpp"
+    return """{scalar_type_prelude}
+{macros_include}
+{scalar_type_fallback}
+{restrict_prelude}
 
 #include <math.h>
-#include "kernel_math.hpp"
+#include "{math_header}"{launch_status_include}
 
 namespace sfem {{
 namespace codegen {{
 
-template <typename scalar_t>
+template <typename s_t>
 struct {function}_reference_data {{
-    static constexpr int N_SHAPE = {n_shape};
-    static constexpr int N_QP = {n_qp};
-    static constexpr int REF_DIM = {ref_dim};
-    static constexpr int PHYSICAL_DIM = {physical_dim};
-
-    static const scalar_t *shape() {{
-        static const scalar_t data[{shape_count}] = {{
-{shape_values}
-        }};
-        return data;
-    }}
-
-    static const scalar_t *grad() {{
-        static const scalar_t data[{grad_count}] = {{
-{grad_values}
-        }};
-        return data;
-    }}
-
-    static const scalar_t *weight() {{
-        static const scalar_t data[{weight_count}] = {{
-{weight_values}
-        }};
-        return data;
-    }}
+  static constexpr int NS = {n_shape};
+{quadrature_members}{grad_member}
 }};
 
-template <typename scalar_t>
-{function_qualifier} scalar_t {function}_measure(
-        const int q,
-        const idx_t *const SFEM_RESTRICT ev,
-        const geom_t *const *const SFEM_RESTRICT points) {{
-    const scalar_t *const grad = {function}_reference_data<scalar_t>::grad();
-    const int n_shape = {function}_reference_data<scalar_t>::N_SHAPE;
-{measure_body}
+template <typename s_t>
+{function_qualifier} s_t {function}_measure({measure_point}
+    const idx_t *const RSTR ev,
+    const geom_t *const *const RSTR points) {{
+{measure_preamble}{measure_body}
 }}
 
 {function_qualifier} const int *{function}_side_nodes() {{
-    static const int data[{side_node_count}] = {{
+  static const int data[{side_node_count}] = {{
 {side_node_values}
-    }};
-    return data;
+  }};
+  return data;
 }}
 
 {function_qualifier} void {function}_gather_sideset_element(
-        const element_idx_t parent_element,
-        const int side,
-        idx_t **const SFEM_RESTRICT elements,
-        idx_t *const SFEM_RESTRICT ev) {{
-    const int *const SFEM_RESTRICT side_nodes = {function}_side_nodes();
-    constexpr int n_shape = {n_shape};
-    for (int i = 0; i < n_shape; ++i) {{
-        ev[i] = elements[side_nodes[side * n_shape + i]][parent_element];
-    }}
+    const element_idx_t parent_element,
+    const int side,
+    idx_t **const RSTR elements,
+    idx_t *const RSTR ev) {{
+  const int *const RSTR side_nodes = {function}_side_nodes();
+  constexpr int n_shape = {n_shape};
+  for (int i = 0; i < n_shape; ++i) {{
+    ev[i] = elements[side_nodes[side * n_shape + i]][parent_element];
+  }}
 }}
 
-template <typename scalar_t>
+template <typename s_t>
 {function_qualifier} void {function}_element(
-        const idx_t *const SFEM_RESTRICT ev,
-        const geom_t *const *const SFEM_RESTRICT points{current_decls}{param_decls},
-        scalar_t element_vector[{components}][{n_shape}]) {{
-    const scalar_t *const shape = {function}_reference_data<scalar_t>::shape();
-    const scalar_t *const weight = {function}_reference_data<scalar_t>::weight();
-    const int n_shape = {function}_reference_data<scalar_t>::N_SHAPE;
-    const int n_qp = {function}_reference_data<scalar_t>::N_QP;
+    const idx_t *const RSTR ev,
+    const geom_t *const *const RSTR points{current_decls}{param_decls},
+    s_t element_vector[{components}][{n_shape}]) {{
+{reference_aliases}  const int n_shape = {function}_reference_data<s_t>::NS;
 
 {coeff_lines}
 
-    for (int q = 0; q < n_qp; ++q) {{
-        const scalar_t dS = {function}_measure<scalar_t>(q, ev, points);
-        const scalar_t qw = weight[q] * dS;
-{qp_coeff_lines}
-{vectorize_pragma}
-        for (int i = 0; i < n_shape; ++i) {{
-            const scalar_t test = shape[q * n_shape + i] * qw;
-{accum_lines}
-        }}
-    }}
+{integration_body}
 }}
 
-template <typename scalar_t>
+template <typename s_t>
 {function_qualifier} void {function}_scatter_element(
-        const idx_t *const SFEM_RESTRICT ev,
-        const scalar_t element_vector[{components}][{n_shape}],
-        const int out_stride,
+    const idx_t *const RSTR ev,
+    const s_t element_vector[{components}][{n_shape}],
+    const int out_stride,
 {out_params}) {{
-    constexpr int n_shape = {n_shape};
-    for (int i = 0; i < n_shape; ++i) {{
-        const idx_t node = ev[i];
+  constexpr int n_shape = {n_shape};
+  for (int i = 0; i < n_shape; ++i) {{
+    const idx_t node = ev[i];
 {scatter_lines}
-    }}
+  }}
 }}
 
-template <typename scalar_t>
-{function_qualifier} int {function}_impl(
-        const ptrdiff_t nelements,
-        const ptrdiff_t,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points{current_decls}{param_decls},
-        const int out_stride,
+template <typename s_t>
+{element_kernel_line}
+    const ptrdiff_t nelements,
+    const ptrdiff_t,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points{current_decls}{param_decls},
+    const int out_stride,
 {out_params}) {{
-{parallel_for_pragma}
-    for (ptrdiff_t e = 0; e < nelements; ++e) {{
-        idx_t ev[{n_shape}];
-        scalar_t element_vector[{components}][{n_shape}];
-        for (int i = 0; i < {n_shape}; ++i) {{
-            ev[i] = elements[i][e];
-        }}
-        for (int c = 0; c < {components}; ++c) {{
-            for (int i = 0; i < {n_shape}; ++i) {{
-                element_vector[c][i] = scalar_t(0);
-            }}
-        }}
-        {function}_element<scalar_t>(ev, points{current_args}{param_args}, element_vector);
-        {function}_scatter_element<scalar_t>(ev, element_vector, out_stride, {scatter_streams});
+{element_loop}
+    idx_t ev[{n_shape}];
+    s_t element_vector[{components}][{n_shape}];
+    for (int i = 0; i < {n_shape}; ++i) {{
+      ev[i] = elements[i][e];
     }}
+    for (int c = 0; c < {components}; ++c) {{
+      for (int i = 0; i < {n_shape}; ++i) {{
+        element_vector[c][i] = s_t(0);
+      }}
+    }}
+    {function}_element<s_t>(ev, points{current_args}{param_args}, element_vector);
+    {function}_scatter_element<s_t>(ev, element_vector, out_stride, {scatter_streams});
+  }}
 
-    return SFEM_SUCCESS;
+{success_return}
 }}
 
-template <typename scalar_t>
-{function_qualifier} int {sideset_function}_impl(
-        const ptrdiff_t nsides,
-        const ptrdiff_t,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points{current_decls}{param_decls},
-        const int out_stride,
+template <typename s_t>
+{sideset_kernel_line}
+    const ptrdiff_t nsides,
+    const ptrdiff_t,
+    idx_t **const RSTR elements,
+    const element_idx_t *const RSTR parent,
+    const int16_t *const RSTR side_idx,
+    const geom_t *const *const RSTR points{current_decls}{param_decls},
+    const int out_stride,
 {out_params}) {{
-{parallel_for_pragma}
-    for (ptrdiff_t s = 0; s < nsides; ++s) {{
-        idx_t ev[{n_shape}];
-        scalar_t element_vector[{components}][{n_shape}];
-        {function}_gather_sideset_element(parent[s], side_idx[s], elements, ev);
-        for (int c = 0; c < {components}; ++c) {{
-            for (int i = 0; i < {n_shape}; ++i) {{
-                element_vector[c][i] = scalar_t(0);
-            }}
-        }}
-        {function}_element<scalar_t>(ev, points{current_args}{param_args}, element_vector);
-        {function}_scatter_element<scalar_t>(ev, element_vector, out_stride, {scatter_streams});
+{sideset_loop}
+    idx_t ev[{n_shape}];
+    s_t element_vector[{components}][{n_shape}];
+    {function}_gather_sideset_element(parent[s], side_idx[s], elements, ev);
+    for (int c = 0; c < {components}; ++c) {{
+      for (int i = 0; i < {n_shape}; ++i) {{
+        element_vector[c][i] = s_t(0);
+      }}
     }}
+    {function}_element<s_t>(ev, points{current_args}{param_args}, element_vector);
+    {function}_scatter_element<s_t>(ev, element_vector, out_stride, {scatter_streams});
+  }}
 
-    return SFEM_SUCCESS;
+{success_return}
 }}
 
 }}  // namespace codegen
 }}  // namespace sfem
 
-extern "C" int {function}(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points{extern_current_decls}{extern_param_decls},
-        const int out_stride,
-{extern_out_params}) {{
-    return sfem::codegen::{function}_impl<real_t>(
-            nelements, nnodes, elements, points{current_args}{param_args}, out_stride, {scatter_streams});
+extern "C" int {public_function}(
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points{extern_current_decls}{extern_param_decls},
+    const int out_stride,
+{extern_out_params}{entry_point_suffix}) {{
+{element_launch_real}
 }}
 
-extern "C" int {function}_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points{extern_float_current_decls}{extern_float_param_decls},
-        const int out_stride,
-{extern_float_out_params}) {{
-    return sfem::codegen::{function}_impl<float>(
-            nelements, nnodes, elements, points{current_args}{param_args}, out_stride, {scatter_streams});
+extern "C" int {public_function_float}(
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points{extern_float_current_decls}{extern_float_param_decls},
+    const int out_stride,
+{extern_float_out_params}{entry_point_suffix}) {{
+{element_launch_float}
 }}
 
-extern "C" int {sideset_function}(
-        const ptrdiff_t nsides,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points{extern_current_decls}{extern_param_decls},
-        const int out_stride,
-{extern_out_params}) {{
-    return sfem::codegen::{sideset_function}_impl<real_t>(
-            nsides, nnodes, elements, parent, side_idx, points{current_args}{param_args}, out_stride, {scatter_streams});
+extern "C" int {public_sideset_function}(
+    const ptrdiff_t nsides,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const element_idx_t *const RSTR parent,
+    const int16_t *const RSTR side_idx,
+    const geom_t *const *const RSTR points{extern_current_decls}{extern_param_decls},
+    const int out_stride,
+{extern_out_params}{entry_point_suffix}) {{
+{sideset_launch_real}
 }}
 
-extern "C" int {sideset_function}_float(
-        const ptrdiff_t nsides,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points{extern_float_current_decls}{extern_float_param_decls},
-        const int out_stride,
-{extern_float_out_params}) {{
-    return sfem::codegen::{sideset_function}_impl<float>(
-            nsides, nnodes, elements, parent, side_idx, points{current_args}{param_args}, out_stride, {scatter_streams});
+extern "C" int {public_sideset_function_float}(
+    const ptrdiff_t nsides,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const element_idx_t *const RSTR parent,
+    const int16_t *const RSTR side_idx,
+    const geom_t *const *const RSTR points{extern_float_current_decls}{extern_float_param_decls},
+    const int out_stride,
+{extern_float_out_params}{entry_point_suffix}) {{
+{sideset_launch_float}
 }}
 """.format(
+        restrict_prelude="\n".join(restrict_prelude()),
+        scalar_type_prelude="\n".join(sfem_scalar_type_prelude()),
+        macros_include="\n".join(optional_sfem_include("sfem_macros.hpp")),
+        scalar_type_fallback="\n".join(sfem_scalar_type_fallback()),
+        math_header=current_target().header_name("kernel_math"),
+        #: The entry points below ask `launch_status` whether their launch
+        #: started, and it lives with the other things a launching target
+        #: needs.  The boundary family writes that header already; it just
+        #: never included it.
+        launch_status_include=(
+            '\n#include "%s"' % current_target().header_name("kernel_diagnostics")
+            if current_target().supports_device_kernels
+            else ""
+        ),
+        #: The reference tables are called from `{function}_element`, which is
+        #: `__host__ __device__` on a device target.  They carried no qualifier
+        #: at all -- correct for the only target that had ever read them, and
+        #: `warning #20011-D: calling a __host__ function ... is not allowed`
+        #: on any other.  This is OP 27's fix for the quadrature tables,
+        #: applied to the copy the boundary family keeps.
+        table_accessor=_table_accessor_qualifier(),
+        **_boundary_target_lines(
+            function, sideset_function, current_args, param_args, scatter_streams
+        ),
         function=function,
         function_qualifier=_function_qualifier(),
         parallel_for_pragma=_parallel_for_pragma(),
-        vectorize_pragma=_vectorize_pragma(),
+        vectorize_pragma=_vectorize_pragma() or "",
         sideset_function=sideset_function,
         n_shape=n_shape,
         n_qp=n_qp,
@@ -561,7 +669,15 @@ extern "C" int {sideset_function}_float(
         shape_values=_cpp_array_values(data["shape"]),
         grad_values=_cpp_array_values(data["grad"]),
         weight_values=_cpp_array_values(data["weight"]),
-        measure_body=_measure_body(ref_dim, physical_dim),
+        measure_body=_MEASURE_BODY[_facet_measure_is_constant(data)](
+            data, ref_dim, physical_dim
+        ),
+        measure_point=_MEASURE_POINT[_facet_measure_is_constant(data)],
+        measure_preamble=_MEASURE_PREAMBLE[_facet_measure_is_constant(data)](function),
+        grad_member=_GRAD_MEMBER[_facet_measure_is_constant(data)](
+            _table_accessor_qualifier(), len(data["grad"]),
+            _cpp_array_values(data["grad"]),
+        ),
         current_decls=current_decls,
         extern_current_decls=extern_current_decls,
         extern_float_current_decls=extern_float_current_decls,
@@ -574,21 +690,157 @@ extern "C" int {sideset_function}_float(
         extern_out_params=extern_out_params,
         extern_float_out_params=extern_float_out_params,
         coeff_lines="\n".join(coeff_lines),
-        qp_coeff_lines="\n".join(qp_coeff_lines),
         components=components,
-        accum_lines="\n".join(
-            "                element_vector[{c}][i] += coeff{c} * test;".format(c=c)
-            for c in range(components)
+        quadrature_members=(
+            ""
+            if constant_integrand
+            else _QUADRATURE_MEMBERS.format(
+                n_qp=n_qp,
+                table_accessor=_table_accessor_qualifier(),
+                shape_count=len(data["shape"]),
+                shape_values=_cpp_array_values(data["shape"]),
+                weight_count=len(data["weight"]),
+                weight_values=_cpp_array_values(data["weight"]),
+            )
+        ),
+        reference_aliases="".join(
+            "  %s\n" % alias
+            for alias in _REFERENCE_ALIASES[constant_integrand](function)
+        ),
+        integration_body="\n".join(
+            _INTEGRATION_BODY[constant_integrand](function, data, uniform_integral, "  ")
+            + list(qp_coeff_lines)
+            + [_vectorize_pragma() or ""]
+            + ["    for (int i = 0; i < n_shape; ++i) {"]
+            + _TEST_VALUE_LINES[constant_integrand]
+            + [
+                "        element_vector[{c}][i] += coeff{c} * test;".format(c=c)
+                for c in range(components)
+            ]
+            + ["    }", "  }"]
         ),
         scatter_lines="\n".join(
-            "{atomic_update_pragma}\n            out{c}[node * out_stride] += element_vector[{c}][i];".format(
-                atomic_update_pragma=_atomic_update_pragma(),
-                c=c,
-            )
+            line
             for c in range(components)
+            for line in current_target().scatter_add_lines(
+                "out%d[node * out_stride]" % c,
+                "element_vector[%d][i]" % c,
+                "            ",
+                pragma_indent="",
+            )
         ),
         scatter_streams=scatter_streams,
     )
+
+
+def _facet_measure_is_constant(data):
+    """Whether this facet's measure is the same at every quadrature point.
+
+    The measure is built from the facet's reference gradients, so it varies
+    over the points exactly when they do.  A flat facet -- a straight edge, a
+    triangle -- has constant ones and therefore one area, however many points
+    its rule carries.
+    """
+    per_point = data["n_shape"] * data["ref_dim"]
+    first = tuple(data["grad"][:per_point])
+    return all(
+        tuple(data["grad"][q * per_point:(q + 1) * per_point]) == first
+        for q in range(data["n_qp"])
+    )
+
+
+#: The point a measure call passes, which is the same answer that shaped the
+#: signature.  A varying integrand on a flat facet is a real combination --
+#: `neumann_general` with a coordinate-dependent traction on a triangle -- so the
+#: quadrature body has to ask this too rather than assume it has a `q` to give.
+_MEASURE_ARGUMENT = {True: "", False: "q, "}
+
+
+def _measure_argument(data):
+    return _MEASURE_ARGUMENT[_facet_measure_is_constant(data)]
+
+
+def _uniform_shape_integral(data):
+    """`integral phi_i` over the reference facet, when every `i` gives the same.
+
+    Returns the common value, or `None` where the shape functions do not share
+    one.  They do on a lowest-order simplex -- each vertex function integrates
+    to the facet's reference area divided by the number of vertices -- which is
+    what makes the whole quadrature sum collapse to a single constant.
+    """
+    n_shape, n_qp = data["n_shape"], data["n_qp"]
+    integrals = [
+        sum(
+            (
+                sp.nsimplify(data["weight"][q]) * sp.nsimplify(data["shape"][q * n_shape + i])
+                for q in range(n_qp)
+            ),
+            sp.S.Zero,
+        )
+        for i in range(n_shape)
+    ]
+    return integrals[0] if len(set(integrals)) == 1 else None
+
+
+#: How the facet integral is written, keyed on whether its integrand is
+#: constant over the facet.  A table because the answer is read off the facet
+#: and the coefficients rather than decided at the call site.
+_INTEGRATION_BODY = {
+    True: lambda function, data, integral, indent: [
+        "  {",
+        "    const s_t test = %s * %s_measure<s_t>(%sev, points);"
+        % (_sfem_ccode(integral), function, _measure_argument(data)),
+    ],
+    False: lambda function, data, integral, indent: [
+        "  for (int q = 0; q < n_qp; ++q) {",
+        "    const s_t dS = %s_measure<s_t>(%sev, points);"
+        % (function, _measure_argument(data)),
+        "    const s_t qw = weight[q] * dS;",
+    ],
+}
+
+
+#: The reference tables the body above reads.  The constant integrand reads
+#: none: its weights and shape values are folded into one number.
+#: What the reference-data struct carries beyond the shape count.  A kernel
+#: that folded its quadrature into one constant reads none of it: no point
+#: count, no shape values, no weights.  Only `grad`, which the measure needs
+#: whatever the integrand looks like, stays outside this.
+_QUADRATURE_MEMBERS = """  static constexpr int NQ = {n_qp};
+
+  {table_accessor} const s_t *shape() {{
+    static const s_t data[{shape_count}] = {{
+{shape_values}
+    }};
+    return data;
+  }}
+
+  {table_accessor} const s_t *weight() {{
+    static const s_t data[{weight_count}] = {{
+{weight_values}
+    }};
+    return data;
+  }}
+"""
+
+
+#: The per-shape test value, where it still has to be looked up.  The constant
+#: integrand already named `test` above the loop, because it is the same for
+#: every shape function.
+_TEST_VALUE_LINES = {
+    True: [],
+    False: ["      const s_t test = shape[q * n_shape + i] * qw;"],
+}
+
+
+_REFERENCE_ALIASES = {
+    True: lambda function: (),
+    False: lambda function: (
+        "const s_t *const shape = %s_reference_data<s_t>::shape();" % function,
+        "const s_t *const weight = %s_reference_data<s_t>::weight();" % function,
+        "const int n_qp = %s_reference_data<s_t>::NQ;" % function,
+    ),
+}
 
 
 def _coordinate_symbol_tuple(physical_dim):
@@ -596,11 +848,9 @@ def _coordinate_symbol_tuple(physical_dim):
 
 
 def _coefficient_coordinate_symbols(coefficients, physical_dim):
-    coordinate_symbols = set(_coordinate_symbol_tuple(physical_dim))
-    used = set()
-    for coefficient in coefficients:
-        used.update(sp.sympify(coefficient).free_symbols.intersection(coordinate_symbols))
-    return tuple(symbol for symbol in _coordinate_symbol_tuple(physical_dim) if symbol in used)
+    return boundary_coefficient_usage(
+        coefficients, _coordinate_candidates(physical_dim), ()
+    ).coordinates
 
 
 def _filter_coordinate_parameters(parameters, physical_dim):
@@ -609,11 +859,8 @@ def _filter_coordinate_parameters(parameters, physical_dim):
 
 
 def _coefficient_current_symbols(system, coefficients):
-    current_symbols = tuple(field.value for field in system.fields)
-    used = set()
-    for coefficient in coefficients:
-        used.update(sp.sympify(coefficient).free_symbols.intersection(current_symbols))
-    return tuple(symbol for symbol in current_symbols if symbol in used)
+    candidates = tuple(field.value for field in system.fields)
+    return boundary_coefficient_usage(coefficients, (), candidates).current
 
 
 def _replace_current_symbols(coefficients, current_symbols):
@@ -628,7 +875,7 @@ def _replace_current_symbols(coefficients, current_symbols):
 
 def _current_declarations(current_symbols, scalar_type):
     return "".join(
-        ", const %s *const SFEM_RESTRICT %s" % (scalar_type, symbol)
+        ", const %s *const RSTR %s" % (scalar_type, symbol)
         for symbol in current_symbols
     )
 
@@ -637,28 +884,28 @@ def _value_eval_lines(coordinate_symbols, current_symbols):
     if not coordinate_symbols and not current_symbols:
         return []
     lines = [
-        "        scalar_t %s = scalar_t(0);" % symbol
+        "    s_t %s = s_t(0);" % symbol
         for symbol in coordinate_symbols
     ]
     lines.extend(
-        "        scalar_t %s_q = scalar_t(0);" % symbol
+        "    s_t %s_q = s_t(0);" % symbol
         for symbol in current_symbols
     )
     lines.extend(
         [
-            "        for (int j = 0; j < n_shape; ++j) {",
-            "            const scalar_t phi = shape[q * n_shape + j];",
-            "            const idx_t node = ev[j];",
+            "    for (int j = 0; j < n_shape; ++j) {",
+            "      const s_t phi = shape[q * n_shape + j];",
+            "      const idx_t node = ev[j];",
         ]
     )
     for symbol in coordinate_symbols:
         component = int(str(symbol)[1:])
         lines.append(
-            "            %s += scalar_t(points[%d][node]) * phi;" % (symbol, component)
+            "      %s += s_t(points[%d][node]) * phi;" % (symbol, component)
         )
     for symbol in current_symbols:
-        lines.append("            %s_q += %s[node] * phi;" % (symbol, symbol))
-    lines.append("        }")
+        lines.append("      %s_q += %s[node] * phi;" % (symbol, symbol))
+    lines.append("    }")
     return lines
 
 
@@ -666,35 +913,35 @@ def _tensor_value_eval_lines(coordinate_symbols, current_symbols):
     if not coordinate_symbols and not current_symbols:
         return []
     lines = [
-        "            scalar_t %s = scalar_t(0);" % symbol
+        "      s_t %s = s_t(0);" % symbol
         for symbol in coordinate_symbols
     ]
     lines.extend(
-        "            scalar_t %s_q = scalar_t(0);" % symbol
+        "      s_t %s_q = s_t(0);" % symbol
         for symbol in current_symbols
     )
     lines.extend(
         [
-            "            for (int cy = 0; cy < S; ++cy) {",
-            "                const scalar_t vy_coord = shape_1d[qy * S + cy];",
-            "                for (int cx = 0; cx < S; ++cx) {",
-            "                    const int j = shape_index[cy * S + cx];",
-            "                    const idx_t node = ev[j];",
-            "                    const scalar_t phi = shape_1d[qx * S + cx] * vy_coord;",
+            "      for (int cy = 0; cy < NS1; ++cy) {",
+            "        const s_t vy_coord = shape_1d[qy * NS1 + cy];",
+            "        for (int cx = 0; cx < NS1; ++cx) {",
+            "          const int j = shape_index[cy * NS1 + cx];",
+            "          const idx_t node = ev[j];",
+            "          const s_t phi = shape_1d[qx * NS1 + cx] * vy_coord;",
         ]
     )
     for symbol in coordinate_symbols:
         component = int(str(symbol)[1:])
         lines.append(
-            "                    %s += scalar_t(points[%d][node]) * phi;"
+            "          %s += s_t(points[%d][node]) * phi;"
             % (symbol, component)
         )
     for symbol in current_symbols:
-        lines.append("                    %s_q += %s[node] * phi;" % (symbol, symbol))
+        lines.append("          %s_q += %s[node] * phi;" % (symbol, symbol))
     lines.extend(
         [
-            "                }",
-            "            }",
+            "        }",
+            "      }",
         ]
     )
     return lines
@@ -721,312 +968,320 @@ def _boundary_tensor_product_source(function, element_type, surface, components,
             % (element_type, n_shape)
         )
     side_node_values = tuple(node for side in side_nodes for node in side)
-    sideset_function = function.replace("_boundary_residual_soa", "_boundary_residual_sideset_soa")
+    sideset_function = function.replace("_boundary_residual_soa", "_boundary_residual_ss_soa")
     coordinate_symbols = _coefficient_coordinate_symbols(coefficients, 3)
     current_symbols = _coefficient_current_symbols(system, coefficients)
     codegen_coefficients = _replace_current_symbols(coefficients, current_symbols)
     parameters = _filter_coordinate_parameters(parameters, 3)
-    param_decls = "".join(", const scalar_t %s" % parameter for parameter in parameters)
+    param_decls = "".join(", const s_t %s" % parameter for parameter in parameters)
     extern_param_decls = "".join(", const real_t %s" % parameter for parameter in parameters)
     extern_float_param_decls = "".join(", const float %s" % parameter for parameter in parameters)
     param_args = "".join(", %s" % parameter for parameter in parameters)
-    current_decls = _current_declarations(current_symbols, "scalar_t")
+    current_decls = _current_declarations(current_symbols, "s_t")
     extern_current_decls = _current_declarations(current_symbols, "real_t")
     extern_float_current_decls = _current_declarations(current_symbols, "float")
     current_args = "".join(", %s" % symbol for symbol in current_symbols)
-    component_uses_coordinates = tuple(
-        bool(sp.sympify(coefficient).free_symbols.intersection(coordinate_symbols))
-        for coefficient in coefficients
-    )
-    component_uses_current = tuple(
-        bool(sp.sympify(coefficient).free_symbols.intersection(current_symbols))
-        for coefficient in coefficients
-    )
+    _usage = boundary_coefficient_usage(coefficients, coordinate_symbols, current_symbols)
+    component_uses_coordinates = _usage.component_uses_coordinates
+    component_uses_current = _usage.component_uses_current
     coeff_lines = [
-        "    const scalar_t coeff%d = %s;" % (i, _sfem_ccode(codegen_coefficients[i]))
+        "  const s_t coeff%d = %s;" % (i, _sfem_ccode(codegen_coefficients[i]))
         for i in range(components)
         if not component_uses_coordinates[i] and not component_uses_current[i]
     ]
     qp_coeff_lines = _tensor_value_eval_lines(coordinate_symbols, current_symbols) + [
-        "            const scalar_t coeff%d = %s;" % (i, _sfem_ccode(codegen_coefficients[i]))
+        "      const s_t coeff%d = %s;" % (i, _sfem_ccode(codegen_coefficients[i]))
         for i in range(components)
         if component_uses_coordinates[i] or component_uses_current[i]
     ]
     scatter_streams = ", ".join("out%d" % i for i in range(components))
     out_params = "\n".join(
-        "        scalar_t *const SFEM_RESTRICT out%d%s" % (i, "," if i + 1 < components else "")
+        "    s_t *const RSTR out%d%s" % (i, "," if i + 1 < components else "")
         for i in range(components)
     )
     extern_out_params = "\n".join(
-        "        real_t *const SFEM_RESTRICT out%d%s" % (i, "," if i + 1 < components else "")
+        "    real_t *const RSTR out%d%s" % (i, "," if i + 1 < components else "")
         for i in range(components)
     )
     extern_float_out_params = "\n".join(
-        "        float *const SFEM_RESTRICT out%d%s" % (i, "," if i + 1 < components else "")
+        "    float *const RSTR out%d%s" % (i, "," if i + 1 < components else "")
         for i in range(components)
     )
-    return """#include "sfem_base.hpp"
-#include "sfem_macros.hpp"
+    return """{scalar_type_prelude}
+{macros_include}
+{scalar_type_fallback}
+{restrict_prelude}
 
 #include <math.h>
-#include "kernel_math.hpp"
+#include "{math_header}"{launch_status_include}
 
 namespace sfem {{
 namespace codegen {{
 
-template <typename scalar_t>
+template <typename s_t>
 struct {function}_reference_data {{
-    static constexpr int N_SHAPE_1D = {n_shape_1d};
-    static constexpr int N_QP_1D = {n_qp_1d};
-    static constexpr int N_SHAPE = {n_shape};
-    static constexpr int N_QP = {n_qp};
-    static constexpr int REF_DIM = 2;
-    static constexpr int PHYSICAL_DIM = 3;
-
-    static const scalar_t *shape_1d() {{
-        static const scalar_t data[{shape_1d_count}] = {{
+  static const s_t *shape_1d() {{
+    static const s_t data[{shape_1d_count}] = {{
 {shape_1d_values}
-        }};
-        return data;
-    }}
+    }};
+    return data;
+  }}
 
-    static const scalar_t *grad_1d() {{
-        static const scalar_t data[{grad_1d_count}] = {{
+  static const s_t *grad_1d() {{
+    static const s_t data[{grad_1d_count}] = {{
 {grad_1d_values}
-        }};
-        return data;
-    }}
+    }};
+    return data;
+  }}
 
-    static const scalar_t *weight_1d() {{
-        static const scalar_t data[{weight_1d_count}] = {{
+  static const s_t *weight_1d() {{
+    static const s_t data[{weight_1d_count}] = {{
 {weight_1d_values}
-        }};
-        return data;
-    }}
+    }};
+    return data;
+  }}
 
-    static const int *shape_index() {{
-        static const int data[{n_shape}] = {{
+  static const int *shape_index() {{
+    static const int data[{n_shape}] = {{
 {shape_index_values}
-        }};
-        return data;
-    }}
+    }};
+    return data;
+  }}
 }};
 
-template <typename scalar_t>
-{function_qualifier} scalar_t {function}_measure(
-        const int qx,
-        const int qy,
-        const idx_t *const SFEM_RESTRICT ev,
-        const geom_t *const *const SFEM_RESTRICT points) {{
-    const scalar_t *const SFEM_RESTRICT shape_1d = {function}_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const SFEM_RESTRICT grad_1d = {function}_reference_data<scalar_t>::grad_1d();
-    const int *const SFEM_RESTRICT shape_index = {function}_reference_data<scalar_t>::shape_index();
-    constexpr int S = {n_shape_1d};
-    scalar_t dxdr0 = scalar_t(0);
-    scalar_t dxdr1 = scalar_t(0);
-    scalar_t dxdr2 = scalar_t(0);
-    scalar_t dxds0 = scalar_t(0);
-    scalar_t dxds1 = scalar_t(0);
-    scalar_t dxds2 = scalar_t(0);
-    for (int sy = 0; sy < S; ++sy) {{
-        const scalar_t vy = shape_1d[qy * S + sy];
-        const scalar_t gy = grad_1d[qy * S + sy];
-        for (int sx = 0; sx < S; ++sx) {{
-            const int i = shape_index[sy * S + sx];
-            const idx_t node = ev[i];
-            const scalar_t vx = shape_1d[qx * S + sx];
-            const scalar_t gx = grad_1d[qx * S + sx];
-            const scalar_t gr = gx * vy;
-            const scalar_t gs = vx * gy;
-            const scalar_t x = scalar_t(points[0][node]);
-            const scalar_t y = scalar_t(points[1][node]);
-            const scalar_t z = scalar_t(points[2][node]);
-            dxdr0 += x * gr;
-            dxdr1 += y * gr;
-            dxdr2 += z * gr;
-            dxds0 += x * gs;
-            dxds1 += y * gs;
-            dxds2 += z * gs;
-        }}
+template <typename s_t>
+{function_qualifier} s_t {function}_measure(
+    const int qx,
+    const int qy,
+    const idx_t *const RSTR ev,
+    const geom_t *const *const RSTR points) {{
+  const s_t *const RSTR shape_1d = {function}_reference_data<s_t>::shape_1d();
+  const s_t *const RSTR grad_1d = {function}_reference_data<s_t>::grad_1d();
+  const int *const RSTR shape_index = {function}_reference_data<s_t>::shape_index();
+  constexpr int NS1 = {n_shape_1d};
+  s_t dxdr0 = s_t(0);
+  s_t dxdr1 = s_t(0);
+  s_t dxdr2 = s_t(0);
+  s_t dxds0 = s_t(0);
+  s_t dxds1 = s_t(0);
+  s_t dxds2 = s_t(0);
+  for (int sy = 0; sy < NS1; ++sy) {{
+    const s_t vy = shape_1d[qy * NS1 + sy];
+    const s_t gy = grad_1d[qy * NS1 + sy];
+    for (int sx = 0; sx < NS1; ++sx) {{
+      const int i = shape_index[sy * NS1 + sx];
+      const idx_t node = ev[i];
+      const s_t vx = shape_1d[qx * NS1 + sx];
+      const s_t gx = grad_1d[qx * NS1 + sx];
+      const s_t gr = gx * vy;
+      const s_t gs = vx * gy;
+      const s_t x = s_t(points[0][node]);
+      const s_t y = s_t(points[1][node]);
+      const s_t z = s_t(points[2][node]);
+      dxdr0 += x * gr;
+      dxdr1 += y * gr;
+      dxdr2 += z * gr;
+      dxds0 += x * gs;
+      dxds1 += y * gs;
+      dxds2 += z * gs;
     }}
-    const scalar_t c0 = dxdr1 * dxds2 - dxdr2 * dxds1;
-    const scalar_t c1 = dxdr2 * dxds0 - dxdr0 * dxds2;
-    const scalar_t c2 = dxdr0 * dxds1 - dxdr1 * dxds0;
-    return sqrt(c0 * c0 + c1 * c1 + c2 * c2);
+  }}
+  const s_t c0 = dxdr1 * dxds2 - dxdr2 * dxds1;
+  const s_t c1 = dxdr2 * dxds0 - dxdr0 * dxds2;
+  const s_t c2 = dxdr0 * dxds1 - dxdr1 * dxds0;
+  return sqrt(c0 * c0 + c1 * c1 + c2 * c2);
 }}
 
 {function_qualifier} const int *{function}_side_nodes() {{
-    static const int data[{side_node_count}] = {{
+  static const int data[{side_node_count}] = {{
 {side_node_values}
-    }};
-    return data;
+  }};
+  return data;
 }}
 
 {function_qualifier} void {function}_gather_sideset_element(
-        const element_idx_t parent_element,
-        const int side,
-        idx_t **const SFEM_RESTRICT elements,
-        idx_t *const SFEM_RESTRICT ev) {{
-    const int *const SFEM_RESTRICT side_nodes = {function}_side_nodes();
-    constexpr int n_shape = {n_shape};
-    for (int i = 0; i < n_shape; ++i) {{
-        ev[i] = elements[side_nodes[side * n_shape + i]][parent_element];
-    }}
+    const element_idx_t parent_element,
+    const int side,
+    idx_t **const RSTR elements,
+    idx_t *const RSTR ev) {{
+  const int *const RSTR side_nodes = {function}_side_nodes();
+  constexpr int n_shape = {n_shape};
+  for (int i = 0; i < n_shape; ++i) {{
+    ev[i] = elements[side_nodes[side * n_shape + i]][parent_element];
+  }}
 }}
 
-template <typename scalar_t>
+template <typename s_t>
 {function_qualifier} void {function}_element(
-        const idx_t *const SFEM_RESTRICT ev,
-        const geom_t *const *const SFEM_RESTRICT points{current_decls}{param_decls},
-        scalar_t element_vector[{components}][{n_shape}]) {{
-    const scalar_t *const SFEM_RESTRICT shape_1d = {function}_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const SFEM_RESTRICT weight_1d = {function}_reference_data<scalar_t>::weight_1d();
-    const int *const SFEM_RESTRICT shape_index = {function}_reference_data<scalar_t>::shape_index();
-    constexpr int S = {n_shape_1d};
-    constexpr int Q = {n_qp_1d};
+    const idx_t *const RSTR ev,
+    const geom_t *const *const RSTR points{current_decls}{param_decls},
+    s_t element_vector[{components}][{n_shape}]) {{
+  const s_t *const RSTR shape_1d = {function}_reference_data<s_t>::shape_1d();
+  const s_t *const RSTR weight_1d = {function}_reference_data<s_t>::weight_1d();
+  const int *const RSTR shape_index = {function}_reference_data<s_t>::shape_index();
+  constexpr int NS1 = {n_shape_1d};
+  constexpr int NQ1 = {n_qp_1d};
 
 {coeff_lines}
 
-    for (int qy = 0; qy < Q; ++qy) {{
-        for (int qx = 0; qx < Q; ++qx) {{
-            const scalar_t dS = {function}_measure<scalar_t>(qx, qy, ev, points);
-            const scalar_t qw = weight_1d[qx] * weight_1d[qy] * dS;
+  for (int qy = 0; qy < NQ1; ++qy) {{
+    for (int qx = 0; qx < NQ1; ++qx) {{
+      const s_t dS = {function}_measure<s_t>(qx, qy, ev, points);
+      const s_t qw = weight_1d[qx] * weight_1d[qy] * dS;
 {qp_coeff_lines}
-            for (int sy = 0; sy < S; ++sy) {{
-                const scalar_t vy = shape_1d[qy * S + sy];
+      for (int sy = 0; sy < NS1; ++sy) {{
+        const s_t vy = shape_1d[qy * NS1 + sy];
 {vectorize_pragma}
-                for (int sx = 0; sx < S; ++sx) {{
-                    const int i = shape_index[sy * S + sx];
-                    const scalar_t test = shape_1d[qx * S + sx] * vy * qw;
+        for (int sx = 0; sx < NS1; ++sx) {{
+          const int i = shape_index[sy * NS1 + sx];
+          const s_t test = shape_1d[qx * NS1 + sx] * vy * qw;
 {accum_lines}
-                }}
-            }}
         }}
+      }}
     }}
+  }}
 }}
 
-template <typename scalar_t>
+template <typename s_t>
 {function_qualifier} void {function}_scatter_element(
-        const idx_t *const SFEM_RESTRICT ev,
-        const scalar_t element_vector[{components}][{n_shape}],
-        const int out_stride,
+    const idx_t *const RSTR ev,
+    const s_t element_vector[{components}][{n_shape}],
+    const int out_stride,
 {out_params}) {{
-    constexpr int n_shape = {n_shape};
-    for (int i = 0; i < n_shape; ++i) {{
-        const idx_t node = ev[i];
+  constexpr int n_shape = {n_shape};
+  for (int i = 0; i < n_shape; ++i) {{
+    const idx_t node = ev[i];
 {scatter_lines}
-    }}
+  }}
 }}
 
-template <typename scalar_t>
-{function_qualifier} int {function}_impl(
-        const ptrdiff_t nelements,
-        const ptrdiff_t,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points{current_decls}{param_decls},
-        const int out_stride,
+template <typename s_t>
+{element_kernel_line}
+    const ptrdiff_t nelements,
+    const ptrdiff_t,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points{current_decls}{param_decls},
+    const int out_stride,
 {out_params}) {{
-{parallel_for_pragma}
-    for (ptrdiff_t e = 0; e < nelements; ++e) {{
-        idx_t ev[{n_shape}];
-        scalar_t element_vector[{components}][{n_shape}];
-        for (int i = 0; i < {n_shape}; ++i) {{
-            ev[i] = elements[i][e];
-        }}
-        for (int c = 0; c < {components}; ++c) {{
-            for (int i = 0; i < {n_shape}; ++i) {{
-                element_vector[c][i] = scalar_t(0);
-            }}
-        }}
-        {function}_element<scalar_t>(ev, points{current_args}{param_args}, element_vector);
-        {function}_scatter_element<scalar_t>(ev, element_vector, out_stride, {scatter_streams});
+{element_loop}
+    idx_t ev[{n_shape}];
+    s_t element_vector[{components}][{n_shape}];
+    for (int i = 0; i < {n_shape}; ++i) {{
+      ev[i] = elements[i][e];
     }}
+    for (int c = 0; c < {components}; ++c) {{
+      for (int i = 0; i < {n_shape}; ++i) {{
+        element_vector[c][i] = s_t(0);
+      }}
+    }}
+    {function}_element<s_t>(ev, points{current_args}{param_args}, element_vector);
+    {function}_scatter_element<s_t>(ev, element_vector, out_stride, {scatter_streams});
+  }}
 
-    return SFEM_SUCCESS;
+{success_return}
 }}
 
-template <typename scalar_t>
-{function_qualifier} int {sideset_function}_impl(
-        const ptrdiff_t nsides,
-        const ptrdiff_t,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points{current_decls}{param_decls},
-        const int out_stride,
+template <typename s_t>
+{sideset_kernel_line}
+    const ptrdiff_t nsides,
+    const ptrdiff_t,
+    idx_t **const RSTR elements,
+    const element_idx_t *const RSTR parent,
+    const int16_t *const RSTR side_idx,
+    const geom_t *const *const RSTR points{current_decls}{param_decls},
+    const int out_stride,
 {out_params}) {{
-{parallel_for_pragma}
-    for (ptrdiff_t s = 0; s < nsides; ++s) {{
-        idx_t ev[{n_shape}];
-        scalar_t element_vector[{components}][{n_shape}];
-        {function}_gather_sideset_element(parent[s], side_idx[s], elements, ev);
-        for (int c = 0; c < {components}; ++c) {{
-            for (int i = 0; i < {n_shape}; ++i) {{
-                element_vector[c][i] = scalar_t(0);
-            }}
-        }}
-        {function}_element<scalar_t>(ev, points{current_args}{param_args}, element_vector);
-        {function}_scatter_element<scalar_t>(ev, element_vector, out_stride, {scatter_streams});
+{sideset_loop}
+    idx_t ev[{n_shape}];
+    s_t element_vector[{components}][{n_shape}];
+    {function}_gather_sideset_element(parent[s], side_idx[s], elements, ev);
+    for (int c = 0; c < {components}; ++c) {{
+      for (int i = 0; i < {n_shape}; ++i) {{
+        element_vector[c][i] = s_t(0);
+      }}
     }}
+    {function}_element<s_t>(ev, points{current_args}{param_args}, element_vector);
+    {function}_scatter_element<s_t>(ev, element_vector, out_stride, {scatter_streams});
+  }}
 
-    return SFEM_SUCCESS;
+{success_return}
 }}
 
 }}  // namespace codegen
 }}  // namespace sfem
 
-extern "C" int {function}(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points{extern_current_decls}{extern_param_decls},
-        const int out_stride,
-{extern_out_params}) {{
-    return sfem::codegen::{function}_impl<real_t>(
-            nelements, nnodes, elements, points{current_args}{param_args}, out_stride, {scatter_streams});
+extern "C" int {public_function}(
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points{extern_current_decls}{extern_param_decls},
+    const int out_stride,
+{extern_out_params}{entry_point_suffix}) {{
+{element_launch_real}
 }}
 
-extern "C" int {function}_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points{extern_float_current_decls}{extern_float_param_decls},
-        const int out_stride,
-{extern_float_out_params}) {{
-    return sfem::codegen::{function}_impl<float>(
-            nelements, nnodes, elements, points{current_args}{param_args}, out_stride, {scatter_streams});
+extern "C" int {public_function_float}(
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points{extern_float_current_decls}{extern_float_param_decls},
+    const int out_stride,
+{extern_float_out_params}{entry_point_suffix}) {{
+{element_launch_float}
 }}
 
-extern "C" int {sideset_function}(
-        const ptrdiff_t nsides,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points{extern_current_decls}{extern_param_decls},
-        const int out_stride,
-{extern_out_params}) {{
-    return sfem::codegen::{sideset_function}_impl<real_t>(
-            nsides, nnodes, elements, parent, side_idx, points{current_args}{param_args}, out_stride, {scatter_streams});
+extern "C" int {public_sideset_function}(
+    const ptrdiff_t nsides,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const element_idx_t *const RSTR parent,
+    const int16_t *const RSTR side_idx,
+    const geom_t *const *const RSTR points{extern_current_decls}{extern_param_decls},
+    const int out_stride,
+{extern_out_params}{entry_point_suffix}) {{
+{sideset_launch_real}
 }}
 
-extern "C" int {sideset_function}_float(
-        const ptrdiff_t nsides,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points{extern_float_current_decls}{extern_float_param_decls},
-        const int out_stride,
-{extern_float_out_params}) {{
-    return sfem::codegen::{sideset_function}_impl<float>(
-            nsides, nnodes, elements, parent, side_idx, points{current_args}{param_args}, out_stride, {scatter_streams});
+extern "C" int {public_sideset_function_float}(
+    const ptrdiff_t nsides,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const element_idx_t *const RSTR parent,
+    const int16_t *const RSTR side_idx,
+    const geom_t *const *const RSTR points{extern_float_current_decls}{extern_float_param_decls},
+    const int out_stride,
+{extern_float_out_params}{entry_point_suffix}) {{
+{sideset_launch_float}
 }}
 """.format(
+        restrict_prelude="\n".join(restrict_prelude()),
+        scalar_type_prelude="\n".join(sfem_scalar_type_prelude()),
+        macros_include="\n".join(optional_sfem_include("sfem_macros.hpp")),
+        scalar_type_fallback="\n".join(sfem_scalar_type_fallback()),
+        math_header=current_target().header_name("kernel_math"),
+        #: The entry points below ask `launch_status` whether their launch
+        #: started, and it lives with the other things a launching target
+        #: needs.  The boundary family writes that header already; it just
+        #: never included it.
+        launch_status_include=(
+            '\n#include "%s"' % current_target().header_name("kernel_diagnostics")
+            if current_target().supports_device_kernels
+            else ""
+        ),
+        #: The reference tables are called from `{function}_element`, which is
+        #: `__host__ __device__` on a device target.  They carried no qualifier
+        #: at all -- correct for the only target that had ever read them, and
+        #: `warning #20011-D: calling a __host__ function ... is not allowed`
+        #: on any other.  This is OP 27's fix for the quadrature tables,
+        #: applied to the copy the boundary family keeps.
+        table_accessor=_table_accessor_qualifier(),
+        **_boundary_target_lines(
+            function, sideset_function, current_args, param_args, scatter_streams
+        ),
         function=function,
         function_qualifier=_function_qualifier(),
         parallel_for_pragma=_parallel_for_pragma(),
-        vectorize_pragma=_vectorize_pragma(),
+        vectorize_pragma=_vectorize_pragma() or "",
         sideset_function=sideset_function,
         n_shape=n_shape,
         n_shape_1d=n_shape_1d,
@@ -1056,15 +1311,18 @@ extern "C" int {sideset_function}_float(
         qp_coeff_lines="\n".join(qp_coeff_lines),
         components=components,
         accum_lines="\n".join(
-            "                    element_vector[{c}][i] += coeff{c} * test;".format(c=c)
+            "          element_vector[{c}][i] += coeff{c} * test;".format(c=c)
             for c in range(components)
         ),
         scatter_lines="\n".join(
-            "{atomic_update_pragma}\n            out{c}[node * out_stride] += element_vector[{c}][i];".format(
-                atomic_update_pragma=_atomic_update_pragma(),
-                c=c,
-            )
+            line
             for c in range(components)
+            for line in current_target().scatter_add_lines(
+                "out%d[node * out_stride]" % c,
+                "element_vector[%d][i]" % c,
+                "            ",
+                pragma_indent="",
+            )
         ),
         scatter_streams=scatter_streams,
     )
@@ -1169,46 +1427,158 @@ def _quad_shape_index(n, sx, sy, proteus):
     return sx + n * sy
 
 
-def _measure_body(ref_dim, physical_dim):
+#: The axis each reference direction contributes to, and how the measure closes.
+#: A straight edge's tangent is the vector between its ends; a flat triangle's
+#: normal is the cross product of its two edge vectors, and the facet area is
+#: its length.
+_MEASURE_CLOSE = {
+    1: lambda: "  return sqrt(%s);" % " + ".join(
+        "dx%d * dx%d" % (axis, axis) for axis in range(2)
+    ),
+    2: lambda: "\n".join(
+        [
+            "  const s_t c0 = dxdr1 * dxds2 - dxdr2 * dxds1;",
+            "  const s_t c1 = dxdr2 * dxds0 - dxdr0 * dxds2;",
+            "  const s_t c2 = dxdr0 * dxds1 - dxdr1 * dxds0;",
+            "  return sqrt(c0 * c0 + c1 * c1 + c2 * c2);",
+        ]
+    ),
+}
+
+#: What each reference direction's accumulator is called, per reference dimension.
+_MEASURE_ACCUMULATORS = {1: ("dx",), 2: ("dxdr", "dxds")}
+
+
+def _constant_measure_terms(data, direction, axis):
+    """`points[axis][ev[i]] * g` summed over the nodes, with the constants folded.
+
+    The gradients are the same at every point, so the first point's are the
+    facet's, and a gradient of zero contributes nothing to write down.
+    """
+    weighted = []
+    for node in range(data["n_shape"]):
+        gradient = sp.nsimplify(
+            data["grad"][node * data["ref_dim"] + direction]
+            if data["ref_dim"] > 1
+            else data["grad"][node]
+        )
+        sign = float(gradient)
+        if sign == 0.0:
+            continue
+        coordinate = "s_t(points[%d][ev[%d]])" % (axis, node)
+        weighted.append((
+            sign,
+            coordinate if abs(sign) == 1.0
+            else "%s * %s" % (_sfem_ccode(abs(gradient)), coordinate),
+        ))
+    # Positive contributions first, so the expression reads `x1 - x0` rather than
+    # opening with a negation.  The value is the same either way: this sum has
+    # one positive and one negative term on every flat facet, and `a - b` is the
+    # same operation as `-b + a`.
+    weighted.sort(key=lambda item: item[0] < 0.0)
+    if not weighted:
+        return "s_t(0)"
+    head = weighted[0]
+    text = ("-%s" if head[0] < 0.0 else "%s") % head[1]
+    for sign, term in weighted[1:]:
+        text += " %s %s" % ("-" if sign < 0.0 else "+", term)
+    return text
+
+
+def _constant_measure_body(data, physical_dim):
+    """The facet's measure, with its constant reference gradients expanded.
+
+    A flat facet's gradients are the same at every quadrature point, so the loop
+    that accumulated them was a loop over constants and the table it read held
+    `n_qp` identical copies of one row -- 18 numbers for the 6 a triangle has.
+    Expanding it is ISSUES.md item 11: on a device the table was a function-local
+    `static const s_t data[18]`, which is a per-thread array where the expansion
+    has immediate operands, and the parameter `q` selected between rows that were
+    all the same.
+    """
+    lines = []
+    for direction, accumulator in enumerate(_MEASURE_ACCUMULATORS[data["ref_dim"]]):
+        for axis in range(physical_dim):
+            lines.append(
+                "  const s_t %s%d = %s;"
+                % (accumulator, axis, _constant_measure_terms(data, direction, axis))
+            )
+    lines.append(_MEASURE_CLOSE[data["ref_dim"]]())
+    return "\n".join(lines)
+
+
+#: The three things a constant measure does not need: the point it selects
+#: between identical rows, the table those rows live in, and the two aliases
+#: that read it.  Keyed on the one plan answer, `_facet_measure_is_constant`.
+_MEASURE_POINT = {True: "", False: "\n    const int q,"}
+
+_MEASURE_PREAMBLE = {
+    True: lambda function: "",
+    False: lambda function: (
+        "  const s_t *const grad = %s_reference_data<s_t>::grad();\n"
+        "  const int n_shape = %s_reference_data<s_t>::NS;\n" % (function, function)
+    ),
+}
+
+_GRAD_MEMBER = {
+    True: lambda accessor, count, values: "",
+    False: lambda accessor, count, values: (
+        "\n  %s const s_t *grad() {\n"
+        "    static const s_t data[%d] = {\n%s\n    };\n"
+        "    return data;\n  }\n" % (accessor, count, values)
+    ),
+}
+
+_MEASURE_BODY = {
+    True: lambda data, ref_dim, physical_dim: _constant_measure_body(
+        data, physical_dim
+    ),
+    False: lambda data, ref_dim, physical_dim: _quadrature_measure_body(
+        ref_dim, physical_dim
+    ),
+}
+
+
+def _quadrature_measure_body(ref_dim, physical_dim):
     if ref_dim == 1:
-        return """    scalar_t dx0 = scalar_t(0);
-    scalar_t dx1 = scalar_t(0);
-    for (int i = 0; i < n_shape; ++i) {
-        const scalar_t gi = grad[q * n_shape + i];
-        const idx_t node = ev[i];
-        dx0 += scalar_t(points[0][node]) * gi;
-        dx1 += scalar_t(points[1][node]) * gi;
-    }
-    return sqrt(dx0 * dx0 + dx1 * dx1);"""
-    return """    scalar_t dxdr0 = scalar_t(0);
-    scalar_t dxdr1 = scalar_t(0);
-    scalar_t dxdr2 = scalar_t(0);
-    scalar_t dxds0 = scalar_t(0);
-    scalar_t dxds1 = scalar_t(0);
-    scalar_t dxds2 = scalar_t(0);
-    for (int i = 0; i < n_shape; ++i) {
-        const scalar_t gr = grad[(q * n_shape + i) * 2 + 0];
-        const scalar_t gs = grad[(q * n_shape + i) * 2 + 1];
-        const idx_t node = ev[i];
-        const scalar_t x = scalar_t(points[0][node]);
-        const scalar_t y = scalar_t(points[1][node]);
-        const scalar_t z = scalar_t(points[2][node]);
-        dxdr0 += x * gr;
-        dxdr1 += y * gr;
-        dxdr2 += z * gr;
-        dxds0 += x * gs;
-        dxds1 += y * gs;
-        dxds2 += z * gs;
-    }
-    const scalar_t c0 = dxdr1 * dxds2 - dxdr2 * dxds1;
-    const scalar_t c1 = dxdr2 * dxds0 - dxdr0 * dxds2;
-    const scalar_t c2 = dxdr0 * dxds1 - dxdr1 * dxds0;
-    return sqrt(c0 * c0 + c1 * c1 + c2 * c2);"""
+        return """    s_t dx0 = s_t(0);
+  s_t dx1 = s_t(0);
+  for (int i = 0; i < n_shape; ++i) {
+    const s_t gi = grad[q * n_shape + i];
+    const idx_t node = ev[i];
+    dx0 += s_t(points[0][node]) * gi;
+    dx1 += s_t(points[1][node]) * gi;
+  }
+  return sqrt(dx0 * dx0 + dx1 * dx1);"""
+    return """    s_t dxdr0 = s_t(0);
+  s_t dxdr1 = s_t(0);
+  s_t dxdr2 = s_t(0);
+  s_t dxds0 = s_t(0);
+  s_t dxds1 = s_t(0);
+  s_t dxds2 = s_t(0);
+  for (int i = 0; i < n_shape; ++i) {
+    const s_t gr = grad[(q * n_shape + i) * 2 + 0];
+    const s_t gs = grad[(q * n_shape + i) * 2 + 1];
+    const idx_t node = ev[i];
+    const s_t x = s_t(points[0][node]);
+    const s_t y = s_t(points[1][node]);
+    const s_t z = s_t(points[2][node]);
+    dxdr0 += x * gr;
+    dxdr1 += y * gr;
+    dxdr2 += z * gr;
+    dxds0 += x * gs;
+    dxds1 += y * gs;
+    dxds2 += z * gs;
+  }
+  const s_t c0 = dxdr1 * dxds2 - dxdr2 * dxds1;
+  const s_t c1 = dxdr2 * dxds0 - dxdr0 * dxds2;
+  const s_t c2 = dxdr0 * dxds1 - dxdr1 * dxds0;
+  return sqrt(c0 * c0 + c1 * c1 + c2 * c2);"""
 
 
 def _cpp_array_values(values):
-    return ",\n".join("            scalar_t(%.17g)" % float(value) for value in values)
+    return ",\n".join("      s_t(%.17g)" % float(value) for value in values)
 
 
 def _cpp_int_array_values(values):
-    return ",\n".join("        %d" % int(value) for value in values)
+    return ",\n".join("    %d" % int(value) for value in values)

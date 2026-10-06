@@ -1,0 +1,4 @@
+neumann_conditions:
+  - {type: sideset, format: file, path: "{mesh}/n16/sets/inner", value: {path: "{mesh}/n16/traction/inner.0.float64.raw"}, component: 0}
+  - {type: sideset, format: file, path: "{mesh}/n16/sets/inner", value: {path: "{mesh}/n16/traction/inner.1.float64.raw"}, component: 1}
+  - {type: sideset, format: file, path: "{mesh}/n16/sets/inner", value: {path: "{mesh}/n16/traction/inner.2.float64.raw"}, component: 2}

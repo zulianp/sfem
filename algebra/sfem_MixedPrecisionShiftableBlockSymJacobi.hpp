@@ -34,6 +34,14 @@ namespace sfem {
             execution_space_ = EXECUTION_SPACE_HOST;
         }
 
+        void set_relaxation_parameter(const HP relaxation) {
+            if (inv_diag && relaxation_parameter != HP(0)) {
+                blas->scal(inv_diag->size(), static_cast<LP>(relaxation / relaxation_parameter), inv_diag->data());
+            }
+
+            relaxation_parameter = relaxation;
+        }
+
         // void read_sparse_update_policy() {
         //     enable_sparse_update_ = smesh::Env::read<bool>("SFEM_JACOBI_SPARSE_UPDATE", true);
         //     if (!sparse_update_policy_logged_) {

@@ -1,0 +1,281 @@
+<h1>CVFEM semi-structured multigrid: kernels, per level</h1>
+<p>What runs at each level of the V-cycle, and what it costs.</p>
+<p><strong>Measurement configuration.</strong> 12x3x3 macro-elements (108) at lattice level 8, Poiseuille,
+Re=100, on one Grace socket (72 cores, <code>OMP_PROC_BIND=close</code>, <code>OMP_PLACES=cores</code>). Fixed work:
+one Newton step, 60 preconditioner applications, 40 linear iterations. SFEM and smesh built
+<strong>with OpenMP</strong> (<code>installations/sfem-omp</code>); the default build has it off, which makes every
+smesh kernel serial -- see the note at the end.</p>
+<h2>The hierarchy</h2>
+<table>
+<thead>
+<tr>
+<th>level</th>
+<th>lattice</th>
+<th>nodes</th>
+<th><strong>dofs</strong></th>
+<th>operator</th>
+<th>smoother</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>L0</td>
+<td>8</td>
+<td>60,625</td>
+<td><strong>242,500</strong></td>
+<td>matrix-free</td>
+<td>damped block-Jacobi</td>
+</tr>
+<tr>
+<td>L1</td>
+<td>4</td>
+<td>8,281</td>
+<td><strong>33,124</strong></td>
+<td>assembled BSR 4x4</td>
+<td>damped block-Jacobi</td>
+</tr>
+<tr>
+<td>L2</td>
+<td>2</td>
+<td>1,225</td>
+<td><strong>4,900</strong></td>
+<td>assembled BSR 4x4</td>
+<td>damped block-Jacobi</td>
+</tr>
+<tr>
+<td>L3</td>
+<td>1</td>
+<td>208</td>
+<td><strong>832</strong></td>
+<td>assembled BSR 4x4</td>
+<td>dense LU (exact)</td>
+</tr>
+</tbody>
+</table>
+<p>Coarse operators are <strong>element-wise Galerkin</strong>: level 1 is assembled from the fine
+macro-elements as <code>sum_e P_e^T A_e P_e</code>, and each level below is one element-local coarsening
+hop from the level above. Nothing is probed at any level.</p>
+<h2>Kernels</h2>
+<table>
+<thead>
+<tr>
+<th>role</th>
+<th>kernel</th>
+<th>where</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>L0 operator / smoother apply</td>
+<td><code>sscvfem_apply_macro_local_hoisted</code></td>
+<td><code>cvfem_sshex8_ns.hpp</code></td>
+</tr>
+<tr>
+<td>L0 scatter</td>
+<td><code>sscvfem_scatter_element_w&lt;4&gt;</code> + <code>sscvfem_reduce_shared_w&lt;4&gt;</code></td>
+<td>two-pass, no atomics, bitwise reproducible</td>
+</tr>
+<tr>
+<td>L1-L3 operator</td>
+<td><code>sfem::bsr_spmv_static_4x4</code></td>
+<td><code>sfem_BSR.hpp</code></td>
+</tr>
+<tr>
+<td>L0-L2 smoother</td>
+<td><code>BlockJacobi::apply</code> (4x4 blocks)</td>
+<td>driver</td>
+</tr>
+<tr>
+<td>L3 solve</td>
+<td><code>DenseLU::apply</code></td>
+<td>driver, densified from the BSR in O(nnz)</td>
+</tr>
+<tr>
+<td>prolongation</td>
+<td><code>smesh::sshex8_prolongate</code></td>
+<td>smesh</td>
+</tr>
+<tr>
+<td>restriction</td>
+<td><code>smesh::sshex8_restrict</code></td>
+<td>smesh</td>
+</tr>
+<tr>
+<td>last-hop restriction</td>
+<td><code>smesh::sshex8_hierarchical_restriction</code></td>
+<td>smesh</td>
+</tr>
+<tr>
+<td>micro-cell matrix</td>
+<td><code>cvfem_hex8_ns_upwind_jacobian_add_slots</code> with identity slots</td>
+<td>yields the dense 8x8-block cell matrix</td>
+</tr>
+<tr>
+<td>coarse assembly</td>
+<td><code>galerkin_assemble</code>, <code>galerkin_hop</code></td>
+<td><code>cvfem_ss_galerkin.hpp</code></td>
+</tr>
+</tbody>
+</table>
+<h2>Cost per call, and throughput</h2>
+<p>Throughput is the level's dofs divided by the call time; for transfers it is the <em>fine</em> side's
+dofs, since that is what the kernel streams.</p>
+<table>
+<thead>
+<tr>
+<th>phase</th>
+<th>us/call</th>
+<th>dofs</th>
+<th>MDOF/s</th>
+<th>share of cycle</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>smooth[L0]</code> (3 sweeps)</td>
+<td>1240.8</td>
+<td>242,500</td>
+<td>195</td>
+<td><strong>50.7%</strong></td>
+</tr>
+<tr>
+<td><code>op[L0]</code></td>
+<td>375.3</td>
+<td>242,500</td>
+<td>646</td>
+<td>7.7%</td>
+</tr>
+<tr>
+<td><code>outer_op</code></td>
+<td>375.7</td>
+<td>242,500</td>
+<td>646</td>
+<td>7.8%</td>
+</tr>
+<tr>
+<td><code>smooth[L1]</code></td>
+<td>153.2</td>
+<td>33,124</td>
+<td>216</td>
+<td>6.3%</td>
+</tr>
+<tr>
+<td><code>smooth[L2]</code></td>
+<td>129.3</td>
+<td>4,900</td>
+<td><strong>38</strong></td>
+<td>5.3%</td>
+</tr>
+<tr>
+<td><code>coarse_solve</code> (L3)</td>
+<td>208.3</td>
+<td>832</td>
+<td><strong>4</strong></td>
+<td>4.3%</td>
+</tr>
+<tr>
+<td><code>restrict[L0-&gt;1]</code></td>
+<td>134.3</td>
+<td>242,500</td>
+<td>1806</td>
+<td>2.7%</td>
+</tr>
+<tr>
+<td><code>prolong[L1-&gt;0]</code></td>
+<td>86.2</td>
+<td>242,500</td>
+<td>2813</td>
+<td>1.8%</td>
+</tr>
+<tr>
+<td><code>restrict[L2-&gt;3]</code></td>
+<td>179.1</td>
+<td>4,900</td>
+<td><strong>27</strong></td>
+<td>3.7%</td>
+</tr>
+<tr>
+<td><code>galerkin_assembly</code> (per Newton step)</td>
+<td>3711</td>
+<td>--</td>
+<td>--</td>
+<td>3.7%</td>
+</tr>
+</tbody>
+</table>
+<p>Total 0.401 s in phases, <code>t_solve</code> 0.406 s, 10160 us per linear iteration.</p>
+<h2>What the numbers say</h2>
+<p><strong>The fine level dominates and is efficient.</strong> <code>smooth[L0]</code> is half the cycle at 195 MDOF/s;
+the bare operator apply runs at 646 MDOF/s, and the smoother is three sweeps plus a block-
+diagonal solve, so those are consistent. Counters for the whole cycle: IPC 3.43, 0.70% cache
+misses, 41.6% backend stalls, 2.73 GHz effective per core -- loaded, and approaching
+memory-bound rather than holding idle headroom.</p>
+<p><strong>Efficiency collapses on the coarse levels, by two orders of magnitude.</strong> 195 MDOF/s at L0,
+216 at L1, 38 at L2, 4 at the coarsest. The work per level falls 8x per hop while the parallel
+overhead does not, so by L2 the barriers cost more than the arithmetic. <code>restrict[L2-&gt;3]</code> at
+179 us is <em>dearer than</em> <code>restrict[L0-&gt;1]</code> at 134 us despite moving 50x fewer dofs -- the
+clearest single symptom.</p>
+<p><strong>Barrier waiting is now the largest item after the fine apply.</strong> <code>libgomp</code> is about 46% of
+profile samples, spread over a dozen entries -- threads spinning, not runtime cost.</p>
+<p><strong>There is a thread-count optimum at 54, and it is not explained.</strong> Three repeats, spread under
+0.005 s:</p>
+<table>
+<thead>
+<tr>
+<th>threads</th>
+<th>108 % n</th>
+<th><code>t_solve</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>27</td>
+<td>divisor</td>
+<td>0.514 s</td>
+</tr>
+<tr>
+<td>36</td>
+<td>divisor</td>
+<td>0.424 s</td>
+</tr>
+<tr>
+<td>48</td>
+<td>rem 12</td>
+<td>0.437 s</td>
+</tr>
+<tr>
+<td><strong>54</strong></td>
+<td><strong>divisor</strong></td>
+<td><strong>0.357 s</strong></td>
+</tr>
+<tr>
+<td>64</td>
+<td>rem 44</td>
+<td>0.379 s</td>
+</tr>
+<tr>
+<td>72</td>
+<td>rem 36</td>
+<td>0.392 s</td>
+</tr>
+</tbody>
+</table>
+<p>54 is reproducibly 9% faster than the full socket, which is worth taking. The obvious
+explanation -- that 108 macro-elements over 72 threads is 1.5 each, so the critical path is two
+elements while half the threads idle, while 108/54 is exactly 2 -- was tested and <strong>does not
+hold</strong>: 64 threads leaves a remainder of 44 and still beats both 36 and 48, and 36 divides 108
+exactly. Nor is the curve monotonic in thread count, since 48 is worse than 36. Whatever sets
+the optimum is not element-count divisibility, and is not yet identified; suspect the socket's
+own topology rather than the decomposition.</p>
+<p><strong>Two environment settings matter more than they should.</strong> <code>OMP_WAIT_POLICY=active</code> is worth
+4%; <code>passive</code> is <strong>4.2x worse</strong> and <code>GOMP_SPINCOUNT=0</code> <strong>4.8x worse</strong>. A job script that sets a
+conservative wait policy will lose most of the performance with no visible symptom.</p>
+<h2>Build requirement</h2>
+<p><code>SFEM_ENABLE_OPENMP</code> and <code>SMESH_ENABLE_OPENMP</code> default to <strong>OFF</strong>, and with them off every
+<code>#pragma omp</code> in smesh compiles to nothing -- <code>libsmesh.a</code> contains zero <code>GOMP_parallel</code>
+symbols. The transfers then run serially: <code>restrict[L0-&gt;1]</code> costs 1456 us instead of 134 us,
+and the whole cycle 0.678 s instead of 0.397 s. Check with</p>
+<pre class="codehilite"><code>nm -C &lt;prefix&gt;/lib64/libsmesh.a | grep -c GOMP_parallel   # must be non-zero</code></pre>
+
+
+<p>before trusting any timing from this hierarchy.</p>

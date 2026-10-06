@@ -1,0 +1,487 @@
+#!/usr/bin/env bash
+# Run the CVFEM verification matrix and write a directory a report can be built from.
+#
+#   scripts/verify_report.sh                     # everything, into verification_runs/<stamp>
+#   OUT=/tmp/v scripts/verify_report.sh          # somewhere specific
+#   VERIFY_GROUPS="mms port" scripts/verify_report.sh   # a subset while iterating
+#
+# Then:
+#   python3 python/cvfem_verify_report.py <OUT> -o docs/CVFEM_Verification_Report.md --html
+#
+# This script only produces evidence; every judgement lives in the report generator, so a
+# report can be rebuilt or its thresholds changed without paying for the runs again.
+#
+# Each run gets its own COMPLETE unfiltered log. A grep pattern is a guess about what will
+# matter, and when a case fails in an unanticipated way the explaining lines are exactly
+# the ones a filter drops.
+set -u
+
+# SLURM_SUBMIT_DIR first: sbatch copies the batch script to /var/spool/slurmd/job<id>/,
+# so anything derived from the running script's own path resolves somewhere useless.
+for cand in "${SLURM_SUBMIT_DIR:-}" "$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/.." && pwd)" "$PWD"; do
+    [ -n "$cand" ] && [ -f "$cand/CMakeLists.txt" ] && [ -d "$cand/drivers" ] && SPIKE_ROOT="$cand" && break
+done
+if [ -z "${SPIKE_ROOT:-}" ]; then
+    echo "verify_report: cannot locate the spike root (tried SLURM_SUBMIT_DIR, script dir, cwd)" >&2
+    exit 1
+fi
+
+BUILD=${BUILD:-$SPIKE_ROOT/build}
+DRIVER=${DRIVER:-$BUILD/cvfem_hex8_ns_ssgmg}
+OUT=${OUT:-$SPIKE_ROOT/verification_runs/$(date +%Y%m%d-%H%M%S)}
+# Absolute, because each case is run from its own directory so that the tracer's
+# hard-coded smesh.trace.csv lands per run rather than being overwritten twenty-two times.
+case "$DRIVER" in /*) ;; *) DRIVER="$PWD/$DRIVER" ;; esac
+mkdir -p "$OUT"
+case "$OUT" in /*) ;; *) OUT="$PWD/$OUT" ;; esac
+# VERIFY_GROUPS and not GROUPS: GROUPS is a bash built-in array holding the caller's
+# group IDs, so ${GROUPS:-...} silently expands to a numeric GID and never to the
+# default. That is exactly what happened -- a job ran with "groups : 33203" and
+# selected nothing at all.
+VERIFY_GROUPS=${VERIFY_GROUPS:-"unit mms bc port budget step pump nozzle"}
+# 4/8/16/32 reproduces the dof ladder docs/CVFEM_Verification_Farrell.md records
+# (500, 2916, 19652, 143748), so a rate measured here is comparable with the one there.
+MMS_LADDER=${MMS_LADDER:-"4 8 16 32"}
+PORT_SWEEP=${PORT_SWEEP:-"-0.16 -0.08 0 0.16 0.5 1.0 1.5 3.0"}
+NL_MAX_IT=${NL_MAX_IT:-40}
+
+# How the linear systems are solved. Every verified number should be reachable without a
+# dense factorisation, so this switches the whole matrix between the two and the report
+# records which was used.
+#
+#   direct  (default) dense LU of the fine Jacobian, by probing. Exact, and O(n^2) memory
+#           and O(n^3) time, so it is a verification instrument and not a solver. It is the
+#           default here because it makes the reference numbers as sharp as the arithmetic
+#           allows, not because it is how anyone would run.
+#   fgmres  flexible GMRES with block-Jacobi. Scales, and reproduces the same conclusions.
+#
+# The RESTART is the parameter that matters and 30 -- the driver's default, which is right
+# for a multigrid-preconditioned solve -- is far too short here. Measured on the step at
+# Re=20: r=30 does not converge at all, r=120 leaves the continuity sum at 6e-11, and r=480
+# reaches 4e-12 in FEWER iterations (19,000 against 43,000) because a longer restart
+# minimises over a larger space. Tightening SFEM_LSOLVE_RTOL does not substitute for it and
+# at fixed restart makes the answer slightly worse, which is the restart truncation setting
+# the floor rather than the stopping tolerance.
+# Flat HEX8 (1) or semi-structured macro-elements at this internal level.
+#
+# When it is raised, every case's cell count is DIVIDED by it, so the fine mesh is the same
+# mesh reached a different way and the two arms are directly comparable rather than merely
+# both plausible: flat N=8 and level 2 at N=4 are both a 9^3 lattice. Multigrid stays off
+# either way -- this is about the operators, not the solver.
+#
+# One thing does not divide: a boundary patch is selected on the MACRO mesh, because a
+# sideset stores (macro element, local face). So the pump's port has to be resolvable at the
+# macro level, and at 2 macro cells across it is not -- the run refuses rather than solving a
+# sealed chamber.
+VERIFY_LEVEL=${VERIFY_LEVEL:-1}
+# N/L, so the fine mesh is unchanged. Refuses rather than silently rounding, because a
+# rounded ladder is a different convergence study.
+lvl_n() {
+    if [ "$VERIFY_LEVEL" -le 1 ]; then echo "$1"; return; fi
+    if [ $(( $1 % VERIFY_LEVEL )) -ne 0 ]; then
+        echo "verify_report: N=$1 is not divisible by VERIFY_LEVEL=$VERIFY_LEVEL" >&2
+        exit 1
+    fi
+    echo $(( $1 / VERIFY_LEVEL ))
+}
+LEVEL_ENV="SFEM_ELEMENT_REFINE_LEVEL=$VERIFY_LEVEL"
+
+VERIFY_SOLVER=${VERIFY_SOLVER:-direct}
+VERIFY_RESTART=${VERIFY_RESTART:-480}
+case "$VERIFY_SOLVER" in
+    direct) SOLVER_ENV="SFEM_PRECOND=direct" ;;
+    fgmres) SOLVER_ENV="SFEM_FGMRES=1 SFEM_FGMRES_RESTART=$VERIFY_RESTART SFEM_PRECOND=bjacobi" ;;
+    *) echo "verify_report: VERIFY_SOLVER must be direct or fgmres, got '$VERIFY_SOLVER'" >&2; exit 1 ;;
+esac
+
+if [ ! -x "$DRIVER" ]; then
+    echo "verify_report: no driver at $DRIVER (set DRIVER= or build first)" >&2
+    exit 1
+fi
+mkdir -p "$OUT"
+TSV="$OUT/runs.tsv"
+: > "$TSV"
+
+# The channel geometry and fluid these cases use. The exact Poiseuille pressure is
+# p(x) = G (Lx/2 - x) with G = 8 mu U / Ly^2, so the outlet value -- which is what a
+# prescribed-pressure port is judged against -- is -G Lx / 2.
+LX=4; LY=1; MU=0.01; U=1
+P_EXACT_OUTLET=$(awk -v mu=$MU -v u=$U -v ly=$LY -v lx=$LX 'BEGIN{printf "%.10g", -(8*mu*u/(ly*ly))*lx/2}')
+# The step's exact volumetric inflow is 1/9; see cvfem_ns_channel_case.hpp.
+MASS_EXACT=$(awk 'BEGIN{printf "%.12g", 1.0/9.0}')
+
+echo ">>> verification matrix  $(date +%H:%M:%S)"
+echo "    spike root : $SPIKE_ROOT"
+echo "    driver     : $DRIVER"
+echo "    output     : $OUT"
+echo "    groups     : $VERIFY_GROUPS"
+echo "    solver     : $VERIFY_SOLVER ($SOLVER_ENV)"
+echo "    level      : $VERIFY_LEVEL"
+echo "    p_exact(outlet) = $P_EXACT_OUTLET   exact step flux = $MASS_EXACT"
+
+want() { case " $VERIFY_GROUPS " in *" $1 "*) return 0;; *) return 1;; esac; }
+
+# run <group> <label> <extra tsv fields> -- <env assignments...>
+run() {
+    local group=$1 label=$2 extra=$3; shift 3; [ "$1" = "--" ] && shift
+    local log="${group}_${label}.log"
+    printf "  %-8s %-14s " "$group" "$label"
+    local t0=$SECONDS
+    # Only SFEM_NL_MAX_IT is set for every case. Geometry and fluid are NOT: the
+    # manufactured solution lives on [0,2]^3 -- its pressure gauge constant is zero-mean
+    # there and nowhere else, and the driver rejects an override for exactly that reason --
+    # so forcing the channel's 4x1x1 on it silently measures a different problem. That is
+    # not hypothetical: it produced u_linf of 26, 10, 8.8 and 14 down a ladder that should
+    # have been converging quadratically.
+    # The default goes first so a per-run SFEM_NL_MAX_IT in the argument list wins. A
+    # `VAR=x run ...` prefix would not do: bash keeps such an assignment after a *function*
+    # returns, so it would leak into every later case.
+    # Each run in its own directory, because the tracer writes smesh.trace.csv into the
+    # CURRENT one and its name is hard-coded. Sharing a directory meant twenty-two runs
+    # overwrote each other's trace and only the last survived -- and that file is where the
+    # per-operator throughput breakdown comes from, so the evidence for every case but one
+    # was being discarded. DRIVER and OUT are resolved to absolute paths above for exactly
+    # this reason.
+    local rundir="$OUT/trace_${group}_${label}"
+    mkdir -p "$rundir"
+    ( cd "$rundir" || exit 1
+      export SFEM_NL_MAX_IT=$NL_MAX_IT
+      for kv in "$@"; do export "$kv"; done
+      "$DRIVER" "$OUT/out_${group}_${label}" ) > "$OUT/$log" 2>&1
+    local rc=$?
+    printf "exit=%-3s %4ds  %s\n" "$rc" "$((SECONDS - t0))" \
+        "$(grep -m1 -E 'u_linf:|sum of continuity' "$OUT/$log" | cut -c1-60)"
+    printf "%s\t%s\t%s\t%s\n" "$group" "$label" "$log" "$extra" >> "$TSV"
+}
+
+# ---- unit tests: the layer that names a line rather than a case ----
+CTEST_TOTAL=0; CTEST_PASS=0; CTEST_FAIL=0; CTEST_FAILING=""
+if want unit && command -v ctest > /dev/null 2>&1; then
+    echo "  unit     ctest"
+    ( cd "$BUILD" && ctest ) > "$OUT/ctest.log" 2>&1
+    line=$(grep -m1 -E "tests passed.*out of" "$OUT/ctest.log")
+    CTEST_PASS=$(echo "$line" | sed -n 's/.*, \([0-9]*\) tests failed out of \([0-9]*\).*/\2/p')
+    CTEST_FAIL=$(echo "$line" | sed -n 's/.*, \([0-9]*\) tests failed out of.*/\1/p')
+    CTEST_TOTAL=${CTEST_PASS:-0}
+    CTEST_FAIL=${CTEST_FAIL:-0}
+    CTEST_PASS=$((CTEST_TOTAL - CTEST_FAIL))
+    CTEST_FAILING=$(sed -n 's/^\t*[0-9]* - \([A-Za-z0-9_]*\) (Failed).*/\1/p' "$OUT/ctest.log" | tr '\n' ',' | sed 's/,$//')
+    echo "           $CTEST_PASS/$CTEST_TOTAL passed"
+fi
+
+# ---- spatial order of accuracy, manufactured solution ----
+# mu = 1/Re is mandated by the manufactured pressure, so this group overrides it.
+if want mms; then
+    # TWO LADDERS, at two Reynolds numbers, and they answer different questions.
+    #
+    # Re = 1 is the CONSISTENCY statement. Upwinding is inactive there, so a first-order
+    # reading would mean a consistency error rather than benign upwind diffusion -- which is
+    # exactly what makes it the right place to detect one, and exactly what makes it silent
+    # about accuracy anywhere else.
+    #
+    # Re = 100 is the ACCURACY statement, and it is the one that was missing. The convection
+    # operator is first-order donor-cell upwind with no limiter, so at a cell Peclet number
+    # of any size the scheme is O(h) and its numerical diffusion scales like |u| h / 2. The
+    # matrix has never measured order where that term is active, which means the 2.308 the
+    # Re = 1 ladder reports has been doing duty as an accuracy claim it cannot support.
+    #
+    # Re enters through mu alone: exact_state derives Re = 1/mu, cvfem_mms::pressure carries
+    # Re as a real parameter, and body_force is recomputed nodally at every continuation stage
+    # with that stage's rho, so the exact solution does not move as the continuation runs. rho
+    # must be 1 at the final stage and the domain must be [0,2]^3 -- the driver now enforces
+    # both rather than asserting them in a comment.
+    #
+    # 100 rather than more: the forcing is a degree-13 polynomial whose 1/Re-weighted and O(1)
+    # terms diverge in magnitude as mu shrinks, and a much larger value would need a
+    # cancellation check before its numbers meant anything.
+    # The solver is NAMED here rather than inherited, which it was until now -- this group is
+    # the only one that did not pass $SOLVER_ENV while the report header printed the solver
+    # choice as though it were global. It cannot take $SOLVER_ENV either: that is
+    # SFEM_PRECOND=direct by default, and the finest level is 143,748 dofs against a dense-LU
+    # cap of 20,000. Multigrid is not available because this ladder is deliberately flat, so
+    # what is left is FGMRES with point block-Jacobi. That is the weak preconditioner -- the
+    # Re = 100, N = 32 run takes 10,952 linear iterations -- but it converges here, and the
+    # alternative is changing the mesh type and with it every number this group has ever
+    # reported.
+    MMS_SOLVER="SFEM_FGMRES=1 SFEM_GMG=0 SFEM_PRECOND=bjacobi"
+    for re_mu in "1:1" "100:0.01"; do
+        MMS_RE=${re_mu%%:*}; MMS_MU=${re_mu##*:}
+        for n in $MMS_LADDER; do
+            run mms "re${MMS_RE}_n$n" "mms_re=$MMS_RE" -- SFEM_CASE=mms SFEM_N=$(lvl_n $n) $LEVEL_ENV \
+                $MMS_SOLVER SFEM_MU=$MMS_MU SFEM_RHO=1
+        done
+    done
+fi
+
+# ---- the boundary conditions, judged against each other and against a closed form ----
+if want bc; then
+    # An EXACT linear solve, and pinned flat at N=8 to afford one.
+    #
+    # This case asks whether a Dirichlet outlet reproduces the exact Poiseuille solution. That
+    # is a claim about the boundary condition and the discretisation, so the linear solver
+    # should not be in it at all -- the same reason step and pump use a dense LU. It named no
+    # preconditioner before and therefore inherited point block-Jacobi on a flat mesh, which
+    # cannot solve this system: measured, the linear residual sat at rel 0.9998 for 1000
+    # iterations a step, 40 steps, 40,000 iterations, 45 s, and the run did not converge.
+    #
+    # N=6 rather than 12 because SFEM_PRECOND=direct builds a DENSE matrix and factors it
+    # afresh every Newton step, and that cost is cubic. 12 cells per unit length is 33,124
+    # dofs, which the driver refuses outright (SFEM_DIRECT_MAX_DOF=20000); 8 is 10,692 and
+    # measured 116 s per run on 72 Grace cores, which put this matrix over the debug
+    # partition's 28-minute wall and got it killed mid-pump with no manifest written; 6 is
+    # 4,900 and costs a few seconds. Resolution is not what this case tests, and the
+    # exactness claim survives the reduction intact -- u_linf 5.8e-13 at N=6 against
+    # 4.5e-14 at N=8, both twelve orders below the flow scale.
+    # Level 1 explicitly, not $LEVEL_ENV: a semi-structured mesh carries float32 node
+    # coordinates and caps the achievable error near 1e-7, which would blunt an exactness
+    # claim that currently reads 4.5e-14.
+    run bc dirichlet "" -- SFEM_LX=$LX SFEM_LY=$LY SFEM_MU=$MU SFEM_U=$U SFEM_CASE=poiseuille \
+        SFEM_N=6 SFEM_ELEMENT_REFINE_LEVEL=1 \
+        SFEM_FGMRES=1 SFEM_GMG=0 SFEM_PRECOND=direct \
+        SFEM_BOUNDARY_MASK=1 SFEM_OUTLET=dirichlet
+    # This one does not converge -- the do-nothing outflow is not the exact Poiseuille
+    # outlet -- so it is capped rather than left to grind out 5 continuation stages of 40
+    # Newton steps, which cost 405 s for a result that is an identity against traction0 and
+    # holds at any iteration count, provided both runs use the same one.
+    run bc natural "" -- SFEM_NL_MAX_IT=12 SFEM_LX=$LX SFEM_LY=$LY SFEM_MU=$MU SFEM_U=$U SFEM_CASE=poiseuille SFEM_N=$(lvl_n 12) $LEVEL_ENV \
+        SFEM_BOUNDARY_MASK=1 SFEM_OUTLET=natural
+    run bc traction0 "" -- SFEM_NL_MAX_IT=12 SFEM_LX=$LX SFEM_LY=$LY SFEM_MU=$MU SFEM_U=$U SFEM_CASE=poiseuille SFEM_N=$(lvl_n 12) $LEVEL_ENV \
+        SFEM_BOUNDARY_MASK=1 SFEM_OUTLET=dirichlet \
+        SFEM_TRACTION_SIDESET=outlet "SFEM_TRACTION=0 0 0"
+fi
+
+# ---- a port holds the level, and nothing else ----
+#
+# TWO SOLVER STACKS, WITH AND WITHOUT MULTIGRID, because a group that exercises one of them
+# certifies one of them. Both are configurations the spike runs and both belong here.
+#
+# This group used to run a single stack, and not by choice -- it named no Krylov method and
+# no preconditioner, so it inherited BiCGStab and point block-Jacobi on a flat mesh. That is
+# the weakest combination the driver can produce, and it is why this group has carried
+# failures at p_bar >= 1.0 that were read, for a long time, as the prescribed pressure being
+# hard. It is not. Measured at this same 33,124 dof on Grace:
+#
+#   stack                          p_bar=-0.16   1.0     3.0     10.0     lin_it (p=3)
+#   FGMRES + multigrid                  pass    pass    pass    pass          227
+#   FGMRES + Vanka, no multigrid        pass    pass    pass    pass         2500
+#   FGMRES + block-Jacobi, no MG        FAIL    FAIL    FAIL    FAIL         9000 (cap)
+#
+# The first column is the zero-severity control -- p_exact(outlet), the level the flow
+# produces on its own, where the boundary condition asks for nothing unusual. Block-Jacobi
+# fails THERE, which is the whole finding: the prescribed pressure was never the variable.
+#
+# Semi-structured because `vanka` needs a micro-element lattice; on a flat mesh the driver's
+# only preconditioners are bjacobi and direct, so "flat without multigrid" cannot be anything
+# but the crippled arm. PORT_LEVEL keeps the dof count at the 33,124 these cases have always
+# used, so the numbers stay comparable with every earlier report.
+if want port; then
+    PORT_LEVEL=${PORT_LEVEL:-4}
+    if [ $(( 12 % PORT_LEVEL )) -ne 0 ]; then
+        echo "verify_report: PORT_LEVEL=$PORT_LEVEL must divide 12" >&2; exit 1
+    fi
+    PORT_N=$(( 12 / PORT_LEVEL ))
+    # THREE arms, and they answer two different questions that must not share a threshold.
+    #
+    #   direct  flat, dense LU. The linear solver is removed rather than exercised, so this
+    #           arm carries the EXACTNESS claim: the shift is p_bar - p_exact(outlet) to
+    #           round-off, and it is judged at 1e-6 relative.
+    #   mg      FGMRES + geometric multigrid, semi-structured.
+    #   vanka   FGMRES + Vanka, no multigrid, semi-structured.
+    #
+    # The last two carry the SOLVER claim -- that the production stacks, with and without
+    # multigrid, handle a prescribed pressure across the sweep. They are judged more loosely
+    # because they cannot do better: a semi-structured mesh stores node coordinates in
+    # float32, which differ from the flat mesh's by about 6e-08 and cap the relative error on
+    # the shift near 2e-06. Holding them to the flat arm's 1e-6 would be scoring them on the
+    # mesh's storage format rather than on the boundary condition.
+    for arm in direct mg vanka; do
+        case $arm in
+            # N=6 for the same reason bc dirichlet uses it: the dense factor is rebuilt
+            # every Newton step and the cost is cubic. At N=8 this arm alone measured
+            # 8 x 116 s and took the whole matrix past the debug wall.
+            direct) ARM_ENV="SFEM_GMG=0 SFEM_PRECOND=direct"
+                    ARM_MESH="SFEM_N=6 SFEM_ELEMENT_REFINE_LEVEL=1" ;;
+            mg)     ARM_ENV="SFEM_GMG=1"
+                    ARM_MESH="SFEM_N=$PORT_N SFEM_ELEMENT_REFINE_LEVEL=$PORT_LEVEL" ;;
+            # omega 1.0, not the driver's 0.35 default: measured on the standalone smoother
+            # probe, Vanka at omega=1 is the convergent setting (0.8279) and the damped one
+            # is slower for no benefit.
+            vanka)  ARM_ENV="SFEM_GMG=0 SFEM_PRECOND=vanka SFEM_GMG_OMEGA=1.0"
+                    ARM_MESH="SFEM_N=$PORT_N SFEM_ELEMENT_REFINE_LEVEL=$PORT_LEVEL" ;;
+        esac
+        for pb in $PORT_SWEEP; do
+            run port "${arm}_p$pb" "p_exact_outlet=$P_EXACT_OUTLET,stack=$arm" -- \
+                SFEM_LX=$LX SFEM_LY=$LY SFEM_MU=$MU SFEM_U=$U \
+                SFEM_CASE=poiseuille $ARM_MESH \
+                SFEM_FGMRES=1 $ARM_ENV \
+                SFEM_BOUNDARY_MASK=1 SFEM_OUTLET=dirichlet \
+                SFEM_PRESSURE_SIDESET=outlet SFEM_PRESSURE=$pb
+        done
+    done
+fi
+
+# ---- the kinetic-energy budget, on a flow where every term has a closed form ----
+#
+# This is the gate for every dissipation number this spike will ever report. The convection
+# operator is first-order upwind with no limiter, so the |mdot| term IS the scheme's subgrid
+# model, and eps_num -- what dE/dt, the boundary power and the viscous dissipation leave over
+# -- is the only measurement of how big that model is. A residual definition inherits every
+# error in the terms it is subtracted from, which is why it has to be shown to vanish where it
+# must before it is believed where it matters.
+#
+# Steady Poiseuille is where it must: dE/dt is zero, the flow is resolved, the exact solution
+# is representable, so eps_num is discretisation error and nothing else. Analytic values for
+# LX=4 LY=1 LZ=1 MU=0.01 U=1, against which the report's table can be read directly:
+#
+#     E        = 1/2 rho (16 U^2/30) Lx Ly Lz      = 1.066667
+#     eps_visc = mu (16 U^2 / (3 Ly)) Lx Lz        = 0.213333
+#     P_in - P_out                                 = eps_visc
+#
+# A ladder of three on the production stack to fit the order, plus one Vanka run at the middle
+# size. That last one is not a duplicate: the budget is a property of the DISCRETE SOLUTION,
+# so two solvers that converge to it must report the same numbers, and a disagreement would
+# mean one of them is not converging rather than that the budget is wrong.
+#
+# Semi-structured throughout, because that is where multigrid and Vanka are available at all,
+# and the diagnostics were wired for both mesh paths precisely so this group could run there.
+if want budget; then
+    for arm in mg vanka; do
+        case $arm in
+            mg)    B_ENV="SFEM_GMG=1"; B_LADDER="2:4 2:8 4:8" ;;
+            vanka) B_ENV="SFEM_GMG=0 SFEM_PRECOND=vanka SFEM_GMG_OMEGA=1.0"; B_LADDER="2:8" ;;
+        esac
+        for nl in $B_LADDER; do
+            BN=${nl%%:*}; BL=${nl##*:}
+            run budget "${arm}_n${BN}l${BL}" "stack=$arm" -- \
+                SFEM_LX=4 SFEM_LY=1 SFEM_LZ=1 SFEM_MU=0.01 SFEM_U=1 SFEM_CASE=poiseuille \
+                SFEM_N=$BN SFEM_ELEMENT_REFINE_LEVEL=$BL \
+                SFEM_FGMRES=1 $B_ENV \
+                SFEM_DIAG_CSV="$OUT/budget_${arm}_n${BN}l${BL}.csv"
+        done
+    done
+fi
+
+# ---- global mass conservation on the one non-box domain the spike has ----
+if want step; then
+    # Flat, Re = 20, no multigrid, and an exact linear solve.
+    #
+    # SFEM_PRECOND=direct builds a dense LU of the fine Jacobian, which is affordable at
+    # 7,060 dofs and is the point: it takes the linear solver out of the question entirely,
+    # so what is left is a statement about the discretisation. Block-Jacobi cannot solve
+    # this case -- it has nothing to say about the pressure coupling and the Krylov residual
+    # wanders and then diverges -- and multigrid is deliberately not used here.
+    run step lshape "mass_exact=$MASS_EXACT" -- SFEM_CASE=step SFEM_BOUNDARY_MASK=1 \
+        $LEVEL_ENV SFEM_MU=0.1 SFEM_GMG=0 $SOLVER_ENV \
+        SFEM_NX=$(lvl_n 40) SFEM_NY=$(lvl_n 8) SFEM_NZ=$(lvl_n 4)
+fi
+
+# ---- the diaphragm pump, across a cycle ----
+#
+# One run per instant rather than one run reporting many, because the identity is checked
+# at the END of a run: each takes the cycle a different distance and is measured there.
+# Peak, reversal and both zero crossings, which is where a sign error would hide.
+if want pump; then
+    # N=8, not larger: SFEM_PRECOND=direct is a dense LU of the fine Jacobian, which is
+    # cubic in the dof count, and the identity being checked is exact at any resolution --
+    # it is a statement about the boundary closure, not about accuracy. N=12 costs a
+    # 618 MB factorisation for the same answer.
+    run pump steady "" -- SFEM_CASE=pump SFEM_N=$(lvl_n 8) $LEVEL_ENV SFEM_MU=0.05 SFEM_GMG=0 $SOLVER_ENV
+    for ns in 1 2 4 6 8; do
+        run pump "t$ns" "" -- SFEM_CASE=pump SFEM_N=$(lvl_n 8) $LEVEL_ENV SFEM_MU=0.05 SFEM_GMG=0 $SOLVER_ENV \
+            SFEM_DT=0.125 SFEM_NSTEPS=$ns SFEM_PUMP_PERIOD=1 SFEM_BDF_ORDER=2
+    done
+fi
+
+# ---- the FDA benchmark nozzle: global mass balance on a curved, non-affine mesh ----
+#
+# The first case here whose elements are not affine, so it is what the isoparametric kernels
+# and the isoparametric boundary closure are verified on. What is scored is the identity the
+# step is scored on -- the summed continuity residual against the flow rate -- and it holds
+# at any resolution, so the mesh is sized for the dense LU rather than for accuracy. Accuracy
+# against the PIV data is a validation question for python/fda_nozzle_compare.py and a
+# resolved run, not for this matrix.
+#
+# Flat and isoparametric by necessity: the semi-structured operator refuses a curved macro
+# element, so there is no multigrid arm yet, and no Vanka. SFEM_FGMRES=1 explicitly, as for
+# every case.
+#
+# The flow rate is the benchmark's Q at throat Re 500, pi r_t^2 u_t with u_t = Re mu / (rho d_t),
+# which the PIV files state as 5.20624e-06 m^3/s.
+#
+# The mesh is the coarsest of a ladder measured at Re 1 on Grace (job 4656808), where the
+# centreline has a known answer -- 2 u_in in the pipes, 18 u_in in the throat:
+#
+#   core  ndof     pipe    throat   expanded pipe   inflow vs Q   probed LU
+#   2     4,540    2.079   18.71    2.269           18.8%          17 s
+#   4     15,740   2.018   18.17    2.054           5.05%         782 s
+#
+# Second order in every column. The axial cell counts matter as much as the cross-section: 2
+# cells in the inlet pipe put the pipe axis at 4 u_in and the throat at 5, while conserving
+# mass exactly. Core 4 is out of reach here because SFEM_PRECOND=direct probes the Jacobian a
+# column at a time, so core 2 it is -- and its inflow error is the inscribed-polygon inlet,
+# O(h^2), which is why this run carries its own inflow tolerance rather than the step's 5%.
+# Measured on Grace (job 4656924): 4,540 dof, 10 continuation stages, 83 Newton steps, 295 s,
+# nearly all of it the probed LU; residual sum 2.7e-09 of its magnitude, out - in exactly 0.
+if want nozzle; then
+    NOZZLE_Q=$(awk 'BEGIN{ut=500*0.0035/(1056*0.004); printf "%.12g", 3.141592653589793*0.002*0.002*ut}')
+    run nozzle re500 "mass_exact=$NOZZLE_Q,inflow_tol=0.25" -- SFEM_CASE=nozzle SFEM_NOZZLE_RE=500 \
+        SFEM_ELEMENT_REFINE_LEVEL=1 SFEM_GMG=0 SFEM_FGMRES=1 $SOLVER_ENV \
+        SFEM_NOZZLE_NCORE=2 SFEM_NOZZLE_NBORE=1 SFEM_NOZZLE_NOUTER=1 "SFEM_NOZZLE_NAXIAL=8 6 16 24"
+fi
+
+# ---- assemble the manifest ----
+# Exported so the heredoc below can read them; a shell variable is not in its environment.
+export SPIKE_ROOT CTEST_TOTAL CTEST_PASS CTEST_FAIL CTEST_FAILING VERIFY_SOLVER VERIFY_RESTART VERIFY_LEVEL
+python3 - "$OUT" "$TSV" <<'PYEOF'
+import json, os, subprocess, sys, platform
+out, tsv = sys.argv[1], sys.argv[2]
+runs = []
+with open(tsv) as fh:
+    for line in fh:
+        parts = line.rstrip("\n").split("\t")
+        if len(parts) < 3:
+            continue
+        group, label, log = parts[0], parts[1], parts[2]
+        rec = {"group": group, "label": label, "log": log}
+        for kv in (parts[3] if len(parts) > 3 else "").split(","):
+            if "=" in kv:
+                k, v = kv.split("=", 1)
+                try:
+                    rec[k] = float(v)
+                except ValueError:
+                    rec[k] = v
+        runs.append(rec)
+
+def sh(cmd, default="--"):
+    try:
+        return subprocess.check_output(cmd, shell=True, stderr=subprocess.DEVNULL).decode().strip() or default
+    except Exception:
+        return default
+
+manifest = {
+    "runs": runs,
+    "machine": os.environ.get("SLURM_JOB_NODELIST") or platform.node(),
+    "threads": os.environ.get("OMP_NUM_THREADS", "unset"),
+    "commit": sh("git -C %s rev-parse --short HEAD" % os.environ.get("SPIKE_ROOT", ".")),
+    "level": os.environ.get("VERIFY_LEVEL", "1"),
+    "solver": (os.environ.get("VERIFY_SOLVER", "direct") +
+               ("" if os.environ.get("VERIFY_SOLVER") != "fgmres"
+                else ", restart %s" % os.environ.get("VERIFY_RESTART", "?"))),
+}
+ct_total = int(os.environ.get("CTEST_TOTAL", "0") or 0)
+if ct_total:
+    failing = [f for f in (os.environ.get("CTEST_FAILING", "") or "").split(",") if f]
+    manifest["ctest"] = {"total": ct_total,
+                         "passed": int(os.environ.get("CTEST_PASS", "0") or 0),
+                         "failed": int(os.environ.get("CTEST_FAIL", "0") or 0),
+                         "failing": failing}
+with open(os.path.join(out, "manifest.json"), "w") as fh:
+    json.dump(manifest, fh, indent=2)
+print("    manifest   : %d run(s)" % len(runs))
+PYEOF
+
+echo "<<< done  $(date +%H:%M:%S)"
+echo
+echo "Build the report with:"
+echo "  python3 $SPIKE_ROOT/python/cvfem_verify_report.py $OUT \\"
+echo "      -o $SPIKE_ROOT/docs/CVFEM_Verification_Report.md --html"

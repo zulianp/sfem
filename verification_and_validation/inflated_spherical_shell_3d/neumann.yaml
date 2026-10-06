@@ -1,0 +1,5 @@
+neumann_conditions:
+  - type: pressure
+    format: file
+    path: "{mesh}/n8/sets/inner"
+    value: {loading_inner_pressure_mpa}

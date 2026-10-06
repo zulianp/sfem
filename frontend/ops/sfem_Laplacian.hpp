@@ -39,6 +39,8 @@ namespace sfem {
     class Laplacian final : public Op {
     public:
         const char *name() const override { return "Laplacian"; }
+        //! the Dirichlet energy
+        bool energy_or_potential_based() const override { return true; }
         inline bool is_linear() const override { return true; }
         inline ptrdiff_t  n_dofs_domain() const override;
         inline ptrdiff_t  n_dofs_image() const override;
@@ -119,6 +121,10 @@ namespace sfem {
         int report(const real_t *const) override;
         std::shared_ptr<Op> clone() const override;
 
+        /**
+         * Per-block diffusion coefficient. Use var_name `"k"` (default 1). Copied through
+         * `derefine_op` so SS GMG levels keep heterogeneous coefficients.
+         */
         void set_value_in_block(const std::string &block_name, const std::string &var_name, const real_t value) override;
         void override_element_types(const std::vector<smesh::ElemType> &element_types) override;
         void set_option(const std::string &name, bool val) override;

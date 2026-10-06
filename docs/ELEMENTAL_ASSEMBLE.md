@@ -7,7 +7,7 @@ This note explains how to call the generated header-only NeoHookean dense local 
 ```cpp
 #include "sfem_GeneratedNeoHookeanOgden_element_api.hpp"
 
-sfem::codegen::neohookean_ogden_hessian_2d_element_soa<real_t, VECTOR_SIZE>(
+sfem::codegen::neohookean_ogden_hessian_2d_esoa<real_t, VECTOR_SIZE>(
         element_type, nelements, coords, lmbda, mu, u_streams, matrix_streams);
 ```
 
@@ -55,7 +55,7 @@ element_matrix_aos[e][row][col]
 AoS is often more convenient for users after assembly. A common pattern is:
 
 1. Gather global data into thread-local SoA batch buffers.
-2. Call the generated `*_element_soa` function.
+2. Call the generated `*_esoa` function.
 3. Convert the active `hessian_soa[row * ndofs + col][lane]` entries to `element_matrix_aos[element][row][col]`.
 
 ## Minimal Batched Call
@@ -92,10 +92,10 @@ for (int shape = 0; shape < nshape; ++shape) {
 
 int status = SFEM_FAILURE;
 if (dim == 2) {
-    status = sfem::codegen::neohookean_ogden_hessian_2d_element_soa<real_t, VECTOR_SIZE>(
+    status = sfem::codegen::neohookean_ogden_hessian_2d_esoa<real_t, VECTOR_SIZE>(
             element_type, nelems, coords, lmbda, mu, u_soa, hessian_soa);
 } else if (dim == 3) {
-    status = sfem::codegen::neohookean_ogden_hessian_3d_element_soa<real_t, VECTOR_SIZE>(
+    status = sfem::codegen::neohookean_ogden_hessian_3d_esoa<real_t, VECTOR_SIZE>(
             element_type, nelems, coords, lmbda, mu, u_soa, hessian_soa);
 }
 
@@ -124,7 +124,7 @@ for (int row = 0; row < ndofs; ++row) {
 Use the 3D dispatch wrapper:
 
 ```cpp
-sfem::codegen::neohookean_ogden_hessian_3d_element_soa<real_t, VECTOR_SIZE>(
+sfem::codegen::neohookean_ogden_hessian_3d_esoa<real_t, VECTOR_SIZE>(
         element_type, nelems, coords, lmbda, mu, u_streams, matrix_streams);
 ```
 
@@ -160,10 +160,10 @@ real_t gradient_soa[MAX_NDOFS][VECTOR_SIZE];
 
 int status = SFEM_FAILURE;
 if (dim == 2) {
-    status = sfem::codegen::neohookean_ogden_gradient_2d_element_soa<real_t, VECTOR_SIZE>(
+    status = sfem::codegen::neohookean_ogden_gradient_2d_esoa<real_t, VECTOR_SIZE>(
             element_type, nelems, coords, lmbda, mu, u_streams, gradient_soa);
 } else if (dim == 3) {
-    status = sfem::codegen::neohookean_ogden_gradient_3d_element_soa<real_t, VECTOR_SIZE>(
+    status = sfem::codegen::neohookean_ogden_gradient_3d_esoa<real_t, VECTOR_SIZE>(
             element_type, nelems, coords, lmbda, mu, u_streams, gradient_soa);
 }
 
@@ -181,10 +181,10 @@ real_t element_energy[VECTOR_SIZE];
 
 int status = SFEM_FAILURE;
 if (dim == 2) {
-    status = sfem::codegen::neohookean_ogden_energy_2d_element_soa<real_t, VECTOR_SIZE>(
+    status = sfem::codegen::neohookean_ogden_energy_2d_esoa<real_t, VECTOR_SIZE>(
             element_type, nelems, coords, lmbda, mu, u_streams, element_energy);
 } else if (dim == 3) {
-    status = sfem::codegen::neohookean_ogden_energy_3d_element_soa<real_t, VECTOR_SIZE>(
+    status = sfem::codegen::neohookean_ogden_energy_3d_esoa<real_t, VECTOR_SIZE>(
             element_type, nelems, coords, lmbda, mu, u_streams, element_energy);
 }
 

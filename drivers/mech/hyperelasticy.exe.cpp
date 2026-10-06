@@ -1,18 +1,23 @@
+#include <cstring>
+#include <fstream>
+#include <iomanip>
 #include <memory>
+#include <sstream>
 
 #include "sfem_test.hpp"
 
 #include "sfem_Function.hpp"
 
+#include "sfem_CRS.hpp"
 #include "sfem_aliases.hpp"
 #include "sfem_base.hpp"
-#include "sfem_CRS.hpp"
-
 
 #include "matrixio_array.h"
 
 #include "sfem_API.hpp"
 #include "sfem_DirichletConditions.hpp"
+#include "sfem_MooneyRivlinVisco.hpp"
+#include "sfem_StateField.hpp"
 #include "smesh_env.hpp"
 #include "smesh_sideset.hpp"
 
@@ -104,6 +109,13 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     const real_t SFEM_LSOLVE_RTOL       = smesh::Env::read("SFEM_LSOLVE_RTOL", 1e-3);
     const real_t SFEM_NL_TOL            = smesh::Env::read("SFEM_NL_TOL", 1e-9);
     bool         SFEM_USE_ACTIVE_STRAIN = smesh::Env::read("SFEM_USE_ACTIVE_STRAIN", false);
+    const std::string SFEM_ACTIVE_STRAIN_FILE = smesh::Env::read_string("SFEM_ACTIVE_STRAIN_FILE", "");
+    SFEM_USE_ACTIVE_STRAIN = SFEM_USE_ACTIVE_STRAIN || !SFEM_ACTIVE_STRAIN_FILE.empty();
+    const std::string SFEM_INITIAL_DISPLACEMENT = smesh::Env::read_string("SFEM_INITIAL_DISPLACEMENT", "");
+    const std::string SFEM_INITIAL_DISPLACEMENT_COMPONENTS =
+            smesh::Env::read_string("SFEM_INITIAL_DISPLACEMENT_COMPONENTS", "");
+    const bool   SFEM_VISCO_REJECT_TRIAL = smesh::Env::read("SFEM_VISCO_REJECT_TRIAL", false);
+    const real_t SFEM_VISCO_REJECT_TRIAL_SCALE = smesh::Env::read("SFEM_VISCO_REJECT_TRIAL_SCALE", 1e-3);
 
     const real_t SFEM_ACTIVE_STRAIN_XX = smesh::Env::read("SFEM_ACTIVE_STRAIN_XX", 0.5);
 
@@ -126,7 +138,9 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
 
     std::shared_ptr<sfem::FunctionSpace::PackedMesh> packed_mesh;
     if (smesh::Env::read("SFEM_USE_PACKED_MESH", false)) {
-        packed_mesh = sfem::FunctionSpace::PackedMesh::create(mesh, {}, true);
+        const bool has_external_state = !SFEM_ACTIVE_STRAIN_FILE.empty() || !SFEM_INITIAL_DISPLACEMENT.empty() ||
+                                        !SFEM_INITIAL_DISPLACEMENT_COMPONENTS.empty();
+        packed_mesh = sfem::FunctionSpace::PackedMesh::create(mesh, {}, !has_external_state);
     }
 
     const int                            block_size = mesh->spatial_dimension();
@@ -138,30 +152,68 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     }
 
     auto dirichlet_conditions = sfem::DirichletConditions::create_from_file(fs, dirichlet_path);
+    if (!dirichlet_conditions) return SFEM_FAILURE;
 
-    auto f  = sfem::Function::create(fs);
-    auto op = sfem::create_op(fs, SFEM_OPERATOR, es);
-    op->initialize();
+    auto                      f = sfem::Function::create(fs);
+    std::shared_ptr<sfem::Op> op;
+    const std::string         operator_config = smesh::Env::read_string("SFEM_OPERATOR_CONFIG", "");
+    if (!operator_config.empty()) {
+#ifdef SFEM_ENABLE_RYAML
+        std::ifstream stream(operator_config);
+        if (!stream.good()) {
+            SFEM_ERROR("Unable to read operator configuration %s\n", operator_config.c_str());
+            return SFEM_FAILURE;
+        }
+        std::ostringstream contents;
+        contents << stream.rdbuf();
+        op = sfem::create_op_from_yaml(fs, contents.str(), es);
+#else
+        SFEM_ERROR("Operator YAML requires SFEM_ENABLE_RYAML\n");
+        return SFEM_FAILURE;
+#endif
+    } else {
+        op = sfem::create_op(fs, SFEM_OPERATOR, es);
+        if (op && op->initialize() != SFEM_SUCCESS) return SFEM_FAILURE;
+    }
+    if (!op) return SFEM_FAILURE;
+
+    if (auto active = std::dynamic_pointer_cast<sfem::NeoHookeanOgdenActiveStrainPacked>(op)) {
+        active->set_mu(smesh::Env::read("SFEM_MU", (real_t)1));
+        active->set_lambda(smesh::Env::read("SFEM_LAMBDA", (real_t)1));
+    }
+    if (auto active = std::dynamic_pointer_cast<sfem::MooneyRivlinActiveStrainPacked>(op)) {
+        active->set_mu(smesh::Env::read("SFEM_MU", (real_t)1));
+        active->set_lambda(smesh::Env::read("SFEM_LAMBDA", (real_t)1));
+        active->set_lmda(smesh::Env::read("SFEM_LMDA", (real_t)1));
+    }
+
+    auto visco_op = std::dynamic_pointer_cast<sfem::MooneyRivlinVisco>(op);
+    if (visco_op) visco_op->initialize_history();
 
     // Generate basic Fa if active strain operator is requested
     std::shared_ptr<sfem::Buffer<real_t>> Fa_storage;
     if (SFEM_USE_ACTIVE_STRAIN) {
-        auto   bbox      = mesh->compute_bounding_box();
-        auto   bb_min    = bbox.first->data();
-        auto   bb_max    = bbox.second->data();
-        geom_t center[3] = {(geom_t)0, (geom_t)0, (geom_t)0};
-        for (int d = 0; d < mesh->spatial_dimension(); d++) {
-            center[d] = (bb_min[d] + bb_max[d]) * (geom_t)0.5;
-        }
-        const geom_t    dx        = bb_max[0] - bb_min[0];
-        const geom_t    dy        = bb_max[1] - bb_min[1];
-        const geom_t    dz        = bb_max[2] - bb_min[2];
-        const geom_t    span      = std::min(dx, std::min(dy, dz));
-        geom_t          radius    = smesh::Env::read("SFEM_ACTIVE_STRAIN_RADIUS", (double)(0.25 * span));
         const ptrdiff_t nelements = mesh->n_elements();
-        Fa_storage                = sfem::create_host_buffer<real_t>(9 * nelements);
-        auto Fa                   = Fa_storage->data();
-        fill_active_strain_Fa(mesh, Fa, center, radius, SFEM_ACTIVE_STRAIN_XX, 1, 1);
+        Fa_storage = sfem::create_host_buffer<real_t>(9 * nelements);
+        if (!SFEM_ACTIVE_STRAIN_FILE.empty()) {
+            if (sfem::read_state_field(SFEM_ACTIVE_STRAIN_FILE, 9 * nelements, Fa_storage->data()) != SFEM_SUCCESS) {
+                return SFEM_FAILURE;
+            }
+        } else {
+            auto   bbox      = mesh->compute_bounding_box();
+            auto   bb_min    = bbox.first->data();
+            auto   bb_max    = bbox.second->data();
+            geom_t center[3] = {(geom_t)0, (geom_t)0, (geom_t)0};
+            for (int d = 0; d < mesh->spatial_dimension(); d++) {
+                center[d] = (bb_min[d] + bb_max[d]) * (geom_t)0.5;
+            }
+            const geom_t dx = bb_max[0] - bb_min[0];
+            const geom_t dy = bb_max[1] - bb_min[1];
+            const geom_t dz = bb_max[2] - bb_min[2];
+            const geom_t span = std::min(dx, std::min(dy, dz));
+            const geom_t radius = smesh::Env::read("SFEM_ACTIVE_STRAIN_RADIUS", (double)(0.25 * span));
+            fill_active_strain_Fa(mesh, Fa_storage->data(), center, radius, SFEM_ACTIVE_STRAIN_XX, 1, 1);
+        }
         op->set_field("active_strain", Fa_storage, 0);
     }
 
@@ -173,12 +225,40 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
         f->add_constraint(rotate_conds->create_constraint());
     }
 
-    const ptrdiff_t ndofs        = fs->n_dofs();
-    auto            displacement = sfem::create_buffer<real_t>(ndofs, es);
-    auto            increment    = sfem::create_buffer<real_t>(ndofs, es);
-    auto            rhs          = sfem::create_buffer<real_t>(ndofs, es);
+    const ptrdiff_t ndofs             = fs->n_dofs();
+    auto            displacement      = sfem::create_buffer<real_t>(ndofs, es);
+    auto            increment         = sfem::create_buffer<real_t>(ndofs, es);
+    auto            rhs               = sfem::create_buffer<real_t>(ndofs, es);
+    auto            material_reaction = sfem::create_buffer<real_t>(ndofs, es);
+    auto            rejected_trial    = SFEM_VISCO_REJECT_TRIAL ? sfem::create_buffer<real_t>(ndofs, es) : nullptr;
+    if (!SFEM_INITIAL_DISPLACEMENT.empty() || !SFEM_INITIAL_DISPLACEMENT_COMPONENTS.empty()) {
+        if (!SFEM_INITIAL_DISPLACEMENT.empty() && !SFEM_INITIAL_DISPLACEMENT_COMPONENTS.empty()) {
+            SFEM_ERROR("Specify either a full initial-displacement file or component files, not both\n");
+            return SFEM_FAILURE;
+        }
+        auto host = sfem::create_host_buffer<real_t>(ndofs);
+        const int status = !SFEM_INITIAL_DISPLACEMENT.empty()
+                                   ? sfem::read_state_field(SFEM_INITIAL_DISPLACEMENT, ndofs, host->data())
+                                   : sfem::read_state_field_components(
+                                             SFEM_INITIAL_DISPLACEMENT_COMPONENTS,
+                                             mesh->n_nodes(),
+                                             block_size,
+                                             host->data());
+        if (status != SFEM_SUCCESS) return status;
+#ifdef SFEM_ENABLE_CUDA
+        if (es == sfem::EXECUTION_SPACE_DEVICE) {
+            displacement = smesh::to_device(host);
+        } else
+#endif
+        {
+            std::memcpy(displacement->data(), host->data(), size_t(ndofs) * sizeof(real_t));
+        }
+    }
+    auto            constrained_mask  = sfem::create_host_buffer<mask_t>(mask_count(ndofs));
+    std::memset(constrained_mask->data(), 0, size_t(mask_count(ndofs)) * sizeof(mask_t));
+    if (f->constraints_mask(constrained_mask->data()) != SFEM_SUCCESS) return SFEM_FAILURE;
 
-    const std::string SFEM_OP_TYPE = smesh::Env::read_string("SFEM_OP_TYPE", "MF");
+    const std::string SFEM_OP_TYPE = smesh::Env::read_string("SFEM_OP_TYPE", visco_op ? "BSR" : "MF");
     auto              linear_op    = sfem::create_linear_operator(SFEM_OP_TYPE.c_str(), f, displacement, es);
     auto              cg           = sfem::create_cg<real_t>(linear_op, es);
     cg->verbose                    = SFEM_VERBOSE;
@@ -192,8 +272,8 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     if (smesh::Env::read("SFEM_USE_PRECONDITIONER", false)) {
         if (fs->element_type() == smesh::HEX8) {
             auto diag                = sfem::create_buffer<real_t>(ndofs, es);
-            auto sj                  = sfem::create_shiftable_jacobi(diag, es);
-            sj->relaxation_parameter = 1. / fs->block_size();
+            auto sj = sfem::create_shiftable_jacobi(diag, es);
+            sj->set_relaxation_parameter(1. / fs->block_size());
             cg->set_preconditioner_op(sj);
             update_preconditioner = [=](const real_t *const disp) {
                 f->hessian_diag(disp, diag->data());
@@ -205,7 +285,7 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     // Newton iteration
     int    nl_max_it          = smesh::Env::read("SFEM_NL_MAX_IT", 30);
     real_t alpha              = smesh::Env::read("SFEM_NL_ALPHA", 1.0);
-    bool   enable_line_search = smesh::Env::read("SFEM_ENABLE_LINE_SEARCH", true);
+    bool   enable_line_search = smesh::Env::read("SFEM_ENABLE_LINE_SEARCH", true) && !visco_op;
     auto   blas               = sfem::blas<real_t>(es);
 
     printf("Solving hyperelasticity: #%ld dofs\n", (long)fs->n_dofs());
@@ -223,6 +303,9 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     smesh::create_directory(output_path / "out");
     out->set_output_dir(output_path / "out");
     out->enable_AoS_to_SoA(true);
+
+    std::ofstream quantities((output_path / "quantities.yaml").c_str());
+    quantities << std::setprecision(17) << "material_objective_history:\n";
 
     if (smesh::Env::read("SFEM_USE_GRADIENT_DESCENT", false)) {
         for (int i = 0; i < nl_max_it; i++) {
@@ -242,13 +325,18 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     } else {
         real_t energy         = 0;
         real_t selected_alpha = 0;
-        f->value(displacement->data(), &energy);
+        f->energy_merit(displacement->data(), &energy);
 
         // Newton solver with line search
         printf("%-10s %-5s %-14s %-14s %-14s\n", "Iteration", "CG", "gnorm", "energy", "alpha");
         printf("-------------------------------------------------------------\n");
 
-        int steps = rotate_conds ? rotate_conds->steps : 1;
+        const int    load_steps = std::max(1, smesh::Env::read("SFEM_LOAD_STEPS", 1));
+        const real_t load_dt    = smesh::Env::read("SFEM_DT", 1.0);
+        const int    export_freq = std::max(1, smesh::Env::read("SFEM_EXPORT_FREQ", 1));
+        int          steps      = std::max(rotate_conds ? rotate_conds->steps : 1, load_steps);
+        dirichlet_conditions->set_time(0);
+        f->apply_constraints(displacement->data());
         if (rotate_conds) {
             out->write_time_step("rhs", 0, smesh::to_host(rhs)->data());
             out->write_time_step("disp", 0, smesh::to_host(displacement)->data());
@@ -257,12 +345,15 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
         int       last_iterations         = 0;
         ptrdiff_t total_linear_iterations = 0;
         for (int step = 1; step <= steps; step++) {
+            const real_t time = step * load_dt;
+            if (dirichlet_conditions->set_time(time) != SFEM_SUCCESS) return SFEM_FAILURE;
+            f->apply_constraints(displacement->data());
             if (rotate_conds) {
                 rotate_conds->update(step);
             }
 
             // Update active strain field per step (incremental loading)
-            if (SFEM_USE_ACTIVE_STRAIN) {
+            if (SFEM_USE_ACTIVE_STRAIN && SFEM_ACTIVE_STRAIN_FILE.empty()) {
                 auto   bbox_step   = mesh->compute_bounding_box();
                 auto   bb_min_s    = bbox_step.first->data();
                 auto   bb_max_s    = bbox_step.second->data();
@@ -280,6 +371,23 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
                 op->set_field("active_strain", Fa_storage, 0);
             }
 
+            if (visco_op && rejected_trial && step == 1) {
+                blas->copy(ndofs, displacement->data(), rejected_trial->data());
+                auto points = mesh->points()->data();
+#pragma omp parallel for
+                for (ptrdiff_t node = 0; node < mesh->n_nodes(); ++node) {
+                    for (int d = 0; d < block_size; ++d) {
+                        rejected_trial->data()[node * block_size + d] +=
+                                SFEM_VISCO_REJECT_TRIAL_SCALE * points[d][node];
+                    }
+                }
+                blas->zeros(ndofs, material_reaction->data());
+                if (op->gradient(rejected_trial->data(), material_reaction->data()) != SFEM_SUCCESS)
+                    return SFEM_FAILURE;
+                if (!comm->rank()) printf("SFEM_VISCO_REJECTED_TRIAL\n");
+            }
+
+            bool converged = false;
             for (int i = 0; i < nl_max_it; i++) {
                 f->update(displacement->data());
                 update_preconditioner(displacement->data());
@@ -289,7 +397,10 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
                 const real_t gnorm = blas->norm2(ndofs, rhs->data());
                 printf("%-10d %-5d %-14.4e %-14.4e %-14.4f\n", i, last_iterations, gnorm, energy, -selected_alpha);
 
-                if (gnorm < SFEM_NL_TOL) break;
+                if (gnorm < SFEM_NL_TOL) {
+                    converged = true;
+                    break;
+                }
 
                 if (SFEM_OP_TYPE != "MF") {
                     linear_op = sfem::create_linear_operator(SFEM_OP_TYPE.c_str(), f, displacement, es);
@@ -314,7 +425,7 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
                                                -alpha / 128};
                     std::vector<real_t> energies(alphas.size(), 0);
 
-                    f->value_steps(displacement->data(), increment->data(), alphas.size(), alphas.data(), energies.data());
+                    f->energy_merit(displacement->data(), increment->data(), alphas.size(), alphas.data(), energies.data());
                     const int min_energy_index =
                             std::distance(energies.begin(), std::min_element(energies.begin(), energies.end()));
                     selected_alpha = alphas[min_energy_index];
@@ -323,17 +434,70 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
                 } else {
                     selected_alpha = -alpha;
                     blas->axpy(ndofs, selected_alpha, increment->data(), displacement->data());
-                    f->value(displacement->data(), &energy);
+                    f->energy_merit(displacement->data(), &energy);
                 }
             }
 
-            if (rotate_conds) {
-                out->write_time_step("rhs", step, smesh::to_host(rhs)->data());
-                out->write_time_step("disp", step, smesh::to_host(displacement)->data());
-            } else {
-                out->write("rhs", smesh::to_host(rhs)->data());
-                out->write("disp", smesh::to_host(displacement)->data());
+            if (!converged) {
+                SFEM_ERROR("Newton did not converge at prescribed state %d\n", step);
+                return SFEM_FAILURE;
             }
+
+            blas->zeros(ndofs, material_reaction->data());
+            if (op->gradient(displacement->data(), material_reaction->data()) != SFEM_SUCCESS) return SFEM_FAILURE;
+            real_t              material_objective = 0;
+            const int           objective_status   = op->value(displacement->data(), &material_objective);
+            auto                host_reaction      = smesh::to_host(material_reaction);
+            std::vector<real_t> constrained_resultant(block_size, 0);
+            for (ptrdiff_t i = 0; i < ndofs; ++i) {
+                if (mask_get(i, constrained_mask->data())) {
+                    constrained_resultant[i % block_size] += host_reaction->data()[i];
+                }
+            }
+
+            quantities << "  - time: " << time << '\n';
+            if (objective_status == SFEM_SUCCESS) {
+                quantities << "    value: " << material_objective << '\n';
+            } else {
+                quantities << "    value: null\n";
+            }
+            quantities << "    constrained_reaction_resultant: [";
+            for (int d = 0; d < block_size; ++d) {
+                quantities << (d ? ", " : "") << constrained_resultant[d];
+            }
+            quantities << "]\n";
+            quantities << "    constraint_reactions:\n";
+            const auto &conditions = dirichlet_conditions->conditions();
+            for (size_t condition_index = 0; condition_index < conditions.size(); ++condition_index) {
+                const auto &condition = conditions[condition_index];
+                real_t      reaction  = 0;
+                for (size_t i = 0; i < condition.nodeset->size(); ++i) {
+                    reaction += host_reaction->data()[condition.nodeset->data()[i] * block_size + condition.component];
+                }
+                quantities << "      - condition: " << condition_index << '\n';
+                quantities << "        component: " << condition.component << '\n';
+                quantities << "        resultant: " << reaction << '\n';
+            }
+
+            if (step % export_freq == 0 || step == steps) {
+                if (rotate_conds) {
+                    out->write_time_step("rhs", step, smesh::to_host(rhs)->data());
+                    out->write_time_step("disp", step, smesh::to_host(displacement)->data());
+                    out->write_time_step("material_reaction", time, host_reaction->data());
+                    out->log_time(time);
+                } else {
+                    out->write("rhs", smesh::to_host(rhs)->data());
+                    out->write("disp", smesh::to_host(displacement)->data());
+                    if (steps > 1) {
+                        out->write_time_step("material_reaction", time, host_reaction->data());
+                        out->log_time(time);
+                    } else {
+                        out->write("material_reaction", host_reaction->data());
+                    }
+                }
+            }
+
+            if (visco_op && visco_op->update_history(displacement->data()) != SFEM_SUCCESS) return SFEM_FAILURE;
         }
 
         printf("Total linear iterations: %ld\n", (long)total_linear_iterations);

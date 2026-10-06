@@ -1,0 +1,81 @@
+schema_version: 2
+id: prony_relaxation_3d
+name: Three-dimensional Prony-series relaxation
+kind: verification
+family: viscoelastic
+dimension: 3
+tier: medium
+
+source:
+  description: Closed-form Prony relaxation modulus with WLF reduced time
+  reference: README.md
+oracle: {type: analytical, implementation: oracle.py}
+geometry: {length: 1.0, height: 1.0, depth: 1.0}
+loading: {strain: 0.05}
+time: {duration: 4.0, time_steps: [0.0125, 0.00625, 0.003125]}
+material: {c10: 1.0, c01: 0.5, bulk_modulus: 0.0}
+wlf: {C1: 2.0, C2: 100.0, T_ref: 20.0}
+
+mesh:
+  command: ["{python}", "{case_dir}/generate_mesh.py", "{mesh}", --nx, "{resolution_nx}", --ny, "{resolution_ny}", --nz, "{resolution_nz}", --strain, "{loading_strain}"]
+inputs:
+  - {template: dirichlet.yaml, output: "{output}/dirichlet.yaml"}
+verification:
+  command: ["{python}", "{case_dir}/verify.py", --case, "{resolved_case}", --output, "{output}", --report, "{output}/verification.json"]
+  report: "{output}/verification.json"
+  tolerances: &tolerances
+    reaction_history_relative_l2: 1.0e-2
+    long_time_modulus_relative_error: 5.0e-3
+    fitted_tau_max_relative_error: 2.0e-2
+    wlf_collapse_relative_l2: 1.0e-2
+    temporal_reduction_deficit: 0.0
+    rejected_trial_history_relative_l2: 1.0e-12
+
+variants:
+  - &base
+    id: one_term_reference
+    operator: MooneyRivlinVisco
+    element: HEX8
+    resolution: {nx: 4, ny: 1, nz: 1, prony_g: "0.4", prony_tau: "0.4", temperatures: "20", use_wlf: 0}
+    driver: &driver
+      executable: "{python}"
+      arguments: ["{suite_dir}/common/run_prony_relaxation.py", --case, "{resolved_case}", --driver, "{build_dir}/hyperelasticy", --mesh, "{mesh}", --dirichlet, "{output}/dirichlet.yaml", --output, "{output}/solution"]
+      environment: &environment
+        OMP_NUM_THREADS: 1
+        SFEM_OPERATOR: MooneyRivlinVisco
+        SFEM_MOONEY_RIVLIN_C10: "{material_c10}"
+        SFEM_MOONEY_RIVLIN_C01: "{material_c01}"
+        SFEM_MOONEY_RIVLIN_K: "{material_bulk_modulus}"
+        SFEM_PRONY_G: "{resolution_prony_g}"
+        SFEM_PRONY_TAU: "{resolution_prony_tau}"
+        SFEM_PRONY_TEMPERATURES: "{resolution_temperatures}"
+        SFEM_USE_WLF: "{resolution_use_wlf}"
+        SFEM_WLF_C1: 2.0
+        SFEM_WLF_C2: 100.0
+        SFEM_WLF_T_REF: 20.0
+        SFEM_NL_TOL: 1.0e-11
+        SFEM_NL_MAX_IT: 20
+        SFEM_LSOLVE_RTOL: 1.0e-12
+        SFEM_OP_TYPE: BSR
+        SFEM_ENABLE_LINE_SEARCH: 0
+    expected_output: &expected
+      required:
+        - {pattern: SFEM_TRANSIENT_LEVEL_COMPLETE, count: 3}
+        - {pattern: SFEM_VISCO_REJECTED_TRIAL, count: 1}
+        - {pattern: SFEM_PRONY_COMMIT_CHECK_COMPLETE, count: 1}
+        - {pattern: SFEM_PRONY_RELAXATION_COMPLETE, count: 1}
+      forbidden: [Newton did not converge, "nan"]
+    tolerances: *tolerances
+  - <<: *base
+    id: multi_term_reference
+    resolution: {nx: 4, ny: 1, nz: 1, prony_g: "0.25,0.2", prony_tau: "0.2,0.8", temperatures: "20", use_wlf: 0}
+  - <<: *base
+    id: multi_term_wlf_pair
+    resolution: {nx: 4, ny: 1, nz: 1, prony_g: "0.25,0.2", prony_tau: "0.2,0.8", temperatures: "20,30", use_wlf: 1}
+    expected_output:
+      required:
+        - {pattern: SFEM_TRANSIENT_LEVEL_COMPLETE, count: 6}
+        - {pattern: SFEM_VISCO_REJECTED_TRIAL, count: 1}
+        - {pattern: SFEM_PRONY_COMMIT_CHECK_COMPLETE, count: 1}
+        - {pattern: SFEM_PRONY_RELAXATION_COMPLETE, count: 1}
+      forbidden: [Newton did not converge, "nan"]

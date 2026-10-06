@@ -41,6 +41,8 @@ namespace sfem {
     class LinearElasticity final : public Op {
     public:
         const char *name() const override { return "LinearElasticity"; }
+        //! the strain energy
+        bool energy_or_potential_based() const override { return true; }
         inline bool is_linear() const override { return true; }
         ptrdiff_t   n_dofs_domain() const override;
         ptrdiff_t   n_dofs_image() const override;
@@ -125,6 +127,16 @@ namespace sfem {
         int gradient(const real_t *const x, real_t *const out) override;
         int apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) override;
         int value(const real_t *x, real_t *const out) override;
+
+        int gradient(const real_t *const x, real_t *const out, const ElementScope scope) override;
+        int apply(const real_t *const x, const real_t *const h, real_t *const out, const ElementScope scope) override;
+
+        int apply_scope_flat_range(const real_t *const x,
+                                   const real_t *const h,
+                                   real_t *const       out,
+                                   const ElementScope  scope,
+                                   const ptrdiff_t     flat_begin,
+                                   const ptrdiff_t     flat_end) override;
 
         int value_steps(const real_t       *x,
                         const real_t       *h,

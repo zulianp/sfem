@@ -1,0 +1,2 @@
+neumann_conditions:
+  - {type: sideset, format: file, path: "{mesh}/sets/right", value: {loading_traction}, component: 1}

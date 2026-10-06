@@ -1,0 +1,9 @@
+dirichlet_conditions:
+  - {type: nodeset, format: file, path: "{mesh}/sets/left.int32.raw", value: 0, component: 0}
+  - type: nodeset
+    format: file
+    path: "{mesh}/sets/right.int32.raw"
+    value: {path: "{mesh}/boundary_values/right_x.float64.raw"}
+    component: 0
+    profile: {type: hold, start_time: 0, before_value: 0, value: 1}
+  - {type: nodeset, format: file, path: "{mesh}/sets/all.int32.raw", value: [0, 0], component: [1, 2]}

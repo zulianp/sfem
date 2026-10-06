@@ -4,6 +4,7 @@ IMPORTANT: Be precise and careful with the changes! I am not here to clean-up yo
 
 EVERY TIME: 
 - After changes, you always have to compile the code and run the tests yourself with `make test`!
+- Never mark a task or todo complete until tests pass **as before**. Breaking previously passing tests is unacceptable. Relink test binaries after library changes. If the user uses `build64` (Release) or another build tree, `make test` must pass there too — Debug-only is not done.
 - Always ensure an empty line at the end of .cpp and .c files!
 - LOR means Low-Order-Refinement!
 

@@ -64,8 +64,6 @@ namespace sfem {
             !is_semistructured_type(space->element_type())) {
             auto ret = std::make_shared<LumpedMass>(space);
             ret->initialize({});
-            assert(space->n_blocks() == 1);
-            ret->override_element_types({space->element_type()});
             return ret;
         }
 

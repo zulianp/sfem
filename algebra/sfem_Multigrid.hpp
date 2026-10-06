@@ -1,6 +1,7 @@
 #ifndef SFEM_MULTIGRID_HPP
 #define SFEM_MULTIGRID_HPP
 
+#include <algorithm>
 #include <math.h>
 #include <cassert>
 #include <cmath>
@@ -13,7 +14,7 @@
 #include <vector>
 
 #include "sfem_MatrixFreeLinearSolver.hpp"
-
+#include "sfem_ParallelOperator.hpp"
 #include "sfem_aliases.hpp"
 
 #include "sfem_openmp_blas.hpp"
@@ -58,9 +59,9 @@ namespace sfem {
 
             // Wrap input arrays into fine level of mg
             if (wrap_input_) {
-                memory_[finest_level()]->solution = Buffer<T>::wrap(smoother_[finest_level()]->rows(), x);
-
-                memory_[finest_level()]->rhs = Buffer<T>::wrap(smoother_[finest_level()]->rows(), (T*)rhs);
+                const std::ptrdiff_t n_alloc = level_alloc(finest_level());
+                memory_[finest_level()]->solution = Buffer<T>::wrap(n_alloc, x);
+                memory_[finest_level()]->rhs      = Buffer<T>::wrap(n_alloc, (T*)rhs);
             }
 
             for (iterations_ = 0; iterations_ < max_it_; iterations_++) {
@@ -108,6 +109,11 @@ namespace sfem {
         void set_max_it(const int val) { max_it_ = val; }
 
         void set_atol(const T val) { atol_ = val; }
+
+        // The caller promises that x is zero when apply is called, as it is for a
+        // preconditioner inside a Krylov method. Coarse levels need no promise: the cycle
+        // zeroes their solution before descending.
+        void set_initial_guess_zero(const bool val) { initial_guess_zero_ = val; }
 
         int test_interp() {
             ensure_init();
@@ -189,10 +195,17 @@ namespace sfem {
         std::vector<std::shared_ptr<Memory>> memory_;
         bool                                 wrap_input_{true};
 
-        int max_it_{10};
-        int iterations_{0};
-        int cycle_type_{V_CYCLE};
-        T   atol_{1e-10};
+        int  max_it_{10};
+        int  iterations_{0};
+        int  cycle_type_{V_CYCLE};
+        T    atol_{1e-10};
+        bool initial_guess_zero_{false};
+
+        // Tell a smoother whether its solution is zero on entry. Only a MatrixFreeLinearSolver
+        // can use the hint; any other operator is applied unchanged.
+        static void hint_zero_guess(const std::shared_ptr<Operator<T>>& smoother, const bool zero) {
+            if (auto s = std::dynamic_pointer_cast<MatrixFreeLinearSolver<T>>(smoother)) s->set_initial_guess_zero(zero);
+        }
 
         T norm_residual_0{1};
         T norm_residual_previous{1};
@@ -211,6 +224,43 @@ namespace sfem {
             }
         }
 
+        T reduce_norm2(const int level, const T* const x) {
+            const std::ptrdiff_t n     = level_owned(level);
+            T                    local = this->blas()->dot(n, x, x);
+            auto                 pop   = std::dynamic_pointer_cast<ParallelOperator<T>>(operator_[level]);
+            if (pop && pop->comm() && pop->comm()->size() > 1) {
+                local = pop->comm()->sum(local);
+            }
+            return std::sqrt(local);
+        }
+
+        bool verbose_rank0() const {
+            if (operator_.empty()) {
+                return true;
+            }
+            auto pop = std::dynamic_pointer_cast<ParallelOperator<T>>(operator_[finest_level()]);
+            if (pop && pop->comm()) {
+                return pop->comm()->rank() == 0;
+            }
+            return true;
+        }
+
+        std::ptrdiff_t level_owned(const int l) const {
+            auto pop = std::dynamic_pointer_cast<ParallelOperator<T>>(operator_[l]);
+            if (pop && pop->comm() && pop->comm()->size() > 1) {
+                return pop->rows();
+            }
+            return smoother_[l]->rows();
+        }
+
+        std::ptrdiff_t level_alloc(const int l) const {
+            auto pop = std::dynamic_pointer_cast<ParallelOperator<T>>(operator_[l]);
+            if (pop && pop->comm() && pop->comm()->size() > 1) {
+                return std::max(pop->row_allocation_size(), pop->col_allocation_size());
+            }
+            return smoother_[l]->rows();
+        }
+
         int init() {
             assert(prolongation_.size() == restriction_.size());
             assert(operator_.size() == smoother_.size());
@@ -221,7 +271,7 @@ namespace sfem {
             for (int l = 0; l < n_levels(); l++) {
                 memory_[l] = std::make_shared<Memory>();
 
-                size_t n = smoother_[l]->rows();
+                size_t n = static_cast<size_t>(level_alloc(l));
                 if (l != finest_level() || !wrap_input_) {
                     auto x               = this->blas()->allocate(n);
                     auto blas_impl       = this->blas();
@@ -247,10 +297,10 @@ namespace sfem {
                 this->blas()->zeros(mem->solution->size(), mem->solution->data());
                 if (!smoother->apply(mem->rhs->data(), mem->solution->data())) {
                     if (debug) {
-                        this->blas()->zeros(mem->size(), mem->work->data());
+                        this->blas()->zeros(mem->work->size(), mem->work->data());
                         operator_[level]->apply(mem->solution->data(), mem->work->data());
-                        this->blas()->axpby(mem->size(), 1, mem->rhs->data(), -1, mem->work->data());
-                        printf("|| r_H || = %g\n", this->blas()->norm2(mem->work->size(), mem->work->data()));
+                        this->blas()->axpby(level_owned(level), 1, mem->rhs->data(), -1, mem->work->data());
+                        printf("|| r_H || = %g\n", (double)reduce_norm2(level, mem->work->data()));
                     }
                     return CYCLE_CONTINUE;
                 } else {
@@ -264,28 +314,36 @@ namespace sfem {
             auto mem_coarse   = memory_[coarser_level(level)];
 
             for (int k = 0; k < this->cycle_type_; k++) {
+                // Pre-smoothing starts from zero on a coarse level's first pass (the parent
+                // zeroed it) and on the finest level's first pass of the first cycle when the
+                // caller said so; nowhere else. Cleared again before post-smoothing, which
+                // always starts from the corrected, non-zero solution.
+                const bool zero_guess =
+                        k == 0 && (level != finest_level() || (initial_guess_zero_ && iterations_ == 0));
+                hint_zero_guess(smoother, zero_guess);
                 smoother->apply(mem->rhs->data(), mem->solution->data());
+                hint_zero_guess(smoother, false);
 
                 {
                     // Compute residual
-                    this->blas()->zeros(mem->size(), mem->work->data());
+                    this->blas()->zeros(mem->work->size(), mem->work->data());
                     op->apply(mem->solution->data(), mem->work->data());
-                    this->blas()->axpby(mem->size(), 1, mem->rhs->data(), -1, mem->work->data());
+                    this->blas()->axpby(level_owned(level), 1, mem->rhs->data(), -1, mem->work->data());
 
                     if (finest_level() == level) {
-                        T norm_residual = this->blas()->norm2(mem->work->size(), mem->work->data());
+                        T norm_residual = reduce_norm2(level, mem->work->data());
 
                         if (iterations_ == 0) {
                             norm_residual_0        = norm_residual;
                             norm_residual_previous = norm_residual;
 
-                            if (verbose) {
+                            if (verbose && verbose_rank0()) {
                                 printf("Multigrid\n");
                                 printf("iter\tabs\t\trel\t\trate\n");
                                 printf("%d\t%g\t-\t\t-\n", iterations_, (double)(norm_residual));
                             }
                         } else {
-                            if (verbose) {
+                            if (verbose && verbose_rank0()) {
                                 printf("%d\t%g\t%g\t%g\n",
                                        iterations_,
                                        (double)(norm_residual),
@@ -316,8 +374,7 @@ namespace sfem {
 
                 {
                     if (debug) {
-                        printf("|| c_H || = %g\n",
-                               (double)this->blas()->norm2(mem_coarse->solution->size(), mem_coarse->solution->data()));
+                        printf("|| c_H || = %g\n", (double)reduce_norm2(coarser_level(level), mem_coarse->solution->data()));
                     }
 
                     // Prolongation
@@ -325,18 +382,18 @@ namespace sfem {
                     prolongation->apply(mem_coarse->solution->data(), mem->work->data());
 
                     if (debug) {
-                        printf("|| c_h || = %g\n", (double)this->blas()->norm2(mem->work->size(), mem->work->data()));
+                        printf("|| c_h || = %g\n", (double)reduce_norm2(level, mem->work->data()));
                     }
 
                     // Apply coarse space correction
-                    this->blas()->axpby(mem->size(), 1, mem->work->data(), 1, mem->solution->data());
+                    this->blas()->axpby(level_owned(level), 1, mem->work->data(), 1, mem->solution->data());
                 }
 
                 if (debug) {
-                    this->blas()->zeros(mem->size(), mem->work->data());
+                    this->blas()->zeros(mem->work->size(), mem->work->data());
                     op->apply(mem->solution->data(), mem->work->data());
-                    this->blas()->axpby(mem->size(), 1, mem->rhs->data(), -1, mem->work->data());
-                    printf("|| r_h || = %g\n", this->blas()->norm2(mem->work->size(), mem->work->data()));
+                    this->blas()->axpby(level_owned(level), 1, mem->rhs->data(), -1, mem->work->data());
+                    printf("|| r_h || = %g\n", (double)reduce_norm2(level, mem->work->data()));
                 }
 
                 smoother->apply(mem->rhs->data(), mem->solution->data());

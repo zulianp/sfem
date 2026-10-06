@@ -1,0 +1,12 @@
+path: sdf.float32
+spatial_dimension: 3
+nx: 80
+ox: -0.1
+dx: 0.0151899
+ny: 4
+oy: -0.2
+dy: 0.075
+nz: 80
+oz: -0.1
+dz: 0.0151899
+block_size: 1

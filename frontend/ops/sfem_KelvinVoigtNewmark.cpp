@@ -160,8 +160,6 @@ namespace sfem {
             ret->impl_->beta                     = impl_->beta;
             ret->impl_->rho                      = impl_->rho;
             ret->impl_->use_affine_approximation = impl_->use_affine_approximation;
-            assert(space->n_blocks() == 1);
-            ret->override_element_types({space->element_type()});
             return ret;
         }
 

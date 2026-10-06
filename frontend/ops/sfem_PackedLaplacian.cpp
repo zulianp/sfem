@@ -730,6 +730,9 @@ namespace sfem {
     int PackedLaplacian::initialize(const std::vector<std::string> &block_names) {
         SFEM_TRACE_SCOPE("PackedLaplacian::initialize");
         impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
+        if (impl_->domains->require_supported_types("PackedLaplacian", laplacian_has_kernel) != SFEM_SUCCESS) {
+            return SFEM_FAILURE;
+        }
 
         if (!impl_->space->has_packed_mesh()) {
             fprintf(stderr, "[Warning] PackedLaplacian: Initializing packed mesh, outer states may be inconsistent!\n");

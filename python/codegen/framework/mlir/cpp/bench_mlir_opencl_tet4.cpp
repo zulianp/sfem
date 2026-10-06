@@ -14,7 +14,7 @@
 using idx_t = int32_t;
 using geom_t = float;
 
-extern "C" int linear_elasticity_tet4_tet4_apply_affine_mesh_soa_float(
+extern "C" int linear_elasticity_tet4_tet4_apply_a_msoa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **elements,
@@ -180,7 +180,7 @@ int main(int argc, char **argv) {
     std::vector<geom_t> generated_det(nelements);
     compute_adjugate_and_det(connectivity, x, y, z, adj, det, generated_adj, generated_det);
 
-    linear_elasticity_tet4_tet4_apply_affine_mesh_soa_float(nelements, nnodes, elements,
+    linear_elasticity_tet4_tet4_apply_a_msoa_float(nelements, nnodes, elements,
                                                             generated_adj[0].data(), generated_adj[1].data(), generated_adj[2].data(),
                                                             generated_adj[3].data(), generated_adj[4].data(), generated_adj[5].data(),
                                                             generated_adj[6].data(), generated_adj[7].data(), generated_adj[8].data(),

@@ -1,12 +1,15 @@
 # This starter workflow is for a CMake project running on multiple platforms. There is a different starter workflow if you just want a single platform.
 # See: https://github.com/actions/starter-workflows/blob/main/ci/cmake-single-platform.yml
-name: CMake on multiple platforms
+name: CMake and verification
 
 on:
   push:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+  schedule:
+    - cron: "17 1 * * *"
+  workflow_dispatch:
 
 jobs:
   build:
@@ -47,6 +50,11 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - name: Initialize required mesh submodule
+      run: |
+        git submodule update --init external/smesh
+        git -C external/smesh submodule update --init --recursive
+
     - name: Set up MPI on Ubuntu
       if: matrix.os == 'ubuntu-latest'
       run: |
@@ -108,7 +116,8 @@ jobs:
         -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
         -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
         -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
-        -S ${{ github.workspace }} -DSFEM_ENABLE_RESAMPLING=OFF -DSFEM_ENABLE_PYTHON=OFF -DMatrixIO_DIR=$MatrixIO_DIR
+        -S ${{ github.workspace }} -DSFEM_ENABLE_RESAMPLING=OFF -DSFEM_ENABLE_PYTHON=OFF
+        -DSFEM_ENABLE_CUDA=OFF -DMatrixIO_DIR=$MatrixIO_DIR
 
     - name: Build
       # Build your program with the given configuration. Note that --config is needed because the default Windows generator is a multi-config generator (Visual Studio generator).
@@ -119,3 +128,46 @@ jobs:
       # Execute tests defined by the CMake configuration. Note that --build-config is needed because the default Windows generator is a multi-config generator (Visual Studio generator).
       # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
       run: ctest --build-config ${{ matrix.build_type }}
+
+    - name: Set up verification Python environment
+      if: matrix.c_compiler == 'gcc'
+      run: |
+        python3 -m venv venv
+        venv/bin/python -m pip install --upgrade pip
+        venv/bin/python -m pip install -r verification_and_validation/requirements.txt
+
+    - name: Test verification infrastructure
+      if: matrix.c_compiler == 'gcc'
+      run: PYTHONPATH=python venv/bin/python -m unittest discover -s verification_and_validation/tests -v
+
+    - name: Run fast verification gate
+      if: matrix.c_compiler == 'gcc' && (github.event_name == 'push' || github.event_name == 'pull_request')
+      run: >
+        PYTHONPATH=python venv/bin/python verification_and_validation/run_all.py
+        --build-dir ${{ steps.strings.outputs.build-output-dir }}
+        --output-dir ${{ runner.temp }}/sfem-vv-fast
+        --tier fast --strict-skips
+
+    - name: Run complete verification suite
+      if: matrix.c_compiler == 'gcc' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+      timeout-minutes: 120
+      run: >
+        PYTHONPATH=python venv/bin/python verification_and_validation/run_all.py
+        --build-dir ${{ steps.strings.outputs.build-output-dir }}
+        --output-dir ${{ runner.temp }}/sfem-vv-full
+        --strict-skips
+
+    - name: Upload verification reports
+      if: always() && matrix.c_compiler == 'gcc'
+      uses: actions/upload-artifact@v4
+      with:
+        name: sfem-vv-${{ matrix.c_compiler }}-${{ github.run_id }}-${{ github.run_attempt }}
+        path: |
+          ${{ runner.temp }}/sfem-vv-fast/report.yaml
+          ${{ runner.temp }}/sfem-vv-fast/**/verification.json
+          ${{ runner.temp }}/sfem-vv-fast/**/run.log
+          ${{ runner.temp }}/sfem-vv-full/report.yaml
+          ${{ runner.temp }}/sfem-vv-full/**/verification.json
+          ${{ runner.temp }}/sfem-vv-full/**/run.log
+        if-no-files-found: ignore
+        retention-days: 30

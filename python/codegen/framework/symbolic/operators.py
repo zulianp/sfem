@@ -1,7 +1,14 @@
 import sympy as sp
 
 from codegen.framework.symbolic.core import directional_derivative, matrix_inner
-from codegen.framework.symbolic.fields import SymbolicArgument, SymbolicField, previous_function
+from codegen.framework.symbolic.fields import (
+    SymbolicArgument,
+    SymbolicField,
+    TimeRate,
+    _sum_time_rate_terms,
+    previous_function,
+    time_rate,
+)
 
 
 def value(expr):
@@ -13,6 +20,8 @@ def value(expr):
 
 
 def grad(expr, dim=None, name=None):
+    if isinstance(expr, TimeRate):
+        return _time_rate_gradient(expr, dim)
     if isinstance(expr, (SymbolicField, SymbolicArgument)):
         return _symbolic_gradient(expr, dim, name)
     if dim is None:
@@ -31,8 +40,33 @@ def old(expr):
     raise TypeError("old(...) requires a symbolic field")
 
 
+def dt(expr):
+    """The time derivative of a field, left for a scheme to weight.
+
+    The material writes this and names no scheme; `symbolic.fields.TimeRate`
+    says what it carries and why.
+    """
+    if isinstance(expr, SymbolicField):
+        return time_rate(expr)
+    raise TypeError("dt(...) requires a symbolic field")
+
+
+def _time_rate_gradient(rate, dim):
+    """The gradient of a rate is the same sum, one gradient per term.
+
+    No `name` here: each term names its gradient after its own argument, and one
+    name shared across the terms would collapse them onto the same symbols.
+    """
+    return _sum_time_rate_terms(rate.terms, lambda argument: grad(argument, dim))
+
+
 def div(expr, dim=None):
-    if isinstance(expr, (SymbolicField, SymbolicArgument)):
+    # A rate goes through `grad` like a field does: `grad` knows how to sum a
+    # `TimeRate`'s terms, and the divergence is the trace of what comes back.
+    # Without this a rate reached `value` instead and arrived here as a column,
+    # which reads as "not a gradient" -- the error a poroelastic material writing
+    # `div(dt(u))` got.
+    if isinstance(expr, (SymbolicField, SymbolicArgument, TimeRate)):
         expr = grad(expr, dim)
     else:
         expr = value(expr)
@@ -135,6 +169,7 @@ __all__ = [
     "deformation_gradient",
     "derivative",
     "div",
+    "dt",
     "grad",
     "Identity",
     "inner",

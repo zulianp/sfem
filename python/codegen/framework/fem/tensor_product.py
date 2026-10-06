@@ -170,11 +170,37 @@ def tensor_product_cartesian_shape_order(dim, n_shape):
     return tuple(range(n_shape))
 
 
-def streams_in_shape_order(streams, n_components, shape_order):
-    if len(streams) != n_components * len(shape_order):
+def tensor_product_subspace_shape_order(dim, cell_n_shape_1d, field_n_shape_1d):
+    """Which cell node carries each node of a lower-order field on that cell.
+
+    A mixed element puts a coarser field on a subset of the cell's nodes: the
+    pressure of a HEX27_HEX8 pair lives on the eight corners of a 27-node cell.
+    Which cell indices those are depends on how the cell numbers its nodes.
+    SFEM numbers the corners first, so the answer is 0..7 and the question never
+    had to be asked; a lexicographic cell spaces them by the stride between
+    the two orders, giving 0, 2, 6, 8, 18, 20, 24, 26 for that pair.
+
+    Both node sets are walked lexicographically, x fastest, which is the order
+    the tensor-product kernels are written against.
+    """
+    stride, remainder = divmod(cell_n_shape_1d - 1, field_n_shape_1d - 1) if field_n_shape_1d > 1 else (0, 0)
+    if field_n_shape_1d <= 1 or remainder:
+        return tuple(range(field_n_shape_1d ** dim))
+    order = []
+    for node in range(field_n_shape_1d ** dim):
+        index = 0
+        for axis in range(dim):
+            along = (node // (field_n_shape_1d ** axis)) % field_n_shape_1d
+            index += along * stride * (cell_n_shape_1d ** axis)
+        order.append(index)
+    return tuple(order)
+
+
+def streams_in_shape_order(streams, n_field_components, shape_order):
+    if len(streams) != n_field_components * len(shape_order):
         raise ValueError("stream count must be component count * number of shapes")
     return tuple(
-        streams[shape * n_components + component]
+        streams[shape * n_field_components + component]
         for shape in shape_order
-        for component in range(n_components)
+        for component in range(n_field_components)
     )

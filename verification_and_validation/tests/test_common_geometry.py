@@ -1,0 +1,120 @@
+import sys
+import unittest
+from pathlib import Path
+
+import numpy as np
+
+
+SUITE_DIR = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(SUITE_DIR))
+
+from common.geometry import (  # noqa: E402
+    annular_sector_mesh,
+    annulus_mesh,
+    box_mesh,
+    cylindrical_sector_mesh,
+    promote_simplex_mesh,
+    proteus_rectangle_mesh,
+    rectangle_mesh,
+    spherical_shell_mesh,
+    spherical_shell_octant_mesh,
+    tensor_product_mesh,
+)
+from common.mesh import Mesh  # noqa: E402
+from common.sets import (  # noqa: E402
+    boundary_sides,
+    select_boundary_axis,
+    surface_geometry,
+    validate_sideset_orientation,
+)
+
+
+class GeometryTests(unittest.TestCase):
+    def test_rectangle_and_box_counts(self):
+        quad = rectangle_mesh(2.0, 1.0, 3, 2, "QUAD4")
+        tri = rectangle_mesh(2.0, 1.0, 3, 2, "TRI3")
+        hexahedron = box_mesh(2.0, 1.0, 3.0, 3, 2, 2, "HEX8")
+        tetrahedron = box_mesh(2.0, 1.0, 3.0, 3, 2, 2, "TET4")
+
+        self.assertEqual((12, 2), quad.points.shape)
+        self.assertEqual((6, 4), quad.elements.shape)
+        self.assertEqual((12, 3), tri.elements.shape)
+        self.assertEqual((36, 3), hexahedron.points.shape)
+        self.assertEqual((12, 8), hexahedron.elements.shape)
+        self.assertEqual((72, 4), tetrahedron.elements.shape)
+
+    def test_higher_order_and_proteus_meshes_share_nodes(self):
+        tri6 = promote_simplex_mesh(rectangle_mesh(1.0, 1.0, 2, 2, "TRI3"), "TRI6")
+        tet10 = promote_simplex_mesh(box_mesh(1.0, 1.0, 1.0, 1, 1, 1, "TET4"), "TET10")
+        proteus_quad = proteus_rectangle_mesh(1.0, 1.0, 2, 2)
+        hex27 = tensor_product_mesh(1.0, 1.0, 1.0, 2, 1, 1, "HEX27")
+        proteus_hex27 = tensor_product_mesh(1.0, 1.0, 1.0, 2, 1, 1, "PROTEUS_HEX27")
+
+        self.assertEqual((8, 6), tri6.elements.shape)
+        self.assertEqual((6, 10), tet10.elements.shape)
+        self.assertEqual((4, 4), proteus_quad.elements.shape)
+        self.assertEqual((2, 27), hex27.elements.shape)
+        self.assertEqual((2, 27), proteus_hex27.elements.shape)
+        self.assertLess(len(np.unique(hex27.elements)), 2 * 27)
+        for mesh in (tri6, tet10, proteus_quad, hex27, proteus_hex27):
+            with self.subTest(element=mesh.element_type):
+                self.assertGreater(validate_sideset_orientation(mesh, boundary_sides(mesh))[
+                    "minimum_orientation_cosine"], 0.0)
+
+    def test_curved_domain_generators_are_deterministic_and_outward(self):
+        factories = (
+            lambda: annulus_mesh(1.0, 2.0, 2, 12),
+            lambda: annulus_mesh(1.0, 2.0, 2, 12, "TRI3"),
+            lambda: annular_sector_mesh(1.0, 2.0, 2, 4),
+            lambda: annular_sector_mesh(1.0, 2.0, 2, 4, element_type="TRI3"),
+            lambda: cylindrical_sector_mesh(1.0, 2.0, 3.0, 2, 4, 2),
+            lambda: cylindrical_sector_mesh(1.0, 2.0, 3.0, 2, 4, 2, element_type="TET4"),
+            lambda: spherical_shell_mesh(1.0, 2.0, 2, 2),
+        )
+        for factory in factories:
+            with self.subTest(factory=factory):
+                first = factory()
+                second = factory()
+                np.testing.assert_array_equal(first.points, second.points)
+                np.testing.assert_array_equal(first.elements, second.elements)
+                sides = boundary_sides(first)
+                diagnostics = validate_sideset_orientation(first, sides)
+                self.assertEqual(sides.size, diagnostics["side_count"])
+                self.assertGreater(diagnostics["minimum_orientation_cosine"], 0.0)
+
+    def test_spherical_shell_nodes_lie_on_layer_radii(self):
+        mesh = spherical_shell_mesh(2.0, 3.0, 2, 2)
+        radii = np.linalg.norm(mesh.points, axis=1)
+        np.testing.assert_allclose(np.unique(np.round(radii, 12)), (2.0, 2.5, 3.0))
+
+    def test_spherical_octants_are_deterministic_and_outward(self):
+        for element_type in ("TET4", "HEX8"):
+            with self.subTest(element_type=element_type):
+                first = spherical_shell_octant_mesh(1.0, 2.0, 2, 4, element_type)
+                second = spherical_shell_octant_mesh(1.0, 2.0, 2, 4, element_type)
+                np.testing.assert_array_equal(first.points, second.points)
+                np.testing.assert_array_equal(first.elements, second.elements)
+                self.assertTrue(np.all(first.points >= -1.0e-13))
+                self.assertGreater(validate_sideset_orientation(first, boundary_sides(first))[
+                    "minimum_orientation_cosine"], 0.0)
+
+
+class SidesetTests(unittest.TestCase):
+    def test_axis_selection_has_expected_measure_and_normal(self):
+        mesh = box_mesh(2.0, 1.0, 3.0, 2, 1, 3)
+        right = select_boundary_axis(mesh, axis=0, value=2.0)
+        geometry = surface_geometry(mesh, right)
+
+        self.assertEqual(3, right.size)
+        self.assertAlmostEqual(3.0, np.sum(geometry.measures))
+        np.testing.assert_allclose(geometry.normals, np.asarray(((1.0, 0.0, 0.0),) * 3))
+
+    def test_orientation_check_rejects_clockwise_element(self):
+        mesh = rectangle_mesh(1.0, 1.0, 1, 1)
+        inverted = Mesh(mesh.points, mesh.elements[:, (0, 3, 2, 1)], "QUAD4")
+        with self.assertRaisesRegex(ValueError, "inward or ambiguous"):
+            validate_sideset_orientation(inverted, boundary_sides(inverted))
+
+
+if __name__ == "__main__":
+    unittest.main()

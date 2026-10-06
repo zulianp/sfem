@@ -4,11 +4,15 @@
 #include <string.h>
 #include <sys/stat.h>
 
+#include <limits>
+
 #include "sfem_API.hpp"
 #include "sfem_DirichletConditions.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_KelvinVoigtNewmark.hpp"
+#include "sfem_NewmarkScheme.hpp"
 #include "smesh_env.hpp"
+#include "sfem_StateField.hpp"
 
 #include "sfem_ssgmg.hpp"
 
@@ -51,8 +55,11 @@ int solve_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communicator> &comm, 
     auto fs = sfem::FunctionSpace::create(m, m->spatial_dimension());
     auto f  = sfem::Function::create(fs);
 
+    std::shared_ptr<sfem::DirichletConditions> dirichlet_conditions;
     if (dirichlet_path.to_string() != "NONE") {
-        auto dirichlet_conditions = sfem::DirichletConditions::create_from_file(fs, dirichlet_path);
+        dirichlet_conditions = sfem::DirichletConditions::create_from_file(fs, dirichlet_path);
+        if (!dirichlet_conditions) return SFEM_FAILURE;
+        if (dirichlet_conditions->set_time(0) != SFEM_SUCCESS) return SFEM_FAILURE;
         if (es == sfem::EXECUTION_SPACE_DEVICE) {
             f->add_constraint(sfem::to_device(dirichlet_conditions));
         } else {
@@ -60,8 +67,11 @@ int solve_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communicator> &comm, 
         }
     }
 
+    std::shared_ptr<sfem::NeumannConditions> neumann_conditions;
     if (neumann_path.to_string() != "NONE") {
-        auto neumann_conditions = sfem::NeumannConditions::create_from_file(fs, neumann_path);
+        neumann_conditions = sfem::NeumannConditions::create_from_file(fs, neumann_path);
+        if (!neumann_conditions) return SFEM_FAILURE;
+        if (neumann_conditions->set_time(0) != SFEM_SUCCESS) return SFEM_FAILURE;
         if (es == sfem::EXECUTION_SPACE_DEVICE) {
             f->add_operator(sfem::to_device(neumann_conditions));
         } else {
@@ -84,23 +94,65 @@ int solve_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communicator> &comm, 
         printf("Refine level: %d\n", SFEM_ELEMENT_REFINE_LEVEL);
     }
 
-    // Create state vectors
-    auto displacement = sfem::create_buffer<real_t>(ndofs, es);
-    auto velocity     = sfem::create_buffer<real_t>(ndofs, es);
-    auto acceleration = sfem::create_buffer<real_t>(ndofs, es);
+    // The scheme carries the state between steps.  Newmark's algebra used to
+    // be written out here in BLAS calls with beta = 1/4 and gamma = 1/2 folded
+    // into literal 4/(dt*dt) and 2/dt; `NewmarkScheme` is the same method with
+    // those two named, and the hand-written `KelvinVoigtNewmark` operator below
+    // is untouched -- it still takes the velocity and the acceleration as
+    // fields, and still gets them at every Newton iterate.
+    auto scheme = std::make_shared<sfem::NewmarkScheme>(fs, es);
+    if (scheme->initialize() != SFEM_SUCCESS) {
+        return SFEM_FAILURE;
+    }
+    auto displacement = scheme->state();
+    auto velocity     = scheme->velocity();
+    auto acceleration = scheme->acceleration();
     auto increment    = sfem::create_buffer<real_t>(ndofs, es);
     auto temp_vel     = sfem::create_buffer<real_t>(ndofs, es);
     auto solution     = sfem::create_buffer<real_t>(ndofs, es);
     auto g            = sfem::create_buffer<real_t>(ndofs, es);
 
     // Initialize all buffers to zero
-    blas->zeros(ndofs, displacement->data());
-    blas->zeros(ndofs, velocity->data());
-    blas->zeros(ndofs, acceleration->data());
     blas->zeros(ndofs, solution->data());
     blas->zeros(ndofs, increment->data());
     blas->zeros(ndofs, temp_vel->data());
     blas->zeros(ndofs, g->data());
+
+    const std::string initial_displacement            = smesh::Env::read_string("SFEM_INITIAL_DISPLACEMENT", "");
+    const std::string initial_displacement_components = smesh::Env::read_string("SFEM_INITIAL_DISPLACEMENT_COMPONENTS", "");
+    const std::string initial_velocity                = smesh::Env::read_string("SFEM_INITIAL_VELOCITY", "");
+    const std::string initial_velocity_components     = smesh::Env::read_string("SFEM_INITIAL_VELOCITY_COMPONENTS", "");
+    const std::string initial_acceleration            = smesh::Env::read_string("SFEM_INITIAL_ACCELERATION", "");
+    const std::string initial_acceleration_components = smesh::Env::read_string("SFEM_INITIAL_ACCELERATION_COMPONENTS", "");
+
+    auto read_initial = [&](const std::string &full_path, const std::string &component_paths, auto &state) -> int {
+        if (full_path.empty() && component_paths.empty()) return SFEM_SUCCESS;
+        if (!full_path.empty() && !component_paths.empty()) {
+            SFEM_ERROR("Specify either a full initial-state file or component files, not both\n");
+            return SFEM_FAILURE;
+        }
+        auto      host   = sfem::create_host_buffer<real_t>(ndofs);
+        const int status = !full_path.empty() ? sfem::read_state_field(full_path, ndofs, host->data())
+                                              : sfem::read_state_field_components(
+                                                        component_paths, m->n_nodes(), m->spatial_dimension(), host->data());
+        if (status != SFEM_SUCCESS) return status;
+#ifdef SFEM_ENABLE_CUDA
+        if (es == sfem::EXECUTION_SPACE_DEVICE) {
+            state = smesh::to_device(host);
+            return SFEM_SUCCESS;
+        }
+#endif
+        blas->copy(ndofs, host->data(), state->data());
+        return SFEM_SUCCESS;
+    };
+
+    if (read_initial(initial_displacement, initial_displacement_components, displacement) != SFEM_SUCCESS ||
+        read_initial(initial_velocity, initial_velocity_components, velocity) != SFEM_SUCCESS ||
+        read_initial(initial_acceleration, initial_acceleration_components, acceleration) != SFEM_SUCCESS)
+        return SFEM_FAILURE;
+    if (dirichlet_conditions && dirichlet_conditions->set_time(0) != SFEM_SUCCESS) return SFEM_FAILURE;
+    f->apply_constraints(displacement->data());
+    blas->copy(ndofs, displacement->data(), solution->data());
 
     // Time integration parameters
     real_t dt          = smesh::Env::read("SFEM_DT", 0.1);
@@ -185,18 +237,16 @@ int solve_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communicator> &comm, 
 
     // Time loop
     while (t < T) {
-        for (int k = 0; k < nliter; k++) {
-            // Use increment as temp buffer
-            blas->zeros(ndofs, increment->data());
-            blas->zaxpby(ndofs, 1, solution->data(), -1, displacement->data(), increment->data());
-            blas->axpy(ndofs, -dt, velocity->data(), increment->data());
-            blas->scal(ndofs, 4 / (dt * dt), increment->data());
-            blas->axpy(ndofs, -1, acceleration->data(), increment->data());
+        // Build the step's predictor and history once, from the state carried
+        // out of the last step.  Everything the Newton loop below reads is
+        // fixed here and does not move under it.
+        scheme->begin_step(t, dt);
 
-            blas->zeros(ndofs, temp_vel->data());
-            blas->copy(ndofs, increment->data(), temp_vel->data());
-            blas->zaxpby(ndofs, dt / 2, temp_vel->data(), dt / 2, acceleration->data(), temp_vel->data());
-            blas->axpy(ndofs, 1, velocity->data(), temp_vel->data());
+        for (int k = 0; k < nliter; k++) {
+            // The velocity and acceleration Newmark implies at this iterate.
+            // The operator takes them as fields, so they are refreshed every
+            // Newton iteration rather than once per step.
+            scheme->reconstruct(solution->data(), temp_vel->data(), increment->data());
 
             blas->zeros(ndofs, g->data());
             // Adds material gradient computation to g
@@ -207,23 +257,10 @@ int solve_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communicator> &comm, 
             blas->axpy(ndofs, -1, increment->data(), solution->data());
         }
 
-        ////////////////////////////////
-        // Update all quantities
-        ////////////////////////////////
+        // Close the step: reconstruct the velocity and acceleration at the
+        // solution and rotate the state.
+        scheme->advance(solution->data());
 
-        // acceleration
-        blas->axpby(ndofs, -4 / (dt * dt), displacement->data(), -1, acceleration->data());
-        blas->axpy(ndofs, 4 / (dt * dt), solution->data(), acceleration->data());
-        blas->axpy(ndofs, -4 / dt, velocity->data(), acceleration->data());
-
-        // velocity
-        blas->axpby(ndofs, -2 / dt, displacement->data(), -1, velocity->data());
-        blas->axpy(ndofs, 2 / dt, solution->data(), velocity->data());
-
-        // displacement
-        blas->copy(ndofs, solution->data(), displacement->data());
-
-        t += dt;
         if (++steps % export_freq == 0 && SFEM_NEWMARK_ENABLE_OUTPUT) {
             if (!comm->rank()) {
                 printf("%g/%g\n", double(t), double(T));
