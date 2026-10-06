@@ -122,3 +122,9 @@ dev-debug.log
 workflows/resample/metadata_test_field_t10.yml
 
 
+
+# Large artifacts purged from history; keep them out
+.vs/
+*.trace
+*.dat.gz
+build_release/
