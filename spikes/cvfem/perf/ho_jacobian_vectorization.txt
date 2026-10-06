@@ -63,3 +63,21 @@
 # remainder is fully paired and reads zero, a kernel that really went scalar reads all of it, and
 # the share column could not tell those apart. That is what let a 0% kernel sit behind an
 # exemption while four of its neighbours were fine at 58%.
+
+## AND THE THROUGHPUT, SO THE PORTABILITY CLAIM IS NOT TAKEN ON TRUST
+#
+# Grace job 4989552, the paper's own jac_ho_bench at n=128 and best of three, against the data
+# file the paper's macros are generated from (data/jacho_4985746.out):
+#
+#   arm (packed)            paper    HEAD    delta
+#   first_order             927.9   925.5   -0.25%
+#   ho_unlimited            486.7   485.2   -0.31%
+#   ho_unlim_lagged         933.6   927.4   -0.66%
+#   ho_clip                 373.5   377.4   +1.06%
+#   ho_venkatakrishnan      354.9   356.6   +0.46%
+#   ho_darwish_moukalled    345.7   347.2   +0.43%
+#
+# Sixteen arms across the three layouts, worst delta 1.06% against a 5% band, and all sixteen
+# CHECKSUMS bit-identical. So nothing between that data file and this commit moved a number the
+# paper reports -- not the attribute, not the arena conversion, not the kernel renaming -- and
+# the paper's higher-order Jacobian table stands as generated.
