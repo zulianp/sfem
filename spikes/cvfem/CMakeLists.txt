@@ -686,25 +686,23 @@ set(CVFEM_VEC_GATE_KERNELS
     23 jv_lane_defcor_venkatakrishnan
     24 jv_lane_defcor_darwish_moukalled)
 
-# Kernels that emit no vector arithmetic, and the list is SCOPED TO THE COMPILER because the
-# shortfall is. On gcc 13.3 on the Grace nodes -- the only machine whose throughput decides
-# anything here -- all twelve kernels above come out 99-100% vector and this list is empty, so
-# that build enforces every one of them. Apple clang gives up inlining the two largest Jacobian
-# arms: the directional derivative of the deferred correction runs to roughly 19,000 instructions
-# per lane body with a limiter on, the lambda inside cvfem_hex8_scs_defcor_jv survives as a call
-# at kernels.hpp:1609 ("call instruction cannot be vectorized"), and the lane loop then goes
-# scalar. gcc inlines the same body and vectorises it.
+# Kernels that emit no vector arithmetic. THE LIST IS EMPTY, and what was on it is worth
+# recording, because the entry was the only thing standing between this gate and two kernels
+# doing no vector arithmetic whatsoever.
 #
-# Listing them unconditionally would have weakened the gate on the machine that matters to suit
-# the laptop. An entry here is still compiled, measured and reported on every build -- never
-# skipped -- and the check fails if a listed kernel starts vectorising, so the list cannot
-# outlive the problem.
+# jv_lane_defcor_venkatakrishnan and jv_lane_defcor_darwish_moukalled were listed, scoped to
+# Clang, on the explanation that Apple clang declined to inline the `lim` lambda inside
+# cvfem_hex8_scs_defcor_jv while gcc inlined it. The diagnosis was right -- the objects held
+# thirty-six calls to that lambda's out-of-line body, inside the lane loop, and measured ZERO
+# vector instructions. The CONCLUSION was wrong: this was not a compiler quirk to tolerate on one
+# machine, it was a missing always_inline, and a call in a lane loop does not make the loop
+# slower, it stops it vectorising at all. With the attribute the two read 6670 and 6111 vector
+# instructions where there had been none, and the finite-difference check against the exact
+# Jacobian is unchanged at every limiter.
+#
+# The gate forced this itself: it fails a listed kernel that STARTS vectorising, which is what
+# turned a permanent exemption into a debt that had to be paid.
 set(CVFEM_VEC_GATE_KNOWN_SCALAR "")
-if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    list(APPEND CVFEM_VEC_GATE_KNOWN_SCALAR
-         jv_lane_defcor_venkatakrishnan
-         jv_lane_defcor_darwish_moukalled)
-endif()
 
 find_program(CVFEM_VEC_GATE_PYTHON NAMES python3 python)
 if(CVFEM_VEC_GATE_PYTHON)

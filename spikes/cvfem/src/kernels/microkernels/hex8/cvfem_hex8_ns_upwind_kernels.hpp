@@ -1573,10 +1573,23 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_scs_defcor_jv(const scalar_t
     // One component's pair of increments and their derivatives, limited together against the
     // same interval the residual uses. The bounds are nodal values, so they carry the direction's
     // nodal values as their derivatives -- which is the part a reader is most likely to drop.
+    //
+    // ALWAYS_INLINE, AND IT IS LOAD-BEARING. This is called three times per sub-control surface,
+    // once per velocity component, so thirty-six times per element from inside the `#pragma omp
+    // simd` lane loop. At LIM 2 and 3, whose derivatives are the largest expressions here, the
+    // compiler declined to inline it and left thirty-six calls to its out-of-line body in the
+    // lane loop: jv_lane_defcor_venkatakrishnan and jv_lane_defcor_darwish_moukalled emitted
+    // ZERO vector floating-point instructions, 4842 and 4559 of pure scalar, while every other
+    // lane kernel in the same gate had no calls at all. The enclosing face kernel already carries
+    // __attribute__((flatten)) for exactly this reason -- "a call inside the `#pragma omp simd`
+    // loop stops the whole loop vectorising" -- but flatten does not reach a lambda's operator()
+    // one level further in, which is how the two largest arms stayed scalar behind a gate that
+    // was watching for it.
     const auto lim = [&](const scalar_t *const SFEM_RESTRICT u, const scalar_t *const SFEM_RESTRICT v,
                          const scalar_t inc_i, const scalar_t inc_j,
                          const scalar_t dinc_i, const scalar_t dinc_j,
-                         scalar_t &oi, scalar_t &oj, scalar_t &doi, scalar_t &doj) {
+                         scalar_t &oi, scalar_t &oj, scalar_t &doi, scalar_t &doj)
+            __attribute__((always_inline)) {
         oi = inc_i;  oj = inc_j;
         doi = dinc_i; doj = dinc_j;
         const scalar_t a  = at(u, i), b = at(u, j);

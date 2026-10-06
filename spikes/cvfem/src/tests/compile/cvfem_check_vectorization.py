@@ -57,26 +57,69 @@ SCALAR_REG = re.compile(r"\b[dsh][0-9]+\b")
 SCALAR_X86 = re.compile(r"^v?[a-z][a-z0-9]*s[sd]$")
 
 
+# A SCALAR OP'S VECTOR TWIN. The share column alone cannot tell two very different things apart,
+# and that mattered: `jv_lane_defcor_unlimited` read 58% and looked half-scalar, while the loop
+# vectoriser reported every one of its twelve lane loops vectorised at width 2. Pairing the
+# mnemonics showed why -- fmadd 672 against fmla.2d 672, fmul 505 against 504, fnmsub 12 against
+# fmls.2d 12, fneg 12 against 12. EVERY scalar op had an exactly matching vector one, which is
+# not scalarised arithmetic but a complete duplicate of the body: the vectoriser's scalar
+# remainder loop. The lane count is a constexpr 16 and the width is 2, so that remainder can
+# never execute; it costs object size and nothing else.
+#
+# What a shortfall actually looks like is the other case, and this tree had it: the two Jacobian
+# limiter arms emitted ZERO vector instructions because a lambda inside cvfem_hex8_scs_defcor_jv
+# was called 36 times from inside the lane loop. There the scalar ops have no vector twin at all.
+#
+# So the number to look at is UNPAIRED scalar arithmetic -- a scalar op whose vector form is
+# absent from the object. A dead remainder is fully paired and reads zero here; a kernel that
+# really went scalar reads all of it. Forcing the remainder away is not worth it: simdlen(16)
+# removed the shortfall on paper, 58% to 92%, by growing the kernel from 13,631 instructions to
+# 104,228, which trades I-cache for a cosmetic number.
+TWIN = {
+    "fmadd": ("fmla",), "fmsub": ("fmls",), "fnmsub": ("fmls", "fmla"), "fnmadd": ("fmla", "fmls"),
+    "fmul": ("fmul",), "fadd": ("fadd",), "fsub": ("fsub",), "fdiv": ("fdiv",),
+    "fneg": ("fneg",), "fabs": ("fabs",), "fsqrt": ("fsqrt",),
+    "fmax": ("fmax",), "fmin": ("fmin",), "fmaxnm": ("fmaxnm",), "fminnm": ("fminnm",),
+    # A compare-and-select becomes a vector compare plus a bitwise select.
+    "fcmp": ("fcmgt", "fcmlt", "fcmge", "fcmle", "fcmeq"),
+    "fccmp": ("fcmgt", "fcmlt", "fcmge", "fcmle", "fcmeq"),
+    "fcsel": ("bsl", "bit", "bif", "fmaxnm", "fminnm"),
+    "fmov": ("mov", "dup", "fmov"),
+    "fcvt": ("fcvt",), "scvtf": ("scvtf",), "ucvtf": ("ucvtf",),
+    "frinta": ("frinta",), "frintm": ("frintm",), "frintp": ("frintp",), "frintz": ("frintz",),
+}
+
+
 def classify(text):
-    """Return (instruction count, vector FP count, scalar FP count) for a disassembly."""
-    insns = vec = sca = 0
+    """Return (instructions, vector FP, scalar FP, unpaired scalar FP) for a disassembly."""
+    insns = vec = 0
+    scalar_ops, vector_ops = {}, set()
     for ln in text.splitlines():
         m = INSN.match(ln)
         if not m:
             continue
         mnemonic, operands = m.group(1), m.group(2)
         insns += 1
+        base = mnemonic.split(".")[0]
         if (
             VEC_OPERAND.search(operands)
             or VEC_MNEMONIC.match(mnemonic)
             or (VEC_X86.match(mnemonic) and VEC_X86_REG.search(operands))
         ):
             vec += 1
+            vector_ops.add(base)
         elif mnemonic in FP_MNEMONIC and SCALAR_REG.search(operands):
-            sca += 1
+            scalar_ops[mnemonic] = scalar_ops.get(mnemonic, 0) + 1
         elif SCALAR_X86.match(mnemonic) and VEC_X86_REG.search(operands):
-            sca += 1
-    return insns, vec, sca
+            scalar_ops[mnemonic] = scalar_ops.get(mnemonic, 0) + 1
+    sca = sum(scalar_ops.values())
+    # Unpaired: a scalar op none of whose vector forms appears anywhere in this object. On x86 the
+    # twin is the same mnemonic with a packed suffix, which the VEC_X86 branch has already put in
+    # vector_ops under its own base, so an unknown mnemonic is treated as unpaired rather than
+    # silently excused.
+    unpaired = sum(n for m, n in scalar_ops.items()
+                   if not (set(TWIN.get(m, ())) & vector_ops))
+    return insns, vec, sca, unpaired
 
 
 def disassemble(obj, objdump):
@@ -114,24 +157,37 @@ def main():
         if text is None:
             unreadable.append(name)
             continue
-        insns, vec, sca = classify(text)
+        insns, vec, sca, unp = classify(text)
         # A disassembly this parser recognised no instructions in means the output format is not
         # one of the four above, not that the kernel is empty. Saying so beats reporting zeros.
         if insns == 0:
             unreadable.append(name)
             continue
-        rows.append((name, insns, vec, sca))
-        if vec == 0 and name not in expect_scalar:
+        rows.append((name, insns, vec, sca, unp))
+        # TWO RULES, both scale-free, because the gate's own note is right that a threshold on the
+        # share is a number nobody could defend. The first is the original one. The second is what
+        # the unpaired column buys: more scalar arithmetic with no vector form than there is
+        # vector arithmetic at all means the kernel is mostly running scalar, which the share
+        # alone could not distinguish from a dead remainder loop. One stray scalar op against
+        # fifteen hundred vector ones is noise; sixteen hundred against none is the defect this
+        # gate exists for, and it sat behind an exemption for as long as only the first rule ran.
+        if name not in expect_scalar and (vec == 0 or unp > vec):
             failed.append(name)
         if vec > 0 and name in expect_scalar:
             fixed.append(name)
 
     w = max((len(r[0]) for r in rows), default=6)
-    print(f"{'kernel'.ljust(w)}  {'insns':>8} {'vector_fp':>10} {'scalar_fp':>10}  share  note")
-    for name, insns, vec, sca in rows:
+    # `unpaired` is the column that means something. `scalar_fp` is reported beside it because the
+    # difference between them is the vectoriser's dead remainder, which is worth seeing but is not
+    # a shortfall: see the note on TWIN above.
+    print(f"{'kernel'.ljust(w)}  {'insns':>8} {'vector_fp':>10} {'scalar_fp':>10} "
+          f"{'unpaired':>9}  share  note")
+    for name, insns, vec, sca, unp in rows:
         share = f"{100 * vec // (vec + sca)}%" if vec + sca else "n/a"
         note = "KNOWN SCALAR -- owed" if name in expect_scalar else ""
-        print(f"{name.ljust(w)}  {insns:>8} {vec:>10} {sca:>10}  {share:>5}  {note}")
+        if unp and not note:
+            note = f"{unp} scalar op(s) with NO vector form in the object"
+        print(f"{name.ljust(w)}  {insns:>8} {vec:>10} {sca:>10} {unp:>9}  {share:>5}  {note}")
 
     # An object the gate could not read is not a pass. Silently skipping is how a check becomes
     # decoration: it would go green on a machine with no objdump and nobody would notice.
@@ -150,7 +206,9 @@ def main():
         return 3
     if failed:
         print(
-            f"\nFAILED: no vector floating-point arithmetic in: {', '.join(failed)}\n"
+            f"\nFAILED: scalar lane loop in: {', '.join(failed)}\n"
+            "Either the object holds no vector floating-point arithmetic at all, or more of its\n"
+            "scalar arithmetic has no vector counterpart than it has vector arithmetic.\n"
             "The lane loop is running scalar. Compile that kernel with\n"
             "  -Rpass-analysis=loop-vectorize -Rpass-analysis=slp-vectorizer\n"
             "to see what the compiler refused, and note that a loop containing a call, an\n"
