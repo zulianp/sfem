@@ -1,0 +1,1540 @@
+#include <cstdio>
+#include <type_traits>
+#include "../laplace_d3_simplex_local.hpp"
+#include "../laplace_d3_simplex_hessian.hpp"
+#include "../../../geometry_kernels.hpp"
+#include "../../../kernel_diagnostics.hpp"
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+#include <cstdint>
+#include <cstdlib>
+#include "../../../packed_thread_scratch.hpp"
+
+namespace sfem {
+namespace codegen {
+
+template <typename s_t, typename g_t, int VS>
+SFEM_INLINE const s_t *ageom_stream(
+    const int ne,
+    const g_t *const RSTR source,
+    s_t *const RSTR,
+    std::true_type) {
+  return source;
+}
+
+template <typename s_t, typename g_t, int VS>
+SFEM_INLINE const s_t *ageom_stream(
+    const int ne,
+    const g_t *const RSTR source,
+    s_t *const RSTR converted,
+    std::false_type) {
+  #pragma omp simd
+  for (int lane = 0; lane < ne; ++lane) {
+    converted[lane] = s_t(source[lane]);
+  }
+  return converted;
+}
+
+} // namespace codegen
+} // namespace sfem
+
+namespace sfem {
+namespace codegen {
+
+static const KernelDiagnostics laplace_tet4_objective_soa_diagnostics_data = {
+  "laplace_tet4_objective_soa",
+  "TET4",
+  3,
+  1,
+  4,
+  16,
+  1,
+  2,
+  2,
+  0,
+  0,
+  3,
+  0,
+  0,
+  0,
+  3,
+  1,
+  7,
+  82,
+  195,
+  0,
+  4,
+  10,
+  12,
+  1,
+  2,
+  12,
+  0,
+  1,
+  1,
+  1,
+  1.0,
+  1.0,
+  8.0,
+  12.0,
+  16.0,
+  20.0,
+  20.0,
+  24.0,
+  1.0,
+  1.0
+};
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" const sfem::codegen::KernelDiagnostics *laplace_tet4_objective_soa_diagnostics(void) {
+  return &sfem::codegen::laplace_tet4_objective_soa_diagnostics_data;
+}
+
+
+namespace sfem {
+namespace codegen {
+
+template <typename s_t, typename g_t, int VS>
+static SFEM_INLINE int laplace_tet4_objective_steps_a_msoa_impl(
+        const ptrdiff_t nelements,
+        const ptrdiff_t,
+        idx_t **const RSTR elements,
+        const g_t *const RSTR g_met0,
+        const g_t *const RSTR g_met1,
+        const g_t *const RSTR g_met2,
+        const g_t *const RSTR g_met3,
+        const g_t *const RSTR g_met4,
+        const g_t *const RSTR g_met5,
+        const s_t kappa,
+        const ptrdiff_t u_stride,
+        const s_t *const RSTR ux,
+        const ptrdiff_t h_stride,
+        const s_t *const RSTR hx,
+        const int nsteps,
+        const s_t *const RSTR steps,
+        s_t *const RSTR value
+) {
+
+  #pragma omp parallel for schedule(static)
+  for (ptrdiff_t element = 0; element < nelements; ++element) {
+    const idx_t ev0 = elements[0][element];
+    const idx_t ev1 = elements[1][element];
+    const idx_t ev2 = elements[2][element];
+    const idx_t ev3 = elements[3][element];
+    const s_t x0 = ux[ev0 * u_stride];
+    const s_t x1 = ux[ev1 * u_stride];
+    const s_t x2 = ux[ev2 * u_stride];
+    const s_t x3 = ux[ev3 * u_stride];
+    const s_t h0 = hx[ev0 * h_stride];
+    const s_t h1 = hx[ev1 * h_stride];
+    const s_t h2 = hx[ev2 * h_stride];
+    const s_t h3 = hx[ev3 * h_stride];
+    const s_t fff0 = kappa * s_t(g_met0[element]);
+    const s_t fff1 = kappa * s_t(g_met1[element]);
+    const s_t fff2 = kappa * s_t(g_met2[element]);
+    const s_t fff3 = kappa * s_t(g_met3[element]);
+    const s_t fff4 = kappa * s_t(g_met4[element]);
+    const s_t fff5 = kappa * s_t(g_met5[element]);
+    for (int step = 0; step < nsteps; ++step) {
+      const s_t alpha = steps[step];
+      const s_t u0 = x0 + alpha * h0;
+      const s_t u1 = x1 + alpha * h1;
+      const s_t u2 = x2 + alpha * h2;
+      const s_t u3 = x3 + alpha * h3;
+      const s_t t0 = -u0 + u1;
+      const s_t t1 = -u0 + u2;
+      const s_t t2 = -u0 + u3;
+      value[(ptrdiff_t)step * nelements + element] = ((s_t(1) / s_t(2)))*t0*(fff0*t0 + fff1*t1 + fff2*t2) + ((s_t(1) / s_t(2)))*t1*(fff1*t0 + fff3*t1 + fff4*t2) + ((s_t(1) / s_t(2)))*t2*(fff2*t0 + fff4*t1 + fff5*t2);
+    }
+  }
+
+  return SFEM_SUCCESS;
+}
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" int laplace_tet4_objective_steps_a_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_met0,
+        const geom_t *const RSTR g_met1,
+        const geom_t *const RSTR g_met2,
+        const geom_t *const RSTR g_met3,
+        const geom_t *const RSTR g_met4,
+        const geom_t *const RSTR g_met5,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const int nsteps,
+        const void *const RSTR steps,
+        void *const RSTR value
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::laplace_tet4_objective_steps_a_msoa_impl<double, geom_t, 16>(nelements, nnodes, elements, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::laplace_tet4_objective_steps_a_msoa_impl<float, geom_t, 16>(nelements, nnodes, elements, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("laplace_tet4_objective_steps_a_msoa", -1, (int)scalar_bytes);
+}
+
+namespace sfem {
+namespace codegen {
+
+template <typename s_t>
+static SFEM_INLINE int laplace_tet4_objective_steps_packed_a_msoa_impl(
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const geom_t *const RSTR g_met0,
+    const geom_t *const RSTR g_met1,
+    const geom_t *const RSTR g_met2,
+    const geom_t *const RSTR g_met3,
+    const geom_t *const RSTR g_met4,
+    const geom_t *const RSTR g_met5,
+    const s_t kappa,
+    const ptrdiff_t u_stride,
+    const s_t *const RSTR ux,
+    const ptrdiff_t h_stride,
+    const s_t *const RSTR hx,
+    const int nsteps,
+    const s_t *const RSTR steps,
+    s_t *const RSTR value
+) {
+  static constexpr int NC = 1;
+
+
+#pragma omp parallel
+  {
+    s_t *const RSTR pk_u_base = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+    s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
+
+#pragma omp for schedule(static)
+    for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
+      const ptrdiff_t e_start = pack * n_elements_per_pack;
+      const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
+      const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
+      const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
+      const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
+      const s_t *const u_components[NC] = {ux};
+      const s_t *const h_components[NC] = {hx};
+      for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR pk_u_base_component = pk_u_base + d * max_nodes_per_pack;
+        s_t *const RSTR pk_h_component = pk_h + d * max_nodes_per_pack;
+        const s_t *const RSTR u_component = u_components[d];
+        const s_t *const RSTR h_component = h_components[d];
+        for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+          const idx_t node = owned_nodes_ptr[pack] + k;
+          pk_u_base_component[k] = u_component[node * u_stride];
+          pk_h_component[k] = h_component[node * h_stride];
+        }
+        for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+          const idx_t node = ghosts[k];
+          pk_u_base_component[n_contiguous + k] = u_component[node * u_stride];
+          pk_h_component[n_contiguous + k] = h_component[node * h_stride];
+        }
+      }
+
+      for (ptrdiff_t element = e_start; element < e_end; ++element) {
+        const uint16_t ev0 = elements[0][element];
+        const uint16_t ev1 = elements[1][element];
+        const uint16_t ev2 = elements[2][element];
+        const uint16_t ev3 = elements[3][element];
+        const s_t x0 = pk_u_base[ev0];
+        const s_t x1 = pk_u_base[ev1];
+        const s_t x2 = pk_u_base[ev2];
+        const s_t x3 = pk_u_base[ev3];
+        const s_t h0 = pk_h[ev0];
+        const s_t h1 = pk_h[ev1];
+        const s_t h2 = pk_h[ev2];
+        const s_t h3 = pk_h[ev3];
+        const s_t fff0 = kappa * s_t(g_met0[element]);
+        const s_t fff1 = kappa * s_t(g_met1[element]);
+        const s_t fff2 = kappa * s_t(g_met2[element]);
+        const s_t fff3 = kappa * s_t(g_met3[element]);
+        const s_t fff4 = kappa * s_t(g_met4[element]);
+        const s_t fff5 = kappa * s_t(g_met5[element]);
+        for (int step = 0; step < nsteps; ++step) {
+          const s_t alpha = steps[step];
+          const s_t u0 = x0 + alpha * h0;
+          const s_t u1 = x1 + alpha * h1;
+          const s_t u2 = x2 + alpha * h2;
+          const s_t u3 = x3 + alpha * h3;
+          const s_t t0 = -u0 + u1;
+          const s_t t1 = -u0 + u2;
+          const s_t t2 = -u0 + u3;
+          value[(ptrdiff_t)step * nelements + element] = ((s_t(1) / s_t(2)))*t0*(fff0*t0 + fff1*t1 + fff2*t2) + ((s_t(1) / s_t(2)))*t1*(fff1*t0 + fff3*t1 + fff4*t2) + ((s_t(1) / s_t(2)))*t2*(fff2*t0 + fff4*t1 + fff5*t2);
+        }
+      }
+
+    }
+  }
+  return SFEM_SUCCESS;
+}
+
+extern "C" int laplace_tet4_objective_steps_packed_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const geom_t *const RSTR g_met0,
+    const geom_t *const RSTR g_met1,
+    const geom_t *const RSTR g_met2,
+    const geom_t *const RSTR g_met3,
+    const geom_t *const RSTR g_met4,
+    const geom_t *const RSTR g_met5,
+    const real_t kappa,
+    const ptrdiff_t u_stride,
+    const void *const RSTR ux,
+    const ptrdiff_t h_stride,
+    const void *const RSTR hx,
+    const int nsteps,
+    const void *const RSTR steps,
+    void *const RSTR value
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return laplace_tet4_objective_steps_packed_a_msoa_impl<double>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
+    }
+    case (int)sizeof(float): {
+        return laplace_tet4_objective_steps_packed_a_msoa_impl<float>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("laplace_tet4_objective_steps_packed_a_msoa", -1, (int)scalar_bytes);
+}
+
+} // namespace codegen
+} // namespace sfem
+
+
+namespace sfem {
+namespace codegen {
+
+static const KernelDiagnostics laplace_tet4_gradient_soa_diagnostics_data = {
+  "laplace_tet4_gradient_soa",
+  "TET4",
+  3,
+  1,
+  4,
+  16,
+  1,
+  0,
+  3,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  3,
+  3,
+  3,
+  27,
+  270,
+  0,
+  2,
+  10,
+  12,
+  1,
+  2,
+  12,
+  0,
+  4,
+  4,
+  4,
+  1.0,
+  1.0,
+  8.0,
+  12.0,
+  16.0,
+  20.0,
+  20.0,
+  24.0,
+  1.0,
+  1.0
+};
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" const sfem::codegen::KernelDiagnostics *laplace_tet4_gradient_soa_diagnostics(void) {
+  return &sfem::codegen::laplace_tet4_gradient_soa_diagnostics_data;
+}
+
+
+namespace sfem {
+namespace codegen {
+
+template <typename s_t, typename g_t, int VS>
+static SFEM_INLINE int laplace_tet4_gradient_a_msoa_impl(
+        const ptrdiff_t nelements,
+        const ptrdiff_t,
+        idx_t **const RSTR elements,
+        const g_t *const RSTR g_met0,
+        const g_t *const RSTR g_met1,
+        const g_t *const RSTR g_met2,
+        const g_t *const RSTR g_met3,
+        const g_t *const RSTR g_met4,
+        const g_t *const RSTR g_met5,
+        const s_t kappa,
+        const ptrdiff_t u_stride,
+        const s_t *const RSTR ux,
+        const ptrdiff_t out_stride,
+        s_t *const RSTR outx
+) {
+
+  #pragma omp parallel for schedule(static)
+  for (ptrdiff_t element = 0; element < nelements; ++element) {
+    const idx_t ev0 = elements[0][element];
+    const idx_t ev1 = elements[1][element];
+    const idx_t ev2 = elements[2][element];
+    const idx_t ev3 = elements[3][element];
+    const s_t u0 = ux[ev0 * u_stride];
+    const s_t u1 = ux[ev1 * u_stride];
+    const s_t u2 = ux[ev2 * u_stride];
+    const s_t u3 = ux[ev3 * u_stride];
+    const s_t fff0 = kappa * s_t(g_met0[element]);
+    const s_t fff1 = kappa * s_t(g_met1[element]);
+    const s_t fff2 = kappa * s_t(g_met2[element]);
+    const s_t fff3 = kappa * s_t(g_met3[element]);
+    const s_t fff4 = kappa * s_t(g_met4[element]);
+    const s_t fff5 = kappa * s_t(g_met5[element]);
+    const s_t t0 = -u0 + u1;
+    const s_t t1 = -u0 + u2;
+    const s_t t2 = -u0 + u3;
+    const s_t t3 = fff0*t0 + fff1*t1 + fff2*t2;
+    const s_t t4 = fff1*t0 + fff3*t1 + fff4*t2;
+    const s_t t5 = fff2*t0 + fff4*t1 + fff5*t2;
+    const s_t e0 = -t3 - t4 - t5;
+    #pragma omp atomic update
+    outx[ev0 * out_stride] += e0;
+    const s_t e1 = t3;
+    #pragma omp atomic update
+    outx[ev1 * out_stride] += e1;
+    const s_t e2 = t4;
+    #pragma omp atomic update
+    outx[ev2 * out_stride] += e2;
+    const s_t e3 = t5;
+    #pragma omp atomic update
+    outx[ev3 * out_stride] += e3;
+  }
+
+  return SFEM_SUCCESS;
+}
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" int laplace_tet4_gradient_a_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_met0,
+        const geom_t *const RSTR g_met1,
+        const geom_t *const RSTR g_met2,
+        const geom_t *const RSTR g_met3,
+        const geom_t *const RSTR g_met4,
+        const geom_t *const RSTR g_met5,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::laplace_tet4_gradient_a_msoa_impl<double, geom_t, 16>(nelements, nnodes, elements, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::laplace_tet4_gradient_a_msoa_impl<float, geom_t, 16>(nelements, nnodes, elements, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("laplace_tet4_gradient_a_msoa", -1, (int)scalar_bytes);
+}
+
+namespace sfem {
+namespace codegen {
+
+template <typename s_t>
+static SFEM_INLINE int laplace_tet4_gradient_packed_a_msoa_impl(
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const geom_t *const RSTR g_met0,
+    const geom_t *const RSTR g_met1,
+    const geom_t *const RSTR g_met2,
+    const geom_t *const RSTR g_met3,
+    const geom_t *const RSTR g_met4,
+    const geom_t *const RSTR g_met5,
+    const s_t kappa,
+    const ptrdiff_t u_stride,
+    const s_t *const RSTR ux,
+    const ptrdiff_t out_stride,
+    s_t *const RSTR outx
+) {
+  static constexpr int NC = 1;
+
+
+#pragma omp parallel
+  {
+    s_t *const RSTR pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+    s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
+
+#pragma omp for schedule(static)
+    for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
+      const ptrdiff_t e_start = pack * n_elements_per_pack;
+      const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
+      const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
+      const ptrdiff_t n_shared = n_shared_nodes[pack];
+      const ptrdiff_t n_not_shared = n_contiguous - n_shared;
+      const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
+      const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
+      const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
+      const s_t *const u_components[NC] = {ux};
+      s_t *const out_components[NC] = {outx};
+      for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+        s_t *const RSTR pk_u_component = pk_u + d * max_nodes_per_pack;
+        const s_t *const RSTR u_component = u_components[d];
+        for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
+          pk_component_out[k] = s_t(0);
+        }
+        for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+          const idx_t node = owned_nodes_ptr[pack] + k;
+          pk_u_component[k] = u_component[node * u_stride];
+        }
+        for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+          const idx_t node = ghosts[k];
+          pk_u_component[n_contiguous + k] = u_component[node * u_stride];
+        }
+      }
+
+      for (ptrdiff_t element = e_start; element < e_end; ++element) {
+        const uint16_t ev0 = elements[0][element];
+        const uint16_t ev1 = elements[1][element];
+        const uint16_t ev2 = elements[2][element];
+        const uint16_t ev3 = elements[3][element];
+        const s_t u0 = pk_u[ev0];
+        const s_t u1 = pk_u[ev1];
+        const s_t u2 = pk_u[ev2];
+        const s_t u3 = pk_u[ev3];
+        const s_t fff0 = kappa * s_t(g_met0[element]);
+        const s_t fff1 = kappa * s_t(g_met1[element]);
+        const s_t fff2 = kappa * s_t(g_met2[element]);
+        const s_t fff3 = kappa * s_t(g_met3[element]);
+        const s_t fff4 = kappa * s_t(g_met4[element]);
+        const s_t fff5 = kappa * s_t(g_met5[element]);
+        const s_t t0 = -u0 + u1;
+        const s_t t1 = -u0 + u2;
+        const s_t t2 = -u0 + u3;
+        const s_t t3 = fff0*t0 + fff1*t1 + fff2*t2;
+        const s_t t4 = fff1*t0 + fff3*t1 + fff4*t2;
+        const s_t t5 = fff2*t0 + fff4*t1 + fff5*t2;
+        const s_t e0 = -t3 - t4 - t5;
+        pk_out[ev0] += e0;
+        const s_t e1 = t3;
+        pk_out[ev1] += e1;
+        const s_t e2 = t4;
+        pk_out[ev2] += e2;
+        const s_t e3 = t5;
+        pk_out[ev3] += e3;
+      }
+
+      for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+        s_t *const RSTR global_out = out_components[d];
+        for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
+          global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
+          pk_component_out[k] = s_t(0);
+        }
+        for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {
+#pragma omp atomic update
+          global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
+          pk_component_out[k] = s_t(0);
+        }
+        for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+#pragma omp atomic update
+          global_out[ghosts[k] * out_stride] += pk_component_out[n_contiguous + k];
+          pk_component_out[n_contiguous + k] = s_t(0);
+        }
+      }
+    }
+  }
+  return SFEM_SUCCESS;
+}
+
+extern "C" int laplace_tet4_gradient_packed_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const geom_t *const RSTR g_met0,
+    const geom_t *const RSTR g_met1,
+    const geom_t *const RSTR g_met2,
+    const geom_t *const RSTR g_met3,
+    const geom_t *const RSTR g_met4,
+    const geom_t *const RSTR g_met5,
+    const real_t kappa,
+    const ptrdiff_t u_stride,
+    const void *const RSTR ux,
+    const ptrdiff_t out_stride,
+    void *const RSTR outx
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return laplace_tet4_gradient_packed_a_msoa_impl<double>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
+    }
+    case (int)sizeof(float): {
+        return laplace_tet4_gradient_packed_a_msoa_impl<float>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("laplace_tet4_gradient_packed_a_msoa", -1, (int)scalar_bytes);
+}
+
+template <typename s_t>
+static SFEM_INLINE int laplace_tet4_gradient_packed_two_pass_a_msoa_impl(
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const ptrdiff_t n_ghost_entries,
+    const ptrdiff_t n_ghost_reduce_rows,
+    const ptrdiff_t *const RSTR ghost_reduce_ptr,
+    const ptrdiff_t *const RSTR ghost_reduce_idx,
+    const idx_t *const RSTR ghost_reduce_dest,
+    s_t *const RSTR ghost_buf,
+    const geom_t *const RSTR g_met0,
+    const geom_t *const RSTR g_met1,
+    const geom_t *const RSTR g_met2,
+    const geom_t *const RSTR g_met3,
+    const geom_t *const RSTR g_met4,
+    const geom_t *const RSTR g_met5,
+    const s_t kappa,
+    const ptrdiff_t u_stride,
+    const s_t *const RSTR ux,
+    const ptrdiff_t out_stride,
+    s_t *const RSTR outx
+) {
+  static constexpr int NC = 1;
+
+
+#pragma omp parallel
+  {
+    s_t *const RSTR pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+    s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
+
+#pragma omp for schedule(static)
+    for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
+      const ptrdiff_t e_start = pack * n_elements_per_pack;
+      const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
+      const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
+      const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
+      const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
+      const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
+      const ptrdiff_t ghost_off = ghost_ptr[pack];
+      const s_t *const u_components[NC] = {ux};
+      s_t *const out_components[NC] = {outx};
+      for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+        s_t *const RSTR pk_u_component = pk_u + d * max_nodes_per_pack;
+        const s_t *const RSTR u_component = u_components[d];
+        for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
+          pk_component_out[k] = s_t(0);
+        }
+        for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+          const idx_t node = owned_nodes_ptr[pack] + k;
+          pk_u_component[k] = u_component[node * u_stride];
+        }
+        for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+          const idx_t node = ghosts[k];
+          pk_u_component[n_contiguous + k] = u_component[node * u_stride];
+        }
+      }
+
+      for (ptrdiff_t element = e_start; element < e_end; ++element) {
+        const uint16_t ev0 = elements[0][element];
+        const uint16_t ev1 = elements[1][element];
+        const uint16_t ev2 = elements[2][element];
+        const uint16_t ev3 = elements[3][element];
+        const s_t u0 = pk_u[ev0];
+        const s_t u1 = pk_u[ev1];
+        const s_t u2 = pk_u[ev2];
+        const s_t u3 = pk_u[ev3];
+        const s_t fff0 = kappa * s_t(g_met0[element]);
+        const s_t fff1 = kappa * s_t(g_met1[element]);
+        const s_t fff2 = kappa * s_t(g_met2[element]);
+        const s_t fff3 = kappa * s_t(g_met3[element]);
+        const s_t fff4 = kappa * s_t(g_met4[element]);
+        const s_t fff5 = kappa * s_t(g_met5[element]);
+        const s_t t0 = -u0 + u1;
+        const s_t t1 = -u0 + u2;
+        const s_t t2 = -u0 + u3;
+        const s_t t3 = fff0*t0 + fff1*t1 + fff2*t2;
+        const s_t t4 = fff1*t0 + fff3*t1 + fff4*t2;
+        const s_t t5 = fff2*t0 + fff4*t1 + fff5*t2;
+        const s_t e0 = -t3 - t4 - t5;
+        pk_out[ev0] += e0;
+        const s_t e1 = t3;
+        pk_out[ev1] += e1;
+        const s_t e2 = t4;
+        pk_out[ev2] += e2;
+        const s_t e3 = t5;
+        pk_out[ev3] += e3;
+      }
+
+      for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+        s_t *const RSTR global_out = out_components[d];
+        s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
+        for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+          global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
+          pk_component_out[k] = s_t(0);
+        }
+        for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+          ghost_component[ghost_off + k] = pk_component_out[n_contiguous + k];
+          pk_component_out[n_contiguous + k] = s_t(0);
+        }
+      }
+    }
+  }
+
+  s_t *const out_components[NC] = {outx};
+#pragma omp parallel for schedule(static)
+  for (ptrdiff_t row = 0; row < n_ghost_reduce_rows; ++row) {
+    const idx_t dest = ghost_reduce_dest[row];
+    const ptrdiff_t begin = ghost_reduce_ptr[row];
+    const ptrdiff_t end = ghost_reduce_ptr[row + 1];
+    for (int d = 0; d < NC; ++d) {
+      const s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
+      s_t sum = s_t(0);
+      for (ptrdiff_t j = begin; j < end; ++j) {
+        sum += ghost_component[ghost_reduce_idx[j]];
+      }
+      out_components[d][dest * out_stride] += sum;
+    }
+  }
+  return SFEM_SUCCESS;
+}
+
+extern "C" int laplace_tet4_gradient_packed_two_pass_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const ptrdiff_t n_ghost_entries,
+    const ptrdiff_t n_ghost_reduce_rows,
+    const ptrdiff_t *const RSTR ghost_reduce_ptr,
+    const ptrdiff_t *const RSTR ghost_reduce_idx,
+    const idx_t *const RSTR ghost_reduce_dest,
+    void *const RSTR ghost_buf,
+    const geom_t *const RSTR g_met0,
+    const geom_t *const RSTR g_met1,
+    const geom_t *const RSTR g_met2,
+    const geom_t *const RSTR g_met3,
+    const geom_t *const RSTR g_met4,
+    const geom_t *const RSTR g_met5,
+    const real_t kappa,
+    const ptrdiff_t u_stride,
+    const void *const RSTR ux,
+    const ptrdiff_t out_stride,
+    void *const RSTR outx
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return laplace_tet4_gradient_packed_two_pass_a_msoa_impl<double>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (double *)ghost_buf, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
+    }
+    case (int)sizeof(float): {
+        return laplace_tet4_gradient_packed_two_pass_a_msoa_impl<float>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (float *)ghost_buf, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("laplace_tet4_gradient_packed_two_pass_a_msoa", -1, (int)scalar_bytes);
+}
+
+} // namespace codegen
+} // namespace sfem
+
+
+namespace sfem {
+namespace codegen {
+
+static const KernelDiagnostics laplace_tet4_apply_soa_diagnostics_data = {
+  "laplace_tet4_apply_soa",
+  "TET4",
+  3,
+  1,
+  4,
+  16,
+  1,
+  0,
+  3,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  3,
+  3,
+  27,
+  270,
+  0,
+  2,
+  10,
+  12,
+  1,
+  2,
+  0,
+  12,
+  4,
+  4,
+  4,
+  1.0,
+  1.0,
+  8.0,
+  12.0,
+  16.0,
+  20.0,
+  20.0,
+  24.0,
+  1.0,
+  1.0
+};
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" const sfem::codegen::KernelDiagnostics *laplace_tet4_apply_soa_diagnostics(void) {
+  return &sfem::codegen::laplace_tet4_apply_soa_diagnostics_data;
+}
+
+
+namespace sfem {
+namespace codegen {
+
+template <typename s_t, typename g_t, int VS>
+static SFEM_INLINE int laplace_tet4_apply_a_msoa_impl(
+        const ptrdiff_t nelements,
+        const ptrdiff_t,
+        idx_t **const RSTR elements,
+        const g_t *const RSTR g_met0,
+        const g_t *const RSTR g_met1,
+        const g_t *const RSTR g_met2,
+        const g_t *const RSTR g_met3,
+        const g_t *const RSTR g_met4,
+        const g_t *const RSTR g_met5,
+        const s_t kappa,
+        const ptrdiff_t h_stride,
+        const s_t *const RSTR hx,
+        const ptrdiff_t out_stride,
+        s_t *const RSTR outx
+) {
+
+  #pragma omp parallel for schedule(static)
+  for (ptrdiff_t element = 0; element < nelements; ++element) {
+    const idx_t ev0 = elements[0][element];
+    const idx_t ev1 = elements[1][element];
+    const idx_t ev2 = elements[2][element];
+    const idx_t ev3 = elements[3][element];
+    const s_t u0 = hx[ev0 * h_stride];
+    const s_t u1 = hx[ev1 * h_stride];
+    const s_t u2 = hx[ev2 * h_stride];
+    const s_t u3 = hx[ev3 * h_stride];
+    const s_t fff0 = kappa * s_t(g_met0[element]);
+    const s_t fff1 = kappa * s_t(g_met1[element]);
+    const s_t fff2 = kappa * s_t(g_met2[element]);
+    const s_t fff3 = kappa * s_t(g_met3[element]);
+    const s_t fff4 = kappa * s_t(g_met4[element]);
+    const s_t fff5 = kappa * s_t(g_met5[element]);
+    const s_t t0 = -u0 + u1;
+    const s_t t1 = -u0 + u2;
+    const s_t t2 = -u0 + u3;
+    const s_t t3 = fff0*t0 + fff1*t1 + fff2*t2;
+    const s_t t4 = fff1*t0 + fff3*t1 + fff4*t2;
+    const s_t t5 = fff2*t0 + fff4*t1 + fff5*t2;
+    const s_t e0 = -t3 - t4 - t5;
+    #pragma omp atomic update
+    outx[ev0 * out_stride] += e0;
+    const s_t e1 = t3;
+    #pragma omp atomic update
+    outx[ev1 * out_stride] += e1;
+    const s_t e2 = t4;
+    #pragma omp atomic update
+    outx[ev2 * out_stride] += e2;
+    const s_t e3 = t5;
+    #pragma omp atomic update
+    outx[ev3 * out_stride] += e3;
+  }
+
+  return SFEM_SUCCESS;
+}
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" int laplace_tet4_apply_a_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_met0,
+        const geom_t *const RSTR g_met1,
+        const geom_t *const RSTR g_met2,
+        const geom_t *const RSTR g_met3,
+        const geom_t *const RSTR g_met4,
+        const geom_t *const RSTR g_met5,
+        const real_t kappa,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::laplace_tet4_apply_a_msoa_impl<double, geom_t, 16>(nelements, nnodes, elements, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::laplace_tet4_apply_a_msoa_impl<float, geom_t, 16>(nelements, nnodes, elements, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("laplace_tet4_apply_a_msoa", -1, (int)scalar_bytes);
+}
+
+namespace sfem {
+namespace codegen {
+
+template <typename s_t>
+static SFEM_INLINE int laplace_tet4_apply_packed_a_msoa_impl(
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const geom_t *const RSTR g_met0,
+    const geom_t *const RSTR g_met1,
+    const geom_t *const RSTR g_met2,
+    const geom_t *const RSTR g_met3,
+    const geom_t *const RSTR g_met4,
+    const geom_t *const RSTR g_met5,
+    const s_t kappa,
+    const ptrdiff_t h_stride,
+    const s_t *const RSTR hx,
+    const ptrdiff_t out_stride,
+    s_t *const RSTR outx
+) {
+  static constexpr int NC = 1;
+
+
+#pragma omp parallel
+  {
+    s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
+    s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
+
+#pragma omp for schedule(static)
+    for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
+      const ptrdiff_t e_start = pack * n_elements_per_pack;
+      const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
+      const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
+      const ptrdiff_t n_shared = n_shared_nodes[pack];
+      const ptrdiff_t n_not_shared = n_contiguous - n_shared;
+      const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
+      const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
+      const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
+      const s_t *const h_components[NC] = {hx};
+      s_t *const out_components[NC] = {outx};
+      for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+        s_t *const RSTR pk_h_component = pk_h + d * max_nodes_per_pack;
+        const s_t *const RSTR h_component = h_components[d];
+        for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
+          pk_component_out[k] = s_t(0);
+        }
+        for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+          const idx_t node = owned_nodes_ptr[pack] + k;
+          pk_h_component[k] = h_component[node * h_stride];
+        }
+        for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+          const idx_t node = ghosts[k];
+          pk_h_component[n_contiguous + k] = h_component[node * h_stride];
+        }
+      }
+
+      for (ptrdiff_t element = e_start; element < e_end; ++element) {
+        const uint16_t ev0 = elements[0][element];
+        const uint16_t ev1 = elements[1][element];
+        const uint16_t ev2 = elements[2][element];
+        const uint16_t ev3 = elements[3][element];
+        const s_t u0 = pk_h[ev0];
+        const s_t u1 = pk_h[ev1];
+        const s_t u2 = pk_h[ev2];
+        const s_t u3 = pk_h[ev3];
+        const s_t fff0 = kappa * s_t(g_met0[element]);
+        const s_t fff1 = kappa * s_t(g_met1[element]);
+        const s_t fff2 = kappa * s_t(g_met2[element]);
+        const s_t fff3 = kappa * s_t(g_met3[element]);
+        const s_t fff4 = kappa * s_t(g_met4[element]);
+        const s_t fff5 = kappa * s_t(g_met5[element]);
+        const s_t t0 = -u0 + u1;
+        const s_t t1 = -u0 + u2;
+        const s_t t2 = -u0 + u3;
+        const s_t t3 = fff0*t0 + fff1*t1 + fff2*t2;
+        const s_t t4 = fff1*t0 + fff3*t1 + fff4*t2;
+        const s_t t5 = fff2*t0 + fff4*t1 + fff5*t2;
+        const s_t e0 = -t3 - t4 - t5;
+        pk_out[ev0] += e0;
+        const s_t e1 = t3;
+        pk_out[ev1] += e1;
+        const s_t e2 = t4;
+        pk_out[ev2] += e2;
+        const s_t e3 = t5;
+        pk_out[ev3] += e3;
+      }
+
+      for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+        s_t *const RSTR global_out = out_components[d];
+        for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
+          global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
+          pk_component_out[k] = s_t(0);
+        }
+        for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {
+#pragma omp atomic update
+          global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
+          pk_component_out[k] = s_t(0);
+        }
+        for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+#pragma omp atomic update
+          global_out[ghosts[k] * out_stride] += pk_component_out[n_contiguous + k];
+          pk_component_out[n_contiguous + k] = s_t(0);
+        }
+      }
+    }
+  }
+  return SFEM_SUCCESS;
+}
+
+extern "C" int laplace_tet4_apply_packed_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const geom_t *const RSTR g_met0,
+    const geom_t *const RSTR g_met1,
+    const geom_t *const RSTR g_met2,
+    const geom_t *const RSTR g_met3,
+    const geom_t *const RSTR g_met4,
+    const geom_t *const RSTR g_met5,
+    const real_t kappa,
+    const ptrdiff_t h_stride,
+    const void *const RSTR hx,
+    const ptrdiff_t out_stride,
+    void *const RSTR outx
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return laplace_tet4_apply_packed_a_msoa_impl<double>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
+    }
+    case (int)sizeof(float): {
+        return laplace_tet4_apply_packed_a_msoa_impl<float>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("laplace_tet4_apply_packed_a_msoa", -1, (int)scalar_bytes);
+}
+
+template <typename s_t>
+static SFEM_INLINE int laplace_tet4_apply_packed_two_pass_a_msoa_impl(
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const ptrdiff_t n_ghost_entries,
+    const ptrdiff_t n_ghost_reduce_rows,
+    const ptrdiff_t *const RSTR ghost_reduce_ptr,
+    const ptrdiff_t *const RSTR ghost_reduce_idx,
+    const idx_t *const RSTR ghost_reduce_dest,
+    s_t *const RSTR ghost_buf,
+    const geom_t *const RSTR g_met0,
+    const geom_t *const RSTR g_met1,
+    const geom_t *const RSTR g_met2,
+    const geom_t *const RSTR g_met3,
+    const geom_t *const RSTR g_met4,
+    const geom_t *const RSTR g_met5,
+    const s_t kappa,
+    const ptrdiff_t h_stride,
+    const s_t *const RSTR hx,
+    const ptrdiff_t out_stride,
+    s_t *const RSTR outx
+) {
+  static constexpr int NC = 1;
+
+
+#pragma omp parallel
+  {
+    s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
+    s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
+
+#pragma omp for schedule(static)
+    for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
+      const ptrdiff_t e_start = pack * n_elements_per_pack;
+      const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
+      const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
+      const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
+      const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
+      const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
+      const ptrdiff_t ghost_off = ghost_ptr[pack];
+      const s_t *const h_components[NC] = {hx};
+      s_t *const out_components[NC] = {outx};
+      for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+        s_t *const RSTR pk_h_component = pk_h + d * max_nodes_per_pack;
+        const s_t *const RSTR h_component = h_components[d];
+        for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
+          pk_component_out[k] = s_t(0);
+        }
+        for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+          const idx_t node = owned_nodes_ptr[pack] + k;
+          pk_h_component[k] = h_component[node * h_stride];
+        }
+        for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+          const idx_t node = ghosts[k];
+          pk_h_component[n_contiguous + k] = h_component[node * h_stride];
+        }
+      }
+
+      for (ptrdiff_t element = e_start; element < e_end; ++element) {
+        const uint16_t ev0 = elements[0][element];
+        const uint16_t ev1 = elements[1][element];
+        const uint16_t ev2 = elements[2][element];
+        const uint16_t ev3 = elements[3][element];
+        const s_t u0 = pk_h[ev0];
+        const s_t u1 = pk_h[ev1];
+        const s_t u2 = pk_h[ev2];
+        const s_t u3 = pk_h[ev3];
+        const s_t fff0 = kappa * s_t(g_met0[element]);
+        const s_t fff1 = kappa * s_t(g_met1[element]);
+        const s_t fff2 = kappa * s_t(g_met2[element]);
+        const s_t fff3 = kappa * s_t(g_met3[element]);
+        const s_t fff4 = kappa * s_t(g_met4[element]);
+        const s_t fff5 = kappa * s_t(g_met5[element]);
+        const s_t t0 = -u0 + u1;
+        const s_t t1 = -u0 + u2;
+        const s_t t2 = -u0 + u3;
+        const s_t t3 = fff0*t0 + fff1*t1 + fff2*t2;
+        const s_t t4 = fff1*t0 + fff3*t1 + fff4*t2;
+        const s_t t5 = fff2*t0 + fff4*t1 + fff5*t2;
+        const s_t e0 = -t3 - t4 - t5;
+        pk_out[ev0] += e0;
+        const s_t e1 = t3;
+        pk_out[ev1] += e1;
+        const s_t e2 = t4;
+        pk_out[ev2] += e2;
+        const s_t e3 = t5;
+        pk_out[ev3] += e3;
+      }
+
+      for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+        s_t *const RSTR global_out = out_components[d];
+        s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
+        for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+          global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
+          pk_component_out[k] = s_t(0);
+        }
+        for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+          ghost_component[ghost_off + k] = pk_component_out[n_contiguous + k];
+          pk_component_out[n_contiguous + k] = s_t(0);
+        }
+      }
+    }
+  }
+
+  s_t *const out_components[NC] = {outx};
+#pragma omp parallel for schedule(static)
+  for (ptrdiff_t row = 0; row < n_ghost_reduce_rows; ++row) {
+    const idx_t dest = ghost_reduce_dest[row];
+    const ptrdiff_t begin = ghost_reduce_ptr[row];
+    const ptrdiff_t end = ghost_reduce_ptr[row + 1];
+    for (int d = 0; d < NC; ++d) {
+      const s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
+      s_t sum = s_t(0);
+      for (ptrdiff_t j = begin; j < end; ++j) {
+        sum += ghost_component[ghost_reduce_idx[j]];
+      }
+      out_components[d][dest * out_stride] += sum;
+    }
+  }
+  return SFEM_SUCCESS;
+}
+
+extern "C" int laplace_tet4_apply_packed_two_pass_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const ptrdiff_t n_ghost_entries,
+    const ptrdiff_t n_ghost_reduce_rows,
+    const ptrdiff_t *const RSTR ghost_reduce_ptr,
+    const ptrdiff_t *const RSTR ghost_reduce_idx,
+    const idx_t *const RSTR ghost_reduce_dest,
+    void *const RSTR ghost_buf,
+    const geom_t *const RSTR g_met0,
+    const geom_t *const RSTR g_met1,
+    const geom_t *const RSTR g_met2,
+    const geom_t *const RSTR g_met3,
+    const geom_t *const RSTR g_met4,
+    const geom_t *const RSTR g_met5,
+    const real_t kappa,
+    const ptrdiff_t h_stride,
+    const void *const RSTR hx,
+    const ptrdiff_t out_stride,
+    void *const RSTR outx
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return laplace_tet4_apply_packed_two_pass_a_msoa_impl<double>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (double *)ghost_buf, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
+    }
+    case (int)sizeof(float): {
+        return laplace_tet4_apply_packed_two_pass_a_msoa_impl<float>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (float *)ghost_buf, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("laplace_tet4_apply_packed_two_pass_a_msoa", -1, (int)scalar_bytes);
+}
+
+} // namespace codegen
+} // namespace sfem
+
+
+namespace sfem {
+namespace codegen {
+
+static SFEM_INLINE void laplace_tet4_hessian_a_msoa_find_cols(
+    const idx_t *const RSTR targets,
+    const idx_t *const RSTR row,
+    const int lenrow,
+    idx_t *const RSTR ks) {
+#pragma unroll(4)
+  for (int d = 0; d < 4; ++d) {
+    ks[d] = 0;
+  }
+  for (int k = 0; k < lenrow; ++k) {
+#pragma unroll(4)
+    for (int d = 0; d < 4; ++d) {
+      ks[d] += row[k] < targets[d];
+    }
+  }
+}
+
+template <typename s_t>
+static SFEM_INLINE void laplace_tet4_hessian_a_msoa_scatter_bsr(
+    const idx_t *const RSTR ev,
+    const s_t *const RSTR element_matrix,
+    const count_t *const RSTR rowptr,
+    const idx_t *const RSTR colidx,
+    s_t *const RSTR values) {
+  static constexpr int NC = 1;
+  static constexpr int NS = 4;
+  count_t entries[NS * NS];
+  idx_t ks[NS];
+  for (int i = 0; i < NS; ++i) {
+    const idx_t dof_i = ev[i];
+    const count_t row_begin = rowptr[dof_i];
+    const int lenrow = (int)(rowptr[dof_i + 1] - row_begin);
+    const idx_t *const RSTR cols = &colidx[row_begin];
+    laplace_tet4_hessian_a_msoa_find_cols(ev, cols, lenrow, ks);
+    for (int j = 0; j < NS; ++j) {
+      entries[i * NS + j] = row_begin + ks[j];
+    }
+  }
+  for (int i = 0; i < NS; ++i) {
+    for (int j = 0; j < NS; ++j) {
+      s_t *const block = &values[entries[i * NS + j] * NC * NC];
+      for (int bi = 0; bi < NC; ++bi) {
+        const int row = bi * NS + i;
+        for (int bj = 0; bj < NC; ++bj) {
+          const int col = bj * NS + j;
+#pragma omp atomic update
+          block[bi * NC + bj] += element_matrix[row * (NC * NS) + col];
+        }
+      }
+    }
+  }
+}
+
+template <typename s_t>
+static SFEM_INLINE void laplace_tet4_hessian_a_msoa_scatter_crs(
+    const idx_t *const RSTR ev,
+    const s_t *const RSTR element_matrix,
+    const count_t *const RSTR rowptr,
+    const idx_t *const RSTR colidx,
+    s_t *const RSTR values) {
+  static constexpr int NC = 1;
+  static constexpr int NS = 4;
+  count_t row_begin[NS];
+  int lenrow[NS];
+  int local_col[NS * NS];
+  idx_t ks[NS];
+  for (int i = 0; i < NS; ++i) {
+    row_begin[i] = rowptr[ev[i]];
+    lenrow[i] = (int)(rowptr[ev[i] + 1] - row_begin[i]);
+    const idx_t *const RSTR cols = &colidx[row_begin[i]];
+    laplace_tet4_hessian_a_msoa_find_cols(ev, cols, lenrow[i], ks);
+    for (int j = 0; j < NS; ++j) {
+      local_col[i * NS + j] = (int)ks[j];
+    }
+  }
+  for (int i = 0; i < NS; ++i) {
+    const count_t rb = row_begin[i];
+    const int lr = lenrow[i];
+    for (int j = 0; j < NS; ++j) {
+      const int lc = local_col[i * NS + j];
+      for (int bi = 0; bi < NC; ++bi) {
+        const int row = bi * NS + i;
+        s_t *const row_values = &values[rb * NC * NC + bi * lr * NC];
+        for (int bj = 0; bj < NC; ++bj) {
+          const int col = bj * NS + j;
+#pragma omp atomic update
+          row_values[lc * NC + bj] += element_matrix[row * (NC * NS) + col];
+        }
+      }
+    }
+  }
+}
+
+template <typename s_t, typename g_t, int FORMAT>
+static int laplace_tet4_hessian_a_msoa_assemble_impl(
+    const ptrdiff_t nelements,
+    const ptrdiff_t,
+    idx_t **const RSTR elements,
+    const g_t *const RSTR g_adj0,
+    const g_t *const RSTR g_adj1,
+    const g_t *const RSTR g_adj2,
+    const g_t *const RSTR g_adj3,
+    const g_t *const RSTR g_adj4,
+    const g_t *const RSTR g_adj5,
+    const g_t *const RSTR g_adj6,
+    const g_t *const RSTR g_adj7,
+    const g_t *const RSTR g_adj8,
+    const g_t *const RSTR g_det0,
+    const s_t kappa,
+    const count_t *const RSTR rowptr,
+    const idx_t *const RSTR colidx,
+    s_t *const RSTR values,
+    const int *const RSTR,
+    const ptrdiff_t,
+    const ptrdiff_t,
+    const idx_t *const RSTR,
+    const idx_t *const RSTR,
+    idx_t *const RSTR,
+    idx_t *const RSTR) {
+  static constexpr int NC = 1;
+  static constexpr int NQ = 1;
+  static constexpr int NS = 4;
+  static constexpr int NDOFS = NC * NS;
+
+  static_assert(FORMAT == 0 || FORMAT == 1,
+                "this kernel has no scatter for the requested matrix format");
+#pragma omp parallel for schedule(static)
+  for (ptrdiff_t element = 0; element < nelements; ++element) {
+    idx_t ev[NS];
+    s_t element_matrix[NDOFS * NDOFS];
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t badj4[NQ];
+    s_t badj5[NQ];
+    s_t badj6[NQ];
+    s_t badj7[NQ];
+    s_t badj8[NQ];
+    s_t bdet0[NQ];
+
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t node = elements[shape][element];
+      ev[shape] = node;
+    }
+
+
+    badj0[0] = s_t(g_adj0[element]);
+    badj1[0] = s_t(g_adj1[element]);
+    badj2[0] = s_t(g_adj2[element]);
+    badj3[0] = s_t(g_adj3[element]);
+    badj4[0] = s_t(g_adj4[element]);
+    badj5[0] = s_t(g_adj5[element]);
+    badj6[0] = s_t(g_adj6[element]);
+    badj7[0] = s_t(g_adj7[element]);
+    badj8[0] = s_t(g_adj8[element]);
+    bdet0[0] = s_t(g_det0[element]);
+
+    laplace_d3_simplex_tet4_direct_hessian_element_matrix<s_t, NS>(badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, kappa, element_matrix);
+
+    if constexpr (FORMAT == 1) {
+      laplace_tet4_hessian_a_msoa_scatter_bsr(ev, element_matrix, rowptr, colidx, values);
+    } else if constexpr (FORMAT == 0) {
+      laplace_tet4_hessian_a_msoa_scatter_crs(ev, element_matrix, rowptr, colidx, values);
+    }
+  }
+
+  return SFEM_SUCCESS;
+}
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" int laplace_tet4_hessian_crs_a_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
+        const real_t kappa,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::laplace_tet4_hessian_a_msoa_assemble_impl<double, geom_t, 0>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, rowptr, colidx, (double *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::laplace_tet4_hessian_a_msoa_assemble_impl<float, geom_t, 0>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, rowptr, colidx, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("laplace_tet4_hessian_crs_a_msoa", -1, (int)scalar_bytes);
+}
+
+extern "C" int laplace_tet4_hessian_bsr_a_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
+        const real_t kappa,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::laplace_tet4_hessian_a_msoa_assemble_impl<double, geom_t, 1>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, rowptr, colidx, (double *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::laplace_tet4_hessian_a_msoa_assemble_impl<float, geom_t, 1>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, rowptr, colidx, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("laplace_tet4_hessian_bsr_a_msoa", -1, (int)scalar_bytes);
+}
