@@ -1,0 +1,258 @@
+#ifndef LINEAR_ELASTICITY_D2_TENSOR_PRODUCT_LOCAL_CUH
+#define LINEAR_ELASTICITY_D2_TENSOR_PRODUCT_LOCAL_CUH
+#include <math.h>
+#include <stddef.h>
+#if defined(__has_include)
+#if __has_include("sfem_base.hpp")
+#include "sfem_base.hpp"
+#define SFEM_GENERATED_SCALAR_T
+#endif
+#endif
+#include "../../../cuda/kernel_math.cuh"
+#include "../../../cuda/tensor_product_kernels.cuh"
+#ifndef SFEM_RESTRICT
+#define SFEM_RESTRICT __restrict__
+#endif
+#ifndef RSTR
+#define RSTR SFEM_RESTRICT
+#endif
+#ifndef SFEM_GENERATED_SCALAR_T
+#define SFEM_GENERATED_SCALAR_T
+typedef double real_t;
+typedef ptrdiff_t idx_t;
+typedef ptrdiff_t element_idx_t;
+typedef ptrdiff_t count_t;
+typedef double geom_t;
+#endif
+namespace sfem {
+namespace codegen {
+
+template <typename s_t, int NQ, int NS>
+static __host__ __device__ __forceinline__ void linear_elasticity_d2_tensor_product_objective_block(
+        const ptrdiff_t geometry_stride,
+        const s_t *const RSTR adj0,
+        const s_t *const RSTR adj1,
+        const s_t *const RSTR adj2,
+        const s_t *const RSTR adj3,
+        const s_t *const RSTR det0,
+        const s_t *const RSTR shape_1d,
+        const s_t *const RSTR grad_1d,
+        const s_t *const RSTR q_weight_1d,
+        const s_t lmbda,
+        const s_t mu,
+        const s_t *const RSTR u_streams[NS * 2],
+        const s_t *const RSTR h_streams[NS * 2],
+        const int nsteps,
+        const s_t *const RSTR steps,
+        const ptrdiff_t value_stride,
+        s_t *const RSTR value
+) {
+  static_assert(NQ > 0, "NQ must be positive");
+  static constexpr int NQ1 = integer_root(NQ, 2);
+  static constexpr int NS1 = integer_root(NS, 2);
+  static_assert(ipow(NQ1, 2) == NQ, "NQ must be tensor-product compatible");
+  static_assert(ipow(NS1, 2) == NS, "NS must be tensor-product compatible");
+  s_t gu_ref_q[4 * NQ];
+  s_t grad_h_ref_q[4 * NQ];
+  tensor_gradient_scalar<s_t, NQ, NS, 2, 2>(shape_1d, grad_1d, u_streams, 0, &gu_ref_q[0]);
+  tensor_gradient_scalar<s_t, NQ, NS, 2, 2>(shape_1d, grad_1d, h_streams, 0, &grad_h_ref_q[0]);
+  tensor_gradient_scalar<s_t, NQ, NS, 2, 2>(shape_1d, grad_1d, u_streams, 1, &gu_ref_q[2 * NQ]);
+  tensor_gradient_scalar<s_t, NQ, NS, 2, 2>(shape_1d, grad_1d, h_streams, 1, &grad_h_ref_q[2 * NQ]);
+  for (int q = 0; q < NQ; ++q) {
+    const int qx = q % NQ1;
+    const int qy = q / NQ1;
+    const s_t qw = q_weight_1d[qx] * q_weight_1d[qy];
+    const s_t *const RSTR gu_ref0 = &gu_ref_q[(2 * q)];
+    const s_t *const RSTR gu_ref1 = &gu_ref_q[(2 * q + 1)];
+    const s_t *const RSTR gu_ref2 = &gu_ref_q[(2 * (NQ + q))];
+    const s_t *const RSTR gu_ref3 = &gu_ref_q[(2 * (NQ + q) + 1)];
+    const s_t *const RSTR grad_h_ref0 = &grad_h_ref_q[(2 * q)];
+    const s_t *const RSTR grad_h_ref1 = &grad_h_ref_q[(2 * q + 1)];
+    const s_t *const RSTR grad_h_ref2 = &grad_h_ref_q[(2 * (NQ + q))];
+    const s_t *const RSTR grad_h_ref3 = &grad_h_ref_q[(2 * (NQ + q) + 1)];
+    const s_t *const RSTR adj_q0 = adj0 + q * geometry_stride;
+    const s_t *const RSTR adj_q1 = adj1 + q * geometry_stride;
+    const s_t *const RSTR adj_q2 = adj2 + q * geometry_stride;
+    const s_t *const RSTR adj_q3 = adj3 + q * geometry_stride;
+    const s_t *const RSTR det_q0 = det0 + q * geometry_stride;
+    s_t gu_base_v[4];
+    s_t trial_grad_v[4];
+    {
+      const s_t adj_value0 = adj_q0[0];
+      const s_t adj_value1 = adj_q1[0];
+      const s_t adj_value2 = adj_q2[0];
+      const s_t adj_value3 = adj_q3[0];
+      const s_t det_value0 = det_q0[0];
+      const s_t idet = s_t(1) / det_value0;
+      gu_base_v[0] = (gu_ref0[0] * adj_value0 + gu_ref1[0] * adj_value2) * idet;
+      trial_grad_v[0] = (grad_h_ref0[0] * adj_value0 + grad_h_ref1[0] * adj_value2) * idet;
+      gu_base_v[1] = (gu_ref0[0] * adj_value1 + gu_ref1[0] * adj_value3) * idet;
+      trial_grad_v[1] = (grad_h_ref0[0] * adj_value1 + grad_h_ref1[0] * adj_value3) * idet;
+      gu_base_v[2] = (gu_ref2[0] * adj_value0 + gu_ref3[0] * adj_value2) * idet;
+      trial_grad_v[2] = (grad_h_ref2[0] * adj_value0 + grad_h_ref3[0] * adj_value2) * idet;
+      gu_base_v[3] = (gu_ref2[0] * adj_value1 + gu_ref3[0] * adj_value3) * idet;
+      trial_grad_v[3] = (grad_h_ref2[0] * adj_value1 + grad_h_ref3[0] * adj_value3) * idet;
+    }
+    for (int step = 0; step < nsteps; ++step) {
+      const s_t alpha = steps[step];
+      {
+        const s_t det_value0 = det_q0[0];
+        s_t gu[4];
+        gu[0] = gu_base_v[0] + alpha * trial_grad_v[0];
+        gu[1] = gu_base_v[1] + alpha * trial_grad_v[1];
+        gu[2] = gu_base_v[2] + alpha * trial_grad_v[2];
+        gu[3] = gu_base_v[3] + alpha * trial_grad_v[3];
+    value[step * value_stride + 0] += qw * det_value0 * (((s_t(1) / s_t(2)))*lmbda*pow_2(gu[0] + gu[3]) + mu*(pow_2(gu[0]) + pow_2(gu[3]) + s_t(2)*pow_2(((s_t(1) / s_t(2)))*gu[1] + ((s_t(1) / s_t(2)))*gu[2])));
+      }
+    }
+  }
+}
+
+template <typename s_t, int NQ, int NS>
+static __host__ __device__ __forceinline__ void linear_elasticity_d2_tensor_product_gradient_block(
+        const ptrdiff_t geometry_stride,
+        const s_t *const RSTR adj0,
+        const s_t *const RSTR adj1,
+        const s_t *const RSTR adj2,
+        const s_t *const RSTR adj3,
+        const s_t *const RSTR det0,
+        const s_t *const RSTR shape_1d,
+        const s_t *const RSTR grad_1d,
+        const s_t *const RSTR q_weight_1d,
+        const s_t lmbda,
+        const s_t mu,
+        const s_t *const RSTR u_streams[NS * 2],
+        s_t *const RSTR out_streams[NS * 2]
+) {
+  static_assert(NQ > 0, "NQ must be positive");
+  static constexpr int NQ1 = integer_root(NQ, 2);
+  static constexpr int NS1 = integer_root(NS, 2);
+  static_assert(ipow(NQ1, 2) == NQ, "NQ must be tensor-product compatible");
+  static_assert(ipow(NS1, 2) == NS, "NS must be tensor-product compatible");
+  s_t gu_ref_q[4 * NQ];
+  s_t loperand_q[4 * NQ];
+  tensor_gradient_scalar<s_t, NQ, NS, 2, 2>(shape_1d, grad_1d, u_streams, 0, &gu_ref_q[0]);
+  tensor_gradient_scalar<s_t, NQ, NS, 2, 2>(shape_1d, grad_1d, u_streams, 1, &gu_ref_q[2 * NQ]);
+  for (int q = 0; q < NQ; ++q) {
+    const int qx = q % NQ1;
+    const int qy = q / NQ1;
+    const s_t qw = q_weight_1d[qx] * q_weight_1d[qy];
+    const s_t *const RSTR gu_ref0 = &gu_ref_q[(2 * q)];
+    const s_t *const RSTR gu_ref1 = &gu_ref_q[(2 * q + 1)];
+    const s_t *const RSTR gu_ref2 = &gu_ref_q[(2 * (NQ + q))];
+    const s_t *const RSTR gu_ref3 = &gu_ref_q[(2 * (NQ + q) + 1)];
+    s_t *const RSTR loperand0 = &loperand_q[(2 * q)];
+    s_t *const RSTR loperand1 = &loperand_q[(2 * q + 1)];
+    s_t *const RSTR loperand2 = &loperand_q[(2 * (NQ + q))];
+    s_t *const RSTR loperand3 = &loperand_q[(2 * (NQ + q) + 1)];
+    const s_t *const RSTR adj_q0 = adj0 + q * geometry_stride;
+    const s_t *const RSTR adj_q1 = adj1 + q * geometry_stride;
+    const s_t *const RSTR adj_q2 = adj2 + q * geometry_stride;
+    const s_t *const RSTR adj_q3 = adj3 + q * geometry_stride;
+    const s_t *const RSTR det_q0 = det0 + q * geometry_stride;
+    {
+      const s_t adj_value0 = adj_q0[0];
+      const s_t adj_value1 = adj_q1[0];
+      const s_t adj_value2 = adj_q2[0];
+      const s_t adj_value3 = adj_q3[0];
+      const s_t det_value0 = det_q0[0];
+      s_t gu[4];
+      const s_t idet = s_t(1) / det_value0;
+      gu[0] = (gu_ref0[0] * adj_value0 + gu_ref1[0] * adj_value2) * idet;
+      gu[1] = (gu_ref0[0] * adj_value1 + gu_ref1[0] * adj_value3) * idet;
+      gu[2] = (gu_ref2[0] * adj_value0 + gu_ref3[0] * adj_value2) * idet;
+      gu[3] = (gu_ref2[0] * adj_value1 + gu_ref3[0] * adj_value3) * idet;
+    const s_t weak_mat_tmp0 = s_t(2)*gu[0];
+    const s_t weak_mat_tmp1 = s_t(2)*gu[3];
+    const s_t weak_mat_tmp2 = ((s_t(1) / s_t(2)))*lmbda*(weak_mat_tmp0 + weak_mat_tmp1);
+    const s_t weak_mat_tmp3 = mu*(gu[1] + gu[2]);
+    const s_t material0 = mu*weak_mat_tmp0 + weak_mat_tmp2;
+    const s_t material1 = weak_mat_tmp3;
+    const s_t material2 = weak_mat_tmp3;
+    const s_t material3 = mu*weak_mat_tmp1 + weak_mat_tmp2;
+      loperand0[0] = qw * (material0 * adj_value0 + material1 * adj_value1);
+      loperand1[0] = qw * (material0 * adj_value2 + material1 * adj_value3);
+      loperand2[0] = qw * (material2 * adj_value0 + material3 * adj_value1);
+      loperand3[0] = qw * (material2 * adj_value2 + material3 * adj_value3);
+    }
+  }
+  tensor_test_scalar<s_t, NQ, NS, 2, 2>(shape_1d, grad_1d, &loperand_q[0], out_streams, 0);
+  tensor_test_scalar<s_t, NQ, NS, 2, 2>(shape_1d, grad_1d, &loperand_q[2 * NQ], out_streams, 1);
+}
+
+template <typename s_t, int NQ, int NS>
+static __host__ __device__ __forceinline__ void linear_elasticity_d2_tensor_product_apply_block(
+        const ptrdiff_t geometry_stride,
+        const s_t *const RSTR adj0,
+        const s_t *const RSTR adj1,
+        const s_t *const RSTR adj2,
+        const s_t *const RSTR adj3,
+        const s_t *const RSTR det0,
+        const s_t *const RSTR shape_1d,
+        const s_t *const RSTR grad_1d,
+        const s_t *const RSTR q_weight_1d,
+        const s_t lmbda,
+        const s_t mu,
+        const s_t *const RSTR h_streams[NS * 2],
+        s_t *const RSTR out_streams[NS * 2]
+) {
+  static_assert(NQ > 0, "NQ must be positive");
+  static constexpr int NQ1 = integer_root(NQ, 2);
+  static constexpr int NS1 = integer_root(NS, 2);
+  static_assert(ipow(NQ1, 2) == NQ, "NQ must be tensor-product compatible");
+  static_assert(ipow(NS1, 2) == NS, "NS must be tensor-product compatible");
+  s_t grad_h_ref_q[4 * NQ];
+  s_t loperand_q[4 * NQ];
+  tensor_gradient_scalar<s_t, NQ, NS, 2, 2>(shape_1d, grad_1d, h_streams, 0, &grad_h_ref_q[0]);
+  tensor_gradient_scalar<s_t, NQ, NS, 2, 2>(shape_1d, grad_1d, h_streams, 1, &grad_h_ref_q[2 * NQ]);
+  for (int q = 0; q < NQ; ++q) {
+    const int qx = q % NQ1;
+    const int qy = q / NQ1;
+    const s_t qw = q_weight_1d[qx] * q_weight_1d[qy];
+    const s_t *const RSTR grad_h_ref0 = &grad_h_ref_q[(2 * q)];
+    const s_t *const RSTR grad_h_ref1 = &grad_h_ref_q[(2 * q + 1)];
+    const s_t *const RSTR grad_h_ref2 = &grad_h_ref_q[(2 * (NQ + q))];
+    const s_t *const RSTR grad_h_ref3 = &grad_h_ref_q[(2 * (NQ + q) + 1)];
+    s_t *const RSTR loperand0 = &loperand_q[(2 * q)];
+    s_t *const RSTR loperand1 = &loperand_q[(2 * q + 1)];
+    s_t *const RSTR loperand2 = &loperand_q[(2 * (NQ + q))];
+    s_t *const RSTR loperand3 = &loperand_q[(2 * (NQ + q) + 1)];
+    const s_t *const RSTR adj_q0 = adj0 + q * geometry_stride;
+    const s_t *const RSTR adj_q1 = adj1 + q * geometry_stride;
+    const s_t *const RSTR adj_q2 = adj2 + q * geometry_stride;
+    const s_t *const RSTR adj_q3 = adj3 + q * geometry_stride;
+    const s_t *const RSTR det_q0 = det0 + q * geometry_stride;
+    {
+      const s_t adj_value0 = adj_q0[0];
+      const s_t adj_value1 = adj_q1[0];
+      const s_t adj_value2 = adj_q2[0];
+      const s_t adj_value3 = adj_q3[0];
+      const s_t det_value0 = det_q0[0];
+      s_t trial_grad[4];
+      const s_t idet = s_t(1) / det_value0;
+      trial_grad[0] = (grad_h_ref0[0] * adj_value0 + grad_h_ref1[0] * adj_value2) * idet;
+      trial_grad[1] = (grad_h_ref0[0] * adj_value1 + grad_h_ref1[0] * adj_value3) * idet;
+      trial_grad[2] = (grad_h_ref2[0] * adj_value0 + grad_h_ref3[0] * adj_value2) * idet;
+      trial_grad[3] = (grad_h_ref2[0] * adj_value1 + grad_h_ref3[0] * adj_value3) * idet;
+    const s_t weak_mat_tmp0 = s_t(2)*trial_grad[0];
+    const s_t weak_mat_tmp1 = s_t(2)*trial_grad[3];
+    const s_t weak_mat_tmp2 = ((s_t(1) / s_t(2)))*lmbda*(weak_mat_tmp0 + weak_mat_tmp1);
+    const s_t weak_mat_tmp3 = mu*(trial_grad[1] + trial_grad[2]);
+    const s_t material0 = mu*weak_mat_tmp0 + weak_mat_tmp2;
+    const s_t material1 = weak_mat_tmp3;
+    const s_t material2 = weak_mat_tmp3;
+    const s_t material3 = mu*weak_mat_tmp1 + weak_mat_tmp2;
+      loperand0[0] = qw * (material0 * adj_value0 + material1 * adj_value1);
+      loperand1[0] = qw * (material0 * adj_value2 + material1 * adj_value3);
+      loperand2[0] = qw * (material2 * adj_value0 + material3 * adj_value1);
+      loperand3[0] = qw * (material2 * adj_value2 + material3 * adj_value3);
+    }
+  }
+  tensor_test_scalar<s_t, NQ, NS, 2, 2>(shape_1d, grad_1d, &loperand_q[0], out_streams, 0);
+  tensor_test_scalar<s_t, NQ, NS, 2, 2>(shape_1d, grad_1d, &loperand_q[2 * NQ], out_streams, 1);
+}
+
+} // namespace codegen
+} // namespace sfem
+
+#endif

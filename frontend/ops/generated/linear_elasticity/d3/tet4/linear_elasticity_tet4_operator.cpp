@@ -1,0 +1,2354 @@
+#include <cstdio>
+#include <type_traits>
+#include "../linear_elasticity_d3_simplex_local.hpp"
+#include "../linear_elasticity_d3_simplex_hessian.hpp"
+#include "../../../geometry_kernels.hpp"
+#include "../../../kernel_diagnostics.hpp"
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+#include <cstdint>
+#include <cstdlib>
+#include "../../../packed_thread_scratch.hpp"
+
+namespace sfem {
+namespace codegen {
+
+template <typename s_t, typename g_t, int VS>
+SFEM_INLINE const s_t *ageom_stream(
+    const int ne,
+    const g_t *const RSTR source,
+    s_t *const RSTR,
+    std::true_type) {
+  return source;
+}
+
+template <typename s_t, typename g_t, int VS>
+SFEM_INLINE const s_t *ageom_stream(
+    const int ne,
+    const g_t *const RSTR source,
+    s_t *const RSTR converted,
+    std::false_type) {
+  #pragma omp simd
+  for (int lane = 0; lane < ne; ++lane) {
+    converted[lane] = s_t(source[lane]);
+  }
+  return converted;
+}
+
+} // namespace codegen
+} // namespace sfem
+
+namespace sfem {
+namespace codegen {
+
+static const KernelDiagnostics linear_elasticity_tet4_objective_soa_diagnostics_data = {
+  "linear_elasticity_tet4_objective_soa",
+  "TET4",
+  3,
+  1,
+  4,
+  16,
+  1,
+  11,
+  6,
+  0,
+  0,
+  7,
+  0,
+  0,
+  0,
+  6,
+  1,
+  24,
+  130,
+  243,
+  0,
+  11,
+  10,
+  12,
+  1,
+  2,
+  12,
+  0,
+  1,
+  1,
+  1,
+  1.0,
+  1.0,
+  8.0,
+  12.0,
+  16.0,
+  20.0,
+  20.0,
+  24.0,
+  1.0,
+  1.0
+};
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_tet4_objective_soa_diagnostics(void) {
+  return &sfem::codegen::linear_elasticity_tet4_objective_soa_diagnostics_data;
+}
+
+
+namespace sfem {
+namespace codegen {
+
+template <typename s_t, typename g_t, int VS>
+static SFEM_INLINE int linear_elasticity_tet4_objective_steps_a_msoa_impl(
+        const ptrdiff_t nelements,
+        const ptrdiff_t,
+        idx_t **const RSTR elements,
+        const g_t *const RSTR g_adj0,
+        const g_t *const RSTR g_adj1,
+        const g_t *const RSTR g_adj2,
+        const g_t *const RSTR g_adj3,
+        const g_t *const RSTR g_adj4,
+        const g_t *const RSTR g_adj5,
+        const g_t *const RSTR g_adj6,
+        const g_t *const RSTR g_adj7,
+        const g_t *const RSTR g_adj8,
+        const g_t *const RSTR g_det0,
+        const s_t lmbda,
+        const s_t mu,
+        const ptrdiff_t u_stride,
+        const s_t *const RSTR ux,
+        const s_t *const RSTR uy,
+        const s_t *const RSTR uz,
+        const ptrdiff_t h_stride,
+        const s_t *const RSTR hx,
+        const s_t *const RSTR hy,
+        const s_t *const RSTR hz,
+        const int nsteps,
+        const s_t *const RSTR steps,
+        s_t *const RSTR value
+) {
+  static constexpr int NC = 3;
+  static constexpr int NS = 4;
+
+#pragma omp parallel for schedule(static)
+  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
+    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+    idx_t ev[VS * NS];
+    s_t bu_data[NS * NC][VS];
+    s_t bh_data[NS * NC][VS];
+
+    for (int element_node = 0; element_node < NS; ++element_node) {
+      const idx_t *const RSTR element_shape = elements[element_node] + evb;
+      idx_t *const RSTR ev_node = &ev[element_node * VS];
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        ev_node[lane] = element_shape[lane];
+      }
+    }
+
+    const s_t *const u_components[NC] = {ux, uy, uz};
+    const s_t *const h_components[NC] = {hx, hy, hz};
+    const s_t *bu_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bu_streams[stream] = bu_data[stream];
+    }
+    const s_t *bh_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bh_streams[stream] = bh_data[stream];
+    }
+
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR bu_row = bu_data[shape * NC + d];
+        s_t *const RSTR bh_row = bh_data[shape * NC + d];
+        #pragma omp simd
+        for (int lane = 0; lane < ne; ++lane) {
+          const idx_t node = ev_shape[lane];
+          bu_row[lane] = u_components[d][node * u_stride];
+          bh_row[lane] = h_components[d][node * h_stride];
+        }
+      }
+    }
+    s_t badj0_data[VS];
+    const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj0 + evb, badj0_data, std::is_same<g_t, s_t>());
+    s_t badj1_data[VS];
+    const s_t *const badj1 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj1 + evb, badj1_data, std::is_same<g_t, s_t>());
+    s_t badj2_data[VS];
+    const s_t *const badj2 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj2 + evb, badj2_data, std::is_same<g_t, s_t>());
+    s_t badj3_data[VS];
+    const s_t *const badj3 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj3 + evb, badj3_data, std::is_same<g_t, s_t>());
+    s_t badj4_data[VS];
+    const s_t *const badj4 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj4 + evb, badj4_data, std::is_same<g_t, s_t>());
+    s_t badj5_data[VS];
+    const s_t *const badj5 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj5 + evb, badj5_data, std::is_same<g_t, s_t>());
+    s_t badj6_data[VS];
+    const s_t *const badj6 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj6 + evb, badj6_data, std::is_same<g_t, s_t>());
+    s_t badj7_data[VS];
+    const s_t *const badj7 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj7 + evb, badj7_data, std::is_same<g_t, s_t>());
+    s_t badj8_data[VS];
+    const s_t *const badj8 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj8 + evb, badj8_data, std::is_same<g_t, s_t>());
+    s_t bdet0_data[VS];
+    const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
+        ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
+
+    for (int step = 0; step < nsteps; ++step) {
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        value[(ptrdiff_t)step * nelements + evb + lane] = s_t(0);
+      }
+    }
+
+    linear_elasticity_d3_simplex_tet4_objective_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
+  }
+
+  return SFEM_SUCCESS;
+}
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" int linear_elasticity_tet4_objective_steps_a_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
+        const real_t lmbda,
+        const real_t mu,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
+        const int nsteps,
+        const void *const RSTR steps,
+        void *const RSTR value
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::linear_elasticity_tet4_objective_steps_a_msoa_impl<double, geom_t, 16>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::linear_elasticity_tet4_objective_steps_a_msoa_impl<float, geom_t, 16>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("linear_elasticity_tet4_objective_steps_a_msoa", -1, (int)scalar_bytes);
+}
+
+namespace sfem {
+namespace codegen {
+
+template <typename s_t>
+static SFEM_INLINE int linear_elasticity_tet4_objective_steps_packed_a_msoa_impl(
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const s_t lmbda,
+    const s_t mu,
+    const ptrdiff_t u_stride,
+    const s_t *const RSTR ux,
+    const s_t *const RSTR uy,
+    const s_t *const RSTR uz,
+    const ptrdiff_t h_stride,
+    const s_t *const RSTR hx,
+    const s_t *const RSTR hy,
+    const s_t *const RSTR hz,
+    const int nsteps,
+    const s_t *const RSTR steps,
+    s_t *const RSTR value
+) {
+  static constexpr int NC = 3;
+  static constexpr int NS = 4;
+  static constexpr int VS = 16;
+
+
+#pragma omp parallel
+  {
+    s_t *const RSTR pk_u_base = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+    s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
+
+#pragma omp for schedule(static)
+    for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
+      const ptrdiff_t e_start = pack * n_elements_per_pack;
+      const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
+      const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
+      const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
+      const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
+      const s_t *const u_components[NC] = {ux, uy, uz};
+      const s_t *const h_components[NC] = {hx, hy, hz};
+      for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR pk_u_base_component = pk_u_base + d * max_nodes_per_pack;
+        s_t *const RSTR pk_h_component = pk_h + d * max_nodes_per_pack;
+        const s_t *const RSTR u_component = u_components[d];
+        const s_t *const RSTR h_component = h_components[d];
+        for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+          const idx_t node = owned_nodes_ptr[pack] + k;
+          pk_u_base_component[k] = u_component[node * u_stride];
+          pk_h_component[k] = h_component[node * h_stride];
+        }
+        for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+          const idx_t node = ghosts[k];
+          pk_u_base_component[n_contiguous + k] = u_component[node * u_stride];
+          pk_h_component[n_contiguous + k] = h_component[node * h_stride];
+        }
+      }
+
+      for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
+        const int ne = (int)MIN((ptrdiff_t)VS, e_end - evb);
+        s_t bu_data[NS * NC][VS];
+        s_t bh_data[NS * NC][VS];
+
+        const s_t *bu_streams[NS * NC] = {bu_data[0], bu_data[1], bu_data[2], bu_data[3], bu_data[4], bu_data[5], bu_data[6], bu_data[7], bu_data[8], bu_data[9], bu_data[10], bu_data[11]};
+        const s_t *bh_streams[NS * NC] = {bh_data[0], bh_data[1], bh_data[2], bh_data[3], bh_data[4], bh_data[5], bh_data[6], bh_data[7], bh_data[8], bh_data[9], bh_data[10], bh_data[11]};
+
+        for (int shape = 0; shape < NS; ++shape) {
+          const uint16_t *const RSTR element_shape = elements[shape];
+          for (int d = 0; d < NC; ++d) {
+            s_t *const RSTR bu_row = bu_data[shape * NC + d];
+            s_t *const RSTR bh_row = bh_data[shape * NC + d];
+            #pragma omp simd
+            for (int lane = 0; lane < ne; ++lane) {
+              const uint16_t packed_node = element_shape[evb + lane];
+              bu_row[lane] = pk_u_base[d * max_nodes_per_pack + packed_node];
+              bh_row[lane] = pk_h[d * max_nodes_per_pack + packed_node];
+            }
+          }
+        }
+
+        s_t badj0_data[VS];
+        const s_t *const badj0 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj0 + evb, badj0_data, std::is_same<geom_t, s_t>());
+        s_t badj1_data[VS];
+        const s_t *const badj1 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj1 + evb, badj1_data, std::is_same<geom_t, s_t>());
+        s_t badj2_data[VS];
+        const s_t *const badj2 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj2 + evb, badj2_data, std::is_same<geom_t, s_t>());
+        s_t badj3_data[VS];
+        const s_t *const badj3 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj3 + evb, badj3_data, std::is_same<geom_t, s_t>());
+        s_t badj4_data[VS];
+        const s_t *const badj4 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj4 + evb, badj4_data, std::is_same<geom_t, s_t>());
+        s_t badj5_data[VS];
+        const s_t *const badj5 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj5 + evb, badj5_data, std::is_same<geom_t, s_t>());
+        s_t badj6_data[VS];
+        const s_t *const badj6 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj6 + evb, badj6_data, std::is_same<geom_t, s_t>());
+        s_t badj7_data[VS];
+        const s_t *const badj7 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj7 + evb, badj7_data, std::is_same<geom_t, s_t>());
+        s_t badj8_data[VS];
+        const s_t *const badj8 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj8 + evb, badj8_data, std::is_same<geom_t, s_t>());
+        s_t bdet0_data[VS];
+        const s_t *const bdet0 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_det0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
+
+        for (int step = 0; step < nsteps; ++step) {
+          #pragma omp simd
+          for (int lane = 0; lane < ne; ++lane) {
+            value[(ptrdiff_t)step * nelements + evb + lane] = s_t(0);
+          }
+        }
+
+        linear_elasticity_d3_simplex_tet4_objective_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
+      }
+    }
+  }
+  return SFEM_SUCCESS;
+}
+
+extern "C" int linear_elasticity_tet4_objective_steps_packed_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t lmbda,
+    const real_t mu,
+    const ptrdiff_t u_stride,
+    const void *const RSTR ux,
+    const void *const RSTR uy,
+    const void *const RSTR uz,
+    const ptrdiff_t h_stride,
+    const void *const RSTR hx,
+    const void *const RSTR hy,
+    const void *const RSTR hz,
+    const int nsteps,
+    const void *const RSTR steps,
+    void *const RSTR value
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return linear_elasticity_tet4_objective_steps_packed_a_msoa_impl<double>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
+    }
+    case (int)sizeof(float): {
+        return linear_elasticity_tet4_objective_steps_packed_a_msoa_impl<float>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("linear_elasticity_tet4_objective_steps_packed_a_msoa", -1, (int)scalar_bytes);
+}
+
+} // namespace codegen
+} // namespace sfem
+
+
+namespace sfem {
+namespace codegen {
+
+static const KernelDiagnostics linear_elasticity_tet4_gradient_soa_diagnostics_data = {
+  "linear_elasticity_tet4_gradient_soa",
+  "TET4",
+  3,
+  1,
+  4,
+  16,
+  1,
+  8,
+  8,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  6,
+  14,
+  16,
+  253,
+  366,
+  5,
+  8,
+  10,
+  12,
+  1,
+  2,
+  12,
+  0,
+  12,
+  12,
+  12,
+  1.0,
+  1.0,
+  8.0,
+  12.0,
+  16.0,
+  20.0,
+  20.0,
+  24.0,
+  1.0,
+  1.0
+};
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_tet4_gradient_soa_diagnostics(void) {
+  return &sfem::codegen::linear_elasticity_tet4_gradient_soa_diagnostics_data;
+}
+
+
+namespace sfem {
+namespace codegen {
+
+template <typename s_t, typename g_t, int VS>
+static SFEM_INLINE int linear_elasticity_tet4_gradient_a_msoa_impl(
+        const ptrdiff_t nelements,
+        const ptrdiff_t,
+        idx_t **const RSTR elements,
+        const g_t *const RSTR g_adj0,
+        const g_t *const RSTR g_adj1,
+        const g_t *const RSTR g_adj2,
+        const g_t *const RSTR g_adj3,
+        const g_t *const RSTR g_adj4,
+        const g_t *const RSTR g_adj5,
+        const g_t *const RSTR g_adj6,
+        const g_t *const RSTR g_adj7,
+        const g_t *const RSTR g_adj8,
+        const g_t *const RSTR g_det0,
+        const s_t lmbda,
+        const s_t mu,
+        const ptrdiff_t u_stride,
+        const s_t *const RSTR ux,
+        const s_t *const RSTR uy,
+        const s_t *const RSTR uz,
+        const ptrdiff_t out_stride,
+        s_t *const RSTR outx,
+        s_t *const RSTR outy,
+        s_t *const RSTR outz
+) {
+  static constexpr int NC = 3;
+  static constexpr int NS = 4;
+
+#pragma omp parallel for schedule(static)
+  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
+    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+    idx_t ev[VS * NS];
+    s_t bu_data[NS * NC][VS];
+    s_t bout_data[NS * NC][VS];
+
+    for (int element_node = 0; element_node < NS; ++element_node) {
+      const idx_t *const RSTR element_shape = elements[element_node] + evb;
+      idx_t *const RSTR ev_node = &ev[element_node * VS];
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        ev_node[lane] = element_shape[lane];
+      }
+    }
+    const s_t *const u_components[NC] = {ux, uy, uz};
+
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR bu_row = bu_data[shape * NC + d];
+        #pragma omp simd
+        for (int lane = 0; lane < ne; ++lane) {
+          const idx_t node = ev_shape[lane];
+          bu_row[lane] = u_components[d][node * u_stride];
+        }
+      }
+    }
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        bout_data[stream][lane] = s_t(0);
+      }
+    }
+
+    const s_t *bu_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bu_streams[stream] = bu_data[stream];
+    }
+    s_t *bout_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bout_streams[stream] = bout_data[stream];
+    }
+    s_t badj0_data[VS];
+    const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj0 + evb, badj0_data, std::is_same<g_t, s_t>());
+    s_t badj1_data[VS];
+    const s_t *const badj1 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj1 + evb, badj1_data, std::is_same<g_t, s_t>());
+    s_t badj2_data[VS];
+    const s_t *const badj2 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj2 + evb, badj2_data, std::is_same<g_t, s_t>());
+    s_t badj3_data[VS];
+    const s_t *const badj3 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj3 + evb, badj3_data, std::is_same<g_t, s_t>());
+    s_t badj4_data[VS];
+    const s_t *const badj4 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj4 + evb, badj4_data, std::is_same<g_t, s_t>());
+    s_t badj5_data[VS];
+    const s_t *const badj5 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj5 + evb, badj5_data, std::is_same<g_t, s_t>());
+    s_t badj6_data[VS];
+    const s_t *const badj6 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj6 + evb, badj6_data, std::is_same<g_t, s_t>());
+    s_t badj7_data[VS];
+    const s_t *const badj7 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj7 + evb, badj7_data, std::is_same<g_t, s_t>());
+    s_t badj8_data[VS];
+    const s_t *const badj8 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj8 + evb, badj8_data, std::is_same<g_t, s_t>());
+    s_t bdet0_data[VS];
+    const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
+        ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
+
+    linear_elasticity_d3_simplex_tet4_gradient_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bout_streams);
+
+    s_t *const out_components[NC] = {outx, outy, outz};
+
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      for (int d = 0; d < NC; ++d) {
+        const s_t *const RSTR bout_row = bout_data[shape * NC + d];
+        {
+          for (int scatter = 0; scatter < ne; ++scatter) {
+            #pragma omp atomic update
+            out_components[d][ev_shape[scatter] * out_stride] += bout_row[scatter];
+          }
+        }
+      }
+    }
+  }
+
+  return SFEM_SUCCESS;
+}
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" int linear_elasticity_tet4_gradient_a_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
+        const real_t lmbda,
+        const real_t mu,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::linear_elasticity_tet4_gradient_a_msoa_impl<double, geom_t, 16>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::linear_elasticity_tet4_gradient_a_msoa_impl<float, geom_t, 16>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("linear_elasticity_tet4_gradient_a_msoa", -1, (int)scalar_bytes);
+}
+
+namespace sfem {
+namespace codegen {
+
+template <typename s_t>
+static SFEM_INLINE int linear_elasticity_tet4_gradient_packed_a_msoa_impl(
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const s_t lmbda,
+    const s_t mu,
+    const ptrdiff_t u_stride,
+    const s_t *const RSTR ux,
+    const s_t *const RSTR uy,
+    const s_t *const RSTR uz,
+    const ptrdiff_t out_stride,
+    s_t *const RSTR outx,
+    s_t *const RSTR outy,
+    s_t *const RSTR outz
+) {
+  static constexpr int NC = 3;
+  static constexpr int NS = 4;
+  static constexpr int VS = 16;
+
+
+#pragma omp parallel
+  {
+    s_t *const RSTR pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+    s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
+
+#pragma omp for schedule(static)
+    for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
+      const ptrdiff_t e_start = pack * n_elements_per_pack;
+      const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
+      const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
+      const ptrdiff_t n_shared = n_shared_nodes[pack];
+      const ptrdiff_t n_not_shared = n_contiguous - n_shared;
+      const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
+      const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
+      const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
+      const s_t *const u_components[NC] = {ux, uy, uz};
+      s_t *const out_components[NC] = {outx, outy, outz};
+      for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+        s_t *const RSTR pk_u_component = pk_u + d * max_nodes_per_pack;
+        const s_t *const RSTR u_component = u_components[d];
+        for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
+          pk_component_out[k] = s_t(0);
+        }
+        for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+          const idx_t node = owned_nodes_ptr[pack] + k;
+          pk_u_component[k] = u_component[node * u_stride];
+        }
+        for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+          const idx_t node = ghosts[k];
+          pk_u_component[n_contiguous + k] = u_component[node * u_stride];
+        }
+      }
+
+      for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
+        const int ne = (int)MIN((ptrdiff_t)VS, e_end - evb);
+        s_t bu_data[NS * NC][VS];
+        s_t bout_data[NS * NC][VS];
+        const s_t *bu_streams[NS * NC];
+        for (int stream = 0; stream < NS * NC; ++stream) {
+          bu_streams[stream] = bu_data[stream];
+        }
+        s_t *bout_streams[NS * NC];
+        for (int stream = 0; stream < NS * NC; ++stream) {
+          bout_streams[stream] = bout_data[stream];
+        }
+
+        for (int shape = 0; shape < NS; ++shape) {
+          const uint16_t *const RSTR element_shape = elements[shape];
+          for (int d = 0; d < NC; ++d) {
+            s_t *const RSTR bu_row = bu_data[shape * NC + d];
+            s_t *const RSTR bout_row = bout_data[shape * NC + d];
+            #pragma omp simd
+            for (int lane = 0; lane < ne; ++lane) {
+              const uint16_t packed_node = element_shape[evb + lane];
+              bu_row[lane] = pk_u[d * max_nodes_per_pack + packed_node];
+              bout_row[lane] = s_t(0);
+            }
+          }
+        }
+
+        s_t badj0_data[VS];
+        const s_t *const badj0 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj0 + evb, badj0_data, std::is_same<geom_t, s_t>());
+        s_t badj1_data[VS];
+        const s_t *const badj1 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj1 + evb, badj1_data, std::is_same<geom_t, s_t>());
+        s_t badj2_data[VS];
+        const s_t *const badj2 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj2 + evb, badj2_data, std::is_same<geom_t, s_t>());
+        s_t badj3_data[VS];
+        const s_t *const badj3 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj3 + evb, badj3_data, std::is_same<geom_t, s_t>());
+        s_t badj4_data[VS];
+        const s_t *const badj4 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj4 + evb, badj4_data, std::is_same<geom_t, s_t>());
+        s_t badj5_data[VS];
+        const s_t *const badj5 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj5 + evb, badj5_data, std::is_same<geom_t, s_t>());
+        s_t badj6_data[VS];
+        const s_t *const badj6 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj6 + evb, badj6_data, std::is_same<geom_t, s_t>());
+        s_t badj7_data[VS];
+        const s_t *const badj7 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj7 + evb, badj7_data, std::is_same<geom_t, s_t>());
+        s_t badj8_data[VS];
+        const s_t *const badj8 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj8 + evb, badj8_data, std::is_same<geom_t, s_t>());
+        s_t bdet0_data[VS];
+        const s_t *const bdet0 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_det0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
+
+        linear_elasticity_d3_simplex_tet4_gradient_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bout_streams);
+
+        for (int shape = 0; shape < NS; ++shape) {
+          const uint16_t *const RSTR element_shape = elements[shape];
+          for (int d = 0; d < NC; ++d) {
+            s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+            const s_t *const RSTR bout_row = bout_data[shape * NC + d];
+            for (int lane = 0; lane < ne; ++lane) {
+              pk_component_out[element_shape[evb + lane]] += bout_row[lane];
+            }
+          }
+        }
+      }
+
+      for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+        s_t *const RSTR global_out = out_components[d];
+        for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
+          global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
+          pk_component_out[k] = s_t(0);
+        }
+        for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {
+#pragma omp atomic update
+          global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
+          pk_component_out[k] = s_t(0);
+        }
+        for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+#pragma omp atomic update
+          global_out[ghosts[k] * out_stride] += pk_component_out[n_contiguous + k];
+          pk_component_out[n_contiguous + k] = s_t(0);
+        }
+      }
+    }
+  }
+  return SFEM_SUCCESS;
+}
+
+extern "C" int linear_elasticity_tet4_gradient_packed_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t lmbda,
+    const real_t mu,
+    const ptrdiff_t u_stride,
+    const void *const RSTR ux,
+    const void *const RSTR uy,
+    const void *const RSTR uz,
+    const ptrdiff_t out_stride,
+    void *const RSTR outx,
+    void *const RSTR outy,
+    void *const RSTR outz
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return linear_elasticity_tet4_gradient_packed_a_msoa_impl<double>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+    }
+    case (int)sizeof(float): {
+        return linear_elasticity_tet4_gradient_packed_a_msoa_impl<float>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("linear_elasticity_tet4_gradient_packed_a_msoa", -1, (int)scalar_bytes);
+}
+
+template <typename s_t>
+static SFEM_INLINE int linear_elasticity_tet4_gradient_packed_two_pass_a_msoa_impl(
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const ptrdiff_t n_ghost_entries,
+    const ptrdiff_t n_ghost_reduce_rows,
+    const ptrdiff_t *const RSTR ghost_reduce_ptr,
+    const ptrdiff_t *const RSTR ghost_reduce_idx,
+    const idx_t *const RSTR ghost_reduce_dest,
+    s_t *const RSTR ghost_buf,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const s_t lmbda,
+    const s_t mu,
+    const ptrdiff_t u_stride,
+    const s_t *const RSTR ux,
+    const s_t *const RSTR uy,
+    const s_t *const RSTR uz,
+    const ptrdiff_t out_stride,
+    s_t *const RSTR outx,
+    s_t *const RSTR outy,
+    s_t *const RSTR outz
+) {
+  static constexpr int NC = 3;
+  static constexpr int NS = 4;
+  static constexpr int VS = 16;
+
+
+#pragma omp parallel
+  {
+    s_t *const RSTR pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+    s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
+
+#pragma omp for schedule(static)
+    for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
+      const ptrdiff_t e_start = pack * n_elements_per_pack;
+      const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
+      const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
+      const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
+      const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
+      const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
+      const ptrdiff_t ghost_off = ghost_ptr[pack];
+      const s_t *const u_components[NC] = {ux, uy, uz};
+      s_t *const out_components[NC] = {outx, outy, outz};
+      for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+        s_t *const RSTR pk_u_component = pk_u + d * max_nodes_per_pack;
+        const s_t *const RSTR u_component = u_components[d];
+        for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
+          pk_component_out[k] = s_t(0);
+        }
+        for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+          const idx_t node = owned_nodes_ptr[pack] + k;
+          pk_u_component[k] = u_component[node * u_stride];
+        }
+        for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+          const idx_t node = ghosts[k];
+          pk_u_component[n_contiguous + k] = u_component[node * u_stride];
+        }
+      }
+
+      for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
+        const int ne = (int)MIN((ptrdiff_t)VS, e_end - evb);
+        s_t bu_data[NS * NC][VS];
+        s_t bout_data[NS * NC][VS];
+        const s_t *bu_streams[NS * NC];
+        for (int stream = 0; stream < NS * NC; ++stream) {
+          bu_streams[stream] = bu_data[stream];
+        }
+        s_t *bout_streams[NS * NC];
+        for (int stream = 0; stream < NS * NC; ++stream) {
+          bout_streams[stream] = bout_data[stream];
+        }
+
+        for (int shape = 0; shape < NS; ++shape) {
+          const uint16_t *const RSTR element_shape = elements[shape];
+          for (int d = 0; d < NC; ++d) {
+            s_t *const RSTR bu_row = bu_data[shape * NC + d];
+            s_t *const RSTR bout_row = bout_data[shape * NC + d];
+            #pragma omp simd
+            for (int lane = 0; lane < ne; ++lane) {
+              const uint16_t packed_node = element_shape[evb + lane];
+              bu_row[lane] = pk_u[d * max_nodes_per_pack + packed_node];
+              bout_row[lane] = s_t(0);
+            }
+          }
+        }
+
+        s_t badj0_data[VS];
+        const s_t *const badj0 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj0 + evb, badj0_data, std::is_same<geom_t, s_t>());
+        s_t badj1_data[VS];
+        const s_t *const badj1 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj1 + evb, badj1_data, std::is_same<geom_t, s_t>());
+        s_t badj2_data[VS];
+        const s_t *const badj2 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj2 + evb, badj2_data, std::is_same<geom_t, s_t>());
+        s_t badj3_data[VS];
+        const s_t *const badj3 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj3 + evb, badj3_data, std::is_same<geom_t, s_t>());
+        s_t badj4_data[VS];
+        const s_t *const badj4 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj4 + evb, badj4_data, std::is_same<geom_t, s_t>());
+        s_t badj5_data[VS];
+        const s_t *const badj5 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj5 + evb, badj5_data, std::is_same<geom_t, s_t>());
+        s_t badj6_data[VS];
+        const s_t *const badj6 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj6 + evb, badj6_data, std::is_same<geom_t, s_t>());
+        s_t badj7_data[VS];
+        const s_t *const badj7 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj7 + evb, badj7_data, std::is_same<geom_t, s_t>());
+        s_t badj8_data[VS];
+        const s_t *const badj8 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj8 + evb, badj8_data, std::is_same<geom_t, s_t>());
+        s_t bdet0_data[VS];
+        const s_t *const bdet0 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_det0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
+
+        linear_elasticity_d3_simplex_tet4_gradient_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bout_streams);
+
+        for (int shape = 0; shape < NS; ++shape) {
+          const uint16_t *const RSTR element_shape = elements[shape];
+          for (int d = 0; d < NC; ++d) {
+            s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+            const s_t *const RSTR bout_row = bout_data[shape * NC + d];
+            for (int lane = 0; lane < ne; ++lane) {
+              pk_component_out[element_shape[evb + lane]] += bout_row[lane];
+            }
+          }
+        }
+      }
+
+      for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+        s_t *const RSTR global_out = out_components[d];
+        s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
+        for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+          global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
+          pk_component_out[k] = s_t(0);
+        }
+        for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+          ghost_component[ghost_off + k] = pk_component_out[n_contiguous + k];
+          pk_component_out[n_contiguous + k] = s_t(0);
+        }
+      }
+    }
+  }
+
+  s_t *const out_components[NC] = {outx, outy, outz};
+#pragma omp parallel for schedule(static)
+  for (ptrdiff_t row = 0; row < n_ghost_reduce_rows; ++row) {
+    const idx_t dest = ghost_reduce_dest[row];
+    const ptrdiff_t begin = ghost_reduce_ptr[row];
+    const ptrdiff_t end = ghost_reduce_ptr[row + 1];
+    for (int d = 0; d < NC; ++d) {
+      const s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
+      s_t sum = s_t(0);
+      for (ptrdiff_t j = begin; j < end; ++j) {
+        sum += ghost_component[ghost_reduce_idx[j]];
+      }
+      out_components[d][dest * out_stride] += sum;
+    }
+  }
+  return SFEM_SUCCESS;
+}
+
+extern "C" int linear_elasticity_tet4_gradient_packed_two_pass_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const ptrdiff_t n_ghost_entries,
+    const ptrdiff_t n_ghost_reduce_rows,
+    const ptrdiff_t *const RSTR ghost_reduce_ptr,
+    const ptrdiff_t *const RSTR ghost_reduce_idx,
+    const idx_t *const RSTR ghost_reduce_dest,
+    void *const RSTR ghost_buf,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t lmbda,
+    const real_t mu,
+    const ptrdiff_t u_stride,
+    const void *const RSTR ux,
+    const void *const RSTR uy,
+    const void *const RSTR uz,
+    const ptrdiff_t out_stride,
+    void *const RSTR outx,
+    void *const RSTR outy,
+    void *const RSTR outz
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return linear_elasticity_tet4_gradient_packed_two_pass_a_msoa_impl<double>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (double *)ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+    }
+    case (int)sizeof(float): {
+        return linear_elasticity_tet4_gradient_packed_two_pass_a_msoa_impl<float>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (float *)ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("linear_elasticity_tet4_gradient_packed_two_pass_a_msoa", -1, (int)scalar_bytes);
+}
+
+} // namespace codegen
+} // namespace sfem
+
+
+namespace sfem {
+namespace codegen {
+
+template <typename s_t, typename g_t>
+static SFEM_INLINE int linear_elasticity_tet4_gradient_a_msoa_aos_unit_impl(
+        const ptrdiff_t nelements,
+        const ptrdiff_t,
+        idx_t **const RSTR elements,
+        const g_t *const RSTR g_adj_aos,
+        const g_t *const RSTR g_det0,
+        const s_t mu,
+        const s_t lmbda,
+        const ptrdiff_t u_stride,
+        const s_t *const RSTR ux,
+        const s_t *const RSTR uy,
+        const s_t *const RSTR uz,
+        const ptrdiff_t out_stride,
+        s_t *const RSTR outx,
+        s_t *const RSTR outy,
+        s_t *const RSTR outz
+) {
+
+#pragma omp parallel for schedule(static)
+  for (ptrdiff_t element = 0; element < nelements; ++element) {
+    const idx_t ev0 = elements[0][element];
+    const idx_t ev1 = elements[1][element];
+    const idx_t ev2 = elements[2][element];
+    const idx_t ev3 = elements[3][element];
+
+    const s_t ux0 = ux[ev0 * u_stride];
+    const s_t ux1 = ux[ev1 * u_stride];
+    const s_t ux2 = ux[ev2 * u_stride];
+    const s_t ux3 = ux[ev3 * u_stride];
+    const s_t uy0 = uy[ev0 * u_stride];
+    const s_t uy1 = uy[ev1 * u_stride];
+    const s_t uy2 = uy[ev2 * u_stride];
+    const s_t uy3 = uy[ev3 * u_stride];
+    const s_t uz0 = uz[ev0 * u_stride];
+    const s_t uz1 = uz[ev1 * u_stride];
+    const s_t uz2 = uz[ev2 * u_stride];
+    const s_t uz3 = uz[ev3 * u_stride];
+
+    const g_t *const RSTR adjugate = g_adj_aos + element * 9;
+    const s_t a0 = s_t(adjugate[0]);
+    const s_t a1 = s_t(adjugate[1]);
+    const s_t a2 = s_t(adjugate[2]);
+    const s_t a3 = s_t(adjugate[3]);
+    const s_t a4 = s_t(adjugate[4]);
+    const s_t a5 = s_t(adjugate[5]);
+    const s_t a6 = s_t(adjugate[6]);
+    const s_t a7 = s_t(adjugate[7]);
+    const s_t a8 = s_t(adjugate[8]);
+    const s_t inv_det = s_t(1) / s_t(g_det0[element]);
+
+    const s_t x1 = ux0 - ux1;
+    const s_t x2 = ux0 - ux2;
+    const s_t x3 = ux0 - ux3;
+    const s_t x4 = uy0 - uy1;
+    const s_t x5 = uy0 - uy2;
+    const s_t x6 = uy0 - uy3;
+    const s_t x7 = uz0 - uz1;
+    const s_t x8 = uz0 - uz2;
+    const s_t x9 = uz0 - uz3;
+
+    s_t p0 = inv_det * (-a0 * x1 - a3 * x2 - a6 * x3);
+    s_t p1 = inv_det * (-a1 * x1 - a4 * x2 - a7 * x3);
+    s_t p2 = inv_det * (-a2 * x1 - a5 * x2 - a8 * x3);
+    s_t p3 = inv_det * (-a0 * x4 - a3 * x5 - a6 * x6);
+    s_t p4 = inv_det * (-a1 * x4 - a4 * x5 - a7 * x6);
+    s_t p5 = inv_det * (-a2 * x4 - a5 * x5 - a8 * x6);
+    s_t p6 = inv_det * (-a0 * x7 - a3 * x8 - a6 * x9);
+    s_t p7 = inv_det * (-a1 * x7 - a4 * x8 - a7 * x9);
+    s_t p8 = inv_det * (-a2 * x7 - a5 * x8 - a8 * x9);
+
+    const s_t m0 = (s_t(1) / s_t(6)) * mu;
+    const s_t m1 = m0 * (p1 + p3);
+    const s_t m2 = m0 * (p2 + p6);
+    const s_t m3 = s_t(2) * mu;
+    const s_t m4 = lmbda * (p0 + p4 + p8);
+    const s_t m5 = (s_t(1) / s_t(6)) * p0 * m3 + (s_t(1) / s_t(6)) * m4;
+    const s_t m6 = m0 * (p5 + p7);
+    const s_t m7 = (s_t(1) / s_t(6)) * p4 * m3 + (s_t(1) / s_t(6)) * m4;
+    const s_t m8 = (s_t(1) / s_t(6)) * p8 * m3 + (s_t(1) / s_t(6)) * m4;
+
+    const s_t q0 = a0 * m5 + a1 * m1 + a2 * m2;
+    const s_t q1 = a3 * m5 + a4 * m1 + a5 * m2;
+    const s_t q2 = a6 * m5 + a7 * m1 + a8 * m2;
+    const s_t q3 = a0 * m1 + a1 * m7 + a2 * m6;
+    const s_t q4 = a3 * m1 + a4 * m7 + a5 * m6;
+    const s_t q5 = a6 * m1 + a7 * m7 + a8 * m6;
+    const s_t q6 = a0 * m2 + a1 * m6 + a2 * m8;
+    const s_t q7 = a3 * m2 + a4 * m6 + a5 * m8;
+    const s_t q8 = a6 * m2 + a7 * m6 + a8 * m8;
+
+    #pragma omp atomic update
+    outx[ev0 * out_stride] += -q0 - q1 - q2;
+    #pragma omp atomic update
+    outx[ev1 * out_stride] += q0;
+    #pragma omp atomic update
+    outx[ev2 * out_stride] += q1;
+    #pragma omp atomic update
+    outx[ev3 * out_stride] += q2;
+    #pragma omp atomic update
+    outy[ev0 * out_stride] += -q3 - q4 - q5;
+    #pragma omp atomic update
+    outy[ev1 * out_stride] += q3;
+    #pragma omp atomic update
+    outy[ev2 * out_stride] += q4;
+    #pragma omp atomic update
+    outy[ev3 * out_stride] += q5;
+    #pragma omp atomic update
+    outz[ev0 * out_stride] += -q6 - q7 - q8;
+    #pragma omp atomic update
+    outz[ev1 * out_stride] += q6;
+    #pragma omp atomic update
+    outz[ev2 * out_stride] += q7;
+    #pragma omp atomic update
+    outz[ev3 * out_stride] += q8;
+  }
+
+  return SFEM_SUCCESS;
+}
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" int linear_elasticity_tet4_gradient_a_msoa_aos_unit(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj_aos,
+        const geom_t *const RSTR g_det0,
+        const real_t mu,
+        const real_t lmbda,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::linear_elasticity_tet4_gradient_a_msoa_aos_unit_impl<double, geom_t>(nelements, nnodes, elements, g_adj_aos, g_det0, mu, lmbda, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::linear_elasticity_tet4_gradient_a_msoa_aos_unit_impl<float, geom_t>(nelements, nnodes, elements, g_adj_aos, g_det0, mu, lmbda, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("linear_elasticity_tet4_gradient_a_msoa_aos_unit", -1, (int)scalar_bytes);
+}
+
+
+namespace sfem {
+namespace codegen {
+
+static const KernelDiagnostics linear_elasticity_tet4_apply_soa_diagnostics_data = {
+  "linear_elasticity_tet4_apply_soa",
+  "TET4",
+  3,
+  1,
+  4,
+  16,
+  1,
+  8,
+  8,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  14,
+  16,
+  253,
+  366,
+  5,
+  8,
+  10,
+  12,
+  1,
+  2,
+  0,
+  12,
+  12,
+  12,
+  12,
+  1.0,
+  1.0,
+  8.0,
+  12.0,
+  16.0,
+  20.0,
+  20.0,
+  24.0,
+  1.0,
+  1.0
+};
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_tet4_apply_soa_diagnostics(void) {
+  return &sfem::codegen::linear_elasticity_tet4_apply_soa_diagnostics_data;
+}
+
+
+namespace sfem {
+namespace codegen {
+
+template <typename s_t, typename g_t, int VS>
+static SFEM_INLINE int linear_elasticity_tet4_apply_a_msoa_impl(
+        const ptrdiff_t nelements,
+        const ptrdiff_t,
+        idx_t **const RSTR elements,
+        const g_t *const RSTR g_adj0,
+        const g_t *const RSTR g_adj1,
+        const g_t *const RSTR g_adj2,
+        const g_t *const RSTR g_adj3,
+        const g_t *const RSTR g_adj4,
+        const g_t *const RSTR g_adj5,
+        const g_t *const RSTR g_adj6,
+        const g_t *const RSTR g_adj7,
+        const g_t *const RSTR g_adj8,
+        const g_t *const RSTR g_det0,
+        const s_t lmbda,
+        const s_t mu,
+        const ptrdiff_t h_stride,
+        const s_t *const RSTR hx,
+        const s_t *const RSTR hy,
+        const s_t *const RSTR hz,
+        const ptrdiff_t out_stride,
+        s_t *const RSTR outx,
+        s_t *const RSTR outy,
+        s_t *const RSTR outz
+) {
+  static constexpr int NC = 3;
+  static constexpr int NS = 4;
+
+#pragma omp parallel for schedule(static)
+  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
+    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+    idx_t ev[VS * NS];
+    s_t bh_data[NS * NC][VS];
+    s_t bout_data[NS * NC][VS];
+
+    for (int element_node = 0; element_node < NS; ++element_node) {
+      const idx_t *const RSTR element_shape = elements[element_node] + evb;
+      idx_t *const RSTR ev_node = &ev[element_node * VS];
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        ev_node[lane] = element_shape[lane];
+      }
+    }
+    const s_t *const h_components[NC] = {hx, hy, hz};
+
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR bh_row = bh_data[shape * NC + d];
+        #pragma omp simd
+        for (int lane = 0; lane < ne; ++lane) {
+          const idx_t node = ev_shape[lane];
+          bh_row[lane] = h_components[d][node * h_stride];
+        }
+      }
+    }
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        bout_data[stream][lane] = s_t(0);
+      }
+    }
+
+    const s_t *bh_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bh_streams[stream] = bh_data[stream];
+    }
+    s_t *bout_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bout_streams[stream] = bout_data[stream];
+    }
+    s_t badj0_data[VS];
+    const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj0 + evb, badj0_data, std::is_same<g_t, s_t>());
+    s_t badj1_data[VS];
+    const s_t *const badj1 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj1 + evb, badj1_data, std::is_same<g_t, s_t>());
+    s_t badj2_data[VS];
+    const s_t *const badj2 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj2 + evb, badj2_data, std::is_same<g_t, s_t>());
+    s_t badj3_data[VS];
+    const s_t *const badj3 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj3 + evb, badj3_data, std::is_same<g_t, s_t>());
+    s_t badj4_data[VS];
+    const s_t *const badj4 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj4 + evb, badj4_data, std::is_same<g_t, s_t>());
+    s_t badj5_data[VS];
+    const s_t *const badj5 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj5 + evb, badj5_data, std::is_same<g_t, s_t>());
+    s_t badj6_data[VS];
+    const s_t *const badj6 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj6 + evb, badj6_data, std::is_same<g_t, s_t>());
+    s_t badj7_data[VS];
+    const s_t *const badj7 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj7 + evb, badj7_data, std::is_same<g_t, s_t>());
+    s_t badj8_data[VS];
+    const s_t *const badj8 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj8 + evb, badj8_data, std::is_same<g_t, s_t>());
+    s_t bdet0_data[VS];
+    const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
+        ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
+
+    linear_elasticity_d3_simplex_tet4_apply_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bh_streams, bout_streams);
+
+    s_t *const out_components[NC] = {outx, outy, outz};
+
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      for (int d = 0; d < NC; ++d) {
+        const s_t *const RSTR bout_row = bout_data[shape * NC + d];
+        {
+          for (int scatter = 0; scatter < ne; ++scatter) {
+            #pragma omp atomic update
+            out_components[d][ev_shape[scatter] * out_stride] += bout_row[scatter];
+          }
+        }
+      }
+    }
+  }
+
+  return SFEM_SUCCESS;
+}
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" int linear_elasticity_tet4_apply_a_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
+        const real_t lmbda,
+        const real_t mu,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::linear_elasticity_tet4_apply_a_msoa_impl<double, geom_t, 16>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::linear_elasticity_tet4_apply_a_msoa_impl<float, geom_t, 16>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("linear_elasticity_tet4_apply_a_msoa", -1, (int)scalar_bytes);
+}
+
+namespace sfem {
+namespace codegen {
+
+template <typename s_t>
+static SFEM_INLINE int linear_elasticity_tet4_apply_packed_a_msoa_impl(
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const s_t lmbda,
+    const s_t mu,
+    const ptrdiff_t h_stride,
+    const s_t *const RSTR hx,
+    const s_t *const RSTR hy,
+    const s_t *const RSTR hz,
+    const ptrdiff_t out_stride,
+    s_t *const RSTR outx,
+    s_t *const RSTR outy,
+    s_t *const RSTR outz
+) {
+  static constexpr int NC = 3;
+  static constexpr int NS = 4;
+  static constexpr int VS = 16;
+
+
+#pragma omp parallel
+  {
+    s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
+    s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
+
+#pragma omp for schedule(static)
+    for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
+      const ptrdiff_t e_start = pack * n_elements_per_pack;
+      const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
+      const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
+      const ptrdiff_t n_shared = n_shared_nodes[pack];
+      const ptrdiff_t n_not_shared = n_contiguous - n_shared;
+      const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
+      const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
+      const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
+      const s_t *const h_components[NC] = {hx, hy, hz};
+      s_t *const out_components[NC] = {outx, outy, outz};
+      for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+        s_t *const RSTR pk_h_component = pk_h + d * max_nodes_per_pack;
+        const s_t *const RSTR h_component = h_components[d];
+        for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
+          pk_component_out[k] = s_t(0);
+        }
+        for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+          const idx_t node = owned_nodes_ptr[pack] + k;
+          pk_h_component[k] = h_component[node * h_stride];
+        }
+        for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+          const idx_t node = ghosts[k];
+          pk_h_component[n_contiguous + k] = h_component[node * h_stride];
+        }
+      }
+
+      for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
+        const int ne = (int)MIN((ptrdiff_t)VS, e_end - evb);
+        s_t bh_data[NS * NC][VS];
+        s_t bout_data[NS * NC][VS];
+        const s_t *bh_streams[NS * NC];
+        for (int stream = 0; stream < NS * NC; ++stream) {
+          bh_streams[stream] = bh_data[stream];
+        }
+        s_t *bout_streams[NS * NC];
+        for (int stream = 0; stream < NS * NC; ++stream) {
+          bout_streams[stream] = bout_data[stream];
+        }
+
+        for (int shape = 0; shape < NS; ++shape) {
+          const uint16_t *const RSTR element_shape = elements[shape];
+          for (int d = 0; d < NC; ++d) {
+            s_t *const RSTR bh_row = bh_data[shape * NC + d];
+            s_t *const RSTR bout_row = bout_data[shape * NC + d];
+            #pragma omp simd
+            for (int lane = 0; lane < ne; ++lane) {
+              const uint16_t packed_node = element_shape[evb + lane];
+              bh_row[lane] = pk_h[d * max_nodes_per_pack + packed_node];
+              bout_row[lane] = s_t(0);
+            }
+          }
+        }
+
+        s_t badj0_data[VS];
+        const s_t *const badj0 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj0 + evb, badj0_data, std::is_same<geom_t, s_t>());
+        s_t badj1_data[VS];
+        const s_t *const badj1 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj1 + evb, badj1_data, std::is_same<geom_t, s_t>());
+        s_t badj2_data[VS];
+        const s_t *const badj2 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj2 + evb, badj2_data, std::is_same<geom_t, s_t>());
+        s_t badj3_data[VS];
+        const s_t *const badj3 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj3 + evb, badj3_data, std::is_same<geom_t, s_t>());
+        s_t badj4_data[VS];
+        const s_t *const badj4 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj4 + evb, badj4_data, std::is_same<geom_t, s_t>());
+        s_t badj5_data[VS];
+        const s_t *const badj5 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj5 + evb, badj5_data, std::is_same<geom_t, s_t>());
+        s_t badj6_data[VS];
+        const s_t *const badj6 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj6 + evb, badj6_data, std::is_same<geom_t, s_t>());
+        s_t badj7_data[VS];
+        const s_t *const badj7 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj7 + evb, badj7_data, std::is_same<geom_t, s_t>());
+        s_t badj8_data[VS];
+        const s_t *const badj8 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj8 + evb, badj8_data, std::is_same<geom_t, s_t>());
+        s_t bdet0_data[VS];
+        const s_t *const bdet0 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_det0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
+
+        linear_elasticity_d3_simplex_tet4_apply_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bh_streams, bout_streams);
+
+        for (int shape = 0; shape < NS; ++shape) {
+          const uint16_t *const RSTR element_shape = elements[shape];
+          for (int d = 0; d < NC; ++d) {
+            s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+            const s_t *const RSTR bout_row = bout_data[shape * NC + d];
+            for (int lane = 0; lane < ne; ++lane) {
+              pk_component_out[element_shape[evb + lane]] += bout_row[lane];
+            }
+          }
+        }
+      }
+
+      for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+        s_t *const RSTR global_out = out_components[d];
+        for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
+          global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
+          pk_component_out[k] = s_t(0);
+        }
+        for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {
+#pragma omp atomic update
+          global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
+          pk_component_out[k] = s_t(0);
+        }
+        for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+#pragma omp atomic update
+          global_out[ghosts[k] * out_stride] += pk_component_out[n_contiguous + k];
+          pk_component_out[n_contiguous + k] = s_t(0);
+        }
+      }
+    }
+  }
+  return SFEM_SUCCESS;
+}
+
+extern "C" int linear_elasticity_tet4_apply_packed_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t lmbda,
+    const real_t mu,
+    const ptrdiff_t h_stride,
+    const void *const RSTR hx,
+    const void *const RSTR hy,
+    const void *const RSTR hz,
+    const ptrdiff_t out_stride,
+    void *const RSTR outx,
+    void *const RSTR outy,
+    void *const RSTR outz
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return linear_elasticity_tet4_apply_packed_a_msoa_impl<double>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+    }
+    case (int)sizeof(float): {
+        return linear_elasticity_tet4_apply_packed_a_msoa_impl<float>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("linear_elasticity_tet4_apply_packed_a_msoa", -1, (int)scalar_bytes);
+}
+
+template <typename s_t>
+static SFEM_INLINE int linear_elasticity_tet4_apply_packed_two_pass_a_msoa_impl(
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const ptrdiff_t n_ghost_entries,
+    const ptrdiff_t n_ghost_reduce_rows,
+    const ptrdiff_t *const RSTR ghost_reduce_ptr,
+    const ptrdiff_t *const RSTR ghost_reduce_idx,
+    const idx_t *const RSTR ghost_reduce_dest,
+    s_t *const RSTR ghost_buf,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const s_t lmbda,
+    const s_t mu,
+    const ptrdiff_t h_stride,
+    const s_t *const RSTR hx,
+    const s_t *const RSTR hy,
+    const s_t *const RSTR hz,
+    const ptrdiff_t out_stride,
+    s_t *const RSTR outx,
+    s_t *const RSTR outy,
+    s_t *const RSTR outz
+) {
+  static constexpr int NC = 3;
+  static constexpr int NS = 4;
+  static constexpr int VS = 16;
+
+
+#pragma omp parallel
+  {
+    s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
+    s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
+
+#pragma omp for schedule(static)
+    for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
+      const ptrdiff_t e_start = pack * n_elements_per_pack;
+      const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
+      const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
+      const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
+      const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
+      const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
+      const ptrdiff_t ghost_off = ghost_ptr[pack];
+      const s_t *const h_components[NC] = {hx, hy, hz};
+      s_t *const out_components[NC] = {outx, outy, outz};
+      for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+        s_t *const RSTR pk_h_component = pk_h + d * max_nodes_per_pack;
+        const s_t *const RSTR h_component = h_components[d];
+        for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
+          pk_component_out[k] = s_t(0);
+        }
+        for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+          const idx_t node = owned_nodes_ptr[pack] + k;
+          pk_h_component[k] = h_component[node * h_stride];
+        }
+        for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+          const idx_t node = ghosts[k];
+          pk_h_component[n_contiguous + k] = h_component[node * h_stride];
+        }
+      }
+
+      for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
+        const int ne = (int)MIN((ptrdiff_t)VS, e_end - evb);
+        s_t bh_data[NS * NC][VS];
+        s_t bout_data[NS * NC][VS];
+        const s_t *bh_streams[NS * NC];
+        for (int stream = 0; stream < NS * NC; ++stream) {
+          bh_streams[stream] = bh_data[stream];
+        }
+        s_t *bout_streams[NS * NC];
+        for (int stream = 0; stream < NS * NC; ++stream) {
+          bout_streams[stream] = bout_data[stream];
+        }
+
+        for (int shape = 0; shape < NS; ++shape) {
+          const uint16_t *const RSTR element_shape = elements[shape];
+          for (int d = 0; d < NC; ++d) {
+            s_t *const RSTR bh_row = bh_data[shape * NC + d];
+            s_t *const RSTR bout_row = bout_data[shape * NC + d];
+            #pragma omp simd
+            for (int lane = 0; lane < ne; ++lane) {
+              const uint16_t packed_node = element_shape[evb + lane];
+              bh_row[lane] = pk_h[d * max_nodes_per_pack + packed_node];
+              bout_row[lane] = s_t(0);
+            }
+          }
+        }
+
+        s_t badj0_data[VS];
+        const s_t *const badj0 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj0 + evb, badj0_data, std::is_same<geom_t, s_t>());
+        s_t badj1_data[VS];
+        const s_t *const badj1 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj1 + evb, badj1_data, std::is_same<geom_t, s_t>());
+        s_t badj2_data[VS];
+        const s_t *const badj2 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj2 + evb, badj2_data, std::is_same<geom_t, s_t>());
+        s_t badj3_data[VS];
+        const s_t *const badj3 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj3 + evb, badj3_data, std::is_same<geom_t, s_t>());
+        s_t badj4_data[VS];
+        const s_t *const badj4 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj4 + evb, badj4_data, std::is_same<geom_t, s_t>());
+        s_t badj5_data[VS];
+        const s_t *const badj5 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj5 + evb, badj5_data, std::is_same<geom_t, s_t>());
+        s_t badj6_data[VS];
+        const s_t *const badj6 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj6 + evb, badj6_data, std::is_same<geom_t, s_t>());
+        s_t badj7_data[VS];
+        const s_t *const badj7 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj7 + evb, badj7_data, std::is_same<geom_t, s_t>());
+        s_t badj8_data[VS];
+        const s_t *const badj8 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj8 + evb, badj8_data, std::is_same<geom_t, s_t>());
+        s_t bdet0_data[VS];
+        const s_t *const bdet0 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_det0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
+
+        linear_elasticity_d3_simplex_tet4_apply_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bh_streams, bout_streams);
+
+        for (int shape = 0; shape < NS; ++shape) {
+          const uint16_t *const RSTR element_shape = elements[shape];
+          for (int d = 0; d < NC; ++d) {
+            s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+            const s_t *const RSTR bout_row = bout_data[shape * NC + d];
+            for (int lane = 0; lane < ne; ++lane) {
+              pk_component_out[element_shape[evb + lane]] += bout_row[lane];
+            }
+          }
+        }
+      }
+
+      for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+        s_t *const RSTR global_out = out_components[d];
+        s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
+        for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+          global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
+          pk_component_out[k] = s_t(0);
+        }
+        for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+          ghost_component[ghost_off + k] = pk_component_out[n_contiguous + k];
+          pk_component_out[n_contiguous + k] = s_t(0);
+        }
+      }
+    }
+  }
+
+  s_t *const out_components[NC] = {outx, outy, outz};
+#pragma omp parallel for schedule(static)
+  for (ptrdiff_t row = 0; row < n_ghost_reduce_rows; ++row) {
+    const idx_t dest = ghost_reduce_dest[row];
+    const ptrdiff_t begin = ghost_reduce_ptr[row];
+    const ptrdiff_t end = ghost_reduce_ptr[row + 1];
+    for (int d = 0; d < NC; ++d) {
+      const s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
+      s_t sum = s_t(0);
+      for (ptrdiff_t j = begin; j < end; ++j) {
+        sum += ghost_component[ghost_reduce_idx[j]];
+      }
+      out_components[d][dest * out_stride] += sum;
+    }
+  }
+  return SFEM_SUCCESS;
+}
+
+extern "C" int linear_elasticity_tet4_apply_packed_two_pass_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const ptrdiff_t n_ghost_entries,
+    const ptrdiff_t n_ghost_reduce_rows,
+    const ptrdiff_t *const RSTR ghost_reduce_ptr,
+    const ptrdiff_t *const RSTR ghost_reduce_idx,
+    const idx_t *const RSTR ghost_reduce_dest,
+    void *const RSTR ghost_buf,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t lmbda,
+    const real_t mu,
+    const ptrdiff_t h_stride,
+    const void *const RSTR hx,
+    const void *const RSTR hy,
+    const void *const RSTR hz,
+    const ptrdiff_t out_stride,
+    void *const RSTR outx,
+    void *const RSTR outy,
+    void *const RSTR outz
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return linear_elasticity_tet4_apply_packed_two_pass_a_msoa_impl<double>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (double *)ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+    }
+    case (int)sizeof(float): {
+        return linear_elasticity_tet4_apply_packed_two_pass_a_msoa_impl<float>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (float *)ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("linear_elasticity_tet4_apply_packed_two_pass_a_msoa", -1, (int)scalar_bytes);
+}
+
+} // namespace codegen
+} // namespace sfem
+
+
+namespace sfem {
+namespace codegen {
+
+template <typename s_t, typename g_t>
+static SFEM_INLINE int linear_elasticity_tet4_apply_a_msoa_aos_unit_impl(
+        const ptrdiff_t nelements,
+        const ptrdiff_t,
+        idx_t **const RSTR elements,
+        const g_t *const RSTR g_adj_aos,
+        const g_t *const RSTR g_det0,
+        const s_t mu,
+        const s_t lmbda,
+        const ptrdiff_t h_stride,
+        const s_t *const RSTR hx,
+        const s_t *const RSTR hy,
+        const s_t *const RSTR hz,
+        const ptrdiff_t out_stride,
+        s_t *const RSTR outx,
+        s_t *const RSTR outy,
+        s_t *const RSTR outz
+) {
+
+#pragma omp parallel for schedule(static)
+  for (ptrdiff_t element = 0; element < nelements; ++element) {
+    const idx_t ev0 = elements[0][element];
+    const idx_t ev1 = elements[1][element];
+    const idx_t ev2 = elements[2][element];
+    const idx_t ev3 = elements[3][element];
+
+    const s_t ux0 = hx[ev0 * h_stride];
+    const s_t ux1 = hx[ev1 * h_stride];
+    const s_t ux2 = hx[ev2 * h_stride];
+    const s_t ux3 = hx[ev3 * h_stride];
+    const s_t uy0 = hy[ev0 * h_stride];
+    const s_t uy1 = hy[ev1 * h_stride];
+    const s_t uy2 = hy[ev2 * h_stride];
+    const s_t uy3 = hy[ev3 * h_stride];
+    const s_t uz0 = hz[ev0 * h_stride];
+    const s_t uz1 = hz[ev1 * h_stride];
+    const s_t uz2 = hz[ev2 * h_stride];
+    const s_t uz3 = hz[ev3 * h_stride];
+
+    const g_t *const RSTR adjugate = g_adj_aos + element * 9;
+    const s_t a0 = s_t(adjugate[0]);
+    const s_t a1 = s_t(adjugate[1]);
+    const s_t a2 = s_t(adjugate[2]);
+    const s_t a3 = s_t(adjugate[3]);
+    const s_t a4 = s_t(adjugate[4]);
+    const s_t a5 = s_t(adjugate[5]);
+    const s_t a6 = s_t(adjugate[6]);
+    const s_t a7 = s_t(adjugate[7]);
+    const s_t a8 = s_t(adjugate[8]);
+    const s_t inv_det = s_t(1) / s_t(g_det0[element]);
+
+    const s_t x1 = ux0 - ux1;
+    const s_t x2 = ux0 - ux2;
+    const s_t x3 = ux0 - ux3;
+    const s_t x4 = uy0 - uy1;
+    const s_t x5 = uy0 - uy2;
+    const s_t x6 = uy0 - uy3;
+    const s_t x7 = uz0 - uz1;
+    const s_t x8 = uz0 - uz2;
+    const s_t x9 = uz0 - uz3;
+
+    s_t p0 = inv_det * (-a0 * x1 - a3 * x2 - a6 * x3);
+    s_t p1 = inv_det * (-a1 * x1 - a4 * x2 - a7 * x3);
+    s_t p2 = inv_det * (-a2 * x1 - a5 * x2 - a8 * x3);
+    s_t p3 = inv_det * (-a0 * x4 - a3 * x5 - a6 * x6);
+    s_t p4 = inv_det * (-a1 * x4 - a4 * x5 - a7 * x6);
+    s_t p5 = inv_det * (-a2 * x4 - a5 * x5 - a8 * x6);
+    s_t p6 = inv_det * (-a0 * x7 - a3 * x8 - a6 * x9);
+    s_t p7 = inv_det * (-a1 * x7 - a4 * x8 - a7 * x9);
+    s_t p8 = inv_det * (-a2 * x7 - a5 * x8 - a8 * x9);
+
+    const s_t m0 = (s_t(1) / s_t(6)) * mu;
+    const s_t m1 = m0 * (p1 + p3);
+    const s_t m2 = m0 * (p2 + p6);
+    const s_t m3 = s_t(2) * mu;
+    const s_t m4 = lmbda * (p0 + p4 + p8);
+    const s_t m5 = (s_t(1) / s_t(6)) * p0 * m3 + (s_t(1) / s_t(6)) * m4;
+    const s_t m6 = m0 * (p5 + p7);
+    const s_t m7 = (s_t(1) / s_t(6)) * p4 * m3 + (s_t(1) / s_t(6)) * m4;
+    const s_t m8 = (s_t(1) / s_t(6)) * p8 * m3 + (s_t(1) / s_t(6)) * m4;
+
+    const s_t q0 = a0 * m5 + a1 * m1 + a2 * m2;
+    const s_t q1 = a3 * m5 + a4 * m1 + a5 * m2;
+    const s_t q2 = a6 * m5 + a7 * m1 + a8 * m2;
+    const s_t q3 = a0 * m1 + a1 * m7 + a2 * m6;
+    const s_t q4 = a3 * m1 + a4 * m7 + a5 * m6;
+    const s_t q5 = a6 * m1 + a7 * m7 + a8 * m6;
+    const s_t q6 = a0 * m2 + a1 * m6 + a2 * m8;
+    const s_t q7 = a3 * m2 + a4 * m6 + a5 * m8;
+    const s_t q8 = a6 * m2 + a7 * m6 + a8 * m8;
+
+    #pragma omp atomic update
+    outx[ev0 * out_stride] += -q0 - q1 - q2;
+    #pragma omp atomic update
+    outx[ev1 * out_stride] += q0;
+    #pragma omp atomic update
+    outx[ev2 * out_stride] += q1;
+    #pragma omp atomic update
+    outx[ev3 * out_stride] += q2;
+    #pragma omp atomic update
+    outy[ev0 * out_stride] += -q3 - q4 - q5;
+    #pragma omp atomic update
+    outy[ev1 * out_stride] += q3;
+    #pragma omp atomic update
+    outy[ev2 * out_stride] += q4;
+    #pragma omp atomic update
+    outy[ev3 * out_stride] += q5;
+    #pragma omp atomic update
+    outz[ev0 * out_stride] += -q6 - q7 - q8;
+    #pragma omp atomic update
+    outz[ev1 * out_stride] += q6;
+    #pragma omp atomic update
+    outz[ev2 * out_stride] += q7;
+    #pragma omp atomic update
+    outz[ev3 * out_stride] += q8;
+  }
+
+  return SFEM_SUCCESS;
+}
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" int linear_elasticity_tet4_apply_a_msoa_aos_unit(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj_aos,
+        const geom_t *const RSTR g_det0,
+        const real_t mu,
+        const real_t lmbda,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::linear_elasticity_tet4_apply_a_msoa_aos_unit_impl<double, geom_t>(nelements, nnodes, elements, g_adj_aos, g_det0, mu, lmbda, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::linear_elasticity_tet4_apply_a_msoa_aos_unit_impl<float, geom_t>(nelements, nnodes, elements, g_adj_aos, g_det0, mu, lmbda, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("linear_elasticity_tet4_apply_a_msoa_aos_unit", -1, (int)scalar_bytes);
+}
+
+
+namespace sfem {
+namespace codegen {
+
+static SFEM_INLINE void linear_elasticity_tet4_hessian_a_msoa_find_cols(
+    const idx_t *const RSTR targets,
+    const idx_t *const RSTR row,
+    const int lenrow,
+    idx_t *const RSTR ks) {
+#pragma unroll(4)
+  for (int d = 0; d < 4; ++d) {
+    ks[d] = 0;
+  }
+  for (int k = 0; k < lenrow; ++k) {
+#pragma unroll(4)
+    for (int d = 0; d < 4; ++d) {
+      ks[d] += row[k] < targets[d];
+    }
+  }
+}
+
+template <typename s_t>
+static SFEM_INLINE void linear_elasticity_tet4_hessian_a_msoa_scatter_bsr(
+    const idx_t *const RSTR ev,
+    const s_t *const RSTR element_matrix,
+    const count_t *const RSTR rowptr,
+    const idx_t *const RSTR colidx,
+    s_t *const RSTR values) {
+  static constexpr int NC = 3;
+  static constexpr int NS = 4;
+  count_t entries[NS * NS];
+  idx_t ks[NS];
+  for (int i = 0; i < NS; ++i) {
+    const idx_t dof_i = ev[i];
+    const count_t row_begin = rowptr[dof_i];
+    const int lenrow = (int)(rowptr[dof_i + 1] - row_begin);
+    const idx_t *const RSTR cols = &colidx[row_begin];
+    linear_elasticity_tet4_hessian_a_msoa_find_cols(ev, cols, lenrow, ks);
+    for (int j = 0; j < NS; ++j) {
+      entries[i * NS + j] = row_begin + ks[j];
+    }
+  }
+  for (int i = 0; i < NS; ++i) {
+    for (int j = 0; j < NS; ++j) {
+      s_t *const block = &values[entries[i * NS + j] * NC * NC];
+      for (int bi = 0; bi < NC; ++bi) {
+        const int row = bi * NS + i;
+        for (int bj = 0; bj < NC; ++bj) {
+          const int col = bj * NS + j;
+#pragma omp atomic update
+          block[bi * NC + bj] += element_matrix[row * (NC * NS) + col];
+        }
+      }
+    }
+  }
+}
+
+template <typename s_t>
+static SFEM_INLINE void linear_elasticity_tet4_hessian_a_msoa_scatter_block_diag_sym(
+    const idx_t *const RSTR ev,
+    const s_t *const RSTR element_matrix,
+    s_t *const RSTR values) {
+  static constexpr int NC = 3;
+  static constexpr int NS = 4;
+  static constexpr int NDOFS = NC * NS;
+  static constexpr int SYM_DIM = (NC * (NC + 1)) / 2;
+  for (int i = 0; i < NS; ++i) {
+    s_t *const block = &values[(ptrdiff_t)ev[i] * SYM_DIM];
+    int sym = 0;
+    for (int bi = 0; bi < NC; ++bi) {
+      const int row = bi * NS + i;
+      for (int bj = bi; bj < NC; ++bj) {
+        const int col = bj * NS + i;
+#pragma omp atomic update
+        block[sym++] += element_matrix[row * NDOFS + col];
+      }
+    }
+  }
+}
+
+template <typename s_t, typename g_t, int FORMAT>
+static int linear_elasticity_tet4_hessian_a_msoa_assemble_impl(
+    const ptrdiff_t nelements,
+    const ptrdiff_t,
+    idx_t **const RSTR elements,
+    const g_t *const RSTR g_adj0,
+    const g_t *const RSTR g_adj1,
+    const g_t *const RSTR g_adj2,
+    const g_t *const RSTR g_adj3,
+    const g_t *const RSTR g_adj4,
+    const g_t *const RSTR g_adj5,
+    const g_t *const RSTR g_adj6,
+    const g_t *const RSTR g_adj7,
+    const g_t *const RSTR g_adj8,
+    const g_t *const RSTR g_det0,
+    const s_t lmbda,
+    const s_t mu,
+    const count_t *const RSTR rowptr,
+    const idx_t *const RSTR colidx,
+    s_t *const RSTR values,
+    const int *const RSTR,
+    const ptrdiff_t,
+    const ptrdiff_t,
+    const idx_t *const RSTR,
+    const idx_t *const RSTR,
+    idx_t *const RSTR,
+    idx_t *const RSTR) {
+  static constexpr int NC = 3;
+  static constexpr int NQ = 1;
+  static constexpr int NS = 4;
+  static constexpr int NDOFS = NC * NS;
+
+  static_assert(FORMAT == 1 || FORMAT == 6,
+                "this kernel has no scatter for the requested matrix format");
+#pragma omp parallel for schedule(static)
+  for (ptrdiff_t element = 0; element < nelements; ++element) {
+    idx_t ev[NS];
+    s_t element_matrix[NDOFS * NDOFS];
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t badj4[NQ];
+    s_t badj5[NQ];
+    s_t badj6[NQ];
+    s_t badj7[NQ];
+    s_t badj8[NQ];
+    s_t bdet0[NQ];
+
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t node = elements[shape][element];
+      ev[shape] = node;
+    }
+
+
+    badj0[0] = s_t(g_adj0[element]);
+    badj1[0] = s_t(g_adj1[element]);
+    badj2[0] = s_t(g_adj2[element]);
+    badj3[0] = s_t(g_adj3[element]);
+    badj4[0] = s_t(g_adj4[element]);
+    badj5[0] = s_t(g_adj5[element]);
+    badj6[0] = s_t(g_adj6[element]);
+    badj7[0] = s_t(g_adj7[element]);
+    badj8[0] = s_t(g_adj8[element]);
+    bdet0[0] = s_t(g_det0[element]);
+
+    linear_elasticity_d3_simplex_tet4_direct_hessian_element_matrix<s_t, NS>(badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, element_matrix);
+
+    if constexpr (FORMAT == 1) {
+      linear_elasticity_tet4_hessian_a_msoa_scatter_bsr(ev, element_matrix, rowptr, colidx, values);
+    } else if constexpr (FORMAT == 6) {
+      linear_elasticity_tet4_hessian_a_msoa_scatter_block_diag_sym(ev, element_matrix, values);
+    }
+  }
+
+  return SFEM_SUCCESS;
+}
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" int linear_elasticity_tet4_hessian_bsr_a_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
+        const real_t lmbda,
+        const real_t mu,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::linear_elasticity_tet4_hessian_a_msoa_assemble_impl<double, geom_t, 1>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, rowptr, colidx, (double *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::linear_elasticity_tet4_hessian_a_msoa_assemble_impl<float, geom_t, 1>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, rowptr, colidx, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("linear_elasticity_tet4_hessian_bsr_a_msoa", -1, (int)scalar_bytes);
+}
+
+extern "C" int linear_elasticity_tet4_hessian_block_diag_sym_a_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
+        const real_t lmbda,
+        const real_t mu,
+        void *const RSTR values
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::linear_elasticity_tet4_hessian_a_msoa_assemble_impl<double, geom_t, 6>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, nullptr, nullptr, (double *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::linear_elasticity_tet4_hessian_a_msoa_assemble_impl<float, geom_t, 6>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, nullptr, nullptr, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("linear_elasticity_tet4_hessian_block_diag_sym_a_msoa", -1, (int)scalar_bytes);
+}

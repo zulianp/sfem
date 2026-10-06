@@ -1,0 +1,508 @@
+#include <type_traits>
+#include "../navier_stokes_form_2_u_p_d2_simplex_mixed_local.hpp"
+#include "../../../reference/quad_tri_q6.hpp"
+#include "../../../reference/tri3_q6.hpp"
+#include "../../../reference/tri6_q6.hpp"
+#include "../../../kernel_math.hpp"
+#include "../../../geometry_kernels.hpp"
+#include "../../../kernel_diagnostics.hpp"
+
+#ifndef SFEM_RESTRICT
+#define SFEM_RESTRICT
+#endif
+#ifndef RSTR
+#define RSTR SFEM_RESTRICT
+#endif
+#ifndef SFEM_INLINE
+#define SFEM_INLINE inline
+#endif
+#ifndef SFEM_GENERATED_SCALAR_T
+#define SFEM_GENERATED_SCALAR_T
+typedef double real_t;
+typedef ptrdiff_t idx_t;
+typedef ptrdiff_t element_idx_t;
+typedef ptrdiff_t count_t;
+typedef double geom_t;
+#endif
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
+namespace sfem {
+namespace codegen {
+
+template <typename s_t, typename g_t, int VS>
+SFEM_INLINE const s_t *ageom_stream(
+    const int ne,
+    const g_t *const RSTR source,
+    s_t *const RSTR,
+    std::true_type) {
+  return source;
+}
+
+template <typename s_t, typename g_t, int VS>
+SFEM_INLINE const s_t *ageom_stream(
+    const int ne,
+    const g_t *const RSTR source,
+    s_t *const RSTR converted,
+    std::false_type) {
+  #pragma omp simd
+  for (int lane = 0; lane < ne; ++lane) {
+    converted[lane] = s_t(source[lane]);
+  }
+  return converted;
+}
+
+} // namespace codegen
+} // namespace sfem
+namespace sfem {
+namespace codegen {
+
+static const KernelDiagnostics navier_stokes_form_2_u_p_tri6_tri3_residual_esoa_diagnostics_data = {
+  "navier_stokes_form_2_u_p_tri6_tri3_residual_esoa",
+  "TRI6",
+  2,
+  6,
+  6,
+  16,
+  4,
+  16,
+  26,
+  1,
+  0,
+  0,
+  0,
+  0,
+  0,
+  22,
+  8,
+  50,
+  1062,
+  1368,
+  5,
+  16,
+  5,
+  162,
+  6,
+  0,
+  0,
+  0,
+  15,
+  1,
+  1,
+  1.0,
+  1.0,
+  8.0,
+  12.0,
+  16.0,
+  20.0,
+  20.0,
+  24.0,
+  1.0,
+  1.0
+};
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_u_p_tri6_tri3_residual_esoa_diagnostics(void) {
+  return &sfem::codegen::navier_stokes_form_2_u_p_tri6_tri3_residual_esoa_diagnostics_data;
+}
+
+namespace sfem {
+namespace codegen {
+
+static const KernelDiagnostics navier_stokes_form_2_u_p_tri6_tri3_jacobian_action_esoa_diagnostics_data = {
+  "navier_stokes_form_2_u_p_tri6_tri3_jacobian_action_esoa",
+  "TRI6",
+  2,
+  6,
+  6,
+  16,
+  4,
+  13,
+  28,
+  1,
+  0,
+  0,
+  0,
+  0,
+  0,
+  20,
+  11,
+  49,
+  1062,
+  1368,
+  8,
+  16,
+  5,
+  162,
+  6,
+  0,
+  0,
+  15,
+  15,
+  1,
+  1,
+  1.0,
+  1.0,
+  8.0,
+  12.0,
+  16.0,
+  20.0,
+  20.0,
+  24.0,
+  1.0,
+  1.0
+};
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_u_p_tri6_tri3_jacobian_action_esoa_diagnostics(void) {
+  return &sfem::codegen::navier_stokes_form_2_u_p_tri6_tri3_jacobian_action_esoa_diagnostics_data;
+}
+
+namespace sfem {
+namespace codegen {
+
+template <typename s_t, typename g_t>
+static SFEM_INLINE int navier_stokes_form_2_u_p_tri6_tri3_jacobian_action_affine_mesh_mixed_impl(
+    const ptrdiff_t nelements,
+    const ptrdiff_t,
+    idx_t **const RSTR elements,
+    const g_t *const RSTR g_adj0,
+    const g_t *const RSTR g_adj1,
+    const g_t *const RSTR g_adj2,
+    const g_t *const RSTR g_adj3,
+    const g_t *const RSTR g_det0,
+    const ptrdiff_t direction_stride,
+    const s_t *const RSTR u_direction_data[2],
+    const s_t *const RSTR p_direction_data,
+    const ptrdiff_t out_stride,
+    s_t *const RSTR u_out[2],
+    s_t *const RSTR p_out
+) {
+  static constexpr int ND = 2;
+  static constexpr int NQ = 6;
+  static constexpr int CELL_NS = 6;
+  static constexpr int NC = 2;
+  static constexpr int N_FIELD_STREAMS = 15;
+  static constexpr int VS = 16;
+  const s_t *const field_shape[NC] = {sfem::codegen::ref_tri6_q6<s_t>::shape(), sfem::codegen::ref_tri3_q6<s_t>::shape()};
+  const s_t *const fgref[NC * ND] = {sfem::codegen::ref_tri6_q6<s_t>::grad_ref_x(), sfem::codegen::ref_tri6_q6<s_t>::grad_ref_y(), sfem::codegen::ref_tri3_q6<s_t>::grad_ref_x(), sfem::codegen::ref_tri3_q6<s_t>::grad_ref_y()};
+
+#pragma omp parallel for schedule(static)
+  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
+    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+    s_t bdirection[N_FIELD_STREAMS][VS];
+    s_t boutput[N_FIELD_STREAMS][VS];
+
+    for (int local_shape = 0; local_shape < 6; ++local_shape) {
+      const idx_t *const RSTR element_shape = elements[local_shape];
+      const int stream = 0 + local_shape;
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        const idx_t node = element_shape[evb + lane];
+        bdirection[stream][lane] = u_direction_data[0][node * direction_stride];
+      }
+    }
+    for (int local_shape = 0; local_shape < 6; ++local_shape) {
+      const idx_t *const RSTR element_shape = elements[local_shape];
+      const int stream = 6 + local_shape;
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        const idx_t node = element_shape[evb + lane];
+        bdirection[stream][lane] = u_direction_data[1][node * direction_stride];
+      }
+    }
+    for (int local_shape = 0; local_shape < 3; ++local_shape) {
+      const idx_t *const RSTR element_shape = elements[local_shape];
+      const int stream = 12 + local_shape;
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        const idx_t node = element_shape[evb + lane];
+        bdirection[stream][lane] = p_direction_data[node * direction_stride];
+      }
+    }
+
+    for (int stream = 0; stream < 15; ++stream) {
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        boutput[stream][lane] = s_t(0);
+      }
+    }
+    const g_t *const affine_geometry_sources[5] = {g_adj0 + evb, g_adj1 + evb, g_adj2 + evb, g_adj3 + evb, g_det0 + evb};
+    s_t baffine_geometry_data[5][VS];
+    const s_t *bageom_streams[5];
+    for (int geometry_stream = 0; geometry_stream < 5; ++geometry_stream) {
+      bageom_streams[geometry_stream] = ageom_stream<s_t, g_t, VS>(
+          ne, affine_geometry_sources[geometry_stream], baffine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());
+    }
+    const s_t *badjugate[ND * ND];
+    for (int component = 0; component < ND * ND; ++component) {
+      badjugate[component] = bageom_streams[component];
+    }
+
+    navier_stokes_form_2_u_p_d2_simplex_mixed_jacobian_action_block_contiguous<s_t, NQ, CELL_NS, VS>(ne, 0, bageom_streams[4], badjugate, field_shape, fgref, sfem::codegen::quad_tri_q6<s_t>::q_weight(), bdirection, boutput);
+
+    {
+      s_t *const RSTR out = u_out[0];
+      for (int local_shape = 0; local_shape < 6; ++local_shape) {
+        const idx_t *const RSTR element_shape = elements[local_shape];
+        const int stream = 0 + local_shape;
+        for (int scatter = 0; scatter < ne; ++scatter) {
+          #pragma omp atomic update
+          out[element_shape[evb + scatter] * out_stride] += boutput[stream][scatter];
+        }
+      }
+    }
+    {
+      s_t *const RSTR out = u_out[1];
+      for (int local_shape = 0; local_shape < 6; ++local_shape) {
+        const idx_t *const RSTR element_shape = elements[local_shape];
+        const int stream = 6 + local_shape;
+        for (int scatter = 0; scatter < ne; ++scatter) {
+          #pragma omp atomic update
+          out[element_shape[evb + scatter] * out_stride] += boutput[stream][scatter];
+        }
+      }
+    }
+    {
+      s_t *const RSTR out = p_out;
+      for (int local_shape = 0; local_shape < 3; ++local_shape) {
+        const idx_t *const RSTR element_shape = elements[local_shape];
+        const int stream = 12 + local_shape;
+        for (int scatter = 0; scatter < ne; ++scatter) {
+          #pragma omp atomic update
+          out[element_shape[evb + scatter] * out_stride] += boutput[stream][scatter];
+        }
+      }
+    }
+  }
+  return SFEM_SUCCESS;
+}
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" int navier_stokes_form_2_u_p_tri6_tri3_jacobian_action_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_det0,
+    const ptrdiff_t direction_stride,
+    const void *const RSTR u_direction_data[2],
+    const void *const RSTR p_direction_data,
+    const ptrdiff_t out_stride,
+    void *const RSTR u_out[2],
+    void *const RSTR p_out
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::navier_stokes_form_2_u_p_tri6_tri3_jacobian_action_affine_mesh_mixed_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::navier_stokes_form_2_u_p_tri6_tri3_jacobian_action_affine_mesh_mixed_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("navier_stokes_form_2_u_p_tri6_tri3_jacobian_action_a_msoa", -1, (int)scalar_bytes);
+}
+
+namespace sfem {
+namespace codegen {
+
+template <typename s_t>
+static SFEM_INLINE int navier_stokes_form_2_u_p_tri6_tri3_jacobian_action_isoparametric_mesh_mixed_impl(
+    const ptrdiff_t nelements,
+    const ptrdiff_t,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const ptrdiff_t direction_stride,
+    const s_t *const RSTR u_direction_data[2],
+    const s_t *const RSTR p_direction_data,
+    const ptrdiff_t out_stride,
+    s_t *const RSTR u_out[2],
+    s_t *const RSTR p_out
+) {
+  static constexpr int ND = 2;
+  static constexpr int NQ = 6;
+  static constexpr int CELL_NS = 6;
+  static constexpr int NS = CELL_NS;
+  static constexpr int NC = 2;
+  static constexpr int N_FIELD_STREAMS = 15;
+  static constexpr int VS = 16;
+  const s_t *const isoparametric_cell_grad_ref_0 = sfem::codegen::ref_tri6_q6<s_t>::grad_ref_x();
+  const s_t *const isoparametric_cell_grad_ref_1 = sfem::codegen::ref_tri6_q6<s_t>::grad_ref_y();
+#pragma omp parallel for schedule(static)
+  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
+    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+    s_t bcoordinates[ND * CELL_NS][VS];
+    s_t badjugate_data[ND * ND][NQ * VS];
+    s_t bdeterminant[NQ * VS];
+    s_t bdirection[N_FIELD_STREAMS][VS];
+    s_t boutput[N_FIELD_STREAMS][VS];
+
+    const geom_t *const coordinate_components[ND] = {points[0], points[1]};
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t *const RSTR element_shape = elements[shape];
+      for (int d = 0; d < ND; ++d) {
+        s_t *const RSTR bcoordinate_row = bcoordinates[shape * ND + d];
+        #pragma omp simd
+        for (int lane = 0; lane < ne; ++lane) {
+          const idx_t node = element_shape[evb + lane];
+          bcoordinate_row[lane] = coordinate_components[d][node];
+        }
+      }
+    }
+
+    for (int local_shape = 0; local_shape < 6; ++local_shape) {
+      const idx_t *const RSTR element_shape = elements[local_shape];
+      const int stream = 0 + local_shape;
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        const idx_t node = element_shape[evb + lane];
+        bdirection[stream][lane] = u_direction_data[0][node * direction_stride];
+      }
+    }
+    for (int local_shape = 0; local_shape < 6; ++local_shape) {
+      const idx_t *const RSTR element_shape = elements[local_shape];
+      const int stream = 6 + local_shape;
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        const idx_t node = element_shape[evb + lane];
+        bdirection[stream][lane] = u_direction_data[1][node * direction_stride];
+      }
+    }
+    for (int local_shape = 0; local_shape < 3; ++local_shape) {
+      const idx_t *const RSTR element_shape = elements[local_shape];
+      const int stream = 12 + local_shape;
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        const idx_t node = element_shape[evb + lane];
+        bdirection[stream][lane] = p_direction_data[node * direction_stride];
+      }
+    }
+
+    for (int stream = 0; stream < 15; ++stream) {
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        boutput[stream][lane] = s_t(0);
+      }
+    }
+
+    s_t *badjugate_streams[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3]};
+    for (int q = 0; q < NQ; ++q) {
+      const s_t *const RSTR coordinate_row0 = bcoordinates[0];
+      const s_t *const RSTR coordinate_row1 = bcoordinates[1];
+      const s_t *const RSTR coordinate_row2 = bcoordinates[2];
+      const s_t *const RSTR coordinate_row3 = bcoordinates[3];
+      const s_t *const RSTR coordinate_row4 = bcoordinates[4];
+      const s_t *const RSTR coordinate_row5 = bcoordinates[5];
+      const s_t *const RSTR coordinate_row6 = bcoordinates[6];
+      const s_t *const RSTR coordinate_row7 = bcoordinates[7];
+      const s_t *const RSTR coordinate_row8 = bcoordinates[8];
+      const s_t *const RSTR coordinate_row9 = bcoordinates[9];
+      const s_t *const RSTR coordinate_row10 = bcoordinates[10];
+      const s_t *const RSTR coordinate_row11 = bcoordinates[11];
+      const s_t cell_grad_ref0_0 = isoparametric_cell_grad_ref_0[q * CELL_NS];
+      const s_t cell_grad_ref0_1 = isoparametric_cell_grad_ref_0[q * CELL_NS + 1];
+      const s_t cell_grad_ref0_2 = isoparametric_cell_grad_ref_0[q * CELL_NS + 2];
+      const s_t cell_grad_ref0_3 = isoparametric_cell_grad_ref_0[q * CELL_NS + 3];
+      const s_t cell_grad_ref0_4 = isoparametric_cell_grad_ref_0[q * CELL_NS + 4];
+      const s_t cell_grad_ref0_5 = isoparametric_cell_grad_ref_0[q * CELL_NS + 5];
+      const s_t cell_grad_ref1_0 = isoparametric_cell_grad_ref_1[q * CELL_NS];
+      const s_t cell_grad_ref1_1 = isoparametric_cell_grad_ref_1[q * CELL_NS + 1];
+      const s_t cell_grad_ref1_2 = isoparametric_cell_grad_ref_1[q * CELL_NS + 2];
+      const s_t cell_grad_ref1_3 = isoparametric_cell_grad_ref_1[q * CELL_NS + 3];
+      const s_t cell_grad_ref1_4 = isoparametric_cell_grad_ref_1[q * CELL_NS + 4];
+      const s_t cell_grad_ref1_5 = isoparametric_cell_grad_ref_1[q * CELL_NS + 5];
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        const s_t J00 = coordinate_row0[lane] * cell_grad_ref0_0 + coordinate_row2[lane] * cell_grad_ref0_1 + coordinate_row4[lane] * cell_grad_ref0_2 + coordinate_row6[lane] * cell_grad_ref0_3 + coordinate_row8[lane] * cell_grad_ref0_4 + coordinate_row10[lane] * cell_grad_ref0_5;
+        const s_t J01 = coordinate_row0[lane] * cell_grad_ref1_0 + coordinate_row2[lane] * cell_grad_ref1_1 + coordinate_row4[lane] * cell_grad_ref1_2 + coordinate_row6[lane] * cell_grad_ref1_3 + coordinate_row8[lane] * cell_grad_ref1_4 + coordinate_row10[lane] * cell_grad_ref1_5;
+        const s_t J10 = coordinate_row1[lane] * cell_grad_ref0_0 + coordinate_row3[lane] * cell_grad_ref0_1 + coordinate_row5[lane] * cell_grad_ref0_2 + coordinate_row7[lane] * cell_grad_ref0_3 + coordinate_row9[lane] * cell_grad_ref0_4 + coordinate_row11[lane] * cell_grad_ref0_5;
+        const s_t J11 = coordinate_row1[lane] * cell_grad_ref1_0 + coordinate_row3[lane] * cell_grad_ref1_1 + coordinate_row5[lane] * cell_grad_ref1_2 + coordinate_row7[lane] * cell_grad_ref1_3 + coordinate_row9[lane] * cell_grad_ref1_4 + coordinate_row11[lane] * cell_grad_ref1_5;
+        geometry_jacobian_adjugate_and_determinant_2<s_t>(
+            J00, J01, J10, J11, badjugate_streams, bdeterminant, q * VS + lane);
+      }
+    }
+
+    const s_t *const field_shape[NC] = {sfem::codegen::ref_tri6_q6<s_t>::shape(), sfem::codegen::ref_tri3_q6<s_t>::shape()};
+    const s_t *const fgref[NC * ND] = {sfem::codegen::ref_tri6_q6<s_t>::grad_ref_x(), sfem::codegen::ref_tri6_q6<s_t>::grad_ref_y(), sfem::codegen::ref_tri3_q6<s_t>::grad_ref_x(), sfem::codegen::ref_tri3_q6<s_t>::grad_ref_y()};
+    const s_t *const badjugate[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3]};
+
+    navier_stokes_form_2_u_p_d2_simplex_mixed_jacobian_action_block_contiguous<s_t, NQ, CELL_NS, VS>(ne, VS, bdeterminant, badjugate, field_shape, fgref, sfem::codegen::quad_tri_q6<s_t>::q_weight(), bdirection, boutput);
+
+    {
+      s_t *const RSTR out = u_out[0];
+      for (int local_shape = 0; local_shape < 6; ++local_shape) {
+        const idx_t *const RSTR element_shape = elements[local_shape];
+        const int stream = 0 + local_shape;
+        for (int scatter = 0; scatter < ne; ++scatter) {
+          #pragma omp atomic update
+          out[element_shape[evb + scatter] * out_stride] += boutput[stream][scatter];
+        }
+      }
+    }
+    {
+      s_t *const RSTR out = u_out[1];
+      for (int local_shape = 0; local_shape < 6; ++local_shape) {
+        const idx_t *const RSTR element_shape = elements[local_shape];
+        const int stream = 6 + local_shape;
+        for (int scatter = 0; scatter < ne; ++scatter) {
+          #pragma omp atomic update
+          out[element_shape[evb + scatter] * out_stride] += boutput[stream][scatter];
+        }
+      }
+    }
+    {
+      s_t *const RSTR out = p_out;
+      for (int local_shape = 0; local_shape < 3; ++local_shape) {
+        const idx_t *const RSTR element_shape = elements[local_shape];
+        const int stream = 12 + local_shape;
+        for (int scatter = 0; scatter < ne; ++scatter) {
+          #pragma omp atomic update
+          out[element_shape[evb + scatter] * out_stride] += boutput[stream][scatter];
+        }
+      }
+    }
+  }
+  return SFEM_SUCCESS;
+}
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" int navier_stokes_form_2_u_p_tri6_tri3_jacobian_action_i_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const ptrdiff_t direction_stride,
+    const void *const RSTR u_direction_data[2],
+    const void *const RSTR p_direction_data,
+    const ptrdiff_t out_stride,
+    void *const RSTR u_out[2],
+    void *const RSTR p_out
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::navier_stokes_form_2_u_p_tri6_tri3_jacobian_action_isoparametric_mesh_mixed_impl<double>(nelements, nnodes, elements, points, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::navier_stokes_form_2_u_p_tri6_tri3_jacobian_action_isoparametric_mesh_mixed_impl<float>(nelements, nnodes, elements, points, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("navier_stokes_form_2_u_p_tri6_tri3_jacobian_action_i_msoa", -1, (int)scalar_bytes);
+}
