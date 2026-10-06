@@ -22,3 +22,10 @@ Kernels are organized by mesh format in separate folders, within each folder we 
 
 
 .. additional structure where it fits
+
+
+# Corrections
+
+- I indicated separate folders for geometry affine vs isoparametric. This implies that the kernels should be separated. Quite obvious isn't it? "GeomKind" is used at the front end level to dispatch based on the type of elements in the block (now smesh also provides such enums) and it can be overriden at runtime.
+- The micro-kernel selector must be removed. Only the best micro-kernels need to be used (given the results in Grace), so there should be only one per kernel. The rest is moved to subpar
+- the kernels should be templated as well. They should support different types for the computation, template scalar_t, geom_t, idx_t, etc... (in a short time we would like to try single precision kernels as well)
