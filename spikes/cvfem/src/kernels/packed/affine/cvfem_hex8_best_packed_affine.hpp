@@ -150,13 +150,12 @@ static SFEM_NOINLINE void apply_residual_packed_affine_range(
 // nodes this part owns -- that is what the packed layout is for -- so the parts need no
 // synchronisation between them, and the ghost rows they do share are reduced afterwards in the
 // launcher, which is the second and independent parallel loop.
-template <typename scalar_t, typename idx_t, typename pack_idx_t, typename geom_t>
+template <typename scalar_t, typename idx_t, typename pack_idx_t, typename geom_t, typename grad_t>
 static SFEM_NOINLINE void apply_jacobian_action_packed_affine_range(
         const cvfem_range packs,
         // The mesh and the pack are staging objects -- they own vectors and a shared_ptr to a
         // mesh -- so what this kernel reads out of them is what it takes. DESIGN.md: only
         // arguments that are actually used are passed.
-        idx_t **const SFEM_RESTRICT mesh_elems,
         const ptrdiff_t nelements,
         const scalar_t *const SFEM_RESTRICT pres,
         const scalar_t *const SFEM_RESTRICT pgx,
@@ -184,8 +183,8 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_affine_range(
         const scalar_t mu,
         const scalar_t *const dir,
         scalar_t *const jv,
-        const scalar_t *const SFEM_RESTRICT ugrad,
-        const scalar_t *const SFEM_RESTRICT vgrad,
+        const grad_t *const SFEM_RESTRICT ugrad,
+        const grad_t *const SFEM_RESTRICT vgrad,
         const int limiter,
         const scalar_t venkat_c,
         const bool with_ho,
@@ -212,6 +211,9 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_affine_range(
         const Hex8PackCoordsT<scalar_t> pk =
                 cvfem_hex8_pack_coords<scalar_t>(with_rc != 0, with_rc, max_actual_nodes_per_pack);
         const Hex8PackQGradT<scalar_t> qg = cvfem_hex8_pack_qgrad<scalar_t>(with_qg, max_actual_nodes_per_pack);
+        // The two gradient fields, staged per pack (slots 14 and 15). See cvfem_hex8_pack_ugrad.
+        const Hex8PackUGradT<scalar_t> ug = cvfem_hex8_pack_ugrad<scalar_t>(with_ho, 14, max_actual_nodes_per_pack);
+        const Hex8PackUGradT<scalar_t> vg = cvfem_hex8_pack_ugrad<scalar_t>(with_ho, 15, max_actual_nodes_per_pack);
 
 
 
@@ -235,15 +237,19 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_affine_range(
                                                pk.pgx, pk.pgy, pk.pgz);
             if (with_qg)
                 cvfem_hex8_fill_pack_qgrad(owned_nodes_ptr, qgx, qgy, qgz, pack, x.n_contiguous, x.n_ghost, x.ghosts, qg.x, qg.y, qg.z);
+            if (with_ho) {
+                cvfem_hex8_fill_pack_ugrad(owned_nodes_ptr, ugrad, pack, x.n_contiguous, x.n_ghost, x.ghosts, ug.g);
+                cvfem_hex8_fill_pack_ugrad(owned_nodes_ptr, vgrad, pack, x.n_contiguous, x.n_ghost, x.ghosts, vg.g);
+            }
             // No coordinate staging for the geometry: the affine sweep reads one adjugate and
             // determinant per element from the precomputed table. The pack stages coordinates
             // only when Rhie-Chow or the higher-order reconstruction needs them, which the two
             // branches above cover.
             CVFEM_PHASE_MARK(acc, _t, PH_GATHER);
 
-            cvfem_hex8_action_lanes_affine(x, pk, qg, adj_ptr, det_ptr, mesh_elems, points,
+            cvfem_hex8_action_lanes_affine(x, pk, qg, adj_ptr, det_ptr,
                                            pack_elems, pack_u, pack_dir, pack_out, rc_coeff, rc_w,
-                                           ugrad, vgrad, rho, mu, rhie_chow_scale, with_rc,
+                                           ug, vg, rho, mu, rhie_chow_scale, with_rc,
                                            with_qg, with_ho, rc_cfg, limiter, venkat_c);
             CVFEM_PHASE_MARK(acc, _t, PH_KERNEL);
 
@@ -509,7 +515,7 @@ static SFEM_NOINLINE void assemble_jacobian_store_affine_range(
 // nodes this part owns -- that is what the packed layout is for -- so the parts need no
 // synchronisation between them, and the ghost rows they do share are reduced afterwards in the
 // launcher, which is the second and independent parallel loop.
-template <typename scalar_t, typename idx_t, typename pack_idx_t, typename geom_t>
+template <typename scalar_t, typename idx_t, typename pack_idx_t, typename geom_t, typename grad_t>
 static SFEM_NOINLINE void apply_residual_packed_defcor_range(
         const cvfem_range packs,
         // The mesh and the pack are staging objects -- they own vectors and a shared_ptr to a
@@ -517,7 +523,6 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_range(
         // arguments that are actually used are passed.
         const scalar_t *const *const SFEM_RESTRICT adj_ptr,
         const scalar_t *const SFEM_RESTRICT det_ptr,
-        idx_t **const SFEM_RESTRICT mesh_elems,
         const ptrdiff_t nelements,
         const scalar_t *const SFEM_RESTRICT pres,
         const scalar_t *const SFEM_RESTRICT pgx,
@@ -538,7 +543,7 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_range(
         const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
         const scalar_t rho,
         const scalar_t mu,
-        const scalar_t *const SFEM_RESTRICT ugrad,
+        const grad_t *const SFEM_RESTRICT ugrad,
         const int limiter,
         const scalar_t venkat_c,
         scalar_t *const SFEM_RESTRICT rx,
@@ -553,6 +558,8 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_range(
         // six-array slot the first-order SIMD path uses, so no new scratch shape appears.
         const Hex8PackCoordsT<scalar_t> pk =
                 cvfem_hex8_pack_coords<scalar_t>(true, with_rc, max_actual_nodes_per_pack);
+        // The state's nodal velocity gradient, staged per pack (slot 14). See cvfem_hex8_pack_ugrad.
+        const Hex8PackUGradT<scalar_t> ug = cvfem_hex8_pack_ugrad<scalar_t>(true, 14, max_actual_nodes_per_pack);
 
 
     for (ptrdiff_t pack = packs.begin; pack < packs.end; ++pack) {
@@ -561,6 +568,7 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_range(
 
             std::memset(pack_out, 0, (size_t)x.n_pack_nodes * (size_t)CVFEM_HEX8_N_FIELDS * sizeof(scalar_t));
             fill_pack_fields(owned_nodes_ptr, ux, uy, uz, pres, pack, x.n_contiguous, x.n_ghost, x.ghosts, pack_u);
+            cvfem_hex8_fill_pack_ugrad(owned_nodes_ptr, ugrad, pack, x.n_contiguous, x.n_ghost, x.ghosts, ug.g);
             if (with_rc)
                 cvfem_hex8_fill_pack_xyz_pgrad(owned_nodes_ptr, points, pgx, pgy, pgz, with_rc, pack, x.n_contiguous, x.n_ghost, x.ghosts, pk.x,
                                                pk.y, pk.z, pk.pgx, pk.pgy, pk.pgz);
@@ -585,21 +593,7 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_range(
                     cvfem_hex8_gather_rc_from_pack(pack_elems, pk.pgx,
                                                    pk.pgy, pk.pgz, begin, nlanes, rcp);
                 }
-                for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
-                    const ptrdiff_t e = begin + lane;
-                    for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                        if (lane >= nlanes) {
-                            hop.x[a][lane] = hop.y[a][lane] = hop.z[a][lane] = scalar_t(0);
-                            for (int c = 0; c < 9; ++c) hop.g[a][c][lane] = scalar_t(0);
-                            continue;
-                        }
-                        const idx_t g = mesh_elems[a][e];
-                        hop.x[a][lane] = scalar_t(points[0][g]);
-                        hop.y[a][lane] = scalar_t(points[1][g]);
-                        hop.z[a][lane] = scalar_t(points[2][g]);
-                        for (int c = 0; c < 9; ++c) hop.g[a][c][lane] = ugrad[(ptrdiff_t)g * 9 + c];
-                    }
-                }
+                cvfem_hex8_gather_ugrad_from_pack(pack_elems, ug.g, begin, nlanes, hop);
                 cvfem_hex8_ns_upwind_residual_sumfact_simd(
                         rho, mu, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, detv, in,
                         outp, with_rc ? &rcp : nullptr, rhie_chow_scale, scalar_t(0), &hop);
@@ -847,7 +841,6 @@ static SFEM_NOINLINE void apply_jacobian_action_packcolored_affine_range(
         const ptrdiff_t *const SFEM_RESTRICT pack_order,
         const scalar_t *const *const SFEM_RESTRICT adj_ptr,
         const scalar_t *const SFEM_RESTRICT det_ptr,
-        idx_t **const SFEM_RESTRICT mesh_elems,
         const ptrdiff_t nelements,
         const scalar_t *const SFEM_RESTRICT pres,
         const scalar_t *const SFEM_RESTRICT pgx,
@@ -902,12 +895,10 @@ static SFEM_NOINLINE void apply_jacobian_action_packcolored_affine_range(
                                        x.n_ghost, x.ghosts, qg.x, qg.y, qg.z);
 
         cvfem_hex8_action_lanes_affine(x, pk, qg, adj_ptr, det_ptr,
-                                       mesh_elems, points, pack_elems, pack_u, pack_dir, pack_out,
+                                       pack_elems, pack_u, pack_dir, pack_out,
                                        rc_coeff, rc_w,
-                                       // No higher-order correction on this path, and a
-                                       // nullptr literal deduces nothing.
-                                       static_cast<const scalar_t *>(nullptr),
-                                       static_cast<const scalar_t *>(nullptr),
+                                       // No higher-order correction on this path: empty packs.
+                                       Hex8PackUGradT<scalar_t>{}, Hex8PackUGradT<scalar_t>{},
                                        rho, mu, rhie_chow_scale, with_rc, with_qg,
                                        /*with_ho=*/false, rc_cfg, 0, scalar_t(0));
 

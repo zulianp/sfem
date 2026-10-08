@@ -13,6 +13,8 @@
 // kernels call the same functions with a per-cell adjugate. Separating by geometry means
 // separating where the Jacobian comes from, not every function that takes one.
 #include "kernels/microkernels/hex8/cvfem_hex8_ns_upwind_kernels.hpp"
+// For the edge columns the deferred correction's reconstruction contracts against.
+#include "kernels/microkernels/hex8/affine/cvfem_hex8_affine_geometry.hpp"
 
 template <typename scalar_t>
 static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_residual(const scalar_t                        rho,
@@ -76,14 +78,12 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_residual_sumfact(c
                                                               scalar_t *const SFEM_RESTRICT         r,
                                                               const Hex8RhieChowT<scalar_t>        &rc = {},
                                                               const scalar_t ueps = scalar_t(0),
-                                                              // Deferred-correction inputs: the element's eight nodal velocity
-                                                              // gradients and its node coordinates. All null -- the default, and
-                                                              // what every caller that has not asked for the correction passes --
+                                                              // Deferred-correction input: the element's eight nodal velocity
+                                                              // gradients, REWRITTEN IN PLACE into the node-surface increments
+                                                              // (cvfem_hex8_defcor_ref_increments). Null -- the default, and what
+                                                              // every caller that has not asked for the correction passes --
                                                               // leaves this kernel bit-for-bit what it was.
-                                                              const scalar_t *const SFEM_RESTRICT ugrad8 = nullptr,
-                                                              const scalar_t *const SFEM_RESTRICT xe = nullptr,
-                                                              const scalar_t *const SFEM_RESTRICT ye = nullptr,
-                                                              const scalar_t *const SFEM_RESTRICT ze = nullptr,
+                                                              scalar_t *const SFEM_RESTRICT ugrad8 = nullptr,
                                                               const int limiter = 0,
                                                               const scalar_t venkat_c = scalar_t(0),
                                                               Hex8LimiterStats *const stats = nullptr,
@@ -96,10 +96,17 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_residual_sumfact(c
                                                               const Hex8PecletConfig<scalar_t> &pcfg = {}) {
     for (int i = 0; i < CVFEM_HEX8_N_DOF; ++i) r[i] = scalar_t(0);
 
-    // The twelve centroids, once for the element, only when the correction is on. Twelve triples
-    // of doubles on the stack against reloading all eight node coordinates twelve times.
-    scalar_t cenx[CVFEM_HEX8_N_SCS], ceny[CVFEM_HEX8_N_SCS], cenz[CVFEM_HEX8_N_SCS];
-    if (ugrad8) cvfem_hex8_scs_centroids<1>(xe, ye, ze, /*off=*/0, cenx, ceny, cenz);
+    // The correction's increments, once for the element, only when the correction is on: the
+    // edge columns from the adjugate this kernel already holds, the staged gradient rewritten
+    // into the twenty-four node-surface increments, and Venkatakrishnan's eps^2 per direction.
+    scalar_t veps2[3] = {scalar_t(0), scalar_t(0), scalar_t(0)};
+    if (ugrad8) {
+        scalar_t ecx[3], ecy[3], ecz[3];
+        cvfem_hex8_affine_edge_cols(adj[0], adj[1], adj[2], adj[3], adj[4], adj[5], adj[6], adj[7], adj[8], det,
+                                    ecx, ecy, ecz);
+        cvfem_hex8_defcor_ref_increments<1>(ugrad8, ecx, ecy, ecz);
+        if (limiter == 2) cvfem_hex8_defcor_venkat_eps2<1>(venkat_c, ecx, ecy, ecz, veps2);
+    }
 
     scalar_t grad[9];
     cvfem_hex8_grad_sumfact(adj, det, ux, uy, uz, grad);
@@ -182,14 +189,20 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_residual_sumfact(c
         // Jacobian below is untouched by design; see cvfem_hex8_scs_defcor.
         if (ugrad8) {
             scalar_t dfx, dfy, dfz;
+            // The same upwind split the flux used, recovered from the mass flux it returned --
+            // which already carries the Rhie-Chow term, so the correction is weighted by the
+            // flux actually transported rather than by a second opinion about it.
+            scalar_t amdot, sgn;
+            cvfem_upwind_abs(mdot, ueps, amdot, sgn);
+            const scalar_t mpos = scalar_t(0.5) * (mdot + amdot);
+            const scalar_t mneg = scalar_t(0.5) * (mdot - amdot);
             // (STRIDE=1, off=0): the flat per-element arrays this scalar sweep holds. The arm
             // is a template argument on the leaf now, so the switch is here -- which is where a
             // sweep-uniform choice belongs. This is the scalar sweep, so the switch costs a
             // predictable branch per surface rather than one inside a lane loop.
 #define CVFEM_HEX8_SCS_DEFCOR_ARM(LIM_)                                                         \
-    cvfem_hex8_scs_defcor<1, LIM_, true>(ugrad8, xe, ye, ze, ux, uy, uz, s, i, j, mdot, ueps,   \
-                                   venkat_c, stats, /*off=*/0, cenx[s], ceny[s], cenz[s],       \
-                                   dfx, dfy, dfz)
+    cvfem_hex8_scs_defcor<1, LIM_, true>(ugrad8, ux, uy, uz, d, i, j, mpos, mneg, veps2[d],     \
+                                         stats, /*off=*/0, dfx, dfy, dfz)
             switch (limiter) {
                 case 1: CVFEM_HEX8_SCS_DEFCOR_ARM(1); break;
                 case 2: CVFEM_HEX8_SCS_DEFCOR_ARM(2); break;
@@ -231,23 +244,30 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_jacobian_action(co
                                                              const scalar_t *const SFEM_RESTRICT   p  = nullptr,
                                                              const scalar_t ueps = scalar_t(0),
                                                              // The exact higher-order action, as on
-                                                             // the packed sweep: the element's node
-                                                             // coordinates, the state's nodal velocity
-                                                             // gradient and the direction's. All null
-                                                             // is the lagged action, which is what
-                                                             // this kernel computed before they existed.
-                                                             const scalar_t *const SFEM_RESTRICT xe = nullptr,
-                                                             const scalar_t *const SFEM_RESTRICT ye = nullptr,
-                                                             const scalar_t *const SFEM_RESTRICT ze = nullptr,
-                                                             const scalar_t *const SFEM_RESTRICT ugrad8 = nullptr,
-                                                             const scalar_t *const SFEM_RESTRICT vgrad8 = nullptr,
+                                                             // the packed sweep: the state's nodal
+                                                             // velocity gradient and the direction's,
+                                                             // both REWRITTEN IN PLACE into increments.
+                                                             // Both null is the lagged action, which is
+                                                             // what this kernel computed before they
+                                                             // existed.
+                                                             scalar_t *const SFEM_RESTRICT ugrad8 = nullptr,
+                                                             scalar_t *const SFEM_RESTRICT vgrad8 = nullptr,
                                                              const scalar_t venkat_c = scalar_t(0)) {
     for (int i = 0; i < CVFEM_HEX8_N_DOF; ++i) r[i] = scalar_t(0);
 
-    // The twelve centroids, once, exactly as the scalar residual builds them when it carries the
-    // correction.
-    scalar_t cenx[CVFEM_HEX8_N_SCS], ceny[CVFEM_HEX8_N_SCS], cenz[CVFEM_HEX8_N_SCS];
-    if (ugrad8 && vgrad8) cvfem_hex8_scs_centroids<1>(xe, ye, ze, /*off=*/0, cenx, ceny, cenz);
+    // The state's and the direction's increments, once, exactly as the scalar residual builds
+    // the state's when it carries the correction.
+    scalar_t veps2[3] = {scalar_t(0), scalar_t(0), scalar_t(0)};
+    // The state's increments' rounding scales, for the limiter derivatives' bands.
+    scalar_t isc[CVFEM_HEX8_N_NODES * 3];
+    if (ugrad8 && vgrad8) {
+        scalar_t ecx[3], ecy[3], ecz[3];
+        cvfem_hex8_affine_edge_cols(adj[0], adj[1], adj[2], adj[3], adj[4], adj[5], adj[6], adj[7], adj[8], det,
+                                    ecx, ecy, ecz);
+        cvfem_hex8_defcor_ref_increments<1, true>(ugrad8, ecx, ecy, ecz, isc);
+        cvfem_hex8_defcor_ref_increments<1>(vgrad8, ecx, ecy, ecz);
+        if constexpr (LIM == 2) cvfem_hex8_defcor_venkat_eps2<1>(venkat_c, ecx, ecy, ecz, veps2);
+    }
 
     scalar_t dgrad[9];
     cvfem_hex8_grad_sumfact(adj, det, vx, vy, vz, dgrad);
@@ -320,9 +340,8 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_jacobian_action(co
         // layouts cannot carry different higher-order terms.
         if (ugrad8 && vgrad8) {
             scalar_t hx, hy, hz;
-            cvfem_hex8_scs_defcor_jv<1, LIM>(ugrad8, vgrad8, xe, ye, ze, ux, uy, uz, vx, vy, vz,
-                                             s, i, j, mdot, dmdot, ueps, venkat_c, /*off=*/0,
-                                             cenx[s], ceny[s], cenz[s], hx, hy, hz);
+            cvfem_hex8_scs_defcor_jv<1, LIM>(ugrad8, vgrad8, ux, uy, uz, vx, vy, vz, d, i, j,
+                                             mpos, mneg, dpos, dneg, veps2[d], isc, /*off=*/0, hx, hy, hz);
             fx += hx; fy += hy; fz += hz;
         }
         r[i * 4 + 0] += fx;

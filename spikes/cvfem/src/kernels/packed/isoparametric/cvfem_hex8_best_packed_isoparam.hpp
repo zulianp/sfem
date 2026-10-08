@@ -111,7 +111,7 @@ static SFEM_NOINLINE void apply_residual_packed_isoparam_range(
 // pack-based layout), no staged direction gradient, no adjugate table, no boundary extras. All
 // of that was dead in this half of the `if constexpr` and had to be in the signature anyway,
 // because a sweep templated on the geometry takes the union of both halves' needs.
-template <typename scalar_t, typename idx_t, typename pack_idx_t, typename geom_t>
+template <typename scalar_t, typename idx_t, typename pack_idx_t, typename geom_t, typename grad_t>
 static SFEM_NOINLINE void apply_jacobian_action_packed_isoparam_range(
         const cvfem_range packs,
         // The mesh and the pack are staging objects -- they own vectors and a shared_ptr to a
@@ -136,8 +136,8 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_isoparam_range(
         const scalar_t mu,
         const scalar_t *const dir,
         scalar_t *const jv,
-        const scalar_t *const SFEM_RESTRICT ugrad,
-        const scalar_t *const SFEM_RESTRICT vgrad,
+        const grad_t *const SFEM_RESTRICT ugrad,
+        const grad_t *const SFEM_RESTRICT vgrad,
         const int limiter,
         const scalar_t venkat_c,
         const bool with_ho,

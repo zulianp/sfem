@@ -73,7 +73,7 @@ CVFEM_VEC_GATE_ENTRY(CVFEM_VEC_GATE_HEAD, const Hex8RhieChowPack *rc) {
 // own notes record the Venkatakrishnan kernel emitting 6000 instructions and not one NEON
 // register.
 #elif CVFEM_VEC_GATE_KERNEL == 3
-CVFEM_VEC_GATE_ENTRY(CVFEM_VEC_GATE_HEAD, const Hex8RhieChowPack *rc, const Hex8UGradPack *ho) {
+CVFEM_VEC_GATE_ENTRY(CVFEM_VEC_GATE_HEAD, const Hex8RhieChowPack *rc, Hex8UGradPack *ho) {
     cvfem_hex8_ns_upwind_residual_sumfact_simd(CVFEM_VEC_GATE_ARGS, rc, scalar_t(1), scalar_t(0),
                                                ho);
 }
@@ -104,9 +104,7 @@ CVFEM_VEC_GATE_ENTRY(const scalar_t rho,
                      Hex8ResidualPack                   &out,
                      const scalar_t                      ueps,
                      const Hex8UGradPack *const          ho,
-                     const scalar_t *const SFEM_RESTRICT cenx,
-                     const scalar_t *const SFEM_RESTRICT ceny,
-                     const scalar_t *const SFEM_RESTRICT cenz,
+                     const scalar_t *const SFEM_RESTRICT veps2,
                      const scalar_t *const SFEM_RESTRICT edx,
                      const scalar_t *const SFEM_RESTRICT edy,
                      const scalar_t *const SFEM_RESTRICT edz) {
@@ -128,9 +126,7 @@ CVFEM_VEC_GATE_ENTRY(const scalar_t rho,
                                                                            out,
                                                                            ueps,
                                                                            ho,
-                                                                           cenx,
-                                                                           ceny,
-                                                                           cenz,
+                                                                           veps2,
                                                                            edx,
                                                                            edy,
                                                                            edz);
@@ -163,9 +159,8 @@ CVFEM_VEC_GATE_ENTRY(const scalar_t rho,
                      const scalar_t                      ueps,
                      const Hex8UGradPack *const          ho,
                      const Hex8UGradPack *const          hov,
-                     const scalar_t *const SFEM_RESTRICT cenx,
-                     const scalar_t *const SFEM_RESTRICT ceny,
-                     const scalar_t *const SFEM_RESTRICT cenz,
+                     const scalar_t *const SFEM_RESTRICT veps2,
+                     const scalar_t *const SFEM_RESTRICT isc,
                      const scalar_t *const SFEM_RESTRICT edx,
                      const scalar_t *const SFEM_RESTRICT edy,
                      const scalar_t *const SFEM_RESTRICT edz) {
@@ -175,7 +170,7 @@ CVFEM_VEC_GATE_ENTRY(const scalar_t rho,
                                 (CVFEM_VEC_GATE_KERNEL > 20),
                                 (CVFEM_VEC_GATE_KERNEL > 20 ? CVFEM_VEC_GATE_KERNEL - 21 : 0)>(
             rho, half, one, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, u, du, rc, out, ueps, ho,
-            hov, cenx, ceny, cenz, edx, edy, edz);
+            hov, veps2, isc, edx, edy, edz);
 }
 
 #else

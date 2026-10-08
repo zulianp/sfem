@@ -55,6 +55,12 @@ source scripts/alps_env.sh || exit 1
 
 B=$PWD/build/cvfem_hex8_ns_upwind_bench
 [ -x "$B" ] || { echo "no bench at $B" >&2; exit 1; }
+# THE SINGLE-PRECISION BUILD, in the same allocation. cvfem_hex8_ns_upwind_bench_f32 is the same
+# driver with every field, pack and kernel in float (held to this one by ctest cvfem_bench_f32).
+# Each pass runs both binaries, order alternating, so the f32-over-f64 gain the paper's stacked
+# bars draw is never a node-to-node difference. Without the f32 build the job reports f64 only.
+B32=$PWD/build/cvfem_hex8_ns_upwind_bench_f32
+PRECS="64"; [ -x "$B32" ] && PRECS="64 32"
 OUT=${OUT:-$SCRATCH/cvfem_convho/${SLURM_JOB_ID:-manual}}
 mkdir -p "$OUT"
 CSV=$OUT/convho.csv
@@ -68,7 +74,7 @@ echo "### packed arms are the GENERATED kernel unless labelled _scalar"
 echo "### scalar-vs-scalar isolates the LAYOUT; generated-vs-scalar isolates the KERNEL"
 echo
 
-printf '%-22s %-8s %10s %10s %10s %10s %14s\n' arm layout MDOF_s dofs elems flops_el checksum
+printf '%-22s %-8s %10s %10s %10s %10s %14s %5s\n' arm layout MDOF_s dofs elems flops_el checksum prec
 # EVERY arm carries --rhie-chow. The sweep used to run the bare operator, which made its rates
 # incomparable with the Jacobian table's -- the same scheme appeared at two rates a third apart
 # and nothing said why. The pressure-velocity coupling is part of the operator a solver applies,
@@ -96,27 +102,33 @@ for arm in "first_order|atomic|--rhie-chow" \
            "ho_darwish_moukalled|packed|--rhie-chow --conv-ho 3" \
            "ho_darwish_moukalled|ecolor|--rhie-chow --conv-ho 3"; do
     IFS='|' read -r lbl lay extra <<<"$arm"
-    best=""; dofs=""; ck=""; elems=""; fpe=""
+    declare -A best=() dofs=() ck=() elems=() fpe=()
     # Best of three passes: one pass cannot separate this band -- the residual carries a large
     # run-to-run variance that the pack-size sweep measured at up to 58% on a single pass.
     for pass in $(seq 1 "$PASSES"); do
-        log=$OUT/${lbl}_${lay}_p${pass}.log
-        timeout "${RUN_TIMEOUT:-360}" \
-          srun -u --ntasks=1 --cpus-per-task=72 --uenv="$CVFEM_UENV" --view="$CVFEM_VIEW" \
-          bash -lc "cd $PWD && OMP_NUM_THREADS=72 OMP_PROC_BIND=true OMP_PLACES=cores $B --n $N --repeat $REPEAT --warmup 3 --layout $lay $extra --csv $CSV --tag ${lbl}_${lay}_p${pass}" \
-          > "$log" 2>&1
-        val() { sed -n "s|^  $1: \(.*\)$|\1|p" "$log" | head -1; }
-        v=$(val 'MDOF/s'); [ -n "$v" ] || continue
-        best=$(awk -v a="${best:-0}" -v b="$v" 'BEGIN{print (b+0>a+0)?b:a}')
-        dofs=$(val 'dofs'); ck=$(val 'checksum')
-        # The work model and the element count are pass-invariant, so they may be read from any
-        # pass; the roofline multiplies them by the BEST rate, which is the rate this table
-        # reports. Reading a GFLOP/s line instead would bind the point to whichever pass it came
-        # from and disagree with the MDOF/s beside it.
-        elems=$(val 'elements'); fpe=$(val 'flops_per_element_model')
+        order=$PRECS; [ $((pass % 2)) -eq 0 ] && order=$(echo $PRECS | awk '{for(i=NF;i>0;i--) printf "%s ", $i}')
+        for prec in $order; do
+            bin=$B; [ "$prec" = 32 ] && bin=$B32
+            log=$OUT/${lbl}_${lay}_f${prec}_p${pass}.log
+            timeout "${RUN_TIMEOUT:-360}" \
+              srun -u --ntasks=1 --cpus-per-task=72 --uenv="$CVFEM_UENV" --view="$CVFEM_VIEW" \
+              bash -lc "cd $PWD && OMP_NUM_THREADS=72 OMP_PROC_BIND=true OMP_PLACES=cores $bin --n $N --repeat $REPEAT --warmup 3 --layout $lay $extra --csv $CSV --tag ${lbl}_${lay}_f${prec}_p${pass}" \
+              > "$log" 2>&1
+            val() { sed -n "s|^  $1: \(.*\)$|\1|p" "$log" | head -1; }
+            v=$(val 'MDOF/s'); [ -n "$v" ] || continue
+            best[$prec]=$(awk -v a="${best[$prec]:-0}" -v b="$v" 'BEGIN{print (b+0>a+0)?b:a}')
+            dofs[$prec]=$(val 'dofs'); ck[$prec]=$(val 'checksum')
+            # The work model and the element count are pass-invariant, so they may be read from
+            # any pass; the roofline multiplies them by the BEST rate, which is the rate this
+            # table reports. Reading a GFLOP/s line instead would bind the point to whichever
+            # pass it came from and disagree with the MDOF/s beside it.
+            elems[$prec]=$(val 'elements'); fpe[$prec]=$(val 'flops_per_element_model')
+        done
     done
-    printf '%-22s %-8s %10s %10s %10s %10s %14s\n' "$lbl" "$lay" "${best:--}" "${dofs:--}" \
-           "${elems:--}" "${fpe:--}" "${ck:--}"
+    for prec in $PRECS; do
+        printf '%-22s %-8s %10s %10s %10s %10s %14s %5s\n' "$lbl" "$lay" "${best[$prec]:--}" \
+               "${dofs[$prec]:--}" "${elems[$prec]:--}" "${fpe[$prec]:--}" "${ck[$prec]:--}" "f$prec"
+    done
 done
 
 echo

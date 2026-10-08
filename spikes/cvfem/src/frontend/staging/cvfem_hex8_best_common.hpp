@@ -22,6 +22,21 @@
 // This header is self-contained: it pulls in the smesh/SFEM headers, the HEX8
 // element kernels, and the scalar/index types the layouts are written against.
 
+// THE LIBRARY'S OWN SCALAR TYPE, SHIELDED WHEN THIS FAMILY COMPUTES IN ANOTHER ONE.
+//
+// sfem_config.h declares a global `typedef smesh::scalar_t scalar_t` -- double in every install
+// -- and this family's kernels and containers name `scalar_t` unqualified. With the default type
+// the two agree and nothing below changes. When the build sets CVFEM_SCALAR_T (the f32 bench),
+// the library headers are included with that global name renamed, so the library keeps its
+// double as `cvfem_library_scalar_t` and the global `scalar_t` this family declares further down
+// is free to be float. Every library header the family reaches is included inside the shield,
+// because its include guard makes a later inclusion a no-op; a library function the driver calls
+// with a type that no longer matches then fails to compile rather than converting silently.
+#if defined(CVFEM_SCALAR_T)
+#define CVFEM_LIBRARY_SCALAR_SHIELD 1
+#define scalar_t cvfem_library_scalar_t
+#endif
+
 // The kernels trace through their own spelling, which is nothing unless a translation
 // unit says what it means. See kernels/cvfem_phases.hpp.
 #include "sfem_aliases.hpp"
@@ -32,6 +47,21 @@
 #include "smesh_packed_mesh.hpp"
 #include "smesh_buffer.hpp"
 #include "sfem_BSR.hpp"
+#if defined(CVFEM_LIBRARY_SCALAR_SHIELD)
+// The rest of what the family and the bench driver include from the library, for the reason
+// above: inside the shield or not at all.
+#include "smesh_env.hpp"
+#include "smesh_glob.hpp"
+#include "smesh_context.hpp"
+#include "smesh_types.hpp"
+#include "smesh_output.hpp"
+#include "smesh_sideset.hpp"
+#include "smesh_sshex8.hpp"
+#include "sfem_API.hpp"
+#include "sfem_Function.hpp"
+#include "sfem_CRS.hpp"
+#undef scalar_t
+#endif
 
 #include <mpi.h>
 
@@ -60,7 +90,16 @@
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #endif
 
-using scalar_t = double;
+// THE COMPUTATION TYPE IS A BUILD-TIME CHOICE OF THIS FAMILY. Double by default; the
+// cvfem_hex8_ns_upwind_bench_f32 target builds the same driver with CVFEM_SCALAR_T=float, so every
+// field, every staged pack, the cached adjugate table and every kernel run in single precision --
+// the fully-f32 measurement, beside the mixed-storage option (--grad-precision) that keeps the
+// computation in double. One source, two instantiations: the kernels are templated on the type,
+// and this alias is the only place the driver fixes it.
+#ifndef CVFEM_SCALAR_T
+#define CVFEM_SCALAR_T double
+#endif
+using scalar_t = CVFEM_SCALAR_T;
 // THE INDEX TYPES THE KERNELS NAME, declared here for the same reason scalar_t above is.
 //
 // DESIGN.md requires src/kernels/ to be "header only self-contained code with templated types"

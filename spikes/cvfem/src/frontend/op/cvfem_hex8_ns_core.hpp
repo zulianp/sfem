@@ -113,6 +113,20 @@ struct MeshData {
     // higher-order action is on. Empty is the signal that the lagged one is wanted, exactly as an
     // empty d.qgx signals the frozen Rhie-Chow form.
     std::vector<scalar_t> vgrad;
+    // MIXED-PRECISION STORAGE OF THE TWO FIELDS ABOVE. SFEM_GRAD_PRECISION=single stores the
+    // nodal velocity gradients as float -- the reconstruction still accumulates in scalar_t and
+    // converts at the write, the sweeps convert back at the gather and compute in scalar_t -- so
+    // the nine-component field the correction reads, and the second one the exact Jacobian
+    // action reads, cost half their traffic. Either precision is one switch away; the default is
+    // double until the measurement says otherwise. Exactly one of each pair is populated, and
+    // cvfem_hex8_has_ugrad / has_vgrad are how a caller asks.
+    int                   grad_single{0};
+    std::vector<float>    ugrad32;
+    std::vector<float>    vgrad32;
+    // Float scratch for the pressure-gradient components of the fused direction sweep under
+    // single storage; held here so the widening pass, which runs on every thread, reads one
+    // buffer rather than a thread-local one.
+    std::vector<float>    grad_tmp32;
     // Ghost staging for the fused nine-component sweep. PackedData::ghost_buf is N_FIELDS
     // wide and this needs nine, and it is held here so a residual does not allocate.
     std::vector<scalar_t> ugrad_ghost;
@@ -267,6 +281,13 @@ struct MeshData {
     // hard switch. See cvfem_upwind_abs.
     scalar_t upwind_eps{0};
 };
+
+// Which storage holds the nodal velocity gradient, and whether it holds one at all. Every test
+// that used to spell `!d.ugrad.empty()` goes through here, so the single-precision option cannot
+// leave a consumer reading the empty double vector as "no gradient".
+inline bool cvfem_hex8_has_ugrad(const MeshData &d) { return d.grad_single ? !d.ugrad32.empty() : !d.ugrad.empty(); }
+inline bool cvfem_hex8_has_vgrad(const MeshData &d) { return d.grad_single ? !d.vgrad32.empty() : !d.vgrad.empty(); }
+
 
 #include "frontend/staging/cvfem_hex8_ns_packed_launch.hpp"
 #include "kernels/microkernels/hex8/affine/generated/cvfem_hex8_ns_upwind_sympy_affine.hpp"
@@ -565,8 +586,9 @@ inline void assemble_nodal_grads(MeshData &d, const GeomKind geom_kind, const Gr
 
     // Velocity alone writes d.ugrad in place, which is the layout its consumers read. Any set
     // that includes the pressure sweeps into the scratch buffer instead, because d.ugrad is
-    // nine-per-node by contract and the fused set is twelve.
-    std::vector<scalar_t> &buf = (set == GradSet::Velocity) ? d.ugrad : d.pgrad_tmp;
+    // nine-per-node by contract and the fused set is twelve. Under single-precision storage the
+    // sweep always lands in the scratch buffer and the copy-out below converts.
+    std::vector<scalar_t> &buf = (set == GradSet::Velocity && !d.grad_single) ? d.ugrad : d.pgrad_tmp;
     if (d.packed && !smesh::Env::read<int>("SFEM_QGRAD_ATOMIC", 0))
         cvfem_hex8_assemble_nodal_grads_packed(d, *d.packed, iso, srcs, nf, buf, d.ugrad_ghost);
     else
@@ -589,11 +611,21 @@ inline void assemble_nodal_grads(MeshData &d, const GeomKind geom_kind, const Gr
     // With p in front the velocity block starts at component 3, and the deferred correction
     // reads d.ugrad as nine-per-node, so it is copied out of the fused buffer. One nodal pass
     // against an element sweep, and it leaves both layouts exactly as their consumers expect.
-    if (want_u && want_p) {
+    const int uoff = want_p ? 3 : 0;
+    if (want_u && d.grad_single) {
+        d.ugrad.clear();
+        d.ugrad32.resize((size_t)d.nnodes * 9);
+#pragma omp parallel for schedule(static)
+        for (ptrdiff_t i = 0; i < d.nnodes; ++i)
+            for (int c = 0; c < 9; ++c) d.ugrad32[(size_t)i * 9 + c] = float(buf[(size_t)i * nc + uoff + c]);
+    } else if (want_u && want_p) {
+        d.ugrad32.clear();
         d.ugrad.resize((size_t)d.nnodes * 9);
 #pragma omp parallel for schedule(static)
         for (ptrdiff_t i = 0; i < d.nnodes; ++i)
             for (int c = 0; c < 9; ++c) d.ugrad[(size_t)i * 9 + c] = buf[(size_t)i * nc + 3 + c];
+    } else if (want_u) {
+        d.ugrad32.clear();
     }
 }
 
@@ -601,6 +633,13 @@ inline void assemble_nodal_grads(MeshData &d, const GeomKind geom_kind, const Gr
 // Gather one element's eight nodal velocity gradients into the 72-scalar block the SCS
 // correction reads.
 inline void gather_element_ugrad(const MeshData &d, const ptrdiff_t e, scalar_t *const g8) {
+    if (d.grad_single) {
+        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+            const smesh::idx_t id = d.elems[a][e];
+            for (int k = 0; k < 9; ++k) g8[a * 9 + k] = scalar_t(d.ugrad32[(size_t)id * 9 + (size_t)k]);
+        }
+        return;
+    }
     for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
         const smesh::idx_t id = d.elems[a][e];
         for (int k = 0; k < 9; ++k) g8[a * 9 + k] = d.ugrad[(size_t)id * 9 + (size_t)k];
@@ -753,11 +792,10 @@ inline SFEM_NOINLINE void apply_residual_atomic_sumfact(MeshData &d, const scala
         // Deferred correction, when it is on. Null pointers otherwise, which is the same
         // arithmetic the kernel did before this existed.
         scalar_t g8[CVFEM_HEX8_N_NODES * 9];
-        const bool ho = d.conv_ho != 0 && !d.ugrad.empty();
+        const bool ho = d.conv_ho != 0 && cvfem_hex8_has_ugrad(d);
         if (ho) gather_element_ugrad(d, e, g8);
         cvfem_hex8_ns_upwind_residual_sumfact(rho, mu, adj, det, ux, uy, uz, p, r, rc,
                                               d.upwind_eps, ho ? g8 : nullptr,
-                                              ho ? x : nullptr, ho ? y : nullptr, ho ? z : nullptr,
                                               d.conv_limiter, d.conv_venkat_c, d.limiter_stats,
                                               d.conv_peclet);
         boundary_scs_add_residual<false>(rho, mu, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, p, r,
@@ -1242,6 +1280,13 @@ inline void apply_residual(MeshData &d, const scalar_t rho, const scalar_t mu, c
     // 19,652 dofs on both -- which is what says the semi-structured wiring is right, since
     // a lattice at level 4 and a flat mesh of the same spacing are the same discretisation.
     d.conv_ho      = (ho_override >= 0) ? ho_override : smesh::Env::read<int>("SFEM_CONV_HO", 0);
+    // SFEM_GRAD_PRECISION: single stores the nodal velocity gradients as float (see MeshData).
+    // Double by default; both are kept so the choice can be measured.
+    {
+        static const std::string gp = smesh::Env::read<std::string>("SFEM_GRAD_PRECISION", "double");
+        if (gp != "double" && gp != "single") SFEM_ERROR("SFEM_GRAD_PRECISION takes double or single, not '%s'", gp.c_str());
+        d.grad_single = gp == "single";
+    }
     // 0 = unlimited, 1 = bounded face. Default 1 when the correction is on: an unlimited
     // reconstruction is right only where the field is smooth, and defaulting to the setting
     // that is correct on a manufactured solution and wrong on a step would be exactly the
@@ -1571,8 +1616,38 @@ inline void apply_jacobian_action_accumulate(MeshData &d, const scalar_t rho, co
     // switchable. SFEM_HO_EXACT_JAC=0 gives the lagged action, the operator an assembled
     // first-order matrix holds and what this solver applied before the term existed.
     const bool want_q = cvfem_hex8_rc_exact_jac() && d.rhie_chow_scale != scalar_t(0) && !d.pgx.empty();
-    const bool want_v = cvfem_hex8_ho_exact_jac() && d.conv_ho && !d.ugrad.empty();
-    if (want_q && want_v) {
+    const bool want_v = cvfem_hex8_ho_exact_jac() && d.conv_ho && cvfem_hex8_has_ugrad(d);
+    if (want_q && want_v && d.grad_single) {
+        // The fused four-field sweep, single-precision storage: the output type is one per sweep,
+        // so the three pressure components go through a float scratch and are widened back into
+        // the double arrays the Rhie-Chow consumers read. A nodal pass over three components,
+        // against the sweep it rides on.
+        SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::assemble_nodal_qv_grad");
+        d.vgrad.clear();
+        d.vgrad32.resize((size_t)d.nnodes * 9);
+        d.qgx.resize((size_t)d.nnodes);
+        d.qgy.resize((size_t)d.nnodes);
+        d.qgz.resize((size_t)d.nnodes);
+        std::vector<float> &qg32 = d.grad_tmp32;
+        qg32.resize((size_t)d.nnodes * 3);
+        const int       iso      = geom == GeomKind::Isoparam ? 1 : 0;
+        const scalar_t *srcs[4]  = {dir + 0, dir + 1, dir + 2, dir + 3};
+        const int       st[4]    = {N_FIELDS, N_FIELDS, N_FIELDS, N_FIELDS};
+        float          *outp[12];
+        ptrdiff_t       ostr[12];
+        for (int c = 0; c < 9; ++c) { outp[c] = d.vgrad32.data() + c; ostr[c] = 9; }
+        for (int c = 0; c < 3; ++c) { outp[9 + c] = qg32.data() + c; ostr[9 + c] = 3; }
+        if (d.packed)
+            cvfem_hex8_assemble_nodal_grads_packed(d, *d.packed, iso, srcs, st, 4, outp, ostr, d.ugrad_ghost);
+        else
+            cvfem_hex8_assemble_nodal_grads_atomic(d, iso, srcs, st, 4, outp, ostr);
+#pragma omp parallel for schedule(static)
+        for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+            d.qgx[(size_t)i] = scalar_t(qg32[(size_t)i * 3 + 0]);
+            d.qgy[(size_t)i] = scalar_t(qg32[(size_t)i * 3 + 1]);
+            d.qgz[(size_t)i] = scalar_t(qg32[(size_t)i * 3 + 2]);
+        }
+    } else if (want_q && want_v) {
         // ONE SWEEP FOR BOTH. They reconstruct different fields of the SAME array with the same
         // stride -- the direction's three velocity components and its pressure -- so together
         // they are a four-field sweep rather than a one-field and a three-field one. What that
@@ -1587,6 +1662,7 @@ inline void apply_jacobian_action_accumulate(MeshData &d, const scalar_t rho, co
         // stride PER COMPONENT rather than one shared stride. It costs nothing in the element
         // loop: the strides appear only in the write-out and the ghost reduction.
         SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::assemble_nodal_qv_grad");
+        d.vgrad32.clear();
         d.vgrad.resize((size_t)d.nnodes * 9);
         d.qgx.resize((size_t)d.nnodes);
         d.qgy.resize((size_t)d.nnodes);
@@ -1608,13 +1684,30 @@ inline void apply_jacobian_action_accumulate(MeshData &d, const scalar_t rho, co
         SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::assemble_nodal_q_grad");
         assemble_nodal_grad_strided(d, geom, dir + 3, N_FIELDS, d.qgx, d.qgy, d.qgz);
         d.vgrad.clear();
+    } else if (want_v && d.grad_single) {
+        SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::assemble_nodal_v_grad");
+        d.vgrad.clear();
+        d.vgrad32.resize((size_t)d.nnodes * 9);
+        const int       iso     = geom == GeomKind::Isoparam ? 1 : 0;
+        const scalar_t *srcs[3] = {dir + 0, dir + 1, dir + 2};
+        const int       st[3]   = {N_FIELDS, N_FIELDS, N_FIELDS};
+        float          *outp[9];
+        ptrdiff_t       ostr[9];
+        for (int c = 0; c < 9; ++c) { outp[c] = d.vgrad32.data() + c; ostr[c] = 9; }
+        if (d.packed)
+            cvfem_hex8_assemble_nodal_grads_packed(d, *d.packed, iso, srcs, st, 3, outp, ostr, d.ugrad_ghost);
+        else
+            cvfem_hex8_assemble_nodal_grads_atomic(d, iso, srcs, st, 3, outp, ostr);
+        d.qgx.clear(); d.qgy.clear(); d.qgz.clear();
     } else if (want_v) {
         SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::assemble_nodal_v_grad");
+        d.vgrad32.clear();
         assemble_nodal_vel_grad_of(d, geom, dir, d.vgrad);
         d.qgx.clear(); d.qgy.clear(); d.qgz.clear();
     } else {
         d.qgx.clear(); d.qgy.clear(); d.qgz.clear();
         d.vgrad.clear();
+        d.vgrad32.clear();
     }
     if (geom == GeomKind::Isoparam) {
         apply_jacobian_action_atomic_isoparam(d, rho, mu, dir, jv);

@@ -60,6 +60,13 @@ source scripts/alps_env.sh || exit 1
 
 B=$PWD/build/cvfem_hex8_ns_upwind_bench
 [ -x "$B" ] || { echo "no bench at $B" >&2; exit 1; }
+# THE SINGLE-PRECISION BUILD, in the same allocation, every pass running both binaries with the
+# order alternating (see jobs/conv_ho_bench.sbatch). In it every vector and the matrix are float,
+# so its one SpMV arm is the fully single-precision product -- the like-for-like reference for the
+# f32 matrix-free rows -- and spmv_f64 is not run there: --bsr-precision double would store float
+# values under a double label.
+B32=$PWD/build/cvfem_hex8_ns_upwind_bench_f32
+PRECS="64"; [ -x "$B32" ] && PRECS="64 32"
 OUT=${OUT:-$SCRATCH/cvfem_jacfair/${SLURM_JOB_ID:-manual}}
 mkdir -p "$OUT"
 CSV=$OUT/jacfair.csv
@@ -75,7 +82,7 @@ PACK=${PACK:-1024}
 
 echo "### host $(hostname)  n=$N repeat=$REPEAT passes=$PASSES  $(date '+%F %T')"
 echo
-printf '%-26s %-8s %10s %10s %12s %12s\n' operator layout MDOF_s dofs qgrad_frac hograd_frac
+printf '%-26s %-8s %10s %10s %12s %12s %5s\n' operator layout MDOF_s dofs qgrad_frac hograd_frac prec
 declare -A FP
 for arm in "jac_exact|packed|--jac-action --rhie-chow" \
            "jac_exact|atomic|--jac-action --rhie-chow" \
@@ -100,51 +107,61 @@ for arm in "jac_exact|packed|--jac-action --rhie-chow" \
     # silently redirected into a non-existent directory.
     layflag=""; [ "$lay" != "none" ] && layflag="--layout $lay"
     [ -n "$PACK" ] && [ "$lay" = "packed" ] && layflag="$layflag --pack-size $PACK"
-    best=""; dofs=""; qg=""; hg=""
+    declare -A best=() dofs=() qg=() hg=()
     for pass in $(seq 1 "$PASSES"); do
-        log=$OUT/${lbl}_${lay}_p${pass}.log
-        timeout "${RUN_TIMEOUT:-360}" \
-          srun -u --ntasks=1 --cpus-per-task=72 --uenv="$CVFEM_UENV" --view="$CVFEM_VIEW" \
-          bash -lc "cd $PWD && OMP_NUM_THREADS=72 OMP_PROC_BIND=true OMP_PLACES=cores $B --n $N --repeat $REPEAT --warmup 3 $layflag $extra --csv $CSV --tag ${lbl}_${lay}_p${pass}" \
-          > "$log" 2>&1
-        val() { sed -n "s|^  $1: \(.*\)$|\1|p" "$log" | head -1; }
-        v=$(val 'MDOF/s'); [ -n "$v" ] || continue
-        best=$(awk -v a="${best:-0}" -v b="$v" 'BEGIN{print (b+0>a+0)?b:a}')
-        # frac_jac_action_qgrad / _hograd, which is what the bench prints. The job read
-        # 'frac_qgrad' -- the CSV's column name, not the stdout line's -- so the column was "-"
-        # for every arm and the reconstruction's share of each matvec was never recorded. The two
-        # together are what says why lagging the Rhie-Chow term buys so much less under a
-        # higher-order scheme: when both direction gradients are needed they are ONE fused
-        # four-field sweep, charged once to hograd, so dropping the pressure one leaves the
-        # sweep's fixed half behind instead of removing it.
-        dofs=$(val 'dofs'); qg=$(val 'frac_jac_action_qgrad'); hg=$(val 'frac_jac_action_hograd')
-        # Kept for the scheme-independence check below. Packed only: the atomic sweep fixes no
-        # summation order, so its fingerprint differs run to run and proves nothing either way.
-        [ "$lay" = packed ] && FP[$lbl]=$(grep -am1 'fingerprint:' "$log" | awk '{print $2}')
+        order=$PRECS; [ $((pass % 2)) -eq 0 ] && order=$(echo $PRECS | awk '{for(i=NF;i>0;i--) printf "%s ", $i}')
+        for prec in $order; do
+            [ "$prec" = 32 ] && [ "$lbl" = spmv_f64 ] && continue
+            bin=$B; [ "$prec" = 32 ] && bin=$B32
+            log=$OUT/${lbl}_${lay}_f${prec}_p${pass}.log
+            timeout "${RUN_TIMEOUT:-360}" \
+              srun -u --ntasks=1 --cpus-per-task=72 --uenv="$CVFEM_UENV" --view="$CVFEM_VIEW" \
+              bash -lc "cd $PWD && OMP_NUM_THREADS=72 OMP_PROC_BIND=true OMP_PLACES=cores $bin --n $N --repeat $REPEAT --warmup 3 $layflag $extra --csv $CSV --tag ${lbl}_${lay}_f${prec}_p${pass}" \
+              > "$log" 2>&1
+            val() { sed -n "s|^  $1: \(.*\)$|\1|p" "$log" | head -1; }
+            v=$(val 'MDOF/s'); [ -n "$v" ] || continue
+            best[$prec]=$(awk -v a="${best[$prec]:-0}" -v b="$v" 'BEGIN{print (b+0>a+0)?b:a}')
+            # frac_jac_action_qgrad / _hograd, which is what the bench prints. The job read
+            # 'frac_qgrad' -- the CSV's column name, not the stdout line's -- so the column was "-"
+            # for every arm and the reconstruction's share of each matvec was never recorded. The two
+            # together are what says why lagging the Rhie-Chow term buys so much less under a
+            # higher-order scheme: when both direction gradients are needed they are ONE fused
+            # four-field sweep, charged once to hograd, so dropping the pressure one leaves the
+            # sweep's fixed half behind instead of removing it.
+            dofs[$prec]=$(val 'dofs'); qg[$prec]=$(val 'frac_jac_action_qgrad'); hg[$prec]=$(val 'frac_jac_action_hograd')
+            # Kept for the scheme-independence check below. Packed only: the atomic sweep fixes no
+            # summation order, so its fingerprint differs run to run and proves nothing either way.
+            [ "$lay" = packed ] && FP[$prec|$lbl]=$(grep -am1 'fingerprint:' "$log" | awk '{print $2}')
+        done
     done
-    printf '%-26s %-8s %10s %10s %12s %12s\n' "$lbl" "$lay" "${best:--}" "${dofs:--}" \
-           "${qg:--}" "${hg:--}"
+    for prec in $PRECS; do
+        [ "$prec" = 32 ] && [ "$lbl" = spmv_f64 ] && continue
+        printf '%-26s %-8s %10s %10s %12s %12s %5s\n' "$lbl" "$lay" "${best[$prec]:--}" \
+               "${dofs[$prec]:--}" "${qg[$prec]:--}" "${hg[$prec]:--}" "f$prec"
+    done
 done
 echo
 
 # THE TABLE HAS ONE LAGGED ROW, AND THIS IS WHY IT MAY.
-ref=${FP[jac_lagged]:-}
+for prec in $PRECS; do
+ref=${FP[$prec|jac_lagged]:-}
 verdict=YES
 if [ -z "$ref" ]; then
     verdict="UNKNOWN (the reference arm produced no fingerprint)"
 else
     for c in unlim clip venk dm; do
-        got=${FP[jac_lagged_ctl_$c]:-}
+        got=${FP[$prec|jac_lagged_ctl_$c]:-}
         if [ -z "$got" ]; then
             verdict="UNKNOWN (control $c produced no fingerprint)"
         elif [ "$got" != "$ref" ]; then
             verdict="NO -- control $c gave $got against $ref; the single lagged row is WRONG"
         fi
-        printf '  control %-6s %s %s\n' "$c" "${got:--}" \
+        printf '  f%s control %-6s %s %s\n' "$prec" "$c" "${got:--}" \
                "$([ "$got" = "$ref" ] && echo match || echo DIFFERS)"
     done
 fi
-echo "fully lagged is scheme-independent across every limiter: $verdict${ref:+ ($ref)}"
+echo "f$prec: fully lagged is scheme-independent across every limiter: $verdict${ref:+ ($ref)}"
+done
 echo
 echo "The exact arms carry the direction-gradient pass; jac_lagged does not, and is the operator"
 echo "the assembled matrix encodes. Compare spmv_* against jac_lagged for like-for-like."

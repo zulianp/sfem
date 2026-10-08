@@ -15,11 +15,12 @@
 #include "frontend/staging/cvfem_element_coloring.hpp"
 #include "kernels/colored/cvfem_hex8_best_ecolored.hpp"
 
+template <typename grad_t = scalar_t>
 static SFEM_NOINLINE void apply_residual_ecolored(MeshData              &d,
                                                   const ElementColoring &ec,
                                                   const scalar_t  rho,
                                                   const scalar_t  mu,
-                                                  const scalar_t *const SFEM_RESTRICT ugrad = nullptr,
+                                                  const grad_t *const SFEM_RESTRICT ugrad = nullptr,
                                                   const int       limiter  = 0,
                                                   const scalar_t  venkat_c = scalar_t(0)) {
     reset_residual(d.nnodes, d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data());
@@ -64,14 +65,15 @@ static SFEM_NOINLINE void apply_residual_ecolored(MeshData              &d,
     }
 }
 
+template <typename grad_t = scalar_t>
 static SFEM_NOINLINE void apply_jacobian_action_ecolored(MeshData              &d,
                                                          const ElementColoring &ec,
                                                          const scalar_t        rho,
                                                          const scalar_t        mu,
                                                          const scalar_t *const dir,
                                                          scalar_t *const       jv,
-                                                         const scalar_t *const SFEM_RESTRICT ugrad = nullptr,
-                                                         const scalar_t *const SFEM_RESTRICT vgrad = nullptr,
+                                                         const grad_t *const SFEM_RESTRICT ugrad = nullptr,
+                                                         const grad_t *const SFEM_RESTRICT vgrad = nullptr,
                                                          const int             limiter  = 0,
                                                          const scalar_t        venkat_c = scalar_t(0)) {
     cvfem_zero_scalars(jv, d.nnodes * CVFEM_HEX8_N_FIELDS);

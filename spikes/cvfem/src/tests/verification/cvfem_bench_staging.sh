@@ -75,7 +75,7 @@ ok_ho() {
         return
     fi
     printf '%-62s OK   %s\n' "$desc" \
-        "$(printf '%s\n' "$out" | grep -oE 'verify_packed_ho_(residual_vs_atomic|simd_vs_packed_ho_scalar|sympy_vs_packed_ho_scalar)_abs: [0-9.e+-]*' | tr '\n' ' ')"
+        "$(printf '%s\n' "$out" | grep -oE 'verify_packed_ho_(residual_vs_atomic|simd_vs_packed_ho_scalar|sympy_vs_packed_ho_scalar)_abs: [0-9.e+-]*|verify_packed_ho_(jac_)?f32_storage_vs_f64_rel: [0-9.e+-]*' | tr '\n' ' ')"
 }
 
 # The Rhie-Chow higher-order oracle. Its own helper because the driver reaches it by a different
@@ -299,6 +299,31 @@ ok_ho "residual + ho, unlimited"                --conv-ho 0
 ok_ho "residual + ho, bounded-face clip"        --conv-ho 1
 ok_ho "residual + ho, Venkatakrishnan"          --conv-ho 2
 ok_ho "residual + ho, Darwish-Moukalled"        --conv-ho 3
+# The mixed-precision storage option: the same correction with the nodal gradient held as float.
+# Its oracle is the f32-against-f64 line the driver prints beside the layout check.
+ok_ho "residual + ho, Venkatakrishnan, f32 gradient storage" --conv-ho 2 --grad-precision single
+ok_ho "residual + ho, unlimited, f32 gradient storage"       --conv-ho 0 --grad-precision single
+
+# THE LIMITED JACOBIANS' LAYOUT AGREEMENT AT THE SIZES THAT BROKE IT. The driver checks the packed
+# exact action against the atomic reference on every Rhie-Chow Jacobian run and refuses on a
+# mismatch, but every gate above runs at n=8 or 10 and every throughput job at 128 -- sizes where
+# it held -- while gcc builds disagreed by 1e-4 at n=24, 40, 72, 80, 96 and 160 until the limiter
+# derivatives' band was scaled by the increment it tests and widened to 64 rounding units (see
+# cvfem_venkata_limiter.hpp). Three of those sizes, all three limiters: a non-zero exit is the
+# driver's own refusal.
+for lim_n in 24 40 72; do
+    for lim in 1 2 3; do
+        desc="Jhoex packed vs atomic, limiter $lim, n=$lim_n"
+        if out=$("$BENCH" --n $lim_n --repeat 1 --warmup 0 --layout packed --jac-action --rhie-chow \
+                     --conv-ho $lim 2>&1); then
+            printf '%-62s OK   %s\n' "$desc" "$(printf '%s\n' "$out" | grep -oE 'jac_action_rc_vs_atomic_rel: [0-9.e+-]*')"
+        else
+            printf '%-62s FAIL\n' "$desc"
+            printf '%s\n' "$out" | grep -E 'disagrees|rel' | sed 's/^/    /'
+            FAIL=$((FAIL + 1))
+        fi
+    done
+done
 # Rhie-Chow, where the generated kernel has its own variant. This arm takes a different route
 # through the driver -- the main verify block is gated off when Rhie-Chow is on -- so it needs its
 # own row rather than being implied by the four above.
@@ -367,6 +392,12 @@ refused "residual + rc, isoparam packed"       --rhie-chow --geom isoparam --lay
 refused "jac-action + rc, isoparam packed"     --rhie-chow --jac-action --geom isoparam --layout packed
 refused "residual + rc, isoparam store"        --rhie-chow --geom isoparam --layout store
 refused "jac-action + rc, isoparam colored"    --rhie-chow --jac-action --geom isoparam --layout colored
+# Pack colouring has no higher-order correction in either operator; before the refusal the
+# residual ran first order under the --conv-ho label. The lagged action needs no correction and
+# must still run there.
+refused "residual + ho, colored"                --rhie-chow --conv-ho 3 --layout colored
+refused "jac-action + ho exact, colored"        --rhie-chow --jac-action --conv-ho 3 --layout colored
+ok "jac-action + ho lagged, colored"            --rhie-chow --jac-action --conv-ho 3 --lagged-ho --layout colored
 
 if [ "$FAIL" -ne 0 ]; then
     echo "cvfem_bench_staging: $FAIL configuration(s) failed"

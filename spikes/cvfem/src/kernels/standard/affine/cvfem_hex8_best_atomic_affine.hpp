@@ -21,7 +21,7 @@
 // null is the lagged one. The atomic path exists here so the layouts can be compared on the same
 // operator -- a packed row carrying the correction against an atomic row that silently dropped it
 // would not be a layout comparison.
-template <typename scalar_t, typename geom_t, typename idx_t>
+template <typename scalar_t, typename geom_t, typename idx_t, typename grad_t = scalar_t>
 static SFEM_NOINLINE void apply_jacobian_action_atomic(
         // The staging objects are gone; what this sweep reads out of them is what it takes.
         const scalar_t *const *const SFEM_RESTRICT adj_ptr,
@@ -54,8 +54,8 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic(
                                                        // and limiter; the defaults were the
                                                        // retired dispatcher's and move here
                                                        // with its name.
-                                                       const scalar_t *const SFEM_RESTRICT ugrad = nullptr,
-                                                       const scalar_t *const SFEM_RESTRICT vgrad = nullptr,
+                                                       const grad_t *const SFEM_RESTRICT ugrad = nullptr,
+                                                       const grad_t *const SFEM_RESTRICT vgrad = nullptr,
                                                        const int             limiter = 0,
                                                        const scalar_t        venkat_c = scalar_t(0)) {
     const bool with_ho = ugrad != nullptr && vgrad != nullptr;
@@ -74,8 +74,8 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic(
                 ye[a] = scalar_t(points[1][gn]);
                 ze[a] = scalar_t(points[2][gn]);
                 for (int c = 0; c < 9; ++c) {
-                    g8[a * 9 + c]  = ugrad[(ptrdiff_t)gn * 9 + c];
-                    gv8[a * 9 + c] = vgrad[(ptrdiff_t)gn * 9 + c];
+                    g8[a * 9 + c]  = scalar_t(ugrad[(ptrdiff_t)gn * 9 + c]);
+                    gv8[a * 9 + c] = scalar_t(vgrad[(ptrdiff_t)gn * 9 + c]);
                 }
             }
         }
@@ -102,9 +102,8 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic(
 #define CVFEM_HEX8_JV_RC(LIM_)                                                                  \
     cvfem_hex8_ns_upwind_jacobian_action<LIM_>(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, r,  \
                                                ex.rc, p, scalar_t(0),                           \
-                                               with_ho ? xe : nullptr, with_ho ? ye : nullptr,  \
-                                               with_ho ? ze : nullptr, with_ho ? g8 : nullptr,  \
-                                               with_ho ? gv8 : nullptr, venkat_c)
+                                               with_ho ? g8 : nullptr, with_ho ? gv8 : nullptr,  \
+                                               venkat_c)
             switch (limiter) {
                 case 1: CVFEM_HEX8_JV_RC(1); break;
                 case 2: CVFEM_HEX8_JV_RC(2); break;
@@ -117,9 +116,8 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic(
     cvfem_hex8_ns_upwind_jacobian_action<LIM_>(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, r,  \
                                                Hex8RhieChowT<scalar_t>{},                       \
                                                (const scalar_t *)nullptr, scalar_t(0),          \
-                                               with_ho ? xe : nullptr, with_ho ? ye : nullptr,  \
-                                               with_ho ? ze : nullptr, with_ho ? g8 : nullptr,  \
-                                               with_ho ? gv8 : nullptr, venkat_c)
+                                               with_ho ? g8 : nullptr, with_ho ? gv8 : nullptr,  \
+                                               venkat_c)
             switch (limiter) {
                 case 1: CVFEM_HEX8_JV_BARE(1); break;
                 case 2: CVFEM_HEX8_JV_BARE(2); break;
@@ -146,7 +144,7 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic(
 //
 // Global gather through d.elems, wide index, untouched element order, per-lane atomic scatter --
 // everything that makes this the standard layout is kept.
-template <typename scalar_t, typename geom_t, typename idx_t>
+template <typename scalar_t, typename geom_t, typename idx_t, typename grad_t = scalar_t>
 static SFEM_NOINLINE void apply_jacobian_action_atomic_simd(
         // The staging objects are gone; what this sweep reads out of them is what it takes.
         const scalar_t *const *const SFEM_RESTRICT adj_ptr,
@@ -177,8 +175,8 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic_simd(
                                                             const scalar_t        mu,
                                                             const scalar_t *const dir,
                                                             scalar_t *const       jv,
-                                                            const scalar_t *const SFEM_RESTRICT ugrad = nullptr,
-                                                            const scalar_t *const SFEM_RESTRICT vgrad = nullptr,
+                                                            const grad_t *const SFEM_RESTRICT ugrad = nullptr,
+                                                            const grad_t *const SFEM_RESTRICT vgrad = nullptr,
                                                             const int             limiter  = 0,
                                                             const scalar_t        venkat_c = scalar_t(0)) {
     cvfem_zero_scalars(jv, nnodes * CVFEM_HEX8_N_FIELDS);
@@ -264,7 +262,6 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic_simd(
                 for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
                     for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
                         if (lane >= nlanes) {
-                            hop.x[a][lane] = hop.y[a][lane] = hop.z[a][lane] = scalar_t(0);
                             for (int c = 0; c < 9; ++c) {
                                 hop.g[a][c][lane]  = scalar_t(0);
                                 hovp.g[a][c][lane] = scalar_t(0);
@@ -272,12 +269,9 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic_simd(
                             continue;
                         }
                         const idx_t gn = mesh_elems[a][e0 + lane];
-                        hop.x[a][lane]        = scalar_t(points[0][gn]);
-                        hop.y[a][lane]        = scalar_t(points[1][gn]);
-                        hop.z[a][lane]        = scalar_t(points[2][gn]);
                         for (int c = 0; c < 9; ++c) {
-                            hop.g[a][c][lane]  = ugrad[(ptrdiff_t)gn * 9 + c];
-                            hovp.g[a][c][lane] = vgrad[(ptrdiff_t)gn * 9 + c];
+                            hop.g[a][c][lane]  = scalar_t(ugrad[(ptrdiff_t)gn * 9 + c]);
+                            hovp.g[a][c][lane] = scalar_t(vgrad[(ptrdiff_t)gn * 9 + c]);
                         }
                     }
                 }
@@ -431,7 +425,7 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact(
 // another layout. Measured at n=128 on Grace, bare and with Rhie-Chow: lane-blocking the atomic
 // sweep alone is worth 1.29x and 1.37x, and what remains between the layouts -- 2.45x and 1.76x
 // -- is the format.
-template <typename scalar_t, typename geom_t, typename idx_t>
+template <typename scalar_t, typename geom_t, typename idx_t, typename grad_t = scalar_t>
 static SFEM_NOINLINE void apply_residual_atomic_sumfact_simd(
         // The staging objects are gone; what this sweep reads out of them is what it takes.
         const scalar_t *const *const SFEM_RESTRICT adj_ptr,
@@ -459,7 +453,7 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact_simd(
                                               const Hex8Extras &opt,
                                                              const scalar_t  rho,
                                                              const scalar_t  mu,
-                                                             const scalar_t *const SFEM_RESTRICT ugrad = nullptr,
+                                                             const grad_t *const SFEM_RESTRICT ugrad = nullptr,
                                                              const int       limiter  = 0,
                                                              const scalar_t  venkat_c = scalar_t(0)) {
     reset_residual(nnodes, rx, ry, rz, rc_out);
@@ -533,15 +527,11 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact_simd(
                 for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
                     for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
                         if (lane >= nlanes) {
-                            hop.x[a][lane] = hop.y[a][lane] = hop.z[a][lane] = scalar_t(0);
                             for (int c = 0; c < 9; ++c) hop.g[a][c][lane] = scalar_t(0);
                             continue;
                         }
                         const idx_t gn = mesh_elems[a][e0 + lane];
-                        hop.x[a][lane]        = scalar_t(points[0][gn]);
-                        hop.y[a][lane]        = scalar_t(points[1][gn]);
-                        hop.z[a][lane]        = scalar_t(points[2][gn]);
-                        for (int c = 0; c < 9; ++c) hop.g[a][c][lane] = ugrad[(ptrdiff_t)gn * 9 + c];
+                        for (int c = 0; c < 9; ++c) hop.g[a][c][lane] = scalar_t(ugrad[(ptrdiff_t)gn * 9 + c]);
                     }
                 }
                 hop.limiter  = limiter;

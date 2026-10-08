@@ -95,14 +95,24 @@ static SFEM_NOINLINE void cvfem_hex8_apply_jacobian_action_packed(MeshData      
     const bool   with_qg   = with_rc && !d.qgx.empty();
     // The exact higher-order action, signalled the same way: a non-empty d.vgrad means
     // apply_jacobian_action_accumulate reconstructed the direction's velocity gradient for it.
-    const bool   with_ho   = d.conv_ho != 0 && !d.ugrad.empty() && !d.vgrad.empty();
+    const bool   with_ho   = d.conv_ho != 0 && cvfem_hex8_has_ugrad(d) && cvfem_hex8_has_vgrad(d);
 
-
+    // Two instantiations of one sweep, selected by the gradient fields' storage type.
+    if (d.grad_single) {
 #pragma omp parallel
     cvfem_hex8_apply_jacobian_action_packed_range(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
-            d.adj_ptr, d.conv_limiter, d.conv_venkat_c, d.det_ptr, d.elems, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.rc_coeff.data(), d.rc_w.data(), d.rhie_chow_scale, d.ugrad.data(), d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), d.vgrad.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, dir, jv, scratch_n, rc_n, qg_n, with_rc, with_qg, with_ho,
+            d.adj_ptr, d.conv_limiter, d.conv_venkat_c, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.rc_coeff.data(), d.rc_w.data(), d.rhie_chow_scale, d.ugrad32.data(), d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), d.vgrad32.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, dir, jv, scratch_n, rc_n, qg_n, with_rc, with_qg, with_ho,
             cvfem_hex8_rc_config_for(d));
 
+
+    } else {
+#pragma omp parallel
+    cvfem_hex8_apply_jacobian_action_packed_range(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
+            d.adj_ptr, d.conv_limiter, d.conv_venkat_c, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.rc_coeff.data(), d.rc_w.data(), d.rhie_chow_scale, d.ugrad.data(), d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), d.vgrad.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, dir, jv, scratch_n, rc_n, qg_n, with_rc, with_qg, with_ho,
+            cvfem_hex8_rc_config_for(d));
+
+
+    }
 
     cvfem_hex8_ghost_reduce_interleaved(p, jv);
 }

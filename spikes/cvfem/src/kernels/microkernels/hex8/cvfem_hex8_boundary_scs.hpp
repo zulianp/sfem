@@ -410,10 +410,10 @@ static SFEM_INLINE SFEM_HOST_DEVICE void boundary_scs_add_residual(const scalar_
             scalar_t  ax, ay, az, grad[9];
             if constexpr (ISO) {
                 scalar_t dN[CVFEM_HEX8_N_NODES][3];
-                cvfem_hex8_dn_ref(CVFEM_HEX8_BFACE_XI[f][k][0], CVFEM_HEX8_BFACE_XI[f][k][1], CVFEM_HEX8_BFACE_XI[f][k][2], dN);
+                cvfem_hex8_dn_ref(scalar_t(CVFEM_HEX8_BFACE_XI[f][k][0]), scalar_t(CVFEM_HEX8_BFACE_XI[f][k][1]), scalar_t(CVFEM_HEX8_BFACE_XI[f][k][2]), dN);
                 scalar_t adj[9], det;
-                cvfem_hex8_geom_at(x, y, z, CVFEM_HEX8_BFACE_XI[f][k][0], CVFEM_HEX8_BFACE_XI[f][k][1],
-                                   CVFEM_HEX8_BFACE_XI[f][k][2], adj, &det);
+                cvfem_hex8_geom_at(x, y, z, scalar_t(CVFEM_HEX8_BFACE_XI[f][k][0]), scalar_t(CVFEM_HEX8_BFACE_XI[f][k][1]),
+                                   scalar_t(CVFEM_HEX8_BFACE_XI[f][k][2]), adj, &det);
                 if (std::fabs(det) < scalar_t(1e-30)) continue;
                 cvfem_hex8_area_dir(adj, axis, ax, ay, az);
                 ax *= out;
@@ -487,7 +487,7 @@ static SFEM_INLINE SFEM_HOST_DEVICE void boundary_scs_add_jacobian(const scalar_
         cvfem_hex8_dir_areas(adj, A);
         const scalar_t inv_det = scalar_t(1) / det;
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-            cvfem_hex8_pushforward(adj, inv_det, CVFEM_HEX8_DN_REF[a][0], CVFEM_HEX8_DN_REF[a][1], CVFEM_HEX8_DN_REF[a][2],
+            cvfem_hex8_pushforward(adj, inv_det, scalar_t(CVFEM_HEX8_DN_REF[a][0]), scalar_t(CVFEM_HEX8_DN_REF[a][1]), scalar_t(CVFEM_HEX8_DN_REF[a][2]),
                                    w_el[a][0], w_el[a][1], w_el[a][2]);
         }
     }
@@ -509,10 +509,10 @@ static SFEM_INLINE SFEM_HOST_DEVICE void boundary_scs_add_jacobian(const scalar_
             scalar_t  w[CVFEM_HEX8_N_NODES][3];
             if constexpr (ISO) {
                 scalar_t dN[CVFEM_HEX8_N_NODES][3];
-                cvfem_hex8_dn_ref(CVFEM_HEX8_BFACE_XI[f][k][0], CVFEM_HEX8_BFACE_XI[f][k][1], CVFEM_HEX8_BFACE_XI[f][k][2], dN);
+                cvfem_hex8_dn_ref(scalar_t(CVFEM_HEX8_BFACE_XI[f][k][0]), scalar_t(CVFEM_HEX8_BFACE_XI[f][k][1]), scalar_t(CVFEM_HEX8_BFACE_XI[f][k][2]), dN);
                 scalar_t adj[9], det;
-                cvfem_hex8_geom_at(x, y, z, CVFEM_HEX8_BFACE_XI[f][k][0], CVFEM_HEX8_BFACE_XI[f][k][1],
-                                   CVFEM_HEX8_BFACE_XI[f][k][2], adj, &det);
+                cvfem_hex8_geom_at(x, y, z, scalar_t(CVFEM_HEX8_BFACE_XI[f][k][0]), scalar_t(CVFEM_HEX8_BFACE_XI[f][k][1]),
+                                   scalar_t(CVFEM_HEX8_BFACE_XI[f][k][2]), adj, &det);
                 if (std::fabs(det) < scalar_t(1e-30)) continue;
                 cvfem_hex8_area_dir(adj, axis, ax, ay, az);
                 ax *= out;
@@ -644,10 +644,10 @@ static SFEM_INLINE SFEM_HOST_DEVICE void boundary_scs_add_jacobian_action(const 
             scalar_t  ax, ay, az, dgrad[9];
             if constexpr (ISO) {
                 scalar_t dN[CVFEM_HEX8_N_NODES][3];
-                cvfem_hex8_dn_ref(CVFEM_HEX8_BFACE_XI[f][k][0], CVFEM_HEX8_BFACE_XI[f][k][1], CVFEM_HEX8_BFACE_XI[f][k][2], dN);
+                cvfem_hex8_dn_ref(scalar_t(CVFEM_HEX8_BFACE_XI[f][k][0]), scalar_t(CVFEM_HEX8_BFACE_XI[f][k][1]), scalar_t(CVFEM_HEX8_BFACE_XI[f][k][2]), dN);
                 scalar_t adj[9], det;
-                cvfem_hex8_geom_at(x, y, z, CVFEM_HEX8_BFACE_XI[f][k][0], CVFEM_HEX8_BFACE_XI[f][k][1],
-                                   CVFEM_HEX8_BFACE_XI[f][k][2], adj, &det);
+                cvfem_hex8_geom_at(x, y, z, scalar_t(CVFEM_HEX8_BFACE_XI[f][k][0]), scalar_t(CVFEM_HEX8_BFACE_XI[f][k][1]),
+                                   scalar_t(CVFEM_HEX8_BFACE_XI[f][k][2]), adj, &det);
                 if (std::fabs(det) < scalar_t(1e-30)) continue;
                 cvfem_hex8_area_dir(adj, axis, ax, ay, az);
                 ax *= out;

@@ -71,13 +71,19 @@ for arm in "|" "_ho|--conv-ho 3"; do
   extra=${arm#*|}
   for lay in packed atomic; do
     key="${lay}${suffix}"
-    # The throughput, and the kernel-only figure the table reports beside it.
+    # The throughput, and the kernel-only figure the table reports beside it. BEST OF THREE for
+    # each, measured as a pair: the ratio mdof_kernel_only/mdof is what the table turns into the
+    # scatter's share, and a single run of either side can land 5-15% low on this node -- three
+    # consecutive jobs each produced one kernel-only figure BELOW its own full sweep, which is
+    # impossible and was noise. The best of three on each side is what the other arms here do.
+    mdof=""; mdofk=""
+    for pass in $(seq 1 "${PASSES:-3}"); do
     out=$(srun -u --ntasks=1 --cpus-per-task=72 --uenv="$CVFEM_UENV" --view="$CVFEM_VIEW" \
             bash -lc "cd $PWD && OMP_NUM_THREADS=72 OMP_PROC_BIND=true OMP_PLACES=cores \
                       $B --n $N --repeat $REPEAT --warmup 3 --layout $lay \
                       $([ "$lay" = packed ] && echo "--pack-size $PACK") --rhie-chow $extra" 2>&1)
-    mdof=$(printf '%s\n' "$out" | sed -n 's/^  MDOF\/s: \(.*\)$/\1/p' | head -1)
-    [ -n "$mdof" ] && echo "kmix $key mdof $mdof"
+    v=$(printf '%s\n' "$out" | sed -n 's/^  MDOF\/s: \(.*\)$/\1/p' | head -1)
+    [ -n "$v" ] && mdof=$(awk -v a="${mdof:-0}" -v b="$v" 'BEGIN{print (b+0>a+0)?b:a}')
 
     # The same sweep with --kernel-only, which has the element kernel write to a dense stack
     # buffer and skip the scatter entirely. The table reports mdof/mdof_kernel_only as the share
@@ -89,7 +95,10 @@ for arm in "|" "_ho|--conv-ho 3"; do
              bash -lc "cd $PWD && OMP_NUM_THREADS=72 OMP_PROC_BIND=true OMP_PLACES=cores \
                        $B --n $N --repeat $REPEAT --warmup 3 --layout $lay \
                        $([ "$lay" = packed ] && echo "--pack-size $PACK") --rhie-chow $extra --kernel-only" 2>&1)
-    mdofk=$(printf '%s\n' "$outk" | sed -n 's/^  MDOF\/s: \(.*\)$/\1/p' | head -1)
+    vk=$(printf '%s\n' "$outk" | sed -n 's/^  MDOF\/s: \(.*\)$/\1/p' | head -1)
+    [ -n "$vk" ] && mdofk=$(awk -v a="${mdofk:-0}" -v b="$vk" 'BEGIN{print (b+0>a+0)?b:a}')
+    done
+    [ -n "$mdof" ] && echo "kmix $key mdof $mdof"
     [ -n "$mdofk" ] && echo "kmix $key mdof_kernel_only $mdofk"
 
     # Group 1: the instruction mix.

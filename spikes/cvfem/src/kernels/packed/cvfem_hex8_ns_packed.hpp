@@ -428,7 +428,7 @@ static SFEM_NOINLINE void cvfem_hex8_apply_residual_packed_range(
 // The pack sweep, driven by a range; the `#pragma omp parallel` is in the launcher below. See
 // kernels/cvfem_range.hpp. A pack writes only the nodes it owns, so the parts need no
 // synchronisation and the shared ghost rows are reduced afterwards.
-template <typename scalar_t, typename geom_t, typename idx_t, typename pack_idx_t>
+template <typename scalar_t, typename geom_t, typename idx_t, typename pack_idx_t, typename grad_t>
 static SFEM_NOINLINE void cvfem_hex8_apply_jacobian_action_packed_range(
         const cvfem_range packs,
         // The mesh and the pack are staging objects -- they own vectors and a shared_ptr to a
@@ -438,7 +438,6 @@ static SFEM_NOINLINE void cvfem_hex8_apply_jacobian_action_packed_range(
         const int conv_limiter,
         const scalar_t conv_venkat_c,
         const scalar_t *const SFEM_RESTRICT det_ptr,
-        idx_t **const SFEM_RESTRICT mesh_elems,
         const ptrdiff_t nelements,
         const scalar_t *const SFEM_RESTRICT pres,
         const scalar_t *const SFEM_RESTRICT pgx,
@@ -451,12 +450,12 @@ static SFEM_NOINLINE void cvfem_hex8_apply_jacobian_action_packed_range(
         const scalar_t *const SFEM_RESTRICT rc_coeff,
         const scalar_t *const SFEM_RESTRICT rc_w,
         const scalar_t rhie_chow_scale,
-        const scalar_t *const SFEM_RESTRICT ugrad_f,
+        const grad_t *const SFEM_RESTRICT ugrad_f,
         const scalar_t upwind_eps,
         const scalar_t *const SFEM_RESTRICT ux,
         const scalar_t *const SFEM_RESTRICT uy,
         const scalar_t *const SFEM_RESTRICT uz,
-        const scalar_t *const SFEM_RESTRICT vgrad_f,
+        const grad_t *const SFEM_RESTRICT vgrad_f,
         pack_idx_t **const SFEM_RESTRICT pack_elems,
         scalar_t *const SFEM_RESTRICT ghost_buf,
         const idx_t *const SFEM_RESTRICT ghost_idx,
@@ -494,6 +493,9 @@ static SFEM_NOINLINE void cvfem_hex8_apply_jacobian_action_packed_range(
         scalar_t *const SFEM_RESTRICT pack_qgx = pack_qg;
         scalar_t *const SFEM_RESTRICT pack_qgy = with_qg ? pack_qg + nmax : nullptr;
         scalar_t *const SFEM_RESTRICT pack_qgz = with_qg ? pack_qg + 2 * nmax : nullptr;
+        // The two gradient fields, staged per pack (slots 14 and 15). See cvfem_hex8_pack_ugrad.
+        const Hex8PackUGradT<scalar_t> ug = cvfem_hex8_pack_ugrad<scalar_t>(with_ho, 14, max_actual_nodes_per_pack);
+        const Hex8PackUGradT<scalar_t> vg = cvfem_hex8_pack_ugrad<scalar_t>(with_ho, 15, max_actual_nodes_per_pack);
 
 
     for (ptrdiff_t pack = packs.begin; pack < packs.end; ++pack) {
@@ -529,6 +531,10 @@ static SFEM_NOINLINE void cvfem_hex8_apply_jacobian_action_packed_range(
             if (with_rc)
                 cvfem_hex8_fill_pack_xyz_pgrad(owned_nodes_ptr, points, pgx, pgy, pgz, with_rc, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z,
                                                pack_pgx, pack_pgy, pack_pgz);
+            if (with_ho) {
+                cvfem_hex8_fill_pack_ugrad(owned_nodes_ptr, ugrad_f, pack, n_contiguous, n_ghost, ghosts, ug.g);
+                cvfem_hex8_fill_pack_ugrad(owned_nodes_ptr, vgrad_f, pack, n_contiguous, n_ghost, ghosts, vg.g);
+            }
 
             Hex8InputPack    u_pack;
             Hex8InputPack    du_pack;
@@ -569,26 +575,8 @@ static SFEM_NOINLINE void cvfem_hex8_apply_jacobian_action_packed_range(
                 if (with_qg)
                     cvfem_hex8_gather_qg_from_pack(pack_elems, pack_qgx, pack_qgy, pack_qgz, begin, nlanes, rcp);
                 if (with_ho) {
-                    for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
-                        const ptrdiff_t e = begin + lane;
-                        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                            if (lane >= nlanes) {
-                                hop.x[a][lane] = hop.y[a][lane] = hop.z[a][lane] = scalar_t(0);
-                                for (int c = 0; c < 9; ++c) {
-                                    hop.g[a][c][lane] = scalar_t(0); hovp.g[a][c][lane] = scalar_t(0);
-                                }
-                                continue;
-                            }
-                            const idx_t gn = mesh_elems[a][e];
-                            hop.x[a][lane] = scalar_t(points[0][gn]);
-                            hop.y[a][lane] = scalar_t(points[1][gn]);
-                            hop.z[a][lane] = scalar_t(points[2][gn]);
-                            for (int c = 0; c < 9; ++c) {
-                                hop.g[a][c][lane]  = ugrad_f[(ptrdiff_t)gn * 9 + c];
-                                hovp.g[a][c][lane] = vgrad_f[(ptrdiff_t)gn * 9 + c];
-                            }
-                        }
-                    }
+                    cvfem_hex8_gather_ugrad_from_pack(pack_elems, ug.g, begin, nlanes, hop);
+                    cvfem_hex8_gather_ugrad_from_pack(pack_elems, vg.g, begin, nlanes, hovp);
                 }
                 cvfem_hex8_ns_upwind_jacobian_action_simd(rho,
                                                           mu,

@@ -136,6 +136,14 @@ CONFIGS=(
     # most arithmetic per face.
     "jac_action_packed_ho_unlim|jac_action|packed|128|5|12|--rhie-chow --conv-ho 0"
     "jac_action_packed_ho_venk|jac_action|packed|128|5|12|--rhie-chow --conv-ho 2"
+    # Darwish-Moukalled is the limiter the paper's size, scaling and pack-size figures run, so its
+    # Jacobian arm is gated beside the two above.
+    "jac_action_packed_ho_dm|jac_action|packed|128|5|12|--rhie-chow --conv-ho 3"
+    # THE STANDARD LAYOUT'S RHIE-CHOW JACOBIAN, which the gate did not have and which fell by a
+    # third between 2 and 6 October 2026 (thread-scaling runs 4967671 against 5003759; both trees
+    # of the A/B that found it agree at 340 MDOF/s, so the fall is older than either). Every row
+    # above runs the term on the packed layout only.
+    "jac_action_atomic_rc|jac_action|atomic|128|5|12|--rhie-chow"
 )
 
 op_flag() {

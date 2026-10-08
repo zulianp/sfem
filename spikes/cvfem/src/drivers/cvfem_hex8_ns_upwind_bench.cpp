@@ -442,6 +442,13 @@ int main(int argc, char **argv) {
     // double. h_bsr_spmv separates storage from compute, so this halves the matrix traffic the
     // apply is bound by without changing the arithmetic it performs.
     int         bsr_single = 0;
+    // --grad-precision single: store the nodal velocity gradients the deferred correction reads
+    // as float. The reconstruction accumulates in double and converts at the write; the sweeps
+    // convert back at the gather and compute in double. Both settings are kept so they can be
+    // measured against each other (the mixed-precision rule: an option, the default following the
+    // measurement). The equivalence oracles run on double storage, and --verify-ho with this flag
+    // adds the f32-against-f64 check.
+    int         grad_single = 0;
     int         verify     = 0;
     int         verify_jac = 0;
     // The higher-order oracles on their own. They live inside the --verify block, but that
@@ -456,6 +463,22 @@ int main(int argc, char **argv) {
     std::string geom       = "affine";
     std::string csv_path;
     std::string csv_tag    = "run";
+    // --dump FILE: the operator's output after the timed loop, written as raw float64 in node-
+    // major field order (the residual interleaved as ux uy uz p per node, the action as it is).
+    // Widened to double whatever the build computes in, so the f32 and f64 builds' outputs can be
+    // compared entry by entry -- which is the f32 build's oracle (src/tests/verification/
+    // cvfem_bench_f32.sh): a finite difference cannot resolve a derivative in single precision,
+    // and the double build's operator is the one a finite difference has already verified.
+    std::string dump_path;
+    // --perturb EPS: move the state off the degenerate set before anything is built from it. The
+    // timing state is linear in the coordinates, so its reconstructed gradients are exact, many
+    // reconstructions land exactly on a limiter bound and some mass fluxes are exactly zero --
+    // the kinks where the Jacobian takes a subgradient decided by the last bit. That is harmless
+    // for a timing and fatal for comparing two precisions, whose last bits differ by design. The
+    // perturbation is keyed on the node COORDINATES (geom_t, the same bits in every build), not on
+    // the node index, so it is identical across precisions and across layouts whatever the pack
+    // renumbering does. Off by default: every recorded timing is of the unperturbed state.
+    scalar_t    perturb    = 0;
     scalar_t    warp       = 0;
     // 0 means derive it from the machine once the mesh exists; see cvfem_default_pack_size.
     int         pack_size  = 0;
@@ -555,6 +578,12 @@ int main(int argc, char **argv) {
             else if (v == "double") bsr_single = 0;
             else { std::fprintf(stderr, "--bsr-precision takes double or single\n"); return 1; }
         }
+        else if (arg == "--grad-precision" && i + 1 < argc) {
+            const std::string v = argv[++i];
+            if (v == "single") grad_single = 1;
+            else if (v == "double") grad_single = 0;
+            else { std::fprintf(stderr, "--grad-precision takes double or single\n"); return 1; }
+        }
         else if (arg == "--verify")
             verify = 1;
         else if (arg == "--verify-ho")
@@ -615,6 +644,10 @@ int main(int argc, char **argv) {
             csv_path = argv[++i];
         else if (arg == "--tag" && i + 1 < argc)
             csv_tag = argv[++i];
+        else if (arg == "--dump" && i + 1 < argc)
+            dump_path = argv[++i];
+        else if (arg == "--perturb" && i + 1 < argc)
+            perturb = scalar_t(std::atof(argv[++i]));
         else if (arg == "--help") {
             std::printf(
                     "usage: %s [--n N] [--repeat N] [--warmup N] [--assemble] [--jac-action] [--bsr-apply]\n"
@@ -661,11 +694,18 @@ int main(int argc, char **argv) {
                     "  --csv FILE     append one machine-readable row per run (header written if\n"
                     "                 the file is new); pairs with python/cvfem_kernel_report.py\n"
                     "  --tag NAME     free-form label carried into the csv (e.g. the machine)\n"
+                    "  --dump FILE    write the operator's output after the timed loop as raw\n"
+                    "                 float64 (residual interleaved per node, or the action)\n"
+                    "  --perturb EPS  add a deterministic perturbation of amplitude EPS, keyed on\n"
+                    "                 the node coordinates, to u and p (off by default)\n"
                     "  --geom NAME    affine (constant J) or isoparam (12 SCS trilinear J)\n"
                     "  --warp EPS     x += EPS * sin(pi y) nodal perturbation\n"
                     "  --bsr-apply    assemble once, then time BSR SpMV y = J(u) v\n"
                     "  --bsr-precision double|single   SpMV value storage (default double);\n"
                     "                 single stores float and still accumulates in double\n"
+                    "  --grad-precision double|single  storage of the nodal velocity gradients the\n"
+                    "                 deferred correction reads (default double); single stores\n"
+                    "                 float and still computes in double\n"
                     "  --conv-ho [L]    deferred-correction higher-order convective flux, limiter L\n"
                     "                   (0 unlimited, 1 bounded-face clip, 2 Venkatakrishnan,\n"
                     "                   3 Darwish-Moukalled; default 0). Reaches the residual AND\n"
@@ -773,6 +813,21 @@ int main(int argc, char **argv) {
     // -- rather than qualifying it at each of the four sites downstream -- keeps one meaning
     // for the variable: "the SpMV reads float values".
     bsr_single &= bsr_apply;
+
+    // THE --verify ORACLES ARE WRITTEN FOR DOUBLE, and an f32 build refuses them rather than
+    // running them against thresholds chosen for 53 bits. Their finite differences cannot resolve
+    // a derivative in 24 bits, and their layout bounds (1e-10 to 1e-12 absolute) sit below what a
+    // correct float operator produces. What holds the f32 build is the cross-precision gate:
+    // both builds --dump the same operator, and the f32 output is compared with the f64 one and
+    // the f32 layouts with each other, at bounds stated for single precision.
+    if (sizeof(scalar_t) != sizeof(double) && (verify || verify_jac || verify_ho || verify_ho_jac)) {
+        std::fprintf(stderr,
+                     "the --verify oracles are double-precision checks; this build computes in %zu-byte "
+                     "scalars. Use src/tests/verification/cvfem_bench_f32.sh, which holds this build "
+                     "to the double one through --dump.\n",
+                     sizeof(scalar_t));
+        return 2;
+    }
 
     // --boundary used to be refused for an assembly on anything but --layout atomic,
     // because the boundary blocks had to be written through the element BSR slots and only
@@ -1028,6 +1083,19 @@ int main(int argc, char **argv) {
         if (own_mpi) MPI_Finalize();
         return 1;
     }
+    // PACK COLOURING CARRIES NO HIGHER-ORDER CORRECTION. apply_residual_colored and
+    // apply_jacobian_action_colored take no velocity-gradient fields, so with --conv-ho the
+    // residual silently ran first order under a higher-order label, and the exact action failed
+    // the always-on layout check by 1.5-2%. Refused, as the element-colouring gaps are above. The
+    // lagged action is the exception: it carries no correction derivative in any layout.
+    if (layout == "colored" && conv_ho && (!jac_action || !lagged_ho)) {
+        std::fprintf(stderr,
+                     "--layout colored has no higher-order correction (--conv-ho): pack colouring "
+                     "implements the first-order residual and Jacobian action only.\n"
+                     "For a coloured higher-order operator use --layout ecolor.\n");
+        if (own_mpi) MPI_Finalize();
+        return 1;
+    }
     // The split assembly restores a saved constant half into the global BSR values
     // and adds the velocity-dependent half through precomputed element slots, so it
     // is defined only for the atomic layout. Reject the other combinations rather
@@ -1203,6 +1271,27 @@ int main(int argc, char **argv) {
     }
 
     fill_fields(d);
+    if (perturb != scalar_t(0)) {
+        const auto *const px = d.points[0];
+        const auto *const py = d.points[1];
+        const auto *const pz = d.points[2];
+#pragma omp parallel for schedule(static)
+        for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+            uint32_t bx = 0, by = 0, bz = 0;
+            const float fx = float(px[i]), fy = float(py[i]), fz = float(pz[i]);
+            std::memcpy(&bx, &fx, 4);
+            std::memcpy(&by, &fy, 4);
+            std::memcpy(&bz, &fz, 4);
+            uint32_t h = bx * 2654435761u ^ (by + 0x9e3779b9u + (bx << 6) + (bx >> 2));
+            h          = h * 2246822519u ^ (bz + 0x9e3779b9u + (h << 6) + (h >> 2));
+            h          = h * 3266489917u + 374761393u;
+            const auto unit = [](const uint32_t v) { return double(v & 0xffffu) / 65535.0 - 0.5; };
+            d.ux[i] += scalar_t(double(perturb) * unit(h >> 0));
+            d.uy[i] += scalar_t(double(perturb) * unit(h >> 8));
+            d.uz[i] += scalar_t(double(perturb) * unit(h >> 16));
+            d.p[i]  += scalar_t(double(perturb) * unit((h >> 24) | (h << 8)));
+        }
+    }
 
     // The transient term. A history that is a small, node-varying displacement of the
     // state: the term is linear in it, so its VALUE cannot change any cost, but a history
@@ -1568,6 +1657,108 @@ int main(int argc, char **argv) {
                 if (own_mpi) MPI_Finalize();
                 return 1;
             }
+
+            // SINGLE-PRECISION STORAGE OF THE GRADIENT FIELD, against the double it replaces.
+            // The same reconstruction written as float, the same packed sweep reading it, and
+            // the difference relative to the residual's own scale. What is bounded is the
+            // storage rounding alone: float carries 24 bits, the correction is a fraction of the
+            // flux, and 1e-5 is three decades above what f32 round-off can produce here while
+            // far below any error that would mean a field was read at the wrong width.
+            if (grad_single) {
+                std::vector<float> ug32((size_t)d.nnodes * 9);
+                {
+                    float    *outp[9];
+                    ptrdiff_t ostr[9];
+                    for (int c = 0; c < 9; ++c) { outp[c] = ug32.data() + c; ostr[c] = 9; }
+                    cvfem_hex8_assemble_nodal_grads_atomic(d, 0, srcs, nullptr, 3, outp, ostr);
+                }
+                apply_residual_packed_defcor(d, packed, rho, mu, ug32.data(), conv_limiter, venkat_c);
+                std::vector<scalar_t> ho32_r;
+                pack_residual(d, ho32_r);
+                scalar_t scale = 0;
+                for (const scalar_t v : ho_packed_r) scale = std::max(scale, std::fabs(v));
+                const scalar_t rel32 = max_abs_diff(ho_packed_r.data(), ho32_r.data(), (ptrdiff_t)ho32_r.size()) /
+                                       (scale > 0 ? scale : scalar_t(1));
+                std::printf("verify_packed_ho_f32_storage_vs_f64_rel: %.6e\n", (double)rel32);
+                if (rel32 > 1.0e-5) {
+                    std::fprintf(stderr, "HEX8 higher-order residual: f32 gradient storage disagrees with f64\n");
+                    if (own_mpi) MPI_Finalize();
+                    return 1;
+                }
+            }
+
+            // AND THE EXACT JACOBIAN ACTION under the same option, which reads TWO fields at the
+            // chosen width -- the state's gradient and the direction's -- and differentiates the
+            // limiter through them. Both storages through the same packed sweep, on the same
+            // direction the finite-difference check uses.
+            //
+            // THE STATE IS PERTURBED FIRST, as the finite-difference check perturbs it, and the
+            // verdict is a fraction of degrees of freedom rather than a max norm, for the reason
+            // that check gives: on this uniform mesh a structural sixth of the surfaces sit
+            // exactly on a limiter bound, where the derivative is a subgradient choice decided by
+            // an ulp of the increment. A field held at 24 bits moves that ulp. Unperturbed and in
+            // the max norm the clip read 4.7e-2 against double storage and the smooth limiters
+            // 4e-3, every bit of it at those surfaces, while the unlimited arm read 4e-9. So the
+            // unlimited arm is held to a max norm and the limited arms to the share of dofs that
+            // disagree, which must stay a vanishing fraction -- the same standard
+            // verify_ho_action_fd applies to the derivative itself.
+            if (grad_single) {
+                const ptrdiff_t       nn = d.nnodes;
+                std::vector<scalar_t> ux0(d.ux), uy0(d.uy), uz0(d.uz);
+                for (ptrdiff_t i = 0; i < nn; ++i) {
+                    const uint32_t h = (uint32_t)i * 2246822519u + 374761393u;
+                    d.ux[i] += scalar_t(1e-3) * (scalar_t((h >> 5) & 0xffffu) / scalar_t(65535) - scalar_t(0.5));
+                    d.uy[i] += scalar_t(1e-3) * (scalar_t((h >> 11) & 0xffffu) / scalar_t(65535) - scalar_t(0.5));
+                    d.uz[i] += scalar_t(1e-3) * (scalar_t((h >> 19) & 0xffffu) / scalar_t(65535) - scalar_t(0.5));
+                }
+                std::vector<scalar_t> dir((size_t)nn * N_FIELDS, scalar_t(0));
+                for (ptrdiff_t i = 0; i < nn; ++i) {
+                    const uint32_t h = (uint32_t)i * 2654435761u;
+                    dir[(size_t)i * N_FIELDS + 0] = scalar_t(1) + scalar_t((h >> 8) & 0xffffu) / scalar_t(65535);
+                    dir[(size_t)i * N_FIELDS + 1] = scalar_t(0.5) + scalar_t((h >> 16) & 0xffffu) / scalar_t(65535);
+                    dir[(size_t)i * N_FIELDS + 2] = scalar_t(-0.25) + scalar_t((h >> 3) & 0xffffu) / scalar_t(65535);
+                    dir[(size_t)i * N_FIELDS + 3] = scalar_t(0.1) * scalar_t((h >> 20) & 0xffu) / scalar_t(255);
+                }
+                const scalar_t *psrcs[3] = {d.ux.data(), d.uy.data(), d.uz.data()};
+                const scalar_t *vsrcs[3] = {dir.data() + 0, dir.data() + 1, dir.data() + 2};
+                const int       vst[3]   = {N_FIELDS, N_FIELDS, N_FIELDS};
+                std::vector<scalar_t> gu64, gv64;
+                cvfem_hex8_assemble_nodal_grads_atomic(d, 0, psrcs, 3, gu64);
+                cvfem_hex8_assemble_nodal_grads_atomic(d, 0, vsrcs, 3, gv64, vst);
+                std::vector<float> gu32((size_t)nn * 9), gv32((size_t)nn * 9);
+                {
+                    float    *ou[9], *ov[9];
+                    ptrdiff_t os[9];
+                    for (int c = 0; c < 9; ++c) { ou[c] = gu32.data() + c; ov[c] = gv32.data() + c; os[c] = 9; }
+                    cvfem_hex8_assemble_nodal_grads_atomic(d, 0, psrcs, nullptr, 3, ou, os);
+                    cvfem_hex8_assemble_nodal_grads_atomic(d, 0, vsrcs, vst, 3, ov, os);
+                }
+                std::vector<scalar_t> jv64((size_t)nn * N_FIELDS), jv32((size_t)nn * N_FIELDS);
+                apply_jacobian_action_packed(d, packed, rho, mu, GeomKind::Affine, dir.data(), jv64.data(),
+                                             gu64.data(), gv64.data(), conv_limiter, venkat_c);
+                apply_jacobian_action_packed(d, packed, rho, mu, GeomKind::Affine, dir.data(), jv32.data(),
+                                             gu32.data(), gv32.data(), conv_limiter, venkat_c);
+                d.ux = ux0; d.uy = uy0; d.uz = uz0;
+                scalar_t jscale = 0;
+                for (const scalar_t v : jv64) jscale = std::max(jscale, std::fabs(v));
+                if (jscale <= 0) jscale = scalar_t(1);
+                scalar_t  jmax = 0;
+                ptrdiff_t jbad = 0;
+                for (size_t i = 0; i < jv64.size(); ++i) {
+                    const scalar_t dd = std::fabs(jv64[i] - jv32[i]) / jscale;
+                    jmax = std::max(jmax, dd);
+                    if (dd > scalar_t(1e-6)) ++jbad;
+                }
+                const scalar_t jfrac = scalar_t(jbad) / scalar_t(jv64.size());
+                std::printf("verify_packed_ho_jac_f32_storage_vs_f64_rel: %.6e (%.4f%% of dofs past 1e-6)\n",
+                            (double)jmax, 100.0 * (double)jfrac);
+                const bool jok = conv_limiter == 0 ? (jmax < scalar_t(1e-6)) : (jfrac < scalar_t(0.01));
+                if (!jok) {
+                    std::fprintf(stderr, "HEX8 higher-order Jacobian action: f32 gradient storage disagrees with f64\n");
+                    if (own_mpi) MPI_Finalize();
+                    return 1;
+                }
+            }
         }
 
         // --verify-ho stops here. What follows includes a colored sympy residual that lives in
@@ -1624,10 +1815,22 @@ int main(int argc, char **argv) {
     // exactly as the Rhie-Chow state gradient is hoisted by default. The same fused
     // multi-field sweep the solver uses, so this is not a second code path.
     std::vector<scalar_t> ugrad;
+    std::vector<float>    ugrad32;  // the same field under --grad-precision single
     if (conv_ho) {
         const scalar_t *srcs[3] = {d.ux.data(), d.uy.data(), d.uz.data()};
         const int       iso     = geom_kind == GeomKind::Isoparam ? 1 : 0;
-        if (packed.n_packs > 0 && !g_qgrad_atomic) {
+        if (grad_single) {
+            ugrad32.resize((size_t)d.nnodes * 9);
+            float    *outp[9];
+            ptrdiff_t ostr[9];
+            for (int c = 0; c < 9; ++c) { outp[c] = ugrad32.data() + c; ostr[c] = 9; }
+            if (packed.n_packs > 0 && !g_qgrad_atomic) {
+                std::vector<scalar_t> gbuf;
+                cvfem_hex8_assemble_nodal_grads_packed(d, packed, iso, srcs, nullptr, 3, outp, ostr, gbuf);
+            } else {
+                cvfem_hex8_assemble_nodal_grads_atomic(d, iso, srcs, nullptr, 3, outp, ostr);
+            }
+        } else if (packed.n_packs > 0 && !g_qgrad_atomic) {
             std::vector<scalar_t> gbuf;
             cvfem_hex8_assemble_nodal_grads_packed(d, packed, iso, srcs, 3, ugrad, gbuf);
         } else {
@@ -1703,8 +1906,14 @@ int main(int argc, char **argv) {
             else
                 apply_residual_atomic_isoparam(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.rc.data(), d.rx.data(), d.ry.data(), d.rz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu);
         } else if (layout == "ecolor")
-            apply_residual_ecolored(d, ecolors, rho, mu, conv_ho ? ugrad.data() : nullptr, conv_limiter,
-                                    scalar_t(0));
+        {
+            if (grad_single)
+                apply_residual_ecolored(d, ecolors, rho, mu, conv_ho ? ugrad32.data() : nullptr, conv_limiter,
+                                        scalar_t(0));
+            else
+                apply_residual_ecolored(d, ecolors, rho, mu, conv_ho ? ugrad.data() : nullptr, conv_limiter,
+                                        scalar_t(0));
+        }
         else if (layout == "colored")
             apply_residual_colored(d, packed, colors, rho, mu, GeomKind::Affine);
         else if ((layout == "packed" || layout == "store") && conv_ho)
@@ -1712,11 +1921,19 @@ int main(int argc, char **argv) {
             // family (the default), this hand-written lane-blocked one, and a scalar sweep.
             // Grace job 4981920 measured this one fastest in all seven pairs, so the other two
             // are in subpar/ and --ho-simd/--ho-scalar are gone with them.
-            apply_residual_packed_defcor(d, packed, rho, mu, ugrad.data(), conv_limiter, venkat_c);
+        {
+            if (grad_single) apply_residual_packed_defcor(d, packed, rho, mu, ugrad32.data(), conv_limiter, venkat_c);
+            else             apply_residual_packed_defcor(d, packed, rho, mu, ugrad.data(), conv_limiter, venkat_c);
+        }
         else if (layout == "packed" || layout == "store")
             apply_residual_packed(d, packed, rho, mu, GeomKind::Affine);
         else if (conv_ho)
-            apply_residual_atomic_sumfact_simd(d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rc.data(), d.rhie_chow_scale, d.rx.data(), d.ry.data(), d.rz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, ugrad.data(), conv_limiter, venkat_c);
+        {
+            if (grad_single)
+    apply_residual_atomic_sumfact_simd(d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rc.data(), d.rhie_chow_scale, d.rx.data(), d.ry.data(), d.rz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, ugrad32.data(), conv_limiter, venkat_c);
+            else
+    apply_residual_atomic_sumfact_simd(d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rc.data(), d.rhie_chow_scale, d.rx.data(), d.ry.data(), d.rz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, ugrad.data(), conv_limiter, venkat_c);
+        }
         else
             // THE LANE-BLOCKED SWEEP, UNCONDITIONALLY. Three scalar arms used to reach this
             // ladder -- the hand-written `current` residual, the generated one and a scalar
@@ -1867,6 +2084,8 @@ int main(int argc, char **argv) {
     // the combination rather than reporting an atomic row that silently ran the lagged operator.
     const bool with_hograd = conv_ho && jac_action && !lagged_ho;
     std::vector<scalar_t> vgrad, vgbuf;
+    std::vector<float>    vgrad32;  // the direction's field under --grad-precision single
+    std::vector<float>    qp32;     // float scratch for the pressure gradients of the fused sweep
     double                hograd_seconds = 0;
     auto jac_action_fn = [&]() {
         // A Krylov iteration never sees the same direction twice, so neither does this when
@@ -1907,20 +2126,48 @@ int main(int argc, char **argv) {
             d.pgx.resize((size_t)d.nnodes);
             d.pgy.resize((size_t)d.nnodes);
             d.pgz.resize((size_t)d.nnodes);
-            scalar_t *outp[24];
-            ptrdiff_t ostr[24];
-            for (int c = 0; c < 9; ++c) { outp[c] = vgrad.data() + c; ostr[c] = 9; }
-            outp[9]  = d.qgx.data(); ostr[9]  = 1;
-            outp[10] = d.qgy.data(); ostr[10] = 1;
-            outp[11] = d.qgz.data(); ostr[11] = 1;
-            for (int c = 0; c < 9; ++c) { outp[12 + c] = ugrad.data() + c; ostr[12 + c] = 9; }
-            outp[21] = d.pgx.data(); ostr[21] = 1;
-            outp[22] = d.pgy.data(); ostr[22] = 1;
-            outp[23] = d.pgz.data(); ostr[23] = 1;
-            if (packed.n_packs > 0 && !g_qgrad_atomic)
-                cvfem_hex8_assemble_nodal_grads_packed(d, packed, iso_ng, srcs, st, 8, outp, ostr, vgbuf);
-            else
-                cvfem_hex8_assemble_nodal_grads_atomic(d, iso_ng, srcs, st, 8, outp, ostr);
+            if (grad_single) {
+                // One output type per sweep, so the six pressure-gradient components go through
+                // a float scratch and are widened back into the double arrays their consumers
+                // read -- a nodal pass over six values, against the eight-field sweep it rides on.
+                vgrad32.resize((size_t)d.nnodes * 9);
+                ugrad32.resize((size_t)d.nnodes * 9);
+                qp32.resize((size_t)d.nnodes * 6);
+                float    *outp[24];
+                ptrdiff_t ostr[24];
+                for (int c = 0; c < 9; ++c) { outp[c] = vgrad32.data() + c; ostr[c] = 9; }
+                for (int c = 0; c < 3; ++c) { outp[9 + c] = qp32.data() + c; ostr[9 + c] = 6; }
+                for (int c = 0; c < 9; ++c) { outp[12 + c] = ugrad32.data() + c; ostr[12 + c] = 9; }
+                for (int c = 0; c < 3; ++c) { outp[21 + c] = qp32.data() + 3 + c; ostr[21 + c] = 6; }
+                if (packed.n_packs > 0 && !g_qgrad_atomic)
+                    cvfem_hex8_assemble_nodal_grads_packed(d, packed, iso_ng, srcs, st, 8, outp, ostr, vgbuf);
+                else
+                    cvfem_hex8_assemble_nodal_grads_atomic(d, iso_ng, srcs, st, 8, outp, ostr);
+#pragma omp parallel for schedule(static)
+                for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+                    d.qgx[(size_t)i] = scalar_t(qp32[(size_t)i * 6 + 0]);
+                    d.qgy[(size_t)i] = scalar_t(qp32[(size_t)i * 6 + 1]);
+                    d.qgz[(size_t)i] = scalar_t(qp32[(size_t)i * 6 + 2]);
+                    d.pgx[(size_t)i] = scalar_t(qp32[(size_t)i * 6 + 3]);
+                    d.pgy[(size_t)i] = scalar_t(qp32[(size_t)i * 6 + 4]);
+                    d.pgz[(size_t)i] = scalar_t(qp32[(size_t)i * 6 + 5]);
+                }
+            } else {
+                scalar_t *outp[24];
+                ptrdiff_t ostr[24];
+                for (int c = 0; c < 9; ++c) { outp[c] = vgrad.data() + c; ostr[c] = 9; }
+                outp[9]  = d.qgx.data(); ostr[9]  = 1;
+                outp[10] = d.qgy.data(); ostr[10] = 1;
+                outp[11] = d.qgz.data(); ostr[11] = 1;
+                for (int c = 0; c < 9; ++c) { outp[12 + c] = ugrad.data() + c; ostr[12 + c] = 9; }
+                outp[21] = d.pgx.data(); ostr[21] = 1;
+                outp[22] = d.pgy.data(); ostr[22] = 1;
+                outp[23] = d.pgz.data(); ostr[23] = 1;
+                if (packed.n_packs > 0 && !g_qgrad_atomic)
+                    cvfem_hex8_assemble_nodal_grads_packed(d, packed, iso_ng, srcs, st, 8, outp, ostr, vgbuf);
+                else
+                    cvfem_hex8_assemble_nodal_grads_atomic(d, iso_ng, srcs, st, 8, outp, ostr);
+            }
             // Charged ONCE, to the higher-order account, because it is one pass. Adding it to
             // both would make the two fractions sum past the application they are fractions of.
             // What frac_jac_action_hograd then reports on a fused arm is the whole
@@ -1969,49 +2216,71 @@ int main(int argc, char **argv) {
             const scalar_t *vsrcs[6] = {dir_v + 0,   dir_v + 1,   dir_v + 2,
                                         d.ux.data(), d.uy.data(), d.uz.data()};
             const int       vst[6]   = {N_FIELDS, N_FIELDS, N_FIELDS, 1, 1, 1};
-            vgrad.resize((size_t)d.nnodes * 9);
-            ugrad.resize((size_t)d.nnodes * 9);
-            scalar_t *outp[18];
-            ptrdiff_t ostr[18];
-            for (int c = 0; c < 9; ++c) { outp[c] = vgrad.data() + c; ostr[c] = 9; }
-            for (int c = 0; c < 9; ++c) { outp[9 + c] = ugrad.data() + c; ostr[9 + c] = 9; }
-            if (packed.n_packs > 0 && !g_qgrad_atomic)
-                cvfem_hex8_assemble_nodal_grads_packed(d, packed, iso_ng, vsrcs, vst, 6, outp, ostr, vgbuf);
-            else
-                cvfem_hex8_assemble_nodal_grads_atomic(d, iso_ng, vsrcs, vst, 6, outp, ostr);
+            if (grad_single) {
+                vgrad32.resize((size_t)d.nnodes * 9);
+                ugrad32.resize((size_t)d.nnodes * 9);
+                float    *outp[18];
+                ptrdiff_t ostr[18];
+                for (int c = 0; c < 9; ++c) { outp[c] = vgrad32.data() + c; ostr[c] = 9; }
+                for (int c = 0; c < 9; ++c) { outp[9 + c] = ugrad32.data() + c; ostr[9 + c] = 9; }
+                if (packed.n_packs > 0 && !g_qgrad_atomic)
+                    cvfem_hex8_assemble_nodal_grads_packed(d, packed, iso_ng, vsrcs, vst, 6, outp, ostr, vgbuf);
+                else
+                    cvfem_hex8_assemble_nodal_grads_atomic(d, iso_ng, vsrcs, vst, 6, outp, ostr);
+            } else {
+                vgrad.resize((size_t)d.nnodes * 9);
+                ugrad.resize((size_t)d.nnodes * 9);
+                scalar_t *outp[18];
+                ptrdiff_t ostr[18];
+                for (int c = 0; c < 9; ++c) { outp[c] = vgrad.data() + c; ostr[c] = 9; }
+                for (int c = 0; c < 9; ++c) { outp[9 + c] = ugrad.data() + c; ostr[9 + c] = 9; }
+                if (packed.n_packs > 0 && !g_qgrad_atomic)
+                    cvfem_hex8_assemble_nodal_grads_packed(d, packed, iso_ng, vsrcs, vst, 6, outp, ostr, vgbuf);
+                else
+                    cvfem_hex8_assemble_nodal_grads_atomic(d, iso_ng, vsrcs, vst, 6, outp, ostr);
+            }
             hograd_seconds += wall_time() - t0;
         }
-        if (partial_assembly)
-            apply_jacobian_action_packed_pa(d, packed, rho, mu, dir_v, jac_out.data());
-        else if (layout == "ecolor")
-            apply_jacobian_action_ecolored(d, ecolors, rho, mu, dir_v, jac_out.data(),
-                                           with_hograd ? ugrad.data() : nullptr,
-                                           with_hograd ? vgrad.data() : nullptr,
-                                           conv_limiter, venkat_c);
-        else if (layout == "colored")
-            apply_jacobian_action_colored(d, packed, colors, rho, mu, dir_v, jac_out.data(), geom_kind);
-        else if (layout == "packed" || layout == "store")
-            apply_jacobian_action_packed(d, packed, rho, mu, geom_kind, dir_v, jac_out.data(),
-                                         with_hograd ? ugrad.data() : nullptr,
-                                         with_hograd ? vgrad.data() : nullptr,
-                                         conv_limiter, venkat_c);
-        else if (geom_kind == GeomKind::Isoparam)
-            apply_jacobian_action_atomic_isoparam(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, dir_v, jac_out.data());
-        // The lane-blocked sweep wherever it applies, for the reason the residual gives: the
-        // standard layout is measured at its best or the comparison credits the format with a
-        // vectorisation difference. It carries the first-order flux, Rhie-Chow exact or frozen,
-        // and the EXACT higher-order action -- the SIMD kernel takes ho and hov, which is what
-        // the packed Jacobian passes it. Only the generated kernel arrangements are outside it,
-        // and the recorded row says which one ran.
-        else {
-            // Braced on purpose: the build below is a second statement in this branch, and an
-            // unbraced one would attach the else that follows to the wrong call.
-            if (cvfem_hex8_extras_of(d).with_rc) cvfem_hex8_build_rc_coeff(d, rho, mu);
-            apply_jacobian_action_atomic_simd(d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.rc_coeff.data(), d.rc_w.data(), d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, dir_v, jac_out.data(),
-                                              with_hograd ? ugrad.data() : nullptr,
-                                              with_hograd ? vgrad.data() : nullptr,
-                                              conv_limiter, venkat_c);
-        }
+        // THE SAME LADDER FOR EITHER STORAGE OF THE GRADIENT FIELDS. The launchers deduce the
+        // storage type from the pointers, so the choice is made once here and never inside a
+        // sweep; null pointers of the double type are the lagged action, as before.
+        auto run_jac = [&](const auto *ug, const auto *vg) {
+            if (partial_assembly)
+                apply_jacobian_action_packed_pa(d, packed, rho, mu, dir_v, jac_out.data());
+            else if (layout == "ecolor")
+                apply_jacobian_action_ecolored(d, ecolors, rho, mu, dir_v, jac_out.data(),
+                                               ug,
+                                               vg,
+                                               conv_limiter, venkat_c);
+            else if (layout == "colored")
+                apply_jacobian_action_colored(d, packed, colors, rho, mu, dir_v, jac_out.data(), geom_kind);
+            else if (layout == "packed" || layout == "store")
+                apply_jacobian_action_packed(d, packed, rho, mu, geom_kind, dir_v, jac_out.data(),
+                                             ug,
+                                             vg,
+                                             conv_limiter, venkat_c);
+            else if (geom_kind == GeomKind::Isoparam)
+                apply_jacobian_action_atomic_isoparam(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, dir_v, jac_out.data());
+            // The lane-blocked sweep wherever it applies, for the reason the residual gives: the
+            // standard layout is measured at its best or the comparison credits the format with a
+            // vectorisation difference. It carries the first-order flux, Rhie-Chow exact or frozen,
+            // and the EXACT higher-order action -- the SIMD kernel takes ho and hov, which is what
+            // the packed Jacobian passes it. Only the generated kernel arrangements are outside it,
+            // and the recorded row says which one ran.
+            else {
+                // Braced on purpose: the build below is a second statement in this branch, and an
+                // unbraced one would attach the else that follows to the wrong call.
+                if (cvfem_hex8_extras_of(d).with_rc) cvfem_hex8_build_rc_coeff(d, rho, mu);
+                apply_jacobian_action_atomic_simd(d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.rc_coeff.data(), d.rc_w.data(), d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, dir_v, jac_out.data(),
+                                                  ug,
+                                                  vg,
+                                                  conv_limiter, venkat_c);
+            }
+
+        };
+        if (!with_hograd) run_jac(static_cast<const scalar_t *>(nullptr), static_cast<const scalar_t *>(nullptr));
+        else if (grad_single) run_jac(ugrad32.data(), vgrad32.data());
+        else run_jac(ugrad.data(), vgrad.data());
 
         if (boundary)
             apply_boundary_scs_jacobian_action_pass(d, rho, mu, geom_kind == GeomKind::Isoparam ? 1 : 0, dir_v,
@@ -2271,7 +2540,13 @@ int main(int argc, char **argv) {
         // The reference carries whatever the timed sweep carried, including the exact
         // higher-order correction. Comparing a packed sweep that has the term against an atomic
         // reference that does not is not a layout check -- it reports the term as a defect.
-        apply_jacobian_action_atomic(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, last_dir, jv_ref.data(),
+        if (with_hograd && grad_single)
+    apply_jacobian_action_atomic(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, last_dir, jv_ref.data(),
+                                     ugrad32.data(),
+                                     vgrad32.data(),
+                                     conv_limiter, venkat_c);
+        else
+    apply_jacobian_action_atomic(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, last_dir, jv_ref.data(),
                                      with_hograd ? ugrad.data() : nullptr,
                                      with_hograd ? vgrad.data() : nullptr,
                                      conv_limiter, venkat_c);
@@ -2288,7 +2563,13 @@ int main(int argc, char **argv) {
         const scalar_t err = max_abs_diff(jv_ref.data(), jac_out.data(), d.nnodes * N_FIELDS);
         const scalar_t rel = ref_max > scalar_t(0) ? err / ref_max : err;
         std::printf("jac_action_rc_vs_atomic_rel: %.6e\n", (double)rel);
-        if (!(rel < 1.0e-10)) {
+        // The bound is the computation type's. Double keeps the 1e-10 it always had. In single
+        // precision the two layouts' different summation orders put them a few ulp apart --
+        // 2.8e-7 measured at n=12 -- and 1e-5 is about eighty-four ulp of float: room for the
+        // reordering, and far below the disagreement a staging error produces (8.3e-1 when the
+        // boundary closure was missing from the reference).
+        const double rc_layout_tol = sizeof(scalar_t) == sizeof(double) ? 1.0e-10 : 1.0e-5;
+        if (!(rel < rc_layout_tol)) {
             std::fprintf(stderr,
                          "packed Jacobian action with Rhie-Chow disagrees with the atomic "
                          "reference (rel %.3e)\n",
@@ -2346,8 +2627,10 @@ int main(int argc, char **argv) {
     // that appears twice, which node arrays are full of.
     uint64_t fingerprint = 0xcbf29ce484222325ull;
     const auto fold = [&fingerprint](const scalar_t v) {
-        uint64_t bits;
-        std::memcpy(&bits, &v, sizeof(bits));
+        // sizeof(v), not sizeof(bits): in an f32 build the value is four bytes, and copying eight
+        // read past it. Zero-initialised so the upper half is defined; a double fills all eight.
+        uint64_t bits = 0;
+        std::memcpy(&bits, &v, sizeof(v));
         fingerprint ^= bits;
         fingerprint *= 0x100000001b3ull;
         fingerprint = (fingerprint << 7) | (fingerprint >> 57);
@@ -2380,6 +2663,33 @@ int main(int argc, char **argv) {
             fold(d.rz[i]);
             fold(d.rc[i]);
         }
+    }
+
+    if (!dump_path.empty()) {
+        std::vector<double> out;
+        if (assemble) {
+            out.assign(bsr.values->data(), bsr.values->data() + bsr.nnz * 16);
+        } else if (assemble_diag) {
+            out.assign(diag_blocks.begin(), diag_blocks.end());
+        } else if (jac_action || bsr_apply) {
+            out.assign(jac_out.begin(), jac_out.begin() + d.nnodes * N_FIELDS);
+        } else {
+            out.resize((size_t)d.nnodes * N_FIELDS);
+            for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+                out[(size_t)i * N_FIELDS + 0] = double(d.rx[i]);
+                out[(size_t)i * N_FIELDS + 1] = double(d.ry[i]);
+                out[(size_t)i * N_FIELDS + 2] = double(d.rz[i]);
+                out[(size_t)i * N_FIELDS + 3] = double(d.rc[i]);
+            }
+        }
+        FILE *f = std::fopen(dump_path.c_str(), "wb");
+        if (!f || std::fwrite(out.data(), sizeof(double), out.size(), f) != out.size()) {
+            std::fprintf(stderr, "--dump: could not write %s\n", dump_path.c_str());
+            if (f) std::fclose(f);
+            if (own_mpi) MPI_Finalize();
+            return 1;
+        }
+        std::fclose(f);
     }
 
     // --assemble-diag was missing from both of these, so a diagonal run announced itself
@@ -2509,6 +2819,8 @@ int main(int argc, char **argv) {
         std::printf("  MELEM/s: %.3f\n", melems);
     }
     std::printf("  checksum: %.16e\n", checksum);
+    std::printf("  scalar: %s\n", sizeof(scalar_t) == sizeof(double) ? "f64" : "f32");
+    if (conv_ho) std::printf("  grad_storage: %s\n", grad_single ? "f32" : "f64");
     std::printf("  fingerprint: %016llx\n", (unsigned long long)fingerprint);
     if (nodal_grad) {
         // Reported per NODE-COMPONENT as well as per dof, because the two say different things:

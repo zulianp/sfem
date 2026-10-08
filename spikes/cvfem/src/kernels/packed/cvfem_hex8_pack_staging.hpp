@@ -190,6 +190,53 @@ static SFEM_INLINE void cvfem_hex8_fill_pack_qgrad(const ptrdiff_t *const SFEM_R
     }
 }
 
+// The deferred correction's nodal velocity gradient into the pack, nine per node, node-major.
+// grad_t is the field's storage type (double, or float under the mixed-precision option); the
+// pack holds the compute type. Owned nodes are one contiguous range of the global array, so this
+// is a streaming copy; the ghosts come through the pack's ghost list, as every other field's do.
+template <typename scalar_t, typename grad_t, typename idx_t>
+static SFEM_INLINE void cvfem_hex8_fill_pack_ugrad(const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
+                                                   const grad_t *const SFEM_RESTRICT    ugrad,
+                                                   const ptrdiff_t                      pack,
+                                                   const ptrdiff_t                      n_contiguous,
+                                                   const ptrdiff_t                      n_ghost,
+                                                   const idx_t *const SFEM_RESTRICT     ghosts,
+                                                   scalar_t *const SFEM_RESTRICT        pack_ug) {
+    const ptrdiff_t owned = owned_nodes_ptr[pack];
+    for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+        const grad_t *const SFEM_RESTRICT src = ugrad + (owned + k) * 9;
+        scalar_t *const SFEM_RESTRICT     dst = pack_ug + k * 9;
+        for (int c = 0; c < 9; ++c) dst[c] = scalar_t(src[c]);
+    }
+    for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+        const grad_t *const SFEM_RESTRICT src = ugrad + (ptrdiff_t)ghosts[k] * 9;
+        scalar_t *const SFEM_RESTRICT     dst = pack_ug + (n_contiguous + k) * 9;
+        for (int c = 0; c < 9; ++c) dst[c] = scalar_t(src[c]);
+    }
+}
+
+// And the lane-major gather of it, from the pack through the pack's own indices -- the same
+// shape as cvfem_hex8_gather_rc_from_pack. A padding lane reads zeros.
+template <typename scalar_t, typename pack_idx_t>
+static SFEM_INLINE void cvfem_hex8_gather_ugrad_from_pack(pack_idx_t **const SFEM_RESTRICT     elems,
+                                                          const scalar_t *const SFEM_RESTRICT pack_ug,
+                                                          const ptrdiff_t                     begin,
+                                                          const int                           nlanes,
+                                                          Hex8UGradPackT<scalar_t>           &ho) {
+    for (int lane = 0; lane < cvfem_hex8_vec_size<scalar_t>; ++lane) {
+        if (lane < nlanes) {
+            const ptrdiff_t e = begin + lane;
+            for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+                const scalar_t *const SFEM_RESTRICT row = pack_ug + (ptrdiff_t)elems[a][e] * 9;
+                for (int c = 0; c < 9; ++c) ho.g[a][c][lane] = row[c];
+            }
+        } else {
+            for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a)
+                for (int c = 0; c < 9; ++c) ho.g[a][c][lane] = scalar_t(0);
+        }
+    }
+}
+
 // The SoA gather for the above, straight into the pack the face loops read.
 //
 // It takes the two tables rather than the mesh, because it is called from inside five pack
@@ -534,25 +581,25 @@ static SFEM_INLINE void scatter_hex8_simd_to_pack(pack_idx_t **const SFEM_RESTRI
 // ONE PACK'S LANE LOOP FOR THE JACOBIAN ACTION, AFFINE. Called by both drains' sweeps -- the
 // contiguous packed action and the pack-coloured one -- which differ in nothing else. It carries
 // everything the operator can: the Rhie-Chow term exact or frozen, the direction's reconstructed
-// gradient, and the exact higher-order correction when `ugrad` and `vgrad` are given. The
-// pack-coloured sweep passes null for those two, so that branch folds away for it.
-template <typename scalar_t, typename idx_t, typename pack_idx_t, typename geom_t>
+// gradient, and the exact higher-order correction when `with_ho` is set -- the two gradient
+// fields arrive STAGED IN THE PACK (ug, vg), filled by the sweep per pack like every other field,
+// so this reads no global array and no standard connectivity. The pack-coloured sweep passes
+// empty packs and with_ho false, so that branch folds away for it.
+template <typename scalar_t, typename idx_t, typename pack_idx_t>
 static SFEM_INLINE void cvfem_hex8_action_lanes_affine(
         const Hex8PackExtentT<idx_t>              &x,
         const Hex8PackCoordsT<scalar_t>           &pk,
         const Hex8PackQGradT<scalar_t>            &qg,
         const scalar_t *const *const SFEM_RESTRICT adj_ptr,
         const scalar_t *const SFEM_RESTRICT        det_ptr,
-        idx_t **const SFEM_RESTRICT                mesh_elems,
-        geom_t **const SFEM_RESTRICT               points,
         pack_idx_t **const SFEM_RESTRICT           pack_elems,
         const scalar_t *const SFEM_RESTRICT        pack_u,
         const scalar_t *const SFEM_RESTRICT        pack_dir,
         scalar_t *const SFEM_RESTRICT              pack_out,
         const scalar_t *const SFEM_RESTRICT        rc_coeff,
         const scalar_t *const SFEM_RESTRICT        rc_w,
-        const scalar_t *const SFEM_RESTRICT        ugrad,
-        const scalar_t *const SFEM_RESTRICT        vgrad,
+        const Hex8PackUGradT<scalar_t>            &ug,
+        const Hex8PackUGradT<scalar_t>            &vg,
         const scalar_t                             rho,
         const scalar_t                             mu,
         const scalar_t                             rhie_chow_scale,
@@ -608,27 +655,8 @@ static SFEM_INLINE void cvfem_hex8_action_lanes_affine(
             if (with_qg)
                 cvfem_hex8_gather_qg_from_pack(pack_elems, qg.x, qg.y, qg.z, begin, nlanes, rcp);
             if (with_ho) {
-                for (int lane = 0; lane < cvfem_hex8_vec_size<scalar_t>; ++lane) {
-                    const ptrdiff_t e = begin + lane;
-                    for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                        if (lane >= nlanes) {
-                            hop.x[a][lane] = hop.y[a][lane] = hop.z[a][lane] = scalar_t(0);
-                            for (int c = 0; c < 9; ++c) {
-                                hop.g[a][c][lane]  = scalar_t(0);
-                                hovp.g[a][c][lane] = scalar_t(0);
-                            }
-                            continue;
-                        }
-                        const idx_t gn = mesh_elems[a][e];
-                        hop.x[a][lane] = scalar_t(points[0][gn]);
-                        hop.y[a][lane] = scalar_t(points[1][gn]);
-                        hop.z[a][lane] = scalar_t(points[2][gn]);
-                        for (int c = 0; c < 9; ++c) {
-                            hop.g[a][c][lane]  = ugrad[(ptrdiff_t)gn * 9 + c];
-                            hovp.g[a][c][lane] = vgrad[(ptrdiff_t)gn * 9 + c];
-                        }
-                    }
-                }
+                cvfem_hex8_gather_ugrad_from_pack(pack_elems, ug.g, begin, nlanes, hop);
+                cvfem_hex8_gather_ugrad_from_pack(pack_elems, vg.g, begin, nlanes, hovp);
             }
             cvfem_hex8_ns_upwind_jacobian_action_simd(rho,
                                                       mu,

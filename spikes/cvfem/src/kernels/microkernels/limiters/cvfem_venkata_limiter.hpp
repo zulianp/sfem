@@ -2,6 +2,7 @@
 #define CVFEM_VENKATA_LIMITER_HPP
 
 #include <cmath>
+#include <limits>
 #include "kernels/cvfem_portability.hpp"
 #include <cstdio>
 #include <cstdlib>
@@ -369,13 +370,62 @@ static SFEM_INLINE SFEM_HOST_DEVICE scalar_t cvfem_darwish_moukalled_inc(const s
 // the limited increment. They are the derivative where one exists; at a branch boundary they
 // return the value of one side, which is a subgradient choice and the same one the first-order
 // upwind switch makes with sgn.
+//
+// EACH ALSO TAKES `inc_scale`, THE ROUNDING SCALE OF THE INCREMENT, and adds it to its band. The
+// bands below were relative to the FIELD -- the nodal values and the increment itself -- and that
+// is not enough where the field passes through zero: the band shrinks with the nodal values while
+// the increment's rounding does not, because the increment is a sum of terms of order |grad u| h
+// that cancel at an exact tie and keep their own last bits doing it. On the linear benchmark state
+// a velocity component crosses zero inside the box, and from the reference-coordinate
+// reconstruction on -- which makes ties exact on an affine element, where the coordinate-built
+// centroid had left float-geometry noise that broke most of them -- gcc's scalar and lane-blocked
+// kernels rounded those ties differently and the packed and atomic Jacobian actions disagreed by
+// 1e-4 at n=24, 40, 72, 80 and 96 (clang and n=48, 128 agreed). Shifting the state away from zero
+// removed every disagreement, which is what identified the band and not the kernels. inc_scale is
+// the sum of the magnitudes the increment was formed from (cvfem_hex8_defcor_ref_increments
+// computes it beside the increment); zero restores the field-relative band exactly.
+//
+// AND THE BAND IS 64 ROUNDING UNITS OF THAT SCALE, NOT 8. Adding inc_scale at eight units was
+// measured and was not enough: at an exact tie the computed increment is a residue of several
+// roundings of terms whose magnitudes sum to about four times inc_scale, so it lands anywhere
+// from zero to roughly eight units -- on the band's edge, which is a discontinuity of its own, and
+// which side it lands on is again the compiler's association. The same packed-against-atomic
+// check then still failed in a handful of dofs (18 of 1,556,068 at n=72 for the clip, all of them
+// u_y rows next to its zero crossing) and moved between sizes as the band moved. At 64 units every
+// limiter agrees at n = 24, 40, 72, 80, 96 and 160, to 1e-15 in double and 4e-7 in float, which is
+// each precision's own rounding. A genuine non-tie on these meshes sits near 1e-10 relative --
+// float coordinates break the geometry at that level -- six orders above the band, so widening it
+// moves no surface that was not a tie. Inside the band the interior subgradient is taken, as it
+// always was; 64 units of a field of order one is 1.4e-14 in double, far below any increment a
+// limiter exists to clip.
+static constexpr int CVFEM_LIMITER_BAND_ULPS = 64;
+//
+// VALUE AND DERIVATIVE COME OUT OF ONE CALL, AND THE REASON IS THE DIVIDE UNIT. The Jacobian
+// needs both -- the correction's value multiplies the derivative of the upwind weight, and its
+// derivative multiplies the weight -- and the two rational arms share one denominator. Written as
+// separate functions, the value took num/den, the derivative took num/den again and then a
+// third division by den; the compiler emitted all three, with and without -ffast-math, because
+// the value's and the derivative's guards differ and the quotients sit in different control flow.
+// That is 72 evaluations per element, so 216 divisions where 72 reciprocals do, in a lane loop
+// whose vector divide has a fraction of the throughput of its multiply-add. The fused form takes
+// the reciprocal of den once and multiplies.
+//
+// The VALUE therefore reaches the Jacobian as num * (1/den) rather than num / den -- one rounding
+// apart from what the residual's own arm computes. The residual keeps its division (one per
+// evaluation, nothing to share); what has to agree to the last bit is the two layouts' Jacobian
+// against each other, and both call this.
 
 template <typename scalar_t>
-static SFEM_INLINE SFEM_HOST_DEVICE scalar_t cvfem_limiter_clip_inc_d(const scalar_t base, const scalar_t inc,
+static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_limiter_clip_inc_and_d(const scalar_t base, const scalar_t inc,
                                                                       const scalar_t lo, const scalar_t hi,
                                                                       const scalar_t dbase, const scalar_t dinc,
-                                                                      const scalar_t dlo, const scalar_t dhi) {
+                                                                      const scalar_t dlo, const scalar_t dhi,
+                                                                      const scalar_t inc_scale,
+                                                                      scalar_t &o, scalar_t &od) {
     const scalar_t f = base + inc;
+    // The value, exactly as cvfem_limiter_clip_inc forms it; no division to share here, the arm
+    // is fused for the one calling convention.
+    o = (f < lo ? lo : (f > hi ? hi : f)) - base;
     // Unclipped, the limiter is the identity and so is its derivative. Clipped, the increment is
     // pinned to a bound that is itself one of the two nodal values, so what survives is that
     // bound's derivative minus the base's.
@@ -392,25 +442,34 @@ static SFEM_INLINE SFEM_HOST_DEVICE scalar_t cvfem_limiter_clip_inc_d(const scal
     // Inside the band the interior subgradient is returned. That is the choice continuous with
     // the unclipped branch, it is a valid subgradient where the limiter has no derivative, and
     // both bodies now return it.
-    const scalar_t scale = std::fabs(hi - lo) + std::fabs(f) + std::fabs(base);
-    // Eight ulp of double precision, wide enough to cover the FMA reassociation of a three-term
-    // dot product and far narrower than any clipping the limiter is meant to do.
-    const scalar_t tol = scale * scalar_t(8) * scalar_t(2.220446049250313e-16);
-    if (f < lo - tol) return dlo - dbase;
-    if (f > hi + tol) return dhi - dbase;
-    return dinc;
+    const scalar_t scale = std::fabs(hi - lo) + std::fabs(f) + std::fabs(base) + inc_scale;
+    // CVFEM_LIMITER_BAND_ULPS (defined above, with the derivatives' note) ulp of the computation type, wide
+    // enough to cover the FMA reassociation of a
+    // three-term dot product and far narrower than any clipping the limiter is meant to do. It was
+    // spelled as double's epsilon, 2.220446049250313e-16, which numeric_limits<double> reproduces
+    // bit for bit -- and which, in a float instantiation, made the band 2^29 times narrower than
+    // the rounding it exists to absorb, so every tie at a bound would have been decided by an ulp.
+    const scalar_t tol = scale * scalar_t(CVFEM_LIMITER_BAND_ULPS) * std::numeric_limits<scalar_t>::epsilon();
+    od = (f < lo - tol) ? (dlo - dbase) : ((f > hi + tol) ? (dhi - dbase) : dinc);
 }
 
 template <typename scalar_t>
-static SFEM_INLINE SFEM_HOST_DEVICE scalar_t cvfem_venkata_inc_d(const scalar_t base, const scalar_t inc,
+static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_venkata_inc_and_d(const scalar_t base, const scalar_t inc,
                                                                  const scalar_t lo, const scalar_t hi,
                                                                  const scalar_t eps2,
                                                                  const scalar_t dbase, const scalar_t dinc,
-                                                                 const scalar_t dlo, const scalar_t dhi) {
+                                                                 const scalar_t dlo, const scalar_t dhi,
+                                                                 const scalar_t inc_scale,
+                                                                 scalar_t &o, scalar_t &od) {
     const scalar_t dp  = (inc >= scalar_t(0)) ? (hi - base) : (lo - base);
     const scalar_t ddp = (inc >= scalar_t(0)) ? (dhi - dbase) : (dlo - dbase);
     const scalar_t num = dp * dp + scalar_t(2) * inc * dp + eps2;
     const scalar_t den = dp * dp + scalar_t(2) * inc * inc + inc * dp + eps2;
+    // The one reciprocal, shared by the value and the quotient rule below. Zero where den is,
+    // which the value's guard and the band below both override.
+    const scalar_t r   = (den != scalar_t(0)) ? scalar_t(1) / den : scalar_t(0);
+    const scalar_t psi = num * r;
+    o                  = (den != scalar_t(0)) ? psi * inc : inc;
     // THE inc >= 0 BRANCH NEEDS A BAND, and the note that used to sit beside this function
     // claiming otherwise was wrong in one case -- the common one.
     //
@@ -438,23 +497,23 @@ static SFEM_INLINE SFEM_HOST_DEVICE scalar_t cvfem_venkata_inc_d(const scalar_t 
     // the clip makes, for the same reason.
     const scalar_t ainc  = inc < scalar_t(0) ? -inc : inc;
     const scalar_t scale = (hi - lo < scalar_t(0) ? lo - hi : hi - lo) + ainc +
-                           (base < scalar_t(0) ? -base : base);
-    if (ainc <= scale * scalar_t(8) * scalar_t(2.220446049250313e-16)) return dinc;
-    // Reachable only with dp, inc and eps2 all exactly zero, which the band above already
-    // covers; kept so the division is guarded on its own terms.
-    if (den == scalar_t(0)) return dinc;
+                           (base < scalar_t(0) ? -base : base) + inc_scale;
+    // den == 0 is reachable only with dp, inc and eps2 all exactly zero, which the band already
+    // covers; kept so the reciprocal is guarded on its own terms.
+    const bool     band = ainc <= scale * scalar_t(CVFEM_LIMITER_BAND_ULPS) * std::numeric_limits<scalar_t>::epsilon() || den == scalar_t(0);
     const scalar_t dnum = scalar_t(2) * dp * ddp + scalar_t(2) * (dinc * dp + inc * ddp);
     const scalar_t dden = scalar_t(2) * dp * ddp + scalar_t(4) * inc * dinc + (dinc * dp + inc * ddp);
-    const scalar_t psi  = num / den;
     // Quotient rule once, then the product with the increment the limiter scales.
-    return ((dnum - psi * dden) / den) * inc + psi * dinc;
+    od = band ? dinc : ((dnum - psi * dden) * r) * inc + psi * dinc;
 }
 
 template <typename scalar_t>
-static SFEM_INLINE SFEM_HOST_DEVICE scalar_t cvfem_darwish_moukalled_inc_d(const scalar_t phi_c, const scalar_t phi_d,
+static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_darwish_moukalled_inc_and_d(const scalar_t phi_c, const scalar_t phi_d,
                                                                            const scalar_t grad_dot_d,
                                                                            const scalar_t dphi_c, const scalar_t dphi_d,
-                                                                           const scalar_t dgrad_dot_d) {
+                                                                           const scalar_t dgrad_dot_d,
+                                                                           const scalar_t inc_scale,
+                                                                           scalar_t &o, scalar_t &od) {
     const scalar_t a   = scalar_t(2) * grad_dot_d;
     const scalar_t b   = phi_d - phi_c;
     const scalar_t da  = scalar_t(2) * dgrad_dot_d;
@@ -490,16 +549,19 @@ static SFEM_INLINE SFEM_HOST_DEVICE scalar_t cvfem_darwish_moukalled_inc_d(const
     // The scale is the field's: the two nodal values and the reconstructed increment. None of
     // them vanishes with a or b, which is the property the old tolerance lacked.
     const scalar_t sc   = (phi_c < scalar_t(0) ? -phi_c : phi_c) + (phi_d < scalar_t(0) ? -phi_d : phi_d) +
-                          (grad_dot_d < scalar_t(0) ? -grad_dot_d : grad_dot_d);
-    const scalar_t tol = sc * scalar_t(8) * scalar_t(2.220446049250313e-16);
+                          (grad_dot_d < scalar_t(0) ? -grad_dot_d : grad_dot_d) + scalar_t(2) * inc_scale;
+    const scalar_t tol = sc * scalar_t(CVFEM_LIMITER_BAND_ULPS) * std::numeric_limits<scalar_t>::epsilon();
     const scalar_t daa = aa <= tol ? scalar_t(0) : (a < scalar_t(0) ? -da : da);
     const scalar_t dab = ab <= tol ? scalar_t(0) : (b < scalar_t(0) ? -db : db);
     const scalar_t den = scalar_t(2) * (aa + ab);
-    if (den <= scalar_t(2) * tol) return scalar_t(0);
+    // The one reciprocal. den vanishes only where num does, so r = 0 there gives the value its
+    // zero without a second guard; the derivative keeps its band on den.
+    const scalar_t r    = (den != scalar_t(0)) ? scalar_t(1) / den : scalar_t(0);
     const scalar_t num  = a * ab + aa * b;
+    o                   = num * r;
     const scalar_t dnum = da * ab + a * dab + daa * b + aa * db;
     const scalar_t dden = scalar_t(2) * (daa + dab);
-    return (dnum - (num / den) * dden) / den;
+    od = (den <= scalar_t(2) * tol) ? scalar_t(0) : (dnum - (num * r) * dden) * r;
 }
 
 #endif  // CVFEM_VENKATA_LIMITER_HPP

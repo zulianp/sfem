@@ -67,12 +67,14 @@ static SFEM_INLINE idx_t cvfem_pack_local_to_global(const ptrdiff_t             
 //   11    the Vanka smoother's macro-element node ids (idx_t)
 //   12    the Vanka smoother's global-node-to-local-slot map (int)
 //   13    the packed block diagonal's pack-local accumulator
+//   14,15 the deferred correction's nodal velocity gradients, staged pack-locally: the state's
+//         and, for the exact Jacobian action, the direction's. Nine per node, node-major.
 //
 // Every one of 9 through 13 replaced a std::vector declared inside a `#pragma omp parallel`,
 // which allocated and freed per thread per call in the V-cycle's inner loop. Slot 12 is the one
 // that mattered most: it is nnodes wide and was being allocated once per thread per smoother
 // application.
-static constexpr int CVFEM_PACK_SCRATCH_SLOTS = 14;
+static constexpr int CVFEM_PACK_SCRATCH_SLOTS = 16;
 
 // Per-thread scratch, indexed by slot. An out-of-range slot used to walk straight off the
 // end of these arrays and corrupt whatever thread_local storage followed -- the symptom was
@@ -186,6 +188,32 @@ static SFEM_INLINE Hex8PackQGradT<scalar_t> cvfem_hex8_pack_qgrad(const int     
     q.y = base ? base + n : nullptr;
     q.z = base ? base + 2 * n : nullptr;
     return q;
+}
+
+// SLOTS 14 AND 15, THE NODAL VELOCITY GRADIENTS THE DEFERRED CORRECTION READS, staged into the
+// pack like every other field the packed sweep reads. Until now they were the one exception: the
+// face loops gathered them from the global arrays through the STANDARD connectivity -- eight
+// global node ids per element on top of the pack's own indices, the array the format exists to
+// avoid reading -- and re-read each node's 72-byte row once per adjacent element. Nine per node,
+// node-major, so a lane's gather of one node is a contiguous row, in the compute type: the
+// storage type converts at the fill.
+static SFEM_INLINE size_t packed_ugrad_n(const ptrdiff_t max_actual_nodes_per_pack) {
+    const ptrdiff_t n = max_actual_nodes_per_pack > 0 ? max_actual_nodes_per_pack : 1;
+    return 9 * (size_t)n;
+}
+
+template <typename scalar_t>
+struct Hex8PackUGradT {
+    scalar_t *SFEM_RESTRICT g;  // [node * 9 + c], or null when the correction is off
+};
+
+template <typename scalar_t>
+static SFEM_INLINE Hex8PackUGradT<scalar_t> cvfem_hex8_pack_ugrad(const bool      with_ho,
+                                                                   const int       slot,
+                                                                   const ptrdiff_t max_actual_nodes_per_pack) {
+    Hex8PackUGradT<scalar_t> u{};
+    u.g = with_ho ? thread_scratch<scalar_t>(slot, packed_ugrad_n(max_actual_nodes_per_pack)) : nullptr;
+    return u;
 }
 
 // WHICH ELEMENTS AND NODES ONE PACK COVERS. The same six lines opened the pack loop in all five

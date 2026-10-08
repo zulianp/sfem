@@ -149,25 +149,18 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_scalar_range(
                 // sweep takes them, so the kernel sees identical inputs in both layouts.
                 Hex8ExtraScratch ex;
                 ex.load(mesh_elems, points, face_mask, pgx, pgy, pgz, qgx, qgy, qgz, ux, uy, uz, adj_ptr, det_ptr, opt, e);
-                // Coordinates are gathered here rather than taken from `ex`, and that is not
-                // redundant: Hex8ExtraScratch::load returns EARLY when neither Rhie-Chow nor
-                // the boundary closure is on, leaving its x/y/z untouched. The reconstruction
-                // works in physical space and needs them whether or not those terms are on, so
-                // reading ex.x there gave an uninitialised buffer -- caught by the packed-vs-
-                // atomic check at 2.9e-03, which is what that check is for.
-                scalar_t xe[8], ye[8], ze[8];
+                // The reconstruction used to take the node coordinates here as well; it works
+                // from the element Jacobian now (cvfem_hex8_defcor_ref_increments), so the
+                // gradient is the only per-element input it needs.
                 for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
                     const idx_t g = mesh_elems[a][e];
-                    xe[a] = scalar_t(points[0][g]);
-                    ye[a] = scalar_t(points[1][g]);
-                    ze[a] = scalar_t(points[2][g]);
                     for (int c = 0; c < 9; ++c) g8[a * 9 + c] = ugrad[(ptrdiff_t)g * 9 + c];
                 }
                 scalar_t adj[9], det;
                 load_hex8_adj(adj_ptr, det_ptr, e, adj, &det);
                 cvfem_hex8_ns_upwind_residual_sumfact(rho, mu, adj, det, ux_e, uy_e, uz_e, p_e, r,
                                                       ex.rc, /*ueps=*/scalar_t(0),
-                                                      g8, xe, ye, ze,
+                                                      g8,
                                                       limiter, venkat_c, nullptr);
 
                 for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {

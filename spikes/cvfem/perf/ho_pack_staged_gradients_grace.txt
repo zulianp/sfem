@@ -1,0 +1,42 @@
+# THE NODAL VELOCITY GRADIENTS STAGED INTO THE PACK: measured on Grace, kept.
+#
+# The change. The packed higher-order sweeps -- the residual, the exact Jacobian action on both of
+# its entry points, and the pack-coloured action that passes empty packs -- gathered the state's
+# and the direction's nodal velocity gradients from the global arrays through the STANDARD
+# connectivity: eight global node ids per element on top of the pack's own indices, and each
+# node's 72-byte row re-read once per adjacent element. Every other field the packed sweep reads
+# was already staged once per pack. Now these two are too: cvfem_hex8_fill_pack_ugrad copies the
+# owned range as a stream and the ghosts through the pack's ghost list into scratch slots 14 and
+# 15, cvfem_hex8_gather_ugrad_from_pack gathers lane-major through the 16-bit pack indices, and
+# no packed sweep takes the standard connectivity any more. The storage type (double, or float
+# under SFEM_GRAD_PRECISION=single) converts at the fill.
+#
+# Exactness: unchanged on every oracle. Packed against atomic 7e-18 to 1e-17; the exact Jacobian
+# against a finite difference 1.625e-10 unlimited and 1.175e-03 / 2.332e-03 limited on 0.38% of
+# dofs, 1.48e-10 on the warped mesh; f32 storage against f64 6e-10 residual, 7e-09 Jacobian.
+#
+# jobs/ab_refactor.sbatch, job 5004447 (nid006555): this change alone, against the tree before it.
+#
+#   residual_packed_ho_unlim     1019.0 -> 1031.8   +1.3%
+#   residual_packed_ho_venk       695.2 ->  701.4   +0.9%
+#   residual_packed_ho_dm         810.3 ->  816.0   +0.7%
+#   jac_action_packed_ho_unlim    450.5 ->  448.0   -0.5%
+#   jac_action_packed_ho_venk     309.5 ->  309.0   -0.2%
+#   jac_action_packed_ho_dm       295.8 ->  295.9   +0.1%
+#   every first-order row within 1.4%; PASSED
+#
+# The final tree -- this change, with the shared-reciprocal attempt reverted
+# (perf/ho_shared_reciprocal_ab_grace.txt) -- against the tree before either, job 5004492
+# (nid006557): every one of the 23 rows within 1.2%, PASSED.
+#
+# DRAM traffic, jobs/dram_traffic.sbatch, job 5004493 against 5003747, bytes per degree of
+# freedom per application, differenced across repeat counts:
+#
+#   residual-ho  packed   120.0 -> 116.8   -2.7%
+#   jac_action-ho packed  447.4 -> 446.5   -0.2%
+#
+# WHAT THIS SAYS. The global re-reads were real traffic but hit in cache often enough that
+# removing them is worth 3% of the residual's bytes and none of its time. On the Jacobian the
+# reads it removed are noise beside the direction's reconstruction sweep, which is where the
+# action's traffic is. The change is kept because it costs nothing and makes the packed path what
+# the format says it is -- no standard connectivity read anywhere in it -- which the paper states.

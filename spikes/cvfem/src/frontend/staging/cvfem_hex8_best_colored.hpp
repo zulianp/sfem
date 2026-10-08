@@ -184,7 +184,7 @@ static SFEM_NOINLINE void apply_jacobian_action_colored(MeshData                
                             rho, mu, dir, jv, scratch_n);
                 else
                     apply_jacobian_action_packcolored_affine_range(
-                            r, c.pack_order.data(), d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.p.data(), d.pgx.data(),
+                            r, c.pack_order.data(), d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(),
                             d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(),
                             d.qgz.data(), d.rc_coeff.data(), d.rc_w.data(), d.rhie_chow_scale,
                             d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_idx, p.ghost_ptr,

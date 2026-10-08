@@ -494,12 +494,18 @@ static void cvfem_hex8_build_grad_weight(MeshT &d, const int isoparam) {
 // 4172. The branch is perfectly predicted and the ISO=0 body is what runs; whatever the extra
 // instantiations do to inlining or register allocation in the nine-component sweep costs more than
 // the branch does. Revisit only with a measurement.
-template <int NC, typename MeshT>
+// out_t IS THE STORAGE TYPE OF THE RECONSTRUCTED GRADIENT, separate from the compute type.
+// The reconstruction accumulates in scalar_t and converts once at the write; a float out_t
+// halves what the nodal gradient fields cost in traffic for every sweep that reads them
+// afterwards, which for the deferred correction is a nine-component field per node and, on
+// the exact Jacobian action, two of them. The default stays the compute type; the choice is
+// the caller's (SFEM_GRAD_PRECISION in the front end, --grad-precision in the bench).
+template <int NC, typename out_t, typename MeshT>
 static void cvfem_hex8_nodal_grads_atomic_nc(MeshT                               &d,
                                              const int                            isoparam,
                                              const scalar_t *const SFEM_RESTRICT *srcs,
                                              const int *const                     src_stride,
-                                             scalar_t *const *const               outp,
+                                             out_t *const *const                  outp,
                                              const ptrdiff_t *const               out_stride) {
     constexpr int nc = NC;
     constexpr int nf = NC / 3;
@@ -510,7 +516,7 @@ static void cvfem_hex8_nodal_grads_atomic_nc(MeshT                              
     // Everything is zeroed because the accumulation below is additive.
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t i = 0; i < d.nnodes; ++i)
-        for (int c = 0; c < nc; ++c) outp[c][i * out_stride[c]] = scalar_t(0);
+        for (int c = 0; c < nc; ++c) outp[c][i * out_stride[c]] = out_t(0);
 
     // The reconstruction follows the layout under test, as every other auxiliary pass does.
     //
@@ -644,23 +650,23 @@ static void cvfem_hex8_nodal_grads_atomic_nc(MeshT                              
 //
 // Four fields is the widest set any caller asks for: the pressure and the three velocity
 // components together. The count is checked here and not inside the sweep.
-template <typename MeshT>
+template <typename out_t, typename MeshT>
 static void cvfem_hex8_assemble_nodal_grads_atomic(MeshT                               &d,
                                                    const int                            isoparam,
                                                    const scalar_t *const SFEM_RESTRICT *srcs,
                                                    const int *const                     src_stride,
                                                    const int                            nf,
-                                                   scalar_t *const *const               outp,
+                                                   out_t *const *const                  outp,
                                                    const ptrdiff_t *const               out_stride) {
     switch (nf) {
-        case 1: cvfem_hex8_nodal_grads_atomic_nc<3>(d, isoparam, srcs, src_stride, outp, out_stride); break;
-        case 2: cvfem_hex8_nodal_grads_atomic_nc<6>(d, isoparam, srcs, src_stride, outp, out_stride); break;
-        case 3: cvfem_hex8_nodal_grads_atomic_nc<9>(d, isoparam, srcs, src_stride, outp, out_stride); break;
-        case 4: cvfem_hex8_nodal_grads_atomic_nc<12>(d, isoparam, srcs, src_stride, outp, out_stride); break;
-        case 5: cvfem_hex8_nodal_grads_atomic_nc<15>(d, isoparam, srcs, src_stride, outp, out_stride); break;
-        case 6: cvfem_hex8_nodal_grads_atomic_nc<18>(d, isoparam, srcs, src_stride, outp, out_stride); break;
-        case 7: cvfem_hex8_nodal_grads_atomic_nc<21>(d, isoparam, srcs, src_stride, outp, out_stride); break;
-        case 8: cvfem_hex8_nodal_grads_atomic_nc<24>(d, isoparam, srcs, src_stride, outp, out_stride); break;
+        case 1: cvfem_hex8_nodal_grads_atomic_nc<3, out_t>(d, isoparam, srcs, src_stride, outp, out_stride); break;
+        case 2: cvfem_hex8_nodal_grads_atomic_nc<6, out_t>(d, isoparam, srcs, src_stride, outp, out_stride); break;
+        case 3: cvfem_hex8_nodal_grads_atomic_nc<9, out_t>(d, isoparam, srcs, src_stride, outp, out_stride); break;
+        case 4: cvfem_hex8_nodal_grads_atomic_nc<12, out_t>(d, isoparam, srcs, src_stride, outp, out_stride); break;
+        case 5: cvfem_hex8_nodal_grads_atomic_nc<15, out_t>(d, isoparam, srcs, src_stride, outp, out_stride); break;
+        case 6: cvfem_hex8_nodal_grads_atomic_nc<18, out_t>(d, isoparam, srcs, src_stride, outp, out_stride); break;
+        case 7: cvfem_hex8_nodal_grads_atomic_nc<21, out_t>(d, isoparam, srcs, src_stride, outp, out_stride); break;
+        case 8: cvfem_hex8_nodal_grads_atomic_nc<24, out_t>(d, isoparam, srcs, src_stride, outp, out_stride); break;
         default: assert(false && "nodal gradient sweep takes 1 to 8 fields"); break;
     }
 }
@@ -719,13 +725,13 @@ static void cvfem_hex8_assemble_nodal_grads_atomic(MeshT                        
 //
 // It keeps its own ghost buffer because PackedData::ghost_buf is sized N_FIELDS (four) wide
 // and this needs nine. Held by the caller and reused, so a residual does not allocate.
-template <int NC, typename MeshT, typename PackT>
+template <int NC, typename out_t, typename MeshT, typename PackT>
 static void cvfem_hex8_nodal_grads_packed_nc(MeshT                               &d,
                                              PackT                               &p,
                                              const int                            isoparam,
                                              const scalar_t *const SFEM_RESTRICT *srcs,
                                              const int *const                     src_stride,
-                                             scalar_t *const *const               outp,
+                                             out_t *const *const                  outp,
                                              const ptrdiff_t *const               out_stride,
                                              std::vector<scalar_t>               &gbuf) {
     constexpr int nc = NC;
@@ -739,7 +745,7 @@ static void cvfem_hex8_nodal_grads_packed_nc(MeshT                              
     if (!owns_all) {
 #pragma omp parallel for schedule(static)
         for (ptrdiff_t i = 0; i < d.nnodes; ++i)
-            for (int c = 0; c < nc; ++c) outp[c][i * out_stride[c]] = scalar_t(0);
+            for (int c = 0; c < nc; ++c) outp[c][i * out_stride[c]] = out_t(0);
     }
     // The ghost entries are stored, not accumulated, so growing the buffer is all this needs.
     if ((ptrdiff_t)gbuf.size() < (ptrdiff_t)p.n_ghost_entries * nc)
@@ -857,7 +863,7 @@ static void cvfem_hex8_nodal_grads_packed_nc(MeshT                              
             // write over the nodal arrays from every matvec.
             for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
                 const scalar_t  wi = w[owned + k];
-                for (int c = 0; c < nc; ++c) outp[c][(owned + k) * out_stride[c]] = pack_out[k * nc + c] * wi;
+                for (int c = 0; c < nc; ++c) outp[c][(owned + k) * out_stride[c]] = out_t(pack_out[k * nc + c] * wi);
             }
             for (ptrdiff_t k = 0; k < n_ghost; ++k) {
                 const scalar_t *const SFEM_RESTRICT o = pack_out + (n_contiguous + k) * nc;
@@ -877,7 +883,7 @@ static void cvfem_hex8_nodal_grads_packed_nc(MeshT                              
             for (int c = 0; c < nc; ++c) s[c] += gb[idx * nc + c];
         }
         const scalar_t wd = w[dest];
-        for (int c = 0; c < nc; ++c) outp[c][(ptrdiff_t)dest * out_stride[c]] += s[c] * wd;
+        for (int c = 0; c < nc; ++c) outp[c][(ptrdiff_t)dest * out_stride[c]] += out_t(s[c] * wd);
     }
 }
 
@@ -891,25 +897,25 @@ static void cvfem_hex8_nodal_grads_packed_nc(MeshT                              
 //
 // Four fields is the widest set any caller asks for: the pressure and the three velocity
 // components together. The count is checked here and not inside the sweep.
-template <typename MeshT, typename PackT>
+template <typename out_t, typename MeshT, typename PackT>
 static void cvfem_hex8_assemble_nodal_grads_packed(MeshT                               &d,
                                                    PackT                               &p,
                                                    const int                            isoparam,
                                                    const scalar_t *const SFEM_RESTRICT *srcs,
                                                    const int *const                     src_stride,
                                                    const int                            nf,
-                                                   scalar_t *const *const               outp,
+                                                   out_t *const *const                  outp,
                                                    const ptrdiff_t *const               out_stride,
                                                    std::vector<scalar_t>               &gbuf) {
     switch (nf) {
-        case 1: cvfem_hex8_nodal_grads_packed_nc<3>(d, p, isoparam, srcs, src_stride, outp, out_stride, gbuf); break;
-        case 2: cvfem_hex8_nodal_grads_packed_nc<6>(d, p, isoparam, srcs, src_stride, outp, out_stride, gbuf); break;
-        case 3: cvfem_hex8_nodal_grads_packed_nc<9>(d, p, isoparam, srcs, src_stride, outp, out_stride, gbuf); break;
-        case 4: cvfem_hex8_nodal_grads_packed_nc<12>(d, p, isoparam, srcs, src_stride, outp, out_stride, gbuf); break;
-        case 5: cvfem_hex8_nodal_grads_packed_nc<15>(d, p, isoparam, srcs, src_stride, outp, out_stride, gbuf); break;
-        case 6: cvfem_hex8_nodal_grads_packed_nc<18>(d, p, isoparam, srcs, src_stride, outp, out_stride, gbuf); break;
-        case 7: cvfem_hex8_nodal_grads_packed_nc<21>(d, p, isoparam, srcs, src_stride, outp, out_stride, gbuf); break;
-        case 8: cvfem_hex8_nodal_grads_packed_nc<24>(d, p, isoparam, srcs, src_stride, outp, out_stride, gbuf); break;
+        case 1: cvfem_hex8_nodal_grads_packed_nc<3, out_t>(d, p, isoparam, srcs, src_stride, outp, out_stride, gbuf); break;
+        case 2: cvfem_hex8_nodal_grads_packed_nc<6, out_t>(d, p, isoparam, srcs, src_stride, outp, out_stride, gbuf); break;
+        case 3: cvfem_hex8_nodal_grads_packed_nc<9, out_t>(d, p, isoparam, srcs, src_stride, outp, out_stride, gbuf); break;
+        case 4: cvfem_hex8_nodal_grads_packed_nc<12, out_t>(d, p, isoparam, srcs, src_stride, outp, out_stride, gbuf); break;
+        case 5: cvfem_hex8_nodal_grads_packed_nc<15, out_t>(d, p, isoparam, srcs, src_stride, outp, out_stride, gbuf); break;
+        case 6: cvfem_hex8_nodal_grads_packed_nc<18, out_t>(d, p, isoparam, srcs, src_stride, outp, out_stride, gbuf); break;
+        case 7: cvfem_hex8_nodal_grads_packed_nc<21, out_t>(d, p, isoparam, srcs, src_stride, outp, out_stride, gbuf); break;
+        case 8: cvfem_hex8_nodal_grads_packed_nc<24, out_t>(d, p, isoparam, srcs, src_stride, outp, out_stride, gbuf); break;
         default: assert(false && "nodal gradient sweep takes 1 to 8 fields"); break;
     }
 }

@@ -86,17 +86,14 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact_defcor(
 
         // The reconstruction needs the element's node coordinates and the eight nodes' nodal
         // velocity gradients; both are gathered per element, like the fields above.
-        scalar_t xe[8], ye[8], ze[8], g8[72];
+        scalar_t g8[72];
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
             const idx_t g = mesh_elems[a][e];
-            xe[a] = scalar_t(points[0][g]);
-            ye[a] = scalar_t(points[1][g]);
-            ze[a] = scalar_t(points[2][g]);
             for (int c = 0; c < 9; ++c) g8[a * 9 + c] = ugrad[(ptrdiff_t)g * 9 + c];
         }
 
         cvfem_hex8_ns_upwind_residual_sumfact(rho, mu, adj, det, ux, uy, uz, p, r, ex.rc,
-                                              /*ueps=*/scalar_t(0), g8, xe, ye, ze,
+                                              /*ueps=*/scalar_t(0), g8,
                                               limiter, venkat_c, nullptr);
 
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {

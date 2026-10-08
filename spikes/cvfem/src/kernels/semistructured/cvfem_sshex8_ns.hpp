@@ -2018,10 +2018,7 @@ static SFEM_INLINE void sscvfem_residual_naive_cell(
     sscvfem_micro_geom(gx, gy, gz, adj, &det);
     cvfem_hex8_ns_upwind_residual_sumfact(rho, mu, adj, det, ux, uy, uz, p, r, rc,
                                          upwind_eps,
-                                         (const scalar_t *)nullptr,
-                                         (const scalar_t *)nullptr,
-                                         (const scalar_t *)nullptr,
-                                         (const scalar_t *)nullptr, 0, scalar_t(0),
+                                         (scalar_t *)nullptr, 0, scalar_t(0),
                                          nullptr, peclet);
     boundary_scs_add_residual<false>(rho, mu, adj, det, box_lx, box_ly, box_lz, x, y, z, ux, uy, uz, p, r);
     for (int a = 0; a < 8; ++a)
@@ -2138,9 +2135,7 @@ static SFEM_INLINE void sscvfem_residual_cell(
     const bool ho = conv_ho != 0;
     cvfem_hex8_ns_upwind_residual_sumfact(rho, mu, g.adj, g.det, ux, uy, uz, p, r,
                                          rc, upwind_eps,
-                                         ho ? g8 : nullptr,
-                                         ho ? x : nullptr, ho ? y : nullptr,
-                                         ho ? z : nullptr, conv_limiter,
+                                         ho ? g8 : nullptr, conv_limiter,
                                          conv_venkat_c, limiter_stats,
                                          peclet);
     boundary_scs_add_residual<false>(rho, mu, g.adj, g.det, box_lx, box_ly, box_lz, x, y, z,

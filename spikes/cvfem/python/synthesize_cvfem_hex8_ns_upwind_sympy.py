@@ -304,6 +304,23 @@ def limit_inc(limiter: int, base: sp.Expr, other: sp.Expr, inc: sp.Expr) -> sp.E
     raise ValueError(f"unknown limiter {limiter}")
 
 
+def affine_edge_cols(sym: dict[str, object]) -> tuple[list[sp.Expr], list[sp.Expr], list[sp.Expr]]:
+    """The three edge columns of the affine element, J = adj(adj)/det, from the cofactors.
+
+    Mirrors cvfem_hex8_affine_edge_cols expression for expression, in its direction-major
+    layout: ``ex[k], ey[k], ez[k]`` are the x, y, z components of the edge of direction k. The
+    affine kernels take every geometric quantity from the one Jacobian they hold, and since the
+    hand-written correction moved its node-to-centroid vectors onto it
+    (cvfem_hex8_defcor_ref_increments) the generated correction does the same, so the two still
+    discretise one operator and the lane-major pack no longer carries node coordinates.
+    """
+    c, inv = sym["cof"], 1 / sym["det"]
+    ex = [(c[4] * c[8] - c[5] * c[7]) * inv, (c[2] * c[7] - c[1] * c[8]) * inv, (c[1] * c[5] - c[2] * c[4]) * inv]
+    ey = [(-c[3] * c[8] + c[5] * c[6]) * inv, (c[0] * c[8] - c[2] * c[6]) * inv, (-c[0] * c[5] + c[2] * c[3]) * inv]
+    ez = [(c[3] * c[7] - c[4] * c[6]) * inv, (-c[0] * c[7] + c[1] * c[6]) * inv, (c[0] * c[4] - c[1] * c[3]) * inv]
+    return ex, ey, ez
+
+
 def defcor_face_expr(sym: dict[str, object], s: int, mdot: sp.Expr,
                      limiter: int = 0) -> tuple[int, int, list[sp.Expr]]:
     """The deferred-correction momentum increment across sub-control surface ``s``.
@@ -324,13 +341,20 @@ def defcor_face_expr(sym: dict[str, object], s: int, mdot: sp.Expr,
     mpos = sp.Rational(1, 2) * (mdot + mdot_abs)
     mneg = sp.Rational(1, 2) * (mdot - mdot_abs)
 
-    x, y, z, g = sym["x"], sym["y"], sym["z"], sym["g"]
-    # The surface centroid in physical space. Every face shares these eight coordinates, and
-    # generating the whole element as one expression set is what lets CSE hoist the shared part
-    # of the twelve centroids -- which twelve separately compiled per-face functions cannot do.
-    cen = [sum(scs_shape(s, a) * comp[a] for a in range(N_NODE)) for comp in (x, y, z)]
-    di = [cen[0] - x[i], cen[1] - y[i], cen[2] - z[i]]
-    dj = [cen[0] - x[j], cen[1] - y[j], cen[2] - z[j]]
+    g = sym["g"]
+    # The node-to-centroid vectors through the element Jacobian, exactly as the hand-written
+    # affine kernels form them: x_s - x_a = J (xi_s - xi_a), with xi_s - xi_a the constant offsets
+    # +-1/2 and +-1/4 the two reference tables give. The centroid summed from the eight node
+    # coordinates that used to stand here is the same point on a parallelepiped and a different
+    # geometry from the rest of the affine kernel on anything else; see the C++ note on
+    # cvfem_hex8_defcor_ref_increments. Every face shares the nine edge-column expressions, which
+    # is what lets CSE hoist them once for the element.
+    ex, ey, ez = affine_edge_cols(sym)
+
+    def to_centroid(a: int) -> list[sp.Expr]:
+        return [sum((SCS_XI[s][k] - REF_XI[a][k]) * e[k] for k in range(3)) for e in (ex, ey, ez)]
+
+    di, dj = to_centroid(i), to_centroid(j)
 
     u = (sym["ux"], sym["uy"], sym["uz"])
     out: list[sp.Expr] = []
@@ -344,7 +368,7 @@ def defcor_face_expr(sym: dict[str, object], s: int, mdot: sp.Expr,
     return i, j, out
 
 
-def rc_mdot_expr(sym: dict[str, object], s: int) -> sp.Expr:
+def rc_mdot_expr(sym: dict[str, object], s: int, edge_cols=None) -> sp.Expr:
     """The Rhie-Chow contribution to surface ``s``'s mass flux.
 
     The pressure difference across the surface's two nodes, minus the same difference as the
@@ -352,11 +376,19 @@ def rc_mdot_expr(sym: dict[str, object], s: int) -> sp.Expr:
     which is what suppresses the checkerboard mode without adding dissipation to a smooth field.
     Scaled by the staged coefficient and subtracted, matching the hand-written kernel's
     ``mdot -= coeff * corr``.
+
+    ``edge_cols`` -- the affine edge columns from affine_edge_cols -- selects the edge vector of
+    the surface's direction group in place of the node-coordinate difference, which is what the
+    hand-written affine path reads and what a kernel whose pack carries no coordinates can form.
     """
     i, j, _ar = SCS[s]
-    x, y, z = sym["x"], sym["y"], sym["z"]
     pgx, pgy, pgz, p = sym["pgx"], sym["pgy"], sym["pgz"], sym["p"]
-    dx, dy, dz = x[j] - x[i], y[j] - y[i], z[j] - z[i]
+    if edge_cols is None:
+        x, y, z = sym["x"], sym["y"], sym["z"]
+        dx, dy, dz = x[j] - x[i], y[j] - y[i], z[j] - z[i]
+    else:
+        ex, ey, ez = edge_cols
+        dx, dy, dz = ex[s // 4], ey[s // 4], ez[s // 4]
     half = sp.Rational(1, 2)
     corr = (p[j] - p[i]) - (half * (pgx[i] + pgx[j]) * dx +
                             half * (pgy[i] + pgy[j]) * dy +
@@ -373,12 +405,13 @@ def residual_defcor_exprs(sym: dict[str, object], rc: bool = False,
     """
     r = [sp.Integer(0)] * N_DOF
     mdots: list[sp.Expr] = []
+    edge = affine_edge_cols(sym)
     for s in range(len(SCS)):
         i, j, ar = SCS[s]
         fr, mdot = face_flux_residual(
                 n_dof=N_DOF, node_i=i, node_j=j, area=area(sym, ar), grad=velocity_gradient(sym),
                 rho=sym["rho"], mu=sym["mu"], u=(sym["ux"], sym["uy"], sym["uz"]), p=sym["p"],
-                sign=sym["sgn"][s], mdot_rc=rc_mdot_expr(sym, s) if rc else None)
+                sign=sym["sgn"][s], mdot_rc=rc_mdot_expr(sym, s, edge) if rc else None)
         mdots.append(mdot)
         for k in range(N_DOF):
             r[k] += fr[k]
@@ -404,9 +437,8 @@ def simd_input_locals_defcor() -> str:
     for name in ("ux", "uy", "uz", "p"):
         for i in range(N_NODE):
             lines.append(f"        const scalar_t {name}{i} = in.{name}[{i}][lane];")
-    for name in ("x", "y", "z"):
-        for i in range(N_NODE):
-            lines.append(f"        const scalar_t {name}{i} = ho.{name}[{i}][lane];")
+    # No node coordinates: the correction's geometry comes from the cofactors above, as the
+    # hand-written affine kernels' does, and the pack stopped carrying them.
     for a in range(N_NODE):
         for c in range(9):
             lines.append(f"        const scalar_t g{a}_{c} = ho.g[{a}][{c}][lane];")

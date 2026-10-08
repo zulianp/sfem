@@ -601,45 +601,46 @@ is not part of the cumulative sequence above it.
 Every row above runs the first-order upwind flux. The deferred correction of
 Section~\ref{sec:defcor} is what the scheme runs when accuracy matters, and it is the one part of
 the operator family the table said nothing about. Measured in one allocation at the same size,
-medians of seven, with the first-order Rhie--Chow operator as the reference because that is what
-each correction is added to --- $1844$ and $944$ here, which agree with the corresponding rows
-above to within $0.6\%$.
+medians of five, with the first-order Rhie--Chow operator as the reference because that is what
+each correction is added to --- $1821$ and $950$ here, which agree with the corresponding rows
+above to within $0.7\%$.
 
 \begin{center}
 \begin{tabular}{lrrr}
 \toprule
 Operator & MDOF/s & vs.\ first order & flops/element \\
 \midrule
-Residual, first order $+$ Rhie--Chow                  & 1844 & 1.00 &  754 \\
-\quad $+$ correction, unlimited                       &  958 & 1.93 & 1426 \\
-\quad $+$ correction, bounded-face clip               &  755 & 2.44 & 1570 \\
-\quad $+$ correction, Venkatakrishnan                 &  649 & 2.84 & 2506 \\
-\quad $+$ correction, Darwish--Moukalled              &  697 & 2.65 & 2146 \\
-\quad $+$ Venkatakrishnan, boundary and transient     &  599 & 3.08 & 2506 \\
+Residual, first order $+$ Rhie--Chow                  & 1821 & 1.00 &  754 \\
+\quad $+$ correction, unlimited                       & 1108 & 1.64 & 1558 \\
+\quad $+$ correction, bounded-face clip               &  856 & 2.13 & 1702 \\
+\quad $+$ correction, Venkatakrishnan                 &  748 & 2.44 & 2638 \\
+\quad $+$ correction, Darwish--Moukalled              &  877 & 2.08 & 2278 \\
+\quad $+$ Venkatakrishnan, boundary and transient     &  683 & 2.67 & 2638 \\
 \midrule
-Jacobian action, first order $+$ exact Rhie--Chow     &  944 & 1.00 &  850 \\
-\quad $+$ correction, unlimited                       &  455 & 2.07 & 2098 \\
-\quad $+$ correction, Venkatakrishnan                 &  339 & 2.78 & 5554 \\
-\quad $+$ Venkatakrishnan, boundary and transient     &  326 & 2.89 & 5554 \\
+Jacobian action, first order $+$ exact Rhie--Chow     &  950 & 1.00 &  850 \\
+\quad $+$ correction, unlimited                       &  449 & 2.12 & 2422 \\
+\quad $+$ correction, Venkatakrishnan                 &  328 & 2.89 & 5878 \\
+\quad $+$ Venkatakrishnan, boundary and transient     &  316 & 3.00 & 5878 \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-The flop column is in the table because the throughput ratio alone would be read as the
-correction's arithmetic cost and it is not. The correction runs through the \emph{scalar}
-sum-factored kernel --- the only one that accepts the nodal velocity gradient --- while the
-first-order packed residual is sixteen lanes wide, so a ratio of $2.84$ against a flop ratio of
-$3.3$ is measuring a change of kernel as much as a change of scheme. The same thing read off the
-standard layout, where both are scalar, gives $1.89$.
+The flop column is the driver's model, counted against the kernel line for line. It includes the
+reconstruction of the twenty-four node-to-surface increments once per element, which on the
+affine element is a product with the three edge columns of the Jacobian rather than a centroid
+built from eight coordinates, so no coordinate is read by the correction at all. The correction
+is a lane-blocked arm of the same face kernel as the flux it is added to and shares its gathers
+and scatters, which is why its throughput ratio of $2.44$ for Venkatakrishnan sits below the
+flop ratio of $3.5$: the arithmetic grows faster than the time.
 
-That is also why the packed layout's advantage shrinks here: $1.99$ over the standard layout for
-the first-order residual and $1.32$ for the Venkatakrishnan one. Where the kernel is scalar on
-both layouts, what is left is the scatter.
+The packed layout's advantage shrinks here, from $1.95$ over the standard layout for the
+first-order residual to $1.37$ for the Venkatakrishnan one. The correction adds arithmetic that
+both layouts perform alike; the layout's gain is in the scatter.
 
 The derivative is the expensive half, and by more than the residual's factor: the correction
-costs the Jacobian action $2.78$ against the residual's $2.84$ on the same limiter, but it does
-so on top of an operator that was already $2.18$ times the bare sweep, and its flop count rises
-from $850$ to $5554$ --- a factor of $6.5$, against the residual's $3.3$. The limiter has to be
+costs the Jacobian action $2.89$ against the residual's $2.44$ on the same limiter, on top of
+an operator that was already $2.18$ times the bare sweep, and its flop count rises from $850$
+to $5878$ --- a factor of $6.9$, against the residual's $3.5$. The limiter has to be
 differentiated through the nodal gradient reconstruction, and that reconstruction is what the
 exact Rhie--Chow term already pays for once.
 

@@ -153,6 +153,20 @@ foreach(DRIVER ${CVFEM_DRIVERS})
     cvfem_target_defaults(${DRIVER_NAME})
 endforeach()
 
+# THE SAME BENCHMARK, FULLY IN SINGLE PRECISION. One source, compiled a second time with the
+# computation type set to float (src/frontend/staging/cvfem_hex8_best_common.hpp): every field,
+# pack, cached geometry table and kernel is f32. A separate target rather than a runtime switch
+# because the type is the template argument of every sweep the driver instantiates -- a runtime
+# switch would compile the whole driver twice into one binary for no gain. Its operators are held
+# to the double build's by src/tests/verification/cvfem_bench_f32.sh.
+add_executable(cvfem_hex8_ns_upwind_bench_f32 ${CMAKE_CURRENT_SOURCE_DIR}/src/drivers/cvfem_hex8_ns_upwind_bench.cpp)
+target_link_libraries(cvfem_hex8_ns_upwind_bench_f32
+    PRIVATE
+        SFEM::sfem
+        $<$<BOOL:${OpenMP_CXX_FOUND}>:OpenMP::OpenMP_CXX>)
+target_compile_definitions(cvfem_hex8_ns_upwind_bench_f32 PRIVATE CVFEM_SCALAR_T=float)
+cvfem_target_defaults(cvfem_hex8_ns_upwind_bench_f32)
+
 # The steady solver reaches into SFEM's algebra headers in place; the Op-linked drivers
 # get the same directories through cvfem_ns_op's PUBLIC includes.
 target_include_directories(cvfem_hex8_ns_steady PRIVATE ${CVFEM_SFEM_ALGEBRA_INCLUDES})
@@ -484,6 +498,16 @@ find_program(CVFEM_PYTHON NAMES python3 python
              NO_CMAKE_SYSTEM_PATH)
 if(NOT CVFEM_PYTHON)
     find_program(CVFEM_PYTHON NAMES python3 python)
+endif()
+
+# The fully-f32 bench against the f64 one, operator by operator: its oracle, since the --verify
+# modes are double-precision checks it refuses. See the script for the two standards.
+if(CVFEM_PYTHON)
+    add_test(NAME cvfem_bench_f32
+             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_bench_f32.sh
+                     $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>
+                     $<TARGET_FILE:cvfem_hex8_ns_upwind_bench_f32>
+                     ${CVFEM_PYTHON})
 endif()
 
 if(CVFEM_PYTHON)

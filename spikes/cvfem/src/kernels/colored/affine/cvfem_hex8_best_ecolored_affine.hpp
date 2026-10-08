@@ -33,7 +33,7 @@
 // The scratch comes in as arguments rather than being declared inside the kernel, which is what
 // DESIGN.md's "only arguments that are actually used" asks for and what removes the hidden
 // per-thread state: the launcher owns one set per thread, in its parallel region, and passes it.
-template <typename scalar_t, typename geom_t, typename idx_t>
+template <typename scalar_t, typename geom_t, typename idx_t, typename grad_t>
 static SFEM_NOINLINE void apply_residual_ecolored_range(
         const cvfem_range r,
         // The mesh and the pack are staging objects -- they own vectors and a shared_ptr to a
@@ -53,7 +53,7 @@ static SFEM_NOINLINE void apply_residual_ecolored_range(
         const scalar_t *const SFEM_RESTRICT uz,
         const scalar_t    rho,
         const scalar_t    mu,
-        const scalar_t *const SFEM_RESTRICT ugrad,
+        const grad_t *const SFEM_RESTRICT ugrad,
         const int         limiter,
         const scalar_t    venkat_c,
         const Hex8Extras &opt,
@@ -125,15 +125,11 @@ static SFEM_NOINLINE void apply_residual_ecolored_range(
                 for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
                     for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
                         if (lane >= nlanes) {
-                            hop.x[a][lane] = hop.y[a][lane] = hop.z[a][lane] = scalar_t(0);
                             for (int c = 0; c < 9; ++c) hop.g[a][c][lane] = scalar_t(0);
                             continue;
                         }
                         const idx_t gn = mesh_elems[a][e0 + lane];
-                        hop.x[a][lane]        = scalar_t(points[0][gn]);
-                        hop.y[a][lane]        = scalar_t(points[1][gn]);
-                        hop.z[a][lane]        = scalar_t(points[2][gn]);
-                        for (int c = 0; c < 9; ++c) hop.g[a][c][lane] = ugrad[(ptrdiff_t)gn * 9 + c];
+                        for (int c = 0; c < 9; ++c) hop.g[a][c][lane] = scalar_t(ugrad[(ptrdiff_t)gn * 9 + c]);
                     }
                 }
                 hop.limiter  = limiter;
@@ -167,7 +163,7 @@ static SFEM_NOINLINE void apply_residual_ecolored_range(
 
 // The Jacobian action, split the same way and for the same reasons. See
 // apply_residual_ecolored_range above.
-template <typename scalar_t, typename geom_t, typename idx_t>
+template <typename scalar_t, typename geom_t, typename idx_t, typename grad_t>
 static SFEM_NOINLINE void apply_jacobian_action_ecolored_range(
         const cvfem_range r,
         // The mesh and the pack are staging objects -- they own vectors and a shared_ptr to a
@@ -194,8 +190,8 @@ static SFEM_NOINLINE void apply_jacobian_action_ecolored_range(
         const scalar_t    mu,
         const scalar_t *const dir,
         scalar_t *const       jv,
-        const scalar_t *const SFEM_RESTRICT ugrad,
-        const scalar_t *const SFEM_RESTRICT vgrad,
+        const grad_t *const SFEM_RESTRICT ugrad,
+        const grad_t *const SFEM_RESTRICT vgrad,
         const int         limiter,
         const scalar_t    venkat_c,
         const Hex8Extras &opt,
@@ -280,7 +276,6 @@ static SFEM_NOINLINE void apply_jacobian_action_ecolored_range(
                 for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
                     for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
                         if (lane >= nlanes) {
-                            hop.x[a][lane] = hop.y[a][lane] = hop.z[a][lane] = scalar_t(0);
                             for (int c = 0; c < 9; ++c) {
                                 hop.g[a][c][lane]  = scalar_t(0);
                                 hovp.g[a][c][lane] = scalar_t(0);
@@ -288,12 +283,9 @@ static SFEM_NOINLINE void apply_jacobian_action_ecolored_range(
                             continue;
                         }
                         const idx_t gn = mesh_elems[a][e0 + lane];
-                        hop.x[a][lane]        = scalar_t(points[0][gn]);
-                        hop.y[a][lane]        = scalar_t(points[1][gn]);
-                        hop.z[a][lane]        = scalar_t(points[2][gn]);
                         for (int c = 0; c < 9; ++c) {
-                            hop.g[a][c][lane]  = ugrad[(ptrdiff_t)gn * 9 + c];
-                            hovp.g[a][c][lane] = vgrad[(ptrdiff_t)gn * 9 + c];
+                            hop.g[a][c][lane]  = scalar_t(ugrad[(ptrdiff_t)gn * 9 + c]);
+                            hovp.g[a][c][lane] = scalar_t(vgrad[(ptrdiff_t)gn * 9 + c]);
                         }
                     }
                 }
