@@ -12,12 +12,12 @@
   grid=both, major grid style={black!12}, minor grid style={black!6},
   tick label style={font=\tiny}, label style={font=\scriptsize},
 ]
-\addplot[PackC,mark=triangle*,mark size=1.6pt,thick] coordinates {(0.40,537.901) (0.90,946.884) (1.80,1019.301) (3.60,1046.076) (7.10,1026.317) (14.20,1099.392) (28.40,1109.212)};
+\addplot[PackC,mark=triangle*,mark size=1.6pt,thick] coordinates {(0.40,519.986) (0.90,886.763) (1.80,971.051) (3.60,1001.270) (7.10,984.980) (14.20,1055.204) (28.40,1051.663)};
 \addlegendentry{$n=64$}
-\addplot[PackA,mark=*,mark size=1.6pt,thick] coordinates {(3.60,797.249) (7.10,852.764) (14.20,911.516) (28.40,913.706) (56.90,895.395) (113.80,856.512) (227.60,824.915)};
+\addplot[PackA,mark=*,mark size=1.6pt,thick] coordinates {(3.60,771.411) (7.10,818.734) (14.20,865.193) (28.40,880.081) (56.90,871.298) (113.80,826.691) (227.60,791.563)};
 \addlegendentry{$n=128$}
-\addplot[PackC,mark=triangle*,mark size=1.4pt,thick,densely dashed,mark options={solid},forget plot] coordinates {(0.40,189.631) (0.90,345.759) (1.80,365.888) (3.60,379.491) (7.10,381.266) (14.20,401.059) (28.40,408.447)};
-\addplot[PackA,mark=*,mark size=1.4pt,thick,densely dashed,mark options={solid},forget plot] coordinates {(3.60,327.873) (7.10,348.224) (14.20,373.807) (28.40,383.276) (56.90,383.867) (113.80,372.701) (227.60,359.810)};
+\addplot[PackC,mark=triangle*,mark size=1.4pt,thick,densely dashed,mark options={solid},forget plot] coordinates {(0.40,154.579) (0.90,257.040) (1.80,277.749) (3.60,304.395) (7.10,317.197) (14.20,336.528) (28.40,339.845)};
+\addplot[PackA,mark=*,mark size=1.4pt,thick,densely dashed,mark options={solid},forget plot] coordinates {(3.60,245.622) (7.10,272.929) (14.20,309.007) (28.40,318.799) (56.90,316.236) (113.80,304.048) (227.60,288.268)};
 \draw[black!50,dashed] (axis cs:1,0) -- (axis cs:1,\pgfkeysvalueof{/pgfplots/ymax});
 \node[black!55,font=\tiny,anchor=south west,xshift=1pt,yshift=1pt] at (axis cs:1,0) {one pack per thread};
 \end{semilogxaxis}

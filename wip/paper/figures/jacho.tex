@@ -11,16 +11,21 @@
                 fill=none, inner sep=1pt, column sep=6pt},
   tick label style={font=\scriptsize}, label style={font=\scriptsize},
   ymajorgrids, major grid style={black!12}]
-\addplot[draw=PackA, fill=PackA] coordinates {(upwind,927.9) (unlimited,486.7) (Barth--J.,373.5) (Venkat.,354.9) (Darwish--M.,345.7)};
+\addplot[draw=PackA, fill=PackA, fill opacity=0.35, draw opacity=0.6, bar shift=-7pt, forget plot] coordinates {(upwind,1568.6) (unlimited,774.2) (Barth--J.,655.3) (Venkat.,596.4) (Darwish--M.,572.9)};
+\addplot[draw=PackA, fill=PackA, bar shift=-7pt] coordinates {(upwind,932.8) (unlimited,466.3) (Barth--J.,384.3) (Venkat.,339.8) (Darwish--M.,326.8)};
 \addlegendentry{packed}
-\addplot[draw=PackB, fill=PackB] coordinates {(upwind,468.1) (unlimited,151.5) (Barth--J.,143.7) (Venkat.,142.7) (Darwish--M.,139.7)};
+\addplot[draw=PackB, fill=PackB, fill opacity=0.35, draw opacity=0.6, bar shift=0pt, forget plot] coordinates {(upwind,1175.7) (unlimited,338.2) (Barth--J.,314.0) (Venkat.,299.7) (Darwish--M.,300.4)};
+\addplot[draw=PackB, fill=PackB, bar shift=0pt] coordinates {(upwind,467.0) (unlimited,151.0) (Barth--J.,144.2) (Venkat.,137.7) (Darwish--M.,137.8)};
 \addlegendentry{coloured}
-\addplot[draw=PackD, fill=PackD] coordinates {(upwind,356.0) (unlimited,153.5) (Barth--J.,140.5) (Venkat.,137.7) (Darwish--M.,136.1)};
+\addplot[draw=PackD, fill=PackD, fill opacity=0.35, draw opacity=0.6, bar shift=7pt, forget plot] coordinates {(upwind,506.6) (unlimited,189.9) (Barth--J.,180.6) (Venkat.,176.0) (Darwish--M.,174.9)};
+\addplot[draw=PackD, fill=PackD, bar shift=7pt] coordinates {(upwind,360.0) (unlimited,153.0) (Barth--J.,143.1) (Venkat.,136.9) (Darwish--M.,133.6)};
 \addlegendentry{standard}
-\draw[PackE,dash pattern=on 2pt off 2pt,thick] ({axis cs:upwind,457.5} -| {rel axis cs:0,0}) -- ({axis cs:upwind,457.5} -| {rel axis cs:1,0});
+\addlegendimage{legend image code/.code={\fill[black!55] (0cm,-0.09cm) rectangle (0.22cm,0cm);\fill[black!55,fill opacity=0.35] (0cm,0cm) rectangle (0.22cm,0.09cm);}}
+\addlegendentry{\texttt{f32} gain}
+\draw[PackE,dash pattern=on 2pt off 2pt,thick] ({axis cs:upwind,462.4} -| {rel axis cs:0,0}) -- ({axis cs:upwind,462.4} -| {rel axis cs:1,0});
 \addlegendimage{legend image code/.code={\draw[PackE,dash pattern=on 2pt off 2pt,thick] (0pt,0pt) -- (10pt,0pt);}}
 \addlegendentry{SpMV \texttt{f64}}
-\draw[PackC,dash pattern=on 2pt off 2pt,thick] ({axis cs:upwind,844.1} -| {rel axis cs:0,0}) -- ({axis cs:upwind,844.1} -| {rel axis cs:1,0});
+\draw[PackC,dash pattern=on 2pt off 2pt,thick] ({axis cs:upwind,843.2} -| {rel axis cs:0,0}) -- ({axis cs:upwind,843.2} -| {rel axis cs:1,0});
 \addlegendimage{legend image code/.code={\draw[PackC,dash pattern=on 2pt off 2pt,thick] (0pt,0pt) -- (10pt,0pt);}}
 \addlegendentry{SpMV \texttt{f32}}
 \end{axis}

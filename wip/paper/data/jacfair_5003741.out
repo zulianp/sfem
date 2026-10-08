@@ -1,0 +1,32 @@
+### host nid006546  n=128 repeat=10 passes=3  2026-10-08 11:23:52
+
+operator                   layout       MDOF_s       dofs   qgrad_frac  hograd_frac
+jac_exact                  packed      925.272    8586756       0.3070            -
+jac_exact                  atomic      348.718    8586756       0.6904            -
+jac_exact                  ecolor      454.926    8586756       0.4833            -
+jac_clip_exact             packed      381.671    8586756       0.0000       0.2715
+jac_clip_exact             atomic      139.516    8586756       0.0000       0.8761
+jac_clip_exact             ecolor      142.854    8586756       0.0000       0.7559
+jac_ho_exact               packed      327.490    8586756       0.0000       0.3445
+jac_ho_exact               atomic      131.889    8586756       0.0000       0.8289
+jac_ho_exact               ecolor      136.088    8586756       0.0000       0.7229
+jac_lagged                 packed     1304.270    8586756            -            -
+jac_lagged                 atomic      771.260    8586756            -            -
+jac_lagged                 ecolor      864.493    8586756            -            -
+jac_lagged_ctl_unlim       packed     1304.204    8586756            -            -
+jac_lagged_ctl_clip        packed     1305.410    8586756            -            -
+jac_lagged_ctl_venk        packed     1316.514    8586756            -            -
+jac_lagged_ctl_dm          packed     1314.908    8586756            -            -
+spmv_f64                   none        458.556    8586756            -            -
+spmv_f32                   none        855.863    8586756            -            -
+
+  control unlim  096730ba546b8a98 match
+  control clip   096730ba546b8a98 match
+  control venk   096730ba546b8a98 match
+  control dm     096730ba546b8a98 match
+fully lagged is scheme-independent across every limiter: YES (096730ba546b8a98)
+
+The exact arms carry the direction-gradient pass; jac_lagged does not, and is the operator
+the assembled matrix encodes. Compare spmv_* against jac_lagged for like-for-like.
+jac_lagged_ctl_* are controls, not rows: each must reproduce jac_lagged packed exactly.
+csv: /ritom/scratch/cscs/zulianp/cvfem_jacfair/5003741/jacfair.csv

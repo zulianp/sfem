@@ -2,15 +2,17 @@
 %% Regenerate with: make figures
 
 \footnotesize
-\begin{tabular}{@{}lrrrrr@{}}
+\begin{tabular}{@{}lrrrrrrrrrr@{}}
 \toprule
-& \multicolumn{3}{c}{MDOF/s} & \multicolumn{2}{c}{packed vs.} \\
-\cmidrule(lr){2-4}\cmidrule(l){5-6}
-terms carried & packed & col. & standard & col. & standard \\
+& \multicolumn{5}{c}{\texttt{f64}} & \multicolumn{5}{c}{\texttt{f32}} \\
+\cmidrule(lr){2-6}\cmidrule(l){7-11}
+& \multicolumn{3}{c}{MDOF/s} & \multicolumn{2}{c}{packed vs.} & \multicolumn{3}{c}{MDOF/s} & \multicolumn{2}{c}{packed vs.} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-6}\cmidrule(lr){7-9}\cmidrule(l){10-11}
+terms carried & packed & col. & standard & col. & standard & packed & col. & standard & col. & standard \\
 \midrule
-element kernel & 2640 & 1863 & 1103 & $1.42\times$ & $2.39\times$ \\
-${}+{}$ pressure--velocity coupling & 1787 & 1214 & 914 & $1.47\times$ & $1.96\times$ \\
-${}+{}$ boundary closure & 1599 & 1087 & 864 & $1.47\times$ & $1.85\times$ \\
-${}+{}$ transient term & 1457 & 1022 & 829 & $1.43\times$ & $1.76\times$ \\
+element kernel & 2496 & 1785 & 1049 & $1.40\times$ & $2.38\times$ & 4708 & 3810 & 1272 & $1.24\times$ & $3.70\times$ \\
+${}+{}$ pressure--velocity coupling & 1646 & 1126 & 865 & $1.46\times$ & $1.90\times$ & 3273 & 2798 & 1157 & $1.17\times$ & $2.83\times$ \\
+${}+{}$ boundary closure & 1499 & 1025 & 818 & $1.46\times$ & $1.83\times$ & 2951 & 2472 & 1119 & $1.19\times$ & $2.64\times$ \\
+${}+{}$ transient term & 1368 & 971 & 778 & $1.41\times$ & $1.76\times$ & 2749 & 2378 & 1091 & $1.16\times$ & $2.52\times$ \\
 \bottomrule
 \end{tabular}

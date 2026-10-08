@@ -965,16 +965,17 @@ The terms a complete operator carries --- the pressure--velocity coupling, the b
 the transient mass term --- are separate passes over the mesh or arithmetic that vectorises less
 well. Table~\ref{tab:ladder} adds them one at a time.
 
-\begin{table}[t]
+\begin{table*}[t]
   \centering
   \caption{\provwarn \fostag{} Throughput as solver terms are added, residual at $n=\campN$, on
     the three matrix-free layouts. \emph{col.} and \emph{standard} both read the standard mesh
     and differ in the scatter, an element colouring against atomics; so packed over \emph{col.}
     is what the format is worth beyond removing the atomics, and packed over \emph{standard}
-    what the two together are worth.}
+    what the two together are worth. \texttt{f32}: the same driver with every field and kernel
+    in single precision, measured in a separate allocation, so ratios are read within a group.}
   \label{tab:ladder}
   \input{tables/ladder}
-\end{table}
+\end{table*}
 
 The ratio falls monotonically, from \ladderBare{} on the bare element kernel to
 \ladderFull{} on the complete operator.
@@ -1112,24 +1113,26 @@ to it.
 \subsection{The higher-order convective flux}
 \label{sec:res:convho}
 
-\begin{table}[t]
+\begin{table*}[t]
   \centering
   \caption{Convective schemes, residual only, at $n=128$, carrying the Rhie--Chow coupling as
     every other complete-operator measurement here does. The nodal velocity gradient is hoisted,
     so the timing is of the flux rather than of the reconstruction feeding it. Each column is
     that layout's shipped kernel. \emph{col.} and \emph{standard} both read the standard mesh
     and differ in the scatter, so the two ratios separate the format from the scatter strategy,
-    as in Table~\ref{tab:ladder}.}
+    as in Table~\ref{tab:ladder}. The \texttt{f32} group is the single-precision build, measured in
+    the same allocation.}
   \label{tab:convho}
   \inputifready{tables/convho}{convective scheme arms, jobs/conv\_ho\_bench.sbatch}
-\end{table}
+\end{table*}
 
 \begin{figure}[t]
   \centering
   \inputifready{figures/convho}{convective scheme arms, jobs/conv\_ho\_bench.sbatch}
   \caption{The variants of Table~\ref{tab:convho}. The layouts converge from left to right as
-    arithmetic per sub-control surface grows. Dashed: the lagged BSR SpMV at the same size,
-    from Figure~\ref{fig:throughput}.}
+    arithmetic per sub-control surface grows. Solid: \texttt{f64}; the light segment above each
+    bar is the gain of the \texttt{f32} build, measured in the same allocation. Dashed: the
+    lagged BSR SpMV at the same size, from Figure~\ref{fig:throughput}.}
   \label{fig:convho}
 \end{figure}
 
@@ -1142,7 +1145,8 @@ to it.
     differentiate. Lagging the correction returns $\Jex$ and reproduces that bar to the last
     bit, at \jachoLaggedPacked{}~MDOF/s packed. Unlike Figure~\ref{fig:convho}, the layout ratio rises
     before it falls, $\jachoFirstLayoutRatio$ to $\jachoUnlimLayoutRatio$ to
-    $\jachoDmLayoutRatio\times$. Dashed: the same SpMV references.}
+    $\jachoDmLayoutRatio\times$. Light segments: the \texttt{f32} gain, as in
+    Figure~\ref{fig:convho}. Dashed: the same SpMV references.}
   \label{fig:jacho}
 \end{figure}
 
@@ -1156,28 +1160,32 @@ normalised-variable \textsc{tvd} limiter on an unstructured
 mesh~\cite{DarwishMoukalled2003}. Table~\ref{tab:convho} and Figure~\ref{fig:convho} report all
 five variants.
 
-\paragraph{Scheme dependence.} The ratio falls monotonically with the arithmetic each scheme adds:
+\paragraph{Scheme dependence.} The ratio falls with the arithmetic each scheme adds:
 $\hoFirstLayoutRatio\times$ on first-order upwind, $\hoUnlimLayoutRatio\times$ with the unlimited
-reconstruction, and $\hoClipLayoutRatio\times$ down to $\hoDmLayoutRatio\times$ across the three
-limiters. The
+reconstruction, and $\hoLimLayoutRatioLo$--$\hoLimLayoutRatioHi\times$ across the three limiters,
+which land within a few percent of one another. The
 format accelerates what the sweep reads and how it writes; the correction adds arithmetic per
 sub-control surface, which no layout can help with, so its share of the run grows and the ratio
-falls. The completeness ladder of \S\ref{sec:res:ladder} shows the same dependence across
+falls. The reconstruction itself is affine arithmetic on the element Jacobian --- the
+node-to-centroid vectors are the Jacobian applied to constant reference offsets, so no coordinate
+is read --- and the twenty-four node-to-surface increments are formed once per element before
+the twelve face loops, which is why the unlimited arm costs the packed layout only
+$\hoUnlimCostPacked\times$. The completeness ladder of \S\ref{sec:res:ladder} shows the same dependence across
 physical terms.
 
 The coloured column says which half of that falls. Against the standard sweep the colouring is
-worth $\hoFirstColOverStd\times$ at first order and $\hoUnlimColOverStd$--$\hoDmColOverStd\times$
-on every higher-order arm --- nothing at all. The format keeps
+worth $\hoFirstColOverStd\times$ at first order and $\hoHoColOverStdLo$--$\hoHoColOverStdHi\times$
+on every higher-order arm --- next to nothing. The format keeps
 $\hoFirstPackedOverCol\times$ falling to $\hoDmPackedOverCol\times$ over the same arms. So the
 convergence is the \emph{scatter} advantage disappearing, not the format's: once a surface costs
 enough arithmetic, removing the atomics buys nothing and what still pays is what the sweep reads.
 
 \paragraph{Cost of the correction.} Within the standard layout the unlimited reconstruction costs
-$\hoUnlimCostAtomic\times$ and the limiters $\hoClipCostAtomic\times$ to
-$\hoDmCostAtomic\times$; within the packed layout, $\hoUnlimCostPacked\times$ to
-$\hoDmCostPacked\times$. The packed factors are larger because the layout has removed more of
+$\hoUnlimCostAtomic\times$ and the limiters $\hoLimCostAtomicLo\times$ to
+$\hoLimCostAtomicHi\times$; within the packed layout, $\hoUnlimCostPacked\times$ to
+$\hoLimCostPackedHi\times$. The packed factors are larger because the layout has removed more of
 the first-order cost, leaving the arithmetic it does not touch. The three limiters land close
-together, $\hoClipCostPacked\times$ to $\hoDmCostPacked\times$ packed, and the step from the
+together, $\hoLimCostPackedLo\times$ to $\hoLimCostPackedHi\times$ packed, and the step from the
 unlimited reconstruction to the cheapest of them is about the size of the spread among them: all
 three share the reconstruction and differ only in the function applied to the increment.
 
@@ -1200,10 +1208,10 @@ machine, and the correction costs traffic as well as arithmetic. It reads a nine
 velocity gradient the first-order flux never touches, and the packed sweep stages that field
 into pack-local order, so measured DRAM traffic rises from \foBytesPacked{} to
 \hoBytesPacked{}~bytes per degree of freedom ($\hoBytesRatioPacked\times$) packed and
-\foBytesAtomic{} to \hoBytesAtomic{} atomic. The traffic outruns the arithmetic at the
-unlimited arm, which sits at \hoAiPackedLo{}~FLOP/byte against the first-order point's
-\rlResidualPackedAi{}, to its left; a limiter carries enough arithmetic to move the operator
-back to the right, and Venkatakrishnan's reaches the measured ridge of \rlRidge{} itself
+\foBytesAtomic{} to \hoBytesAtomic{} atomic. The unlimited arm sits level with the first-order
+point, at \hoAiPackedLo{} against \rlResidualPackedAi{}~FLOP/byte: the reconstruction adds
+traffic and arithmetic in about the same proportion. A limiter carries enough arithmetic to move
+the operator to the right, and Venkatakrishnan's crosses the measured ridge of \rlRidge{}
 (\hoAiPackedHi{}).
 Every arm stays far from the roof, so the correction changes where an operator sits on the
 intensity axis and leaves its distance from the machine where it was.
@@ -1379,7 +1387,9 @@ kernel by those factors.
     operator scheme-independent by construction: the first-order row \emph{is} the lagged action,
     and a control at every limiter reproduces its result bit for bit. It is also the only form the
     matrix can hold; the $\Jhoex$ rows have no matrix counterpart at all. The limiters are the
-    cheapest and among the dearest, so they bracket what one costs.}
+    cheapest and among the dearest, so they bracket what one costs. The \texttt{f32} group is the
+    single-precision build in the same allocation, against its own SpMV, whose matrix and vectors
+    are both float.}
   \label{tab:jacfair}
   \inputifready{tables/jacfair}{fair Jacobian comparison, jobs/jac\_fair.sbatch}
 \end{table*}

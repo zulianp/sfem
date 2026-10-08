@@ -13,17 +13,13 @@
   grid=both, major grid style={black!12}, minor grid style={black!6},
   tick label style={font=\tiny}, label style={font=\scriptsize},
 ]
-\addplot[PackA,mark=*,mark size=1.6pt,thick] coordinates {(64,2864.167) (96,2923.749) (128,2639.704) (160,2530.272) (192,2601.240)};
+\addplot[PackA,mark=*,mark size=1.6pt,thick] coordinates {(64,2942.455) (96,2977.359) (128,2496.186) (160,2397.867) (192,2477.535)};
 \addlegendentry{packed}
-\addplot[PackD,mark=square*,mark size=1.6pt,thick] coordinates {(64,1076.405) (96,1130.466) (128,1102.562) (160,1074.582) (192,1101.390)};
+\addplot[PackD,mark=square*,mark size=1.6pt,thick] coordinates {(64,1070.552) (96,1057.715) (128,1048.910) (160,1039.782) (192,1056.355)};
 \addlegendentry{standard}
-\addplot[PackE,mark=triangle*,mark size=1.6pt,thick] coordinates {(64,533.426) (96,455.786) (128,457.465) (160,450.582) (192,452.666)};
+\addplot[PackE,mark=triangle*,mark size=1.6pt,thick] coordinates {(64,470.524) (96,451.545) (128,462.425) (160,454.335) (192,460.478)};
 \addlegendentry{BSR SpMV \texttt{f64}}
-\addplot[PackC,mark=diamond*,mark size=1.6pt,thick] coordinates {(64,1162.908) (96,856.871) (128,844.078) (160,897.764) (192,896.240)};
+\addplot[PackC,mark=diamond*,mark size=1.6pt,thick] coordinates {(64,1021.447) (96,877.075) (128,843.179) (160,890.428) (192,885.061)};
 \addlegendentry{BSR SpMV \texttt{f32}}
-\addplot[PackA,mark=*,mark size=1.6pt,thick,mark options={draw=PackA,fill=white,solid},dash pattern=on 2pt off 2pt] coordinates {(64,722.793) (96,760.658) (128,739.548) (160,730.384) (192,727.587)};
-\addlegendentry{packed, Darwish--M.}
-\addplot[PackD,mark=square*,mark size=1.6pt,thick,mark options={draw=PackD,fill=white,solid},dash pattern=on 2pt off 2pt] coordinates {(64,544.596) (96,539.054) (128,525.860) (160,519.157) (192,526.184)};
-\addlegendentry{standard, Darwish--M.}
 \end{axis}
 \end{tikzpicture}

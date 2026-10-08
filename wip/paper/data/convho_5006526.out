@@ -1,0 +1,46 @@
+### host nid006545  n=128 repeat=10 passes=3  2026-10-08 18:28:25
+### packed arms are the GENERATED kernel unless labelled _scalar
+### scalar-vs-scalar isolates the LAYOUT; generated-vs-scalar isolates the KERNEL
+
+arm                    layout       MDOF_s       dofs      elems   flops_el       checksum  prec
+first_order            atomic      914.425    8586756    2097152      754.0 1.3814703504408388e-13   f64
+first_order            atomic     1159.892    8586756    2097152      754.0 -4.5675857109017670e-05   f32
+first_order            packed     1751.759    8586756    2097152      754.0 1.3664823396083992e-13   f64
+first_order            packed     3295.434    8586756    2097152      754.0 -8.0462617916055024e-05   f32
+first_order            ecolor     1213.385    8586756    2097152      754.0 1.3813272357540707e-13   f64
+first_order            ecolor     2791.788    8586756    2097152      754.0 -4.6951303374953568e-05   f32
+ho_unlimited           atomic      704.002    8586756    2097152     1558.0 -1.6939176298615133e-13   f64
+ho_unlimited           atomic      936.364    8586756    2097152     1558.0 -9.1007605078630149e-05   f32
+ho_unlimited           packed     1119.891    8586756    2097152     1558.0 -1.7050895200973470e-13   f64
+ho_unlimited           packed     1957.203    8586756    2097152     1558.0 -1.0455648589413613e-04   f32
+ho_unlimited           ecolor      680.305    8586756    2097152     1558.0 -1.6939523243310328e-13   f64
+ho_unlimited           ecolor     1545.456    8586756    2097152     1558.0 -9.3267924967221916e-05   f32
+ho_clip                atomic      593.833    8586756    2097152     1702.0 1.0462876225136863e-14   f64
+ho_clip                atomic      812.719    8586756    2097152     1702.0 -9.1437177616171539e-05   f32
+ho_clip                packed      867.080    8586756    2097152     1702.0 1.0421269966767732e-14   f64
+ho_clip                packed     1523.793    8586756    2097152     1702.0 -1.0441981430631131e-04   f32
+ho_clip                ecolor      609.592    8586756    2097152     1702.0 1.0466345672088817e-14   f64
+ho_clip                ecolor     1277.842    8586756    2097152     1702.0 -9.3184338766150177e-05   f32
+ho_venkatakrishnan     atomic      540.108    8586756    2097152     2638.0 -5.2502131060640916e-12   f64
+ho_venkatakrishnan     atomic      796.151    8586756    2097152     2638.0 -9.2327623860910535e-05   f32
+ho_venkatakrishnan     packed      760.802    8586756    2097152     2638.0 -5.2473959151391053e-12   f64
+ho_venkatakrishnan     packed     1415.391    8586756    2097152     2638.0 -1.0735171963460743e-04   f32
+ho_venkatakrishnan     ecolor      564.596    8586756    2097152     2638.0 -5.2506762772321774e-12   f64
+ho_venkatakrishnan     ecolor     1208.784    8586756    2097152     2638.0 -9.2525064246729016e-05   f32
+ho_darwish_moukalled   atomic      605.285    8586756    2097152     2278.0 -4.9301151269082188e-12   f64
+ho_darwish_moukalled   atomic      859.872    8586756    2097152     2278.0 -9.6028088591992855e-05   f32
+ho_darwish_moukalled   packed      880.787    8586756    2097152     2278.0 -4.9272979359832325e-12   f64
+ho_darwish_moukalled   packed     1647.016    8586756    2097152     2278.0 -1.1169293429702520e-04   f32
+ho_darwish_moukalled   ecolor      618.369    8586756    2097152     2278.0 -4.9301567602716423e-12   f64
+ho_darwish_moukalled   ecolor     1363.587    8586756    2097152     2278.0 -9.6490024589002132e-05   f32
+
+The checksums must DIFFER between first order and each higher-order arm: an identical one
+would mean the correction was not applied and the row is measuring first order twice.
+
+That guard does NOT extend to the Rhie-Chow arms. The checksum is a sum over millions of
+values that is almost entirely cancellation, so a term can be present per node and invisible
+in the total: at n=32 the scalar arm with scale 1.0 prints exactly the no-Rhie-Chow checksum
+while scale 3.0 prints a different one, which is how that was established. Whether the term
+reached the kernel is answered by ran_rc in the CSV and by the driver's per-node oracles
+(--verify-ho --rhie-chow), never by these totals.
+csv: /ritom/scratch/cscs/zulianp/cvfem_convho/5006526/convho.csv

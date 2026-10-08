@@ -689,30 +689,111 @@ def ladder_ratios(rows, op="residual", n=128):
     return (got[0], got[-1]) if got else (None, None)
 
 
-def table_ladder(rows, op="residual", n=128):
+def _layout_table(head, body, precs):
+    """The layout comparison table, one column group per computation precision.
+
+    ``body`` is [(row label, {prec: (packed, coloured, standard)})]. Each group is the table the
+    paper has always printed -- three rates, then packed over coloured and over standard -- so
+    the f32 group reads exactly as the f64 one does and the format's margin can be compared
+    across precisions along a row. The ratios stay inside a group: a ratio between groups would
+    be the precision's gain, which the stacked bars draw.
+
+    With f64 alone the output is the single-group table, so an archive without an f32 build
+    still produces the table it always did.
+    """
+    def cells(t):
+        pk, ec, at = t if t else (None, None, None)
+        return [_fmt0(pk), _fmt0(ec), _fmt0(at),
+                (r"$%.2f\times$" % (pk / ec)) if (pk and ec) else "---",
+                (r"$%.2f\times$" % (pk / at)) if (pk and at) else "---"]
+
+    ncol = 5 * len(precs)
+    out = [PREAMBLE, r"\footnotesize", r"\begin{tabular}{@{}l%s@{}}" % ("r" * ncol), r"\toprule"]
+    if len(precs) > 1:
+        out.append("& " + " & ".join(r"\multicolumn{5}{c}{\texttt{%s}}" % p for p in precs) + r" \\")
+        out.append("".join(r"\cmidrule(%s){%d-%d}" % ("lr" if g < len(precs) - 1 else "l",
+                                                       2 + 5 * g, 6 + 5 * g)
+                           for g in range(len(precs))))
+    out.append("& " + " & ".join([r"\multicolumn{3}{c}{MDOF/s} & \multicolumn{2}{c}{packed vs.}"]
+                                 * len(precs)) + r" \\")
+    out.append("".join(r"\cmidrule(lr){%d-%d}\cmidrule(%s){%d-%d}"
+                       % (2 + 5 * g, 4 + 5 * g, "lr" if g < len(precs) - 1 else "l",
+                          5 + 5 * g, 6 + 5 * g) for g in range(len(precs))))
+    out.append(head + " & " + " & ".join(["packed & col. & standard & col. & standard"]
+                                         * len(precs)) + r" \\")
+    out.append(r"\midrule")
+    for label, by_prec in body:
+        row = []
+        for p in precs:
+            row += cells(by_prec.get(p))
+        out.append(r"%s & %s \\" % (label, " & ".join(row)))
+    out.append(r"\bottomrule")
+    out.append(r"\end{tabular}")
+    return "\n".join(out) + "\n"
+
+
+def parse_f32(path):
+    """Read jobs/f32_vs_f64.sbatch's n=128 block: {(key, layout): (f64 best, f32 best)}.
+
+    The BEST columns, not the medians the perf note quotes, because every table in the paper
+    reports the best of its passes. Older files without best columns yield nothing, and the
+    tables that would read them fall back to f64 alone.
+    """
+    out = {}
+    block = None
+    has_best = False
+    for line in open(path):
+        if line.startswith("### n="):
+            block = line.split()[1]
+            continue
+        f = line.split()
+        if f and f[0] == "key":
+            has_best = "f64_best" in f
+            continue
+        if block != "n=128" or not has_best or len(f) < 8:
+            continue
+        try:
+            out[(f[0], f[-6])] = (float(f[-2]), float(f[-1]))
+        except ValueError:
+            continue
+    return out
+
+
+# The ladder's rungs as the f32 job names them, in LADDER's order.
+LADDER_F32_KEYS = ["res", "res_rc", "res_bnd", "res_bnd_dt"]
+
+
+def table_ladder(rows, op="residual", n=128, f32=None):
+    """T1, the completeness ladder.
+
+    The f64 group is the campaign's, as the prose's ladder macros are. The f32 group, when the
+    f32 job's file is given, is that job's f32 best per rung and layout: a different allocation
+    from the campaign, so the two groups' ratios are each internally consistent and a gain read
+    ACROSS them carries node-to-node variation; the caption says so.
+    """
     at_n = [r for r in rows if r["_n"] == n and r["operation"] == op]
-    out = [PREAMBLE, r"\footnotesize", r"\begin{tabular}{@{}lrrrrr@{}}", r"\toprule",
-           r"& \multicolumn{3}{c}{MDOF/s} & \multicolumn{2}{c}{packed vs.} \\",
-           r"\cmidrule(lr){2-4}\cmidrule(l){5-6}",
-           r"terms carried & packed & col. & standard & col. & standard \\",
-           r"\midrule"]
-    any_row = False
-    for label, sel in LADDER:
+    body = []
+    have32 = False
+    for k, (label, sel) in enumerate(LADDER):
         p = best(at_n, ran_layout="packed", **sel)
         a = best(at_n, ran_layout="atomic", **sel)
         e = best(at_n, ran_layout="ecolor", **sel)
         if p is None or a is None:
             continue
-        any_row = True
         # The coloured column is allowed to be missing a row without dropping the row: the
         # element-coloured layout was added to this sweep later than the other two, so an
         # archived campaign file still produces the table it always did.
-        out.append(r"%s & %.0f & %s & %.0f & %s & $%.2f\times$ \\"
-                   % (label, p, ("%.0f" % e) if e else "---", a,
-                      (r"$%.2f\times$" % (p / e)) if e else "---", p / a))
-    out.append(r"\bottomrule")
-    out.append(r"\end{tabular}")
-    return "\n".join(out) + "\n" if any_row else None
+        cell = {"f64": (p, e, a)}
+        if f32:
+            key = LADDER_F32_KEYS[k]
+            t = tuple((f32.get((key, lay)) or (None, None))[1] for lay in ("packed", "ecolor", "atomic"))
+            if t[0] and t[2]:
+                cell["f32"] = t
+                have32 = True
+        body.append((label, cell))
+    if not body:
+        return None
+    return _layout_table("terms carried", body, ["f64", "f32"] if have32 else ["f64"])
 
 
 def macros_throughput(rows, host, n=128, provisional=False):
@@ -1108,7 +1189,8 @@ def roofline_ho_points(rows, dram_ho, n=128, dram_key="residual-ho"):
             continue
         pts = []
         for arm in ("ho_unlimited", "ho_clip", "ho_darwish_moukalled", "ho_venkatakrishnan"):
-            r = next((r for r in rows if r.arm == arm and r.layout == lay), None)
+            r = next((r for r in rows if r.arm == arm and r.layout == lay and r.prec == "f64"),
+                     None)
             if r is None or not r.flops_elem or not r.elems:
                 continue
             flop_per_dof = r.flops_elem * r.elems / float(r.dofs)
@@ -1435,7 +1517,12 @@ HO_SCALAR_ARM = {
 HO_EXTRA = ("ho_unlim_simd", "ho_unlim_rc", "ho_unlim_rc_scalar", "ho_unlim_lagged")
 
 
-ConvHo = collections.namedtuple("ConvHo", "arm layout mdof dofs elems flops_elem checksum")
+# ``prec`` is the computation precision of the build that produced the row: "f64" for
+# cvfem_hex8_ns_upwind_bench, "f32" for cvfem_hex8_ns_upwind_bench_f32. The jobs print it as an
+# eighth column since they run both builds in one allocation; older files have no such column
+# and are f64 throughout, which the default says.
+ConvHo = collections.namedtuple("ConvHo", "arm layout mdof dofs elems flops_elem checksum prec",
+                                defaults=("f64",))
 
 
 def macros_jacho(rows):
@@ -1474,7 +1561,7 @@ def parse_convho(path):
     out = []
     for line in open(path):
         f = line.split()
-        if not f or f[0] not in known or len(f) not in (5, 7):
+        if not f or f[0] not in known or len(f) not in (5, 7, 8):
             continue
         if f[1] not in ("atomic", "packed", "ecolor") or f[2] == "-":
             continue
@@ -1484,7 +1571,8 @@ def parse_convho(path):
             else:
                 elems = int(f[4]) if f[4] != "-" else None
                 fpe = float(f[5]) if f[5] != "-" else None
-                out.append(ConvHo(f[0], f[1], float(f[2]), int(f[3]), elems, fpe, f[6]))
+                prec = f[7] if len(f) == 8 else "f64"
+                out.append(ConvHo(f[0], f[1], float(f[2]), int(f[3]), elems, fpe, f[6], prec))
         except ValueError:
             continue
     return out
@@ -1495,11 +1583,17 @@ def parse_convho(path):
 _CONVHO_LAY = {"packed": "gen", "atomic": "atomic", "ecolor": "ecolor"}
 
 
-def _convho_index(rows):
-    """{scheme: {"gen":x, "hand":x, "atomic":x, "ecolor":x}} plus the loose arms, by name."""
+def _convho_index(rows, prec="f64"):
+    """{scheme: {"gen":x, "hand":x, "atomic":x, "ecolor":x}} plus the loose arms, by name.
+
+    One precision at a time, f64 unless asked: every macro the prose cites and every roofline
+    point is a double-precision quantity, and a caller that wants the f32 build says so.
+    """
     by = {}
     loose = {}
-    for arm, lay, mdof, _dofs, _e, _fp, _ck in rows:
+    for arm, lay, mdof, _dofs, _e, _fp, _ck, pr in rows:
+        if pr != prec:
+            continue
         if arm in HO_SCALAR_ARM and lay == "packed":
             by.setdefault(HO_SCALAR_ARM[arm], {})["hand"] = mdof
         elif arm in HO_NAME and lay in _CONVHO_LAY:
@@ -1524,29 +1618,24 @@ def table_convho(rows):
     """
     if not rows:
         return None
-    by, _loose = _convho_index(rows)
-    out = [PREAMBLE, r"\footnotesize", r"\begin{tabular}{@{}lrrrrr@{}}", r"\toprule",
-           r"& \multicolumn{3}{c}{MDOF/s} & \multicolumn{2}{c}{packed vs.} \\",
-           r"\cmidrule(lr){2-4}\cmidrule(l){5-6}",
-           r"convective scheme & packed & col. & standard & col. & standard \\",
-           r"\midrule"]
+    by = {"f64": _convho_index(rows, "f64")[0], "f32": _convho_index(rows, "f32")[0]}
+    precs = ["f64", "f32"] if by["f32"] else ["f64"]
+    body = []
     for arm in ("first_order", "ho_unlimited", "ho_clip", "ho_venkatakrishnan",
                 "ho_darwish_moukalled"):
-        d = by.get(arm)
-        if not d:
+        if not by["f64"].get(arm):
             continue
-        pk, ec, at = d.get("gen"), d.get("ecolor"), d.get("atomic")
         # Two ratios, because the element-coloured layout is the more informative baseline: it
         # removes the atomics without the packed format's staging, so packed-over-coloured is
         # what the format is worth beyond the scatter strategy, and packed-over-atomic is the
         # headline both together are worth.
-        r_ec = (r"$%.2f\times$" % (pk / ec)) if (pk and ec) else "---"
-        r_at = (r"$%.2f\times$" % (pk / at)) if (pk and at) else "---"
-        out.append(r"%s & %s & %s & %s & %s & %s \\"
-                   % (HO_NAME[arm], _fmt0(pk), _fmt0(ec), _fmt0(at), r_ec, r_at))
-    out.append(r"\bottomrule")
-    out.append(r"\end{tabular}")
-    return "\n".join(out) + "\n"
+        cell = {}
+        for pr in precs:
+            d = by[pr].get(arm)
+            if d:
+                cell[pr] = (d.get("gen"), d.get("ecolor"), d.get("atomic"))
+        body.append((HO_NAME[arm], cell))
+    return _layout_table("convective scheme", body, precs) if body else None
 
 
 def spmv_reference(rows, n=128):
@@ -1595,9 +1684,41 @@ def fig_scheme_bars(rows, spmv=None, ylabel="MDOF/s"):
              "ho_venkatakrishnan": "Venkat.", "ho_darwish_moukalled": "Darwish--M."}
     coords = ",".join(short[a] for a in order)
 
-    def series(key):
-        return " ".join("(%s,%.1f)" % (short[a], by[a][key])
-                        for a in order if by[a].get(key))
+    by32, _l32 = _convho_index(rows, "f32")
+
+    def series(idx, key):
+        return " ".join("(%s,%.1f)" % (short[a], idx[a][key])
+                        for a in order if idx.get(a, {}).get(key))
+
+    for a in order:
+        for key in ("gen", "ecolor", "atomic"):
+            v64, v32 = by[a].get(key), by32.get(a, {}).get(key)
+            if v64 and v32 and v32 <= v64:
+                print("  WARNING: %s %s: f32 %.1f is not above f64 %.1f -- the stacked bar draws "
+                      "no gain for it" % (a, key, v32, v64))
+
+    # THE f32 GAIN IS STACKED ON THE f64 BAR. Each layout's two bars share one explicit shift: the
+    # f32 rate is drawn first at a light fill, then the f64 rate solid over it, so what remains
+    # visible of the light bar is exactly the difference f32 - f64, sitting on top of the f64 bar.
+    # Drawing the difference as its own series under `ybar stacked` would need stacking reset per
+    # layout group, which pgfplots does not offer within one axis; the overlay draws the same
+    # picture. Shifts are explicit because six plots under automatic ybar shifting would be six
+    # side-by-side bars rather than three stacked ones.
+    shifts = {"gen": -7, "ecolor": 0, "atomic": 7}
+    have32 = any(by32.get(a) for a in order)
+    bars = []
+    for key, colour, label in (("gen", "PackA", "packed"), ("ecolor", "PackB", "coloured"),
+                               ("atomic", "PackD", "standard")):
+        bars += _bars(lambda k, idx=by: series(idx, k), key, colour, label, shifts[key],
+                      light=series(by32, key) if have32 else None)
+    if have32:
+        # One key entry for the light segment, in a neutral grey, since it means the same thing
+        # in every layout's colour: a light segment over a solid one.
+        bars += [r"\addlegendimage{legend image code/.code={"
+                 r"\fill[black!55] (0cm,-0.09cm) rectangle (0.22cm,0cm);"
+                 r"\fill[black!55,fill opacity=%s] (0cm,0cm) rectangle (0.22cm,0.09cm);}}"
+                 % F32_OPACITY,
+                 r"\addlegendentry{\texttt{f32} gain}"]
 
     return PREAMBLE + "\n".join([
         r"\begin{tikzpicture}",
@@ -1615,6 +1736,7 @@ def fig_scheme_bars(rows, spmv=None, ylabel="MDOF/s"):
         # longer empty -- the Darwish--Moukalled group and the f32 rule both reach into it. Five
         # entries in one row would exceed the column, so three columns: the three layouts on the
         # first row and the two references on the second, which is also how they group.
+        # With the f32 build measured, the second row holds its key entry before the references.
         r"  legend columns=3, legend cell align=left,",
         r"  legend style={at={(0.5,1.02)}, anchor=south, font=\tiny, draw=none,",
         r"                fill=none, inner sep=1pt, column sep=6pt},",
@@ -1623,22 +1745,33 @@ def fig_scheme_bars(rows, spmv=None, ylabel="MDOF/s"):
         # packed | coloured | atomic, left to right within each group: the two that avoid
         # atomics stand together, so the step from coloured to atomic is the scatter strategy
         # and the step from packed to coloured is the format.
-    ] + _bars(series, "gen", "PackA", "packed")
-      + _bars(series, "ecolor", "PackB", "coloured")
-      + _bars(series, "atomic", "PackD", "standard")
+    ] + bars
       + _convho_spmv_lines(spmv, short[order[0]]) + [
         r"\end{axis}",
         r"\end{tikzpicture}",
     ]) + "\n"
 
 
-def _bars(series, key, colour, label):
-    """One bar series, or nothing when that layout has no rows in the file."""
+# The f32 segment's fill opacity: light enough to read as the same layout's colour, dark enough
+# to stay visible against the white page and the grid.
+F32_OPACITY = "0.35"
+
+
+def _bars(series, key, colour, label, shift, light=None):
+    """One layout's bars: its f32 rates light and underneath when given, its f64 rates solid on
+    top, both at the same explicit shift. Nothing when that layout has no rows in the file."""
     pts = series(key)
     if not pts:
         return []
-    return [r"\addplot[draw=%s, fill=%s] coordinates {%s};" % (colour, colour, pts),
+    out = []
+    if light:
+        out.append(r"\addplot[draw=%s, fill=%s, fill opacity=%s, draw opacity=0.6, "
+                   r"bar shift=%dpt, forget plot] coordinates {%s};"
+                   % (colour, colour, F32_OPACITY, shift, light))
+    out += [r"\addplot[draw=%s, fill=%s, bar shift=%dpt] coordinates {%s};"
+            % (colour, colour, shift, pts),
             r"\addlegendentry{%s}" % label]
+    return out
 
 
 def _convho_spmv_lines(spmv, xref):
@@ -1707,6 +1840,26 @@ def macros_convho(rows):
             v = by.get(arm, {}).get(lay)
             if fo and v:
                 out.append(r"\newcommand{\ho%sCost%s}{%.2f}" % (tag, suffix, fo / v))
+    # RANGES OVER THE LIMITERS, so a sentence that says "across the three limiters" spans all
+    # three. The prose had named two endpoint arms and Venkatakrishnan fell outside both ranges
+    # it was meant to be inside (its atomic cost 1.69 against a quoted 1.50-1.53).
+    lim = ("ho_clip", "ho_venkatakrishnan", "ho_darwish_moukalled")
+
+    def span(name, vals, arms=lim):
+        vals = [v for v in vals if v]
+        if len(vals) == len(arms):
+            out.append(r"\newcommand{\%sLo}{%.2f}" % (name, min(vals)))
+            out.append(r"\newcommand{\%sHi}{%.2f}" % (name, max(vals)))
+
+    g = lambda a, k: by.get(a, {}).get(k)
+    span("hoLimLayoutRatio", [g(a, "gen") / g(a, "atomic") if g(a, "gen") and g(a, "atomic")
+                              else None for a in lim])
+    for lay, suffix in (("gen", "Packed"), ("atomic", "Atomic")):
+        fo = g("first_order", lay)
+        span("hoLimCost" + suffix, [fo / g(a, lay) if fo and g(a, lay) else None for a in lim])
+    hoarms = ("ho_unlimited",) + lim
+    span("hoHoColOverStd", [g(a, "ecolor") / g(a, "atomic") if g(a, "ecolor") and g(a, "atomic")
+                            else None for a in hoarms], hoarms)
     return "\n".join(out) + "\n"
 
 
@@ -1989,10 +2142,15 @@ JF_EXACT = ("jac_exact", "jac_clip_exact", "jac_ho_exact")
 JF_LAGGED = ("jac_lagged",)
 
 
-def parse_jacfair(path):
+def parse_jacfair(path, prec="f64"):
+    """The rows of one computation precision. jobs/jac_fair.sbatch prints it as a seventh column
+    now that it runs both builds; a file without that column is f64 throughout."""
     out = []
     for line in open(path):
         f = line.split()
+        pr = f[6] if len(f) >= 7 and f[6] in ("f64", "f32") else "f64"
+        if pr != prec:
+            continue
         if len(f) >= 4 and f[0] in JF_NAME and f[2] != "-":
             try:
                 out.append((f[0], f[1], float(f[2])))
@@ -2001,7 +2159,7 @@ def parse_jacfair(path):
     return out
 
 
-def table_jacfair(rows):
+def table_jacfair(rows, rows32=None):
     """Matrix-free against the assembled matrix, with the operators made comparable.
 
     The exact rows are what a Newton--Krylov solve should apply; the first-order lagged row is
@@ -2017,46 +2175,82 @@ def table_jacfair(rows):
     """
     if not rows:
         return None
-    by = {}
-    for op, lay, v in rows:
-        by.setdefault(op, {})[lay] = v
-    f64 = by.get("spmv_f64", {}).get("none")
+
+    def index(rs):
+        by = {}
+        for op, lay, v in rs or []:
+            by.setdefault(op, {})[lay] = v
+        return by
+
+    # One column group per computation precision, each the table this was before the f32 build:
+    # rates, then each layout against the SpMV OF THE SAME PRECISION. The f32 group's reference is
+    # the f32 build's product, which holds the matrix and the vectors in float -- the like-for-like
+    # for a matrix-free action computed in float. The f64 build's float-storage SpMV keeps its row
+    # in the f64 group, where it is the fairest version of the matrix a double solve can use.
+    groups = [("f64", index(rows), "spmv_f64")]
+    by32 = index(rows32)
+    if any(op in by32 for op in JF_EXACT + JF_LAGGED):
+        groups.append(("f32", by32, "spmv_f32"))
+    two = len(groups) > 1
+    ncol = 6 * len(groups)
     # Three layouts, grouped by quantity rather than by layout: rates together and ratios
     # together, so a reader comparing two layouts reads along a row instead of hopping over the
     # ratio between them. Ordered packed | coloured | atomic throughout the paper.
-    out = [PREAMBLE, r"\small", r"\begin{tabular}{@{}lrrrrrr@{}}", r"\toprule",
-           r"& \multicolumn{3}{c}{MDOF/s} & \multicolumn{3}{c}{vs.\ \texttt{f64}} \\",
-           r"\cmidrule(lr){2-4}\cmidrule(l){5-7}",
-           r"operator & packed & col. & standard & packed & col. & standard \\",
-           r"\midrule"]
+    out = [PREAMBLE, r"\footnotesize" if two else r"\small",
+           r"\begin{tabular}{@{}l%s@{}}" % ("r" * ncol), r"\toprule"]
+    if two:
+        out.append("& " + " & ".join(r"\multicolumn{6}{c}{\texttt{%s}}" % g[0] for g in groups)
+                   + r" \\")
+        out.append(r"\cmidrule(lr){2-7}\cmidrule(l){8-13}")
+        out.append("& " + " & ".join(r"\multicolumn{3}{c}{MDOF/s} & "
+                                     r"\multicolumn{3}{c}{vs.\ \texttt{%s} SpMV}" % g[0]
+                                     for g in groups) + r" \\")
+        out.append(r"\cmidrule(lr){2-4}\cmidrule(lr){5-7}\cmidrule(lr){8-10}\cmidrule(l){11-13}")
+    else:
+        out.append(r"& \multicolumn{3}{c}{MDOF/s} & \multicolumn{3}{c}{vs.\ \texttt{f64}} \\")
+        out.append(r"\cmidrule(lr){2-4}\cmidrule(l){5-7}")
+    out.append("operator & " + " & ".join(["packed & col. & standard & packed & col. & standard"]
+                                          * len(groups)) + r" \\")
+    out.append(r"\midrule")
 
-    def cells(op):
+    def cells(by, ref, op):
         rates, ratios = [], []
         for lay in ("packed", "ecolor", "atomic"):
-            v = by[op].get(lay)
+            v = by.get(op, {}).get(lay)
             rates.append("%.0f" % v if v else "---")
-            ratios.append((r"$%.2f\times$" % (v / f64)) if v and f64 else "---")
-        return " & ".join(rates + ratios)
+            ratios.append((r"$%.2f\times$" % (v / ref)) if v and ref else "---")
+        return rates + ratios
 
     for group in (JF_EXACT, JF_LAGGED):
-        present = [o for o in group if o in by]
+        present = [o for o in group if o in groups[0][1]]
         if not present:
             continue
         if group is JF_LAGGED:
             out.append(r"\addlinespace")
         for op in present:
-            out.append(r"%s & %s \\" % (JF_NAME[op], cells(op)))
+            row = []
+            for _pr, by, refop in groups:
+                row += cells(by, by.get(refop, {}).get("none"), op)
+            out.append(r"%s & %s \\" % (JF_NAME[op], " & ".join(row)))
     out.append(r"\midrule")
-    # The matrix has no layout, so its rows span ALL FOUR numeric columns as one cell rather than
-    # filling a layout's pair. Spanning only columns 2--3 put the rate under the "packed" heading
-    # and the ratio under "atomic", since the rate and ratio columns alternate -- which read as a
-    # packed measurement and an atomic one rather than as a single number belonging to neither.
+    # The matrix has no layout, so its rows span ALL SIX numeric columns of a group as one cell
+    # rather than filling a layout's pair. Spanning only columns 2--3 put the rate under the
+    # "packed" heading and the ratio under "atomic", since the rate and ratio columns alternate --
+    # which read as a packed measurement and an atomic one rather than as a single number
+    # belonging to neither.
     for op in ("spmv_f64", "spmv_f32"):
-        v = by.get(op, {}).get("none")
-        if v is None:
+        if all(by.get(op, {}).get("none") is None for _p, by, _r in groups):
             continue
-        rel = (r", $%.2f\times$" % (v / f64)) if f64 else ""
-        out.append(r"%s & \multicolumn{6}{c}{%.0f%s} \\" % (JF_NAME[op], v, rel))
+        spans = []
+        for _pr, by, refop in groups:
+            v = by.get(op, {}).get("none")
+            ref = by.get(refop, {}).get("none")
+            if v is None:
+                spans.append(r"\multicolumn{6}{c}{---}")
+            else:
+                rel = (r", $%.2f\times$" % (v / ref)) if ref else ""
+                spans.append(r"\multicolumn{6}{c}{%.0f%s}" % (v, rel))
+        out.append(r"%s & %s \\" % (JF_NAME[op], " & ".join(spans)))
     out.append(r"\bottomrule")
     out.append(r"\end{tabular}")
     return "\n".join(out) + "\n"
@@ -2165,7 +2359,9 @@ def build(out_dir, tab_dir):
             with open(os.path.join(out_dir, "campaign_macros.tex"), "w") as fh:
                 fh.write(macros_throughput(rows, host, provisional=prov))
             written += ["figures/throughput_size.tex", "figures/campaign_macros.tex"]
-            lad = table_ladder(rows)
+            # The f32 group comes from the newest f32 job file, when one carries best columns.
+            f3 = [f for f in sorted(os.listdir(DATA)) if f.startswith("f32_") and f.endswith(".out")]
+            lad = table_ladder(rows, f32=parse_f32(os.path.join(DATA, f3[-1])) if f3 else None)
             if lad:
                 with open(os.path.join(tab_dir, "ladder.tex"), "w") as fh:
                     fh.write(lad)
@@ -2253,15 +2449,17 @@ def build(out_dir, tab_dir):
                 fh.write(macros_convho(hr))
             written.append("figures/convho_macros.tex")
             for lay in ("atomic", "packed"):
-                base = next((r for r in hr if r.arm == "first_order" and r.layout == lay), None)
-                if not base:
-                    continue
-                same = [r.arm for r in hr
-                        if r.arm != "first_order" and r.layout == lay
-                        and r.checksum == base.checksum]
-                if same:
-                    print("  WARNING: %s checksum identical to first order -- correction not"
-                          " applied in: %s" % (lay, ", ".join(same)))
+                for pr in ("f64", "f32"):
+                    base = next((r for r in hr if r.arm == "first_order" and r.layout == lay
+                                 and r.prec == pr), None)
+                    if not base:
+                        continue
+                    same = [r.arm for r in hr
+                            if r.arm != "first_order" and r.layout == lay and r.prec == pr
+                            and r.checksum == base.checksum]
+                    if same:
+                        print("  WARNING: %s %s checksum identical to first order -- correction"
+                              " not applied in: %s" % (lay, pr, ", ".join(same)))
 
     ng = [f for f in sorted(os.listdir(DATA)) if f.startswith("ngrad_")] if os.path.isdir(DATA) else []
     if ng:
@@ -2294,7 +2492,7 @@ def build(out_dir, tab_dir):
     jf = [f for f in sorted(os.listdir(DATA)) if f.startswith("jacfair_")] if os.path.isdir(DATA) else []
     if jf:
         jr = parse_jacfair(os.path.join(DATA, jf[-1]))
-        t = table_jacfair(jr)
+        t = table_jacfair(jr, parse_jacfair(os.path.join(DATA, jf[-1]), "f32"))
         if t:
             with open(os.path.join(tab_dir, "jacfair.tex"), "w") as fh:
                 fh.write(t)
@@ -2540,6 +2738,54 @@ def selftest():
         got = roofline_points(camp_pts, n=128, measured_bytes={})
         check(bool(got) and got[0][3] is False,
               "the model is used where no measurement exists, and flagged")
+
+        # The f32 build beside the f64 one: the eighth column, the stacked bars, the two-group
+        # tables, and the f32 job's best columns.
+        hp = os.path.join(td, "convho_f32.out")
+        with open(hp, "w") as fh:
+            for arm, base in (("first_order", 1000.0), ("ho_unlimited", 600.0)):
+                for lay, k in (("packed", 1.0), ("ecolor", 0.7), ("atomic", 0.5)):
+                    fh.write("%s %s %.1f 100 10 100.0 1.0e-3 f64\n" % (arm, lay, base * k))
+                    fh.write("%s %s %.1f 100 10 100.0 2.0e-3 f32\n" % (arm, lay, 1.8 * base * k))
+        hr8 = parse_convho(hp)
+        check(len(hr8) == 12 and {r.prec for r in hr8} == {"f64", "f32"},
+              "eight-column scheme rows parse with their precision")
+        check(_convho_index(hr8)[0]["first_order"]["gen"] == 1000.0,
+              "the default index is f64 only, so the prose macros stay double precision")
+        fg8 = fig_scheme_bars(hr8)
+        check(fg8.count("fill opacity=%s" % F32_OPACITY) == 4 and "bar shift=-7pt" in fg8
+              and r"\texttt{f32} gain" in fg8,
+              "each layout gets a light f32 bar under its solid f64 one, and one key entry")
+        light = fg8.index("(upwind,1800.0)")
+        check(light < fg8.index("(upwind,1000.0)"),
+              "the light f32 bar is drawn before the solid f64 bar it sits behind")
+        t8 = table_convho(hr8)
+        check(r"\multicolumn{5}{c}{\texttt{f32}}" in t8 and "1800" in t8 and "1000" in t8,
+              "the scheme table carries an f32 group")
+        check(r"\texttt{f32}" not in table_convho([r for r in hr8 if r.prec == "f64"]),
+              "without f32 rows the scheme table is the single-group one")
+        jp = os.path.join(td, "jacfair_f32.out")
+        with open(jp, "w") as fh:
+            fh.write("jac_exact packed 900 100 0.2 - f64\njac_exact packed 1500 100 0.2 - f32\n"
+                     "jac_lagged packed 1300 100 - - f64\njac_lagged packed 2000 100 - - f32\n"
+                     "spmv_f64 none 450 100 - - f64\nspmv_f32 none 830 100 - - f64\n"
+                     "spmv_f32 none 840 100 - - f32\n")
+        tj = table_jacfair(parse_jacfair(jp), parse_jacfair(jp, "f32"))
+        check(r"$2.00\times$" in tj and r"$1.79\times$" in tj,
+              "the f32 Jacobian rows divide by the f32 build's SpMV, the f64 ones by the f64 SpMV")
+        check(r"\multicolumn{6}{c}{---}" in tj,
+              "the f64-storage SpMV has no f32-group cell, and says so")
+        fp = os.path.join(td, "f32_x.out")
+        with open(fp, "w") as fh:
+            fh.write("### n=128  (100 dofs)\n"
+                     "key operator layout f64 f32 f32/f64 f64_best f32_best\n"
+                     "res_rc residual + Rhie-Chow packed 100.0 180.0 1.800 110.0 190.0\n"
+                     "### n=64  (10 dofs)\n"
+                     "key operator layout f64 f32 f32/f64 f64_best f32_best\n"
+                     "res_rc residual + Rhie-Chow packed 1.0 2.0 2.000 3.0 4.0\n")
+        p32 = parse_f32(fp)
+        check(p32 == {("res_rc", "packed"): (110.0, 190.0)},
+              "the f32 job's n=128 best columns are read, other sizes are not", repr(p32))
 
         # Missing data must be absent, not fabricated.
         with tempfile.TemporaryDirectory() as td2:

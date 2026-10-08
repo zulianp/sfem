@@ -76,6 +76,61 @@ cannot append to another node's rows.
 | M10 | higher-order deferred-correction flux: four limiter arms x {generated, hand-written} x {packed, atomic}, plus Rhie--Chow and the hand-vectorised variant that lost | `jobs/conv_ho_bench.sbatch` (new) | **done**, 4814703 (nid006545) -> `data/convho_4814703.out` -> `tables/convho.tex` |
 | M11 | like-for-like Jacobian action against the assembled matrix, exact and lagged | `jobs/jac_fair.sbatch` (new) | **done**, 4812322 -> `data/jacfair_4812322.out` -> `tables/jacfair.tex` |
 
+### Re-measured on 2026-10-08, after the reconstruction moved onto the Jacobian
+
+The deferred correction's reconstruction now takes its node-to-centroid vectors from the affine
+element Jacobian's edge columns instead of staging node coordinates and summing twelve centroids
+per lane (`cvfem_hex8_defcor_ref_increments`; the A/B is `spikes/cvfem/perf/ho_ref_increments_ab_grace.txt`:
+every higher-order residual arm 16--26% faster, the Jacobian arms within the 5% band, every
+first-order row unchanged). Every measurement that reaches a higher-order kernel was rerun on the
+tree carrying it, and the generator picks the newest file per prefix, so these are the inputs now:
+
+| measurement | job | file |
+|---|---|---|
+| M1 campaign | 5003779 (nid005994, 750 rows) | `data/campaign_grace_5003779.csv` |
+| M4 thread scaling | 5003759 | `data/tscale_5003759.out` |
+| M5/M7 pack size and ordering | 5005778 | `data/packsize_5005778.out` |
+| M10 convective schemes, f64 and f32 | 5006526 | `data/convho_5006526.out` |
+| M11 fair Jacobian comparison, f64 and f32 | 5006559 | `data/jacfair_5006559.out` |
+| M13 DRAM traffic | 5005775 | `data/dram_5005775.out` |
+| Jacobian per scheme (fig:jacho), f64 and f32 | 5006527 | `data/jacho_5006527.out` |
+| f32 against f64, every layout (ladder f32 group) | 5006525 | `data/f32_5006525.out` |
+| exact higher-order Jacobian breakdown | 5005769 | `data/hoexact_5005769.out` |
+| instruction mix | 5003851 | `data/kmix_5003851.out` |
+| higher-order size sweep | 5005800 | `data/hosize_5005800.out` |
+
+The rows naming jobs 5005763-5005800 were measured again after the limiter derivatives' rounding
+band was fixed (spikes/cvfem/perf/f32_vs_f64_grace.txt): every job that runs the exact
+higher-order Jacobian, which that fix costs 2-3%. Every sentence that reads those macros was
+checked against the new values and still holds.
+
+The rows marked "f64 and f32" run the double build and the single-precision build
+(`cvfem_hex8_ns_upwind_bench_f32`, every field and kernel in float) in one allocation, order
+alternating per pass, so the light f32 segments stacked on the bars of fig:convho and fig:jacho and
+the f32 groups of tab:convho and tab:jacfair are each against their own f64 neighbour. The ladder's
+f32 group cannot be: the campaign behind its f64 group runs 31 minutes, so its f32 group is the best
+pass of `jobs/f32_vs_f64.sbatch` (5006525) and the caption says it is a separate allocation. A first
+jac_fair run on the normal partition (5006528, nid005482) was discarded: its lagged action read
+1182 MDOF/s while the four controls of the identical operator read 1232-1296, and its f64 rates sat
+8-10% below every other run. The debug-partition rerun's lagged action and controls agree within 1%.
+
+Three things the rerun turned up that are not about the kernels:
+
+- `jobs/camp_full.sbatch` failed in its first seconds on a tree made with `git archive`, because
+  `scripts/layout_campaign.sh` is tracked without its executable bit. Restoring the bit and
+  resubmitting (5003779) is what produced the campaign above; the bit should be fixed in git.
+- The instruction-mix job's kernel-only throughput was a single run, and three consecutive jobs
+  each produced one kernel-only figure *below* its own full sweep, which is impossible. The job
+  now takes the best of three for both sides of that pair (jobs/kernel_mix.sbatch); 5003851 is
+  the first run of that form, and the scatter shares it reports are back under 1%.
+- The thread-scaling rows for the standard and element-coloured **Jacobian action with the
+  Rhie--Chow term** fell from 510 to 335 and from 587 to 438 MDOF/s against the 2 October run
+  (4967671). An interleaved check of the reference tree (9b62d097f, the commit the previous
+  measurements were taken on) against the new one puts both at 340 and 437, so the fall
+  predates this change and lies between 2 and 6 October; the throughput gate has no atomic
+  Rhie--Chow Jacobian row, which is how it passed. Not chased here; recorded so the scaling
+  figure's standard-layout Jacobian curve is read against the right cause.
+
 ### Provenance note, now resolved
 
 `data/peak_4811812.out` was transcribed from the job's printed output during an Alps outage --
