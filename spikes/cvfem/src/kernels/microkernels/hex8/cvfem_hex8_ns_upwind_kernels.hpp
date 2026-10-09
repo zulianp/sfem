@@ -1,0 +1,3229 @@
+#ifndef CVFEM_HEX8_NS_UPWIND_KERNELS_HPP
+#define CVFEM_HEX8_NS_UPWIND_KERNELS_HPP
+
+#include <cmath>
+#include "kernels/microkernels/limiters/cvfem_venkata_limiter.hpp"
+#include <cstddef>
+#include <cstring>
+#include <cstdint>
+
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
+
+
+#ifndef VEC_BYTES
+#define VEC_BYTES 128
+#endif
+
+#ifndef ALIGN_BYTES
+#define ALIGN_BYTES 64
+#endif
+
+#include "kernels/cvfem_portability.hpp"
+
+static constexpr int CVFEM_HEX8_N_FIELDS = 4;
+static constexpr int CVFEM_HEX8_N_NODES  = 8;
+static constexpr int CVFEM_HEX8_N_DOF    = CVFEM_HEX8_N_FIELDS * CVFEM_HEX8_N_NODES;
+static constexpr int CVFEM_HEX8_N_SCS    = 12;
+// THE LANE WIDTH IS A FUNCTION OF THE SCALAR TYPE, not of the build's. DESIGN.md's
+// correction: "the kernels should be templated as well. They should support different types for
+// the computation, template scalar_t, geom_t, idx_t, etc... (in a short time we would like to
+// try single precision kernels as well)."
+//
+// This was the obstacle that made the sweeps untemplatable, and the reason is worth keeping:
+// cvfem_hex8_vec_size<scalar_t> was `VEC_BYTES / sizeof(scalar_t)` at NAMESPACE scope, so a sweep
+// instantiated at `float` would have kept the lane width computed for `double` -- sixteen
+// lanes' worth of work in an eight-lane pack, read past the end of every staged array. The
+// width has to travel with the type, which is what this does: an f32 instantiation gets
+// twice the lanes, which is the point of trying f32 at all.
+template <typename S>
+static constexpr int cvfem_hex8_vec_size = VEC_BYTES / int(sizeof(S));
+
+// The build's own width, for the many places that work in the including translation unit's
+// scalar_t. It is the same number it always was.
+static constexpr int CVFEM_HEX8_VEC_SIZE = cvfem_hex8_vec_size<scalar_t>;
+static_assert(CVFEM_HEX8_VEC_SIZE >= 1, "invalid HEX8 vector size");
+static_assert(cvfem_hex8_vec_size<float> == 2 * cvfem_hex8_vec_size<double>,
+              "a single-precision lane group must hold twice as many elements");
+
+// The reference element's node coordinates, in this element's node order. Read by the
+// isoparametric gather for a pack that stages no geometry of its own.
+static constexpr scalar_t CVFEM_HEX8_UNIT_CUBE[CVFEM_HEX8_N_NODES][3] = {
+        {0, 0, 0},
+        {1, 0, 0},
+        {1, 1, 0},
+        {0, 1, 0},
+        {0, 0, 1},
+        {1, 0, 1},
+        {1, 1, 1},
+        {0, 1, 1}};
+
+struct Hex8Face {
+    int    i;
+    int    j;
+    double ar[3];
+};
+
+template <typename scalar_t>
+struct Hex8InputPackT {
+    alignas(ALIGN_BYTES) scalar_t ux[CVFEM_HEX8_N_NODES][cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t uy[CVFEM_HEX8_N_NODES][cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t uz[CVFEM_HEX8_N_NODES][cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t p[CVFEM_HEX8_N_NODES][cvfem_hex8_vec_size<scalar_t>];
+};
+
+// The build's own instantiation. Every existing caller spells the plain name and
+// keeps working; a single-precision sweep spells Hex8InputPackT<float> and gets a
+// pack with twice the lanes.
+using Hex8InputPack = Hex8InputPackT<scalar_t>;
+
+template <typename scalar_t>
+struct Hex8ResidualPackT {
+    alignas(ALIGN_BYTES) scalar_t rx[CVFEM_HEX8_N_NODES][cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t ry[CVFEM_HEX8_N_NODES][cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t rz[CVFEM_HEX8_N_NODES][cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t rc[CVFEM_HEX8_N_NODES][cvfem_hex8_vec_size<scalar_t>];
+};
+
+// The build's own instantiation. Every existing caller spells the plain name and
+// keeps working; a single-precision sweep spells Hex8ResidualPackT<float> and gets a
+// pack with twice the lanes.
+using Hex8ResidualPack = Hex8ResidualPackT<scalar_t>;
+
+template <typename scalar_t>
+struct Hex8CoordPackT {
+    alignas(ALIGN_BYTES) scalar_t x[CVFEM_HEX8_N_NODES][cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t y[CVFEM_HEX8_N_NODES][cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t z[CVFEM_HEX8_N_NODES][cvfem_hex8_vec_size<scalar_t>];
+};
+
+// The build's own instantiation. Every existing caller spells the plain name and
+// keeps working; a single-precision sweep spells Hex8CoordPackT<float> and gets a
+// pack with twice the lanes.
+using Hex8CoordPack = Hex8CoordPackT<scalar_t>;
+
+// What the Rhie-Chow time scale needs beyond the element's own geometry. Resolved once per
+// Newton step from the mesh state, never rediscovered per element, and carried as one object
+// so no path can end up half-converted.
+//
+// u2_scale is the mode selector rather than a physical quantity: 1 evaluates the combined
+// advective-diffusive-transient time scale, 0 suppresses the advective and transient
+// branches and, together with a doubled rc_scale, reproduces the previous diffusion-only
+// coefficient bit for bit. The scale itself stays on the channel it already travels --
+// Hex8RhieChowT::scale and the rc_scale argument -- rather than being duplicated here.
+template <typename scalar_t>
+struct Hex8RcTauT {
+    scalar_t inv_dt_a0{0};
+    scalar_t u2_scale{1};
+};
+
+using Hex8RcTau = Hex8RcTauT<scalar_t>;
+
+// The nodal velocity gradient for the deferred correction, lane-major like every other pack:
+// nine components per node (du_c/dx_k, c and k both fastest-to-slowest as the scalar kernel
+// packs them), one column per element in the SIMD batch.
+template <typename scalar_t>
+struct Hex8UGradPackT {
+    // Staged as the gradient; REWRITTEN IN PLACE by the kernel into the twenty-four node-surface
+    // increments, [a][c*3 + d], before the face loops read it. See
+    // cvfem_hex8_defcor_ref_increments. No node coordinates: the affine reconstruction takes its
+    // node-to-centroid vectors from the element Jacobian the sweep already holds, as the Rhie-Chow
+    // pack beside this one does for its edge vector.
+    alignas(ALIGN_BYTES) scalar_t g[CVFEM_HEX8_N_NODES][9][cvfem_hex8_vec_size<scalar_t>];
+    int      limiter{0};
+    scalar_t venkat_c{0};
+};
+
+// The build's own instantiation. Every existing caller spells the plain name and
+// keeps working; a single-precision sweep spells Hex8UGradPackT<float> and gets a
+// pack with twice the lanes.
+using Hex8UGradPack = Hex8UGradPackT<scalar_t>;
+
+template <typename scalar_t>
+struct Hex8RhieChowPackT {
+    // No node coordinates. Every face on this path takes its edge vector from the element
+    // Jacobian (cvfem_hex8_affine_edge_cols), so the three arrays that used to stage eight nodes'
+    // coordinates per lane group -- 3 KB of stack and twenty-four indexed gathers per element --
+    // have no reader left. The isoparametric kernels keep their own Hex8CoordPack.
+    alignas(ALIGN_BYTES) scalar_t pgx[CVFEM_HEX8_N_NODES][cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t pgy[CVFEM_HEX8_N_NODES][cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t pgz[CVFEM_HEX8_N_NODES][cvfem_hex8_vec_size<scalar_t>];
+    // The DIRECTION's reconstructed gradient, for the Jacobian action. Only the packed
+    // Jacobian fills these; the residual has no use for them and leaves them untouched,
+    // which is why the kernels take them behind a template flag rather than a null check.
+    alignas(ALIGN_BYTES) scalar_t qgx[CVFEM_HEX8_N_NODES][cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t qgy[CVFEM_HEX8_N_NODES][cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t qgz[CVFEM_HEX8_N_NODES][cvfem_hex8_vec_size<scalar_t>];
+    // The Rhie-Chow mass-flux coefficient, one per sub-control surface, computed outside
+    // the element loop and read here. It is pure geometry (times rho, mu and the scale),
+    // so it changes only when those do -- once per Newton step, not once per matvec.
+    //
+    // Hoisting it is worth 1.83x on this kernel and the reason is the compiler, not the
+    // arithmetic. cvfem_hex8_rhie_chow_mdot_coeff carries a degenerate-geometry guard, and
+    // with that guard inline GCC 13.3 declines to vectorise the twelve face loops below at
+    // all -- "vectorization is not profitable" -- while without it every one of the twelve
+    // vectorises. Measured on Grace, 72 threads, 11,212,884 dof, packed Jacobian action:
+    // 878 MDOF/s with the guard inline, 1605 without. The guard's arithmetic is not the
+    // cost (its sqrt is worth 1.3% and its two divides 0.7%); its presence in the loop is.
+    // Rewriting it branchlessly does not help, because the cost model still counts the
+    // extra operations -- 959 MDOF/s, measured.
+    //
+    // The Jacobian action reads this; the residual does not, and that asymmetry is
+    // measured rather than an oversight. The residual's face loop is smaller, its cost
+    // model lands on the other side of the same threshold, and its output checksum is
+    // bit-identical with the coefficient hoisted or not -- so its vectorisation never
+    // changed and it would pay the gather below for nothing. It did: 1615 -> 1577 MDOF/s.
+    // The Jacobian action is also the one that matters, being evaluated once per Krylov
+    // iteration against the residual's once per Newton step.
+    //
+    // The guard itself is not dropped. It runs once per element in
+    // cvfem_hex8_build_rc_coeff, so a degenerate sub-control surface still yields exactly
+    // zero here, which is what the scalar and isoparametric paths get from calling the
+    // function directly. This is the arrangement the semi-structured path has always used
+    // (SSMacroGeom::coeff, kernels/semistructured/cvfem_sshex8_ns.hpp) -- which is why it never paid this.
+    alignas(ALIGN_BYTES) scalar_t coeff[CVFEM_HEX8_N_SCS][cvfem_hex8_vec_size<scalar_t>];
+    // The coefficient's velocity-sensitivity weight, tabulated beside it because it is purely
+    // geometric: see cvfem_hex8_build_rc_coeff.
+    alignas(ALIGN_BYTES) scalar_t wdu[CVFEM_HEX8_N_SCS][cvfem_hex8_vec_size<scalar_t>];
+    // The part of the time scale that belongs to the solve rather than to the element.
+    // Only the isoparametric path reads it; the affine path has the finished coefficient in
+    // the table above.
+    Hex8RcTauT<scalar_t> tau{};
+    // The Rhie-Chow scale as the coefficient table was built with it, for the coefficient's
+    // velocity sensitivity in the Jacobian action (cvfem_hex8_rhie_chow_du_weight). Set with tau
+    // by cvfem_hex8_gather_rc_coeff, which also makes tau hold what the table was built with.
+    scalar_t scale{0};
+};
+
+// The build's own instantiation. Every existing caller spells the plain name and
+// keeps working; a single-precision sweep spells Hex8RhieChowPackT<float> and gets a
+// pack with twice the lanes.
+using Hex8RhieChowPack = Hex8RhieChowPackT<scalar_t>;
+
+// The partially assembled element tangent: the complete state dependence of one element's
+// Jacobian action, five scalars per sub-control surface.
+//
+// For a fixed Newton iterate the flux through a surface is BILINEAR -- state scalars times
+// direction vectors -- and reading cvfem_hex8_conv_face_jv_simd shows exactly which state
+// scalars survive. Its momentum flux is
+//
+//     fx = dpos*u_I + mpos*du_I + dneg*u_J + mneg*du_J + qmid*ax
+//
+// with dpos = d_pos*dmdot and dneg = d_neg*dmdot, and d_pos + d_neg = 1. The two state
+// terms collapse: dpos*u_I + dneg*u_J = dmdot * (d_pos*u_I + d_neg*u_J), and that bracket
+// is the upwinded velocity. So a surface's whole dependence on (u, p) is mpos, mneg and
+// three components of upwinded velocity -- 60 scalars per element, 116 bytes per degree of
+// freedom, against 847 for the assembled matrix.
+//
+// What the apply then stops doing is worth more than the arithmetic: it never stages the
+// state u,p at all, and never stages the nodal pressure gradient pgx/pgy/pgz, which is half
+// of the six-array Rhie-Chow staging and half of the 768 doubles gathered per SIMD group.
+// The coordinates stay, because the direction side still needs the edge vectors.
+//
+// Stored as SoA by (surface, component) for the same reason Hex8RhieChowPack::coeff is:
+// the gather is then a strided SoA read and not a stride-60 walk.
+// Read straight out of the store in the face loop, not staged into a pack first. Staging
+// it was the obvious shape -- Hex8RhieChowPack::coeff is staged, and that was worth 1.83x --
+// but the two are not alike: coeff is twelve scalars replacing a guard that stopped the
+// loop vectorising, and this is sixty scalars replacing nothing but a few multiplies. Held
+// in a struct it is a 7.7 KB stack object written and read back for every sixteen elements,
+// which is 480 bytes per element of L1 traffic on top of the DRAM stream. Measured both
+// ways; see subpar/README.md.
+// Eight since the Rhie-Chow coefficient's velocity sensitivity joined the tangent: the five
+// described below, plus k = g * corr * ubar (three components), which the face loop dots with
+// the direction's face-average velocity. See cvfem_hex8_rhie_chow_coeff_du.
+static constexpr int CVFEM_HEX8_PA_PER_SCS = 8;
+static constexpr int CVFEM_HEX8_PA_PER_ELEM = CVFEM_HEX8_PA_PER_SCS * CVFEM_HEX8_N_SCS;
+
+/* Optional colocated Rhie–Chow: u_f = u_avg - D_f[(p_j-p_i)/h - 0.5(∇p_i+∇p_j)·e].
+   scale=0 (default) keeps the original mdot = rho u_avg · A. Nodal ∇p is assembled
+   outside the element kernel; globally linear p is unchanged. */
+template <typename T>
+struct Hex8RhieChowT {
+    const T *x{};
+    const T *y{};
+    const T *z{};
+    const T *pgx{};
+    const T *pgy{};
+    const T *pgz{};
+    T        scale{0};
+    // Reconstructed nodal gradient of the *perturbation* q, for the Jacobian action only.
+    // The residual's Rhie-Chow correction subtracts avg(pg_i,pg_j).d, and pg is itself a
+    // (linear, geometry-weighted) function of p, so its derivative is the same operator
+    // applied to q. Leaving these null reproduces the previous, frozen-pg behaviour --
+    // which the assembled Jacobian still relies on, since including the term there would
+    // widen the pressure coupling beyond nearest neighbours.
+    const T *qgx{};
+    const T *qgy{};
+    const T *qgz{};
+    // The advecting velocity, for the convective branch of the time scale. Same
+    // element-local indexing as x/y/z.
+    const T *ux{};
+    const T *uy{};
+    const T *uz{};
+    Hex8RcTauT<T> tau{};
+    // The three affine edge vectors, direction-major (ecol[3*c + q] is component c of the edge
+    // of direction group q), and a flag saying they are present. The SCALAR kernels are the
+    // oracle the vectorised ones are verified against, so they must discretise the SAME
+    // operator -- and on the affine path the edge vector is the Jacobian column, not a
+    // difference of node coordinates (cvfem_hex8_affine_edge_cols). Leaving has_ecol false
+    // keeps the coordinate difference, which is what the ISOPARAMETRIC kernels need.
+    //
+    // This was not optional once the vectorised kernels moved: a reference on a different
+    // geometry stops being a reference. It read 2.0e-4 against the packed Jacobian at n=160,
+    // where the correction's near-cancellation amplifies a last-bit geometry difference into a
+    // visible one, while every cube-sized check still passed.
+    T        ecol[9]{};
+    bool     has_ecol{false};
+};
+
+// Every existing host call site names `Hex8RhieChow`, so keep that spelling bound
+// to the file-scope scalar type. Device code names Hex8RhieChowT<T> directly.
+using Hex8RhieChow = Hex8RhieChowT<scalar_t>;
+
+// The compile-time tables below must be readable from device code.
+//
+// A namespace-scope `static constexpr` array is host-only under nvcc -- it fails with
+// "identifier ... is undefined in device code", and so do the plain-constexpr and
+// static-data-member spellings (all three were tried). What nvcc does accept on both
+// sides is a `static constexpr` array local to a __host__ __device__ function.
+//
+// The accessor form is therefore used only under __CUDACC__, and the plain array is
+// kept everywhere else: routing the host build through the accessor changed its
+// generated code (+20 bytes and a good deal of register reshuffling), and there is no
+// reason to perturb the CPU path to solve a device problem. The initialiser is shared
+// between the two forms, so the data is still written once. Every use site is
+// unchanged in both cases, because the name is aliased to the accessor by macro.
+
+#define CVFEM_HEX8_SCS_INIT { \
+        {0, 1, {double(0.25), double(0), double(0)}}, \
+        {3, 2, {double(0.25), double(0), double(0)}}, \
+        {4, 5, {double(0.25), double(0), double(0)}}, \
+        {7, 6, {double(0.25), double(0), double(0)}}, \
+        {0, 3, {double(0), double(0.25), double(0)}}, \
+        {1, 2, {double(0), double(0.25), double(0)}}, \
+        {4, 7, {double(0), double(0.25), double(0)}}, \
+        {5, 6, {double(0), double(0.25), double(0)}}, \
+        {0, 4, {double(0), double(0), double(0.25)}}, \
+        {1, 5, {double(0), double(0), double(0.25)}}, \
+        {2, 6, {double(0), double(0), double(0.25)}}, \
+        {3, 7, {double(0), double(0), double(0.25)}}}
+#if defined(__CUDACC__)
+static SFEM_INLINE SFEM_HOST_DEVICE const Hex8Face (&cvfem_hex8_scs_tbl())[CVFEM_HEX8_N_SCS] {
+    static constexpr Hex8Face t[CVFEM_HEX8_N_SCS] = CVFEM_HEX8_SCS_INIT;
+    return t;
+}
+#define CVFEM_HEX8_SCS cvfem_hex8_scs_tbl()
+#else
+static constexpr Hex8Face CVFEM_HEX8_SCS[CVFEM_HEX8_N_SCS] = CVFEM_HEX8_SCS_INIT;
+#endif
+
+#define CVFEM_HEX8_DIR_EDGES_INIT {{{0, 1}, {3, 2}, {4, 5}, {7, 6}}, \
+                                   {{0, 3}, {1, 2}, {4, 7}, {5, 6}}, \
+                                   {{0, 4}, {1, 5}, {2, 6}, {3, 7}}}
+#if defined(__CUDACC__)
+static SFEM_INLINE SFEM_HOST_DEVICE const int (&cvfem_hex8_dir_edges_tbl())[3][4][2] {
+    static constexpr int t[3][4][2] = CVFEM_HEX8_DIR_EDGES_INIT;
+    return t;
+}
+#define CVFEM_HEX8_DIR_EDGES cvfem_hex8_dir_edges_tbl()
+#else
+static constexpr int CVFEM_HEX8_DIR_EDGES[3][4][2] = CVFEM_HEX8_DIR_EDGES_INIT;
+#endif
+
+// The direction group of the edge (i,j), from the same table that defines the grouping. Used by
+// the scalar kernels, which receive node indices rather than a surface index.
+template <typename T = int>
+static SFEM_INLINE SFEM_HOST_DEVICE int cvfem_hex8_edge_dir(const int i, const int j) {
+    for (int q = 0; q < 3; ++q)
+        for (int e = 0; e < 4; ++e)
+            if ((CVFEM_HEX8_DIR_EDGES[q][e][0] == i && CVFEM_HEX8_DIR_EDGES[q][e][1] == j) ||
+                (CVFEM_HEX8_DIR_EDGES[q][e][0] == j && CVFEM_HEX8_DIR_EDGES[q][e][1] == i))
+                return q;
+    return 0;
+}
+
+#define CVFEM_HEX8_SNET_INIT { \
+        {double(1), double(1), double(1)}, \
+        {double(-1), double(1), double(1)}, \
+        {double(-1), double(-1), double(1)}, \
+        {double(1), double(-1), double(1)}, \
+        {double(1), double(1), double(-1)}, \
+        {double(-1), double(1), double(-1)}, \
+        {double(-1), double(-1), double(-1)}, \
+        {double(1), double(-1), double(-1)}}
+#if defined(__CUDACC__)
+static SFEM_INLINE SFEM_HOST_DEVICE const double (&cvfem_hex8_snet_tbl())[CVFEM_HEX8_N_NODES][3] {
+    static constexpr double t[CVFEM_HEX8_N_NODES][3] = CVFEM_HEX8_SNET_INIT;
+    return t;
+}
+#define CVFEM_HEX8_SNET cvfem_hex8_snet_tbl()
+#else
+static constexpr double CVFEM_HEX8_SNET[CVFEM_HEX8_N_NODES][3] = CVFEM_HEX8_SNET_INIT;
+#endif
+
+#define CVFEM_HEX8_DN_REF_INIT { \
+        {-double(0.25), -double(0.25), -double(0.25)}, \
+        {double(0.25), -double(0.25), -double(0.25)}, \
+        {double(0.25), double(0.25), -double(0.25)}, \
+        {-double(0.25), double(0.25), -double(0.25)}, \
+        {-double(0.25), -double(0.25), double(0.25)}, \
+        {double(0.25), -double(0.25), double(0.25)}, \
+        {double(0.25), double(0.25), double(0.25)}, \
+        {-double(0.25), double(0.25), double(0.25)}}
+#if defined(__CUDACC__)
+static SFEM_INLINE SFEM_HOST_DEVICE const double (&cvfem_hex8_dn_ref_tbl())[CVFEM_HEX8_N_NODES][3] {
+    static constexpr double t[CVFEM_HEX8_N_NODES][3] = CVFEM_HEX8_DN_REF_INIT;
+    return t;
+}
+#define CVFEM_HEX8_DN_REF cvfem_hex8_dn_ref_tbl()
+#else
+static constexpr double CVFEM_HEX8_DN_REF[CVFEM_HEX8_N_NODES][3] = CVFEM_HEX8_DN_REF_INIT;
+#endif
+
+// Edge-associated SCS centroids in [0,1]^3, toward the element center.
+// Reference coordinates of the eight nodes in [0,1]^3, in the element's own node order.
+// Redundant with the sign pattern of CVFEM_HEX8_DN_REF and written out anyway: a
+// reconstruction that reads them transposed is wrong in a way no residual norm reveals,
+// because the error is a smooth field rather than a blow-up.
+#define CVFEM_HEX8_REF_XI_INIT { \
+        {double(0), double(0), double(0)}, \
+        {double(1), double(0), double(0)}, \
+        {double(1), double(1), double(0)}, \
+        {double(0), double(1), double(0)}, \
+        {double(0), double(0), double(1)}, \
+        {double(1), double(0), double(1)}, \
+        {double(1), double(1), double(1)}, \
+        {double(0), double(1), double(1)}}
+#if defined(__CUDACC__)
+static SFEM_INLINE SFEM_HOST_DEVICE const double (&cvfem_hex8_ref_xi_tbl())[CVFEM_HEX8_N_NODES][3] {
+    static constexpr double t[CVFEM_HEX8_N_NODES][3] = CVFEM_HEX8_REF_XI_INIT;
+    return t;
+}
+#define CVFEM_HEX8_REF_XI cvfem_hex8_ref_xi_tbl()
+#else
+static constexpr double CVFEM_HEX8_REF_XI[CVFEM_HEX8_N_NODES][3] = CVFEM_HEX8_REF_XI_INIT;
+#endif
+
+#define CVFEM_HEX8_SCS_XI_INIT { \
+        {double(0.5), double(0.25), double(0.25)}, \
+        {double(0.5), double(0.75), double(0.25)}, \
+        {double(0.5), double(0.25), double(0.75)}, \
+        {double(0.5), double(0.75), double(0.75)}, \
+        {double(0.25), double(0.5), double(0.25)}, \
+        {double(0.75), double(0.5), double(0.25)}, \
+        {double(0.25), double(0.5), double(0.75)}, \
+        {double(0.75), double(0.5), double(0.75)}, \
+        {double(0.25), double(0.25), double(0.5)}, \
+        {double(0.75), double(0.25), double(0.5)}, \
+        {double(0.75), double(0.75), double(0.5)}, \
+        {double(0.25), double(0.75), double(0.5)}}
+#if defined(__CUDACC__)
+static SFEM_INLINE SFEM_HOST_DEVICE const double (&cvfem_hex8_scs_xi_tbl())[CVFEM_HEX8_N_SCS][3] {
+    static constexpr double t[CVFEM_HEX8_N_SCS][3] = CVFEM_HEX8_SCS_XI_INIT;
+    return t;
+}
+#define CVFEM_HEX8_SCS_XI cvfem_hex8_scs_xi_tbl()
+#else
+static constexpr double CVFEM_HEX8_SCS_XI[CVFEM_HEX8_N_SCS][3] = CVFEM_HEX8_SCS_XI_INIT;
+#endif
+
+// The trilinear shape function of every node at every sub-control-surface centroid, N[s][a].
+//
+// DERIVED from the two tables above rather than written out. The deferred correction needs the
+// centroid in physical space, which is sum_a N[s][a] * x[a]; evaluating N there costs eight
+// iterations of three compares and two multiplies, per lane and per face, for a quantity that
+// depends on nothing but these two compile-time tables. Hoisting it into a table is therefore
+// free arithmetic -- and deriving it from CVFEM_HEX8_{REF,SCS}_XI_INIT rather than typing the
+// 96 values means it cannot drift from them, which a third hand-written copy would.
+//
+// It is also bit-exact, not an approximation: the centroids are 1/4, 1/2 and 3/4 and the node
+// references are 0 and 1, so every weight is a product of exact binary fractions and the table
+// holds precisely what the run-time expression produced.
+struct Hex8ScsShape {
+    double n[CVFEM_HEX8_N_SCS][CVFEM_HEX8_N_NODES];
+};
+static constexpr Hex8ScsShape cvfem_hex8_scs_shape_build() {
+    const double ref[CVFEM_HEX8_N_NODES][3] = CVFEM_HEX8_REF_XI_INIT;
+    const double scs[CVFEM_HEX8_N_SCS][3]   = CVFEM_HEX8_SCS_XI_INIT;
+    Hex8ScsShape t{};
+    for (int s = 0; s < CVFEM_HEX8_N_SCS; ++s) {
+        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+            t.n[s][a] = (ref[a][0] > 0.5 ? scs[s][0] : 1.0 - scs[s][0]) *
+                        (ref[a][1] > 0.5 ? scs[s][1] : 1.0 - scs[s][1]) *
+                        (ref[a][2] > 0.5 ? scs[s][2] : 1.0 - scs[s][2]);
+        }
+    }
+    return t;
+}
+#if defined(__CUDACC__)
+static SFEM_INLINE SFEM_HOST_DEVICE
+        const double (&cvfem_hex8_scs_n_tbl())[CVFEM_HEX8_N_SCS][CVFEM_HEX8_N_NODES] {
+    static constexpr Hex8ScsShape t = cvfem_hex8_scs_shape_build();
+    return t.n;
+}
+#define CVFEM_HEX8_SCS_N cvfem_hex8_scs_n_tbl()
+#else
+static constexpr Hex8ScsShape cvfem_hex8_scs_shape_tbl = cvfem_hex8_scs_shape_build();
+#define CVFEM_HEX8_SCS_N cvfem_hex8_scs_shape_tbl.n
+#endif
+
+// Partition of unity, per surface. A transposed read of either source table would still sum to
+// one, so this does not catch everything -- but a weight indexed off the end, or a table built
+// from the wrong extent, shows up here at compile time and nowhere else until a residual is
+// quietly wrong by a smooth field.
+static_assert(cvfem_hex8_scs_shape_build().n[0][0] +
+                      cvfem_hex8_scs_shape_build().n[0][1] +
+                      cvfem_hex8_scs_shape_build().n[0][2] +
+                      cvfem_hex8_scs_shape_build().n[0][3] +
+                      cvfem_hex8_scs_shape_build().n[0][4] +
+                      cvfem_hex8_scs_shape_build().n[0][5] +
+                      cvfem_hex8_scs_shape_build().n[0][6] +
+                      cvfem_hex8_scs_shape_build().n[0][7] ==
+              1.0,
+              "HEX8 sub-control-surface shape functions must sum to one");
+
+// Face-diff grad + 3-dir traction + 12-SCS convection (see kernel).
+static constexpr double CVFEM_HEX8_RESIDUAL_FLOPS_PER_ELEMENT = 754.0;
+static constexpr double CVFEM_HEX8_JAC_ACTION_FLOPS_PER_ELEMENT =
+        CVFEM_HEX8_RESIDUAL_FLOPS_PER_ELEMENT + 12.0 * 8.0;
+// NOTE: this is an idealised work model, not the arithmetic the kernels actually
+// issue. Counting operators in the emitted code gives ~2900 flops/element for
+// cvfem_hex8_ns_upwind_jacobian_add_slots and ~5471 for the SymPy
+// add_local_slots variant, so GFLOP/s_assemble_model understates the SymPy
+// assembly rate by roughly 2.4x. Compare assembly variants with MDOF/s.
+static constexpr double CVFEM_HEX8_ASSEMBLE_FLOPS_PER_ELEMENT = 2304.0;
+
+// The deferred-correction higher-order flux, counted in the same idealised style as the
+// first-order number above and added to it when --conv-ho is on.
+//
+// Per element, once: the reconstruction in reference coordinates (cvfem_hex8_defcor_ref_increments)
+// -- for each of 8 nodes and 3 velocity components, three dot products with the edge columns
+// (15), their signs (3), the sum (2) and the three surface increments (6): 26 each, 624 in all.
+// Then per sub-control surface: the limiter applied to the two increments of each component
+// (2L each) and the flux-weighted combination (3), and the correction added into both nodes'
+// residuals (6 over the three components):
+//
+//     per element = 624 + 12 * (9 + 6L + 6) = 804 + 72L
+//
+// L is the limiter's own arithmetic: 0 unlimited; 2 for the bounded-face clip (one add to
+// reconstruct, one subtract to return the increment); 15 for Venkatakrishnan's rational psi;
+// 10 for Darwish-Moukalled. Venkatakrishnan's eps^2 term is not counted because it is reached
+// only with a non-zero K, which no arm measured here uses.
+//
+// THE PREVIOUS MODEL READ 672 + 72L AND UNDER-COUNTED. It charged each surface for two
+// node-to-centroid vectors and two three-term directional derivatives per component but omitted
+// the twelve centroids those vectors were taken from -- 576 flops per element that the kernel
+// did and the column did not show. The reference-coordinate form does neither; what it costs
+// is the 624 above, so the modelled number RISES while the kernel's arithmetic falls by about
+// 450 flops per element. Read the change in this column against that, not as a cost increase.
+static constexpr double cvfem_hex8_defcor_flops_per_element(const int limiter) {
+    const double L = limiter == 1 ? 2.0 : limiter == 2 ? 15.0 : limiter == 3 ? 10.0 : 0.0;
+    return 624.0 + 12.0 * (15.0 + 6.0 * L);
+}
+
+// The SAME correction differentiated, which is what the exact higher-order Jacobian action
+// evaluates (cvfem_hex8_scs_defcor_jv). Counted against that kernel line for line, in the same
+// idealised style.
+//
+// Per element, once: the reconstruction of the state's gradient AND of the direction's, 624
+// each. Per sub-control surface: per velocity component the limiter and its derivative applied
+// to the two increments (L + L' each, as one fused evaluation sharing a reciprocal) and the
+// four-term flux-weighted combination (7), and the correction added into both nodes' rows (6):
+//
+//     per element = 1248 + 12 * (3 * (2(L + L') + 7) + 6) = 1572 + 72(L + L')
+//
+// L is the forward limiter's arithmetic, as above. L' is its derivative's, counted the same
+// way: 9 for the bounded-face clip, whose derivative is a branch on a tolerance it has to form
+// (the forward clip has none); 33 for Venkatakrishnan's quotient rule; 28 for
+// Darwish-Moukalled. Unlimited is 0 for both. The upwind split and its derivative weights are
+// the face's own and are counted there, not here.
+//
+// The previous model read 1248 + 72(L + L') and omitted the same 576 centroid flops the
+// residual's did; see the note above.
+//
+// This is NOT added to the lagged action. There the correction is deferred, the Jacobian never
+// sees it, and the first-order model is exactly right; the caller gates on that.
+static constexpr double cvfem_hex8_defcor_jac_flops_per_element(const int limiter) {
+    const double L  = limiter == 1 ? 2.0 : limiter == 2 ? 15.0 : limiter == 3 ? 10.0 : 0.0;
+    const double Ld = limiter == 1 ? 9.0 : limiter == 2 ? 33.0 : limiter == 3 ? 28.0 : 0.0;
+    return 1248.0 + 12.0 * (27.0 + 6.0 * (L + Ld));
+}
+
+// 12 SCS: dN (27) + J (144) + cof/det (33) + A (3) + ∇_ref u (144) + push (55)
+// + traction (24) + convection (36) + scatter (8) = 474 * 12.
+static constexpr double CVFEM_HEX8_ISOPARAM_RESIDUAL_FLOPS_PER_ELEMENT = 5688.0;
+static constexpr double CVFEM_HEX8_ISOPARAM_JAC_ACTION_FLOPS_PER_ELEMENT =
+        CVFEM_HEX8_ISOPARAM_RESIDUAL_FLOPS_PER_ELEMENT + 12.0 * (144.0 + 55.0 + 8.0);
+static constexpr double CVFEM_HEX8_ISOPARAM_ASSEMBLE_FLOPS_PER_ELEMENT = 9216.0;
+
+template <typename scalar_t>
+static SFEM_INLINE void cvfem_zero_scalars(scalar_t *const SFEM_RESTRICT p, const ptrdiff_t n) {
+#ifdef _OPENMP
+#pragma omp parallel
+    {
+        const int       tid   = omp_get_thread_num();
+        const int       nt    = omp_get_num_threads();
+        const ptrdiff_t begin = (n * (ptrdiff_t)tid) / (ptrdiff_t)nt;
+        const ptrdiff_t end   = (n * (ptrdiff_t)(tid + 1)) / (ptrdiff_t)nt;
+        std::memset(p + begin, 0, (size_t)(end - begin) * sizeof(scalar_t));
+    }
+#else
+    std::memset(p, 0, (size_t)n * sizeof(scalar_t));
+#endif
+}
+
+template <typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_area(const scalar_t *const SFEM_RESTRICT adj,
+                                        const scalar_t                      ar0,
+                                        const scalar_t                      ar1,
+                                        const scalar_t                      ar2,
+                                        scalar_t                           &ax,
+                                        scalar_t                           &ay,
+                                        scalar_t                           &az) {
+    ax = adj[0] * ar0 + adj[3] * ar1 + adj[6] * ar2;
+    ay = adj[1] * ar0 + adj[4] * ar1 + adj[7] * ar2;
+    az = adj[2] * ar0 + adj[5] * ar1 + adj[8] * ar2;
+}
+
+template <typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_area_dir(const scalar_t *const SFEM_RESTRICT adj, const int d, scalar_t &ax,
+                                            scalar_t &ay, scalar_t &az) {
+    const scalar_t qtr = scalar_t(0.25);
+    ax                 = qtr * adj[3 * d];
+    ay                 = qtr * adj[3 * d + 1];
+    az                 = qtr * adj[3 * d + 2];
+}
+
+template <typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_face_diff(const scalar_t *const SFEM_RESTRICT u,
+                                             scalar_t                           &dr,
+                                             scalar_t                           &ds,
+                                             scalar_t                           &dt) {
+    dr = scalar_t(0.25) * ((u[1] + u[2] + u[5] + u[6]) - (u[0] + u[3] + u[4] + u[7]));
+    ds = scalar_t(0.25) * ((u[2] + u[3] + u[6] + u[7]) - (u[0] + u[1] + u[4] + u[5]));
+    dt = scalar_t(0.25) * ((u[4] + u[5] + u[6] + u[7]) - (u[0] + u[1] + u[2] + u[3]));
+}
+
+template <typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_pushforward(const scalar_t *const SFEM_RESTRICT adj,
+                                               const scalar_t                      inv_det,
+                                               const scalar_t                      dr,
+                                               const scalar_t                      ds,
+                                               const scalar_t                      dt,
+                                               scalar_t                           &gx,
+                                               scalar_t                           &gy,
+                                               scalar_t                           &gz) {
+    gx = (adj[0] * dr + adj[3] * ds + adj[6] * dt) * inv_det;
+    gy = (adj[1] * dr + adj[4] * ds + adj[7] * dt) * inv_det;
+    gz = (adj[2] * dr + adj[5] * ds + adj[8] * dt) * inv_det;
+}
+
+template <typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_dn_ref(const scalar_t xi,
+                                          const scalar_t eta,
+                                          const scalar_t zeta,
+                                          scalar_t       dN[CVFEM_HEX8_N_NODES][3]) {
+    const scalar_t x0 = scalar_t(1) - xi;
+    const scalar_t y0 = scalar_t(1) - eta;
+    const scalar_t z0 = scalar_t(1) - zeta;
+    dN[0][0]          = -y0 * z0;
+    dN[0][1]          = -x0 * z0;
+    dN[0][2]          = -x0 * y0;
+    dN[1][0]          = y0 * z0;
+    dN[1][1]          = -xi * z0;
+    dN[1][2]          = -xi * y0;
+    dN[2][0]          = eta * z0;
+    dN[2][1]          = xi * z0;
+    dN[2][2]          = -xi * eta;
+    dN[3][0]          = -eta * z0;
+    dN[3][1]          = x0 * z0;
+    dN[3][2]          = -x0 * eta;
+    dN[4][0]          = -y0 * zeta;
+    dN[4][1]          = -x0 * zeta;
+    dN[4][2]          = x0 * y0;
+    dN[5][0]          = y0 * zeta;
+    dN[5][1]          = -xi * zeta;
+    dN[5][2]          = xi * y0;
+    dN[6][0]          = eta * zeta;
+    dN[6][1]          = xi * zeta;
+    dN[6][2]          = xi * eta;
+    dN[7][0]          = -eta * zeta;
+    dN[7][1]          = x0 * zeta;
+    dN[7][2]          = x0 * eta;
+}
+
+// Vendored verbatim from operators/hex8/hex8_inline_cpu.hpp and templated on the
+// scalar type. Vendored rather than included because that header is host-only:
+// it pulls <stdio.h> under !NDEBUG. The arithmetic is unchanged.
+template <typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_adjugate_and_det(const scalar_t *const SFEM_RESTRICT x,
+                                              const scalar_t *const SFEM_RESTRICT y,
+                                              const scalar_t *const SFEM_RESTRICT z,
+                                              const scalar_t                      qx,
+                                              const scalar_t                      qy,
+                                              const scalar_t                      qz,
+                                              scalar_t *const SFEM_RESTRICT       adjugate,
+                                              scalar_t *const SFEM_RESTRICT       jacobian_determinant) {
+    scalar_t jacobian[9];
+    {
+        const scalar_t x0  = qy * qz;
+        const scalar_t x1  = 1 - qz;
+        const scalar_t x2  = qy * x1;
+        const scalar_t x3  = 1 - qy;
+        const scalar_t x4  = qz * x3;
+        const scalar_t x5  = x1 * x3;
+        const scalar_t x6  = qx * qz;
+        const scalar_t x7  = qx * x1;
+        const scalar_t x8  = 1 - qx;
+        const scalar_t x9  = qz * x8;
+        const scalar_t x10 = x1 * x8;
+        const scalar_t x11 = qx * qy;
+        const scalar_t x12 = qx * x3;
+        const scalar_t x13 = qy * x8;
+        const scalar_t x14 = x3 * x8;
+
+        jacobian[0] = x0 * x[6] - x0 * x[7] + x2 * x[2] - x2 * x[3] - x4 * x[4] + x4 * x[5] - x5 * x[0] + x5 * x[1];
+        jacobian[1] = qx * qz * x[6] + qx * x1 * x[2] + qz * x8 * x[7] + x1 * x8 * x[3] - x10 * x[0] - x6 * x[5] - x7 * x[1] -
+                      x9 * x[4];
+        jacobian[2] = qx * qy * x[6] + qx * x3 * x[5] + qy * x8 * x[7] - x11 * x[2] - x12 * x[1] - x13 * x[3] - x14 * x[0] +
+                      x3 * x8 * x[4];
+        jacobian[3] = x0 * y[6] - x0 * y[7] + x2 * y[2] - x2 * y[3] - x4 * y[4] + x4 * y[5] - x5 * y[0] + x5 * y[1];
+        jacobian[4] = qx * qz * y[6] + qx * x1 * y[2] + qz * x8 * y[7] + x1 * x8 * y[3] - x10 * y[0] - x6 * y[5] - x7 * y[1] -
+                      x9 * y[4];
+        jacobian[5] = qx * qy * y[6] + qx * x3 * y[5] + qy * x8 * y[7] - x11 * y[2] - x12 * y[1] - x13 * y[3] - x14 * y[0] +
+                      x3 * x8 * y[4];
+        jacobian[6] = x0 * z[6] - x0 * z[7] + x2 * z[2] - x2 * z[3] - x4 * z[4] + x4 * z[5] - x5 * z[0] + x5 * z[1];
+        jacobian[7] = qx * qz * z[6] + qx * x1 * z[2] + qz * x8 * z[7] + x1 * x8 * z[3] - x10 * z[0] - x6 * z[5] - x7 * z[1] -
+                      x9 * z[4];
+        jacobian[8] = qx * qy * z[6] + qx * x3 * z[5] + qy * x8 * z[7] - x11 * z[2] - x12 * z[1] - x13 * z[3] - x14 * z[0] +
+                      x3 * x8 * z[4];
+    }
+
+    const scalar_t x0 = jacobian[4] * jacobian[8];
+    const scalar_t x1 = jacobian[5] * jacobian[7];
+    const scalar_t x2 = jacobian[1] * jacobian[8];
+    const scalar_t x3 = jacobian[1] * jacobian[5];
+    const scalar_t x4 = jacobian[2] * jacobian[4];
+
+    adjugate[0]           = x0 - x1;
+    adjugate[1]           = jacobian[2] * jacobian[7] - x2;
+    adjugate[2]           = x3 - x4;
+    adjugate[3]           = -jacobian[3] * jacobian[8] + jacobian[5] * jacobian[6];
+    adjugate[4]           = jacobian[0] * jacobian[8] - jacobian[2] * jacobian[6];
+    adjugate[5]           = -jacobian[0] * jacobian[5] + jacobian[2] * jacobian[3];
+    adjugate[6]           = jacobian[3] * jacobian[7] - jacobian[4] * jacobian[6];
+    adjugate[7]           = -jacobian[0] * jacobian[7] + jacobian[1] * jacobian[6];
+    adjugate[8]           = jacobian[0] * jacobian[4] - jacobian[1] * jacobian[3];
+    *jacobian_determinant = jacobian[0] * x0 - jacobian[0] * x1 + jacobian[2] * jacobian[3] * jacobian[7] - jacobian[3] * x2 +
+                            jacobian[6] * x3 - jacobian[6] * x4;
+}
+
+template <typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_geom_at(const scalar_t *const SFEM_RESTRICT x,
+                                           const scalar_t *const SFEM_RESTRICT y,
+                                           const scalar_t *const SFEM_RESTRICT z,
+                                           const scalar_t                      qx,
+                                           const scalar_t                      qy,
+                                           const scalar_t                      qz,
+                                           scalar_t *const SFEM_RESTRICT       adj,
+                                           scalar_t *const SFEM_RESTRICT       det) {
+    cvfem_hex8_adjugate_and_det(x, y, z, qx, qy, qz, adj, det);
+}
+
+template <typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_grad_at(const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
+                                           const scalar_t                      dN[CVFEM_HEX8_N_NODES][3],
+                                           const scalar_t *const SFEM_RESTRICT ux,
+                                           const scalar_t *const SFEM_RESTRICT uy,
+                                           const scalar_t *const SFEM_RESTRICT uz,
+                                           scalar_t *const SFEM_RESTRICT       grad) {
+    scalar_t ur[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
+    for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+        ur[0] += ux[a] * dN[a][0];
+        ur[1] += ux[a] * dN[a][1];
+        ur[2] += ux[a] * dN[a][2];
+        ur[3] += uy[a] * dN[a][0];
+        ur[4] += uy[a] * dN[a][1];
+        ur[5] += uy[a] * dN[a][2];
+        ur[6] += uz[a] * dN[a][0];
+        ur[7] += uz[a] * dN[a][1];
+        ur[8] += uz[a] * dN[a][2];
+    }
+    const scalar_t inv_det = scalar_t(1) / det;
+    for (int c = 0; c < 3; ++c) {
+        const scalar_t rx = ur[3 * c + 0];
+        const scalar_t ry = ur[3 * c + 1];
+        const scalar_t rz = ur[3 * c + 2];
+        grad[3 * c + 0]   = (adj[0] * rx + adj[3] * ry + adj[6] * rz) * inv_det;
+        grad[3 * c + 1]   = (adj[1] * rx + adj[4] * ry + adj[7] * rz) * inv_det;
+        grad[3 * c + 2]   = (adj[2] * rx + adj[5] * ry + adj[8] * rz) * inv_det;
+    }
+}
+
+template <typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_dir_areas(const scalar_t *const SFEM_RESTRICT adj, scalar_t A[3][3]) {
+    A[0][0] = scalar_t(0.25) * adj[0];
+    A[0][1] = scalar_t(0.25) * adj[1];
+    A[0][2] = scalar_t(0.25) * adj[2];
+    A[1][0] = scalar_t(0.25) * adj[3];
+    A[1][1] = scalar_t(0.25) * adj[4];
+    A[1][2] = scalar_t(0.25) * adj[5];
+    A[2][0] = scalar_t(0.25) * adj[6];
+    A[2][1] = scalar_t(0.25) * adj[7];
+    A[2][2] = scalar_t(0.25) * adj[8];
+}
+
+template <typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_traction(const scalar_t mu,
+                                            const scalar_t g00,
+                                            const scalar_t g01,
+                                            const scalar_t g02,
+                                            const scalar_t g10,
+                                            const scalar_t g11,
+                                            const scalar_t g12,
+                                            const scalar_t g20,
+                                            const scalar_t g21,
+                                            const scalar_t g22,
+                                            const scalar_t ax,
+                                            const scalar_t ay,
+                                            const scalar_t az,
+                                            scalar_t      &tx,
+                                            scalar_t      &ty,
+                                            scalar_t      &tz) {
+    tx = mu * ((scalar_t(2) * g00) * ax + (g01 + g10) * ay + (g02 + g20) * az);
+    ty = mu * ((g10 + g01) * ax + (scalar_t(2) * g11) * ay + (g12 + g21) * az);
+    tz = mu * ((g20 + g02) * ax + (g21 + g12) * ay + (scalar_t(2) * g22) * az);
+}
+
+template <typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_grad_sumfact(const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
+                                                const scalar_t *const SFEM_RESTRICT ux,
+                                                const scalar_t *const SFEM_RESTRICT uy,
+                                                const scalar_t *const SFEM_RESTRICT uz,
+                                                scalar_t *const SFEM_RESTRICT       grad) {
+    const scalar_t inv_det = scalar_t(1) / det;
+    scalar_t       dr, ds, dt;
+    cvfem_hex8_face_diff(ux, dr, ds, dt);
+    cvfem_hex8_pushforward(adj, inv_det, dr, ds, dt, grad[0], grad[1], grad[2]);
+    cvfem_hex8_face_diff(uy, dr, ds, dt);
+    cvfem_hex8_pushforward(adj, inv_det, dr, ds, dt, grad[3], grad[4], grad[5]);
+    cvfem_hex8_face_diff(uz, dr, ds, dt);
+    cvfem_hex8_pushforward(adj, inv_det, dr, ds, dt, grad[6], grad[7], grad[8]);
+}
+
+template <typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_grad(const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
+                                        const scalar_t *const SFEM_RESTRICT ux,
+                                        const scalar_t *const SFEM_RESTRICT uy,
+                                        const scalar_t *const SFEM_RESTRICT uz,
+                                        scalar_t *const SFEM_RESTRICT       grad) {
+    scalar_t ur[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+    for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+        const scalar_t gx = CVFEM_HEX8_DN_REF[a][0];
+        const scalar_t gy = CVFEM_HEX8_DN_REF[a][1];
+        const scalar_t gz = CVFEM_HEX8_DN_REF[a][2];
+        ur[0] += ux[a] * gx;
+        ur[1] += ux[a] * gy;
+        ur[2] += ux[a] * gz;
+        ur[3] += uy[a] * gx;
+        ur[4] += uy[a] * gy;
+        ur[5] += uy[a] * gz;
+        ur[6] += uz[a] * gx;
+        ur[7] += uz[a] * gy;
+        ur[8] += uz[a] * gz;
+    }
+
+    const scalar_t inv_det = scalar_t(1) / det;
+    for (int c = 0; c < 3; ++c) {
+        const scalar_t rx = ur[3 * c + 0];
+        const scalar_t ry = ur[3 * c + 1];
+        const scalar_t rz = ur[3 * c + 2];
+        grad[3 * c + 0]   = (adj[0] * rx + adj[3] * ry + adj[6] * rz) * inv_det;
+        grad[3 * c + 1]   = (adj[1] * rx + adj[4] * ry + adj[7] * rz) * inv_det;
+        grad[3 * c + 2]   = (adj[2] * rx + adj[5] * ry + adj[8] * rz) * inv_det;
+    }
+}
+
+template <typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE int cvfem_hex8_rhie_chow_active(const Hex8RhieChowT<scalar_t> &rc) {
+    return rc.scale != scalar_t(0) && rc.x && rc.y && rc.z && rc.pgx && rc.pgy && rc.pgz;
+}
+
+// The momentum-interpolation time scale.
+//
+// Rhie-Chow is not a stabilisation term someone chose; it is the momentum equation
+// evaluated at the face. Writing the discrete momentum equation at node P as
+// a_P u_P = H_P - V_P (grad p)_P and solving for u_P gives
+//
+//     u_f = ubar_f - (V/a_P) [ (grad p)_f^compact - (grad p)_f^interpolated ]
+//
+// so the coefficient is V/a_P -- the control volume over the momentum equation's own
+// diagonal. It answers one question: how much does a unit pressure difference across this
+// face actually move the velocity there?
+//
+// a_P carries three mechanisms, and they add in the denominator, so whichever is largest
+// wins:
+//
+//     inertia      rho V a0 / dt   ~ rho h^3 a0/dt      -> tau = dt / a0
+//     convection   ~ rho |u| h^2                        -> tau = h / |u|
+//     diffusion    ~ mu h                               -> tau = h^2 / nu
+//
+// This used to evaluate only the third, as Df = rc_scale h^2 / (2 mu). That is V/a_P
+// computed as though the momentum diagonal were purely viscous, and it overstates the
+// coefficient by roughly the cell Peclet number rho|u|h/mu -- about 31x on the cavity at
+// Re=1000 on 32 cells, about 159x on the backward-facing step at Re_h=5100. The correction
+// is then no longer the small one the derivation assumes: a substantial part of the face
+// mass flux ends up set by pressure smoothing rather than by the flow.
+//
+// The standard closed form reproducing all three limits (Shakib, Tezduyar; it is what Nalu
+// means by "a combined elemental advection and diffusion time scale") is
+//
+//     tau = [ (2 a0/dt)^2 + (2|u|/h)^2 + (4 nu/h^2)^2 ]^(-1/2)
+//
+// Only |u|^2 is ever needed, not |u|, so no square root is spent on the velocity.
+//
+// Callers pass u2 = |u|^2 at the sub-control surface and inv_dt_a0 = a0/dt (zero for a
+// steady solve). Passing u2 = 0, inv_dt_a0 = 0 and twice the scale reproduces the previous
+// diffusion-only coefficient exactly, which is how SFEM_RHIE_CHOW_TAU=diffusive keeps the
+// old form measurable; the factor two is the difference between this form's h^2/(4 nu) and
+// the old h^2/(2 nu).
+template <typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE scalar_t cvfem_hex8_rhie_chow_mdot_coeff(const scalar_t rho, const scalar_t mu, const scalar_t rc_scale,
+                                                            const scalar_t dx, const scalar_t dy, const scalar_t dz,
+                                                            const scalar_t ax, const scalar_t ay, const scalar_t az,
+                                                            const scalar_t u2, const scalar_t inv_dt_a0) {
+    if (rc_scale == scalar_t(0) || rho == scalar_t(0)) return scalar_t(0);
+    const scalar_t h2    = dx * dx + dy * dy + dz * dz;
+    const scalar_t Adotd = ax * dx + ay * dy + az * dz;
+    const scalar_t A2    = ax * ax + ay * ay + az * az;
+    const scalar_t lim   = scalar_t(1e-30) * (std::sqrt(A2 * h2) + scalar_t(1e-30));
+    if (std::fabs(Adotd) < lim) return scalar_t(0);
+    const scalar_t nu  = (mu > scalar_t(1e-30) ? mu : scalar_t(1e-30)) / rho;
+    const scalar_t ct  = scalar_t(2) * inv_dt_a0;
+    const scalar_t cd  = scalar_t(4) * nu / h2;
+    const scalar_t ca2 = scalar_t(4) * u2 / h2;
+    return rc_scale * (A2 / Adotd) / std::sqrt(ct * ct + ca2 + cd * cd);
+}
+
+// The coefficient's sensitivity to the advecting velocity, which the Jacobian must carry.
+//
+// The time scale holds |u|^2, so the coefficient is K / sqrt(S) with K = rc_scale |A|^2/(A.d)
+// and S = (2 a0/dt)^2 + (4 nu/h^2)^2 + 4 u2_scale |ubar|^2 / h^2, ubar the face-average
+// velocity. Differentiating along a direction v with face average vbar,
+//
+//     d coeff = -g (ubar . vbar),    g = 4 (u2_scale / h^2) coeff / S = coeff^3 w,
+//     w = 4 u2_scale / (h^2 K^2) = 4 u2_scale (A.d)^2 / (h^2 rc_scale^2 |A|^4),
+//
+// and the Rhie-Chow mass flux -coeff * corr therefore gains g * corr * (ubar . vbar). The coeff^3 w
+// form is the one used: w is pure geometry, so the paths that hoist geometry hoist w with it and
+// pay one multiply per surface, and the rest compute it from the surface's own A and d beside the
+// coefficient they already have. The time-scale formula stays written once, above.
+//
+// Not gathered into the packed Rhie-Chow pack as a second per-element table, although that was
+// the first arrangement: measured on Grace, 72 threads, 8,586,756 dof, the packed Rhie-Chow
+// Jacobian action lost 15% to that gather alone -- 1,159 MDOF/s without it, 990 with the table
+// gathered and never read -- while computing w in the face loop from the pack's coordinates
+// costs a division per lane.
+//
+// Without it the Jacobian treats the coefficient as frozen at the state. That is exact at low
+// Reynolds number, where the viscous branch of the time scale dominates, and wrong by a margin
+// that grows with the cell Peclet number: on the FDA nozzle (semi-structured, 15,740 dof) the
+// continuity rows sat 1.3e-2 from a finite difference of the residual at Re 64 and 2.7e-2 at
+// Re 89, where Newton could no longer find a descent direction and the continuation stalled.
+// With it they sit at 3e-8 and the same case reaches Re 100.
+// Branch-free, because the packed face loop calls it: callers with a possibly degenerate surface
+// (|A| or h zero) guard it themselves, which they already do for the coefficient.
+template <typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE scalar_t cvfem_hex8_rhie_chow_du_weight(const scalar_t rc_scale, const scalar_t A2,
+                                                                          const scalar_t Adotd, const scalar_t h2,
+                                                                          const scalar_t u2_scale) {
+    return scalar_t(4) * u2_scale * Adotd * Adotd / (h2 * rc_scale * rc_scale * A2 * A2);
+}
+
+template <typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE scalar_t cvfem_hex8_rhie_chow_coeff_du(const scalar_t coeff, const scalar_t w) {
+    return coeff * coeff * coeff * w;
+}
+
+// |u|^2 at a sub-control surface, from the element-local velocity the struct carries,
+// scaled by the mode selector.
+//
+// The null test is loop-invariant and selects a time scale rather than guarding against a
+// caller mistake: a struct with no velocity in it can only mean the diffusion-only
+// coefficient, which is what u2 = 0 with a doubled scale evaluates. It costs nothing the
+// packed path pays -- that path reads the finished coefficient out of MeshData::rc_coeff
+// and never reaches here.
+template <typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE scalar_t cvfem_hex8_rhie_chow_u2(const Hex8RhieChowT<scalar_t> &rc, const int i,
+                                                                    const int j) {
+    if (!rc.ux) return scalar_t(0);
+    const scalar_t half = scalar_t(0.5);
+    const scalar_t ux   = half * (rc.ux[i] + rc.ux[j]);
+    const scalar_t uy   = half * (rc.uy[i] + rc.uy[j]);
+    const scalar_t uz   = half * (rc.uz[i] + rc.uz[j]);
+    return rc.tau.u2_scale * (ux * ux + uy * uy + uz * uz);
+}
+
+template <typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE scalar_t cvfem_hex8_rhie_chow_mdotc(const scalar_t rho, const scalar_t mu, const Hex8RhieChowT<scalar_t> &rc, const int i,
+                                                       const int j, const scalar_t ax, const scalar_t ay, const scalar_t az,
+                                                       const scalar_t p_i, const scalar_t p_j) {
+    if (!cvfem_hex8_rhie_chow_active(rc)) return scalar_t(0);
+    const int      q_    = rc.has_ecol ? cvfem_hex8_edge_dir(i, j) : 0;
+    const scalar_t dx    = rc.has_ecol ? rc.ecol[0 * 3 + q_] : rc.x[j] - rc.x[i];
+    const scalar_t dy    = rc.has_ecol ? rc.ecol[1 * 3 + q_] : rc.y[j] - rc.y[i];
+    const scalar_t dz    = rc.has_ecol ? rc.ecol[2 * 3 + q_] : rc.z[j] - rc.z[i];
+    const scalar_t coeff = cvfem_hex8_rhie_chow_mdot_coeff(rho, mu, rc.scale, dx, dy, dz, ax, ay, az,
+                                                           cvfem_hex8_rhie_chow_u2(rc, i, j), rc.tau.inv_dt_a0);
+    const scalar_t half  = scalar_t(0.5);
+    const scalar_t corr  = (p_j - p_i) - (half * (rc.pgx[i] + rc.pgx[j]) * dx + half * (rc.pgy[i] + rc.pgy[j]) * dy +
+                                         half * (rc.pgz[i] + rc.pgz[j]) * dz);
+    return -coeff * corr;
+}
+
+// k = g * corr * ubar at one sub-control surface: the vector that, dotted with the direction's
+// face-average velocity, gives the Rhie-Chow mass flux's velocity derivative through the
+// coefficient (cvfem_hex8_rhie_chow_coeff_du). Takes the coefficient and the state's correction
+// from the caller, which has both, and is zero where the coefficient carries no velocity. The
+// matrix-free action and the assembled face both take it from here, so the two cannot drift apart.
+template <typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_rhie_chow_kvec(const scalar_t coeff, const Hex8RhieChowT<scalar_t> &rc,
+                                                                  const int i, const int j, const scalar_t ax, const scalar_t ay,
+                                                                  const scalar_t az, const scalar_t corr, scalar_t &kx,
+                                                                  scalar_t &ky, scalar_t &kz) {
+    kx = ky = kz = scalar_t(0);
+    if (!rc.ux || coeff == scalar_t(0)) return;
+    const scalar_t half  = scalar_t(0.5);
+    const int      q_    = rc.has_ecol ? cvfem_hex8_edge_dir(i, j) : 0;
+    const scalar_t dx    = rc.has_ecol ? rc.ecol[0 * 3 + q_] : rc.x[j] - rc.x[i];
+    const scalar_t dy    = rc.has_ecol ? rc.ecol[1 * 3 + q_] : rc.y[j] - rc.y[i];
+    const scalar_t dz    = rc.has_ecol ? rc.ecol[2 * 3 + q_] : rc.z[j] - rc.z[i];
+    const scalar_t h2    = dx * dx + dy * dy + dz * dz;
+    const scalar_t Adotd = ax * dx + ay * dy + az * dz;
+    const scalar_t A2    = ax * ax + ay * ay + az * az;
+    // coeff != 0 above already excludes the degenerate surface this would divide by.
+    const scalar_t w     = cvfem_hex8_rhie_chow_du_weight(rc.scale, A2, Adotd, h2, rc.tau.u2_scale);
+    const scalar_t gk    = cvfem_hex8_rhie_chow_coeff_du(coeff, w) * corr;
+    kx = gk * half * (rc.ux[i] + rc.ux[j]);
+    ky = gk * half * (rc.uy[i] + rc.uy[j]);
+    kz = gk * half * (rc.uz[i] + rc.uz[j]);
+}
+
+// The Rhie-Chow coefficient at one sub-control surface and, where a pressure is given, the state's
+// correction (p_j - p_i) - avg(grad p).d, computed once for the callers that need both: the mass
+// flux is -coeff * corr, and the Jacobian's pressure and velocity halves both reuse them. Zero
+// coefficient where Rhie-Chow is off; zero correction where p is null.
+template <typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE scalar_t cvfem_hex8_rhie_chow_coeff_corr(const scalar_t rho, const scalar_t mu,
+                                                                            const Hex8RhieChowT<scalar_t> &rc, const int i,
+                                                                            const int j, const scalar_t ax, const scalar_t ay,
+                                                                            const scalar_t az, const scalar_t *const p,
+                                                                            scalar_t &coeff) {
+    coeff = scalar_t(0);
+    if (!cvfem_hex8_rhie_chow_active(rc)) return scalar_t(0);
+    const int      q_ = rc.has_ecol ? cvfem_hex8_edge_dir(i, j) : 0;
+    const scalar_t dx = rc.has_ecol ? rc.ecol[0 * 3 + q_] : rc.x[j] - rc.x[i];
+    const scalar_t dy = rc.has_ecol ? rc.ecol[1 * 3 + q_] : rc.y[j] - rc.y[i];
+    const scalar_t dz = rc.has_ecol ? rc.ecol[2 * 3 + q_] : rc.z[j] - rc.z[i];
+    coeff             = cvfem_hex8_rhie_chow_mdot_coeff(rho, mu, rc.scale, dx, dy, dz, ax, ay, az,
+                                                        cvfem_hex8_rhie_chow_u2(rc, i, j), rc.tau.inv_dt_a0);
+    if (!p) return scalar_t(0);
+    const scalar_t half = scalar_t(0.5);
+    return (p[j] - p[i]) - (half * (rc.pgx[i] + rc.pgx[j]) * dx + half * (rc.pgy[i] + rc.pgy[j]) * dy +
+                            half * (rc.pgz[i] + rc.pgz[j]) * dz);
+}
+
+// The Rhie-Chow mass flux's derivative along (v, q), from the coefficient and state correction
+// cvfem_hex8_rhie_chow_coeff_corr returned for this surface.
+template <typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE scalar_t cvfem_hex8_rhie_chow_dmdotc(const scalar_t coeff, const scalar_t corr,
+                                                                        const Hex8RhieChowT<scalar_t> &rc, const int i,
+                                                                        const int j, const scalar_t ax, const scalar_t ay,
+                                                                        const scalar_t az, const scalar_t q_i, const scalar_t q_j,
+                                                                        const scalar_t *const vx, const scalar_t *const vy,
+                                                                        const scalar_t *const vz) {
+    if (coeff == scalar_t(0)) return scalar_t(0);
+    const int      q_    = rc.has_ecol ? cvfem_hex8_edge_dir(i, j) : 0;
+    const scalar_t dx    = rc.has_ecol ? rc.ecol[0 * 3 + q_] : rc.x[j] - rc.x[i];
+    const scalar_t dy    = rc.has_ecol ? rc.ecol[1 * 3 + q_] : rc.y[j] - rc.y[i];
+    const scalar_t dz    = rc.has_ecol ? rc.ecol[2 * 3 + q_] : rc.z[j] - rc.z[i];
+    // Mirror mdotc exactly: corr = (q_j - q_i) - avg(qg_i, qg_j) . d. Dropping the second
+    // term -- as this did -- leaves the continuity rows of the Jacobian wrong by ~4%, which
+    // caps Newton at a linear rate (contraction 0.675, independent of mesh) instead of
+    // quadratic. See SFEM_FD_CHECK.
+    scalar_t qcorr = q_j - q_i;
+    if (rc.qgx) {
+        const scalar_t half = scalar_t(0.5);
+        qcorr -= half * (rc.qgx[i] + rc.qgx[j]) * dx + half * (rc.qgy[i] + rc.qgy[j]) * dy +
+                 half * (rc.qgz[i] + rc.qgz[j]) * dz;
+    }
+    scalar_t dm = -coeff * qcorr;
+    // The velocity half: the coefficient itself moves with u.
+    if (corr != scalar_t(0)) {
+        const scalar_t half = scalar_t(0.5);
+        scalar_t       kx, ky, kz;
+        cvfem_hex8_rhie_chow_kvec(coeff, rc, i, j, ax, ay, az, corr, kx, ky, kz);
+        dm += half * (kx * (vx[i] + vx[j]) + ky * (vy[i] + vy[j]) + kz * (vz[i] + vz[j]));
+    }
+    return dm;
+}
+
+
+// Smoothing the upwind switch, following Venkatakrishnan (JCP 118, 120-130, 1995).
+//
+// The upwind flux is m*(phi_i+phi_j)/2 + |m|*(phi_i-phi_j)/2, and |m| has a corner at m = 0.
+// Where the flow stagnates -- inside a recirculation bubble, or across a reversed outlet --
+// sub-control surfaces sit arbitrarily close to that corner while the upwinded values across
+// them still differ by O(1), so the flux is not differentiable near the iterate and Newton
+// loses its rate. Measured on the backward-facing step, the finite-difference check never
+// reaches its round-off floor at the stalled iterate (7.11e-07 at eps 1e-7, against 2.24e-12
+// for a case that converges quadratically), and the floor rises as Newton proceeds.
+//
+// Venkatakrishnan diagnoses exactly this for MUSCL limiters: the limiter "does not settle
+// down", is "reacting to machine-level noise" in the near-constant regions where it is not
+// needed, and "while this has almost no impact on the solution, it inhibits convergence to
+// steady state". His requirement is a switch that is *not active* where it does not matter,
+// with a *smooth* transition into that state, and he notes explicitly that "if a Newton's
+// method is used to solve the nonlinear system of equations, a differentiable limiter is
+// required".
+//
+// The direction of the perturbation is the part that is easy to get backwards, and it decides
+// whether the fix works. Harten's entropy fix sets |m| to eps/2 at m = 0, which *adds* upwind
+// dissipation (eps/4)(phi_i - phi_j) on every face carrying no flux. In a unidirectional flow
+// that is most of the mesh: measured, a Harten band of 1e-3 took the Poiseuille regression
+// from 25 linear iterations to no convergence at all, while curing the step. Venkatakrishnan's
+// modification does the opposite -- in the near-constant regions "we recover the scheme
+// without limiting" -- so the smoothing must send |m| to *zero*, blending to central
+// differencing, not saturate it at a floor.
+//
+// Hence, exactly |m| outside the band and vanishing quadratically inside it:
+//
+//     |m|_e = |m|                     for |m| >= e
+//           = m^2 (2e - |m|) / e^2    for |m| <  e
+//
+// which matches |m| in value and slope at |m| = e, is zero with zero slope at m = 0, and is
+// never larger than |m|. Faces carrying real flux are bit-for-bit untouched; faces carrying
+// none lose their upwinding rather than gaining diffusion.
+//
+// e = 0 reproduces the hard switch exactly, which is what every default call site gets.
+// --------------------------------------------------- cell-Peclet blending of the upwind term
+//
+// The convective flux this code writes is
+//
+//     m (u_i + u_j)/2  +  |m| (u_i - u_j)/2,
+//
+// a central term plus a dissipation term, and the second one is pure first-order donor cell.
+// Nalu and Nalu-Wind, on the same discretisation, do not choose between upwind and central at
+// all: they blend them by cell Peclet number, phi_ip = eta phi_upw + (1 - eta) phi_cds. In
+// this form that blend is a single factor on |m|, because
+//
+//     eta phi_upw + (1 - eta) phi_cds  =  phi_cds + eta |m| (u_i - u_j) / 2,
+//
+// so nothing about the flux's structure changes and the Jacobian keeps its shape. eta = 1 is
+// the current scheme bit for bit, which is what an unset environment gets.
+//
+// THE TRANSITION POINTS ARE NOT A TUNING CHOICE, they are the whole point. Nalu's tanh blend
+// is centred at Peclet 50,000 with width 200 for VELOCITY and at 2 with width 1 for every
+// other scalar -- so at any Peclet a real flow reaches, eta is zero for momentum and the
+// momentum equations run essentially unstabilised central, with upwinding reserved for
+// scalars. That is the production answer to "the |m| term is this scheme's subgrid model",
+// and it is a much larger lever than reconstructing that term more accurately: measured on
+// the backward-facing step, the deferred correction moves eps_num by 2.6% to 17.6%, while
+// this switches the term off.
+//
+// Whether it is STABLE here is an experiment and not a deduction. Colocated central
+// differencing is viable because Rhie-Chow supplies the pressure-velocity coupling, which
+// this code has; but Nalu is a projection scheme with an LES subgrid model carrying the
+// dissipation, and this is a monolithic Newton formulation that at present has neither. The
+// energy budget is the instrument that decides it, which is why it was built first.
+template <typename scalar_t>
+struct Hex8PecletConfig {
+    // 0 off (eta = 1 everywhere, the current scheme), 1 classic, 2 tanh.
+    int      form{0};
+    scalar_t gamma{1};   // classic: hybrid upwind factor, eta = (g Pe)^2 / (5 + (g Pe)^2)
+    scalar_t trans{0};   // tanh: transition Peclet
+    scalar_t width{1};   // tanh: transition width
+};
+
+
+// eta from the cell Peclet number. pe_num is 0.5 (u_i + u_j) . (x_j - x_i), the velocity
+// averaged across the face dotted with the node separation, and nu is the kinematic
+// viscosity -- Nalu's definition, formed at the call site because only it has the node
+// coordinates. Returns 1 when the blend is off, so the caller needs no branch.
+template <typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE scalar_t cvfem_hex8_peclet_eta(const Hex8PecletConfig<scalar_t> &c,
+                                                                   const scalar_t pe_num,
+                                                                   const scalar_t nu) {
+    if (c.form == 0) return scalar_t(1);
+    // |Pe|: the blend is about the magnitude of convection against diffusion, and the sign of
+    // the flux is already carried by |m| and its derivative.
+    const scalar_t pe_raw = nu > scalar_t(0) ? pe_num / nu : pe_num;
+    const scalar_t pe     = pe_raw < scalar_t(0) ? -pe_raw : pe_raw;
+    if (c.form == 1) {
+        const scalar_t gp = c.gamma * pe;
+        const scalar_t g2 = gp * gp;
+        return g2 / (scalar_t(5) + g2);
+    }
+    return scalar_t(0.5) * (scalar_t(1) + std::tanh((pe - c.trans) / c.width));
+}
+
+template <bool EPS = true, typename scalar_t>
+// Forced inline rather than left to SFEM_INLINE, which the SFEM headers define as plain inline
+// before this file's own definition can take effect. Left to the heuristic, GCC outlined it as a
+// .constprop clone once the packed Jacobian face loops grew by the Rhie-Chow coefficient's velocity
+// term, and a call in the loop body stopped 3 of the 36 face loops vectorising: 6 points of the
+// packed Rhie-Chow Jacobian action on Grace.
+// EPS IS A TEMPLATE PARAMETER, and the alternative was relying on the optimiser. The two SIMD
+// callers used to hand this a literal `EPS ? ueps : 0` so that the band test would constant-fold
+// out of the lane loop, which worked and left the whole band arithmetic in the source of a
+// kernel that never runs it. `if constexpr` says the same thing structurally: with EPS false
+// there is no band, no reciprocal and nothing to fold. The default is true, so every scalar call
+// site that passes a runtime ueps is unchanged.
+static SFEM_INLINE __attribute__((always_inline)) SFEM_HOST_DEVICE void cvfem_upwind_abs(const scalar_t m, const scalar_t eps,
+                                                          scalar_t &absm, scalar_t &dabs) {
+    const scalar_t am = m > scalar_t(0) ? m : -m;
+    if constexpr (EPS) {
+        if (eps > scalar_t(0) && am < eps) {
+            const scalar_t ie2 = scalar_t(1) / (eps * eps);
+            absm = m * m * (scalar_t(2) * eps - am) * ie2;
+            // d|m|_e/dm, odd in m and zero at the origin.
+            const scalar_t d = (scalar_t(4) * eps * am - scalar_t(3) * m * m) * ie2;
+            dabs = m > scalar_t(0) ? d : -d;
+            return;
+        }
+    }
+    absm = am;
+    dabs = m > scalar_t(0) ? scalar_t(1) : (m < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+}
+
+// --------------------------------------------------- deferred-correction convection
+//
+// The convective flux is first-order donor cell: mpos*u[i] + mneg*u[j] carries the UPWIND
+// NODE'S value to a face that sits between the two nodes. Measured on the manufactured
+// solution, that costs an order: the ladder converges at 2.308 at Re = 1, where upwinding is
+// inactive, and at 0.727 at Re = 100, where it is not.
+//
+// The fix is the standard one, and this is the DEFERRED-CORRECTION form of it: extrapolate
+// the donor value to the face with the donor's own gradient,
+//
+//     u_face = u[donor] + grad u[donor] . (x_scs - x_donor)
+//
+// and add only the DIFFERENCE from the first-order value to the residual, leaving the
+// Jacobian first-order. That is what Nalu and FUN3D do, and here it has a second reason: the
+// assembled convective Jacobian writes only column d of an edge block -- 32 of 64 node pairs,
+// 3 of 9 momentum entries, hard-coded in CVFEM_HEX8_RECOMPUTED_PAIRS -- and a reconstructed
+// value reaches nodes outside the element, so differentiating it would void that sparsity and
+// regrow the stencil to two rings. Nothing here touches the Jacobian at all.
+//
+// The cost is Newton's rate: a lagged correction makes this defect correction rather than
+// Newton, so convergence is linear. That is the trade the method is.
+//
+// `g` is the element's eight nodal velocity gradients, [a*9 + r*3 + c] = du_r/dx_c, the same
+// layout CVFEMNavierStokes::nodal_velocity_gradient produces. Passing null disables the
+// correction with no arithmetic, which is what every caller that has not asked for it does.
+// THE INCREMENTS IN REFERENCE COORDINATES, once per element, in place of the staged gradient.
+//
+// The reconstruction extrapolates node a's value along its own gradient to the centroid of each
+// of the three sub-control surfaces it sits on, inc = grad u_a . (x_s - x_a). On the affine path
+// the map is x = x_0 + J xi with J's columns the three edge vectors, so x_s - x_a = J (xi_s - xi_a),
+// and xi_s - xi_a is a CONSTANT: +-1/2 along the surface's own direction and +-1/4 along the other
+// two (CVFEM_HEX8_SCS_XI against CVFEM_HEX8_REF_XI), positive where the node's reference
+// coordinate is 0. With t_k = sigma_k (grad u_a . e_k) over the three edge columns e_k,
+//
+//     inc_{a,d} = 1/2 t_d + 1/4 sum_{k != d} t_k = 1/4 (T + t_d),      T = t_0 + t_1 + t_2.
+//
+// So the twenty-four node-surface increments of a component cost eight nodes times three dot
+// products and five additions, and no coordinate is read at all. What this replaces, per lane:
+// the eight node coordinates staged into the pack (twenty-four indexed gathers per element and
+// 3 KB per lane group), the twelve centroids summed from them (288 multiply-adds), and per surface
+// two node-to-centroid vectors and two three-term directional derivatives per component -- about
+// a thousand flops per element against roughly six hundred here, and some 7 KB less live data
+// per lane group. The centroids had themselves been hoisted out of the twelve face loops for
+// register pressure (job 4813956: 580 stores per element against the 32 the kernel writes was
+// spill traffic); there is nothing left to hoist.
+//
+// IT IS THE AFFINE GEOMETRY, NOT AN APPROXIMATION OF IT. On a parallelepiped the centroid summed
+// from the eight coordinates and the one taken through J agree to round-off. On a hex that is
+// not one, this path has already committed to the single Jacobian it holds for the area vectors,
+// the gradient and the Rhie-Chow edge vector (cvfem_hex8_affine_edge_cols); the centroid from
+// true coordinates was the one geometric quantity on it not derived from that Jacobian, and the
+// scalar oracle and the lane-blocked kernel now discretise the same operator on every mesh
+// rather than only on the cubes the equivalence checks run on.
+//
+// IN PLACE. g arrives as the nodal gradient, [a][c*3 + k] = du_c/dx_k in the caller's lane-major
+// layout with STRIDE lanes, and leaves as the increments, [a][c*3 + d] = inc of component c at
+// node a's surface of direction d. Same count, same layout, no second pack: the staged gradient
+// is this element's scratch and nothing reads it afterwards. ex/ey/ez are the edge columns,
+// direction-major, in the same layout -- ex[k*STRIDE + lane] is the x component of edge k, as
+// cvfem_hex8_affine_edge_cols lays them out. The scalar sweep is STRIDE = 1.
+//
+// THE LANE LOOP IS THE INNERMOST ONE, and that is measured rather than tidy. The first form of
+// this took one lane and looped over nodes and components inside it, with the dispatcher's
+// `#pragma omp simd` lane loop outside; gcc 13.3 on Grace unrolled the inner loops, found no
+// innermost loop to vectorise, tried SLP on the straight-line body and reported "vectorization is
+// not profitable" (-fopt-info-vec-all) -- so the pass ran SCALAR, about 11,000 operations per
+// lane group on the Jacobian action, which read -8% in the interleaved A/B while the residual
+// arms gained 14-26% in spite of it. Twenty-four lane loops of unit-stride loads and stores is
+// the shape every other vectorised loop in this file has, and the one gcc's loop vectoriser takes.
+//
+// THE ROUNDING SCALE, when WITH_SCALE: isc[(a*3 + c)*STRIDE + lane] = 1/4 sum_k sum_x
+// |du_c/dx_x| |e_k,x|, the sum of the magnitudes every increment of that node and component was
+// formed from. The limiter derivatives add it to their rounding bands (see the note above the
+// derivatives in cvfem_venkata_limiter.hpp for the defect that made it necessary). Only the
+// state's increments carry branch decisions, so only the state's pass asks for it; the
+// direction's leaves the flag off and the branch folds at compile time.
+template <int STRIDE, bool WITH_SCALE = false, typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_defcor_ref_increments(
+        scalar_t *const SFEM_RESTRICT       g,
+        const scalar_t *const SFEM_RESTRICT ex,
+        const scalar_t *const SFEM_RESTRICT ey,
+        const scalar_t *const SFEM_RESTRICT ez,
+        scalar_t *const SFEM_RESTRICT       isc = nullptr) {
+    const scalar_t qtr = scalar_t(0.25);
+    if constexpr (!WITH_SCALE) (void)isc;
+    for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+        // The node's side of each reference plane: a node at xi_k = 0 looks towards +e_k.
+        const bool n0 = CVFEM_HEX8_REF_XI[a][0] > 0.5;
+        const bool n1 = CVFEM_HEX8_REF_XI[a][1] > 0.5;
+        const bool n2 = CVFEM_HEX8_REF_XI[a][2] > 0.5;
+        for (int c = 0; c < 3; ++c) {
+            scalar_t *const SFEM_RESTRICT gc = g + (a * 9 + c * 3) * STRIDE;
+#pragma omp simd
+            for (int lane = 0; lane < STRIDE; ++lane) {
+                const scalar_t gx = gc[lane], gy = gc[STRIDE + lane], gz = gc[2 * STRIDE + lane];
+                if constexpr (WITH_SCALE) {
+                    const auto mag = [](const scalar_t v) { return v < scalar_t(0) ? -v : v; };
+                    const scalar_t sx = mag(ex[lane]) + mag(ex[STRIDE + lane]) + mag(ex[2 * STRIDE + lane]);
+                    const scalar_t sy = mag(ey[lane]) + mag(ey[STRIDE + lane]) + mag(ey[2 * STRIDE + lane]);
+                    const scalar_t sz = mag(ez[lane]) + mag(ez[STRIDE + lane]) + mag(ez[2 * STRIDE + lane]);
+                    isc[(a * 3 + c) * STRIDE + lane] = qtr * (mag(gx) * sx + mag(gy) * sy + mag(gz) * sz);
+                }
+                const scalar_t d0 = gx * ex[lane] + gy * ey[lane] + gz * ez[lane];
+                const scalar_t d1 = gx * ex[STRIDE + lane] + gy * ey[STRIDE + lane] + gz * ez[STRIDE + lane];
+                const scalar_t d2 = gx * ex[2 * STRIDE + lane] + gy * ey[2 * STRIDE + lane] + gz * ez[2 * STRIDE + lane];
+                const scalar_t t0 = n0 ? -d0 : d0;
+                const scalar_t t1 = n1 ? -d1 : d1;
+                const scalar_t t2 = n2 ? -d2 : d2;
+                const scalar_t T  = t0 + t1 + t2;
+                gc[lane]              = qtr * (T + t0);
+                gc[STRIDE + lane]     = qtr * (T + t1);
+                gc[2 * STRIDE + lane] = qtr * (T + t2);
+            }
+        }
+    }
+}
+
+// Venkatakrishnan's eps^2 = coeff * h^3 per DIRECTION GROUP, h the edge the surfaces of the group
+// cut -- on the affine path all four cut edges of one length, |e_d|. Three square roots per
+// element where there were twelve per lane inside the face loops, each behind a per-lane test of
+// a K that is uniform over the sweep; the test is now the caller's, outside the loop. Only the
+// Venkatakrishnan arm reads the result, so only that arm's dispatch calls this.
+template <int STRIDE, typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_defcor_venkat_eps2(
+        const scalar_t                      venkat_c,
+        const scalar_t *const SFEM_RESTRICT ex,
+        const scalar_t *const SFEM_RESTRICT ey,
+        const scalar_t *const SFEM_RESTRICT ez,
+        scalar_t *const SFEM_RESTRICT       veps2) {
+    for (int d = 0; d < 3; ++d) {
+#pragma omp simd
+        for (int lane = 0; lane < STRIDE; ++lane) {
+            const scalar_t hx = ex[d * STRIDE + lane], hy = ey[d * STRIDE + lane], hz = ez[d * STRIDE + lane];
+            const scalar_t h  = std::sqrt(hx * hx + hy * hy + hz * hz);
+            veps2[d * STRIDE + lane] = venkat_c * h * h * h;
+        }
+    }
+}
+
+// STRIDE and `off` are the LAYOUT, and they are the only difference between the two callers.
+//
+// The flat element arrays a scalar sweep holds are (STRIDE=1, off=0): inc[a*9+c], ux[a]. The
+// lane-major packs a 16-wide sweep holds are (STRIDE=cvfem_hex8_vec_size<scalar_t>, off=lane):
+// inc[a][c][lane] is inc[(a*9+c)*VEC + lane], and ux[a][lane] is ux[a*VEC + lane]. Every array
+// this body reads -- the increments and the three velocity components -- shares that one stride,
+// so a single compile-time parameter serves both.
+//
+// This exists because the SIMD caller used to GATHER a lane's 96 inputs out of the packs into
+// flat locals and call the (1, 0) form. That gather sat inside the per-face lane loop, so it ran
+// twelve times per element against the scalar sweep's once, and it expanded seven private arrays
+// per lane inside a loop the compiler was being asked to vectorise. Reading the packs in place
+// removes it outright rather than hoisting it, and keeps ONE implementation of the reconstruction
+// and its limiters: a second, hand-vectorised copy of this arithmetic is the redundant path that
+// would be certain to drift.
+//
+// `off` stays a runtime argument rather than being folded into the base pointers: an invariant
+// base plus a lane-varying index is the form a vectoriser recognises as unit-stride, where a
+// lane-varying pointer invites it to emit a gather.
+//
+// STATS IS A TEMPLATE PARAMETER, AND THE FLATTEN ABOVE IS NOT ENOUGH WITHOUT IT. The note on
+// cvfem_hex8_conv_face_lane records that an out-of-line call to this function left the whole lane
+// loop scalar, and flatten was added to force the call site open. It does force it open, and the
+// loop was still scalar afterwards: cvfem_limiter_record updates its counters under
+// `#pragma omp atomic`, and an atomic inside a `#pragma omp simd` body is a barrier no amount of
+// inlining removes. Measured on the emitted object, the higher-order lane kernel held zero vector
+// FP instructions against 937 scalar ones -- for every limiter including the unlimited arm, which
+// records just as the others do -- while the first-order kernel beside it was 384 vector against
+// one scalar. A diagnostic nobody had switched on was costing the correction its vectorisation.
+//
+// So the sink is selected at compile time, not by the runtime `stats != nullptr` the SIMD path was
+// passing. That is the same correction the band and the HO flag above already carry, for the same
+// stated reason -- a sweep-uniform test inside the vectorised body -- and this call site is the
+// one that was missed. The scalar sweep instantiates STATS=true and keeps the diagnostic
+// unchanged; the lane-blocked sweep instantiates STATS=false and the atomics are not emitted.
+template <int STRIDE, int LIM, bool STATS, typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_scs_defcor(
+        // The element's node-surface increments, as cvfem_hex8_defcor_ref_increments leaves them.
+        const scalar_t *const SFEM_RESTRICT inc,
+        const scalar_t *const SFEM_RESTRICT ux,
+        const scalar_t *const SFEM_RESTRICT uy,
+        const scalar_t *const SFEM_RESTRICT uz,
+        // The surface's direction group and its two nodes.
+        const int d, const int i, const int j,
+        // The upwind split the flux used, handed in rather than recovered from the mass flux a
+        // second time: the correction is weighted by the flux actually transported.
+        const scalar_t mpos, const scalar_t mneg,
+        // Venkatakrishnan's eps^2 for this direction group; read by that arm only.
+        const scalar_t veps2,
+        Hex8LimiterStats *const stats,
+        const int off,
+        scalar_t &dfx, scalar_t &dfy, scalar_t &dfz) {
+    // Node `a`'s slot, and the increment of component `c` at node `a`'s surface of direction
+    // `d`, in whichever layout the caller holds. One place decides the addressing so no reader
+    // has to spell it again.
+    const auto at = [off](const scalar_t *const SFEM_RESTRICT v, const int a) -> scalar_t {
+        return v[a * STRIDE + off];
+    };
+    const auto inc_at = [inc, off, d](const int a, const int c) -> scalar_t {
+        return inc[(a * 9 + c * 3 + d) * STRIDE + off];
+    };
+
+    // One component's pair of increments, limited together.
+    //
+    // limiter = 0: none. Correct for a smooth field and the right thing for measuring what
+    //              the reconstruction is worth, wrong anywhere a discontinuity can form.
+    // limiter = 1: bounded face. The reconstructed face value is clipped into
+    //              [min(u_i,u_j), max(u_i,u_j)], so the face can introduce no value outside
+    //              the range its own two nodes already span, and the correction vanishes
+    //              where it would. This is local -- no neighbour stencil, no extra pass --
+    //              and it needs no differentiability, because under deferred correction the
+    //              limiter never enters the Jacobian. Its known cost is that it also clips
+    //              at a SMOOTH extremum, where the true face value legitimately lies outside
+    //              the nodal range; that is the classic Barth-Jespersen weakness and it is
+    //              why the unlimited arm is kept and measured beside it.
+    //
+    //              THE CLAIM THAT IT NEEDS NO DIFFERENTIABILITY IS WRONG, and the paragraph
+    //              above records why it looked right: the limiter is indeed absent from the
+    //              Jacobian. But the deferred correction is a LAGGED term, so the Newton
+    //              loop is also a fixed-point iteration on it, and that iteration has to
+    //              settle. The clip is continuous with a derivative that jumps between 0 and
+    //              1 as the active branch flips, so the lagged source can flip with it and
+    //              the iteration chatters instead of converging. Measured on the step case
+    //              at 7,060 dof, Re = 40: first order converges in 14 Newton steps, the same
+    //              cell with this limiter ran 399 Newton steps and 103,441 linear iterations
+    //              without converging. This is the failure Venkatakrishnan describes above
+    //              -- the limiter "does not settle down" and "inhibits convergence to steady
+    //              state" -- and the requirement he states, a differentiable limiter when
+    //              Newton is used, applies to the deferred correction as much as to a fully
+    //              coupled one.
+    // limiter = 2: Venkatakrishnan's smooth form of the same bound, which is what he
+    //              proposes for exactly this reason. Write D- for the increment being
+    //              limited and D+ for the room the bound leaves it -- max(u_i,u_j) - u_i
+    //              when the increment is positive, min(u_i,u_j) - u_i when it is negative --
+    //              and scale the increment by
+    //
+    //                  psi = (D+^2 + 2 D- D+) / (D+^2 + 2 D-^2 + D- D+).
+    //
+    //              psi -> 1 as D- -> 0, so a small increment is not touched; psi -> D+/D- as
+    //              D- grows, so a large one saturates at the same bound the clip enforces;
+    //              psi = 0 when there is no room at all. It is rational in both arguments
+    //              with a strictly positive denominator, so it has no active set to flip.
+    //              The price is Venkatakrishnan's own: at D- = D+, where the clip would pass
+    //              the increment through untouched, psi = 3/4 -- the bound is approached
+    //              smoothly rather than met exactly, so this arm is slightly more diffusive
+    //              than limiter = 1 wherever the reconstruction is near its limit.
+    //
+    //              His epsilon^2 term, which deactivates the limiter outright in near-
+    //              constant regions, is NOT included: it is dimensional in the solution
+    //              variable and there is no velocity scale in this signature to form it
+    //              from. Without it the limiter stays active everywhere, which costs
+    //              accuracy at smooth extrema but cannot reintroduce a switch.
+    //
+    // MEASURED, AND NEITHER LIMITER IS USABLE YET. On the step at Re = 40, unlimited reaches
+    // the target in 24 Newton steps at 7,060 dof and 18 at 47,268; the clip stalls at Re
+    // 14.04 and the smooth form at Re 21.92, and on the finer mesh at 3.51 and 5.32. So
+    // smoothing the switch is worth a consistent factor of about 1.5 and nothing more, and
+    // the default is 0 because 0 is what converges.
+    //
+    // The factor of four between the meshes is the diagnosis. It is a limiter property --
+    // unlimited converges on both -- and it says what is wrong with the BOUND rather than
+    // with its smoothness: [min(u_i,u_j), max(u_i,u_j)] is a two-node interval that collapses
+    // as h -> 0, while the reconstruction it is asked to contain does not collapse with it.
+    // The sub-control surface's centroid is offset from the edge, so on an edge lying along
+    // the flow -- most of the edges in a channel core -- u_i and u_j agree to round-off while
+    // the true face value legitimately differs from both in the transverse direction. The
+    // limiter then clips a correction that was right, and which of the two bounds it clips to
+    // is decided by round-off in u_i - u_j. Refining widens the region where that is true,
+    // which is the h^-2.
+    //
+    // Venkatakrishnan's epsilon^2 addresses exactly those near-constant regions and is the
+    // obvious next thing to try, but it is unlikely to be the whole answer on its own: his
+    // epsilon^2 = (K dx)^3 is below O(h^2) and so vanishes against a smooth field's own
+    // Delta^2, leaving the ee = 0 behaviour -- psi = 3/4 where the clip passes the increment
+    // through -- across most of the mesh. The bound itself is what is too narrow, and the
+    // standard remedy is Barth and Jespersen's actual bound, taken over ALL neighbours of the
+    // node rather than over the two nodes of one edge. That needs a per-node min/max pass,
+    // which is a new sweep this file does not have and which the deferred correction's
+    // existing nodal-gradient pass could carry.
+    //
+    // AND THE LITERATURE DOES NOT AGREE THAT THIS IS THE REMEDY, checked after the paragraph
+    // above was written. Nalu and Nalu-Wind run the same discretisation -- median-dual CVFEM,
+    // Rhie-Chow, projected nodal gradients -- and their higher-order upwind is this file's
+    // reconstruction to the letter, phi_L + d_L . grad phi_L. Their limiter is van Leer
+    // applied to the extrapolated value on a ONE-DIMENSIONAL stencil of the two adjacent
+    // nodes, not a min/max over a node's neighbours. The canonical way to put a TVD limiter
+    // on an unstructured grid is Darwish and Moukalled (2003): reconstruct a virtual upwind
+    // node phi_U = phi_C - 2 grad phi_C . d, form r = (phi_C - phi_U)/(phi_D - phi_C), and the
+    // whole NVD/TVD family then applies unchanged. That is what the one-dimensional stencil
+    // is, and it needs no extra sweep.
+    //
+    // Two further things that search turned up and that matter more than the choice of
+    // limiter. Nalu does not select between upwind and central at all: it blends them by cell
+    // Peclet number, phi_ip = eta phi_upw + (1 - eta) phi_central. And for VELOCITY its tanh
+    // blend is centred at Peclet 50,000 with width 200, against 2 and 1 for every other
+    // scalar -- so at any Peclet a real flow reaches, eta is zero and the momentum equations
+    // run essentially unstabilised central, with upwinding reserved for scalars. This kernel
+    // applies first-order donor-cell to momentum unconditionally and has no Peclet dependence
+    // anywhere, which is a larger gap than the limiter is.
+    //
+    // For the convergence failure specifically, the named remedy is LIMITER FREEZING:
+    // precompute the limited values from a predictor and hold them fixed through the
+    // iterations. It fits the deferred correction, which already lags per Newton step; it
+    // would freeze per continuation stage instead of recomputing per residual. The same
+    // sources note that a limiter's contribution to an implicit Jacobian cannot readily be
+    // evaluated, which is the reason deferred correction is the right structure here and the
+    // Jacobian stays first-order -- the paragraph above got the consequence of that wrong,
+    // not the structure.
+    // limiter = 3: Darwish and Moukalled's virtual upwind node, the arm that does not use a
+    //              bound at all. See cvfem_venkata_limiter.hpp, which is where every arm's
+    //              formula lives -- this kernel selects between them and owns none of them,
+    //              so an arm cannot drift from the one it is meant to be a term away from.
+    auto lim = [&](const scalar_t *const u, const scalar_t inc_i, const scalar_t inc_j,
+                   scalar_t &oi, scalar_t &oj) {
+        oi = inc_i;
+        oj = inc_j;
+        const scalar_t a  = at(u, i), b = at(u, j);
+        const scalar_t lo = a < b ? a : b;
+        const scalar_t hi = a < b ? b : a;
+        if constexpr (LIM == 3) {
+            oi = cvfem_darwish_moukalled_inc(a, b, inc_i);
+            oj = cvfem_darwish_moukalled_inc(b, a, inc_j);
+        } else if constexpr (LIM == 1) {
+            oi = cvfem_limiter_clip_inc(a, inc_i, lo, hi);
+            oj = cvfem_limiter_clip_inc(b, inc_j, lo, hi);
+        } else if constexpr (LIM == 2) {
+            oi = cvfem_venkata_inc(a, inc_i, lo, hi, veps2);
+            oj = cvfem_venkata_inc(b, inc_j, lo, hi, veps2);
+        }
+        // Recorded for EVERY arm including limiter 0, because the count that matters is how
+        // often the unlimited reconstruction leaves the bound -- that is a property of the
+        // case, not of the arm, and it is what says whether a case can test a limiter at all.
+        if constexpr (STATS) {
+            cvfem_limiter_record(stats, a, inc_i, oi, lo, hi);
+            cvfem_limiter_record(stats, b, inc_j, oj, lo, hi);
+        } else {
+            (void)stats;
+        }
+    };
+
+    scalar_t ii, jj;
+    lim(ux, inc_at(i, 0), inc_at(j, 0), ii, jj);
+    dfx = mpos * ii + mneg * jj;
+    lim(uy, inc_at(i, 1), inc_at(j, 1), ii, jj);
+    dfy = mpos * ii + mneg * jj;
+    lim(uz, inc_at(i, 2), inc_at(j, 2), ii, jj);
+    dfz = mpos * ii + mneg * jj;
+}
+
+// The deferred correction's DIRECTIONAL DERIVATIVE, which is what an exact Jacobian action needs.
+//
+// Structurally a mirror of cvfem_hex8_scs_defcor above, line for line, and deliberately so: the
+// two have to be the same term and its derivative, and the cheapest way to keep them that way is
+// to be able to read them side by side. Everything geometric -- the centroid, the two
+// node-to-centroid vectors, Venkatakrishnan's eps^2 -- is constant in the direction and carries
+// no derivative.
+//
+// What is NOT constant, and is the whole reason this costs more than the lagged action, is the
+// nodal velocity gradient: the reconstruction reads grad(u) at the donor, so the derivative reads
+// grad(v) there, and grad(v) has to be reconstructed from the direction by its own pass before
+// this kernel can run. `gv` is that field.
+// LIM IS A TEMPLATE PARAMETER, not the runtime int the residual's twin takes, and the difference
+// is worth 2x. This is called from inside a `#pragma omp simd` lane loop, and a runtime limiter
+// puts a three-way select there for every velocity component of every surface -- the same shape
+// of sweep-uniform guard this file has already measured at 1.83x, and the reason the residual's
+// higher-order path ships eight generated kernels selected outside the loop rather than one
+// taking the limiter as an argument. Measured before this was templated: the correction's
+// derivative added 27.7 ms to the packed matvec against 13.5 ms to the atomic scalar one, for
+// identical arithmetic.
+template <int STRIDE, int LIM, typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_scs_defcor_jv(
+        // The state's node-surface increments and the direction's, both as
+        // cvfem_hex8_defcor_ref_increments leaves them: the increment reads grad(u) at the donor,
+        // so its derivative reads grad(v) there, and grad(v) is reconstructed from the direction
+        // by its own pass before this kernel can run.
+        const scalar_t *const SFEM_RESTRICT inc,
+        const scalar_t *const SFEM_RESTRICT dinc,
+        const scalar_t *const SFEM_RESTRICT ux,
+        const scalar_t *const SFEM_RESTRICT uy,
+        const scalar_t *const SFEM_RESTRICT uz,
+        const scalar_t *const SFEM_RESTRICT vx,
+        const scalar_t *const SFEM_RESTRICT vy,
+        const scalar_t *const SFEM_RESTRICT vz,
+        const int d, const int i, const int j,
+        // The upwind split and its derivative weights, the face's own. d|m|/dm = sgn is the
+        // subgradient the first-order action already takes, so the two linearisations agree at
+        // m = 0 rather than one of them being exact there and the other not.
+        const scalar_t mpos, const scalar_t mneg, const scalar_t dpos, const scalar_t dneg,
+        const scalar_t veps2,
+        // The state's increments' rounding scales, [a*3 + c] in the same (STRIDE, off) layout;
+        // see cvfem_hex8_defcor_ref_increments. Read by the three limited arms' bands.
+        const scalar_t *const SFEM_RESTRICT isc,
+        const int off,
+        scalar_t &dfx, scalar_t &dfy, scalar_t &dfz) {
+    const auto at = [off](const scalar_t *const SFEM_RESTRICT v, const int a) -> scalar_t {
+        return v[a * STRIDE + off];
+    };
+    const auto inc_at = [inc, off, d](const int a, const int c) -> scalar_t {
+        return inc[(a * 9 + c * 3 + d) * STRIDE + off];
+    };
+    const auto isc_at = [isc, off](const int a, const int c) -> scalar_t {
+        return isc[(a * 3 + c) * STRIDE + off];
+    };
+    const auto dinc_at = [dinc, off, d](const int a, const int c) -> scalar_t {
+        return dinc[(a * 9 + c * 3 + d) * STRIDE + off];
+    };
+
+    // One component's pair of increments and their derivatives, limited together against the
+    // same interval the residual uses. The bounds are nodal values, so they carry the direction's
+    // nodal values as their derivatives -- which is the part a reader is most likely to drop.
+    //
+    // ALWAYS_INLINE, AND IT IS LOAD-BEARING. This is called three times per sub-control surface,
+    // once per velocity component, so thirty-six times per element from inside the `#pragma omp
+    // simd` lane loop. At LIM 2 and 3, whose derivatives are the largest expressions here, the
+    // compiler declined to inline it and left thirty-six calls to its out-of-line body in the
+    // lane loop: jv_lane_defcor_venkatakrishnan and jv_lane_defcor_darwish_moukalled emitted
+    // ZERO vector floating-point instructions, 4842 and 4559 of pure scalar, while every other
+    // lane kernel in the same gate had no calls at all. The enclosing face kernel already carries
+    // __attribute__((flatten)) for exactly this reason -- "a call inside the `#pragma omp simd`
+    // loop stops the whole loop vectorising" -- but flatten does not reach a lambda's operator()
+    // one level further in, which is how the two largest arms stayed scalar behind a gate that
+    // was watching for it.
+    const auto lim = [&](const scalar_t *const SFEM_RESTRICT u, const scalar_t *const SFEM_RESTRICT v,
+                         const int c,
+                         const scalar_t inc_i, const scalar_t inc_j,
+                         const scalar_t dinc_i, const scalar_t dinc_j,
+                         scalar_t &oi, scalar_t &oj, scalar_t &doi, scalar_t &doj)
+            __attribute__((always_inline)) {
+        oi = inc_i;  oj = inc_j;
+        doi = dinc_i; doj = dinc_j;
+        const scalar_t a  = at(u, i), b = at(u, j);
+        const scalar_t da = at(v, i), db = at(v, j);
+        const scalar_t lo = a < b ? a : b;
+        const scalar_t hi = a < b ? b : a;
+        const scalar_t dlo = a < b ? da : db;
+        const scalar_t dhi = a < b ? db : da;
+        // Value and derivative from ONE call per increment, sharing one reciprocal: see the
+        // note above the derivatives in cvfem_venkata_limiter.hpp for what the separate calls
+        // cost in divisions.
+        if constexpr (LIM == 3) {
+            cvfem_darwish_moukalled_inc_and_d(a, b, inc_i, da, db, dinc_i, isc_at(i, c), oi, doi);
+            cvfem_darwish_moukalled_inc_and_d(b, a, inc_j, db, da, dinc_j, isc_at(j, c), oj, doj);
+        } else if constexpr (LIM == 1) {
+            cvfem_limiter_clip_inc_and_d(a, inc_i, lo, hi, da, dinc_i, dlo, dhi, isc_at(i, c), oi, doi);
+            cvfem_limiter_clip_inc_and_d(b, inc_j, lo, hi, db, dinc_j, dlo, dhi, isc_at(j, c), oj, doj);
+        } else if constexpr (LIM == 2) {
+            cvfem_venkata_inc_and_d(a, inc_i, lo, hi, veps2, da, dinc_i, dlo, dhi, isc_at(i, c), oi, doi);
+            cvfem_venkata_inc_and_d(b, inc_j, lo, hi, veps2, db, dinc_j, dlo, dhi, isc_at(j, c), oj, doj);
+        } else {
+            (void)c;
+        }
+    };
+
+    scalar_t ii, jj, dii, djj;
+    lim(ux, vx, 0, inc_at(i, 0), inc_at(j, 0), dinc_at(i, 0), dinc_at(j, 0), ii, jj, dii, djj);
+    dfx = dpos * ii + mpos * dii + dneg * jj + mneg * djj;
+    lim(uy, vy, 1, inc_at(i, 1), inc_at(j, 1), dinc_at(i, 1), dinc_at(j, 1), ii, jj, dii, djj);
+    dfy = dpos * ii + mpos * dii + dneg * jj + mneg * djj;
+    lim(uz, vz, 2, inc_at(i, 2), inc_at(j, 2), dinc_at(i, 2), dinc_at(j, 2), ii, jj, dii, djj);
+    dfz = dpos * ii + mpos * dii + dneg * jj + mneg * djj;
+}
+
+template <typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_scs_convection(const scalar_t rho,
+                                                  const scalar_t ux_i,
+                                                  const scalar_t ux_j,
+                                                  const scalar_t uy_i,
+                                                  const scalar_t uy_j,
+                                                  const scalar_t uz_i,
+                                                  const scalar_t uz_j,
+                                                  const scalar_t p_i,
+                                                  const scalar_t p_j,
+                                                  const scalar_t ax,
+                                                  const scalar_t ay,
+                                                  const scalar_t az,
+                                                  scalar_t      &fx,
+                                                  scalar_t      &fy,
+                                                  scalar_t      &fz,
+                                                  scalar_t      &mdot,
+                                                  const scalar_t mdot_rc = scalar_t(0),
+                                               const scalar_t ueps = scalar_t(0),
+                                               // Cell-Peclet blending. The node separation and
+                                               // the kinematic viscosity, plus the blend's
+                                               // configuration; the default config has form 0,
+                                               // so eta is 1 and this kernel is what it was.
+                                               const scalar_t dx = scalar_t(0),
+                                               const scalar_t dy = scalar_t(0),
+                                               const scalar_t dz = scalar_t(0),
+                                               const scalar_t nu = scalar_t(0),
+                                               const Hex8PecletConfig<scalar_t> &pcfg = {}) {
+    const scalar_t adv_x = scalar_t(0.5) * (ux_i + ux_j);
+    const scalar_t adv_y = scalar_t(0.5) * (uy_i + uy_j);
+    const scalar_t adv_z = scalar_t(0.5) * (uz_i + uz_j);
+    mdot                 = rho * (adv_x * ax + adv_y * ay + adv_z * az) + mdot_rc;
+    scalar_t amdot, sgn;
+    cvfem_upwind_abs(mdot, ueps, amdot, sgn);
+    // One multiplication, and it is the whole blend: the flux is central plus
+    // |m|(u_i - u_j)/2, so scaling |m| by eta interpolates between upwind at eta = 1 and pure
+    // central at eta = 0 without touching anything else. The advecting velocity is already
+    // averaged across the face above, which is exactly what the Peclet number wants.
+    amdot *= cvfem_hex8_peclet_eta(pcfg, adv_x * dx + adv_y * dy + adv_z * dz, nu);
+    const scalar_t mpos  = scalar_t(0.5) * (mdot + amdot);
+    const scalar_t mneg  = scalar_t(0.5) * (mdot - amdot);
+    const scalar_t pmid  = scalar_t(0.5) * (p_i + p_j);
+    fx                   = mpos * ux_i + mneg * ux_j + pmid * ax;
+    fy                   = mpos * uy_i + mneg * uy_j + pmid * ay;
+    fz                   = mpos * uz_i + mneg * uz_j + pmid * az;
+}
+
+template <bool Atomic, typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_acc(scalar_t &x, const scalar_t v) {
+    if constexpr (Atomic) {
+        CVFEM_ATOMIC_ADD(x, v);
+    } else {
+        x += v;
+    }
+}
+
+// A negative slot means "this block is not being assembled" and the write is dropped.
+// That is what lets a diagonal-only assembly reuse the full element kernel unchanged:
+// pass a slot array with -1 everywhere off the diagonal and the same code produces the
+// block diagonal, with none of the off-diagonal write traffic. Slots are non-negative on
+// every other path, so the branch is perfectly predicted there.
+template <bool Atomic, typename Slot, typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_bsr_acc(scalar_t *const SFEM_RESTRICT values,
+                                           const Slot                   slot,
+                                           const int                    rf,
+                                           const int                    cf,
+                                           const scalar_t               v) {
+    if (slot < 0) return;
+    cvfem_hex8_acc<Atomic>(values[(ptrdiff_t)slot * 16 + rf * 4 + cf], v);
+}
+
+template <bool Atomic, typename Slot, typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_bsr_acc_mom(scalar_t *const SFEM_RESTRICT values,
+                                               const Slot                   slot,
+                                               const scalar_t               d00,
+                                               const scalar_t               d01,
+                                               const scalar_t               d02,
+                                               const scalar_t               d10,
+                                               const scalar_t               d11,
+                                               const scalar_t               d12,
+                                               const scalar_t               d20,
+                                               const scalar_t               d21,
+                                               const scalar_t               d22) {
+    if (slot < 0) return;
+    scalar_t *const SFEM_RESTRICT blk = values + (ptrdiff_t)slot * 16;
+    cvfem_hex8_acc<Atomic>(blk[0], d00);
+    cvfem_hex8_acc<Atomic>(blk[1], d01);
+    cvfem_hex8_acc<Atomic>(blk[2], d02);
+    cvfem_hex8_acc<Atomic>(blk[4], d10);
+    cvfem_hex8_acc<Atomic>(blk[5], d11);
+    cvfem_hex8_acc<Atomic>(blk[6], d12);
+    cvfem_hex8_acc<Atomic>(blk[8], d20);
+    cvfem_hex8_acc<Atomic>(blk[9], d21);
+    cvfem_hex8_acc<Atomic>(blk[10], d22);
+}
+
+template <bool Atomic, typename Slot, typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_jac_rhie_chow_p(const scalar_t                        rho,
+                                                   const scalar_t                        mu,
+                                                   const Hex8RhieChowT<scalar_t>        &rc,
+                                                   const scalar_t                        ax,
+                                                   const scalar_t                        ay,
+                                                   const scalar_t                        az,
+                                                   const int                             i,
+                                                   const int                             j,
+                                                   const scalar_t *const SFEM_RESTRICT   ux,
+                                                   const scalar_t *const SFEM_RESTRICT   uy,
+                                                   const scalar_t *const SFEM_RESTRICT   uz,
+                                                   const scalar_t *const SFEM_RESTRICT   p,
+                                                   const Slot *const SFEM_RESTRICT       slots,
+                                                   scalar_t *const SFEM_RESTRICT         values,
+                                               const scalar_t ueps = scalar_t(0)) {
+    if (!p || !cvfem_hex8_rhie_chow_active(rc)) return;
+    const int      q_    = rc.has_ecol ? cvfem_hex8_edge_dir(i, j) : 0;
+    const scalar_t dx    = rc.has_ecol ? rc.ecol[0 * 3 + q_] : rc.x[j] - rc.x[i];
+    const scalar_t dy    = rc.has_ecol ? rc.ecol[1 * 3 + q_] : rc.y[j] - rc.y[i];
+    const scalar_t dz    = rc.has_ecol ? rc.ecol[2 * 3 + q_] : rc.z[j] - rc.z[i];
+    const scalar_t coeff = cvfem_hex8_rhie_chow_mdot_coeff(rho, mu, rc.scale, dx, dy, dz, ax, ay, az,
+                                                           cvfem_hex8_rhie_chow_u2(rc, i, j), rc.tau.inv_dt_a0);
+    if (coeff == scalar_t(0)) return;
+
+    const scalar_t half     = scalar_t(0.5);
+    const scalar_t mdot_avg = rho * half * ((ux[i] + ux[j]) * ax + (uy[i] + uy[j]) * ay + (uz[i] + uz[j]) * az);
+    const scalar_t corr     = (p[j] - p[i]) - (half * (rc.pgx[i] + rc.pgx[j]) * dx + half * (rc.pgy[i] + rc.pgy[j]) * dy +
+                                           half * (rc.pgz[i] + rc.pgz[j]) * dz);
+    const scalar_t mdot     = mdot_avg - coeff * corr;
+    scalar_t amdot, sgn;
+    cvfem_upwind_abs(mdot, ueps, amdot, sgn);
+    const scalar_t d_pos    = half * (scalar_t(1) + sgn);
+    const scalar_t d_neg    = half * (scalar_t(1) - sgn);
+    const scalar_t uup_x    = d_pos * ux[i] + d_neg * ux[j];
+    const scalar_t uup_y    = d_pos * uy[i] + d_neg * uy[j];
+    const scalar_t uup_z    = d_pos * uz[i] + d_neg * uz[j];
+    const scalar_t dmdot_i  = coeff;
+    const scalar_t dmdot_j  = -coeff;
+    cvfem_hex8_bsr_acc<Atomic>(values, slots[i * 8 + i], 3, 3, dmdot_i);
+    cvfem_hex8_bsr_acc<Atomic>(values, slots[i * 8 + j], 3, 3, dmdot_j);
+    cvfem_hex8_bsr_acc<Atomic>(values, slots[j * 8 + i], 3, 3, -dmdot_i);
+    cvfem_hex8_bsr_acc<Atomic>(values, slots[j * 8 + j], 3, 3, -dmdot_j);
+    cvfem_hex8_bsr_acc<Atomic>(values, slots[i * 8 + i], 0, 3, uup_x * dmdot_i);
+    cvfem_hex8_bsr_acc<Atomic>(values, slots[i * 8 + j], 0, 3, uup_x * dmdot_j);
+    cvfem_hex8_bsr_acc<Atomic>(values, slots[j * 8 + i], 0, 3, -uup_x * dmdot_i);
+    cvfem_hex8_bsr_acc<Atomic>(values, slots[j * 8 + j], 0, 3, -uup_x * dmdot_j);
+    cvfem_hex8_bsr_acc<Atomic>(values, slots[i * 8 + i], 1, 3, uup_y * dmdot_i);
+    cvfem_hex8_bsr_acc<Atomic>(values, slots[i * 8 + j], 1, 3, uup_y * dmdot_j);
+    cvfem_hex8_bsr_acc<Atomic>(values, slots[j * 8 + i], 1, 3, -uup_y * dmdot_i);
+    cvfem_hex8_bsr_acc<Atomic>(values, slots[j * 8 + j], 1, 3, -uup_y * dmdot_j);
+    cvfem_hex8_bsr_acc<Atomic>(values, slots[i * 8 + i], 2, 3, uup_z * dmdot_i);
+    cvfem_hex8_bsr_acc<Atomic>(values, slots[i * 8 + j], 2, 3, uup_z * dmdot_j);
+    cvfem_hex8_bsr_acc<Atomic>(values, slots[j * 8 + i], 2, 3, -uup_z * dmdot_i);
+    cvfem_hex8_bsr_acc<Atomic>(values, slots[j * 8 + j], 2, 3, -uup_z * dmdot_j);
+
+}
+
+template <bool Atomic, typename Slot, typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_jacobian_add_rhie_chow(const scalar_t                        rho,
+                                                                    const scalar_t                        mu,
+                                                                    const scalar_t *const SFEM_RESTRICT   adj,
+                                                                    const Hex8RhieChowT<scalar_t>        &rc,
+                                                                    const scalar_t *const SFEM_RESTRICT   ux,
+                                                                    const scalar_t *const SFEM_RESTRICT   uy,
+                                                                    const scalar_t *const SFEM_RESTRICT   uz,
+                                                                    const scalar_t *const SFEM_RESTRICT   p,
+                                                                    const Slot *const SFEM_RESTRICT       slots,
+                                                                    scalar_t *const SFEM_RESTRICT         values) {
+    if (!p || !cvfem_hex8_rhie_chow_active(rc)) return;
+    scalar_t A[3][3];
+    cvfem_hex8_dir_areas(adj, A);
+    for (int s = 0; s < CVFEM_HEX8_N_SCS; ++s) {
+        const int d = s >> 2;
+        cvfem_hex8_jac_rhie_chow_p<Atomic>(rho,
+                                           mu,
+                                           rc,
+                                           A[d][0],
+                                           A[d][1],
+                                           A[d][2],
+                                           CVFEM_HEX8_SCS[s].i,
+                                           CVFEM_HEX8_SCS[s].j,
+                                           ux,
+                                           uy,
+                                           uz,
+                                           p,
+                                           slots,
+                                           values);
+    }
+}
+
+template <bool Atomic, typename Slot, typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_jac_conv_face(const scalar_t                        rho,
+                                                 const scalar_t                        ax,
+                                                 const scalar_t                        ay,
+                                                 const scalar_t                        az,
+                                                 const int                             i,
+                                                 const int                             j,
+                                                 const scalar_t *const SFEM_RESTRICT   ux,
+                                                 const scalar_t *const SFEM_RESTRICT   uy,
+                                                 const scalar_t *const SFEM_RESTRICT   uz,
+                                                 const Slot *const SFEM_RESTRICT       slots,
+                                                 scalar_t *const SFEM_RESTRICT         values,
+                                                 const scalar_t                        mdot_rc = scalar_t(0),
+                                                 const scalar_t                        ueps    = scalar_t(0),
+                                                 const scalar_t                        kx      = scalar_t(0),
+                                                 const scalar_t                        ky      = scalar_t(0),
+                                                 const scalar_t                        kz      = scalar_t(0));
+
+// ---------------------------------------------------------------------------
+// Split assembly: the Jacobian's viscous, geometry-only part does not change between
+// Newton iterations, so there is no reason to rebuild it every time.
+//
+//   d(viscous)/du  depends on adj, det and mu only -- constant for a fixed mesh.
+//   d(convection)/du and the Rhie-Chow terms depend on the current velocity.
+//
+// The viscous half writes all 64 blocks of the element matrix (the dense 8x8 node
+// coupling, momentum-momentum 3x3 each); the convective half writes only the blocks
+// touched by the 12 sub-control surfaces. So the constant half is also the larger half
+// of the write traffic, which is what makes this worth splitting.
+
+// The 32 element-local node pairs whose block the convection also writes, each with the
+// direction that makes it so: -1 for a diagonal pair, otherwise the axis of the hex edge.
+//
+// The direction matters because convection does not write the whole momentum 3x3 of an
+// edge block -- only column d, since the sub-control surface's area vector points along
+// d. Measured, per element: convection touches all 9 momentum entries of a diagonal
+// block but only 3 of an edge block. So the viscous half that must be rebuilt each
+// iteration is 8*9 + 24*3 = 144 entries, not 32*9 = 288.
+#define CVFEM_HEX8_RECOMPUTED_PAIRS_INIT { \
+        {0,0,-1},{1,1,-1},{2,2,-1},{3,3,-1},{4,4,-1},{5,5,-1},{6,6,-1},{7,7,-1}, \
+        {0,1,0},{1,0,0},{3,2,0},{2,3,0},{4,5,0},{5,4,0},{7,6,0},{6,7,0}, \
+        {0,3,1},{3,0,1},{1,2,1},{2,1,1},{4,7,1},{7,4,1},{5,6,1},{6,5,1}, \
+        {0,4,2},{4,0,2},{1,5,2},{5,1,2},{2,6,2},{6,2,2},{3,7,2},{7,3,2}}
+static constexpr int CVFEM_HEX8_N_RECOMPUTED_PAIRS = 32;
+#if defined(__CUDACC__)
+static SFEM_INLINE SFEM_HOST_DEVICE const int (&cvfem_hex8_recomputed_pairs_tbl())[32][3] {
+    static constexpr int t[32][3] = CVFEM_HEX8_RECOMPUTED_PAIRS_INIT;
+    return t;
+}
+#define CVFEM_HEX8_RECOMPUTED_PAIRS cvfem_hex8_recomputed_pairs_tbl()
+#else
+static constexpr int CVFEM_HEX8_RECOMPUTED_PAIRS[32][3] = CVFEM_HEX8_RECOMPUTED_PAIRS_INIT;
+#endif
+
+// Does the convection write momentum entry (r,c) of this pair? dir < 0 means a diagonal
+// pair, where it writes all nine.
+static SFEM_INLINE SFEM_HOST_DEVICE bool cvfem_hex8_conv_writes(const int dir, const int c) {
+    return dir < 0 || c == dir;
+}
+
+// Which element-local node pairs (i,k) land in a block the velocity-dependent half
+// also writes? Exactly the pairs the 12 sub-control surfaces couple: i == k, or (i,k) an
+// edge of the hex. 32 of the 64 local blocks.
+//
+// This is what lets the split work with ONE matrix instead of two: those blocks are
+// zeroed and fully recomputed each iteration (viscous + convection), while the other 32
+// keep the viscous values written once at setup and are never touched again.
+static SFEM_INLINE SFEM_HOST_DEVICE bool cvfem_hex8_pair_is_recomputed(const int i, const int k) {
+    if (i == k) return true;
+    for (int s = 0; s < CVFEM_HEX8_N_SCS; ++s) {
+        const int a = CVFEM_HEX8_SCS[s].i, b = CVFEM_HEX8_SCS[s].j;
+        if ((i == a && k == b) || (i == b && k == a)) return true;
+    }
+    return false;
+}
+
+template <typename scalar_t>
+static SFEM_INLINE void cvfem_hex8_zero_residual_pack(Hex8ResidualPackT<scalar_t> &out) {
+    std::memset(&out, 0, sizeof(out));
+}
+
+template <int I0, int J0, int I1, int J1, int I2, int J2, int I3, int J3, typename scalar_t>
+static SFEM_INLINE void cvfem_hex8_visc_dir_simd(const scalar_t                      mu,
+                                                 const scalar_t *const SFEM_RESTRICT g00,
+                                                 const scalar_t *const SFEM_RESTRICT g01,
+                                                 const scalar_t *const SFEM_RESTRICT g02,
+                                                 const scalar_t *const SFEM_RESTRICT g10,
+                                                 const scalar_t *const SFEM_RESTRICT g11,
+                                                 const scalar_t *const SFEM_RESTRICT g12,
+                                                 const scalar_t *const SFEM_RESTRICT g20,
+                                                 const scalar_t *const SFEM_RESTRICT g21,
+                                                 const scalar_t *const SFEM_RESTRICT g22,
+                                                 const scalar_t *const SFEM_RESTRICT Ax,
+                                                 const scalar_t *const SFEM_RESTRICT Ay,
+                                                 const scalar_t *const SFEM_RESTRICT Az,
+                                                 Hex8ResidualPackT<scalar_t>                   &out) {
+#pragma omp simd
+    for (int lane = 0; lane < cvfem_hex8_vec_size<scalar_t>; ++lane) {
+        const scalar_t ax = Ax[lane];
+        const scalar_t ay = Ay[lane];
+        const scalar_t az = Az[lane];
+        const scalar_t tx = mu * ((scalar_t(2) * g00[lane]) * ax + (g01[lane] + g10[lane]) * ay +
+                                  (g02[lane] + g20[lane]) * az);
+        const scalar_t ty = mu * ((g10[lane] + g01[lane]) * ax + (scalar_t(2) * g11[lane]) * ay +
+                                  (g12[lane] + g21[lane]) * az);
+        const scalar_t tz = mu * ((g20[lane] + g02[lane]) * ax + (g21[lane] + g12[lane]) * ay +
+                                  (scalar_t(2) * g22[lane]) * az);
+        out.rx[I0][lane] -= tx;
+        out.ry[I0][lane] -= ty;
+        out.rz[I0][lane] -= tz;
+        out.rx[J0][lane] += tx;
+        out.ry[J0][lane] += ty;
+        out.rz[J0][lane] += tz;
+        out.rx[I1][lane] -= tx;
+        out.ry[I1][lane] -= ty;
+        out.rz[I1][lane] -= tz;
+        out.rx[J1][lane] += tx;
+        out.ry[J1][lane] += ty;
+        out.rz[J1][lane] += tz;
+        out.rx[I2][lane] -= tx;
+        out.ry[I2][lane] -= ty;
+        out.rz[I2][lane] -= tz;
+        out.rx[J2][lane] += tx;
+        out.ry[J2][lane] += ty;
+        out.rz[J2][lane] += tz;
+        out.rx[I3][lane] -= tx;
+        out.ry[I3][lane] -= ty;
+        out.rz[I3][lane] -= tz;
+        out.rx[J3][lane] += tx;
+        out.ry[J3][lane] += ty;
+        out.rz[J3][lane] += tz;
+    }
+}
+
+// FLATTEN, and it is load-bearing rather than decoration. The higher-order reconstruction is
+// marked always_inline, and both compilers ignore it here: clang emits an out-of-line
+// cvfem_hex8_scs_defcor<16> and gcc a .constprop clone, and both then CALL it from inside this
+// function's `#pragma omp simd` loop. A loop containing a call does not vectorise, so the whole
+// lane loop -- the flux as well as the correction -- was running scalar. That is why removing
+// the per-lane gather bought only 7.5%: the gather was real, but it was not what was stopping
+// the vectorisation. flatten forces the call site open so the loop body is straight-line again.
+// One face of the convective residual, for ONE lane. The lane loop lives in the caller so that
+// all twelve faces can share it, which is what cvfem_hex8_conv_all_simd does and why it is worth
+// +4%. The Jacobian's face kernel is split the same way and reached the opposite answer.
+template <int I, int J, int S, bool RC = false, bool EPS = false, bool HO = false, int LIM = 0,
+          typename scalar_t = ::scalar_t>
+static SFEM_INLINE __attribute__((flatten)) void cvfem_hex8_conv_face_lane(const int lane,
+                                                  const scalar_t rho,
+                                                  const scalar_t                      mu,
+                                                  const scalar_t                      rc_scale,
+                                                  const scalar_t                      half,
+                                                  const scalar_t *const SFEM_RESTRICT Ax,
+                                                  const scalar_t *const SFEM_RESTRICT Ay,
+                                                  const scalar_t *const SFEM_RESTRICT Az,
+                                                  const Hex8InputPackT<scalar_t>                &in,
+                                                  const Hex8RhieChowPackT<scalar_t>             *rc,
+                                                  scalar_t                           &ofx,
+                                                  scalar_t                           &ofy,
+                                                  scalar_t                           &ofz,
+                                                  scalar_t                           &odm,
+                                               const scalar_t ueps,
+                                               const Hex8UGradPackT<scalar_t> *const ho,
+                                               // Venkatakrishnan's eps^2 per direction group,
+                                               // veps2[d * VEC + lane], built once per element
+                                               // batch by the dispatcher; that arm reads one.
+                                               const scalar_t *const SFEM_RESTRICT veps2,
+                                               // The three affine edge vectors, indexed by
+                                               // direction: see cvfem_hex8_affine_edge_cols.
+                                               const scalar_t *const SFEM_RESTRICT edx,
+                                               const scalar_t *const SFEM_RESTRICT edy,
+                                               const scalar_t *const SFEM_RESTRICT edz) {
+    if constexpr (!RC) {
+        (void)mu;
+        (void)rc_scale;
+        (void)rc;
+    }
+    if constexpr (!RC) {
+        (void)edx;
+        (void)edy;
+        (void)edz;
+    }
+    if constexpr (!HO) {
+        (void)veps2;
+    }
+    const scalar_t ax    = Ax[lane];
+    const scalar_t ay    = Ay[lane];
+    const scalar_t az    = Az[lane];
+    const scalar_t adv_x = half * (in.ux[I][lane] + in.ux[J][lane]);
+    const scalar_t adv_y = half * (in.uy[I][lane] + in.uy[J][lane]);
+    const scalar_t adv_z = half * (in.uz[I][lane] + in.uz[J][lane]);
+    scalar_t       mdot  = rho * (adv_x * ax + adv_y * ay + adv_z * az);
+    if constexpr (RC) {
+        // The four surfaces of a direction group share one edge vector on the affine path, so
+        // S/4 -- a compile-time constant -- selects it and no coordinate is loaded at all. The
+        // isoparametric residual is a separate kernel and still differences true coordinates,
+        // which is what varying geometry requires.
+        const scalar_t dx    = edx[(S / 4) * cvfem_hex8_vec_size<scalar_t> + lane];
+        const scalar_t dy    = edy[(S / 4) * cvfem_hex8_vec_size<scalar_t> + lane];
+        const scalar_t dz    = edz[(S / 4) * cvfem_hex8_vec_size<scalar_t> + lane];
+        const scalar_t coeff = cvfem_hex8_rhie_chow_mdot_coeff(
+                rho, mu, rc_scale, dx, dy, dz, ax, ay, az,
+                rc->tau.u2_scale * (adv_x * adv_x + adv_y * adv_y + adv_z * adv_z),
+                rc->tau.inv_dt_a0);
+        const scalar_t corr =
+                (in.p[J][lane] - in.p[I][lane]) -
+                (half * (rc->pgx[I][lane] + rc->pgx[J][lane]) * dx +
+                 half * (rc->pgy[I][lane] + rc->pgy[J][lane]) * dy +
+                 half * (rc->pgz[I][lane] + rc->pgz[J][lane]) * dz);
+        mdot -= coeff * corr;
+    }
+    scalar_t amdot, sgn;
+    // A literal zero when the band is off, so cvfem_upwind_abs's branch folds and
+    // this loop keeps vectorising. A runtime zero would leave the compare in the
+    // SIMD body, which is the shape of guard that cost 1.83x here when the
+    // Rhie-Chow coefficient carried one -- see Hex8RhieChowPack::coeff.
+    cvfem_upwind_abs<EPS>(mdot, ueps, amdot, sgn);
+    const scalar_t mpos = half * (mdot + amdot);
+    const scalar_t mneg = half * (mdot - amdot);
+    const scalar_t pmid = half * (in.p[I][lane] + in.p[J][lane]);
+    const scalar_t fx   = mpos * in.ux[I][lane] + mneg * in.ux[J][lane] + pmid * ax;
+    const scalar_t fy   = mpos * in.uy[I][lane] + mneg * in.uy[J][lane] + pmid * ay;
+    const scalar_t fz   = mpos * in.uz[I][lane] + mneg * in.uz[J][lane] + pmid * az;
+    // DEFERRED CORRECTION, in the SIMD path. Only the momentum flux is corrected; the
+    // continuity row and mdot are untouched, which is what keeps the Jacobian first-order.
+    //
+    // The reconstruction is the SAME cvfem_hex8_scs_defcor the scalar sweep calls -- one
+    // implementation of the arithmetic and the limiters, so they cannot drift -- reading the
+    // lane-major packs IN PLACE through its (STRIDE=VEC_SIZE, off=lane) instantiation. There
+    // is no gather: g[a][c][lane] over varying lane is contiguous, so each read is a
+    // unit-stride vector load. The earlier version gathered this lane's 96 inputs into flat
+    // locals here, inside the loop and therefore once per FACE rather than once per element,
+    // and it measured slower than not vectorising at all -- 500 against 659 MDOF/s.
+    //
+    // The pack holds the node-surface INCREMENTS by the time this runs -- the dispatcher
+    // rewrites the staged gradient in place once per element batch -- so what is left per face
+    // is the limiter and the flux weighting; see cvfem_hex8_defcor_ref_increments.
+    //
+    // HO is a template flag rather than the `if (ho)` this used to be, for the reason the
+    // band above is one: a sweep-uniform pointer test inside the vectorised body is the
+    // shape of guard that cost 1.83x here once already.
+    scalar_t hx = scalar_t(0), hy = scalar_t(0), hz = scalar_t(0);
+    if constexpr (HO) {
+        cvfem_hex8_scs_defcor<cvfem_hex8_vec_size<scalar_t>, LIM, false>(
+                &ho->g[0][0][0], &in.ux[0][0], &in.uy[0][0], &in.uz[0][0],
+                S / 4, I, J, mpos, mneg,
+                LIM == 2 ? veps2[(S / 4) * cvfem_hex8_vec_size<scalar_t> + lane] : scalar_t(0),
+                (Hex8LimiterStats *)nullptr, /*off=*/lane, hx, hy, hz);
+    }
+    // Handed back rather than accumulated here, so that the caller can hold a node's three face
+    // contributions in a register and store once. See cvfem_hex8_conv_all_simd.
+    ofx = fx + hx;
+    ofy = fy + hy;
+    ofz = fz + hz;
+    odm = mdot;
+}
+
+// FLATTEN for the same reason the residual face kernel carries it: with HO on this body calls
+// cvfem_hex8_scs_defcor_jv, and a call inside the `#pragma omp simd` loop stops the whole loop
+// vectorising -- the flux linearisation as well as the correction's.
+//
+// A LANE LOOP PER FACE, AND WHY THE TWELVE ARE NOT FUSED INTO ONE.
+//
+// Each of the eight nodes sits on three of the twelve sub-control surfaces -- one per direction
+// group -- so with a loop per face, a node's eight staged inputs are loaded three times over and
+// its four accumulators are read-modify-written three times. That redundancy is real, and it was
+// the last of the three optimisations left on the list for this kernel. Fusing the twelve faces
+// into one lane loop removes it: the node indices are compile-time constants over straight-line
+// code on local packs nothing else aliases, which is the shape in which the repeats can be
+// forwarded.
+//
+// Measured on Grace, 72 threads, n=128 (8,586,756 dofs), against a residual arm that runs
+// identical code in every binary and so controls for the node:
+//
+//                        per face   fused   fused, accumulating into locals
+//   jac_exact  packed       920.5   720.5 (0.78)   807.8 (0.88)
+//   jac_exact  standard     519.5   444.5 (0.86)   472.4 (0.91)
+//   jac_ho     packed       548.2   429.8 (0.78)   445.6 (0.81)
+//   jac_ho     standard     247.6   219.2 (0.89)   222.7 (0.90)
+//   residual   packed      1414.2  1429.5 (1.01)  1428.8 (1.01)   <- control, flat
+//   residual   standard     807.0   814.1 (1.01)   812.7 (1.01)   <- control, flat
+//
+// Both fused shapes lose, by 9% to 22%. Accumulating into thirty-two lane-private scalars and
+// storing each once -- which removes the ninety-six read-modify-writes by construction rather
+// than by hoping the compiler does it -- recovers some of the loss but does not close it. The
+// reading is that the redundant loads are not what this kernel is short of: they hit L1, and
+// buying them back costs a live set past thirty-two vector registers, so the compiler spills.
+// Spilling is strictly worse than the staged pack it replaces, because the pack is contiguous
+// and prefetchable and the spill slots add stores as well as loads.
+//
+// So the redundancy stays, deliberately. Do not re-derive the fusion from a load count.
+template <int S, int I, int J, bool RC = false, bool QG = false, bool EPS = false, bool HO = false,
+          int LIM = 0,
+          typename scalar_t = ::scalar_t>
+static SFEM_INLINE __attribute__((flatten)) void cvfem_hex8_conv_face_jv_simd(const scalar_t rho,
+                                                     const scalar_t                      half,
+                                                     const scalar_t                      one,
+                                                     const scalar_t *const SFEM_RESTRICT Ax,
+                                                     const scalar_t *const SFEM_RESTRICT Ay,
+                                                     const scalar_t *const SFEM_RESTRICT Az,
+                                                     const Hex8InputPackT<scalar_t>                &u,
+                                                     const Hex8InputPackT<scalar_t>                &du,
+                                                     const Hex8RhieChowPackT<scalar_t>             *rc,
+                                                     Hex8ResidualPackT<scalar_t>                   &out,
+                                               const scalar_t ueps = scalar_t(0),
+                                               // The state's nodal velocity gradient and the
+                                               // DIRECTION's, plus the centroids. Only the exact
+                                               // higher-order action reads them; the lagged one
+                                               // leaves them null and HO false.
+                                               const Hex8UGradPackT<scalar_t> *const ho = nullptr,
+                                               const Hex8UGradPackT<scalar_t> *const hov = nullptr,
+                                               const scalar_t *const SFEM_RESTRICT veps2 = nullptr,
+                                               // The state's increments' rounding scales.
+                                               const scalar_t *const SFEM_RESTRICT isc = nullptr,
+                                               // The three affine edge vectors, direction-major;
+                                               // see cvfem_hex8_affine_edge_cols.
+                                               const scalar_t *const SFEM_RESTRICT edx = nullptr,
+                                               const scalar_t *const SFEM_RESTRICT edy = nullptr,
+                                               const scalar_t *const SFEM_RESTRICT edz = nullptr) {
+    if constexpr (!RC) { (void)rc; (void)edx; (void)edy; (void)edz; }
+    if constexpr (!HO) { (void)ho; (void)hov; (void)veps2; (void)isc; }
+#pragma omp simd
+    for (int lane = 0; lane < cvfem_hex8_vec_size<scalar_t>; ++lane) {
+        const scalar_t ax    = Ax[lane];
+        const scalar_t ay    = Ay[lane];
+        const scalar_t az    = Az[lane];
+        const scalar_t adv_x = half * (u.ux[I][lane] + u.ux[J][lane]);
+        const scalar_t adv_y = half * (u.uy[I][lane] + u.uy[J][lane]);
+        const scalar_t adv_z = half * (u.uz[I][lane] + u.uz[J][lane]);
+        scalar_t       mdot  = rho * (adv_x * ax + adv_y * ay + adv_z * az);
+        scalar_t       dmdot = rho * half *
+                         ((du.ux[I][lane] + du.ux[J][lane]) * ax + (du.uy[I][lane] + du.uy[J][lane]) * ay +
+                          (du.uz[I][lane] + du.uz[J][lane]) * az);
+        if constexpr (RC) {
+            // Same affine edge vector the residual uses: the four surfaces of a direction group
+            // share one, and S/4 is a compile-time constant, so no coordinate is loaded here.
+            const scalar_t dx    = edx[(S / 4) * cvfem_hex8_vec_size<scalar_t> + lane];
+            const scalar_t dy    = edy[(S / 4) * cvfem_hex8_vec_size<scalar_t> + lane];
+            const scalar_t dz    = edz[(S / 4) * cvfem_hex8_vec_size<scalar_t> + lane];
+            const scalar_t coeff = rc->coeff[S][lane];
+            const scalar_t corr =
+                    (u.p[J][lane] - u.p[I][lane]) -
+                    (half * (rc->pgx[I][lane] + rc->pgx[J][lane]) * dx +
+                     half * (rc->pgy[I][lane] + rc->pgy[J][lane]) * dy +
+                     half * (rc->pgz[I][lane] + rc->pgz[J][lane]) * dz);
+            mdot -= coeff * corr;
+            dmdot += coeff * (du.p[I][lane] - du.p[J][lane]);
+            // Rhie-Chow differentiates through the nodal pressure-gradient reconstruction,
+            // and this is that derivative: the same shape as `corr` above, built from the
+            // direction's reconstructed gradient instead of the state's. Its absence is not
+            // visible in the residual and does not make any single Newton step fail -- it
+            // caps Newton at a LINEAR rate, and only where the continuity rows matter enough
+            // to notice. On the backward-facing step it put the Jacobian 11.7% away from a
+            // finite difference of the residual in the continuity rows (0.3% in momentum)
+            // and the solve never reached its target; the same case on the atomic layout,
+            // which has always carried this term, sits at 2.8e-13.
+            if constexpr (QG) {
+                dmdot += coeff * (half * (rc->qgx[I][lane] + rc->qgx[J][lane]) * dx +
+                                  half * (rc->qgy[I][lane] + rc->qgy[J][lane]) * dy +
+                                  half * (rc->qgz[I][lane] + rc->qgz[J][lane]) * dz);
+            }
+            // The coefficient's own velocity dependence; see cvfem_hex8_rhie_chow_coeff_du.
+            // Tabulated, not recomputed: this is three dot products and a division that do not
+            // depend on the state. See cvfem_hex8_build_rc_coeff.
+            const scalar_t w = rc->wdu[S][lane];
+            dmdot += cvfem_hex8_rhie_chow_coeff_du(coeff, w) * corr *
+                     (adv_x * half * (du.ux[I][lane] + du.ux[J][lane]) + adv_y * half * (du.uy[I][lane] + du.uy[J][lane]) +
+                      adv_z * half * (du.uz[I][lane] + du.uz[J][lane]));
+        }
+        scalar_t amdot, sgn;
+        // A literal zero when the band is off, so cvfem_upwind_abs's branch folds and
+        // this loop keeps vectorising. A runtime zero would leave the compare in the
+        // SIMD body, which is the shape of guard that cost 1.83x here when the
+        // Rhie-Chow coefficient carried one -- see Hex8RhieChowPack::coeff.
+        cvfem_upwind_abs<EPS>(mdot, ueps, amdot, sgn);
+        const scalar_t mpos  = half * (mdot + amdot);
+        const scalar_t mneg  = half * (mdot - amdot);
+        const scalar_t d_pos = half * (one + sgn);
+        const scalar_t d_neg = half * (one - sgn);
+        const scalar_t dpos  = d_pos * dmdot;
+        const scalar_t dneg  = d_neg * dmdot;
+        const scalar_t qmid  = half * (du.p[I][lane] + du.p[J][lane]);
+        const scalar_t fx =
+                dpos * u.ux[I][lane] + mpos * du.ux[I][lane] + dneg * u.ux[J][lane] + mneg * du.ux[J][lane] + qmid * ax;
+        const scalar_t fy =
+                dpos * u.uy[I][lane] + mpos * du.uy[I][lane] + dneg * u.uy[J][lane] + mneg * du.uy[J][lane] + qmid * ay;
+        const scalar_t fz =
+                dpos * u.uz[I][lane] + mpos * du.uz[I][lane] + dneg * u.uz[J][lane] + mneg * du.uz[J][lane] + qmid * az;
+        // The correction's derivative, from the same function the residual's correction comes
+        // from. It touches momentum only -- the continuity row and the mass flux are untouched by
+        // the correction, so they are untouched by its derivative too.
+        scalar_t hx = scalar_t(0), hy = scalar_t(0), hz = scalar_t(0);
+        if constexpr (HO) {
+            cvfem_hex8_scs_defcor_jv<cvfem_hex8_vec_size<scalar_t>, LIM>(
+                    &ho->g[0][0][0], &hov->g[0][0][0],
+                    &u.ux[0][0], &u.uy[0][0], &u.uz[0][0],
+                    &du.ux[0][0], &du.uy[0][0], &du.uz[0][0],
+                    S / 4, I, J, mpos, mneg, dpos, dneg,
+                    LIM == 2 ? veps2[(S / 4) * cvfem_hex8_vec_size<scalar_t> + lane] : scalar_t(0),
+                    isc, /*off=*/lane, hx, hy, hz);
+        }
+        out.rx[I][lane] += fx + hx;
+        out.ry[I][lane] += fy + hy;
+        out.rz[I][lane] += fz + hz;
+        out.rc[I][lane] += dmdot;
+        out.rx[J][lane] -= fx + hx;
+        out.ry[J][lane] -= fy + hy;
+        out.rz[J][lane] -= fz + hz;
+        out.rc[J][lane] -= dmdot;
+    }
+}
+
+template <bool RC = false, bool EPS = false, bool HO = false, int LIM = 0,
+          typename scalar_t = ::scalar_t>
+// FLATTEN HERE TOO, BECAUSE THE ONE ON THE FACE KERNEL IS NOT ENOUGH ON GCC. flatten forces a
+// function's own callees open; it does not stop that function from being outlined by ITS caller,
+// and this is the caller that owns the lane loop. Measured on Grace with gcc 13.3,
+// -fopt-info-vec-missed reports a call to "cvfem_hex8_conv_face_lane.isra" from inside the
+// `#pragma omp simd` loop below -- an IPA-SRA clone, made in spite of always_inline -- together
+// with "couldn't vectorize loop" and "control flow in loop". The result was a higher-order lane
+// kernel with ZERO vector instructions and 1506 scalar FP ones, against a first-order kernel in
+// the same object that was 100% vector; the sweep around it ran 12% vector, and the higher-order
+// residual's throughput sat at 567-766 MDOF/s against 2604 for first order. Apple clang inlines
+// it either way, which is why this needed the Grace build to see at all.
+static SFEM_INLINE __attribute__((flatten)) void cvfem_hex8_conv_all_simd(const scalar_t rho,
+                                                 const scalar_t                      mu,
+                                                 const scalar_t                      rc_scale,
+                                                 const scalar_t                      half,
+                                                 const scalar_t *const SFEM_RESTRICT Ax0,
+                                                 const scalar_t *const SFEM_RESTRICT Ay0,
+                                                 const scalar_t *const SFEM_RESTRICT Az0,
+                                                 const scalar_t *const SFEM_RESTRICT Ax1,
+                                                 const scalar_t *const SFEM_RESTRICT Ay1,
+                                                 const scalar_t *const SFEM_RESTRICT Az1,
+                                                 const scalar_t *const SFEM_RESTRICT Ax2,
+                                                 const scalar_t *const SFEM_RESTRICT Ay2,
+                                                 const scalar_t *const SFEM_RESTRICT Az2,
+                                                 const Hex8InputPackT<scalar_t>                &in,
+                                                 const Hex8RhieChowPackT<scalar_t>             *rc,
+                                                 Hex8ResidualPackT<scalar_t>                   &out,
+                                                 const scalar_t                      ueps = scalar_t(0),
+                                                 const Hex8UGradPackT<scalar_t> *const          ho = nullptr,
+                                                 const scalar_t *const SFEM_RESTRICT veps2 = nullptr,
+                                                 const scalar_t *const SFEM_RESTRICT edx = nullptr,
+                                                 const scalar_t *const SFEM_RESTRICT edy = nullptr,
+                                                 const scalar_t *const SFEM_RESTRICT edz = nullptr) {
+    // ONE lane loop for all twelve faces, accumulating into thirty-two lane-private scalars and
+    // storing each once.
+    //
+    // Each of the eight nodes sits on three of the twelve sub-control surfaces -- one per
+    // direction group -- so the vectorised loop per face this used to be loaded a node's staged
+    // inputs three times and read-modify-wrote its four accumulators three times. Holding the
+    // three contributions in a register turns ninety-six read-modify-writes into thirty-two
+    // stores.
+    //
+    // Measured on Grace, 72 threads, n=128 (8,586,756 dofs), best of five, against a jac_exact
+    // control whose own face loop this does not touch and which read 0.997-1.002:
+    //
+    //                     per face   one loop, into the pack   one loop, into locals
+    //   residual packed     1461.0        1441.4 (0.99)            1521.8 (1.04)
+    //   residual standard    790.8         794.8 (1.01)             823.4 (1.04)
+    //
+    // +4% on both layouts, reproduced across two jobs. The middle column matters: fusing the
+    // loops while leaving the accumulation in the pack buys nothing, so what pays is the
+    // accumulator traffic, not the redundant input loads.
+    //
+    // It does not generalise. The same change on the Jacobian action lost 9-22%, measured the
+    // same way. The live set is what separates them: the Jacobian also carries the direction pack
+    // and the correction's derivative, and past thirty-two vector registers the compiler spills
+    // into slots worse than the contiguous, prefetchable pack they replace.
+    // cvfem_hex8_conv_face_jv_simd carries that measurement.
+    //
+    // The higher-order residual is NOT affected by any of this and was not measured: with
+    // --conv-ho the packed sweep dispatches to apply_residual_packed_defcor with sympy=true, the
+    // generated whole-element kernels, which never enter this function and have no face loop to
+    // fuse. An arm run through that path reports whatever the node is doing and nothing about
+    // this code.
+    //
+    // WHY THIS IS WHERE IT STOPS: the sweep is register-starved, and no loop order fixes that.
+    //
+    // Disassembling the shipping kernel: the vectorised loop of this sweep with Rhie-Chow is 1924
+    // instructions, of which 743 -- 39% -- are spill loads and stores against a 1952-byte frame.
+    // That, and not DRAM or L1, is what holds the operator at 30% of its roofline point while
+    // both roofs read slack; a roofline cannot see spill traffic, counting only DRAM bytes and
+    // flops.
+    //
+    // The cause is the working set, not the layout. One vector iteration holds eight nodes times
+    // four fields = thirty-two accumulators, and each face needs roughly twenty-four more live
+    // values on top of them -- the area vector, both nodes' velocity and pressure, and with
+    // Rhie-Chow the two nodes' coordinates and pressure gradients and the surface coefficient.
+    // That is about fifty-six live vector values against the thirty-two registers AArch64 has, so
+    // the allocator spills whatever order the faces are visited in.
+    //
+    // Three reorderings were built and measured against this shape on Grace at n=128, each with a
+    // jac_exact control that stayed within 0.4%:
+    //
+    //   lane width 64/128/256 bytes    within the 4.3% noise band, no effect
+    //   one vectorised loop per face   0.99 packed -- the shape this replaced
+    //   momentum and continuity split  0.66 packed, 0.78 standard
+    //
+    // The last is the informative one, because it is exactly the lever the spill count suggests:
+    // it takes the accumulators from thirty-two to twenty-four and then eight. It moved neither
+    // the frame (1952 -> 1968 bytes) nor the spill count (1061 -> 1085), because the per-face
+    // inputs alone already exceed what the accumulators leave free; all it added was 20% more
+    // instructions recomputing mdot, whose Rhie-Chow half is the expensive one.
+    //
+    // So the live set, not the loop order, is the binding constraint, and shrinking it means
+    // changing what a face computes rather than when. Do not re-derive a loop reordering from
+    // the spill count.
+    //
+    // This is NOT bit-identical to the per-face shape: `out` already holds the viscous term when
+    // the faces start, so summing a node's three contributions in a register and adding once
+    // reassociates what was three separate additions. The effect is round-off. Measured against
+    // an independent atomic reference, max absolute difference over the field is 2.4e-18 for this
+    // shape against 1.7e-18 for the per-face one, on a residual whose entries are of order one.
+    // Do not use the checksum to judge this -- it is a near-cancelling sum of order 1e-14 and a
+    // last-bit change in it reads as a large relative move.
+#pragma omp simd
+    for (int lane = 0; lane < cvfem_hex8_vec_size<scalar_t>; ++lane) {
+        scalar_t ax[CVFEM_HEX8_N_NODES], ay[CVFEM_HEX8_N_NODES], az[CVFEM_HEX8_N_NODES], ac[CVFEM_HEX8_N_NODES];
+        for (int nd = 0; nd < CVFEM_HEX8_N_NODES; ++nd) { ax[nd] = scalar_t(0); ay[nd] = scalar_t(0); az[nd] = scalar_t(0); ac[nd] = scalar_t(0); }
+        scalar_t fx, fy, fz, dm;
+
+        cvfem_hex8_conv_face_lane<0, 1, 0, RC, EPS, HO, LIM>(lane, rho, mu, rc_scale, half, Ax0, Ay0, Az0, in, rc, fx, fy, fz, dm, ueps, ho, veps2, edx, edy, edz);
+        ax[0] += fx; ay[0] += fy; az[0] += fz; ac[0] += dm;
+        ax[1] -= fx; ay[1] -= fy; az[1] -= fz; ac[1] -= dm;
+        cvfem_hex8_conv_face_lane<3, 2, 1, RC, EPS, HO, LIM>(lane, rho, mu, rc_scale, half, Ax0, Ay0, Az0, in, rc, fx, fy, fz, dm, ueps, ho, veps2, edx, edy, edz);
+        ax[3] += fx; ay[3] += fy; az[3] += fz; ac[3] += dm;
+        ax[2] -= fx; ay[2] -= fy; az[2] -= fz; ac[2] -= dm;
+        cvfem_hex8_conv_face_lane<4, 5, 2, RC, EPS, HO, LIM>(lane, rho, mu, rc_scale, half, Ax0, Ay0, Az0, in, rc, fx, fy, fz, dm, ueps, ho, veps2, edx, edy, edz);
+        ax[4] += fx; ay[4] += fy; az[4] += fz; ac[4] += dm;
+        ax[5] -= fx; ay[5] -= fy; az[5] -= fz; ac[5] -= dm;
+        cvfem_hex8_conv_face_lane<7, 6, 3, RC, EPS, HO, LIM>(lane, rho, mu, rc_scale, half, Ax0, Ay0, Az0, in, rc, fx, fy, fz, dm, ueps, ho, veps2, edx, edy, edz);
+        ax[7] += fx; ay[7] += fy; az[7] += fz; ac[7] += dm;
+        ax[6] -= fx; ay[6] -= fy; az[6] -= fz; ac[6] -= dm;
+        cvfem_hex8_conv_face_lane<0, 3, 4, RC, EPS, HO, LIM>(lane, rho, mu, rc_scale, half, Ax1, Ay1, Az1, in, rc, fx, fy, fz, dm, ueps, ho, veps2, edx, edy, edz);
+        ax[0] += fx; ay[0] += fy; az[0] += fz; ac[0] += dm;
+        ax[3] -= fx; ay[3] -= fy; az[3] -= fz; ac[3] -= dm;
+        cvfem_hex8_conv_face_lane<1, 2, 5, RC, EPS, HO, LIM>(lane, rho, mu, rc_scale, half, Ax1, Ay1, Az1, in, rc, fx, fy, fz, dm, ueps, ho, veps2, edx, edy, edz);
+        ax[1] += fx; ay[1] += fy; az[1] += fz; ac[1] += dm;
+        ax[2] -= fx; ay[2] -= fy; az[2] -= fz; ac[2] -= dm;
+        cvfem_hex8_conv_face_lane<4, 7, 6, RC, EPS, HO, LIM>(lane, rho, mu, rc_scale, half, Ax1, Ay1, Az1, in, rc, fx, fy, fz, dm, ueps, ho, veps2, edx, edy, edz);
+        ax[4] += fx; ay[4] += fy; az[4] += fz; ac[4] += dm;
+        ax[7] -= fx; ay[7] -= fy; az[7] -= fz; ac[7] -= dm;
+        cvfem_hex8_conv_face_lane<5, 6, 7, RC, EPS, HO, LIM>(lane, rho, mu, rc_scale, half, Ax1, Ay1, Az1, in, rc, fx, fy, fz, dm, ueps, ho, veps2, edx, edy, edz);
+        ax[5] += fx; ay[5] += fy; az[5] += fz; ac[5] += dm;
+        ax[6] -= fx; ay[6] -= fy; az[6] -= fz; ac[6] -= dm;
+        cvfem_hex8_conv_face_lane<0, 4, 8, RC, EPS, HO, LIM>(lane, rho, mu, rc_scale, half, Ax2, Ay2, Az2, in, rc, fx, fy, fz, dm, ueps, ho, veps2, edx, edy, edz);
+        ax[0] += fx; ay[0] += fy; az[0] += fz; ac[0] += dm;
+        ax[4] -= fx; ay[4] -= fy; az[4] -= fz; ac[4] -= dm;
+        cvfem_hex8_conv_face_lane<1, 5, 9, RC, EPS, HO, LIM>(lane, rho, mu, rc_scale, half, Ax2, Ay2, Az2, in, rc, fx, fy, fz, dm, ueps, ho, veps2, edx, edy, edz);
+        ax[1] += fx; ay[1] += fy; az[1] += fz; ac[1] += dm;
+        ax[5] -= fx; ay[5] -= fy; az[5] -= fz; ac[5] -= dm;
+        cvfem_hex8_conv_face_lane<2, 6, 10, RC, EPS, HO, LIM>(lane, rho, mu, rc_scale, half, Ax2, Ay2, Az2, in, rc, fx, fy, fz, dm, ueps, ho, veps2, edx, edy, edz);
+        ax[2] += fx; ay[2] += fy; az[2] += fz; ac[2] += dm;
+        ax[6] -= fx; ay[6] -= fy; az[6] -= fz; ac[6] -= dm;
+        cvfem_hex8_conv_face_lane<3, 7, 11, RC, EPS, HO, LIM>(lane, rho, mu, rc_scale, half, Ax2, Ay2, Az2, in, rc, fx, fy, fz, dm, ueps, ho, veps2, edx, edy, edz);
+        ax[3] += fx; ay[3] += fy; az[3] += fz; ac[3] += dm;
+        ax[7] -= fx; ay[7] -= fy; az[7] -= fz; ac[7] -= dm;
+        for (int nd = 0; nd < CVFEM_HEX8_N_NODES; ++nd) {
+            out.rx[nd][lane] += ax[nd]; out.ry[nd][lane] += ay[nd];
+            out.rz[nd][lane] += az[nd]; out.rc[nd][lane] += ac[nd];
+        }
+    }
+}
+
+template <typename scalar_t>
+static SFEM_INLINE void cvfem_hex8_conv_all_simd(const scalar_t                      rho,
+                                                 const scalar_t                      half,
+                                                 const scalar_t *const SFEM_RESTRICT Ax0,
+                                                 const scalar_t *const SFEM_RESTRICT Ay0,
+                                                 const scalar_t *const SFEM_RESTRICT Az0,
+                                                 const scalar_t *const SFEM_RESTRICT Ax1,
+                                                 const scalar_t *const SFEM_RESTRICT Ay1,
+                                                 const scalar_t *const SFEM_RESTRICT Az1,
+                                                 const scalar_t *const SFEM_RESTRICT Ax2,
+                                                 const scalar_t *const SFEM_RESTRICT Ay2,
+                                                 const scalar_t *const SFEM_RESTRICT Az2,
+                                                 const Hex8InputPack                &in,
+                                                 Hex8ResidualPack                   &out) {
+    cvfem_hex8_conv_all_simd<false, false, false, 0>(rho,
+                                    scalar_t(0),
+                                    scalar_t(0),
+                                    half,
+                                    Ax0,
+                                    Ay0,
+                                    Az0,
+                                    Ax1,
+                                    Ay1,
+                                    Az1,
+                                    Ax2,
+                                    Ay2,
+                                    Az2,
+                                    in,
+                                    static_cast<const Hex8RhieChowPackT<scalar_t> *>(nullptr),
+                                    out);
+}
+
+// The same face flux with the state read out of the stored tangent instead of recomputed
+// from u and p. Compare cvfem_hex8_conv_face_jv_simd above: everything that touched `u` is
+// gone -- the advective mass flux, the Rhie-Chow correction to it, the upwind switch and
+// its derivative -- and what is left is the direction side, which was always there, times
+// three numbers that were computed once for this Newton step.
+//
+// Not bit-identical to the kernel it replaces, and it cannot be: dpos*u_I + dneg*u_J
+// reassociates into dmdot*uup. The difference is one rounding.
+template <int S, int I, int J, bool RC = false, bool QG = false,
+          typename scalar_t = ::scalar_t>
+static SFEM_INLINE void cvfem_hex8_conv_face_jv_pa_simd(const scalar_t                      rho,
+                                                        const scalar_t                      half,
+                                                        const scalar_t *const SFEM_RESTRICT Ax,
+                                                        const scalar_t *const SFEM_RESTRICT Ay,
+                                                        const scalar_t *const SFEM_RESTRICT Az,
+                                                        const Hex8InputPack                &du,
+                                                        const Hex8RhieChowPack             *rc,
+                                                        const scalar_t *const SFEM_RESTRICT pa,
+                                                        const ptrdiff_t                     nelem,
+                                                        Hex8ResidualPack                   &out,
+                                                        const scalar_t *const SFEM_RESTRICT edx,
+                                                        const scalar_t *const SFEM_RESTRICT edy,
+                                                        const scalar_t *const SFEM_RESTRICT edz) {
+    if constexpr (!(RC && QG)) { (void)edx; (void)edy; (void)edz; }
+    if constexpr (!RC) (void)rc;
+    // `pa` already points at this group's first element, so these are five contiguous
+    // vector loads. Lanes past the end of the mesh read into the next slice and are
+    // discarded by the scatter, which is why the store carries a pad.
+    const scalar_t *const SFEM_RESTRICT t_mpos = pa + (ptrdiff_t)(S * CVFEM_HEX8_PA_PER_SCS + 0) * nelem;
+    const scalar_t *const SFEM_RESTRICT t_mneg = pa + (ptrdiff_t)(S * CVFEM_HEX8_PA_PER_SCS + 1) * nelem;
+    const scalar_t *const SFEM_RESTRICT t_uupx = pa + (ptrdiff_t)(S * CVFEM_HEX8_PA_PER_SCS + 2) * nelem;
+    const scalar_t *const SFEM_RESTRICT t_uupy = pa + (ptrdiff_t)(S * CVFEM_HEX8_PA_PER_SCS + 3) * nelem;
+    const scalar_t *const SFEM_RESTRICT t_uupz = pa + (ptrdiff_t)(S * CVFEM_HEX8_PA_PER_SCS + 4) * nelem;
+    const scalar_t *const SFEM_RESTRICT t_kx   = pa + (ptrdiff_t)(S * CVFEM_HEX8_PA_PER_SCS + 5) * nelem;
+    const scalar_t *const SFEM_RESTRICT t_ky   = pa + (ptrdiff_t)(S * CVFEM_HEX8_PA_PER_SCS + 6) * nelem;
+    const scalar_t *const SFEM_RESTRICT t_kz   = pa + (ptrdiff_t)(S * CVFEM_HEX8_PA_PER_SCS + 7) * nelem;
+#pragma omp simd
+    for (int lane = 0; lane < cvfem_hex8_vec_size<scalar_t>; ++lane) {
+        const scalar_t ax    = Ax[lane];
+        const scalar_t ay    = Ay[lane];
+        const scalar_t az    = Az[lane];
+        scalar_t       dmdot = rho * half *
+                         ((du.ux[I][lane] + du.ux[J][lane]) * ax + (du.uy[I][lane] + du.uy[J][lane]) * ay +
+                          (du.uz[I][lane] + du.uz[J][lane]) * az);
+        if constexpr (RC) {
+            const scalar_t coeff = rc->coeff[S][lane];
+            dmdot += coeff * (du.p[I][lane] - du.p[J][lane]);
+            // The coefficient's velocity dependence, stored as k = g * corr * ubar.
+            dmdot += half * (t_kx[lane] * (du.ux[I][lane] + du.ux[J][lane]) + t_ky[lane] * (du.uy[I][lane] + du.uy[J][lane]) +
+                             t_kz[lane] * (du.uz[I][lane] + du.uz[J][lane]));
+            if constexpr (QG) {
+                // The affine edge vector, as everywhere else on this path.
+                const scalar_t dx = edx[(S / 4) * cvfem_hex8_vec_size<scalar_t> + lane];
+                const scalar_t dy = edy[(S / 4) * cvfem_hex8_vec_size<scalar_t> + lane];
+                const scalar_t dz = edz[(S / 4) * cvfem_hex8_vec_size<scalar_t> + lane];
+                dmdot += coeff * (half * (rc->qgx[I][lane] + rc->qgx[J][lane]) * dx +
+                                  half * (rc->qgy[I][lane] + rc->qgy[J][lane]) * dy +
+                                  half * (rc->qgz[I][lane] + rc->qgz[J][lane]) * dz);
+            }
+        }
+        const scalar_t mpos = t_mpos[lane];
+        const scalar_t mneg = t_mneg[lane];
+        const scalar_t qmid = half * (du.p[I][lane] + du.p[J][lane]);
+        const scalar_t fx   = dmdot * t_uupx[lane] + mpos * du.ux[I][lane] + mneg * du.ux[J][lane] + qmid * ax;
+        const scalar_t fy   = dmdot * t_uupy[lane] + mpos * du.uy[I][lane] + mneg * du.uy[J][lane] + qmid * ay;
+        const scalar_t fz   = dmdot * t_uupz[lane] + mpos * du.uz[I][lane] + mneg * du.uz[J][lane] + qmid * az;
+        out.rx[I][lane] += fx;
+        out.ry[I][lane] += fy;
+        out.rz[I][lane] += fz;
+        out.rc[I][lane] += dmdot;
+        out.rx[J][lane] -= fx;
+        out.ry[J][lane] -= fy;
+        out.rz[J][lane] -= fz;
+        out.rc[J][lane] -= dmdot;
+    }
+}
+
+template <bool RC = false, bool QG = false, typename scalar_t = ::scalar_t>
+static SFEM_INLINE void cvfem_hex8_conv_all_jv_pa_simd(const scalar_t                      rho,
+                                                       const scalar_t                      half,
+                                                       const scalar_t *const SFEM_RESTRICT Ax0,
+                                                       const scalar_t *const SFEM_RESTRICT Ay0,
+                                                       const scalar_t *const SFEM_RESTRICT Az0,
+                                                       const scalar_t *const SFEM_RESTRICT Ax1,
+                                                       const scalar_t *const SFEM_RESTRICT Ay1,
+                                                       const scalar_t *const SFEM_RESTRICT Az1,
+                                                       const scalar_t *const SFEM_RESTRICT Ax2,
+                                                       const scalar_t *const SFEM_RESTRICT Ay2,
+                                                       const scalar_t *const SFEM_RESTRICT Az2,
+                                                       const Hex8InputPack                &du,
+                                                       const Hex8RhieChowPack             *rc,
+                                                       const scalar_t *const SFEM_RESTRICT pa,
+                                                       const ptrdiff_t                     nelem,
+                                                       Hex8ResidualPack                   &out,
+                                                       const scalar_t *const SFEM_RESTRICT edx,
+                                                       const scalar_t *const SFEM_RESTRICT edy,
+                                                       const scalar_t *const SFEM_RESTRICT edz) {
+    cvfem_hex8_conv_face_jv_pa_simd<0, 0, 1, RC, QG>(rho, half, Ax0, Ay0, Az0, du, rc, pa, nelem, out, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_pa_simd<1, 3, 2, RC, QG>(rho, half, Ax0, Ay0, Az0, du, rc, pa, nelem, out, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_pa_simd<2, 4, 5, RC, QG>(rho, half, Ax0, Ay0, Az0, du, rc, pa, nelem, out, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_pa_simd<3, 7, 6, RC, QG>(rho, half, Ax0, Ay0, Az0, du, rc, pa, nelem, out, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_pa_simd<4, 0, 3, RC, QG>(rho, half, Ax1, Ay1, Az1, du, rc, pa, nelem, out, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_pa_simd<5, 1, 2, RC, QG>(rho, half, Ax1, Ay1, Az1, du, rc, pa, nelem, out, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_pa_simd<6, 4, 7, RC, QG>(rho, half, Ax1, Ay1, Az1, du, rc, pa, nelem, out, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_pa_simd<7, 5, 6, RC, QG>(rho, half, Ax1, Ay1, Az1, du, rc, pa, nelem, out, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_pa_simd<8, 0, 4, RC, QG>(rho, half, Ax2, Ay2, Az2, du, rc, pa, nelem, out, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_pa_simd<9, 1, 5, RC, QG>(rho, half, Ax2, Ay2, Az2, du, rc, pa, nelem, out, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_pa_simd<10, 2, 6, RC, QG>(rho, half, Ax2, Ay2, Az2, du, rc, pa, nelem, out, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_pa_simd<11, 3, 7, RC, QG>(rho, half, Ax2, Ay2, Az2, du, rc, pa, nelem, out, edx, edy, edz);
+}
+
+template <bool RC = false, bool QG = false, bool EPS = false, bool HO = false, int LIM = 0,
+          typename scalar_t = ::scalar_t>
+// FLATTEN, for the reason cvfem_hex8_conv_all_simd carries it: the face kernel's own flatten does
+// not stop this function -- the one that owns the lane loop -- from outlining it. Apple clang had
+// been saying so on every build, 72 times, as "loop not vectorized: the optimizer was unable to
+// perform the requested transformation" against this line, and because -Wpass-failed is a warning
+// rather than an error the message had no consequence. The gate gave it one: the Venkatakrishnan
+// and Darwish-Moukalled arms of the directional derivative emitted ZERO vector instructions.
+static SFEM_INLINE __attribute__((flatten)) void cvfem_hex8_conv_all_jv_simd(const scalar_t rho,
+                                                    const scalar_t                      half,
+                                                    const scalar_t                      one,
+                                                    const scalar_t *const SFEM_RESTRICT Ax0,
+                                                    const scalar_t *const SFEM_RESTRICT Ay0,
+                                                    const scalar_t *const SFEM_RESTRICT Az0,
+                                                    const scalar_t *const SFEM_RESTRICT Ax1,
+                                                    const scalar_t *const SFEM_RESTRICT Ay1,
+                                                    const scalar_t *const SFEM_RESTRICT Az1,
+                                                    const scalar_t *const SFEM_RESTRICT Ax2,
+                                                    const scalar_t *const SFEM_RESTRICT Ay2,
+                                                    const scalar_t *const SFEM_RESTRICT Az2,
+                                                    const Hex8InputPackT<scalar_t>                &u,
+                                                    const Hex8InputPackT<scalar_t>                &du,
+                                                    const Hex8RhieChowPackT<scalar_t>             *rc,
+                                                    Hex8ResidualPackT<scalar_t>                   &out,
+                                                    const scalar_t                      ueps = scalar_t(0),
+                                                    const Hex8UGradPackT<scalar_t> *const          ho = nullptr,
+                                                    const Hex8UGradPackT<scalar_t> *const          hov = nullptr,
+                                                    const scalar_t *const SFEM_RESTRICT veps2 = nullptr,
+                                                    const scalar_t *const SFEM_RESTRICT isc = nullptr,
+                                                    const scalar_t *const SFEM_RESTRICT edx = nullptr,
+                                                    const scalar_t *const SFEM_RESTRICT edy = nullptr,
+                                                    const scalar_t *const SFEM_RESTRICT edz = nullptr) {
+    cvfem_hex8_conv_face_jv_simd<0, 0, 1, RC, QG, EPS, HO, LIM>(rho, half, one, Ax0, Ay0, Az0, u, du, rc, out, ueps, ho, hov, veps2, isc, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_simd<1, 3, 2, RC, QG, EPS, HO, LIM>(rho, half, one, Ax0, Ay0, Az0, u, du, rc, out, ueps, ho, hov, veps2, isc, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_simd<2, 4, 5, RC, QG, EPS, HO, LIM>(rho, half, one, Ax0, Ay0, Az0, u, du, rc, out, ueps, ho, hov, veps2, isc, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_simd<3, 7, 6, RC, QG, EPS, HO, LIM>(rho, half, one, Ax0, Ay0, Az0, u, du, rc, out, ueps, ho, hov, veps2, isc, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_simd<4, 0, 3, RC, QG, EPS, HO, LIM>(rho, half, one, Ax1, Ay1, Az1, u, du, rc, out, ueps, ho, hov, veps2, isc, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_simd<5, 1, 2, RC, QG, EPS, HO, LIM>(rho, half, one, Ax1, Ay1, Az1, u, du, rc, out, ueps, ho, hov, veps2, isc, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_simd<6, 4, 7, RC, QG, EPS, HO, LIM>(rho, half, one, Ax1, Ay1, Az1, u, du, rc, out, ueps, ho, hov, veps2, isc, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_simd<7, 5, 6, RC, QG, EPS, HO, LIM>(rho, half, one, Ax1, Ay1, Az1, u, du, rc, out, ueps, ho, hov, veps2, isc, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_simd<8, 0, 4, RC, QG, EPS, HO, LIM>(rho, half, one, Ax2, Ay2, Az2, u, du, rc, out, ueps, ho, hov, veps2, isc, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_simd<9, 1, 5, RC, QG, EPS, HO, LIM>(rho, half, one, Ax2, Ay2, Az2, u, du, rc, out, ueps, ho, hov, veps2, isc, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_simd<10, 2, 6, RC, QG, EPS, HO, LIM>(rho, half, one, Ax2, Ay2, Az2, u, du, rc, out, ueps, ho, hov, veps2, isc, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_simd<11, 3, 7, RC, QG, EPS, HO, LIM>(rho, half, one, Ax2, Ay2, Az2, u, du, rc, out, ueps, ho, hov, veps2, isc, edx, edy, edz);
+}
+
+template <typename scalar_t>
+static SFEM_INLINE void cvfem_hex8_conv_all_jv_simd(const scalar_t                      rho,
+                                                    const scalar_t                      half,
+                                                    const scalar_t                      one,
+                                                    const scalar_t *const SFEM_RESTRICT Ax0,
+                                                    const scalar_t *const SFEM_RESTRICT Ay0,
+                                                    const scalar_t *const SFEM_RESTRICT Az0,
+                                                    const scalar_t *const SFEM_RESTRICT Ax1,
+                                                    const scalar_t *const SFEM_RESTRICT Ay1,
+                                                    const scalar_t *const SFEM_RESTRICT Az1,
+                                                    const scalar_t *const SFEM_RESTRICT Ax2,
+                                                    const scalar_t *const SFEM_RESTRICT Ay2,
+                                                    const scalar_t *const SFEM_RESTRICT Az2,
+                                                    const Hex8InputPack                &u,
+                                                    const Hex8InputPack                &du,
+                                                    Hex8ResidualPack                   &out) {
+    cvfem_hex8_conv_all_jv_simd<false>(rho,
+                                       half,
+                                       one,
+                                       Ax0,
+                                       Ay0,
+                                       Az0,
+                                       Ax1,
+                                       Ay1,
+                                       Az1,
+                                       Ax2,
+                                       Ay2,
+                                       Az2,
+                                       u,
+                                       du,
+                                       static_cast<const Hex8RhieChowPackT<scalar_t> *>(nullptr),
+                                       out);
+}
+
+template <bool Atomic, typename Slot, typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_jac_conv_face(const scalar_t                        rho,
+                                                 const scalar_t                        ax,
+                                                 const scalar_t                        ay,
+                                                 const scalar_t                        az,
+                                                 const int                             i,
+                                                 const int                             j,
+                                                 const scalar_t *const SFEM_RESTRICT   ux,
+                                                 const scalar_t *const SFEM_RESTRICT   uy,
+                                                 const scalar_t *const SFEM_RESTRICT   uz,
+                                                 const Slot *const SFEM_RESTRICT       slots,
+                                                 scalar_t *const SFEM_RESTRICT         values,
+                                                 const scalar_t                        mdot_rc,
+                                                 const scalar_t                        ueps,
+                                                 const scalar_t                        kx,
+                                                 const scalar_t                        ky,
+                                                 const scalar_t                        kz) {
+    const scalar_t half  = scalar_t(0.5);
+    const scalar_t one   = scalar_t(1);
+    const scalar_t alpha = rho * half;
+    const scalar_t adv_x = half * (ux[i] + ux[j]);
+    const scalar_t adv_y = half * (uy[i] + uy[j]);
+    const scalar_t adv_z = half * (uz[i] + uz[j]);
+    const scalar_t mdot  = rho * (adv_x * ax + adv_y * ay + adv_z * az) + mdot_rc;
+    scalar_t amdot, sgn;
+    cvfem_upwind_abs(mdot, ueps, amdot, sgn);
+    const scalar_t mpos  = half * (mdot + amdot);
+    const scalar_t mneg  = half * (mdot - amdot);
+    const scalar_t d_pos = half * (one + sgn);
+    const scalar_t d_neg = half * (one - sgn);
+    const scalar_t hax   = half * ax;
+    const scalar_t hay   = half * ay;
+    const scalar_t haz   = half * az;
+
+    const int bnodes[2] = {i, j};
+    const scalar_t mass[2] = {mpos, mneg};
+    for (int nb = 0; nb < 2; ++nb) {
+        const int      b  = bnodes[nb];
+        const scalar_t m  = mass[nb];
+        const Slot     si = slots[i * 8 + b];
+        const Slot     sj = slots[j * 8 + b];
+
+        {
+            const scalar_t dmdot = alpha * ax + half * kx;  // k: cvfem_hex8_rhie_chow_kvec
+            const scalar_t dpos  = d_pos * dmdot;
+            const scalar_t dneg  = d_neg * dmdot;
+            const scalar_t dfx   = dpos * ux[i] + dneg * ux[j] + m;
+            const scalar_t dfy   = dpos * uy[i] + dneg * uy[j];
+            const scalar_t dfz   = dpos * uz[i] + dneg * uz[j];
+            cvfem_hex8_bsr_acc<Atomic>(values, si, 0, 0, dfx);
+            cvfem_hex8_bsr_acc<Atomic>(values, si, 1, 0, dfy);
+            cvfem_hex8_bsr_acc<Atomic>(values, si, 2, 0, dfz);
+            cvfem_hex8_bsr_acc<Atomic>(values, si, 3, 0, dmdot);
+            cvfem_hex8_bsr_acc<Atomic>(values, sj, 0, 0, -dfx);
+            cvfem_hex8_bsr_acc<Atomic>(values, sj, 1, 0, -dfy);
+            cvfem_hex8_bsr_acc<Atomic>(values, sj, 2, 0, -dfz);
+            cvfem_hex8_bsr_acc<Atomic>(values, sj, 3, 0, -dmdot);
+        }
+        {
+            const scalar_t dmdot = alpha * ay + half * ky;  // k: cvfem_hex8_rhie_chow_kvec
+            const scalar_t dpos  = d_pos * dmdot;
+            const scalar_t dneg  = d_neg * dmdot;
+            const scalar_t dfx   = dpos * ux[i] + dneg * ux[j];
+            const scalar_t dfy   = dpos * uy[i] + dneg * uy[j] + m;
+            const scalar_t dfz   = dpos * uz[i] + dneg * uz[j];
+            cvfem_hex8_bsr_acc<Atomic>(values, si, 0, 1, dfx);
+            cvfem_hex8_bsr_acc<Atomic>(values, si, 1, 1, dfy);
+            cvfem_hex8_bsr_acc<Atomic>(values, si, 2, 1, dfz);
+            cvfem_hex8_bsr_acc<Atomic>(values, si, 3, 1, dmdot);
+            cvfem_hex8_bsr_acc<Atomic>(values, sj, 0, 1, -dfx);
+            cvfem_hex8_bsr_acc<Atomic>(values, sj, 1, 1, -dfy);
+            cvfem_hex8_bsr_acc<Atomic>(values, sj, 2, 1, -dfz);
+            cvfem_hex8_bsr_acc<Atomic>(values, sj, 3, 1, -dmdot);
+        }
+        {
+            const scalar_t dmdot = alpha * az + half * kz;  // k: cvfem_hex8_rhie_chow_kvec
+            const scalar_t dpos  = d_pos * dmdot;
+            const scalar_t dneg  = d_neg * dmdot;
+            const scalar_t dfx   = dpos * ux[i] + dneg * ux[j];
+            const scalar_t dfy   = dpos * uy[i] + dneg * uy[j];
+            const scalar_t dfz   = dpos * uz[i] + dneg * uz[j] + m;
+            cvfem_hex8_bsr_acc<Atomic>(values, si, 0, 2, dfx);
+            cvfem_hex8_bsr_acc<Atomic>(values, si, 1, 2, dfy);
+            cvfem_hex8_bsr_acc<Atomic>(values, si, 2, 2, dfz);
+            cvfem_hex8_bsr_acc<Atomic>(values, si, 3, 2, dmdot);
+            cvfem_hex8_bsr_acc<Atomic>(values, sj, 0, 2, -dfx);
+            cvfem_hex8_bsr_acc<Atomic>(values, sj, 1, 2, -dfy);
+            cvfem_hex8_bsr_acc<Atomic>(values, sj, 2, 2, -dfz);
+            cvfem_hex8_bsr_acc<Atomic>(values, sj, 3, 2, -dmdot);
+        }
+        cvfem_hex8_bsr_acc<Atomic>(values, si, 0, 3, hax);
+        cvfem_hex8_bsr_acc<Atomic>(values, si, 1, 3, hay);
+        cvfem_hex8_bsr_acc<Atomic>(values, si, 2, 3, haz);
+        cvfem_hex8_bsr_acc<Atomic>(values, sj, 0, 3, -hax);
+        cvfem_hex8_bsr_acc<Atomic>(values, sj, 1, 3, -hay);
+        cvfem_hex8_bsr_acc<Atomic>(values, sj, 2, 3, -haz);
+    }
+}
+
+template <typename scalar_t>
+static SFEM_INLINE void cvfem_hex8_ns_upwind_residual_sumfact_simd(
+        const scalar_t                        rho_s,
+        const scalar_t                        mu_s,
+        const scalar_t *const SFEM_RESTRICT   cof0,
+        const scalar_t *const SFEM_RESTRICT   cof1,
+        const scalar_t *const SFEM_RESTRICT   cof2,
+        const scalar_t *const SFEM_RESTRICT   cof3,
+        const scalar_t *const SFEM_RESTRICT   cof4,
+        const scalar_t *const SFEM_RESTRICT   cof5,
+        const scalar_t *const SFEM_RESTRICT   cof6,
+        const scalar_t *const SFEM_RESTRICT   cof7,
+        const scalar_t *const SFEM_RESTRICT   cof8,
+        const scalar_t *const SFEM_RESTRICT   det,
+        const Hex8InputPackT<scalar_t>                  &in,
+        Hex8ResidualPackT<scalar_t>                     &out,
+        const Hex8RhieChowPackT<scalar_t>               *rc       = nullptr,
+        const scalar_t                        rc_scale = scalar_t(0),
+        // The Harten band. Absent here until now, which is why the solver's flat packed
+        // path silently ran the hard switch while SFEM_UPWIND_EPS reached every other one.
+        const scalar_t                        ueps     = scalar_t(0),
+        // The deferred-correction inputs, or null for first-order upwinding. Defaulted so
+        // every existing call site keeps the first-order kernel it had, bit for bit. Not const:
+        // the staged gradient is rewritten in place into the increments the face loops read.
+        Hex8UGradPackT<scalar_t> *const                  ho       = nullptr) {
+    const scalar_t rho  = rho_s;
+    const scalar_t mu   = mu_s;
+    const scalar_t half = scalar_t(0.5);
+    const scalar_t qtr  = scalar_t(0.25);
+
+    alignas(ALIGN_BYTES) scalar_t g00v[cvfem_hex8_vec_size<scalar_t>], g01v[cvfem_hex8_vec_size<scalar_t>], g02v[cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t g10v[cvfem_hex8_vec_size<scalar_t>], g11v[cvfem_hex8_vec_size<scalar_t>], g12v[cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t g20v[cvfem_hex8_vec_size<scalar_t>], g21v[cvfem_hex8_vec_size<scalar_t>], g22v[cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t Ax0[cvfem_hex8_vec_size<scalar_t>], Ay0[cvfem_hex8_vec_size<scalar_t>], Az0[cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t Ax1[cvfem_hex8_vec_size<scalar_t>], Ay1[cvfem_hex8_vec_size<scalar_t>], Az1[cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t Ax2[cvfem_hex8_vec_size<scalar_t>], Ay2[cvfem_hex8_vec_size<scalar_t>], Az2[cvfem_hex8_vec_size<scalar_t>];
+    // The three affine edge vectors, direction-major. Filled in the geometry loop below, where the
+    // cofactors and 1/det are already in registers, so they cost their arithmetic and no loads.
+    alignas(ALIGN_BYTES) scalar_t edx[3 * cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t edy[3 * cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t edz[3 * cvfem_hex8_vec_size<scalar_t>];
+
+#pragma omp simd aligned(cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det : 64)
+    for (int lane = 0; lane < cvfem_hex8_vec_size<scalar_t>; ++lane) {
+        const scalar_t inv = scalar_t(1) / det[lane];
+        const scalar_t c0  = cof0[lane];
+        const scalar_t c1  = cof1[lane];
+        const scalar_t c2  = cof2[lane];
+        const scalar_t c3  = cof3[lane];
+        const scalar_t c4  = cof4[lane];
+        const scalar_t c5  = cof5[lane];
+        const scalar_t c6  = cof6[lane];
+        const scalar_t c7  = cof7[lane];
+        const scalar_t c8  = cof8[lane];
+        Ax0[lane]          = qtr * c0;
+        Ay0[lane]          = qtr * c1;
+        Az0[lane]          = qtr * c2;
+        Ax1[lane]          = qtr * c3;
+        Ay1[lane]          = qtr * c4;
+        Az1[lane]          = qtr * c5;
+        Ax2[lane]          = qtr * c6;
+        Ay2[lane]          = qtr * c7;
+        Az2[lane]          = qtr * c8;
+        // J = adj(adj)/det; see cvfem_hex8_affine_edge_cols for the identity and the layout.
+        edx[0 * cvfem_hex8_vec_size<scalar_t> + lane] = (c4 * c8 - c5 * c7) * inv;
+        edx[1 * cvfem_hex8_vec_size<scalar_t> + lane] = (c2 * c7 - c1 * c8) * inv;
+        edx[2 * cvfem_hex8_vec_size<scalar_t> + lane] = (c1 * c5 - c2 * c4) * inv;
+        edy[0 * cvfem_hex8_vec_size<scalar_t> + lane] = (-c3 * c8 + c5 * c6) * inv;
+        edy[1 * cvfem_hex8_vec_size<scalar_t> + lane] = (c0 * c8 - c2 * c6) * inv;
+        edy[2 * cvfem_hex8_vec_size<scalar_t> + lane] = (-c0 * c5 + c2 * c3) * inv;
+        edz[0 * cvfem_hex8_vec_size<scalar_t> + lane] = (c3 * c7 - c4 * c6) * inv;
+        edz[1 * cvfem_hex8_vec_size<scalar_t> + lane] = (-c0 * c7 + c1 * c6) * inv;
+        edz[2 * cvfem_hex8_vec_size<scalar_t> + lane] = (c0 * c4 - c1 * c3) * inv;
+
+        const scalar_t ux0 = in.ux[0][lane], ux1 = in.ux[1][lane], ux2 = in.ux[2][lane], ux3 = in.ux[3][lane];
+        const scalar_t ux4 = in.ux[4][lane], ux5 = in.ux[5][lane], ux6 = in.ux[6][lane], ux7 = in.ux[7][lane];
+        const scalar_t uy0 = in.uy[0][lane], uy1 = in.uy[1][lane], uy2 = in.uy[2][lane], uy3 = in.uy[3][lane];
+        const scalar_t uy4 = in.uy[4][lane], uy5 = in.uy[5][lane], uy6 = in.uy[6][lane], uy7 = in.uy[7][lane];
+        const scalar_t uz0 = in.uz[0][lane], uz1 = in.uz[1][lane], uz2 = in.uz[2][lane], uz3 = in.uz[3][lane];
+        const scalar_t uz4 = in.uz[4][lane], uz5 = in.uz[5][lane], uz6 = in.uz[6][lane], uz7 = in.uz[7][lane];
+
+        const scalar_t ur = qtr * ((ux1 + ux2 + ux5 + ux6) - (ux0 + ux3 + ux4 + ux7));
+        const scalar_t us = qtr * ((ux2 + ux3 + ux6 + ux7) - (ux0 + ux1 + ux4 + ux5));
+        const scalar_t ut = qtr * ((ux4 + ux5 + ux6 + ux7) - (ux0 + ux1 + ux2 + ux3));
+        const scalar_t vr = qtr * ((uy1 + uy2 + uy5 + uy6) - (uy0 + uy3 + uy4 + uy7));
+        const scalar_t vs = qtr * ((uy2 + uy3 + uy6 + uy7) - (uy0 + uy1 + uy4 + uy5));
+        const scalar_t vt = qtr * ((uy4 + uy5 + uy6 + uy7) - (uy0 + uy1 + uy2 + uy3));
+        const scalar_t wr = qtr * ((uz1 + uz2 + uz5 + uz6) - (uz0 + uz3 + uz4 + uz7));
+        const scalar_t ws = qtr * ((uz2 + uz3 + uz6 + uz7) - (uz0 + uz1 + uz4 + uz5));
+        const scalar_t wt = qtr * ((uz4 + uz5 + uz6 + uz7) - (uz0 + uz1 + uz2 + uz3));
+
+        g00v[lane] = (c0 * ur + c3 * us + c6 * ut) * inv;
+        g01v[lane] = (c1 * ur + c4 * us + c7 * ut) * inv;
+        g02v[lane] = (c2 * ur + c5 * us + c8 * ut) * inv;
+        g10v[lane] = (c0 * vr + c3 * vs + c6 * vt) * inv;
+        g11v[lane] = (c1 * vr + c4 * vs + c7 * vt) * inv;
+        g12v[lane] = (c2 * vr + c5 * vs + c8 * vt) * inv;
+        g20v[lane] = (c0 * wr + c3 * ws + c6 * wt) * inv;
+        g21v[lane] = (c1 * wr + c4 * ws + c7 * wt) * inv;
+        g22v[lane] = (c2 * wr + c5 * ws + c8 * wt) * inv;
+    }
+
+    cvfem_hex8_zero_residual_pack(out);
+    cvfem_hex8_visc_dir_simd<0, 1, 3, 2, 4, 5, 7, 6>(
+            mu, g00v, g01v, g02v, g10v, g11v, g12v, g20v, g21v, g22v, Ax0, Ay0, Az0, out);
+    cvfem_hex8_visc_dir_simd<0, 3, 1, 2, 4, 7, 5, 6>(
+            mu, g00v, g01v, g02v, g10v, g11v, g12v, g20v, g21v, g22v, Ax1, Ay1, Az1, out);
+    cvfem_hex8_visc_dir_simd<0, 4, 1, 5, 2, 6, 3, 7>(
+            mu, g00v, g01v, g02v, g10v, g11v, g12v, g20v, g21v, g22v, Ax2, Ay2, Az2, out);
+
+    // The upwind band, dispatched at compile time.
+    //
+    // cvfem_upwind_abs branches on `eps > 0`, and this is the SIMD face loop -- the same
+    // loop in which a guard on the Rhie-Chow coefficient cost 1.83x by tipping GCC's cost
+    // model out of vectorising it. A runtime eps would leave that compare in the body of
+    // every run, including the overwhelming majority that use the hard switch. So the
+    // band is a template flag: EPS=false passes a literal zero, the branch folds, and the
+    // default path emits what it emitted before this parameter existed.
+    //
+    // The deferred correction is dispatched the same way and for the same reason. It used to be
+    // an `if (ho)` inside the lane loop, on a pointer that cannot change across the sweep; as a
+    // template flag the whole reconstruction leaves the body of every first-order run instead of
+    // sitting behind a compare in it.
+    //
+    // Eight leaves, written out because each has to name its template arguments as constants.
+    // The macro keeps the argument list in one place -- it is eight copies of thirteen arguments
+    // otherwise, which is where a transposed pack would hide -- and is undefined immediately.
+    const bool eps_on = ueps > scalar_t(0);
+    const bool rc_on  = rc && rc_scale != scalar_t(0);
+    const bool ho_on  = ho != nullptr;
+
+    // The correction's increments for this batch of elements, lane-parallel, once, written over
+    // the staged gradient; and Venkatakrishnan's eps^2 per direction group, for that arm only.
+    // The edge columns are the ones the geometry loop above already formed for Rhie-Chow. See
+    // cvfem_hex8_defcor_ref_increments for what this replaced.
+    alignas(ALIGN_BYTES) scalar_t veps2[3 * cvfem_hex8_vec_size<scalar_t>];
+    if (ho_on) {
+        cvfem_hex8_defcor_ref_increments<cvfem_hex8_vec_size<scalar_t>>(&ho->g[0][0][0], edx, edy, edz);
+        if (ho->limiter == 2)
+            cvfem_hex8_defcor_venkat_eps2<cvfem_hex8_vec_size<scalar_t>>(ho->venkat_c, edx, edy, edz, veps2);
+    }
+#define CVFEM_HEX8_CONV_ALL(RC_, EPS_, HO_, LIM_)                                                \
+    cvfem_hex8_conv_all_simd<RC_, EPS_, HO_, LIM_>(rho, mu, rc_scale, half, Ax0, Ay0, Az0, Ax1,  \
+                                             Ay1, Az1, Ax2, Ay2, Az2, in, rc, out, ueps, ho,     \
+                                             veps2, edx, edy, edz)
+// THE LIMITER ARM IS A TEMPLATE ARGUMENT, which is the whole point of this ladder. Its
+// Jacobian twin already did this and records the measurement: a runtime arm inside the
+// surface loop is worth 2x against a compiled one, because the branch sits inside the lane
+// loop and the arms have different register footprints.
+//
+// Only the HO leaves take it. The four first-order leaves never reach a limiter, so they are
+// one instantiation each and the space is 4 + 4*4 rather than 8*4.
+// do/while(0) so the expansion is one statement: it sits in the arms of the if/else ladder
+// below, where a bare braced switch plus the call site's semicolon leaves the else dangling.
+#define CVFEM_HEX8_CONV_ALL_LIM(RC_, EPS_)                                                       \
+    do {                                                                                         \
+        switch (ho->limiter) {                                                                   \
+            case 1: CVFEM_HEX8_CONV_ALL(RC_, EPS_, true, 1); break;                              \
+            case 2: CVFEM_HEX8_CONV_ALL(RC_, EPS_, true, 2); break;                              \
+            case 3: CVFEM_HEX8_CONV_ALL(RC_, EPS_, true, 3); break;                              \
+            default: CVFEM_HEX8_CONV_ALL(RC_, EPS_, true, 0); break;                             \
+        }                                                                                        \
+    } while (0)
+    if (rc_on) {
+        if (eps_on) {
+            if (ho_on) CVFEM_HEX8_CONV_ALL_LIM(true, true);
+            else       CVFEM_HEX8_CONV_ALL(true, true, false, 0);
+        } else {
+            if (ho_on) CVFEM_HEX8_CONV_ALL_LIM(true, false);
+            else       CVFEM_HEX8_CONV_ALL(true, false, false, 0);
+        }
+    } else {
+        if (eps_on) {
+            if (ho_on) CVFEM_HEX8_CONV_ALL_LIM(false, true);
+            else       CVFEM_HEX8_CONV_ALL(false, true, false, 0);
+        } else {
+            if (ho_on) CVFEM_HEX8_CONV_ALL_LIM(false, false);
+            else       CVFEM_HEX8_CONV_ALL(false, false, false, 0);
+        }
+    }
+#undef CVFEM_HEX8_CONV_ALL_LIM
+#undef CVFEM_HEX8_CONV_ALL
+}
+
+#define CVFEM_HEX8_ACTION_GEOM_ARGS                                                                          \
+    scalar_t *const SFEM_RESTRICT Ax0, scalar_t *const SFEM_RESTRICT Ay0, scalar_t *const SFEM_RESTRICT Az0, \
+            scalar_t *const SFEM_RESTRICT Ax1, scalar_t *const SFEM_RESTRICT Ay1,                            \
+            scalar_t *const SFEM_RESTRICT Az1, scalar_t *const SFEM_RESTRICT Ax2,                            \
+            scalar_t *const SFEM_RESTRICT Ay2, scalar_t *const SFEM_RESTRICT Az2,                            \
+            scalar_t *const SFEM_RESTRICT g00v, scalar_t *const SFEM_RESTRICT g01v,                          \
+            scalar_t *const SFEM_RESTRICT g02v, scalar_t *const SFEM_RESTRICT g10v,                          \
+            scalar_t *const SFEM_RESTRICT g11v, scalar_t *const SFEM_RESTRICT g12v,                          \
+            scalar_t *const SFEM_RESTRICT g20v, scalar_t *const SFEM_RESTRICT g21v,                          \
+            scalar_t *const SFEM_RESTRICT g22v, scalar_t *const SFEM_RESTRICT edx,                            \
+            scalar_t *const SFEM_RESTRICT edy, scalar_t *const SFEM_RESTRICT edz
+
+#define CVFEM_HEX8_ACTION_GEOM_PASS                                                                          \
+    Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, g00v, g01v, g02v, g10v, g11v, g12v, g20v, g21v, g22v,      \
+            edx, edy, edz
+
+// The part of the Jacobian action that touches neither the state nor the stored tangent:
+// the three direction area vectors, and the gradient of the DIRECTION. Note it reads `du`
+// and never `u` -- the viscous block of this operator has no state dependence at all, which
+// is why it is not part of the partial assembly below.
+//
+// Shared by the two action kernels rather than written twice. It is SFEM_INLINE, so the
+// kernel that was here before gets the same instruction stream it always did; the
+// regression gate is what confirms that rather than the reasoning.
+template <typename scalar_t>
+static SFEM_INLINE void cvfem_hex8_action_geom_simd(const scalar_t                      qtr,
+                                                    const scalar_t *const SFEM_RESTRICT cof0,
+                                                    const scalar_t *const SFEM_RESTRICT cof1,
+                                                    const scalar_t *const SFEM_RESTRICT cof2,
+                                                    const scalar_t *const SFEM_RESTRICT cof3,
+                                                    const scalar_t *const SFEM_RESTRICT cof4,
+                                                    const scalar_t *const SFEM_RESTRICT cof5,
+                                                    const scalar_t *const SFEM_RESTRICT cof6,
+                                                    const scalar_t *const SFEM_RESTRICT cof7,
+                                                    const scalar_t *const SFEM_RESTRICT cof8,
+                                                    const scalar_t *const SFEM_RESTRICT det,
+                                                    const Hex8InputPackT<scalar_t>                &du,
+                                                    CVFEM_HEX8_ACTION_GEOM_ARGS) {
+#pragma omp simd aligned(cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det : 64)
+    for (int lane = 0; lane < cvfem_hex8_vec_size<scalar_t>; ++lane) {
+        const scalar_t inv = scalar_t(1) / det[lane];
+        const scalar_t c0  = cof0[lane];
+        const scalar_t c1  = cof1[lane];
+        const scalar_t c2  = cof2[lane];
+        const scalar_t c3  = cof3[lane];
+        const scalar_t c4  = cof4[lane];
+        const scalar_t c5  = cof5[lane];
+        const scalar_t c6  = cof6[lane];
+        const scalar_t c7  = cof7[lane];
+        const scalar_t c8  = cof8[lane];
+        Ax0[lane]          = qtr * c0;
+        Ay0[lane]          = qtr * c1;
+        Az0[lane]          = qtr * c2;
+        Ax1[lane]          = qtr * c3;
+        Ay1[lane]          = qtr * c4;
+        Az1[lane]          = qtr * c5;
+        Ax2[lane]          = qtr * c6;
+        Ay2[lane]          = qtr * c7;
+        Az2[lane]          = qtr * c8;
+        // The three affine edge vectors, for the Rhie-Chow term in the face loop: J = adj(adj)/det,
+        // computed here because the cofactors and 1/det are already in registers. See
+        // cvfem_hex8_affine_edge_cols for the identity and the direction-major layout.
+        edx[0 * cvfem_hex8_vec_size<scalar_t> + lane] = (c4 * c8 - c5 * c7) * inv;
+        edx[1 * cvfem_hex8_vec_size<scalar_t> + lane] = (c2 * c7 - c1 * c8) * inv;
+        edx[2 * cvfem_hex8_vec_size<scalar_t> + lane] = (c1 * c5 - c2 * c4) * inv;
+        edy[0 * cvfem_hex8_vec_size<scalar_t> + lane] = (-c3 * c8 + c5 * c6) * inv;
+        edy[1 * cvfem_hex8_vec_size<scalar_t> + lane] = (c0 * c8 - c2 * c6) * inv;
+        edy[2 * cvfem_hex8_vec_size<scalar_t> + lane] = (-c0 * c5 + c2 * c3) * inv;
+        edz[0 * cvfem_hex8_vec_size<scalar_t> + lane] = (c3 * c7 - c4 * c6) * inv;
+        edz[1 * cvfem_hex8_vec_size<scalar_t> + lane] = (-c0 * c7 + c1 * c6) * inv;
+        edz[2 * cvfem_hex8_vec_size<scalar_t> + lane] = (c0 * c4 - c1 * c3) * inv;
+
+        const scalar_t ux0 = du.ux[0][lane], ux1 = du.ux[1][lane], ux2 = du.ux[2][lane], ux3 = du.ux[3][lane];
+        const scalar_t ux4 = du.ux[4][lane], ux5 = du.ux[5][lane], ux6 = du.ux[6][lane], ux7 = du.ux[7][lane];
+        const scalar_t uy0 = du.uy[0][lane], uy1 = du.uy[1][lane], uy2 = du.uy[2][lane], uy3 = du.uy[3][lane];
+        const scalar_t uy4 = du.uy[4][lane], uy5 = du.uy[5][lane], uy6 = du.uy[6][lane], uy7 = du.uy[7][lane];
+        const scalar_t uz0 = du.uz[0][lane], uz1 = du.uz[1][lane], uz2 = du.uz[2][lane], uz3 = du.uz[3][lane];
+        const scalar_t uz4 = du.uz[4][lane], uz5 = du.uz[5][lane], uz6 = du.uz[6][lane], uz7 = du.uz[7][lane];
+
+        const scalar_t ur = qtr * ((ux1 + ux2 + ux5 + ux6) - (ux0 + ux3 + ux4 + ux7));
+        const scalar_t us = qtr * ((ux2 + ux3 + ux6 + ux7) - (ux0 + ux1 + ux4 + ux5));
+        const scalar_t ut = qtr * ((ux4 + ux5 + ux6 + ux7) - (ux0 + ux1 + ux2 + ux3));
+        const scalar_t vr = qtr * ((uy1 + uy2 + uy5 + uy6) - (uy0 + uy3 + uy4 + uy7));
+        const scalar_t vs = qtr * ((uy2 + uy3 + uy6 + uy7) - (uy0 + uy1 + uy4 + uy5));
+        const scalar_t vt = qtr * ((uy4 + uy5 + uy6 + uy7) - (uy0 + uy1 + uy2 + uy3));
+        const scalar_t wr = qtr * ((uz1 + uz2 + uz5 + uz6) - (uz0 + uz3 + uz4 + uz7));
+        const scalar_t ws = qtr * ((uz2 + uz3 + uz6 + uz7) - (uz0 + uz1 + uz4 + uz5));
+        const scalar_t wt = qtr * ((uz4 + uz5 + uz6 + uz7) - (uz0 + uz1 + uz2 + uz3));
+
+        g00v[lane] = (c0 * ur + c3 * us + c6 * ut) * inv;
+        g01v[lane] = (c1 * ur + c4 * us + c7 * ut) * inv;
+        g02v[lane] = (c2 * ur + c5 * us + c8 * ut) * inv;
+        g10v[lane] = (c0 * vr + c3 * vs + c6 * vt) * inv;
+        g11v[lane] = (c1 * vr + c4 * vs + c7 * vt) * inv;
+        g12v[lane] = (c2 * vr + c5 * vs + c8 * vt) * inv;
+        g20v[lane] = (c0 * wr + c3 * ws + c6 * wt) * inv;
+        g21v[lane] = (c1 * wr + c4 * ws + c7 * wt) * inv;
+        g22v[lane] = (c2 * wr + c5 * ws + c8 * wt) * inv;
+    }
+}
+
+template <typename scalar_t>
+static SFEM_INLINE void cvfem_hex8_ns_upwind_jacobian_action_simd(
+        const scalar_t                        rho_s,
+        const scalar_t                        mu_s,
+        const scalar_t *const SFEM_RESTRICT   cof0,
+        const scalar_t *const SFEM_RESTRICT   cof1,
+        const scalar_t *const SFEM_RESTRICT   cof2,
+        const scalar_t *const SFEM_RESTRICT   cof3,
+        const scalar_t *const SFEM_RESTRICT   cof4,
+        const scalar_t *const SFEM_RESTRICT   cof5,
+        const scalar_t *const SFEM_RESTRICT   cof6,
+        const scalar_t *const SFEM_RESTRICT   cof7,
+        const scalar_t *const SFEM_RESTRICT   cof8,
+        const scalar_t *const SFEM_RESTRICT   det,
+        const Hex8InputPackT<scalar_t>                  &u,
+        const Hex8InputPackT<scalar_t>                  &du,
+        Hex8ResidualPackT<scalar_t>                     &out,
+        const Hex8RhieChowPackT<scalar_t>               *rc       = nullptr,
+        const scalar_t                        rc_scale = scalar_t(0),
+        const bool                            has_qg   = false,
+        const scalar_t                        ueps     = scalar_t(0),
+        // The exact higher-order action. `ho` is the state's nodal velocity gradient, the same
+        // field the residual's correction reads; `hov` is the DIRECTION's, reconstructed by its
+        // own pass on every matvec. Both null is the lagged action, which is what this kernel
+        // computed before they existed and what it still computes bit for bit when they are.
+        // Not const: both are rewritten in place into the increments the face loops read.
+        Hex8UGradPackT<scalar_t>                        *ho       = nullptr,
+        Hex8UGradPackT<scalar_t>                        *hov      = nullptr) {
+    const scalar_t rho  = rho_s;
+    const scalar_t mu   = mu_s;
+    const scalar_t half = scalar_t(0.5);
+    const scalar_t qtr  = scalar_t(0.25);
+    const scalar_t one  = scalar_t(1);
+
+    alignas(ALIGN_BYTES) scalar_t g00v[cvfem_hex8_vec_size<scalar_t>], g01v[cvfem_hex8_vec_size<scalar_t>], g02v[cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t g10v[cvfem_hex8_vec_size<scalar_t>], g11v[cvfem_hex8_vec_size<scalar_t>], g12v[cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t g20v[cvfem_hex8_vec_size<scalar_t>], g21v[cvfem_hex8_vec_size<scalar_t>], g22v[cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t Ax0[cvfem_hex8_vec_size<scalar_t>], Ay0[cvfem_hex8_vec_size<scalar_t>], Az0[cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t Ax1[cvfem_hex8_vec_size<scalar_t>], Ay1[cvfem_hex8_vec_size<scalar_t>], Az1[cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t Ax2[cvfem_hex8_vec_size<scalar_t>], Ay2[cvfem_hex8_vec_size<scalar_t>], Az2[cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t edx[3 * cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t edy[3 * cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t edz[3 * cvfem_hex8_vec_size<scalar_t>];
+
+    cvfem_hex8_action_geom_simd(qtr, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det, du,
+                                CVFEM_HEX8_ACTION_GEOM_PASS);
+
+    cvfem_hex8_zero_residual_pack(out);
+    cvfem_hex8_visc_dir_simd<0, 1, 3, 2, 4, 5, 7, 6>(
+            mu, g00v, g01v, g02v, g10v, g11v, g12v, g20v, g21v, g22v, Ax0, Ay0, Az0, out);
+    cvfem_hex8_visc_dir_simd<0, 3, 1, 2, 4, 7, 5, 6>(
+            mu, g00v, g01v, g02v, g10v, g11v, g12v, g20v, g21v, g22v, Ax1, Ay1, Az1, out);
+    cvfem_hex8_visc_dir_simd<0, 4, 1, 5, 2, 6, 3, 7>(
+            mu, g00v, g01v, g02v, g10v, g11v, g12v, g20v, g21v, g22v, Ax2, Ay2, Az2, out);
+
+    // Three instantiations rather than a runtime test inside the face loop: the term is
+    // either present for a whole sweep or absent for it, and has_qg == false must stay
+    // bit-identical to what this kernel emitted before the term existed.
+    // The upwind band, dispatched at compile time.
+    //
+    // cvfem_upwind_abs branches on `eps > 0`, and this is the SIMD face loop -- the same
+    // loop in which a guard on the Rhie-Chow coefficient cost 1.83x by tipping GCC's cost
+    // model out of vectorising it. A runtime eps would leave that compare in the body of
+    // every run, including the overwhelming majority that use the hard switch. So the
+    // band is a template flag: EPS=false passes a literal zero, the branch folds, and the
+    // default path emits what it emitted before this parameter existed.
+    const bool eps_on = ueps > scalar_t(0);
+    const bool ho_on  = ho != nullptr && hov != nullptr;
+
+    // The state's and the direction's increments, exactly as the residual dispatcher builds the
+    // state's and for the same reason -- the correction's derivative reads grad(v) through the
+    // same node-to-centroid vectors the correction reads grad(u) through -- and eps^2 per
+    // direction group for the Venkatakrishnan arm.
+    alignas(ALIGN_BYTES) scalar_t veps2[3 * cvfem_hex8_vec_size<scalar_t>];
+    // The state's increments' rounding scales, for the limiter derivatives' bands.
+    alignas(ALIGN_BYTES) scalar_t isc[CVFEM_HEX8_N_NODES * 3 * cvfem_hex8_vec_size<scalar_t>];
+    if (ho_on) {
+        cvfem_hex8_defcor_ref_increments<cvfem_hex8_vec_size<scalar_t>, true>(&ho->g[0][0][0], edx, edy, edz, isc);
+        cvfem_hex8_defcor_ref_increments<cvfem_hex8_vec_size<scalar_t>>(&hov->g[0][0][0], edx, edy, edz);
+        if (ho->limiter == 2)
+            cvfem_hex8_defcor_venkat_eps2<cvfem_hex8_vec_size<scalar_t>>(ho->venkat_c, edx, edy, edz, veps2);
+    }
+    // A macro over the eight arguments the sixteen instantiations share, for the reason the
+    // residual side has one: sixteen hand-written copies of the argument list is where a
+    // transposed pack hides.
+// The limiter joins the compile-time set, and it is dispatched HERE rather than inside the lane
+// loop: it is uniform across the sweep, and a select on it in the vector body cost 2x. Only the
+// HO arms instantiate the four values; without the correction there is no limiter to select, so
+// LIM stays 0 and the non-HO instantiation count is unchanged.
+#define CVFEM_HEX8_CONV_ALL_JV_L(RC_, QG_, EPS_, HO_, LIM_)                                     \
+    cvfem_hex8_conv_all_jv_simd<RC_, QG_, EPS_, HO_, LIM_>(rho, half, one, Ax0, Ay0, Az0, Ax1,  \
+                                                     Ay1, Az1, Ax2, Ay2, Az2, u, du, rc, out,   \
+                                                     ueps, ho, hov, veps2, isc, edx, edy, edz)
+#define CVFEM_HEX8_CONV_ALL_JV(RC_, QG_, EPS_, HO_)                                             \
+    do {                                                                                        \
+        if constexpr (!(HO_)) {                                                                 \
+            CVFEM_HEX8_CONV_ALL_JV_L(RC_, QG_, EPS_, false, 0);                                 \
+        } else {                                                                                \
+            switch (ho->limiter) {                                                              \
+                case 1: CVFEM_HEX8_CONV_ALL_JV_L(RC_, QG_, EPS_, true, 1); break;               \
+                case 2: CVFEM_HEX8_CONV_ALL_JV_L(RC_, QG_, EPS_, true, 2); break;               \
+                case 3: CVFEM_HEX8_CONV_ALL_JV_L(RC_, QG_, EPS_, true, 3); break;               \
+                default: CVFEM_HEX8_CONV_ALL_JV_L(RC_, QG_, EPS_, true, 0); break;              \
+            }                                                                                   \
+        }                                                                                       \
+    } while (0)
+    if (rc && rc_scale != scalar_t(0)) {
+        if (has_qg) {
+            if (eps_on) { if (ho_on) CVFEM_HEX8_CONV_ALL_JV(true, true, true, true);
+                          else       CVFEM_HEX8_CONV_ALL_JV(true, true, true, false); }
+            else        { if (ho_on) CVFEM_HEX8_CONV_ALL_JV(true, true, false, true);
+                          else       CVFEM_HEX8_CONV_ALL_JV(true, true, false, false); }
+        } else {
+            if (eps_on) { if (ho_on) CVFEM_HEX8_CONV_ALL_JV(true, false, true, true);
+                          else       CVFEM_HEX8_CONV_ALL_JV(true, false, true, false); }
+            else        { if (ho_on) CVFEM_HEX8_CONV_ALL_JV(true, false, false, true);
+                          else       CVFEM_HEX8_CONV_ALL_JV(true, false, false, false); }
+        }
+    } else {
+        if (eps_on) { if (ho_on) CVFEM_HEX8_CONV_ALL_JV(false, false, true, true);
+                      else       CVFEM_HEX8_CONV_ALL_JV(false, false, true, false); }
+        else        { if (ho_on) CVFEM_HEX8_CONV_ALL_JV(false, false, false, true);
+                      else       CVFEM_HEX8_CONV_ALL_JV(false, false, false, false); }
+#undef CVFEM_HEX8_CONV_ALL_JV
+    }
+}
+
+// The Jacobian action with the state read out of a partially assembled tangent.
+//
+// Same operator as cvfem_hex8_ns_upwind_jacobian_action_simd, and the same geometry and
+// viscous work -- it calls the same helpers for both. What differs is the convective half:
+// it takes no Hex8InputPack for the state, because the state reaches it only through the
+// sixty scalars per element that were computed once for this Newton step.
+//
+// The Rhie-Chow argument is still needed and is not a leftover: the coefficient and the
+// edge vectors multiply the DIRECTION's pressure and its reconstructed gradient, neither of
+// which can be folded into a per-element store.
+template <typename scalar_t>
+static SFEM_INLINE void cvfem_hex8_ns_upwind_jacobian_action_pa_simd(
+        const scalar_t                        rho_s,
+        const scalar_t                        mu_s,
+        const scalar_t *const SFEM_RESTRICT   cof0,
+        const scalar_t *const SFEM_RESTRICT   cof1,
+        const scalar_t *const SFEM_RESTRICT   cof2,
+        const scalar_t *const SFEM_RESTRICT   cof3,
+        const scalar_t *const SFEM_RESTRICT   cof4,
+        const scalar_t *const SFEM_RESTRICT   cof5,
+        const scalar_t *const SFEM_RESTRICT   cof6,
+        const scalar_t *const SFEM_RESTRICT   cof7,
+        const scalar_t *const SFEM_RESTRICT   cof8,
+        const scalar_t *const SFEM_RESTRICT   det,
+        const Hex8InputPackT<scalar_t>                  &du,
+        const scalar_t *const SFEM_RESTRICT   pa,
+        const ptrdiff_t                       nelem,
+        Hex8ResidualPackT<scalar_t>                     &out,
+        const Hex8RhieChowPackT<scalar_t>               *rc       = nullptr,
+        const scalar_t                        rc_scale = scalar_t(0),
+        const bool                            has_qg   = false) {
+    const scalar_t rho  = rho_s;
+    const scalar_t mu   = mu_s;
+    const scalar_t half = scalar_t(0.5);
+    const scalar_t qtr  = scalar_t(0.25);
+
+    alignas(ALIGN_BYTES) scalar_t g00v[cvfem_hex8_vec_size<scalar_t>], g01v[cvfem_hex8_vec_size<scalar_t>], g02v[cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t g10v[cvfem_hex8_vec_size<scalar_t>], g11v[cvfem_hex8_vec_size<scalar_t>], g12v[cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t g20v[cvfem_hex8_vec_size<scalar_t>], g21v[cvfem_hex8_vec_size<scalar_t>], g22v[cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t Ax0[cvfem_hex8_vec_size<scalar_t>], Ay0[cvfem_hex8_vec_size<scalar_t>], Az0[cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t Ax1[cvfem_hex8_vec_size<scalar_t>], Ay1[cvfem_hex8_vec_size<scalar_t>], Az1[cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t Ax2[cvfem_hex8_vec_size<scalar_t>], Ay2[cvfem_hex8_vec_size<scalar_t>], Az2[cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t edx[3 * cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t edy[3 * cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t edz[3 * cvfem_hex8_vec_size<scalar_t>];
+
+    cvfem_hex8_action_geom_simd(qtr, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det, du,
+                                CVFEM_HEX8_ACTION_GEOM_PASS);
+
+    cvfem_hex8_zero_residual_pack(out);
+    cvfem_hex8_visc_dir_simd<0, 1, 3, 2, 4, 5, 7, 6>(
+            mu, g00v, g01v, g02v, g10v, g11v, g12v, g20v, g21v, g22v, Ax0, Ay0, Az0, out);
+    cvfem_hex8_visc_dir_simd<0, 3, 1, 2, 4, 7, 5, 6>(
+            mu, g00v, g01v, g02v, g10v, g11v, g12v, g20v, g21v, g22v, Ax1, Ay1, Az1, out);
+    cvfem_hex8_visc_dir_simd<0, 4, 1, 5, 2, 6, 3, 7>(
+            mu, g00v, g01v, g02v, g10v, g11v, g12v, g20v, g21v, g22v, Ax2, Ay2, Az2, out);
+
+    // No upwind-band dispatch here: the band lives entirely in the switch, and the switch
+    // was evaluated when the tangent was built. That is one of the things the store buys --
+    // the smoothing costs the matvec nothing at all now, whatever eps is.
+    if (rc && rc_scale != scalar_t(0)) {
+        if (has_qg)
+            cvfem_hex8_conv_all_jv_pa_simd<true, true>(
+                    rho, half, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, du, rc, pa, nelem, out, edx, edy, edz);
+        else
+            cvfem_hex8_conv_all_jv_pa_simd<true, false>(
+                    rho, half, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, du, rc, pa, nelem, out, edx, edy, edz);
+    } else {
+        cvfem_hex8_conv_all_jv_pa_simd<false, false>(
+                rho, half, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, du, rc, pa, nelem, out, edx, edy, edz);
+    }
+}
+
+#define CVFEM_HEX8_PART_ALL       0
+#define CVFEM_HEX8_PART_LINEAR    1
+#define CVFEM_HEX8_PART_NONLINEAR 2
+
+
+#endif
+

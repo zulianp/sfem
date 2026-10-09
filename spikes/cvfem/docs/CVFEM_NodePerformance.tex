@@ -1,0 +1,298 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=2.4cm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{siunitx}
+\usepackage{xcolor}
+\usepackage[colorlinks=true,linkcolor=blue!50!black,urlcolor=blue!55!black]{hyperref}
+\usepackage{enumitem}
+\usepackage{titlesec}
+
+\titleformat{\section}{\normalfont\Large\bfseries\color{blue!45!black}}{\thesection}{1em}{}
+
+\sisetup{
+  table-number-alignment = center,
+  detect-weight          = true,
+}
+
+\newcommand{\dofs}{\ensuremath{\mathrm{dof}}}
+
+\title{Node-level performance of a CVFEM Navier--Stokes multigrid solver\\
+       on an NVIDIA GH200 node}
+\author{SFEM / CVFEM spike}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We report node-level performance of the semi-structured CVFEM Navier--Stokes
+solver in SFEM on a single Alps GH200 node (four sockets, \num{72} Neoverse~V2
+cores each, \num{288} cores, \(\approx\SI{870}{\giga\byte}\)). At a fixed core
+count the rank\,\(\times\)\,thread decomposition is swept from \(1\times288\) to
+\(72\times4\); the optimum is \(4\times72\), one rank per socket, at both problem
+sizes tested. The decomposition is shown to be iteration-count invariant, so the
+wall-clock comparisons are between runs performing identical work. The dominant
+cost at every shape is the coarsest-level solve, a dense LU that each rank stores
+in full and assembles through an \(n^2\) allreduce; it is a fixed
+\(\approx\SI{5.4}{\second}\) floor that does not amortise with problem size and
+that bounds the attainable macro-element resolution. We also quantify the cost of
+a defect in the coarse hierarchy's mesh packing, which silently tripled the
+iteration count at the shipped default settings.
+\end{abstract}
+
+\section{Platform and configuration}
+
+All measurements are taken on one Alps GH200 node: four sockets of \num{72}
+Neoverse~V2 cores, \num{288} cores in total, \num{36} NUMA domains, and roughly
+\SI{870}{\giga\byte} of memory. The toolchain is the \texttt{prgenv-gnu/24.11:v2}
+user environment with cray-mpich under \texttt{srun}; threads are bound with
+\texttt{OMP\_PROC\_BIND=true} throughout.
+
+The test problem is the lid-driven cavity discretised with the semi-structured
+CVFEM Navier--Stokes operator. Two sizes are used:
+
+\begin{center}
+\begin{tabular}{lrrrr}
+\toprule
+case & macro elements & nodes & \dofs & MG levels \\
+\midrule
+\(N=16\), refine \num{4} & \num{4096} & \num{274625}  & \num{1098500} & 3 \\
+\(N=16\), refine \num{8} & \num{4096} & \num{2146689} & \num{8586756} & 4 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The solver is FGMRES preconditioned by geometric multigrid with a Vanka
+smoother and Galerkin-assembled coarse operators
+(\texttt{SFEM\_GMG\_GALERKIN=2}); the coarsest level is solved by a dense LU. All
+runs perform one Newton step with a linear tolerance of \num{1e-4}, which is the
+regime the solver is used in; reported iteration counts are therefore the linear
+iterations of that step.
+
+\section{Rank\,\(\times\)\,thread decomposition at fixed core count}
+
+Table~\ref{tab:shape-small} and Table~\ref{tab:shape-large} sweep the
+decomposition at a constant \num{288} cores. In both, the linear iteration count
+is identical at every shape, so the wall-clock figures compare runs performing
+the same work.
+
+\begin{table}[htbp]
+\centering
+\caption{Decomposition sweep at \num{1098500}~\dofs\ (three levels).
+Linear iterations are \num{7} at every shape.}
+\label{tab:shape-small}
+\begin{tabular}{l S[table-format=2.2] S[table-format=2.3] S[table-format=1.4]}
+\toprule
+shape (ranks \(\times\) threads) & {total (\si{\second})} & {coarse factorisation (\si{\second})} & {solve (\si{\second})} \\
+\midrule
+\textbf{4\,\(\times\)\,72} & \bfseries 9.31 & 5.351 & 1.2901 \\
+8\,\(\times\)\,36          & 11.59          & 7.824 & 1.3259 \\
+12\,\(\times\)\,24         & 14.66          & 10.864 & 1.3852 \\
+18\,\(\times\)\,16         & 20.24          & 16.214 & 1.5299 \\
+36\,\(\times\)\,8          & 28.58          & 24.602 & 1.5454 \\
+72\,\(\times\)\,4          & 49.99          & 45.778 & 1.7269 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\caption{Decomposition sweep at \num{8586756}~\dofs\ (four levels),
+\(\approx\num{29800}\)~\dofs\ per core. Linear iterations are \num{5} at every
+shape. The three fat shapes are from a separate job that repeats \(4\times72\);
+the two \(4\times72\) measurements, \SI{11.44}{\second} and \SI{11.07}{\second},
+bound the run-to-run variation at about \SI{3}{\percent}.}
+\label{tab:shape-large}
+\begin{tabular}{l S[table-format=2.2] S[table-format=2.3] S[table-format=1.4]}
+\toprule
+shape (ranks \(\times\) threads) & {total (\si{\second})} & {coarse factorisation (\si{\second})} & {solve (\si{\second})} \\
+\midrule
+1\,\(\times\)\,288         & 21.50 & 10.864 & 5.5725 \\
+2\,\(\times\)\,144         & 16.49 & 6.117  & 4.2616 \\
+\textbf{4\,\(\times\)\,72} & \bfseries 11.07 & 5.322 & 1.6595 \\
+\textbf{4\,\(\times\)\,72} & \bfseries 11.44 & 5.414 & 1.6693 \\
+8\,\(\times\)\,36          & 12.97 & 7.779  & 1.7866 \\
+18\,\(\times\)\,16         & 22.61 & 16.945 & 2.4573 \\
+72\,\(\times\)\,4          & 50.74 & 45.385 & 2.4001 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The optimum is \(4\times72\) at both sizes: one MPI rank per socket, with each
+thread team confined to one socket's memory. The curve is monotone on both sides
+of it, and the two directions fail for different reasons.
+
+Towards lean ranks, the coarse factorisation dominates: it grows by \(8.6\times\)
+from \(4\times72\) to \(72\times4\) while the solve phase moves only
+\SI{34}{\percent}. Towards fat ranks, the failure is NUMA. At \(1\times288\) a
+single OpenMP team spans all four sockets: the solve phase degrades by
+\(3.4\times\) (\SI{1.66}{\second} to \SI{5.57}{\second}), and the factorisation
+itself is \emph{worse} than at four ranks (\SI{10.86}{\second} against
+\SI{5.32}{\second}), because one dense \texttt{getrf} spread across four sockets
+is slower than four independent factorisations each inside a socket. The
+elimination of MPI replication and of the \(n^2\) allreduce at one rank does not
+compensate.
+
+At saturation the baseline wins on \emph{both} components: even setting the
+coarse factorisation aside, the solve phase alone favours \(4\times72\) by
+roughly \(1.5\times\) over the lean shapes.
+
+\section{Where the time is spent}\label{sec:time}
+
+The phase breakdown at \(4\times72\) and \num{8586756}~\dofs\ attributes
+\SI{5.414}{\second} of \SI{11.44}{\second} --- \SI{47}{\percent} --- to the
+coarsest-level factorisation; at \(72\times4\) the same phase is
+\SI{89}{\percent} of the run. Raising the problem size eightfold, from
+\num{1098500} to \num{8586756}~\dofs, left that cost essentially unchanged
+(\SI{5.351}{\second} against \SI{5.414}{\second} at the baseline shape), because
+the coarsest level is fixed by the macro mesh (\(17^3\) nodes, \num{19652}~\dofs)
+and is untouched by refinement. It is therefore a fixed floor, not an amortisable
+overhead.
+
+Table~\ref{tab:coarse} separates the two components of that phase on a
+\num{740772}~\dofs\ case with a \num{13500}-\dofs\ coarsest level, in pure MPI.
+
+\begin{table}[htbp]
+\centering
+\caption{Coarse-solve components at \num{740772}~\dofs, pure MPI (one thread per
+rank). \texttt{getrf} is the per-rank dense factorisation; the remainder of the
+phase is dominated by the \(n^2\) allreduce that assembles the coarse matrix on
+every rank.}
+\label{tab:coarse}
+\begin{tabular}{S[table-format=3.0] S[table-format=2.1] S[table-format=2.1] S[table-format=2.2]}
+\toprule
+{ranks} & {\texttt{getrf} (\si{\second})} & {rest of phase (\si{\second})} & {solve (\si{\second})} \\
+\midrule
+1   & 45.4 & 0.1  & 12.57 \\
+8   & 44.9 & 1.9  & 2.97 \\
+32  & 47.4 & 1.3  & 1.64 \\
+128 & 47.4 & 5.2  & 1.35 \\
+288 & 54.9 & 54.9 & 3.41 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The two costs have opposite character. The factorisation is replicated, so its
+cost per rank is flat and no parallelism is recovered from it. The assembly
+allreduce grows with rank count, from \SI{5.2}{\second} at \num{128} ranks to
+\SI{54.9}{\second} at \num{288}. The solve phase, by contrast, scales well:
+\SI{12.57}{\second} to \SI{1.35}{\second} from \num{1} to \num{128} ranks, a
+factor of \num{9.3}.
+
+\paragraph{Resolution ceiling.} The dense coarse solve costs
+\(\mathcal{O}(n^3)\) in time and \(\mathcal{O}(n^2)\) in memory, where \(n\) is
+the coarse \dofs\ count and scales as \((N+1)^3\) in the macro resolution \(N\)
+--- so roughly \(N^9\). Extrapolating from the measured point at \(N=16\)
+(\num{19652}~\dofs, \SI{3.09}{\giga\byte} per rank, \SI{5.4}{\second}), \(N=24\)
+would need \(\approx\SI{31}{\giga\byte}\) per rank and minutes of factorisation,
+and \(N=32\) about \SI{165}{\giga\byte} per rank. This was observed directly: at
+\num{288} ranks and a \num{19652}-\dofs\ coarse level the replicated factor
+required \(288\times\SI{3.09}{\giga\byte}\approx\SI{890}{\giga\byte}\) and the run
+was terminated by the out-of-memory killer. \emph{The coarse solver, not the
+domain decomposition, is what bounds the attainable mesh resolution.}
+
+\section{Iteration-count invariance}
+
+The wall-clock comparisons above are only meaningful if the decompositions
+perform identical work. Table~\ref{tab:invariance} confirms this over the full
+range of rank counts.
+
+\begin{table}[htbp]
+\centering
+\caption{Linear iterations against rank count, pure MPI. Block-Jacobi is the
+structural control: it inverts one \(4\times4\) block per node, so its owned
+output depends only on owned input and it cannot be partition dependent. The
+four-level and three-level entries at \num{1098500}~\dofs\ are not a
+duplication: \(N=8\) at refine \num{8} and \(N=16\) at refine \num{4} coincide in
+degree-of-freedom count while differing in hierarchy depth.}
+\label{tab:invariance}
+\begin{tabular}{lll}
+\toprule
+case & smoother & linear iterations \\
+\midrule
+\num{1098500}~\dofs, 4 levels & Vanka        & \num{6} at 1, 8, 32, 64, 128, 288 ranks \\
+\num{740772}~\dofs, 3 levels  & Vanka        & \num{7} at 1, 8, 32, 128, 288 ranks \\
+\num{1098500}~\dofs, 3 levels & Vanka        & \num{7} at 1, 8, 32, 128 ranks \\
+\num{1098500}~\dofs, 3 levels & block-Jacobi & \num{10} at 1, 8, 32, 128 ranks \\
+\num{143748}~\dofs, 3 levels  & block-Jacobi & \num{11} at 1, 8, 32, 64 ranks \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{A packing defect in the coarse hierarchy}
+
+The coarse levels of the hierarchy were packed for SIMD execution, and packing
+renumbers a mesh's nodes in place. The hierarchy's transfer operators, however,
+do not address the coarse vector through the coarse mesh at all: both
+\texttt{sshex8\_\allowbreak hierarchical\_\allowbreak prolongation} and
+\texttt{sshex8\_\allowbreak hierarchical\_\allowbreak restriction} take only the \emph{fine} element
+table and index coarse degrees of freedom by macro-corner identifier. Renumbering
+the coarse mesh therefore desynchronised the coarse operator from the transfers
+that feed it. The permutation is the identity when a level fits in a single pack,
+which is why the defect was invisible below \num{2048} macro elements --- the
+shipped default pack size.
+
+Table~\ref{tab:fix} gives the cost at \num{1098500}~\dofs. Two coarse-operator
+modes are shown: Galerkin assembly, the default, and rediscretisation.
+
+\begin{table}[htbp]
+\centering
+\caption{Effect of the coarse-packing defect and its repair at
+\num{1098500}~\dofs, serial, \num{72} threads. Pack size \num{2048} is the
+shipped default and yields two packs at this mesh size; \num{4096} yields one
+pack and \num{0} disables packing. ``cap'' denotes a run that reached the
+\num{1000}-iteration limit without converging, so both its iteration count and
+its time are lower bounds.}
+\label{tab:fix}
+\begin{tabular}{llrrrr}
+\toprule
+& & \multicolumn{2}{c}{before} & \multicolumn{2}{c}{after} \\
+\cmidrule(lr){3-4}\cmidrule(lr){5-6}
+coarse operator & pack size & iters & time (\si{\second}) & iters & time (\si{\second}) \\
+\midrule
+Galerkin          & 0 (off)        & 7    & 5.80   & 7  & 5.79 \\
+Galerkin          & \textbf{2048}  & \textbf{22} & \textbf{8.97} & \textbf{7} & \textbf{5.82} \\
+Galerkin          & 4096           & 7    & 5.65   & 7  & 5.87 \\
+rediscretisation  & 0 (off)        & 17   & 13.03  & 17 & 12.85 \\
+rediscretisation  & \textbf{2048}  & \textbf{cap} & \textbf{222.65} & \textbf{17} & \textbf{12.97} \\
+rediscretisation  & 4096           & 17   & 30.79  & 17 & 12.98 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+At the shipped default the Galerkin path required three times the iterations and
+\SI{55}{\percent} more wall clock; the rediscretisation path failed to converge
+at all. The repair is to decline packing on derefined levels, whose numbering is
+load-bearing for the transfers, while leaving the fine level's packing --- the
+performance-critical one --- untouched. The unpacked configurations are unchanged
+to within run-to-run variation, confirming that the change does not perturb the
+path it does not touch.
+
+\section{Limitations}
+
+\begin{itemize}
+  \item \textbf{Communication overlap is not exercised.} The library's default
+    matrix-free path overlaps the halo exchange with computation over element
+    subranges. The CVFEM operator does not implement a scoped apply and aborts on
+    that path, so every measurement here uses the blocking
+    \texttt{SFEM\_PARALLEL\_MF\_LEGACY=1} path. The cost of the communication
+    thread at each decomposition shape therefore remains unmeasured.
+  \item \textbf{One Newton step.} Iteration counts and timings are for a single
+    Newton step at a linear tolerance of \num{1e-4}. A full nonlinear
+    continuation has not been swept across decompositions.
+  \item \textbf{One coarse-operator mode for the sweeps.} The decomposition
+    sweeps use Galerkin-assembled coarse operators. Substituting an iterative
+    (BiCGStab) coarse solve removes the factorisation cost but destroys
+    iteration-count invariance: it neither converged to its \num{1e-8} tolerance
+    nor exhausted its iteration budget, stalling inconsistently and yielding
+    outer counts that varied with decomposition and between repeat runs of the
+    same configuration. A preconditioned or genuinely distributed direct coarse
+    solve, rather than this substitution, is the route to lifting the ceiling in
+    Section~\ref{sec:time}.
+  \item \textbf{Single node.} No multi-node results are reported.
+\end{itemize}
+
+\end{document}

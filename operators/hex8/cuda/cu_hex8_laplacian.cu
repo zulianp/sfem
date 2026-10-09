@@ -209,7 +209,7 @@ extern int cu_affine_hex8_laplacian_apply(const ptrdiff_t                 neleme
                                           idx_t **const SFEM_RESTRICT     elements,
                                           const ptrdiff_t                 fff_stride,
                                           const void *const SFEM_RESTRICT fff,
-                                          const enum smesh::PrimitiveType             real_type_xy,
+                                          const enum smesh::PrimitiveType real_type_xy,
                                           const void *const               x,
                                           void *const                     y,
                                           void                           *stream) {
@@ -342,7 +342,7 @@ extern int cu_affine_hex8_laplacian_taylor_apply(const ptrdiff_t                
                                                  idx_t **const SFEM_RESTRICT     elements,
                                                  const ptrdiff_t                 fff_stride,
                                                  const void *const SFEM_RESTRICT fff,
-                                                 const enum smesh::PrimitiveType             real_type_xy,
+                                                 const enum smesh::PrimitiveType real_type_xy,
                                                  const void *const               x,
                                                  void *const                     y,
                                                  void                           *stream) {
@@ -376,7 +376,7 @@ __global__ void cu_affine_hex8_laplacian_crs_sym_kernel(const ptrdiff_t         
                                                         const ptrdiff_t                          fff_stride,
                                                         const cu_jacobian_t *const SFEM_RESTRICT g_fff,
                                                         const count_t *const SFEM_RESTRICT       rowptr,
-                                                        const idx_t *const SFEM_RESTRICT              colidx,
+                                                        const idx_t *const SFEM_RESTRICT         colidx,
                                                         T *const SFEM_RESTRICT                   diag,
                                                         T *const SFEM_RESTRICT                   offdiag) {
     for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements; e += blockDim.x * gridDim.x) {
@@ -432,7 +432,7 @@ static int cu_affine_hex8_laplacian_crs_sym_tpl(const ptrdiff_t                 
                                                 const ptrdiff_t                          fff_stride,
                                                 const cu_jacobian_t *const SFEM_RESTRICT fff,
                                                 const count_t *const SFEM_RESTRICT       rowptr,
-                                                const idx_t *const SFEM_RESTRICT              colidx,
+                                                const idx_t *const SFEM_RESTRICT         colidx,
                                                 T *const SFEM_RESTRICT                   diag,
                                                 T *const SFEM_RESTRICT                   offdiag,
                                                 void                                    *stream) {
@@ -466,8 +466,8 @@ extern int cu_affine_hex8_laplacian_crs_sym(const ptrdiff_t                    n
                                             const ptrdiff_t                    fff_stride,
                                             const void *const SFEM_RESTRICT    fff,
                                             const count_t *const SFEM_RESTRICT rowptr,
-                                            const idx_t *const SFEM_RESTRICT        colidx,
-                                            const enum smesh::PrimitiveType                real_type,
+                                            const idx_t *const SFEM_RESTRICT   colidx,
+                                            const enum smesh::PrimitiveType    real_type,
                                             void *const SFEM_RESTRICT          diag,
                                             void *const SFEM_RESTRICT          offdiag,
                                             void                              *stream) {
@@ -511,6 +511,92 @@ extern int cu_affine_hex8_laplacian_crs_sym(const ptrdiff_t                    n
                     "%d)\n",
                     smesh::to_string(real_type),
                     real_type);
+            return SFEM_FAILURE;
+        }
+    }
+}
+
+template <typename real_t>
+__global__ void cu_affine_hex8_laplacian_diag_kernel(const ptrdiff_t                          nelements,
+                                                     idx_t **const SFEM_RESTRICT              elements,
+                                                     const ptrdiff_t                          fff_stride,
+                                                     const cu_jacobian_t *const SFEM_RESTRICT g_fff,
+                                                     real_t *const SFEM_RESTRICT              diag) {
+    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements; e += blockDim.x * gridDim.x) {
+        idx_t         ev[8];
+        accumulator_t element_diag[8];
+        scalar_t      fff[6];
+
+        for (int v = 0; v < 8; ++v) {
+            ev[v] = elements[v][e];
+        }
+
+        for (int d = 0; d < 6; d++) {
+            fff[d] = g_fff[d * fff_stride + e];
+        }
+
+        cu_hex8_laplacian_diag_fff_integral(fff, element_diag);
+
+        for (int edof_i = 0; edof_i < 8; ++edof_i) {
+            atomicAdd(&diag[ev[edof_i]], element_diag[edof_i]);
+        }
+    }
+}
+
+template <typename T>
+static int cu_affine_hex8_laplacian_diag_tpl(const ptrdiff_t                          nelements,
+                                             idx_t **const SFEM_RESTRICT              elements,
+                                             const ptrdiff_t                          fff_stride,
+                                             const cu_jacobian_t *const SFEM_RESTRICT fff,
+                                             T *const                                 diag,
+                                             void                                    *stream) {
+    SFEM_DEBUG_SYNCHRONIZE();
+
+    int block_size = 128;
+#ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
+    {
+        int min_grid_size;
+        cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size, cu_affine_hex8_laplacian_diag_kernel<T>, 0, 0);
+    }
+#endif
+
+    const ptrdiff_t n_blocks = MAX(ptrdiff_t(1), (nelements + block_size - 1) / (ptrdiff_t)block_size);
+
+    if (stream) {
+        cudaStream_t s = *static_cast<cudaStream_t *>(stream);
+        cu_affine_hex8_laplacian_diag_kernel<<<n_blocks, block_size, 0, s>>>(nelements, elements, fff_stride, fff, diag);
+    } else {
+        cu_affine_hex8_laplacian_diag_kernel<<<n_blocks, block_size, 0>>>(nelements, elements, fff_stride, fff, diag);
+    }
+
+    SFEM_DEBUG_SYNCHRONIZE();
+    return SFEM_SUCCESS;
+}
+
+extern int cu_affine_hex8_laplacian_diag(const ptrdiff_t                 nelements,
+                                         idx_t **const SFEM_RESTRICT     elements,
+                                         const ptrdiff_t                 fff_stride,
+                                         const void *const SFEM_RESTRICT fff,
+                                         const enum smesh::PrimitiveType real_type_xy,
+                                         void *const SFEM_RESTRICT       diag,
+                                         void                           *stream) {
+    switch (real_type_xy) {
+        case smesh::SMESH_DEFAULT: {
+            return cu_affine_hex8_laplacian_diag_tpl(
+                    nelements, elements, fff_stride, (cu_jacobian_t *)fff, (real_t *)diag, stream);
+        }
+        case smesh::SMESH_FLOAT32: {
+            return cu_affine_hex8_laplacian_diag_tpl(
+                    nelements, elements, fff_stride, (cu_jacobian_t *)fff, (float *)diag, stream);
+        }
+        case smesh::SMESH_FLOAT64: {
+            return cu_affine_hex8_laplacian_diag_tpl(
+                    nelements, elements, fff_stride, (cu_jacobian_t *)fff, (double *)diag, stream);
+        }
+        default: {
+            SFEM_ERROR("[Error] cu_affine_hex8_laplacian_diag: not implemented for type %s (code %d)\n",
+                       smesh::to_string(real_type_xy),
+                       real_type_xy);
             return SFEM_FAILURE;
         }
     }

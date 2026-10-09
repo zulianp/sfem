@@ -1,0 +1,29 @@
+### host nid006561  threads 72  repeat=10 warmup=3  2026-09-28 16:03:39
+### 72 cores; a pack is one OpenMP iteration, so n_packs is the available parallelism
+
+### pack-size sweep, space-filling order
+n      pack_req elems/pack  n_packs packs/thr mean_nodes  res_MDOFs   jac_MDOFs
+64          128       128     2048      28.4        225   1392.187    1038.180
+64          256       256     1024      14.2        405   1385.864    1048.385
+64          512       512      512       7.1        729   1321.510     974.893
+64         1024      1024      256       3.6       1377   1326.150     985.296
+64         2048      2048      128       1.8       2601   1322.913     976.960
+64         4096      4096       64       0.9       4913   1338.984     913.758
+64         8192      8192       32       0.4       9537    699.104     503.018
+128         128       128    16384     227.6        225   1301.725     821.504
+128         256       256     8192     113.8        405   1306.319     856.096
+128         512       512     4096      56.9        729   1338.755     874.136
+128        1024      1024     2048      28.4       1377   1321.916     858.644
+128        2048      2048     1024      14.2       2601   1273.567     843.509
+128        4096      4096      512       7.1       4913   1205.301     791.243
+128        8192      8192      256       3.6       9537   1159.265     730.420
+
+### spatial ordering: same pack size, space-filling against lexicographic
+n          pack order          mean_nodes  res_MDOFs   jac_MDOFs
+64         2048 sfc                  2601   1349.060     970.560
+64         2048 nosfc                4290   1232.530     802.425
+128        2048 sfc                  2601   1293.013     836.280
+128        2048 nosfc                4386   1091.775     704.759
+
+csv: /ritom/scratch/cscs/zulianp/cvfem_packsz_paper/4867770/packsize.csv
+logs in /ritom/scratch/cscs/zulianp/cvfem_packsz_paper/4867770

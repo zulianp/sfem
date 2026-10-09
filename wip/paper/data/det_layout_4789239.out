@@ -1,0 +1,56 @@
+### host nid006545  n=100  repeats=3 at 72t  thread sweep: 1 8 36 72
+### fingerprints are comparable only DOWN a column (within one layout): packing renumbers
+
+layout    op    A: repeats @72t              B: across threads           
+atomic    res   3 distinct / 3 runs          4 distinct / 4 runs         
+atomic    jac   3 distinct / 3 runs          4 distinct / 4 runs         
+packed    res   1 distinct / 3 runs          1 distinct / 4 runs         
+packed    jac   1 distinct / 3 runs          1 distinct / 4 runs         
+colored   res   1 distinct / 3 runs          1 distinct / 4 runs         
+colored   jac   1 distinct / 3 runs          1 distinct / 4 runs         
+
+1 distinct = bit-reproducible. Compare down a column only.
+raw fingerprints:
+atomic_jac_rep1.log:  fingerprint: ba7d95c938d4d2cb
+atomic_jac_rep2.log:  fingerprint: bf71ef584dcc0aac
+atomic_jac_rep3.log:  fingerprint: da3e334be1141005
+atomic_jac_t1.log:  fingerprint: 2d062b568e262fc8
+atomic_jac_t36.log:  fingerprint: a45085ca021fe5f3
+atomic_jac_t72.log:  fingerprint: 92292032ba3ca50c
+atomic_jac_t8.log:  fingerprint: e996eeacf4cb768c
+atomic_res_rep1.log:  fingerprint: f58b9a504199bf12
+atomic_res_rep2.log:  fingerprint: 527e3fbabaff3592
+atomic_res_rep3.log:  fingerprint: 61168dc23a622b7e
+atomic_res_t1.log:  fingerprint: e8c90a468c1d638e
+atomic_res_t36.log:  fingerprint: 596c8ebf7ff926c3
+atomic_res_t72.log:  fingerprint: 53f211df5370166e
+atomic_res_t8.log:  fingerprint: 04ecbbc88d95e2e8
+colored_jac_rep1.log:  fingerprint: 41cef863d0b5d18b
+colored_jac_rep2.log:  fingerprint: 41cef863d0b5d18b
+colored_jac_rep3.log:  fingerprint: 41cef863d0b5d18b
+colored_jac_t1.log:  fingerprint: 41cef863d0b5d18b
+colored_jac_t36.log:  fingerprint: 41cef863d0b5d18b
+colored_jac_t72.log:  fingerprint: 41cef863d0b5d18b
+colored_jac_t8.log:  fingerprint: 41cef863d0b5d18b
+colored_res_rep1.log:  fingerprint: e7428cbf9631d27a
+colored_res_rep2.log:  fingerprint: e7428cbf9631d27a
+colored_res_rep3.log:  fingerprint: e7428cbf9631d27a
+colored_res_t1.log:  fingerprint: e7428cbf9631d27a
+colored_res_t36.log:  fingerprint: e7428cbf9631d27a
+colored_res_t72.log:  fingerprint: e7428cbf9631d27a
+colored_res_t8.log:  fingerprint: e7428cbf9631d27a
+packed_jac_rep1.log:  fingerprint: 4fcf63adff5e337f
+packed_jac_rep2.log:  fingerprint: 4fcf63adff5e337f
+packed_jac_rep3.log:  fingerprint: 4fcf63adff5e337f
+packed_jac_t1.log:  fingerprint: 4fcf63adff5e337f
+packed_jac_t36.log:  fingerprint: 4fcf63adff5e337f
+packed_jac_t72.log:  fingerprint: 4fcf63adff5e337f
+packed_jac_t8.log:  fingerprint: 4fcf63adff5e337f
+packed_res_rep1.log:  fingerprint: ceb1c6375ba96425
+packed_res_rep2.log:  fingerprint: ceb1c6375ba96425
+packed_res_rep3.log:  fingerprint: ceb1c6375ba96425
+packed_res_t1.log:  fingerprint: ceb1c6375ba96425
+packed_res_t36.log:  fingerprint: ceb1c6375ba96425
+packed_res_t72.log:  fingerprint: ceb1c6375ba96425
+packed_res_t8.log:  fingerprint: ceb1c6375ba96425
+logs in /ritom/scratch/cscs/zulianp/cvfem_det_layout/4789239

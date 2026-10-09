@@ -1,0 +1,8703 @@
+// HEX8 CVFEM Navier-Stokes through the SFEM frontend.
+//
+// Same channel problem as cvfem_hex8_ns_steady, driven through sfem::Function rather
+// than through the spike's own mesh state: FunctionSpace of block size 4, the CVFEM
+// operator, and DirichletConditions instead of a hand-maintained constraint mask. The
+// destination is the semi-structured multigrid hierarchy, which needs a Function to
+// derefine; this is the step that gets there and can still be checked against the
+// standalone driver, which solves the same problem to the same tolerances.
+//
+// Note what it includes: the operator header and the channel case, and nothing else from
+// this directory. No MeshData, no BSR4, no kernels. That is the point of the split -- a
+// driver states the problem and the operator stays opaque.
+
+#include "frontend/op/cvfem_hex8_ns_op.hpp"
+#include "support/cvfem_flow_diagnostics.hpp"
+#include "support/cvfem_fgmres.hpp"
+#include "support/cvfem_parallel.hpp"
+#include "frontend/ss/cvfem_ss_transfer.hpp"
+#include "frontend/galerkin/cvfem_ss_galerkin_api.hpp"
+
+#include "sfem_CRS_X_BSR.hpp"
+#include "cases/cvfem_ns_channel_case.hpp"
+
+#include "sfem_API.hpp"
+#include "sfem_Function.hpp"
+#include "sfem_GeometricMultigrid.hpp"
+#include "sfem_ElementScope.hpp"
+#include "sfem_Multigrid.hpp"
+#include "sfem_ParallelGradientOperator.hpp"
+#include "sfem_ParallelOperator.hpp"
+#include "sfem_ParallelPreconditioner.hpp"
+#include "sfem_context.hpp"
+#include "sfem_mask.hpp"
+
+#include "smesh_env.hpp"
+#include "smesh_sideset.hpp"
+#include "smesh_glob.hpp"
+#include "smesh_buffer.hpp"
+#include "smesh_mesh.hpp"
+#include "smesh_mesh_reorder.hpp"
+#include "smesh_semistructured.hpp"
+
+#include <functional>
+#include <algorithm>
+#include <cstddef>
+
+// LAPACK and BLAS by their Fortran names: the same symbols in OpenBLAS and Accelerate, with no
+// header whose spelling differs between the two. The trailing size_t arguments are gfortran's
+// hidden string lengths; an implementation written in C ignores them. Declared at global scope
+// because the dense coarse solve that calls them lives in an anonymous namespace, where a
+// C-linkage declaration would not name the library's symbol.
+extern "C" {
+void dgetrf_(const int *m, const int *n, double *a, const int *lda, int *ipiv, int *info);
+void sgetrf_(const int *m, const int *n, float *a, const int *lda, int *ipiv, int *info);
+void dtrsv_(const char *uplo, const char *trans, const char *diag, const int *n, const double *a,
+            const int *lda, double *x, const int *incx, std::size_t, std::size_t, std::size_t);
+void strsv_(const char *uplo, const char *trans, const char *diag, const int *n, const float *a,
+            const int *lda, float *x, const int *incx, std::size_t, std::size_t, std::size_t);
+}
+#include <array>
+#include <cmath>
+#include <filesystem>
+#include <fstream>
+#include <system_error>
+#include <cstdio>
+#include <cstdlib>
+#include <string>
+#include <omp.h>
+
+#include <map>
+#include <limits>
+#include <random>
+#include <vector>
+
+using cvfem_case::FlowCase;
+
+// Relative floor for a scalar about to be inverted.
+//
+// Guards of the form `fabs(d) > 1e-30 ? 1/d : fallback` put an absolute threshold on a
+// quantity that only means anything relative to its matrix. A 3x3 determinant of 1e-25, or a
+// pressure diagonal of 1e-20, passes such a test and yields an inverse of 1e25 or 1e20, which
+// a smoother or preconditioner then applies to the residual on every application. That is
+// exactly how the Vanka smoother came to amplify one degree of freedom by 2.8e16 per sweep.
+//
+// The floor is deliberately far below anything legitimate: it guards against catastrophe and
+// is not a conditioning heuristic. Placed anywhere near a plausible value it zeroes healthy
+// entries and cripples the smoother -- measured, at 1e-11 it took Poiseuille from 178 linear
+// iterations to 1119.
+static inline bool cvfem_invertible(const real_t d, const real_t scale) {
+    return std::fabs(d) > scale * real_t(1e-14) && std::fabs(d) > real_t(1e-300);
+}
+
+// The damping the smoother is actually run with.
+//
+// This was two parameters describing one thing. SFEM_GMG_OMEGA (0.35) drove the point-block
+// smoother and the standalone smoother check; SFEM_VANKA_OMEGA (1) drove the Vanka smoother
+// that replaces it inside the cycle. Vanka is the default, so the cycle ran undamped while
+// every diagnostic reported 0.35 -- the check that exists to certify the smoother was
+// measuring a different operator than the one being certified, and duly certified it.
+//
+// On the closed box that was survivable: additive Vanka at omega = 1 is still just
+// convergent there, so the V-cycle worked and nothing pointed at the damping. With the
+// do-nothing outflow the same smoother crosses one, and then more smoothing makes the cycle
+// diverge faster rather than slower -- measured at 59x per cycle for two sweeps, 1000x for
+// three, 1.5e4 for four and 9e8 for eight. That monotonicity is the signature, and it is
+// what distinguishes a divergent smoother from a bad coarse space, which does not care how
+// often the smoother runs.
+//
+// One function now, so the cycle and the check cannot disagree again.
+//
+// The default stays at 1, which is the measured-best value and not the thing that was wrong.
+// On the closed-box Poiseuille regression at Re = 3200, omega = 1 reaches the target in 178
+// linear iterations against 509 at 0.35 and 1711 at 0.5 (which does not even reach Re = 3200),
+// so damping the smoother globally would cost a factor of three on every case that already
+// works, to help one that needs more than damping anyway. What was wrong was that the check
+// said 0.35 while the cycle ran 1; the value itself was chosen on evidence.
+//
+// A case with an open outflow needs damping to make the cycle converge at all -- set
+// SFEM_VANKA_OMEGA explicitly there. It is a per-problem property, not a default.
+static real_t smoother_omega() {
+    return smesh::Env::read<real_t>("SFEM_VANKA_OMEGA", real_t(1));
+}
+
+// SFEM_VANKA_FREEZE=N rebuilds the Vanka smoother every Nth Newton iteration and reuses the
+// previous one in between. N = 1 rebuilds every iteration and is what this code did originally,
+// bit for bit; it was the default until the measurement recorded below moved it. (That
+// measurement, and the reset point it turned on, are at vanka_freeze_every.)
+//
+// Why there is a knob at all: the rebuild is the largest single cost in a transient step and it
+// scales worse than the solve. Measured on the nozzle at one Grace socket, vanka_setup costs
+// 18.1 ms at 116,212 dof, 126.8 ms at 893,924 and 3,604 ms at 7,014,340 -- about dof^1.65
+// between the top two rungs -- which is 11.2% of the step at 893,924 dof and 31.6% at
+// 7,014,340. At 4.00 Newton iterations per step it is paid four times per step, while a DNS
+// timestep moves the state by O(dt) and the factorisations it produces barely move with it.
+//
+// What it is safe to skip, and why. make_diagonal_vanka calls op.update(state) first, which
+// refreshes the nodal pressure gradient and stamps pgrad_for. That is NOT the per-iteration
+// state push: gradient() redoes the same unpack and nodal_p_grad from its own x argument on
+// every Newton iteration, and the residual is evaluated before the linear solve -- the loop
+// shape cache_nodal_pgrad already documents as its precondition. The matrix-free level
+// operators read states[0] live, and states[0] IS xbuf, so the cycle's operator tracks the
+// linearisation whether or not the smoother is rebuilt. Freezing therefore stales the
+// PRECONDITIONER and nothing else.
+//
+// What that costs is iterations, and it is the thing to measure rather than assume: a
+// preconditioner built at an older linearisation can raise the Newton and linear counts faster
+// than the skipped rebuilds save, particularly with the Peclet blend on, where the defect
+// correction already contracts at only r ~ 0.49 at L = 8. Any report of this knob quotes
+// Newton and linear iterations beside wall time, or it is not a result.
+//
+// DEFAULT 0, WHICH IS ONE SMOOTHER PER CONTINUATION STAGE, BECAUSE IT COSTS NOTHING. The
+// paragraph above demanded Newton and linear iterations beside wall time before this knob is
+// reported on; here they are, each block measured within one allocation, sweeping only this:
+//
+//   cavity N=8 L=8, 1,098,500 dof    cavity N=16 L=4, 1,098,500 dof   step N=8 L=4, 343,876
+//   VF  newton linear n_vs vsetup    VF  newton linear n_vs vsetup    VF  newton linear vsetup
+//    1      14    130   14  2.288s    1      14    148   14  2.471s    1      14    183  0.804s
+//    2      14    130    9  1.529s    2      14    148    9  1.634s
+//    3      14    130    5  0.896s    3      14    148    5  0.990s
+//  stage    14    130    5  0.904s  stage    14    148    5  0.998s  stage    14    183  0.320s
+//
+// The Newton count and the linear count are IDENTICAL down every column of all three blocks.
+// The smoother built at a stage's opening state is as good a preconditioner for the rest of
+// that stage as one rebuilt each iteration, and rebuilding it was simply redundant work.
+//
+// THIS CONTRADICTS AN EARLIER MEASUREMENT, and the difference is the reset point, not the
+// stride. Measured before precond_freeze_stage_begin reset this counter, SFEM_VANKA_FREEZE=2
+// on the N=16 case ran past a 330 s cap WITHOUT CONVERGING against an 87 s baseline -- because
+// the stride then ran across continuation stages and reused a smoother built at Re = 1 at
+// Re = 4. Bounded by the stage, the same stride is free. A freeze policy is only as good as
+// what bounds its staleness.
+//
+// Why this matters more at N = 8 than the phase share at N = 16 suggests: with the coarse
+// level small, vanka_setup is 19.2% of the run rather than 1.9%, so the same saving is ten
+// times the fraction. See the coarse-level sizing note on SFEM_COARSE_FREEZE.
+//
+// 0 means "hold it for the stage"; a positive N rebuilds every Nth Newton iteration within a
+// stage, and N = 1 restores the original behaviour of rebuilding every time.
+static int vanka_freeze_every() {
+    static const int n = smesh::Env::read<int>("SFEM_VANKA_FREEZE", 0);
+    return n == 0 ? std::numeric_limits<int>::max() : (n > 1 ? n : 1);
+}
+
+// The frozen smoother, and the rebuild index it was built at.
+//
+// One cache for both preconditioner paths, because there is exactly one smoother in a run: the
+// multigrid fine level (refresh_gmg) and the hierarchy-free SFEM_PRECOND=vanka path are the two
+// arms of one if/else and never both execute. Sharing the slot is what keeps this a single
+// mechanism rather than two that can drift apart.
+//
+// Counting rebuilds here rather than keying on newton_it, which is a local of main() and is not
+// in scope inside refresh_gmg. The count is equivalent -- both sites are reached once per Newton
+// iteration -- and it keeps the policy in one place instead of in each caller.
+//
+// The operator keeps its own factorisations and, on the stencil path, the stencil buffer they
+// were built from alive, so a cached smoother owns everything it reads.
+static std::shared_ptr<sfem::Operator<real_t>> g_vanka_cached;
+static long                                    g_vanka_calls = 0;
+
+// Whether this call should build a new smoother, given how many have been requested so far.
+// Always true for the first one and whenever the knob is 1, which is the default.
+//
+// Asking advances the count, so ask exactly once per production preconditioner build and never
+// from a diagnostic. The SFEM_GMG_CHECK gates build their own throwaway smoothers and call
+// refresh_gmg once before the Newton loop; counting those would shift the rebuild phase on a
+// checked run, so the cycle and the check would disagree about when the smoother is fresh --
+// the same trap SFEM_VANKA_OMEGA was consolidated into one function to avoid.
+//
+// The stride arithmetic itself lives in one function, because the dense coarse factorisation
+// below freezes on exactly the same policy and two copies of a modulo would be two things to
+// keep in step. `have` is what makes the first call always build, whatever the stride.
+static bool precond_freeze_rebuild(const bool have, long &calls, const int every) {
+    const bool build = !have || (calls % (every > 1 ? every : 1)) == 0;
+    ++calls;
+    return build;
+}
+
+static bool vanka_rebuild_now() {
+    return precond_freeze_rebuild((bool)g_vanka_cached, g_vanka_calls, vanka_freeze_every());
+}
+
+// SFEM_COARSE_FREEZE=N reuses the dense coarse factorisation for N-1 further Newton iterations,
+// the same policy the smoother has and for a much larger stake.
+//
+// The stake, measured on the cavity at 1,098,500 dof (SFEM_N=16, level 4, Re = 100, 14 Newton
+// steps over 5 continuation stages): of 130.919 s in top-level phases, coarse_factor is
+// 50.405 s (38.5%) -- 46.750 s of it inside LAPACK's getrf -- while vanka_setup is 2.466 s
+// (1.9%). A profile of the same run puts dgemm_kernel_NEOVERSEV1 at 54.5% of samples, and that
+// dgemm is getrf's blocked update and nothing else. Freezing the smoother alone therefore
+// addresses a twentieth of what freezing the factorisation addresses.
+//
+// Why it is admissible, in the same terms as the smoother: the level operators read states[0]
+// live, so this stales the PRECONDITIONER and not the operator being solved. FGMRES -- which
+// this work always uses, never BiCGStab -- is the flexible variant precisely so that the
+// preconditioner may differ from one iteration to the next, so a held factorisation is inside
+// what the Krylov method is specified for rather than an abuse of it.
+//
+// The cost is iterations and it must be measured, not assumed: an LU of an older Jacobian is a
+// worse coarse solve, and the coarse correction is what makes the cycle mesh-independent. Any
+// report of this knob quotes Newton and linear iterations beside wall time, or it is not a
+// result -- the same standard the smoother's knob is held to.
+//
+// DEFAULT 0, WHICH IS ONE FACTORISATION PER CONTINUATION STAGE, BECAUSE IT IS FREE. Measured
+// on Grace, within one allocation per case, sweeping only this knob:
+//
+//   cavity, 1,098,500 dof            step, 343,876 dof
+//   CF  newton linear  n_cf  wall    CF  newton linear  n_cf  wall
+//    1      14    148    14    85s    1      14    183    14    13s
+//    2      14    148     9    68s    2      14    183     9    13s
+//    3      14    148     5    53s    3      14    183     5    10s
+//  stage    14    148     5    53s  stage    14    183     5    11s
+//
+// The Newton count and the linear-iteration count are IDENTICAL down every column, and
+// coarse_solve does not move either (22.665 / 22.670 / 22.682 / 22.703 s on the cavity), so
+// the saved factorisations are not being paid for anywhere -- they were simply redundant. On
+// the cavity that is 38% of the wall clock.
+//
+// 0 means "hold it for the stage": the stride resets at every stage boundary, so an
+// unreachable stride is exactly one factorisation per stage without this having to know in
+// advance how many Newton iterations a stage will take. A positive N rebuilds every Nth
+// iteration within a stage, and N = 1 restores the old behaviour of factorising every time.
+static int coarse_freeze_every() {
+    static const int n = smesh::Env::read<int>("SFEM_COARSE_FREEZE", 0);
+    return n == 0 ? std::numeric_limits<int>::max() : (n > 1 ? n : 1);
+}
+
+// Counted separately from the smoother's, because the two strides are independent and because
+// the coarse site is reached on runs where the smoother site is not -- a non-Vanka smoother
+// skips that branch entirely, and a shared counter would then never advance and would freeze
+// the factorisation for the whole run.
+static long g_coarse_calls = 0;
+
+// Start a time step's freeze cycle, so the first Newton iteration after the state jumps by a
+// full dt always gets a smoother built at that state, and the stride runs within the step
+// rather than across the whole run. Without this the rebuild lands on an arbitrary iteration of
+// an arbitrary step, which is both worse -- the staleness is largest right after the step -- and
+// unreadable in a log. A steady solve enters the step loop once, so it is unaffected.
+//
+// Per time step, not per continuation stage: this is called above the stage loop, so a step
+// that ramps through several stages runs one stride across all of their Newton iterations and
+// only the first stage begins with a freshly built smoother. That is deliberate -- a
+// continuation stage moves the state by a change of parameter, not by a full dt, and it
+// typically begins nearly solved -- but it does mean the guarantee is "first iteration of a
+// step", never "first iteration of a stage".
+// Both strides restart here, so a step begins with a freshly built preconditioner throughout
+// rather than with a fresh smoother wrapped around a held factorisation.
+static void vanka_freeze_step_begin() {
+    g_vanka_calls  = 0;
+    g_coarse_calls = 0;
+}
+
+// The coarse stride ALSO restarts at every continuation stage, which the smoother's does not.
+//
+// The comment above vanka_freeze_step_begin argues that a stage moves the state by a change of
+// parameter rather than by a full dt and typically begins nearly solved, so one stride may run
+// across all of a step's stages. That reasoning does not survive contact with the coarse
+// factorisation. Measured on the cavity at 1,098,500 dof with the stride running across stages,
+// SFEM_COARSE_FREEZE=2 held the LU built at Re = 1 and reused it at Re = 4: stage 1 went 3, 14,
+// 39 linear iterations against the baseline's 3, 5, 9, and stage 2 hit the 1000-iteration cap
+// on its first Newton step, where the baseline needed 5. The ramp multiplies Re by four per
+// stage, which moves the Jacobian far more than a timestep does.
+//
+// Resetting here means a held factorisation is never older than the stage it is used in, which
+// is the only regime where holding one can be expected to work at all.
+//
+// THE SMOOTHER'S STRIDE RESTARTS HERE TOO, which revises the per-step-only reasoning above.
+// That reasoning was written before either knob had been measured on a steady continuation
+// ramp, and the ramp is where it fails: a stage multiplies Re by four, so "a stage moves the
+// state by a change of parameter, not by a full dt" understates the move rather than
+// overstating it. The smoother freeze was measured across stages and lost outright --
+// SFEM_VANKA_FREEZE=2 ran past a 330 s cap unconverged against an 87 s baseline at 1,098,500
+// dof -- for the same reason the factorisation freeze did.
+//
+// This is a no-op at both defaults: SFEM_VANKA_FREEZE defaults to 1, where the stride rebuilds
+// every iteration and resetting the counter changes nothing. It only affects a run that asks
+// for a stride, and for such a run it can only help, because it bounds the staleness by the
+// stage instead of by the whole steady solve.
+static void precond_freeze_stage_begin() {
+    g_vanka_calls  = 0;
+    g_coarse_calls = 0;
+}
+
+// Which Newton iteration the SFEM_GMG_CHECK gates fire on. Default 0, which is where they
+// have always fired and where they should stay for anything that depends only on geometry.
+//
+// It is a knob because the Rhie-Chow time scale now carries the advecting velocity, and at
+// Newton iteration 0 the interior velocity is ZERO -- only the Dirichlet values are set. So
+// the advective branch of the time scale is absent by construction at iteration 0, and a gate
+// measured there reports the diffusive limit whatever the flow is: on the L=8 Poiseuille
+// configuration the block-split norms move by exactly the factor two between the old
+// coefficient and the new one, which is the ratio of h^2/(2 nu) to h^2/(4 nu) and nothing to
+// do with the Peclet number the change is about.
+//
+// Setting this to a later iteration measures the same gate against a developed velocity
+// field, which is the regime the operator is actually solved in.
+static int gmg_check_at() {
+    return smesh::Env::read<int>("SFEM_GMG_CHECK_AT", 0);
+}
+
+
+namespace {
+
+    constexpr int N_FIELDS = 4;
+
+// Pressure gauge by zero mean, for the cases where nothing constrains the pressure.
+//
+// Pinning one pressure node nominally removes the constant mode, but it leaves a nearly
+// constant one that costs the operator almost nothing, and it acts like a point source in
+// the pressure. Measured on the 3D cavity at Re=100 with Vanka preconditioning, the pin puts
+// a single isolated eigenvalue 51x (h=1/2) to 71x (h=1/4) below the rest of the spectrum,
+// whose eigenvector is 96 percent pressure energy with no sign changes -- a smooth pressure
+// mode, not a checkerboard. It takes cond(M^-1 A) from 9.1 to 447 at h=1/2 and from 27.4 to
+// 1946 at h=1/4, so its damage grows like h^-2 and gets worse the finer the mesh.
+//
+// The remedy is to leave the system singular and work in the complement of its null space,
+// which is what a zero-mean constraint or a Lagrange multiplier does. Two projections are
+// needed and both are the same index set here, the pressure component:
+//
+//   null(A)   is the constant pressure: pressure enters the momentum equations only through
+//             differences, so a uniform shift produces no force. Projecting the *solution*
+//             fixes the gauge.
+//   null(A^T) is the constant on the continuity rows: summing continuity over every node
+//             cancels the interior fluxes and leaves the net boundary flux, which is zero
+//             for a closed domain. Projecting the *residual* makes the right-hand side
+//             compatible, which is what lets a Krylov method solve a consistent singular
+//             system at all.
+//
+// The projection is unweighted because both null vectors are unweighted constants -- the
+// same quantity the "sum of continuity residual" conservation check already reports.
+class PressureGauge {
+public:
+    // ndof_owned as well as ndof, because the two halves of the projection need different
+    // ranges: the mean is reduced over owned entries, the subtraction touches every local one.
+    // idx_ is filled with k increasing, so the owned entries are exactly its first
+    // n_owned_idx_ elements and no second index list is needed.
+    PressureGauge(const ptrdiff_t       ndof,
+                  const ptrdiff_t       ndof_owned,
+                  const mask_t *const   cmask,
+                  const cvfem::Domain  &domain)
+        : domain_(domain) {
+        for (ptrdiff_t k = 3; k < ndof; k += N_FIELDS)
+            if (!mask_get(k, cmask)) {
+                if (k < ndof_owned) ++n_owned_idx_;
+                idx_.push_back(k);
+            }
+    }
+
+    // Off when something already constrains the pressure -- a pin, or a Dirichlet value.
+    // Adding a gauge on top of one would over-determine the system.
+    bool active() const { return active_ && !idx_.empty(); }
+    void set_active(const bool a) { active_ = a; }
+    size_t size() const { return idx_.size(); }
+
+    void project(real_t *const v) const {
+        if (!active()) return;
+        // Reduce over OWNED entries, subtract over ALL local ones. The asymmetry is the whole
+        // content of making this distributed, and inverting either half is silent.
+        //
+        // The mean must be global, so BOTH its numerator and its denominator are reduced over
+        // the owned prefix. Using idx_.size() would count every shared, ghost and aura
+        // pressure dof once per rank holding it and shrink the mean.
+        //
+        // The subtraction, by contrast, has to touch every local entry: the operator reads
+        // ghost values, and leaving them unprojected hands it a vector still carrying the
+        // constant this exists to remove.
+        long double s = 0;
+        for (ptrdiff_t i = 0; i < n_owned_idx_; ++i) s += (long double)v[(size_t)idx_[(size_t)i]];
+        ptrdiff_t n = n_owned_idx_;
+        // Only when there is something to reduce with. At one rank the accumulator, the count
+        // and the long double division below are exactly what they were, so the serial gauge
+        // is unchanged bit for bit -- narrowing to double to reduce and dividing in double
+        // would move the last bit of every projected vector.
+        if (domain_.distributed()) {
+            s = (long double)cvfem::sum_kahan(domain_, s);
+            n = cvfem::sum(domain_, n);
+        }
+        if (n == 0) return;
+        const real_t m = (real_t)(s / (long double)n);
+        for (const ptrdiff_t k : idx_) v[(size_t)k] -= m;
+    }
+
+private:
+    std::vector<ptrdiff_t> idx_;
+    ptrdiff_t              n_owned_idx_{0};
+    cvfem::Domain          domain_;
+    bool                   active_{true};
+};
+
+// A preconditioner whose output carries no constant-pressure component.
+//
+// Without this the preconditioner reintroduces the null direction the residual projection
+// just removed, and the Krylov space drifts out of the complement it is supposed to stay in.
+// Projection is linear and idempotent, so applying it to an accumulated result is correct
+// whether or not the incoming vector was already projected.
+class GaugedPreconditioner final : public sfem::Operator<real_t> {
+public:
+    GaugedPreconditioner(std::shared_ptr<sfem::Operator<real_t>> p, const PressureGauge *g)
+        : p_(std::move(p)), g_(g) {}
+
+    int apply(const real_t *const b, real_t *const x) override {
+        const int ret = p_->apply(b, x);
+        g_->project(x);
+        return ret;
+    }
+
+    ptrdiff_t rows() const override { return p_->rows(); }
+    ptrdiff_t cols() const override { return p_->cols(); }
+    sfem::ExecutionSpace execution_space() const override { return p_->execution_space(); }
+
+private:
+    std::shared_ptr<sfem::Operator<real_t>> p_;
+    const PressureGauge                    *g_;
+};
+
+    void usage(const char *argv0) {
+        std::fprintf(stderr,
+                     "usage: %s <output_folder>\n"
+                     "\n"
+                     "HEX8 CVFEM Navier-Stokes channel, driven through the SFEM frontend.\n"
+                     "Same problem and defaults as cvfem_hex8_ns_steady, so the two are\n"
+                     "directly comparable.\n"
+                     "\n"
+                     "Environment:\n"
+                     "  SFEM_CASE            poiseuille | couette | cavity | cavity_reg | mms | step |\n"
+                     "                       step_turb | pump | nozzle (required)\n"
+                     "  SFEM_NOZZLE_RE       FDA nozzle: throat Reynolds number (default 500)\n"
+                     "  SFEM_NOZZLE_NCORE SFEM_NOZZLE_NBORE SFEM_NOZZLE_NOUTER   nozzle cross-section\n"
+                     "                       cells: core square (even), bore rings, outer rings\n"
+                     "  SFEM_NOZZLE_NAXIAL   nozzle axial cells: \"inlet cone throat outlet\"\n"
+                     "  SFEM_N               cells in y (default 8)\n"
+                     "  SFEM_NX SFEM_NY SFEM_NZ   override cells per direction\n"
+                     "  SFEM_LX SFEM_LY SFEM_LZ   channel size (default 4, 1, 1)\n"
+                     "  SFEM_RHO SFEM_MU SFEM_U   density, viscosity, velocity scale\n"
+                     "  SFEM_GEOM            affine | isoparam (default affine)\n"
+                     "  SFEM_NL_MAX_IT SFEM_NL_RTOL SFEM_NL_ATOL\n"
+                     "  SFEM_DT              timestep; <= 0 (default) is the steady solve\n"
+                     "  SFEM_NSTEPS          time steps to take (default 1)\n"
+                     "  SFEM_BDF_ORDER       1 or 2 (default 2; step 1 falls back to BDF1)\n"
+                     "  SFEM_LSOLVE_RTOL SFEM_LSOLVE_ATOL SFEM_LSOLVE_MAX_IT\n"
+                     "  SFEM_PACK_SIZE       affine packed SIMD (default 1024; 0 = atomic)\n"
+                     "  SFEM_MATRIX_FREE     1: Krylov uses J(u)v (default); 0: assembled BSR\n"
+                     "  SFEM_CHECK_JV        1: compare |J_mf v - J_asm v| on the first Jacobian\n"
+                     "  SFEM_GMG             1: V-cycle preconditioner (needs a refine level > 1)\n"
+                     "                       2: cost-matched control -- fine-level smoother, no hierarchy\n"
+                     "  SFEM_GMG_SMOOTH      block-Jacobi smoothing steps (default 2)\n"
+                     "  SFEM_ELEMENT_REFINE_LEVEL  >1: semi-structured macro-elements at that\n"
+                     "                       internal level (default 1 = flat)\n"
+                     "  SFEM_PGRAD_CACHE     1: reuse the nodal pressure gradient across a\n"
+                     "                       Krylov solve rather than rebuilding it per apply\n"
+                     "  SFEM_VERIFY_TOL      fail if velocity Linf exceeds this (default 1e-2)\n",
+                     argv0);
+    }
+
+    // Inverse of the 4x4 node blocks, used as the Krylov preconditioner. Velocity and
+    // pressure are inverted separately, exactly as the standalone driver does: the 3x3
+    // velocity block by cofactors, and the pressure entry as a reciprocal. The pressure
+    // diagonal is nonzero here only because Rhie-Chow stabilisation puts it there -- see
+    // the SFEM_PC_PSCALE discussion in the standalone driver for what governs its size.
+    // Phase timing.
+    //
+    // Cost has so far been inferred from operator-application counts, which is a model, not
+    // a measurement -- it assumes every application costs the same and ignores the sparse
+    // coarse work, the transfers and the assembly entirely. This wraps each thing the cycle
+    // does in a timer so the breakdown is measured. SFEM's own tracing needs
+    // SMESH_ENABLE_TRACE compiled into smesh, which the installed one lacks.
+    struct Phase {
+        double t{0};
+        long   n{0};
+    };
+    std::map<std::string, Phase> g_phases;
+
+    void phase_add(const std::string &k, const double dt) {
+        auto &p = g_phases[k];
+        p.t += dt;
+        p.n += 1;
+    }
+
+    // Thread clamp for small levels.
+    //
+    // A coarse level has too little work to fill a thread team, and paying to start one per
+    // vector operation costs far more than the arithmetic. Measured on an 81-node level
+    // (324 unknowns): 156 us per smoother application on one thread, 4.6 ms on four,
+    // 14.2 ms on eight -- ninety times slower for having more cores. It also inverts the
+    // whole solve, which ran 14.9 s on one thread, 4.9 s on four and 13.0 s on eight, and it
+    // is why the same configuration that was merely slow on a laptop was an order of
+    // magnitude off on 72 Grace cores.
+    //
+    // So each level runs with a thread count matched to its size rather than the machine's.
+    // These calls happen between parallel regions, never inside one.
+    //
+    // The threshold was 20000 dofs per thread, and that was far too high: at 242,500 dofs on
+    // 72 Grace cores it gave the *fine* level 12 threads and level 1 exactly one, throttling
+    // the two phases that are 65% of the cycle. perf saw it three ways at once -- 4.21
+    // instructions per cycle and a 0.57% cache miss rate, so the code runs well when it runs;
+    // cores idle 83% of the wall time; and 12/72 = 16.7% matching the 17% of peak cycles
+    // actually retired. Lowering it to 1000 leaves the coarse protection intact, since a
+    // 324-dof level still gets one thread either way -- the threshold only governs when a
+    // level is allowed *more* threads, and 20000 was high enough that nothing on this machine
+    // ever got the full count.
+    //
+    // Measured at 242,500 dofs, 72 cores, fixed work, three repeats each: preconditioner
+    // phases 1.657 s against 0.681 s, a factor of 2.43; smooth[L0] 4327 us against 1723,
+    // smooth[L1] 2292 us against 161. Run-to-run spread was under 2%.
+    //
+    // This is also why the pathology never showed on a laptop: at 8 threads the clamp is
+    // nearly inert, and it only bites once the machine is wide enough for the ratio to matter.
+    std::shared_ptr<sfem::Operator<real_t>> thread_clamped(const ptrdiff_t                                ndofs,
+                                                           const std::shared_ptr<sfem::Operator<real_t>> &op) {
+        if (!op) return op;
+        // SFEM_GMG_CLAMP_BELOW: engage the clamp only on levels smaller than this, and leave
+        // everything above it on the full team.
+        //
+        // The clamp changes the team size, and with schedule(static) over the element loops a
+        // different team size means a different partition of the same array. The grid
+        // transfers are *not* clamped, so restriction writes a coarse vector partitioned
+        // across 72 threads and the coarse smoother then reads it partitioned across 30 -- the
+        // mapping does not line up, and a V-cycle crosses that boundary at every level. Add
+        // the per-call omp_set_num_threads and there is team-resize churn on top. Clamping
+        // only where a level genuinely cannot fill the machine keeps one partition for
+        // everything large enough to care about locality.
+        //
+        // 0 keeps the pure dofs-per-thread rule.
+        //
+        // OFF BY DEFAULT, because measurement says the mechanism costs more than it saves.
+        // At 242,500 dofs on 72 Grace cores, three repeats, fixed work, t_solve:
+        //
+        //     dofs/thread 1000, no floor      1.394 s
+        //     dofs/thread 1000, floor 10000   1.163 s   (clamp only the coarse space)
+        //     no clamp at all                 0.642 s
+        //
+        // and the *phase totals are the same in all three*, ~0.69 s. The whole difference is
+        // outside the timed phases: omp_set_num_threads is called around every clamped apply,
+        // and resizing the team degrades the unclamped parallel regions that follow -- the
+        // outer Krylov vector operations. Clamping only the coarse levels halves the damage
+        // but does not remove it, because the churn is per clamped operator, not per dof.
+        //
+        // The coarse levels do not need it any more either: coarse_solve is 209 us unclamped
+        // against 318 us clamped. The pathology it was written for -- an 81-node level at 156
+        // us on one thread and 14.2 ms on eight -- was measured before the deterministic
+        // scatter and the assembled coarse operators existed, and no longer reproduces.
+        //
+        // Set SFEM_GMG_DOFS_PER_THREAD to a positive value to bring it back.
+        const ptrdiff_t per = (ptrdiff_t)smesh::Env::read<int>("SFEM_GMG_DOFS_PER_THREAD", 0);
+        if (per <= 0) return op;
+
+        const ptrdiff_t clamp_below = (ptrdiff_t)smesh::Env::read<int>("SFEM_GMG_CLAMP_BELOW", 0);
+        if (clamp_below > 0 && ndofs >= clamp_below) return op;
+        const int       mx  = omp_get_max_threads();
+        int             n   = (int)std::min<ptrdiff_t>(mx, std::max<ptrdiff_t>(1, ndofs / std::max<ptrdiff_t>(1, per)));
+        if (n >= mx) return op;  // big enough to use the machine as configured
+        auto fn = [op, n, mx](const real_t *const x, real_t *const y) {
+            omp_set_num_threads(n);
+            op->apply(x, y);
+            omp_set_num_threads(mx);
+        };
+
+        // Same reasoning as in timed(): this wrapper is applied to multigrid levels too, and
+        // make_op would erase the ParallelOperator face that Multigrid casts for. Note this
+        // function returns `op` untouched on every path above, so it only erases anything
+        // when the clamp actually engages -- which, with SFEM_GMG_DOFS_PER_THREAD defaulting
+        // to 0, is currently never. That is exactly why it would have been easy to miss.
+        if (auto pop = std::dynamic_pointer_cast<sfem::ParallelOperator<real_t>>(op)) {
+            return sfem::make_parallel_op<real_t>(pop->comm(),
+                                                  pop->rows(),
+                                                  pop->cols(),
+                                                  pop->row_allocation_size(),
+                                                  pop->col_allocation_size(),
+                                                  fn,
+                                                  pop->execution_space());
+        }
+        return sfem::make_op<real_t>(op->rows(), op->cols(), fn, sfem::EXECUTION_SPACE_HOST);
+    }
+
+    // A timed solver stays a solver. Multigrid hints its smoothers that pre-smoothing starts
+    // from zero through MatrixFreeLinearSolver::set_initial_guess_zero, and a plain make_op
+    // wrapper would hide the smoother behind an Operator the hint cannot reach.
+    class TimedSolver final : public sfem::MatrixFreeLinearSolver<real_t> {
+    public:
+        TimedSolver(std::string name, std::shared_ptr<sfem::MatrixFreeLinearSolver<real_t>> s)
+            : name_(std::move(name)), s_(std::move(s)) {}
+
+        int apply(const real_t *const x, real_t *const y) override {
+            const double t0 = smesh::time_seconds();
+            const int    ret = s_->apply(x, y);
+            phase_add(name_, smesh::time_seconds() - t0);
+            return ret;
+        }
+        ptrdiff_t            rows() const override { return s_->rows(); }
+        ptrdiff_t            cols() const override { return s_->cols(); }
+        sfem::ExecutionSpace execution_space() const override { return s_->execution_space(); }
+
+        void set_op(const std::shared_ptr<sfem::Operator<real_t>> &op) override { s_->set_op(op); }
+        void set_preconditioner_op(const std::shared_ptr<sfem::Operator<real_t>> &op) override {
+            s_->set_preconditioner_op(op);
+        }
+        void set_max_it(const int it) override { s_->set_max_it(it); }
+        void set_n_dofs(const ptrdiff_t n) override { s_->set_n_dofs(n); }
+        void set_initial_guess_zero(const bool val) override { s_->set_initial_guess_zero(val); }
+        int  iterations() const override { return s_->iterations(); }
+
+    private:
+        std::string                                             name_;
+        std::shared_ptr<sfem::MatrixFreeLinearSolver<real_t>> s_;
+    };
+
+    std::shared_ptr<sfem::Operator<real_t>> timed(const std::string                             &name,
+                                                  const std::shared_ptr<sfem::Operator<real_t>> &op) {
+        if (!op) return op;
+        if (auto s = std::dynamic_pointer_cast<sfem::MatrixFreeLinearSolver<real_t>>(op))
+            return std::make_shared<TimedSolver>(name, s);
+        auto fn = [op, name](const real_t *const x, real_t *const y) {
+            const double t0 = smesh::time_seconds();
+            op->apply(x, y);
+            phase_add(name, smesh::time_seconds() - t0);
+        };
+
+        // Keep the parallel face if the wrapped operator has one.
+        //
+        // make_op returns a plain Operator, and that erases ParallelOperator -- which is the
+        // face Multigrid asks for by dynamic_pointer_cast. reduce_norm2 uses it to decide
+        // whether to allreduce the dot, verbose_rank0 to decide who prints, and level_owned
+        // to decide whether a level's dof count means owned or local. EVERY multigrid level
+        // in this driver is wrapped here, so erasing it would make all three take the serial
+        // branch on a distributed run. level_owned is the one that matters: taking the serial
+        // branch there does not merely mislabel a diagnostic, it reduces over the wrong
+        // number of dofs.
+        //
+        // make_parallel_op is the factory the library already uses to rebuild this face
+        // (sfem_ShiftedPenaltyMultigrid.hpp, shifted_op), so this reuses it instead of
+        // inventing a second way to do the same thing. The allocation sizes are carried
+        // across rather than recomputed: they are the range and domain capacities INCLUDING
+        // ghosts and aura, which rows()/cols() deliberately do not count.
+        //
+        // The same fn goes to both factories, so the timed path cannot drift from the plain
+        // one. At one rank there is no ParallelOperator to find and this is the old code.
+        if (auto pop = std::dynamic_pointer_cast<sfem::ParallelOperator<real_t>>(op)) {
+            return sfem::make_parallel_op<real_t>(pop->comm(),
+                                                  pop->rows(),
+                                                  pop->cols(),
+                                                  pop->row_allocation_size(),
+                                                  pop->col_allocation_size(),
+                                                  fn,
+                                                  pop->execution_space());
+        }
+        return sfem::make_op<real_t>(op->rows(), op->cols(), fn, sfem::EXECUTION_SPACE_HOST);
+    }
+
+    // Some phases contain others: precond_total wraps the whole V-cycle, so the smoothers,
+    // transfers and coarse solve are inside it. Summing every row therefore double counts,
+    // and shares taken against that sum understate everything -- which is exactly how an
+    // earlier reading of this table came to report fine-level smoothing at 42% when it is
+    // 79% of wall time. Containers are excluded from the denominator and printed apart.
+    bool is_container(const std::string &k) { return k == "precond_total"; }
+
+    void phase_report() {
+        if (g_phases.empty()) return;
+        double total = 0;
+        for (auto &kv : g_phases)
+            if (!is_container(kv.first)) total += kv.second.t;
+        std::vector<std::pair<std::string, Phase>> v(g_phases.begin(), g_phases.end());
+        std::sort(v.begin(), v.end(), [](const auto &a, const auto &b) { return a.second.t > b.second.t; });
+        std::printf("\nphase breakdown (%.3f s in top-level phases; shares are of that)\n", total);
+        std::printf("  %-22s %10s %10s %12s %7s\n", "phase", "seconds", "calls", "us/call", "share");
+        for (auto &kv : v) {
+            if (is_container(kv.first)) continue;
+            std::printf("  %-22s %10.3f %10ld %12.1f %6.1f%%\n", kv.first.c_str(), kv.second.t, kv.second.n,
+                        1e6 * kv.second.t / (double)std::max(1L, kv.second.n),
+                        100.0 * kv.second.t / std::max(1e-30, total));
+        }
+        for (auto &kv : v)
+            if (is_container(kv.first))
+                std::printf("  %-22s %10.3f %10ld %12.1f %6.1f%%  (container: the rows above it\n"
+                            "  %-22s %10s %10s %12s %7s   marked op/smooth/transfer/coarse are inside)\n",
+                            kv.first.c_str(), kv.second.t, kv.second.n,
+                            1e6 * kv.second.t / (double)std::max(1L, kv.second.n),
+                            100.0 * kv.second.t / std::max(1e-30, total), "", "", "", "", "");
+    }
+
+    class BlockJacobi final : public sfem::Operator<real_t> {
+    public:
+        BlockJacobi(const ptrdiff_t nnodes, std::vector<real_t> inv) : nnodes_(nnodes), inv_(std::move(inv)) {}
+
+        int apply(const real_t *const x, real_t *const y) override {
+#pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < nnodes_; ++i) {
+                const real_t *const m  = inv_.data() + (size_t)i * 16;
+                const real_t *const xx = x + (size_t)i * 4;
+                real_t *const       yy = y + (size_t)i * 4;
+                for (int r = 0; r < 4; ++r) {
+                    real_t s = 0;
+                    for (int c = 0; c < 4; ++c) s += m[r * 4 + c] * xx[c];
+                    yy[r] += s;
+                }
+            }
+            return SFEM_SUCCESS;
+        }
+
+        ptrdiff_t rows() const override { return nnodes_ * 4; }
+        ptrdiff_t cols() const override { return nnodes_ * 4; }
+        sfem::ExecutionSpace execution_space() const override { return sfem::EXECUTION_SPACE_HOST; }
+
+    private:
+        ptrdiff_t           nnodes_;
+        std::vector<real_t> inv_;
+    };
+
+    // SIMPLE smoother.
+    //
+    // Block-Jacobi is not a smoother for this system: measured as the stationary iteration
+    // it becomes inside a cycle, its rate crosses 1 at the damping that looked best by
+    // iteration count, and even at its best damping it only reaches about 0.97 per sweep.
+    // That is the failure a saddle-point smoother exists to fix, and it is what the 2x2
+    // block split was built for -- SIMPLE needs the off-diagonal blocks on their own, and
+    // evaluating the whole operator to get one of them would discard most of the work.
+    //
+    // One application, given a residual r = (r_u, r_p):
+    //   du   = Du^-1 r_u                        velocity predictor, 3x3 solves per node
+    //   rp   = r_p - (C du)_p                   continuity defect of that predictor
+    //   dp   = solve(S dp = rp),  S = Dpp - C Du^-1 B, approximated by its diagonal
+    //   du  -= Du^-1 (B dp)_u                   make the predictor respect the new pressure
+    // With one inner sweep from dp = 0 the Schur apply drops out and the cost is two block
+    // applications, PU and UP, rather than two full ones.
+    //
+    // Accumulates into `out`, which is the Operator convention here and is what the
+    // stationary iteration relies on: it computes r = b - A x and then calls the
+    // preconditioner as x += M^-1 r.
+    class SimpleSmoother final : public sfem::Operator<real_t> {
+    public:
+        SimpleSmoother(sfem::CVFEMNavierStokes &op, const real_t *const state, const ptrdiff_t nnodes,
+                       std::vector<real_t> dinv_u, std::vector<real_t> dinv_p, std::vector<uint8_t> free_dof,
+                       const real_t omega, const int inner)
+            : op_(op), state_(state), nnodes_(nnodes), dinv_u_(std::move(dinv_u)), dinv_p_(std::move(dinv_p)),
+              free_(std::move(free_dof)), omega_(omega), inner_(inner) {}
+
+        int apply(const real_t *const r, real_t *const out) override {
+            const ptrdiff_t    nd = nnodes_ * 4;
+            std::vector<real_t> du((size_t)nd, 0), tmp((size_t)nd, 0), dp((size_t)nd, 0);
+
+            // velocity predictor
+            for (ptrdiff_t i = 0; i < nnodes_; ++i) {
+                const real_t *const m = dinv_u_.data() + (size_t)i * 9;
+                const real_t *const rr = r + (size_t)i * 4;
+                real_t *const       dd = du.data() + (size_t)i * 4;
+                for (int a = 0; a < 3; ++a)
+                    dd[a] = m[a * 3 + 0] * rr[0] + m[a * 3 + 1] * rr[1] + m[a * 3 + 2] * rr[2];
+            }
+
+            // continuity defect of the predictor
+            op_.apply_blocks(state_, du.data(), tmp.data(), sfem::CVFEM_BLOCK_PU);
+            std::vector<real_t> rp((size_t)nnodes_, 0);
+            for (ptrdiff_t i = 0; i < nnodes_; ++i)
+                rp[(size_t)i] = r[(size_t)i * 4 + 3] - tmp[(size_t)i * 4 + 3];
+
+            // pressure correction. The first sweep starts from dp = 0, so the Schur
+            // application is zero and is skipped rather than computed.
+            for (int it = 0; it < inner_; ++it) {
+                std::vector<real_t> s((size_t)nnodes_, 0);
+                if (it > 0) {
+                    std::fill(tmp.begin(), tmp.end(), real_t(0));
+                    std::vector<real_t> t2((size_t)nd, 0), w((size_t)nd, 0), t3((size_t)nd, 0);
+                    op_.apply_blocks(state_, dp.data(), tmp.data(), sfem::CVFEM_BLOCK_PP);
+                    op_.apply_blocks(state_, dp.data(), t2.data(), sfem::CVFEM_BLOCK_UP);
+                    for (ptrdiff_t i = 0; i < nnodes_; ++i) {
+                        const real_t *const m  = dinv_u_.data() + (size_t)i * 9;
+                        const real_t *const tt = t2.data() + (size_t)i * 4;
+                        real_t *const       ww = w.data() + (size_t)i * 4;
+                        for (int a = 0; a < 3; ++a)
+                            ww[a] = m[a * 3 + 0] * tt[0] + m[a * 3 + 1] * tt[1] + m[a * 3 + 2] * tt[2];
+                    }
+                    op_.apply_blocks(state_, w.data(), t3.data(), sfem::CVFEM_BLOCK_PU);
+                    for (ptrdiff_t i = 0; i < nnodes_; ++i)
+                        s[(size_t)i] = tmp[(size_t)i * 4 + 3] - t3[(size_t)i * 4 + 3];
+                }
+                for (ptrdiff_t i = 0; i < nnodes_; ++i)
+                    dp[(size_t)i * 4 + 3] += dinv_p_[(size_t)i] * (rp[(size_t)i] - s[(size_t)i]);
+            }
+
+            // velocity correction for the new pressure
+            std::fill(tmp.begin(), tmp.end(), real_t(0));
+            op_.apply_blocks(state_, dp.data(), tmp.data(), sfem::CVFEM_BLOCK_UP);
+
+            for (ptrdiff_t i = 0; i < nnodes_; ++i) {
+                const real_t *const m  = dinv_u_.data() + (size_t)i * 9;
+                const real_t *const tt = tmp.data() + (size_t)i * 4;
+                real_t              c[3];
+                for (int a = 0; a < 3; ++a)
+                    c[a] = m[a * 3 + 0] * tt[0] + m[a * 3 + 1] * tt[1] + m[a * 3 + 2] * tt[2];
+                for (int a = 0; a < 3; ++a) {
+                    const ptrdiff_t k = i * 4 + a;
+                    if (free_[(size_t)k]) out[k] += omega_ * (du[(size_t)k] - c[a]);
+                }
+                const ptrdiff_t kp = i * 4 + 3;
+                if (free_[(size_t)kp]) out[kp] += omega_ * dp[(size_t)kp];
+            }
+            return SFEM_SUCCESS;
+        }
+
+        ptrdiff_t rows() const override { return nnodes_ * 4; }
+        ptrdiff_t cols() const override { return nnodes_ * 4; }
+        sfem::ExecutionSpace execution_space() const override { return sfem::EXECUTION_SPACE_HOST; }
+
+    private:
+        sfem::CVFEMNavierStokes &op_;
+        const real_t *const      state_;
+        ptrdiff_t                nnodes_;
+        std::vector<real_t>      dinv_u_, dinv_p_;
+        std::vector<uint8_t>     free_;
+        real_t                   omega_;
+        int                      inner_;
+    };
+
+    // `mask` marks the constrained dofs. It is needed because hessian_block_diag reports
+    // the operator's own diagonal and knows nothing about boundary conditions, while the
+    // matrix the Krylov method actually sees has identity rows there -- Function applies
+    // the constraints to it after the operators. A preconditioner built from the
+    // unconstrained diagonal scales those rows by something unrelated to 1.
+    // Builds the pieces SIMPLE needs from the operator's own 4x4 block diagonal: the 3x3
+    // velocity inverse per node, and a diagonal approximation of the Schur complement.
+    // `ds_scale` tunes the latter, which is the one genuinely approximate ingredient --
+    // S = Dpp - C Du^-1 B is not diagonal and its true diagonal is not available
+    // matrix-free, so the pressure block's own diagonal stands in for it.
+    std::shared_ptr<SimpleSmoother> make_simple(sfem::CVFEMNavierStokes &op,
+                                                const real_t *const      x,
+                                                const mask_t *const      mask,
+                                                const ptrdiff_t          nnodes,
+                                                const real_t             omega,
+                                                const int                inner,
+                                                const real_t             ds_scale) {
+        // SIMPLE takes the frozen-pressure-gradient block apply, not the exact restriction
+        // of the operator.
+        //
+        // sscvfem_apply_blocks can differentiate through the nodal pressure-gradient
+        // reconstruction, and by default it does, because the four field blocks are checked
+        // against the requirement that they sum back to the operator. A preconditioner is
+        // under no such obligation, and here the exact term is measurably not worth its
+        // price: on 72 Grace cores it adds one nodal gradient pass per pressure-column apply
+        // -- +140% on B^T and +217% on C at 34,147,332 dofs -- and moves this smoother's
+        // standalone convergence rate not at all. Measured to 40 sweeps at 75,140 dofs, the
+        // exact and frozen forms agree to six decimals at every single sweep, ending at
+        // 0.990157 against 0.990157.
+        //
+        // The block diagonal SIMPLE builds below is frozen anyway and cannot be otherwise:
+        // the exact term is nonlocal and does not fit the BSR sparsity pattern. So this also
+        // makes the two halves of the preconditioner consistent with each other.
+        //
+        // SFEM_SIMPLE_EXACT_RC=1 restores the exact form, which is how the numbers above
+        // were obtained and how they can be re-obtained.
+        op.set_option("blocks_exact_rc", smesh::Env::read<int>("SFEM_SIMPLE_EXACT_RC", 0) != 0);
+
+        std::vector<real_t> bd((size_t)nnodes * 16, real_t(0));
+        op.hessian_block_diag(x, bd.data());
+
+        std::vector<real_t>  du((size_t)nnodes * 9, real_t(0));
+        std::vector<real_t>  dp((size_t)nnodes, real_t(0));
+        std::vector<uint8_t> freed((size_t)nnodes * 4, 1);
+
+        for (ptrdiff_t i = 0; i < nnodes; ++i) {
+            const real_t *const b = bd.data() + (size_t)i * 16;
+            real_t              a[9];
+            for (int r = 0; r < 3; ++r)
+                for (int c = 0; c < 3; ++c) a[r * 3 + c] = b[r * 4 + c];
+
+            const real_t det = a[0] * (a[4] * a[8] - a[5] * a[7]) - a[1] * (a[3] * a[8] - a[5] * a[6]) +
+                               a[2] * (a[3] * a[7] - a[4] * a[6]);
+            real_t *const m = du.data() + (size_t)i * 9;
+            // A determinant scales as the cube of the entries, so its floor must too.
+            real_t ascale = 0;
+            for (int k = 0; k < 9; ++k) ascale = std::max(ascale, std::fabs(a[k]));
+            if (cvfem_invertible(det, ascale * ascale * ascale)) {
+                const real_t id = real_t(1) / det;
+                m[0] = (a[4] * a[8] - a[5] * a[7]) * id;
+                m[1] = (a[2] * a[7] - a[1] * a[8]) * id;
+                m[2] = (a[1] * a[5] - a[2] * a[4]) * id;
+                m[3] = (a[5] * a[6] - a[3] * a[8]) * id;
+                m[4] = (a[0] * a[8] - a[2] * a[6]) * id;
+                m[5] = (a[2] * a[3] - a[0] * a[5]) * id;
+                m[6] = (a[3] * a[7] - a[4] * a[6]) * id;
+                m[7] = (a[1] * a[6] - a[0] * a[7]) * id;
+                m[8] = (a[0] * a[4] - a[1] * a[3]) * id;
+            } else {
+                m[0] = m[4] = m[8] = real_t(1);
+            }
+
+            // Scale the pressure diagonal against the pressure row, not against the whole
+            // block. In a colocated scheme the pressure diagonal is the Rhie-Chow term,
+            // h^2/(2 mu) times an area, and it is legitimately orders of magnitude below the
+            // momentum entries beside it. Flooring it relative to the block maximum therefore
+            // rejects perfectly healthy entries -- measured, it stopped the backward-facing
+            // step converging at all under the block-Jacobi preconditioner.
+            const real_t pp = b[15];
+            real_t       prow = 0;
+            for (int k = 12; k < 16; ++k) prow = std::max(prow, std::fabs(b[k]));
+            dp[(size_t)i] = cvfem_invertible(pp, prow) ? ds_scale / pp : real_t(0);
+
+            for (int c = 0; c < 4; ++c) {
+                const ptrdiff_t k = i * 4 + c;
+                if (mask_get(k, mask)) freed[(size_t)k] = 0;
+            }
+        }
+
+        return std::make_shared<SimpleSmoother>(op, x, nnodes, std::move(du), std::move(dp),
+                                                std::move(freed), omega, inner);
+    }
+
+    // Inverts a given 4x4 block diagonal. Split out from make_block_jacobi so a smoother
+    // can be built from an assembled matrix's own diagonal rather than from the operator's,
+    // which is what the Galerkin levels need: they smooth an assembled matrix, and
+    // preconditioning it with the rediscretised diagonal is what made those levels diverge.
+    std::shared_ptr<BlockJacobi> make_block_jacobi_from_diag(std::vector<real_t> blocks,
+                                                             const mask_t *const mask,
+                                                             const ptrdiff_t     nnodes,
+                                                             const real_t        omega = real_t(1),
+                                                             const real_t        prow  = real_t(1)) {
+
+        // `prow` scales the continuity row of every block, matching SFEM_GMG_PSCALE's
+        // scaling of the level operator. The two must agree: the smoother preconditions
+        // the operator it smooths, so preconditioning a scaled operator with an unscaled
+        // diagonal leaves the pressure update wrong by 1/prow and turns the coarse
+        // smoother divergent as prow shrinks -- which is what an earlier reading of
+        // SFEM_GMG_PSCALE was actually measuring.
+        if (prow != real_t(1))
+            for (ptrdiff_t i = 0; i < nnodes; ++i)
+                for (int c = 0; c < 4; ++c) blocks[(size_t)i * 16 + 12 + c] *= prow;
+
+        std::vector<real_t> inv((size_t)nnodes * 16, 0);
+        static const int schur = smesh::Env::read<int>("SFEM_PC_SCHUR", 0);
+#pragma omp parallel for schedule(static)
+        for (ptrdiff_t i = 0; i < nnodes; ++i) {
+            const real_t *const b = blocks.data() + (size_t)i * 16;
+            real_t *const       m = inv.data() + (size_t)i * 16;
+
+            const real_t a00 = b[0], a01 = b[1], a02 = b[2];
+            const real_t a10 = b[4], a11 = b[5], a12 = b[6];
+            const real_t a20 = b[8], a21 = b[9], a22 = b[10];
+            const real_t c00 = a11 * a22 - a12 * a21;
+            const real_t c01 = a02 * a21 - a01 * a22;
+            const real_t c02 = a01 * a12 - a02 * a11;
+            const real_t det = a00 * c00 + a10 * c01 + a20 * c02;
+
+            real_t vscale = 0;
+            for (const real_t q : {a00, a01, a02, a10, a11, a12, a20, a21, a22})
+                vscale = std::max(vscale, std::fabs(q));
+            if (cvfem_invertible(det, vscale * vscale * vscale)) {
+                const real_t d = real_t(1) / det;
+                m[0] = c00 * d;
+                m[1] = c01 * d;
+                m[2] = c02 * d;
+                m[4] = (a12 * a20 - a10 * a22) * d;
+                m[5] = (a00 * a22 - a02 * a20) * d;
+                m[6] = (a02 * a10 - a00 * a12) * d;
+                m[8]  = (a10 * a21 - a11 * a20) * d;
+                m[9]  = (a01 * a20 - a00 * a21) * d;
+                m[10] = (a00 * a11 - a01 * a10) * d;
+            } else {
+                m[0] = m[5] = m[10] = real_t(1);
+            }
+
+            // Same reasoning as above: the pressure row sets the scale for its own diagonal.
+            const real_t pp = b[15];
+            real_t       prow2 = 0;
+            for (int k = 12; k < 16; ++k) prow2 = std::max(prow2, std::fabs(b[k]));
+
+            // SFEM_PC_SCHUR=1: invert SIMPLE's Schur diagonal S = C_pp - D_pu F_uu^-1 G_up
+            // rather than C_pp alone.
+            //
+            // This block-Jacobi ignores the coupling blocks -- it inverts the 3x3 velocity
+            // block and takes 1/C_pp beside it -- and that was defensible while C_pp
+            // dominated. It no longer does. With the Rhie-Chow coefficient corrected from its
+            // viscous limit to the full momentum time scale, C_pp fell by about the cell
+            // Peclet number, so 1/C_pp is that factor too LARGE and the pressure correction
+            // overshoots: measured on the pressure-port sweep, cases that converged to Re=100
+            // under the old coefficient now fail on a line search that finds no decrease at
+            // rel 0.9, while the same cases with SFEM_PRECOND=direct converge under both
+            // coefficients. The discretisation is sound and this inverse is not.
+            //
+            // The 3x3 inverse is already in hand, so the Schur correction costs nine multiplies
+            // and no extra storage. It is also why the recorded finding that SIMPLE "matches
+            // block-Jacobi to four digits" no longer applies: that held because C_pp was about
+            // eighty-five times the momentum block and the coupling was a two percent
+            // perturbation on it. At the corrected scale the coupling is not a perturbation.
+            //
+            // IT IS OFF BY DEFAULT, AND DELIBERATELY SO -- it is a diagnostic, not a fix.
+            // Measured at 4,900 dof on the pressure port and at 75,140 and 19,652 on the rest,
+            // all under the corrected coefficient:
+            //
+            //   case          schur=0                      schur=2
+            //   port p=1.0    FAILS, Re 0                  converges, Re 100, 2406 lin_it
+            //   poiseuille    converges, 1081, 4.4e-12     FAILS,     u_linf 1.9e-04
+            //   couette       converges, 1892, 3.1e-11     converges, 2381,  1.1e-08
+            //   cavity Re=100 converges, 3143              converges, 10824
+            //   mms N=16      converges,  857              converges,  3576
+            //
+            // So the two families want different pressure scalings: 1/C_pp for velocity-driven
+            // flow and 1/|S| for pressure-driven. That is the same shape of problem as
+            // SFEM_GMG_RC_DECAY and it has the same answer -- a scalar choice between two
+            // regimes is not the fix. What this measures is that the block-Jacobi STRUCTURE
+            // cannot serve both: it inverts the 3x3, inverts the pressure scalar, and drops the
+            // coupling, so the only freedom it has is which scalar to use. A proper SIMPLE
+            // keeps the coupling and has the velocity correction that a signed S requires,
+            // which is where this should go next.
+            // Mode 1 uses S as computed and mode 2 its magnitude, and the difference is not
+            // cosmetic. C_pp is positive and D_pu F_uu^-1 G_up is positive definite, so once
+            // C_pp is small -- which is the whole regime this exists for -- S is NEGATIVE
+            // almost everywhere, and 1/S then flips the sign of every pressure correction.
+            // Measured: mode 1 fails the pressure-port case under BOTH coefficients, taking
+            // the old one from 2463 linear iterations and convergence to failure at 193, which
+            // is what a wrong-signed preconditioner looks like. The sign convention is the
+            // driver's own -- positive is correct for the continuity row as assembled here --
+            // so mode 2 keeps the sign and takes only the Schur magnitude as the scale.
+            real_t pdiag = pp;
+            if (schur) {
+                const real_t g[3] = {b[3], b[7], b[11]};
+                real_t       t[3];
+                for (int r = 0; r < 3; ++r)
+                    t[r] = m[r * 4 + 0] * g[0] + m[r * 4 + 1] * g[1] + m[r * 4 + 2] * g[2];
+                const real_t sc = pp - (b[12] * t[0] + b[13] * t[1] + b[14] * t[2]);
+                pdiag           = (schur == 2) ? std::fabs(sc) : sc;
+            }
+            m[15] = cvfem_invertible(pdiag, prow2) ? real_t(1) / pdiag : real_t(1);
+
+            // Damping. Undamped block-Jacobi is fine as a Krylov preconditioner, where it
+            // is applied once, and is not a smoother: as a stationary iteration on this
+            // saddle-point system it does not converge. SFEM's own multigrid damps its
+            // block-Jacobi by 1/block_size for the same reason.
+            if (omega != real_t(1))
+                for (int k = 0; k < 16; ++k) m[k] *= omega;
+
+            // Constrained rows are identity in the assembled matrix, so they must be
+            // identity here too.
+            for (int c = 0; c < 4; ++c) {
+                if (!mask_get(i * 4 + c, mask)) continue;
+                for (int k = 0; k < 4; ++k) m[c * 4 + k] = real_t(0);
+                m[c * 4 + c] = real_t(1);
+            }
+        }
+        return std::make_shared<BlockJacobi>(nnodes, std::move(inv));
+    }
+
+    std::shared_ptr<BlockJacobi> make_block_jacobi(sfem::CVFEMNavierStokes &op,
+                                                   const real_t *const      x,
+                                                   const mask_t *const      mask,
+                                                   const ptrdiff_t          nnodes,
+                                                   const real_t             omega = real_t(1),
+                                                   const real_t             prow  = real_t(1)) {
+        std::vector<real_t> blocks((size_t)nnodes * 16, 0);
+        const double        t0 = smesh::time_seconds();
+        op.hessian_block_diag(x, blocks.data());
+        phase_add("hessian_block_diag", smesh::time_seconds() - t0);
+        return make_block_jacobi_from_diag(std::move(blocks), mask, nnodes, omega, prow);
+    }
+
+
+    // ---------------------------------------------------------------------------
+    // Semi-structured geometric multigrid, as a preconditioner for the Jacobian solve.
+    //
+    // sfem::create_gmg_data builds the hierarchy: it derefines the Function level by level,
+    // which calls derefine_op on the CVFEM operator, which reassembles itself on the coarse
+    // space. That is rediscretisation rather than Galerkin coarsening, and it has to be --
+    // the Rhie-Chow coefficient carries h^2/(2 mu), so the coarse pressure operator differs
+    // from the fine one by about 8x per level in 3D and P^T A P would inherit the wrong one.
+    //
+    // Two things here are not create_gmg_operators and create_gmg_default_smoothers_and_solver,
+    // and neither could be:
+    //
+    //   * create_gmg_operators builds each level with a null state. That is fine for a
+    //     linear operator and fatal for this one, whose Jacobian depends on where it is
+    //     linearised. Each level gets the fine state restricted onto it instead. The
+    //     restriction divides by the node incidence count before accumulating, so it
+    //     averages rather than sums and is the right transfer for a state.
+    //
+    //   * the default smoothers compute sym_block_size as (block_size == 3 ? 6 : 3), which
+    //     silently yields 3 for a block size of 4 where a symmetric 4x4 needs 10; they then
+    //     call hessian_block_diag_sym, which assumes a symmetry Navier-Stokes does not have;
+    //     and the coarse solver is CG, which needs an SPD operator. All three are wrong here,
+    //     so the smoother is the operator's own 4x4 block diagonal and the coarse solver is
+    //     BiCGStab.
+    struct GmgLevels {
+        std::shared_ptr<sfem::MultigridData>                   data;
+        std::vector<sfem::SharedBuffer<real_t>>                states;
+        // R = P^T sums; dividing by R applied to the constant 1 turns it into the
+        // partition-of-unity average that a state transfer needs. One per coarse level.
+        std::vector<std::vector<real_t>>                       state_weights;   // kept alive for the operators
+        std::vector<std::shared_ptr<sfem::Operator<real_t>>>   ops;
+        std::vector<std::shared_ptr<sfem::CVFEMNavierStokes>>  level_ops;
+        std::shared_ptr<sfem::Multigrid<real_t>>               mg;
+        int                                                    smoothing_steps{3};
+
+        // Transfer matrices, built once: they depend on the lattice, not the linearisation.
+        // Pmat[i] maps level i (coarse) to level i-1 (fine); Rmat[i] is its transpose.
+        using CRS_t = sfem::CRS<sfem::count_t, sfem::idx_t, real_t, real_t>;
+        using BSR_t = sfem::BSR<sfem::count_t, sfem::idx_t, real_t, real_t>;
+        std::vector<std::shared_ptr<CRS_t>> Pmat, Rmat;
+        // The assembled coarse operators, kept as matrices so the level below can be formed
+        // from the level above by a triple product instead of by probing.
+        std::vector<std::shared_ptr<BSR_t>> Amat;
+    };
+
+    // Zero the source component of every block feeding a constrained dof.
+    //
+    // The grid transfers zero constrained dofs on their output, and they do it per
+    // *component* -- ux,uy,uz at a wall, not p. A scalar nodal transfer cannot express that,
+    // so R*A*P alone does not reproduce the composite the driver probes. Folding the mask
+    // into A's columns first does, exactly and in O(nnz): blocks are row-major
+    // values[a*16 + r*4 + c] with c the source component, so a constrained dof (j,c) means
+    // clearing column c of every block in block-column j.
+    std::shared_ptr<GmgLevels::BSR_t> mask_block_columns(const std::shared_ptr<GmgLevels::BSR_t> &a,
+                                                         const mask_t *const                      mask) {
+        const ptrdiff_t nbr = a->row_ptr->size() - 1;
+        auto            rp  = a->row_ptr;
+        auto            ci  = a->col_idx;
+        auto            va  = smesh::create_host_buffer<real_t>(a->values->size());
+        std::copy(a->values->data(), a->values->data() + a->values->size(), va->data());
+
+        const sfem::count_t *const rpd = rp->data();
+        const sfem::idx_t *const   cid = ci->data();
+        real_t *const              vd  = va->data();
+
+#pragma omp parallel for schedule(static)
+        for (ptrdiff_t i = 0; i < nbr; ++i)
+            for (sfem::count_t k = rpd[i]; k < rpd[i + 1]; ++k) {
+                const ptrdiff_t j = cid[k];
+                for (int c = 0; c < N_FIELDS; ++c) {
+                    if (!mask_get(j * N_FIELDS + c, mask)) continue;
+                    for (int r = 0; r < N_FIELDS; ++r) vd[(size_t)k * 16 + (size_t)r * N_FIELDS + c] = 0;
+                }
+            }
+
+        return sfem::h_bsr_spmv<sfem::count_t, sfem::idx_t, real_t, real_t>(
+                nbr, a->cols() / N_FIELDS, N_FIELDS, rp, ci, va, real_t(0));
+    }
+
+    // Apply a scalar nodal matrix to a block vector. The transfers are scalar because the
+    // interpolation is identical for all four fields; the CRS x BSR rap knows that (a scalar
+    // entry scales a whole block), but a hand composition has to spell it out.
+    void apply_scalar_to_blocks(const std::shared_ptr<GmgLevels::CRS_t> &m,
+                                const real_t *const                     in,
+                                real_t *const                           out) {
+        const ptrdiff_t nr = m->rows(), nc = m->cols();
+        std::vector<real_t> a((size_t)nc), b((size_t)nr);
+        for (int c = 0; c < N_FIELDS; ++c) {
+            for (ptrdiff_t k = 0; k < nc; ++k) a[(size_t)k] = in[k * N_FIELDS + c];
+            std::fill(b.begin(), b.end(), real_t(0));
+            m->apply(a.data(), b.data());
+            for (ptrdiff_t k = 0; k < nr; ++k) out[k * N_FIELDS + c] += b[(size_t)k];
+        }
+    }
+
+    // Identity rows for constrained dofs, searching for the diagonal rather than assuming
+    // its position -- mm emits unsorted column indices.
+    void patch_identity_rows(const std::shared_ptr<GmgLevels::BSR_t> &a, const mask_t *const mask) {
+        const ptrdiff_t            nbr = a->row_ptr->size() - 1;
+        const sfem::count_t *const rp  = a->row_ptr->data();
+        const sfem::idx_t *const   ci  = a->col_idx->data();
+        real_t *const              vd  = a->values->data();
+
+#pragma omp parallel for schedule(static)
+        for (ptrdiff_t i = 0; i < nbr; ++i)
+            for (int r = 0; r < N_FIELDS; ++r) {
+                if (!mask_get(i * N_FIELDS + r, mask)) continue;
+                for (sfem::count_t k = rp[i]; k < rp[i + 1]; ++k) {
+                    const bool diag = (ci[k] == i);
+                    for (int c = 0; c < N_FIELDS; ++c)
+                        vd[(size_t)k * 16 + (size_t)r * N_FIELDS + c] =
+                                (diag && c == r) ? real_t(1) : real_t(0);
+                }
+            }
+    }
+
+    std::shared_ptr<GmgLevels> build_gmg(const std::shared_ptr<sfem::Function>       &f,
+                                         const std::shared_ptr<sfem::CVFEMNavierStokes> &fine_op,
+                                         const sfem::SharedBuffer<real_t>            &x_fine,
+                                         const int smoothing_steps) {
+        auto data = sfem::create_gmg_data(f);
+        if (!data) return nullptr;
+        int nlevels = (int)data->functions.size();
+        if (nlevels < 2) return nullptr;
+
+        // SFEM_GMG_MAX_LEVELS caps the depth, keeping the finest levels and solving on the
+        // deepest one kept.
+        //
+        // The hierarchy bottoms out at the macro mesh, which for a small N is a handful of
+        // cells. A convection-dominated Navier-Stokes discretisation there does not
+        // approximate the fine operator in any useful sense, and because that level is
+        // solved to tolerance the cycle takes its answer at face value and prolongs a
+        // confidently wrong correction. Stopping the hierarchy while the coarse mesh still
+        // resolves the flow is the standard remedy.
+        {
+            const int cap = smesh::Env::read<int>("SFEM_GMG_MAX_LEVELS", 0);
+            if (cap > 1 && cap < nlevels) nlevels = cap;
+        }
+
+        auto out             = std::make_shared<GmgLevels>();
+        out->data            = data;
+        out->smoothing_steps = smoothing_steps;
+
+        // Level states. The matrix-free operators read these buffers live, so the buffers
+        // are allocated once and refilled per Newton step rather than reallocated -- which
+        // is also what lets the operators below be built once.
+        out->states.resize(nlevels);
+        out->states[0] = x_fine;
+        for (int i = 1; i < nlevels; ++i)
+            out->states[i] = smesh::create_host_buffer<real_t>((size_t)data->functions[i]->space()->n_dofs());
+
+        // The operator chain, so each level's block diagonal is reachable.
+        out->level_ops.resize(nlevels);
+        out->level_ops[0] = fine_op;
+        const real_t rc_decay = smesh::Env::read<real_t>("SFEM_GMG_RC_DECAY", real_t(1));
+        for (int i = 1; i < nlevels; ++i) {
+            out->level_ops[i] = out->level_ops[i - 1] ? out->level_ops[i - 1]->coarser() : nullptr;
+            if (!out->level_ops[i]) return nullptr;
+
+            // Rhie-Chow does not survive rediscretisation unscaled. Its coefficient is
+            // Df = rc_scale * h^2 / (2 mu), so halving the lattice resolution per level
+            // quadruples Df, and the coarse pressure block ends up far stiffer than the
+            // fine block whose error it is supposed to correct. The operator inherits
+            // rc_scale from its parent, so left alone every level stabilises for its own
+            // h. SFEM_GMG_RC_DECAY rescales it per level; 0.25 keeps Df fixed at the fine
+            // level's value, which is what makes the coarse correction commensurate.
+            out->level_ops[i]->rhie_chow_scale = out->level_ops[i - 1]->rhie_chow_scale * rc_decay;
+        }
+
+        for (int i = 0; i < nlevels; ++i)
+            out->ops.push_back(sfem::create_linear_operator(sfem::op_type::MATRIX_FREE, data->functions[i],
+                                                            out->states[i], sfem::EXECUTION_SPACE_HOST));
+        return out;
+    }
+
+    // Per Newton step: push the new state down the levels and rebuild the smoothers around
+    // it. The hierarchy, its transfer operators and the level operators are all reused --
+    // only the linearisation moved. Rebuilding the whole hierarchy here instead was the
+    // first attempt and it dominated the solve, since create_gmg_data derefines every
+    // Function again.
+    // Transfer sanity check (SFEM_GMG_CHECK=1).
+    //
+    // A V-cycle that measures identically to its own smoother is suspicious in a specific
+    // way: it suggests the coarse-grid correction is not weak but absent. This applies the
+    // transfers to a smooth test field and reports what survives each hop, which separates
+    // "the correction is small" from "the correction is zero".
+    void check_transfers(GmgLevels &g) {
+        const int nlevels = (int)g.ops.size();
+        auto nrm = [](const std::vector<real_t> &v) {
+            real_t s = 0;
+            for (auto e : v) s += e * e;
+            return std::sqrt(s);
+        };
+
+        // Is the Jacobian action element-local?
+        //
+        // Element-wise Galerkin (sum_e P_e^T A_e P_e) is only exact if A is a sum of
+        // macro-element contributions. Rhie-Chow couples through a *nodal* pressure
+        // gradient, which is not element-local -- unless it is frozen from the state rather
+        // than recomputed from the direction. Test it directly: put the direction on the
+        // interior of a single macro element and see whether the response stays inside that
+        // element's nodes. If it spreads, the operator is not a sum of element operators and
+        // the element-wise construction is wrong.
+        {
+            auto           &fop = *g.level_ops[0];
+            const ptrdiff_t nd  = g.data->functions[0]->space()->n_dofs();
+            const ptrdiff_t nn0 = nd / N_FIELDS;
+
+            auto     &m0   = g.data->functions[0]->space()->mesh();
+            auto      b0   = m0.block(0);
+            const int lvl  = smesh::semistructured_level(m0);
+            const int nxe0 = (lvl + 1) * (lvl + 1) * (lvl + 1);
+
+            std::vector<uint8_t> in_elem((size_t)nn0, 0);
+            for (int a = 0; a < nxe0; ++a) in_elem[(size_t)b0->elements()->data()[a][0]] = 1;
+
+            std::vector<real_t> dir((size_t)nd, 0), out((size_t)nd, 0);
+            // Interior lattice nodes of element 0 only, so nothing is shared with a neighbour.
+            for (int z = 1; z < lvl; ++z)
+                for (int y = 1; y < lvl; ++y)
+                    for (int x = 1; x < lvl; ++x) {
+                        const ptrdiff_t gnode = b0->elements()->data()[smesh::sshex8_lidx(lvl, x, y, z)][0];
+                        for (int c = 0; c < N_FIELDS; ++c) dir[(size_t)gnode * N_FIELDS + c] = 1;
+                    }
+
+            fop.apply(g.states[0]->data(), dir.data(), out.data());
+
+            real_t inside = 0, outside = 0;
+            for (ptrdiff_t k = 0; k < nn0; ++k)
+                for (int c = 0; c < N_FIELDS; ++c) {
+                    const real_t v = std::fabs(out[(size_t)k * N_FIELDS + c]);
+                    if (in_elem[(size_t)k]) inside = std::max(inside, v);
+                    else                    outside = std::max(outside, v);
+                }
+            std::printf("element-locality: max |out| inside elem 0 = %.4e, outside = %.4e  %s\n",
+                        inside, outside,
+                        (outside <= inside * 1e-12) ? "LOCAL (element-wise Galerkin is exact)"
+                                                    : "NON-LOCAL (element-wise Galerkin would be wrong)");
+        }
+
+        // Element-wise Galerkin, identity gate.
+        //
+        // At q = 1 the prolongation is the identity, so P^T A P is A itself and the assembled
+        // matrix must reproduce the matrix-free apply to round-off. That one comparison
+        // covers everything the construction rests on at once: that identity slots really do
+        // yield the micro-cell matrix, that the hoisted geometry and Rhie-Chow struct fed to
+        // the assembly kernel are the ones the apply uses, that the derived pattern holds
+        // every entry, and that the inverted-index accumulation lands each block where it
+        // belongs. A failure here means the coarse operators are wrong for a reason that has
+        // nothing to do with coarsening, so it runs before any q > 1 comparison.
+        {
+            auto           &fop = *g.level_ops[0];
+            const auto      fs  = g.data->functions[0]->space();
+            const ptrdiff_t nd  = fs->n_dofs();
+
+            std::vector<real_t> diag;
+            auto                A1 = cvfem_ss::assemble_coarse_operator(fop, fs, fs, &diag);
+
+            std::vector<real_t> v((size_t)nd), a((size_t)nd, 0), b((size_t)nd, 0);
+            for (ptrdiff_t k = 0; k < nd; ++k) v[(size_t)k] = std::sin(real_t(0.7) * (real_t)k + real_t(0.3));
+
+            fop.apply(g.states[0]->data(), v.data(), a.data());
+            A1->apply(v.data(), b.data());
+
+            real_t num = 0, den = 0;
+            for (ptrdiff_t k = 0; k < nd; ++k) {
+                const real_t d = a[(size_t)k] - b[(size_t)k];
+                num += d * d;
+                den += a[(size_t)k] * a[(size_t)k];
+            }
+            const real_t rel = den > 0 ? std::sqrt(num / den) : std::sqrt(num);
+            std::printf("egal identity (q=1): rel |A_egal v - A v| = %.3e over %td blocks  %s\n", rel,
+                        (ptrdiff_t)A1->col_idx->size(), rel < 1e-12 ? "OK" : "FAILED");
+        }
+
+        // Element-wise Galerkin against the composite it claims to equal, at q > 1.
+        //
+        // The identity gate above proves the assembly reproduces A; this proves the
+        // coarsening reproduces P^T A P. Both sides are built without constraints -- the
+        // matrix-free composite from the structured transfer and the raw operator, the
+        // assembled one straight from the element matrices -- so nothing here depends on
+        // the constraint treatment, which is applied identically to both afterwards and
+        // would otherwise hide a discrepancy inside the rows it overwrites.
+        std::shared_ptr<cvfem_ss::CoarseBSR> egal_prev;
+        for (int i = 1; i < (int)g.data->functions.size(); ++i) {
+            auto           &fop = *g.level_ops[0];
+            const auto      fs  = g.data->functions[0]->space();
+            const auto      cs  = g.data->functions[i]->space();
+            const ptrdiff_t ndc = cs->n_dofs();
+            const ptrdiff_t nnc = ndc / N_FIELDS;
+
+            // Level 1 is checked against the matrix-free composite. Below that the check is
+            // the stronger one: the direct construction at ratio q must equal the same
+            // operator coarsened one 2:1 hop from the level above -- which is the claim that
+            // levels do not chain, that piecewise-linear interpolation on nested uniform
+            // lattices composes to the direct map. If it were false, building each level
+            // straight from the fine element matrices would silently differ from the
+            // hierarchy the transfers actually implement.
+            const auto      up  = i == 1 ? fs : g.data->functions[i - 1]->space();
+            const ptrdiff_t ndf = up->n_dofs();
+
+            cvfem_ss::ProlongationPattern pat;
+            cvfem_ss::build_from_spaces(cs, up, pat);
+            if (!pat.uniform) continue;  // apply_structured covers the 2:1 hops only
+
+            auto A = cvfem_ss::assemble_coarse_operator(fop, cs, fs, nullptr);
+            if (i > 1 && !egal_prev) continue;
+
+            std::vector<real_t> vc((size_t)ndc), tf((size_t)ndf, 0), wf((size_t)ndf, 0);
+            std::vector<real_t> a((size_t)ndc, 0), b((size_t)ndc, 0);
+            for (ptrdiff_t k = 0; k < ndc; ++k) vc[(size_t)k] = std::cos(real_t(0.41) * (real_t)k + real_t(0.9));
+
+            // P applied per component, the transfer being scalar and nodal.
+            for (int c = 0; c < N_FIELDS; ++c) {
+                std::vector<real_t> cin((size_t)nnc), fout((size_t)(ndf / N_FIELDS), 0);
+                for (ptrdiff_t k = 0; k < nnc; ++k) cin[(size_t)k] = vc[(size_t)k * N_FIELDS + c];
+                cvfem_ss::apply_structured(pat, cin.data(), fout.data());
+                for (ptrdiff_t k = 0; k < ndf / N_FIELDS; ++k) tf[(size_t)k * N_FIELDS + c] = fout[(size_t)k];
+            }
+
+            if (i == 1) fop.apply(g.states[0]->data(), tf.data(), wf.data());
+            else        egal_prev->apply(tf.data(), wf.data());
+
+            // P^T, the adjoint of apply_structured with the same implied weights.
+            for (ptrdiff_t r = 0; r < pat.n_fine; ++r) {
+                const sfem::count_t bk = pat.rowptr[(size_t)r], ek = pat.rowptr[(size_t)r + 1];
+                const real_t        w  = real_t(1) / (real_t)(ek - bk);
+                for (sfem::count_t k = bk; k < ek; ++k)
+                    for (int c = 0; c < N_FIELDS; ++c)
+                        a[(size_t)pat.colidx[(size_t)k] * N_FIELDS + c] += w * wf[(size_t)r * N_FIELDS + c];
+            }
+
+            A->apply(vc.data(), b.data());
+
+            real_t num = 0, den = 0;
+            for (ptrdiff_t k = 0; k < ndc; ++k) {
+                const real_t d = a[(size_t)k] - b[(size_t)k];
+                num += d * d;
+                den += a[(size_t)k] * a[(size_t)k];
+            }
+            const real_t rel = den > 0 ? std::sqrt(num / den) : std::sqrt(num);
+            std::printf("egal galerkin (0->%d): rel |A_egal - P^T %s P| = %.3e  %s\n", i,
+                        i == 1 ? "A" : "A_egal(prev)", rel, rel < 1e-11 ? "OK" : "FAILED");
+            egal_prev = A;
+        }
+
+        // Block-split gate: the four blocks must sum to the full Jacobian action, and
+        // each must be non-trivial. A smoother built on the block split is only as good as
+        // this, and a block application that silently produced nothing would make SIMPLE
+        // degenerate into block-Jacobi without saying so.
+        {
+            auto           &fop = *g.level_ops[0];
+            const ptrdiff_t nd  = g.data->functions[0]->space()->n_dofs();
+            std::vector<real_t> dir((size_t)nd), full((size_t)nd, 0), sum((size_t)nd, 0);
+            for (ptrdiff_t k = 0; k < nd; ++k) dir[(size_t)k] = std::sin(0.7 * (real_t)k) + 0.3;
+
+            fop.apply(g.states[0]->data(), dir.data(), full.data());
+
+            const int   sel[4] = {sfem::CVFEM_BLOCK_UU, sfem::CVFEM_BLOCK_UP,
+                                  sfem::CVFEM_BLOCK_PU, sfem::CVFEM_BLOCK_PP};
+            const char *bn[4]  = {"uu", "up", "pu", "pp"};
+            std::printf("block split:");
+            for (int b = 0; b < 4; ++b) {
+                std::vector<real_t> one((size_t)nd, 0);
+                fop.apply_blocks(g.states[0]->data(), dir.data(), one.data(), sel[b]);
+                real_t n = 0;
+                for (ptrdiff_t k = 0; k < nd; ++k) {
+                    n += one[(size_t)k] * one[(size_t)k];
+                    sum[(size_t)k] += one[(size_t)k];
+                }
+                std::printf("  |%s| %.4e", bn[b], std::sqrt(n));
+            }
+            real_t dn = 0, fn = 0;
+            for (ptrdiff_t k = 0; k < nd; ++k) {
+                const real_t d = sum[(size_t)k] - full[(size_t)k];
+                dn += d * d;
+                fn += full[(size_t)k] * full[(size_t)k];
+            }
+            // Full-precision checksum of one operator application, plus a repeat, so
+            // non-determinism is visible rather than hidden by the print width above.
+            // Compare this line across thread counts and across runs.
+            {
+                std::vector<real_t> y1((size_t)nd, 0), y2((size_t)nd, 0);
+                fop.apply(g.states[0]->data(), dir.data(), y1.data());
+                fop.apply(g.states[0]->data(), dir.data(), y2.data());
+                real_t s1 = 0, dmax = 0;
+                for (ptrdiff_t k = 0; k < nd; ++k) {
+                    s1 += y1[(size_t)k];
+                    dmax = std::max(dmax, std::fabs(y1[(size_t)k] - y2[(size_t)k]));
+                }
+                real_t sx = 0;
+                for (ptrdiff_t k = 0; k < nd; ++k) sx += g.states[0]->data()[(size_t)k];
+                // Sorted checksum too: summing in sorted order is invariant to node
+                // numbering, so if the plain sum varies and this one does not, the mesh is
+                // being numbered differently between runs and the values are the same.
+                std::vector<real_t> sv(g.states[0]->data(), g.states[0]->data() + nd);
+                std::sort(sv.begin(), sv.end());
+                real_t sxs = 0;
+                for (auto v : sv) sxs += v;
+                std::printf("  state checksum: %.17g  sorted: %.17g\n", (double)sx, (double)sxs);
+                std::printf("  apply checksum: %.17g   repeat-diff %.3e\n", (double)s1, (double)dmax);
+
+                // The other three kernels that scatter: residual, block diagonal, and one
+                // block of the 2x2 split. Same question, same evidence.
+                {
+                    std::vector<real_t> r1((size_t)nd, 0), r2((size_t)nd, 0);
+                    fop.gradient(g.states[0]->data(), r1.data());
+                    fop.gradient(g.states[0]->data(), r2.data());
+                    real_t cs = 0, dm = 0;
+                    for (ptrdiff_t k = 0; k < nd; ++k) {
+                        cs += r1[(size_t)k];
+                        dm = std::max(dm, std::fabs(r1[(size_t)k] - r2[(size_t)k]));
+                    }
+                    std::printf("  residual checksum: %.17g   repeat-diff %.3e\n", (double)cs, (double)dm);
+
+                    const ptrdiff_t nnod = nd / N_FIELDS;
+                    std::vector<real_t> b1((size_t)nnod * 16, 0), b2((size_t)nnod * 16, 0);
+                    fop.hessian_block_diag(g.states[0]->data(), b1.data());
+                    fop.hessian_block_diag(g.states[0]->data(), b2.data());
+                    real_t bs = 0, bm = 0;
+                    for (size_t k = 0; k < b1.size(); ++k) {
+                        bs += b1[k];
+                        bm = std::max(bm, std::fabs(b1[k] - b2[k]));
+                    }
+                    std::printf("  blockdiag checksum: %.17g  repeat-diff %.3e\n", (double)bs, (double)bm);
+
+                    std::vector<real_t> k1((size_t)nd, 0), k2((size_t)nd, 0);
+                    fop.apply_blocks(g.states[0]->data(), dir.data(), k1.data(), sfem::CVFEM_BLOCK_PU);
+                    fop.apply_blocks(g.states[0]->data(), dir.data(), k2.data(), sfem::CVFEM_BLOCK_PU);
+                    real_t ks = 0, km = 0;
+                    for (ptrdiff_t k = 0; k < nd; ++k) {
+                        ks += k1[(size_t)k];
+                        km = std::max(km, std::fabs(k1[(size_t)k] - k2[(size_t)k]));
+                    }
+                    std::printf("  blocksplit checksum: %.17g repeat-diff %.3e\n", (double)ks, (double)km);
+                }
+            }
+            std::printf("\n  sum vs full: rel %.4e  %s\n", (fn > 0) ? std::sqrt(dn / fn) : 0.0,
+                        (fn > 0 && std::sqrt(dn / fn) < 1e-10) ? "OK" : "MISMATCH");
+        }
+
+        // Constraint census per level. A colocated Navier-Stokes system with velocity
+        // Dirichlet data all round fixes pressure only up to a constant, so the pressure
+        // needs a pin. If the fine level has one and a coarse level does not, that coarse
+        // operator is singular, its solve wanders along the constant-pressure null vector,
+        // and the prolonged correction carries that spurious mode back up -- which looks
+        // exactly like a V-cycle that diverges after the first couple of cycles.
+        for (int i = 0; i < nlevels; ++i) {
+            const ptrdiff_t     nd = g.data->functions[i]->space()->n_dofs();
+            std::vector<mask_t> m(mask_count(nd), 0);
+            g.data->functions[i]->constraints_mask(m.data());
+            int per[N_FIELDS] = {0};
+            for (ptrdiff_t k = 0; k < nd; ++k)
+                if (mask_get(k, m.data())) per[k % N_FIELDS]++;
+            std::printf("constraints level %d: n %td  ux %d  uy %d  uz %d  p %d\n",
+                        i, nd, per[0], per[1], per[2], per[3]);
+        }
+
+        for (int i = 0; i + 1 < nlevels; ++i) {
+            const ptrdiff_t nf = g.data->functions[i]->space()->n_dofs();
+            const ptrdiff_t nc = g.data->functions[i + 1]->space()->n_dofs();
+
+            std::vector<real_t> fine((size_t)nf), coarse((size_t)nc, 0), back((size_t)nf, 0);
+            // Smooth and non-zero on every component, so a component-selective bug shows.
+            for (ptrdiff_t k = 0; k < nf; ++k) fine[(size_t)k] = 1 + 0.1 * (real_t)(k % 7);
+
+            g.data->restrictions[i]->apply(fine.data(), coarse.data());
+            if (g.data->prolongations[i + 1]) g.data->prolongations[i + 1]->apply(coarse.data(), back.data());
+
+            {
+                // Gate for the structured prolongation: it must reproduce the matrix-free
+                // transfer it is meant to replace. The structured form carries no values at
+                // all -- the weight is 1/nnz for a 2:1 hop -- so this also checks that the
+                // "weights are implied by row length" claim actually holds on the real
+                // numbering, not just on paper.
+                cvfem_ss::ProlongationPattern pp;
+                cvfem_ss::build_from_spaces(g.data->functions[i + 1]->space(),
+                                            g.data->functions[i]->space(), pp);
+
+                std::vector<real_t> cs((size_t)nc), ref((size_t)nf, 0), got((size_t)nf, 0);
+                unsigned            st = 4242u;
+                for (auto &v : cs) {
+                    st = st * 1103515245u + 12345u;
+                    v  = (real_t)((st >> 16) & 0x7fff) / (real_t)0x7fff - real_t(0.5);
+                }
+
+                // The driver's prolongation is block-valued; compare one component by
+                // scattering the scalar field into that component and reading it back.
+                std::vector<real_t> cb((size_t)nc * 0 + (size_t)g.data->functions[i + 1]->space()->n_dofs(), 0);
+                std::vector<real_t> fb((size_t)g.data->functions[i]->space()->n_dofs(), 0);
+                for (ptrdiff_t k = 0; k < pp.n_coarse; ++k) cb[(size_t)k * N_FIELDS] = cs[(size_t)k];
+                if (g.data->prolongations[i + 1]) {
+                    auto praw = sfem::create_hierarchical_prolongation(g.data->functions[i + 1]->space(),
+                                                                       g.data->functions[i]->space(),
+                                                                       sfem::EXECUTION_SPACE_HOST);
+                    praw->apply(cb.data(), fb.data());
+                    for (ptrdiff_t k = 0; k < pp.n_fine; ++k) ref[(size_t)k] = fb[(size_t)k * N_FIELDS];
+
+                    cvfem_ss::apply_structured(pp, cs.data(), got.data());
+
+                    real_t dn = 0, rn = 0;
+                    for (ptrdiff_t k = 0; k < pp.n_fine; ++k) {
+                        const real_t d = got[(size_t)k] - ref[(size_t)k];
+                        dn += d * d;
+                        rn += ref[(size_t)k] * ref[(size_t)k];
+                    }
+                    const real_t rel = (rn > 0) ? std::sqrt(dn / rn) : 0.0;
+                    std::printf("  structured P %d->%d: nnz %td  uniform %d  vs matrix-free rel %.4e  %s\n",
+                                i + 1, i, (ptrdiff_t)pp.rowptr[(size_t)pp.n_fine], (int)pp.uniform, rel,
+                                (rel < 1e-12) ? "OK" : "MISMATCH");
+
+                    // Does P reproduce a constant?
+                    //
+                    // Neither test above asks this. The structured-vs-matrix-free comparison
+                    // checks two implementations of the same P against each other, and the
+                    // adjoint check verifies R = P^T; both pass whatever P is. A prolongation
+                    // whose rows do not sum to one interpolates a constant field into
+                    // something else, and the multigrid correction is then wrong by an amount
+                    // proportional to the solution itself rather than to the error.
+                    //
+                    // This goes unnoticed on every case in this file but one. Where the whole
+                    // skin is Dirichlet, the correction at boundary nodes is zeroed after the
+                    // prolongation, so a defect confined to boundary rows is masked exactly.
+                    // The do-nothing outflow leaves those nodes free, and it is the only
+                    // configuration here that exposes them -- which is why it is also the only
+                    // one whose V-cycle diverges.
+                    std::vector<real_t> one((size_t)g.data->functions[i + 1]->space()->n_dofs(), 0),
+                            pone((size_t)g.data->functions[i]->space()->n_dofs(), 0);
+                    for (ptrdiff_t k = 0; k < pp.n_coarse; ++k) one[(size_t)k * N_FIELDS] = 1;
+                    praw->apply(one.data(), pone.data());
+                    real_t    worst = 0;
+                    ptrdiff_t worst_k = -1, n_bad = 0;
+                    for (ptrdiff_t k = 0; k < pp.n_fine; ++k) {
+                        const real_t d = std::fabs(pone[(size_t)k * N_FIELDS] - real_t(1));
+                        if (d > 1e-10) ++n_bad;
+                        if (d > worst) { worst = d; worst_k = k; }
+                    }
+                    std::printf("  P %d->%d reproduces constants: worst |P1-1| = %.4e at node %td, %td of %td nodes off  %s\n",
+                                i + 1, i, (double)worst, worst_k, n_bad, (ptrdiff_t)pp.n_fine,
+                                (worst < 1e-10) ? "OK" : "BROKEN");
+                }
+            }
+
+            {
+                // Full-precision checksums of the transfers themselves. The restriction
+                // accumulates fine contributions into coarse nodes, which is the same kind
+                // of operation the element scatter was, so it is a candidate for the same
+                // problem.
+                long double cr = 0, cp = 0;
+                for (ptrdiff_t k = 0; k < nc; ++k) cr += (long double)coarse[(size_t)k];
+                for (ptrdiff_t k = 0; k < nf; ++k) cp += (long double)back[(size_t)k];
+                std::printf("  transfer checksums: R %.17g  P %.17g\n", (double)cr, (double)cp);
+            }
+            std::printf("transfer %d->%d: n %td->%td  |x| %.4e  |Rx| %.4e  |PRx| %.4e\n",
+                        i, i + 1, nf, nc, nrm(fine), nrm(coarse), nrm(back));
+
+            // Adjoint test. A coarse-grid correction is only consistent when the residual
+            // restriction is the transpose of the correction prolongation, so that the
+            // coarse problem minimises the same error the fine level sees. If it is not,
+            // the correction is scaled wrongly and the cycle over- or under-corrects; a
+            // constant ratio here is exactly the factor it is out by.
+            if (g.data->prolongations[i + 1]) {
+                std::vector<real_t> xr((size_t)nf), yc((size_t)nc), Rx((size_t)nc, 0), Py((size_t)nf, 0);
+
+                // The probe directions are functions of POSITION, and the inner products are
+                // taken over the OWNED range and reduced. All three were wrong under MPI and
+                // each one alone is enough to make the printed ratio meaningless.
+                //
+                // The directions used to come from an LCG seeded per local dof index. That is
+                // not a distributed vector: a node carries one local index on its owner and a
+                // different one in every rank holding it as a ghost, so the same physical
+                // node entered R and P with different values, and the vector itself changed
+                // with the decomposition -- the one rank and two rank runs were not probing
+                // the same thing at all.
+                //
+                // The dot products then ran over the whole LOCAL range, which counts every
+                // shared, ghost and aura entry once per rank that stores it, and nothing
+                // reduced them, so each rank printed its own partial sum and called it an
+                // inner product. Summed by hand afterwards those partials gave 0.866, which
+                // is not 1 and not evidence of anything either, because the two flaws above
+                // were still in force.
+                //
+                // Over the owned range only, keyed on coordinates, and allreduced, this is
+                // the actual global <Rx, y> against <x, Py>. Serial is unaffected: n_owned
+                // equals n_dofs and the reduction short circuits.
+                {
+                    auto              fs = g.data->functions[i]->space();
+                    auto              cs = g.data->functions[i + 1]->space();
+                    const auto *const fx = fs->points()->data()[0];
+                    const auto *const fy = fs->points()->data()[1];
+                    const auto *const fz = fs->points()->data()[2];
+                    const auto *const cx = cs->points()->data()[0];
+                    const auto *const cy = cs->points()->data()[1];
+                    const auto *const cz = cs->points()->data()[2];
+
+                    for (ptrdiff_t n = 0; n < nf / N_FIELDS; ++n)
+                        for (int c = 0; c < N_FIELDS; ++c)
+                            xr[(size_t)(n * N_FIELDS + c)] = (real_t)std::sin(
+                                    1.9 * (double)fx[n] + 2.7 * (double)fy[n] + 1.3 * (double)fz[n] + 0.6 * c + 0.3);
+
+                    for (ptrdiff_t n = 0; n < nc / N_FIELDS; ++n)
+                        for (int c = 0; c < N_FIELDS; ++c)
+                            yc[(size_t)(n * N_FIELDS + c)] = (real_t)std::cos(
+                                    2.1 * (double)cx[n] + 1.5 * (double)cy[n] + 2.9 * (double)cz[n] + 0.4 * c + 0.7);
+                }
+
+                // Both transfers zero constrained dofs on their output, so the adjoint
+                // identity only holds on vectors that already satisfy the constraints.
+                // Probing with unconstrained noise measures the constraint handling, not
+                // the transfers, and reports a spurious mismatch.
+                g.data->functions[i]->apply_zero_constraints(xr.data());
+                g.data->functions[i + 1]->apply_zero_constraints(yc.data());
+
+                g.data->restrictions[i]->apply(xr.data(), Rx.data());
+                g.data->prolongations[i + 1]->apply(yc.data(), Py.data());
+
+                auto dom_of = [](const std::shared_ptr<sfem::FunctionSpace> &sp) {
+                    cvfem::Domain d;
+                    auto          m = sp->mesh_ptr();
+                    if (m && m->is_distributed() && m->comm() && m->comm()->size() > 1) d.comm = m->comm();
+                    d.n_owned = sp->n_owned_dofs();
+                    d.n_local = sp->n_dofs();
+                    return d;
+                };
+                const cvfem::Domain dom_f = dom_of(g.data->functions[i]->space());
+                const cvfem::Domain dom_c = dom_of(g.data->functions[i + 1]->space());
+
+                long double lhs_loc = 0, rhs_loc = 0;
+                for (ptrdiff_t k = 0; k < dom_c.n_owned && k < nc; ++k)
+                    lhs_loc += (long double)Rx[(size_t)k] * (long double)yc[(size_t)k];
+                for (ptrdiff_t k = 0; k < dom_f.n_owned && k < nf; ++k)
+                    rhs_loc += (long double)xr[(size_t)k] * (long double)Py[(size_t)k];
+
+                const double lhs  = cvfem::sum_kahan(dom_c, lhs_loc);
+                const double rhs2 = cvfem::sum_kahan(dom_f, rhs_loc);
+                if (!dom_f.distributed() || dom_f.is_root())
+                    std::printf("  adjoint %d: <Rx,y>=%.6e  <x,Py>=%.6e  ratio=%.6f\n",
+                                i, lhs, rhs2, (rhs2 != 0) ? lhs / rhs2 : 0.0);
+            }
+
+            // Coarse-operator consistency: A_c v against R A_f P v on a smooth coarse
+            // vector.
+            //
+            // The coarse level is rediscretised rather than assembled as R A_f P, which is
+            // the whole reason the hierarchy is affordable, but it is only a legitimate
+            // substitute if it acts like the Galerkin operator on the smooth vectors a
+            // coarse grid is supposed to carry. If the two disagree by O(1) here, the
+            // coarse solve is answering a different question from the one the fine level
+            // asked, and no smoother can repair the correction that comes back.
+            if (g.data->prolongations[i + 1]) {
+                std::vector<real_t> vc((size_t)nc), vf((size_t)nf, 0), wf((size_t)nf, 0),
+                        g1((size_t)nc, 0), g2((size_t)nc, 0);
+                for (ptrdiff_t k = 0; k < nc; ++k) vc[(size_t)k] = 1 + 0.1 * (real_t)(k % 7);
+                g.data->functions[i + 1]->apply_zero_constraints(vc.data());
+
+                g.data->prolongations[i + 1]->apply(vc.data(), vf.data());
+                g.ops[i]->apply(vf.data(), wf.data());
+                g.data->restrictions[i]->apply(wf.data(), g1.data());
+                g.ops[i + 1]->apply(vc.data(), g2.data());
+
+                // Split by component. The momentum and continuity rows coarsen very
+                // differently: Rhie-Chow's Df = rc_scale * h^2 / (2 mu) is the only term
+                // that depends on the lattice spacing outright, so an inconsistency
+                // concentrated in the pressure rows implicates the stabilisation, and one
+                // spread evenly implicates the discretisation as a whole.
+                real_t dn[N_FIELDS] = {0}, rn[N_FIELDS] = {0};
+                real_t ab[N_FIELDS] = {0}, aa[N_FIELDS] = {0};
+                for (ptrdiff_t k = 0; k < nc; ++k) {
+                    const int    c = (int)(k % N_FIELDS);
+                    const real_t d = g1[(size_t)k] - g2[(size_t)k];
+                    dn[c] += d * d;
+                    rn[c] += g1[(size_t)k] * g1[(size_t)k];
+                    ab[c] += g2[(size_t)k] * g1[(size_t)k];   // <A_c v, R A P v>
+                    aa[c] += g2[(size_t)k] * g2[(size_t)k];
+                }
+                const char *nm[N_FIELDS] = {"ux", "uy", "uz", "p"};
+                std::printf("  coarse-op %d rel:  ", i);
+                for (int c = 0; c < N_FIELDS; ++c)
+                    std::printf("%s %.4f  ", nm[c], (rn[c] > 0) ? std::sqrt(dn[c] / rn[c]) : 0.0);
+                // Best-fit scale per component. A rediscretised coarse operator is not
+                // meant to equal R A P -- the two differ by a fixed factor from the
+                // h-scaling convention -- so the raw mismatch above conflates that known
+                // factor with real disagreement. What matters is whether the velocity and
+                // pressure rows carry the SAME factor. If they do not, the coarse operator
+                // is not a scalar multiple of the Galerkin one, and no single scaling of
+                // the correction can reconcile it, which is why SFEM_GMG_CGC failed.
+                std::printf("\n  coarse-op %d scale:", i);
+                real_t su = 0;
+                for (int c = 0; c < N_FIELDS; ++c) {
+                    const real_t sc = (aa[c] > 0) ? ab[c] / aa[c] : 0.0;
+                    std::printf("  %s %.4f", nm[c], sc);
+                    if (c < 3) su += sc / 3;
+                }
+                const real_t sp = (aa[3] > 0) ? ab[3] / aa[3] : 0.0;
+                std::printf("   -> pressure/velocity %.4f", (su != 0) ? sp / su : 0.0);
+                // Residual left after removing each component's own best-fit scale. This
+                // is the part of the disagreement that no rescaling of any kind can reach,
+                // and it decides whether a cheap fix exists at all.
+                std::printf("\n  coarse-op %d after-scale:", i);
+                for (int c = 0; c < N_FIELDS; ++c) {
+                    const real_t sc = (aa[c] > 0) ? ab[c] / aa[c] : 0.0;
+                    real_t       rr2 = 0;
+                    for (ptrdiff_t k = c; k < nc; k += N_FIELDS) {
+                        const real_t d = sc * g2[(size_t)k] - g1[(size_t)k];
+                        rr2 += d * d;
+                    }
+                    std::printf("  %s %.4f", nm[c], (rn[c] > 0) ? std::sqrt(rr2 / rn[c]) : 0.0);
+                }
+                std::printf("\n");
+            }
+        }
+    }
+
+    // R is the adjoint of the prolongation, which is what the residual transfer in a
+    // V-cycle must be, and is exactly wrong for moving a state down. Applied to a field it
+    // sums rather than averages and inflates it by the number of fine nodes feeding each
+    // coarse node -- measured here as a factor of about 3.8 per level. A coarse operator
+    // linearised about a state that large is not an approximation of the fine operator at
+    // all, so its correction is not a correction. Normalising by R applied to the constant
+    // 1 recovers the average, which is exact for constants and leaves a smooth field alone.
+    // Transfer matrices, built once. They depend only on the lattice, so rebuilding them
+    // per Newton step -- as the probing path effectively did with its pattern and colouring
+    // -- is pure waste.
+    void build_transfer_matrices(GmgLevels &g) {
+        const int nlevels = (int)g.ops.size();
+        g.Pmat.assign((size_t)nlevels, nullptr);
+        g.Rmat.assign((size_t)nlevels, nullptr);
+        g.Amat.assign((size_t)nlevels, nullptr);
+        for (int i = 1; i < nlevels; ++i) {
+            cvfem_ss::ProlongationPattern pp;
+            cvfem_ss::build_from_spaces(g.data->functions[i]->space(), g.data->functions[i - 1]->space(), pp);
+            g.Pmat[(size_t)i] = cvfem_ss::to_crs(pp);
+            g.Rmat[(size_t)i] = g.Pmat[(size_t)i]->transpose();
+        }
+    }
+
+    // Exact probe pattern for the first coarse level, derived rather than guessed.
+    //
+    // Probing needs a sparsity pattern up front, and an entry falling outside it is folded
+    // into the wrong slot rather than dropped -- so a guess that is too narrow yields a
+    // wrong matrix, which is why the old code guessed, checked, and widened to dense. There
+    // is no need to guess: the fine operator's stencil is the fine node graph, so the
+    // pattern of R*G*P with G the graph carrying unit values is a guaranteed superset of the
+    // true Galerkin pattern (it can only over-estimate, under cancellation). Probing on a
+    // superset is correct by construction.
+    std::shared_ptr<GmgLevels::CRS_t> symbolic_rap_pattern(const std::shared_ptr<sfem::Function> &f_fine,
+                                                           const std::shared_ptr<GmgLevels::CRS_t> &R,
+                                                           const std::shared_ptr<GmgLevels::CRS_t> &P) {
+        auto            graph = f_fine->space()->node_to_node_graph();
+        const ptrdiff_t nn    = graph->rowptr()->size() - 1;
+        const ptrdiff_t nnz   = graph->rowptr()->data()[nn];
+
+        auto rp = smesh::create_host_buffer<sfem::count_t>((size_t)nn + 1);
+        auto ci = smesh::create_host_buffer<sfem::idx_t>((size_t)nnz);
+        auto va = smesh::create_host_buffer<real_t>((size_t)nnz);
+        std::copy(graph->rowptr()->data(), graph->rowptr()->data() + nn + 1, rp->data());
+        std::copy(graph->colidx()->data(), graph->colidx()->data() + nnz, ci->data());
+        std::fill(va->data(), va->data() + nnz, real_t(1));
+
+        auto G = sfem::h_crs_spmv<sfem::count_t, sfem::idx_t, real_t, real_t>(nn, nn, rp, ci, va, real_t(0));
+        return sfem::rap(R, G, P);
+    }
+
+    void build_state_weights(GmgLevels &g) {
+        const int nlevels = (int)g.ops.size();
+        g.state_weights.assign((size_t)nlevels, {});
+        for (int i = 1; i < nlevels; ++i) {
+            const ptrdiff_t nf = g.data->functions[i - 1]->space()->n_dofs();
+            const ptrdiff_t nc = g.data->functions[i]->space()->n_dofs();
+            std::vector<real_t> ones((size_t)nf, real_t(1)), w((size_t)nc, real_t(0));
+            g.data->restrictions[i - 1]->apply(ones.data(), w.data());
+            g.state_weights[(size_t)i] = std::move(w);
+        }
+    }
+
+    // Is the derefined coarse operator the same operator as one built directly on the
+    // coarse space?
+    //
+    // The coarse operators come from derefine_op, walking down from the fine one. A driver
+    // run at that refine level would instead construct the operator on that space from
+    // scratch. Those two ought to be the same object, and if they are not, the hierarchy is
+    // not solving a coarse version of the problem at all -- which would be a defect rather
+    // than the known fact that rediscretisation differs from Galerkin coarsening.
+    void check_derefined_op(GmgLevels &g) {
+        auto            fs = g.data->functions[1]->space();
+        const ptrdiff_t nd = fs->n_dofs();
+
+        auto fresh = std::make_shared<sfem::CVFEMNavierStokes>(fs);
+        fresh->rho             = g.level_ops[0]->rho;
+        fresh->mu              = g.level_ops[0]->mu;
+        fresh->rhie_chow_scale = g.level_ops[1]->rhie_chow_scale;
+        fresh->geom            = g.level_ops[0]->geom;
+        fresh->pack_size       = 0;
+        if (fresh->initialize() != SFEM_SUCCESS) {
+            std::printf("derefined-op check: could not build a fresh coarse operator\n");
+            return;
+        }
+
+        std::vector<real_t> dir((size_t)nd), a((size_t)nd, 0), b((size_t)nd, 0);
+        for (ptrdiff_t k = 0; k < nd; ++k) dir[(size_t)k] = std::sin(0.9 * (real_t)k) + 0.2;
+
+        g.level_ops[1]->apply(g.states[1]->data(), dir.data(), a.data());
+        fresh->apply(g.states[1]->data(), dir.data(), b.data());
+
+        real_t dn[N_FIELDS] = {0}, rn[N_FIELDS] = {0};
+        for (ptrdiff_t k = 0; k < nd; ++k) {
+            const int    c = (int)(k % N_FIELDS);
+            const real_t d = a[(size_t)k] - b[(size_t)k];
+            dn[c] += d * d;
+            rn[c] += a[(size_t)k] * a[(size_t)k];
+        }
+        const char *nm[N_FIELDS] = {"ux", "uy", "uz", "p"};
+        std::printf("derefined vs freshly built coarse operator, rel:");
+        for (int c = 0; c < N_FIELDS; ++c)
+            std::printf("  %s %.3e", nm[c], (rn[c] > 0) ? std::sqrt(dn[c] / rn[c]) : 0.0);
+        std::printf("\n");
+    }
+
+    // Exact coarse solve by dense LU.
+    //
+    // The coarsest level is solved, not smoothed, so the cycle takes its answer at face
+    // value and an iterative method that fails there poisons everything above it. Measured
+    // at N=2, L=16: BiCGStab on the 81-node coarsest operator diverges outright, its
+    // residual going from 1.577 to 36066 over a hundred iterations, and it then returns
+    // that amplified vector as the coarse-grid correction. The V-cycle amplified by 1e6 to
+    // 1e9 per cycle, FGMRES could not converge, and Newton stepped from a badly solved
+    // system to an answer three orders of magnitude wrong.
+    //
+    // At this size the question should not be asked of an iterative solver at all. The
+    // coarsest level here is a few hundred unknowns and already stored dense, so a
+    // factorisation is both exact and cheap, and it cannot diverge. The matrix is recovered
+    // by applying the operator to unit vectors, which costs n small matrix-vector products
+    // once per Newton step.
+    // The coarse solve is rank-revealing, because the coarse operator need not have full rank.
+    //
+    // A pivot is small or large only relative to the matrix it came from, so the old absolute
+    // `1e-300` test let a pivot of 1e-18 through in a matrix of scale one and back-substituted
+    // an inverse of 1e18. On the backward-facing step that produced a coarse correction of
+    // norm 1.6e12 from a fine residual of 5e-3, which the prolongation then added to the
+    // solution -- the cycle's divergence at 1e19 per iteration was this and nothing else.
+    //
+    // Treating such a pivot as a null direction (y = 0 there) makes the solve a truncated
+    // least-squares one: the coarse space's null components are simply not corrected, which is
+    // the right thing for a multigrid coarse solve, since a null direction of A_H carries no
+    // information about the fine residual. The dropped count is printed rather than swallowed;
+    // a coarse operator that suddenly loses rank is a defect worth seeing.
+    //
+    // The factorisation is LAPACK's getrf, partial pivoting like the loop it replaced, on the
+    // matrix stored COLUMN-major (a_[j * n + i] is A(i, j)); both builders below write it that
+    // way. The hand-written unblocked loop was ~1 s per Newton step on the FDA nozzle's
+    // 2,320-dof coarsest level, the same at 116,212 and 893,924 dof -- 28 of the 45 s of the
+    // smaller run -- and threading its row update reached only 1.7x on 72 cores.
+    //
+    // The null-direction treatment is kept: a pivot at or below the relative tolerance is
+    // recorded, its U row is reduced to a unit diagonal, and the solve zeroes that component
+    // between the two triangular sweeps, which is y = 0 there exactly as before. getrf, unlike
+    // the loop, still eliminates below such a pivot; that is harmless when the near-null pivots
+    // are the last ones factored -- where partial pivoting puts a rank deficiency of the
+    // trailing Schur complement -- and a dropped pivot anywhere else is reported.
+    // What the coarsest level's solver owes its caller beyond an apply: which directions the
+    // factorisation could not resolve. Both forms report it -- the per-rank one over its own
+    // matrix, the global one over the whole coarse problem -- so the diagnostic below reads
+    // the same either way instead of switching on the concrete type.
+    class CoarseFactorization : public sfem::Operator<real_t> {
+    public:
+        virtual ptrdiff_t                     n_dropped() const      = 0;
+        virtual const std::vector<ptrdiff_t> &dropped() const        = 0;
+        /// The order actually factorised: LOCAL for the per-rank form, GLOBAL for the
+        /// redundant one, so a dropped count is reported against what was factored.
+        virtual ptrdiff_t                     factored_order() const = 0;
+    };
+
+    // The held factorisation, kept here because this is the first scope where its type exists.
+    // It owns its own factors -- DenseLU copies the matrix it is given and keeps the pivots --
+    // so a held one stays valid after the coarse matrix it came from has been reassembled.
+    std::shared_ptr<CoarseFactorization> g_coarse_cached;
+
+    static bool coarse_rebuild_now() {
+        return precond_freeze_rebuild((bool)g_coarse_cached, g_coarse_calls, coarse_freeze_every());
+    }
+
+    class DenseLU final : public CoarseFactorization {
+        static void getrf(const int n, double *a, int *ipiv, int *info) { dgetrf_(&n, &n, a, &n, ipiv, info); }
+        static void getrf(const int n, float *a, int *ipiv, int *info) { sgetrf_(&n, &n, a, &n, ipiv, info); }
+        static void trsv(const char uplo, const char diag, const int n, const double *a, double *x) {
+            const int one = 1;
+            dtrsv_(&uplo, "N", &diag, &n, a, &n, x, &one, 1, 1, 1);
+        }
+        static void trsv(const char uplo, const char diag, const int n, const float *a, float *x) {
+            const int one = 1;
+            strsv_(&uplo, "N", &diag, &n, a, &n, x, &one, 1, 1, 1);
+        }
+
+    public:
+        DenseLU(const ptrdiff_t n, std::vector<real_t> a) : n_(n), a_(std::move(a)), piv_((size_t)n), y_((size_t)n) {
+            real_t amax = 0;
+            for (const real_t v : a_) amax = std::max(amax, std::fabs(v));
+            const real_t ptol =
+                    amax * (real_t)smesh::Env::read<double>("SFEM_COARSE_LU_TOL", 1e-14);
+
+            std::vector<int> ipiv((size_t)n_);
+            int              info = 0;
+            const double     t_getrf = smesh::time_seconds();
+            getrf((int)n_, a_.data(), ipiv.data(), &info);
+            // Inside coarse_factor, so the factorisation can be told apart from densifying.
+            phase_add("coarse_getrf", smesh::time_seconds() - t_getrf);
+            if (info < 0) {
+                std::fprintf(stderr, "DenseLU: getrf rejected argument %d\n", -info);
+                std::abort();
+            }
+            // getrf's interchanges, applied in order, give the original row at each position.
+            for (ptrdiff_t i = 0; i < n_; ++i) piv_[(size_t)i] = i;
+            for (ptrdiff_t k = 0; k < n_; ++k) std::swap(piv_[(size_t)k], piv_[(size_t)ipiv[(size_t)k] - 1]);
+
+            ptrdiff_t first_null = n_;
+            for (ptrdiff_t k = 0; k < n_; ++k) {
+                if (!(std::fabs(a_[(size_t)k * n_ + k]) <= ptol)) continue;
+                // Rank-deficient column: record it, and make back-substitution take y = 0 here.
+                a_[(size_t)k * n_ + k] = real_t(1);
+                for (ptrdiff_t j = k + 1; j < n_; ++j) a_[(size_t)j * n_ + k] = real_t(0);
+                null_.push_back((int)k);
+                if (dropped_.size() < 32) dropped_.push_back(piv_[(size_t)k]);
+                ++n_dropped_;
+                first_null = std::min(first_null, k);
+            }
+            if (n_dropped_ && first_null < n_ - n_dropped_)
+                std::printf("coarse LU: a null pivot at position %td of %td, before the trailing block -- "
+                            "getrf eliminated below it, so the factors past it are not trustworthy\n",
+                            first_null, n_);
+        }
+
+        int apply(const real_t *const b, real_t *const x) override {
+            const real_t *const y = y_.data();
+            for (ptrdiff_t i = 0; i < n_; ++i) y_[(size_t)i] = b[piv_[(size_t)i]];
+            trsv('L', 'U', (int)n_, a_.data(), y_.data());
+            for (const int k : null_) y_[(size_t)k] = real_t(0);
+            trsv('U', 'N', (int)n_, a_.data(), y_.data());
+            for (ptrdiff_t i = 0; i < n_; ++i) x[i] += y[i];
+            return SFEM_SUCCESS;
+        }
+
+        ptrdiff_t rows() const override { return n_; }
+        ptrdiff_t cols() const override { return n_; }
+        sfem::ExecutionSpace execution_space() const override { return sfem::EXECUTION_SPACE_HOST; }
+
+        // Number of coarse directions the factorisation could not resolve.
+        ptrdiff_t                     n_dropped() const override { return n_dropped_; }
+        const std::vector<ptrdiff_t> &dropped() const override { return dropped_; }
+        ptrdiff_t                     factored_order() const override { return n_; }
+
+    private:
+        ptrdiff_t              n_;
+        std::vector<real_t>    a_;
+        std::vector<ptrdiff_t> piv_;
+        std::vector<real_t>    y_;
+        std::vector<int>       null_;
+        ptrdiff_t              n_dropped_{0};
+        std::vector<ptrdiff_t> dropped_;
+    };
+
+    // Densify from the assembled matrix instead of applying it once per column.
+    //
+    // make_dense_lu below recovers the coarse operator by probing it with n unit vectors,
+    // which is the same anti-pattern the coarse operators themselves no longer use: n
+    // applications of an operator whose entries are already sitting in memory. It costs 832
+    // applies on a 208-node coarsest level and showed up at 2.85% of a profiled V-cycle run,
+    // and it grows as n * cost(apply) -- so it gets worse in exactly the regime where a
+    // larger terminal problem is wanted. Reading the blocks is O(nnz) and does not touch the
+    // operator at all.
+    std::shared_ptr<CoarseFactorization> make_dense_lu_from_bsr(const std::shared_ptr<GmgLevels::BSR_t> &a,
+                                                    const ptrdiff_t                          n) {
+        std::vector<real_t>        dense((size_t)n * (size_t)n, real_t(0));
+        const sfem::count_t *const rp = a->row_ptr->data();
+        const sfem::idx_t *const   ci = a->col_idx->data();
+        const real_t *const        vd = a->values->data();
+        const ptrdiff_t            nb = n / N_FIELDS;
+
+        for (ptrdiff_t r = 0; r < nb; ++r)
+            for (sfem::count_t k = rp[r]; k < rp[r + 1]; ++k) {
+                const ptrdiff_t c = (ptrdiff_t)ci[k];
+                for (int i = 0; i < N_FIELDS; ++i)
+                    for (int j = 0; j < N_FIELDS; ++j)
+                        dense[(size_t)(c * N_FIELDS + j) * (size_t)n + (size_t)(r * N_FIELDS + i)] =  // column-major
+                                vd[(size_t)k * 16 + (size_t)(i * N_FIELDS + j)];
+            }
+        return std::make_shared<DenseLU>(n, std::move(dense));
+    }
+
+    // owned prefix is [node_offsets[rank], node_offsets[rank + 1]) and the ghost and aura
+    // slots carry their owners' ids. So one lookup translates both the row and the column of
+    // every block, and because every rank ends up holding the whole solution, the apply can
+    // fill its entire local vector -- owned, ghosts and aura -- with no exchange afterwards.
+    class GlobalDenseLU final : public CoarseFactorization {
+    public:
+        GlobalDenseLU(std::shared_ptr<DenseLU>                  lu,
+                      const std::shared_ptr<smesh::Communicator> comm,
+                      std::vector<smesh::large_idx_t>            local_to_global,
+                      const ptrdiff_t                            n_local_dofs,
+                      const ptrdiff_t                            n_owned_dofs,
+                      const ptrdiff_t                            n_global_dofs)
+            : lu_(std::move(lu)),
+              comm_(comm),
+              l2g_(std::move(local_to_global)),
+              n_local_(n_local_dofs),
+              n_owned_(n_owned_dofs),
+              n_global_(n_global_dofs),
+              gb_((size_t)n_global_dofs),
+              gx_((size_t)n_global_dofs) {
+            const int size = comm_->size();
+            counts_.resize((size_t)size);
+            displs_.resize((size_t)size);
+            const int mine = (int)n_owned_;
+            comm_->allgather(&mine, counts_.data(), 1);
+            int at = 0;
+            for (int r = 0; r < size; ++r) {
+                displs_[(size_t)r] = at;
+                at += counts_[(size_t)r];
+            }
+
+            // counts_ and displs_ are kept because the factorisation still reports per-rank
+            // extents, but apply() no longer places anything by them: it scatters through l2g_
+            // and reduces, which does not care whether the owned ids happen to be contiguous.
+        }
+
+        int apply(const real_t *const b, real_t *const x) override {
+            SFEM_TRACE_SCOPE("GlobalDenseLU::apply");
+            // Place each owned value at its GLOBAL index, then sum.
+            //
+            // This was an allgatherv with no index translation, which is right only while a
+            // rank's owned global ids are the contiguous block [displs_[rank], displs_[rank] +
+            // counts_[rank]). On a derefined coarse mesh they are not. Measured on the cavity
+            // at 64 macro elements: cuts into one, two or four ranks land on whole layers of
+            // the 4x4x4 lattice and every rank's ids are contiguous, while five, six and eight
+            // ranks each leave several ranks whose ids are not -- at eight, rank 1's first
+            // owned node has global id 15 where the tiling expects 30.
+            //
+            // The right-hand side was then assembled in the wrong order while the solution came
+            // back through the correct map, so every rank agreed on the same wrong coarse
+            // correction: consistent across ranks, wrong against serial, and invisible to any
+            // rank-to-rank comparison. The first linear solve took 5 iterations at 1, 2 and 4
+            // ranks against 54, 210 and 18 at 5, 6 and 8, ordered by how many ranks were out of
+            // order rather than by rank count.
+            //
+            // Scatter-then-sum is what make_dense_lu_from_bsr_global already does with the
+            // owned block rows, for the same reason and on the same disjointness argument:
+            // every global entry is written by exactly one rank, so the reduction is an
+            // assembly and not an average.
+            std::fill(gb_.begin(), gb_.end(), real_t(0));
+            std::fill(gx_.begin(), gx_.end(), real_t(0));
+            for (ptrdiff_t i = 0; i < n_owned_ / N_FIELDS; ++i) {
+                const ptrdiff_t g = (ptrdiff_t)l2g_[(size_t)i];
+                for (int c = 0; c < N_FIELDS; ++c) gb_[(size_t)(g * N_FIELDS + c)] = b[i * N_FIELDS + c];
+            }
+            comm_->sum(gb_.data(), (int)gb_.size(), smesh::TypeToEnum<real_t>::value());
+
+            // Every rank solves the same system and gets the same answer, so there is nothing
+            // to exchange afterwards.
+            lu_->apply(gb_.data(), gx_.data());
+
+            // Fill the whole local range, not just the owned prefix: the prolongation reads
+            // this vector over its local length, ghost and aura slots included.
+            for (ptrdiff_t i = 0; i < n_local_ / N_FIELDS; ++i) {
+                const ptrdiff_t g = (ptrdiff_t)l2g_[(size_t)i];
+                for (int c = 0; c < N_FIELDS; ++c)
+                    x[i * N_FIELDS + c] += gx_[(size_t)(g * N_FIELDS + c)];
+            }
+            return SFEM_SUCCESS;
+        }
+
+        // The LOCAL size, deliberately. Multigrid sizes this level's buffers from the
+        // smoother when the coarse operator is not a ParallelOperator, and those buffers are
+        // local-length; the global extent is an implementation detail of the factorisation.
+        ptrdiff_t            rows() const override { return n_local_; }
+        ptrdiff_t            cols() const override { return n_local_; }
+        sfem::ExecutionSpace execution_space() const override { return sfem::EXECUTION_SPACE_HOST; }
+
+        ptrdiff_t                     n_dropped() const override { return lu_->n_dropped(); }
+        const std::vector<ptrdiff_t> &dropped() const override { return lu_->dropped(); }
+        ptrdiff_t                     factored_order() const override { return n_global_; }
+
+    private:
+        std::shared_ptr<DenseLU>              lu_;
+        std::shared_ptr<smesh::Communicator>  comm_;
+        std::vector<smesh::large_idx_t>       l2g_;
+        ptrdiff_t                             n_local_, n_owned_, n_global_;
+        std::vector<real_t>                   gb_, gx_;
+        std::vector<int>                      counts_, displs_;
+    };
+
+    // Densify the OWNED block rows into the global matrix, then let every rank factorise it.
+    std::shared_ptr<CoarseFactorization> make_dense_lu_from_bsr_global(
+            const std::shared_ptr<GmgLevels::BSR_t>    &a,
+            const std::shared_ptr<sfem::FunctionSpace> &space,
+            const ptrdiff_t                             n_local_dofs) {
+        auto mesh = space->mesh_ptr();
+
+        // SFEM_GMG_COARSE_MAT_SUM=1: is the matrix handed to the coarse factorisation the same
+        // matrix however the domain was cut?
+        //
+        // The coarse SOLVE is known to differ at eight ranks: the owned-range checksum of what
+        // it returns agrees to thirteen figures at one, two and four ranks and moves in the
+        // fourth at eight. Reassociation does not explain that, because two and four ranks
+        // reduce over different orderings as well and stay at thirteen figures, so the input to
+        // the factorisation is what to look at.
+        //
+        // The assembly below takes owned rows only and trusts each one to be complete in the
+        // LOCAL matrix, whose sparsity comes from the local coarse graph. A row missing a
+        // column it has globally is then silently zero in the dense matrix, and every rank
+        // agrees on the same wrong matrix -- consistent across ranks and wrong against serial,
+        // which is the failure mode only a 1-versus-N comparison catches.
+        //
+        // Keyed by GLOBAL row and column so the same entries are summed whatever the partition,
+        // and computed from the input BSR rather than from `dense`, because the serial branch
+        // below returns before `dense` exists and would otherwise leave nothing to compare
+        // against. Blocks are counted as well as summed: a row short of a column is exactly
+        // what this is looking for, and it moves the count while barely moving the sum.
+        auto coarse_mat_sum = [&a, &mesh](const ptrdiff_t n_rows, const smesh::large_idx_t *const l2g_or_null) {
+            if (!smesh::Env::read<int>("SFEM_GMG_COARSE_MAT_SUM", 0)) return;
+            const sfem::count_t *const rp = a->row_ptr->data();
+            const sfem::idx_t *const   ci = a->col_idx->data();
+            const real_t *const        vd = a->values->data();
+
+            long double sum = 0, absum = 0, wsum = 0, nblk = 0;
+            for (ptrdiff_t r = 0; r < n_rows; ++r) {
+                const long double gr = l2g_or_null ? (long double)l2g_or_null[r] : (long double)r;
+                for (sfem::count_t k = rp[r]; k < rp[r + 1]; ++k) {
+                    const long double gc = l2g_or_null ? (long double)l2g_or_null[(ptrdiff_t)ci[k]]
+                                                       : (long double)ci[k];
+                    nblk += 1;
+                    for (int e = 0; e < 16; ++e) {
+                        const long double v = (long double)vd[(size_t)k * 16 + (size_t)e];
+                        sum += v;
+                        absum += v < 0 ? -v : v;
+                        wsum += v * (gr + 1) * (gc + 1);
+                    }
+                }
+            }
+
+            cvfem::Domain dom;
+            dom.comm         = mesh->comm();
+            const double gz  = cvfem::sum_kahan(dom, nblk);
+            const double gs  = cvfem::sum_kahan(dom, sum);
+            const double ga  = cvfem::sum_kahan(dom, absum);
+            const double gw  = cvfem::sum_kahan(dom, wsum);
+            if (dom.is_root())
+                std::printf("coarsemat: blocks %.0f  sum %.17g  abs %.17g  wsum %.17g\n", gz, gs, ga, gw);
+        };
+
+        if (!mesh->is_distributed() || mesh->comm()->size() == 1) {
+            // One rank: the local matrix IS the global one, and this is the old code.
+            coarse_mat_sum(n_local_dofs / N_FIELDS, nullptr);
+            return make_dense_lu_from_bsr(a, n_local_dofs);
+        }
+
+        auto            dist     = mesh->distributed();
+        const auto      l2g      = dist->node_mapping()->data();
+        const ptrdiff_t n_owned_nodes = dist->n_nodes_owned();
+        const ptrdiff_t n_local_nodes = dist->n_nodes_local();
+        const ptrdiff_t n_global      = space->n_dofs_global();
+
+        // Owned rows only, keyed by global id, then reduced: the same set of global rows the
+        // serial call above sums over its whole local matrix, so the two are comparable.
+        coarse_mat_sum(n_owned_nodes, l2g);
+
+        // Only the owned rows are complete; the ghost and aura rows this rank also stores are
+        // partial sums belonging to their owners, and including them would double-count.
+        std::vector<real_t>        dense((size_t)n_global * (size_t)n_global, real_t(0));
+        const sfem::count_t *const rp = a->row_ptr->data();
+        const sfem::idx_t *const   ci = a->col_idx->data();
+        const real_t *const        vd = a->values->data();
+
+        for (ptrdiff_t r = 0; r < n_owned_nodes; ++r) {
+            const ptrdiff_t gr = (ptrdiff_t)l2g[r];
+            for (sfem::count_t k = rp[r]; k < rp[r + 1]; ++k) {
+                const ptrdiff_t gc = (ptrdiff_t)l2g[(ptrdiff_t)ci[k]];
+                for (int i = 0; i < N_FIELDS; ++i)
+                    for (int j = 0; j < N_FIELDS; ++j)
+                        dense[(size_t)(gc * N_FIELDS + j) * (size_t)n_global +
+                              (size_t)(gr * N_FIELDS + i)] =  // column-major, as above
+                                vd[(size_t)k * 16 + (size_t)(i * N_FIELDS + j)];
+            }
+        }
+
+        // Each rank wrote only its own rows; summing makes every rank hold the whole matrix.
+        // The blocks are disjoint by ownership, so the sum is an assembly, not an average.
+        // Communicator::sum takes an int count and this buffer is n_global^2, so the assembly
+        // stops being representable above n_global ~ 46340. The caller gates long before that,
+        // but a silent overflow would corrupt the coarse operator rather than fail.
+        if ((double)n_global * (double)n_global > 2147483647.0) {
+            SFEM_ERROR("make_dense_lu_from_bsr_global: coarse order %td needs an n^2 allreduce past "
+                       "the int count MPI takes; lower SFEM_GMG_DENSE_LU_BELOW or deepen the hierarchy\n",
+                       n_global);
+        }
+        mesh->comm()->sum(dense.data(), (int)dense.size(), smesh::TypeToEnum<real_t>::value());
+
+        std::vector<smesh::large_idx_t> l2g_copy((size_t)n_local_nodes);
+        for (ptrdiff_t i = 0; i < n_local_nodes; ++i) l2g_copy[(size_t)i] = l2g[i];
+
+        auto lu = std::make_shared<DenseLU>(n_global, std::move(dense));
+        return std::make_shared<GlobalDenseLU>(lu,
+                                               mesh->comm(),
+                                               std::move(l2g_copy),
+                                               n_local_dofs,
+                                               space->n_owned_dofs(),
+                                               n_global);
+    }
+
+    // Write a densified operator out so its spectrum can be examined offline.
+    //
+    // Component structure is what matters here -- which field a near-null mode lives in, and
+    // whether it is smooth or oscillatory -- and that is far easier to read from an SVD than
+    // to infer from residual norms. Gated on SFEM_GMG_DUMP_COARSE and off by default.
+    static void dump_dense(const char *path, const ptrdiff_t n, const std::vector<real_t> &a) {
+        FILE *f = std::fopen(path, "w");
+        if (!f) {
+            std::fprintf(stderr, "dump_dense: cannot open %s\n", path);
+            return;
+        }
+        std::fprintf(f, "%td\n", n);
+        for (ptrdiff_t i = 0; i < n; ++i) {
+            for (ptrdiff_t j = 0; j < n; ++j)
+                std::fprintf(f, "%.17g%c", (double)a[(size_t)i * n + j], (j + 1 == n) ? '\n' : ' ');
+        }
+        std::fclose(f);
+        std::printf("dump_dense: wrote %td x %td to %s\n", n, n, path);
+    }
+
+    std::shared_ptr<CoarseFactorization> make_dense_lu(const std::shared_ptr<sfem::Operator<real_t>> &op,
+                                           const ptrdiff_t                                n) {
+        std::vector<real_t> a((size_t)n * (size_t)n, real_t(0));
+        std::vector<real_t> e((size_t)n, real_t(0)), col((size_t)n, real_t(0));
+        for (ptrdiff_t j = 0; j < n; ++j) {
+            std::fill(e.begin(), e.end(), real_t(0));
+            std::fill(col.begin(), col.end(), real_t(0));
+            e[(size_t)j] = real_t(1);
+            op->apply(e.data(), col.data());
+            for (ptrdiff_t i = 0; i < n; ++i) a[(size_t)j * n + i] = col[(size_t)i];  // column-major
+        }
+        return std::make_shared<DenseLU>(n, std::move(a));
+    }
+
+    // Two-level coarse-grid correction, measured on one prescribed error mode.
+    //
+    // The cycle's rate decays to the smoother's own and the stalled residual is pressure,
+    // so the question is narrow: given a smooth error the smoother cannot touch, does the
+    // coarse grid reproduce it? This applies the textbook correction operator
+    // P A_c^-1 R A to a chosen mode and reports what fraction of it survives. A working
+    // coarse grid leaves little; a value near 1 means the correction is doing nothing for
+    // that mode, and comparing a pressure mode against a velocity mode says whether the
+    // failure is specific to the pressure equation.
+    void check_cgc(GmgLevels &g, const int mode) {
+        const ptrdiff_t nf = g.data->functions[0]->space()->n_dofs();
+        const ptrdiff_t nc = g.data->functions[1]->space()->n_dofs();
+
+        std::vector<real_t> e((size_t)nf, 0), r((size_t)nf, 0), rc((size_t)nc, 0),
+                ec((size_t)nc, 0), ef((size_t)nf, 0);
+
+        // The mode is built as P applied to a coarse field, not as a formula in the node
+        // index. Node ids are not positions, so an index-based "smooth" mode need not be
+        // smooth at all, and a rough mode is supposed to survive a coarse correction. A
+        // mode in the range of the prolongation is exactly representable on the coarse
+        // grid by construction, so a correct two-level correction must reproduce it almost
+        // perfectly: with the Galerkin operator A_c = R A P the surviving fraction would be
+        // zero. Whatever survives is the rediscretisation error, measured on the modes the
+        // coarse grid is supposed to own.
+        {
+            std::vector<real_t> seed((size_t)nc, 0);
+            unsigned            st = 7u;
+            auto                rnd = [&st]() {
+                st = st * 1103515245u + 12345u;
+                return (real_t)((st >> 16) & 0x7fff) / (real_t)0x7fff - real_t(0.5);
+            };
+            // A random coarse field is oscillatory at the coarse scale, which is the
+            // harshest case for a rediscretised operator. SFEM_GMG_CGC_SMOOTH seeds two
+            // levels down and prolongs, giving a field that is smooth relative to the
+            // coarse grid -- the case rediscretisation is actually supposed to handle. If
+            // the correction fails on that too, the verdict does not rest on an unfair test.
+            if (smesh::Env::read<int>("SFEM_GMG_CGC_SMOOTH", 0) && (int)g.ops.size() > 2) {
+                const ptrdiff_t n2 = g.data->functions[2]->space()->n_dofs();
+                std::vector<real_t> s2((size_t)n2, 0);
+                for (ptrdiff_t i = 0; i < n2 / N_FIELDS; ++i)
+                    s2[(size_t)i * N_FIELDS + (mode == 3 ? 3 : 0)] = rnd();
+                g.data->functions[2]->apply_zero_constraints(s2.data());
+                g.data->prolongations[2]->apply(s2.data(), seed.data());
+            } else {
+                for (ptrdiff_t i = 0; i < nc / N_FIELDS; ++i)
+                    seed[(size_t)i * N_FIELDS + (mode == 3 ? 3 : 0)] = rnd();
+            }
+            g.data->functions[1]->apply_zero_constraints(seed.data());
+            g.data->prolongations[1]->apply(seed.data(), e.data());
+        }
+        g.data->functions[0]->apply_zero_constraints(e.data());
+
+        g.ops[0]->apply(e.data(), r.data());
+        g.data->restrictions[0]->apply(r.data(), rc.data());
+
+        // Two coarse operators, same everything else. `galerkin` builds R A P explicitly by
+        // composing the transfers with the fine operator -- far too expensive for
+        // production, and exactly the right thing for a diagnostic, because with it the
+        // surviving fraction is zero by construction if the transfers are sound. Comparing
+        // the two separates a wrong rediscretisation from wrong transfers, which nothing
+        // measured so far has been able to do.
+        const bool use_galerkin = smesh::Env::read<int>("SFEM_GMG_GALERKIN", 2) != 0;
+        auto       coarse_op    = g.ops[1];
+        if (use_galerkin) {
+            auto Pop = g.data->prolongations[1];
+            auto Rop = g.data->restrictions[0];
+            auto Af  = g.ops[0];
+            coarse_op = sfem::make_op<real_t>(
+                    nc, nc,
+                    [Pop, Rop, Af, nf, nc](const real_t *const xc, real_t *const yc) {
+                        std::vector<real_t> t1((size_t)nf, 0), t2((size_t)nf, 0);
+                        Pop->apply(xc, t1.data());
+                        Af->apply(t1.data(), t2.data());
+                        Rop->apply(t2.data(), yc);
+                    },
+                    sfem::EXECUTION_SPACE_HOST);
+        }
+
+        auto cs = sfem::create_bcgs<real_t>(coarse_op, sfem::EXECUTION_SPACE_HOST);
+        cs->set_max_it(500);
+        cs->set_rtol(1e-10);
+        cs->verbose = false;
+        cs->apply(rc.data(), ec.data());
+
+        g.data->prolongations[1]->apply(ec.data(), ef.data());
+
+        real_t ne[N_FIELDS] = {0}, nd[N_FIELDS] = {0};
+        for (ptrdiff_t k = 0; k < nf; ++k) {
+            const int    c = (int)(k % N_FIELDS);
+            const real_t d = e[(size_t)k] - ef[(size_t)k];
+            ne[c] += e[(size_t)k] * e[(size_t)k];
+            nd[c] += d * d;
+        }
+        const char *nm[N_FIELDS] = {"ux", "uy", "uz", "p"};
+        std::printf("cgc [%s] on %s mode: surviving fraction",
+                    use_galerkin ? "galerkin" : "rediscretised", mode == 3 ? "pressure" : "velocity");
+        for (int c = 0; c < N_FIELDS; ++c)
+            if (ne[c] > 0) std::printf("  %s %.4f", nm[c], std::sqrt(nd[c] / ne[c]));
+        std::printf("\n");
+    }
+
+    // Assembles the Galerkin coarse operator A_c = R A P into BSR, once per Newton step.
+    //
+    // Composing R A P at solve time works -- it is what SFEM_GMG_GALERKIN=1 measures -- but
+    // puts fine-level work under every coarse application, which is precisely what a
+    // hierarchy exists to avoid. Assembling it instead pays that cost once per Newton step
+    // and leaves the cycle applying a sparse matrix, so a coarse level never reaches back
+    // up to a finer one during the solve.
+    //
+    // Assembly also fixes the other half of the problem. A coarse smoother needs the
+    // diagonal of the operator it smooths, and the matrix-free composite cannot supply one;
+    // using the rediscretised diagonal instead mismatches the Galerkin operator by the
+    // per-block scale factors (about 1.6 in velocity and 8 in pressure) and makes the
+    // coarse smoother diverge. An assembled matrix hands over its own diagonal.
+    //
+    // The entries are recovered by probing. With a distance-2 colouring of the coarse node
+    // graph, no node has two neighbours of the same colour, so one application per colour
+    // and component reveals a whole set of blocks at once: colours x 4 applications rather
+    // than one per coarse degree of freedom.
+    std::shared_ptr<GmgLevels::BSR_t> g_last_assembled;  // set by assemble_galerkin
+
+    std::shared_ptr<sfem::Operator<real_t>> assemble_galerkin(const std::shared_ptr<sfem::Function>         &f_coarse,
+                                                              const std::shared_ptr<sfem::Operator<real_t>> &A_above,
+                                                              const std::shared_ptr<sfem::Operator<real_t>> &P,
+                                                              const std::shared_ptr<sfem::Operator<real_t>> &R,
+                                                              const ptrdiff_t                                n_fine,
+                                                              std::vector<real_t>                           *diag_out,
+                                                              const GmgLevels::CRS_t *const                  pattern = nullptr) {
+        auto            graph = f_coarse->space()->node_to_node_graph();
+        const ptrdiff_t nn    = f_coarse->space()->n_dofs() / N_FIELDS;
+        const count_t *const g_rp = graph->rowptr()->data();
+        const idx_t *const   g_ci = graph->colidx()->data();
+
+        // The pattern is the coarse mesh graph, widened if that turns out to be too narrow.
+        //
+        // Probing recovers A_c(i,j) only for j inside the pattern being probed; a non-zero
+        // of R A P outside it is not dropped but folded into the wrong entry, so a pattern
+        // that is too narrow yields a wrong matrix rather than an approximate one. The mesh
+        // graph is right while the coarse mesh is fine enough that R A P does not reach past
+        // it, and stops being right on the coarsest levels, where a few nodes are all within
+        // reach of each other. `widen` squares the adjacency; at the second retry the level
+        // is small enough that a dense pattern costs nothing.
+        std::vector<std::vector<idx_t>> adj((size_t)nn);
+        auto build_pattern = [&](const int widen) {
+            for (ptrdiff_t i = 0; i < nn; ++i) {
+                std::vector<idx_t> row(g_ci + g_rp[i], g_ci + g_rp[i + 1]);
+                if (widen == 2) {
+                    row.clear();
+                    for (ptrdiff_t j = 0; j < nn; ++j) row.push_back((idx_t)j);
+                } else if (widen == 1) {
+                    for (count_t a = g_rp[i]; a < g_rp[i + 1]; ++a) {
+                        const idx_t j = g_ci[a];
+                        row.insert(row.end(), g_ci + g_rp[j], g_ci + g_rp[j + 1]);
+                    }
+                    std::sort(row.begin(), row.end());
+                    row.erase(std::unique(row.begin(), row.end()), row.end());
+                }
+                adj[(size_t)i] = std::move(row);
+            }
+        };
+
+        std::shared_ptr<sfem::Operator<real_t>> assembled;
+        for (int attempt = 0; attempt < 3; ++attempt) {
+        if (pattern) {
+            // Derived pattern: exact by construction, so there is nothing to retry.
+            const sfem::count_t *const prp = pattern->row_ptr->data();
+            const sfem::idx_t *const   pci = pattern->col_idx->data();
+            for (ptrdiff_t i = 0; i < nn; ++i)
+                adj[(size_t)i].assign(pci + prp[i], pci + prp[i + 1]);
+        } else {
+            build_pattern(attempt);
+        }
+        std::vector<count_t> rpv((size_t)nn + 1, 0);
+        for (ptrdiff_t i = 0; i < nn; ++i) rpv[(size_t)i + 1] = rpv[(size_t)i] + (count_t)adj[(size_t)i].size();
+        std::vector<idx_t> civ;
+        civ.reserve((size_t)rpv[(size_t)nn]);
+        for (ptrdiff_t i = 0; i < nn; ++i) civ.insert(civ.end(), adj[(size_t)i].begin(), adj[(size_t)i].end());
+        const count_t *const rp  = rpv.data();
+        const idx_t *const   ci  = civ.data();
+        const ptrdiff_t      nnz = rp[nn];
+
+        // Greedy distance-2 colouring: two nodes sharing a neighbour must differ, so that a
+        // probe on one colour never mixes two contributions into the same row.
+        std::vector<int> color((size_t)nn, -1);
+        {
+            std::vector<int> used;
+            for (ptrdiff_t i = 0; i < nn; ++i) {
+                used.assign(64, 0);
+                for (count_t a = rp[i]; a < rp[i + 1]; ++a) {
+                    const idx_t j = ci[a];
+                    if (color[(size_t)j] >= 0) {
+                        if ((size_t)color[(size_t)j] >= used.size()) used.resize((size_t)color[(size_t)j] + 1, 0);
+                        used[(size_t)color[(size_t)j]] = 1;
+                    }
+                    for (count_t b = rp[j]; b < rp[j + 1]; ++b) {
+                        const idx_t k = ci[b];
+                        if (color[(size_t)k] >= 0) {
+                            if ((size_t)color[(size_t)k] >= used.size()) used.resize((size_t)color[(size_t)k] + 1, 0);
+                            used[(size_t)color[(size_t)k]] = 1;
+                        }
+                    }
+                }
+                int c = 0;
+                while (c < (int)used.size() && used[(size_t)c]) ++c;
+                color[(size_t)i] = c;
+            }
+        }
+        // The colour count has to be the same number on every rank.
+        //
+        // The colouring above is greedy over the LOCAL pattern, so each rank derives its own
+        // count: 27 and 27 at two ranks, but 18 against something else at four. The probe loop
+        // below calls composite() once per colour and component, and composite() applies the
+        // fine matrix-free operator, which is collective. Ranks that disagree on the count
+        // issue different numbers of collectives and the run deadlocks -- which is what hung
+        // every SFEM_GMG_CHECK arm at four ranks and above, while two ranks survived only
+        // because their counts happened to coincide.
+        //
+        // Looping to the global maximum keeps the collectives paired. A colour that no local
+        // node carries costs one application and writes nothing, because the scatter below
+        // only touches entries whose column actually holds that colour.
+        //
+        // This makes the probe RUN at every rank count; it does not make it a valid
+        // distributed reference. Rank A's colour c and rank B's colour c are different sets of
+        // nodes, so the composite still pairs one rank's probe direction with another's. A
+        // probed composite is comparable against serial at one rank only, until the colouring
+        // itself is made global.
+        cvfem::Domain probe_dom;
+        {
+            auto m = f_coarse->space()->mesh_ptr();
+            if (m && m->is_distributed() && m->comm() && m->comm()->size() > 1) probe_dom.comm = m->comm();
+            probe_dom.n_owned = f_coarse->space()->n_owned_dofs();
+            probe_dom.n_local = f_coarse->space()->n_dofs();
+        }
+        const int ncolors = cvfem::max(probe_dom, 1 + *std::max_element(color.begin(), color.end()));
+
+        auto rowptr = smesh::create_host_buffer<count_t>((size_t)nn + 1);
+        auto colidx = smesh::create_host_buffer<idx_t>((size_t)nnz);
+        auto values = smesh::create_host_buffer<real_t>((size_t)nnz * 16);
+        std::copy(rp, rp + nn + 1, rowptr->data());
+        std::copy(ci, ci + nnz, colidx->data());
+        std::fill(values->data(), values->data() + (size_t)nnz * 16, real_t(0));
+
+        const ptrdiff_t     ndc = nn * N_FIELDS;
+        std::vector<real_t> v((size_t)ndc), y((size_t)ndc), t1((size_t)n_fine), t2((size_t)n_fine);
+
+        // With null transfers this assembles A itself rather than R A P, which is how the
+        // fine level gets a matrix. Worth having for its own sake: a matrix-free apply
+        // accumulates with atomics, so its summation order changes with the thread count and
+        // the solve is not reproducible; a BSR apply accumulates each row in one thread and
+        // is deterministic however many threads are used.
+        auto composite = [&](const real_t *const xc, real_t *const yc) {
+            if (P && R) {
+                std::fill(t1.begin(), t1.end(), real_t(0));
+                std::fill(t2.begin(), t2.end(), real_t(0));
+                P->apply(xc, t1.data());
+                A_above->apply(t1.data(), t2.data());
+                R->apply(t2.data(), yc);
+            } else {
+                A_above->apply(xc, yc);
+            }
+        };
+
+        for (int c = 0; c < ncolors; ++c) {
+            for (int b = 0; b < N_FIELDS; ++b) {
+                std::fill(v.begin(), v.end(), real_t(0));
+                for (ptrdiff_t j = 0; j < nn; ++j)
+                    if (color[(size_t)j] == c) v[(size_t)j * N_FIELDS + b] = real_t(1);
+
+                std::fill(y.begin(), y.end(), real_t(0));
+                composite(v.data(), y.data());
+
+                for (ptrdiff_t i = 0; i < nn; ++i)
+                    for (count_t a = rp[i]; a < rp[i + 1]; ++a)
+                        if (color[(size_t)ci[a]] == c)
+                            for (int r = 0; r < N_FIELDS; ++r)
+                                values->data()[(size_t)a * 16 + (size_t)r * N_FIELDS + b] =
+                                        y[(size_t)i * N_FIELDS + r];
+            }
+        }
+
+        // Both transfers zero constrained degrees of freedom on output, so the assembled
+        // rows for those are empty and the matrix would be singular. Restore the identity
+        // rows the constrained system actually has.
+        {
+            std::vector<mask_t> m(mask_count(f_coarse->space()->n_dofs()), 0);
+            f_coarse->constraints_mask(m.data());
+            for (ptrdiff_t i = 0; i < nn; ++i)
+                for (int r = 0; r < N_FIELDS; ++r) {
+                    if (!mask_get(i * N_FIELDS + r, m.data())) continue;
+                    for (count_t a = rp[i]; a < rp[i + 1]; ++a)
+                        for (int cc = 0; cc < N_FIELDS; ++cc)
+                            values->data()[(size_t)a * 16 + (size_t)r * N_FIELDS + cc] =
+                                    (ci[a] == i && cc == r) ? real_t(1) : real_t(0);
+                }
+        }
+
+        if (diag_out) {
+            diag_out->assign((size_t)nn * 16, real_t(0));
+            for (ptrdiff_t i = 0; i < nn; ++i)
+                for (count_t a = rp[i]; a < rp[i + 1]; ++a)
+                    if (ci[a] == i)
+                        std::copy(values->data() + (size_t)a * 16, values->data() + (size_t)a * 16 + 16,
+                                  diag_out->data() + (size_t)i * 16);
+        }
+
+        auto assembled_bsr = sfem::h_bsr_spmv<count_t, idx_t, real_t, real_t>(nn, nn, N_FIELDS, rowptr,
+                                                                              colidx, values, real_t(0));
+        assembled          = assembled_bsr;
+        g_last_assembled   = assembled_bsr;
+        bool gate_ok       = false;
+
+        // Gate: the assembled matrix must reproduce the composite R A P it was probed from.
+        // Probing is only valid if every non-zero of R A P falls inside the pattern being
+        // probed; anything outside it lands in the wrong row and is silently absorbed.
+        {
+            std::vector<real_t> v((size_t)ndc), ya((size_t)ndc, 0), yb((size_t)ndc, 0);
+            // The probe direction is a function of POSITION, not of the local dof index.
+            //
+            // It used to be an LCG seeded per local index, which is not a distributed vector: a
+            // node carries one local index on its owner and a different one on every rank that
+            // holds it as a ghost. composite() runs the collective fine operator, which reads
+            // the ghost entries of its input, so each rank was handed a different field and the
+            // comparison measured the probe rather than the assembly. With the too-narrow
+            // symbolic pattern switched off, serial passes at 2.2e-16 while two, four and eight
+            // ranks reported 4.0e-2 to 1.3e-1 -- all of it this flaw, none of it a finding.
+            //
+            // Keyed on coordinates a ghost copy agrees with its owner by construction, so every
+            // rank count probes the same direction and a surviving mismatch is the assembly's.
+            {
+                const auto *const qx = f_coarse->space()->points()->data()[0];
+                const auto *const qy = f_coarse->space()->points()->data()[1];
+                const auto *const qz = f_coarse->space()->points()->data()[2];
+                for (ptrdiff_t n = 0; n < nn; ++n)
+                    for (int c = 0; c < N_FIELDS; ++c)
+                        v[(size_t)(n * N_FIELDS + c)] =
+                                (real_t)std::sin(2.3 * (double)qx[n] + 1.7 * (double)qy[n] +
+                                                 1.1 * (double)qz[n] + 0.4 * c + 1.1);
+            }
+            f_coarse->apply_zero_constraints(v.data());
+
+            assembled->apply(v.data(), ya.data());
+            composite(v.data(), yb.data());
+
+            // Compared over the OWNED range and reduced, not over the whole local range.
+            //
+            // ya comes from a local BSR apply, whose ghost and aura rows are partial by
+            // construction; yb comes from the composite, whose ghost rows the transfers fill.
+            // Those rows were never meant to agree, and comparing them dominated the result:
+            // with the probe direction already made coordinate-keyed and the too-narrow
+            // symbolic pattern switched off, serial read 4.1e-16 while two, four and eight
+            // ranks read 6.9e-1, 5.5e-1 and 1.0e+0 -- larger than before the probe was fixed,
+            // which is the tell that what remained was not the probe.
+            long double dn_l = 0, rn_l = 0;
+            for (ptrdiff_t k = 0; k < probe_dom.n_owned && k < ndc; ++k) {
+                const long double d = (long double)ya[(size_t)k] - (long double)yb[(size_t)k];
+                dn_l += d * d;
+                rn_l += (long double)yb[(size_t)k] * (long double)yb[(size_t)k];
+            }
+            const double dn2 = cvfem::sum_kahan(probe_dom, dn_l);
+            const double rn2 = cvfem::sum_kahan(probe_dom, rn_l);
+            const real_t rel = (rn2 > 0) ? (real_t)std::sqrt(dn2 / rn2) : real_t(0);
+
+            // SFEM_GMG_GATE_SPLIT=1: which of the two sides moves with the rank count?
+            //
+            // A mismatch here is not yet evidence against the assembled matrix. composite() is
+            // R o A_fine o P: P fills its fine-range output correctly on owned entries but not
+            // necessarily on ghosts, and A_fine then READS those ghosts, so the composite can
+            // be the invalid side. The adjoint check cannot exclude that -- <Rx,y> = <x,Py> is
+            // a bilinear identity and says nothing about whether P fills ghost slots.
+            //
+            // Both sides are already in hand here, so checksum them separately over the owned
+            // range and reduce. Whichever one moves as the cut gets finer is the defect:
+            //
+            //   ya moves, yb holds -> the assembled coarse matrix is wrong under decomposition
+            //   yb moves, ya holds -> the composite is, and the target is the transfers' ghost
+            //                         handling rather than the assembly. applysum already
+            //                         measured the assembled operator's owned action invariant
+            //                         to sixteen figures at 1, 2, 4 and 8 ranks, which makes
+            //                         this the outcome to expect.
+            if (smesh::Env::read<int>("SFEM_GMG_GATE_SPLIT", 0)) {
+                long double a_l = 0, b_l = 0, aa_l = 0, ab_l = 0;
+                for (ptrdiff_t k = 0; k < probe_dom.n_owned && k < ndc; ++k) {
+                    const long double a = (long double)ya[(size_t)k];
+                    const long double b = (long double)yb[(size_t)k];
+                    a_l += a;
+                    b_l += b;
+                    aa_l += a < 0 ? -a : a;
+                    ab_l += b < 0 ? -b : b;
+                }
+                const double ga  = cvfem::sum_kahan(probe_dom, a_l);
+                const double gb  = cvfem::sum_kahan(probe_dom, b_l);
+                const double gaa = cvfem::sum_kahan(probe_dom, aa_l);
+                const double gab = cvfem::sum_kahan(probe_dom, ab_l);
+                if (probe_dom.is_root())
+                    std::printf(
+                            "gatesplit: assembled sum %.17g abs %.17g   composite sum %.17g abs %.17g\n",
+                            ga, gaa, gb, gab);
+            }
+            // Agreed across ranks, for the same reason the colour count is: a rank that fails
+            // the gate alone widens its pattern and re-enters the colour loop while its peers
+            // have moved on.
+            gate_ok          = cvfem::all(probe_dom, rel < 1e-10);
+            // Reported when a pattern was supplied too. The return below accepts a supplied
+            // pattern whether or not the gate passed, so a failure here printed nothing at all,
+            // and the default symbolic pattern does fail: it is built as R G P over the fine
+            // node-to-node graph, while Rhie-Chow couples through a nodal reconstruction that
+            // makes the fine operator distance-2. Measured serially, the symbolic pattern gives
+            // 2197 blocks and no gate line, the widened pattern 6859 blocks and 2.15e-16.
+            if (gate_ok || attempt == 2 || pattern)
+                std::printf("assembly gate [%s]: rel = %.4e  %s\n", (P && R) ? "RAP" : "A", rel,
+                            gate_ok ? "OK" : "MISMATCH");
+        }
+
+        if (gate_ok || attempt == 2 || pattern) {
+            std::printf("galerkin assembly: %td nodes, %td blocks, %d colours, %d applications%s\n",
+                        nn, nnz, ncolors, ncolors * N_FIELDS,
+                        pattern ? "  (derived pattern)"
+                                : (attempt == 0 ? "" : (attempt == 1 ? "  (widened pattern)" : "  (dense pattern)")));
+            return assembled;
+        }
+        }  // attempt
+
+        return assembled;
+    }
+
+    void refresh_gmg(GmgLevels &g) {
+        const int nlevels = (int)g.ops.size();
+
+        // SFEM_GMG_CONST_STATE=1: a diagnostic that removes the state transfer as a
+        // variable. Every level is given the *same* constant field, which averaging and an
+        // L2 projection reproduce identically, so a directly-assembled coarse operator and
+        // the Galerkin one are then evaluated at genuinely the same state. Whatever gap
+        // survives is the discretisation, not the state -- which is the thing an L2
+        // projection could and could not fix, respectively.
+        if (smesh::Env::read<int>("SFEM_GMG_CONST_STATE", 0)) {
+            const real_t cu = smesh::Env::read<real_t>("SFEM_GMG_CONST_U", real_t(1));
+            for (int i = 0; i < nlevels; ++i) {
+                const ptrdiff_t nd = g.data->functions[i]->space()->n_dofs();
+                real_t *const   xs = g.states[i]->data();
+                for (ptrdiff_t k = 0; k < nd; k += N_FIELDS) {
+                    xs[k + 0] = cu;
+                    xs[k + 1] = 0;
+                    xs[k + 2] = 0;
+                    xs[k + 3] = 0;
+                }
+            }
+        } else
+        for (int i = 1; i < nlevels; ++i) {
+            g.data->restrictions[i - 1]->apply(g.states[i - 1]->data(), g.states[i]->data());
+
+            const auto     &w  = g.state_weights[(size_t)i];
+            real_t *const   sc = g.states[i]->data();
+            const ptrdiff_t nc = g.data->functions[i]->space()->n_dofs();
+            // Constrained dofs come back zeroed by the transfer and so does their weight;
+            // apply_constraints below writes the boundary values over them regardless.
+            for (ptrdiff_t k = 0; k < nc; ++k)
+                if (w[(size_t)k] > real_t(1e-12)) sc[(size_t)k] /= w[(size_t)k];
+
+            g.data->functions[i]->apply_constraints(g.states[i]->data());
+        }
+
+        // SFEM_GMG_STATE_SUM=1: the linearisation state of every level, as it stands at the
+        // moment the cycle is rebuilt.
+        //
+        // This is the quantity SFEM_GMG_CONST_STATE replaces, and replacing it makes the
+        // iteration counts identical at 1, 2 and 4 ranks, so it is where the decomposition
+        // dependence is carried. refresh_gmg runs once before the Newton loop and again on
+        // every step; only the later calls are informative, because before the first step
+        // the state is boundary data alone -- every non-zero entry sits on a constrained
+        // dof, both transfers zero constrained dofs on their output, and the hierarchy is
+        // derefined with homogeneous Dirichlet data, so a zero coarse state there is
+        // correct rather than evidence of anything.
+        //
+        // Summed over the owned range only and keyed by global id: local indices are
+        // incomparable across partitions, and the ghost and aura entries a rank also stores
+        // belong to their owners. The gid-weighted sum accompanies the plain one because a
+        // permutation moves the weighted sum while leaving the plain one untouched.
+        if (smesh::Env::read<int>("SFEM_GMG_STATE_SUM", 0)) {
+            for (int i = 0; i < nlevels; ++i) {
+                auto      sp = g.data->functions[i]->space();
+                auto      me = sp->mesh_ptr();
+                const int bs = sp->block_size();
+                const bool dd = me->is_distributed() && me->comm() && me->comm()->size() > 1;
+                const ptrdiff_t nown = dd ? me->distributed()->n_nodes_owned() : sp->n_dofs() / bs;
+                const real_t *const xs = g.states[i]->data();
+
+                std::vector<mask_t> cm(mask_count(sp->n_dofs()), 0);
+                g.data->functions[i]->constraints_mask(cm.data());
+
+                long double plain = 0, wsum = 0, free_abs = 0;
+                for (ptrdiff_t n = 0; n < nown; ++n) {
+                    const long double gid =
+                            dd ? (long double)me->distributed()->node_mapping()->data()[n] : (long double)n;
+                    for (int c = 0; c < bs; ++c) {
+                        const ptrdiff_t   k = n * bs + c;
+                        const long double v = (long double)xs[(size_t)k];
+                        plain += v;
+                        wsum += v * (gid * (long double)bs + (long double)c);
+                        if (!mask_get(k, cm.data())) free_abs += v < 0 ? -v : v;
+                    }
+                }
+
+                cvfem::Domain dom;
+                dom.comm    = me->comm();
+                dom.n_owned = nown * bs;
+                dom.n_local = sp->n_dofs();
+
+                const double gp = cvfem::sum_kahan(dom, plain);
+                const double gw = cvfem::sum_kahan(dom, wsum);
+                const double gn = cvfem::sum_kahan(dom, (long double)nown);
+                const double gf = cvfem::sum_kahan(dom, free_abs);
+                if (dom.is_root())
+                    std::printf("gmgstate level %d: owned_nodes %.0f  sum %.17g  gidsum %.17g  free_abs %.17g\n",
+                                i, gn, gp, gw, gf);
+            }
+        }
+
+        g.mg          = sfem::h_mg<real_t>();
+        g.mg->verbose = false;
+
+        // SFEM_GMG_PFILTER=1: strip the constant pressure mode from each prolonged
+        // correction.
+        //
+        // Pressure here is fixed only by a single pin, so it is determined up to a
+        // constant and each level's pin is its own gauge. Nothing makes the coarse pin the
+        // same physical node as the fine one, so a coarse pressure correction can arrive
+        // carrying an arbitrary constant offset. That constant is a near-null mode of the
+        // fine operator, which is precisely what the smoother is worst at removing, so it
+        // accumulates from cycle to cycle instead of being damped.
+        const bool pfilter = smesh::Env::read<int>("SFEM_GMG_PFILTER", 0) != 0;
+
+        // SFEM_GMG_CGC scales the prolonged coarse-grid correction. The rediscretised
+        // coarse operator measures about six times the Galerkin operator R A P that the
+        // transfers imply (see the coarse-op line under SFEM_GMG_CHECK=1), so its inverse
+        // returns a correction scaled by the reciprocal of that. This is the knob that
+        // says whether the mismatch is a single scalar per level -- in which case one
+        // factor repairs the cycle -- or a genuine difference in what the two operators
+        // do, which no scalar can fix.
+        const real_t cgc    = smesh::Env::read<real_t>("SFEM_GMG_CGC", real_t(1));
+        const real_t pscale   = smesh::Env::read<real_t>("SFEM_GMG_PSCALE", real_t(1));
+        // 0 rediscretised, 1 Galerkin composed matrix-free (diagnostic), 2 Galerkin
+        // assembled once per Newton step (the usable form).
+        //
+        // Default 2. The rediscretised levels have no matrix, so the dense coarsest solve
+        // recovered one by probing -- 2,320 operator applications per Newton step on the FDA
+        // nozzle, ~570 ms of a ~600 ms factorisation whose getrf is 24 ms -- and they are also
+        // the weaker coarse space. Warped nozzle, Re 500, FGMRES + multigrid, Grace 72 threads,
+        // same 28 Newton steps and identical flux and stations either way:
+        //
+        //     dof        coarse ops       linear its   coarse_factor   run
+        //     116,212    rediscretised      1,171         16.1 s       32.4 s
+        //     116,212    Galerkin (2)         491          0.7 s        8.1 s
+        //     893,924    rediscretised      2,031         16.3 s      256.8 s
+        //     893,924    Galerkin (2)       1,023          0.8 s      134.6 s
+        const int  galerkin_mode = smesh::Env::read<int>("SFEM_GMG_GALERKIN", 2);
+        const bool galerkin      = galerkin_mode == 1;
+        std::shared_ptr<sfem::Operator<real_t>> level_op_below;
+        std::vector<real_t>                     galerkin_diag;
+
+        // The whole element-wise hierarchy, built in one pass before the level loop.
+        //
+        // Level 1 comes from the micro-cell matrices; every level below is one element-local
+        // coarsening hop from the level above, masking that level's columns with its own
+        // constraints. Those constraints already exist -- create_gmg_data derefines the
+        // Function at each level -- which is what makes the hops reproduce the composite the
+        // transfers define (Z_i Rhat A_{i-1} Z_{i-1} Phat) instead of skipping the
+        // intermediate Z's, the omission that gave wrong block diagonals when every level was
+        // built straight from level 0.
+        cvfem_ss::CoarseHierarchy egal_hier;
+        const bool                egal_on = smesh::Env::read<int>("SFEM_GMG_EGAL", 1) && galerkin_mode == 2 &&
+                                            g.level_ops[0] && g.level_ops[0]->is_semi_structured();
+        if (egal_on) {
+            const double t_h = smesh::time_seconds();
+            std::vector<std::shared_ptr<sfem::FunctionSpace>> spaces;
+            std::vector<std::vector<uint8_t>>                 masks;
+            for (int l = 0; l < nlevels; ++l) {
+                spaces.push_back(g.data->functions[l]->space());
+                const ptrdiff_t     nd = spaces.back()->n_dofs();
+                std::vector<mask_t> m(mask_count(nd), 0);
+                g.data->functions[l]->constraints_mask(m.data());
+                std::vector<uint8_t> b((size_t)nd, 0);
+                for (ptrdiff_t k = 0; k < nd; ++k) b[(size_t)k] = mask_get(k, m.data()) ? 1 : 0;
+                masks.push_back(std::move(b));
+            }
+                        // SFEM_GMG_EGAL_EM keeps every level but the coarsest as element matrices, so
+            // nothing above the level that is factorised is ever assembled. The hops coarsen
+            // element matrices to element matrices, so this costs no extra construction -- it
+            // stops at the element form instead of going on to a BSR.
+            egal_hier = cvfem_ss::assemble_hierarchy(*g.level_ops[0], g.states[0]->data(), spaces, masks,
+                                                     smesh::Env::read<int>("SFEM_GMG_EGAL_EM", 0) != 0);
+            phase_add("galerkin_assembly", smesh::time_seconds() - t_h);
+        }
+        auto       wrap_p  = [&](const int i) -> std::shared_ptr<sfem::Operator<real_t>> {
+            auto P = g.data->prolongations[i];
+            if (!P || (!pfilter && cgc == real_t(1))) return P;
+            const ptrdiff_t nf = g.data->functions[i - 1]->space()->n_dofs();
+            return sfem::make_op<real_t>(
+                    P->rows(), P->cols(),
+                    [P, nf, pfilter, cgc](const real_t *const from, real_t *const to) {
+                        P->apply(from, to);
+                        if (cgc != real_t(1))
+                            for (ptrdiff_t k = 0; k < nf; ++k) to[k] *= cgc;
+                        if (!pfilter) return;
+                        real_t    sum = 0;
+                        ptrdiff_t cnt = 0;
+                        for (ptrdiff_t k = 3; k < nf; k += N_FIELDS) {
+                            sum += to[k];
+                            ++cnt;
+                        }
+                        if (!cnt) return;
+                        const real_t mean = sum / (real_t)cnt;
+                        for (ptrdiff_t k = 3; k < nf; k += N_FIELDS) to[k] -= mean;
+                    },
+                    sfem::EXECUTION_SPACE_HOST);
+        };
+        for (int i = 0; i < nlevels; ++i) {
+            auto            fi = g.data->functions[i];
+            const ptrdiff_t nn = fi->space()->n_dofs() / N_FIELDS;
+            std::vector<mask_t> mask(mask_count(fi->space()->n_dofs()), 0);
+            fi->constraints_mask(mask.data());
+            const real_t omega = (i + 1 < nlevels)
+                                         ? smesh::Env::read<real_t>("SFEM_GMG_OMEGA", real_t(0.35))
+                                         : real_t(1);
+            auto lop = g.ops[i];
+
+            // SFEM_GMG_GALERKIN=1: use R A P as the coarse operator instead of the
+            // rediscretised one, composed matrix-free and recursively, so level i applies
+            // the level i-1 operator between its transfers.
+            //
+            // This is deliberately the expensive form. Every coarse application reaches all
+            // the way up to the fine level, which is exactly what a hierarchy exists to
+            // avoid, so it is not a solution -- it is the experiment that says whether
+            // Galerkin coarsening fixes the cycle before any effort is spent making it
+            // affordable. If it does, the affordable version is to assemble these operators
+            // once per Newton step and apply them as sparse matrices.
+            if (i > 0 && galerkin) {
+                auto Pop   = g.data->prolongations[i];
+                auto Rop   = g.data->restrictions[i - 1];
+                auto below = level_op_below;           // already Galerkin for i-1
+                const ptrdiff_t nfine = g.data->functions[i - 1]->space()->n_dofs();
+                const ptrdiff_t ncrs  = fi->space()->n_dofs();
+                lop = sfem::make_op<real_t>(
+                        ncrs, ncrs,
+                        [Pop, Rop, below, nfine](const real_t *const xc, real_t *const yc) {
+                            std::vector<real_t> t1((size_t)nfine, 0), t2((size_t)nfine, 0);
+                            Pop->apply(xc, t1.data());
+                            below->apply(t1.data(), t2.data());
+                            Rop->apply(t2.data(), yc);
+                        },
+                        sfem::EXECUTION_SPACE_HOST);
+            }
+
+            if (i > 0 && galerkin_mode == 2) {
+                const double t_asm = smesh::time_seconds();
+
+                // Element-wise Galerkin, when the fine operator is semi-structured: every
+                // level is built straight from the fine macro-elements as sum_e P_e^T A_e P_e.
+                //
+                // This replaces both branches below. Nothing is probed, so no level pays 108
+                // to 192 operator applications and no pattern has to be guessed -- the one
+                // here is derived from the lattice and is exact, which removes the failure
+                // mode where an entry outside a too-narrow guess is folded into the wrong
+                // slot instead of being dropped. Levels are built directly rather than
+                // chained, so no error accumulates through repeated triple products; the
+                // SFEM_GMG_CHECK=1 gates measure both claims at 2e-16.
+                // Element-wise Galerkin replaces the *probe*, and the probe was only ever
+                // needed at level 1 -- below that the level above is already a matrix and the
+                // triple product is exact and cheap. Restricting it to level 1 is not a
+                // limitation of the construction but of the constraint treatment: the
+                // hierarchy's transfers zero constrained dofs at every hop, so level 2 built
+                // by chaining coarsens a level-1 matrix that already carries identity rows,
+                // and those rows contribute to the product. Building level 2 straight from
+                // level 0 cannot see them. The operators still agree to 2e-16 on unconstrained
+                // columns, which is why this was invisible until the block diagonals were
+                // compared -- they differed by 1.2e-2 at level 2 and 5.7e-2 at level 3, and a
+                // smoother given wrong diagonals cost the solve its convergence (40 Newton
+                // steps against 27) while every operator gate still passed.
+                const bool egal = egal_on && egal_hier.op[(size_t)i];
+
+                if (egal) {
+
+                    // Identity rows and the block diagonal are already applied to whichever
+                    // form backs this level -- assembled BSR, or element matrices kept as they
+                    // are -- so from here the two are interchangeable.
+                    auto a_c      = egal_hier.op[(size_t)i];
+                    galerkin_diag = egal_hier.diag[(size_t)i];
+
+                    // SFEM_GMG_DIAG_OWNED_SUM=1: is the coarse block diagonal complete on the
+                    // nodes this rank OWNS?
+                    //
+                    // galerkin_block_diag accumulates each coarse node's 4x4 centre block
+                    // over the local reduce table alone, and nothing exchanges the result, so
+                    // a coarse node shared between ranks holds only its local contributions.
+                    // That diagonal is what the coarse block-Jacobi smoother inverts
+                    // (make_block_jacobi_from_diag below), which is a direct mechanism for the
+                    // cycle degrading as the decomposition gets finer -- and unlike the
+                    // operator comparison further down, this quantity never touches a probe
+                    // vector, so it was never affected by that probe being index-keyed.
+                    //
+                    // What is NOT settled is which exchange repairs it, and the two are not
+                    // interchangeable:
+                    //
+                    //   owned sums match serial -> the owner is authoritative and a gather of
+                    //                              the finished diagonal is enough
+                    //   owned sums differ       -> the partial sums are genuinely split and
+                    //                              the fix must scatter_add them back first
+                    //
+                    // The argument cuts both ways on inspection. The coarse level reuses the
+                    // FINE macro elements (galerkin_init copies d.nmacro), and d.nmacro is
+                    // Mesh::n_elements, the whole local array including aura -- which is the
+                    // same shape the fine nodal reconstruction had, where the owner did turn
+                    // out to be authoritative. But a coarse node is a macro-element corner
+                    // rather than an interior lattice node, so that is a resemblance, not a
+                    // proof. Hence this, rather than a guess.
+                    //
+                    // Summed over the owned range only and keyed by global id: local indices
+                    // are incomparable across partitions, and the ghost entries this rank
+                    // also stores belong to somebody else.
+                    if (smesh::Env::read<int>("SFEM_GMG_DIAG_OWNED_SUM", 0) && !galerkin_diag.empty()) {
+                        auto       cm   = fi->space()->mesh_ptr();
+                        const bool dist = cm && cm->is_distributed() && cm->comm() && cm->comm()->size() > 1;
+                        const ptrdiff_t nown = dist ? cm->distributed()->n_nodes_owned() : nn;
+
+                        long double plain = 0, gidw = 0;
+                        for (ptrdiff_t n = 0; n < nown && n < nn; ++n) {
+                            const long double gid =
+                                    dist ? (long double)cm->distributed()->node_mapping()->data()[n]
+                                         : (long double)n;
+                            long double blk = 0;
+                            for (int c = 0; c < 16; ++c) blk += (long double)galerkin_diag[(size_t)(n * 16 + c)];
+                            plain += blk;
+                            gidw += blk * gid;
+                        }
+
+                        double gp = (double)plain, gw = (double)gidw, gn = (double)nown;
+                        int    rank = 0;
+                        if (dist) {
+                            gp   = cm->comm()->sum(gp);
+                            gw   = cm->comm()->sum(gw);
+                            gn   = cm->comm()->sum(gn);
+                            rank = cm->comm()->rank();
+                        }
+                        if (rank == 0)
+                            std::printf("diagsum level %d: owned_nodes %.0f  sum %.17g  gidsum %.17g\n",
+                                        i, gn, gp, gw);
+                    }
+
+                    // SFEM_GMG_APPLY_OWNED_SUM=1: is the coarse operator's ACTION the same
+                    // however the domain is cut?
+                    //
+                    // The diagonal above measured invariant at 1, 2, 4 and 8 ranks on the
+                    // pre-Newton state, and the transfers are their own adjoints at 1, 2 and 4,
+                    // so what remains of the coarse correction is the operator applied to a
+                    // vector. galerkin_apply reduces element contributions through a purely
+                    // local table and nothing exchanges the result -- the same shape the fine
+                    // nodal reconstruction had before it was gathered, which is the one defect
+                    // of this kind already found and fixed here.
+                    //
+                    // The direction is a function of POSITION, so a ghost copy agrees with its
+                    // owner by construction and every rank count probes the same vector. A
+                    // direction keyed on the local index would differ per rank and measure
+                    // nothing, which is how several earlier readings in this file were voided.
+                    //
+                    // Summed over the OWNED range only and reduced: plain, weighted by global
+                    // id, and in absolute value. The weighted sum moves when the same total
+                    // sits on different nodes, which the plain sum would hide; the absolute sum
+                    // moves when contributions cancel, which both of the others would hide.
+                    if (smesh::Env::read<int>("SFEM_GMG_APPLY_OWNED_SUM", 0) && a_c) {
+                        auto              cm = fi->space()->mesh_ptr();
+                        const auto *const px = fi->space()->points()->data()[0];
+                        const auto *const py = fi->space()->points()->data()[1];
+                        const auto *const pz = fi->space()->points()->data()[2];
+
+                        const ptrdiff_t     ndc = nn * N_FIELDS;
+                        std::vector<real_t> v((size_t)ndc, 0), y((size_t)ndc, 0);
+                        for (ptrdiff_t n = 0; n < nn; ++n)
+                            for (int c = 0; c < N_FIELDS; ++c)
+                                v[(size_t)(n * N_FIELDS + c)] =
+                                        (real_t)std::sin(1.7 * (double)px[n] + 2.3 * (double)py[n] +
+                                                         1.1 * (double)pz[n] + 0.5 * c + 0.9);
+                        fi->apply_zero_constraints(v.data());
+                        a_c->apply(v.data(), y.data());
+
+                        const bool dd = cm && cm->is_distributed() && cm->comm() && cm->comm()->size() > 1;
+                        const ptrdiff_t nown = dd ? cm->distributed()->n_nodes_owned() : nn;
+
+                        cvfem::Domain dom;
+                        dom.comm    = cm ? cm->comm() : nullptr;
+                        dom.n_owned = nown * N_FIELDS;
+                        dom.n_local = ndc;
+
+                        long double plain = 0, wsum = 0, absum = 0;
+                        for (ptrdiff_t n = 0; n < nown && n < nn; ++n) {
+                            const long double gid =
+                                    dd ? (long double)cm->distributed()->node_mapping()->data()[n]
+                                       : (long double)n;
+                            for (int c = 0; c < N_FIELDS; ++c) {
+                                const long double e = (long double)y[(size_t)(n * N_FIELDS + c)];
+                                plain += e;
+                                wsum += e * (gid * (long double)N_FIELDS + (long double)c);
+                                absum += e < 0 ? -e : e;
+                            }
+                        }
+
+                        const double ap = cvfem::sum_kahan(dom, plain);
+                        const double aw = cvfem::sum_kahan(dom, wsum);
+                        const double aa = cvfem::sum_kahan(dom, absum);
+                        const double an = cvfem::sum_kahan(dom, (long double)nown);
+                        if (dom.is_root())
+                            std::printf("applysum level %d: owned_nodes %.0f  sum %.17g  gidsum %.17g  abs %.17g\n",
+                                        i, an, ap, aw, aa);
+                    }
+
+                    // Cross-check against the construction it replaces (SFEM_GMG_CHECK).
+                    //
+                    // The gates in build_gmg compare the two constructions unconstrained.
+                    // This is the constrained comparison, and the probe is the right
+                    // reference for it: it recovers the composite including the transfers'
+                    // zero-constraint wrapping, which is the thing the column mask and the
+                    // identity-row patch here are meant to reproduce. Level 1 probes the
+                    // matrix-free fine operator, so it is the true composite; below that the
+                    // probe sees the element-wise matrix above, making this the direct
+                    // against the chained construction with constraints in place.
+                    if (smesh::Env::read<int>("SFEM_GMG_CHECK", 0)) {
+                        auto saved = g_last_assembled;
+                        std::shared_ptr<GmgLevels::CRS_t> pat;
+                        if (i == 1 && g.Rmat[1] && g.Pmat[1] &&
+                            smesh::Env::read<int>("SFEM_GMG_SYMBOLIC_PATTERN", 1))
+                            pat = symbolic_rap_pattern(g.data->functions[0], g.Rmat[1], g.Pmat[1]);
+                        std::vector<real_t> pdiag;
+                        assemble_galerkin(fi, level_op_below, g.data->prolongations[i],
+                                          g.data->restrictions[i - 1],
+                                          g.data->functions[i - 1]->space()->n_dofs(), &pdiag, pat.get());
+                        auto probed = g_last_assembled;
+                        g_last_assembled = saved;
+
+                        // The constrained rows, and the block diagonal, deliberately left out
+                        // of the comparison below. Both feed the smoother, so a difference
+                        // there does not show up as a wrong coarse operator but as a worse
+                        // cycle -- which is exactly the symptom that sent this back here.
+                        {
+                            real_t dd = 0, dr = 0;
+                            for (size_t k = 0; k < pdiag.size() && k < galerkin_diag.size(); ++k) {
+                                const real_t d = galerkin_diag[k] - pdiag[k];
+                                dd += d * d;
+                                dr += pdiag[k] * pdiag[k];
+                            }
+                            const real_t rd = dr > 0 ? std::sqrt(dd / dr) : std::sqrt(dd);
+                            std::printf("egal diag  %d: rel |diag_egal - diag_probe| = %.4e  %s (n %zu vs %zu)\n",
+                                        i, rd, rd < 1e-10 ? "OK" : "MISMATCH", galerkin_diag.size(),
+                                        pdiag.size());
+                        }
+
+                        const ptrdiff_t ndc = fi->space()->n_dofs();
+                        std::vector<real_t> v((size_t)ndc), ya((size_t)ndc, 0), yb((size_t)ndc, 0);
+
+                        // The probe direction is a function of POSITION, not of the local
+                        // index. It used to be sin(0.37 k + 1.1) over the local dof index,
+                        // which is not a distributed vector at all: a node carries one local
+                        // index on its owner and a different one in every rank that holds it
+                        // as a ghost, so the same physical node entered the two operators
+                        // with different values, and the vector itself changed shape with the
+                        // decomposition. The comparison below stayed apples-to-apples within
+                        // a single run -- both operators saw the same v -- but its value
+                        // could not be compared BETWEEN rank counts, which is precisely what
+                        // it was being read for. Keyed on the coordinates the node actually
+                        // has, a ghost copy agrees with its owner by construction and the
+                        // same run at one, two and four ranks probes the same direction.
+                        {
+                            const auto *const cx = fi->space()->points()->data()[0];
+                            const auto *const cy = fi->space()->points()->data()[1];
+                            const auto *const cz = fi->space()->points()->data()[2];
+                            for (ptrdiff_t n = 0; n < nn; ++n) {
+                                const double X = (double)cx[n], Y = (double)cy[n], Z = (double)cz[n];
+                                for (int c = 0; c < N_FIELDS; ++c)
+                                    v[(size_t)(n * N_FIELDS + c)] =
+                                            (real_t)std::sin(2.3 * X + 1.7 * Y + 1.1 * Z + 0.4 * c + 1.1);
+                            }
+                        }
+                        fi->apply_zero_constraints(v.data());
+                        a_c->apply(v.data(), ya.data());
+                        probed->apply(v.data(), yb.data());
+                        // Whole-vector comparison, constrained rows included. The earlier
+                        // version zeroed them on both sides, copying the rap gate, and that
+                        // hid whatever lives there.
+                        real_t dn = 0, rn = 0;
+                        for (ptrdiff_t k = 0; k < ndc; ++k) {
+                            const real_t d = ya[(size_t)k] - yb[(size_t)k];
+                            dn += d * d;
+                            rn += yb[(size_t)k] * yb[(size_t)k];
+                        }
+                        const real_t rel = rn > 0 ? std::sqrt(dn / rn) : std::sqrt(dn);
+                        std::printf("egal level %d: %s (probe %td blocks)  vs probed composite rel = %.4e  %s\n", i,
+                                    egal_hier.A[(size_t)i]
+                                            ? (std::to_string((long long)egal_hier.A[(size_t)i]->col_idx->size()) +
+                                               " blocks")
+                                                      .c_str()
+                                            : "element matrices",
+                                    (ptrdiff_t)probed->col_idx->size(), rel, rel < 1e-10 ? "OK" : "MISMATCH");
+                    }
+
+                    g.Amat[(size_t)i] = egal_hier.A[(size_t)i];  // null when kept as element matrices
+                    lop               = a_c;
+                } else
+                // Level 1 is the only level that must be probed: the operator above it is
+                // matrix-free and has no matrix form. Below that the level above IS a
+                // matrix, so the Galerkin operator is a sparse triple product -- exact
+                // sparsity, no colouring, no pattern guess, no dense fallback.
+                if (i == 1 || !g.Amat[(size_t)i - 1] || galerkin_mode != 2 ||
+                    smesh::Env::read<int>("SFEM_GMG_RAP", 1) == 0) {
+                    std::shared_ptr<GmgLevels::CRS_t> pat;
+                    if (i == 1 && g.Rmat[1] && g.Pmat[1] &&
+                        smesh::Env::read<int>("SFEM_GMG_SYMBOLIC_PATTERN", 1))
+                        pat = symbolic_rap_pattern(g.data->functions[0], g.Rmat[1], g.Pmat[1]);
+
+                    lop = assemble_galerkin(fi, level_op_below, g.data->prolongations[i],
+                                            g.data->restrictions[i - 1],
+                                            g.data->functions[i - 1]->space()->n_dofs(), &galerkin_diag,
+                                            pat.get());
+                    g.Amat[(size_t)i] = g_last_assembled;
+                } else {
+                    const ptrdiff_t nd_up = g.data->functions[i - 1]->space()->n_dofs();
+                    std::vector<mask_t> mup(mask_count(nd_up), 0);
+                    g.data->functions[i - 1]->constraints_mask(mup.data());
+
+                    auto masked = mask_block_columns(g.Amat[(size_t)i - 1], mup.data());
+                    auto a_c    = sfem::rap(g.Rmat[(size_t)i], masked, g.Pmat[(size_t)i]);
+                    patch_identity_rows(a_c, mask.data());
+
+                    g.Amat[(size_t)i] = a_c;
+                    lop               = a_c;
+
+                    // Block diagonal for the smoother: search for the diagonal, since mm
+                    // emits unsorted column indices.
+                    galerkin_diag.assign((size_t)nn * 16, real_t(0));
+                    {
+                        const sfem::count_t *const rp = a_c->row_ptr->data();
+                        const sfem::idx_t *const   ci = a_c->col_idx->data();
+                        const real_t *const        vd = a_c->values->data();
+                        for (ptrdiff_t r = 0; r < nn; ++r)
+                            for (sfem::count_t k = rp[r]; k < rp[r + 1]; ++k)
+                                if (ci[k] == r)
+                                    std::copy(vd + (size_t)k * 16, vd + (size_t)k * 16 + 16,
+                                              galerkin_diag.data() + (size_t)r * 16);
+                    }
+
+                    if (smesh::Env::read<int>("SFEM_GMG_CHECK", 0) && !fi->space()->has_semi_structured_mesh()) {
+                        // How far is a directly-assembled (rediscretised) operator from the
+                        // Galerkin one at this level?
+                        //
+                        // hessian_bsr refuses on the semi-structured path but works on an
+                        // unstructured level, so the coarsest level could be assembled
+                        // outright and the probe dropped. That trades Galerkin for
+                        // rediscretisation, which measured badly higher up (5.52 against
+                        // 0.000 on a coarse-representable mode) -- but that was with a
+                        // partition-of-unity averaged state. This reports the gap on the
+                        // real coarse operator, per component, before any effort goes into a
+                        // better state transfer.
+                        auto direct = sfem::create_linear_operator(sfem::op_type::BSR, fi, g.states[i],
+                                                                   sfem::EXECUTION_SPACE_HOST);
+                        const ptrdiff_t     ndc = nn * N_FIELDS;
+                        std::vector<real_t> v((size_t)ndc), yg((size_t)ndc, 0), yd((size_t)ndc, 0);
+                        unsigned            st = 17u;
+                        for (auto &e : v) {
+                            st = st * 1103515245u + 12345u;
+                            e  = (real_t)((st >> 16) & 0x7fff) / (real_t)0x7fff - real_t(0.5);
+                        }
+                        fi->apply_zero_constraints(v.data());
+                        a_c->apply(v.data(), yg.data());
+                        direct->apply(v.data(), yd.data());
+                        fi->apply_zero_constraints(yg.data());
+                        fi->apply_zero_constraints(yd.data());
+
+                        real_t dn[N_FIELDS] = {0}, rn[N_FIELDS] = {0};
+                        for (ptrdiff_t k = 0; k < ndc; ++k) {
+                            const int    c = (int)(k % N_FIELDS);
+                            const real_t d = yd[(size_t)k] - yg[(size_t)k];
+                            dn[c] += d * d;
+                            rn[c] += yg[(size_t)k] * yg[(size_t)k];
+                        }
+                        // Separate a scale mismatch from a structural one. If the direct
+                        // operator is close to a constant multiple of the Galerkin one, the
+                        // difference is the h-dependent stabilisation and no state transfer
+                        // can touch it. If a residual survives removing the best-fit scale,
+                        // the two operators genuinely differ.
+                        real_t ab[N_FIELDS] = {0}, aa[N_FIELDS] = {0};
+                        for (ptrdiff_t k = 0; k < ndc; ++k) {
+                            const int c = (int)(k % N_FIELDS);
+                            ab[c] += yd[(size_t)k] * yg[(size_t)k];
+                            aa[c] += yd[(size_t)k] * yd[(size_t)k];
+                        }
+                        const char *nm[N_FIELDS] = {"ux", "uy", "uz", "p"};
+                        std::printf("  direct vs galerkin, level %d   raw:", i);
+                        for (int c = 0; c < N_FIELDS; ++c)
+                            std::printf("  %s %8.3f", nm[c], (rn[c] > 0) ? std::sqrt(dn[c] / rn[c]) : 0.0);
+                        std::printf("\n                                scale:");
+                        for (int c = 0; c < N_FIELDS; ++c)
+                            std::printf("  %s %8.4f", nm[c], (aa[c] > 0) ? ab[c] / aa[c] : 0.0);
+                        std::printf("\n                          after-scale:");
+                        for (int c = 0; c < N_FIELDS; ++c) {
+                            const real_t sc = (aa[c] > 0) ? ab[c] / aa[c] : 0.0;
+                            real_t       rr = 0;
+                            for (ptrdiff_t k = c; k < ndc; k += N_FIELDS) {
+                                const real_t d = sc * yd[(size_t)k] - yg[(size_t)k];
+                                rr += d * d;
+                            }
+                            std::printf("  %s %8.4f", nm[c], (rn[c] > 0) ? std::sqrt(rr / rn[c]) : 0.0);
+                        }
+                        std::printf("\n");
+                    }
+
+                    if (smesh::Env::read<int>("SFEM_GMG_CHECK", 0)) {
+                        // Same gate the probing path uses: the assembled level must
+                        // reproduce the matrix-free composite it stands for.
+                        const ptrdiff_t     ndc = nn * N_FIELDS;
+                        std::vector<real_t> v((size_t)ndc), ya((size_t)ndc, 0), t1((size_t)nd_up, 0),
+                                t2((size_t)nd_up, 0), yb((size_t)ndc, 0);
+                        unsigned st = 991u;
+                        for (auto &e : v) {
+                            st = st * 1103515245u + 12345u;
+                            e  = (real_t)((st >> 16) & 0x7fff) / (real_t)0x7fff - real_t(0.5);
+                        }
+                        fi->apply_zero_constraints(v.data());
+                        a_c->apply(v.data(), ya.data());
+                        // Compose the SAME three matrices by hand. Comparing against the
+                        // matrix-free composite instead would be comparing Galerkin against
+                        // rediscretisation, which differ by construction -- that difference
+                        // is the reason this work exists. This isolates the triple product,
+                        // which is the untested part: rap has only ever been exercised at
+                        // block size 1 in this repo.
+                        apply_scalar_to_blocks(g.Pmat[(size_t)i], v.data(), t1.data());
+                        masked->apply(t1.data(), t2.data());
+                        apply_scalar_to_blocks(g.Rmat[(size_t)i], t2.data(), yb.data());
+                        // a_c carries identity rows where the coarse level is constrained,
+                        // while the raw product carries whatever R*A*P gives there. Those
+                        // rows are not part of what is being tested, so both sides are
+                        // zeroed on them. (Zeroing only the probe is not enough: the
+                        // identity reproduces the zero, the raw product does not.)
+                        fi->apply_zero_constraints(ya.data());
+                        fi->apply_zero_constraints(yb.data());
+                        real_t dn = 0, rn = 0;
+                        for (ptrdiff_t k = 0; k < ndc; ++k) {
+                            const real_t d = ya[(size_t)k] - yb[(size_t)k];
+                            dn += d * d;
+                            rn += yb[(size_t)k] * yb[(size_t)k];
+                        }
+                        const real_t rel = (rn > 0) ? std::sqrt(dn / rn) : 0.0;
+                        std::printf("rap level %d: %td blocks  vs R*(A*(P*v)) rel = %.4e  %s\n", i,
+                                    (ptrdiff_t)a_c->col_idx->size(), rel, (rel < 1e-10) ? "OK" : "MISMATCH");
+                    }
+                }
+                phase_add("galerkin_assembly", smesh::time_seconds() - t_asm);
+            }
+
+            std::shared_ptr<BlockJacobi> prec;
+            if (i > 0 && galerkin_mode == 2)
+                prec = make_block_jacobi_from_diag(galerkin_diag, mask.data(), nn, omega);
+            else
+                prec = make_block_jacobi(*g.level_ops[i], g.states[i]->data(), mask.data(), nn, omega,
+                                         (i > 0) ? pscale : real_t(1));
+
+            // SFEM_GMG_PSCALE scales the continuity rows of every coarse level.
+            //
+            // Left-scaling a row does not change what the coarse system solves; it changes
+            // the correction the cycle takes from it. Unlike SFEM_GMG_RC_DECAY this leaves
+            // Df alone, so the balance between divergence and stabilisation inside the
+            // continuity row is untouched and the coarse operator keeps the stabilisation
+            // its own mesh needs. The value to use is not tuned: it is the pressure/velocity
+            // ratio of the best-fit scales printed by SFEM_GMG_CHECK=1.
+            if (i > 0 && pscale != real_t(1)) {
+                const ptrdiff_t nd = fi->space()->n_dofs();
+                auto            inner = lop;
+                lop = sfem::make_op<real_t>(
+                        inner->rows(), inner->cols(),
+                        [inner, nd, pscale](const real_t *const x, real_t *const y) {
+                            std::vector<real_t> t((size_t)nd, real_t(0));
+                            inner->apply(x, t.data());
+                            for (ptrdiff_t k = 0; k < nd; ++k)
+                                y[k] += (k % N_FIELDS == 3) ? pscale * t[(size_t)k] : t[(size_t)k];
+                        },
+                        sfem::EXECUTION_SPACE_HOST);
+            }
+
+            if (i + 1 < nlevels) {
+                // SFEM_GMG_KSMOOTH > 0 replaces the stationary smoother with that many
+                // BiCGStab iterations, preconditioned by the same block-Jacobi.
+                //
+                // The Galerkin coarse operators approximate the fine operator far better
+                // than the rediscretised ones and are far worse to smooth -- denser, and
+                // without the diagonal dominance a stationary iteration needs, so they
+                // diverge under block-Jacobi at every damping. A Krylov method does not
+                // require that: it adapts to the operator it is given. The price is that
+                // the resulting cycle is no longer a fixed linear operator, which is why
+                // this must be paired with a flexible outer solver.
+                // Coarse levels only. The Krylov smoother exists because the assembled
+                // Galerkin operators lack the diagonal dominance block-Jacobi needs; the
+                // fine level is the matrix-free rediscretised operator and has no such
+                // problem, and it is the level where work is expensive. Smoothing it with
+                // sixteen preconditioned BiCGStab iterations costs sixty-four fine
+                // operator applications per cycle, which is what made the large cases run
+                // an order of magnitude slower than plain block-Jacobi despite needing far
+                // fewer iterations.
+                // SFEM_GMG_KSMOOTH_FINE controls the fine level separately, because the
+                // right answer depends on size. Krylov smoothing the fine level buys
+                // iterations everywhere, but a BiCGStab iteration there costs two fine
+                // operator applications, so at 16 sweeps a cycle spends 64 of them on the
+                // finest level alone. When the coarse hierarchy dominates the work that is
+                // cheap; when the fine level dominates it is not, and the same setting that
+                // wins at one macro-element loses by an order of magnitude at twenty-seven.
+                // Default is to follow SFEM_GMG_KSMOOTH, i.e. smooth every level the same.
+                // The fine level gets far less smoothing than the coarse ones, and the
+                // reason is pure arithmetic. The fine smoother is itself BiCGStab
+                // preconditioned by block-Jacobi -- the same solver this whole cycle is
+                // competing against -- so at k iterations a cycle spends 4k fine operator
+                // applications on smoothing alone, against the two that solver spends per
+                // iteration. At k = 16 that is 32 times the work per outer iteration, which
+                // the eleven-fold drop in iteration count cannot pay for. At k = 2 it is
+                // four times the work for a comparable drop, and that is the configuration
+                // that finally beats the baseline. Coarse levels keep the strong smoother:
+                // they need it, and they are cheap.
+                const int kdefault = smesh::Env::read<int>("SFEM_GMG_KSMOOTH", 0);
+                const int ksmooth  = (i > 0) ? kdefault
+                                             : smesh::Env::read<int>("SFEM_GMG_KSMOOTH_FINE",
+                                                                     kdefault > 0 ? 2 : 0);
+                // SFEM_SMOOTHER=vanka replaces the point-block smoother on the fine level.
+                //
+                // Measured standalone at Re=1, 150 sweeps to the asymptote: block-Jacobi
+                // 0.981 (and divergent for omega >= 0.5), additive Vanka 0.883, multiplicative
+                // 8-colour Vanka 0.63 at omega = 1 with no damping needed. The point-block
+                // smoother discards the velocity-pressure coupling that determines the
+                // pressure; the patch solve keeps it.
+                //
+                // Fine level only: the patch operator is read from the assembled fine matrix
+                // via the element-wise Galerkin path at q = 1, and the coarse levels have a
+                // different lattice. They keep block-Jacobi for now.
+                // Vanka is the default smoother. Block-Jacobi is retained only as a
+                // reference and for meshes with no lattice (SFEM_SMOOTHER=bjacobi).
+                //
+                // Measured: block-Jacobi has an asymptotic factor of 0.981 at Re=1 and diverges
+                // at omega >= 0.5, so it is not a smoother in any useful sense on this system;
+                // it damps momentum while discarding the continuity constraint. At 33,124 dofs
+                // on 72 cores it diverges outright at omega = 1 where Vanka converges at both
+                // Re=1 and Re=100. And Re=200, which block-Jacobi could never converge -- 40
+                // Newton steps, ramp stalling at Re~75 -- solves in 3 Newton steps with Vanka,
+                // to u_linf 2.28e-10 against the 2.9e-7 plateau of the run that never
+                // converged.
+                std::shared_ptr<sfem::Operator<real_t>> prec_op = prec;
+                // Coarse levels: same smoother, built from the matrix the element-wise Galerkin
+                // assembly already produced. A cycle is limited by its worst level, and leaving
+                // these on the point-block smoother would waste the fine-level gain.
+                if (i > 0 && smesh::Env::read<std::string>("SFEM_SMOOTHER", "vanka") == "vanka" &&
+                    g.Amat[(size_t)i] && g.level_ops[(size_t)i] &&
+                    g.level_ops[(size_t)i]->is_semi_structured()) {
+                    std::vector<uint8_t> cb((size_t)fi->space()->n_dofs(), 0);
+                    for (ptrdiff_t k = 0; k < fi->space()->n_dofs(); ++k)
+                        cb[(size_t)k] = mask_get(k, mask.data()) ? 1 : 0;
+                    auto vk = cvfem_ss::make_diagonal_vanka_from_bsr(
+                            *g.level_ops[(size_t)i], g.Amat[(size_t)i], cb.data(),
+                            smoother_omega());
+                    if (vk) prec_op = vk;
+                }
+                if (i == 0 && smesh::Env::read<std::string>("SFEM_SMOOTHER", "vanka") == "vanka" &&
+                    g.level_ops[0] && g.level_ops[0]->is_semi_structured()) {
+                    const ptrdiff_t      nd0 = g.data->functions[0]->space()->n_dofs();
+                    std::vector<mask_t>  m0(mask_count(nd0), 0);
+                    g.data->functions[0]->constraints_mask(m0.data());
+                    std::vector<uint8_t> cb((size_t)nd0, 0);
+                    for (ptrdiff_t k = 0; k < nd0; ++k) cb[(size_t)k] = mask_get(k, m0.data()) ? 1 : 0;
+                    if (vanka_rebuild_now()) {
+                        const double t_v = smesh::time_seconds();
+                        g_vanka_cached = cvfem_ss::make_diagonal_vanka(
+                                *g.level_ops[0], g.data->functions[0]->space(), g.states[0]->data(),
+                                cb.data(), smoother_omega());
+                        // Counted per REBUILD, so the phase table's call count is the number of
+                        // rebuilds a run actually paid for and not the number of Newton steps.
+                        phase_add("vanka_setup", smesh::time_seconds() - t_v);
+                    }
+                    prec_op = g_vanka_cached;
+                }
+
+                // A Vanka patch reads its neighbours' residual entries, and on a distributed
+                // mesh some of those are ghost or aura nodes that nothing fills: Multigrid
+                // hands the smoother mem->rhs, whose residual was reduced over the owned range
+                // alone. Block-Jacobi never sees this, because it reads only its own row --
+                // which is why block-Jacobi is unaffected by the cut while Vanka was not.
+                // Cavity, N 4, level 2, full continuation: Vanka took 61 linear iterations at
+                // one rank and then exhausted the 4000- and 7000-iteration caps at two and four
+                // ranks WITHOUT converging. Gathered, the same runs converge in 3088 and 9082,
+                // against 9125 and 8189 for block-Jacobi over the same two cuts.
+                //
+                // Only the Vanka branches are wrapped. The point-block default needs no
+                // exchange, and giving it a ParallelOperator face would change which branch
+                // Multigrid::level_owned takes for that level.
+                if (prec_op != prec) {
+                    prec_op = sfem::create_parallel_preconditioner(prec_op, fi->space(),
+                                                                   sfem::EXECUTION_SPACE_HOST);
+                }
+
+                // SFEM_SMOOTHER_APPLY_SUM=1: is the smoother the cycle actually uses the same
+                // operator however the domain was cut?
+                //
+                // Measured on the smoother AS WRAPPED, because that is what the cycle calls.
+                // Everything upstream of it has been cleared: the linearisation state is
+                // identical at 1, 2, 4 and 8 ranks (gmgstate level 0 sum 81, free_abs 0), the
+                // patch multiplicity weights are complete on owned nodes because they are
+                // accumulated over the local macro array including the aura, and the wrapper
+                // above gathers GhostsAndAura in place before the inner apply. Yet Vanka still
+                // took 6 / 6 / 6 / 8 / 10 / 14 linear iterations at 1 / 2 / 4 / 5 / 6 / 8 with
+                // the coarse correction contributing nothing at all.
+                //
+                // So rather than guess at a fifth cause, this measures the object directly, the
+                // way the coarse operator and its diagonal were measured: a direction defined by
+                // POSITION so every rank count probes the same vector, the output summed over
+                // the OWNED range and reduced, plain and weighted by global id and in absolute
+                // value. If this moves with the rank count the smoother's apply is provably not
+                // invariant and the bisection continues inside it; if it does not, the smoother
+                // is exonerated and the difference lives elsewhere in the cycle.
+                if (smesh::Env::read<int>("SFEM_SMOOTHER_APPLY_SUM", 0) && prec_op) {
+                    auto              sp  = fi->space();
+                    auto              cm  = sp->mesh_ptr();
+                    const auto *const px  = sp->points()->data()[0];
+                    const auto *const py  = sp->points()->data()[1];
+                    const auto *const pz  = sp->points()->data()[2];
+                    const ptrdiff_t   ndl = sp->n_dofs();
+                    const ptrdiff_t   nnl = ndl / N_FIELDS;
+
+                    std::vector<real_t> v((size_t)ndl, 0), y((size_t)ndl, 0);
+                    for (ptrdiff_t n = 0; n < nnl; ++n)
+                        for (int c = 0; c < N_FIELDS; ++c)
+                            v[(size_t)(n * N_FIELDS + c)] =
+                                    (real_t)std::sin(1.3 * (double)px[n] + 2.7 * (double)py[n] +
+                                                     1.9 * (double)pz[n] + 0.8 * c + 0.2);
+                    fi->apply_zero_constraints(v.data());
+                    prec_op->apply(v.data(), y.data());
+
+                    const bool dd = cm && cm->is_distributed() && cm->comm() && cm->comm()->size() > 1;
+                    const ptrdiff_t nown = dd ? cm->distributed()->n_nodes_owned() : nnl;
+
+                    cvfem::Domain dom;
+                    dom.comm    = cm ? cm->comm() : nullptr;
+                    dom.n_owned = nown * N_FIELDS;
+                    dom.n_local = ndl;
+
+                    long double plain = 0, wsum = 0, absum = 0;
+                    for (ptrdiff_t n = 0; n < nown && n < nnl; ++n) {
+                        const long double gid =
+                                dd ? (long double)cm->distributed()->node_mapping()->data()[n]
+                                   : (long double)n;
+                        for (int c = 0; c < N_FIELDS; ++c) {
+                            const long double e = (long double)y[(size_t)(n * N_FIELDS + c)];
+                            plain += e;
+                            wsum += e * (gid * (long double)N_FIELDS + (long double)c);
+                            absum += e < 0 ? -e : e;
+                        }
+                    }
+
+                    const double mp = cvfem::sum_kahan(dom, plain);
+                    const double mw = cvfem::sum_kahan(dom, wsum);
+                    const double ma = cvfem::sum_kahan(dom, absum);
+                    const double mn = cvfem::sum_kahan(dom, (long double)nown);
+                    if (dom.is_root())
+                        std::printf("smoothsum level %d: owned_nodes %.0f  sum %.17g  gidsum %.17g  abs %.17g\n",
+                                    i, mn, mp, mw, ma);
+                }
+
+                // A SMOOTHED level needs the parallel face, and needs its input gathered.
+                //
+                // Multigrid asks for ParallelOperator by dynamic_pointer_cast. When the cast
+                // fails, level_owned falls back to smoother_[l]->rows() -- the LOCAL dof count,
+                // not the owned one -- and reduce_norm2 skips its allreduce in the same branch.
+                // A smoothed level then forms rhs - A x across its ghost entries and takes a
+                // per-rank partial for its residual norm.
+                //
+                // Level 0 carries the face already, because create_linear_operator hands back a
+                // ParallelMatrixFreeOperator. The coarser levels do not: with
+                // SFEM_GMG_GALERKIN=2 this loop replaces g.ops[i] with the element-matrix or
+                // assembled form, and make_em_operator returns a plain make_op while
+                // level_to_bsr returns a plain h_bsr_spmv. Measured at four levels, two ranks
+                // before this wrap: level 0 reported op_rows 10404 against true_owned 10404,
+                // while level 1 reported 2916 against 1620 and level 2 reported 500 against 300.
+                //
+                // create_parallel_preconditioner is exactly the object needed and already
+                // exists: make_parallel_op(comm, owned, owned, local, local, fn) whose fn
+                // gathers GhostsAndAura before applying. It supplies both halves at once -- the
+                // face Multigrid casts for, and the gather the apply needs -- so this reuses it
+                // rather than adding a second way to say the same thing.
+                //
+                // Built BEFORE the smoother, because the smoother is the other consumer: a
+                // stationary sweep is x += M^-1 (b - A x), and with a raw A that never gathers
+                // its input the residual is wrong at exactly the owned rows that depend on
+                // ghost values. Giving the level the face while leaving the smoother on the raw
+                // operator fixes the cycle's bookkeeping and leaves the sweep itself wrong.
+                //
+                // Only when the face is missing, so level 0 is not double wrapped and does not
+                // gather twice. The RAW lop stays in level_op_below, because the next level's
+                // Galerkin assembly consumes it as A_above and must not see the wrapper.
+                auto mg_op = lop;
+                {
+                    auto       me   = fi->space()->mesh_ptr();
+                    const bool dist = me && me->is_distributed() && me->comm() && me->comm()->size() > 1;
+                    if (dist && !std::dynamic_pointer_cast<sfem::ParallelOperator<real_t>>(lop))
+                        mg_op = sfem::create_parallel_preconditioner(lop, fi->space(),
+                                                                     sfem::EXECUTION_SPACE_HOST);
+                }
+
+                std::shared_ptr<sfem::MatrixFreeLinearSolver<real_t>> sm;
+                if (ksmooth > 0) {
+                    auto ks = sfem::create_bcgs<real_t>(mg_op, sfem::EXECUTION_SPACE_HOST);
+                    ks->set_max_it(ksmooth);
+                    ks->set_rtol(1e-12);
+                    ks->set_atol(1e-30);
+                    ks->verbose = false;
+                    ks->set_preconditioner_op(prec_op);
+                    sm = ks;
+                } else {
+                    // mg_op, not lop: this is the branch that actually runs, since
+                    // SFEM_GMG_KSMOOTH defaults to 0. A stationary sweep is
+                    // x += M^-1 (b - A x), so an A that never gathers its input makes the
+                    // residual wrong at exactly the owned rows that depend on ghost values.
+                    auto st = sfem::create_stationary<real_t>(mg_op, prec_op, sfem::EXECUTION_SPACE_HOST);
+                    st->set_max_it(g.smoothing_steps);
+                    sm = st;
+                }
+                auto sm_unused = sm;
+                level_op_below = lop;
+                const ptrdiff_t nd_lvl = fi->space()->n_dofs();
+                // A SMOOTHED level needs the parallel face, and needs its input gathered.
+                //
+                // Multigrid asks for ParallelOperator by dynamic_pointer_cast. When the cast
+                // fails, level_owned falls back to smoother_[l]->rows() -- the LOCAL dof count,
+                // not the owned one -- and reduce_norm2 skips its allreduce in the same branch.
+                // A smoothed level then forms rhs - A x across its ghost entries and takes a
+                // per-rank partial for its residual norm.
+                //
+                // Level 0 carries the face already, because create_linear_operator hands back a
+                // ParallelMatrixFreeOperator. The coarser levels do not: with
+                // SFEM_GMG_GALERKIN=2 this loop replaces g.ops[i] with the element-matrix or
+                // assembled form, and make_em_operator returns a plain make_op while
+                // level_to_bsr returns a plain h_bsr_spmv. Measured at four levels, two ranks:
+                // level 0 reports op_rows 10404 against true_owned 10404, while level 1 reports
+                // 2916 against 1620 and level 2 reports 500 against 300.
+                //
+                auto lvl_op = timed("op[L" + std::to_string(i) + "]", thread_clamped(nd_lvl, mg_op));
+                auto lvl_sm = timed("smooth[L" + std::to_string(i) + "]", thread_clamped(nd_lvl, sm));
+
+                // SFEM_GMG_FACE_CHECK=1: does this level's operator carry the ParallelOperator
+                // face Multigrid casts for?
+                //
+                // Multigrid::level_owned falls back to smoother_[l]->rows() when the cast
+                // fails, and that is the LOCAL dof count, not the owned one; reduce_norm2 skips
+                // its allreduce in the same branch. A level that is SMOOTHED then forms
+                // rhs - A x over its ghost entries as well and takes a per-rank partial for its
+                // residual norm. A level that is SOLVED does not care, because the coarse solve
+                // fills the whole local range by design.
+                //
+                // That asymmetry is why a two-level hierarchy shows nothing -- its only coarse
+                // level is solved -- while a four-level one drifts, and why the drift is
+                // identical for block-Jacobi and Vanka and disappears with SFEM_GMG_CGC=0.
+                //
+                // timed() and thread_clamped() both preserve a face when there is one, so this
+                // reports on what add_level actually receives.
+                if (smesh::Env::read<int>("SFEM_GMG_FACE_CHECK", 0)) {
+                    auto       pop  = std::dynamic_pointer_cast<sfem::ParallelOperator<real_t>>(lvl_op);
+                    const bool face = pop && pop->comm() && pop->comm()->size() > 1;
+                    auto       me   = fi->space()->mesh_ptr();
+                    const bool dist = me && me->is_distributed() && me->comm() && me->comm()->size() > 1;
+                    if (!dist || me->comm()->rank() == 0)
+                        std::printf(
+                                "gmgface level %d: parallel_face %d  op_rows %td  smoother_rows %td  "
+                                "level_owned_would_be %td  true_owned %td  n_local %td\n",
+                                i, face ? 1 : 0, lvl_op->rows(), lvl_sm->rows(),
+                                face ? lvl_op->rows() : lvl_sm->rows(),
+                                fi->space()->n_owned_dofs(), fi->space()->n_dofs());
+                }
+
+                g.mg->add_level(lvl_op,
+                                lvl_sm,
+                                i == 0 ? nullptr : timed("prolong[L" + std::to_string(i) + "->" + std::to_string(i - 1) + "]", wrap_p(i)),
+                                timed("restrict[L" + std::to_string(i) + "->" + std::to_string(i + 1) + "]", g.data->restrictions[i]));
+            } else {
+                level_op_below = lop;
+                // Coarse solve. Dense LU when the level is small enough to factorise,
+                // which is exact and cannot diverge; BiCGStab otherwise, and not CG,
+                // because the operator is not symmetric.
+                const ptrdiff_t nd_coarse = fi->space()->n_dofs();
+                // The coarsest level is solved directly.
+                //
+                // A cycle takes its coarse answer at face value, so an iterative coarse solve
+                // that stagnates hands up a correction that is noise while reporting success.
+                // The direct solve cannot do that. It is also the second place a varying
+                // preconditioner came from, since an iterative coarse solve inherits every
+                // nondeterminism below it.
+                //
+                // The cost is real and cubic: this is a dense LU, so a coarse level of n dofs
+                // costs O(n^3) to factor and O(n^2) to store, once per Jacobian. Where that
+                // bites, the answer is a deeper hierarchy so the coarsest level is genuinely
+                // small, not a return to an iterative coarse solve. SFEM_GMG_DENSE_LU_BELOW
+                // caps it for the cases where that is not yet possible.
+                //
+                // WHAT "A DEEPER HIERARCHY" MEANS HERE, AND WHAT IT IS WORTH. This hierarchy
+                // bottoms out at the MACRO mesh, so the coarsest order is fixed by SFEM_N alone
+                // -- (N+1)^3 * 4 -- while the fine size is (N * LEVEL + 1)^3 * 4. Holding
+                // N * LEVEL fixed therefore trades coarse order against macro count with the
+                // fine problem IDENTICAL in size, which is a configuration choice and not a
+                // discretisation one: the arms below agree to every printed digit of the cavity
+                // centreline profile.
+                //
+                // Cavity at 1,098,500 dof, one allocation, 72 threads, both freeze defaults on:
+                //
+                //   N x LEVEL  coarse   linear  coarse_factor  coarse_solve  precond   wall
+                //    32 x  2   143748        -              -             -        -   >400 s (capped)
+                //    16 x  4    19652      148        18.27 s       22.79 s  29.51 s     52 s
+                //     8 x  8     2916      130         0.26 s        0.62 s   7.42 s     11 s
+                //     4 x 16      500      120         0.03 s        0.03 s   8.78 s     20 s
+                //
+                // The coarse space does NOT degrade as it shrinks -- linear iterations fall
+                // monotonically, 148, 130, 120 -- so the warning above about a macro mesh too
+                // coarse to approximate a convection-dominated operator did not bite down to 500
+                // dofs on this case. What bites instead is PARALLELISM: the macro element is the
+                // work unit, and N = 4 gives 64 of them for 72 threads, which inflates
+                // vanka_setup from 2.13 s to 7.62 s and takes the wall time back up.
+                //
+                // So the rule is the SMALLEST N whose N^3 comfortably exceeds the thread count --
+                // N = 8, giving 512 elements on a 72-core socket -- and not simply the smallest
+                // N. A geometry that needs macro elements to represent it sets its own floor.
+                const ptrdiff_t lu_max =
+                        (ptrdiff_t)smesh::Env::read<int>("SFEM_GMG_DENSE_LU_BELOW", 1 << 30);
+                // Gated on the GLOBAL count as well: the factorisation is of the whole coarse
+                // problem now, so this rank's local dof count says nothing about what it costs.
+                const ptrdiff_t nd_coarse_global = fi->space()->n_dofs_global();
+                if (nd_coarse <= lu_max && nd_coarse_global <= lu_max) {
+                    // Prefer the assembled matrix when there is one; fall back to probing
+                    // only for a level that has no matrix form.
+                    // Counted per REBUILD, like vanka_setup, so the phase table's call count
+                    // is the number of factorisations a run actually paid for rather than the
+                    // number of Newton steps it took.
+                    const bool rebuilt_lu = coarse_rebuild_now();
+                    if (rebuilt_lu) {
+                        const double t_lu = smesh::time_seconds();
+                        g_coarse_cached = g.Amat[(size_t)i]
+                                          ? make_dense_lu_from_bsr_global(g.Amat[(size_t)i], fi->space(), nd_coarse)
+                                          : make_dense_lu(lop, nd_coarse);
+                        phase_add("coarse_factor", smesh::time_seconds() - t_lu);
+                    }
+                    auto lu = g_coarse_cached;
+                    {
+                        const std::string dpath =
+                                smesh::Env::read_string("SFEM_GMG_DUMP_COARSE", std::string());
+                        if (!dpath.empty()) {
+                            std::vector<real_t> dn((size_t)nd_coarse * (size_t)nd_coarse, 0);
+                            std::vector<real_t> e((size_t)nd_coarse), c((size_t)nd_coarse);
+                            for (ptrdiff_t j = 0; j < nd_coarse; ++j) {
+                                std::fill(e.begin(), e.end(), real_t(0));
+                                std::fill(c.begin(), c.end(), real_t(0));
+                                e[(size_t)j] = 1;
+                                lop->apply(e.data(), c.data());
+                                for (ptrdiff_t r = 0; r < nd_coarse; ++r)
+                                    dn[(size_t)r * nd_coarse + j] = c[(size_t)r];
+                            }
+                            dump_dense(dpath.c_str(), nd_coarse, dn);
+                        }
+                    }
+
+                    // A rank-deficient coarse operator is reported by component, because which
+                    // component loses rank says what is missing: pressure alone is a gauge
+                    // (no Dirichlet pressure and an outflow that does not fix the level),
+                    // velocity means the coarse boundary treatment itself is wrong.
+                    // Printed only on a rebuild, like the phase count: with the factorisation
+                    // held across a stage this otherwise repeats the same line once per Newton
+                    // iteration and reads as though every one of them had factorised.
+                    if (lu->n_dropped() && rebuilt_lu) {
+                        int by_comp[4] = {0, 0, 0, 0};
+                        for (const ptrdiff_t d : lu->dropped()) by_comp[(int)(d % 4)]++;
+                        std::printf(
+                                "coarse LU: %td of %td directions dropped as null  "
+                                "(first %zu by component: ux %d  uy %d  uz %d  p %d)\n",
+                                lu->n_dropped(), lu->factored_order(), lu->dropped().size(),
+                                by_comp[0], by_comp[1], by_comp[2], by_comp[3]);
+                    }
+
+                    // SFEM_GMG_SOLVE_OWNED_SUM=1: does the coarse SOLVE return the same
+                    // correction however the domain was cut?
+                    //
+                    // This is the last object in the two-level correction that has never been
+                    // validly measured. The coarse operator's action, its block diagonal and
+                    // the transfer adjoint all match serial to sixteen figures at one, two,
+                    // four and eight ranks, while the one-step reproducer still takes 5 linear
+                    // iterations at one and four ranks against 18 at eight -- so what the solve
+                    // hands back is what is left to look at.
+                    //
+                    // The comparison directly below drives both factorisations with
+                    // sin(0.61 k) over the LOCAL dof index. That is a different vector on every
+                    // rank, so it has never measured anything under MPI; its serial 0.0 against
+                    // 4.8e-01 and 7.3e-01 at two ranks was the probe breaking, not the solve.
+                    //
+                    // Here the right-hand side is a function of POSITION, so every rank count
+                    // solves the same system, and the answer is summed over the OWNED range and
+                    // reduced. It works on both paths without distinguishing them: the global
+                    // factorisation that allgathers and the serial dense one are the same
+                    // object to this probe, which is what makes 1 and 8 comparable at all.
+                    if (smesh::Env::read<int>("SFEM_GMG_SOLVE_OWNED_SUM", 0) && lu) {
+                        auto              cm  = fi->space()->mesh_ptr();
+                        const auto *const px  = fi->space()->points()->data()[0];
+                        const auto *const py  = fi->space()->points()->data()[1];
+                        const auto *const pz  = fi->space()->points()->data()[2];
+                        const ptrdiff_t   ncn = nd_coarse / N_FIELDS;
+
+                        std::vector<real_t> b((size_t)nd_coarse, 0), x((size_t)nd_coarse, 0);
+                        for (ptrdiff_t n = 0; n < ncn; ++n)
+                            for (int c = 0; c < N_FIELDS; ++c)
+                                b[(size_t)(n * N_FIELDS + c)] =
+                                        (real_t)std::sin(2.9 * (double)px[n] + 1.3 * (double)py[n] +
+                                                         2.1 * (double)pz[n] + 0.7 * c + 0.4);
+                        lu->apply(b.data(), x.data());
+
+                        const bool dd = cm && cm->is_distributed() && cm->comm() && cm->comm()->size() > 1;
+                        const ptrdiff_t nown = dd ? cm->distributed()->n_nodes_owned() : ncn;
+
+                        cvfem::Domain dom;
+                        dom.comm    = cm ? cm->comm() : nullptr;
+                        dom.n_owned = nown * N_FIELDS;
+                        dom.n_local = nd_coarse;
+
+                        long double plain = 0, wsum = 0, absum = 0;
+                        for (ptrdiff_t n = 0; n < nown && n < ncn; ++n) {
+                            const long double gid =
+                                    dd ? (long double)cm->distributed()->node_mapping()->data()[n]
+                                       : (long double)n;
+                            for (int c = 0; c < N_FIELDS; ++c) {
+                                const long double e = (long double)x[(size_t)(n * N_FIELDS + c)];
+                                plain += e;
+                                wsum += e * (gid * (long double)N_FIELDS + (long double)c);
+                                absum += e < 0 ? -e : e;
+                            }
+                        }
+
+                        const double sp = cvfem::sum_kahan(dom, plain);
+                        const double sw = cvfem::sum_kahan(dom, wsum);
+                        const double sa = cvfem::sum_kahan(dom, absum);
+                        const double sn = cvfem::sum_kahan(dom, (long double)nown);
+                        if (dom.is_root())
+                            std::printf("solvesum level %d: owned_nodes %.0f  sum %.17g  gidsum %.17g  abs %.17g\n",
+                                        i, sn, sp, sw, sa);
+                    }
+
+                    if (smesh::Env::read<int>("SFEM_GMG_CHECK", 0) && g.Amat[(size_t)i]) {
+                        // The two densifications must agree: same operator, read two ways.
+                        auto                ref = make_dense_lu(lop, nd_coarse);
+                        std::vector<real_t> b((size_t)nd_coarse), x1((size_t)nd_coarse, 0),
+                                x2((size_t)nd_coarse, 0);
+                        for (ptrdiff_t k = 0; k < nd_coarse; ++k)
+                            b[(size_t)k] = std::sin(real_t(0.61) * (real_t)k + real_t(0.2));
+                        lu->apply(b.data(), x1.data());
+                        ref->apply(b.data(), x2.data());
+                        real_t dn = 0, rn = 0;
+                        for (ptrdiff_t k = 0; k < nd_coarse; ++k) {
+                            const real_t d = x1[(size_t)k] - x2[(size_t)k];
+                            dn += d * d;
+                            rn += x2[(size_t)k] * x2[(size_t)k];
+                        }
+                        const real_t rel = rn > 0 ? std::sqrt(dn / rn) : std::sqrt(dn);
+                        std::printf("coarse LU: assembled vs probed, rel = %.4e over %td dofs  %s\n", rel,
+                                    nd_coarse, rel < 1e-10 ? "OK" : "MISMATCH");
+                    }
+                    // The coarsest level gets the face too, for the diagnostics rather than for
+                    // the solve.
+                    //
+                    // Without it, level_owned(coarsest) falls back to smoother_[l]->rows(), and
+                    // GlobalDenseLU::rows() is deliberately the LOCAL size, so the debug
+                    // residual || r_H || is formed over ghost rows of a BSR whose ghost rows are
+                    // incomplete, and reduce_norm2 skips its allreduce for want of the face.
+                    // That reads as a broken coarse solve when nothing is broken: under
+                    // block-Jacobi at four levels, where the iteration count is flat at 43 on
+                    // one rank and eight, || r_H || still reported 8.0e-17 against 5.1e-03.
+                    //
+                    // The solve itself is unaffected either way: the cycle zeroes the whole
+                    // buffer and the factorisation fills the entire local range, and
+                    // create_parallel_preconditioner reports row/col allocation sizes equal to
+                    // the local length, so level_alloc is unchanged.
+                    auto coarse_mg_op = lop;
+                    {
+                        auto       me   = fi->space()->mesh_ptr();
+                        const bool dist = me && me->is_distributed() && me->comm() && me->comm()->size() > 1;
+                        if (dist && !std::dynamic_pointer_cast<sfem::ParallelOperator<real_t>>(lop))
+                            coarse_mg_op = sfem::create_parallel_preconditioner(lop, fi->space(),
+                                                                                sfem::EXECUTION_SPACE_HOST);
+                    }
+                    g.mg->add_level(timed("op[coarsest]", coarse_mg_op), timed("coarse_solve", lu),
+                                    timed("prolong[L" + std::to_string(i) + "->" + std::to_string(i - 1) + "]", wrap_p(i)), nullptr);
+                    continue;
+                }
+
+                auto cs = sfem::create_bcgs<real_t>(lop, sfem::EXECUTION_SPACE_HOST);
+                cs->set_max_it(smesh::Env::read<int>("SFEM_GMG_COARSE_MAX_IT", 200));
+                cs->set_rtol(1e-8);
+                cs->set_atol(1e-14);
+                // The coarse level is solved, not smoothed, so the cycle takes its answer
+                // at face value. If that solve stagnates the correction is noise, and a
+                // stagnating BiCGStab reports success by exhausting its iterations.
+                cs->verbose = smesh::Env::read<int>("SFEM_GMG_COARSE_VERBOSE", 0) != 0;
+                cs->set_preconditioner_op(prec);
+                const ptrdiff_t nd_c = fi->space()->n_dofs();
+                g.mg->add_level(timed("op[coarsest]", thread_clamped(nd_c, lop)),
+                                timed("coarse_solve", thread_clamped(nd_c, cs)),
+                                timed("prolong[L" + std::to_string(i) + "->" + std::to_string(i - 1) + "]", wrap_p(i)), nullptr);
+            }
+        }
+        // Cycle index, following Brandt's TME report (NASA/CR-1998-207647).
+        //
+        // For non-aligned grids with open characteristics -- entering flow, which is what an
+        // inlet/outlet channel is -- he identifies the difficulty as "the shorter distance
+        // (along the characteristics) for which a coarser grid still approximates some smooth
+        // solution components", and lists three cures: downstream-ordered relaxation marching,
+        // semi-coarsening, and a cycle index of 2^(p/m), the last "not requiring ordered
+        // relaxation". For closed characteristics -- a recirculation bubble, which the
+        // backward-facing step also has -- the recommended cycles are likewise W-based
+        // (defect correction within W cycles, or downstream ordering with doubled transferred
+        // residuals).
+        //
+        // That matches what was measured here: the weakly damped modes are smooth streamwise
+        // velocity, not pressure, and neither the repaired smoother nor the coarse space
+        // removes them. A higher cycle index visits the coarse levels more often per fine
+        // sweep, which is the cheapest of the three cures to try and the only one needing no
+        // new machinery.
+        g.mg->set_cycle_type(smesh::Env::read<int>("SFEM_GMG_CYCLE", 1));
+        g.mg->set_max_it(1);  // one cycle per preconditioner application
+        // Every caller hands the cycle a zero vector: FGMRES clears z_j before applying the
+        // preconditioner, and the SFEM_GMG_CHECK=2 probe starts from zeros. So the finest
+        // level's first pre-smoothing sweep can take the right-hand side as its residual
+        // instead of applying the fine operator to zero -- one matrix-free application saved
+        // per cycle, and the same bits.
+        g.mg->set_initial_guess_zero(true);
+    }
+
+}  // namespace
+
+// Exact Jacobian action by forward differencing of the residual:
+//
+//     J v  ~  ( R(x + eps v) - R(x) ) / eps
+//
+// The assembled Jacobian here is not the exact derivative: the Rhie-Chow term freezes the
+// reconstructed nodal pressure gradient pg, dropping its dependence on p. SFEM_FD_CHECK
+// measures 3.9e-2 relative error in the continuity rows against 1.3e-4 in the momentum rows,
+// flat in eps and identical at L=8 and L=16. Differencing the residual has no such omission
+// by construction, so it isolates that defect from everything else.
+//
+// eps follows Knoll & Keyes: sqrt(machine eps) * (1 + ||x||) / ||v||, balancing truncation
+// against cancellation.
+//
+// Constrained rows must stay identity. The difference is exactly zero there -- v is zeroed at
+// constraints, so x + eps v equals x and the two residuals cancel -- which would leave a zero
+// row and a singular operator. The mask restores v on those rows.
+class JFNKOperator final : public sfem::Operator<real_t> {
+public:
+    JFNKOperator(std::shared_ptr<sfem::Function> f, const ptrdiff_t n, const mask_t *const cmask)
+        : f_(std::move(f)), n_(n), cmask_(cmask), xt_((size_t)n), rt_((size_t)n), r0_((size_t)n) {}
+
+    void set_base(const real_t *const x) {
+        base_.assign(x, x + n_);
+        std::fill(r0_.begin(), r0_.end(), real_t(0));
+        f_->gradient(base_.data(), r0_.data());
+        f_->apply_zero_constraints(r0_.data());
+        xnorm_ = 0;
+        for (ptrdiff_t i = 0; i < n_; ++i) xnorm_ += base_[(size_t)i] * base_[(size_t)i];
+        xnorm_ = std::sqrt(xnorm_);
+    }
+
+    int apply(const real_t *const v, real_t *const y) override {
+        real_t vn = 0;
+        for (ptrdiff_t i = 0; i < n_; ++i) vn += v[i] * v[i];
+        vn = std::sqrt(vn);
+        if (vn == real_t(0)) return SFEM_SUCCESS;
+        const real_t eps =
+                std::sqrt(std::numeric_limits<real_t>::epsilon()) * (real_t(1) + xnorm_) / vn;
+        for (ptrdiff_t i = 0; i < n_; ++i) xt_[(size_t)i] = base_[(size_t)i] + eps * v[i];
+        std::fill(rt_.begin(), rt_.end(), real_t(0));
+        f_->gradient(xt_.data(), rt_.data());
+        f_->apply_zero_constraints(rt_.data());
+        for (ptrdiff_t i = 0; i < n_; ++i)  // Operator::apply accumulates into y
+            y[i] += mask_get(i, cmask_) ? v[i] : (rt_[(size_t)i] - r0_[(size_t)i]) / eps;
+        return SFEM_SUCCESS;
+    }
+
+    std::ptrdiff_t       rows() const override { return n_; }
+    std::ptrdiff_t       cols() const override { return n_; }
+    sfem::ExecutionSpace execution_space() const override { return sfem::EXECUTION_SPACE_HOST; }
+
+private:
+    std::shared_ptr<sfem::Function> f_;
+    ptrdiff_t                       n_;
+    const mask_t                   *cmask_;
+    std::vector<real_t>             base_, xt_, rt_, r0_;
+    real_t                          xnorm_{0};
+};
+
+int main(int argc, char **argv) {
+    // LINE-BUFFER STDOUT, before anything is written to it.
+    //
+    // stdout is block-buffered when it is a file or a pipe and stderr never is, so a message
+    // written to stderr overtakes whatever stdout is still holding and lands in the MIDDLE of
+    // a half-flushed line. The result is not a cosmetic jumble, it is a corrupted record: the
+    // verification matrix's own parser reads "u_linf: ... p_linf: ..." off one line, and on
+    // run 4658898 the failure message split that line in two, so p_linf was not where the
+    // parser looked and the report generator died with a KeyError after 47 runs and nineteen
+    // minutes of Grace time had already succeeded. The same run's data was fine; only the
+    // transcript was torn.
+    //
+    // Fixed here rather than by a stdbuf in each job script, for the reason a default exists
+    // at all: a convention every caller has to remember is one some caller will not. It also
+    // serves the standing requirement that a long run's diagnostics be observable WHILE it
+    // runs -- block buffering is what makes a working job look like a hung one.
+    std::setvbuf(stdout, nullptr, _IOLBF, 0);
+
+    auto ctx = sfem::initialize(argc, argv);
+
+    if (argc == 2 && (std::string(argv[1]) == "-h" || std::string(argv[1]) == "--help")) {
+        usage(argv[0]);
+        return EXIT_SUCCESS;
+    }
+    if (argc != 2) {
+        usage(argv[0]);
+        return EXIT_FAILURE;
+    }
+
+    // Multi-rank is refused, not attempted -- and the refusal is placed after the argv
+    // handling above so that `mpirun -n 4 <driver> --help` still prints usage.
+    //
+    // This driver does run under mpirun today, which is the problem. Measured at -n 2: the
+    // mesh genuinely partitions (each rank reports its own elements_per_pack), both ranks
+    // build their operator, and the run then dies inside sfem_Op.hpp with "cvfem:NavierStokes
+    // does not support ElementScope other than ALL". That abort is luck rather than a check.
+    // The quantities that are wrong without an exchange are all reductions -- the FGMRES dot
+    // and norm, the pressure gauge's two projections, the Newton and Armijo acceptance tests,
+    // the CFL maximum -- and a rank evaluates every one of them over its own slice without
+    // ever noticing the slice is partial. So the failure a missing guard leaves open is not a
+    // crash: it is a run that converges, writes output, and reports a per-rank answer.
+    //
+    // SFEM_ALLOW_MPI is the opt-in the parallel stages grow into, so each of those reductions
+    // can be made collective and tested against this same binary rather than a forked one.
+    //
+    // Every rank evaluates this identically and returns non-zero, so the refusal is itself
+    // collective: no rank is left waiting in a barrier for one that has already exited, and
+    // ~Context calls MPI_Finalize as the shared_ptr unwinds. Only rank 0 prints, or a full
+    // node says this 288 times.
+    const int comm_size = ctx->communicator()->size();
+    if (comm_size > 1 && !smesh::Env::read<int>("SFEM_ALLOW_MPI", 0)) {
+        if (ctx->communicator()->rank() == 0) {
+            fprintf(stderr,
+                    "%s: refusing to run on %d ranks.\n"
+                    "  This driver is not distributed yet. Its reductions are local, so a\n"
+                    "  multi-rank run would not fail -- it would converge to a per-rank\n"
+                    "  answer. Use one rank and give the cores to OMP_NUM_THREADS.\n"
+                    "  SFEM_ALLOW_MPI=1 proceeds anyway, for work on the parallel path.\n",
+                    argv[0],
+                    comm_size);
+        }
+        return EXIT_FAILURE;
+    }
+
+    const std::string out_folder = argv[1];
+
+    const std::string case_name  = smesh::Env::read_string("SFEM_CASE", "");
+    const int         n          = smesh::Env::read<int>("SFEM_N", 8);
+    int               ny         = smesh::Env::read<int>("SFEM_NY", n);
+    int               nx         = smesh::Env::read<int>("SFEM_NX", 0);
+    int               nz         = smesh::Env::read<int>("SFEM_NZ", 0);
+    // The channel default is 4x1x1; a cavity wants a square box, so its default differs.
+    // Explicit SFEM_LX/LY/LZ still win.
+    // The manufactured pressure's gauge constant makes it zero-mean on [0,2]^2 and nowhere
+    // else, so the MMS domain is not a free parameter -- default it, and reject an override.
+    const std::string case_req    = smesh::Env::read_string("SFEM_CASE", "");
+    const bool        want_mms    = case_req == "mms" || case_req == "manufactured";
+    // Their cavity is the cube [0,2]^3 and the lid profile is written for it; on any other
+    // box the polynomial no longer vanishes at the edges and it is a different problem.
+    const bool        want_cavreg = case_req == "cavity_reg" || case_req == "regularized_cavity" ||
+                             case_req == "cavity_regularized";
+    // The backward-facing step is not a box: it needs its own generator and the topological
+    // boundary mask, since a coordinate test cannot see the two step faces.
+    const bool        want_step   = case_req == "step" || case_req == "backward_facing_step" ||
+                           case_req == "bfs";
+    // The same geometry family as the step and the same generator, but a different case:
+    // a wide, spanwise-slip, wall-graded box with a perturbed initial state, run until the
+    // shear layer breaks down. Sharing `step` would put all of that into the case the
+    // verification matrix checks conservation on. See parse_case for the full argument.
+    const bool        want_step_turb = case_req == "step_turb" || case_req == "turbulent_step" ||
+                                case_req == "bfs_turb";
+    // Everything that is true of the step's GEOMETRY is true of this one's, so the two share
+    // every branch that asks about shape rather than about physics.
+    const bool        want_any_step  = want_step || want_step_turb;
+    // Smith-Hutton: the box is the paper's [-1,1] x [0,1] shifted to the origin, and thin in
+    // z because the problem is two-dimensional -- one cell, with w uniform along it, is what
+    // makes the z-momentum equation reduce to the scalar transport the benchmark is.
+    const bool        want_sh     = case_req == "smith_hutton" || case_req == "smithhutton" ||
+                                    case_req == "sh";
+    const bool        want_cavity = smesh::Env::read_string("SFEM_CASE", "") == "cavity" ||
+                             smesh::Env::read_string("SFEM_CASE", "") == "lid" ||
+                             smesh::Env::read_string("SFEM_CASE", "") == "lid_driven_cavity";
+    // The diaphragm pump: a closed chamber with a moving wall and one port. See the block
+    // comment in src/cases/cvfem_ns_channel_case.hpp for the geometry and for the identity
+    // it is checked against. A cube by default, so the diaphragm area is Lx*Lz and the
+    // arithmetic in that identity is visible rather than buried.
+    const bool        want_pump   = case_req == "pump" || case_req == "diaphragm" ||
+                           case_req == "diaphragm_pump";
+    // The FDA benchmark nozzle: SI units and the benchmark's blood analogue, so rho and mu
+    // default to its values rather than to the channel's. See NozzleGeometry in
+    // cvfem_ns_channel_case.hpp. Lx, Ly and Lz are its bounding box; nothing below uses them
+    // to find a boundary, because none of its boundaries but the two ends is a plane.
+    const bool        want_nozzle = case_req == "nozzle" || case_req == "fda_nozzle";
+    const cvfem_case::NozzleGeometry<real_t> nozzle;
+    // 21 x 2 x 4 for the turbulent step: one step height of inlet, twenty downstream so the
+    // shear layer has room to break down and reattach well clear of the outflow, and a span
+    // of four step heights -- the box width the reference DNS uses, which is the narrowest
+    // that does not constrain the spanwise structures it is there to permit.
+    const real_t      Lx         = want_nozzle ? nozzle.x_out - nozzle.x_in : smesh::Env::read<real_t>("SFEM_LX", want_sh ? 2 : (want_step_turb ? 21 : (want_step ? 10 : ((want_mms || want_cavreg) ? 2 : ((want_cavity || want_pump) ? 1 : 4)))));
+    const real_t      Ly         = want_nozzle ? 2 * nozzle.r_inlet : smesh::Env::read<real_t>("SFEM_LY", want_sh ? 1 : ((want_mms || want_cavreg || want_any_step) ? 2 : 1));
+    const real_t      Lz         = want_nozzle ? 2 * nozzle.r_inlet : smesh::Env::read<real_t>("SFEM_LZ", want_step_turb ? 4 : ((want_mms || want_cavreg) ? 2 : 1));
+    const real_t      rho        = smesh::Env::read<real_t>("SFEM_RHO", want_nozzle ? 1056 : 1);
+    const real_t      mu         = smesh::Env::read<real_t>("SFEM_MU", want_nozzle ? 0.0035 : 0.01);
+    // The nozzle is specified by its throat Reynolds number, so its velocity scale is the
+    // bulk THROAT velocity that number implies, and its length scale is the throat diameter.
+    // Every "Re" this driver prints and continues in is rho U L_re / mu, which for the nozzle
+    // is then the benchmark's Re_t and for every other case is the Ly-based number it always
+    // was. SFEM_U is refused for the nozzle rather than ignored: two knobs for one quantity is
+    // a way to believe a run was at a Reynolds number it was not.
+    const real_t      nozzle_re  = smesh::Env::read<real_t>("SFEM_NOZZLE_RE", 500);
+    if (want_nozzle && std::getenv("SFEM_U")) {
+        std::fprintf(stderr, "nozzle: set SFEM_NOZZLE_RE (the throat Reynolds number), not SFEM_U\n");
+        return EXIT_FAILURE;
+    }
+    // The manufactured case's domain and density are NOT free parameters, and until now this
+    // was asserted in three comments and enforced nowhere.
+    //
+    // The pressure carries a gauge constant, 1408/33075 - 8/(5 Re), which makes it exactly
+    // zero-mean on [0,2]^2 and on no other box; and its nonlinear part carries an implicit
+    // rho = 1, so at any other density the returned p is simply not the exact pressure. Under
+    // either override the run still converges and still prints an error norm -- against a
+    // reference that is not the solution. scripts/verify_report.sh records what that looks
+    // like: "it produced u_linf of 26, 10, 8.8 and 14 down a ladder that should have been
+    // converging quadratically", and it avoids it only by not setting the variables, which is
+    // a convention rather than a guarantee.
+    //
+    // Re enters through mu alone -- exact_state derives Re = 1/mu, so the two cannot disagree
+    // -- which is what makes a ladder at a different Reynolds number legitimate while a
+    // ladder on a different box is not.
+    // The VALUE is checked, not the variable's presence: SFEM_RHO=1 and SFEM_LX=2 are the
+    // required settings and scripts pass them explicitly, so rejecting the name would refuse
+    // the correct configuration. Rejecting the wrong value is the useful test.
+    if (want_mms) {
+        struct { const char *name; real_t got, want; } req[] = {
+                {"SFEM_LX", Lx, 2}, {"SFEM_LY", Ly, 2}, {"SFEM_LZ", Lz, 2}, {"SFEM_RHO", rho, 1}};
+        for (const auto &r : req) {
+            if (std::fabs((double)(r.got - r.want)) > 1e-12) {
+                std::fprintf(stderr,
+                             "mms: %s = %g, but the manufactured case requires %g. Its pressure "
+                             "gauge constant 1408/33075 - 8/(5 Re) is zero-mean on [0,2]^3 and "
+                             "nowhere else, and its nonlinear term carries rho = 1; either way "
+                             "the reported error would be measured against something that is "
+                             "not the exact solution. Set the Reynolds number with SFEM_MU "
+                             "(Re = 1/mu), which is the one parameter that IS free.\n",
+                             r.name, (double)r.got, (double)r.want);
+                return EXIT_FAILURE;
+            }
+        }
+    }
+    const real_t      U          = want_nozzle ? cvfem_case::nozzle_throat_velocity(nozzle, nozzle_re, rho, mu)
+                                               : smesh::Env::read<real_t>("SFEM_U", 1);
+    const real_t      L_re       = want_nozzle ? 2 * nozzle.r_throat : Ly;
+    // Isoparametric by default on the nozzle, because its elements are not affine. SFEM_GEOM=
+    // affine is an explicit opt-in to approximating each element by its Jacobian at the centre
+    // -- per element on a flat mesh, per MACRO element on a semi-structured one -- whose error
+    // shrinks with the element (macro element) size. It is announced, never silent.
+    const std::string geom_name  = smesh::Env::read_string("SFEM_GEOM", want_nozzle ? "isoparam" : "affine");
+    if (want_nozzle && geom_name == "affine")
+        std::printf("nozzle: SFEM_GEOM=affine -- curved elements approximated by their centre Jacobian\n");
+    const int         max_newton = smesh::Env::read<int>("SFEM_NL_MAX_IT", 40);
+    // Transient stepping. SFEM_DT <= 0 -- the default -- is the steady solve every existing
+    // case runs, and nothing below changes for it. With a timestep the whole continuation
+    // and Newton solve becomes one time step, repeated SFEM_NSTEPS times, with the velocity
+    // history shifted after each. BDF2 falls back to BDF1 on the first step, which has no
+    // second history level; that is the standard start-up.
+    const real_t      dt_step   = smesh::Env::read<real_t>("SFEM_DT", real_t(0));
+    const int         nsteps    = std::max(1, smesh::Env::read<int>("SFEM_NSTEPS", 1));
+    // CFL-DRIVEN TIMESTEP. cfl_max has been computed by the flow diagnostics since they were
+    // wired up and consumed by nothing; this closes that loop.
+    //
+    //     dt_next = dt * (target / cfl_measured)
+    //
+    // clamped by a growth factor per step and by absolute bounds, so one anomalous step
+    // cannot take the step size somewhere the next one cannot recover from.
+    //
+    // 0 -- the default -- keeps the fixed step, which is what every recorded transient number
+    // was measured with and what keeps a run reproducible. It requires the diagnostics, since
+    // cfl_max comes from them: asking for adaptation without SFEM_DIAG_CSV is refused rather
+    // than silently ignored.
+    //
+    // BDF2 IS THE REASON dt_prev EXISTS. Its coefficients {3/2, -2, 1/2} are second order on a
+    // uniform step and on nothing else, so changing dt under them is not an approximation --
+    // it is a first-order scheme still calling itself second. The variable-step form is now
+    // in bdf_coeffs and the driver feeds it the previous step.
+    const real_t      cfl_target = smesh::Env::read<real_t>("SFEM_CFL_TARGET", real_t(0));
+    const real_t      cfl_grow   = smesh::Env::read<real_t>("SFEM_CFL_GROW", real_t(1.25));
+    const real_t      dt_min     = smesh::Env::read<real_t>("SFEM_DT_MIN", real_t(0));
+    const real_t      dt_max     = smesh::Env::read<real_t>("SFEM_DT_MAX", real_t(0));
+    const int         bdf_order = smesh::Env::read<int>("SFEM_BDF_ORDER", 2);
+    const real_t      nl_rtol    = smesh::Env::read<real_t>("SFEM_NL_RTOL", 1e-8);
+    const real_t      nl_atol    = smesh::Env::read<real_t>("SFEM_NL_ATOL", 1e-12);
+    // Step-size convergence. The residual tests above cannot fire once ||R|| has reached its
+    // round-off floor, because no further relative reduction is achievable; but a Newton step
+    // of size 1e-10 has converged whatever the residual is doing. Without this the loop asks
+    // for another linear solve, that solve chases a relative tolerance against a residual it
+    // cannot reduce and burns its whole iteration cap, and the line search then correctly
+    // finds no decrease -- abandoning a stage that had in fact succeeded.
+    // Off by default: measured harmful. Accepting convergence on the step alone declares a
+    // stage successful without ever confirming ||R|| came down, and the continuation then
+    // grows its step from a state that has not converged. At Re=3200 it produced 8 such false
+    // successes and took the reachable Reynolds number from 3200 (at target) down to 1682.
+    // Retained only as an experiment knob.
+    const real_t      nl_stol    = smesh::Env::read<real_t>("SFEM_NL_STOL", 0);
+    // 1e-3, not 1e-8. A Newton step only needs its linear solve to reduce the residual well
+    // below the nonlinear one it corrects; the last five orders are Krylov iterations that
+    // change the step by nothing Newton can see. FDA nozzle, Re 500, FGMRES + multigrid, Grace
+    // 72 threads -- same 28 Newton steps and every printed station identical to the digit:
+    //
+    //     dof        rtol   linear its   t_solve   run
+    //     116,212    1e-8     2,386       45.4 s    76 s
+    //     116,212    1e-3     1,171       16.9 s    48 s
+    //     893,924    1e-8     4,020        713 s   761 s   (first solve capped at 1000)
+    //     893,924    1e-3     2,031        278 s   324 s
+    const real_t      lin_rtol   = smesh::Env::read<real_t>("SFEM_LSOLVE_RTOL", 1e-3);
+    const real_t      lin_atol   = smesh::Env::read<real_t>("SFEM_LSOLVE_ATOL", 1e-14);
+    const int         lin_max_it = smesh::Env::read<int>("SFEM_LSOLVE_MAX_IT", 1000);
+    const int         pack_size  = smesh::Env::read<int>("SFEM_PACK_SIZE", 1024);
+    // Matrix-free by default. 0 assembles a BSR once per Newton step and hands the
+    // Krylov method an SpMV instead; that path stays fully supported and gated, and at
+    // p=1 it is still the faster of the two -- see the timing breakdown printed at the
+    // end. The default reflects where the work is going, not where it is today: the
+    // semi-structured hierarchy is what makes the matrix-free apply worth having, and
+    // an assembled BSR per level is exactly the memory the hierarchy exists to avoid.
+    const int         matrix_free = smesh::Env::read<int>("SFEM_MATRIX_FREE", 1);
+    // 1: precondition the Jacobian solve with a semi-structured multigrid V-cycle instead
+    // of point block-Jacobi. Needs a semi-structured mesh with more than one level, so it
+    // is ignored on a flat one.
+    const int         use_gmg     = smesh::Env::read<int>("SFEM_GMG", 0);
+    // Two sweeps, pre and post. The fine-level Vanka sweep is ~70% of a large run, so a third
+    // one costs more than the iterations it saves once the problem is big. Warped FDA nozzle,
+    // Re 500, FGMRES + Galerkin multigrid, Grace 72 threads, same Newton steps and results:
+    //
+    //     dof        sweeps   linear its   run
+    //     116,212      3          491       8.1 s
+    //     116,212      2          617       8.2 s
+    //     116,212      1        1,007       9.9 s   (one more Newton step)
+    //     893,924      3        1,023     134.9 s
+    //     893,924      2        1,153     111.6 s
+    //     893,924      1        1,832     104.4 s
+    const int         gmg_smooth  = smesh::Env::read<int>("SFEM_GMG_SMOOTH", 2);
+    // Compares J_mf v against J_asm v once, on the first Jacobian. The two paths must
+    // agree before any timing comparison between them means anything.
+    const int         check_jv    = smesh::Env::read<int>("SFEM_CHECK_JV", 0);
+    const real_t      verify_tol = smesh::Env::read<real_t>("SFEM_VERIFY_TOL", 1e-2);
+
+    FlowCase flow;
+    if (case_name.empty() || !cvfem_case::parse_case(case_name, flow)) {
+        std::fprintf(stderr, "SFEM_CASE is required "
+                                 "(poiseuille, couette, cavity, cavity_reg or mms)\n");
+        usage(argv[0]);
+        return EXIT_FAILURE;
+    }
+    if (geom_name != "affine" && geom_name != "isoparam") {
+        std::fprintf(stderr, "invalid SFEM_GEOM '%s' (expected affine or isoparam)\n", geom_name.c_str());
+        return EXIT_FAILURE;
+    }
+    if (ny < 1) ny = 1;
+    if (nx < 1) nx = std::max(1, (int)std::lround((double)ny * (double)Lx / (double)Ly));
+    if (nz < 1) nz = std::max(1, (int)std::lround((double)ny * (double)Lz / (double)Ly));
+
+    const double tick = smesh::time_seconds();
+
+    const real_t step_x = smesh::Env::read<real_t>("SFEM_STEP_X", 1);
+    const real_t step_y = smesh::Env::read<real_t>("SFEM_STEP_Y", 1);
+    std::shared_ptr<smesh::Mesh> mesh;
+    // Set by the nozzle, for after to_semistructured: the micro nodes go on the nozzle's own map
+    // rather than on the chords between macro corners. See smesh::Mesh::warp_semistructured_hex8_nozzle.
+    std::function<int(const std::shared_ptr<smesh::Mesh> &)> nozzle_warp;
+    if (want_nozzle) {
+        // The semi-structured operator hoists one Jacobian per macro element -- the macro
+        // element's own Jacobian at its centre, scaled to a micro cell -- which is exact for an
+        // affine macro element and an approximation for every element of this mesh, one that
+        // improves as the MACRO elements shrink and not with the level. So it is allowed only
+        // under SFEM_GEOM=affine, which says that approximation is what the run asked for.
+        if (smesh::Env::read<int>("SFEM_ELEMENT_REFINE_LEVEL", 1) > 1 && geom_name != "affine") {
+            std::fprintf(stderr, "nozzle: SFEM_ELEMENT_REFINE_LEVEL > 1 approximates each macro element "
+                                 "by its centre Jacobian; say so with SFEM_GEOM=affine\n");
+            return EXIT_FAILURE;
+        }
+        // Resolution, in cells: across the core square, ring layers out to the bore, ring
+        // layers from the bore to the expanded pipe, and per axial segment (inlet pipe, cone,
+        // throat, expanded pipe).
+        const ptrdiff_t n_core  = smesh::Env::read<int>("SFEM_NOZZLE_NCORE", 4);
+        const ptrdiff_t n_bore  = smesh::Env::read<int>("SFEM_NOZZLE_NBORE", 2);
+        const ptrdiff_t n_outer = smesh::Env::read<int>("SFEM_NOZZLE_NOUTER", 3);
+        const std::string axial = smesh::Env::read_string("SFEM_NOZZLE_NAXIAL", "8 6 16 32");
+        // Mesh grading, both defaulting to 0, which is the ungraded mesh bit for bit -- so
+        // every recorded number on this geometry stands until one of these is set.
+        //
+        // SFEM_NOZZLE_GRADE_R clusters the ring layers toward the bore wall, where the boundary
+        // layer is. SFEM_NOZZLE_GRADE_X clusters each axial segment's planes toward its
+        // downstream break, which here means the throat and the expansion -- the two stations
+        // the FDA data is taken at and the two places the gradients are.
+        const smesh::geom_t grade_r =
+                (smesh::geom_t)smesh::Env::read<double>("SFEM_NOZZLE_GRADE_R", 0);
+        const smesh::geom_t grade_x =
+                (smesh::geom_t)smesh::Env::read<double>("SFEM_NOZZLE_GRADE_X", 0);
+        long              na[4];
+        if (std::sscanf(axial.c_str(), "%ld %ld %ld %ld", &na[0], &na[1], &na[2], &na[3]) != 4) {
+            std::fprintf(stderr, "nozzle: SFEM_NOZZLE_NAXIAL must be four cell counts, got '%s'\n",
+                         axial.c_str());
+            return EXIT_FAILURE;
+        }
+        const auto &g = nozzle;
+        mesh          = smesh::Mesh::create_hex8_nozzle(
+                ctx->communicator(),
+                {(smesh::geom_t)g.x_in, (smesh::geom_t)g.x_cone, (smesh::geom_t)g.x_throat,
+                 (smesh::geom_t)g.x_expansion, (smesh::geom_t)g.x_out},
+                {(smesh::geom_t)g.r_inlet, (smesh::geom_t)g.r_inlet, (smesh::geom_t)g.r_throat,
+                 (smesh::geom_t)g.r_throat, (smesh::geom_t)g.r_throat},
+                {(ptrdiff_t)na[0], (ptrdiff_t)na[1], (ptrdiff_t)na[2], (ptrdiff_t)na[3]},
+                3, (smesh::geom_t)g.r_inlet, n_core, n_bore, n_outer, 0.5, grade_r, grade_x);
+        // The same arguments, captured, so the lattice is warped onto exactly this nozzle.
+        {
+            const std::vector<smesh::geom_t> xb = {(smesh::geom_t)g.x_in, (smesh::geom_t)g.x_cone,
+                                                   (smesh::geom_t)g.x_throat, (smesh::geom_t)g.x_expansion,
+                                                   (smesh::geom_t)g.x_out};
+            const std::vector<smesh::geom_t> rb = {(smesh::geom_t)g.r_inlet, (smesh::geom_t)g.r_inlet,
+                                                   (smesh::geom_t)g.r_throat, (smesh::geom_t)g.r_throat,
+                                                   (smesh::geom_t)g.r_throat};
+            const std::vector<ptrdiff_t>     nx = {(ptrdiff_t)na[0], (ptrdiff_t)na[1], (ptrdiff_t)na[2], (ptrdiff_t)na[3]};
+            const smesh::geom_t              rx = (smesh::geom_t)g.r_inlet;
+            // The grading is captured with the rest: the warp places micro nodes by the
+            // generator's own map, so it has to be the SAME map. Warping an ungraded lattice
+            // onto a graded macro mesh would put every micro node on a chord of the graded
+            // nozzle, and the corner check inside the warp -- which matches against the graded
+            // plane positions -- would reject it.
+            nozzle_warp = [xb, rb, nx, rx, n_core, n_bore, n_outer, grade_r,
+                           grade_x](const std::shared_ptr<smesh::Mesh> &ss) {
+                return smesh::Mesh::warp_semistructured_hex8_nozzle(ss, xb, rb, nx, 3, rx, n_core, n_bore,
+                                                                    n_outer, 0.5, grade_r, grade_x);
+            };
+        }
+        if (mesh)
+            std::printf("nozzle: mesh core %td  bore rings %td  outer rings %td  axial %ld %ld %ld %ld\n",
+                        n_core, n_bore, n_outer, na[0], na[1], na[2], na[3]);
+    } else {
+        mesh = want_any_step ? smesh::Mesh::create_hex8_lshape(ctx->communicator(), nx, ny, nz, Lx, Ly, Lz,
+                                                               step_x, step_y)
+                             : smesh::Mesh::create_hex8_cube(ctx->communicator(), nx, ny, nz, 0, 0, 0, Lx, Ly, Lz);
+    }
+    if (!mesh) {
+        std::fprintf(stderr, "mesh generation failed\n");
+        return EXIT_FAILURE;
+    }
+
+    // Wall grading, before anything else touches the mesh.
+    //
+    // A separated shear layer at Re_h in the thousands has its action in two thin places --
+    // the wall layers and the lip -- and a uniform mesh spends its cells in the middle where
+    // nothing happens. SFEM_STEP_GRADE = 0, the default, is the uniform mesh bit for bit, so
+    // no existing run moves.
+    //
+    // There is no grading API in smesh and none is needed: the points buffer is writable and
+    // this is what create_wall_mounted_hump does to build its geometry. Three properties are
+    // required of the map and all three are why it is piecewise:
+    //
+    //   * y = 0, y = step_y and y = Ly must be fixed EXACTLY. The generator refuses a step
+    //     that is off a grid line, and a map that moved the lip off the node plane would
+    //     produce a mesh whose step corner is not a corner.
+    //   * it must stay rectilinear, so SFEM_GEOM=affine remains valid. A warped mesh forces
+    //     the isoparametric kernels and a slower operator for no gain here.
+    //   * it must be monotone, or elements invert.
+    //
+    // Clustering within [0, step_y] and within [step_y, Ly] separately gives all of that and
+    // clusters toward all three planes at once. The map is the standard symmetric tanh
+    // stretch, normalised so f(0)=0 and f(1)=1.
+    //
+    // It runs BEFORE SFC::reorder and before any sideset: sidesets select on face centroids
+    // of the current points, so moving points afterwards would change which faces a
+    // predicate would have chosen without changing the ones it already did.
+    const real_t step_grade = smesh::Env::read<real_t>("SFEM_STEP_GRADE", 0);
+    if (want_any_step && step_grade > real_t(0)) {
+        auto *const     py     = mesh->points()->data()[1];
+        const ptrdiff_t nn     = mesh->n_nodes();
+        const double    beta   = (double)step_grade;
+        const double    tanhb  = std::tanh(0.5 * beta);
+        auto            spread = [&](const double t) {
+            return 0.5 * (1.0 + std::tanh(beta * (t - 0.5)) / tanhb);
+        };
+        for (ptrdiff_t i = 0; i < nn; ++i) {
+            const double yv = (double)py[i];
+            double       a = 0, b = (double)step_y;
+            if (yv > (double)step_y) { a = (double)step_y; b = (double)Ly; }
+            if (b <= a) continue;
+            const double t = (yv - a) / (b - a);
+            py[i]          = (smesh::geom_t)(a + (b - a) * spread(t < 0 ? 0 : (t > 1 ? 1 : t)));
+        }
+        std::printf("mesh: y graded toward y=0, %g and %g (tanh beta %g)\n",
+                    (double)step_y, (double)Ly, beta);
+    }
+
+    // Space-fill the element and node order before anything derives indices from the mesh.
+    //
+    // The packed sweep works a pack of elements at a time and gathers their nodes into a
+    // pack-local buffer, so how many distinct nodes a pack touches -- and therefore how much
+    // of its gather is ghost traffic -- is decided entirely by the order the mesh is
+    // numbered in. Measured on the benchmark at 4,121,204 dof with 2048-element packs, a
+    // pack holds 2735 nodes space-filled and 4373 lexicographic, and the element sweep runs
+    // at 1483 against 1183 MDOF/s. This driver never did it, and its own scope reads well
+    // below what the benchmark measures for the same kernel; see the bench-to-solver section
+    // of docs/CVFEM_Throughput.md.
+    //
+    // It belongs here, before the sidesets below, because a Sideset stores (parent element,
+    // local face index) and renumbering the elements underneath one would silently re-point
+    // it at a different face. SFC::reorder can remap sidesets that already exist, but there
+    // are none yet at this point and not creating the problem beats fixing it.
+    //
+    // SFEM_SFC=0 restores the original order. It is not a physics switch: the discretisation
+    // is unchanged and only the summation order of the ghost reduction moves with it, so
+    // results shift at round-off and no further.
+    if (smesh::Env::read<int>("SFEM_SFC", 1)) {
+        auto sfc = smesh::SFC::create_from_env();
+        if (sfc) sfc->reorder(*mesh);
+    }
+
+    // Named sidesets, built once on the MACRO mesh and carried from there.
+    //
+    // These are the specification of the boundary; the per-element bitmask the kernels read
+    // is the compiled form of them. Building them here has three consequences worth stating.
+    //
+    // The outlet is named rather than found by a coordinate test. Selecting it by comparing
+    // corners against x = Lx was the same box-thinking that makes hex8_face_on_domain wrong
+    // on this geometry -- it happens to work because this outlet is a plane, and would not on
+    // one that is not.
+    //
+    // The Dirichlet set and the control-volume closure are then derived from the *same*
+    // objects rather than from two independent tests. cvfem_ns_channel_case.hpp documents the
+    // invariant that the two must decide the same thing, "and if they disagree a node gets a
+    // closed control volume without a boundary condition, or the reverse"; one source removes
+    // the possibility instead of testing for it.
+    //
+    // And they are level-invariant. Sideset stores (parent, lfi) on the macro element, which
+    // a semi-structured level change leaves untouched, so every multigrid level compiles its
+    // mask from these same sidesets instead of re-deriving the skin -- which cost an
+    // element-adjacency pass per level.
+    //
+    // SFEM_OUTLET=natural puts the same do-nothing outflow on a plain box. The step is an
+    // L-shape with an open outlet; when its multigrid cycle misbehaves, those two properties
+    // are confounded, and every clean diagnostic in this file was obtained on a box. This
+    // knob supplies the missing control -- a box that differs from the working Poiseuille
+    // case in the outlet treatment and nothing else -- and it is off by default, so no
+    // existing run changes.
+    // The nozzle's outlet is always the do-nothing outflow: there is no outlet profile to
+    // prescribe, since the jet has not finished decaying where the domain is cut.
+    //
+    // ONE READ, ONE NAME. SFEM_STEP_OUTFLOW was read here and again where the Dirichlet set
+    // is built, spelled `!= "dirichlet"` in both places -- so every value other than that one
+    // word meant "natural", including a typo, and including any third option added later.
+    // Reading it once and rejecting what it does not understand is what makes a third option
+    // possible at all.
+    //
+    //   natural      leave x = Lx unconstrained; the boundary sub-control-surface term
+    //                evaluates the flux from the interior state.
+    //   dirichlet    impose the fully-developed profile. Not their boundary condition, so a
+    //                number produced under it must be labelled as such.
+    //   convective   du/dt + U_c du/dn = 0, the advective condition of Orlanski (1976) as
+    //                used for incompressible flow by Sani and Gresho. Transient only, and
+    //                implemented below as a Dirichlet value refreshed once per step.
+    // ONE KNOB FOR THE OUTLET, on every case that has one. SFEM_OUTLET already took two of
+    // these three values and is the name job scripts and the verification matrix already pass,
+    // so it takes the third rather than a new name being invented beside it. SFEM_OUTFLOW_MODE
+    // is a different axis entirely -- donothing against extrapolate, WITHIN the natural
+    // treatment -- and the two must not be conflated.
+    //
+    // The default is per case and reproduces exactly what each case did before: the nozzle and
+    // the step open (there is no outlet profile to prescribe on either), everything else
+    // Dirichlet. SFEM_STEP_OUTFLOW is the step's old spelling, still honoured so recorded
+    // invocations keep working, and refused rather than silently overridden when both are set
+    // and disagree -- a run whose outlet treatment depends on which of two names won is the
+    // failure this consolidation exists to remove.
+    const std::string outlet_default = (want_nozzle || want_any_step) ? "natural" : "dirichlet";
+    std::string       outlet_mode    = smesh::Env::read_string("SFEM_OUTLET", outlet_default);
+    if (want_any_step) {
+        const std::string legacy = smesh::Env::read_string("SFEM_STEP_OUTFLOW", "");
+        if (!legacy.empty()) {
+            if (std::getenv("SFEM_OUTLET") && legacy != outlet_mode) {
+                std::fprintf(stderr,
+                             "SFEM_OUTLET='%s' and SFEM_STEP_OUTFLOW='%s' disagree; set one\n",
+                             outlet_mode.c_str(), legacy.c_str());
+                return EXIT_FAILURE;
+            }
+            outlet_mode = legacy;
+        }
+    }
+    if (outlet_mode != "natural" && outlet_mode != "dirichlet" && outlet_mode != "convective") {
+        std::fprintf(stderr, "invalid SFEM_OUTLET '%s' (expected natural, dirichlet or convective)\n",
+                     outlet_mode.c_str());
+        return EXIT_FAILURE;
+    }
+    // Both non-natural modes constrain the outlet velocity, so neither leaves the outflow
+    // open. The pressure gauge follows on its own: fixes_pressure_level() goes false and the
+    // zero-mean projection takes over, which is the treatment the closed cases already use.
+    const bool        want_convective_outflow = outlet_mode == "convective";
+    // OPEN, not traction-free. These are different questions and only one of them is about the
+    // boundary term.
+    //
+    // A convective outlet prescribes a velocity, so it is Dirichlet as far as the constraint
+    // machinery is concerned -- but it is still an OPEN end, and the two solver defaults below
+    // are properties of the flow leaving the domain rather than of the term the operator drops.
+    // Keying them on "is the outlet traction-free" instead would take omega back to 1 and
+    // re-enable the multiplicative sweep the moment the outlet became convective, so an A/B
+    // between the two outflow treatments would in fact be comparing two smoothers -- and by the
+    // table beside SFEM_VANKA_OMEGA below, comparing them at the setting that costs the nozzle
+    // 1,067 iterations against 502, and stalls core 4 outright.
+    const bool outlet_is_open = outlet_mode == "natural" || outlet_mode == "convective";
+    // Traction-free, which is narrower: only the do-nothing form drops (p I - tau).n, and that
+    // is what fixes the pressure gauge. The convective form must NOT drop it.
+    const bool want_natural_outlet = outlet_mode == "natural";
+    // A traction or pressure condition names one of these sidesets, so they have to exist
+    // whether or not the outlet is natural. Read here rather than where the operator is
+    // configured, several hundred lines below, because the sidesets are built now and a
+    // condition naming one that was never registered would fail for the wrong reason.
+    const std::string want_traction_sideset = smesh::Env::read_string("SFEM_TRACTION_SIDESET", "");
+    // The pump's port defaults to being the pressure boundary, because that is what a port
+    // is; naming SFEM_PRESSURE_SIDESET explicitly still wins.
+    const std::string want_pressure_sideset =
+            smesh::Env::read_string("SFEM_PRESSURE_SIDESET", want_pump ? "port" : "");
+    const bool        want_named_bc = !want_traction_sideset.empty() || !want_pressure_sideset.empty();
+    // A face carrying a traction or pressure condition must not also carry Dirichlet
+    // velocity data. It is the same invariant cvfem_ns_channel_case.hpp states for the
+    // boundary mask -- two channels deciding the same face -- and getting it wrong is
+    // silent in the worst way: the constraint wins, the condition is overridden, and the
+    // run prints that the port was applied while reporting the Dirichlet answer. Measured
+    // before this line existed, on 33,124 dofs: a port at p_bar = 1.5 on a Dirichlet-pinned
+    // outlet moved u_linf from 3.754076e-05 to 3.754095e-05, which is nothing at all.
+    //
+    // "outlet" is this driver's own name for the x = Lx plane, registered above from the
+    // same plane the `outlet` predicate tests, so matching on the name is the correct test
+    // here rather than a coincidence of naming.
+    // `outlet_is_open` rather than `want_natural_outlet`: a convective outlet carries its own
+    // velocity data, written by the time loop, so the general Dirichlet arm must leave it alone
+    // exactly as it leaves the traction-free one alone.
+    const bool outlet_governed = outlet_is_open || want_traction_sideset == "outlet" ||
+                                 want_pressure_sideset == "outlet";
+    // SFEM_DIAG_CSV names a file to write the flow diagnostics and the kinetic-energy budget
+    // to, one row per time step (one row total for a steady solve). Empty -- the default --
+    // means none of it runs and no existing number moves.
+    //
+    // It is read here rather than beside the other output knobs because the budget's boundary
+    // power is an integral over named sidesets, and the sidesets are built a few lines below.
+    const std::string diag_csv  = smesh::Env::read_string("SFEM_DIAG_CSV", "");
+    const bool        want_diag = !diag_csv.empty();
+
+    // The live step size and the one before it. Equal to SFEM_DT and 0 for a fixed-step run,
+    // which is every run that does not ask for adaptation.
+    real_t dt_now       = dt_step;
+    real_t dt_prev_step = 0;
+    // The step this iteration is actually taking, and the clock that accumulates it. Both
+    // exist because dt_now moves: t = n*dt is only the time when every step was the same
+    // size, and a run that adapts and still reports n*dt labels its frames with instants it
+    // never visited.
+    real_t dt_taken     = dt_step;
+    real_t t_run        = 0;
+    if (cfl_target > real_t(0) && !want_diag) {
+        std::fprintf(stderr, "SFEM_CFL_TARGET needs SFEM_DIAG_CSV: the CFL number it steers on "
+                             "is measured by the flow diagnostics, and adapting on a number "
+                             "nothing computed would just be a fixed step with extra steps.\n");
+        return EXIT_FAILURE;
+    }
+
+    std::shared_ptr<smesh::Sideset> step_skin, step_outlet, step_inlet;
+    // Kept so they survive to_semistructured, which builds a new Mesh and copies none.
+    std::shared_ptr<smesh::Sideset> pump_skin, pump_port, pump_diaphragm;
+    if (!want_pump && (want_any_step || outlet_is_open || want_named_bc || want_diag)) {
+        step_skin = smesh::skin_sideset(mesh);
+        // The nozzle's outlet is the plane x = x_out, not x = Lx: its bounding box starts at
+        // x_in < 0. Its two ends are the only planes it has, so a plane selector is exact there.
+        const smesh::geom_t x_outlet = (smesh::geom_t)(want_nozzle ? nozzle.x_out : Lx);
+        auto outs = smesh::Sideset::create_from_plane(mesh, 1, 0, 0, x_outlet, 1e-6);
+        if (!step_skin || outs.empty()) {
+            std::fprintf(stderr, "could not build the boundary sidesets\n");
+            return EXIT_FAILURE;
+        }
+        step_outlet = outs.front();
+        if (want_nozzle) {
+            // Named so the inflow nodes and the inflow flux both come from this one set of
+            // faces rather than from a coordinate test on nodes.
+            auto ins = smesh::Sideset::create_from_plane(mesh, 1, 0, 0, (smesh::geom_t)nozzle.x_in, 1e-6);
+            if (ins.empty()) {
+                std::fprintf(stderr, "nozzle: could not build the inlet sideset\n");
+                return EXIT_FAILURE;
+            }
+            // Held in step_inlet so the re-attachment after to_semistructured carries it too.
+            step_inlet = ins.front();
+            mesh->add_sideset("inlet", step_inlet);
+            std::printf("sidesets: inlet %td faces\n", (ptrdiff_t)step_inlet->parent()->size());
+        }
+        // Register them on the flat mesh as well, so a run at refine_level 1 -- which never
+        // reaches the re-attachment below, because it does not rebuild the mesh -- still has
+        // the named sidesets the operator asks for.
+        mesh->add_sideset("skin", step_skin);
+        mesh->add_sideset("outlet", step_outlet);
+        std::printf("sidesets: skin %td faces, outlet %td faces\n",
+                    (ptrdiff_t)step_skin->parent()->size(), (ptrdiff_t)step_outlet->parent()->size());
+        // The inlet plane, for the energy budget's P_in. The nozzle already built its own
+        // above, at x = x_in rather than x = 0. A named sideset nothing refers to is inert --
+        // the operator compiles a mask only for the sidesets it is handed as a traction,
+        // pressure or natural-outflow surface -- so registering this costs nothing to a run
+        // that is not measuring a budget.
+        if (!want_nozzle) {
+            auto ins = smesh::Sideset::create_from_plane(mesh, 1, 0, 0, (smesh::geom_t)0, 1e-6);
+            if (!ins.empty() && ins.front()) {
+                step_inlet = ins.front();
+                mesh->add_sideset("inlet", step_inlet);
+                std::printf("sidesets: inlet %td faces\n", (ptrdiff_t)step_inlet->parent()->size());
+            }
+        }
+        // NOT widened to want_diag. This changes what the operator computes, and asking for a
+        // diagnostic must not change the thing being diagnosed.
+        if (want_any_step || outlet_is_open || want_named_bc) setenv("SFEM_BOUNDARY_MASK", "1", 0);
+    }
+
+    // The pump's two openings, both derived from the SAME coordinate predicates the
+    // Dirichlet set below uses. That is the point of building them here rather than from a
+    // plane: cvfem_ns_channel_case.hpp states the invariant that the boundary marking and
+    // the constraint set must decide the same faces, and deriving both from one predicate
+    // removes the possibility of disagreement instead of testing for it.
+    //
+    // The port is a patch and not a whole face, so create_from_plane cannot express it;
+    // create_from_selector takes the predicate directly.
+    const real_t pump_port_frac = smesh::Env::read<real_t>("SFEM_PUMP_PORT", real_t(0.5));
+    if (want_pump) {
+        auto skin = smesh::skin_sideset(mesh);
+        auto port = smesh::Sideset::create_from_selector(
+                mesh, [&](const smesh::geom_t x, const smesh::geom_t y, const smesh::geom_t z) {
+                    return cvfem_case::pump_on_port<real_t>((real_t)x, (real_t)y, (real_t)z, Lx, Ly, Lz,
+                                                            pump_port_frac);
+                });
+        if (!skin || port.empty()) {
+            std::fprintf(stderr, "pump: could not build the chamber sidesets\n");
+            return EXIT_FAILURE;
+        }
+        auto diaphragm = smesh::Sideset::create_from_selector(
+                mesh, [&](const smesh::geom_t /*x*/, const smesh::geom_t y, const smesh::geom_t /*z*/) {
+                    return cvfem_case::pump_on_diaphragm<real_t>((real_t)y, Ly);
+                });
+        if (diaphragm.empty()) {
+            std::fprintf(stderr, "pump: could not build the diaphragm sideset\n");
+            return EXIT_FAILURE;
+        }
+        pump_skin      = skin;
+        pump_port      = port.front();
+        pump_diaphragm = diaphragm.front();
+        mesh->add_sideset("skin", skin);
+        mesh->add_sideset("port", port.front());
+        // Named only so the flux through it can be measured; no boundary condition reads it,
+        // because the diaphragm is Dirichlet and lives in the constraint set.
+        mesh->add_sideset("diaphragm", diaphragm.front());
+        const ptrdiff_t n_port = (ptrdiff_t)port.front()->parent()->size();
+        // A port of no faces is a closed chamber with a moving wall pushing into an
+        // incompressible fluid, which has no solution. Say so here rather than let the
+        // linear solver discover it.
+        if (n_port == 0) {
+            std::fprintf(stderr,
+                         "pump: SFEM_PUMP_PORT=%g selected no faces at this resolution -- the "
+                         "chamber has no opening and the problem is unsolvable. Raise it, or "
+                         "raise SFEM_N.\n",
+                         (double)pump_port_frac);
+            return EXIT_FAILURE;
+        }
+        std::printf("pump: chamber %gx%gx%g  diaphragm area %g  port %td faces (frac %g)\n",
+                    (double)Lx, (double)Ly, (double)Lz, (double)(Lx * Lz), n_port,
+                    (double)pump_port_frac);
+        // The port is where the fluid leaves, so it carries the pressure and must not also
+        // carry velocity data; the diaphragm carries velocity and must not carry pressure.
+        // Both are set by name below.
+        setenv("SFEM_BOUNDARY_MASK", "1", 0);
+    }
+    // SFEM_ELEMENT_REFINE_LEVEL > 1 turns the mesh semi-structured: the cells above become
+    // macro-elements, each holding a level^3 lattice, and the operator switches to the
+    // sshex8 kernels on its own from what the space carries. The requested cell counts then
+    // describe macro-elements, so the problem is level^3 times larger than the flat run of
+    // the same SFEM_N -- which is the point, but worth knowing when comparing.
+    const int refine_level = smesh::Env::read<int>("SFEM_ELEMENT_REFINE_LEVEL", 1);
+    if (refine_level > 1) {
+        mesh = smesh::to_semistructured(refine_level, mesh, true, false);
+        // On by default, because the chords are the approximation and the nozzle is the geometry:
+        // macro core 2 at level 4 is then the core-8 nozzle, with the hierarchy depth of core 2.
+        // SFEM_NOZZLE_WARP=0 keeps the chords, for A/B against that.
+        if (mesh && nozzle_warp && smesh::Env::read<int>("SFEM_NOZZLE_WARP", 1)) {
+            if (nozzle_warp(mesh) != SMESH_SUCCESS) {
+                std::fprintf(stderr, "nozzle: warping the level-%d lattice onto the nozzle failed\n", refine_level);
+                return EXIT_FAILURE;
+            }
+            std::printf("nozzle: micro nodes warped onto the nozzle (level %d)\n", refine_level);
+        }
+        // to_semistructured builds a new Mesh and does not copy sidesets. The macro elements
+        // are the same and (parent, lfi) refers to them, so re-attaching is exact rather than
+        // a re-derivation.
+        if (mesh && step_skin) {
+            mesh->add_sideset("skin", step_skin);
+            mesh->add_sideset("outlet", step_outlet);
+            if (step_inlet) mesh->add_sideset("inlet", step_inlet);
+        }
+        // The pump's, for the same reason. (parent, lfi) addresses the MACRO element, which
+        // the conversion leaves alone, so re-attaching is exact and not a re-derivation --
+        // and it is what lets one coordinate predicate keep governing a mesh whose nodes it
+        // was never evaluated on.
+        if (mesh && pump_port) {
+            mesh->add_sideset("skin", pump_skin);
+            mesh->add_sideset("port", pump_port);
+            mesh->add_sideset("diaphragm", pump_diaphragm);
+        }
+        if (!mesh) {
+            std::fprintf(stderr, "to_semistructured failed for level %d\n", refine_level);
+            return EXIT_FAILURE;
+        }
+    }
+    auto fs   = sfem::FunctionSpace::create(mesh, N_FIELDS);
+    auto f    = sfem::Function::create(fs);
+
+    auto op  = std::make_shared<sfem::CVFEMNavierStokes>(fs);
+    real_t upwind_eps_ref = 0;
+    // Harten band for the upwind switch, expressed relatively so it does not depend on the
+    // mesh or the units.
+    //
+    // The band has to be compared against a mass flux, so it is scaled by one: rho times a
+    // velocity scale times a fine-cell face area. SFEM_UPWIND_EPS_REL is the fraction of that
+    // flux inside which the upwind switch is rounded off; 0, the default, is the hard switch
+    // and reproduces every existing result bit for bit. SFEM_UPWIND_EPS overrides with an
+    // absolute value for when a specific band is wanted.
+    {
+        const int    Lref_u = std::max(1, refine_level);
+        const real_t h_u    = std::min({Lx / (real_t)(nx * Lref_u), Ly / (real_t)(ny * Lref_u),
+                                        Lz / (real_t)(nz * Lref_u)});
+        const real_t rel_u  = smesh::Env::read<real_t>("SFEM_UPWIND_EPS_REL", real_t(0));
+        const real_t abs_u  = smesh::Env::read<real_t>("SFEM_UPWIND_EPS", real_t(-1));
+        // One power of h below the physical flux scale, which is what makes the band a
+        // discriminator rather than a perturbation.
+        //
+        // A sub-control-surface flux in a real flow is of order rho * U * h^2. Sizing the
+        // band at that order -- which is what rho*U*h^2 did -- swamps genuine fluxes instead
+        // of separating them from noise, and it does not vanish under refinement relative to
+        // the thing it is being compared against. Venkatakrishnan's eps^2 = (K dx)^3 is the
+        // same idea for a limiter: in smooth regions the differences are O(dx) so eps^2 is
+        // an order smaller and the limiter stays active, while in the near-constant regions
+        // -- where the quantity has collapsed to noise -- eps^2 dominates and the switch
+        // turns off. Here that means eps / (rho U h^2) = K h / L, going to zero with the
+        // mesh, so the band separates a flux that is physically small from one that is
+        // merely round-off.
+        const real_t L_ref = std::max({Lx, Ly, Lz});
+        upwind_eps_ref = (abs_u >= 0) ? abs_u : rel_u * rho * U * h_u * h_u * h_u / L_ref;
+        if (upwind_eps_ref > 0)
+            std::printf("upwind switch: band eps = %.6e (K %g, rho %g, U %g, h %g)%s\n",
+                        (double)upwind_eps_ref, (double)rel_u, (double)rho, (double)U, (double)h_u,
+                        smesh::Env::read<int>("SFEM_UPWIND_ADAPT", 0) ? "  [adaptive]" : "");
+        if (!smesh::Env::read<int>("SFEM_UPWIND_ADAPT", 0)) op->upwind_eps = upwind_eps_ref;
+    }
+    op->rho  = rho;
+    op->mu   = mu;
+    op->geom = (geom_name == "isoparam") ? sfem::CVFEMGeometry::Isoparam : sfem::CVFEMGeometry::Affine;
+    op->pack_size = pack_size;
+    // Two ways to leave an outlet open, and they are different boundary conditions.
+    //
+    //   donothing   (default) drop (p I - tau).n on the outlet face. This imposes a
+    //               traction-free condition, which is the natural condition the weak form
+    //               produces, and it is what the Farrell/Mitchell/Wechsung step is specified
+    //               with. Dropping p_i*a is also what fixes the pressure level, so no gauge
+    //               is applied.
+    //   extrapolate keep the face as an ordinary closed boundary face evaluated from the
+    //               interior state, while leaving the velocity unconstrained -- a
+    //               zero-gradient outflow. It imposes nothing on the traction, so the
+    //               constant-pressure mode returns and the zero-mean gauge takes over.
+    //
+    // The two are not related by a pressure shift: the retained term carries the local p_i,
+    // not a constant, so the velocity fields genuinely differ near the outlet. The reason to
+    // have both is that the extrapolation form gives the outflow momentum diagonal a viscous
+    // contribution that the do-nothing form has no source for, and it is the absence of that
+    // contribution that the Vanka patch solve degenerates on.
+    const std::string outflow_mode =
+            smesh::Env::read_string("SFEM_OUTFLOW_MODE", std::string("donothing"));
+    // An open outlet switches the Vanka sweep to the additive form.
+    //
+    // The multiplicative 8-colour sweep is the better smoother on a closed box -- the
+    // measurements recorded in this file give it 0.63 at omega = 1 against the additive
+    // form's 0.883 -- and that ranking reverses once the outlet opens. Brandt's regime
+    // diagnostic (SFEM_GMG_CHECK=7) localises it: on the backward-facing step the
+    // multiplicative sweep decays error healthily through the whole upstream half, including
+    // the recirculation bubble, and then amplifies it through the last third of the channel,
+    // reaching a local rate of 1.99 at the outlet plane. The additive sweep is convergent
+    // everywhere on the same problem, worst local rate 1.0013.
+    //
+    // The mechanism is ordering. A multiplicative sweep propagates information in colour
+    // order, which roughly follows the characteristics where the flow is unidirectional --
+    // which is why it wins on a box. At an outlet with more than half its faces reversed (24
+    // of 45 on this case) colour order and characteristic direction disagree and the sweep
+    // carries error against the flow. The additive form has no ordering to get wrong.
+    //
+    // Recorded honestly: this is a smoother measurement. Applied as a solver on the box with
+    // an open outlet the additive V-cycle is *worse* -- diverging about 20x per cycle against
+    // the multiplicative one's 7.3x -- so a locally convergent smoother is not by itself
+    // buying a convergent cycle here, and that tension is unresolved.
+    //
+    // The gate matters in both directions, and cost is not the reason for it. Measured on
+    // closed domains -- the side that keeps the multiplicative sweep -- everything else equal:
+    //
+    //     Poiseuille  5,508 dof   mult  Re 3200 reached,    25 its,   0.233 s, sweep 0.263 ms
+    //                             add   Re 0,            12000 its,  67.6 s,   sweep 0.090 ms
+    //     cavity     19,652 dof   mult  Re 50 reached,     100 its,   1.53 s,  sweep 0.554 ms
+    //                             add   Re 0,            12000 its, 101.8 s,   sweep 0.157 ms
+    //
+    // The additive sweep is about three times cheaper per call and still loses by two orders
+    // of magnitude in time to solution, needing 480 times the iterations and converging on
+    // neither case. Per-sweep cost is the wrong figure of merit; only its product with the
+    // iteration count decides anything.
+    //
+    // So this is not a cheap-versus-expensive trade with a happy side benefit. Each variant
+    // is unusable where the other belongs -- multiplicative diverges at an open outlet,
+    // additive cannot solve a closed domain -- which is why the choice is gated on the
+    // geometry rather than offered as a tuning knob.
+    //
+    // An explicit SFEM_VANKA_MULT still wins: setenv's overwrite flag is 0.
+    //
+    // Measured again as a PRECONDITIONER, which is how the sweep is used, the gate belongs to
+    // the standalone Vanka preconditioner only. Inside a V-cycle the open outlet keeps the
+    // multiplicative sweep like every other case. FGMRES (restart 480), semi-structured, same
+    // build for both sweeps:
+    //
+    //     step      7,060 dof, L 2, Re 20, 24 of 45 outlet nodes reversed
+    //                 multigrid  mult    239 its   1.64 s     add  2,621 its  16.7 s
+    //                 Vanka      mult  1,055 its   0.94 s     add  1,551 its   1.07 s
+    //     box      10,692 dof, do-nothing outlet, N 2 L 4
+    //                 multigrid  mult  35/8/8 per Newton step   add  1000 (cap) every step, no convergence
+    //     nozzle   Re 1, macro core 2
+    //                 multigrid  L 2  15,740 dof  mult  5 Newton, 1,167 its    add  line search failed
+    //                 multigrid  L 4 116,212 dof  mult  4 Newton, 1,067 its    add  stalled
+    //                 Vanka      L 2  15,740 dof  mult 14 Newton, 13,253 its   add  5 Newton, 3,518 its
+    //                 Vanka      macro core 4, L 2, 116,212 dof: mult line search failed, add converged
+    //
+    // So the localised rate above is real for the sweep on its own, and a V-cycle's coarse
+    // correction removes what it leaves. A build from before the block apply got its boundary
+    // masks gives the same 239 on the step, so this was not something the masks fixed: the gate
+    // applied to multigrid cost the step a factor of ten from the start, and on the box and the
+    // core 2 nozzle it was the whole of the "multigrid fails at an open outlet" failure.
+    if (outlet_is_open && use_gmg != 1) setenv("SFEM_VANKA_MULT", "0", 0);
+
+    // And inside a V-cycle an open outlet gets the smoother damped to 0.5 by default, because
+    // undamped it can diverge there outright. Measured on the nozzle at macro core 4, level 2
+    // (58,780 dof): the cycle's own Vanka as a stationary iteration contracts for four sweeps and
+    // then grows 2.09x per sweep (additive 3.60x), worst local rate 7.1 on the centreline at x
+    // 0.153, next to the outlet at 0.16 -- while core 2, which multigrid solved, stays at or
+    // below 1. Eight smoothing steps instead of three made the cycle worse (0.997 after 300 its
+    // against 0.83), and neither the element-wise nor the exact Galerkin coarse operator helped,
+    // so it was the smoother and not the coarse space. FGMRES (restart 480) + multigrid, Re 1:
+    //
+    //     nozzle core 2, L 2   15,740 dof   omega 1  5 Newton, 1,167 its  5.7 s   0.5  343 its  1.5 s
+    //     nozzle core 2, L 4  116,212 dof   omega 1  4 Newton, 1,067 its 26.5 s   0.5  502 its 10.9 s
+    //     nozzle core 4, L 2   58,780 dof   omega 1  stalls, 0.964 after 300 its  0.5  5 Newton, 1,203 its
+    //     step, L 2, Re 20      7,060 dof   omega 1  239 its                      0.5  269 its
+    //     box N 2, L 4         10,692 dof   omega 1  51 its                       0.5  66 its
+    //
+    // Same stations wherever both converge. The closed domains keep omega = 1 (see smoother_omega:
+    // 0.5 costs the closed Poiseuille regression a factor of ten), and the standalone Vanka
+    // preconditioner keeps it too, since 0.5 has not been measured there. An explicit
+    // SFEM_VANKA_OMEGA still wins.
+    if (outlet_is_open && use_gmg == 1) setenv("SFEM_VANKA_OMEGA", "0.5", 0);
+    if (want_natural_outlet && outflow_mode == "donothing") {
+        // Do-nothing outflow at x = Lx. This drops (p I - tau).n there, which is what fixes
+        // the pressure gauge -- so the pin must come off with it, or the system is
+        // over-determined.
+        op->natural_outflow_sideset = "outlet";
+    }
+
+    // Value-carrying boundary conditions, named by sideset. Both are off unless named, so
+    // every existing case and every recorded number is untouched.
+    //
+    //   SFEM_TRACTION_SIDESET=<name> SFEM_TRACTION="tx ty tz"
+    //       (pI - tau).n = t there. Those faces become natural, so a zero t is a second
+    //       do-nothing outflow and a non-zero one is a surface being pushed -- which is
+    //       what a diaphragm looks like when it is driven by force rather than motion.
+    //   SFEM_PRESSURE_SIDESET=<name> SFEM_PRESSURE=<p>
+    //       p = p there, with the viscous traction still from the interior state: a port
+    //       held at a pressure.
+    //
+    //       A continuation on the prescribed value exists and is OFF by default, because
+    //       measurement says it is not needed: with any working preconditioner the cases
+    //       that used to fail here converge without it, and it costs about 8 percent in
+    //       linear iterations. SFEM_P_STAGES=<n> turns the ramp on with n steps, in lockstep
+    //       with the Reynolds ramp; SFEM_P_PREDICT=1 additionally shifts the whole pressure
+    //       field by the change in the prescribed value, which for a velocity-driven case
+    //       with a single port is an exact predictor. Reach for them when a port case really
+    //       does resist -- two ports at different pressures would be the honest candidate --
+    //       not as a substitute for a preconditioner that can solve the problem.
+    //
+    // The sideset must already exist on the mesh under that name. Both need
+    // SFEM_BOUNDARY_MASK=1, and the operator refuses rather than proceeding without it.
+    op->traction_sideset = want_traction_sideset;
+    if (!op->traction_sideset.empty()) {
+        const std::string t = smesh::Env::read_string("SFEM_TRACTION", "0 0 0");
+        if (std::sscanf(t.c_str(), "%lf %lf %lf", &op->traction[0], &op->traction[1], &op->traction[2]) != 3) {
+            std::fprintf(stderr, "SFEM_TRACTION must be three numbers, got '%s'\n", t.c_str());
+            return EXIT_FAILURE;
+        }
+    }
+    op->pressure_sideset = want_pressure_sideset;
+    if (!op->pressure_sideset.empty())
+        op->pressure_value = smesh::Env::read<real_t>("SFEM_PRESSURE", real_t(0));
+    if (op->initialize() != SFEM_SUCCESS) return EXIT_FAILURE;
+
+    // Checked here rather than assumed, and checked AFTER initialize() because that is what
+    // renumbers the nodes for the packed layout.
+    //
+    // The scoped apply paths index per-block element ranges directly, so they require the
+    // block layout to be [owned-not-shared | shared | aura] with n_elements == owned+ghosts.
+    // A mesh that does not satisfy it produces no error of its own: the ranges simply address
+    // the wrong elements. This is the library's own predicate rather than a second opinion --
+    // sfem_ParallelMatrixFreeOperator calls it for the same reason -- and it returns
+    // immediately on a serial mesh, so it costs a branch here.
+    sfem::assert_mesh_supports_distributed_element_scopes(*mesh);
+    // The Newton loop below evaluates the residual immediately after every step and
+    // before the linear solve, which is the condition this option asks for: the nodal
+    // pressure gradient is then current for the whole Krylov sweep and need not be
+    // rebuilt on each of its hundreds of applies. SFEM_PGRAD_CACHE=0 turns it off.
+    const int pgrad_cache = smesh::Env::read<int>("SFEM_PGRAD_CACHE", 1);
+    op->set_option("cache_nodal_pgrad", pgrad_cache != 0);
+    f->add_operator(op);
+
+    const ptrdiff_t     nnodes = mesh->n_nodes();
+    const ptrdiff_t     ndof   = nnodes * N_FIELDS;
+
+    // mesh->n_nodes() is the LOCAL count on a distributed mesh -- owned plus ghosts plus
+    // aura -- so nnodes and ndof above already mean "local", and every existing use of them
+    // is an allocation or an index, which is what local is for. What is missing is the other
+    // half: a reduction has to run over the OWNED range, or every shared, ghost and aura
+    // entry is counted once per rank that holds it.
+    //
+    // Measured on the cavity at N=2 over two ranks: the ranks report 27 and 18 local nodes
+    // against a serial 27, and each prints its own coordinate checksum -- 13.5/13.5/13.5 and
+    // 9/9/13.5. Neither is the mesh's checksum and summing them is not either.
+    //
+    // Only the setup-stage quantities are converted here. The solve path -- the Krylov
+    // workspace, the Newton tests, the gauge -- is a hundred-odd further uses and belongs to
+    // the stages that make those reductions collective; splitting them here would be a large
+    // unverifiable diff and would put the byte-compared serial results at risk for no gain.
+    //
+    // At one rank n_owned_nodes == nnodes and every loop below is unchanged.
+    cvfem::Domain domain;
+    domain.comm                     = ctx->communicator();
+    // The node count comes from the mesh and the dof count from the function space, because
+    // they are different quantities and each has an owner. FunctionSpace already derives the
+    // owned dof count from the same Distributed metadata -- initialize_dof_counts() computes
+    // nowned = n_nodes_owned * block_size, and collapses all three counts to n_nodes() * bs on
+    // a serial mesh -- so multiplying the node count by N_FIELDS here would be a second way to
+    // reach a number the space already publishes. The space is created with block_size
+    // N_FIELDS, so the two agree by construction.
+    const ptrdiff_t n_owned_nodes   = mesh->is_distributed() ? mesh->distributed()->n_nodes_owned() : nnodes;
+    const ptrdiff_t ndof_owned      = f->space()->n_owned_dofs();
+    domain.n_owned                  = ndof_owned;
+    domain.n_local                  = ndof;
+    std::vector<real_t> p_exact;
+    ptrdiff_t           pin_node = 0;  // pressure pin, needed again by the MMS diagnostics
+    // The pressure level the initial state already carries ON THE PORT. A prescribed pressure
+    // is a level, and the state has one of its own: the seed is the case's analytic pressure,
+    // whose value at the port is whatever drop the flow produces by itself (-0.16 for the
+    // 4x1x1 Poiseuille channel). The distance between the two is what makes a port case hard,
+    // not the prescribed value, so it has to be measured rather than assumed to be zero.
+    real_t p_seed_port = 0;
+    double mesh_coord_checksum = 0;
+    std::shared_ptr<sfem::DirichletConditions> dirichlet;
+    // Which entries of uvw_nodes below are the convective outflow's, so the time loop can
+    // rewrite those values and only those. Recorded as an index into uvw_nodes rather than
+    // as a second node list, because the time loop writes into the Condition's values buffer
+    // and that buffer is in uvw_nodes order -- a parallel list would have to be matched back
+    // to it every step, which is the kind of second path that desynchronises. The two
+    // vectors are filled together and are the same length. Declared out here because the
+    // constraint set is built in a block and the time loop is several hundred lines below it.
+    std::vector<size_t>    conv_slot;
+    std::vector<ptrdiff_t> conv_node;
+    // The nozzle's wall and inflow nodes, per node in the operator's numbering. Built with the
+    // constraints below and kept, because the wall-pressure profile reads the same wall.
+    std::vector<char> nozzle_inlet_node, nozzle_wall_node, nozzle_outlet_node;
+
+    // Built after op->initialize(), and that order is required rather than incidental:
+    // initialize() renumbers the mesh nodes for the packed layout, so node indices taken
+    // before it would refer to the old numbering.
+    //
+    // Boundary conditions, node by node, matching mark_constraints in the standalone
+    // driver: no-slip and inlet/outlet fix all three velocity components to the exact
+    // profile, the spanwise planes fix uz alone, and the pressure gets a single pin
+    // because the continuity equations only determine it up to a constant.
+    {
+        const auto *const px = mesh->points()->data()[0];
+        const auto *const py = mesh->points()->data()[1];
+        const auto *const pz = mesh->points()->data()[2];
+
+        {
+            // Checksum the mesh coordinates. p_exact is a serial function of these, so if
+            // it varies between runs, they do. It doubles as the restart's identity guard.
+            // Over the OWNED nodes, then reduced. Summing to nnodes would add every ghost and
+            // aura node once per rank holding it; measured at two ranks on the N=2 cavity, the
+            // two ranks produced 13.5/13.5/13.5 and 9/9/13.5 and neither was the mesh's.
+            //
+            // This stays a guard against the NUMBERING changing between runs at the same rank
+            // count, which is what a restart needs and what the comment above describes. It is
+            // deliberately not offered as a value that matches across rank counts: floating
+            // point addition does not associate, so a four-way partial-sum tree and a
+            // sequential sum need not agree in the last bits even when both are correct.
+            // The gate compares integer counts for that reason.
+            //
+            // n_owned_nodes == nnodes at one rank, so the loop and the sum are unchanged.
+            long double cx = 0, cy = 0, cz = 0;
+            for (ptrdiff_t i = 0; i < n_owned_nodes; ++i) {
+                cx += (long double)px[i];
+                cy += (long double)py[i];
+                cz += (long double)pz[i];
+            }
+            const double gcx = cvfem::sum_kahan(domain, cx);
+            const double gcy = cvfem::sum_kahan(domain, cy);
+            const double gcz = cvfem::sum_kahan(domain, cz);
+            // One line per run, not one per rank: a full node would otherwise print this 288
+            // times. is_root() is true at one rank, so serial output is unchanged.
+            if (domain.is_root())
+                std::printf("mesh coords checksum: %.17g %.17g %.17g\n", gcx, gcy, gcz);
+            // Kept, because it is exactly the guard a restart needs. Reading a state back
+            // into a different node numbering is silent: every array is the right LENGTH, so
+            // nothing fails, and the run continues from a scrambled field. SFC::reorder and
+            // op->initialize() both renumber, so the numbering is a function of the mesh, the
+            // resolution and a handful of environment variables -- and this sum over the
+            // coordinates in node order changes if any of them do.
+            mesh_coord_checksum = gcx + gcy + gcz;
+        }
+
+        const bool step_outflow_natural = outlet_mode == "natural";
+
+        // Which nodes lie on the domain skin. Topological, so the step faces are included.
+        std::vector<char> skin_node((size_t)nnodes, 0);
+        if (flow == cvfem_case::FlowCase::Step || flow == cvfem_case::FlowCase::StepTurb) {
+            auto skin = smesh::skin_sideset(mesh);
+            if (!skin) {
+                std::fprintf(stderr, "step: skin_sideset failed\n");
+                return EXIT_FAILURE;
+            }
+            auto ns = smesh::create_nodeset_from_sideset(mesh, skin);
+            if (!ns) {
+                std::fprintf(stderr, "step: create_nodeset_from_sideset failed\n");
+                return EXIT_FAILURE;
+            }
+            for (ptrdiff_t k = 0; k < ns->size(); ++k) skin_node[(size_t)ns->data()[k]] = 1;
+            ptrdiff_t n_skin = 0;
+            for (auto c : skin_node) n_skin += c;
+            std::printf("step: skin nodes %td of %td\n", n_skin, nnodes);
+        }
+
+        // The nozzle's walls are the skin minus its two ends, taken face by face, so that the
+        // curved bore, the cone and the expansion annulus are walls without any of them being
+        // described. Nodes are then no-slip if they touch a wall face, inflow if they touch the
+        // inlet and no wall, and free otherwise -- which leaves the outlet disc free and puts
+        // its RIM on the wall. The rim matters: the pump measured a free rim carrying a fifth of
+        // the flux out through the wall faces beside it.
+        if (flow == cvfem_case::FlowCase::Nozzle) {
+            auto skin    = smesh::skin_sideset(mesh);
+            auto inlets  = mesh->sidesets("inlet");
+            auto outlets = mesh->sidesets("outlet");
+            if (!skin || inlets.empty() || outlets.empty()) {
+                std::fprintf(stderr, "nozzle: missing the skin, inlet or outlet sideset\n");
+                return EXIT_FAILURE;
+            }
+            const ptrdiff_t   ne = mesh->n_elements(0);
+            std::vector<char> end_face((size_t)ne * 6, 0);
+            for (const auto &ss : {inlets.front(), outlets.front()})
+                for (ptrdiff_t k = 0; k < ss->parent()->size(); ++k)
+                    end_face[(size_t)ss->parent()->data()[k] * 6 + (size_t)ss->lfi()->data()[k]] = 1;
+            std::vector<smesh::element_idx_t> wall_parent;
+            std::vector<smesh::i16>           wall_lfi;
+            for (ptrdiff_t k = 0; k < skin->parent()->size(); ++k) {
+                const auto e = skin->parent()->data()[k];
+                const auto l = skin->lfi()->data()[k];
+                if (end_face[(size_t)e * 6 + (size_t)l]) continue;
+                wall_parent.push_back(e);
+                wall_lfi.push_back(l);
+            }
+            auto wp = smesh::create_host_buffer<smesh::element_idx_t>(wall_parent.size());
+            auto wl = smesh::create_host_buffer<smesh::i16>(wall_lfi.size());
+            std::copy(wall_parent.begin(), wall_parent.end(), wp->data());
+            std::copy(wall_lfi.begin(), wall_lfi.end(), wl->data());
+            auto wall = smesh::Sideset::create(skin->comm(), wp, wl);
+
+            auto flag = [&](const std::shared_ptr<smesh::Sideset> &ss, std::vector<char> &out) {
+                out.assign((size_t)nnodes, 0);
+                auto ns = smesh::create_nodeset_from_sideset(mesh, ss);
+                if (!ns) return false;
+                for (ptrdiff_t k = 0; k < ns->size(); ++k) out[(size_t)ns->data()[k]] = 1;
+                return true;
+            };
+            if (!flag(inlets.front(), nozzle_inlet_node) || !flag(wall, nozzle_wall_node) ||
+                !flag(outlets.front(), nozzle_outlet_node)) {
+                std::fprintf(stderr, "nozzle: create_nodeset_from_sideset failed\n");
+                return EXIT_FAILURE;
+            }
+            ptrdiff_t n_in = 0, n_wall = 0;
+            for (ptrdiff_t i = 0; i < nnodes; ++i) {
+                n_wall += nozzle_wall_node[(size_t)i];
+                n_in += nozzle_inlet_node[(size_t)i] && !nozzle_wall_node[(size_t)i];
+            }
+            std::printf("nozzle: wall faces %td  wall nodes %td  inflow nodes %td (rim excluded)\n",
+                        (ptrdiff_t)wall_parent.size(), n_wall, n_in);
+        }
+
+        std::vector<idx_t>  uvw_nodes, uz_nodes;
+        std::vector<real_t> uvw_ux, uvw_uy, uvw_uz, uz_vals;
+        // Smith-Hutton constrains u and v at EVERY node -- that is what turns the z-momentum
+        // equation into the benchmark's scalar transport -- and phi (= w) only on the boundary
+        // minus the outlet. Two components at interior nodes is a shape none of the other
+        // cases needs, hence its own lists rather than a flag on uvw_nodes.
+        std::vector<idx_t>  sh_uv_nodes, sh_w_nodes;
+        std::vector<real_t> sh_u_vals, sh_v_vals, sh_w_vals, sh_p_vals;
+        // Which entries of uvw_nodes are the convective outflow's, so the time loop can
+        // rewrite those values and only those. Recorded as an index into uvw_nodes rather
+        // than as a second node list, because the time loop writes into the Condition's
+        // values buffer and that buffer is in uvw_nodes order -- a parallel list would have
+        // to be matched back to it every step, which is the kind of second path that
+        // desynchronises. The two vectors are filled together and are the same length.
+
+        p_exact.assign((size_t)nnodes, real_t(0));
+        ptrdiff_t          &pin  = pin_node;
+        real_t              best = 1e300;
+
+        for (ptrdiff_t i = 0; i < nnodes; ++i) {
+            const real_t x = (real_t)px[i], y = (real_t)py[i], z = (real_t)pz[i];
+            if (x + y + z < best) {
+                best = x + y + z;
+                pin  = i;
+            }
+
+            real_t ux, uy, uz, p;
+            cvfem_case::exact_state(flow, mu, U, Lx, Ly, x, y, z, ux, uy, uz, p);
+            p_exact[(size_t)i] = p;
+
+            const bool wall_y = cvfem_case::on_plane(y, real_t(0), Ly) || cvfem_case::on_plane(y, Ly, Ly);
+            const bool inlet  = cvfem_case::on_plane(x, real_t(0), Lx);
+            const bool outlet = cvfem_case::on_plane(x, Lx, Lx);
+            const bool span   = cvfem_case::on_plane(z, real_t(0), Lz) || cvfem_case::on_plane(z, Lz, Lz);
+
+            if (flow == cvfem_case::FlowCase::SmithHutton) {
+                // u and v everywhere: the prescribed rotating field is the problem statement,
+                // not something to be solved for. exact_state already returned it.
+                sh_uv_nodes.push_back((idx_t)i);
+                sh_u_vals.push_back(ux);
+                sh_v_vals.push_back(uy);
+                // PRESSURE TOO, and this is what makes the case the benchmark rather than an
+                // approximation of it. Smith-Hutton is a scalar transported by a PRESCRIBED
+                // field: there is no continuity equation to satisfy and no pressure in the
+                // problem. Leaving p free instead left Newton with a floor near 1e-3, because
+                // the prescribed field is divergence-free in the continuum but not discretely,
+                // so the continuity rows had no solution and Rhie-Chow could only absorb part
+                // of the defect. Constraining p removes those rows and leaves exactly one
+                // unknown per node -- phi -- which is the problem as posed.
+                sh_p_vals.push_back(real_t(0));
+                // phi where the boundary prescribes one. The outlet (y = 0, x > 0) is left
+                // free, which is how this discretisation spells zero-gradient.
+                //
+                // The spanwise planes are NOT excluded, and the first version of this excluded
+                // them: with one cell in z every node lies on z = 0 or z = Lz, so the guard
+                // removed every constraint and the run reported sh_phi = 0. phi depends only on
+                // (x, y) and is uniform along z by construction, so a z-face node carries the
+                // same value as any other node at that (x, y) and constraining it is right.
+                real_t phi = 0;
+                if (cvfem_smith_hutton::phi_dirichlet(x, y, Lx, Ly, phi)) {
+                    sh_w_nodes.push_back((idx_t)i);
+                    sh_w_vals.push_back(phi);
+                }
+                continue;
+            }
+            if (flow == cvfem_case::FlowCase::StepTurb) {
+                // The step's skin treatment, with two differences that are the case.
+                //
+                // FIRST, the span slips. The reference DNS is spanwise-periodic, which this
+                // discretisation cannot express -- sfem::Constraint eliminates dofs and has
+                // no way to say u_left = u_right. No-slip side walls are the wrong surrogate:
+                // they grow boundary layers the periodic box does not have, and in a span
+                // four step heights wide those layers are a large fraction of the domain.
+                // Free slip -- constrain u_z alone, leave u_x and u_y free -- is the closest
+                // thing available, and it is what the channel cases already do on their
+                // spanwise planes. It is an approximation and is reported as one.
+                //
+                // SECOND, the corners belong to the walls. A node on z=0 that is also on a
+                // real wall, or on either step face, must be no-slip; only a node whose ONLY
+                // skin membership is the spanwise plane may slip. `on_step_face` is exactly
+                // "on the skin but on none of the bounding-box planes", which is what the
+                // two step faces are and what no coordinate test can find directly.
+                const bool outflow     = cvfem_case::on_plane(x, Lx, Lx);
+                const bool free_outlet = step_outflow_natural && outflow;
+                if (skin_node[(size_t)i] && !free_outlet) {
+                    const bool on_step_face =
+                            !inlet && !outflow && !wall_y && !span;
+                    const bool slip_only = span && !inlet && !wall_y && !on_step_face;
+                    if (slip_only) {
+                        uz_nodes.push_back((idx_t)i);
+                        uz_vals.push_back(real_t(0));
+                    } else {
+                        // The inflow profile needs step_y and Lz, which exact_state's
+                        // signature does not carry, so it is evaluated here. Everything not
+                        // on the inlet plane is no-slip, which is the zero exact_state left.
+                        const real_t uin =
+                                inlet ? cvfem_case::step_inflow_ux<real_t>(y, z, step_y, Ly, Lz, U)
+                                      : real_t(0);
+                        // Same bookkeeping as the `step` branch, and it has to be here too or
+                        // the option is silently wrong on this case: SFEM_STEP_OUTFLOW is
+                        // validated once for both step cases, so `convective` would constrain
+                        // this outlet and then never refresh it -- an outlet frozen at zero
+                        // for the whole run, with nothing in the log to say so.
+                        if (want_convective_outflow && outflow) {
+                            conv_slot.push_back(uvw_nodes.size());
+                            conv_node.push_back(i);
+                        }
+                        uvw_nodes.push_back((idx_t)i);
+                        uvw_ux.push_back(uin);
+                        uvw_uy.push_back(real_t(0));
+                        uvw_uz.push_back(real_t(0));
+                    }
+                }
+            } else if (flow == cvfem_case::FlowCase::Nozzle) {
+                // Wall faces no-slip, the inlet the developed pipe profile, the outlet disc free.
+                // A node on both the inlet and a wall is the inlet's rim and takes the wall's zero,
+                // which is also the profile's value there, so the two conditions agree on it.
+                const bool wall  = nozzle_wall_node[(size_t)i] != 0;
+                const bool inlet = nozzle_inlet_node[(size_t)i] != 0;
+                // The outlet disc, when it is prescribed rather than left free. Its rim goes to
+                // the wall for the same reason the inlet's does: a node on both is a wall node,
+                // and no-slip is the value the two conditions agree on there.
+                const bool outflow = !wall && nozzle_outlet_node[(size_t)i] != 0;
+                if (wall || inlet || (outflow && !outlet_is_open)) {
+                    uvw_nodes.push_back((idx_t)i);
+                    uvw_ux.push_back(wall ? real_t(0) : cvfem_case::nozzle_inflow_ux<real_t>(nozzle, y, z, U));
+                    uvw_uy.push_back(real_t(0));
+                    uvw_uz.push_back(real_t(0));
+                } else if (outflow && want_convective_outflow) {
+                    // Same bookkeeping as the two step branches: the slot is recorded inside
+                    // the branch that pushes the node, so the two cannot drift apart. The
+                    // starting value is zero -- the jet has not reached the outlet at t = 0 --
+                    // and the first step's mass-balance correction gives it the right flux.
+                    conv_slot.push_back(uvw_nodes.size());
+                    conv_node.push_back(i);
+                    uvw_nodes.push_back((idx_t)i);
+                    uvw_ux.push_back(real_t(0));
+                    uvw_uy.push_back(real_t(0));
+                    uvw_uz.push_back(real_t(0));
+                }
+            } else if (flow == cvfem_case::FlowCase::Step) {
+                // Constrain the skin, minus the outflow plane. The skin comes from the same
+                // smesh::skin_sideset that builds the boundary mask, so the Dirichlet set and
+                // the control-volume closure agree by construction.
+                //
+                // That matters more than it sounds. cvfem_ns_channel_case.hpp documents the
+                // invariant that boundary marking and the sub-control-surface test must decide
+                // the same thing, "and if they disagree a node gets a closed control volume
+                // without a boundary condition, or the reverse". On a box two independent
+                // coordinate tests happen to agree; on the L-shape they would not, because the
+                // step faces lie on no bounding-box plane. Deriving both from one skin removes
+                // the possibility rather than testing for it.
+                //
+                // Outflow nodes are simply left out: no Dirichlet condition, and the boundary
+                // sub-control-surface term then evaluates the flux from the interior state.
+                // SFEM_STEP_OUTFLOW selects the outlet treatment.
+                //   natural   (default) leave x=Lx unconstrained; the boundary
+                //             sub-control-surface term then evaluates the flux from the
+                //             interior state -- a zero-gradient finite-volume outflow.
+                //   dirichlet impose the inflow profile's fully-developed counterpart. Not
+                //             their boundary condition, so any number produced under it must
+                //             be labelled as such; it exists to separate an outflow problem
+                //             from a geometry or marking problem.
+                const bool outflow = cvfem_case::on_plane(x, Lx, Lx);
+                const bool free_outlet = step_outflow_natural && outflow;
+                if (skin_node[(size_t)i] && !free_outlet) {
+                    // The convective outlet's nodes are Dirichlet like every other
+                    // constrained node; what makes them different is only that the time loop
+                    // rewrites their values. Noting the slot here is what lets it, and doing
+                    // it inside the same branch that pushes the node is what keeps the two
+                    // in step. exact_state's zero is the starting value -- the flow has not
+                    // reached the outlet at t = 0 -- and the first step's mass-balance
+                    // correction gives it the right flux immediately.
+                    if (want_convective_outflow && outflow) {
+                        conv_slot.push_back(uvw_nodes.size());
+                        conv_node.push_back(i);
+                    }
+                    uvw_nodes.push_back((idx_t)i);
+                    uvw_ux.push_back(ux);
+                    uvw_uy.push_back(uy);
+                    uvw_uz.push_back(uz);
+                }
+            } else if (flow == cvfem_case::FlowCase::Pump) {
+                // Every wall of the chamber, all three components, EXCEPT the port.
+                //
+                // The diaphragm is in here too and is not a special case: it is a wall whose
+                // prescribed velocity happens to be non-zero and normal, which is what makes
+                // transpiration cost no new constraint machinery. exact_state supplies
+                // (0, -U, 0) there and zero elsewhere.
+                //
+                // The port is left out entirely -- no velocity data at all -- because it
+                // carries the prescribed pressure, and a face cannot carry both. Constrain
+                // it here and the port is overridden while the log still reports it applied,
+                // which is the failure the outlet_governed test above exists to prevent.
+                const bool on_port = cvfem_case::pump_on_port<real_t>(x, y, z, Lx, Ly, Lz, pump_port_frac);
+                const bool on_wall = wall_y || inlet || outlet || span;  // the chamber is a box
+                if (on_wall && !on_port) {
+                    uvw_nodes.push_back((idx_t)i);
+                    uvw_ux.push_back(ux);
+                    uvw_uy.push_back(uy);
+                    uvw_uz.push_back(uz);
+                }
+            } else if (flow == cvfem_case::FlowCase::CavityRegularized) {
+                // No-slip on every wall including the spanwise pair, with the lid profile on
+                // y = Ly. This is a genuinely three-dimensional cavity, which is what their
+                // section 5.5 solves and what Table 5.6 is measured on.
+                //
+                // Note this differs deliberately from FlowCase::Cavity, which leaves the
+                // z-planes with uz = 0 only -- a slip/symmetry condition that makes the flow
+                // quasi-two-dimensional. That is the right choice there, because our
+                // constant-lid cavity is compared against Ghia et al.'s 2D reference data;
+                // it is the wrong choice here. Same geometry, different problem.
+                if (wall_y || inlet || outlet || span) {
+                    uvw_nodes.push_back((idx_t)i);
+                    uvw_ux.push_back(ux);
+                    uvw_uy.push_back(uy);
+                    uvw_uz.push_back(uz);
+                }
+            } else if (flow == cvfem_case::FlowCase::MMS) {
+                // Every boundary node, all three components. The manufactured field has a
+                // nonzero tangential velocity on the z-planes too, so the channel pattern
+                // below (which constrains only uz there) would impose the wrong data.
+                if (wall_y || inlet || outlet || span) {
+                    uvw_nodes.push_back((idx_t)i);
+                    uvw_ux.push_back(ux);
+                    uvw_uy.push_back(uy);
+                    uvw_uz.push_back(uz);
+                }
+            } else if (wall_y || inlet || (outlet && !outlet_governed)) {
+                uvw_nodes.push_back((idx_t)i);
+                uvw_ux.push_back(ux);
+                uvw_uy.push_back(uy);
+                uvw_uz.push_back(uz);
+            } else if (span) {
+                // Only where the velocity is not already fully constrained, so no node
+                // appears twice for the same component.
+                uz_nodes.push_back((idx_t)i);
+                uz_vals.push_back(uz);
+            }
+        }
+
+        // The seed's level at the port, averaged over the port's nodes. Measured here because
+        // this is where p_exact exists and where the mesh is already in its final (possibly
+        // semi-structured, already renumbered) form -- the same place the step case takes its
+        // skin nodeset, so the machinery is known to work on both paths.
+        if (!want_pressure_sideset.empty()) {
+            auto named = mesh->sidesets(want_pressure_sideset);
+            if (!named.empty() && named.front()) {
+                auto ns = smesh::create_nodeset_from_sideset(mesh, named.front());
+                if (ns && ns->size() > 0) {
+                    real_t sum = 0;
+                    for (ptrdiff_t k = 0; k < ns->size(); ++k)
+                        sum += p_exact[(size_t)ns->data()[k]];
+                    p_seed_port = sum / (real_t)ns->size();
+                }
+            }
+            std::printf("prescribed pressure: seed level at '%s' = %g, target = %g\n",
+                        want_pressure_sideset.c_str(), (double)p_seed_port,
+                        (double)op->pressure_value);
+        }
+
+        real_t pux, puy, puz, pp;
+        cvfem_case::exact_state(
+                flow, mu, U, Lx, Ly, (real_t)px[pin], (real_t)py[pin], (real_t)pz[pin], pux, puy, puz, pp);
+
+        // Conditions are built with owned buffers rather than through the raw-pointer
+        // add_condition overloads: those call manage_host_buffer, which takes ownership
+        // of the pointer, so handing them a std::vector's storage both dangles and frees
+        // memory the vector still owns.
+        auto make_cond = [](const std::vector<idx_t>  &nodes,
+                            const std::vector<real_t> &vals,
+                            const int                  component) {
+            sfem::DirichletConditions::Condition c;
+            c.component = component;
+            c.nodeset   = smesh::create_host_buffer<idx_t>(nodes.size());
+            c.values    = smesh::create_host_buffer<real_t>(vals.size());
+            std::copy(nodes.begin(), nodes.end(), c.nodeset->data());
+            std::copy(vals.begin(), vals.end(), c.values->data());
+            return c;
+        };
+
+        std::vector<sfem::DirichletConditions::Condition> conds;
+        if (!sh_uv_nodes.empty()) {
+            conds.push_back(make_cond(sh_uv_nodes, sh_u_vals, 0));
+            conds.push_back(make_cond(sh_uv_nodes, sh_v_vals, 1));
+            conds.push_back(make_cond(sh_uv_nodes, sh_p_vals, 3));
+        }
+        if (!sh_w_nodes.empty()) conds.push_back(make_cond(sh_w_nodes, sh_w_vals, 2));
+        conds.push_back(make_cond(uvw_nodes, uvw_ux, 0));
+        conds.push_back(make_cond(uvw_nodes, uvw_uy, 1));
+        conds.push_back(make_cond(uvw_nodes, uvw_uz, 2));
+        if (!uz_nodes.empty()) conds.push_back(make_cond(uz_nodes, uz_vals, 2));
+        // The pressure is left unconstrained and its gauge is fixed by a zero-mean
+        // projection instead (see PressureGauge). Pinning a node is the cheaper-looking
+        // option and the more expensive one: it leaves a near-constant mode that puts an
+        // isolated eigenvalue far below the rest of the spectrum and degrades like h^-2.
+        //
+        // SFEM_PIN_PRESSURE=1 restores the pin, which is worth having to reproduce older
+        // numbers and to compare the two treatments directly.
+        if (smesh::Env::read<int>("SFEM_PIN_PRESSURE", 0))
+            conds.push_back(make_cond({(idx_t)pin}, {pp}, 3));
+        else
+            std::printf("pressure pin: DISABLED\n");
+
+        // Kept rather than discarded: the pump drives its diaphragm by rescaling these
+        // values every time step through set_time, which is the mechanism
+        // DirichletConditions already has for a time-varying load and which spares this
+        // driver from rebuilding the whole constraint set once per step.
+        dirichlet = sfem::DirichletConditions::create(fs, conds);
+        f->add_constraint(dirichlet);
+
+        // The manufactured solution is driven by a body force. This must happen after
+        // op->initialize() -- which ran above -- because the packed path renumbers mesh
+        // nodes, and a force built against the old numbering would be silently scrambled
+        // rather than rejected.
+        if (flow == cvfem_case::FlowCase::MMS)
+            std::printf("mms: forcing recomputed per continuation stage (rho varies, mu=%g, Re=%g)\n",
+                        (double)mu, (double)(1.0 / mu));
+
+        std::printf("constraints: uvw_nodes=%td  uz_nodes=%td  p_pin=%td  sh_uv=%td  sh_phi=%td\n",
+                    (ptrdiff_t)uvw_nodes.size(),
+                    (ptrdiff_t)uz_nodes.size(),
+                    pin,
+                    (ptrdiff_t)sh_uv_nodes.size(),
+                    (ptrdiff_t)sh_w_nodes.size());
+    }
+
+    std::printf("case: %s  geom: %s  refine_level: %d  semi_structured: %d\n",
+                case_name.c_str(), geom_name.c_str(), refine_level, op->is_semi_structured() ? 1 : 0);
+    std::printf("channel: L=(%g,%g,%g)  cells=(%d,%d,%d)\n", Lx, Ly, Lz, nx, ny, nz);
+    if (want_any_step) {
+        // The step Reynolds number, which is NOT the one the continuation reports.
+        //
+        // The ramp works in Re_phys = rho U Ly / mu, a number about the channel height and
+        // the peak velocity, because that is what it needs to schedule rho. Every step
+        // result in the literature is quoted on Re_h = rho U_b h / mu with h the step height
+        // and U_b the inlet BULK velocity -- for this profile (4/9) of the peak. At the
+        // default geometry the two differ by a factor of 4.5, which is more than enough to
+        // make a run look like it reached a Reynolds number it never approached. Print both,
+        // labelled, so a reader cannot take one for the other.
+        //
+        // AND the two step cases do not share an inflow profile, so they do not share these
+        // numbers either. `step_turb` is fed step_inflow_ux, whose peak is U and whose flux
+        // is (4/9) U (Ly - step_y) Lz. `step` is fed exact_state's literal transcription of
+        // Farrell's 4(2-y)(y-1) z(1-z), whose peak is U/4 and whose flux is U/9 -- a factor
+        // of four apart on the default geometry, in a line whose whole purpose is to be the
+        // oracle a measured mass flux is compared against.
+        const bool   farrell = flow == cvfem_case::FlowCase::Step;
+        const real_t u_peak  = farrell ? real_t(0.25) * U : U;
+        const real_t u_bulk  = (real_t(4) / real_t(9)) * u_peak;
+        const real_t re_h    = rho * u_bulk * step_y / std::max(mu, real_t(1e-30));
+        std::printf("step: h=%g  inlet %g x %g  U_peak=%g  U_bulk=%g  Re_h=%g  (continuation Re_phys=%g)\n",
+                    (double)step_y, (double)(Ly - step_y), (double)Lz, (double)u_peak, (double)u_bulk,
+                    (double)re_h, (double)(rho * U * L_re / std::max(mu, real_t(1e-30))));
+        const double q_in_exact =
+                farrell ? (double)cvfem_case::step_farrell_inflow_flux<real_t>(step_y, Ly, Lz, U)
+                        : (double)cvfem_case::step_inflow_flux<real_t>(step_y, Ly, Lz, U);
+        if (std::isnan(q_in_exact)) {
+            // Only reachable for `step`, whose profile is hard-coded to Ly = 2, step_y = 1,
+            // Lz = 1. Say there is no oracle rather than print one that is not this run's.
+            std::printf("step: exact inflow flux UNAVAILABLE -- the `step` profile is written "
+                        "for Ly=2 step_y=1 Lz=1 and this run is %g/%g/%g; use step_turb for "
+                        "another geometry\n",
+                        (double)Ly, (double)step_y, (double)Lz);
+        } else {
+            std::printf("step: exact inflow flux %.12g\n", q_in_exact);
+        }
+    }
+    std::printf("nnodes: %td  nelements: %td  ndof: %td\n", nnodes, mesh->n_elements(0), ndof);
+    // Left exactly as it was, deliberately: scripts/dns_cost_model.py and the tracked
+    // verification reports parse that line, and these are LOCAL counts, which is what a
+    // per-rank line should say. The global picture goes on its own line and only when there
+    // is one to report, so a serial run's output is byte-identical.
+    if (domain.distributed()) {
+        auto dist = mesh->distributed();
+        // Two independent sources for the same number, printed together on purpose. The left
+        // pair is what smesh recorded when it built the decomposition; the right is what this
+        // rank set actually sums to over the owned ranges. They must agree, and a disagreement
+        // means the ownership metadata does not describe the mesh -- the exact failure S1 was
+        // about, which no single-rank check can see.
+        const ptrdiff_t owned_elements =
+                mesh->block(0)->n_elements_owned() ? mesh->block(0)->n_elements_owned() : mesh->n_elements(0);
+        const ptrdiff_t summed_nodes    = cvfem::sum(domain, n_owned_nodes);
+        const ptrdiff_t summed_elements = cvfem::sum(domain, owned_elements);
+        if (domain.is_root())
+            // No parentheses around the summed values, deliberately: the gate splits this line
+            // on whitespace, and "(summed 123)" would hand it a token with a trailing paren.
+            std::printf("global: nnodes %td summed %td nelements %td summed %td ranks %d\n",
+                        dist->n_nodes_global(),
+                        summed_nodes,
+                        dist->n_elements_global(),
+                        summed_elements,
+                        domain.size());
+    }
+    if (flow == cvfem_case::FlowCase::MMS) {
+        // Two different quantities would otherwise both be printed as "Re": the driver's
+        // flow Reynolds number rho*U*Ly/mu, and the manufactured solution's own parameter
+        // 1/mu which appears in its pressure formula. On the MMS domain Ly=2, so they differ
+        // by a factor of two and a run asked for Re=200 would report 400.
+        std::printf("rho: %g  mu: %g  mms_Re (=1/mu, the parameter in p): %g   "
+                    "[continuation ramps rho to 1]\n", rho, mu, 1.0 / mu);
+    } else {
+        std::printf("rho: %g  mu: %g  U: %g  Re: %g\n", rho, mu, U, rho * U * Ly / mu);
+    }
+
+    // The state lives in a SharedBuffer because the Jacobian operator is built from it:
+    // create_linear_operator assembles once, at construction, so a nonlinear problem has
+    // to rebuild it per Newton step against the current state.
+    auto                xbuf = smesh::create_host_buffer<real_t>((size_t)ndof);
+    real_t *const       x    = xbuf->data();
+    std::vector<real_t> r((size_t)ndof, 0), dx((size_t)ndof, 0), rhs((size_t)ndof, 0);
+    std::fill(x, x + ndof, real_t(0));
+    f->apply_constraints(x);
+    // Seed the whole pressure field with the analytic pressure, not just the pinned node.
+    // The standalone driver's init_fields does the same -- velocity respects the
+    // constraint mask, pressure is set everywhere -- and it matters: starting from p = 0
+    // leaves Newton converging linearly at a far worse rate, needing several times the
+    // iterations for the same answer. Verification drivers against an analytic solution
+    // are entitled to the better initial guess; the two must simply agree about it.
+    for (ptrdiff_t i = 0; i < nnodes; ++i) x[(size_t)i * 4 + 3] = p_exact[(size_t)i];
+
+    // A solenoidal kick, without which a turbulent case cannot start.
+    //
+    // The initial state is symmetric in z and the boundary data is too, so a step fed a
+    // laminar profile has nothing that can break spanwise symmetry: it will converge to a
+    // two-dimensional solution and stay there, however high the Reynolds number. The
+    // instability is physical and real, but it has to be given something to amplify.
+    //
+    // The perturbation is a sum of Fourier modes each built as a vector orthogonal to its own
+    // wavevector, so every mode is divergence free by construction and the pressure solve has
+    // no spurious transient to project away on the first step. It is deliberately NOT
+    // windowed onto the region downstream of the lip: multiplying a solenoidal field by a
+    // spatial window destroys exactly the property it was constructed for. Confinement comes
+    // instead from re-applying the constraints afterwards, which zeroes the kick on every
+    // no-slip and inflow node.
+    //
+    // Seeded and reproducible. SFEM_IC_PERTURB=0, the default, leaves the state bit for bit
+    // what it was, which tests/ asserts.
+    const real_t ic_perturb = smesh::Env::read<real_t>("SFEM_IC_PERTURB", 0);
+    if (ic_perturb != real_t(0)) {
+        const unsigned seed  = (unsigned)smesh::Env::read<int>("SFEM_IC_SEED", 20260911);
+        const int      modes = std::max(1, smesh::Env::read<int>("SFEM_IC_MODES", 12));
+        std::mt19937                           rng(seed);
+        std::uniform_real_distribution<double> uni(-1.0, 1.0);
+        std::vector<double>                    kx(modes), ky(modes), kz(modes), ax(modes), ay(modes),
+                az(modes), ph(modes);
+        for (int m = 0; m < modes; ++m) {
+            // Wavenumbers of a few box lengths, so the kick is a large-scale stirring rather
+            // than grid noise the upwind term would erase in one step.
+            const double n1 = std::round(1 + 3 * std::fabs(uni(rng)));
+            const double n2 = std::round(1 + 3 * std::fabs(uni(rng)));
+            const double n3 = std::round(1 + 3 * std::fabs(uni(rng)));
+            kx[m] = 2 * M_PI * n1 / (double)Lx;
+            ky[m] = 2 * M_PI * n2 / (double)Ly;
+            kz[m] = 2 * M_PI * n3 / (double)Lz;
+            // a = e x k is orthogonal to k for any e, which is what makes div(a cos(k.x)) = 0.
+            const double ex = uni(rng), ey = uni(rng), ez = uni(rng);
+            ax[m] = ey * kz[m] - ez * ky[m];
+            ay[m] = ez * kx[m] - ex * kz[m];
+            az[m] = ex * ky[m] - ey * kx[m];
+            const double an = std::sqrt(ax[m] * ax[m] + ay[m] * ay[m] + az[m] * az[m]);
+            if (an > 0) { ax[m] /= an; ay[m] /= an; az[m] /= an; }
+            ph[m] = M_PI * uni(rng);
+        }
+        const auto *const gx = mesh->points()->data()[0];
+        const auto *const gy = mesh->points()->data()[1];
+        const auto *const gz = mesh->points()->data()[2];
+        const double      amp = (double)ic_perturb / std::sqrt((double)modes);
+        for (ptrdiff_t i = 0; i < nnodes; ++i) {
+            double px = 0, pyv = 0, pz = 0;
+            for (int m = 0; m < modes; ++m) {
+                const double c = std::cos(kx[m] * gx[i] + ky[m] * gy[i] + kz[m] * gz[i] + ph[m]);
+                px += ax[m] * c;
+                pyv += ay[m] * c;
+                pz += az[m] * c;
+            }
+            x[(size_t)i * 4 + 0] += (real_t)(amp * px);
+            x[(size_t)i * 4 + 1] += (real_t)(amp * pyv);
+            x[(size_t)i * 4 + 2] += (real_t)(amp * pz);
+        }
+        // Last, so no prescribed boundary value is disturbed by the kick.
+        f->apply_constraints(x);
+        std::printf("ic: solenoidal perturbation amp %g, %d modes, seed %u\n",
+                    (double)ic_perturb, modes, seed);
+    }
+    {
+        // Checksum the state at construction, before any solver has touched it, to say
+        // whether the variation seen later is built in or acquired.
+        real_t s0 = 0, sp = 0;
+        for (ptrdiff_t i = 0; i < ndof; ++i) s0 += x[(size_t)i];
+        for (ptrdiff_t i = 0; i < nnodes; ++i) sp += p_exact[(size_t)i];
+        std::printf("initial state checksum: %.17g   p_exact: %.17g\n", (double)s0, (double)sp);
+    }
+
+    std::vector<mask_t> cmask(mask_count(ndof), 0);
+    f->constraints_mask(cmask.data());
+
+    // How many dofs the constraints actually pin, globally.
+    //
+    // Counted over the OWNED range and then reduced. cmask covers the local range, so a
+    // shared node's constrained dofs appear on every rank holding that node; counting to ndof
+    // and summing would report a number that grows with the rank count while the problem does
+    // not change. Owned ranges partition the global dofs exactly once, which is the whole
+    // reason to reduce over them.
+    //
+    // Reported because it is the cheapest quantity that proves the constraint set survived
+    // partitioning: it is an integer, so unlike the coordinate checksum it can be compared
+    // across rank counts EXACTLY, with no floating-point association to argue about.
+    //
+    // ndof_owned == ndof at one rank, so this is the serial count and the line is new output
+    // on its own row rather than a change to any line a parser already reads.
+    {
+        ptrdiff_t n_constrained = 0;
+        for (ptrdiff_t k = 0; k < ndof_owned; ++k)
+            if (mask_get(k, cmask.data())) n_constrained++;
+        const ptrdiff_t global_constrained = cvfem::sum(domain, n_constrained);
+        if (domain.is_root()) std::printf("constrained dofs: %td\n", global_constrained);
+    }
+
+    // Stop after setup, before the solve.
+    //
+    // This exists so the distributed setup can be gated at all. A multi-rank run cannot reach
+    // a solve yet -- the operator has no scoped apply, so it aborts there -- but everything
+    // above IS meant to be correct multi-rank already: the decomposition, the ownership
+    // metadata, the constraints, the counts. SFEM_SETUP_ONLY lets a 1-vs-4 comparison of those
+    // run to a clean exit instead of being buried under the abort that follows.
+    //
+    // Deliberately placed after the constraint count and before the hierarchy build, so it
+    // covers the mesh, the operator's initialize, and the constraints, and nothing that needs
+    // a working parallel apply.
+    if (smesh::Env::read<int>("SFEM_SETUP_ONLY", 0)) {
+        if (domain.is_root()) std::printf("setup only: stopping before the solve\n");
+        return EXIT_SUCCESS;
+    }
+
+    // Outlet nodes, for the active-set trace in the Newton loop. Empty for every case that
+    // has no outlet, which is what switches the trace off for them.
+    std::vector<ptrdiff_t> outlet_nodes;
+    std::vector<uint8_t>   outlet_active;
+    if (flow == cvfem_case::FlowCase::Step) {
+        const auto *const pxo = mesh->points()->data()[0];
+        for (ptrdiff_t i = 0; i < nnodes; ++i)
+            if (cvfem_case::on_plane((real_t)pxo[i], Lx, Lx)) outlet_nodes.push_back(i);
+        outlet_active.assign(outlet_nodes.size(), 0);
+    }
+
+    // The gauge applies exactly when nothing else determines the pressure level, and there
+    // are two ways it can be determined -- one obvious, one not.
+    //
+    // The obvious one is a constrained pressure dof: a pin, or a Dirichlet value.
+    //
+    // The other is a do-nothing outflow. That boundary drops the p_i*a term, and dropping it
+    // is exactly what removes the constant-pressure null mode: with p_i*a retained a uniform
+    // pressure shift integrates to zero over every closed control volume and the level stays
+    // free, whereas without it the shift leaves a net force on the outflow control volumes.
+    // So an open outlet is a pressure condition even though it constrains no dof, and adding
+    // a zero-mean condition on top over-determines the system. Measured, doing so took the
+    // backward-facing step's continuity residual from 6.8e-09 to 5.4e-03.
+    PressureGauge gauge(ndof, ndof_owned, cmask.data(), domain);
+    {
+        // Counted over the owned range and reduced, because what follows is a DECISION rather
+        // than a report: whether the gauge is active at all. Counted locally, one rank can
+        // find every pressure dof free while another does not, and the gauge would then be on
+        // for some ranks and off for others -- two different problems being solved at once.
+        ptrdiff_t n_p_free = 0, n_p = 0;
+        for (ptrdiff_t k = 3; k < ndof_owned; k += N_FIELDS) {
+            ++n_p;
+            if (!mask_get(k, cmask.data())) ++n_p_free;
+        }
+        n_p      = cvfem::sum(domain, n_p);
+        n_p_free = cvfem::sum(domain, n_p_free);
+        // Ask the operator rather than testing one of the three conditions that can do it.
+        // A traction surface and a pressure port fix the level exactly as the do-nothing
+        // outflow does, and this test used to see only the outflow -- so naming a port
+        // would have left the zero-mean gauge on top of it and over-determined the system.
+        const bool outflow_fixes_it = op->fixes_pressure_level();
+        gauge.set_active(n_p_free == n_p && !outflow_fixes_it);
+        std::printf("pressure gauge: %s  (%td of %td pressure dofs free)\n",
+                    gauge.active()      ? "zero mean"
+                    : !op->pressure_sideset.empty() ? "determined by the prescribed pressure"
+                    : !op->traction_sideset.empty() ? "determined by the traction surface"
+                    : outflow_fixes_it  ? "determined by the do-nothing outflow"
+                                        : "constrained (pin or Dirichlet)",
+                    n_p_free, n_p);
+    }
+
+    // Reynolds continuation, matching the standalone driver. Newton from a zero state
+    // does not converge at Re=100: the first stage solves the same geometry at Re=1 by
+    // taking rho = mu / (U Ly), and the second continues from that solution at the
+    // physical density. Without it this diverges to inf, which is how its absence was
+    // found rather than reasoned about.
+    const real_t Re_phys = rho * U * L_re / std::max(mu, real_t(1e-30));
+    const real_t rho_re1 = mu / std::max(U * L_re, real_t(1e-30));
+
+    // The two-stage scheme above stops working between Re=200 and Re=400.
+    //
+    // Measured at 33,124 dofs: Re=100 converges in 32 Newton steps; Re=200 reaches the
+    // right answer (u_linf 2.90e-07 against the converged Re=100 run's 2.55e-07, both at
+    // discretisation accuracy) but does not satisfy the Newton test within 40 steps; Re=400,
+    // 800 and 3200 diverge outright, to 1e+13, 1e+112 and 1e+87. Every failing run reaches
+    // the navier-stokes stage, so the Re=1 solve always succeeds and the blow-up is always
+    // on the single jump to physical density. The linear solves stay healthy throughout --
+    // 663 to 1289 iterations per Newton step with no trend against Re -- so it is Newton
+    // diverging, not the preconditioner. The jump is what fails, so ramp it.
+    //
+    // Geometric in rho, which is geometric in Re since Re is linear in rho at fixed mu, U
+    // and Ly. SFEM_RE_STEP is the ratio per stage; 4 gives Re = 1, 4, 16, 64, ... and seven
+    // stages to reach 3200. Each stage starts from the previous stage's solution.
+    //
+    // A stage that fails is not fatal: the state is rolled back and a stage is inserted at
+    // the geometric mean of the last success and the failure, up to SFEM_RE_MAX_RETRY times.
+    // That is the cheap half of pseudo-transient continuation -- no timestep term in the
+    // operator, just a smaller step in the parameter -- and it costs nothing when the ramp
+    // is already fine enough, since no retry happens.
+    const real_t re_step   = std::max(real_t(1.5), smesh::Env::read<real_t>("SFEM_RE_STEP", real_t(4)));
+    const int    re_retry  = smesh::Env::read<int>("SFEM_RE_MAX_RETRY", 6);
+    // Adaptive step control. The schedule above is only a starting guess: what actually has
+    // to adapt during a run is the *increment*, not the destination. See the success and
+    // failure blocks in the stage loop for why aiming each stage at the final target wastes
+    // the retry budget.
+    const bool   re_adapt  = smesh::Env::read<int>("SFEM_RE_ADAPT", 1) != 0;
+    const real_t re_grow   = std::max(real_t(1), smesh::Env::read<real_t>("SFEM_RE_GROW", real_t(1.5)));
+    const real_t re_shrink = smesh::Env::read<real_t>("SFEM_RE_SHRINK", real_t(0.5));
+    const real_t re_fmin   = smesh::Env::read<real_t>("SFEM_RE_STEP_MIN", real_t(1.02));
+
+    std::vector<real_t> rho_schedule;
+    if (rho == real_t(0) || Re_phys <= real_t(1.5)) {
+        rho_schedule.push_back(rho);
+    } else {
+        real_t r = rho_re1;
+        rho_schedule.push_back(r);
+        while (r * re_step < rho) {
+            r *= re_step;
+            rho_schedule.push_back(r);
+        }
+        rho_schedule.push_back(rho);
+    }
+    {
+        std::printf("continuation: %d stages, Re =", (int)rho_schedule.size());
+        for (size_t k = 0; k < rho_schedule.size(); ++k)
+            std::printf(" %g", (double)(rho_schedule[k] * U * L_re / std::max(mu, real_t(1e-30))));
+        std::printf("\n");
+    }
+
+    // Continuation on the PRESCRIBED PRESSURE, alongside the one on Reynolds.
+    //
+    // The Reynolds ramp cannot help a pressure-driven case, and the failures say so plainly:
+    // the port sweep fails in the FIRST stage, at Re = 1, on a nearly-Stokes problem. It ramps
+    // rho to control Re = rho U Ly / mu, but when the flow is driven by a prescribed pressure
+    // the velocity is set by dp/mu and not by U, so "Re = 1" is a label on a scale that is not
+    // the one governing the difficulty. Nothing ramped the quantity that does.
+    //
+    // Measured, the failures are monotone in the imposed pressure and in nothing else:
+    //
+    //   p_bar   -0.16  -0.08   0    0.16   0.5   1.0   1.5   3.0
+    //   solves    y      y     y     y      y     n     n     n
+    //
+    // with p_exact_outlet = -0.16, the pressure drop the flow produces on its own. So a case
+    // fails in order of how far the imposed value sits from the one the flow would choose, and
+    // p=3.0 is about nineteen times it. Ramping the boundary condition is what Nalu and FUN3D
+    // do for exactly this, alongside under-relaxation and pseudo-transient marching.
+    //
+    // NOT a vector parallel to the Reynolds schedule, a COUNTER -- and that is the whole
+    // design, because the parallel vector was wrong. rho_schedule is rebuilt in place: a
+    // converged stage erases its tail and re-plans from the state just solved, and a failed
+    // one inserts an entry. A second vector indexed by the same `stage` silently stops
+    // meaning what its index says the moment either happens. Measured, p_bar = -3 ran its
+    // five stages, ended reporting AT TARGET, and left the pressure at -2.25: the erase
+    // shortened rho_schedule to five while p_schedule still held seven, so the last stage
+    // read the ramp's fourth entry instead of its last. The run looked converged and the
+    // answer was the wrong boundary condition.
+    //
+    // The counter cannot desynchronise because it is not indexed by anything. It holds how
+    // many increments are still owed, and each stage takes one of them from the level the
+    // last converged stage reached.
+    //
+    // TWO KNOBS, because there are two mechanisms and they must be separable. SFEM_P_STAGES
+    // sets the number of ramp steps and 0 turns the ramp off; SFEM_P_PREDICT turns off the
+    // level predictor below. Both off is the behaviour before any of this existed, which is
+    // the only honest control for an A/B -- with the predictor on, SFEM_P_STAGES=0 is already
+    // a large change, because the single step it leaves still carries the shift.
+    const real_t p_target  = op->pressure_value;
+    const bool   p_on      = !op->pressure_sideset.empty();
+    // DEFAULT OFF, both of them, and the measurement is why.
+    //
+    // The failures this was built for were a PRECONDITIONER failure wearing a boundary
+    // condition's clothes. At 33,124 dof on Grace, semi-structured, all FGMRES:
+    //
+    //   stack                          p_bar=-0.16   1.0     3.0    10.0    lin_it (p=3)
+    //   FGMRES + multigrid                  pass    pass    pass    pass         227
+    //   FGMRES + Vanka, no multigrid        pass    pass    pass    pass        2500
+    //   FGMRES + block-Jacobi, no MG        FAIL    FAIL    FAIL    FAIL   9000 (cap)
+    //
+    // The first column is the zero-severity control: p_exact(outlet), the level the flow
+    // produces on its own, where the port asks for nothing unusual. Block-Jacobi fails
+    // THERE. So the prescribed pressure was never the variable, and the monotone-looking
+    // sweep that made it look like one was recording where block-Jacobi happened to give up.
+    //
+    // Wherever the preconditioner works the continuation is pure cost: with multigrid
+    // 227 -> 245 linear iterations at p_bar = 3, with Vanka 2500 -> 2707. It is kept because
+    // it is correct, tested, and the one configuration that would genuinely need it -- two
+    // ports at different pressures, where the level is not a gauge and the predictor is not
+    // exact -- does not exist in this spike yet. Turning it on is then a deliberate act.
+    const bool   p_predict = smesh::Env::read<int>("SFEM_P_PREDICT", 0) != 0;
+    // The level of the last CONVERGED state, the level the state vector currently carries,
+    // and how many ramp increments are still owed. The first two start at the seed's own
+    // level, which the seed satisfies by construction.
+    real_t       p_solved      = p_seed_port;
+    real_t       p_state_level = p_seed_port;
+    int          p_ramp_left   = 0;
+    if (p_on) {
+        const int want = smesh::Env::read<int>("SFEM_P_STAGES", 0);
+        // Nothing to ramp toward a value the flow already produces: p_exact is the natural
+        // drop, so a p_bar near it is not a hard case and a ramp would only cost stages.
+        if (want > 0 && p_target != p_seed_port) {
+            p_ramp_left = want;
+            std::printf("pressure continuation: %d stages, p_bar =", want);
+            for (int k = 0; k < want; ++k)
+                std::printf(" %g", (double)(p_seed_port + (p_target - p_seed_port) *
+                                                                  (real_t)(k + 1) / (real_t)want));
+            std::printf(" (from the seed's %g, target %g)\n", (double)p_seed_port,
+                        (double)p_target);
+        }
+    }
+    // SFEM_FD_CHECK: is the Jacobian action actually the derivative of the residual?
+    //
+    // cvfem_ns_op_gate compares the assembled matrix against the matrix-free action, which
+    // catches a wiring mistake but not a modelling one: both encode the same linearisation, so
+    // a term missing from both is invisible to it. This compares J*v against a central
+    // difference of the residual, which has no such blind spot.
+    //
+    // Mode 2 evaluates at a random state, where every sub-control surface has mdot != 0.
+    // Mode 1 evaluates at the current iterate, which for Poiseuille has mdot ~ 0 on the faces
+    // perpendicular to the flow -- exactly where the upwind switch sgn(mdot) is not
+    // differentiable. If the Jacobian is exact in mode 2 and inexact in mode 1, the upwind
+    // kink is the cause of the linear Newton tail, and no solver tuning will remove it.
+    // Fine-level Rhie-Chow scale. Setting this to 0 removes the stabilisation -- and with it
+    // the only Jacobian term that is not exact -- which is how the missing pg derivative is
+    // shown to be what caps Newton at a linear rate, rather than merely being inexact.
+    if (const real_t rc_override = smesh::Env::read<real_t>("SFEM_RC_SCALE", real_t(-1));
+        rc_override >= real_t(0)) {
+        op->rhie_chow_scale = rc_override;
+        op->update(x);
+        std::printf("rhie_chow_scale overridden to %g\n", (double)rc_override);
+    }
+
+    if (const int fd_mode = smesh::Env::read<int>("SFEM_FD_CHECK", 0)) {
+        std::vector<real_t> v((size_t)ndof), jv((size_t)ndof), rp((size_t)ndof),
+                            rm((size_t)ndof), xt((size_t)ndof), xb(x, x + ndof);
+        std::mt19937                       gen(12345u);
+        std::uniform_real_distribution<real_t> dist(real_t(-1), real_t(1));
+        for (ptrdiff_t i = 0; i < ndof; ++i) v[(size_t)i] = dist(gen);
+        if (fd_mode == 2)
+            for (ptrdiff_t i = 0; i < ndof; ++i) xb[(size_t)i] = real_t(0.1) * dist(gen);
+        f->apply_zero_constraints(v.data());
+
+        // SFEM_FD_NO_RC=1 switches Rhie-Chow off. The suspected missing term is the
+        // derivative of the reconstructed nodal pressure gradient inside the Rhie-Chow
+        // correction, so with rc off the Jacobian should be exact and the error collapse.
+        if (smesh::Env::read<int>("SFEM_FD_NO_RC", 0)) {
+            op->rhie_chow_scale = real_t(0);
+            op->update(xb.data());
+            std::printf("fd_check: Rhie-Chow DISABLED\n");
+        }
+
+        std::fill(jv.begin(), jv.end(), real_t(0));
+        f->apply(xb.data(), v.data(), jv.data());
+        f->apply_zero_constraints(jv.data());
+
+        std::printf("fd_check: mode %d (%s), ndof %ld\n", fd_mode,
+                    fd_mode == 2 ? "random state, mdot != 0" : "current iterate", (long)ndof);
+        for (const real_t eps : {real_t(1e-3), real_t(1e-4), real_t(1e-5), real_t(1e-6),
+                                 real_t(1e-7), real_t(1e-8)}) {
+            for (ptrdiff_t i = 0; i < ndof; ++i) xt[(size_t)i] = xb[(size_t)i] + eps * v[(size_t)i];
+            std::fill(rp.begin(), rp.end(), real_t(0));
+            f->gradient(xt.data(), rp.data());
+            f->apply_zero_constraints(rp.data());
+            for (ptrdiff_t i = 0; i < ndof; ++i) xt[(size_t)i] = xb[(size_t)i] - eps * v[(size_t)i];
+            std::fill(rm.begin(), rm.end(), real_t(0));
+            f->gradient(xt.data(), rm.data());
+            f->apply_zero_constraints(rm.data());
+            // Split by field. A discrepancy confined to the continuity rows or to the
+            // pressure columns is invisible in a global norm dominated by momentum, yet it is
+            // exactly what would set Newton's asymptotic rate.
+            real_t num = 0, den = 0, nmom = 0, dmom = 0, ncon = 0, dcon = 0;
+            real_t worst = 0; ptrdiff_t worst_i = -1;
+            for (ptrdiff_t i = 0; i < ndof; ++i) {
+                const real_t fd = (rp[(size_t)i] - rm[(size_t)i]) / (real_t(2) * eps);
+                const real_t d  = fd - jv[(size_t)i];
+                num += d * d; den += fd * fd;
+                if (i % 4 == 3) { ncon += d * d; dcon += fd * fd; }
+                else            { nmom += d * d; dmom += fd * fd; }
+                if (std::fabs(d) > worst) { worst = std::fabs(d); worst_i = i; }
+            }
+            std::printf("  eps %.1e  all %.4e  momentum %.4e  continuity %.4e"
+                        "  worst |d| %.3e at dof %ld (field %ld)\n",
+                        (double)eps,
+                        (double)std::sqrt(num / std::max(den, real_t(1e-300))),
+                        (double)std::sqrt(nmom / std::max(dmom, real_t(1e-300))),
+                        (double)std::sqrt(ncon / std::max(dcon, real_t(1e-300))),
+                        (double)worst, (long)worst_i, (long)(worst_i % 4));
+        }
+        return 0;
+    }
+
+    // What to do with a time step that exhausts its continuation retries.
+    //
+    // `abort` is the default and the only safe one to inherit: the behaviour it replaced was to
+    // accept the unconverged state and step on, which leaves no trace in the output. `cutback`
+    // restores the step's starting state, shrinks dt and retries -- the outer analogue of the
+    // continuation's own bisection, which retries a STAGE at an intermediate Reynolds number.
+    // When that inner budget is spent, the step size itself is the remaining parameter.
+    //
+    // Not the default, because a campaign that silently halves its way to dt_min has changed
+    // its own discretisation without saying so; a run that asks for cutback has accepted that.
+    //
+    // Read here rather than beside the restart knobs below because the step snapshot allocated
+    // a few lines down is conditional on it.
+    const std::string step_on_fail = smesh::Env::read_string("SFEM_STEP_ON_FAIL", "abort");
+    const bool        cutback_on   = step_on_fail == "cutback";
+    // How far each retry shrinks the step, how many retries a single step may spend, and how
+    // many consecutive converged steps it takes to earn the original size back.
+    //
+    // Recovery is not the CFL controller's job and does not fight it: when SFEM_CFL_TARGET is
+    // set, that controller owns dt_now and this leaves it alone. Recovery exists for the fixed
+    // step case, where nothing else would ever undo a cutback and a campaign that hit one hard
+    // instant would run its remaining 10^5 steps at half speed for no reason.
+    const real_t cutback_factor = smesh::Env::read<real_t>("SFEM_STEP_CUTBACK_FACTOR", real_t(0.5));
+    const int    cutback_max    = smesh::Env::read<int>("SFEM_STEP_MAX_CUTBACK", 4);
+    const int    recover_after  = smesh::Env::read<int>("SFEM_STEP_RECOVER_AFTER", 8);
+    if (cutback_on && (cutback_factor <= real_t(0) || cutback_factor >= real_t(1))) {
+        std::fprintf(stderr, "SFEM_STEP_CUTBACK_FACTOR must lie in (0,1); got %g\n",
+                     (double)cutback_factor);
+        return EXIT_FAILURE;
+    }
+    if (!cutback_on && step_on_fail != "abort") {
+        std::fprintf(stderr, "SFEM_STEP_ON_FAIL='%s' is not one of abort|cutback\n",
+                     step_on_fail.c_str());
+        return EXIT_FAILURE;
+    }
+    // Whether the step size has ever moved from SFEM_DT. Two things key on it and both are
+    // wrong if they ask "is the CFL controller on" instead, because a cutback varies dt with
+    // SFEM_CFL_TARGET unset: the absolute time below, which would otherwise report n*dt for
+    // instants the run never visited, and the restart's fixed-step flag, which would otherwise
+    // claim a checkpoint may be resumed at the env dt and silently undo every cutback taken.
+    bool dt_varies = cfl_target > real_t(0);
+
+    std::vector<real_t> x_stage_start((size_t)ndof, real_t(0));
+    // The state a TIME STEP started from, for the cutback policy. Sized only when that policy
+    // is selected: it is an ndof copy per step, and across a campaign of 10^5 steps an unused
+    // one is pure waste in the inner loop. The stage snapshot above cannot serve instead --
+    // it is retaken at the top of every continuation stage, so on a multi-stage step it holds
+    // the last stage's entry state rather than the step's.
+    std::vector<real_t> x_step_start;
+    if (cutback_on) x_step_start.assign((size_t)ndof, real_t(0));
+    // The last residual a TIME STEP reached, for the step-failure policy below: the stage
+    // loop's own prev_rnorm and r_stage0 are declared inside it and are gone by the time a
+    // failure is detected.
+    real_t              step_last_rnorm = 0;
+    // Consecutive converged steps since the last cutback, and how far below the requested size
+    // the current one sits. Zero cutbacks means dt_now is the size the caller asked for.
+    int                 good_steps  = 0;
+    int                 cutbacks_in = 0;
+    int                 re_retries = 0;
+    real_t              step_f     = re_step;  // current continuation step factor
+
+    double t_op    = 0;  // building the Jacobian operator (assembly, or nothing)
+    double t_prec  = 0;  // building the block-Jacobi preconditioner
+    double t_solve = 0;  // the Krylov solve itself
+
+    // Matrix-free reads the state buffer on every apply, so one operator tracks Newton
+    // for the whole solve. The assembled one is a snapshot and has to be rebuilt.
+    std::shared_ptr<sfem::Operator<real_t>> mf_op;
+    if (matrix_free) {
+        const double t0 = smesh::time_seconds();
+        mf_op = sfem::create_linear_operator(sfem::op_type::MATRIX_FREE, f, xbuf, sfem::EXECUTION_SPACE_HOST);
+        t_op += smesh::time_seconds() - t0;
+    }
+
+    // The residual's counterpart to mf_op.
+    //
+    // Function::gradient communicates nothing: it reads x wherever its elements point, and on
+    // a distributed mesh that includes ghost and aura nodes whose slots nothing fills. Every
+    // owned row touched by a partition-crossing element then comes out wrong -- and wrong the
+    // same way on every rank, so the ranks agree with each other and disagree with serial.
+    // That is the one failure a rank-to-rank comparison cannot see, which is why it survived
+    // until a 1-vs-N check existed: measured on the cavity at N=4 over two ranks, Newton's
+    // first residual read 6.131693e-03 against a serial 8.100926e-03.
+    //
+    // The evaluator gathers ghosts AND aura, then evaluates over every local element. The aura
+    // is one element deep, so every element touching an owned node is present locally and the
+    // owned rows come out complete -- one gather, and no scatter back to the owners.
+    //
+    // At one rank it calls Function::gradient directly, so the serial path is unchanged.
+    auto grad_op = sfem::create_parallel_gradient_operator(f, sfem::EXECUTION_SPACE_HOST);
+
+    // Built once: the hierarchy and its transfer operators depend on the mesh, not the
+    // state. The level states are refreshed per Newton step below, since they do.
+    std::shared_ptr<GmgLevels> gmg;
+    if (use_gmg == 1) {  // 2 is the no-hierarchy control and must not build one
+        std::printf("preconditioner: geometric multigrid (smoother %s)\n",
+                    smesh::Env::read_string("SFEM_SMOOTHER", "vanka").c_str());
+        gmg = build_gmg(f, op, xbuf, gmg_smooth);
+        if (gmg) build_state_weights(*gmg);
+        if (gmg) build_transfer_matrices(*gmg);
+        if (gmg && smesh::Env::read<int>("SFEM_GMG_CHECK", 0)) {
+            refresh_gmg(*gmg);
+            if (smesh::Env::read<int>("SFEM_GMG_CHECK", 0) == 4) {
+                check_derefined_op(*gmg);
+                check_cgc(*gmg, 0);
+                check_cgc(*gmg, 3);
+            } else {
+                check_transfers(*gmg);
+            }
+        }
+        if (!gmg) {
+            std::fprintf(stderr, "SFEM_GMG=1 but the hierarchy could not be built "
+                                 "(needs a semi-structured mesh with more than one level)\n");
+            return EXIT_FAILURE;
+        }
+        std::printf("gmg: %zu levels, %d smoothing steps\n", gmg->ops.size(), gmg_smooth);
+    }
+
+    int  newton_it    = 0;
+    int  lin_it_total = 0;
+    // Newton steps summed over every continuation stage. `newton_it` below is the inner loop
+    // variable and restarts at each stage, so on its own it reports only the last stage --
+    // which, after a good ramp, is the cheapest one. Printing it beside the cumulative
+    // lin_it_total invited exactly the wrong reading: "3 Newton steps, 1346 linear iterations".
+    int    newton_total = 0;
+    int    stages_run   = 0;
+    real_t rho_solved   = 0;  // highest rho whose stage actually converged
+
+    // Globalization. Two things the Newton loop was missing, both standard practice in the
+    // implicit CFD codes surveyed in docs/CVFEM_SotA.tex:
+    //
+    //   * a residual merit function controlling the step, so an update that does not reduce
+    //     ||R|| is backtracked rather than accepted. LAURA's Algorithm 1 does exactly this and
+    //     treats a line-search parameter below 0.1 as the signal to give up on the step;
+    //     HANIM discards any update failing its merit test and never re-linearises.
+    //   * early divergence detection, so a stage that is going to fail fails FAST. At Re=1000
+    //     the Re=1000 stage burned the full 40 Newton steps on each of four attempts while the
+    //     residual grew monotonically -- 344 Newton steps and 183 s to discover the ramp could
+    //     not get past 843.
+    //
+    // Both feed the continuation: a stage that reports failure early triggers the adaptive
+    // bisection that much sooner.
+    const bool   ls_on     = smesh::Env::read<int>("SFEM_NL_LINESEARCH", 1) != 0;
+    const int    ls_max    = smesh::Env::read<int>("SFEM_NL_MAX_LS", 8);
+    const real_t ls_armijo = smesh::Env::read<real_t>("SFEM_NL_ARMIJO", real_t(1e-4));
+    const real_t div_grow  = smesh::Env::read<real_t>("SFEM_NL_DIVERGE", real_t(1e3));
+    // Relative residual below which a line search that cannot improve means "converged", not
+    // "failed": at the round-off floor there is no decrease left to find.
+    //
+    // A hundred times nl_rtol, and it used to be ten. The reason for ten was that "anything
+    // looser starts accepting states that simply have not converged", which is the right
+    // worry and is now a measured question rather than a guess, because rel is measured
+    // against r0 -- the first residual of the current time step, and of the whole run for a
+    // steady solve -- shared by that step's stages: a stage that begins nearly solved has no
+    // reachable rtol at all, and the corrected Rhie-Chow time scale makes stages begin nearly
+    // solved routinely.
+    //
+    // The two cases that have to be separated, from jobs/rc_tau_remedy.sbatch on 72 Grace
+    // cores:
+    //
+    //   cavity Re=100, 470,596 dof     rel 4.31e-07   at its floor, must be accepted
+    //   mms N=64, 1,098,500 dof        rel 3.81e-03   unconverged, must still be rejected
+    //
+    // At 1e-6 the cavity reaches its Re=100 target in 16 Newton steps and 7,159 linear
+    // iterations with no abandoned stage -- against 86 and 35,572 for the coefficient this
+    // replaced -- and the manufactured-solution case is refused exactly as before, 2 Newton
+    // steps and one abandoned stage, unchanged to the digit. So the loosening does not buy
+    // the cavity at the price of accepting the other, which is the only thing that would make
+    // it the wrong trade. Re-run that job before moving it again.
+    const real_t nl_ls_floor = smesh::Env::read<real_t>("SFEM_NL_LS_FLOOR", real_t(1e-6));
+    std::vector<real_t> x_try((size_t)ndof, 0), r_try((size_t)ndof, 0);
+    bool converged    = false;
+    // Set from the first nonzero residual of a time step and kept across that step's stages,
+    // as in the standalone driver: the continuation stage and the physical stage are measured
+    // against the same reference.
+    //
+    // Per STEP, not per run. Left global, it made SFEM_NL_RTOL meaningless after the first
+    // step of a transient: every later step starts O(dt) from its answer, so rel was already
+    // below rtol at the first Newton iteration and only SFEM_NL_ATOL decided convergence --
+    // the run silently swapped a relative criterion for an absolute one. A steady solve takes
+    // the step loop exactly once, so it is untouched bit for bit. SFEM_NL_R0_SCOPE=run
+    // restores the old behaviour, for bisecting against transient logs recorded before this.
+    real_t     r0          = 0;
+    const bool r0_per_step = smesh::Env::read_string("SFEM_NL_R0_SCOPE", "step") != "run";
+
+    // ---------------------------------------------------------------- time stepping
+    //
+    // One time step is a full continuation-and-Newton solve of the transient residual, so
+    // everything below -- the Reynolds ramp, the adaptive retry, the divergence detection --
+    // works unchanged inside a step. With SFEM_DT = 0 the loop runs exactly once and the
+    // operator has no time term, which is bit-for-bit the steady solve.
+    std::vector<real_t> u_hist, u_hist2;
+    // ------------------------------------------------------------------- running statistics
+    //
+    // Time-averaged first and second moments of the state, for the averaging window a DNS is
+    // actually judged on. Three choices here are deliberate and none of them is free:
+    //
+    // WEIGHTED, by the step actually taken. With SFEM_CFL_TARGET the step size moves, so an
+    // unweighted mean over samples is a mean over STEPS and not over TIME -- it overweights
+    // whatever part of the flow forced the controller to take small steps, which is precisely
+    // the energetic part one is trying to measure.
+    //
+    // WELFORD, not raw sums. In the jet core u_rms is orders below u_mean, so
+    // mean-of-squares minus square-of-mean cancels away exactly the digits the fluctuation
+    // lives in. Welford's update never forms either of those products.
+    //
+    // DOUBLE, whatever real_t is. These accumulate over 10^5 steps; in single precision the
+    // increment w*(v-mean) falls below the mean's last bit long before the window closes and
+    // the average silently stops moving.
+    const int stats_on    = smesh::Env::read<int>("SFEM_STATS", 0);
+    // Skips the start-up transient, exactly as SFEM_WRITE_STEPS_FIRST does for frames: an
+    // average that includes the initial ramp is not an average of the flow.
+    const int stats_first = smesh::Env::read<int>("SFEM_STATS_FIRST", 0);
+    double              stats_w = 0;  // sum of weights, i.e. the window length in seconds
+    long long           stats_n = 0;  // samples in it, reported so a window can be read back
+    std::vector<double> stats_mean, stats_m2;
+    if (stats_on && dt_step > real_t(0)) {
+        stats_mean.assign((size_t)ndof, 0.0);
+        stats_m2.assign((size_t)ndof, 0.0);
+    }
+    // Segmented runs. A long transient does not have to fit one allocation: SFEM_RESTART_OUT
+    // writes the state every SFEM_RESTART_EVERY steps and at the end of the segment, and
+    // SFEM_RESTART_IN picks it up. `tstep0` and `t0` are the absolute step and time the
+    // segment starts from, so a run cut into pieces reports the same times as one that was
+    // not, and SFEM_NSTEPS means "steps in THIS segment" rather than "steps in total".
+    const std::string restart_in    = smesh::Env::read_string("SFEM_RESTART_IN", "");
+    const std::string restart_out   = smesh::Env::read_string("SFEM_RESTART_OUT", "");
+    const int         restart_every = smesh::Env::read<int>("SFEM_RESTART_EVERY", 0);
+    int               tstep0        = 0;
+    real_t            t0            = 0;
+    bool              resumed       = false;
+    if (dt_step > real_t(0)) {
+        op->set_time_step(dt_now, bdf_order, dt_prev_step);
+        u_hist.assign((size_t)nnodes * 3, real_t(0));
+        // The initial condition is whatever the state holds when stepping starts, so the
+        // first step is consistent with it rather than with an implied zero field.
+        for (ptrdiff_t i = 0; i < nnodes; ++i)
+            for (int c = 0; c < 3; ++c) u_hist[(size_t)i * 3 + (size_t)c] = x[(size_t)i * 4 + (size_t)c];
+        op->set_velocity_history(u_hist.data(), nullptr);
+        std::printf("transient: dt %g, %d steps, BDF%d\n", (double)dt_step, nsteps, bdf_order);
+
+        // ------------------------------------------------------------------ restart in
+        //
+        // Resume from a saved state, so a long run can be cut into segments that each fit a
+        // queue's wall clock. SFEM_RESTART_IN names a folder written by the block at the end
+        // of the step loop.
+        //
+        // The layout is the one sfem::TwoPhaseFlowTimeIntegration already uses for the same
+        // job: Buffer::to_file / from_file for the arrays, the scalar type in the extension
+        // via TypeToString, and a plain-text restart.txt beside them. Nothing here is a new
+        // format.
+        //
+        // What is saved is exactly what the next step needs and nothing else: the state, and
+        // the one or two velocity history levels BDF needs. The mesh is not saved -- it is
+        // regenerated -- which is why the coordinate checksum is written and checked. Reading
+        // a state into a different node numbering is otherwise silent: every array has the
+        // right length, nothing fails, and the run continues from a scrambled field.
+        if (!restart_in.empty()) {
+            const std::string ext   = std::string(smesh::TypeToString<real_t>::value());
+            auto              st    = smesh::Buffer<real_t>::from_file(smesh::Path(restart_in) / ("state." + ext));
+            auto              h1    = smesh::Buffer<real_t>::from_file(smesh::Path(restart_in) / ("u_prev." + ext));
+            std::ifstream     meta((smesh::Path(restart_in) / "restart.txt").c_str());
+            double            m_t = 0, m_dt = 0, m_sum = 0;
+            int               m_step = 0, m_bdf = 0;
+            long long         m_nnodes = 0;
+            if (!st || !h1 || !meta || !(meta >> m_step >> m_t >> m_dt >> m_bdf >> m_nnodes >> m_sum)) {
+                std::fprintf(stderr, "restart: cannot read a complete restart from '%s'\n", restart_in.c_str());
+                return EXIT_FAILURE;
+            }
+            // The live step size, if this checkpoint carries it. Absent in anything written
+            // before it was added, which is why its failure is not an error: the defaults
+            // below reproduce exactly what such a checkpoint used to resume with.
+            double    m_dt_now = 0, m_dt_prev = 0;
+            int       m_dt_fixed = 1;
+            const bool have_dt_state = static_cast<bool>(meta >> m_dt_now >> m_dt_prev >> m_dt_fixed);
+            // The averaging window. Read HERE, immediately after the dt fields, because these
+            // are positional trailing fields in one stream: consuming them anywhere else in
+            // the sequence would take the dt values into the statistics or leave the stream
+            // mid-record. The moments themselves load further down with the other arrays, and
+            // the window is applied only if they do, so the two can never resume out of step.
+            double     m_stats_w = 0;
+            long long  m_stats_n = 0;
+            const bool have_stats_w = static_cast<bool>(meta >> m_stats_w >> m_stats_n);
+            if (have_dt_state && !m_dt_fixed) {
+                // An adapted run: the env dt is only where it started, so the guard below --
+                // which compares the env value -- cannot speak for it. Resume at the size the
+                // controller had reached, with the previous size BDF2's variable-step
+                // coefficients need.
+                dt_now        = (real_t)m_dt_now;
+                dt_prev_step  = (real_t)m_dt_prev;
+                std::printf("restart: resuming an adapted step, dt %.17g (previous %.17g)\n", m_dt_now,
+                            m_dt_prev);
+            }
+            if ((ptrdiff_t)st->size() != ndof || (ptrdiff_t)h1->size() != nnodes * 3 || m_nnodes != (long long)nnodes) {
+                std::fprintf(stderr,
+                             "restart: size mismatch -- saved %lld nodes, this run has %td. The mesh or the "
+                             "resolution differs.\n",
+                             m_nnodes, nnodes);
+                return EXIT_FAILURE;
+            }
+            // Relative, because the sum is O(nnodes * L) and its last bits move with the
+            // summation order of a different build; a scrambled numbering moves it by O(1).
+            const double tol = 1e-9 * std::fmax(std::fabs(m_sum), 1.0);
+            if (std::fabs(m_sum - mesh_coord_checksum) > tol) {
+                std::fprintf(stderr,
+                             "restart: mesh coordinate checksum %.17g does not match this run's %.17g. The node "
+                             "numbering differs, and loading would silently scramble the field.\n",
+                             m_sum, mesh_coord_checksum);
+                return EXIT_FAILURE;
+            }
+            if (m_bdf != bdf_order || std::fabs(m_dt - (double)dt_step) > 1e-12 * std::fmax(m_dt, 1.0)) {
+                // Refused rather than warned. The history levels ARE the timestep: reading
+                // u^{n-1} saved at one dt and differencing it at another is not a small
+                // error, it is a different equation, and BDF2 fed a BDF1 history is worse.
+                std::fprintf(stderr,
+                             "restart: saved dt %.17g BDF%d, this run dt %.17g BDF%d -- the history belongs to the "
+                             "timestep it was written at.\n",
+                             m_dt, m_bdf, (double)dt_step, bdf_order);
+                return EXIT_FAILURE;
+            }
+            std::copy(st->data(), st->data() + ndof, x);
+            std::copy(h1->data(), h1->data() + nnodes * 3, u_hist.begin());
+            auto h2 = smesh::Buffer<real_t>::from_file(smesh::Path(restart_in) / ("u_prev2." + ext));
+            if (h2 && (ptrdiff_t)h2->size() == nnodes * 3) {
+                u_hist2.assign((size_t)nnodes * 3, real_t(0));
+                std::copy(h2->data(), h2->data() + nnodes * 3, u_hist2.begin());
+            }
+            // The moments, when this run is accumulating them AND the checkpoint carries
+            // them. Missing files are not an error in either direction: from_file returns
+            // null for a checkpoint written before statistics existed, or by a segment that
+            // ran with SFEM_STATS off, and such a run resumes with an empty window -- which is
+            // the truth, it has averaged nothing yet. The window is taken only alongside the
+            // arrays, so weight and moments can never be resumed out of step with each other.
+            if (!stats_mean.empty()) {
+                auto sm = smesh::Buffer<double>::from_file(smesh::Path(restart_in) / "stats_mean.float64");
+                auto s2 = smesh::Buffer<double>::from_file(smesh::Path(restart_in) / "stats_m2.float64");
+                if (sm && s2 && (ptrdiff_t)sm->size() == ndof && (ptrdiff_t)s2->size() == ndof &&
+                    have_stats_w && m_stats_w > 0) {
+                    std::copy(sm->data(), sm->data() + ndof, stats_mean.begin());
+                    std::copy(s2->data(), s2->data() + ndof, stats_m2.begin());
+                    stats_w = m_stats_w;
+                    stats_n = m_stats_n;
+                    std::printf("restart: resumed statistics, window %.6g s over %lld samples\n", stats_w,
+                                stats_n);
+                } else {
+                    std::printf("restart: no statistics in '%s'; averaging starts here\n", restart_in.c_str());
+                }
+            }
+            // BDF2 from the first step of the segment when the second level came back: a
+            // resumed run is mid-sequence, not starting up, and dropping to BDF1 for one step
+            // would put a first-order error into the middle of a second-order run.
+            const bool have_h2 = !u_hist2.empty();
+            op->set_velocity_history(u_hist.data(), (bdf_order >= 2 && have_h2) ? u_hist2.data() : nullptr);
+            tstep0 = m_step;
+            t0     = (real_t)m_t;
+            resumed = true;
+            // The state carries its own constraint values; re-applying is what makes a
+            // time-varying condition correct at the resumed instant rather than the saved one.
+            f->apply_constraints(x);
+            std::printf("restart: resumed from '%s' at step %d, t = %.17g%s\n", restart_in.c_str(), tstep0,
+                        (double)t0, have_h2 ? " (BDF2 history)" : " (BDF1 history only)");
+        }
+    }
+
+    // The diaphragm waveform. A steady run leaves this at 1, which is a diaphragm held at
+    // a constant displacement rate -- not a physical pump cycle, but the configuration in
+    // which the swept-volume identity is easiest to read, and the one the verification
+    // harness checks.
+    //
+    // With a timestep it becomes V sin(2 pi t / T). Note this does NOT rectify: the port is
+    // an opening with no valve, so over a full cycle the chamber breathes in and out and
+    // nets nothing. Rectification needs the port's condition to depend on the sign of its
+    // own flux, which is a different and much less pleasant problem, and is out of scope.
+    const real_t pump_period = smesh::Env::read<real_t>("SFEM_PUMP_PERIOD", real_t(1));
+    real_t       pump_scale  = 1;
+
+    // Diagnostics state that has to outlive one step: the previous FlowState is what dE/dt is
+    // differenced against, and the volume array is geometry so it is built once. The file
+    // handle is opened lazily at the first row so a run that never reaches one leaves no
+    // empty file behind.
+    cvfem_diag::FlowState diag_prev{};
+    bool                  diag_have_prev = false;
+    std::vector<real_t>   diag_vol, diag_grad, diag_w;
+    // The convective outflow's scratch, hoisted out of the step loop for the same reason the
+    // diagnostics' is: these are ndof-sized and reallocating them every step is pure waste.
+    std::vector<real_t>   conv_grad, conv_trial;
+    FILE                 *diag_fh = nullptr;
+    // Whether this segment has written the geometry its frames share. Outside the loop because
+    // the first frame a segment writes is rarely its first step: a stride, or a resumed
+    // segment, both start elsewhere, and frames without the mesh beside them are unreadable.
+    bool                  wrote_step_mesh = false;
+
+    // A monitor point, sampled every step into the diagnostics row. Stage 2 wanted this and the
+    // driver did not have it: the nozzle stations and nozzle_centerline.csv are written once,
+    // after the loop, so nothing recorded what happened at a FIXED place as a function of time --
+    // which is the only form in which an outflow condition's reflection can be seen at all.
+    //
+    // SFEM_MON_X selects it, with SFEM_MON_Y/Z defaulting to 0 -- which is the axis on the nozzle
+    // and an EDGE of the domain on a box case like the pump, where the nearest node is a no-slip
+    // wall and the sampled velocity is identically zero. Resolved ONCE here rather
+    // than per step: a nearest-node search is O(nnodes), and at 7M dof inside a 10^5-step
+    // campaign that is the same inner-loop waste the Vanka freeze exists to remove.
+    //
+    // The node's ACTUAL coordinates are printed, not the requested ones. The nearest node is in
+    // general not the point asked for, and a probe whose true position is unrecorded cannot be
+    // compared against a second run, a finer mesh, or an experiment.
+    ptrdiff_t mon_node = -1;
+    if (!smesh::Env::read_string("SFEM_MON_X", "").empty()) {
+        const double      mx  = (double)smesh::Env::read<real_t>("SFEM_MON_X", real_t(0));
+        const double      my  = (double)smesh::Env::read<real_t>("SFEM_MON_Y", real_t(0));
+        const double      mz  = (double)smesh::Env::read<real_t>("SFEM_MON_Z", real_t(0));
+        const auto *const mpx = mesh->points()->data()[0];
+        const auto *const mpy = mesh->points()->data()[1];
+        const auto *const mpz = mesh->points()->data()[2];
+        double            best = 0;
+        for (ptrdiff_t i = 0; i < nnodes; ++i) {
+            const double dx = (double)mpx[i] - mx, dy = (double)mpy[i] - my, dz = (double)mpz[i] - mz;
+            const double d2 = dx * dx + dy * dy + dz * dz;
+            if (mon_node < 0 || d2 < best) {
+                best     = d2;
+                mon_node = i;
+            }
+        }
+        if (mon_node >= 0)
+            std::printf("monitor: requested (%.6g %.6g %.6g), using node %td at (%.6g %.6g %.6g), "
+                        "distance %.3e\n",
+                        mx, my, mz, mon_node, (double)mpx[mon_node], (double)mpy[mon_node],
+                        (double)mpz[mon_node], std::sqrt(best));
+        // A monitor on a CONSTRAINED node reports the boundary condition rather than the flow.
+        // Its velocity is pinned, so mon_ux reads exactly zero for every step of the campaign --
+        // which is indistinguishable from "no disturbance ever arrived", and that is the one
+        // signal this probe exists to detect. Measured on the pump with the default y = z = 0:
+        // mon_ux was 0 at every step while mon_p varied, because the point is a no-slip edge.
+        //
+        // Warned and not refused: wall PRESSURE is a legitimate thing to sample -- the FDA
+        // benchmark reports it -- so the run is allowed to proceed knowing what it is getting.
+        //
+        // sfem::constraints_mask is the tree's own query for this; the alternative of pushing a
+        // sentinel vector through apply_constraints and diffing it would be inventing a second
+        // way to ask a question SFEM already answers.
+        if (mon_node >= 0) {
+            std::vector<sfem::mask_t> cmask((size_t)sfem::mask_count(ndof), 0);
+            if (f->constraints_mask(cmask.data()) == SFEM_SUCCESS) {
+                int nfixed = 0;
+                for (int d = 0; d < 3; ++d)
+                    nfixed += sfem::mask_get(mon_node * 4 + d, cmask.data()) != 0;
+                if (nfixed > 0)
+                    std::printf("monitor: WARNING -- %d of 3 velocity components at this node are "
+                                "constrained, so mon_ux reports the boundary condition and not the "
+                                "flow. Move the point off the boundary unless wall pressure is what "
+                                "was wanted.\n",
+                                nfixed);
+            }
+        }
+    }
+
+    for (int tstep = 0; tstep < (dt_step > real_t(0) ? nsteps : 1); ++tstep) {
+    // Absolute, so a segmented run and a single one report the same instants and a frame
+    // written in segment three is not labelled as though it were the third frame overall.
+    const int    abs_step = tstep0 + tstep + 1;
+    // The instant this step lands on. Assigned inside the retry below, because a cutback
+    // changes the size this step takes and therefore the time it reaches, but declared out
+    // here because the frame writer, the diagnostics row and the restart all read it after
+    // the retry has settled on a step that converged.
+    real_t       t_abs    = 0;
+    // Wall time of this step, reported as the diagnostics' t_step column. The cost model a
+    // long campaign is planned from needs the per-step cost directly: t_solve is a run total,
+    // and lin_it is cumulative, so both have to be differenced to say what one step cost --
+    // which is exactly the arithmetic a reader gets wrong. Measured here rather than around
+    // the solve alone so that it counts everything a step actually spends: the residual, the
+    // preconditioner rebuild, the diagnostics and the output.
+    const double t_step_wall0 = smesh::time_seconds();
+    // TELL THE OPERATOR. Without this the CFL controller below is inert: it moves dt_now,
+    // the diagnostics compute their CFL from dt_now, and the log reports a step size that
+    // converges on the target -- while every step the solver actually takes is still
+    // dt_step, because set_time_step was called once before the loop and never again. The
+    // reported CFL was then a function of the number the controller had just written rather
+    // than of anything the solve did, which is a measurement of the controller by itself.
+    //
+    // Called every step rather than only when the size changes, because BDF2's variable-step
+    // coefficients need dt AND the previous dt: calling only on a change leaves the operator
+    // holding a stale dt_prev on the step after one, which is exactly where the coefficients
+    // matter most.
+    // The step's own retry loop. One pass unless SFEM_STEP_ON_FAIL=cutback and the step fails,
+    // in which case the state is restored, dt shrinks and the body runs again at the smaller
+    // size. Re-entering HERE rather than lower down is what makes the retry correct without a
+    // second copy of the step's set-up: set_time_step is re-called with the new size and the
+    // unchanged dt_prev_step that BDF2 needs, the convective outflow re-extrapolates with the
+    // size actually being attempted, and `have_guess` rebuilds the continuation schedule that
+    // the failed attempt's bisections had grown.
+    //
+    // The body is not re-indented for this loop. It is 1100 lines long and the file already
+    // keeps it at the enclosing level for exactly that reason.
+    int cutbacks_here = 0;
+    for (;;) {
+    if (cutback_on && dt_step > real_t(0)) std::copy(x, x + ndof, x_step_start.begin());
+    const real_t p_solved_at_step    = p_solved;
+    const int    p_ramp_left_at_step = p_ramp_left;
+    dt_taken = dt_now;
+    if (dt_step > real_t(0)) op->set_time_step(dt_taken, bdf_order, dt_prev_step);
+    t_run += dt_taken;
+    // n*dt while the step is FIXED, accumulated only once it is not. Not a micro-optimisation
+    // and not cosmetic: summing dt six times and multiplying it by six differ in the last
+    // bit, the pump drives its diaphragm at sin(2 pi t / T), and that bit reaches the swept
+    // volume -- the restart test compares the printed port-versus-swept identity across a
+    // seam and read 1.110223e-16 against 0.000000e+00 the moment this became a sum. For a
+    // fixed step n*dt is also the more accurate answer, since it accumulates no error at all;
+    // the sum is only needed when there is no single dt to multiply by.
+    t_abs = dt_varies ? (t0 + t_run)
+                      : (t0 + (real_t)(tstep + 1) * dt_step);
+    if (dt_step > real_t(0)) std::printf("=== step %d (segment %d/%d)  t = %g ===\n", abs_step, tstep + 1,
+                                         nsteps, (double)t_abs);
+    // ------------------------------------------------ the convective outflow, du/dt + U_c du/dn = 0
+    //
+    // Orlanski's advective condition (JCP 21, 1976), as used for incompressible flow by Sani
+    // and Gresho. It exists because the do-nothing outflow reflects: a vortex reaching x = Lx
+    // has to leave, and a zero-traction plane sends part of it back upstream. That only
+    // matters once the flow is unsteady enough to advect structures out, which is why this is
+    // transient-only and why the natural outflow remains the default.
+    //
+    // IMPLEMENTED AS A DIRICHLET VALUE REFRESHED ONCE PER STEP, not as a third boundary mask.
+    // The condition is explicit in time by construction -- it reads u^n and writes u^{n+1} --
+    // so it needs no term in the residual and no entry in the Jacobian, and the machinery for
+    // a time-varying prescribed velocity already exists and is already used by the pump. A
+    // mask in Hex8BoundaryDataT would be a second path to the same boundary values, and it
+    // would have to carry a level of face history that the nodal state already holds.
+    //
+    // du/dn COMES FROM nodal_velocity_gradient, the same pass the diagnostics and the
+    // deferred correction use, rather than from a neighbour search along the normal. That is
+    // the whole reason it works on the semi-structured mesh without a second implementation:
+    // the operator already dispatches that call on both paths. The outlet is the plane
+    // x = Lx, so n = (1,0,0) and du/dn is column 0 of each node's gradient.
+    //
+    // U_c IS UNIFORM, NOT LOCAL. Orlanski used a locally computed phase speed and the
+    // literature since reports that the local choice leaves wavy profiles at the boundary;
+    // the uniform mean is the robust one. It is also parameter-free here, because the mean
+    // outflow velocity is exactly the number the mass balance below already needs:
+    // U_c = |mdot_in| / (rho * A_outlet).
+    //
+    // AND THE MASS BALANCE IS NOT OPTIONAL. With the outlet velocity prescribed, every
+    // boundary of the domain carries a velocity condition, so the discrete continuity
+    // equations are consistent only if the prescribed fluxes sum to zero. The advective
+    // update has no reason to satisfy that, and an inconsistent singular system does not fail
+    // loudly -- it converges to something. So the updated outflow is shifted by a uniform
+    // normal velocity that restores the balance exactly. The flux is linear in u, so the
+    // shift is a division rather than an iteration.
+    if (want_convective_outflow && dt_step > real_t(0) && dirichlet && !conv_slot.empty()) {
+        // The outlet area, once. Measured rather than computed from Ly*Lz: sideset_mass_flux
+        // of a uniform u = (1,0,0) is rho*A through a plane normal to x by construction, and
+        // it is the SAME quadrature the balance below uses, so any error in it cancels
+        // instead of biasing the shift. The flow-diagnostics test pins that identity against
+        // rho*U*Ly*Lz on both the flat and the semi-structured path.
+        //
+        // TWO AREAS, and they are not always the same one. conv_area is the whole outlet and
+        // is what the mean outflow velocity U_c is defined against. conv_area_ctl is the part
+        // the shift can actually move -- the nodes this condition prescribes -- and is what
+        // the shift must be divided by. On `step` every outlet node is prescribed and the two
+        // are equal. On `step_turb` they are not: a node on both x = Lx and a spanwise plane
+        // is a slip node, so its u_x and u_y stay free, and dividing the flux deficit by the
+        // full area would under-correct by that ring's share. Measuring the controlled area
+        // as the flux of a field that is 1 on exactly those nodes gets it right on both cases
+        // without either of them being special.
+        static real_t conv_area = -1, conv_area_ctl = -1;
+        if (conv_area < 0) {
+            std::vector<real_t> probe((size_t)ndof, 0);
+            for (ptrdiff_t i = 0; i < nnodes; ++i) probe[(size_t)i * N_FIELDS + 0] = 1;
+            real_t qa = 0;
+            if (op->sideset_mass_flux(probe.data(), "outlet", qa) != SFEM_SUCCESS || qa <= 0) {
+                std::fprintf(stderr, "convective outflow: could not measure the outlet area\n");
+                return EXIT_FAILURE;
+            }
+            conv_area = qa / op->rho;
+
+            std::fill(probe.begin(), probe.end(), real_t(0));
+            for (size_t k = 0; k < conv_node.size(); ++k)
+                probe[(size_t)conv_node[k] * N_FIELDS + 0] = 1;
+            real_t qc = 0;
+            if (op->sideset_mass_flux(probe.data(), "outlet", qc) != SFEM_SUCCESS || qc <= 0) {
+                std::fprintf(stderr, "convective outflow: the prescribed nodes carry no area\n");
+                return EXIT_FAILURE;
+            }
+            conv_area_ctl = qc / op->rho;
+            std::printf("convective outflow: %td nodes  outlet area %g  controlled %g\n",
+                        (ptrdiff_t)conv_slot.size(), (double)conv_area, (double)conv_area_ctl);
+        }
+
+        real_t mdot_in = 0;
+        if (op->sideset_mass_flux(x, "inlet", mdot_in) != SFEM_SUCCESS) {
+            std::fprintf(stderr, "convective outflow: no inlet sideset to balance against\n");
+            return EXIT_FAILURE;
+        }
+        // positive LEAVING, so the inlet reads negative and the outlet must carry +|mdot_in|.
+        const real_t q_target = -mdot_in;
+        const real_t u_mean   = q_target / (op->rho * conv_area);
+        const real_t uc       = smesh::Env::read<real_t>("SFEM_OUTFLOW_UC", u_mean);
+
+        conv_grad.assign((size_t)nnodes * 9, 0);
+        if (op->nodal_velocity_gradient(x, conv_grad.data()) != SFEM_SUCCESS) {
+            std::fprintf(stderr, "convective outflow: nodal_velocity_gradient failed\n");
+            return EXIT_FAILURE;
+        }
+
+        // u* = u^n - dt U_c du/dn, into a copy of the state so the flux of the CANDIDATE can
+        // be measured with the same routine that measures every other flux in this driver.
+        conv_trial.assign(x, x + ndof);
+        for (size_t k = 0; k < conv_node.size(); ++k) {
+            const ptrdiff_t i = conv_node[k];
+            for (int c = 0; c < 3; ++c) {
+                const real_t dudn = conv_grad[(size_t)i * 9 + (size_t)c * 3 + 0];  // n = +x
+                conv_trial[(size_t)i * N_FIELDS + (size_t)c] =
+                        x[(size_t)i * N_FIELDS + (size_t)c] - dt_now * uc * dudn;
+            }
+        }
+
+        real_t q_cand = 0;
+        if (op->sideset_mass_flux(conv_trial.data(), "outlet", q_cand) != SFEM_SUCCESS) {
+            std::fprintf(stderr, "convective outflow: could not measure the outlet flux\n");
+            return EXIT_FAILURE;
+        }
+        // Flux is linear in u and the shift is normal, so Q(u* + d n) = Q(u*) + d rho A_ctl,
+        // over the nodes the shift is written to and no others.
+        const real_t shift = (q_target - q_cand) / (op->rho * conv_area_ctl);
+
+        auto &conds = dirichlet->conditions();
+        for (size_t k = 0; k < conv_slot.size(); ++k) {
+            const ptrdiff_t i = conv_node[k];
+            const size_t    slot = conv_slot[k];
+            for (int c = 0; c < 3; ++c)
+                conds[(size_t)c].values->data()[slot] =
+                        conv_trial[(size_t)i * N_FIELDS + (size_t)c] + (c == 0 ? shift : real_t(0));
+        }
+        // The constraint holds the new values; x does not, and the Newton loop only ever
+        // applies ZERO constraints to its correction. Without this the outlet keeps the
+        // previous step's velocity while the log reports the new one -- the same trap the
+        // pump's diaphragm fell into above.
+        f->apply_constraints(x);
+        std::printf("outflow: U_c %g  q_target %g  q_cand %g  shift %g\n",
+                    (double)uc, (double)q_target, (double)q_cand, (double)shift);
+    }
+
+    if (want_pump && dt_step > real_t(0) && dirichlet) {
+        const real_t t_now = t_abs;
+        pump_scale         = std::sin(real_t(2) * real_t(M_PI) * t_now / pump_period);
+        // set_time snapshots the base values on its first call and thereafter writes
+        // scale * base, so passing the waveform as the global scale drives every prescribed
+        // velocity together. In this case only the diaphragm is non-zero, so that is exactly
+        // the diaphragm; the no-slip walls scale from zero to zero.
+        dirichlet->set_time(t_now, pump_scale);
+        // And put the new values into the state. set_time rewrites what the constraint
+        // holds; it does not touch x, and the Newton loop only ever applies ZERO constraints
+        // to its correction, so without this the diaphragm keeps whatever velocity the
+        // initial apply_constraints gave it and the waveform is a number in a log line. It
+        // read v_diaphragm = 0 at the end of a cycle while still carrying its full amplitude
+        // of flux.
+        f->apply_constraints(x);
+        std::printf("pump: t = %g  v_diaphragm = %g\n", (double)t_now, (double)(U * pump_scale));
+    }
+
+    // The Reynolds ramp is for a state that has no good initial guess. From the second time
+    // step on there is one -- the previous step's converged solution -- and walking the ramp
+    // again does not merely repeat work, it destroys that guess: the first stage takes a
+    // solution at the physical Reynolds number and converges it to the solution of a much
+    // more viscous problem before climbing back. Measured on the pump at N=32 and Re=200,
+    // 17 time steps produced 84 stage executions, about 4.94 per step, of which only the
+    // last solved the problem asked for.
+    //
+    // So a step that has a guess solves the physical problem directly, and the ramp stays as
+    // the fallback: if that single stage fails, the retry below inserts an intermediate
+    // Reynolds number and the walk reappears for exactly the step that needed it. Each step
+    // gets its own retry budget and step factor, because a step is where the difficulty is
+    // -- one hard instant in a cycle should not spend the budget of the ones after it.
+    //
+    // A resumed segment has that guess on its first step too: the checkpoint IS the previous
+    // step's converged state. Without `resumed` the segment walked the whole ramp again on its
+    // first step, so a run cut in two took a different Newton path from the run that was not
+    // cut and landed on a state ~1e-9 away -- which cvfem_restart only caught once a change
+    // moved the round-off in the port identity it compares.
+    const bool have_guess = dt_step > real_t(0) && (tstep > 0 || resumed);
+    if (have_guess) {
+        rho_schedule.assign(1, rho);
+        rho_solved = 0;  // no stage of THIS step has converged yet
+        re_retries = 0;
+        step_f     = re_step;
+    }
+    // The reference this step's `rel` is measured against, taken from its own first residual
+    // by the test at the top of the Newton loop. See r0's declaration for why it is per step.
+    if (dt_step > real_t(0) && r0_per_step) r0 = 0;
+    // Rebuild the Vanka smoother on this step's first Newton iteration, whatever the freeze
+    // stride. See vanka_freeze_step_begin.
+    vanka_freeze_step_begin();
+
+    for (size_t stage = 0; stage < rho_schedule.size(); ++stage) {
+    // A change of continuation parameter moves the state, so anything the operator holds that
+    // was built from the previous stage's state is stale. Unconditional and free when nothing
+    // is held; today only SFEM_CONV_FREEZE's deferred correction is.
+    op->begin_continuation_stage();
+    // Same argument, for the held coarse factorisation. See precond_freeze_stage_begin.
+    precond_freeze_stage_begin();
+    const real_t rho_use = rho_schedule[stage];
+    // The stage's share of the prescribed pressure: one of the increments still owed,
+    // measured from the last converged level. With none owed this is the target itself, so
+    // every case without a port and every stage past the ramp takes the same path.
+    real_t p_stage = p_target;
+    if (p_on) {
+        p_stage = p_solved + (p_target - p_solved) / (real_t)std::max(p_ramp_left, 1);
+        // Shift the whole pressure field with the boundary condition -- the continuation's
+        // predictor, and for this class of problem an EXACT one.
+        //
+        // A prescribed pressure enters the momentum flux on the port face in place of the
+        // interior pressure, and every other boundary here fixes the velocity. Adding a
+        // constant to p and to p_bar together therefore changes nothing: each control volume
+        // is closed, so the constant's contribution sums to zero over its faces, port face
+        // included. Measured on the 4x1x1 channel, p_bar in {-0.16, 0, 0.16, 0.5} gives
+        // u_linf at round-off in all four and p_linf exactly |p_bar + 0.16| -- the velocity
+        // does not move and the pressure moves rigidly.
+        //
+        // So the state for the next stage is the state from this one plus the level
+        // difference, and without this the ramp does almost nothing: the state keeps whatever
+        // level it converged to and every stage re-discovers the shift through a Newton solve
+        // that starts O(dp) away from its own answer.
+        const real_t dp = p_predict ? p_stage - p_state_level : real_t(0);
+        if (dp != real_t(0)) {
+            for (ptrdiff_t i = 0; i < nnodes; ++i) x[(size_t)i * N_FIELDS + 3] += dp;
+            p_state_level = p_stage;
+        }
+        op->set_pressure_value(p_stage);
+    }
+    // The manufactured forcing is a function of rho, so it must track the continuation. The
+    // exact solution does not move -- u and p depend only on mu -- which is precisely why
+    // the error measured at the final stage is still against the right reference.
+    if (flow == cvfem_case::FlowCase::MMS) {
+        const auto *const mx = mesh->points()->data()[0];
+        const auto *const my = mesh->points()->data()[1];
+        const auto *const mz = mesh->points()->data()[2];
+        std::vector<real_t> bfx((size_t)nnodes), bfy((size_t)nnodes), bfz((size_t)nnodes);
+        for (ptrdiff_t i = 0; i < nnodes; ++i) {
+            cvfem_case::body_force(flow, rho_use, mu, (real_t)mx[i], (real_t)my[i], (real_t)mz[i],
+                                   bfx[(size_t)i], bfy[(size_t)i], bfz[(size_t)i]);
+        }
+        op->set_body_force(bfx.data(), bfy.data(), bfz.data());
+    }
+    op->rho              = rho_use;
+    std::copy(x, x + ndof, x_stage_start.begin());
+    std::printf("stage %d/%d: rho: %g  Re: %g\n",
+                (int)stage + 1,
+                (int)rho_schedule.size(),
+                (double)rho_use,
+                (double)(rho_use * U * L_re / std::max(mu, real_t(1e-30))));
+
+    converged = false;
+    real_t prev_rnorm = 0; // previous Newton residual, for the adaptive band's rate test
+    real_t r_stage0 = 0;   // this stage's initial residual, the divergence reference
+    bool   diverged = false;
+    int    lin_diverged_count = 0;
+    for (newton_it = 0; newton_it <= max_newton; ++newton_it) {
+        std::fill(r.begin(), r.end(), real_t(0));
+        { const double t0 = smesh::time_seconds();
+          grad_op->gradient(x, r.data());
+          phase_add("newton_residual", smesh::time_seconds() - t0); }
+        // Measure the residual on the free dofs only. Function::gradient leaves the
+        // boundary-condition residual (x - value) in the constrained rows, which is a
+        // different quantity from the equation residual and never decays to zero the way
+        // the Newton test expects -- it stalls the relative criterion near the solution.
+        // The standalone driver zeroes them for the same reason.
+        f->apply_zero_constraints(r.data());
+        // Make the right-hand side compatible: remove the component along null(A^T).
+        gauge.project(r.data());
+
+        // SFEM_FD_AT_IT: run the finite-difference Jacobian check at *this* iterate.
+        //
+        // The check above the Newton loop can only ever evaluate the initial state, where
+        // almost every sub-control surface has mdot near zero and the upwind switch sits on
+        // its corner, so it cannot say whether the Jacobian is wrong where Newton actually
+        // stalls. Evaluating it at a chosen iteration can. A central difference of a smooth
+        // function has O(eps^2) truncation error; O(eps) is the signature of a corner being
+        // crossed, and a plateau is the signature of a genuinely wrong derivative. The three
+        // are distinguishable only by watching the error as eps shrinks.
+        if (smesh::Env::read<int>("SFEM_FD_AT_IT", -1) == newton_it) {
+            std::vector<real_t> v((size_t)ndof), jv((size_t)ndof), rp((size_t)ndof),
+                    rm((size_t)ndof), xt((size_t)ndof);
+            std::mt19937                           g2(12345u);
+            std::uniform_real_distribution<real_t> d2(real_t(-1), real_t(1));
+            for (ptrdiff_t i = 0; i < ndof; ++i) v[(size_t)i] = d2(g2);
+            f->apply_zero_constraints(v.data());
+            std::fill(jv.begin(), jv.end(), real_t(0));
+            f->apply(x, v.data(), jv.data());
+            f->apply_zero_constraints(jv.data());
+            std::printf("fd_at_it %d: ndof %ld\n", newton_it, (long)ndof);
+            for (const real_t eps : {real_t(1e-4), real_t(1e-5), real_t(1e-6), real_t(1e-7)}) {
+                for (ptrdiff_t i = 0; i < ndof; ++i) xt[(size_t)i] = x[(size_t)i] + eps * v[(size_t)i];
+                std::fill(rp.begin(), rp.end(), real_t(0));
+                f->gradient(xt.data(), rp.data());
+                f->apply_zero_constraints(rp.data());
+                for (ptrdiff_t i = 0; i < ndof; ++i) xt[(size_t)i] = x[(size_t)i] - eps * v[(size_t)i];
+                std::fill(rm.begin(), rm.end(), real_t(0));
+                f->gradient(xt.data(), rm.data());
+                f->apply_zero_constraints(rm.data());
+                real_t nmom = 0, dmom = 0, ncon = 0, dcon = 0;
+                for (ptrdiff_t i = 0; i < ndof; ++i) {
+                    const real_t fd = (rp[(size_t)i] - rm[(size_t)i]) / (real_t(2) * eps);
+                    const real_t d  = fd - jv[(size_t)i];
+                    if (i % 4 == 3) { ncon += d * d; dcon += fd * fd; }
+                    else            { nmom += d * d; dmom += fd * fd; }
+                }
+                std::printf("  eps %.1e  momentum %.4e  continuity %.4e\n", (double)eps,
+                            (double)std::sqrt(nmom / std::max(dmom, real_t(1e-300))),
+                            (double)std::sqrt(ncon / std::max(dcon, real_t(1e-300))));
+            }
+        }
+
+        // Track the backflow guard's active set across Newton iterations.
+        //
+        // max(mdot, 0) is semismooth, and the Jacobian assembled for it is a genuine element
+        // of the Clarke generalized Jacobian -- the mdot > 0 branch differentiated, zero
+        // elsewhere -- so this is already a semismooth Newton method and should converge
+        // superlinearly. When it does not, the usual cause is the active set failing to
+        // settle: the iterates cycle between branch assignments and each linearisation solves
+        // for a different problem. Counting the set and its changes per iteration is what
+        // separates that from a merely inaccurate Jacobian, and the two want different
+        // remedies -- an active-set or smoothing treatment for the first, a better derivative
+        // for the second.
+        if (smesh::Env::read<int>("SFEM_ACTIVE_SET_TRACE", 0) && !outlet_nodes.empty()) {
+            ptrdiff_t n_pos = 0, n_flip = 0;
+            for (size_t k = 0; k < outlet_nodes.size(); ++k) {
+                const bool pos = x[(size_t)outlet_nodes[k] * 4 + 0] > real_t(0);
+                if (pos) ++n_pos;
+                if (newton_it > 0 && pos != (bool)outlet_active[k]) ++n_flip;
+                outlet_active[k] = pos ? 1 : 0;
+            }
+            std::printf("  active set: %td of %zu outlet nodes have mdot>0, %td flipped\n",
+                        n_pos, outlet_nodes.size(), n_flip);
+        }
+
+        // Over the owned range, with the SQUARE reduced and the root taken after: a sum of
+        // per-rank norms is not the norm of the whole. Summing to ndof would count every
+        // shared, ghost and aura entry once per rank holding it, so the residual would grow
+        // with the rank count while the problem did not.
+        //
+        // This is an acceptance quantity and not a diagnostic. rnorm sets r0 and rel, which
+        // gate convergence and the line-search floor below, so per-rank values make the ranks
+        // take different branches -- which is a hang, not a wrong answer.
+        real_t rnorm = 0;
+        for (ptrdiff_t i = 0; i < ndof_owned; ++i) rnorm += r[(size_t)i] * r[(size_t)i];
+        rnorm = std::sqrt(cvfem::sum(domain, rnorm));
+        if (r0 == real_t(0) && rnorm > 0) r0 = rnorm;
+        step_last_rnorm = rnorm;  // outlives the stage loop, for the step-failure report
+
+        const real_t rel = (r0 > 0) ? rnorm / r0 : rnorm;
+        std::printf("newton %d  ||R||: %.6e  rel: %.6e\n", newton_it, rnorm, rel);
+
+        // Adaptive Harten band: smooth the upwind switch only while Newton is stalling.
+        //
+        // A band keyed on the flux magnitude cannot work, and the reason is worth stating
+        // because it is not obvious. At mdot = 0 the smoothed |mdot| is eps/2, so the flux
+        // picks up an artificial diffusion (eps/4)(u_i - u_j) on every face carrying no
+        // flux. In a unidirectional flow that is most of the mesh -- which is why a global
+        // band of 1e-3 takes Poiseuille from 25 linear iterations to no convergence at all,
+        // while the same band restores quadratic convergence on the step. Both cases have
+        // faces with mdot ~ 0 and an O(1) jump across them; no local flux measure separates
+        // them.
+        //
+        // What separates them is stability, not magnitude. Poiseuille's near-zero fluxes sit
+        // there stably -- the switch never flips, the assembled Jacobian is a perfectly good
+        // subdifferential element, and Newton converges quadratically. The step's flip, and
+        // that is what costs the rate. Newton's own convergence rate is therefore the honest
+        // detector, and it needs no per-face state: engage the band only after the rate has
+        // been poor for a step, and scale it by the current relative residual so it shrinks
+        // to nothing as the iteration converges. A case that never stalls never sees it,
+        // and a case that does converges to the unsmoothed equations rather than to the
+        // smoothed ones.
+        if (upwind_eps_ref > 0 && smesh::Env::read<int>("SFEM_UPWIND_ADAPT", 0)) {
+            static const real_t bad_rate =
+                    smesh::Env::read<real_t>("SFEM_UPWIND_ADAPT_RATE", real_t(0.5));
+            const real_t rate = (prev_rnorm > 0) ? rnorm / prev_rnorm : real_t(0);
+            const bool   stalling = newton_it >= 2 && rate > bad_rate;
+            const real_t want = stalling ? upwind_eps_ref * std::min(real_t(1), rel) : real_t(0);
+            if (want != op->upwind_eps) {
+                op->upwind_eps = want;
+                op->update(x);
+                std::printf("  upwind band %s: eps = %.3e (rate %.3f, rel %.3e)\n",
+                            want > 0 ? "ON" : "off", (double)want, (double)rate, (double)rel);
+            }
+        }
+        // The contraction this Newton step achieved, kept for the two residual-floor tests
+        // further down. They ask whether there is any decrease left to find, and a step that
+        // reduced ||R|| by almost nothing is the direct evidence of that -- the relative
+        // threshold beside it is only a proxy for the same thing.
+        const real_t newton_rate = (prev_rnorm > 0) ? rnorm / prev_rnorm : real_t(0);
+        prev_rnorm = rnorm;
+        if (rnorm < nl_atol || rel < nl_rtol) {
+            converged = true;
+            break;
+        }
+        if (r_stage0 == real_t(0)) r_stage0 = rnorm;
+        // Diverging: stop now and let the continuation bisect, instead of spending the rest of
+        // the iteration budget watching the residual grow.
+        if (rnorm > div_grow * r_stage0 || !std::isfinite((double)rnorm)) {
+            std::printf("  diverging (||R|| grew %.3gx over the stage) -- abandoning this stage\n",
+                        (double)(rnorm / std::max(r_stage0, real_t(1e-300))));
+            diverged = true;
+            break;
+        }
+        if (newton_it == max_newton) {
+            // The residual floor the other two stage-ending paths already respect -- the linear
+            // solve giving up, and the line search finding no decrease -- applied to the third.
+            // At the floor there is nothing left to reduce, so a stage that reaches the
+            // iteration cap there has converged rather than failed, and the cap was the only
+            // exit that could not say so. That mattered little while an unconverged step was
+            // silently accepted; now that such a step aborts the run, a step at the floor would
+            // take a multi-day campaign down with it.
+            //
+            // rel, not the contraction rate, for the reason measured at the site below: the
+            // accepted cavity stage and the rejected manufactured solution have rates 0.612 and
+            // 0.548 -- indistinguishable -- while their rel differ by four orders of magnitude.
+            if (rel < nl_ls_floor) {
+                std::printf("  iteration cap reached at rel=%.3e (rate %.3f) -- residual floor,"
+                            " accepting as converged\n",
+                            (double)rel, (double)newton_rate);
+                converged = true;
+                ++newton_total;
+            }
+            break;
+        }
+
+        for (ptrdiff_t i = 0; i < ndof; ++i) rhs[(size_t)i] = -r[(size_t)i];
+        std::fill(dx.begin(), dx.end(), real_t(0));
+
+        // The assembled operator is a snapshot of the Jacobian at construction, so it is
+        // rebuilt each step; the matrix-free one reads the live state and is not.
+        std::shared_ptr<sfem::Operator<real_t>> linop = mf_op;
+        {
+            const double t0 = smesh::time_seconds();
+            if (!matrix_free)
+                linop = sfem::create_linear_operator(sfem::op_type::BSR, f, xbuf, sfem::EXECUTION_SPACE_HOST);
+            t_op += smesh::time_seconds() - t0;
+        }
+
+        if (check_jv) {
+            auto asm_op = sfem::create_linear_operator(sfem::op_type::BSR, f, xbuf, sfem::EXECUTION_SPACE_HOST);
+            auto mf     = sfem::create_linear_operator(sfem::op_type::MATRIX_FREE, f, xbuf, sfem::EXECUTION_SPACE_HOST);
+            std::vector<real_t> v((size_t)ndof), ya((size_t)ndof, 0), ym((size_t)ndof, 0);
+            for (ptrdiff_t i = 0; i < ndof; ++i) v[(size_t)i] = std::sin(real_t(0.7) * real_t(i) + real_t(0.3));
+            asm_op->apply(v.data(), ya.data());
+            mf->apply(v.data(), ym.data());
+            real_t dmax = 0, amax = 0, uinf = 0;
+            for (ptrdiff_t i = 0; i < nnodes; ++i)
+                for (int c = 0; c < 3; ++c) uinf = std::max(uinf, std::fabs(x[(size_t)i * 4 + c]));
+            for (ptrdiff_t i = 0; i < ndof; ++i) {
+                dmax = std::max(dmax, std::fabs(ya[(size_t)i] - ym[(size_t)i]));
+                amax = std::max(amax, std::fabs(ya[(size_t)i]));
+            }
+            std::printf("check_jv[newton %d]: rel=%.6e  |u|_inf=%.3e\n", newton_it, (amax > 0) ? dmax / amax : dmax, uinf);
+        }
+
+        // A Krylov smoother makes the cycle vary between applications, and BiCGStab
+        // assumes its preconditioner does not. It does not fail loudly when that is
+        // violated -- it stagnates -- so the outer solver switches to FGMRES whenever the
+        // preconditioner is not a fixed operator.
+        // Still flexible: a Krylov smoother on any level makes the cycle vary.
+        const int  ksmooth_outer = smesh::Env::read<int>("SFEM_GMG_KSMOOTH", 0);
+        // Multigrid preconditions FGMRES, not BiCGStab.
+        //
+        // BiCGStab's short recurrence assumes the preconditioner is a fixed linear operator.
+        // A multigrid cycle is not: its semi-structured restriction accumulates with
+        // #pragma omp atomic update, so the cycle differs in the last bits between runs, and
+        // BiCGStab has no theory for that. Flexible GMRES is built for a preconditioner that
+        // varies between applications, and the difference is not subtle. On the 3D cavity at
+        // 19,652 dof on 4 threads, over repeated identical runs:
+        //
+        //     BiCGStab   680 / 1662 / 748 / 2519 linear iterations, t_solve 40.1 s
+        //     FGMRES     115 / 115 / 115         linear iterations, t_solve  1.78 s
+        //
+        // Reproducible, and 22x faster on the same 10 Newton steps. A model of the same
+        // effect -- redrawing the preconditioner with relative noise on every application --
+        // gives BiCGStab a spread and leaves FGMRES exactly invariant up to 1e-10 noise.
+        // Default 1, unconditionally. It used to be `gmg ? 1 : 0`, which made BiCGStab the
+        // default for every run without multigrid -- and the numbers just above say BiCGStab
+        // is not a working default anywhere near this operator. The consequence was not
+        // hypothetical: a study of when a prescribed-pressure boundary makes the solver fail
+        // was run without naming a Krylov method, so it measured BiCGStab's breakdown and
+        // said nothing about the operator it was supposed to be about.
+        //
+        // A default is a claim about what to use when nobody has thought about it, so it has
+        // to be the thing that works. SFEM_FGMRES=0 still selects BiCGStab for anyone who
+        // wants to reproduce or measure it.
+        const bool use_fgmres = smesh::Env::read<int>("SFEM_FGMRES", 1) != 0;
+
+        std::shared_ptr<sfem::FGMRES<real_t>>    fsolver;
+        std::shared_ptr<sfem::BiCGStab<real_t>>  bsolver;
+        std::function<void(const std::shared_ptr<sfem::Operator<real_t>> &)> set_prec;
+        std::function<int()>                                                 get_its;
+        std::function<bool()>                                                lin_failed;
+        std::function<void(const real_t *, real_t *)>                        do_solve;
+
+        // SFEM_ASSEMBLE_FINE=1 replaces the matrix-free fine operator with an assembled
+        // BSR one, probed the same way the Galerkin levels are. The point is determinism:
+        // the matrix-free apply accumulates through atomics, so its summation order follows
+        // the thread schedule and neither solver is reproducible; a BSR apply is.
+        if (smesh::Env::read<int>("SFEM_ASSEMBLE_FINE", 0)) {
+            const double t0  = smesh::time_seconds();
+            auto         src = gmg ? gmg->ops[0] : linop;
+            auto         fine_bsr = assemble_galerkin(f, src, nullptr, nullptr,
+                                                      f->space()->n_dofs(), nullptr);
+            phase_add("fine_assembly", smesh::time_seconds() - t0);
+            linop = fine_bsr;
+        }
+        // SFEM_JFNK=1: replace the OUTER operator with the exact Jacobian action, obtained by
+        // differencing the residual, while the preconditioner keeps using the assembled
+        // (inexact) Jacobian. This is the decisive test of whether the frozen Rhie-Chow pg
+        // derivative is what caps Newton at a linear rate: if the tail disappears, it is.
+        // It is also the cheap remedy -- one extra residual evaluation per Krylov iteration,
+        // no new kernel and no change to the assembled sparsity pattern.
+        if (smesh::Env::read<int>("SFEM_JFNK", 0)) {
+            auto jfnk = std::make_shared<JFNKOperator>(f, ndof, cmask.data());
+            jfnk->set_base(x);   // linearise about the current Newton iterate
+            linop = jfnk;
+        }
+        auto linop_timed = timed("outer_op", linop);
+        if (use_fgmres) {
+            fsolver = std::make_shared<sfem::FGMRES<real_t>>(linop_timed);
+            fsolver->set_max_it(lin_max_it);
+            fsolver->set_rtol(lin_rtol);
+            fsolver->set_atol(lin_atol);
+            fsolver->set_restart(smesh::Env::read<int>("SFEM_FGMRES_RESTART", 30));
+            fsolver->set_dtol(smesh::Env::read<real_t>("SFEM_LSOLVE_DTOL", real_t(1e4)));
+            set_prec = [fsolver, &gauge](const std::shared_ptr<sfem::Operator<real_t>> &p) {
+                fsolver->set_preconditioner_op(
+                        gauge.active() ? std::static_pointer_cast<sfem::Operator<real_t>>(
+                                                 std::make_shared<GaugedPreconditioner>(p, &gauge))
+                                       : p);
+            };
+            get_its  = [fsolver]() { return fsolver->iterations(); };
+            do_solve = [fsolver](const real_t *b, real_t *x) { fsolver->apply(b, x); };
+            lin_failed = [fsolver]() { return fsolver->has_diverged(); };
+        } else {
+            bsolver = sfem::create_bcgs<real_t>(linop_timed, sfem::EXECUTION_SPACE_HOST);
+            bsolver->set_max_it(lin_max_it);
+            // A diverging Krylov solve otherwise burns the full iteration budget inside
+            // every Newton step and hands back a correction that the line search will only
+            // reject afterwards. Detecting it here stops the waste at its source.
+            bsolver->set_dtol(smesh::Env::read<real_t>("SFEM_LSOLVE_DTOL", real_t(1e4)));
+            bsolver->set_rtol(lin_rtol);
+            bsolver->set_atol(lin_atol);
+            set_prec = [bsolver, &gauge](const std::shared_ptr<sfem::Operator<real_t>> &p) {
+                bsolver->set_preconditioner_op(
+                        gauge.active() ? std::static_pointer_cast<sfem::Operator<real_t>>(
+                                                 std::make_shared<GaugedPreconditioner>(p, &gauge))
+                                       : p);
+            };
+            get_its  = [bsolver]() { return bsolver->iterations(); };
+            do_solve = [bsolver](const real_t *b, real_t *x) { bsolver->apply(b, x); };
+            lin_failed = [bsolver]() { return bsolver->has_diverged(); };
+        }
+        {
+            const double t0 = smesh::time_seconds();
+            if (gmg) {
+                // The hierarchy is fixed but the linearisation is not.
+                refresh_gmg(*gmg);
+
+                // SFEM_GMG_CHECK=2: run the V-cycle standalone as a solver on this Newton
+                // step's right-hand side and let it report its own convergence rate.
+                //
+                // Outer Krylov iteration counts cannot tell a broken coarse correction
+                // from a weak smoother -- both just look like "many iterations". The
+                // cycle's own rate can: a working V-cycle drops the residual by roughly
+                // an order of magnitude per cycle at a rate independent of level, and one
+                // whose coarse correction contributes nothing stalls near the rate of the
+                // smoother alone.
+                // SFEM_GMG_CHECK=3: the smoother, standalone, as the stationary iteration
+                // it actually is inside the cycle.
+                //
+                // Its good showing as a BiCGStab preconditioner (SFEM_GMG=2) is no
+                // evidence that it converges: a Krylov method tolerates a preconditioner
+                // that would diverge if iterated. Inside a V-cycle it IS iterated, so a
+                // divergent smoother makes the cycle diverge regardless of what the coarse
+                // levels do -- and no coarse-grid fix can repair that.
+                if (smesh::Env::read<int>("SFEM_GMG_CHECK", 0) == 3 && newton_it == gmg_check_at()) {
+                    const std::string kind = smesh::Env::read<std::string>("SFEM_SMOOTHER", "vanka");
+                    // Same source as the cycle's, or this check measures something else.
+                    const real_t om = (kind == "vanka")
+                                              ? smoother_omega()
+                                              : smesh::Env::read<real_t>("SFEM_GMG_OMEGA", real_t(0.35));
+                    std::shared_ptr<sfem::Operator<real_t>> prec;
+                    if (kind == "vanka") {
+                        // Diagonal Vanka: a coupled solve over each micro-element patch,
+                        // measured through the same gate as block-Jacobi so the asymptotic
+                        // rates are directly comparable.
+                        std::vector<uint8_t> cb((size_t)ndof, 0);
+                        for (ptrdiff_t k = 0; k < ndof; ++k)
+                            cb[(size_t)k] = mask_get(k, cmask.data()) ? 1 : 0;
+                        prec = cvfem_ss::make_diagonal_vanka(*op, f->space(), x, cb.data(), om);
+                    } else if (kind == "simple")
+                        prec = make_simple(*op, x, cmask.data(), nnodes, om,
+                                           smesh::Env::read<int>("SFEM_SIMPLE_INNER", 1),
+                                           smesh::Env::read<real_t>("SFEM_SIMPLE_DS", real_t(1)));
+                    else
+                        prec = make_block_jacobi(*op, x, cmask.data(), nnodes, om);
+                    std::printf("smoother kind: %s\n", kind.c_str());
+                    std::vector<real_t> xs((size_t)ndof, 0), r((size_t)ndof, 0), z((size_t)ndof, 0);
+                    real_t prev = 0;
+                    for (ptrdiff_t k = 0; k < ndof; ++k) prev += rhs[(size_t)k] * rhs[(size_t)k];
+                    prev = std::sqrt(prev);
+                    std::printf("smoother-only (omega=%g):\n", (double)om);
+                    for (int it = 0; it < smesh::Env::read<int>("SFEM_GMG_CHECK_IT", 10); ++it) {
+                        std::fill(r.begin(), r.end(), real_t(0));
+                        linop->apply(xs.data(), r.data());
+                        for (ptrdiff_t k = 0; k < ndof; ++k) r[(size_t)k] = rhs[(size_t)k] - r[(size_t)k];
+                        std::fill(z.begin(), z.end(), real_t(0));
+                        prec->apply(r.data(), z.data());
+                        for (ptrdiff_t k = 0; k < ndof; ++k) xs[(size_t)k] += z[(size_t)k];
+                        real_t nr = 0;
+                        for (ptrdiff_t k = 0; k < ndof; ++k) nr += r[(size_t)k] * r[(size_t)k];
+                        nr = std::sqrt(nr);
+                        std::printf("  sweep %2d  |r| %.6e  rate %.6f\n", it, (double)nr,
+                                    (double)(prev > 0 ? nr / prev : 0));
+                        prev = nr;
+                    }
+                }
+
+                // SFEM_GMG_CHECK=6: write the fine operator and the preconditioner out, so
+                // the spectrum of what the Krylov method actually sees can be examined.
+                //
+                // A Krylov iteration count is a very indirect view of an operator. Whether the
+                // iteration is fragile because the discretisation is badly conditioned,
+                // because the preconditioned operator is strongly non-normal, or because
+                // BiCGStab is simply erratic, are three different diagnoses with three
+                // different remedies, and none of them can be told apart from the count. Both
+                // matrices are recovered by probing with unit vectors, which is O(n) applies
+                // and so only sensible for the small meshes used for this.
+                // SFEM_GMG_CHECK=7: Brandt's regime diagnostic, localised.
+                //
+                // TME (NASA/CR-1998-207647) suggests running the relaxation of a non-elliptic
+                // factor on its own to "produce a scalar sigma ~ 1 in regions of open
+                // characteristics and sigma << 1 on closed characteristics (such as separated
+                // flow zones)". The point is that the two regimes need different cures --
+                // downstream-ordered marching for open, defect-correction or semicoarsening
+                // for closed -- and the backward-facing step has both, so building either
+                // without knowing which region is which is guesswork.
+                //
+                // What is computed here is the local decay of the error under the smoother
+                // alone: set b = 0, start from a random error, relax, and measure per node
+                //
+                //     rate_i = ( |e_i^N| / |e_i^0| )^(1/N)
+                //
+                // Error is swept out of open-characteristic regions and lingers where the
+                // characteristics close, so a rate near 1 marks the regions the smoother
+                // cannot clear -- exactly the regions a coarse grid then has to handle, and
+                // exactly what lam_min was telling us globally. This is that measurement
+                // resolved in space rather than as one number. It is the local decay, not
+                // Brandt's normalisation, so it is reported as a rate and not called sigma.
+                if (smesh::Env::read<int>("SFEM_GMG_CHECK", 0) == 7 && newton_it == gmg_check_at()) {
+                    const int nsweep = smesh::Env::read<int>("SFEM_SIGMA_SWEEPS", 20);
+                    const std::string kind = smesh::Env::read<std::string>("SFEM_SMOOTHER", "vanka");
+                    const real_t om = (kind == "vanka")
+                                              ? smoother_omega()
+                                              : smesh::Env::read<real_t>("SFEM_GMG_OMEGA", real_t(0.35));
+                    std::shared_ptr<sfem::Operator<real_t>> prec;
+                    if (kind == "vanka") {
+                        std::vector<uint8_t> cb((size_t)ndof, 0);
+                        for (ptrdiff_t k = 0; k < ndof; ++k)
+                            cb[(size_t)k] = mask_get(k, cmask.data()) ? 1 : 0;
+                        prec = cvfem_ss::make_diagonal_vanka(*op, f->space(), x, cb.data(), om);
+                    } else {
+                        prec = make_block_jacobi(*op, x, cmask.data(), nnodes, om);
+                    }
+
+                    std::vector<real_t> e((size_t)ndof), r((size_t)ndof), z((size_t)ndof);
+                    std::mt19937                           g3(20260907u);
+                    std::uniform_real_distribution<real_t> d3(real_t(-1), real_t(1));
+                    for (ptrdiff_t k = 0; k < ndof; ++k) e[(size_t)k] = d3(g3);
+                    f->apply_zero_constraints(e.data());
+                    std::vector<real_t> e0((size_t)nnodes, 0);
+                    for (ptrdiff_t i = 0; i < nnodes; ++i)
+                        for (int c = 0; c < 3; ++c)
+                            e0[(size_t)i] += e[(size_t)i * 4 + c] * e[(size_t)i * 4 + c];
+                    for (auto &v : e0) v = std::sqrt(v);
+
+                    for (int it = 0; it < nsweep; ++it) {
+                        std::fill(r.begin(), r.end(), real_t(0));
+                        linop->apply(e.data(), r.data());
+                        for (ptrdiff_t k = 0; k < ndof; ++k) r[(size_t)k] = -r[(size_t)k];
+                        std::fill(z.begin(), z.end(), real_t(0));
+                        prec->apply(r.data(), z.data());
+                        for (ptrdiff_t k = 0; k < ndof; ++k) e[(size_t)k] += z[(size_t)k];
+                        f->apply_zero_constraints(e.data());
+                    }
+
+                    const auto *const pxs = mesh->points()->data()[0];
+                    const auto *const pys = mesh->points()->data()[1];
+                    // Bin the local rate by streamwise position; the recirculation sits just
+                    // behind the step and the outlet is at the far end, so a rate profile
+                    // along x separates them without needing a field dump.
+                    const int    NB = 10;
+                    std::vector<double> rsum(NB, 0), rmax(NB, 0);
+                    std::vector<ptrdiff_t> cnt(NB, 0);
+                    double slow_x = 0, slow_y = 0, slow_r = -1;
+                    for (ptrdiff_t i = 0; i < nnodes; ++i) {
+                        if (e0[(size_t)i] <= 0) continue;
+                        double en = 0;
+                        for (int c = 0; c < 3; ++c)
+                            en += (double)e[(size_t)i * 4 + c] * (double)e[(size_t)i * 4 + c];
+                        en = std::sqrt(en);
+                        const double rate = std::pow(en / (double)e0[(size_t)i], 1.0 / (double)nsweep);
+                        int b = (int)((double)pxs[i] / std::max(Lx, real_t(1e-30)) * NB);
+                        b = std::min(NB - 1, std::max(0, b));
+                        rsum[b] += rate; ++cnt[b];
+                        rmax[b] = std::max(rmax[b], rate);
+                        if (rate > slow_r) { slow_r = rate; slow_x = pxs[i]; slow_y = pys[i]; }
+                    }
+                    std::printf("regime diagnostic: %d smoother sweeps, local error decay by "
+                                "streamwise band\n", nsweep);
+                    std::printf("   x-band        nodes   mean rate   max rate\n");
+                    for (int b = 0; b < NB; ++b) {
+                        if (!cnt[b]) continue;
+                        std::printf("   [%5.2f,%5.2f) %7td   %9.4f  %9.4f\n",
+                                    (double)Lx * b / NB, (double)Lx * (b + 1) / NB,
+                                    cnt[b], rsum[b] / (double)cnt[b], rmax[b]);
+                    }
+                    std::printf("   slowest node at (x %.3f, y %.3f) rate %.4f\n",
+                                slow_x, slow_y, slow_r);
+                }
+
+                if (smesh::Env::read<int>("SFEM_GMG_CHECK", 0) == 6 && newton_it == gmg_check_at()) {
+                    const std::string base =
+                            smesh::Env::read_string("SFEM_DUMP_OP", std::string("/tmp/op"));
+                    // Build the same preconditioner the solve would use, so the spectrum
+                    // examined is the one the Krylov method is actually handed.
+                    const std::string pkind =
+                            smesh::Env::read<std::string>("SFEM_SMOOTHER", "vanka");
+                    const real_t pom = (pkind == "vanka")
+                                               ? smoother_omega()
+                                               : smesh::Env::read<real_t>("SFEM_GMG_OMEGA", real_t(0.35));
+                    std::shared_ptr<sfem::Operator<real_t>> prec;
+                    if (pkind == "vanka") {
+                        std::vector<uint8_t> cb((size_t)ndof, 0);
+                        for (ptrdiff_t k = 0; k < ndof; ++k)
+                            cb[(size_t)k] = mask_get(k, cmask.data()) ? 1 : 0;
+                        prec = cvfem_ss::make_diagonal_vanka(*op, f->space(), x, cb.data(), pom);
+                    } else {
+                        prec = make_block_jacobi(*op, x, cmask.data(), nnodes, pom);
+                    }
+                    std::printf("dump: preconditioner kind %s (omega %g)\n", pkind.c_str(), (double)pom);
+                    std::vector<real_t> col((size_t)ndof), out((size_t)ndof);
+                    std::vector<real_t> dA((size_t)ndof * (size_t)ndof, 0),
+                            dM((size_t)ndof * (size_t)ndof, 0);
+                    for (ptrdiff_t j = 0; j < ndof; ++j) {
+                        std::fill(col.begin(), col.end(), real_t(0));
+                        std::fill(out.begin(), out.end(), real_t(0));
+                        col[(size_t)j] = 1;
+                        linop->apply(col.data(), out.data());
+                        for (ptrdiff_t i = 0; i < ndof; ++i) dA[(size_t)i * ndof + j] = out[(size_t)i];
+                        std::fill(out.begin(), out.end(), real_t(0));
+                        prec->apply(col.data(), out.data());
+                        for (ptrdiff_t i = 0; i < ndof; ++i) dM[(size_t)i * ndof + j] = out[(size_t)i];
+                    }
+                    dump_dense((base + "_A.txt").c_str(), ndof, dA);
+                    dump_dense((base + "_M.txt").c_str(), ndof, dM);
+                }
+
+                if (smesh::Env::read<int>("SFEM_GMG_CHECK", 0) == 2 && newton_it == gmg_check_at()) {
+                    std::vector<real_t> probe((size_t)ndof, 0);
+                    gmg->mg->verbose = true;
+                    // Multigrid::debug prints, per level per cycle, the coarse residual after
+                    // the coarse solve, the coarse correction before prolongation, the
+                    // prolonged correction, and the fine residual after the correction. Those
+                    // are exactly the intermediate norms needed to localise where a cycle
+                    // first produces a non-finite value; the residual monitor alone only
+                    // reports once per cycle, which localises no further than "somewhere
+                    // between the restriction of one cycle and the residual of the next".
+                    gmg->mg->debug = smesh::Env::read<int>("SFEM_GMG_DEBUG", 0) != 0;
+                    gmg->mg->set_max_it(smesh::Env::read<int>("SFEM_GMG_CHECK_IT", 20));
+                    gmg->mg->apply(rhs.data(), probe.data());
+                    gmg->mg->verbose = false;
+                    gmg->mg->debug   = false;
+                    gmg->mg->set_max_it(1);
+
+                    // Where does the stalled error live?
+                    //
+                    // The cycle's rate decays to the smoother's own, which means the coarse
+                    // correction stops contributing once the smoother has cleared the high
+                    // frequencies. What is left is the smooth error the coarse grid exists
+                    // to remove, and splitting it by component says which equation's smooth
+                    // modes are being missed.
+                    std::vector<real_t> rr((size_t)ndof, 0);
+                    linop->apply(probe.data(), rr.data());
+                    for (ptrdiff_t k = 0; k < ndof; ++k) rr[(size_t)k] = rhs[(size_t)k] - rr[(size_t)k];
+                    real_t n0[N_FIELDS] = {0}, n1[N_FIELDS] = {0};
+                    for (ptrdiff_t k = 0; k < ndof; ++k) {
+                        const int c = (int)(k % N_FIELDS);
+                        n0[c] += rhs[(size_t)k] * rhs[(size_t)k];
+                        n1[c] += rr[(size_t)k] * rr[(size_t)k];
+                    }
+                    const char *nm[N_FIELDS] = {"ux", "uy", "uz", "p"};
+                    std::printf("residual by component  (start -> after cycles, and reduction)\n");
+                    for (int c = 0; c < N_FIELDS; ++c)
+                        std::printf("  %s  %.4e -> %.4e   x%.3e\n", nm[c], std::sqrt(n0[c]),
+                                    std::sqrt(n1[c]), (n0[c] > 0) ? std::sqrt(n1[c] / n0[c]) : 0.0);
+                }
+                set_prec(timed("precond_total", gmg->mg));
+            } else if (use_gmg == 2) {
+                // Cost-matched control for the V-cycle. The same damped block-Jacobi, run
+                // as a stationary iteration on the fine level for the same number of
+                // sweeps a V-cycle spends smoothing, with no hierarchy under it.
+                //
+                // Worth having as its own arm because "more smoothing steps help" says
+                // nothing on its own: a damped smoother converges by itself, so a V-cycle
+                // whose coarse-grid correction did nothing at all would still improve as
+                // the smoothing count rose. This is the arm that separates the two. If the
+                // V-cycle cannot beat it, the hierarchy is only an expensive smoother and
+                // the fault is in the transfers or the coarse operator, not the smoother.
+                const real_t om = smesh::Env::read<real_t>("SFEM_GMG_OMEGA", real_t(0.35));
+                auto prec = make_block_jacobi(*op, x, cmask.data(), nnodes, om);
+                auto sm   = sfem::create_stationary<real_t>(linop, prec, sfem::EXECUTION_SPACE_HOST);
+                sm->set_max_it(2 * gmg_smooth);
+                set_prec(sm);
+            } else {
+                // No hierarchy. SFEM_PRECOND chooses what preconditions the fine level, and
+                // the default stays block-Jacobi so every existing SFEM_GMG=0 run is
+                // untouched.
+                //
+                // It exists because block-Jacobi is the wrong preconditioner for a saddle
+                // point and the backward-facing step is where that bites. Point-block
+                // Jacobi has nothing to say about the pressure coupling -- A_pp is
+                // structurally zero without Rhie-Chow -- so on the step the linear residual
+                // wanders (0.0034 -> 0.070 -> 0.016 over 255 iterations at Re=1) and the
+                // next Newton step diverges outright. Poiseuille and the cavity are
+                // velocity-dominated enough not to care, which is why this went unnoticed.
+                //
+                // The semi-structured operator behaves the same as the flat one under every
+                // one of these, which is the property that matters when choosing between the
+                // two discretisations. The backward-facing step at Re=20, same 7,060-dof fine
+                // mesh reached both ways -- flat 40x8x4, and 20x4x2 macro at level 2:
+                //
+                //     set-up                 flat                       semi-structured
+                //     direct                 20/20, sum 1.90e-17        20/20, sum 4.15e-17
+                //     fgmres r=480 bjacobi   20/20, 2688 its, 4.87e-15  20/20, 2689 its, 6.26e-15
+                //     bcgs bjacobi           0/20, diverges             0/20, diverges
+                //
+                // Including the failure: block-Jacobi is too weak for this saddle point on
+                // either path and gives out after 254 and 244 iterations respectively. That
+                // is the equivalence being claimed -- not that semi-structured is better, but
+                // that it is the same operator and answers to the same solvers.
+                //
+                //   bjacobi  (default) damped 4x4 point-block Jacobi
+                //   simple   SIMPLE: velocity predictor, pressure Schur correction. Built
+                //            for exactly this and already here, needing a semi-structured
+                //            mesh -- apply_blocks has no flat path -- but no hierarchy.
+                //   vanka    coupled solve per micro-element patch, likewise
+                //   direct   dense LU of the fine Jacobian, probed column by column. O(n)
+                //            applies and O(n^2) memory, so it is capped and is a
+                //            verification instrument, not a solver: it removes the linear
+                //            solve from the question entirely, which is what you want when
+                //            asking whether Newton and the conservation property are sound.
+                const std::string pc = smesh::Env::read_string("SFEM_PRECOND", "bjacobi");
+                // SAY WHICH ONE. The driver has never printed the preconditioner it selected,
+                // and over the course of this work four separate results were decided by a
+                // solver choice nobody had named -- BiCGStab inherited from a conditional
+                // default, block-Jacobi inherited from SFEM_PRECOND, a verification group that
+                // never ran, and a driver path that did not exist. A line of output is the
+                // cheapest possible guard against the next one.
+                // Once, not once per Newton step: the preconditioner is rebuilt every step
+                // and an unconditional print buries the rest of the output.
+                static bool said_pc = false;
+                if (!said_pc) {
+                    std::printf("preconditioner: %s (no multigrid)\n", pc.c_str());
+                    said_pc = true;
+                }
+                const real_t      om = smesh::Env::read<real_t>("SFEM_GMG_OMEGA", real_t(0.35));
+                // simple and vanka need apply_blocks and a micro-element lattice, neither of
+                // which a flat mesh has. Both do say so further down, but from inside the
+                // construction and under MPI_Abort's noise; saying it here names the knob the
+                // caller typed and costs nothing.
+                if ((pc == "simple" || pc == "vanka") && !fs->has_semi_structured_mesh()) {
+                    std::fprintf(stderr,
+                                 "SFEM_PRECOND=%s needs a semi-structured mesh (set "
+                                 "SFEM_ELEMENT_REFINE_LEVEL > 1). On a flat mesh the choices are "
+                                 "bjacobi and direct.\n",
+                                 pc.c_str());
+                    return EXIT_FAILURE;
+                }
+                if (pc == "direct") {
+                    const ptrdiff_t cap = (ptrdiff_t)smesh::Env::read<int>("SFEM_DIRECT_MAX_DOF", 20000);
+                    if (ndof > cap) {
+                        std::fprintf(stderr,
+                                     "SFEM_PRECOND=direct refuses %td dofs (cap %td, raise with "
+                                     "SFEM_DIRECT_MAX_DOF): it builds a dense %td x %td matrix.\n",
+                                     ndof, cap, ndof, ndof);
+                        return EXIT_FAILURE;
+                    }
+                    set_prec(timed("precond_total", make_dense_lu(linop, ndof)));
+                } else if (pc == "simple") {
+                    set_prec(timed("precond_total",
+                                   make_simple(*op, x, cmask.data(), nnodes, om,
+                                               smesh::Env::read<int>("SFEM_SIMPLE_INNER", 1),
+                                               smesh::Env::read<real_t>("SFEM_SIMPLE_DS", real_t(1)))));
+                } else if (pc == "vanka") {
+                    // Same freeze policy as the multigrid fine level, through the same cache.
+                    // set_prec still runs every Newton iteration -- the solver's preconditioner
+                    // slot is reassigned each step, so a frozen iteration reuses the operator
+                    // rather than skipping the hand-off.
+                    if (vanka_rebuild_now()) {
+                        std::vector<uint8_t> cb((size_t)ndof, 0);
+                        for (ptrdiff_t k = 0; k < ndof; ++k)
+                            cb[(size_t)k] = mask_get(k, cmask.data()) ? 1 : 0;
+                        const double t_v = smesh::time_seconds();
+                        g_vanka_cached   = cvfem_ss::make_diagonal_vanka(*op, f->space(), x, cb.data(), om);
+                        phase_add("vanka_setup", smesh::time_seconds() - t_v);
+                    }
+                    // The same gather the multigrid fine level does, for the same reason.
+                    //
+                    // A patch reads every node of its macro-element, and on a cut mesh some of
+                    // those are ghost or aura nodes carrying only the partial values a
+                    // distributed apply leaves behind, so the patch solve is built on values
+                    // that are not the residual. The multigrid branch wraps for exactly this
+                    // and says so; this branch never did, which is why no-multigrid Vanka grew
+                    // 434 / 443 / 509 / 535 at 1 / 2 / 4 / 8 ranks while block-Jacobi on the
+                    // same path stayed at 812 / 812 / 812 / 811 -- block-Jacobi reads only its
+                    // own row and never touches the slots that were wrong.
+                    set_prec(timed("precond_total",
+                                   sfem::create_parallel_preconditioner(g_vanka_cached, f->space(),
+                                                                        sfem::EXECUTION_SPACE_HOST)));
+                } else {
+                    if (pc != "bjacobi") {
+                        std::fprintf(stderr, "SFEM_PRECOND='%s' is not one of bjacobi|simple|vanka|direct\n",
+                                     pc.c_str());
+                        return EXIT_FAILURE;
+                    }
+                    set_prec(timed("precond_total", make_block_jacobi(*op, x, cmask.data(), nnodes)));
+                }
+            }
+            t_prec += smesh::time_seconds() - t0;
+        }
+        {
+            const double t0 = smesh::time_seconds();
+            do_solve(rhs.data(), dx.data());
+            t_solve += smesh::time_seconds() - t0;
+        }
+        // The correction carries no constant-pressure component; the gauge is fixed, so
+        // whatever multiple of the null vector the solve happened to leave in is noise.
+        gauge.project(dx.data());
+        lin_it_total += get_its();
+
+        // React to a divergent linear solve immediately. The correction it returns cannot be
+        // trusted, and continuing would only spend a line search discovering that. Abandoning
+        // here lets the continuation shrink its step while the failure is still cheap.
+        if (lin_failed && lin_failed()) {
+            // A Krylov solve handed a right-hand side that is already round-off cannot do
+            // anything sensible with it, and its "divergence" says nothing about the state.
+            // This is the normal case once the Jacobian is exact: the first stage converges to
+            // ~1e-15 and, for a solution that barely changes with the continuation parameter,
+            // every later stage starts solved. Abandoning here discards converged stages --
+            // the same floor the line search already respects applies.
+            // A stalling test was tried here -- accept when the Newton step moved the residual
+            // by less than 20% -- and it does not work, because it cannot tell the two cases
+            // apart. Measured on the 470,596-dof sweep: the Re=100 cavity stage is at the floor
+            // with rel 4.31e-07 and rate 0.612, and the N=64 manufactured-solution stage is
+            // genuinely unconverged with rel 3.81e-03 and rate 0.548. The rates are the same;
+            // only rel separates them, so rel is what the test uses. The rate is kept only for
+            // the message, where it tells a reader which of the two they are looking at.
+            if (rel < nl_ls_floor) {
+                std::printf("  linear solve gave up on a rel=%.3e right-hand side (rate %.3f)"
+                            " -- residual floor, accepting as converged\n", (double)rel,
+                            (double)newton_rate);
+                converged = true;
+                ++newton_total;
+                break;
+            }
+            std::printf("  linear solve diverged after %d iterations -- abandoning stage\n",
+                        get_its());
+            ++lin_diverged_count;
+            diverged = true;
+            break;
+        }
+
+        // Max over the owned range, then reduced. Unlike a summed norm this is EXACTLY
+        // partition-independent: max associates and commutes, so it agrees bit for bit
+        // between one rank and many, with no tolerance to argue about.
+        real_t dxinf = 0;
+        for (ptrdiff_t i = 0; i < ndof_owned; ++i) dxinf = std::max(dxinf, std::fabs(dx[(size_t)i]));
+        dxinf = cvfem::max(domain, dxinf);
+
+        {
+            real_t xinf = 0;
+            for (ptrdiff_t i = 0; i < ndof_owned; ++i) xinf = std::max(xinf, std::fabs(x[(size_t)i]));
+            xinf = cvfem::max(domain, xinf);
+            // nl_stol > 0 guards the disabled case: with nl_stol == 0 the comparison reduces
+            // to dxinf <= 0, which is *true* for an exactly-zero correction -- so a linear
+            // solve that returned nothing would be reported as a converged Newton step.
+            if (nl_stol > real_t(0) && dxinf <= nl_stol * std::max(xinf, real_t(1))) {
+                for (ptrdiff_t i = 0; i < ndof; ++i) x[(size_t)i] += dx[(size_t)i];
+                gauge.project(x);
+                std::printf("  lin_it: %d  |dx|_inf: %.6e  converged on step size\n",
+                            get_its(), dxinf);
+                converged = true;
+                ++newton_total;
+                break;
+            }
+        }
+
+        // Backtracking line search on ||R||. Accept the first step that reduces the residual by
+        // the Armijo margin; halve otherwise. A step that cannot reduce it at all is not
+        // accepted -- the stage is abandoned so the continuation can bisect.
+        real_t alpha = 1;
+        if (ls_on) {
+            bool ok = false;
+            for (int ls = 0; ls < ls_max; ++ls) {
+                for (ptrdiff_t i = 0; i < ndof; ++i)
+                    x_try[(size_t)i] = x[(size_t)i] + alpha * dx[(size_t)i];
+                std::fill(r_try.begin(), r_try.end(), real_t(0));
+                // The same evaluator as the Newton residual, and for the same reason: rt is
+                // compared against rnorm a few lines below, so the two have to be the same
+                // measure. x_try's ghost slots are stale by construction -- dx is written only
+                // over the owned range -- and the evaluator re-gathers them.
+                grad_op->gradient(x_try.data(), r_try.data());
+                f->apply_zero_constraints(r_try.data());
+                gauge.project(r_try.data());   // same measure as the residual it is compared to
+                // The same measure as the rnorm it is compared against on the next line, which
+                // is the reason this has to be reduced too: an Armijo test between a global
+                // rnorm and a per-rank rt would accept on some ranks and reject on others, and
+                // the ranks would then walk different Newton paths.
+                real_t rt = 0;
+                for (ptrdiff_t i = 0; i < ndof_owned; ++i) rt += r_try[(size_t)i] * r_try[(size_t)i];
+                rt = std::sqrt(cvfem::sum(domain, rt));
+                if (std::isfinite((double)rt) && rt < (real_t(1) - ls_armijo * alpha) * rnorm) {
+                    ok = true;
+                    break;
+                }
+                alpha *= real_t(0.5);
+            }
+            if (!ok) {
+                // No step reduces ||R||. That is a genuine failure only if the residual is
+                // still large; at the round-off floor it just means there is nothing left to
+                // reduce, and treating it as failure discards a converged stage.
+                if (rel < nl_ls_floor) {
+                    std::printf("  line search found no decrease at rel=%.3e (rate %.3f)"
+                                " -- residual floor, accepting as converged\n", (double)rel,
+                                (double)newton_rate);
+                    converged = true;
+                    ++newton_total;
+                    break;
+                }
+                std::printf("  line search failed (no decrease down to alpha=%.3g, rel=%.3e)"
+                            " -- abandoning stage\n", (double)alpha, (double)rel);
+                diverged = true;
+                break;
+            }
+            for (ptrdiff_t i = 0; i < ndof; ++i) x[(size_t)i] = x_try[(size_t)i];
+            gauge.project(x);
+        } else {
+            for (ptrdiff_t i = 0; i < ndof; ++i) x[(size_t)i] += dx[(size_t)i];
+            gauge.project(x);
+        }
+
+        std::printf("  lin_it: %d  |dx|_inf: %.6e  alpha: %.4g\n", get_its(), dxinf, (double)alpha);
+        ++newton_total;
+    }
+    (void)diverged;
+    ++stages_run;
+    if (converged) rho_solved = std::max(rho_solved, rho_use);
+    // One increment spent, and the level it reached is the one the next stage steps from.
+    if (converged && p_on) {
+        p_solved = p_stage;
+        if (p_ramp_left > 0) --p_ramp_left;
+    }
+    if (converged && re_adapt && rho_solved > real_t(0) &&
+        rho_solved < rho * (real_t(1) - real_t(1e-12))) {
+        // The stage converged, so widen the step -- but re-plan from the state just solved,
+        // never straight at the final target. Aiming every stage at the target is what made
+        // the fixed schedule squander its retries: having solved Re 6400 it would attempt
+        // 10000, fail, bisect to 8000, fail, bisect to 7155, fail, ... paying a full stage
+        // for each. Stepping by a factor that has *just been shown to work* costs one stage
+        // per success and lets the ramp refine itself only where the problem is actually
+        // hard.
+        step_f = std::min(step_f * re_grow, re_step);
+        rho_schedule.erase(rho_schedule.begin() + (ptrdiff_t)stage + 1, rho_schedule.end());
+        real_t r = rho_solved;
+        while (r * step_f < rho) { r *= step_f; rho_schedule.push_back(r); }
+        rho_schedule.push_back(rho);
+    }
+    // The pressure ramp must not be cut short by the Reynolds loop running out of stages.
+    // It piggybacks on that loop, so with the schedule at its last entry and increments still
+    // owed the loop simply ends -- and the run then reports a converged solution to a boundary
+    // condition nobody asked for. Measured at p_bar = 10: a retry doubled the four increments
+    // to eight, the five Reynolds stages spent five of them, and the run stopped at 6.19.
+    // Extending at the final rho costs one cheap stage per remaining increment; the count is
+    // bounded because it only doubles on a retry and the retry budget is finite.
+    if (converged && p_on && p_ramp_left > 0 && stage + 1 >= rho_schedule.size())
+        rho_schedule.push_back(rho_use);
+    if (!converged) {
+        // Roll back and halve the step in log space rather than giving up. The stage that
+        // failed is retried from the last state known to be good, via an intermediate Re.
+        // A first stage that fails used to be terminal: with no solved stage behind it there
+        // was nothing to roll back to. A prescribed pressure gives it one -- the seed's own
+        // level, which the state satisfies by construction -- so stage 0 can bisect the
+        // pressure even though it cannot bisect the Reynolds number.
+        const bool can_bisect_p = p_on && p_ramp_left > 0 && p_stage != p_solved;
+        if ((stage > 0 || rho_solved > real_t(0) || have_guess || can_bisect_p) &&
+            re_retries < re_retry) {
+            std::copy(x_stage_start.begin(), x_stage_start.end(), x);
+            // A pressure-only retry keeps the Reynolds number where it is. The adaptive rule
+            // below shrinks the Re step and stops when it collapses, which at stage 0 it
+            // immediately does -- there is no solved Re behind the first stage to step from,
+            // so `next` lands on rho_use and the collapse test fires. That is correct for a
+            // Reynolds failure and wrong for a pressure one: the parameter that has room to
+            // move is the prescribed pressure, so the inserted stage repeats this stage's rho
+            // and only the pressure bisects.
+            const bool p_only_retry = stage == 0 && rho_solved <= real_t(0) && !have_guess;
+            real_t next;
+            if (p_only_retry) {
+                next = rho_use;
+            } else if (re_adapt) {
+                // Shrink the increment towards 1 and re-step from the last solved state.
+                // The old rule bisected between the previous schedule entry and the failure,
+                // which converges on the ceiling from above and spends a stage per probe;
+                // shrinking the factor instead keeps every subsequent step small enough to
+                // stand a chance, so the budget buys progress rather than measurement.
+                const real_t base = rho_solved > real_t(0) ? rho_solved : rho_re1;
+                step_f = real_t(1) + (step_f - real_t(1)) * re_shrink;
+                // Cap the adaptive step by the geometric mean of the last success and the
+                // failure. Without this the step can overshoot the very target that just
+                // failed -- having solved 2749 with a factor of 1.59, the "next" attempt
+                // computes 4367 against a failing target of 3200, which is not a smaller
+                // step at all. The mean keeps the attempt strictly inside the bracket, so
+                // adaptive stepping degrades gracefully into bisection near a hard limit.
+                next   = std::min(base * step_f, std::sqrt(base * rho_use));
+                if (step_f < re_fmin || next <= base * (real_t(1) + real_t(1e-9))) {
+                    std::printf("  stage failed; step factor collapsed to %.4f -- stopping\n",
+                                (double)step_f);
+                    break;
+                }
+            } else {
+                next = std::sqrt(rho_schedule[stage - 1] * rho_use);
+            }
+            rho_schedule.insert(rho_schedule.begin() + (ptrdiff_t)stage, next);
+            // The pressure step halves with it, or the inserted stage would retry exactly the
+            // pressure that just failed at a slightly smaller Reynolds number. Doubling what
+            // is owed halves the next increment, because each stage takes (target - solved)
+            // divided by the count.
+            if (p_on && p_ramp_left > 0 && p_ramp_left < 1024) p_ramp_left *= 2;
+            ++re_retries;
+            if (p_only_retry)
+                std::printf("  stage failed; retrying via p_bar = %g (retry %d/%d)\n",
+                            (double)(p_solved + (p_target - p_solved) /
+                                                        (real_t)std::max(p_ramp_left, 1)),
+                            re_retries, re_retry);
+            else
+                std::printf("  stage failed; retrying via Re = %g (step x%.3f, retry %d/%d)\n",
+                            (double)(next * U * L_re / std::max(mu, real_t(1e-30))),
+                            (double)step_f, re_retries, re_retry);
+            --stage;  // the for-increment lands back on the inserted stage
+            continue;
+        }
+        break;
+    }
+    }
+
+    // A step that did not converge is not a step.
+    //
+    // Reaching here with `converged` false means the continuation exhausted its retries. The
+    // loop used to accept that silently: the history shifted, the next step started from an
+    // unconverged field, and nothing in the output said so -- the failure was invisible in a
+    // run whose whole purpose is the sequence. Over a campaign of 10^5 steps that is not a
+    // degraded answer, it is fiction with a plausible shape.
+    //
+    // Abort rather than continue, and deliberately WITHOUT writing a restart: the checkpoint
+    // already on disk is the last step that did converge, so leaving it untouched is what
+    // makes the campaign resumable from the last good state.
+    if (dt_step > real_t(0) && !converged) {
+        // Cutback: put the step back exactly as it was found, shrink dt and try again.
+        //
+        // What has to be undone is short, because most of the step's state is rebuilt on
+        // re-entry: `have_guess` reassigns rho_schedule and clears rho_solved, re_retries and
+        // step_f, and dt_prev_step is only assigned at the bottom of the loop, so it still
+        // holds the last CONVERGED size that BDF2's variable-step coefficients want. What it
+        // does not rebuild is the pressure ramp -- p_solved and p_ramp_left advance per
+        // converged stage and would otherwise claim increments the restored state never took.
+        const real_t dt_next = dt_now * cutback_factor;
+        const bool   room    = cutbacks_here < cutback_max &&
+                             (dt_min <= real_t(0) || dt_next >= dt_min);
+        if (cutback_on && room) {
+            std::copy(x_step_start.begin(), x_step_start.end(), x);
+            p_solved    = p_solved_at_step;
+            p_ramp_left = p_ramp_left_at_step;
+            t_run -= dt_taken;
+            dt_now      = dt_next;
+            dt_varies   = true;
+            ++cutbacks_here;
+            ++cutbacks_in;
+            good_steps = 0;
+            std::printf("step %d did not converge at dt = %.6g -- cutback %d/%d to dt = %.6g\n",
+                        abs_step, (double)dt_taken, cutbacks_here, cutback_max, (double)dt_now);
+            continue;
+        }
+        std::fprintf(stderr,
+                     "step %d (t = %.17g) FAILED to converge: %d Newton iterations, ||R|| %.6e, "
+                     "rel %.6e\n",
+                     abs_step, (double)t_abs, newton_it, (double)step_last_rnorm,
+                     (double)(r0 > 0 ? step_last_rnorm / r0 : step_last_rnorm));
+        if (cutback_on)
+            std::fprintf(stderr,
+                         "cutback exhausted after %d of %d retries at dt = %.6g%s\n",
+                         cutbacks_here, cutback_max, (double)dt_taken,
+                         (dt_min > real_t(0) && dt_next < dt_min)
+                                 ? " (the next size would fall below SFEM_DT_MIN)"
+                                 : "");
+        if (!restart_out.empty())
+            std::fprintf(stderr, "restart: resume from '%s', which still holds the last converged step\n",
+                         restart_out.c_str());
+        return EXIT_FAILURE;
+    }
+    break;
+    }  // step retry
+
+    // Shift the history: u^{n-1} <- u^n, u^n <- the state just solved for. Done after the
+    // step rather than before the next one so a run that stops early leaves the history
+    // consistent with the state it reports.
+    if (dt_step > real_t(0)) {
+        if (bdf_order >= 2) u_hist2 = u_hist;
+        for (ptrdiff_t i = 0; i < nnodes; ++i)
+            for (int c = 0; c < 3; ++c) u_hist[(size_t)i * 3 + (size_t)c] = x[(size_t)i * 4 + (size_t)c];
+        // `tstep >= 1` is the start-up rule: a fresh run has no second level before its
+        // second step. A RESUMED run does -- it was loaded -- so the condition is about
+        // whether u_hist2 has been filled, not about where we are in this segment.
+        const bool h2_ready = (ptrdiff_t)u_hist2.size() == nnodes * 3 && (tstep >= 1 || resumed);
+        op->set_velocity_history(u_hist.data(), bdf_order >= 2 && h2_ready ? u_hist2.data() : nullptr);
+    }
+
+    // The statistics, here because this is where the step is committed: the retry loop has
+    // closed above, so a step that was cut back and retried contributes ONCE, at the size it
+    // finally converged with. Accumulating inside the loop would count every abandoned
+    // attempt, weighted by a step the run did not take.
+    //
+    // dt_taken, not dt_now: dt_now is already the size proposed for the NEXT step.
+    if (!stats_mean.empty() && abs_step >= stats_first && dt_taken > real_t(0)) {
+        const double w = (double)dt_taken;
+        stats_w += w;
+        ++stats_n;
+        // West's weighted form: mean moves by (w/W)(v - mean), and M2 takes the product of
+        // the deviations from the OLD and NEW means, which is what keeps it non-negative
+        // without ever squaring a large number.
+        const double inv = w / stats_w;
+        for (ptrdiff_t i = 0; i < ndof; ++i) {
+            const double v     = (double)x[i];
+            const double d_old = v - stats_mean[(size_t)i];
+            stats_mean[(size_t)i] += inv * d_old;
+            stats_m2[(size_t)i] += w * d_old * (v - stats_mean[(size_t)i]);
+        }
+    }
+
+    // A transient run's whole point is the sequence, and the writer at the end of this file
+    // only ever sees the last state. SFEM_WRITE_STEPS writes each one into its own
+    // step_NNNN/ under the output folder, which python/create_xdmf.py turns into a temporal
+    // XDMF that ParaView animates.
+    //
+    // Off by default: it is one full field dump per step, and the runs that gave the
+    // verification numbers want none of it. The mesh is written once at the top rather than
+    // per step -- this is transpiration on a FIXED mesh, so there is exactly one geometry
+    // for every frame to share.
+    // SFEM_WRITE_STEPS is a STRIDE, not a flag: 1 keeps its original meaning of every step,
+    // N writes every Nth. At 793k nodes a frame is ~25 MB, so a campaign of 10^5 steps writing
+    // every one of them is ~2.5 TB of fields nobody will animate. SFEM_WRITE_STEPS_FIRST skips
+    // the start-up transient. The segment's last step is always written, so segments
+    // concatenate without a gap where the stride happened to fall.
+    const int  write_every = smesh::Env::read<int>("SFEM_WRITE_STEPS", 0);
+    const int  write_first = smesh::Env::read<int>("SFEM_WRITE_STEPS_FIRST", 0);
+    const bool want_frame  = dt_step > real_t(0) && write_every > 0 && abs_step >= write_first &&
+                            ((abs_step - write_first) % write_every == 0 || tstep + 1 == nsteps);
+    if (want_frame) {
+        char sub[64];
+        // Absolute, so segments concatenate into one animation instead of each
+        // overwriting the other's step_0000.
+        std::snprintf(sub, sizeof(sub), "step_%04d", abs_step - 1);
+        const smesh::Path step_dir = smesh::Path(out_folder) / sub;
+        smesh::create_directory(smesh::Path(out_folder));
+        smesh::create_directory(step_dir);
+        // The FIRST frame this segment writes, not step 0: with a stride or a resumed segment
+        // the first frame is rarely step 0, and without the mesh beside them the frames are
+        // unreadable.
+        if (!wrote_step_mesh) {
+            if (fs->has_semi_structured_mesh())
+                smesh::semistructured_export_as_standard(fs->mesh_ptr(), smesh::Path(out_folder) / "mesh");
+            else
+                mesh->write(smesh::Path(out_folder) / "mesh");
+            wrote_step_mesh = true;
+        }
+        auto so = f->output();
+        so->enable_AoS_to_SoA(true);
+        so->set_output_dir(step_dir);
+        so->write("vel", x);
+        const char *const sext = sizeof(real_t) == 8 ? "float64" : "float32";
+        const std::string sfrom = std::string(step_dir.c_str()) + "/vel.3." + sext;
+        const std::string sto   = std::string(step_dir.c_str()) + "/p." + sext;
+        std::remove(sto.c_str());
+        (void)std::rename(sfrom.c_str(), sto.c_str());
+        // The time each frame is AT, so the XDMF can carry real times rather than indices.
+        FILE *tf = std::fopen((std::string(step_dir.c_str()) + "/time.txt").c_str(), "w");
+        if (tf) {
+            std::fprintf(tf, "%.17g\n", (double)t_abs);
+            std::fclose(tf);
+        }
+    }
+
+    // -------------------------------------------------------- flow diagnostics, one row
+    //
+    // The kinetic-energy budget, which is what makes a claim about this scheme's numerical
+    // dissipation possible at all:
+    //
+    //     dE/dt = P_in - P_out - eps_visc - eps_num
+    //
+    // Every term but the last is measured; eps_num is DEFINED as what they leave over. That
+    // is the measurement, not an error bar -- the convection operator is first-order upwind
+    // with no limiter, so the |mdot| term is the entire subgrid model and this is the number
+    // that says how large it is.
+    //
+    // The terms come from machinery that already existed and had no caller: cvfem_diag::
+    // contract for the volume sums, energy_flux_weight + Op::sideset_flux_weighted for the
+    // boundary power, and cvfem_diag::close to difference consecutive states. The weight is
+    // |u|^2/2 + p/rho, so w * (rho u.n) integrates to the rate the surface does work.
+    //
+    // SIGNS. Both fluxes are handed to close() RAW, in the positive-leaving convention that
+    // sideset_mass_flux documents -- close() negates the inlet itself (`e.p_in = -q_in`).
+    // Pre-negating here double-negates, which is exactly what the Poiseuille control caught:
+    // P_in read -0.3348 where the magnitudes were right, so P_in - P_out came out at -0.457
+    // against an analytic dissipation of +0.2133. Measured, the convention is mdot_in
+    // -0.664062 and mdot_out +0.664062 on a channel whose analytic bulk flux is 0.666667.
+    //
+    // A missing inlet or outlet sideset leaves that half of the budget at zero, reported in
+    // the have_in/have_out columns rather than silently absorbed into eps_num.
+    if (want_diag) {
+        cvfem_diag::FlowState st{};
+        {
+            if (diag_vol.empty()) {
+                diag_vol.assign((size_t)nnodes, 0);
+                op->node_volume(diag_vol.data());
+            }
+            diag_grad.assign((size_t)nnodes * 9, 0);
+            if (op->nodal_velocity_gradient(x, diag_grad.data()) != SFEM_SUCCESS) {
+                std::fprintf(stderr, "diag: nodal_velocity_gradient failed; no row written\n");
+            } else {
+                // dt_now, not dt_step: with SFEM_CFL_TARGET the step size moves, and a CFL
+                // computed from the step the run STARTED with does not describe the step it
+                // just took. Measured with dt_step here, the controller read a constant 0.190
+                // while dt grew 0.02 -> 0.0610 and simply multiplied by its growth cap every
+                // step -- an adaptive scheme steering on a number that could not respond to it.
+                st = cvfem_diag::contract(nnodes, x, diag_grad.data(), diag_vol.data(),
+                                          (double)op->rho, (double)op->mu, (double)dt_now);
+                real_t q_in = 0, q_out = 0;
+                cvfem_diag::energy_flux_weight(nnodes, x, (double)op->rho, diag_w);
+                auto weighted = [&](const char *name, real_t &q) {
+                    auto named = mesh->sidesets(name);
+                    if (named.empty() || !named.front()) return false;
+                    return op->sideset_flux_weighted(x, name, diag_w.data(), q) == SFEM_SUCCESS;
+                };
+                const bool have_in  = weighted("inlet", q_in);
+                const bool have_out = weighted("outlet", q_out);
+                // The unweighted mass fluxes alongside, which cost one more pass each and
+                // pin the sign convention down in the output instead of leaving it to be
+                // reasoned about: sideset_mass_flux is positive LEAVING, so a channel reads
+                // mdot_in negative and mdot_out positive, and mdot_in + mdot_out is the
+                // mass-balance residual for free.
+                real_t mdot_in = 0, mdot_out = 0;
+                if (have_in) op->sideset_mass_flux(x, "inlet", mdot_in);
+                if (have_out) op->sideset_mass_flux(x, "outlet", mdot_out);
+
+                // THE FIRST SAMPLE HAS NO PREDECESSOR, and close() centres eps_visc as
+                // (prev + cur)/2. Handing it a default-constructed FlowState therefore
+                // averages the dissipation against zero and reports exactly half of it --
+                // which is what the steady Poiseuille control caught, reading eps_visc
+                // 0.1006 against an analytic 0.2133 while P_in - P_out came out at 0.2131.
+                // Differencing against the current state instead makes the centring exact
+                // and dE/dt identically zero, which is the truth for a steady solve and a
+                // lie for the first step of a transient -- so that case is flagged rather
+                // than quietly reported.
+                const bool                   first = !diag_have_prev;
+                const cvfem_diag::FlowState &prev  = first ? st : diag_prev;
+                const auto b = cvfem_diag::close(prev, st, (double)dt_now,
+                                                 have_in ? (double)q_in : 0.0,
+                                                 have_out ? (double)q_out : 0.0);
+                const int budget_valid = (dt_step <= real_t(0) || !first) ? 1 : 0;
+                if (!diag_fh) {
+                    // Appended when this run resumes a segment, because the CSV is the whole
+                    // record of a campaign that spans allocations: opened "w" every time, each
+                    // segment destroyed the rows of the ones before it and only the last
+                    // 24 hours survived. The header goes in only when the file is empty, so a
+                    // resumed segment continues the table rather than restarting it.
+                    const bool append = !restart_in.empty();
+                    // The column set has to be the same in every segment of a campaign, because
+                    // the header is written once and the later segments only append rows. Change
+                    // SFEM_MON_X between segments and the rows stop matching the header -- and it
+                    // is silent, since every consumer resolves columns by NAME from the header and
+                    // would read a shifted or missing field rather than fail. Refused for the same
+                    // reason the restart refuses a mesh or a timestep it does not belong to.
+                    if (append) {
+                        std::ifstream hdr_in(diag_csv.c_str());
+                        std::string   first;
+                        if (hdr_in && std::getline(hdr_in, first) && !first.empty()) {
+                            const bool had_mon = first.find("mon_ux") != std::string::npos;
+                            if (had_mon != (mon_node >= 0)) {
+                                std::fprintf(stderr,
+                                             "diag: '%s' was written %s a monitor column, and this "
+                                             "segment has %s. The appended rows would not match the "
+                                             "header.\n",
+                                             diag_csv.c_str(), had_mon ? "with" : "without",
+                                             mon_node >= 0 ? "one" : "none");
+                                return EXIT_FAILURE;
+                            }
+                        }
+                    }
+                    diag_fh           = std::fopen(diag_csv.c_str(), append ? "a" : "w");
+                    if (diag_fh) {
+                        std::fseek(diag_fh, 0, SEEK_END);
+                        if (std::ftell(diag_fh) <= 0) {
+                            std::fprintf(diag_fh,
+                                         "step,t,ndof,E,dEdt,P_in,P_out,eps_visc,eps_num,closure,"
+                                         "enstrophy,omega_max,div_l2,div_inf,cfl_max,u_max,"
+                                         "newton_it,lin_it,t_step,have_in,have_out,budget_valid,"
+                                         "mdot_in,mdot_out");
+                            // Appended only when a monitor point is configured, which is safe
+                            // because every consumer of this file builds a name-to-index map from
+                            // the header row rather than counting columns.
+                            if (mon_node >= 0) std::fprintf(diag_fh, ",mon_ux,mon_p");
+                            std::fprintf(diag_fh, "\n");
+                        }
+                    }
+                }
+                if (diag_fh) {
+                    std::fprintf(diag_fh,
+                                 "%d,%.17g,%td,%.17g,%.17g,%.17g,%.17g,%.17g,%.17g,%.17g,"
+                                 "%.17g,%.17g,%.17g,%.17g,%.17g,%.17g,%d,%d,%.6f,%d,%d,%d,"
+                                 "%.17g,%.17g",
+                                 abs_step, (double)t_abs, (ptrdiff_t)ndof, st.E, b.dEdt, b.p_in,
+                                 b.p_out, b.eps_visc, b.eps_num, b.closure, st.enstrophy,
+                                 st.omega_max, st.div_l2, st.div_inf, st.cfl_max, st.u_max,
+                                 newton_it, lin_it_total, smesh::time_seconds() - t_step_wall0,
+                                 have_in ? 1 : 0, have_out ? 1 : 0, budget_valid,
+                                 (double)mdot_in, (double)mdot_out);
+                    // The state at the monitor point, as it stands at the end of this step. The
+                    // velocity and the pressure together, because a reflection shows in the
+                    // pressure first and in the velocity only once it has arrived.
+                    if (mon_node >= 0)
+                        std::fprintf(diag_fh, ",%.17g,%.17g",
+                                     (double)x[(size_t)mon_node * 4 + 0],
+                                     (double)x[(size_t)mon_node * 4 + 3]);
+                    std::fprintf(diag_fh, "\n");
+                    std::fflush(diag_fh);
+                }
+                // Echoed as well as written, because a long run whose only output appears at
+                // the end is indistinguishable from one that has hung.
+                std::printf("diag: E %.6e  dEdt %.3e  P_in %.3e  P_out %.3e  eps_visc %.3e  "
+                            "eps_num %.3e  closure %.3e  cfl %.3f  div_l2 %.3e\n",
+                            st.E, b.dEdt, b.p_in, b.p_out, b.eps_visc, b.eps_num, b.closure,
+                            st.cfl_max, st.div_l2);
+                // Choose the next step from the CFL this one actually ran at. Done here
+                // because this is where cfl_max is current; applied at the top of the next
+                // step through set_time_step.
+                if (cfl_target > real_t(0) && dt_step > real_t(0) && st.cfl_max > 0) {
+                    const real_t want = dt_now * (real_t)(cfl_target / st.cfl_max);
+                    real_t       nxt  = want;
+                    if (nxt > dt_now * cfl_grow) nxt = dt_now * cfl_grow;
+                    if (nxt < dt_now / cfl_grow) nxt = dt_now / cfl_grow;
+                    if (dt_min > real_t(0) && nxt < dt_min) nxt = dt_min;
+                    if (dt_max > real_t(0) && nxt > dt_max) nxt = dt_max;
+                    if (nxt != dt_now) {
+                        std::printf("cfl: measured %.3f, target %g -> dt %g to %g\n",
+                                    st.cfl_max, (double)cfl_target, (double)dt_now, (double)nxt);
+                        // dt_now is the size of the NEXT step. dt_prev_step is the size of
+                        // the one just taken and is set at the bottom of the loop, not here:
+                        // setting it alongside dt_now made it the previous size only on the
+                        // steps where the controller happened to act, and stale on every
+                        // step in between.
+                        dt_now = nxt;
+                    }
+                }
+                diag_prev      = st;
+                diag_have_prev = true;
+            }
+        }
+    }
+
+    // ----------------------------------------------------------------- restart out
+    //
+    // Written after the history shift, so what lands on disk is a state and the history that
+    // belongs to it -- a pair the next segment can step from directly. Writing before the
+    // shift would save u^{n-1} beside u^n and the resumed run would take one step with a
+    // stale history, which is the kind of error that shows up as a small wrong answer rather
+    // than as a failure.
+    //
+    // Every SFEM_RESTART_EVERY steps and always at the end of the segment. The folder is
+    // overwritten in place rather than numbered: a restart is a resume point, not an archive,
+    // and keeping one bounded folder is what makes it safe to call this from a job that may
+    // be killed by the wall clock at any moment.
+    if (dt_step > real_t(0) && !restart_out.empty()) {
+        const bool last  = (tstep + 1 == nsteps);
+        const bool cadence = restart_every > 0 && ((tstep + 1) % restart_every == 0);
+        if (last || cadence) {
+            const std::string ext = std::string(smesh::TypeToString<real_t>::value());
+            smesh::create_directory(smesh::Path(restart_out));
+            auto st = smesh::create_host_buffer<real_t>(ndof);
+            std::copy(x, x + ndof, st->data());
+            auto h1 = smesh::create_host_buffer<real_t>(nnodes * 3);
+            std::copy(u_hist.begin(), u_hist.end(), h1->data());
+            int rc = st->to_file(smesh::Path(restart_out) / ("state." + ext));
+            rc |= h1->to_file(smesh::Path(restart_out) / ("u_prev." + ext));
+            if ((ptrdiff_t)u_hist2.size() == nnodes * 3) {
+                auto h2 = smesh::create_host_buffer<real_t>(nnodes * 3);
+                std::copy(u_hist2.begin(), u_hist2.end(), h2->data());
+                rc |= h2->to_file(smesh::Path(restart_out) / ("u_prev2." + ext));
+            }
+            // The statistics travel with the state, or a campaign cut into segments reports
+            // an average of its LAST segment while looking exactly like an average of the
+            // whole run. The extension is the literal float64 rather than `ext`: the
+            // accumulator is double whatever real_t is, so naming it after real_t would write
+            // a double array under a float32 name on a single-precision build.
+            if (!stats_mean.empty()) {
+                auto sm = smesh::create_host_buffer<double>(ndof);
+                auto s2 = smesh::create_host_buffer<double>(ndof);
+                std::copy(stats_mean.begin(), stats_mean.end(), sm->data());
+                std::copy(stats_m2.begin(), stats_m2.end(), s2->data());
+                rc |= sm->to_file(smesh::Path(restart_out) / "stats_mean.float64");
+                rc |= s2->to_file(smesh::Path(restart_out) / "stats_m2.float64");
+            }
+            // The metadata last, so a folder whose restart.txt is present and complete is a
+            // folder whose arrays are too. A job killed mid-write then leaves a restart that
+            // fails to load rather than one that loads a half-written state.
+            std::ofstream meta((smesh::Path(restart_out) / "restart.txt").c_str());
+            meta.precision(17);
+            meta << abs_step << "\n"
+                 << (double)t_abs << "\n"
+                 << (double)dt_step << "\n"
+                 << bdf_order << "\n"
+                 << (long long)nnodes << "\n"
+                 << mesh_coord_checksum << "\n";
+            // The LIVE step size, appended after the six fields every earlier checkpoint has.
+            // Optional by construction, in both directions: an old restart.txt loads here
+            // because the reader stops after six and keeps its defaults, and this file loads
+            // into an older build because that build stops after six and ignores the rest.
+            //
+            // Without them an adapted run resumed at the wrong size silently -- dt_step is the
+            // env value and says nothing about where the CFL controller had got to, and
+            // dt_prev_step re-initialised to zero, which hands BDF2 the uniform-step
+            // coefficients on the first step of every segment.
+            meta << (double)dt_now << "\n"
+                 << (double)dt_prev_step << "\n"
+                 << (dt_varies ? 0 : 1) << "\n";
+            // The averaging window, appended after those for the same reason they were
+            // appended after the original six. Without it the moments would resume with the
+            // right values and a zero weight, and the first step of the new segment would be
+            // given the entire weight of everything averaged before it.
+            meta << (double)stats_w << "\n" << stats_n << "\n";
+            if (rc != SFEM_SUCCESS || !meta) {
+                std::fprintf(stderr, "restart: failed to write '%s'\n", restart_out.c_str());
+                return EXIT_FAILURE;
+            }
+            std::printf("restart: wrote step %d, t = %.17g to '%s'\n", abs_step, (double)t_abs,
+                        restart_out.c_str());
+        }
+    }
+    // Earn the requested step size back after a run of converged steps.
+    //
+    // Only for a fixed step: with SFEM_CFL_TARGET set, dt_now is the controller's to choose and
+    // a second rule moving it would be two paths steering one quantity. Growth is by the same
+    // factor the cutback used, so the size walks back up the way it came rather than jumping,
+    // and it stops at the size the caller asked for -- this recovers from a cutback, it does
+    // not adapt beyond SFEM_DT.
+    if (dt_step > real_t(0) && cutback_on && cutbacks_in > 0 && cfl_target <= real_t(0)) {
+        if (++good_steps >= recover_after) {
+            const real_t want = std::min(dt_now / cutback_factor, dt_step);
+            if (want != dt_now) {
+                std::printf("step %d: %d converged steps since the last cutback -- dt %.6g to %.6g\n",
+                            abs_step, good_steps, (double)dt_now, (double)want);
+                dt_now = want;
+            }
+            if (dt_now >= dt_step) cutbacks_in = 0;
+            good_steps = 0;
+        }
+    }
+    // The step just completed becomes the previous step for the next one's BDF2 coefficients.
+    dt_prev_step = dt_taken;
+    }  // time step
+
+
+    // Report the Reynolds number actually reached, not just the one asked for.
+    //
+    // With continuation the run can stall partway up the ramp and still look healthy: for
+    // Poiseuille the exact solution is a parabolic profile *independent of Re*, so u_linf
+    // measures agreement with the same analytic answer whatever Re the state is at. A run
+    // that stalled at Re=75 on the way to Re=200 reports the same u_linf as one that
+    // arrived. Only this line distinguishes them.
+    {
+        // Report the highest Re whose stage actually CONVERGED, not the last one attempted.
+        //
+        // The first version of this printed op->rho, i.e. wherever the ramp had got to, and so
+        // announced "reached Re = 1000 of 1000 (AT TARGET)" for a run that tried Re=1000 four
+        // times, failed every time, and whose solution had blown up to u_linf 3.4e+06. The
+        // highest Re it had actually solved was 843.
+        const real_t re_solved = rho_solved * U * L_re / std::max(mu, real_t(1e-30));
+        const bool   at_target = rho_solved > 0 && std::fabs(re_solved - Re_phys) <= real_t(1e-6) * Re_phys;
+        std::printf("continuation: highest Re SOLVED = %g of %g target  %s\n",
+                    (double)re_solved, (double)Re_phys,
+                    at_target ? "(AT TARGET)" : "(SHORT OF TARGET)");
+        if (!at_target) converged = false;
+    }
+    // The same question for the other continuation parameter, and for the same reason: a ramp
+    // that stops short leaves a solution to a DIFFERENT boundary condition, and every error
+    // norm below is computed against the one that was asked for. This is the check that the
+    // schedule-desynchronisation bug would have failed -- it reported AT TARGET at p = -2.25
+    // of a requested -3, and nothing else in the output said so.
+    if (p_on && std::fabs(p_solved - p_target) >
+                        real_t(1e-9) * std::max(std::fabs(p_target), real_t(1))) {
+        std::printf("continuation: prescribed pressure SOLVED = %g of %g target"
+                    "  (SHORT OF TARGET)\n", (double)p_solved, (double)p_target);
+        converged = false;
+    }
+    std::printf("newton_converged: %d  newton_it: %d (last stage)  newton_total: %d over %d stage(s)  "
+                "lin_it_total: %d\n",
+                converged ? 1 : 0, newton_it, newton_total, stages_run, lin_it_total);
+    std::printf("matrix_free: %d  t_operator: %.4f s  t_precond: %.4f s  t_solve: %.4f s  us_per_lin_it: %.2f\n",
+                matrix_free,
+                t_op,
+                t_prec,
+                t_solve,
+                lin_it_total ? 1e6 * t_solve / lin_it_total : 0.0);
+
+    // Write the mesh and the solution so a run can actually be looked at afterwards.
+    // argv[1] has always been taken as an output folder but was discarded, so every
+    // verification case ran blind: a converged number and nothing to inspect. The layout is
+    // the one the rest of the tree uses -- mesh/ plus SoA field files -- so
+    // external/smesh/python/smesh/raw_to_db.py converts it without special-casing.
+    //
+    // Semi-structured meshes need semistructured_export_as_standard: the macro-element mesh
+    // on its own describes only the corners, and writing that would silently show a
+    // level-1 mesh with the fine solution attached to it.
+    if (smesh::Env::read<int>("SFEM_ENABLE_OUTPUT", 1)) {
+        const smesh::Path out_dir(out_folder);
+        smesh::create_directory(out_dir);
+        if (fs->has_semi_structured_mesh()) {
+            mesh->write(out_dir / "coarse_mesh");
+            smesh::semistructured_export_as_standard(fs->mesh_ptr(), out_dir / "mesh");
+        } else {
+            mesh->write(out_dir / "mesh");
+        }
+        auto output = f->output();
+        // block_size is 4 (ux, uy, uz, p), and Output::write with AoS_to_SoA appends .0 .. .3
+        // to the given name -- so it cannot by itself produce three velocity components plus a
+        // differently named pressure. Write the block as "vel", then rename the fourth
+        // component to "p": the files are plain nodal arrays, so this is a rename and not a
+        // conversion. The result is vel.0 vel.1 vel.2 and p, named as the fields actually are
+        // rather than after the state vector they happen to be packed in.
+        output->enable_AoS_to_SoA(true);
+        output->set_output_dir(out_dir);
+        output->write("vel", x);
+
+        const char *const ext  = sizeof(real_t) == 8 ? "float64" : "float32";
+        const std::string from = std::string(out_folder) + "/vel.3." + ext;
+        const std::string to   = std::string(out_folder) + "/p." + ext;
+        std::remove(to.c_str());
+        if (std::rename(from.c_str(), to.c_str()) != 0) {
+            std::fprintf(stderr, "output: could not rename %s -> %s; pressure stays as vel.3\n",
+                         from.c_str(), to.c_str());
+        }
+        std::printf("output: wrote mesh and solution to %s (vel.0 vel.1 vel.2 = u, p = pressure)\n",
+                    out_folder.c_str());
+        // The averaged fields beside the instantaneous one, through the SAME writer and the
+        // same .3 -> pressure rename documented above: a mean state is a state, and there is
+        // no reason for it to reach disk by a second route that create_xdmf.py would have to
+        // learn about separately.
+        //
+        // Converted to real_t only at the last moment. The accumulator has to be double to
+        // accumulate at all, but what lands on disk is a nodal field like any other.
+        if (!stats_mean.empty() && stats_w > 0) {
+            std::vector<real_t> fld((size_t)ndof, 0);
+            auto                emit = [&](const char *name, const char *pname) {
+                output->write(name, fld.data());
+                const std::string f4 = std::string(out_folder) + "/" + name + ".3." + ext;
+                const std::string t4 = std::string(out_folder) + "/" + pname + "." + ext;
+                std::remove(t4.c_str());
+                if (std::rename(f4.c_str(), t4.c_str()) != 0)
+                    std::fprintf(stderr, "output: could not rename %s -> %s\n", f4.c_str(), t4.c_str());
+            };
+            for (ptrdiff_t i = 0; i < ndof; ++i) fld[(size_t)i] = (real_t)stats_mean[(size_t)i];
+            emit("vel_mean", "p_mean");
+            // sqrt(M2 / W) is the weighted standard deviation. The fmax guards the one case
+            // that can make the argument negative: a window of a single sample, where M2 is
+            // analytically zero and rounding can leave it a few ulp below it.
+            for (ptrdiff_t i = 0; i < ndof; ++i)
+                fld[(size_t)i] = (real_t)std::sqrt(std::fmax(stats_m2[(size_t)i] / stats_w, 0.0));
+            emit("vel_rms", "p_rms");
+            std::printf("stats: wrote vel_mean/p_mean and vel_rms/p_rms\n");
+        }
+    }
+
+    // The averaging window itself, reported whatever SFEM_ENABLE_OUTPUT is set to. It is a
+    // property of the run and not of the files the run happened to write -- and the restart
+    // test sets SFEM_ENABLE_OUTPUT=0 on purpose, so that it compares the driver's own numbers
+    // rather than diffing fields, which means a summary buried in the output block would be
+    // invisible exactly where it is most worth checking.
+    //
+    // The two sums are what make a resumed average falsifiable. A run cut in two performs the
+    // same Welford updates on the same states in the same order, so these must agree with the
+    // uninterrupted run to every digit printed; a sample dropped at the seam, one counted
+    // twice, or a window resumed out of step with its moments each move them.
+    if (!stats_mean.empty()) {
+        double s_mean = 0, s_m2 = 0;
+        for (ptrdiff_t i = 0; i < ndof; ++i) {
+            s_mean += stats_mean[(size_t)i];
+            s_m2 += stats_m2[(size_t)i];
+        }
+        std::printf("stats: window %.17g s over %lld samples, mean sum %.17g, m2 sum %.17g\n", stats_w,
+                    stats_n, s_mean, s_m2);
+    }
+
+    // Verification against the analytic profile, on the free nodes only, matching what
+    // the standalone driver reports.
+    {
+        const auto *const px = mesh->points()->data()[0];
+        const auto *const py = mesh->points()->data()[1];
+        const auto *const pz = mesh->points()->data()[2];
+        real_t            u_linf = 0, p_linf = 0;
+        for (ptrdiff_t i = 0; i < nnodes; ++i) {
+            real_t ux, uy, uz, p;
+            cvfem_case::exact_state(
+                    flow, mu, U, Lx, Ly, (real_t)px[i], (real_t)py[i], (real_t)pz[i], ux, uy, uz, p);
+            u_linf = std::max(u_linf, std::fabs(x[(size_t)i * 4 + 0] - ux));
+            u_linf = std::max(u_linf, std::fabs(x[(size_t)i * 4 + 1] - uy));
+            u_linf = std::max(u_linf, std::fabs(x[(size_t)i * 4 + 2] - uz));
+            p_linf = std::max(p_linf, std::fabs(x[(size_t)i * 4 + 3] - p));
+        }
+
+        // Volume-weighted L2 norms, and the pressure additionally compared up to a constant.
+        //
+        // Both matter for a convergence study and neither is available from L-infinity. L-inf
+        // is set by a single worst node, so it reports the worst corner rather than the field,
+        // and it is the noisiest possible basis for an observed order. The mean shift matters
+        // more: the pressure is fixed by a pin at one node rather than by a zero-mean
+        // constraint, so a discrete solution that is right everywhere but offset by a constant
+        // is penalised at every node. Subtracting mean(p_h - p_exact) is the standard MMS
+        // treatment and separates "the pressure field is wrong" from "the gauge is offset".
+        if (flow == cvfem_case::FlowCase::MMS) {
+            std::vector<real_t> vol((size_t)nnodes, 0);
+            op->node_volume(vol.data());
+            long double vtot = 0, u_l2 = 0, p_l2 = 0, p_l2s = 0, dp_mean = 0;
+            for (ptrdiff_t i = 0; i < nnodes; ++i) {
+                real_t ux, uy, uz, p;
+                cvfem_case::exact_state(flow, mu, U, Lx, Ly, (real_t)px[i], (real_t)py[i],
+                                        (real_t)pz[i], ux, uy, uz, p);
+                const long double v = vol[(size_t)i];
+                vtot += v;
+                dp_mean += v * (long double)(x[(size_t)i * 4 + 3] - p);
+            }
+            dp_mean /= (vtot > 0 ? vtot : 1);
+            for (ptrdiff_t i = 0; i < nnodes; ++i) {
+                real_t ux, uy, uz, p;
+                cvfem_case::exact_state(flow, mu, U, Lx, Ly, (real_t)px[i], (real_t)py[i],
+                                        (real_t)pz[i], ux, uy, uz, p);
+                const long double v  = vol[(size_t)i];
+                const long double ex = x[(size_t)i * 4 + 0] - ux;
+                const long double ey = x[(size_t)i * 4 + 1] - uy;
+                const long double ez = x[(size_t)i * 4 + 2] - uz;
+                const long double ep = x[(size_t)i * 4 + 3] - p;
+                u_l2  += v * (ex * ex + ey * ey + ez * ez);
+                p_l2  += v * ep * ep;
+                p_l2s += v * (ep - dp_mean) * (ep - dp_mean);
+            }
+            std::printf("mms_err: u_l2 %.6e  p_l2 %.6e  p_l2_shifted %.6e  (dp_mean %.6e, vol %.6f)\n",
+                        (double)std::sqrt((double)u_l2), (double)std::sqrt((double)p_l2),
+                        (double)std::sqrt((double)p_l2s), (double)dp_mean, (double)vtot);
+
+            // Is the pressure pin polluting its neighbourhood?
+            //
+            // The pin fixes p at a single node instead of constraining the mean, which acts
+            // as a point constraint on the pressure equation and can drive a spurious local
+            // velocity in a colocated scheme. If that is happening, the worst errors sit on
+            // top of the pin and excluding a few cells around it should collapse them. If the
+            // errors are spread over the domain instead, the pin is exonerated and the
+            // convergence rate is telling us about the discretisation.
+            {
+                const real_t hh   = Lx / (real_t)std::max<ptrdiff_t>(1, (ptrdiff_t)std::lround(
+                                            std::cbrt((double)nnodes) - 1));
+                const real_t pinx = (real_t)px[pin_node], piny = (real_t)py[pin_node],
+                             pinz = (real_t)pz[pin_node];
+                real_t    wu = 0, wp = 0, wux = 0, wuy = 0, wuz = 0, wpx = 0, wpy = 0, wpz = 0;
+                real_t    fu[4] = {0, 0, 0, 0}, fp[4] = {0, 0, 0, 0};  // excluding r <= k*h, k=0,1,2,4
+                for (ptrdiff_t i = 0; i < nnodes; ++i) {
+                    real_t ux, uy, uz, p;
+                    cvfem_case::exact_state(flow, mu, U, Lx, Ly, (real_t)px[i], (real_t)py[i],
+                                            (real_t)pz[i], ux, uy, uz, p);
+                    const real_t eu = std::max(std::max(std::fabs(x[(size_t)i * 4 + 0] - ux),
+                                                        std::fabs(x[(size_t)i * 4 + 1] - uy)),
+                                               std::fabs(x[(size_t)i * 4 + 2] - uz));
+                    const real_t ep = std::fabs(x[(size_t)i * 4 + 3] - p);
+                    if (eu > wu) { wu = eu; wux = (real_t)px[i]; wuy = (real_t)py[i]; wuz = (real_t)pz[i]; }
+                    if (ep > wp) { wp = ep; wpx = (real_t)px[i]; wpy = (real_t)py[i]; wpz = (real_t)pz[i]; }
+                    const real_t dx0 = (real_t)px[i] - pinx, dy0 = (real_t)py[i] - piny,
+                                 dz0 = (real_t)pz[i] - pinz;
+                    const real_t rr  = std::sqrt(dx0 * dx0 + dy0 * dy0 + dz0 * dz0);
+                    const real_t ks[4] = {0, 1, 2, 4};
+                    for (int k = 0; k < 4; ++k)
+                        if (rr > ks[k] * hh) {
+                            fu[k] = std::max(fu[k], eu);
+                            fp[k] = std::max(fp[k], ep);
+                        }
+                }
+                std::printf("mms_pin: pin at (%.4f,%.4f,%.4f)  h=%.4f\n",
+                            (double)pinx, (double)piny, (double)pinz, (double)hh);
+                std::printf("mms_pin: worst u err %.4e at (%.4f,%.4f,%.4f), dist_to_pin %.4f (%.1f h)\n",
+                            (double)wu, (double)wux, (double)wuy, (double)wuz,
+                            (double)std::sqrt((wux-pinx)*(wux-pinx)+(wuy-piny)*(wuy-piny)+(wuz-pinz)*(wuz-pinz)),
+                            (double)(std::sqrt((wux-pinx)*(wux-pinx)+(wuy-piny)*(wuy-piny)+(wuz-pinz)*(wuz-pinz))/hh));
+                std::printf("mms_pin: worst p err %.4e at (%.4f,%.4f,%.4f), dist_to_pin %.4f (%.1f h)\n",
+                            (double)wp, (double)wpx, (double)wpy, (double)wpz,
+                            (double)std::sqrt((wpx-pinx)*(wpx-pinx)+(wpy-piny)*(wpy-piny)+(wpz-pinz)*(wpz-pinz)),
+                            (double)(std::sqrt((wpx-pinx)*(wpx-pinx)+(wpy-piny)*(wpy-piny)+(wpz-pinz)*(wpz-pinz))/hh));
+                std::printf("mms_pin: u_linf excluding r<=0h %.4e  1h %.4e  2h %.4e  4h %.4e\n",
+                            (double)fu[0], (double)fu[1], (double)fu[2], (double)fu[3]);
+                std::printf("mms_pin: p_linf excluding r<=0h %.4e  1h %.4e  2h %.4e  4h %.4e\n",
+                            (double)fp[0], (double)fp[1], (double)fp[2], (double)fp[3]);
+            }
+        }
+        phase_report();
+
+        // ------------------------------------------------------------------- the pump
+        //
+        // What the diaphragm displaces must leave through the port. The chamber is fixed and
+        // the flow incompressible, so the flux through its closed boundary is zero; the walls
+        // carry none, the diaphragm's velocity is prescribed, and the port is the only other
+        // opening. So the port must carry exactly what the diaphragm sweeps:
+        //
+        //     Q_port  ==  rho * V * Lx * Lz
+        //
+        // with no closed-form solution anywhere in it. This is the check transpiration has to
+        // pass -- it says the prescribed normal velocity moved the mass it claimed to -- and
+        // it fails by the size of the lie if the boundary control volumes on either surface
+        // are not closed the way the masks think they are.
+        //
+        // Both fluxes come from Op::sideset_mass_flux, which integrates on the operator's own
+        // sub-control surfaces. The second line is the weaker but independent statement that
+        // the two openings balance each other, which holds even if the amplitude is wrong.
+        if (flow == cvfem_case::FlowCase::Pump) {
+            real_t q_port = 0, q_diaphragm = 0;
+            if (op->sideset_mass_flux(x, "port", q_port) == SFEM_SUCCESS &&
+                op->sideset_mass_flux(x, "diaphragm", q_diaphragm) == SFEM_SUCCESS) {
+                // The area vectors point out of the domain: a positive flux leaves. The
+                // diaphragm moves in -y against an outward +y, so it carries -V*area, and
+                // the port carries the opposite. pump_scale is the waveform at this instant,
+                // 1 for a steady run.
+                const real_t swept = rho * U * Lx * Lz * pump_scale;
+                std::printf("pump: swept %.12f  port %.12f  diaphragm %.12f\n",
+                            (double)swept, (double)q_port, (double)q_diaphragm);
+                std::printf("pump: |port - swept| %.6e   |port + diaphragm| %.6e\n",
+                            (double)std::fabs(q_port - swept),
+                            (double)std::fabs(q_port + q_diaphragm));
+            }
+        }
+
+        // Quadrature-free mass balance. The continuity residual at a node is the net mass flux
+        // out of its control volume; summed over every node the interior faces cancel in pairs
+        // and what remains is the net flux through the domain boundary. Returns that sum and
+        // the sum of magnitudes, the scale it is judged against.
+        auto continuity_sums = [&](long double &net, long double &absnet) {
+            std::vector<real_t> rr((size_t)ndof, 0);
+            // Gathered, like every other residual evaluation here. An ungathered gradient
+            // leaves the continuity rows of partition-crossing elements wrong, and those rows
+            // are exactly what this sums.
+            grad_op->gradient(x, rr.data());
+            net = absnet = 0;
+            // Over OWNED nodes. Summing to nnodes counts every shared, ghost and aura node
+            // once per rank holding it, and this is a conservation identity -- the strongest
+            // row in the verification table, precisely because it does not care how the domain
+            // was cut. A figure that grew with the rank count would discredit the one quantity
+            // meant to be partition-independent.
+            for (ptrdiff_t i = 0; i < n_owned_nodes; ++i) {
+                net += (long double)rr[(size_t)i * 4 + 3];
+                absnet += std::fabs((long double)rr[(size_t)i * 4 + 3]);
+            }
+            // Reduced only when there is something to reduce with, and the accumulators stay
+            // long double throughout: the consumer prints these at %.6Le, so narrowing to
+            // double in order to reduce would move a printed conservation figure that the
+            // tracked verification reports compare against.
+            if (domain.distributed()) {
+                net    = (long double)cvfem::sum_kahan(domain, net);
+                absnet = (long double)cvfem::sum_kahan(domain, absnet);
+            }
+        };
+        if (flow == cvfem_case::FlowCase::Nozzle) {
+            // Global mass balance, the identity the step is checked on, here on a mesh whose
+            // elements are curved -- so it is a check of the isoparametric boundary closure as
+            // much as of the scheme. Everything is divided by rho: the continuity rows carry a
+            // MASS flux, and the oracle Q is a volumetric one.
+            const long double rho_l = (long double)rho;
+            {
+                long double net, absnet;
+                continuity_sums(net, absnet);
+                std::printf("nozzle: sum of continuity residual %.6Le  (sum |.| %.6Le, ratio %.3Le)  [volumetric]\n",
+                            net / rho_l, absnet / rho_l, absnet > 0 ? std::fabs(net) / absnet : 0.0L);
+            }
+            // Through the operator's own sub-control surfaces, not a quadrature of this
+            // driver's: see sideset_flux_weighted for why that distinction has cost a false 17%.
+            // Outward-positive, so the inlet's flux is negative.
+            real_t q_in = 0, q_out = 0;
+            if (op->sideset_mass_flux(x, "inlet", q_in) != SFEM_SUCCESS ||
+                op->sideset_mass_flux(x, "outlet", q_out) != SFEM_SUCCESS) {
+                std::fprintf(stderr, "nozzle: sideset_mass_flux failed\n");
+                return EXIT_FAILURE;
+            }
+            const long double Q_exact = (long double)cvfem_case::nozzle_flow_rate(nozzle, U);
+            const long double Q_in = -(long double)q_in / rho_l, Q_out = (long double)q_out / rho_l;
+            // RELATIVE error here, where the step prints an absolute one: the step's Q is 1/9,
+            // so the two nearly coincide there, while this Q is 5e-6 m^3/s and an absolute
+            // error of it would pass any tolerance. What it measures is the inscribed-polygon
+            // inlet and the nodal quadrature of the parabola, both O(h^2).
+            std::printf("nozzle: Re_t %g  u_t %.6e m/s  Q %.9Le m^3/s\n", (double)(rho * U * L_re / mu),
+                        (double)U, Q_exact);
+            std::printf("nozzle: inflow flux %.9Le  (exact %.9Le, err %.3Le)\n", Q_in, Q_exact,
+                        std::fabs(Q_in - Q_exact) / Q_exact);
+            std::printf("nozzle: outflow flux %.9Le   imbalance (out-in) %.3Le  relative %.3Le\n", Q_out,
+                        Q_out - Q_in, std::fabs((Q_out - Q_in) / (Q_in != 0 ? Q_in : 1)));
+
+            // The quantities the benchmark is compared on: axial velocity on the centreline,
+            // and wall pressure along one generator. The generator puts nodes exactly on the
+            // axis and exactly on the plane z = 0, so both are node selections rather than
+            // interpolations off the mesh. Where several wall nodes share an x -- the annulus of
+            // the expansion -- the outermost is the wall.
+            const auto *const px = mesh->points()->data()[0];
+            const auto *const py = mesh->points()->data()[1];
+            const auto *const pz = mesh->points()->data()[2];
+            std::vector<std::array<double, 3>> centre;  // x, ux, p
+            std::map<double, std::pair<double, double>> wall_line;  // x -> (radius, p)
+            for (ptrdiff_t i = 0; i < nnodes; ++i) {
+                if (py[i] == 0 && pz[i] == 0)
+                    centre.push_back({(double)px[i], (double)x[(size_t)i * 4 + 0], (double)x[(size_t)i * 4 + 3]});
+                if (nozzle_wall_node[(size_t)i] && pz[i] == 0 && py[i] > 0) {
+                    auto it = wall_line.find((double)px[i]);
+                    if (it == wall_line.end() || (double)py[i] > it->second.first)
+                        wall_line[(double)px[i]] = {(double)py[i], (double)x[(size_t)i * 4 + 3]};
+                }
+            }
+            std::sort(centre.begin(), centre.end());
+            const double u_in = (double)(U * nozzle.r_throat * nozzle.r_throat / (nozzle.r_inlet * nozzle.r_inlet));
+            // The PIV stations of the published data sets.
+            for (const double xs : {-0.088, -0.064, -0.048, -0.02, -0.008, 0.0, 0.008, 0.016, 0.024, 0.032, 0.06, 0.08}) {
+                auto hi = std::lower_bound(centre.begin(), centre.end(), std::array<double, 3>{xs, -1e300, -1e300});
+                if (hi == centre.end() || hi == centre.begin()) continue;
+                const auto  &b = *hi, &a = *(hi - 1);
+                const double t = (b[0] > a[0]) ? (xs - a[0]) / (b[0] - a[0]) : 0.0;
+                std::printf("nozzle: station x %+.4f  u_x/u_in %.4f\n", xs, ((1 - t) * a[1] + t * b[1]) / u_in);
+            }
+            std::error_code ec;
+            std::filesystem::create_directories(out_folder, ec);
+            FILE *fc = ec ? nullptr : std::fopen((out_folder + "/nozzle_centerline.csv").c_str(), "w");
+            FILE *fw = ec ? nullptr : std::fopen((out_folder + "/nozzle_wall.csv").c_str(), "w");
+            if (fc && fw) {
+                std::fprintf(fc, "x,ux,p\n");
+                for (const auto &c : centre) std::fprintf(fc, "%.9e,%.9e,%.9e\n", c[0], c[1], c[2]);
+                std::fprintf(fw, "x,p\n");
+                for (const auto &w : wall_line) std::fprintf(fw, "%.9e,%.9e\n", w.first, w.second.second);
+                std::printf("nozzle: wrote %s/nozzle_centerline.csv (%zu) and nozzle_wall.csv (%zu)\n",
+                            out_folder.c_str(), centre.size(), wall_line.size());
+            } else {
+                std::printf("nozzle: could not write profiles to '%s'\n", out_folder.c_str());
+            }
+            if (fc) std::fclose(fc);
+            if (fw) std::fclose(fw);
+
+            // ------------------------------------------------------------- axisymmetry rays
+            //
+            // Four radial rays, at azimuth 0, 90, 180 and 270 degrees. The flow is nominally
+            // axisymmetric, so the four must agree; what they disagree by is an error bar that
+            // costs nothing to collect, and it measures the mesh's own asymmetry rather than
+            // anything the benchmark supplies.
+            //
+            // Four rays and not azimuthal bins, because the bore is a square-to-circle blend:
+            // an intermediate ring has no constant-radius node set to bin, so a bin would be
+            // an interpolation dressed as a measurement.
+            //
+            // ONLY THE +y RAY IS EXACT, which is worth stating because the obvious predicate is
+            // wrong. ring() takes cy = cos(th), cz = sin(th) with th = -pi/4 + (pi/2) m / n; the
+            // four rays land on integer m, so the nodes are all there, but M_PI is not pi and
+            // so cos(M_PI/2) = 6.1e-17 and sin(M_PI) = 1.2e-16 -- 3.7e-19 m on this geometry.
+            // A `py[i] == 0` test would therefore have selected NOTHING on the two z rays and
+            // reported a spread over an empty set, which reads exactly like a quiet one.
+            //
+            // cvfem_case::on_plane is what selects them: the predicate the boundary tests
+            // already use, rather than a second tolerance private to this file. Its 1e-8 m is
+            // absolute below a 1 m domain, so it clears the residual by 2.7e10 and sits 609x
+            // below the finest bore spacing at level 16 -- but only 305x at level 32, since the
+            // cells shrink with refinement and the tolerance does not.
+            struct RaySample {
+                double x, r, ux, ux_mean;
+            };
+            std::array<std::vector<RaySample>, 4> rays;
+            const char *const ray_name[4] = {"+y", "+z", "-y", "-z"};
+            for (ptrdiff_t i = 0; i < nnodes; ++i) {
+                const double yy = (double)py[i], zz = (double)pz[i];
+                const bool   on_z = cvfem_case::on_plane((real_t)pz[i], real_t(0), Lz);
+                const bool   on_y = cvfem_case::on_plane((real_t)py[i], real_t(0), Ly);
+                // The axis node satisfies both planes but neither sign test, so it stays with
+                // the centreline above and is not double-counted into a ray.
+                int k = -1;
+                if (on_z && yy > 0) k = 0;
+                else if (on_y && zz > 0) k = 1;
+                else if (on_z && yy < 0) k = 2;
+                else if (on_y && zz < 0) k = 3;
+                if (k < 0) continue;
+                const double r  = (k == 0 || k == 2) ? std::fabs(yy) : std::fabs(zz);
+                const double um = stats_mean.empty() ? 0.0 : stats_mean[(size_t)i * 4 + 0];
+                rays[(size_t)k].push_back({(double)px[i], r, (double)x[(size_t)i * 4 + 0], um});
+            }
+            for (auto &v : rays)
+                std::sort(v.begin(), v.end(), [](const RaySample &a, const RaySample &b) {
+                    return a.x != b.x ? a.x < b.x : a.r < b.r;
+                });
+            const size_t nr0 = rays[0].size();
+            const bool   rays_match =
+                    nr0 > 0 && rays[1].size() == nr0 && rays[2].size() == nr0 && rays[3].size() == nr0;
+            std::printf("nozzle: axisymmetry rays %s %zu / %s %zu / %s %zu / %s %zu\n", ray_name[0],
+                        rays[0].size(), ray_name[1], rays[1].size(), ray_name[2], rays[2].size(),
+                        ray_name[3], rays[3].size());
+            if (!rays_match) {
+                // Reported rather than tolerated. Equal counts is what makes the element-wise
+                // comparison below meaningful, and unequal ones mean a ray missed nodes -- which
+                // is a selection defect, not an asymmetry in the flow.
+                std::printf("nozzle: ray node counts differ; no axisymmetry spread reported\n");
+            } else {
+                // ray_spread rather than spread: `spread` is already a mesh-warp lambda further
+                // up this function, and a diagnostics scalar shadowing it would compile while
+                // reading as though the two were related.
+                double ray_spread = 0, ray_spread_mean = 0, u_scale = 0;
+                for (size_t q = 0; q < nr0; ++q) {
+                    double lo = rays[0][q].ux, hi = lo, lom = rays[0][q].ux_mean, him = lom;
+                    for (int k = 1; k < 4; ++k) {
+                        lo  = std::fmin(lo, rays[(size_t)k][q].ux);
+                        hi  = std::fmax(hi, rays[(size_t)k][q].ux);
+                        lom = std::fmin(lom, rays[(size_t)k][q].ux_mean);
+                        him = std::fmax(him, rays[(size_t)k][q].ux_mean);
+                    }
+                    ray_spread      = std::fmax(ray_spread, hi - lo);
+                    ray_spread_mean = std::fmax(ray_spread_mean, him - lom);
+                    u_scale         = std::fmax(u_scale, std::fabs(hi));
+                }
+                // Relative to the largest axial velocity the rays see, so the number is
+                // readable as a percentage of the jet rather than in m/s.
+                std::printf("nozzle: axisymmetry spread %.3e (%.3e relative)%s\n", ray_spread,
+                            u_scale > 0 ? ray_spread / u_scale : 0.0,
+                            stats_mean.empty() ? "" : " [instantaneous]");
+                if (!stats_mean.empty())
+                    std::printf("nozzle: axisymmetry spread of the MEAN %.3e (%.3e relative)\n",
+                                ray_spread_mean, u_scale > 0 ? ray_spread_mean / u_scale : 0.0);
+            }
+            FILE *fr = ec ? nullptr : std::fopen((out_folder + "/nozzle_rays.csv").c_str(), "w");
+            if (fr) {
+                std::fprintf(fr, "ray,x,r,ux,ux_mean\n");
+                for (int k = 0; k < 4; ++k)
+                    for (const auto &s : rays[(size_t)k])
+                        std::fprintf(fr, "%s,%.9e,%.9e,%.9e,%.9e\n", ray_name[k], s.x, s.r, s.ux,
+                                     s.ux_mean);
+                std::fclose(fr);
+                std::printf("nozzle: wrote %s/nozzle_rays.csv\n", out_folder.c_str());
+            }
+
+            std::printf("cvfem_hex8_ns_ssgmg: %g seconds\n", smesh::time_seconds() - tick);
+            if (!converged) {
+                std::fprintf(stderr, "verification failed (nozzle did not converge)\n");
+                return EXIT_FAILURE;
+            }
+            return EXIT_SUCCESS;
+        }
+        if (flow == cvfem_case::FlowCase::Step) {
+            // Global mass balance. This is the check that detects an unclosed control volume
+            // along the step: if a step face is missing its boundary sub-control-surface
+            // term, mass leaks there, and the imbalance is of the order of (step area) x
+            // (a velocity) -- large and obvious, not subtle.
+            //
+            // Fluxes are integrated on the inlet and outlet planes with trapezoidal nodal
+            // weights, which are exact for the bilinear variation the mesh carries there.
+            // Spacing is the FINE spacing: the macro mesh is refined by refine_level, so
+            // Ly/ny is the macro cell size and using it overstates every area by
+            // refine_level^2. Also, the two planes have different extents -- the inlet spans
+            // y in [step_y, Ly] because the notch removes the rest, so its half-weight edge
+            // is at y = step_y and not at y = 0.
+            const int    Lref = std::max(1, refine_level);
+            const real_t hy   = Ly / (real_t)(ny * Lref), hz = Lz / (real_t)(nz * Lref);
+            const real_t step_y = smesh::Env::read<real_t>("SFEM_STEP_Y", 1);
+            auto wgt = [](real_t c, real_t lo, real_t hi, real_t h) {
+                return (std::fabs(c - lo) < 1e-9 || std::fabs(c - hi) < 1e-9) ? real_t(0.5) * h : h;
+            };
+            long double q_in = 0, q_out = 0;
+            for (ptrdiff_t i = 0; i < nnodes; ++i) {
+                const real_t xx = (real_t)px[i], yy = (real_t)py[i], zz = (real_t)pz[i];
+                const real_t wz = wgt(zz, 0, Lz, hz);
+                if (cvfem_case::on_plane(xx, real_t(0), Lx))
+                    q_in += (long double)(wgt(yy, step_y, Ly, hy) * wz) * x[(size_t)i * 4 + 0];
+                if (cvfem_case::on_plane(xx, Lx, Lx))
+                    q_out += (long double)(wgt(yy, real_t(0), Ly, hy) * wz) * x[(size_t)i * 4 + 0];
+            }
+            // Quadrature-free mass balance. The continuity residual at a node is the net mass
+            // flux out of its control volume; summed over every node the interior faces
+            // cancel in pairs and what remains is the net flux through the domain boundary.
+            // For an incompressible solution with all control volumes closed that is zero, so
+            // this separates "the discretisation leaks mass" from "my trapezoidal rule on the
+            // inlet and outlet planes disagrees with itself".
+            {
+                long double net, absnet;
+                continuity_sums(net, absnet);
+                std::printf("step: sum of continuity residual %.6Le  (sum |.| %.6Le, ratio %.3Le)\n",
+                            net, absnet, absnet > 0 ? std::fabs(net) / absnet : 0.0L);
+            }
+
+            // Is the backflow guard active, and is anything sitting on its kink?
+            //
+            // The do-nothing outflow convects with max(mdot, 0), which is piecewise linear
+            // with a corner at mdot = 0. Newton has no quadratic rate across such a corner and
+            // a differenced Jacobian action is meaningless there, so whether any outflow face
+            // is near it decides whether the non-smoothness is a real problem on this case or
+            // a theoretical one. mdot = rho u.a and a points along +x on the outlet, so the
+            // nodal u_x carries the sign.
+            {
+                ptrdiff_t n_out = 0, n_back = 0, n_near = 0;
+                real_t    umin = 1e300, umax = -1e300, amin = 1e300;
+                for (ptrdiff_t i = 0; i < nnodes; ++i) {
+                    if (!cvfem_case::on_plane((real_t)px[i], Lx, Lx)) continue;
+                    const real_t u = x[(size_t)i * 4 + 0];
+                    ++n_out;
+                    if (u <= 0) ++n_back;
+                    umin = std::min(umin, u);
+                    umax = std::max(umax, u);
+                    amin = std::min(amin, std::fabs(u));
+                }
+                // "Near" measured against the outlet's own scale, not an absolute number.
+                for (ptrdiff_t i = 0; i < nnodes; ++i) {
+                    if (!cvfem_case::on_plane((real_t)px[i], Lx, Lx)) continue;
+                    if (std::fabs(x[(size_t)i * 4 + 0]) < real_t(1e-3) * std::fabs(umax)) ++n_near;
+                }
+                std::printf("step: outlet nodes %td   backflow (u_x<=0) %td   within 1e-3 of the "
+                            "kink %td   u_x in [%.6e, %.6e]  min|u_x| %.3e\n",
+                            n_out, n_back, n_near, (double)umin, (double)umax, (double)amin);
+            }
+
+            const long double exact_in = 1.0L / 9.0L;
+            std::printf("step: inflow flux %.9Lf  (exact %.9Lf, err %.3Le)\n",
+                        q_in, exact_in, std::fabs(q_in - exact_in));
+            std::printf("step: outflow flux %.9Lf   imbalance (out-in) %.3Le  relative %.3Le\n",
+                        q_out, q_out - q_in, std::fabs((q_out - q_in) / (q_in != 0 ? q_in : 1)));
+            std::printf("cvfem_hex8_ns_ssgmg: %g seconds\n", smesh::time_seconds() - tick);
+            if (!converged) {
+                std::fprintf(stderr, "verification failed (step did not converge)\n");
+                return EXIT_FAILURE;
+            }
+            (void)out_folder;
+            return EXIT_SUCCESS;
+        }
+        if (flow == cvfem_case::FlowCase::Cavity ||
+            flow == cvfem_case::FlowCase::CavityRegularized) {
+            // No closed form to compare against. Report what a cavity run is actually judged
+            // on: the velocity extrema, and u_x down the vertical centreline, which is the
+            // profile tabulated by Ghia, Ghia & Shin (1982) for the square cavity.
+            real_t umin = 1e300, umax = -1e300, vmin = 1e300, vmax = -1e300;
+            for (ptrdiff_t i = 0; i < nnodes; ++i) {
+                umin = std::min(umin, x[(size_t)i * 4 + 0]);
+                umax = std::max(umax, x[(size_t)i * 4 + 0]);
+                vmin = std::min(vmin, x[(size_t)i * 4 + 1]);
+                vmax = std::max(vmax, x[(size_t)i * 4 + 1]);
+            }
+            std::printf("cavity: ux in [%.6f, %.6f]   uy in [%.6f, %.6f]\n",
+                        (double)umin, (double)umax, (double)vmin, (double)vmax);
+            std::printf("cavity: u_x on the vertical centreline (x=%.3g, z=%.3g)\n",
+                        (double)(0.5 * Lx), (double)(0.5 * Lz));
+            const real_t xtol = real_t(1e-6) * std::max(Lx, real_t(1));
+            const real_t ztol = real_t(1e-6) * std::max(Lz, real_t(1));
+            for (ptrdiff_t i = 0; i < nnodes; ++i) {
+                if (std::fabs((real_t)px[i] - real_t(0.5) * Lx) > xtol) continue;
+                if (std::fabs((real_t)pz[i] - real_t(0.5) * Lz) > ztol) continue;
+                std::printf("   y/Ly %.4f   ux %+.6f   uy %+.6f\n",
+                            (double)((real_t)py[i] / Ly), (double)x[(size_t)i * 4 + 0],
+                            (double)x[(size_t)i * 4 + 1]);
+            }
+            std::printf("cvfem_hex8_ns_ssgmg: %g seconds\n", smesh::time_seconds() - tick);
+            if (!converged) {
+                std::fprintf(stderr, "verification failed (cavity did not converge)\n");
+                return EXIT_FAILURE;
+            }
+            (void)out_folder;
+            return EXIT_SUCCESS;
+        }
+    std::printf("u_linf: %.6e  p_linf: %.6e\n", u_linf, p_linf);
+
+    // Smith-Hutton's two verdicts. Neither is a norm against a tabulated solution: the first
+    // is a maximum principle, which either holds or does not, and the second compares the
+    // outlet against an EXACT statement about the pure-convection limit.
+    if (flow == cvfem_case::FlowCase::SmithHutton) {
+        real_t lo_b, hi_b;
+        cvfem_smith_hutton::phi_bounds(lo_b, hi_b);
+        real_t phi_min = std::numeric_limits<real_t>::max();
+        real_t phi_max = -std::numeric_limits<real_t>::max();
+        for (ptrdiff_t i = 0; i < nnodes; ++i) {
+            const real_t w = x[(size_t)i * 4 + 2];
+            phi_min        = std::min(phi_min, w);
+            phi_max        = std::max(phi_max, w);
+        }
+        const real_t under = lo_b - phi_min, over = phi_max - hi_b;
+        const real_t worst = std::max(real_t(0), std::max(under, over));
+        std::printf("smith_hutton: phi in [%.6e, %.6e]  bounds [%.6e, %.6e]  overshoot %.6e\n",
+                    phi_min, phi_max, lo_b, hi_b, worst);
+        std::printf("smith_hutton: BOUNDED=%d  (a maximum principle holds for this problem, so\n"
+                    "              any excursion is the scheme's and nothing else)\n",
+                    worst <= real_t(1e-10) ? 1 : 0);
+        // The outlet, against the pure-convection limit. At finite rho/Gamma the true profile
+        // is smeared relative to this, so the comparison is one-sided and diagnostic: it says
+        // how much of the front survived the half turn, not whether the answer is wrong.
+        std::printf("smith_hutton: outlet      x        phi        phi_ref(pure convection)\n");
+        for (int k = 0; k <= 10; ++k) {
+            const real_t Xr = real_t(k) / 10;            // paper coordinate, 0 .. 1
+            const real_t xm = Xr + 1;                     // mesh coordinate
+            real_t best = std::numeric_limits<real_t>::max(); ptrdiff_t at = -1;
+            for (ptrdiff_t i = 0; i < nnodes; ++i) {
+                if ((real_t)py[i] > real_t(1e-9)) continue;   // outlet edge only
+                const real_t d = std::fabs((real_t)px[i] - xm);
+                if (d < best) { best = d; at = i; }
+            }
+            if (at >= 0)
+                std::printf("smith_hutton: outlet %8.3f %12.6f %12.6f\n", (double)Xr,
+                            (double)x[(size_t)at * 4 + 2],
+                            (double)cvfem_smith_hutton::phi_outlet_pure_convection(Xr));
+        }
+    }
+        std::printf("cvfem_hex8_ns_ssgmg: %g seconds\n", smesh::time_seconds() - tick);
+
+        // The pump and the turbulent step have no closed-form solution, so u_linf against
+        // exact_state -- which returns their boundary data -- measures nothing and would fail
+        // every correct run. The pump's verification is the swept-volume identity printed
+        // above; the turbulent step's is the energy budget and the mass balance. Convergence
+        // is still required of both.
+        //
+        // StepTurb was missing from this list while cvfem_ns_channel_case.hpp:320 asserted it
+        // was in it -- "the verification block exempts this case from the u_linf gate for the
+        // reason the pump is exempt". It did not, and since exact_state returns zero velocity
+        // everywhere for that case, u_linf is max|u| and any real run failed the 1e-2 gate.
+        if (flow == cvfem_case::FlowCase::Pump || flow == cvfem_case::FlowCase::StepTurb) {
+            if (!converged) {
+                std::fprintf(stderr, "verification failed (%s did not converge)\n",
+                             flow == cvfem_case::FlowCase::Pump ? "pump" : "step_turb");
+                return EXIT_FAILURE;
+            }
+        } else if (!converged || u_linf > verify_tol) {
+            std::fprintf(stderr, "verification failed (converged=%d, u_linf=%.6e, tol=%g)\n", converged ? 1 : 0, u_linf, verify_tol);
+            return EXIT_FAILURE;
+        }
+    }
+
+    (void)out_folder;
+    return EXIT_SUCCESS;
+}

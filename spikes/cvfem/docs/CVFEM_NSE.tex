@@ -245,6 +245,46 @@ matters: an entropy-fix style band that saturates $|\mdot|$ at a floor $\varepsi
 which in a unidirectional flow is most of the mesh. Taking $\varepsilon = 0$ recovers the hard
 switch exactly.
 
+\subsection{Second order by deferred correction}
+\label{sec:defcor}
+
+The upwinded state in \eqref{eq:flux} is the donor node's value, which is first order. The
+scheme reaches second order by a deferred correction: the donor value is extrapolated to the
+sub-control surface along the reconstructed nodal gradient,
+\begin{equation}
+  \phi_{\mathrm{up}} \;=\; \phi_C \;+\; \Psi \, \nabla \phi_C \cdot \bd_{C \to s} ,
+  \label{eq:defcor}
+\end{equation}
+with $\bd_{C \to s}$ the offset from the donor node to the surface centroid and $\Psi$ a
+limiter. The gradient is the same nodal reconstruction the Rhie--Chow term uses
+(Section~\ref{sec:nodalgrad}), so the correction adds no sweep of its own; it is lagged one
+Newton step, which is what ``deferred'' means here.
+
+Four choices of $\Psi$ are carried, because the limiter is the part of the reconstruction with
+data-dependent selects in it and each behaves differently:
+
+\begin{itemize}
+  \item $\Psi = 1$, unlimited, which is second order and not bounded;
+  \item a bounded-face clip, which pins $\phi_{\mathrm{up}}$ into the interval spanned by the
+        two nodes of the surface;
+  \item Venkatakrishnan's limiter, with his dimensionless $K$ setting
+        $\varepsilon^2 = u_{\mathrm{ref}}^2 (K/L)^3 h^3$ so that the limiter switches itself off
+        where the field is smooth;
+  \item Darwish and Moukalled's, which rebuilds the one-dimensional TVD stencil by placing a
+        virtual upwind node, so the classical limiter family applies with no neighbour min/max.
+\end{itemize}
+
+Two properties matter for the Jacobian rather than for the solution. The limited increment is
+continuous but not differentiable: a clip is non-smooth where it engages, and both remaining
+limiters branch on a sign. The Jacobian action differentiates \eqref{eq:defcor} exactly, which
+means differentiating through the reconstruction --- the same second pass the exact Rhie--Chow
+term pays for --- and means choosing a subgradient where the limiter has none. Those choices
+have to be made against a rounding of the data and not against a quantity that vanishes with
+the one being tested, or two implementations of the same operator disagree by far more than
+round-off: the measured consequence of getting it wrong was $10^{-4}$ between two mesh layouts,
+on a limiter whose value agreed to the last bit. And $K = 0$, which is a legitimate limiter for
+the value, is the case in which Venkatakrishnan's $\varepsilon^2$ stops bounding that choice.
+
 \section{Pressure--velocity coupling}
 \label{sec:rc}
 
@@ -517,50 +557,113 @@ approximations. The Rhie--Chow blocks belong entirely to the varying half.
 
 The operators above differ in cost by more than an order of magnitude, and the differences do
 not follow the number of terms. The table gives measured throughput in millions of degrees of
-freedom per second on one 72-core Grace socket at $4.12 \times 10^6$ degrees of freedom, with
-the bare element sweep --- no Rhie--Chow, no boundary closure, no transient --- as the
-reference.
+freedom per second on one 72-core Grace socket at $4\,121\,204$ degrees of freedom, on the
+packed mesh layout, with the bare element sweep --- no Rhie--Chow, no boundary closure, no
+transient --- as the reference. Each figure is the median of five runs in one allocation; the
+rows re-measured at eleven runs carried a $1$--$2\%$ spread.
 
 \begin{center}
 \begin{tabular}{lrr}
 \toprule
 Operator & MDOF/s & vs.\ bare sweep \\
 \midrule
-Residual $\mathcal{F}$, interior flux only            & 2945 & 1.00 \\
-\quad $+$ Rhie--Chow, reconstruction reused           & 1759 & 1.67 \\
-\quad $+$ boundary closure                            & 1559 & 1.89 \\
-\quad $+$ transient                                   & 1436 & 2.05 \\
-\quad $+$ reconstruction rebuilt every evaluation     &  667 & 4.41 \\
+Residual $\mathcal{F}$, interior flux only            & 2839 & 1.00 \\
+\quad $+$ Rhie--Chow, reconstruction reused           & 1834 & 1.55 \\
+\quad $+$ boundary closure                            & 1640 & 1.73 \\
+\quad $+$ transient                                   & 1519 & 1.87 \\
+\quad $+$ reconstruction rebuilt every evaluation     & 1263 & 2.25 \\
 \midrule
-Jacobian action $\mathcal{J}v$, interior flux only    & 2067 & 1.00 \\
-\quad $+$ exact Rhie--Chow \eqref{eq:rcjac}           &  605 & 3.42 \\
-\quad $+$ boundary closure and transient              &  561 & 3.68 \\
+Jacobian action $\mathcal{J}v$, interior flux only    & 2055 & 1.00 \\
+\quad $+$ exact Rhie--Chow \eqref{eq:rcjac}           &  944 & 2.18 \\
+\quad $+$ boundary closure and transient              &  839 & 2.45 \\
+\quad the same with the frozen Rhie--Chow form        & 1179 & 1.74 \\
 \midrule
-Matrix--vector product $Jv$                           &  462 & 4.47 \\
-Assembly of $J$                                       & 39--87 & 34--75 \\
-Block diagonal $D$                                    &   90 & --- \\
+Matrix--vector product $Jv$                           &  440 & 4.67 \\
+Assembly of $J$                                       & 39--103 & 28--73 \\
+Block diagonal $D$                                    &  113 & --- \\
 \bottomrule
 \end{tabular}
 \end{center}
 
+The assembly row spans the four scatter layouts --- $39$ on the flat atomic sweep, $63$ packed,
+$88$ with the streaming flush, $103$ with the pack colouring --- and the layout matters more
+here than any term does. For comparison, the standard atomic layout runs the bare residual at
+$1135$ against the packed layout's $2839$, a factor of $2.5$, and every row of the table keeps
+that factor to within a few percent.
+
+The frozen-Rhie--Chow row is there because the assembled matrix carries that form and not the
+exact one: it cannot carry the exact term without widening its one-ring sparsity. It is
+therefore the matrix-free operator to compare against $Jv$, and the only row in this table that
+is not part of the cumulative sequence above it.
+
+\subsection{The higher-order convective flux}
+
+Every row above runs the first-order upwind flux. The deferred correction of
+Section~\ref{sec:defcor} is what the scheme runs when accuracy matters, and it is the one part of
+the operator family the table said nothing about. Measured in one allocation at the same size,
+medians of five, with the first-order Rhie--Chow operator as the reference because that is what
+each correction is added to --- $1821$ and $950$ here, which agree with the corresponding rows
+above to within $0.7\%$.
+
+\begin{center}
+\begin{tabular}{lrrr}
+\toprule
+Operator & MDOF/s & vs.\ first order & flops/element \\
+\midrule
+Residual, first order $+$ Rhie--Chow                  & 1821 & 1.00 &  754 \\
+\quad $+$ correction, unlimited                       & 1108 & 1.64 & 1558 \\
+\quad $+$ correction, bounded-face clip               &  856 & 2.13 & 1702 \\
+\quad $+$ correction, Venkatakrishnan                 &  748 & 2.44 & 2638 \\
+\quad $+$ correction, Darwish--Moukalled              &  877 & 2.08 & 2278 \\
+\quad $+$ Venkatakrishnan, boundary and transient     &  683 & 2.67 & 2638 \\
+\midrule
+Jacobian action, first order $+$ exact Rhie--Chow     &  950 & 1.00 &  850 \\
+\quad $+$ correction, unlimited                       &  449 & 2.12 & 2422 \\
+\quad $+$ correction, Venkatakrishnan                 &  328 & 2.89 & 5878 \\
+\quad $+$ Venkatakrishnan, boundary and transient     &  316 & 3.00 & 5878 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The flop column is the driver's model, counted against the kernel line for line. It includes the
+reconstruction of the twenty-four node-to-surface increments once per element, which on the
+affine element is a product with the three edge columns of the Jacobian rather than a centroid
+built from eight coordinates, so no coordinate is read by the correction at all. The correction
+is a lane-blocked arm of the same face kernel as the flux it is added to and shares its gathers
+and scatters, which is why its throughput ratio of $2.44$ for Venkatakrishnan sits below the
+flop ratio of $3.5$: the arithmetic grows faster than the time.
+
+The packed layout's advantage shrinks here, from $1.95$ over the standard layout for the
+first-order residual to $1.37$ for the Venkatakrishnan one. The correction adds arithmetic that
+both layouts perform alike; the layout's gain is in the scatter.
+
+The derivative is the expensive half, and by more than the residual's factor: the correction
+costs the Jacobian action $2.89$ against the residual's $2.44$ on the same limiter, on top of
+an operator that was already $2.18$ times the bare sweep, and its flop count rises from $850$
+to $5878$ --- a factor of $6.9$, against the residual's $3.5$. The limiter has to be
+differentiated through the nodal gradient reconstruction, and that reconstruction is what the
+exact Rhie--Chow term already pays for once.
+
 Three readings of this table bear on the design rather than on the implementation.
 
-The exact Rhie--Chow term costs the Jacobian action a factor of $3.4$ on its own, against
-$1.67$ for the same term in the residual. The asymmetry is \eqref{eq:rcjac}: the residual
+The exact Rhie--Chow term costs the Jacobian action a factor of $2.2$ on its own, against
+$1.55$ for the same term in the residual. The asymmetry is \eqref{eq:rcjac}: the residual
 reconstructs the gradient of a field that is fixed over the Newton step, the action
 reconstructs the gradient of a direction that changes at every Krylov iteration, and only the
 former can be amortised. Where the reconstruction cannot be reused --- the last residual row
 --- the residual pays the same factor.
 
 The matrix--vector product is slower than the matrix-free action carrying the same physics,
-by $1.25$, before counting the assembly that produced the matrix. The reason is traffic
+by $2.7$, before counting the assembly that produced the matrix --- and ``the same physics''
+has to mean the frozen Rhie--Chow form, since that is what the assembled matrix encodes. The
+exact action, which the solver actually applies, is $1.9$ times the product. The reason is traffic
 rather than arithmetic: the assembled blocks are roughly $840$ bytes per degree of freedom
 and must be streamed in full at every application, whereas the matrix-free operator reads the
 state and the mesh and recomputes the rest. This is also why the product's cost is flat in the
 physics while the matrix-free operator's is not. The assembled matrix earns its place as the
 source of $D$ and $S$, not as a way to apply $J$.
 
-Adding physics narrows the gap between matrix-free and assembled from $4.5$ to $1.25$ without
+Adding physics narrows the gap between matrix-free and assembled from $4.7$ to $2.7$ without
 closing it. Any future term heavy enough to close it would also, by the same argument, be
 heavy enough to make assembly worth revisiting --- which is the quantitative form of the
 usual matrix-free trade-off, and the reason the terms are enumerated separately here rather

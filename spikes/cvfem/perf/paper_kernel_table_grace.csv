@@ -1,0 +1,40 @@
+# The kernel-cost table of docs/CVFEM_NSE.tex, re-measured on Grace.
+#
+# Produced by jobs/paper_kernel_table.sbatch (job 4985346) with the negative rows and the
+# frozen-Rhie-Chow row confirmed at eleven repetitions by jobs/paper_confirm.sbatch (4985363).
+# 72 threads, OMP_PROC_BIND=true, --n 100 = 4,121,204 dofs, medians.
+#
+# `paper_mdof_s` is what the table said before this measurement; the two rows that came out
+# lower than it reproduced to 1.8% and 2.0% within a node, which is inside the 5-11%
+# node-to-node variation scripts/perf_regression.sh documents and outside a single node's own
+# spread -- so they are the same operator on a different node, not a regression.
+#
+# Every row was checked against the driver's ran_* columns before being compared: ran_rc=exact
+# for the exact-Rhie-Chow rows, pgrad_per_apply=1, transient=1, ran_boundary=on. A rate whose
+# operator was not verified that way is not comparable with the paper's.
+key,row,layout,ndof,paper_mdof_s,mdof_s,spread_pct,reps
+res_bare,"residual, interior flux only",packed,4121204,2945,2839.1,1.8,11
+res_rc,"+ Rhie-Chow, reconstruction reused",packed,4121204,1759,1833.5,,5
+res_rc_bnd,"+ boundary closure",packed,4121204,1559,1639.7,,5
+res_rc_bnd_dt,"+ transient",packed,4121204,1436,1518.6,,5
+res_rc_bnd_dt_perapply,"+ reconstruction rebuilt every evaluation",packed,4121204,667,1262.6,,5
+jac_bare,"Jacobian action, interior flux only",packed,4121204,2067,2054.7,1.0,11
+jac_rc,"+ exact Rhie-Chow",packed,4121204,605,943.9,,5
+jac_rc_bnd_dt,"+ boundary closure and transient",packed,4121204,561,838.5,,5
+jac_lagged_rc_bnd_dt,"the same with the frozen Rhie-Chow form",packed,4121204,,1178.7,1.9,11
+bsr_apply,"matrix-vector product Jv",packed,4121204,462,439.5,2.0,11
+assemble,"assembly of J",atomic,4121204,,39.0,,5
+assemble,"assembly of J",packed,4121204,,63.1,,5
+assemble,"assembly of J",store,4121204,,88.1,,5
+assemble,"assembly of J",colored,4121204,,103.4,,5
+block_diag,"block diagonal D",atomic,4121204,90,113.0,,5
+# The standard layout, which is the standing comparison for any rate here.
+res_bare,"residual, interior flux only",atomic,4121204,,1135.3,,5
+res_rc,"+ Rhie-Chow, reconstruction reused",atomic,4121204,,924.2,,5
+res_rc_bnd,"+ boundary closure",atomic,4121204,,888.6,,5
+res_rc_bnd_dt,"+ transient",atomic,4121204,,857.5,,5
+res_rc_bnd_dt_perapply,"+ reconstruction rebuilt every evaluation",atomic,4121204,,587.5,,5
+jac_bare,"Jacobian action, interior flux only",atomic,4121204,,969.0,,5
+jac_rc,"+ exact Rhie-Chow",atomic,4121204,,425.4,,5
+jac_rc_bnd_dt,"+ boundary closure and transient",atomic,4121204,,406.8,,5
+bsr_apply,"matrix-vector product Jv",atomic,4121204,,444.6,,5

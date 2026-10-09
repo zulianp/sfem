@@ -370,7 +370,12 @@ def section_mms(runs, checks):
                          "fitted value is a bound on the order rather than a measurement of",
                          "it: what is established is that the ladder converges and that the",
                          "order is nowhere near the 2.3 the Re = 1 arm reports. The gate is",
-                         "set well below the fitted rate for that reason.", ""]
+                         "set well below the fitted rate for that reason.", "",
+                         "That describes the DEFAULT scheme, which is what this ladder runs.",
+                         "A higher-order reconstruction and four limiter arms exist and are",
+                         "off unless asked for; what each is worth is measured separately in",
+                         "*The convective scheme, arm by arm* below, which appears when the",
+                         "matrix is run with `VERIFY_GROUPS=conv`.", ""]
         # The LOCAL rate between consecutive levels, alongside the global fit. A single fitted
         # number reads as a settled order whether or not the ladder is in its asymptotic
         # regime, and at Re = 100 it is not: the local rates run 1.28, 0.45, 0.61 while the
@@ -416,6 +421,107 @@ def section_mms(runs, checks):
             body.append(table(["quantity", "fitted rate", "R^2", "levels", "threshold", "status"], fits))
             body.append(svg_xy(series, "h  (~ ndof^-1/3)", "L2 error", logx=True, logy=True,
                                caption="MMS convergence%s" % tag) + "\n")
+    return "\n".join(body) + "\n"
+
+
+# What each arm of the convective scheme is, in the order a reader should meet them: the
+# default first, then the reconstruction with nothing holding it back, then the things that
+# hold it back. Kept here rather than derived from the label so the report says what an arm
+# IS, not merely what it was called on the command line.
+CONV_ARMS = [
+    ("lo",          "first-order donor-cell upwind (the default)"),
+    ("ho_lim0",     "deferred correction, unlimited -- the ceiling"),
+    ("ho_lim1",     "bounded-face clip (Barth-Jespersen on two nodes)"),
+    ("ho_lim2_k0",  "Venkatakrishnan, K = 0 -- the zero-severity control"),
+    ("ho_lim2_k1",  "Venkatakrishnan, K = 1"),
+    ("ho_lim2_k5",  "Venkatakrishnan, K = 5 -- the step case's best convergence"),
+    ("ho_lim2_k30", "Venkatakrishnan, K = 30"),
+    ("ho_lim3",     "Darwish-Moukalled virtual upwind node + van Leer"),
+    ("ho_lim0_frozen",    "unlimited, correction frozen per continuation stage"),
+    ("ho_lim2_k0_frozen", "Venkatakrishnan K = 0 frozen -- bounded AND 12 Newton steps"),
+]
+
+
+def section_conv(runs, checks):
+    """Order of accuracy per limiter arm, at the Reynolds number where a limiter exists.
+
+    One ladder per arm, all at Re = 100, because a limiter only acts where the donor split
+    does: at Re = 1 every arm would report the same rate for the same reason and the table
+    would separate nothing.
+
+    The table is read against two rows, not against an absolute threshold. `lo` is what the
+    scheme costs today and `ho_lim0` is what the reconstruction is worth with nothing holding
+    it back; every limiter sits between them, and the useful question is how much of that gap
+    it gives back. An arm that matches the ceiling exactly has not won -- it has switched
+    itself off, which is a correctness problem wearing an accuracy result's clothes, and it
+    is why the boundedness column is beside the rate rather than replaced by it.
+
+    Only one thing is gated: that every arm converges at all. The order an arm SHOULD reach
+    is the open question this group was built to answer, so gating it would be asserting the
+    answer -- and a threshold set from today's numbers would pass the arms that already fail
+    the step case. The rates are reported, the gap to the ceiling is computed, and the
+    decision stays with the reader until an arm is chosen.
+    """
+    rows = [r for r in runs if r.get("group") == "conv" and "u_l2" in r]
+    if len(rows) < 2:
+        return ""
+
+    fits = {}
+    for arm, _ in CONV_ARMS:
+        arm_rows = sorted((r for r in rows if r.get("conv_arm") == arm), key=lambda r: r["ndof"])
+        if len(arm_rows) < 2:
+            continue
+        for r in arm_rows:
+            r["h"] = r["ndof"] ** (-1.0 / 3.0)
+        data = [(r["h"], r["u_l2"]) for r in arm_rows if r.get("u_l2")]
+        f = fit_convergence_rate([d[0] for d in data], [d[1] for d in data])
+        if f:
+            fits[arm] = (f, arm_rows, data)
+
+    if not fits:
+        return ""
+
+    ceiling = fits["ho_lim0"][0][0] if "ho_lim0" in fits else None
+    base    = fits["lo"][0][0] if "lo" in fits else None
+
+    trows, series = [], []
+    for arm, what in CONV_ARMS:
+        if arm not in fits:
+            continue
+        (rate, inter, r2, n), arm_rows, data = fits[arm]
+        finest = arm_rows[-1]
+        # How much of the gap between the default and the ceiling this arm recovers. Only
+        # meaningful when both ends were measured, and only when the ceiling is actually above
+        # the default -- if the reconstruction bought nothing there is no gap to share out.
+        gap = "--"
+        if ceiling is not None and base is not None and ceiling - base > 1e-9 and arm not in ("lo", "ho_lim0"):
+            gap = "%.0f%%" % (100.0 * (rate - base) / (ceiling - base))
+        ok = rate >= 0.5
+        checks.append(("Convective arm %s converges" % arm,
+                       "fitted u L2 rate %.3f (expect >= 0.50)" % rate, ok))
+        trows.append([arm, what, n, "%.3f" % rate, "%.4f" % r2, gap,
+                      fmt(finest.get("u_l2")), status(ok)])
+        series.append(("%s: rate %.2f" % (arm, rate), data, "points"))
+
+    body = ["## The convective scheme, arm by arm", "",
+            "Manufactured solution at Re = 100, where the donor split is active and a limiter",
+            "therefore does something. One ladder per arm; the rate is fitted by log-log least",
+            "squares against `h ~ ndof^(-1/3)`, the same fit the order-of-accuracy section uses.", "",
+            "`gap recovered` is the share of the distance between the default scheme and the",
+            "unlimited reconstruction that an arm gets back. 100% means the arm is as accurate",
+            "as no limiter at all, which is a warning and not a win: the arm exists to bound the",
+            "reconstruction, and one that recovers the full gap is very likely not bounding it",
+            "anywhere. Read it beside whether the arm converges on the step case, which is the",
+            "measurement it was added for and which lives in jobs/conv_limiter.sbatch.", "",
+            "`ho_lim2_k0` is bit-for-bit `ho_lim2` with the deactivation term switched off --",
+            "proved over 512 input combinations in tests/cvfem_venkata_test.cpp -- so it is the",
+            "control: if its row ever differs from an unswept Venkatakrishnan run, SFEM_VENKAT_K",
+            "has acquired an effect at zero and every other K row is suspect.", ""]
+    body.append(table(["arm", "what it is", "levels", "u L2 rate", "R^2",
+                       "gap recovered", "finest u L2", "status"], trows))
+    if series:
+        body.append(svg_xy(series, "h  (~ ndof^-1/3)", "L2 error", logx=True, logy=True,
+                           caption="Convective arms, Re = 100") + "\n")
     return "\n".join(body) + "\n"
 
 
@@ -842,6 +948,7 @@ def build_report(manifest, rundir):
     checks = []
     parts = [section_unit(manifest, checks),
              section_mms(runs, checks),
+             section_conv(runs, checks),
              section_boundary(runs, checks),
              section_budget(runs, checks),
              section_pump(runs, checks),
@@ -897,6 +1004,29 @@ def selftest():
         print("%-58s %s" % (what, "OK" if ok else "FAIL"))
         if not ok:
             fails.append(what)
+
+    # The convective-arm table, on ladders whose order is planted. The arithmetic that can
+    # quietly mislead here is "gap recovered": it divides by the distance between two other
+    # rows, so a sign error or a swapped end reads as an arm doing well when it is doing
+    # badly. Planting 0.8 against a default of 1.0 and a ceiling of 2.0 must come back
+    # NEGATIVE -- the arm is worse than doing nothing -- and 1.8 must come back at 80%.
+    conv_runs = []
+    for arm, order in (("lo", 1.0), ("ho_lim0", 2.0), ("ho_lim1", 0.8), ("ho_lim2_k30", 1.8)):
+        for ndof in (1000, 8000, 27000):
+            h = ndof ** (-1.0 / 3.0)
+            conv_runs.append({"group": "conv", "conv_arm": arm, "ndof": ndof,
+                              "u_l2": h ** order, "label": arm})
+    conv_checks = []
+    conv_out = section_conv(conv_runs, conv_checks)
+    ck("1.000" in conv_out and "2.000" in conv_out and "0.800" in conv_out,
+       "the arm table recovers each planted order")
+    ck("-20%" in conv_out, "an arm worse than the default reports a negative gap")
+    ck("| 80% |" in conv_out, "an arm partway to the ceiling reports its share")
+    ck(len(conv_checks) == 4 and not any(ok is False for _, _, ok in conv_checks),
+       "every converging arm is gated and passes")
+    # And the group is absent from the default matrix, so no rows must produce no section --
+    # otherwise every ordinary run grows an empty heading.
+    ck(section_conv([], []) == "", "no convective runs produces no section")
 
     # Exact power laws: the fit must return the exponent it was built from.
     for expect in (1.0, 1.3, 2.0, 3.0):

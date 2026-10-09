@@ -351,82 +351,84 @@ endif()
 ######################################################
 # Executables
 
-list(APPEND SFEM_DRIVER_MODULES . mesh examples mesh_functions postprocess sdf bench ale simulations contact mech verification)
+if(NOT SFEM_ENABLE_MINIMAL)
+    list(APPEND SFEM_DRIVER_MODULES . mesh examples mesh_functions postprocess sdf bench ale simulations contact mech verification)
 
-foreach(DRIVER_MODULE ${SFEM_DRIVER_MODULES})
-    file(GLOB MODULE_C_DRIVERS CONFIGURE_DEPENDS "drivers/${DRIVER_MODULE}/*.c")
-    file(GLOB MODULE_CPP_DRIVERS CONFIGURE_DEPENDS "drivers/${DRIVER_MODULE}/*.cpp")
-    list(APPEND CPP_DRIVERS ${MODULE_CPP_DRIVERS})
-    list(APPEND C_DRIVERS ${MODULE_C_DRIVERS})
-endforeach()
+    foreach(DRIVER_MODULE ${SFEM_DRIVER_MODULES})
+        file(GLOB MODULE_C_DRIVERS CONFIGURE_DEPENDS "drivers/${DRIVER_MODULE}/*.c")
+        file(GLOB MODULE_CPP_DRIVERS CONFIGURE_DEPENDS "drivers/${DRIVER_MODULE}/*.cpp")
+        list(APPEND CPP_DRIVERS ${MODULE_CPP_DRIVERS})
+        list(APPEND C_DRIVERS ${MODULE_C_DRIVERS})
+    endforeach()
 
-set(DRIVERS "${C_DRIVERS};${CPP_DRIVERS}")
+    set(DRIVERS "${C_DRIVERS};${CPP_DRIVERS}")
 
-if(${SFEM_SCALAR_TYPE} STREQUAL "float32")
-    # FIXME these executables need to be fixed when compiling with real_t=float32
-    list (APPEND SFEM_EXCLUDED_EXEC assemble;assemble3;assemble4;cvfem_assemble;heat_equation;heat_equation;taylor_hood_navier_stokes)
-endif()
-
-if(NOT SFEM_ENABLE_MPI)
-    # These drivers depend on distributed/MPI-only headers (e.g. smesh_distributed_aura.hpp)
-    list(APPEND SFEM_EXCLUDED_EXEC "partition")
-endif()
-
-if(SFEM_ENABLE_RESAMPLING)
-    file(GLOB RESAMPLING_C_EXAMPLES CONFIGURE_DEPENDS "drivers/resampling/*.c")
-    file(GLOB RESAMPLING_CXX_EXAMPLES CONFIGURE_DEPENDS "drivers/resampling/*.cpp")
-
-    list(APPEND DRIVERS "${RESAMPLING_C_EXAMPLES}")
-    list(APPEND DRIVERS "${RESAMPLING_CXX_EXAMPLES}")
-endif()
-
-if(SFEM_ENABLE_CUDA)
-    file(GLOB CUDA_C_EXAMPLES CONFIGURE_DEPENDS "drivers/cuda/*.c")
-    file(GLOB CUDA_CXX_EXAMPLES CONFIGURE_DEPENDS "drivers/cuda/*.cpp")
-
-    list(APPEND DRIVERS "${CUDA_C_EXAMPLES}")
-    list(APPEND DRIVERS "${CUDA_CXX_EXAMPLES}")
-else()
-    list(APPEND SFEM_EXCLUDED_EXEC "run_poisson_cuda;lapl_matrix_free;linear_elasticity_matrix_free;sym_spmv_bench")
-endif()
-
-
-
-foreach(DRIVER ${DRIVERS})
-    get_filename_component(DRIVER_NAME ${DRIVER} NAME_WE)
-    list(FIND SFEM_EXCLUDED_EXEC "${DRIVER_NAME}" LIST_INDEX)
-
-    if(TARGET ${DRIVER_NAME})
-        message(
-            STATUS
-                "Skipping DRIVER_NAME (already provided): ${DRIVER_NAME}")
-    elseif (${LIST_INDEX} GREATER -1)
-        message(STATUS "Skipped DRIVER_NAME: ${DRIVER_NAME}")
-    else()
-        add_executable(${DRIVER_NAME} ${DRIVER})
-        target_link_libraries(${DRIVER_NAME} PRIVATE sfem)
-        list(APPEND SFEM_TARGETS ${DRIVER_NAME})
+    if(${SFEM_SCALAR_TYPE} STREQUAL "float32")
+        # FIXME these executables need to be fixed when compiling with real_t=float32
+        list (APPEND SFEM_EXCLUDED_EXEC assemble;assemble3;assemble4;cvfem_assemble;heat_equation;heat_equation;taylor_hood_navier_stokes)
     endif()
-endforeach()
 
-if(SFEM_ENABLE_CUDA)
-    add_executable(bench_packed_laplacian_cuda
-        bench/cuda/bench_packed_laplacian.cpp
-        bench/cuda/bench_packed_laplacian.cu)
-    target_link_libraries(bench_packed_laplacian_cuda PRIVATE sfem)
-    # if(SFEM_ENABLE_OPENMP)
-    #     if(OPENMP_DIR)
-    #         target_compile_options(bench_packed_laplacian_cuda PRIVATE
-    #             $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-fopenmp>)
-    #     elseif(OpenMP_CXX_FLAGS)
-    #         separate_arguments(SFEM_OPENMP_CXX_OPTIONS NATIVE_COMMAND "${OpenMP_CXX_FLAGS}")
-    #         foreach(SFEM_OPENMP_CXX_OPTION ${SFEM_OPENMP_CXX_OPTIONS})
-    #             target_compile_options(bench_packed_laplacian_cuda PRIVATE
-    #                 $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=${SFEM_OPENMP_CXX_OPTION}>)
-    #         endforeach()
-    #     endif()
-    # endif()
-    list(APPEND SFEM_TARGETS bench_packed_laplacian_cuda)
+    if(NOT SFEM_ENABLE_MPI)
+        # These drivers depend on distributed/MPI-only headers (e.g. smesh_distributed_aura.hpp)
+        list(APPEND SFEM_EXCLUDED_EXEC "partition")
+    endif()
+
+    if(SFEM_ENABLE_RESAMPLING)
+        file(GLOB RESAMPLING_C_EXAMPLES CONFIGURE_DEPENDS "drivers/resampling/*.c")
+        file(GLOB RESAMPLING_CXX_EXAMPLES CONFIGURE_DEPENDS "drivers/resampling/*.cpp")
+
+        list(APPEND DRIVERS "${RESAMPLING_C_EXAMPLES}")
+        list(APPEND DRIVERS "${RESAMPLING_CXX_EXAMPLES}")
+    endif()
+
+    if(SFEM_ENABLE_CUDA)
+        file(GLOB CUDA_C_EXAMPLES CONFIGURE_DEPENDS "drivers/cuda/*.c")
+        file(GLOB CUDA_CXX_EXAMPLES CONFIGURE_DEPENDS "drivers/cuda/*.cpp")
+
+        list(APPEND DRIVERS "${CUDA_C_EXAMPLES}")
+        list(APPEND DRIVERS "${CUDA_CXX_EXAMPLES}")
+    else()
+        list(APPEND SFEM_EXCLUDED_EXEC "run_poisson_cuda;lapl_matrix_free;linear_elasticity_matrix_free;sym_spmv_bench")
+    endif()
+
+
+
+    foreach(DRIVER ${DRIVERS})
+        get_filename_component(DRIVER_NAME ${DRIVER} NAME_WE)
+        list(FIND SFEM_EXCLUDED_EXEC "${DRIVER_NAME}" LIST_INDEX)
+
+        if(TARGET ${DRIVER_NAME})
+            message(
+                STATUS
+                    "Skipping DRIVER_NAME (already provided): ${DRIVER_NAME}")
+        elseif (${LIST_INDEX} GREATER -1)
+            message(STATUS "Skipped DRIVER_NAME: ${DRIVER_NAME}")
+        else()
+            add_executable(${DRIVER_NAME} ${DRIVER})
+            target_link_libraries(${DRIVER_NAME} PRIVATE sfem)
+            list(APPEND SFEM_TARGETS ${DRIVER_NAME})
+        endif()
+    endforeach()
+
+    if(SFEM_ENABLE_CUDA)
+        add_executable(bench_packed_laplacian_cuda
+            bench/cuda/bench_packed_laplacian.cpp
+            bench/cuda/bench_packed_laplacian.cu)
+        target_link_libraries(bench_packed_laplacian_cuda PRIVATE sfem)
+        # if(SFEM_ENABLE_OPENMP)
+        #     if(OPENMP_DIR)
+        #         target_compile_options(bench_packed_laplacian_cuda PRIVATE
+        #             $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-fopenmp>)
+        #     elseif(OpenMP_CXX_FLAGS)
+        #         separate_arguments(SFEM_OPENMP_CXX_OPTIONS NATIVE_COMMAND "${OpenMP_CXX_FLAGS}")
+        #         foreach(SFEM_OPENMP_CXX_OPTION ${SFEM_OPENMP_CXX_OPTIONS})
+        #             target_compile_options(bench_packed_laplacian_cuda PRIVATE
+        #                 $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=${SFEM_OPENMP_CXX_OPTION}>)
+        #         endforeach()
+        #     endif()
+        # endif()
+        list(APPEND SFEM_TARGETS bench_packed_laplacian_cuda)
+    endif()
 endif()
 
 # if(TARGET bench_hyperelasticity)

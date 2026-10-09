@@ -1,0 +1,18 @@
+### host nid006549  n=128 repeat=10 passes=3  2026-10-01 12:39:54
+### the correction is Venkatakrishnan unless the label says otherwise
+
+### verification first -- a throughput row for an unverified operator is not a result
+  limiter 0  exact_rel 2.700e-10 (0.0000% of dofs disagree)  lagged_rel 5.920e-02 (74.9904%)
+  limiter 1  exact_rel 2.363e-02 (0.6320% of dofs disagree)  lagged_rel 2.063e-01 (74.9968%)
+  limiter 2  exact_rel 7.937e-04 (0.3152% of dofs disagree)  lagged_rel 1.696e-01 (75.0000%)
+  limiter 3  exact_rel 1.576e-03 (0.3168% of dofs disagree)  lagged_rel 1.807e-01 (74.9984%)
+
+arm                                    MDOF_s       dofs frac_hograd
+jac_first_order                       973.483    8586756          -
+jac_ho_lagged_packed                  969.821    8586756          -
+jac_ho_exact_packed                   409.182    8586756     0.2449
+jac_ho_lagged_atomic                  538.948    8586756          -
+jac_ho_exact_atomic                   214.899    8586756     0.6268
+jac_ho_exact_packed_unlim             556.961    8586756     0.3319
+
+csv: /ritom/scratch/cscs/zulianp/cvfem_hoexact/4962293/hoexact.csv

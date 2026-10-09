@@ -86,7 +86,7 @@ closes the ghosts with a CSR gather whose summation order is fixed by the index 
 than by thread timing. Both are bit-reproducible.
 
 What is not is the **boundary closure**. `apply_boundary_scs_jacobian_action_pass` and its
-residual twin (`src/hex8/cvfem_hex8_layout_common.hpp:538,577`) scatter the element
+residual twin (`src/best/cvfem_hex8_best_common.hpp:538,577`) scatter the element
 contribution into the shared node arrays with `atomic_add`, under
 `#pragma omp parallel for schedule(static)` over the boundary shell. `schedule(static)` fixes
 which thread owns which face, but not the order in which two threads holding faces that meet

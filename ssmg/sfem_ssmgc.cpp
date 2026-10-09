@@ -561,7 +561,8 @@ namespace sfem {
                         sfem::create_buffer<T>(sym_block_size * coarse->mapping->size(), sfem::MEMORY_SPACE_HOST);
                 coarse->sbv = sfem::create_sparse_block_vector(coarse->mapping, coarse_normal_prod);
 
-                const ptrdiff_t n_from_geom = surface_n_nodes(fine->sides, n_fine_owned);
+                // fine->sides is already on the device. The node-id scan is a host walk.
+                const ptrdiff_t n_from_geom = surface_n_nodes(host_sides[i - 1], n_fine_owned);
                 const ptrdiff_t n_to_owned  = coarse->mapping->size();
                 const ptrdiff_t n_to_geom   = surface_n_nodes(coarse_sides, n_to_owned);
 
