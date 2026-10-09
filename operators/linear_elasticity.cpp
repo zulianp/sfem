@@ -10,19 +10,19 @@
 #include "tet4_linear_elasticity.hpp"
 #include "tri3_linear_elasticity.hpp"
 
+#include "smesh_elem_type.hpp"
+
 #include <mpi.h>
 #include <stdio.h>
 
 int linear_elasticity_is_opt(smesh::ElemType element_type) {
-    return element_type == smesh::HEX8 ||
-           (sfem::is_semistructured_type(element_type) && smesh::is_hex_ss_family(element_type));
+    return element_type == smesh::HEX8 || (sfem::is_semistructured_type(element_type) && smesh::is_hex_ss_family(element_type));
 }
 
 static int linear_elasticity_ss_not_implemented(const char *const fn, const smesh::ElemType element_type) {
     if (smesh::is_wedge_ss_family(element_type)) {
-        SFEM_ERROR("%s: no kernel for WEDGE family (%s); hex-dominant apply is not implemented\n",
-                   fn,
-                   type_to_string(element_type));
+        SFEM_ERROR(
+                "%s: no kernel for WEDGE family (%s); hex-dominant apply is not implemented\n", fn, type_to_string(element_type));
     } else if (smesh::is_pyramid_ss_family(element_type)) {
         SFEM_ERROR("%s: no kernel for PYRAMID family (%s); hex-dominant apply is not implemented\n",
                    fn,
@@ -430,17 +430,17 @@ int linear_elasticity_apply_adjugate_aos(const smesh::ElemType                 e
     return SFEM_FAILURE;
 }
 
-int linear_elasticity_apply_adjugate_soa(const smesh::ElemType                          element_type,
-                                         const ptrdiff_t                                nelements,
-                                         const ptrdiff_t                                nnodes,
-                                         idx_t **const SFEM_RESTRICT                    elements,
-                                         geom_t **const SFEM_RESTRICT                   points,
-                                         const jacobian_t *const SFEM_RESTRICT *const   jacobian_adjugate,
-                                         const geom_t *const SFEM_RESTRICT              jacobian_determinant,
-                                         const real_t                                   mu,
-                                         const real_t                                   lambda,
-                                         const real_t *const SFEM_RESTRICT              u,
-                                         real_t *const SFEM_RESTRICT                    values) {
+int linear_elasticity_apply_adjugate_soa(const smesh::ElemType                        element_type,
+                                         const ptrdiff_t                              nelements,
+                                         const ptrdiff_t                              nnodes,
+                                         idx_t **const SFEM_RESTRICT                  elements,
+                                         geom_t **const SFEM_RESTRICT                 points,
+                                         const jacobian_t *const SFEM_RESTRICT *const jacobian_adjugate,
+                                         const geom_t *const SFEM_RESTRICT            jacobian_determinant,
+                                         const real_t                                 mu,
+                                         const real_t                                 lambda,
+                                         const real_t *const SFEM_RESTRICT            u,
+                                         real_t *const SFEM_RESTRICT                  values) {
     SFEM_UNUSED(points);
 
     if (element_type == smesh::HEX8) {
@@ -576,10 +576,10 @@ int linear_elasticity_block_diag_sym_aos(const smesh::ElemType        element_ty
                                                                   &out[5]);
         }
         if (smesh::is_tet_ss_family(element_type)) {
-            const int                                level = smesh::semistructured_level(element_type);
+            const int                           level = smesh::semistructured_level(element_type);
             sstet4_linear_elasticity_stencil_t *st    = nullptr;
-            if (sstet4_linear_elasticity_stencil_create_from_points(
-                        level, nelements, elements, points, mu, lambda, &st) != SFEM_SUCCESS) {
+            if (sstet4_linear_elasticity_stencil_create_from_points(level, nelements, elements, points, mu, lambda, &st) !=
+                SFEM_SUCCESS) {
                 return SFEM_FAILURE;
             }
             const int err = sstet4_linear_elasticity_block_diag_sym_stencil(

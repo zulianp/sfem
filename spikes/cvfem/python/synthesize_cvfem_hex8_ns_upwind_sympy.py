@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import re
 from pathlib import Path
 
 import sympy as sp
@@ -25,7 +26,13 @@ HERE = Path(__file__).resolve().parent
 # python/ -> spike root. The emitted headers live with the sources they are
 # compiled into, not beside the generator that writes them.
 SPIKE_ROOT = HERE.parent
-OUT = SPIKE_ROOT / "src" / "generated" / "cvfem_hex8_ns_upwind_sympy_kernels.hpp"
+OUT = (SPIKE_ROOT / "src" / "kernels" / "microkernels" / "hex8" / "affine" / "generated"
+       / "cvfem_hex8_ns_upwind_sympy_affine.hpp")
+# The isoparametric pair goes to the isoparametric folder, for the same reason the hand-written
+# kernels are separated by geometry: what differs between the two sets is where the Jacobian comes
+# from. Everything else this generator emits takes one adjugate and one determinant per element.
+ISOPARAM_OUT = (SPIKE_ROOT / "src" / "kernels" / "microkernels" / "hex8" / "isoparametric"
+                / "generated" / "cvfem_hex8_ns_upwind_sympy_isoparam.hpp")
 
 N_NODE = 8
 N_DOF = N_NODE * N_FIELD
@@ -67,6 +74,30 @@ SCS_XI = (
     (_Q, _H, _Q), (_T, _H, _Q), (_Q, _H, _T), (_T, _H, _T),
     (_Q, _Q, _H), (_T, _Q, _H), (_T, _T, _H), (_Q, _T, _H),
 )
+
+
+# Reference coordinates of the eight nodes on the unit cube, in the element's own node order.
+# Matches CVFEM_HEX8_REF_XI in the C++ header, and stated here for the same reason that table
+# states it rather than deriving it from the DN_REF sign pattern: a reconstruction that reads
+# these transposed is wrong in a way no residual norm reveals, because the error is a smooth
+# field rather than a blow-up.
+REF_XI = (
+    (0, 0, 0), (1, 0, 0), (1, 1, 0), (0, 1, 0),
+    (0, 0, 1), (1, 0, 1), (1, 1, 1), (0, 1, 1),
+)
+
+
+def scs_shape(s: int, a: int) -> sp.Expr:
+    """Node ``a``'s trilinear shape function at sub-control surface ``s``'s centroid.
+
+    Exact rationals, products of 1/4, 1/2 and 3/4, which is why the generated centroid is
+    bit-identical to the hand-written kernel's -- the same values reach the same FMA chain.
+    Derived from the two tables rather than tabulated a third time.
+    """
+    out = sp.Integer(1)
+    for d in range(3):
+        out *= SCS_XI[s][d] if REF_XI[a][d] == 1 else (1 - SCS_XI[s][d])
+    return out
 
 
 def dn_ref_at(xi, eta, zeta):
@@ -115,6 +146,35 @@ def build_symbols() -> dict[str, object]:
         "vy": sp.symbols("vy0:8"),
         "vz": sp.symbols("vz0:8"),
         "q": sp.symbols("q0:8"),
+        # The deferred correction's inputs. The element's node coordinates -- the
+        # reconstruction works in physical space -- and the eight nodal velocity gradients,
+        # nine components each, g[a][r*3 + c] = du_r/dx_c, matching the layout
+        # CVFEMNavierStokes::nodal_velocity_gradient produces and the hand-written kernel reads.
+        "x": sp.symbols("x0:8"),
+        "y": sp.symbols("y0:8"),
+        "z": sp.symbols("z0:8"),
+        "g": tuple(sp.symbols(f"g{a}_0:9") for a in range(N_NODE)),
+        # The DIRECTION's nodal velocity gradient, same layout as "g". The exact Jacobian
+        # action needs it because the reconstruction reads a gradient that is an input to the
+        # apply rather than a function of the element's own unknowns: differentiating
+        # grad(u_D) . (x_scs - x_D) in direction v gives grad(v_D) . (x_scs - x_D), and
+        # grad(v_D) can only come from a reconstruction pass over v. That pass is what makes
+        # the exact higher-order action cost more than the lagged one; see the driver's
+        # --conv-ho-exact.
+        "gv": tuple(sp.symbols(f"gv{a}_0:9") for a in range(N_NODE)),
+        # Rhie-Chow. The per-sub-control-surface coefficient arrives as a SYMBOL rather than
+        # being built here, and that is deliberate: cvfem_hex8_rhie_chow_mdot_coeff carries two
+        # square roots, a division and a data-dependent degeneracy guard that returns zero, so
+        # expressing it inline would put a Piecewise in the middle of every surface's flux. The
+        # tree already precomputes it per element (cvfem_hex8_build_rc_coeff) and stages it into
+        # the pack (cvfem_hex8_gather_rc_coeff), which is the same reason the hand-written
+        # Jacobian-action kernels read rc->coeff[s][lane] instead of recomputing it -- the guard
+        # inside a vector loop was measured at 1.83x. Reusing that staging keeps this body
+        # branch-free and adds no second path.
+        "rcoef": sp.symbols("rcoef0:12"),
+        "pgx": sp.symbols("pgx0:8"),
+        "pgy": sp.symbols("pgy0:8"),
+        "pgz": sp.symbols("pgz0:8"),
     }
 
 
@@ -191,6 +251,359 @@ def residual_exprs(sym: dict[str, object], isoparam: bool = False) -> tuple[list
         for i in range(N_DOF):
             r[i] += fr[i]
     return r, mdots
+
+
+def limit_inc(limiter: int, base: sp.Expr, other: sp.Expr, inc: sp.Expr) -> sp.Expr:
+    """One node's reconstruction increment, limited, matching src/venkata/cvfem_venkata_limiter.hpp.
+
+    ``base`` is the donor node's value and ``other`` the surface's far node, so the bound is the
+    interval the surface's own two nodes span -- the same one-dimensional stencil the scalar kernel
+    uses. Every arm is a select rather than a branch, as it is there.
+
+    Venkatakrishnan's eps^2 term is ZERO here, not omitted by oversight: it is `venkat_c * h^3`
+    with h the edge length, so carrying it would put a square root at every surface, and every
+    caller in the tree passes venkat_c = 0. The sweep refuses a non-zero venkat_c with the
+    generated kernel rather than silently dropping it.
+    """
+    if limiter == 0:
+        return inc
+    lo, hi = sp.Min(base, other), sp.Max(base, other)
+    if limiter == 1:
+        # Bounded face: clip the reconstructed value into the nodal interval, return the increment
+        # that survives. Pure Min/Max, no division, nothing for CSE to lose its way in.
+        return sp.Max(lo, sp.Min(hi, base + inc)) - base
+    if limiter == 2:
+        dp  = sp.Piecewise((hi - base, sp.Ge(inc, 0)), (lo - base, True))
+        num = dp * dp + 2 * inc * dp
+        den = dp * dp + 2 * inc * inc + inc * dp
+        # The guard is on `inc`, NOT on `den`, and that is what makes this kernel vectorise.
+        #
+        # `den` contains `dp`, which is a Piecewise. Writing Ne(den, 0) therefore builds a
+        # relational around a Piecewise, and SymPy folds the comparison inside it, so the printer
+        # emits a ternary whose CONDITION is another ternary:
+        #     ((c) ? (...) : (x70 - x76*x80 + x77 != 0)) ? A : B
+        # GCC if-converts the inner conditional into a PHI node and then reports
+        #     not vectorized: relevant stmt not supported: iftmp = _c ? iftmp : iftmp
+        # and abandons the loop. Measured on the emitted object, the Venkatakrishnan kernel held
+        # 6000 instructions and not one NEON register, against 25-30% vector for the other three
+        # limiters, which have no Piecewise in any condition -- limiter 3's guard divides by
+        # 2*(|a|+|b|), an Abs and not a Piecewise, which is exactly why it was unaffected.
+        #
+        # Guarding on `inc` is the same function, not an approximation. Writing den as
+        # (dp + inc/2)^2 + (7/4)*inc^2 shows it is a sum of squares, so den == 0 requires both
+        # dp == 0 and inc == 0; and wherever inc == 0 the guarded branch evaluates to
+        # (num/den)*inc == 0 as well, so the two arms already agree there. Hence den == 0 is
+        # reachable only inside inc == 0, where this returns the same zero the old guard returned
+        # as `inc`. For inc != 0, den >= (7/4)*inc^2 > 0 and the division is safe.
+        return sp.Piecewise(((num / den) * inc, sp.Ne(inc, 0)), (sp.Integer(0), True))
+    if limiter == 3:
+        a, b = 2 * inc, other - base
+        aa, ab = sp.Abs(a), sp.Abs(b)
+        den = 2 * (aa + ab)
+        return sp.Piecewise(((a * ab + aa * b) / den, sp.Ne(den, 0)), (sp.Integer(0), True))
+    raise ValueError(f"unknown limiter {limiter}")
+
+
+def affine_edge_cols(sym: dict[str, object]) -> tuple[list[sp.Expr], list[sp.Expr], list[sp.Expr]]:
+    """The three edge columns of the affine element, J = adj(adj)/det, from the cofactors.
+
+    Mirrors cvfem_hex8_affine_edge_cols expression for expression, in its direction-major
+    layout: ``ex[k], ey[k], ez[k]`` are the x, y, z components of the edge of direction k. The
+    affine kernels take every geometric quantity from the one Jacobian they hold, and since the
+    hand-written correction moved its node-to-centroid vectors onto it
+    (cvfem_hex8_defcor_ref_increments) the generated correction does the same, so the two still
+    discretise one operator and the lane-major pack no longer carries node coordinates.
+    """
+    c, inv = sym["cof"], 1 / sym["det"]
+    ex = [(c[4] * c[8] - c[5] * c[7]) * inv, (c[2] * c[7] - c[1] * c[8]) * inv, (c[1] * c[5] - c[2] * c[4]) * inv]
+    ey = [(-c[3] * c[8] + c[5] * c[6]) * inv, (c[0] * c[8] - c[2] * c[6]) * inv, (-c[0] * c[5] + c[2] * c[3]) * inv]
+    ez = [(c[3] * c[7] - c[4] * c[6]) * inv, (-c[0] * c[7] + c[1] * c[6]) * inv, (c[0] * c[4] - c[1] * c[3]) * inv]
+    return ex, ey, ez
+
+
+def defcor_face_expr(sym: dict[str, object], s: int, mdot: sp.Expr,
+                     limiter: int = 0) -> tuple[int, int, list[sp.Expr]]:
+    """The deferred-correction momentum increment across sub-control surface ``s``.
+
+    The face value is reconstructed from each donor node and its nodal velocity gradient, and
+    only the DIFFERENCE from the first-order upwind value enters, which is what leaves the
+    Jacobian first-order. Unlimited: the limiter arms carry data-dependent selects that CSE does
+    not see through, and arm 0 is the documented default, so it is the arm generated first.
+
+    ``mdot`` is the surface's mass flux as the flux itself built it, so the correction is
+    weighted by the flux actually transported -- including its Rhie-Chow part where present --
+    rather than by a second opinion about it. The upwind split below is structurally identical to
+    the flux's, so ``sp.cse`` unifies the two rather than emitting both: one expression of the
+    split reaches the generated text even though it is written twice here.
+    """
+    i, j, _ar = SCS[s]
+    mdot_abs = sym["sgn"][s] * mdot
+    mpos = sp.Rational(1, 2) * (mdot + mdot_abs)
+    mneg = sp.Rational(1, 2) * (mdot - mdot_abs)
+
+    g = sym["g"]
+    # The node-to-centroid vectors through the element Jacobian, exactly as the hand-written
+    # affine kernels form them: x_s - x_a = J (xi_s - xi_a), with xi_s - xi_a the constant offsets
+    # +-1/2 and +-1/4 the two reference tables give. The centroid summed from the eight node
+    # coordinates that used to stand here is the same point on a parallelepiped and a different
+    # geometry from the rest of the affine kernel on anything else; see the C++ note on
+    # cvfem_hex8_defcor_ref_increments. Every face shares the nine edge-column expressions, which
+    # is what lets CSE hoist them once for the element.
+    ex, ey, ez = affine_edge_cols(sym)
+
+    def to_centroid(a: int) -> list[sp.Expr]:
+        return [sum((SCS_XI[s][k] - REF_XI[a][k]) * e[k] for k in range(3)) for e in (ex, ey, ez)]
+
+    di, dj = to_centroid(i), to_centroid(j)
+
+    u = (sym["ux"], sym["uy"], sym["uz"])
+    out: list[sp.Expr] = []
+    for r in range(3):  # velocity component
+        inc_i = sum(g[i][r * 3 + k] * di[k] for k in range(3))
+        inc_j = sum(g[j][r * 3 + k] * dj[k] for k in range(3))
+        # Limited together, against the interval this surface's own two nodes span.
+        li = limit_inc(limiter, u[r][i], u[r][j], inc_i)
+        lj = limit_inc(limiter, u[r][j], u[r][i], inc_j)
+        out.append(mpos * li + mneg * lj)
+    return i, j, out
+
+
+def rc_mdot_expr(sym: dict[str, object], s: int, edge_cols=None) -> sp.Expr:
+    """The Rhie-Chow contribution to surface ``s``'s mass flux.
+
+    The pressure difference across the surface's two nodes, minus the same difference as the
+    reconstructed nodal pressure gradients predict it: where the two agree the term vanishes,
+    which is what suppresses the checkerboard mode without adding dissipation to a smooth field.
+    Scaled by the staged coefficient and subtracted, matching the hand-written kernel's
+    ``mdot -= coeff * corr``.
+
+    ``edge_cols`` -- the affine edge columns from affine_edge_cols -- selects the edge vector of
+    the surface's direction group in place of the node-coordinate difference, which is what the
+    hand-written affine path reads and what a kernel whose pack carries no coordinates can form.
+    """
+    i, j, _ar = SCS[s]
+    pgx, pgy, pgz, p = sym["pgx"], sym["pgy"], sym["pgz"], sym["p"]
+    if edge_cols is None:
+        x, y, z = sym["x"], sym["y"], sym["z"]
+        dx, dy, dz = x[j] - x[i], y[j] - y[i], z[j] - z[i]
+    else:
+        ex, ey, ez = edge_cols
+        dx, dy, dz = ex[s // 4], ey[s // 4], ez[s // 4]
+    half = sp.Rational(1, 2)
+    corr = (p[j] - p[i]) - (half * (pgx[i] + pgx[j]) * dx +
+                            half * (pgy[i] + pgy[j]) * dy +
+                            half * (pgz[i] + pgz[j]) * dz)
+    return -sym["rcoef"][s] * corr
+
+
+def residual_defcor_exprs(sym: dict[str, object], rc: bool = False,
+                          limiter: int = 0) -> tuple[list[sp.Expr], list[sp.Expr]]:
+    """The complete element residual with the deferred correction folded into the momentum rows.
+
+    The correction touches momentum only; the continuity row and the mass flux are untouched,
+    which is the whole point of deferring it.
+    """
+    r = [sp.Integer(0)] * N_DOF
+    mdots: list[sp.Expr] = []
+    edge = affine_edge_cols(sym)
+    for s in range(len(SCS)):
+        i, j, ar = SCS[s]
+        fr, mdot = face_flux_residual(
+                n_dof=N_DOF, node_i=i, node_j=j, area=area(sym, ar), grad=velocity_gradient(sym),
+                rho=sym["rho"], mu=sym["mu"], u=(sym["ux"], sym["uy"], sym["uz"]), p=sym["p"],
+                sign=sym["sgn"][s], mdot_rc=rc_mdot_expr(sym, s, edge) if rc else None)
+        mdots.append(mdot)
+        for k in range(N_DOF):
+            r[k] += fr[k]
+    for s in range(len(SCS)):
+        i, j, inc = defcor_face_expr(sym, s, mdots[s], limiter)
+        for c in range(3):
+            r[dof(i, c)] += inc[c]
+            r[dof(j, c)] -= inc[c]
+    return r, mdots
+
+
+def simd_input_locals_defcor() -> str:
+    """Every input this kernel needs, hoisted once per lane from the lane-major packs.
+
+    `pack[node][lane]` over varying lane is contiguous, so each of these is a unit-stride vector
+    load, and each value is read ONCE per lane per element rather than once per face. That is the
+    property the hand-written kernel had to be coaxed into: it gathered a lane's 96 reconstruction
+    inputs into flat locals inside each of the twelve face loops, and then the compiler refused to
+    inline the reconstruction and the lane loop stopped vectorising altogether.
+    """
+    lines = [f"        const scalar_t cof{i} = scalar_t(cof{i}_ptr[lane]);" for i in range(9)]
+    lines.append("        const scalar_t det = scalar_t(det_ptr[lane]);")
+    for name in ("ux", "uy", "uz", "p"):
+        for i in range(N_NODE):
+            lines.append(f"        const scalar_t {name}{i} = in.{name}[{i}][lane];")
+    # No node coordinates: the correction's geometry comes from the cofactors above, as the
+    # hand-written affine kernels' does, and the pack stopped carrying them.
+    for a in range(N_NODE):
+        for c in range(9):
+            lines.append(f"        const scalar_t g{a}_{c} = ho.g[{a}][{c}][lane];")
+    return "\n".join(lines)
+
+
+def residual_pack_outputs() -> list[str]:
+    """The lane-major residual pack, in this file's dof order: ux, uy, uz, p per node."""
+    field = ("rx", "ry", "rz", "rc")
+    return [f"out.{field[f]}[{a}][lane]" for a in range(N_NODE) for f in range(N_FIELD)]
+
+
+def defcor_simd_args() -> str:
+    lines = [f"        const scalar_t *const SFEM_RESTRICT cof{i}_ptr," for i in range(9)]
+    lines.append("        const scalar_t *const SFEM_RESTRICT det_ptr,")
+    return "\n".join(lines)
+
+
+def simd_rc_locals() -> str:
+    """The Rhie-Chow inputs, hoisted per lane from the packs that already hold them.
+
+    The coefficient comes from the pack's staged table, which is what the hand-written
+    Jacobian-action kernels read too; the nodal pressure gradients come from the same pack the
+    first-order Rhie-Chow path fills. Nothing new is staged for this kernel.
+    """
+    lines = [f"        const scalar_t rcoef{s} = rc.coeff[{s}][lane];" for s in range(len(SCS))]
+    for name in ("pgx", "pgy", "pgz"):
+        for i in range(N_NODE):
+            lines.append(f"        const scalar_t {name}{i} = rc.{name}[{i}][lane];")
+    return "\n".join(lines)
+
+
+LIMITER_NAME = {
+    0: "unlimited reconstruction",
+    1: "bounded-face clip",
+    2: "Venkatakrishnan's smooth bound, with eps^2 = 0",
+    3: "Darwish-Moukalled",
+}
+
+
+def defcor_kernel(sym: dict[str, object], limiter: int, rc: bool) -> str:
+    """One lane-blocked higher-order kernel: whole element, one CSE'd block, one loop, no calls."""
+    residual, mdots = residual_defcor_exprs(sym, rc=rc, limiter=limiter)
+    name = f"cvfem_hex8_ns_upwind_sympy_residual_defcor{'_rc' if rc else ''}_lim{limiter}_simd"
+    rc_arg = "        const Hex8RhieChowPack &rc,\n" if rc else ""
+    rc_loc = simd_rc_locals() + "\n" if rc else ""
+    return f"""
+// {LIMITER_NAME[limiter]}{', with Rhie-Chow' if rc else ''}.
+static SFEM_INLINE void {name}(
+        const scalar_t rho,
+        const scalar_t mu,
+{defcor_simd_args()}
+        const Hex8InputPack &in,
+        const Hex8UGradPack &ho,
+{rc_arg}        Hex8ResidualPack    &out) {{
+#pragma omp simd aligned(cof0_ptr, cof1_ptr, cof2_ptr, cof3_ptr, cof4_ptr, cof5_ptr, cof6_ptr, cof7_ptr, cof8_ptr, det_ptr : 64)
+    for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {{
+{simd_input_locals_defcor()}
+{rc_loc}{sign_locals(mdots, indent="        ")}
+{cse_code(residual, residual_pack_outputs(), indent="        ")}
+    }}
+}}
+"""
+
+
+def defcor_kernels(sym: dict[str, object]) -> str:
+    """All four limiter arms, with and without Rhie-Chow.
+
+    Separate kernels rather than one taking the limiter as an argument: a runtime limiter would put
+    a four-way select inside the vector body at every surface and for every velocity component, and
+    a sweep-uniform branch in that loop is the shape of guard measured at 1.83x here once already.
+    Eight generated functions cost header size and generation time, both of which are recorded in
+    the repository's own budget checks, and nothing at run time.
+    """
+    return "".join(defcor_kernel(sym, lim, rc)
+                   for rc in (False, True) for lim in (0, 1, 2, 3))
+
+
+def defcor_action_exprs(sym: dict[str, object], rc: bool, limiter: int) -> tuple[list[sp.Expr], list[sp.Expr]]:
+    """The EXACT Jacobian action of the residual carrying the deferred correction.
+
+    A directional derivative taken term by term rather than a Jacobian built and contracted: the
+    correction's Jacobian is dense in a way the first-order one is not -- every momentum row picks
+    up the nine gradient components of both of its surface's nodes -- so forming the matrix first
+    would build 104 columns per row and throw almost all of them away.
+
+    Differentiated with respect to the element's unknowns AND with respect to the nodal gradient,
+    each contracted with its own direction. The second half is the part a lagged action drops, and
+    it is not a small correction to the first: for a smooth field the reconstruction IS the
+    correction, so dropping grad(v) drops the term's leading behaviour.
+
+    ``sgn`` stays a symbol, so d|m|/dm = sgn exactly as the hand-written action assumes. That is a
+    choice of subgradient at m = 0 and it is the same one the first-order kernel makes, which is
+    what keeps the two demonstrably one linearisation.
+    """
+    r, mdots = residual_defcor_exprs(sym, rc=rc, limiter=limiter)
+    pairs: list[tuple[sp.Symbol, sp.Symbol]] = []
+    for a in range(N_NODE):
+        pairs.append((sym["ux"][a], sym["vx"][a]))
+        pairs.append((sym["uy"][a], sym["vy"][a]))
+        pairs.append((sym["uz"][a], sym["vz"][a]))
+        pairs.append((sym["p"][a], sym["q"][a]))
+        for c in range(9):
+            pairs.append((sym["g"][a][c], sym["gv"][a][c]))
+    out = []
+    for k in range(N_DOF):
+        terms = []
+        for var, dvar in pairs:
+            if not r[k].has(var):
+                continue
+            d = sp.diff(r[k], var)
+            if d != 0:
+                terms.append(d * dvar)
+        out.append(sp.Add(*terms) if terms else sp.Integer(0))
+    return out, mdots
+
+
+def simd_direction_locals_defcor() -> str:
+    """The direction and its reconstructed gradient, hoisted per lane like the state is."""
+    lines = []
+    for name, field in (("vx", "ux"), ("vy", "uy"), ("vz", "uz"), ("q", "p")):
+        for i in range(N_NODE):
+            lines.append(f"        const scalar_t {name}{i} = dir.{field}[{i}][lane];")
+    for a in range(N_NODE):
+        for c in range(9):
+            lines.append(f"        const scalar_t gv{a}_{c} = hov.g[{a}][{c}][lane];")
+    return "\n".join(lines)
+
+
+def defcor_action_kernel(sym: dict[str, object], limiter: int, rc: bool) -> str:
+    """One lane-blocked EXACT higher-order Jacobian action: whole element, one CSE'd block."""
+    action, mdots = defcor_action_exprs(sym, rc=rc, limiter=limiter)
+    name = f"cvfem_hex8_ns_upwind_sympy_jv_defcor{'_rc' if rc else ''}_lim{limiter}_simd"
+    rc_arg = "        const Hex8RhieChowPack &rc,\n" if rc else ""
+    rc_loc = simd_rc_locals() + "\n" if rc else ""
+    return f"""
+// {LIMITER_NAME[limiter]}{', with Rhie-Chow' if rc else ''}, exact Jacobian action.
+static SFEM_INLINE void {name}(
+        const scalar_t rho,
+        const scalar_t mu,
+{defcor_simd_args()}
+        const Hex8InputPack &in,
+        const Hex8InputPack &dir,
+        const Hex8UGradPack &ho,
+        const Hex8UGradPack &hov,
+{rc_arg}        Hex8ResidualPack    &out) {{
+#pragma omp simd aligned(cof0_ptr, cof1_ptr, cof2_ptr, cof3_ptr, cof4_ptr, cof5_ptr, cof6_ptr, cof7_ptr, cof8_ptr, det_ptr : 64)
+    for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {{
+{simd_input_locals_defcor()}
+{simd_direction_locals_defcor()}
+{rc_loc}{sign_locals(mdots, indent="        ")}
+{cse_code(action, residual_pack_outputs(), indent="        ")}
+    }}
+}}
+"""
+
+
+def defcor_action_kernels(sym: dict[str, object]) -> str:
+    """The exact action for every limiter arm, with and without Rhie-Chow.
+
+    Same eight-way split as the residual and for the same reason: a runtime limiter would put a
+    four-way select inside the vector body at every surface and component.
+    """
+    return "".join(defcor_action_kernel(sym, lim, rc)
+                   for rc in (False, True) for lim in (0, 1, 2, 3))
 
 
 def direction_symbols(sym: dict[str, object]) -> list[sp.Expr]:
@@ -429,8 +842,10 @@ def geom_locals_isoparam() -> str:
     return "\n".join(lines)
 
 
-def sign_locals(mdots: list[sp.Expr]) -> str:
-    return _sign_locals(mdots)
+def sign_locals(mdots: list[sp.Expr], indent: str = "    ") -> str:
+    # `indent` is forwarded rather than reimplemented: the lane-blocked kernel below sits one
+    # level deeper than the scalar ones, and the shared emitter already takes it.
+    return _sign_locals(mdots, indent)
 
 
 def residual_outputs() -> list[str]:
@@ -533,6 +948,18 @@ def generate() -> str:
     # of the operation a Krylov solve actually spends its time in.
     action = action_exprs(jac, sym)
 
+    # The residual WITH the deferred correction, as one expression set for the whole element.
+    # Generated rather than hand-written because the hand-written form hit a wall that is
+    # structural rather than incidental: the reconstruction is a function, two compilers both
+    # declined to inline it into the `#pragma omp simd` lane loop despite always_inline, and a
+    # loop containing a call does not vectorise. There is no function here to inline. It also
+    # lets CSE span all twelve surfaces, which twelve separately compiled per-face kernels
+    # cannot do -- the eight node coordinates feeding the twelve centroids are shared once.
+    # All four limiter arms, with and without Rhie-Chow. Separate kernels rather than one taking a
+    # runtime limiter or a zero coefficient: either would put sweep-uniform work or a four-way select
+    # inside the vector body at every surface, which is the shape of guard measured at 1.83x here.
+    defcor_kernels_text = defcor_kernels(sym)
+
     return f"""#ifndef CVFEM_HEX8_NS_UPWIND_SYMPY_KERNELS_HPP
 #define CVFEM_HEX8_NS_UPWIND_SYMPY_KERNELS_HPP
 
@@ -543,7 +970,7 @@ def generate() -> str:
 //
 // Not self-contained: the includer must already provide SFEM_RESTRICT and
 // CVFEM_HEX8_N_DOF. Accumulation goes through CVFEM_ATOMIC_ADD.
-#include "cvfem_portability.hpp"
+#include "kernels/cvfem_portability.hpp"
 
 template <typename scalar_t>
 static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_sympy_residual(const scalar_t rho,
@@ -695,14 +1122,14 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_sympy_jacobian_act
 {cse_action_geom_code(action, sym, facewise_jacs=face_jacs)}
 }}
 
-template <typename scalar_t>
+template <typename scalar_t, typename count_t>
 static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots(const scalar_t rho,
                                                                           const scalar_t mu,
                                                                           const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
                                                                           const scalar_t *const SFEM_RESTRICT ux,
                                                                           const scalar_t *const SFEM_RESTRICT uy,
                                                                           const scalar_t *const SFEM_RESTRICT uz,
-                                                                          const smesh::count_t *const SFEM_RESTRICT slots,
+                                                                          const count_t *const SFEM_RESTRICT slots,
                                                                           scalar_t *const SFEM_RESTRICT values) {{
 {geom_locals()}
 {input_locals(include_pressure=False)}
@@ -710,14 +1137,14 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_sympy_jacobian_add
 {cse_add_bsr_slots_code(jac, "flat", atomic=True)}
 }}
 
-template <typename scalar_t>
+template <typename scalar_t, typename count_t>
 static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots_blockwise(const scalar_t rho,
                                                                                     const scalar_t mu,
                                                                                     const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
                                                                                     const scalar_t *const SFEM_RESTRICT ux,
                                                                                     const scalar_t *const SFEM_RESTRICT uy,
                                                                                     const scalar_t *const SFEM_RESTRICT uz,
-                                                                                    const smesh::count_t *const SFEM_RESTRICT slots,
+                                                                                    const count_t *const SFEM_RESTRICT slots,
                                                                                     scalar_t *const SFEM_RESTRICT values) {{
 {geom_locals()}
 {input_locals(include_pressure=False)}
@@ -732,7 +1159,7 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_sympy_jacobian_add
                                                                                   const scalar_t *const SFEM_RESTRICT ux,
                                                                                   const scalar_t *const SFEM_RESTRICT uy,
                                                                                   const scalar_t *const SFEM_RESTRICT uz,
-                                                                                  const smesh::count_t *const SFEM_RESTRICT slots,
+                                                                                  const count_t *const SFEM_RESTRICT slots,
                                                                                   scalar_t *const SFEM_RESTRICT values) {{
 {geom_locals()}
 {input_locals(include_pressure=False)}
@@ -747,7 +1174,7 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_sympy_jacobian_add
                                                                                    const scalar_t *const SFEM_RESTRICT ux,
                                                                                    const scalar_t *const SFEM_RESTRICT uy,
                                                                                    const scalar_t *const SFEM_RESTRICT uz,
-                                                                                   const smesh::count_t *const SFEM_RESTRICT slots,
+                                                                                   const count_t *const SFEM_RESTRICT slots,
                                                                                    scalar_t *const SFEM_RESTRICT values) {{
 {geom_locals()}
 {input_locals(include_pressure=False)}
@@ -797,6 +1224,23 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_sympy_jacobian_add
 {cse_add_bsr_slots_code(iso_jac, "flat", atomic=True)}
 }}
 
+// ------------------------------------------------- the deferred correction, lane-blocked
+//
+// The complete element residual including the higher-order deferred correction, sixteen elements at
+// a time, reading the lane-major packs in place. One kernel per limiter arm and per Rhie-Chow state.
+//
+// Each is the whole element as ONE common-subexpression-eliminated block inside ONE lane loop, and
+// both of those matter. One block, because the eight node coordinates feed all twelve sub-control-
+// surface centroids and CSE can only see that if the twelve surfaces are emitted together -- a
+// per-face kernel, compiled twelve times, reloads them twelve times. One loop with no calls in it,
+// because the hand-written equivalent could not keep the reconstruction inlined: clang emitted an
+// out-of-line copy and gcc a .constprop clone and both CALLED it from inside the `#pragma omp simd`
+// body, which stops the loop vectorising outright. There is no function here for a compiler to
+// decline to inline.
+//
+// The upwind split is written once per surface by the flux and again by the correction; CSE unifies
+// them, so the emitted text carries it once.
+{defcor_kernels_text}
 template <typename scalar_t>
 static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots(const scalar_t rho,
                                                                             const scalar_t mu,
@@ -872,31 +1316,132 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_sympy_jacobian_add
 # words, a Jacobian-action arrangement that has never been measured and that the assembly
 # verdict says nothing about. A rule that decides by substring cannot distinguish a variant
 # that lost from one that merely shares a word with it.
-SUBPAR_MARKERS = ("_add_bsr_slots_rowwise", "_add_bsr_slots_facewise",
-                  "_add_local_slots_rowwise", "_add_local_slots_facewise")
+SUBPAR_MARKERS = (
+                  "cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots_rowwise",
+                  "cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots_facewise",
+                  "cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots_rowwise",
+                  "cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots_facewise",
+                  # The six generated Jacobian-action arrangements, measured on Grace at
+                  # 8,586,756 dof against the hand-written atomic action's 828.9 MDOF/s
+                  # (perf/campaign_generated_arms.csv, 3 reps):
+                  #
+                  #   action           307.8   0.37x      action_geom      359.2   0.43x
+                  #   action_comp      328.2   0.40x      action_face      418.6   0.51x
+                  #   action_node      329.3   0.40x      action_geomface  473.3   0.57x
+                  #
+                  # The best of the six reaches 57% of the hand-written atomic action and 25%
+                  # of the packed one (1905.3). The axis they explore -- the scope given to one
+                  # sp.cse call -- is genuinely interesting and the spread across it is 1.5x,
+                  # which is why they were built; none of it closes a gap this size.
+                  "cvfem_hex8_ns_upwind_sympy_jacobian_action",
+                  "cvfem_hex8_ns_upwind_sympy_jacobian_action_componentwise",
+                  "cvfem_hex8_ns_upwind_sympy_jacobian_action_facewise",
+                  "cvfem_hex8_ns_upwind_sympy_jacobian_action_geom",
+                  "cvfem_hex8_ns_upwind_sympy_jacobian_action_geomface",
+                  "cvfem_hex8_ns_upwind_sympy_jacobian_action_nodewise",
+                  # The affine generated residual. NOT a flat loss and the entry in
+                  # subpar/README.md says so: on the packed layout it gives up 21.6%
+                  # (2066.9 against sumfact's 2636.8), on the atomic layout it TIES sumfact
+                  # (854.8 against 858.2, inside the spread) and trails `current` by 3.9%.
+                  # It is quarantined for never winning anywhere rather than for losing
+                  # everywhere, which are different findings.
+                  #
+                  # _residual_isoparam is deliberately absent: it is the isoparametric scalar
+                  # winner and this campaign measured affine geometry only, so there is no
+                  # fresh evidence about it and it is not being retired on old evidence.
+                  "cvfem_hex8_ns_upwind_sympy_residual",
+                  # The eight generated deferred-correction kernels -- four limiter arms, with
+                  # and without Rhie-Chow. They were the DEFAULT higher-order kernel on the
+                  # packed layout, chosen because they measured 1.39x the hand-written SCALAR
+                  # sweep; the comparison that decides the question is against the hand-written
+                  # LANE-BLOCKED kernel beside them, and it had never been run.
+                  #
+                  # Grace job 4981920, 8,586,756 dof, 72 threads, packed, best of three
+                  # (generated / hand-written MDOF/s, ratio):
+                  #
+                  #   lim0     1012.9 / 1059.3  0.956     rc_lim0   732.1 /  944.9  0.775
+                  #   lim1      836.8 /  857.5  0.976     rc_lim2   583.3 /  638.5  0.914
+                  #   lim2      706.6 /  763.7  0.925     rc_lim3   592.1 /  686.1  0.863
+                  #   lim3      729.7 /  797.1  0.916
+                  #
+                  # The generated arm loses all seven pairs, and loses worst exactly where it
+                  # was meant to pay off: the Rhie-Chow arm it reads a staged coefficient table
+                  # for, at 0.775x. So the whole family is quarantined, and with it the staged
+                  # table the hand-written kernel does not need.
+                  "cvfem_hex8_ns_upwind_sympy_residual_defcor_lim0_simd",
+                  "cvfem_hex8_ns_upwind_sympy_residual_defcor_lim1_simd",
+                  "cvfem_hex8_ns_upwind_sympy_residual_defcor_lim2_simd",
+                  "cvfem_hex8_ns_upwind_sympy_residual_defcor_lim3_simd",
+                  "cvfem_hex8_ns_upwind_sympy_residual_defcor_rc_lim0_simd",
+                  "cvfem_hex8_ns_upwind_sympy_residual_defcor_rc_lim1_simd",
+                  "cvfem_hex8_ns_upwind_sympy_residual_defcor_rc_lim2_simd",
+                  "cvfem_hex8_ns_upwind_sympy_residual_defcor_rc_lim3_simd")
 
 SUBPAR_OUT = SPIKE_ROOT / "subpar" / "cvfem_hex8_ns_upwind_sympy_subpar.hpp"
 
 
-def split_generated(text: str) -> tuple[str, str]:
-    """Partition the generated header into survivors and quarantined arrangements.
+def split_generated(text: str) -> tuple[str, str, str]:
+    """Partition the generated header into affine, isoparametric and quarantined sets.
 
     The functions are *moved*, not re-emitted: both outputs carry the exact text this
     run produced, so a survivor cannot drift as a side effect of the split. That is the
     property worth having -- the alternative, generating each set separately, would let
     a change in which expressions are built perturb the CSE of the ones that stayed.
     """
-    marker = "template <typename scalar_t"
-    first = text.index(marker)
-    prologue, tail = text[:first], "\n#endif\n"
-    body = text[first : text.rindex("#endif")]
+    # A CHUNK IS ONE FUNCTION, AND THE BOUNDARY IS THE DEFINITION -- NOT `template <typename
+    # scalar_t`.
+    #
+    # That marker misses every kernel this generator emits without a template header: the eight
+    # lane-blocked `_residual_defcor_*_simd` kernels are `static SFEM_INLINE void`. They did not
+    # start a chunk, so they were ABSORBED into whichever templated function preceded them and
+    # were partitioned as part of it. The two-way split survived that because both of its halves
+    # were published anyway; the three-way split did not -- eight affine deferred-correction
+    # kernels came out in isoparametric/ behind _residual_isoparam, the function that happens to
+    # precede them.
+    #
+    # This is the second incarnation of this bug. The comment below records the first, a substring
+    # test that could not tell `_residual` from `_residual_isoparam`.
+    defn = re.compile(r"^(?:template <[^>]*>\n)?static SFEM_INLINE [^;{\n]*?\b\w+\(", re.M)
+    hits = list(defn.finditer(text))
+    assert hits, "no function definitions found in the generated text"
+    end_all = text.rindex("#endif")
+    tail = "\n#endif\n"
 
-    chunks, keep, drop = [], [], []
-    idx = [i for i in range(len(body)) if body.startswith(marker, i)]
-    for a, b in zip(idx, idx[1:] + [len(body)]):
-        chunks.append(body[a:b])
+    def chunk_start(at: int) -> int:
+        """`at` back to the start of the comment block introducing it."""
+        lines = text[:at].split("\n")
+        q = len(lines) - 1
+        while q > 0 and (lines[q].lstrip().startswith("//") or lines[q].strip() == ""):
+            q -= 1
+        return len("\n".join(lines[: q + 1])) + 1
+
+    bounds = [chunk_start(m.start()) for m in hits] + [end_all]
+    prologue = text[: bounds[0]]
+    chunks = [text[a:b] for a, b in zip(bounds, bounds[1:])]
+    keep, drop = [], []
+
+    # EXACT function names, not substrings. The previous rule asked whether a marker was a
+    # substring of the text before the first "(", which cannot tell a name from that same name
+    # with a suffix: quarantining `_residual` would silently take `_residual_isoparam` with it,
+    # and that one is a measured WINNER. The earlier incarnation of this rule already swallowed
+    # an unmeasured kernel for the same reason, which is why the comment above says to name
+    # them precisely -- this makes the code enforce what the comment asks for.
+    # The name comes from the DEFINITION inside the chunk, not from the text before its first
+    # "(": a chunk now carries the comment block that introduces it, and those comments contain
+    # parentheses, so splitting on the first one reads a word out of prose.
+    name_re = re.compile(r"^(?:template <[^>]*>\n)?static SFEM_INLINE [^;{\n]*?\b(\w+)\(", re.M)
+
+    def fn_name(chunk: str) -> str:
+        m = name_re.search(chunk)
+        return m.group(1) if m else ""
+
+    # THREE WAYS, QUARANTINE FIRST. A kernel can be both isoparametric and quarantined, and the
+    # quarantine is the stronger claim: it says this arrangement is not the fastest anywhere, which
+    # is true whatever its geometry. Testing geometry first would publish it in isoparametric/.
+    iso = []
     for c in chunks:
-        (drop if any(m in c.split("(")[0] for m in SUBPAR_MARKERS) else keep).append(c)
+        n = fn_name(c)
+        (drop if n in SUBPAR_MARKERS else iso if n.endswith("_isoparam") else keep).append(c)
 
     subpar_prologue = prologue.replace(
         "CVFEM_HEX8_NS_UPWIND_SYMPY_KERNELS_HPP", "CVFEM_HEX8_NS_UPWIND_SYMPY_SUBPAR_HPP"
@@ -908,17 +1453,39 @@ def split_generated(text: str) -> tuple[str, str]:
         "//\n"
         "// Not self-contained:",
     )
-    return prologue + "".join(keep) + tail, subpar_prologue + "".join(drop) + tail
+    iso_prologue = prologue.replace(
+        "CVFEM_HEX8_NS_UPWIND_SYMPY_KERNELS_HPP", "CVFEM_HEX8_NS_UPWIND_SYMPY_ISOPARAM_HPP"
+    ).replace(
+        "// Not self-contained:",
+        "// THE ISOPARAMETRIC GENERATED KERNELS. Each sub-control volume derives its own geometry\n"
+        "// from the element's node coordinates, so these take x/y/z where the rest of this\n"
+        "// generator's output takes one adjugate and one determinant per element.\n"
+        "//\n"
+        "// Not self-contained:",
+    )
+    affine_prologue = prologue.replace(
+        "CVFEM_HEX8_NS_UPWIND_SYMPY_KERNELS_HPP", "CVFEM_HEX8_NS_UPWIND_SYMPY_AFFINE_HPP"
+    ).replace(
+        "// Not self-contained:",
+        "// THE AFFINE GENERATED KERNELS: one adjugate and one determinant for the whole element,\n"
+        "// which the caller derives once and the sweep reads from a table.\n"
+        "//\n"
+        "// Not self-contained:",
+    )
+    return (affine_prologue + "".join(keep) + tail,
+            iso_prologue + "".join(iso) + tail,
+            subpar_prologue + "".join(drop) + tail)
 
 
 def main() -> int:
     args = add_output_arguments(argparse.ArgumentParser(description=__doc__)).parse_args()
-    main_hpp, subpar_hpp = split_generated(generate())
+    affine_hpp, iso_hpp, subpar_hpp = split_generated(generate())
     out = args.out or OUT
-    # --out relocates the main header; the quarantined half follows it, so a check
-    # against a scratch copy still exercises both.
+    # --out relocates the affine header; the other two follow it, so a check against a scratch
+    # copy still exercises all three.
+    iso_out = ISOPARAM_OUT if args.out is None else out.parent / ISOPARAM_OUT.name
     subpar_out = SUBPAR_OUT if args.out is None else out.parent / SUBPAR_OUT.name
-    return emit([(out, main_hpp), (subpar_out, subpar_hpp)], args.check)
+    return emit([(out, affine_hpp), (iso_out, iso_hpp), (subpar_out, subpar_hpp)], args.check)
 
 
 if __name__ == "__main__":

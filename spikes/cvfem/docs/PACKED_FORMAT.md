@@ -39,7 +39,7 @@ A pack-local id `l` resolves to a global id as:
 | `0 <= l < n_contiguous` | owned by this pack | `owned_nodes_ptr[p] + l` |
 | `l >= n_contiguous` | ghost | `ghost_idx[ghost_ptr[p] + (l - n_contiguous)]` |
 
-Reference implementation: `pack_local_to_global`, `src/hex8/cvfem_hex8_layout_common.hpp`.
+Reference implementation: `pack_local_to_global`, `src/best/cvfem_hex8_best_common.hpp`.
 Ghost ids start exactly at `n_contiguous` — `smesh_packed_mesh.cpp:303`
 (`d_packed_elements[v][e] = nowned + d_ghost_map[node]`).
 
@@ -107,7 +107,7 @@ note what it does and does not buy: it makes the ghost gather reproducible, not 
 whole residual. A GPU implementation that accumulates a pack's element contributions
 with `atomicAdd` into shared memory is still non-reproducible run to run, because those
 shared-memory atomics fix no order either -- measured, on the implementation in
-cuda/cvfem_hex8_ns_cuda.cu, which is bit-unstable in both flush modes for exactly this
+src/frontend/cuda/cvfem_hex8_ns_cuda.cu, which is bit-unstable in both flush modes for exactly this
 reason.
 
 Making a GPU residual genuinely bit-reproducible therefore needs the *in-pack*
@@ -128,11 +128,62 @@ Anything sizing scratch or GPU shared memory must compute its own maximum:
 max over p of  (owned_nodes_ptr[p+1] - owned_nodes_ptr[p]) + (ghost_ptr[p+1] - ghost_ptr[p])
 ```
 
-`PackedData::max_actual_nodes_per_pack` (`src/hex8/cvfem_hex8_layout_common.hpp`) is that value.
+`PackedData::max_actual_nodes_per_pack` (`src/best/cvfem_hex8_best_common.hpp`) is that value.
 Using the 65,536 constant to size shared memory would ask for 16 MB per block.
 
 `pack_idx_t` also caps how large a pack may be: a pack may never reach more than
 `max()+1` distinct nodes, which is what bounds `elements_per_pack`.
+
+## 6b. What the format costs in memory — measured
+
+`cvfem_hex8_ns_upwind_bench --mesh-footprint` prints every array's own `nbytes()` and exits.
+Nothing in its output is `n_elements * nodes_per_element * sizeof(index)` worked out by hand,
+which matters because the two quantities that decide the answer have no closed form: the ghost
+list length and the number of reduction-graph rows depend on how the pack boundaries happen to
+cut the mesh. An arithmetic model that guessed both from the mean node count per pack was about
+20% out.
+
+Grace, HEX8 cube at n=128 (2,146,689 nodes, 2,097,152 elements, 8,586,756 dof), pack size 1024,
+bytes per dof:
+
+| array | B/dof |
+|---|---:|
+| `standard.elements` (8 x `idx_t`) | 7.82 |
+| `packed.elements` (8 x `pack_idx_t`) | 3.91 |
+| `packed.ghost_idx` | 0.31 |
+| `packed.ghost_reduce_ptr` | 0.52 |
+| `packed.ghost_reduce_idx` | 0.63 |
+| `packed.ghost_reduce_dest` | 0.26 |
+| `packed.node_map` | 1.00 |
+| `owned_nodes_ptr`, `n_shared`, `ghost_ptr` | 0.01 |
+| **packed total** | **6.64** |
+
+So the packed topology is **85%** of the standard one. The 16-bit index halves the connectivity
+exactly, as it must, and the ownership and ghost arrays spend part of that back. Coordinates are
+byte-for-byte identical in both and are excluded; including them gives 9.64 against 10.82, or
+89%.
+
+Two items in the packed total are avoidable, and together they are most of the distance to the
+~60% the format costs in principle:
+
+- `node_map`, 1.00 B/dof, is the permutation between packed and unpacked numbering. The apply
+  never reads it, and neither does a solver whose fields live in packed numbering throughout.
+  Excluding it gives 72%.
+- `ghost_reduce_ptr` and `ghost_reduce_idx` are `ptrdiff_t` while indexing fewer than a million
+  entries — eight bytes per index with three orders of magnitude to spare. Narrowing them to a
+  32-bit count saves a further 0.58 B/dof and gives **65%**, or **58%** at 4096 elements per
+  pack, where there are proportionally fewer ghosts.
+
+The narrowing has **not** been done. Both arrays are public smesh API consumed by several
+hundred generated operator files across the codegen framework as well as the CUDA paths, so
+changing their width is a submodule API change and belongs with that work, not here. It would
+also cut the reduction pass's read traffic, so it is a throughput item as well as a footprint
+one.
+
+The ghost count, and therefore the whole overhead, falls as the pack size rises: 839,295 ghost
+entries at 512 elements per pack against 294,783 at 8192. The footprint and the throughput
+sweep of `docs/CVFEM_Performance.md` therefore do not want the same pack size, and the
+footprint figures above are quoted at the shipped default rather than at the smallest total.
 
 ## 7. Element connectivity
 
@@ -146,11 +197,11 @@ The node partition above supports two different pack-local sparse layouts. They 
 distinct and both in use, so a spec that names only one is incomplete:
 
 - **compact** — `local_rowptr` / `local_colidx` / `local_global_slot`
-  (`src/hex8/cvfem_hex8_layout_packed.hpp`). Every row of the pack gets a compact pattern; each
+  (`src/best/cvfem_hex8_best_packed.hpp`). Every row of the pack gets a compact pattern; each
   local nonzero maps to a global block id.
 - **store** — owned rows adopt the **global** row pattern, so a pack's owned blocks are
   one contiguous slice of the global values array and can be flushed with a single
-  streaming write, no zeroing pass (`src/hex8/cvfem_hex8_layout_store.hpp`).
+  streaming write, no zeroing pass (`src/best/cvfem_hex8_best_store.hpp`).
 
 Neither is part of the on-disk format; both are derived at load time.
 

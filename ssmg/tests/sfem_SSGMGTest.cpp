@@ -182,6 +182,13 @@ int test_ssgmg_sstet4_em_linear_elasticity_cube() {
         es = sfem::execution_space_from_string(SFEM_EXECUTION_SPACE);
     }
 
+    if (es == sfem::EXECUTION_SPACE_DEVICE) {
+        fprintf(stderr,
+                "warning: skipping test_ssgmg_sstet4_em_linear_elasticity_cube on DEVICE: "
+                "gpu:em:LinearElasticity supports HEX8 / SSHEX8 blocks only\n");
+        return SFEM_TEST_SKIPPED;
+    }
+
     const char *SFEM_OPERATOR = "em:LinearElasticity";
 
     int SFEM_ELEMENT_REFINE_LEVEL = 4;
@@ -239,3 +246,4 @@ int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }
+

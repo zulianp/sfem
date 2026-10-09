@@ -1,0 +1,48 @@
+# SINGLE-PRECISION STORAGE OF THE NODAL VELOCITY GRADIENTS, against double, on Grace.
+#
+# The option: SFEM_GRAD_PRECISION=single in the front end, --grad-precision single in the bench.
+# The reconstruction accumulates in double and converts at the write; every sweep that reads the
+# field converts back at the gather and computes in double, so what changes is the width of the
+# nine-component field per node the correction reads -- and of the second one, the direction's,
+# that the exact Jacobian action reads on every application.
+#
+# jobs/grad_precision_ab.sbatch, job 5004007, nid006544: one binary, the two settings interleaved
+# with the order alternating every pass, medians of 5, n=128 (8,586,756 dofs), 72 threads.
+#
+#   arm            layout        f64       f32  f32/f64
+#   res_ho_unlim   packed     1083.3    1104.8    1.020
+#   res_ho_venk    packed      746.9     755.9    1.012
+#   res_ho_dm      packed      870.4     886.0    1.018
+#   jac_ho_unlim   packed      463.6     502.1    1.083
+#   jac_ho_venk    packed      337.0     355.6    1.055
+#   jac_ho_dm      packed      329.9     345.8    1.048
+#   res_ho_venk    atomic      536.8     545.4    1.016
+#   jac_ho_venk    atomic      133.6     145.1    1.086
+#
+# The residual gains 1-2%: it reads one field, and its time is not in that read. The Jacobian
+# action gains 5-9%: it reads two, on top of an operator whose added traffic the roofline
+# section of the paper already names as the correction's first cost.
+#
+# WHAT HOLDS IT TO THE DOUBLE RESULT. --verify-ho with --grad-precision single adds two oracles,
+# both gated in src/tests/verification/cvfem_bench_staging.sh:
+#   verify_packed_ho_f32_storage_vs_f64_rel        the residual, relative to its own scale:
+#                                                  4e-10 to 7e-10 on every limiter
+#   verify_packed_ho_jac_f32_storage_vs_f64_rel    the exact Jacobian action, state perturbed off
+#                                                  the limiter bounds as the finite-difference
+#                                                  check perturbs it: 4e-9 to 1e-8, 0.0000% of
+#                                                  dofs past 1e-6, on every limiter
+# The perturbation is load-bearing. Unperturbed, on the uniform cube where a structural sixth of
+# the surfaces sit exactly on a limiter bound, the clip's Jacobian read 4.7e-2 against double
+# storage and the smooth limiters 4e-3 in the max norm: a field held at 24 bits moves the ulp that
+# decides a subgradient branch at those surfaces. That is the same property the derivative
+# itself has (cvfem_venkata_limiter.hpp), and it is why the Jacobian oracle judges by the share
+# of disagreeing dofs where the residual's judges by the max norm.
+#
+# The default stays double for now. The solver-level ctest gates pass with
+# SFEM_GRAD_PRECISION=single, including cvfem_conv_freeze, whose arms assert the Newton counts of
+# the frozen and the exact unfrozen higher-order solves against each other -- so on that case the
+# counts are unchanged by the storage. That and the 5-9% above are the case for flipping the
+# default, as the Vanka smoother's float storage was flipped on 27% with identical counts; it is
+# one line in the front end and one in the bench, and it has not been taken here because every
+# higher-order number the paper now carries was measured at double. The semi-structured residual
+# keeps its own double field and is outside this option.

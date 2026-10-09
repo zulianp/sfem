@@ -80,6 +80,9 @@ int cu_laplacian_diag(const smesh::ElemType             element_type,
         case smesh::MACRO_TET4: {
             return cu_macro_tet4_laplacian_diag(nelements, elements, fff_stride, fff, real_type_xy, diag, stream);
         }
+        case smesh::HEX8: {
+            return cu_affine_hex8_laplacian_diag(nelements, elements, fff_stride, fff, real_type_xy, diag, stream);
+        }
         default: {
             SFEM_ERROR("cu_laplacian_diag: Invalid element type %s (code = %d)\n", type_to_string(element_type), element_type);
             return SFEM_FAILURE;

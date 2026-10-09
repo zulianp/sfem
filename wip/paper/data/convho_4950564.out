@@ -1,0 +1,33 @@
+### host nid006546  n=128 repeat=10 passes=3  2026-09-30 10:45:46
+### packed arms are the GENERATED kernel unless labelled _scalar
+### scalar-vs-scalar isolates the LAYOUT; generated-vs-scalar isolates the KERNEL
+
+arm                    layout       MDOF_s       dofs      elems   flops_el       checksum
+first_order            atomic     1069.190    8586756    2097152      754.0 1.3815218500440318e-13
+first_order            packed     2636.043    8586756    2097152      754.0 1.3666032281506313e-13
+ho_unlimited           atomic      651.466    8586756    2097152     1426.0 -1.6940602024471951e-13
+ho_unlimited           packed      996.154    8586756    2097152     1426.0 -1.7053868625431512e-13
+ho_unlim_scalar        packed      668.241    8586756    2097152     1426.0 -1.7054139675974633e-13
+ho_unlim_simd          packed      586.421    8586756    2097152     1426.0 -1.7055139852478751e-13
+ho_unlim_rc            packed      714.166    8586756    2097152     1426.0 -1.7055787663276811e-13
+ho_unlim_rc_scalar     packed      491.013    8586756    2097152     1426.0 -1.7054920301538823e-13
+ho_clip                atomic      575.416    8586756    2097152     1570.0 1.0476754012944678e-14
+ho_clip                packed      823.698    8586756    2097152     1570.0 1.0421242861713420e-14
+ho_clip_scalar         packed      633.982    8586756    2097152     1570.0 1.0400832755816380e-14
+ho_venkatakrishnan     atomic      426.783    8586756    2097152     2506.0 -5.2514250272524959e-12
+ho_venkatakrishnan     packed      562.925    8586756    2097152     2506.0 -5.2492045812032456e-12
+ho_venk_scalar         packed      543.547    8586756    2097152     2506.0 -5.2478384864659139e-12
+ho_darwish_moukalled   atomic      525.099    8586756    2097152     2146.0 -4.9298722927266364e-12
+ho_darwish_moukalled   packed      726.251    8586756    2097152     2146.0 -4.9269718350748032e-12
+ho_dm_scalar           packed      600.726    8586756    2097152     2146.0 -4.9282285880230398e-12
+
+The checksums must DIFFER between first order and each higher-order arm: an identical one
+would mean the correction was not applied and the row is measuring first order twice.
+
+That guard does NOT extend to the Rhie-Chow arms. The checksum is a sum over millions of
+values that is almost entirely cancellation, so a term can be present per node and invisible
+in the total: at n=32 the scalar arm with scale 1.0 prints exactly the no-Rhie-Chow checksum
+while scale 3.0 prints a different one, which is how that was established. Whether the term
+reached the kernel is answered by ran_rc in the CSV and by the driver's per-node oracles
+(--verify-ho --rhie-chow), never by these totals.
+csv: /ritom/scratch/cscs/zulianp/cvfem_convho/4950564/convho.csv

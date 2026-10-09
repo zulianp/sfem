@@ -51,33 +51,61 @@ enable_testing()
 # is where most of this spike is developed.
 option(CVFEM_ENABLE_CUDA "Build the CVFEM HEX8 CUDA targets" OFF)
 
+# THE PHASE BREAKDOWN, AND WHERE IT IS NOT WANTED.
+#
+# The packed sweeps carry probes that report where their time goes -- local memset, gather,
+# kernel, scatter, ghost reduction -- which is what the benchmark's --breakdown prints. They are
+# macros (see src/kernels/cvfem_phases.hpp) so that they can be compiled out rather than merely
+# switched off at runtime: with CVFEM_PHASES=0 there is no clock read, no accumulator, no branch
+# and no parameter carrying the accumulator through the signature. Measured on a probe kernel,
+# the disabled build holds no reference to wall_time or g_breakdown at all.
+#
+# ON by default, because the benchmark is where this spike measures things and --breakdown is one
+# of the ways it does. The operator library below sets it to 0 regardless: a breakdown is a
+# benchmark feature, and the library SFEM links has no caller for it.
+option(CVFEM_ENABLE_PHASES "Compile the packed sweeps' phase-breakdown probes" ON)
+if(NOT CVFEM_ENABLE_PHASES)
+    add_compile_definitions(CVFEM_PHASES=0)
+endif()
+
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 include(CVFEMCMakeFunctions)
 
-# ---------------------------------------------------------------------- modules
-# Every cvfem header is included by bare filename, never by path, so each module
-# directory goes on the include path. This mirrors the SFEM_MODULES / scan_directories
-# loop in SFEM's own top-level CMakeLists.txt, and reuses its function where the SFEM
-# source tree is reachable -- the spike already compiles against ../../algebra.
-set(CVFEM_MODULES src/core src/hex8 src/tet4 src/generated src/ss src/op src/cases src/diag)
+# ----------------------------------------------------------------------- the source tree
+# ONE include root, and every cvfem header is included BY PATH relative to it:
+#
+#     #include "kernels/packed/affine/residual.hpp"
+#
+# not by bare filename. That is the whole of what lets src/ have a shape. The previous
+# arrangement put each module directory flat onto the include path, which bought bare
+# filenames at two prices: a directory not named in a hand-maintained list was invisible to
+# the build, and two headers sharing a basename were one header, with the winner decided by
+# directory order. Both failures were silent, which is why there were two FATAL_ERROR guards
+# here to catch them. Neither is needed once the path is part of the include.
+#
+# Recursive, so a new directory is picked up by existing. The guard below is about shape,
+# not about membership.
+file(GLOB_RECURSE CVFEM_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
+# src/drivers and src/tests are under src/ but are not library sources: each of those files
+# carries a main(). They are globbed separately below.
+list(FILTER CVFEM_SOURCES EXCLUDE REGEX "/src/(drivers|tests)/")
+file(GLOB_RECURSE CVFEM_HEADERS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.hpp")
+set(CVFEM_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
-set(_sfem_cmake_functions ${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/SFEMCMakeFunctions.cmake)
-if(EXISTS ${_sfem_cmake_functions})
-    include(${_sfem_cmake_functions})
-    foreach(MODULE ${CVFEM_MODULES})
-        scan_directories(${CMAKE_CURRENT_SOURCE_DIR}/${MODULE} "."
-                         CVFEM_INCLUDE_DIRS CVFEM_HEADERS CVFEM_SOURCES)
-    endforeach()
-else()
-    # Detached copy of the spike: same result without the SFEM source tree.
-    foreach(MODULE ${CVFEM_MODULES})
-        file(GLOB _mod_sources CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${MODULE}/*.cpp")
-        file(GLOB _mod_headers CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${MODULE}/*.hpp")
-        list(APPEND CVFEM_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/${MODULE})
-        list(APPEND CVFEM_SOURCES ${_mod_sources})
-        list(APPEND CVFEM_HEADERS ${_mod_headers})
-    endforeach()
-endif()
+# WHAT MAY COMPILE INTO THE OP LIBRARY. Every .cpp the glob finds lands in
+# add_library(cvfem_ns_op) below, so a translation unit under src/kernels/ would drag a whole
+# kernel family into the one target that must not see it -- and the two operator families
+# define sixteen of the same names with different physics. src/kernels/ is header-only, and
+# this is what says so loudly rather than at link time.
+foreach(_src ${CVFEM_SOURCES})
+    file(RELATIVE_PATH _rel ${CMAKE_CURRENT_SOURCE_DIR} ${_src})
+    if(_rel MATCHES "^src/kernels/")
+        message(FATAL_ERROR
+            "${_rel} is a translation unit under src/kernels/, which is header-only. Every "
+            ".cpp under src/ is compiled into cvfem_ns_op; a kernel .cpp would put a kernel "
+            "family into the operator library. Make it a header, or put it in src/frontend/.")
+    endif()
+endforeach()
 
 # The SFEM source tree, for the two headers that are reached in place rather than through
 # the install. Kept explicit so it is obvious which targets pay for the coupling.
@@ -94,6 +122,12 @@ target_link_libraries(cvfem_ns_op
     PUBLIC
         SFEM::sfem
         $<$<BOOL:${OpenMP_CXX_FOUND}>:OpenMP::OpenMP_CXX>)
+# The breakdown probes are a benchmark feature; this library has no caller for one, so they are
+# compiled out of it whatever CVFEM_ENABLE_PHASES says. The kernels it does instantiate carry no
+# probes today, so this states the intent rather than changing the code -- which is the point of
+# saying it on the target rather than relying on that staying true.
+target_compile_definitions(cvfem_ns_op PRIVATE CVFEM_PHASES=0)
+
 target_include_directories(cvfem_ns_op PUBLIC
     ${CVFEM_INCLUDE_DIRS}
     ${CVFEM_SFEM_ALGEBRA_INCLUDES})
@@ -104,7 +138,7 @@ cvfem_target_defaults(cvfem_ns_op)
 # Most link SFEM directly; the ones below go through the Op library.
 set(CVFEM_OP_DRIVERS cvfem_hex8_ns_ssgmg cvfem_ns_apply_bench cvfem_sshex8_bench)
 
-file(GLOB CVFEM_DRIVERS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/drivers/*.cpp")
+file(GLOB_RECURSE CVFEM_DRIVERS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/drivers/*.cpp")
 foreach(DRIVER ${CVFEM_DRIVERS})
     get_filename_component(DRIVER_NAME ${DRIVER} NAME_WE)
     add_executable(${DRIVER_NAME} ${DRIVER})
@@ -118,6 +152,20 @@ foreach(DRIVER ${CVFEM_DRIVERS})
     endif()
     cvfem_target_defaults(${DRIVER_NAME})
 endforeach()
+
+# THE SAME BENCHMARK, FULLY IN SINGLE PRECISION. One source, compiled a second time with the
+# computation type set to float (src/frontend/staging/cvfem_hex8_best_common.hpp): every field,
+# pack, cached geometry table and kernel is f32. A separate target rather than a runtime switch
+# because the type is the template argument of every sweep the driver instantiates -- a runtime
+# switch would compile the whole driver twice into one binary for no gain. Its operators are held
+# to the double build's by src/tests/verification/cvfem_bench_f32.sh.
+add_executable(cvfem_hex8_ns_upwind_bench_f32 ${CMAKE_CURRENT_SOURCE_DIR}/src/drivers/cvfem_hex8_ns_upwind_bench.cpp)
+target_link_libraries(cvfem_hex8_ns_upwind_bench_f32
+    PRIVATE
+        SFEM::sfem
+        $<$<BOOL:${OpenMP_CXX_FOUND}>:OpenMP::OpenMP_CXX>)
+target_compile_definitions(cvfem_hex8_ns_upwind_bench_f32 PRIVATE CVFEM_SCALAR_T=float)
+cvfem_target_defaults(cvfem_hex8_ns_upwind_bench_f32)
 
 # The steady solver reaches into SFEM's algebra headers in place; the Op-linked drivers
 # get the same directories through cvfem_ns_op's PUBLIC includes.
@@ -143,6 +191,23 @@ add_test(NAME cvfem_sshex8_agree COMMAND cvfem_sshex8_bench)
 # a diagonal of anything.
 set_tests_properties(cvfem_sshex8_agree PROPERTIES ENVIRONMENT "SFEM_BENCH_MACROS=2;SFEM_BENCH_LEVELS=2,4;SFEM_BENCH_REPS=1;SFEM_BENCH_WARMUP=0;SFEM_BENCH_PROBE_DIAG=1")
 
+# THE SAME AGREEMENT ON A MESH WITH CURVED MACRO ELEMENTS, and what it does NOT gate.
+#
+# The box above has no curved macro element, so this arm warps its inflow half and one mesh then
+# carries curved and straight macro elements side by side. What that buys is coverage of the
+# curved branch and of which macro element each sweep claims: these four sweeps are split along
+# the affine / isoparametric line separately, so an element dropped from one sweep's range shows
+# up here as a disagreement with the other three.
+#
+# What it does NOT gate is whether the geometry is derived correctly, and the distinction was
+# measured rather than reasoned: forcing sscvfem_macro_curved to false -- which hoists one
+# geometry over a curved macro element's micro cells, the exact bug this split could introduce
+# -- leaves BOTH arms of this test passing. All four sweeps read the same geometry source, so
+# they agree with each other whether it is right or wrong. The oracle for that is
+# cvfem_flat_vs_ss_test's warped arms, where the same break fails four checks and nothing else.
+add_test(NAME cvfem_sshex8_agree_warped COMMAND cvfem_sshex8_bench)
+set_tests_properties(cvfem_sshex8_agree_warped PROPERTIES ENVIRONMENT "SFEM_BENCH_MACROS=2;SFEM_BENCH_LEVELS=2,4;SFEM_BENCH_REPS=1;SFEM_BENCH_WARMUP=0;SFEM_BENCH_PROBE_DIAG=1;SFEM_BENCH_WARP=0.15")
+
 # ------------------------------------------------------------------------ tests
 # One test per file in tests/, filename == target name == ctest name, as SFEM does for
 # <module>/tests/. What each one gates:
@@ -153,8 +218,19 @@ set_tests_properties(cvfem_sshex8_agree PROPERTIES ENVIRONMENT "SFEM_BENCH_MACRO
 #                          benchmark's layout family. Failure mode is a build error.
 #   tests_lshape_check     the L-shape generator's element and node counts against their
 #                          closed forms.
-file(GLOB CVFEM_TESTS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tests/*.cpp")
-list(REMOVE_ITEM CVFEM_TESTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/cvfem_guard_selftest.cpp)
+# Recursive: the tests are grouped by TYPE in subfolders now. Target and ctest names stay
+# NAME_WE, so the suite's names are unchanged by the move and a run before and after is
+# comparable entry by entry.
+file(GLOB_RECURSE CVFEM_TESTS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/tests/*.cpp")
+list(REMOVE_ITEM CVFEM_TESTS ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/compile/cvfem_guard_selftest.cpp)
+list(REMOVE_ITEM CVFEM_TESTS ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/compile/cvfem_vectorization_gate.cpp)
+# The two device tests are built by the CUDA block below, with nvcc and the CUDA libraries, and
+# only when CVFEM_ENABLE_CUDA is on. Left in this glob they would be configured a second time as
+# plain CPU targets -- a duplicate target name where CUDA is on, and a link failure where it is
+# off. They live under src/tests/verification/ because that is what they are: a device-against-host
+# comparison. Where they are built from is not where they are grouped.
+list(REMOVE_ITEM CVFEM_TESTS ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_cuda_smoke.cpp)
+list(REMOVE_ITEM CVFEM_TESTS ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_hex8_ns_cuda_verify.cpp)
 
 set(CVFEM_OP_TESTS cvfem_ns_op_gate cvfem_ns_op_isolation cvfem_bc_sideset_test cvfem_flat_vs_ss_test cvfem_flow_diag_test cvfem_ss_packed_probe cvfem_operator_consistency_test)
 foreach(TEST_SOURCE ${CVFEM_TESTS})
@@ -172,6 +248,21 @@ foreach(TEST_SOURCE ${CVFEM_TESTS})
     add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
 endforeach()
 
+# cvfem_sympy_action_test gates the generated Jacobian-action arrangements, which are
+# quarantined in subpar/ by default, so it exits 77 (ctest's SKIP) unless CVFEM_ENABLE_SUBPAR
+# is on. Declared here rather than beside the option because the glob loop above is what
+# creates the test. Without this the skip would be recorded as a FAILURE, which is the worst
+# of both: a red suite that means nothing, training people to ignore it.
+set_tests_properties(cvfem_sympy_action_test PROPERTIES SKIP_RETURN_CODE 77)
+
+# cvfem_subpar_compiles is the quarantine's own gate: it includes every subpar/ header so that
+# a retired kernel cannot stop compiling unnoticed. Nothing else includes them -- that is the
+# whole reason they rot -- and two of them had, each dating from the commit that made the
+# change it missed. Same SKIP, for the same reason: without the option the headers are not on
+# the include path.
+set_tests_properties(cvfem_subpar_compiles PROPERTIES SKIP_RETURN_CODE 77)
+set_tests_properties(cvfem_subpar_ss_compiles PROPERTIES SKIP_RETURN_CODE 77)
+
 # ------------------------------------------------------------ verification report machinery
 #
 # The report generator draws the conclusions -- it fits the convergence rates, decides which
@@ -182,6 +273,83 @@ endforeach()
 # Standard-library only and no build dependency, so this runs wherever a python3 does,
 # including inside the Alps uenv where numpy, matplotlib and markdown are all absent.
 find_program(CVFEM_REPORT_PYTHON NAMES python3 python)
+# ------------------------------------------------- src/kernels/ carries no dependency
+#
+# The property this checks took a long cascade to establish and one convenient #include to
+# undo, which is exactly the shape of thing that needs a test rather than a note. It also
+# replaces the old depth-1 directory guard, which only ever looked one level down and would
+# have passed a stray src/kernels/packed/affine/ without seeing it.
+if(CVFEM_REPORT_PYTHON)
+    add_test(NAME cvfem_kernels_self_contained
+             COMMAND ${CVFEM_REPORT_PYTHON}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/compile/cvfem_kernels_self_contained.py)
+    # ------------------------------------------------- an absent input is a null pointer
+    #
+    # The sweeps signal "this input is not there" with a null pointer: no boundary mask, no
+    # prescribed pressure, no curved macro element. A caller that spells such an argument
+    # `d.mask.data()` breaks that signal, because std::vector::data() is only required to
+    # return null for a vector that never allocated, and the Op clears four of these masks on
+    # every setup -- so a cleared-but-allocated mask arrives looking present, carrying the
+    # entries of the previous setup.
+    #
+    # This is not a style check. Fifty-three arguments were spelled that way when the
+    # semi-structured sweeps shed their staging objects, and none of them was visible one
+    # level deep: the sweep itself rarely tests the pointer, it hands it to the kernel that
+    # does. The test propagates the null test through calls until it stops finding new ones,
+    # which is what makes the fifty-three appear at all.
+    add_test(NAME cvfem_null_tested_args
+             COMMAND ${CVFEM_REPORT_PYTHON}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/compile/cvfem_null_tested_args.py)
+
+    # A SWEEP CALL LEFT OUTSIDE ITS PARALLEL REGION, which nothing else can see.
+    #
+    # `#pragma omp parallel` applies to the one statement after it. A split sweep pair is two
+    # statements, and without braces the second runs after the region closes -- once, on the
+    # encountering thread. The answer is still right, every element is processed once, and the
+    # fingerprints are taken at one thread, so the whole suite passes while half of a pair runs
+    # serially. On a box the curved half is empty and there is nothing to notice at all.
+    #
+    # Found the hard way: the naive residual pair went in unbraced and was caught by a brace pass
+    # run for a different sweep, with six more in the benchmark.
+    add_test(NAME cvfem_parallel_region_pairs
+             COMMAND ${CVFEM_REPORT_PYTHON}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/compile/cvfem_parallel_region_pairs.py)
+
+    # EVERY KERNEL THAT NAMES A COMPUTATION TYPE DECLARES IT, which the mixed-precision gates
+    # cannot say. Those three show that the templated kernels run at single precision and agree;
+    # they cannot show that nothing was missed, because a definition still spelling the build's
+    # scalar_t compiles perfectly and is only ever reached at the other precision if some f32
+    # test happens to instantiate it -- and most of src/kernels/ is not reached by them.
+    #
+    # It found four boundary-closure kernels, two partial-assembly convective kernels, two
+    # generated BSR-slot kernels and four generated TET4 kernels after all three families had
+    # been converted and all three mixed-precision gates were passing.
+    #
+    # The shared constant tables are the one listed exception: an accessor returning a reference
+    # to a `const double[...]` table promotes an f32 chain, and templating it means a copy per
+    # precision -- a decision about storage, not a missing parameter.
+    add_test(NAME cvfem_kernels_are_templated
+             COMMAND ${CVFEM_REPORT_PYTHON}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/compile/cvfem_kernels_are_templated.py)
+
+    # Every option a job script hands a driver must still be one that driver parses. Removing
+    # the micro-kernel selector took --kernel with it and broke twenty-six job scripts in
+    # silence, thirteen of which feed the paper's generated macros: a driver rejects an unknown
+    # option and exits, and the jobs scrape its stdout with sed, so the failure arrived as an
+    # empty table cell rather than as a non-zero exit.
+    add_test(NAME cvfem_jobs_use_live_flags
+             COMMAND ${CVFEM_REPORT_PYTHON}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/compile/cvfem_jobs_use_live_flags.py)
+
+    # Per-thread scratch comes from the arena, never from a std::vector declared inside a
+    # parallel region, which allocates and frees once per thread per call. The arena's slot
+    # register is what makes each thread's working set visible; a vector hides it, which is how
+    # an nnodes-wide allocation ended up in the Vanka smoother.
+    add_test(NAME cvfem_no_vector_in_parallel
+             COMMAND ${CVFEM_REPORT_PYTHON}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/compile/cvfem_no_vector_in_parallel.py)
+endif()
+
 if(CVFEM_REPORT_PYTHON)
     add_test(NAME cvfem_verify_report_selftest
              COMMAND ${CVFEM_REPORT_PYTHON}
@@ -199,8 +367,47 @@ endif()
 # it refuses. The staging work only means something if the combinations it opened are checked
 # and the ones it kept shut stay shut, and both halves live in the driver's own oracles rather
 # than in a reimplementation -- so this drives the driver. n=8, a couple of seconds.
+# The TET4 benchmark's own oracles, which nothing ran. It carries verify_packed_vs_atomic,
+# verify_jac_packed_vs_atomic, the element-kernel finite-difference checks and the SpMV-against-
+# matrix-free chain, and it exits non-zero on any of them -- but no test invoked it, so the only
+# thing holding its kernels together was a person remembering to pass --verify by hand. That
+# became load-bearing when thirteen micro-kernel arms were reduced to three and the packed
+# assembly changed kernel; a reduction defended by an oracle nobody runs is not defended.
+# The packed layout's determinism, which is the property that makes its throughput comparable
+# with the atomic layout's at all. It is checked by running the same configuration twice and
+# comparing the bitwise fingerprint -- a run against ITSELF, which a race cannot satisfy by
+# luck. The fingerprint sweep compares against a recorded baseline instead, so a race that
+# happened to reproduce the baseline would pass it; that is how a nested parallel region
+# survived long enough to be found by accident. Shown to fire before being committed: with the
+# stray pragma back, it failed exactly the three affected configurations and nothing else.
+add_test(NAME cvfem_packed_determinism
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/regression/cvfem_packed_determinism.sh
+                 $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)
+set_tests_properties(cvfem_packed_determinism PROPERTIES SKIP_RETURN_CODE 77)
+
+add_test(NAME cvfem_tet4_bench_verify
+         COMMAND cvfem_tet4_ns_upwind_bench --n 10 --repeat 1 --warmup 0 --verify --verify-jac)
+
 add_test(NAME cvfem_bench_staging
-         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/cvfem_bench_staging.sh
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_bench_staging.sh
+                 $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)
+# The script asserts that every quarantined configuration is REFUSED, which is true of the
+# default build and false of this one -- the flag exists to make them reachable. So it is told
+# which build it is in rather than inferring it.
+if(CVFEM_ENABLE_SUBPAR)
+    set_tests_properties(cvfem_bench_staging PROPERTIES ENVIRONMENT CVFEM_HAS_SUBPAR=1)
+endif()
+
+# ------------------------------------------------- the geometry gate, on a NON-AFFINE mesh
+#
+# Every other oracle here runs on a uniform cube, where the affine edge vector and the
+# difference of two node coordinates are the same number to the last bit -- so a kernel using
+# one and its reference using the other agree perfectly while discretising different geometries.
+# This gate warps the mesh, which separates them. It was added after exactly that inconsistency
+# reached a campaign undetected and surfaced at n=160 as a 2.0e-4 disagreement; the gate was
+# then checked by reintroducing the bug, which it fails at warp > 0 and passes on the cube.
+add_test(NAME cvfem_warped_geometry
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_warped_geometry.sh
                  $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)
 
 # --------------------------------------------- the packed macro path is the same operator
@@ -232,19 +439,32 @@ set_tests_properties(cvfem_flat_vs_ss_packed PROPERTIES ENVIRONMENT "SFEM_SS_PAC
 
 # ------------------------------------------------------------------- restart round trip
 #
+# The deferred correction's freezing path, and the default that selects it. Registered
+# because nothing else in this suite sets SFEM_CONV_HO: without it the entire higher-order
+# convection path, and the branch its default now takes, sit outside the local gate.
+add_test(NAME cvfem_conv_freeze
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_conv_freeze_test.sh
+                 $<TARGET_FILE:cvfem_hex8_ns_ssgmg>)
+# 600, not 300, because this test gained a fourth solver arm: the LAGGED Jacobian, which is the
+# point of the assertion it feeds -- it must cost Newton steps, and it does, 35 against 13, which
+# makes it the most expensive run in the file. Isolated the test takes 134 s; under the suite's own
+# `ctest -j 6` it has been seen at 238 s and has timed out at 300. The limit was sized for the
+# shorter test, not for a slow machine.
+set_tests_properties(cvfem_conv_freeze PROPERTIES TIMEOUT 600)
+
 # A run cut in two must be the run that was not cut. The pump is used because it is the
 # cheapest case with an exact identity AND a time-varying boundary condition, so a segment
 # that mistook its own step index for the absolute one drives the diaphragm at the wrong
 # phase and the identity reports it.
 add_test(NAME cvfem_restart
-         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/cvfem_restart_test.sh
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/regression/cvfem_restart_test.sh
                  $<TARGET_FILE:cvfem_hex8_ns_ssgmg>)
 
 # A step that will not converge is either the end of the run or a smaller step, never a step
 # that is quietly accepted. Both policies are driven against one forced failure, because the
 # thing worth testing is that they disagree in exactly the intended way.
 add_test(NAME cvfem_cutback
-         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/cvfem_cutback_test.sh
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_cutback_test.sh
                  $<TARGET_FILE:cvfem_hex8_ns_ssgmg>)
 
 # The transient multigrid/Vanka path, which nothing else exercised: cvfem_restart and
@@ -257,13 +477,13 @@ add_test(NAME cvfem_cutback
 # 36 s there against 1 s for multigrid; at N=8 the same arm costs 689 s, the dense coarse
 # factorisation being cubic in a problem that grew 8x under refinement.
 add_test(NAME cvfem_mg_transient
-         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/cvfem_mg_transient_test.sh
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_mg_transient_test.sh
                  $<TARGET_FILE:cvfem_hex8_ns_ssgmg>)
 set_tests_properties(cvfem_mg_transient PROPERTIES TIMEOUT 300)
 
 # ------------------------------------------------ generated headers match their generators
 #
-# The three headers under src/generated/ and src/cases/ are committed artifacts compiled as
+# The three generated headers, under src/upwind/ and src/cases/, are committed artifacts compiled as
 # ordinary source, and nothing regenerated or diffed them, so they could drift from the
 # scripts that emit them unnoticed. Each generator now has a --check mode that regenerates
 # in memory and compares, writing nothing.
@@ -278,6 +498,16 @@ find_program(CVFEM_PYTHON NAMES python3 python
              NO_CMAKE_SYSTEM_PATH)
 if(NOT CVFEM_PYTHON)
     find_program(CVFEM_PYTHON NAMES python3 python)
+endif()
+
+# The fully-f32 bench against the f64 one, operator by operator: its oracle, since the --verify
+# modes are double-precision checks it refuses. See the script for the two standards.
+if(CVFEM_PYTHON)
+    add_test(NAME cvfem_bench_f32
+             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_bench_f32.sh
+                     $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>
+                     $<TARGET_FILE:cvfem_hex8_ns_upwind_bench_f32>
+                     ${CVFEM_PYTHON})
 endif()
 
 if(CVFEM_PYTHON)
@@ -318,7 +548,7 @@ if(CVFEM_PYTHON)
                     RESULT_VARIABLE _cvfem_no_numpy OUTPUT_QUIET ERROR_QUIET)
     if(_cvfem_no_numpy EQUAL 0)
         add_test(NAME cvfem_richardson
-                 COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/cvfem_richardson_test.sh
+                 COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_richardson_test.sh
                          $<TARGET_FILE:cvfem_hex8_ns_ssgmg> ${CVFEM_PYTHON})
         set_tests_properties(cvfem_richardson PROPERTIES TIMEOUT 900 LABELS slow)
         message(STATUS "cvfem: temporal-order gate enabled (${CVFEM_PYTHON})")
@@ -344,7 +574,7 @@ endif()
 # wiring is live.
 if(MPIEXEC_EXECUTABLE)
     add_test(NAME cvfem_mpi_guard
-             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/cvfem_mpi_guard_test.sh
+             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_mpi_guard_test.sh
                      $<TARGET_FILE:cvfem_hex8_ns_ssgmg>
                      ${MPIEXEC_EXECUTABLE}
                      $<TARGET_FILE:cvfem_sshex8_bench>)
@@ -363,7 +593,7 @@ if(MPIEXEC_EXECUTABLE)
     # addition does not associate, so a partitioned sum need not match a sequential one bit for
     # bit even when both are right.
     add_test(NAME cvfem_distributed_setup
-             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/cvfem_distributed_setup_test.sh
+             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_distributed_setup_test.sh
                      $<TARGET_FILE:cvfem_hex8_ns_ssgmg>
                      ${MPIEXEC_EXECUTABLE})
     set_tests_properties(cvfem_distributed_setup PROPERTIES TIMEOUT 300 SKIP_RETURN_CODE 77)
@@ -379,7 +609,7 @@ endif()
 # drivers/cvfem_hex8_ns_steady.cpp's std::isfinite() checks into a constant `true`. See
 # the -fno-finite-math-only comment in cmake/CVFEMCMakeFunctions.cmake. Run it in CI; it
 # takes microseconds.
-add_executable(cvfem_guard_selftest tests/cvfem_guard_selftest.cpp)
+add_executable(cvfem_guard_selftest src/tests/compile/cvfem_guard_selftest.cpp)
 target_compile_options(cvfem_guard_selftest PRIVATE ${_cvfem_perf_opts})
 target_include_directories(cvfem_guard_selftest PRIVATE ${CVFEM_INCLUDE_DIRS})
 add_test(NAME cvfem_guard_selftest COMMAND cvfem_guard_selftest)
@@ -418,7 +648,9 @@ if(CVFEM_ENABLE_CUDA)
     function(cvfem_cuda_target tgt)
         target_compile_definitions(${tgt} PRIVATE CVFEM_ENABLE_CUDA)
         target_include_directories(${tgt} PRIVATE
-            ${CVFEM_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/cuda)
+            ${CVFEM_INCLUDE_DIRS}
+            # The device tests include their own headers by bare name.
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification)
         cvfem_subpar_target(${tgt})
         cvfem_trace_target(${tgt})
         target_compile_options(${tgt} PRIVATE
@@ -434,14 +666,113 @@ if(CVFEM_ENABLE_CUDA)
 
     # Smoke target: proves the toolchain, the device, and the C-ABI/stream convention
     # before any real kernel depends on them.
-    add_executable(cvfem_cuda_smoke cuda/cvfem_cuda_smoke.cpp cuda/cvfem_cuda_smoke.cu)
+    add_executable(cvfem_cuda_smoke src/tests/verification/cvfem_cuda_smoke.cpp
+                               src/tests/verification/cvfem_cuda_smoke.cu)
     cvfem_cuda_target(cvfem_cuda_smoke)
 
     # Packed residual: verification against the CPU reference, plus timing. Kept as its
     # own driver rather than folded into cvfem_hex8_ns_upwind_bench, so the CPU
     # benchmark's build -- and therefore its measured baseline -- is left alone.
     add_executable(cvfem_hex8_ns_cuda_verify
-        cuda/cvfem_hex8_ns_cuda_verify.cpp
-        cuda/cvfem_hex8_ns_cuda.cu)
+        src/tests/verification/cvfem_hex8_ns_cuda_verify.cpp
+        src/frontend/cuda/cvfem_hex8_ns_cuda.cu)
     cvfem_cuda_target(cvfem_hex8_ns_cuda_verify)
+endif()
+
+# ------------------------------------------------------------------- the vectorisation gate
+#
+# DESIGN.md requires the build to fail when a lane loop does not vectorise. It has to be the
+# BUILD rather than a test, because a kernel that quietly went scalar still produces the right
+# answers -- every oracle in this suite stays green through it, which is exactly how the one
+# this gate found survived. The measured cost of that one was the entire vectorisation of the
+# higher-order residual: zero vector FP instructions against 937 scalar ones.
+#
+# WHY IT INSPECTS OBJECTS RATHER THAN READING COMPILER REMARKS is argued at length in
+# src/tests/compile/cvfem_check_vectorization.py. The short of it: a lane loop runs
+# CVFEM_HEX8_VEC_SIZE iterations, a compile-time constant, so it is unrolled and vectorised by
+# the SLP pass -- the loop vectoriser never engages and -Rpass-missed=loop-vectorize is silent
+# whether the result is vector or scalar. -Werror=pass-failed would be a gate that cannot fire.
+#
+# ONE OBJECT PER KERNEL, and that is not fastidiousness. With three wrappers in one translation
+# unit the compiler tail-merged them into a single shared body reached by three entry stubs, and
+# a scalar kernel would have hidden behind its neighbours' vector instructions.
+set(CVFEM_VEC_GATE_KERNELS
+    1  residual_first_order        # the kernel the standing performance gate measures
+    2  residual_rhie_chow          # the same, with the coupling this discretisation always runs
+    3  residual_higher_order       # the deferred correction, entered through the sweep
+    10 lane_defcor_unlimited       # the lane kernel itself, one limiter per object, which is
+    11 lane_defcor_clip            # the resolution that caught the limiter-stats atomic --
+    12 lane_defcor_venkatakrishnan # entering through the sweep showed 17% and read as merely
+    13 lane_defcor_darwish_moukalled  # poor, where the lane kernels showed a flat zero.
+    20 jv_lane_first_order         # the Jacobian action's lane sweep, which the gate had no row
+    21 jv_lane_defcor_unlimited    # for while clang warned about it 72 times a build
+    22 jv_lane_defcor_clip
+    23 jv_lane_defcor_venkatakrishnan
+    24 jv_lane_defcor_darwish_moukalled)
+
+# Kernels that emit no vector arithmetic. THE LIST IS EMPTY, and what was on it is worth
+# recording, because the entry was the only thing standing between this gate and two kernels
+# doing no vector arithmetic whatsoever.
+#
+# jv_lane_defcor_venkatakrishnan and jv_lane_defcor_darwish_moukalled were listed, scoped to
+# Clang, on the explanation that Apple clang declined to inline the `lim` lambda inside
+# cvfem_hex8_scs_defcor_jv while gcc inlined it. The diagnosis was right -- the objects held
+# thirty-six calls to that lambda's out-of-line body, inside the lane loop, and measured ZERO
+# vector instructions. The CONCLUSION was wrong: this was not a compiler quirk to tolerate on one
+# machine, it was a missing always_inline, and a call in a lane loop does not make the loop
+# slower, it stops it vectorising at all. With the attribute the two read 6670 and 6111 vector
+# instructions where there had been none, and the finite-difference check against the exact
+# Jacobian is unchanged at every limiter.
+#
+# The gate forced this itself: it fails a listed kernel that STARTS vectorising, which is what
+# turned a permanent exemption into a debt that had to be paid.
+set(CVFEM_VEC_GATE_KNOWN_SCALAR "")
+
+find_program(CVFEM_VEC_GATE_PYTHON NAMES python3 python)
+if(CVFEM_VEC_GATE_PYTHON)
+    set(_vec_gate_objs "")
+    list(LENGTH CVFEM_VEC_GATE_KERNELS _vec_gate_n)
+    math(EXPR _vec_gate_last "${_vec_gate_n} / 2 - 1")
+    foreach(_i RANGE ${_vec_gate_last})
+        math(EXPR _ki "${_i} * 2")
+        math(EXPR _ni "${_i} * 2 + 1")
+        list(GET CVFEM_VEC_GATE_KERNELS ${_ki} _kid)
+        list(GET CVFEM_VEC_GATE_KERNELS ${_ni} _kname)
+        set(_tgt cvfem_vecgate_${_kname})
+        add_library(${_tgt} OBJECT
+                    ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/compile/cvfem_vectorization_gate.cpp)
+        # The real flags, through the same interface every kernel target uses. A gate compiled
+        # with anything else would be measuring a build nobody ships.
+        target_include_directories(${_tgt} PRIVATE ${CVFEM_INCLUDE_DIRS})
+        target_compile_definitions(${_tgt} PRIVATE CVFEM_VEC_GATE_KERNEL=${_kid})
+        target_compile_options(${_tgt} PRIVATE ${_cvfem_perf_opts})
+        # OpenMP for the `#pragma omp simd` the lane loops carry. Without it the pragma is
+        # ignored and the gate would be measuring a different loop from the one that ships.
+        if(OpenMP_CXX_FOUND)
+            target_link_libraries(${_tgt} PRIVATE OpenMP::OpenMP_CXX)
+        endif()
+        list(APPEND _vec_gate_objs "${_kname}=$<TARGET_OBJECTS:${_tgt}>")
+        list(APPEND _vec_gate_tgts ${_tgt})
+    endforeach()
+
+    set(_vec_gate_exempt "")
+    foreach(_x ${CVFEM_VEC_GATE_KNOWN_SCALAR})
+        list(APPEND _vec_gate_exempt --expect-scalar ${_x})
+    endforeach()
+
+    # ALL, so it runs on a plain `make` and a scalar kernel cannot reach a commit. CMAKE_OBJDUMP
+    # is passed rather than assumed: the Apple toolchain's objdump and the uenv's binutils are
+    # different programs and the script falls back through both.
+    add_custom_target(cvfem_vectorization_gate ALL
+        COMMAND ${CVFEM_VEC_GATE_PYTHON}
+                ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/compile/cvfem_check_vectorization.py
+                --objdump "${CMAKE_OBJDUMP}" ${_vec_gate_exempt} ${_vec_gate_objs}
+        COMMENT "checking that the lane-blocked kernels emit vector arithmetic"
+        VERBATIM)
+    # $<TARGET_OBJECTS:> does NOT create a dependency on the target that produces them, so
+    # without this the check runs against objects that may not exist yet. It read as a pass on a
+    # plain `make all`, where the object libraries happened to be built first, and failed only
+    # when the gate was built as a named target on its own -- which is how it was found. The
+    # script treating an unreadable object as a failure rather than a skip is what surfaced it.
+    add_dependencies(cvfem_vectorization_gate ${_vec_gate_tgts})
 endif()

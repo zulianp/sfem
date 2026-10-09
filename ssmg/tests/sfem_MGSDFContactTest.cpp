@@ -67,8 +67,7 @@ struct EnvOptions {
     }
 };
 
-static void write_sdf_output(const std::shared_ptr<sfem::Communicator>     &comm,
-                             const std::shared_ptr<smesh::Grid<geom_t>>    &sdf) {
+static void write_sdf_output(const std::shared_ptr<sfem::Communicator> &comm, const std::shared_ptr<smesh::Grid<geom_t>> &sdf) {
     if (!sdf) {
         return;
     }
@@ -125,11 +124,15 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_sphere_contact(const std::
         SFEM_ERROR("test_contact: no contact faces on any rank\n");
     }
 
-    const int n   = opts.base_resolution * smesh::semistructured_level(fs->mesh());
-    auto      sdf = smesh::create_sdf(comm,
-                                 n * resolution_ratio * 2,
-                                 n * 1 * 2,
-                                 n * resolution_ratio * 2,
+    const ptrdiff_t n  = static_cast<ptrdiff_t>(opts.base_resolution) * smesh::semistructured_level(fs->mesh());
+    const ptrdiff_t nx = n * resolution_ratio * 2;
+    const ptrdiff_t ny = n * 2;
+    const ptrdiff_t nz = n * resolution_ratio * 2;
+
+    auto sdf = smesh::create_sdf(comm,
+                                 nx,
+                                 ny,
+                                 nz,
                                  -0.1,
                                  -0.2,
                                  -0.1,
@@ -338,23 +341,13 @@ int test_contact() {
 
     SFEM_TEST_ASSERT(opts.element_refine_level > 1);
 
-    mesh                 = smesh::to_semistructured(opts.element_refine_level, mesh, true, false);
+    mesh = smesh::to_semistructured(opts.element_refine_level, mesh, true, false);
     SFEM_TEST_ASSERT(mesh != nullptr);
     if (!smesh::is_hex_ss_family(mesh->element_type(0))) {
         setenv("SFEM_COARSE_OP_TYPE", sfem::op_type::MATRIX_FREE, 1);
     }
     const int block_size = mesh->spatial_dimension();
     auto      fs         = sfem::FunctionSpace::create(mesh, block_size);
-
-#ifdef SFEM_ENABLE_CUDA
-    {
-        auto elements = fs->device_elements();
-        if (!elements) {
-            elements = create_device_elements(fs, fs->element_type());
-            fs->set_device_elements(elements);
-        }
-    }
-#endif
 
     auto f  = sfem::Function::create(fs);
     auto op = sfem::create_op(fs, opts.operator_name, es);
@@ -678,4 +671,3 @@ int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }
-

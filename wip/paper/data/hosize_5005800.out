@@ -1,0 +1,25 @@
+### host nid006545  repeat=10 passes=2 pack=1024  2026-10-08 17:10:26
+### residual, --rhie-chow --conv-ho 3, against the first-order arm at the same sizes
+
+n        layout   scheme           MDOF_s         dofs
+64       packed   fo             1812.242      1098500
+64       packed   ho              896.372      1098500
+64       atomic   fo              899.224      1098500
+64       atomic   ho              620.013      1098500
+96       packed   fo             1878.441      3650692
+96       packed   ho              920.055      3650692
+96       atomic   fo              936.406      3650692
+96       atomic   ho              615.547      3650692
+128      packed   fo             1746.179      8586756
+128      packed   ho              884.992      8586756
+128      atomic   fo              915.599      8586756
+128      atomic   ho              604.430      8586756
+160      packed   fo             1660.667     16693124
+160      packed   ho              871.003     16693124
+160      atomic   fo              895.481     16693124
+160      atomic   ho              594.929     16693124
+192      packed   fo             1618.300     28756228
+192      packed   ho              886.293     28756228
+192      atomic   fo              909.154     28756228
+192      atomic   ho              599.979     28756228
+### done

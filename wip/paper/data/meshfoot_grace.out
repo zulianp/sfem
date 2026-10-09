@@ -1,0 +1,117 @@
+### mesh footprint, Grace login node daint-ln003, 2026-09-27
+### bench: cvfem_hex8_ns_upwind_bench --n 128 --mesh-footprint, pack sizes 512..8192
+@@@ pack_size 512
+### mesh footprint  n_nodes=2146689 n_elements=2097152 dofs=8586756
+### n_packs=4096 elements_per_pack=512 packed_elements=2097152 ghost_entries=839295 ghost_reduce_rows=665145
+
+array                                 bytes        B/dof
+standard.elements                  67108864        7.815
+standard.topology_total            67108864        7.815
+packed.elements                    33554432        3.908
+packed.owned_nodes_ptr                32776        0.004
+packed.n_shared                       32768        0.004
+packed.ghost_ptr                      32776        0.004
+packed.ghost_idx                    3357180        0.391
+packed.ghost_reduce_ptr             5321168        0.620
+packed.ghost_reduce_idx             6714360        0.782
+packed.ghost_reduce_dest            2660580        0.310
+packed.node_map                     8586756        1.000
+packed.topology_total              60292796        7.022
+shared.points                      25760268        3.000
+standard.with_points               92869132       10.815
+packed.with_points                 86053064       10.022
+
+packed/standard topology_only   0.8984
+packed/standard with_points     0.9266
+@@@ pack_size 1024
+### mesh footprint  n_nodes=2146689 n_elements=2097152 dofs=8586756
+### n_packs=2048 elements_per_pack=1024 packed_elements=2097152 ghost_entries=673407 ghost_reduce_rows=561177
+
+array                                 bytes        B/dof
+standard.elements                  67108864        7.815
+standard.topology_total            67108864        7.815
+packed.elements                    33554432        3.908
+packed.owned_nodes_ptr                16392        0.002
+packed.n_shared                       16384        0.002
+packed.ghost_ptr                      16392        0.002
+packed.ghost_idx                    2693628        0.314
+packed.ghost_reduce_ptr             4489424        0.523
+packed.ghost_reduce_idx             5387256        0.627
+packed.ghost_reduce_dest            2244708        0.261
+packed.node_map                     8586756        1.000
+packed.topology_total              57005372        6.639
+shared.points                      25760268        3.000
+standard.with_points               92869132       10.815
+packed.with_points                 82765640        9.639
+
+packed/standard topology_only   0.8494
+packed/standard with_points     0.8912
+@@@ pack_size 2048
+### mesh footprint  n_nodes=2146689 n_elements=2097152 dofs=8586756
+### n_packs=1024 elements_per_pack=2048 packed_elements=2097152 ghost_entries=516735 ghost_reduce_rows=449913
+
+array                                 bytes        B/dof
+standard.elements                  67108864        7.815
+standard.topology_total            67108864        7.815
+packed.elements                    33554432        3.908
+packed.owned_nodes_ptr                 8200        0.001
+packed.n_shared                        8192        0.001
+packed.ghost_ptr                       8200        0.001
+packed.ghost_idx                    2066940        0.241
+packed.ghost_reduce_ptr             3599312        0.419
+packed.ghost_reduce_idx             4133880        0.481
+packed.ghost_reduce_dest            1799652        0.210
+packed.node_map                     8586756        1.000
+packed.topology_total              53765564        6.261
+shared.points                      25760268        3.000
+standard.with_points               92869132       10.815
+packed.with_points                 79525832        9.261
+
+packed/standard topology_only   0.8012
+packed/standard with_points     0.8563
+@@@ pack_size 4096
+### mesh footprint  n_nodes=2146689 n_elements=2097152 dofs=8586756
+### n_packs=512 elements_per_pack=4096 packed_elements=2097152 ghost_entries=368767 ghost_reduce_rows=330841
+
+array                                 bytes        B/dof
+standard.elements                  67108864        7.815
+standard.topology_total            67108864        7.815
+packed.elements                    33554432        3.908
+packed.owned_nodes_ptr                 4104        0.000
+packed.n_shared                        4096        0.000
+packed.ghost_ptr                       4104        0.000
+packed.ghost_idx                    1475068        0.172
+packed.ghost_reduce_ptr             2646736        0.308
+packed.ghost_reduce_idx             2950136        0.344
+packed.ghost_reduce_dest            1323364        0.154
+packed.node_map                     8586756        1.000
+packed.topology_total              50548796        5.887
+shared.points                      25760268        3.000
+standard.with_points               92869132       10.815
+packed.with_points                 76309064        8.887
+
+packed/standard topology_only   0.7532
+packed/standard with_points     0.8217
+@@@ pack_size 8192
+### mesh footprint  n_nodes=2146689 n_elements=2097152 dofs=8586756
+### n_packs=256 elements_per_pack=8192 packed_elements=2097152 ghost_entries=294783 ghost_reduce_rows=271305
+
+array                                 bytes        B/dof
+standard.elements                  67108864        7.815
+standard.topology_total            67108864        7.815
+packed.elements                    33554432        3.908
+packed.owned_nodes_ptr                 2056        0.000
+packed.n_shared                        2048        0.000
+packed.ghost_ptr                       2056        0.000
+packed.ghost_idx                    1179132        0.137
+packed.ghost_reduce_ptr             2170448        0.253
+packed.ghost_reduce_idx             2358264        0.275
+packed.ghost_reduce_dest            1085220        0.126
+packed.node_map                     8586756        1.000
+packed.topology_total              48940412        5.700
+shared.points                      25760268        3.000
+standard.with_points               92869132       10.815
+packed.with_points                 74700680        8.700
+
+packed/standard topology_only   0.7293
+packed/standard with_points     0.8044

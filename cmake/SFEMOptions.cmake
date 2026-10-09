@@ -17,6 +17,7 @@ option(SFEM_ENABLE_HXTSORT "Enable HXTSort library for unsigned indices" OFF)
 option(SFEM_ENABLE_LAPACK "Enable Lapck support" OFF)
 option(SFEM_ENABLE_MEM_DIAGNOSTICS "Enable mem diagonstics" ON)
 option(SFEM_ENABLE_METIS "Enable METIS graph-partitioning" OFF)
+option(SFEM_ENABLE_MINIMAL "Build only the SFEM library (no drivers, no tests)" OFF)
 option(SFEM_ENABLE_MPI "Enable MPI support" ON)
 option(SFEM_ENABLE_OPENMP "Enable OpenMP support" OFF)
 option(SFEM_ENABLE_PYTHON "Enable python bindings for SFEM" OFF)
@@ -55,6 +56,12 @@ else()
     option(SFEM_ENABLE_TESTING "Build the tests" ON)
     option(SFEM_ENABLE_BENCHMARK "enable benchmark suite" OFF)
 endif()
+
+if(SFEM_ENABLE_MINIMAL)
+    set(SFEM_ENABLE_TESTING OFF)
+    set(SFEM_ENABLE_BENCHMARK OFF)
+endif()
+message(STATUS "SFEM_ENABLE_MINIMAL: ${SFEM_ENABLE_MINIMAL}")
 
 # ##############################################################################
 # Handle xSDK defaults
