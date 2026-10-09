@@ -33,7 +33,13 @@ endif()
 # Library
 ######################################################
 
-find_package(MatrixIO REQUIRED)
+# smesh provides matrixio (fetched when SMESH_ENABLE_MPI=ON) but links it
+# privately, so link it here as well. Fall back to a local matrix.io checkout.
+if(TARGET matrixio::matrixio)
+    list(APPEND SFEM_SUBMODULES matrixio::matrixio)
+else()
+    find_package(MatrixIO REQUIRED)
+endif()
 
 set(SFEM_MODULES
     algebra base matrix 
@@ -142,6 +148,8 @@ list(APPEND SFEM_MODULES
     frontend/ops/generated/neohookean_ogden/op
     frontend/ops/generated/mooney_rivlin_kelvin_voigt
     frontend/ops/generated/mooney_rivlin_kelvin_voigt/op
+    frontend/ops/generated/modified_mooney_rivlin
+    frontend/ops/generated/modified_mooney_rivlin/op
     frontend/ops/generated/two_phase_flow
     frontend/ops/generated/two_phase_flow/op
     frontend/mesh
@@ -230,8 +238,8 @@ file(GLOB_RECURSE SFEM_GENERATED_HEADERS CONFIGURE_DEPENDS
 # glob below only collects when CUDA is on.  Compiling them anyway meant a
 # host-only build depended on the device runtime being on the include path.
 if(NOT SFEM_ENABLE_CUDA)
-    list(FILTER SFEM_GENERATED_SOURCES EXCLUDE REGEX "/generated/.*/cuda/")
-    list(FILTER SFEM_GENERATED_HEADERS EXCLUDE REGEX "/generated/.*/cuda/")
+    list(FILTER SFEM_GENERATED_SOURCES EXCLUDE REGEX "/generated/(.*/)?cuda/")
+    list(FILTER SFEM_GENERATED_HEADERS EXCLUDE REGEX "/generated/(.*/)?cuda/")
 endif()
 list(APPEND SFEM_SOURCES ${SFEM_GENERATED_SOURCES})
 list(APPEND SFEM_HEADERS ${SFEM_GENERATED_HEADERS})
