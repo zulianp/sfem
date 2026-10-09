@@ -1503,7 +1503,12 @@ namespace sfem {
         }
 
         int initialize(const std::vector<std::string> &block_names = {}) override {
-            auto mesh = space->mesh_ptr();
+            auto mesh    = space->mesh_ptr();
+            auto em_mesh = gpu_em_element_matrix_mesh(space);
+            if (!em_mesh) {
+                SFEM_ERROR("GPUEMOp: sshex_to_hex8(derefine) failed\n");
+                return SFEM_FAILURE;
+            }
             blocks.clear();
 
             int err = SFEM_SUCCESS;
@@ -1528,12 +1533,12 @@ namespace sfem {
                 const int  level = is_ss ? smesh::semistructured_level(space->mesh()) : 1;
 
                 auto h_element_matrix = sfem::create_host_buffer<real_t>(ne * 64);
-                err                   = sshex8_laplacian_element_matrix(level,
-                                                      ne,
-                                                      mesh->n_nodes(),
-                                                      mesh->elements(bid)->data(),
-                                                      mesh->points()->data(),
-                                                      h_element_matrix->data());
+                err                   = sshex8_laplacian_element_matrix_cartesian(level,
+                                                                 ne,
+                                                                 em_mesh->n_nodes(),
+                                                                 em_mesh->elements(bid)->data(),
+                                                                 em_mesh->points()->data(),
+                                                                 h_element_matrix->data());
                 if (err != SFEM_SUCCESS) {
                     return err;
                 }

@@ -1849,6 +1849,9 @@ namespace sfem {
     }
 
     static ptrdiff_t ss_elements_max_node_id(const SharedBuffer<idx_t *> &elements) {
+        if (elements && elements->mem_space() == smesh::MEMORY_SPACE_DEVICE) {
+            SFEM_ERROR("ss_elements_max_node_id: connectivity is on the device\n");
+        }
         ptrdiff_t max_node_id{-1};
         {
             auto            vv        = elements->data();

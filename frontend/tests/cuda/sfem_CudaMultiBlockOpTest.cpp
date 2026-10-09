@@ -43,9 +43,9 @@ namespace {
         geom_t **const  points = fs.mesh_ptr()->points()->data();
         const ptrdiff_t n      = fs.mesh_ptr()->n_nodes();
         for (ptrdiff_t i = 0; i < n; ++i) {
-            const real_t px  = points[0][i];
-            const real_t py  = points[1][i];
-            const real_t pz  = points[2][i];
+            const real_t px      = points[0][i];
+            const real_t py      = points[1][i];
+            const real_t pz      = points[2][i];
             h->data()[3 * i + 0] = px + real_t(0.25) * py * py;
             h->data()[3 * i + 1] = py - real_t(0.125) * px * pz;
             h->data()[3 * i + 2] = pz + real_t(0.5) * px * px;
@@ -63,8 +63,8 @@ namespace {
         real_t    max_abs = 0;
         ptrdiff_t n_fail  = 0;
         for (ptrdiff_t i = 0; i < (ptrdiff_t)host->size(); ++i) {
-            const real_t a   = host->data()[i];
-            const real_t b   = hd->data()[i];
+            const real_t a = host->data()[i];
+            const real_t b = hd->data()[i];
             if (!std::isfinite(a) || !std::isfinite(b)) {
                 fprintf(stderr, "[Error] %s: non-finite at i=%ld a=%g b=%g\n", label, (long)i, (double)a, (double)b);
                 return SFEM_TEST_FAILURE;
@@ -79,7 +79,12 @@ namespace {
         }
 
         if (n_fail > 0) {
-            fprintf(stderr, "[Error] %s: %ld entries fail (tol=%g, max_abs=%g)\n", label, (long)n_fail, (double)tol, (double)max_abs);
+            fprintf(stderr,
+                    "[Error] %s: %ld entries fail (tol=%g, max_abs=%g)\n",
+                    label,
+                    (long)n_fail,
+                    (double)tol,
+                    (double)max_abs);
             return SFEM_TEST_FAILURE;
         }
         return SFEM_TEST_SUCCESS;
@@ -98,10 +103,10 @@ namespace {
         return FunctionSpace::create(ss, block_size);
     }
 
-    int apply_host_device(const std::shared_ptr<FunctionSpace>     &fs,
-                          const char                               *op_name,
-                          const std::shared_ptr<Buffer<real_t>>    &x_host,
-                          const real_t                              tol) {
+    int apply_host_device(const std::shared_ptr<FunctionSpace>  &fs,
+                          const char                            *op_name,
+                          const std::shared_ptr<Buffer<real_t>> &x_host,
+                          const real_t                           tol) {
         auto op_h = create_op(fs, op_name, EXECUTION_SPACE_HOST);
         auto op_d = create_op(fs, op_name, EXECUTION_SPACE_DEVICE);
         SFEM_TEST_ASSERT(op_h != nullptr);
@@ -137,20 +142,35 @@ int test_ss_gpu_em_laplacian_vs_host() {
     return apply_host_device(fs, "em:Laplacian", fill_scalar_host(*fs), tol);
 }
 
-int test_ss_gpu_em_linear_elasticity_vs_host() {
+int test_ss_gpu_em_linear_elasticity_vs_linear_elasticity() {
     auto fs = hex_ss_space(3);
     SFEM_TEST_ASSERT(fs->has_semi_structured_mesh());
     SFEM_TEST_EQ(fs->mesh().n_blocks(), static_cast<size_t>(1));
     const real_t tol = sizeof(real_t) == sizeof(double) ? real_t(1e-8) : real_t(1e-4);
-    return apply_host_device(fs, "em:LinearElasticity", fill_vector_host(*fs), tol);
+
+    auto x_host = fill_vector_host(*fs);
+    auto op_em  = create_op(fs, "em:LinearElasticity", EXECUTION_SPACE_DEVICE);
+    auto op_le  = create_op(fs, "LinearElasticity", EXECUTION_SPACE_DEVICE);
+    SFEM_TEST_ASSERT(op_em != nullptr);
+    SFEM_TEST_ASSERT(op_le != nullptr);
+    SFEM_TEST_ASSERT(op_em->initialize() == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(op_le->initialize() == SFEM_SUCCESS);
+
+    auto y_em = create_buffer<real_t>(fs->n_dofs(), EXECUTION_SPACE_DEVICE);
+    auto y_le = create_buffer<real_t>(fs->n_dofs(), EXECUTION_SPACE_DEVICE);
+    device_zeros(y_em);
+    device_zeros(y_le);
+    auto x_d = smesh::to_device(x_host);
+    SFEM_TEST_ASSERT(op_em->apply(nullptr, x_d->data(), y_em->data()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(op_le->apply(nullptr, x_d->data(), y_le->data()) == SFEM_SUCCESS);
+    return compare_host_device("em:LinearElasticity vs LinearElasticity", smesh::to_host(y_le), y_em, tol);
 }
 
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_checkerboard_ss_gpu_laplacian_vs_host);
     SFEM_RUN_TEST(test_ss_gpu_em_laplacian_vs_host);
-    SFEM_RUN_TEST(test_ss_gpu_em_linear_elasticity_vs_host);
+    SFEM_RUN_TEST(test_ss_gpu_em_linear_elasticity_vs_linear_elasticity);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }
-
