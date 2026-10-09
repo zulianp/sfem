@@ -91,6 +91,13 @@ namespace {
         return FunctionSpace::create(ss, block_size);
     }
 
+    // GPU EM kernels are HEX8 / SSHEX8 only. Checkerboard SS is hex+tet.
+    std::shared_ptr<FunctionSpace> hex_ss_space(const int block_size) {
+        auto hex = Mesh::create_hex8_cube(Communicator::self(), 2, 2, 2, 0, 0, 0, 1, 1, 1);
+        auto ss  = smesh::to_semistructured(2, hex, true, false);
+        return FunctionSpace::create(ss, block_size);
+    }
+
     int apply_host_device(const std::shared_ptr<FunctionSpace>     &fs,
                           const char                               *op_name,
                           const std::shared_ptr<Buffer<real_t>>    &x_host,
@@ -122,18 +129,18 @@ int test_checkerboard_ss_gpu_laplacian_vs_host() {
     return apply_host_device(fs, "Laplacian", fill_scalar_host(*fs), tol);
 }
 
-int test_checkerboard_ss_gpu_em_laplacian_vs_host() {
-    auto fs = checkerboard_ss_space(1);
+int test_ss_gpu_em_laplacian_vs_host() {
+    auto fs = hex_ss_space(1);
     SFEM_TEST_ASSERT(fs->has_semi_structured_mesh());
-    SFEM_TEST_EQ(fs->mesh().n_blocks(), static_cast<size_t>(2));
+    SFEM_TEST_EQ(fs->mesh().n_blocks(), static_cast<size_t>(1));
     const real_t tol = sizeof(real_t) == sizeof(double) ? real_t(1e-10) : real_t(1e-5);
     return apply_host_device(fs, "em:Laplacian", fill_scalar_host(*fs), tol);
 }
 
-int test_checkerboard_ss_gpu_em_linear_elasticity_vs_host() {
-    auto fs = checkerboard_ss_space(3);
+int test_ss_gpu_em_linear_elasticity_vs_host() {
+    auto fs = hex_ss_space(3);
     SFEM_TEST_ASSERT(fs->has_semi_structured_mesh());
-    SFEM_TEST_EQ(fs->mesh().n_blocks(), static_cast<size_t>(2));
+    SFEM_TEST_EQ(fs->mesh().n_blocks(), static_cast<size_t>(1));
     const real_t tol = sizeof(real_t) == sizeof(double) ? real_t(1e-8) : real_t(1e-4);
     return apply_host_device(fs, "em:LinearElasticity", fill_vector_host(*fs), tol);
 }
@@ -141,8 +148,9 @@ int test_checkerboard_ss_gpu_em_linear_elasticity_vs_host() {
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_checkerboard_ss_gpu_laplacian_vs_host);
-    SFEM_RUN_TEST(test_checkerboard_ss_gpu_em_laplacian_vs_host);
-    SFEM_RUN_TEST(test_checkerboard_ss_gpu_em_linear_elasticity_vs_host);
+    SFEM_RUN_TEST(test_ss_gpu_em_laplacian_vs_host);
+    SFEM_RUN_TEST(test_ss_gpu_em_linear_elasticity_vs_host);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }
+

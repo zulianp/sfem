@@ -86,16 +86,6 @@ int test_galerkin_assembly(const std::shared_ptr<sfem::Communicator> &comm, int 
     }
     auto fs = sfem::FunctionSpace::create(m, SFEM_BLOCK_SIZE);
 
-#ifdef SFEM_ENABLE_CUDA
-    {
-        auto elements = fs->device_elements();
-        if (!elements) {
-            elements = create_device_elements(fs, fs->element_type());
-            fs->set_device_elements(elements);
-        }
-    }
-#endif
-
     auto conds = sfem::create_dirichlet_conditions_from_env(fs, es);
     auto f     = sfem::Function::create(fs);
     auto x     = sfem::create_buffer<real_t>(fs->n_dofs(), es);

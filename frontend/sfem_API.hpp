@@ -621,11 +621,7 @@ namespace sfem {
                 SFEM_ERROR("create_hierarchical_prolongation: DEVICE unstructured multi-block is not implemented\n");
             }
 
-            auto elements = to_space->device_elements();
-            if (!elements) {
-                elements = create_device_elements(to_space, to_space->element_type());
-                to_space->set_device_elements(elements);
-            }
+            auto elements = to_space->mesh().block(0)->device_elements_SoA();
 
             const ptrdiff_t n_elements = to_space->mesh().n_elements(0);
             return wrap_prolongation_coarse_gather(

@@ -346,16 +346,6 @@ int test_contact() {
     const int block_size = mesh->spatial_dimension();
     auto      fs         = sfem::FunctionSpace::create(mesh, block_size);
 
-#ifdef SFEM_ENABLE_CUDA
-    {
-        auto elements = fs->device_elements();
-        if (!elements) {
-            elements = create_device_elements(fs, fs->element_type());
-            fs->set_device_elements(elements);
-        }
-    }
-#endif
-
     auto f  = sfem::Function::create(fs);
     auto op = sfem::create_op(fs, opts.operator_name, es);
     op->initialize();

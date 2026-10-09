@@ -673,3 +673,162 @@ extern int cu_affine_hex8_linear_elasticity_block_diag_sym(const ptrdiff_t      
         }
     }
 }
+
+template <typename T>
+__global__ void cu_affine_hex8_linear_elasticity_diag_kernel(const ptrdiff_t                          nelements,
+                                                             idx_t **const SFEM_RESTRICT              elements,
+                                                             const ptrdiff_t                          jacobian_stride,
+                                                             const cu_jacobian_t *const SFEM_RESTRICT jacobian_adjugate,
+                                                             const cu_jacobian_t *const SFEM_RESTRICT jacobian_determinant,
+                                                             const T                                  mu,
+                                                             const T                                  lambda,
+                                                             const ptrdiff_t                          out_stride,
+                                                             T *const SFEM_RESTRICT                   outx,
+                                                             T *const SFEM_RESTRICT                   outy,
+                                                             T *const SFEM_RESTRICT                   outz) {
+    T *const out[3] = {outx, outy, outz};
+
+    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements; e += blockDim.x * gridDim.x) {
+        idx_t ev[8];
+        for (int v = 0; v < 8; ++v) {
+            ev[v] = elements[v][e];
+        }
+
+        T adjugate[9];
+        for (int i = 0; i < 9; i++) {
+            adjugate[i] = jacobian_adjugate[i * jacobian_stride + e];
+        }
+        const T determinant = jacobian_determinant[e];
+
+        T element_diag[3 * 8];
+        cu_hex8_linear_elasticity_diag<T>(mu, lambda, adjugate, determinant, element_diag);
+
+        for (int d = 0; d < 3; d++) {
+            for (int v = 0; v < 8; v++) {
+                atomicAdd(&out[d][ev[v] * out_stride], element_diag[d * 8 + v]);
+            }
+        }
+    }
+}
+
+template <typename T>
+static int cu_affine_hex8_linear_elasticity_diag_tpl(const ptrdiff_t                          nelements,
+                                                     idx_t **const SFEM_RESTRICT              elements,
+                                                     const ptrdiff_t                          jacobian_stride,
+                                                     const cu_jacobian_t *const SFEM_RESTRICT jacobian_adjugate,
+                                                     const cu_jacobian_t *const SFEM_RESTRICT jacobian_determinant,
+                                                     const real_t                             mu,
+                                                     const real_t                             lambda,
+                                                     const ptrdiff_t                          out_stride,
+                                                     T *const SFEM_RESTRICT                   outx,
+                                                     T *const SFEM_RESTRICT                   outy,
+                                                     T *const SFEM_RESTRICT                   outz,
+                                                     void                                    *stream) {
+    SFEM_DEBUG_SYNCHRONIZE();
+
+    int block_size = 128;
+#ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
+    {
+        int min_grid_size;
+        cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size, cu_affine_hex8_linear_elasticity_diag_kernel<T>, 0, 0);
+    }
+#endif
+
+    const ptrdiff_t n_blocks = MAX(ptrdiff_t(1), (nelements + block_size - 1) / block_size);
+
+    if (stream) {
+        cudaStream_t s = *static_cast<cudaStream_t *>(stream);
+        cu_affine_hex8_linear_elasticity_diag_kernel<T><<<n_blocks, block_size, 0, s>>>(nelements,
+                                                                                        elements,
+                                                                                        jacobian_stride,
+                                                                                        jacobian_adjugate,
+                                                                                        jacobian_determinant,
+                                                                                        mu,
+                                                                                        lambda,
+                                                                                        out_stride,
+                                                                                        outx,
+                                                                                        outy,
+                                                                                        outz);
+    } else {
+        cu_affine_hex8_linear_elasticity_diag_kernel<T><<<n_blocks, block_size, 0>>>(nelements,
+                                                                                     elements,
+                                                                                     jacobian_stride,
+                                                                                     jacobian_adjugate,
+                                                                                     jacobian_determinant,
+                                                                                     mu,
+                                                                                     lambda,
+                                                                                     out_stride,
+                                                                                     outx,
+                                                                                     outy,
+                                                                                     outz);
+    }
+
+    SFEM_DEBUG_SYNCHRONIZE();
+    return SFEM_SUCCESS;
+}
+
+extern int cu_affine_hex8_linear_elasticity_diag(const ptrdiff_t                 nelements,
+                                                 idx_t **const SFEM_RESTRICT     elements,
+                                                 const ptrdiff_t                 jacobian_stride,
+                                                 const void *const SFEM_RESTRICT jacobian_adjugate,
+                                                 const void *const SFEM_RESTRICT jacobian_determinant,
+                                                 const real_t                    mu,
+                                                 const real_t                    lambda,
+                                                 const enum smesh::PrimitiveType real_type,
+                                                 const ptrdiff_t                 out_stride,
+                                                 void *const SFEM_RESTRICT       outx,
+                                                 void *const SFEM_RESTRICT       outy,
+                                                 void *const SFEM_RESTRICT       outz,
+                                                 void                           *stream) {
+    switch (real_type) {
+        case smesh::SMESH_DEFAULT: {
+            return cu_affine_hex8_linear_elasticity_diag_tpl(nelements,
+                                                             elements,
+                                                             jacobian_stride,
+                                                             (cu_jacobian_t *)jacobian_adjugate,
+                                                             (cu_jacobian_t *)jacobian_determinant,
+                                                             mu,
+                                                             lambda,
+                                                             out_stride,
+                                                             (real_t *)outx,
+                                                             (real_t *)outy,
+                                                             (real_t *)outz,
+                                                             stream);
+        }
+        case smesh::SMESH_FLOAT32: {
+            return cu_affine_hex8_linear_elasticity_diag_tpl(nelements,
+                                                             elements,
+                                                             jacobian_stride,
+                                                             (cu_jacobian_t *)jacobian_adjugate,
+                                                             (cu_jacobian_t *)jacobian_determinant,
+                                                             mu,
+                                                             lambda,
+                                                             out_stride,
+                                                             (float *)outx,
+                                                             (float *)outy,
+                                                             (float *)outz,
+                                                             stream);
+        }
+        case smesh::SMESH_FLOAT64: {
+            return cu_affine_hex8_linear_elasticity_diag_tpl(nelements,
+                                                             elements,
+                                                             jacobian_stride,
+                                                             (cu_jacobian_t *)jacobian_adjugate,
+                                                             (cu_jacobian_t *)jacobian_determinant,
+                                                             mu,
+                                                             lambda,
+                                                             out_stride,
+                                                             (double *)outx,
+                                                             (double *)outy,
+                                                             (double *)outz,
+                                                             stream);
+        }
+        default: {
+            SFEM_ERROR("[Error] cu_affine_hex8_linear_elasticity_diag: not implemented for type %s (code %d)\n",
+                       smesh::to_string(real_type),
+                       real_type);
+            return SFEM_FAILURE;
+        }
+    }
+}
+
