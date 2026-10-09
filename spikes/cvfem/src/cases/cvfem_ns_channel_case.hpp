@@ -10,17 +10,26 @@
 // benchmark layouts fight over. So it is safe to include next to either family, or next
 // to cvfem_hex8_ns_op.hpp alone.
 
-#include "cvfem_ns_mms_case.hpp"
+#include "cases/cvfem_ns_mms_case.hpp"
 
 #include <cmath>
+
+#include "cases/cvfem_ns_smith_hutton_case.hpp"
 #include <limits>
 #include <string>
 
 namespace cvfem_case {
 
-    enum class FlowCase { Poiseuille, Couette, Cavity, CavityRegularized, MMS, Step, StepTurb, Pump, Nozzle };
+    enum class FlowCase { Poiseuille, Couette, Cavity, CavityRegularized, MMS, Step, StepTurb, Pump, Nozzle,
+                      // Smith and Hutton's bounded-convection benchmark; see
+                      // cvfem_ns_smith_hutton_case.hpp for how it runs without a scalar field.
+                      SmithHutton };
 
     inline bool parse_case(const std::string &name, FlowCase &out) {
+        if (name == "smith_hutton" || name == "smithhutton" || name == "sh") {
+            out = FlowCase::SmithHutton;
+            return true;
+        }
         if (name == "poiseuille") {
             out = FlowCase::Poiseuille;
             return true;
@@ -286,6 +295,18 @@ namespace cvfem_case {
                             T &p) {
         uy = T(0);
         uz = T(0);
+        if (flow == FlowCase::SmithHutton) {
+            // u and v are the prescribed rotating field and are constrained at every node;
+            // w carries phi and is returned as its boundary value, which the driver uses only
+            // where phi_dirichlet says there is one. p is irrelevant -- the field is
+            // divergence-free, so any constant satisfies continuity.
+            cvfem_smith_hutton::velocity(x, y, ux, uy);
+            T phi = T(0);
+            (void)cvfem_smith_hutton::phi_dirichlet(x, y, Lx, Ly, phi);
+            uz = phi;
+            p  = T(0);
+            return;
+        }
         if (flow == FlowCase::MMS) {
             // Their equation carries 1/Re on the viscous term and ours carries mu, so the
             // manufactured case mandates rho = 1 and mu = 1/Re. Re is therefore recoverable

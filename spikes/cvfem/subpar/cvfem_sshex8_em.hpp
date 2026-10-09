@@ -11,7 +11,7 @@
 // Included only under -DCVFEM_ENABLE_SUBPAR, so the comparison stays reproducible on
 // other hardware without carrying the variants in the default build.
 
-#include "cvfem_sshex8_ns.hpp"
+#include "frontend/ss/cvfem_sshex8_ns.hpp"
 
 // Momentum element matrix, assembled on the fly, applied with a gemm.
 //
@@ -86,7 +86,12 @@ inline void sscvfem_build_full_em(const SSMacroGeom &g, const scalar_t rho, cons
         const int      i = CVFEM_HEX8_SCS[sc].i;
         const int      j = CVFEM_HEX8_SCS[sc].j;
         const int      d = sc >> 2;
-        const scalar_t c = g.coeff[sc];
+        // THE COEFFICIENT IS VELOCITY-DEPENDENT NOW. SSMacroGeom hoists only its geometric
+        // parts; sscvfem_rc_coeff closes it with the surface |u|^2, exactly as the live sweep
+        // does. This element matrix is built WITHOUT a velocity -- it is the momentum block --
+        // so the coefficient is evaluated at rest, which is what g.coeff held when the whole
+        // coefficient was hoisted and velocity-independent.
+        const scalar_t c = sscvfem_rc_coeff(g, sc, scalar_t(0));
         for (int comp = 0; comp < 3; ++comp) {
             const scalar_t ac = g.A[d][comp];
             // Momentum: + qmid * A, qmid = (q_i + q_j)/2.
@@ -130,7 +135,10 @@ static SFEM_INLINE void sscvfem_convection_only(const scalar_t rho, const SSMacr
         const int      j  = CVFEM_HEX8_SCS[s].j;
         const int      dd = s >> 2;
         const scalar_t ax = g.A[dd][0], ay = g.A[dd][1], az = g.A[dd][2];
-        const scalar_t c  = g.coeff[s];
+        const scalar_t adv_x = half * (ux[i] + ux[j]);
+        const scalar_t adv_y = half * (uy[i] + uy[j]);
+        const scalar_t adv_z = half * (uz[i] + uz[j]);
+        const scalar_t c  = sscvfem_rc_coeff(g, s, adv_x * adv_x + adv_y * adv_y + adv_z * adv_z);
 
         const scalar_t corr = (p[j] - p[i]) - (half * (pgx[i] + pgx[j]) * g.dvec[s][0] +
                                                half * (pgy[i] + pgy[j]) * g.dvec[s][1] +
@@ -183,7 +191,10 @@ static SFEM_INLINE void sscvfem_convective_remainder(const scalar_t rho, const S
         const int      j  = CVFEM_HEX8_SCS[s].j;
         const int      dd = s >> 2;
         const scalar_t ax = g.A[dd][0], ay = g.A[dd][1], az = g.A[dd][2];
-        const scalar_t c  = g.coeff[s];
+        const scalar_t adv_x = half * (ux[i] + ux[j]);
+        const scalar_t adv_y = half * (uy[i] + uy[j]);
+        const scalar_t adv_z = half * (uz[i] + uz[j]);
+        const scalar_t c  = sscvfem_rc_coeff(g, s, adv_x * adv_x + adv_y * adv_y + adv_z * adv_z);
 
         const scalar_t corr = (p[j] - p[i]) - (half * (pgx[i] + pgx[j]) * g.dvec[s][0] +
                                                half * (pgy[i] + pgy[j]) * g.dvec[s][1] +
@@ -280,7 +291,8 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_em(SSMeshData &d, const scal
                 ey[a]       = ly[(size_t)l];
                 ez[a]       = lz[(size_t)l];
             }
-            sscvfem_macro_geom(ex, ey, ez, rho, mu, d.rhie_chow_scale, mg);
+            sscvfem_macro_geom(ex, ey, ez, rho, mu, d.rhie_chow_scale,
+                               sscvfem_rc_config(d).tau, mg);
             sscvfem_build_momentum_em(mg, mu, M.data());
 
             // Gather the direction for every micro-element into one block.
@@ -345,7 +357,7 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_em(SSMeshData &d, const scal
                         }
 
                         sscvfem_convective_remainder(rho, mg, ux, uy, uz, vx, vy, vz, q, p, pgx, pgy, pgz, r);
-                        boundary_scs_add_jacobian_action(rho, mu, 0, mg.adj, mg.det, d.Lx, d.Ly, d.Lz, x, y, z,
+                        boundary_scs_add_jacobian_action<false>(rho, mu, mg.adj, mg.det, d.Lx, d.Ly, d.Lz, x, y, z,
                                                          ux, uy, uz, vx, vy, vz, q, r);
 
                         for (int a = 0; a < 8; ++a) {
@@ -417,7 +429,8 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_emfull(SSMeshData &d, const 
                 ey[a]       = ly[(size_t)l];
                 ez[a]       = lz[(size_t)l];
             }
-            sscvfem_macro_geom(ex, ey, ez, rho, mu, d.rhie_chow_scale, mg);
+            sscvfem_macro_geom(ex, ey, ez, rho, mu, d.rhie_chow_scale,
+                               sscvfem_rc_config(d).tau, mg);
             sscvfem_build_full_em(mg, rho, mu, M.data());
 
             // Gather the direction for every micro-element into one block.
@@ -477,7 +490,7 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_emfull(SSMeshData &d, const 
                         for (int i2 = 0; i2 < CVFEM_HEX8_N_DOF; ++i2) r[i2] = ye[i2];
 
                         sscvfem_convection_only(rho, mg, ux, uy, uz, vx, vy, vz, q, p, pgx, pgy, pgz, r);
-                        boundary_scs_add_jacobian_action(rho, mu, 0, mg.adj, mg.det, d.Lx, d.Ly, d.Lz, x, y, z,
+                        boundary_scs_add_jacobian_action<false>(rho, mu, mg.adj, mg.det, d.Lx, d.Ly, d.Lz, x, y, z,
                                                          ux, uy, uz, vx, vy, vz, q, r);
 
                         for (int a = 0; a < 8; ++a) {

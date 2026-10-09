@@ -1,0 +1,2257 @@
+#pragma once
+
+// Two families of HEX8 CVFEM headers live in this directory and they are not
+// interchangeable. This one backs the steady solver and the sfem::Op; the
+// cvfem_hex8_best_*.hpp family backs the throughput benchmark. They define sixteen
+// of the same names -- MeshData, BSR4, GeomKind, assemble_jacobian_atomic_sumfact and
+// the residual entry points among them -- and the assembly ones differ in physics, not
+// just in layout: the benchmark's carry no boundary sub-control-surface or Rhie-Chow
+// terms, because the benchmark has no boundaries to close. Including both would
+// otherwise produce a page of redefinition errors that says nothing about why.
+#if defined(CVFEM_HEX8_BEST_COMMON_HPP)
+#error "cvfem_hex8_ns_core.hpp (solver) and cvfem_hex8_best_*.hpp (benchmark) define the same names with different physics -- include one family per translation unit. Drivers that only need the operator should include cvfem_hex8_ns_op.hpp instead, which exposes neither."
+#endif
+#define CVFEM_HEX8_NS_CORE_HPP
+// Core of the HEX8 CVFEM Navier-Stokes spike: mesh state, kernels, assembly and
+// the verification helpers. Split out of cvfem_hex8_ns_steady.cpp so that a second
+// translation unit -- the sfem::Op wrapper -- can drive the same code. Moving code
+// only: no logic changed, and file-scope `static` became `inline` so the header can
+// be included from more than one TU.
+
+// The kernels trace through their own spelling, which is nothing unless a translation
+// unit says what it means. See kernels/cvfem_phases.hpp.
+#include "sfem_aliases.hpp"
+#define CVFEM_TRACE_SCOPE(name) SFEM_TRACE_SCOPE(name)
+
+#include "sfem_BSR.hpp"
+#include "sfem_Operator.hpp"
+#include "sfem_base.hpp"
+#include "sfem_bcgs.hpp"
+#include "sfem_context.hpp"
+#include "sfem_openmp_blas.hpp"
+#include "smesh_buffer.hpp"
+#include "smesh_context.hpp"
+#include "smesh_env.hpp"
+#include "smesh_glob.hpp"
+#include "smesh_mesh.hpp"
+#include "smesh_output.hpp"
+#include "smesh_types.hpp"
+
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <memory>
+#include <string>
+#include <vector>
+
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
+
+
+
+using scalar_t = double;
+// THE INDEX TYPES THE KERNELS NAME, declared here for the same reason scalar_t above is.
+//
+// DESIGN.md requires src/kernels/ to be "header only self-contained code with templated types"
+// and to carry no library dependency. Those headers spelled smesh::idx_t and smesh::count_t,
+// which named a library and a namespace; they now name idx_t and count_t unqualified, exactly as
+// they have always named scalar_t, and the family header that includes them supplies the alias.
+// That is what lets the vectorisation gate compile the lane kernels against nothing but the
+// standard library, and it is what will let a caller with a different index width instantiate
+// them without editing them.
+using idx_t   = smesh::idx_t;
+using count_t = smesh::count_t;
+using geom_t  = smesh::geom_t;
+#include "kernels/microkernels/hex8/affine/cvfem_hex8_affine_geometry.hpp"
+#include "kernels/microkernels/hex8/affine/cvfem_hex8_ns_upwind_affine.hpp"
+#include "kernels/microkernels/hex8/isoparametric/cvfem_hex8_ns_upwind_isoparam.hpp"
+#include "kernels/cvfem_bdf.hpp"
+#include "kernels/cvfem_hex8_element_gather.hpp"
+
+static constexpr int N_FIELDS = 4;
+
+#include "kernels/cvfem_portability.hpp"
+
+#include "frontend/cvfem_env_config.hpp"  // resolves SFEM_PECLET_* / SFEM_LIMITER_STATS;
+                                        // it includes the kernel headers in turn
+#include "kernels/microkernels/hex8/cvfem_hex8_ns_upwind_kernels.hpp"
+#include "frontend/staging/cvfem_bnd_gather_build.hpp"
+#include "frontend/staging/cvfem_pack_coloring.hpp"
+
+enum class GeomKind { Affine, Isoparam };
+enum class FlowCase { Poiseuille, Couette };
+enum class InitKind { Zero, Exact };
+
+struct PackedData;
+
+struct MeshData {
+    std::shared_ptr<smesh::Mesh> mesh;
+    ptrdiff_t                    nnodes{0};
+    ptrdiff_t                    nelements{0};
+    smesh::idx_t               **elems{nullptr};
+    smesh::geom_t              **points{nullptr};
+    scalar_t                     Lx{1};
+    scalar_t                     Ly{1};
+    scalar_t                     Lz{1};
+
+    std::vector<scalar_t> ux, uy, uz, p;
+    std::vector<scalar_t> rx, ry, rz, rc;
+    std::vector<scalar_t> pgx, pgy, pgz;
+    std::vector<scalar_t> qgx, qgy, qgz;  // same reconstruction applied to the Jacobian direction
+    // The nodal VELOCITY gradient, [i*9 + r*3 + c] = du_r/dx_c, for the deferred-correction
+    // convection scheme. Built only when that is on, and rebuilt once per residual rather than
+    // once per Krylov application: the correction is lagged by construction, so a gradient
+    // from the current Newton iterate is exactly what it wants.
+    std::vector<scalar_t> ugrad;
+    // The DIRECTION's nodal velocity gradient, rebuilt on every Jacobian apply when the exact
+    // higher-order action is on. Empty is the signal that the lagged one is wanted, exactly as an
+    // empty d.qgx signals the frozen Rhie-Chow form.
+    std::vector<scalar_t> vgrad;
+    // MIXED-PRECISION STORAGE OF THE TWO FIELDS ABOVE. SFEM_GRAD_PRECISION=single stores the
+    // nodal velocity gradients as float -- the reconstruction still accumulates in scalar_t and
+    // converts at the write, the sweeps convert back at the gather and compute in scalar_t -- so
+    // the nine-component field the correction reads, and the second one the exact Jacobian
+    // action reads, cost half their traffic. Either precision is one switch away; the default is
+    // double until the measurement says otherwise. Exactly one of each pair is populated, and
+    // cvfem_hex8_has_ugrad / has_vgrad are how a caller asks.
+    int                   grad_single{0};
+    std::vector<float>    ugrad32;
+    std::vector<float>    vgrad32;
+    // Float scratch for the pressure-gradient components of the fused direction sweep under
+    // single storage; held here so the widening pass, which runs on every thread, reads one
+    // buffer rather than a thread-local one.
+    std::vector<float>    grad_tmp32;
+    // Ghost staging for the fused nine-component sweep. PackedData::ghost_buf is N_FIELDS
+    // wide and this needs nine, and it is held here so a residual does not allocate.
+    std::vector<scalar_t> ugrad_ghost;
+    // Interleaved staging when only the pressure gradient is asked for.
+    std::vector<scalar_t> pgrad_tmp;
+    int                   conv_ho{0};
+    int                   conv_limiter{0};
+    // The cell-Peclet blend, resolved from the environment once per residual and carried as
+    // data because the kernels that read it are SFEM_HOST_DEVICE. form 0 is off.
+    // Limiter freezing, the same mechanism the semi-structured residual carries. Four output
+    // arrays here against one interleaved one there, so the held correction is one vector of
+    // 4 * nnodes read as [node * 4 + component].
+    // Non-null turns on the limiter's boundedness counting (src/venkata). Diagnostic only:
+    // the deferred correction is unreachable without a nodal gradient, so the default path
+    // never evaluates the null test this adds.
+    Hex8LimiterStats     *limiter_stats{nullptr};
+    int                   conv_freeze{0};
+    std::vector<scalar_t> conv_frozen;
+
+    // Venkatakrishnan's eps^2 coefficient, already carrying the units: eps^2 = this times the
+    // local edge length cubed. Zero unless SFEM_VENKAT_K is set, and zero is bit-for-bit the
+    // limiter as it behaved before the deactivation term existed.
+    scalar_t                   conv_venkat_c{0};
+    Hex8PecletConfig<scalar_t> conv_peclet{};
+    // The PREVIOUS step size, for variable-step BDF2. Zero -- the default -- means no step
+    // has been recorded and the uniform coefficients apply, which is every existing caller.
+    scalar_t              dt_prev{0};
+
+    // The Rhie-Chow coefficient, hoisted out of the element loop -- twelve values per
+    // element, one per sub-control surface, rebuilt by cvfem_hex8_build_rc_coeff only when
+    // rho, mu, the scale or the mesh change. See Hex8RhieChowPack::coeff for why it is not
+    // computed where it is used.
+    // ONE array, element-major: coefficient s of element e is rc_coeff[e * N_SCS + s]. It was
+    // twelve separate arrays of nelements, so the lane gather opened twelve independent read
+    // streams on top of the ~24 the sweep already has. That was the hypothesis for why the
+    // Rhie-Chow arm moves 4.1x its compulsory DRAM traffic -- 217.5 B/dof measured against 83.4
+    // compulsory, where the bare arm sits at 1.5x -- and the hypothesis is WRONG. Interleaving
+    // predicted a ~130 B/dof drop and delivered 5.5: 217.5 -> 212.0 packed, 211.6 -> 201.3
+    // atomic. The rate moved 8-10% in the same runs, but so did the bare control that never
+    // touches this table, on a different node; that is node variation, not this change. Kept
+    // because one array for one table is simpler than twelve and it is bit-identical, NOT as an
+    // optimisation. Whatever the remaining 4.1x is, it is not this.
+    std::vector<scalar_t> rc_coeff;
+    // The coefficient's velocity-sensitivity weight, per surface. Purely geometric plus the two
+    // Rhie-Chow uniforms, so the Jacobian face loop need not recompute three dot products and a
+    // division for it. Same shape and lifetime as rc_coeff.
+    std::vector<scalar_t> rc_w;
+    scalar_t              rc_coeff_rho{0}, rc_coeff_mu{0}, rc_coeff_scale{0};
+    // The coefficient carries the advecting velocity now, so rho, mu and the scale no
+    // longer span everything it depends on. state_stamp is bumped by whoever moves the
+    // state; the cache compares it and rebuilds once per Newton step rather than once per
+    // matvec. A harness that sets the state once and never moves it leaves the stamp at
+    // zero and gets the same single build it always got.
+    uint64_t              state_stamp{0};
+    uint64_t              rc_coeff_stamp{~0ull};
+    // Optional body force, one value per node, and the control volume it is weighted by.
+    // Left empty for every case that has no source term, in which case nothing is added and
+    // the residual is bit-identical to what it was before this existed. Used by the
+    // manufactured-solution case, where f = -(1/Re) lap(u) + (u.grad)u + grad(p).
+    std::vector<scalar_t> fx, fy, fz;
+    std::vector<scalar_t> node_vol;
+    // The reconstruction's denominator: 1 / sum_{e in i} |det J_e|, one scalar per node.
+    // Pure geometry, so it is constant for the whole solve -- and it was being rebuilt from
+    // scratch on every matvec, with its own heap allocation and one atomic per node per
+    // element, inside the pass that is 69% of that matvec. Keyed on the mesh and the
+    // geometry rule, because the affine and isoparametric sweeps evaluate det differently.
+    std::vector<scalar_t> grad_w_inv;
+    // The partially assembled element tangent: five scalars per sub-control surface, sixty
+    // per element, SoA by (surface, component). The complete dependence of the Jacobian
+    // action on the Newton iterate -- see Hex8TangentPack. Built once per Newton step and
+    // read on every matvec, so it is invalidated by the STATE changing, which no key made
+    // of rho, mu and the mesh can see: pa_valid is cleared by whoever moves the state.
+    std::vector<scalar_t> pa_tangent;
+    scalar_t              pa_rho{0}, pa_mu{0}, pa_scale{0}, pa_ueps{0};
+    ptrdiff_t             pa_nelements{0};
+    bool                  pa_valid{false};
+    int                   grad_w_isoparam{-1};
+    ptrdiff_t             grad_w_nelements{0};
+    // Transient term. dt <= 0 means steady, in which case nothing below is touched and the
+    // residual is bit-identical to what it was before this existed -- which is what every
+    // existing case and every recorded number depends on.
+    //
+    // The history is the velocity at the previous one or two time levels, three components
+    // interleaved per node the way the state vector is. Pressure has no time derivative in
+    // incompressible flow and no history: the continuity equation is a constraint, not an
+    // evolution equation, and giving it a mass term would be a different set of equations.
+    scalar_t              dt{0};
+    int                   bdf_order{1};
+    std::vector<scalar_t> u_prev;   // u^n,     3 * nnodes
+    std::vector<scalar_t> u_prev2;  // u^{n-1}, 3 * nnodes, BDF2 only
+    // Per-element boundary-face bitmask, one bit per CVFEM local face. Empty means "decide
+    // from the bounding box", which is what every box case does and keeps those results
+    // bit-identical. A non-box domain must set it: a coordinate test cannot see a re-entrant
+    // face, and an unclosed control volume does not fail, it just stops conserving mass.
+    std::vector<uint8_t> face_mask;
+    // Faces carrying a prescribed pressure, and the values the two new boundary conditions
+    // need. Empty / zero means neither is in use -- every case in the repository today --
+    // and the boundary term then behaves exactly as it did.
+    //
+    // Plain scalars rather than a Hex8BoundaryDataT because that type is defined in
+    // cvfem_hex8_boundary_scs.hpp, which this header includes further down; hex8_bd()
+    // assembles the struct once the type is in scope.
+    std::vector<uint8_t> pressure_mask;
+    // Which natural faces carry bc_t*. Empty means none do, so every natural face is the
+    // traction-free do-nothing outflow -- see the tmask note in cvfem_hex8_boundary_scs.hpp.
+    std::vector<uint8_t> traction_mask;
+    scalar_t             bc_tx{0}, bc_ty{0}, bc_tz{0};
+    scalar_t             bc_p{0};
+    // Faces carrying the do-nothing outflow. Empty/zero everywhere means no
+    // natural face, which is every case except the backward-facing step, and the
+    // outflow branch is then never taken.
+    std::vector<uint8_t> natural_mask;
+
+    // The effective boundary face mask -- see cvfem_hex8_build_face_mask_eff. Built once so
+    // the boundary sweeps can skip the elements that have no boundary face at all, which on
+    // any refined mesh is nearly all of them.
+    std::vector<uint8_t> face_mask_eff;
+    bool                 face_mask_eff_valid{false};
+    scalar_t             face_mask_eff_lx{0}, face_mask_eff_ly{0}, face_mask_eff_lz{0};
+    // The subset of elements face_mask_eff marks, compacted so the boundary sweeps are
+    // load balanced rather than merely short.
+    std::vector<ptrdiff_t> bnd_elems;
+    // The boundary shell's node gather map -- see cvfem_hex8_build_bnd_gather. It lets the
+    // closure be summed per node in a fixed order instead of scattered atomically, which
+    // is what makes the operator bit-reproducible across thread counts.
+    std::vector<ptrdiff_t>   bnd_gather_ptr;
+    std::vector<int32_t>     bnd_gather_slot;
+    std::vector<smesh::idx_t> bnd_gather_dest;
+    std::vector<scalar_t>    bnd_r;
+    ptrdiff_t                bnd_gather_n_bnd{-1};
+    bool                     bnd_gather_valid{false};
+    std::vector<scalar_t> jacobian_adjugate[9];
+    std::vector<scalar_t> jacobian_determinant;
+
+    // THE SAME ADJUGATE AND DETERMINANT, AS RAW POINTERS, so that a kernel can be handed the
+    // affine geometry without being handed this object. jacobian_adjugate is nine separate
+    // vectors, so there is no single pointer into it and the alternative was building a
+    // nine-element array of pointers at thirty-one call sites. PackedData already carries raw
+    // pointers beside its vectors for the same reason.
+    //
+    // Filled by precompute_affine_geometry, which is the only thing that sizes those vectors.
+    // They are valid until it runs again, which is the same lifetime the vectors themselves have.
+    const scalar_t *adj_ptr[9]{};
+    const scalar_t *det_ptr{nullptr};
+    PackedData           *packed{nullptr};
+    const PackColoring   *coloring{nullptr};
+    // Field-major ghost staging for the block diagonal's packed sweep, 16 wide where
+    // PackedData::ghost_buf is N_FIELDS wide. Sized on the pack decomposition and reused.
+    std::vector<scalar_t> diag_ghost_buf;
+    scalar_t              rhie_chow_scale{1};
+    // Harten band for the upwind switch, as an absolute mass-flux magnitude; 0 is the
+    // hard switch. See cvfem_upwind_abs.
+    scalar_t upwind_eps{0};
+};
+
+// Which storage holds the nodal velocity gradient, and whether it holds one at all. Every test
+// that used to spell `!d.ugrad.empty()` goes through here, so the single-precision option cannot
+// leave a consumer reading the empty double vector as "no gradient".
+inline bool cvfem_hex8_has_ugrad(const MeshData &d) { return d.grad_single ? !d.ugrad32.empty() : !d.ugrad.empty(); }
+inline bool cvfem_hex8_has_vgrad(const MeshData &d) { return d.grad_single ? !d.vgrad32.empty() : !d.vgrad.empty(); }
+
+
+#include "frontend/staging/cvfem_hex8_ns_packed_launch.hpp"
+#include "kernels/microkernels/hex8/affine/generated/cvfem_hex8_ns_upwind_sympy_affine.hpp"
+#include "kernels/microkernels/hex8/isoparametric/generated/cvfem_hex8_ns_upwind_sympy_isoparam.hpp"
+#include "kernels/microkernels/hex8/cvfem_hex8_boundary_scs.hpp"
+
+// The Rhie-Chow time-scale configuration for this mesh's solve. Declared here and defined
+// below, next to the BDF coefficients it reads: the element sweeps that need it all sit
+// above those.
+
+// SFEM_RC_EXACT_JAC, read once. Shared by the Jacobian action and by assemble_block_diag, so
+// the operator and the preconditioner built beside it cannot end up differentiating different
+// things -- which is exactly what they were doing.
+inline bool cvfem_hex8_rc_exact_jac() {
+    static const int v = smesh::Env::read<int>("SFEM_RC_EXACT_JAC", 1);
+    return v != 0;
+}
+
+// SFEM_HO_EXACT_JAC, the same switch for the deferred correction. Default on, because a default
+// must be the option that is right: with it off the Jacobian is not the derivative of the
+// residual the solver evaluates, and Newton is capped at a linear rate on the correction exactly
+// as it is on a frozen Rhie-Chow term. Off restores the lagged action, which is the operator an
+// assembled first-order matrix can hold and is the like-for-like comparison against it.
+inline bool cvfem_hex8_ho_exact_jac() {
+    static const int v = smesh::Env::read<int>("SFEM_HO_EXACT_JAC", 1);
+    return v != 0;
+}
+
+// The prescribed boundary data for one element. A default-constructed result -- what every
+// case with neither condition in use produces -- makes the boundary term behave exactly as
+// it did before the conditions existed.
+static SFEM_INLINE Hex8BoundaryDataT<scalar_t> hex8_bd(const MeshData &d, const ptrdiff_t e) {
+    Hex8BoundaryDataT<scalar_t> bd;
+    bd.tx    = d.bc_tx;
+    bd.ty    = d.bc_ty;
+    bd.tz    = d.bc_tz;
+    bd.p_bar = d.bc_p;
+    bd.tmask = d.traction_mask.empty() ? 0 : (int)d.traction_mask[(size_t)e];
+    bd.pmask = d.pressure_mask.empty() ? 0 : (int)d.pressure_mask[(size_t)e];
+    return bd;
+}
+
+struct BSR4 {
+    std::shared_ptr<smesh::Mesh::NodeToNodeGraph> graph;
+    const smesh::count_t                         *rowptr{nullptr};
+    const smesh::idx_t                           *colidx{nullptr};
+    smesh::SharedBuffer<scalar_t>                 values;
+    std::vector<smesh::count_t>                   element_slots;
+    std::vector<smesh::count_t>                   diag_slots;
+    ptrdiff_t                                     nnz{0};
+
+    // When set, assembly writes here instead of into `values`. The sfem::Op wrapper
+    // is handed a values buffer by its caller and owns neither the buffer nor the
+    // graph, so it points this at the caller's array and reuses the slot caches.
+    scalar_t *external_values{nullptr};
+
+    scalar_t *data() const { return external_values ? external_values : values->data(); }
+};
+
+inline void usage(const char *argv0) {
+    std::fprintf(stderr,
+                 "usage: %s <output_folder>\n"
+                 "\n"
+                 "HEX8 CVFEM Navier-Stokes channel verification (textbook Couette / Poiseuille).\n"
+                 "Domain: [0,Lx] x [0,Ly] x [0,Lz]  (default 4 x 1 x 1).\n"
+                 "  walls y=0,Ly     no-slip (Couette: top lid u=(U,0,0))\n"
+                 "  span  z=0,Lz     symmetry uz=0\n"
+                 "  x=0 and x=Lx     fully-developed profile (inlet/outlet)\n"
+                 "  pressure         one Dirichlet pin (CVs closed by boundary SCS)\n"
+                 "Writes <output_folder>/mesh and <output_folder>/out.\n"
+                 "ParaView: create_xdmf.sh <output_folder>\n"
+                 "\n"
+                 "Environment:\n"
+                 "  SFEM_CASE            poiseuille | couette | coutte\n"
+                 "  SFEM_N               cells in y (wall-normal, default 8)\n"
+                 "  SFEM_NX SFEM_NY SFEM_NZ   override cells per direction\n"
+                 "  SFEM_LX SFEM_LY SFEM_LZ   channel size (default 4, 1, 1)\n"
+                 "  SFEM_RHO SFEM_MU SFEM_U   density, viscosity, velocity scale\n"
+                 "  SFEM_GEOM            affine | isoparam (default affine)\n"
+                 "  SFEM_INIT            zero | exact (default zero)\n"
+                 "  SFEM_NL_MAX_IT       Newton iterations (default 40)\n"
+                 "  SFEM_NL_RTOL SFEM_NL_ATOL\n"
+                 "  SFEM_LSOLVE_RTOL SFEM_LSOLVE_ATOL SFEM_LSOLVE_MAX_IT\n"
+                 "  SFEM_VERIFY_TOL      fail if velocity Linf exceeds this (default 1e-2)\n"
+                 "  SFEM_VERBOSE         BiCGStab monitor (default 0)\n"
+                 "  SFEM_NO_PREC         disable Jacobi (default 0)\n"
+                 "  SFEM_MATRIX_FREE     1: Krylov uses J(u)v (default 0 = assembled BSR)\n"
+                 "  SFEM_CHECK_JV        1: print |J_mf v - J_asm v| after first assembly\n"
+                 "  SFEM_RHIE_CHOW       colocated mass-flux interpolation (default 1)\n"
+                 "  SFEM_RHIE_CHOW_SCALE D_f = scale * h^2 / (2 mu) (default 1)\n"
+                 "  SFEM_PACK_SIZE       affine packed SIMD (default 1024; 0 = atomic)\n"
+                 "  SFEM_PC_PSCALE       Schur scaling of the pressure block:\n"
+                 "                       inv_pp = PSCALE / V_p (default 0 = use 1/A_pp).\n"
+                 "                       Tuned, not physical: PSCALE * rc_scale ~ 0.1 over\n"
+                 "                       rc_scale 0.5..2. Helps at high Re only.\n"
+                 "  SFEM_PC_PDAMP        damping on the 1 / A_pp pressure block (default 1)\n"
+                 "  SFEM_NL_CONTINUATION 0: skip the Re=1 continuation stage (default 1)\n"
+                 "  SFEM_PC_SIMPLE       1: pressure block from the SIMPLE Schur diagonal\n"
+                 "                       diag(C - B diag(A_uu)^-1 B^T); overrides PSCALE\n",
+                 argv0);
+}
+
+inline GeomKind parse_geom(const std::string &name) {
+    if (name == "isoparam") return GeomKind::Isoparam;
+    return GeomKind::Affine;
+}
+
+inline bool parse_case(const std::string &name, FlowCase &out) {
+    if (name == "poiseuille") {
+        out = FlowCase::Poiseuille;
+        return true;
+    }
+    if (name == "couette" || name == "coutte") {
+        out = FlowCase::Couette;
+        return true;
+    }
+    return false;
+}
+
+
+inline void exact_state(const FlowCase flow,
+                        const scalar_t mu,
+                        const scalar_t U,
+                        const scalar_t Lx,
+                        const scalar_t Ly,
+                        const scalar_t x,
+                        const scalar_t y,
+                        const scalar_t z,
+                        scalar_t      &ux,
+                        scalar_t      &uy,
+                        scalar_t      &uz,
+                        scalar_t      &p) {
+    (void)z;
+    uy = scalar_t(0);
+    uz = scalar_t(0);
+    if (flow == FlowCase::Couette) {
+        ux = U * (y / Ly);
+        p  = scalar_t(0);
+        return;
+    }
+    const scalar_t G = scalar_t(8) * mu * U / (Ly * Ly);
+    ux               = scalar_t(4) * U * y * (Ly - y) / (Ly * Ly);
+    p                = G * (scalar_t(0.5) * Lx - x);
+}
+
+// Forwards to the array form in kernels/cvfem_scatter.hpp rather than repeating its body: this
+// family's callers pass the mesh, and the loop itself is the same four writes per node.
+inline void reset_residual(MeshData &d) {
+    reset_residual(d.nnodes, d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data());
+}
+
+inline BSR4 make_bsr4(const std::shared_ptr<smesh::Mesh> &mesh) {
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::make_bsr4");
+    BSR4 b;
+    b.graph  = mesh->node_to_node_graph();
+    b.rowptr = b.graph->rowptr()->data();
+    b.colidx = b.graph->colidx()->data();
+    b.nnz    = b.graph->nnz();
+    b.values = smesh::create_host_buffer<scalar_t>((size_t)b.nnz * 16);
+    return b;
+}
+
+inline void zero_bsr4(BSR4 &b) { cvfem_zero_scalars(b.data(), b.nnz * 16); }
+
+// atomic_add and find_bsr_slot moved to kernels/cvfem_scatter.hpp, which this family reaches
+// through the kernel headers. They were defined identically on both sides; one copy now.
+
+
+inline void precompute_element_bsr_slots(const MeshData &d, BSR4 &b) {
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::precompute_element_bsr_slots");
+    b.element_slots.resize((size_t)d.nelements * CVFEM_HEX8_N_NODES * CVFEM_HEX8_N_NODES);
+    b.diag_slots.resize((size_t)d.nnodes);
+
+    smesh::idx_t **const SFEM_RESTRICT  elems = d.elems;
+    smesh::count_t *const SFEM_RESTRICT slots = b.element_slots.data();
+
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+            const smesh::idx_t row = elems[a][e];
+            for (int bnode = 0; bnode < CVFEM_HEX8_N_NODES; ++bnode) {
+                const smesh::idx_t col                = elems[bnode][e];
+                slots[(size_t)e * 64 + a * 8 + bnode] = find_bsr_slot(b.rowptr, b.colidx, row, col);
+            }
+        }
+    }
+
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t row = 0; row < d.nnodes; ++row) {
+        b.diag_slots[(size_t)row] = find_bsr_slot(b.rowptr, b.colidx, (smesh::idx_t)row, (smesh::idx_t)row);
+    }
+}
+
+// Take the arrays, not the mesh, matching the bench family's pair in cvfem_hex8_best_common.hpp.
+// The two families define these separately and deliberately -- see the note at the top of this
+// file on why they differ in physics -- so both had to be converted, and keeping them the same
+// shape is what lets the sweeps above them be converted the same way.
+
+
+
+/* Nodal ∇p (volume-weighted element gradients). Element-local ∇p makes
+   (p_j-p_i)-∇p_el·Δx vanish for any field that is linear on a HEX8, including the
+   axis-aligned odd-even mode p=(-1)^i. Averaging neighboring elements restores
+   the standard Rhie–Chow term 0.5(∇p_i+∇p_j) and still annihilates globally linear p. */
+// The reconstruction, over an arbitrary strided nodal scalar. It is linear in that scalar
+// and its weights depend only on geometry, so applying it to a perturbation q yields exactly
+// the derivative of applying it to p -- which is the term the Jacobian was missing.
+// The reconstruction itself lives in cvfem_hex8_pack_helpers.hpp, which this header already
+// includes and which exists precisely so the benchmark and the solver cannot drift on a
+// quantity both of them feed into the same element kernels. This was a second copy of it --
+// the thing that header's own comment warns against -- and is now a two-line forward that
+// keeps the trace scope, because the pass is 40-52% of every matvec in the solver's own
+// trace and has to stay separately attributable.
+inline void assemble_nodal_grad_strided(MeshData &d, const GeomKind geom_kind,
+                                        const scalar_t *const SFEM_RESTRICT src, const int stride,
+                                        std::vector<scalar_t> &ogx, std::vector<scalar_t> &ogy,
+                                        std::vector<scalar_t> &ogz) {
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::nodal_grad_strided");
+    const int iso = geom_kind == GeomKind::Isoparam ? 1 : 0;
+    // Over packs where there is a pack to sweep, which is the solver's normal case. Same
+    // operator, no atomics, and deterministic. SFEM_QGRAD_ATOMIC=1 forces the flat sweep,
+    // as a measurement escape hatch rather than a supported mode.
+    static const int force_atomic = smesh::Env::read<int>("SFEM_QGRAD_ATOMIC", 0);
+    if (d.packed && !force_atomic)
+        cvfem_hex8_assemble_nodal_grads_packed(d, *d.packed, iso, src, stride, ogx, ogy, ogz, d.ugrad_ghost);
+    else
+        cvfem_hex8_assemble_nodal_grads_atomic(d, iso, src, stride, ogx, ogy, ogz);
+}
+
+inline void assemble_nodal_p_grad(MeshData &d, const GeomKind geom_kind) {
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::assemble_nodal_p_grad");
+    assemble_nodal_grad_strided(d, geom_kind, d.p.data(), 1, d.pgx, d.pgy, d.pgz);
+}
+
+// WHICH nodal gradients a call needs, so the solver asks for what it is about to use.
+//
+// The pressure gradient is wanted on every residual and is hoisted across a Krylov solve; the
+// velocity gradient only when the deferred correction is on, and then once per Newton step
+// because the correction is lagged. Computing both unconditionally would waste a sweep in the
+// common case, and computing them separately wastes one in the higher-order case -- they are
+// the SAME reconstruction over the same elements with the same geometry, differing only in
+// which field is read.
+enum class GradSet { Pressure, Velocity, Both };
+
+// One sweep for whatever was asked for. Four fields at most: p, then u, v, w.
+//
+// The nodal velocity gradient the deferred correction extrapolates with. Three passes of the
+// same reconstruction the pressure already uses, interleaved into one array in the layout
+// CVFEMNavierStokes::nodal_velocity_gradient publishes, so the diagnostics and the scheme read
+// the same thing.
+//
+// This is not cheap -- the gradient pass is 40-52% of a matvec by the solver's own trace, and
+// this is three of them -- which is the other reason the correction is lagged per Newton step
+// rather than evaluated per Krylov application.
+//
+// ONE sweep for all nine components, not three sweeps of three.
+//
+// This ran assemble_nodal_grad_strided once per velocity component, so everything that is
+// not the field was done three times -- the adjugate load, the determinant check, the
+// element-node indirection, the pack memset, the weight pass and the ghost reduction --
+// and then three full-length temporaries were transposed into d.ugrad. Only the reference
+// gradient and the pushforward are per-component.
+//
+// The flat path is fused too. It keeps its atomics -- seventy-two per element either way --
+// but loses two thirds of the adjugate loads and element indirections, two of the three
+// zeroing and weight passes, and the transpose entirely.
+inline void assemble_nodal_grads(MeshData &d, const GeomKind geom_kind, const GradSet set) {
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::assemble_nodal_grads");
+    // The pressure ALONE keeps the single-field sweep it has always used. That sweep writes
+    // pgx/pgy/pgz directly, where the fused one writes interleaved and then needs a nodal pass
+    // to split three components back out -- strictly more work, on the path that pays it on
+    // every evaluation. Delegating rather than reimplementing keeps one sweep per shape.
+    //
+    // No measurement is claimed for this. The solver's conv_cost job runs the SEMI-STRUCTURED
+    // residual (CVFEMNavierStokes::gradient takes the sscvfem_residual branch whenever
+    // SFEM_ELEMENT_REFINE_LEVEL > 1), so it does not reach this file at all, and the flat path
+    // has no Grace measurement of its own yet.
+    if (set == GradSet::Pressure) {
+        assemble_nodal_p_grad(d, geom_kind);
+        return;
+    }
+
+    const int iso = geom_kind == GeomKind::Isoparam ? 1 : 0;
+    const bool want_p = set != GradSet::Velocity;
+    const bool want_u = set != GradSet::Pressure;
+
+    const scalar_t *srcs[4];
+    int             nf = 0;
+    if (want_p) srcs[nf++] = d.p.data();
+    if (want_u) {
+        srcs[nf++] = d.ux.data();
+        srcs[nf++] = d.uy.data();
+        srcs[nf++] = d.uz.data();
+    }
+    const int nc = 3 * nf;
+
+    // Velocity alone writes d.ugrad in place, which is the layout its consumers read. Any set
+    // that includes the pressure sweeps into the scratch buffer instead, because d.ugrad is
+    // nine-per-node by contract and the fused set is twelve. Under single-precision storage the
+    // sweep always lands in the scratch buffer and the copy-out below converts.
+    std::vector<scalar_t> &buf = (set == GradSet::Velocity && !d.grad_single) ? d.ugrad : d.pgrad_tmp;
+    if (d.packed && !smesh::Env::read<int>("SFEM_QGRAD_ATOMIC", 0))
+        cvfem_hex8_assemble_nodal_grads_packed(d, *d.packed, iso, srcs, nf, buf, d.ugrad_ghost);
+    else
+        cvfem_hex8_assemble_nodal_grads_atomic(d, iso, srcs, nf, buf);
+
+    // The pressure's three components are split out into the arrays the rest of the solver
+    // reads. One nodal pass against a saved element sweep, and it keeps every consumer of
+    // pgx/pgy/pgz untouched.
+    if (want_p) {
+        d.pgx.resize((size_t)d.nnodes);
+        d.pgy.resize((size_t)d.nnodes);
+        d.pgz.resize((size_t)d.nnodes);
+#pragma omp parallel for schedule(static)
+        for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+            d.pgx[(size_t)i] = buf[(size_t)i * nc + 0];
+            d.pgy[(size_t)i] = buf[(size_t)i * nc + 1];
+            d.pgz[(size_t)i] = buf[(size_t)i * nc + 2];
+        }
+    }
+    // With p in front the velocity block starts at component 3, and the deferred correction
+    // reads d.ugrad as nine-per-node, so it is copied out of the fused buffer. One nodal pass
+    // against an element sweep, and it leaves both layouts exactly as their consumers expect.
+    const int uoff = want_p ? 3 : 0;
+    if (want_u && d.grad_single) {
+        d.ugrad.clear();
+        d.ugrad32.resize((size_t)d.nnodes * 9);
+#pragma omp parallel for schedule(static)
+        for (ptrdiff_t i = 0; i < d.nnodes; ++i)
+            for (int c = 0; c < 9; ++c) d.ugrad32[(size_t)i * 9 + c] = float(buf[(size_t)i * nc + uoff + c]);
+    } else if (want_u && want_p) {
+        d.ugrad32.clear();
+        d.ugrad.resize((size_t)d.nnodes * 9);
+#pragma omp parallel for schedule(static)
+        for (ptrdiff_t i = 0; i < d.nnodes; ++i)
+            for (int c = 0; c < 9; ++c) d.ugrad[(size_t)i * 9 + c] = buf[(size_t)i * nc + 3 + c];
+    } else if (want_u) {
+        d.ugrad32.clear();
+    }
+}
+
+
+// Gather one element's eight nodal velocity gradients into the 72-scalar block the SCS
+// correction reads.
+inline void gather_element_ugrad(const MeshData &d, const ptrdiff_t e, scalar_t *const g8) {
+    if (d.grad_single) {
+        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+            const smesh::idx_t id = d.elems[a][e];
+            for (int k = 0; k < 9; ++k) g8[a * 9 + k] = scalar_t(d.ugrad32[(size_t)id * 9 + (size_t)k]);
+        }
+        return;
+    }
+    for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+        const smesh::idx_t id = d.elems[a][e];
+        for (int k = 0; k < 9; ++k) g8[a * 9 + k] = d.ugrad[(size_t)id * 9 + (size_t)k];
+    }
+}
+
+SFEM_INLINE void gather_element_pgrad(const MeshData               &d,
+                                             const ptrdiff_t               e,
+                                             scalar_t *const SFEM_RESTRICT gx,
+                                             scalar_t *const SFEM_RESTRICT gy,
+                                             scalar_t *const SFEM_RESTRICT gz) {
+    for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+        const smesh::idx_t id = d.elems[a][e];
+        gx[a]                 = d.pgx[id];
+        gy[a]                 = d.pgy[id];
+        gz[a]                 = d.pgz[id];
+    }
+}
+
+
+SFEM_INLINE void gather_element_qgrad(const MeshData               &d,
+                                      const ptrdiff_t               e,
+                                      scalar_t *const SFEM_RESTRICT gx,
+                                      scalar_t *const SFEM_RESTRICT gy,
+                                      scalar_t *const SFEM_RESTRICT gz) {
+    for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+        const smesh::idx_t id = d.elems[a][e];
+        gx[a]                 = d.qgx[id];
+        gy[a]                 = d.qgy[id];
+        gz[a]                 = d.qgz[id];
+    }
+}
+
+SFEM_INLINE void gather_element_dir(const MeshData &d, const ptrdiff_t e, const scalar_t *const SFEM_RESTRICT dir,
+                                           scalar_t *const SFEM_RESTRICT vx, scalar_t *const SFEM_RESTRICT vy,
+                                           scalar_t *const SFEM_RESTRICT vz, scalar_t *const SFEM_RESTRICT q);
+
+inline SFEM_NOINLINE void apply_boundary_scs_residual(MeshData &d, const scalar_t rho, const scalar_t mu,
+                                                      const int isoparam) {
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_boundary_scs_residual");
+    // The boundary layer is what this closes, so walk only it. This swept the whole mesh --
+    // gathering coordinates, fields and, where applicable, the direction, 88 doubles an
+    // element -- to do work on the faces touching the domain edge alone, which at N=96 is
+    // about 9% of the elements. cvfem_hex8_build_face_mask_eff settles which faces those
+    // are once and lists the elements that have any; an element with none contributes
+    // exactly nothing, so restricting the sweep to that list is exact.
+    cvfem_hex8_build_face_mask_eff(d);
+    // The gather is the default: scattering the closure atomically made the operator's
+    // result depend on thread timing. SFEM_BND_ATOMIC=1 restores the old scatter, as a
+    // measurement escape hatch rather than a supported mode.
+    static const int bnd_atomic = smesh::Env::read<int>("SFEM_BND_ATOMIC", 0);
+    if (!bnd_atomic) cvfem_hex8_build_bnd_gather(d);
+    const ptrdiff_t n_bnd = (ptrdiff_t)d.bnd_elems.size();
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t i = 0; i < n_bnd; ++i) {
+        const ptrdiff_t e     = d.bnd_elems[(size_t)i];
+        const int       fmask = (int)d.face_mask_eff[(size_t)e];
+        scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8], r[CVFEM_HEX8_N_DOF];
+        gather_element_coords(d.elems, d.points, e, x, y, z);
+        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
+        std::memset(r, 0, sizeof(r));
+        scalar_t adj[9], det = scalar_t(0);
+        if (!isoparam) cvfem_hex8_load_adj(d, e, adj, &det);
+        // The masks, which this post-pass used to omit -- it fell back to the bounding-box
+        // test, so on a non-box domain it closed the wrong faces and it never applied the
+        // do-nothing outflow at all. Both are exactly what the masks exist to prevent, and
+        // this is the path the packed residual takes.
+        if (isoparam)
+            boundary_scs_add_residual<true>(rho, mu, (const scalar_t *)nullptr, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz,
+                                  p, r, fmask,
+                                  d.natural_mask.empty() ? 0 : (int)d.natural_mask[(size_t)e], hex8_bd(d, e));
+        else
+            boundary_scs_add_residual<false>(rho, mu, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz,
+                                  p, r, fmask,
+                                  d.natural_mask.empty() ? 0 : (int)d.natural_mask[(size_t)e], hex8_bd(d, e));
+        // The caller picks the instantiation, so the staged-or-atomic choice is made once per
+        // pass rather than once per boundary element.
+        if (bnd_atomic)
+            cvfem_hex8_bnd_commit<true>(d.elems, d.bnd_r.data(), i, e, r, d.rx.data(),
+                                        d.ry.data(), d.rz.data(), d.rc.data());
+        else
+            cvfem_hex8_bnd_commit<false>(d.elems, d.bnd_r.data(), i, e, r, d.rx.data(),
+                                         d.ry.data(), d.rz.data(), d.rc.data());
+    }
+    if (!bnd_atomic) cvfem_hex8_drain_boundary_soa(d, d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data());
+}
+
+inline SFEM_NOINLINE void apply_boundary_scs_jacobian_action(MeshData &d, const scalar_t rho, const scalar_t mu,
+                                                             const int isoparam, const scalar_t *const SFEM_RESTRICT dir,
+                                                             scalar_t *const SFEM_RESTRICT jv) {
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_boundary_scs_jacobian_action");
+    // The boundary layer is what this closes, so walk only it. This swept the whole mesh --
+    // gathering coordinates, fields and, where applicable, the direction, 88 doubles an
+    // element -- to do work on the faces touching the domain edge alone, which at N=96 is
+    // about 9% of the elements. cvfem_hex8_build_face_mask_eff settles which faces those
+    // are once and lists the elements that have any; an element with none contributes
+    // exactly nothing, so restricting the sweep to that list is exact.
+    cvfem_hex8_build_face_mask_eff(d);
+    // The gather is the default: scattering the closure atomically made the operator's
+    // result depend on thread timing. SFEM_BND_ATOMIC=1 restores the old scatter, as a
+    // measurement escape hatch rather than a supported mode.
+    static const int bnd_atomic = smesh::Env::read<int>("SFEM_BND_ATOMIC", 0);
+    if (!bnd_atomic) cvfem_hex8_build_bnd_gather(d);
+    const ptrdiff_t n_bnd = (ptrdiff_t)d.bnd_elems.size();
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t i = 0; i < n_bnd; ++i) {
+        const ptrdiff_t e     = d.bnd_elems[(size_t)i];
+        const int       fmask = (int)d.face_mask_eff[(size_t)e];
+        scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8], vx[8], vy[8], vz[8], q[8], r[CVFEM_HEX8_N_DOF];
+        gather_element_coords(d.elems, d.points, e, x, y, z);
+        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
+        gather_element_dir(d, e, dir, vx, vy, vz, q);
+        std::memset(r, 0, sizeof(r));
+        scalar_t adj[9], det = scalar_t(0);
+        if (!isoparam) cvfem_hex8_load_adj(d, e, adj, &det);
+        if (isoparam)
+            boundary_scs_add_jacobian_action<true>(rho, mu, (const scalar_t *)nullptr, det, d.Lx, d.Ly, d.Lz, x, y, z, ux,
+                                         uy, uz, vx, vy, vz, q, r,
+                                         fmask,
+                                         d.natural_mask.empty() ? 0 : (int)d.natural_mask[(size_t)e], hex8_bd(d, e));
+        else
+            boundary_scs_add_jacobian_action<false>(rho, mu, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux,
+                                         uy, uz, vx, vy, vz, q, r,
+                                         fmask,
+                                         d.natural_mask.empty() ? 0 : (int)d.natural_mask[(size_t)e], hex8_bd(d, e));
+        if (bnd_atomic)
+            cvfem_hex8_bnd_commit_interleaved<true>(d.elems, d.bnd_r.data(), i, e, r, jv);
+        else
+            cvfem_hex8_bnd_commit_interleaved<false>(d.elems, d.bnd_r.data(), i, e, r, jv);
+    }
+    if (!bnd_atomic) cvfem_hex8_drain_boundary_interleaved(d, jv);
+}
+
+inline SFEM_NOINLINE void apply_residual_atomic_sumfact(MeshData &d, const scalar_t rho, const scalar_t mu) {
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_residual_sumfact");
+    reset_residual(d);
+
+    const Hex8RcConfig rcfg = cvfem_hex8_rc_config_for(d);
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+        scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8], r[CVFEM_HEX8_N_DOF];
+        gather_element_coords(d.elems, d.points, e, x, y, z);
+        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
+        scalar_t pgx[8], pgy[8], pgz[8];
+        gather_element_pgrad(d, e, pgx, pgy, pgz);
+        const Hex8RhieChow rc{x,       y,  z,  pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
+                              nullptr, ux, uy, uz,  rcfg.tau};
+        scalar_t adj[9], det;
+        cvfem_hex8_load_adj(d, e, adj, &det);
+        // Deferred correction, when it is on. Null pointers otherwise, which is the same
+        // arithmetic the kernel did before this existed.
+        scalar_t g8[CVFEM_HEX8_N_NODES * 9];
+        const bool ho = d.conv_ho != 0 && cvfem_hex8_has_ugrad(d);
+        if (ho) gather_element_ugrad(d, e, g8);
+        cvfem_hex8_ns_upwind_residual_sumfact(rho, mu, adj, det, ux, uy, uz, p, r, rc,
+                                              d.upwind_eps, ho ? g8 : nullptr,
+                                              d.conv_limiter, d.conv_venkat_c, d.limiter_stats,
+                                              d.conv_peclet);
+        boundary_scs_add_residual<false>(rho, mu, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, p, r,
+                                  d.face_mask.empty() ? -1 : (int)d.face_mask[(size_t)e],
+                                  d.natural_mask.empty() ? 0 : (int)d.natural_mask[(size_t)e], hex8_bd(d, e));
+
+        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+            const smesh::idx_t g = d.elems[a][e];
+            atomic_add(d.rx.data(), g, r[a * 4 + 0]);
+            atomic_add(d.ry.data(), g, r[a * 4 + 1]);
+            atomic_add(d.rz.data(), g, r[a * 4 + 2]);
+            atomic_add(d.rc.data(), g, r[a * 4 + 3]);
+        }
+    }
+}
+
+inline SFEM_NOINLINE void apply_residual_atomic_isoparam(MeshData &d, const scalar_t rho, const scalar_t mu) {
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_residual_isoparam");
+    reset_residual(d);
+
+    const Hex8RcConfig rcfg = cvfem_hex8_rc_config_for(d);
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+        scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8], r[CVFEM_HEX8_N_DOF];
+        gather_element_coords(d.elems, d.points, e, x, y, z);
+        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
+        scalar_t pgx[8], pgy[8], pgz[8];
+        gather_element_pgrad(d, e, pgx, pgy, pgz);
+        const Hex8RhieChow rc{x,       y,  z,  pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
+                              nullptr, ux, uy, uz,  rcfg.tau};
+        cvfem_hex8_ns_upwind_residual_isoparam(rho, mu, x, y, z, ux, uy, uz, p, r, rc);
+        boundary_scs_add_residual<true>(rho, mu, (const scalar_t *)nullptr, scalar_t(0), d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, p, r,
+                                  d.face_mask.empty() ? -1 : (int)d.face_mask[(size_t)e],
+                                  d.natural_mask.empty() ? 0 : (int)d.natural_mask[(size_t)e], hex8_bd(d, e));
+
+        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+            const smesh::idx_t g = d.elems[a][e];
+            atomic_add(d.rx.data(), g, r[a * 4 + 0]);
+            atomic_add(d.ry.data(), g, r[a * 4 + 1]);
+            atomic_add(d.rz.data(), g, r[a * 4 + 2]);
+            atomic_add(d.rc.data(), g, r[a * 4 + 3]);
+        }
+    }
+}
+
+// Colored assembly. Packs sharing a color touch no common node, so the element
+// kernels can accumulate straight into the global BSR with plain (non-atomic)
+// updates. Compared with the atomic sweep this drops ~1024 atomic
+// read-modify-writes per element and keeps each pack's rows cache-resident.
+inline SFEM_NOINLINE void assemble_jacobian_colored_sumfact(MeshData           &d,
+                                                            const PackedData   &p,
+                                                            const PackColoring &c,
+                                                            BSR4               &b,
+                                                            const scalar_t      rho,
+                                                            const scalar_t      mu) {
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::assemble_jacobian_colored_sumfact");
+    scalar_t *const SFEM_RESTRICT             values = b.data();
+    const smesh::count_t *const SFEM_RESTRICT slots  = b.element_slots.data();
+
+    const Hex8RcConfig rcfg = cvfem_hex8_rc_config_for(d);
+#pragma omp parallel
+    {
+        for (int color = 0; color < c.n_colors; ++color) {
+            const ptrdiff_t cbegin = c.color_ptr[(size_t)color];
+            const ptrdiff_t cend   = c.color_ptr[(size_t)color + 1];
+#pragma omp for schedule(dynamic, 1)
+            for (ptrdiff_t i = cbegin; i < cend; ++i) {
+                const ptrdiff_t pack    = c.pack_order[(size_t)i];
+                const ptrdiff_t e_start = pack * p.n_elements_per_pack;
+                const ptrdiff_t e_end   = MIN(d.nelements, (pack + 1) * p.n_elements_per_pack);
+                for (ptrdiff_t e = e_start; e < e_end; ++e) {
+                    scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], pp[8];
+                    gather_element_coords(d.elems, d.points, e, x, y, z);
+                    gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, pp);
+                    scalar_t pgx[8], pgy[8], pgz[8];
+                    gather_element_pgrad(d, e, pgx, pgy, pgz);
+                    const Hex8RhieChow rc{x,       y,  z,  pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
+                                          nullptr, ux, uy, uz,  rcfg.tau};
+                    scalar_t           adj[9], det;
+                    cvfem_hex8_load_adj(d, e, adj, &det);
+                    const smesh::count_t *const SFEM_RESTRICT es = slots + (size_t)e * 64;
+                    // One rc-aware kernel instead of the SymPy kernel plus a separate
+                    // Rhie-Chow pass. The SymPy kernel picks the upwind direction from
+                    // rho (u.A) alone, while the residual and the matrix-free action use
+                    // rho (u.A) + mdot_rc, so the two operators disagreed wherever the
+                    // Rhie-Chow flux could flip the sign. This kernel takes rc and p and
+                    // routes mdot_rc into the same switch, so assembled and matrix-free
+                    // are the same operator by construction.
+                    cvfem_hex8_ns_upwind_jacobian_add_slots<false>(
+                            rho, mu, adj, det, ux, uy, uz, es, values, rc, pp);
+                    boundary_scs_add_jacobian<false, false>(
+                            rho, mu, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, es, values,
+                            d.face_mask.empty() ? -1 : (int)d.face_mask[(size_t)e],
+                            d.natural_mask.empty() ? 0 : (int)d.natural_mask[(size_t)e], hex8_bd(d, e));
+                }
+            }
+        }
+    }
+}
+
+inline SFEM_NOINLINE void assemble_jacobian_atomic_sumfact(MeshData &d, BSR4 &b, const scalar_t rho, const scalar_t mu) {
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::assemble_jacobian_sumfact");
+    scalar_t *const SFEM_RESTRICT             values = b.data();
+    const smesh::count_t *const SFEM_RESTRICT slots  = b.element_slots.data();
+
+    const Hex8RcConfig rcfg = cvfem_hex8_rc_config_for(d);
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+        scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8];
+        gather_element_coords(d.elems, d.points, e, x, y, z);
+        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
+        scalar_t pgx[8], pgy[8], pgz[8];
+        gather_element_pgrad(d, e, pgx, pgy, pgz);
+        const Hex8RhieChow rc{x,       y,  z,  pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
+                              nullptr, ux, uy, uz,  rcfg.tau};
+        scalar_t adj[9], det;
+        cvfem_hex8_load_adj(d, e, adj, &det);
+        // See the note in assemble_jacobian_colored_sumfact: rc and p go through the same
+        // upwind switch the residual uses, so this matches the matrix-free action.
+        cvfem_hex8_ns_upwind_jacobian_add_slots<true>(
+                rho, mu, adj, det, ux, uy, uz, slots + (size_t)e * 64, values, rc, p);
+        boundary_scs_add_jacobian<true, false>(rho, mu, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, slots + (size_t)e * 64, values,
+                                         cvfem_hex8_face_mask_of(d, e),
+                                         d.natural_mask.empty() ? 0 : (int)d.natural_mask[(size_t)e], hex8_bd(d, e));
+    }
+}
+
+inline SFEM_NOINLINE void assemble_jacobian_atomic_isoparam(MeshData &d, BSR4 &b, const scalar_t rho, const scalar_t mu) {
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::assemble_jacobian_isoparam");
+    scalar_t *const SFEM_RESTRICT             values = b.data();
+    const smesh::count_t *const SFEM_RESTRICT slots  = b.element_slots.data();
+
+    const Hex8RcConfig rcfg = cvfem_hex8_rc_config_for(d);
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+        scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8];
+        gather_element_coords(d.elems, d.points, e, x, y, z);
+        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
+        scalar_t pgx[8], pgy[8], pgz[8];
+        gather_element_pgrad(d, e, pgx, pgy, pgz);
+        const Hex8RhieChow rc{x,       y,  z,  pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
+                              nullptr, ux, uy, uz,  rcfg.tau};
+        cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam<true>(rho, mu, x, y, z, ux, uy, uz, slots + (size_t)e * 64, values, rc,
+                                                              p);
+        boundary_scs_add_jacobian<true, true>(rho, mu, (const scalar_t *)nullptr, scalar_t(0), d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, slots + (size_t)e * 64,
+                                        values,
+                                         cvfem_hex8_face_mask_of(d, e),
+                                         d.natural_mask.empty() ? 0 : (int)d.natural_mask[(size_t)e], hex8_bd(d, e));
+    }
+}
+
+// Node-indexed 4x4 diagonal blocks, 16 doubles per node, without forming the matrix.
+// This is what a block-Jacobi smoother wants, and it is the reason the multigrid work
+// does not have to keep assembling a BSR on the fine level.
+//
+// The bench has a diagonal assembly (assemble_diag_atomic in cvfem_hex8_best_atomic.hpp)
+// that masks the off-diagonal slots with -1 and lets the element kernel drop them, since
+// cvfem_hex8_bsr_acc returns on a negative slot. That trick cannot be reused here, for
+// two independent reasons:
+//
+//   - The solver's affine path runs the SymPy kernel, which writes
+//     values[slots[k] * 16 + f] directly instead of going through the guarded accessor.
+//     A negative slot there is an out-of-bounds write, not a dropped one.
+//   - The bench's version omits both the Rhie-Chow and the boundary sub-control-surface
+//     terms, because the bench has no boundary handling at all and verifies against its
+//     own boundary-free assembly. Rhie-Chow is the entire pressure-pressure diagonal, so
+//     a diagonal missing it is exactly the degenerate saddle point block-Jacobi cannot
+//     invert, and the boundary term reaches 43% of the nodes on this channel at N=8 --
+//     a larger share on the coarse grids where a smoother matters most.
+//
+// So each element assembles its full 8x8 block set into a local buffer addressed by
+// identity slots, which is correct for every kernel however it writes, and only the eight
+// diagonal blocks are scattered. The call sequence mirrors assemble_jacobian_atomic_*
+// exactly; if those gain a term, this must too, and the gate will say so.
+// Both are defined below, after the element sweeps they share helpers with. The existing
+// forward declaration of build_node_volume sits further down than this function does.
+inline void     build_node_volume(const MeshData &d, std::vector<scalar_t> &node_vol);
+inline scalar_t transient_diag_weight(const MeshData &d, const scalar_t rho);
+
+inline SFEM_NOINLINE void assemble_block_diag(MeshData             &d,
+                                              const scalar_t        rho,
+                                              const scalar_t        mu,
+                                              const GeomKind        geom,
+                                              std::vector<scalar_t> &diag) {
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::assemble_block_diag");
+    diag.assign((size_t)d.nnodes * 16, scalar_t(0));
+    assemble_nodal_p_grad(d, geom);
+    scalar_t *const SFEM_RESTRICT out = diag.data();
+
+    smesh::count_t sl[64];
+    for (int k = 0; k < 64; ++k) sl[k] = (smesh::count_t)k;
+
+    const Hex8RcConfig rcfg = cvfem_hex8_rc_config_for(d);
+
+    // One element's local matrix, from which only the eight diagonal blocks are wanted.
+    const auto element_blocks = [&](const ptrdiff_t e, scalar_t *const SFEM_RESTRICT loc) {
+        for (int k = 0; k < 64 * 16; ++k) loc[k] = scalar_t(0);
+
+        scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8];
+        gather_element_coords(d.elems, d.points, e, x, y, z);
+        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
+        scalar_t pgx[8], pgy[8], pgz[8];
+        gather_element_pgrad(d, e, pgx, pgy, pgz);
+        const Hex8RhieChow rc{x,       y,  z,  pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
+                              nullptr, ux, uy, uz,  rcfg.tau};
+
+        // Both the block diagonal and the assembled matrix are built here from the FROZEN
+        // Rhie-Chow Jacobian, and they must stay that way together.
+        //
+        // An attempt to make this one exact -- adding the element's share of d(qg)/d(q) -- was
+        // reverted. It could not do what it claimed, because qg_i sums over every element
+        // containing node i before being scaled by 1/W_i, so d(qg_i)/d(q_i) belongs to i's
+        // whole element neighbourhood while a sub-control surface belongs to one element; it
+        // narrowed the gap to the action from round-off-away-in-the-frozen-form to 8.2e-02
+        // rather than closing it. Worse, it desynchronised two objects that are the same thing
+        // computed two ways: the block diagonal and diag(BSR) went from agreeing at 3.6e-16 to
+        // differing by 6.0e-02, and the Galerkin levels build their smoother from the
+        // assembled matrix's diagonal while the fine level builds it from this one, so they
+        // would have been smoothing different operators.
+        //
+        // tests/cvfem_operator_consistency_test asserts that agreement now, in every variant
+        // and under both settings.
+        if (geom == GeomKind::Isoparam) {
+            cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam<false>(rho, mu, x, y, z, ux, uy, uz, sl, loc, rc, p);
+            boundary_scs_add_jacobian<false, true>(
+                    rho, mu, (const scalar_t *)nullptr, scalar_t(0), d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, sl, loc,
+                    d.face_mask.empty() ? -1 : (int)d.face_mask[(size_t)e],
+                    d.natural_mask.empty() ? 0 : (int)d.natural_mask[(size_t)e], hex8_bd(d, e));
+        } else {
+            scalar_t adj[9], det;
+            cvfem_hex8_load_adj(d, e, adj, &det);
+            cvfem_hex8_ns_upwind_jacobian_add_slots<false>(rho, mu, adj, det, ux, uy, uz, sl, loc, rc, p);
+            boundary_scs_add_jacobian<false, false>(rho, mu, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, sl, loc,
+                                         cvfem_hex8_face_mask_of(d, e),
+                                         d.natural_mask.empty() ? 0 : (int)d.natural_mask[(size_t)e], hex8_bd(d, e));
+        }
+
+    };
+
+    // Into a pack-private buffer at pack-local node ids: no other thread can be writing
+    // these rows, so a plain `+=` is both correct and the reason there is no atomic.
+    const auto one_element = [&](const ptrdiff_t e, scalar_t *const SFEM_RESTRICT pack_diag,
+                                 pack_idx_t **const SFEM_RESTRICT pelems) {
+        scalar_t loc[64 * 16];
+        element_blocks(e, loc);
+        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+            const scalar_t *const         blk = loc + (size_t)(a * 8 + a) * 16;
+            scalar_t *const SFEM_RESTRICT dst = pack_diag + (ptrdiff_t)pelems[a][e] * 16;
+            for (int k = 0; k < 16; ++k) dst[k] += blk[k];
+        }
+    };
+
+    // The unpacked fallback, which still has to scatter atomically because nothing
+    // partitions the mesh for it. Not reproducible across thread counts, and that is why
+    // it is the fallback rather than the path.
+    const auto one_element_global = [&](const ptrdiff_t e) {
+        scalar_t loc[64 * 16];
+        element_blocks(e, loc);
+        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+            const smesh::idx_t    g   = d.elems[a][e];
+            const scalar_t *const blk = loc + (size_t)(a * 8 + a) * 16;
+            for (int k = 0; k < 16; ++k) CVFEM_ATOMIC_ADD(out[(size_t)g * 16 + k], blk[k]);
+        }
+    };
+
+    // The two-pass packed algorithm, which is deterministic by design.
+    //
+    // This is the preconditioner's data, and accumulating it with CVFEM_ATOMIC_ADD made it
+    // depend on thread timing: the summation order for a node followed whichever threads
+    // reached it first, and floating-point addition is not associative. With the boundary
+    // closure gathered the matvec is bit-reproducible, and this was what was left -- a solve
+    // with no multigrid at all still varied run to run, because the block-Jacobi blocks it
+    // inverts were not the same blocks twice.
+    //
+    // The shape is the one cvfem_hex8_apply_jacobian_action_packed already uses, at width 16
+    // instead of N_FIELDS: each pack accumulates into a pack-private buffer with a plain
+    // `+=`, its owned rows are written straight out because no other pack owns them, and the
+    // nodes it touches but does not own are closed by the ghost reduction, which sums a CSR
+    // in an order the index array fixes rather than thread timing. No atomic anywhere, and
+    // the same answer for any thread count.
+    //
+    // SFEM_DIAG_ATOMIC=1 restores the atomic sweep, as a measurement escape hatch.
+    static const int diag_atomic = smesh::Env::read<int>("SFEM_DIAG_ATOMIC", 0);
+    if (!diag_atomic && d.packed && d.packed->n_packs > 0) {
+        PackedData &p = *d.packed;
+        const int   W = 16;
+        if ((ptrdiff_t)d.diag_ghost_buf.size() != (ptrdiff_t)W * p.n_ghost_entries)
+            d.diag_ghost_buf.assign((size_t)W * (size_t)p.n_ghost_entries, scalar_t(0));
+        scalar_t *const SFEM_RESTRICT gbuf = d.diag_ghost_buf.data();
+
+#pragma omp parallel
+        {
+            // Arena slot 13 of its own. It stood here as a std::vector on the grounds that
+            // this runs once per Newton step, so the allocation is cheap at that rate, and that
+            // a slot could collide with a matvec's scratch. The first is a reason the cost is
+            // small rather than a reason to allocate inside a parallel region, and the second is
+            // answered by the slot being this routine's alone.
+            scalar_t *const SFEM_RESTRICT pack_diag =
+                    thread_scratch<scalar_t>(13, (size_t)p.max_nodes_per_pack * (size_t)W);
+#pragma omp for schedule(static)
+            for (ptrdiff_t pack = 0; pack < p.n_packs; ++pack) {
+                const ptrdiff_t owned        = p.owned_nodes_ptr[pack];
+                const ptrdiff_t n_contiguous = p.owned_nodes_ptr[pack + 1] - owned;
+                const ptrdiff_t n_ghost      = p.ghost_ptr[pack + 1] - p.ghost_ptr[pack];
+                const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
+                const ptrdiff_t ghost_off    = p.ghost_ptr[pack];
+
+                std::memset(pack_diag, 0, (size_t)n_pack_nodes * (size_t)W * sizeof(scalar_t));
+
+                const ptrdiff_t e_start = pack * p.n_elements_per_pack;
+                const ptrdiff_t e_end   = MIN(d.nelements, (pack + 1) * p.n_elements_per_pack);
+                for (ptrdiff_t e = e_start; e < e_end; ++e) one_element(e, pack_diag, p.elems);
+
+                // Owned rows are this pack's alone, so they are written rather than added.
+                std::memcpy(out + owned * W, pack_diag, (size_t)n_contiguous * (size_t)W * sizeof(scalar_t));
+
+                // Field-major, matching the layout cvfem_hex8_ghost_reduce_interleaved reads.
+                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+                    const scalar_t *const SFEM_RESTRICT blk = pack_diag + (n_contiguous + k) * W;
+                    for (int f = 0; f < W; ++f) gbuf[(ptrdiff_t)f * p.n_ghost_entries + ghost_off + k] = blk[f];
+                }
+            }
+        }
+
+        cvfem_hex8_ghost_reduce_wide(p, gbuf, 16, out);
+    } else {
+#pragma omp parallel for schedule(static)
+        for (ptrdiff_t e = 0; e < d.nelements; ++e) one_element_global(e);
+    }
+
+    // The transient term's diagonal. It is rho V a0 / dt on each velocity component and
+    // nothing on pressure, so it strengthens exactly the block the smoother inverts and
+    // leaves the saddle-point structure alone. Adding it here rather than in the element
+    // kernels keeps it consistent with apply_transient, which is a post-pass for the same
+    // reason.
+    {
+        const scalar_t a = transient_diag_weight(d, rho);
+        if (a != scalar_t(0)) {
+            if ((ptrdiff_t)d.node_vol.size() != d.nnodes) build_node_volume(d, d.node_vol);
+#pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+                const scalar_t w = a * d.node_vol[(size_t)i];
+                for (int c = 0; c < 3; ++c) diag[(size_t)i * 16 + (size_t)c * 4 + (size_t)c] += w;
+            }
+        }
+    }
+}
+
+inline void build_node_volume(const MeshData &d, std::vector<scalar_t> &node_vol);  // defined below
+
+// Subtract the body force from the momentum residual.
+//
+// The residual is a *volume integral* over each node's control volume -- see the flux form in
+// cvfem_hex8_ns_upwind_residual_sumfact, where the face contribution is added at the owner and
+// subtracted at the neighbour, so r[i*4+0..2] accumulates the integral of
+// div(rho u u) + grad p - div tau over CV_i. A source term therefore enters as -f(x_i) * V_i,
+// with V_i the control volume from build_node_volume.
+//
+// This is a per-node post-pass rather than a term inside the element kernels, and that is
+// deliberate: the forcing does not interact with any sub-control-surface flux, so putting it
+// here covers the sumfact, isoparametric and packed sweeps at once instead of touching five
+// host kernels and five CUDA kernels for the same arithmetic.
+inline void apply_body_force(MeshData &d) {
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_body_force");
+    if (d.fx.empty()) return;
+    if ((ptrdiff_t)d.node_vol.size() != d.nnodes) build_node_volume(d, d.node_vol);
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+        const scalar_t v = d.node_vol[(size_t)i];
+        d.rx[(size_t)i] -= d.fx[(size_t)i] * v;
+        d.ry[(size_t)i] -= d.fy[(size_t)i] * v;
+        d.rz[(size_t)i] -= d.fz[(size_t)i] * v;
+    }
+}
+
+// The staging read for the BDF coefficients. The rule is in kernels/cvfem_bdf.hpp;
+// what belongs here is which members hold the step sizes and the history.
+inline BdfCoeffs bdf_coeffs(const MeshData &d) {
+    return cvfem_bdf_coeffs(d.bdf_order, d.dt, d.dt_prev,
+                            (ptrdiff_t)d.u_prev2.size() == 3 * d.nnodes);
+}
+
+inline Hex8RcConfig cvfem_hex8_rc_config_for(const MeshData &d) {
+    // a0/dt through the transient diagonal's own rule, at rho = 1.
+    //
+    // That function already settles the history question this one has to settle, and for the
+    // same reason: a coarse level built by clone_onto receives dt but never a history, so a
+    // rule keyed on u_prev2 would give every level below the finest a different time scale
+    // from the one it is correcting. Its comment records that this exact mistake once gave
+    // every coarse level a steady Jacobian. Deriving the time scale's a0 anywhere else would
+    // reintroduce it in the stabilisation instead.
+    return cvfem_hex8_rc_config(d.rhie_chow_scale, transient_diag_weight(d, scalar_t(1)));
+}
+
+// The transient term, as a per-node post-pass.
+//
+// In a control-volume scheme the mass matrix IS the control volume: the momentum equation
+// integrated over CV_i has d/dt of (rho u_i V_i), so the term is diagonal and V_i is
+// already computed for the body force and the MMS norms. There is no consistent mass
+// matrix to assemble and none should be introduced -- an FEM mass matrix here would be a
+// different discretisation, not a better one.
+//
+// This is a post-pass for the reason apply_body_force gives above: the term touches no
+// sub-control-surface flux, so one pass covers the sumfact, isoparametric and packed
+// sweeps at once rather than being threaded into five host kernels and five CUDA kernels.
+inline void apply_transient(MeshData &d, const scalar_t rho) {
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_transient");
+    if (d.dt <= scalar_t(0)) return;
+    if ((ptrdiff_t)d.u_prev.size() != 3 * d.nnodes) return;
+    if ((ptrdiff_t)d.node_vol.size() != d.nnodes) build_node_volume(d, d.node_vol);
+    const BdfCoeffs c   = bdf_coeffs(d);
+    const scalar_t  inv = scalar_t(1) / d.dt;
+    const bool      two = c.order == 2;
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+        const scalar_t w  = rho * d.node_vol[(size_t)i] * inv;
+        const size_t   k  = (size_t)i * 3;
+        const scalar_t p2x = two ? d.u_prev2[k + 0] : scalar_t(0);
+        const scalar_t p2y = two ? d.u_prev2[k + 1] : scalar_t(0);
+        const scalar_t p2z = two ? d.u_prev2[k + 2] : scalar_t(0);
+        d.rx[(size_t)i] += w * (c.a0 * d.ux[(size_t)i] + c.a1 * d.u_prev[k + 0] + c.a2 * p2x);
+        d.ry[(size_t)i] += w * (c.a0 * d.uy[(size_t)i] + c.a1 * d.u_prev[k + 1] + c.a2 * p2y);
+        d.rz[(size_t)i] += w * (c.a0 * d.uz[(size_t)i] + c.a1 * d.u_prev[k + 2] + c.a2 * p2z);
+    }
+}
+
+// The same term's contribution to the Jacobian: d/du of the above is rho V a0 / dt on each
+// of the three velocity diagonal entries. Pressure is untouched, so the saddle-point
+// structure -- and the reason the block-diagonal preconditioner needs Rhie-Chow to invert
+// the pressure entry at all -- is unchanged.
+inline scalar_t transient_diag_weight(const MeshData &d, const scalar_t rho) {
+    if (d.dt <= scalar_t(0)) return scalar_t(0);
+    // The history is NOT required. The derivative of the BDF term is rho a0 / dt whatever
+    // u^n and u^{n-1} hold -- they are data the residual differences, not part of the
+    // Jacobian. Requiring them here gave every coarse level in a hierarchy a STEADY
+    // Jacobian: clone_onto builds those and they never receive a history, being applied
+    // only to a correction. For a small timestep rho V a0 / dt is the dominant diagonal, so
+    // that is not a small coarse-grid inconsistency.
+    //
+    // With a history present the coefficient still comes from it, so a BDF2 run's FIRST
+    // step -- which has u^n but no u^{n-1} and correctly falls back to BDF1 -- keeps a
+    // Jacobian consistent with the residual it is the derivative of. Without one, the
+    // requested order is the best available and the factor of 1.5 is immaterial to a
+    // preconditioner anyway.
+    if ((ptrdiff_t)d.u_prev.size() == 3 * d.nnodes) return bdf_coeffs(d).a0 * rho / d.dt;
+    return (d.bdf_order >= 2 ? scalar_t(1.5) : scalar_t(1)) * rho / d.dt;
+}
+
+// Applied to the matrix-free Jacobian action, where the direction plays the role of u.
+inline void apply_transient_action(MeshData &d, const scalar_t rho,
+                                   const scalar_t *const SFEM_RESTRICT dir,
+                                   scalar_t *const SFEM_RESTRICT jv) {
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_transient_action");
+    const scalar_t a = transient_diag_weight(d, rho);
+    if (a == scalar_t(0)) return;
+    if ((ptrdiff_t)d.node_vol.size() != d.nnodes) build_node_volume(d, d.node_vol);
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+        const scalar_t w = a * d.node_vol[(size_t)i];
+        for (int c = 0; c < 3; ++c) jv[(ptrdiff_t)i * N_FIELDS + c] += w * dir[(ptrdiff_t)i * N_FIELDS + c];
+    }
+}
+
+// ho_override: -1 takes SFEM_CONV_HO from the environment as before; 0 or 1 forces it, which
+// is what the freezing path needs to evaluate the same residual both ways on one state.
+inline void apply_residual(MeshData &d, const scalar_t rho, const scalar_t mu, const GeomKind geom,
+                           const int ho_override = -1) {
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_residual");
+    // SFEM_CONV_HO: deferred-correction convection. Off by default, and off is bit-for-bit the
+    // scheme that every recorded number in this repository was measured with.
+    //
+    // On the FLAT mesh it runs only the sum-factored atomic path, so turning it on forces that
+    // path. The correction needs the element's node coordinates and its eight nodal velocity
+    // gradients, and threading those through the packed SIMD face kernel is a larger change
+    // than the question this was built to answer. Forcing the path here rather than silently
+    // producing a first-order answer under the packed layout is the difference between a
+    // limitation and a bug.
+    //
+    // The semi-structured path needs no such forcing: sscvfem_residual gathers through a
+    // local-to-global index array already, so the correction rides the production kernel
+    // directly. At equal resolution the two agree to every digit -- u_l2 2.422124e-02 at
+    // 19,652 dofs on both -- which is what says the semi-structured wiring is right, since
+    // a lattice at level 4 and a flat mesh of the same spacing are the same discretisation.
+    d.conv_ho      = (ho_override >= 0) ? ho_override : smesh::Env::read<int>("SFEM_CONV_HO", 0);
+    // SFEM_GRAD_PRECISION: single stores the nodal velocity gradients as float (see MeshData).
+    // Double by default; both are kept so the choice can be measured.
+    {
+        static const std::string gp = smesh::Env::read<std::string>("SFEM_GRAD_PRECISION", "double");
+        if (gp != "double" && gp != "single") SFEM_ERROR("SFEM_GRAD_PRECISION takes double or single, not '%s'", gp.c_str());
+        d.grad_single = gp == "single";
+    }
+    // 0 = unlimited, 1 = bounded face. Default 1 when the correction is on: an unlimited
+    // reconstruction is right only where the field is smooth, and defaulting to the setting
+    // that is correct on a manufactured solution and wrong on a step would be exactly the
+    // shape of default this work has spent the day removing.
+    // DEFAULT 0, BECAUSE 0 IS WHAT CONVERGES. Measured on the backward-facing step at
+    // Re = 40, the deferred correction reaches the target in 24 Newton steps unlimited
+    // and does not converge at all with either limiter -- the bounded-face clip stalls
+    // at Re 14.04 after 399 steps, Venkatakrishnan's smooth form at Re 21.92 after 411.
+    // The limiter is the cause, not the reconstruction. Both remain reachable, because
+    // a bounded scheme is still wanted and reproducing the failure is a legitimate need.
+    d.conv_limiter = smesh::Env::read<int>("SFEM_CONV_LIMITER", 0);
+    // SFEM_VENKAT_K: the dimensionless K in Venkatakrishnan's eps^2 = (K dx)^3, which is his
+    // deactivation threshold -- below it the limiter switches itself off and the increment
+    // passes through untouched. DEFAULT 0, which is the zero-severity control: it recovers
+    // the arm measured above exactly, so a sweep over K starts from a known point rather than
+    // from a different scheme. K is dimensionless and the scales are restored here, from the
+    // reference velocity and the box length, because the kernel has neither.
+    {
+        const scalar_t k = smesh::Env::read<scalar_t>("SFEM_VENKAT_K", 0);
+        const scalar_t u = smesh::Env::read<scalar_t>("SFEM_U", 1);
+        d.conv_venkat_c  = cvfem_venkata_eps2_coeff(k, u, d.Lx);
+    }
+    {
+        d.limiter_stats = cvfem_limiter_stats_sink();
+    }
+
+    // CELL-PECLET BLENDING takes the same route as the deferred correction, and for the same
+    // two reasons. It is a residual-only change -- the Jacobian keeps the full first-order
+    // upwind dissipation -- which is defect correction, the structure this file already uses
+    // and the one the literature recommends precisely because a limiter's or a blend's
+    // contribution to an implicit Jacobian cannot readily be evaluated. An upwinded Jacobian
+    // for a less-upwinded residual is also the better-conditioned pairing, not merely the
+    // cheaper one.
+    //
+    // And only the sum-factored kernel carries it, so asking for the blend forces that path
+    // exactly as SFEM_CONV_HO does. The alternative is a run where some elements are blended
+    // and others are not depending on which sweep the layout selected, which would be
+    // invisible in the output and fatal to anything measured from it.
+    d.conv_peclet = cvfem_hex8_peclet_config<scalar_t>();
+    if (d.conv_ho && d.conv_peclet.form) {
+        // Both at once is not yet defined: the deferred correction recovers its upwind split
+        // from mdot to decide which node is the donor, and with the dissipation blended away
+        // there is no donor to recover. Refused rather than run, because the combination
+        // would produce a number and not an error.
+        static bool said = false;
+        if (!said) {
+            std::fprintf(stderr,
+                         "SFEM_PECLET_BLEND with SFEM_CONV_HO is not defined: the deferred "
+                         "correction's donor split comes from the unblended flux. Run one or "
+                         "the other.\n");
+            said = true;
+        }
+        std::abort();
+    }
+    // SFEM_CONV_FREEZE: the deferred correction built once per continuation stage and held.
+    //
+    // Same mechanism and same reason as sscvfem_residual, and built the same way: R(ho) - R(lo)
+    // on one state IS the correction's contribution, because every other term is identical
+    // between them, so this reuses the residual rather than adding a second path that computes
+    // the same quantity. Four output arrays here rather than one interleaved, so the held
+    // vector is 4 * nnodes read as [node * 4 + component].
+    //
+    // It makes Newton consistent rather than merely damped: frozen, the residual is R_lo(u)
+    // plus a constant, whose exact Jacobian is the first-order one this path already
+    // assembles. Measured on the semi-structured path, that took every limiter arm to the
+    // first-order step count -- 12 against 303 for the same arm unfrozen.
+    //
+    // The recursion terminates because the inner calls pass ho_override and this branch runs
+    // only for the outer, environment-driven call.
+    if (ho_override < 0) {
+    // DEFAULT 1, BECAUSE 1 IS WHAT WORKS. Measured on Grace, backward-facing step at Re = 40
+    // and the manufactured solution at Re = 100:
+    //
+    //                          Newton steps          u L2 rate
+    //                       7,060      47,268        (8/16/32)
+    //   unfrozen, K = 0       103         303          2.120
+    //   unfrozen, unlimited    24    NO CONVERGENCE    2.227
+    //   FROZEN,   K = 0        15          12          2.272
+    //
+    // Frozen is better on every axis measured: fewer Newton steps, 3.3x fewer linear
+    // iterations, final residuals of 1e-9 against 5e-7, a HIGHER fitted order of accuracy,
+    // and it converges where the unlimited arm does not. It also keeps the bound fully
+    // intact, which Venkatakrishnan's eps^2 buys its convergence by giving up.
+    //
+    // It is an approximation and the default should say so: frozen, the converged state
+    // solves R_lo(u) + frozen = 0 rather than R_ho(u) = 0, with the correction taken at the
+    // stage's opening state. The accuracy ladder is what licenses the default -- if the
+    // correction were too stale the order would fall toward 1, and it rises instead.
+    //
+    // SFEM_CONV_FREEZE=0 restores the unfrozen scheme. This changes nothing when
+    // SFEM_CONV_HO is off, which is still the overall default: the branch is guarded on it.
+        d.conv_freeze = smesh::Env::read<int>("SFEM_CONV_FREEZE", 1);
+        if (d.conv_freeze && d.conv_ho) {
+            const ptrdiff_t n = d.nnodes;
+            if ((ptrdiff_t)d.conv_frozen.size() != n * 4) {
+                std::vector<scalar_t> hx, hy, hz, hc;
+                apply_residual(d, rho, mu, geom, 1);
+                hx = d.rx; hy = d.ry; hz = d.rz; hc = d.rc;
+                apply_residual(d, rho, mu, geom, 0);
+                d.conv_frozen.assign((size_t)n * 4, scalar_t(0));
+                for (ptrdiff_t i = 0; i < n; ++i) {
+                    d.conv_frozen[(size_t)i * 4 + 0] = hx[(size_t)i] - d.rx[(size_t)i];
+                    d.conv_frozen[(size_t)i * 4 + 1] = hy[(size_t)i] - d.ry[(size_t)i];
+                    d.conv_frozen[(size_t)i * 4 + 2] = hz[(size_t)i] - d.rz[(size_t)i];
+                    d.conv_frozen[(size_t)i * 4 + 3] = hc[(size_t)i] - d.rc[(size_t)i];
+                }
+            }
+            apply_residual(d, rho, mu, geom, 0);
+            for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+                d.rx[(size_t)i] += d.conv_frozen[(size_t)i * 4 + 0];
+                d.ry[(size_t)i] += d.conv_frozen[(size_t)i * 4 + 1];
+                d.rz[(size_t)i] += d.conv_frozen[(size_t)i * 4 + 2];
+                d.rc[(size_t)i] += d.conv_frozen[(size_t)i * 4 + 3];
+            }
+            return;
+        }
+        // Drop a correction held under a different configuration, so turning freezing off
+        // mid-run cannot keep adding a stale source.
+        if (!d.conv_freeze && !d.conv_frozen.empty()) d.conv_frozen.clear();
+    }
+
+    // ONE element sweep for whichever gradients this evaluation is about to read.
+    //
+    // The pressure gradient is read by every arm; the velocity gradient only by the deferred
+    // correction and the Peclet blend, and the two are the SAME reconstruction over the same
+    // elements with the same geometry, differing only in which field is gathered. Asking for
+    // them together takes the higher-order residual from three element passes to two, which
+    // is what first order already costs.
+    //
+    // It sits below the freeze block deliberately. A frozen residual is a first-order one
+    // plus a held vector, so it must not pay for a velocity gradient it never reads; the two
+    // inner evaluations that BUILD the held vector reach this line themselves and each ask
+    // for what they need.
+    assemble_nodal_grads(d, geom, (d.conv_ho || d.conv_peclet.form) ? GradSet::Both : GradSet::Pressure);
+
+    if (d.conv_ho || d.conv_peclet.form) {
+        apply_residual_atomic_sumfact(d, rho, mu);
+        apply_body_force(d);
+        apply_transient(d, rho);
+        return;
+    }
+    if (geom == GeomKind::Isoparam) {
+        apply_residual_atomic_isoparam(d, rho, mu);
+        apply_body_force(d);
+        apply_transient(d, rho);
+        return;
+    }
+    if (d.packed) {
+        reset_residual(d);
+        cvfem_hex8_apply_residual_packed(d, *d.packed, rho, mu);
+        apply_boundary_scs_residual(d, rho, mu, 0);
+        apply_body_force(d);
+        apply_transient(d, rho);
+        return;
+    }
+    apply_residual_atomic_sumfact(d, rho, mu);
+    apply_body_force(d);
+    apply_transient(d, rho);
+}
+
+// zero_first=false accumulates into whatever is already in b. sfem::Function::hessian_bsr
+// runs every operator over one shared values buffer without clearing it between them, so
+// an Op that cleared would silently drop the operators assembled before it. The element
+// scatter accumulates either way, so this costs nothing but the skipped memset.
+// The transient term's diagonal, on the assembled matrix. Identical in substance to the
+// block one assemble_block_diag adds -- rho V a0 / dt on each velocity diagonal entry and
+// nothing on pressure -- and it reads the same transient_diag_weight, so the two cannot
+// disagree about the coefficient.
+//
+// It was missing, and that is not cosmetic. apply_jacobian_action_accumulate applies the
+// term and assemble_block_diag applies it, so in an unsteady run the assembled matrix was
+// the STEADY Jacobian while the operator it preconditions and the smoother built beside it
+// were the unsteady one. For a small timestep rho V a0 / dt is the dominant diagonal, so
+// the preconditioner was missing the largest entry it has.
+inline void assemble_transient_diag(MeshData &d, const scalar_t rho, BSR4 &b) {
+    const scalar_t a = transient_diag_weight(d, rho);
+    if (a == scalar_t(0)) return;
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::assemble_transient_diag");
+    if ((ptrdiff_t)d.node_vol.size() != d.nnodes) build_node_volume(d, d.node_vol);
+    scalar_t *const SFEM_RESTRICT values = b.data();
+    // diag_slots is what precompute_element_bsr_slots leaves behind and is the direct
+    // answer; the row scan is the fallback for a matrix assembled without it.
+    const bool have_diag = (ptrdiff_t)b.diag_slots.size() == d.nnodes;
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t r = 0; r < d.nnodes; ++r) {
+        const scalar_t w = a * d.node_vol[(size_t)r];
+        if (have_diag) {
+            const smesh::count_t j = b.diag_slots[(size_t)r];
+            if (j < 0) continue;
+            for (int c = 0; c < 3; ++c) values[(ptrdiff_t)j * 16 + c * 4 + c] += w;
+            continue;
+        }
+        for (smesh::count_t j = b.rowptr[r]; j < b.rowptr[r + 1]; ++j) {
+            if (b.colidx[j] != (smesh::idx_t)r) continue;
+            for (int c = 0; c < 3; ++c) values[(ptrdiff_t)j * 16 + c * 4 + c] += w;
+        }
+    }
+}
+
+inline void assemble_jacobian(MeshData &d, BSR4 &b, const scalar_t rho, const scalar_t mu, const GeomKind geom,
+                              const bool zero_first = true) {
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::assemble_jacobian");
+    if (zero_first) zero_bsr4(b);
+    assemble_nodal_p_grad(d, geom);
+    if (geom == GeomKind::Isoparam)
+        assemble_jacobian_atomic_isoparam(d, b, rho, mu);
+    else if (d.packed && d.coloring)
+        assemble_jacobian_colored_sumfact(d, *d.packed, *d.coloring, b, rho, mu);
+    else
+        assemble_jacobian_atomic_sumfact(d, b, rho, mu);
+    assemble_transient_diag(d, rho, b);
+}
+
+SFEM_INLINE void gather_element_dir(const MeshData &d, const ptrdiff_t e, const scalar_t *const SFEM_RESTRICT dir,
+                                           scalar_t *const SFEM_RESTRICT vx, scalar_t *const SFEM_RESTRICT vy,
+                                           scalar_t *const SFEM_RESTRICT vz, scalar_t *const SFEM_RESTRICT q) {
+    for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+        const scalar_t *const SFEM_RESTRICT dv = dir + (ptrdiff_t)d.elems[a][e] * N_FIELDS;
+        vx[a]                                  = dv[0];
+        vy[a]                                  = dv[1];
+        vz[a]                                  = dv[2];
+        q[a]                                   = dv[3];
+    }
+}
+
+inline SFEM_NOINLINE void apply_jacobian_action_atomic_sumfact(MeshData &d, const scalar_t rho, const scalar_t mu,
+                                                               const scalar_t *const SFEM_RESTRICT dir,
+                                                               scalar_t *const SFEM_RESTRICT       jv) {
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_jacobian_action_sumfact");
+    const Hex8RcConfig rcfg = cvfem_hex8_rc_config_for(d);
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+        scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8], vx[8], vy[8], vz[8], q[8], r[CVFEM_HEX8_N_DOF];
+        gather_element_coords(d.elems, d.points, e, x, y, z);
+        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
+        gather_element_dir(d, e, dir, vx, vy, vz, q);
+        scalar_t pgx[8], pgy[8], pgz[8], qgx[8], qgy[8], qgz[8];
+        gather_element_pgrad(d, e, pgx, pgy, pgz);
+        const bool has_qg = !d.qgx.empty();
+        if (has_qg) gather_element_qgrad(d, e, qgx, qgy, qgz);
+        const Hex8RhieChow rc{x,   y,   z,   pgx, pgy, pgz, rcfg.scale,
+                              has_qg ? qgx : nullptr, has_qg ? qgy : nullptr,
+                              has_qg ? qgz : nullptr, ux, uy, uz, rcfg.tau};
+        scalar_t adj[9], det;
+        cvfem_hex8_load_adj(d, e, adj, &det);
+        cvfem_hex8_ns_upwind_jacobian_action<0>(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, r, rc, p);
+        boundary_scs_add_jacobian_action<false>(rho, mu, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, vx, vy, vz, q, r,
+                                         cvfem_hex8_face_mask_of(d, e),
+                                         d.natural_mask.empty() ? 0 : (int)d.natural_mask[(size_t)e], hex8_bd(d, e));
+        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+            const smesh::idx_t g = d.elems[a][e];
+            atomic_add(jv + (ptrdiff_t)g * N_FIELDS + 0, 0, r[a * 4 + 0]);
+            atomic_add(jv + (ptrdiff_t)g * N_FIELDS + 1, 0, r[a * 4 + 1]);
+            atomic_add(jv + (ptrdiff_t)g * N_FIELDS + 2, 0, r[a * 4 + 2]);
+            atomic_add(jv + (ptrdiff_t)g * N_FIELDS + 3, 0, r[a * 4 + 3]);
+        }
+    }
+}
+
+inline SFEM_NOINLINE void apply_jacobian_action_atomic_isoparam(MeshData &d, const scalar_t rho, const scalar_t mu,
+                                                                const scalar_t *const SFEM_RESTRICT dir,
+                                                                scalar_t *const SFEM_RESTRICT       jv) {
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_jacobian_action_isoparam");
+    const Hex8RcConfig rcfg = cvfem_hex8_rc_config_for(d);
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+        scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8], vx[8], vy[8], vz[8], q[8], r[CVFEM_HEX8_N_DOF];
+        gather_element_coords(d.elems, d.points, e, x, y, z);
+        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
+        gather_element_dir(d, e, dir, vx, vy, vz, q);
+        scalar_t pgx[8], pgy[8], pgz[8], qgx[8], qgy[8], qgz[8];
+        gather_element_pgrad(d, e, pgx, pgy, pgz);
+        const bool has_qg = !d.qgx.empty();
+        if (has_qg) gather_element_qgrad(d, e, qgx, qgy, qgz);
+        const Hex8RhieChow rc{x,   y,   z,   pgx, pgy, pgz, rcfg.scale,
+                              has_qg ? qgx : nullptr, has_qg ? qgy : nullptr,
+                              has_qg ? qgz : nullptr, ux, uy, uz, rcfg.tau};
+        cvfem_hex8_ns_upwind_jacobian_action_isoparam(rho, mu, x, y, z, ux, uy, uz, vx, vy, vz, q, r, rc, p);
+        boundary_scs_add_jacobian_action<true>(rho, mu, (const scalar_t *)nullptr, scalar_t(0), d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, vx, vy, vz, q, r,
+                                         cvfem_hex8_face_mask_of(d, e),
+                                         d.natural_mask.empty() ? 0 : (int)d.natural_mask[(size_t)e], hex8_bd(d, e));
+        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+            const smesh::idx_t g = d.elems[a][e];
+            atomic_add(jv + (ptrdiff_t)g * N_FIELDS + 0, 0, r[a * 4 + 0]);
+            atomic_add(jv + (ptrdiff_t)g * N_FIELDS + 1, 0, r[a * 4 + 1]);
+            atomic_add(jv + (ptrdiff_t)g * N_FIELDS + 2, 0, r[a * 4 + 2]);
+            atomic_add(jv + (ptrdiff_t)g * N_FIELDS + 3, 0, r[a * 4 + 3]);
+        }
+    }
+}
+
+// Element contributions only: no zeroing of jv and no constraint handling, so the
+// caller decides both. The driver wants neither left to it and uses the wrapper below;
+// sfem::Op wants exactly this, because Op::apply accumulates and the Function owns the
+// constraints.
+// The direction's nodal velocity gradient, in the nine-per-node layout the correction reads. The
+// direction arrives interleaved by node, and the sweep reads it in place: its three components are
+// three base pointers into the same array with stride N_FIELDS. The de-interleave pass this used
+// to do first -- three full-length copies per matvec -- is what the sweep's per-field stride
+// removed.
+inline void assemble_nodal_vel_grad_of(MeshData &d, const GeomKind geom,
+                                       const scalar_t *const SFEM_RESTRICT dir,
+                                       std::vector<scalar_t> &out) {
+    const int       iso     = geom == GeomKind::Isoparam ? 1 : 0;
+    const scalar_t *srcs[3] = {dir + 0, dir + 1, dir + 2};
+    const int       st[3]   = {N_FIELDS, N_FIELDS, N_FIELDS};
+    if (d.packed)
+        cvfem_hex8_assemble_nodal_grads_packed(d, *d.packed, iso, srcs, 3, out, d.ugrad_ghost, st);
+    else
+        cvfem_hex8_assemble_nodal_grads_atomic(d, iso, srcs, 3, out, st);
+}
+
+inline void apply_jacobian_action_accumulate(MeshData &d, const scalar_t rho, const scalar_t mu, const GeomKind geom,
+                                             const scalar_t *const SFEM_RESTRICT dir,
+                                             scalar_t *const SFEM_RESTRICT       jv) {
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_jacobian_action_accumulate");
+    // The Rhie-Chow correction differentiates through the nodal pressure-gradient
+    // reconstruction, so the direction's own reconstructed gradient is needed. One extra
+    // pass per Jacobian apply, the same shape as the one update() already does for p.
+    // SFEM_RC_EXACT_JAC=0 restores the frozen-pg Jacobian. Parity with the semi-structured
+    // path, and it is what lets cvfem_ns_op_gate compare the assembled operator against the
+    // matrix-free action like for like: the assembled Jacobian keeps the frozen form on
+    // purpose, so with the exact term on they are *meant* to differ.
+    // The same treatment for the deferred correction, and for the same reason: it reconstructs a
+    // nodal VELOCITY gradient, so differentiating it needs the direction's. Nine components rather
+    // than three, so this pass costs more than the Rhie-Chow one beside it -- which is why it is
+    // switchable. SFEM_HO_EXACT_JAC=0 gives the lagged action, the operator an assembled
+    // first-order matrix holds and what this solver applied before the term existed.
+    const bool want_q = cvfem_hex8_rc_exact_jac() && d.rhie_chow_scale != scalar_t(0) && !d.pgx.empty();
+    const bool want_v = cvfem_hex8_ho_exact_jac() && d.conv_ho && cvfem_hex8_has_ugrad(d);
+    if (want_q && want_v && d.grad_single) {
+        // The fused four-field sweep, single-precision storage: the output type is one per sweep,
+        // so the three pressure components go through a float scratch and are widened back into
+        // the double arrays the Rhie-Chow consumers read. A nodal pass over three components,
+        // against the sweep it rides on.
+        SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::assemble_nodal_qv_grad");
+        d.vgrad.clear();
+        d.vgrad32.resize((size_t)d.nnodes * 9);
+        d.qgx.resize((size_t)d.nnodes);
+        d.qgy.resize((size_t)d.nnodes);
+        d.qgz.resize((size_t)d.nnodes);
+        std::vector<float> &qg32 = d.grad_tmp32;
+        qg32.resize((size_t)d.nnodes * 3);
+        const int       iso      = geom == GeomKind::Isoparam ? 1 : 0;
+        const scalar_t *srcs[4]  = {dir + 0, dir + 1, dir + 2, dir + 3};
+        const int       st[4]    = {N_FIELDS, N_FIELDS, N_FIELDS, N_FIELDS};
+        float          *outp[12];
+        ptrdiff_t       ostr[12];
+        for (int c = 0; c < 9; ++c) { outp[c] = d.vgrad32.data() + c; ostr[c] = 9; }
+        for (int c = 0; c < 3; ++c) { outp[9 + c] = qg32.data() + c; ostr[9 + c] = 3; }
+        if (d.packed)
+            cvfem_hex8_assemble_nodal_grads_packed(d, *d.packed, iso, srcs, st, 4, outp, ostr, d.ugrad_ghost);
+        else
+            cvfem_hex8_assemble_nodal_grads_atomic(d, iso, srcs, st, 4, outp, ostr);
+#pragma omp parallel for schedule(static)
+        for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+            d.qgx[(size_t)i] = scalar_t(qg32[(size_t)i * 3 + 0]);
+            d.qgy[(size_t)i] = scalar_t(qg32[(size_t)i * 3 + 1]);
+            d.qgz[(size_t)i] = scalar_t(qg32[(size_t)i * 3 + 2]);
+        }
+    } else if (want_q && want_v) {
+        // ONE SWEEP FOR BOTH. They reconstruct different fields of the SAME array with the same
+        // stride -- the direction's three velocity components and its pressure -- so together
+        // they are a four-field sweep rather than a one-field and a three-field one. What that
+        // saves is the half of a sweep that does not depend on the field count: the adjugate
+        // load, the determinant check, the element-node indirection, the pack staging, the memset
+        // and the ghost reduction, all of which were being done twice. Fitting t(nf) = a + b*nf
+        // to the measured one- and three-field sweeps puts that fixed half at 0.40 ms of 2.71 at
+        // n=128, so this is worth about 15% of the reconstruction.
+        //
+        // The two results keep the layouts their consumers read -- nine-per-node for the velocity
+        // gradient, three separate arrays for the pressure one -- which is why the sweep takes a
+        // stride PER COMPONENT rather than one shared stride. It costs nothing in the element
+        // loop: the strides appear only in the write-out and the ghost reduction.
+        SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::assemble_nodal_qv_grad");
+        d.vgrad32.clear();
+        d.vgrad.resize((size_t)d.nnodes * 9);
+        d.qgx.resize((size_t)d.nnodes);
+        d.qgy.resize((size_t)d.nnodes);
+        d.qgz.resize((size_t)d.nnodes);
+        const int       iso      = geom == GeomKind::Isoparam ? 1 : 0;
+        const scalar_t *srcs[4]  = {dir + 0, dir + 1, dir + 2, dir + 3};
+        const int       st[4]    = {N_FIELDS, N_FIELDS, N_FIELDS, N_FIELDS};
+        scalar_t       *outp[12];
+        ptrdiff_t       ostr[12];
+        for (int c = 0; c < 9; ++c) { outp[c] = d.vgrad.data() + c; ostr[c] = 9; }
+        outp[9]  = d.qgx.data(); ostr[9]  = 1;
+        outp[10] = d.qgy.data(); ostr[10] = 1;
+        outp[11] = d.qgz.data(); ostr[11] = 1;
+        if (d.packed)
+            cvfem_hex8_assemble_nodal_grads_packed(d, *d.packed, iso, srcs, st, 4, outp, ostr, d.ugrad_ghost);
+        else
+            cvfem_hex8_assemble_nodal_grads_atomic(d, iso, srcs, st, 4, outp, ostr);
+    } else if (want_q) {
+        SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::assemble_nodal_q_grad");
+        assemble_nodal_grad_strided(d, geom, dir + 3, N_FIELDS, d.qgx, d.qgy, d.qgz);
+        d.vgrad.clear();
+    } else if (want_v && d.grad_single) {
+        SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::assemble_nodal_v_grad");
+        d.vgrad.clear();
+        d.vgrad32.resize((size_t)d.nnodes * 9);
+        const int       iso     = geom == GeomKind::Isoparam ? 1 : 0;
+        const scalar_t *srcs[3] = {dir + 0, dir + 1, dir + 2};
+        const int       st[3]   = {N_FIELDS, N_FIELDS, N_FIELDS};
+        float          *outp[9];
+        ptrdiff_t       ostr[9];
+        for (int c = 0; c < 9; ++c) { outp[c] = d.vgrad32.data() + c; ostr[c] = 9; }
+        if (d.packed)
+            cvfem_hex8_assemble_nodal_grads_packed(d, *d.packed, iso, srcs, st, 3, outp, ostr, d.ugrad_ghost);
+        else
+            cvfem_hex8_assemble_nodal_grads_atomic(d, iso, srcs, st, 3, outp, ostr);
+        d.qgx.clear(); d.qgy.clear(); d.qgz.clear();
+    } else if (want_v) {
+        SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::assemble_nodal_v_grad");
+        d.vgrad32.clear();
+        assemble_nodal_vel_grad_of(d, geom, dir, d.vgrad);
+        d.qgx.clear(); d.qgy.clear(); d.qgz.clear();
+    } else {
+        d.qgx.clear(); d.qgy.clear(); d.qgz.clear();
+        d.vgrad.clear();
+        d.vgrad32.clear();
+    }
+    if (geom == GeomKind::Isoparam) {
+        apply_jacobian_action_atomic_isoparam(d, rho, mu, dir, jv);
+    } else if (d.packed) {
+        cvfem_hex8_apply_jacobian_action_packed(d, *d.packed, rho, mu, dir, jv);
+        apply_boundary_scs_jacobian_action(d, rho, mu, 0, dir, jv);
+    } else {
+        apply_jacobian_action_atomic_sumfact(d, rho, mu, dir, jv);
+    }
+    apply_transient_action(d, rho, dir, jv);
+}
+
+inline void apply_jacobian_action(MeshData &d, const scalar_t rho, const scalar_t mu, const GeomKind geom,
+                                  const std::vector<uint8_t> &constrained, const scalar_t *const SFEM_RESTRICT dir,
+                                  scalar_t *const SFEM_RESTRICT jv) {
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_jacobian_action");
+    const ptrdiff_t ndof = d.nnodes * N_FIELDS;
+    cvfem_zero_scalars(jv, ndof);
+    apply_jacobian_action_accumulate(d, rho, mu, geom, dir, jv);
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t i = 0; i < ndof; ++i) {
+        if (constrained[(size_t)i]) jv[i] = dir[i];
+    }
+}
+
+inline void pack_fields(const MeshData &d, scalar_t *const SFEM_RESTRICT x) {
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+        x[(size_t)i * 4 + 0] = d.ux[i];
+        x[(size_t)i * 4 + 1] = d.uy[i];
+        x[(size_t)i * 4 + 2] = d.uz[i];
+        x[(size_t)i * 4 + 3] = d.p[i];
+    }
+}
+
+inline void unpack_fields(MeshData &d, const scalar_t *const SFEM_RESTRICT x) {
+    // The single route by which a new Newton iterate reaches MeshData, and therefore the
+    // right place to invalidate everything keyed on the state. The Rhie-Chow coefficient
+    // is the one such thing today.
+    ++d.state_stamp;
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+        d.ux[i] = x[(size_t)i * 4 + 0];
+        d.uy[i] = x[(size_t)i * 4 + 1];
+        d.uz[i] = x[(size_t)i * 4 + 2];
+        d.p[i]  = x[(size_t)i * 4 + 3];
+    }
+}
+
+inline void pack_residual(const MeshData &d, scalar_t *const SFEM_RESTRICT r) {
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+        r[(size_t)i * 4 + 0] = d.rx[i];
+        r[(size_t)i * 4 + 1] = d.ry[i];
+        r[(size_t)i * 4 + 2] = d.rz[i];
+        r[(size_t)i * 4 + 3] = d.rc[i];
+    }
+}
+
+// Accumulating counterpart of pack_residual, for sfem::Op::gradient.
+inline void add_residual(const MeshData &d, scalar_t *const SFEM_RESTRICT r) {
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+        r[(size_t)i * 4 + 0] += d.rx[i];
+        r[(size_t)i * 4 + 1] += d.ry[i];
+        r[(size_t)i * 4 + 2] += d.rz[i];
+        r[(size_t)i * 4 + 3] += d.rc[i];
+    }
+}
+
+inline void apply_dirichlet_residual(const std::vector<uint8_t> &constrained, scalar_t *const r, const ptrdiff_t ndof) {
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t i = 0; i < ndof; ++i) {
+        if (constrained[(size_t)i]) r[i] = scalar_t(0);
+    }
+}
+
+inline void apply_dirichlet_fields(const std::vector<uint8_t>  &constrained,
+                                   const std::vector<scalar_t> &bc,
+                                   scalar_t *const              x,
+                                   const ptrdiff_t              ndof) {
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t i = 0; i < ndof; ++i) {
+        if (constrained[(size_t)i]) x[i] = bc[(size_t)i];
+    }
+}
+
+inline void apply_dirichlet_bsr(BSR4 &b, const std::vector<uint8_t> &constrained, const ptrdiff_t nnodes) {
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_dirichlet_bsr");
+    scalar_t *const SFEM_RESTRICT values = b.data();
+
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t row = 0; row < nnodes; ++row) {
+        const int c0 = constrained[(size_t)row * 4 + 0];
+        const int c1 = constrained[(size_t)row * 4 + 1];
+        const int c2 = constrained[(size_t)row * 4 + 2];
+        const int c3 = constrained[(size_t)row * 4 + 3];
+        if (!(c0 | c1 | c2 | c3)) continue;
+
+        for (smesh::count_t k = b.rowptr[row]; k < b.rowptr[row + 1]; ++k) {
+            scalar_t *const blk  = values + (ptrdiff_t)k * 16;
+            const int       diag = (b.colidx[k] == (smesh::idx_t)row);
+            if (c0) {
+                blk[0] = blk[1] = blk[2] = blk[3] = scalar_t(0);
+                if (diag) blk[0] = scalar_t(1);
+            }
+            if (c1) {
+                blk[4] = blk[5] = blk[6] = blk[7] = scalar_t(0);
+                if (diag) blk[5] = scalar_t(1);
+            }
+            if (c2) {
+                blk[8] = blk[9] = blk[10] = blk[11] = scalar_t(0);
+                if (diag) blk[10] = scalar_t(1);
+            }
+            if (c3) {
+                blk[12] = blk[13] = blk[14] = blk[15] = scalar_t(0);
+                if (diag) blk[15] = scalar_t(1);
+            }
+        }
+    }
+}
+
+inline bool invert3_vel(const scalar_t *const SFEM_RESTRICT a, scalar_t *const SFEM_RESTRICT inv) {
+    const scalar_t a00 = a[0], a01 = a[1], a02 = a[2];
+    const scalar_t a10 = a[4], a11 = a[5], a12 = a[6];
+    const scalar_t a20 = a[8], a21 = a[9], a22 = a[10];
+    const scalar_t x0  = a11 * a22;
+    const scalar_t x1  = a12 * a21;
+    const scalar_t x2  = a01 * a12;
+    const scalar_t x3  = a01 * a22;
+    const scalar_t x4  = a02 * a11;
+    const scalar_t det = a00 * (x0 - x1) + a02 * a10 * a21 - a10 * x3 + a20 * x2 - a20 * x4;
+    if (std::fabs(det) < scalar_t(1e-30) || !std::isfinite(det)) return false;
+    const scalar_t s = scalar_t(1) / det;
+    inv[0]           = s * (x0 - x1);
+    inv[1]           = s * (a02 * a21 - x3);
+    inv[2]           = s * (x2 - x4);
+    inv[4]           = s * (-a10 * a22 + a12 * a20);
+    inv[5]           = s * (a00 * a22 - a02 * a20);
+    inv[6]           = s * (-a00 * a12 + a02 * a10);
+    inv[8]           = s * (a10 * a21 - a11 * a20);
+    inv[9]           = s * (-a00 * a21 + a01 * a20);
+    inv[10]          = s * (a00 * a11 - a01 * a10);
+    return std::isfinite(inv[0]) && std::isfinite(inv[5]) && std::isfinite(inv[10]);
+}
+
+// Lumped pressure mass matrix: the control volume attached to each node.
+//
+// A HEX8 element's eight sub-control volumes partition it evenly, so each node collects
+// |det| / 8 from every element it touches. This is M_p for a piecewise-constant pressure
+// test space, which is what the Schur approximation below needs.
+inline void build_node_volume(const MeshData &d, std::vector<scalar_t> &node_vol) {
+    node_vol.assign((size_t)d.nnodes, scalar_t(0));
+    // jacobian_determinant is only precomputed for affine geometry, so evaluate it here
+    // when it is absent rather than reading an empty array.
+    const bool have_det = (ptrdiff_t)d.jacobian_determinant.size() >= d.nelements;
+    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+        scalar_t det;
+        if (have_det) {
+            det = d.jacobian_determinant[e];
+        } else {
+            scalar_t x[8], y[8], z[8], adj[9];
+            for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+                const smesh::idx_t g = d.elems[a][e];
+                x[a] = d.points[0][g]; y[a] = d.points[1][g]; z[a] = d.points[2][g];
+            }
+            cvfem_hex8_geom_at(x, y, z, scalar_t(0.5), scalar_t(0.5), scalar_t(0.5), adj, &det);
+        }
+        const scalar_t v = std::fabs(det) / scalar_t(8);
+        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) node_vol[d.elems[a][e]] += v;
+    }
+}
+
+inline int cvfem_report_schur = 1;
+
+// SIMPLE-style pressure Schur diagonal: diag(C - B diag(A_uu)^-1 B^T).
+//
+// This is the approximation colocated finite-volume codes actually use, and unlike
+// mu * M_p^-1 it makes no assumption about which term dominates -- it reads both the
+// Rhie-Chow pressure operator C and the velocity coupling straight out of the assembled
+// Jacobian. C_ii is block(i,i)[3][3]; B is the continuity row of block(i,j) over the
+// velocity columns; B^T is the momentum rows of block(j,i) over the pressure column.
+//
+// Dirichlet rows are zeroed by apply_dirichlet_bsr before this runs, so a constrained
+// velocity dof contributes B^T = 0 and drops out on its own.
+//
+// This costs O(nnz * row_length) because block(j,i) has to be looked up for each (i,j).
+// That is once per Jacobian, against a linear solve of several hundred iterations, so it
+// is not on the hot path -- but it is not free either, which is why it is opt-in.
+inline void build_schur_diag(const BSR4 &b, const ptrdiff_t nnodes, std::vector<scalar_t> &schur) {
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::build_schur_diag");
+    schur.assign((size_t)nnodes, scalar_t(0));
+    const scalar_t *const SFEM_RESTRICT values = b.data();
+
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t row = 0; row < nnodes; ++row) {
+        const smesh::count_t dslot = find_bsr_slot(b.rowptr, b.colidx, (smesh::idx_t)row, (smesh::idx_t)row);
+        scalar_t             s     = values[(ptrdiff_t)dslot * 16 + 15];
+
+        for (smesh::count_t k = b.rowptr[row]; k < b.rowptr[row + 1]; ++k) {
+            const smesh::idx_t   col   = b.colidx[k];
+            const scalar_t *const bij  = values + (ptrdiff_t)k * 16;
+            const smesh::count_t djj   = find_bsr_slot(b.rowptr, b.colidx, col, col);
+            const smesh::count_t kji   = find_bsr_slot(b.rowptr, b.colidx, col, (smesh::idx_t)row);
+            const scalar_t *const ajj  = values + (ptrdiff_t)djj * 16;
+            const scalar_t *const bji  = values + (ptrdiff_t)kji * 16;
+            for (int c = 0; c < 3; ++c) {
+                const scalar_t auu = ajj[c * 4 + c];
+                if (std::fabs(auu) < scalar_t(1e-30)) continue;
+                s -= bij[3 * 4 + c] * (scalar_t(1) / auu) * bji[c * 4 + 3];
+            }
+        }
+        schur[(size_t)row] = s;
+    }
+
+    // One-shot report of how the two terms of S compare. The question this answers is
+    // whether S is dominated by the Rhie-Chow operator C or by the velocity coupling
+    // B A^-1 B^T, which is what decides whether any S^-1 approximation can differ from
+    // the 1 / A_pp that block-Jacobi already applies.
+    if (cvfem_report_schur) {
+        cvfem_report_schur = 0;
+        double c_sum = 0, bab_sum = 0, s_sum = 0;
+        ptrdiff_t cnt = 0;
+        for (ptrdiff_t row = 0; row < nnodes; ++row) {
+            const smesh::count_t ds = find_bsr_slot(b.rowptr, b.colidx, (smesh::idx_t)row, (smesh::idx_t)row);
+            const double         c  = (double)values[(ptrdiff_t)ds * 16 + 15];
+            if (std::fabs(c) < 1e-30) continue;
+            c_sum += std::fabs(c);
+            bab_sum += std::fabs(c - (double)schur[(size_t)row]);
+            s_sum += std::fabs((double)schur[(size_t)row]);
+            ++cnt;
+        }
+        if (cnt) {
+            std::printf("  schur: mean|C|=%.6e  mean|B A^-1 B^T|=%.6e  mean|S|=%.6e  ratio=%.3e  (n=%td)\n",
+                        c_sum / cnt, bab_sum / cnt, s_sum / cnt, bab_sum / c_sum, cnt);
+        }
+    }
+}
+
+inline void build_block_jacobi(const BSR4                  &b,
+                               const std::vector<uint8_t>  &constrained,
+                               const ptrdiff_t              nnodes,
+                               const std::vector<scalar_t> &node_vol,
+                               const std::vector<scalar_t> &schur,
+                               const scalar_t               pscale,
+                               const scalar_t               pdamp,
+                               std::vector<scalar_t>       &inv_diag) {
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::build_block_jacobi");
+    inv_diag.assign((size_t)nnodes * 16, scalar_t(0));
+    const scalar_t *const SFEM_RESTRICT values = b.data();
+
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t row = 0; row < nnodes; ++row) {
+        const scalar_t *const blk = values + (ptrdiff_t)b.diag_slots[(size_t)row] * 16;
+        scalar_t *const       inv = inv_diag.data() + (size_t)row * 16;
+        const int             c0  = constrained[(size_t)row * 4 + 0];
+        const int             c1  = constrained[(size_t)row * 4 + 1];
+        const int             c2  = constrained[(size_t)row * 4 + 2];
+        const int             c3  = constrained[(size_t)row * 4 + 3];
+
+        if (!(c0 | c1 | c2) && invert3_vel(blk, inv)) {
+            /* velocity 3x3 inverse */
+        } else {
+            for (int f = 0; f < 3; ++f) {
+                if (constrained[(size_t)row * 4 + f]) {
+                    inv[f * 4 + f] = scalar_t(1);
+                } else {
+                    const scalar_t d = blk[f * 4 + f];
+                    inv[f * 4 + f]   = (std::fabs(d) > scalar_t(1e-30)) ? scalar_t(1) / d : scalar_t(1);
+                }
+            }
+        }
+
+        if (c3) {
+            inv[15] = scalar_t(1);
+        } else {
+            const scalar_t d = blk[15];
+            const scalar_t v = node_vol[(size_t)row];
+            if (!schur.empty()) {
+                // The literature approximation, with no fitted constant.
+                const scalar_t sd = schur[(size_t)row];
+                inv[15] = (std::fabs(sd) > scalar_t(1e-30)) ? scalar_t(1) / sd : scalar_t(1);
+            } else if (pscale != scalar_t(0) && v > scalar_t(1e-30)) {
+                // Pressure block scaled by the control volume instead of by A_pp.
+                //
+                // The textbook reading of this is the viscous Schur approximation
+                // S^-1 ~ -mu M_p^-1, which for the lumped mass matrix is -mu / V_p. That
+                // is not what is going on here, and the measurements say so twice over.
+                //
+                // First, S is already what block-Jacobi inverts. Measured from the
+                // assembled Jacobian (SFEM_PC_SIMPLE), diag(B A^-1 B^T) is about 0.19 of
+                // diag(C), so S = C - B A^-1 B^T sits within a fifth of the C = A_pp that
+                // block-Jacobi uses -- and building the real SIMPLE Schur diagonal
+                // changes the iteration count by 0.1%. Approximating S^-1 better is not
+                // where the gain comes from.
+                //
+                // Second, the gain is a high-Reynolds effect, not a viscous one. Split by
+                // continuation stage at N=8, this scaling saves 60% of the linear
+                // iterations in the Re=100 stage and 3% in the Re=10 one. In the Stokes
+                // limit 1 / A_pp is already right, which is exactly where the textbook
+                // approximation is supposed to hold.
+                //
+                // So this is not an S^-1 approximation. What it does is weaken the
+                // pressure block relative to the velocity block by a factor that grows
+                // with Re, which a block-diagonal preconditioner needs and a Schur
+                // approximation does not supply.
+                //
+                // PSCALE is therefore a tuned coefficient, not a physical constant. It is
+                // dimensional and it tracks the stabilisation. A_pp is proportional to
+                // rc_scale, and sweeping SFEM_RHIE_CHOW_SCALE moves the optimum inversely,
+                // so the product is what is conserved:
+                //
+                //   rc_scale   0.25   0.5    1      2
+                //   PSCALE     0.3    0.2    0.1    0.05
+                //   product    0.075  0.10   0.10   0.10
+                //
+                // The three points from 0.5 to 2 are exact. Only rc=0.25 is off, and it
+                // was swept on a grid of {0.1, 0.3, 1.0} that never tested the predicted
+                // 0.4, so read it as unresolved rather than as a departure from the law.
+                //
+                // Positive is the correct sign for the continuity row as assembled here;
+                // negative diverges. Default 0 keeps plain 1 / A_pp.
+                inv[15] = pscale / v;
+            } else {
+                // A_pp is only structurally zero without Rhie-Chow, a configuration whose
+                // linear solves do not converge anyway; the guard costs one compare.
+                inv[15] = (std::fabs(d) > scalar_t(1e-30)) ? pdamp / d : scalar_t(1);
+            }
+        }
+    }
+}
+
+inline void apply_block_jacobi(const std::vector<scalar_t> &inv_diag,
+                               const ptrdiff_t              nnodes,
+                               const scalar_t *const        x,
+                               scalar_t *const              y) {
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_block_jacobi");
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t row = 0; row < nnodes; ++row) {
+        const scalar_t *const inv = inv_diag.data() + (size_t)row * 16;
+        const scalar_t *const xx  = x + (size_t)row * 4;
+        scalar_t *const       yy  = y + (size_t)row * 4;
+        yy[0]                     = inv[0] * xx[0] + inv[1] * xx[1] + inv[2] * xx[2] + inv[3] * xx[3];
+        yy[1]                     = inv[4] * xx[0] + inv[5] * xx[1] + inv[6] * xx[2] + inv[7] * xx[3];
+        yy[2]                     = inv[8] * xx[0] + inv[9] * xx[1] + inv[10] * xx[2] + inv[11] * xx[3];
+        yy[3]                     = inv[12] * xx[0] + inv[13] * xx[1] + inv[14] * xx[2] + inv[15] * xx[3];
+    }
+}
+
+inline bool all_finite(const scalar_t *const v, const ptrdiff_t n) {
+    for (ptrdiff_t i = 0; i < n; ++i) {
+        if (!std::isfinite(v[i])) return false;
+    }
+    return true;
+}
+
+inline scalar_t max_abs(const scalar_t *const v, const ptrdiff_t n) {
+    scalar_t m = 0;
+    for (ptrdiff_t i = 0; i < n; ++i) m = std::max(m, std::fabs(v[i]));
+    return m;
+}
+
+inline void compare_hessian_apply(MeshData &d, sfem::Operator<scalar_t> &A_bsr, const scalar_t rho, const scalar_t mu,
+                                  const GeomKind geom, const std::vector<uint8_t> &constrained,
+                                  const scalar_t *const SFEM_RESTRICT v, const ptrdiff_t ndof) {
+    std::vector<scalar_t> y_mf((size_t)ndof), y_asm((size_t)ndof);
+    apply_jacobian_action(d, rho, mu, geom, constrained, v, y_mf.data());
+    A_bsr.apply(v, y_asm.data());
+    scalar_t linf = 0, l2 = 0, nrm = 0, linf_u = 0, linf_p = 0;
+    ptrdiff_t imax = 0;
+    for (ptrdiff_t i = 0; i < ndof; ++i) {
+        const scalar_t e = y_mf[i] - y_asm[i];
+        const scalar_t ae = std::fabs(e);
+        l2 += e * e;
+        nrm += y_asm[i] * y_asm[i];
+        if (ae > linf) {
+            linf = ae;
+            imax = i;
+        }
+        if ((i & 3) == 3)
+            linf_p = std::max(linf_p, ae);
+        else
+            linf_u = std::max(linf_u, ae);
+    }
+    std::printf("  Jv check: |Jmf-Jasm|_inf=%.6e  rel_l2=%.6e  |du|=%.6e  |dp|=%.6e  imax=%ld (node %ld fld %ld)\n",
+                linf,
+                (nrm > 0) ? std::sqrt(l2 / nrm) : std::sqrt(l2),
+                linf_u,
+                linf_p,
+                (long)imax,
+                (long)(imax / 4),
+                (long)(imax & 3));
+}
+
+inline bool newton_step_converged(const scalar_t rn, const scalar_t r0, const scalar_t atol, const scalar_t rtol) {
+    if (!std::isfinite(rn) || !std::isfinite(r0)) return false;
+    return rn < atol || (r0 > 0 && rn / r0 < rtol);
+}
+
+inline void mark_constraints(const MeshData        &d,
+                             const FlowCase         flow,
+                             const scalar_t         mu,
+                             const scalar_t         U,
+                             std::vector<uint8_t>  &constrained,
+                             std::vector<scalar_t> &bc,
+                             ptrdiff_t             &pin_p) {
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::mark_constraints");
+    const ptrdiff_t ndof = d.nnodes * N_FIELDS;
+    constrained.assign((size_t)ndof, 0);
+    bc.assign((size_t)ndof, scalar_t(0));
+
+    const auto *const px = d.points[0];
+    const auto *const py = d.points[1];
+    const auto *const pz = d.points[2];
+
+    scalar_t  best = 1e300;
+    ptrdiff_t pin  = 0;
+    for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+        const scalar_t x = scalar_t(px[i]);
+        const scalar_t y = scalar_t(py[i]);
+        const scalar_t z = scalar_t(pz[i]);
+        const scalar_t r = x + y + z;
+        if (r < best) {
+            best = r;
+            pin  = i;
+        }
+
+        scalar_t ux, uy, uz, p;
+        exact_state(flow, mu, U, d.Lx, d.Ly, x, y, z, ux, uy, uz, p);
+        bc[(size_t)i * 4 + 0] = ux;
+        bc[(size_t)i * 4 + 1] = uy;
+        bc[(size_t)i * 4 + 2] = uz;
+        bc[(size_t)i * 4 + 3] = p;
+
+        const bool wall_y = on_plane(y, scalar_t(0), d.Ly) || on_plane(y, d.Ly, d.Ly);
+        const bool inlet  = on_plane(x, scalar_t(0), d.Lx);
+        const bool outlet = on_plane(x, d.Lx, d.Lx);
+        const bool span   = on_plane(z, scalar_t(0), d.Lz) || on_plane(z, d.Lz, d.Lz);
+
+        if (wall_y) {
+            constrained[(size_t)i * 4 + 0] = 1;
+            constrained[(size_t)i * 4 + 1] = 1;
+            constrained[(size_t)i * 4 + 2] = 1;
+        } else if ((inlet || outlet)) {
+            constrained[(size_t)i * 4 + 0] = 1;
+            constrained[(size_t)i * 4 + 1] = 1;
+            constrained[(size_t)i * 4 + 2] = 1;
+        }
+
+        if (span) constrained[(size_t)i * 4 + 2] = 1;
+    }
+
+    pin_p = pin;
+    constrained[(size_t)pin * 4 + 3] = 1;
+}
+
+inline void init_fields(MeshData                    &d,
+                        const InitKind               init,
+                        const std::vector<uint8_t>  &constrained,
+                        const std::vector<scalar_t> &bc) {
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::init_fields");
+    d.ux.resize((size_t)d.nnodes);
+    d.uy.resize((size_t)d.nnodes);
+    d.uz.resize((size_t)d.nnodes);
+    d.p.resize((size_t)d.nnodes);
+    d.rx.assign((size_t)d.nnodes, 0);
+    d.ry.assign((size_t)d.nnodes, 0);
+    d.rz.assign((size_t)d.nnodes, 0);
+    d.rc.assign((size_t)d.nnodes, 0);
+
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+        d.p[i] = bc[(size_t)i * 4 + 3];
+        if (init == InitKind::Exact) {
+            d.ux[i] = bc[(size_t)i * 4 + 0];
+            d.uy[i] = bc[(size_t)i * 4 + 1];
+            d.uz[i] = bc[(size_t)i * 4 + 2];
+        } else {
+            d.ux[i] = constrained[(size_t)i * 4 + 0] ? bc[(size_t)i * 4 + 0] : scalar_t(0);
+            d.uy[i] = constrained[(size_t)i * 4 + 1] ? bc[(size_t)i * 4 + 1] : scalar_t(0);
+            d.uz[i] = constrained[(size_t)i * 4 + 2] ? bc[(size_t)i * 4 + 2] : scalar_t(0);
+        }
+    }
+}
+
+struct ErrorNorms {
+    scalar_t  u_linf{0};
+    scalar_t  u_l2{0};
+    scalar_t  p_linf{0};
+    scalar_t  p_l2{0};
+    scalar_t  u_linf_free{0};
+    scalar_t  p_linf_free{0};
+    scalar_t  p_min{0};
+    scalar_t  p_max{0};
+    ptrdiff_t n_free_u{0};
+    ptrdiff_t n_free_p{0};
+};
+
+inline ErrorNorms compute_errors(const MeshData               &d,
+                                 const FlowCase                flow,
+                                 const scalar_t                mu,
+                                 const scalar_t                U,
+                                 const std::vector<uint8_t>   &constrained) {
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::compute_errors");
+    ErrorNorms        err;
+    scalar_t          u2 = 0;
+    scalar_t          p2 = 0;
+    const auto *const px = d.points[0];
+    const auto *const py = d.points[1];
+    const auto *const pz = d.points[2];
+
+    if (d.nnodes > 0) {
+        err.p_min = d.p[0];
+        err.p_max = d.p[0];
+    }
+
+    for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+        scalar_t ux, uy, uz, p;
+        exact_state(flow, mu, U, d.Lx, d.Ly, scalar_t(px[i]), scalar_t(py[i]), scalar_t(pz[i]), ux, uy, uz, p);
+        const scalar_t eux = d.ux[i] - ux;
+        const scalar_t euy = d.uy[i] - uy;
+        const scalar_t euz = d.uz[i] - uz;
+        const scalar_t ep  = d.p[i] - p;
+        const scalar_t eu  = std::sqrt(eux * eux + euy * euy + euz * euz);
+        err.u_linf         = std::max(err.u_linf, eu);
+        err.p_linf         = std::max(err.p_linf, std::fabs(ep));
+        err.p_min          = std::min(err.p_min, d.p[i]);
+        err.p_max          = std::max(err.p_max, d.p[i]);
+        u2 += eux * eux + euy * euy + euz * euz;
+        p2 += ep * ep;
+
+        const int u_free = !constrained[(size_t)i * 4 + 0] || !constrained[(size_t)i * 4 + 1] ||
+                           !constrained[(size_t)i * 4 + 2];
+        if (u_free) {
+            err.u_linf_free = std::max(err.u_linf_free, eu);
+            err.n_free_u += 1;
+        }
+        if (!constrained[(size_t)i * 4 + 3]) {
+            err.p_linf_free = std::max(err.p_linf_free, std::fabs(ep));
+            err.n_free_p += 1;
+        }
+    }
+    err.u_l2 = std::sqrt(u2 / scalar_t(d.nnodes));
+    err.p_l2 = std::sqrt(p2 / scalar_t(d.nnodes));
+    return err;
+}
+

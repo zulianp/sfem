@@ -1,0 +1,695 @@
+// Every spelling of the Jacobian must agree with every other one.
+//
+// The spike carries the same operator in several forms -- a matrix-free action, an assembled
+// BSR, a block diagonal for the preconditioner -- and they are written independently. Nothing
+// compared the block diagonal against the action until this test, and that gap was not
+// hypothetical: with the exact Rhie-Chow Jacobian on, assemble_block_diag was building the
+// FROZEN operator's blocks while the action differentiated the reconstructed pressure
+// gradient, so the preconditioner was built from a different operator than the one it
+// preconditions. It measured 3.5e-02 relative and it stopped the pressure-port case
+// converging at all. A self-consistency test is the only thing that catches that class of
+// defect, because each form looks perfectly reasonable on its own.
+//
+// The invariants are not all unconditional, and saying which hold where is most of the value:
+//
+//   [1] block diagonal == the diagonal 4x4 blocks of the ACTION.
+//       Asserted in the frozen form, where it holds to round-off. It SHOULD be
+//       unconditional -- the action is the operator the solver applies, so whatever the
+//       preconditioner inverts ought to be its diagonal -- and in the exact form it is not,
+//       by 8.2e-02 steady and 1.2e-02 on BDF2. That is measured here rather than asserted,
+//       because the gap is understood and closing it is not a local change:
+//
+//       qg_i is the reconstructed gradient at node i, summed over EVERY element containing
+//       i and then scaled by 1/W_i. So d(qg_i)/d(q_i) is a property of i's whole element
+//       neighbourhood, while a sub-control surface (i,j) belongs to one element. An element
+//       loop can therefore only ever supply its own share of it, and assemble_block_diag
+//       does exactly that -- which is why its exact-form diagonal is closer to the action's
+//       than the frozen one but still not equal to it. Getting it right needs a per-node
+//       pass for d(qg_i)/d(q_i) and a per-edge one for d(qg_j)/d(q_i), both structured like
+//       the reconstruction itself.
+//
+//       An earlier commit claimed this test's [1] was satisfied unconditionally. It was not;
+//       this test is what established that, which is the reason it exists.
+//
+//   [2] BSR SpMV == action,  [3] diag(BSR) == action diagonal.
+//       Hold in the frozen form and NOT in the exact one, and that is a defect rather than a
+//       design. An earlier version of this comment called it "meant to differ", repeating a
+//       rationalisation instead of examining it. The assembled matrix is not merely the
+//       preconditioner's input: SFEM_MATRIX_FREE=0 hands it to the Krylov solver as THE
+//       operator, so a single environment variable decides which Jacobian the solve uses. The
+//       exact Rhie-Chow term cannot be held in the BSR pattern -- it couples pressures past
+//       nearest neighbours -- so with it on there are genuinely two operators in the code and
+//       which one you get depends on the path. That is the thing to fix, by widening the
+//       pattern or by confining the exact term to paths that never assemble; until then this
+//       measures the gap and bounds it rather than blessing it.
+//
+//   [4] block diagonal == diag(BSR). UNCONDITIONAL, and the one that has teeth in both forms.
+//       Both are built by element loops over the same kernel, so they are the same object
+//       computed twice and must agree whatever either of them approximates. This is not
+//       hypothetical either: a partial exact-diagonal term added to the block diagonal alone
+//       took them from 3.6e-16 apart to 6.0e-02, and the Galerkin levels build their smoother
+//       from the assembled matrix's diagonal while the fine level builds it from the block
+//       diagonal -- they would have been smoothing different operators. That term is reverted.
+//
+//   [S1] semi-structured block diagonal == the semi-structured action's diagonal.
+//       The same question on the other discretisation, asked separately because it is a
+//       different set of kernels over a macro-element lattice and the multigrid hierarchy is
+//       built on it. It shows the identical pattern -- round-off frozen, 1.4e-01 steady in the
+//       exact form -- which is what establishes that this is one systematic gap and not two.
+//
+// The diagonal of the action is obtained by probing it with unit vectors, which is legitimate
+// here and nowhere else: this is a test, the mesh is deliberately tiny, and the point is to
+// get the diagonal from the operator itself rather than from anything that shares code with
+// the thing being checked.
+//
+// Run for steady, BDF1 and BDF2, because the transient term enters the diagonal and the
+// action by different paths -- a post-pass on one and a per-node weight on the other -- and
+// an inconsistency there would be invisible to a steady-only test.
+//
+// SFEM_RC_EXACT_JAC is a process-wide static, so it cannot be swept in-process; CMake
+// registers this binary twice, once per setting, the way cvfem_flat_vs_ss_packed is.
+
+#include "frontend/op/cvfem_hex8_ns_op.hpp"
+
+#include "frontend/op/cvfem_hex8_ns_core.hpp"
+#include "frontend/ss/cvfem_sshex8_ns.hpp"
+#include "frontend/galerkin/cvfem_ss_galerkin.hpp"
+
+#include "sfem_context.hpp"
+#include "smesh_mesh.hpp"
+#include "smesh_semistructured.hpp"
+
+#include <algorithm>
+#include <cmath>
+#include <cstdio>
+#include <cstdlib>
+#include <vector>
+
+static int g_failures = 0;
+
+static void check(const bool ok, const char *what) {
+    std::printf("%-64s %s\n", what, ok ? "OK" : "FAIL");
+    if (!ok) ++g_failures;
+}
+
+static void report(const scalar_t rel, const char *what) {
+    std::printf("%-64s rel %.3e  (reported, not asserted)\n", what, (double)rel);
+}
+
+static void check_rel(const scalar_t worst, const scalar_t scale, const scalar_t tol, const char *what) {
+    const scalar_t rel = scale > 0 ? worst / scale : worst;
+    const bool     ok  = rel <= tol;
+    std::printf("%-64s rel %.3e %s\n", what, (double)rel, ok ? "OK" : "FAIL");
+    if (!ok) ++g_failures;
+}
+
+namespace {
+
+    // Deliberately not a flow: every component and every coupling is excited, so a term that
+    // is dropped somewhere cannot hide behind a residual that happens to be near zero.
+    void fill_state(MeshData &d) {
+        const auto *const px = d.points[0];
+        const auto *const py = d.points[1];
+        const auto *const pz = d.points[2];
+        for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+            const scalar_t X = px[i], Y = py[i], Z = pz[i];
+            d.ux[(size_t)i] = std::sin(scalar_t(1.7) * X) * std::cos(scalar_t(2.3) * Y) + scalar_t(0.3) * Z;
+            d.uy[(size_t)i] = std::cos(scalar_t(1.1) * Y) * (scalar_t(1) + scalar_t(0.2) * X) - scalar_t(0.15) * Z;
+            d.uz[(size_t)i] = std::sin(scalar_t(0.9) * Z) * (scalar_t(0.5) + scalar_t(0.1) * Y);
+            d.p[(size_t)i]  = scalar_t(0.7) * X - scalar_t(0.4) * Y + scalar_t(0.25) * Z * Z;
+        }
+    }
+
+    void make_mesh(MeshData &d, std::shared_ptr<smesh::Mesh> &mesh, sfem::Context &ctx) {
+        // Small on purpose: the probe below costs one operator apply per degree of freedom.
+        const int mn = std::getenv("CVFEM_TEST_N") ? std::atoi(std::getenv("CVFEM_TEST_N")) : 3;
+        mesh = smesh::Mesh::create_hex8_cube(ctx.communicator(), mn, mn > 3 ? mn / 2 : 2, mn > 3 ? mn / 2 : 2,
+                                             0, 0, 0, 2, 1, 1);
+        d.mesh      = mesh;
+        d.Lx        = 2;
+        d.Ly        = 1;
+        d.Lz        = 1;
+        d.nnodes    = mesh->n_nodes();
+        d.nelements = mesh->n_elements(0);
+        d.elems     = mesh->elements(0)->data();
+        d.points    = mesh->points()->data();
+        cvfem_hex8_precompute_affine_geometry(d);
+        d.ux.assign((size_t)d.nnodes, 0);
+        d.uy.assign((size_t)d.nnodes, 0);
+        d.uz.assign((size_t)d.nnodes, 0);
+        d.p.assign((size_t)d.nnodes, 0);
+        d.rx.assign((size_t)d.nnodes, 0);
+        d.ry.assign((size_t)d.nnodes, 0);
+        d.rz.assign((size_t)d.nnodes, 0);
+        d.rc.assign((size_t)d.nnodes, 0);
+        d.rhie_chow_scale = 1;
+        fill_state(d);
+    }
+
+    // The diagonal 4x4 blocks of the action, column by column. Nothing here shares code with
+    // assemble_block_diag, which is the entire point.
+    void probe_action_diag(MeshData &d, const scalar_t rho, const scalar_t mu,
+                           const std::vector<uint8_t> &free_mask, std::vector<scalar_t> &blocks) {
+        const ptrdiff_t ndof = d.nnodes * N_FIELDS;
+        blocks.assign((size_t)d.nnodes * 16, scalar_t(0));
+        std::vector<scalar_t> dir((size_t)ndof), jv((size_t)ndof);
+        for (ptrdiff_t col = 0; col < ndof; ++col) {
+            std::fill(dir.begin(), dir.end(), scalar_t(0));
+            dir[(size_t)col] = scalar_t(1);
+            apply_jacobian_action(d, rho, mu, GeomKind::Affine, free_mask, dir.data(), jv.data());
+            const ptrdiff_t node = col / N_FIELDS;
+            const int       c    = (int)(col % N_FIELDS);
+            for (int r = 0; r < N_FIELDS; ++r)
+                blocks[(size_t)node * 16 + (size_t)r * 4 + (size_t)c] = jv[(size_t)node * N_FIELDS + r];
+        }
+    }
+
+    // Where the difference lives, per 4x4 component, each normalised by the largest entry of
+    // ITS OWN component rather than by the global maximum.
+    //
+    // The global-maximum normalisation used by worst_rel below is dominated by the momentum
+    // diagonal, so a total error on a small pressure entry shows up as a modest-looking
+    // fraction. That is exactly what the headline numbers do, and it is why they shrink when a
+    // transient term is added -- the denominator grows, the numerator does not.
+    void report_by_block(const std::vector<scalar_t> &a, const std::vector<scalar_t> &b, const char *what) {
+        scalar_t worst[16] = {0}, scale[16] = {0};
+        for (size_t k = 0; k < a.size(); ++k) {
+            const int c = (int)(k % 16);
+            worst[c]    = std::max(worst[c], std::fabs(a[k] - b[k]));
+            scale[c]    = std::max(scale[c], std::fabs(b[k]));
+        }
+        // The pp entry per NODE, against that node's own value, so the distribution is visible
+        // rather than a single max over a global scale.
+        {
+            const size_t n = a.size() / 16;
+            scalar_t     mx = 0, mn = 1e30, sum = 0;
+            size_t       cnt = 0;
+            for (size_t i = 0; i < n; ++i) {
+                const scalar_t av = a[i * 16 + 15], bv = b[i * 16 + 15];
+                if (std::fabs(bv) < scalar_t(1e-12)) continue;
+                const scalar_t r = std::fabs(av - bv) / std::fabs(bv);
+                mx = std::max(mx, r); mn = std::min(mn, r); sum += r; ++cnt;
+            }
+            if (cnt)
+                std::printf("   pp per node, relative to that node's own pp: min %.4f  mean %.4f  max %.4f  (%zu nodes)\n",
+                            (double)mn, (double)(sum / (scalar_t)cnt), (double)mx, cnt);
+        }
+        const char *nm[4] = {"u", "v", "w", "p"};
+        std::printf("   %s, per block (rel to that block's own scale):\n", what);
+        for (int r = 0; r < 4; ++r) {
+            std::printf("     ");
+            for (int c = 0; c < 4; ++c) {
+                const int      k  = r * 4 + c;
+                const scalar_t rr = scale[k] > 0 ? worst[k] / scale[k] : scalar_t(0);
+                std::printf("%s%s %8.2e   ", nm[r], nm[c], (double)rr);
+            }
+            std::printf("\n");
+        }
+    }
+
+    scalar_t worst_rel(const std::vector<scalar_t> &a, const std::vector<scalar_t> &b) {
+        scalar_t worst = 0, scale = 0;
+        for (size_t k = 0; k < a.size(); ++k) {
+            worst = std::max(worst, std::fabs(a[k] - b[k]));
+            scale = std::max(scale, std::fabs(b[k]));
+        }
+        return scale > 0 ? worst / scale : worst;
+    }
+
+    void run_variant(sfem::Context &ctx, const char *name, const scalar_t dt, const int bdf_order,
+                     const bool with_prev2, const bool exact) {
+        std::printf("\n-- %s --\n", name);
+
+        MeshData                     d;
+        std::shared_ptr<smesh::Mesh> mesh;
+        make_mesh(d, mesh, ctx);
+        d.dt        = dt;
+        d.bdf_order = bdf_order;
+        if (dt > 0) {
+            d.u_prev.assign((size_t)d.nnodes * 3, scalar_t(0.25));
+            if (with_prev2) d.u_prev2.assign((size_t)d.nnodes * 3, scalar_t(0.1));
+        }
+
+        const scalar_t rho = 1, mu = 0.01;
+        const ptrdiff_t ndof = d.nnodes * N_FIELDS;
+
+        // The nodal pressure gradient the exact term reads; the action requires it to exist.
+        assemble_nodal_p_grad(d, GeomKind::Affine);
+
+        const std::vector<uint8_t> free_mask((size_t)ndof, 0);
+
+        std::vector<scalar_t> bd;
+        assemble_block_diag(d, rho, mu, GeomKind::Affine, bd);
+
+        std::vector<scalar_t> probed;
+        probe_action_diag(d, rho, mu, free_mask, probed);
+
+        scalar_t scale = 0;
+        for (const scalar_t v : probed) scale = std::max(scale, std::fabs(v));
+        check(scale > scalar_t(1e-8), "the probed diagonal is not trivially zero");
+
+        const scalar_t r_bd = worst_rel(bd, probed);
+        if (exact) {
+            report(r_bd, "[1] block diagonal vs action diagonal (exact form: known gap)");
+            report_by_block(bd, probed, "[1]");
+            check(r_bd < scalar_t(0.25), "[1] the block diagonal's known gap stays bounded");
+        } else {
+            check_rel(r_bd, scalar_t(1), scalar_t(1e-10),
+                      "[1] block diagonal == diagonal blocks of the action");
+        }
+
+        // [2] and [3]
+        BSR4 b = make_bsr4(d.mesh);
+        precompute_element_bsr_slots(d, b);
+        assemble_jacobian(d, b, rho, mu, GeomKind::Affine);
+
+        std::vector<scalar_t> dir((size_t)ndof), act((size_t)ndof), spmv((size_t)ndof, scalar_t(0));
+        for (ptrdiff_t i = 0; i < ndof; ++i)
+            dir[(size_t)i] = std::sin(scalar_t(0.37) * (scalar_t)i) + scalar_t(0.11) * (scalar_t)(i % 7);
+        apply_jacobian_action(d, rho, mu, GeomKind::Affine, free_mask, dir.data(), act.data());
+
+        const scalar_t *const vals = b.data();
+        for (ptrdiff_t row = 0; row < d.nnodes; ++row)
+            for (smesh::count_t k = b.rowptr[row]; k < b.rowptr[row + 1]; ++k) {
+                const scalar_t *const blk = vals + (ptrdiff_t)k * 16;
+                const smesh::idx_t    col = b.colidx[k];
+                for (int r = 0; r < 4; ++r)
+                    for (int c = 0; c < 4; ++c)
+                        spmv[(size_t)row * 4 + (size_t)r] += blk[r * 4 + c] * dir[(size_t)col * 4 + (size_t)c];
+            }
+
+        std::vector<scalar_t> bsr_diag((size_t)d.nnodes * 16);
+        for (ptrdiff_t r = 0; r < d.nnodes; ++r)
+            for (int k = 0; k < 16; ++k)
+                bsr_diag[(size_t)r * 16 + (size_t)k] = vals[(ptrdiff_t)b.diag_slots[(size_t)r] * 16 + k];
+
+        const scalar_t r_spmv = worst_rel(spmv, act);
+        const scalar_t r_diag = worst_rel(bsr_diag, probed);
+        // [4] the two ASSEMBLED objects against each other. Both are built by element loops
+        // over the same kernel, so this holds whatever either of them approximates -- unless
+        // one of them has gained a term the other has not.
+        check_rel(worst_rel(bd, bsr_diag), scalar_t(1), scalar_t(1e-11),
+                  "[4] block diagonal == diag(BSR), unconditionally");
+        if (exact) {
+            // Meant to differ: the assembled matrix deliberately omits the wide term. Bounded
+            // rather than ignored, so a blow-up is still caught.
+            report(r_spmv, "[2] BSR SpMV vs action (exact form: differs by design)");
+            report(r_diag, "[3] diag(BSR) vs action diagonal (exact form: differs by design)");
+            check(r_spmv < scalar_t(0.5) && r_diag < scalar_t(0.5),
+                  "[2,3] the by-design difference stays bounded");
+        } else {
+            check_rel(r_spmv * scalar_t(1), scalar_t(1), scalar_t(1e-11), "[2] BSR SpMV == action");
+            check_rel(r_diag * scalar_t(1), scalar_t(1), scalar_t(1e-11), "[3] diag(BSR) == action diagonal");
+        }
+    }
+
+    // ---- the semi-structured path ----
+    //
+    // The same question on the other discretisation, and it has to be asked separately: the
+    // semi-structured operator is a different set of kernels over a macro-element lattice, and
+    // it carries its own block diagonal. A flat-only test says nothing about it, and the
+    // semi-structured path is what the multigrid hierarchy is built on.
+    void probe_ss_action_diag(SSMeshData &d, const scalar_t rho, const scalar_t mu,
+                              std::vector<scalar_t> &blocks) {
+        const ptrdiff_t ndof = d.nnodes * N_FIELDS;
+        blocks.assign((size_t)d.nnodes * 16, scalar_t(0));
+        std::vector<scalar_t> dir((size_t)ndof), jv((size_t)ndof);
+        for (ptrdiff_t col = 0; col < ndof; ++col) {
+            std::fill(dir.begin(), dir.end(), scalar_t(0));
+            dir[(size_t)col] = scalar_t(1);
+            std::fill(jv.begin(), jv.end(), scalar_t(0));
+            sscvfem_apply(d, rho, mu, dir.data(), jv.data());
+            const ptrdiff_t node = col / N_FIELDS;
+            const int       c    = (int)(col % N_FIELDS);
+            for (int r = 0; r < N_FIELDS; ++r)
+                blocks[(size_t)node * 16 + (size_t)r * 4 + (size_t)c] = jv[(size_t)node * N_FIELDS + r];
+        }
+    }
+
+    void run_ss_variant(sfem::Context &ctx, const char *name, const scalar_t dt, const int bdf_order,
+                        const bool with_prev2, const bool exact) {
+        std::printf("\n-- semi-structured, %s --\n", name);
+        const int level  = 2;  // a power of two; the operator refuses the others
+        auto      coarse = smesh::Mesh::create_hex8_cube(ctx.communicator(), 1, 1, 1, 0, 0, 0, 2, 1, 1);
+        auto      mesh   = smesh::to_semistructured(level, coarse, true, false);
+        if (!mesh) {
+            check(false, "to_semistructured built a mesh");
+            return;
+        }
+        SSMeshData d;
+        sscvfem_init(d, mesh, level);
+        d.rhie_chow_scale = 1;
+        d.dt              = dt;
+        d.bdf_order       = bdf_order;
+        if (dt > 0) {
+            d.u_prev.assign((size_t)d.nnodes * 3, scalar_t(0.25));
+            if (with_prev2) d.u_prev2.assign((size_t)d.nnodes * 3, scalar_t(0.1));
+        }
+        const auto *const px = d.points[0];
+        const auto *const py = d.points[1];
+        const auto *const pz = d.points[2];
+        for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+            const scalar_t X = px[i], Y = py[i], Z = pz[i];
+            d.ux[(size_t)i] = std::sin(scalar_t(1.7) * X) * std::cos(scalar_t(2.3) * Y) + scalar_t(0.3) * Z;
+            d.uy[(size_t)i] = std::cos(scalar_t(1.1) * Y) * (scalar_t(1) + scalar_t(0.2) * X) - scalar_t(0.15) * Z;
+            d.uz[(size_t)i] = std::sin(scalar_t(0.9) * Z) * (scalar_t(0.5) + scalar_t(0.1) * Y);
+            d.p[(size_t)i]  = scalar_t(0.7) * X - scalar_t(0.4) * Y + scalar_t(0.25) * Z * Z;
+        }
+        const scalar_t rho = 1, mu = 0.01;
+        sscvfem_nodal_p_grad(d);
+
+        std::vector<scalar_t> bd;
+        sscvfem_block_diag(d, rho, mu, bd);
+
+        std::vector<scalar_t> probed;
+        probe_ss_action_diag(d, rho, mu, probed);
+
+        scalar_t scale = 0;
+        for (const scalar_t v : probed) scale = std::max(scale, std::fabs(v));
+        check(scale > scalar_t(1e-8), "the probed semi-structured diagonal is not trivially zero");
+
+        const scalar_t r = worst_rel(bd, probed);
+        if (exact) {
+            report(r, "[S1] SS block diagonal vs SS action diagonal (exact form)");
+            check(r < scalar_t(0.25), "[S1] the semi-structured gap stays bounded");
+        } else {
+            check_rel(r, scalar_t(1), scalar_t(1e-10), "[S1] SS block diagonal == SS action diagonal");
+        }
+    }
+
+    // ---- the element-wise Galerkin assembly, with every term ----
+    //
+    // At q = 1 the coarse space IS the fine one and the prolongation is the identity, so
+    // P^T A P is A and the assembled operator must reproduce the action exactly. That makes
+    // this the sharpest statement available about the assembly: it is not "the coarsening is
+    // plausible", it is "every term the action carries is in the assembly and none is extra".
+    // A missing transient contribution, a dropped boundary closure or a Rhie-Chow term that
+    // did not make it into the cell matrix all show up here as a finite number, because there
+    // is nowhere for them to hide behind a coarsening.
+    //
+    // Reachable from a test only because galerkin_gid_from_rows exists: the coarse
+    // connectivity at q = 1 is the semi-structured mesh's own element table, so no coarse
+    // FunctionSpace has to be built.
+    void run_galerkin_variant(sfem::Context &ctx, const char *name, const scalar_t dt, const int bdf_order,
+                              const bool with_prev2, const bool exact) {
+        std::printf("\n-- galerkin assembly at q=1, %s --\n", name);
+        const int level  = 2;
+        auto      coarse = smesh::Mesh::create_hex8_cube(ctx.communicator(), 2, 1, 1, 0, 0, 0, 2, 1, 1);
+        auto      mesh   = smesh::to_semistructured(level, coarse, true, false);
+        if (!mesh) {
+            check(false, "to_semistructured built a mesh for the Galerkin check");
+            return;
+        }
+        SSMeshData d;
+        sscvfem_init(d, mesh, level);
+        d.rhie_chow_scale = 1;
+        d.dt              = dt;
+        d.bdf_order       = bdf_order;
+        if (dt > 0) {
+            d.u_prev.assign((size_t)d.nnodes * 3, scalar_t(0.25));
+            if (with_prev2) d.u_prev2.assign((size_t)d.nnodes * 3, scalar_t(0.1));
+        }
+        const auto *const px = d.points[0];
+        const auto *const py = d.points[1];
+        const auto *const pz = d.points[2];
+        for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+            const scalar_t X = px[i], Y = py[i], Z = pz[i];
+            d.ux[(size_t)i] = std::sin(scalar_t(1.7) * X) * std::cos(scalar_t(2.3) * Y) + scalar_t(0.3) * Z;
+            d.uy[(size_t)i] = std::cos(scalar_t(1.1) * Y) * (scalar_t(1) + scalar_t(0.2) * X) - scalar_t(0.15) * Z;
+            d.uz[(size_t)i] = std::sin(scalar_t(0.9) * Z) * (scalar_t(0.5) + scalar_t(0.1) * Y);
+            d.p[(size_t)i]  = scalar_t(0.7) * X - scalar_t(0.4) * Y + scalar_t(0.25) * Z * Z;
+        }
+        const scalar_t rho = 1, mu = 0.01;
+        sscvfem_nodal_p_grad(d);
+
+        cvfem_ss::GalerkinLevel g;
+        cvfem_ss::galerkin_init(d, 1, g);
+        std::vector<const smesh::idx_t *> rows((size_t)g.nc, nullptr);
+        for (int a = 0; a < g.nc; ++a) rows[(size_t)a] = d.elems[a];
+        cvfem_ss::galerkin_gid_from_rows(rows, d.nnodes, g);
+        cvfem_ss::galerkin_assemble(d, rho, mu, g, 0, g.nmacro);
+
+        cvfem_ss::GalerkinReduce r;
+        cvfem_ss::galerkin_build_node_reduce(g, r);
+
+        const ptrdiff_t       ndof = d.nnodes * N_FIELDS;
+        std::vector<scalar_t> dir((size_t)ndof), ga((size_t)ndof, 0), act((size_t)ndof, 0), stage;
+        for (ptrdiff_t i = 0; i < ndof; ++i)
+            dir[(size_t)i] = std::sin(scalar_t(0.37) * (scalar_t)i) + scalar_t(0.11) * (scalar_t)(i % 7);
+        cvfem_ss::galerkin_apply(g, r, stage, dir.data(), ga.data());
+        sscvfem_apply(d, rho, mu, dir.data(), act.data());
+
+        const scalar_t rg = worst_rel(ga, act);
+        if (exact) {
+            report(rg, "[G1] galerkin(q=1) apply vs SS action (exact form)");
+            check(rg < scalar_t(0.5), "[G1] the galerkin gap stays bounded");
+        } else {
+            check_rel(rg, scalar_t(1), scalar_t(1e-9), "[G1] galerkin(q=1) apply == SS action, every term");
+        }
+    }
+
+    // ---- the operator the SOLVER drives ----
+    //
+    // Everything above tests the reference kernels through MeshData. The driver does not use
+    // those: it drives sfem::CVFEMNavierStokes, which owns the FunctionSpace-derived mesh
+    // state, the packed layout, the boundary sub-control surfaces and the transient history,
+    // and which renumbers the mesh in initialize(). A consistency result on the kernels says
+    // nothing about the object the solve actually calls, and the three forms it exposes --
+    // apply, hessian_bsr and hessian_block_diag -- are the three that have to agree.
+    // ss_level > 1 builds the operator on a SEMI-STRUCTURED space, which is what the
+    // multigrid solver runs on. Covering the semi-structured KERNELS through SSMeshData, as
+    // [S1] does, is not the same thing: the Op owns the space, the constraints, the packed
+    // layout and the node renumbering, and the driver reaches the kernels only through it.
+    void run_op_variant(sfem::Context &ctx, const char *name, const real_t dt, const int bdf_order,
+                        const bool exact, const int ss_level = 1) {
+        std::printf("\n-- solver operator%s, %s --\n", ss_level > 1 ? " (semi-structured)" : "", name);
+        const int      nx = 3, ny = 2, nz = 2;
+        const scalar_t rho = 1, mu = 0.01;
+
+        auto mesh = smesh::Mesh::create_hex8_cube(ctx.communicator(), nx, ny, nz, 0, 0, 0, 2, 1, 1);
+        if (ss_level > 1) {
+            mesh = smesh::to_semistructured(ss_level, mesh, true, false);
+            if (!mesh) {
+                check(false, "to_semistructured built a mesh for the Op");
+                return;
+            }
+        }
+        auto fs   = sfem::FunctionSpace::create(mesh, N_FIELDS);
+        auto op   = std::make_shared<sfem::CVFEMNavierStokes>(fs);
+        op->rho             = rho;
+        op->mu              = mu;
+        op->rhie_chow_scale = std::getenv("CVFEM_TEST_NO_RC") ? 0 : 1;
+        op->geom            = sfem::CVFEMGeometry::Affine;
+        op->initialize();
+        if (dt > 0) op->set_time_step(dt, bdf_order);
+
+        const ptrdiff_t ndof = fs->n_dofs();
+        const auto *const px = mesh->points()->data()[0];
+        const auto *const py = mesh->points()->data()[1];
+        const auto *const pz = mesh->points()->data()[2];
+        std::vector<real_t> x((size_t)ndof);
+        for (ptrdiff_t i = 0; i < ndof / N_FIELDS; ++i) {
+            const real_t X = px[i], Y = py[i], Z = pz[i];
+            x[(size_t)i * 4 + 0] = std::sin(real_t(1.7) * X) * std::cos(real_t(2.3) * Y) + real_t(0.3) * Z;
+            x[(size_t)i * 4 + 1] = std::cos(real_t(1.1) * Y) * (real_t(1) + real_t(0.2) * X) - real_t(0.15) * Z;
+            x[(size_t)i * 4 + 2] = std::sin(real_t(0.9) * Z) * (real_t(0.5) + real_t(0.1) * Y);
+            x[(size_t)i * 4 + 3] = real_t(0.7) * X - real_t(0.4) * Y + real_t(0.25) * Z * Z;
+        }
+
+        // The action's diagonal, from the Op itself.
+        std::vector<scalar_t> probed((size_t)(ndof / N_FIELDS) * 16, scalar_t(0));
+        std::vector<real_t>   h((size_t)ndof), y((size_t)ndof);
+        for (ptrdiff_t col = 0; col < ndof; ++col) {
+            std::fill(h.begin(), h.end(), real_t(0));
+            h[(size_t)col] = real_t(1);
+            std::fill(y.begin(), y.end(), real_t(0));
+            op->apply(x.data(), h.data(), y.data());
+            const ptrdiff_t node = col / N_FIELDS;
+            const int       c    = (int)(col % N_FIELDS);
+            for (int r = 0; r < N_FIELDS; ++r)
+                probed[(size_t)node * 16 + (size_t)r * 4 + (size_t)c] = (scalar_t)y[(size_t)node * N_FIELDS + r];
+        }
+
+        std::vector<real_t> bd((size_t)(ndof / N_FIELDS) * 16, real_t(0));
+        op->hessian_block_diag(x.data(), bd.data());
+        std::vector<scalar_t> bds(bd.begin(), bd.end());
+
+        scalar_t scale = 0, vmax = 0;
+        for (const scalar_t v : probed) scale = std::max(scale, std::fabs(v));
+        for (size_t i = 0; i < probed.size() / 16; ++i) vmax = std::max(vmax, std::fabs(probed[i * 16 + 0]));
+        check(scale > scalar_t(1e-8), "the probed solver-operator diagonal is not trivially zero");
+        std::printf("   (uu diagonal max %.6e -- the transient term lands here)\n", (double)vmax);
+
+        const scalar_t r = worst_rel(bds, probed);
+        if (exact) {
+            report(r, "[O1] Op block diagonal vs Op action diagonal (exact form)");
+            check(r < scalar_t(0.25), "[O1] the solver operator's gap stays bounded");
+        } else {
+            // One tolerance for both paths. The semi-structured Op used to need 1e-6 here,
+            // because sscvfem_block_diag fed the Rhie-Chow struct each micro-cell's own
+            // float32 node coordinates while the action differenced micro-cell 0's -- 4.23e-08
+            // apart, where the flat Op was at 4.03e-17. That is fixed at the source, so the
+            // two paths now hold to the same round-off bound and a regression in either shows.
+            check_rel(r, scalar_t(1), scalar_t(1e-10), "[O1] Op block diagonal == Op action diagonal");
+        }
+    }
+
+    // ---- the action against the residual itself ----
+    //
+    // Every check above compares one spelling of the Jacobian with another, so a term missing
+    // from ALL of them passes every one. That is not hypothetical: the Rhie-Chow coefficient's
+    // velocity dependence (cvfem_hex8_rhie_chow_coeff_du) was absent from every form at once,
+    // the forms agreed with each other to round-off, and the FDA nozzle's Newton continuation
+    // stalled at Re 89 because its Jacobian was 2.7e-02 away from a finite difference of its
+    // residual. Only a comparison against the residual can see that, and only at a state where
+    // the term is alive: here the velocity is O(1) and nu = 0.01, so the advective branch of
+    // the time scale dominates. The driver's SFEM_FD_CHECK runs at the initial state, where the
+    // interior velocity is zero and the term vanishes -- which is how it went unnoticed.
+    //
+    // Asserted with the exact Rhie-Chow Jacobian only. The frozen form drops the pressure-
+    // gradient reconstruction's derivative from the continuity rows on purpose, so there the
+    // numbers are reported rather than gated.
+    struct FdRel {
+        scalar_t mom{0}, con{0};
+    };
+
+    template <typename Residual, typename Action>
+    FdRel fd_rel(const std::vector<scalar_t> &x0, const ptrdiff_t ndof, Residual &&residual, Action &&action) {
+        std::vector<scalar_t> v((size_t)ndof), jv((size_t)ndof), rp((size_t)ndof), rm((size_t)ndof), xt((size_t)ndof);
+        uint32_t              seed = 0x9e3779b9u;
+        for (auto &e : v) {
+            seed = seed * 1664525u + 1013904223u;
+            e    = scalar_t((seed >> 8) & 0xffff) / scalar_t(0xffff) - scalar_t(0.5);
+        }
+        action(x0, v, jv);
+        FdRel best{scalar_t(1e300), scalar_t(1e300)};
+        // Best over three steps: a sub-control surface whose mass flux sits within eps of the
+        // upwind switch's corner spoils a central difference at that eps and not at the others.
+        for (const scalar_t eps : {scalar_t(1e-5), scalar_t(1e-6), scalar_t(1e-7)}) {
+            for (ptrdiff_t i = 0; i < ndof; ++i) xt[(size_t)i] = x0[(size_t)i] + eps * v[(size_t)i];
+            residual(xt, rp);
+            for (ptrdiff_t i = 0; i < ndof; ++i) xt[(size_t)i] = x0[(size_t)i] - eps * v[(size_t)i];
+            residual(xt, rm);
+            scalar_t nm = 0, dm = 0, nc = 0, dc = 0;
+            for (ptrdiff_t i = 0; i < ndof; ++i) {
+                const scalar_t fdv = (rp[(size_t)i] - rm[(size_t)i]) / (scalar_t(2) * eps);
+                const scalar_t dd  = fdv - jv[(size_t)i];
+                if (i % N_FIELDS == 3) { nc += dd * dd; dc += fdv * fdv; }
+                else                   { nm += dd * dd; dm += fdv * fdv; }
+            }
+            best.mom = std::min(best.mom, std::sqrt(nm / std::max(dm, scalar_t(1e-300))));
+            best.con = std::min(best.con, std::sqrt(nc / std::max(dc, scalar_t(1e-300))));
+        }
+        return best;
+    }
+
+    void run_fd_variant(sfem::Context &ctx, const bool exact) {
+        const scalar_t rho = 1, mu = 0.01;
+        {
+            std::printf("\n-- flat, action against a finite difference of the residual --\n");
+            MeshData                     d;
+            std::shared_ptr<smesh::Mesh> mesh;
+            make_mesh(d, mesh, ctx);
+            const ptrdiff_t       ndof = d.nnodes * N_FIELDS;
+            std::vector<scalar_t> x0((size_t)ndof);
+            pack_fields(d, x0.data());
+            const std::vector<uint8_t> free_mask((size_t)ndof, 0);
+            const FdRel r = fd_rel(
+                    x0, ndof,
+                    [&](const std::vector<scalar_t> &x, std::vector<scalar_t> &out) {
+                        unpack_fields(d, x.data());
+                        apply_residual(d, rho, mu, GeomKind::Affine);
+                        pack_residual(d, out.data());
+                    },
+                    [&](const std::vector<scalar_t> &x, const std::vector<scalar_t> &dir, std::vector<scalar_t> &out) {
+                        unpack_fields(d, x.data());
+                        assemble_nodal_p_grad(d, GeomKind::Affine);
+                        apply_jacobian_action(d, rho, mu, GeomKind::Affine, free_mask, dir.data(), out.data());
+                    });
+            if (exact) {
+                check_rel(r.mom, scalar_t(1), scalar_t(1e-6), "[F1] flat action == d(residual), momentum rows");
+                check_rel(r.con, scalar_t(1), scalar_t(1e-6), "[F1] flat action == d(residual), continuity rows");
+            } else {
+                report(r.mom, "[F1] flat action vs d(residual), momentum rows");
+                report(r.con, "[F1] flat action vs d(residual), continuity rows");
+            }
+        }
+        {
+            std::printf("\n-- semi-structured, action against a finite difference of the residual --\n");
+            const int level  = 2;
+            auto      coarse = smesh::Mesh::create_hex8_cube(ctx.communicator(), 1, 1, 1, 0, 0, 0, 2, 1, 1);
+            auto      mesh   = smesh::to_semistructured(level, coarse, true, false);
+            if (!mesh) {
+                check(false, "to_semistructured built a mesh");
+                return;
+            }
+            SSMeshData d;
+            sscvfem_init(d, mesh, level);
+            d.rhie_chow_scale    = 1;
+            const auto *const px = d.points[0];
+            const auto *const py = d.points[1];
+            const auto *const pz = d.points[2];
+            const ptrdiff_t       ndof = d.nnodes * N_FIELDS;
+            std::vector<scalar_t> x0((size_t)ndof);
+            for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+                const scalar_t X = px[i], Y = py[i], Z = pz[i];
+                x0[(size_t)i * 4 + 0] = std::sin(scalar_t(1.7) * X) * std::cos(scalar_t(2.3) * Y) + scalar_t(0.3) * Z;
+                x0[(size_t)i * 4 + 1] = std::cos(scalar_t(1.1) * Y) * (scalar_t(1) + scalar_t(0.2) * X) - scalar_t(0.15) * Z;
+                x0[(size_t)i * 4 + 2] = std::sin(scalar_t(0.9) * Z) * (scalar_t(0.5) + scalar_t(0.1) * Y);
+                x0[(size_t)i * 4 + 3] = scalar_t(0.7) * X - scalar_t(0.4) * Y + scalar_t(0.25) * Z * Z;
+            }
+            const FdRel r = fd_rel(
+                    x0, ndof,
+                    [&](const std::vector<scalar_t> &x, std::vector<scalar_t> &out) {
+                        sscvfem_unpack(d, x.data());
+                        sscvfem_nodal_p_grad(d);
+                        sscvfem_residual(d, rho, mu, out.data());
+                    },
+                    [&](const std::vector<scalar_t> &x, const std::vector<scalar_t> &dir, std::vector<scalar_t> &out) {
+                        sscvfem_unpack(d, x.data());
+                        sscvfem_nodal_p_grad(d);
+                        std::fill(out.begin(), out.end(), scalar_t(0));
+                        sscvfem_apply(d, rho, mu, dir.data(), out.data());
+                    });
+            if (exact) {
+                check_rel(r.mom, scalar_t(1), scalar_t(1e-6), "[F2] SS action == d(residual), momentum rows");
+                check_rel(r.con, scalar_t(1), scalar_t(1e-6), "[F2] SS action == d(residual), continuity rows");
+            } else {
+                report(r.mom, "[F2] SS action vs d(residual), momentum rows");
+                report(r.con, "[F2] SS action vs d(residual), continuity rows");
+            }
+        }
+    }
+
+}  // namespace
+
+int main(int argc, char **argv) {
+    auto      ctx   = sfem::initialize(argc, argv);
+    const char *const raw = std::getenv("SFEM_RC_EXACT_JAC");
+    const bool  exact = !(raw && raw[0] == '0');
+    std::printf("operator consistency: SFEM_RC_EXACT_JAC=%d (%s Rhie-Chow Jacobian)\n",
+                exact ? 1 : 0, exact ? "exact" : "frozen");
+
+    run_variant(*ctx, "steady", scalar_t(0), 1, false, exact);
+    run_variant(*ctx, "transient BDF1", scalar_t(0.05), 1, false, exact);
+    run_variant(*ctx, "transient BDF2", scalar_t(0.05), 2, true, exact);
+
+    run_ss_variant(*ctx, "steady", scalar_t(0), 1, false, exact);
+    run_ss_variant(*ctx, "transient BDF1", scalar_t(0.05), 1, false, exact);
+    run_ss_variant(*ctx, "transient BDF2", scalar_t(0.05), 2, true, exact);
+
+    run_op_variant(*ctx, "steady", real_t(0), 1, exact);
+    run_op_variant(*ctx, "transient BDF1", real_t(0.05), 1, exact);
+    run_op_variant(*ctx, "transient BDF2", real_t(0.05), 2, exact);
+
+    run_galerkin_variant(*ctx, "steady", scalar_t(0), 1, false, exact);
+    run_galerkin_variant(*ctx, "transient BDF2", scalar_t(0.05), 2, true, exact);
+
+    run_op_variant(*ctx, "steady", real_t(0), 1, exact, 2);
+    run_op_variant(*ctx, "transient BDF2", real_t(0.05), 2, exact, 2);
+
+    run_fd_variant(*ctx, exact);
+
+    std::printf("\n%s\n", g_failures ? "operator consistency: FAILED" : "all operator forms agree");
+    return g_failures ? EXIT_FAILURE : EXIT_SUCCESS;
+}

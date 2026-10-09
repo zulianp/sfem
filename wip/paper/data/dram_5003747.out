@@ -1,0 +1,31 @@
+# MEASURED DRAM TRAFFIC, Grace SCF counters, job 5003747 (repeat=10 and repeat=40).
+#
+# Two captures differenced across repeat count so that mesh setup, pack construction and the
+# three warmup applies cancel exactly. Both runs used --warmup 3, n=128, 72 threads,
+# OMP_PROC_BIND=true. See jobs/dram_traffic.sbatch for the units.
+#
+# bytes = cmem_rd_data * 32 + cmem_wr_total_bytes
+#
+# operation  layout  repeat_lo  repeat_hi  bytes_lo        bytes_hi         dofs
+residual     packed  10  40  8426313096    22624470488    8586756
+residual     atomic  10  40  8124968480    22841701152    8586756
+residual     colored 10  40  8766774783    23358094824    8586756
+residual     ecolor  10  40  15334631328   42993516416    8586756
+residual_rc  packed  10  40  11141748984   31220296120    8586756
+residual_rc  atomic  10  40  10243495472   28422836304    8586756
+residual_rc  colored 10  40  13831591016   36778091448    8586756
+residual_rc  ecolor  10  40  25806225616   77939666816    8586756
+jac_action   packed  10  40  9393008768    25081672184    8586756
+jac_action   atomic  10  40  10303281344   25880323968    8586756
+jac_action   colored 10  40  11930657488   31988618440    8586756
+jac_action   ecolor  10  40  28415948728   86661582136    8586756
+jac_action_rc packed  10  40  33242979264   95488361224    8586756
+jac_action_rc atomic  10  40  30701058408   90528645544    8586756
+jac_action_rc colored 10  40  37118233920   106100306312   8586756
+jac_action_rc ecolor  10  40  90498055856   283175955512   8586756
+jac_action-ho packed  10  40  58514920936   173760092840   8586756
+jac_action-ho atomic  10  40  66833524608   209283113304   8586756
+jac_action-ho ecolor  10  40  275793048320  882460311168   8586756
+residual-ho  packed  10  40  17236252488   48135904680    8586756
+residual-ho  atomic  10  40  16318226416   46216936816    8586756
+residual-ho  ecolor  10  40  59996207072   181267864680   8586756

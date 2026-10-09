@@ -1,0 +1,60 @@
+# IS THE ARENA CONVERSION INVARIANT? Grace, 72 threads, OMP_PROC_BIND=true.
+#
+# Commit under test: e4e530a90, which moved thirteen per-thread std::vector scratch buffers out
+# of `#pragma omp parallel` regions and into arena slots 9-13 -- including the Vanka smoother's
+# nnodes-wide node-to-slot map. Reference: fb86be26a, the commit before it.
+#
+# This is the verification that was OWED on Grace rather than on a laptop, and could not be made
+# until the Alps SFEM install was refreshed: the install predated
+# frontend/sfem_ParallelGradientOperator.hpp, so cvfem_hex8_ns_ssgmg did not build there at all.
+# jobs/ab_refactor.sbatch settles throughput and cannot see this code -- the bench reaches neither
+# Vanka nor the Galerkin coarse operator -- so what is needed here is invariance, not timing.
+
+## jobs/vanka_invariance_ab.sbatch, Grace job 4986218
+
+The Vanka stencil application against a BSR built for the same state -- the one assertion in this
+area that makes a claim -- agrees to the printed digit on both sides:
+
+    ref   vanka stencil vs bsr: rel |M_sten r - M_bsr r| = 2.3228e-08  OK
+    new   vanka stencil vs bsr: rel |M_sten r - M_bsr r| = 2.3228e-08  OK
+
+Every iteration count, convergence flag and final residual is identical:
+
+  arm    ndof      converged  newton_total  lin_it_total  final ||R||      final rel
+  gate   116212    0 (capped) 3             124           1.726115e-11     1.297237e-05
+  mg     143748    1          15            101           2.328954e-11     2.384926e-09
+  nomg   143748    1          15            4426          5.190589e-11     5.315333e-09
+
+`gate` is the nozzle at SFEM_NL_MAX_IT=3, so not converging is the arm's design. `mg` and `nomg`
+are the cavity at internal level 4, which converges, through the same Vanka smoother and the same
+Galerkin coarse operator -- the nozzle with multigrid is a nine-stage Reynolds continuation with
+no env var to cut it, which is a poor shape for an invariance comparison.
+
+ONE scalar of 94 differed: `newton 4 rel: 9.436903e-12` against `9.436901e-12`, at the end of
+continuation stage 4 of 5, where ||R|| is 9.215431e-14 and printed the SAME on both sides. Only
+the derived ratio moved, so the denominator differed below print precision.
+
+## jobs/vanka_selfcmp.sbatch, Grace job 4986232 -- what that difference actually is
+
+A baseline comparison can be satisfied by luck, so each binary was run twice and compared against
+itself. The same binary disagrees with itself at that same line:
+
+    ref vs ref   line 74   9.436902e-12  against  9.436901e-12
+    new vs new   line 74   9.436901e-12  against  9.436903e-12
+    ref vs new   line 74   (the same line, the same magnitude)
+
+Line 74 is the ONLY line that ever differs, in all four comparisons, out of 94 scalars each. So
+that scalar is not reproducible run to run whatever binary produces it: the A/B difference is
+pre-existing nondeterminism and is not attributable to the arena.
+
+VERDICT: the arena conversion is invariant.
+
+## The finding this turned up, which is about the solver and not about the change
+
+cvfem_hex8_ns_ssgmg is NOT bitwise reproducible against itself. It is reproducible in everything
+that decides anything -- iteration counts, convergence flags, final residuals, 93 of 94 scalars --
+and irreproducible in one derived ratio at a 9.2e-14 residual, which is the signature of a
+reduction whose order is not fixed. That is a property of the DRIVER's reductions. It says nothing
+about the packed layouts, whose atomics-free determinism is gated separately and by fingerprint.
+
+Worth knowing before anyone reads a last-digit difference in this driver as a regression.

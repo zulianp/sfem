@@ -1,0 +1,105 @@
+\section{The nodal gradient reconstruction}
+\label{sec:recon}
+
+One pass produces every nodal gradient the operator needs
+(\code{cvfem\_hex8\_nodal\_grads\_packed\_nc} and its atomic twin in
+\code{src/hex8/cvfem\_hex8\_pack\_helpers.hpp}). Which ones those are, per operator, is the table
+of Section~\ref{sec:schemes:needs}; in summary, Rhie--Chow needs the state's pressure gradient in
+every form and the direction's when it is differentiated, the higher-order residual needs the
+state's velocity gradient, and the exact higher-order action needs both velocity gradients ---
+the state's for term (a) of Eq.~\eqref{eq:defcor-jv} and the direction's for term (b). The
+deferred-correction action needs no velocity gradient at all.
+
+\subsection{What it computes}
+
+For each element the reference gradient of the field is contracted from the nodal values and
+pushed forward by $\adj\Jmat/\det\Jmat$, giving one element-constant gradient per field
+component; that value is then distributed to all eight of the element's nodes with a weight, and
+the nodal gradient is the weighted sum over the elements meeting at the node. The route ---
+reference gradient, then geometry --- is the same two-stage shape every other gradient in the code
+uses, deliberately, so there is one implementation of the mapping.
+
+Three properties shape the kernel:
+
+\begin{itemize}
+\item \emph{The element gradient does not depend on the node.} The same $n_c$-vector is
+      broadcast to all eight nodes, so the pass is scatter-dominated: at three fields that is
+      seventy-two scalar read-modify-writes per element against roughly sixty-six flops of real
+      work.
+\item \emph{It is a reduction over elements.} Hence the same layout question as the operator:
+      pack-local accumulation with a deterministic ghost closure, or atomics.
+\item \emph{The field count is a template parameter} (\code{NC}). A runtime trip count in the
+      scatter cost measurably, so the single code path is instantiated per field count rather than
+      parameterised at runtime.
+\end{itemize}
+
+\subsection{One path, every field count}
+
+The pass is instantiated for one to eight fields and the combinations that occur are set by the
+table of Section~\ref{sec:schemes:needs}: one field for the pressure gradient in a Rhie--Chow
+residual, three for the velocity gradient in a higher-order one, two for $\Jex$ (the direction's
+pressure gradient and the state's), six for the velocity pair, and eight for $\Jhoex$, which
+reconstructs all four of $\Gop u(v)$, $\Gop p(v)$, $\Gop u(u)$ and $\Gop p(u)$ in a single sweep.
+
+That the widest case is one sweep and not four is what makes the exact action affordable, and it
+is why input is described by a base pointer and a stride per field: the direction arrives
+interleaved by node with stride $4$ and the state's fields are contiguous, so both go in
+together without a de-interleaving copy. These were once two separate implementations at
+$n_c \in \{1,3\}$, and unifying them removed more than duplication --- the multi-field path could
+not read strided input, which was the only reason the exact action de-interleaved the direction's
+three velocity components into scratch on every application.
+
+The two per-thread staging buffers are sized from the instantiation's field count. They were
+once fixed at the four-field maximum the pass then had, which an eight-field sweep overran; it did
+not crash, it made the operator stop being bit-reproducible, which is the failure mode to expect
+from a scratch overrun in a sweep whose output is a reduction.
+
+The unification measured $+10\%$ on the packed layout and $+27\%$ on the standard one at both field
+counts. Performance neutrality at $n_c = 1$ was the gate that had to be cleared before anything
+else, since that path runs in every Rhie--Chow residual.
+
+\subsection{Rejected optimisations, and why they are recorded}
+
+Three further changes to this pass were built, measured and reverted. They are recorded in the
+source with their numbers, because each is the kind of idea that looks obviously right on a static
+count and is wrong in fact:
+
+\begin{itemize}
+\item \emph{Templating the geometry kind} to hoist the isoparametric branch out of the element
+      loop. Lost; and the first diagnosis of why was also wrong, blaming an OpenMP capture that
+      turned out to be innocent.
+\item \emph{Writing owned rows straight out}, skipping the pack-local buffer for the contiguous
+      owned range. The static argument is sound --- it removes a read-and-write pass over the
+      owned majority --- and it measured slower.
+\item \emph{Lane-blocking the element loop}, which every operator sweep beside it already does.
+      Lost at this pass's arithmetic-to-scatter ratio.
+\end{itemize}
+
+The reason to keep the numbers rather than the conclusions is that all three arguments remain
+superficially convincing, and a reader who re-derives them from a load count will rebuild them.
+The same applies to the surface-loop reschedulings of Section~\ref{sec:mk:structure}.
+
+\section{Reading the source from here}
+\label{sec:map}
+
+\begin{center}
+\begin{tabular}{@{}ll@{}}
+\toprule
+component & file \\
+\midrule
+surfaces, geometry, fluxes, packs & \code{src/upwind/cvfem\_hex8\_ns\_upwind\_kernels.hpp} \\
+generated higher-order kernels    & \code{src/upwind/cvfem\_hex8\_ns\_upwind\_sympy\_kernels.hpp} \\
+their generator                   & \code{python/synthesize\_cvfem\_hex8\_ns\_upwind\_sympy.py} \\
+limiters and their derivatives    & \code{src/venkata/cvfem\_venkata\_limiter.hpp} \\
+coefficient table, PA tangent, reconstruction & \code{src/hex8/cvfem\_hex8\_pack\_helpers.hpp} \\
+packed / standard / coloured sweeps & \code{src/best/cvfem\_hex8\_best\_*.hpp} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+Two conventions that make the source easier to read. Anything uniform over a sweep is a template
+parameter, so a function's behaviour is determined by its instantiation and not by its arguments;
+and the hand-written scalar kernels are kept as references for the vectorised and generated ones
+to be measured against, not as dead code --- they are what the oracles of
+Section~\ref{sec:jac} compare against.

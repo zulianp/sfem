@@ -1,0 +1,32 @@
+### host nid006544  threads 72  repeat=10 warmup=3  2026-10-01 12:49:51
+### 72 cores; a pack is one OpenMP iteration, so n_packs is the available parallelism
+### operators: residual and the EXACT Rhie-Chow Jacobian action, both with the boundary
+###            closure. The exact action is the two-sweep form -- it reconstructs the
+###            direction gradient every matvec -- not the lagged one the matrix holds.
+
+### pack-size sweep, space-filling order
+n      pack_req elems/pack  n_packs packs/thr mean_nodes  res_MDOFs   jac_MDOFs
+64          128       128     2048      28.4        225   1753.680    1106.787
+64          256       256     1024      14.2        405   1724.988    1107.505
+64          512       512      512       7.1        729   1642.582    1025.015
+64         1024      1024      256       3.6       1377   1642.582    1038.835
+64         2048      2048      128       1.8       2601   1659.622    1014.654
+64         4096      4096       64       0.9       4913   1622.682     954.693
+64         8192      8192       32       0.4       9537    873.267     533.460
+128         128       128    16384     227.6        225   1483.730     836.524
+128         256       256     8192     113.8        405   1528.469     878.265
+128         512       512     4096      56.9        729   1573.257     904.448
+128        1024      1024     2048      28.4       1377   1576.963     914.446
+128        2048      2048     1024      14.2       2601   1530.190     895.422
+128        4096      4096      512       7.1       4913   1435.657     849.261
+128        8192      8192      256       3.6       9537   1353.126     793.112
+
+### spatial ordering: same pack size, space-filling against lexicographic
+n          pack order          mean_nodes  res_MDOFs   jac_MDOFs
+64         2048 sfc                  2601   1661.238    1029.113
+64         2048 nosfc                4290   1521.814     811.312
+128        2048 sfc                  2601   1527.542     904.611
+128        2048 nosfc                4386   1265.899     747.181
+
+csv: /ritom/scratch/cscs/zulianp/cvfem_packsz_paper/4962375/packsize.csv
+logs in /ritom/scratch/cscs/zulianp/cvfem_packsz_paper/4962375

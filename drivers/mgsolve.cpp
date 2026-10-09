@@ -131,16 +131,6 @@ int mgsolve(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *arg
     m       = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, m, true, false);
     auto fs = sfem::FunctionSpace::create(m, SFEM_BLOCK_SIZE);
 
-#ifdef SFEM_ENABLE_CUDA
-    {
-        auto elements = fs->device_elements();
-        if (!elements) {
-            elements = create_device_elements(fs, fs->element_type());
-            fs->set_device_elements(elements);
-        }
-    }
-#endif
-
     auto conds = sfem::create_dirichlet_conditions_from_env(fs, es);
     auto f     = sfem::Function::create(fs);
 

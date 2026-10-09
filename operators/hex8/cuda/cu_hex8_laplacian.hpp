@@ -27,6 +27,14 @@ int cu_affine_hex8_laplacian_taylor_apply(const ptrdiff_t                 neleme
                                           void *const                     y,
                                           void                           *stream);
 
+int cu_affine_hex8_laplacian_diag(const ptrdiff_t                 nelements,
+                                  idx_t **const SFEM_RESTRICT     elements,
+                                  const ptrdiff_t                 fff_stride,
+                                  const void *const SFEM_RESTRICT fff,
+                                  const enum smesh::PrimitiveType             real_type_xy,
+                                  void *const SFEM_RESTRICT       diag,
+                                  void                           *stream);
+
 int cu_affine_hex8_laplacian_crs_sym(const ptrdiff_t                    nelements,
                                      idx_t **const SFEM_RESTRICT        elements,
                                      const ptrdiff_t                    fff_stride,

@@ -1,0 +1,9 @@
+### host nid006544  n=8192 reps=5  2026-09-27 08:25:44
+  rep 1: 0.478 s  2300.2 GFLOP/s
+  rep 2: 0.478 s  2301.5 GFLOP/s
+  rep 3: 0.477 s  2303.9 GFLOP/s
+  rep 4: 0.477 s  2304.4 GFLOP/s
+  rep 5: 0.477 s  2305.3 GFLOP/s
+PEAK_FP64_GFLOPS: 2305.3
+checksum: 2.970750e+02
+logs in /ritom/scratch/cscs/zulianp/cvfem_peak/4811812

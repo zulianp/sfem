@@ -38,7 +38,7 @@
 # Common overrides:
 #   N=64 OPS="assemble" LAYOUTS="colored" sbatch perf_hex8_alps.sbatch
 #   PERF_RECORD=1 sbatch perf_hex8_alps.sbatch        # + sampled profile per config
-#   GROUPS="basic stalls memory" sbatch perf_hex8_alps.sbatch
+#   PERF_GROUPS="basic stalls memory" sbatch perf_hex8_alps.sbatch
 #
 # Output:
 #   perf_hex8_alps_<ts>/cvfem_hex8_perf.csv    tidy: config,event,count  (+ derived metrics)
@@ -54,7 +54,7 @@ set -euo pipefail
 # under sbatch: Slurm copies the batch script to /var/spool/slurmd/job<id>/, so the
 # BASH_SOURCE candidate is only live when the script is run directly. SCRIPT_DIR keeps
 # its name below: everything downstream uses it as the spike root.
-_cvfem_probe=drivers/cvfem_hex8_ns_upwind_bench.cpp
+_cvfem_probe=src/drivers/cvfem_hex8_ns_upwind_bench.cpp
 SCRIPT_DIR=""
 for _cand in "${SLURM_SUBMIT_DIR:-}" "${SLURM_SUBMIT_DIR:-}/.." "${CVFEM_DIR:-}" \
              "$(dirname "${BASH_SOURCE[0]}")/.."; do
@@ -76,7 +76,6 @@ NCORES="${NCORES:-${SLURM_CPUS_PER_TASK:-72}}"
 N="${N:-64}"
 REPEAT="${REPEAT:-10}"
 WARMUP="${WARMUP:-3}"
-KERNEL="${KERNEL:-sumfact}"
 OPS="${OPS:-residual jac-action assemble bsr-apply}"
 LAYOUTS="${LAYOUTS:-packed colored}"
 PACK_packed="${PACK_packed:-2048}"
@@ -84,7 +83,11 @@ PACK_colored="${PACK_colored:-512}"
 PACK_store="${PACK_store:-384}"
 PACK_atomic=0
 
-GROUPS="${GROUPS:-basic stalls cache memory simd scf}"
+# PERF_GROUPS, not GROUPS. GROUPS is a bash special variable holding the process's group ids,
+# so bash overwrites any value passed in and `${GROUPS:-...}` expands to a numeric gid rather
+# than to the default below -- the selection silently never worked, in either direction. The
+# symptom is "error: unknown counter group '33203'".
+PERF_GROUPS="${PERF_GROUPS:-basic stalls cache memory simd scf}"
 PERF_STAT_REPEAT="${PERF_STAT_REPEAT:-2}"
 PERF_RECORD="${PERF_RECORD:-0}"
 PERF_FREQ="${PERF_FREQ:-499}"
@@ -195,6 +198,34 @@ op_flag() {
         jac-action) printf -- "--jac-action" ;;
         assemble)   printf -- "--assemble" ;;
         bsr-apply)  printf -- "--bsr-apply" ;;
+        # The higher-order deferred correction, through each of its two kernels. These are the
+        # arms the `simd` counter group exists to separate: ASE_SPEC/INST_SPEC says whether the
+        # lane loop vectorised at all, and LD_SPEC+ST_SPEC says what the reconstruction's reads
+        # cost. Both emit more than one word, which is why the expansion below is deliberately
+        # unquoted.
+        residual-ho)      printf -- "--conv-ho 0" ;;
+        residual-ho-simd) printf -- "--conv-ho 0 --ho-simd" ;;
+        # One arm per limiter, because they are four separately generated kernels and GCC does
+        # not treat them alike: its vectoriser report has defcor_lim0, lim1 and lim3 each
+        # reporting "loop vectorized using 16 byte vectors", and lim2 -- Venkatakrishnan --
+        # reporting none, with "relevant stmt not supported: iftmp = _c ? iftmp : iftmp" and then
+        # "couldn't vectorize loop". The emitted expression nests a ternary inside the condition
+        # of another, so GCC if-converts the inner one to a PHI and cannot select over it.
+        # ASE_SPEC/INST_SPEC across these four arms is what says whether that refusal actually
+        # reaches the instruction mix or whether SLP recovers it -- the throughput alone does not
+        # settle it, lim2's modelled flop rate sitting above lim0's.
+        residual-ho0)     printf -- "--conv-ho 0" ;;
+        residual-ho1)     printf -- "--conv-ho 1" ;;
+        residual-ho2)     printf -- "--conv-ho 2" ;;
+        residual-ho3)     printf -- "--conv-ho 3" ;;
+        # The nodal gradient reconstruction on its own, at one field (the pressure gradient every
+        # Rhie-Chow residual builds) and three (the velocity gradient the exact higher-order
+        # Jacobian action rebuilds per matvec). The counter groups are chosen for exactly the
+        # question this kernel poses: `simd` says whether the scalar element loop vectorises at
+        # all and what its indexed gather costs, `stalls` says whether the broadcast-to-eight-nodes
+        # scatter is stalling on memory, and `scf` gives it a roofline point.
+        nodal-grad-1)     printf -- "--nodal-grad 1" ;;
+        nodal-grad-3)     printf -- "--nodal-grad 3" ;;
         *) die "unknown operation '$1'" ;;
     esac
 }
@@ -216,10 +247,10 @@ echo "  n:        ${N}  repeat=${REPEAT} warmup=${WARMUP}"
 echo "  threads:  ${OMP_NUM_THREADS} (bind=${CPU_BIND})"
 echo "  ops:      ${OPS}"
 echo "  layouts:  ${LAYOUTS}"
-echo "  groups:   ${GROUPS}"
+echo "  groups:   ${PERF_GROUPS}"
 echo
 
-printf "config,operation,layout,kernel,pack_size,threads,cube_n,group,event,count,run_seconds\n" >"${CSV}"
+printf "config,operation,layout,pack_size,threads,cube_n,group,event,count,run_seconds\n" >"${CSV}"
 
 for op in ${OPS}; do
     flag="$(op_flag "${op}")"
@@ -230,17 +261,20 @@ for op in ${OPS}; do
         cfg="${cfg//-/_}"
 
         cmd=("${BENCH}" --n "${N}" --repeat "${REPEAT}" --warmup "${WARMUP}"
-             --layout "${layout}" --kernel "${KERNEL}")
-        [[ -n "${flag}" ]] && cmd+=("${flag}")
+             --layout "${layout}")
+        # Unquoted on purpose: op_flag may return several words (see residual-ho above), and
+        # one quoted argument would reach the driver as a single unknown option.
+        # shellcheck disable=SC2206
+        [[ -n "${flag}" ]] && cmd+=(${flag})
         [[ "${layout}" != "atomic" ]] && cmd+=(--pack-size "${ps}")
 
         # a plain run first, so the csv carries the wall time the counters belong to
         run_step "${cmd[@]}" >"${OUT_DIR}/run_${cfg}.txt" 2>&1 || true
-        secs="$(grep -m1 -E 'seconds_per_(assemble|apply|jac_action|bsr_apply):' "${OUT_DIR}/run_${cfg}.txt" \
+        secs="$(grep -m1 -E 'seconds_per_(assemble|apply|jac_action|bsr_apply|nodal_grad):' "${OUT_DIR}/run_${cfg}.txt" \
                 | awk '{print $2}')"
         secs="${secs:-nan}"
 
-        for grp in ${GROUPS}; do
+        for grp in ${PERF_GROUPS}; do
             echo "==> ${cfg} / ${grp}"
             evs="$(group_events "${grp}")"
             if [[ -z "${evs}" ]]; then
@@ -254,14 +288,14 @@ for op in ${OPS}; do
                 continue
             fi
             # perf -x, rows are: count,unit,event,runtime,pct[,...]
-            awk -F, -v cfg="${cfg}" -v op="${op}" -v lay="${layout}" -v k="${KERNEL}" \
+            awk -F, -v cfg="${cfg}" -v op="${op}" -v lay="${layout}" \
                     -v ps="${ps}" -v th="${OMP_NUM_THREADS}" -v n="${N}" -v grp="${grp}" -v s="${secs}" '
                 /^#/ || NF < 3 { next }
                 {
                     count = $1; ev = $3
                     gsub(/^[ \t]+|[ \t]+$/, "", count); gsub(/^[ \t]+|[ \t]+$/, "", ev)
                     if (count == "<not counted>" || count == "<not supported>" || count == "") next
-                    printf "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n", cfg, op, lay, k, ps, th, n, grp, ev, count, s
+                    printf "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n", cfg, op, lay, ps, th, n, grp, ev, count, s
                 }' "${raw}" >>"${CSV}"
             echo "    -> ${raw}"
         done

@@ -1,0 +1,42 @@
+# ONE DIVISION PER SURFACE IN THE LIMITER DERIVATIVES: built, measured on Grace, REVERTED.
+#
+# The idea. Each sub-control surface of the exact higher-order Jacobian action evaluates six
+# limiter value-and-derivative pairs -- two nodes, three velocity components -- and the two
+# rational arms (Venkatakrishnan, Darwish-Moukalled) each need the reciprocal of their
+# denominator: 72 divisions per element, in a lane loop whose vector divide issues at a fraction
+# of the multiply-add's rate. Six reciprocals come out of one division and fourteen multiplies
+# through the product tree, exact to a few roundings, so the arms were split into `_terms` and
+# `_finish` and the leaf took the six reciprocals from one divide. The gate objects confirmed the
+# count: 12 vector divisions per lane kernel where there had been 72. Every exactness oracle was
+# unchanged: finite difference 1.625e-10 unlimited, 1.175e-03 / 2.332e-03 limited (0.38% of dofs),
+# layouts agreeing to 1e-17.
+#
+# jobs/ab_refactor.sbatch, job 5004322, nid006567: the tree with the change against the tree
+# without it, interleaved, medians of 9, n=128, 72 threads.
+#
+#   config                            ndof      ref      new  new/ref   band  verdict
+#   residual_packed_ho_unlim       8586756   1104.6   1103.2    -0.1%     5%  ok
+#   residual_packed_ho_clip        8586756    854.1    856.1     0.2%     5%  ok
+#   residual_packed_ho_venk        8586756    748.1    744.4    -0.5%     5%  ok
+#   residual_packed_ho_dm          8586756    872.9    876.2     0.4%     5%  ok
+#   jac_action_packed_ho_unlim     8586756    472.4    471.9    -0.1%     5%  ok
+#   jac_action_packed_ho_venk      8586756    341.8    327.1    -4.3%     5%  ok
+#   jac_action_packed_ho_dm        8586756    334.4    312.9    -6.4%     5%  REGRESSION
+#   jac_action_atomic_rc           8586756    351.5    351.9     0.1%     5%  ok
+#   (confirmation)  jac_action_packed_ho_dm   334.4 -> 312.6   -6.5%
+#   every first-order row within 0.6%
+#
+# THE READING. Removing five sixths of the divisions made both rational arms SLOWER, so the
+# divide unit was not what bound them. What the change added was live state: six terms records
+# of six values each, held across the product tree until the finish, in a face loop the paper's
+# own disassembly already describes as register-starved -- fifty-odd live vector values against
+# thirty-two registers, spilling whatever order the faces are visited in. Trading divides for
+# live values is the wrong trade on that kernel. The attempt is recorded here rather than kept
+# behind a flag: a kernel variant that loses on the machine it is for is not an option, it is a
+# measurement.
+#
+# A FIRST VERSION WAS SCALAR AND THE GATE CAUGHT IT. Written with a three-trip loop over the
+# components and arrays indexed by it inside the lane body, both rational arms emitted ZERO vector
+# instructions on clang -- the vectoriser takes the innermost loop, found calls and per-lane arrays
+# in it, and left the lane loop scalar. Spelling the six evaluations out through lambdas with
+# constant arguments restored full vectorisation before anything was measured.

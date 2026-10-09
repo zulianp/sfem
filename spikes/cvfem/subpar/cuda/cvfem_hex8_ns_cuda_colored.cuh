@@ -15,7 +15,7 @@
 // where it does not hold. Element colouring (cvfem_element_coloring.hpp) is the form that
 // does work here, and stays in the main build.
 //
-// Included by cuda/cvfem_hex8_ns_cuda.cu only under -DCVFEM_ENABLE_SUBPAR. It is not
+// Included by src/frontend/cuda/cvfem_hex8_ns_cuda.cu only under -DCVFEM_ENABLE_SUBPAR. It is not
 // self-contained: it expects the enclosing translation unit's anonymous namespace, the
 // cvfem_cuda_ctx definition and CVFEM_CUDA_CHECK.
 

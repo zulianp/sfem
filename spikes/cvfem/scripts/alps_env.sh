@@ -41,14 +41,26 @@ cvfem_uenv() { uenv run --view="$CVFEM_VIEW" "$CVFEM_UENV" -- "$@"; }
 # rsync -a preserves source mtimes, which are often older than the object files already
 # in the remote build tree -- make then decides everything is up to date and silently
 # runs a stale binary. Touch the sources after every sync.
-# Sources live under src/, drivers/, tests/, cuda/ and subpar/, so this has to recurse.
-# A top-level glob would silently match nothing and let make run a stale binary, which
-# is exactly the failure this function exists to prevent.
+# Sources live under src/, cuda/ and subpar/, so this has to recurse. A top-level glob would
+# silently match nothing and let make run a stale binary, which is exactly the failure this
+# function exists to prevent -- and this function had walked into it: it still named
+# $CVFEM_SRC/drivers and $CVFEM_SRC/tests after both moved under src/, with 2>/dev/null hiding
+# the "No such file or directory" that would have said so. The roots are checked now, and a
+# missing one is an error rather than a silence.
 cvfem_touch() {
-    find "$CVFEM_SRC"/src "$CVFEM_SRC"/drivers "$CVFEM_SRC"/tests \
-         "$CVFEM_SRC"/cuda "$CVFEM_SRC"/subpar \
+    local roots=() d
+    # cuda/ is gone: the device kernels are in src/kernels/<layout>/cuda/ and the launcher
+    # translation unit in src/frontend/cuda/, so src/ covers them. subpar/ keeps its own.
+    for d in src subpar; do
+        if [ -d "$CVFEM_SRC/$d" ]; then roots+=("$CVFEM_SRC/$d"); fi
+    done
+    if [ ${#roots[@]} -eq 0 ]; then
+        echo "cvfem_touch: neither src/ nor subpar/ exists under $CVFEM_SRC" >&2
+        return 1
+    fi
+    find "${roots[@]}" \
          \( -name '*.hpp' -o -name '*.cpp' -o -name '*.cu' -o -name '*.cuh' \) \
-         -exec touch {} + 2>/dev/null
+         -exec touch {} +
 }
 
 # The dependency configs are under lib64/cmake/<dep>/ while SFEM's own is under

@@ -1,0 +1,45 @@
+### host nid005791  n=128 repeat=10 passes=3  2026-10-08 18:19:27
+### the JACOBIAN ACTION per convective scheme -- the companion to conv_ho_bench.sbatch
+### ho_unlim_lagged is the lagged action, which carries no correction derivative at all
+
+arm                    layout       MDOF_s       dofs      elems   flops_el       checksum  prec
+first_order            atomic      359.979    8586756    2097152      850.0 -3.0782440398752220e-13   f64
+first_order            atomic      506.575    8586756    2097152      850.0 2.7132045943289995e-07   f32
+first_order            packed      932.845    8586756    2097152      850.0 -3.0693622556782207e-13   f64
+first_order            packed     1568.584    8586756    2097152      850.0 -1.6509293345734477e-06   f32
+first_order            ecolor      466.986    8586756    2097152      850.0 7.7796677520197699e-13   f64
+first_order            ecolor     1175.658    8586756    2097152      850.0 1.2515881098806858e-03   f32
+ho_unlimited           atomic      153.017    8586756    2097152     2422.0 2.1479779760413820e-14   f64
+ho_unlimited           atomic      189.855    8586756    2097152     2422.0 1.7695155693218112e-03   f32
+ho_unlimited           packed      466.258    8586756    2097152     2422.0 2.1257735155488788e-14   f64
+ho_unlimited           packed      774.236    8586756    2097152     2422.0 1.7722704214975238e-03   f32
+ho_unlimited           ecolor      150.991    8586756    2097152     2422.0 8.3624990612762851e-13   f64
+ho_unlimited           ecolor      338.167    8586756    2097152     2422.0 1.3620381942018867e-03   f32
+ho_unlim_lagged        packed      934.644    8586756    2097152      850.0 -3.0693622556782207e-13   f64
+ho_unlim_lagged        packed     1564.774    8586756    2097152      850.0 -1.6509293345734477e-06   f32
+ho_clip                atomic      143.127    8586756    2097152     3214.0 -3.9815389483652264e-13   f64
+ho_clip                atomic      180.578    8586756    2097152     3214.0 9.9939375650137663e-04   f32
+ho_clip                packed      384.271    8586756    2097152     3214.0 -3.9460118115772214e-13   f64
+ho_clip                packed      655.337    8586756    2097152     3214.0 1.0018971515819430e-03   f32
+ho_clip                ecolor      144.152    8586756    2097152     3214.0 -5.1089877771068326e-13   f64
+ho_clip                ecolor      314.030    8586756    2097152     3214.0 2.6908651925623417e-03   f32
+ho_venkatakrishnan     atomic      136.903    8586756    2097152     5878.0 -9.0982133122991665e-13   f64
+ho_venkatakrishnan     atomic      176.013    8586756    2097152     5878.0 1.9493935396894813e-03   f32
+ho_venkatakrishnan     packed      339.787    8586756    2097152     5878.0 -9.1209728843039822e-13   f64
+ho_venkatakrishnan     packed      596.436    8586756    2097152     5878.0 1.9518075278028846e-03   f32
+ho_venkatakrishnan     ecolor      137.690    8586756    2097152     5878.0 -1.0402742713468485e-12   f64
+ho_venkatakrishnan     ecolor      299.729    8586756    2097152     5878.0 1.5168387908488512e-03   f32
+ho_darwish_moukalled   atomic      133.601    8586756    2097152     5158.0 -4.2509294424352556e-13   f64
+ho_darwish_moukalled   atomic      174.935    8586756    2097152     5158.0 6.7783315898850560e-04   f32
+ho_darwish_moukalled   packed      326.754    8586756    2097152     5158.0 -4.2642521187307575e-13   f64
+ho_darwish_moukalled   packed      572.943    8586756    2097152     5158.0 6.7591835977509618e-04   f32
+ho_darwish_moukalled   ecolor      137.784    8586756    2097152     5158.0 7.7257055191171792e-13   f64
+ho_darwish_moukalled   ecolor      300.442    8586756    2097152     5158.0 1.3582005631178617e-03   f32
+
+The checksums must DIFFER between first order and each higher-order arm. For the ACTION the
+reason is sharper than for the residual: the correction is deferred, so an action that was
+not differentiated through it is EXACTLY the first-order action -- an identical checksum
+means the exact term never reached the kernel and the row is first order measured twice.
+ho_unlim_lagged is the arm that SHOULD match first_order, and is included as that control.
+
+csv: /ritom/scratch/cscs/zulianp/cvfem_jacho/5006527/jacho.csv

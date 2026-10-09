@@ -24,7 +24,6 @@ namespace sfem {
         // CRS graph
         std::shared_ptr<CRSGraph>              node_to_node_graph;
         std::shared_ptr<CRSGraph>              dof_to_dof_graph;
-        std::shared_ptr<sfem::Buffer<idx_t *>> device_elements;
         std::shared_ptr<FunctionSpace::PackedMesh> packed_mesh;
         //: old node id -> new node id, for the renumbering `packed_mesh` applied
         //: to `mesh` in place.  Kept because nothing else records it: anything
@@ -161,12 +160,6 @@ namespace sfem {
         }
     };
 
-    void FunctionSpace::set_device_elements(const std::shared_ptr<sfem::Buffer<idx_t *>> &elems) {
-        impl_->device_elements = elems;
-    }
-
-    std::shared_ptr<sfem::Buffer<idx_t *>> FunctionSpace::device_elements() { return impl_->device_elements; }
-
     std::shared_ptr<CRSGraph> FunctionSpace::dof_to_dof_graph() {
         impl_->initialize_dof_to_dof_graph(this->block_size());
         return impl_->dof_to_dof_graph;
@@ -237,6 +230,8 @@ namespace sfem {
     }
 
     Mesh &FunctionSpace::mesh() { return *impl_->mesh; }
+
+    const Mesh &FunctionSpace::mesh() const { return *impl_->mesh; }
 
     std::shared_ptr<Mesh> FunctionSpace::mesh_ptr() const { return impl_->mesh; }
 

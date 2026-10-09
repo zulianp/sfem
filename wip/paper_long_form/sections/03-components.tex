@@ -1,0 +1,110 @@
+\section{The operator's components}
+\label{sec:components}
+
+Each component below is given in the form the code evaluates, with the function that evaluates it.
+Throughout, $\scs$ is a sub-control surface with nodes $i,j$, area vector $\Avec$, edge vector
+$\dvec$ (Section~\ref{sec:geom:edges}), and $\bar{\uvec} = \tfrac12(\uvec_i + \uvec_j)$ is the
+face-average velocity.
+
+\subsection{The viscous term}
+
+The viscous flux uses the element's velocity gradient, obtained from the nodal values by the
+reference-gradient-then-pushforward route shared with every other gradient in the code
+(\code{cvfem\_hex8\_grad\_at}): the reference gradient is contracted from the nodal values, then
+mapped by $\adj\Jmat/\det\Jmat$. In the sweeps the nine components are held in
+\code{g00v}\dots\code{g22v}, one lane-major array each, built once per element in the geometry
+loop. The surface then contributes $\mu\,\nabla\uvec\cdot\Avec$ per velocity component, which is
+\code{cvfem\_hex8\_visc\_dir\_simd} instantiated once per direction group --- three calls, each
+reusing one area vector across its four surfaces.
+
+The viscous term is scheme-independent and layout-independent. It is also the reason the Jacobian
+is not bit-identical to the residual under reassociation: the viscous contribution is already in
+the accumulator when the surface loop starts, so summing a node's three surface contributions in a
+register before adding changes the order of additions. That is round-off, but it is why the
+fingerprint moves when the surface loop is restructured.
+
+\subsection{The convective flux and the mass flux}
+
+The surface mass flux is
+\begin{equation}
+\mdot_\scs \;=\; \rho\,\bar{\uvec}\cdot\Avec \;-\; \underbrace{G_\scs\,c_\scs}_{\text{Rhie--Chow}},
+\label{eq:mdot}
+\end{equation}
+with the second term deferred to Section~\ref{sec:rc}. The convected momentum uses an upwind
+split of $\mdot$:
+\begin{equation}
+\mdot^{+} = \tfrac12\bigl(\mdot + |\mdot|_\epsilon\bigr), \qquad
+\mdot^{-} = \tfrac12\bigl(\mdot - |\mdot|_\epsilon\bigr),
+\end{equation}
+so that $\mdot^{+}$ vanishes for inflow and $\mdot^{-}$ for outflow, and the momentum flux is
+\begin{equation}
+\mathbf{F}^{\text{conv}}_\scs \;=\; \mdot^{+}\uvec_i \;+\; \mdot^{-}\uvec_j
+      \;+\; \tfrac12\bigl(p_i + p_j\bigr)\Avec \;+\; \mathbf{h}_\scs ,
+\label{eq:flux}
+\end{equation}
+where the last term is the higher-order correction of Section~\ref{sec:schemes} and is zero for
+first-order upwinding. The continuity row of the surface is $\mdot_\scs$ itself, carried with the
+same antisymmetry as the momentum rows.
+
+\paragraph{The Harten band.} $|\mdot|_\epsilon$ is the absolute value with an optional smoothing
+band of half-width $\epsilon$ (\code{cvfem\_upwind\_abs}). With $\epsilon = 0$ it is the hard
+switch. The band exists because the hard switch is non-differentiable exactly where $\mdot$
+changes sign, which a Newton method visits. It is a \emph{compile-time} flag in every kernel
+(\code{EPS}), not a runtime argument: a runtime zero would leave the comparison in the vector body,
+and a guard of that shape in this loop was measured at $1.83\times$.
+
+\subsection{Rhie--Chow pressure--velocity coupling}
+\label{sec:rc}
+
+Collocated storage admits a checkerboard pressure mode, because the face mass flux built from
+$\bar{\uvec}$ alone does not see pressure oscillations at the mesh scale. Rhie--Chow adds to
+$\mdot$ a term proportional to the difference between the true pressure difference across the
+surface and the one implied by the nodal pressure gradients:
+\begin{equation}
+c_\scs \;=\; \bigl(p_j - p_i\bigr) \;-\; \tfrac12\bigl(\nabla p_i + \nabla p_j\bigr)\cdot\dvec ,
+\label{eq:corr}
+\end{equation}
+which vanishes identically for a pressure field whose nodal gradient is exact, and is $O(h^2)$
+for a smooth one --- so the term is a filter on the mesh-scale mode and not a modification of the
+continuous equations. The nodal pressure gradient is reconstructed by its own pass
+(Section~\ref{sec:recon}).
+
+The coefficient $G_\scs$ is $V/a_P$ in the usual presentation --- a cell volume over a momentum
+diagonal. The implementation (\code{cvfem\_hex8\_rhie\_chow\_mdot\_coeff}) evaluates
+\begin{equation}
+G_\scs \;=\; \alpha\,\frac{|\Avec|^2}{\Avec\cdot\dvec}\,
+      \Bigl[\bigl(2a_0/\Delta t\bigr)^2 + \frac{4|\bar{\uvec}|^2}{h^2}
+            + \Bigl(\frac{4\nu}{h^2}\Bigr)^{\!2}\Bigr]^{-1/2},
+\qquad h^2 = |\dvec|^2 ,
+\label{eq:coeff}
+\end{equation}
+with $\alpha$ the user scale. The bracket is the Shakib--Tezduyar combined time scale, and the
+choice matters: the earlier implementation used the diffusion limit alone,
+$\alpha h^2/(2\mu)$, which is $V/a_P$ computed as though the momentum diagonal were purely
+viscous. That overstates $G$ by roughly the cell P\'eclet number $\rho|u|h/\mu$ --- about $31\times$
+on a lid-driven cavity at $Re=1000$, about $159\times$ on a backward-facing step at
+$Re_h = 5100$ --- at which point the "small" correction the derivation assumes is setting a
+substantial part of the face mass flux by pressure smoothing rather than by the flow. Note that
+only $|\bar{\uvec}|^2$ is needed, never $|\bar{\uvec}|$, so no square root is spent on the
+velocity.
+
+\paragraph{What is tabulated and what is not.} $G_\scs$ depends on the state through
+$|\bar{\uvec}|^2$, so it is rebuilt once per Newton step, not once per matvec, and stored
+element-major as \code{rc\_coeff}$[e\cdot 12 + \scs]$. The velocity sensitivity needed by the
+Jacobian,
+\begin{equation}
+w_\scs \;=\; \frac{4\,u^2_{\text{scale}}\,(\Avec\cdot\dvec)^2}{h^2\,\alpha^2\,|\Avec|^4},
+\label{eq:wdu}
+\end{equation}
+is by contrast \emph{purely geometric} plus two uniforms --- no state at all --- and is tabulated
+beside the coefficient as \code{rc\_w}. It was previously recomputed in the surface loop, three dot
+products and a division per surface, for a quantity that never varies with the solution.
+
+\subsection{Transient and boundary terms}
+
+The transient term is a volume contribution per sub-control volume, applied as a separate pass
+(\code{apply\_transient\_action\_pass}) so that a steady solve pays nothing for it. The boundary
+closure is likewise a separate pass over boundary sub-control surfaces. Both are
+scheme-independent; the paper's completeness ladder reports the operator with each switched on in
+turn, and any verification of the Jacobian must include whichever passes the timed apply included
+--- omitting them makes a finite-difference check report the closure as a staging error.

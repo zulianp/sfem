@@ -1,0 +1,137 @@
+# THE KERNELS FULLY IN SINGLE PRECISION, against double, on Grace.
+#
+# cvfem_hex8_ns_upwind_bench_f32 is cvfem_hex8_ns_upwind_bench compiled with CVFEM_SCALAR_T=float
+# (src/frontend/staging/cvfem_hex8_best_common.hpp): every field, staged pack, cached adjugate
+# table and kernel is f32, and the lane-blocked sweeps run 32 elements per 128-byte lane group
+# where double runs 16. gcc 13.3 emits 10,393 four-lane FMAs in it against the double build's
+# 11,002 two-lane ones, so the kernels vectorise the same way at twice the width.
+#
+# HELD TO THE DOUBLE BUILD by src/tests/verification/cvfem_bench_f32.sh (ctest cvfem_bench_f32):
+# both builds --dump the same operator on a perturbed state and the f32 output is compared with
+# the f64 one, layout by layout -- 2e-7 to 3e-6 relative on every residual, the first-order and
+# unlimited Jacobians and the lagged one; the three limited Jacobians differ on 0.02-0.4% of dofs
+# where float's wider rounding band takes the interior subgradient. The f32 build refuses the
+# --verify oracles, which are double-precision checks.
+#
+# jobs/f32_vs_f64.sbatch, job 5006525 (nid006551), on the tree with the limiter-band fix below:
+# both binaries in one allocation, order alternating, 5 passes, 72 threads, OMP_PROC_BIND=true,
+# the unperturbed timing state every other job measures. MDOF/s: medians, then the best pass,
+# which is what the paper's tables quote. Four layouts: packed; `ecolor`, the element colouring
+# the paper calls "col."; `colored`, pack colouring, which has no higher-order correction and
+# runs the first-order operators only (the driver now refuses --conv-ho there -- before, the
+# residual silently ran first order under that label); and the standard atomic sweep. Job
+# 5005575, the first measurement, had packed and atomic only and agrees with these within 5%.
+#
+#   ### n=128  (8586756 dofs)
+#   key        operator                                       layout        f64       f32  f32/f64  f64_best  f32_best
+#   res        residual, bare                                 packed     2645.1    4636.4    1.753    2662.5    4708.5
+#   res        residual, bare                                 ecolor     1912.5    3800.1    1.987    1945.8    3810.4
+#   res        residual, bare                                 colored    1998.4    3368.2    1.685    2004.5    3371.8
+#   res        residual, bare                                 atomic     1086.1    1270.1    1.169    1088.6    1272.2
+#   res_rc     residual + Rhie-Chow                           packed     1763.5    3259.5    1.848    1766.3    3272.8
+#   res_rc     residual + Rhie-Chow                           ecolor     1195.7    2775.9    2.321    1204.7    2798.3
+#   res_rc     residual + Rhie-Chow                           colored    1260.9    2280.9    1.809    1266.1    2285.1
+#   res_rc     residual + Rhie-Chow                           atomic      910.8    1153.8    1.267     914.3    1157.2
+#   res_bnd    residual + Rhie-Chow + boundary                packed     1591.5    2934.1    1.844    1598.1    2951.1
+#   res_bnd    residual + Rhie-Chow + boundary                ecolor     1083.2    2461.3    2.272    1088.7    2472.4
+#   res_bnd    residual + Rhie-Chow + boundary                colored    1143.7    2125.6    1.859    1151.4    2130.3
+#   res_bnd    residual + Rhie-Chow + boundary                atomic      865.4    1116.4    1.290     868.0    1119.0
+#   res_bnd_dt residual + Rhie-Chow + boundary + transient    packed     1443.3    2727.2    1.890    1449.9    2748.6
+#   res_bnd_dt residual + Rhie-Chow + boundary + transient    ecolor     1022.2    2354.7    2.304    1033.0    2377.8
+#   res_bnd_dt residual + Rhie-Chow + boundary + transient    colored    1089.6    2033.2    1.866    1091.9    2041.7
+#   res_bnd_dt residual + Rhie-Chow + boundary + transient    atomic      825.8    1074.9    1.302     828.0    1091.0
+#   res_ho0    residual + correction, unlimited               packed     1111.7    1936.4    1.742    1115.6    1942.2
+#   res_ho0    residual + correction, unlimited               ecolor      680.0    1524.6    2.242     682.2    1531.7
+#   res_ho0    residual + correction, unlimited               atomic      701.1     929.4    1.326     704.9     932.9
+#   res_ho2    residual + correction, Venkatakrishnan         packed      754.9    1392.0    1.844     756.4    1402.1
+#   res_ho2    residual + correction, Venkatakrishnan         ecolor      559.9    1190.8    2.127     562.4    1196.9
+#   res_ho2    residual + correction, Venkatakrishnan         atomic      537.5     784.0    1.459     540.1     784.9
+#   res_ho3    residual + correction, Darwish-Moukalled       packed      877.8    1620.6    1.846     879.8    1642.7
+#   res_ho3    residual + correction, Darwish-Moukalled       ecolor      609.1    1342.3    2.204     613.9    1354.2
+#   res_ho3    residual + correction, Darwish-Moukalled       atomic      599.4     856.5    1.429     599.8     857.9
+#   jac        Jex bare                                       packed     1961.0    3336.8    1.702    1965.7    3348.9
+#   jac        Jex bare                                       ecolor     1266.6    2866.0    2.263    1274.8    2880.7
+#   jac        Jex bare                                       colored    1383.7    2329.9    1.684    1390.0    2335.6
+#   jac        Jex bare                                       atomic      970.7    1174.5    1.210     973.2    1176.4
+#   jac_rc     Jex + Rhie-Chow                                packed      926.6    1531.6    1.653     928.5    1538.5
+#   jac_rc     Jex + Rhie-Chow                                ecolor      458.8    1169.0    2.548     461.5    1175.2
+#   jac_rc     Jex + Rhie-Chow                                colored     684.8    1085.8    1.586     687.8    1095.7
+#   jac_rc     Jex + Rhie-Chow                                atomic      352.5     494.0    1.402     353.5     496.0
+#   jac_ho0    Jhoex unlimited                                packed      455.9     755.8    1.658     459.5     758.4
+#   jac_ho0    Jhoex unlimited                                ecolor      148.5     328.1    2.209     149.1     330.3
+#   jac_ho0    Jhoex unlimited                                atomic      149.2     185.3    1.242     149.9     185.5
+#   jac_ho2    Jhoex Venkatakrishnan                          packed      333.8     584.8    1.752     334.2     585.3
+#   jac_ho2    Jhoex Venkatakrishnan                          ecolor      137.4     296.1    2.154     137.8     298.2
+#   jac_ho2    Jhoex Venkatakrishnan                          atomic      133.6     172.9    1.294     133.8     173.0
+#   jac_ho3    Jhoex Darwish-Moukalled                        packed      323.4     560.2    1.732     325.2     561.0
+#   jac_ho3    Jhoex Darwish-Moukalled                        ecolor      136.2     292.1    2.145     136.5     293.4
+#   jac_ho3    Jhoex Darwish-Moukalled                        atomic      131.3     170.9    1.301     131.8     171.0
+#   ngrad3     nodal velocity gradient, 9 components          packed     4394.2    7994.6    1.819    4420.4    8083.9
+#   ngrad3     nodal velocity gradient, 9 components          ecolor     1003.2    4365.3    4.352    1006.6    4399.9
+#   ngrad3     nodal velocity gradient, 9 components          colored    4331.1    8014.1    1.850    4372.1    8074.7
+#   ngrad3     nodal velocity gradient, 9 components          atomic      656.7     697.4    1.062     658.4     698.3
+#   spmv       assembled SpMV (first order, lagged)           packed      453.8     853.4    1.880     456.3     873.7
+#
+#   ### n=64  (1098500 dofs)
+#   key        operator                                       layout        f64       f32  f32/f64  f64_best  f32_best
+#   res_rc     residual + Rhie-Chow                           packed     1927.5    3222.4    1.672    1941.7    3257.1
+#   res_ho3    residual + correction, Darwish-Moukalled       packed      956.2    1669.6    1.746     964.7    1692.7
+#   jac_rc     Jex + Rhie-Chow                                packed     1110.2    1707.3    1.538    1124.5    1727.3
+#   jac_ho3    Jhoex Darwish-Moukalled                        packed      350.0     621.1    1.774     352.5     629.0
+#
+#   ### n=96  (3650692 dofs)
+#   key        operator                                       layout        f64       f32  f32/f64  f64_best  f32_best
+#   res_rc     residual + Rhie-Chow                           packed     1869.7    3375.5    1.805    1870.3    3411.5
+#   res_ho3    residual + correction, Darwish-Moukalled       packed      915.4    1717.2    1.876     917.7    1723.5
+#   jac_rc     Jex + Rhie-Chow                                packed      955.7    1609.3    1.684     964.7    1621.0
+#   jac_ho3    Jhoex Darwish-Moukalled                        packed      312.8     569.5    1.821     313.2     571.6
+#
+#   ### n=160  (16693124 dofs)
+#   key        operator                                       layout        f64       f32  f32/f64  f64_best  f32_best
+#   res_rc     residual + Rhie-Chow                           packed     1677.2    3010.2    1.795    1678.4    3052.8
+#   res_ho3    residual + correction, Darwish-Moukalled       packed      866.1    1575.1    1.819     868.3    1582.1
+#   jac_rc     Jex + Rhie-Chow                                packed      929.9    1491.0    1.603     932.4    1499.4
+#   jac_ho3    Jhoex Darwish-Moukalled                        packed      318.5     562.0    1.764     319.2     563.1
+#
+#   ### n=192  (28756228 dofs)
+#   key        operator                                       layout        f64       f32  f32/f64  f64_best  f32_best
+#   res_rc     residual + Rhie-Chow                           packed     1734.7    3059.0    1.763    1738.8    3066.1
+#   res_ho3    residual + correction, Darwish-Moukalled       packed      869.4    1599.3    1.840     869.5    1600.9
+#   jac_rc     Jex + Rhie-Chow                                packed      936.2    1551.7    1.658     938.4    1559.4
+#   jac_ho3    Jhoex Darwish-Moukalled                        packed      302.6     571.9    1.890     303.6     572.4
+#
+# WHAT IT SAYS.
+#
+# * Packed, float is worth 1.65x to 1.89x on every matrix-free operator at the paper's n=128, and
+#   1.54x to 1.89x across the sweep from 1.1M to 28.8M dofs (the low end is the first-order
+#   Rhie-Chow Jacobian at n=64). The assembled SpMV gains 1.88x as well, so float does not move
+#   the matrix-free side's advantage over the matrix: it scales both by about the same factor.
+# * Standard layout, float is worth 1.17x to 1.46x (1.06x on the nodal gradient). The atomic
+#   scatter does not halve its cost with the bytes, so the packed format's margin over it GROWS
+#   in single precision: 3.65x on the bare residual (2.44x in double) and 3.28x on the
+#   Darwish-Moukalled exact Jacobian (2.46x).
+# * Element colouring gains MORE than the bytes alone would give: 1.99x to 2.55x on every
+#   operator, 4.35x on the nodal gradient. So the packed format's margin over it SHRINKS in
+#   float: 1.38x to 1.22x on the bare residual, 2.37x to 1.92x on the Darwish-Moukalled exact
+#   Jacobian. Its f32 operators match the f64 ones within the cross-precision gate's bounds
+#   (cvfem_bench_f32 now runs every operator on this layout), so the gain is a performance
+#   property of the f64 sweep, not a different computation; why the f64 element-coloured sweep
+#   is that far below its f32 self was not investigated.
+# * Pack colouring gains 1.59x to 1.87x, close to packed, and stays 1.32x to 1.43x behind it
+#   on every first-order operator in both precisions.
+# * The first-order Rhie-Chow Jacobian gains least among the packed rows, the LIMITED
+#   higher-order arms the most (1.73x to 1.89x across sizes): a limiter is arithmetic, which float
+#   doubles the lane count of, on top of traffic, which float halves.
+#
+# THE SIZE SWEEP COULD NOT RUN THE EXACT HIGHER-ORDER JACOBIAN UNTIL A DEFECT WAS FIXED. The first
+# measurement of this job (5004989) lost that arm at n=96, 160 and 192: the driver's own
+# packed-against-atomic check refused it, in double as well as float. The limiter derivatives'
+# rounding bands were relative to the field and too narrow near a velocity component's zero
+# crossing, where the reference-coordinate reconstruction leaves exact ties; gcc's scalar and
+# lane kernels then took different subgradients on 18-52 dofs of 1.5M (clang never did). The
+# bands now scale with the increment's own terms and are 64 rounding units
+# (CVFEM_LIMITER_BAND_ULPS, cvfem_venkata_limiter.hpp); every limiter agrees at n = 24 through 160
+# in both precisions on gcc, and cvfem_bench_staging.sh now checks n = 24, 40 and 72.
+#
+# Its cost, jobs/ab_refactor.sbatch job 5005574 against the tree before it: Jhoex unlimited -3.2%,
+# Venkatakrishnan -2.1%, Darwish-Moukalled -3.3%, inside the 5% band; every other row within 1%.

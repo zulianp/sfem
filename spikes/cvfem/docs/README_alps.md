@@ -182,7 +182,7 @@ CVFEM_CPUS=72 cvfem_run env OMP_NUM_THREADS=72 OMP_PROC_BIND=close OMP_PLACES=co
     SFEM_BENCH_SIZES=8,16,32,48,64 ./build/cvfem_ns_apply_bench
 
 cvfem_configure_cuda && cvfem_build_cuda --target cvfem_hex8_ns_cuda_verify
-cvfem_run_cuda ./build_cuda/cvfem_hex8_ns_cuda_verify --n 128 --time-only --repeat 20
+cvfem_run_cuda ./build_src/tests/verification/cvfem_hex8_ns_cuda_verify --n 128 --time-only --repeat 20
 ```
 
 ## T3: the macro-local gather, the invariants lifted out of it, and the block diagonal

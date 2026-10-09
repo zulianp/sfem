@@ -1,0 +1,83 @@
+# DOES THE HIGHER-ORDER JACOBIAN ACTION VECTORISE? Measured, both compilers.
+#
+# The question was asked because the vectorisation gate's share column read 58-65% for the
+# jv_lane_defcor_* kernels on the laptop and two of them carried an exemption. It turned out to be
+# two separate things, one real and one an artefact of the metric.
+
+## THE REAL ONE: a lambda called from inside the lane loop. Apple clang only.
+#
+# `lim`, inside cvfem_hex8_scs_defcor_jv, is called three times per sub-control surface -- once
+# per velocity component -- so thirty-six times per element, from inside the `#pragma omp simd`
+# lane loop. Apple clang declined to inline it at LIM 2 and 3:
+#
+#   kernel                              insns  vector_fp  scalar_fp  unpaired  share
+#   jv_lane_defcor_venkatakrishnan       4842          0       1659      1659     0%
+#   jv_lane_defcor_darwish_moukalled     4559          0       1521      1521     0%
+#
+# Zero vector arithmetic. The objects hold thirty-six `bl` sites and the lambda's mangled symbol
+# as a defined function, where every other lane kernel has no calls at all. With
+# __attribute__((always_inline)):
+#
+#   jv_lane_defcor_venkatakrishnan      24558       6670       4201         0    61%
+#   jv_lane_defcor_darwish_moukalled    23601       6111       4333         0    58%
+
+## GCC ON GRACE WAS ALREADY INLINING IT, and this is the part that matters for the paper.
+#
+# Login node, gcc 13.3, the same gate with and without the attribute:
+#
+#   kernel                            without_attr   with_attr
+#   jv_lane_first_order                 1074 vec      1074 vec
+#   jv_lane_defcor_unlimited            3108 vec      3108 vec
+#   jv_lane_defcor_clip                 6305 vec      6310 vec
+#   jv_lane_defcor_venkatakrishnan      7080 vec      7082 vec
+#   jv_lane_defcor_darwish_moukalled    7359 vec      7356 vec
+#
+# Identical within instruction-scheduling noise, every kernel at 99-100% share with 2 to 36
+# scalar instructions and nothing unpaired. So the paper's jacho numbers were taken on a fully
+# vectorised kernel and do not move: the attribute is a portability fix, not a performance one.
+# It is still worth having. Without it the kernel's vectorisation depends on one compiler's
+# inlining heuristic, which is exactly the kind of thing that changes under you.
+
+## THE ARTEFACT: 58-65% on clang is a DEAD REMAINDER LOOP, not scalarised arithmetic.
+#
+# The loop vectoriser reports all twelve lane loops vectorised at width 2 in every one of these
+# kernels, including the one that reads 99%. Pairing each scalar mnemonic with its vector form
+# says what the rest is -- from jv_lane_defcor_unlimited:
+#
+#   fmadd  672  <->  fmla.2d  672
+#   fmul   505  <->  fmul.2d  504
+#   fnmsub  12  <->  fmls.2d   12
+#   fneg    12  <->  fneg.2d   12
+#
+# Every scalar op has an exactly matching vector one: a complete duplicate of the body, which is
+# the vectoriser's scalar remainder. The lane count is a constexpr 16 and the width is 2, so it
+# can never execute. gcc unrolls it away; clang keeps it.
+#
+# Two attempts to remove it, both rejected on measurement:
+#
+#   simdlen(16)              share 58% -> 92%, but 13,631 instructions -> 104,228. Trades
+#                            I-cache for a cosmetic number.
+#   drop the null guard      no change to the share; the body halves and the ratio stays.
+#
+# This is why the gate now reports UNPAIRED scalar arithmetic and enforces on it: a dead
+# remainder is fully paired and reads zero, a kernel that really went scalar reads all of it, and
+# the share column could not tell those apart. That is what let a 0% kernel sit behind an
+# exemption while four of its neighbours were fine at 58%.
+
+## AND THE THROUGHPUT, SO THE PORTABILITY CLAIM IS NOT TAKEN ON TRUST
+#
+# Grace job 4989552, the paper's own jac_ho_bench at n=128 and best of three, against the data
+# file the paper's macros are generated from (data/jacho_4985746.out):
+#
+#   arm (packed)            paper    HEAD    delta
+#   first_order             927.9   925.5   -0.25%
+#   ho_unlimited            486.7   485.2   -0.31%
+#   ho_unlim_lagged         933.6   927.4   -0.66%
+#   ho_clip                 373.5   377.4   +1.06%
+#   ho_venkatakrishnan      354.9   356.6   +0.46%
+#   ho_darwish_moukalled    345.7   347.2   +0.43%
+#
+# Sixteen arms across the three layouts, worst delta 1.06% against a 5% band, and all sixteen
+# CHECKSUMS bit-identical. So nothing between that data file and this commit moved a number the
+# paper reports -- not the attribute, not the arena conversion, not the kernel renaming -- and
+# the paper's higher-order Jacobian table stands as generated.

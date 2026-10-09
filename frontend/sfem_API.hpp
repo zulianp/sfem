@@ -621,11 +621,7 @@ namespace sfem {
                 SFEM_ERROR("create_hierarchical_prolongation: DEVICE unstructured multi-block is not implemented\n");
             }
 
-            auto elements = to_space->device_elements();
-            if (!elements) {
-                elements = create_device_elements(to_space, to_space->element_type());
-                to_space->set_device_elements(elements);
-            }
+            auto elements = to_space->mesh().block(0)->device_elements_SoA();
 
             const ptrdiff_t n_elements = to_space->mesh().n_elements(0);
             return wrap_prolongation_coarse_gather(
@@ -1853,6 +1849,9 @@ namespace sfem {
     }
 
     static ptrdiff_t ss_elements_max_node_id(const SharedBuffer<idx_t *> &elements) {
+        if (elements && elements->mem_space() == smesh::MEMORY_SPACE_DEVICE) {
+            SFEM_ERROR("ss_elements_max_node_id: connectivity is on the device\n");
+        }
         ptrdiff_t max_node_id{-1};
         {
             auto            vv        = elements->data();

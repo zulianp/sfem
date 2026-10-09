@@ -1,0 +1,74 @@
+### host nid006544  n=128  repeat=12 warmup=3  2026-10-01 12:45:24
+
+### STREAM triad (the roofline's memory bound)
+  STREAM BUILD FAILED -- first lines of /ritom/scratch/cscs/zulianp/cvfem_tscale/4962329/stream_build.log:
+    /users/zulianp/.profile: line 31: bind: warning: line editing not enabled
+    /users/zulianp/.profile: line 32: bind: warning: line editing not enabled
+    /ritom/scratch/cscs/zulianp/sfem-coarseop/baseline/stream/stream.cpp:186:30: warning: ISO C++ forbids converting a string constant to 'char*' [-Wwrite-strings]
+      186 | static char     *label[4] = {"Copy:      ", "Scale:     ",
+          |                              ^~~~~~~~~~~~~
+    /ritom/scratch/cscs/zulianp/sfem-coarseop/baseline/stream/stream.cpp:186:45: warning: ISO C++ forbids converting a string constant to 'char*' [-Wwrite-strings]
+
+### thread scaling
+layout     op     threads    MDOF_s    packs       dofs  sec_call
+### pack size pinned at 1024 elements for every thread count
+
+packed     res          1    26.608     2048    8586756 3.227073e-01
+packed     res          2    52.905     2048    8586756 1.623046e-01
+packed     res          4   105.010     2048    8586756 8.177078e-02
+packed     res          8   207.847     2048    8586756 4.131281e-02
+packed     res         18   450.855     2048    8586756 1.904551e-02
+packed     res         36   857.550     2048    8586756 1.001312e-02
+packed     res         54  1245.689     2048    8586756 6.893178e-03
+packed     res         72  1579.724     2048    8586756 5.435606e-03
+atomic     res          1    12.625        -    8586756 6.801329e-01
+atomic     res          2    25.388        -    8586756 3.382275e-01
+atomic     res          4    50.727        -    8586756 1.692750e-01
+atomic     res          8   101.236        -    8586756 8.481926e-02
+atomic     res         18   225.619        -    8586756 3.805862e-02
+atomic     res         36   441.656        -    8586756 1.944216e-02
+atomic     res         54   651.089        -    8586756 1.318830e-02
+atomic     res         72   851.034        -    8586756 1.008979e-02
+packed     resho        1     8.605     2048    8586756 9.978303e-01
+packed     resho        2    17.531     2048    8586756 4.898093e-01
+packed     resho        4    34.811     2048    8586756 2.466663e-01
+packed     resho        8    69.703     2048    8586756 1.231901e-01
+packed     resho       18   155.365     2048    8586756 5.526817e-02
+packed     resho       36   303.233     2048    8586756 2.831733e-02
+packed     resho       54   446.228     2048    8586756 1.924296e-02
+packed     resho       72   573.951     2048    8586756 1.496079e-02
+atomic     resho        1     6.600        -    8586756 1.301014e+00
+atomic     resho        2    13.402        -    8586756 6.407139e-01
+atomic     resho        4    27.028        -    8586756 3.176946e-01
+atomic     resho        8    53.661        -    8586756 1.600171e-01
+atomic     resho       18   120.287        -    8586756 7.138566e-02
+atomic     resho       36   235.986        -    8586756 3.638667e-02
+atomic     resho       54   351.794        -    8586756 2.440848e-02
+atomic     resho       72   461.277        -    8586756 1.861519e-02
+packed     jac          1    16.374     2048    8586756 5.244082e-01
+packed     jac          2    32.906     2048    8586756 2.609505e-01
+packed     jac          4    65.309     2048    8586756 1.314787e-01
+packed     jac          8   129.240     2048    8586756 6.644054e-02
+packed     jac         18   283.276     2048    8586756 3.031236e-02
+packed     jac         36   525.831     2048    8586756 1.632988e-02
+packed     jac         54   741.579     2048    8586756 1.157902e-02
+packed     jac         72   901.429     2048    8586756 9.525716e-03
+atomic     jac          1     7.790        -    8586756 1.102250e+00
+atomic     jac          2    15.813        -    8586756 5.430223e-01
+atomic     jac          4    31.526        -    8586756 2.723714e-01
+atomic     jac          8    62.963        -    8586756 1.363781e-01
+atomic     jac         18   140.753        -    8586756 6.100589e-02
+atomic     jac         36   274.336        -    8586756 3.130011e-02
+atomic     jac         54   400.468        -    8586756 2.144182e-02
+atomic     jac         72   517.062        -    8586756 1.660683e-02
+colored    res          1    26.237     2048    8586756 3.272776e-01
+colored    res          2    52.582     2048    8586756 1.633012e-01
+colored    res          4   104.430     2048    8586756 8.222508e-02
+colored    res          8   201.911     2048    8586756 4.252740e-02
+colored    res         18   419.261     2048    8586756 2.048071e-02
+colored    res         36   727.970     2048    8586756 1.179548e-02
+colored    res         54  1114.021     2048    8586756 7.707894e-03
+colored    res         72  1155.280     2048    8586756 7.432620e-03
+
+csv: /ritom/scratch/cscs/zulianp/cvfem_tscale/4962329/tscale.csv
+logs in /ritom/scratch/cscs/zulianp/cvfem_tscale/4962329

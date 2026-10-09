@@ -1,0 +1,94 @@
+%% CVFEM HEX8 Navier-Stokes: the operator, component by component, and the micro-kernels.
+%%
+%% This is the LONG-FORM companion to wip/paper. The paper is hard-limited to ten pages and
+%% carries the performance argument; it cannot carry the discretisation. This document does the
+%% opposite: it states every component of the operator in closed form, says which micro-kernel
+%% evaluates it for each scheme and layout, and names the file and function that implements it so
+%% a reader can go from a formula to the code that runs.
+%%
+%% TWO RULES THIS DOCUMENT KEEPS.
+%%
+%% Every formula is the one the code evaluates, not a textbook form it resembles. Where the
+%% implementation departs from the usual presentation -- the Rhie-Chow time scale, the
+%% Darwish-Moukalled algebra, the limiter subgradients -- the departure is stated and the reason
+%% given, because those are exactly the places where reading the paper's equations and the source
+%% side by side would otherwise mislead.
+%%
+%% No ABSOLUTE timing is typed in here. Throughputs belong to the paper, which generates them from
+%% the measurement files. What this document carries are (a) COUNTS -- loads per surface, live
+%% values, lines of generated kernel -- which are properties of the written kernel, and (b) RATIOS
+%% between alternatives measured against each other in ONE job, which are the evidence for the
+%% selection table of Section 6 and cannot be stated without them. Every ratio names its job id,
+%% because the tree moved under these measurements and a ratio from one state is not comparable
+%% with an absolute from another.
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{microtype}
+\usepackage[hidelinks]{hyperref}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+
+\lstset{basicstyle=\ttfamily\footnotesize,columns=fullflexible,keepspaces=true,
+        breaklines=true,frame=single,framesep=4pt,rulecolor=\color{black!25},
+        showstringspaces=false,language=C++,commentstyle=\color{black!55}\itshape}
+
+% The operator's recurring symbols, defined once so the document cannot drift from itself.
+\newcommand{\scs}{\mathrm{s}}                      % a sub-control surface
+\newcommand{\Avec}{\mathbf{A}}                     % its area vector
+\newcommand{\dvec}{\mathbf{d}}                     % its node-to-node edge vector
+\newcommand{\uvec}{\mathbf{u}}
+\newcommand{\xvec}{\mathbf{x}}
+\newcommand{\Jmat}{\mathsf{J}}                     % the element Jacobian
+\newcommand{\adj}{\operatorname{adj}}
+\newcommand{\mdot}{\dot{m}}
+\newcommand{\code}[1]{\texttt{\small #1}}
+\newcommand{\Gop}{\mathcal{G}}                     % the nodal gradient reconstruction
+\newcommand{\Fres}{\mathcal{F}}
+\newcommand{\Fho}{\mathcal{F}^{\mathrm{ho}}}
+\newcommand{\Jlag}{\mathcal{J}_{\mathrm{lagged}}}
+\newcommand{\Jex}{\mathcal{J}_{\mathrm{exact}}}
+\newcommand{\Jhoex}{\mathcal{J}^{\mathrm{ho}}_{\mathrm{exact}}}
+
+\title{The CVFEM HEX8 Navier--Stokes operator\\
+       \large Components, closed forms, and the micro-kernel for each scheme}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+This is the long-form companion to the performance paper. It states each component of the
+control-volume finite-element HEX8 Navier--Stokes operator in the form the code evaluates, and for
+each convective scheme it describes the micro-kernel that evaluates it: the loop structure, what it
+reads per sub-control surface, how it is vectorised, and which of the two mesh layouts changes what.
+Every section names the file and function it describes. Where the implementation departs from the
+textbook statement of a scheme --- and it does, in the Rhie--Chow time scale, in the
+Darwish--Moukalled algebra, and in every limiter derivative --- the departure and its reason are
+given, since those are the places where the source and a naive reading of the equations part
+company.
+\end{abstract}
+
+\tableofcontents
+
+\input{sections/01-discretisation}
+\input{sections/02-geometry}
+\input{sections/03-components}
+\input{sections/04-schemes}
+\input{sections/05-microkernels}
+\input{sections/06-selection}
+\input{sections/07-jacobian}
+\input{sections/08-reconstruction}
+
+% The paper's bibliography, not a second copy of it: this document cites the few methods it
+% attributes, and those entries already exist next door.
+\bibliographystyle{plain}
+\bibliography{../paper/refs}
+
+\end{document}

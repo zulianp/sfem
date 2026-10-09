@@ -12,8 +12,9 @@ of results.
 | | |
 |---|---|
 | `src/core/` | portability shims, element colouring, FGMRES |
-| `src/hex8/`, `src/tet4/` | element kernels and the memory layouts they run under |
-| `src/generated/` | SymPy-emitted kernels — **machine-written, do not edit** (see `python/`) |
+| `src/hex8/` | the HEX8 solver core, the boundary closure and the pack helpers |
+| `src/upwind/` | the convective scheme — the upwind kernels both elements run, hand-written and SymPy-emitted. The generated ones are **machine-written, do not edit** (see `python/`) |
+| `src/best/` | the surviving operator implementations: the memory layouts the kernels run under |
 | `src/ss/` | semi-structured operator, Galerkin coarsening, transfers, Vanka smoother |
 | `src/op/` | the `sfem::Op` face of the kernels |
 | `src/cases/` | channel and manufactured-solution problem definitions |
@@ -97,6 +98,6 @@ scripts/cvrun.sh poiseuille ./build/cvfem_hex8_ns_ssgmg OMP_NUM_THREADS=72 -- ..
 
 ## Regenerating the kernels
 
-The headers in `src/generated/` are emitted by the scripts in `python/`; see
+The `*_sympy_kernels.hpp` headers in `src/upwind/` are emitted by the scripts in `python/`; see
 `python/README.md` for which script writes which header and how to check a regeneration
 against what is committed.

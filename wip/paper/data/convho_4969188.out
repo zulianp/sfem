@@ -1,0 +1,36 @@
+### host nid006553  n=128 repeat=10 passes=3  2026-10-02 15:20:01
+### packed arms are the GENERATED kernel unless labelled _scalar
+### scalar-vs-scalar isolates the LAYOUT; generated-vs-scalar isolates the KERNEL
+
+arm                    layout       MDOF_s       dofs      elems   flops_el       checksum
+first_order            atomic      909.355    8586756    2097152      754.0 1.3814703504408388e-13
+first_order            packed     1770.063    8586756    2097152      754.0 1.3664823396083992e-13
+first_order            ecolor     1182.304    8586756    2097152      754.0 1.3813272357540707e-13
+ho_unlimited           atomic      561.920    8586756    2097152     1426.0 -1.6942683692643123e-13
+ho_unlimited           packed      739.483    8586756    2097152     1426.0 -1.7055787663276811e-13
+ho_unlimited           ecolor      551.908    8586756    2097152     1426.0 -1.6942683692643123e-13
+ho_unlim_scalar        packed      507.180    8586756    2097152     1426.0 -1.7054920301538823e-13
+ho_unlim_simd          packed      614.970    8586756    2097152     1426.0 -1.7052364294917188e-13
+ho_clip                atomic      501.337    8586756    2097152     1570.0 1.0504509588560307e-14
+ho_clip                packed      637.115    8586756    2097152     1570.0 1.0421242861713420e-14
+ho_clip                ecolor      501.208    8586756    2097152     1570.0 1.0504509588560307e-14
+ho_clip_scalar         packed      472.893    8586756    2097152     1570.0 1.0424685203611062e-14
+ho_venkatakrishnan     atomic      477.297    8586756    2097152     2506.0 -5.2507588934377208e-12
+ho_venkatakrishnan     packed      597.142    8586756    2097152     2506.0 -5.2474663882803169e-12
+ho_venkatakrishnan     ecolor      482.967    8586756    2097152     2506.0 -5.2507948889498474e-12
+ho_venk_scalar         packed      432.914    8586756    2097152     2506.0 -5.2478645073180535e-12
+ho_darwish_moukalled   atomic      476.678    8586756    2097152     2146.0 -4.9295756550122444e-12
+ho_darwish_moukalled   packed      597.798    8586756    2097152     2146.0 -4.9264661631815559e-12
+ho_darwish_moukalled   ecolor      485.771    8586756    2097152     2146.0 -4.9304885532414772e-12
+ho_dm_scalar           packed      464.816    8586756    2097152     2146.0 -4.9282277206613018e-12
+
+The checksums must DIFFER between first order and each higher-order arm: an identical one
+would mean the correction was not applied and the row is measuring first order twice.
+
+That guard does NOT extend to the Rhie-Chow arms. The checksum is a sum over millions of
+values that is almost entirely cancellation, so a term can be present per node and invisible
+in the total: at n=32 the scalar arm with scale 1.0 prints exactly the no-Rhie-Chow checksum
+while scale 3.0 prints a different one, which is how that was established. Whether the term
+reached the kernel is answered by ran_rc in the CSV and by the driver's per-node oracles
+(--verify-ho --rhie-chow), never by these totals.
+csv: /ritom/scratch/cscs/zulianp/cvfem_convho/4969188/convho.csv

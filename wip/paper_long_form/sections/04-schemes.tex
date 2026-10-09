@@ -1,0 +1,406 @@
+\section{The convective schemes}
+\label{sec:schemes}
+
+The schemes differ only in $\mathbf{h}_\scs$, the higher-order correction in
+Eq.~\eqref{eq:flux}. All five share the mass flux, the upwind split and the pressure term.
+
+\subsection{The reconstruction and the increment}
+\label{sec:schemes:recon}
+
+A sub-control surface $\scs$ separates two nodes $i$ and $j$ and has a centroid $\xvec^c_\scs$.
+For each velocity component $u^{(k)}$, $k \in \{x,y,z\}$, the face value is reconstructed from a
+node and that node's \emph{nodal} velocity gradient:
+\begin{equation}
+u^{(k)}_{\text{face},a} \;=\; u^{(k)}_a \;+\; \Delta^{(k)}_a ,
+\qquad
+\Delta^{(k)}_a \;=\; \bigl(\Gop u^{(k)}\bigr)_a \cdot \bigl(\xvec^c_\scs - \xvec_a\bigr),
+\qquad a \in \{i,j\}.
+\label{eq:increment}
+\end{equation}
+Here $\Gop u$ is the nodal gradient reconstruction of Section~\ref{sec:recon}: nine components
+per node, one gradient per velocity component. \emph{This is the one place in the residual where a
+velocity gradient is needed}, and Eq.~\eqref{eq:increment} is why --- without a nodal gradient
+there is nothing to extrapolate along $\xvec^c_\scs - \xvec_a$, and the face value collapses to
+the nodal one, which is first-order upwinding.
+
+Each increment is passed through a limiter,
+\begin{equation}
+\delta^{(k)}_a \;=\; \Lambda\!\left(\Delta^{(k)}_a;\; u^{(k)}_i,\, u^{(k)}_j\right),
+\label{eq:limited}
+\end{equation}
+whose bounds come from the surface's own two nodes, $[\,\ell, h\,] =
+[\min(u_i,u_j),\,\max(u_i,u_j)]$ --- a two-node stencil, not a full one-ring. With $\Lambda$ the
+identity this is unlimited second-order upwinding; the three limiters below are the three
+non-trivial choices.
+
+\subsection{Deferred correction}
+
+The correction is the \emph{difference} between the reconstructed flux and the first-order upwind
+one. Since first-order upwinding takes $u_a$ at the donor and the reconstruction takes
+$u_a + \delta_a$, that difference is $\delta_a$ carried by the same upwind split:
+\begin{equation}
+\mathbf{h}_\scs \;=\; \mdot^{+}\,\boldsymbol{\delta}_i \;+\; \mdot^{-}\,\boldsymbol{\delta}_j .
+\label{eq:defcor}
+\end{equation}
+Adding this to Eq.~\eqref{eq:flux} gives the higher-order flux exactly. Note which mass flux
+weights it: $\mdot$ is the one Eq.~\eqref{eq:mdot} returned, Rhie--Chow term included, so the
+correction is transported by the flux that is actually there rather than by a second opinion
+about it.
+
+What makes the scheme \emph{deferred} is how Eq.~\eqref{eq:defcor} is treated in the implicit
+operator. The first-order flux is carried implicitly and $\mathbf{h}_\scs$ explicitly, as a
+source~\cite{KhoslaRubin1974,XuePhanThienTanner2002}, so the implicit operator stays the
+first-order upwind one: diagonally dominant, one-ring, and \emph{the same for every scheme in
+this section}. The higher-order accuracy is recovered through the outer iteration. That is the
+property the method exists for, and Section~\ref{sec:jac:defcor} is where it is paid for.
+
+\subsection{Scheme 0: unlimited}
+
+$\Lambda(\Delta) = \Delta$. The arm every other is measured against, and the solver's default.
+Smooth, differentiable, and does not preserve the bound: a reconstruction can place the face value
+outside the interval its nodes span.
+
+\subsection{Scheme 1: bounded-face clip}
+
+Barth--Jespersen's bound on the two-node stencil
+(\code{cvfem\_limiter\_clip\_inc}):
+\begin{equation}
+\Lambda(\Delta) \;=\; \operatorname{clip}\bigl(u_a + \Delta,\; \ell,\; h\bigr) - u_a .
+\end{equation}
+The face value cannot introduce a new extremum, so the bound holds by construction. It is kept as
+the reference arm rather than recommended: it clips at a smooth extremum too, and its active set
+flips --- an ulp of change in $\Delta$ can move the result by a finite amount, which is exactly
+what makes its derivative delicate (Section~\ref{sec:jac:subgrad}).
+
+\subsection{Scheme 2: Venkatakrishnan}
+
+A smooth limiter (\code{cvfem\_venkata\_inc}). With $D^{+}$ the signed room to the bound in the
+direction of the increment,
+\begin{equation}
+D^{+} = \begin{cases} h - u_a, & \Delta \ge 0\\ \ell - u_a, & \Delta < 0\end{cases}
+\qquad
+\Lambda(\Delta) \;=\; \frac{(D^{+})^2 + 2\Delta D^{+} + \varepsilon^2}
+                          {(D^{+})^2 + 2\Delta^2 + \Delta D^{+} + \varepsilon^2}\;\Delta .
+\label{eq:venkat}
+\end{equation}
+The denominator is a sum of squares, $(D^{+} + \Delta/2)^2 + \tfrac74\Delta^2 + \varepsilon^2$,
+hence positive unless $D^{+}$, $\Delta$ and $\varepsilon$ all vanish --- and there $\Lambda = 0$
+anyway, so the guard can be placed on $\Delta$ rather than on the denominator. That is not a
+cosmetic choice: writing it as a test on the denominator builds a relational around a
+\code{Piecewise}, which the code generator folds into a ternary \emph{inside the condition of
+another ternary}, and GCC then abandons the loop. The generated Venkatakrishnan kernel contained
+zero vector instructions for exactly this reason until the guard was moved.
+
+$\varepsilon^2$ is Venkatakrishnan's deactivation term, dimensional in the square of the solution
+variable. Its purpose is to switch the limiter \emph{off} where the two-node variation is at the
+level of round-off --- along flow-aligned edges in a channel core, where $u_i$ and $u_j$ agree to
+round-off while the true face value legitimately differs from both transversally. Without it the
+bound is decided by round-off there, the limiter clips a correction that was right, and refining
+makes the error worse at $h^{-2}$. $\varepsilon^2 = 0$ recovers the preceding arm bit for bit,
+which makes $K=0$ a genuine zero-severity control rather than an approximation of one.
+
+\subsection{Scheme 3: Darwish--Moukalled}
+
+van Leer's $\psi(r) = (r + |r|)/(1 + |r|)$ in the TVD form, with the limited increment
+$\tfrac12\psi(r)(\phi_D - \phi_C)$. Substituting $r$ and clearing fractions
+(\code{cvfem\_darwish\_moukalled\_inc}) gives
+\begin{equation}
+\Lambda \;=\; \frac{a\,|b| + |a|\,b}{2\,(|a| + |b|)},
+\qquad a = 2\,\nabla\phi_C\cdot\dvec, \quad b = \phi_D - \phi_C ,
+\label{eq:dm}
+\end{equation}
+which is one division rather than three and has no removable singularity: the denominator vanishes
+only when $a$ and $b$ both do, and the numerator vanishes with it. Opposite signs give exactly
+zero, which is $\psi(r<0) = 0$ --- the increment is discarded where the reconstruction and the
+downwind difference disagree about the direction of the gradient. Note that this guard divides by
+$2(|a|+|b|)$, an absolute value and not a \code{Piecewise}, which is why this kernel vectorised
+when Venkatakrishnan's did not.
+
+\subsection{The correction in the Jacobian, and the two halves of its derivative}
+\label{sec:jac:defcor}
+
+Differentiating Eq.~\eqref{eq:defcor} along a direction $v$ is the product rule, and both factors
+depend on $v$. With $\dot{\mdot} = (\partial\mdot/\partial\uvec)\,v$ and
+$\partial\mdot^{\pm}/\partial\uvec\,v = \tfrac12\bigl(1 \pm \operatorname{sgn}\mdot\bigr)\dot{\mdot}$,
+\begin{equation}
+\frac{\partial\mathbf{h}_\scs}{\partial\uvec}\,v
+\;=\;
+\underbrace{\tfrac12(1+\operatorname{sgn}\mdot)\,\dot{\mdot}\;\boldsymbol{\delta}_i
+          + \tfrac12(1-\operatorname{sgn}\mdot)\,\dot{\mdot}\;\boldsymbol{\delta}_j}_{\textbf{(a)}
+          \text{ flux sensitivity} \,\times\, \text{frozen increment}}
+\;+\;
+\underbrace{\mdot^{+}\,\dot{\boldsymbol{\delta}}_i + \mdot^{-}\,\dot{\boldsymbol{\delta}}_j}_{\textbf{(b)}
+          \text{ increment sensitivity}} .
+\label{eq:defcor-jv}
+\end{equation}
+The two halves need different things, and the distinction decides which reconstructions an
+operator must run.
+
+\paragraph{(a) needs the state's velocity gradient and nothing of the direction's.}
+$\boldsymbol{\delta}_a$ is Eq.~\eqref{eq:limited} evaluated at the state, so it needs
+$\Gop u(u)$ --- the same values the residual's correction reads. The factor multiplying it is
+$\dot{\mdot}$, the mass flux's own sensitivity, which the first-order action already computes.
+This term is therefore available at no reconstruction cost beyond what $\Fho$ already pays.
+
+\paragraph{(b) needs the direction's.} By the chain rule,
+\begin{equation}
+\dot{\delta}^{(k)}_a
+\;=\;
+\frac{\partial\Lambda}{\partial\Delta}\;
+      \bigl(\Gop v^{(k)}\bigr)_a \cdot \bigl(\xvec^c_\scs - \xvec_a\bigr)
+\;+\;
+\frac{\partial\Lambda}{\partial u_i}\,v^{(k)}_i
+\;+\;
+\frac{\partial\Lambda}{\partial u_j}\,v^{(k)}_j .
+\label{eq:dinc}
+\end{equation}
+The first piece is $\Gop v$, the direction's nodal velocity gradient, which must be rebuilt on
+every operator application because the direction changes every Krylov iteration. The last two
+exist only because the limiter's bounds are \emph{nodal} values: they carry the direction's nodal
+values, not its gradient, and they vanish for $\Lambda$ the identity. They are the part of this
+derivative a reader is most likely to drop, and the source says so where they are formed.
+
+\paragraph{The subgradient is shared.} $\operatorname{sgn}\mdot$ in Eq.~\eqref{eq:defcor-jv} is
+$\partial|\mdot|/\partial\mdot$, which is the same subgradient the first-order action already
+takes at $\mdot = 0$. The two linearisations therefore agree there, rather than one being exact
+and the other not.
+
+\paragraph{The Rhie--Chow coupling arrives through (a).} $\dot{\mdot}$ carries the Rhie--Chow
+sensitivity of Section~\ref{sec:rc}, so when both terms are differentiated the correction's
+Jacobian inherits the pressure coupling through the flux it is weighted by. The two higher-order
+terms are not independent of the two pressure ones.
+
+\subsection{Which operator needs which reconstruction}
+\label{sec:schemes:needs}
+
+Collecting Eqs.~\eqref{eq:increment}, \eqref{eq:defcor-jv} and \eqref{eq:dinc}, together with the
+Rhie--Chow correction of Eq.~\eqref{eq:corr} and its derivative:
+
+\begin{center}
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+& \multicolumn{2}{c}{pressure} & \multicolumn{2}{c}{velocity} \\
+\cmidrule(lr){2-3}\cmidrule(l){4-5}
+operator & $\Gop p(u)$ & $\Gop p(v)$ & $\Gop u(u)$ & $\Gop u(v)$ \\
+\midrule
+$\Fres(u)$, first-order residual          & \checkmark &            &            &            \\
+$\Fho(u)$, higher-order residual          & \checkmark &            & \checkmark &            \\
+\addlinespace
+$\Jlag(u)\,v$, deferred correction        & \checkmark &            &            &            \\
+$\Jex(u)\,v$, exact, first-order          & \checkmark & \checkmark &            &            \\
+$\Jhoex(u)\,v$, exact, higher-order       & \checkmark & \checkmark & \checkmark & \checkmark \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+Three readings of that table are worth stating, because each is easy to get wrong.
+
+\emph{The velocity gradient is needed in exactly two operators.} $\Fho$ needs the state's, by
+Eq.~\eqref{eq:increment}. $\Jhoex$ needs the state's for term (a) and the direction's for term
+(b). No other operator needs one at all --- and in particular $\Jlag$ needs none, which is the
+whole of why one lagged operator serves every scheme.
+
+\emph{A state gradient appears in every row, but it is the pressure one.} The Rhie--Chow
+correction is a function of $\Gop p(u)$ whether or not its sensitivity is differentiated, so every
+operator carrying the coupling reads it. That is not the same thing as needing a velocity
+gradient, and conflating the two is what makes this table look inconsistent at a glance.
+
+\emph{The two lagged forms are lagged in different senses}, which Section~\ref{sec:jac:asym}
+sets out: the Rhie--Chow term freezes a gradient and is still differentiated, the correction's
+derivative is dropped outright.
+
+\subsection{Pseudocode}
+\label{sec:schemes:pseudo}
+
+The residual's correction, once per sub-control surface
+(\code{cvfem\_hex8\_scs\_defcor}):
+
+\begin{algorithm}[H]
+\caption{$\mathbf{h}_\scs$, the deferred correction (residual)}
+\begin{algorithmic}[1]
+\Require nodes $i,j$; centroid $\xvec^c_\scs$; $\mdot$ from Eq.~\eqref{eq:mdot};
+         nodal state $u$; nodal gradients $\Gop u(u)$
+\State $\mdot^{\pm} \gets \tfrac12(\mdot \pm |\mdot|_\epsilon)$
+       \Comment{the split the flux already used}
+\State $\dvec_i \gets \xvec^c_\scs - \xvec_i$; \quad $\dvec_j \gets \xvec^c_\scs - \xvec_j$
+\For{each velocity component $k \in \{x,y,z\}$}
+  \State $\Delta_i \gets (\Gop u^{(k)})_i \cdot \dvec_i$; \quad
+         $\Delta_j \gets (\Gop u^{(k)})_j \cdot \dvec_j$
+         \Comment{Eq.~\eqref{eq:increment}}
+  \State $\ell \gets \min(u^{(k)}_i, u^{(k)}_j)$; \quad $h \gets \max(u^{(k)}_i, u^{(k)}_j)$
+  \State $\delta_i \gets \Lambda(\Delta_i; u^{(k)}_i, \ell, h)$; \quad
+         $\delta_j \gets \Lambda(\Delta_j; u^{(k)}_j, \ell, h)$
+  \State $h^{(k)}_\scs \gets \mdot^{+}\delta_i + \mdot^{-}\delta_j$
+         \Comment{Eq.~\eqref{eq:defcor}}
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+\noindent
+Its derivative, once per sub-control surface
+(\code{cvfem\_hex8\_scs\_defcor\_jv}). The two halves of Eq.~\eqref{eq:defcor-jv} are lines 7
+and 8:
+
+\begin{algorithm}[H]
+\caption{$(\partial\mathbf{h}_\scs/\partial\uvec)\,v$, the exact correction derivative}
+\begin{algorithmic}[1]
+\Require the above, plus the direction $v$, its nodal gradients $\Gop v$, and
+         $\dot{\mdot}$ from the first-order action --- Rhie--Chow sensitivity included
+\State $\mdot^{\pm} \gets \tfrac12(\mdot \pm |\mdot|_\epsilon)$;\quad
+       $d^{\pm} \gets \tfrac12(1 \pm \operatorname{sgn}\mdot)$
+\State $\dvec_i \gets \xvec^c_\scs - \xvec_i$; \quad $\dvec_j \gets \xvec^c_\scs - \xvec_j$
+\For{each velocity component $k \in \{x,y,z\}$}
+  \State $\Delta_a \gets (\Gop u^{(k)})_a \cdot \dvec_a$ \quad for $a \in \{i,j\}$
+         \Comment{at the state}
+  \State $\dot{\Delta}_a \gets (\Gop v^{(k)})_a \cdot \dvec_a$ \quad for $a \in \{i,j\}$
+         \Comment{at the direction}
+  \State $\delta_a,\ \dot{\delta}_a \gets \Lambda$ and Eq.~\eqref{eq:dinc}, from
+         $\Delta_a, \dot{\Delta}_a$ and the nodal $u^{(k)}, v^{(k)}$ at $i$ and $j$
+  \State $\textbf{(a)} \gets d^{+}\dot{\mdot}\,\delta_i + d^{-}\dot{\mdot}\,\delta_j$
+         \Comment{no direction gradient}
+  \State $\textbf{(b)} \gets \mdot^{+}\dot{\delta}_i + \mdot^{-}\dot{\delta}_j$
+         \Comment{needs $\Gop v$}
+  \State $\dot{h}^{(k)}_\scs \gets \textbf{(a)} + \textbf{(b)}$
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+\noindent
+$\Jlag$ runs neither algorithm. $\Jhoex$ runs the second in full. A partially implicit treatment
+would keep \textbf{(a)} and drop the direction's increment with \textbf{(b)} --- lines 5 and 8,
+and the $\dot{\delta}$ half of line 6 --- which costs no reconstruction of the direction at all;
+it is not built here.
+
+\subsection{The Newton loop}
+\label{sec:schemes:newton}
+
+The two algorithms above are inner kernels. What places them, and what decides which
+reconstruction runs where, is the outer iteration
+(\code{drivers/cvfem\_hex8\_ns\_steady.cpp}, over \code{apply\_residual} and
+\code{apply\_jacobian\_action\_accumulate} in \code{src/hex8/cvfem\_hex8\_ns\_core.hpp}).
+
+\begin{algorithm}[H]
+\caption{Newton--Krylov with the higher-order scheme}
+\label{alg:newton}
+\begin{algorithmic}[1]
+\Require $u^0$ satisfying the Dirichlet data; tolerances $\tau_{\text{nl}}$, $\tau_{\text{lin}}$
+\For{$k = 0, 1, 2, \dots$}
+  \Statex \textbf{\emph{once per Newton step --- the state is new}}
+  \State $\Gop p(u^k),\; \Gop u(u^k) \gets$ \emph{one} fused four-field reconstruction of
+         $(p, u_x, u_y, u_z)$ at $u^k$
+         \Comment{\code{GradSet::Both}; three fields of it exist only because the scheme is
+                  higher order}
+  \State $r^k \gets \Fho(u^k)$: the element sweep, whose flux is Eq.~\eqref{eq:flux} with
+         $\mathbf{h}_\scs$ from Algorithm~1 reading $\Gop u(u^k)$
+  \State $r^k \gets r^k + \text{boundary closure} + \text{transient}$, then apply the Dirichlet
+         rows
+  \If{$\|r^k\| \le \tau_{\text{nl}}$} \textbf{stop} \EndIf
+  \Statex \textbf{\emph{the linear solve --- $u^k$ is fixed throughout, so its gradients are not
+          rebuilt}}
+  \State solve $\mathcal{J}(u^k)\,s = -r^k$ by FGMRES to relative tolerance $\tau_{\text{lin}}$:
+  \ForAll{applications of $\mathcal{J}$, on a Krylov direction $v$}
+    \If{the correction is differentiated \textbf{and} the coupling is}
+      \State $\Gop u(v),\; \Gop p(v) \gets$ \emph{one} fused four-field reconstruction of $v$
+             \Comment{$\Jhoex$; $9 + 3$ components}
+    \ElsIf{the correction is differentiated \textbf{and} there is no coupling}
+      \State $\Gop u(v) \gets$ three-field reconstruction
+             \Comment{exact for a problem without Rhie--Chow}
+    \ElsIf{the coupling is differentiated}
+      \State $\Gop p(v) \gets$ one-field reconstruction \Comment{$\Jex$}
+    \Else
+      \State nothing reconstructed \Comment{$\Jlag$: the deferred correction}
+    \EndIf
+    \State $\mathcal{J}v \gets$ the element sweep: the first-order linearisation; plus the
+           Rhie--Chow terms of Section~\ref{sec:jac:asym}, which read $\Gop p(u^k)$ always and
+           $\Gop p(v)$ when exact; plus, when the correction is exact, \textbf{(a)} and
+           \textbf{(b)} of Algorithm~2 reading $\Gop u(u^k)$ and $\Gop u(v)$
+    \State $\mathcal{J}v \gets \mathcal{J}v + \text{boundary} + \text{transient}$, Dirichlet rows
+  \EndFor
+  \State $u^{k+1} \gets u^k + \theta s$, with $\theta \le 1$ capping $\|s\|_\infty$
+  \State re-apply the Dirichlet data to $u^{k+1}$
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+Four things in that loop are the whole of the answer to where a velocity gradient is needed, and
+each is a consequence of the structure rather than a choice made at the call site.
+
+\paragraph{$\Gop u(u^k)$ is built on line 3 and read twice.} The residual reads it to form
+$\mathbf{h}_\scs$, and --- if the correction is differentiated --- so does term \textbf{(a)} of
+every Jacobian application in the linear solve. It is not rebuilt there, because $u^k$ does not
+change inside the solve: hoisting it is exact, not an approximation. This is also why the fused
+four-field sweep on line 3 is worth having: at first order that line is a one-field pressure
+sweep, and the higher-order scheme turns it into four fields for the price of one pass.
+
+\paragraph{The correction is applied at $u^k$, not at $u^{k-1}$.} ``Deferred'' here refers to the
+implicit operator, not to the residual: line 3 reconstructs at the current iterate, so
+$\Fho(u^k)$ is the higher-order residual at $u^k$ and the converged solution is the higher-order
+one. What is deferred to the next iteration is the \emph{correction's share of the update}, since
+the operator that computed $s$ did not know about it.
+
+\paragraph{The exact correction has a precondition the loop supplies.} The Jacobian enables its
+higher-order term only when $\Gop u(u^k)$ already exists --- in the source,
+\code{want\_v} tests \code{!d.ugrad.empty()} alongside the switch. Line 3 is what fills it, so the
+exact action is available because the residual ran first at this state. An application reached
+without that residual silently gets the lagged action instead.
+
+\paragraph{Only $\Gop u(v)$ is per-application, and only for $\Jhoex$.} It is the one
+reconstruction that cannot be hoisted anywhere, because the direction changes every Krylov
+iteration. $\Jlag$ needs none; $\Jex$ needs the three components of $\Gop p(v)$; $\Jhoex$ needs
+those plus the nine of $\Gop u(v)$, in one sweep rather than two.
+
+\paragraph{The third branch means \emph{absent}, not lagged.} Its condition in the source is
+one test, \code{want\_q = rc\_exact\_jac() \&\& rhie\_chow\_scale != 0 \&\& !pgx.empty()}, which
+is false both when the coupling is lagged and when there is no coupling at all. Those are not the
+same operator. With no coupling, the exact correction is the exact Jacobian of the residual being
+solved, and that is a configuration worth having: a prescribed-velocity transport problem has no
+pressure--velocity coupling to begin with --- Smith--Hutton, the benchmark for whether a
+convective scheme is bounded, is exactly one --- and it is also the configuration the
+higher-order Jacobian is \emph{verified} in, which is why the agreement quoted in
+Section~\ref{sec:jac:asym} is meaningful.
+
+With the coupling present but lagged, differentiating the correction gives an operator that is
+exact in one reconstruction and frozen in the other, and no residual has it as its Jacobian. The
+driver refuses that combination up front rather than letting the branch serve both, so only the
+absent case reaches line 11. The three remaining combinations are all operators somebody applies:
+both differentiated is $\Jhoex$; both lagged is $\Jlag$; and the coupling differentiated with the
+correction lagged is $\Jex$, which is deferred correction as published, since the correction is
+\emph{meant} to stay an explicit source. Note that this is a different question from the
+partially implicit treatment of Section~\ref{sec:jac:asym}, which splits the correction's own
+derivative rather than mixing it with the coupling's.
+
+\paragraph{A note on what the benchmark measures.} The performance paper's exact arms rebuild
+$\Gop p(u)$ and $\Gop u(u)$ inside \emph{every} application rather than hoisting them as line 3
+does, so a reported rate for $\Jex$ or $\Jhoex$ is the cost of a self-contained application and
+does not credit the hoist. The solver's own cost per Krylov iteration is lower by those two
+reconstructions, amortised over the iterations of one linear solve.
+
+\subsection{Bound preservation, measured}
+
+The schemes' claims are checked by instrumenting the limiter over a converged solve
+($\sim$2M surface samples), counting how often the unlimited reconstruction leaves the two-node
+interval, how often the limiter alters it, and how often the \emph{limited} value is still
+outside:
+
+\begin{center}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+scheme & outside before & altered & outside after \\
+\midrule
+unlimited (control)        & 60.96\% & \phantom{0}0.00\% & 60.96\% \\
+bounded-face clip          & 61.17\% & 61.17\% & 0.0000\% \\
+Venkatakrishnan, $K=0$     & 61.11\% & 99.29\% & 0.0000\% \\
+Darwish--Moukalled         & 61.13\% & 99.26\% & 0.0000\% \\
+Venkatakrishnan, $K=5$     & 60.98\% & 65.84\% & 60.86\% \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The last row is the one to read carefully, and it is not a defect. With $\varepsilon^2 > 0$ the
+limiter is deliberately inactive where the variation is at round-off, so it no longer enforces the
+bound there --- "outside after" returns to the unlimited level. That is the trade $\varepsilon^2$
+buys: bound preservation on the edges that matter, in exchange for not clipping the flow-aligned
+ones where the two-node bound is meaningless. The two smooth limiters alter nearly every surface
+($\sim$99\%) while the clip alters only those actually out of bounds, which is the difference
+between a smooth rescaling and an active set.

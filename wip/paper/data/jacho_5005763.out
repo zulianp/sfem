@@ -1,0 +1,29 @@
+### host nid006559  n=128 repeat=10 passes=3  2026-10-08 17:01:30
+### the JACOBIAN ACTION per convective scheme -- the companion to conv_ho_bench.sbatch
+### ho_unlim_lagged is the lagged action, which carries no correction derivative at all
+
+arm                    layout       MDOF_s       dofs      elems   flops_el       checksum
+first_order            atomic      356.173    8586756    2097152      850.0 -3.0782440398752220e-13
+first_order            packed      930.075    8586756    2097152      850.0 -3.0693622556782207e-13
+first_order            ecolor      468.881    8586756    2097152      850.0 7.7796677520197699e-13
+ho_unlimited           atomic      152.597    8586756    2097152     2422.0 2.1479779760413820e-14
+ho_unlimited           packed      464.278    8586756    2097152     2422.0 2.1257735155488788e-14
+ho_unlimited           ecolor      156.671    8586756    2097152     2422.0 8.3624990612762851e-13
+ho_unlim_lagged        packed      932.654    8586756    2097152      850.0 -3.0693622556782207e-13
+ho_clip                atomic      142.108    8586756    2097152     3214.0 -3.9815389483652264e-13
+ho_clip                packed      379.085    8586756    2097152     3214.0 -3.9460118115772214e-13
+ho_clip                ecolor      148.750    8586756    2097152     3214.0 -5.1089877771068326e-13
+ho_venkatakrishnan     atomic      135.881    8586756    2097152     5878.0 -9.0982133122991665e-13
+ho_venkatakrishnan     packed      334.765    8586756    2097152     5878.0 -9.1209728843039822e-13
+ho_venkatakrishnan     ecolor      142.648    8586756    2097152     5878.0 -1.0402742713468485e-12
+ho_darwish_moukalled   atomic      133.633    8586756    2097152     5158.0 -4.2509294424352556e-13
+ho_darwish_moukalled   packed      323.244    8586756    2097152     5158.0 -4.2642521187307575e-13
+ho_darwish_moukalled   ecolor      141.697    8586756    2097152     5158.0 7.7257055191171792e-13
+
+The checksums must DIFFER between first order and each higher-order arm. For the ACTION the
+reason is sharper than for the residual: the correction is deferred, so an action that was
+not differentiated through it is EXACTLY the first-order action -- an identical checksum
+means the exact term never reached the kernel and the row is first order measured twice.
+ho_unlim_lagged is the arm that SHOULD match first_order, and is included as that control.
+
+csv: /ritom/scratch/cscs/zulianp/cvfem_jacho/5005763/jacho.csv
