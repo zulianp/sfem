@@ -20,6 +20,7 @@
 #include "reference/tet4_q1.hpp"
 #include "reference/quad_tet_q1.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -203,8 +204,11 @@ namespace {
         std::vector<real_t> merit((size_t)steps.size(), 0);
         SFEM_TEST_ASSERT(run_patch_kernel(fx, steps, zero.data(), merit.data()) == SFEM_SUCCESS);
 
-        // Repeated alphas agree exactly; distinct ones do not.
-        SFEM_TEST_ASSERT(merit[0] == merit[2]);
+        // Repeated alphas agree; distinct ones do not.
+        // OpenMP atomics + SIMD do not preserve bitwise equality of the
+        // two reductions, even when both lanes used the same step length.
+        const real_t scale = std::max(std::abs(merit[0]), std::abs(merit[2]));
+        SFEM_TEST_ASSERT(std::abs(merit[0] - merit[2]) <= kGeometryTolerance * scale);
         SFEM_TEST_ASSERT(std::abs(merit[0] - merit[1]) > real_t(1e-12) * merit[0]);
         SFEM_TEST_ASSERT(std::abs(merit[0] - merit[3]) > real_t(1e-12) * merit[0]);
         for (size_t k = 0; k < steps.size(); ++k) {
@@ -224,3 +228,4 @@ int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }
+

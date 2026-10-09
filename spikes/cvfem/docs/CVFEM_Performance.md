@@ -102,14 +102,20 @@ Best of three passes over the whole sweep at 4,121,204 dof:
 |---|---:|---:|
 | 256 | 938.4 | 1292.2 |
 | **512** | **947.3** | 1331.1 |
-| 1024 | 927.3 | **1336.3** |
-| 2048 *(default)* | 895.0 | 1306.1 |
+| 1024 *(default)* | 927.3 | **1336.3** |
+| 2048 | 895.0 | 1306.1 |
 | 4096 | 758.2 | 1115.8 |
 | 8192 | 720.3 | 1034.1 |
 
-512 beats the default by **5.8%** on the Jacobian action; above 2048 it falls off 15–25%. A
-single pass had read the opposite ordering — 909.9 at 256 against 829.1 at 512 — which is
-noise, and is why the table is best-of-three.
+The default was 2048 when this sweep was taken and is now 1024, which is the best row on the
+residual and within 2.1% of the best on the Jacobian action; 512 is still 2.2% ahead on the
+Jacobian. Above 2048 throughput falls off 15–25%. A single pass had read the opposite ordering
+— 909.9 at 256 against 829.1 at 512 — which is noise, and is why the table is best-of-three.
+
+The default is chosen here rather than by the packer, which sizes packs against the 65,536-node
+ceiling that `pack_idx_t` being 16-bit imposes and so lands far above the best row. That ceiling
+is a bound on what the index type admits, not an estimate of what the machine wants, and the two
+are not the same number.
 
 `SFEM_PACK_SIZE` has no effect on a semi-structured run at all: `initialize()` returns before
 the packing block, and such a hierarchy has no flat level for it to act on. Measured: 783

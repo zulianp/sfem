@@ -1,0 +1,57 @@
+### host nid006544  n=128  repeat=12 warmup=3  2026-09-26 10:17:00
+
+### STREAM triad (the roofline's memory bound)
+
+### thread scaling
+layout     op     threads    MDOF_s    packs       dofs  sec_call
+packed     res          1    21.314     1024    8586756 4.028634e-01
+packed     res          2    42.980     1024    8586756 1.997838e-01
+packed     res          4    85.248     1024    8586756 1.007272e-01
+packed     res          8   169.585     1024    8586756 5.063387e-02
+packed     res         18   371.345     1024    8586756 2.312336e-02
+packed     res         36   702.566     1024    8586756 1.222199e-02
+packed     res         54  1040.083     1024    8586756 8.255839e-03
+packed     res         72  1266.070     1024    8586756 6.782214e-03
+packed     jac          1    15.383     1024    8586756         -
+packed     jac          2    31.110     1024    8586756         -
+packed     jac          4    61.079     1024    8586756         -
+packed     jac          8   121.012     1024    8586756         -
+packed     jac         18   264.606     1024    8586756         -
+packed     jac         36   471.478     1024    8586756         -
+packed     jac         54   698.725     1024    8586756         -
+packed     jac         72   837.103     1024    8586756         -
+atomic     res          1     8.398        -    8586756 1.022439e+00
+atomic     res          2    16.842        -    8586756 5.098514e-01
+atomic     res          4    33.489        -    8586756 2.564069e-01
+atomic     res          8    66.640        -    8586756 1.288525e-01
+atomic     res         18   150.522        -    8586756 5.704639e-02
+atomic     res         36   295.086        -    8586756 2.909919e-02
+atomic     res         54   440.171        -    8586756 1.950777e-02
+atomic     res         72   576.360        -    8586756 1.489824e-02
+atomic     jac          1     6.794        -    8586756         -
+atomic     jac          2    13.602        -    8586756         -
+atomic     jac          4    27.341        -    8586756         -
+atomic     jac          8    54.654        -    8586756         -
+atomic     jac         18   121.705        -    8586756         -
+atomic     jac         36   236.641        -    8586756         -
+atomic     jac         54   351.323        -    8586756         -
+atomic     jac         72   448.965        -    8586756         -
+colored    res          1    21.197     1024    8586756 4.050907e-01
+colored    res          2    42.357     1024    8586756 2.027244e-01
+colored    res          4    83.064     1024    8586756 1.033748e-01
+colored    res          8   154.073     1024    8586756 5.573159e-02
+colored    res         18   312.289     1024    8586756 2.749620e-02
+colored    res         36   508.888     1024    8586756 1.687356e-02
+colored    res         54   724.264     1024    8586756 1.185584e-02
+colored    res         72   751.188     1024    8586756 1.143090e-02
+colored    jac          1    15.355     1024    8586756         -
+colored    jac          2    30.748     1024    8586756         -
+colored    jac          4    59.626     1024    8586756         -
+colored    jac          8   112.054     1024    8586756         -
+colored    jac         18   221.765     1024    8586756         -
+colored    jac         36   353.331     1024    8586756         -
+colored    jac         54   491.782     1024    8586756         -
+colored    jac         72   506.965     1024    8586756         -
+
+csv: /ritom/scratch/cscs/zulianp/cvfem_tscale/4789282/tscale.csv
+logs in /ritom/scratch/cscs/zulianp/cvfem_tscale/4789282

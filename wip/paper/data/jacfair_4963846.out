@@ -1,0 +1,17 @@
+### host nid006544  n=128 repeat=10 passes=3  2026-10-01 14:49:58
+
+operator                   layout       MDOF_s       dofs   qgrad_frac
+jac_exact                  packed      970.644    8586756            -
+jac_exact                  atomic      528.301    8586756            -
+jac_lagged                 packed     1266.928    8586756            -
+jac_lagged                 atomic      771.112    8586756            -
+jac_ho_exact               packed      387.075    8586756            -
+jac_ho_exact               atomic      208.565    8586756            -
+jac_ho_lagged              packed      417.349    8586756            -
+jac_ho_lagged              atomic      239.855    8586756            -
+spmv_f64                   none        441.451    8586756            -
+spmv_f32                   none        856.891    8586756            -
+
+jac_exact carries the direction-gradient pass; jac_lagged does not, and is the operator
+the assembled matrix encodes. Compare spmv_* against jac_lagged for like-for-like.
+csv: /ritom/scratch/cscs/zulianp/cvfem_jacfair/4963846/jacfair.csv

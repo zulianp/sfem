@@ -18,8 +18,6 @@ namespace sfem {
     // std::shared_ptr<Constraint> to_device(const std::shared_ptr<DirichletConditions> &dc);
     // std::shared_ptr<Op>         to_device(const std::shared_ptr<NeumannConditions> &nc);
 
-    SharedBuffer<idx_t *> create_device_elements(const std::shared_ptr<FunctionSpace> &space, const smesh::ElemType element_type);
-
     template <typename T>
     std::shared_ptr<SparseBlockVector<T>> to_device(const std::shared_ptr<SparseBlockVector<T>> &in) {
         if (in->mem_space() == MEMORY_SPACE_DEVICE) {

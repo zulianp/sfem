@@ -1,0 +1,176 @@
+#!/usr/bin/env bash
+#SBATCH --account=c40
+#SBATCH --job-name=cvfem-kernels
+#SBATCH --partition=debug
+#SBATCH --nodes=1 --ntasks=1 --cpus-per-task=72
+#SBATCH --time=00:30:00
+#SBATCH --exclusive --hint=nomultithread --uenv-passthrough=ignore
+#SBATCH --output=kernels_%j.out
+#SBATCH --error=kernels_%j.err
+#
+# The measurement behind docs/CVFEM_Kernels.md.
+#
+#   sbatch jobs/kernels.sbatch
+#   python3 python/cvfem_kernel_report.py <csv> -o docs/CVFEM_Kernels.md --html
+#
+# One allocation, one CSV. Everything in it is measured on the same idle socket, which is
+# what makes the rows comparable at all: the same binary reads 5-11% apart on two different
+# Grace nodes, so a report assembled from separate jobs would be reporting the machine.
+#
+# --exclusive is not optional for the same reason, and OMP_PROC_BIND=true rather than
+# close or spread is this repository's convention.
+#
+# Two sizes. 4,121,204 dof is past saturation -- the packed residual reads 1798/1458/1476
+# MDOF/s at 1.1M/4.1M/11.2M dof, so the ordering is settled well before this -- and
+# 1,098,500 dof is there so that no ordering in the report rests on a single point.
+#
+# The order matters if the allocation runs out: the cascades come first, because they are
+# the part of the report that cannot be reconstructed from anything else. The
+# cross-product of layouts and kernels comes last.
+set -u
+
+ROOT=${SLURM_SUBMIT_DIR:-$PWD}
+BIN=${BIN:-$ROOT/build_alps/cvfem_hex8_ns_upwind_bench}
+OUT=${OUT:-$SCRATCH/cvfem_kernels/${SLURM_JOB_ID:-manual}}
+CSV=$OUT/kernels.csv
+mkdir -p "$OUT"
+export OMP_NUM_THREADS=${OMP_NUM_THREADS:-72} OMP_PROC_BIND=true OMP_PLACES=cores
+U=$(grep '^uenv start' ~/init.sh | sed 's/^uenv start //')
+
+# Ten timed applies after five warmups. The Rhie-Chow configurations spread 20-32% across
+# passes at 5/2 -- enough to put an inversion in the cascade, where the operator with an
+# extra term read faster than the one without it -- and the per-run cost here is dominated
+# by mesh construction, not by the applies, so converging each reading properly is close to
+# free.
+REPEAT=${REPEAT:-10}
+WARMUP=${WARMUP:-5}
+# Passes over the whole sweep, not repeats inside one run. The report reduces repeated
+# measurements of a configuration to the best observed, which is the right estimator on a
+# shared machine -- background load can only make a run slower -- but it needs more than
+# one to reduce. With a single pass it had nothing to work with and the cascade came out
+# non-monotone: the residual with Rhie-Chow and the boundary read 928 MDOF/s against 1394
+# for the same operator plus the transient term, which cannot be true of the arithmetic and
+# was a bad reading standing alone. Three passes in the one allocation also spread each
+# configuration across three positions in the run order, which is the other effect that
+# cannot be averaged out of a single sequence.
+PASSES=${PASSES:-3}
+BIG=${BIG:-100}      # 4,121,204 dof
+SMALL=${SMALL:-64}   # 1,098,500 dof
+
+echo "host $(hostname)  threads $OMP_NUM_THREADS  $(date)"
+echo "csv  $CSV"
+
+run() {  # run <tag> <n> <flags...>
+    local tag=$1 n=$2; shift 2
+    printf '%-38s n=%-4s ' "$tag" "$n"
+    if uenv run $U -- "$BIN" --n "$n" --repeat "$REPEAT" --warmup "$WARMUP" \
+            --csv "$CSV" --tag "$tag" "$@" > "$OUT/$tag.n$n.log" 2>&1; then
+        grep -m1 '  MDOF/s:' "$OUT/$tag.n$n.log" | awk '{printf "%10.1f MDOF/s\n", $2}'
+    else
+        echo "FAILED (see $OUT/$tag.n$n.log)"
+    fi
+}
+
+sweep() {
+# ---------------------------------------------------------------- the two cascades
+#
+# The element kernel alone, then the same kernel carrying each thing the solver needs. The
+# two cascades are different lengths and the report says so rather than padding either: the
+# residual has no direction-gradient stage, because there is no direction.
+echo
+echo "== residual cascade, packed =="
+run res_bare            $BIG --layout packed
+run res_rc              $BIG --layout packed --rhie-chow
+run res_rc_perapply     $BIG --layout packed --rhie-chow --pgrad-per-apply
+run res_rc_bnd          $BIG --layout packed --rhie-chow --boundary
+run res_rc_bnd_dt       $BIG --layout packed --rhie-chow --boundary --transient 0.01
+run res_solver          $BIG --layout packed --rhie-chow --pgrad-per-apply --boundary --transient 0.01
+
+echo
+echo "== Jacobian-action cascade, packed =="
+# --rhie-chow on the action is the EXACT form: it differentiates through the nodal gradient
+# reconstruction, and rebuilds the direction's gradient inside every apply because that one
+# cannot be hoisted out of a Krylov solve. The frozen form appears in the assembled matrix
+# below, deliberately, which is what the report's `frozen by design` cell means.
+run jac_bare            $BIG --layout packed --jac-action
+run jac_rc              $BIG --layout packed --jac-action --rhie-chow
+run jac_rc_bnd          $BIG --layout packed --jac-action --rhie-chow --boundary
+run jac_rc_bnd_dt       $BIG --layout packed --jac-action --rhie-chow --boundary --transient 0.01
+run jac_live7           $BIG --layout packed --jac-action --rhie-chow --boundary --live-vectors 7
+
+# The other way to apply the Jacobian: an SpMV of the assembled BSR. One row per problem
+# size is enough, because the cost does not depend on the physics -- the sparsity pattern is
+# the mesh's node-to-node graph whatever terms the values carry, and it stays that way by
+# design: the exact Rhie-Chow term is deliberately kept out of the assembled matrix
+# precisely because it would couple pressures beyond nearest neighbours and widen the
+# pattern (cvfem_hex8_ns_upwind_kernels.hpp:135).
+#
+# That is an argument, not a measurement, so the two control rows below make it one. If
+# they ever stop agreeing, the pattern has widened and something more interesting than a
+# throughput has changed.
+run spmv                $BIG --layout packed --bsr-apply
+run spmv_rc             $BIG --layout packed --bsr-apply --rhie-chow
+run spmv_rc_bnd         $BIG --layout packed --bsr-apply --rhie-chow --boundary
+
+echo
+echo "== the residual cascade on atomic, for the layout comparison =="
+# The packed layout's margin over atomic is quoted from the bare kernel, where it is
+# largest. Whether it survives the physics is a separate question and needs the same
+# cascade on the other layout to answer -- so this is here, and it is why the report can
+# say what a layout comparison made on the bare kernel is worth.
+run res_atomic_bare      $BIG --layout atomic
+run res_atomic_rc        $BIG --layout atomic --rhie-chow
+run res_atomic_rc_bnd    $BIG --layout atomic --rhie-chow --boundary
+run res_atomic_perapply  $BIG --layout atomic --rhie-chow --pgrad-per-apply
+run jac_atomic_rc_bnd    $BIG --layout atomic --jac-action --rhie-chow --boundary
+
+# ------------------------------------------------------- the same cascades, smaller
+echo
+echo "== both cascades at the smaller size =="
+run res_bare            $SMALL --layout packed
+run res_rc_bnd          $SMALL --layout packed --rhie-chow --boundary
+run jac_bare            $SMALL --layout packed --jac-action
+run jac_rc_bnd          $SMALL --layout packed --jac-action --rhie-chow --boundary
+run spmv                $SMALL --layout packed --bsr-apply
+
+# ------------------------------------------------------------- the variant sweep
+echo
+echo "== residual, layout x geometry =="
+for lay in packed atomic colored store; do run "res_${lay}" $BIG --layout $lay; done
+run res_packed_isoparam  $BIG --layout packed --geom isoparam
+run res_atomic_isoparam  $BIG --layout atomic --geom isoparam
+
+echo
+echo "== Jacobian action, layout x geometry =="
+for lay in packed atomic colored store; do run "jac_${lay}" $BIG --layout $lay --jac-action; done
+run jac_atomic_isoparam  $BIG --layout atomic --jac-action --geom isoparam
+run jac_packed_isoparam  $BIG --layout packed --jac-action --geom isoparam
+
+echo
+echo "== assembly, layout x geometry =="
+for lay in atomic packed colored store; do run "asm_${lay}" $BIG --layout $lay --assemble; done
+run asm_atomic_isoparam  $BIG --layout atomic --assemble --geom isoparam
+run asm_atomic_rc        $BIG --layout atomic --assemble --rhie-chow
+run asm_atomic_rc_bnd    $BIG --layout atomic --assemble --rhie-chow --boundary
+run asm_packed_rc_bnd    $BIG --layout packed --assemble --rhie-chow --boundary
+
+echo
+echo "== block diagonal =="
+run diag_bare            $BIG --layout atomic --assemble-diag
+run diag_rc              $BIG --layout atomic --assemble-diag --rhie-chow
+run diag_rc_bnd          $BIG --layout atomic --assemble-diag --rhie-chow --boundary
+run diag_solver          $BIG --layout atomic --assemble-diag --rhie-chow --boundary --transient 0.01
+run diag_isoparam        $BIG --layout atomic --assemble-diag --geom isoparam --rhie-chow --boundary
+
+}
+
+for pass in $(seq 1 "$PASSES"); do
+    echo
+    echo "################ pass $pass of $PASSES ################"
+    sweep
+done
+
+echo
+echo "rows: $(( $(wc -l < "$CSV") - 1 ))"
+echo "done $(date)"
+echo "report: python3 python/cvfem_kernel_report.py $CSV -o docs/CVFEM_Kernels.md --html"

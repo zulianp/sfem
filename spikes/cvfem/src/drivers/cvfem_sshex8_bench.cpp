@@ -1,0 +1,465 @@
+// T3: does the macro-local gather pay?
+//
+// Two implementations of the same operator on the same semi-structured mesh, differing
+// only in how they reach the node data -- flat gather through the global id, versus one
+// gather per macro-element followed by constant-offset reads from local buffers. They
+// must agree to round-off, and that agreement is checked before any timing is reported,
+// because two kernels that disagree cannot be compared on speed.
+//
+// Sizes and levels are both swept. T1 and T2 each produced a wrong conclusion from
+// numbers taken below saturation, so nothing here is measured at a single point.
+
+#include "frontend/ss/cvfem_sshex8_ns.hpp"
+
+#ifdef CVFEM_ENABLE_SUBPAR_EM
+#include "cvfem_sshex8_em.hpp"
+#endif
+#ifdef CVFEM_ENABLE_SUBPAR
+// Quarantined and unreferenced, so this is the only place that keeps them compiling.
+#include "cvfem_ss_scatter_fixed_width.hpp"
+#endif
+#include "cases/cvfem_ns_channel_case.hpp"
+
+#include "sfem_context.hpp"
+#include "smesh_env.hpp"
+#include "smesh_glob.hpp"
+#include "smesh_mesh.hpp"
+#include "smesh_semistructured.hpp"
+
+#include <algorithm>
+#include <cmath>
+#include <cstdio>
+#include <string>
+#include <vector>
+
+namespace {
+
+    double median(std::vector<double> v) {
+        std::sort(v.begin(), v.end());
+        return v.empty() ? 0.0 : v[v.size() / 2];
+    }
+
+    std::vector<int> parse_list(const std::string &spec) {
+        std::vector<int> out;
+        std::string      rest = spec;
+        while (!rest.empty()) {
+            const auto pos = rest.find(',');
+            const auto tok = rest.substr(0, pos);
+            if (!tok.empty()) out.push_back(std::atoi(tok.c_str()));
+            if (pos == std::string::npos) break;
+            rest = rest.substr(pos + 1);
+        }
+        return out;
+    }
+
+}  // namespace
+
+int main(int argc, char **argv) {
+    // initialize_serial, not initialize: this is a single-process throughput benchmark, and it
+    // is also the standing packed-matrix-free performance gate. A second rank would have each
+    // rank time its own share of a partitioned mesh and report it as the whole.
+    auto ctx = sfem::initialize_serial(argc, argv);
+
+    const int    reps   = smesh::Env::read<int>("SFEM_BENCH_REPS", 10);
+    const int    warmup = smesh::Env::read<int>("SFEM_BENCH_WARMUP", 3);
+    const real_t Lx = 4, Ly = 1, Lz = 1;
+    const real_t rho = 1, mu = 0.01, U = 1;
+    const double tol = 1e-11;
+
+    // Macro-element counts in y, and the internal level of each.
+    // ndof applies is only affordable on a small mesh, so the probe check is opt-in and
+    // self-limiting.
+    const int  probe_diag     = smesh::Env::read<int>("SFEM_BENCH_PROBE_DIAG", 0);
+    const int  verbose_blocks = smesh::Env::read<int>("SFEM_BENCH_VERBOSE_BLOCKS", 0);
+    const auto macros = parse_list(smesh::Env::read_string("SFEM_BENCH_MACROS", "2,4,6,8"));
+    const auto levels = parse_list(smesh::Env::read_string("SFEM_BENCH_LEVELS", "2,4,8"));
+
+    // CURVED MACRO ELEMENTS, WHICH THE BOX DOES NOT HAVE.
+    //
+    // Every arm below agrees to round-off on a box because its macro elements are affine: the
+    // hoisted sweeps lift one geometry over the micro cells and that IS the per-cell geometry,
+    // so the four variants cannot disagree about it however they derive it. That makes this
+    // bench blind to the curved path -- the branch that gives a curved macro element's micro
+    // cells their own geometry -- and the curved path is what a warped mesh such as the FDA
+    // nozzle runs on. A change to how the geometry is derived therefore has to be measured on a
+    // non-affine mesh, or the oracle cannot see the class of bug it introduces.
+    //
+    // The warp is a product of sines, which is the shape that buys both properties needed here.
+    // It vanishes on all six faces of the box, so the outer boundary stays where the
+    // coordinate-derived face tests expect it; and it is not a trilinear function of the macro
+    // corners, so both of sscvfem_classify_macros' tests fire -- the corners carry cross terms
+    // AND the lattice nodes sit off the trilinear map of those corners. The amplitude is a
+    // fraction of the micro cell size, so the Jacobian stays positive.
+    //
+    // It is confined to the INFLOW HALF of the box, and that is the point rather than economy:
+    // the right half stays a box, so one mesh carries curved and straight macro elements side
+    // by side. That is the configuration the geometry split has to get right -- which macro
+    // element belongs to which sweep -- and an all-curved mesh would not test it. The window is
+    // sin(2 pi X / Lx) on the inflow half and exactly zero beyond it, which is continuous at the
+    // midplane, so the macro elements there are undisplaced rather than half-displaced.
+    const double warp = smesh::Env::read<double>("SFEM_BENCH_WARP", 0.0);
+
+    std::printf("%-4s %-10s %-11s %-11s %-11s %-11s %-11s %-11s %-9s %-9s %-9s %-10s %-10s %-10s %-10s %s\n",
+                "L", "ndof", "naive_ns/d", "macro_ns/d", "affine_ns/d", "hoist_ns/d", "em24_ns/d", "em32_ns/d", "bd_nv", "bd_mac", "pgrad", "hoist+pg", "agree", "bd_agree", "blk_agree", "res_agree");
+
+    int failures = 0;
+
+    for (const int L : levels) {
+        for (const int m : macros) {
+            const int ny = m;
+            const int nx = std::max(1, (int)std::lround((double)ny * (double)Lx / (double)Ly));
+            const int nz = std::max(1, (int)std::lround((double)ny * (double)Lz / (double)Ly));
+
+            auto coarse = smesh::Mesh::create_hex8_cube(ctx->communicator(), nx, ny, nz, 0, 0, 0, Lx, Ly, Lz);
+            auto mesh   = smesh::to_semistructured(L, coarse, true, false);
+            if (!mesh) {
+                std::fprintf(stderr, "to_semistructured failed for L=%d\n", L);
+                return EXIT_FAILURE;
+            }
+
+            if (warp > 0) {
+                const double h   = std::min(Lx / nx, std::min(Ly / ny, Lz / nz)) / L;
+                const double amp = warp * h;
+                auto *const  px  = mesh->points()->data()[0];
+                auto *const  py  = mesh->points()->data()[1];
+                auto *const  pz  = mesh->points()->data()[2];
+                for (ptrdiff_t i = 0; i < mesh->n_nodes(); ++i) {
+                    const double X  = (double)px[i];
+                    const double sx = X < 0.5 * Lx ? std::sin(2 * M_PI * X / Lx) : 0.0;
+                    const double sy = std::sin(M_PI * (double)py[i] / Ly);
+                    const double sz = std::sin(M_PI * (double)pz[i] / Lz);
+                    const double s  = sx * sy * sz;
+                    px[i] = (geom_t)((double)px[i] + amp * s);
+                    py[i] = (geom_t)((double)py[i] + amp * s * 0.7);
+                    pz[i] = (geom_t)((double)pz[i] - amp * s * 0.4);
+                }
+            }
+
+            SSMeshData d;
+            sscvfem_init(d, mesh, L);
+            d.rhie_chow_scale = 1;
+
+            const ptrdiff_t ndof = d.nnodes * N_FIELDS;
+
+            std::vector<scalar_t> x((size_t)ndof), dir((size_t)ndof);
+            for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+                const scalar_t X = (scalar_t)d.points[0][i], Y = (scalar_t)d.points[1][i], Z = (scalar_t)d.points[2][i];
+                scalar_t       ux, uy, uz, p;
+                cvfem_case::exact_state(cvfem_case::FlowCase::Poiseuille, mu, U, Lx, Ly, X, Y, Z, ux, uy, uz, p);
+                // Developed and asymmetric, so the upwind switch is actually exercised.
+                x[(size_t)i * 4 + 0] = ux + scalar_t(0.1) * std::sin(scalar_t(3) * X);
+                x[(size_t)i * 4 + 1] = uy + scalar_t(0.05) * std::cos(scalar_t(2) * Y);
+                x[(size_t)i * 4 + 2] = uz + scalar_t(0.05) * std::sin(scalar_t(2) * Z);
+                x[(size_t)i * 4 + 3] = p;
+                for (int c = 0; c < 4; ++c)
+                    dir[(size_t)i * 4 + c] = std::sin(scalar_t(0.7) * (scalar_t)(i * 4 + c) + scalar_t(0.3));
+            }
+
+            sscvfem_unpack(d, x.data());
+            sscvfem_nodal_p_grad(d);
+
+            std::vector<scalar_t> y_naive((size_t)ndof, 0), y_macro((size_t)ndof, 0), y_aff((size_t)ndof, 0);
+            {  // its own scope: ScopedEvent's variable name is fixed, so two trace scopes in one block collide
+                CVFEM_TRACE_SCOPE("sscvfem::apply_naive");
+                #pragma omp parallel
+                {
+                        sscvfem_apply_naive_affine(cvfem_range_split(0, d.n_straight, 1, cvfem_thread_index(), cvfem_n_threads()), d.macro_order.empty() ? nullptr : d.macro_order.data(), d.Lx, d.Ly, d.Lz, d.elems, d.level, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), rho, mu, dir.data(), y_naive.data());
+                        sscvfem_apply_naive_isoparam(cvfem_range_split(d.n_straight, d.nmacro, 1, cvfem_thread_index(), cvfem_n_threads()), d.macro_order.empty() ? nullptr : d.macro_order.data(), d.Lx, d.Ly, d.Lz, d.elems, d.level, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), rho, mu, dir.data(), y_naive.data());
+                }
+            }
+            {  // its own scope: ScopedEvent's variable name is fixed, so two trace scopes in one block collide
+                CVFEM_TRACE_SCOPE("sscvfem::apply_macro_local");
+                #pragma omp parallel
+                {
+                        sscvfem_apply_macro_local_affine(cvfem_range_split(0, d.n_straight, 1, cvfem_thread_index(), cvfem_n_threads()), d.macro_order.empty() ? nullptr : d.macro_order.data(), d.Lx, d.Ly, d.Lz, d.elems, d.level, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), rho, mu, dir.data(), y_macro.data());
+                        sscvfem_apply_macro_local_isoparam(cvfem_range_split(d.n_straight, d.nmacro, 1, cvfem_thread_index(), cvfem_n_threads()), d.macro_order.empty() ? nullptr : d.macro_order.data(), d.Lx, d.Ly, d.Lz, d.elems, d.level, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), rho, mu, dir.data(), y_macro.data());
+                }
+            }
+            {  // its own scope: ScopedEvent's variable name is fixed, so two trace scopes in one block collide
+                CVFEM_TRACE_SCOPE("sscvfem::apply_macro_local_affine");
+                #pragma omp parallel
+                {
+                        sscvfem_apply_macro_lifted_affine(cvfem_range_split(0, d.n_straight, 1, cvfem_thread_index(), cvfem_n_threads()), d.macro_order.empty() ? nullptr : d.macro_order.data(), d.Lx, d.Ly, d.Lz, d.elems, d.level, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), rho, mu, dir.data(), y_aff.data());
+                        sscvfem_apply_macro_local_isoparam(cvfem_range_split(d.n_straight, d.nmacro, 1, cvfem_thread_index(), cvfem_n_threads()), d.macro_order.empty() ? nullptr : d.macro_order.data(), d.Lx, d.Ly, d.Lz, d.elems, d.level, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), rho, mu, dir.data(), y_aff.data());
+                }
+            }
+            std::vector<scalar_t> y_hoi((size_t)ndof, 0), y_em((size_t)ndof, 0);
+            {
+                CVFEM_TRACE_SCOPE("sscvfem::apply_macro_local_hoisted");
+                #pragma omp parallel
+                {
+                        sscvfem_apply_macro_hoisted_affine(sscvfem_affine_range(d, 0, d.nmacro), sscvfem_order(d), d.Lx, d.Ly, d.Lz, d.bc_p, d.bc_tx, d.bc_ty, d.bc_tz, d.elems, d.level, d.macro_face_mask.empty() ? nullptr : d.macro_face_mask.data(), d.macro_natural_mask.empty() ? nullptr : d.macro_natural_mask.data(), d.macro_pressure_mask.empty() ? nullptr : d.macro_pressure_mask.data(), d.macro_traction_mask.empty() ? nullptr : d.macro_traction_mask.data(), d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.empty() ? nullptr : d.qgx.data(), d.qgy.data(), d.qgz.data(), d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), d.scatter ? d.scatter->red_idx.empty() ? nullptr : d.scatter->red_idx.data() : nullptr, d.scatter ? d.scatter->red_ptr.empty() ? nullptr : d.scatter->red_ptr.data() : nullptr, d.scatter ? d.scatter->shared_node.empty() ? nullptr : d.scatter->shared_node.data() : nullptr, d.scatter ? d.scatter->slot.empty() ? nullptr : d.scatter->slot.data() : nullptr, d.scatter ? d.scatter->stage.empty() ? nullptr : d.scatter->stage.data() : nullptr, d.scatter ? (ptrdiff_t)d.scatter->shared_node.size() : 0, rho, mu, dir.data(), y_hoi.data());
+                        sscvfem_apply_macro_hoisted_isoparam(sscvfem_isoparam_range(d, 0, d.nmacro), sscvfem_order(d), d.Lx, d.Ly, d.Lz, d.bc_p, d.bc_tx, d.bc_ty, d.bc_tz, d.elems, d.level, d.macro_face_mask.empty() ? nullptr : d.macro_face_mask.data(), d.macro_natural_mask.empty() ? nullptr : d.macro_natural_mask.data(), d.macro_pressure_mask.empty() ? nullptr : d.macro_pressure_mask.data(), d.macro_traction_mask.empty() ? nullptr : d.macro_traction_mask.data(), d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.empty() ? nullptr : d.qgx.data(), d.qgy.data(), d.qgz.data(), d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), d.scatter ? d.scatter->red_idx.empty() ? nullptr : d.scatter->red_idx.data() : nullptr, d.scatter ? d.scatter->red_ptr.empty() ? nullptr : d.scatter->red_ptr.data() : nullptr, d.scatter ? d.scatter->shared_node.empty() ? nullptr : d.scatter->shared_node.data() : nullptr, d.scatter ? d.scatter->slot.empty() ? nullptr : d.scatter->slot.data() : nullptr, d.scatter ? d.scatter->stage.empty() ? nullptr : d.scatter->stage.data() : nullptr, d.scatter ? (ptrdiff_t)d.scatter->shared_node.size() : 0, rho, mu, dir.data(), y_hoi.data());
+                }
+            }
+            sscvfem_drain_shared(d, y_hoi.data());
+#ifdef CVFEM_ENABLE_SUBPAR_EM
+            sscvfem_apply_macro_local_em(d, rho, mu, dir.data(), y_em.data());
+#endif
+            std::vector<scalar_t> y_emf((size_t)ndof, 0);
+#ifdef CVFEM_ENABLE_SUBPAR_EM
+            sscvfem_apply_macro_local_emfull(d, rho, mu, dir.data(), y_emf.data());
+#endif
+
+            double dmax = 0, amax = 0;
+            for (ptrdiff_t i = 0; i < ndof; ++i) {
+                dmax = std::max(dmax, std::fabs(y_naive[(size_t)i] - y_macro[(size_t)i]));
+                dmax = std::max(dmax, std::fabs(y_naive[(size_t)i] - y_aff[(size_t)i]));
+                dmax = std::max(dmax, std::fabs(y_naive[(size_t)i] - y_hoi[(size_t)i]));
+#ifdef CVFEM_ENABLE_SUBPAR_EM
+                dmax = std::max(dmax, std::fabs(y_naive[(size_t)i] - y_em[(size_t)i]));
+                dmax = std::max(dmax, std::fabs(y_naive[(size_t)i] - y_emf[(size_t)i]));
+#endif
+                amax = std::max(amax, std::fabs(y_naive[(size_t)i]));
+            }
+            const double rel = (amax > 0) ? dmax / amax : dmax;
+
+            // Block diagonal, both layouts. Checked twice: against each other, and -- on
+            // the smallest configuration, where ndof applies is affordable -- against the
+            // operator itself, by probing sscvfem_apply with unit vectors and picking out
+            // the diagonal blocks. The second is what makes this a statement about the
+            // Jacobian rather than about two functions agreeing with each other.
+            std::vector<scalar_t> bd_naive, bd_macro;
+            sscvfem_block_diag_naive(d, rho, mu, bd_naive);
+            sscvfem_block_diag(d, rho, mu, bd_macro);
+
+            double bdmax = 0, bdref = 0;
+            for (size_t i = 0; i < bd_naive.size(); ++i) {
+                bdmax = std::max(bdmax, std::fabs(bd_naive[i] - bd_macro[i]));
+                bdref = std::max(bdref, std::fabs(bd_naive[i]));
+            }
+            const double bd_rel = (bdref > 0) ? bdmax / bdref : bdmax;
+
+            double bd_probe_rel = 0;
+            if (probe_diag && ndof <= 20000) {
+                std::vector<scalar_t> ecol((size_t)ndof), ycol((size_t)ndof);
+                double                pmax = 0, pref = 0;
+                // Probed against the FROZEN-pg action, deliberately, and not against
+                // sscvfem_apply. The exact Rhie-Chow term differentiates through the nodal
+                // pressure-gradient reconstruction, which is nonlocal -- qg at a node reads
+                // p on its neighbours' neighbours -- so it does not fit the BSR sparsity
+                // pattern and the assembled Jacobian keeps the frozen form on purpose. The
+                // block diagonal is an extraction of that matrix, so the frozen action is
+                // what it is the diagonal *of*; probing it against the exact operator
+                // measured a documented approximation and reported it as a failure, which
+                // is the same trap tests/cvfem_ns_op_gate.cpp records at its top.
+                //
+                // The matrix-free block apply is a different matter and is NOT excused this
+                // way: it can carry the nonlocal term, so it must, and blk_agree below
+                // checks it with the exact term on.
+                d.qgx.clear();
+                d.qgy.clear();
+                d.qgz.clear();
+                for (ptrdiff_t c = 0; c < ndof; ++c) {
+                    std::fill(ecol.begin(), ecol.end(), scalar_t(0));
+                    ecol[(size_t)c] = scalar_t(1);
+                    std::fill(ycol.begin(), ycol.end(), scalar_t(0));
+                    {
+                        CVFEM_TRACE_SCOPE("sscvfem::apply_macro_local_hoisted");
+                        #pragma omp parallel
+                        {
+                                sscvfem_apply_macro_hoisted_affine(sscvfem_affine_range(d, 0, d.nmacro), sscvfem_order(d), d.Lx, d.Ly, d.Lz, d.bc_p, d.bc_tx, d.bc_ty, d.bc_tz, d.elems, d.level, d.macro_face_mask.empty() ? nullptr : d.macro_face_mask.data(), d.macro_natural_mask.empty() ? nullptr : d.macro_natural_mask.data(), d.macro_pressure_mask.empty() ? nullptr : d.macro_pressure_mask.data(), d.macro_traction_mask.empty() ? nullptr : d.macro_traction_mask.data(), d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.empty() ? nullptr : d.qgx.data(), d.qgy.data(), d.qgz.data(), d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), d.scatter ? d.scatter->red_idx.empty() ? nullptr : d.scatter->red_idx.data() : nullptr, d.scatter ? d.scatter->red_ptr.empty() ? nullptr : d.scatter->red_ptr.data() : nullptr, d.scatter ? d.scatter->shared_node.empty() ? nullptr : d.scatter->shared_node.data() : nullptr, d.scatter ? d.scatter->slot.empty() ? nullptr : d.scatter->slot.data() : nullptr, d.scatter ? d.scatter->stage.empty() ? nullptr : d.scatter->stage.data() : nullptr, d.scatter ? (ptrdiff_t)d.scatter->shared_node.size() : 0, rho, mu, ecol.data(), ycol.data());
+                                sscvfem_apply_macro_hoisted_isoparam(sscvfem_isoparam_range(d, 0, d.nmacro), sscvfem_order(d), d.Lx, d.Ly, d.Lz, d.bc_p, d.bc_tx, d.bc_ty, d.bc_tz, d.elems, d.level, d.macro_face_mask.empty() ? nullptr : d.macro_face_mask.data(), d.macro_natural_mask.empty() ? nullptr : d.macro_natural_mask.data(), d.macro_pressure_mask.empty() ? nullptr : d.macro_pressure_mask.data(), d.macro_traction_mask.empty() ? nullptr : d.macro_traction_mask.data(), d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.empty() ? nullptr : d.qgx.data(), d.qgy.data(), d.qgz.data(), d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), d.scatter ? d.scatter->red_idx.empty() ? nullptr : d.scatter->red_idx.data() : nullptr, d.scatter ? d.scatter->red_ptr.empty() ? nullptr : d.scatter->red_ptr.data() : nullptr, d.scatter ? d.scatter->shared_node.empty() ? nullptr : d.scatter->shared_node.data() : nullptr, d.scatter ? d.scatter->slot.empty() ? nullptr : d.scatter->slot.data() : nullptr, d.scatter ? d.scatter->stage.empty() ? nullptr : d.scatter->stage.data() : nullptr, d.scatter ? (ptrdiff_t)d.scatter->shared_node.size() : 0, rho, mu, ecol.data(), ycol.data());
+                        }
+                    }
+                    sscvfem_drain_shared(d, ycol.data());
+                    // Column c of J touches the diagonal block of node c/4 in rows of the
+                    // same node.
+                    const ptrdiff_t node = c / 4, fld = c % 4;
+                    for (int r = 0; r < 4; ++r) {
+                        const double a = (double)ycol[(size_t)node * 4 + r];
+                        const double b = (double)bd_macro[(size_t)node * 16 + r * 4 + fld];
+                        pmax = std::max(pmax, std::fabs(a - b));
+                        pref = std::max(pref, std::fabs(a));
+                    }
+                }
+                bd_probe_rel = (pref > 0) ? pmax / pref : pmax;
+            }
+
+            auto time_it = [&](auto &&fn) {
+                for (int r = 0; r < warmup; ++r) fn();
+                std::vector<double> t;
+                for (int r = 0; r < reps; ++r) {
+                    const double t0 = smesh::time_seconds();
+                    fn();
+                    t.push_back(smesh::time_seconds() - t0);
+                }
+                return median(t);
+            };
+
+            const double t_naive = time_it([&] {
+                std::fill(y_naive.begin(), y_naive.end(), scalar_t(0));
+                {  // its own scope: ScopedEvent's variable name is fixed, so two trace scopes in one block collide
+                    CVFEM_TRACE_SCOPE("sscvfem::apply_naive");
+                    #pragma omp parallel
+                    {
+                            sscvfem_apply_naive_affine(cvfem_range_split(0, d.n_straight, 1, cvfem_thread_index(), cvfem_n_threads()), d.macro_order.empty() ? nullptr : d.macro_order.data(), d.Lx, d.Ly, d.Lz, d.elems, d.level, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), rho, mu, dir.data(), y_naive.data());
+                            sscvfem_apply_naive_isoparam(cvfem_range_split(d.n_straight, d.nmacro, 1, cvfem_thread_index(), cvfem_n_threads()), d.macro_order.empty() ? nullptr : d.macro_order.data(), d.Lx, d.Ly, d.Lz, d.elems, d.level, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), rho, mu, dir.data(), y_naive.data());
+                    }
+                }
+            });
+            const double t_macro = time_it([&] {
+                std::fill(y_macro.begin(), y_macro.end(), scalar_t(0));
+                {  // its own scope: ScopedEvent's variable name is fixed, so two trace scopes in one block collide
+                    CVFEM_TRACE_SCOPE("sscvfem::apply_macro_local");
+                    #pragma omp parallel
+                    {
+                            sscvfem_apply_macro_local_affine(cvfem_range_split(0, d.n_straight, 1, cvfem_thread_index(), cvfem_n_threads()), d.macro_order.empty() ? nullptr : d.macro_order.data(), d.Lx, d.Ly, d.Lz, d.elems, d.level, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), rho, mu, dir.data(), y_macro.data());
+                            sscvfem_apply_macro_local_isoparam(cvfem_range_split(d.n_straight, d.nmacro, 1, cvfem_thread_index(), cvfem_n_threads()), d.macro_order.empty() ? nullptr : d.macro_order.data(), d.Lx, d.Ly, d.Lz, d.elems, d.level, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), rho, mu, dir.data(), y_macro.data());
+                    }
+                }
+            });
+
+            const double t_aff = time_it([&] {
+                std::fill(y_aff.begin(), y_aff.end(), scalar_t(0));
+                {  // its own scope: ScopedEvent's variable name is fixed, so two trace scopes in one block collide
+                    CVFEM_TRACE_SCOPE("sscvfem::apply_macro_local_affine");
+                    #pragma omp parallel
+                    {
+                            sscvfem_apply_macro_lifted_affine(cvfem_range_split(0, d.n_straight, 1, cvfem_thread_index(), cvfem_n_threads()), d.macro_order.empty() ? nullptr : d.macro_order.data(), d.Lx, d.Ly, d.Lz, d.elems, d.level, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), rho, mu, dir.data(), y_aff.data());
+                            sscvfem_apply_macro_local_isoparam(cvfem_range_split(d.n_straight, d.nmacro, 1, cvfem_thread_index(), cvfem_n_threads()), d.macro_order.empty() ? nullptr : d.macro_order.data(), d.Lx, d.Ly, d.Lz, d.elems, d.level, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), rho, mu, dir.data(), y_aff.data());
+                    }
+                }
+            });
+
+            const double t_hoi = time_it([&] {
+                std::fill(y_hoi.begin(), y_hoi.end(), scalar_t(0));
+                {
+                    CVFEM_TRACE_SCOPE("sscvfem::apply_macro_local_hoisted");
+                    #pragma omp parallel
+                    {
+                            sscvfem_apply_macro_hoisted_affine(sscvfem_affine_range(d, 0, d.nmacro), sscvfem_order(d), d.Lx, d.Ly, d.Lz, d.bc_p, d.bc_tx, d.bc_ty, d.bc_tz, d.elems, d.level, d.macro_face_mask.empty() ? nullptr : d.macro_face_mask.data(), d.macro_natural_mask.empty() ? nullptr : d.macro_natural_mask.data(), d.macro_pressure_mask.empty() ? nullptr : d.macro_pressure_mask.data(), d.macro_traction_mask.empty() ? nullptr : d.macro_traction_mask.data(), d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.empty() ? nullptr : d.qgx.data(), d.qgy.data(), d.qgz.data(), d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), d.scatter ? d.scatter->red_idx.empty() ? nullptr : d.scatter->red_idx.data() : nullptr, d.scatter ? d.scatter->red_ptr.empty() ? nullptr : d.scatter->red_ptr.data() : nullptr, d.scatter ? d.scatter->shared_node.empty() ? nullptr : d.scatter->shared_node.data() : nullptr, d.scatter ? d.scatter->slot.empty() ? nullptr : d.scatter->slot.data() : nullptr, d.scatter ? d.scatter->stage.empty() ? nullptr : d.scatter->stage.data() : nullptr, d.scatter ? (ptrdiff_t)d.scatter->shared_node.size() : 0, rho, mu, dir.data(), y_hoi.data());
+                            sscvfem_apply_macro_hoisted_isoparam(sscvfem_isoparam_range(d, 0, d.nmacro), sscvfem_order(d), d.Lx, d.Ly, d.Lz, d.bc_p, d.bc_tx, d.bc_ty, d.bc_tz, d.elems, d.level, d.macro_face_mask.empty() ? nullptr : d.macro_face_mask.data(), d.macro_natural_mask.empty() ? nullptr : d.macro_natural_mask.data(), d.macro_pressure_mask.empty() ? nullptr : d.macro_pressure_mask.data(), d.macro_traction_mask.empty() ? nullptr : d.macro_traction_mask.data(), d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.empty() ? nullptr : d.qgx.data(), d.qgy.data(), d.qgz.data(), d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), d.scatter ? d.scatter->red_idx.empty() ? nullptr : d.scatter->red_idx.data() : nullptr, d.scatter ? d.scatter->red_ptr.empty() ? nullptr : d.scatter->red_ptr.data() : nullptr, d.scatter ? d.scatter->shared_node.empty() ? nullptr : d.scatter->shared_node.data() : nullptr, d.scatter ? d.scatter->slot.empty() ? nullptr : d.scatter->slot.data() : nullptr, d.scatter ? d.scatter->stage.empty() ? nullptr : d.scatter->stage.data() : nullptr, d.scatter ? (ptrdiff_t)d.scatter->shared_node.size() : 0, rho, mu, dir.data(), y_hoi.data());
+                    }
+                }
+                sscvfem_drain_shared(d, y_hoi.data());
+            });
+
+#ifdef CVFEM_ENABLE_SUBPAR_EM
+            const double t_em = time_it([&] {
+                std::fill(y_em.begin(), y_em.end(), scalar_t(0));
+                sscvfem_apply_macro_local_em(d, rho, mu, dir.data(), y_em.data());
+            });
+#else
+            const double t_em = 0;  // subpar; rebuild with -DCVFEM_ENABLE_SUBPAR_EM=ON
+#endif
+#ifdef CVFEM_ENABLE_SUBPAR_EM
+            const double t_emf = time_it([&] {
+                std::fill(y_emf.begin(), y_emf.end(), scalar_t(0));
+                sscvfem_apply_macro_local_emfull(d, rho, mu, dir.data(), y_emf.data());
+            });
+            const double t_best = std::min(std::min(t_macro, t_aff), std::min(std::min(t_hoi, t_em), t_emf));
+#else
+            const double t_emf  = 0;
+            const double t_best = std::min(std::min(t_macro, t_aff), t_hoi);
+#endif
+            const double t_bdn = time_it([&] { sscvfem_block_diag_naive(d, rho, mu, bd_naive); });
+            const double t_bdm = time_it([&] { sscvfem_block_diag(d, rho, mu, bd_macro); });
+
+            // Residual: the two layouts must agree, as everywhere else.
+            double res_rel = 0;
+            {
+                std::vector<scalar_t> rn((size_t)ndof), rm((size_t)ndof);
+                sscvfem_residual_naive(d, rho, mu, rn.data());
+                sscvfem_residual(d, rho, mu, rm.data());
+                double m = 0, f = 0;
+                for (ptrdiff_t i = 0; i < ndof; ++i) {
+                    m = std::max(m, std::fabs((double)(rn[(size_t)i] - rm[(size_t)i])));
+                    f = std::max(f, std::fabs((double)rn[(size_t)i]));
+                }
+                res_rel = (f > 0) ? m / f : m;
+            }
+
+            // The 2x2 field blocks. Each specialised kernel is checked against the
+            // reference built by masking the inputs around the unmodified operator, and
+            // the four of them must also sum back to the full operator -- a term landing
+            // in the wrong block would pass the first check and fail the second.
+            double blk_rel = 0, blk_sum_rel = 0;
+            {
+                const int    masks[4] = {SSBLOCK_UU, SSBLOCK_UP, SSBLOCK_PU, SSBLOCK_PP};
+                const char  *names[4] = {"uu", "up", "pu", "pp"};
+                std::vector<scalar_t> yb((size_t)ndof), yr((size_t)ndof), acc((size_t)ndof, 0), yfull((size_t)ndof, 0);
+                sscvfem_apply(d, rho, mu, dir.data(), yfull.data());
+
+                double fmax = 0;
+                for (ptrdiff_t i = 0; i < ndof; ++i) fmax = std::max(fmax, std::fabs((double)yfull[(size_t)i]));
+
+                for (int b = 0; b < 4; ++b) {
+                    std::fill(yb.begin(), yb.end(), scalar_t(0));
+                    std::fill(yr.begin(), yr.end(), scalar_t(0));
+                    sscvfem_apply_blocks(d, rho, mu, masks[b], dir.data(), yb.data());
+                    sscvfem_apply_blocks_ref(d, rho, mu, masks[b], dir.data(), yr.data());
+                    double m = 0;
+                    for (ptrdiff_t i = 0; i < ndof; ++i) {
+                        m = std::max(m, std::fabs((double)(yb[(size_t)i] - yr[(size_t)i])));
+                        acc[(size_t)i] += yb[(size_t)i];
+                    }
+                    const double rl = (fmax > 0) ? m / fmax : m;
+                    blk_rel = std::max(blk_rel, rl);
+                    if (verbose_blocks) std::printf("    block %s vs reference: %.3e\n", names[b], rl);
+                }
+                double sm = 0;
+                for (ptrdiff_t i = 0; i < ndof; ++i)
+                    sm = std::max(sm, std::fabs((double)(acc[(size_t)i] - yfull[(size_t)i])));
+                blk_sum_rel = (fmax > 0) ? sm / fmax : sm;
+                if (verbose_blocks) {
+                    std::printf("    uu+up+pu+pp vs full operator: %.3e\n", blk_sum_rel);
+                    // What a scheme actually saves by asking for one block instead of J.
+                    const int   tm[8]  = {0, SSBLOCK_UU, SSBLOCK_UP, SSBLOCK_PU, SSBLOCK_PP,
+                                          SSBLOCK_MOM, SSBLOCK_CON, SSBLOCK_ALL};
+                    const char *tn[8]  = {"gather only", "uu (A)", "up (B^T)", "pu (B)", "pp (C)",
+                                          "mom rows", "con rows", "all (J)"};
+                    double      tall   = 0;
+                    for (int b = 0; b < 8; ++b) {
+                        const double tb = time_it([&] {
+                            std::fill(yb.begin(), yb.end(), scalar_t(0));
+                            sscvfem_apply_blocks(d, rho, mu, tm[b], dir.data(), yb.data());
+                        });
+                        if (tm[b] == SSBLOCK_ALL) tall = tb;
+                        std::printf("    %-10s %8.3f ns/dof%s\n", tn[b], 1e9 * tb / (double)ndof,
+                                    (tall > 0 && tm[b] != SSBLOCK_ALL) ? "" : "");
+                    }
+                    for (int b = 0; b < 7; ++b) {
+                        const double tb = time_it([&] {
+                            std::fill(yb.begin(), yb.end(), scalar_t(0));
+                            sscvfem_apply_blocks(d, rho, mu, tm[b], dir.data(), yb.data());
+                        });
+                        std::printf("    %-10s %5.2f%% of the full operator\n", tn[b], 100.0 * tb / tall);
+                    }
+                }
+            }
+
+            // The nodal pressure gradient, timed separately because the flat operator
+            // recomputes it inside every apply while this benchmark hoists it out of the
+            // timed region. Any comparison against the flat kernel has to add it back, or
+            // it is not measuring the same work.
+            const double t_pg = time_it([&] { sscvfem_nodal_p_grad(d); });
+
+            std::printf("%-4d %-10td %-11.3f %-11.3f %-11.3f %-11.3f %-11.3f %-11.3f %-9.3f %-9.3f %-9.3f %-10.3f %-10.2e %-10.2e %-10.2e %.2e%s\n",
+                        L,
+                        ndof,
+                        1e9 * t_naive / (double)ndof,
+                        1e9 * t_macro / (double)ndof,
+                        1e9 * t_aff / (double)ndof,
+                        1e9 * t_hoi / (double)ndof,
+                        1e9 * t_em / (double)ndof,
+                        1e9 * t_emf / (double)ndof,
+                        1e9 * t_bdn / (double)ndof,
+                        1e9 * t_bdm / (double)ndof,
+                        1e9 * t_pg / (double)ndof,
+                        1e9 * (t_hoi + t_pg) / (double)ndof,
+                        rel,
+                        std::max(bd_rel, bd_probe_rel),
+                        std::max(blk_rel, blk_sum_rel),
+                        res_rel,
+                        (rel < tol) ? "" : "  <-- MISMATCH");
+            if (rel >= tol || res_rel >= tol || bd_rel >= tol || bd_probe_rel >= tol || blk_rel >= tol || blk_sum_rel >= tol) ++failures;
+        }
+    }
+
+    if (failures) {
+        std::printf("cvfem_sshex8_bench: FAILED, %d configuration(s) disagree\n", failures);
+        return EXIT_FAILURE;
+    }
+    return EXIT_SUCCESS;
+}

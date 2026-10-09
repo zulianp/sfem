@@ -25,18 +25,29 @@ from cvfem_codegen import (
     sign_locals as _sign_locals,
 )
 
-# TET4 has always been emitted with C99CodePrinter's own reciprocal spelling.
-# Turning this on is an improvement -- it makes the header independent of the
-# SymPy version -- but it rewrites 35 lines of a measured kernel, so it belongs
-# in its own commit with a benchmark behind it, not in a refactor.
-set_stable_pow(False)
+# ON, which it had not been: TET4 was emitted with C99CodePrinter's own reciprocal
+# spelling, so the header depended on the SymPy version -- `1.0/det` under 1.12,
+# `scalar_t(1)/det` under newer releases. Thirty-five lines.
+#
+# Two reasons, and NOT a third one it would be easy to assume. The stated one is output
+# stability: the committed header should not change when SymPy does. The one that makes
+# it due now is DESIGN.md's third correction, and it bites only in the SIMD paths: there
+# the temporaries are `auto` and the reciprocal is taken against a VECTOR `det`, so the
+# literal's own type decides which vector arithmetic the expression names. Pinning it to
+# scalar_t is what lets those kernels instantiate at float at all.
+#
+# What this is NOT is a fix for a double division. ScalarPrinter._print_Pow records the
+# measurement: float->double->float is exactly narrowable for + - * /, so the compiler
+# contracts `1.0/x`, and both spellings were measured to produce byte-identical object
+# code. The scalar paths were never computing in double.
+set_stable_pow(True)
 
 
 HERE = Path(__file__).resolve().parent
 # python/ -> spike root. The emitted headers live with the sources they are
 # compiled into, not beside the generator that writes them.
 SPIKE_ROOT = HERE.parent
-OUT = SPIKE_ROOT / "src" / "generated" / "cvfem_tet4_ns_upwind_sympy_kernels.hpp"
+OUT = SPIKE_ROOT / "src" / "kernels" / "microkernels" / "tet4" / "generated" / "cvfem_tet4_ns_upwind_sympy_kernels.hpp"
 
 N_NODE = 4
 N_DOF = N_NODE * N_FIELD
@@ -440,7 +451,7 @@ def jac_bsr_slot_outputs() -> list[str]:
 
 
 def jac_vector_outputs() -> list[str]:
-    return [f"ke + {i} * SIMD_SIZE" for i in range(N_DOF * N_DOF)]
+    return [f"ke + {i} * cvfem_tet4_simd_size<scalar_t>" for i in range(N_DOF * N_DOF)]
 
 
 def jac_compact_entries(jac: list[sp.Expr]) -> list[tuple[int, int, sp.Expr]]:
@@ -460,7 +471,7 @@ def jac_compact_entries(jac: list[sp.Expr]) -> list[tuple[int, int, sp.Expr]]:
 
 
 def jac_face_vector_outputs(n: int) -> list[str]:
-    return [f"face_ke + {i} * SIMD_SIZE" for i in range(n)]
+    return [f"face_ke + {i} * cvfem_tet4_simd_size<scalar_t>" for i in range(n)]
 
 
 def cse_face_vector_functions(face_jacs: list[list[sp.Expr]], face_mdots: list[sp.Expr]) -> str:
@@ -474,6 +485,7 @@ def cse_face_vector_functions(face_jacs: list[list[sp.Expr]], face_mdots: list[s
             f"""
 static constexpr int CVFEM_TET4_NS_UPWIND_FACE{s}_SIMD_NNZ = {len(entries)};
 
+template <typename scalar_t>
 static SFEM_INLINE void cvfem_tet4_ns_upwind_sympy_jacobian_face{s}_vector(const scalar_t rho,
                                                                            const scalar_t mu,
                                                                            const scalar_t *const SFEM_RESTRICT adj0_ptr,
@@ -504,6 +516,7 @@ static SFEM_INLINE void cvfem_tet4_ns_upwind_sympy_jacobian_face{s}_vector(const
 {cse_vector_store_code(exprs, jac_face_vector_outputs(len(entries)))}
 }}
 
+template <typename scalar_t>
 static SFEM_INLINE void cvfem_tet4_ns_upwind_sympy_jacobian_face{s}_vector_lane_to_bsr_slots(
         const int *const SFEM_RESTRICT      slots,
         const scalar_t *const SFEM_RESTRICT face_ke,
@@ -520,7 +533,7 @@ static SFEM_INLINE void cvfem_tet4_ns_upwind_sympy_jacobian_face{s}_vector_lane_
 def cse_face_vector_lane_scatter_code(entries: list[tuple[int, int, sp.Expr]], indent: str = "    ") -> str:
     lines: list[str] = []
     for i, (block, offset, _expr) in enumerate(entries):
-        lines.append(f"{indent}values[(ptrdiff_t)slots[{block}] * 16 + {offset}] += face_ke[{i} * SIMD_SIZE + lane];")
+        lines.append(f"{indent}values[(ptrdiff_t)slots[{block}] * 16 + {offset}] += face_ke[{i} * cvfem_tet4_simd_size<scalar_t> + lane];")
     return "\n".join(lines)
 
 
@@ -540,7 +553,7 @@ def cse_add_vector_blocks_to_slots_code(jac: list[sp.Expr], indent: str = "    "
                 lines.append(f"{indent}    const auto {var} = {printer.doprint(expr)};")
             for k, expr in enumerate(reduced):
                 lines.append(f"{indent}    const auto b{k} = {printer.doprint(expr)};")
-            lines.append(f"{indent}    for (int lane = 0; lane < SIMD_SIZE; ++lane) {{")
+            lines.append(f"{indent}    for (int lane = 0; lane < cvfem_tet4_simd_size<scalar_t>; ++lane) {{")
             lines.append(f"{indent}        scalar_t *const SFEM_RESTRICT block{block} = values + (ptrdiff_t)slots_base[lane * 16 + {block}] * 16;")
             for k, (offset, _expr) in enumerate(entries):
                 lines.append(f"{indent}        block{block}[{offset}] += b{k}[lane];")
@@ -569,7 +582,7 @@ def cse_add_vector_rows_to_slots_code(jac: list[sp.Expr], indent: str = "    ") 
                     lines.append(f"{indent}    const auto {var} = {printer.doprint(expr)};")
                 for k, expr in enumerate(reduced):
                     lines.append(f"{indent}    const auto b{k} = {printer.doprint(expr)};")
-                lines.append(f"{indent}    for (int lane = 0; lane < SIMD_SIZE; ++lane) {{")
+                lines.append(f"{indent}    for (int lane = 0; lane < cvfem_tet4_simd_size<scalar_t>; ++lane) {{")
                 lines.append(f"{indent}        scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + {block}] * 16 + {row_field * N_FIELD};")
                 for k, (col_field, _expr) in enumerate(entries):
                     lines.append(f"{indent}        row[{col_field}] += b{k}[lane];")
@@ -606,6 +619,7 @@ def generate() -> str:
 
 // Generated by synthesize_cvfem_tet4_ns_upwind_sympy.py. Do not edit by hand.
 
+template <typename scalar_t>
 static SFEM_INLINE void cvfem_tet4_ns_upwind_sympy_residual_dense(const scalar_t rho,
                                                                   const scalar_t mu,
                                                                   const scalar_t adj0,
@@ -627,6 +641,7 @@ static SFEM_INLINE void cvfem_tet4_ns_upwind_sympy_residual_dense(const scalar_t
 {cse_code(residual, residual_outputs)}
 }}
 
+template <typename scalar_t, typename jacobian_t>
 static SFEM_INLINE void cvfem_tet4_ns_upwind_sympy_residual_simd_microkernel(
         const scalar_t                        rho,
         const scalar_t                        mu,
@@ -643,12 +658,13 @@ static SFEM_INLINE void cvfem_tet4_ns_upwind_sympy_residual_simd_microkernel(
         const Tet4InputPack                  &in,
         Tet4ResidualPack                     &out) {{
 #pragma omp simd aligned(adj0_ptr, adj1_ptr, adj2_ptr, adj3_ptr, adj4_ptr, adj5_ptr, adj6_ptr, adj7_ptr, adj8_ptr, det_ptr : 64)
-    for (int lane = 0; lane < VEC_SIZE; ++lane) {{
+    for (int lane = 0; lane < cvfem_tet4_vec_size<scalar_t>; ++lane) {{
 {simd_input_locals()}
 {cse_code(residual, residual_pack_outputs(), indent="        ")}
     }}
 }}
 
+template <typename scalar_t, typename jacobian_t>
 static SFEM_INLINE void cvfem_tet4_ns_upwind_sympy_jacobian_action_simd_microkernel(
         const scalar_t                        rho,
         const scalar_t                        mu,
@@ -666,7 +682,7 @@ static SFEM_INLINE void cvfem_tet4_ns_upwind_sympy_jacobian_action_simd_microker
         const Tet4InputPack                  &du,
         Tet4ResidualPack                     &out) {{
 #pragma omp simd aligned(adj0_ptr, adj1_ptr, adj2_ptr, adj3_ptr, adj4_ptr, adj5_ptr, adj6_ptr, adj7_ptr, adj8_ptr, det_ptr : 64)
-    for (int lane = 0; lane < VEC_SIZE; ++lane) {{
+    for (int lane = 0; lane < cvfem_tet4_vec_size<scalar_t>; ++lane) {{
 {simd_action_input_locals()}
 {action_direction_gradient_code()}
         for (int a = 0; a < 4; ++a) {{
@@ -679,6 +695,7 @@ static SFEM_INLINE void cvfem_tet4_ns_upwind_sympy_jacobian_action_simd_microker
     }}
 }}
 
+template <typename scalar_t, typename jacobian_t>
 static SFEM_INLINE void cvfem_run_jacobian_action_sympy_kernel(const scalar_t                        rho,
                                                                const scalar_t                        mu,
                                                                const jacobian_t *const SFEM_RESTRICT adj0,
@@ -695,7 +712,7 @@ static SFEM_INLINE void cvfem_run_jacobian_action_sympy_kernel(const scalar_t   
                                                                const Tet4InputPack                  &u,
                                                                const Tet4InputPack                  &du,
                                                                Tet4ResidualPack                     &out) {{
-    if (nlanes == VEC_SIZE) {{
+    if (nlanes == cvfem_tet4_vec_size<scalar_t>) {{
         cvfem_tet4_ns_upwind_sympy_jacobian_action_simd_microkernel(rho,
                                                                     mu,
                                                                     cvfem_aligned_geom(adj0),
@@ -713,12 +730,13 @@ static SFEM_INLINE void cvfem_run_jacobian_action_sympy_kernel(const scalar_t   
                                                                     out);
         return;
     }}
-    alignas(ALIGN_BYTES) jacobian_t a0[VEC_SIZE], a1[VEC_SIZE], a2[VEC_SIZE], a3[VEC_SIZE], a4[VEC_SIZE];
-    alignas(ALIGN_BYTES) jacobian_t a5[VEC_SIZE], a6[VEC_SIZE], a7[VEC_SIZE], a8[VEC_SIZE], detp[VEC_SIZE];
+    alignas(ALIGN_BYTES) jacobian_t a0[cvfem_tet4_vec_size<scalar_t>], a1[cvfem_tet4_vec_size<scalar_t>], a2[cvfem_tet4_vec_size<scalar_t>], a3[cvfem_tet4_vec_size<scalar_t>], a4[cvfem_tet4_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) jacobian_t a5[cvfem_tet4_vec_size<scalar_t>], a6[cvfem_tet4_vec_size<scalar_t>], a7[cvfem_tet4_vec_size<scalar_t>], a8[cvfem_tet4_vec_size<scalar_t>], detp[cvfem_tet4_vec_size<scalar_t>];
     cvfem_pad_geom_lanes(adj0, adj1, adj2, adj3, adj4, adj5, adj6, adj7, adj8, det, nlanes, a0, a1, a2, a3, a4, a5, a6, a7, a8, detp);
     cvfem_tet4_ns_upwind_sympy_jacobian_action_simd_microkernel(rho, mu, a0, a1, a2, a3, a4, a5, a6, a7, a8, detp, u, du, out);
 }}
 
+template <typename scalar_t, typename jacobian_t>
 static SFEM_INLINE void cvfem_run_residual_sympy_kernel(const scalar_t                        rho,
                                                         const scalar_t                        mu,
                                                         const jacobian_t *const SFEM_RESTRICT adj0,
@@ -734,7 +752,7 @@ static SFEM_INLINE void cvfem_run_residual_sympy_kernel(const scalar_t          
                                                         const int                             nlanes,
                                                         const Tet4InputPack                  &in,
                                                         Tet4ResidualPack                     &out) {{
-    if (nlanes == VEC_SIZE) {{
+    if (nlanes == cvfem_tet4_vec_size<scalar_t>) {{
         cvfem_tet4_ns_upwind_sympy_residual_simd_microkernel(rho,
                                                              mu,
                                                              cvfem_aligned_geom(adj0),
@@ -751,12 +769,13 @@ static SFEM_INLINE void cvfem_run_residual_sympy_kernel(const scalar_t          
                                                              out);
         return;
     }}
-    alignas(ALIGN_BYTES) jacobian_t a0[VEC_SIZE], a1[VEC_SIZE], a2[VEC_SIZE], a3[VEC_SIZE], a4[VEC_SIZE];
-    alignas(ALIGN_BYTES) jacobian_t a5[VEC_SIZE], a6[VEC_SIZE], a7[VEC_SIZE], a8[VEC_SIZE], detp[VEC_SIZE];
+    alignas(ALIGN_BYTES) jacobian_t a0[cvfem_tet4_vec_size<scalar_t>], a1[cvfem_tet4_vec_size<scalar_t>], a2[cvfem_tet4_vec_size<scalar_t>], a3[cvfem_tet4_vec_size<scalar_t>], a4[cvfem_tet4_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) jacobian_t a5[cvfem_tet4_vec_size<scalar_t>], a6[cvfem_tet4_vec_size<scalar_t>], a7[cvfem_tet4_vec_size<scalar_t>], a8[cvfem_tet4_vec_size<scalar_t>], detp[cvfem_tet4_vec_size<scalar_t>];
     cvfem_pad_geom_lanes(adj0, adj1, adj2, adj3, adj4, adj5, adj6, adj7, adj8, det, nlanes, a0, a1, a2, a3, a4, a5, a6, a7, a8, detp);
     cvfem_tet4_ns_upwind_sympy_residual_simd_microkernel(rho, mu, a0, a1, a2, a3, a4, a5, a6, a7, a8, detp, in, out);
 }}
 
+template <typename scalar_t>
 static SFEM_INLINE void cvfem_tet4_ns_upwind_sympy_jacobian_dense(const scalar_t rho,
                                                                   const scalar_t mu,
                                                                   const scalar_t adj0,
@@ -778,6 +797,7 @@ static SFEM_INLINE void cvfem_tet4_ns_upwind_sympy_jacobian_dense(const scalar_t
 {cse_code(jac, jac_outputs)}
 }}
 
+template <typename scalar_t>
 static SFEM_INLINE void cvfem_tet4_ns_upwind_sympy_jacobian_dense_vector(const scalar_t rho,
                                                                          const scalar_t mu,
                                                                          const scalar_t *const SFEM_RESTRICT adj0_ptr,
@@ -808,6 +828,7 @@ static SFEM_INLINE void cvfem_tet4_ns_upwind_sympy_jacobian_dense_vector(const s
 {cse_vector_store_code(jac, jac_vector_outputs())}
 }}
 
+template <typename scalar_t>
 static SFEM_INLINE void cvfem_tet4_ns_upwind_sympy_jacobian_dense_vector_values(const scalar_t rho,
                                                                                 const scalar_t mu,
 {vector_value_args(indent="                                                                                ")}
@@ -816,6 +837,7 @@ static SFEM_INLINE void cvfem_tet4_ns_upwind_sympy_jacobian_dense_vector_values(
 {cse_vector_store_code(jac, jac_vector_outputs())}
 }}
 
+template <typename scalar_t>
 static SFEM_INLINE void cvfem_tet4_ns_upwind_sympy_jacobian_add_bsr_slots_blockwise_vector(
         const scalar_t                        rho,
         const scalar_t                        mu,
@@ -848,6 +870,7 @@ static SFEM_INLINE void cvfem_tet4_ns_upwind_sympy_jacobian_add_bsr_slots_blockw
 {cse_add_vector_blocks_to_slots_code(jac)}
 }}
 
+template <typename scalar_t>
 static SFEM_INLINE void cvfem_tet4_ns_upwind_sympy_jacobian_add_bsr_slots_rowwise_vector_values(
         const scalar_t                        rho,
         const scalar_t                        mu,
@@ -858,6 +881,7 @@ static SFEM_INLINE void cvfem_tet4_ns_upwind_sympy_jacobian_add_bsr_slots_rowwis
 {cse_add_vector_rows_to_slots_code(jac)}
 }}
 
+template <typename scalar_t>
 static SFEM_INLINE void cvfem_tet4_ns_upwind_sympy_jacobian_add_bsr_slots(const scalar_t rho,
                                                                           const scalar_t mu,
                                                                           const scalar_t adj0,
@@ -880,6 +904,7 @@ static SFEM_INLINE void cvfem_tet4_ns_upwind_sympy_jacobian_add_bsr_slots(const 
 {cse_add_code(jac, jac_bsr_slot_outputs())}
 }}
 
+template <typename scalar_t>
 static SFEM_INLINE void cvfem_tet4_ns_upwind_sympy_jacobian_add_bsr_slots_blockwise(const scalar_t rho,
                                                                                     const scalar_t mu,
                                                                                     const scalar_t adj0,
@@ -902,6 +927,7 @@ static SFEM_INLINE void cvfem_tet4_ns_upwind_sympy_jacobian_add_bsr_slots_blockw
 {cse_add_blocks_code(jac)}
 }}
 
+template <typename scalar_t>
 static SFEM_INLINE void cvfem_tet4_ns_upwind_sympy_jacobian_add_bsr_slots_facewise(const scalar_t rho,
                                                                                    const scalar_t mu,
                                                                                    const scalar_t adj0,

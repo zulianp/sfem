@@ -1,0 +1,9 @@
+### host nid006553  n=128 repeat=20 passes=5  2026-09-29 09:35:00
+
+fields     layout       MDOF_s      MCOMP_s       dofs
+1          packed    10267.837     7700.878    8586756
+1          atomic     1955.763     1466.822    8586756
+3          packed     4716.072    10611.163    8586756
+3          atomic      676.519     1522.168    8586756
+
+csv: /ritom/scratch/cscs/zulianp/cvfem_ngrad/4938016/ngrad.csv

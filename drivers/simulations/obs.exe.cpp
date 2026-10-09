@@ -58,17 +58,6 @@ int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int 
     const int block_size = mesh->spatial_dimension();
     auto      fs         = sfem::FunctionSpace::create(mesh, block_size);
 
-// FIXME
-#ifdef SFEM_ENABLE_CUDA
-    {
-        auto elements = fs->device_elements();
-        if (!elements) {
-            elements = create_device_elements(fs, fs->element_type());
-            fs->set_device_elements(elements);
-        }
-    }
-#endif
-
     auto dirichlet_conditions = sfem::DirichletConditions::create_from_file(fs, dirichlet_path);
     auto f                    = sfem::Function::create(fs);
     auto op                   = sfem::create_op(fs, SFEM_OPERATOR, es);

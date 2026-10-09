@@ -359,14 +359,6 @@ int test_cube() {
 
     auto fs = sfem::FunctionSpace::create(m, SFEM_BLOCK_SIZE);
 
-    // if (es == sfem::EXECUTION_SPACE_DEVICE) {
-    //     auto elements = fs->device_elements();
-    //     if (!elements) {
-    //         elements = create_device_elements(fs, fs->element_type());
-    //         fs->set_device_elements(elements);
-    //     }
-    // }
-
     auto f  = sfem::Function::create(fs);
     auto x  = sfem::create_buffer<real_t>(fs->n_dofs(), es);
     auto op = sfem::create_op(fs, SFEM_OPERATOR, es);

@@ -203,7 +203,8 @@ def face_flux_residual(*,
                        mu: sp.Expr,
                        u: tuple[tuple[sp.Expr, ...], ...],
                        p: tuple[sp.Expr, ...],
-                       sign: sp.Expr | None = None) -> tuple[list[sp.Expr], sp.Expr]:
+                       sign: sp.Expr | None = None,
+                       mdot_rc: sp.Expr | None = None) -> tuple[list[sp.Expr], sp.Expr]:
     """The CVFEM flux across one sub-control surface, scattered to its two nodes.
 
     This is the physics, and it is identical for every element: what differs between
@@ -216,6 +217,12 @@ def face_flux_residual(*,
     ``sign``  the semismooth sign symbol for this surface; ``None`` uses ``Abs(mdot)``
               directly, which is the exact upwind switch but is not differentiable at a
               flow reversal.
+    ``mdot_rc`` an additive contribution to the mass flux -- the Rhie-Chow pressure-gradient
+              term, where a caller carries it -- named as the scalar kernel names it. ``None``
+              is the default and leaves every existing emitted kernel byte for byte as it was,
+              which this file's contract requires. It is added BEFORE the upwind split, so the
+              split, the flux and anything the caller weights by ``mdot`` all see the flux that
+              is actually transported rather than a second opinion about it.
 
     Returns the length-``n_dof`` residual contribution and the mass flux, the latter
     because the caller needs it to emit the sign locals.
@@ -231,6 +238,8 @@ def face_flux_residual(*,
     adv_y = sp.Rational(1, 2) * (uy[i] + uy[j])
     adv_z = sp.Rational(1, 2) * (uz[i] + uz[j])
     mdot = rho * (adv_x * ax + adv_y * ay + adv_z * az)
+    if mdot_rc is not None:
+        mdot = mdot + mdot_rc
 
     mdot_abs = sign * mdot if sign is not None else sp.Abs(mdot)
     mdot_pos = sp.Rational(1, 2) * (mdot + mdot_abs)

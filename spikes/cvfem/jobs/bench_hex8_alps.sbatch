@@ -40,7 +40,7 @@ set -euo pipefail
 # under sbatch: Slurm copies the batch script to /var/spool/slurmd/job<id>/, so the
 # BASH_SOURCE candidate is only live when the script is run directly. SCRIPT_DIR keeps
 # its name below: everything downstream uses it as the spike root.
-_cvfem_probe=drivers/cvfem_hex8_ns_upwind_bench.cpp
+_cvfem_probe=src/drivers/cvfem_hex8_ns_upwind_bench.cpp
 SCRIPT_DIR=""
 for _cand in "${SLURM_SUBMIT_DIR:-}" "${SLURM_SUBMIT_DIR:-}/.." "${CVFEM_DIR:-}" \
              "$(dirname "${BASH_SOURCE[0]}")/.."; do
@@ -66,7 +66,7 @@ REPEAT="${REPEAT:-20}"
 WARMUP="${WARMUP:-3}"
 
 # which sweeps to run
-SWEEPS="${SWEEPS:-layout packsize threads size kernel breakdown}"
+SWEEPS="${SWEEPS:-layout packsize threads size breakdown}"
 
 # cube_n. The old default stopped at 96, which is below saturation on a GH200: at n=64
 # the mesh has 262k elements against 132 SMs, roughly one element per resident thread,
@@ -79,7 +79,6 @@ MAIN_N="${MAIN_N:-64}"                        # the size used by the non-size sw
 THREADS="${THREADS:-1 2 4 9 18 36 72}"
 PACK_SIZES="${PACK_SIZES:-128 256 384 512 768 1024 2048 4096}"
 LAYOUTS="${LAYOUTS:-atomic packed colored store}"
-KERNELS="${KERNELS:-sumfact sympy sympy_row current}"
 OPS="${OPS:-residual jac-action assemble bsr-apply}"
 
 # best pack size per layout for the sweeps that do not vary it; retune from the
@@ -144,13 +143,13 @@ pack_default_for() {
 }
 
 # --tag encodes the sweep so the analysis scripts can slice the csv
-# usage: measure <sweep> <threads> <n> <layout> <kernel> <op> <pack_size> [extra args...]
+# usage: measure <sweep> <threads> <n> <layout> <op> <pack_size> [extra args...]
 measure() {
-    local sweep="$1" nthreads="$2" n="$3" layout="$4" kernel="$5" op="$6" ps="$7"; shift 7
+    local sweep="$1" nthreads="$2" n="$3" layout="$4" op="$5" ps="$6"; shift 6
     local -a extra=("$@")
     local flag; flag="$(op_flag "${op}")"
     local -a args=("${BENCH}" --n "${n}" --repeat "${REPEAT}" --warmup "${WARMUP}"
-                   --layout "${layout}" --kernel "${kernel}"
+                   --layout "${layout}"
                    --csv "${CSV}" --tag "${TAG}:${sweep}")
     [[ -n "${flag}" ]] && args+=("${flag}")
     [[ "${layout}" != "atomic" && "${ps}" != "0" ]] && args+=(--pack-size "${ps}")
@@ -197,7 +196,7 @@ echo "==> verifying (n=16, every layout)"
     for l in atomic packed colored store; do
         echo "--- layout ${l}"
         run_step "${NCORES}" "${BENCH}" --n 16 --repeat 1 --warmup 0 --layout "${l}" \
-            --kernel sumfact --assemble --verify-jac --pack-size 256 2>&1 | grep -E "verify_|error" || true
+            --assemble --verify-jac --pack-size 256 2>&1 | grep -E "verify_|error" || true
     done
     echo "--- residual (all kernels)"
     run_step "${NCORES}" "${BENCH}" --n 16 --repeat 1 --warmup 0 --layout packed --verify --pack-size 256 2>&1 \
@@ -218,7 +217,7 @@ if has_sweep layout; then
     for op in ${OPS}; do
         for l in ${LAYOUTS}; do
             [[ "${op}" == "bsr-apply" && "${l}" != "packed" ]] && continue   # spmv is layout-independent
-            measure layout "${NCORES}" "${MAIN_N}" "${l}" sumfact "${op}" "$(pack_default_for "${l}")"
+            measure layout "${NCORES}" "${MAIN_N}" "${l}" "${op}" "$(pack_default_for "${l}")"
         done
     done
 fi
@@ -230,7 +229,7 @@ if has_sweep packsize; then
         for l in packed colored store; do
             [[ "${l}" == "store" && "${op}" != "assemble" ]] && continue     # store falls back to packed
             for ps in ${PACK_SIZES}; do
-                measure packsize "${NCORES}" "${MAIN_N}" "${l}" sumfact "${op}" "${ps}"
+                measure packsize "${NCORES}" "${MAIN_N}" "${l}" "${op}" "${ps}"
             done
         done
     done
@@ -242,7 +241,7 @@ if has_sweep threads; then
     for t in ${THREADS}; do
         for op in residual assemble; do
             for l in atomic packed colored; do
-                measure threads "${t}" "${MAIN_N}" "${l}" sumfact "${op}" "$(pack_default_for "${l}")"
+                measure threads "${t}" "${MAIN_N}" "${l}" "${op}" "$(pack_default_for "${l}")"
             done
         done
     done
@@ -255,19 +254,8 @@ if has_sweep size; then
         for op in residual assemble; do
             for l in atomic packed colored store; do
                 [[ "${l}" == "store" && "${op}" != "assemble" ]] && continue
-                measure size "${NCORES}" "${n}" "${l}" sumfact "${op}" "$(pack_default_for "${l}")"
+                measure size "${NCORES}" "${n}" "${l}" "${op}" "$(pack_default_for "${l}")"
             done
-        done
-    done
-fi
-
-# 5. element kernel variants
-if has_sweep kernel; then
-    echo "-- kernel variants"
-    for k in ${KERNELS}; do
-        for op in residual assemble; do
-            measure kernel "${NCORES}" "${MAIN_N}" colored "${k}" "${op}" "${PACK_DEFAULT_colored}"
-            measure kernel "${NCORES}" "${MAIN_N}" packed  "${k}" "${op}" "${PACK_DEFAULT_packed}"
         done
     done
 fi
@@ -279,9 +267,9 @@ done   # trial passes
 if has_sweep breakdown; then
     echo "-- phase breakdown"
     for l in packed colored store; do
-        measure breakdown "${NCORES}" "${MAIN_N}" "${l}" sumfact assemble "$(pack_default_for "${l}")" --breakdown
+        measure breakdown "${NCORES}" "${MAIN_N}" "${l}" assemble "$(pack_default_for "${l}")" --breakdown
     done
-    measure breakdown "${NCORES}" "${MAIN_N}" packed sumfact assemble "${PACK_DEFAULT_packed}" --breakdown --kernel-only
+    measure breakdown "${NCORES}" "${MAIN_N}" packed assemble "${PACK_DEFAULT_packed}" --breakdown --kernel-only
 fi
 
 echo

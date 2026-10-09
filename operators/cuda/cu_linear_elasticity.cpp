@@ -206,6 +206,21 @@ extern int cu_linear_elasticity_diag(const smesh::ElemType           element_typ
                                                    &d_t[2],
                                                    stream);
         }
+        case smesh::HEX8: {
+            return cu_affine_hex8_linear_elasticity_diag(nelements,
+                                                         elements,
+                                                         jacobian_stride,
+                                                         jacobian_adjugate,
+                                                         jacobian_determinant,
+                                                         mu,
+                                                         lambda,
+                                                         real_type,
+                                                         3,
+                                                         d_t,
+                                                         &d_t[1],
+                                                         &d_t[2],
+                                                         stream);
+        }
         default: {
             SFEM_UNSUPPORTED_ELEMENT_ERROR(element_type);
             return SFEM_FAILURE;
@@ -313,3 +328,4 @@ int cu_linear_elasticity_block_diag_sym_aos(const smesh::ElemType           elem
         }
     }
 }
+

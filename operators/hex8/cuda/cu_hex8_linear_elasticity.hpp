@@ -41,6 +41,20 @@ int cu_affine_hex8_linear_elasticity_bsr(const ptrdiff_t                    nele
                                          void *const SFEM_RESTRICT          values,
                                          void                              *stream);
 
+int cu_affine_hex8_linear_elasticity_diag(const ptrdiff_t                 nelements,
+                                           idx_t **const SFEM_RESTRICT     elements,
+                                           const ptrdiff_t                 jacobian_stride,
+                                           const void *const SFEM_RESTRICT jacobian_adjugate,
+                                           const void *const SFEM_RESTRICT jacobian_determinant,
+                                           const real_t                    mu,
+                                           const real_t                    lambda,
+                                           const enum smesh::PrimitiveType real_type,
+                                           const ptrdiff_t                 out_stride,
+                                           void *const SFEM_RESTRICT       outx,
+                                           void *const SFEM_RESTRICT       outy,
+                                           void *const SFEM_RESTRICT       outz,
+                                           void                           *stream);
+
 int cu_affine_hex8_linear_elasticity_block_diag_sym(const ptrdiff_t                 nelements,
                                                     idx_t **const SFEM_RESTRICT     elements,
                                                     const ptrdiff_t                 jacobian_stride,

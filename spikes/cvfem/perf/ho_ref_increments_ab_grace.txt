@@ -1,0 +1,72 @@
+# THE DEFERRED CORRECTION IN REFERENCE COORDINATES: the Grace A/B, both passes.
+#
+# The change under test (one working tree, uncommitted at the time of measurement):
+#   * the correction's node-to-centroid vectors come from the element Jacobian's edge columns,
+#     x_s - x_a = J (xi_s - xi_a), and the staged gradient pack is rewritten in place into the
+#     twenty-four node-surface increments once per element (cvfem_hex8_defcor_ref_increments);
+#     no node coordinates are staged and no centroids are built;
+#   * each limiter's value and derivative come from one fused call sharing one reciprocal;
+#   * Venkatakrishnan's eps^2 is formed per direction group outside the lane loop.
+#
+# Reference: the tree at 9b62d097f, the commit the paper's higher-order table was measured on.
+# Both binaries gcc 13.3 under prgenv-gnu/24.11:v2 against installations/sfem-omp, run by
+# jobs/ab_refactor.sbatch -> scripts/perf_regression.sh --against: one allocation, order
+# alternating every rep, medians of 9, n=128 (8,586,756 dofs), 72 threads.
+#
+# PASS 1, job 5003520 (nid006545): the increments pre-pass as one lane per call with the node and
+# component loops inside it, under the dispatcher's `#pragma omp simd` lane loop. gcc did not
+# vectorise it -- -fopt-info-vec-all: "couldn't vectorize loop" on the node loop and "not
+# profitable" for SLP on the body -- so the pre-pass ran scalar, twice per lane group on the
+# Jacobian. The residual arms gained in spite of it; the Jacobian arms lost, and the gate's
+# confirmation pass reproduced the loss.
+#
+#   config                            ndof      ref      new  new/ref   band  verdict
+#   residual_packed_ho_unlim       8586756    955.4   1102.8    15.4%     5%  faster than band
+#   residual_packed_ho_clip        8586756    749.6    856.0    14.2%     5%  faster than band
+#   residual_packed_ho_venk        8586756    643.4    752.7    17.0%     5%  faster than band
+#   residual_packed_ho_dm          8586756    692.3    873.0    26.1%     5%  faster than band
+#   jac_action_packed_ho_unlim     8586756    483.1    446.7    -7.5%     5%  REGRESSION
+#   jac_action_packed_ho_venk      8586756    357.1    327.6    -8.3%     5%  REGRESSION
+#   (confirmation)   ho_unlim 486.5 -> 447.5 -8.0%   ho_venk 356.8 -> 328.2 -8.0%
+#
+# PASS 2, job 5003626 (nid006549): the same pre-pass with the lane loop INNERMOST -- twenty-four
+# unit-stride lane loops, the shape every other vectorised loop in the file has. gcc reports
+# "loop vectorized using 16 byte vectors" for it. Nothing else changed between the passes.
+#
+#   config                            ndof      ref      new  new/ref   band  verdict
+#   residual_packed_sumfact        8586756   2656.6   2646.6    -0.4%     5%  ok
+#   residual_packed_sumfact_big   16693124   2571.0   2548.6    -0.9%     5%  ok
+#   jac_action_packed_sumfact      8586756   1965.9   1987.6     1.1%     5%  ok
+#   jac_action_atomic_sumfact      8586756    976.8    974.8    -0.2%     5%  ok
+#   jac_action_packed_isoparam     8586756    793.1    800.4     0.9%     5%  ok
+#   residual_colored_sumfact       8586756   1978.7   1976.6    -0.1%     5%  ok
+#   bsr_apply_packed_sumfact       8586756    446.7    452.1     1.2%     8%  ok
+#   assemble_store_sumfact         8586756     79.7     79.7    -0.0%    10%  ok
+#   assemble_colored_sumfact       8586756    106.6    105.1    -1.4%    10%  ok
+#   assemble_packed_sumfact        8586756     58.6     58.8     0.3%    10%  ok
+#   residual_packed_rc             8586756   1753.0   1760.8     0.4%     5%  ok
+#   residual_packed_rc_bnd         8586756   1580.5   1578.2    -0.1%     5%  ok
+#   residual_packed_rc_perapply    8586756   1432.9   1443.4     0.7%     5%  ok
+#   jac_action_packed_rc           8586756    920.6    928.1     0.8%     5%  ok
+#   jac_action_packed_rc_bnd       8586756    866.8    873.7     0.8%     5%  ok
+#   residual_packed_ho_unlim       8586756    949.9   1104.5    16.3%     5%  faster than band
+#   residual_packed_ho_clip        8586756    740.1    858.1    15.9%     5%  faster than band
+#   residual_packed_ho_venk        8586756    644.1    751.5    16.7%     5%  faster than band
+#   residual_packed_ho_dm          8586756    692.5    871.8    25.9%     5%  faster than band
+#   jac_action_packed_ho_unlim     8586756    474.8    472.8    -0.4%     5%  ok
+#   jac_action_packed_ho_venk      8586756    351.1    343.9    -2.0%     5%  ok
+#   both sides measured in one allocation, order alternating every rep, medians of 9
+#   PASSED: packed throughput unchanged against the reference binary
+#
+# WHAT THE TWO PASSES SAY. The residual's gain is the removed work: the centroids, the coordinate
+# staging and the per-surface dot products were a third of the correction's arithmetic and it is
+# now 16-26% faster at the paper's own configuration. The Jacobian action is unchanged within
+# the band, which is what removing the same work and adding a second in-place pass over the
+# direction's pack comes to on that kernel; what it does NOT do is regress, and pass 1 is kept
+# here because the only difference between -8% and 0% was the nesting of one loop that the
+# laptop's compiler vectorised either way. Every first-order row is unchanged, as it must be --
+# none of this code is reached without --conv-ho.
+#
+# Every oracle held across both passes: packed-vs-atomic agreement 1e-17, the exact Jacobian
+# against a finite difference 1.6e-10 unlimited and 1e-3 limited, on the cube and on the warped
+# mesh, and the vectorisation gate on all twelve lane kernels.

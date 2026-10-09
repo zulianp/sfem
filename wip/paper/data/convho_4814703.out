@@ -1,0 +1,32 @@
+### host nid006545  n=128 repeat=10 passes=3  2026-09-27 20:58:01
+### both layouts through the scalar sum-factored kernel, so this isolates the layout
+
+arm                    layout       MDOF_s       dofs       checksum
+first_order            atomic      851.206    8586756 1.3813836142670399e-13
+first_order            packed     2608.701    8586756 1.3715298428224054e-13
+ho_unlimited           atomic      475.873    8586756 -1.6941035705340945e-13
+ho_unlimited           packed      989.482    8586756 -1.6853334591608593e-13
+ho_unlim_scalar        packed      675.445    8586756 -1.6853605642151714e-13
+ho_unlim_simd          packed      577.539    8586756 -1.6853218039875051e-13
+ho_unlim_rc            packed      654.558    8586756 -1.6853605642151714e-13
+ho_unlim_rc_scalar     packed      486.276    8586756 -1.6853692378325513e-13
+ho_clip                atomic      461.728    8586756 1.0470221694855453e-14
+ho_clip                packed      822.975    8586756 1.1448199159491690e-14
+ho_clip_scalar         packed      644.378    8586756 1.1413911265786836e-14
+ho_venkatakrishnan     atomic      410.620    8586756 -5.2507250663299393e-12
+ho_venkatakrishnan     packed      550.803    8586756 -5.2517997275233069e-12
+ho_venk_scalar         packed      546.291    8586756 -5.2508777219958253e-12
+ho_darwish_moukalled   atomic      440.966    8586756 -4.9307612842979659e-12
+ho_darwish_moukalled   packed      714.396    8586756 -4.9293171812143238e-12
+ho_dm_scalar           packed      605.682    8586756 -4.9311498623565847e-12
+
+The checksums must DIFFER between first order and each higher-order arm: an identical one
+would mean the correction was not applied and the row is measuring first order twice.
+
+That guard does NOT extend to the Rhie-Chow arms. The checksum is a sum over millions of
+values that is almost entirely cancellation, so a term can be present per node and invisible
+in the total: at n=32 the scalar arm with scale 1.0 prints exactly the no-Rhie-Chow checksum
+while scale 3.0 prints a different one, which is how that was established. Whether the term
+reached the kernel is answered by ran_rc in the CSV and by the driver's per-node oracles
+(--verify-ho --rhie-chow), never by these totals.
+csv: /ritom/scratch/cscs/zulianp/cvfem_convho/4814703/convho.csv

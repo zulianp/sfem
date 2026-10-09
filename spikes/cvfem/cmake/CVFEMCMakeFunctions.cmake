@@ -6,6 +6,15 @@
 # than tidied. Include this after find_package(SFEM) and before any target is declared.
 
 option(CVFEM_ENABLE_SUBPAR "Build the quarantined CVFEM variants in subpar/" OFF)
+# The element-matrix variants need their own switch, and it is OFF even when the one above
+# is ON, because they no longer compile and cannot be restored as written: the Rhie-Chow
+# coefficient became velocity-dependent, SSMacroGeom lost coeff[] and sscvfem_macro_geom
+# changed arity, and sscvfem_build_full_em takes no velocity by design (subpar/README.md).
+#
+# Without the split, one unbuildable header made -DCVFEM_ENABLE_SUBPAR=ON fail outright,
+# so NOTHING in the quarantine could be rebuilt or re-measured -- which is the one thing
+# subpar/ exists to keep possible. Turning this on is a request to port them first.
+option(CVFEM_ENABLE_SUBPAR_EM "Build the subpar element-matrix variants (needs porting first)" OFF)
 
 # BLAS for the element-matrix gemm path. Off by default so the build stays dependency
 # free, but worth turning on wherever this is benchmarked: without it
@@ -54,6 +63,9 @@ endfunction()
 # subpar/ headers are not on the include path at all, so a stray #include fails loudly
 # rather than silently resurrecting a removed kernel.
 function(cvfem_subpar_target tgt)
+    if(CVFEM_ENABLE_SUBPAR_EM)
+        target_compile_definitions(${tgt} PRIVATE CVFEM_ENABLE_SUBPAR_EM)
+    endif()
     if(CVFEM_ENABLE_SUBPAR)
         target_compile_definitions(${tgt} PRIVATE CVFEM_ENABLE_SUBPAR)
         target_include_directories(${tgt} PRIVATE

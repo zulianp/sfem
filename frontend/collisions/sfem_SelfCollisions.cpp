@@ -7,7 +7,7 @@
 #include "sfem_API.hpp"
 #include "sfem_OpFactory.hpp"
 
-#include "integrations/smesh/sccd_smesh_CCD.hpp"
+#include "integrations/smesh/sccd_smesh_ccd.hpp"
 #include "ssdf.hpp"
 
 #include <algorithm>
@@ -81,7 +81,9 @@ namespace sfem {
                 return;
             }
 
-            ccd->broad_phase(p0, p1, vertex_to_face.first, vertex_to_face.second, edge_to_edge.first, edge_to_edge.second);
+            ccd->broad_phase_prep(p0, p1);
+            ccd->broad_phase_fv_step(vertex_to_face.first, vertex_to_face.second);
+            ccd->broad_phase_ee_step(edge_to_edge.first, edge_to_edge.second);
         }
 
         real_t time_of_impact() {

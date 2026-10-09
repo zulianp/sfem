@@ -38,6 +38,7 @@
 #include "sfem_MultiDomainOp.hpp"
 #include "smesh_semistructured.hpp"
 
+#include "smesh_device_arrays.hpp"
 #include "smesh_device_buffer.hpp"
 #include "smesh_device_sideset.hpp"
 #include "smesh_kernel_data.hpp"
@@ -63,19 +64,6 @@ namespace sfem {
         }
 
         return out;
-    }
-
-    std::shared_ptr<Buffer<idx_t *>> create_device_elements(const std::shared_ptr<FunctionSpace> &space,
-                                                            const smesh::ElemType                 element_type) {
-        (void)element_type;
-        assert(space);
-        assert(space->mesh_ptr());
-        if (space->mesh_ptr()->n_blocks() != 1) {
-            SFEM_ERROR("create_device_elements: multi-block requires per-block device_elements_SoA (n_blocks=%zu)\n",
-                       space->mesh_ptr()->n_blocks());
-            return nullptr;
-        }
-        return space->mesh_ptr()->block(0)->device_elements_SoA();
     }
 
     std::shared_ptr<Buffer<idx_t>> create_device_elements_AoS(const std::shared_ptr<FunctionSpace> &space,
@@ -553,6 +541,34 @@ namespace sfem {
             ret->jacobian_determinant = create_gpu_jacobian_determinant(space, block_id);
             return ret;
         }
+
+        /// Device SoA view of elements[:, begin:end). begin==0 reuses the device pointer
+        /// table (SS HEX nxe is 125/729). A host `idx_t *view[32]` overflows those sizes
+        /// and is not a device pointer for the kernels.
+        static idx_t **device_element_soa_view(idx_t **const                     elems,
+                                               const int                         nxe,
+                                               const ptrdiff_t                   begin,
+                                               std::shared_ptr<Buffer<idx_t *>> &owned) {
+            if (begin == 0) {
+                return elems;
+            }
+
+            std::vector<idx_t *> host_dev_ptrs(static_cast<size_t>(nxe));
+            smesh::device::device_to_host(static_cast<size_t>(nxe), elems, host_dev_ptrs.data());
+            for (int v = 0; v < nxe; ++v) {
+                host_dev_ptrs[v] += begin;
+            }
+
+            idx_t **dev_buff = smesh::device::alloc<idx_t *>(static_cast<size_t>(nxe));
+            smesh::device::host_to_device(static_cast<size_t>(nxe), host_dev_ptrs.data(), dev_buff);
+            owned = Buffer<idx_t *>::own(
+                    static_cast<size_t>(nxe),
+                    1,
+                    dev_buff,
+                    [](int /*n*/, void **ptr) { smesh::device::destroy(ptr); },
+                    smesh::MEMORY_SPACE_DEVICE);
+            return owned->data();
+        }
     }  // namespace
 
     class GPULaplacian final : public Op {
@@ -737,13 +753,11 @@ namespace sfem {
                 SFEM_ERROR("GPULaplacian: block ElementRange out of bounds\n");
                 return SFEM_FAILURE;
             }
-            const ptrdiff_t ne  = range.size();
-            const int       nxe = elem_num_nodes(domain.element_type);
-            idx_t          *view[32];
-            idx_t **const   elems = op_data->elements->data();
-            for (int v = 0; v < nxe; ++v) {
-                view[v] = elems[v] + range.begin;
-            }
+            const ptrdiff_t                      ne    = range.size();
+            idx_t **const                        elems = op_data->elements->data();
+            const int                            nxe   = static_cast<int>(op_data->elements->extent(0));
+            std::shared_ptr<Buffer<idx_t *>>     owned_view;
+            idx_t **const                        view  = device_element_soa_view(elems, nxe, range.begin, owned_view);
             return cu_laplacian_apply(domain.element_type,
                                       ne,
                                       view,
@@ -1489,7 +1503,12 @@ namespace sfem {
         }
 
         int initialize(const std::vector<std::string> &block_names = {}) override {
-            auto mesh = space->mesh_ptr();
+            auto mesh    = space->mesh_ptr();
+            auto em_mesh = gpu_em_element_matrix_mesh(space);
+            if (!em_mesh) {
+                SFEM_ERROR("GPUEMOp: sshex_to_hex8(derefine) failed\n");
+                return SFEM_FAILURE;
+            }
             blocks.clear();
 
             int err = SFEM_SUCCESS;
@@ -1514,12 +1533,12 @@ namespace sfem {
                 const int  level = is_ss ? smesh::semistructured_level(space->mesh()) : 1;
 
                 auto h_element_matrix = sfem::create_host_buffer<real_t>(ne * 64);
-                err                   = sshex8_laplacian_element_matrix(level,
-                                                      ne,
-                                                      mesh->n_nodes(),
-                                                      mesh->elements(bid)->data(),
-                                                      mesh->points()->data(),
-                                                      h_element_matrix->data());
+                err                   = sshex8_laplacian_element_matrix_cartesian(level,
+                                                                 ne,
+                                                                 em_mesh->n_nodes(),
+                                                                 em_mesh->elements(bid)->data(),
+                                                                 em_mesh->points()->data(),
+                                                                 h_element_matrix->data());
                 if (err != SFEM_SUCCESS) {
                     return err;
                 }

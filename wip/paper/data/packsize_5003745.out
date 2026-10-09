@@ -1,0 +1,32 @@
+### host nid006544  threads 72  repeat=10 warmup=3  2026-10-08 11:25:43
+### 72 cores; a pack is one OpenMP iteration, so n_packs is the available parallelism
+### operators: residual and the EXACT Rhie-Chow Jacobian action, both with the boundary
+###            closure. The exact action is the two-sweep form -- it reconstructs the
+###            direction gradient every matvec -- not the lagged one the matrix holds.
+
+### pack-size sweep, space-filling order
+n      pack_req elems/pack  n_packs packs/thr mean_nodes  res_MDOFs   jac_MDOFs  hodm_MDOFs
+64          128       128     2048      28.4        225   1757.024    1052.913     354.743
+64          256       256     1024      14.2        405   1739.839    1051.615     350.629
+64          512       512      512       7.1        729   1642.816     988.467     333.045
+64         1024      1024      256       3.6       1377   1654.319     987.895     326.054
+64         2048      2048      128       1.8       2601   1677.080     973.081     304.584
+64         4096      4096       64       0.9       4913   1660.160     897.053     285.388
+64         8192      8192       32       0.4       9537    882.381     514.568     164.066
+128         128       128    16384     227.6        225   1494.232     783.330     297.953
+128         256       256     8192     113.8        405   1521.251     820.443     311.247
+128         512       512     4096      56.9        729   1568.283     857.360     324.281
+128        1024      1024     2048      28.4       1377   1576.618     871.543     326.679
+128        2048      2048     1024      14.2       2601   1528.456     860.566     319.776
+128        4096      4096      512       7.1       4913   1431.605     808.354     289.099
+128        8192      8192      256       3.6       9537   1381.046     760.711     262.134
+
+### spatial ordering: same pack size, space-filling against lexicographic
+n          pack order          mean_nodes  res_MDOFs   jac_MDOFs
+64         2048 sfc                  2601   1646.986     978.828
+64         2048 nosfc                4290   1529.492     760.254
+128        2048 sfc                  2601   1525.168     864.534
+128        2048 nosfc                4386   1265.997     686.425
+
+csv: /ritom/scratch/cscs/zulianp/cvfem_packsz_paper/5003745/packsize.csv
+logs in /ritom/scratch/cscs/zulianp/cvfem_packsz_paper/5003745

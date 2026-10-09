@@ -1,0 +1,17 @@
+# MEASURED DRAM TRAFFIC, Grace SCF counters, job 4963084 (repeat=10 and repeat=40).
+#
+# Two captures differenced across repeat count so that mesh setup, pack construction and the
+# three warmup applies cancel exactly. Both runs used --warmup 3, n=128, 72 threads,
+# OMP_PROC_BIND=true. See jobs/dram_traffic.sbatch for the units.
+#
+# bytes = cmem_rd_data * 32 + cmem_wr_total_bytes
+#
+# operation  layout  repeat_lo  repeat_hi  bytes_lo        bytes_hi         dofs
+residual     packed  10  40  8853756456    22882534088    8586756
+residual     atomic  10  40  7977154336    22290086168    8586756
+residual_rc  packed  10  40  11397084096   31217808432    8586756
+residual_rc  atomic  10  40  10267345720   28269065608    8586756
+jac_action   packed  10  40  9458986664    24626994984    8586756
+jac_action   atomic  10  40  9603496896    25365406952    8586756
+jac_action_rc packed  10  40  30827830408   86731279608    8586756
+jac_action_rc atomic  10  40  27249642312   79607200512    8586756

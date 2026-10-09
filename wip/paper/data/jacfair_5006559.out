@@ -1,0 +1,54 @@
+### host nid006545  n=128 repeat=10 passes=3  2026-10-08 18:30:28
+
+operator                   layout       MDOF_s       dofs   qgrad_frac  hograd_frac  prec
+jac_exact                  packed      931.711    8586756       0.3013            -   f64
+jac_exact                  packed     1541.996    8586756       0.2708            -   f32
+jac_exact                  atomic      355.636    8586756       0.7168            -   f64
+jac_exact                  atomic      497.739    8586756       0.6344            -   f32
+jac_exact                  ecolor      468.725    8586756       0.4796            -   f64
+jac_exact                  ecolor     1176.034    8586756       0.3493            -   f32
+jac_clip_exact             packed      379.620    8586756       0.0000       0.3781   f64
+jac_clip_exact             packed      647.268    8586756       0.0000       0.3499   f32
+jac_clip_exact             atomic      139.417    8586756       0.0000       0.8664   f64
+jac_clip_exact             atomic      178.845    8586756       0.0000       0.9131   f32
+jac_clip_exact             ecolor      143.872    8586756       0.0000       0.7541   f64
+jac_clip_exact             ecolor      311.079    8586756       0.0000       0.7205   f32
+jac_ho_exact               packed      323.805    8586756       0.0000       0.3450   f64
+jac_ho_exact               packed      564.608    8586756       0.0000       0.3062   f32
+jac_ho_exact               atomic      132.745    8586756       0.0000       0.8134   f64
+jac_ho_exact               atomic      172.159    8586756       0.0000       0.8801   f32
+jac_ho_exact               ecolor      136.653    8586756       0.0000       0.7174   f64
+jac_ho_exact               ecolor      291.804    8586756       0.0000       0.6556   f32
+jac_lagged                 packed     1313.455    8586756            -            -   f64
+jac_lagged                 packed     2183.391    8586756            -            -   f32
+jac_lagged                 atomic      791.175    8586756            -            -   f64
+jac_lagged                 atomic      984.955    8586756            -            -   f32
+jac_lagged                 ecolor      879.003    8586756            -            -   f64
+jac_lagged                 ecolor     1867.945    8586756            -            -   f32
+jac_lagged_ctl_unlim       packed     1319.141    8586756            -            -   f64
+jac_lagged_ctl_unlim       packed     2202.215    8586756            -            -   f32
+jac_lagged_ctl_clip        packed     1311.465    8586756            -            -   f64
+jac_lagged_ctl_clip        packed     2183.245    8586756            -            -   f32
+jac_lagged_ctl_venk        packed     1312.727    8586756            -            -   f64
+jac_lagged_ctl_venk        packed     2183.047    8586756            -            -   f32
+jac_lagged_ctl_dm          packed     1306.475    8586756            -            -   f64
+jac_lagged_ctl_dm          packed     2166.279    8586756            -            -   f32
+spmv_f64                   none        445.629    8586756            -            -   f64
+spmv_f32                   none        842.589    8586756            -            -   f64
+spmv_f32                   none        869.729    8586756            -            -   f32
+
+  f64 control unlim  096730ba546b8a98 match
+  f64 control clip   096730ba546b8a98 match
+  f64 control venk   096730ba546b8a98 match
+  f64 control dm     096730ba546b8a98 match
+f64: fully lagged is scheme-independent across every limiter: YES (096730ba546b8a98)
+  f32 control unlim  ee7667f5fe12ddfe match
+  f32 control clip   ee7667f5fe12ddfe match
+  f32 control venk   ee7667f5fe12ddfe match
+  f32 control dm     ee7667f5fe12ddfe match
+f32: fully lagged is scheme-independent across every limiter: YES (ee7667f5fe12ddfe)
+
+The exact arms carry the direction-gradient pass; jac_lagged does not, and is the operator
+the assembled matrix encodes. Compare spmv_* against jac_lagged for like-for-like.
+jac_lagged_ctl_* are controls, not rows: each must reproduce jac_lagged packed exactly.
+csv: /ritom/scratch/cscs/zulianp/cvfem_jacfair/5006559/jacfair.csv

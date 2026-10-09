@@ -38,6 +38,9 @@ case "$OUT" in /*) ;; *) OUT="$PWD/$OUT" ;; esac
 # group IDs, so ${GROUPS:-...} silently expands to a numeric GID and never to the
 # default. That is exactly what happened -- a job ran with "groups : 33203" and
 # selected nothing at all.
+# conv is NOT in the default set: it is seven arms times a ladder, which is longer than
+# the rest of the matrix put together, and the arms it measures are all off by default.
+# Run it with VERIFY_GROUPS=conv when the convective scheme is what changed.
 VERIFY_GROUPS=${VERIFY_GROUPS:-"unit mms bc port budget step pump nozzle"}
 # 4/8/16/32 reproduces the dof ladder docs/CVFEM_Verification_Farrell.md records
 # (500, 2916, 19652, 143748), so a rate measured here is comparable with the one there.
@@ -144,11 +147,23 @@ run() {
     # this reason.
     local rundir="$OUT/trace_${group}_${label}"
     mkdir -p "$rundir"
+    # VERIFY_RUN_TIMEOUT caps a single case, and is UNSET by default so nothing about the
+    # existing matrix changes. It exists for the batch queue: the conv group's whole subject
+    # is arms that may not converge, and an arm that does not converge does not fail quickly.
+    # Without a cap one of them consumes the allocation and every case after it is missing,
+    # which reads as a crashed job rather than as one arm that stalled.
     ( cd "$rundir" || exit 1
       export SFEM_NL_MAX_IT=$NL_MAX_IT
       for kv in "$@"; do export "$kv"; done
-      "$DRIVER" "$OUT/out_${group}_${label}" ) > "$OUT/$log" 2>&1
+      if [ -n "${VERIFY_RUN_TIMEOUT:-}" ]; then
+          timeout "$VERIFY_RUN_TIMEOUT" "$DRIVER" "$OUT/out_${group}_${label}"
+      else
+          "$DRIVER" "$OUT/out_${group}_${label}"
+      fi ) > "$OUT/$log" 2>&1
     local rc=$?
+    # 124 is the cap firing, and it is reported as its own thing: "ran past the cap" and
+    # "diverged" are different findings and one exit code for both loses the distinction.
+    [ "$rc" -eq 124 ] && echo "run: TIMEOUT after ${VERIFY_RUN_TIMEOUT}s" >> "$OUT/$log"
     printf "exit=%-3s %4ds  %s\n" "$rc" "$((SECONDS - t0))" \
         "$(grep -m1 -E 'u_linf:|sum of continuity' "$OUT/$log" | cut -c1-60)"
     printf "%s\t%s\t%s\t%s\n" "$group" "$label" "$log" "$extra" >> "$TSV"
@@ -167,6 +182,87 @@ if want unit && command -v ctest > /dev/null 2>&1; then
     CTEST_PASS=$((CTEST_TOTAL - CTEST_FAIL))
     CTEST_FAILING=$(sed -n 's/^\t*[0-9]* - \([A-Za-z0-9_]*\) (Failed).*/\1/p' "$OUT/ctest.log" | tr '\n' ',' | sed 's/,$//')
     echo "           $CTEST_PASS/$CTEST_TOTAL passed"
+fi
+
+# ---- the convective scheme: order of accuracy, one limiter arm at a time ----
+#
+# THE GAP THIS FILLS. Nothing in tests/, drivers/ or this script set SFEM_CONV_HO,
+# SFEM_CONV_LIMITER or SFEM_VENKAT_K, so the deferred-correction flux and every limiter arm
+# were unmeasured by the matrix that exists to say what this code computes -- while
+# docs/CVFEM_Verification_Report.md described the scheme as first-order upwind with no
+# limiter, which was true of the default and of nothing else.
+#
+# WHY Re = 100 AND NOT Re = 1. The mms group already runs both, and at Re = 1 upwinding is
+# inactive: every arm would report the same order for the same reason and the ladder would
+# say nothing about any of them. The limiter only exists where the donor split does, so the
+# arms can only be separated where convection dominates.
+#
+# WHAT EACH ARM HAS TO BEAT. Measured before this group existed: first order 1.28 / 0.44,
+# the deferred correction unlimited 1.92 / 2.32, the bounded-face clip 0.80 / 2.81. So the
+# reconstruction is worth roughly a full order and the clip gives it back -- a working
+# limiter has to hold near 2 while remaining bounded, and an arm that reports 2 by switching
+# itself off everywhere has not solved the problem it was added for. That is why the
+# unlimited arm stays in the table: it is the ceiling, and an arm that matches it exactly is
+# reporting that it did nothing.
+#
+# lim2_k0 is in the table although it is bit-for-bit lim2. It costs one run and it is the
+# check that the sweep's own control behaves as the unswept arm -- if those two rows ever
+# disagree, SFEM_VENKAT_K has acquired an effect at zero and every other K row is suspect.
+if want conv; then
+    # Reaching n = 32 so this ladder spans the same range the mms group's does. Measured on
+    # 8/16/24 the first-order arm fitted 0.481 with local rates 0.41 and 0.52 and R^2 = 0.9965
+    # -- a consistent sub-linear fit, not a bad one -- against the 0.727 the mms group reports
+    # on 4/8/16/32. The gap is the span, not a defect: the coarser starting level carries a
+    # steeper local rate and lifts the fit.
+    #
+    # The change is for COMPARABILITY, not to clear a threshold. The first-order arm may well
+    # still fit below the 0.5 gate here, and if it does that is the finding -- donor-cell
+    # upwind at a cell Peclet number this size is sub-linear -- and not a reason to move the
+    # number until the fit disagrees with it.
+    CONV_LADDER=${CONV_LADDER:-"8 16 32"}
+    # The mms ladder's solver, and for its reason: this ladder is deliberately flat, so
+    # multigrid is unavailable and the dense coarse factor does not fit.
+    CONV_SOLVER="SFEM_FGMRES=1 SFEM_GMG=0 SFEM_PRECOND=bjacobi"
+    # Overridable, because the full list is ten arms times a ladder and the interesting subset
+    # is rarely all of it. It also fixes an ordering hazard: the arms added most recently sit
+    # at the end, so a run that meets its wall clock loses precisely the ones it was submitted
+    # to measure. Naming the subset puts them first.
+    CONV_ARMS=${CONV_ARMS:-"lo ho_lim0 ho_lim1 ho_lim2_k0 ho_lim2_k1 ho_lim2_k5 ho_lim2_k30 ho_lim3 ho_lim0_frozen ho_lim2_k0_frozen"}
+    for arm in $CONV_ARMS; do
+        case $arm in
+            # The scheme the default runs and every recorded number was measured with.
+            lo)          ARM_ENV="SFEM_CONV_HO=0" ;;
+            # The reconstruction with nothing holding it back: the accuracy ceiling.
+            ho_lim0)     ARM_ENV="SFEM_CONV_HO=1 SFEM_CONV_LIMITER=0" ;;
+            ho_lim1)     ARM_ENV="SFEM_CONV_HO=1 SFEM_CONV_LIMITER=1" ;;
+            ho_lim2_k0)  ARM_ENV="SFEM_CONV_HO=1 SFEM_CONV_LIMITER=2 SFEM_VENKAT_K=0" ;;
+            # Two decades apart, because the useful K is the measurement and not an input.
+            ho_lim2_k1)  ARM_ENV="SFEM_CONV_HO=1 SFEM_CONV_LIMITER=2 SFEM_VENKAT_K=1" ;;
+            # K = 5 is where the step case converges best -- 303 Newton steps at K = 0 down to
+            # 41 -- so it is the setting a default would be argued for, and the one whose
+            # accuracy therefore has to be on the table rather than interpolated between its
+            # neighbours.
+            ho_lim2_k5)  ARM_ENV="SFEM_CONV_HO=1 SFEM_CONV_LIMITER=2 SFEM_VENKAT_K=5" ;;
+            ho_lim2_k30) ARM_ENV="SFEM_CONV_HO=1 SFEM_CONV_LIMITER=2 SFEM_VENKAT_K=30" ;;
+            # Darwish and Moukalled's virtual upwind node: no bound at all, van Leer on the
+            # one-dimensional stencil the codes running this discretisation actually use.
+            ho_lim3)     ARM_ENV="SFEM_CONV_HO=1 SFEM_CONV_LIMITER=3" ;;
+            # THE QUESTION THESE TWO ANSWER. Freezing put every arm on the first-order step
+            # count -- 15 and 12 against 303 for the same limiter unfrozen -- by holding the
+            # correction fixed through a continuation stage. That makes the converged state
+            # solve R_lo(u) + frozen = 0 rather than R_ho(u) = 0, which is a DIFFERENT problem,
+            # and a correction evaluated too far from the solution is indistinguishable from no
+            # correction at all. If these two arms hold ~2, freezing is free and eps^2 is a knob
+            # nobody needs; if they fall toward 1, freezing bought its convergence by discarding
+            # the higher-order term and the step counts above mean nothing.
+            ho_lim0_frozen)    ARM_ENV="SFEM_CONV_HO=1 SFEM_CONV_LIMITER=0 SFEM_CONV_FREEZE=1" ;;
+            ho_lim2_k0_frozen) ARM_ENV="SFEM_CONV_HO=1 SFEM_CONV_LIMITER=2 SFEM_VENKAT_K=0 SFEM_CONV_FREEZE=1" ;;
+        esac
+        for n in $CONV_LADDER; do
+            run conv "${arm}_n$n" "conv_arm=$arm" -- SFEM_CASE=mms SFEM_N=$(lvl_n $n) $LEVEL_ENV \
+                $CONV_SOLVER SFEM_MU=0.01 SFEM_RHO=1 $ARM_ENV
+        done
+    done
 fi
 
 # ---- spatial order of accuracy, manufactured solution ----

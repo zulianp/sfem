@@ -107,16 +107,6 @@ int solve_sdf_obstacle(const std::shared_ptr<sfem::Communicator> &comm, int argc
 
     auto fs = sfem::FunctionSpace::create(m, block_size);
 
-#ifdef SFEM_ENABLE_CUDA
-    {
-        auto elements = fs->device_elements();
-        if (!elements) {
-            elements = create_device_elements(fs, fs->element_type());
-            fs->set_device_elements(elements);
-        }
-    }
-#endif
-
     auto conds = sfem::create_dirichlet_conditions_from_env(fs, es);
     auto f     = sfem::Function::create(fs);
     auto op    = sfem::create_op(fs, "LinearElasticity", es);

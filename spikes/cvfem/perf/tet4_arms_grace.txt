@@ -1,0 +1,82 @@
+### host nid006563  n=96 repeat=10 passes=3  2026-10-05 10:30:58
+### res_/asm_/jac_ are the residual, the assembly and the matrix-free action
+
+arm                           MELEM_s       dofs       checksum
+res_current                  1503.104          ? -9.8811804693632078e-03
+res_sympy                    1356.278          ? -9.8811804693632235e-03
+res_current_slots            1493.808          ? -9.8811804693632078e-03
+res_sympy_slots              1346.791          ? -9.8811804693632235e-03
+res_sympy_direct             1358.068          ? -9.8811804693632235e-03
+res_sympy_block              1355.033          ? -9.8811804693632235e-03
+res_sympy_face               1349.587          ? -9.8811804693632235e-03
+res_sympy_simd               1359.702          ? -9.8811804693632235e-03
+res_sympy_simd_clean         1352.999          ? -9.8811804693632235e-03
+res_sympy_block_simd         1353.560          ? -9.8811804693632235e-03
+res_sympy_row_simd           1355.529          ? -9.8811804693632235e-03
+res_sympy_row_simd_fused     1353.746          ? -9.8811804693632235e-03
+res_sympy_face_simd          1354.391          ? -9.8811804693632235e-03
+asm_current                   136.164          ? 0.0000000000000000e+00
+asm_sympy                     114.978          ? 0.0000000000000000e+00
+asm_current_slots             150.516          ? 0.0000000000000000e+00
+asm_sympy_slots               125.634          ? 0.0000000000000000e+00
+asm_sympy_direct              147.823          ? 0.0000000000000000e+00
+asm_sympy_block               133.837          ? 0.0000000000000000e+00
+asm_sympy_face                159.742          ? 0.0000000000000000e+00
+asm_sympy_simd                158.336          ? 0.0000000000000000e+00
+asm_sympy_simd_clean          158.406          ? 0.0000000000000000e+00
+asm_sympy_block_simd          168.112          ? 0.0000000000000000e+00
+asm_sympy_row_simd            167.131          ? 0.0000000000000000e+00
+asm_sympy_row_simd_fused      163.025          ? 0.0000000000000000e+00
+asm_sympy_face_simd           135.501          ? 0.0000000000000000e+00
+jac_current                  1058.942          ? -1.6322960186062455e-02
+jac_sympy                    1005.365          ? -1.6322960186062455e-02
+jac_current_slots            1063.456          ? -1.6322960186062455e-02
+jac_sympy_slots              1002.861          ? -1.6322960186062455e-02
+jac_sympy_direct             1005.513          ? -1.6322960186062455e-02
+jac_sympy_block              1003.691          ? -1.6322960186062455e-02
+jac_sympy_face               1007.086          ? -1.6322960186062455e-02
+jac_sympy_simd               1007.096          ? -1.6322960186062455e-02
+jac_sympy_simd_clean         1007.970          ? -1.6322960186062455e-02
+jac_sympy_block_simd         1009.233          ? -1.6322960186062455e-02
+jac_sympy_row_simd           1007.889          ? -1.6322960186062455e-02
+jac_sympy_row_simd_fused     1007.242          ? -1.6322960186062455e-02
+jac_sympy_face_simd          1009.628          ? -1.6322960186062455e-02
+
+### fastest per operation:
+  res  current                1503.104
+  asm  sympy_block_simd       168.112
+  jac  current_slots          1063.456
+### done 2026-10-05 10:37:33
+
+### WHAT THIS SETTLES (jobs/tet4_arms.sbatch, job 4982357; the TET4 bench writes no CSV,
+### so this table IS the record).
+###
+### The TET4 benchmark carried thirteen micro-kernel arms behind its own --kernel flag and
+### perf/ held no TET4 row at all: every one was unmeasured on this hardware. The default was
+### sympy_row_simd, and it is the fastest of the three operations' winners in none of them --
+### it gives up 10% on the residual and 5% on the action.
+###
+###   residual          hand-written       1503.1   the generated family clusters 1347-1360
+###   assembly          sympy_block_simd    168.1   current_slots 150.5, current 136.2
+###   Jacobian action   hand-written       1063.5   the generated family clusters 1003-1010
+###
+### THE NOISE FLOOR, FREE. `current` and `current_slots` differ only in the ASSEMBLY -- the
+### residual and the action dispatch on one boolean (sympy or not) and have no slots variant --
+### so res_current/res_current_slots and jac_current/jac_current_slots are the SAME code
+### measured twice. They come back 0.6% and 0.4% apart, which is this job's run-to-run spread
+### and the resolution any other gap here has to beat.
+###
+### Read against that floor:
+###
+###   residual   hand-written beats the best generated arm 1503.1 / 1359.7 = 1.11x
+###   action     hand-written beats the best generated arm 1063.5 / 1009.6 = 1.05x
+###   assembly   generated block-SIMD beats the best hand-written 168.1 / 150.5 = 1.12x,
+###              and the plain hand-written one 168.1 / 136.2 = 1.23x
+###
+### So TET4 splits the other way from HEX8's residual: the generated arrangements win the
+### assembly and lose the matrix-free operations. The eleven of them span 1% on the residual and
+### 0.7% on the action -- both inside the floor, so the CSE-scope axis they explore is worth
+### nothing measurable there, against 1.23x on the assembly.
+###
+### sympy_block_simd 168.1 and sympy_row_simd 167.1 are 0.6% apart, which is the floor: that
+### pair is a tie and the measured order is what picks between them, not a gap.

@@ -1,0 +1,17 @@
+# LaTeX build products, anchored to this directory so the pattern cannot reach into data/:
+# an unanchored *.out also matched the measurement files in data/, which are tracked provenance.
+/main.pdf
+/main.aux
+/main.log
+/main.out
+/main.bbl
+/main.blg
+/main.fls
+/main.fdb_latexmk
+/main.synctex.gz
+__pycache__/
+
+# The repository root ignores *.out, which is right for build products and wrong for these: the
+# files under data/ are measurement provenance that the figure generators read, so a fresh clone
+# without them produces a paper full of placeholders. Un-ignored explicitly.
+!data/*.out

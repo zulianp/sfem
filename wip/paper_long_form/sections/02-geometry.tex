@@ -1,0 +1,90 @@
+\section{Geometry: the affine and isoparametric variants}
+\label{sec:geom}
+
+The reference element is the unit cube $[0,1]^3$ with trilinear shape functions. The Jacobian
+$\Jmat(\xi) = \partial\xvec/\partial\xi$ is in general a function of position; the two variants
+differ in whether they admit that.
+
+\subsection{What each variant commits to}
+
+The \emph{isoparametric} variant evaluates the geometry where it is needed, so $\Jmat$, its
+adjugate and the surface areas all vary within the element
+(\code{cvfem\_hex8\_geom\_at}, and the \code{\_isoparam} kernels).
+
+The \emph{affine} variant evaluates $\Jmat$ once, at the reference centre
+$\xi = (\tfrac12,\tfrac12,\tfrac12)$, and uses it everywhere
+(\code{cvfem\_hex8\_affine\_adj}). For a parallelepiped this is exact. For a general trilinear
+hexahedron it is an approximation, and it is the \emph{defining} approximation of the variant:
+having made it, the variant's geometry \emph{is} that one constant Jacobian, and a kernel on this
+path has no entitlement to any other geometric information. This is a stronger statement than it
+first appears, and Section~\ref{sec:geom:edges} shows where ignoring it introduced a real bug.
+
+What is stored per element is the adjugate and the determinant, not $\Jmat$ itself. With
+$\adj(\mathsf{A}) = \det(\mathsf{A})\,\mathsf{A}^{-1}$ the code keeps
+\code{cof0..cof8} $=\adj(\Jmat)$ row-major and \code{det} $=\det\Jmat$.
+
+\subsection{Surface areas}
+
+The physical area vector of surface $\scs$ in direction $q = \scs/4$ is the reference area vector
+pushed forward by the cofactor matrix. Because $\Avec^{\mathrm{ref}}$ is $\tfrac14$ along axis
+$q$, this reduces to a scaling of one row of the adjugate:
+\begin{equation}
+\Avec_\scs \;=\; \tfrac14 \bigl(\adj\Jmat\bigr)_{q,\cdot} ,
+\end{equation}
+which is exactly the nine lines \code{Ax0 = qtr*c0} \dots{} \code{Az2 = qtr*c8} in the geometry
+loop of each sweep. All four surfaces of a direction group share one area vector, so the sweep
+holds three of them, not twelve.
+
+\subsection{Edge vectors, and why the Jacobian suffices}
+\label{sec:geom:edges}
+
+Several components need $\dvec_\scs$, the vector from node $i$ to node $j$ across the surface.
+The obvious implementation differences the node coordinates, $\dvec_\scs = \xvec_j - \xvec_i$,
+and that is what the code did until recently.
+
+On the affine path it is the wrong choice, and not because it is inaccurate --- because it is
+\emph{inconsistent}. Evaluating the trilinear Jacobian at the reference centre gives, for
+direction $q$,
+\begin{equation}
+\bigl(\Jmat\bigr)_{\cdot,q} \;=\; \frac{1}{4}\!\!\sum_{\scs \,\in\, \text{group } q}\!\!
+      \bigl(\xvec_{j(\scs)} - \xvec_{i(\scs)}\bigr),
+\label{eq:col-is-mean}
+\end{equation}
+that is, column $q$ of the centre Jacobian is exactly the arithmetic mean of the four true edge
+vectors of group $q$. This holds for \emph{any} trilinear hexahedron, not only a parallelepiped:
+it is an identity of the trilinear basis evaluated at the centre, and it was verified
+symbolically against the code's own adjugate expressions on cubes, sheared parallelepipeds and
+randomly distorted elements, agreeing to $10^{-16}$ in every case.
+
+So the affine variant has already committed to that mean when it computes the flux. A kernel that
+then differences node coordinates for $\dvec$ is using a \emph{second, different} geometry for one
+term while the rest of the same kernel uses the first. On a cube the two coincide exactly; on a
+distorted element the true edges differ from their mean by $10\%$ to over $100\%$, which is a
+measure of how far outside its validity the affine variant has been pushed, not of an error in
+either formula.
+
+The affine path therefore takes
+\begin{equation}
+\dvec_\scs \;=\; \bigl(\Jmat\bigr)_{\cdot,\,\scs/4},
+\end{equation}
+and recovers $\Jmat$ from what is already in registers using the $3\times 3$ identity
+\begin{equation}
+\adj\bigl(\adj \mathsf{A}\bigr) \;=\; \det(\mathsf{A})\,\mathsf{A}
+\qquad\Longrightarrow\qquad
+\Jmat \;=\; \frac{\adj(\adj\Jmat)}{\det\Jmat} ,
+\label{eq:adj-adj}
+\end{equation}
+implemented in \code{cvfem\_hex8\_affine\_edge\_cols}. The cofactors and $1/\det$ are already live
+in the geometry loop that builds the area vectors, so the three columns cost roughly forty flops
+per element and no loads, and the four surfaces of a group share one column. The isoparametric
+kernels keep true per-surface coordinates, which is correct where the geometry genuinely varies.
+
+\paragraph{A consistency obligation this creates.} Every \emph{producer} of precomputed data must
+use the same $\dvec$ as every \emph{consumer}. The coefficient table
+(\code{cvfem\_hex8\_build\_rc\_coeff}) and the partially assembled tangent
+(\code{cvfem\_hex8\_build\_pa\_tangent}) are both producers, and both had to move to
+Eq.~\eqref{eq:adj-adj} with the kernels. Missing the second of them put the stored tangent and the
+kernel reading it on different geometries, which \code{cvfem\_pa\_tangent\_test} caught at
+$1.4\times10^{-5}$ --- five orders of magnitude above round-off, and invisible to every
+cube-based check, because on a cube Eq.~\eqref{eq:col-is-mean} makes the two definitions
+identical. Any future change here needs a non-affine oracle.

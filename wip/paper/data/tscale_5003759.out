@@ -1,0 +1,84 @@
+### host nid006544  n=128  repeat=12 warmup=3  2026-10-08 11:31:09
+
+### STREAM triad (the roofline's memory bound)
+  stream source not found at /ritom/scratch/cscs/zulianp/cvfem_ho/NEW/baseline/stream/stream.cpp -- SKIPPED
+
+### thread scaling
+layout     op     threads    MDOF_s    packs       dofs  sec_call
+### pack size pinned at 1024 elements for every thread count
+
+packed     res          1    26.401     2048    8586756 3.252413e-01
+packed     res          2    53.118     2048    8586756 1.616531e-01
+packed     res          4   106.085     2048    8586756 8.094235e-02
+packed     res          8   209.421     2048    8586756 4.100231e-02
+packed     res         18   454.079     2048    8586756 1.891025e-02
+packed     res         36   868.125     2048    8586756 9.891152e-03
+packed     res         54  1251.707     2048    8586756 6.860038e-03
+packed     res         72  1550.219     2048    8586756 5.539060e-03
+atomic     res          1    12.852        -    8586756 6.681071e-01
+atomic     res          2    25.754        -    8586756 3.334200e-01
+atomic     res          4    51.753        -    8586756 1.659175e-01
+atomic     res          8   103.189        -    8586756 8.321383e-02
+atomic     res         18   229.687        -    8586756 3.738463e-02
+atomic     res         36   444.344        -    8586756 1.932458e-02
+atomic     res         54   662.542        -    8586756 1.296031e-02
+atomic     res         72   797.370        -    8586756 1.076885e-02
+packed     resho        1    12.858     2048    8586756 6.677965e-01
+packed     resho        2    25.533     2048    8586756 3.362992e-01
+packed     resho        4    51.521     2048    8586756 1.666664e-01
+packed     resho        8   102.540     2048    8586756 8.374083e-02
+packed     resho       18   227.664     2048    8586756 3.771681e-02
+packed     resho       36   442.030     2048    8586756 1.942573e-02
+packed     resho       54   649.972     2048    8586756 1.321097e-02
+packed     resho       72   828.169     2048    8586756 1.036837e-02
+atomic     resho        1     8.468        -    8586756 1.014023e+00
+atomic     resho        2    17.213        -    8586756 4.988657e-01
+atomic     resho        4    34.331        -    8586756 2.501160e-01
+atomic     resho        8    68.550        -    8586756 1.252624e-01
+atomic     resho       18   153.001        -    8586756 5.612214e-02
+atomic     resho       36   301.021        -    8586756 2.852541e-02
+atomic     resho       54   444.036        -    8586756 1.933795e-02
+atomic     resho       72   549.319        -    8586756 1.563164e-02
+packed     jac          1    16.224     2048    8586756 5.292536e-01
+packed     jac          2    32.400     2048    8586756 2.650261e-01
+packed     jac          4    64.118     2048    8586756 1.339204e-01
+packed     jac          8   127.083     2048    8586756 6.756812e-02
+packed     jac         18   279.476     2048    8586756 3.072453e-02
+packed     jac         36   519.669     2048    8586756 1.652350e-02
+packed     jac         54   716.519     2048    8586756 1.198399e-02
+packed     jac         72   871.042     2048    8586756 9.858032e-03
+atomic     jac          1     5.208        -    8586756 1.648826e+00
+atomic     jac          2    10.402        -    8586756 8.254556e-01
+atomic     jac          4    20.865        -    8586756 4.115354e-01
+atomic     jac          8    41.594        -    8586756 2.064411e-01
+atomic     jac         18    92.855        -    8586756 9.247512e-02
+atomic     jac         36   182.190        -    8586756 4.713074e-02
+atomic     jac         54   264.937        -    8586756 3.241054e-02
+atomic     jac         72   335.436        -    8586756 2.559880e-02
+colored    res          1    26.320     2048    8586756 3.262499e-01
+colored    res          2    53.042     2048    8586756 1.618869e-01
+colored    res          4   105.194     2048    8586756 8.162796e-02
+colored    res          8   201.973     2048    8586756 4.251428e-02
+colored    res         18   418.705     2048    8586756 2.050789e-02
+colored    res         36   723.389     2048    8586756 1.187019e-02
+colored    res         54  1108.390     2048    8586756 7.747054e-03
+colored    res         72  1117.582     2048    8586756 7.683337e-03
+ecolor     res          1    21.951        -    8586756 3.911695e-01
+ecolor     res          2    43.098        -    8586756 1.992365e-01
+ecolor     res          4    84.041        -    8586756 1.021735e-01
+ecolor     res          8   164.078        -    8586756 5.233326e-02
+ecolor     res         18   348.760        -    8586756 2.462085e-02
+ecolor     res         36   648.779        -    8586756 1.323525e-02
+ecolor     res         54   887.157        -    8586756 9.678960e-03
+ecolor     res         72  1082.472        -    8586756 7.932544e-03
+ecolor     jac          1    11.812        -    8586756 7.269494e-01
+ecolor     jac          2    23.390        -    8586756 3.671093e-01
+ecolor     jac          4    45.650        -    8586756 1.881006e-01
+ecolor     jac          8    87.072        -    8586756 9.861684e-02
+ecolor     jac         18   179.798        -    8586756 4.775788e-02
+ecolor     jac         36   302.500        -    8586756 2.838600e-02
+ecolor     jac         54   378.008        -    8586756 2.271579e-02
+ecolor     jac         72   438.176        -    8586756 1.959658e-02
+
+csv: /ritom/scratch/cscs/zulianp/cvfem_tscale/5003759/tscale.csv
+logs in /ritom/scratch/cscs/zulianp/cvfem_tscale/5003759

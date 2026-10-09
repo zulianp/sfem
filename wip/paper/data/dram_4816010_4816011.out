@@ -1,0 +1,20 @@
+# MEASURED DRAM TRAFFIC, Grace SCF counters, jobs 4816010 (repeat=10) and 4816011 (repeat=40).
+#
+# Two captures differenced across repeat count so that mesh setup, pack construction and the three
+# warmup applies cancel exactly: the counters cover a whole process, so a single capture cannot be
+# divided by the apply count. Both runs used --warmup 3, n=128, 72 threads, OMP_PROC_BIND=true.
+#
+# Units. cmem_rd_access is exactly half cmem_rd_data in every row, which fixes cmem_rd_data as a
+# count of 32-byte flits (a 64-byte line being two flits and one access); cmem_wr_total_bytes is
+# already bytes. The interpretation is corroborated by the relative figures behaving as the
+# mechanisms require: the atomic sweep reads more than the packed one in both operators, as its
+# wider global index and its node re-reads demand, and writes more on the residual, as its global
+# zeroing pass and read-modify-write updates demand.
+#
+# bytes = cmem_rd_data * 32 + cmem_wr_total_bytes
+#
+# operation  layout  repeat_lo  repeat_hi  bytes_lo        bytes_hi         dofs
+residual     packed  10  40   8154484452   21424691936   8586756
+residual     atomic  10  40   7886889384   22606541704   8586756
+jac_action   packed  10  40   8866120912   24023593176   8586756
+jac_action   atomic  10  40   9295955730   25146496880   8586756

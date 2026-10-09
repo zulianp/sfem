@@ -3,7 +3,7 @@
 #include "sfem_ContactSkin.hpp"
 #include "sfem_FunctionSpace.hpp"
 
-#include "integrations/smesh/sccd_smesh_CCD.hpp"
+#include "integrations/smesh/sccd_smesh_ccd.hpp"
 
 #include "sfem_aliases.hpp"
 #include "sfem_context.hpp"
