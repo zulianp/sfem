@@ -47,9 +47,7 @@ set(SFEM_MODULES
     algebra/mg
     algebra/openmp
     algebra/parallel
-    mesh 
-    mesh/multiblock
-    mesh/sshex8
+    mesh
     operators 
     operators/beam2 
     operators/boundary_conditions
@@ -144,7 +142,6 @@ list(APPEND SFEM_MODULES
     frontend/ops/generated/mooney_rivlin_kelvin_voigt/op
     frontend/ops/generated/two_phase_flow
     frontend/ops/generated/two_phase_flow/op
-    frontend/mesh
 )
 
 if(SFEM_ENABLE_METIS)
@@ -167,12 +164,10 @@ if(SFEM_ENABLE_CUDA)
         operators/contact/cuda
         operators/cuda
         operators/hex8/cuda
-        operators/hierarchical/cuda
         operators/macro_tet4/cuda
         operators/quadshell4/cuda
         operators/spectral_hex/cuda
         operators/sshex8/cuda
-        operators/ssquad4/cuda
         operators/sstet4/cuda
         operators/tet10/cuda
         operators/tet4/cuda
