@@ -771,8 +771,13 @@ fixed --- \emph{lagged} one Newton step --- the gradient is an input to the appl
 than part of it. Differentiated, the Jacobian action needs the reconstructed gradient of the
 \emph{direction} and not only of the state, which is one further pass per operator
 application. All four
-combinations are implemented and measured (\S\ref{sec:res:hoexact}); the limiters are
-differentiated where they are differentiable and a subgradient is taken where they are not.
+combinations are implemented and measured (\S\ref{sec:res:hoexact}). Here ``exact'' means
+that all reconstruction and flux sensitivities are retained on differentiable branches.
+At limiter ties or a zero mass flux, the action uses the implemented tie conventions;
+a classical Jacobian need not exist. In particular, writing a convective flux as
+$m^+ u_L + m^- u_R$, with $m^\pm=(m\pm|m|)/2$, shows that its two derivatives at
+$m=0$ differ when the reconstructed states $u_L$ and $u_R$ differ. Roundoff can then
+select different branches in two layouts even when their residuals agree.
 
 \paragraph{Operators.} The names below are used throughout, in the tables and figures as well as
 the text. The subscript is the Rhie--Chow term, whose sensitivity is to the pressure gradient,
@@ -1281,9 +1286,17 @@ The recorded phase fractions also included warmup time in the reconstruction cou
 but excluded it from total application time. The benchmark now resets both counters
 before measurement; corrected phase fractions require new runs.
 
-$\Jhoex$ is the derivative it claims to be: against a finite difference of $\Fho$ with $\Gop u$
-rebuilt at each perturbed state it agrees to \hoxFdUnlim{} on the unlimited arm, where the
-deferred correction's action differs by \num{6e-2}.
+On the tested unlimited case, a finite difference of $\Fho$ with $\Gop u$ rebuilt at
+each perturbed state agrees with $\Jhoex$ to \hoxFdUnlim{}, whereas the
+correction-lagged action differs by \num{6e-2}. This does not validate all limiter
+branches. For limited cases, a central difference that crosses a limiter or donor
+switch is not a reference for the action's chosen branch. Validation must distinguish
+such crossings from errors on unchanged branches; a small fraction of disagreeing
+nodes alone does not establish correctness. The regression now requires a whole-vector
+relative infinity error below \num{1e-6} at two step sizes on a perturbed state. This
+check uses velocity directions without Rhie--Chow coupling; it does not validate the
+full coupled pressure--velocity action. Residual agreement between layouts also does
+not establish agreement of their selected linearizations at a switch.
 
 \subsection{Against the lagged matrix}
 \label{sec:res:spmv}

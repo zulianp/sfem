@@ -81,32 +81,18 @@ static void bench_nodal_grad(MeshData &d, PackedData &p, const GeomKind geom_kin
 // same shape of vacuous gate this driver has already shipped once, when a packed sweep with no
 // pack built compared two zeros.
 //
-// Central difference, so the error is O(eps^2) and the comparison is not dominated by the
+// On a smooth branch, central differencing has O(eps^2) truncation error rather than the
 // truncation of a one-sided one. Returns max|fd - jv| / max|fd|, and prints the lagged action
 // against the same reference beside it, because the number that matters to a solver is not
 // whether the exact action is right but how wrong the lagged one is.
 static scalar_t verify_ho_action_fd(MeshData &d, PackedData &p, const scalar_t rho, const scalar_t mu,
                                     const int limiter, const GeomKind geom_kind, scalar_t &lagged_rel,
-                                    // The fraction of degrees of freedom where the two disagree by
-                                    // more than the tolerance. A max norm cannot verify a
-                                    // piecewise-differentiable operator: the limiters switch branch
-                                    // somewhere inside the +/- eps step for a handful of surfaces,
-                                    // and at such a surface the difference quotient is not a
-                                    // derivative of anything. What must hold is that those surfaces
-                                    // are a vanishing fraction and that everywhere else the
-                                    // agreement is the unlimited arm's.
+                                    // Disagreement fractions are diagnostics, not acceptance criteria.
                                     scalar_t &frac_bad, scalar_t &lagged_frac_bad) {
     const ptrdiff_t n   = d.nnodes;
     const int       iso = geom_kind == GeomKind::Isoparam ? 1 : 0;
-    // THE STATE IS PERTURBED FIRST, and this is not cosmetic. On a uniform hex mesh with a
-    // smooth field the reconstruction lands EXACTLY on a limiter bound for a structural sixth of
-    // the sub-control surfaces -- measured, 1024 of 6144 at n=8 -- and at such a surface the
-    // limiter has a kink at the evaluation point. A central difference across a kink returns the
-    // average of the two one-sided derivatives, which equals neither, so the reference is invalid
-    // there however right the derivative is. Each node touches many surfaces, so a sixth of the
-    // surfaces contaminates three quarters of the nodes, which is exactly the disagreement this
-    // check reported before the ties were broken. A small deterministic perturbation moves the
-    // state off the degenerate set; it changes nothing about the operator being verified.
+    // Break structural ties, but still require agreement on every component: a finite
+    // difference can cross a switch even after this perturbation.
     for (ptrdiff_t i = 0; i < n; ++i) {
         const uint32_t h = (uint32_t)i * 2246822519u + 374761393u;
         d.ux[i] += scalar_t(1e-3) * (scalar_t((h >> 5) & 0xffffu) / scalar_t(65535) - scalar_t(0.5));
@@ -148,6 +134,10 @@ static scalar_t verify_ho_action_fd(MeshData &d, PackedData &p, const scalar_t r
     // branch-crossing artefact shrinks with the step, and that is what tells them apart.
     const char *eps_env = std::getenv("CVFEM_FD_EPS");
     const scalar_t eps = eps_env ? (scalar_t)std::atof(eps_env) : scalar_t(1e-6);
+    if (!(eps > scalar_t(0)) || !std::isfinite(eps)) {
+        std::fprintf(stderr, "FAIL: CVFEM_FD_EPS must be finite and positive\n");
+        return std::numeric_limits<scalar_t>::infinity();
+    }
     residual_at(scalar_t(+1), rp, eps);
     residual_at(scalar_t(-1), rm, eps);
     d.ux = ux0; d.uy = uy0; d.uz = uz0;
@@ -170,6 +160,10 @@ static scalar_t verify_ho_action_fd(MeshData &d, PackedData &p, const scalar_t r
 
     scalar_t den = 0, num = 0, numl = 0;
     for (size_t i = 0; i < fd.size(); ++i) {
+        if (!std::isfinite(fd[i]) || !std::isfinite(jv[i]) || !std::isfinite(jl[i])) {
+            std::fprintf(stderr, "FAIL: nonfinite value in higher-order derivative check\n");
+            return std::numeric_limits<scalar_t>::infinity();
+        }
         den  = std::max(den, std::fabs(fd[i]));
         num  = std::max(num, std::fabs(fd[i] - jv[i]));
         numl = std::max(numl, std::fabs(fd[i] - jl[i]));
@@ -1864,24 +1858,14 @@ int main(int argc, char **argv) {
         // The lagged action differing from the finite difference is the POINT, not a failure, so
         // only the exact arm is gated. A lagged arm that agreed would mean the correction never
         // reached the residual and the whole comparison is vacuous, so it is gated from below.
-        // Two standards, because the operators differ. The unlimited arm is differentiable
-        // everywhere, so its max norm must hold. A limited arm is differentiable almost
-        // everywhere, so what must hold is that the exceptions are a vanishing fraction of the
-        // mesh -- the surfaces whose limiter branch the perturbation crosses -- and that the
-        // lagged action is wrong on a far larger share.
+        // A small set of wrong rows is still a failure. A switch crossing needs a
+        // separate diagnosis; it cannot be excused by the fraction of affected rows.
         const scalar_t tol = scalar_t(1e-6);
-        const bool ok = conv_limiter == 0 ? (rel < tol) : (fbad < scalar_t(0.01));
+        const bool ok = rel < tol;
         if (!ok) {
             std::fprintf(stderr, "FAIL: exact higher-order action differs from the finite "
                                  "difference: max %.3e, %.4f%% of dofs (limiter %d)\n",
                          (double)rel, 100.0 * (double)fbad, conv_limiter);
-            if (own_mpi) MPI_Finalize();
-            return 1;
-        }
-        if (conv_limiter != 0 && !(fbadl > scalar_t(20) * fbad + scalar_t(0.05))) {
-            std::fprintf(stderr, "FAIL: the lagged action disagrees on %.4f%% of dofs against the "
-                                 "exact one's %.4f%% -- too close to call this a check\n",
-                         100.0 * (double)fbadl, 100.0 * (double)fbad);
             if (own_mpi) MPI_Finalize();
             return 1;
         }

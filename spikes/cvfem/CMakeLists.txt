@@ -390,6 +390,9 @@ add_test(NAME cvfem_tet4_bench_verify
 add_test(NAME cvfem_bench_staging
          COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_bench_staging.sh
                  $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)
+add_test(NAME cvfem_jacobian_fd
+         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_jacobian_fd.sh
+                 $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)
 add_test(NAME cvfem_jacobian_cache
          COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_jacobian_cache.sh
                  $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)
