@@ -1292,11 +1292,16 @@ correction-lagged action differs by \num{6e-2}. This does not validate all limit
 branches. For limited cases, a central difference that crosses a limiter or donor
 switch is not a reference for the action's chosen branch. Validation must distinguish
 such crossings from errors on unchanged branches; a small fraction of disagreeing
-nodes alone does not establish correctness. The regression now requires a whole-vector
-relative infinity error below \num{1e-6} at two step sizes on a perturbed state. This
-check uses velocity directions without Rhie--Chow coupling; it does not validate the
-full coupled pressure--velocity action. Residual agreement between layouts also does
-not establish agreement of their selected linearizations at a switch.
+nodes alone does not establish correctness. The regressions require a relative infinity
+error below \num{1e-6} at two prescribed step sizes on perturbed states. The first
+checks velocity directions without Rhie--Chow coupling. A separate coupled check
+perturbs all four unknowns, rebuilds the state reconstructions, and checks each
+momentum and continuity equation separately. It also requires controls omitting the
+pressure-gradient sensitivity or the coefficient's velocity sensitivity to fail.
+These checks cover the tested steady, affine interior operators; they do not establish
+nonlinear convergence or boundary and transient consistency. Residual agreement
+between layouts also does not establish agreement of their selected linearizations
+at a switch.
 
 \subsection{Against the lagged matrix}
 \label{sec:res:spmv}

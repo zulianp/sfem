@@ -29,6 +29,8 @@ static void pack_residual(const MeshData &d, std::vector<scalar_t> &r) {
     }
 }
 
+#include "tests/verification/cvfem_coupled_jacobian_fd.hpp"
+
 static void bsr4_spmv(const BSR4 &b, const ptrdiff_t nnodes, const scalar_t *const x, scalar_t *const y) {
     std::fill(y, y + nnodes * 4, scalar_t(0));
 
@@ -514,6 +516,7 @@ int main(int argc, char **argv) {
     // holds and what this driver computed before the exact form existed.
     int         lagged_ho    = 0;
     int         verify_ho_jac = 0;
+    int         verify_coupled_jac = 0;
     // The nodal gradient reconstruction as an operation in its own right, at nf fields: 1 is the
     // pressure gradient every Rhie-Chow residual builds, 3 the velocity gradient the exact
     // higher-order Jacobian action rebuilds on every matvec. It has only ever been timed from
@@ -607,6 +610,9 @@ int main(int argc, char **argv) {
                 std::fprintf(stderr, "--nodal-grad takes 1 (pressure) or 3 (velocity)\n");
                 return 2;
             }
+        } else if (arg == "--verify-jac-coupled") {
+            verify_coupled_jac = 1;
+            jac_action = 1;
         } else if (arg == "--verify-jac-ho") {
             verify_ho_jac = 1;
         } else if (arg == "--venkat-k") {
@@ -747,6 +753,8 @@ int main(int argc, char **argv) {
                     "                   like-for-like partner for --bsr-apply once --conv-ho is\n"
                     "                   on, and it is what this driver computed before the exact\n"
                     "                   form existed. Had no help entry at all until now.\n"
+                    "  --verify-jac-coupled  standalone FP64 full (u,p) derivative check; requires\n"
+                    "                 packed affine geometry, steady RC and double gradients.\n"
                     "  --rhie-chow [S]  include the Rhie-Chow pressure-velocity coupling at scale\n"
                     "                 S (default 1), and the nodal pressure gradient it needs.\n"
                     "                 sumfact only -- the hand-written and generated kernels carry\n"
@@ -817,12 +825,23 @@ int main(int argc, char **argv) {
     // correct float operator produces. What holds the f32 build is the cross-precision gate:
     // both builds --dump the same operator, and the f32 output is compared with the f64 one and
     // the f32 layouts with each other, at bounds stated for single precision.
-    if (sizeof(scalar_t) != sizeof(double) && (verify || verify_jac || verify_ho || verify_ho_jac)) {
+    if (sizeof(scalar_t) != sizeof(double) && (verify || verify_jac || verify_ho || verify_ho_jac || verify_coupled_jac)) {
         std::fprintf(stderr,
                      "the --verify oracles are double-precision checks; this build computes in %zu-byte "
                      "scalars. Use src/tests/verification/cvfem_bench_f32.sh, which holds this build "
                      "to the double one through --dump.\n",
                      sizeof(scalar_t));
+        return 2;
+    }
+
+    if (verify_coupled_jac && (layout != "packed" || geom != "affine" || !rhie_chow ||
+        boundary || dt != scalar_t(0) || grad_single || lagged_rc || lagged_ho ||
+        partial_assembly || assemble || bsr_apply || nodal_grad || verify || verify_jac ||
+        verify_ho || verify_ho_jac || !(rho > scalar_t(0)) || !(mu > scalar_t(0)) ||
+        !(rc_scale > scalar_t(0)) || !std::isfinite(rho) || !std::isfinite(mu) || !std::isfinite(rc_scale))) {
+        std::fprintf(stderr, "--verify-jac-coupled requires a standalone packed affine steady RC action "
+                             "with positive finite rho, mu and RC scale and double gradients\n");
+        if (own_mpi) MPI_Finalize();
         return 2;
     }
 
@@ -1378,6 +1397,12 @@ int main(int argc, char **argv) {
         bench_nodal_grad(d, packed, geom_kind, d.p.data(), 1, d.pgx, d.pgy, d.pgz);
         std::printf("rhie_chow: scale %g, nodal gradient %s\n", (double)rc_scale,
                     pgrad_per_apply ? "rebuilt per apply" : "hoisted out of the timed loop");
+    }
+
+    if (verify_coupled_jac) {
+        const int result = verify_coupled_jacobian_fd(d, packed, rho, mu, conv_ho, conv_limiter, venkat_c);
+        if (own_mpi) MPI_Finalize();
+        return result;
     }
 
     // Built here, once, for the same reason the nodal gradient is: it is a function of the
