@@ -22,8 +22,7 @@ endif()
 find_package(ryml CONFIG REQUIRED)
 find_package(matrixio CONFIG REQUIRED)
 find_package(smesh CONFIG REQUIRED)
-find_package(SCCD CONFIG REQUIRED)
-find_package(ssdf CONFIG REQUIRED)
+# SFEM resolves its optional collision dependencies when they are enabled in the install.
 find_package(SFEM CONFIG REQUIRED)
 
 # Header-only CUDA Thrust is sometimes exported by SFEM as -lThrust.
@@ -391,6 +390,12 @@ add_test(NAME cvfem_tet4_bench_verify
 add_test(NAME cvfem_bench_staging
          COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_bench_staging.sh
                  $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)
+add_test(NAME cvfem_jacobian_cache
+         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_jacobian_cache.sh
+                 $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)
+add_test(NAME cvfem_jacobian_cache_f32
+         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_jacobian_cache.sh
+                 $<TARGET_FILE:cvfem_hex8_ns_upwind_bench_f32>)
 # The script asserts that every quarantined configuration is REFUSED, which is true of the
 # default build and false of this one -- the flag exists to make them reachable. So it is told
 # which build it is in rather than inferring it.

@@ -788,7 +788,7 @@ $\Fres(u)$ is the residual with first-order upwinding and $\Fho(u)$ the residual
 deferred correction. Both carry the Rhie--Chow coupling and so read $\Gop p(u)$; $\Fho$ reads
 $\Gop u(u)$ as well.
 
-Three Jacobian actions are measured, each either fully exact or fully lagged. $\Jex(u)\,v$ is
+Three Jacobian actions are measured. $\Jex(u)\,v$ is
 the exact Jacobian of $\Fres$: it differentiates the coupling through the reconstruction and so
 rebuilds $\Gop p(v)$ on every application. $\Jhoex(u)\,v$ is the exact Jacobian of $\Fho$, adding
 the differentiated correction and the derivative of the limiter, and rebuilding $\Gop u(v)$ with
@@ -799,15 +799,24 @@ sensitivity, and rebuilds nothing.
 $\Jlag$ is what that implicit treatment gives: the correction is an explicit source, so it
 contributes nothing to the operator, which is why a single matrix serves every scheme and why
 $\Jlag$ is one operator rather than one per scheme. The price is that it is an
-inconsistent linearisation of $\Fho$: against a finite difference of $\Fho$, $\Jhoex$ agrees to
-\hoxFdUnlim{} where $\Jlag$ is wrong by \num{6e-2} (\S\ref{sec:res:hoexact}), so $\Jhoex$ is what
-a solve must apply to converge on the higher-order residual. Between them sits a partially
+approximate linearisation of $\Fho$: for the unlimited correction, $\Jhoex$ agrees with a
+finite difference to \hoxFdUnlim{} where $\Jlag$ differs by \num{6e-2}
+(\S\ref{sec:res:hoexact}). An approximate Jacobian can still converge to a root of $\Fho$;
+these action checks do not establish nonlinear convergence. Between them sits a partially
 implicit treatment: the correction's derivative splits into the mass-flux sensitivity times the
 increment at $\Gop u(u)$, which needs no direction reconstruction, and the increment's own
 derivative at $\Gop u(v)$, which does, and keeping only the first is neither form measured here.
 
-The mixed combinations --- one sensitivity differentiated and the other lagged --- are the exact
-Jacobian of no residual, and are not measured.
+With the higher-order correction treated as an explicit source, $\Jex$ is also the
+correction-lagged, RC-exact action. It is an approximate derivative of $\Fho$, and an exact
+derivative of the surrogate residual with that source held fixed.
+
+Caching a reconstruction at the current state is distinct from dropping its sensitivity.
+For $F(u)=\mathcal{R}(u,g(u))$, differentiation gives
+$F'(u)v=\mathcal{R}_u v+\mathcal{R}_g g'(u)v$ wherever the derivatives exist.
+During a Krylov solve, $u$ is fixed: $g(u)$ can be reused while $g'(u)v$ is evaluated for
+each direction. Both terms are retained in the exact action. The state cache must be
+refreshed when the state or geometry changes.
 
 The assembled matrix holds $\Jlag$ alone, for the sparsity reason of
 \S\ref{sec:cost}. Algorithm~\ref{alg:jacaction} is where the forms part, and the driver
@@ -822,7 +831,7 @@ records which one ran.
 \Ensure $\Jex(u)\,v$, or $\Jhoex(u)\,v$ when the correction is carried; $\Jlag(u)\,v$ when lagged
 \If{exact}
   \State $q, g_v \gets \Gop p(v)$, and $\Gop u(v)$ if the correction is carried
-         \Comment{\emph{one} sweep of Algorithm~\ref{alg:apply}: $3$ fields, or $4$ at the same
+         \Comment{\emph{one} sweep of Algorithm~\ref{alg:apply}: $1$ scalar field, or $4$ at the same
                   stride}
 \Else
   \State $q, g_v \gets \varnothing$
@@ -838,11 +847,10 @@ records which one ran.
          limiter's included --- at $g_v$
 \EndIf
 \State add the boundary closure and the transient term, each an extra sweep
-\Statex The exact forms cost one reconstruction of the \emph{direction} per operator application,
-        and that is the whole of what they cost: $\Gop p(u)$ and $\Gop u(u)$ are hoisted across
+\Statex The exact forms require one reconstruction of the \emph{direction} per operator application:
+        $\Gop p(u)$ and $\Gop u(u)$ are hoisted across
         the Krylov solve because $u$ is fixed there, while $\Gop p(v)$ and $\Gop u(v)$ change
-        every iteration and cannot be. \S\ref{sec:res:hoexact} measures what the second pair
-        buys.
+        every iteration and cannot be cached across different directions.
 \end{algorithmic}
 \end{algorithm}
 
@@ -852,8 +860,8 @@ must be \emph{complete} before any flux may use it. That is a data dependency, s
 reconstruction cannot fuse into the flux sweep: it is a separate pass ending in its own ghost
 reduction. A state reconstruction is hoisted --- computed once per Newton step and reused across
 the Krylov solve, since $u$ is fixed there --- and a direction reconstruction cannot be, because
-the direction changes every iteration. That is the whole of the difference between $\Jlag$ and
-$\Jex$ in Table~\ref{tab:passes}.
+the direction changes every iteration. This adds one reconstruction pass to $\Jex$ relative to
+$\Jlag$ in Table~\ref{tab:passes}, as well as derivative arithmetic in the flux kernel.
 
 \begin{figure}[t]
   \centering
@@ -869,8 +877,8 @@ $\Jex$ in Table~\ref{tab:passes}.
     below are counted in units of it, and its count is per sweep whatever number of fields it
     carries. The last column is what the operator reads but does not rebuild: a state
     reconstruction, computed once per Newton step and read by every application in that step, or
-    the assembly. Both are measured on their own (\S\ref{sec:res:hoexact},
-    \S\ref{sec:res:spmv}).}
+    the assembly. Residual rows describe the flux sweep with reconstruction supplied;
+    evaluating the residual at a new or trial state also requires refreshing those fields.}
   \label{tab:passes}
   \small
   \begin{tabular}{@{}lccl@{}}
@@ -883,29 +891,27 @@ $\Jex$ in Table~\ref{tab:passes}.
     $\Fres(u)$                        & 1 & 1 & $\Gop p(u)$ \\
     $\Fho(u)$                         & 1 & 1 & $\Gop p(u)$, $\Gop u(u)$ \\
     $\Jlag(u)\,v$                     & 1 & 1 & $\Gop p(u)$ \\
-    $\Jex(u)\,v$                      & 2 & 2 & --- \\
-    $\Jhoex(u)\,v$                    & 2 & 2 & --- \\
+    $\Jex(u)\,v$                      & 2 & 2 & $\Gop p(u)$ \\
+    $\Jhoex(u)\,v$                    & 2 & 2 & $\Gop p(u)$, $\Gop u(u)$ \\
     SpMV with $\Jlag$                 & 0 & 0 & assembly \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-Table~\ref{tab:passes} collects the counts. The exact actions hoist \emph{nothing}, and that is
-what makes them exact applications rather than exact sensitivities evaluated at frozen fields: an
-operator that reads a reconstruction evaluates it. $\Jex$ rebuilds $\Gop p(v)$ and $\Gop p(u)$,
-$\Jhoex$ rebuilds those two and $\Gop u(v)$, $\Gop u(u)$ as well, and each is one sweep rather
-than two or four because the sweep takes a base pointer and a stride per field: the direction's
-interleaved fields and the state's contiguous ones go in together, two fields on $\Jex$ and eight
-on $\Jhoex$. $\Jlag$ is the form that keeps the cache, which is what lagging means, so it reads
-$\Gop p(u)$ without rebuilding it. $\Fho$ likewise stays at one sweep because its correction is
-lagged, which moves $\Gop u(u)$ into the last column rather than making it disappear. The
-assembled matrix performs no element sweep per application but pays a full assembly --- the most
-expensive sweep here --- once per Newton step, and thereafter streams a matrix two orders of
-magnitude larger than the mesh.
+Table~\ref{tab:passes} describes the cached-state implementation. Each exact action has one
+reconstruction sweep: one scalar input field for $\Jex$, or four for $\Jhoex$. The latter
+fuses the direction's pressure and three velocity components. $\Jlag$ omits the direction
+reconstruction because it drops that sensitivity, not because it caches the state.
+The assembled matrix performs no element sweep per application but pays for assembly once
+per Newton step.
 
-That the reconstruction is one sweep is what makes the exact forms affordable, and it is most of
-what they cost: \S\ref{sec:res:hoexact} measures it at \SI{\hoxFracPacked}{\percent} of the
-packed $\Jhoex$ and \SI{\hoxFracAtomic}{\percent} of the atomic one.
+The exact-action timings currently reported in the results were obtained with the
+earlier implementation, which also rebuilt the state gradients inside each application:
+two scalar input fields for $\Jex$ and eight for $\Jhoex$, fused in one sweep. The benchmark
+retains this scope through \texttt{--rebuild-state-gradients}; its default now caches the
+state reconstruction. Both modes retain the same derivatives. The existing measurements
+must therefore be read as rates for the rebuild mode, not as measurements of the cached
+implementation. A performance comparison requires new runs with the mode recorded.
 
 The driver times that sweep separately, so its share of the application appears beside the
 element kernel's rather than folded into it.
@@ -1234,10 +1240,12 @@ cancellation, so a term can be present at every node and absent from the total. 
 \subsection{$\Jhoex$, the exact higher-order Jacobian action}
 \label{sec:res:hoexact}
 
-With the correction left an explicit source, the action of $\Fho$ is $\Jex$ (\S\ref{sec:setup}).
-$\Jhoex$ instead costs one reconstruction $\Gop u(v)$ per operator
-application --- nine components against the three $\Gop p(v)$ that $\Jex$ already rebuilds ---
-and the limiter's own derivative, which is not free: the unlimited arm reaches
+With the correction left an explicit source, $\Jex$ approximates the derivative of $\Fho$
+(\S\ref{sec:setup}). $\Jhoex$ also reconstructs $\Gop u(v)$ and differentiates the limiter.
+The measurements in this section use the rebuild mode: their fused sweep includes both
+state and direction gradients, eight scalar input fields for $\Jhoex$ against two for
+$\Jex$. Thus the measured cost includes redundant state reconstruction as well as the
+additional sensitivities. In this mode, the unlimited arm reaches
 \hoxExactPackedUnlim{}~MDOF/s against Venkatakrishnan's \hoxExactPacked{}, a factor of
 $\hoxLimiterCost$.
 
@@ -1266,16 +1274,12 @@ the pressure gradient at \ngPgradPacked{} against \ngPgradAtomic{}~MDOF/s, a fac
 $\ngPgradRatio$, and the three-component velocity gradient at \ngUgradPacked{} against
 \ngUgradAtomic{}, a factor of $\ngUgradRatio$ --- both far above the
 \hoxLayoutLagged$\times$ the element sweeps get. Almost all of a reconstruction is indexed
-traffic, which the layout removes, and almost none is arithmetic, which it cannot touch. It is
-also where $\Jhoex$ spends its time: the reconstruction is \SI{\hoxFracPacked}{\percent}
-of the packed application against \SI{\hoxFracAtomic}{\percent} of the standard one --- on the
-standard layout it is almost the whole operator. All four gradients are taken in ONE sweep --- they read different fields of the same array at the same
-stride, so together they are a four-field sweep rather than a one-field and a three-field one ---
-which is why those shares cover all four and why they differ so much between the layouts: the
-fixed half of a sweep that fusing saves is \SI{46}{\percent} of a one-field sweep packed and
-\SI{4}{\percent} atomic, the atomic one being dominated by a scatter that scales with the field
-count. That is also why the atomic $\Jhoex$ is so nearly all reconstruction: its sweep pays the
-field count where the packed one does not.
+traffic, with relatively little arithmetic. The standalone one- and three-field sweeps
+do not measure the same work as the fused eight-field reconstruction in the recorded
+$\Jhoex$ runs. Their throughput should not be used to infer its share of the action.
+The recorded phase fractions also included warmup time in the reconstruction counter
+but excluded it from total application time. The benchmark now resets both counters
+before measurement; corrected phase fractions require new runs.
 
 $\Jhoex$ is the derivative it claims to be: against a finite difference of $\Fho$ with $\Gop u$
 rebuilt at each perturbed state it agrees to \hoxFdUnlim{} on the unlimited arm, where the

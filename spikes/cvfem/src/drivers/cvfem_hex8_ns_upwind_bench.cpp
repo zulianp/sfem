@@ -347,6 +347,7 @@ struct CsvRow {
     // matvec that caps the problem size per node is the trade full assembly already loses,
     // so the price belongs beside the rate.
     double      pa_bytes_per_dof;
+    const char *state_gradients;
     const double *phase;  // PH_N entries, thread-summed ms per call, or nullptr
 };
 
@@ -365,7 +366,7 @@ static void csv_write(const std::string &path, const CsvRow &r) {
             "n_colors,packs_per_color_min,packs_per_color_max,checksum,"
             "rhie_chow,rhie_chow_scale,boundary,"
             "ran_kernel,ran_rc,ran_boundary,exact_rc,pgrad_per_apply,live_vectors,"
-            "upwind_eps,transient,s_qgrad,frac_qgrad,pa_bytes_per_dof";
+            "upwind_eps,transient,s_qgrad,frac_qgrad,pa_bytes_per_dof,jac_state_gradients";
     for (int i = 0; i < PH_N; ++i) header += std::string(",ms_") + g_phase_name[i];
 
     bool need_header = true;
@@ -415,7 +416,7 @@ static void csv_write(const std::string &path, const CsvRow &r) {
         std::fprintf(f, ",%.9e,%.6f", r.qgrad_seconds, r.qgrad_frac);
     else
         std::fprintf(f, ",,");
-    std::fprintf(f, ",%.3f", r.pa_bytes_per_dof);
+    std::fprintf(f, ",%.3f,%s", r.pa_bytes_per_dof, r.state_gradients);
     for (int i = 0; i < PH_N; ++i) {
         if (r.phase)
             std::fprintf(f, ",%.6f", 1000.0 * r.phase[i] / double(r.repeat));
@@ -536,6 +537,7 @@ int main(int argc, char **argv) {
     // the timed loop. This is the difference SFEM_PGRAD_CACHE makes in the solver, and it
     // is the other half of the cascade: the gradient is a full element sweep.
     int         pgrad_per_apply = 0;
+    int         rebuild_state_gradients = 0;
     int         live_vectors    = 0;
     // Steady by default -- dt <= 0 means no transient term, which is what every recorded
     // baseline was measured with.
@@ -628,6 +630,8 @@ int main(int argc, char **argv) {
             boundary = 1;
         else if (arg == "--pgrad-per-apply")
             pgrad_per_apply = 1;
+        else if (arg == "--rebuild-state-gradients")
+            rebuild_state_gradients = 1;
         else if (arg == "--qgrad-atomic")
             g_qgrad_atomic = 1;
         else if (arg == "--qgrad-packed")
@@ -765,6 +769,10 @@ int main(int argc, char **argv) {
                     "                 instead of over packs. Same operator; the packed one has no\n"
                     "                 atomics and is deterministic. Here to measure the difference,\n"
                     "                 not as a mode to run in.\n"
+                    "  --rebuild-state-gradients  rebuild fixed-state gradients inside each\n"
+                    "                 Jacobian action, reproducing the original timing scope.\n"
+                    "                 By default they are cached; direction gradients are always\n"
+                    "                 rebuilt. Requires an action with an exact RC or HO term.\n"
                     "  --transient DT   make the operator unsteady with timestep DT: the BDF mass\n"
                     "                 term rho V a0 / dt on the velocity diagonal, applied as a\n"
                     "                 per-node post-pass because in a control-volume scheme the mass\n"
@@ -782,13 +790,8 @@ int main(int argc, char **argv) {
                     "                     every time. BiCGStab holds about 7, which is what makes N=7\n"
                     "                     the interesting value. Only the apply is timed -- the churn\n"
                     "                     runs between applies, outside the clock.\n"
-                    "  --pgrad-per-apply  rebuild the nodal pressure gradient inside every apply\n"
-                    "                     (--jac-action always rebuilds the DIRECTION's gradient,\n"
-                    "                      which cannot be hoisted, and reports it separately)\n"
-                    "                 instead of hoisting it out of the timed loop. The gradient is\n"
-                    "                 a full element sweep, about 39%% of an apply, and hoisting it\n"
-                    "                 across a Krylov solve is worth 1.26x off the whole linear\n"
-                    "                 solve -- so which of the two is measured has to be said.\n"
+                    "  --pgrad-per-apply  rebuild the state pressure gradient inside each residual\n"
+                    "                 evaluation. For Jacobian actions use --rebuild-state-gradients.\n"
                     "                 Requires --rhie-chow.\n"
                     "  --boundary     close the boundary control volumes with the boundary\n"
                     "                 sub-control-surface terms. Off by default; the benchmark\n"
@@ -884,6 +887,18 @@ int main(int argc, char **argv) {
         std::fprintf(stderr, "--pgrad-per-apply is meaningless without --rhie-chow\n");
         if (own_mpi) MPI_Finalize();
         return 1;
+    }
+    if (pgrad_per_apply && jac_action) {
+        std::fprintf(stderr, "use --rebuild-state-gradients for Jacobian actions, not --pgrad-per-apply\n");
+        if (own_mpi) MPI_Finalize();
+        return 2;
+    }
+    if (rebuild_state_gradients &&
+        (!jac_action || assemble || assemble_diag || bsr_apply || nodal_grad ||
+         (!(rhie_chow && !lagged_rc) && !(conv_ho && !lagged_ho)))) {
+        std::fprintf(stderr, "--rebuild-state-gradients requires --jac-action with an exact RC or HO term\n");
+        if (own_mpi) MPI_Finalize();
+        return 2;
     }
     // THE ONE MIXED FORM THAT IS THE JACOBIAN OF NO RESIDUAL.
     //
@@ -1807,13 +1822,8 @@ int main(int argc, char **argv) {
         // anything, so it goes with the sweep.
     }
 
-    // The boundary closure is one extra element sweep after the layout's own, which is
-    // how the solver arranges it too -- see apply_boundary_scs_residual_pass. Doing it
-    // Nodal velocity gradient for the deferred correction: nine interleaved components per
-    // node. Hoisted, because the solver lags the correction one Newton step -- so what the
-    // timed apply measures is the higher-order FLUX, not the reconstruction that feeds it,
-    // exactly as the Rhie-Chow state gradient is hoisted by default. The same fused
-    // multi-field sweep the solver uses, so this is not a second code path.
+    // The state is fixed throughout this benchmark. Cache its velocity reconstruction;
+    // an exact Jacobian still reconstructs the direction on every application below.
     std::vector<scalar_t> ugrad;
     std::vector<float>    ugrad32;  // the same field under --grad-precision single
     if (conv_ho) {
@@ -2087,34 +2097,12 @@ int main(int argc, char **argv) {
     std::vector<float>    vgrad32;  // the direction's field under --grad-precision single
     std::vector<float>    qp32;     // float scratch for the pressure gradients of the fused sweep
     double                hograd_seconds = 0;
-    auto jac_action_fn = [&]() {
-        // A Krylov iteration never sees the same direction twice, so neither does this when
-        // the live set exists: the rotation is what stops the direction being resident.
-        const scalar_t *const dir_v = live.empty() ? jac_dir.data() : live[(size_t)(live_k++ % (long)live.size())].data();
-        last_dir                    = dir_v;
-        // BOTH DIRECTION GRADIENTS IN ONE SWEEP when both are wanted. They read different fields
-        // of the SAME array at the same stride -- the direction's three velocity components and
-        // its pressure -- so together they are one four-field sweep instead of a one-field and a
-        // three-field one, and the half of a sweep that does not scale with the field count is
-        // paid once. Each keeps the layout its consumer reads, which is what the per-component
-        // output stride is for. The whole cost lands in the qgrad phase, since it is one pass.
-        // THE EXACT ACTION RECONSTRUCTS THE STATE'S GRADIENTS TOO, ON EVERY APPLICATION.
-        //
-        // It used to rebuild only the direction's and read the state's from a cache filled once
-        // at setup, which makes the operator exact in its sensitivities and frozen in the fields
-        // those sensitivities are evaluated at -- and makes the measured rate exclude two full
-        // element sweeps the operator needs. An exact application is self-contained: it
-        // evaluates every reconstruction it reads. The frozen-state form is the LAGGED one, and
-        // it keeps the cache.
-        //
-        // All of it is ONE sweep, which is the only reason this is affordable. The sweep takes a
-        // base pointer and a stride per field, so the direction's four interleaved fields and
-        // the state's four contiguous ones go in together: eight fields on the higher-order arm,
-        // two on the first-order one. Outputs run three per field in field order, which is what
-        // fixes the index arithmetic below.
+    // Caching G(u) at a fixed u retains G(v) and every derivative in the element kernel.
+    // Refresh the cache when the state or geometry changes, before another Krylov solve.
+    auto reconstruct_jac_gradients = [&](const scalar_t *dir_v, const bool rebuild_state) {
         const int iso_ng = geom_kind == GeomKind::Isoparam ? 1 : 0;
         if (with_qgrad && with_hograd) {
-            const double    t0      = wall_time();
+            const int nf = rebuild_state ? 8 : 4;
             const scalar_t *srcs[8] = {dir_v + 0,     dir_v + 1,     dir_v + 2,     dir_v + 3,
                                        d.ux.data(),   d.uy.data(),   d.uz.data(),   d.p.data()};
             const int       st[8]   = {N_FIELDS, N_FIELDS, N_FIELDS, N_FIELDS, 1, 1, 1, 1};
@@ -2127,9 +2115,7 @@ int main(int argc, char **argv) {
             d.pgy.resize((size_t)d.nnodes);
             d.pgz.resize((size_t)d.nnodes);
             if (grad_single) {
-                // One output type per sweep, so the six pressure-gradient components go through
-                // a float scratch and are widened back into the double arrays their consumers
-                // read -- a nodal pass over six values, against the eight-field sweep it rides on.
+                // Preserve the fused sweep's pressure-gradient rounding in both modes.
                 vgrad32.resize((size_t)d.nnodes * 9);
                 ugrad32.resize((size_t)d.nnodes * 9);
                 qp32.resize((size_t)d.nnodes * 6);
@@ -2140,17 +2126,19 @@ int main(int argc, char **argv) {
                 for (int c = 0; c < 9; ++c) { outp[12 + c] = ugrad32.data() + c; ostr[12 + c] = 9; }
                 for (int c = 0; c < 3; ++c) { outp[21 + c] = qp32.data() + 3 + c; ostr[21 + c] = 6; }
                 if (packed.n_packs > 0 && !g_qgrad_atomic)
-                    cvfem_hex8_assemble_nodal_grads_packed(d, packed, iso_ng, srcs, st, 8, outp, ostr, vgbuf);
+                    cvfem_hex8_assemble_nodal_grads_packed(d, packed, iso_ng, srcs, st, nf, outp, ostr, vgbuf);
                 else
-                    cvfem_hex8_assemble_nodal_grads_atomic(d, iso_ng, srcs, st, 8, outp, ostr);
+                    cvfem_hex8_assemble_nodal_grads_atomic(d, iso_ng, srcs, st, nf, outp, ostr);
 #pragma omp parallel for schedule(static)
                 for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
                     d.qgx[(size_t)i] = scalar_t(qp32[(size_t)i * 6 + 0]);
                     d.qgy[(size_t)i] = scalar_t(qp32[(size_t)i * 6 + 1]);
                     d.qgz[(size_t)i] = scalar_t(qp32[(size_t)i * 6 + 2]);
-                    d.pgx[(size_t)i] = scalar_t(qp32[(size_t)i * 6 + 3]);
-                    d.pgy[(size_t)i] = scalar_t(qp32[(size_t)i * 6 + 4]);
-                    d.pgz[(size_t)i] = scalar_t(qp32[(size_t)i * 6 + 5]);
+                    if (rebuild_state) {
+                        d.pgx[(size_t)i] = scalar_t(qp32[(size_t)i * 6 + 3]);
+                        d.pgy[(size_t)i] = scalar_t(qp32[(size_t)i * 6 + 4]);
+                        d.pgz[(size_t)i] = scalar_t(qp32[(size_t)i * 6 + 5]);
+                    }
                 }
             } else {
                 scalar_t *outp[24];
@@ -2164,21 +2152,12 @@ int main(int argc, char **argv) {
                 outp[22] = d.pgy.data(); ostr[22] = 1;
                 outp[23] = d.pgz.data(); ostr[23] = 1;
                 if (packed.n_packs > 0 && !g_qgrad_atomic)
-                    cvfem_hex8_assemble_nodal_grads_packed(d, packed, iso_ng, srcs, st, 8, outp, ostr, vgbuf);
+                    cvfem_hex8_assemble_nodal_grads_packed(d, packed, iso_ng, srcs, st, nf, outp, ostr, vgbuf);
                 else
-                    cvfem_hex8_assemble_nodal_grads_atomic(d, iso_ng, srcs, st, 8, outp, ostr);
+                    cvfem_hex8_assemble_nodal_grads_atomic(d, iso_ng, srcs, st, nf, outp, ostr);
             }
-            // Charged ONCE, to the higher-order account, because it is one pass. Adding it to
-            // both would make the two fractions sum past the application they are fractions of.
-            // What frac_jac_action_hograd then reports on a fused arm is the whole
-            // reconstruction -- all four gradients -- which is the quantity section 7.8 wants.
-            const double dt = wall_time() - t0;
-            hograd_seconds += dt;
-            if (g_breakdown) g_phase[PH_QGRAD] += dt;
         } else if (with_qgrad) {
-            // First-order exact: the coupling's sensitivity needs the direction's pressure
-            // gradient, and the coupling itself the state's. Two fields, one sweep.
-            const double    t0      = wall_time();
+            const int nf = rebuild_state ? 2 : 1;
             const scalar_t *srcs[2] = {dir_v + 3, d.p.data()};
             const int       st[2]   = {N_FIELDS, 1};
             d.qgx.resize((size_t)d.nnodes);
@@ -2191,28 +2170,12 @@ int main(int argc, char **argv) {
                                  d.pgx.data(), d.pgy.data(), d.pgz.data()};
             ptrdiff_t ostr[6] = {1, 1, 1, 1, 1, 1};
             if (packed.n_packs > 0 && !g_qgrad_atomic)
-                cvfem_hex8_assemble_nodal_grads_packed(d, packed, iso_ng, srcs, st, 2, outp, ostr, vgbuf);
+                cvfem_hex8_assemble_nodal_grads_packed(d, packed, iso_ng, srcs, st, nf, outp, ostr, vgbuf);
             else
-                cvfem_hex8_assemble_nodal_grads_atomic(d, iso_ng, srcs, st, 2, outp, ostr);
-            const double dt_qg = wall_time() - t0;
-            qgrad_seconds += dt_qg;
-            // Also into the phase table, so the pass that dominates this application appears
-            // beside the phases of the sweep it precedes rather than only in a stdout line.
-            if (g_breakdown) g_phase[PH_QGRAD] += dt_qg;
+                cvfem_hex8_assemble_nodal_grads_atomic(d, iso_ng, srcs, st, nf, outp, ostr);
         }
         if (with_hograd && !with_qgrad) {
-            // The direction's nodal velocity gradient, reconstructed from scratch on every
-            // matvec because the direction changes every Krylov iteration. This is the pass the
-            // lagged action does not run, and it is what the exact form costs.
-            //
-            // Read in place: the direction arrives interleaved by node, and the sweep takes a
-            // base pointer and a stride per field, so its three velocity components are three
-            // views of the same array. This used to de-interleave them into scratch first --
-            // three full-length copies inside the timed region on every matvec.
-            // The state's velocity gradient goes in with it, for the reason above: six fields,
-            // one sweep. The Rhie--Chow term is lagged on this arm, so its state pressure
-            // gradient stays cached -- that is what lagging it means.
-            const double    t0       = wall_time();
+            const int nf = rebuild_state ? 6 : 3;
             const scalar_t *vsrcs[6] = {dir_v + 0,   dir_v + 1,   dir_v + 2,
                                         d.ux.data(), d.uy.data(), d.uz.data()};
             const int       vst[6]   = {N_FIELDS, N_FIELDS, N_FIELDS, 1, 1, 1};
@@ -2224,9 +2187,9 @@ int main(int argc, char **argv) {
                 for (int c = 0; c < 9; ++c) { outp[c] = vgrad32.data() + c; ostr[c] = 9; }
                 for (int c = 0; c < 9; ++c) { outp[9 + c] = ugrad32.data() + c; ostr[9 + c] = 9; }
                 if (packed.n_packs > 0 && !g_qgrad_atomic)
-                    cvfem_hex8_assemble_nodal_grads_packed(d, packed, iso_ng, vsrcs, vst, 6, outp, ostr, vgbuf);
+                    cvfem_hex8_assemble_nodal_grads_packed(d, packed, iso_ng, vsrcs, vst, nf, outp, ostr, vgbuf);
                 else
-                    cvfem_hex8_assemble_nodal_grads_atomic(d, iso_ng, vsrcs, vst, 6, outp, ostr);
+                    cvfem_hex8_assemble_nodal_grads_atomic(d, iso_ng, vsrcs, vst, nf, outp, ostr);
             } else {
                 vgrad.resize((size_t)d.nnodes * 9);
                 ugrad.resize((size_t)d.nnodes * 9);
@@ -2235,11 +2198,28 @@ int main(int argc, char **argv) {
                 for (int c = 0; c < 9; ++c) { outp[c] = vgrad.data() + c; ostr[c] = 9; }
                 for (int c = 0; c < 9; ++c) { outp[9 + c] = ugrad.data() + c; ostr[9 + c] = 9; }
                 if (packed.n_packs > 0 && !g_qgrad_atomic)
-                    cvfem_hex8_assemble_nodal_grads_packed(d, packed, iso_ng, vsrcs, vst, 6, outp, ostr, vgbuf);
+                    cvfem_hex8_assemble_nodal_grads_packed(d, packed, iso_ng, vsrcs, vst, nf, outp, ostr, vgbuf);
                 else
-                    cvfem_hex8_assemble_nodal_grads_atomic(d, iso_ng, vsrcs, vst, 6, outp, ostr);
+                    cvfem_hex8_assemble_nodal_grads_atomic(d, iso_ng, vsrcs, vst, nf, outp, ostr);
             }
-            hograd_seconds += wall_time() - t0;
+        }
+    };
+    if (!rebuild_state_gradients && (with_qgrad || with_hograd))
+        reconstruct_jac_gradients(jac_dir.data(), true);
+
+    const char *state_gradient_mode = jac_action && (rhie_chow || with_hograd)
+                                         ? (rebuild_state_gradients ? "per_apply" : "cached") : "n/a";
+    auto jac_action_fn = [&]() {
+        const scalar_t *const dir_v = live.empty() ? jac_dir.data() : live[(size_t)(live_k++ % (long)live.size())].data();
+        last_dir = dir_v;
+        if (with_qgrad || with_hograd) {
+            const double t0 = wall_time();
+            reconstruct_jac_gradients(dir_v, rebuild_state_gradients);
+            const double elapsed = wall_time() - t0;
+            // A fused pressure/velocity sweep is charged once, to the HO account.
+            if (with_hograd) hograd_seconds += elapsed;
+            else qgrad_seconds += elapsed;
+            if (g_breakdown) g_phase[PH_QGRAD] += elapsed;
         }
         // THE SAME LADDER FOR EITHER STORAGE OF THE GRADIENT FIELDS. The launchers deduce the
         // storage type from the pointers, so the choice is made once here and never inside a
@@ -2485,6 +2465,8 @@ int main(int argc, char **argv) {
     }
 
     phase_reset();
+    qgrad_seconds = 0;
+    hograd_seconds = 0;
     // With a live set the clock has to be stopped for the churn: what is being measured is
     // still the apply, only now with the caches in the state a Krylov iteration leaves them
     // in. Without one this is the same single interval it always was, so the default path's
@@ -2864,6 +2846,7 @@ int main(int argc, char **argv) {
         std::printf("  flops_per_element_assemble_model: %.1f\n", assemble_flops);
     }
     if (jac_action) {
+        std::printf("  state_gradients: %s\n", state_gradient_mode);
         std::printf("  seconds_per_jac_action: %.6e\n", seconds_per_call);
         std::printf("  MDOF/s_jac_action: %.3f\n", mdofs);
         std::printf("  MELEM/s_jac_action: %.3f\n", melems);
@@ -2987,6 +2970,7 @@ int main(int argc, char **argv) {
         row.upwind_eps      = 0.0;
         row.transient       = dt > scalar_t(0) ? 1 : 0;
         row.pa_bytes_per_dof = partial_assembly ? cvfem_hex8_pa_bytes_per_dof(d) : 0.0;
+        row.state_gradients = state_gradient_mode;
         row.qgrad_seconds   = with_qgrad ? qgrad_seconds / double(repeat) : -1.0;
         row.qgrad_frac      = with_qgrad ? qgrad_seconds / seconds : -1.0;
         row.phase                = g_breakdown ? g_phase : nullptr;
