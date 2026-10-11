@@ -1,0 +1,1616 @@
+diff --git a/spikes/cvfem/CMakeLists.txt b/spikes/cvfem/CMakeLists.txt
+index 3e4c6de..b6f4f30 100644
+--- a/spikes/cvfem/CMakeLists.txt
++++ b/spikes/cvfem/CMakeLists.txt
+@@ -22,8 +22,7 @@ endif()
+ find_package(ryml CONFIG REQUIRED)
+ find_package(matrixio CONFIG REQUIRED)
+ find_package(smesh CONFIG REQUIRED)
+-find_package(SCCD CONFIG REQUIRED)
+-find_package(ssdf CONFIG REQUIRED)
++# SFEM resolves its optional collision dependencies when they are enabled in the install.
+ find_package(SFEM CONFIG REQUIRED)
+ 
+ # Header-only CUDA Thrust is sometimes exported by SFEM as -lThrust.
+@@ -391,6 +390,24 @@ add_test(NAME cvfem_tet4_bench_verify
+ add_test(NAME cvfem_bench_staging
+          COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_bench_staging.sh
+                  $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)
++add_test(NAME cvfem_scatter_study
++         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_scatter_study.sh
++                 $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)
++add_test(NAME cvfem_kernel_only
++         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_kernel_only.sh
++                 $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)
++add_test(NAME cvfem_jacobian_coupled
++         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_jacobian_coupled.sh
++                 $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)
++add_test(NAME cvfem_jacobian_fd
++         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_jacobian_fd.sh
++                 $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)
++add_test(NAME cvfem_jacobian_cache
++         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_jacobian_cache.sh
++                 $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)
++add_test(NAME cvfem_jacobian_cache_f32
++         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_jacobian_cache.sh
++                 $<TARGET_FILE:cvfem_hex8_ns_upwind_bench_f32>)
+ # The script asserts that every quarantined configuration is REFUSED, which is true of the
+ # default build and false of this one -- the flag exists to make them reachable. So it is told
+ # which build it is in rather than inferring it.
+diff --git a/spikes/cvfem/jobs/ho_exact_jac.sbatch b/spikes/cvfem/jobs/ho_exact_jac.sbatch
+index ca9f150..8cc02f8 100644
+--- a/spikes/cvfem/jobs/ho_exact_jac.sbatch
++++ b/spikes/cvfem/jobs/ho_exact_jac.sbatch
+@@ -17,11 +17,11 @@
+ # action already rebuilds for the pressure.
+ #
+ # Both layouts, because the operator is the same one and a layout comparison that carried the term
+-# on one side only would report the term as a layout effect. Both arms verified against a finite
+-# difference of the higher-order residual first (--verify-jac-ho), so a throughput row cannot be
+-# reported for an operator that does not compute what it claims.
++# on one side only would report the term as a layout effect. The packed finite-difference gate
++# runs before timing. Its failure stops the campaign and its full output is retained; passing
++# it does not establish derivative equivalence at a nonsmooth donor or limiter switch.
+ 
+-set -uo pipefail
++set -euo pipefail
+ cd "$SLURM_SUBMIT_DIR" || exit 1
+ source scripts/alps_env.sh || exit 1
+ 
+@@ -69,10 +69,13 @@ echo "### the correction is Venkatakrishnan unless the label says otherwise"
+ echo
+ 
+ echo "### verification first -- a throughput row for an unverified operator is not a result"
+-for L in 0 1 2 3; do
+-    srun -u --ntasks=1 --cpus-per-task=72 --uenv="$CVFEM_UENV" --view="$CVFEM_VIEW" \
+-      bash -lc "cd $PWD && OMP_NUM_THREADS=72 $B --n 24 --repeat 1 --warmup 0 --layout packed --jac-action --conv-ho $L --verify-jac-ho" \
+-      2>&1 | sed -n 's/^verify_jac_ho: /  /p'
++# Small perturbed state; both steps must pass the whole-vector tolerance.
++for eps in 1e-7 1e-8; do
++    for L in 0 1 2 3; do
++        srun -u --ntasks=1 --cpus-per-task=72 --uenv="$CVFEM_UENV" --view="$CVFEM_VIEW" \
++          bash -lc "cd $PWD && OMP_NUM_THREADS=72 CVFEM_FD_EPS=$eps $B --n 8 --pack-size 64 --perturb 0.017 --repeat 1 --warmup 0 --layout packed --jac-action --conv-ho $L --verify-jac-ho" \
++          2>&1 | tee "$OUT/verify_limiter_${L}_eps_${eps}.log"
++    done
+ done
+ echo
+ 
+diff --git a/spikes/cvfem/jobs/kernel_mix.sbatch b/spikes/cvfem/jobs/kernel_mix.sbatch
+index a04d1cf..757f507 100644
+--- a/spikes/cvfem/jobs/kernel_mix.sbatch
++++ b/spikes/cvfem/jobs/kernel_mix.sbatch
+@@ -43,7 +43,7 @@
+ # keeping `cycles` and `instructions`, because those carry no slash. The trailing slash goes
+ # first.
+ 
+-set -uo pipefail
++set -euo pipefail
+ cd "$SLURM_SUBMIT_DIR" || exit 1
+ source scripts/alps_env.sh || exit 1
+ 
+@@ -71,43 +71,27 @@ for arm in "|" "_ho|--conv-ho 3"; do
+   extra=${arm#*|}
+   for lay in packed atomic; do
+     key="${lay}${suffix}"
+-    # The throughput, and the kernel-only figure the table reports beside it. BEST OF THREE for
+-    # each, measured as a pair: the ratio mdof_kernel_only/mdof is what the table turns into the
+-    # scatter's share, and a single run of either side can land 5-15% low on this node -- three
+-    # consecutive jobs each produced one kernel-only figure BELOW its own full sweep, which is
+-    # impossible and was noise. The best of three on each side is what the other arms here do.
+-    mdof=""; mdofk=""
++    # Keep the throughput convention used by the saved campaign.
++    mdof=""
+     for pass in $(seq 1 "${PASSES:-3}"); do
+-    out=$(srun -u --ntasks=1 --cpus-per-task=72 --uenv="$CVFEM_UENV" --view="$CVFEM_VIEW" \
+-            bash -lc "cd $PWD && OMP_NUM_THREADS=72 OMP_PROC_BIND=true OMP_PLACES=cores \
+-                      $B --n $N --repeat $REPEAT --warmup 3 --layout $lay \
+-                      $([ "$lay" = packed ] && echo "--pack-size $PACK") --rhie-chow $extra" 2>&1)
+-    v=$(printf '%s\n' "$out" | sed -n 's/^  MDOF\/s: \(.*\)$/\1/p' | head -1)
+-    [ -n "$v" ] && mdof=$(awk -v a="${mdof:-0}" -v b="$v" 'BEGIN{print (b+0>a+0)?b:a}')
+-
+-    # The same sweep with --kernel-only, which has the element kernel write to a dense stack
+-    # buffer and skip the scatter entirely. The table reports mdof/mdof_kernel_only as the share
+-    # of the sweep the scatter and its staging cost, so this must be a SEPARATE run rather than
+-    # a phase timing: deriving it from ms_element_kernel does not work, because the standard
+-    # layout does not report those phase fields at all and the ratio would be silently wrong for
+-    # one of the two columns.
+-    outk=$(srun -u --ntasks=1 --cpus-per-task=72 --uenv="$CVFEM_UENV" --view="$CVFEM_VIEW" \
+-             bash -lc "cd $PWD && OMP_NUM_THREADS=72 OMP_PROC_BIND=true OMP_PLACES=cores \
+-                       $B --n $N --repeat $REPEAT --warmup 3 --layout $lay \
+-                       $([ "$lay" = packed ] && echo "--pack-size $PACK") --rhie-chow $extra --kernel-only" 2>&1)
+-    vk=$(printf '%s\n' "$outk" | sed -n 's/^  MDOF\/s: \(.*\)$/\1/p' | head -1)
+-    [ -n "$vk" ] && mdofk=$(awk -v a="${mdofk:-0}" -v b="$vk" 'BEGIN{print (b+0>a+0)?b:a}')
++      out=$(srun -u --ntasks=1 --cpus-per-task=72 --uenv="$CVFEM_UENV" --view="$CVFEM_VIEW" \
++              bash -lc "cd $PWD && OMP_NUM_THREADS=72 OMP_PROC_BIND=true OMP_PLACES=cores \
++                        $B --n $N --repeat $REPEAT --warmup 3 --layout $lay \
++                        $([ "$lay" = packed ] && echo "--pack-size $PACK") --rhie-chow $extra" 2>&1) || { printf '%s\n' "$out" >&2; exit 1; }
++      v=$(printf '%s\n' "$out" | sed -n 's/^  MDOF\/s: \(.*\)$/\1/p' | head -1)
++      [ -n "$v" ] && mdof=$(awk -v a="${mdof:-0}" -v b="$v" 'BEGIN{print (b+0>a+0)?b:a}')
+     done
+     [ -n "$mdof" ] && echo "kmix $key mdof $mdof"
+-    [ -n "$mdofk" ] && echo "kmix $key mdof_kernel_only $mdofk"
+ 
+     # Group 1: the instruction mix.
+-    printf '%s\n' "$(run_group "$lay" 'armv8_pmuv3_0/INST_SPEC/,armv8_pmuv3_0/ASE_SPEC/,armv8_pmuv3_0/VFP_SPEC/,armv8_pmuv3_0/DP_SPEC/,armv8_pmuv3_0/LD_SPEC/,armv8_pmuv3_0/ST_SPEC/' "$extra")" \
++    counters=$(run_group "$lay" 'armv8_pmuv3_0/INST_SPEC/,armv8_pmuv3_0/ASE_SPEC/,armv8_pmuv3_0/VFP_SPEC/,armv8_pmuv3_0/DP_SPEC/,armv8_pmuv3_0/LD_SPEC/,armv8_pmuv3_0/ST_SPEC/' "$extra") || { printf '%s\n' "$counters" >&2; exit 1; }
++    printf '%s\n' "$counters" \
+       | awk -F, -v l="$key" '$1 ~ /^[0-9]/ && $3 != "" {
+             k=$3; sub(/\/$/,"",k); sub(/^.*\//,"",k); if (k != "") printf "kmix %s %s %s\n", l, k, $1 }'
+ 
+     # Group 2: cycles, instructions and the stall split.
+-    printf '%s\n' "$(run_group "$lay" 'cycles,instructions,armv8_pmuv3_0/STALL_BACKEND/,armv8_pmuv3_0/STALL_BACKEND_MEM/' "$extra")" \
++    counters=$(run_group "$lay" 'cycles,instructions,armv8_pmuv3_0/STALL_BACKEND/,armv8_pmuv3_0/STALL_BACKEND_MEM/' "$extra") || { printf '%s\n' "$counters" >&2; exit 1; }
++    printf '%s\n' "$counters" \
+       | awk -F, -v l="$key" '$1 ~ /^[0-9]/ && $3 != "" {
+             k=$3; sub(/\/$/,"",k); sub(/^.*\//,"",k); if (k != "") printf "kmix %s %s %s\n", l, k, $1 }'
+   done
+diff --git a/spikes/cvfem/src/drivers/cvfem_hex8_ns_upwind_bench.cpp b/spikes/cvfem/src/drivers/cvfem_hex8_ns_upwind_bench.cpp
+index fbb8956..60cd242 100644
+--- a/spikes/cvfem/src/drivers/cvfem_hex8_ns_upwind_bench.cpp
++++ b/spikes/cvfem/src/drivers/cvfem_hex8_ns_upwind_bench.cpp
+@@ -29,6 +29,9 @@ static void pack_residual(const MeshData &d, std::vector<scalar_t> &r) {
+     }
+ }
+ 
++#include "tests/verification/cvfem_coupled_jacobian_fd.hpp"
++#include "tests/verification/cvfem_scatter_study.hpp"
++
+ static void bsr4_spmv(const BSR4 &b, const ptrdiff_t nnodes, const scalar_t *const x, scalar_t *const y) {
+     std::fill(y, y + nnodes * 4, scalar_t(0));
+ 
+@@ -81,32 +84,18 @@ static void bench_nodal_grad(MeshData &d, PackedData &p, const GeomKind geom_kin
+ // same shape of vacuous gate this driver has already shipped once, when a packed sweep with no
+ // pack built compared two zeros.
+ //
+-// Central difference, so the error is O(eps^2) and the comparison is not dominated by the
++// On a smooth branch, central differencing has O(eps^2) truncation error rather than the
+ // truncation of a one-sided one. Returns max|fd - jv| / max|fd|, and prints the lagged action
+ // against the same reference beside it, because the number that matters to a solver is not
+ // whether the exact action is right but how wrong the lagged one is.
+ static scalar_t verify_ho_action_fd(MeshData &d, PackedData &p, const scalar_t rho, const scalar_t mu,
+                                     const int limiter, const GeomKind geom_kind, scalar_t &lagged_rel,
+-                                    // The fraction of degrees of freedom where the two disagree by
+-                                    // more than the tolerance. A max norm cannot verify a
+-                                    // piecewise-differentiable operator: the limiters switch branch
+-                                    // somewhere inside the +/- eps step for a handful of surfaces,
+-                                    // and at such a surface the difference quotient is not a
+-                                    // derivative of anything. What must hold is that those surfaces
+-                                    // are a vanishing fraction and that everywhere else the
+-                                    // agreement is the unlimited arm's.
++                                    // Disagreement fractions are diagnostics, not acceptance criteria.
+                                     scalar_t &frac_bad, scalar_t &lagged_frac_bad) {
+     const ptrdiff_t n   = d.nnodes;
+     const int       iso = geom_kind == GeomKind::Isoparam ? 1 : 0;
+-    // THE STATE IS PERTURBED FIRST, and this is not cosmetic. On a uniform hex mesh with a
+-    // smooth field the reconstruction lands EXACTLY on a limiter bound for a structural sixth of
+-    // the sub-control surfaces -- measured, 1024 of 6144 at n=8 -- and at such a surface the
+-    // limiter has a kink at the evaluation point. A central difference across a kink returns the
+-    // average of the two one-sided derivatives, which equals neither, so the reference is invalid
+-    // there however right the derivative is. Each node touches many surfaces, so a sixth of the
+-    // surfaces contaminates three quarters of the nodes, which is exactly the disagreement this
+-    // check reported before the ties were broken. A small deterministic perturbation moves the
+-    // state off the degenerate set; it changes nothing about the operator being verified.
++    // Break structural ties, but still require agreement on every component: a finite
++    // difference can cross a switch even after this perturbation.
+     for (ptrdiff_t i = 0; i < n; ++i) {
+         const uint32_t h = (uint32_t)i * 2246822519u + 374761393u;
+         d.ux[i] += scalar_t(1e-3) * (scalar_t((h >> 5) & 0xffffu) / scalar_t(65535) - scalar_t(0.5));
+@@ -148,6 +137,10 @@ static scalar_t verify_ho_action_fd(MeshData &d, PackedData &p, const scalar_t r
+     // branch-crossing artefact shrinks with the step, and that is what tells them apart.
+     const char *eps_env = std::getenv("CVFEM_FD_EPS");
+     const scalar_t eps = eps_env ? (scalar_t)std::atof(eps_env) : scalar_t(1e-6);
++    if (!(eps > scalar_t(0)) || !std::isfinite(eps)) {
++        std::fprintf(stderr, "FAIL: CVFEM_FD_EPS must be finite and positive\n");
++        return std::numeric_limits<scalar_t>::infinity();
++    }
+     residual_at(scalar_t(+1), rp, eps);
+     residual_at(scalar_t(-1), rm, eps);
+     d.ux = ux0; d.uy = uy0; d.uz = uz0;
+@@ -170,6 +163,10 @@ static scalar_t verify_ho_action_fd(MeshData &d, PackedData &p, const scalar_t r
+ 
+     scalar_t den = 0, num = 0, numl = 0;
+     for (size_t i = 0; i < fd.size(); ++i) {
++        if (!std::isfinite(fd[i]) || !std::isfinite(jv[i]) || !std::isfinite(jl[i])) {
++            std::fprintf(stderr, "FAIL: nonfinite value in higher-order derivative check\n");
++            return std::numeric_limits<scalar_t>::infinity();
++        }
+         den  = std::max(den, std::fabs(fd[i]));
+         num  = std::max(num, std::fabs(fd[i] - jv[i]));
+         numl = std::max(numl, std::fabs(fd[i] - jl[i]));
+@@ -347,6 +344,7 @@ struct CsvRow {
+     // matvec that caps the problem size per node is the trade full assembly already loses,
+     // so the price belongs beside the rate.
+     double      pa_bytes_per_dof;
++    const char *state_gradients;
+     const double *phase;  // PH_N entries, thread-summed ms per call, or nullptr
+ };
+ 
+@@ -365,7 +363,7 @@ static void csv_write(const std::string &path, const CsvRow &r) {
+             "n_colors,packs_per_color_min,packs_per_color_max,checksum,"
+             "rhie_chow,rhie_chow_scale,boundary,"
+             "ran_kernel,ran_rc,ran_boundary,exact_rc,pgrad_per_apply,live_vectors,"
+-            "upwind_eps,transient,s_qgrad,frac_qgrad,pa_bytes_per_dof";
++            "upwind_eps,transient,s_qgrad,frac_qgrad,pa_bytes_per_dof,jac_state_gradients";
+     for (int i = 0; i < PH_N; ++i) header += std::string(",ms_") + g_phase_name[i];
+ 
+     bool need_header = true;
+@@ -415,7 +413,7 @@ static void csv_write(const std::string &path, const CsvRow &r) {
+         std::fprintf(f, ",%.9e,%.6f", r.qgrad_seconds, r.qgrad_frac);
+     else
+         std::fprintf(f, ",,");
+-    std::fprintf(f, ",%.3f", r.pa_bytes_per_dof);
++    std::fprintf(f, ",%.3f,%s", r.pa_bytes_per_dof, r.state_gradients);
+     for (int i = 0; i < PH_N; ++i) {
+         if (r.phase)
+             std::fprintf(f, ",%.6f", 1000.0 * r.phase[i] / double(r.repeat));
+@@ -519,6 +517,7 @@ int main(int argc, char **argv) {
+     // holds and what this driver computed before the exact form existed.
+     int         lagged_ho    = 0;
+     int         verify_ho_jac = 0;
++    int         verify_coupled_jac = 0;
+     // The nodal gradient reconstruction as an operation in its own right, at nf fields: 1 is the
+     // pressure gradient every Rhie-Chow residual builds, 3 the velocity gradient the exact
+     // higher-order Jacobian action rebuilds on every matvec. It has only ever been timed from
+@@ -532,10 +531,13 @@ int main(int argc, char **argv) {
+     // rather than a column of the timing CSV: it needs the packed mesh built and nothing else
+     // run, and the numbers it prints are sizes, not rates.
+     int         mesh_footprint = 0;
++    int         scatter_study = 0;
++    int         scatter_samples = 12;
+     // Whether the nodal pressure gradient is rebuilt inside every apply or hoisted out of
+     // the timed loop. This is the difference SFEM_PGRAD_CACHE makes in the solver, and it
+     // is the other half of the cascade: the gradient is a full element sweep.
+     int         pgrad_per_apply = 0;
++    int         rebuild_state_gradients = 0;
+     int         live_vectors    = 0;
+     // Steady by default -- dt <= 0 means no transient term, which is what every recorded
+     // baseline was measured with.
+@@ -596,6 +598,10 @@ int main(int argc, char **argv) {
+             g_breakdown = 1;
+         else if (arg == "--mesh-footprint")
+             mesh_footprint = 1;
++        else if (arg == "--scatter-study")
++            scatter_study = 1;
++        else if (arg == "--scatter-samples" && i + 1 < argc)
++            scatter_samples = std::atoi(argv[++i]);
+         else if (arg == "--kernel-only")
+             g_kernel_only = 1;
+         else if (arg == "--dense-flush")
+@@ -611,6 +617,9 @@ int main(int argc, char **argv) {
+                 std::fprintf(stderr, "--nodal-grad takes 1 (pressure) or 3 (velocity)\n");
+                 return 2;
+             }
++        } else if (arg == "--verify-jac-coupled") {
++            verify_coupled_jac = 1;
++            jac_action = 1;
+         } else if (arg == "--verify-jac-ho") {
+             verify_ho_jac = 1;
+         } else if (arg == "--venkat-k") {
+@@ -628,6 +637,8 @@ int main(int argc, char **argv) {
+             boundary = 1;
+         else if (arg == "--pgrad-per-apply")
+             pgrad_per_apply = 1;
++        else if (arg == "--rebuild-state-gradients")
++            rebuild_state_gradients = 1;
+         else if (arg == "--qgrad-atomic")
+             g_qgrad_atomic = 1;
+         else if (arg == "--qgrad-packed")
+@@ -687,8 +698,12 @@ int main(int argc, char **argv) {
+                     "  --mesh-footprint  print the bytes each representation of the mesh occupies,\n"
+                     "                 array by array, and exit. Every figure is the allocation's\n"
+                     "                 own nbytes(), so nothing here is a hand computation.\n"
+-                    "  --kernel-only  element kernel writes to a dense stack buffer (no scatter);\n"
+-                    "                 measures the arithmetic floor of the element kernel\n"
++                    "  --scatter-study  paired residual accumulation timings and element-output checks\n"
++                    "                   affine packed/atomic, FP64, steady interior only\n"
++                    "  --scatter-samples N  multiple of 6, default 12; --repeat applies to each sample\n"
++                    "  --kernel-only  dense-element assembly diagnostic: --assemble with packed\n"
++                    "                 (affine/isoparam) or store (affine only). It does not\n"
++                    "                 measure the residual's scatter cost or produce its operator.\n"
+                     "  --dense-flush  sumfact only: stage ke densely, then flush 64 contiguous\n"
+                     "                 blocks (measured slower than direct scatter on Apple M1)\n"
+                     "  --csv FILE     append one machine-readable row per run (header written if\n"
+@@ -749,6 +764,8 @@ int main(int argc, char **argv) {
+                     "                   like-for-like partner for --bsr-apply once --conv-ho is\n"
+                     "                   on, and it is what this driver computed before the exact\n"
+                     "                   form existed. Had no help entry at all until now.\n"
++                    "  --verify-jac-coupled  standalone FP64 full (u,p) derivative check; requires\n"
++                    "                 packed affine geometry, steady RC and double gradients.\n"
+                     "  --rhie-chow [S]  include the Rhie-Chow pressure-velocity coupling at scale\n"
+                     "                 S (default 1), and the nodal pressure gradient it needs.\n"
+                     "                 sumfact only -- the hand-written and generated kernels carry\n"
+@@ -765,6 +782,10 @@ int main(int argc, char **argv) {
+                     "                 instead of over packs. Same operator; the packed one has no\n"
+                     "                 atomics and is deterministic. Here to measure the difference,\n"
+                     "                 not as a mode to run in.\n"
++                    "  --rebuild-state-gradients  rebuild fixed-state gradients inside each\n"
++                    "                 Jacobian action, reproducing the original timing scope.\n"
++                    "                 By default they are cached; direction gradients are always\n"
++                    "                 rebuilt. Requires an action with an exact RC or HO term.\n"
+                     "  --transient DT   make the operator unsteady with timestep DT: the BDF mass\n"
+                     "                 term rho V a0 / dt on the velocity diagonal, applied as a\n"
+                     "                 per-node post-pass because in a control-volume scheme the mass\n"
+@@ -782,13 +803,8 @@ int main(int argc, char **argv) {
+                     "                     every time. BiCGStab holds about 7, which is what makes N=7\n"
+                     "                     the interesting value. Only the apply is timed -- the churn\n"
+                     "                     runs between applies, outside the clock.\n"
+-                    "  --pgrad-per-apply  rebuild the nodal pressure gradient inside every apply\n"
+-                    "                     (--jac-action always rebuilds the DIRECTION's gradient,\n"
+-                    "                      which cannot be hoisted, and reports it separately)\n"
+-                    "                 instead of hoisting it out of the timed loop. The gradient is\n"
+-                    "                 a full element sweep, about 39%% of an apply, and hoisting it\n"
+-                    "                 across a Krylov solve is worth 1.26x off the whole linear\n"
+-                    "                 solve -- so which of the two is measured has to be said.\n"
++                    "  --pgrad-per-apply  rebuild the state pressure gradient inside each residual\n"
++                    "                 evaluation. For Jacobian actions use --rebuild-state-gradients.\n"
+                     "                 Requires --rhie-chow.\n"
+                     "  --boundary     close the boundary control volumes with the boundary\n"
+                     "                 sub-control-surface terms. Off by default; the benchmark\n"
+@@ -820,7 +836,7 @@ int main(int argc, char **argv) {
+     // correct float operator produces. What holds the f32 build is the cross-precision gate:
+     // both builds --dump the same operator, and the f32 output is compared with the f64 one and
+     // the f32 layouts with each other, at bounds stated for single precision.
+-    if (sizeof(scalar_t) != sizeof(double) && (verify || verify_jac || verify_ho || verify_ho_jac)) {
++    if (sizeof(scalar_t) != sizeof(double) && (verify || verify_jac || verify_ho || verify_ho_jac || verify_coupled_jac)) {
+         std::fprintf(stderr,
+                      "the --verify oracles are double-precision checks; this build computes in %zu-byte "
+                      "scalars. Use src/tests/verification/cvfem_bench_f32.sh, which holds this build "
+@@ -829,6 +845,17 @@ int main(int argc, char **argv) {
+         return 2;
+     }
+ 
++    if (verify_coupled_jac && (layout != "packed" || geom != "affine" || !rhie_chow ||
++        boundary || dt != scalar_t(0) || grad_single || lagged_rc || lagged_ho ||
++        partial_assembly || assemble || bsr_apply || nodal_grad || verify || verify_jac ||
++        verify_ho || verify_ho_jac || !(rho > scalar_t(0)) || !(mu > scalar_t(0)) ||
++        !(rc_scale > scalar_t(0)) || !std::isfinite(rho) || !std::isfinite(mu) || !std::isfinite(rc_scale))) {
++        std::fprintf(stderr, "--verify-jac-coupled requires a standalone packed affine steady RC action "
++                             "with positive finite rho, mu and RC scale and double gradients\n");
++        if (own_mpi) MPI_Finalize();
++        return 2;
++    }
++
+     // --boundary used to be refused for an assembly on anything but --layout atomic,
+     // because the boundary blocks had to be written through the element BSR slots and only
+     // the atomic assembly did that. assemble_boundary_scs_jacobian_pass scatters through
+@@ -885,6 +912,18 @@ int main(int argc, char **argv) {
+         if (own_mpi) MPI_Finalize();
+         return 1;
+     }
++    if (pgrad_per_apply && jac_action) {
++        std::fprintf(stderr, "use --rebuild-state-gradients for Jacobian actions, not --pgrad-per-apply\n");
++        if (own_mpi) MPI_Finalize();
++        return 2;
++    }
++    if (rebuild_state_gradients &&
++        (!jac_action || assemble || assemble_diag || bsr_apply || nodal_grad ||
++         (!(rhie_chow && !lagged_rc) && !(conv_ho && !lagged_ho)))) {
++        std::fprintf(stderr, "--rebuild-state-gradients requires --jac-action with an exact RC or HO term\n");
++        if (own_mpi) MPI_Finalize();
++        return 2;
++    }
+     // THE ONE MIXED FORM THAT IS THE JACOBIAN OF NO RESIDUAL.
+     //
+     // The two sensitivities are switchable independently, which is right: three of the four
+@@ -948,6 +987,31 @@ int main(int argc, char **argv) {
+     // geometry and the term set select, which is the only thing that was ever true.
+     const bool residual_op = !(assemble || assemble_diag || jac_action || bsr_apply || nodal_grad);
+ 
++    if (scatter_study && (!residual_op || geom != "affine" ||
++        !(layout == "packed" || layout == "atomic") || sizeof(scalar_t) != sizeof(double) ||
++        boundary || dt != scalar_t(0) || grad_single || pgrad_per_apply || rebuild_state_gradients ||
++        partial_assembly || mesh_footprint || verify || verify_jac || verify_ho ||
++        verify_ho_jac || verify_coupled_jac || g_kernel_only || g_dense_flush || g_breakdown ||
++        lagged_rc || lagged_ho || live_vectors || !csv_path.empty() || !dump_path.empty() ||
++        repeat < 1 || warmup < 1 || scatter_samples < 6 || scatter_samples % 6 != 0)) {
++        std::fprintf(stderr, "--scatter-study requires a standalone FP64 affine packed/atomic residual, "
++                             "cached gradients, no boundary/transient terms, warmup/repeat >= 1, "
++                             "and a positive multiple of 6 samples\n");
++        if (own_mpi) MPI_Finalize();
++        return 2;
++    }
++
++    // Only these assembly paths consume the dense element slots.
++    if (g_kernel_only && (!assemble ||
++        !(layout == "packed" || (layout == "store" && geom == "affine")) ||
++        partial_assembly || mesh_footprint || verify || verify_jac || verify_ho ||
++        verify_ho_jac || verify_coupled_jac)) {
++        std::fprintf(stderr, "--kernel-only requires standalone --assemble with --layout packed "
++                             "(affine/isoparam) or store (affine); it does not remove residual scatter\n");
++        if (own_mpi) MPI_Finalize();
++        return 2;
++    }
++
+     // Read only inside the sumfact branch of the colored and store assemblies.
+     if (g_dense_flush && !(assemble && (layout == "colored" || layout == "store"))) {
+         std::fprintf(stderr, "--dense-flush is read only by --assemble on --layout colored|store\n");
+@@ -1371,6 +1435,12 @@ int main(int argc, char **argv) {
+                     pgrad_per_apply ? "rebuilt per apply" : "hoisted out of the timed loop");
+     }
+ 
++    if (verify_coupled_jac) {
++        const int result = verify_coupled_jacobian_fd(d, packed, rho, mu, conv_ho, conv_limiter, venkat_c);
++        if (own_mpi) MPI_Finalize();
++        return result;
++    }
++
+     // Built here, once, for the same reason the nodal gradient is: it is a function of the
+     // Newton iterate, and a Krylov solve applies the operator hundreds of times at a state
+     // that does not move. Outside the timed loop because that is where the solver would
+@@ -1807,13 +1877,8 @@ int main(int argc, char **argv) {
+         // anything, so it goes with the sweep.
+     }
+ 
+-    // The boundary closure is one extra element sweep after the layout's own, which is
+-    // how the solver arranges it too -- see apply_boundary_scs_residual_pass. Doing it
+-    // Nodal velocity gradient for the deferred correction: nine interleaved components per
+-    // node. Hoisted, because the solver lags the correction one Newton step -- so what the
+-    // timed apply measures is the higher-order FLUX, not the reconstruction that feeds it,
+-    // exactly as the Rhie-Chow state gradient is hoisted by default. The same fused
+-    // multi-field sweep the solver uses, so this is not a second code path.
++    // The state is fixed throughout this benchmark. Cache its velocity reconstruction;
++    // an exact Jacobian still reconstructs the direction on every application below.
+     std::vector<scalar_t> ugrad;
+     std::vector<float>    ugrad32;  // the same field under --grad-precision single
+     if (conv_ho) {
+@@ -1854,13 +1919,10 @@ int main(int argc, char **argv) {
+         // The lagged action differing from the finite difference is the POINT, not a failure, so
+         // only the exact arm is gated. A lagged arm that agreed would mean the correction never
+         // reached the residual and the whole comparison is vacuous, so it is gated from below.
+-        // Two standards, because the operators differ. The unlimited arm is differentiable
+-        // everywhere, so its max norm must hold. A limited arm is differentiable almost
+-        // everywhere, so what must hold is that the exceptions are a vanishing fraction of the
+-        // mesh -- the surfaces whose limiter branch the perturbation crosses -- and that the
+-        // lagged action is wrong on a far larger share.
++        // A small set of wrong rows is still a failure. A switch crossing needs a
++        // separate diagnosis; it cannot be excused by the fraction of affected rows.
+         const scalar_t tol = scalar_t(1e-6);
+-        const bool ok = conv_limiter == 0 ? (rel < tol) : (fbad < scalar_t(0.01));
++        const bool ok = rel < tol;
+         if (!ok) {
+             std::fprintf(stderr, "FAIL: exact higher-order action differs from the finite "
+                                  "difference: max %.3e, %.4f%% of dofs (limiter %d)\n",
+@@ -1868,13 +1930,6 @@ int main(int argc, char **argv) {
+             if (own_mpi) MPI_Finalize();
+             return 1;
+         }
+-        if (conv_limiter != 0 && !(fbadl > scalar_t(20) * fbad + scalar_t(0.05))) {
+-            std::fprintf(stderr, "FAIL: the lagged action disagrees on %.4f%% of dofs against the "
+-                                 "exact one's %.4f%% -- too close to call this a check\n",
+-                         100.0 * (double)fbadl, 100.0 * (double)fbad);
+-            if (own_mpi) MPI_Finalize();
+-            return 1;
+-        }
+         if (!(lag > scalar_t(10) * rel)) {
+             std::fprintf(stderr, "FAIL: the lagged action is as close to the finite difference as "
+                                  "the exact one (%.3e vs %.3e) -- the correction did not reach "
+@@ -1947,6 +2002,13 @@ int main(int argc, char **argv) {
+         if (boundary) apply_boundary_scs_residual_pass(d, rho, mu, geom_kind == GeomKind::Isoparam ? 1 : 0);
+         apply_transient_pass(d, rho);
+     };
++    if (scatter_study) {
++        const int status = run_scatter_study(d, packed, layout == "packed", rho, mu,
++                                             conv_ho ? ugrad.data() : nullptr, conv_limiter,
++                                             venkat_c, repeat, warmup, scatter_samples, apply_fn);
++        if (own_mpi) MPI_Finalize();
++        return status;
++    }
+     auto jac_fn = [&]() {
+         if (geom_kind == GeomKind::Isoparam) {
+             if (layout == "store")
+@@ -2087,34 +2149,12 @@ int main(int argc, char **argv) {
+     std::vector<float>    vgrad32;  // the direction's field under --grad-precision single
+     std::vector<float>    qp32;     // float scratch for the pressure gradients of the fused sweep
+     double                hograd_seconds = 0;
+-    auto jac_action_fn = [&]() {
+-        // A Krylov iteration never sees the same direction twice, so neither does this when
+-        // the live set exists: the rotation is what stops the direction being resident.
+-        const scalar_t *const dir_v = live.empty() ? jac_dir.data() : live[(size_t)(live_k++ % (long)live.size())].data();
+-        last_dir                    = dir_v;
+-        // BOTH DIRECTION GRADIENTS IN ONE SWEEP when both are wanted. They read different fields
+-        // of the SAME array at the same stride -- the direction's three velocity components and
+-        // its pressure -- so together they are one four-field sweep instead of a one-field and a
+-        // three-field one, and the half of a sweep that does not scale with the field count is
+-        // paid once. Each keeps the layout its consumer reads, which is what the per-component
+-        // output stride is for. The whole cost lands in the qgrad phase, since it is one pass.
+-        // THE EXACT ACTION RECONSTRUCTS THE STATE'S GRADIENTS TOO, ON EVERY APPLICATION.
+-        //
+-        // It used to rebuild only the direction's and read the state's from a cache filled once
+-        // at setup, which makes the operator exact in its sensitivities and frozen in the fields
+-        // those sensitivities are evaluated at -- and makes the measured rate exclude two full
+-        // element sweeps the operator needs. An exact application is self-contained: it
+-        // evaluates every reconstruction it reads. The frozen-state form is the LAGGED one, and
+-        // it keeps the cache.
+-        //
+-        // All of it is ONE sweep, which is the only reason this is affordable. The sweep takes a
+-        // base pointer and a stride per field, so the direction's four interleaved fields and
+-        // the state's four contiguous ones go in together: eight fields on the higher-order arm,
+-        // two on the first-order one. Outputs run three per field in field order, which is what
+-        // fixes the index arithmetic below.
++    // Caching G(u) at a fixed u retains G(v) and every derivative in the element kernel.
++    // Refresh the cache when the state or geometry changes, before another Krylov solve.
++    auto reconstruct_jac_gradients = [&](const scalar_t *dir_v, const bool rebuild_state) {
+         const int iso_ng = geom_kind == GeomKind::Isoparam ? 1 : 0;
+         if (with_qgrad && with_hograd) {
+-            const double    t0      = wall_time();
++            const int nf = rebuild_state ? 8 : 4;
+             const scalar_t *srcs[8] = {dir_v + 0,     dir_v + 1,     dir_v + 2,     dir_v + 3,
+                                        d.ux.data(),   d.uy.data(),   d.uz.data(),   d.p.data()};
+             const int       st[8]   = {N_FIELDS, N_FIELDS, N_FIELDS, N_FIELDS, 1, 1, 1, 1};
+@@ -2127,9 +2167,7 @@ int main(int argc, char **argv) {
+             d.pgy.resize((size_t)d.nnodes);
+             d.pgz.resize((size_t)d.nnodes);
+             if (grad_single) {
+-                // One output type per sweep, so the six pressure-gradient components go through
+-                // a float scratch and are widened back into the double arrays their consumers
+-                // read -- a nodal pass over six values, against the eight-field sweep it rides on.
++                // Preserve the fused sweep's pressure-gradient rounding in both modes.
+                 vgrad32.resize((size_t)d.nnodes * 9);
+                 ugrad32.resize((size_t)d.nnodes * 9);
+                 qp32.resize((size_t)d.nnodes * 6);
+@@ -2140,17 +2178,19 @@ int main(int argc, char **argv) {
+                 for (int c = 0; c < 9; ++c) { outp[12 + c] = ugrad32.data() + c; ostr[12 + c] = 9; }
+                 for (int c = 0; c < 3; ++c) { outp[21 + c] = qp32.data() + 3 + c; ostr[21 + c] = 6; }
+                 if (packed.n_packs > 0 && !g_qgrad_atomic)
+-                    cvfem_hex8_assemble_nodal_grads_packed(d, packed, iso_ng, srcs, st, 8, outp, ostr, vgbuf);
++                    cvfem_hex8_assemble_nodal_grads_packed(d, packed, iso_ng, srcs, st, nf, outp, ostr, vgbuf);
+                 else
+-                    cvfem_hex8_assemble_nodal_grads_atomic(d, iso_ng, srcs, st, 8, outp, ostr);
++                    cvfem_hex8_assemble_nodal_grads_atomic(d, iso_ng, srcs, st, nf, outp, ostr);
+ #pragma omp parallel for schedule(static)
+                 for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+                     d.qgx[(size_t)i] = scalar_t(qp32[(size_t)i * 6 + 0]);
+                     d.qgy[(size_t)i] = scalar_t(qp32[(size_t)i * 6 + 1]);
+                     d.qgz[(size_t)i] = scalar_t(qp32[(size_t)i * 6 + 2]);
+-                    d.pgx[(size_t)i] = scalar_t(qp32[(size_t)i * 6 + 3]);
+-                    d.pgy[(size_t)i] = scalar_t(qp32[(size_t)i * 6 + 4]);
+-                    d.pgz[(size_t)i] = scalar_t(qp32[(size_t)i * 6 + 5]);
++                    if (rebuild_state) {
++                        d.pgx[(size_t)i] = scalar_t(qp32[(size_t)i * 6 + 3]);
++                        d.pgy[(size_t)i] = scalar_t(qp32[(size_t)i * 6 + 4]);
++                        d.pgz[(size_t)i] = scalar_t(qp32[(size_t)i * 6 + 5]);
++                    }
+                 }
+             } else {
+                 scalar_t *outp[24];
+@@ -2164,21 +2204,12 @@ int main(int argc, char **argv) {
+                 outp[22] = d.pgy.data(); ostr[22] = 1;
+                 outp[23] = d.pgz.data(); ostr[23] = 1;
+                 if (packed.n_packs > 0 && !g_qgrad_atomic)
+-                    cvfem_hex8_assemble_nodal_grads_packed(d, packed, iso_ng, srcs, st, 8, outp, ostr, vgbuf);
++                    cvfem_hex8_assemble_nodal_grads_packed(d, packed, iso_ng, srcs, st, nf, outp, ostr, vgbuf);
+                 else
+-                    cvfem_hex8_assemble_nodal_grads_atomic(d, iso_ng, srcs, st, 8, outp, ostr);
++                    cvfem_hex8_assemble_nodal_grads_atomic(d, iso_ng, srcs, st, nf, outp, ostr);
+             }
+-            // Charged ONCE, to the higher-order account, because it is one pass. Adding it to
+-            // both would make the two fractions sum past the application they are fractions of.
+-            // What frac_jac_action_hograd then reports on a fused arm is the whole
+-            // reconstruction -- all four gradients -- which is the quantity section 7.8 wants.
+-            const double dt = wall_time() - t0;
+-            hograd_seconds += dt;
+-            if (g_breakdown) g_phase[PH_QGRAD] += dt;
+         } else if (with_qgrad) {
+-            // First-order exact: the coupling's sensitivity needs the direction's pressure
+-            // gradient, and the coupling itself the state's. Two fields, one sweep.
+-            const double    t0      = wall_time();
++            const int nf = rebuild_state ? 2 : 1;
+             const scalar_t *srcs[2] = {dir_v + 3, d.p.data()};
+             const int       st[2]   = {N_FIELDS, 1};
+             d.qgx.resize((size_t)d.nnodes);
+@@ -2191,28 +2222,12 @@ int main(int argc, char **argv) {
+                                  d.pgx.data(), d.pgy.data(), d.pgz.data()};
+             ptrdiff_t ostr[6] = {1, 1, 1, 1, 1, 1};
+             if (packed.n_packs > 0 && !g_qgrad_atomic)
+-                cvfem_hex8_assemble_nodal_grads_packed(d, packed, iso_ng, srcs, st, 2, outp, ostr, vgbuf);
++                cvfem_hex8_assemble_nodal_grads_packed(d, packed, iso_ng, srcs, st, nf, outp, ostr, vgbuf);
+             else
+-                cvfem_hex8_assemble_nodal_grads_atomic(d, iso_ng, srcs, st, 2, outp, ostr);
+-            const double dt_qg = wall_time() - t0;
+-            qgrad_seconds += dt_qg;
+-            // Also into the phase table, so the pass that dominates this application appears
+-            // beside the phases of the sweep it precedes rather than only in a stdout line.
+-            if (g_breakdown) g_phase[PH_QGRAD] += dt_qg;
++                cvfem_hex8_assemble_nodal_grads_atomic(d, iso_ng, srcs, st, nf, outp, ostr);
+         }
+         if (with_hograd && !with_qgrad) {
+-            // The direction's nodal velocity gradient, reconstructed from scratch on every
+-            // matvec because the direction changes every Krylov iteration. This is the pass the
+-            // lagged action does not run, and it is what the exact form costs.
+-            //
+-            // Read in place: the direction arrives interleaved by node, and the sweep takes a
+-            // base pointer and a stride per field, so its three velocity components are three
+-            // views of the same array. This used to de-interleave them into scratch first --
+-            // three full-length copies inside the timed region on every matvec.
+-            // The state's velocity gradient goes in with it, for the reason above: six fields,
+-            // one sweep. The Rhie--Chow term is lagged on this arm, so its state pressure
+-            // gradient stays cached -- that is what lagging it means.
+-            const double    t0       = wall_time();
++            const int nf = rebuild_state ? 6 : 3;
+             const scalar_t *vsrcs[6] = {dir_v + 0,   dir_v + 1,   dir_v + 2,
+                                         d.ux.data(), d.uy.data(), d.uz.data()};
+             const int       vst[6]   = {N_FIELDS, N_FIELDS, N_FIELDS, 1, 1, 1};
+@@ -2224,9 +2239,9 @@ int main(int argc, char **argv) {
+                 for (int c = 0; c < 9; ++c) { outp[c] = vgrad32.data() + c; ostr[c] = 9; }
+                 for (int c = 0; c < 9; ++c) { outp[9 + c] = ugrad32.data() + c; ostr[9 + c] = 9; }
+                 if (packed.n_packs > 0 && !g_qgrad_atomic)
+-                    cvfem_hex8_assemble_nodal_grads_packed(d, packed, iso_ng, vsrcs, vst, 6, outp, ostr, vgbuf);
++                    cvfem_hex8_assemble_nodal_grads_packed(d, packed, iso_ng, vsrcs, vst, nf, outp, ostr, vgbuf);
+                 else
+-                    cvfem_hex8_assemble_nodal_grads_atomic(d, iso_ng, vsrcs, vst, 6, outp, ostr);
++                    cvfem_hex8_assemble_nodal_grads_atomic(d, iso_ng, vsrcs, vst, nf, outp, ostr);
+             } else {
+                 vgrad.resize((size_t)d.nnodes * 9);
+                 ugrad.resize((size_t)d.nnodes * 9);
+@@ -2235,11 +2250,28 @@ int main(int argc, char **argv) {
+                 for (int c = 0; c < 9; ++c) { outp[c] = vgrad.data() + c; ostr[c] = 9; }
+                 for (int c = 0; c < 9; ++c) { outp[9 + c] = ugrad.data() + c; ostr[9 + c] = 9; }
+                 if (packed.n_packs > 0 && !g_qgrad_atomic)
+-                    cvfem_hex8_assemble_nodal_grads_packed(d, packed, iso_ng, vsrcs, vst, 6, outp, ostr, vgbuf);
++                    cvfem_hex8_assemble_nodal_grads_packed(d, packed, iso_ng, vsrcs, vst, nf, outp, ostr, vgbuf);
+                 else
+-                    cvfem_hex8_assemble_nodal_grads_atomic(d, iso_ng, vsrcs, vst, 6, outp, ostr);
++                    cvfem_hex8_assemble_nodal_grads_atomic(d, iso_ng, vsrcs, vst, nf, outp, ostr);
+             }
+-            hograd_seconds += wall_time() - t0;
++        }
++    };
++    if (!rebuild_state_gradients && (with_qgrad || with_hograd))
++        reconstruct_jac_gradients(jac_dir.data(), true);
++
++    const char *state_gradient_mode = jac_action && (rhie_chow || with_hograd)
++                                         ? (rebuild_state_gradients ? "per_apply" : "cached") : "n/a";
++    auto jac_action_fn = [&]() {
++        const scalar_t *const dir_v = live.empty() ? jac_dir.data() : live[(size_t)(live_k++ % (long)live.size())].data();
++        last_dir = dir_v;
++        if (with_qgrad || with_hograd) {
++            const double t0 = wall_time();
++            reconstruct_jac_gradients(dir_v, rebuild_state_gradients);
++            const double elapsed = wall_time() - t0;
++            // A fused pressure/velocity sweep is charged once, to the HO account.
++            if (with_hograd) hograd_seconds += elapsed;
++            else qgrad_seconds += elapsed;
++            if (g_breakdown) g_phase[PH_QGRAD] += elapsed;
+         }
+         // THE SAME LADDER FOR EITHER STORAGE OF THE GRADIENT FIELDS. The launchers deduce the
+         // storage type from the pointers, so the choice is made once here and never inside a
+@@ -2485,6 +2517,8 @@ int main(int argc, char **argv) {
+     }
+ 
+     phase_reset();
++    qgrad_seconds = 0;
++    hograd_seconds = 0;
+     // With a live set the clock has to be stopped for the churn: what is being measured is
+     // still the apply, only now with the caches in the state a Krylov iteration leaves them
+     // in. Without one this is the same single interval it always was, so the default path's
+@@ -2864,6 +2898,7 @@ int main(int argc, char **argv) {
+         std::printf("  flops_per_element_assemble_model: %.1f\n", assemble_flops);
+     }
+     if (jac_action) {
++        std::printf("  state_gradients: %s\n", state_gradient_mode);
+         std::printf("  seconds_per_jac_action: %.6e\n", seconds_per_call);
+         std::printf("  MDOF/s_jac_action: %.3f\n", mdofs);
+         std::printf("  MELEM/s_jac_action: %.3f\n", melems);
+@@ -2987,6 +3022,7 @@ int main(int argc, char **argv) {
+         row.upwind_eps      = 0.0;
+         row.transient       = dt > scalar_t(0) ? 1 : 0;
+         row.pa_bytes_per_dof = partial_assembly ? cvfem_hex8_pa_bytes_per_dof(d) : 0.0;
++        row.state_gradients = state_gradient_mode;
+         row.qgrad_seconds   = with_qgrad ? qgrad_seconds / double(repeat) : -1.0;
+         row.qgrad_frac      = with_qgrad ? qgrad_seconds / seconds : -1.0;
+         row.phase                = g_breakdown ? g_phase : nullptr;
+diff --git a/spikes/cvfem/src/frontend/staging/cvfem_hex8_best_common.hpp b/spikes/cvfem/src/frontend/staging/cvfem_hex8_best_common.hpp
+index ec03d5e..6edf50a 100644
+--- a/spikes/cvfem/src/frontend/staging/cvfem_hex8_best_common.hpp
++++ b/spikes/cvfem/src/frontend/staging/cvfem_hex8_best_common.hpp
+@@ -376,7 +376,7 @@ static double wall_time() {
+ 
+ static SFEM_INLINE double phase_now() { return g_breakdown ? wall_time() : 0.0; }
+ static int g_dense_flush = 0;  // --dense-flush: stage ke densely, then flush 64 contiguous blocks
+-static int g_kernel_only = 0;  // --kernel-only: element kernel writes to a dense stack buffer (no scatter)
++static int g_kernel_only = 0;  // Dense-element assembly diagnostic; the driver rejects unsupported paths.
+ static int g_identity_slots[64];
+ 
+ // WHAT THE ASSEMBLY SWEEPS GET INSTEAD OF THESE GLOBALS. The sweeps used to read
+diff --git a/spikes/cvfem/src/frontend/staging/cvfem_hex8_packed_launch.hpp b/spikes/cvfem/src/frontend/staging/cvfem_hex8_packed_launch.hpp
+index 67d10ad..9aa7bc9 100644
+--- a/spikes/cvfem/src/frontend/staging/cvfem_hex8_packed_launch.hpp
++++ b/spikes/cvfem/src/frontend/staging/cvfem_hex8_packed_launch.hpp
+@@ -147,7 +147,7 @@ static void build_pack_local_crs(PackedData               &p,
+ // grad_t is the STORAGE type of the nodal gradient fields the correction reads -- scalar_t, or
+ // float under the mixed-precision option (SFEM_GRAD_PRECISION / --grad-precision). The sweeps
+ // convert at the gather and compute in scalar_t throughout.
+-template <typename grad_t>
++template <bool ScatterProbe = false, typename grad_t>
+ static SFEM_NOINLINE void apply_residual_packed_defcor(MeshData       &d,
+                                                        PackedData     &p,
+                                                        const scalar_t  rho,
+@@ -164,9 +164,13 @@ static SFEM_NOINLINE void apply_residual_packed_defcor(MeshData       &d,
+     const int                     with_rc = !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0);
+ 
+ #pragma omp parallel
+-    apply_residual_packed_defcor_range(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
++    apply_residual_packed_defcor_range<ScatterProbe>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
+             d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, ugrad, limiter, venkat_c, rx, ry, rz, rc, scratch_n, with_rc);
+ 
++    if constexpr (ScatterProbe) {
++        if (!g_scatter_accumulate) return;
++    }
++
+     scalar_t *const fields[CVFEM_HEX8_N_FIELDS] = {d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data()};
+ #pragma omp parallel for schedule(static)
+     for (ptrdiff_t row = 0; row < p.n_ghost_reduce_rows; ++row) {
+@@ -187,6 +191,7 @@ static SFEM_NOINLINE void apply_residual_packed_defcor(MeshData       &d,
+ // provides such enums) and it can be overriden at runtime." The two sweeps are separate
+ // functions in packed/affine/ and packed/isoparametric/, and this is the only place that
+ // chooses between them -- nothing below here tests the geometry.
++template <bool ScatterProbe = false>
+ static SFEM_NOINLINE void apply_residual_packed(MeshData        &d,
+                                                 PackedData      &p,
+                                                 const scalar_t   rho,
+@@ -218,10 +223,14 @@ static SFEM_NOINLINE void apply_residual_packed(MeshData        &d,
+                 d.nelements, d.p.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, rx, ry, rz, rc, scratch_n);
+     } else {
+ #pragma omp parallel
+-        apply_residual_packed_affine_range(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
++        apply_residual_packed_affine_range<ScatterProbe>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
+                 d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, rx, ry, rz, rc, scratch_n, with_rc);
+     }
+ 
++    if constexpr (ScatterProbe) {
++        if (!g_scatter_accumulate) return;
++    }
++
+     scalar_t *const fields[CVFEM_HEX8_N_FIELDS] = {d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data()};
+ #pragma omp parallel for schedule(static)
+     for (ptrdiff_t row = 0; row < p.n_ghost_reduce_rows; ++row) {
+diff --git a/spikes/cvfem/src/kernels/packed/affine/cvfem_hex8_best_packed_affine.hpp b/spikes/cvfem/src/kernels/packed/affine/cvfem_hex8_best_packed_affine.hpp
+index 8f7716f..f2d251c 100644
+--- a/spikes/cvfem/src/kernels/packed/affine/cvfem_hex8_best_packed_affine.hpp
++++ b/spikes/cvfem/src/kernels/packed/affine/cvfem_hex8_best_packed_affine.hpp
+@@ -17,6 +17,7 @@
+ // Every geometric quantity it needs comes from that constant Jacobian, which is what makes the
+ // variant affine; true per-element geometry belongs to the isoparametric sweep beside it.
+ 
++#include "kernels/cvfem_scatter_probe.hpp"
+ #include "kernels/packed/cvfem_hex8_best_packed.hpp"
+ #include "kernels/packed/cvfem_hex8_best_store.hpp"
+ #include "kernels/standard/cvfem_hex8_best_atomic.hpp"
+@@ -36,7 +37,7 @@
+ // nodes this part owns -- that is what the packed layout is for -- so the parts need no
+ // synchronisation between them, and the ghost rows they do share are reduced afterwards in the
+ // launcher, which is the second and independent parallel loop.
+-template <typename scalar_t, typename idx_t, typename pack_idx_t, typename geom_t>
++template <bool ScatterProbe = false, typename scalar_t, typename idx_t, typename pack_idx_t, typename geom_t>
+ static SFEM_NOINLINE void apply_residual_packed_affine_range(
+         const cvfem_range packs,
+         // The mesh and the pack are staging objects -- they own vectors and a shared_ptr to a
+@@ -127,9 +128,15 @@ static SFEM_NOINLINE void apply_residual_packed_affine_range(
+                 cvfem_hex8_ns_upwind_residual_sumfact_simd(
+                         rho, mu, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det, in, outp,
+                         with_rc ? &rcp : nullptr, rhie_chow_scale);
++                if constexpr (ScatterProbe) {
++                    if (!cvfem_scatter_probe(outp, begin, nlanes)) continue;
++                }
+                 scatter_hex8_simd_to_pack(pack_elems, pack_out, begin, nlanes, outp);
+             }
+ 
++            if constexpr (ScatterProbe) {
++                if (!g_scatter_accumulate) continue;
++            }
+             cvfem_hex8_drain_pack_soa(x, pack_out, n_ghost_entries, ghost_buf, rx, ry, rz, rc);
+     }
+ }
+@@ -515,7 +522,7 @@ static SFEM_NOINLINE void assemble_jacobian_store_affine_range(
+ // nodes this part owns -- that is what the packed layout is for -- so the parts need no
+ // synchronisation between them, and the ghost rows they do share are reduced afterwards in the
+ // launcher, which is the second and independent parallel loop.
+-template <typename scalar_t, typename idx_t, typename pack_idx_t, typename geom_t, typename grad_t>
++template <bool ScatterProbe = false, typename scalar_t, typename idx_t, typename pack_idx_t, typename geom_t, typename grad_t>
+ static SFEM_NOINLINE void apply_residual_packed_defcor_range(
+         const cvfem_range packs,
+         // The mesh and the pack are staging objects -- they own vectors and a shared_ptr to a
+@@ -597,8 +604,14 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_range(
+                 cvfem_hex8_ns_upwind_residual_sumfact_simd(
+                         rho, mu, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, detv, in,
+                         outp, with_rc ? &rcp : nullptr, rhie_chow_scale, scalar_t(0), &hop);
++                if constexpr (ScatterProbe) {
++                    if (!cvfem_scatter_probe(outp, begin, nlanes)) continue;
++                }
+                 scatter_hex8_simd_to_pack(pack_elems, pack_out, begin, nlanes, outp);
+             }
++            if constexpr (ScatterProbe) {
++                if (!g_scatter_accumulate) continue;
++            }
+             cvfem_hex8_drain_pack_soa(x, pack_out, n_ghost_entries, ghost_buf, rx, ry, rz, rc);
+     }
+ }
+diff --git a/spikes/cvfem/src/kernels/standard/affine/cvfem_hex8_best_atomic_affine.hpp b/spikes/cvfem/src/kernels/standard/affine/cvfem_hex8_best_atomic_affine.hpp
+index 3a0a294..c62c5d8 100644
+--- a/spikes/cvfem/src/kernels/standard/affine/cvfem_hex8_best_atomic_affine.hpp
++++ b/spikes/cvfem/src/kernels/standard/affine/cvfem_hex8_best_atomic_affine.hpp
+@@ -1,5 +1,7 @@
+ #pragma once
+ 
++#include "kernels/cvfem_scatter_probe.hpp"
++
+ // The standard layout's affine sweeps.
+ //
+ // Separated by geometry as DESIGN.md asks, by MOVING whole functions: these two sets were always
+@@ -425,7 +427,7 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact(
+ // another layout. Measured at n=128 on Grace, bare and with Rhie-Chow: lane-blocking the atomic
+ // sweep alone is worth 1.29x and 1.37x, and what remains between the layouts -- 2.45x and 1.76x
+ // -- is the format.
+-template <typename scalar_t, typename geom_t, typename idx_t, typename grad_t = scalar_t>
++template <bool ScatterProbe = false, typename scalar_t, typename geom_t, typename idx_t, typename grad_t = scalar_t>
+ static SFEM_NOINLINE void apply_residual_atomic_sumfact_simd(
+         // The staging objects are gone; what this sweep reads out of them is what it takes.
+         const scalar_t *const *const SFEM_RESTRICT adj_ptr,
+@@ -549,6 +551,9 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact_simd(
+                                                        opt.with_rc ? &rcp : nullptr, rhie_chow_scale,
+                                                        scalar_t(0), with_ho ? &hop : nullptr);
+ 
++            if constexpr (ScatterProbe) {
++                if (!cvfem_scatter_probe(outp, e0, nlanes)) continue;
++            }
+             for (int lane = 0; lane < nlanes; ++lane) {
+                 const ptrdiff_t e = e0 + lane;
+                 for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+diff --git a/spikes/cvfem/src/tests/verification/cvfem_coupled_jacobian_fd.hpp b/spikes/cvfem/src/tests/verification/cvfem_coupled_jacobian_fd.hpp
+new file mode 100644
+index 0000000..e71f484
+--- /dev/null
++++ b/spikes/cvfem/src/tests/verification/cvfem_coupled_jacobian_fd.hpp
+@@ -0,0 +1,138 @@
++#ifndef CVFEM_COUPLED_JACOBIAN_FD_HPP
++#define CVFEM_COUPLED_JACOBIAN_FD_HPP
++
++#include <array>
++#include <limits>
++
++// The caller exits after verification, so the fixture cannot enter a timing run.
++static int verify_coupled_jacobian_fd(MeshData &d, PackedData &p, const scalar_t rho,
++                                      const scalar_t mu, const bool with_ho,
++                                      const int limiter, const scalar_t venkat_c) {
++    const ptrdiff_t n = d.nnodes;
++    const auto cfg = cvfem_hex8_rc_config_for(d);
++    if (cfg.tau.u2_scale != scalar_t(1) || cfg.tau.inv_dt_a0 != scalar_t(0) ||
++        cfg.scale != d.rhie_chow_scale) {
++        std::fprintf(stderr, "FAIL: coupled verification requires the default steady RC coefficient\n");
++        return 2;
++    }
++    std::vector<scalar_t> dir(size_t(n) * N_FIELDS);
++    for (ptrdiff_t i = 0; i < n; ++i) {
++        const uint32_t h = uint32_t(i) * 2246822519u + 374761393u;
++        const auto noise = [&](const int shift) {
++            return scalar_t((h >> shift) & 255u) / scalar_t(255) - scalar_t(0.5);
++        };
++        // Move the affine initialization off structural limiter and donor ties.
++        d.ux[i] += scalar_t(0.03) * noise(0);
++        d.uy[i] += scalar_t(0.03) * noise(8);
++        d.uz[i] += scalar_t(0.03) * noise(16);
++        d.p[i] += scalar_t(0.03) * noise(3);
++        for (int c = 0; c < N_FIELDS; ++c) dir[size_t(i) * N_FIELDS + c] = scalar_t(0.25) + noise(c * 5);
++    }
++    const auto ux = d.ux, uy = d.uy, uz = d.uz, pressure = d.p;
++    std::vector<scalar_t> gu, gv, buffer, rp, rm;
++    std::vector<scalar_t> exact(dir.size()), no_qgrad(dir.size()), no_coeff_du(dir.size());
++    auto set_state = [&](const scalar_t step) {
++        for (ptrdiff_t i = 0; i < n; ++i) {
++            d.ux[i] = ux[i] + step * dir[size_t(i) * N_FIELDS];
++            d.uy[i] = uy[i] + step * dir[size_t(i) * N_FIELDS + 1];
++            d.uz[i] = uz[i] + step * dir[size_t(i) * N_FIELDS + 2];
++            d.p[i] = pressure[i] + step * dir[size_t(i) * N_FIELDS + 3];
++        }
++        ++d.state_stamp;
++        cvfem_hex8_assemble_nodal_grads_packed(d, p, 0, d.p.data(), 1, d.pgx, d.pgy, d.pgz, buffer);
++        if (with_ho) {
++            const scalar_t *src[3] = {d.ux.data(), d.uy.data(), d.uz.data()};
++            cvfem_hex8_assemble_nodal_grads_packed(d, p, 0, src, 3, gu, buffer);
++        }
++    };
++    auto action = [&](std::vector<scalar_t> &out) {
++        if (with_ho)
++            apply_jacobian_action_packed(d, p, rho, mu, GeomKind::Affine, dir.data(), out.data(),
++                                        gu.data(), gv.data(), limiter, venkat_c);
++        else
++            apply_jacobian_action_packed(d, p, rho, mu, GeomKind::Affine, dir.data(), out.data());
++    };
++    set_state(scalar_t(0));
++    cvfem_hex8_assemble_nodal_grads_packed(d, p, 0, dir.data() + 3, N_FIELDS,
++                                        d.qgx, d.qgy, d.qgz, buffer);
++    if (with_ho) {
++        const scalar_t *src[3] = {dir.data(), dir.data() + 1, dir.data() + 2};
++        const int strides[3] = {N_FIELDS, N_FIELDS, N_FIELDS};
++        cvfem_hex8_assemble_nodal_grads_packed(d, p, 0, src, 3, gv, buffer, strides);
++    }
++    action(exact);
++
++    // Each omitted sensitivity must be visible to the finite-difference oracle.
++    auto qgx = d.qgx, qgy = d.qgy, qgz = d.qgz;
++    std::fill(d.qgx.begin(), d.qgx.end(), scalar_t(0));
++    std::fill(d.qgy.begin(), d.qgy.end(), scalar_t(0));
++    std::fill(d.qgz.begin(), d.qgz.end(), scalar_t(0));
++    action(no_qgrad);
++    d.qgx.swap(qgx); d.qgy.swap(qgy); d.qgz.swap(qgz);
++    // Preserve the cache key so the action uses these zero derivative weights.
++    auto weights = d.rc_w;
++    std::fill(d.rc_w.begin(), d.rc_w.end(), scalar_t(0));
++    action(no_coeff_du);
++    d.rc_w.swap(weights);
++
++    auto residual = [&](const scalar_t step, std::vector<scalar_t> &out) {
++        set_state(step);
++        if (with_ho) apply_residual_packed_defcor(d, p, rho, mu, gu.data(), limiter, venkat_c);
++        else apply_residual_packed(d, p, rho, mu, GeomKind::Affine);
++        pack_residual(d, out);
++    };
++    const scalar_t tolerance = scalar_t(1e-6);
++    bool passed = true;
++    int required_steps = 0;
++    for (const scalar_t eps : {scalar_t(1e-4), scalar_t(1e-5), scalar_t(1e-6), scalar_t(1e-7)}) {
++        residual(eps, rp);
++        residual(-eps, rm);
++        std::array<scalar_t, N_FIELDS> scale{}, error{};
++        scalar_t scale_all = 0, error_all = 0, qgrad_error = 0, coeff_error = 0;
++        for (size_t i = 0; i < exact.size(); ++i) {
++            const scalar_t fd = (rp[i] - rm[i]) / (scalar_t(2) * eps);
++            if (!std::isfinite(fd) || !std::isfinite(exact[i]) || !std::isfinite(no_qgrad[i]) ||
++                !std::isfinite(no_coeff_du[i])) {
++                std::fprintf(stderr, "FAIL: nonfinite value in coupled derivative check\n");
++                return 1;
++            }
++            const scalar_t delta = std::fabs(fd - exact[i]);
++            scale[i % N_FIELDS] = std::max(scale[i % N_FIELDS], std::fabs(fd));
++            error[i % N_FIELDS] = std::max(error[i % N_FIELDS], delta);
++            scale_all = std::max(scale_all, std::fabs(fd));
++            error_all = std::max(error_all, delta);
++            qgrad_error = std::max(qgrad_error, std::fabs(fd - no_qgrad[i]));
++            coeff_error = std::max(coeff_error, std::fabs(fd - no_coeff_du[i]));
++        }
++        if (!(scale_all > scalar_t(0))) {
++            std::fprintf(stderr, "FAIL: zero coupled finite-difference reference\n");
++            return 1;
++        }
++        bool fields_pass = true;
++        for (int c = 0; c < N_FIELDS; ++c) {
++            // Check each equation separately so momentum cannot hide continuity errors.
++            fields_pass &= scale[c] > scalar_t(0) && error[c] < tolerance * scale[c];
++        }
++        const bool required = eps <= scalar_t(1e-6);
++        const bool controls_fail = qgrad_error > scalar_t(10) * tolerance * scale_all &&
++                                   coeff_error > scalar_t(10) * tolerance * scale_all;
++        std::printf("verify_jac_coupled: ho %d limiter %d eps %.1e required %d rel %.9e "
++                    "fields %.3e %.3e %.3e %.3e no_qgrad %.3e no_coeff_du %.3e\n",
++                    int(with_ho), limiter, double(eps), int(required), double(error_all / scale_all),
++                    double(error[0] / scale[0]), double(error[1] / scale[1]),
++                    double(error[2] / scale[2]), double(error[3] / scale[3]),
++                    double(qgrad_error / scale_all), double(coeff_error / scale_all));
++        if (required) {
++            ++required_steps;
++            passed &= fields_pass && controls_fail;
++        }
++    }
++    if (!passed || required_steps != 2) {
++        std::fprintf(stderr, "FAIL: coupled derivative or omitted-sensitivity control at a required step\n");
++        return 1;
++    }
++    std::printf("verify_jac_coupled: PASSED (all four fields at both required steps)\n");
++    return 0;
++}
++
++#endif
+diff --git a/spikes/cvfem/src/tests/verification/cvfem_jacobian_cache.sh b/spikes/cvfem/src/tests/verification/cvfem_jacobian_cache.sh
+new file mode 100644
+index 0000000..9307f2e
+--- /dev/null
++++ b/spikes/cvfem/src/tests/verification/cvfem_jacobian_cache.sh
+@@ -0,0 +1,88 @@
++#!/usr/bin/env bash
++# Compare complete actions while the Krylov direction changes at a fixed state.
++set -euo pipefail
++bench=${1:?usage: cvfem_jacobian_cache.sh /absolute/path/to/bench}
++work=$(mktemp -d)
++trap 'rm -rf "$work"' EXIT
++cd "$work"
++
++check() {
++    local layout=$1 threads=$2 label=$3
++    shift 3
++    for mode in cached per_apply; do
++        local extra=(--repeat 3)
++        if [[ $mode == per_apply ]]; then extra+=(--rebuild-state-gradients); fi
++        if ! OMP_NUM_THREADS=$threads "$bench" --n 10 --pack-size 64 --layout "$layout" \
++            --jac-action --warmup 1 --live-vectors 3 --perturb 0.017 \
++            --breakdown --dump "$mode.bin" --csv "$mode.csv" "$@" "${extra[@]}" > "$mode.log" 2>&1; then
++            cat "$mode.log"
++            echo "FAIL: $layout/$threads/$label ($mode)"
++            exit 1
++        fi
++        grep -q "^  state_gradients: $mode$" "$mode.log"
++        awk -F, -v mode="$mode" '
++            NR == 1 { for (i=1; i<=NF; ++i) if ($i == "jac_state_gradients") col=i; next }
++            { if (!col || $col != mode) exit 1; rows++ }
++            END { if (!rows) exit 1 }
++        ' "$mode.csv"
++        # Warmup must not enter a phase fraction whose denominator excludes warmup.
++        awk '/^  frac_jac_action_(qgrad|hograd):/ { if ($2 < 0 || $2 > 1.001) exit 1 }' "$mode.log"
++        test -s "$mode.bin"
++        rm "$mode.csv"
++    done
++    if cmp -s cached.bin per_apply.bin; then
++        echo "PASS: $layout/$threads/$label (bit-identical)"
++        return
++    fi
++    # A different field count selects a different compiled reconstruction kernel.
++    # Allow 64 scalar rounding units in the infinity norm, not a limiter-sized error.
++    local tolerance=1.4210854715202004e-14
++    if grep -q '^  scalar: f32' cached.log; then tolerance=7.62939453125e-6; fi
++    for mode in cached per_apply; do
++        LC_ALL=C od -An -v -t f8 "$mode.bin" | awk '{ for (i=1; i<=NF; ++i) print $i }' > "$mode.txt"
++    done
++    paste cached.txt per_apply.txt | LC_ALL=C awk -v tolerance="$tolerance" \
++        -v label="$layout/$threads/$label" '
++        function abs(x) { return x < 0 ? -x : x }
++        NF != 2 || toupper($0) ~ /NAN|INF/ { bad=1; next }
++        { error=abs($1-$2); if (error>max_error) max_error=error;
++          if (abs($1)>scale) scale=abs($1); if (abs($2)>scale) scale=abs($2); count++ }
++        END {
++            relative=scale ? max_error/scale : max_error;
++            ok=!bad && count && relative<=tolerance;
++            printf "%s: %s (relative infinity error %.3e)\n", ok ? "PASS" : "FAIL", label, relative;
++            exit !ok;
++        }'
++}
++
++# Packed reconstruction has a fixed sum order at either thread count.
++for threads in ${CACHE_TEST_THREADS:-1 2}; do
++    check packed "$threads" first_order --rhie-chow
++    for limiter in 0 1 2 3; do
++        check packed "$threads" "limiter_$limiter" --rhie-chow --conv-ho "$limiter"
++        check packed "$threads" "limiter_${limiter}_float_grad" \
++            --rhie-chow --conv-ho "$limiter" --grad-precision single
++    done
++    check packed "$threads" rc_off --conv-ho 0
++    check packed "$threads" rc_off_float_grad --conv-ho 0 --grad-precision single
++    check packed "$threads" closure --rhie-chow --boundary --transient 0.01 --bdf 2
++    check packed "$threads" correction_lagged --rhie-chow --conv-ho 2 --lagged-ho
++done
++# The unperturbed Venkat case fails the existing layout oracle even before this change.
++for limiter in 0 1; do
++    check packed 1 "unperturbed_$limiter" --n 24 --rhie-chow --conv-ho "$limiter" --perturb 0
++done
++
++# Atomic summation order is repeatable only at one thread.
++for layout in atomic ecolor; do
++    check "$layout" 1 first_order --rhie-chow
++    check "$layout" 1 unlimited --rhie-chow --conv-ho 0
++done
++check atomic 1 isoparam --rhie-chow --geom isoparam --warp 0.03
++
++if "$bench" --n 2 --rebuild-state-gradients > refused.log 2>&1; then
++    echo 'FAIL: accepted state-gradient rebuild for a residual'
++    exit 1
++fi
++grep -q 'requires --jac-action' refused.log
++echo 'cvfem_jacobian_cache: PASSED'
+diff --git a/spikes/cvfem/src/tests/verification/cvfem_jacobian_coupled.sh b/spikes/cvfem/src/tests/verification/cvfem_jacobian_coupled.sh
+new file mode 100644
+index 0000000..4f7d4df
+--- /dev/null
++++ b/spikes/cvfem/src/tests/verification/cvfem_jacobian_coupled.sh
+@@ -0,0 +1,36 @@
++#!/usr/bin/env bash
++# Check all four equations and expose both Rhie-Chow sensitivities.
++set -euo pipefail
++bench=${1:?usage: cvfem_jacobian_coupled.sh /absolute/path/to/bench}
++work=$(mktemp -d)
++trap 'rm -rf "$work"' EXIT
++cd "$work"
++args=(--n 8 --pack-size 64 --perturb 0.017 --layout packed --rhie-chow --verify-jac-coupled)
++for threads in ${COUPLED_TEST_THREADS:-1 2}; do
++    for scheme in first 0 1 2 3; do
++        flags=(--jac-action)
++        if [[ $scheme != first ]]; then flags+=(--conv-ho "$scheme"); fi
++        if ! OMP_NUM_THREADS=$threads "$bench" "${args[@]}" "${flags[@]}" > check.log 2>&1; then
++            cat check.log
++            exit 1
++        fi
++        echo "threads=$threads scheme=$scheme"
++        grep '^verify_jac_coupled:' check.log
++        grep -q '^verify_jac_coupled: PASSED' check.log
++        test "$(grep -c 'required 1' check.log)" -eq 2
++    done
++done
++for option in '--lagged-rc' '--lagged-ho' '--boundary' '--transient 0.1' \
++              '--geom isoparam' '--grad-precision single' '--layout atomic'; do
++    if OMP_NUM_THREADS=1 "$bench" "${args[@]}" $option > refused.log 2>&1; then
++        echo "FAIL: coupled check accepted unsupported option $option"
++        exit 1
++    fi
++    grep -q 'requires a standalone packed affine steady RC action' refused.log
++done
++if OMP_NUM_THREADS=1 SFEM_RC_TAU=0 "$bench" "${args[@]}" > refused.log 2>&1; then
++    echo 'FAIL: coupled check accepted a velocity-independent RC coefficient'
++    exit 1
++fi
++grep -q 'requires the default steady RC coefficient' refused.log
++echo 'cvfem_jacobian_coupled: PASSED'
+diff --git a/spikes/cvfem/src/tests/verification/cvfem_jacobian_fd.sh b/spikes/cvfem/src/tests/verification/cvfem_jacobian_fd.sh
+new file mode 100644
+index 0000000..8cea5a7
+--- /dev/null
++++ b/spikes/cvfem/src/tests/verification/cvfem_jacobian_fd.sh
+@@ -0,0 +1,36 @@
++#!/usr/bin/env bash
++# FP64 velocity-direction check on affine geometry, without Rhie-Chow coupling.
++set -euo pipefail
++bench=${1:?usage: cvfem_jacobian_fd.sh /absolute/path/to/bench}
++work=$(mktemp -d)
++trap 'rm -rf "$work"' EXIT
++cd "$work"
++args=(--n 8 --pack-size 64 --perturb 0.017 --layout packed --jac-action
++      --verify-jac-ho --repeat 1 --warmup 0)
++for threads in ${FD_TEST_THREADS:-1 2}; do
++    for eps in 1e-7 1e-8; do
++        for limiter in 0 1 2 3; do
++            if ! OMP_NUM_THREADS=$threads CVFEM_FD_EPS=$eps "$bench" "${args[@]}" \
++                    --conv-ho "$limiter" > check.log 2>&1; then
++                cat check.log
++                exit 1
++            fi
++            grep '^verify_jac_ho:' check.log
++        done
++    done
++done
++# The larger step crosses clip branches. The old percentage rule accepted it.
++if OMP_NUM_THREADS=1 CVFEM_FD_EPS=1e-6 "$bench" "${args[@]}" --conv-ho 1 > crossing.log 2>&1; then
++    cat crossing.log
++    echo 'FAIL: accepted the branch-crossing finite difference'
++    exit 1
++fi
++grep -q 'FAIL: exact higher-order action differs' crossing.log
++for eps in 0 -1 nan inf; do
++    if OMP_NUM_THREADS=1 CVFEM_FD_EPS=$eps "$bench" "${args[@]}" --conv-ho 0 > invalid.log 2>&1; then
++        echo "FAIL: accepted CVFEM_FD_EPS=$eps"
++        exit 1
++    fi
++    grep -q 'FAIL: CVFEM_FD_EPS must be finite and positive' invalid.log
++done
++echo 'cvfem_jacobian_fd: PASSED'
+diff --git a/wip/paper/README.md b/wip/paper/README.md
+index 4021cc9..e490656 100644
+--- a/wip/paper/README.md
++++ b/wip/paper/README.md
+@@ -119,10 +119,11 @@ Three things the rerun turned up that are not about the kernels:
+ - `jobs/camp_full.sbatch` failed in its first seconds on a tree made with `git archive`, because
+   `scripts/layout_campaign.sh` is tracked without its executable bit. Restoring the bit and
+   resubmitting (5003779) is what produced the campaign above; the bit should be fixed in git.
+-- The instruction-mix job's kernel-only throughput was a single run, and three consecutive jobs
+-  each produced one kernel-only figure *below* its own full sweep, which is impossible. The job
+-  now takes the best of three for both sides of that pair (jobs/kernel_mix.sbatch); 5003851 is
+-  the first run of that form, and the scatter shares it reports are back under 1%.
++- In the reviewed source, the instruction-mix job's `--kernel-only` flag has no effect
++  on the residual path. The saved log does not identify its source revision, so its
++  paired rates do not establish scatter cost. The job no longer runs that
++  comparison, and the generator omits its row and macros. Historical raw logs are retained;
++  their instruction counters and ordinary throughput remain separate measurements.
+ - The thread-scaling rows for the standard and element-coloured **Jacobian action with the
+   Rhie--Chow term** fell from 510 to 335 and from 587 to 438 MDOF/s against the 2 October run
+   (4967671). An interleaved check of the reference tree (9b62d097f, the commit the previous
+@@ -237,6 +238,42 @@ These are written down because each has already cost something.
+ | the discretisation | `spikes/cvfem/docs/CVFEM_NSE.tex` |
+ | roofline script | `notebook/compressed/roofline.py` |
+ 
++## Residual accumulation measurement
++
++`--scatter-study` replaces the unsupported residual use of `--kernel-only` with
++a separate FP64 affine diagnostic. Each sample times the normal residual, the
++instrumented full residual, and the same instrumented sweep with accumulation
++bypassed. Twelve samples use all six execution orders twice. The element kernel,
++input staging and existing buffer clearing remain; state-gradient reconstruction
++is outside the timed region. Boundary and transient terms are excluded.
++
++The atomic bypass skips the four nodal atomic additions per element node. The
++packed bypass skips pack-local additions, the owned/ghost drain and the final
++ghost reduction. A compiler escape consumes the full SIMD result in both probe
++arms, so bypassing its additions cannot delete the element calculations. Normal
++calls instantiate the original loop without this instrumentation.
++
++Before timing each case, the diagnostic captures every element's 32 contributions
++in both arms and requires finite, nonzero, bit-identical arrays. Its full nodal
++result must agree with the normal residual within `1e-11` relative infinity norm
++in each equation, and the bypass must leave a zero output. Captures are freed
++before timing; timed loops retain the compiler escape and accumulation switch.
++The job stops on a failed check.
++
++Run `spikes/cvfem/jobs/scatter_study.sh BENCH NEW_OUTPUT_DIRECTORY` inside one
++72-core allocation. It records first-order and Darwish residuals with Rhie--Chow,
++`n=128`, pack size 1024, at one and 72 threads. Analyze the eight logs with
++`spikes/cvfem/scripts/analyze_scatter.py --expect-full OUTPUT_DIRECTORY/*.log`.
++The summary gives mean times, signed paired differences, their range and the
++full-probe overhead relative to normal execution. The atomic-minus-packed gap
++is also split into the bypass gap and the difference in accumulation costs.
++
++This measures the marginal cost of accumulation in the probe, including changes
++in memory traffic and synchronization. It is not an additive instruction cost:
++inspect instrumentation overhead and sample variation before relating the result
++to production performance. Grace results are pending; no replacement scatter-cost
++value has been inserted in the manuscript.
++
+ ## Open
+ 
+ - `refs.bib` holds one placeholder entry so the first build succeeds. Populate and delete it.
+diff --git a/wip/paper/figures/kmix_macros.tex b/wip/paper/figures/kmix_macros.tex
+index b897a7e..984aeb4 100644
+--- a/wip/paper/figures/kmix_macros.tex
++++ b/wip/paper/figures/kmix_macros.tex
+@@ -1,19 +1,15 @@
+ \newcommand{\kmixIpcPacked}{2.85}
+ \newcommand{\kmixStallPctPacked}{48}
+ \newcommand{\kmixStallMemPctPacked}{29}
+-\newcommand{\kmixScatterPctPacked}{0.4}
+ \newcommand{\kmixIpcAtomic}{1.68}
+ \newcommand{\kmixStallPctAtomic}{60}
+ \newcommand{\kmixStallMemPctAtomic}{12}
+-\newcommand{\kmixScatterPctAtomic}{0.1}
+ \newcommand{\kmixIpcPackedHo}{2.95}
+ \newcommand{\kmixStallPctPackedHo}{44}
+ \newcommand{\kmixStallMemPctPackedHo}{29}
+-\newcommand{\kmixScatterPctPackedHo}{1.0}
+ \newcommand{\kmixIpcAtomicHo}{2.06}
+ \newcommand{\kmixStallPctAtomicHo}{57}
+ \newcommand{\kmixStallMemPctAtomicHo}{14}
+-\newcommand{\kmixScatterPctAtomicHo}{0.1}
+ \newcommand{\kmixRateFo}{1.91}
+ \newcommand{\kmixIpcRatioFo}{1.70}
+ \newcommand{\kmixRateHo}{1.44}
+diff --git a/wip/paper/main.tex b/wip/paper/main.tex
+index 3333369..9bd8086 100644
+--- a/wip/paper/main.tex
++++ b/wip/paper/main.tex
+@@ -771,8 +771,13 @@ fixed --- \emph{lagged} one Newton step --- the gradient is an input to the appl
+ than part of it. Differentiated, the Jacobian action needs the reconstructed gradient of the
+ \emph{direction} and not only of the state, which is one further pass per operator
+ application. All four
+-combinations are implemented and measured (\S\ref{sec:res:hoexact}); the limiters are
+-differentiated where they are differentiable and a subgradient is taken where they are not.
++combinations are implemented and measured (\S\ref{sec:res:hoexact}). Here ``exact'' means
++that all reconstruction and flux sensitivities are retained on differentiable branches.
++At limiter ties or a zero mass flux, the action uses the implemented tie conventions;
++a classical Jacobian need not exist. In particular, writing a convective flux as
++$m^+ u_L + m^- u_R$, with $m^\pm=(m\pm|m|)/2$, shows that its two derivatives at
++$m=0$ differ when the reconstructed states $u_L$ and $u_R$ differ. Roundoff can then
++select different branches in two layouts even when their residuals agree.
+ 
+ \paragraph{Operators.} The names below are used throughout, in the tables and figures as well as
+ the text. The subscript is the Rhie--Chow term, whose sensitivity is to the pressure gradient,
+@@ -788,7 +793,7 @@ $\Fres(u)$ is the residual with first-order upwinding and $\Fho(u)$ the residual
+ deferred correction. Both carry the Rhie--Chow coupling and so read $\Gop p(u)$; $\Fho$ reads
+ $\Gop u(u)$ as well.
+ 
+-Three Jacobian actions are measured, each either fully exact or fully lagged. $\Jex(u)\,v$ is
++Three Jacobian actions are measured. $\Jex(u)\,v$ is
+ the exact Jacobian of $\Fres$: it differentiates the coupling through the reconstruction and so
+ rebuilds $\Gop p(v)$ on every application. $\Jhoex(u)\,v$ is the exact Jacobian of $\Fho$, adding
+ the differentiated correction and the derivative of the limiter, and rebuilding $\Gop u(v)$ with
+@@ -799,15 +804,24 @@ sensitivity, and rebuilds nothing.
+ $\Jlag$ is what that implicit treatment gives: the correction is an explicit source, so it
+ contributes nothing to the operator, which is why a single matrix serves every scheme and why
+ $\Jlag$ is one operator rather than one per scheme. The price is that it is an
+-inconsistent linearisation of $\Fho$: against a finite difference of $\Fho$, $\Jhoex$ agrees to
+-\hoxFdUnlim{} where $\Jlag$ is wrong by \num{6e-2} (\S\ref{sec:res:hoexact}), so $\Jhoex$ is what
+-a solve must apply to converge on the higher-order residual. Between them sits a partially
++approximate linearisation of $\Fho$: for the unlimited correction, $\Jhoex$ agrees with a
++finite difference to \hoxFdUnlim{} where $\Jlag$ differs by \num{6e-2}
++(\S\ref{sec:res:hoexact}). An approximate Jacobian can still converge to a root of $\Fho$;
++these action checks do not establish nonlinear convergence. Between them sits a partially
+ implicit treatment: the correction's derivative splits into the mass-flux sensitivity times the
+ increment at $\Gop u(u)$, which needs no direction reconstruction, and the increment's own
+ derivative at $\Gop u(v)$, which does, and keeping only the first is neither form measured here.
+ 
+-The mixed combinations --- one sensitivity differentiated and the other lagged --- are the exact
+-Jacobian of no residual, and are not measured.
++With the higher-order correction treated as an explicit source, $\Jex$ is also the
++correction-lagged, RC-exact action. It is an approximate derivative of $\Fho$, and an exact
++derivative of the surrogate residual with that source held fixed.
++
++Caching a reconstruction at the current state is distinct from dropping its sensitivity.
++For $F(u)=\mathcal{R}(u,g(u))$, differentiation gives
++$F'(u)v=\mathcal{R}_u v+\mathcal{R}_g g'(u)v$ wherever the derivatives exist.
++During a Krylov solve, $u$ is fixed: $g(u)$ can be reused while $g'(u)v$ is evaluated for
++each direction. Both terms are retained in the exact action. The state cache must be
++refreshed when the state or geometry changes.
+ 
+ The assembled matrix holds $\Jlag$ alone, for the sparsity reason of
+ \S\ref{sec:cost}. Algorithm~\ref{alg:jacaction} is where the forms part, and the driver
+@@ -822,7 +836,7 @@ records which one ran.
+ \Ensure $\Jex(u)\,v$, or $\Jhoex(u)\,v$ when the correction is carried; $\Jlag(u)\,v$ when lagged
+ \If{exact}
+   \State $q, g_v \gets \Gop p(v)$, and $\Gop u(v)$ if the correction is carried
+-         \Comment{\emph{one} sweep of Algorithm~\ref{alg:apply}: $3$ fields, or $4$ at the same
++         \Comment{\emph{one} sweep of Algorithm~\ref{alg:apply}: $1$ scalar field, or $4$ at the same
+                   stride}
+ \Else
+   \State $q, g_v \gets \varnothing$
+@@ -838,11 +852,10 @@ records which one ran.
+          limiter's included --- at $g_v$
+ \EndIf
+ \State add the boundary closure and the transient term, each an extra sweep
+-\Statex The exact forms cost one reconstruction of the \emph{direction} per operator application,
+-        and that is the whole of what they cost: $\Gop p(u)$ and $\Gop u(u)$ are hoisted across
++\Statex The exact forms require one reconstruction of the \emph{direction} per operator application:
++        $\Gop p(u)$ and $\Gop u(u)$ are hoisted across
+         the Krylov solve because $u$ is fixed there, while $\Gop p(v)$ and $\Gop u(v)$ change
+-        every iteration and cannot be. \S\ref{sec:res:hoexact} measures what the second pair
+-        buys.
++        every iteration and cannot be cached across different directions.
+ \end{algorithmic}
+ \end{algorithm}
+ 
+@@ -852,8 +865,8 @@ must be \emph{complete} before any flux may use it. That is a data dependency, s
+ reconstruction cannot fuse into the flux sweep: it is a separate pass ending in its own ghost
+ reduction. A state reconstruction is hoisted --- computed once per Newton step and reused across
+ the Krylov solve, since $u$ is fixed there --- and a direction reconstruction cannot be, because
+-the direction changes every iteration. That is the whole of the difference between $\Jlag$ and
+-$\Jex$ in Table~\ref{tab:passes}.
++the direction changes every iteration. This adds one reconstruction pass to $\Jex$ relative to
++$\Jlag$ in Table~\ref{tab:passes}, as well as derivative arithmetic in the flux kernel.
+ 
+ \begin{figure}[t]
+   \centering
+@@ -869,8 +882,8 @@ $\Jex$ in Table~\ref{tab:passes}.
+     below are counted in units of it, and its count is per sweep whatever number of fields it
+     carries. The last column is what the operator reads but does not rebuild: a state
+     reconstruction, computed once per Newton step and read by every application in that step, or
+-    the assembly. Both are measured on their own (\S\ref{sec:res:hoexact},
+-    \S\ref{sec:res:spmv}).}
++    the assembly. Residual rows describe the flux sweep with reconstruction supplied;
++    evaluating the residual at a new or trial state also requires refreshing those fields.}
+   \label{tab:passes}
+   \small
+   \begin{tabular}{@{}lccl@{}}
+@@ -883,29 +896,27 @@ $\Jex$ in Table~\ref{tab:passes}.
+     $\Fres(u)$                        & 1 & 1 & $\Gop p(u)$ \\
+     $\Fho(u)$                         & 1 & 1 & $\Gop p(u)$, $\Gop u(u)$ \\
+     $\Jlag(u)\,v$                     & 1 & 1 & $\Gop p(u)$ \\
+-    $\Jex(u)\,v$                      & 2 & 2 & --- \\
+-    $\Jhoex(u)\,v$                    & 2 & 2 & --- \\
++    $\Jex(u)\,v$                      & 2 & 2 & $\Gop p(u)$ \\
++    $\Jhoex(u)\,v$                    & 2 & 2 & $\Gop p(u)$, $\Gop u(u)$ \\
+     SpMV with $\Jlag$                 & 0 & 0 & assembly \\
+     \bottomrule
+   \end{tabular}
+ \end{table}
+ 
+-Table~\ref{tab:passes} collects the counts. The exact actions hoist \emph{nothing}, and that is
+-what makes them exact applications rather than exact sensitivities evaluated at frozen fields: an
+-operator that reads a reconstruction evaluates it. $\Jex$ rebuilds $\Gop p(v)$ and $\Gop p(u)$,
+-$\Jhoex$ rebuilds those two and $\Gop u(v)$, $\Gop u(u)$ as well, and each is one sweep rather
+-than two or four because the sweep takes a base pointer and a stride per field: the direction's
+-interleaved fields and the state's contiguous ones go in together, two fields on $\Jex$ and eight
+-on $\Jhoex$. $\Jlag$ is the form that keeps the cache, which is what lagging means, so it reads
+-$\Gop p(u)$ without rebuilding it. $\Fho$ likewise stays at one sweep because its correction is
+-lagged, which moves $\Gop u(u)$ into the last column rather than making it disappear. The
+-assembled matrix performs no element sweep per application but pays a full assembly --- the most
+-expensive sweep here --- once per Newton step, and thereafter streams a matrix two orders of
+-magnitude larger than the mesh.
+-
+-That the reconstruction is one sweep is what makes the exact forms affordable, and it is most of
+-what they cost: \S\ref{sec:res:hoexact} measures it at \SI{\hoxFracPacked}{\percent} of the
+-packed $\Jhoex$ and \SI{\hoxFracAtomic}{\percent} of the atomic one.
++Table~\ref{tab:passes} describes the cached-state implementation. Each exact action has one
++reconstruction sweep: one scalar input field for $\Jex$, or four for $\Jhoex$. The latter
++fuses the direction's pressure and three velocity components. $\Jlag$ omits the direction
++reconstruction because it drops that sensitivity, not because it caches the state.
++The assembled matrix performs no element sweep per application but pays for assembly once
++per Newton step.
++
++The exact-action timings currently reported in the results were obtained with the
++earlier implementation, which also rebuilt the state gradients inside each application:
++two scalar input fields for $\Jex$ and eight for $\Jhoex$, fused in one sweep. The benchmark
++retains this scope through \texttt{--rebuild-state-gradients}; its default now caches the
++state reconstruction. Both modes retain the same derivatives. The existing measurements
++must therefore be read as rates for the rebuild mode, not as measurements of the cached
++implementation. A performance comparison requires new runs with the mode recorded.
+ 
+ The driver times that sweep separately, so its share of the application appears beside the
+ element kernel's rather than folded into it.
+@@ -1234,10 +1245,12 @@ cancellation, so a term can be present at every node and absent from the total.
+ \subsection{$\Jhoex$, the exact higher-order Jacobian action}
+ \label{sec:res:hoexact}
+ 
+-With the correction left an explicit source, the action of $\Fho$ is $\Jex$ (\S\ref{sec:setup}).
+-$\Jhoex$ instead costs one reconstruction $\Gop u(v)$ per operator
+-application --- nine components against the three $\Gop p(v)$ that $\Jex$ already rebuilds ---
+-and the limiter's own derivative, which is not free: the unlimited arm reaches
++With the correction left an explicit source, $\Jex$ approximates the derivative of $\Fho$
++(\S\ref{sec:setup}). $\Jhoex$ also reconstructs $\Gop u(v)$ and differentiates the limiter.
++The measurements in this section use the rebuild mode: their fused sweep includes both
++state and direction gradients, eight scalar input fields for $\Jhoex$ against two for
++$\Jex$. Thus the measured cost includes redundant state reconstruction as well as the
++additional sensitivities. In this mode, the unlimited arm reaches
+ \hoxExactPackedUnlim{}~MDOF/s against Venkatakrishnan's \hoxExactPacked{}, a factor of
+ $\hoxLimiterCost$.
+ 
+@@ -1266,20 +1279,29 @@ the pressure gradient at \ngPgradPacked{} against \ngPgradAtomic{}~MDOF/s, a fac
+ $\ngPgradRatio$, and the three-component velocity gradient at \ngUgradPacked{} against
+ \ngUgradAtomic{}, a factor of $\ngUgradRatio$ --- both far above the
+ \hoxLayoutLagged$\times$ the element sweeps get. Almost all of a reconstruction is indexed
+-traffic, which the layout removes, and almost none is arithmetic, which it cannot touch. It is
+-also where $\Jhoex$ spends its time: the reconstruction is \SI{\hoxFracPacked}{\percent}
+-of the packed application against \SI{\hoxFracAtomic}{\percent} of the standard one --- on the
+-standard layout it is almost the whole operator. All four gradients are taken in ONE sweep --- they read different fields of the same array at the same
+-stride, so together they are a four-field sweep rather than a one-field and a three-field one ---
+-which is why those shares cover all four and why they differ so much between the layouts: the
+-fixed half of a sweep that fusing saves is \SI{46}{\percent} of a one-field sweep packed and
+-\SI{4}{\percent} atomic, the atomic one being dominated by a scatter that scales with the field
+-count. That is also why the atomic $\Jhoex$ is so nearly all reconstruction: its sweep pays the
+-field count where the packed one does not.
+-
+-$\Jhoex$ is the derivative it claims to be: against a finite difference of $\Fho$ with $\Gop u$
+-rebuilt at each perturbed state it agrees to \hoxFdUnlim{} on the unlimited arm, where the
+-deferred correction's action differs by \num{6e-2}.
++traffic, with relatively little arithmetic. The standalone one- and three-field sweeps
++do not measure the same work as the fused eight-field reconstruction in the recorded
++$\Jhoex$ runs. Their throughput should not be used to infer its share of the action.
++The recorded phase fractions also included warmup time in the reconstruction counter
++but excluded it from total application time. The benchmark now resets both counters
++before measurement; corrected phase fractions require new runs.
++
++On the tested unlimited case, a finite difference of $\Fho$ with $\Gop u$ rebuilt at
++each perturbed state agrees with $\Jhoex$ to \hoxFdUnlim{}, whereas the
++correction-lagged action differs by \num{6e-2}. This does not validate all limiter
++branches. For limited cases, a central difference that crosses a limiter or donor
++switch is not a reference for the action's chosen branch. Validation must distinguish
++such crossings from errors on unchanged branches; a small fraction of disagreeing
++nodes alone does not establish correctness. The regressions require a relative infinity
++error below \num{1e-6} at two prescribed step sizes on perturbed states. The first
++checks velocity directions without Rhie--Chow coupling. A separate coupled check
++perturbs all four unknowns, rebuilds the state reconstructions, and checks each
++momentum and continuity equation separately. It also requires controls omitting the
++pressure-gradient sensitivity or the coefficient's velocity sensitivity to fail.
++These checks cover the tested steady, affine interior operators; they do not establish
++nonlinear convergence or boundary and transient consistency. Residual agreement
++between layouts also does not establish agreement of their selected linearizations
++at a switch.
+ 
+ \subsection{Against the lagged matrix}
+ \label{sec:res:spmv}
+@@ -1327,12 +1349,10 @@ ridge of
+ \rlRidge{}~FLOP/byte, so the memory roof is the binding one --- but none of them is close to it.
+ Against the roof binding at its own intensity the packed residual attains
+ \rlResidualPackedPct\%, the packed Jacobian action \rlJacobianPackedPct\%, and the atomic sweeps
+-\rlResidualAtomicPct\%, while the lagged SpMV attains \rlSpmvFSixFourPct\%. The asymmetry is the
+-result: the lagged operator is genuinely bandwidth-bound and has almost nothing left to recover,
+-whereas the matrix-free kernels are limited neither by bandwidth nor by arithmetic but by the
+-element kernel's instruction mix and dependencies, and retain the corresponding headroom. The
+-format's contribution is to need far less traffic in the first place, not to use the available
+-bandwidth better.
++\rlResidualAtomicPct\%, while the lagged SpMV attains \rlSpmvFSixFourPct\%. The lagged product reaches a larger fraction of this roof than the matrix-free kernels.
++These fractions alone do not identify the limiting mechanism: low attained bandwidth can
++also reflect latency or dependencies. The instruction counters below provide additional
++observations, without isolating the cost of scatter.
+ 
+ \begin{table}[t]
+   \centering
+@@ -1348,30 +1368,25 @@ bandwidth better.
+   \inputifready{tables/kmix}{instruction mix, jobs/kernel\_mix.sbatch}
+ \end{table}
+ 
+-Table~\ref{tab:kmix} says which. The mixes are similar and removing the scatter moves either
+-sweep by under \SI{1}{\percent} (\kmixScatterPctPacked\% and \kmixScatterPctAtomic\%), so neither
+-explains the gap; retirement does, at \kmixIpcPacked{} instructions per cycle against
+-\kmixIpcAtomic{} from a back-end stalled \kmixStallPctPacked\% of cycles against
+-\kmixStallPctAtomic\%. That stall is not a wait on memory where it hurts ---
+-\kmixStallMemPctAtomic\% of the standard layout's stall cycles against \kmixStallMemPctPacked\% of
+-the packed layout's --- which fits the atomic updates serialising, and is outside what the
+-roofline's axes can express.
+-
+-The second scheme is what tests that reading. Adding the limited correction issues
+-$\kmixInstGrowthPacked\times$ and $\kmixInstGrowthAtomic\times$ the instructions and shifts the
+-mix the same way on each --- loads and stores take a markedly larger share as the hoisted nodal
+-gradient is read, and addressing arithmetic and the vector share give up the room --- so the
+-\emph{composition} still does not separate them. Retirement again does,
+-and it moves with the throughput: the standard layout's rate rises from \kmixIpcAtomic{} to
+-\kmixIpcAtomicHo{} instructions per cycle while the packed layout's rises only from
+-\kmixIpcPacked{} to \kmixIpcPackedHo{}, so the retirement ratio falls from
+-$\kmixIpcRatioFo\times$ to $\kmixIpcRatioHo\times$ against a throughput ratio that falls from
+-$\kmixRateFo\times$ to $\kmixRateHo\times$. The two track each other, which is the evidence that
+-retirement is the mechanism and not a correlate of it: arithmetic the scatter cannot serialise
+-gives the stalled layout work to issue between its atomic updates, and its stall share falls from
+-\kmixStallPctAtomic\% to \kmixStallPctAtomicHo\% while the packed layout's does not move
+-(\kmixStallPctPacked\% to \kmixStallPctPackedHo\%). The format's advantage is largest exactly
+-where there is least other work to hide the serialisation behind.
++Table~\ref{tab:kmix} reports similar instruction mixes but different retirement rates:
++\kmixIpcPacked{} instructions per cycle for packed against \kmixIpcAtomic{} for standard.
++The back-end stall shares are \kmixStallPctPacked\% and \kmixStallPctAtomic\%, respectively;
++the reported memory-wait fractions of those stalls are \kmixStallMemPctPacked\% and
++\kmixStallMemPctAtomic\%. These counters do not isolate the effects of atomic updates,
++indexing or accumulation. In the reviewed benchmark source, the flag used for an earlier
++comparison labelled ``scatter removed'' does not change either residual sweep. The saved
++measurement log does not identify its source revision, so that comparison does not establish
++scatter cost and is omitted here.
++
++Adding the limited correction increases the instruction counts by
++$\kmixInstGrowthPacked\times$ and $\kmixInstGrowthAtomic\times$. The standard layout's
++retirement rate rises from \kmixIpcAtomic{} to \kmixIpcAtomicHo{} instructions per cycle,
++while the packed layout's rises from \kmixIpcPacked{} to \kmixIpcPackedHo{}.
++The retirement-rate ratio falls from $\kmixIpcRatioFo\times$ to $\kmixIpcRatioHo\times$,
++alongside a throughput ratio that falls from $\kmixRateFo\times$ to $\kmixRateHo\times$.
++This association is consistent with a change in instruction throughput, but it does not
++establish why the layouts differ. A controlled experiment that changes accumulation while
++holding the other work fixed would be needed to attribute the gap to scatter.
+ 
+ \paragraph{Measured against specified.} The two roof pairs differ by more than any kernel here can
+ recover: the triad attains \rlBwPctSpec\% of specified bandwidth and the \textsc{gemm}
+diff --git a/wip/paper/python/perf_figures.py b/wip/paper/python/perf_figures.py
+index 8e67975..32ff6cc 100644
+--- a/wip/paper/python/perf_figures.py
++++ b/wip/paper/python/perf_figures.py
+@@ -1946,11 +1946,7 @@ def macros_kmix(mix):
+         put("kmixStallPct" + tag, 100.0 * m["STALL_BACKEND"] / m["cycles"], "%.0f")
+         put("kmixStallMemPct" + tag,
+             100.0 * m["STALL_BACKEND_MEM"] / m["STALL_BACKEND"], "%.0f")
+-        put("kmixScatterPct" + tag,
+-            abs(100.0 * (m["mdof_kernel_only"] / m["mdof"] - 1.0)), "%.1f")
+-    # The reading the higher-order arm was measured for: the throughput ratio between the layouts
+-    # and the retirement-rate ratio, on each arm. If retirement is what separates the layouts then
+-    # the two must move together as the scheme adds arithmetic, and only a second arm can say so.
++    # Compare throughput and retirement ratios without attributing a cause.
+     for sfx, tag in (("", "Fo"), ("_ho", "Ho")):
+         if "packed" + sfx not in mix:
+             continue
+@@ -2026,20 +2022,6 @@ def table_kmix(mix):
+     out.append(row(r"\quad of which waiting on memory",
+                    lambda c: 100.0 * mix[c]["STALL_BACKEND_MEM"] / mix[c]["STALL_BACKEND"],
+                    "%.0f"))
+-    out.append(r"\midrule")
+-    # The staging is gather, scatter, ghost reduction and zeroing. Dropping it with --kernel-only
+-    # says how much of the sweep is the element kernel, which is what the roofline's y-axis counts.
+-    # What this row actually measures, which is NOT what it used to claim. --kernel-only has the
+-    # element kernel write to a dense stack buffer and skip the SCATTER; it does not remove the
+-    # gather or the staging. So the ratio is the scatter's share of the sweep, not the element
+-    # kernel's, and the label said the latter. It is also small enough to sit at the resolution
+-    # limit of two separate runs -- the standard layout measured 0.5% FASTER with the scatter than
+-    # without, which printed as "101%" of the sweep and is simply noise. Reported as a signed
+-    # delta with one decimal so that a value inside the noise reads as inside the noise.
+-    out.append(row(r"scatter removed, \% rate change" if wide
+-                   else r"scatter, change in sweep rate when removed",
+-                   lambda c: 100.0 * (mix[c]["mdof_kernel_only"] / mix[c]["mdof"] - 1.0),
+-                   "%+.1f"))
+     out += [r"\bottomrule", r"\end{tabular}"]
+     return "\n".join(out) + "\n"
+ 
+@@ -2787,6 +2769,19 @@ def selftest():
+         check(p32 == {("res_rc", "packed"): (110.0, 190.0)},
+               "the f32 job's n=128 best columns are read, other sizes are not", repr(p32))
+ 
++        mix = {layout: dict(instructions=200, cycles=100, STALL_BACKEND=50,
++                            STALL_BACKEND_MEM=10, INST_SPEC=200, ASE_SPEC=40,
++                            VFP_SPEC=20, LD_SPEC=30, ST_SPEC=10, DP_SPEC=80, mdof=100)
++               for layout in ("packed", "atomic", "packed_ho", "atomic_ho")}
++        km_table, km_macros = table_kmix(mix), macros_kmix(mix)
++        check("instructions per cycle" in km_table and "scatter" not in km_table
++              and "kmixIpcPacked" in km_macros and "kmixScatter" not in km_macros,
++              "instruction mix needs no unsupported scatter measurement")
++        for values in mix.values():
++            values["mdof_kernel_only"] = float("nan")
++        check(table_kmix(mix) == km_table and macros_kmix(mix) == km_macros,
++              "historical kernel-only rows cannot change the generated table or macros")
++
+         # Missing data must be absent, not fabricated.
+         with tempfile.TemporaryDirectory() as td2:
+             written = build(os.path.join(td2, "f"), os.path.join(td2, "t"))
+diff --git a/wip/paper/tables/kmix.tex b/wip/paper/tables/kmix.tex
+index 746879b..40acb4f 100644
+--- a/wip/paper/tables/kmix.tex
++++ b/wip/paper/tables/kmix.tex
+@@ -17,7 +17,5 @@
+ instructions per cycle & 2.85 & 1.68 & 2.95 & 2.06 \\
+ back-end stall, \% of cycles & 48 & 60 & 44 & 57 \\
+ \quad of which waiting on memory & 29 & 12 & 29 & 14 \\
+-\midrule
+-scatter removed, \% rate change & +0.4 & -0.1 & +1.0 & +0.1 \\
+ \bottomrule
+ \end{tabular}

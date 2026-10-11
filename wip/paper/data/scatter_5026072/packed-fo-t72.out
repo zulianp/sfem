@@ -1,0 +1,29 @@
+/capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/build/cvfem/cvfem_hex8_ns_upwind_bench --n 128 --pack-size 1024 --repeat 10 --warmup 3 --scatter-study --scatter-samples 12 --rhie-chow --layout packed 
+--------------------
+| PackedMesh |
+n_packs: 2048
+elements_per_pack: 1024
+Memory PackedMesh: 40214.8 KB
+Original:      55738.3 KB
+--------------------
+rhie_chow: scale 1, nodal gradient hoisted out of the timed loop
+scatter_capture entries=67108864 finite=1 nonzero=1 identical=1 bypass_zero=1
+scatter_equivalence field=0 relative=0 tolerance=1e-11
+scatter_equivalence field=1 relative=0 tolerance=1e-11
+scatter_equivalence field=2 relative=0 tolerance=1e-11
+scatter_equivalence field=3 relative=0 tolerance=1e-11
+scatter_gate PASS
+scatter_config layout=packed elements=2097152 nodes=2146689 threads=72 ho=0 limiter=0 repeat=10 warmup=3 samples=12
+scatter_sample 0 0.0049216358000000009 0.0049553149000000005 0.0039695164000000003
+scatter_sample 1 0.0049643835000000008 0.004932009900000001 0.0040005588000000007
+scatter_sample 2 0.0049147592000000004 0.0049381473000000009 0.0039714748000000003
+scatter_sample 3 0.0049110920000000006 0.0048973676000000008 0.0039711259000000006
+scatter_sample 4 0.0048857423000000007 0.0049115144000000006 0.0039671708999999998
+scatter_sample 5 0.0049079818000000008 0.0049150056000000011 0.0039636285
+scatter_sample 6 0.0049048458000000008 0.0049266501000000008 0.0039685020000000005
+scatter_sample 7 0.0049411809000000006 0.0052565647000000007 0.0039794841000000006
+scatter_sample 8 0.0049293348000000008 0.0049330882000000013 0.0039668605000000006
+scatter_sample 9 0.0048709587000000006 0.0049312227000000005 0.0039469602000000003
+scatter_sample 10 0.0049225702000000003 0.0049386657000000007 0.0039237448000000001
+scatter_sample 11 0.0049277284000000011 0.0049087241000000011 0.0039702012000000005
+scatter_study PASS
