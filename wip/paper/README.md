@@ -98,6 +98,7 @@ tree carrying it, and the generator picks the newest file per prefix, so these a
 | exact higher-order Jacobian breakdown | 5005769 | `data/hoexact_5005769.out` |
 | instruction mix | 5003851 | `data/kmix_5003851.out` |
 | residual accumulation diagnostic | 5026072 (nid006544) | `data/scatter_5026072/` |
+| checked residual traffic and work | 5039102 (nid006550) | `data/residual_counters_5039102/` |
 | higher-order size sweep | 5005800 | `data/hosize_5005800.out` |
 
 The rows naming jobs 5005763-5005800 were measured again after the limiter derivatives' rounding
@@ -140,40 +141,66 @@ Three things the rerun turned up that are not about the kernels:
 returned, the file was fetched, and the measured lines match the transcription exactly
 (PEAK_FP64_GFLOPS 2305.3). The file is now the fetched copy and the caveat is withdrawn.
 
-## The roofline is built on measured traffic, after a model that was wrong
+## Roofline audit (11 October 2026)
 
-The intensity of every matrix-free point used to come from a compulsory-traffic model, and the model
-was wrong in a way that inverted a conclusion. It counted, per dof, 16 B of field vectors plus 6.8 B
-of "mesh" (connectivity and nodal coordinates). But the bare affine kernel reads no nodal
-coordinates -- they are staged only when Rhie--Chow or the boundary closure is on -- and it does read
-the cached affine geometry, `jacobian_adjugate[9]` and `jacobian_determinant`, **ten doubles per
-element**, which is 19.5 B/dof: larger than every term the model did count. Two further faults: the
-atomic points were drawn with the *packed* connectivity width, so their intensity was identical to
-the packed points' by construction and the prose then reasoned from that identity; and the mesh
-figure was taken from the smallest problem size in the campaign rather than the n=128 the figure is
-drawn at.
+The historical plot combines different nodes. `data/roofline_sources.json` now pins
+six input files and their hashes; `tables/roofline_sources.tex` records the jobs and
+hostnames. The traffic file has no hostname, raw event rows, source SHA, binary hash,
+or CPU/PMU mapping. Hashing the archive now preserves it; it does not recover that
+missing provenance. No older DRAM row is silently substituted for a missing new row.
 
-Rather than repair the model, the points are now placed on **measured DRAM traffic** from the Grace
-SCF counters, differenced across two repeat counts so setup and warmup cancel exactly. Units were
-established rather than assumed: `cmem_rd_access` is exactly half `cmem_rd_data` in every row, which
-fixes `cmem_rd_data` as 32-byte flits, and the interpretation is corroborated by the atomic sweep
-reading more than the packed one in both operators and writing more on the residual, as its wider
-index, node re-reads, zeroing pass and read-modify-write updates require.
+The first-order points are bare kernels without Rhie--Chow. The higher-order traffic
+was captured for Darwish with coupling, so only that limiter is plotted. Its action
+predates the state-gradient cache correction. The FLOP model counts element work,
+including a correction increment, but omits separate reconstruction and RC work.
+Both axes now say modelled work; the plot cannot establish full-operator intensity.
 
-Effect on the conclusions, which is why this is recorded here rather than only in the commit:
+NVIDIA documents read data beats times 32 plus write bytes. A 2:1 ratio of read
+beats to accesses is not an independent calibration of the unit. Subtracting two
+process-wide captures estimates a slope; setup and background traffic need not
+cancel exactly. STREAM useful bytes and SCF transported bytes can differ because
+of write allocation. The earlier percentages and bottleneck conclusions have been
+removed. DGEMM remains a benchmark reference rather than a universal upper bound.
+The documented GH200 nominal 500 GB/s is retained in the hardware table, while the
+unsupported 3.55 TFLOP/s specification and dashed vendor roof are removed.
 
-| | old model | corrected model | measured |
-|---|---:|---:|---:|
-| traffic, packed residual | 22.8 B/dof | 39.5 | **51.5** |
-| intensity, packed residual | 8.1 | 4.7 | **3.6** |
-| intensity, atomic residual | 8.1 (identical by construction) | 4.2 | **3.2** |
+The new counter-calibration job is the first required Grace gate before collecting
+replacement operator points. Raw historical logs and ordinary throughput figures
+remain unchanged. Remeasurement must record the selected node, CPU/memory binding,
+PMU instance, event coverage, binary/source hashes, and each operator's dispatched
+terms and cache mode. Use the same transported-byte convention for the bandwidth
+reference and operator points; report PMU operations separately from the source
+FLOP model, since the PMU events count speculative operations of all precisions.
 
-Measured intensity is below the measured ridge of 5.1 for every matrix-free arm, so the memory roof
-binds -- but each attains only 11--29% of it, while the assembled SpMV attains 92% of its own. The
-format's contribution is to need less traffic, not to use bandwidth better; the matrix-free kernels
-are limited by the element kernel's instruction mix and retain headroom, and the assembled operator
-does not. An intermediate draft of this analysis said "bandwidth-bound", which the attained
-fractions contradict; it does not.
+## Accepted residual counter campaign (12 October 2026)
+
+Job 5039102 on nid006550 passes the fixed reuse controls and the actual residual
+campaign. `data/residual_counters_5039102/` contains a hash-bound archive of the
+public raw counts, requests, outputs, source records and patch chain.
+`python/residual_counter_figures.py`, called by `make figures` and `make selftest`,
+checks the archive and captured analysis, reconstructs every count and numerical
+check, and reproduces the acceptance summaries before emitting the table/macros.
+The source verification also checked 4,273 bundle entries, 7 operator and 11
+calibration source hashes, 144 operator records and 60 controls. All 1,152
+per-field before/after checks pass; maximum relative error is 4.145e-16.
+
+Scope is fixed-state FP64 affine interior residuals at n=128, pack=1024, 72 threads,
+Rhie--Chow on, first-order/Darwish, cached state gradients, without boundary or
+transient terms. Each scheme/layout uses six worker blocks with retained arrays,
+30 warmups before every capture and all six orders of 10/40/70 sweeps. A normal
+40-sweep capture alternates before/after each block; empty controls bracket its
+counted captures. Normal samples have no perf monitors. All acceptance limits
+are unchanged; no samples or background counts are subtracted.
+
+Normal atomic/packed times are 9.624/4.960 ms (1.940x) for first-order and
+15.137/10.659 ms (1.420x) for Darwish. Mean transported bytes change by +3.75%
+and -3.11%, respectively. Comparable traffic alongside these speedups rules out
+a large reduction in transferred bytes as their explanation in this fixture;
+it does not isolate the hardware bottleneck. The earlier controlled accumulation
+experiment is independent evidence for the benefit of the accumulation method.
+The reference rates use transported bytes; the work counts are speculative PMU
+operations, not a useful-FLOP model. No Jacobian, compute ceiling, solver result
+or complete replacement roofline is accepted by this campaign.
 
 ## Claims discipline
 

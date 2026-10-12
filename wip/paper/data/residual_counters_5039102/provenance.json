@@ -1,0 +1,16 @@
+{
+  "job": "5039102",
+  "host": "nid006550",
+  "threads": 72,
+  "n": 128,
+  "pack_size": 1024,
+  "precision": "fp64",
+  "geometry": "affine",
+  "rhie_chow": true,
+  "state_gradients": "cached",
+  "boundary": false,
+  "transient": false,
+  "archive": "captures.tar.gz",
+  "sha256": "5a08c0480c7114f6010ca4b2a2c3309c02c4d375fd38b47570c8b6f8e4e11873",
+  "archive_files": 1306
+}

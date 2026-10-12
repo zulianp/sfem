@@ -1,0 +1,38 @@
+{
+  "campaign": {
+    "file": "campaign_grace_5003779.csv",
+    "host": "nid005994",
+    "job": "5003779",
+    "sha256": "4486db4ba871646b6addbe2041973d2cdf48bb0ff3e6aae745808dc963424847"
+  },
+  "stream": {
+    "file": "stream_4789412.out",
+    "host": "nid006544",
+    "job": "4789412",
+    "sha256": "39425dc4ff0d04587bed23ae30e1e20e829bda61c772c14e8ef8cd4eedaf7985"
+  },
+  "peak": {
+    "file": "peak_4811812.out",
+    "host": "nid006544",
+    "job": "4811812",
+    "sha256": "6e287f926df5e650baa068f50b7047c205d5d07881ba189f1ba9ef29dabb540e"
+  },
+  "dram": {
+    "file": "dram_5005775.out",
+    "host": null,
+    "job": "5005775",
+    "sha256": "028ec51df0498a32a23ae739c4d8f87aef1bb099836939ec843f399b24963314"
+  },
+  "convho": {
+    "file": "convho_5006526.out",
+    "host": "nid006545",
+    "job": "5006526",
+    "sha256": "ceeda7f07a8862ebc5fee09a24ecd87db7c31eb51192a17fb8f768b7dbac5c29"
+  },
+  "jacho": {
+    "file": "jacho_5006527.out",
+    "host": "nid005791",
+    "job": "5006527",
+    "sha256": "8bbb8cebc854dd341816c85552d095c7f732b37e49d9520245e0b3c1e078754f"
+  }
+}

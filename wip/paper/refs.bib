@@ -169,13 +169,26 @@
 % told apart from the ones measured here. Note the 7.1 TFLOP/s figure that circulates for Grace
 % is the dual-die CPU Superchip; a single 72-core Grace die is half of it.
 @misc{NvidiaGrace2023,
-  author       = {{NVIDIA Corporation}},
-  title        = {{NVIDIA Grace CPU Superchip Architecture Whitepaper}},
-  year         = {2023},
-  howpublished = {\url{https://www.nvidia.com/en-us/data-center/grace-cpu-superchip/}},
-  note         = {72 Arm Neoverse~V2 cores per die, $4\times$\SI{128}{\bit} SVE2 per core,
-                  LPDDR5X up to \SI{500}{\giga\byte\per\second}, \SI{3.55}{\tera\flops} FP64
-                  peak per die},
+  author = {{NVIDIA Corporation}},
+  title = {{NVIDIA Grace Performance Tuning Guide: Platform Specifications}},
+  year = {2026},
+  howpublished = {\url{https://docs.nvidia.com/dccpu/grace-perf-tuning-guide/index.html}},
+  note = {Accessed 11 October 2026; GH200 platform table},
+}
+
+@misc{NvidiaGraceCounters,
+  author = {{NVIDIA Corporation}},
+  title = {{Measuring Workload Performance with Hardware Performance Counters}},
+  year = {2026},
+  howpublished = {\url{https://docs.nvidia.com/dccpu/grace-perf-tuning-guide/measuring-performance.html}},
+  note = {Accessed 11 October 2026},
+}
+
+@misc{StreamAccounting,
+  author = {John D. McCalpin},
+  title = {{STREAM Benchmark Reference Information: Counting Bytes and FLOPS}},
+  howpublished = {\url{https://www.cs.virginia.edu/stream/ref.html}},
+  note = {Accessed 11 October 2026},
 }
 
 % ==============================================================================================
