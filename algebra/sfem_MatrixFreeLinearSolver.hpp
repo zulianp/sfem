@@ -187,7 +187,7 @@ namespace sfem {
     public:
         virtual ~ShiftableOperator()                   = default;
         virtual int shift(const SharedBuffer<T>& diag) = 0;
-        virtual int shift(const std::shared_ptr<SparseBlockVector<T>>& block_diag, const SharedBuffer<T>& scaling) {
+        virtual int shift(const std::shared_ptr<SparseBlockVector<T>>& /*block_diag*/, const SharedBuffer<T>& /*scaling*/) {
             assert(false);
             SFEM_ERROR("[Error] ShiftableOperator::shift(block_diag, scaling) not implemented!\n");
             return SFEM_FAILURE;
@@ -204,16 +204,16 @@ namespace sfem {
         virtual void set_n_dofs(const ptrdiff_t n)                                 = 0;
         virtual void set_initial_guess_zero(const bool /*val*/) {}
         virtual int  iterations() const = 0;
-        virtual int  set_op_and_diag_shift(const std::shared_ptr<Operator<T>>& op, const SharedBuffer<T>& diag) {
+        virtual int  set_op_and_diag_shift(const std::shared_ptr<Operator<T>>& /*op*/, const SharedBuffer<T>& /*diag*/) {
             SFEM_ERROR(
                     "set_op_and_diag_shift: not implemented for subclass of "
                      "MatrixFreeLinearSolver!\n");
             return SFEM_FAILURE;
         }
 
-        virtual int set_op_and_diag_shift(const std::shared_ptr<Operator<T>>&          op,
-                                          const std::shared_ptr<SparseBlockVector<T>>& sbv,
-                                          const SharedBuffer<T>&                       diag) {
+        virtual int set_op_and_diag_shift(const std::shared_ptr<Operator<T>>&          /*op*/,
+                                          const std::shared_ptr<SparseBlockVector<T>>& /*sbv*/,
+                                          const SharedBuffer<T>&                       /*diag*/) {
             SFEM_ERROR(
                     "set_op_and_diag_shift: not implemented for subclass of "
                     "MatrixFreeLinearSolver!\n");

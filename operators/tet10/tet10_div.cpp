@@ -642,13 +642,13 @@ void tet10_integrate_div(const ptrdiff_t nelements,
         printf("tet10_div.c: tet10_integrate_div\t%g seconds\n", tock - tick);
 }
 
-void tet10_cdiv(const ptrdiff_t nelements,
-                const ptrdiff_t nnodes,
-                idx_t **const SFEM_RESTRICT elems,
-                geom_t **const SFEM_RESTRICT xyz,
-                const real_t *const SFEM_RESTRICT ux,
-                const real_t *const SFEM_RESTRICT uy,
-                const real_t *const SFEM_RESTRICT uz,
-                real_t *const SFEM_RESTRICT div) {
+void tet10_cdiv(const ptrdiff_t /*nelements*/,
+                const ptrdiff_t /*nnodes*/,
+                idx_t **const SFEM_RESTRICT /*elems*/,
+                geom_t **const SFEM_RESTRICT /*xyz*/,
+                const real_t *const SFEM_RESTRICT /*ux*/,
+                const real_t *const SFEM_RESTRICT /*uy*/,
+                const real_t *const SFEM_RESTRICT /*uz*/,
+                real_t *const SFEM_RESTRICT /*div*/) {
     SFEM_ERROR("tet10_cdiv not implemented!\n");
 }

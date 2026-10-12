@@ -130,7 +130,6 @@ void tri3_apply_mass(const ptrdiff_t nelements,
 #pragma omp for  // nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[3];
-            idx_t ks[3];
             real_t element_x[3];
             real_t element_vector[3];
 
@@ -247,7 +246,6 @@ void tri3_assemble_lumped_mass(const ptrdiff_t nelements,
     // double tick = MPI_Wtime();
 
     idx_t ev[3];
-    idx_t ks[3];
 
     real_t element_vector[3];
 

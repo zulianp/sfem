@@ -53,9 +53,6 @@ int solve_obstacle(const std::shared_ptr<sfem::Communicator> &comm, int argc, ch
     int SFEM_USE_PROJECTED_CG = 0;
     SFEM_READ_ENV(SFEM_USE_PROJECTED_CG, atoi);
 
-    int SFEM_TEST_AGAINST_LINEAR = 0;
-    SFEM_READ_ENV(SFEM_TEST_AGAINST_LINEAR, atoi);
-
     int SFEM_MAX_IT = 4000;
     SFEM_READ_ENV(SFEM_MAX_IT, atoi);
 

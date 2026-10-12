@@ -233,10 +233,7 @@ namespace sfem {
             T* ub               = (upper_bound_) ? upper_bound_->data() : nullptr;
             lagr_lb             = lb ? make_buffer(n_constrained_dofs) : nullptr;
             lagr_ub             = ub ? make_buffer(n_constrained_dofs) : nullptr;
-            const T* const l_lb = lagr_lb ? lagr_lb->data() : nullptr;
-            const T* const l_ub = lagr_ub ? lagr_ub->data() : nullptr;
 
-            T penetration_norm = 0;
             T penetration_tol  = 1 / (penalty_param_ * 0.1);
 
             int count_inner_iter        = 0;
@@ -390,7 +387,7 @@ namespace sfem {
             }
 
             write_stats();
-            return SFEM_SUCCESS;
+            return converged ? SFEM_SUCCESS : SFEM_FAILURE;
         }
 
         void clear() {
@@ -998,7 +995,7 @@ namespace sfem {
                     blas_->zeros(mem_coarse->solution->size(), mem_coarse->solution->data());
                 }
 
-                CycleReturnCode ret = cycle(coarser_level(level));
+                cycle(coarser_level(level));
 
                 {
                     // Prolongation

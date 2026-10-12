@@ -34,6 +34,7 @@ namespace sfem {
                                               const real_t *const  d3,
                                               real_t *const        d6,
                                               const ExecutionSpace es) {
+        SFEM_UNUSED(es);
         if (n_nodes <= 0 || !d3 || !d6) {
             return;
         }
@@ -174,7 +175,7 @@ namespace sfem {
     std::shared_ptr<ShiftedPenalty<real_t>> create_shifted_penalty(const std::shared_ptr<Function>         &f,
                                                                    const std::shared_ptr<ContactConditions> contact_conds,
 
-                                                                   const std::shared_ptr<Input> &in) {
+                                                                   const std::shared_ptr<Input> & /*in*/) {
         const enum ExecutionSpace es          = f->execution_space();
         auto                      fs          = f->space();
         const int                 block_size  = fs->block_size();
@@ -268,14 +269,14 @@ namespace sfem {
 
         void check() {
             for (auto &l : levels) {
-                if (l->count && l->mapping->size() > static_cast<ptrdiff_t>(l->count->size())) {
+                if (l->count && static_cast<ptrdiff_t>(l->mapping->size()) > static_cast<ptrdiff_t>(l->count->size())) {
                     SFEM_ERROR("Mapping larger than incidence count! %ld > %ld\n", l->mapping->size(), (long)l->count->size());
                 }
             }
 
             const int nlevels = levels.size();
             for (int l = 0; l < nlevels - 1; l++) {
-                if (levels[l]->mapping->size() != restrict_penalization[l]->cols()) {
+                if (static_cast<ptrdiff_t>(levels[l]->mapping->size()) != restrict_penalization[l]->cols()) {
                     SFEM_ERROR("Mapping and restrict_penalization inconsistent sizes! %ld != %ld\n",
                                levels[l]->mapping->size(),
                                restrict_penalization[l]->cols());
@@ -302,7 +303,7 @@ namespace sfem {
             ptrdiff_t n_prefix = 0;
             auto      data     = sides->data();
             for (int r = 0; r < static_cast<int>(sides->extent(0)); ++r) {
-                for (ptrdiff_t e = 0; e < sides->extent(1); ++e) {
+                for (ptrdiff_t e = 0; e < static_cast<ptrdiff_t>(sides->extent(1)); ++e) {
                     const idx_t id = data[r][e];
                     if (id >= 0 && static_cast<ptrdiff_t>(id) < n_owned && static_cast<ptrdiff_t>(id) + 1 > n_prefix) {
                         n_prefix = static_cast<ptrdiff_t>(id) + 1;
@@ -455,8 +456,6 @@ namespace sfem {
 
             auto            fs             = f->space();
             auto           &ssmesh         = f->space()->mesh();
-            const int       L              = smesh::semistructured_level(ssmesh);
-            const ptrdiff_t sym_block_size = (fs->block_size() == 3 ? 6 : 3);
 
             std::vector<int> levels = smesh::derefinement_levels(ssmesh);
             this->levels.clear();

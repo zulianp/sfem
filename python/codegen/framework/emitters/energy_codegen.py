@@ -423,7 +423,7 @@ def affine_geometry_stream_helper_lines(source_builder=None):
         "",
         _block_template_head("typename s_t", "typename g_t"),
         "%s const s_t *ageom_stream(" % inline_qualifier,
-        *("    %s," % parameter for parameter in _count_params()),
+        *("    %s," % parameter for parameter in _unnamed_count_params()),
         "    const g_t *const RSTR source,",
         "    s_t *const RSTR,",
         "    std::true_type) {",
@@ -4642,13 +4642,7 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
             lines.append("        s_t bcoordinate_data[NS * ND]%s;" % _wi_extent())
             for stream in _soa_array_stream_names(_adjugate_input(dim)):
                 lines.append("        s_t b%s[%s];" % (stream, c_product("NQ", *_width_factors())))
-            lines.extend(
-                [
-                    "        s_t bdet0[%s];" % c_product("NQ", *_width_factors()),
-                    "        s_t *badj_streams[ND * ND] = {%s};"
-                    % ", ".join("badj%d" % i for i in range(dim * dim)),
-                ]
-            )
+            lines.append("        s_t bdet0[%s];" % c_product("NQ", *_width_factors()))
         lines.extend(
             [
                 "",
@@ -6547,13 +6541,7 @@ def _sfem_soa_packed_apply_public_wrappers(
                 lines.append("        s_t bcoordinate_data[NS * ND]%s;" % _wi_extent())
                 for stream in _soa_array_stream_names(_adjugate_input(dim)):
                     lines.append("        s_t b%s[%s];" % (stream, c_product("NQ", *_width_factors())))
-                lines.extend(
-                    [
-                        "        s_t bdet0[%s];" % c_product("NQ", *_width_factors()),
-                        "        s_t *badj_streams[ND * ND] = {%s};"
-                        % ", ".join("badj%d" % i for i in range(dim * dim)),
-                    ]
-                )
+                lines.append("        s_t bdet0[%s];" % c_product("NQ", *_width_factors()))
             if uses_current:
                 lines.extend(
                     _ordered_stream_pointer_array_lines(
@@ -8737,10 +8725,6 @@ def _sfem_soa_hessian_packed_crs_passes(
         for stream in _soa_array_stream_names(_adjugate_input(dim)):
             lines.append("        s_t b%s[%s];" % (stream, c_product("NQ", *_width_factors())))
         lines.append("        s_t bdet0[%s];" % c_product("NQ", *_width_factors()))
-        lines.append(
-            "        s_t *badj_streams[ND * ND] = {%s};"
-            % ", ".join("badj%d" % i for i in range(dim * dim))
-        )
         lines.extend(
             [
                 "",
@@ -9061,8 +9045,9 @@ def _holding_one_element_hessian_matrix_assembly_function(
     if not is_affine_assembly:
         for d in range(dim):
             lines.append(
-                "  const g_t *const RSTR %s = points[%d];"
-                % (_component_name(d), d)
+                kernel_local(
+                    _component_name(d), "points[%d]" % d, "const g_t *const RSTR"
+                )
             )
         lines.extend(
             _ordered_element_pointer_array_lines(
@@ -9106,11 +9091,6 @@ def _holding_one_element_hessian_matrix_assembly_function(
     for stream in _soa_array_stream_names(_adjugate_input(dim)):
         lines.append("    s_t b%s[%s];" % (stream, c_product("NQ", *_width_factors())))
     lines.append("    s_t bdet0[%s];" % c_product("NQ", *_width_factors()))
-    if not is_affine_assembly:
-        lines.append(
-            "    s_t *badj_streams[ND * ND] = {%s};"
-            % ", ".join("badj%d" % i for i in range(dim * dim))
-        )
     lines.extend(
         [
             "",
@@ -11438,6 +11418,11 @@ _COUNT = {True: ("ne",), False: ()}
 
 def _count_params():
     return tuple("const int %s" % name for name in _COUNT[_has_width()])
+
+
+def _unnamed_count_params():
+    """The same parameters for an overload that never reads the count."""
+    return tuple("const int" for _ in _COUNT[_has_width()])
 
 
 def _count_args():

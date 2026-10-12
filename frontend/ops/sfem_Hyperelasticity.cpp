@@ -346,7 +346,7 @@ namespace sfem {
             }
 
             int apply_aos(const ptrdiff_t      nelements,
-                          const ptrdiff_t      nnodes,
+                          const ptrdiff_t      /*nnodes*/,
                           idx_t **const        elements,
                           geom_t **const       points,
                           const real_t *const  u,
@@ -728,8 +728,8 @@ namespace sfem {
     Hyperelasticity::Hyperelasticity(const std::shared_ptr<FunctionSpace> &space) : impl_(std::make_unique<Impl>(space)) {}
 
     int Hyperelasticity::hessian_crs(const real_t *const  x,
-                                     const count_t *const rowptr,
-                                     const idx_t *const   colidx,
+                                     const count_t *const /*rowptr*/,
+                                     const idx_t *const   /*colidx*/,
                                      real_t *const        values) {
         SFEM_TRACE_SCOPE("Hyperelasticity::hessian_crs");
 
@@ -869,15 +869,16 @@ namespace sfem {
                             sfem::create_host_buffer<metric_tensor_t>(domain.second.block->n_elements() * IKMN_SIZE);
                 }
                 auto kernels = impl_->find_kernels(domain.second);
-                int  ok      = kernels->hessian_partial_assembly(domain.second.block->n_elements(),
-                                                           assembly_data->elements_stride,
-                                                           assembly_data->elements->data(),
-                                                           mesh->points()->data(),
-                                                           3,
-                                                           &u[0],
-                                                           &u[1],
-                                                           &u[2],
-                                                           assembly_data->partial_assembly_buffer->data());
+                int err = kernels->hessian_partial_assembly(domain.second.block->n_elements(),
+                                                            assembly_data->elements_stride,
+                                                            assembly_data->elements->data(),
+                                                            mesh->points()->data(),
+                                                            3,
+                                                            &u[0],
+                                                            &u[1],
+                                                            &u[2],
+                                                            assembly_data->partial_assembly_buffer->data());
+                if (err != SFEM_SUCCESS) return err;
                 assembly_data->compress_partial_assembly(domain.second);
             }
         }

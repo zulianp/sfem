@@ -275,7 +275,6 @@ int sshex8_prolongate(const ptrdiff_t                   nelements,
 
 #pragma omp parallel
     {
-        const int from_nxe    = sshex8_nxe(from_level);
         const int to_nxe      = sshex8_nxe(to_level);
         const int step_factor = to_level / from_level;
 

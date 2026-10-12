@@ -229,7 +229,7 @@ namespace sfem {
                       SharedBuffer<T>&       b_values) {
         const ptrdiff_t rows = a_rowptr->size() - 1;
 
-        if (b_rowptr->size() != columns + 1) {
+        if ((ptrdiff_t)b_rowptr->size() != columns + 1) {
             b_rowptr = create_host_buffer<R>(columns + 1);
         }
 
@@ -241,11 +241,11 @@ namespace sfem {
 
         crs_transpose_sym(rows, columns, d_a_rowptr, d_a_colidx, d_a_values, d_b_rowptr);
 
-        if (b_colidx->size() != d_b_rowptr[columns]) {
+        if ((ptrdiff_t)b_colidx->size() != d_b_rowptr[columns]) {
             b_colidx = create_host_buffer<C>(d_b_rowptr[columns]);
         }
 
-        if (b_values->size() != d_b_rowptr[columns]) {
+        if ((ptrdiff_t)b_values->size() != d_b_rowptr[columns]) {
             b_values = create_host_buffer<T>(d_b_rowptr[columns]);
         }
 
@@ -273,7 +273,7 @@ namespace sfem {
                SharedBuffer<T>&       c_values) {
         const ptrdiff_t rows = a_rowptr->size() - 1;
 
-        if (c_rowptr->size() != rows + 1) {
+        if ((ptrdiff_t)c_rowptr->size() != rows + 1) {
             c_rowptr = create_host_buffer<R>(rows + 1);
         }
 
@@ -305,11 +305,11 @@ namespace sfem {
                    n_workspaces);
 
         // Allocate column indices
-        if (c_colidx->size() != d_c_rowptr[rows]) {
+        if ((ptrdiff_t)c_colidx->size() != d_c_rowptr[rows]) {
             c_colidx = create_host_buffer<C>(d_c_rowptr[rows]);
         }
 
-        if (c_values->size() != d_c_rowptr[rows]) {
+        if ((ptrdiff_t)c_values->size() != d_c_rowptr[rows]) {
             c_values = create_host_buffer<T>(d_c_rowptr[rows]);
         }
 

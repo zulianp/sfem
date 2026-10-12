@@ -20,7 +20,7 @@ namespace codegen {
 
 template <typename s_t, typename g_t, int VS>
 SFEM_INLINE const s_t *ageom_stream(
-    const int ne,
+    const int,
     const g_t *const RSTR source,
     s_t *const RSTR,
     std::true_type) {
@@ -840,8 +840,6 @@ static int saint_venant_kirchhoff_tri6_hessian_i_msoa_assemble_impl(
   static constexpr int NS = 6;
   static constexpr int NDOFS = NC * NS;
   const s_t *const u_components[NC] = {ux, uy};
-  const g_t *const RSTR x = points[0];
-  const g_t *const RSTR y = points[1];
   const s_t *const isoparametric_grad_ref_x = sfem::codegen::ref_tri6_q6<s_t>::grad_ref_x();
   const s_t *const isoparametric_grad_ref_y = sfem::codegen::ref_tri6_q6<s_t>::grad_ref_y();
   const s_t *const isoparametric_q_weight = sfem::codegen::quad_tri_q6<s_t>::q_weight();
@@ -859,7 +857,6 @@ static int saint_venant_kirchhoff_tri6_hessian_i_msoa_assemble_impl(
     s_t badj2[NQ];
     s_t badj3[NQ];
     s_t bdet0[NQ];
-    s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
 
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t node = elements[shape][element];

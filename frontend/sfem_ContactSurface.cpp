@@ -333,7 +333,6 @@ namespace sfem {
         if (st == smesh::INVALID) {
             SFEM_ERROR("Invalid element type: %d\n", space->element_type());
         }
-        const int       nnxs = elem_num_nodes(st);
 
         auto mesh_for_surface = space->mesh_ptr();
         auto sides = smesh::create_surface_from_sidesets(mesh_for_surface, sidesets).second;

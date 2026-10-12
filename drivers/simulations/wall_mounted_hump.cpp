@@ -40,7 +40,7 @@ static void zero_buffer(const std::shared_ptr<sfem::Buffer<real_t>> &buffer) {
 
 static real_t dot(const std::shared_ptr<sfem::Buffer<real_t>> &left, const std::shared_ptr<sfem::Buffer<real_t>> &right) {
     real_t value = 0;
-    for (ptrdiff_t i = 0; i < left->size(); ++i) {
+    for (ptrdiff_t i = 0; i < static_cast<ptrdiff_t>(left->size()); ++i) {
         value += left->data()[i] * right->data()[i];
     }
     return value;
@@ -116,7 +116,7 @@ static void split_state(const std::shared_ptr<sfem::Buffer<real_t>> &state,
                         const std::shared_ptr<sfem::Buffer<real_t>> &u1,
                         const std::shared_ptr<sfem::Buffer<real_t>> &u2,
                         const std::shared_ptr<sfem::Buffer<real_t>> &p) {
-    for (ptrdiff_t node = 0; node < u0->size(); ++node) {
+    for (ptrdiff_t node = 0; node < static_cast<ptrdiff_t>(u0->size()); ++node) {
         u0->data()[node] = state->data()[4 * node + 0];
         u1->data()[node] = state->data()[4 * node + 1];
         u2->data()[node] = state->data()[4 * node + 2];
@@ -369,7 +369,7 @@ static int run_wall_mounted_hump(const std::shared_ptr<sfem::Communicator> &comm
                 return EXIT_FAILURE;
             }
 
-            for (ptrdiff_t dof = 0; dof < state->size(); ++dof) {
+            for (ptrdiff_t dof = 0; dof < static_cast<ptrdiff_t>(state->size()); ++dof) {
                 state->data()[dof] -= nonlinear_alpha * correction->data()[dof];
             }
             function->apply_constraints(state->data());

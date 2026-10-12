@@ -450,38 +450,6 @@ static SFEM_INLINE void find_cols4(const idx_t *targets, const idx_t *const row,
     }
 }
 
-#ifndef NDEBUG
-static int check_symmetric(int n, const real_t *const element_matrix) {
-    for (int i = 0; i < n; ++i) {
-        for (int j = 0; j < n; ++j) {
-            const real_t diff = element_matrix[i * n + j] - element_matrix[i + j * n];
-            assert(diff < 1e-16);
-            if (diff > 1e-16) {
-                return 1;
-            }
-
-            // printf("%g ",  element_matrix[i*n + j] );
-        }
-
-        // printf("\n");
-    }
-
-    // printf("\n");
-
-    return 0;
-}
-#endif
-
-#ifndef NDEBUG
-static void numerate(int n, real_t *const element_matrix) {
-    for (int i = 0; i < n; ++i) {
-        for (int j = 0; j < n; ++j) {
-            element_matrix[i * n + j] = i * n + j;
-        }
-    }
-}
-#endif
-
 static const int n_qp = 8;
 static const real_t qx[8] = {0.0, 1.0, 0.0, 0.0, 0.333333333333, 0.333333333333, 0.0, 0.333333333333};
 static const real_t qy[8] = {0.0, 0.0, 1.0, 0.0, 0.333333333333, 0.0, 0.333333333333, 0.333333333333};

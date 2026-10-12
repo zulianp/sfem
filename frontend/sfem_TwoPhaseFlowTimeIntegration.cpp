@@ -46,7 +46,7 @@ namespace sfem {
 
     int TwoPhaseFlowTimeIntegration::initialize() {
         const ptrdiff_t ndofs = 2 * impl_->mesh->n_nodes();
-        if (!impl_->initial_state || impl_->initial_state->size() != ndofs ||
+        if (!impl_->initial_state || (ptrdiff_t)impl_->initial_state->size() != ndofs ||
             !impl_->dirichlet) {
             return SFEM_FAILURE;
         }
@@ -139,7 +139,7 @@ namespace sfem {
                 folder / (std::string("state.") +
                           std::string(smesh::TypeToString<real_t>::value()));
         auto state = Buffer<real_t>::from_file(state_path);
-        if (!state || state->size() != 2 * impl_->mesh->n_nodes()) {
+        if (!state || (ptrdiff_t)state->size() != 2 * impl_->mesh->n_nodes()) {
             return SFEM_FAILURE;
         }
         std::ifstream metadata((folder / "restart.txt").c_str());

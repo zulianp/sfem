@@ -12,7 +12,7 @@ static /*SFEM_INLINE*/ void tet10_add_convection_rhs_kernel(const real_t px0,
                                                         const real_t pz2,
                                                         const real_t pz3,
                                                         const real_t dt,
-                                                        const real_t nu,
+                                                        const real_t /*nu*/,
                                                         real_t *const SFEM_RESTRICT u,
                                                         real_t *const SFEM_RESTRICT
                                                             element_vector) {

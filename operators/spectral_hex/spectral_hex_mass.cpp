@@ -98,11 +98,9 @@ int lagrange_hex_mass_apply_tpl(const ptrdiff_t                   nelements,
             break;
         }
     }
+    SFEM_UNUSED(n_qp);
 
     lagrange_eval<scalar_t>(order, Q, qx, S);
-
-    const int nxe = sshex8_nxe(order);
-    const int txe = sshex8_txe(order);
 
     const int hex8_corners[8] = {// Bottom
                                  sshex8_lidx(order, 0, 0, 0),
@@ -197,9 +195,6 @@ int spectral_hex_mass_apply_tpl(const ptrdiff_t                   nelements,
 
     static const int N  = order + 1;
     static const int N3 = N * N * N;
-
-    const int nxe = sshex8_nxe(order);
-    const int txe = sshex8_txe(order);
 
     const int hex8_corners[8] = {// Bottom
                                  sshex8_lidx(order, 0, 0, 0),

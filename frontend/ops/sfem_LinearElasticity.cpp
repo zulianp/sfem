@@ -55,7 +55,7 @@ namespace sfem {
                 return false;
             }
 
-            node[key] >> value;
+            node[key].load(&value);
             return true;
         }
 
@@ -518,9 +518,9 @@ namespace sfem {
 
     LinearElasticity::~LinearElasticity() = default;
 
-    int LinearElasticity::hessian_crs(const real_t *const  x,
-                                      const count_t *const rowptr,
-                                      const idx_t *const   colidx,
+    int LinearElasticity::hessian_crs(const real_t *const  /*x*/,
+                                      const count_t *const /*rowptr*/,
+                                      const idx_t *const   /*colidx*/,
                                       real_t *const        values) {
         SFEM_TRACE_SCOPE("LinearElasticity::hessian_crs");
 
@@ -549,9 +549,9 @@ namespace sfem {
         return err;
     }
 
-    int LinearElasticity::hessian_bsr(const real_t *const  x,
-                                      const count_t *const rowptr,
-                                      const idx_t *const   colidx,
+    int LinearElasticity::hessian_bsr(const real_t *const  /*x*/,
+                                      const count_t *const /*rowptr*/,
+                                      const idx_t *const   /*colidx*/,
                                       real_t *const        values) {
         SFEM_TRACE_SCOPE("LinearElasticity::hessian_bsr");
 
@@ -580,9 +580,9 @@ namespace sfem {
         return err;
     }
 
-    int LinearElasticity::hessian_bcrs_sym(const real_t *const  x,
-                                           const count_t *const rowptr,
-                                           const idx_t *const   colidx,
+    int LinearElasticity::hessian_bcrs_sym(const real_t *const  /*x*/,
+                                           const count_t *const /*rowptr*/,
+                                           const idx_t *const   /*colidx*/,
                                            const ptrdiff_t      block_stride,
                                            real_t **const       diag_values,
                                            real_t **const       off_diag_values) {
@@ -615,7 +615,7 @@ namespace sfem {
         return err;
     }
 
-    int LinearElasticity::hessian_block_diag_sym(const real_t *const x, real_t *const values) {
+    int LinearElasticity::hessian_block_diag_sym(const real_t *const /*x*/, real_t *const values) {
         SFEM_TRACE_SCOPE("LinearElasticity::hessian_block_diag_sym");
 
         auto mesh = impl_->space->mesh_ptr();
@@ -651,7 +651,7 @@ namespace sfem {
         return err;
     }
 
-    int LinearElasticity::hessian_block_diag_sym_soa(const real_t *const x, real_t **const values) {
+    int LinearElasticity::hessian_block_diag_sym_soa(const real_t *const /*x*/, real_t **const values) {
         SFEM_TRACE_SCOPE("LinearElasticity::hessian_block_diag_sym_soa");
 
         auto mesh = impl_->space->mesh_ptr();
@@ -869,11 +869,11 @@ namespace sfem {
 
         if (node.has_child("ASSUME_AFFINE")) {
             int assume_affine = ret->impl_->use_affine_approximation ? 1 : 0;
-            node["ASSUME_AFFINE"] >> assume_affine;
+            node["ASSUME_AFFINE"].load(&assume_affine);
             ret->impl_->use_affine_approximation = assume_affine != 0;
         } else if (node.has_child("assume_affine")) {
             int assume_affine = ret->impl_->use_affine_approximation ? 1 : 0;
-            node["assume_affine"] >> assume_affine;
+            node["assume_affine"].load(&assume_affine);
             ret->impl_->use_affine_approximation = assume_affine != 0;
         }
 

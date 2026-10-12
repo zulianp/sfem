@@ -48,7 +48,7 @@ int main(int argc, char* argv[]) {
     const char* data_path     = argv[11];
     const char* output_folder = argv[12];
 
-    struct stat st = {0};
+    struct stat st = {};
     if (stat(output_folder, &st) == -1) {
         mkdir(output_folder, 0700);
     }
@@ -84,7 +84,6 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    ptrdiff_t n   = nglobal[0] * nglobal[1] * nglobal[2];
     geom_t*   sdf = 0;
     ptrdiff_t nlocal[3];
 

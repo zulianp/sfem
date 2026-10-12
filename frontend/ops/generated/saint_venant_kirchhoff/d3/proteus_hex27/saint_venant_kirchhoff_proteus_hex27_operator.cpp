@@ -20,7 +20,7 @@ namespace codegen {
 
 template <typename s_t, typename g_t, int VS>
 SFEM_INLINE const s_t *ageom_stream(
-    const int ne,
+    const int,
     const g_t *const RSTR source,
     s_t *const RSTR,
     std::true_type) {
@@ -730,7 +730,6 @@ static SFEM_INLINE int saint_venant_kirchhoff_proteus_hex27_objective_steps_pack
         s_t badj7[NQ * VS];
         s_t badj8[NQ * VS];
         s_t bdet0[NQ * VS];
-        s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
 
         const s_t *bu_streams[NS * NC] = {bu_data[0], bu_data[1], bu_data[2], bu_data[3], bu_data[4], bu_data[5], bu_data[6], bu_data[7], bu_data[8], bu_data[9], bu_data[10], bu_data[11], bu_data[12], bu_data[13], bu_data[14], bu_data[15], bu_data[16], bu_data[17], bu_data[18], bu_data[19], bu_data[20], bu_data[21], bu_data[22], bu_data[23], bu_data[24], bu_data[25], bu_data[26], bu_data[27], bu_data[28], bu_data[29], bu_data[30], bu_data[31], bu_data[32], bu_data[33], bu_data[34], bu_data[35], bu_data[36], bu_data[37], bu_data[38], bu_data[39], bu_data[40], bu_data[41], bu_data[42], bu_data[43], bu_data[44], bu_data[45], bu_data[46], bu_data[47], bu_data[48], bu_data[49], bu_data[50], bu_data[51], bu_data[52], bu_data[53], bu_data[54], bu_data[55], bu_data[56], bu_data[57], bu_data[58], bu_data[59], bu_data[60], bu_data[61], bu_data[62], bu_data[63], bu_data[64], bu_data[65], bu_data[66], bu_data[67], bu_data[68], bu_data[69], bu_data[70], bu_data[71], bu_data[72], bu_data[73], bu_data[74], bu_data[75], bu_data[76], bu_data[77], bu_data[78], bu_data[79], bu_data[80]};
         const s_t *bh_streams[NS * NC] = {bh_data[0], bh_data[1], bh_data[2], bh_data[3], bh_data[4], bh_data[5], bh_data[6], bh_data[7], bh_data[8], bh_data[9], bh_data[10], bh_data[11], bh_data[12], bh_data[13], bh_data[14], bh_data[15], bh_data[16], bh_data[17], bh_data[18], bh_data[19], bh_data[20], bh_data[21], bh_data[22], bh_data[23], bh_data[24], bh_data[25], bh_data[26], bh_data[27], bh_data[28], bh_data[29], bh_data[30], bh_data[31], bh_data[32], bh_data[33], bh_data[34], bh_data[35], bh_data[36], bh_data[37], bh_data[38], bh_data[39], bh_data[40], bh_data[41], bh_data[42], bh_data[43], bh_data[44], bh_data[45], bh_data[46], bh_data[47], bh_data[48], bh_data[49], bh_data[50], bh_data[51], bh_data[52], bh_data[53], bh_data[54], bh_data[55], bh_data[56], bh_data[57], bh_data[58], bh_data[59], bh_data[60], bh_data[61], bh_data[62], bh_data[63], bh_data[64], bh_data[65], bh_data[66], bh_data[67], bh_data[68], bh_data[69], bh_data[70], bh_data[71], bh_data[72], bh_data[73], bh_data[74], bh_data[75], bh_data[76], bh_data[77], bh_data[78], bh_data[79], bh_data[80]};
@@ -1783,7 +1782,6 @@ static SFEM_INLINE int saint_venant_kirchhoff_proteus_hex27_gradient_packed_i_ms
         s_t badj7[NQ * VS];
         s_t badj8[NQ * VS];
         s_t bdet0[NQ * VS];
-        s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
         const s_t *bu_streams[NS * NC];
         for (int stream = 0; stream < NS * NC; ++stream) {
           bu_streams[stream] = bu_data[stream];
@@ -2001,7 +1999,6 @@ static SFEM_INLINE int saint_venant_kirchhoff_proteus_hex27_gradient_packed_two_
         s_t badj7[NQ * VS];
         s_t badj8[NQ * VS];
         s_t bdet0[NQ * VS];
-        s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
         const s_t *bu_streams[NS * NC];
         for (int stream = 0; stream < NS * NC; ++stream) {
           bu_streams[stream] = bu_data[stream];
@@ -3181,7 +3178,6 @@ static SFEM_INLINE int saint_venant_kirchhoff_proteus_hex27_apply_packed_i_msoa_
         s_t badj7[NQ * VS];
         s_t badj8[NQ * VS];
         s_t bdet0[NQ * VS];
-        s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
         const s_t *bu_streams[NS * NC];
         for (int stream = 0; stream < NS * NC; ++stream) {
           bu_streams[stream] = bu_data[stream];
@@ -3420,7 +3416,6 @@ static SFEM_INLINE int saint_venant_kirchhoff_proteus_hex27_apply_packed_two_pas
         s_t badj7[NQ * VS];
         s_t badj8[NQ * VS];
         s_t bdet0[NQ * VS];
-        s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
         const s_t *bu_streams[NS * NC];
         for (int stream = 0; stream < NS * NC; ++stream) {
           bu_streams[stream] = bu_data[stream];
@@ -3654,9 +3649,6 @@ static int saint_venant_kirchhoff_proteus_hex27_hessian_i_msoa_assemble_impl(
   static constexpr int NS = 27;
   static constexpr int NDOFS = NC * NS;
   const s_t *const u_components[NC] = {ux, uy, uz};
-  const g_t *const RSTR x = points[0];
-  const g_t *const RSTR y = points[1];
-  const g_t *const RSTR z = points[2];
   const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p2_q4<s_t>::shape_1d();
   const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p2_q4<s_t>::grad_1d();
   const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q4<s_t>::q_weight_1d();
@@ -3679,7 +3671,6 @@ static int saint_venant_kirchhoff_proteus_hex27_hessian_i_msoa_assemble_impl(
     s_t badj7[NQ];
     s_t badj8[NQ];
     s_t bdet0[NQ];
-    s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
 
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t node = elements[shape][element];

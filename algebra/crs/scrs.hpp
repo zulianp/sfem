@@ -114,19 +114,6 @@ namespace sfem {
             auto d_offdiag_values = offdiag_values->data();
 
             const ptrdiff_t nrows = diag_rowptr->size() - 1;
-            const ptrdiff_t nblocks = (nrows + BLOCK_SPAN - 1) / BLOCK_SPAN;
-
-            int nthreads = 1;
-
-#ifdef _OPENMP
-#pragma omp parallel
-            {
-#pragma omp master
-                {
-                    nthreads = omp_get_num_threads();
-                }
-            }
-#endif
 
 #if 1
 #pragma omp parallel for
@@ -157,6 +144,7 @@ namespace sfem {
                 y[row] = acc;
             }
 #else
+            const ptrdiff_t nblocks = (nrows + BLOCK_SPAN - 1) / BLOCK_SPAN;
 #pragma omp parallel for
             for (ptrdiff_t b = 0; b < nblocks; b++) {
                 const ptrdiff_t block_base = b * BLOCK_SPAN;
@@ -227,7 +215,7 @@ namespace sfem {
 
         for (ptrdiff_t b = 0; b < nblocks; b++) {
             const ptrdiff_t block_base = b * BLOCK_SPAN;
-            const ptrdiff_t block_end  = MIN(block_base + BLOCK_SPAN, nrows);
+            const ptrdiff_t block_end  = MIN(block_base + BLOCK_SPAN, (ptrdiff_t)nrows);
 
             for (ptrdiff_t row = block_base; row < block_end; ++row) {
                 const auto row_begin = d_rowptr[row];
@@ -270,7 +258,7 @@ namespace sfem {
 
         for (ptrdiff_t b = 0; b < nblocks; b++) {
             const ptrdiff_t block_base = b * BLOCK_SPAN;
-            const ptrdiff_t block_end  = MIN(block_base + BLOCK_SPAN, nrows);
+            const ptrdiff_t block_end  = MIN(block_base + BLOCK_SPAN, (ptrdiff_t)nrows);
 
             for (ptrdiff_t row = block_base; row < block_end; ++row) {
                 const auto row_begin = d_rowptr[row];

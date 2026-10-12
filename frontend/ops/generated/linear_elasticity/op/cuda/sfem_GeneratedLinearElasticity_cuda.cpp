@@ -24,12 +24,6 @@ namespace sfem {
       parameters.set_value("lmbda", 1);
     }
 
-    void seed_material(MultiDomainOp &domains) {
-      for (auto &entry : domains.domains()) {
-        seed_parameters(*entry.second.parameters);
-      }
-    }
-
     //! The part of the time discretisation that is not in this material's form:
     //! the inertia.  It is a *potential* here, because this operator's 0-form
     //! is one, so it reaches `value_steps` as well as `gradient` -- the energy
@@ -80,7 +74,7 @@ namespace sfem {
       if (!node.has_child(key)) {
         return false;
       }
-      node[key] >> value;
+      node[key].load(&value);
       return true;
     }
 
@@ -153,7 +147,7 @@ namespace sfem {
         return false;
       }
       int raw = value ? 1 : 0;
-      node[key] >> raw;
+      node[key].load(&raw);
       value = raw != 0;
       return true;
     }
@@ -186,16 +180,6 @@ namespace sfem {
       }
       SFEM_ERROR("GPUGeneratedLinearElasticity: mesh block pointer not found in mesh.blocks()\n");
       return 0;
-    }
-
-    int packed_block_id_for_domain(const FunctionSpace::PackedMesh &packed,
-                                       const smesh::Mesh::Block &block) {
-      for (ptrdiff_t i = 0; i < packed.n_blocks(); ++i) {
-        if (packed.block_name(i) == block.name()) {
-          return static_cast<int>(i);
-        }
-      }
-      return -1;
     }
 
     struct AffineGeometryCache {
@@ -677,7 +661,6 @@ namespace sfem {
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const geom_t *const *adjugate = nullptr;
-      const geom_t *adjugate_aos = nullptr;
       const geom_t *determinant = nullptr;
             if (impl_->apply_uses_affine || domain.element_type == smesh::TET4 || domain.element_type == smesh::TRI3) {
         auto cache = std::static_pointer_cast<AffineGeometryCache>(
@@ -695,8 +678,6 @@ namespace sfem {
             SFEM_ERROR("GPUGeneratedLinearElasticity affine hessian action requires cached AoS geometry\n");
             return SFEM_FAILURE;
           }
-          adjugate_aos = reinterpret_cast<const geom_t *>(
-              cache->jacobian_aos->jacobian_adjugate_AoS()->data());
           determinant = reinterpret_cast<const geom_t *>(
               cache->jacobian_aos->jacobian_determinant()->data());
         }
@@ -838,8 +819,7 @@ namespace sfem {
     }
 
     auto mesh = impl_->space->mesh_ptr();
-    auto points = element_points(mesh);
-    return impl_->domains->iterate([&](const OpDomain &domain) {
+    return impl_->domains->iterate([&](const OpDomain &/*domain*/) {
       const int dim = mesh->spatial_dimension();
       if (dim == 2) {
         SFEM_ERROR("linear_elasticity hessian_crs 2d dispatch was not generated\n");
@@ -866,8 +846,7 @@ namespace sfem {
     }
 
     auto mesh = impl_->space->mesh_ptr();
-    auto points = element_points(mesh);
-    return impl_->domains->iterate([&](const OpDomain &domain) {
+    return impl_->domains->iterate([&](const OpDomain &/*domain*/) {
       const int dim = mesh->spatial_dimension();
       if (dim == 2) {
         SFEM_ERROR("linear_elasticity hessian_bsr 2d dispatch was not generated\n");
@@ -895,8 +874,7 @@ namespace sfem {
     }
 
     auto mesh = impl_->space->mesh_ptr();
-    auto points = element_points(mesh);
-    return impl_->domains->iterate([&](const OpDomain &domain) {
+    return impl_->domains->iterate([&](const OpDomain &/*domain*/) {
       const int dim = mesh->spatial_dimension();
       if (dim == 2) {
         SFEM_ERROR("linear_elasticity hessian_block_diag_sym 2d dispatch was not generated\n");

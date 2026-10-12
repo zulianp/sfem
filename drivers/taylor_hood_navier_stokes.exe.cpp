@@ -69,47 +69,47 @@ static ptrdiff_t count_nan(const ptrdiff_t n, const real_t *const v) {
     return ret;
 }
 
-static void make_matrix_nonsingular(const real_t                       factor,
-                                    const ptrdiff_t                    n,
-                                    const count_t *const SFEM_RESTRICT rowptr,
-                                    const idx_t *const SFEM_RESTRICT   colidx,
-                                    real_t *const SFEM_RESTRICT        values) {
-    count_t            rstart  = rowptr[n - 1];
-    count_t            rextent = rowptr[n] - rstart;
-    const idx_t *const cols    = &colidx[rstart];
-    real_t *const      vals    = &values[rstart];
+// static void make_matrix_nonsingular(const real_t                       factor,
+//                                     const ptrdiff_t                    n,
+//                                     const count_t *const SFEM_RESTRICT rowptr,
+//                                     const idx_t *const SFEM_RESTRICT   colidx,
+//                                     real_t *const SFEM_RESTRICT        values) {
+//     count_t            rstart  = rowptr[n - 1];
+//     count_t            rextent = rowptr[n] - rstart;
+//     const idx_t *const cols    = &colidx[rstart];
+//     real_t *const      vals    = &values[rstart];
 
-    for (count_t i = 0; i < rextent; ++i) {
-        if (cols[i] == n - 1) {
-            vals[i] *= (1 + factor);
+//     for (count_t i = 0; i < rextent; ++i) {
+//         if (cols[i] == n - 1) {
+//             vals[i] *= (1 + factor);
 
-            // vals[i] += factor;
-            break;
-        }
-    }
-}
+//             // vals[i] += factor;
+//             break;
+//         }
+//     }
+// }
 
-static void shift_diag(const ptrdiff_t                    n,
-                       const real_t                       factor,
-                       const real_t *const SFEM_RESTRICT  vector,
-                       const count_t *const SFEM_RESTRICT rowptr,
-                       const idx_t *const SFEM_RESTRICT   colidx,
-                       real_t *const SFEM_RESTRICT        values) {
-    for (ptrdiff_t i = 0; i < n; ++i) {
-        // ptrdiff_t i = n - 1;
-        count_t            rstart  = rowptr[i];
-        count_t            rextent = rowptr[i + 1] - rstart;
-        const idx_t *const cols    = &colidx[rstart];
-        real_t *const      vals    = &values[rstart];
+// static void shift_diag(const ptrdiff_t                    n,
+//                        const real_t                       factor,
+//                        const real_t *const SFEM_RESTRICT  vector,
+//                        const count_t *const SFEM_RESTRICT rowptr,
+//                        const idx_t *const SFEM_RESTRICT   colidx,
+//                        real_t *const SFEM_RESTRICT        values) {
+//     for (ptrdiff_t i = 0; i < n; ++i) {
+//         // ptrdiff_t i = n - 1;
+//         count_t            rstart  = rowptr[i];
+//         count_t            rextent = rowptr[i + 1] - rstart;
+//         const idx_t *const cols    = &colidx[rstart];
+//         real_t *const      vals    = &values[rstart];
 
-        for (count_t k = 0; k < rextent; ++k) {
-            if (cols[k] == i) {
-                vals[k] += factor * vector[i];
-                break;
-            }
-        }
-    }
-}
+//         for (count_t k = 0; k < rextent; ++k) {
+//             if (cols[k] == i) {
+//                 vals[k] += factor * vector[i];
+//                 break;
+//             }
+//         }
+//     }
+// }
 
 //////////////////////////////////////////////
 
@@ -366,7 +366,7 @@ int solve_taylor_hood_navier_stokes(const std::shared_ptr<sfem::Communicator> &c
     const int    SFEM_LUMPED_MASS      = smesh::Env::read("SFEM_LUMPED_MASS", 0);
 
     const int    SFEM_AVG_PRESSURE_CONSTRAINT = smesh::Env::read("SFEM_AVG_PRESSURE_CONSTRAINT", 0);
-    const real_t SFEM_REGULARIZATION_FACTOR   = smesh::Env::read("SFEM_REGULARIZATION_FACTOR", real_t(1e-8));
+    // const real_t SFEM_REGULARIZATION_FACTOR = smesh::Env::read("SFEM_REGULARIZATION_FACTOR", real_t(1e-8));
 
     const std::string SFEM_RESTART_FOLDER_str = smesh::Env::read_string("SFEM_RESTART_FOLDER", "");
     const char       *SFEM_RESTART_FOLDER     = SFEM_RESTART_FOLDER_str.empty() ? nullptr : SFEM_RESTART_FOLDER_str.c_str();

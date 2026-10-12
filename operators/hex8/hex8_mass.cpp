@@ -5,7 +5,7 @@
 #include <stdio.h>
 
 int hex8_apply_mass(const ptrdiff_t                   nelements,
-                    const ptrdiff_t                   nnodes,
+                    const ptrdiff_t                   /*nnodes*/,
                     idx_t **const SFEM_RESTRICT       elements,
                     geom_t **const SFEM_RESTRICT      points,
                     const ptrdiff_t                   stride_u,
@@ -58,7 +58,7 @@ int hex8_apply_mass(const ptrdiff_t                   nelements,
 }
 
 int hex8_assemble_lumped_mass(const ptrdiff_t              nelements,
-                              const ptrdiff_t              nnodes,
+                              const ptrdiff_t              /*nnodes*/,
                               idx_t **const SFEM_RESTRICT  elements,
                               geom_t **const SFEM_RESTRICT points,
                               const ptrdiff_t              stride_values,

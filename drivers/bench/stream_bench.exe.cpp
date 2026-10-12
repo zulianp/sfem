@@ -13,10 +13,9 @@ typedef double array_element_t;
 #define REPEAT 5
 
 static void bench(const size_t n, array_element_t *a, array_element_t *b, array_element_t *c) {
-    size_t          i, j;
+    size_t          j;
     int             k;
     array_element_t scalar = 3.0;
-    double          t;
     double          times[4][REPEAT];
 
     static const char *label[4] = {"Copy:      ", "Scale:     ", "Add:       ", "Triad:     "};

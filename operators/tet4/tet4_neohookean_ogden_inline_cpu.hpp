@@ -5,7 +5,7 @@
 
 // This can be used with any element type
 static SFEM_INLINE void neohookean_PxJinv_t_adj(const scalar_t *const SFEM_RESTRICT adjugate,
-                                                const scalar_t jacobian_determinant,
+                                                const scalar_t /*jacobian_determinant*/,
                                                 const scalar_t mu,
                                                 const scalar_t lambda,
                                                 scalar_t *const SFEM_RESTRICT F_in_PxJinv_t_out) {
@@ -191,8 +191,8 @@ static SFEM_INLINE void tet4_neohookean_gradient_adj(const scalar_t *const SFEM_
 #endif
 }
 
-static SFEM_INLINE void neohookean_lin_stress_adj(const scalar_t *const SFEM_RESTRICT adjugate,
-                                                  const scalar_t jacobian_determinant,
+static SFEM_INLINE void neohookean_lin_stress_adj(const scalar_t *const SFEM_RESTRICT /*adjugate*/,
+                                                  const scalar_t /*jacobian_determinant*/,
                                                   const scalar_t mu,
                                                   const scalar_t lambda,
                                                   const scalar_t *const inc_grad,

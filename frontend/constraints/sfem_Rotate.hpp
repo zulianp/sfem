@@ -139,7 +139,7 @@ namespace sfem {
             }
 
 #pragma omp parallel for
-            for (ptrdiff_t i = 0; i < n_nodes; i++) {
+            for (ptrdiff_t i = 0; i < (ptrdiff_t)n_nodes; i++) {
                 const ptrdiff_t dof = nodes[i];
 
                 const geom_t pos0 = p0[dof] - center0;
@@ -197,15 +197,15 @@ namespace sfem {
             int         steps{10};
             bool        verbose{false};
 
-            node["angle"] >> angle;
-            node["sideset"] >> sideset_path;
+            node["angle"].load(&angle);
+            node["sideset"].load(&sideset_path);
 
             if (node["steps"].readable()) {
-                node["steps"] >> steps;
+                node["steps"].load(&steps);
             }
 
             if (node["verbose"].readable()) {
-                node["verbose"] >> verbose;
+                node["verbose"].load(&verbose);
             }
 
             if (!sideset_path.empty()) {
@@ -217,9 +217,9 @@ namespace sfem {
 
                 auto rcenter = node["rotation_center"];
                 if (rcenter.is_seq()) {
-                    rcenter[0] >> ret->rcenter[0];
-                    rcenter[1] >> ret->rcenter[1];
-                    rcenter[2] >> ret->rcenter[2];
+                    rcenter[0].load(&ret->rcenter[0]);
+                    rcenter[1].load(&ret->rcenter[1]);
+                    rcenter[2].load(&ret->rcenter[2]);
                 } else {
                     SFEM_ERROR("Rotation center must be a sequence [x, y, z]\n");
                 }

@@ -32,7 +32,6 @@ int test_hyperelasticity_partial_assembly(const std::string &op_name) {
     SFEM_TEST_ASSERT(op->initialize() == SFEM_SUCCESS);
 
     // Active strain Fa: identity per element (AoS: 9 per element)
-    const ptrdiff_t ne = mesh->n_elements();
     f->add_operator(op);
 
     const ptrdiff_t ndofs = fs->n_dofs();

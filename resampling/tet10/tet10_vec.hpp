@@ -8,7 +8,7 @@
 #include "tet10_weno.hpp"
 
 #if SFEM_VEC_SIZE == 8 && SIZEOF_REAL_T == 8
-#pragma message "SIMD 512 double"
+// #pragma message "SIMD 512 double"
 
 #define SIMD_512_DOUBLE
 #define _VL_ 8
@@ -16,7 +16,7 @@
 #define ptrdiff_t_sfem int64_t
 
 #elif SFEM_VEC_SIZE == 4 && SIZEOF_REAL_T == 8
-#pragma message "SIMD 256 double"
+// #pragma message "SIMD 256 double"
 
 #define SIMD_256_DOUBLE
 #define _VL_ 4
@@ -25,7 +25,7 @@
 
 #elif SFEM_VEC_SIZE == 4 && SIZEOF_REAL_T == 4
 
-#pragma message "SIMD 256 float"
+// #pragma message "SIMD 256 float"
 
 #define SIMD_256_FLOAT
 #define _VL_ 8
@@ -34,7 +34,7 @@
 
 #elif SFEM_VEC_SIZE == 8 && SIZEOF_REAL_T == 4
 
-#pragma message "SIMD 512 float"
+// #pragma message "SIMD 512 float"
 
 #define SIMD_512_FLOAT
 

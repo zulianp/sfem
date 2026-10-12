@@ -76,7 +76,7 @@ static SFEM_INLINE real_t p3(const real_t x, const real_t y) {
 }
 
 void stokes_ref_sol(const int tp_num,
-                    const real_t mu,
+                    const real_t /*mu*/,
                     const ptrdiff_t nnodes,
                     geom_t **const points,
                     real_t *const ux,

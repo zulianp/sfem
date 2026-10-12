@@ -13,15 +13,15 @@
 // Structure of arrays
 //////////////////////////
 
-int neohookean_ogden_value_soa(const smesh::ElemType          element_type,
-                               const ptrdiff_t              nelements,
-                               const ptrdiff_t              nnodes,
-                               idx_t **const SFEM_RESTRICT  elements,
-                               geom_t **const SFEM_RESTRICT points,
-                               const real_t                 mu,
-                               const real_t                 lambda,
-                               real_t **const SFEM_RESTRICT u,
-                               real_t *const SFEM_RESTRICT  value) {
+int neohookean_ogden_value_soa(const smesh::ElemType          /*element_type*/,
+                               const ptrdiff_t              /*nelements*/,
+                               const ptrdiff_t              /*nnodes*/,
+                               idx_t **const SFEM_RESTRICT  /*elements*/,
+                               geom_t **const SFEM_RESTRICT /*points*/,
+                               const real_t                 /*mu*/,
+                               const real_t                 /*lambda*/,
+                               real_t **const SFEM_RESTRICT /*u*/,
+                               real_t *const SFEM_RESTRICT  /*value*/) {
     SFEM_ERROR("IMPLEMENT ME");
     return SFEM_FAILURE;
 }
@@ -60,24 +60,24 @@ int neohookean_ogden_apply_soa(const smesh::ElemType          element_type,
                                real_t **const SFEM_RESTRICT values) {
     switch (element_type) {
         case smesh::TET4: {
-            tet4_neohookean_ogden_apply(nelements,
-                                        nnodes,
-                                        elements,
-                                        points,
-                                        mu,
-                                        lambda,
-                                        1,
-                                        u[0],
-                                        u[1],
-                                        u[2],
-                                        1,
-                                        h[0],
-                                        h[1],
-                                        h[2],
-                                        1,
-                                        values[0],
-                                        values[1],
-                                        values[2]);
+            return tet4_neohookean_ogden_apply(nelements,
+                                               nnodes,
+                                               elements,
+                                               points,
+                                               mu,
+                                               lambda,
+                                               1,
+                                               u[0],
+                                               u[1],
+                                               u[2],
+                                               1,
+                                               h[0],
+                                               h[1],
+                                               h[2],
+                                               1,
+                                               values[0],
+                                               values[1],
+                                               values[2]);
         }
         default: {
             SFEM_ERROR("neohookean_ogden_apply_soa not implemented for type %s\n", type_to_string(element_type));
@@ -86,16 +86,16 @@ int neohookean_ogden_apply_soa(const smesh::ElemType          element_type,
     return SFEM_FAILURE;
 }
 
-int neohookean_ogden_hessian_soa(const smesh::ElemType                element_type,
-                                 const ptrdiff_t                    nelements,
-                                 const ptrdiff_t                    nnodes,
-                                 idx_t **const SFEM_RESTRICT        elements,
-                                 geom_t **const SFEM_RESTRICT       points,
-                                 const real_t                       mu,
-                                 const real_t                       lambda,
-                                 const count_t *const SFEM_RESTRICT rowptr,
-                                 const idx_t *const SFEM_RESTRICT   colidx,
-                                 real_t **const SFEM_RESTRICT       values) {
+int neohookean_ogden_hessian_soa(const smesh::ElemType                /*element_type*/,
+                                 const ptrdiff_t                    /*nelements*/,
+                                 const ptrdiff_t                    /*nnodes*/,
+                                 idx_t **const SFEM_RESTRICT        /*elements*/,
+                                 geom_t **const SFEM_RESTRICT       /*points*/,
+                                 const real_t                       /*mu*/,
+                                 const real_t                       /*lambda*/,
+                                 const count_t *const SFEM_RESTRICT /*rowptr*/,
+                                 const idx_t *const SFEM_RESTRICT   /*colidx*/,
+                                 real_t **const SFEM_RESTRICT       /*values*/) {
     SFEM_ERROR("IMPLEMENT ME");
     return SFEM_FAILURE;
 }
@@ -104,15 +104,15 @@ int neohookean_ogden_hessian_soa(const smesh::ElemType                element_ty
 // Array of structures
 //////////////////////////
 
-int neohookean_ogden_value_aos(const smesh::ElemType               element_type,
-                               const ptrdiff_t                   nelements,
-                               const ptrdiff_t                   nnodes,
-                               idx_t **const SFEM_RESTRICT       elements,
-                               geom_t **const SFEM_RESTRICT      points,
-                               const real_t                      mu,
-                               const real_t                      lambda,
-                               const real_t *const SFEM_RESTRICT u,
-                               real_t *const SFEM_RESTRICT       value) {
+int neohookean_ogden_value_aos(const smesh::ElemType               /*element_type*/,
+                               const ptrdiff_t                   /*nelements*/,
+                               const ptrdiff_t                   /*nnodes*/,
+                               idx_t **const SFEM_RESTRICT       /*elements*/,
+                               geom_t **const SFEM_RESTRICT      /*points*/,
+                               const real_t                      /*mu*/,
+                               const real_t                      /*lambda*/,
+                               const real_t *const SFEM_RESTRICT /*u*/,
+                               real_t *const SFEM_RESTRICT       /*value*/) {
     SFEM_ERROR("IMPLEMENT ME");
     return SFEM_FAILURE;
 }
@@ -248,17 +248,17 @@ int neohookean_ogden_gradient_aos(const smesh::ElemType               element_ty
     return SFEM_FAILURE;
 }
 
-int neohookean_ogden_hessian_aos(const smesh::ElemType                element_type,
-                                 const ptrdiff_t                    nelements,
-                                 const ptrdiff_t                    nnodes,
-                                 idx_t **const SFEM_RESTRICT        elements,
-                                 geom_t **const SFEM_RESTRICT       points,
-                                 const real_t                       mu,
-                                 const real_t                       lambda,
-                                 const real_t *const SFEM_RESTRICT  u,
-                                 const count_t *const SFEM_RESTRICT rowptr,
-                                 const idx_t *const SFEM_RESTRICT   colidx,
-                                 real_t *const SFEM_RESTRICT        values) {
+int neohookean_ogden_hessian_aos(const smesh::ElemType                /*element_type*/,
+                                 const ptrdiff_t                    /*nelements*/,
+                                 const ptrdiff_t                    /*nnodes*/,
+                                 idx_t **const SFEM_RESTRICT        /*elements*/,
+                                 geom_t **const SFEM_RESTRICT       /*points*/,
+                                 const real_t                       /*mu*/,
+                                 const real_t                       /*lambda*/,
+                                 const real_t *const SFEM_RESTRICT  /*u*/,
+                                 const count_t *const SFEM_RESTRICT /*rowptr*/,
+                                 const idx_t *const SFEM_RESTRICT   /*colidx*/,
+                                 real_t *const SFEM_RESTRICT        /*values*/) {
     SFEM_ERROR("IMPLEMENT ME");
     return SFEM_FAILURE;
 }
@@ -340,7 +340,7 @@ int neohookean_ogden_partial_assembly_diag(const smesh::ElemType               e
     switch (element_type) {
         case smesh::HEX8: {
             return hex8_neohookean_ogden_partial_assembly_diag(
-                    nelements, stride, elements, points, mu, lambda, 3, ux, uy, uz, 3, outx, outy, outz);
+                    nelements, stride, elements, points, mu, lambda, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
         }
         default: {
             SFEM_ERROR("neohookean_ogden_partial_assembly_diag not implemented for type %s\n", type_to_string(element_type));

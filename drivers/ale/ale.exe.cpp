@@ -22,55 +22,55 @@ int         fvm_quad4_volumes(const ptrdiff_t             nelements,
     return SFEM_SUCCESS;
 }
 
-static SFEM_INLINE void fvm_quad4_surface_vectors(const geom_t x0,
-                                                  const geom_t x1,
-                                                  const geom_t x2,
-                                                  const geom_t x3,
-                                                  const geom_t y0,
-                                                  const geom_t y1,
-                                                  const geom_t y2,
-                                                  const geom_t y3,
-                                                  scalar_t *const SFEM_RESTRICT sf0,
-                                                  scalar_t *const SFEM_RESTRICT sf1,
-                                                  scalar_t *const SFEM_RESTRICT sf2,
-                                                  scalar_t *const SFEM_RESTRICT sf3) {
-    {
-        scalar_t ux = x1 - x0;
-        scalar_t uy = y1 - y0;
-        sf0[0]      = -uy;
-        sf0[1]      = ux;
-    }
+// static SFEM_INLINE void fvm_quad4_surface_vectors(const geom_t x0,
+//                                                   const geom_t x1,
+//                                                   const geom_t x2,
+//                                                   const geom_t x3,
+//                                                   const geom_t y0,
+//                                                   const geom_t y1,
+//                                                   const geom_t y2,
+//                                                   const geom_t y3,
+//                                                   scalar_t *const SFEM_RESTRICT sf0,
+//                                                   scalar_t *const SFEM_RESTRICT sf1,
+//                                                   scalar_t *const SFEM_RESTRICT sf2,
+//                                                   scalar_t *const SFEM_RESTRICT sf3) {
+//     {
+//         scalar_t ux = x1 - x0;
+//         scalar_t uy = y1 - y0;
+//         sf0[0]      = -uy;
+//         sf0[1]      = ux;
+//     }
 
-    {
-        scalar_t ux = x2 - x1;
-        scalar_t uy = y2 - y1;
-        sf1[0]      = -uy;
-        sf1[1]      = ux;
-    }
+//     {
+//         scalar_t ux = x2 - x1;
+//         scalar_t uy = y2 - y1;
+//         sf1[0]      = -uy;
+//         sf1[1]      = ux;
+//     }
 
-    {
-        scalar_t ux = x3 - x2;
-        scalar_t uy = y3 - y2;
-        sf2[0]      = -uy;
-        sf2[1]      = ux;
-    }
+//     {
+//         scalar_t ux = x3 - x2;
+//         scalar_t uy = y3 - y2;
+//         sf2[0]      = -uy;
+//         sf2[1]      = ux;
+//     }
 
-    {
-        scalar_t ux = x0 - x3;
-        scalar_t uy = y0 - y3;
-        sf3[0]      = -uy;
-        sf3[1]      = ux;
-    }
-}
+//     {
+//         scalar_t ux = x0 - x3;
+//         scalar_t uy = y0 - y3;
+//         sf3[0]      = -uy;
+//         sf3[1]      = ux;
+//     }
+// }
 
-static SFEM_INLINE scalar_t fvm_quad4_convection_flux() { return 0; }
+// static SFEM_INLINE scalar_t fvm_quad4_convection_flux() { return 0; }
 
-static SFEM_INLINE scalar_t fvm_quad4_face_interp(const scalar_t volume,
-                                                  const scalar_t val,
-                                                  const scalar_t volume_neigh,
-                                                  const scalar_t val_neigh) {
-    return (volume * val + volume_neigh * val_neigh) / (volume + volume_neigh);
-}
+// static SFEM_INLINE scalar_t fvm_quad4_face_interp(const scalar_t volume,
+//                                                   const scalar_t val,
+//                                                   const scalar_t volume_neigh,
+//                                                   const scalar_t val_neigh) {
+//     return (volume * val + volume_neigh * val_neigh) / (volume + volume_neigh);
+// }
 
 int solve_ale(const std::shared_ptr<sfem::Communicator> &comm, int /*argc*/, char * /*argv*/[]) {
     if (comm->size() != 1) {
@@ -87,7 +87,7 @@ int solve_ale(const std::shared_ptr<sfem::Communicator> &comm, int /*argc*/, cha
     auto      mesh = sfem::Mesh::create_quad4_square(comm, L * nx, H * nx, 0, 0, L, H);
 
     auto sideset_inlet = sfem::Sideset::create_from_selector(
-            mesh, [L](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool { return x > -1e-5 && x < 1e-5; });
+            mesh, [](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool { return x > -1e-5 && x < 1e-5; });
 
     auto sideset_outlet = sfem::Sideset::create_from_selector(
             mesh,

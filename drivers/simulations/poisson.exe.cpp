@@ -82,7 +82,7 @@ int lsolve(const std::shared_ptr<sfem::Function> &f, const smesh::Path &output_d
     return SFEM_SUCCESS;
 }
 
-int solve_poisson_problem(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *argv[]) {
+int solve_poisson_problem(const std::shared_ptr<sfem::Communicator> &comm, int /*argc*/, char * /*argv*/[]) {
     SFEM_TRACE_SCOPE("solve_poisson_problem");
 
     auto es                        = smesh::Env::read("SFEM_EXECUTION_SPACE", sfem::EXECUTION_SPACE_HOST);
@@ -120,10 +120,10 @@ int solve_poisson_problem(const std::shared_ptr<sfem::Communicator> &comm, int a
     op->initialize();
 
     auto sideset0 = sfem::Sideset::create_from_selector(
-            m, [](const geom_t x, const geom_t y, const geom_t z) -> bool { return z > 3.999; });
+            m, [](const geom_t /*x*/, const geom_t /*y*/, const geom_t z) -> bool { return z > 3.999; });
 
     auto sideset1 = sfem::Sideset::create_from_selector(
-            m, [](const geom_t x, const geom_t y, const geom_t z) -> bool { return z < 0.001; });
+            m, [](const geom_t /*x*/, const geom_t /*y*/, const geom_t z) -> bool { return z < 0.001; });
 
     std::vector<sfem::DirichletConditions::Condition> boundary_conditions = {{.sidesets = sideset1, .value = -1, .component = 0},
                                                                              {.sidesets = sideset0, .value = 1, .component = 0}};

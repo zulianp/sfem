@@ -82,10 +82,7 @@ void lagrange_hex_integrate(
         // Evaluation Q x Q x Q
         T* const out) {
     static const int N2   = N * N;
-    static const int N3   = N2 * N;
     static const int Q2   = Q * Q;
-    static const int Q3   = Q2 * Q;
-    static const int SIZE = MAX(Q3, N3);
 
     T temp1[N * Q2];
     T temp2[N2 * Q];

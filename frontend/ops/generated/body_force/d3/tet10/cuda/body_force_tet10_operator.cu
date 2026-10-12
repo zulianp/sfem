@@ -196,9 +196,6 @@ __global__ void body_force_tet10_residual_a_msoa_impl(
   static constexpr int NS = 10;
   static constexpr int NC = 3;
   const s_t *const affine_shape = sfem::codegen::ref_tet10_q4<s_t>::shape();
-  const s_t *const affine_grad_ref_x = sfem::codegen::ref_tet10_q4<s_t>::grad_ref_x();
-  const s_t *const affine_grad_ref_y = sfem::codegen::ref_tet10_q4<s_t>::grad_ref_y();
-  const s_t *const affine_grad_ref_z = sfem::codegen::ref_tet10_q4<s_t>::grad_ref_z();
   const s_t *const affine_q_weight = sfem::codegen::quad_tet_q4<s_t>::q_weight();
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {

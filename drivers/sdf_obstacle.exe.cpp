@@ -48,23 +48,14 @@ int solve_sdf_obstacle(const std::shared_ptr<sfem::Communicator> &comm, int argc
     int SFEM_ELEMENT_REFINE_LEVEL = 0;
     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
 
-    int SFEM_USE_PROJECTED_CG = 0;
-    SFEM_READ_ENV(SFEM_USE_PROJECTED_CG, atoi);
-
-    int SFEM_TEST_AGAINST_LINEAR = 0;
-    SFEM_READ_ENV(SFEM_TEST_AGAINST_LINEAR, atoi);
-
     int SFEM_MAX_IT = 20;
     SFEM_READ_ENV(SFEM_MAX_IT, atoi);
 
-    int SFEM_CONTACT_LINEARIZATIONS = 1;
-    SFEM_READ_ENV(SFEM_CONTACT_LINEARIZATIONS, atoi);
+    // int SFEM_CONTACT_LINEARIZATIONS = 1;
+    // SFEM_READ_ENV(SFEM_CONTACT_LINEARIZATIONS, atoi);
 
     bool SFEM_USE_GPU = true;
     SFEM_READ_ENV(SFEM_USE_GPU, atoi);
-
-    int SFEM_EXPORT_CRS_MATRIX = false;
-    SFEM_READ_ENV(SFEM_EXPORT_CRS_MATRIX, atoi);
 
     int SFEM_MATRIX_FREE = 1;
     SFEM_READ_ENV(SFEM_MATRIX_FREE, atoi);

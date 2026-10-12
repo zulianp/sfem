@@ -27,10 +27,6 @@ static SFEM_INLINE void quad4_fff_s(const scalar_t px0,
     fff[2] = x1 / x0;
 }
 
-static SFEM_INLINE scalar_t quad4_det_fff(const scalar_t *const fff) {
-    return fff[0] * fff[2] - POW2(fff[1]);
-}
-
 static SFEM_INLINE void quad4_laplacian_apply_fff(const scalar_t *const SFEM_RESTRICT fff,
                                                   const scalar_t *const SFEM_RESTRICT u,
                                                   accumulator_t *const SFEM_RESTRICT

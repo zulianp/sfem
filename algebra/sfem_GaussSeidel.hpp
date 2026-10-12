@@ -42,7 +42,7 @@ namespace sfem {
             this->apply_op = [=](const T* const x, T* const y) { op->apply(x, y); };
         }
 
-        void set_preconditioner_op(const std::shared_ptr<Operator<T>>& op) override {
+        void set_preconditioner_op(const std::shared_ptr<Operator<T>>& /*op*/) override {
             assert(false);
         }
 

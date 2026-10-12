@@ -26,8 +26,8 @@ namespace sfem {
         return instance_;
     }
 
-    std::shared_ptr<Constraint> ConstraintsFactory::create_from_env(const std::shared_ptr<FunctionSpace> &space,
-                                                                    const ExecutionSpace                  execution_space) {
+    std::shared_ptr<Constraint> ConstraintsFactory::create_from_env(const std::shared_ptr<FunctionSpace> & /*space*/,
+                                                                    const ExecutionSpace                  /*execution_space*/) {
         return nullptr;
     }
 
@@ -41,7 +41,7 @@ namespace sfem {
         }
 
         std::string name;
-        node["type"] >> name;
+        node["type"].load(&name);
         auto iterator = instance().impl_->constraints.find(name);
         if (iterator != instance().impl_->constraints.end()) {
             return iterator->second(space, node, execution_space);

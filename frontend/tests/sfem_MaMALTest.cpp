@@ -7,9 +7,7 @@
 
 #include "sfem_test.hpp"
 
-#define private public
 #include "../contact/sfem_MaMAL.hpp"
-#undef private
 
 #include "sfem_API.hpp"
 #include "sfem_Function.hpp"
@@ -17,6 +15,12 @@
 #include "../contact/sfem_ContactSolveKernels.cpp"
 #include "../contact/sfem_MaMAL.cpp"
 #include "../contact/sfem_SelfContact.cpp"
+
+namespace sfem {
+    struct MaMALTestAccess {
+        static MaMAL::Impl *impl(MaMAL &mamal) { return mamal.impl_.get(); }
+    };
+}  // namespace sfem
 
 static real_t contact_objective(const ptrdiff_t     nnodes,
                                 const count_t*      rowptr,
@@ -176,10 +180,10 @@ std::shared_ptr<sfem::Function> create_touching_two_body_function(const sfem::Ex
             mesh, [](const geom_t, const geom_t y, const geom_t) -> bool { return y > (1.75 - 1e-5) && y < (1.75 + 1e-5); });
 
     auto left_ss = sfem::Sideset::create_from_selector(
-            mesh, [](const geom_t x, const geom_t, const geom_t z) -> bool { return x > -1e-5 && x < 1e-5; });
+            mesh, [](const geom_t x, const geom_t, const geom_t) -> bool { return x > -1e-5 && x < 1e-5; });
 
     auto right_ss = sfem::Sideset::create_from_selector(
-            mesh, [](const geom_t x, const geom_t, const geom_t z) -> bool { return x > (1 - 1e-5) && x < (1 + 1e-5); });
+            mesh, [](const geom_t x, const geom_t, const geom_t) -> bool { return x > (1 - 1e-5) && x < (1 + 1e-5); });
 
     auto top_ns   = smesh::create_nodeset_from_sidesets(mesh, top_ss);
     auto left_ns  = smesh::create_nodeset_from_sidesets(mesh, left_ss);
@@ -239,7 +243,7 @@ int test_mamal_nonlinear_cycle() {
     const bool write_output = smesh::Env::read_string("SFEM_MAMAL_OUTPUT_DIR", std::string()).size() > 0;
 
     auto mamal = sfem::MaMAL::create(f);
-    auto impl  = mamal->impl_.get();
+    auto impl  = sfem::MaMALTestAccess::impl(*mamal);
 
     SFEM_TEST_ASSERT(impl->n_levels() > 1);
     SFEM_TEST_ASSERT(impl->galerkin_restrictions.size() >= 1);
@@ -251,12 +255,12 @@ int test_mamal_nonlinear_cycle() {
 
     for (int l = 0; l < impl->n_levels(); ++l) {
         const real_t* const sol = impl->memory[l]->solution->data();
-        for (ptrdiff_t i = 0; i < impl->memory[l]->solution->size(); ++i) {
+        for (ptrdiff_t i = 0; i < (ptrdiff_t)impl->memory[l]->solution->size(); ++i) {
             SFEM_TEST_ASSERT(std::isfinite(sol[i]));
         }
 
         const real_t* const diag = impl->contact_block_diag_aos[l]->data();
-        for (ptrdiff_t i = 0; i < impl->contact_block_diag_aos[l]->size(); ++i) {
+        for (ptrdiff_t i = 0; i < (ptrdiff_t)impl->contact_block_diag_aos[l]->size(); ++i) {
             SFEM_TEST_ASSERT(std::isfinite(diag[i]));
         }
     }

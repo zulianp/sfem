@@ -5,9 +5,6 @@
 
 namespace sfem {
 
-// real_t Power(const real_t x, const real_t y) { return exp(y * log(x)); }
-static SFEM_INLINE real_t Power(const real_t x, const real_t y) { return pow(x, y); }
-
 static SFEM_INLINE real_t Power2(const real_t x) { return x * x; }
 
 // real_t Power1p5(const real_t x) { return exp(1.5 * log(x)); }
