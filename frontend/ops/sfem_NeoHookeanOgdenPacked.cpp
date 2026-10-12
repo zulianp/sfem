@@ -342,17 +342,17 @@ struct Hex8MicroKernelGradient {
 };
 
 struct Tet4MicroKernelGradient {
-    static SFEM_INLINE void apply(const scalar_t *const SFEM_RESTRICT lx,
-                                  const scalar_t *const SFEM_RESTRICT ly,
-                                  const scalar_t *const SFEM_RESTRICT lz,
-                                  const scalar_t                      mu,
-                                  const scalar_t                      lambda,
-                                  const scalar_t *const SFEM_RESTRICT edispx,
-                                  const scalar_t *const SFEM_RESTRICT edispy,
-                                  const scalar_t *const SFEM_RESTRICT edispz,
-                                  scalar_t *const SFEM_RESTRICT       eoutx,
-                                  scalar_t *const SFEM_RESTRICT       eouty,
-                                  scalar_t *const SFEM_RESTRICT       eoutz) {}
+    static SFEM_INLINE void apply(const scalar_t *const SFEM_RESTRICT /*lx*/,
+                                  const scalar_t *const SFEM_RESTRICT /*ly*/,
+                                  const scalar_t *const SFEM_RESTRICT /*lz*/,
+                                  const scalar_t                      /*mu*/,
+                                  const scalar_t                      /*lambda*/,
+                                  const scalar_t *const SFEM_RESTRICT /*edispx*/,
+                                  const scalar_t *const SFEM_RESTRICT /*edispy*/,
+                                  const scalar_t *const SFEM_RESTRICT /*edispz*/,
+                                  scalar_t *const SFEM_RESTRICT       /*eoutx*/,
+                                  scalar_t *const SFEM_RESTRICT       /*eouty*/,
+                                  scalar_t *const SFEM_RESTRICT       /*eoutz*/) {}
 };
 
 struct Tet10MicroKernelGradient {
@@ -922,10 +922,10 @@ namespace sfem {
 
     NeoHookeanOgdenPacked::~NeoHookeanOgdenPacked() = default;
 
-    int NeoHookeanOgdenPacked::hessian_crs(const real_t *const  x,
-                                           const count_t *const rowptr,
-                                           const idx_t *const   colidx,
-                                           real_t *const        values) {
+    int NeoHookeanOgdenPacked::hessian_crs(const real_t *const  /*x*/,
+                                           const count_t *const /*rowptr*/,
+                                           const idx_t *const   /*colidx*/,
+                                           real_t *const        /*values*/) {
         // SFEM_TRACE_SCOPE("NeoHookeanOgdenPacked::hessian_crs");
 
         // auto mesh  = impl_->space->mesh_ptr();
@@ -948,11 +948,11 @@ namespace sfem {
         return SFEM_FAILURE;
     }
 
-    int NeoHookeanOgdenPacked::hessian_crs_sym(const real_t *const  x,
-                                               const count_t *const rowptr,
-                                               const idx_t *const   colidx,
-                                               real_t *const        diag_values,
-                                               real_t *const        off_diag_values) {
+    int NeoHookeanOgdenPacked::hessian_crs_sym(const real_t *const  /*x*/,
+                                               const count_t *const /*rowptr*/,
+                                               const idx_t *const   /*colidx*/,
+                                               real_t *const        /*diag_values*/,
+                                               real_t *const        /*off_diag_values*/) {
         SFEM_TRACE_SCOPE("NeoHookeanOgdenPacked::hessian_crs_sym");
 
         // auto mesh = impl_->space->mesh_ptr();

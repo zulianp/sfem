@@ -46,7 +46,7 @@ namespace sfem {
 
         template <typename T>
         void read_optional(const ryml::ConstNodeRef &node, const char *key, T &value) {
-            if (node.has_child(key)) node[key] >> value;
+            if (node.has_child(key)) node[key].load(&value);
         }
 
         int read_table(const std::string &path, std::vector<real_t> &times, std::vector<real_t> &values) {

@@ -64,8 +64,6 @@ int test_ssgmg_poisson_cube() {
 
     const char *SFEM_OPERATOR = "Laplacian";
     // const char *SFEM_OPERATOR       = "em:Laplacian";
-    const char *SFEM_FINE_OP_TYPE   = sfem::op_type::MATRIX_FREE;
-    const char *SFEM_COARSE_OP_TYPE = sfem::op_type::MATRIX_FREE;
 
     int SFEM_ELEMENT_REFINE_LEVEL = 4;
     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
@@ -96,10 +94,10 @@ int test_ssgmg_poisson_cube() {
     f->add_operator(op);
 
     auto bottom_ss = sfem::Sideset::create_from_selector(
-            m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool { return y > -1e-5 && y < 1e-5; });
+            m, [=](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool { return y > -1e-5 && y < 1e-5; });
 
     auto right_ss = sfem::Sideset::create_from_selector(
-            m, [=](const geom_t x, const geom_t /*y*/, const geom_t z) -> bool { return x > (Lx - 1e-5) && x < (Lx + 1e-5); });
+            m, [=](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool { return x > (Lx - 1e-5) && x < (Lx + 1e-5); });
 
     sfem::DirichletConditions::Condition left{.sidesets = bottom_ss, .value = -1, .component = 0};
     sfem::DirichletConditions::Condition right{.sidesets = right_ss, .value = 1, .component = 0};
@@ -121,11 +119,6 @@ int test_ssgmg_linear_elasticity_cube() {
     }
 
     const char *SFEM_OPERATOR       = "LinearElasticity";
-    const char *SFEM_FINE_OP_TYPE   = sfem::op_type::MATRIX_FREE;
-    const char *SFEM_COARSE_OP_TYPE = sfem::op_type::MATRIX_FREE;
-
-    SFEM_READ_ENV(SFEM_COARSE_OP_TYPE, );
-    SFEM_READ_ENV(SFEM_FINE_OP_TYPE, );
 
     int SFEM_ELEMENT_REFINE_LEVEL = 4;
     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
@@ -156,10 +149,10 @@ int test_ssgmg_linear_elasticity_cube() {
     f->add_operator(op);
 
     auto left_ss = sfem::Sideset::create_from_selector(
-            m, [=](const geom_t x, const geom_t y, const geom_t z) -> bool { return x > -1e-5 && x < 1e-5; });
+            m, [=](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool { return x > -1e-5 && x < 1e-5; });
 
     auto right_ss = sfem::Sideset::create_from_selector(
-            m, [=](const geom_t x, const geom_t /*y*/, const geom_t z) -> bool { return x > (Lx - 1e-5) && x < (Lx + 1e-5); });
+            m, [=](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool { return x > (Lx - 1e-5) && x < (Lx + 1e-5); });
 
     sfem::DirichletConditions::Condition left{.sidesets = left_ss, .value = -1, .component = 0};
     sfem::DirichletConditions::Condition right0{.sidesets = right_ss, .value = 1, .component = 0};

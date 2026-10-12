@@ -1,3 +1,4 @@
+from codegen.framework.plans.conventions import generated_include
 from codegen.framework.targets import current_target
 
 
@@ -47,8 +48,11 @@ def reference_header_path(key):
     and rule emit identical bytes to this path, and `pipeline/driver.py
     _merge_files` refuses two *different* bodies for one path, so a key that is
     too coarse stops generation instead of silently choosing a winner.
+
+    The extension is the target's, because the device tables differ from the
+    host's and the two must not share a file name once installed flat.
     """
-    return "%s/%s.hpp" % (REFERENCE_DIRECTORY, key)
+    return "%s/%s" % (REFERENCE_DIRECTORY, current_target().header_name(key))
 
 
 def _reference_header_lines(key, struct_name, tables, includes=()):
@@ -172,7 +176,10 @@ def reference_include_lines(cell_rule, references):
         key = owner[4:] if owner.startswith("ref_") else owner
         if key not in owners:
             owners.append(key)
-    return ['#include "%s"' % reference_header_path(key) for key in sorted(owners)]
+    return [
+        '#include "%s"' % generated_include(reference_header_path(key))
+        for key in sorted(owners)
+    ]
 
 
 def reference_header_files(cell_rule, references):
@@ -197,7 +204,7 @@ def reference_header_files(cell_rule, references):
         includes = ()
         if owner.startswith("ref_"):
             rule_owner, _ = _owner(cell_rule, rule_weight_accessor(cell_rule))
-            includes = ("%s.hpp" % rule_owner,)
+            includes = (current_target().header_name(rule_owner),)
         source = "\n".join(_reference_header_lines(key, owner, tables, includes)) + "\n"
         files.append(GeneratedKernelFile(reference_header_path(key), source))
     return tuple(files)

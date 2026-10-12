@@ -190,7 +190,6 @@ void assemble_lumped_boundary_mass(const ptrdiff_t nelements,
     double tick = MPI_Wtime();
 
     idx_t ev[3];
-    idx_t ks[3];
 
     real_t element_vector[3];
 

@@ -17,9 +17,6 @@ int sshex8_stencil_element_matrix_apply(const int                           leve
                                         const real_t *const SFEM_RESTRICT   u,
                                         real_t *const SFEM_RESTRICT         values) {
     const int nxe  = sshex8_nxe(level);
-    const int txe  = sshex8_txe(level);
-    const int Lm1  = level - 1;
-    const int Lm13 = Lm1 * Lm1 * Lm1;
 
 #pragma omp parallel
     {
@@ -255,17 +252,6 @@ static SFEM_INLINE scalar_t sshex8_tp_p(const int d) {
 
 static SFEM_INLINE scalar_t sshex8_tp_q(const int d) {
     return d < 0 ? (scalar_t)-0.5 : (d > 0 ? (scalar_t)0.5 : (scalar_t)0);
-}
-
-static SFEM_INLINE scalar_t sshex8_tp_basis(const int basis, const int dx, const int dy, const int dz) {
-    switch (basis) {
-        case 0: return sshex8_tp_k(dx) * sshex8_tp_m(dy) * sshex8_tp_m(dz);
-        case 1: return sshex8_tp_m(dx) * sshex8_tp_k(dy) * sshex8_tp_m(dz);
-        case 2: return sshex8_tp_m(dx) * sshex8_tp_m(dy) * sshex8_tp_k(dz);
-        case 3: return sshex8_tp_p(dx) * sshex8_tp_q(dy) * sshex8_tp_m(dz);
-        case 4: return sshex8_tp_p(dx) * sshex8_tp_m(dy) * sshex8_tp_q(dz);
-        default: return sshex8_tp_m(dx) * sshex8_tp_p(dy) * sshex8_tp_q(dz);
-    }
 }
 
 static SFEM_INLINE scalar_t sshex8_tp_pair_basis(const int p, const int q, const int dx, const int dy, const int dz) {
@@ -659,18 +645,6 @@ static SFEM_INLINE scalar_t sshex8_tp_row_q(const int cat, const int d) {
     return sshex8_tp_q(d);
 }
 
-static SFEM_INLINE scalar_t sshex8_tp_row_basis(
-        const int basis, const int cx, const int cy, const int cz, const int dx, const int dy, const int dz) {
-    switch (basis) {
-        case 0: return sshex8_tp_row_k(cx, dx) * sshex8_tp_row_m(cy, dy) * sshex8_tp_row_m(cz, dz);
-        case 1: return sshex8_tp_row_m(cx, dx) * sshex8_tp_row_k(cy, dy) * sshex8_tp_row_m(cz, dz);
-        case 2: return sshex8_tp_row_m(cx, dx) * sshex8_tp_row_m(cy, dy) * sshex8_tp_row_k(cz, dz);
-        case 3: return sshex8_tp_row_p(cx, dx) * sshex8_tp_row_q(cy, dy) * sshex8_tp_row_m(cz, dz);
-        case 4: return sshex8_tp_row_p(cx, dx) * sshex8_tp_row_m(cy, dy) * sshex8_tp_row_q(cz, dz);
-        default: return sshex8_tp_row_m(cx, dx) * sshex8_tp_row_p(cy, dy) * sshex8_tp_row_q(cz, dz);
-    }
-}
-
 static SFEM_INLINE scalar_t sshex8_tp_row_pair_basis(
         const int p, const int q, const int cx, const int cy, const int cz, const int dx, const int dy, const int dz) {
     scalar_t ret = 1;
@@ -692,39 +666,39 @@ static SFEM_INLINE scalar_t sshex8_tp_row_pair_basis(
     return ret;
 }
 
-static SFEM_INLINE void sshex8_tensor_terms_at_category(const int                           idx,
-                                                        const int                           Lp1,
-                                                        const int                           zstride,
-                                                        const int                           cx,
-                                                        const int                           cy,
-                                                        const int                           cz,
-                                                        const int                           dx_begin,
-                                                        const int                           dx_end,
-                                                        const int                           dy_begin,
-                                                        const int                           dy_end,
-                                                        const int                           dz_begin,
-                                                        const int                           dz_end,
-                                                        const scalar_t *const SFEM_RESTRICT u,
-                                                        scalar_t *const SFEM_RESTRICT       t) {
-    for (int i = 0; i < 9; ++i) {
-        t[i] = 0;
-    }
+// static SFEM_INLINE void sshex8_tensor_terms_at_category(const int                           idx,
+//                                                         const int                           Lp1,
+//                                                         const int                           zstride,
+//                                                         const int                           cx,
+//                                                         const int                           cy,
+//                                                         const int                           cz,
+//                                                         const int                           dx_begin,
+//                                                         const int                           dx_end,
+//                                                         const int                           dy_begin,
+//                                                         const int                           dy_end,
+//                                                         const int                           dz_begin,
+//                                                         const int                           dz_end,
+//                                                         const scalar_t *const SFEM_RESTRICT u,
+//                                                         scalar_t *const SFEM_RESTRICT       t) {
+//     for (int i = 0; i < 9; ++i) {
+//         t[i] = 0;
+//     }
 
-    for (int dz = dz_begin; dz <= dz_end; ++dz) {
-        for (int dy = dy_begin; dy <= dy_end; ++dy) {
-            const int base = idx + dy * Lp1 + dz * zstride;
-            for (int dx = dx_begin; dx <= dx_end; ++dx) {
-                const scalar_t ui = u[base + dx];
+//     for (int dz = dz_begin; dz <= dz_end; ++dz) {
+//         for (int dy = dy_begin; dy <= dy_end; ++dy) {
+//             const int base = idx + dy * Lp1 + dz * zstride;
+//             for (int dx = dx_begin; dx <= dx_end; ++dx) {
+//                 const scalar_t ui = u[base + dx];
 
-                for (int p = 0; p < 3; ++p) {
-                    for (int q = 0; q < 3; ++q) {
-                        t[p * 3 + q] += sshex8_tp_row_pair_basis(p, q, cx, cy, cz, dx, dy, dz) * ui;
-                    }
-                }
-            }
-        }
-    }
-}
+//                 for (int p = 0; p < 3; ++p) {
+//                     for (int q = 0; q < 3; ++q) {
+//                         t[p * 3 + q] += sshex8_tp_row_pair_basis(p, q, cx, cy, cz, dx, dy, dz) * ui;
+//                     }
+//                 }
+//             }
+//         }
+//     }
+// }
 
 static void sshex8_linear_elasticity_tensor_coeffs_to_boundary_category_stencils(
         const scalar_t *const SFEM_RESTRICT tensor_coeffs,
@@ -1236,89 +1210,89 @@ static void sshex8_linear_elasticity_scatter_boundary(
     }
 }
 
-static void sshex8_linear_elasticity_apply_boundary_tensor_stencils(
-        const int                           level,
-        const scalar_t *const SFEM_RESTRICT tensor_coeffs,
-        scalar_t **const SFEM_RESTRICT      eu,
-        scalar_t **const SFEM_RESTRICT      v) {
-    const int                     Lp1     = level + 1;
-    const int                     zstride = Lp1 * Lp1;
-    const scalar_t *const SFEM_RESTRICT eu0 = eu[0];
-    const scalar_t *const SFEM_RESTRICT eu1 = eu[1];
-    const scalar_t *const SFEM_RESTRICT eu2 = eu[2];
-    scalar_t *const SFEM_RESTRICT       v0  = v[0];
-    scalar_t *const SFEM_RESTRICT       v1  = v[1];
-    scalar_t *const SFEM_RESTRICT       v2  = v[2];
+// static void sshex8_linear_elasticity_apply_boundary_tensor_stencils(
+//         const int                           level,
+//         const scalar_t *const SFEM_RESTRICT tensor_coeffs,
+//         scalar_t **const SFEM_RESTRICT      eu,
+//         scalar_t **const SFEM_RESTRICT      v) {
+//     const int                     Lp1     = level + 1;
+//     const int                     zstride = Lp1 * Lp1;
+//     const scalar_t *const SFEM_RESTRICT eu0 = eu[0];
+//     const scalar_t *const SFEM_RESTRICT eu1 = eu[1];
+//     const scalar_t *const SFEM_RESTRICT eu2 = eu[2];
+//     scalar_t *const SFEM_RESTRICT       v0  = v[0];
+//     scalar_t *const SFEM_RESTRICT       v1  = v[1];
+//     scalar_t *const SFEM_RESTRICT       v2  = v[2];
 
-    for (int cz = 0; cz < 3; ++cz) {
-        const int zi_begin = cz == 0 ? 0 : (cz == 1 ? 1 : level);
-        const int zi_end   = cz == 0 ? 0 : (cz == 1 ? level - 1 : level);
-        const int dz_begin = cz == 0 ? 0 : -1;
-        const int dz_end   = cz == 2 ? 0 : 1;
+//     for (int cz = 0; cz < 3; ++cz) {
+//         const int zi_begin = cz == 0 ? 0 : (cz == 1 ? 1 : level);
+//         const int zi_end   = cz == 0 ? 0 : (cz == 1 ? level - 1 : level);
+//         const int dz_begin = cz == 0 ? 0 : -1;
+//         const int dz_end   = cz == 2 ? 0 : 1;
 
-        for (int cy = 0; cy < 3; ++cy) {
-            const int yi_begin = cy == 0 ? 0 : (cy == 1 ? 1 : level);
-            const int yi_end   = cy == 0 ? 0 : (cy == 1 ? level - 1 : level);
-            const int dy_begin = cy == 0 ? 0 : -1;
-            const int dy_end   = cy == 2 ? 0 : 1;
+//         for (int cy = 0; cy < 3; ++cy) {
+//             const int yi_begin = cy == 0 ? 0 : (cy == 1 ? 1 : level);
+//             const int yi_end   = cy == 0 ? 0 : (cy == 1 ? level - 1 : level);
+//             const int dy_begin = cy == 0 ? 0 : -1;
+//             const int dy_end   = cy == 2 ? 0 : 1;
 
-            for (int cx = 0; cx < 3; ++cx) {
-                if (cx == 1 && cy == 1 && cz == 1) {
-                    continue;
-                }
+//             for (int cx = 0; cx < 3; ++cx) {
+//                 if (cx == 1 && cy == 1 && cz == 1) {
+//                     continue;
+//                 }
 
-                const int xi_begin = cx == 0 ? 0 : (cx == 1 ? 1 : level);
-                const int xi_end   = cx == 0 ? 0 : (cx == 1 ? level - 1 : level);
-                const int dx_begin = cx == 0 ? 0 : -1;
-                const int dx_end   = cx == 2 ? 0 : 1;
+//                 const int xi_begin = cx == 0 ? 0 : (cx == 1 ? 1 : level);
+//                 const int xi_end   = cx == 0 ? 0 : (cx == 1 ? level - 1 : level);
+//                 const int dx_begin = cx == 0 ? 0 : -1;
+//                 const int dx_end   = cx == 2 ? 0 : 1;
 
-                for (int zi = zi_begin; zi <= zi_end; ++zi) {
-                    for (int yi = yi_begin; yi <= yi_end; ++yi) {
-                        for (int xi = xi_begin; xi <= xi_end; ++xi) {
-                            const int idx = xi + yi * Lp1 + zi * zstride;
-                            scalar_t  acc0 = 0, acc1 = 0, acc2 = 0;
-                            scalar_t  t[9];
+//                 for (int zi = zi_begin; zi <= zi_end; ++zi) {
+//                     for (int yi = yi_begin; yi <= yi_end; ++yi) {
+//                         for (int xi = xi_begin; xi <= xi_end; ++xi) {
+//                             const int idx = xi + yi * Lp1 + zi * zstride;
+//                             scalar_t  acc0 = 0, acc1 = 0, acc2 = 0;
+//                             scalar_t  t[9];
 
-#define SSHEX8_ELASTICITY_TENSOR_BOUNDARY_ACCUMULATE(ci_, input_)                                    \
-    do {                                                                                             \
-        sshex8_tensor_terms_at_category(idx,                                                         \
-                                        Lp1,                                                         \
-                                        zstride,                                                     \
-                                        cx,                                                          \
-                                        cy,                                                          \
-                                        cz,                                                          \
-                                        dx_begin,                                                    \
-                                        dx_end,                                                      \
-                                        dy_begin,                                                    \
-                                        dy_end,                                                      \
-                                        dz_begin,                                                    \
-                                        dz_end,                                                      \
-                                        input_,                                                      \
-                                        t);                                                          \
-        const scalar_t *const SFEM_RESTRICT c0 = &tensor_coeffs[(0 * 3 + (ci_)) * 9];                \
-        const scalar_t *const SFEM_RESTRICT c1 = &tensor_coeffs[(1 * 3 + (ci_)) * 9];                \
-        const scalar_t *const SFEM_RESTRICT c2 = &tensor_coeffs[(2 * 3 + (ci_)) * 9];                \
-        acc0 += c0[0] * t[0] + c0[1] * t[1] + c0[2] * t[2] + c0[3] * t[3] + c0[4] * t[4] + c0[5] * t[5] + c0[6] * t[6] + c0[7] * t[7] + c0[8] * t[8]; \
-        acc1 += c1[0] * t[0] + c1[1] * t[1] + c1[2] * t[2] + c1[3] * t[3] + c1[4] * t[4] + c1[5] * t[5] + c1[6] * t[6] + c1[7] * t[7] + c1[8] * t[8]; \
-        acc2 += c2[0] * t[0] + c2[1] * t[1] + c2[2] * t[2] + c2[3] * t[3] + c2[4] * t[4] + c2[5] * t[5] + c2[6] * t[6] + c2[7] * t[7] + c2[8] * t[8]; \
-    } while (0)
+// #define SSHEX8_ELASTICITY_TENSOR_BOUNDARY_ACCUMULATE(ci_, input_)                                    \
+//     do {                                                                                             \
+//         sshex8_tensor_terms_at_category(idx,                                                         \
+//                                         Lp1,                                                         \
+//                                         zstride,                                                     \
+//                                         cx,                                                          \
+//                                         cy,                                                          \
+//                                         cz,                                                          \
+//                                         dx_begin,                                                    \
+//                                         dx_end,                                                      \
+//                                         dy_begin,                                                    \
+//                                         dy_end,                                                      \
+//                                         dz_begin,                                                    \
+//                                         dz_end,                                                      \
+//                                         input_,                                                      \
+//                                         t);                                                          \
+//         const scalar_t *const SFEM_RESTRICT c0 = &tensor_coeffs[(0 * 3 + (ci_)) * 9];                \
+//         const scalar_t *const SFEM_RESTRICT c1 = &tensor_coeffs[(1 * 3 + (ci_)) * 9];                \
+//         const scalar_t *const SFEM_RESTRICT c2 = &tensor_coeffs[(2 * 3 + (ci_)) * 9];                \
+//         acc0 += c0[0] * t[0] + c0[1] * t[1] + c0[2] * t[2] + c0[3] * t[3] + c0[4] * t[4] + c0[5] * t[5] + c0[6] * t[6] + c0[7] * t[7] + c0[8] * t[8]; \
+//         acc1 += c1[0] * t[0] + c1[1] * t[1] + c1[2] * t[2] + c1[3] * t[3] + c1[4] * t[4] + c1[5] * t[5] + c1[6] * t[6] + c1[7] * t[7] + c1[8] * t[8]; \
+//         acc2 += c2[0] * t[0] + c2[1] * t[1] + c2[2] * t[2] + c2[3] * t[3] + c2[4] * t[4] + c2[5] * t[5] + c2[6] * t[6] + c2[7] * t[7] + c2[8] * t[8]; \
+//     } while (0)
 
-                            SSHEX8_ELASTICITY_TENSOR_BOUNDARY_ACCUMULATE(0, eu0);
-                            SSHEX8_ELASTICITY_TENSOR_BOUNDARY_ACCUMULATE(1, eu1);
-                            SSHEX8_ELASTICITY_TENSOR_BOUNDARY_ACCUMULATE(2, eu2);
+//                             SSHEX8_ELASTICITY_TENSOR_BOUNDARY_ACCUMULATE(0, eu0);
+//                             SSHEX8_ELASTICITY_TENSOR_BOUNDARY_ACCUMULATE(1, eu1);
+//                             SSHEX8_ELASTICITY_TENSOR_BOUNDARY_ACCUMULATE(2, eu2);
 
-#undef SSHEX8_ELASTICITY_TENSOR_BOUNDARY_ACCUMULATE
+// #undef SSHEX8_ELASTICITY_TENSOR_BOUNDARY_ACCUMULATE
 
-                            v0[idx] += acc0;
-                            v1[idx] += acc1;
-                            v2[idx] += acc2;
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
+//                             v0[idx] += acc0;
+//                             v1[idx] += acc1;
+//                             v2[idx] += acc2;
+//                         }
+//                     }
+//                 }
+//             }
+//         }
+//     }
+// }
 
 static void sshex8_linear_elasticity_apply_category_stencils(
         const int                           level,
@@ -1339,14 +1313,14 @@ static void sshex8_linear_elasticity_apply_tensor_category_stencils(
     sshex8_linear_elasticity_apply_boundary_stencils(level, category_stencils, eu, v);
 }
 
-static void sshex8_linear_elasticity_apply_tensor_stencils(
-        const int                           level,
-        const scalar_t *const SFEM_RESTRICT tensor_coeffs,
-        scalar_t **const SFEM_RESTRICT      eu,
-        scalar_t **const SFEM_RESTRICT      v) {
-    sshex8_linear_elasticity_apply_interior_tensor_stencil(level, tensor_coeffs, eu, v);
-    sshex8_linear_elasticity_apply_boundary_tensor_stencils(level, tensor_coeffs, eu, v);
-}
+// static void sshex8_linear_elasticity_apply_tensor_stencils(
+//         const int                           level,
+//         const scalar_t *const SFEM_RESTRICT tensor_coeffs,
+//         scalar_t **const SFEM_RESTRICT      eu,
+//         scalar_t **const SFEM_RESTRICT      v) {
+//     sshex8_linear_elasticity_apply_interior_tensor_stencil(level, tensor_coeffs, eu, v);
+//     sshex8_linear_elasticity_apply_boundary_tensor_stencils(level, tensor_coeffs, eu, v);
+// }
 
 int sshex8_stencil_element_matrix_apply3_hyteg(const int                           level,
                                                const ptrdiff_t                     nelements,

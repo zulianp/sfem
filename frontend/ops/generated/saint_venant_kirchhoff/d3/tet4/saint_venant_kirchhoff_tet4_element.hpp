@@ -2,8 +2,8 @@
 #define SAINT_VENANT_KIRCHHOFF_TET4_ELEMENT_API_HPP
 
 #include <stddef.h>
-#include "../saint_venant_kirchhoff_d3_simplex_local.hpp"
-#include "../../../geometry_kernels.hpp"
+#include "saint_venant_kirchhoff_d3_simplex_local.hpp"
+#include "geometry_kernels.hpp"
 
 namespace sfem {
 namespace codegen {

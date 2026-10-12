@@ -207,7 +207,7 @@ is_point_in_domain(const field_mpi_domain_t* const domain,  //
 ///////////////////////////////////////////////////////////////////////////////////
 // tets_field_mpi_domain
 ///////////////////////////////////////////////////////////////////////////////////
-int test_field_mpi_domain(int argc, char* argv[]) {  //
+int test_field_mpi_domain(int /*argc*/, char* /*argv*/[]) {  //
 
     field_mpi_domain_t domain_a, domain_b, overlapped_domain;
 

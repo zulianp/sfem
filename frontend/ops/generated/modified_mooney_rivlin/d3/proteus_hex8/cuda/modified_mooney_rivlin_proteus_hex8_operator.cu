@@ -1,10 +1,10 @@
 #include <type_traits>
 #include <cuda_runtime.h>
-#include "../../cuda/modified_mooney_rivlin_d3_tensor_product_local.cuh"
-#include "../../../../reference/cuda/line_p1_q2.hpp"
-#include "../../../../reference/cuda/quad_line_q2.hpp"
-#include "../../../../cuda/geometry_kernels.cuh"
-#include "../../../../cuda/kernel_diagnostics.cuh"
+#include "modified_mooney_rivlin_d3_tensor_product_local.cuh"
+#include "line_p1_q2.cuh"
+#include "quad_line_q2.cuh"
+#include "geometry_kernels.cuh"
+#include "kernel_diagnostics.cuh"
 #include <cstdint>
 #include <cstdlib>
 

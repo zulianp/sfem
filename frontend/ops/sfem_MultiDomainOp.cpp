@@ -10,7 +10,7 @@ namespace sfem {
         if (block_names.empty()) {
             for (auto &block : space->mesh_ptr()->blocks()) {
                 domains_[block->name()] =
-                        OpDomain{block->element_type(), block, std::make_shared<Parameters>()};
+                        OpDomain{block->element_type(), block, std::make_shared<Parameters>(), nullptr};
             }
         } else {
             for (auto &block_name : block_names) {
@@ -19,7 +19,7 @@ namespace sfem {
                     SFEM_ERROR("Block %s not found", block_name.c_str());
                 }
                 domains_[block_name] =
-                        OpDomain{block->element_type(), block, std::make_shared<Parameters>()};
+                        OpDomain{block->element_type(), block, std::make_shared<Parameters>(), nullptr};
             }
         }
     }

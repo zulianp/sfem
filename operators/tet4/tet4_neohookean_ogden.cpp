@@ -16,7 +16,7 @@
 
 int tet4_neohookean_ogden_objective(const ptrdiff_t                   nelements,
                                     const ptrdiff_t                   stride,
-                                    const ptrdiff_t                   nnodes,
+                                    const ptrdiff_t                   /*nnodes*/,
                                     idx_t **const SFEM_RESTRICT       elements,
                                     geom_t **const SFEM_RESTRICT      points,
                                     const real_t                      mu,
@@ -92,7 +92,7 @@ int tet4_neohookean_ogden_objective(const ptrdiff_t                   nelements,
 
 int tet4_neohookean_ogden_objective_steps(const ptrdiff_t                   nelements,
                                           const ptrdiff_t                   stride,
-                                          const ptrdiff_t                   nnodes,
+                                          const ptrdiff_t                   /*nnodes*/,
                                           idx_t **const SFEM_RESTRICT       elements,
                                           geom_t **const SFEM_RESTRICT      points,
                                           const real_t                      mu,
@@ -199,6 +199,7 @@ int tet4_neohookean_ogden_objective_steps(const ptrdiff_t                   nele
     return SFEM_SUCCESS;
 }
 
+#ifndef NDEBUG
 static void neohookean_gradient_ref(const real_t                      mu,
                                     const real_t                      lambda,
                                     const real_t                      px0,
@@ -337,6 +338,7 @@ static void neohookean_gradient_ref(const real_t                      mu,
     element_vector[10] = x18 * (x103 * x88 + x104 * x90 + x105 * x86);
     element_vector[11] = x18 * (x103 * x96 + x104 * x92 + x105 * x94);
 }
+#endif
 
 int tet4_neohookean_ogden_apply(const ptrdiff_t              nelements,
                                 const ptrdiff_t              nnodes,
@@ -645,8 +647,8 @@ int tet4_neohookean_ogden_diag(const ptrdiff_t              nelements,
                                const ptrdiff_t              nnodes,
                                idx_t **const SFEM_RESTRICT  elements,
                                geom_t **const SFEM_RESTRICT points,
-                               const real_t                 mu,
-                               const real_t                 lambda,
+                               const real_t                 /*mu*/,
+                               const real_t                 /*lambda*/,
                                const ptrdiff_t              u_stride,
                                const real_t *const          ux,
                                const real_t *const          uy,

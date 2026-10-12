@@ -46,26 +46,6 @@ namespace sfem {
       bool       *flag;
     };
 
-    inline bool set_affine_option(const std::string &name,
-                                      const bool val,
-                                      const AffineOption *const options,
-                                      const int n_options) {
-      if (name == "ASSUME_AFFINE" || name == "assume_affine") {
-        for (int i = 0; i < n_options; ++i) {
-          *options[i].flag = val;
-        }
-        return true;
-      }
-      bool matched = false;
-      for (int i = 0; i < n_options; ++i) {
-        if (name == options[i].name) {
-          *options[i].flag = val;
-          matched = true;
-        }
-      }
-      return matched;
-    }
-
     void material_defaults(real_t *const values) {
       values[0] = 0;
       values[1] = 0;
@@ -92,7 +72,7 @@ namespace sfem {
       if (!node.has_child(key)) {
         return false;
       }
-      node[key] >> value;
+      node[key].load(&value);
       return true;
     }
 
@@ -138,89 +118,7 @@ namespace sfem {
       return changed;
     }
 
-    void set_material(MultiDomainOp &domains,
-                          const real_t *const values) {
-      for (auto &entry : domains.domains()) {
-        for (int i = 0; i < N_DEFINED_MATERIAL_PARAMETERS; ++i) {
-          entry.second.parameters->set_value(MATERIAL_PARAMETER_NAMES[i],
-                                                       values[i]);
-        }
-      }
-    }
-
-    void set_material_in_block(MultiDomainOp &domains,
-                                   const std::string &block_name,
-                                   const real_t *const values) {
-      for (int i = 0; i < N_DEFINED_MATERIAL_PARAMETERS; ++i) {
-        domains.set_value_in_block(block_name,
-                                           MATERIAL_PARAMETER_NAMES[i],
-                                           values[i]);
-      }
-    }
-
-    bool yaml_read_bool(const ryml::ConstNodeRef &node,
-              const char *const key,
-              bool &value) {
-      if (!node.has_child(key)) {
-        return false;
-      }
-      int raw = value ? 1 : 0;
-      node[key] >> raw;
-      value = raw != 0;
-      return true;
-    }
-
-    inline void read_affine_options(const ryml::ConstNodeRef &node,
-                    const AffineOption *const options,
-                    const int n_options) {
-      bool all = true;
-      for (int i = 0; i < n_options; ++i) {
-        all = all && *options[i].flag;
-      }
-      if (yaml_read_bool(node, "ASSUME_AFFINE", all) ||
-        yaml_read_bool(node, "assume_affine", all)) {
-        for (int i = 0; i < n_options; ++i) {
-          *options[i].flag = all;
-        }
-      }
-      for (int i = 0; i < n_options; ++i) {
-        yaml_read_bool(node, options[i].name, *options[i].flag);
-      }
-    }
 #endif  // SFEM_ENABLE_RYAML
-
-    void parameter_array(const Parameters &parameters,
-                             const int dim,
-                             real_t *const values) {
-      int index = 0;
-      switch (dim) {
-        case 2:
-          values[index++] = parameters.require_real_value("t0");
-          values[index++] = parameters.require_real_value("t0_010");
-          values[index++] = parameters.require_real_value("t0_100");
-          values[index++] = parameters.require_real_value("t1");
-          values[index++] = parameters.require_real_value("t1_010");
-          values[index++] = parameters.require_real_value("t1_100");
-          break;
-        case 3:
-          values[index++] = parameters.require_real_value("t0");
-          values[index++] = parameters.require_real_value("t0_001");
-          values[index++] = parameters.require_real_value("t0_010");
-          values[index++] = parameters.require_real_value("t0_100");
-          values[index++] = parameters.require_real_value("t1");
-          values[index++] = parameters.require_real_value("t1_001");
-          values[index++] = parameters.require_real_value("t1_010");
-          values[index++] = parameters.require_real_value("t1_100");
-          values[index++] = parameters.require_real_value("t2");
-          values[index++] = parameters.require_real_value("t2_001");
-          values[index++] = parameters.require_real_value("t2_010");
-          values[index++] = parameters.require_real_value("t2_100");
-          break;
-        default:
-          SFEM_ERROR("unsupported spatial dimension %d for generated residual parameters\n", dim);
-          break;
-      }
-    }
 
     //! Where this build's kernels read the connectivity from.
     //!
@@ -292,7 +190,7 @@ namespace sfem {
         }
 
         const ptrdiff_t size = node["parent"].num_children();
-        if (node["lfi"].num_children() != size) {
+        if ((ptrdiff_t)node["lfi"].num_children() != size) {
           SFEM_ERROR("GPUGeneratedNeumannGeneral expr sideset parent/lfi length mismatch\n");
           return nullptr;
         }
@@ -302,12 +200,12 @@ namespace sfem {
 
         ptrdiff_t parent_count = 0;
         for (auto p : node["parent"].children()) {
-          p >> parent->data()[parent_count++];
+          p.load(&parent->data()[parent_count++]);
         }
 
         ptrdiff_t lfi_count = 0;
         for (auto p : node["lfi"].children()) {
-          p >> lfi->data()[lfi_count++];
+          p.load(&lfi->data()[lfi_count++]);
         }
 
         return std::make_shared<smesh::Sideset>(
@@ -350,99 +248,27 @@ namespace sfem {
   ptrdiff_t GPUGeneratedNeumannGeneral::n_dofs_image() const { return impl_->space->n_dofs(); }
 
     double GPUGeneratedNeumannGeneral::flops_value() const {
-    double total = 0;
-    if (!impl_->domains) {
-      return total;
-    }
-
-    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
-    impl_->domains->iterate([&](const OpDomain &domain) {
-      const ptrdiff_t nelements = domain.block->n_elements();
-
-      return SFEM_SUCCESS;
-    });
-
-    return total;
+    return 0;
   }
 
     size_t GPUGeneratedNeumannGeneral::memory_traffic_bytes_value() const {
-    size_t total = 0;
-    if (!impl_->domains) {
-      return total;
-    }
-
-    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
-    impl_->domains->iterate([&](const OpDomain &domain) {
-      const ptrdiff_t nelements = domain.block->n_elements();
-
-      return SFEM_SUCCESS;
-    });
-
-    return total;
+    return 0;
   }
 
     double GPUGeneratedNeumannGeneral::flops_gradient() const {
-    double total = 0;
-    if (!impl_->domains) {
-      return total;
-    }
-
-    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
-    impl_->domains->iterate([&](const OpDomain &domain) {
-      const ptrdiff_t nelements = domain.block->n_elements();
-
-      return SFEM_SUCCESS;
-    });
-
-    return total;
+    return 0;
   }
 
     size_t GPUGeneratedNeumannGeneral::memory_traffic_bytes_gradient() const {
-    size_t total = 0;
-    if (!impl_->domains) {
-      return total;
-    }
-
-    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
-    impl_->domains->iterate([&](const OpDomain &domain) {
-      const ptrdiff_t nelements = domain.block->n_elements();
-
-      return SFEM_SUCCESS;
-    });
-
-    return total;
+    return 0;
   }
 
     double GPUGeneratedNeumannGeneral::flops_apply() const {
-    double total = 0;
-    if (!impl_->domains) {
-      return total;
-    }
-
-    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
-    impl_->domains->iterate([&](const OpDomain &domain) {
-      const ptrdiff_t nelements = domain.block->n_elements();
-
-      return SFEM_SUCCESS;
-    });
-
-    return total;
+    return 0;
   }
 
     size_t GPUGeneratedNeumannGeneral::memory_traffic_bytes_apply() const {
-    size_t total = 0;
-    if (!impl_->domains) {
-      return total;
-    }
-
-    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
-    impl_->domains->iterate([&](const OpDomain &domain) {
-      const ptrdiff_t nelements = domain.block->n_elements();
-
-      return SFEM_SUCCESS;
-    });
-
-    return total;
+    return 0;
   }
 
   // Establish once, at setup, that this operator's dof graph is well formed:

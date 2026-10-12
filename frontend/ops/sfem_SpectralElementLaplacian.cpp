@@ -47,7 +47,7 @@ namespace sfem {
         }
     }
 
-    std::shared_ptr<Op> SpectralElementLaplacian::lor_op(const std::shared_ptr<FunctionSpace> &space) {
+    std::shared_ptr<Op> SpectralElementLaplacian::lor_op(const std::shared_ptr<FunctionSpace> & /*space*/) {
         SMESH_ERROR("SpectralElementLaplacian::lor_op NOT IMPLEMENTED!\n");
         return nullptr;
     }
@@ -74,23 +74,23 @@ namespace sfem {
 
     const char *SpectralElementLaplacian::name() const { return "SpectralElementLaplacian"; }
 
-    int SpectralElementLaplacian::initialize(const std::vector<std::string> &block_names) { return SFEM_SUCCESS; }
+    int SpectralElementLaplacian::initialize(const std::vector<std::string> & /*block_names*/) { return SFEM_SUCCESS; }
 
-    int SpectralElementLaplacian::hessian_crs(const real_t *const  x,
-                                              const count_t *const rowptr,
-                                              const idx_t *const   colidx,
-                                              real_t *const        values) {
+    int SpectralElementLaplacian::hessian_crs(const real_t *const  /*x*/,
+                                              const count_t *const /*rowptr*/,
+                                              const idx_t *const   /*colidx*/,
+                                              real_t *const        /*values*/) {
         SFEM_ERROR("[Error] SpectralElementLaplacian::hessian_crs NOT IMPLEMENTED!\n");
         return SFEM_FAILURE;
     }
 
-    int SpectralElementLaplacian::hessian_diag(const real_t *const, real_t *const out) {
+    int SpectralElementLaplacian::hessian_diag(const real_t *const, real_t *const /*out*/) {
         SFEM_TRACE_SCOPE("SpectralElementLaplacian::hessian_diag");
         SFEM_ERROR("[Error] SpectralElementLaplacian::hessian_diag NOT IMPLEMENTED!\n");
         return SFEM_FAILURE;
     }
 
-    int SpectralElementLaplacian::gradient(const real_t *const x, real_t *const out) {
+    int SpectralElementLaplacian::gradient(const real_t *const /*x*/, real_t *const /*out*/) {
         SFEM_ERROR("[Error] SpectralElementLaplacian::gradient NOT IMPLEMENTED!\n");
         return SFEM_FAILURE;
     }
@@ -129,7 +129,7 @@ namespace sfem {
         return err;
     }
 
-    int SpectralElementLaplacian::value(const real_t *x, real_t *const out) {
+    int SpectralElementLaplacian::value(const real_t * /*x*/, real_t *const /*out*/) {
         SFEM_ERROR("[Error] SpectralElementLaplacian::value NOT IMPLEMENTED!\n");
         return SFEM_FAILURE;
     }

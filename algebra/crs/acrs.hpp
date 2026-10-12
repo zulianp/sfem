@@ -188,7 +188,6 @@ namespace sfem {
         for (ptrdiff_t i = 0; i < nrows; i++) {
             auto            cols     = &d_colidx[d_rowptr[i]];
             const ptrdiff_t extent   = d_rowptr[i + 1] - d_rowptr[i];
-            const ptrdiff_t nbuckets = d_acrs_rowptr[i + 1] - d_acrs_rowptr[i];
             if (!extent) continue;
 
             ptrdiff_t bucket_offset                         = 0;

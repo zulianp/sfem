@@ -155,9 +155,6 @@ int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int 
     kv_op->set_field("velocity", temp_vel, 0);
     kv_op->set_field("acceleration", increment, 0);
 
-    int SFEM_USE_SPMG = 1;
-    SFEM_READ_ENV(SFEM_USE_SPMG, atoi);
-
     std::shared_ptr<sfem::Input> in;
     const char                  *SFEM_SSMGC_YAML{nullptr};
     SFEM_READ_ENV(SFEM_SSMGC_YAML, );

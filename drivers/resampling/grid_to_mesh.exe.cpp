@@ -93,7 +93,7 @@ void  //
 handle_option_result(const int    result,
                      const char*  option,
                      const char*  arg,
-                     const size_t arg_size,
+                     const size_t /*arg_size*/,
                      const int    mandatory,
                      const int    print_result) {
     int mpi_rank;
@@ -403,7 +403,7 @@ real_t mesh_fun_par(real_t x, real_t y, real_t z) { return x * x + y * y + z * z
 
 real_t mesh_fun_trig(real_t x, real_t y, real_t z) { return 2.0 * (sin(3.0 * x) + cos(3.0 * y) + sin(3.0 * z)); }
 
-real_t mesh_fun_ones(real_t x, real_t y, real_t z) { return 1.0; }
+real_t mesh_fun_ones(real_t /*x*/, real_t /*y*/, real_t /*z*/) { return 1.0; }
 
 ////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -440,7 +440,7 @@ int main(int argc, char* argv[]) {
         printf("\n");
     }
 
-    if (argc < 13 && argc > 14) {
+    if (argc < 13) {
         fprintf(stderr, "Error: Invalid number of arguments\n\n");
 
         fprintf(stderr,
@@ -515,7 +515,7 @@ int main(int argc, char* argv[]) {
     auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
 
     // FIXME mesh_t will be removed in the future
-    mesh_t mesh_deprecated                = {0};
+    mesh_t mesh_deprecated                = {};
     mesh_deprecated.comm                  = mesh->comm()->get();
     mesh_deprecated.mem_space             = SFEM_MEM_SPACE_HOST;
     mesh_deprecated.spatial_dim           = mesh->spatial_dimension();
@@ -642,20 +642,6 @@ int main(int argc, char* argv[]) {
     // X is contiguous
     ptrdiff_t stride[3] = {1, nlocal[0], nlocal[0] * nlocal[1]};
 
-    // used to perform the assembly of the dual mass vector in the kernel
-    // for smesh::TET10 elements
-    // 0: do not assemble the dual mass vector in the kernel if the memory model is host and mpi_size > 1
-    // 1: assemble the dual mass vector in the kernel
-    int assemble_dual_mass_vector_cuda = 0;
-
-    if (info.element_type == smesh::TET10 && SFEM_TET10_CUDA) {
-        if (SFEM_CUDA_MEMORY_MODEL == CUDA_HOST_MEMORY && mpi_size > 1) {
-            assemble_dual_mass_vector_cuda = 0;
-        } else {
-            assemble_dual_mass_vector_cuda = 1;
-        }
-    }
-
     // real_t* test_field = calloc(nlocal[0] * nlocal[1] * nlocal[2], sizeof(real_t));  /// DEBUG
 
     if (mpi_size > 1) {
@@ -758,8 +744,6 @@ int main(int argc, char* argv[]) {
                               mesh_fun_ones,                           //
                               g);                                      //
 
-            const real_t alpha_th_tet10 = 2.5;
-
             switch (info.element_type) {
                 case smesh::TET10: {
                     ret_resample_adjoint =                                       //
@@ -853,9 +837,6 @@ int main(int argc, char* argv[]) {
                     //                                               delta,              //
                     //                                               &bit_array_in_out,  //
                     //                                               &info);             //
-
-                    unsigned int max_field_cnt = 0;
-                    unsigned int max_in_out    = 0;
 
                     // unsigned int min_non_zero_field_cnt = UINT_MAX;
                     // unsigned int min_non_zero_in_out    = 0;
@@ -984,13 +965,6 @@ int main(int argc, char* argv[]) {
                                              (resample_tock - resample_tick));  //
 
         MPI_Gather(&flops, 1, MPI_DOUBLE, flops_v, 1, MPI_DOUBLE, 0, comm);
-
-        double tot_flops = 0.0;
-        if (mpi_rank == 0) {
-            for (int i = 0; i < mpi_size; i++) {
-                tot_flops += flops_v[i];
-            }
-        }
 
         free(flops_v);
 

@@ -35,9 +35,10 @@ namespace sfem {
             const ptrdiff_t rows = this->rows_;
 
             // Check preconditions
-            assert(this->colidx->size() == nnz);
-            assert(this->off_diag_values->size() == nnz);
-            assert(this->diag_values->size() == rows);
+            assert((ptrdiff_t)this->colidx->size() == nnz);
+            assert((ptrdiff_t)this->off_diag_values->size() == nnz);
+            assert((ptrdiff_t)this->diag_values->size() == rows);
+            (void)nnz;
 
             // Get raw pointers
             auto rowptr = this->rowptr->data();

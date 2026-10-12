@@ -26,8 +26,8 @@ typedef double geom_t;
 #endif
 
 #include <math.h>
-#include "../../../../cuda/kernel_math.cuh"
-#include "../../../../cuda/kernel_diagnostics.cuh"
+#include "kernel_math.cuh"
+#include "kernel_diagnostics.cuh"
 
 namespace sfem {
 namespace codegen {

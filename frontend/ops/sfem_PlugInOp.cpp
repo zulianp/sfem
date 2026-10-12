@@ -14,12 +14,6 @@
 namespace sfem {
 
     namespace {
-        inline std::string to_lower(const std::string &s) {
-            std::string r = s;
-            for (auto &c : r) c = std::tolower(c);
-            return r;
-        }
-
         inline const char *elem_suffix(smesh::ElemType t) {
             switch (t) {
                 case smesh::HEX8: return "hex8";
@@ -290,7 +284,7 @@ namespace sfem {
         });
     }
 
-    int PlugInOp::value(const real_t *x, real_t *const out) {
+    int PlugInOp::value(const real_t * /*x*/, real_t *const /*out*/) {
         SFEM_ERROR("PlugInOp::value not implemented");
         return SFEM_FAILURE;
     }

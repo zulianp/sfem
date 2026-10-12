@@ -1169,7 +1169,7 @@ hex_aa_8_eval_weno4_3D_Unit_cuda(const real_t                      x_unit,   //
 #define WENO_DIRECT_CUDA 1
 
 #if WENO_DIRECT_CUDA == 1
-#pragma message "WENO_DIRECT_CUDA is enabled"
+// #pragma message "WENO_DIRECT_CUDA is enabled"
 
     const int stride_x = stride0;
     const int stride_y = stride1;

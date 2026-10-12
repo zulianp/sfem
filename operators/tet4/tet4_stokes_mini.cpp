@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#ifndef NDEBUG
 static int check_symmetric(int n, const real_t *const element_matrix) {
     for (int i = 0; i < n; ++i) {
         for (int j = 0; j < n; ++j) {
@@ -30,6 +31,7 @@ static int check_symmetric(int n, const real_t *const element_matrix) {
 
     return 0;
 }
+#endif
 
 static SFEM_INLINE idx_t linear_search(const idx_t target, const idx_t *const arr, const int size) {
     idx_t i;
@@ -483,7 +485,7 @@ static SFEM_INLINE void tet4_stokes_assemble_hessian_kernel(const scalar_t mu,
 }
 
 static SFEM_INLINE void tet4_stokes_mini_assemble_rhs_kernel(
-        const scalar_t mu,
+        const scalar_t /*mu*/,
         const scalar_t rho,
         const scalar_t px0,
         const scalar_t px1,
@@ -1030,16 +1032,12 @@ void tet4_stokes_mini_assemble_rhs_soa(const ptrdiff_t nelements,
     double tick = MPI_Wtime();
 
     static const int n_vars = 4;
-    static const int ndofs = 4;
-    static const int rows = 16;
-    static const int cols = 16;
 
 #pragma omp parallel
     {
 #pragma omp for  // nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[4];
-            idx_t ks[4];
             accumulator_t element_vector[4 * 4];
             scalar_t u_rhs[5 * 4];
             scalar_t p_rhs[4] = {0., 0., 0., 0.};
@@ -1124,16 +1122,12 @@ void tet4_stokes_mini_assemble_rhs_aos(const ptrdiff_t nelements,
     double tick = MPI_Wtime();
 
     static const int n_vars = 4;
-    static const int ndofs = 4;
-    static const int rows = 16;
-    static const int cols = 16;
 
 #pragma omp parallel
     {
 #pragma omp for  // nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[4];
-            idx_t ks[4];
             accumulator_t element_vector[4 * 4];
             scalar_t u_rhs[5 * 4];
             scalar_t p_rhs[4] = {0., 0., 0., 0.};
@@ -1218,16 +1212,12 @@ void tet4_stokes_mini_apply_aos(const ptrdiff_t nelements,
     double tick = MPI_Wtime();
 
     static const int n_vars = 4;
-    static const int ndofs = 4;
-    static const int rows = 16;
-    static const int cols = 16;
 
 #pragma omp parallel
     {
 #pragma omp for  // nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[4];
-            idx_t ks[4];
             real_t element_vector[4 * 4];
             real_t element_x[4 * 4];
 

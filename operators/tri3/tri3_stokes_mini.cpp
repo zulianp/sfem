@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#ifndef NDEBUG
 static int check_symmetric(int n, const real_t *const element_matrix) {
     for (int i = 0; i < n; ++i) {
         for (int j = 0; j < n; ++j) {
@@ -30,6 +31,7 @@ static int check_symmetric(int n, const real_t *const element_matrix) {
 
     return 0;
 }
+#endif
 
 static SFEM_INLINE idx_t linear_search(const idx_t target, const idx_t *const arr, const int size) {
     idx_t i;
@@ -569,16 +571,12 @@ void tri3_stokes_mini_assemble_rhs_soa(const ptrdiff_t nelements,
     double tick = MPI_Wtime();
 
     static const int n_vars = 3;
-    static const int ndofs = 3;
-    static const int rows = 9;
-    static const int cols = 9;
 
 #pragma omp parallel
     {
 #pragma omp for //nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[3];
-            idx_t ks[3];
             real_t element_vector[3 * 3];
             real_t u_rhs[4 * 2];
             real_t p_rhs[3] = {0., 0., 0.};
@@ -592,14 +590,6 @@ void tri3_stokes_mini_assemble_rhs_soa(const ptrdiff_t nelements,
             const idx_t i0 = ev[0];
             const idx_t i1 = ev[1];
             const idx_t i2 = ev[2];
-
-            const real_t x0 = points[0][i0];
-            const real_t x1 = points[0][i1];
-            const real_t x2 = points[0][i2];
-
-            const real_t y0 = points[1][i0];
-            const real_t y1 = points[1][i1];
-            const real_t y2 = points[1][i2];
 
             memset(u_rhs, 0, 4 * 2 * sizeof(real_t));
 
@@ -666,16 +656,12 @@ void tri3_stokes_mini_assemble_rhs_aos(const ptrdiff_t nelements,
     double tick = MPI_Wtime();
 
     static const int n_vars = 3;
-    static const int ndofs = 3;
-    static const int rows = 9;
-    static const int cols = 9;
 
 #pragma omp parallel
     {
 #pragma omp for //nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[3];
-            idx_t ks[3];
             real_t element_vector[3 * 3];
             real_t u_rhs[4 * 2];
             real_t p_rhs[3] = {0., 0., 0.};
@@ -689,14 +675,6 @@ void tri3_stokes_mini_assemble_rhs_aos(const ptrdiff_t nelements,
             const idx_t i0 = ev[0];
             const idx_t i1 = ev[1];
             const idx_t i2 = ev[2];
-
-            const real_t x0 = points[0][i0];
-            const real_t x1 = points[0][i1];
-            const real_t x2 = points[0][i2];
-
-            const real_t y0 = points[1][i0];
-            const real_t y1 = points[1][i1];
-            const real_t y2 = points[1][i2];
 
             memset(u_rhs, 0, 4 * 2 * sizeof(real_t));
 
@@ -758,16 +736,12 @@ void tri3_stokes_mini_apply_aos(const ptrdiff_t nelements,
     double tick = MPI_Wtime();
 
     static const int n_vars = 3;
-    static const int ndofs = 3;
-    static const int rows = 9;
-    static const int cols = 9;
 
 #pragma omp parallel
     {
 #pragma omp for //nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[3];
-            idx_t ks[3];
             real_t element_vector[3 * 3];
             real_t element_x[3 * 3];
 
@@ -788,14 +762,6 @@ void tri3_stokes_mini_apply_aos(const ptrdiff_t nelements,
             const idx_t i0 = ev[0];
             const idx_t i1 = ev[1];
             const idx_t i2 = ev[2];
-
-            const real_t x0 = points[0][i0];
-            const real_t x1 = points[0][i1];
-            const real_t x2 = points[0][i2];
-
-            const real_t y0 = points[1][i0];
-            const real_t y1 = points[1][i1];
-            const real_t y2 = points[1][i2];
 
             tri3_stokes_mini_apply_kernel(mu,
                                           // rho,

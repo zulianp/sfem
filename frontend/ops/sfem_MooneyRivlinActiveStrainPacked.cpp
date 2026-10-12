@@ -406,7 +406,7 @@ namespace sfem {
     void MooneyRivlinActiveStrainPacked::set_lambda(const real_t lambda) { impl_->lambda = lambda; }
     void MooneyRivlinActiveStrainPacked::set_lmda(const real_t lmda) { impl_->lmda = lmda; }
 
-    void MooneyRivlinActiveStrainPacked::set_field(const char *name,
+    void MooneyRivlinActiveStrainPacked::set_field(const char * /*name*/,
                                                       const SharedBuffer<real_t> &v,
                                                       const int /*component*/) {
         if (impl_->Fa.empty()) {

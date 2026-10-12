@@ -15,52 +15,52 @@
 #include "tet10_navier_stokes.hpp"
 #include "tri6_navier_stokes.hpp"
 
-void navier_stokes_assemble_value_aos(const smesh::ElemType               element_type,
-                                      const ptrdiff_t                   nelements,
-                                      const ptrdiff_t                   nnodes,
-                                      idx_t **const SFEM_RESTRICT       elems,
-                                      geom_t **const SFEM_RESTRICT      xyz,
-                                      const real_t                      nu,
-                                      const real_t                      rho,
-                                      const real_t *const SFEM_RESTRICT u,
-                                      real_t *const SFEM_RESTRICT       value) {
+void navier_stokes_assemble_value_aos(const smesh::ElemType               /*element_type*/,
+                                      const ptrdiff_t                   /*nelements*/,
+                                      const ptrdiff_t                   /*nnodes*/,
+                                      idx_t **const SFEM_RESTRICT       /*elems*/,
+                                      geom_t **const SFEM_RESTRICT      /*xyz*/,
+                                      const real_t                      /*nu*/,
+                                      const real_t                      /*rho*/,
+                                      const real_t *const SFEM_RESTRICT /*u*/,
+                                      real_t *const SFEM_RESTRICT       /*value*/) {
     SFEM_ERROR("IMPLEMENT ME!\n");
 }
 
-void navier_stokes_assemble_gradient_aos(const smesh::ElemType               element_type,
-                                         const ptrdiff_t                   nelements,
-                                         const ptrdiff_t                   nnodes,
-                                         idx_t **const SFEM_RESTRICT       elems,
-                                         geom_t **const SFEM_RESTRICT      xyz,
-                                         const real_t                      nu,
-                                         const real_t                      rho,
-                                         const real_t *const SFEM_RESTRICT u,
-                                         real_t *const SFEM_RESTRICT       values) {
+void navier_stokes_assemble_gradient_aos(const smesh::ElemType               /*element_type*/,
+                                         const ptrdiff_t                   /*nelements*/,
+                                         const ptrdiff_t                   /*nnodes*/,
+                                         idx_t **const SFEM_RESTRICT       /*elems*/,
+                                         geom_t **const SFEM_RESTRICT      /*xyz*/,
+                                         const real_t                      /*nu*/,
+                                         const real_t                      /*rho*/,
+                                         const real_t *const SFEM_RESTRICT /*u*/,
+                                         real_t *const SFEM_RESTRICT       /*values*/) {
     SFEM_ERROR("IMPLEMENT ME!\n");
 }
 
-void navier_stokes_assemble_hessian_aos(const smesh::ElemType                element_type,
-                                        const ptrdiff_t                    nelements,
-                                        const ptrdiff_t                    nnodes,
-                                        idx_t **const SFEM_RESTRICT        elems,
-                                        geom_t **const SFEM_RESTRICT       xyz,
-                                        const real_t                       nu,
-                                        const real_t                       rho,
-                                        const count_t *const SFEM_RESTRICT rowptr,
-                                        const idx_t *const SFEM_RESTRICT   colidx,
-                                        real_t *const SFEM_RESTRICT        values) {
+void navier_stokes_assemble_hessian_aos(const smesh::ElemType                /*element_type*/,
+                                        const ptrdiff_t                    /*nelements*/,
+                                        const ptrdiff_t                    /*nnodes*/,
+                                        idx_t **const SFEM_RESTRICT        /*elems*/,
+                                        geom_t **const SFEM_RESTRICT       /*xyz*/,
+                                        const real_t                       /*nu*/,
+                                        const real_t                       /*rho*/,
+                                        const count_t *const SFEM_RESTRICT /*rowptr*/,
+                                        const idx_t *const SFEM_RESTRICT   /*colidx*/,
+                                        real_t *const SFEM_RESTRICT        /*values*/) {
     SFEM_ERROR("IMPLEMENT ME!\n");
 }
 
-void navier_stokes_apply_aos(const smesh::ElemType               element_type,
-                             const ptrdiff_t                   nelements,
-                             const ptrdiff_t                   nnodes,
-                             idx_t **const SFEM_RESTRICT       elems,
-                             geom_t **const SFEM_RESTRICT      xyz,
-                             const real_t                      nu,
-                             const real_t                      rho,
-                             const real_t *const SFEM_RESTRICT u,
-                             real_t *const SFEM_RESTRICT       values) {
+void navier_stokes_apply_aos(const smesh::ElemType               /*element_type*/,
+                             const ptrdiff_t                   /*nelements*/,
+                             const ptrdiff_t                   /*nnodes*/,
+                             idx_t **const SFEM_RESTRICT       /*elems*/,
+                             geom_t **const SFEM_RESTRICT      /*xyz*/,
+                             const real_t                      /*nu*/,
+                             const real_t                      /*rho*/,
+                             const real_t *const SFEM_RESTRICT /*u*/,
+                             real_t *const SFEM_RESTRICT       /*values*/) {
     SFEM_ERROR("IMPLEMENT ME!\n");
 }
 
@@ -103,6 +103,7 @@ void navier_stokes_mixed_divergence(const smesh::ElemType          high_order,
                                     const real_t                 nu,
                                     real_t **const SFEM_RESTRICT vel,
                                     real_t *const SFEM_RESTRICT  f) {
+    SFEM_UNUSED(low_order);
     switch (high_order) {
         case smesh::TRI6: {
             assert(low_order == smesh::TRI3);
@@ -123,7 +124,7 @@ void navier_stokes_mixed_divergence(const smesh::ElemType          high_order,
 }
 
 void navier_stokes_mixed_correction(const smesh::ElemType          high_order,
-                                    const smesh::ElemType          low_order,
+                                    const smesh::ElemType          /*low_order*/,
                                     const ptrdiff_t              nelements,
                                     const ptrdiff_t              nnodes,
                                     idx_t **const                elems,

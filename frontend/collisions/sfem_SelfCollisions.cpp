@@ -120,11 +120,10 @@ namespace sfem {
 
         void distance_and_normal(const real_t                                     toi,
                                  real_t* const SFEM_RESTRICT                      d,
-                                 const ptrdiff_t                                  stride_normal,
+                                 const ptrdiff_t                                  /*stride_normal*/,
                                  real_t* const SFEM_RESTRICT* const SFEM_RESTRICT n) {
             SMESH_TRACE_SCOPE("SelfCollisions::Impl::distance_and_normal");
 
-            int             dim     = surface->spatial_dimension();
             const ptrdiff_t n_nodes = surface->n_nodes();
 
             discrete_detection_with_side_effects(toi);
@@ -176,7 +175,7 @@ namespace sfem {
 
                 // Remove points past the face, unless they are on the face (this works only if the simulation is penetration
                 // free)
-                if (dot < 1e-8 && d2 > 1e-6 || d[vidx] < d2) {
+                if ((dot < 1e-8 && d2 > 1e-6) || d[vidx] < d2) {
                     continue;
                 }
 

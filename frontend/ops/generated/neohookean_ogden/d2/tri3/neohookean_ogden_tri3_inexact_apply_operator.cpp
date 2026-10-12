@@ -1,5 +1,5 @@
-#include "../../op/sfem_GeneratedNeoHookeanOgden_c_abi.hpp"
-#include "../../../kernel_diagnostics.hpp"
+#include "sfem_GeneratedNeoHookeanOgden_c_abi.hpp"
+#include "kernel_diagnostics.hpp"
 
 #include "neohookean_ogden_tri3_inexact_apply_inline.hpp"
 

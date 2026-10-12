@@ -11,6 +11,7 @@ from codegen.framework.emitters.kernel_prologue import (
 from codegen.framework.plans.conventions import (
     PREFIXES,
     abi_geometry_name,
+    generated_include,
     abi_local_level,
     abi_mesh_fragment,
     INLINE_QUALIFIER_MACROS,
@@ -423,7 +424,7 @@ def affine_geometry_stream_helper_lines(source_builder=None):
         "",
         _block_template_head("typename s_t", "typename g_t"),
         "%s const s_t *ageom_stream(" % inline_qualifier,
-        *("    %s," % parameter for parameter in _count_params()),
+        *("    %s," % parameter for parameter in _unnamed_count_params()),
         "    const g_t *const RSTR source,",
         "    s_t *const RSTR,",
         "    std::true_type) {",
@@ -805,7 +806,7 @@ def generate_sfem_soa_cpp_files(
                 ),
             ),
             GeneratedKernelFile(
-                "%s_element.hpp" % prefix,
+                source_builder.header_name("%s_element" % prefix),
                 _sfem_soa_element_api_header(
                     forms,
                     prefix,
@@ -4642,13 +4643,7 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
             lines.append("        s_t bcoordinate_data[NS * ND]%s;" % _wi_extent())
             for stream in _soa_array_stream_names(_adjugate_input(dim)):
                 lines.append("        s_t b%s[%s];" % (stream, c_product("NQ", *_width_factors())))
-            lines.extend(
-                [
-                    "        s_t bdet0[%s];" % c_product("NQ", *_width_factors()),
-                    "        s_t *badj_streams[ND * ND] = {%s};"
-                    % ", ".join("badj%d" % i for i in range(dim * dim)),
-                ]
-            )
+            lines.append("        s_t bdet0[%s];" % c_product("NQ", *_width_factors()))
         lines.extend(
             [
                 "",
@@ -6547,13 +6542,7 @@ def _sfem_soa_packed_apply_public_wrappers(
                 lines.append("        s_t bcoordinate_data[NS * ND]%s;" % _wi_extent())
                 for stream in _soa_array_stream_names(_adjugate_input(dim)):
                     lines.append("        s_t b%s[%s];" % (stream, c_product("NQ", *_width_factors())))
-                lines.extend(
-                    [
-                        "        s_t bdet0[%s];" % c_product("NQ", *_width_factors()),
-                        "        s_t *badj_streams[ND * ND] = {%s};"
-                        % ", ".join("badj%d" % i for i in range(dim * dim)),
-                    ]
-                )
+                lines.append("        s_t bdet0[%s];" % c_product("NQ", *_width_factors()))
             if uses_current:
                 lines.extend(
                     _ordered_stream_pointer_array_lines(
@@ -8737,10 +8726,6 @@ def _sfem_soa_hessian_packed_crs_passes(
         for stream in _soa_array_stream_names(_adjugate_input(dim)):
             lines.append("        s_t b%s[%s];" % (stream, c_product("NQ", *_width_factors())))
         lines.append("        s_t bdet0[%s];" % c_product("NQ", *_width_factors()))
-        lines.append(
-            "        s_t *badj_streams[ND * ND] = {%s};"
-            % ", ".join("badj%d" % i for i in range(dim * dim))
-        )
         lines.extend(
             [
                 "",
@@ -9061,8 +9046,9 @@ def _holding_one_element_hessian_matrix_assembly_function(
     if not is_affine_assembly:
         for d in range(dim):
             lines.append(
-                "  const g_t *const RSTR %s = points[%d];"
-                % (_component_name(d), d)
+                kernel_local(
+                    _component_name(d), "points[%d]" % d, "const g_t *const RSTR"
+                )
             )
         lines.extend(
             _ordered_element_pointer_array_lines(
@@ -9106,11 +9092,6 @@ def _holding_one_element_hessian_matrix_assembly_function(
     for stream in _soa_array_stream_names(_adjugate_input(dim)):
         lines.append("    s_t b%s[%s];" % (stream, c_product("NQ", *_width_factors())))
     lines.append("    s_t bdet0[%s];" % c_product("NQ", *_width_factors()))
-    if not is_affine_assembly:
-        lines.append(
-            "    s_t *badj_streams[ND * ND] = {%s};"
-            % ", ".join("badj%d" % i for i in range(dim * dim))
-        )
     lines.extend(
         [
             "",
@@ -11097,21 +11078,6 @@ def _sfem_soa_element_api_header(
     return "\n".join(resolve_dead_parameters(resolve_kernel_constants(lines)))
 
 
-def _sibling_element_include(element_name, header):
-    """Another element's API header, seen from inside this element's directory.
-
-    Both sit in `d<dim>/<element>/` plus whatever folder the target claims for
-    its sources, so the number of steps up is the target's answer rather than a
-    constant: `../hex8/x.hpp` on the host, `../../hex8/cuda/x.hpp` on a device.
-    The mesh-order element delegates to its PROTEUS twin through exactly this
-    include, so a wrong count here breaks the delegation rather than a header.
-    """
-    subdirectory = current_target().source_subdirectory()
-    if not subdirectory:
-        return "../%s/%s" % (element_name, header)
-    return "../../%s/%s/%s" % (element_name, subdirectory, header)
-
-
 def _sfem_tensor_product_element_api_alias(prefix, dim, n_nodes):
     aliases = (
         ("quad4", "proteus_quad4", 2, 4),
@@ -11126,9 +11092,10 @@ def _sfem_tensor_product_element_api_alias(prefix, dim, n_nodes):
                 "element_name": element_name,
                 "proteus_name": proteus_name,
                 "target_prefix": "%s_%s" % (prefix[: -len(suffix)], proteus_name),
-                "include": _sibling_element_include(
-                    proteus_name,
-                    "%s_%s_element.hpp" % (prefix[: -len(suffix)], proteus_name),
+                "include": generated_include(
+                    current_target().header_name(
+                        "%s_%s_element" % (prefix[: -len(suffix)], proteus_name)
+                    )
                 ),
                 "shape_order": tensor_product_cartesian_shape_order(dim, n_nodes),
             }
@@ -11438,6 +11405,11 @@ _COUNT = {True: ("ne",), False: ()}
 
 def _count_params():
     return tuple("const int %s" % name for name in _COUNT[_has_width()])
+
+
+def _unnamed_count_params():
+    """The same parameters for an overload that never reads the count."""
+    return tuple("const int" for _ in _COUNT[_has_width()])
 
 
 def _count_args():

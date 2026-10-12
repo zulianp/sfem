@@ -28,69 +28,69 @@ ptrdiff_t nSizes_global = 0;
  * @param qz
  * @param f
  */
-SFEM_INLINE static void  //
-tet10_dual_basis_popp(const real_t qx, const real_t qy, const real_t qz, real_t* const f) {
-    const real_t x0  = -qx - qy - qz + 1;
-    const real_t x1  = 2 * qy;
-    const real_t x2  = 2 * qz;
-    const real_t x3  = 2 * qx - 1;
-    const real_t x4  = -x1 - x2 - x3;
-    const real_t x5  = x0 * x4;
-    const real_t x6  = x1 - 1;
-    const real_t x7  = (7.0 / 10.0) * qy;
-    const real_t x8  = x6 * x7;
-    const real_t x9  = x2 - 1;
-    const real_t x10 = (7.0 / 10.0) * qz;
-    const real_t x11 = x10 * x9;
-    const real_t x12 = -4 * qx - 4 * qy - 4 * qz + 4;
-    const real_t x13 = (7.0 / 40.0) * x12;
-    const real_t x14 = qy * qz;
-    const real_t x15 = qx * x13 + x11 + (14.0 / 5.0) * x14 + x8;
-    const real_t x16 = qx * x3;
-    const real_t x17 = (7.0 / 10.0) * x16;
-    const real_t x18 = (14.0 / 5.0) * qx;
-    const real_t x19 = qy * x13 + qz * x18 + x17;
-    const real_t x20 = qy * x18 + qz * x13;
-    const real_t x21 = (7.0 / 10.0) * x5;
-    const real_t x22 = qx * x7 + x10 * x12 + x21;
-    const real_t x23 = qx * x10 + x12 * x7;
-    const real_t x24 = qy * x6;
-    const real_t x25 = qx * x12;
-    const real_t x26 = qz * x7 + (7.0 / 10.0) * x25;
-    const real_t x27 = qz * x9;
-    const real_t x28 = -6.0 / 5.0 * qy * x6;
-    const real_t x29 = -6.0 / 5.0 * qz * x9;
-    const real_t x30 = (15.0 / 2.0) * qx;
-    const real_t x31 = qz * x30;
-    const real_t x32 = (15.0 / 8.0) * x12;
-    const real_t x33 = qy * x32;
-    const real_t x34 = (39.0 / 10.0) * x16;
-    const real_t x35 = x29 + x31 + x33 + x34;
-    const real_t x36 = qy * x30;
-    const real_t x37 = qz * x32;
-    const real_t x38 = (39.0 / 10.0) * x5;
-    const real_t x39 = x36 + x37 + x38;
-    const real_t x40 = (15.0 / 2.0) * x14 + (15.0 / 8.0) * x25;
-    const real_t x41 = -6.0 / 5.0 * x0 * x4;
-    const real_t x42 = (39.0 / 10.0) * x24;
-    const real_t x43 = x41 + x42;
-    const real_t x44 = -6.0 / 5.0 * qx * x3;
-    const real_t x45 = x40 + x44;
-    const real_t x46 = (39.0 / 10.0) * x27;
-    const real_t x47 = x28 + x46;
-    const real_t x48 = x31 + x33;
-    const real_t x49 = x36 + x37;
-    f[0]             = x15 + x19 + x20 + 7 * x5;
-    f[1]             = x15 + 7 * x16 + x22 + x23;
-    f[2]             = x11 + x19 + x22 + 7 * x24 + x26;
-    f[3]             = x17 + x20 + x21 + x23 + x26 + 7 * x27 + x8;
-    f[4]             = (111.0 / 20.0) * qx * x12 + (24.0 / 5.0) * qy * qz - x28 - x35 - x39;
-    f[5]             = (111.0 / 5.0) * qx * qy + (6.0 / 5.0) * qz * x12 - x35 - x40 - x43;
-    f[6]             = (24.0 / 5.0) * qx * qz + (111.0 / 20.0) * qy * x12 - x29 - x39 - x42 - x45;
-    f[7]             = (24.0 / 5.0) * qx * qy + (111.0 / 20.0) * qz * x12 - x38 - x45 - x47 - x48;
-    f[8]             = (111.0 / 5.0) * qx * qz + (6.0 / 5.0) * qy * x12 - x34 - x40 - x41 - x47 - x49;
-    f[9]             = (6.0 / 5.0) * qx * x12 + (111.0 / 5.0) * qy * qz - x43 - x44 - x46 - x48 - x49;
-}
+// SFEM_INLINE static void  //
+// tet10_dual_basis_popp(const real_t qx, const real_t qy, const real_t qz, real_t* const f) {
+//     const real_t x0  = -qx - qy - qz + 1;
+//     const real_t x1  = 2 * qy;
+//     const real_t x2  = 2 * qz;
+//     const real_t x3  = 2 * qx - 1;
+//     const real_t x4  = -x1 - x2 - x3;
+//     const real_t x5  = x0 * x4;
+//     const real_t x6  = x1 - 1;
+//     const real_t x7  = (7.0 / 10.0) * qy;
+//     const real_t x8  = x6 * x7;
+//     const real_t x9  = x2 - 1;
+//     const real_t x10 = (7.0 / 10.0) * qz;
+//     const real_t x11 = x10 * x9;
+//     const real_t x12 = -4 * qx - 4 * qy - 4 * qz + 4;
+//     const real_t x13 = (7.0 / 40.0) * x12;
+//     const real_t x14 = qy * qz;
+//     const real_t x15 = qx * x13 + x11 + (14.0 / 5.0) * x14 + x8;
+//     const real_t x16 = qx * x3;
+//     const real_t x17 = (7.0 / 10.0) * x16;
+//     const real_t x18 = (14.0 / 5.0) * qx;
+//     const real_t x19 = qy * x13 + qz * x18 + x17;
+//     const real_t x20 = qy * x18 + qz * x13;
+//     const real_t x21 = (7.0 / 10.0) * x5;
+//     const real_t x22 = qx * x7 + x10 * x12 + x21;
+//     const real_t x23 = qx * x10 + x12 * x7;
+//     const real_t x24 = qy * x6;
+//     const real_t x25 = qx * x12;
+//     const real_t x26 = qz * x7 + (7.0 / 10.0) * x25;
+//     const real_t x27 = qz * x9;
+//     const real_t x28 = -6.0 / 5.0 * qy * x6;
+//     const real_t x29 = -6.0 / 5.0 * qz * x9;
+//     const real_t x30 = (15.0 / 2.0) * qx;
+//     const real_t x31 = qz * x30;
+//     const real_t x32 = (15.0 / 8.0) * x12;
+//     const real_t x33 = qy * x32;
+//     const real_t x34 = (39.0 / 10.0) * x16;
+//     const real_t x35 = x29 + x31 + x33 + x34;
+//     const real_t x36 = qy * x30;
+//     const real_t x37 = qz * x32;
+//     const real_t x38 = (39.0 / 10.0) * x5;
+//     const real_t x39 = x36 + x37 + x38;
+//     const real_t x40 = (15.0 / 2.0) * x14 + (15.0 / 8.0) * x25;
+//     const real_t x41 = -6.0 / 5.0 * x0 * x4;
+//     const real_t x42 = (39.0 / 10.0) * x24;
+//     const real_t x43 = x41 + x42;
+//     const real_t x44 = -6.0 / 5.0 * qx * x3;
+//     const real_t x45 = x40 + x44;
+//     const real_t x46 = (39.0 / 10.0) * x27;
+//     const real_t x47 = x28 + x46;
+//     const real_t x48 = x31 + x33;
+//     const real_t x49 = x36 + x37;
+//     f[0]             = x15 + x19 + x20 + 7 * x5;
+//     f[1]             = x15 + 7 * x16 + x22 + x23;
+//     f[2]             = x11 + x19 + x22 + 7 * x24 + x26;
+//     f[3]             = x17 + x20 + x21 + x23 + x26 + 7 * x27 + x8;
+//     f[4]             = (111.0 / 20.0) * qx * x12 + (24.0 / 5.0) * qy * qz - x28 - x35 - x39;
+//     f[5]             = (111.0 / 5.0) * qx * qy + (6.0 / 5.0) * qz * x12 - x35 - x40 - x43;
+//     f[6]             = (24.0 / 5.0) * qx * qz + (111.0 / 20.0) * qy * x12 - x29 - x39 - x42 - x45;
+//     f[7]             = (24.0 / 5.0) * qx * qy + (111.0 / 20.0) * qz * x12 - x38 - x45 - x47 - x48;
+//     f[8]             = (111.0 / 5.0) * qx * qz + (6.0 / 5.0) * qy * x12 - x34 - x40 - x41 - x47 - x49;
+//     f[9]             = (6.0 / 5.0) * qx * x12 + (111.0 / 5.0) * qy * qz - x43 - x44 - x46 - x48 - x49;
+// }
 
 /**
  * @brief Compute the dual basis of the tet10 element
@@ -376,6 +376,10 @@ hex_aa_8_collect_indices(const ptrdiff_t* const SFEM_RESTRICT stride,  //
     indices[7] = i * stride[0] + (j + 1) * stride[1] + (k + 1) * stride[2];
 }
 
+#define WENO_GRID 0
+#define WENO_DIRECT
+
+#if WENO_GRID == 1 || !defined(WENO_DIRECT)
 /**
  * @brief Compute the indices of the field for third order interpolation
  *
@@ -418,7 +422,9 @@ SFEM_INLINE static void hex_aa_8_indices_O3(const ptrdiff_t* const SFEM_RESTRICT
     *i14 = (i + 1) * stride_x + (j + 2) * stride_y + (k + k_diff) * stride_z;
     *i15 = (i + 2) * stride_x + (j + 2) * stride_y + (k + k_diff) * stride_z;
 }
+#endif  // WENO_GRID == 1 || !defined(WENO_DIRECT)
 
+#ifdef WENO_DIRECT
 /**
  * @brief Compute the first index of the field for third order interpolation
  *
@@ -455,7 +461,9 @@ SFEM_INLINE static real_t* hex_aa_8_collect_coeffs_O3_ptr(const ptrdiff_t* const
 
     return (real_t*)&data[first_index];
 }
+#endif  // WENO_DIRECT
 
+#if WENO_GRID == 1 || !defined(WENO_DIRECT)
 /**
  * @brief Compute the coefficients of the field for third order interpolation
  *
@@ -560,7 +568,9 @@ SFEM_INLINE static void hex_aa_8_collect_coeffs_O3(const ptrdiff_t* const SFEM_R
     out[62] = data[i62];
     out[63] = data[i63];
 }
+#endif  // WENO_GRID == 1 || !defined(WENO_DIRECT)
 
+#if WENO_GRID == 1
 ////////////////////////////////////////////////////////////////////////
 // hex_aa_8_eval_weno4_3D
 ////////////////////////////////////////////////////////////////////////
@@ -619,11 +629,11 @@ SFEM_INLINE static real_t hex_aa_8_eval_weno4_3D(const real_t                   
 
     return w4;
 }
+#endif  // WENO_GRID == 1
 
 ////////////////////////////////////////////////////////////////////////
 // hex_aa_8_eval_weno4_3D
 ////////////////////////////////////////////////////////////////////////
-#define WENO_DIRECT
 real_t hex_aa_8_eval_weno4_3D_Unit(                 //
         const real_t                      x_unit,   //
         const real_t                      y_unit,   //
@@ -645,7 +655,7 @@ real_t hex_aa_8_eval_weno4_3D_Unit(                 //
 
 #ifdef WENO_DIRECT
 
-#pragma message "WENO_DIRECT"
+// #pragma message "WENO_DIRECT"
 
     const int stride_x = stride[0];
     const int stride_y = stride[1];
@@ -709,7 +719,7 @@ real_t hex_aa_8_eval_weno4_3D_Unit(                 //
 int hex8_to_subparametric_tet10_resample_field_local(
         // Mesh
         const ptrdiff_t              nelements,  // number of elements
-        const ptrdiff_t              nnodes,     // number of nodes
+        const ptrdiff_t              /*nnodes*/,     // number of nodes
         idx_t** const SFEM_RESTRICT  elems,      // connectivity
         geom_t** const SFEM_RESTRICT xyz,        // coordinates
         // SDF
@@ -907,38 +917,38 @@ int hex8_to_subparametric_tet10_resample_field_local(
 ///////////////////////////////////////////////////////////////////////
 // tet10_assemble_dual_mass_vector
 ///////////////////////////////////////////////////////////////////////
-static SFEM_INLINE void lumped_mass_kernel_popp(const real_t px0, const real_t px1, const real_t px2, const real_t px3,
-                                                const real_t py0, const real_t py1, const real_t py2, const real_t py3,
-                                                const real_t pz0, const real_t pz1, const real_t pz2, const real_t pz3,
-                                                real_t* const SFEM_RESTRICT element_matrix_diag) {
-    //
-    const real_t x0  = px0 - px1;
-    const real_t x1  = py0 - py2;
-    const real_t x2  = pz0 - pz3;
-    const real_t x3  = x1 * x2;
-    const real_t x4  = py0 - py3;
-    const real_t x5  = pz0 - pz2;
-    const real_t x6  = px0 - px2;
-    const real_t x7  = py0 - py1;
-    const real_t x8  = pz0 - pz1;
-    const real_t x9  = x4 * x8;
-    const real_t x10 = px0 - px3;
-    const real_t x11 = x5 * x7;
-    const real_t x12 = -7.0 / 600.0 * x0 * x3 + (7.0 / 600.0) * x0 * x4 * x5 + (7.0 / 600.0) * x1 * x10 * x8 -
-                       7.0 / 600.0 * x10 * x11 + (7.0 / 600.0) * x2 * x6 * x7 - 7.0 / 600.0 * x6 * x9;
-    const real_t x13 = -1.0 / 50.0 * x0 * x3 + (1.0 / 50.0) * x0 * x4 * x5 + (1.0 / 50.0) * x1 * x10 * x8 -
-                       1.0 / 50.0 * x10 * x11 + (1.0 / 50.0) * x2 * x6 * x7 - 1.0 / 50.0 * x6 * x9;
-    element_matrix_diag[0] = x12;
-    element_matrix_diag[1] = x12;
-    element_matrix_diag[2] = x12;
-    element_matrix_diag[3] = x12;
-    element_matrix_diag[4] = x13;
-    element_matrix_diag[5] = x13;
-    element_matrix_diag[6] = x13;
-    element_matrix_diag[7] = x13;
-    element_matrix_diag[8] = x13;
-    element_matrix_diag[9] = x13;
-}
+// static SFEM_INLINE void lumped_mass_kernel_popp(const real_t px0, const real_t px1, const real_t px2, const real_t px3,
+//                                                 const real_t py0, const real_t py1, const real_t py2, const real_t py3,
+//                                                 const real_t pz0, const real_t pz1, const real_t pz2, const real_t pz3,
+//                                                 real_t* const SFEM_RESTRICT element_matrix_diag) {
+//     //
+//     const real_t x0  = px0 - px1;
+//     const real_t x1  = py0 - py2;
+//     const real_t x2  = pz0 - pz3;
+//     const real_t x3  = x1 * x2;
+//     const real_t x4  = py0 - py3;
+//     const real_t x5  = pz0 - pz2;
+//     const real_t x6  = px0 - px2;
+//     const real_t x7  = py0 - py1;
+//     const real_t x8  = pz0 - pz1;
+//     const real_t x9  = x4 * x8;
+//     const real_t x10 = px0 - px3;
+//     const real_t x11 = x5 * x7;
+//     const real_t x12 = -7.0 / 600.0 * x0 * x3 + (7.0 / 600.0) * x0 * x4 * x5 + (7.0 / 600.0) * x1 * x10 * x8 -
+//                        7.0 / 600.0 * x10 * x11 + (7.0 / 600.0) * x2 * x6 * x7 - 7.0 / 600.0 * x6 * x9;
+//     const real_t x13 = -1.0 / 50.0 * x0 * x3 + (1.0 / 50.0) * x0 * x4 * x5 + (1.0 / 50.0) * x1 * x10 * x8 -
+//                        1.0 / 50.0 * x10 * x11 + (1.0 / 50.0) * x2 * x6 * x7 - 1.0 / 50.0 * x6 * x9;
+//     element_matrix_diag[0] = x12;
+//     element_matrix_diag[1] = x12;
+//     element_matrix_diag[2] = x12;
+//     element_matrix_diag[3] = x12;
+//     element_matrix_diag[4] = x13;
+//     element_matrix_diag[5] = x13;
+//     element_matrix_diag[6] = x13;
+//     element_matrix_diag[7] = x13;
+//     element_matrix_diag[8] = x13;
+//     element_matrix_diag[9] = x13;
+// }
 
 ///////////////////////////////////////////////////////////////////////
 // tet10_assemble_dual_mass_vector
@@ -986,7 +996,7 @@ static SFEM_INLINE void lumped_mass_kernel_hrt(const real_t px0, const real_t px
 ///////////////////////////////////////////////////////////////////////
 // tet10_assemble_dual_mass_vector
 ///////////////////////////////////////////////////////////////////////
-int subparametric_tet10_assemble_dual_mass_vector(const ptrdiff_t nelements, const ptrdiff_t nnodes,
+int subparametric_tet10_assemble_dual_mass_vector(const ptrdiff_t nelements, const ptrdiff_t /*nnodes*/,
                                                   idx_t** const SFEM_RESTRICT elems, geom_t** const SFEM_RESTRICT xyz,
                                                   real_t* const diag) {
     const geom_t* x = xyz[0];
@@ -1224,7 +1234,7 @@ tet10_transform_real_t(const real_t* const SFEM_RESTRICT x,  //
 int hex8_to_isoparametric_tet10_resample_field_local(
         // Mesh
         const ptrdiff_t              nelements,  // number of elements
-        const ptrdiff_t              nnodes,     // number of nodes
+        const ptrdiff_t              /*nnodes*/,     // number of nodes
         idx_t** const SFEM_RESTRICT  elems,      // connectivity
         geom_t** const SFEM_RESTRICT xyz,        // coordinates
         // SDF
@@ -1237,8 +1247,6 @@ int hex8_to_isoparametric_tet10_resample_field_local(
         real_t* const SFEM_RESTRICT weighted_field) {  //
     //
     PRINT_CURRENT_FUNCTION;
-
-#define WENO_GRID 0
 
     ptrdiff_t nDataNodes = n[0] * n[1] * n[2];
 
@@ -1285,8 +1293,10 @@ int hex8_to_isoparametric_tet10_resample_field_local(
             // ISOPARAMETRIC
             geom_t x[10], y[10], z[10];
 
+#if WENO_GRID != 1
             real_t hex8_f[8];
             real_t coeffs[8];
+#endif
 
             real_t tet10_f[10];
             real_t element_field[10];
@@ -1422,10 +1432,10 @@ int hex8_to_isoparametric_tet10_resample_field_local(
 int                                                                                                      //
 hex8_to_isoparametric_tet10_resample_field_adjoint(const ptrdiff_t                      start_element,   // Mesh
                                                    const ptrdiff_t                      end_element,     //
-                                                   const ptrdiff_t                      nnodes,          //
+                                                   const ptrdiff_t                      /*nnodes*/,          //
                                                    const idx_t** const SFEM_RESTRICT    elems,           //
                                                    const geom_t** const SFEM_RESTRICT   xyz,             //
-                                                   const ptrdiff_t* const SFEM_RESTRICT n,               // SDF
+                                                   const ptrdiff_t* const SFEM_RESTRICT /*n*/,               // SDF
                                                    const ptrdiff_t* const SFEM_RESTRICT stride,          //
                                                    const geom_t* const SFEM_RESTRICT    origin,          //
                                                    const geom_t* const SFEM_RESTRICT    delta,           //
@@ -1460,7 +1470,6 @@ hex8_to_isoparametric_tet10_resample_field_adjoint(const ptrdiff_t              
         geom_t x[10], y[10], z[10];
 
         real_t hex8_f[8];
-        real_t coeffs[8];
 
         real_t tet10_f[10];
         // real_t element_field[10];
@@ -1590,7 +1599,7 @@ hex8_to_isoparametric_tet10_resample_field_adjoint(const ptrdiff_t              
 int hex8_to_isoparametric_tet10_resample_field_local_cube1(
         /// Mesh
         const ptrdiff_t              nelements,  // number of elements
-        const ptrdiff_t              nnodes,     // number of nodes
+        const ptrdiff_t              /*nnodes*/,     // number of nodes
         idx_t** const SFEM_RESTRICT  elems,      // connectivity
         geom_t** const SFEM_RESTRICT xyz,        // coordinates
         /// SDF
@@ -1648,9 +1657,6 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1(
             // ISOPARAMETRIC
             geom_t x[10], y[10], z[10];
             geom_t x_unit[10], y_unit[10], z_unit[10];
-
-            real_t hex8_f[8];
-            real_t coeffs[8];
 
             real_t tet10_f[10];
             real_t element_field[10];
@@ -1901,7 +1907,7 @@ SFEM_INLINE static void isoparametric_lumped_mass_kernel_hrt(const real_t dV,
 ///////////////////////////////////////////////////////////////////////
 // subparametric_tet10_assemble_dual_mass_vector
 ///////////////////////////////////////////////////////////////////////
-int isoparametric_tet10_assemble_dual_mass_vector(const ptrdiff_t nelements, const ptrdiff_t nnodes,
+int isoparametric_tet10_assemble_dual_mass_vector(const ptrdiff_t nelements, const ptrdiff_t /*nnodes*/,
                                                   idx_t** const SFEM_RESTRICT elems, geom_t** const SFEM_RESTRICT xyz,
                                                   real_t* const diag) {
     PRINT_CURRENT_FUNCTION;
@@ -1992,7 +1998,7 @@ int hex8_to_tet10_resample_field_local(const ptrdiff_t                      nele
 #define CUBE1 0
 #endif
 
-    if (1 | SFEM_ENABLE_ISOPARAMETRIC) {
+    if (1 || SFEM_ENABLE_ISOPARAMETRIC) {
         // This is the scalar version of the code for the WENO version.
 #if CUBE1 == 1 && SFEM_VEC_SIZE == 1                                                    // CUBE1
         return hex8_to_isoparametric_tet10_resample_field_local_cube1(nelements,        //
@@ -2010,7 +2016,7 @@ int hex8_to_tet10_resample_field_local(const ptrdiff_t                      nele
 #if (SFEM_VEC_SIZE == 8 || SFEM_VEC_SIZE == 4)
         // Vectorized version for CPU
         // It is a wrapper between the classical algo and the WENO version
-        hex8_to_tet10_resample_field_local_V2(nelements,        //
+        return hex8_to_tet10_resample_field_local_V2(nelements,        //
                                               nnodes,           //
                                               elems,            //
                                               xyz,              //
@@ -2022,7 +2028,7 @@ int hex8_to_tet10_resample_field_local(const ptrdiff_t                      nele
                                               weighted_field);  //
 #else
         // Original code for the scalar version
-        hex8_to_isoparametric_tet10_resample_field_local(nelements,        //
+        return hex8_to_isoparametric_tet10_resample_field_local(nelements,        //
                                                          nnodes,           //
                                                          elems,            //
                                                          xyz,              //

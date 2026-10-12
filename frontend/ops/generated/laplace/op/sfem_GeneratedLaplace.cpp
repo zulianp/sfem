@@ -23,12 +23,6 @@ namespace sfem {
       parameters.set_value("kappa", 1);
     }
 
-    void seed_material(MultiDomainOp &domains) {
-      for (auto &entry : domains.domains()) {
-        seed_parameters(*entry.second.parameters);
-      }
-    }
-
     //! The part of the time discretisation that is not in this material's form:
     //! the inertia.  It is a *potential* here, because this operator's 0-form
     //! is one, so it reaches `value_steps` as well as `gradient` -- the energy
@@ -78,7 +72,7 @@ namespace sfem {
       if (!node.has_child(key)) {
         return false;
       }
-      node[key] >> value;
+      node[key].load(&value);
       return true;
     }
 
@@ -151,7 +145,7 @@ namespace sfem {
         return false;
       }
       int raw = value ? 1 : 0;
-      node[key] >> raw;
+      node[key].load(&raw);
       value = raw != 0;
       return true;
     }
@@ -633,7 +627,6 @@ namespace sfem {
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const geom_t *const *adjugate = nullptr;
-      const geom_t *adjugate_aos = nullptr;
       const geom_t *determinant = nullptr;
       const geom_t *const *geom_metric = nullptr;
             if (impl_->gradient_uses_affine || domain.element_type == smesh::TET4 || domain.element_type == smesh::TRI3) {
@@ -652,8 +645,6 @@ namespace sfem {
             SFEM_ERROR("GeneratedLaplace affine gradient requires cached AoS geometry\n");
             return SFEM_FAILURE;
           }
-          adjugate_aos = reinterpret_cast<const geom_t *>(
-              cache->jacobian_aos->jacobian_adjugate_AoS()->data());
           determinant = reinterpret_cast<const geom_t *>(
               cache->jacobian_aos->jacobian_determinant()->data());
         }
@@ -746,7 +737,6 @@ namespace sfem {
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const geom_t *const *adjugate = nullptr;
-      const geom_t *adjugate_aos = nullptr;
       const geom_t *determinant = nullptr;
       const geom_t *const *geom_metric = nullptr;
             if (impl_->apply_uses_affine || domain.element_type == smesh::TET4 || domain.element_type == smesh::TRI3) {
@@ -765,8 +755,6 @@ namespace sfem {
             SFEM_ERROR("GeneratedLaplace affine hessian action requires cached AoS geometry\n");
             return SFEM_FAILURE;
           }
-          adjugate_aos = reinterpret_cast<const geom_t *>(
-              cache->jacobian_aos->jacobian_adjugate_AoS()->data());
           determinant = reinterpret_cast<const geom_t *>(
               cache->jacobian_aos->jacobian_determinant()->data());
         }
@@ -1089,8 +1077,7 @@ namespace sfem {
     }
 
     auto mesh = impl_->space->mesh_ptr();
-    auto points = element_points(mesh);
-    return impl_->domains->iterate([&](const OpDomain &domain) {
+    return impl_->domains->iterate([&](const OpDomain &/*domain*/) {
       const int dim = mesh->spatial_dimension();
       if (dim == 2) {
         SFEM_ERROR("laplace hessian_block_diag_sym 2d dispatch was not generated\n");

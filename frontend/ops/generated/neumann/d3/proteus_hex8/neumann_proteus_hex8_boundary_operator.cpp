@@ -26,7 +26,7 @@ typedef double geom_t;
 #endif
 
 #include <math.h>
-#include "../../../kernel_math.hpp"
+#include "kernel_math.hpp"
 
 namespace sfem {
 namespace codegen {

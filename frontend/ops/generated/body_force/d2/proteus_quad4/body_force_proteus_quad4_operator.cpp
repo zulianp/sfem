@@ -2,12 +2,12 @@
 #include <cstdint>
 #include <cstdlib>
 #include <string.h>
-#include "../body_force_d2_tensor_product_local.hpp"
-#include "../../../geometry_kernels.hpp"
-#include "../../../kernel_diagnostics.hpp"
-#include "../../../packed_thread_scratch.hpp"
-#include "../../../reference/line_p1_q2.hpp"
-#include "../../../reference/quad_line_q2.hpp"
+#include "body_force_d2_tensor_product_local.hpp"
+#include "geometry_kernels.hpp"
+#include "kernel_diagnostics.hpp"
+#include "packed_thread_scratch.hpp"
+#include "line_p1_q2.hpp"
+#include "quad_line_q2.hpp"
 #if defined(__has_include)
 #if __has_include("smesh_types.hpp")
 #include "smesh_types.hpp"
@@ -24,7 +24,7 @@ namespace codegen {
 
 template <typename s_t, typename g_t, int VS>
 SFEM_INLINE const s_t *ageom_stream(
-    const int ne,
+    const int,
     const g_t *const RSTR source,
     s_t *const RSTR,
     std::true_type) {
@@ -200,7 +200,6 @@ static SFEM_INLINE int body_force_proteus_quad4_residual_a_msoa_impl(
   static constexpr int NC = 2;
   static constexpr int VS = 16;
   const s_t *const affine_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
-  const s_t *const affine_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
   const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
 
 #pragma omp parallel for schedule(static)

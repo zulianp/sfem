@@ -1,4 +1,4 @@
-#include "../../../op/cuda/sfem_GeneratedTwoPhaseFlow_cuda_c_abi.hpp"
+#include "sfem_GeneratedTwoPhaseFlow_cuda_c_abi.hpp"
 
 extern "C" int cu_two_phase_flow_form_2_p_c_p_w_proteus_quad4_jacobian_action_i_maos(
         const int scalar_bytes,

@@ -1007,7 +1007,6 @@ static SFEM_INLINE void aux_tet4_linear_elasticity_crs_adj_less_registers(
     const scalar_t x29 = x3 * (x12 * x7 + x12 * x8 + x12 * x9);
 
     scalar_t loperand[9];
-    scalar_t gtrial[3];
 
     // x (0)
     {

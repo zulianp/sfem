@@ -1,11 +1,11 @@
 #include <type_traits>
-#include "../navier_stokes_form_1_u_d3_simplex_mixed_local.hpp"
-#include "../../../reference/quad_tet_q11.hpp"
-#include "../../../reference/tet10_q11.hpp"
-#include "../../../reference/tet4_q11.hpp"
-#include "../../../kernel_math.hpp"
-#include "../../../geometry_kernels.hpp"
-#include "../../../kernel_diagnostics.hpp"
+#include "navier_stokes_form_1_u_d3_simplex_mixed_local.hpp"
+#include "quad_tet_q11.hpp"
+#include "tet10_q11.hpp"
+#include "tet4_q11.hpp"
+#include "kernel_math.hpp"
+#include "geometry_kernels.hpp"
+#include "kernel_diagnostics.hpp"
 
 #ifndef SFEM_RESTRICT
 #define SFEM_RESTRICT
@@ -33,7 +33,7 @@ namespace codegen {
 
 template <typename s_t, typename g_t, int VS>
 SFEM_INLINE const s_t *ageom_stream(
-    const int ne,
+    const int,
     const g_t *const RSTR source,
     s_t *const RSTR,
     std::true_type) {

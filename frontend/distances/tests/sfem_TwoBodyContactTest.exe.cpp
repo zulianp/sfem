@@ -214,7 +214,6 @@ void displace_points(const std::shared_ptr<smesh::Mesh>&     surface,
 int test_two_body_contact() {
     const EnvOptions env = EnvOptions::read();
     env.print(std::cout);
-    ptrdiff_t nx = env.nx;
 
     auto es   = ExecutionSpace::EXECUTION_SPACE_HOST;
     auto blas = sfem::blas<real_t>(es);
@@ -222,14 +221,13 @@ int test_two_body_contact() {
     auto      f     = create_function(env, es, env);
     auto      space = f->space();
     auto      mesh  = space->mesh_ptr();
-    const int dim   = mesh->spatial_dimension();
 
     auto displacement     = sfem::create_buffer<real_t>(space->n_dofs(), es);
     auto rhs              = sfem::create_buffer<real_t>(space->n_dofs(), es);
     auto constraints_mask = sfem::create_buffer<mask_t>(mask_count(space->n_dofs()), es);
 
 #pragma omp parallel for
-    for (ptrdiff_t i = 0; i < constraints_mask->size(); ++i) {
+    for (ptrdiff_t i = 0; i < (ptrdiff_t)constraints_mask->size(); ++i) {
         constraints_mask->data()[i] = 0;
     }
 

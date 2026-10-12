@@ -179,52 +179,6 @@ tet4_measure_v2(const real_type px0,    // X-coordinate 1st vertex
 }
 
 /**
- * @brief Compute the barycenter (centroid) of a tetrahedral element.
- *
- * This function calculates the coordinates of the barycenter of a tetrahedron by taking
- * the arithmetic mean of its four vertices' coordinates. The barycenter is the point where
- * the four medians of the tetrahedron intersect, and represents the center of mass assuming
- * uniform density.
- *
- * @param[in] px0 X-coordinate of vertex 0.
- * @param[in] px1 X-coordinate of vertex 1.
- * @param[in] px2 X-coordinate of vertex 2.
- * @param[in] px3 X-coordinate of vertex 3.
- * @param[in] py0 Y-coordinate of vertex 0.
- * @param[in] py1 Y-coordinate of vertex 1.
- * @param[in] py2 Y-coordinate of vertex 2.
- * @param[in] py3 Y-coordinate of vertex 3.
- * @param[in] pz0 Z-coordinate of vertex 0.
- * @param[in] pz1 Z-coordinate of vertex 1.
- * @param[in] pz2 Z-coordinate of vertex 2.
- * @param[in] pz3 Z-coordinate of vertex 3.
- * @param[out] bx Pointer to store the x-coordinate of the barycenter.
- * @param[out] by Pointer to store the y-coordinate of the barycenter.
- * @param[out] bz Pointer to store the z-coordinate of the barycenter.
- */
-SFEM_INLINE static void                                  //
-tet4_barycenter_v2(const real_type                px0,   // X-coordinate
-                   const real_type                px1,   //
-                   const real_type                px2,   //
-                   const real_type                px3,   //
-                   const real_type                py0,   // Y-coordinate
-                   const real_type                py1,   //
-                   const real_type                py2,   //
-                   const real_type                py3,   //
-                   const real_type                pz0,   // Z-coordinate
-                   const real_type                pz1,   //
-                   const real_type                pz2,   //
-                   const real_type                pz3,   //
-                   real_type* const SFEM_RESTRICT bx,    // Output
-                   real_type* const SFEM_RESTRICT by,    //
-                   real_type* const SFEM_RESTRICT bz) {  //
-                                                         //
-    *bx = (px0 + px1 + px2 + px3) / 4.0;
-    *by = (py0 + py1 + py2 + py3) / 4.0;
-    *bz = (pz0 + pz1 + pz2 + pz3) / 4.0;
-}
-
-/**
  * @brief Evaluate the shape functions for an 8-node hexahedral element.
  *
  * Computes the value of the eight standard basis (hat) functions associated
@@ -346,7 +300,7 @@ hex_aa_8_collect_coeffs_indices_V(const ptrdiff_t* const SFEM_RESTRICT stride,  
 int                                                                               //
 tet4_resample_field_local_v2(const ptrdiff_t                      start_element,  // Mesh
                              const ptrdiff_t                      end_element,    //
-                             const ptrdiff_t                      nnodes,         //
+                             const ptrdiff_t                      /*nnodes*/,         //
                              const idx_t** const SFEM_RESTRICT    elems,          //
                              const geom_t** const SFEM_RESTRICT   xyz,            //
                              const ptrdiff_t* const SFEM_RESTRICT n,              // SDF

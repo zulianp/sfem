@@ -2,10 +2,10 @@
 #define LAPLACE_TET10_ELEMENT_API_HPP
 
 #include <stddef.h>
-#include "../laplace_d3_simplex_local.hpp"
-#include "../../../geometry_kernels.hpp"
-#include "../../../reference/quad_tet_q11.hpp"
-#include "../../../reference/tet10_q11.hpp"
+#include "laplace_d3_simplex_local.hpp"
+#include "geometry_kernels.hpp"
+#include "quad_tet_q11.hpp"
+#include "tet10_q11.hpp"
 
 namespace sfem {
 namespace codegen {

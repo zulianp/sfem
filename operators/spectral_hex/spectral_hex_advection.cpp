@@ -128,12 +128,10 @@ int lagrange_hex_advection_apply_tpl(const ptrdiff_t                   nelements
             break;
         }
     }
+    SFEM_UNUSED(n_qp);
 
     lagrange_eval<scalar_t>(order, Q, qx, S);
     lagrange_diff_eval<scalar_t>(order, Q, qx, D);
-
-    const int nxe = sshex8_nxe(order);
-    const int txe = sshex8_txe(order);
 
     const int hex8_corners[8] = {// Bottom
                                  sshex8_lidx(order, 0, 0, 0),
@@ -213,15 +211,15 @@ int lagrange_hex_advection_apply_tpl(const ptrdiff_t                   nelements
 }
 
 template <int order>
-int spectral_hex_advection_apply_tpl(const ptrdiff_t                   nelements,
-                                     const ptrdiff_t                   nnodes,
-                                     idx_t** const SFEM_RESTRICT       elements,
-                                     geom_t** const SFEM_RESTRICT      points,
-                                     const real_t* const SFEM_RESTRICT vx,
-                                     const real_t* const SFEM_RESTRICT vy,
-                                     const real_t* const SFEM_RESTRICT vz,
-                                     const real_t* const SFEM_RESTRICT c,
-                                     real_t* const SFEM_RESTRICT       values) {
+int spectral_hex_advection_apply_tpl(const ptrdiff_t                   /*nelements*/,
+                                     const ptrdiff_t                   /*nnodes*/,
+                                     idx_t** const SFEM_RESTRICT       /*elements*/,
+                                     geom_t** const SFEM_RESTRICT      /*points*/,
+                                     const real_t* const SFEM_RESTRICT /*vx*/,
+                                     const real_t* const SFEM_RESTRICT /*vy*/,
+                                     const real_t* const SFEM_RESTRICT /*vz*/,
+                                     const real_t* const SFEM_RESTRICT /*c*/,
+                                     real_t* const SFEM_RESTRICT       /*values*/) {
     SFEM_ERROR("IMPLEMENT ME!\n");
     return SFEM_SUCCESS;
 }

@@ -57,7 +57,7 @@ static SFEM_INLINE void inverse3(
 
 int hex8_mooney_rivlin_active_strain_objective(const ptrdiff_t      nelements,
                                                const ptrdiff_t      stride,
-                                               const ptrdiff_t      nnodes,
+                                               const ptrdiff_t      /*nnodes*/,
                                                idx_t **const        elements,
                                                geom_t **const       points,
                                                const real_t         mu,
@@ -175,7 +175,7 @@ int hex8_mooney_rivlin_active_strain_objective(const ptrdiff_t      nelements,
 
 int hex8_mooney_rivlin_active_strain_objective_steps(const ptrdiff_t      nelements,
                                                      const ptrdiff_t      stride,
-                                                     const ptrdiff_t      nnodes,
+                                                     const ptrdiff_t      /*nnodes*/,
                                                      idx_t **const        elements,
                                                      geom_t **const       points,
                                                      const real_t         mu,
@@ -327,7 +327,7 @@ int hex8_mooney_rivlin_active_strain_objective_steps(const ptrdiff_t      neleme
 
 int hex8_mooney_rivlin_active_strain_gradient(const ptrdiff_t      nelements,
                                               const ptrdiff_t      stride,
-                                              const ptrdiff_t      nnodes,
+                                              const ptrdiff_t      /*nnodes*/,
                                               idx_t **const        elements,
                                               geom_t **const       points,
                                               const real_t         mu,
@@ -842,7 +842,7 @@ int hex8_mooney_rivlin_active_strain_compressed_partial_assembly_apply(const ptr
 
 int hex8_mooney_rivlin_active_strain_elasticity_diag(const ptrdiff_t      nelements,
                                                      const ptrdiff_t      stride,
-                                                     const ptrdiff_t      nnodes,
+                                                     const ptrdiff_t      /*nnodes*/,
                                                      idx_t **const        elements,
                                                      geom_t **const       points,
                                                      const real_t         mu,

@@ -56,32 +56,32 @@ static void dinvert(const ptrdiff_t nnodes,
     }
 }
 
-static void l1_dinvert(const ptrdiff_t nnodes,
-                       const count_t *const SFEM_RESTRICT rowptr,
-                       const idx_t *const SFEM_RESTRICT colidx,
-                       real_t *const SFEM_RESTRICT values,
-                       real_t *const SFEM_RESTRICT off,
-                       real_t *const SFEM_RESTRICT inv_diag) {
-    for (ptrdiff_t i = 0; i < nnodes; i++) {
-        const count_t r_begin = rowptr[i];
-        const count_t r_end = rowptr[i + 1];
-        const count_t r_extent = r_end - r_begin;
-        const real_t *vals = &values[r_begin];
+// static void l1_dinvert(const ptrdiff_t nnodes,
+//                        const count_t *const SFEM_RESTRICT rowptr,
+//                        const idx_t *const SFEM_RESTRICT /*colidx*/,
+//                        real_t *const SFEM_RESTRICT values,
+//                        real_t *const SFEM_RESTRICT off,
+//                        real_t *const SFEM_RESTRICT inv_diag) {
+//     for (ptrdiff_t i = 0; i < nnodes; i++) {
+//         const count_t r_begin = rowptr[i];
+//         const count_t r_end = rowptr[i + 1];
+//         const count_t r_extent = r_end - r_begin;
+//         const real_t *vals = &values[r_begin];
 
-        real_t sum_abs = fabs(off[i]);
-        for (count_t k = 0; k < r_extent; k++) {
-            sum_abs += fabs(vals[k]);
-        }  // end for
+//         real_t sum_abs = fabs(off[i]);
+//         for (count_t k = 0; k < r_extent; k++) {
+//             sum_abs += fabs(vals[k]);
+//         }  // end for
 
-        inv_diag[i] = 1. / sum_abs;
-    }
-}
+//         inv_diag[i] = 1. / sum_abs;
+//     }
+// }
 
 int constrained_gs_init(const ptrdiff_t nnodes,
                         const count_t *const SFEM_RESTRICT rowptr,
                         const idx_t *const SFEM_RESTRICT colidx,
                         real_t *const SFEM_RESTRICT values,
-                        real_t *const SFEM_RESTRICT off,
+                        real_t *const SFEM_RESTRICT /*off*/,
                         real_t *const inv_diag) {
     dinvert(nnodes, rowptr, colidx, values, inv_diag);
     // l1_dinvert(nnodes, rowptr, colidx, values, off, inv_diag);
@@ -95,12 +95,11 @@ int constrained_gs_residual(const ptrdiff_t nnodes,
                             real_t *const SFEM_RESTRICT rhs,
                             real_t *const SFEM_RESTRICT x,
                             const real_t *const SFEM_RESTRICT weights,
-                            const real_t sum_weights,
+                            const real_t /*sum_weights*/,
                             const real_t lagrange_multiplier,
                             real_t *res) {
     *res = 0;
 
-    real_t sum_values = 0;
     for (ptrdiff_t i = 0; i < nnodes; i++) {
         const real_t v = x[i] * weights[i];
         *res += v * v;

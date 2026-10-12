@@ -131,9 +131,10 @@ namespace sfem {
      */
     std::string d_op_str(const std::string &name);
 
-    static std::shared_ptr<Op> create_op(const std::shared_ptr<FunctionSpace> &space,
+    inline std::shared_ptr<Op> create_op(const std::shared_ptr<FunctionSpace> &space,
                                          const std::string                    &name,
                                          const ExecutionSpace                  es) {
+        SFEM_UNUSED(es);
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) return sfem::Factory::create_op_gpu(space, name.c_str());
 #endif  // SFEM_ENABLE_CUDA

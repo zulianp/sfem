@@ -1,7 +1,7 @@
 #ifndef SAINT_VENANT_KIRCHHOFF_QUAD4_ELEMENT_API_HPP
 #define SAINT_VENANT_KIRCHHOFF_QUAD4_ELEMENT_API_HPP
 
-#include "../proteus_quad4/saint_venant_kirchhoff_proteus_quad4_element.hpp"
+#include "saint_venant_kirchhoff_proteus_quad4_element.hpp"
 
 namespace sfem {
 namespace codegen {

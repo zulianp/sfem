@@ -17,27 +17,11 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-static void print_matrix(int r, int c, const scalar_t *const m) {
-    printf("A = [");
-    for (int i = 0; i < r; i++) {
-        for (int j = 0; j < c; j++) {
-            printf("%g", m[i * c + j]);
-
-            if (j < c - 1) {
-                printf(",");
-            }
-        }
-        if (i < r - 1) {
-            printf(";\n");
-        }
-    }
-    printf("]\n");
-}
 
 // FIXME there is probably a bug in here!
 int sshex8_linear_elasticity_apply(const int                    level,
                                    const ptrdiff_t              nelements,
-                                   const ptrdiff_t              nnodes,
+                                   const ptrdiff_t              /*nnodes*/,
                                    idx_t **const SFEM_RESTRICT  elements,
                                    geom_t **const SFEM_RESTRICT points,
                                    const real_t                 mu,
@@ -51,7 +35,6 @@ int sshex8_linear_elasticity_apply(const int                    level,
                                    real_t *const                outy,
                                    real_t *const                outz) {
     const int nxe = sshex8_nxe(level);
-    const int txe = sshex8_txe(level);
 
     const int proteus_to_std_hex8_corners[8] = {// Bottom
                                                 sshex8_lidx(level, 0, 0, 0),
@@ -82,9 +65,6 @@ int sshex8_linear_elasticity_apply(const int                    level,
         qw   = line_q6_w;
     }
 
-    int Lm1  = level - 1;
-    int Lm13 = Lm1 * Lm1 * Lm1;
-
 #pragma omp parallel
     {
         // Allocation per thread
@@ -109,8 +89,6 @@ int sshex8_linear_elasticity_apply(const int                    level,
         accumulator_t element_outx[8];
         accumulator_t element_outy[8];
         accumulator_t element_outz[8];
-
-        scalar_t m_adjugate[9], adjugate[9];
 
 #pragma omp for
         for (ptrdiff_t e = 0; e < nelements; ++e) {
@@ -171,19 +149,11 @@ int sshex8_linear_elasticity_apply(const int                    level,
                             element_outz[d] = 0;
                         }
 
-                        // Translation
-                        const scalar_t tx = (scalar_t)xi / level;
-                        const scalar_t ty = (scalar_t)yi / level;
-                        const scalar_t tz = (scalar_t)zi / level;
-
                         // Quadrature
                         for (int kz = 0; kz < n_qp; kz++) {
                             for (int ky = 0; ky < n_qp; ky++) {
                                 for (int kx = 0; kx < n_qp; kx++) {
                                     // 1) Compute qp in macro-element coordinates
-                                    const scalar_t m_qx = h * qx[kx] + tx;
-                                    const scalar_t m_qy = h * qx[ky] + ty;
-                                    const scalar_t m_qz = h * qx[kz] + tz;
 
                                     // 2) Evaluate Adjugate
                                     scalar_t adjugate[9];
@@ -425,7 +395,7 @@ int affine_sshex8_linear_elasticity_apply_macro_adjugate(const int              
 
 int affine_sshex8_linear_elasticity_apply(const int                    level,
                                           const ptrdiff_t              nelements,
-                                          const ptrdiff_t              nnodes,
+                                          const ptrdiff_t              /*nnodes*/,
                                           idx_t **const SFEM_RESTRICT  elements,
                                           geom_t **const SFEM_RESTRICT points,
                                           const real_t                 mu,
@@ -439,7 +409,6 @@ int affine_sshex8_linear_elasticity_apply(const int                    level,
                                           real_t *const                outy,
                                           real_t *const                outz) {
     const int nxe = sshex8_nxe(level);
-    const int txe = sshex8_txe(level);
 
     const int proteus_to_std_hex8_corners[8] = {// Bottom
                                                 sshex8_lidx(level, 0, 0, 0),
@@ -469,8 +438,6 @@ int affine_sshex8_linear_elasticity_apply(const int                    level,
         scalar_t x[8];
         scalar_t y[8];
         scalar_t z[8];
-
-        scalar_t m_adjugate[9], adjugate[9];
 
         scalar_t      element_u[3 * 8];
         accumulator_t element_out[3 * 8];
@@ -604,7 +571,7 @@ int affine_sshex8_linear_elasticity_apply(const int                    level,
 
 int affine_sshex8_linear_elasticity_apply(const int                    level,
                                           const ptrdiff_t              nelements,
-                                          const ptrdiff_t              nnodes,
+                                          const ptrdiff_t              /*nnodes*/,
                                           idx_t **const SFEM_RESTRICT  elements,
                                           geom_t **const SFEM_RESTRICT points,
                                           const real_t                 mu,
@@ -648,10 +615,6 @@ int affine_sshex8_linear_elasticity_apply(const int                    level,
         scalar_t y[8];
         scalar_t z[8];
 
-        scalar_t m_adjugate[9], adjugate[9];
-
-        scalar_t      element_u[3 * 8];
-        accumulator_t element_out[3 * 8];
         scalar_t      element_matrix[(3 * 8) * (3 * 8)];
 
         scalar_t *X = (scalar_t *)malloc(txe * 3 * 8 * sizeof(scalar_t));
@@ -769,17 +732,7 @@ int affine_sshex8_linear_elasticity_apply_macro_adjugate(const int              
 
         idx_t *ev = (idx_t *)malloc(nxe * sizeof(idx_t));
 
-        scalar_t      element_u[3 * 8];
-        accumulator_t element_out[3 * 8];
         scalar_t      element_matrix[(3 * 8) * (3 * 8)];
-
-        scalar_t *element_ux = &element_u[0 * 8];
-        scalar_t *element_uy = &element_u[1 * 8];
-        scalar_t *element_uz = &element_u[2 * 8];
-
-        scalar_t *element_outx = &element_out[0 * 8];
-        scalar_t *element_outy = &element_out[1 * 8];
-        scalar_t *element_outz = &element_out[2 * 8];
 
         scalar_t *X = (scalar_t *)malloc(txe * 3 * 8 * sizeof(scalar_t));
         scalar_t *Y = (scalar_t *)malloc(txe * 3 * 8 * sizeof(scalar_t));
@@ -857,7 +810,7 @@ int affine_sshex8_linear_elasticity_apply_macro_adjugate(const int              
 
 int affine_sshex8_elasticity_bsr(const int                          level,
                                  const ptrdiff_t                    nelements,
-                                 const ptrdiff_t                    nnodes,
+                                 const ptrdiff_t                    /*nnodes*/,
                                  idx_t **const SFEM_RESTRICT        elements,
                                  geom_t **const SFEM_RESTRICT       points,
                                  const real_t                       mu,
@@ -866,7 +819,6 @@ int affine_sshex8_elasticity_bsr(const int                          level,
                                  const idx_t *const SFEM_RESTRICT   colidx,
                                  real_t *const SFEM_RESTRICT        values) {
     const int nxe = sshex8_nxe(level);
-    const int txe = sshex8_txe(level);
 
     const int proteus_to_std_hex8_corners[8] = {// Bottom
                                                 sshex8_lidx(level, 0, 0, 0),
@@ -879,8 +831,6 @@ int affine_sshex8_elasticity_bsr(const int                          level,
                                                 sshex8_lidx(level, level, 0, level),
                                                 sshex8_lidx(level, level, level, level),
                                                 sshex8_lidx(level, 0, level, level)};
-    int       Lm1                            = level - 1;
-    int       Lm13                           = Lm1 * Lm1 * Lm1;
 
 #pragma omp parallel
     {
@@ -890,7 +840,6 @@ int affine_sshex8_elasticity_bsr(const int                          level,
         scalar_t y[8];
         scalar_t z[8];
 
-        scalar_t m_adjugate[9], adjugate[9];
         scalar_t element_matrix[(3 * 8) * (3 * 8)];
 
 #pragma omp for
@@ -951,18 +900,18 @@ int affine_sshex8_elasticity_bsr(const int                          level,
     return SFEM_SUCCESS;
 }
 
-int affine_sshex8_elasticity_crs_sym(const int                          level,
-                                     const ptrdiff_t                    nelements,
-                                     const ptrdiff_t                    nnodes,
-                                     idx_t **const SFEM_RESTRICT        elements,
-                                     geom_t **const SFEM_RESTRICT       points,
-                                     const real_t                       mu,
-                                     const real_t                       lambda,
-                                     const count_t *const SFEM_RESTRICT rowptr,
-                                     const idx_t *const SFEM_RESTRICT   colidx,
+int affine_sshex8_elasticity_crs_sym(const int                          /*level*/,
+                                     const ptrdiff_t                    /*nelements*/,
+                                     const ptrdiff_t                    /*nnodes*/,
+                                     idx_t **const SFEM_RESTRICT        /*elements*/,
+                                     geom_t **const SFEM_RESTRICT       /*points*/,
+                                     const real_t                       /*mu*/,
+                                     const real_t                       /*lambda*/,
+                                     const count_t *const SFEM_RESTRICT /*rowptr*/,
+                                     const idx_t *const SFEM_RESTRICT   /*colidx*/,
                                      // Output in SoA format (6)
-                                     real_t **const SFEM_RESTRICT block_diag,
-                                     real_t **const SFEM_RESTRICT block_offdiag) {
+                                     real_t **const SFEM_RESTRICT /*block_diag*/,
+                                     real_t **const SFEM_RESTRICT /*block_offdiag*/) {
     // TODO Implement
     assert(0);
     return SFEM_FAILURE;
@@ -970,7 +919,7 @@ int affine_sshex8_elasticity_crs_sym(const int                          level,
 
 int affine_sshex8_linear_elasticity_diag(const int                    level,
                                          const ptrdiff_t              nelements,
-                                         const ptrdiff_t              nnodes,
+                                         const ptrdiff_t              /*nnodes*/,
                                          idx_t **const SFEM_RESTRICT  elements,
                                          geom_t **const SFEM_RESTRICT points,
                                          const real_t                 mu,
@@ -980,7 +929,6 @@ int affine_sshex8_linear_elasticity_diag(const int                    level,
                                          real_t *const                outy,
                                          real_t *const                outz) {
     const int nxe = sshex8_nxe(level);
-    const int txe = sshex8_txe(level);
 
     const int proteus_to_std_hex8_corners[8] = {// Bottom
                                                 sshex8_lidx(level, 0, 0, 0),
@@ -993,8 +941,6 @@ int affine_sshex8_linear_elasticity_diag(const int                    level,
                                                 sshex8_lidx(level, level, 0, level),
                                                 sshex8_lidx(level, level, level, level),
                                                 sshex8_lidx(level, 0, level, level)};
-    int       Lm1                            = level - 1;
-    int       Lm13                           = Lm1 * Lm1 * Lm1;
 
 #pragma omp parallel
     {
@@ -1011,7 +957,6 @@ int affine_sshex8_linear_elasticity_diag(const int                    level,
         scalar_t y[8];
         scalar_t z[8];
 
-        scalar_t m_adjugate[9], adjugate[9];
         scalar_t element_diag[(3 * 8)];
 
 #pragma omp for
@@ -1101,7 +1046,7 @@ int affine_sshex8_linear_elasticity_diag(const int                    level,
 
 int affine_sshex8_linear_elasticity_block_diag_sym(const int                    level,
                                                    const ptrdiff_t              nelements,
-                                                   const ptrdiff_t              nnodes,
+                                                   const ptrdiff_t              /*nnodes*/,
                                                    idx_t **const SFEM_RESTRICT  elements,
                                                    geom_t **const SFEM_RESTRICT points,
                                                    const real_t                 mu,
@@ -1114,7 +1059,6 @@ int affine_sshex8_linear_elasticity_block_diag_sym(const int                    
                                                    real_t *const                out4,
                                                    real_t *const                out5) {
     const int nxe = sshex8_nxe(level);
-    const int txe = sshex8_txe(level);
 
     int SFEM_HEX8_QUADRATURE_ORDER = 2;
     SFEM_READ_ENV(SFEM_HEX8_QUADRATURE_ORDER, atoi);
@@ -1145,8 +1089,6 @@ int affine_sshex8_linear_elasticity_block_diag_sym(const int                    
                                                 sshex8_lidx(level, level, 0, level),
                                                 sshex8_lidx(level, level, level, level),
                                                 sshex8_lidx(level, 0, level, level)};
-    int       Lm1                            = level - 1;
-    int       Lm13                           = Lm1 * Lm1 * Lm1;
 
 #pragma omp parallel
     {
@@ -1366,7 +1308,7 @@ int sshex8_linear_elasticity_element_matrix_cartesian(int                       
 int sshex8_linear_elasticity_objective_steps(int                               level,
                                              const ptrdiff_t                   nelements,
                                              const ptrdiff_t                   stride,
-                                             const ptrdiff_t                   nnodes,
+                                             const ptrdiff_t                   /*nnodes*/,
                                              idx_t **const SFEM_RESTRICT       elements,
                                              geom_t **const SFEM_RESTRICT      points,
                                              const real_t                      mu,
@@ -1383,7 +1325,6 @@ int sshex8_linear_elasticity_objective_steps(int                               l
                                              const real_t *const SFEM_RESTRICT steps,
                                              real_t *const SFEM_RESTRICT       out) {
     const int nxe = sshex8_nxe(level);
-    const int txe = sshex8_txe(level);
 
     const int proteus_to_std_hex8_corners[8] = {// Bottom
                                                 sshex8_lidx(level, 0, 0, 0),

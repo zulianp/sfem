@@ -1,4 +1,4 @@
-#include "../../../op/cuda/sfem_GeneratedNavierStokes_cuda_c_abi.hpp"
+#include "sfem_GeneratedNavierStokes_cuda_c_abi.hpp"
 
 extern "C" int cu_navier_stokes_form_2_u_u_proteus_hex27_jacobian_action_i_msoa(
         const int scalar_bytes,

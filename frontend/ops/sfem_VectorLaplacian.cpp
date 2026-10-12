@@ -159,32 +159,32 @@ namespace sfem {
 
     VectorLaplacian::~VectorLaplacian() = default;
 
-    int VectorLaplacian::hessian_crs(const real_t *const  x,
-                                     const count_t *const rowptr,
-                                     const idx_t *const   colidx,
-                                     real_t *const        values) {
+    int VectorLaplacian::hessian_crs(const real_t *const  /*x*/,
+                                     const count_t *const /*rowptr*/,
+                                     const idx_t *const   /*colidx*/,
+                                     real_t *const        /*values*/) {
         SFEM_TRACE_SCOPE("VectorLaplacian::hessian_crs");
         SFEM_ERROR("IMPLEMENT ME!\n");
         return SFEM_FAILURE;
     }
 
-    int VectorLaplacian::hessian_crs_sym(const real_t *const  x,
-                                        const count_t *const rowptr,
-                                        const idx_t *const   colidx,
-                                        real_t *const        diag_values,
-                                        real_t *const        off_diag_values) {
+    int VectorLaplacian::hessian_crs_sym(const real_t *const  /*x*/,
+                                        const count_t *const /*rowptr*/,
+                                        const idx_t *const   /*colidx*/,
+                                        real_t *const        /*diag_values*/,
+                                        real_t *const        /*off_diag_values*/) {
         SFEM_TRACE_SCOPE("VectorLaplacian::hessian_crs_sym");
         SFEM_ERROR("IMPLEMENT ME!\n");
         return SFEM_FAILURE;
     }
 
-    int VectorLaplacian::hessian_diag(const real_t *const /*x*/, real_t *const values) {
+    int VectorLaplacian::hessian_diag(const real_t *const /*x*/, real_t *const /*values*/) {
         SFEM_TRACE_SCOPE("VectorLaplacian::hessian_diag");
         SFEM_ERROR("IMPLEMENT ME!\n");
         return SFEM_FAILURE;
     }
 
-    int VectorLaplacian::gradient(const real_t *const x, real_t *const out) {
+    int VectorLaplacian::gradient(const real_t *const /*x*/, real_t *const /*out*/) {
         SFEM_TRACE_SCOPE("VectorLaplacian::gradient");
         SFEM_ERROR("IMPLEMENT ME!\n");
         return SFEM_FAILURE;
@@ -208,7 +208,7 @@ namespace sfem {
         });
     }
 
-    int VectorLaplacian::value(const real_t *x, real_t *const out) {
+    int VectorLaplacian::value(const real_t * /*x*/, real_t *const /*out*/) {
         SFEM_TRACE_SCOPE("VectorLaplacian::value");
         SFEM_ERROR("IMPLEMENT ME!\n");
         return SFEM_FAILURE;

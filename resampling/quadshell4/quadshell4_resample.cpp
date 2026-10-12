@@ -22,23 +22,6 @@ static const real_t   SFEM_SDF_GRAD_EPS = 1e-12;
 
 static SFEM_INLINE real_t put_inside(const real_t v) { return MIN(MAX(1e-7, v), 1 - 1e-7); }
 
-SFEM_INLINE static int hex_aa_8_contains(
-        // X-coordinates
-        const real_t xmin,
-        const real_t xmax,
-        // Y-coordinates
-        const real_t ymin,
-        const real_t ymax,
-        // Z-coordinates
-        const real_t zmin,
-        const real_t zmax,
-        const real_t x,
-        const real_t y,
-        const real_t z) {
-    int outside = (x < xmin) | (x > xmax) | (y < ymin) | (y > ymax) | (z < zmin) | (z > zmax);
-    return !outside;
-}
-
 SFEM_INLINE static real_t quadshell4_measure_and_normal(
         // X-coordinates
         const real_t px0,
@@ -239,7 +222,7 @@ SFEM_INLINE static void hex_aa_8_eval_grad(
 int quadshell4_resample_gap_local(
         // Mesh
         const ptrdiff_t              nelements,
-        const ptrdiff_t              nnodes,
+        const ptrdiff_t              /*nnodes*/,
         idx_t** const SFEM_RESTRICT  elems,
         geom_t** const SFEM_RESTRICT xyz,
         // SDF
@@ -483,7 +466,7 @@ int quadshell4_resample_gap_local(
 int quadshell4_resample_weight_local(
         // Mesh
         const ptrdiff_t              nelements,
-        const ptrdiff_t              nnodes,
+        const ptrdiff_t              /*nnodes*/,
         idx_t** const SFEM_RESTRICT  elems,
         geom_t** const SFEM_RESTRICT xyz,
         // Output
@@ -499,7 +482,6 @@ int quadshell4_resample_weight_local(
         idx_t  ev[4];
         geom_t x[4], y[4], z[4];
 
-        real_t hex8_f[8];
         real_t quad4_f[4];
         real_t element_weight[4];
 
@@ -572,7 +554,7 @@ int quadshell4_resample_weight_local(
 int quadshell4_resample_gap_value_local(
         // Mesh
         const ptrdiff_t              nelements,
-        const ptrdiff_t              nnodes,
+        const ptrdiff_t              /*nnodes*/,
         idx_t** const SFEM_RESTRICT  elems,
         geom_t** const SFEM_RESTRICT xyz,
         // SDF
@@ -741,7 +723,7 @@ int quadshell4_resample_gap_value_local(
 int quadshell4_resample_gap_normals_local(
         // Mesh
         const ptrdiff_t              nelements,
-        const ptrdiff_t              nnodes,
+        const ptrdiff_t              /*nnodes*/,
         idx_t** const SFEM_RESTRICT  elems,
         geom_t** const SFEM_RESTRICT xyz,
         // SDF

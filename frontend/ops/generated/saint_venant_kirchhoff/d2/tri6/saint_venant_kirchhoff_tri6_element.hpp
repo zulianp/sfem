@@ -2,10 +2,10 @@
 #define SAINT_VENANT_KIRCHHOFF_TRI6_ELEMENT_API_HPP
 
 #include <stddef.h>
-#include "../saint_venant_kirchhoff_d2_simplex_local.hpp"
-#include "../../../geometry_kernels.hpp"
-#include "../../../reference/quad_tri_q6.hpp"
-#include "../../../reference/tri6_q6.hpp"
+#include "saint_venant_kirchhoff_d2_simplex_local.hpp"
+#include "geometry_kernels.hpp"
+#include "quad_tri_q6.hpp"
+#include "tri6_q6.hpp"
 
 namespace sfem {
 namespace codegen {

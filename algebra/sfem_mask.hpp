@@ -15,7 +15,7 @@ static SFEM_INLINE int mask_get(ptrdiff_t i, const mask_t *const mask) {
     const ptrdiff_t     idx   = i / nbits;
     mask_t              shift = i - idx * nbits;
 
-    assert(shift < nbits);
+    assert((size_t)shift < nbits);
     assert(shift >= 0);
 
     mask_t m;

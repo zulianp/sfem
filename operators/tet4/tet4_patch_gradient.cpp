@@ -5,20 +5,6 @@
 #include <math.h>
 #include <stddef.h>
 
-inline static void cross(const real_t                a1,
-                         const real_t                a2,
-                         const real_t                a3,
-                         const real_t                b1,
-                         const real_t                b2,
-                         const real_t                b3,
-                         real_t* const SFEM_RESTRICT s1,
-                         real_t* const SFEM_RESTRICT s2,
-                         real_t* const SFEM_RESTRICT s3) {
-    *s1 = a2 * b3 - a3 * b2;
-    *s2 = a3 * b1 - a1 * b3;
-    *s3 = a1 * b2 - a2 * b1;
-}
-
 inline static void grad(const real_t                xp,
                         const real_t                x1,
                         const real_t                x2,
@@ -73,7 +59,7 @@ inline static void grad(const real_t                xp,
                  up * (-x20 * x27 + x22 * x26));
 }
 
-int         tet4_patch_gradient(const ptrdiff_t                                        nelements,
+int         tet4_patch_gradient(const ptrdiff_t                                        /*nelements*/,
                                 const idx_t* const SFEM_RESTRICT* const SFEM_RESTRICT  elements,
                                 const ptrdiff_t                                        nnodes,
                                 const ptrdiff_t                                        max_indicence,
@@ -113,7 +99,6 @@ int         tet4_patch_gradient(const ptrdiff_t                                 
         real_t* yy[3] = {y1, y2, y3};
         real_t* zz[3] = {z1, z2, z3};
         real_t* uu[3] = {u1, u2, u3};
-        real_t* gg[3] = {gx, gy, gz};
 
 #pragma omp for
         for (ptrdiff_t node = 0; node < nnodes; node++) {

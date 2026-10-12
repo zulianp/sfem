@@ -334,6 +334,7 @@ namespace sfem {
         const ptrdiff_t nnz = rowptr->data()[block_rows];
         assert(values->extent(0) == static_cast<size_t>(row_block_size));
         assert(values->extent(1) == static_cast<size_t>(nnz * col_block_size));
+        SFEM_UNUSED(nnz);
 
         ptrdiff_t max_row_nnz = 0;
         for (ptrdiff_t i = 0; i < block_rows; i++) {

@@ -2459,11 +2459,11 @@ static SFEM_INLINE void hex8_linear_elasticity_matrix_coord_taylor_sym(const sca
                                                                        const scalar_t *const SFEM_RESTRICT adjugate,
                                                                        const scalar_t                      jacobian_determinant,
                                                                        const scalar_t *const SFEM_RESTRICT trial_g,
-                                                                       const scalar_t *const SFEM_RESTRICT test_g,
+                                                                       const scalar_t *const SFEM_RESTRICT /*test_g*/,
                                                                        const scalar_t *const SFEM_RESTRICT trial_H,
-                                                                       const scalar_t *const SFEM_RESTRICT test_H,
+                                                                       const scalar_t *const SFEM_RESTRICT /*test_H*/,
                                                                        const scalar_t *const SFEM_RESTRICT trial_diff3,
-                                                                       const scalar_t *const SFEM_RESTRICT test_diff3,
+                                                                       const scalar_t *const SFEM_RESTRICT /*test_diff3*/,
                                                                        accumulator_t *const SFEM_RESTRICT  element_matrix) {
     const scalar_t x0   = POW2(trial_diff3[0]);
     const scalar_t x1   = POW2(adjugate[3]);

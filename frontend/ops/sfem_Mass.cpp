@@ -63,7 +63,7 @@ namespace sfem {
 
     Mass::~Mass() = default;
 
-    int Mass::hessian_crs(const real_t *const x, const count_t *const rowptr, const idx_t *const colidx, real_t *const values) {
+    int Mass::hessian_crs(const real_t *const /*x*/, const count_t *const /*rowptr*/, const idx_t *const /*colidx*/, real_t *const values) {
         SFEM_TRACE_SCOPE("Mass::hessian_crs");
 
         auto mesh  = impl_->space->mesh_ptr();
@@ -104,7 +104,7 @@ namespace sfem {
         });
     }
 
-    int Mass::apply(const real_t *const x, const real_t *const h, real_t *const out) {
+    int Mass::apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) {
         SFEM_TRACE_SCOPE("Mass::apply");
         SFEM_OP_CAPTURE();
 
@@ -124,7 +124,7 @@ namespace sfem {
         });
     }
 
-    int Mass::value(const real_t *x, real_t *const out) {
+    int Mass::value(const real_t * /*x*/, real_t *const /*out*/) {
         assert(0);
         return SFEM_FAILURE;
     }

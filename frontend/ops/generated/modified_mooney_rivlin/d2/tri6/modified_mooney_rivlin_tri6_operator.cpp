@@ -1,26 +1,26 @@
 #include <cstdio>
 #include <type_traits>
-#include "../modified_mooney_rivlin_d2_simplex_local.hpp"
-#include "../modified_mooney_rivlin_d2_simplex_hessian.hpp"
-#include "../../../reference/quad_tri_q3.hpp"
-#include "../../../reference/tri6_q3.hpp"
-#include "../../../reference/quad_tri_q6.hpp"
-#include "../../../reference/tri6_q6.hpp"
-#include "../../../geometry_kernels.hpp"
-#include "../../../kernel_diagnostics.hpp"
+#include "modified_mooney_rivlin_d2_simplex_local.hpp"
+#include "modified_mooney_rivlin_d2_simplex_hessian.hpp"
+#include "quad_tri_q3.hpp"
+#include "tri6_q3.hpp"
+#include "quad_tri_q6.hpp"
+#include "tri6_q6.hpp"
+#include "geometry_kernels.hpp"
+#include "kernel_diagnostics.hpp"
 #ifdef _OPENMP
 #include <omp.h>
 #endif
 #include <cstdint>
 #include <cstdlib>
-#include "../../../packed_thread_scratch.hpp"
+#include "packed_thread_scratch.hpp"
 
 namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t, int VS>
 SFEM_INLINE const s_t *ageom_stream(
-    const int ne,
+    const int,
     const g_t *const RSTR source,
     s_t *const RSTR,
     std::true_type) {
@@ -847,8 +847,6 @@ static int modified_mooney_rivlin_tri6_hessian_i_msoa_assemble_impl(
   static constexpr int NS = 6;
   static constexpr int NDOFS = NC * NS;
   const s_t *const u_components[NC] = {ux, uy};
-  const g_t *const RSTR x = points[0];
-  const g_t *const RSTR y = points[1];
   const s_t *const isoparametric_grad_ref_x = sfem::codegen::ref_tri6_q6<s_t>::grad_ref_x();
   const s_t *const isoparametric_grad_ref_y = sfem::codegen::ref_tri6_q6<s_t>::grad_ref_y();
   const s_t *const isoparametric_q_weight = sfem::codegen::quad_tri_q6<s_t>::q_weight();
@@ -866,7 +864,6 @@ static int modified_mooney_rivlin_tri6_hessian_i_msoa_assemble_impl(
     s_t badj2[NQ];
     s_t badj3[NQ];
     s_t bdet0[NQ];
-    s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
 
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t node = elements[shape][element];

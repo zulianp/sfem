@@ -98,8 +98,8 @@ namespace sfem {
     NeoHookeanOgden::NeoHookeanOgden(const std::shared_ptr<FunctionSpace> &space) : impl_(std::make_unique<Impl>(space)) {}
 
     int NeoHookeanOgden::hessian_crs(const real_t *const  x,
-                                     const count_t *const rowptr,
-                                     const idx_t *const   colidx,
+                                     const count_t *const /*rowptr*/,
+                                     const idx_t *const   /*colidx*/,
                                      real_t *const        values) {
         SFEM_TRACE_SCOPE("NeoHookeanOgden::hessian_crs");
 
@@ -265,8 +265,6 @@ namespace sfem {
             auto assembly_data = std::static_pointer_cast<struct ElasticityAssemblyData>(domain.second.user_data);
             if (!assembly_data->use_partial_assembly) continue;
 
-            auto lambda       = domain.second.parameters->get_real_value("lambda", impl_->lambda);
-            auto mu           = domain.second.parameters->get_real_value("mu", impl_->mu);
             auto element_type = domain.second.element_type;
 
             const int pa_cols = neohookean_partial_assembly_metric_cols(element_type);
@@ -275,18 +273,19 @@ namespace sfem {
                         sfem::create_host_buffer<metric_tensor_t>(domain.second.block->n_elements() * (ptrdiff_t)pa_cols);
             }
 
-            int ok = neohookean_ogden_hessian_partial_assembly(domain.second.element_type,
-                                                               domain.second.block->n_elements(),
-                                                               assembly_data->elements_stride,
-                                                               assembly_data->elements->data(),
-                                                               mesh->points()->data(),
-                                                               domain.second.parameters->get_real_value("mu", impl_->mu),
-                                                               domain.second.parameters->get_real_value("lambda", impl_->lambda),
-                                                               3,
-                                                               &u[0],
-                                                               &u[1],
-                                                               &u[2],
-                                                               assembly_data->partial_assembly_buffer->data());
+            int err = neohookean_ogden_hessian_partial_assembly(domain.second.element_type,
+                                                                domain.second.block->n_elements(),
+                                                                assembly_data->elements_stride,
+                                                                assembly_data->elements->data(),
+                                                                mesh->points()->data(),
+                                                                domain.second.parameters->get_real_value("mu", impl_->mu),
+                                                                domain.second.parameters->get_real_value("lambda", impl_->lambda),
+                                                                3,
+                                                                &u[0],
+                                                                &u[1],
+                                                                &u[2],
+                                                                assembly_data->partial_assembly_buffer->data());
+            if (err != SFEM_SUCCESS) return err;
             assembly_data->compress_partial_assembly(domain.second);
         }
 

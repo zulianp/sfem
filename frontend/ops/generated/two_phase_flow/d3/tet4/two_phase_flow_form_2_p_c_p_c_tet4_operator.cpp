@@ -2,12 +2,12 @@
 #include <cstdint>
 #include <cstdlib>
 #include <string.h>
-#include "../two_phase_flow_form_2_p_c_p_c_d3_simplex_local.hpp"
-#include "../../../geometry_kernels.hpp"
-#include "../../../kernel_diagnostics.hpp"
-#include "../../../packed_thread_scratch.hpp"
-#include "../../../reference/quad_tet_q11.hpp"
-#include "../../../reference/tet4_q11.hpp"
+#include "two_phase_flow_form_2_p_c_p_c_d3_simplex_local.hpp"
+#include "geometry_kernels.hpp"
+#include "kernel_diagnostics.hpp"
+#include "packed_thread_scratch.hpp"
+#include "quad_tet_q11.hpp"
+#include "tet4_q11.hpp"
 #if defined(__has_include)
 #if __has_include("smesh_types.hpp")
 #include "smesh_types.hpp"
@@ -24,7 +24,7 @@ namespace codegen {
 
 template <typename s_t, typename g_t, int VS>
 SFEM_INLINE const s_t *ageom_stream(
-    const int ne,
+    const int,
     const g_t *const RSTR source,
     s_t *const RSTR,
     std::true_type) {

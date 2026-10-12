@@ -2,8 +2,8 @@
 #define LAPLACE_TET4_ELEMENT_API_HPP
 
 #include <stddef.h>
-#include "../laplace_d3_simplex_local.hpp"
-#include "../../../geometry_kernels.hpp"
+#include "laplace_d3_simplex_local.hpp"
+#include "geometry_kernels.hpp"
 
 namespace sfem {
 namespace codegen {

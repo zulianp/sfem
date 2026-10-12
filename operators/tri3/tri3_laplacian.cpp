@@ -23,7 +23,6 @@ int tri3_laplacian_assemble_value(const ptrdiff_t nelements,
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[3];
-        scalar_t element_u[3];
         scalar_t fff[3];
 
         // Element indices
@@ -68,7 +67,6 @@ int tri3_laplacian_apply(const ptrdiff_t nelements,
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[3];
         scalar_t fff[3];
-        scalar_t element_u[3];
         accumulator_t element_vector[3];
         
         // Element indices

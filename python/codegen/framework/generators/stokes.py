@@ -19,6 +19,7 @@ except ImportError:
 bootstrap_python_path(__file__, 3)
 
 from codegen.framework.materials.stokes import material  # noqa: E402
+from codegen.framework.plans.conventions import generated_include  # noqa: E402
 from sfem import gen  # noqa: E402
 
 
@@ -128,8 +129,7 @@ def validate_m6_4(result):
                 % (basename, operator_dim)
             )
         local_header_includes = tuple(
-            os.path.relpath(header, start=os.path.dirname(path)).replace(os.sep, "/")
-            for header in local_headers
+            generated_include(header) for header in local_headers
         )
         if not any('#include "%s"' % header in contents for header in local_header_includes):
             raise RuntimeError(

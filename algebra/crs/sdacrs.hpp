@@ -194,7 +194,7 @@ namespace sfem {
         d_drp[0] = 0;
         d_orp[0] = 0;
 
-        for (ptrdiff_t row = 0; row < nrows; ++row) {
+        for (ptrdiff_t row = 0; row < (ptrdiff_t)nrows; ++row) {
             const auto row_begin = d_rowptr[row];
             const auto row_end   = d_rowptr[row + 1];
 
@@ -233,7 +233,7 @@ namespace sfem {
         auto d_off_colidx  = off_colidx->data();
         auto d_off_values  = off_values->data();
 
-        for (ptrdiff_t row = 0; row < nrows; ++row) {
+        for (ptrdiff_t row = 0; row < (ptrdiff_t)nrows; ++row) {
             const auto row_begin = d_rowptr[row];
             const auto row_end   = d_rowptr[row + 1];
 

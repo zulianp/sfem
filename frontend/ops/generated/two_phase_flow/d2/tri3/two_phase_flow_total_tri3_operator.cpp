@@ -7,12 +7,12 @@
 #include "sfem_base.hpp"
 #endif
 #endif
-#include "../../../kernel_math.hpp"
-#include "../../../geometry_kernels.hpp"
-#include "../../../kernel_diagnostics.hpp"
-#include "../../../packed_thread_scratch.hpp"
-#include "../../../reference/quad_tri_q6.hpp"
-#include "../../../reference/tri3_q6.hpp"
+#include "kernel_math.hpp"
+#include "geometry_kernels.hpp"
+#include "kernel_diagnostics.hpp"
+#include "packed_thread_scratch.hpp"
+#include "quad_tri_q6.hpp"
+#include "tri3_q6.hpp"
 #if defined(__has_include)
 #if __has_include("smesh_types.hpp")
 #include "smesh_types.hpp"
@@ -29,7 +29,7 @@ namespace codegen {
 
 template <typename s_t, typename g_t, int VS>
 SFEM_INLINE const s_t *ageom_stream(
-    const int ne,
+    const int,
     const g_t *const RSTR source,
     s_t *const RSTR,
     std::true_type) {

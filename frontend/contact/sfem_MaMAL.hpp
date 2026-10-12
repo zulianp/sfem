@@ -4,7 +4,7 @@
 #include "sfem_ForwardDeclarations.hpp"
 #include "sfem_aliases.hpp"
 
-#ifdef SFEM_ENABLE_YAML
+#ifdef SFEM_ENABLE_RYAML
 #include <ryml.hpp>
 #endif
 
@@ -18,7 +18,7 @@ namespace sfem {
         MaMAL(const std::shared_ptr<Function>& f);
         ~MaMAL();
 
-#ifdef SFEM_ENABLE_YAML
+#ifdef SFEM_ENABLE_RYAML
         static std::shared_ptr<MaMAL> create(const std::shared_ptr<Function>& f, const ryml::ConstNodeRef& node);
 #endif
 
@@ -28,6 +28,8 @@ namespace sfem {
         int solve(const smesh::SharedBuffer<real_t>& x);
 
     private:
+        friend struct MaMALTestAccess;
+
         class Impl;
         std::unique_ptr<Impl> impl_;
     };

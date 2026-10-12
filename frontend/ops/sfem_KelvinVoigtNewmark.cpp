@@ -470,8 +470,7 @@ namespace sfem {
         const real_t *ay    = &abase[1];
         const real_t *az    = &abase[2];
 
-        const double tick = MPI_Wtime();
-        int          err  = SFEM_SUCCESS;
+        int err = SFEM_SUCCESS;
 
         err = impl_->iterate([&](const OpDomain &domain) {
             auto          block        = domain.block;

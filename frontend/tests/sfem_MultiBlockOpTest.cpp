@@ -15,7 +15,7 @@
 
 namespace {
 
-    const geom_t geom_tol() { return sizeof(geom_t) == sizeof(double) ? geom_t(1e-12) : geom_t(1e-5); }
+    geom_t geom_tol() { return sizeof(geom_t) == sizeof(double) ? geom_t(1e-12) : geom_t(1e-5); }
 
     int map_nodes_by_xyz(const smesh::Mesh &from, const smesh::Mesh &to, std::vector<ptrdiff_t> &from_to_to) {
         SFEM_TEST_EQ(from.n_nodes(), to.n_nodes());

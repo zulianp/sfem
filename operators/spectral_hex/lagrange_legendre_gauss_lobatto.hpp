@@ -144,7 +144,6 @@ int lagrange_GLL_diff_eval(const int                           order,
     switch (order) {
         case 1: {
             for (int q = 0; q < Q; q++) {
-                const scalar_t  x  = qx[q];
                 scalar_t *const Dq = &D[q * N];
                 Dq[0]              = -1;
                 Dq[1]              = 1;

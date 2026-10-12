@@ -64,10 +64,10 @@ namespace sfem {
          * This method is called after construction to perform any
          * necessary setup, such as precomputing Jacobians or element matrices.
          */
-        virtual int initialize(const std::vector<std::string> &block_names = {}) { return SFEM_SUCCESS; }
+        virtual int initialize(const std::vector<std::string> & /*block_names*/ = {}) { return SFEM_SUCCESS; }
 
-        virtual int update(const real_t *const x) { return SFEM_SUCCESS; }
-        virtual int update(const real_t *const SFEM_RESTRICT x_prev, const real_t *const SFEM_RESTRICT x_curr) {
+        virtual int update(const real_t *const /*x*/) { return SFEM_SUCCESS; }
+        virtual int update(const real_t *const SFEM_RESTRICT /*x_prev*/, const real_t *const SFEM_RESTRICT /*x_curr*/) {
             return SFEM_SUCCESS;
         }
 
@@ -148,11 +148,11 @@ namespace sfem {
          *
          * This method assembles the symmetric Hessian matrix, separating diagonal and off-diagonal entries.
          */
-        virtual int hessian_crs_sym(const real_t *const  x,
-                                    const count_t *const rowptr,
-                                    const idx_t *const   colidx,
-                                    real_t *const        diag_values,
-                                    real_t *const        off_diag_values) {
+        virtual int hessian_crs_sym(const real_t *const  /*x*/,
+                                    const count_t *const /*rowptr*/,
+                                    const idx_t *const   /*colidx*/,
+                                    real_t *const        /*diag_values*/,
+                                    real_t *const        /*off_diag_values*/) {
             SFEM_ERROR("hessian_crs_sym not implemented for this operator");
             return SFEM_FAILURE;
         }
@@ -169,12 +169,12 @@ namespace sfem {
          *
          * This method assembles the symmetric Hessian matrix in block CRS format.
          */
-        virtual int hessian_bcrs_sym(const real_t *const  x,
-                                     const count_t *const rowptr,
-                                     const idx_t *const   colidx,
-                                     const ptrdiff_t      block_stride,
-                                     real_t **const       diag_values,
-                                     real_t **const       off_diag_values) {
+        virtual int hessian_bcrs_sym(const real_t *const  /*x*/,
+                                     const count_t *const /*rowptr*/,
+                                     const idx_t *const   /*colidx*/,
+                                     const ptrdiff_t      /*block_stride*/,
+                                     real_t **const       /*diag_values*/,
+                                     real_t **const       /*off_diag_values*/) {
             SFEM_ERROR("hessian_bcrs_sym not implemented for this operator");
             return SFEM_FAILURE;
         }
@@ -187,7 +187,7 @@ namespace sfem {
          *
          * This method assembles only the block diagonal entries of the symmetric Hessian matrix.
          */
-        virtual int hessian_block_diag_sym(const real_t *const x, real_t *const values) {
+        virtual int hessian_block_diag_sym(const real_t *const /*x*/, real_t *const /*values*/) {
             SFEM_ERROR("hessian_block_diag_sym not implemented for this operator");
             return SFEM_FAILURE;
         }
@@ -200,7 +200,7 @@ namespace sfem {
          *
          * This method assembles the block diagonal entries in structure-of-arrays format.
          */
-        virtual int hessian_block_diag_sym_soa(const real_t *const x, real_t **const values) {
+        virtual int hessian_block_diag_sym_soa(const real_t *const /*x*/, real_t **const /*values*/) {
             SFEM_ERROR("hessian_block_diag_sym_soa not implemented for this operator");
             return SFEM_FAILURE;
         }
@@ -390,11 +390,11 @@ namespace sfem {
          * @param out Energy values per step (output)
          * @return SFEM_SUCCESS on success, SFEM_FAILURE on error
          */
-        virtual int value_steps(const real_t       *x,
-                                const real_t       *h,
-                                const int           nsteps,
-                                const real_t *const steps,
-                                real_t *const       out) {
+        virtual int value_steps(const real_t       * /*x*/,
+                                const real_t       * /*h*/,
+                                const int           /*nsteps*/,
+                                const real_t *const /*steps*/,
+                                real_t *const       /*out*/) {
             SFEM_ERROR("value_steps not implemented for this operator");
             return SFEM_FAILURE;
         }
@@ -432,14 +432,14 @@ namespace sfem {
          * @param space Function space for the LOR operator
          * @return Shared pointer to the LOR operator, or nullptr if not supported
          */
-        virtual std::shared_ptr<Op> lor_op(const std::shared_ptr<FunctionSpace> &space) { return nullptr; }
+        virtual std::shared_ptr<Op> lor_op(const std::shared_ptr<FunctionSpace> & /*space*/) { return nullptr; }
 
         /**
          * @brief Create a derefined version of this operator
          * @param space Function space for the derefined operator
          * @return Shared pointer to the derefined operator, or nullptr if not supported
          */
-        virtual std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) { return nullptr; }
+        virtual std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> & /*space*/) { return nullptr; }
 
         /**
          * @brief Get the execution space of this operator
@@ -457,7 +457,7 @@ namespace sfem {
 
         virtual bool is_no_op() const { return false; }
 
-        virtual void override_element_types(const std::vector<smesh::ElemType> &element_types) {}
+        virtual void override_element_types(const std::vector<smesh::ElemType> & /*element_types*/) {}
 
         virtual double flops() const { return flops_apply(); }
         virtual double flops_value() const { return 0; }
@@ -525,7 +525,7 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
         std::shared_ptr<Op> clone() const override { return std::make_shared<NoOp>(); }
-        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override { return std::make_shared<NoOp>(); }
+        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> & /*space*/) override { return std::make_shared<NoOp>(); }
         bool                is_no_op() const override { return true; }
         ptrdiff_t           n_dofs_domain() const override { return -1; };
         ptrdiff_t           n_dofs_image() const override { return -1; };

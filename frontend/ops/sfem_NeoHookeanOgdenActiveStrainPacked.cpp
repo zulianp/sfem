@@ -439,7 +439,6 @@ namespace sfem {
         // Accept AoS active strain buffer for all blocks
         if (name && (strcmp(name, "active_strain_aos") == 0 || strcmp(name, "Fa_aos") == 0 ||
                      strcmp(name, "active_strain") == 0 || strcmp(name, "Fa") == 0)) {
-            const real_t *Fa_aos = v ? v->data() : nullptr;
             if (impl_->Fa.empty()) {
                 impl_->Fa.resize(impl_->packed->n_blocks());
                 impl_->Fa_stride.resize(impl_->packed->n_blocks(), (ptrdiff_t)9);

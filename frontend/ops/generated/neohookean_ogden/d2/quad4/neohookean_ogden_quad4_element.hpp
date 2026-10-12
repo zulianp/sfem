@@ -1,7 +1,7 @@
 #ifndef NEOHOOKEAN_OGDEN_QUAD4_ELEMENT_API_HPP
 #define NEOHOOKEAN_OGDEN_QUAD4_ELEMENT_API_HPP
 
-#include "../proteus_quad4/neohookean_ogden_proteus_quad4_element.hpp"
+#include "neohookean_ogden_proteus_quad4_element.hpp"
 
 namespace sfem {
 namespace codegen {

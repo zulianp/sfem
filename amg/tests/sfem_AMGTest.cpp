@@ -146,7 +146,7 @@ int test_amg_sqp() {
             u[i] = 10000;  // kind of infinity
         }
 
-        for (ptrdiff_t i = 0; i < bottom->size(); i++) {
+        for (ptrdiff_t i = 0; i < (ptrdiff_t)bottom->size(); i++) {
             u[idx[i]] = -1;
         }
     }

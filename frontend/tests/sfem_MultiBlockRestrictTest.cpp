@@ -11,9 +11,9 @@
 
 namespace {
 
-const real_t val_tol() { return sizeof(real_t) == sizeof(double) ? real_t(1e-12) : real_t(1e-5); }
+real_t val_tol() { return sizeof(real_t) == sizeof(double) ? real_t(1e-12) : real_t(1e-5); }
 
-const geom_t geom_tol() { return sizeof(geom_t) == sizeof(double) ? geom_t(1e-12) : geom_t(1e-5); }
+geom_t geom_tol() { return sizeof(geom_t) == sizeof(double) ? geom_t(1e-12) : geom_t(1e-5); }
 
 void fill_ones(const sfem::SharedBuffer<real_t> &v) {
     auto            d = v->data();

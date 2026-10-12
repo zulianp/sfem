@@ -160,7 +160,6 @@ void principal_strains(const ptrdiff_t nelements,
     SFEM_UNUSED(nnodes);
 
     idx_t ev[4];
-    double element_vector[4];
 
     double element_ux[4];
     double element_uy[4];
