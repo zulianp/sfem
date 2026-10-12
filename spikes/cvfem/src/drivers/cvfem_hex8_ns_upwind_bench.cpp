@@ -31,6 +31,7 @@ static void pack_residual(const MeshData &d, std::vector<scalar_t> &r) {
 
 #include "tests/verification/cvfem_coupled_jacobian_fd.hpp"
 #include "tests/verification/cvfem_scatter_study.hpp"
+#include "tests/verification/cvfem_roofline_window.hpp"
 
 static void bsr4_spmv(const BSR4 &b, const ptrdiff_t nnodes, const scalar_t *const x, scalar_t *const y) {
     std::fill(y, y + nnodes * 4, scalar_t(0));
@@ -531,6 +532,8 @@ int main(int argc, char **argv) {
     // rather than a column of the timing CSV: it needs the packed mesh built and nothing else
     // run, and the numbers it prints are sizes, not rates.
     int         mesh_footprint = 0;
+    std::string roofline_window;
+    std::vector<int> perf_fds;
     int         scatter_study = 0;
     int         scatter_samples = 12;
     // Whether the nodal pressure gradient is rebuilt inside every apply or hoisted out of
@@ -598,6 +601,18 @@ int main(int argc, char **argv) {
             g_breakdown = 1;
         else if (arg == "--mesh-footprint")
             mesh_footprint = 1;
+        else if (arg == "--roofline-window" && i + 1 < argc)
+            roofline_window = argv[++i];
+        else if (arg == "--perf-fds" && i + 4 < argc) {
+            try {
+                if (!perf_fds.empty()) throw std::runtime_error("duplicate --perf-fds");
+                for (int j = 0; j < 4; ++j) perf_fds.push_back(CounterPhase::descriptor(argv[++i]));
+            } catch (const std::exception &e) {
+                std::fprintf(stderr, "%s\n", e.what());
+                if (own_mpi) MPI_Finalize();
+                return 2;
+            }
+        }
         else if (arg == "--scatter-study")
             scatter_study = 1;
         else if (arg == "--scatter-samples" && i + 1 < argc)
@@ -698,6 +713,8 @@ int main(int argc, char **argv) {
                     "  --mesh-footprint  print the bytes each representation of the mesh occupies,\n"
                     "                 array by array, and exit. Every figure is the allocation's\n"
                     "                 own nbytes(), so nothing here is a hand computation.\n"
+                    "  --roofline-window normal|sweep|sweep-empty|session  checked RC residual measurement\n"
+                    "  --perf-fds C1 A1 C2 A2  two perf control/acknowledgement channels\n"
                     "  --scatter-study  paired residual accumulation timings and element-output checks\n"
                     "                   affine packed/atomic, FP64, steady interior only\n"
                     "  --scatter-samples N  multiple of 6, default 12; --repeat applies to each sample\n"
@@ -986,6 +1003,30 @@ int main(int argc, char **argv) {
     // operation there is nothing left to misname -- the row records what the layout, the
     // geometry and the term set select, which is the only thing that was ever true.
     const bool residual_op = !(assemble || assemble_diag || jac_action || bsr_apply || nodal_grad);
+
+    if (!roofline_window.empty() || !perf_fds.empty()) {
+        const bool normal = roofline_window == "normal";
+        const bool counted = roofline_window == "sweep" || roofline_window == "sweep-empty";
+        const bool session = roofline_window == "session";
+        if ((!normal && !counted && !session) || (normal ? !perf_fds.empty() : perf_fds.size() != 4) ||
+            (session && warmup != 30) ||
+            !residual_op || geom != "affine" || sizeof(scalar_t) != sizeof(double) ||
+            !(layout == "packed" || layout == "atomic") || !rhie_chow || rc_scale != scalar_t(1) ||
+            (conv_ho && conv_limiter != 3) || boundary || dt != scalar_t(0) ||
+            grad_single || pgrad_per_apply || rebuild_state_gradients || partial_assembly ||
+            mesh_footprint || verify || verify_jac || verify_ho || verify_ho_jac || verify_coupled_jac ||
+            g_kernel_only || g_dense_flush || g_breakdown || lagged_rc || lagged_ho || live_vectors ||
+            scatter_study || !csv_path.empty() || !dump_path.empty() || n < 2 || repeat < 1 || warmup < 1 ||
+            perturb != scalar_t(0.017) || rho != scalar_t(1) || mu != scalar_t(0.01) ||
+            warp != scalar_t(0) || !use_sfc || venkat_k != scalar_t(0) || g_qgrad_atomic || g_qgrad_packed) {
+            std::fprintf(stderr, "--roofline-window requires an FP64 affine packed/atomic RC residual, "
+                                 "first-order or Darwish, cached gradients, no boundary/transient or other diagnostics, "
+                                 "rho=1, mu=0.01, perturb=0.017, SFC, no warp, positive repeats/warmup, "
+                                 "and two control channels only for counted windows\n");
+            if (own_mpi) MPI_Finalize();
+            return 2;
+        }
+    }
 
     if (scatter_study && (!residual_op || geom != "affine" ||
         !(layout == "packed" || layout == "atomic") || sizeof(scalar_t) != sizeof(double) ||
@@ -2002,6 +2043,22 @@ int main(int argc, char **argv) {
         if (boundary) apply_boundary_scs_residual_pass(d, rho, mu, geom_kind == GeomKind::Isoparam ? 1 : 0);
         apply_transient_pass(d, rho);
     };
+    if (!roofline_window.empty()) {
+        auto reference = [&]() {
+            apply_residual_atomic_sumfact_simd(
+                d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.nnodes, d.p.data(),
+                d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rc.data(), d.rhie_chow_scale,
+                d.rx.data(), d.ry.data(), d.rz.data(), d.ux.data(), d.uy.data(), d.uz.data(),
+                cvfem_hex8_extras_of(d), rho, mu, conv_ho ? ugrad.data() : nullptr,
+                conv_limiter, venkat_c);
+        };
+        const int status = roofline_window == "session"
+            ? run_roofline_session(d, perf_fds, layout, conv_ho ? 3 : -1, pack_size, apply_fn, reference)
+            : run_roofline_window(d, roofline_window, perf_fds, layout,
+                                  conv_ho ? 3 : -1, pack_size, repeat, warmup, apply_fn, reference);
+        if (own_mpi) MPI_Finalize();
+        return status;
+    }
     if (scatter_study) {
         const int status = run_scatter_study(d, packed, layout == "packed", rho, mu,
                                              conv_ho ? ugrad.data() : nullptr, conv_limiter,
