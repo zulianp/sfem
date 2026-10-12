@@ -1,4 +1,4 @@
-#include "../../op/sfem_GeneratedTwoPhaseFlow_c_abi.hpp"
+#include "sfem_GeneratedTwoPhaseFlow_c_abi.hpp"
 
 extern "C" int two_phase_flow_form_1_p_c_proteus_quad4_residual_i_maos(
         const int scalar_bytes,

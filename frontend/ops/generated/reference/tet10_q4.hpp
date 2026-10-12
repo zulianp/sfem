@@ -1,7 +1,7 @@
 #ifndef SFEM_CODEGEN_REFERENCE_TET10_Q4_HPP
 #define SFEM_CODEGEN_REFERENCE_TET10_Q4_HPP
 
-#include "../../reference/quad_tet_q4.hpp"
+#include "quad_tet_q4.hpp"
 
 namespace sfem {
 namespace codegen {

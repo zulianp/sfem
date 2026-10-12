@@ -2,17 +2,17 @@
 
 #include <cstddef>
 
-#include "../d2/proteus_quad4/modified_mooney_rivlin_proteus_quad4_element.hpp"
-#include "../d2/quad4/modified_mooney_rivlin_quad4_element.hpp"
-#include "../d2/tri3/modified_mooney_rivlin_tri3_element.hpp"
-#include "../d2/tri6/modified_mooney_rivlin_tri6_element.hpp"
-#include "../d3/hex27/modified_mooney_rivlin_hex27_element.hpp"
-#include "../d3/hex8/modified_mooney_rivlin_hex8_element.hpp"
-#include "../d3/proteus_hex27/modified_mooney_rivlin_proteus_hex27_element.hpp"
-#include "../d3/proteus_hex64/modified_mooney_rivlin_proteus_hex64_element.hpp"
-#include "../d3/proteus_hex8/modified_mooney_rivlin_proteus_hex8_element.hpp"
-#include "../d3/tet10/modified_mooney_rivlin_tet10_element.hpp"
-#include "../d3/tet4/modified_mooney_rivlin_tet4_element.hpp"
+#include "modified_mooney_rivlin_proteus_quad4_element.hpp"
+#include "modified_mooney_rivlin_quad4_element.hpp"
+#include "modified_mooney_rivlin_tri3_element.hpp"
+#include "modified_mooney_rivlin_tri6_element.hpp"
+#include "modified_mooney_rivlin_hex27_element.hpp"
+#include "modified_mooney_rivlin_hex8_element.hpp"
+#include "modified_mooney_rivlin_proteus_hex27_element.hpp"
+#include "modified_mooney_rivlin_proteus_hex64_element.hpp"
+#include "modified_mooney_rivlin_proteus_hex8_element.hpp"
+#include "modified_mooney_rivlin_tet10_element.hpp"
+#include "modified_mooney_rivlin_tet4_element.hpp"
 
 namespace sfem {
 namespace codegen {

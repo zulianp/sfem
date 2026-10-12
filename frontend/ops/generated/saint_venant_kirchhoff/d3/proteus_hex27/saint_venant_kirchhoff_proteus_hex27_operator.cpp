@@ -1,19 +1,19 @@
 #include <cstdio>
 #include <type_traits>
-#include "../saint_venant_kirchhoff_d3_tensor_product_local.hpp"
-#include "../saint_venant_kirchhoff_d3_tensor_product_hessian.hpp"
-#include "../../../reference/line_p2_q3.hpp"
-#include "../../../reference/quad_line_q3.hpp"
-#include "../../../reference/line_p2_q4.hpp"
-#include "../../../reference/quad_line_q4.hpp"
-#include "../../../geometry_kernels.hpp"
-#include "../../../kernel_diagnostics.hpp"
+#include "saint_venant_kirchhoff_d3_tensor_product_local.hpp"
+#include "saint_venant_kirchhoff_d3_tensor_product_hessian.hpp"
+#include "line_p2_q3.hpp"
+#include "quad_line_q3.hpp"
+#include "line_p2_q4.hpp"
+#include "quad_line_q4.hpp"
+#include "geometry_kernels.hpp"
+#include "kernel_diagnostics.hpp"
 #ifdef _OPENMP
 #include <omp.h>
 #endif
 #include <cstdint>
 #include <cstdlib>
-#include "../../../packed_thread_scratch.hpp"
+#include "packed_thread_scratch.hpp"
 
 namespace sfem {
 namespace codegen {

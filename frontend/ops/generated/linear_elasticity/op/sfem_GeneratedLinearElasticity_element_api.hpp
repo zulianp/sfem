@@ -2,13 +2,13 @@
 
 #include <cstddef>
 
-#include "../d2/proteus_quad4/linear_elasticity_proteus_quad4_element.hpp"
-#include "../d2/quad4/linear_elasticity_quad4_element.hpp"
-#include "../d2/tri3/linear_elasticity_tri3_element.hpp"
-#include "../d3/hex8/linear_elasticity_hex8_element.hpp"
-#include "../d3/proteus_hex8/linear_elasticity_proteus_hex8_element.hpp"
-#include "../d3/tet10/linear_elasticity_tet10_element.hpp"
-#include "../d3/tet4/linear_elasticity_tet4_element.hpp"
+#include "linear_elasticity_proteus_quad4_element.hpp"
+#include "linear_elasticity_quad4_element.hpp"
+#include "linear_elasticity_tri3_element.hpp"
+#include "linear_elasticity_hex8_element.hpp"
+#include "linear_elasticity_proteus_hex8_element.hpp"
+#include "linear_elasticity_tet10_element.hpp"
+#include "linear_elasticity_tet4_element.hpp"
 
 namespace sfem {
 namespace codegen {

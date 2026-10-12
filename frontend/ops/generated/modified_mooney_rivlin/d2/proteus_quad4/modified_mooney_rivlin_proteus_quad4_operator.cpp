@@ -1,17 +1,17 @@
 #include <cstdio>
 #include <type_traits>
-#include "../modified_mooney_rivlin_d2_tensor_product_local.hpp"
-#include "../modified_mooney_rivlin_d2_tensor_product_hessian.hpp"
-#include "../../../reference/line_p1_q2.hpp"
-#include "../../../reference/quad_line_q2.hpp"
-#include "../../../geometry_kernels.hpp"
-#include "../../../kernel_diagnostics.hpp"
+#include "modified_mooney_rivlin_d2_tensor_product_local.hpp"
+#include "modified_mooney_rivlin_d2_tensor_product_hessian.hpp"
+#include "line_p1_q2.hpp"
+#include "quad_line_q2.hpp"
+#include "geometry_kernels.hpp"
+#include "kernel_diagnostics.hpp"
 #ifdef _OPENMP
 #include <omp.h>
 #endif
 #include <cstdint>
 #include <cstdlib>
-#include "../../../packed_thread_scratch.hpp"
+#include "packed_thread_scratch.hpp"
 
 namespace sfem {
 namespace codegen {

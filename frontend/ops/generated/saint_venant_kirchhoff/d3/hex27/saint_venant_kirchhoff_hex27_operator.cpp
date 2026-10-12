@@ -1,4 +1,4 @@
-#include "../../op/sfem_GeneratedSaintVenantKirchhoff_c_abi.hpp"
+#include "sfem_GeneratedSaintVenantKirchhoff_c_abi.hpp"
 
 extern "C" int saint_venant_kirchhoff_proteus_hex27_apply_i_msoa(
         const int scalar_bytes,

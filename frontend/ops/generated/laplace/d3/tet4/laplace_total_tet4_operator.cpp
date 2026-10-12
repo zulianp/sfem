@@ -7,10 +7,10 @@
 #include "sfem_base.hpp"
 #endif
 #endif
-#include "../../../kernel_math.hpp"
-#include "../../../geometry_kernels.hpp"
-#include "../../../kernel_diagnostics.hpp"
-#include "../../../packed_thread_scratch.hpp"
+#include "kernel_math.hpp"
+#include "geometry_kernels.hpp"
+#include "kernel_diagnostics.hpp"
+#include "packed_thread_scratch.hpp"
 #if defined(__has_include)
 #if __has_include("smesh_types.hpp")
 #include "smesh_types.hpp"

@@ -1,7 +1,7 @@
 #ifndef SAINT_VENANT_KIRCHHOFF_HEX8_ELEMENT_API_HPP
 #define SAINT_VENANT_KIRCHHOFF_HEX8_ELEMENT_API_HPP
 
-#include "../proteus_hex8/saint_venant_kirchhoff_proteus_hex8_element.hpp"
+#include "saint_venant_kirchhoff_proteus_hex8_element.hpp"
 
 namespace sfem {
 namespace codegen {

@@ -1,10 +1,10 @@
 #include <type_traits>
-#include "../../cuda/navier_stokes_form_2_u_u_d3_tensor_product_local.cuh"
-#include "../../../../reference/cuda/line_p2_q4.hpp"
-#include "../../../../reference/cuda/quad_line_q4.hpp"
-#include "../../../../cuda/kernel_math.cuh"
-#include "../../../../cuda/geometry_kernels.cuh"
-#include "../../../../cuda/kernel_diagnostics.cuh"
+#include "navier_stokes_form_2_u_u_d3_tensor_product_local.cuh"
+#include "line_p2_q4.cuh"
+#include "quad_line_q4.cuh"
+#include "kernel_math.cuh"
+#include "geometry_kernels.cuh"
+#include "kernel_diagnostics.cuh"
 
 #ifndef SFEM_RESTRICT
 #define SFEM_RESTRICT

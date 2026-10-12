@@ -1,4 +1,4 @@
-#include "../../op/sfem_GeneratedNeoHookeanOgden_c_abi.hpp"
+#include "sfem_GeneratedNeoHookeanOgden_c_abi.hpp"
 
 extern "C" int neohookean_ogden_proteus_hex8_apply_i_msoa(
         const int scalar_bytes,

@@ -2,10 +2,10 @@
 #include <cstdint>
 #include <cstdlib>
 #include <string.h>
-#include "../body_force_d2_simplex_local.hpp"
-#include "../../../geometry_kernels.hpp"
-#include "../../../kernel_diagnostics.hpp"
-#include "../../../packed_thread_scratch.hpp"
+#include "body_force_d2_simplex_local.hpp"
+#include "geometry_kernels.hpp"
+#include "kernel_diagnostics.hpp"
+#include "packed_thread_scratch.hpp"
 #if defined(__has_include)
 #if __has_include("smesh_types.hpp")
 #include "smesh_types.hpp"

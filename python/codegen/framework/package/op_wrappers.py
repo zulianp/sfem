@@ -3,6 +3,7 @@ from codegen.framework.emitters.runtime_typed_abi import (
     runtime_type_correspondence_lines,
 )
 from codegen.framework.plans.conventions import (
+    generated_include,
     sfem_scalar_type_fallback,
     sfem_scalar_type_prelude,
     diagnostics_tail,
@@ -5954,27 +5955,15 @@ def _op_path(name):
     return "%s/%s" % (_op_directory(), name)
 
 
-def _op_relative_include(path):
-    """Spell `path`, given from the material's root, as the wrapper sees it.
-
-    The wrapper's own directory is the target's -- `op/` on the host,
-    `op/cuda/` on a device -- so the number of `../` steps is not a constant.
-    It was written as one, which left every device wrapper's include a level
-    short of where the file it names actually sits.
-    """
-    return os.path.relpath(path, start=_op_directory()).replace(os.sep, "/")
-
-
 def _op_shared_header_include(stem):
     """One of the target's shared primitive headers, as the wrapper sees it.
 
     The name and the folder are both the target's: `kernel_diagnostics.hpp` at
     the tree root on the host, `cuda/kernel_diagnostics.cuh` on a device.
     """
-    target = current_target()
-    return _op_relative_include(
-        os.path.join(target.source_subdirectory(), target.header_name(stem))
-    )
+    # Bare, like every include between generated files
+    # (`plans/conventions.py generated_include`): the folder is not spelled.
+    return current_target().header_name(stem)
 
 
 def _op_file_stem(material):
@@ -6452,7 +6441,9 @@ def _element_api_headers(material, elements, kernel_sources):
     for element in elements:
         dim = _element_dim(element)
         label = _element_name(element).lower()
-        suffix = "/%s_%s_element.hpp" % (material.name, label)
+        suffix = "/%s" % current_target().header_name(
+            "%s_%s_element" % (material.name, label)
+        )
         for path in sorted(kernel_sources):
             if path.endswith(suffix):
                 entries.append(
@@ -6476,7 +6467,7 @@ def _element_api_dispatch_header(material, entries):
         "",
     ]
     for header in sorted({entry["header"] for entry in entries}):
-        lines.append('#include "%s"' % _op_relative_include(header))
+        lines.append('#include "%s"' % generated_include(header))
     lines.extend(["", "namespace sfem {", "namespace codegen {", ""])
 
     for operation in ("energy", "gradient", "hessian"):
@@ -7475,7 +7466,7 @@ def _c_abi_header(material, kernel_sources):
         body += "\n"
     matrix_formats_include = (
         #: Target-independent, so it keeps the host name and the host place.
-        '#include "%s"\n' % _op_relative_include("matrix_formats.hpp")
+        '#include "matrix_formats.hpp"\n'
         if "sfem_MatrixAssemblyDiagnostics" in body
         else ""
     )
@@ -7595,7 +7586,7 @@ def _op_manifest(
 def _header_api_sources(kernel_sources, element_api_sources):
     headers = []
     for path in sorted(kernel_sources):
-        if path.endswith("_element.hpp"):
+        if path.endswith(("_element.hpp", "_element.cuh")):
             headers.append(
                 {
                     "kind": "dense_element",

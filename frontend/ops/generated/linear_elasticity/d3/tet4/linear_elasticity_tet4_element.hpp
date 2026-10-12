@@ -2,8 +2,8 @@
 #define LINEAR_ELASTICITY_TET4_ELEMENT_API_HPP
 
 #include <stddef.h>
-#include "../linear_elasticity_d3_simplex_local.hpp"
-#include "../../../geometry_kernels.hpp"
+#include "linear_elasticity_d3_simplex_local.hpp"
+#include "geometry_kernels.hpp"
 
 namespace sfem {
 namespace codegen {

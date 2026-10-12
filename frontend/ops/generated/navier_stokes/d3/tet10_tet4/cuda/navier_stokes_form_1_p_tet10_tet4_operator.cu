@@ -1,11 +1,11 @@
 #include <type_traits>
-#include "../../cuda/navier_stokes_form_1_p_d3_simplex_mixed_local.cuh"
-#include "../../../../reference/cuda/quad_tet_q11.hpp"
-#include "../../../../reference/cuda/tet10_q11.hpp"
-#include "../../../../reference/cuda/tet4_q11.hpp"
-#include "../../../../cuda/kernel_math.cuh"
-#include "../../../../cuda/geometry_kernels.cuh"
-#include "../../../../cuda/kernel_diagnostics.cuh"
+#include "navier_stokes_form_1_p_d3_simplex_mixed_local.cuh"
+#include "quad_tet_q11.cuh"
+#include "tet10_q11.cuh"
+#include "tet4_q11.cuh"
+#include "kernel_math.cuh"
+#include "geometry_kernels.cuh"
+#include "kernel_diagnostics.cuh"
 
 #ifndef SFEM_RESTRICT
 #define SFEM_RESTRICT
