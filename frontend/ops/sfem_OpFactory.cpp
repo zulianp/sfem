@@ -4,6 +4,7 @@
 #include "sfem_BoundaryMass.hpp"
 #include "sfem_CVFEMMass.hpp"
 #include "sfem_CVFEMUpwindConvection.hpp"
+#include "sfem_DSS.hpp"
 #include "generated/sfem_generated_ops_registration.hpp"
 #include "generated/neumann/op/sfem_GeneratedNeumann.hpp"
 #include "generated/neumann_general/op/sfem_GeneratedNeumannGeneral.hpp"
@@ -65,6 +66,7 @@ namespace sfem {
             instance_.private_register_op("LinearElasticity", LinearElasticity::create);
             instance_.private_register_op("Laplacian", Laplacian::create);
             instance_.private_register_op("VectorLaplacian", VectorLaplacian::create);
+            instance_.private_register_op("DSS", DSS::create);
             instance_.private_register_op("em:Laplacian", SemiStructuredEMLaplacian::create);
             instance_.private_register_op("em:LinearElasticity", SemiStructuredEMLinearElasticity::create);
             instance_.private_register_op("LinearElasticityHyTeG", SemiStructuredHyTeGLinearElasticity::create);

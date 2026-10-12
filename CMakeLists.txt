@@ -133,6 +133,8 @@ list(APPEND SFEM_MODULES
     frontend
     frontend/constraints
     frontend/ops
+    frontend/ops/dss
+    operators/dss
 )
 
 if(SFEM_ENABLE_METIS)
@@ -454,6 +456,7 @@ if(SFEM_ENABLE_TESTING)
         operators/stencil/tests
         mesh/tests
         frontend/tests
+        frontend/ops/dss/test
         ssmg/tests
     )
 
