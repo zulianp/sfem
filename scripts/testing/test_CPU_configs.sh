@@ -133,7 +133,6 @@ FLAG_NAMES=(
     AVX2
     AVX512
     AVX512_SORT
-    HXTSORT
 )
 
 flag_cmake_name() {
@@ -154,7 +153,6 @@ flag_cmake_name() {
         AVX2) echo SFEM_ENABLE_AVX2 ;;
         AVX512) echo SFEM_ENABLE_AVX512 ;;
         AVX512_SORT) echo SFEM_ENABLE_AVX512_SORT ;;
-        HXTSORT) echo SFEM_ENABLE_HXTSORT ;;
         *) die "unknown flag alias: $1" ;;
     esac
 }
@@ -289,7 +287,7 @@ mask_to_on_flags() {
 config_valid() {
     local mask=$1
     local i name
-    local openmp=0 sccd=0 ssdf=0 hxt=0
+    local openmp=0 sccd=0 ssdf=0
 
     for i in "${!ACTIVE_FLAGS[@]}"; do
         name="${ACTIVE_FLAGS[$i]}"
@@ -300,13 +298,9 @@ config_valid() {
             OPENMP) openmp=1 ;;
             SCCD) sccd=1 ;;
             SSDF) ssdf=1 ;;
-            HXTSORT) hxt=1 ;;
         esac
     done
 
-    if [[ "$hxt" -eq 1 && "$openmp" -eq 0 ]]; then
-        return 1
-    fi
     return 0
 }
 
@@ -324,7 +318,7 @@ config_needs_skip() {
         case "$name" in
             METIS) have_metis || return 0 ;;
             PYTHON) have_python_bindings || return 0 ;;
-            OPENMP|HXTSORT) have_openmp || return 0 ;;
+            OPENMP) have_openmp || return 0 ;;
             MPI) have_mpi || return 0 ;;
         esac
     done
@@ -391,20 +385,16 @@ generate_masks_quick() {
     done
 
     # a few structured combos
-    local combo_openmp_metis=0 combo_sccd_ssdf=0 combo_openmp_hxt=0
+    local combo_openmp_metis=0 combo_sccd_ssdf=0
     for i in "${!ACTIVE_FLAGS[@]}"; do
         case "${ACTIVE_FLAGS[$i]}" in
             OPENMP) combo_openmp_metis=$((combo_openmp_metis | (1 << i))) ;;
             METIS) combo_openmp_metis=$((combo_openmp_metis | (1 << i))) ;;
             SCCD) combo_sccd_ssdf=$((combo_sccd_ssdf | (1 << i))) ;;
             SSDF) combo_sccd_ssdf=$((combo_sccd_ssdf | (1 << i))) ;;
-            HXTSORT) combo_openmp_hxt=$((combo_openmp_hxt | (1 << i))) ;;
         esac
-        if [[ "${ACTIVE_FLAGS[$i]}" == OPENMP ]]; then
-            combo_openmp_hxt=$((combo_openmp_hxt | (1 << i)))
-        fi
     done
-    for mask in "$combo_openmp_metis" "$combo_sccd_ssdf" "$combo_openmp_hxt"; do
+    for mask in "$combo_openmp_metis" "$combo_sccd_ssdf"; do
         if config_valid "$mask"; then
             GENERATED_MASKS+=("$mask")
         fi
