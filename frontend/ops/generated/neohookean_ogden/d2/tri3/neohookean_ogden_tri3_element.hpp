@@ -2,8 +2,8 @@
 #define NEOHOOKEAN_OGDEN_TRI3_ELEMENT_API_HPP
 
 #include <stddef.h>
-#include "../neohookean_ogden_d2_simplex_local.hpp"
-#include "../../../geometry_kernels.hpp"
+#include "neohookean_ogden_d2_simplex_local.hpp"
+#include "geometry_kernels.hpp"
 
 namespace sfem {
 namespace codegen {

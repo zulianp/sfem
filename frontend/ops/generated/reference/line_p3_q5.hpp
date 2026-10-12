@@ -1,7 +1,7 @@
 #ifndef SFEM_CODEGEN_REFERENCE_LINE_P3_Q5_HPP
 #define SFEM_CODEGEN_REFERENCE_LINE_P3_Q5_HPP
 
-#include "../../reference/quad_line_q5.hpp"
+#include "quad_line_q5.hpp"
 
 namespace sfem {
 namespace codegen {

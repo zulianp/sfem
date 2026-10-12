@@ -725,6 +725,14 @@ def patch_merit_argument_names(system, rule, dependencies, parameters=()):
     return tuple(names)
 
 
+#: Only the combination in loop 2 reads a step length, so a residual the state
+#: does not enter keeps the parameter for the ABI and leaves it unnamed.
+_STEPS_PARAMETER_BY_USE = {
+    True: {},
+    False: {"const s_t *const RSTR steps": "const s_t *const RSTR"},
+}
+
+
 def patch_merit_kernel_lines(system, rule, coefficients, dependencies,
                              element_type, function_name, material_lines,
                              parameters=()):
@@ -745,7 +753,14 @@ def patch_merit_kernel_lines(system, rule, coefficients, dependencies,
     n_fields = len(system.fields)
     n_shape = rule.n_shape
     buffers = patch_loop_one_buffers(dim, n_fields, dependencies)
-    declared = patch_merit_kernel_parameters(system, rule, dependencies, parameters)
+    declared = tuple(
+        _STEPS_PARAMETER_BY_USE[
+            bool(patch_merit_staged_quantities(dependencies, "current"))
+        ].get(param, param)
+        for param in patch_merit_kernel_parameters(
+            system, rule, dependencies, parameters
+        )
+    )
     lines = [
         "template <typename s_t, typename g_t, int NQ, int NS, int VS>",
         "static int %s(" % function_name,

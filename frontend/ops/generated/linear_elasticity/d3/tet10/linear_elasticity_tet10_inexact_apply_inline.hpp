@@ -1,8 +1,8 @@
 #pragma once
-#include "../../../kernel_math.hpp"
-#include "../../../packed_thread_scratch.hpp"
-#include "../../../reference/quad_tet_q11.hpp"
-#include "../../../reference/tet10_q11.hpp"
+#include "kernel_math.hpp"
+#include "packed_thread_scratch.hpp"
+#include "quad_tet_q11.hpp"
+#include "tet10_q11.hpp"
 
 namespace sfem {
 namespace codegen {
@@ -29,9 +29,6 @@ static SFEM_INLINE int linear_elasticity_tet10_inexact_apply_tangent_a_msoa_impl
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
     const int ne = (int)((nelements - evb) < (ptrdiff_t)VS ? (nelements - evb) : (ptrdiff_t)VS);
     static constexpr int NQ = 11;
-    const s_t *const RSTR qgrad_x = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x();
-    const s_t *const RSTR qgrad_y = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y();
-    const s_t *const RSTR qgrad_z = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z();
     const s_t *const RSTR qweight = sfem::codegen::quad_tet_q11<s_t>::q_weight();
     static constexpr s_t QMEASURE = s_t(6.0000000000000018);
     s_t btangent_acc[45][VS];

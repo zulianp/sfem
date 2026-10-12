@@ -52,7 +52,7 @@ static real_t tet_qz[TET_QUAD_NQP] = {
 
 int tet10_neohookean_ogden_objective(const ptrdiff_t                   nelements,
                                      const ptrdiff_t                   stride,
-                                     const ptrdiff_t                   nnodes,
+                                     const ptrdiff_t                   /*nnodes*/,
                                      idx_t **const SFEM_RESTRICT       elements,
                                      geom_t **const SFEM_RESTRICT      points,
                                      const real_t                      mu,
@@ -84,9 +84,6 @@ int tet10_neohookean_ogden_objective(const ptrdiff_t                   nelements
         scalar_t edispx[10];
         scalar_t edispy[10];
         scalar_t edispz[10];
-
-        scalar_t jacobian_adjugate[9];
-        scalar_t jacobian_determinant = 0;
 
         for (int v = 0; v < 10; ++v) {
             ev[v] = elements[v][i * stride];
@@ -126,7 +123,7 @@ int tet10_neohookean_ogden_objective(const ptrdiff_t                   nelements
 
 int tet10_neohookean_ogden_objective_steps(const ptrdiff_t                   nelements,
                                            const ptrdiff_t                   stride,
-                                           const ptrdiff_t                   nnodes,
+                                           const ptrdiff_t                   /*nnodes*/,
                                            idx_t **const SFEM_RESTRICT       elements,
                                            geom_t **const SFEM_RESTRICT      points,
                                            const real_t                      mu,
@@ -236,7 +233,7 @@ int tet10_neohookean_ogden_objective_steps(const ptrdiff_t                   nel
 
 int tet10_neohookean_ogden_gradient(const ptrdiff_t                   nelements,
                                     const ptrdiff_t                   stride,
-                                    const ptrdiff_t                   nnodes,
+                                    const ptrdiff_t                   /*nnodes*/,
                                     idx_t **const SFEM_RESTRICT       elements,
                                     geom_t **const SFEM_RESTRICT      points,
                                     const real_t                      mu,

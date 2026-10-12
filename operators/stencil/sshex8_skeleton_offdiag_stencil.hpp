@@ -4,9 +4,9 @@
 //===============
 // stencil000)
 //===============
-static void sshex8_apply_offdiag_stencil000(const ptrdiff_t                     xc,
-                                            const ptrdiff_t                     yc,
-                                            const ptrdiff_t                     zc,
+static void sshex8_apply_offdiag_stencil000(const ptrdiff_t                     /*xc*/,
+                                            const ptrdiff_t                     /*yc*/,
+                                            const ptrdiff_t                     /*zc*/,
                                             const ptrdiff_t                     xstride,
                                             const ptrdiff_t                     ystride,
                                             const ptrdiff_t                     zstride,
@@ -53,8 +53,8 @@ static void sshex8_apply_offdiag_stencil000(const ptrdiff_t                     
 // stencil100)
 //===============
 static void sshex8_apply_offdiag_stencil100(const ptrdiff_t                     xc,
-                                            const ptrdiff_t                     yc,
-                                            const ptrdiff_t                     zc,
+                                            const ptrdiff_t                     /*yc*/,
+                                            const ptrdiff_t                     /*zc*/,
                                             const ptrdiff_t                     xstride,
                                             const ptrdiff_t                     ystride,
                                             const ptrdiff_t                     zstride,
@@ -113,8 +113,8 @@ static void sshex8_apply_offdiag_stencil100(const ptrdiff_t                     
 // stencil200)
 //===============
 static void sshex8_apply_offdiag_stencil200(const ptrdiff_t                     xc,
-                                            const ptrdiff_t                     yc,
-                                            const ptrdiff_t                     zc,
+                                            const ptrdiff_t                     /*yc*/,
+                                            const ptrdiff_t                     /*zc*/,
                                             const ptrdiff_t                     xstride,
                                             const ptrdiff_t                     ystride,
                                             const ptrdiff_t                     zstride,
@@ -160,9 +160,9 @@ static void sshex8_apply_offdiag_stencil200(const ptrdiff_t                     
 //===============
 // stencil010)
 //===============
-static void sshex8_apply_offdiag_stencil010(const ptrdiff_t                     xc,
+static void sshex8_apply_offdiag_stencil010(const ptrdiff_t                     /*xc*/,
                                             const ptrdiff_t                     yc,
-                                            const ptrdiff_t                     zc,
+                                            const ptrdiff_t                     /*zc*/,
                                             const ptrdiff_t                     xstride,
                                             const ptrdiff_t                     ystride,
                                             const ptrdiff_t                     zstride,
@@ -222,7 +222,7 @@ static void sshex8_apply_offdiag_stencil010(const ptrdiff_t                     
 //===============
 static void sshex8_apply_offdiag_stencil110(const ptrdiff_t                     xc,
                                             const ptrdiff_t                     yc,
-                                            const ptrdiff_t                     zc,
+                                            const ptrdiff_t                     /*zc*/,
                                             const ptrdiff_t                     xstride,
                                             const ptrdiff_t                     ystride,
                                             const ptrdiff_t                     zstride,
@@ -300,7 +300,7 @@ static void sshex8_apply_offdiag_stencil110(const ptrdiff_t                     
 //===============
 static void sshex8_apply_offdiag_stencil210(const ptrdiff_t                     xc,
                                             const ptrdiff_t                     yc,
-                                            const ptrdiff_t                     zc,
+                                            const ptrdiff_t                     /*zc*/,
                                             const ptrdiff_t                     xstride,
                                             const ptrdiff_t                     ystride,
                                             const ptrdiff_t                     zstride,
@@ -358,9 +358,9 @@ static void sshex8_apply_offdiag_stencil210(const ptrdiff_t                     
 //===============
 // stencil020)
 //===============
-static void sshex8_apply_offdiag_stencil020(const ptrdiff_t                     xc,
+static void sshex8_apply_offdiag_stencil020(const ptrdiff_t                     /*xc*/,
                                             const ptrdiff_t                     yc,
-                                            const ptrdiff_t                     zc,
+                                            const ptrdiff_t                     /*zc*/,
                                             const ptrdiff_t                     xstride,
                                             const ptrdiff_t                     ystride,
                                             const ptrdiff_t                     zstride,
@@ -408,7 +408,7 @@ static void sshex8_apply_offdiag_stencil020(const ptrdiff_t                     
 //===============
 static void sshex8_apply_offdiag_stencil120(const ptrdiff_t                     xc,
                                             const ptrdiff_t                     yc,
-                                            const ptrdiff_t                     zc,
+                                            const ptrdiff_t                     /*zc*/,
                                             const ptrdiff_t                     xstride,
                                             const ptrdiff_t                     ystride,
                                             const ptrdiff_t                     zstride,
@@ -468,7 +468,7 @@ static void sshex8_apply_offdiag_stencil120(const ptrdiff_t                     
 //===============
 static void sshex8_apply_offdiag_stencil220(const ptrdiff_t                     xc,
                                             const ptrdiff_t                     yc,
-                                            const ptrdiff_t                     zc,
+                                            const ptrdiff_t                     /*zc*/,
                                             const ptrdiff_t                     xstride,
                                             const ptrdiff_t                     ystride,
                                             const ptrdiff_t                     zstride,
@@ -514,8 +514,8 @@ static void sshex8_apply_offdiag_stencil220(const ptrdiff_t                     
 //===============
 // stencil001)
 //===============
-static void sshex8_apply_offdiag_stencil001(const ptrdiff_t                     xc,
-                                            const ptrdiff_t                     yc,
+static void sshex8_apply_offdiag_stencil001(const ptrdiff_t                     /*xc*/,
+                                            const ptrdiff_t                     /*yc*/,
                                             const ptrdiff_t                     zc,
                                             const ptrdiff_t                     xstride,
                                             const ptrdiff_t                     ystride,
@@ -575,7 +575,7 @@ static void sshex8_apply_offdiag_stencil001(const ptrdiff_t                     
 // stencil101)
 //===============
 static void sshex8_apply_offdiag_stencil101(const ptrdiff_t                     xc,
-                                            const ptrdiff_t                     yc,
+                                            const ptrdiff_t                     /*yc*/,
                                             const ptrdiff_t                     zc,
                                             const ptrdiff_t                     xstride,
                                             const ptrdiff_t                     ystride,
@@ -653,7 +653,7 @@ static void sshex8_apply_offdiag_stencil101(const ptrdiff_t                     
 // stencil201)
 //===============
 static void sshex8_apply_offdiag_stencil201(const ptrdiff_t                     xc,
-                                            const ptrdiff_t                     yc,
+                                            const ptrdiff_t                     /*yc*/,
                                             const ptrdiff_t                     zc,
                                             const ptrdiff_t                     xstride,
                                             const ptrdiff_t                     ystride,
@@ -712,7 +712,7 @@ static void sshex8_apply_offdiag_stencil201(const ptrdiff_t                     
 //===============
 // stencil011)
 //===============
-static void sshex8_apply_offdiag_stencil011(const ptrdiff_t                     xc,
+static void sshex8_apply_offdiag_stencil011(const ptrdiff_t                     /*xc*/,
                                             const ptrdiff_t                     yc,
                                             const ptrdiff_t                     zc,
                                             const ptrdiff_t                     xstride,
@@ -790,107 +790,107 @@ static void sshex8_apply_offdiag_stencil011(const ptrdiff_t                     
 //===============
 // stencil111)
 //===============
-static void sshex8_apply_offdiag_stencil111(const ptrdiff_t                     xc,
-                                            const ptrdiff_t                     yc,
-                                            const ptrdiff_t                     zc,
-                                            const ptrdiff_t                     xstride,
-                                            const ptrdiff_t                     ystride,
-                                            const ptrdiff_t                     zstride,
-                                            const scalar_t *const SFEM_RESTRICT A,
-                                            const scalar_t *const SFEM_RESTRICT input,
-                                            scalar_t *const SFEM_RESTRICT       output) {
-    scalar_t stencil111[27];
-    stencil111[0]  = A[48];
-    stencil111[1]  = A[49] + A[56];
-    stencil111[2]  = A[57];
-    stencil111[3]  = A[40] + A[51];
-    stencil111[4]  = A[32] + A[41] + A[50] + A[59];
-    stencil111[5]  = A[33] + A[58];
-    stencil111[6]  = A[43];
-    stencil111[7]  = A[35] + A[42];
-    stencil111[8]  = A[34];
-    stencil111[9]  = A[16] + A[52];
-    stencil111[10] = A[17] + A[24] + A[53] + A[60];
-    stencil111[11] = A[25] + A[61];
-    stencil111[12] = A[19] + A[44] + A[55] + A[8];
-    stencil111[13] = 0; // FIXME remove this component from computation
-    stencil111[14] = A[1] + A[26] + A[37] + A[62];
-    stencil111[15] = A[11] + A[47];
-    stencil111[16] = A[10] + A[39] + A[3] + A[46];
-    stencil111[17] = A[2] + A[38];
-    stencil111[18] = A[20];
-    stencil111[19] = A[21] + A[28];
-    stencil111[20] = A[29];
-    stencil111[21] = A[12] + A[23];
-    stencil111[22] = A[13] + A[22] + A[31] + A[4];
-    stencil111[23] = A[30] + A[5];
-    stencil111[24] = A[15];
-    stencil111[25] = A[14] + A[7];
-    stencil111[26] = A[6];
-    // buffs
-    const scalar_t *const in0  = &input[0];
-    const scalar_t *const in1  = &input[xstride];
-    const scalar_t *const in2  = &input[2 * xstride];
-    const scalar_t *const in3  = &input[ystride];
-    const scalar_t *const in4  = &input[xstride + ystride];
-    const scalar_t *const in5  = &input[2 * xstride + ystride];
-    const scalar_t *const in6  = &input[2 * ystride];
-    const scalar_t *const in7  = &input[xstride + 2 * ystride];
-    const scalar_t *const in8  = &input[2 * xstride + 2 * ystride];
-    const scalar_t *const in9  = &input[zstride];
-    const scalar_t *const in10 = &input[xstride + zstride];
-    const scalar_t *const in11 = &input[2 * xstride + zstride];
-    const scalar_t *const in12 = &input[ystride + zstride];
-    const scalar_t *const in13 = &input[xstride + ystride + zstride];
-    const scalar_t *const in14 = &input[2 * xstride + ystride + zstride];
-    const scalar_t *const in15 = &input[2 * ystride + zstride];
-    const scalar_t *const in16 = &input[xstride + 2 * ystride + zstride];
-    const scalar_t *const in17 = &input[2 * xstride + 2 * ystride + zstride];
-    const scalar_t *const in18 = &input[2 * zstride];
-    const scalar_t *const in19 = &input[xstride + 2 * zstride];
-    const scalar_t *const in20 = &input[2 * xstride + 2 * zstride];
-    const scalar_t *const in21 = &input[ystride + 2 * zstride];
-    const scalar_t *const in22 = &input[xstride + ystride + 2 * zstride];
-    const scalar_t *const in23 = &input[2 * xstride + ystride + 2 * zstride];
-    const scalar_t *const in24 = &input[2 * ystride + 2 * zstride];
-    const scalar_t *const in25 = &input[xstride + 2 * ystride + 2 * zstride];
-    const scalar_t *const in26 = &input[2 * xstride + 2 * ystride + 2 * zstride];
-    scalar_t *const       out  = &output[xstride + ystride + zstride];
-    for (ptrdiff_t zi = 0; zi < (zc - 2); zi++) {
-        for (ptrdiff_t yi = 0; yi < (yc - 2); yi++) {
-            for (ptrdiff_t xi = 0; xi < (xc - 2); xi++) {
-                const ptrdiff_t idx = xi * xstride + yi * ystride + zi * zstride;
-                out[idx] += in0[idx] * stencil111[0];
-                out[idx] += in1[idx] * stencil111[1];
-                out[idx] += in2[idx] * stencil111[2];
-                out[idx] += in3[idx] * stencil111[3];
-                out[idx] += in4[idx] * stencil111[4];
-                out[idx] += in5[idx] * stencil111[5];
-                out[idx] += in6[idx] * stencil111[6];
-                out[idx] += in7[idx] * stencil111[7];
-                out[idx] += in8[idx] * stencil111[8];
-                out[idx] += in9[idx] * stencil111[9];
-                out[idx] += in10[idx] * stencil111[10];
-                out[idx] += in11[idx] * stencil111[11];
-                out[idx] += in12[idx] * stencil111[12];
-                out[idx] += in13[idx] * stencil111[13];
-                out[idx] += in14[idx] * stencil111[14];
-                out[idx] += in15[idx] * stencil111[15];
-                out[idx] += in16[idx] * stencil111[16];
-                out[idx] += in17[idx] * stencil111[17];
-                out[idx] += in18[idx] * stencil111[18];
-                out[idx] += in19[idx] * stencil111[19];
-                out[idx] += in20[idx] * stencil111[20];
-                out[idx] += in21[idx] * stencil111[21];
-                out[idx] += in22[idx] * stencil111[22];
-                out[idx] += in23[idx] * stencil111[23];
-                out[idx] += in24[idx] * stencil111[24];
-                out[idx] += in25[idx] * stencil111[25];
-                out[idx] += in26[idx] * stencil111[26];
-            }
-        }
-    }
-}
+// static void sshex8_apply_offdiag_stencil111(const ptrdiff_t                     xc,
+//                                             const ptrdiff_t                     yc,
+//                                             const ptrdiff_t                     zc,
+//                                             const ptrdiff_t                     xstride,
+//                                             const ptrdiff_t                     ystride,
+//                                             const ptrdiff_t                     zstride,
+//                                             const scalar_t *const SFEM_RESTRICT A,
+//                                             const scalar_t *const SFEM_RESTRICT input,
+//                                             scalar_t *const SFEM_RESTRICT       output) {
+//     scalar_t stencil111[27];
+//     stencil111[0]  = A[48];
+//     stencil111[1]  = A[49] + A[56];
+//     stencil111[2]  = A[57];
+//     stencil111[3]  = A[40] + A[51];
+//     stencil111[4]  = A[32] + A[41] + A[50] + A[59];
+//     stencil111[5]  = A[33] + A[58];
+//     stencil111[6]  = A[43];
+//     stencil111[7]  = A[35] + A[42];
+//     stencil111[8]  = A[34];
+//     stencil111[9]  = A[16] + A[52];
+//     stencil111[10] = A[17] + A[24] + A[53] + A[60];
+//     stencil111[11] = A[25] + A[61];
+//     stencil111[12] = A[19] + A[44] + A[55] + A[8];
+//     stencil111[13] = 0; // FIXME remove this component from computation
+//     stencil111[14] = A[1] + A[26] + A[37] + A[62];
+//     stencil111[15] = A[11] + A[47];
+//     stencil111[16] = A[10] + A[39] + A[3] + A[46];
+//     stencil111[17] = A[2] + A[38];
+//     stencil111[18] = A[20];
+//     stencil111[19] = A[21] + A[28];
+//     stencil111[20] = A[29];
+//     stencil111[21] = A[12] + A[23];
+//     stencil111[22] = A[13] + A[22] + A[31] + A[4];
+//     stencil111[23] = A[30] + A[5];
+//     stencil111[24] = A[15];
+//     stencil111[25] = A[14] + A[7];
+//     stencil111[26] = A[6];
+//     // buffs
+//     const scalar_t *const in0  = &input[0];
+//     const scalar_t *const in1  = &input[xstride];
+//     const scalar_t *const in2  = &input[2 * xstride];
+//     const scalar_t *const in3  = &input[ystride];
+//     const scalar_t *const in4  = &input[xstride + ystride];
+//     const scalar_t *const in5  = &input[2 * xstride + ystride];
+//     const scalar_t *const in6  = &input[2 * ystride];
+//     const scalar_t *const in7  = &input[xstride + 2 * ystride];
+//     const scalar_t *const in8  = &input[2 * xstride + 2 * ystride];
+//     const scalar_t *const in9  = &input[zstride];
+//     const scalar_t *const in10 = &input[xstride + zstride];
+//     const scalar_t *const in11 = &input[2 * xstride + zstride];
+//     const scalar_t *const in12 = &input[ystride + zstride];
+//     const scalar_t *const in13 = &input[xstride + ystride + zstride];
+//     const scalar_t *const in14 = &input[2 * xstride + ystride + zstride];
+//     const scalar_t *const in15 = &input[2 * ystride + zstride];
+//     const scalar_t *const in16 = &input[xstride + 2 * ystride + zstride];
+//     const scalar_t *const in17 = &input[2 * xstride + 2 * ystride + zstride];
+//     const scalar_t *const in18 = &input[2 * zstride];
+//     const scalar_t *const in19 = &input[xstride + 2 * zstride];
+//     const scalar_t *const in20 = &input[2 * xstride + 2 * zstride];
+//     const scalar_t *const in21 = &input[ystride + 2 * zstride];
+//     const scalar_t *const in22 = &input[xstride + ystride + 2 * zstride];
+//     const scalar_t *const in23 = &input[2 * xstride + ystride + 2 * zstride];
+//     const scalar_t *const in24 = &input[2 * ystride + 2 * zstride];
+//     const scalar_t *const in25 = &input[xstride + 2 * ystride + 2 * zstride];
+//     const scalar_t *const in26 = &input[2 * xstride + 2 * ystride + 2 * zstride];
+//     scalar_t *const       out  = &output[xstride + ystride + zstride];
+//     for (ptrdiff_t zi = 0; zi < (zc - 2); zi++) {
+//         for (ptrdiff_t yi = 0; yi < (yc - 2); yi++) {
+//             for (ptrdiff_t xi = 0; xi < (xc - 2); xi++) {
+//                 const ptrdiff_t idx = xi * xstride + yi * ystride + zi * zstride;
+//                 out[idx] += in0[idx] * stencil111[0];
+//                 out[idx] += in1[idx] * stencil111[1];
+//                 out[idx] += in2[idx] * stencil111[2];
+//                 out[idx] += in3[idx] * stencil111[3];
+//                 out[idx] += in4[idx] * stencil111[4];
+//                 out[idx] += in5[idx] * stencil111[5];
+//                 out[idx] += in6[idx] * stencil111[6];
+//                 out[idx] += in7[idx] * stencil111[7];
+//                 out[idx] += in8[idx] * stencil111[8];
+//                 out[idx] += in9[idx] * stencil111[9];
+//                 out[idx] += in10[idx] * stencil111[10];
+//                 out[idx] += in11[idx] * stencil111[11];
+//                 out[idx] += in12[idx] * stencil111[12];
+//                 out[idx] += in13[idx] * stencil111[13];
+//                 out[idx] += in14[idx] * stencil111[14];
+//                 out[idx] += in15[idx] * stencil111[15];
+//                 out[idx] += in16[idx] * stencil111[16];
+//                 out[idx] += in17[idx] * stencil111[17];
+//                 out[idx] += in18[idx] * stencil111[18];
+//                 out[idx] += in19[idx] * stencil111[19];
+//                 out[idx] += in20[idx] * stencil111[20];
+//                 out[idx] += in21[idx] * stencil111[21];
+//                 out[idx] += in22[idx] * stencil111[22];
+//                 out[idx] += in23[idx] * stencil111[23];
+//                 out[idx] += in24[idx] * stencil111[24];
+//                 out[idx] += in25[idx] * stencil111[25];
+//                 out[idx] += in26[idx] * stencil111[26];
+//             }
+//         }
+//     }
+// }
 
 //===============
 // stencil211)
@@ -973,7 +973,7 @@ static void sshex8_apply_offdiag_stencil211(const ptrdiff_t                     
 //===============
 // stencil021)
 //===============
-static void sshex8_apply_offdiag_stencil021(const ptrdiff_t                     xc,
+static void sshex8_apply_offdiag_stencil021(const ptrdiff_t                     /*xc*/,
                                             const ptrdiff_t                     yc,
                                             const ptrdiff_t                     zc,
                                             const ptrdiff_t                     xstride,
@@ -1171,8 +1171,8 @@ static void sshex8_apply_offdiag_stencil221(const ptrdiff_t                     
 //===============
 // stencil002)
 //===============
-static void sshex8_apply_offdiag_stencil002(const ptrdiff_t                     xc,
-                                            const ptrdiff_t                     yc,
+static void sshex8_apply_offdiag_stencil002(const ptrdiff_t                     /*xc*/,
+                                            const ptrdiff_t                     /*yc*/,
                                             const ptrdiff_t                     zc,
                                             const ptrdiff_t                     xstride,
                                             const ptrdiff_t                     ystride,
@@ -1220,7 +1220,7 @@ static void sshex8_apply_offdiag_stencil002(const ptrdiff_t                     
 // stencil102)
 //===============
 static void sshex8_apply_offdiag_stencil102(const ptrdiff_t                     xc,
-                                            const ptrdiff_t                     yc,
+                                            const ptrdiff_t                     /*yc*/,
                                             const ptrdiff_t                     zc,
                                             const ptrdiff_t                     xstride,
                                             const ptrdiff_t                     ystride,
@@ -1280,7 +1280,7 @@ static void sshex8_apply_offdiag_stencil102(const ptrdiff_t                     
 // stencil202)
 //===============
 static void sshex8_apply_offdiag_stencil202(const ptrdiff_t                     xc,
-                                            const ptrdiff_t                     yc,
+                                            const ptrdiff_t                     /*yc*/,
                                             const ptrdiff_t                     zc,
                                             const ptrdiff_t                     xstride,
                                             const ptrdiff_t                     ystride,
@@ -1327,7 +1327,7 @@ static void sshex8_apply_offdiag_stencil202(const ptrdiff_t                     
 //===============
 // stencil012)
 //===============
-static void sshex8_apply_offdiag_stencil012(const ptrdiff_t                     xc,
+static void sshex8_apply_offdiag_stencil012(const ptrdiff_t                     /*xc*/,
                                             const ptrdiff_t                     yc,
                                             const ptrdiff_t                     zc,
                                             const ptrdiff_t                     xstride,
@@ -1525,7 +1525,7 @@ static void sshex8_apply_offdiag_stencil212(const ptrdiff_t                     
 //===============
 // stencil022)
 //===============
-static void sshex8_apply_offdiag_stencil022(const ptrdiff_t                     xc,
+static void sshex8_apply_offdiag_stencil022(const ptrdiff_t                     /*xc*/,
                                             const ptrdiff_t                     yc,
                                             const ptrdiff_t                     zc,
                                             const ptrdiff_t                     xstride,

@@ -238,7 +238,6 @@ tet4_assemble_lumped_mass(const ptrdiff_t              nelements,  //
     double tick = MPI_Wtime();
 
     idx_t ev[4];
-    idx_t ks[4];
 
     real_t element_vector[4];
 

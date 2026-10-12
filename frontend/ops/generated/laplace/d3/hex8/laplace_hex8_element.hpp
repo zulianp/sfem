@@ -1,7 +1,7 @@
 #ifndef LAPLACE_HEX8_ELEMENT_API_HPP
 #define LAPLACE_HEX8_ELEMENT_API_HPP
 
-#include "../proteus_hex8/laplace_proteus_hex8_element.hpp"
+#include "laplace_proteus_hex8_element.hpp"
 
 namespace sfem {
 namespace codegen {

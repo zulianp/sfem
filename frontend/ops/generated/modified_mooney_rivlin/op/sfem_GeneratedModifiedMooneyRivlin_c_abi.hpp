@@ -27,8 +27,8 @@ typedef double geom_t;
 #define RSTR SFEM_RESTRICT
 #endif
 
-#include "../../kernel_diagnostics.hpp"
-#include "../matrix_formats.hpp"
+#include "kernel_diagnostics.hpp"
+#include "matrix_formats.hpp"
 
 #include "smesh_mesh.hpp"
 

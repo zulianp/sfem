@@ -52,7 +52,7 @@ namespace sfem {
                              real_t **const       off_diag_values) override;
 
         int hessian_block_diag_sym(const real_t *const x, real_t *const values) override;
-        int hessian_block_diag_sym_soa(const real_t *const x, real_t **const values) override { return SFEM_FAILURE; }
+        int hessian_block_diag_sym_soa(const real_t *const /*x*/, real_t **const /*values*/) override { return SFEM_FAILURE; }
         int hessian_diag(const real_t *const x, real_t *const values) override;
 
         int gradient(const real_t *const x, real_t *const out) override;

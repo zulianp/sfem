@@ -2,8 +2,8 @@
 #define MODIFIED_MOONEY_RIVLIN_TET4_ELEMENT_API_HPP
 
 #include <stddef.h>
-#include "../modified_mooney_rivlin_d3_simplex_local.hpp"
-#include "../../../geometry_kernels.hpp"
+#include "modified_mooney_rivlin_d3_simplex_local.hpp"
+#include "geometry_kernels.hpp"
 
 namespace sfem {
 namespace codegen {

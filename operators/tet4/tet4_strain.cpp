@@ -88,7 +88,6 @@ void strain(const ptrdiff_t nelements,
     SFEM_UNUSED(nnodes);
 
     idx_t ev[4];
-    real_t element_vector[4];
 
     real_t element_ux[4];
     real_t element_uy[4];

@@ -2,11 +2,11 @@
 #include <cstdint>
 #include <cstdlib>
 #include <string.h>
-#include "../../cuda/body_force_d2_tensor_product_local.cuh"
-#include "../../../../cuda/geometry_kernels.cuh"
-#include "../../../../cuda/kernel_diagnostics.cuh"
-#include "../../../../reference/cuda/line_p1_q2.hpp"
-#include "../../../../reference/cuda/quad_line_q2.hpp"
+#include "body_force_d2_tensor_product_local.cuh"
+#include "geometry_kernels.cuh"
+#include "kernel_diagnostics.cuh"
+#include "line_p1_q2.cuh"
+#include "quad_line_q2.cuh"
 #if defined(__has_include)
 #if __has_include("smesh_types.hpp")
 #include "smesh_types.hpp"
@@ -193,7 +193,6 @@ __global__ void body_force_proteus_quad4_residual_a_msoa_impl(
   static constexpr int NS = 4;
   static constexpr int NC = 2;
   const s_t *const affine_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
-  const s_t *const affine_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
   const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {

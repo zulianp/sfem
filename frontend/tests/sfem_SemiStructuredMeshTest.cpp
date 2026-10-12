@@ -40,7 +40,6 @@ int test_derefine(const std::shared_ptr<sfem::Mesh> &m, const smesh::Path &outpu
 
 int test_derefine_cube() {
 
-    int L                    = 8;
     int SFEM_BASE_RESOLUTION = 1;
     SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
 
@@ -63,7 +62,7 @@ int test_derefine_mesh() {
     return test_derefine(m, smesh::Path("test_derefine_mesh"));
 }
 
-int test_prolongation(const std::shared_ptr<sfem::Mesh> &m, const smesh::Path &output_dir) {
+int test_prolongation(const std::shared_ptr<sfem::Mesh> &m, const smesh::Path & /*output_dir*/) {
     int L = 8;
 
     auto ssmesh = smesh::to_semistructured(L, m, true, false);

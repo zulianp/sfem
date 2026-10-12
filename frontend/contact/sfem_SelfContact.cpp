@@ -14,7 +14,7 @@
 #include <string>
 #include <vector>
 
-#ifdef SFEM_ENABLE_YAML
+#ifdef SFEM_ENABLE_RYAML
 #include <ryml.hpp>
 #endif
 
@@ -89,9 +89,10 @@ namespace sfem {
                                         const smesh::SharedBuffer<real_t>&     values) {
             const ptrdiff_t n   = element_idx->size();
             const int       nxe = elements->extent(0);
+            (void)nxe;
 
-            SMESH_ASSERT(n == s->size());
-            SMESH_ASSERT(n == t->size());
+            SMESH_ASSERT(n == (ptrdiff_t)s->size());
+            SMESH_ASSERT(n == (ptrdiff_t)t->size());
 
             auto rowptr = graph.rowptr()->data();
             auto vals   = values->data();
@@ -566,50 +567,50 @@ namespace sfem {
             // By biorthogonality of the dual basis this equals the proper dual-mortar diagonal D_aa, which is strictly
             // positive (phi_a >= 0, dA > 0) and hence a safe nodal mass / projection normalizer. 2x2 Gauss is exact
             // for phi_a * |x_s x x_t| on a bilinear quad.
-            SFEM_INLINE void quad4_nodal_areas(const real_t* const SFEM_RESTRICT X,
-                                               const real_t* const SFEM_RESTRICT Y,
-                                               const real_t* const SFEM_RESTRICT Z,
-                                               real_t* const SFEM_RESTRICT       out_area) {
-                const real_t half_offset = real_t(0.5) / std::sqrt(real_t(3));
-                const real_t gp[2]       = {real_t(0.5) - half_offset, real_t(0.5) + half_offset};
+            // SFEM_INLINE void quad4_nodal_areas(const real_t* const SFEM_RESTRICT X,
+            //                                    const real_t* const SFEM_RESTRICT Y,
+            //                                    const real_t* const SFEM_RESTRICT Z,
+            //                                    real_t* const SFEM_RESTRICT       out_area) {
+            //     const real_t half_offset = real_t(0.5) / std::sqrt(real_t(3));
+            //     const real_t gp[2]       = {real_t(0.5) - half_offset, real_t(0.5) + half_offset};
 
-                out_area[0] = out_area[1] = out_area[2] = out_area[3] = real_t(0);
+            //     out_area[0] = out_area[1] = out_area[2] = out_area[3] = real_t(0);
 
-                for (int is = 0; is < 2; ++is) {
-                    for (int it = 0; it < 2; ++it) {
-                        const real_t s = gp[is];
-                        const real_t t = gp[it];
+            //     for (int is = 0; is < 2; ++is) {
+            //         for (int it = 0; it < 2; ++it) {
+            //             const real_t s = gp[is];
+            //             const real_t t = gp[it];
 
-                        real_t phi[4];
-                        quad4_shape(s, t, phi);
+            //             real_t phi[4];
+            //             quad4_shape(s, t, phi);
 
-                        const real_t dphi_ds[4] = {-(real_t(1) - t), (real_t(1) - t), t, -t};
-                        const real_t dphi_dt[4] = {-(real_t(1) - s), -s, s, (real_t(1) - s)};
+            //             const real_t dphi_ds[4] = {-(real_t(1) - t), (real_t(1) - t), t, -t};
+            //             const real_t dphi_dt[4] = {-(real_t(1) - s), -s, s, (real_t(1) - s)};
 
-                        real_t xs[3] = {0, 0, 0};
-                        real_t xt[3] = {0, 0, 0};
-                        for (int c = 0; c < 4; ++c) {
-                            xs[0] += dphi_ds[c] * X[c];
-                            xs[1] += dphi_ds[c] * Y[c];
-                            xs[2] += dphi_ds[c] * Z[c];
-                            xt[0] += dphi_dt[c] * X[c];
-                            xt[1] += dphi_dt[c] * Y[c];
-                            xt[2] += dphi_dt[c] * Z[c];
-                        }
+            //             real_t xs[3] = {0, 0, 0};
+            //             real_t xt[3] = {0, 0, 0};
+            //             for (int c = 0; c < 4; ++c) {
+            //                 xs[0] += dphi_ds[c] * X[c];
+            //                 xs[1] += dphi_ds[c] * Y[c];
+            //                 xs[2] += dphi_ds[c] * Z[c];
+            //                 xt[0] += dphi_dt[c] * X[c];
+            //                 xt[1] += dphi_dt[c] * Y[c];
+            //                 xt[2] += dphi_dt[c] * Z[c];
+            //             }
 
-                        const real_t cx   = xs[1] * xt[2] - xs[2] * xt[1];
-                        const real_t cy   = xs[2] * xt[0] - xs[0] * xt[2];
-                        const real_t cz   = xs[0] * xt[1] - xs[1] * xt[0];
-                        const real_t detJ = std::sqrt(cx * cx + cy * cy + cz * cz);
+            //             const real_t cx   = xs[1] * xt[2] - xs[2] * xt[1];
+            //             const real_t cy   = xs[2] * xt[0] - xs[0] * xt[2];
+            //             const real_t cz   = xs[0] * xt[1] - xs[1] * xt[0];
+            //             const real_t detJ = std::sqrt(cx * cx + cy * cy + cz * cz);
 
-                        // 2x2 Gauss weight on [0,1]^2 is 0.25 per point.
-                        const real_t wj = real_t(0.25) * detJ;
-                        for (int a = 0; a < 4; ++a) {
-                            out_area[a] += wj * phi[a];
-                        }
-                    }
-                }
-            }
+            //             // 2x2 Gauss weight on [0,1]^2 is 0.25 per point.
+            //             const real_t wj = real_t(0.25) * detJ;
+            //             for (int a = 0; a < 4; ++a) {
+            //                 out_area[a] += wj * phi[a];
+            //             }
+            //         }
+            //     }
+            // }
 
             // Degree-4 Strang triangle rule (6 points, weights sum to 1).
             static const real_t mortar_tri4_l1[MORTAR_TRI4_NQP] = {0.445948174109818469204897801127010,
@@ -703,9 +704,8 @@ namespace sfem {
             (void)nspoints;
 
             SMESH_ASSERT(nxe == elem_num_nodes(element_type));
+            (void)nxe;
 
-            auto ed  = elements->data();
-            auto pd  = points->data();
             auto ivd = is_valid->data();
 
             // Per slave-node mortar quantities (indexed by surface point id).
@@ -1098,11 +1098,12 @@ namespace sfem {
             {
                 auto   m    = mass_vector->data();
                 real_t area = 0;
-                for (ptrdiff_t i = 0; i < mass_vector->size(); i++) {
+                for (ptrdiff_t i = 0; i < (ptrdiff_t)mass_vector->size(); i++) {
                     area += m[i];
                 }
                 // printf("AREA: %g\n", (double)area);
                 assert(area > 0);
+                SFEM_UNUSED(area);
             }
         }
 
@@ -1254,35 +1255,12 @@ namespace sfem {
             }
         }
 
-        void sum_diag(const std::shared_ptr<smesh::CRSGraph<count_t, idx_t>>& graph,
-                      const SharedBuffer<real_t>&                             values,
-                      const SharedBuffer<real_t>&                             diag) {
-            auto rowptr = graph->rowptr()->data();
-            auto colidx = graph->colidx()->data();
-            auto vals   = values->data();
-            auto d      = diag->data();
-
-            const ptrdiff_t n = graph->rowptr()->size() - 1;
-#pragma omp parallel for
-            for (ptrdiff_t i = 0; i < n; ++i) {
-                const count_t lenrow = rowptr[i + 1] - rowptr[i];
-                const real_t* values = &vals[rowptr[i]];
-
-                real_t sum = 0;
-                for (count_t j = 0; j < lenrow; j++) {
-                    sum += values[j];
-                }
-                d[i] = sum;
-            }
-        }
-
         void sum_postprocess_weighted_quantities(const std::shared_ptr<smesh::CRSGraph<count_t, idx_t>>& graph,
                                                  const SharedBuffer<real_t>&                             values,
                                                  const SharedBuffer<real_t>&                             weighted_normals,
                                                  const SharedBuffer<real_t>&                             weighted_gap,
                                                  const SharedBuffer<real_t>&                             diag) {
             auto rowptr = graph->rowptr()->data();
-            auto colidx = graph->colidx()->data();
             auto vals   = values->data();
             auto d      = diag->data();
             auto wg     = weighted_gap->data();
@@ -1623,7 +1601,7 @@ namespace sfem {
         return std::make_shared<ContactNodeToSurface>(space, surface, margin, search_radius_sqr, es);
     }
 
-#ifdef SFEM_ENABLE_YAML
+#ifdef SFEM_ENABLE_RYAML
     std::shared_ptr<Contact> create_contact(const std::shared_ptr<FunctionSpace>& space,
                                             const std::shared_ptr<smesh::Mesh>&   surface,
                                             const ryml::ConstNodeRef&             node,
@@ -1632,10 +1610,10 @@ namespace sfem {
         real_t search_radius = 1e-4;
 
         if (node["margin"].readable()) {
-            node["margin"] >> margin;
+            node["margin"].load(&margin);
         }
         if (node["search_radius"].readable()) {
-            node["search_radius"] >> search_radius;
+            node["search_radius"].load(&search_radius);
         }
 
         return create_contact(space, surface, margin, search_radius * search_radius, es);

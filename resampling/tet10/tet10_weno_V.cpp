@@ -200,35 +200,6 @@ SFEM_INLINE static vec_real weno4_2D_HOne_V(
     return yw;
 }
 
-SFEM_INLINE static vec_indices copy_strides(const vec_indices stride_x,  //
-                                            const vec_indices stride_y,  //
-                                            const vec_indices stride_z,  //
-                                            const int side_x, const int side_y, const int side_z) {
-    vec_indices ret = CONST_VEC(0);
-
-    for (int ii = 0; ii < _VL_; ii++) {
-        ret[ii] = stride_x[ii] * side_x + stride_y[ii] * side_y + stride_z[ii] * side_z;
-    }
-
-    return ret;
-}
-
-SFEM_INLINE static vec_real copy_f(const double *f,             //
-                                   const vec_indices stride_x,  //
-                                   const vec_indices stride_y,  //
-                                   const vec_indices stride_z,  //
-                                   const int side_x, const int side_y, const int side_z) {
-    //
-    vec_real ret;
-    vec_indices indx = stride_x * side_x + stride_y * side_y + stride_z * side_z;
-
-    for (int ii = 0; ii < _VL_; ii++) {
-        ret[ii] = f[indx[ii]];
-    }
-
-    return ret;
-}
-
 /**
  * @brief Compute the first index of the field for third order interpolation
  *

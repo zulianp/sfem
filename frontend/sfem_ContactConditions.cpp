@@ -67,7 +67,6 @@ namespace sfem {
     std::shared_ptr<Constraint> AxisAlignedContactConditions::derefine(const std::shared_ptr<FunctionSpace> &coarse_space,
                                                                        const bool                            as_zero) const {
         auto space = impl_->space;
-        auto et    = (smesh::ElemType)space->element_type();
 
         const ptrdiff_t max_coarse_idx = max_node_id(
                 coarse_space->element_type(), space->mesh_ptr()->n_elements(), space->mesh_ptr()->elements(0)->data());
@@ -164,12 +163,6 @@ namespace sfem {
         //
         auto dc = std::make_unique<AxisAlignedContactConditions>(space);
 
-        char *SFEM_CONTACT_NODESET   = 0;
-        char *SFEM_CONTACT_VALUE     = 0;
-        char *SFEM_CONTACT_COMPONENT = 0;
-        SFEM_READ_ENV(SFEM_CONTACT_NODESET, );
-        SFEM_READ_ENV(SFEM_CONTACT_VALUE, );
-        SFEM_READ_ENV(SFEM_CONTACT_COMPONENT, );
         SFEM_ERROR("REFACTOR ME!\n");
 
         // read_dirichlet_conditions(space->mesh_ptr(),
@@ -245,7 +238,7 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    int AxisAlignedContactConditions::hessian_crs(const real_t *const  x,
+    int AxisAlignedContactConditions::hessian_crs(const real_t *const  /*x*/,
                                                   const count_t *const rowptr,
                                                   const idx_t *const   colidx,
                                                   real_t *const        values) {

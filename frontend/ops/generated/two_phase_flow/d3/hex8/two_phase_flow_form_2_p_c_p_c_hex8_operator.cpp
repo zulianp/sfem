@@ -1,4 +1,4 @@
-#include "../../op/sfem_GeneratedTwoPhaseFlow_c_abi.hpp"
+#include "sfem_GeneratedTwoPhaseFlow_c_abi.hpp"
 
 extern "C" int two_phase_flow_form_2_p_c_p_c_proteus_hex8_jacobian_action_i_maos(
         const int scalar_bytes,

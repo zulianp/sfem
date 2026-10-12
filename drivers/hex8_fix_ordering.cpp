@@ -19,7 +19,6 @@ int solve_hex8_fix_ordering(const std::shared_ptr<sfem::Communicator> &comm, int
     const char *folder        = argv[1];
     auto        m             = sfem::Mesh::create_from_file(comm, smesh::Path(folder));
 
-    int nxe = elem_num_nodes((smesh::ElemType)m->element_type(0));
     const auto elements = m->elements(0)->data();
     const auto points = m->points()->data();
     const ptrdiff_t nelements = m->n_elements();

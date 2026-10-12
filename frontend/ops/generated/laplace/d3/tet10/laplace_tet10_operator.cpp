@@ -1,26 +1,26 @@
 #include <cstdio>
 #include <type_traits>
-#include "../laplace_d3_simplex_local.hpp"
-#include "../laplace_d3_simplex_hessian.hpp"
-#include "../../../reference/quad_tet_q4.hpp"
-#include "../../../reference/tet10_q4.hpp"
-#include "../../../reference/quad_tet_q11.hpp"
-#include "../../../reference/tet10_q11.hpp"
-#include "../../../geometry_kernels.hpp"
-#include "../../../kernel_diagnostics.hpp"
+#include "laplace_d3_simplex_local.hpp"
+#include "laplace_d3_simplex_hessian.hpp"
+#include "quad_tet_q4.hpp"
+#include "tet10_q4.hpp"
+#include "quad_tet_q11.hpp"
+#include "tet10_q11.hpp"
+#include "geometry_kernels.hpp"
+#include "kernel_diagnostics.hpp"
 #ifdef _OPENMP
 #include <omp.h>
 #endif
 #include <cstdint>
 #include <cstdlib>
-#include "../../../packed_thread_scratch.hpp"
+#include "packed_thread_scratch.hpp"
 
 namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t, int VS>
 SFEM_INLINE const s_t *ageom_stream(
-    const int ne,
+    const int,
     const g_t *const RSTR source,
     s_t *const RSTR,
     std::true_type) {
@@ -744,7 +744,6 @@ static SFEM_INLINE int laplace_tet10_objective_steps_packed_i_msoa_impl(
         s_t badj7[NQ * VS];
         s_t badj8[NQ * VS];
         s_t bdet0[NQ * VS];
-        s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
 
         const s_t *bu_streams[NS * NC] = {bu_data[0], bu_data[1], bu_data[2], bu_data[3], bu_data[4], bu_data[5], bu_data[6], bu_data[7], bu_data[8], bu_data[9]};
         const s_t *bh_streams[NS * NC] = {bh_data[0], bh_data[1], bh_data[2], bh_data[3], bh_data[4], bh_data[5], bh_data[6], bh_data[7], bh_data[8], bh_data[9]};
@@ -1843,7 +1842,6 @@ static SFEM_INLINE int laplace_tet10_gradient_packed_i_msoa_impl(
         s_t badj7[NQ * VS];
         s_t badj8[NQ * VS];
         s_t bdet0[NQ * VS];
-        s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
         const s_t *bu_streams[NS * NC];
         for (int stream = 0; stream < NS * NC; ++stream) {
           bu_streams[stream] = bu_data[stream];
@@ -2098,7 +2096,6 @@ static SFEM_INLINE int laplace_tet10_gradient_packed_two_pass_i_msoa_impl(
         s_t badj7[NQ * VS];
         s_t badj8[NQ * VS];
         s_t bdet0[NQ * VS];
-        s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
         const s_t *bu_streams[NS * NC];
         for (int stream = 0; stream < NS * NC; ++stream) {
           bu_streams[stream] = bu_data[stream];
@@ -3239,7 +3236,6 @@ static SFEM_INLINE int laplace_tet10_apply_packed_i_msoa_impl(
         s_t badj7[NQ * VS];
         s_t badj8[NQ * VS];
         s_t bdet0[NQ * VS];
-        s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
         const s_t *bh_streams[NS * NC];
         for (int stream = 0; stream < NS * NC; ++stream) {
           bh_streams[stream] = bh_data[stream];
@@ -3494,7 +3490,6 @@ static SFEM_INLINE int laplace_tet10_apply_packed_two_pass_i_msoa_impl(
         s_t badj7[NQ * VS];
         s_t badj8[NQ * VS];
         s_t bdet0[NQ * VS];
-        s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
         const s_t *bh_streams[NS * NC];
         for (int stream = 0; stream < NS * NC; ++stream) {
           bh_streams[stream] = bh_data[stream];
@@ -3795,9 +3790,6 @@ static int laplace_tet10_hessian_i_msoa_assemble_impl(
   static constexpr int NQ = 11;
   static constexpr int NS = 10;
   static constexpr int NDOFS = NC * NS;
-  const g_t *const RSTR x = points[0];
-  const g_t *const RSTR y = points[1];
-  const g_t *const RSTR z = points[2];
   const s_t *const isoparametric_grad_ref_x = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x();
   const s_t *const isoparametric_grad_ref_y = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y();
   const s_t *const isoparametric_grad_ref_z = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z();
@@ -3820,7 +3812,6 @@ static int laplace_tet10_hessian_i_msoa_assemble_impl(
     s_t badj7[NQ];
     s_t badj8[NQ];
     s_t bdet0[NQ];
-    s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
 
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t node = elements[shape][element];

@@ -1,7 +1,7 @@
 #ifndef MODIFIED_MOONEY_RIVLIN_QUAD4_ELEMENT_API_HPP
 #define MODIFIED_MOONEY_RIVLIN_QUAD4_ELEMENT_API_HPP
 
-#include "../proteus_quad4/modified_mooney_rivlin_proteus_quad4_element.hpp"
+#include "modified_mooney_rivlin_proteus_quad4_element.hpp"
 
 namespace sfem {
 namespace codegen {

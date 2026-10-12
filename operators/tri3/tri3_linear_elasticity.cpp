@@ -102,9 +102,6 @@ int tri3_linear_elasticity_apply(const ptrdiff_t nelements,
         }
 
         // Element indices
-        const idx_t i0 = ev[0];
-        const idx_t i1 = ev[1];
-        const idx_t i2 = ev[2];
 
         tri3_linear_elasticity_apply_points(
                 // Model parameters
@@ -234,7 +231,6 @@ int tri3_linear_elasticity_crs_soa(const ptrdiff_t nelements,
     const geom_t *const y = points[1];
 
     static const int block_size = 2;
-    static const int mat_block_size = 2 * 2;
 
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
@@ -298,15 +294,15 @@ int tri3_linear_elasticity_crs_soa(const ptrdiff_t nelements,
 }
 
 
-int tri3_linear_elasticity_diag(const ptrdiff_t nelements,
-                                const ptrdiff_t nnodes,
-                                idx_t **const SFEM_RESTRICT elements,
-                                geom_t **const SFEM_RESTRICT points,
-                                const real_t mu,
-                                const real_t lambda,
-                                const ptrdiff_t out_stride,
-                                real_t *const outx,
-                                real_t *const outy)
+int tri3_linear_elasticity_diag(const ptrdiff_t /*nelements*/,
+                                const ptrdiff_t /*nnodes*/,
+                                idx_t **const SFEM_RESTRICT /*elements*/,
+                                geom_t **const SFEM_RESTRICT /*points*/,
+                                const real_t /*mu*/,
+                                const real_t /*lambda*/,
+                                const ptrdiff_t /*out_stride*/,
+                                real_t *const /*outx*/,
+                                real_t *const /*outy*/)
 {
     // TODO
     return SFEM_FAILURE;

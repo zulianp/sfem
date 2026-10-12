@@ -11,12 +11,12 @@
 namespace sfem {
 
     // Forward declarations
-    class YoungsModulus;
-    class PoissonRatio;
-    class BulkModulus;
-    class ShearModulus;
-    class LameFirstParameter;
-    class LameSecondParameter;
+    struct YoungsModulus;
+    struct PoissonRatio;
+    struct BulkModulus;
+    struct ShearModulus;
+    struct LameFirstParameter;
+    struct LameSecondParameter;
 
     struct YoungsModulus {
         real_t value;

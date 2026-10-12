@@ -255,7 +255,7 @@ namespace sfem {
     DirichletConditions::~DirichletConditions() = default;
 
     void DirichletConditions::add_condition(const ptrdiff_t local_size,
-                                            const ptrdiff_t global_size,
+                                            const ptrdiff_t /*global_size*/,
                                             idx_t *const    idx,
                                             const int       component,
                                             const real_t    value) {
@@ -267,7 +267,7 @@ namespace sfem {
     }
 
     void DirichletConditions::add_condition(const ptrdiff_t local_size,
-                                            const ptrdiff_t global_size,
+                                            const ptrdiff_t /*global_size*/,
                                             idx_t *const    idx,
                                             const int       component,
                                             real_t *const   values) {
@@ -310,7 +310,7 @@ namespace sfem {
             int i = 0;
             while (sets[i]) {
                 count += (sets[i++] == splitter[0]);
-                assert(i <= strlen(sets));
+                assert((size_t)i <= strlen(sets));
             }
         }
 
@@ -375,7 +375,7 @@ namespace sfem {
                     }
                     const ptrdiff_t lsize = values ? (ptrdiff_t)values->size() : 0;
 
-                    if (conds[i].nodeset->size() != lsize) {
+                    if ((ptrdiff_t)conds[i].nodeset->size() != lsize) {
                         if (!rank) {
                             SFEM_ERROR(
                                     "read_boundary_conditions: len(idx) != len(values) (%ld != "
@@ -419,7 +419,7 @@ namespace sfem {
             if (is_sideset) {
                 if (is_file) {
                     std::string path;
-                    c["path"] >> path;
+                    c["path"].load(&path);
                     sideset = Sideset::create_from_file(space->mesh_ptr()->comm(), smesh::Path(path));
                 } else if (is_expr) {
                     assert(c["parent"].is_seq());
@@ -431,12 +431,12 @@ namespace sfem {
 
                     ptrdiff_t parent_count = 0;
                     for (auto p : c["parent"]) {
-                        p >> parent->data()[parent_count++];
+                        p.load(&parent->data()[parent_count++]);
                     }
 
                     ptrdiff_t lfi_count = 0;
                     for (auto p : c["lfi"]) {
-                        p >> lfi->data()[lfi_count++];
+                        p.load(&lfi->data()[lfi_count++]);
                     }
 
                     assert(lfi_count == parent_count);
@@ -447,7 +447,7 @@ namespace sfem {
             } else {
                 if (is_file) {
                     std::string path;
-                    c["path"] >> path;
+                    c["path"].load(&path);
                     nodeset = Buffer<idx_t>::from_file(smesh::Path(path));
                     if (!nodeset) {
                         SFEM_ERROR("Unable to read file %s!\n", path.c_str());
@@ -457,7 +457,7 @@ namespace sfem {
                     nodeset         = create_host_buffer<idx_t>(size);
                     ptrdiff_t count = 0;
                     for (auto p : c["nodes"]) {
-                        p >> nodeset->data()[count++];
+                        p.load(&nodeset->data()[count++]);
                     }
                 }
 
@@ -472,7 +472,7 @@ namespace sfem {
                     auto       *const ids   = nodeset->data();
                     const auto *const to_new = map->data();
                     const ptrdiff_t   nnodes = map->size();
-                    for (ptrdiff_t i = 0; i < nodeset->size(); ++i) {
+                    for (ptrdiff_t i = 0; i < (ptrdiff_t)nodeset->size(); ++i) {
                         if (ids[i] < 0 || ids[i] >= nnodes) {
                             SFEM_ERROR("node %ld in a Dirichlet nodeset is out of range for a "
                                        "mesh of %ld nodes\n",
@@ -500,7 +500,7 @@ namespace sfem {
                 }
 
                 std::string value_path;
-                node_value["path"] >> value_path;
+                node_value["path"].load(&value_path);
                 file_values = Buffer<real_t>::from_file(smesh::Path(value_path));
                 if (!file_values || file_values->size() != nodeset->size()) {
                     SFEM_ERROR("Dirichlet value file %s has %td entries; expected %td\n",
@@ -510,17 +510,17 @@ namespace sfem {
                     return nullptr;
                 }
             } else if (node_value.is_seq()) {
-                node_value >> value;
+                node_value.load(&value);
             } else {
                 value.resize(1);
-                node_value >> value[0];
+                node_value.load(&value[0]);
             }
 
             if (node_component.is_seq()) {
-                node_component >> component;
+                node_component.load(&component);
             } else {
                 component.resize(1);
-                node_component >> component[0];
+                node_component.load(&component[0]);
             }
 
             if (file_values && component.size() != 1) {
@@ -692,7 +692,7 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    int DirichletConditions::hessian_crs(const real_t *const  x,
+    int DirichletConditions::hessian_crs(const real_t *const  /*x*/,
                                          const count_t *const rowptr,
                                          const idx_t *const   colidx,
                                          real_t *const        values) {
@@ -707,7 +707,7 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    int DirichletConditions::hessian_bsr(const real_t *const  x,
+    int DirichletConditions::hessian_bsr(const real_t *const  /*x*/,
                                          const count_t *const rowptr,
                                          const idx_t *const   colidx,
                                          real_t *const        values) {
@@ -731,7 +731,7 @@ namespace sfem {
             if (c.nodeset->size() == 0) continue;
 
             auto nodeset = c.nodeset->data();
-            for (ptrdiff_t node = 0; node < c.nodeset->size(); node++) {
+            for (ptrdiff_t node = 0; node < (ptrdiff_t)c.nodeset->size(); node++) {
                 const ptrdiff_t idx = nodeset[node] * block_size + c.component;
                 mask_set(idx, mask);
             }

@@ -2,13 +2,13 @@
 #include <cstdint>
 #include <cstdlib>
 #include <string.h>
-#include "../../cuda/mooney_rivlin_kelvin_voigt_total_d3_simplex_local.cuh"
-#include "../../../../cuda/geometry_kernels.cuh"
-#include "../../../../cuda/kernel_diagnostics.cuh"
-#include "../../../../reference/cuda/quad_tet_q4.hpp"
-#include "../../../../reference/cuda/tet10_q4.hpp"
-#include "../../../../reference/cuda/quad_tet_q11.hpp"
-#include "../../../../reference/cuda/tet10_q11.hpp"
+#include "mooney_rivlin_kelvin_voigt_total_d3_simplex_local.cuh"
+#include "geometry_kernels.cuh"
+#include "kernel_diagnostics.cuh"
+#include "quad_tet_q4.cuh"
+#include "tet10_q4.cuh"
+#include "quad_tet_q11.cuh"
+#include "tet10_q11.cuh"
 #if defined(__has_include)
 #if __has_include("smesh_types.hpp")
 #include "smesh_types.hpp"
@@ -705,7 +705,6 @@ __global__ void mooney_rivlin_kelvin_voigt_total_tet10_residual_a_msoa_impl(
   static constexpr int NQ = 4;
   static constexpr int NS = 10;
   static constexpr int NC = 3;
-  const s_t *const affine_shape = sfem::codegen::ref_tet10_q4<s_t>::shape();
   const s_t *const affine_grad_ref_x = sfem::codegen::ref_tet10_q4<s_t>::grad_ref_x();
   const s_t *const affine_grad_ref_y = sfem::codegen::ref_tet10_q4<s_t>::grad_ref_y();
   const s_t *const affine_grad_ref_z = sfem::codegen::ref_tet10_q4<s_t>::grad_ref_z();
@@ -852,7 +851,6 @@ __global__ void mooney_rivlin_kelvin_voigt_total_tet10_residual_i_msoa_impl(
   static constexpr int NQ = 11;
   static constexpr int NS = 10;
   static constexpr int NC = 3;
-  const s_t *const isoparametric_shape = sfem::codegen::ref_tet10_q11<s_t>::shape();
   const s_t *const isoparametric_grad_ref_x = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x();
   const s_t *const isoparametric_grad_ref_y = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y();
   const s_t *const isoparametric_grad_ref_z = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z();
@@ -1110,7 +1108,6 @@ __global__ void mooney_rivlin_kelvin_voigt_total_tet10_jacobian_action_a_msoa_im
   static constexpr int NQ = 4;
   static constexpr int NS = 10;
   static constexpr int NC = 3;
-  const s_t *const affine_shape = sfem::codegen::ref_tet10_q4<s_t>::shape();
   const s_t *const affine_grad_ref_x = sfem::codegen::ref_tet10_q4<s_t>::grad_ref_x();
   const s_t *const affine_grad_ref_y = sfem::codegen::ref_tet10_q4<s_t>::grad_ref_y();
   const s_t *const affine_grad_ref_z = sfem::codegen::ref_tet10_q4<s_t>::grad_ref_z();
@@ -1268,7 +1265,6 @@ __global__ void mooney_rivlin_kelvin_voigt_total_tet10_jacobian_action_i_msoa_im
   static constexpr int NQ = 11;
   static constexpr int NS = 10;
   static constexpr int NC = 3;
-  const s_t *const isoparametric_shape = sfem::codegen::ref_tet10_q11<s_t>::shape();
   const s_t *const isoparametric_grad_ref_x = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x();
   const s_t *const isoparametric_grad_ref_y = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y();
   const s_t *const isoparametric_grad_ref_z = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z();
@@ -1542,7 +1538,6 @@ __global__ void mooney_rivlin_kelvin_voigt_total_tet10_hessian_crs_i_msoa_impl(
   static constexpr int NS = 10;
   static constexpr int NC = 3;
   static constexpr int N_STREAMS = NC * NS;
-  const s_t *const isoparametric_shape = sfem::codegen::ref_tet10_q11<s_t>::shape();
   const s_t *const isoparametric_grad_ref_x = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x();
   const s_t *const isoparametric_grad_ref_y = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y();
   const s_t *const isoparametric_grad_ref_z = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z();

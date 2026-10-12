@@ -11,22 +11,22 @@
 
 #include "tet10_convection.hpp"
 
-static SFEM_INLINE void tet10_momentum_lhs_scalar_kernel(const real_t px0,
-                                                         const real_t px1,
-                                                         const real_t px2,
-                                                         const real_t px3,
-                                                         const real_t py0,
-                                                         const real_t py1,
-                                                         const real_t py2,
-                                                         const real_t py3,
-                                                         const real_t pz0,
-                                                         const real_t pz1,
-                                                         const real_t pz2,
-                                                         const real_t pz3,
-                                                         const real_t dt,
-                                                         const real_t nu,
+static SFEM_INLINE void tet10_momentum_lhs_scalar_kernel(const real_t /*px0*/,
+                                                         const real_t /*px1*/,
+                                                         const real_t /*px2*/,
+                                                         const real_t /*px3*/,
+                                                         const real_t /*py0*/,
+                                                         const real_t /*py1*/,
+                                                         const real_t /*py2*/,
+                                                         const real_t /*py3*/,
+                                                         const real_t /*pz0*/,
+                                                         const real_t /*pz1*/,
+                                                         const real_t /*pz2*/,
+                                                         const real_t /*pz3*/,
+                                                         const real_t /*dt*/,
+                                                         const real_t /*nu*/,
                                                          real_t *const SFEM_RESTRICT
-                                                             element_matrix) {
+                                                             /*element_matrix*/) {
     // TODO
     assert(0);
 }
@@ -1601,11 +1601,10 @@ void tet4_tet10_divergence(const ptrdiff_t nelements,
                            geom_t **const points,
                            const real_t dt,
                            const real_t rho,
-                           const real_t nu,
+                           const real_t /*nu*/,
                            real_t **const SFEM_RESTRICT vel,
                            real_t *const SFEM_RESTRICT f) {
     SFEM_UNUSED(nnodes);
-    double tick = MPI_Wtime();
 
     static const int n_vars = 3;
     static const int element_nnodes = 10;
@@ -1682,7 +1681,6 @@ void tet4_tet10_divergence(const ptrdiff_t nelements,
         }
     }
 
-    double tock = MPI_Wtime();
     // printf("tet10_naviers_stokes.c: tet10_explict_momentum_tentative\t%g seconds\n", tock -
     // tick);
 }
@@ -1696,7 +1694,6 @@ void tet10_tet4_correction(const ptrdiff_t nelements,
                            real_t *const SFEM_RESTRICT p,
                            real_t **const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
-    double tick = MPI_Wtime();
 
     static const int n_vars = 3;
     static const int element_nnodes = 10;
@@ -1776,7 +1773,6 @@ void tet10_tet4_correction(const ptrdiff_t nelements,
         }
     }
 
-    double tock = MPI_Wtime();
     // printf("tet10_naviers_stokes.c: tet10_explict_momentum_tentative\t%g seconds\n", tock -
     // tick);
 }
@@ -1882,7 +1878,6 @@ void tet10_explict_momentum_tentative(const ptrdiff_t nelements,
                                       real_t **const SFEM_RESTRICT vel,
                                       real_t **const SFEM_RESTRICT f) {
     SFEM_UNUSED(nnodes);
-    double tick = MPI_Wtime();
 
     static const int n_vars = 3;
     static const int element_nnodes = 10;
@@ -1986,7 +1981,6 @@ void tet10_explict_momentum_tentative(const ptrdiff_t nelements,
         }
     }
 
-    double tock = MPI_Wtime();
     // printf("tet10_naviers_stokes.c: tet10_explict_momentum_tentative\t%g seconds\n", tock -
     // tick);
 }

@@ -125,7 +125,7 @@ namespace sfem {
         int set_op_and_diag_shift(const std::shared_ptr<Operator<T>>&          op,
                                   const std::shared_ptr<SparseBlockVector<T>>& sbv,
                                   const SharedBuffer<T>&                       diag) override {
-            assert(sbv->n_blocks() == diag->size());
+            assert(sbv->n_blocks() == (ptrdiff_t)diag->size());
 
             this->op = op;
             configure_sizes_from_op();

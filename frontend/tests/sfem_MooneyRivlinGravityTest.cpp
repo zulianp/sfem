@@ -1175,7 +1175,6 @@ int test_mooney_rivlin_gravity() {
         // Export obstacle geometry based on type
         if (SFEM_OBSTACLE_TYPE == 2) {
             // Stepped obstacle
-            const real_t y_min   = min_c[1];
             const real_t y_max   = max_c[1];
             const real_t z_min   = min_c[2];
             const real_t z_max   = max_c[2];

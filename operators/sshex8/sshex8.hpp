@@ -41,10 +41,10 @@ static SFEM_INLINE void hex8_sub_adj_0(const scalar_t *const SFEM_RESTRICT adjug
     sub_determinant[0] = determinant * (POW3(h));
 }
 
-static void sshex8_apply_element_matrix(const int                           level,
-                                        const scalar_t *const SFEM_RESTRICT element_matrix,
-                                        const scalar_t *const SFEM_RESTRICT input,
-                                        scalar_t *const SFEM_RESTRICT       output) {
+static SFEM_INLINE void sshex8_apply_element_matrix(const int                           level,
+                                                    const scalar_t *const SFEM_RESTRICT element_matrix,
+                                                    const scalar_t *const SFEM_RESTRICT input,
+                                                    scalar_t *const SFEM_RESTRICT       output) {
     scalar_t element_u[8];
     scalar_t element_vector[8];
     for (int zi = 0; zi < level; zi++) {

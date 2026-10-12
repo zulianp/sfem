@@ -1,12 +1,12 @@
 #include <type_traits>
 #include <cuda_runtime.h>
-#include "../../cuda/saint_venant_kirchhoff_d3_tensor_product_local.cuh"
-#include "../../../../reference/cuda/line_p3_q4.hpp"
-#include "../../../../reference/cuda/quad_line_q4.hpp"
-#include "../../../../reference/cuda/line_p3_q5.hpp"
-#include "../../../../reference/cuda/quad_line_q5.hpp"
-#include "../../../../cuda/geometry_kernels.cuh"
-#include "../../../../cuda/kernel_diagnostics.cuh"
+#include "saint_venant_kirchhoff_d3_tensor_product_local.cuh"
+#include "line_p3_q4.cuh"
+#include "quad_line_q4.cuh"
+#include "line_p3_q5.cuh"
+#include "quad_line_q5.cuh"
+#include "geometry_kernels.cuh"
+#include "kernel_diagnostics.cuh"
 #include <cstdint>
 #include <cstdlib>
 

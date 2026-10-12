@@ -159,7 +159,7 @@ hex_aa_8_eval_fun_V(const vec_real                x,   //
 #if _VL_ == 8
 #define GET_OUT_MACRO(_out, _data, _indx_V)   \
     {                                         \
-        _out = (vec_real){_data[_indx_V[0]],  \
+        _out = vec_real{_data[_indx_V[0]],  \
                           _data[_indx_V[1]],  \
                           _data[_indx_V[2]],  \
                           _data[_indx_V[3]],  \
@@ -176,7 +176,7 @@ hex_aa_8_eval_fun_V(const vec_real                x,   //
     }
 
 #define COPY_COORDINATES(__ev__, __xyz_ind__)                                                                                  \
-    (vec_real) {                                                                                                               \
+    vec_real {                                                                                                               \
         (real_t) xyz[__xyz_ind__][__ev__[0]], (real_t)xyz[__xyz_ind__][__ev__[1]], (real_t)xyz[__xyz_ind__][__ev__[2]],        \
                 (real_t)xyz[__xyz_ind__][__ev__[3]], (real_t)xyz[__xyz_ind__][__ev__[4]], (real_t)xyz[__xyz_ind__][__ev__[5]], \
                 (real_t)xyz[__xyz_ind__][__ev__[6]], (real_t)xyz[__xyz_ind__][__ev__[7]]                                       \
@@ -196,13 +196,13 @@ hex_aa_8_eval_fun_V(const vec_real                x,   //
 
 #elif _VL_ == 4
 #define GET_OUT_MACRO(_out, _data, _indx_V) \
-    { _out = (vec_real){_data[_indx_V[0]], _data[_indx_V[1]], _data[_indx_V[2]], _data[_indx_V[3]]}; }
+    { _out = vec_real{_data[_indx_V[0]], _data[_indx_V[1]], _data[_indx_V[2]], _data[_indx_V[3]]}; }
 
 #define GET_INDICES(_elems_, _element_i_) \
     { _elems_[_element_i_ + 0], _elems_[_element_i_ + 1], _elems_[_element_i_ + 2], _elems_[_element_i_ + 3] }
 
 #define COPY_COORDINATES(__ev__, __xyz_ind__)                                                                           \
-    (vec_real) {                                                                                                        \
+    vec_real {                                                                                                        \
         (real_t) xyz[__xyz_ind__][__ev__[0]], (real_t)xyz[__xyz_ind__][__ev__[1]], (real_t)xyz[__xyz_ind__][__ev__[2]], \
                 (real_t)xyz[__xyz_ind__][__ev__[3]]                                                                     \
     }
@@ -218,7 +218,7 @@ hex_aa_8_eval_fun_V(const vec_real                x,   //
 #elif _VL_ == 16
 #define GET_OUT_MACRO(_out, _data, _indx_V)    \
     {                                          \
-        _out = (vec_real){_data[_indx_V[0]],   \
+        _out = vec_real{_data[_indx_V[0]],   \
                           _data[_indx_V[1]],   \
                           _data[_indx_V[2]],   \
                           _data[_indx_V[3]],   \
@@ -253,7 +253,7 @@ hex_aa_8_eval_fun_V(const vec_real                x,   //
     }
 
 #define COPY_COORDINATES(__ev__, __xyz_ind__)                                                                               \
-    (vec_real) {                                                                                                            \
+    vec_real {                                                                                                            \
         xyz[__xyz_ind__][__ev__[0]], xyz[__xyz_ind__][__ev__[1]], xyz[__xyz_ind__][__ev__[2]], xyz[__xyz_ind__][__ev__[3]], \
                 xyz[__xyz_ind__][__ev__[4]], xyz[__xyz_ind__][__ev__[5]], xyz[__xyz_ind__][__ev__[6]],                      \
                 xyz[__xyz_ind__][__ev__[7]], xyz[__xyz_ind__][__ev__[8]], xyz[__xyz_ind__][__ev__[9]],                      \
@@ -326,10 +326,10 @@ SFEM_INLINE static void hex_aa_8_collect_coeffs_V(const vec_indices stride0, con
 int                                                                                       //
 tet4_resample_field_local_V_aligned(const ptrdiff_t                      start_nelement,  // Mesh
                                     const ptrdiff_t                      end_nelement,    //
-                                    const ptrdiff_t                      nnodes,          //
+                                    const ptrdiff_t                      /*nnodes*/,          //
                                     idx_t** const SFEM_RESTRICT          elems,           //
                                     geom_t** const SFEM_RESTRICT         xyz,             //
-                                    const ptrdiff_t* const SFEM_RESTRICT n,               // SDF
+                                    const ptrdiff_t* const SFEM_RESTRICT /*n*/,               // SDF
                                     const ptrdiff_t* const SFEM_RESTRICT stride,          //
                                     const geom_t* const SFEM_RESTRICT    origin,          //
                                     const geom_t* const SFEM_RESTRICT    delta,           //
@@ -352,9 +352,9 @@ tet4_resample_field_local_V_aligned(const ptrdiff_t                      start_n
     const real_t dy = (real_t)delta[1];
     const real_t dz = (real_t)delta[2];
 
-    vec_indices stride0 = CONST_VEC(stride[0]);
-    vec_indices stride1 = CONST_VEC(stride[1]);
-    vec_indices stride2 = CONST_VEC(stride[2]);
+    vec_indices stride0 = CONST_VEC((ptrdiff_t_sfem_tet4)stride[0]);
+    vec_indices stride1 = CONST_VEC((ptrdiff_t_sfem_tet4)stride[1]);
+    vec_indices stride2 = CONST_VEC((ptrdiff_t_sfem_tet4)stride[2]);
 
     //////////////////////////////////////////////////////////////////////
     // Loop over the elements

@@ -90,7 +90,7 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_sphere_contact(const std::
     const int    resolution_ratio = opts.resolution_ratio;
 
     if (opts.enable_top_bc) {
-        auto top_ss = sfem::Sideset::create_from_selector(m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool {
+        auto top_ss = sfem::Sideset::create_from_selector(m, [=](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool {
             return y > (y_top - 1e-5) && y < (y_top + 1e-5);
         });
 
@@ -103,7 +103,7 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_sphere_contact(const std::
 
     } else {
         auto left_right = sfem::Sideset::create_from_selector(
-                m, [=](const geom_t x, const geom_t y, const geom_t z) -> bool { return fabs(x) < 1e-8 || fabs(x - 1) < 1e-8; });
+                m, [=](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool { return fabs(x) < 1e-8 || fabs(x - 1) < 1e-8; });
 
         sfem::DirichletConditions::Condition x_bc{.sidesets = left_right, .value = 0, .component = 0};
         sfem::DirichletConditions::Condition y_bc{.sidesets = left_right, .value = disp_y, .component = 1};
@@ -114,7 +114,7 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_sphere_contact(const std::
     }
 
     auto bottom_ss = sfem::Sideset::create_from_selector(
-            m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool { return y > -1e-5 && y < 1e-5; });
+            m, [=](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool { return y > -1e-5 && y < 1e-5; });
 
     ptrdiff_t n_contact_faces = 0;
     for (const auto &s : bottom_ss) {
@@ -169,7 +169,7 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_highfreq_contact(const std
     const int    resolution_ratio = opts.resolution_ratio;
 
     if (opts.enable_top_bc) {
-        auto top_ss = sfem::Sideset::create_from_selector(m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool {
+        auto top_ss = sfem::Sideset::create_from_selector(m, [=](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool {
             return y > (y_top - 1e-5) && y < (y_top + 1e-5);
         });
 
@@ -182,7 +182,7 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_highfreq_contact(const std
 
     } else {
         auto ss = sfem::Sideset::create_from_selector(
-                m, [=](const geom_t x, const geom_t y, const geom_t z) -> bool { return fabs(x) < 1e-8 || fabs(x - 1) < 1e-8; });
+                m, [=](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool { return fabs(x) < 1e-8 || fabs(x - 1) < 1e-8; });
 
         sfem::DirichletConditions::Condition x_bc{.sidesets = ss, .value = 0, .component = 0};
         sfem::DirichletConditions::Condition y_bc{.sidesets = ss, .value = disp_y, .component = 1};
@@ -193,7 +193,7 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_highfreq_contact(const std
     }
 
     auto bottom_ss = sfem::Sideset::create_from_selector(
-            m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool { return y > -1e-5 && y < 1e-5; });
+            m, [=](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool { return y > -1e-5 && y < 1e-5; });
 
     const int n   = opts.base_resolution * smesh::semistructured_level(fs->mesh());
     auto      sdf = smesh::create_sdf(comm,
@@ -246,7 +246,7 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_multisphere_contact(const 
     const geom_t y_top  = opts.y_top;
 
     if (opts.enable_top_bc) {
-        auto top_ss = sfem::Sideset::create_from_selector(m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool {
+        auto top_ss = sfem::Sideset::create_from_selector(m, [=](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool {
             return y > (y_top - 1e-5) && y < (y_top + 1e-5);
         });
 
@@ -259,7 +259,7 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_multisphere_contact(const 
 
     } else {
         auto ss = sfem::Sideset::create_from_selector(
-                m, [=](const geom_t x, const geom_t y, const geom_t z) -> bool { return fabs(x) < 1e-8 || fabs(x - 1) < 1e-8; });
+                m, [=](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool { return fabs(x) < 1e-8 || fabs(x - 1) < 1e-8; });
 
         sfem::DirichletConditions::Condition x_bc{.sidesets = ss, .value = 0, .component = 0};
         sfem::DirichletConditions::Condition y_bc{.sidesets = ss, .value = disp_y, .component = 1};
@@ -270,7 +270,7 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_multisphere_contact(const 
     }
 
     auto bottom_ss = sfem::Sideset::create_from_selector(
-            m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool { return y > -1e-5 && y < 1e-5; });
+            m, [=](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool { return y > -1e-5 && y < 1e-5; });
 
     const int n         = opts.base_resolution * smesh::semistructured_level(fs->mesh());
     const int n_spheres = opts.n_spheres;
@@ -288,7 +288,6 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_multisphere_contact(const 
                                      geom_t       dd = 1000000;
                                      const geom_t hx = 1. / (n_spheres + 1);
                                      const geom_t hz = 1. / (n_spheres + 1);
-                                     const geom_t hy = 1. / (n_spheres + 1);
 
                                      for (int i = 0; i < n_spheres; i++) {
                                          for (int j = 0; j < n_spheres; j++) {

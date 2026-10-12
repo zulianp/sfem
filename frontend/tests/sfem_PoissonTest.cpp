@@ -322,6 +322,7 @@ int test_poisson_and_boundary_selector() {
     if (SFEM_OPERATOR == "VectorLaplacian") {
         int SFEM_ELEMENT_REFINE_LEVEL = smesh::Env::read<int>("SFEM_ELEMENT_REFINE_LEVEL", 1);
         assert(SFEM_ELEMENT_REFINE_LEVEL <= 1);
+        SFEM_UNUSED(SFEM_ELEMENT_REFINE_LEVEL);
         SFEM_BLOCK_SIZE = 3;
     }
 
@@ -497,12 +498,6 @@ int test_bidomain_elasticity() {
         return SFEM_TEST_SUCCESS;
     }
 
-    int SFEM_BLOCK_SIZE = 1;
-    if (SFEM_OPERATOR == "VectorLaplacian") {
-        assert(SFEM_ELEMENT_REFINE_LEVEL <= 1);
-        SFEM_BLOCK_SIZE = 3;
-    }
-
     int  SFEM_BASE_RESOLUTION = smesh::Env::read<int>("SFEM_BASE_RESOLUTION", 6);
     auto m                    = sfem::Mesh::create_hex8_bidomain_cube(
             sfem::Communicator::world(), SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 2, 2, 2);
@@ -518,10 +513,10 @@ int test_bidomain_elasticity() {
     op->set_value_in_block("right", "lambda", 10);
 
     auto right_sideset = sfem::Sideset::create_from_selector(
-            m, [](const geom_t x, const geom_t y, const geom_t z) -> bool { return x > 1.99999; });
+            m, [](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool { return x > 1.99999; });
 
     auto left_sideset = sfem::Sideset::create_from_selector(
-            m, [](const geom_t x, const geom_t y, const geom_t z) -> bool { return x < 0.00001; });
+            m, [](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool { return x < 0.00001; });
 
     std::vector<sfem::DirichletConditions::Condition> boundary_conditions = {
             {.sidesets = left_sideset, .value = 0, .component = 0},
@@ -548,12 +543,6 @@ int test_boundary_layer_elasticity() {
     if (SFEM_ELEMENT_REFINE_LEVEL > 1) {
         // FIXME
         return SFEM_TEST_SUCCESS;
-    }
-
-    int SFEM_BLOCK_SIZE = 1;
-    if (SFEM_OPERATOR == "VectorLaplacian") {
-        assert(SFEM_ELEMENT_REFINE_LEVEL <= 1);
-        SFEM_BLOCK_SIZE = 3;
     }
 
     int  SFEM_BASE_RESOLUTION = smesh::Env::read<int>("SFEM_BASE_RESOLUTION", 6);
@@ -583,10 +572,10 @@ int test_boundary_layer_elasticity() {
     op->set_value_in_block("default", "lambda", 1);
 
     auto left_sideset = sfem::Sideset::create_from_selector(
-            m, [](const geom_t x, const geom_t y, const geom_t z) -> bool { return x < 0.00001; });
+            m, [](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool { return x < 0.00001; });
 
     auto right_sideset = sfem::Sideset::create_from_selector(
-            m, [](const geom_t x, const geom_t y, const geom_t z) -> bool { return x > 1.99999; });
+            m, [](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool { return x > 1.99999; });
 
     std::vector<sfem::DirichletConditions::Condition> boundary_conditions = {
             {.sidesets = left_sideset, .value = 0.2, .component = 0},

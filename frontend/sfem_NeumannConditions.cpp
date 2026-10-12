@@ -315,7 +315,7 @@ namespace sfem {
             int i = 0;
             while (sets[i]) {
                 count += (sets[i++] == splitter[0]);
-                assert(i <= strlen(sets));
+                assert((size_t)i <= strlen(sets));
             }
         }
 
@@ -352,12 +352,12 @@ namespace sfem {
                         for (auto &p : paths) {
                             idx_t    *ii{nullptr};
                             ptrdiff_t lsize{0};
-                            if (smesh::array_read_convert_from_extension<idx_t>(smesh::Path(pch), &ii, &lsize) != SMESH_SUCCESS) {
-                                SFEM_ERROR("Failed to read file %s\n", pch);
+                            if (smesh::array_read_convert_from_extension<idx_t>(smesh::Path(p), &ii, &lsize) != SMESH_SUCCESS) {
+                                SFEM_ERROR("Failed to read file %s\n", p.c_str());
                                 break;
                             }
 
-                            if (!nse || nse != lsize) {
+                            if (nse && nse != lsize) {
                                 assert(!nse || nse == lsize);
                                 SFEM_ERROR("Inconsistent lenghts between files!\n");
                             }
@@ -417,7 +417,7 @@ namespace sfem {
                     }
                     const ptrdiff_t lsize = values ? (ptrdiff_t)values->size() : 0;
 
-                    if (conds[i].surface->extent(1) != lsize) {
+                    if ((ptrdiff_t)conds[i].surface->extent(1) != lsize) {
                         if (!rank) {
                             SFEM_ERROR(
                                     "read_boundary_conditions: len(idx) != len(values) (%ld != "
@@ -462,11 +462,12 @@ namespace sfem {
             const bool is_expr     = c["format"].readable() && c["format"].val() == "expr";
 
             assert(is_sideset || is_pressure);
+            SFEM_UNUSED(is_sideset);
             assert(is_file || is_expr);
 
             if (is_file) {
                 std::string path;
-                c["path"] >> path;
+                c["path"].load(&path);
                 sideset = Sideset::create_from_file(space->mesh_ptr()->comm(), smesh::Path(path));
             } else if (is_expr) {
                 assert(c["parent"].is_seq());
@@ -478,12 +479,12 @@ namespace sfem {
 
                 ptrdiff_t parent_count = 0;
                 for (auto p : c["parent"]) {
-                    p >> parent->data()[parent_count++];
+                    p.load(&parent->data()[parent_count++]);
                 }
 
                 ptrdiff_t lfi_count = 0;
                 for (auto p : c["lfi"]) {
-                    p >> lfi->data()[lfi_count++];
+                    p.load(&lfi->data()[lfi_count++]);
                 }
 
                 assert(lfi_count == parent_count);
@@ -502,7 +503,7 @@ namespace sfem {
                 assert(!node_value.is_seq());
                 struct Condition nc;
                 nc.sidesets.push_back(sideset);
-                node_value >> nc.value;
+                node_value.load(&nc.value);
                 nc.follower_pressure = true;
                 if (c.has_child("profile") && LoadProfile::from_yaml(c["profile"], nc.profile) != SFEM_SUCCESS) {
                     return nullptr;
@@ -519,24 +520,24 @@ namespace sfem {
                     return nullptr;
                 }
                 std::string value_path;
-                node_value["path"] >> value_path;
+                node_value["path"].load(&value_path);
                 file_values = Buffer<real_t>::from_file(smesh::Path(value_path));
                 if (!file_values) {
                     SFEM_ERROR("Unable to read Neumann value file %s\n", value_path.c_str());
                     return nullptr;
                 }
             } else if (node_value.is_seq()) {
-                node_value >> value;
+                node_value.load(&value);
             } else {
                 value.resize(1);
-                node_value >> value[0];
+                node_value.load(&value[0]);
             }
 
             if (node_component.is_seq()) {
-                node_component >> component;
+                node_component.load(&component);
             } else {
                 component.resize(1);
-                node_component >> component[0];
+                node_component.load(&component[0]);
             }
 
             if (file_values && component.size() != 1) {
@@ -1149,7 +1150,7 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    std::shared_ptr<Op> NeumannConditions::derefine_op(const std::shared_ptr<FunctionSpace> &derefined_space) {
+    std::shared_ptr<Op> NeumannConditions::derefine_op(const std::shared_ptr<FunctionSpace> & /*derefined_space*/) {
         // std::map<  //
         //         std::shared_ptr<Sideset>,
         //         std::shared_ptr<Buffer<idx_t *>>>

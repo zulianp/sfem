@@ -1,8 +1,8 @@
 #pragma once
-#include "../../../kernel_math.hpp"
-#include "../../../reference/line_p1_q2.hpp"
-#include "../../../reference/quad_line_q2.hpp"
-#include "../../../tensor_product_kernels.hpp"
+#include "kernel_math.hpp"
+#include "line_p1_q2.hpp"
+#include "quad_line_q2.hpp"
+#include "tensor_product_kernels.hpp"
 
 namespace sfem {
 namespace codegen {

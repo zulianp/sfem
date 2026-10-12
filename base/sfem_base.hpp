@@ -70,8 +70,8 @@
 #define SFEM_INLINE inline
 #define SFEM_FORCE_INLINE inline __attribute__((always_inline))
 #else
-#define SFEM_INLINE
-#define SFEM_FORCE_INLINE
+#define SFEM_INLINE inline
+#define SFEM_FORCE_INLINE inline
 #endif
 
 // Marks a function as callable from both host and device. Expands to nothing on

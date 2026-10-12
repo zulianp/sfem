@@ -2,13 +2,13 @@
 
 #include <cstddef>
 
-#include "../d2/proteus_quad4/laplace_proteus_quad4_element.hpp"
-#include "../d2/quad4/laplace_quad4_element.hpp"
-#include "../d2/tri3/laplace_tri3_element.hpp"
-#include "../d3/hex8/laplace_hex8_element.hpp"
-#include "../d3/proteus_hex8/laplace_proteus_hex8_element.hpp"
-#include "../d3/tet10/laplace_tet10_element.hpp"
-#include "../d3/tet4/laplace_tet4_element.hpp"
+#include "laplace_proteus_quad4_element.hpp"
+#include "laplace_quad4_element.hpp"
+#include "laplace_tri3_element.hpp"
+#include "laplace_hex8_element.hpp"
+#include "laplace_proteus_hex8_element.hpp"
+#include "laplace_tet10_element.hpp"
+#include "laplace_tet4_element.hpp"
 
 namespace sfem {
 namespace codegen {

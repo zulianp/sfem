@@ -1,7 +1,7 @@
 #ifndef LAPLACE_QUAD4_ELEMENT_API_HPP
 #define LAPLACE_QUAD4_ELEMENT_API_HPP
 
-#include "../proteus_quad4/laplace_proteus_quad4_element.hpp"
+#include "laplace_proteus_quad4_element.hpp"
 
 namespace sfem {
 namespace codegen {

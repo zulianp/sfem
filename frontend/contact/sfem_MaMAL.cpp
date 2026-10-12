@@ -88,13 +88,13 @@ namespace sfem {
             output_dir       = smesh::Env::read_string("SFEM_MAMAL_OUTPUT_DIR", output_dir);
         }
 
-#ifdef SFEM_ENABLE_YAML
+#ifdef SFEM_ENABLE_RYAML
         void from_yaml(const ryml::ConstNodeRef& node) {
             // TODO: implement
-            max_iterations = node["max_iterations"].val<int>();
-            tolerance      = node["tolerance"].val<real_t>();
-            margin         = node["margin"].val<real_t>();
-            search_radius  = node["search_radius"].val<real_t>();
+            if (node["max_iterations"].readable()) node["max_iterations"].load(&max_iterations);
+            if (node["tolerance"].readable()) node["tolerance"].load(&tolerance);
+            if (node["margin"].readable()) node["margin"].load(&margin);
+            if (node["search_radius"].readable()) node["search_radius"].load(&search_radius);
             from_env();
         }
 #endif
@@ -397,7 +397,7 @@ namespace sfem {
                 }
             }
 
-            for (ptrdiff_t k = 0; k < colidx->size(); ++k) {
+            for (ptrdiff_t k = 0; k < (ptrdiff_t)colidx->size(); ++k) {
                 assert(colidx->data()[k] < fine_n_nodes);
                 assert(fine_to_coarse[colidx->data()[k]] != SFEM_IDX_INVALID);
                 colidx->data()[k] = fine_to_coarse[colidx->data()[k]];
@@ -546,7 +546,7 @@ namespace sfem {
 
         int n_levels() const { return data->semistructured_levels.size(); }
 
-#ifdef SFEM_ENABLE_YAML
+#ifdef SFEM_ENABLE_RYAML
         void init(const ryml::ConstNodeRef& node) {
             params.from_yaml(node);
             init();
@@ -565,7 +565,6 @@ namespace sfem {
             }
 
             auto mesh        = space->mesh_ptr();
-            auto block_size  = space->block_size();
             auto spatial_dim = mesh->spatial_dimension();
             auto es          = f->execution_space();
 
@@ -579,7 +578,7 @@ namespace sfem {
 
             constraints_mask = sfem::create_buffer<mask_t>(mask_count(space->n_dofs()), es);
 #pragma omp parallel for
-            for (ptrdiff_t i = 0; i < constraints_mask->size(); ++i) {
+            for (ptrdiff_t i = 0; i < (ptrdiff_t)constraints_mask->size(); ++i) {
                 constraints_mask->data()[i] = 0;
             }
             f->constraints_mask(constraints_mask->data());
@@ -1014,7 +1013,7 @@ namespace sfem {
 
             for (int l = 0; l < n_levels(); ++l) {
 #pragma omp parallel for
-                for (ptrdiff_t i = 0; i < level_constraints_mask[l]->size(); ++i) {
+                for (ptrdiff_t i = 0; i < (ptrdiff_t)level_constraints_mask[l]->size(); ++i) {
                     level_constraints_mask[l]->data()[i] = 0;
                 }
                 data->functions[l]->constraints_mask(level_constraints_mask[l]->data());
@@ -1081,13 +1080,12 @@ namespace sfem {
             real_t* const   dst = contact_block_diag_aos[level]->data();
             const ptrdiff_t n   = memory[level]->diag->size();
             const int       dim = data->functions[level]->space()->block_size();
-            const idx_t*    idx = contact_block_idx[level]->data();
 
             assert(dim == 3);
+            SFEM_UNUSED(dim);
 
 #pragma omp parallel for
             for (ptrdiff_t i = 0; i < n; ++i) {
-                const ptrdiff_t dof = idx[i] * dim;
                 real_t* const   b   = &dst[i * 6];
 
                 b[0] = src[0][i];
@@ -1146,7 +1144,7 @@ namespace sfem {
             for (int l = 0; l < n_levels(); ++l) {
                 blas->values(memory[l]->diag->size(), 1, memory[l]->diag->data());
 #pragma omp parallel for
-                for (ptrdiff_t i = 0; i < level_constraints_mask[l]->size(); ++i) {
+                for (ptrdiff_t i = 0; i < (ptrdiff_t)level_constraints_mask[l]->size(); ++i) {
                     level_constraints_mask[l]->data()[i] = 0;
                 }
                 data->functions[l]->constraints_mask(level_constraints_mask[l]->data());
@@ -1490,7 +1488,7 @@ namespace sfem {
         void nonlinear_cycle() {
             nonlinear_smooth(memory[0]->solution);
 
-            const real_t grad_norm = eval_fine_residual_and_jacobian();
+            eval_fine_residual_and_jacobian();
 
             auto                    blas = sfem::blas<real_t>(f->execution_space());
             std::shared_ptr<Memory> mem  = memory[0];
@@ -1536,7 +1534,7 @@ namespace sfem {
                         real_t              du_max = 0;
                         real_t              du_bc  = 0;
                         ptrdiff_t           n_active = 0;
-                        for (ptrdiff_t i = 0; i < macaulay->size(); ++i) {
+                        for (ptrdiff_t i = 0; i < (ptrdiff_t)macaulay->size(); ++i) {
                             if (macaulay->data()[i] > 0) ++n_active;
                         }
                         for (ptrdiff_t i = 0; i < n; ++i) {
@@ -1653,7 +1651,7 @@ namespace sfem {
         return ret;
     }
 
-#ifdef SFEM_ENABLE_YAML
+#ifdef SFEM_ENABLE_RYAML
     std::shared_ptr<MaMAL> MaMAL::create(const std::shared_ptr<Function>& f, const ryml::ConstNodeRef& node) {
         auto ret = std::make_shared<MaMAL>(f);
         ret->impl_->init(node);

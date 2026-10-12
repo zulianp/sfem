@@ -1,12 +1,12 @@
 #include <type_traits>
 #include <cuda_runtime.h>
-#include "../../cuda/linear_elasticity_d3_simplex_local.cuh"
-#include "../../../../reference/cuda/quad_tet_q4.hpp"
-#include "../../../../reference/cuda/tet10_q4.hpp"
-#include "../../../../reference/cuda/quad_tet_q11.hpp"
-#include "../../../../reference/cuda/tet10_q11.hpp"
-#include "../../../../cuda/geometry_kernels.cuh"
-#include "../../../../cuda/kernel_diagnostics.cuh"
+#include "linear_elasticity_d3_simplex_local.cuh"
+#include "quad_tet_q4.cuh"
+#include "tet10_q4.cuh"
+#include "quad_tet_q11.cuh"
+#include "tet10_q11.cuh"
+#include "geometry_kernels.cuh"
+#include "kernel_diagnostics.cuh"
 #include <cstdint>
 #include <cstdlib>
 

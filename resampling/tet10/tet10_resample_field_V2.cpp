@@ -21,16 +21,16 @@ namespace sfem {
 // Casting from int64 to double SIMD vector
 vec_real vec_indices_to_real(const vec_indices a) {
 #if _VL_ == 8  //// 512 bits SIMD in double precision or 256 bits SIMD in single precision
-    return (vec_real){
+    return vec_real{
             (real_t)a[0], (real_t)a[1], (real_t)a[2], (real_t)a[3], (real_t)a[4], (real_t)a[5], (real_t)a[6], (real_t)a[7]};
 
 #elif _VL_ == 4  //// 256 bits SIMD in double precision or 128 bits SIMD in single precision
 
-    return (vec_real){(real_t)a[0], (real_t)a[1], (real_t)a[2], (real_t)a[3]};
+    return vec_real{(real_t)a[0], (real_t)a[1], (real_t)a[2], (real_t)a[3]};
 
 #elif _VL_ == 16  //// 512 bits SIMD in single precision
 
-    return (vec_real){(real_t)a[0],
+    return vec_real{(real_t)a[0],
                       (real_t)a[1],
                       (real_t)a[2],
                       (real_t)a[3],
@@ -64,7 +64,7 @@ vec_real vec_indices_to_real(const vec_indices a) {
 
 #define ASSIGN_QUADRATURE_POINT_MACRO_TAIL(_q, _qx_V, _qy_V, _qz_V, _qw_V)       \
     {                                                                            \
-        _qx_V = (vec_real){(_q + 0) >= TET_QUAD_NQP ? tet_qx[0] : tet_qx[_q + 0],  \
+        _qx_V = vec_real{(_q + 0) >= TET_QUAD_NQP ? tet_qx[0] : tet_qx[_q + 0],  \
                            (_q + 1) >= TET_QUAD_NQP ? tet_qx[0] : tet_qx[_q + 1],  \
                            (_q + 2) >= TET_QUAD_NQP ? tet_qx[0] : tet_qx[_q + 2],  \
                            (_q + 3) >= TET_QUAD_NQP ? tet_qx[0] : tet_qx[_q + 3],  \
@@ -73,7 +73,7 @@ vec_real vec_indices_to_real(const vec_indices a) {
                            (_q + 6) >= TET_QUAD_NQP ? tet_qx[0] : tet_qx[_q + 6],  \
                            (_q + 7) >= TET_QUAD_NQP ? tet_qx[0] : tet_qx[_q + 7]}; \
                                                                                  \
-        _qy_V = (vec_real){(_q + 0) >= TET_QUAD_NQP ? tet_qy[0] : tet_qy[_q + 0],  \
+        _qy_V = vec_real{(_q + 0) >= TET_QUAD_NQP ? tet_qy[0] : tet_qy[_q + 0],  \
                            (_q + 1) >= TET_QUAD_NQP ? tet_qy[0] : tet_qy[_q + 1],  \
                            (_q + 2) >= TET_QUAD_NQP ? tet_qy[0] : tet_qy[_q + 2],  \
                            (_q + 3) >= TET_QUAD_NQP ? tet_qy[0] : tet_qy[_q + 3],  \
@@ -82,7 +82,7 @@ vec_real vec_indices_to_real(const vec_indices a) {
                            (_q + 6) >= TET_QUAD_NQP ? tet_qy[0] : tet_qy[_q + 6],  \
                            (_q + 7) >= TET_QUAD_NQP ? tet_qy[0] : tet_qy[_q + 7]}; \
                                                                                  \
-        _qz_V = (vec_real){(_q + 0) >= TET_QUAD_NQP ? tet_qz[0] : tet_qz[_q + 0],  \
+        _qz_V = vec_real{(_q + 0) >= TET_QUAD_NQP ? tet_qz[0] : tet_qz[_q + 0],  \
                            (_q + 1) >= TET_QUAD_NQP ? tet_qz[0] : tet_qz[_q + 1],  \
                            (_q + 2) >= TET_QUAD_NQP ? tet_qz[0] : tet_qz[_q + 2],  \
                            (_q + 3) >= TET_QUAD_NQP ? tet_qz[0] : tet_qz[_q + 3],  \
@@ -91,45 +91,45 @@ vec_real vec_indices_to_real(const vec_indices a) {
                            (_q + 6) >= TET_QUAD_NQP ? tet_qz[0] : tet_qz[_q + 6],  \
                            (_q + 7) >= TET_QUAD_NQP ? tet_qz[0] : tet_qz[_q + 7]}; \
                                                                                  \
-        _qw_V = (vec_real){(_q + 0) >= TET_QUAD_NQP ? 0.0 : tet_qw[_q + 0],         \
-                           (_q + 1) >= TET_QUAD_NQP ? 0.0 : tet_qw[_q + 1],         \
-                           (_q + 2) >= TET_QUAD_NQP ? 0.0 : tet_qw[_q + 2],         \
-                           (_q + 3) >= TET_QUAD_NQP ? 0.0 : tet_qw[_q + 3],         \
-                           (_q + 4) >= TET_QUAD_NQP ? 0.0 : tet_qw[_q + 4],         \
-                           (_q + 5) >= TET_QUAD_NQP ? 0.0 : tet_qw[_q + 5],         \
-                           (_q + 6) >= TET_QUAD_NQP ? 0.0 : tet_qw[_q + 6],         \
-                           (_q + 7) >= TET_QUAD_NQP ? 0.0 : tet_qw[_q + 7]};        \
+        _qw_V = vec_real{(_q + 0) >= TET_QUAD_NQP ? (real_t)0 : tet_qw[_q + 0],         \
+                           (_q + 1) >= TET_QUAD_NQP ? (real_t)0 : tet_qw[_q + 1],         \
+                           (_q + 2) >= TET_QUAD_NQP ? (real_t)0 : tet_qw[_q + 2],         \
+                           (_q + 3) >= TET_QUAD_NQP ? (real_t)0 : tet_qw[_q + 3],         \
+                           (_q + 4) >= TET_QUAD_NQP ? (real_t)0 : tet_qw[_q + 4],         \
+                           (_q + 5) >= TET_QUAD_NQP ? (real_t)0 : tet_qw[_q + 5],         \
+                           (_q + 6) >= TET_QUAD_NQP ? (real_t)0 : tet_qw[_q + 6],         \
+                           (_q + 7) >= TET_QUAD_NQP ? (real_t)0 : tet_qw[_q + 7]};        \
     }
 
 #elif _VL_ == 4  //// AVX512
 
 #define ASSIGN_QUADRATURE_POINT_MACRO_TAIL(_q, _qx_V, _qy_V, _qz_V, _qw_V)       \
     {                                                                            \
-        _qx_V = (vec_real){(_q + 0) >= TET_QUAD_NQP ? tet_qx[0] : tet_qx[_q + 0],  \
+        _qx_V = vec_real{(_q + 0) >= TET_QUAD_NQP ? tet_qx[0] : tet_qx[_q + 0],  \
                            (_q + 1) >= TET_QUAD_NQP ? tet_qx[0] : tet_qx[_q + 1],  \
                            (_q + 2) >= TET_QUAD_NQP ? tet_qx[0] : tet_qx[_q + 2],  \
                            (_q + 3) >= TET_QUAD_NQP ? tet_qx[0] : tet_qx[_q + 3]}; \
                                                                                  \
-        _qy_V = (vec_real){(_q + 0) >= TET_QUAD_NQP ? tet_qy[0] : tet_qy[_q + 0],  \
+        _qy_V = vec_real{(_q + 0) >= TET_QUAD_NQP ? tet_qy[0] : tet_qy[_q + 0],  \
                            (_q + 1) >= TET_QUAD_NQP ? tet_qy[0] : tet_qy[_q + 1],  \
                            (_q + 2) >= TET_QUAD_NQP ? tet_qy[0] : tet_qy[_q + 2],  \
                            (_q + 3) >= TET_QUAD_NQP ? tet_qy[0] : tet_qy[_q + 3]}; \
                                                                                  \
-        _qz_V = (vec_real){(_q + 0) >= TET_QUAD_NQP ? tet_qz[0] : tet_qz[_q + 0],  \
+        _qz_V = vec_real{(_q + 0) >= TET_QUAD_NQP ? tet_qz[0] : tet_qz[_q + 0],  \
                            (_q + 1) >= TET_QUAD_NQP ? tet_qz[0] : tet_qz[_q + 1],  \
                            (_q + 2) >= TET_QUAD_NQP ? tet_qz[0] : tet_qz[_q + 2],  \
                            (_q + 3) >= TET_QUAD_NQP ? tet_qz[0] : tet_qz[_q + 3]}; \
                                                                                  \
-        _qw_V = (vec_real){(_q + 0) >= TET_QUAD_NQP ? 0.0 : tet_qw[_q + 0],         \
-                           (_q + 1) >= TET_QUAD_NQP ? 0.0 : tet_qw[_q + 1],         \
-                           (_q + 2) >= TET_QUAD_NQP ? 0.0 : tet_qw[_q + 2],         \
-                           (_q + 3) >= TET_QUAD_NQP ? 0.0 : tet_qw[_q + 3]};        \
+        _qw_V = vec_real{(_q + 0) >= TET_QUAD_NQP ? (real_t)0 : tet_qw[_q + 0],         \
+                           (_q + 1) >= TET_QUAD_NQP ? (real_t)0 : tet_qw[_q + 1],         \
+                           (_q + 2) >= TET_QUAD_NQP ? (real_t)0 : tet_qw[_q + 2],         \
+                           (_q + 3) >= TET_QUAD_NQP ? (real_t)0 : tet_qw[_q + 3]};        \
     }
 
 #elif _VL_ == 16
 
 #define _qx_V                                                         \
-    (vec_real){(_q + 0) >= TET_QUAD_NQP ? tet_qx[0] : tet_qx[_q + 0],   \
+    vec_real{(_q + 0) >= TET_QUAD_NQP ? tet_qx[0] : tet_qx[_q + 0],   \
                (_q + 1) >= TET_QUAD_NQP ? tet_qx[0] : tet_qx[_q + 1],   \
                (_q + 2) >= TET_QUAD_NQP ? tet_qx[0] : tet_qx[_q + 2],   \
                (_q + 3) >= TET_QUAD_NQP ? tet_qx[0] : tet_qx[_q + 3],   \
@@ -147,7 +147,7 @@ vec_real vec_indices_to_real(const vec_indices a) {
                (_q + 15) >= TET_QUAD_NQP ? tet_qx[0] : tet_qx[_q + 15]};
 
 #define _qy_V                                                         \
-    (vec_real){(_q + 0) >= TET_QUAD_NQP ? tet_qy[0] : tet_qy[_q + 0],   \
+    vec_real{(_q + 0) >= TET_QUAD_NQP ? tet_qy[0] : tet_qy[_q + 0],   \
                (_q + 1) >= TET_QUAD_NQP ? tet_qy[0] : tet_qy[_q + 1],   \
                (_q + 2) >= TET_QUAD_NQP ? tet_qy[0] : tet_qy[_q + 2],   \
                (_q + 3) >= TET_QUAD_NQP ? tet_qy[0] : tet_qy[_q + 3],   \
@@ -165,7 +165,7 @@ vec_real vec_indices_to_real(const vec_indices a) {
                (_q + 15) >= TET_QUAD_NQP ? tet_qy[0] : tet_qy[_q + 15]};
 
 #define _qz_V                                                         \
-    (vec_real){(_q + 0) >= TET_QUAD_NQP ? tet_qz[0] : tet_qz[_q + 0],   \
+    vec_real{(_q + 0) >= TET_QUAD_NQP ? tet_qz[0] : tet_qz[_q + 0],   \
                (_q + 1) >= TET_QUAD_NQP ? tet_qz[0] : tet_qz[_q + 1],   \
                (_q + 2) >= TET_QUAD_NQP ? tet_qz[0] : tet_qz[_q + 2],   \
                (_q + 3) >= TET_QUAD_NQP ? tet_qz[0] : tet_qz[_q + 3],   \
@@ -183,26 +183,26 @@ vec_real vec_indices_to_real(const vec_indices a) {
                (_q + 15) >= TET_QUAD_NQP ? tet_qz[0] : tet_qz[_q + 15]};
 
 #define _qw_V                                                  \
-    (vec_real){(_q + 0) >= TET_QUAD_NQP ? 0.0 : tet_qw[_q + 0],   \
-               (_q + 1) >= TET_QUAD_NQP ? 0.0 : tet_qw[_q + 1],   \
-               (_q + 2) >= TET_QUAD_NQP ? 0.0 : tet_qw[_q + 2],   \
-               (_q + 3) >= TET_QUAD_NQP ? 0.0 : tet_qw[_q + 3],   \
-               (_q + 4) >= TET_QUAD_NQP ? 0.0 : tet_qw[_q + 4],   \
-               (_q + 5) >= TET_QUAD_NQP ? 0.0 : tet_qw[_q + 5],   \
-               (_q + 6) >= TET_QUAD_NQP ? 0.0 : tet_qw[_q + 6],   \
-               (_q + 7) >= TET_QUAD_NQP ? 0.0 : tet_qw[_q + 7],   \
-               (_q + 8) >= TET_QUAD_NQP ? 0.0 : tet_qw[_q + 8],   \
-               (_q + 9) >= TET_QUAD_NQP ? 0.0 : tet_qw[_q + 9],   \
-               (_q + 10) >= TET_QUAD_NQP ? 0.0 : tet_qw[_q + 10], \
-               (_q + 11) >= TET_QUAD_NQP ? 0.0 : tet_qw[_q + 11], \
-               (_q + 12) >= TET_QUAD_NQP ? 0.0 : tet_qw[_q + 12], \
-               (_q + 13) >= TET_QUAD_NQP ? 0.0 : tet_qw[_q + 13], \
-               (_q + 14) >= TET_QUAD_NQP ? 0.0 : tet_qw[_q + 14], \
-               (_q + 15) >= TET_QUAD_NQP ? 0.0 : tet_qw[_q + 15]};
+    vec_real{(_q + 0) >= TET_QUAD_NQP ? (real_t)0 : tet_qw[_q + 0],   \
+               (_q + 1) >= TET_QUAD_NQP ? (real_t)0 : tet_qw[_q + 1],   \
+               (_q + 2) >= TET_QUAD_NQP ? (real_t)0 : tet_qw[_q + 2],   \
+               (_q + 3) >= TET_QUAD_NQP ? (real_t)0 : tet_qw[_q + 3],   \
+               (_q + 4) >= TET_QUAD_NQP ? (real_t)0 : tet_qw[_q + 4],   \
+               (_q + 5) >= TET_QUAD_NQP ? (real_t)0 : tet_qw[_q + 5],   \
+               (_q + 6) >= TET_QUAD_NQP ? (real_t)0 : tet_qw[_q + 6],   \
+               (_q + 7) >= TET_QUAD_NQP ? (real_t)0 : tet_qw[_q + 7],   \
+               (_q + 8) >= TET_QUAD_NQP ? (real_t)0 : tet_qw[_q + 8],   \
+               (_q + 9) >= TET_QUAD_NQP ? (real_t)0 : tet_qw[_q + 9],   \
+               (_q + 10) >= TET_QUAD_NQP ? (real_t)0 : tet_qw[_q + 10], \
+               (_q + 11) >= TET_QUAD_NQP ? (real_t)0 : tet_qw[_q + 11], \
+               (_q + 12) >= TET_QUAD_NQP ? (real_t)0 : tet_qw[_q + 12], \
+               (_q + 13) >= TET_QUAD_NQP ? (real_t)0 : tet_qw[_q + 13], \
+               (_q + 14) >= TET_QUAD_NQP ? (real_t)0 : tet_qw[_q + 14], \
+               (_q + 15) >= TET_QUAD_NQP ? (real_t)0 : tet_qw[_q + 15]};
 
 #define ASSIGN_QUADRATURE_POINT_MACRO_TAIL(_q, _qx_V, _qy_V, _qz_V, _qw_V)         \
     {                                                                              \
-        _qx_V = (vec_real){(_q + 0) >= TET_QUAD_NQP ? tet_qx[0] : tet_qx[_q + 0],    \
+        _qx_V = vec_real{(_q + 0) >= TET_QUAD_NQP ? tet_qx[0] : tet_qx[_q + 0],    \
                            (_q + 1) >= TET_QUAD_NQP ? tet_qx[0] : tet_qx[_q + 1],    \
                            (_q + 2) >= TET_QUAD_NQP ? tet_qx[0] : tet_qx[_q + 2],    \
                            (_q + 3) >= TET_QUAD_NQP ? tet_qx[0] : tet_qx[_q + 3],    \
@@ -219,7 +219,7 @@ vec_real vec_indices_to_real(const vec_indices a) {
                            (_q + 14) >= TET_QUAD_NQP ? tet_qx[0] : tet_qx[_q + 14],  \
                            (_q + 15) >= TET_QUAD_NQP ? tet_qx[0] : tet_qx[_q + 15]}; \
                                                                                    \
-        _qy_V = (vec_real){(_q + 0) >= TET_QUAD_NQP ? tet_qy[0] : tet_qy[_q + 0],    \
+        _qy_V = vec_real{(_q + 0) >= TET_QUAD_NQP ? tet_qy[0] : tet_qy[_q + 0],    \
                            (_q + 1) >= TET_QUAD_NQP ? tet_qy[0] : tet_qy[_q + 1],    \
                            (_q + 2) >= TET_QUAD_NQP ? tet_qy[0] : tet_qy[_q + 2],    \
                            (_q + 3) >= TET_QUAD_NQP ? tet_qy[0] : tet_qy[_q + 3],    \
@@ -236,7 +236,7 @@ vec_real vec_indices_to_real(const vec_indices a) {
                            (_q + 14) >= TET_QUAD_NQP ? tet_qy[0] : tet_qy[_q + 14],  \
                            (_q + 15) >= TET_QUAD_NQP ? tet_qy[0] : tet_qy[_q + 15]}; \
                                                                                    \
-        _qz_V = (vec_real){(_q + 0) >= TET_QUAD_NQP ? tet_qz[0] : tet_qz[_q + 0],    \
+        _qz_V = vec_real{(_q + 0) >= TET_QUAD_NQP ? tet_qz[0] : tet_qz[_q + 0],    \
                            (_q + 1) >= TET_QUAD_NQP ? tet_qz[0] : tet_qz[_q + 1],    \
                            (_q + 2) >= TET_QUAD_NQP ? tet_qz[0] : tet_qz[_q + 2],    \
                            (_q + 3) >= TET_QUAD_NQP ? tet_qz[0] : tet_qz[_q + 3],    \
@@ -253,22 +253,22 @@ vec_real vec_indices_to_real(const vec_indices a) {
                            (_q + 14) >= TET_QUAD_NQP ? tet_qz[0] : tet_qz[_q + 14],  \
                            (_q + 15) >= TET_QUAD_NQP ? tet_qz[0] : tet_qz[_q + 15]}; \
                                                                                    \
-        _qw_V = (vec_real){(_q + 0) >= TET_QUAD_NQP ? 0.0 : tet_qw[_q + 0],           \
-                           (_q + 1) >= TET_QUAD_NQP ? 0.0 : tet_qw[_q + 1],           \
-                           (_q + 2) >= TET_QUAD_NQP ? 0.0 : tet_qw[_q + 2],           \
-                           (_q + 3) >= TET_QUAD_NQP ? 0.0 : tet_qw[_q + 3],           \
-                           (_q + 4) >= TET_QUAD_NQP ? 0.0 : tet_qw[_q + 4],           \
-                           (_q + 5) >= TET_QUAD_NQP ? 0.0 : tet_qw[_q + 5],           \
-                           (_q + 6) >= TET_QUAD_NQP ? 0.0 : tet_qw[_q + 6],           \
-                           (_q + 7) >= TET_QUAD_NQP ? 0.0 : tet_qw[_q + 7],           \
-                           (_q + 8) >= TET_QUAD_NQP ? 0.0 : tet_qw[_q + 8],           \
-                           (_q + 9) >= TET_QUAD_NQP ? 0.0 : tet_qw[_q + 9],           \
-                           (_q + 10) >= TET_QUAD_NQP ? 0.0 : tet_qw[_q + 10],         \
-                           (_q + 11) >= TET_QUAD_NQP ? 0.0 : tet_qw[_q + 11],         \
-                           (_q + 12) >= TET_QUAD_NQP ? 0.0 : tet_qw[_q + 12],         \
-                           (_q + 13) >= TET_QUAD_NQP ? 0.0 : tet_qw[_q + 13],         \
-                           (_q + 14) >= TET_QUAD_NQP ? 0.0 : tet_qw[_q + 14],         \
-                           (_q + 15) >= TET_QUAD_NQP ? 0.0 : tet_qw[_q + 15]};        \
+        _qw_V = vec_real{(_q + 0) >= TET_QUAD_NQP ? (real_t)0 : tet_qw[_q + 0],           \
+                           (_q + 1) >= TET_QUAD_NQP ? (real_t)0 : tet_qw[_q + 1],           \
+                           (_q + 2) >= TET_QUAD_NQP ? (real_t)0 : tet_qw[_q + 2],           \
+                           (_q + 3) >= TET_QUAD_NQP ? (real_t)0 : tet_qw[_q + 3],           \
+                           (_q + 4) >= TET_QUAD_NQP ? (real_t)0 : tet_qw[_q + 4],           \
+                           (_q + 5) >= TET_QUAD_NQP ? (real_t)0 : tet_qw[_q + 5],           \
+                           (_q + 6) >= TET_QUAD_NQP ? (real_t)0 : tet_qw[_q + 6],           \
+                           (_q + 7) >= TET_QUAD_NQP ? (real_t)0 : tet_qw[_q + 7],           \
+                           (_q + 8) >= TET_QUAD_NQP ? (real_t)0 : tet_qw[_q + 8],           \
+                           (_q + 9) >= TET_QUAD_NQP ? (real_t)0 : tet_qw[_q + 9],           \
+                           (_q + 10) >= TET_QUAD_NQP ? (real_t)0 : tet_qw[_q + 10],         \
+                           (_q + 11) >= TET_QUAD_NQP ? (real_t)0 : tet_qw[_q + 11],         \
+                           (_q + 12) >= TET_QUAD_NQP ? (real_t)0 : tet_qw[_q + 12],         \
+                           (_q + 13) >= TET_QUAD_NQP ? (real_t)0 : tet_qw[_q + 13],         \
+                           (_q + 14) >= TET_QUAD_NQP ? (real_t)0 : tet_qw[_q + 14],         \
+                           (_q + 15) >= TET_QUAD_NQP ? (real_t)0 : tet_qw[_q + 15]};        \
     }
 
 #endif  //// end SIMD implementation
@@ -284,11 +284,12 @@ void assert_vec_real(const vec_real a, const vec_real b) {
 
 //////////////////////////////////////////////////////////
 /// Macros for the cases of the SIMD implementation
+#undef ZEROS_VEC
 #if _VL_ == 8  //// AVX512
 
 //// ZEROS for AVX512
 #define ZEROS_VEC \
-    (vec_real) { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 }
+    vec_real { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 }
 
 //// SIMD_REDUCE_SUM for AVX512
 #define SIMD_REDUCE_SUM_MACRO(_out, _in) \
@@ -302,34 +303,34 @@ static vec_indices floor_V(vec_real a) {
     // }
 
     // return r;
-    return (vec_indices){(ptrdiff_t)a[0],
-                         (ptrdiff_t)a[1],
-                         (ptrdiff_t)a[2],
-                         (ptrdiff_t)a[3],
-                         (ptrdiff_t)a[4],
-                         (ptrdiff_t)a[5],
-                         (ptrdiff_t)a[6],
-                         (ptrdiff_t)a[7]};
+    return vec_indices{(ptrdiff_t_sfem)a[0],
+                         (ptrdiff_t_sfem)a[1],
+                         (ptrdiff_t_sfem)a[2],
+                         (ptrdiff_t_sfem)a[3],
+                         (ptrdiff_t_sfem)a[4],
+                         (ptrdiff_t_sfem)a[5],
+                         (ptrdiff_t_sfem)a[6],
+                         (ptrdiff_t_sfem)a[7]};
 }
 
 #elif _VL_ == 4  //// AVX2
 
 //// ZEROS for AVX2
 #define ZEROS_VEC \
-    (vec_real) { 0.0, 0.0, 0.0, 0.0 }
+    vec_real { 0.0, 0.0, 0.0, 0.0 }
 
 //// SIMD_REDUCE_SUM for AVX2
 #define SIMD_REDUCE_SUM_MACRO(_out, _in) \
     { _out = _in[0] + _in[1] + _in[2] + _in[3]; }
 
 //// SIMD floor for AVX2
-vec_indices floor_V(vec_real a) { return (vec_indices){(ptrdiff_t)a[0], (ptrdiff_t)a[1], (ptrdiff_t)a[2], (ptrdiff_t)a[3]}; }
+vec_indices floor_V(vec_real a) { return vec_indices{(ptrdiff_t_sfem)a[0], (ptrdiff_t_sfem)a[1], (ptrdiff_t_sfem)a[2], (ptrdiff_t_sfem)a[3]}; }
 
 #elif _VL_ == 16
 
 //// ZEROS for AVX512
 #define ZEROS_VEC \
-    (vec_real) { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 }
+    vec_real { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 }
 
 //// SIMD_REDUCE_SUM for AVX512
 #define SIMD_REDUCE_SUM_MACRO(_out, _in)                                                                                     \
@@ -339,22 +340,22 @@ vec_indices floor_V(vec_real a) { return (vec_indices){(ptrdiff_t)a[0], (ptrdiff
     }
 
 static SFEM_INLINE vec_indices floor_V(vec_real a) {
-    return (vec_indices){(ptrdiff_t)a[0],
-                         (ptrdiff_t)a[1],
-                         (ptrdiff_t)a[2],
-                         (ptrdiff_t)a[3],
-                         (ptrdiff_t)a[4],
-                         (ptrdiff_t)a[5],
-                         (ptrdiff_t)a[6],
-                         (ptrdiff_t)a[7],
-                         (ptrdiff_t)a[8],
-                         (ptrdiff_t)a[9],
-                         (ptrdiff_t)a[10],
-                         (ptrdiff_t)a[11],
-                         (ptrdiff_t)a[12],
-                         (ptrdiff_t)a[13],
-                         (ptrdiff_t)a[14],
-                         (ptrdiff_t)a[15]};
+    return vec_indices{(ptrdiff_t_sfem)a[0],
+                         (ptrdiff_t_sfem)a[1],
+                         (ptrdiff_t_sfem)a[2],
+                         (ptrdiff_t_sfem)a[3],
+                         (ptrdiff_t_sfem)a[4],
+                         (ptrdiff_t_sfem)a[5],
+                         (ptrdiff_t_sfem)a[6],
+                         (ptrdiff_t_sfem)a[7],
+                         (ptrdiff_t_sfem)a[8],
+                         (ptrdiff_t_sfem)a[9],
+                         (ptrdiff_t_sfem)a[10],
+                         (ptrdiff_t_sfem)a[11],
+                         (ptrdiff_t_sfem)a[12],
+                         (ptrdiff_t_sfem)a[13],
+                         (ptrdiff_t_sfem)a[14],
+                         (ptrdiff_t_sfem)a[15]};
 }
 
 #endif  //// end SIMD implementation
@@ -606,7 +607,7 @@ SFEM_INLINE static void hex_aa_8_eval_fun_V(
 
 #define GET_DATA_MACRO(_out, _data, _indx_V)  \
     {                                         \
-        _out = (vec_real){_data[_indx_V[0]],  \
+        _out = vec_real{_data[_indx_V[0]],  \
                           _data[_indx_V[1]],  \
                           _data[_indx_V[2]],  \
                           _data[_indx_V[3]],  \
@@ -619,13 +620,13 @@ SFEM_INLINE static void hex_aa_8_eval_fun_V(
 #elif _VL_ == 4
 
 #define GET_DATA_MACRO(_out, _data, _indx_V) \
-    { _out = (vec_real){_data[_indx_V[0]], _data[_indx_V[1]], _data[_indx_V[2]], _data[_indx_V[3]]}; }
+    { _out = vec_real{_data[_indx_V[0]], _data[_indx_V[1]], _data[_indx_V[2]], _data[_indx_V[3]]}; }
 
 #elif _VL_ == 16
 
 #define GET_DATA_MACRO(_out, _data, _indx_V)   \
     {                                          \
-        _out = (vec_real){_data[_indx_V[0]],   \
+        _out = vec_real{_data[_indx_V[0]],   \
                           _data[_indx_V[1]],   \
                           _data[_indx_V[2]],   \
                           _data[_indx_V[3]],   \
@@ -715,11 +716,11 @@ int vec_real_check_nan(const vec_real a) {
 int hex8_to_isoparametric_tet10_resample_field_local_V(
         // Mesh
         const ptrdiff_t              nelements,  // number of elements
-        const ptrdiff_t              nnodes,     // number of nodes
+        const ptrdiff_t              /*nnodes*/,     // number of nodes
         idx_t** const SFEM_RESTRICT  elems,      // connectivity
         geom_t** const SFEM_RESTRICT xyz,        // coordinates
         // SDF
-        const ptrdiff_t* const SFEM_RESTRICT n,       // number of nodes in each direction
+        const ptrdiff_t* const SFEM_RESTRICT /*n*/,       // number of nodes in each direction
         const ptrdiff_t* const SFEM_RESTRICT stride,  // stride of the data
         const geom_t* const SFEM_RESTRICT    origin,  // origin of the domain
         const geom_t* const SFEM_RESTRICT    delta,   // delta of the domain
@@ -1085,11 +1086,11 @@ SFEM_INLINE static void tet10_dual_basis_hrt_VV(const vec_real  qx,   //
 int hex8_to_subparametric_tet10_resample_field_local_V(
         // Mesh
         const ptrdiff_t              nelements,  // number of elements
-        const ptrdiff_t              nnodes,     // number of nodes
+        const ptrdiff_t              /*nnodes*/,     // number of nodes
         idx_t** const SFEM_RESTRICT  elems,      // connectivity
         geom_t** const SFEM_RESTRICT xyz,        // coordinates
         // SDF
-        const ptrdiff_t* const SFEM_RESTRICT n,       // number of nodes in each direction
+        const ptrdiff_t* const SFEM_RESTRICT /*n*/,       // number of nodes in each direction
         const ptrdiff_t* const SFEM_RESTRICT stride,  // stride of the data
         const geom_t* const SFEM_RESTRICT    origin,  // origin of the domain
         const geom_t* const SFEM_RESTRICT    delta,   // delta of the domain
@@ -1351,11 +1352,11 @@ SFEM_INLINE static vec_real hex_aa_8_eval_weno4_3D_Unit_V(  //
 int hex8_to_isoparametric_tet10_resample_field_local_cube1_V(
         /// Mesh
         const ptrdiff_t              nelements,  // number of elements
-        const ptrdiff_t              nnodes,     // number of nodes
+        const ptrdiff_t              /*nnodes*/,     // number of nodes
         idx_t** const SFEM_RESTRICT  elems,      // connectivity
         geom_t** const SFEM_RESTRICT xyz,        // coordinates
         /// SDF
-        const ptrdiff_t* const SFEM_RESTRICT n,       // number of nodes in each direction
+        const ptrdiff_t* const SFEM_RESTRICT /*n*/,       // number of nodes in each direction
         const ptrdiff_t* const SFEM_RESTRICT stride,  // stride of the data
         const geom_t* const SFEM_RESTRICT    origin,  // origin of the domain
         const geom_t* const SFEM_RESTRICT    delta,   // delta of the domain
@@ -1375,12 +1376,6 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1_V(
 
     const real_t cVolume = dx * dy * dz;
 
-    const ptrdiff_t stride0 = stride[0];
-    const ptrdiff_t stride1 = stride[1];
-    const ptrdiff_t stride2 = stride[2];
-
-    double quad_sum = 0.0;
-
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         // printf("element = %d\n", i);
 
@@ -1389,9 +1384,6 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1_V(
         // ISOPARAMETRIC
         real_t x[10], y[10], z[10];
         real_t x_unit[10], y_unit[10], z_unit[10];
-
-        vec_real hex8_f[8];
-        vec_real coeffs[8];
 
         vec_real tet10_f[10];
         vec_real element_field[10];
@@ -1582,7 +1574,7 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1_V(
 // hex8_to_tet10_resample_field_local_cube1_V
 ////////////////////////////////////////////////////////////////////////
 int isoparametric_tet10_assemble_dual_mass_vector_V(const ptrdiff_t              nelements,  //
-                                                    const ptrdiff_t              nnodes,     //
+                                                    const ptrdiff_t              /*nnodes*/,     //
                                                     idx_t** const SFEM_RESTRICT  elems,      //
                                                     geom_t** const SFEM_RESTRICT xyz,        //
                                                     real_t* const                diag) {                    //
@@ -1675,53 +1667,37 @@ int hex8_to_tet10_resample_field_local_V2(
         const real_t* const SFEM_RESTRICT    data,    // SDF
         // Output
         real_t* const SFEM_RESTRICT weighted_field) {
-    //
-    int SFEM_ENABLE_ISOPARAMETRIC = 0;
-    SFEM_READ_ENV(SFEM_ENABLE_ISOPARAMETRIC, atoi);
-
+    // The caller always selects the isoparametric mapping (see hex8_to_tet10_resample_field_local).
     // const ptrdiff_t nelements_aligned = nelements - (nelements % (_VL_));
     // const ptrdiff_t nelements_tail = nelements % (_VL_);
 
-    if (SFEM_ENABLE_ISOPARAMETRIC) {
-        int a = 0;
+    int a = 0;
 
 #if !SFEM_TET10_WENO
-        a = hex8_to_isoparametric_tet10_resample_field_local_V(nelements,  //
-                                                               nnodes,
-                                                               elems,
-                                                               xyz,
-                                                               n,
-                                                               stride,
-                                                               origin,
-                                                               delta,
-                                                               data,
-                                                               weighted_field);
+    a = hex8_to_isoparametric_tet10_resample_field_local_V(nelements,  //
+                                                           nnodes,
+                                                           elems,
+                                                           xyz,
+                                                           n,
+                                                           stride,
+                                                           origin,
+                                                           delta,
+                                                           data,
+                                                           weighted_field);
 
 #else
-        a = hex8_to_isoparametric_tet10_resample_field_local_cube1_V(nelements,  //
-                                                                     nnodes,
-                                                                     elems,
-                                                                     xyz,
-                                                                     n,
-                                                                     stride,
-                                                                     origin,
-                                                                     delta,
-                                                                     data,
-                                                                     weighted_field);
+    a = hex8_to_isoparametric_tet10_resample_field_local_cube1_V(nelements,  //
+                                                                 nnodes,
+                                                                 elems,
+                                                                 xyz,
+                                                                 n,
+                                                                 stride,
+                                                                 origin,
+                                                                 delta,
+                                                                 data,
+                                                                 weighted_field);
 #endif
-        RETURN_FROM_FUNCTION(a);
-    } else {
-        // return hex8_to_subparametric_tet10_resample_field_local(nelements,  //
-        //                                                         nnodes,
-        //                                                         elems,
-        //                                                         xyz,
-        //                                                         n,
-        //                                                         stride,
-        //                                                         origin,
-        //                                                         delta,
-        //                                                         data,
-        //                                                         weighted_field);
-    }
+    RETURN_FROM_FUNCTION(a);
 }
 
 }  // namespace sfem

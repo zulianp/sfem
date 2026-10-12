@@ -267,7 +267,7 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     cg->set_rtol(SFEM_LSOLVE_RTOL);
     cg->set_atol(1e-11);
 
-    std::function<void(const real_t *const)> update_preconditioner = [](const real_t *const disp) {};
+    std::function<void(const real_t *const)> update_preconditioner = [](const real_t *const /*disp*/) {};
 
     if (smesh::Env::read("SFEM_USE_PRECONDITIONER", false)) {
         if (fs->element_type() == smesh::HEX8) {

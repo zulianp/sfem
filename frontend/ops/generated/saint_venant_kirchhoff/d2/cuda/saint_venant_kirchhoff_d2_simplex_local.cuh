@@ -8,7 +8,7 @@
 #define SFEM_GENERATED_SCALAR_T
 #endif
 #endif
-#include "../../../cuda/kernel_math.cuh"
+#include "kernel_math.cuh"
 #ifndef SFEM_RESTRICT
 #define SFEM_RESTRICT __restrict__
 #endif

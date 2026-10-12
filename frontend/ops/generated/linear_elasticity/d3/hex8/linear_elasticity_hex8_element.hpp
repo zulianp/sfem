@@ -1,7 +1,7 @@
 #ifndef LINEAR_ELASTICITY_HEX8_ELEMENT_API_HPP
 #define LINEAR_ELASTICITY_HEX8_ELEMENT_API_HPP
 
-#include "../proteus_hex8/linear_elasticity_proteus_hex8_element.hpp"
+#include "linear_elasticity_proteus_hex8_element.hpp"
 
 namespace sfem {
 namespace codegen {

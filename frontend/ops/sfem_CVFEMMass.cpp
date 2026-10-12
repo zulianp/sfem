@@ -15,7 +15,7 @@ namespace sfem {
         return ret;
     }
 
-    int CVFEMMass::initialize(const std::vector<std::string> &block_names) { return SFEM_SUCCESS; }
+    int CVFEMMass::initialize(const std::vector<std::string> & /*block_names*/) { return SFEM_SUCCESS; }
 
     CVFEMMass::CVFEMMass(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
 
@@ -27,25 +27,25 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    int CVFEMMass::hessian_crs(const real_t *const  x,
-                               const count_t *const rowptr,
-                               const idx_t *const   colidx,
-                               real_t *const        values) {
+    int CVFEMMass::hessian_crs(const real_t *const  /*x*/,
+                               const count_t *const /*rowptr*/,
+                               const idx_t *const   /*colidx*/,
+                               real_t *const        /*values*/) {
         assert(0);
         return SFEM_FAILURE;
     }
 
-    int CVFEMMass::gradient(const real_t *const x, real_t *const out) {
+    int CVFEMMass::gradient(const real_t *const /*x*/, real_t *const /*out*/) {
         assert(0);
         return SFEM_FAILURE;
     }
 
-    int CVFEMMass::apply(const real_t *const x, const real_t *const h, real_t *const out) {
+    int CVFEMMass::apply(const real_t *const /*x*/, const real_t *const /*h*/, real_t *const /*out*/) {
         assert(0);
         return SFEM_FAILURE;
     }
 
-    int CVFEMMass::value(const real_t *x, real_t *const out) {
+    int CVFEMMass::value(const real_t * /*x*/, real_t *const /*out*/) {
         assert(0);
         return SFEM_FAILURE;
     }

@@ -162,7 +162,7 @@ tet4_resample_tetrahedron_local_hyteg_adjoint(const real_t                      
                                               const real_t                         dy,      //
                                               const real_t                         dz,      //
                                               const ptrdiff_t* const SFEM_RESTRICT stride,  // Stride
-                                              const ptrdiff_t* const SFEM_RESTRICT n,       // Size of the grid
+                                              const ptrdiff_t* const SFEM_RESTRICT /*n*/,       // Size of the grid
                                               real_t* const SFEM_RESTRICT          data) {           //
 
     for (int quad_i = 0; quad_i < TET_QUAD_NQP; quad_i++) {  // loop over the quadrature points
@@ -273,6 +273,8 @@ tet4_resample_tetrahedron_local_hyteg_adjoint(const real_t                      
         data[i6] += d6;
         data[i7] += d7;
     }
+
+    return 0;
 }
 
 real_t                                                      //
@@ -320,7 +322,7 @@ calculate_det_Jacobian_for_category(const int    category,  //
                     "%d\n",
                     category,
                     tet_i,
-                    L);
+                    (int)L);
             *error_flag = -1;
             // The decision to exit should be made by the caller
             break;
@@ -361,7 +363,7 @@ alpha_to_hyteg_level(const real_t alpha,                //
 int                                                                                                  //
 tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                      start_element,   // Mesh
                                                const ptrdiff_t                      end_element,     //
-                                               const ptrdiff_t                      nnodes,          //
+                                               const ptrdiff_t                      /*nnodes*/,          //
                                                const idx_t** const SFEM_RESTRICT    elems,           //
                                                const geom_t** const SFEM_RESTRICT   xyz,             //
                                                const ptrdiff_t* const SFEM_RESTRICT n,               // SDF
@@ -369,7 +371,7 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
                                                const geom_t* const SFEM_RESTRICT    origin,          //
                                                const geom_t* const SFEM_RESTRICT    delta,           //
                                                const real_t* const SFEM_RESTRICT    weighted_field,  // Input weighted field
-                                               const real_t                         alpha_th,        // Threshold for alpha
+                                               const real_t                         /*alpha_th*/,        // Threshold for alpha
                                                real_t* const SFEM_RESTRICT          data) {                   //
 
     PRINT_CURRENT_FUNCTION;
@@ -396,9 +398,6 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
     printf("= Hexahedron volume = %g\n", hexahedron_volume);
     printf("============================================================\n");
 #endif
-
-    int degenerated_tetrahedra_cnt = 0;
-    int uniform_refine_cnt         = 0;
 
     for (ptrdiff_t element_i = start_element; element_i < end_element; element_i++) {
         // loop over the 4 vertices of the tetrahedron
@@ -479,24 +478,6 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
         //            d_min,
         //            hteg_num_tetrahedra);
         // }
-
-        // DEBUG: theta_volume_main
-        const real_t theta_volume_main = tet4_measure_v2(x0_n,  //
-                                                         x1_n,  //
-                                                         x2_n,  //
-                                                         x3_n,  //
-                                                         //
-                                                         y0_n,  //
-                                                         y1_n,  //
-                                                         y2_n,  //
-                                                         y3_n,  //
-                                                         //
-                                                         z0_n,   //
-                                                         z1_n,   //
-                                                         z2_n,   //
-                                                         z3_n);  //
-
-        real_t theta_volume_acc = 0.0;  // DEBUG: theta_volume_acc
 
         // printf("Num tet = %d, L = %d, alpha_tet = %g, max_edges_length = %g, d_min = %g\n",
         //        hteg_num_tetrahedra,
@@ -761,8 +742,6 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
                                                         L,             //
                                                         tet_i,         //
                                                         &error_flag);  //
-
-            theta_volume_acc += det_jacobian * (1.0 / 6.0);  // DEBUG code
 
             // // // Calculate the volume of the HyTeg tetrahedron
             // // // In the physical space

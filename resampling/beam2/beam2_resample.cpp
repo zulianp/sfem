@@ -161,7 +161,7 @@ SFEM_INLINE static void hex_aa_8_collect_coeffs(const ptrdiff_t* const SFEM_REST
 int beam2_resample_gap_local(
         // Mesh
         const ptrdiff_t              nelements,
-        const ptrdiff_t              nnodes,
+        const ptrdiff_t              /*nnodes*/,
         idx_t** const SFEM_RESTRICT  elems,
         geom_t** const SFEM_RESTRICT xyz,
         // SDF

@@ -98,7 +98,7 @@ namespace sfem {
         }
     }
 
-    std::shared_ptr<Op> SemiStructuredEMLinearElasticity::lor_op(const std::shared_ptr<FunctionSpace> &space) {
+    std::shared_ptr<Op> SemiStructuredEMLinearElasticity::lor_op(const std::shared_ptr<FunctionSpace> & /*space*/) {
         SMESH_ERROR("SemiStructuredEMLinearElasticity::lor_op NOT IMPLEMENTED!\n");
         return nullptr;
     }
@@ -284,7 +284,7 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    int SemiStructuredEMLinearElasticity::gradient(const real_t *const x, real_t *const out) {
+    int SemiStructuredEMLinearElasticity::gradient(const real_t *const /*x*/, real_t *const /*out*/) {
         SFEM_ERROR("[Error] em:LinearElasticity::gradient NOT IMPLEMENTED!\n");
         return SFEM_FAILURE;
     }
@@ -333,7 +333,7 @@ namespace sfem {
         return err;
     }
 
-    int SemiStructuredEMLinearElasticity::value(const real_t *x, real_t *const out) {
+    int SemiStructuredEMLinearElasticity::value(const real_t * /*x*/, real_t *const /*out*/) {
         SFEM_ERROR("[Error] em:LinearElasticity::value NOT IMPLEMENTED!\n");
         return SFEM_FAILURE;
     }

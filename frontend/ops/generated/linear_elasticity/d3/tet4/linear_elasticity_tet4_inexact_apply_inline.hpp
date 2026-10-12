@@ -1,6 +1,6 @@
 #pragma once
-#include "../../../kernel_math.hpp"
-#include "../../../packed_thread_scratch.hpp"
+#include "kernel_math.hpp"
+#include "packed_thread_scratch.hpp"
 
 namespace sfem {
 namespace codegen {

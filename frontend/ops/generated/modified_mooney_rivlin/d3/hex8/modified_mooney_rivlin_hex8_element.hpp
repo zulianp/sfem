@@ -1,7 +1,7 @@
 #ifndef MODIFIED_MOONEY_RIVLIN_HEX8_ELEMENT_API_HPP
 #define MODIFIED_MOONEY_RIVLIN_HEX8_ELEMENT_API_HPP
 
-#include "../proteus_hex8/modified_mooney_rivlin_proteus_hex8_element.hpp"
+#include "modified_mooney_rivlin_proteus_hex8_element.hpp"
 
 namespace sfem {
 namespace codegen {

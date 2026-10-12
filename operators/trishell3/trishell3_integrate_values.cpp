@@ -4,18 +4,6 @@
 
 #include <math.h>
 
-static SFEM_INLINE scalar_t det3(const scalar_t *mat) {
-    return mat[0] * mat[4] * mat[8] + mat[1] * mat[5] * mat[6] + mat[2] * mat[3] * mat[7] - mat[0] * mat[5] * mat[7] -
-           mat[1] * mat[3] * mat[8] - mat[2] * mat[4] * mat[6];
-}
-
-static SFEM_INLINE scalar_t area3(const scalar_t left[3], const scalar_t right[3]) {
-    scalar_t a = (left[1] * right[2]) - (right[1] * left[2]);
-    scalar_t b = (left[2] * right[0]) - (right[2] * left[0]);
-    scalar_t c = (left[0] * right[1]) - (right[0] * left[1]);
-    return sqrt(a * a + b * b + c * c);
-}
-
 static SFEM_INLINE void tri_shell_3_integrate(const scalar_t                px0,
                                               const scalar_t                px1,
                                               const scalar_t                px2,
@@ -71,7 +59,7 @@ static SFEM_INLINE void tri_shell_3_integrate(const scalar_t                px0,
 }
 
 int trishell3_integrate_value(const ptrdiff_t              nelements,
-                              const ptrdiff_t              nnodes,
+                              const ptrdiff_t              /*nnodes*/,
                               idx_t **const SFEM_RESTRICT  elements,
                               geom_t **const SFEM_RESTRICT points,
                               const real_t                 value,
@@ -106,7 +94,7 @@ int trishell3_integrate_value(const ptrdiff_t              nelements,
 }
 
 int trishell3_integrate_values(const ptrdiff_t                   nelements,
-                               const ptrdiff_t                   nnodes,
+                               const ptrdiff_t                   /*nnodes*/,
                                idx_t **const SFEM_RESTRICT       elements,
                                geom_t **const SFEM_RESTRICT      points,
                                const real_t                      scale_factor,

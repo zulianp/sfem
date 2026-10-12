@@ -371,6 +371,7 @@ namespace sfem {
 
                 CycleReturnCode ret = cycle(coarser_level(level));
                 assert(ret != CYCLE_FAILURE);
+                SFEM_UNUSED(ret);
 
                 {
                     if (debug) {

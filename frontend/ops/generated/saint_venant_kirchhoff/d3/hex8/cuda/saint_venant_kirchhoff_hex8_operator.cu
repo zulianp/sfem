@@ -1,4 +1,4 @@
-#include "../../../op/cuda/sfem_GeneratedSaintVenantKirchhoff_cuda_c_abi.hpp"
+#include "sfem_GeneratedSaintVenantKirchhoff_cuda_c_abi.hpp"
 
 extern "C" int cu_saint_venant_kirchhoff_proteus_hex8_apply_i_msoa(
         const int scalar_bytes,

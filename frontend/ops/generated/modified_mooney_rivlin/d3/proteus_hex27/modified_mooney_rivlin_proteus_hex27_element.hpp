@@ -2,10 +2,10 @@
 #define MODIFIED_MOONEY_RIVLIN_PROTEUS_HEX27_ELEMENT_API_HPP
 
 #include <stddef.h>
-#include "../modified_mooney_rivlin_d3_tensor_product_local.hpp"
-#include "../../../geometry_kernels.hpp"
-#include "../../../reference/line_p2_q4.hpp"
-#include "../../../reference/quad_line_q4.hpp"
+#include "modified_mooney_rivlin_d3_tensor_product_local.hpp"
+#include "geometry_kernels.hpp"
+#include "line_p2_q4.hpp"
+#include "quad_line_q4.hpp"
 
 namespace sfem {
 namespace codegen {

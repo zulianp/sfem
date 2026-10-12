@@ -25,9 +25,11 @@ there, not from the file that contains them.  A check that omits them fails
 thirty-eight headers out of fifty and looks like a tree-wide defect.  It is
 not one -- it is the check being wrong -- and the first version of this test
 made exactly that mistake.
+
+Generated includes are now bare file names, so the include path is every
+folder of the tree that holds a header, which is what the library build uses.
 """
 
-import glob
 import os
 import re
 import shutil
@@ -62,11 +64,15 @@ _ENTRY = re.compile(r"^template <typename s_t(?:, int VS)?>\n[^\n]*\bint (\w+)\(
 
 
 def _include_arguments(root):
-    arguments = ["-I", root]
-    for directory in sorted(glob.glob(os.path.join(root, "*", "op"))) + sorted(
-        glob.glob(os.path.join(root, "*", "op", "cuda"))
-    ):
-        arguments += ["-I", directory]
+    """Every folder of the tree that holds a header, as the library build has.
+
+    Generated files include each other by file name alone, so a folder left
+    off here is a header the compile cannot find.
+    """
+    arguments = []
+    for directory, _, names in sorted(os.walk(root)):
+        if any(name.endswith((".hpp", ".cuh")) for name in names):
+            arguments += ["-I", directory]
     return arguments
 
 
@@ -75,7 +81,7 @@ def _device_element_headers(root):
         os.path.join(directory, name)
         for directory, _, names in os.walk(root)
         for name in names
-        if name.endswith("_element.hpp") and os.path.basename(directory) == "cuda"
+        if name.endswith("_element.cuh") and os.path.basename(directory) == "cuda"
     )
 
 

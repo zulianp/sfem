@@ -73,11 +73,11 @@ namespace sfem {
                         const idx_t *const colidx,
                         real_t *const values) override;
 
-        int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
+        int apply(const real_t *const /*x*/, const real_t *const /*h*/, real_t *const /*out*/) override {
             return SFEM_FAILURE;
         }
 
-        int value(const real_t *x, real_t *const out) override {
+        int value(const real_t * /*x*/, real_t *const /*out*/) override {
             return SFEM_FAILURE;
         }
 

@@ -222,7 +222,7 @@ tet4_resample_tetrahedron_local_adjoint(const real_type                      x0,
 int                                                                                     //
 tet4_resample_field_local_adjoint(const ptrdiff_t                      start_element,   // Mesh
                                   const ptrdiff_t                      end_element,     //
-                                  const ptrdiff_t                      nnodes,          //
+                                  const ptrdiff_t                      /*nnodes*/,          //
                                   const idx_t** const SFEM_RESTRICT    elems,           //
                                   const geom_t** const SFEM_RESTRICT   xyz,             //
                                   const ptrdiff_t* const SFEM_RESTRICT n,               // SDF
@@ -294,7 +294,6 @@ tet4_resample_field_local_adjoint(const ptrdiff_t                      start_ele
                                                        z2,
                                                        z3);
 
-        const real_type ratio_Vth = theta_volume / hexahedron_volume;
         real_type       edges_length[6];
         tet_edge_length(x0,
                         y0,
@@ -385,7 +384,7 @@ tet4_resample_field_local_adjoint(const ptrdiff_t                      start_ele
 int                                                                                            //
 tet4_resample_field_local_refine_adjoint(const ptrdiff_t                      start_element,   // Mesh
                                          const ptrdiff_t                      end_element,     //
-                                         const ptrdiff_t                      nnodes,          //
+                                         const ptrdiff_t                      /*nnodes*/,          //
                                          const idx_t** const SFEM_RESTRICT    elems,           //
                                          const geom_t** const SFEM_RESTRICT   xyz,             //
                                          const ptrdiff_t* const SFEM_RESTRICT n,               // SDF
@@ -715,6 +714,7 @@ push_tet_vertices(struct sfem_stack*         stack,     //
         }
     }
 
+    return 0;
 }  // end push_tet_vertices
 
 //////////////////////////////////////////////////////////
@@ -771,8 +771,8 @@ tet4_iterative_refinement(const real_type       x0,                // Tetrahedro
                           const real_type       z2,                //
                           const real_type       z3,                //
                           const real_type       dx,                // Spacing of the grid
-                          const real_type       dy,                //
-                          const real_type       dz,                //
+                          const real_type       /*dy*/,                //
+                          const real_type       /*dz*/,                //
                           const real_type       wf0,               // Weighted field at the vertices
                           const real_type       wf1,               //
                           const real_type       wf2,               //
@@ -786,7 +786,7 @@ tet4_iterative_refinement(const real_type       x0,                // Tetrahedro
 
     // tet_vertices is automatically freed by the function
 
-    if (&tets_out != NULL) {
+    if (tets_out != NULL) {
         free(*tets_out);
         *tets_out = NULL;
     }
@@ -799,10 +799,8 @@ tet4_iterative_refinement(const real_type       x0,                // Tetrahedro
 
     int flag_loop          = 1;
     int n_tets             = 0;
-    int total_refined_tets = 0;
 
-    struct tet_vertices* tets_ref                   = (struct tet_vertices*)malloc(sizeof(struct tet_vertices) * 8);
-    int                  degenerated_tetrahedra_cnt = 0;
+    struct tet_vertices* tets_ref = (struct tet_vertices*)malloc(sizeof(struct tet_vertices) * 8);
 
     struct sfem_stack* stack = sfem_stack_create(max_refined_tets);
 
@@ -871,7 +869,6 @@ tet4_iterative_refinement(const real_type       x0,                // Tetrahedro
         int degenerated_tet = 0;
 
         if (max_min_edges_ratio > 2.0 && alpha_tet > alpha_th) {
-            degenerated_tetrahedra_cnt++;
             degenerated_tet = 1;
         }
 
@@ -885,8 +882,6 @@ tet4_iterative_refinement(const real_type       x0,                // Tetrahedro
                                                  &tets_capacity,       // The current capacity of the array
                                                  tet_delta_capacity);  // The delta capacity of the array
 
-            total_refined_tets++;
-
             if (tets_size >= max_refined_tets) {
                 while (sfem_stack_size(stack) > 0) {
                     struct tet_vertices* tet_loc = (struct tet_vertices*)sfem_stack_pop(stack);
@@ -897,7 +892,6 @@ tet4_iterative_refinement(const real_type       x0,                // Tetrahedro
                                                          &tets_capacity,       // The current capacity of the array
                                                          tet_delta_capacity);  // The delta capacity of the array
                     free(tet_loc);
-                    total_refined_tets++;
                 }
 
                 flag_loop = 0;
@@ -980,7 +974,7 @@ tet4_iterative_refinement(const real_type       x0,                // Tetrahedro
 int                                                                                                   //
 tet4_resample_field_local_ref_iterative_adjoint(const ptrdiff_t                      start_element,   // Mesh
                                                 const ptrdiff_t                      end_element,     //
-                                                const ptrdiff_t                      nnodes,          //
+                                                const ptrdiff_t                      /*nnodes*/,          //
                                                 const idx_t** const SFEM_RESTRICT    elems,           //
                                                 const geom_t** const SFEM_RESTRICT   xyz,             //
                                                 const ptrdiff_t* const SFEM_RESTRICT n,               // SDF
@@ -1004,8 +998,6 @@ tet4_resample_field_local_ref_iterative_adjoint(const ptrdiff_t                 
     const real_type dz = (real_type)delta[2];
 
     const real_type hexahedron_volume = dx * dy * dz;
-
-    int degenerated_tetrahedra_cnt = 0;
 
 #if SFEM_LOG_LEVEL >= 5
     printf("============================================================\n");
@@ -1171,24 +1163,8 @@ tet4_update_cnt_local_adjoint(const real_type                      x0,       // 
                               const real_type                      dy,       //
                               const real_type                      dz,       //
                               const ptrdiff_t* const SFEM_RESTRICT stride,   // Stride
-                              const ptrdiff_t* const SFEM_RESTRICT n,        // Size of the grid
+                              const ptrdiff_t* const SFEM_RESTRICT /*n*/,        // Size of the grid
                               unsigned int* const SFEM_RESTRICT    data_cnt) {  // Output
-
-    // Volume of the tetrahedron
-    const real_type theta_volume = tet4_measure_v2(x0,
-                                                   x1,
-                                                   x2,
-                                                   x3,
-                                                   //
-                                                   y0,
-                                                   y1,
-                                                   y2,
-                                                   y3,
-                                                   //
-                                                   z0,
-                                                   z1,
-                                                   z2,
-                                                   z3);
 
     for (int quad_i = 0; quad_i < TET_QUAD_NQP; quad_i++) {  // loop over the quadrature points
 
@@ -1261,14 +1237,14 @@ tet4_update_cnt_local_adjoint(const real_type                      x0,       // 
 int                                                                         //
 tet4_cnt_mesh_adjoint(const ptrdiff_t                      start_element,   // Mesh
                       const ptrdiff_t                      end_element,     //
-                      const ptrdiff_t                      nnodes,          //
+                      const ptrdiff_t                      /*nnodes*/,          //
                       const idx_t** const SFEM_RESTRICT    elems,           //
                       const geom_t** const SFEM_RESTRICT   xyz,             //
                       const ptrdiff_t* const SFEM_RESTRICT n,               // SDF
                       const ptrdiff_t* const SFEM_RESTRICT stride,          //
                       const geom_t* const SFEM_RESTRICT    origin,          //
                       const geom_t* const SFEM_RESTRICT    delta,           //
-                      const real_t* const SFEM_RESTRICT    weighted_field,  // Input weighted field
+                      const real_t* const SFEM_RESTRICT    /*weighted_field*/,  // Input weighted field
                       unsigned int* const SFEM_RESTRICT    data_cnt) {         // Output
                                                                             //
     PRINT_CURRENT_FUNCTION;
@@ -1348,14 +1324,14 @@ tet4_cnt_mesh_adjoint(const ptrdiff_t                      start_element,   // M
 int                                                                                  //
 tet4_alpha_volume_mesh_adjoint(const ptrdiff_t                      start_element,   // Mesh
                                const ptrdiff_t                      end_element,     //
-                               const ptrdiff_t                      nnodes,          //
+                               const ptrdiff_t                      /*nnodes*/,          //
                                const idx_t** const SFEM_RESTRICT    elems,           //
                                const geom_t** const SFEM_RESTRICT   xyz,             //
-                               const ptrdiff_t* const SFEM_RESTRICT n,               // SDF
+                               const ptrdiff_t* const SFEM_RESTRICT /*n*/,               // SDF
                                const ptrdiff_t* const SFEM_RESTRICT stride,          //
                                const geom_t* const SFEM_RESTRICT    origin,          //
                                const geom_t* const SFEM_RESTRICT    delta,           //
-                               const real_t* const SFEM_RESTRICT    weighted_field,  // Input weighted field
+                               const real_t* const SFEM_RESTRICT    /*weighted_field*/,  // Input weighted field
                                real_t* const SFEM_RESTRICT          alpha,           // Output alpha
                                real_t* const SFEM_RESTRICT          volume) {                 // Output volume
 
@@ -1608,10 +1584,10 @@ is_point_inside_tetrahedron(const real_type px,     //
 int                                                                         //
 tet4_field_in_out_mesh(const ptrdiff_t                      start_element,  // Mesh
                        const ptrdiff_t                      end_element,    //
-                       const ptrdiff_t                      nnodes,         //
+                       const ptrdiff_t                      /*nnodes*/,         //
                        const idx_t** const SFEM_RESTRICT    elems,          //
                        const geom_t** const SFEM_RESTRICT   xyz,            //
-                       const ptrdiff_t* const SFEM_RESTRICT n,              // SDF
+                       const ptrdiff_t* const SFEM_RESTRICT /*n*/,              // SDF
                        const ptrdiff_t* const SFEM_RESTRICT stride,         //
                        const geom_t* const SFEM_RESTRICT    origin,         //
                        const geom_t* const SFEM_RESTRICT    delta,          //
@@ -1708,15 +1684,15 @@ tet4_field_in_out_mesh(const ptrdiff_t                      start_element,  // M
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
 int                                                                     //
-in_out_field_mesh_tet4(const int                            mpi_size,   // MPI size
-                       const int                            mpi_rank,   // MPI rank
+in_out_field_mesh_tet4(const int                            /*mpi_size*/,   // MPI size
+                       const int                            /*mpi_rank*/,   // MPI rank
                        const mesh_t* const SFEM_RESTRICT    mesh,       // Mesh: mesh_t struct
                        const ptrdiff_t* const SFEM_RESTRICT n,          // SDF: n[3]
                        const ptrdiff_t* const SFEM_RESTRICT stride,     // SDF: stride[3]
                        const geom_t* const SFEM_RESTRICT    origin,     // SDF: origin[3]
                        const geom_t* const SFEM_RESTRICT    delta,      // SDF: delta[3]
                        BitArray*                            bit_array,  // Output
-                       sfem_resample_field_info*            info) {                // info
+                       sfem_resample_field_info*            /*info*/) {                // info
     PRINT_CURRENT_FUNCTION;
 
     int ret = 0;
@@ -2343,6 +2319,7 @@ field_analytic_create(const int n) {
     field.n      = n;
     field.alpha  = (real_t*)calloc(n, sizeof(real_t));
     field.volume = (real_t*)calloc(n, sizeof(real_t));
+    return field;
 }
 
 void  //

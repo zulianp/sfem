@@ -108,7 +108,7 @@ namespace sfem {
     std::vector<std::shared_ptr<Operator<real_t>>> create_gmg_operators(const std::shared_ptr<MultigridData> &data,
                                                                         const OperatorType                    op_type) {
         std::vector<std::shared_ptr<Operator<real_t>>> operators;
-        for (int i = 0; i < data->functions.size(); i++) {
+        for (int i = 0; i < (int)data->functions.size(); i++) {
             auto f  = data->functions[i];
             auto op = sfem::create_linear_operator(op_type, f, nullptr, f->execution_space());
             operators.push_back(op);

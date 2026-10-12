@@ -3,6 +3,7 @@ from codegen.framework.emitters.runtime_typed_abi import (
     runtime_type_correspondence_lines,
 )
 from codegen.framework.plans.conventions import (
+    generated_include,
     sfem_scalar_type_fallback,
     sfem_scalar_type_prelude,
     diagnostics_tail,
@@ -23,6 +24,10 @@ import os
 import re
 
 from codegen.framework.emitters.cprinter import parameter_list_lines
+from codegen.framework.emitters.kernel_prologue import (
+    kernel_local,
+    resolve_kernel_constants,
+)
 from codegen.framework.forms.equations import total_residual_collection
 from codegen.framework.symbolic.fields import is_time_rate_shift
 from codegen.framework.plans.form_transformations import (
@@ -147,6 +152,7 @@ def generate_op_files(material, elements, kernel_sources=None):
             )
     else:
         raise ValueError("unsupported generated Op equation form")
+    source = _drop_uncalled_helpers(source)
     wrapper_header = _op_path("sfem_%s.hpp" % _op_file_stem(material))
     wrapper_source = _op_path("sfem_%s.cpp" % _op_file_stem(material))
     registration_source = _op_path("sfem_%s_registration.cpp" % _op_file_stem(material))
@@ -913,7 +919,7 @@ def _inexact_definitions(
     return true;
   }
 
-  int %%(op)s::inexact_update(const real_t *const x) {
+  int %%(op)s::inexact_update(const real_t *const %(update_state_parameter)s) {
     SFEM_TRACE_SCOPE("%%(op)s::inexact_update");
     auto mesh = impl_->space->mesh_ptr();
     const int dim = mesh->spatial_dimension();
@@ -977,6 +983,9 @@ def _inexact_definitions(
     });
   }""" % {
         "components_by_dim": components_by_dim,
+        "update_state_parameter": _parameter_name(
+            "x", _wrapper_reads("\n".join(update_lines), "x")
+        ),
         "update_body": "\n".join(update_lines),
         "apply_body": "\n".join(apply_lines),
     }
@@ -1344,7 +1353,7 @@ def _hyperelastic_op(
                     ),
                 )
             )
-    source = """#include "sfem_%(header_stem)s.hpp"
+    template = """#include "sfem_%(header_stem)s.hpp"
 %(c_abi_include)s
 %(packed_scratch_include)s
 
@@ -1626,8 +1635,7 @@ namespace sfem {
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const geom_t *const *adjugate = nullptr;
-      const geom_t *adjugate_aos = nullptr;
-      const geom_t *determinant = nullptr;
+%(gradient_adjugate_aos_declaration)s      const geom_t *determinant = nullptr;
 %(metric_declaration)s            if (%(gradient_affine_condition)s) {
         auto cache = std::static_pointer_cast<AffineGeometryCache>(
             domain.user_data);
@@ -1644,9 +1652,7 @@ namespace sfem {
             SFEM_ERROR("%(op)s affine gradient requires cached AoS geometry\\n");
             return SFEM_FAILURE;
           }
-          adjugate_aos = reinterpret_cast<const geom_t *>(
-              cache->jacobian_aos->jacobian_adjugate_AoS()->data());
-          determinant = reinterpret_cast<const geom_t *>(
+%(gradient_adjugate_aos_binding)s          determinant = reinterpret_cast<const geom_t *>(
               cache->jacobian_aos->jacobian_determinant()->data());
         }
 %(gradient_metric_binding)s            }
@@ -1668,8 +1674,7 @@ namespace sfem {
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const geom_t *const *adjugate = nullptr;
-      const geom_t *adjugate_aos = nullptr;
-      const geom_t *determinant = nullptr;
+%(apply_adjugate_aos_declaration)s      const geom_t *determinant = nullptr;
 %(metric_declaration)s            if (%(apply_affine_condition)s) {
         auto cache = std::static_pointer_cast<AffineGeometryCache>(
             domain.user_data);
@@ -1686,9 +1691,7 @@ namespace sfem {
             SFEM_ERROR("%(op)s affine hessian action requires cached AoS geometry\\n");
             return SFEM_FAILURE;
           }
-          adjugate_aos = reinterpret_cast<const geom_t *>(
-              cache->jacobian_aos->jacobian_adjugate_AoS()->data());
-          determinant = reinterpret_cast<const geom_t *>(
+%(apply_adjugate_aos_binding)s          determinant = reinterpret_cast<const geom_t *>(
               cache->jacobian_aos->jacobian_determinant()->data());
         }
 %(apply_metric_binding)s            }
@@ -1785,8 +1788,7 @@ namespace sfem {
     }
 %(hessian_crs_current_prologue)s
     auto mesh = impl_->space->mesh_ptr();
-    auto points = element_points(mesh);
-    return impl_->domains->iterate([&](const OpDomain &domain) {
+%(hessian_crs_points_alias)s    return impl_->domains->iterate([&](const OpDomain &%(hessian_crs_domain_parameter)s) {
 %(hessian_crs_dispatch_body)s
     });
   }
@@ -1803,8 +1805,7 @@ namespace sfem {
     }
 %(hessian_bsr_current_prologue)s
     auto mesh = impl_->space->mesh_ptr();
-    auto points = element_points(mesh);
-    return impl_->domains->iterate([&](const OpDomain &domain) {
+%(hessian_bsr_points_alias)s    return impl_->domains->iterate([&](const OpDomain &%(hessian_bsr_domain_parameter)s) {
 %(hessian_bsr_dispatch_body)s
     });
   }
@@ -1822,8 +1823,7 @@ namespace sfem {
     }
 %(hessian_block_diag_sym_current_prologue)s
     auto mesh = impl_->space->mesh_ptr();
-    auto points = element_points(mesh);
-    return impl_->domains->iterate([&](const OpDomain &domain) {
+%(hessian_block_diag_sym_points_alias)s    return impl_->domains->iterate([&](const OpDomain &%(hessian_block_diag_sym_domain_parameter)s) {
 %(hessian_block_diag_sym_dispatch_body)s
     });
   }
@@ -1905,7 +1905,8 @@ namespace sfem {
   }
 #endif  // SFEM_ENABLE_RYAML
 }  // namespace sfem
-""" % {
+"""
+    substitutions = {
         "op": _op_class_name(material),
         "header_stem": _op_file_stem(material),
         "stream_member": _op_stream_member(),
@@ -2096,6 +2097,8 @@ namespace sfem {
             owner="ret->impl_",
         ),
     }
+    substitutions.update(_hyperelastic_signature_names(substitutions))
+    source = template % substitutions
     # The inexact methods are appended rather than woven into the template: they
     # are additive, reached only through their own entry points, and absent
     # entirely for a material that does not ask for them.
@@ -2851,7 +2854,37 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
         declaration_block = 'extern "C" {\n%s\n}' % "\n".join(
             [*declarations, *private_declarations]
         )
-    source = """#include "sfem_%(header_stem)s.hpp"
+    residual_dispatch_body = _residual_apply_dispatch_body(
+        dispatch_stem,
+        "residual",
+        "residual_uses_affine",
+        "state",
+        kernel_sources,
+        {dim: deps[0] for dim, deps in dependencies_by_dim.items()},
+        parameter_names_by_dim,
+        fields_by_dim,
+        block_size_by_dim,
+        residual_affine_metric_aos_elements_by_dim,
+        residual_affine_metric_aos_unit_elements_by_dim,
+        "      ",
+        mixed_order=mixed_order,
+    )
+    action_dispatch_body = _residual_apply_dispatch_body(
+        dispatch_stem,
+        "jacobian_action",
+        "jacobian_action_uses_affine",
+        "current",
+        kernel_sources,
+        {dim: deps[1] for dim, deps in dependencies_by_dim.items()},
+        parameter_names_by_dim,
+        fields_by_dim,
+        block_size_by_dim,
+        action_affine_metric_aos_elements_by_dim,
+        action_affine_metric_aos_unit_elements_by_dim,
+        "      ",
+        mixed_order=mixed_order,
+    )
+    template = """#include "sfem_%(header_stem)s.hpp"
 %(c_abi_include)s
 %(laplace_packed_include)s
 %(packed_scratch_include)s
@@ -3122,45 +3155,7 @@ namespace sfem {
     auto mesh = impl_->space->mesh_ptr();
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
-      const geom_t *const *adjugate = nullptr;
-      const geom_t *determinant = nullptr;
-      const geom_t *const *geom_metric = nullptr;
-      const geom_t *geom_metric_aos = nullptr;
-      if (impl_->residual_uses_affine) {
-        auto cache = std::static_pointer_cast<AffineGeometryCache>(
-            domain.user_data);
-        if (!cache) {
-          SFEM_ERROR("%(op)s affine residual requires cached geometry\\n");
-          return SFEM_FAILURE;
-        }
-        if (%(residual_affine_uses_jacobian)s) {
-          if (!cache->jacobian) {
-            SFEM_ERROR("%(op)s affine residual requires cached jacobian geometry\\n");
-            return SFEM_FAILURE;
-          }
-          adjugate = reinterpret_cast<const geom_t *const *>(
-              cache->jacobian->jacobian_adjugate_SoA()->data());
-          determinant = reinterpret_cast<const geom_t *>(
-              cache->jacobian->jacobian_determinant()->data());
-        }
-        if (%(residual_affine_uses_metric_soa)s) {
-          if (!cache->metric_soa) {
-            SFEM_ERROR("%(op)s affine residual requires cached SoA metric geometry\\n");
-            return SFEM_FAILURE;
-          }
-          geom_metric = reinterpret_cast<const geom_t *const *>(
-              cache->metric_soa->fff_SoA()->data());
-        }
-        if (%(residual_affine_uses_metric_aos)s) {
-          if (!cache->metric_aos) {
-            SFEM_ERROR("%(op)s affine residual requires cached AoS metric geometry\\n");
-            return SFEM_FAILURE;
-          }
-          geom_metric_aos = reinterpret_cast<const geom_t *>(
-              cache->metric_aos->fff_AoS()->data());
-        }
-      }
-      real_t storage[MAX_PARAMETERS];
+%(gradient_affine_geometry)s      real_t storage[MAX_PARAMETERS];
       parameter_array(*domain.parameters,%(scheme_argument)s
               mesh->spatial_dimension(),
               storage);
@@ -3169,55 +3164,15 @@ namespace sfem {
     });
   }
 
-  int %(op)s::apply(const real_t *const state,
-                      const real_t *const direction,
-                      real_t *const out) {
+  int %(op)s::apply(const real_t *const %(apply_state_parameter)s,
+                      const real_t *const %(apply_direction_parameter)s,
+                      real_t *const %(apply_out_parameter)s) {
     SFEM_TRACE_SCOPE("%(op)s::apply");
-    const real_t *const current = state ? state : impl_->current;
-%(apply_state_check)s%(scheme_apply_term)s
+%(apply_current_alias)s%(apply_state_check)s%(scheme_apply_term)s
     auto mesh = impl_->space->mesh_ptr();
-    auto points = element_points(mesh);
-%(laplace_packed_apply_fast_path)s
+%(apply_points_alias)s%(laplace_packed_apply_fast_path)s
     return impl_->domains->iterate([&](const OpDomain &domain) {
-      const geom_t *const *adjugate = nullptr;
-      const geom_t *determinant = nullptr;
-      const geom_t *const *geom_metric = nullptr;
-      const geom_t *geom_metric_aos = nullptr;
-      if (impl_->jacobian_action_uses_affine) {
-        auto cache = std::static_pointer_cast<AffineGeometryCache>(
-            domain.user_data);
-        if (!cache) {
-          SFEM_ERROR("%(op)s affine jacobian action requires cached geometry\\n");
-          return SFEM_FAILURE;
-        }
-        if (%(action_affine_uses_jacobian)s) {
-          if (!cache->jacobian) {
-            SFEM_ERROR("%(op)s affine jacobian action requires cached jacobian geometry\\n");
-            return SFEM_FAILURE;
-          }
-          adjugate = reinterpret_cast<const geom_t *const *>(
-              cache->jacobian->jacobian_adjugate_SoA()->data());
-          determinant = reinterpret_cast<const geom_t *>(
-              cache->jacobian->jacobian_determinant()->data());
-        }
-        if (%(action_affine_uses_metric_soa)s) {
-          if (!cache->metric_soa) {
-            SFEM_ERROR("%(op)s affine jacobian action requires cached SoA metric geometry\\n");
-            return SFEM_FAILURE;
-          }
-          geom_metric = reinterpret_cast<const geom_t *const *>(
-              cache->metric_soa->fff_SoA()->data());
-        }
-        if (%(action_affine_uses_metric_aos)s) {
-          if (!cache->metric_aos) {
-            SFEM_ERROR("%(op)s affine jacobian action requires cached AoS metric geometry\\n");
-            return SFEM_FAILURE;
-          }
-          geom_metric_aos = reinterpret_cast<const geom_t *>(
-              cache->metric_aos->fff_AoS()->data());
-        }
-      }
-      real_t storage[MAX_PARAMETERS];
+%(apply_affine_geometry)s      real_t storage[MAX_PARAMETERS];
       parameter_array(*domain.parameters,%(scheme_argument)s
               mesh->spatial_dimension(),
               storage);
@@ -3255,9 +3210,6 @@ namespace sfem {
       const bool needs_affine_jacobian =
           (impl_->residual_uses_affine && %(residual_affine_uses_jacobian)s) ||
           (impl_->jacobian_action_uses_affine && %(action_affine_uses_jacobian)s);
-      const bool needs_affine_metric =
-          (impl_->residual_uses_affine && (%(residual_affine_uses_metric_soa)s || %(residual_affine_uses_metric_aos)s)) ||
-          (impl_->jacobian_action_uses_affine && (%(action_affine_uses_metric_soa)s || %(action_affine_uses_metric_aos)s));
       const bool needs_a_met_soa =
           (impl_->residual_uses_affine && %(residual_affine_uses_metric_soa)s) ||
           (impl_->jacobian_action_uses_affine && %(action_affine_uses_metric_soa)s);
@@ -3327,24 +3279,25 @@ namespace sfem {
   }
 #endif  // SFEM_ENABLE_RYAML
 
-  int %(op)s::hessian_crs(const real_t *const state,
-              const count_t *const rowptr,
-              const idx_t *const colidx,
-              real_t *const values) {
+  int %(op)s::hessian_crs(const real_t *const %(hessian_crs_state_parameter)s,
+              const count_t *const %(hessian_crs_rowptr_parameter)s,
+              const idx_t *const %(hessian_crs_colidx_parameter)s,
+              real_t *const %(hessian_crs_values_parameter)s) {
     SFEM_TRACE_SCOPE("%(op)s::hessian_crs");
 %(hessian_crs_body)s
   }
 
-  int %(op)s::hessian_bsr(const real_t *const state,
-              const count_t *const rowptr,
-              const idx_t *const colidx,
-              real_t *const values) {
+  int %(op)s::hessian_bsr(const real_t *const %(hessian_bsr_state_parameter)s,
+              const count_t *const %(hessian_bsr_rowptr_parameter)s,
+              const idx_t *const %(hessian_bsr_colidx_parameter)s,
+              real_t *const %(hessian_bsr_values_parameter)s) {
     SFEM_TRACE_SCOPE("%(op)s::hessian_bsr");
 %(hessian_bsr_body)s
   }
 
 %(merit_methods)s}  // namespace sfem
-""" % {
+"""
+    substitutions = {
         "op": _op_class_name(material),
         "header_stem": _op_file_stem(material),
         "stream_member": _op_stream_member(),
@@ -3409,36 +3362,30 @@ namespace sfem {
         ),
         "residual_cases": "\n".join(residual_cases),
         "action_cases": "\n".join(action_cases),
-        "residual_dispatch_body": _residual_apply_dispatch_body(
-            dispatch_stem,
+        "residual_dispatch_body": residual_dispatch_body,
+        "action_dispatch_body": action_dispatch_body,
+        "gradient_affine_geometry": _residual_affine_geometry_lines(
+            _op_class_name(material),
             "residual",
             "residual_uses_affine",
-            "state",
-            kernel_sources,
-            {dim: deps[0] for dim, deps in dependencies_by_dim.items()},
-            parameter_names_by_dim,
-            fields_by_dim,
-            block_size_by_dim,
-            residual_affine_metric_aos_elements_by_dim,
-            residual_affine_metric_aos_unit_elements_by_dim,
-            "      ",
-                    mixed_order=mixed_order,
-                ),
-        "action_dispatch_body": _residual_apply_dispatch_body(
-            dispatch_stem,
-            "jacobian_action",
+            {
+                "jacobian": _cpp_bool(residual_affine_uses_jacobian),
+                "metric_soa": _cpp_bool(residual_affine_uses_metric_soa),
+                "metric_aos": _cpp_bool(residual_affine_uses_metric_aos),
+            },
+            residual_dispatch_body,
+        ),
+        "apply_affine_geometry": _residual_affine_geometry_lines(
+            _op_class_name(material),
+            "jacobian action",
             "jacobian_action_uses_affine",
-            "current",
-            kernel_sources,
-            {dim: deps[1] for dim, deps in dependencies_by_dim.items()},
-            parameter_names_by_dim,
-            fields_by_dim,
-            block_size_by_dim,
-            action_affine_metric_aos_elements_by_dim,
-            action_affine_metric_aos_unit_elements_by_dim,
-            "      ",
-                    mixed_order=mixed_order,
-                ),
+            {
+                "jacobian": _cpp_bool(action_affine_uses_jacobian),
+                "metric_soa": _cpp_bool(action_affine_uses_metric_soa),
+                "metric_aos": _cpp_bool(action_affine_uses_metric_aos),
+            },
+            action_dispatch_body,
+        ),
         "hessian_crs_body": (
             "%s\n"
             "%s\n"
@@ -3579,10 +3526,325 @@ namespace sfem {
             else ""
         ),
     }
+    substitutions.update(_residual_signature_names(substitutions))
+    source = template % substitutions
     # A volume forcing publishes the stepped 0-form too, now that the energy
     # merit asks every operator for it.
     return _header(material, True, publishes_value_steps=emits_linear_work,
                    node_wise=emits_merit), source
+
+
+def _hyperelastic_signature_names(substitutions):
+    """The energy wrapper's optional locals, declared where their body reads them.
+
+    The AoS adjugate is bound only for an operation whose dispatch passes it,
+    and a Hessian with no kernel to dispatch to names neither the coordinates
+    nor the domain it is handed.
+    """
+    names = {}
+    for operation, keys in (
+        ("gradient", ("gradient_packed_dispatch_body", "gradient_dispatch_body")),
+        ("apply", ("apply_dispatch_body",)),
+    ):
+        reads = _wrapper_reads(
+            "\n".join(substitutions[key] for key in keys), "adjugate_aos"
+        )
+        names["%s_adjugate_aos_declaration" % operation] = (
+            "      const geom_t *adjugate_aos = nullptr;\n" if reads else ""
+        )
+        names["%s_adjugate_aos_binding" % operation] = (
+            "          adjugate_aos = reinterpret_cast<const geom_t *>(\n"
+            "              cache->jacobian_aos->jacobian_adjugate_AoS()->data());\n"
+            if reads
+            else ""
+        )
+    for method in ("hessian_crs", "hessian_bsr", "hessian_block_diag_sym"):
+        body = substitutions["%s_dispatch_body" % method]
+        names["%s_points_alias" % method] = (
+            "    auto points = element_points(mesh);\n"
+            if _wrapper_reads(body, "points")
+            else ""
+        )
+        names["%s_domain_parameter" % method] = _parameter_name(
+            "domain", _wrapper_reads(body, "domain")
+        )
+    return names
+
+
+_HELPER_NAME = re.compile(r"\b([A-Za-z_]\w*)\s*\(")
+_NOT_A_FUNCTION = re.compile(r"^\s*(#|//|struct\b|class\b|using\b|enum\b|typedef\b)")
+
+
+def _anonymous_namespace_entities(lines, opening):
+    """The top-level entities of the anonymous namespace opened at `opening`.
+
+    Each entity is `(first, last, name)`, inclusive line indices, with `name`
+    set for a function definition and None for anything else.  A run of
+    comment lines belongs to the entity it precedes, so a function and its
+    documentation go together.
+    """
+    entities = []
+    depth = 0
+    start = None
+    for index in range(opening + 1, len(lines)):
+        line = lines[index]
+        code = line.split("//", 1)[0]
+        if depth == 0:
+            stripped = line.strip()
+            if stripped.startswith("}"):
+                return entities, index
+            if stripped.startswith("#") and start is not None:
+                # A directive ends a run of comments: they do not document
+                # what follows it, and must not be dropped with it.
+                entities.append((start, index - 1, None))
+                start = None
+            if not stripped or stripped.startswith("#"):
+                if start is None:
+                    entities.append((index, index, None))
+                continue
+            if start is None:
+                start = index
+        depth += code.count("{") - code.count("}")
+        if depth == 0 and start is not None and (
+            code.rstrip().endswith("}") or code.rstrip().endswith(";")
+        ):
+            text = "\n".join(lines[start:index + 1])
+            first_code = next(
+                candidate
+                for candidate in lines[start:index + 1]
+                if candidate.strip() and not candidate.strip().startswith("//")
+            )
+            name = None
+            head = text.split("{", 1)[0]
+            match = _HELPER_NAME.search(head)
+            if (
+                match
+                and "{" in text
+                and "=" not in head
+                and not _NOT_A_FUNCTION.match(first_code)
+            ):
+                name = match.group(1)
+            entities.append((start, index, name))
+            start = None
+    return entities, len(lines)
+
+
+def _drop_uncalled_helpers(source):
+    """Remove the anonymous-namespace functions nothing in the wrapper calls.
+
+    Every wrapper shape draws its file-local helpers from one shared set --
+    seeding the material, reading YAML options, finding a packed block -- and
+    which of them a given operator calls depends on which operations it
+    publishes.  An uncalled one has internal linkage, so it is a
+    `-Wunused-function` diagnostic rather than dead weight, and it is left out.
+    Liveness is transitive: a helper called only by a dropped helper goes too.
+    """
+    lines = source.split("\n")
+    opening = next(
+        (
+            index
+            for index, line in enumerate(lines)
+            if line.strip() == "namespace {"
+        ),
+        None,
+    )
+    if opening is None:
+        return source
+    entities, closing = _anonymous_namespace_entities(lines, opening)
+    helpers = [entity for entity in entities if entity[2] is not None]
+    if not helpers:
+        return source
+    owned = {}
+    for first, last, name in helpers:
+        for index in range(first, last + 1):
+            owned[index] = name
+    live = set()
+    outside = "\n".join(
+        line for index, line in enumerate(lines) if index not in owned
+    )
+    pending = [name for _, _, name in helpers if _wrapper_reads(outside, name)]
+    while pending:
+        name = pending.pop()
+        if name in live:
+            continue
+        live.add(name)
+        body = "\n".join(
+            lines[index] for index, owner in owned.items() if owner == name
+        )
+        pending.extend(
+            other
+            for _, _, other in helpers
+            if other not in live and other != name and _wrapper_reads(body, other)
+        )
+    dropped = set()
+    for first, last, name in helpers:
+        if name in live:
+            continue
+        dropped.update(range(first, last + 1))
+        # The blank line that separated it from the next entity goes with it.
+        if last + 1 < closing and not lines[last + 1].strip():
+            dropped.add(last + 1)
+    if not dropped:
+        return source
+    return "\n".join(
+        line for index, line in enumerate(lines) if index not in dropped
+    )
+
+
+def _residual_signature_names(substitutions):
+    """The residual wrapper's parameter and alias names, where their body reads them.
+
+    A method with no kernel to dispatch to still has the signature its base
+    class declares, so its parameters stay and only lose the names nothing
+    reads; the state alias and the coordinates are declared only for a body
+    that uses them.
+    """
+    apply_body = "\n".join(
+        substitutions[key]
+        for key in (
+            "apply_state_check",
+            "scheme_apply_term",
+            "laplace_packed_apply_fast_path",
+            "apply_affine_geometry",
+            "apply_previous_alias",
+            "action_dispatch_body",
+        )
+    )
+    reads_current = _wrapper_reads(apply_body, "current")
+    names = {
+        "apply_current_alias": (
+            "    const real_t *const current = state ? state : impl_->current;\n"
+            if reads_current
+            else ""
+        ),
+        "apply_points_alias": (
+            "    auto points = element_points(mesh);\n"
+            if _wrapper_reads(apply_body, "points")
+            else ""
+        ),
+        "apply_state_parameter": _parameter_name(
+            "state", reads_current or _wrapper_reads(apply_body, "state")
+        ),
+        "apply_direction_parameter": _parameter_name(
+            "direction", _wrapper_reads(apply_body, "direction")
+        ),
+        "apply_out_parameter": _parameter_name(
+            "out", _wrapper_reads(apply_body, "out")
+        ),
+    }
+    for method in ("hessian_crs", "hessian_bsr"):
+        body = substitutions["%s_body" % method]
+        for parameter in ("state", "rowptr", "colidx", "values"):
+            names["%s_%s_parameter" % (method, parameter)] = _parameter_name(
+                parameter, _wrapper_reads(body, parameter)
+            )
+    return names
+
+
+def _parameter_name(name, read):
+    """A parameter's name, or the name commented out where the body ignores it."""
+    return name if read else "/*%s*/" % name
+
+
+def _residual_affine_geometry_lines(op_name, label, affine_flag, uses, body):
+    """The cached affine geometry an operation body reads, and only that.
+
+    Each pointer is declared, and assigned out of the cache, only where `body`
+    -- the dispatch it is handed to -- spells its name; a guard whose flag is
+    set still checks that the cache holds what initialisation was asked for.
+    `uses` maps each cache slot to the C++ boolean the template used to spell.
+    """
+    groups = (
+        (
+            "jacobian",
+            "jacobian",
+            "jacobian geometry",
+            (
+                ("adjugate", "const geom_t *const *",
+                 "cache->jacobian->jacobian_adjugate_SoA()->data()"),
+                ("determinant", "const geom_t *",
+                 "cache->jacobian->jacobian_determinant()->data()"),
+            ),
+        ),
+        (
+            "metric_soa",
+            "metric_soa",
+            "SoA metric geometry",
+            (
+                ("geom_metric", "const geom_t *const *",
+                 "cache->metric_soa->fff_SoA()->data()"),
+            ),
+        ),
+        (
+            "metric_aos",
+            "metric_aos",
+            "AoS metric geometry",
+            (
+                ("geom_metric_aos", "const geom_t *",
+                 "cache->metric_aos->fff_AoS()->data()"),
+            ),
+        ),
+    )
+    read = {
+        name
+        for _, _, _, pointers in groups
+        for name, _, _ in pointers
+        if _wrapper_reads(body, name)
+    }
+    lines = [
+        "      %s%s = nullptr;" % (pointer_type, name)
+        for _, _, _, pointers in groups
+        for name, pointer_type, _ in pointers
+        if name in read
+    ]
+    lines.extend(
+        [
+            "      if (impl_->%s) {" % affine_flag,
+            "        auto cache = std::static_pointer_cast<AffineGeometryCache>(",
+            "            domain.user_data);",
+            "        if (!cache) {",
+            '          SFEM_ERROR("%s affine %s requires cached geometry\\n");' % (op_name, label),
+            "          return SFEM_FAILURE;",
+            "        }",
+        ]
+    )
+    for key, slot, description, pointers in groups:
+        assigned = [pointer for pointer in pointers if pointer[0] in read]
+        if uses[key] != "true" and not assigned:
+            continue
+        lines.extend(
+            [
+                "        if (%s) {" % uses[key],
+                "          if (!cache->%s) {" % slot,
+                '            SFEM_ERROR("%s affine %s requires cached %s\\n");'
+                % (op_name, label, description),
+                "            return SFEM_FAILURE;",
+                "          }",
+            ]
+        )
+        for name, pointer_type, source in assigned:
+            lines.extend(
+                [
+                    "          %s = reinterpret_cast<%s>(" % (name, pointer_type.strip()),
+                    "              %s);" % source,
+                ]
+            )
+        lines.append("        }")
+    lines.append("      }")
+    return "\n".join(lines) + "\n"
+
+
+_STRING_OR_COMMENT = re.compile(r'"(?:\\.|[^"\\])*"|//[^\n]*')
+
+
+def _wrapper_reads(text, name):
+    """Whether the wrapper code `text` mentions the identifier `name`.
+
+    String literals and comments are not code: an error message that says
+    "requires a previous state" does not read `state`.
+    """
+    code = _STRING_OR_COMMENT.sub(" ", text)
+    return re.search(r"\b%s\b" % re.escape(name), code) is not None
 
 
 def _linear_work_value_method(op_name):
@@ -3940,7 +4202,7 @@ namespace sfem {
         }
 
         const ptrdiff_t size = node["parent"].num_children();
-        if (node["lfi"].num_children() != size) {
+        if ((ptrdiff_t)node["lfi"].num_children() != size) {
           SFEM_ERROR("%(op)s expr sideset parent/lfi length mismatch\\n");
           return nullptr;
         }
@@ -3950,12 +4212,12 @@ namespace sfem {
 
         ptrdiff_t parent_count = 0;
         for (auto p : node["parent"].children()) {
-          p >> parent->data()[parent_count++];
+          p.load(&parent->data()[parent_count++]);
         }
 
         ptrdiff_t lfi_count = 0;
         for (auto p : node["lfi"].children()) {
-          p >> lfi->data()[lfi_count++];
+          p.load(&lfi->data()[lfi_count++]);
         }
 
         return std::make_shared<smesh::Sideset>(
@@ -5693,27 +5955,15 @@ def _op_path(name):
     return "%s/%s" % (_op_directory(), name)
 
 
-def _op_relative_include(path):
-    """Spell `path`, given from the material's root, as the wrapper sees it.
-
-    The wrapper's own directory is the target's -- `op/` on the host,
-    `op/cuda/` on a device -- so the number of `../` steps is not a constant.
-    It was written as one, which left every device wrapper's include a level
-    short of where the file it names actually sits.
-    """
-    return os.path.relpath(path, start=_op_directory()).replace(os.sep, "/")
-
-
 def _op_shared_header_include(stem):
     """One of the target's shared primitive headers, as the wrapper sees it.
 
     The name and the folder are both the target's: `kernel_diagnostics.hpp` at
     the tree root on the host, `cuda/kernel_diagnostics.cuh` on a device.
     """
-    target = current_target()
-    return _op_relative_include(
-        os.path.join(target.source_subdirectory(), target.header_name(stem))
-    )
+    # Bare, like every include between generated files
+    # (`plans/conventions.py generated_include`): the folder is not spelled.
+    return current_target().header_name(stem)
 
 
 def _op_file_stem(material):
@@ -6008,14 +6258,23 @@ def _residual_soa_view_declarations(fields, base, suffix, scalar_type):
         name = _safe_identifier("%s_%s" % (field.name, suffix))
         if components == 1:
             lines.append(
-                "          %s *const RSTR %s = %s + %d;"
-                % (scalar_type, name, base, offset)
+                kernel_local(
+                    name,
+                    "%s + %d" % (base, offset),
+                    "%s *const RSTR" % scalar_type,
+                    indent="          ",
+                )
             )
         else:
             entries = ", ".join("%s + %d" % (base, offset + component) for component in range(components))
             lines.append(
-                "          %s *const RSTR %s[%d] = {%s};"
-                % (scalar_type, name, components, entries)
+                kernel_local(
+                    name,
+                    "{%s}" % entries,
+                    "%s *const RSTR" % scalar_type,
+                    indent="          ",
+                    declarator="%s[%d]" % (name, components),
+                )
             )
         offset += components
     return lines
@@ -6182,7 +6441,9 @@ def _element_api_headers(material, elements, kernel_sources):
     for element in elements:
         dim = _element_dim(element)
         label = _element_name(element).lower()
-        suffix = "/%s_%s_element.hpp" % (material.name, label)
+        suffix = "/%s" % current_target().header_name(
+            "%s_%s_element" % (material.name, label)
+        )
         for path in sorted(kernel_sources):
             if path.endswith(suffix):
                 entries.append(
@@ -6206,7 +6467,7 @@ def _element_api_dispatch_header(material, entries):
         "",
     ]
     for header in sorted({entry["header"] for entry in entries}):
-        lines.append('#include "%s"' % _op_relative_include(header))
+        lines.append('#include "%s"' % generated_include(header))
     lines.extend(["", "namespace sfem {", "namespace codegen {", ""])
 
     for operation in ("energy", "gradient", "hessian"):
@@ -7205,7 +7466,7 @@ def _c_abi_header(material, kernel_sources):
         body += "\n"
     matrix_formats_include = (
         #: Target-independent, so it keeps the host name and the host place.
-        '#include "%s"\n' % _op_relative_include("matrix_formats.hpp")
+        '#include "matrix_formats.hpp"\n'
         if "sfem_MatrixAssemblyDiagnostics" in body
         else ""
     )
@@ -7325,7 +7586,7 @@ def _op_manifest(
 def _header_api_sources(kernel_sources, element_api_sources):
     headers = []
     for path in sorted(kernel_sources):
-        if path.endswith("_element.hpp"):
+        if path.endswith(("_element.hpp", "_element.cuh")):
             headers.append(
                 {
                     "kind": "dense_element",
@@ -8144,6 +8405,8 @@ def _performance_dispatch_cases(material_name, element_names, cases):
 
 
 def _performance_flops_method(op_name, method, cases):
+    if not cases:
+        return _performance_empty_method("double", "flops", op_name, method)
     return """    double %(op)s::flops_%(method)s() const {
     double total = 0;
     if (!impl_->domains) {
@@ -8166,6 +8429,8 @@ def _performance_flops_method(op_name, method, cases):
 
 
 def _performance_bytes_method(op_name, method, cases):
+    if not cases:
+        return _performance_empty_method("size_t", "memory_traffic_bytes", op_name, method)
     return """    size_t %(op)s::memory_traffic_bytes_%(method)s() const {
     size_t total = 0;
     if (!impl_->domains) {
@@ -8184,6 +8449,18 @@ def _performance_bytes_method(op_name, method, cases):
         "op": op_name,
         "method": method,
         "cases": _performance_bytes_cases(cases),
+    }
+
+
+def _performance_empty_method(result_type, measure, op_name, method):
+    """A method with no kernel to ask: nothing is counted, so it counts nothing."""
+    return """    %(type)s %(op)s::%(measure)s_%(method)s() const {
+    return 0;
+  }""" % {
+        "type": result_type,
+        "op": op_name,
+        "measure": measure,
+        "method": method,
     }
 
 
@@ -8770,8 +9047,12 @@ def _residual_apply_dispatch_body(
         prefix = "if" if not any(line.endswith("{") for line in lines) else "else if"
         lines.append("%s%s (dim == %d) {" % (indent, prefix, dim))
         lines.append(
-            "%s  static constexpr ptrdiff_t FIELD_STRIDE = %d;"
-            % (indent, block_size_by_dim[dim])
+            kernel_local(
+                "FIELD_STRIDE",
+                block_size_by_dim[dim],
+                "static constexpr ptrdiff_t",
+                indent="%s  " % indent,
+            )
         )
         setup = []
         parameter_index = {
@@ -9198,7 +9479,7 @@ def _residual_apply_dispatch_body(
             "%sreturn SFEM_FAILURE;" % indent,
         ]
     )
-    return "\n".join(lines)
+    return "\n".join(resolve_kernel_constants(lines))
 
 
 def _packed_two_pass_function(function):
@@ -10327,7 +10608,7 @@ def _yaml_helpers(defaults):
       if (!node.has_child(key)) {
         return false;
       }
-      node[key] >> value;
+      node[key].load(&value);
       return true;
     }
 
@@ -10400,7 +10681,7 @@ def _yaml_helpers(defaults):
         return false;
       }
       int raw = value ? 1 : 0;
-      node[key] >> raw;
+      node[key].load(&raw);
       value = raw != 0;
       return true;
     }

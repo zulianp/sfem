@@ -72,14 +72,14 @@ void cvfem_laplacian_apply(const smesh::ElemType element_type,
 }
 
 void cvfem_convection_assemble_hessian(const smesh::ElemType element_type,
-                                       const ptrdiff_t nelements,
-                                       const ptrdiff_t nnodes,
-                                       idx_t **const SFEM_RESTRICT elems,
-                                       geom_t **const SFEM_RESTRICT xyz,
-                                       real_t **const SFEM_RESTRICT velocity,
-                                       const count_t *const SFEM_RESTRICT rowptr,
-                                       const idx_t *const SFEM_RESTRICT colidx,
-                                       real_t *const SFEM_RESTRICT values) {
+                                       const ptrdiff_t /*nelements*/,
+                                       const ptrdiff_t /*nnodes*/,
+                                       idx_t **const SFEM_RESTRICT /*elems*/,
+                                       geom_t **const SFEM_RESTRICT /*xyz*/,
+                                       real_t **const SFEM_RESTRICT /*velocity*/,
+                                       const count_t *const SFEM_RESTRICT /*rowptr*/,
+                                       const idx_t *const SFEM_RESTRICT /*colidx*/,
+                                       real_t *const SFEM_RESTRICT /*values*/) {
     switch (element_type) {
         // case smesh::TRI3: {
         //     return;

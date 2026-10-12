@@ -24,12 +24,13 @@ macro(_sfem_find_colocated_dependency _name _subdir)
     unset(_sfem_${_name}_dir)
 endmacro()
 
-# smesh is a mandatory submodule of SFEM.
-_sfem_find_colocated_dependency(smesh smesh)
-
+# 1. ryml: smesh targets depend on it in its link interface
 if(@SFEM_ENABLE_RYAML@)
     _sfem_find_colocated_dependency(ryml ryml)
 endif()
+
+# 2. smesh is a mandatory submodule of SFEM.
+_sfem_find_colocated_dependency(smesh smesh)
 
 if(@SFEM_ENABLE_SCCD@)
     _sfem_find_colocated_dependency(SCCD SCCD)

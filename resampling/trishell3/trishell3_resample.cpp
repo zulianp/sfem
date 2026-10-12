@@ -52,23 +52,6 @@ static real_t tri3_qy[TRI3_NQP] = {0.063089014491502228340331602870819,
                                    0.053145049844816947353249671631398,
                                    0.31035245103378440541660773395655};
 
-SFEM_INLINE static int hex_aa_8_contains(
-        // X-coordinates
-        const real_t xmin,
-        const real_t xmax,
-        // Y-coordinates
-        const real_t ymin,
-        const real_t ymax,
-        // Z-coordinates
-        const real_t zmin,
-        const real_t zmax,
-        const real_t x,
-        const real_t y,
-        const real_t z) {
-    int outside = (x < xmin) | (x > xmax) | (y < ymin) | (y > ymax) | (z < zmin) | (x > zmax);
-    return !outside;
-}
-
 SFEM_INLINE static real_t tri_shell_3_measure(
         // X-coordinates
         const real_t px0,
@@ -210,7 +193,7 @@ SFEM_INLINE static void hex_aa_8_eval_grad(
 int trishell3_resample_gap_local(
         // Mesh
         const ptrdiff_t              nelements,
-        const ptrdiff_t              nnodes,
+        const ptrdiff_t              /*nnodes*/,
         idx_t** const SFEM_RESTRICT  elems,
         geom_t** const SFEM_RESTRICT xyz,
         // SDF

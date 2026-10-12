@@ -118,58 +118,12 @@ static void par_slice_stencil_3x3x3(const ptrdiff_t                     xc,
     }
 }
 
-static void hex8_side_stencil(const ptrdiff_t                     xc,
-                              const ptrdiff_t                     yc,
-                              const ptrdiff_t                     zc,
-                              const ptrdiff_t                     xstride,
-                              const ptrdiff_t                     ystride,
-                              const ptrdiff_t                     zstride,
-                              const int                           v0,
-                              const int                           v1,
-                              const int                           v2,
-                              const int                           v3,
-                              const scalar_t *const SFEM_RESTRICT A,
-                              const scalar_t *const SFEM_RESTRICT input,
-                              scalar_t *const SFEM_RESTRICT       output) {
-    for (ptrdiff_t zi = 0; zi < zc; zi++) {
-        for (ptrdiff_t yi = 0; yi < yc; yi++) {
-            for (ptrdiff_t xi = 0; xi < xc; xi++) {
-                scalar_t acc[4] = {0, 0, 0, 0};
-
-                idx_t v[8];
-                v[0] = xi * xstride + yi * ystride + zi * zstride;
-                v[1] = (xi + 1) * xstride + yi * ystride + zi * zstride;
-                v[2] = (xi + 1) * xstride + (yi + 1) * ystride + zi * zstride;
-                v[3] = xi * xstride + (yi + 1) * ystride + zi * zstride;
-
-                v[4] = xi * xstride + yi * ystride + (zi + 1) * zstride;
-                v[5] = (xi + 1) * xstride + yi * ystride + (zi + 1) * zstride;
-                v[6] = (xi + 1) * xstride + (yi + 1) * ystride + (zi + 1) * zstride;
-                v[7] = xi * xstride + (yi + 1) * ystride + (zi + 1) * zstride;
-
-                for (int i = 0; i < 8; i++) {
-                    const scalar_t val = input[v[i]];
-                    acc[0] += A[v0 * 8 + i] * val;
-                    acc[1] += A[v1 * 8 + i] * val;
-                    acc[2] += A[v2 * 8 + i] * val;
-                    acc[3] += A[v3 * 8 + i] * val;
-                }
-
-                output[v[v0]] += acc[0];
-                output[v[v1]] += acc[1];
-                output[v[v2]] += acc[2];
-                output[v[v3]] += acc[3];
-            }
-        }
-    }
-}
-
-static void sshex8_stencil(const ptrdiff_t                     xc,
-                           const ptrdiff_t                     yc,
-                           const ptrdiff_t                     zc,
-                           const scalar_t *const SFEM_RESTRICT stencil,
-                           const scalar_t *const SFEM_RESTRICT input,
-                           scalar_t *const                     output) {
+static SFEM_INLINE void sshex8_stencil(const ptrdiff_t                     xc,
+                                       const ptrdiff_t                     yc,
+                                       const ptrdiff_t                     zc,
+                                       const scalar_t *const SFEM_RESTRICT stencil,
+                                       const scalar_t *const SFEM_RESTRICT input,
+                                       scalar_t *const                     output) {
     slice_stencil_3x3x3(xc - 2,
                         yc - 2,
                         zc - 2,
@@ -183,12 +137,12 @@ static void sshex8_stencil(const ptrdiff_t                     xc,
                         &output[1 + 1 * xc + 1 * xc * yc]);
 }
 
-static void par_sshex8_stencil(const ptrdiff_t                     xc,
-                               const ptrdiff_t                     yc,
-                               const ptrdiff_t                     zc,
-                               const scalar_t *const SFEM_RESTRICT stencil,
-                               const scalar_t *const SFEM_RESTRICT input,
-                               scalar_t *const                     output) {
+static SFEM_INLINE void par_sshex8_stencil(const ptrdiff_t                     xc,
+                                           const ptrdiff_t                     yc,
+                                           const ptrdiff_t                     zc,
+                                           const scalar_t *const SFEM_RESTRICT stencil,
+                                           const scalar_t *const SFEM_RESTRICT input,
+                                           scalar_t *const                     output) {
     par_slice_stencil_3x3x3(xc - 2,
                             yc - 2,
                             zc - 2,

@@ -2,10 +2,10 @@
 #define LINEAR_ELASTICITY_PROTEUS_HEX8_ELEMENT_API_HPP
 
 #include <stddef.h>
-#include "../linear_elasticity_d3_tensor_product_local.hpp"
-#include "../../../geometry_kernels.hpp"
-#include "../../../reference/line_p1_q2.hpp"
-#include "../../../reference/quad_line_q2.hpp"
+#include "linear_elasticity_d3_tensor_product_local.hpp"
+#include "geometry_kernels.hpp"
+#include "line_p1_q2.hpp"
+#include "quad_line_q2.hpp"
 
 namespace sfem {
 namespace codegen {

@@ -327,7 +327,7 @@ def _inexact_apply_kernel_source(
     # unparseable, which a spike driver hides by including sfem_base.hpp itself
     # before it -- and which the library build does not.
     operator_lines = [
-        '#include "../../op/sfem_%s_c_abi.hpp"' % op_name,
+        '#include "sfem_%s_c_abi.hpp"' % op_name,
         '#include "kernel_diagnostics.hpp"',
         "",
         '#include "%s_inexact_apply_inline.hpp"' % prefix,
@@ -888,11 +888,7 @@ def _tabulated_gradient_source(
     """
     basis_symbols = basis_gradient_symbols(n_nodes, dim)
     tables = [kernel_constant("NQ", len(weights), indent="    ")]
-    tables.extend(
-        "    const s_t *const RSTR qgrad_%s = %s;"
-        % (axis, quadrature_reference_accessor(rule, "grad_ref_%s" % axis))
-        for axis in REFERENCE_AXES[:dim]
-    )
+    tables.extend(_BASIS_TABLES_BY_USE[bool(roles)](rule, dim))
     tables.append(
         "    const s_t *const RSTR qweight = %s;"
         % quadrature_reference_accessor(rule, "q_weight")
@@ -1020,11 +1016,24 @@ def _contraction_tables(rule, n_nodes):
     ]
 
 
+def _basis_tables(rule, dim):
+    """The reference basis gradients `_basis_reads` reads, from the shared struct."""
+    return [
+        "    const s_t *const RSTR qgrad_%s = %s;"
+        % (axis, quadrature_reference_accessor(rule, "grad_ref_%s" % axis))
+        for axis in REFERENCE_AXES[:dim]
+    ]
+
+
 #: A tangent that reads no field reads no basis either.  Tables rather than
 #: branches, as elsewhere here.
 _BASIS_READS_BY_USE = {
     True: _basis_reads,
     False: lambda basis_symbols, n_nodes, dim: [],
+}
+_BASIS_TABLES_BY_USE = {
+    True: _basis_tables,
+    False: lambda rule, dim: [],
 }
 _CONTRACTION_TABLES_BY_USE = {
     True: _contraction_tables,
@@ -2210,7 +2219,7 @@ def _delegated_prototype_files(
         plan, flux_form, rule, adjugate, determinant, is_deformation_gradient
     )
     lines = [
-        '#include "../../op/sfem_%s_c_abi.hpp"' % material.op_name,
+        '#include "sfem_%s_c_abi.hpp"' % material.op_name,
         "",
     ]
     lines.extend(

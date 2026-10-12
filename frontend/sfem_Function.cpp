@@ -122,7 +122,6 @@ namespace sfem {
             auto buff = create_host_buffer<real_t>(n_blocks);
             auto bb   = buff->data();
 
-            char path[2048];
             for (int b = 0; b < block_size; b++) {
                 for (ptrdiff_t i = 0; i < n_blocks; i++) {
                     bb[i] = x[i * block_size + b];
@@ -150,7 +149,7 @@ namespace sfem {
         log_write_double(&impl_->time_logger, t);
     }
 
-    int Output::write_time_step(const char *name, const real_t t, const real_t *const x) {
+    int Output::write_time_step(const char *name, const real_t /*t*/, const real_t *const x) {
         SFEM_TRACE_SCOPE("Output::write_time_step");
 
         auto      space      = impl_->space;
@@ -880,7 +879,7 @@ namespace sfem {
         return impl_->output->write("out", x);
     }
 
-    int Function::initial_guess(real_t *const x) { return SFEM_SUCCESS; }
+    int Function::initial_guess(real_t *const /*x*/) { return SFEM_SUCCESS; }
 
     int Function::set_output_dir(const smesh::Path &path) {
         impl_->output->set_output_dir(path);
@@ -990,7 +989,9 @@ namespace sfem {
                 },
                 MEMORY_SPACE_HOST);
 
-        assert(!err);
+        if (err) {
+            SFEM_ERROR("mesh_connectivity_from_file: failed to read connectivity from %s\n", folder);
+        }
 
         return ret;
     }

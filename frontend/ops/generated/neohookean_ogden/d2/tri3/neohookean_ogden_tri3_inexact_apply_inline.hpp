@@ -1,5 +1,5 @@
 #pragma once
-#include "../../../kernel_math.hpp"
+#include "kernel_math.hpp"
 
 namespace sfem {
 namespace codegen {

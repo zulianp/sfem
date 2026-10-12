@@ -140,7 +140,7 @@ namespace sfem {
         }
 
         template <typename V>
-        int array_require_keys(const std::string &key, V &value) {
+        int array_require_keys(const std::string &key, V & /*value*/) {
             auto iter = kv.find(key);
             if (iter == kv.end()) {
                 error_not_found(key);
@@ -151,7 +151,7 @@ namespace sfem {
         }
 
         template <typename V>
-        int array_require_values(const std::string &key, V &value) {
+        int array_require_values(const std::string &key, V & /*value*/) {
             auto iter = kv.find(key);
             if (iter == kv.end()) {
                 error_not_found(key);

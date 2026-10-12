@@ -1,8 +1,8 @@
 #pragma once
-#include "../../../kernel_math.hpp"
-#include "../../../packed_thread_scratch.hpp"
-#include "../../../reference/quad_tet_q11.hpp"
-#include "../../../reference/tet10_q11.hpp"
+#include "kernel_math.hpp"
+#include "packed_thread_scratch.hpp"
+#include "quad_tet_q11.hpp"
+#include "tet10_q11.hpp"
 
 namespace sfem {
 namespace codegen {

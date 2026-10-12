@@ -111,41 +111,41 @@ namespace {
         return env.load_scale * ramp;
     }
 
-    void initialize_cantilever_bend(const std::shared_ptr<sfem::Mesh> &mesh,
-                                    const real_t                       tip_y,
-                                    const real_t                       tip_z,
-                                    real_t *const SFEM_RESTRICT        u) {
-        if (tip_y == 0 && tip_z == 0) {
-            return;
-        }
+//     void initialize_cantilever_bend(const std::shared_ptr<sfem::Mesh> &mesh,
+//                                                      const real_t                       tip_y,
+//                                                      const real_t                       tip_z,
+//                                                      real_t *const SFEM_RESTRICT        u) {
+//         if (tip_y == 0 && tip_z == 0) {
+//             return;
+//         }
 
-        const ptrdiff_t n_nodes = mesh->n_nodes();
-        const int       dim     = mesh->spatial_dimension();
-        auto            points  = mesh->points()->data();
-        const geom_t   *x       = points[0];
+//         const ptrdiff_t n_nodes = mesh->n_nodes();
+//         const int       dim     = mesh->spatial_dimension();
+//         auto            points  = mesh->points()->data();
+//         const geom_t   *x       = points[0];
 
-        geom_t xmin = x[0];
-        geom_t xmax = x[0];
-        for (ptrdiff_t i = 1; i < n_nodes; ++i) {
-            xmin = std::min(xmin, x[i]);
-            xmax = std::max(xmax, x[i]);
-        }
+//         geom_t xmin = x[0];
+//         geom_t xmax = x[0];
+//         for (ptrdiff_t i = 1; i < n_nodes; ++i) {
+//             xmin = std::min(xmin, x[i]);
+//             xmax = std::max(xmax, x[i]);
+//         }
 
-        const real_t inv_length = xmax > xmin ? real_t(1) / (xmax - xmin) : real_t(0);
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < n_nodes; ++i) {
-            real_t s = (x[i] - xmin) * inv_length;
-            s        = std::max<real_t>(0, std::min<real_t>(1, s));
+//         const real_t inv_length = xmax > xmin ? real_t(1) / (xmax - xmin) : real_t(0);
+// #pragma omp parallel for
+//         for (ptrdiff_t i = 0; i < n_nodes; ++i) {
+//             real_t s = (x[i] - xmin) * inv_length;
+//             s        = std::max<real_t>(0, std::min<real_t>(1, s));
 
-            const real_t shape = s * s * (3 - 2 * s);
-            if (dim > 1) {
-                u[dim * i + 1] = tip_y * shape;
-            }
-            if (dim > 2) {
-                u[dim * i + 2] = tip_z * shape;
-            }
-        }
-    }
+//             const real_t shape = s * s * (3 - 2 * s);
+//             if (dim > 1) {
+//                 u[dim * i + 1] = tip_y * shape;
+//             }
+//             if (dim > 2) {
+//                 u[dim * i + 2] = tip_z * shape;
+//             }
+//         }
+//     }
 
     // int read_initial_state(const std::shared_ptr<sfem::Mesh> &mesh,
     //                        const std::string                 &full_path,
@@ -164,49 +164,6 @@ namespace {
     //     return SFEM_SUCCESS;
     // }
 
-    void newmark_predictor(const ptrdiff_t n,
-                           const real_t    dt,
-                           const real_t    beta,
-                           const real_t   *const SFEM_RESTRICT u,
-                           const real_t   *const SFEM_RESTRICT v,
-                           const real_t   *const SFEM_RESTRICT a,
-                           real_t         *const SFEM_RESTRICT u_hat) {
-        const real_t dt2_scale = dt * dt * (real_t(0.5) - beta);
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < n; ++i) {
-            u_hat[i] = u[i] + dt * v[i] + dt2_scale * a[i];
-        }
-    }
-
-    void newmark_velocity_shift(const ptrdiff_t n,
-                                const real_t    dt,
-                                const real_t    gamma,
-                                const real_t    alpha_v,
-                                const real_t   *const SFEM_RESTRICT v,
-                                const real_t   *const SFEM_RESTRICT a,
-                                const real_t   *const SFEM_RESTRICT u_hat,
-                                real_t         *const SFEM_RESTRICT z) {
-        const real_t a_scale = dt * (1 - gamma);
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < n; ++i) {
-            z[i] = v[i] + a_scale * a[i] - alpha_v * u_hat[i];
-        }
-    }
-
-    void newmark_update(const ptrdiff_t n,
-                        const real_t    alpha_a,
-                        const real_t    alpha_v,
-                        const real_t   *const SFEM_RESTRICT u,
-                        const real_t   *const SFEM_RESTRICT u_hat,
-                        const real_t   *const SFEM_RESTRICT z,
-                        real_t         *const SFEM_RESTRICT v,
-                        real_t         *const SFEM_RESTRICT a) {
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < n; ++i) {
-            a[i] = alpha_a * (u[i] - u_hat[i]);
-            v[i] = alpha_v * u[i] + z[i];
-        }
-    }
 }  // namespace
 
 int solve_mooney_rivlin_kelvin_voigt(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *argv[]) {

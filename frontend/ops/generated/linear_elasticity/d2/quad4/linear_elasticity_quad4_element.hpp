@@ -1,7 +1,7 @@
 #ifndef LINEAR_ELASTICITY_QUAD4_ELEMENT_API_HPP
 #define LINEAR_ELASTICITY_QUAD4_ELEMENT_API_HPP
 
-#include "../proteus_quad4/linear_elasticity_proteus_quad4_element.hpp"
+#include "linear_elasticity_proteus_quad4_element.hpp"
 
 namespace sfem {
 namespace codegen {

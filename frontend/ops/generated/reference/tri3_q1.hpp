@@ -1,7 +1,7 @@
 #ifndef SFEM_CODEGEN_REFERENCE_TRI3_Q1_HPP
 #define SFEM_CODEGEN_REFERENCE_TRI3_Q1_HPP
 
-#include "../../reference/quad_tri_q1.hpp"
+#include "quad_tri_q1.hpp"
 
 namespace sfem {
 namespace codegen {

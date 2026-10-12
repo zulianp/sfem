@@ -1,22 +1,22 @@
 #include <cstdio>
 #include <type_traits>
-#include "../linear_elasticity_d2_simplex_local.hpp"
-#include "../linear_elasticity_d2_simplex_hessian.hpp"
-#include "../../../geometry_kernels.hpp"
-#include "../../../kernel_diagnostics.hpp"
+#include "linear_elasticity_d2_simplex_local.hpp"
+#include "linear_elasticity_d2_simplex_hessian.hpp"
+#include "geometry_kernels.hpp"
+#include "kernel_diagnostics.hpp"
 #ifdef _OPENMP
 #include <omp.h>
 #endif
 #include <cstdint>
 #include <cstdlib>
-#include "../../../packed_thread_scratch.hpp"
+#include "packed_thread_scratch.hpp"
 
 namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t, int VS>
 SFEM_INLINE const s_t *ageom_stream(
-    const int ne,
+    const int,
     const g_t *const RSTR source,
     s_t *const RSTR,
     std::true_type) {

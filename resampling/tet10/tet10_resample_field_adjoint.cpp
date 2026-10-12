@@ -446,6 +446,8 @@ hex8_to_isoparametric_tet10_resample_tet_adjoint(const real_t* const SFEM_RESTRI
         data[indices[6]] += d6;
         data[indices[7]] += d7;
     }
+
+    return 0;
 }
 
 ///////////////////////////////////////////////////////////////////////
@@ -455,10 +457,10 @@ int                                                           //
 hex8_to_isoparametric_tet10_resample_field_refine_adjoint(    //
         const ptrdiff_t                      start_element,   // Mesh
         const ptrdiff_t                      end_element,     //
-        const ptrdiff_t                      nnodes,          //
+        const ptrdiff_t                      /*nnodes*/,          //
         const idx_t** const SFEM_RESTRICT    elems,           //
         const geom_t** const SFEM_RESTRICT   xyz,             //
-        const ptrdiff_t* const SFEM_RESTRICT n,               // SDF
+        const ptrdiff_t* const SFEM_RESTRICT /*n*/,               // SDF
         const ptrdiff_t* const SFEM_RESTRICT stride,          //
         const geom_t* const SFEM_RESTRICT    origin,          //
         const geom_t* const SFEM_RESTRICT    delta,           //
@@ -472,15 +474,7 @@ hex8_to_isoparametric_tet10_resample_field_refine_adjoint(    //
 
     int ret = 0;
 
-    const real_t ox = (real_t)origin[0];
-    const real_t oy = (real_t)origin[1];
-    const real_t oz = (real_t)origin[2];
-
     const real_t dx = (real_t)delta[0];
-    const real_t dy = (real_t)delta[1];
-    const real_t dz = (real_t)delta[2];
-
-    const real_t hexahedron_volume = dx * dy * dz;
 
     struct tet10_vertices rTets[8];
 
@@ -494,10 +488,6 @@ hex8_to_isoparametric_tet10_resample_field_refine_adjoint(    //
         // ISOPARAMETRIC
         real_t x[10], y[10], z[10];
 
-        real_t hex8_f[8];
-        real_t coeffs[8];
-
-        real_t tet10_f[10];
         // real_t element_field[10];
 
         // loop over the 4 vertices of the tetrahedron
@@ -599,7 +589,7 @@ insert_tet10_in_output_array(struct tet10_vertices*  tet10_head,    //
                              const size_t tet_delta_capacity) {
     // Check if there is enough space in the output array
     // If not, allocate more space
-    if (tets_size >= *tets_capacity) {
+    if ((size_t)tets_size >= *tets_capacity) {
         *tets_capacity += tet_delta_capacity;
         *rTets_out = (struct tet10_vertices*)realloc(*rTets_out, sizeof(struct tet10_vertices) * (*tets_capacity));
         if (*rTets_out == NULL) {
@@ -624,8 +614,8 @@ tet10_iterative_refinement(const real_t* const           x,                     
                            const real_t* const           z,                      //
                            const real_t* const           w,                      //
                            const real_t                  dx,                     //
-                           const real_t                  dy,                     //
-                           const real_t                  dz,                     //
+                           const real_t                  /*dy*/,                     //
+                           const real_t                  /*dz*/,                     //
                            const real_t                  alpha_th,               //
                            const real_t                  degenerated_tet_ratio,  //
                            const int                     max_refined_tets,       // Maximum number of iterations
@@ -641,12 +631,9 @@ tet10_iterative_refinement(const real_t* const           x,                     
 
     *rTets_out = (struct tet10_vertices*)malloc(sizeof(struct tet10_vertices) * tets_capacity);
 
-    int tets_size                  = 0;
-    int flag_loop                  = 1;
-    int n_tet                      = 0;
-    int total_refined_tets         = 0;
-    int degenerated_tetrahedra_cnt = 0;
-    int refinements_cnt            = 0;
+    int tets_size = 0;
+    int flag_loop = 1;
+    int n_tet     = 0;
 
     struct sfem_stack* stack = sfem_stack_create(100);
 
@@ -699,7 +686,6 @@ tet10_iterative_refinement(const real_t* const           x,                     
         int degenerated_tet = 0;
 
         if (max_min_edges_ratio > degenerated_tet_ratio && alpha_tet > alpha_th) {
-            degenerated_tetrahedra_cnt++;
             degenerated_tet = 1;
         }
 
@@ -744,7 +730,6 @@ tet10_iterative_refinement(const real_t* const           x,                     
             }
 
             n_tet = 2;
-            refinements_cnt++;
 
             for (int ni = 0; ni < n_tet; ni++) {
                 struct tet10_vertices* tet10_new = (struct tet10_vertices*)malloc(sizeof(struct tet10_vertices));
@@ -762,7 +747,6 @@ tet10_iterative_refinement(const real_t* const           x,                     
                                      tet10_head->w,  //
                                      rTets);         //
             n_tet = 8;
-            refinements_cnt++;
 
             for (int ni = 0; ni < n_tet; ni++) {
                 struct tet10_vertices* tet10_new = (struct tet10_vertices*)malloc(sizeof(struct tet10_vertices));
@@ -791,10 +775,10 @@ tet10_iterative_refinement(const real_t* const           x,                     
 int                                                                                                                    //
 hex8_to_isoparametric_tet10_resample_field_iterative_ref_adjoint(const ptrdiff_t                      start_element,   // Mesh
                                                                  const ptrdiff_t                      end_element,     //
-                                                                 const ptrdiff_t                      nnodes,          //
+                                                                 const ptrdiff_t                      /*nnodes*/,          //
                                                                  const idx_t** const SFEM_RESTRICT    elems,           //
                                                                  const geom_t** const SFEM_RESTRICT   xyz,             //
-                                                                 const ptrdiff_t* const SFEM_RESTRICT n,               // SDF
+                                                                 const ptrdiff_t* const SFEM_RESTRICT /*n*/,               // SDF
                                                                  const ptrdiff_t* const SFEM_RESTRICT stride,          //
                                                                  const geom_t* const SFEM_RESTRICT    origin,          //
                                                                  const geom_t* const SFEM_RESTRICT    delta,           //
@@ -806,17 +790,9 @@ hex8_to_isoparametric_tet10_resample_field_iterative_ref_adjoint(const ptrdiff_t
 
     const real_t degenerated_tet_ratio = 2.5;  // TODO: make it a parameter
 
-    int ret = 0;
-
-    const real_t ox = (real_t)origin[0];
-    const real_t oy = (real_t)origin[1];
-    const real_t oz = (real_t)origin[2];
-
     const real_t dx = (real_t)delta[0];
     const real_t dy = (real_t)delta[1];
     const real_t dz = (real_t)delta[2];
-
-    const real_t hexahedron_volume = dx * dy * dz;
 
     // real_t alpha_max       = 0.0;
     // real_t alpha_mim       = 1e9;
@@ -830,10 +806,6 @@ hex8_to_isoparametric_tet10_resample_field_iterative_ref_adjoint(const ptrdiff_t
         // ISOPARAMETRIC
         real_t x[10], y[10], z[10];
 
-        real_t hex8_f[8];
-        real_t coeffs[8];
-
-        real_t tet10_f[10];
         // real_t element_field[10];
 
         // loop over the 4 vertices of the tetrahedron
