@@ -254,15 +254,6 @@ namespace {
         return ret;
     }
 
-    real_t dot_host(const ptrdiff_t n, const real_t *const a, const real_t *const b) {
-        real_t ret = 0;
-#pragma omp parallel for reduction(+ : ret)
-        for (ptrdiff_t i = 0; i < n; ++i) {
-            ret += a[i] * b[i];
-        }
-        return ret;
-    }
-
 
     idx_t nearest_node(const std::shared_ptr<sfem::Mesh> &mesh, const geom_t target[3]) {
         const int       dim    = mesh->spatial_dimension();

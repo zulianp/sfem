@@ -27,7 +27,7 @@ namespace codegen {
 
 template <typename s_t, typename g_t, int VS>
 SFEM_INLINE const s_t *ageom_stream(
-    const int ne,
+    const int,
     const g_t *const RSTR source,
     s_t *const RSTR,
     std::true_type) {
@@ -68,7 +68,7 @@ static int body_force_total_tet4_merit_patch(
     const s_t g1,
     const s_t g2,
     const int nsteps,
-    const s_t *const RSTR steps,
+    const s_t *const RSTR,
     const s_t *const RSTR x,
     const s_t *const RSTR h,
     const s_t *const RSTR accumulator,

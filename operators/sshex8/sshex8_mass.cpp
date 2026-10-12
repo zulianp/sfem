@@ -10,12 +10,11 @@
 
 extern int affine_sshex8_mass_lumped(const int                    level,
                                      const ptrdiff_t              nelements,
-                                     ptrdiff_t                    interior_start,
+                                     ptrdiff_t                    /*interior_start*/,
                                      idx_t **const SFEM_RESTRICT  elements,
                                      geom_t **const SFEM_RESTRICT std_hex8_points,
                                      real_t *const SFEM_RESTRICT  diag) {
     const int nxe = sshex8_nxe(level);
-    const int txe = sshex8_txe(level);
 
     const int proteus_to_std_hex8_corners[8] = {// Bottom
                                                 sshex8_lidx(level, 0, 0, 0),

@@ -65,7 +65,7 @@ namespace sfem {
             this->apply_op = op;
             n_dofs         = op->rows();
         }
-        void set_preconditioner_op(const std::shared_ptr<Operator<T>>& op) override {
+        void set_preconditioner_op(const std::shared_ptr<Operator<T>>& /*op*/) override {
             // Ignoring op!
         }
 
@@ -132,7 +132,6 @@ namespace sfem {
             if (lb && !lagr_lb) lagr_lb = make_buffer(n_constrained_dofs);
             if (ub && !lagr_ub) lagr_ub = make_buffer(n_constrained_dofs);
 
-            T penetration_norm = 0;
             T penetration_tol  = 1 / (penalty_param_ * 0.1);
 
             int count_inner_iter         = 0;
@@ -334,20 +333,14 @@ namespace sfem {
         }
 
         T line_search(const T* const x,
-                      const T* const b,
-                      const T* const c,
-                      const T* const lb,
-                      const T* const ub,
-                      const T* const lagr_lb,
-                      const T* const lagr_ub) {
+                      const T* const /*b*/,
+                      const T* const /*c*/,
+                      const T* const /*lb*/,
+                      const T* const /*ub*/,
+                      const T* const /*lagr_lb*/,
+                      const T* const /*lagr_ub*/) {
             auto temp = make_buffer(n_dofs);
             apply_op->apply(x, temp->data());
-
-            const T xtAx = blas->dot(n_dofs, x, temp->data());
-            const T xtb  = blas->dot(n_dofs, x, b);
-
-            T alpha  = 2;
-            T energy = 0;
 
             SFEM_ERROR("IMPLEMENT ME!\n");
             return SFEM_FAILURE;

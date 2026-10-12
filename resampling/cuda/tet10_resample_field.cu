@@ -846,7 +846,7 @@ hex8_to_tet10_resample_field_local_CUDA_wrapper(const int mpi_size,             
 
 #if SFEM_CUDA_MEMORY_MODEL == CUDA_UNIFIED_MEMORY
 
-#pragma message "CUDA_UNIFIED_MEMORY is enabled"
+// #pragma message "CUDA_UNIFIED_MEMORY is enabled"
 
     *bool_assemble_dual_mass_vector = 1;
 
@@ -862,7 +862,7 @@ hex8_to_tet10_resample_field_local_CUDA_wrapper(const int mpi_size,             
                                                               g_host);
 #elif SFEM_CUDA_MEMORY_MODEL == CUDA_MANAGED_MEMORY
 
-#pragma message "CUDA_MEMORY_MANAGED is enabled:"
+// #pragma message "CUDA_MEMORY_MANAGED is enabled:"
 
     *bool_assemble_dual_mass_vector = 1;
 
@@ -880,7 +880,7 @@ hex8_to_tet10_resample_field_local_CUDA_wrapper(const int mpi_size,             
 #elif SFEM_CUDA_MEMORY_MODEL == CUDA_HOST_MEMORY
 
     // Default memory model is CUDA_HOST_MEMORY.
-#pragma message "CUDA_HOST_MEMORY is enabled"
+// #pragma message "CUDA_HOST_MEMORY is enabled"
 
     const int mesh_nnodes           = mpi_size >= 1 ? mesh->nnodes : mesh->n_owned_nodes;
     *bool_assemble_dual_mass_vector = 0;

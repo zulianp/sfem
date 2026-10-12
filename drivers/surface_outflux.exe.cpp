@@ -183,12 +183,6 @@ void surf_cell_values_integrate(const ptrdiff_t nelements,
                           real_t *SFEM_RESTRICT value) {
     SFEM_UNUSED(nnodes);
 
-    double tick = smesh::time_seconds();
-
-    real_t element_vector_x[3];
-    real_t element_vector_y[3];
-    real_t element_vector_z[3];
-
     *value = 0;
 
     idx_t ev[3];
@@ -220,12 +214,6 @@ void surf_cell_values_remove_scaling(const ptrdiff_t nelements,
                           real_t *const SFEM_RESTRICT cell_values
                           ) {
     SFEM_UNUSED(nnodes);
-
-    double tick = smesh::time_seconds();
-
-    real_t element_vector_x[3];
-    real_t element_vector_y[3];
-    real_t element_vector_z[3];
 
     idx_t ev[3];
 

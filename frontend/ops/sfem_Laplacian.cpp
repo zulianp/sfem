@@ -339,9 +339,9 @@ namespace sfem {
 
     Laplacian::~Laplacian() = default;
 
-    int Laplacian::hessian_crs(const real_t *const  x,
-                               const count_t *const rowptr,
-                               const idx_t *const   colidx,
+    int Laplacian::hessian_crs(const real_t *const  /*x*/,
+                               const count_t *const /*rowptr*/,
+                               const idx_t *const   /*colidx*/,
                                real_t *const        values) {
         SFEM_TRACE_SCOPE("Laplacian::hessian_crs");
 
@@ -360,7 +360,7 @@ namespace sfem {
         });
     }
 
-    int Laplacian::hessian_crs_sym(const real_t *const  x,
+    int Laplacian::hessian_crs_sym(const real_t *const  /*x*/,
                                    const count_t *const rowptr,
                                    const idx_t *const   colidx,
                                    real_t *const        diag_values,
@@ -431,7 +431,7 @@ namespace sfem {
         });
     }
 
-    int Laplacian::apply(const real_t *const x, const real_t *const h, real_t *const out, const ElementScope scope) {
+    int Laplacian::apply(const real_t *const /*x*/, const real_t *const h, real_t *const out, const ElementScope scope) {
         auto mesh = impl_->space->mesh_ptr();
         return impl_->iterate([&](const OpDomain &domain) {
             return laplacian_dispatch_domain_vector(domain, *mesh, h, out, domain_element_range(*mesh, domain, scope));

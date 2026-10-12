@@ -99,9 +99,9 @@ void add_matrix_free_scalar_ops(smesh::ElemType                 element_type,
     }
 }
 
-void add_matrix_based_scalar_ops(smesh::ElemType                 element_type,
+void add_matrix_based_scalar_ops(smesh::ElemType                 /*element_type*/,
                                  const bool                      semi_structured,
-                                 const enum sfem::ExecutionSpace es,
+                                 const enum sfem::ExecutionSpace /*es*/,
                                  std::vector<OpDesc_t>          &ops) {
     if (!semi_structured) {
         ops.push_back({.name = "Laplacian", .type = sfem::op_type::CRS, .block_size = 1});
@@ -145,7 +145,7 @@ void add_matrix_free_vector_ops(const int                       dim,
 void add_matrix_based_vector_ops(const int                       dim,
                                  smesh::ElemType                 element_type,
                                  const bool                      semi_structured,
-                                 const enum sfem::ExecutionSpace es,
+                                 const enum sfem::ExecutionSpace /*es*/,
                                  std::vector<OpDesc_t>          &ops) {
     if (element_type == smesh::TET10 || semi_structured) return;
     ops.push_back({.name = "LinearElasticity", .type = sfem::op_type::BSR, .block_size = dim});
@@ -338,7 +338,7 @@ int main(int argc, char *argv[]) {
             double stop      = MPI_Wtime();
             op_desc.setup    = stop - start;
 
-            op_desc.measure(linear_op, input->data(), output->data(), 5);
+            op_desc.measure(linear_op, input->data(), output->data(), SFEM_REPEAT);
         }
 
         std::cout << "#elements " << m->n_elements() << "\n";

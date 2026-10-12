@@ -18,7 +18,7 @@ namespace codegen {
 
 template <typename s_t, typename g_t, int VS>
 SFEM_INLINE const s_t *ageom_stream(
-    const int ne,
+    const int,
     const g_t *const RSTR source,
     s_t *const RSTR,
     std::true_type) {
@@ -768,8 +768,6 @@ static int linear_elasticity_proteus_quad4_hessian_i_msoa_assemble_impl(
   static constexpr int NQ = 4;
   static constexpr int NS = 4;
   static constexpr int NDOFS = NC * NS;
-  const g_t *const RSTR x = points[0];
-  const g_t *const RSTR y = points[1];
   const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
   const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
   const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
@@ -786,7 +784,6 @@ static int linear_elasticity_proteus_quad4_hessian_i_msoa_assemble_impl(
     s_t badj2[NQ];
     s_t badj3[NQ];
     s_t bdet0[NQ];
-    s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
 
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t node = elements[shape][element];

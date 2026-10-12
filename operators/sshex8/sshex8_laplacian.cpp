@@ -5,7 +5,7 @@
 
 #include "hex8_quadrature.hpp"
 #include "sfem_mask.hpp"
-#include "sshex8_skeleton_offdiag_stencil.hpp"
+// #include "sshex8_skeleton_offdiag_stencil.hpp"
 #include "sshex8_skeleton_stencil.hpp"
 #include "stencil3.hpp"
 #include "stencil_cg.hpp"
@@ -43,7 +43,6 @@ int sshex8_laplacian_apply(const int                         level,
                            const real_t *const SFEM_RESTRICT u,
                            real_t *const SFEM_RESTRICT       values) {
     const int nxe = sshex8_nxe(level);
-    const int txe = sshex8_txe(level);
 
     const int proteus_to_std_hex8_corners[8] = {// Bottom
                                                 sshex8_lidx(level, 0, 0, 0),
@@ -62,9 +61,6 @@ int sshex8_laplacian_apply(const int                         level,
     const scalar_t *qy   = q6_y;
     const scalar_t *qz   = q6_z;
     const scalar_t *qw   = q6_w;
-
-    int Lm1  = level - 1;
-    int Lm13 = Lm1 * Lm1 * Lm1;
 
 #pragma omp parallel
     {
@@ -188,7 +184,6 @@ int affine_sshex8_laplacian_apply(const int                         level,
                                   const real_t *const SFEM_RESTRICT u,
                                   real_t *const SFEM_RESTRICT       values) {
     const int nxe = sshex8_nxe(level);
-    const int txe = sshex8_txe(level);
 
     const int proteus_to_std_hex8_corners[8] = {// Bottom
                                                 sshex8_lidx(level, 0, 0, 0),
@@ -201,9 +196,6 @@ int affine_sshex8_laplacian_apply(const int                         level,
                                                 sshex8_lidx(level, level, 0, level),
                                                 sshex8_lidx(level, level, level, level),
                                                 sshex8_lidx(level, 0, level, level)};
-
-    const int Lm1  = level - 1;
-    const int Lm13 = Lm1 * Lm1 * Lm1;
 
 #pragma omp parallel
     {
@@ -336,7 +328,6 @@ int affine_sshex8_laplacian_diag(const int                    level,
                                  geom_t **const SFEM_RESTRICT std_hex8_points,
                                  real_t *const SFEM_RESTRICT  diag) {
     const int nxe = sshex8_nxe(level);
-    const int txe = sshex8_txe(level);
 
     const int proteus_to_std_hex8_corners[8] = {// Bottom
                                                 sshex8_lidx(level, 0, 0, 0),
@@ -349,9 +340,6 @@ int affine_sshex8_laplacian_diag(const int                    level,
                                                 sshex8_lidx(level, level, 0, level),
                                                 sshex8_lidx(level, level, level, level),
                                                 sshex8_lidx(level, 0, level, level)};
-
-    const int Lm1  = level - 1;
-    const int Lm13 = Lm1 * Lm1 * Lm1;
 
 #pragma omp parallel
     {
@@ -441,7 +429,6 @@ int affine_sshex8_laplacian_stencil_apply(const int                         leve
                                           const real_t *const SFEM_RESTRICT u,
                                           real_t *const SFEM_RESTRICT       values) {
     const int nxe = sshex8_nxe(level);
-    const int txe = sshex8_txe(level);
 
     const int proteus_to_std_hex8_corners[8] = {// Bottom
                                                 sshex8_lidx(level, 0, 0, 0),
@@ -455,9 +442,6 @@ int affine_sshex8_laplacian_stencil_apply(const int                         leve
                                                 sshex8_lidx(level, level, level, level),
                                                 sshex8_lidx(level, 0, level, level)};
 
-    const int Lm1  = level - 1;
-    const int Lm13 = Lm1 * Lm1 * Lm1;
-
 #pragma omp parallel
     {
         // Allocation per thread
@@ -469,8 +453,6 @@ int affine_sshex8_laplacian_stencil_apply(const int                         leve
         scalar_t y[8];
         scalar_t z[8];
 
-        scalar_t      element_u[8];
-        accumulator_t element_vector[8];
         scalar_t      m_fff[6], fff[6];
 
 #pragma omp for
@@ -594,7 +576,7 @@ int affine_sshex8_laplacian_stencil_apply(const int                         leve
 
 int sshex8_laplacian_element_matrix(int                           level,
                                     const ptrdiff_t               nelements,
-                                    const ptrdiff_t               nnodes,
+                                    const ptrdiff_t               /*nnodes*/,
                                     idx_t **const SFEM_RESTRICT   elements,
                                     geom_t **const SFEM_RESTRICT  points,
                                     scalar_t *const SFEM_RESTRICT values) {
@@ -626,7 +608,6 @@ int sshex8_laplacian_element_matrix(int                           level,
         hex8_fff(lx, ly, lz, 0.5, 0.5, 0.5, m_fff);
         hex8_sub_fff_0(m_fff, h, fff);
 
-        accumulator_t element_matrix[8 * 8];
         hex8_laplacian_matrix_fff_integral(fff, &values[i * 64]);
     }
 
@@ -635,7 +616,7 @@ int sshex8_laplacian_element_matrix(int                           level,
 
 int sshex8_laplacian_element_matrix_cartesian(int                           level,
                                               const ptrdiff_t               nelements,
-                                              const ptrdiff_t               nnodes,
+                                              const ptrdiff_t               /*nnodes*/,
                                               idx_t **const SFEM_RESTRICT   elements,
                                               geom_t **const SFEM_RESTRICT  points,
                                               scalar_t *const SFEM_RESTRICT values) {
@@ -702,10 +683,6 @@ int affine_sshex8_laplacian_stencil_apply_fff(const int                         
                                               const real_t *const SFEM_RESTRICT     u,
                                               real_t *const SFEM_RESTRICT           values) {
     const int nxe = sshex8_nxe(level);
-    const int txe = sshex8_txe(level);
-
-    const int Lm1  = level - 1;
-    const int Lm13 = Lm1 * Lm1 * Lm1;
 
 #pragma omp parallel
     {
@@ -714,8 +691,6 @@ int affine_sshex8_laplacian_stencil_apply_fff(const int                         
         idx_t         *ev = (idx_t *)malloc(nxe * sizeof(idx_t));
         accumulator_t *v  = (accumulator_t *)malloc(nxe * sizeof(accumulator_t));
 
-        scalar_t      element_u[8];
-        accumulator_t element_vector[8];
         scalar_t      m_fff[6], fff[6];
 
 #pragma omp for
@@ -775,7 +750,6 @@ int affine_sshex8_laplacian_substructuring_inner_fff(const int                  
                                                      const real_t *const SFEM_RESTRICT     rhs,
                                                      real_t *const SFEM_RESTRICT           u) {
     const int nxe = sshex8_nxe(level);
-    const int txe = sshex8_txe(level);
 
 #pragma omp parallel
     {
@@ -787,8 +761,6 @@ int affine_sshex8_laplacian_substructuring_inner_fff(const int                  
         scalar_t *p    = (scalar_t *)malloc(nxe * sizeof(scalar_t));
         scalar_t *Ap   = (scalar_t *)malloc(nxe * sizeof(scalar_t));
 
-        scalar_t      element_u[8];
-        accumulator_t element_vector[8];
         scalar_t      laplacian_stencil[3 * 3 * 3];
 
         const scalar_t h = 1. / level;
@@ -932,16 +904,13 @@ int affine_sshex8_laplacian_bjacobi_fff(const int                             le
                                         const jacobian_t *const SFEM_RESTRICT g_fff,
                                         const uint16_t *const                 count,
                                         const mask_t *const                   mask,
-                                        const real_t *const SFEM_RESTRICT     diag,
+                                        const real_t *const SFEM_RESTRICT     /*diag*/,
                                         const real_t *const SFEM_RESTRICT     rhs,
                                         real_t *const SFEM_RESTRICT           u) {
     const int           nxe             = sshex8_nxe(level);
     const int           levelp2         = level + 2;
     const int           gnxe            = (level + 3) * (level + 3) * (level + 3);
-    const int           txe             = sshex8_txe(level);
     const int           nn              = level + 3;
-    const int           lystride        = nn;
-    const int           lzstride        = lystride * lystride;
     static const real_t over_relaxation = 1;
 
 #pragma omp parallel
@@ -992,22 +961,22 @@ int affine_sshex8_laplacian_bjacobi_fff(const int                             le
 
             memset(eu, 0, gnxe * sizeof(scalar_t));
 
-            int err = sshex8_stencil_c_cg(10,
-                                          0,
-                                          0,
-                                          // Grid info
-                                          nn,
-                                          nn,
-                                          nn,
-                                          laplacian_stencil,
-                                          emask,
-                                          erhs,
-                                          // Temps
-                                          r,
-                                          p,
-                                          Ap,
-                                          // Out
-                                          eu);
+            sshex8_stencil_c_cg(10,
+                                0,
+                                0,
+                                // Grid info
+                                nn,
+                                nn,
+                                nn,
+                                laplacian_stencil,
+                                emask,
+                                erhs,
+                                // Temps
+                                r,
+                                p,
+                                Ap,
+                                // Out
+                                eu);
 
             // Scatter elemental data
             for (int zi = 1; zi < levelp2; zi++) {

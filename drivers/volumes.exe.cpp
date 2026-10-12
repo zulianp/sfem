@@ -88,8 +88,6 @@ int compute_volumes(const std::shared_ptr<sfem::Communicator> &comm, int argc, c
         volumes[i] = vol;
     }
 
-    int SFEM_VERBOSE = 1;
-    SFEM_READ_ENV(SFEM_VERBOSE, atoi);
     volumes_buf->to_file(smesh::Path(path_output));
 
     const double tock = smesh::time_seconds();

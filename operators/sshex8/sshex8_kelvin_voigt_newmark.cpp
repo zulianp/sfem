@@ -15,22 +15,6 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-static void print_matrix(int r, int c, const scalar_t *const m) {
-    printf("A = [");
-    for (int i = 0; i < r; i++) {
-        for (int j = 0; j < c; j++) {
-            printf("%g", m[i * c + j]);
-
-            if (j < c - 1) {
-                printf(",");
-            }
-        }
-        if (i < r - 1) {
-            printf(";\n");
-        }
-    }
-    printf("]\n");
-}
 
 int sshex8_macro_hex8_adjugate_and_det_fill(const int                       level,
                                             const ptrdiff_t                 nelements,
@@ -224,7 +208,7 @@ int affine_sshex8_kelvin_voigt_newmark_apply_adjugate(const int                 
 
 int affine_sshex8_kelvin_voigt_newmark_apply(const int                    level,
                                              const ptrdiff_t              nelements,
-                                             const ptrdiff_t              nnodes,
+                                             const ptrdiff_t              /*nnodes*/,
                                              idx_t **const SFEM_RESTRICT  elements,
                                              geom_t **const SFEM_RESTRICT points,
                                              const real_t                 k,
@@ -243,7 +227,6 @@ int affine_sshex8_kelvin_voigt_newmark_apply(const int                    level,
                                              real_t *const                outy,
                                              real_t *const                outz) {
     const int nxe = sshex8_nxe(level);
-    const int txe = sshex8_txe(level);
 
     const int proteus_to_std_hex8_corners[8] = {// Bottom
                                                 sshex8_lidx(level, 0, 0, 0),
@@ -273,8 +256,6 @@ int affine_sshex8_kelvin_voigt_newmark_apply(const int                    level,
         scalar_t x[8];
         scalar_t y[8];
         scalar_t z[8];
-
-        scalar_t m_adjugate[9], adjugate[9];
 
         scalar_t      element_u[3 * 8];
         accumulator_t element_out[3 * 8];
@@ -584,7 +565,7 @@ int affine_sshex8_kelvin_voigt_newmark_gradient_adjugate(const int              
 
 int affine_sshex8_kelvin_voigt_newmark_gradient(const int                    level,
                                                 const ptrdiff_t              nelements,
-                                                const ptrdiff_t              nnodes,
+                                                const ptrdiff_t              /*nnodes*/,
                                                 idx_t **const SFEM_RESTRICT  elements,
                                                 geom_t **const SFEM_RESTRICT points,
                                                 const real_t                 k,
@@ -606,7 +587,6 @@ int affine_sshex8_kelvin_voigt_newmark_gradient(const int                    lev
                                                 real_t *const                outy,
                                                 real_t *const                outz) {
     const int nxe = sshex8_nxe(level);
-    const int txe = sshex8_txe(level);
 
     const int proteus_to_std_hex8_corners[8] = {// Bottom
                                                 sshex8_lidx(level, 0, 0, 0),
@@ -640,8 +620,6 @@ int affine_sshex8_kelvin_voigt_newmark_gradient(const int                    lev
         scalar_t x[8];
         scalar_t y[8];
         scalar_t z[8];
-
-        scalar_t m_adjugate[9], adjugate[9];
 
         scalar_t      element_u[3 * 8];
         scalar_t      element_vel[3 * 8];
@@ -809,7 +787,7 @@ int affine_sshex8_kelvin_voigt_newmark_gradient(const int                    lev
 
 int affine_sshex8_kelvin_voigt_newmark_diag(const int                    level,
                                             const ptrdiff_t              nelements,
-                                            const ptrdiff_t              nnodes,
+                                            const ptrdiff_t              /*nnodes*/,
                                             idx_t **const SFEM_RESTRICT  elements,
                                             geom_t **const SFEM_RESTRICT points,
                                             const real_t                 beta,
@@ -824,7 +802,6 @@ int affine_sshex8_kelvin_voigt_newmark_diag(const int                    level,
                                             real_t *const                outy,
                                             real_t *const                outz) {
     const int nxe = sshex8_nxe(level);
-    const int txe = sshex8_txe(level);
 
     const int proteus_to_std_hex8_corners[8] = {// Bottom
                                                 sshex8_lidx(level, 0, 0, 0),
@@ -837,8 +814,6 @@ int affine_sshex8_kelvin_voigt_newmark_diag(const int                    level,
                                                 sshex8_lidx(level, level, 0, level),
                                                 sshex8_lidx(level, level, level, level),
                                                 sshex8_lidx(level, 0, level, level)};
-    int       Lm1                            = level - 1;
-    int       Lm13                           = Lm1 * Lm1 * Lm1;
 
 #pragma omp parallel
     {
@@ -855,7 +830,6 @@ int affine_sshex8_kelvin_voigt_newmark_diag(const int                    level,
         scalar_t y[8];
         scalar_t z[8];
 
-        scalar_t m_adjugate[9], adjugate[9];
         scalar_t element_diag[(3 * 8)];
 
 #pragma omp for
@@ -945,7 +919,7 @@ int affine_sshex8_kelvin_voigt_newmark_diag(const int                    level,
 
 int affine_sshex8_kelvin_voigt_newmark_block_diag_sym(const int                    level,
                                                       const ptrdiff_t              nelements,
-                                                      const ptrdiff_t              nnodes,
+                                                      const ptrdiff_t              /*nnodes*/,
                                                       idx_t **const SFEM_RESTRICT  elements,
                                                       geom_t **const SFEM_RESTRICT points,
                                                       const real_t                 beta,
@@ -963,7 +937,6 @@ int affine_sshex8_kelvin_voigt_newmark_block_diag_sym(const int                 
                                                       real_t *const SFEM_RESTRICT  out4,
                                                       real_t *const SFEM_RESTRICT  out5) {
     const int nxe = sshex8_nxe(level);
-    const int txe = sshex8_txe(level);
 
     real_t *outs[6] = {out0, out1, out2, out3, out4, out5};
 
@@ -996,8 +969,6 @@ int affine_sshex8_kelvin_voigt_newmark_block_diag_sym(const int                 
                                                 sshex8_lidx(level, level, 0, level),
                                                 sshex8_lidx(level, level, level, level),
                                                 sshex8_lidx(level, 0, level, level)};
-    int       Lm1                            = level - 1;
-    int       Lm13                           = Lm1 * Lm1 * Lm1;
 
 #pragma omp parallel
     {

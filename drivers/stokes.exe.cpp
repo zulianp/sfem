@@ -68,13 +68,13 @@ static SFEM_INLINE real_t rhs3_y(const real_t mu, const real_t x, const real_t y
     return pis4 * mu * sin(pi2 * x) * (2 * cos(pi2 * y) - 1) - pis4 * sin(pi2 * y);
 }
 
-static SFEM_INLINE real_t rhs4_x(const real_t mu, const real_t x, const real_t y, const real_t z) {
+static SFEM_INLINE real_t rhs4_x(const real_t mu, const real_t x, const real_t y, const real_t /*z*/) {
     const real_t pis4 = 4 * M_PI * M_PI;
     const real_t pi2 = 2 * M_PI;
     return -pis4 * mu * sin(pi2 * y) * (2 * cos(pi2 * x) - 1) + pis4 * sin(pi2 * x);
 }
 
-static SFEM_INLINE real_t rhs4_y(const real_t mu, const real_t x, const real_t y, const real_t z) {
+static SFEM_INLINE real_t rhs4_y(const real_t mu, const real_t x, const real_t y, const real_t /*z*/) {
     const real_t pis4 = 4 * M_PI * M_PI;
     const real_t pi2 = 2 * M_PI;
     return pis4 * mu * sin(pi2 * x) * (2 * cos(pi2 * y) - 1) - pis4 * sin(pi2 * y);
@@ -86,7 +86,7 @@ static SFEM_INLINE real_t rhs4_z(const real_t mu, const real_t x, const real_t y
     return pis4 * mu * sin(pi2 * z) * (2 * cos(pi2 * x) - 1) - pis4 * sin(pi2 * y);
 }
 
-static SFEM_INLINE real_t rhs5_x(const real_t mu, const real_t x, const real_t y, const real_t z) {
+static SFEM_INLINE real_t rhs5_x(const real_t /*mu*/, const real_t x, const real_t y, const real_t z) {
     return 10000 * (x * x + y * y + z * z);
 }
 

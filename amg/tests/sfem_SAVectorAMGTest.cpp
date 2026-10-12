@@ -46,62 +46,6 @@ namespace {
         return std::sqrt(nrm2);
     }
 
-    std::shared_ptr<sfem::Operator<real_t>> sa_coarse_correction(
-            const sfem::SAVectorAMGLevel<sfem::count_t, sfem::idx_t, real_t, real_t>& level) {
-        auto coarse_op         = zeroing_op(level.coarse_a);
-        auto coarse_solver     = sfem::create_cg<real_t>(coarse_op, sfem::EXECUTION_SPACE_HOST);
-        coarse_solver->verbose = false;
-        coarse_solver->set_rtol(1e-10);
-        coarse_solver->set_atol(1e-14);
-        coarse_solver->set_max_it(80);
-
-        printf("coarse_solver->rows(): %ld\n", coarse_solver->rows());
-
-        auto coarse_rhs = sfem::create_host_buffer<real_t>(level.r->rows());
-        auto coarse_x   = sfem::create_host_buffer<real_t>(level.p->cols());
-
-        return sfem::make_op<real_t>(
-                level.p->rows(),
-                level.r->cols(),
-                [=](const real_t* const x, real_t* const y) {
-#pragma omp parallel for
-                    for (ptrdiff_t i = 0; i < level.r->rows(); ++i) {
-                        coarse_rhs->data()[i] = 0;
-                        coarse_x->data()[i]   = 0;
-                    }
-
-                    level.r->apply(x, coarse_rhs->data());
-                    coarse_solver->apply(coarse_rhs->data(), coarse_x->data());
-
-#pragma omp parallel for
-                    for (ptrdiff_t i = 0; i < level.p->rows(); ++i) {
-                        y[i] = 0;
-                    }
-                    level.p->apply(coarse_x->data(), y);
-                },
-                sfem::EXECUTION_SPACE_HOST);
-    }
-
-    std::shared_ptr<sfem::Operator<real_t>> additive_sa_preconditioner(
-            const sfem::SAVectorAMGLevel<sfem::count_t, sfem::idx_t, real_t, real_t>& level,
-            const sfem::SharedBuffer<real_t>&                                         inv_diag) {
-        auto coarse      = sa_coarse_correction(level);
-        auto coarse_work = sfem::create_host_buffer<real_t>(level.p->rows());
-
-        return sfem::make_op<real_t>(
-                level.p->rows(),
-                level.r->cols(),
-                [=](const real_t* const x, real_t* const y) {
-                    coarse->apply(x, coarse_work->data());
-
-#pragma omp parallel for
-                    for (ptrdiff_t i = 0; i < level.p->rows(); ++i) {
-                        y[i] = inv_diag->data()[i] * x[i] + coarse_work->data()[i];
-                    }
-                },
-                sfem::EXECUTION_SPACE_HOST);
-    }
-
     std::shared_ptr<sfem::Operator<real_t>> inverse_diagonal_preconditioner(const sfem::SharedBuffer<real_t>& inv_diag) {
         return sfem::make_op<real_t>(
                 inv_diag->size(),
@@ -112,34 +56,6 @@ namespace {
                     }
                 },
                 sfem::EXECUTION_SPACE_HOST);
-    }
-
-    sfem::SharedBuffer<real_t> bsr_inverse_diagonal(
-            const std::shared_ptr<sfem::BSR<sfem::count_t, sfem::idx_t, real_t, real_t>>& a) {
-        const ptrdiff_t block_rows = a->row_ptr->size() - 1;
-        const int       block_size = a->block_size();
-        auto            inv_diag   = sfem::create_host_buffer<real_t>(a->rows());
-
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < a->rows(); ++i) {
-            inv_diag->data()[i] = 1;
-        }
-
-#pragma omp parallel for
-        for (ptrdiff_t node = 0; node < block_rows; ++node) {
-            for (sfem::count_t k = a->row_ptr->data()[node]; k < a->row_ptr->data()[node + 1]; ++k) {
-                if (a->col_idx->data()[k] != node) continue;
-
-                const real_t* const block = &a->values->data()[k * block_size * block_size];
-                for (int d = 0; d < block_size; ++d) {
-                    const real_t diag                       = block[d * block_size + d];
-                    inv_diag->data()[node * block_size + d] = std::abs(diag) > 1e-14 ? 1 / diag : 1;
-                }
-                break;
-            }
-        }
-
-        return inv_diag;
     }
 
     sfem::SharedBuffer<real_t> bsr_inverse_diagonal_blocks(
@@ -246,84 +162,6 @@ namespace {
                                 value += inv[d * block_size + e] * x[node * block_size + e];
                             }
                             y[node * block_size + d] = value;
-                        }
-                    }
-                },
-                sfem::EXECUTION_SPACE_HOST);
-    }
-
-    std::shared_ptr<sfem::Operator<real_t>> sa_multilevel_additive_preconditioner(
-            const sfem::SAVectorAMGHierarchy<sfem::count_t, sfem::idx_t, real_t>& hierarchy,
-            const ptrdiff_t                                                       level_idx,
-            const sfem::SharedBuffer<real_t>&                                     inv_diag_blocks) {
-        const auto level      = hierarchy.levels[level_idx];
-        const int  block_size = level.a->block_size();
-
-        std::shared_ptr<sfem::Operator<real_t>> coarse_apply;
-        if (level_idx + 1 < static_cast<ptrdiff_t>(hierarchy.levels.size())) {
-            auto next_inv_diag_blocks = bsr_inverse_diagonal_blocks(hierarchy.levels[level_idx + 1].a);
-            coarse_apply              = sa_multilevel_additive_preconditioner(hierarchy, level_idx + 1, next_inv_diag_blocks);
-        } else {
-            auto coarse_op         = zeroing_op(level.coarse_a);
-            auto coarse_solver     = sfem::create_cg<real_t>(coarse_op, sfem::EXECUTION_SPACE_HOST);
-            coarse_solver->verbose = false;
-            coarse_solver->set_preconditioner_op(
-                    block_diagonal_preconditioner(bsr_inverse_diagonal_blocks(level.coarse_a), level.coarse_a->block_size()));
-            coarse_solver->set_rtol(1e-10);
-            coarse_solver->set_atol(1e-14);
-            coarse_solver->set_max_it(200);
-
-            printf("hierarchy_level: %ld, coarse_solver->rows(): %ld\n", level_idx, coarse_solver->rows());
-
-            coarse_apply = sfem::make_op<real_t>(
-                    coarse_op->rows(),
-                    coarse_op->cols(),
-                    [=](const real_t* const x, real_t* const y) {
-                        for (ptrdiff_t i = 0; i < coarse_op->rows(); ++i) {
-                            y[i] = 0;
-                        }
-                        coarse_solver->apply(x, y);
-                    },
-                    sfem::EXECUTION_SPACE_HOST);
-        }
-
-        printf("hierarchy_level: %ld, additive_rows: %ld, coarse_rows: %ld\n",
-               level_idx,
-               level.a->rows(),
-               level.coarse_a->rows());
-
-        auto coarse_rhs  = sfem::create_host_buffer<real_t>(level.r->rows());
-        auto coarse_x    = sfem::create_host_buffer<real_t>(level.p->cols());
-        auto coarse_work = sfem::create_host_buffer<real_t>(level.p->rows());
-
-        return sfem::make_op<real_t>(
-                level.p->rows(),
-                level.r->cols(),
-                [=](const real_t* const x, real_t* const y) {
-                    for (ptrdiff_t i = 0; i < level.r->rows(); ++i) {
-                        coarse_rhs->data()[i] = 0;
-                        coarse_x->data()[i]   = 0;
-                    }
-
-                    level.r->apply(x, coarse_rhs->data());
-                    coarse_apply->apply(coarse_rhs->data(), coarse_x->data());
-
-                    for (ptrdiff_t i = 0; i < level.p->rows(); ++i) {
-                        coarse_work->data()[i] = 0;
-                    }
-                    level.p->apply(coarse_x->data(), coarse_work->data());
-
-                    const ptrdiff_t block_rows = level.a->row_ptr->size() - 1;
-
-#pragma omp parallel for
-                    for (ptrdiff_t node = 0; node < block_rows; ++node) {
-                        const real_t* const inv = &inv_diag_blocks->data()[node * block_size * block_size];
-                        for (int d = 0; d < block_size; ++d) {
-                            real_t smooth = 0;
-                            for (int e = 0; e < block_size; ++e) {
-                                smooth += inv[d * block_size + e] * x[node * block_size + e];
-                            }
-                            y[node * block_size + d] = smooth + coarse_work->data()[node * block_size + d];
                         }
                     }
                 },

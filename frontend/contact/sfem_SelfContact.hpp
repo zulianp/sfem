@@ -6,7 +6,7 @@
 
 #include <memory>
 
-#ifdef SFEM_ENABLE_YAML
+#ifdef SFEM_ENABLE_RYAML
 #include "smesh_forward_declarations.hpp"
 #endif
 
@@ -33,7 +33,7 @@ namespace sfem {
                                             real_t                                search_radius_sqr,
                                             ExecutionSpace                        es);
 
-#ifdef SFEM_ENABLE_YAML
+#ifdef SFEM_ENABLE_RYAML
     std::shared_ptr<Contact> create_contact(const std::shared_ptr<FunctionSpace>& space,
                                             const std::shared_ptr<smesh::Mesh>&   surface,
                                             const ryml::ConstNodeRef&             node,

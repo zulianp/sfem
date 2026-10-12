@@ -22,10 +22,6 @@ int affine_sshex8_vector_laplacian_apply_fff(const int                          
                                              real_t **const SFEM_RESTRICT          u,
                                              real_t **const SFEM_RESTRICT          values) {
     const int nxe = sshex8_nxe(level);
-    const int txe = sshex8_txe(level);
-
-    const int Lm1  = level - 1;
-    const int Lm13 = Lm1 * Lm1 * Lm1;
 
 #pragma omp parallel
     {
@@ -34,8 +30,6 @@ int affine_sshex8_vector_laplacian_apply_fff(const int                          
         idx_t         *ev = (idx_t *)malloc(nxe * sizeof(idx_t));
         accumulator_t *v  = (accumulator_t *)malloc(nxe * sizeof(accumulator_t));
 
-        scalar_t      element_u[8];
-        accumulator_t element_vector[8];
         scalar_t      fff[6];
 
         const scalar_t h = 1. / level;

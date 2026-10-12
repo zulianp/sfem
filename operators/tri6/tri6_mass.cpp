@@ -264,7 +264,6 @@ void tri6_assemble_lumped_mass(const ptrdiff_t nelements,
 #pragma omp for  // nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[6];
-            idx_t ks[6];
 
             real_t element_vector[6];
 #pragma unroll(6)

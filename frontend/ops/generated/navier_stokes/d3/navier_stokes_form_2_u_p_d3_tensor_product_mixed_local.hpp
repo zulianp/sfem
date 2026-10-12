@@ -37,7 +37,7 @@ template <typename s_t, int NQ, int CELL_NS, int VS>
 static SFEM_INLINE void navier_stokes_form_2_u_p_d3_tensor_product_mixed_jacobian_action_block(
     const int ne,
     const ptrdiff_t geometry_stride,
-    const s_t *const RSTR determinant,
+    const s_t *const RSTR,
     const s_t *const RSTR adjugate[9],
     const s_t *const RSTR field_shape_1d[2],
     const s_t *const RSTR field_grad_1d[2],
@@ -71,7 +71,6 @@ static SFEM_INLINE void navier_stokes_form_2_u_p_d3_tensor_product_mixed_jacobia
     const int qy = (q / NQ1) % NQ1;
     const int qz = q / (NQ1 * NQ1);
     const s_t qw = q_weight_1d[qx] * q_weight_1d[qy] * q_weight_1d[qz];
-    const s_t *const RSTR det_q = determinant + q * geometry_stride;
     const s_t *const RSTR adj_q0 = adjugate[0] + q * geometry_stride;
     const s_t *const RSTR adj_q1 = adjugate[1] + q * geometry_stride;
     const s_t *const RSTR adj_q2 = adjugate[2] + q * geometry_stride;
@@ -100,7 +99,6 @@ static SFEM_INLINE void navier_stokes_form_2_u_p_d3_tensor_product_mixed_jacobia
     s_t *const RSTR p_grad_coeff_ref_q2 = &p_grad_coeff_ref[(q * ND + 2) * VS];
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
-      const s_t det = det_q[lane];
       const s_t adj0 = adj_q0[lane];
       const s_t adj1 = adj_q1[lane];
       const s_t adj2 = adj_q2[lane];
@@ -151,7 +149,7 @@ template <typename s_t, int NQ, int CELL_NS, int VS>
 static SFEM_INLINE void navier_stokes_form_2_u_p_d3_tensor_product_mixed_jacobian_action_block_contiguous(
     const int ne,
     const ptrdiff_t geometry_stride,
-    const s_t *const RSTR determinant,
+    const s_t *const RSTR,
     const s_t *const RSTR adjugate[9],
     const s_t *const RSTR field_shape_1d[2],
     const s_t *const RSTR field_grad_1d[2],
@@ -184,7 +182,6 @@ static SFEM_INLINE void navier_stokes_form_2_u_p_d3_tensor_product_mixed_jacobia
     const int qy = (q / NQ1) % NQ1;
     const int qz = q / (NQ1 * NQ1);
     const s_t qw = q_weight_1d[qx] * q_weight_1d[qy] * q_weight_1d[qz];
-    const s_t *const RSTR det_q = determinant + q * geometry_stride;
     const s_t *const RSTR adj_q0 = adjugate[0] + q * geometry_stride;
     const s_t *const RSTR adj_q1 = adjugate[1] + q * geometry_stride;
     const s_t *const RSTR adj_q2 = adjugate[2] + q * geometry_stride;
@@ -213,7 +210,6 @@ static SFEM_INLINE void navier_stokes_form_2_u_p_d3_tensor_product_mixed_jacobia
     s_t *const RSTR p_grad_coeff_ref_q2 = &p_grad_coeff_ref[(q * ND + 2) * VS];
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
-      const s_t det = det_q[lane];
       const s_t adj0 = adj_q0[lane];
       const s_t adj1 = adj_q1[lane];
       const s_t adj2 = adj_q2[lane];

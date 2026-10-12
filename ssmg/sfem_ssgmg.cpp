@@ -7,6 +7,7 @@
 namespace sfem {
 
     std::shared_ptr<Multigrid<real_t>> create_ssgmg(const std::shared_ptr<Function> &f, const enum ExecutionSpace es) {
+        SFEM_UNUSED(es);
         SFEM_TRACE_SCOPE("create_ssgmg");
 
         auto data = sfem::create_gmg_data(f);

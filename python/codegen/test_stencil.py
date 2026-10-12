@@ -5,6 +5,8 @@ from quad4 import *
 from mass_op import *
 from laplace_op import *
 
+import re
+
 
 def assign_matrix(name, mat):
     rows, cols = mat.shape
@@ -26,6 +28,26 @@ def assign_tensor3(name, mat):
                 val = mat[zi * 9 + yi * 3 + xi]
                 expr.append(ast.Assignment(var, val))
     return expr
+
+
+def comment_unused_params(code):
+    head, body = code.split("{\n", 1)
+    for p in ["xc", "yc", "zc"]:
+        if not re.search(rf"\b{p}\b", body):
+            head = head.replace(f"const ptrdiff_t {p},", f"const ptrdiff_t /*{p}*/,")
+    return head + "{\n" + body
+
+
+def comment_out(code):
+    return "\n".join("// " + line if line else line for line in code.split("\n"))
+
+
+def finalize_stencil(k, code):
+    code = comment_unused_params(code)
+    # The surface stencils skip the interior category: its call is commented out, so is its definition
+    if k == "stencil111":
+        code = comment_out(code)
+    return code
 
 
 def full_stencil(fe):
@@ -90,7 +112,7 @@ def full_stencil(fe):
         code += "}\n"
         code += "}\n"
         code += "}\n"
-        print(code)
+        print(finalize_stencil(k, code))
 
     code = "static void sshex8_surface_stencil"
     code += paramlist
@@ -170,7 +192,7 @@ def offdiag_stencil(fe):
         code += "}\n"
         code += "}\n"
         code += "}\n"
-        print(code)
+        print(finalize_stencil(k, code))
 
     code = "static void sshex8_surface_offdiag_stencil"
     code += paramlist

@@ -20,7 +20,7 @@ namespace codegen {
 
 template <typename s_t, typename g_t, int VS>
 SFEM_INLINE const s_t *ageom_stream(
-    const int ne,
+    const int,
     const g_t *const RSTR source,
     s_t *const RSTR,
     std::true_type) {
@@ -737,7 +737,6 @@ static SFEM_INLINE int modified_mooney_rivlin_proteus_hex64_objective_steps_pack
         s_t badj7[NQ * VS];
         s_t badj8[NQ * VS];
         s_t bdet0[NQ * VS];
-        s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
 
         const s_t *bu_streams[NS * NC] = {bu_data[0], bu_data[1], bu_data[2], bu_data[3], bu_data[4], bu_data[5], bu_data[6], bu_data[7], bu_data[8], bu_data[9], bu_data[10], bu_data[11], bu_data[12], bu_data[13], bu_data[14], bu_data[15], bu_data[16], bu_data[17], bu_data[18], bu_data[19], bu_data[20], bu_data[21], bu_data[22], bu_data[23], bu_data[24], bu_data[25], bu_data[26], bu_data[27], bu_data[28], bu_data[29], bu_data[30], bu_data[31], bu_data[32], bu_data[33], bu_data[34], bu_data[35], bu_data[36], bu_data[37], bu_data[38], bu_data[39], bu_data[40], bu_data[41], bu_data[42], bu_data[43], bu_data[44], bu_data[45], bu_data[46], bu_data[47], bu_data[48], bu_data[49], bu_data[50], bu_data[51], bu_data[52], bu_data[53], bu_data[54], bu_data[55], bu_data[56], bu_data[57], bu_data[58], bu_data[59], bu_data[60], bu_data[61], bu_data[62], bu_data[63], bu_data[64], bu_data[65], bu_data[66], bu_data[67], bu_data[68], bu_data[69], bu_data[70], bu_data[71], bu_data[72], bu_data[73], bu_data[74], bu_data[75], bu_data[76], bu_data[77], bu_data[78], bu_data[79], bu_data[80], bu_data[81], bu_data[82], bu_data[83], bu_data[84], bu_data[85], bu_data[86], bu_data[87], bu_data[88], bu_data[89], bu_data[90], bu_data[91], bu_data[92], bu_data[93], bu_data[94], bu_data[95], bu_data[96], bu_data[97], bu_data[98], bu_data[99], bu_data[100], bu_data[101], bu_data[102], bu_data[103], bu_data[104], bu_data[105], bu_data[106], bu_data[107], bu_data[108], bu_data[109], bu_data[110], bu_data[111], bu_data[112], bu_data[113], bu_data[114], bu_data[115], bu_data[116], bu_data[117], bu_data[118], bu_data[119], bu_data[120], bu_data[121], bu_data[122], bu_data[123], bu_data[124], bu_data[125], bu_data[126], bu_data[127], bu_data[128], bu_data[129], bu_data[130], bu_data[131], bu_data[132], bu_data[133], bu_data[134], bu_data[135], bu_data[136], bu_data[137], bu_data[138], bu_data[139], bu_data[140], bu_data[141], bu_data[142], bu_data[143], bu_data[144], bu_data[145], bu_data[146], bu_data[147], bu_data[148], bu_data[149], bu_data[150], bu_data[151], bu_data[152], bu_data[153], bu_data[154], bu_data[155], bu_data[156], bu_data[157], bu_data[158], bu_data[159], bu_data[160], bu_data[161], bu_data[162], bu_data[163], bu_data[164], bu_data[165], bu_data[166], bu_data[167], bu_data[168], bu_data[169], bu_data[170], bu_data[171], bu_data[172], bu_data[173], bu_data[174], bu_data[175], bu_data[176], bu_data[177], bu_data[178], bu_data[179], bu_data[180], bu_data[181], bu_data[182], bu_data[183], bu_data[184], bu_data[185], bu_data[186], bu_data[187], bu_data[188], bu_data[189], bu_data[190], bu_data[191]};
         const s_t *bh_streams[NS * NC] = {bh_data[0], bh_data[1], bh_data[2], bh_data[3], bh_data[4], bh_data[5], bh_data[6], bh_data[7], bh_data[8], bh_data[9], bh_data[10], bh_data[11], bh_data[12], bh_data[13], bh_data[14], bh_data[15], bh_data[16], bh_data[17], bh_data[18], bh_data[19], bh_data[20], bh_data[21], bh_data[22], bh_data[23], bh_data[24], bh_data[25], bh_data[26], bh_data[27], bh_data[28], bh_data[29], bh_data[30], bh_data[31], bh_data[32], bh_data[33], bh_data[34], bh_data[35], bh_data[36], bh_data[37], bh_data[38], bh_data[39], bh_data[40], bh_data[41], bh_data[42], bh_data[43], bh_data[44], bh_data[45], bh_data[46], bh_data[47], bh_data[48], bh_data[49], bh_data[50], bh_data[51], bh_data[52], bh_data[53], bh_data[54], bh_data[55], bh_data[56], bh_data[57], bh_data[58], bh_data[59], bh_data[60], bh_data[61], bh_data[62], bh_data[63], bh_data[64], bh_data[65], bh_data[66], bh_data[67], bh_data[68], bh_data[69], bh_data[70], bh_data[71], bh_data[72], bh_data[73], bh_data[74], bh_data[75], bh_data[76], bh_data[77], bh_data[78], bh_data[79], bh_data[80], bh_data[81], bh_data[82], bh_data[83], bh_data[84], bh_data[85], bh_data[86], bh_data[87], bh_data[88], bh_data[89], bh_data[90], bh_data[91], bh_data[92], bh_data[93], bh_data[94], bh_data[95], bh_data[96], bh_data[97], bh_data[98], bh_data[99], bh_data[100], bh_data[101], bh_data[102], bh_data[103], bh_data[104], bh_data[105], bh_data[106], bh_data[107], bh_data[108], bh_data[109], bh_data[110], bh_data[111], bh_data[112], bh_data[113], bh_data[114], bh_data[115], bh_data[116], bh_data[117], bh_data[118], bh_data[119], bh_data[120], bh_data[121], bh_data[122], bh_data[123], bh_data[124], bh_data[125], bh_data[126], bh_data[127], bh_data[128], bh_data[129], bh_data[130], bh_data[131], bh_data[132], bh_data[133], bh_data[134], bh_data[135], bh_data[136], bh_data[137], bh_data[138], bh_data[139], bh_data[140], bh_data[141], bh_data[142], bh_data[143], bh_data[144], bh_data[145], bh_data[146], bh_data[147], bh_data[148], bh_data[149], bh_data[150], bh_data[151], bh_data[152], bh_data[153], bh_data[154], bh_data[155], bh_data[156], bh_data[157], bh_data[158], bh_data[159], bh_data[160], bh_data[161], bh_data[162], bh_data[163], bh_data[164], bh_data[165], bh_data[166], bh_data[167], bh_data[168], bh_data[169], bh_data[170], bh_data[171], bh_data[172], bh_data[173], bh_data[174], bh_data[175], bh_data[176], bh_data[177], bh_data[178], bh_data[179], bh_data[180], bh_data[181], bh_data[182], bh_data[183], bh_data[184], bh_data[185], bh_data[186], bh_data[187], bh_data[188], bh_data[189], bh_data[190], bh_data[191]};
@@ -1800,7 +1799,6 @@ static SFEM_INLINE int modified_mooney_rivlin_proteus_hex64_gradient_packed_i_ms
         s_t badj7[NQ * VS];
         s_t badj8[NQ * VS];
         s_t bdet0[NQ * VS];
-        s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
         const s_t *bu_streams[NS * NC];
         for (int stream = 0; stream < NS * NC; ++stream) {
           bu_streams[stream] = bu_data[stream];
@@ -2020,7 +2018,6 @@ static SFEM_INLINE int modified_mooney_rivlin_proteus_hex64_gradient_packed_two_
         s_t badj7[NQ * VS];
         s_t badj8[NQ * VS];
         s_t bdet0[NQ * VS];
-        s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
         const s_t *bu_streams[NS * NC];
         for (int stream = 0; stream < NS * NC; ++stream) {
           bu_streams[stream] = bu_data[stream];
@@ -3210,7 +3207,6 @@ static SFEM_INLINE int modified_mooney_rivlin_proteus_hex64_apply_packed_i_msoa_
         s_t badj7[NQ * VS];
         s_t badj8[NQ * VS];
         s_t bdet0[NQ * VS];
-        s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
         const s_t *bu_streams[NS * NC];
         for (int stream = 0; stream < NS * NC; ++stream) {
           bu_streams[stream] = bu_data[stream];
@@ -3451,7 +3447,6 @@ static SFEM_INLINE int modified_mooney_rivlin_proteus_hex64_apply_packed_two_pas
         s_t badj7[NQ * VS];
         s_t badj8[NQ * VS];
         s_t bdet0[NQ * VS];
-        s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
         const s_t *bu_streams[NS * NC];
         for (int stream = 0; stream < NS * NC; ++stream) {
           bu_streams[stream] = bu_data[stream];
@@ -3687,9 +3682,6 @@ static int modified_mooney_rivlin_proteus_hex64_hessian_i_msoa_assemble_impl(
   static constexpr int NS = 64;
   static constexpr int NDOFS = NC * NS;
   const s_t *const u_components[NC] = {ux, uy, uz};
-  const g_t *const RSTR x = points[0];
-  const g_t *const RSTR y = points[1];
-  const g_t *const RSTR z = points[2];
   const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p3_q5<s_t>::shape_1d();
   const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p3_q5<s_t>::grad_1d();
   const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q5<s_t>::q_weight_1d();
@@ -3712,7 +3704,6 @@ static int modified_mooney_rivlin_proteus_hex64_hessian_i_msoa_assemble_impl(
     s_t badj7[NQ];
     s_t badj8[NQ];
     s_t bdet0[NQ];
-    s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
 
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t node = elements[shape][element];

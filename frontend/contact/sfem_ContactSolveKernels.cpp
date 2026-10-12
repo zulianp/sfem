@@ -104,7 +104,7 @@ namespace sfem {
                                const real_t* const SFEM_RESTRICT                      distances,
                                const real_t* const SFEM_RESTRICT                      agumentation,
                                const real_t* const* const SFEM_RESTRICT               normals,
-                               const real_t* const SFEM_RESTRICT                      mass,
+                               const real_t* const SFEM_RESTRICT                      /*mass*/,
                                const real_t* const SFEM_RESTRICT penalty,
                                const ptrdiff_t                                        in_stride,
                                const real_t* const SFEM_RESTRICT* const SFEM_RESTRICT in,
@@ -179,8 +179,8 @@ namespace sfem {
                                    const count_t* const SFEM_RESTRICT       cm_rowptr,
                                    const idx_t* const SFEM_RESTRICT         cm_colidx,
                                    const real_t* const SFEM_RESTRICT        cm_vals,
-                                   const real_t* const SFEM_RESTRICT        distances,
-                                   const real_t* const SFEM_RESTRICT        agumentation,
+                                   const real_t* const SFEM_RESTRICT        /*distances*/,
+                                   const real_t* const SFEM_RESTRICT        /*agumentation*/,
                                    const real_t* const* const SFEM_RESTRICT normals,
                                    const real_t* const SFEM_RESTRICT        mass,
                                    const real_t* const SFEM_RESTRICT        macaulay,
@@ -228,8 +228,8 @@ namespace sfem {
                                              const count_t* const SFEM_RESTRICT       cm_rowptr,
                                              const idx_t* const SFEM_RESTRICT         cm_colidx,
                                              const real_t* const SFEM_RESTRICT        cm_vals,
-                                             const real_t* const SFEM_RESTRICT        distances,
-                                             const real_t* const SFEM_RESTRICT        agumentation,
+                                             const real_t* const SFEM_RESTRICT        /*distances*/,
+                                             const real_t* const SFEM_RESTRICT        /*agumentation*/,
                                              const real_t* const* const SFEM_RESTRICT normals,
                                              const real_t* const SFEM_RESTRICT        mass,
                                              const real_t* const SFEM_RESTRICT penalty,
@@ -289,6 +289,7 @@ namespace sfem {
                                              real_t* const SFEM_RESTRICT* const SFEM_RESTRICT diag_values) {
         SFEM_TRACE_SCOPE("assemble_contact_hessian_block_diag");
         assert(dim == 3);
+        SFEM_UNUSED(dim);
 
         const real_t* const nx = normals[0];
         const real_t* const ny = normals[1];
@@ -1019,7 +1020,7 @@ namespace sfem {
             const real_t*      mass      = cd->mass_vector->data();
             real_t* const*     normals   = cd->normals->data();
 #pragma omp parallel for
-            for (ptrdiff_t i = 0; i < contact_node_mask->size(); ++i) {
+            for (ptrdiff_t i = 0; i < (ptrdiff_t)contact_node_mask->size(); ++i) {
                 contact_node_mask->data()[i] = 0;
             }
 

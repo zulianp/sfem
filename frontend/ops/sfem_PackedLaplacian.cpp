@@ -798,10 +798,10 @@ namespace sfem {
 
     PackedLaplacian::~PackedLaplacian() = default;
 
-    int PackedLaplacian::hessian_crs(const real_t *const  x,
-                                     const count_t *const rowptr,
-                                     const idx_t *const   colidx,
-                                     real_t *const        values) {
+    int PackedLaplacian::hessian_crs(const real_t *const  /*x*/,
+                                     const count_t *const /*rowptr*/,
+                                     const idx_t *const   /*colidx*/,
+                                     real_t *const        /*values*/) {
         // SFEM_TRACE_SCOPE("PackedLaplacian::hessian_crs");
 
         // auto mesh  = impl_->space->mesh_ptr();
@@ -824,11 +824,11 @@ namespace sfem {
         return SFEM_FAILURE;
     }
 
-    int PackedLaplacian::hessian_crs_sym(const real_t *const  x,
-                                         const count_t *const rowptr,
-                                         const idx_t *const   colidx,
-                                         real_t *const        diag_values,
-                                         real_t *const        off_diag_values) {
+    int PackedLaplacian::hessian_crs_sym(const real_t *const  /*x*/,
+                                         const count_t *const /*rowptr*/,
+                                         const idx_t *const   /*colidx*/,
+                                         real_t *const        /*diag_values*/,
+                                         real_t *const        /*off_diag_values*/) {
         SFEM_TRACE_SCOPE("PackedLaplacian::hessian_crs_sym");
 
         // auto mesh = impl_->space->mesh_ptr();
@@ -851,7 +851,7 @@ namespace sfem {
         return SFEM_FAILURE;
     }
 
-    int PackedLaplacian::hessian_diag(const real_t *const /*x*/, real_t *const values) {
+    int PackedLaplacian::hessian_diag(const real_t *const /*x*/, real_t *const /*values*/) {
         SFEM_TRACE_SCOPE("PackedLaplacian::hessian_diag");
 
         // auto mesh = impl_->space->mesh_ptr();
@@ -871,7 +871,7 @@ namespace sfem {
         return SFEM_FAILURE;
     }
 
-    int PackedLaplacian::gradient(const real_t *const x, real_t *const out) {
+    int PackedLaplacian::gradient(const real_t *const /*x*/, real_t *const /*out*/) {
         SFEM_TRACE_SCOPE("PackedLaplacian::gradient");
 
         // auto mesh = impl_->space->mesh_ptr();
@@ -943,7 +943,7 @@ namespace sfem {
         });
     }
 
-    int PackedLaplacian::value(const real_t *x, real_t *const out) {
+    int PackedLaplacian::value(const real_t * /*x*/, real_t *const /*out*/) {
         SFEM_TRACE_SCOPE("PackedLaplacian::value");
 
         // auto mesh = impl_->space->mesh_ptr();

@@ -36,7 +36,7 @@ void read_boundary_conditions(MPI_Comm comm,
         int i = 0;
         while (sets[i]) {
             count += (sets[i++] == splitter[0]);
-            assert(i <= strlen(sets));
+            assert((size_t)i <= strlen(sets));
         }
     }
 

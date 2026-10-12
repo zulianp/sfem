@@ -143,6 +143,7 @@ namespace sfem {
 
         count_t *row_ptr = crs_graph->rowptr()->data();
         idx_t *col_indices = crs_graph->colidx()->data();
+        SFEM_UNUSED(col_indices);
         for (idx_t i = 0; i < fs_coarse->n_dofs(); i++) {
             for (idx_t idx = row_ptr[i]; idx < row_ptr[i + 1]; idx++) {
                 off_diag_rows->data()[idx] = i;
@@ -179,7 +180,6 @@ namespace sfem {
         float SFEM_MG_RELAXATION = 1;
         int SFEM_MG_CYCLE_TYPE = 4;
         int SFEM_MG_MAX_LEVELS = 20;
-        int SFEM_MG_PROJECT_COARSE_CORRECTION = 0;
         int SFEM_MG_COARSE_SMOOTH_STEPS = 3;
 
         SFEM_READ_ENV(SFEM_MG_COARSENING_FACTOR, atof);

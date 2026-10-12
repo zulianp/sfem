@@ -145,7 +145,7 @@ namespace sfem {
                      SharedBuffer<TStorage>&       c_values) {
         const ptrdiff_t block_rows = crs_rowptr->size() - 1;
 
-        if (c_rowptr->size() != block_rows + 1) {
+        if ((ptrdiff_t)c_rowptr->size() != block_rows + 1) {
             c_rowptr = create_host_buffer<R>(block_rows + 1);
         }
 
@@ -179,11 +179,11 @@ namespace sfem {
         const ptrdiff_t nblocks           = d_c_rowptr[block_rows];
         const int       block_matrix_size = row_block_size * col_block_size;
 
-        if (c_colidx->size() != nblocks) {
+        if ((ptrdiff_t)c_colidx->size() != nblocks) {
             c_colidx = create_host_buffer<C>(nblocks);
         }
 
-        if (c_values->size() != nblocks * block_matrix_size) {
+        if ((ptrdiff_t)c_values->size() != nblocks * block_matrix_size) {
             c_values = create_host_buffer<TStorage>(nblocks * block_matrix_size);
         }
 
@@ -330,7 +330,7 @@ namespace sfem {
                      SharedBuffer<TStorage>&       c_values) {
         const ptrdiff_t block_rows = bsr_rowptr->size() - 1;
 
-        if (c_rowptr->size() != block_rows + 1) {
+        if ((ptrdiff_t)c_rowptr->size() != block_rows + 1) {
             c_rowptr = create_host_buffer<R>(block_rows + 1);
         }
 
@@ -364,11 +364,11 @@ namespace sfem {
         const ptrdiff_t nblocks           = d_c_rowptr[block_rows];
         const int       block_matrix_size = row_block_size * col_block_size;
 
-        if (c_colidx->size() != nblocks) {
+        if ((ptrdiff_t)c_colidx->size() != nblocks) {
             c_colidx = create_host_buffer<C>(nblocks);
         }
 
-        if (c_values->size() != nblocks * block_matrix_size) {
+        if ((ptrdiff_t)c_values->size() != nblocks * block_matrix_size) {
             c_values = create_host_buffer<TStorage>(nblocks * block_matrix_size);
         }
 

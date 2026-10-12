@@ -191,7 +191,6 @@ void trishell6_ep1_p2_projection_coeffs(const ptrdiff_t nelements,
         const idx_t i0 = ev[0];
         const idx_t i1 = ev[1];
         const idx_t i2 = ev[2];
-        const idx_t i3 = ev[3];
 
         trishell6_p1_p2_l2_projection_apply_kernel(
             // X-coordinates

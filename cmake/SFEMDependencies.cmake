@@ -232,7 +232,7 @@ endif()
 
 if(SFEM_ENABLE_RYAML)
     set(RYML_REPO_URL https://github.com/biojppm/rapidyaml CACHE STRING "")
-    set(RYML_BRANCH_NAME master CACHE STRING "")
+    set(RYML_BRANCH_NAME v0.16.0 CACHE STRING "")
     include(FetchContent)
     FetchContent_Declare(ryml
         GIT_REPOSITORY ${RYML_REPO_URL}

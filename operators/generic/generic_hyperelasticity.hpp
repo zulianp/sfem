@@ -10,7 +10,7 @@ namespace sfem {
         static int objective(MicroKernel                  micro_kernel,
                              const ptrdiff_t              nelements,
                              const ptrdiff_t              stride,
-                             const ptrdiff_t              nnodes,
+                             const ptrdiff_t              /*nnodes*/,
                              idx_t **const SFEM_RESTRICT  elements,
                              geom_t **const SFEM_RESTRICT points,
                              const ptrdiff_t              u_stride,
@@ -34,9 +34,6 @@ namespace sfem {
                 T edispx[NXE];
                 T edispy[NXE];
                 T edispz[NXE];
-
-                T jacobian_adjugate[9];
-                T jacobian_determinant = 0;
 
                 for (int v = 0; v < NXE; ++v) {
                     ev[v] = elements[v][i * stride];
@@ -78,11 +75,11 @@ namespace sfem {
         int objective_steps(MicroKernel                  micro_kernel,
                             const ptrdiff_t              nelements,
                             const ptrdiff_t              stride,
-                            const ptrdiff_t              nnodes,
+                            const ptrdiff_t              /*nnodes*/,
                             idx_t **const SFEM_RESTRICT  elements,
                             geom_t **const SFEM_RESTRICT points,
-                            const T                      mu,
-                            const T                      lambda,
+                            const T                      /*mu*/,
+                            const T                      /*lambda*/,
                             const ptrdiff_t              u_stride,
                             const T *const SFEM_RESTRICT ux,
                             const T *const SFEM_RESTRICT uy,
@@ -166,7 +163,7 @@ namespace sfem {
         int gradient(MicroKernel                  micro_kernel,
                      const ptrdiff_t              nelements,
                      const ptrdiff_t              stride,
-                     const ptrdiff_t              nnodes,
+                     const ptrdiff_t              /*nnodes*/,
                      idx_t **const SFEM_RESTRICT  elements,
                      geom_t **const SFEM_RESTRICT points,
                      const ptrdiff_t              u_stride,
@@ -196,9 +193,6 @@ namespace sfem {
                 T eoutx[NXE] = {0};
                 T eouty[NXE] = {0};
                 T eoutz[NXE] = {0};
-
-                T jacobian_adjugate[9];
-                T jacobian_determinant = 0;
 
                 for (int v = 0; v < NXE; ++v) {
                     ev[v] = elements[v][i * stride];
@@ -442,7 +436,7 @@ namespace sfem {
         int hessian_diag(MicroKernel                  micro_kernel,
                          const ptrdiff_t              nelements,
                          const ptrdiff_t              stride,
-                         const ptrdiff_t              nnodes,
+                         const ptrdiff_t              /*nnodes*/,
                          idx_t **const SFEM_RESTRICT  elements,
                          geom_t **const SFEM_RESTRICT points,
                          const ptrdiff_t              u_stride,

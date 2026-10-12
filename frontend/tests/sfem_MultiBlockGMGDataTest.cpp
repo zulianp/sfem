@@ -69,27 +69,6 @@ namespace {
         return SFEM_TEST_SUCCESS;
     }
 
-    sfem::SharedBuffer<idx_t> nodeset_from_sidesets(const std::shared_ptr<smesh::Mesh>                 &mesh,
-                                                    const std::vector<std::shared_ptr<smesh::Sideset>> &sidesets) {
-        std::vector<idx_t> ids;
-        for (const auto &ss : sidesets) {
-            auto ns = smesh::create_nodeset_from_sideset(mesh, ss);
-            if (!ns || ns->size() == 0) {
-                continue;
-            }
-            auto d = ns->data();
-            ids.insert(ids.end(), d, d + ns->size());
-        }
-        std::sort(ids.begin(), ids.end());
-        ids.erase(std::unique(ids.begin(), ids.end()), ids.end());
-
-        auto out = sfem::create_host_buffer<idx_t>((ptrdiff_t)ids.size());
-        if (!ids.empty()) {
-            std::memcpy(out->data(), ids.data(), ids.size() * sizeof(idx_t));
-        }
-        return out;
-    }
-
     sfem::SharedBuffer<idx_t> nodeset_from_selector(const std::shared_ptr<smesh::Mesh> &mesh,
                                                     const std::function<bool(geom_t, geom_t, geom_t)> &selector) {
         std::vector<idx_t> ids;
@@ -696,7 +675,7 @@ int test_checkerboard_ss_sideset_dirichlet() {
     auto coarse_ns = coarse_dc->conditions()[0].nodeset;
     std::vector<idx_t> fine_ids(fine_ns->data(), fine_ns->data() + fine_ns->size());
     std::sort(fine_ids.begin(), fine_ids.end());
-    for (ptrdiff_t i = 0; i < coarse_ns->size(); ++i) {
+    for (ptrdiff_t i = 0; i < (ptrdiff_t)coarse_ns->size(); ++i) {
         const idx_t id = coarse_ns->data()[i];
         SFEM_TEST_ASSERT(std::binary_search(fine_ids.begin(), fine_ids.end(), id));
     }
@@ -749,9 +728,9 @@ int test_hex8_tet4_ss_sideset_dirichlet() {
     SFEM_TEST_ASSERT(hex_ns != nullptr);
     SFEM_TEST_ASSERT(tet_ns != nullptr);
     const ptrdiff_t n_union = dc->conditions()[0].nodeset->size();
-    SFEM_TEST_ASSERT(n_union >= hex_ns->size());
-    SFEM_TEST_ASSERT(n_union >= tet_ns->size());
-    SFEM_TEST_ASSERT(n_union <= hex_ns->size() + tet_ns->size());
+    SFEM_TEST_ASSERT(n_union >= (ptrdiff_t)hex_ns->size());
+    SFEM_TEST_ASSERT(n_union >= (ptrdiff_t)tet_ns->size());
+    SFEM_TEST_ASSERT(n_union <= (ptrdiff_t)(hex_ns->size() + tet_ns->size()));
     return SFEM_TEST_SUCCESS;
 }
 

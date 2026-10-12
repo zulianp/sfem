@@ -395,18 +395,14 @@ int test_mooney_rivlin_visco_relaxation() {
             // F_int(x)
             blas->zeros(ndofs, f_int->data());
             op->gradient(x->data(), f_int->data());
-            real_t f_int_norm = blas->norm2(ndofs, f_int->data());
             blas->axpy(ndofs, 1.0, f_int->data(), rhs->data());
 
             // F_ext (Neumann) - note: gradient gives -F_ext
             blas->zeros(ndofs, f_neumann->data());
             neumann_op->gradient(x->data(), f_neumann->data());
-            real_t f_ext_norm = blas->norm2(ndofs, f_neumann->data());
             blas->axpy(ndofs, 1.0, f_neumann->data(), rhs->data());
 
             if (iter == 0) {
-                real_t x_norm       = blas->norm2(ndofs, x->data());
-                real_t inertia_norm = blas->norm2(ndofs, inertia_term->data());
                 // printf("    |u|=%e, |M*a|=%e, |F_int|=%e, |F_ext|=%e\n", x_norm, inertia_norm, f_int_norm, f_ext_norm);
             }
 
@@ -464,7 +460,6 @@ int test_mooney_rivlin_visco_relaxation() {
             solver->apply(rhs->data(), delta_x->data());
 
             // u = u + dx
-            real_t dx_norm = blas->norm2(ndofs, delta_x->data());
             // if (iter == 0) {
             //     printf("    |dx|=%e\n", dx_norm);
             // }

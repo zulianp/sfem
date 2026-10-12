@@ -315,12 +315,10 @@ int lagrange_hex_laplacian_apply_tpl(const ptrdiff_t                   nelements
             break;
         }
     }
+    SFEM_UNUSED(n_qp);
 
     lagrange_eval<scalar_t>(order, Q, qx, S);
     lagrange_diff_eval<scalar_t>(order, Q, qx, D);
-
-    const int nxe = sshex8_nxe(order);
-    const int txe = sshex8_txe(order);
 
     const int hex8_corners[8] = {// Bottom
                                  sshex8_lidx(order, 0, 0, 0),

@@ -20,7 +20,7 @@ namespace codegen {
 
 template <typename s_t, typename g_t, int VS>
 SFEM_INLINE const s_t *ageom_stream(
-    const int ne,
+    const int,
     const g_t *const RSTR source,
     s_t *const RSTR,
     std::true_type) {
@@ -779,7 +779,6 @@ static SFEM_INLINE int linear_elasticity_tet10_objective_steps_packed_i_msoa_imp
         s_t badj7[NQ * VS];
         s_t badj8[NQ * VS];
         s_t bdet0[NQ * VS];
-        s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
 
         const s_t *bu_streams[NS * NC] = {bu_data[0], bu_data[1], bu_data[2], bu_data[3], bu_data[4], bu_data[5], bu_data[6], bu_data[7], bu_data[8], bu_data[9], bu_data[10], bu_data[11], bu_data[12], bu_data[13], bu_data[14], bu_data[15], bu_data[16], bu_data[17], bu_data[18], bu_data[19], bu_data[20], bu_data[21], bu_data[22], bu_data[23], bu_data[24], bu_data[25], bu_data[26], bu_data[27], bu_data[28], bu_data[29]};
         const s_t *bh_streams[NS * NC] = {bh_data[0], bh_data[1], bh_data[2], bh_data[3], bh_data[4], bh_data[5], bh_data[6], bh_data[7], bh_data[8], bh_data[9], bh_data[10], bh_data[11], bh_data[12], bh_data[13], bh_data[14], bh_data[15], bh_data[16], bh_data[17], bh_data[18], bh_data[19], bh_data[20], bh_data[21], bh_data[22], bh_data[23], bh_data[24], bh_data[25], bh_data[26], bh_data[27], bh_data[28], bh_data[29]};
@@ -1928,7 +1927,6 @@ static SFEM_INLINE int linear_elasticity_tet10_gradient_packed_i_msoa_impl(
         s_t badj7[NQ * VS];
         s_t badj8[NQ * VS];
         s_t bdet0[NQ * VS];
-        s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
         const s_t *bu_streams[NS * NC];
         for (int stream = 0; stream < NS * NC; ++stream) {
           bu_streams[stream] = bu_data[stream];
@@ -2193,7 +2191,6 @@ static SFEM_INLINE int linear_elasticity_tet10_gradient_packed_two_pass_i_msoa_i
         s_t badj7[NQ * VS];
         s_t badj8[NQ * VS];
         s_t bdet0[NQ * VS];
-        s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
         const s_t *bu_streams[NS * NC];
         for (int stream = 0; stream < NS * NC; ++stream) {
           bu_streams[stream] = bu_data[stream];
@@ -3384,7 +3381,6 @@ static SFEM_INLINE int linear_elasticity_tet10_apply_packed_i_msoa_impl(
         s_t badj7[NQ * VS];
         s_t badj8[NQ * VS];
         s_t bdet0[NQ * VS];
-        s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
         const s_t *bh_streams[NS * NC];
         for (int stream = 0; stream < NS * NC; ++stream) {
           bh_streams[stream] = bh_data[stream];
@@ -3649,7 +3645,6 @@ static SFEM_INLINE int linear_elasticity_tet10_apply_packed_two_pass_i_msoa_impl
         s_t badj7[NQ * VS];
         s_t badj8[NQ * VS];
         s_t bdet0[NQ * VS];
-        s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
         const s_t *bh_streams[NS * NC];
         for (int stream = 0; stream < NS * NC; ++stream) {
           bh_streams[stream] = bh_data[stream];
@@ -3939,9 +3934,6 @@ static int linear_elasticity_tet10_hessian_i_msoa_assemble_impl(
   static constexpr int NQ = 11;
   static constexpr int NS = 10;
   static constexpr int NDOFS = NC * NS;
-  const g_t *const RSTR x = points[0];
-  const g_t *const RSTR y = points[1];
-  const g_t *const RSTR z = points[2];
   const s_t *const isoparametric_grad_ref_x = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x();
   const s_t *const isoparametric_grad_ref_y = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y();
   const s_t *const isoparametric_grad_ref_z = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z();
@@ -3964,7 +3956,6 @@ static int linear_elasticity_tet10_hessian_i_msoa_assemble_impl(
     s_t badj7[NQ];
     s_t badj8[NQ];
     s_t bdet0[NQ];
-    s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
 
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t node = elements[shape][element];

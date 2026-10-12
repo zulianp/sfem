@@ -74,7 +74,7 @@ namespace sfem {
         }
     }
 
-    std::shared_ptr<Op> SemiStructuredEMLaplacian::lor_op(const std::shared_ptr<FunctionSpace> &space) {
+    std::shared_ptr<Op> SemiStructuredEMLaplacian::lor_op(const std::shared_ptr<FunctionSpace> & /*space*/) {
         SMESH_ERROR("SemiStructuredEMLaplacian::lor_op NOT IMPLEMENTED!\n");
         return nullptr;
     }
@@ -153,10 +153,10 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    int SemiStructuredEMLaplacian::hessian_crs(const real_t *const  x,
-                                               const count_t *const rowptr,
-                                               const idx_t *const   colidx,
-                                               real_t *const        values) {
+    int SemiStructuredEMLaplacian::hessian_crs(const real_t *const  /*x*/,
+                                               const count_t *const /*rowptr*/,
+                                               const idx_t *const   /*colidx*/,
+                                               real_t *const        /*values*/) {
         SFEM_ERROR("[Error] em:Laplacian::hessian_crs NOT IMPLEMENTED!\n");
         return SFEM_FAILURE;
     }
@@ -185,7 +185,7 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    int SemiStructuredEMLaplacian::gradient(const real_t *const x, real_t *const out) {
+    int SemiStructuredEMLaplacian::gradient(const real_t *const /*x*/, real_t *const /*out*/) {
         SFEM_ERROR("[Error] em:Laplacian::gradient NOT IMPLEMENTED!\n");
         return SFEM_FAILURE;
     }
@@ -234,7 +234,7 @@ namespace sfem {
         return err;
     }
 
-    int SemiStructuredEMLaplacian::value(const real_t *x, real_t *const out) {
+    int SemiStructuredEMLaplacian::value(const real_t * /*x*/, real_t *const /*out*/) {
         SFEM_ERROR("[Error] em:Laplacian::value NOT IMPLEMENTED!\n");
         return SFEM_FAILURE;
     }

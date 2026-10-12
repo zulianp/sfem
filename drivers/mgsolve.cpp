@@ -177,6 +177,7 @@ int mgsolve(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *arg
     } else if (SFEM_USE_PRECONDITIONER) {
         int err = f->hessian_diag(nullptr, diag->data());
         assert(!err);
+        SFEM_UNUSED(err);
     }
 
     f->set_output_dir(output_path);

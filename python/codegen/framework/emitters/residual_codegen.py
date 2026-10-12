@@ -2953,6 +2953,8 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
         kernel_constant("NQ1", "integer_root(NQ, ND)", indent="  "),
         "  static_assert(ipow(NQ1, ND) == NQ, \"NQ must be tensor-product compatible\");",
     ]
+    if uses_determinant:
+        lines.append(discard_unused("determinant"))
     for group in layout.groups:
         shape_name = "%s_NS" % group.name.upper()
         shape_1d_name = "%s_NS1" % group.name.upper()
@@ -3069,14 +3071,19 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
     body = []
     if uses_determinant:
         hoisted.append(
-            "    const s_t *const RSTR det_q = determinant + q * geometry_stride;"
+            kernel_local(
+                "det_q",
+                "determinant + q * geometry_stride",
+                "const s_t *const RSTR",
+                indent="    ",
+            )
         )
     hoisted.extend(
         "    const s_t *const RSTR adj_q%d = adjugate[%d] + q * geometry_stride;" % (i, i)
         for i in _adjugate_components(dependencies, dim)
     )
     if uses_determinant:
-        body.append('      const s_t det = det_q' + _ptr() + ';')
+        body.append(kernel_local("det", "det_q" + _ptr(), "const s_t", indent="      "))
     body.extend(
         ('      const s_t adj%d = adj_q%d' + _ptr() + ';') % (i, i)
         for i in _adjugate_components(dependencies, dim)
@@ -11311,10 +11318,10 @@ def _mesh_reference_alias_lines(
             reference for reference in references if reference.name in wanted
         )
     return [
-        "  const s_t *const %s = %s;"
-        % (
+        kernel_local(
             _mesh_reference_name(geometry_mode, reference.name),
             quadrature_reference_accessor(rule, reference.name),
+            "const s_t *const",
         )
         for reference in references
     ]

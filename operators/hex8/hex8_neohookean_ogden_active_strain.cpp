@@ -59,7 +59,7 @@ static SFEM_INLINE void inverse3(
 
 int hex8_neohookean_ogden_active_strain_objective(const ptrdiff_t                    nelements,
                                                   const ptrdiff_t                    stride,
-                                                  const ptrdiff_t                    nnodes,
+                                                  const ptrdiff_t                    /*nnodes*/,
                                                   idx_t **const SFEM_RESTRICT        elements,
                                                   geom_t **const SFEM_RESTRICT       points,
                                                   const real_t                       mu,
@@ -91,9 +91,6 @@ int hex8_neohookean_ogden_active_strain_objective(const ptrdiff_t               
         scalar_t edispx[8];
         scalar_t edispy[8];
         scalar_t edispz[8];
-
-        scalar_t jacobian_adjugate[9];
-        scalar_t jacobian_determinant = 0;
 
         for (int v = 0; v < 8; ++v) {
             ev[v] = elements[v][i * stride];
@@ -156,7 +153,7 @@ int hex8_neohookean_ogden_active_strain_objective(const ptrdiff_t               
 
 int hex8_neohookean_ogden_active_strain_objective_steps(const ptrdiff_t                    nelements,
                                                         const ptrdiff_t                    stride,
-                                                        const ptrdiff_t                    nnodes,
+                                                        const ptrdiff_t                    /*nnodes*/,
                                                         idx_t **const SFEM_RESTRICT        elements,
                                                         geom_t **const SFEM_RESTRICT       points,
                                                         const real_t                       mu,
@@ -288,7 +285,7 @@ int hex8_neohookean_ogden_active_strain_objective_steps(const ptrdiff_t         
 
 int hex8_neohookean_ogden_active_strain_gradient(const ptrdiff_t                    nelements,
                                                  const ptrdiff_t                    stride,
-                                                 const ptrdiff_t                    nnodes,
+                                                 const ptrdiff_t                    /*nnodes*/,
                                                  idx_t **const SFEM_RESTRICT        elements,
                                                  geom_t **const SFEM_RESTRICT       points,
                                                  const real_t                       mu,
@@ -968,7 +965,7 @@ int hex8_neohookean_ogden_active_strain_partial_assembly_diag(const ptrdiff_t   
 
 int hex8_neohookean_ogden_active_strain_elasticity_diag(const ptrdiff_t                   nelements,
                                                         const ptrdiff_t                   stride,
-                                                        const ptrdiff_t                   nnodes,
+                                                        const ptrdiff_t                   /*nnodes*/,
                                                         idx_t **const SFEM_RESTRICT       elements,
                                                         geom_t **const SFEM_RESTRICT      points,
                                                         const real_t                      mu,
@@ -1207,17 +1204,17 @@ int hex8_neohookean_ogden_active_strain_bsr(const ptrdiff_t                    n
 }
 
 int hex8_neohookean_ogden_active_strain_bcrs_sym(const ptrdiff_t                    nelements,
-                                                 const ptrdiff_t                    stride,
+                                                 const ptrdiff_t                    /*stride*/,
                                                  idx_t **const SFEM_RESTRICT        elements,
                                                  geom_t **const SFEM_RESTRICT       points,
-                                                 const real_t                       mu,
-                                                 const real_t                       lambda,
+                                                 const real_t                       /*mu*/,
+                                                 const real_t                       /*lambda*/,
                                                  const ptrdiff_t                    Fa_stride,
                                                  const real_t **const               Fa,
-                                                 const ptrdiff_t                    u_stride,
-                                                 const real_t *const SFEM_RESTRICT  ux,
-                                                 const real_t *const SFEM_RESTRICT  uy,
-                                                 const real_t *const SFEM_RESTRICT  uz,
+                                                 const ptrdiff_t                    /*u_stride*/,
+                                                 const real_t *const SFEM_RESTRICT  /*ux*/,
+                                                 const real_t *const SFEM_RESTRICT  /*uy*/,
+                                                 const real_t *const SFEM_RESTRICT  /*uz*/,
                                                  const count_t *const SFEM_RESTRICT rowptr,
                                                  const idx_t *const SFEM_RESTRICT   colidx,
                                                  const ptrdiff_t                    block_stride,
@@ -1232,15 +1229,12 @@ int hex8_neohookean_ogden_active_strain_bcrs_sym(const ptrdiff_t                
 
     int             n_qp = line_q3_n;
     const scalar_t *qx   = line_q3_x;
-    const scalar_t *qw   = line_q3_w;
     if (SFEM_HEX8_QUADRATURE_ORDER == 1) {
         n_qp = line_q2_n;
         qx   = line_q2_x;
-        qw   = line_q2_w;
     } else if (SFEM_HEX8_QUADRATURE_ORDER == 5) {
         n_qp = line_q6_n;
         qx   = line_q6_x;
-        qw   = line_q6_w;
     }
 
 #pragma omp parallel

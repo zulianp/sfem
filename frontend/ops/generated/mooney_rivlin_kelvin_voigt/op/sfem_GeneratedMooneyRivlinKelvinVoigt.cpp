@@ -81,7 +81,7 @@ namespace sfem {
       if (!node.has_child(key)) {
         return false;
       }
-      node[key] >> value;
+      node[key].load(&value);
       return true;
     }
 
@@ -154,7 +154,7 @@ namespace sfem {
         return false;
       }
       int raw = value ? 1 : 0;
-      node[key] >> raw;
+      node[key].load(&raw);
       value = raw != 0;
       return true;
     }
@@ -187,16 +187,6 @@ namespace sfem {
       }
       SFEM_ERROR("GeneratedMooneyRivlinKelvinVoigt: mesh block pointer not found in mesh.blocks()\n");
       return 0;
-    }
-
-    int packed_block_id_for_domain(const FunctionSpace::PackedMesh &packed,
-                                       const smesh::Mesh::Block &block) {
-      for (ptrdiff_t i = 0; i < packed.n_blocks(); ++i) {
-        if (packed.block_name(i) == block.name()) {
-          return static_cast<int>(i);
-        }
-      }
-      return -1;
     }
 
     struct AffineGeometryCache {
@@ -346,35 +336,11 @@ namespace sfem {
   ptrdiff_t GeneratedMooneyRivlinKelvinVoigt::n_dofs_image() const { return impl_->space->n_dofs(); }
 
     double GeneratedMooneyRivlinKelvinVoigt::flops_value() const {
-    double total = 0;
-    if (!impl_->domains) {
-      return total;
-    }
-
-    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
-    impl_->domains->iterate([&](const OpDomain &domain) {
-      const ptrdiff_t nelements = domain.block->n_elements();
-
-      return SFEM_SUCCESS;
-    });
-
-    return total;
+    return 0;
   }
 
     size_t GeneratedMooneyRivlinKelvinVoigt::memory_traffic_bytes_value() const {
-    size_t total = 0;
-    if (!impl_->domains) {
-      return total;
-    }
-
-    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
-    impl_->domains->iterate([&](const OpDomain &domain) {
-      const ptrdiff_t nelements = domain.block->n_elements();
-
-      return SFEM_SUCCESS;
-    });
-
-    return total;
+    return 0;
   }
 
     double GeneratedMooneyRivlinKelvinVoigt::flops_gradient() const {
@@ -616,8 +582,6 @@ namespace sfem {
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const geom_t *const *adjugate = nullptr;
       const geom_t *determinant = nullptr;
-      const geom_t *const *geom_metric = nullptr;
-      const geom_t *geom_metric_aos = nullptr;
       if (impl_->residual_uses_affine) {
         auto cache = std::static_pointer_cast<AffineGeometryCache>(
             domain.user_data);
@@ -634,22 +598,6 @@ namespace sfem {
               cache->jacobian->jacobian_adjugate_SoA()->data());
           determinant = reinterpret_cast<const geom_t *>(
               cache->jacobian->jacobian_determinant()->data());
-        }
-        if (false) {
-          if (!cache->metric_soa) {
-            SFEM_ERROR("GeneratedMooneyRivlinKelvinVoigt affine residual requires cached SoA metric geometry\n");
-            return SFEM_FAILURE;
-          }
-          geom_metric = reinterpret_cast<const geom_t *const *>(
-              cache->metric_soa->fff_SoA()->data());
-        }
-        if (false) {
-          if (!cache->metric_aos) {
-            SFEM_ERROR("GeneratedMooneyRivlinKelvinVoigt affine residual requires cached AoS metric geometry\n");
-            return SFEM_FAILURE;
-          }
-          geom_metric_aos = reinterpret_cast<const geom_t *>(
-              cache->metric_aos->fff_AoS()->data());
         }
       }
       real_t storage[MAX_PARAMETERS];
@@ -704,8 +652,6 @@ namespace sfem {
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const geom_t *const *adjugate = nullptr;
       const geom_t *determinant = nullptr;
-      const geom_t *const *geom_metric = nullptr;
-      const geom_t *geom_metric_aos = nullptr;
       if (impl_->jacobian_action_uses_affine) {
         auto cache = std::static_pointer_cast<AffineGeometryCache>(
             domain.user_data);
@@ -722,22 +668,6 @@ namespace sfem {
               cache->jacobian->jacobian_adjugate_SoA()->data());
           determinant = reinterpret_cast<const geom_t *>(
               cache->jacobian->jacobian_determinant()->data());
-        }
-        if (false) {
-          if (!cache->metric_soa) {
-            SFEM_ERROR("GeneratedMooneyRivlinKelvinVoigt affine jacobian action requires cached SoA metric geometry\n");
-            return SFEM_FAILURE;
-          }
-          geom_metric = reinterpret_cast<const geom_t *const *>(
-              cache->metric_soa->fff_SoA()->data());
-        }
-        if (false) {
-          if (!cache->metric_aos) {
-            SFEM_ERROR("GeneratedMooneyRivlinKelvinVoigt affine jacobian action requires cached AoS metric geometry\n");
-            return SFEM_FAILURE;
-          }
-          geom_metric_aos = reinterpret_cast<const geom_t *>(
-              cache->metric_aos->fff_AoS()->data());
         }
       }
       real_t storage[MAX_PARAMETERS];
@@ -809,9 +739,6 @@ namespace sfem {
       const bool needs_affine_jacobian =
           (impl_->residual_uses_affine && true) ||
           (impl_->jacobian_action_uses_affine && true);
-      const bool needs_affine_metric =
-          (impl_->residual_uses_affine && (false || false)) ||
-          (impl_->jacobian_action_uses_affine && (false || false));
       const bool needs_a_met_soa =
           (impl_->residual_uses_affine && false) ||
           (impl_->jacobian_action_uses_affine && false);
@@ -899,10 +826,10 @@ namespace sfem {
   }
 #endif  // SFEM_ENABLE_RYAML
 
-  int GeneratedMooneyRivlinKelvinVoigt::hessian_crs(const real_t *const state,
-              const count_t *const rowptr,
-              const idx_t *const colidx,
-              real_t *const values) {
+  int GeneratedMooneyRivlinKelvinVoigt::hessian_crs(const real_t *const /*state*/,
+              const count_t *const /*rowptr*/,
+              const idx_t *const /*colidx*/,
+              real_t *const /*values*/) {
     SFEM_TRACE_SCOPE("GeneratedMooneyRivlinKelvinVoigt::hessian_crs");
     return SFEM_FAILURE;
   }

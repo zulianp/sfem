@@ -40,10 +40,10 @@ int         obstacle_distribute_contact_forces(const int                        
 
 int         obstacle_hessian_block_diag_sym(const int                         dim,
                                             const ptrdiff_t                   n,
-                                            const idx_t *const SFEM_RESTRICT  idx,
+                                            const idx_t *const SFEM_RESTRICT  /*idx*/,
                                             real_t **const SFEM_RESTRICT      normals,
                                             const real_t *const SFEM_RESTRICT m,
-                                            const real_t *const               x,
+                                            const real_t *const               /*x*/,
                                             real_t *const                     values) {
     const int sym_block_size = (dim == 3 ? 6 : 3);
 

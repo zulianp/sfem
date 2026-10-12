@@ -47,7 +47,6 @@ int steady_state_sim(const std::shared_ptr<sfem::Communicator> &comm, int argc, 
     smesh::Path output_path{argv[2]};
     const char *SFEM_OPERATOR             = "Laplacian";
     int         SFEM_BLOCK_SIZE           = 1;
-    int         SFEM_USE_PRECONDITIONER   = 0;
     int         SFEM_ELEMENT_REFINE_LEVEL = 0;
     int         SFEM_MAX_IT               = 1000;
     bool        SFEM_USE_GPU              = true;
@@ -55,7 +54,6 @@ int steady_state_sim(const std::shared_ptr<sfem::Communicator> &comm, int argc, 
 
     SFEM_READ_ENV(SFEM_OPERATOR, );
     SFEM_READ_ENV(SFEM_BLOCK_SIZE, atoi);
-    SFEM_READ_ENV(SFEM_USE_PRECONDITIONER, atoi);
     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
     SFEM_READ_ENV(SFEM_MAX_IT, atoi);
     SFEM_READ_ENV(SFEM_USE_GPU, atoi);
@@ -123,6 +121,7 @@ int steady_state_sim(const std::shared_ptr<sfem::Communicator> &comm, int argc, 
                 assert(col_indices[idx] > i);
             }
         }
+        SFEM_UNUSED(col_indices);
 
         auto mask = sfem::create_buffer<mask_t>(mask_count(fs->n_dofs()), es);
         f->constraints_mask(mask->data());

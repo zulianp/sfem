@@ -141,7 +141,6 @@ namespace sfem {
 #pragma omp parallel for schedule(static)
         for (ptrdiff_t s = 0; s < n_slices; ++s) {
             const ptrdiff_t row_begin = s * SLICE_HEIGHT;
-            const ptrdiff_t row_end   = row_begin + SLICE_HEIGHT;
             const ptrdiff_t elems     = slice_ptr[s + 1] - slice_ptr[s];
             const ptrdiff_t width     = elems / SLICE_HEIGHT;
             const ptrdiff_t base      = slice_ptr[s];
@@ -170,7 +169,6 @@ namespace sfem {
         if(reminder) {
                 // Clean-up loop for the last slice
             const ptrdiff_t row_begin = n_slices * SLICE_HEIGHT;
-            const ptrdiff_t row_end   = row_begin + reminder;
             const ptrdiff_t elems     = slice_ptr[n_slices + 1] - slice_ptr[n_slices];
             const ptrdiff_t width     = elems / reminder;
             const ptrdiff_t base      = slice_ptr[n_slices];

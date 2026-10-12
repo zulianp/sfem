@@ -3648,7 +3648,7 @@ static SFEM_INLINE void hex8_mooney_rivlin_active_strain_hessian_diag(const scal
                                                                          const scalar_t                      qy,
                                                                          const scalar_t                      qz,
                                                                          const scalar_t                      qw,
-                                                                         const scalar_t                      lmda,
+                                                                         const scalar_t                      /*lmda*/,
                                                                          const scalar_t                      mu,
                                                                          const scalar_t                      lmbda,
                                                                          const scalar_t *const SFEM_RESTRICT Fa_inv,

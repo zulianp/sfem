@@ -14,19 +14,19 @@
 
 #include <string.h>
 
-int sshex8_neohookean_ogden_objective(int                               level,
-                                      const ptrdiff_t                   nelements,
-                                      const ptrdiff_t                   stride,
-                                      const ptrdiff_t                   nnodes,
-                                      idx_t **const SFEM_RESTRICT       elements,
-                                      geom_t **const SFEM_RESTRICT      points,
-                                      const real_t                      mu,
-                                      const real_t                      lambda,
-                                      const ptrdiff_t                   u_stride,
-                                      const real_t *const SFEM_RESTRICT ux,
-                                      const real_t *const SFEM_RESTRICT uy,
-                                      const real_t *const SFEM_RESTRICT uz,
-                                      const int                         is_element_wise,
+int sshex8_neohookean_ogden_objective(int                               /*level*/,
+                                      const ptrdiff_t                   /*nelements*/,
+                                      const ptrdiff_t                   /*stride*/,
+                                      const ptrdiff_t                   /*nnodes*/,
+                                      idx_t **const SFEM_RESTRICT       /*elements*/,
+                                      geom_t **const SFEM_RESTRICT      /*points*/,
+                                      const real_t                      /*mu*/,
+                                      const real_t                      /*lambda*/,
+                                      const ptrdiff_t                   /*u_stride*/,
+                                      const real_t *const SFEM_RESTRICT /*ux*/,
+                                      const real_t *const SFEM_RESTRICT /*uy*/,
+                                      const real_t *const SFEM_RESTRICT /*uz*/,
+                                      const int                         /*is_element_wise*/,
                                       real_t *const SFEM_RESTRICT       out) {
     // FIXME
     out[0] = 1;
@@ -36,7 +36,7 @@ int sshex8_neohookean_ogden_objective(int                               level,
 int sshex8_neohookean_ogden_objective_steps(int                               level,
                                             const ptrdiff_t                   nelements,
                                             const ptrdiff_t                   stride,
-                                            const ptrdiff_t                   nnodes,
+                                            const ptrdiff_t                   /*nnodes*/,
                                             idx_t **const SFEM_RESTRICT       elements,
                                             geom_t **const SFEM_RESTRICT      points,
                                             const real_t                      mu,
@@ -53,7 +53,6 @@ int sshex8_neohookean_ogden_objective_steps(int                               le
                                             const real_t *const SFEM_RESTRICT steps,
                                             real_t *const SFEM_RESTRICT       out) {
     const int nxe = sshex8_nxe(level);
-    const int txe = sshex8_txe(level);
 
     const int proteus_to_std_hex8_corners[8] = {// Bottom
                                                 sshex8_lidx(level, 0, 0, 0),
@@ -211,7 +210,7 @@ int sshex8_neohookean_ogden_objective_steps(int                               le
 int sshex8_neohookean_ogden_gradient(int                               level,
                                      const ptrdiff_t                   nelements,
                                      const ptrdiff_t                   stride,
-                                     const ptrdiff_t                   nnodes,
+                                     const ptrdiff_t                   /*nnodes*/,
                                      idx_t **const SFEM_RESTRICT       elements,
                                      geom_t **const SFEM_RESTRICT      points,
                                      const real_t                      mu,
@@ -225,7 +224,6 @@ int sshex8_neohookean_ogden_gradient(int                               level,
                                      real_t *const SFEM_RESTRICT       outy,
                                      real_t *const SFEM_RESTRICT       outz) {
     const int nxe = sshex8_nxe(level);
-    const int txe = sshex8_txe(level);
 
     const int proteus_to_std_hex8_corners[8] = {// Bottom
                                                 sshex8_lidx(level, 0, 0, 0),
@@ -262,7 +260,6 @@ int sshex8_neohookean_ogden_gradient(int                               level,
 
         scalar_t      element_u[3 * 8];
         accumulator_t eout[3 * 8];
-        scalar_t      element_matrix[(3 * 8) * (3 * 8)];
 
         // Aliases for reduced complexity inside
         scalar_t *element_ux = &element_u[0 * 8];
@@ -423,6 +420,7 @@ int sshex8_neohookean_ogden_diag(int                               level,
                                  real_t *const SFEM_RESTRICT       outx,
                                  real_t *const SFEM_RESTRICT       outy,
                                  real_t *const SFEM_RESTRICT       outz) {
+    SFEM_UNUSED(nnodes);
     const int nxe = sshex8_nxe(level);
 
     const int proteus_to_std_hex8_corners[8] = {// Bottom
@@ -591,7 +589,6 @@ int sshex8_neohookean_ogden_hessian_partial_assembly(int                        
                                                      const real_t *const SFEM_RESTRICT    uz,
                                                      metric_tensor_t *const SFEM_RESTRICT partial_assembly) {
     const int nxe = sshex8_nxe(level);
-    const int txe = sshex8_txe(level);
 
     const int proteus_to_std_hex8_corners[8] = {// Bottom
                                                 sshex8_lidx(level, 0, 0, 0),
@@ -765,7 +762,9 @@ int sshex8_neohookean_ogden_partial_assembly_apply(int                          
                                                    real_t *const SFEM_RESTRICT                outy,
                                                    real_t *const SFEM_RESTRICT                outz) {
     const int nxe = sshex8_nxe(level);
+#ifdef SFEM_ENABLE_BLAS
     const int txe = sshex8_txe(level);
+#endif
 
     scalar_t Wimpn_compressed[10];
     hex8_Wimpn_compressed(Wimpn_compressed);
@@ -782,6 +781,7 @@ int sshex8_neohookean_ogden_partial_assembly_apply(int                          
 
         idx_t *ev = (idx_t *)malloc(nxe * sizeof(idx_t));
 
+#ifndef SFEM_ENABLE_BLAS
         scalar_t element_h[3 * 8];
 
         // Aliases for reduced complexity inside
@@ -793,6 +793,7 @@ int sshex8_neohookean_ogden_partial_assembly_apply(int                          
         scalar_t *eoutx = &eout[0 * 8];
         scalar_t *eouty = &eout[1 * 8];
         scalar_t *eoutz = &eout[2 * 8];
+#endif
 
 #ifdef SFEM_ENABLE_BLAS
         scalar_t *X = (scalar_t *)malloc(txe * 3 * 8 * sizeof(scalar_t));
@@ -907,20 +908,20 @@ int sshex8_neohookean_ogden_partial_assembly_apply(int                          
     return SFEM_SUCCESS;
 }
 
-int sshex8_neohookean_ogden_compressed_partial_assembly_apply(int                                     level,
-                                                              const ptrdiff_t                         nelements,
-                                                              const ptrdiff_t                         stride,
-                                                              idx_t **const SFEM_RESTRICT             elements,
-                                                              const compressed_t *const SFEM_RESTRICT partial_assembly,
-                                                              const scaling_t *const SFEM_RESTRICT    scaling,
-                                                              const ptrdiff_t                         h_stride,
-                                                              const real_t *const SFEM_RESTRICT       hx,
-                                                              const real_t *const SFEM_RESTRICT       hy,
-                                                              const real_t *const SFEM_RESTRICT       hz,
-                                                              const ptrdiff_t                         out_stride,
-                                                              real_t *const SFEM_RESTRICT             outx,
-                                                              real_t *const SFEM_RESTRICT             outy,
-                                                              real_t *const SFEM_RESTRICT             outz) {
+int sshex8_neohookean_ogden_compressed_partial_assembly_apply(int                                     /*level*/,
+                                                              const ptrdiff_t                         /*nelements*/,
+                                                              const ptrdiff_t                         /*stride*/,
+                                                              idx_t **const SFEM_RESTRICT             /*elements*/,
+                                                              const compressed_t *const SFEM_RESTRICT /*partial_assembly*/,
+                                                              const scaling_t *const SFEM_RESTRICT    /*scaling*/,
+                                                              const ptrdiff_t                         /*h_stride*/,
+                                                              const real_t *const SFEM_RESTRICT       /*hx*/,
+                                                              const real_t *const SFEM_RESTRICT       /*hy*/,
+                                                              const real_t *const SFEM_RESTRICT       /*hz*/,
+                                                              const ptrdiff_t                         /*out_stride*/,
+                                                              real_t *const SFEM_RESTRICT             /*outx*/,
+                                                              real_t *const SFEM_RESTRICT             /*outy*/,
+                                                              real_t *const SFEM_RESTRICT             /*outz*/) {
     SFEM_IMPLEMENT_ME();
     return SFEM_FAILURE;
 }

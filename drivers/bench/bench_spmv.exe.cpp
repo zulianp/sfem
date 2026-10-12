@@ -20,7 +20,7 @@
 
 static ptrdiff_t crs_num_cols(const sfem::SharedBuffer<sfem::idx_t>& colidx) {
     ptrdiff_t cols = 0;
-    for (ptrdiff_t k = 0; k < colidx->size(); ++k) {
+    for (ptrdiff_t k = 0; k < static_cast<ptrdiff_t>(colidx->size()); ++k) {
         cols = std::max(cols, static_cast<ptrdiff_t>(colidx->data()[k]) + 1);
     }
     return cols;

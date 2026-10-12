@@ -146,7 +146,7 @@ int hex8_laplacian_apply(const ptrdiff_t                   nelements,
 }
 
 int hex8_laplacian_crs_sym(const ptrdiff_t                    nelements,
-                           const ptrdiff_t                    nnodes,
+                           const ptrdiff_t                    /*nnodes*/,
                            idx_t **const SFEM_RESTRICT        elements,
                            geom_t **const SFEM_RESTRICT       points,
                            const count_t *const SFEM_RESTRICT rowptr,
@@ -221,7 +221,7 @@ int hex8_laplacian_crs_sym(const ptrdiff_t                    nelements,
 }
 
 int hex8_laplacian_crs(const ptrdiff_t                    nelements,
-                       const ptrdiff_t                    nnodes,
+                       const ptrdiff_t                    /*nnodes*/,
                        idx_t **const SFEM_RESTRICT        elements,
                        geom_t **const SFEM_RESTRICT       points,
                        const count_t *const SFEM_RESTRICT rowptr,
@@ -260,7 +260,7 @@ int hex8_laplacian_crs(const ptrdiff_t                    nelements,
 }
 
 int hex8_laplacian_diag(const ptrdiff_t              nelements,
-                        const ptrdiff_t              nnodes,
+                        const ptrdiff_t              /*nnodes*/,
                         idx_t **const SFEM_RESTRICT  elements,
                         geom_t **const SFEM_RESTRICT points,
                         real_t *const SFEM_RESTRICT  diag) {

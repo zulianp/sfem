@@ -72,17 +72,6 @@ static const scalar_t *hex8_q2_weight_1d() {
 
 }  // namespace
 
-static void print_matrix(int r, int c, const accumulator_t *const m) {
-    printf("-------------------\n");
-    for (int i = 0; i < r; i++) {
-        for (int j = 0; j < c; j++) {
-            printf("%g\t", m[i * c + j]);
-        }
-        printf("\n");
-    }
-    printf("-------------------\n");
-}
-
 int hex8_linear_elasticity_apply(const ptrdiff_t              nelements,
                                  const ptrdiff_t              nnodes,
                                  idx_t **const SFEM_RESTRICT  elements,
@@ -1353,7 +1342,7 @@ int hex8_linear_elasticity_l2_project_cauchy_stress(const ptrdiff_t             
 
 int hex8_linear_elasticity_objective_steps(const ptrdiff_t                   nelements,
                                            const ptrdiff_t                   stride,
-                                           const ptrdiff_t                   nnodes,
+                                           const ptrdiff_t                   /*nnodes*/,
                                            idx_t **const SFEM_RESTRICT       elements,
                                            geom_t **const SFEM_RESTRICT      points,
                                            const real_t                      mu,

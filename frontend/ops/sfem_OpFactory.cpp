@@ -172,7 +172,7 @@ namespace sfem {
                                             const ryml::ConstNodeRef             &node,
                                             const ExecutionSpace                  es) {
         std::string name;
-        node["type"] >> name;
+        node["type"].load(&name);
 
         auto prototype = create_op(space, name.c_str(), es);
         if (!prototype) return nullptr;

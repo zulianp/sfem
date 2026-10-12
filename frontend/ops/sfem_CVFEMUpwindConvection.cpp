@@ -56,10 +56,10 @@ namespace sfem {
         vel[component] = v;
     }
 
-    int CVFEMUpwindConvection::hessian_crs(const real_t *const  x,
-                                           const count_t *const rowptr,
-                                           const idx_t *const   colidx,
-                                           real_t *const        values) {
+    int CVFEMUpwindConvection::hessian_crs(const real_t *const  /*x*/,
+                                           const count_t *const /*rowptr*/,
+                                           const idx_t *const   /*colidx*/,
+                                           real_t *const        /*values*/) {
         // auto mesh = space->mesh_ptr();
 
         // auto graph = space->dof_to_dof_graph();
@@ -81,7 +81,7 @@ namespace sfem {
 
     int CVFEMUpwindConvection::gradient(const real_t *const x, real_t *const out) { return apply(nullptr, x, out); }
 
-    int CVFEMUpwindConvection::apply(const real_t *const x, const real_t *const h, real_t *const out) {
+    int CVFEMUpwindConvection::apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) {
         auto mesh = space->mesh_ptr();
 
         real_t *vel_[3] = {nullptr, nullptr, nullptr};
@@ -104,7 +104,7 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    int CVFEMUpwindConvection::value(const real_t *x, real_t *const out) {
+    int CVFEMUpwindConvection::value(const real_t * /*x*/, real_t *const /*out*/) {
         // auto mesh = space->mesh_ptr();
 
         // cvfem_convection_assemble_value(element_type,
@@ -129,6 +129,6 @@ namespace sfem {
         return ret;
     }
 
-    int CVFEMUpwindConvection::initialize(const std::vector<std::string> &block_names) { return SFEM_SUCCESS; }
+    int CVFEMUpwindConvection::initialize(const std::vector<std::string> & /*block_names*/) { return SFEM_SUCCESS; }
 
 }  // namespace sfem
