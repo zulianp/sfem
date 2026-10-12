@@ -1,11 +1,11 @@
 #include <type_traits>
-#include "../navier_stokes_form_1_u_d2_simplex_mixed_local.hpp"
-#include "../../../reference/quad_tri_q6.hpp"
-#include "../../../reference/tri3_q6.hpp"
-#include "../../../reference/tri6_q6.hpp"
-#include "../../../kernel_math.hpp"
-#include "../../../geometry_kernels.hpp"
-#include "../../../kernel_diagnostics.hpp"
+#include "navier_stokes_form_1_u_d2_simplex_mixed_local.hpp"
+#include "quad_tri_q6.hpp"
+#include "tri3_q6.hpp"
+#include "tri6_q6.hpp"
+#include "kernel_math.hpp"
+#include "geometry_kernels.hpp"
+#include "kernel_diagnostics.hpp"
 
 #ifndef SFEM_RESTRICT
 #define SFEM_RESTRICT

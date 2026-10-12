@@ -1,4 +1,4 @@
-#include "../../op/sfem_GeneratedLinearElasticity_c_abi.hpp"
+#include "sfem_GeneratedLinearElasticity_c_abi.hpp"
 
 extern "C" int linear_elasticity_proteus_quad4_inexact_apply_compressed_a_msoa(
         const int scalar_bytes,

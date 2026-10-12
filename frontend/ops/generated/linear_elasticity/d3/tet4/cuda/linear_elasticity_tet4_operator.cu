@@ -1,8 +1,8 @@
 #include <type_traits>
 #include <cuda_runtime.h>
-#include "../../cuda/linear_elasticity_d3_simplex_local.cuh"
-#include "../../../../cuda/geometry_kernels.cuh"
-#include "../../../../cuda/kernel_diagnostics.cuh"
+#include "linear_elasticity_d3_simplex_local.cuh"
+#include "geometry_kernels.cuh"
+#include "kernel_diagnostics.cuh"
 #include <cstdint>
 #include <cstdlib>
 

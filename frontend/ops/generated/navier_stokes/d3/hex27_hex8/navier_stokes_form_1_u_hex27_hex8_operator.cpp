@@ -1,4 +1,4 @@
-#include "../../op/sfem_GeneratedNavierStokes_c_abi.hpp"
+#include "sfem_GeneratedNavierStokes_c_abi.hpp"
 
 extern "C" int navier_stokes_form_1_u_proteus_hex27_proteus_hex8_residual_i_msoa(
         const int scalar_bytes,

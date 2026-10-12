@@ -327,7 +327,7 @@ def _inexact_apply_kernel_source(
     # unparseable, which a spike driver hides by including sfem_base.hpp itself
     # before it -- and which the library build does not.
     operator_lines = [
-        '#include "../../op/sfem_%s_c_abi.hpp"' % op_name,
+        '#include "sfem_%s_c_abi.hpp"' % op_name,
         '#include "kernel_diagnostics.hpp"',
         "",
         '#include "%s_inexact_apply_inline.hpp"' % prefix,
@@ -2219,7 +2219,7 @@ def _delegated_prototype_files(
         plan, flux_form, rule, adjugate, determinant, is_deformation_gradient
     )
     lines = [
-        '#include "../../op/sfem_%s_c_abi.hpp"' % material.op_name,
+        '#include "sfem_%s_c_abi.hpp"' % material.op_name,
         "",
     ]
     lines.extend(

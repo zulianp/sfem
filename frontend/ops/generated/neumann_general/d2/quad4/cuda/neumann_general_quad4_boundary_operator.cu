@@ -1,4 +1,4 @@
-#include "../../../op/cuda/sfem_GeneratedNeumannGeneral_cuda_c_abi.hpp"
+#include "sfem_GeneratedNeumannGeneral_cuda_c_abi.hpp"
 
 extern "C" int cu_neumann_general_proteus_quad4_edgeshell2_boundary_residual_ss_soa(
         const ptrdiff_t nsides,

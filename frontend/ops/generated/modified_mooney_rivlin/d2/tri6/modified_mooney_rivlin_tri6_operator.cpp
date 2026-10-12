@@ -1,19 +1,19 @@
 #include <cstdio>
 #include <type_traits>
-#include "../modified_mooney_rivlin_d2_simplex_local.hpp"
-#include "../modified_mooney_rivlin_d2_simplex_hessian.hpp"
-#include "../../../reference/quad_tri_q3.hpp"
-#include "../../../reference/tri6_q3.hpp"
-#include "../../../reference/quad_tri_q6.hpp"
-#include "../../../reference/tri6_q6.hpp"
-#include "../../../geometry_kernels.hpp"
-#include "../../../kernel_diagnostics.hpp"
+#include "modified_mooney_rivlin_d2_simplex_local.hpp"
+#include "modified_mooney_rivlin_d2_simplex_hessian.hpp"
+#include "quad_tri_q3.hpp"
+#include "tri6_q3.hpp"
+#include "quad_tri_q6.hpp"
+#include "tri6_q6.hpp"
+#include "geometry_kernels.hpp"
+#include "kernel_diagnostics.hpp"
 #ifdef _OPENMP
 #include <omp.h>
 #endif
 #include <cstdint>
 #include <cstdlib>
-#include "../../../packed_thread_scratch.hpp"
+#include "packed_thread_scratch.hpp"
 
 namespace sfem {
 namespace codegen {

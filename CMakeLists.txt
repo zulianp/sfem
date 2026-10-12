@@ -133,23 +133,6 @@ list(APPEND SFEM_MODULES
     frontend
     frontend/constraints
     frontend/ops
-    frontend/ops/generated
-    frontend/ops/generated/body_force
-    frontend/ops/generated/body_force/op
-    frontend/ops/generated/laplace
-    frontend/ops/generated/laplace/op
-    frontend/ops/generated/linear_elasticity
-    frontend/ops/generated/linear_elasticity/op
-    frontend/ops/generated/saint_venant_kirchhoff
-    frontend/ops/generated/saint_venant_kirchhoff/op
-    frontend/ops/generated/neohookean_ogden
-    frontend/ops/generated/neohookean_ogden/op
-    frontend/ops/generated/mooney_rivlin_kelvin_voigt
-    frontend/ops/generated/mooney_rivlin_kelvin_voigt/op
-    frontend/ops/generated/modified_mooney_rivlin
-    frontend/ops/generated/modified_mooney_rivlin/op
-    frontend/ops/generated/two_phase_flow
-    frontend/ops/generated/two_phase_flow/op
 )
 
 if(SFEM_ENABLE_METIS)
@@ -183,18 +166,6 @@ if(SFEM_ENABLE_CUDA)
         resampling/quadshell4/cuda
         ssmg/cuda
         frontend/ops/cuda
-        # The generated device tree, laid out the way the hand-written one is:
-        # a local `cuda/` folder beside the host sources it mirrors.  These are
-        # the folders whose files are included by bare name and so need to be
-        # on the include path; the kernels below them include by relative path
-        # and are swept up by the recursive glob further down.
-        frontend/ops/generated/cuda
-        frontend/ops/generated/body_force/op/cuda
-        frontend/ops/generated/laplace/op/cuda
-        frontend/ops/generated/linear_elasticity/op/cuda
-        frontend/ops/generated/neohookean_ogden/op/cuda
-        frontend/ops/generated/mooney_rivlin_kelvin_voigt/op/cuda
-        frontend/ops/generated/two_phase_flow/op/cuda
     )
 
     if(SFEM_ENABLE_AMG)
@@ -251,6 +222,30 @@ if(SFEM_ENABLE_CUDA)
     list(APPEND SFEM_KERNEL_SOURCES ${SFEM_GENERATED_KERNEL_SOURCES})
     list(APPEND SFEM_KERNEL_HEADERS ${SFEM_GENERATED_KERNEL_HEADERS})
 endif()
+
+# Generated files include each other by file name alone, because install copies
+# every header into one flat `include/` (`plans/conventions.py
+# generated_include`).  So the build tree puts every generated folder that holds
+# a header on the include path -- derived from the headers rather than listed,
+# so a new material or element needs no edit here -- and file names must be
+# unique, or the flat install would let one header overwrite another.
+set(SFEM_GENERATED_INCLUDE_DIRS)
+set(SFEM_GENERATED_HEADER_NAMES)
+foreach(header ${SFEM_GENERATED_HEADERS} ${SFEM_GENERATED_KERNEL_HEADERS})
+    get_filename_component(header_dir "${header}" DIRECTORY)
+    get_filename_component(header_name "${header}" NAME)
+    list(APPEND SFEM_GENERATED_INCLUDE_DIRS "${header_dir}")
+    list(FIND SFEM_GENERATED_HEADER_NAMES "${header_name}" seen)
+    if(NOT seen EQUAL -1)
+        message(FATAL_ERROR
+            "Two generated headers are named ${header_name}; one is ${header}. "
+            "Generated headers are included by file name and installed flat, "
+            "so their names must be unique.")
+    endif()
+    list(APPEND SFEM_GENERATED_HEADER_NAMES "${header_name}")
+endforeach()
+list(REMOVE_DUPLICATES SFEM_GENERATED_INCLUDE_DIRS)
+list(APPEND SFEM_BUILD_INCLUDES ${SFEM_GENERATED_INCLUDE_DIRS})
 
 list(REMOVE_DUPLICATES SFEM_SOURCES)
 list(REMOVE_DUPLICATES SFEM_HEADERS)

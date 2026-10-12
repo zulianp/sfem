@@ -1,15 +1,15 @@
 #include <cstdio>
 #include <type_traits>
-#include "../neohookean_ogden_d2_simplex_local.hpp"
-#include "../neohookean_ogden_d2_simplex_hessian.hpp"
-#include "../../../geometry_kernels.hpp"
-#include "../../../kernel_diagnostics.hpp"
+#include "neohookean_ogden_d2_simplex_local.hpp"
+#include "neohookean_ogden_d2_simplex_hessian.hpp"
+#include "geometry_kernels.hpp"
+#include "kernel_diagnostics.hpp"
 #ifdef _OPENMP
 #include <omp.h>
 #endif
 #include <cstdint>
 #include <cstdlib>
-#include "../../../packed_thread_scratch.hpp"
+#include "packed_thread_scratch.hpp"
 
 namespace sfem {
 namespace codegen {

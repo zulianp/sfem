@@ -231,7 +231,7 @@ from codegen.framework.targets import (
     ARMSVETarget,
     HIPTarget,
 )
-from codegen.framework.plans.conventions import unit_output_name
+from codegen.framework.plans.conventions import generated_include, unit_output_name
 from codegen.framework.plans.scheduling import build_expression_graph
 
 
@@ -337,6 +337,30 @@ class GenerationResult:
     objects: tuple = ()
     plan: object = None
     plan_dump: object = None
+
+    @property
+    def include_dirs(self):
+        """What a compile of these sources needs on its include path."""
+        return generated_include_dirs(self.sources)
+
+
+def generated_include_dirs(paths):
+    """Every folder among `paths` that holds a generated header.
+
+    Generated files include each other by file name alone
+    (`plans/conventions.py generated_include`), so compiling them in place --
+    the staging tree, before install flattens it -- needs each of these folders
+    on the include path.  The library build derives the same set in CMake.
+    """
+    return tuple(
+        sorted(
+            {
+                os.path.dirname(os.path.abspath(path))
+                for path in paths
+                if str(path).endswith((".hpp", ".cuh"))
+            }
+        )
+    )
 
 
 @dataclass(frozen=True)
@@ -868,6 +892,7 @@ def generate(
 
     files = _relocate_generated_primitive_headers(files, out_dir, material.name)
     files = _collapse_duplicate_operators(files)
+    _check_flat_file_names(files)
     _validate_generated_call_graph(files)
     _validate_generated_op_overrides(files)
     source_paths = _write_files(out_dir, files)
@@ -1535,7 +1560,6 @@ def _replace_legacy_tensor_product_sources_with_proteus_aliases(files):
                 if not selected:
                     continue
                 files[source_path] = _tensor_product_proteus_alias_source(
-                    source_path,
                     c_abi_path,
                     selected,
                     alias,
@@ -1862,15 +1886,14 @@ def _extern_c_declarations(source):
     )
 
 
-def _tensor_product_proteus_alias_source(source_path, c_abi_path, declarations, alias):
-    include_path = _relative_codegen_include(os.path.dirname(source_path), c_abi_path)
+def _tensor_product_proteus_alias_source(c_abi_path, declarations, alias):
     declarations = tuple(
         declaration
         for declaration in declarations
         if "_matrix_assembly_" not in declaration["name"]
     )
     lines = [
-        '#include "%s"' % include_path,
+        '#include "%s"' % generated_include(c_abi_path),
         "",
     ]
     target_declarations = []
@@ -2002,22 +2025,13 @@ def _c_element_pointer_type(param):
 
 
 def _layout_codegen_files(unit, context, files, subdirectory=""):
-    local_headers = tuple(
-        generated.path
-        for generated in files
-        if _is_codegen_local_header(generated.path)
-    )
+    """Place each file; its source is unchanged, because every `#include` the
+    emitters print is already a bare file name (`plans/conventions.py
+    generated_include`) and so does not depend on where either file lands."""
     return tuple(
         GeneratedKernelFile(
             _layout_codegen_path(unit, context, generated.path, subdirectory),
-            _layout_codegen_source(
-                unit,
-                context,
-                generated.path,
-                generated.source,
-                local_headers,
-                subdirectory,
-            ),
+            generated.source,
         )
         for generated in files
     )
@@ -2050,52 +2064,6 @@ def _layout_codegen_path(unit, context, filename, subdirectory=""):
     if not directory:
         return filename
     return os.path.join(directory, filename)
-
-
-def _layout_codegen_source(
-    unit, context, filename, source, local_headers, subdirectory=""
-):
-    if _is_target_independent_codegen_file(filename):
-        subdirectory = ""
-    directory = _codegen_file_directory(unit, context, filename, subdirectory)
-    replacements = {}
-    for header in _CODEGEN_COMMON_HEADERS:
-        # Each included header is looked up where *it* was placed, which is not
-        # always where this file was: `matrix_formats.hpp` keeps the host
-        # position under every target.
-        header_directory = _in_target_subdirectory(
-            "", "" if _is_target_independent_codegen_file(header) else subdirectory
-        )
-        replacements[header] = _relative_codegen_include(
-            directory, os.path.join(header_directory, header)
-        )
-    for local in local_headers:
-        replacements[local] = _relative_codegen_include(
-            directory,
-            os.path.join(
-                _in_target_subdirectory(
-                    _codegen_dimension_directory(context), subdirectory
-                ),
-                local,
-            ),
-        )
-
-    relocated = source
-    for header, relative in replacements.items():
-        if header != relative:
-            relocated = relocated.replace(
-                '#include "%s"' % header,
-                '#include "%s"' % relative,
-            )
-    # The reference headers are a family, so their includes move by path rather
-    # than by a lookup of each name.
-    reference_directory = _in_target_subdirectory(REFERENCE_DIRECTORY, subdirectory)
-    if directory or reference_directory != REFERENCE_DIRECTORY:
-        relocated = relocated.replace(
-            '#include "%s/' % REFERENCE_DIRECTORY,
-            '#include "%s/' % _relative_codegen_include(directory, reference_directory),
-        )
-    return relocated
 
 
 def _is_shared_primitive_header(filename):
@@ -2190,6 +2158,10 @@ _CODEGEN_COMMON_HEADERS = frozenset(
 
 _CODEGEN_SHARED_PRIMITIVE_HEADERS = frozenset(
     (
+        #: Identical for every material, like the primitives, so one copy at the
+        #: tree root: a copy per material is several files with one name, which
+        #: a flattened install and a bare-name include cannot tell apart.
+        "matrix_formats.hpp",
         "kernel_math.hpp",
         "kernel_math.cuh",
         "kernel_diagnostics.hpp",
@@ -2203,32 +2175,25 @@ _CODEGEN_SHARED_PRIMITIVE_HEADERS = frozenset(
 )
 
 
-def _relative_codegen_include(directory, target):
-    if not directory:
-        return target.replace(os.sep, "/")
-    return os.path.relpath(target, start=directory).replace(os.sep, "/")
-
-
 def _relocate_generated_primitive_headers(files, out_dir, material_name):
+    """Move the headers every material shares up to the generated tree root.
+
+    Only the file moves: the files that include it name it bare, so nothing
+    that includes it has to be rewritten to follow it.
+    """
     if not _uses_generated_shared_primitive_headers(out_dir, material_name):
         return files
 
     relocated = {}
-    header_targets = {}
-    for filename in files:
-        if _is_shared_primitive_header(filename) or _is_shared_reference_header(filename):
-            header_targets[filename] = os.path.join("..", filename)
-
-    if not header_targets:
-        return files
-
     for filename, source in files.items():
-        target = header_targets.get(filename, filename)
-        rewritten = _rewrite_generated_primitive_includes(filename, source, header_targets)
+        if _is_shared_primitive_header(filename) or _is_shared_reference_header(filename):
+            target = os.path.join("..", filename)
+        else:
+            target = filename
         existing = relocated.get(target)
-        if existing is not None and existing != rewritten:
+        if existing is not None and existing != source:
             raise RuntimeError("conflicting generated source for %s" % target)
-        relocated[target] = rewritten
+        relocated[target] = source
     return relocated
 
 
@@ -2241,21 +2206,6 @@ def _uses_generated_shared_primitive_headers(out_dir, material_name):
     # its device sources.  The sibling `<material>_cuda` tree this used to
     # accept was a second place for the same material and is gone.
     return generated_root == "generated" and output_name == material_name
-
-
-def _rewrite_generated_primitive_includes(filename, source, header_targets):
-    directory = os.path.dirname(filename)
-    rewritten = source
-    for header, target in header_targets.items():
-        local_include = _relative_codegen_include(directory, header)
-        shared_include = _relative_codegen_include(directory, target)
-        if local_include == shared_include:
-            continue
-        rewritten = rewritten.replace(
-            '#include "%s"' % local_include,
-            '#include "%s"' % shared_include,
-        )
-    return rewritten
 
 
 def _codegen_output_element_label(unit, context):
@@ -2741,6 +2691,28 @@ def _merge_files(outputs, files):
         outputs[generated.path] = generated.source
 
 
+def _check_flat_file_names(files):
+    """Refuse two generated files that share a file name.
+
+    Every `#include` between generated files is a bare file name and
+    `make install` flattens the headers into one directory, so a file name is
+    the whole of a file's identity: two files called the same would make the
+    build tree's include ambiguous and let one overwrite the other on install.
+    This sees one generation run; the top-level CMakeLists.txt checks the whole
+    installed set, which is where the host and device runs meet.
+    """
+    seen = {}
+    for filename in files:
+        name = generated_include(filename)
+        other = seen.setdefault(name, filename)
+        if other != filename:
+            raise RuntimeError(
+                "generated files '%s' and '%s' share the name '%s', which "
+                "install flattening and bare-name includes cannot tell apart"
+                % (other, filename, name)
+            )
+
+
 def _write_files(out_dir, files):
     """Write the generated sources, each appearing complete or not at all.
 
@@ -2892,6 +2864,7 @@ def _compile_operators(paths):
     include_dirs = [
         os.path.join(repo_root, "base"),
     ]
+    include_dirs.extend(generated_include_dirs(paths))
     include_dirs.extend(_smesh_source_include_dirs(repo_root))
     include_dirs.extend(_compile_config_include_dirs(repo_root))
     objects = []
@@ -3031,6 +3004,7 @@ __all__ = [
     "dx",
     "ds",
     "GenerationResult",
+    "generated_include_dirs",
     "KernelTarget",
     "current_geometric_dimension",
     "geometric_dimension_context",

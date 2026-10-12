@@ -1,4 +1,4 @@
-#include "../../../op/cuda/sfem_GeneratedMooneyRivlinKelvinVoigt_cuda_c_abi.hpp"
+#include "sfem_GeneratedMooneyRivlinKelvinVoigt_cuda_c_abi.hpp"
 
 extern "C" int cu_mooney_rivlin_kelvin_voigt_total_proteus_hex8_hessian_bsr_i_msoa(
         const int scalar_bytes,

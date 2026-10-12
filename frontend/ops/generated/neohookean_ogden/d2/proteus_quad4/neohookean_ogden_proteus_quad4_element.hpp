@@ -2,10 +2,10 @@
 #define NEOHOOKEAN_OGDEN_PROTEUS_QUAD4_ELEMENT_API_HPP
 
 #include <stddef.h>
-#include "../neohookean_ogden_d2_tensor_product_local.hpp"
-#include "../../../geometry_kernels.hpp"
-#include "../../../reference/line_p1_q2.hpp"
-#include "../../../reference/quad_line_q2.hpp"
+#include "neohookean_ogden_d2_tensor_product_local.hpp"
+#include "geometry_kernels.hpp"
+#include "line_p1_q2.hpp"
+#include "quad_line_q2.hpp"
 
 namespace sfem {
 namespace codegen {

@@ -140,6 +140,20 @@ def sfem_scalar_type_prelude(indent=""):
     ]
 
 
+def generated_include(path):
+    """How one generated file names another in an `#include`: by file name only.
+
+    `make install` copies every header into one flat `include/` directory, so a
+    directory in the spelling -- `../d2/quad4/x.hpp`, `reference/line_p1_q2.hpp`
+    -- names a path that does not exist once installed.  The build tree resolves
+    the bare name because every generated directory that holds a header is on
+    the include path (see the top-level CMakeLists.txt), and flattening is only
+    safe while file names are unique across the generated tree, which
+    `pipeline/driver.py _check_flat_file_names` enforces at generation time.
+    """
+    return str(path).replace("\\", "/").rsplit("/", 1)[-1]
+
+
 def optional_sfem_include(header, indent=""):
     """Include one of SFEM's headers where it is on the path, and carry on where
     it is not.

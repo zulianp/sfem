@@ -11,6 +11,7 @@ from codegen.framework.emitters.kernel_prologue import (
 from codegen.framework.plans.conventions import (
     PREFIXES,
     abi_geometry_name,
+    generated_include,
     abi_local_level,
     abi_mesh_fragment,
     INLINE_QUALIFIER_MACROS,
@@ -805,7 +806,7 @@ def generate_sfem_soa_cpp_files(
                 ),
             ),
             GeneratedKernelFile(
-                "%s_element.hpp" % prefix,
+                source_builder.header_name("%s_element" % prefix),
                 _sfem_soa_element_api_header(
                     forms,
                     prefix,
@@ -11077,21 +11078,6 @@ def _sfem_soa_element_api_header(
     return "\n".join(resolve_dead_parameters(resolve_kernel_constants(lines)))
 
 
-def _sibling_element_include(element_name, header):
-    """Another element's API header, seen from inside this element's directory.
-
-    Both sit in `d<dim>/<element>/` plus whatever folder the target claims for
-    its sources, so the number of steps up is the target's answer rather than a
-    constant: `../hex8/x.hpp` on the host, `../../hex8/cuda/x.hpp` on a device.
-    The mesh-order element delegates to its PROTEUS twin through exactly this
-    include, so a wrong count here breaks the delegation rather than a header.
-    """
-    subdirectory = current_target().source_subdirectory()
-    if not subdirectory:
-        return "../%s/%s" % (element_name, header)
-    return "../../%s/%s/%s" % (element_name, subdirectory, header)
-
-
 def _sfem_tensor_product_element_api_alias(prefix, dim, n_nodes):
     aliases = (
         ("quad4", "proteus_quad4", 2, 4),
@@ -11106,9 +11092,10 @@ def _sfem_tensor_product_element_api_alias(prefix, dim, n_nodes):
                 "element_name": element_name,
                 "proteus_name": proteus_name,
                 "target_prefix": "%s_%s" % (prefix[: -len(suffix)], proteus_name),
-                "include": _sibling_element_include(
-                    proteus_name,
-                    "%s_%s_element.hpp" % (prefix[: -len(suffix)], proteus_name),
+                "include": generated_include(
+                    current_target().header_name(
+                        "%s_%s_element" % (prefix[: -len(suffix)], proteus_name)
+                    )
                 ),
                 "shape_order": tensor_product_cartesian_shape_order(dim, n_nodes),
             }

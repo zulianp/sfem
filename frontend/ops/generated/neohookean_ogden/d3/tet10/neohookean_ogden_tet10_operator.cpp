@@ -1,19 +1,19 @@
 #include <cstdio>
 #include <type_traits>
-#include "../neohookean_ogden_d3_simplex_local.hpp"
-#include "../neohookean_ogden_d3_simplex_hessian.hpp"
-#include "../../../reference/quad_tet_q4.hpp"
-#include "../../../reference/tet10_q4.hpp"
-#include "../../../reference/quad_tet_q11.hpp"
-#include "../../../reference/tet10_q11.hpp"
-#include "../../../geometry_kernels.hpp"
-#include "../../../kernel_diagnostics.hpp"
+#include "neohookean_ogden_d3_simplex_local.hpp"
+#include "neohookean_ogden_d3_simplex_hessian.hpp"
+#include "quad_tet_q4.hpp"
+#include "tet10_q4.hpp"
+#include "quad_tet_q11.hpp"
+#include "tet10_q11.hpp"
+#include "geometry_kernels.hpp"
+#include "kernel_diagnostics.hpp"
 #ifdef _OPENMP
 #include <omp.h>
 #endif
 #include <cstdint>
 #include <cstdlib>
-#include "../../../packed_thread_scratch.hpp"
+#include "packed_thread_scratch.hpp"
 
 namespace sfem {
 namespace codegen {

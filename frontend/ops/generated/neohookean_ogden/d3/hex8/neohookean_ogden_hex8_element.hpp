@@ -1,7 +1,7 @@
 #ifndef NEOHOOKEAN_OGDEN_HEX8_ELEMENT_API_HPP
 #define NEOHOOKEAN_OGDEN_HEX8_ELEMENT_API_HPP
 
-#include "../proteus_hex8/neohookean_ogden_proteus_hex8_element.hpp"
+#include "neohookean_ogden_proteus_hex8_element.hpp"
 
 namespace sfem {
 namespace codegen {

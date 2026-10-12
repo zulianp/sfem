@@ -1,10 +1,10 @@
 #include <type_traits>
-#include "../navier_stokes_form_2_u_u_d3_tensor_product_local.hpp"
-#include "../../../reference/line_p2_q4.hpp"
-#include "../../../reference/quad_line_q4.hpp"
-#include "../../../kernel_math.hpp"
-#include "../../../geometry_kernels.hpp"
-#include "../../../kernel_diagnostics.hpp"
+#include "navier_stokes_form_2_u_u_d3_tensor_product_local.hpp"
+#include "line_p2_q4.hpp"
+#include "quad_line_q4.hpp"
+#include "kernel_math.hpp"
+#include "geometry_kernels.hpp"
+#include "kernel_diagnostics.hpp"
 
 #ifndef SFEM_RESTRICT
 #define SFEM_RESTRICT

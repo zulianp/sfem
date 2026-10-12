@@ -1,4 +1,4 @@
-#include "../../../op/cuda/sfem_GeneratedNeoHookeanOgden_cuda_c_abi.hpp"
+#include "sfem_GeneratedNeoHookeanOgden_cuda_c_abi.hpp"
 
 extern "C" int cu_neohookean_ogden_proteus_quad4_apply_i_msoa(
         const int scalar_bytes,

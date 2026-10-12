@@ -8,8 +8,8 @@
 #define SFEM_GENERATED_SCALAR_T
 #endif
 #endif
-#include "../../../cuda/kernel_math.cuh"
-#include "../../../cuda/tensor_product_kernels.cuh"
+#include "kernel_math.cuh"
+#include "tensor_product_kernels.cuh"
 #ifndef SFEM_RESTRICT
 #define SFEM_RESTRICT __restrict__
 #endif

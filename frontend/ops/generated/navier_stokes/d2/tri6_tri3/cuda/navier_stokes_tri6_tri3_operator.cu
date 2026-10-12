@@ -1,11 +1,11 @@
 #include <type_traits>
-#include "../../cuda/navier_stokes_d2_simplex_mixed_local.cuh"
-#include "../../../../reference/cuda/quad_tri_q6.hpp"
-#include "../../../../reference/cuda/tri3_q6.hpp"
-#include "../../../../reference/cuda/tri6_q6.hpp"
-#include "../../../../cuda/kernel_math.cuh"
-#include "../../../../cuda/geometry_kernels.cuh"
-#include "../../../../cuda/kernel_diagnostics.cuh"
+#include "navier_stokes_d2_simplex_mixed_local.cuh"
+#include "quad_tri_q6.cuh"
+#include "tri3_q6.cuh"
+#include "tri6_q6.cuh"
+#include "kernel_math.cuh"
+#include "geometry_kernels.cuh"
+#include "kernel_diagnostics.cuh"
 
 #ifndef SFEM_RESTRICT
 #define SFEM_RESTRICT

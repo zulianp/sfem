@@ -1,12 +1,12 @@
 #include <type_traits>
 #include <cuda_runtime.h>
-#include "../../cuda/saint_venant_kirchhoff_d2_simplex_local.cuh"
-#include "../../../../reference/cuda/quad_tri_q3.hpp"
-#include "../../../../reference/cuda/tri6_q3.hpp"
-#include "../../../../reference/cuda/quad_tri_q6.hpp"
-#include "../../../../reference/cuda/tri6_q6.hpp"
-#include "../../../../cuda/geometry_kernels.cuh"
-#include "../../../../cuda/kernel_diagnostics.cuh"
+#include "saint_venant_kirchhoff_d2_simplex_local.cuh"
+#include "quad_tri_q3.cuh"
+#include "tri6_q3.cuh"
+#include "quad_tri_q6.cuh"
+#include "tri6_q6.cuh"
+#include "geometry_kernels.cuh"
+#include "kernel_diagnostics.cuh"
 #include <cstdint>
 #include <cstdlib>
 

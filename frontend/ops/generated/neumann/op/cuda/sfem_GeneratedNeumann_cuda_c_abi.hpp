@@ -27,7 +27,7 @@ typedef double geom_t;
 #define RSTR SFEM_RESTRICT
 #endif
 
-#include "../../../cuda/kernel_diagnostics.cuh"
+#include "kernel_diagnostics.cuh"
 
 #include "smesh_mesh.hpp"
 

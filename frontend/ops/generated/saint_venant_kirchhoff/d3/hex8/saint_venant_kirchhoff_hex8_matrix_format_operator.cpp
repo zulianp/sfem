@@ -1,4 +1,4 @@
-#include "../../matrix_formats.hpp"
+#include "matrix_formats.hpp"
 
 namespace sfem {
 namespace codegen {

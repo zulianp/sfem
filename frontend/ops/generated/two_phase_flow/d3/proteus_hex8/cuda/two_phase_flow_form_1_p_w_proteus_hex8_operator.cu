@@ -2,11 +2,11 @@
 #include <cstdint>
 #include <cstdlib>
 #include <string.h>
-#include "../../cuda/two_phase_flow_form_1_p_w_d3_tensor_product_local.cuh"
-#include "../../../../cuda/geometry_kernels.cuh"
-#include "../../../../cuda/kernel_diagnostics.cuh"
-#include "../../../../reference/cuda/line_p1_q3.hpp"
-#include "../../../../reference/cuda/quad_line_q3.hpp"
+#include "two_phase_flow_form_1_p_w_d3_tensor_product_local.cuh"
+#include "geometry_kernels.cuh"
+#include "kernel_diagnostics.cuh"
+#include "line_p1_q3.cuh"
+#include "quad_line_q3.cuh"
 #if defined(__has_include)
 #if __has_include("smesh_types.hpp")
 #include "smesh_types.hpp"

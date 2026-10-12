@@ -1,4 +1,4 @@
-#include "../../../op/cuda/sfem_GeneratedBodyForce_cuda_c_abi.hpp"
+#include "sfem_GeneratedBodyForce_cuda_c_abi.hpp"
 
 extern "C" int cu_body_force_proteus_quad4_residual_i_maos(
         const int scalar_bytes,

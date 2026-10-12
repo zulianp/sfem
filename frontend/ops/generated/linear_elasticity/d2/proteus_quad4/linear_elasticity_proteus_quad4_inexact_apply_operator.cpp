@@ -1,5 +1,5 @@
-#include "../../op/sfem_GeneratedLinearElasticity_c_abi.hpp"
-#include "../../../kernel_diagnostics.hpp"
+#include "sfem_GeneratedLinearElasticity_c_abi.hpp"
+#include "kernel_diagnostics.hpp"
 
 #include "linear_elasticity_proteus_quad4_inexact_apply_inline.hpp"
 

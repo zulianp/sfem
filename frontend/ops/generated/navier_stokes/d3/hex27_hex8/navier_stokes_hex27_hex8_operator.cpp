@@ -1,4 +1,4 @@
-#include "../../op/sfem_GeneratedNavierStokes_c_abi.hpp"
+#include "sfem_GeneratedNavierStokes_c_abi.hpp"
 
 extern "C" int navier_stokes_proteus_hex27_proteus_hex8_jacobian_action_i_msoa(
         const int scalar_bytes,
