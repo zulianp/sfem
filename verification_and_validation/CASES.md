@@ -31,7 +31,7 @@ solid-related source file.
 | Hyperelastic | `GeneratedSaintVenantKirchhoff` | Generated 2D/3D simplex and tensor-product families | Required in the homogeneous mode cases. |
 | Viscoelastic | `GeneratedMooneyRivlinKelvinVoigtNewmark` | Generated 2D and 3D element families | Canonical finite-strain Kelvin-Voigt target in both dimensions. |
 | Viscoelastic | `KelvinVoigtNewmark` | Legacy 3D `HEX8` and semi-structured hex only | Cover with the analytical damped-mode case. |
-| Viscoelastic | `MooneyRivlinVisco` | Legacy 3D `HEX8` only; Prony series and optional WLF shift | Cover with homogeneous relaxation and reduced-time WLF variants. |
+| Viscoelastic | `GeneratedMooneyRivlinProny` | 3D `HEX8`; Prony series and optional WLF shift | Cover with homogeneous relaxation and reduced-time WLF variants. |
 
 `Hyperelasticity` is a generic/plugin-facing operator rather than a distinct
 constitutive law, so it does not receive a separate physics case.
@@ -256,7 +256,7 @@ outside this material-focused catalog.
 ### VE-3D-03: `prony_relaxation_3d`
 
 - **Type:** history-variable verification; medium gate.
-- **Target:** `MooneyRivlinVisco` on `HEX8`.
+- **Target:** `GeneratedMooneyRivlinProny` on `HEX8`.
 - **Setup:** homogeneous constrained uniaxial step-and-hold deformation. Run a
   one-term Prony series first, then a separated multi-term series. A WLF variant
   repeats the history at two temperatures.
@@ -270,7 +270,7 @@ outside this material-focused catalog.
   long-time modulus error at or below `0.5%`, each fitted relaxation-time error
   at or below `2%`, and WLF reduced-time curve-collapse error at or below `1%`.
 - **Prerequisite:** a driver path that initializes, advances, and commits
-  `MooneyRivlinVisco` history while reading the prescribed deformation history
+  `GeneratedMooneyRivlinProny` history while reading the prescribed deformation history
   from YAML-referenced files.
 
 ### HE-3D-03: `active_strain_homogeneous_3d`

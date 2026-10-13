@@ -35,6 +35,12 @@ FORM_ORDER_BY_KERNEL = {
     "apply": FormOrder.TWO,
 }
 
+#: The kernels whose body writes per integration point.  Not forms: a tensor
+#: the material publishes at its integration points is evaluated and written
+#: there and never integrated, so it has no order and is not in the table above.
+#: Its body shape is `FormAccumulation.PER_POINT`, which is what emission keys on.
+POINTWISE_OUTPUT_KERNELS = ("quadrature_output",)
+
 
 def form_order(form):
     """The order of the form this kernel emits.
@@ -57,11 +63,12 @@ def writes_per_shape(form):
     """Whether this form scatters to shape functions.
 
     A 0-form accumulates a single value over the element; a 1-form and a 2-form
-    both write one contribution per shape function.  That is the distinction
-    every ``form.name != "objective"`` in emission is actually making, and it
-    follows from the order rather than from the name.
+    both write one contribution per shape function, and a quadrature output
+    writes per point instead.  That is the distinction every
+    ``form.name != "objective"`` in emission is actually making, and it is
+    `form_accumulation`'s to answer.
     """
-    return form_order(form) is not FormOrder.ZERO
+    return form_accumulation(form) is FormAccumulation.PER_SHAPE
 
 
 def output_assignment(form):
@@ -125,11 +132,9 @@ class MeshOutputShape:
 
 def mesh_output_shape(form):
     """That record, for one form."""
-    if writes_per_shape(form):
-        return MeshOutputShape(
-            stride="out_stride", block="bout_data", extents=("NS * NC",), per_shape=True
-        )
-    return MeshOutputShape(stride="", block="bvalue", extents=(), per_shape=False)
+    return _MESH_OUTPUT_SHAPE[form_accumulation(form)]
+
+
 
 
 def mesh_output_streams(form, n_field_components, n_nodes, component_name):
@@ -151,7 +156,10 @@ def mesh_output_streams(form, n_field_components, n_nodes, component_name):
     ``component_name`` spells a field component's suffix, which is the caller's
     convention rather than this layer's.
     """
-    if not writes_per_shape(form):
+    accumulation = form_accumulation(form)
+    if accumulation is FormAccumulation.PER_POINT:
+        return ()
+    if accumulation is FormAccumulation.SCALAR:
         return ("value",)
     return tuple(
         "out%s%d" % (component_name(d), node)
@@ -184,14 +192,39 @@ class FormAccumulation(Enum):
     #: One contribution per shape function per field component.
     PER_SHAPE = "per_shape"
 
+    #: One tensor per integration point, written in place into an
+    #: integration-point stream: no accumulation and no scatter.
+    PER_POINT = "per_point"
+
+
+def form_is_integrated(form):
+    """Whether the body weights its integrand by the rule's weights.
+
+    Every form does.  A quadrature output does not: it is the integrand's
+    ingredient at a point, written there, and a weight it read would be a value
+    nothing uses.
+    """
+    return form_accumulation(form) is not FormAccumulation.PER_POINT
+
 
 def form_accumulation(form):
-    """Which of the two body shapes this form has."""
-    return (
-        FormAccumulation.PER_SHAPE
-        if writes_per_shape(form)
-        else FormAccumulation.SCALAR
-    )
+    """Which of the three body shapes this form has."""
+    if str(getattr(form, "name", form)) in POINTWISE_OUTPUT_KERNELS:
+        return FormAccumulation.PER_POINT
+    if form_order(form) is FormOrder.ZERO:
+        return FormAccumulation.SCALAR
+    return FormAccumulation.PER_SHAPE
+
+
+#: A per-point output writes its integration-point streams in place, so it has
+#: no stride, no staging buffer and nothing to scatter: an empty `block`.
+_MESH_OUTPUT_SHAPE = {
+    FormAccumulation.PER_SHAPE: MeshOutputShape(
+        stride="out_stride", block="bout_data", extents=("NS * NC",), per_shape=True
+    ),
+    FormAccumulation.SCALAR: MeshOutputShape(stride="", block="bvalue", extents=(), per_shape=False),
+    FormAccumulation.PER_POINT: MeshOutputShape(stride="", block="", extents=(), per_shape=False),
+}
 
 
 class FormContraction(Enum):
@@ -396,9 +429,10 @@ def objective_kernel_variants(form, emits_steps):
     the failure mode that having a single implementation removes.
 
     A 1-form and a 2-form scatter per shape and have no stepped variant, so they
-    always take the plain kernel.
+    always take the plain kernel; so does a quadrature output, which is not
+    evaluated along a search direction at all.
     """
-    if writes_per_shape(form):
+    if form_accumulation(form) is not FormAccumulation.SCALAR:
         return ("plain",)
     if emits_steps and getattr(form, "weak_form", None) is not None:
         return ("steps",)

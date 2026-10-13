@@ -1,4 +1,4 @@
-# The same scenario with inertia, through sfem::BDF2InertiaPotential.
+# The same scenario with inertia, through sfem::BDF2Scheme.
 #
 # Quasi-static is the right regime for a relaxation experiment and is the default, but the
 # release is a step change and a real body rings after one. dt is an order of magnitude

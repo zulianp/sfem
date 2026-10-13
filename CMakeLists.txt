@@ -133,6 +133,7 @@ list(APPEND SFEM_MODULES
     frontend
     frontend/constraints
     frontend/ops
+    frontend/ops/prony
 )
 
 if(SFEM_ENABLE_METIS)
@@ -166,6 +167,7 @@ if(SFEM_ENABLE_CUDA)
         resampling/quadshell4/cuda
         ssmg/cuda
         frontend/ops/cuda
+        frontend/ops/prony/cuda
     )
 
     if(SFEM_ENABLE_AMG)

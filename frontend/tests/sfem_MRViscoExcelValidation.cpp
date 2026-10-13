@@ -1,6 +1,6 @@
 /**
  * @file sfem_MRViscoExcelValidation.cpp
- * @brief Validate MooneyRivlinVisco against Excel Marc simulation data
+ * @brief Validate GeneratedMooneyRivlinProny against Excel Marc simulation data
  * 
  * Reads displacement from Excel "Simulation viscoelastic" data,
  * computes stress using SFEM, and compares with Marc's output.
@@ -17,7 +17,7 @@
 #include "sfem_API.hpp"
 #include "sfem_context.hpp"
 #include "sfem_Function.hpp"
-#include "sfem_MooneyRivlinVisco.hpp"
+#include "sfem_prony_test_material.hpp"
 
 enum TestMode {
     MODE_UNIAXIAL = 0,
@@ -155,26 +155,26 @@ TestResult run_visco_test(TestMode mode, const RefData& ref, double dt, double t
     );
     
     auto fs = sfem::FunctionSpace::create(mesh, 3);
-    auto op = std::make_shared<sfem::MooneyRivlinVisco>(fs);
-    
-    op->set_C10(MARC_C10);
-    op->set_C01(MARC_C01);
-    op->set_K(MARC_K);
-    op->set_dt(dt);
-    op->set_prony_terms(NUM_PRONY, prony_g, prony_tau);
-    
-    // Set WLF time-temperature superposition parameters
-    op->set_wlf_params(WLF_C1, WLF_C2, WLF_TREF);
-    op->set_temperature(temperature);
-    op->enable_wlf(true);  // Enable WLF for temperature shift
-    
-    op->initialize();
-    op->initialize_history();
-    
+    sfem::test::PronyMooneyRivlin material;
+    material.C10 = MARC_C10;
+    material.C01 = MARC_C01;
+    material.K   = MARC_K;
+    material.g.assign(prony_g, prony_g + NUM_PRONY);
+    material.tau.assign(prony_tau, prony_tau + NUM_PRONY);
+    // WLF time-temperature superposition
+    material.wlf         = true;
+    material.wlf_C1      = WLF_C1;
+    material.wlf_C2      = WLF_C2;
+    material.wlf_T_ref   = WLF_TREF;
+    material.temperature = temperature;
+    auto op              = sfem::test::make_prony_mooney_rivlin(fs, material);
+    if (!op) return TestResult{};
+
+    // Every commit below is one step of length dt, as the material was validated with.
+    op->begin_step(dt, dt);
     printf("  C10=%.3f MPa, C01=%.3f MPa, K=%.1f MPa\n", MARC_C10, MARC_C01, MARC_K);
     printf("  WLF: C1=%.4f, C2=%.4f°C, Tref=%.2f°C, T=%.1f°C\n", WLF_C1, WLF_C2, WLF_TREF, temperature);
-    printf("  Prony terms: %d, Active: %d, Gamma: %.6f\n", 
-           NUM_PRONY, op->get_num_active_terms(), op->get_gamma());
+    printf("  Prony terms: %d, Gamma: %.6f\n", NUM_PRONY, sfem::test::prony_gamma(*op, fs));
     printf("  Time step: %.4f s\n", dt);
     
     const ptrdiff_t ndofs = fs->n_dofs();
@@ -230,15 +230,16 @@ TestResult run_visco_test(TestMode mode, const RefData& ref, double dt, double t
             
             apply_displacement(mode, strain_interp, n_nodes, pts, x_buf->data());
             blas->zeros(ndofs, rhs_buf->data());
-            // op->gradient(x_buf->data(), rhs_buf->data());
-            op->update_history(x_buf->data());
+            op->begin_step(t + dt, dt);
+            op->advance(x_buf->data());
             
             t += dt;
         }
         
-        // At reference point
+        // At reference point: the step ending here is open while its stress is read.
         apply_displacement(mode, target_strain, n_nodes, pts, x_buf->data());
         blas->zeros(ndofs, rhs_buf->data());
+        op->begin_step(target_time, dt);
         op->gradient(x_buf->data(), rhs_buf->data());
         
         // Sum reaction forces on right face
@@ -277,7 +278,7 @@ TestResult run_visco_test(TestMode mode, const RefData& ref, double dt, double t
                    target_time, target_strain, stress_sfem, marc_stress, error);
         }
         
-        op->update_history(x_buf->data());
+        op->advance(x_buf->data());
         t = target_time;
         ref_idx++;
     }
@@ -289,7 +290,7 @@ int main(int argc, char *argv[]) {
     auto context__ = sfem::initialize(argc, argv);
     
     printf("================================================================\n");
-    printf("  MooneyRivlinVisco Excel Validation Test (with WLF TTS)\n");
+    printf("  GeneratedMooneyRivlinProny Excel Validation Test (with WLF TTS)\n");
     printf("================================================================\n");
     
     double DT = 0.0001;  // Time step

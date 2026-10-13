@@ -85,6 +85,13 @@ from codegen.framework.symbolic.boundary_forms import (
 )
 from codegen.framework.symbolic.constitutive import (
     TwoPhaseFlowConstitutiveModel,
+    isochoric_invariants,
+)
+from codegen.framework.symbolic.relaxation import (
+    PronyRelaxation,
+    RelaxationDeclaration,
+    is_relaxation_gamma,
+    relaxation_gamma_name,
 )
 from codegen.framework.symbolic.core import (
     KernelExpressions,
@@ -95,7 +102,9 @@ from codegen.framework.forms.equations import (
     EquationSystem,
     EquationSystemBuilder,
     EquationSystems,
+    QUADRATURE_OUTPUT_KERNEL,
     TOTAL_RESIDUAL_UNIT_NAME,
+    quadrature_output_dependencies,
     system_mixes_energy_and_residual,
     total_residual_collection,
 )
@@ -106,6 +115,7 @@ from codegen.framework.symbolic.fields import (
     MixedFunctionSpace,
     PREVIOUS_ARGUMENT,
     PreviousFunction,
+    QuadratureField,
     ScalarField,
     SpatialCoordinate,
     SymbolicArgument,
@@ -123,6 +133,8 @@ from codegen.framework.symbolic.fields import (
     VectorFunctionSpace,
     current_geometric_dimension,
     geometric_dimension_context,
+    is_quadrature_symbol,
+    symmetric_tensor_entries,
     previous_function,
     scalar_field,
     tensor_field,
@@ -705,6 +717,8 @@ class LoweredEquationEvaluation:
     #: unit: an emitter sees one unit's forms and cannot see the other beside
     #: it.
     mixes_energy_and_residual: bool = False
+    #: The energy's integration-point outputs, ((name, components), ...).
+    quadrature_outputs: tuple = ()
 
 
 @dataclass(frozen=True)
@@ -1164,6 +1178,7 @@ def _energy_codegen_unit(material_name, dim, evaluated):
     weak_form = sfem_soa_weak_form(
         evaluated.form_evaluation.form(FormOrder.ZERO).expression,
         evaluated.data_symbols,
+        quadrature_outputs=evaluated.quadrature_outputs,
     )
     kernel_forms = tuple(
         sfem_soa_kernel_form(
@@ -1274,7 +1289,11 @@ def _energy_expression_plans(kernel_forms, diagnostic_graph, collection):
     plans = []
     for kernel_form in kernel_forms:
         form_order = _form_order_for_kernel_name(kernel_form.name)
-        dependencies = _metadata_dependencies(collection, form_order)
+        dependencies = (
+            quadrature_output_dependencies(kernel_form.weak_form.quadrature_outputs, collection.variables)
+            if kernel_form.name == QUADRATURE_OUTPUT_KERNEL
+            else _metadata_dependencies(collection, form_order)
+        )
         source = replace(kernel_form, dependencies=dependencies)
         plans.append(
             KernelExpressionPlan(
@@ -1335,6 +1354,10 @@ def _form_order_for_kernel_name(name):
         return FormOrder.ONE
     if name == "apply":
         return FormOrder.TWO
+    if name == QUADRATURE_OUTPUT_KERNEL:
+        # Filed with the 1-form, whose stress it is; its own dependencies are
+        # taken from its expressions, not from the 1-form's.
+        return FormOrder.ONE
     raise ValueError("unsupported energy kernel form '%s'" % name)
 
 
@@ -1910,6 +1933,8 @@ def _tensor_product_proteus_alias_source(c_abi_path, declarations, alias):
         lines.extend(_extern_c_prototype_lines(declaration))
     if target_declarations:
         lines.append("")
+    if any(_c_element_pointer_param_index(_c_params(d["params"])) is not None for d in declarations):
+        lines.extend(current_target().permuted_connectivity_preamble())
     for declaration in declarations:
         lines.extend(
             _tensor_product_proteus_alias_function(
@@ -1936,19 +1961,21 @@ def _tensor_product_proteus_alias_function(declaration, alias):
 
     args = [_c_param_name(param) for param in params]
     element_index = _c_element_pointer_param_index(params)
+    after = ()
     if element_index is not None:
         pointer_type = _c_element_pointer_type(params[element_index])
-        shape_order = alias["shape_order"]
-        lines.append("    %s *proteus_elements[%d] = {" % (pointer_type, alias["n_shape"]))
-        for idx, source_index in enumerate(shape_order):
-            comma = "," if idx + 1 < len(shape_order) else ""
-            lines.append("        elements[%d]%s" % (source_index, comma))
-        lines.append("    };")
+        before, after = current_target().permuted_connectivity(pointer_type, alias["shape_order"])
+        lines.extend(before)
         args[element_index] = "proteus_elements"
 
     call = "%s(%s)" % (target, ", ".join(args))
     if return_type == "void":
         lines.append("    %s;" % call)
+        lines.extend(after)
+    elif after:
+        lines.append("    const %s status = %s;" % (return_type, call))
+        lines.extend(after)
+        lines.append("    return status;")
     else:
         lines.append("    return %s;" % call)
     lines.extend(["}", ""])
@@ -2254,7 +2281,34 @@ def _generate_op_wrapper_files(material, selected, user_input, kernel_sources):
         raise ValueError(
             "single-equation generated Op wrappers require an unnamed equation"
         )
-    return generate_op_files(material, selected, kernel_sources)
+    return generate_op_files(
+        material, selected, kernel_sources, quadrature_points=_quadrature_points_by_element(user_input)
+    )
+
+
+def _quadrature_points_by_element(user_input):
+    """{element: (points of each geometry route's rule)}.
+
+    What the kernels were generated with, handed to packaging rather than
+    re-derived there: an operator that stores integration-point history has to
+    allocate it at the points its kernels visit.
+    """
+    ret = {}
+    for context in user_input.element_contexts:
+        rules = [context.specialization.quadrature_rule.n_qp]
+        if context.affine_specialization is not None:
+            rules.append(context.affine_specialization.quadrature_rule.n_qp)
+        ret.setdefault(str(context.element_type).upper(), set()).update(rules)
+    return {element: tuple(sorted(rules)) for element, rules in ret.items()}
+
+
+def _reads_integration_point_fields(equations):
+    return any(
+        is_quadrature_symbol(symbol)
+        for equation in equations
+        if equation.is_energy
+        for symbol in sp.sympify(equation.define).free_symbols
+    )
 
 
 def _total_residual_unit(material_system, mixed_order=False, matrix_format_plan=None):
@@ -2302,6 +2356,19 @@ def _total_residual_unit(material_system, mixed_order=False, matrix_format_plan=
         # Taylor-Hood material keeps every kernel it has, and its residual
         # merit falls back to assembling per trial step, which is correct and
         # slow rather than absent.
+        return None
+    if _reads_integration_point_fields(equations):
+        # The residual-merit kernels do not read integration-point streams
+        # yet.  A material written as one energy loses nothing by it: its
+        # 0-form is the energy, reduced element-wise, and the residual merit
+        # is only the fallback a mixed material needs.  A mixed one has no
+        # such fallback, so it is refused rather than given a merit that
+        # silently ignores its history.
+        if mixes_energy_and_residual:
+            raise NotImplementedError(
+                "a material mixing an energy with a residual cannot read "
+                "integration-point fields yet: its residual merit has no stream for them"
+            )
         return None
     return LoweredEquationEvaluation(
         TOTAL_RESIDUAL_UNIT_NAME,
@@ -2361,6 +2428,7 @@ def _evaluate_equation(
             mixes_energy_and_residual=mixes_energy_and_residual,
             diagnostics=equation.diagnostics,
             matrix_format_plan=matrix_format_plan if "apply" in equation.kernels else None,
+            quadrature_outputs=equation.quadrature_outputs,
         )
     if equation.is_residual:
         if form_collection.kind is not FormKind.RESIDUAL:
@@ -3021,6 +3089,8 @@ __all__ = [
     "PRESSURE",
     "PREVIOUS_ARGUMENT",
     "PreviousFunction",
+    "PronyRelaxation",
+    "QuadratureField",
     "QuadratureSetting",
     "QualifiedExpression",
     "ScalarField",
@@ -3058,6 +3128,7 @@ __all__ = [
     "grad",
     "inner",
     "inv",
+    "isochoric_invariants",
     "material_parameter",
     "matrix_format_plan_from_request",
     "matrix_inner",

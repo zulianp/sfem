@@ -34,6 +34,7 @@ from codegen.framework.plans.affine_element_kernel import (
 )
 from codegen.framework.plans.form_transformations import stabilise_constant_cancellation
 from codegen.framework.plans.geometry_variants import geometry_variant_plan
+from codegen.framework.plans import quadrature_fields
 from codegen.framework.emitters.kernel_diagnostics_record import (
     STRUCT_NAME,
     DiagnosticsRecord,
@@ -50,6 +51,7 @@ from codegen.framework.plans.form_transformations import (
 )
 from codegen.framework.plans.form_emission import (
     FormAccumulation,
+    form_is_integrated,
     element_api_field_roles,
     form_material_parameter_names,
     form_reads_current,
@@ -1257,6 +1259,7 @@ def _sfem_soa_direct_hessian_element_matrix_function(
         )
         params.append("const s_t *const RSTR q_weight")
     params.extend(_form_material_parameter_declarations(form))
+    params.extend(quadrature_fields.block_parameters(quadrature_fields.quadrature_field_streams(form)))
     # The current state, where the tangent depends on it.  Same shape the apply
     # takes it in, so the caller hands over the streams it already gathered.
     # The component count is settled by the form, and the signature is written
@@ -1836,9 +1839,10 @@ def _sfem_soa_weak_form_block_function(
         for name in (
             _QUADRATURE_WEIGHT_PARAMETER[bool(shared.use_tensor_product_reference)],
         )
-        if not omit_reference_basis_inputs
+        if not omit_reference_basis_inputs and form_is_integrated(form)
     )
     params.extend(_form_material_parameter_declarations(form))
+    params.extend(quadrature_fields.block_parameters(quadrature_fields.quadrature_field_streams(form)))
     if use_stream_arrays:
         if shared.uses_current:
             params.append(
@@ -1849,7 +1853,7 @@ def _sfem_soa_weak_form_block_function(
                 "const s_t *const RSTR h_streams[NS * %d]" % n_field_components
             )
         params.extend(_objective_step_parameters(form))
-        params.append(
+        params.extend(
             _BLOCK_OUTPUT_PARAMETER[form_accumulation(form)](n_field_components)
         )
     else:
@@ -2252,9 +2256,36 @@ def _tensor_weak_per_shape_tail(
         )
 
 
+def _append_quadrature_output_lines(lines, form, weak_form, substitutions, work_item, closing):
+    """Evaluate the declared tensors at this point and write them in place.
+
+    Every element-type body ends here the same way: the deformation gradient of
+    the point is in `gu`, the output streams are at the point
+    (`quadrature_fields.point_base_lines`), and each component is one store.
+    """
+    outputs = dict(weak_form.quadrature_outputs)
+    expressions = []
+    targets = []
+    for stream in quadrature_fields.written_streams(quadrature_fields.quadrature_field_streams(form)):
+        for component, expression in enumerate(outputs[stream.name]):
+            expressions.append(sp.sympify(expression).xreplace(substitutions))
+            targets.append("%s =" % quadrature_fields.store_target(stream, component, work_item))
+    _append_cse_array_assignments(lines, expressions, targets, "qp_out_tmp")
+    lines.extend(closing)
+
+
+def _tensor_weak_per_point_tail(
+    lines, form, weak_form, substitutions, dim, n_field_components,
+    work_item, geometry_value, out_streams, closing, step_gradient=None,
+):
+    """A quadrature output: evaluate at the point, store, nothing to contract."""
+    _append_quadrature_output_lines(lines, form, weak_form, substitutions, work_item, closing)
+
+
 _TENSOR_WEAK_TAIL = {
     FormAccumulation.SCALAR: _tensor_weak_scalar_tail,
     FormAccumulation.PER_SHAPE: _tensor_weak_per_shape_tail,
+    FormAccumulation.PER_POINT: _tensor_weak_per_point_tail,
 }
 
 
@@ -2305,11 +2336,14 @@ def _append_sfem_soa_tensor_weak_form_lines(
             )
 
     lines.append("  for (int q = 0; q < NQ; ++q) {")
-    lines.extend(tensor_product_q_index_lines(dim, "    "))
-    lines.append(
-        "    const s_t qw = %s;"
-        % tensor_product_quadrature_weight_expr(dim)
-    )
+    # The lattice coordinates serve only the weight: the point's tables are
+    # reached through `q` itself.  A body that does not integrate takes neither.
+    for _integrated in [candidate for candidate in (form,) if form_is_integrated(candidate)]:
+        lines.extend(tensor_product_q_index_lines(dim, "    "))
+        lines.append(
+            "    const s_t qw = %s;"
+            % tensor_product_quadrature_weight_expr(dim)
+        )
     if uses_current:
         lines.extend(
             _reference_gradient_offset_lines("gu_ref", n_field_components, dim, "    ")
@@ -2334,6 +2368,8 @@ def _append_sfem_soa_tensor_weak_form_lines(
             % (component, component)
         )
     lines.append("    const s_t *const RSTR det_q0 = det0 + q * geometry_stride;")
+    point_streams = quadrature_fields.quadrature_field_streams(form)
+    lines.extend(quadrature_fields.point_base_lines(point_streams, "    "))
     step_loop = _objective_step_loop(
         form,
         weak_form,
@@ -2342,9 +2378,11 @@ def _append_sfem_soa_tensor_weak_form_lines(
         work_item,
         source_builder,
         # The density is scaled by the measure, so the second work-item loop
-        # reads the determinant again rather than carrying it across.
+        # reads the determinant again rather than carrying it across -- and
+        # the integration-point fields it names.
         ["const s_t %s = det_q0[%s];"
-         % (_work_item_name(source_builder, "det", 0), work_item)],
+         % (_work_item_name(source_builder, "det", 0), work_item)]
+        + quadrature_fields.load_lines(point_streams, "", work_item),
         "    ",
     )
     if step_loop is not None:
@@ -2363,6 +2401,7 @@ def _append_sfem_soa_tensor_weak_form_lines(
         "      const s_t %s = det_q0[%s];"
         % (_work_item_name(source_builder, "det", 0), work_item)
     )
+    lines.extend(quadrature_fields.load_lines(point_streams, "      ", work_item))
     def geometry_value(name, component):
         return _work_item_name(source_builder, name, component)
 
@@ -4452,6 +4491,7 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
     n_field_components=None,
     metric=None,
     expanded_value_plan=None,
+    quadrature_streams=(),
 ):
     n_field_components = dim if n_field_components is None else n_field_components
     if geometry_mode not in ("affine", "isoparametric"):
@@ -4491,6 +4531,10 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
         lines.extend(
             "    const %s %s," % (scalar_type, parameter)
             for parameter in material_parameter_names
+        )
+        lines.extend(
+            "    %s," % parameter
+            for parameter in quadrature_fields.mesh_parameters(quadrature_streams, scalar_type)
         )
         lines.append("    const ptrdiff_t u_stride,")
         for d in range(n_field_components):
@@ -4811,6 +4855,9 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
             if not omit_reference_basis_inputs
         )
         call_args.extend(material_parameter_names)
+        call_args.extend(
+            quadrature_fields.block_call_arguments(quadrature_streams, "evb", "nelements")
+        )
         # The packed half of the same arrangement the mesh kernel makes: the
         # block owns the step loop, so this gathers once and calls once.
         call_args.extend(
@@ -4905,7 +4952,9 @@ def _mesh_operator_parameters(
     else:
         base_params.append("const g_t *const *const RSTR points")
 
-    material_params = _form_material_parameter_declarations(form)
+    material_params = _form_material_parameter_declarations(form) + quadrature_fields.mesh_parameters(
+        quadrature_fields.quadrature_field_streams(form)
+    )
     field_params = []
     if uses_current:
         field_params.append("const ptrdiff_t u_stride")
@@ -4927,7 +4976,7 @@ def _mesh_operator_parameters(
         "const ptrdiff_t %s" % name for name in (output.stride,) if name
     ) + tuple(
         "s_t *const RSTR %s" % name
-        for name in _OUTPUT_ABI_BUFFERS[output.per_shape](
+        for name in _OUTPUT_ABI_BUFFERS[form_accumulation(form)](
             n_field_components, _component_name
         )
     )
@@ -5048,6 +5097,9 @@ _WEAK_OUTPUT_STREAM_ARRAY = {
     FormAccumulation.SCALAR: (
         lambda form, n_field_components, n_nodes, order: []
     ),
+    FormAccumulation.PER_POINT: (
+        lambda form, n_field_components, n_nodes, order: []
+    ),
     FormAccumulation.PER_SHAPE: _per_shape_weak_output_stream_array,
 }
 
@@ -5079,6 +5131,9 @@ def _per_shape_block_output_stream_array(form, n_field_components, n_nodes,
 #: an empty sequence, which emits nothing without anyone deciding not to.
 _BLOCK_OUTPUT_STREAM_ARRAY = {
     FormAccumulation.SCALAR: (
+        lambda form, n_field_components, n_nodes, compact, order: []
+    ),
+    FormAccumulation.PER_POINT: (
         lambda form, n_field_components, n_nodes, compact, order: []
     ),
     FormAccumulation.PER_SHAPE: _per_shape_block_output_stream_array,
@@ -5151,6 +5206,8 @@ def _per_shape_output_scatter(lines, form, dim, n_nodes, n_field_components,
 _OUTPUT_SCATTER = {
     FormAccumulation.SCALAR: _scalar_output_scatter,
     FormAccumulation.PER_SHAPE: _per_shape_output_scatter,
+    # The block wrote the integration-point streams; there is nothing to move.
+    FormAccumulation.PER_POINT: lambda *args: None,
 }
 
 
@@ -5202,13 +5259,15 @@ def _append_mesh_operator_compact_buffers(
         if uses_direction:
             lines.append("    s_t bh_data[NS * NC]%s;" % current_target().work_item_extent())
         output = mesh_output_shape(form)
-        lines.append(
+        lines.extend(
             "    s_t %s%s%s;"
             % (
-                output.block,
+                block,
                 "".join("[%s]" % extent for extent in output.extents),
                 current_target().work_item_extent(),
             )
+            for block in (output.block,)
+            if block
         )
         if compact_coordinate_buffers:
             lines.append("    s_t bcoordinate_data[NS * ND]%s;" % _wi_extent())
@@ -5579,6 +5638,7 @@ def _append_mesh_operator_packed_entry_points(
                 n_field_components=n_field_components,
                 metric=metric,
                 expanded_plan=expanded_plan,
+                quadrature_streams=quadrature_fields.quadrature_field_streams(form),
             )
         )
 
@@ -5986,17 +6046,20 @@ def _sfem_soa_mesh_operator_function(
                 use_tensor_product_reference, tensor_weight_name, scalar_weight_name
             ),
         )
-        if not omit_reference_basis_inputs
+        if not omit_reference_basis_inputs and form_is_integrated(form)
     )
     call_args.extend(material_parameter_names)
+    call_args.extend(
+        quadrature_fields.block_call_arguments(
+            quadrature_fields.quadrature_field_streams(form), "evb", "nelements"
+        )
+    )
     if use_stream_arrays:
         if uses_current:
             call_args.append("bu_streams")
         if uses_direction:
             call_args.append("bh_streams")
-        call_args.append(
-            _OUTPUT_CALL_ARGUMENT[mesh_output_shape(form).per_shape]
-        )
+        call_args.extend(_OUTPUT_CALL_ARGUMENT[form_accumulation(form)])
     else:
         if uses_current:
             call_args.extend(_BLOCK_FMT % stream for stream in _field_stream_names("u", n_field_components, n_nodes))
@@ -6262,6 +6325,7 @@ def _sfem_soa_packed_apply_public_wrappers(
     n_field_components=None,
     metric=None,
     expanded_plan=None,
+    quadrature_streams=(),
 ):
     n_field_components = dim if n_field_components is None else n_field_components
     if geometry_mode not in ("affine", "isoparametric"):
@@ -6318,6 +6382,10 @@ def _sfem_soa_packed_apply_public_wrappers(
             lines.extend(
                 "    const %s %s," % (scalar_type, parameter)
                 for parameter in material_parameter_names
+            )
+            lines.extend(
+                "    %s," % parameter
+                for parameter in quadrature_fields.mesh_parameters(quadrature_streams, scalar_type)
             )
             if uses_current:
                 lines.append("    const ptrdiff_t u_stride,")
@@ -6746,6 +6814,9 @@ def _sfem_soa_packed_apply_public_wrappers(
                 if not omit_reference_basis_inputs
             )
             call_args.extend(material_parameter_names)
+            call_args.extend(
+                quadrature_fields.block_call_arguments(quadrature_streams, "evb", "nelements")
+            )
             if uses_current:
                 call_args.append("bu_streams")
             if uses_direction:
@@ -7141,7 +7212,9 @@ def _objective_steps_lines(
     else:
         base_params.append("const g_t *const *const RSTR points")
 
-    material_params = _form_material_parameter_declarations(form)
+    material_params = _form_material_parameter_declarations(form) + quadrature_fields.mesh_parameters(
+        quadrature_fields.quadrature_field_streams(form)
+    )
     field_params = ["const ptrdiff_t u_stride"]
     field_params.extend(
         "const s_t *const RSTR u%s" % _component_name(d)
@@ -7496,6 +7569,11 @@ def _objective_steps_lines(
         if not omit_reference_basis_inputs
     )
     call_args.extend(material_parameter_names)
+    call_args.extend(
+        quadrature_fields.block_call_arguments(
+            quadrature_fields.quadrature_field_streams(form), "evb", "nelements"
+        )
+    )
     if use_stream_arrays:
         call_args.extend(("bu_streams", "bh_streams"))
     else:
@@ -7602,6 +7680,7 @@ def _objective_steps_lines(
                 n_field_components=n_field_components,
                 metric=metric,
                 expanded_value_plan=value_plan,
+                quadrature_streams=quadrature_fields.quadrature_field_streams(form),
             )
         )
     return lines
@@ -8136,6 +8215,11 @@ def _sfem_soa_direct_hessian_sum_factorized_assembly_lines(
     lines.extend(
         _sfem_soa_direct_hessian_point_geometry_lines(dim, "%s      " % indent)
     )
+    point_streams = quadrature_fields.quadrature_field_streams(form)
+    lines.extend(quadrature_fields.point_base_lines(point_streams, "%s      " % indent))
+    lines.extend(
+        quadrature_fields.load_lines(point_streams, "%s      " % indent, quadrature_fields.SINGLE_ELEMENT)
+    )
     if uses_current:
         lines.extend(
             _sfem_soa_direct_hessian_current_gradient_lines(
@@ -8453,6 +8537,7 @@ def _sfem_soa_direct_hessian_element_matrix_call_lines(
     reference_prefix,
     indent,
     constant_p1=False,
+    quadrature_streams=(),
 ):
     args = [
         *("badj%d" % i for i in range(dim * dim)),
@@ -8477,6 +8562,8 @@ def _sfem_soa_direct_hessian_element_matrix_call_lines(
         )
         args.append(scalar_weight_name)
     args.extend(material_parameter_names)
+    # One element in hand, so each stream is offset to it and strided by the mesh.
+    args.extend(quadrature_fields.block_call_arguments(quadrature_streams, "element", "nelements"))
     if uses_current:
         args.append("bu_data")
     args.append("element_matrix")
@@ -8521,6 +8608,7 @@ def _sfem_soa_hessian_packed_crs_passes(
     n_field_components=None,
     assembly=None,
     constant_p1=False,
+    quadrature_streams=(),
 ):
     """The multi-pass packed CRS assembly: discover the pattern, then fill it.
 
@@ -8549,6 +8637,7 @@ def _sfem_soa_hessian_packed_crs_passes(
             "const s_t %s" % parameter
             for parameter in material_parameter_names
         )
+        packed_state_params.extend(quadrature_fields.mesh_parameters(quadrature_streams))
         if uses_current:
             packed_state_params.append("const ptrdiff_t u_stride")
             packed_state_params.extend(
@@ -8803,6 +8892,7 @@ def _sfem_soa_hessian_packed_crs_passes(
                 reference_prefix,
                 "      ",
                     constant_p1=constant_p1,
+                quadrature_streams=quadrature_streams,
             )
         )
         lines.extend(
@@ -8989,6 +9079,10 @@ def _holding_one_element_hessian_matrix_assembly_function(
     lines.extend(
         "    const s_t %s," % parameter
         for parameter in material_parameter_names
+    )
+    lines.extend(
+        "    %s," % parameter
+        for parameter in quadrature_fields.mesh_parameters(quadrature_fields.quadrature_field_streams(form))
     )
     if uses_current:
         lines.append("    const ptrdiff_t u_stride,")
@@ -9206,6 +9300,7 @@ def _holding_one_element_hessian_matrix_assembly_function(
             reference_prefix,
             "    ",
             constant_p1=constant_p1_hessian is not None,
+            quadrature_streams=quadrature_fields.quadrature_field_streams(form),
         )
     )
     lines.append("")
@@ -9248,6 +9343,7 @@ def _holding_one_element_hessian_matrix_assembly_function(
         uses_current,
         n_field_components=n_field_components,
         constant_p1=constant_p1_hessian is not None,
+        quadrature_streams=quadrature_fields.quadrature_field_streams(form),
     )
     lines.extend(
         [
@@ -9266,6 +9362,7 @@ def _holding_one_element_hessian_matrix_assembly_function(
             uses_current,
             crs_passes,
             geometry_mode=geometry_mode,
+            quadrature_streams=quadrature_fields.quadrature_field_streams(form),
         )
     )
     return lines
@@ -9884,6 +9981,7 @@ def _sfem_soa_hessian_matrix_public_wrappers(
     uses_current,
     packed_crs_passes=(),
     geometry_mode="isoparametric",
+    quadrature_streams=(),
 ):
     # The ids the `FORMAT` template parameter is instantiated with.  They are
     # sparse because DIA, COO and patch were removed; the remaining three keep
@@ -9907,6 +10005,7 @@ def _sfem_soa_hessian_matrix_public_wrappers(
                     material_parameter_names,
                     uses_current,
                     geometry_mode=geometry_mode,
+                    quadrature_streams=quadrature_streams,
                 )
             )
     if "crs" in formats:
@@ -9922,6 +10021,7 @@ def _sfem_soa_hessian_matrix_public_wrappers(
                     material_parameter_names,
                     uses_current,
                     two_pass=False,
+                    quadrature_streams=quadrature_streams,
                 )
             )
         if "two_pass" in packed_crs_passes:
@@ -9936,6 +10036,7 @@ def _sfem_soa_hessian_matrix_public_wrappers(
                     material_parameter_names,
                     uses_current,
                     two_pass=True,
+                    quadrature_streams=quadrature_streams,
                 )
             )
     return lines
@@ -9948,6 +10049,7 @@ def _sfem_soa_hessian_packed_crs_public_wrapper(
     material_parameter_names,
     uses_current,
     two_pass,
+    quadrature_streams=(),
 ):
     n_field_components = dim
     params = _hessian_packed_crs_public_params(
@@ -9956,6 +10058,7 @@ def _sfem_soa_hessian_packed_crs_public_wrapper(
         material_parameter_names,
         uses_current,
         two_pass,
+        quadrature_streams=quadrature_streams,
     )
     if True:
         common_args = [
@@ -9973,6 +10076,7 @@ def _sfem_soa_hessian_packed_crs_public_wrapper(
         fill_args = common_args + [
             "points",
             *material_parameter_names,
+            *(stream.name for stream in quadrature_streams),
         ]
         if uses_current:
             fill_args.append("u_stride")
@@ -10019,6 +10123,7 @@ def _sfem_soa_hessian_matrix_public_wrapper(
     material_parameter_names,
     uses_current,
     geometry_mode="isoparametric",
+    quadrature_streams=(),
 ):
     params = _hessian_matrix_public_params(
         matrix_format,
@@ -10027,6 +10132,7 @@ def _sfem_soa_hessian_matrix_public_wrapper(
         material_parameter_names,
         uses_current,
         geometry_mode=geometry_mode,
+        quadrature_streams=quadrature_streams,
     )
     impl_args = _hessian_matrix_impl_args(
         matrix_format,
@@ -10034,6 +10140,7 @@ def _sfem_soa_hessian_matrix_public_wrapper(
         material_parameter_names,
         uses_current,
         geometry_mode=geometry_mode,
+        quadrature_streams=quadrature_streams,
     )
     return runtime_typed_entry_point_lines(
         public_name,
@@ -10058,6 +10165,7 @@ def _hessian_matrix_public_params(
     material_parameter_names,
     uses_current,
     geometry_mode="isoparametric",
+    quadrature_streams=(),
 ):
     params = [
         "const ptrdiff_t nelements",
@@ -10069,6 +10177,7 @@ def _hessian_matrix_public_params(
         "const %s %s" % (scalar_type, parameter)
         for parameter in material_parameter_names
     )
+    params.extend(quadrature_fields.mesh_parameters(quadrature_streams, scalar_type))
     if uses_current:
         params.append("const ptrdiff_t u_stride")
         params.extend(
@@ -10129,6 +10238,7 @@ def _hessian_packed_crs_public_params(
     material_parameter_names,
     uses_current,
     two_pass,
+    quadrature_streams=(),
 ):
     params = [
         argument.declaration for argument in PACKED_MESH_CORE_ARGUMENTS
@@ -10139,6 +10249,7 @@ def _hessian_packed_crs_public_params(
         "const %s %s" % (scalar_type, parameter)
         for parameter in material_parameter_names
     )
+    params.extend(quadrature_fields.mesh_parameters(quadrature_streams, scalar_type))
     if uses_current:
         params.append("const ptrdiff_t u_stride")
         params.extend(
@@ -10181,6 +10292,7 @@ def _hessian_matrix_impl_args(
     material_parameter_names,
     uses_current,
     geometry_mode="isoparametric",
+    quadrature_streams=(),
 ):
     n_field_components = dim
     args = [
@@ -10192,6 +10304,7 @@ def _hessian_matrix_impl_args(
             for param in _hessian_matrix_geometry_params(dim, geometry_mode)
         ),
         *material_parameter_names,
+        *(stream.name for stream in quadrature_streams),
     ]
     if uses_current:
         args.append("u_stride")
@@ -12071,11 +12184,13 @@ def _cpp_scalar_literal(value, scalar_type="real_t"):
 #: The output parameter a block kernel declares, per body shape.  A scalar body
 #: is handed one accumulator; a per-shape body is handed the stream array.
 _BLOCK_OUTPUT_PARAMETER = {
-    FormAccumulation.SCALAR: lambda n_field_components: "s_t *const RSTR value",
+    FormAccumulation.SCALAR: lambda n_field_components: ("s_t *const RSTR value",),
     FormAccumulation.PER_SHAPE: (
-        lambda n_field_components: "s_t *const RSTR out_streams[NS * %d]"
-        % n_field_components
+        lambda n_field_components: ("s_t *const RSTR out_streams[NS * %d]"
+        % n_field_components,)
     ),
+    # Its outputs are integration-point streams, declared with the inputs.
+    FormAccumulation.PER_POINT: lambda n_field_components: (),
 }
 
 #: The per-point buffers a body needs beyond its gradients.  A scalar body forms
@@ -12083,12 +12198,14 @@ _BLOCK_OUTPUT_PARAMETER = {
 _POINT_BUFFERS = {
     FormAccumulation.SCALAR: (),
     FormAccumulation.PER_SHAPE: ("loperand_q",),
+    FormAccumulation.PER_POINT: (),
 }
 
 #: The same, per component, for the bodies that keep the loperand in lane-major
 #: scalars rather than one block.
 _LOPERAND_COMPONENTS = {
     FormAccumulation.SCALAR: lambda n_field_components, dim: (),
+    FormAccumulation.PER_POINT: lambda n_field_components, dim: (),
     FormAccumulation.PER_SHAPE: (
         lambda n_field_components, dim: range(n_field_components * dim)
     ),
@@ -12119,9 +12236,19 @@ def _per_shape_diagnostic_expressions(form, substitutions):
 #: expressions the body actually evaluates, which is the same fact the body
 #: emitters read -- a record that counted the wrong half would be wrong in a
 #: way nothing compiles against.
+def _per_point_diagnostic_expressions(form, substitutions):
+    """A quadrature output's cost is the tensors it evaluates."""
+    return tuple(
+        sp.sympify(component).xreplace(substitutions)
+        for _name, components in form.weak_form.quadrature_outputs
+        for component in components
+    )
+
+
 _DIAGNOSTIC_EXPRESSIONS = {
     FormAccumulation.SCALAR: _scalar_diagnostic_expressions,
     FormAccumulation.PER_SHAPE: _per_shape_diagnostic_expressions,
+    FormAccumulation.PER_POINT: _per_point_diagnostic_expressions,
 }
 
 
@@ -12134,6 +12261,10 @@ def _zero_fill_lines(output, source_builder, work_item, indent="    "):
     same text at two depths rather than two texts.
     """
     lines = []
+    if not output.block:
+        # Nothing is staged, so nothing is cleared: a per-point output writes
+        # its streams in place.
+        return lines
     subscripts = ""
     for depth, extent in enumerate(output.extents):
         index = "stream" if depth == 0 else "stream%d" % depth
@@ -12223,15 +12354,22 @@ _MESH_WEIGHT_CALL_ARGUMENT = {
 #: per-shape output is one pointer per field component beside its stride.  The
 #: shape is `plans.form_emission.mesh_output`; this is only the spelling.
 _OUTPUT_ABI_BUFFERS = {
-    False: lambda n_field_components, component_name: ("value",),
-    True: lambda n_field_components, component_name: tuple(
+    FormAccumulation.SCALAR: lambda n_field_components, component_name: ("value",),
+    FormAccumulation.PER_SHAPE: lambda n_field_components, component_name: tuple(
         "out%s" % component_name(d) for d in range(n_field_components)
     ),
+    # Written in place through its integration-point streams.
+    FormAccumulation.PER_POINT: lambda n_field_components, component_name: (),
 }
 
 #: What the block kernel is handed.  The scalar accumulator is one buffer; the
-#: per-shape output is the pointer array built above it.
-_OUTPUT_CALL_ARGUMENT = {False: "bvalue", True: "bout_streams"}
+#: per-shape output is the pointer array built above it; a per-point output is
+#: handed its streams with the inputs.
+_OUTPUT_CALL_ARGUMENT = {
+    FormAccumulation.SCALAR: ("bvalue",),
+    FormAccumulation.PER_SHAPE: ("bout_streams",),
+    FormAccumulation.PER_POINT: (),
+}
 
 
 def _output_stream_names(form, n_field_components, n_nodes):

@@ -10,24 +10,22 @@
 // together characterise the series far better than either alone, which is why the release is
 // part of the case rather than a separate run.
 //
-// The structure follows drivers/mech/hyperelasticity_bdf2.exe.cpp -- predictor, Newton with an
-// assembled tangent, per-step export -- with three differences forced by the material:
+// The structure follows drivers/mech/hyperelasticity_bdf2.exe.cpp -- a time scheme held by the
+// material, Newton with an assembled tangent, per-step export. The material is the generated
+// sfem::GeneratedMooneyRivlinProny:
 //
-//   * sfem::MooneyRivlinVisco provides no energy and no matrix-free apply, so the tangent is
-//     assembled in BSR and the line search backtracks on the residual norm rather than on the
-//     incremental potential.
-//   * the material carries history, so update_history() closes each converged step and dt must
-//     stay fixed: the Prony coefficients alpha_i = exp(-dt / tau_i) are computed once from it.
+//   * it carries history, so each step is opened with begin_step(t, dt) before the solve and
+//     closed with advance(u) at the converged state. Between the two, gradient, apply and the
+//     assembly are pure functions of the iterate, so a rejected line-search trial leaves no trace.
 //   * inertia is optional. A relaxation experiment lives in the quasi-static regime, which is
-//     the default here; `dynamics: {type: bdf2}` restores the second-order term.
+//     the default here; `dynamics: {type: bdf2}` or `{type: newmark}` hands the material a
+//     BDF2Scheme or a NewmarkScheme, and the material contributes the scheme's inertia itself.
 //
-// The material kernels are HEX8 only (see operators/mooney_rivlin_visco.cpp), so the mesh must
-// be a hexahedral one.
+// The generated material is built for HEX8, so the mesh must be a hexahedral one.
 
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
-#include <functional>
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -35,11 +33,11 @@
 #include <vector>
 
 #include "sfem_API.hpp"
-#include "sfem_BDF2InertiaPotential.hpp"
+#include "sfem_BDF2Scheme.hpp"
 #include "sfem_DirichletConditions.hpp"
 #include "sfem_Function.hpp"
-#include "sfem_MooneyRivlinVisco.hpp"
-#include "sfem_NewmarkInertiaPotential.hpp"
+#include "sfem_GeneratedMooneyRivlinProny.hpp"
+#include "sfem_NewmarkScheme.hpp"
 #include "sfem_defs.hpp"
 #include "smesh_env.hpp"
 #include "smesh_glob.hpp"
@@ -101,111 +99,6 @@ namespace {
         return ret;
     }
 
-    void bdf2_predictor_be(const ptrdiff_t     n,
-                           const real_t        dt,
-                           const real_t *const u_n,
-                           const real_t *const v_n,
-                           real_t *const       u_hat) {
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < n; ++i) {
-            u_hat[i] = u_n[i] + dt * v_n[i];
-        }
-    }
-
-    void bdf2_predictor(const ptrdiff_t     n,
-                        const real_t        dt,
-                        const real_t *const u_n,
-                        const real_t *const u_nm1,
-                        const real_t *const v_n,
-                        const real_t *const v_nm1,
-                        real_t *const       u_hat) {
-        const real_t a0 = real_t(4.0 / 3.0);
-        const real_t a1 = real_t(-1.0 / 3.0);
-        const real_t b0 = real_t(8.0 / 9.0) * dt;
-        const real_t b1 = real_t(-2.0 / 9.0) * dt;
-
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < n; ++i) {
-            u_hat[i] = a0 * u_n[i] + a1 * u_nm1[i] + b0 * v_n[i] + b1 * v_nm1[i];
-        }
-    }
-
-    void update_velocity_be(const ptrdiff_t     n,
-                            const real_t        inv_dt,
-                            const real_t *const u_np1,
-                            const real_t *const u_n,
-                            real_t *const       v_np1) {
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < n; ++i) {
-            v_np1[i] = inv_dt * (u_np1[i] - u_n[i]);
-        }
-    }
-
-    void update_velocity_bdf2(const ptrdiff_t     n,
-                              const real_t        inv_2dt,
-                              const real_t *const u_np1,
-                              const real_t *const u_n,
-                              const real_t *const u_nm1,
-                              real_t *const       v_np1) {
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < n; ++i) {
-            v_np1[i] = inv_2dt * (3 * u_np1[i] - 4 * u_n[i] + u_nm1[i]);
-        }
-    }
-
-    // The three below are lifted verbatim from drivers/mech/mooney_rivlin_kelvin_voigt_newmark,
-    // the reference Newmark driver in this tree, which agrees line for line with the hand-rolled
-    // scheme in frontend/tests/sfem_MooneyRivlinGravityTest.cpp.
-    //
-    // `z` is the constant part of the affine relation v = alpha_v * u + z. It exists because a
-    // rate-dependent material needs v as a function of u *inside* the element kernel during the
-    // Newton solve. MooneyRivlinVisco is displacement-based -- it takes prev_u, not a velocity --
-    // so nothing here needs that, but the form is kept as-is so this stays diffable against the
-    // reference.
-    void newmark_predictor(const ptrdiff_t     n,
-                           const real_t        dt,
-                           const real_t        beta,
-                           const real_t *const u,
-                           const real_t *const v,
-                           const real_t *const a,
-                           real_t *const       u_hat) {
-        const real_t dt2_scale = dt * dt * (real_t(0.5) - beta);
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < n; ++i) {
-            u_hat[i] = u[i] + dt * v[i] + dt2_scale * a[i];
-        }
-    }
-
-    void newmark_velocity_shift(const ptrdiff_t     n,
-                                const real_t        dt,
-                                const real_t        gamma,
-                                const real_t        alpha_v,
-                                const real_t *const v,
-                                const real_t *const a,
-                                const real_t *const u_hat,
-                                real_t *const       z) {
-        const real_t a_scale = dt * (1 - gamma);
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < n; ++i) {
-            z[i] = v[i] + a_scale * a[i] - alpha_v * u_hat[i];
-        }
-    }
-
-    void newmark_update(const ptrdiff_t     n,
-                        const real_t        alpha_a,
-                        const real_t        alpha_v,
-                        const real_t *const u,
-                        const real_t *const u_hat,
-                        const real_t *const z,
-                        real_t *const       v,
-                        real_t *const       a) {
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < n; ++i) {
-            a[i] = alpha_a * (u[i] - u_hat[i]);
-            v[i] = alpha_v * u[i] + z[i];
-        }
-    }
-
 }  // namespace
 
 int solve_prony_visco_torsion(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *argv[]) {
@@ -248,21 +141,18 @@ int solve_prony_visco_torsion(const std::shared_ptr<sfem::Communicator> &comm, i
     auto      f          = sfem::Function::create(fs);
 
     // ------------------------------------------------------------------ material
-    auto visco = std::make_shared<sfem::MooneyRivlinVisco>(fs);
-    visco->set_C10(c.material.C10);
-    visco->set_C01(c.material.C01);
-    visco->set_K(c.material.K);
-    visco->set_dt(c.time.dt);
-
-    if (c.material.wlf_enabled) {
-        // Order matters: the shift factor enters the coefficients that set_prony_terms and
-        // initialize_history go on to compute.
-        visco->set_wlf_params(c.material.wlf_C1, c.material.wlf_C2, c.material.wlf_T_ref);
-        visco->set_temperature(c.material.temperature);
-        visco->enable_wlf(true);
+    auto visco = std::make_shared<sfem::GeneratedMooneyRivlinProny>(fs);
+    if (visco->initialize() != SFEM_SUCCESS) {
+        return SFEM_FAILURE;
     }
 
-    if (!c.material.prony.empty()) {
+    for (const auto &block : mesh->blocks()) {
+        visco->set_value_in_block(block->name(), "C10", c.material.C10);
+        visco->set_value_in_block(block->name(), "C01", c.material.C01);
+        visco->set_value_in_block(block->name(), "K", c.material.K);
+    }
+
+    {
         std::vector<real_t> g, tau;
         g.reserve(c.material.prony.size());
         tau.reserve(c.material.prony.size());
@@ -270,57 +160,48 @@ int solve_prony_visco_torsion(const std::shared_ptr<sfem::Communicator> &comm, i
             g.push_back(t.g);
             tau.push_back(t.tau);
         }
-        visco->set_prony_terms((int)g.size(), g.data(), tau.data());
-    }
 
-    if (visco->initialize() != SFEM_SUCCESS) {
-        return SFEM_FAILURE;
+        // The shift is evaluated at every begin_step, so the temperature is read per step rather
+        // than baked into coefficients computed once.
+        sfem::PronyRelaxation::Options options;
+        if (c.material.wlf_enabled) {
+            options.shift       = std::make_shared<sfem::WLFShift>(c.material.wlf_C1, c.material.wlf_C2, c.material.wlf_T_ref);
+            options.temperature = c.material.temperature;
+        }
+        visco->relaxation_groups().set_series("", "iso", sfem::PronySeries(g, tau), options);
     }
-    visco->initialize_history();
-    f->add_operator(visco);
 
     // ------------------------------------------------------------------ inertia
-    // BDF2InertiaPotential and NewmarkInertiaPotential are the same operator -- a lumped-mass
-    // penalty 1/2 alpha (u - u_hat)^T M (u - u_hat) -- and carry no scheme of their own. Which
-    // integrator this is comes entirely from the alpha and u_hat the loop below feeds them, so
-    // the two are held behind a setter rather than a common base class, which they lack.
-    const bool                 dynamic = c.dynamics.integrator != prony::Integrator::QuasiStatic;
-    const bool                 newmark = c.dynamics.integrator == prony::Integrator::Newmark;
-    std::shared_ptr<sfem::Op>  inertia;
-    std::function<void(real_t)> set_inertia_alpha;
-    sfem::SharedBuffer<real_t>  u_hat;
+    // The scheme is held by the material, which adds the scheme's inertia to its gradient, its
+    // tangent and its energy. The predictor, the shift and BDF2's backward-Euler start all belong
+    // to the scheme, so none of them is spelled in the step loop below.
+    const bool                        dynamic = c.dynamics.integrator != prony::Integrator::QuasiStatic;
+    const bool                        newmark = c.dynamics.integrator == prony::Integrator::Newmark;
+    std::shared_ptr<sfem::TimeScheme> scheme;
 
     if (newmark) {
-        auto op = std::make_shared<sfem::NewmarkInertiaPotential>(fs);
-        op->set_density(c.dynamics.density);
-        if (op->initialize() != SFEM_SUCCESS) {
+        auto newmark_scheme = std::make_shared<sfem::NewmarkScheme>(fs);
+        newmark_scheme->set_beta(c.dynamics.beta);
+        newmark_scheme->set_gamma(c.dynamics.gamma);
+        newmark_scheme->set_density(c.dynamics.density);
+        if (newmark_scheme->initialize() != SFEM_SUCCESS) {
             return SFEM_FAILURE;
         }
-        inertia           = op;
-        u_hat             = op->u_hat();
-        set_inertia_alpha = [op](const real_t alpha) { op->set_alpha(alpha); };
+        scheme = newmark_scheme;
     } else if (dynamic) {
-        auto op = std::make_shared<sfem::BDF2InertiaPotential>(fs);
-        op->set_density(c.dynamics.density);
-        if (op->initialize() != SFEM_SUCCESS) {
+        auto bdf2_scheme = std::make_shared<sfem::BDF2Scheme>(fs);
+        bdf2_scheme->set_density(c.dynamics.density);
+        if (bdf2_scheme->initialize() != SFEM_SUCCESS) {
             return SFEM_FAILURE;
         }
-        inertia           = op;
-        u_hat             = op->u_hat();
-        set_inertia_alpha = [op](const real_t alpha) { op->set_alpha(alpha); };
+        scheme = bdf2_scheme;
     }
 
-    if (inertia) {
-        f->add_operator(inertia);
+    if (scheme) {
+        visco->set_time_scheme(scheme);
     }
 
-    // Newmark's coefficients do not change from step to step, unlike BDF2's, which switches
-    // from the backward-Euler start to 9/4 after the first step.
-    const real_t newmark_alpha_a = newmark ? 1 / (c.dynamics.beta * c.time.dt * c.time.dt) : 0;
-    const real_t newmark_alpha_v = newmark ? c.dynamics.gamma / (c.dynamics.beta * c.time.dt) : 0;
-    if (newmark) {
-        set_inertia_alpha(newmark_alpha_a);
-    }
+    f->add_operator(visco);
 
     // ------------------------------------------------------------------ constraints
     std::shared_ptr<sfem::DirichletConditions> dirichlet;
@@ -346,46 +227,62 @@ int solve_prony_visco_torsion(const std::shared_ptr<sfem::Communicator> &comm, i
     const ptrdiff_t ndofs = fs->n_dofs();
     auto            blas  = sfem::blas<real_t>(sfem::EXECUTION_SPACE_HOST);
 
-    auto u      = sfem::create_host_buffer<real_t>(ndofs);
-    auto u_n    = sfem::create_host_buffer<real_t>(ndofs);
-    auto u_nm1  = sfem::create_host_buffer<real_t>(ndofs);
-    auto v      = sfem::create_host_buffer<real_t>(ndofs);
-    auto v_n    = sfem::create_host_buffer<real_t>(ndofs);
-    auto v_nm1  = sfem::create_host_buffer<real_t>(ndofs);
-    auto a      = newmark ? sfem::create_host_buffer<real_t>(ndofs) : nullptr;
-    auto a_n    = newmark ? sfem::create_host_buffer<real_t>(ndofs) : nullptr;
-    auto z      = newmark ? sfem::create_host_buffer<real_t>(ndofs) : nullptr;
-    auto rhs    = sfem::create_host_buffer<real_t>(ndofs);
-    auto trial  = sfem::create_host_buffer<real_t>(ndofs);
-    auto incr   = sfem::create_host_buffer<real_t>(ndofs);
-    auto diag   = sfem::create_host_buffer<real_t>(ndofs);
-    auto react  = sfem::create_host_buffer<real_t>(ndofs);
+    auto u     = sfem::create_host_buffer<real_t>(ndofs);
+    auto u_n   = sfem::create_host_buffer<real_t>(ndofs);
+    auto v     = sfem::create_host_buffer<real_t>(ndofs);
+    auto a     = sfem::create_host_buffer<real_t>(ndofs);
+    auto rhs   = sfem::create_host_buffer<real_t>(ndofs);
+    auto trial = sfem::create_host_buffer<real_t>(ndofs);
+    auto incr  = sfem::create_host_buffer<real_t>(ndofs);
+    auto react = sfem::create_host_buffer<real_t>(ndofs);
 
     blas->zeros(ndofs, u->data());
     blas->zeros(ndofs, u_n->data());
-    blas->zeros(ndofs, u_nm1->data());
     blas->zeros(ndofs, v->data());
-    blas->zeros(ndofs, v_n->data());
-    blas->zeros(ndofs, v_nm1->data());
-    if (newmark) {
-        blas->zeros(ndofs, a->data());
-        blas->zeros(ndofs, a_n->data());
-        blas->zeros(ndofs, z->data());
-    }
+    blas->zeros(ndofs, a->data());
 
+    // The body starts at rest, undeformed: the scheme's state and the material's history both
+    // start from zero, which is what the constraints give at t = 0 (no twist yet).
     if (dirichlet && dirichlet->set_time(0) != SFEM_SUCCESS) {
         return SFEM_FAILURE;
     }
     f->apply_constraints(u_n->data());
-    f->apply_constraints(u_nm1->data());
     f->apply_constraints(u->data());
 
     // ------------------------------------------------------------------ solvers
-    auto linear_op = sfem::create_linear_operator(sfem::op_type::BSR, f, u, sfem::EXECUTION_SPACE_HOST);
-    if (!linear_op) {
-        SFEM_ERROR("[prony] unable to assemble the BSR tangent\n");
-        return SFEM_FAILURE;
-    }
+    // The tangent is assembled in BSR here rather than through create_linear_operator, which
+    // keeps the values behind the operator it returns: the Jacobi preconditioner reads its
+    // diagonal straight off the assembled diagonal blocks, so no second assembly is needed for
+    // it. Constrained rows act as the identity, as in create_linear_operator.
+    auto graph       = fs->node_to_node_graph();
+    auto bsr_values  = sfem::create_host_buffer<real_t>(graph->nnz() * block_size * block_size);
+    auto diag        = sfem::create_host_buffer<real_t>(ndofs);
+    auto bsr         = sfem::h_bsr_spmv<count_t, idx_t, real_t>(
+            graph->n_nodes(), graph->n_nodes(), block_size, graph->rowptr(), graph->colidx(), bsr_values, (real_t)1);
+    auto linear_op   = sfem::compose_constraints_op(f, bsr);
+
+    auto assemble_tangent = [&](const real_t *const x) -> int {
+        blas->zeros(bsr_values->size(), bsr_values->data());
+        if (f->hessian_bsr(x, graph->rowptr()->data(), graph->colidx()->data(), bsr_values->data()) != SFEM_SUCCESS) {
+            SFEM_ERROR("[prony] unable to assemble the BSR tangent\n");
+            return SFEM_FAILURE;
+        }
+
+        const count_t *const rowptr = graph->rowptr()->data();
+        const idx_t *const   colidx = graph->colidx()->data();
+        const real_t *const  values = bsr_values->data();
+        const int            bs2    = block_size * block_size;
+        for (ptrdiff_t i = 0; i < graph->n_nodes(); ++i) {
+            for (count_t k = rowptr[i]; k < rowptr[i + 1]; ++k) {
+                if (colidx[k] != i) continue;
+                for (int d = 0; d < block_size; ++d) {
+                    diag->data()[i * block_size + d] = values[k * bs2 + d * block_size + d];
+                }
+            }
+        }
+        f->set_value_to_constrained_dofs(1, diag->data());
+        return SFEM_SUCCESS;
+    };
 
     auto jacobi = c.solver.preconditioner ? sfem::create_shiftable_jacobi(diag, sfem::EXECUTION_SPACE_HOST) : nullptr;
     auto lsolve = create_linear_solver(c.solver, linear_op, jacobi, ndofs);
@@ -395,16 +292,10 @@ int solve_prony_visco_torsion(const std::shared_ptr<sfem::Communicator> &comm, i
     // the constraint violation -- zero once the constraint is satisfied. That is what the
     // Newton solve wants and exactly what the reaction must not have: the constraint force
     // lives in those entries and would be erased. So the reaction is read from the operators
-    // directly.
+    // directly. The material's gradient includes the scheme's inertia, which it holds.
     auto internal_force = [&](const real_t *const x, real_t *const out) -> int {
         blas->zeros(ndofs, out);
-        if (visco->gradient(x, out) != SFEM_SUCCESS) {
-            return SFEM_FAILURE;
-        }
-        if (inertia && inertia->gradient(x, out) != SFEM_SUCCESS) {
-            return SFEM_FAILURE;
-        }
-        return SFEM_SUCCESS;
+        return visco->gradient(x, out);
     };
 
     // ------------------------------------------------------------------ output
@@ -443,7 +334,7 @@ int solve_prony_visco_torsion(const std::shared_ptr<sfem::Communicator> &comm, i
     // the transient export failed downstream on the mismatch.
     auto export_state = [&](const real_t time, const real_t *const u_s, const real_t *const v_s, const real_t *const a_s) {
         out->write_time_step("disp", time, u_s);
-        if (inertia) {
+        if (scheme) {
             out->write_time_step("velocity", time, v_s);
         }
         if (newmark) {
@@ -452,7 +343,7 @@ int solve_prony_visco_torsion(const std::shared_ptr<sfem::Communicator> &comm, i
         out->log_time(time);
     };
 
-    export_state(0, u_n->data(), v_n->data(), newmark ? a_n->data() : nullptr);
+    export_state(0, u_n->data(), v->data(), a->data());
 
     FILE *history = fopen(c.output.history_csv.c_str(), "w");
     if (!history) {
@@ -546,25 +437,12 @@ int solve_prony_visco_torsion(const std::shared_ptr<sfem::Communicator> &comm, i
             return SFEM_FAILURE;
         }
 
-        if (newmark) {
-            newmark_predictor(ndofs, c.time.dt, c.dynamics.beta, u_n->data(), v_n->data(), a_n->data(), u_hat->data());
-            newmark_velocity_shift(ndofs,
-                                   c.time.dt,
-                                   c.dynamics.gamma,
-                                   newmark_alpha_v,
-                                   v_n->data(),
-                                   a_n->data(),
-                                   u_hat->data(),
-                                   z->data());
-        } else if (inertia) {
-            if (step == 1) {
-                set_inertia_alpha(1 / (c.time.dt * c.time.dt));
-                bdf2_predictor_be(ndofs, c.time.dt, u_n->data(), v_n->data(), u_hat->data());
-            } else {
-                set_inertia_alpha(real_t(9.0 / 4.0) / (c.time.dt * c.time.dt));
-                bdf2_predictor(ndofs, c.time.dt, u_n->data(), u_nm1->data(), v_n->data(), v_nm1->data(), u_hat->data());
-            }
+        // Open the step: the scheme's predictor and shift, and the material's frozen history and
+        // step weight. Torque control re-solves the step below, which reads both unchanged.
+        if (scheme) {
+            scheme->begin_step(t, c.time.dt);
         }
+        visco->begin_step(t, c.time.dt);
 
         blas->copy(ndofs, u_n->data(), u->data());
 
@@ -625,28 +503,18 @@ int solve_prony_visco_torsion(const std::shared_ptr<sfem::Communicator> &comm, i
                 break;
             }
 
-            // MooneyRivlinVisco assembles but does not apply, so the tangent is rebuilt in BSR
-            // at every iteration.
-            linear_op = sfem::create_linear_operator(sfem::op_type::BSR, f, u, sfem::EXECUTION_SPACE_HOST);
-            if (!linear_op) {
-                SFEM_ERROR("[prony] unable to assemble the BSR tangent\n");
+            // The tangent is rebuilt at every iteration.
+            if (assemble_tangent(u->data()) != SFEM_SUCCESS) {
                 fclose(history);
                 return SFEM_FAILURE;
             }
 
             if (jacobi) {
-                blas->zeros(ndofs, diag->data());
-                if (f->hessian_diag(u->data(), diag->data()) != SFEM_SUCCESS) {
-                    fclose(history);
-                    return SFEM_FAILURE;
-                }
-                f->set_value_to_constrained_dofs(1, diag->data());
                 jacobi->set_diag(diag);
             }
 
             blas->zeros(ndofs, incr->data());
             f->copy_constrained_dofs(rhs->data(), incr->data());
-            lsolve->set_op(linear_op);
             lsolve->apply(rhs->data(), incr->data());
             step_linear_it += lsolve->iterations();
             total_linear_iterations += lsolve->iterations();
@@ -655,8 +523,7 @@ int solve_prony_visco_torsion(const std::shared_ptr<sfem::Communicator> &comm, i
             real_t alpha = -c.solver.nl_alpha;
 
             if (c.solver.line_search) {
-                // Backtracking on ||residual||. There is no energy to minimise here: the
-                // viscoelastic operator implements neither value() nor value_steps().
+                // Backtracking on ||residual||.
                 const real_t factors[] = {real_t(1), real_t(0.5), real_t(0.25), real_t(0.125), real_t(1.0 / 16)};
 
                 real_t best_norm  = std::numeric_limits<real_t>::max();
@@ -778,21 +645,10 @@ int solve_prony_visco_torsion(const std::shared_ptr<sfem::Communicator> &comm, i
                     (double)torque);
         }
 
-        if (newmark) {
-            newmark_update(ndofs,
-                           newmark_alpha_a,
-                           newmark_alpha_v,
-                           u->data(),
-                           u_hat->data(),
-                           z->data(),
-                           v->data(),
-                           a->data());
-        } else if (inertia) {
-            if (step == 1) {
-                update_velocity_be(ndofs, 1 / c.time.dt, u->data(), u_n->data(), v->data());
-            } else {
-                update_velocity_bdf2(ndofs, 1 / (2 * c.time.dt), u->data(), u_n->data(), u_nm1->data(), v->data());
-            }
+        // Read the derived states before advancing, because advance rotates the history they
+        // are reconstructed from.
+        if (scheme) {
+            scheme->reconstruct(u->data(), v->data(), scheme->has_acceleration() ? a->data() : nullptr);
         }
 
         if (step > 1 && torque * previous_torque < 0) {
@@ -834,9 +690,9 @@ int solve_prony_visco_torsion(const std::shared_ptr<sfem::Communicator> &comm, i
 
         // The history advances once per step, on the converged displacement. Doing it inside
         // the Newton loop would make the material depend on the iterate rather than the state.
-        if (visco->update_history(u->data()) != SFEM_SUCCESS) {
-            fclose(history);
-            return SFEM_FAILURE;
+        visco->advance(u->data());
+        if (scheme) {
+            scheme->advance(u->data());
         }
 
         if (!comm->rank()) {
@@ -867,16 +723,10 @@ int solve_prony_visco_torsion(const std::shared_ptr<sfem::Communicator> &comm, i
         fflush(history);
 
         if (step % c.output.export_freq == 0 || step == n_steps) {
-            export_state(t, u->data(), v->data(), newmark ? a->data() : nullptr);
+            export_state(t, u->data(), v->data(), a->data());
         }
 
-        blas->copy(ndofs, u_n->data(), u_nm1->data());
         blas->copy(ndofs, u->data(), u_n->data());
-        blas->copy(ndofs, v_n->data(), v_nm1->data());
-        blas->copy(ndofs, v->data(), v_n->data());
-        if (newmark) {
-            blas->copy(ndofs, a->data(), a_n->data());
-        }
     }
 
     if (!comm->rank()) {

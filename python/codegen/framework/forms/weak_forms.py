@@ -11,6 +11,8 @@ from typing import Optional, Tuple
 
 import sympy as sp
 
+from codegen.framework.symbolic.fields import is_quadrature_symbol
+
 from codegen.framework.symbolic.core import (
     _as_matrix,
     _check_scalar_expression,
@@ -67,8 +69,19 @@ class SfemSoAWeakForm:
     deformation_gradient: Tuple[sp.Expr, ...]
     dim: int
     n_field_components: Optional[int] = None
+    #: Tensors the material publishes at its integration points, as
+    #: ((name, components), ...), written in the same variables as the density.
+    quadrature_outputs: tuple = ()
 
     def __post_init__(self):
+        object.__setattr__(
+            self,
+            "quadrature_outputs",
+            tuple(
+                (str(name), tuple(sp.sympify(entry) for entry in components))
+                for name, components in self.quadrature_outputs
+            ),
+        )
         dim = int(self.dim)
         deformation_gradient = tuple(self.deformation_gradient)
         n_field_components = dim if self.n_field_components is None else int(self.n_field_components)
@@ -223,6 +236,25 @@ class SfemSoAFluxForm:
         return sp.Matrix(self.n_field_components, self.dim, self.flux)
 
     @property
+    def quadrature_symbols(self):
+        """The integration-point field components the flux and source read.
+
+        Field data like ``previous_gradient``, so not a material parameter; a
+        stored tensor is per point rather than per node, and its spelling is
+        the only place that says which.
+        """
+        return tuple(
+            sorted(
+                {
+                    str(symbol)
+                    for entry in tuple(self.flux) + tuple(self.source)
+                    for symbol in entry.free_symbols
+                    if is_quadrature_symbol(symbol)
+                }
+            )
+        )
+
+    @property
     def parameters(self):
         """The material parameters the flux and source mention, sorted.
 
@@ -232,6 +264,7 @@ class SfemSoAFluxForm:
         """
         state = {str(symbol) for symbol in self.gradient}
         state |= {str(symbol) for symbol in self.previous_gradient}
+        state |= set(self.quadrature_symbols)
         return tuple(
             sorted(
                 {
@@ -362,7 +395,7 @@ def flux_form_from_residual(residual_expressions, fields, dim):
     )
 
 
-def sfem_soa_weak_form(energy_density, deformation_gradient):
+def sfem_soa_weak_form(energy_density, deformation_gradient, quadrature_outputs=()):
     """Lower an energy density against a field gradient of any shape.
 
     Rows are field components and columns are spatial directions.  This used to
@@ -377,4 +410,5 @@ def sfem_soa_weak_form(energy_density, deformation_gradient):
         tuple(deformation_gradient),
         cols,
         n_field_components=rows,
+        quadrature_outputs=quadrature_outputs,
     )

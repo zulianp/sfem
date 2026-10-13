@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstring>
 #include <fstream>
 #include <iomanip>
@@ -16,7 +17,7 @@
 
 #include "sfem_API.hpp"
 #include "sfem_DirichletConditions.hpp"
-#include "sfem_MooneyRivlinVisco.hpp"
+#include "sfem_HistoryDependent.hpp"
 #include "sfem_StateField.hpp"
 #include "smesh_env.hpp"
 #include "smesh_sideset.hpp"
@@ -187,8 +188,9 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
         active->set_lmda(smesh::Env::read("SFEM_LMDA", (real_t)1));
     }
 
-    auto visco_op = std::dynamic_pointer_cast<sfem::MooneyRivlinVisco>(op);
-    if (visco_op) visco_op->initialize_history();
+    // Any operator whose material carries integration-point history -- a generated
+    // material with a Prony series, for one -- is stepped through this interface.
+    auto history_op = std::dynamic_pointer_cast<sfem::HistoryDependent>(op);
 
     // Generate basic Fa if active strain operator is requested
     std::shared_ptr<sfem::Buffer<real_t>> Fa_storage;
@@ -258,7 +260,7 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     std::memset(constrained_mask->data(), 0, size_t(mask_count(ndofs)) * sizeof(mask_t));
     if (f->constraints_mask(constrained_mask->data()) != SFEM_SUCCESS) return SFEM_FAILURE;
 
-    const std::string SFEM_OP_TYPE = smesh::Env::read_string("SFEM_OP_TYPE", visco_op ? "BSR" : "MF");
+    const std::string SFEM_OP_TYPE = smesh::Env::read_string("SFEM_OP_TYPE", "MF");
     auto              linear_op    = sfem::create_linear_operator(SFEM_OP_TYPE.c_str(), f, displacement, es);
     auto              cg           = sfem::create_cg<real_t>(linear_op, es);
     cg->verbose                    = SFEM_VERBOSE;
@@ -285,7 +287,7 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     // Newton iteration
     int    nl_max_it          = smesh::Env::read("SFEM_NL_MAX_IT", 30);
     real_t alpha              = smesh::Env::read("SFEM_NL_ALPHA", 1.0);
-    bool   enable_line_search = smesh::Env::read("SFEM_ENABLE_LINE_SEARCH", true) && !visco_op;
+    bool   enable_line_search = smesh::Env::read("SFEM_ENABLE_LINE_SEARCH", true);
     auto   blas               = sfem::blas<real_t>(es);
 
     printf("Solving hyperelasticity: #%ld dofs\n", (long)fs->n_dofs());
@@ -371,16 +373,23 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
                 op->set_field("active_strain", Fa_storage, 0);
             }
 
-            if (visco_op && rejected_trial && step == 1) {
-                blas->copy(ndofs, displacement->data(), rejected_trial->data());
+            // The history the step reads is fixed here, before the first Newton iterate.
+            if (history_op) history_op->begin_step(time, load_dt);
+
+            if (history_op && rejected_trial && step == 1) {
+                // Built on the host, where the mesh points are, and moved to
+                // where the operator runs.
+                auto trial_host = sfem::create_host_buffer<real_t>(ndofs);
+                auto state_host = smesh::to_host(displacement);
+                std::copy(state_host->data(), state_host->data() + ndofs, trial_host->data());
                 auto points = mesh->points()->data();
 #pragma omp parallel for
                 for (ptrdiff_t node = 0; node < mesh->n_nodes(); ++node) {
                     for (int d = 0; d < block_size; ++d) {
-                        rejected_trial->data()[node * block_size + d] +=
-                                SFEM_VISCO_REJECT_TRIAL_SCALE * points[d][node];
+                        trial_host->data()[node * block_size + d] += SFEM_VISCO_REJECT_TRIAL_SCALE * points[d][node];
                     }
                 }
+                rejected_trial = es == sfem::EXECUTION_SPACE_DEVICE ? smesh::to_device(trial_host) : trial_host;
                 blas->zeros(ndofs, material_reaction->data());
                 if (op->gradient(rejected_trial->data(), material_reaction->data()) != SFEM_SUCCESS)
                     return SFEM_FAILURE;
@@ -497,7 +506,7 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
                 }
             }
 
-            if (visco_op && visco_op->update_history(displacement->data()) != SFEM_SUCCESS) return SFEM_FAILURE;
+            if (history_op) history_op->advance(displacement->data());
         }
 
         printf("Total linear iterations: %ld\n", (long)total_linear_iterations);
