@@ -4,6 +4,7 @@
 #include <string.h>
 #include <sys/stat.h>
 
+#include <algorithm>
 #include <limits>
 
 #include "sfem_API.hpp"
@@ -236,11 +237,19 @@ int solve_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communicator> &comm, 
     }
 
     // Time loop
-    while (t < T) {
+    const real_t end_time_tolerance = 16 * std::numeric_limits<real_t>::epsilon() * std::max<real_t>(1, T);
+    while (t + end_time_tolerance < T) {
+        const real_t step_dt   = std::min<real_t>(dt, T - t);
+        const real_t next_time = t + step_dt;
+        if (es == sfem::EXECUTION_SPACE_HOST) {
+            if (dirichlet_conditions && dirichlet_conditions->set_time(next_time) != SFEM_SUCCESS) return SFEM_FAILURE;
+            if (neumann_conditions && neumann_conditions->set_time(next_time) != SFEM_SUCCESS) return SFEM_FAILURE;
+        }
+
         // Build the step's predictor and history once, from the state carried
         // out of the last step.  Everything the Newton loop below reads is
         // fixed here and does not move under it.
-        scheme->begin_step(t, dt);
+        scheme->begin_step(t, step_dt);
 
         for (int k = 0; k < nliter; k++) {
             // The velocity and acceleration Newmark implies at this iterate.
@@ -261,6 +270,7 @@ int solve_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communicator> &comm, 
         // solution and rotate the state.
         scheme->advance(solution->data());
 
+        t = next_time;
         if (++steps % export_freq == 0 && SFEM_NEWMARK_ENABLE_OUTPUT) {
             if (!comm->rank()) {
                 printf("%g/%g\n", double(t), double(T));
