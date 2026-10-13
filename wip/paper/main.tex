@@ -165,8 +165,9 @@ We instead resolve the conflict through ownership. Elements form packs, each
 node belongs to exactly one pack, and owned node ranges partition the numbering.
 Pack-private accumulation uses ordinary additions; owned rows are assigned and
 ghost contributions are staged for a sorted gather. Stored indices fix the
-summation order with one thread per pack. This enables bitwise regression tests
-and reproducibility across thread counts without redundant global solution entries.
+summation order with one thread per pack. For fixed inputs, packing and compiled
+arithmetic, this gives bitwise reproducibility across thread counts without
+redundant global solution entries.
 
 \begin{samepage}
 \noindent\textbf{Contributions.}
@@ -175,7 +176,8 @@ and reproducibility across thread counts without redundant global solution entri
         \emph{atomics-free by construction} rather than by synchronisation, on any number of
         threads (\S\ref{sec:format}).
   \item An argument from three properties of the layout, with measurement, that operator
-        application with one thread per pack is \emph{bitwise reproducible} across thread counts
+        application with one thread per pack and fixed inputs, packing and arithmetic
+        is \emph{bitwise reproducible} across thread counts
         (\S\ref{sec:apply}, \S\ref{sec:res:determinism}).
   \item An evaluation on a solver's operators against an atomic sweep and against lagged
         sparse matrix--vector products, reported along a \emph{term-completeness ladder} and
@@ -446,7 +448,7 @@ can take:
 
 \begin{enumerate}
   \item \emph{Within a pack}, one thread walks the pack's elements in increasing index order,
-        and pack membership is a pure function of the element index. The order in which a node
+        and, at fixed pack size, membership is a function of the element index. The order in which a node
         receives its contributions from inside the pack is therefore the same on every run and
         at every thread count.
   \item \emph{Across packs, for owned nodes}, there is no summation to order at all: the owned
@@ -459,11 +461,12 @@ can take:
 Every path is atomic-free, and by the ownership partition rather than by a choice of
 synchronisation primitive.
 
-\paragraph{Scope of the claim.} The argument holds where one thread owns a pack, which is the
-setting of this paper. Splitting a pack across threads leaves the reduction graph deterministic
-and the in-pack accumulation open, so such an implementation would need its in-pack order fixed
-too --- by gathering per node from a pack-local node-to-element adjacency, for instance, rather
-than scattering per element. The property belongs to the execution together with the format.
+\paragraph{Scope of the claim.} Input bits, mesh ordering, pack size, reduction graph
+and compiled arithmetic must stay fixed. The thread-dependent default pack size
+must therefore be pinned in cross-thread comparisons; the reported sweep does so.
+Changing the packing can change the summation order. Parallel input generation
+can also change last bits independently of the operator. Splitting a pack across
+threads would require a fixed in-pack reduction as well.
 
 \subsection{Alternatives}
 \label{sec:apply:alternatives}
@@ -563,12 +566,17 @@ both actions; only the comparison with $\Jlag$ measures equivalent operators.
   \end{tabular}
 \end{table}
 
-Every performance rate in this paper was measured on the Grace CPU die of an NVIDIA GH200 Grace Hopper
-Superchip (Table~\ref{tab:platform}), at 72 OpenMP threads with threads bound to cores,
-except in the thread sweep of Figure~\ref{fig:scaling}. One-thread Grace solver
-iteration counts in \S\ref{sec:res:solver} are a separate numerical experiment.
+Performance is measured on the Grace CPU die of an NVIDIA GH200 Grace Hopper
+Superchip (Table~\ref{tab:platform}), normally at 72 OpenMP threads bound to cores.
+The thread sweep and single-thread comparisons state their thread counts;
+the one-thread solver study (\S\ref{sec:res:solver}) measures iterations separately.
 The matched residual/action campaign and its copy/triad and DGEMM references use
 one allocation on \texttt{\matchedHost{}}, job \matchedJob{}.
+The matched operators use GCC~14.3.0, OpenMP, \texttt{-O3} and native CPU tuning.
+Floating-point flags include \path{-ffast-math}, \path{-fno-finite-math-only}
+and \path{-ffp-contract=fast}; the companion records all flags.
+The fixed state uses $\rho=1$, $\mu=0.01$
+and a coordinate-keyed perturbation of amplitude $0.017$.
 
 \paragraph{References and memory policy.} Copy and triad use $80\times10^6$
 doubles per array; their reported rates count transported bytes. DGEMM uses
@@ -873,11 +881,11 @@ not move the knee either: at \pkszHoWorkFactor$\times$ the work per degree of fr
 higher-order arm falls at the same place, retaining \pkszKneeHo{} of its pre-knee rate against
 \pkszKneeFo{} for first order.
 
-The default therefore derives from the core count, with the index-width ceiling retained as the
-correctness bound it is: the packer targets \packsPerThread{} packs per thread and rounds to a
-power of two, which reproduces the measured optimum at the sizes swept. Every packed performance measurement in
-this paper runs at that default rather than at the ceiling-derived one, so the numbers reported
-are the ones the format gives when its one parameter is set from the machine.
+The default targets \packsPerThread{} packs per thread, rounded to a power of two
+and capped by the index-width bound. It reproduces the measured optimum at the
+sizes swept. The pack-size study varies this parameter; thread scaling pins the
+72-thread choice. Matched and accumulation studies explicitly use pack size 1024,
+including the one-thread accumulation cases.
 
 \subsection{Spatial ordering}
 \label{sec:res:ordering}
@@ -1191,8 +1199,9 @@ packed solver performance is established.
 \label{sec:conclusion}
 
 Pack ownership and a sorted ghost gather remove atomics and colour barriers,
-with completion between phases. One thread per pack fixes summation order,
-confirmed across tested thread counts. Colouring also gives reproducibility;
+with completion between phases. With fixed inputs, packing and arithmetic,
+one thread per pack fixes summation order across thread counts.
+Colouring also gives reproducibility;
 packing improves throughput.
 
 Controlled residual probes show lower marginal accumulation costs at one and 72

@@ -2,6 +2,7 @@
 # Compare complete actions while the Krylov direction changes at a fixed state.
 set -euo pipefail
 bench=${1:?usage: cvfem_jacobian_cache.sh /absolute/path/to/bench}
+checker=$(cd "$(dirname "$0")" && pwd)/cvfem_check_dump.sh
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 cd "$work"
@@ -9,6 +10,12 @@ cd "$work"
 check() {
     local layout=$1 threads=$2 label=$3
     shift 3
+    local n=10 previous='' arg
+    for arg in "$@"; do
+        if [[ $previous == --n ]]; then n=$arg; fi
+        previous=$arg
+    done
+    local expected=$((4 * (n + 1) * (n + 1) * (n + 1)))
     for mode in cached per_apply; do
         local extra=(--repeat 3)
         if [[ $mode == per_apply ]]; then extra+=(--rebuild-state-gradients); fi
@@ -27,7 +34,10 @@ check() {
         ' "$mode.csv"
         # Warmup must not enter a phase fraction whose denominator excludes warmup.
         awk '/^  frac_jac_action_(qgrad|hograd):/ { if ($2 < 0 || $2 > 1.001) exit 1 }' "$mode.log"
-        test -s "$mode.bin"
+        if ! bash "$checker" "$mode.bin" "$expected" > "$mode.txt"; then
+            echo "FAIL: $layout/$threads/$label ($mode): invalid output dump"
+            exit 1
+        fi
         rm "$mode.csv"
     done
     if cmp -s cached.bin per_apply.bin; then
@@ -38,9 +48,6 @@ check() {
     # Allow 64 scalar rounding units in the infinity norm, not a limiter-sized error.
     local tolerance=1.4210854715202004e-14
     if grep -q '^  scalar: f32' cached.log; then tolerance=7.62939453125e-6; fi
-    for mode in cached per_apply; do
-        LC_ALL=C od -An -v -t f8 "$mode.bin" | awk '{ for (i=1; i<=NF; ++i) print $i }' > "$mode.txt"
-    done
     paste cached.txt per_apply.txt | LC_ALL=C awk -v tolerance="$tolerance" \
         -v label="$layout/$threads/$label" '
         function abs(x) { return x < 0 ? -x : x }

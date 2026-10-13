@@ -48,6 +48,33 @@ cached. Each exact action reconstructs the direction gradients; directions are
 keyed on coordinates so renumbered layouts apply the same physical direction.
 Boundary/transient terms and assembly/setup cost are excluded.
 
+The matched operator build uses GCC 14.3.0 with OpenMP. Its recorded performance
+flags are:
+
+```text
+-O3 -DNDEBUG -ffast-math -fno-finite-math-only -funroll-loops
+-fomit-frame-pointer -fno-math-errno -fno-trapping-math
+-ffp-contract=fast -mcpu=native -mtune=native -ftree-vectorize
+```
+
+OpenMP adds `-fopenmp`. The fixed state uses `rho=1`, `mu=0.01` and
+`--perturb 0.017`, keyed on coordinates. These settings describe the matched
+campaign; they do not retroactively describe every historical run.
+The [archive](../data/matched_counters_5047137/captures.tar.gz) retains
+`compiler.txt`, `build.log`, `SOURCE-SHA256.txt`, source checks and captured
+measurement code. Per-capture requests and commands record the measurement
+configuration; [provenance.json](../data/matched_counters_5047137/provenance.json)
+binds the archive hash. The captured bundle identifies the measured sources even
+though the manuscript has since changed.
+
+Bitwise reproducibility requires identical input bits, mesh ordering, pack size,
+reduction graph and compiled arithmetic, with one thread per pack. Pin the pack
+size when changing thread count: the automatic default depends on that count.
+Independent parallel initialization can change input rounding even at fixed
+packing. The local `cvfem_packed_fixed_input_test` therefore initializes one mesh
+and state once, then checks residuals and actions at 1/2/3/4 application threads.
+This test is separate from the archived Grace timing campaign.
+
 Each operator has six retained worker blocks and all three repeat counts
 30/60/90, giving 18 counted captures. Each capture follows 30 warmups and checks
 the result before and after measurement. Copy/triad controls use six blocks with
