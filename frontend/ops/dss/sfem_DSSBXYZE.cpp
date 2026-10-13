@@ -1,6 +1,7 @@
 #include "sfem_DSSBXYZE.hpp"
 
 #include "sfem_dss_bxyze.hpp"
+#include "sfem_dss_bxyze_structured.hpp"
 #include "smesh_semistructured.hpp"
 #include "smesh_sshex8.hpp"
 
@@ -78,6 +79,45 @@ int dss_global_to_bxyze(const SharedMesh &mesh,
     out->values             = values;
 
     return SFEM_SUCCESS;
+}
+
+int dss_bxyze_structured_inplace(const ptrdiff_t nx,
+                                 const ptrdiff_t ny,
+                                 const ptrdiff_t nz,
+                                 DSSBXYZEBuffer *const buffer) {
+    if (!buffer || !buffer->values) {
+        std::fprintf(stderr, "dss_bxyze_structured_inplace: invalid BXYZE buffer\n");
+        return SFEM_FAILURE;
+    }
+
+    if (nx <= 0 || ny <= 0 || nz <= 0) {
+        std::fprintf(stderr, "dss_bxyze_structured_inplace: invalid structured dimensions\n");
+        return SFEM_FAILURE;
+    }
+
+    const ptrdiff_t ne = nx * ny * nz;
+    if (buffer->nelements != ne) {
+        std::fprintf(stderr,
+                     "dss_bxyze_structured_inplace: dimensions imply %ld elements, buffer has %ld\n",
+                     (long)ne,
+                     (long)buffer->nelements);
+        return SFEM_FAILURE;
+    }
+
+    const ptrdiff_t nvalues =
+            sfem_dss_bxyze_n_values(buffer->level, buffer->nelements, buffer->element_block_size);
+
+    if (nvalues != buffer->nvalues || (ptrdiff_t)buffer->values->size() != buffer->nvalues) {
+        std::fprintf(stderr, "dss_bxyze_structured_inplace: inconsistent BXYZE buffer metadata\n");
+        return SFEM_FAILURE;
+    }
+
+    return sfem_dss_bxyze_structured_inplace(buffer->level,
+                                            nx,
+                                            ny,
+                                            nz,
+                                            buffer->element_block_size,
+                                            buffer->values->data());
 }
 
 }  // namespace sfem

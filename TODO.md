@@ -72,7 +72,19 @@ e successiva integrazione con mesh semi-strutturate di SFEM.
 - [ ] Valutare in-place vs out-of-place per performance.
 - [ ] Rendere il kernel DSS strutturato HPC-ready.
 
-## 8. Integrazione SFEM Frontend
+## 8. DSS Optimization
+
+- [ ] Aggiungere fast path per blocchi pieni: evitare divisioni/moduli e branch nel caso comune in cui le run lungo `x` sono allineate a blocchi BXYZE completi.
+- [ ] Specializzare il kernel lungo `x`: separare interfacce intra-block (`b -> b+1`) e inter-block (`B-1 -> 0` del blocco successivo).
+- [x] Usare una singola regione OpenMP per le tre passate `z`, `y`, `x`, mantenendo le barriere tra assi ma riducendo overhead di creazione/sincronizzazione del team.
+- [x] Precomputare offset locali di faccia e `block_stride = B * (p + 1)^3` per ridurre moltiplicazioni nel loop caldo.
+- [x] Sostituire gli offset heap-based (`std::vector`) con array fissi su stack per il range `p = 1..7`.
+- [ ] Specializzare per ordine polinomiale `p = 1..7`, così `n = p + 1` diventa compile-time e il compilatore può unrollare i loop locali.
+- [ ] Valutare specializzazione per `B = 1,2,4,8,16,32,64`, soprattutto per i casi benchmark e per eliminare logica runtime nel path caldo.
+- [x] Migliorare loop order e strategia OpenMP: ridurre `collapse(5)` quando produce troppe iterazioni piccole, testando flatten manuale o parallelizzazione su tile/blocchi esterni.
+- [ ] Aggiungere misura `SoL` CPU: misurare bandwidth sostenuta con microbenchmark STREAM-like e riportare `sol_useful = gb_s_useful / peak_measured_gb_s`.
+
+## 9. Integrazione SFEM Frontend
 
 - [ ] Collegare i kernel C in `operators/dss` al wrapper C++ `frontend/ops/dss`.
 - [ ] Stabilizzare API pubblica del modulo `DSS`.
@@ -80,7 +92,7 @@ e successiva integrazione con mesh semi-strutturate di SFEM.
 - [ ] Decidere come esporre conversione global -> cell-wise.
 - [ ] Decidere come esporre BXYZE come formato dati persistente.
 
-## 9. Mesh Semi-Strutturate
+## 10. Mesh Semi-Strutturate
 
 - [ ] Studiare integrazione con `smesh::to_semistructured`.
 - [ ] Studiare indexing locale `sshex8_lidx` e funzioni correlate.
@@ -90,7 +102,7 @@ e successiva integrazione con mesh semi-strutturate di SFEM.
 - [ ] Aggiungere test su mesh semi-strutturate piccole.
 - [ ] Confrontare DSS semi-strutturato contro DSS reference.
 
-## 10. Oltre La Mesh Strutturata
+## 11. Oltre La Mesh Strutturata
 
 - [ ] Studiare interfacce tra macro-blocchi non strutturati.
 - [ ] Disegnare kernel separati per face, edge/line e vertex entities.

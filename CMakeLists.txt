@@ -361,6 +361,9 @@ if(NOT SFEM_ENABLE_MINIMAL)
         list(APPEND C_DRIVERS ${MODULE_C_DRIVERS})
     endforeach()
 
+    file(GLOB DSS_BENCHMARK_DRIVERS CONFIGURE_DEPENDS "frontend/ops/dss/benchmark/*.cpp")
+    list(APPEND CPP_DRIVERS ${DSS_BENCHMARK_DRIVERS})
+
     set(DRIVERS "${C_DRIVERS};${CPP_DRIVERS}")
 
     if(${SFEM_SCALAR_TYPE} STREQUAL "float32")
