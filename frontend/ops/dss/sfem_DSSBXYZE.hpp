@@ -17,4 +17,9 @@ int dss_global_to_bxyze(const SharedMesh &mesh,
                         const real_t *const global,
                         DSSBXYZEBuffer *const out);
 
+int dss_bxyze_structured_inplace(ptrdiff_t nx,
+                                 ptrdiff_t ny,
+                                 ptrdiff_t nz,
+                                 DSSBXYZEBuffer *const buffer);
+
 }  // namespace sfem
