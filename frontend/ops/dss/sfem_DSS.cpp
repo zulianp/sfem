@@ -3,6 +3,8 @@
 #include "sfem_dss.h"
 #include "sfem_logger.hpp"
 
+#include <cstdio>
+
 namespace sfem {
 
 DSS::DSS(const std::shared_ptr<FunctionSpace> &space) : space_(space) {}
@@ -43,6 +45,13 @@ int DSS::gradient(const real_t *const, real_t *const) {
 
 int DSS::apply(const real_t *const, const real_t *const h, real_t *const out) {
     SFEM_TRACE_SCOPE("DSS::apply");
+
+    if (space_->mesh_ptr()->n_blocks() != 1) {
+        std::fprintf(stderr,
+                     "DSS::apply: expected exactly one mesh block, got %zu\n",
+                     space_->mesh_ptr()->n_blocks());
+        return SFEM_FAILURE;
+    }
 
     if constexpr (sizeof(real_t) == sizeof(float)) {
         return sfem_dss_apply_real32(space_->n_dofs(),

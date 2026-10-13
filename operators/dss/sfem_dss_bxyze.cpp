@@ -20,7 +20,7 @@ template <typename Scalar>
 int global_to_bxyze(const int                  level,
                     const ptrdiff_t            nelements,
                     const int                  element_block_size,
-                    const int32_t *const *const elements,
+                    const idx_t *const *const  elements,
                     const Scalar *const        global,
                     Scalar *const              bxyze) {
     if (!valid_shape(level, nelements, element_block_size)) {
@@ -45,16 +45,16 @@ int global_to_bxyze(const int                  level,
         for (int iz = 0; iz < n; ++iz) {
             for (int iy = 0; iy < n; ++iy) {
                 for (int ix = 0; ix < n; ++ix) {
-                    const int            lidx    = iz * n2 + iy * n + ix;
-                    const int32_t *const row     = elements[lidx];
-                    const ptrdiff_t      e_begin = eb * bsize;
-                    const ptrdiff_t      rem     = nelements - e_begin;
-                    const int            b_count = rem < bsize ? (int)rem : bsize;
-                    Scalar *const        dst     = &bxyze[block_offset(n, bsize, eb, ix, iy, iz)];
+                    const int          lidx    = iz * n2 + iy * n + ix;
+                    const idx_t *const row     = elements[lidx];
+                    const ptrdiff_t    e_begin = eb * bsize;
+                    const ptrdiff_t    rem     = nelements - e_begin;
+                    const int          b_count = rem < bsize ? (int)rem : bsize;
+                    Scalar *const      dst     = &bxyze[block_offset(n, bsize, eb, ix, iy, iz)];
 
                     for (int b = 0; b < b_count; ++b) {
-                        const int32_t gid = row[e_begin + b];
-                        dst[b]            = global[gid];
+                        const idx_t gid = row[e_begin + b];
+                        dst[b]          = global[gid];
                     }
 
                     for (int b = b_count; b < bsize; ++b) {
@@ -104,10 +104,19 @@ ptrdiff_t sfem_dss_bxyze_index(const int       level,
     return (ptrdiff_t)b + block_offset(n, element_block_size, eb, ix, iy, iz);
 }
 
+int sfem_dss_global_to_bxyze(const int                  level,
+                             const ptrdiff_t            nelements,
+                             const int                  element_block_size,
+                             const idx_t *const *const  elements,
+                             const real_t *const        global,
+                             real_t *const              bxyze) {
+    return global_to_bxyze<real_t>(level, nelements, element_block_size, elements, global, bxyze);
+}
+
 int sfem_dss_global_to_bxyze_real32(const int                  level,
                                     const ptrdiff_t            nelements,
                                     const int                  element_block_size,
-                                    const int32_t *const *const elements,
+                                    const idx_t *const *const  elements,
                                     const float *const         global,
                                     float *const               bxyze) {
     return global_to_bxyze<float>(level, nelements, element_block_size, elements, global, bxyze);
@@ -116,7 +125,7 @@ int sfem_dss_global_to_bxyze_real32(const int                  level,
 int sfem_dss_global_to_bxyze_real64(const int                  level,
                                     const ptrdiff_t            nelements,
                                     const int                  element_block_size,
-                                    const int32_t *const *const elements,
+                                    const idx_t *const *const  elements,
                                     const double *const        global,
                                     double *const              bxyze) {
     return global_to_bxyze<double>(level, nelements, element_block_size, elements, global, bxyze);

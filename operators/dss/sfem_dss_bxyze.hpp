@@ -1,7 +1,8 @@
 #pragma once
 
+#include "sfem_base.hpp"
+
 #include <stddef.h>
-#include <stdint.h>
 
 #ifndef SFEM_SUCCESS
 #define SFEM_SUCCESS 0
@@ -39,16 +40,23 @@ ptrdiff_t sfem_dss_bxyze_index(int level,
                                int iy,
                                int iz);
 
+int sfem_dss_global_to_bxyze(int level,
+                             ptrdiff_t nelements,
+                             int element_block_size,
+                             const idx_t *const *const elements,
+                             const real_t *const global,
+                             real_t *const bxyze);
+
 int sfem_dss_global_to_bxyze_real32(int level,
                                     ptrdiff_t nelements,
                                     int element_block_size,
-                                    const int32_t *const *const elements,
+                                    const idx_t *const *const elements,
                                     const float *const global,
                                     float *const bxyze);
 
 int sfem_dss_global_to_bxyze_real64(int level,
                                     ptrdiff_t nelements,
                                     int element_block_size,
-                                    const int32_t *const *const elements,
+                                    const idx_t *const *const elements,
                                     const double *const global,
                                     double *const bxyze);
