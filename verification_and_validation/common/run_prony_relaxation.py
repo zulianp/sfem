@@ -19,6 +19,29 @@ def temperature_label(value):
     return "T" + format(float(value), ".8g").replace("-", "m").replace(".", "p")
 
 
+def generated_operator_config(environment, temperature):
+    """The YAML the generated Prony operator is configured with, from the case's variables."""
+    g = [float(value) for value in environment["SFEM_PRONY_G"].split(",") if value]
+    tau = [float(value) for value in environment["SFEM_PRONY_TAU"].split(",") if value]
+    group = {"prony": [{"g": gi, "tau": ti} for gi, ti in zip(g, tau)]}
+    if environment.get("SFEM_USE_WLF", "0") not in ("", "0"):
+        group["wlf"] = {
+            "C1": float(environment["SFEM_WLF_C1"]),
+            "C2": float(environment["SFEM_WLF_C2"]),
+            "T_ref": float(environment["SFEM_WLF_T_REF"]),
+        }
+        group["temperature"] = float(temperature)
+    if environment.get("SFEM_PRONY_HISTORY_STORAGE"):
+        group["history_storage"] = environment["SFEM_PRONY_HISTORY_STORAGE"]
+    return {
+        "type": environment["SFEM_OPERATOR"],
+        "C10": float(environment["SFEM_MOONEY_RIVLIN_C10"]),
+        "C01": float(environment["SFEM_MOONEY_RIVLIN_C01"]),
+        "K": float(environment["SFEM_MOONEY_RIVLIN_K"]),
+        "relaxation": {"iso": group},
+    }
+
+
 def run_level(args, output, duration, dt, temperature, rejected_trial=False):
     output = Path(output)
     output.mkdir(parents=True, exist_ok=True)
@@ -35,6 +58,12 @@ def run_level(args, output, duration, dt, temperature, rejected_trial=False):
             "SFEM_VISCO_REJECT_TRIAL": "1" if rejected_trial else "0",
         }
     )
+    config = output / "operator.yaml"
+    config.write_text(
+        yaml.safe_dump(generated_operator_config(environment, temperature), sort_keys=False),
+        encoding="utf-8",
+    )
+    environment["SFEM_OPERATOR_CONFIG"] = str(config)
     return run_checked([args.driver, args.mesh, args.dirichlet, output], environment)
 
 

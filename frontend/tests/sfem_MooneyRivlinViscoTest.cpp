@@ -8,7 +8,7 @@
 
 #include "sfem_API.hpp"
 #include "sfem_Function.hpp"
-#include "sfem_MooneyRivlinVisco.hpp"
+#include "sfem_prony_test_material.hpp"
 #include "sfem_BSR.hpp"
 #include "sfem_test.hpp"
 #include "smesh_sideset.hpp"
@@ -77,9 +77,6 @@ int test_mooney_rivlin_visco_relaxation() {
     auto fs = sfem::FunctionSpace::create(mesh, 3);  // 3D displacement
     auto f  = sfem::Function::create(fs);
 
-    // Operator
-    auto op = std::make_shared<sfem::MooneyRivlinVisco>(fs);
-
     // LumpedMass
     auto mass_op = sfem::create_op(fs, "LumpedMass", es);
     mass_op->initialize();
@@ -94,12 +91,12 @@ int test_mooney_rivlin_visco_relaxation() {
     SFEM_READ_ENV(SFEM_BULK_MODULUS, atof);
     SFEM_READ_ENV(SFEM_DT, atof);
 
-    op->set_C10(SFEM_C10);
-    op->set_C01(SFEM_C01);
-    op->set_K(SFEM_BULK_MODULUS);
+    sfem::test::PronyMooneyRivlin material;
+    material.C10 = SFEM_C10;
+    material.C01 = SFEM_C01;
+    material.K   = SFEM_BULK_MODULUS;
 
     real_t dt = SFEM_DT;
-    op->set_dt(dt);
 
     int SFEM_ENABLE_CONTACT = false;
     SFEM_READ_ENV(SFEM_ENABLE_CONTACT, atoi);
@@ -117,10 +114,11 @@ int test_mooney_rivlin_visco_relaxation() {
     SFEM_READ_ENV(SFEM_TEMPERATURE, atof);
 
     if (SFEM_USE_WLF) {
-        // Set WLF params and enable BEFORE setting Prony terms
-        op->set_wlf_params(SFEM_WLF_C1, SFEM_WLF_C2, SFEM_WLF_T_REF);
-        op->set_temperature(SFEM_TEMPERATURE);
-        op->enable_wlf(true);
+        material.wlf         = true;
+        material.wlf_C1      = SFEM_WLF_C1;
+        material.wlf_C2      = SFEM_WLF_C2;
+        material.wlf_T_ref   = SFEM_WLF_T_REF;
+        material.temperature = SFEM_TEMPERATURE;
         printf("WLF enabled: C1=%.4f, C2=%.4f, T_ref=%.2f, T=%.2f\n", SFEM_WLF_C1, SFEM_WLF_C2, SFEM_WLF_T_REF, SFEM_TEMPERATURE);
         fflush(stdout);
     }
@@ -165,11 +163,10 @@ int test_mooney_rivlin_visco_relaxation() {
         }
     }
 
-    // set_prony_terms will call compute_prony_coefficients() with WLF already enabled
-    op->set_prony_terms((int)g_prony.size(), g_prony.data(), tau_prony.data());
-
-    op->initialize();
-    op->initialize_history();
+    material.g   = g_prony;
+    material.tau = tau_prony;
+    auto op      = sfem::test::make_prony_mooney_rivlin(fs, material);
+    SFEM_TEST_ASSERT(op != nullptr);
     f->add_operator(op);
 
     // BC: use mesh bounds in x-direction
@@ -379,6 +376,9 @@ int test_mooney_rivlin_visco_relaxation() {
                                         ndofs);
         }
 
+        // The step being solved ends at t + dt; its history is fixed here.
+        op->begin_step(t + dt, dt);
+
         // Newton Loop with Inertia
         for (int iter = 0; iter < 20; ++iter) {
             // Residual: R = M*a + F_int(u) - F_ext
@@ -476,7 +476,7 @@ int test_mooney_rivlin_visco_relaxation() {
         }
 
         // Update history
-        op->update_history(x->data());
+        op->advance(x->data());
 
         t += dt;
         steps++;

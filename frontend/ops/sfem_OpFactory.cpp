@@ -15,7 +15,6 @@
 #include "sfem_LumpedMass.hpp"
 #include "sfem_Mass.hpp"
 #include "sfem_MooneyRivlinActiveStrainPacked.hpp"
-#include "sfem_MooneyRivlinVisco.hpp"
 #include "sfem_InertiaPotential.hpp"
 #include "sfem_NeoHookeanOgden.hpp"
 #include "sfem_NeoHookeanOgdenActiveStrainPacked.hpp"
@@ -80,7 +79,6 @@ namespace sfem {
             instance_.private_register_op("NeoHookeanOgdenActiveStrainPacked", NeoHookeanOgdenActiveStrainPacked::create);
             instance_.private_register_op("MooneyRivlin", MooneyRivlinActiveStrainPacked::create);
             instance_.private_register_op("MooneyRivlinActiveStrainPacked", MooneyRivlinActiveStrainPacked::create);
-            instance_.private_register_op("MooneyRivlinVisco", MooneyRivlinVisco::create);
             instance_.private_register_op("Hyperelasticity", Hyperelasticity::create);
             instance_.private_register_op("PackedLaplacian", PackedLaplacian::create);
             instance_.private_register_op("Gradient", Gradient::create);

@@ -6,7 +6,7 @@
 #
 # The temperatures are close to T_ref on purpose. These EPDM constants are steep: by
 # T = -45 C the shift is already 526, every term satisfies dt/tau_eff > 30, and
-# MooneyRivlinVisco filters all of them out as fully relaxed within one step. Two runs
+# all of them relax fully within one step. Two runs
 # above that threshold are literally the same problem, which is correct behaviour and a
 # useless measurement.
 #

@@ -28,8 +28,10 @@ from codegen.framework.emitters.kernel_prologue import (
     kernel_local,
     resolve_kernel_constants,
 )
-from codegen.framework.forms.equations import total_residual_collection
+from codegen.framework.forms.equations import quadrature_output_dependencies, total_residual_collection
 from codegen.framework.symbolic.fields import is_time_rate_shift
+from codegen.framework.symbolic.relaxation import is_relaxation_gamma, relaxation_group_of_gamma
+from codegen.framework.plans.quadrature_fields import quadrature_read_streams
 from codegen.framework.plans.form_transformations import (
     symmetric_metric_component_count,
 )
@@ -54,7 +56,7 @@ def generate_op_registration_files(manifests, function_name="register_generated_
     }
 
 
-def generate_op_files(material, elements, kernel_sources=None):
+def generate_op_files(material, elements, kernel_sources=None, quadrature_points=None):
     c_abi_header = "sfem_%s_c_abi.hpp" % _op_file_stem(material) if kernel_sources else None
     kernel_sources = dict(kernel_sources or {})
     dispatch_sources, declared_signatures = (
@@ -135,7 +137,8 @@ def generate_op_files(material, elements, kernel_sources=None):
             )
         form_collections = _single_equation_form_collections(systems_by_dim, equations[0])
         header, source = _hyperelastic_op(
-            material, elements, c_abi_header, form_collections, abi_sources
+            material, elements, c_abi_header, form_collections, abi_sources,
+            quadrature_points=quadrature_points,
         )
     elif equations[0].is_residual:
         form_collections = _single_equation_form_collections(systems_by_dim, equations[0])
@@ -556,7 +559,7 @@ def _inexact_declarations(material):
 
 
 def _header(material, residual, publishes_value_steps=None, node_wise=False,
-            holds_time_scheme=None):
+            holds_time_scheme=None, relaxes=False):
     """The Op's declared interface.
 
     ``publishes_value_steps`` says whether this Op offers the Newton
@@ -621,9 +624,9 @@ def _header(material, residual, publishes_value_steps=None, node_wise=False,
 
 #include "sfem_Op.hpp"
 #include "sfem_NeumannConditions.hpp"
-%(time_scheme_include)s
+%(time_scheme_include)s%(relaxation_include)s
 namespace sfem {
-  class %(op)s final : public Op%(time_scheme_base)s {
+  class %(op)s final : public Op%(time_scheme_base)s%(relaxation_base)s {
   public:
     static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space);
 
@@ -655,7 +658,7 @@ namespace sfem {
     int apply(const real_t *const x,
                   const real_t *const h,
                   real_t *const out) override;
-    int value(const real_t *x, real_t *const out) override;%(value_steps)s%(inexact_methods)s
+    int value(const real_t *x, real_t *const out) override;%(value_steps)s%(inexact_methods)s%(relaxation_declarations)s
     int hessian_crs(const real_t *const x,
             const count_t *const rowptr,
             const idx_t *const colidx,
@@ -696,6 +699,9 @@ namespace sfem {
         "value_steps": value_steps,
         "matrix_methods": matrix_methods,
         "inexact_methods": _inexact_declarations(material),
+        "relaxation_include": _HEADER_RELAXATION_INCLUDE[bool(relaxes)],
+        "relaxation_base": _HEADER_RELAXATION_BASE[bool(relaxes)],
+        "relaxation_declarations": _HEADER_RELAXATION_DECLARATIONS[bool(relaxes)],
     }
 
 
@@ -992,7 +998,8 @@ def _inexact_definitions(
 
 
 def _hyperelastic_op(
-    material, elements, c_abi_header=None, form_collections=None, kernel_sources=None
+    material, elements, c_abi_header=None, form_collections=None, kernel_sources=None,
+    quadrature_points=None,
 ):
     if form_collections is None:
         raise ValueError("energy generated Op requires form collections")
@@ -1363,7 +1370,7 @@ def _hyperelastic_op(
 #include "sfem_Parameters.hpp"
 #include "smesh_kernel_data.hpp"
 #include "smesh_mesh.hpp"
-
+%(relaxation_include)s
 #include <algorithm>
 #include <cstring>
 #include <memory>
@@ -1376,7 +1383,7 @@ namespace sfem {
     void seed_parameters(Parameters &parameters) {
 %(defaults)s
     }
-
+%(relaxation_helpers)s
     void seed_material(MultiDomainOp &domains) {
       for (auto &entry : domains.domains()) {
         seed_parameters(*entry.second.parameters);
@@ -1497,7 +1504,7 @@ namespace sfem {
     std::shared_ptr<FunctionSpace> space;
     std::shared_ptr<MultiDomainOp> domains;
     std::shared_ptr<TimeScheme> time_scheme;
-%(element_scratch_fields)s
+%(relaxation_field)s%(element_scratch_fields)s
     bool objective_uses_affine{false};
     bool gradient_uses_affine{false};
     bool apply_uses_affine{false};
@@ -1608,7 +1615,7 @@ namespace sfem {
     if (cache_affine_geometry(impl_->space, *impl_->domains, needs_affine_geometry) != SFEM_SUCCESS) {
       return SFEM_FAILURE;
     }
-%(element_scratch_alloc)s
+%(relaxation_setup)s%(element_scratch_alloc)s
 %(packed_scratch_prealloc)s
     return SFEM_SUCCESS;
   }
@@ -1623,7 +1630,7 @@ namespace sfem {
       scheme->claim(this);
     }
   }
-
+%(relaxation_methods)s
   int %(op)s::gradient(const real_t *const x, real_t *const out) {
     SFEM_TRACE_SCOPE("%(op)s::gradient");
     if (auto term = time_scheme_term(impl_->time_scheme)) {
@@ -1883,13 +1890,13 @@ namespace sfem {
     if (material_from_yaml(node, defaults, top_values)) {
       set_material(*ret->impl_->domains, top_values);
     }
-
+%(relaxation_yaml_top)s
     if (node.has_child("blocks")) {
       for (auto block : node["blocks"].children()) {
         if (!block.has_child("name")) {
           continue;
         }
-
+%(relaxation_yaml_block)s
         real_t block_values[N_MATERIAL_PARAMETERS];
         copy_material_parameters(top_values, block_values);
         if (!material_from_yaml(block, top_values, block_values)) {
@@ -1906,11 +1913,22 @@ namespace sfem {
 #endif  // SFEM_ENABLE_RYAML
 }  // namespace sfem
 """
+    relaxation = _relaxation_declarations_by_dim(material, elements)
+    relaxation_fragments = _relaxation_fragments(
+        material,
+        elements,
+        relaxation,
+        quadrature_points,
+        kernel_sources,
+        form_collections,
+        n_field_components_by_dim,
+    )
     substitutions = {
         "op": _op_class_name(material),
         "header_stem": _op_file_stem(material),
         "stream_member": _op_stream_member(),
         "c_abi_include": '#include "%s"' % c_abi_header if c_abi_header else "",
+        **relaxation_fragments,
         "packed_scratch_include": packed_scratch_include,
         "packed_scratch_prealloc": packed_scratch_prealloc,
         "element_scratch_include": _element_scratch_include(),
@@ -2119,7 +2137,7 @@ namespace sfem {
             inexact % {"op": _op_class_name(material)} + marker,
             1,
         )
-    return _header(material, False, holds_time_scheme=True), source
+    return _header(material, False, holds_time_scheme=True, relaxes=bool(relaxation)), source
 
 
 def _residual_op(material, elements, c_abi_header=None, form_collections=None, kernel_sources=None):
@@ -5902,6 +5920,27 @@ _HEADER_TIME_SCHEME_INCLUDE = {False: "", True: '#include "sfem_TimeScheme.hpp"\
 #: operator inherits it exactly when its form has a rate to discretise.
 _HEADER_TIME_SCHEME_BASE = {False: "", True: ", public TimeSteppable"}
 
+#: A material whose energy relaxes carries integration-point history, so its
+#: operator is `HistoryDependent` and holds the material-independent relaxation
+#: state (`frontend/ops/prony`).  The rest of the wrapper does not change shape.
+_HEADER_RELAXATION_INCLUDE = {
+    False: "",
+    True: '#include "sfem_HistoryDependent.hpp"\n#include "sfem_RelaxationGroups.hpp"\n',
+}
+_HEADER_RELAXATION_BASE = {False: "", True: ", public HistoryDependent"}
+_HEADER_RELAXATION_DECLARATIONS = {
+    False: "",
+    True: """
+    void begin_step(const real_t t, const real_t dt) override;
+    void advance(const real_t *const x) override;
+    void reset_history(const real_t *const x) override;
+    //! The relaxation state: spectra, time-temperature shift, storage.
+    RelaxationGroups &relaxation_groups();
+    //! Evaluate the material's integration-point outputs at `x` into workspace
+    //! slot `slot` of the relaxation, which has to be holding one.
+    int quadrature_output(const real_t *const x, const int slot);""",
+}
+
 
 def _op_stream_member():
     """The stream this Op hands every kernel, where the target has one.
@@ -6145,11 +6184,336 @@ def _dependency_parameters(dependencies):
     return tuple(getattr(dependencies, "parameters", dependencies or ()))
 
 
+def _relaxation_declarations_by_dim(material, elements):
+    """{dim: (RelaxationDeclaration, ...)} for the dimensions that relax."""
+    ret = {}
+    for dim, system in _systems_by_dim(material, elements).items():
+        declarations = tuple(
+            declaration
+            for equation in system.equations
+            if equation.is_energy
+            for declaration in equation.relaxations
+        )
+        if declarations:
+            ret[dim] = declarations
+    return ret
+
+
+def _relaxation_outputs_by_dim(material, elements):
+    """{dim: ((name, components), ...)}, the energy's integration-point outputs."""
+    return {
+        dim: tuple(
+            output
+            for equation in system.equations
+            if equation.is_energy
+            for output in equation.quadrature_outputs
+        )
+        for dim, system in _systems_by_dim(material, elements).items()
+    }
+
+
+def _relaxation_fragments(
+    material, elements, relaxation, quadrature_points, kernel_sources, form_collections,
+    n_field_components_by_dim,
+):
+    """The C++ a relaxing material's operator adds, keyed by template slot.
+
+    Empty strings for a material that does not relax, so the template is one
+    text for both and nothing in it asks which it is.
+    """
+    slots = (
+        "relaxation_include",
+        "relaxation_helpers",
+        "relaxation_field",
+        "relaxation_setup",
+        "relaxation_methods",
+        "relaxation_yaml_top",
+        "relaxation_yaml_block",
+    )
+    if not relaxation:
+        return {slot: "" for slot in slots}
+
+    op = _op_class_name(material)
+    declaration_cases = "".join(
+        "        case %d:\n          return {%s};\n"
+        % (
+            dim,
+            ", ".join(
+                '{"%s", "%s", "%s", %d}'
+                % (declaration.group, declaration.history, declaration.stress, declaration.n_components)
+                for declaration in declarations
+            ),
+        )
+        for dim, declarations in sorted(relaxation.items())
+    )
+    point_cases = "".join(
+        "        case smesh::%s:\n          return %d;\n" % (element, n_qp)
+        for element, n_qp in _relaxation_point_counts(elements, quadrature_points)
+    )
+    helpers = """
+    //! The relaxation groups the material declares, per spatial dimension.
+    std::vector<RelaxationGroupDeclaration> relaxation_declarations(const int dim) {
+      switch (dim) {
+%(declaration_cases)s        default:
+          break;
+      }
+      SFEM_ERROR("%(op)s declares no relaxation groups in dimension %%d\\n", dim);
+      return {};
+    }
+
+    //! The points of the rule an element's kernels integrate with, which is
+    //! where its history lives.  Every kernel of an element reads one rule, so
+    //! the history the energy kernels read is the one the output kernel wrote.
+    int quadrature_points(const smesh::ElemType element_type) {
+      switch (element_type) {
+%(point_cases)s        default:
+          break;
+      }
+      SFEM_ERROR("%(op)s has no integration-point history for this element type\\n");
+      return 0;
+    }
+""" % {"declaration_cases": declaration_cases, "point_cases": point_cases, "op": op}
+    setup = """    impl_->relaxation = std::make_shared<RelaxationGroups>(
+        relaxation_declarations(impl_->space->mesh_ptr()->spatial_dimension()),
+        impl_->space->n_dofs(),
+        %(execution_space)s);
+    for (auto &entry : impl_->domains->domains()) {
+      impl_->relaxation->add_block(entry.second.block->name(),
+                                   entry.second.block->n_elements(),
+                                   quadrature_points(entry.second.element_type));
+    }
+"""
+    methods = """
+  // Null until `initialize`, which every factory route calls; an operator
+  // driven without it gets a message instead of a crash.
+  RelaxationGroups &%(op)s::relaxation_groups() {
+    if (!impl_->relaxation) {
+      SFEM_ERROR("%(op)s: call initialize() before using the relaxation\\n");
+    }
+%(stream_binding)s    return *impl_->relaxation;
+  }
+
+  // The relaxed stress the step starts from is evaluated from the previous
+  // displacement, never stored: it is then exactly what the last `advance`
+  // committed, and the history is the only state carried between steps.  With
+  // no spectrum anywhere there is nothing to evaluate.
+  void %(op)s::begin_step(const real_t t, const real_t dt) {
+    SFEM_TRACE_SCOPE("%(op)s::begin_step");
+    auto &relaxation = relaxation_groups();
+    if (relaxation.relaxes()) {
+      relaxation.acquire_workspace(1);
+      if (quadrature_output(relaxation.previous_state(), 0) != SFEM_SUCCESS) {
+        SFEM_ERROR("%(op)s::begin_step: evaluating the relaxed stress failed\\n");
+      }
+    }
+    relaxation.begin_step(t, dt);
+    relaxation.release_workspace();
+  }
+
+  void %(op)s::advance(const real_t *const x) {
+    SFEM_TRACE_SCOPE("%(op)s::advance");
+    auto &relaxation = relaxation_groups();
+    if (relaxation.relaxes()) {
+      relaxation.acquire_workspace(2);
+      if (quadrature_output(relaxation.previous_state(), 0) != SFEM_SUCCESS ||
+          quadrature_output(x, 1) != SFEM_SUCCESS) {
+        SFEM_ERROR("%(op)s::advance: evaluating the relaxed stress failed\\n");
+      }
+    }
+    relaxation.advance();
+    relaxation.release_workspace();
+    relaxation.set_previous_state(x);
+  }
+
+  void %(op)s::reset_history(const real_t *const x) {
+    SFEM_TRACE_SCOPE("%(op)s::reset_history");
+    relaxation_groups().reset(x);
+  }
+
+  int %(op)s::quadrature_output(const real_t *const x, const int slot) {
+    SFEM_TRACE_SCOPE("%(op)s::quadrature_output");
+    auto mesh = impl_->space->mesh_ptr();
+    auto points = element_points(mesh);
+    return impl_->domains->iterate([&](const OpDomain &domain) {
+      const geom_t *const *adjugate = nullptr;
+      const geom_t *determinant = nullptr;
+      if (%(affine_condition)s) {
+        auto cache = std::static_pointer_cast<AffineGeometryCache>(domain.user_data);
+        if (!cache || !cache->jacobian_soa) {
+          SFEM_ERROR("%(op)s affine quadrature output requires cached geometry\\n");
+          return SFEM_FAILURE;
+        }
+        adjugate = reinterpret_cast<const geom_t *const *>(
+            cache->jacobian_soa->jacobian_adjugate_SoA()->data());
+        determinant = reinterpret_cast<const geom_t *>(
+            cache->jacobian_soa->jacobian_determinant()->data());
+      }
+%(dispatch_body)s
+    });
+  }
+""" % {
+        "op": op,
+        # The device loops of the relaxation run on the operator's stream, where
+        # the stresses they read are written; re-read on every use, because the
+        # caller may set the stream at any time.
+        "stream_binding": "".join(
+            "    impl_->relaxation->set_stream(%s);\n" % argument
+            for argument in current_target().op_stream_arguments()
+        ),
+        # The output and the gradient read the same rule, so they take the same
+        # geometry route.
+        "affine_condition": _affine_preamble_condition(
+            kernel_sources, material.name, ("gradient",), "gradient_uses_affine"
+        ),
+        "dispatch_body": _hyperelastic_quadrature_output_dispatch_body(
+            material,
+            elements,
+            kernel_sources,
+            form_collections,
+            n_field_components_by_dim,
+            indent="      ",
+        ),
+    }
+    return {
+        "relaxation_include": '#include "sfem_RelaxationGroups.hpp"\n',
+        "relaxation_helpers": helpers,
+        "relaxation_field": "    std::shared_ptr<RelaxationGroups> relaxation;\n",
+        "relaxation_setup": setup % {"execution_space": current_target().execution_space()},
+        "relaxation_methods": methods,
+        "relaxation_yaml_top": '    ret->impl_->relaxation->configure_from_yaml("", node);\n',
+        "relaxation_yaml_block": '        ret->impl_->relaxation->configure_from_yaml(yaml_read_string(block["name"]), block);\n',
+    }
+
+
+def _relaxation_point_counts(elements, quadrature_points):
+    """(element, points) for every element whose kernels read history.
+
+    The history is stored at one rule's points, so an element whose affine and
+    isoparametric kernels integrate with different rules cannot carry it: the
+    two would read different points.  That is refused here, at generation,
+    rather than discovered as a wrong answer.
+    """
+    if not quadrature_points:
+        raise ValueError("a relaxing material's operator needs the integration-point count per element")
+    counts = []
+    for element in elements:
+        name = _element_name(element)
+        rules = tuple(sorted(set(quadrature_points.get(name, ()))))
+        if len(rules) != 1:
+            raise ValueError(
+                "element %s integrates with %s points depending on the geometry route; "
+                "integration-point history needs one rule -- pin it with a quadrature setting"
+                % (name, " and ".join(str(n) for n in rules) or "an unknown number of")
+            )
+        counts.append((name, rules[0]))
+    return tuple(counts)
+
+
+def _hyperelastic_quadrature_output_dispatch_body(
+    material, elements, kernel_sources, form_collections, n_field_components_by_dim, indent
+):
+    """The call that writes a relaxing material's outputs into the scratch."""
+    outputs_by_dim = _relaxation_outputs_by_dim(material, elements)
+    lines = ["%sconst int dim = mesh->spatial_dimension();" % indent]
+    for dim in sorted(outputs_by_dim):
+        outputs = outputs_by_dim[dim]
+        dependencies = quadrature_output_dependencies(outputs, form_collections[dim].variables)
+        components = _components((n_field_components_by_dim or {}).get(dim, dim))
+        current_args = [str(arg) for arg in _energy_field_args(dependencies, components, current="x")]
+        write_args = [
+            'impl_->relaxation->stress_scratch(domain.block->name(), "%s", slot)' % name for name, _ in outputs
+        ]
+        affine = "%s_quadrature_output_%dd_a_msoa" % (material.name, dim)
+        isop = "%s_quadrature_output_%dd_i_msoa" % (material.name, dim)
+        lines.append("%sif (dim == %d) {" % (indent, dim))
+        if _c_abi_function_exists(kernel_sources, affine, public_only=True):
+            lines.append("%s  if (adjugate) {" % indent)
+            lines.append(
+                "%s    return %s(%s);"
+                % (
+                    indent,
+                    _entry_point_name(affine),
+                    _with_stream(
+                        ", ".join(
+                            [
+                                "domain.element_type",
+                                "real_type",
+                                "domain.block->n_elements()",
+                                "mesh->n_nodes()",
+                                "element_connectivity(domain)",
+                                *_affine_geometry_call_args(kernel_sources, affine, dim),
+                                *_c_abi_ordered_domain_parameter_args(kernel_sources, affine, dependencies),
+                                *write_args,
+                                *current_args,
+                            ]
+                        )
+                    ),
+                )
+            )
+            lines.append("%s  }" % indent)
+        lines.append(
+            "%s  return %s(%s);"
+            % (
+                indent,
+                _entry_point_name(isop),
+                _with_stream(
+                    ", ".join(
+                        [
+                            "domain.element_type",
+                            "real_type",
+                            "domain.block->n_elements()",
+                            "mesh->n_nodes()",
+                            "element_connectivity(domain)",
+                            "points",
+                            *_c_abi_ordered_domain_parameter_args(kernel_sources, isop, dependencies),
+                            *write_args,
+                            *current_args,
+                        ]
+                    )
+                ),
+            )
+        )
+        lines.append("%s}" % indent)
+    lines.extend(
+        [
+            '%sSFEM_ERROR("%s quadrature output does not support spatial dimension %%d\\n", dim);'
+            % (indent, material.name),
+            "%sreturn SFEM_FAILURE;" % indent,
+        ]
+    )
+    return "\n".join(lines)
+
+
+def _domain_parameter_value(parameter):
+    """Where a kernel's scalar argument comes from, per domain.
+
+    A material constant from the block's parameters, except a relaxation
+    group's step weight, which belongs to the step and is the relaxation
+    object's -- the same arrangement as a rate's shift and its `TimeScheme`.
+    """
+    parameter = str(parameter)
+    if is_relaxation_gamma(parameter):
+        return 'impl_->relaxation->gamma(domain.block->name(), "%s")' % relaxation_group_of_gamma(parameter)
+    return 'domain.parameters->require_real_value("%s")' % parameter
+
+
+def _domain_quadrature_stream_args(dependencies):
+    """The integration-point fields a kernel reads, after its parameters.
+
+    In the order the kernels declare them (`plans.quadrature_fields`).  Every
+    field the generated operators read is a relaxation group's frozen history.
+    """
+    return tuple(
+        'impl_->relaxation->history(domain.block->name(), "%s")' % stream.name
+        for stream in quadrature_read_streams(dependencies)
+    )
+
+
 def _dependency_domain_parameter_args(dependencies):
     return tuple(
-        'domain.parameters->require_real_value("%s")' % str(parameter)
+        _domain_parameter_value(parameter)
         for parameter in _dependency_parameters(getattr(dependencies, "parameters", ()))
-    )
+    ) + _domain_quadrature_stream_args(dependencies)
 
 
 def _compatible_element_for_field(element, field):
@@ -7934,7 +8298,7 @@ def _c_abi_parameter_names(kernel_sources, function_name, public_only=False):
 def _c_abi_ordered_domain_parameter_args(kernel_sources, function_name, dependencies):
     parameters = tuple(str(parameter) for parameter in _dependency_parameters(dependencies))
     if not parameters:
-        return ()
+        return _domain_quadrature_stream_args(dependencies)
     remaining = list(parameters)
     ordered = []
     for name in _c_abi_parameter_names(kernel_sources, function_name, public_only=True):
@@ -7942,9 +8306,8 @@ def _c_abi_ordered_domain_parameter_args(kernel_sources, function_name, dependen
             ordered.append(name)
             remaining.remove(name)
     ordered.extend(remaining)
-    return tuple(
-        'domain.parameters->require_real_value("%s")' % parameter
-        for parameter in ordered
+    return tuple(_domain_parameter_value(parameter) for parameter in ordered) + _domain_quadrature_stream_args(
+        dependencies
     )
 
 

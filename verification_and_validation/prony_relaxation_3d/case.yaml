@@ -34,7 +34,7 @@ verification:
 variants:
   - &base
     id: one_term_reference
-    operator: MooneyRivlinVisco
+    operator: GeneratedMooneyRivlinProny
     element: HEX8
     resolution: {nx: 4, ny: 1, nz: 1, prony_g: "0.4", prony_tau: "0.4", temperatures: "20", use_wlf: 0}
     driver: &driver
@@ -42,7 +42,7 @@ variants:
       arguments: ["{suite_dir}/common/run_prony_relaxation.py", --case, "{resolved_case}", --driver, "{build_dir}/hyperelasticy", --mesh, "{mesh}", --dirichlet, "{output}/dirichlet.yaml", --output, "{output}/solution"]
       environment: &environment
         OMP_NUM_THREADS: 1
-        SFEM_OPERATOR: MooneyRivlinVisco
+        SFEM_OPERATOR: GeneratedMooneyRivlinProny
         SFEM_MOONEY_RIVLIN_C10: "{material_c10}"
         SFEM_MOONEY_RIVLIN_C01: "{material_c01}"
         SFEM_MOONEY_RIVLIN_K: "{material_bulk_modulus}"
@@ -57,7 +57,7 @@ variants:
         SFEM_NL_MAX_IT: 20
         SFEM_LSOLVE_RTOL: 1.0e-12
         SFEM_OP_TYPE: BSR
-        SFEM_ENABLE_LINE_SEARCH: 0
+        SFEM_ENABLE_LINE_SEARCH: 1
     expected_output: &expected
       required:
         - {pattern: SFEM_TRANSIENT_LEVEL_COMPLETE, count: 3}

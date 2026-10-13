@@ -13,13 +13,17 @@ if(DEFINED SFEM_DIR)
             set(${_dep}_DIR "${SFEM_DIR}/${_dep}")
         endif()
     endforeach()
+    # Where the dependencies install to lib64 rather than lib, they are found from the prefix.
+    get_filename_component(_sfem_prefix "${SFEM_DIR}/../.." ABSOLUTE)
+    list(APPEND CMAKE_PREFIX_PATH "${_sfem_prefix}")
 endif()
 
 find_package(ryml CONFIG REQUIRED)
 find_package(matrixio CONFIG REQUIRED)
 find_package(smesh CONFIG REQUIRED)
-find_package(SCCD CONFIG REQUIRED)
-find_package(ssdf CONFIG REQUIRED)
+# Optional in SFEM, so present only when SFEM was built with them.
+find_package(SCCD CONFIG QUIET)
+find_package(ssdf CONFIG QUIET)
 find_package(SFEM CONFIG REQUIRED)
 
 # Header-only CUDA Thrust is sometimes exported by SFEM as -lThrust.
@@ -62,43 +66,9 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
     target_compile_options(prony_visco_torsion PRIVATE -O3 -DNDEBUG)
 endif()
 
-# Gate on the operator the driver rests on: the assembled tangent must be the derivative of
-# the assembled gradient, at a state that carries Prony history. Cheap; run it in CI.
-#
-# This gate found three real defects, all now fixed in SFEM proper. Two were in the emitter for
-# the history geometric-stiffness kernel, python/codegen/sr_visco_hyper_unique_Hi.py: it wrote
-# the element matrix node-major into a component-major layout, and it contracted the wrong index
-# of the inverse Jacobian. The third was in hex8_mooney_rivlin_visco_flexible.cpp, which read
-# the element diagonal at node-major positions out of the same component-major matrix.
-#
-# Keep all three variants. Each one is the only thing that can see its own defect: the cube
-# catches the ordering, the distorted mesh catches the Jacobian transpose (on an axis-aligned
-# mesh J is diagonal and J^-1 is its own transpose, so it is invisible there), and the elastic
-# variant separates the Mooney-Rivlin backbone from the viscoelastic part above it.
-#
-# Never make these green by raising PRONY_CHECK_TOL. The clean value is ~2e-11, set by round-off
-# in the differenced gradient; the smallest structural error seen here was 3.6e-5.
-add_executable(prony_tangent_check prony_tangent_check.cpp)
-target_include_directories(prony_tangent_check PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(prony_tangent_check
-    PRIVATE
-        SFEM::sfem
-        $<$<BOOL:${OpenMP_CXX_FOUND}>:OpenMP::OpenMP_CXX>)
-if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
-    target_compile_options(prony_tangent_check PRIVATE -O3 -DNDEBUG)
-endif()
-add_test(NAME prony_tangent_check COMMAND prony_tangent_check)
-
-# The same check with the Prony series switched off, which separates a fault in the
-# viscoelastic part of the tangent from one in the Mooney-Rivlin backbone underneath it.
-add_test(NAME prony_tangent_check_elastic COMMAND prony_tangent_check)
-set_tests_properties(prony_tangent_check_elastic PROPERTIES ENVIRONMENT "PRONY_CHECK_TERMS=0")
-
-# On distorted elements. Required: a transposed inverse Jacobian in an element kernel cannot be
-# observed on an axis-aligned mesh at all, so the cube variant above passed throughout the time
-# that defect was present.
-add_test(NAME prony_tangent_check_distorted COMMAND prony_tangent_check)
-set_tests_properties(prony_tangent_check_distorted PROPERTIES ENVIRONMENT "PRONY_CHECK_DISTORTION=0.15")
+# The operator's gate is frontend/tests/sfem_GeneratedMooneyRivlinPronyTest.cpp in SFEM: finite-
+# difference checks of value, gradient, apply and the assembled tangent after committed history
+# steps, on an axis-aligned and a distorted mesh, with and without Prony terms.
 
 # The end-to-end scenario: twist, hold, release, recover. Slow enough to be excluded from a
 # default `ctest`; run it with `ctest -L scenario`.

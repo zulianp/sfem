@@ -525,6 +525,25 @@ class TargetPlatform:
         """
         return "mesh->points()->data()"
 
+    def permuted_connectivity_preamble(self):
+        """Source lines a file of permuting forwarders needs once, above them."""
+        return ()
+
+    def permuted_connectivity(self, pointer_type, shape_order, name="proteus_elements"):
+        """A forwarder's connectivity table in another node order.
+
+        Returns (lines before the call, lines after it).  The table is named
+        `name` and holds `elements[shape_order[k]]` at position `k`.  On the
+        host it is an array on the stack: the table `elements` points to is in
+        host memory, so the pointers are read and reordered in place.
+        """
+        lines = ["    %s *%s[%d] = {" % (pointer_type, name, len(shape_order))]
+        for idx, source_index in enumerate(shape_order):
+            comma = "," if idx + 1 < len(shape_order) else ""
+            lines.append("        elements[%d]%s" % (source_index, comma))
+        lines.append("    };")
+        return tuple(lines), ()
+
     def element_connectivity_accessor(self):
         """Where a generated `Op` reads its connectivity from.
 
@@ -963,6 +982,46 @@ class CUDATarget(TargetPlatform):
 
     def geometry_memory_space(self):
         return "smesh::MEMORY_SPACE_DEVICE"
+
+    def permuted_connectivity_preamble(self):
+        return (
+            "namespace {",
+            "  //! Reorder a device table of connectivity rows on the device.",
+            "  template <typename T, int N>",
+            "  struct ConnectivityOrder {",
+            "    int source[N];",
+            "  };",
+            "",
+            "  template <typename T, int N>",
+            "  __global__ void permute_connectivity(T *const *const elements,",
+            "                                       const ConnectivityOrder<T, N> order,",
+            "                                       T **const permuted) {",
+            "    const int k = threadIdx.x;",
+            "    if (k < N) permuted[k] = elements[order.source[k]];",
+            "  }",
+            "}  // namespace",
+            "",
+        )
+
+    def permuted_connectivity(self, pointer_type, shape_order, name="proteus_elements"):
+        #: The connectivity table a device `Op` passes -- `device_elements_SoA()` --
+        #: is itself in device memory, so the host cannot read its rows to reorder
+        #: them: that read was a segmentation fault on every HEX8 device kernel.
+        #: The reordered table is built on the device instead, in stream order
+        #: around the call, so nothing synchronises and nothing outlives it.
+        n = len(shape_order)
+        stream = "(cudaStream_t)stream"
+        before = (
+            "    %s **%s = nullptr;" % (pointer_type, name),
+            "    if (cudaMallocAsync((void **)&%s, %d * sizeof(%s *), %s) != cudaSuccess) return SFEM_FAILURE;"
+            % (name, n, pointer_type, stream),
+            "    const ConnectivityOrder<%s, %d> %s_order{{%s}};"
+            % (pointer_type, n, name, ", ".join(str(index) for index in shape_order)),
+            "    permute_connectivity<%s, %d><<<1, %d, 0, %s>>>(elements, %s_order, %s);"
+            % (pointer_type, n, n, stream, name, name),
+        )
+        after = ("    cudaFreeAsync(%s, %s);" % (name, stream),)
+        return before, after
 
     def op_stream_arguments(self):
         return ("stream",)

@@ -11,6 +11,7 @@ namespace sfem {
     void register_GeneratedNeumann_generated_op();
     void register_GeneratedNeumannGeneral_generated_op();
     void register_GeneratedTwoPhaseFlow_generated_op();
+    void register_GeneratedMooneyRivlinProny_generated_op();
 
     void register_generated_ops() {
         register_GeneratedBodyForce_generated_op();
@@ -23,5 +24,6 @@ namespace sfem {
         register_GeneratedNeumann_generated_op();
         register_GeneratedNeumannGeneral_generated_op();
         register_GeneratedTwoPhaseFlow_generated_op();
+        register_GeneratedMooneyRivlinProny_generated_op();
     }
 }  // namespace sfem

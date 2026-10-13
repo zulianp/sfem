@@ -112,6 +112,7 @@ generate_materials() {
     run_generator codegen.framework.generators.navier_stokes "$@"
     run_generator codegen.framework.generators.saint_venant_kirchhoff "$@"
     run_generator codegen.framework.generators.modified_mooney_rivlin "$@"
+    run_generator codegen.framework.generators.mooney_rivlin_prony "$@"
 }
 
 generate_materials

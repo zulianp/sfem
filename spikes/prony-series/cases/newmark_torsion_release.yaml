@@ -1,4 +1,4 @@
-# The same scenario with inertia, through sfem::NewmarkInertiaPotential -- the integrator
+# The same scenario with inertia, through sfem::NewmarkScheme -- the integrator
 # the Mooney-Rivlin tests in frontend/tests use, so results from this case are directly
 # comparable with theirs. See bdf2_torsion_release.yaml for the other dynamic option.
 #
@@ -19,7 +19,8 @@
 #
 # Note also that the inertia term adds alpha*M to the tangent diagonal, which regularises it
 # -- that is exactly how the three tangent defects this spike found stayed hidden in SFEM's
-# own dynamic tests. Do not gate the operator on this case; use prony_tangent_check.
+# own dynamic tests. Do not gate the operator on this case; the operator's gate is
+# frontend/tests/sfem_GeneratedMooneyRivlinPronyTest.cpp.
 
 mesh: mesh
 verbose: false

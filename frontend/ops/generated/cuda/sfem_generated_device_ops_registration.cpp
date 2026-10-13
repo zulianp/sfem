@@ -6,6 +6,7 @@ namespace sfem {
   void register_GeneratedLinearElasticity_cuda_generated_op();
   void register_GeneratedModifiedMooneyRivlin_cuda_generated_op();
   void register_GeneratedMooneyRivlinKelvinVoigt_cuda_generated_op();
+  void register_GeneratedMooneyRivlinProny_cuda_generated_op();
   void register_GeneratedNavierStokes_cuda_generated_op();
   void register_GeneratedNeoHookeanOgden_cuda_generated_op();
   void register_GeneratedNeumann_cuda_generated_op();
@@ -19,6 +20,7 @@ namespace sfem {
     register_GeneratedLinearElasticity_cuda_generated_op();
     register_GeneratedModifiedMooneyRivlin_cuda_generated_op();
     register_GeneratedMooneyRivlinKelvinVoigt_cuda_generated_op();
+    register_GeneratedMooneyRivlinProny_cuda_generated_op();
     register_GeneratedNavierStokes_cuda_generated_op();
     register_GeneratedNeoHookeanOgden_cuda_generated_op();
     register_GeneratedNeumann_cuda_generated_op();

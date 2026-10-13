@@ -26,7 +26,7 @@
 #include "sfem_API.hpp"
 #include "sfem_context.hpp"
 #include "sfem_Function.hpp"
-#include "sfem_MooneyRivlinVisco.hpp"
+#include "sfem_prony_test_material.hpp"
 
 // ============================================================================
 // Material parameters from Polymer Testing 133 (2024) 108375
@@ -199,9 +199,6 @@ int run_strain_rate_test(double strain_rate, double max_strain, const char* labe
     const ptrdiff_t ndofs = fs->n_dofs();
     const ptrdiff_t n_nodes = fs->mesh_ptr()->n_nodes();
     
-    // Create operator
-    auto op = std::make_shared<sfem::MooneyRivlinVisco>(fs);
-    
     // Calculate appropriate time step
     // We want strain increment per step to be small enough
     double d_strain = 0.001;  // 0.1% strain per step (smaller for accuracy)
@@ -216,29 +213,30 @@ int run_strain_rate_test(double strain_rate, double max_strain, const char* labe
     printf("  dt = %.6e s (strain increment = %.4f per step)\n", dt, d_strain);
     
     // Set material parameters
-    op->set_C10(PAPER_C10);
-    op->set_C01(PAPER_C01);
-    op->set_K(PAPER_K);
-    op->set_dt(dt);
-    
+    sfem::test::PronyMooneyRivlin material;
+    material.C10 = PAPER_C10;
+    material.C01 = PAPER_C01;
+    material.K   = PAPER_K;
+
     // Option to test pure elastic (for debugging)
     bool pure_elastic = (strain_rate >= 10000.0);  // Use very high rate as "pure elastic" test
     
     if (pure_elastic) {
         // Pure elastic: no Prony terms, gamma = 1
-        op->set_prony_terms(0, nullptr, nullptr);
         printf("  [DEBUG] Pure elastic mode (num_prony=0, gamma=1)\n");
     } else {
         // Set Prony series (normalized)
-        op->set_prony_terms(NUM_PRONY, prony_g_normalized, prony_tau);
+        material.g.assign(prony_g_normalized, prony_g_normalized + NUM_PRONY);
+        material.tau.assign(prony_tau, prony_tau + NUM_PRONY);
     }
-    
-    op->initialize();
-    op->initialize_history();
-    
+
+    auto op = sfem::test::make_prony_mooney_rivlin(fs, material);
+    if (!op) return 1;
+
+    // Every step has length dt, so gamma is the same in all of them.
+    op->begin_step(dt, dt);
     printf("  C10 = %.4f, C01 = %.4f MPa\n", PAPER_C10, PAPER_C01);
-    printf("  Prony terms: %d, Active: %d, Gamma: %.6f\n",
-           NUM_PRONY, op->get_num_active_terms(), op->get_gamma());
+    printf("  Prony terms: %d, Gamma: %.6f\n", (int)material.g.size(), sfem::test::prony_gamma(*op, fs));
     
     // Buffers
     auto x_buf = sfem::create_buffer<real_t>(ndofs, es);
@@ -276,7 +274,7 @@ int run_strain_rate_test(double strain_rate, double max_strain, const char* labe
     
     // Get gamma for analytical comparison
     // Both SFEM and Paper use: gamma = g_inf + Σβ_i with Short Term parameters
-    double gamma = op->get_gamma();
+    double gamma = sfem::test::prony_gamma(*op, fs);
     
     printf("\n  gamma = %.6f (g_inf + Σβ_i)\n", gamma);
     printf("\n  %-12s %-12s %-14s %-14s %-10s\n", "Time[s]", "Strain", "SFEM[MPa]", "Paper[MPa]", "Ratio");
@@ -292,8 +290,9 @@ int run_strain_rate_test(double strain_rate, double max_strain, const char* labe
         // Apply displacement
         apply_compression_displacement(current_strain, n_nodes, pts, x_buf->data());
         
-        // Compute internal forces
+        // Compute internal forces, in the step that ends at t
         blas->zeros(ndofs, rhs_buf->data());
+        op->begin_step(t, dt);
         op->gradient(x_buf->data(), rhs_buf->data());
         
         // Extract stress: sum of reaction forces on loaded face / area
@@ -325,7 +324,7 @@ int run_strain_rate_test(double strain_rate, double max_strain, const char* labe
         }
         
         // Update history
-        op->update_history(x_buf->data());
+        op->advance(x_buf->data());
         
         t += dt;
         step++;
