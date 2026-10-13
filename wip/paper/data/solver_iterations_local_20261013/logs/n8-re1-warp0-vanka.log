@@ -1,0 +1,50 @@
+
+libgomp: Affinity not supported on this configuration
+mesh coords checksum: 729 729 729
+pressure pin: DISABLED
+constraints: uvw_nodes=386  uz_nodes=0  p_pin=0  sh_uv=0  sh_phi=0
+case: cavity_reg  geom: affine  refine_level: 2  semi_structured: 1
+channel: L=(2,2,2)  cells=(4,4,4)
+nnodes: 729  nelements: 64  ndof: 2916
+rho: 1  mu: 2  U: 1  Re: 1
+initial state checksum: 18.195556640625   p_exact: 0
+constrained dofs: 1158
+pressure gauge: zero mean  (729 of 729 pressure dofs free)
+continuation: 1 stages, Re = 1
+stage 1/1: rho: 1  Re: 1
+newton 0  ||R||: 1.336480e+00  rel: 1.000000e+00
+preconditioner: vanka (no multigrid)
+50: residual abs: 1.11358e-06, rel: 8.33217e-07
+linear_check: step=0 stage=1 newton=0 iterations=50 status=converged true_abs=1.1135776845058883e-06 rhs_norm=1.3364800848101432 target=1.3364800848101432e-06 at_limit=0
+  lin_it: 50  |dx|_inf: 1.334357e+01  alpha: 1
+newton 1  ||R||: 1.259401e-02  rel: 9.423264e-03
+linear_check: step=0 stage=1 newton=1 iterations=47 status=converged true_abs=9.8884238447310969e-09 rhs_norm=0.012594005061933403 target=1.2594005061933403e-08 at_limit=0
+  lin_it: 47  |dx|_inf: 7.146480e-02  alpha: 1
+newton 2  ||R||: 3.995599e-06  rel: 2.989644e-06
+linear_check: step=0 stage=1 newton=2 iterations=48 status=converged true_abs=3.0995150381288197e-12 rhs_norm=3.9955993519451975e-06 target=3.9955993519451977e-12 at_limit=0
+  lin_it: 48  |dx|_inf: 8.383154e-06  alpha: 1
+newton 3  ||R||: 3.125191e-12  rel: 2.338375e-12
+continuation: highest Re SOLVED = 1 of 1 target  (AT TARGET)
+newton_converged: 1  newton_it: 3 (last stage)  newton_total: 3 over 1 stage(s)  lin_it_total: 145
+linear_check_summary: checked=3 failed=0 nonlinear_abs=3.1251911234412684e-12 nonlinear_initial=1.3364800848101432 nonlinear_rtol=1e-08 nonlinear_atol=9.9999999999999998e-13 dofs=2916
+matrix_free: 1  t_operator: 0.0000 s  t_precond: 0.0130 s  t_solve: 0.1237 s  us_per_lin_it: 853.20
+
+phase breakdown (0.049 s in top-level phases; shares are of that)
+  phase                     seconds      calls      us/call   share
+  outer_op                    0.035        148        233.7   71.3%
+  vanka_setup                 0.013          3       4334.7   26.8%
+  newton_residual             0.001          4        232.4    1.9%
+  precond_total               0.076        145        524.4  156.7%  (container: the rows above it
+                                                                      marked op/smooth/transfer/coarse are inside)
+cavity: ux in [-0.124268, 1.000000]   uy in [-0.247259, 0.246949]
+cavity: u_x on the vertical centreline (x=1, z=1)
+   y/Ly 0.0000   ux +0.000000   uy +0.000000
+   y/Ly 0.2500   ux -0.070131   uy +0.000046
+   y/Ly 0.5000   ux -0.124268   uy +0.000286
+   y/Ly 0.7500   ux -0.042164   uy +0.000990
+   y/Ly 1.0000   ux +1.000000   uy +0.000000
+   y/Ly 0.1250   ux -0.039836   uy +0.000006
+   y/Ly 0.3750   ux -0.096287   uy +0.000054
+   y/Ly 0.6250   ux -0.119718   uy +0.000497
+   y/Ly 0.8750   ux +0.238018   uy +0.000882
+cvfem_hex8_ns_ssgmg: 0.140102 seconds

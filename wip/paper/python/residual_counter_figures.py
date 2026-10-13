@@ -9,8 +9,11 @@ import tarfile
 ROOT = Path(__file__).resolve().parents[3]
 SCRIPTS = ROOT / 'spikes/cvfem/scripts'
 sys.path.insert(0, str(SCRIPTS))
-import roofline_operator as operator
+# Keep this accepted campaign tied to the analysis captured with its measurements.
+sys.path.insert(0, str(Path(__file__).with_name('counter_sources_5039102')))
+import roofline_operator_5039102 as operator
 import roofline_reuse_diagnostic as reuse
+import roofline_calibration as calibration
 from roofline_calibration import counter_events, parse_perf
 from roofline_sweep_validation import window_seconds
 from roofline_warmup_diagnostic import parse_output as parse_control
@@ -37,11 +40,12 @@ def read_study(directory):
         return json.loads(files[name])
     def text(name):
         return files[name].decode()
-    for module, folder in ((operator, 'study'), (reuse, 'study/calibration')):
-        name = Path(module.__file__).name
+    for module, folder, name in ((operator, 'study', 'roofline_operator.py'),
+                                 (calibration, 'study/calibration', 'roofline_calibration.py'),
+                                 (reuse, 'study/calibration', 'roofline_reuse_diagnostic.py')):
         if files[folder+'/'+name] != Path(module.__file__).read_bytes():
             raise ValueError('captured counter analysis changed: '+name)
-    for name in ('roofline_calibration.py','roofline_sweep_validation.py','roofline_warmup_diagnostic.py'):
+    for name in ('roofline_sweep_validation.py','roofline_warmup_diagnostic.py'):
         if files['study/calibration/'+name] != (SCRIPTS/name).read_bytes():
             raise ValueError('captured counter parser changed: '+name)
     for folder in ('study/operators', 'study/calibration/captures'):

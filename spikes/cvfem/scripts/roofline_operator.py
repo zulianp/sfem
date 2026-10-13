@@ -13,19 +13,42 @@ import sys
 from roofline_calibration import counter_events, parse_perf, prepare_capture
 from roofline_sweep_validation import control_timing, window_seconds, spread
 from roofline_reuse_diagnostic import Session, analyze_measurements as analyze_controls
+import roofline_memory_policy as memory_policy
 
 
-def groups():
-    for block, order in enumerate(itertools.permutations((10,40,70))):
+REPEAT_COUNTS = (10, 40, 70)
+LONG_REPEAT_COUNTS = (30, 60, 90)
+
+
+def checked_repeat_counts(counts):
+    counts = tuple(counts)
+    if counts not in (REPEAT_COUNTS, LONG_REPEAT_COUNTS):
+        raise ValueError('unsupported counter-window repeat counts')
+    return counts
+
+
+def stability_details(direct, slopes):
+    lines = []
+    for label, samples in (('direct', direct), ('slopes', slopes)):
+        fields = {k: [s[k] for s in samples] for k in ('read_bytes', 'write_bytes', 'fp_ops')}
+        fields['total_bytes'] = [s['read_bytes']+s['write_bytes'] for s in samples]
+        lines.append('  {} spread percent (limit 10): {}'.format(label, ', '.join(
+            '{}={:.6f}'.format(k, 100*spread(v)) for k, v in fields.items())))
+    return lines
+
+
+def groups(repeat_counts=REPEAT_COUNTS):
+    low, middle, high = checked_repeat_counts(repeat_counts)
+    for block, order in enumerate(itertools.permutations((low,middle,high))):
         for scheme in (('fo','darwish') if block % 2 == 0 else ('darwish','fo')):
-            kinds = [('empty-before',10)] + [('sweep',r) for r in order] + [('empty-after',10)]
-            kinds.insert(0 if block % 2 == 0 else len(kinds), ('normal',40))
+            kinds = [('empty-before',low)] + [('sweep',r) for r in order] + [('empty-after',low)]
+            kinds.insert(0 if block % 2 == 0 else len(kinds), ('normal',middle))
             for layout in (('atomic','packed') if block % 2 == 0 else ('packed','atomic')):
                 yield [(block,scheme,layout,kind,repeat) for kind,repeat in kinds]
 
 
-def cases():
-    return [case for group in groups() for case in group]
+def cases(repeat_counts=REPEAT_COUNTS):
+    return [case for group in groups(repeat_counts) for case in group]
 
 
 def session_name(block, scheme, layout):
@@ -70,7 +93,9 @@ class OperatorSession(Session):
         command = benchmark_command(binary,self.scheme,self.layout,'session',40,30,self.n)
         return command+['--perf-fds']+[str(self.fds[i]) for i in (1,2,5,6)]
 
-    def capture(self, topo, binary, stem, kind, repeat, monitor_prefix=None, timeout=180):
+    def capture(self, topo, binary, stem, kind, repeat, monitor_prefix=None, timeout=180, trace=False, resources=False):
+        if resources and not trace:
+            raise ValueError('resource sampling requires a timing trace')
         command = None
         phase = 'normal' if kind == 'normal' else ('sweep' if kind == 'sweep' else 'sweep-empty')
         if kind != 'normal':
@@ -78,7 +103,9 @@ class OperatorSession(Session):
             command = command[:command.index('numactl')]+['cat']
             if monitor_prefix is not None:
                 command = list(monitor_prefix)+[str(self.fds[i]) for i in (0,3,4,7)]
-        return self.exchange(stem,'{} {}\n'.format(phase,repeat),command,timeout)
+        option = ' resources' if resources else ' trace' if trace else ''
+        request = '{} {}{}\n'.format(phase,repeat,option)
+        return self.exchange(stem,request,command,timeout)
 
 
 def parse_output(output, scheme, layout, kind, repeat, n=128, threads=72, warmup=3):
@@ -125,10 +152,11 @@ def parse_output(output, scheme, layout, kind, repeat, n=128, threads=72, warmup
     return result
 
 
-def analyze(records):
+def analyze(records, repeat_counts=REPEAT_COUNTS):
+    repeat_counts = checked_repeat_counts(repeat_counts)
     keys = ('block','scheme','layout','kind','repeat')
     actual = [tuple(r[k] for k in keys) for r in records]
-    if actual != cases():
+    if actual != cases(repeat_counts):
         raise ValueError('incomplete/duplicate operator campaign')
     sessions = {}
     for r in records:
@@ -148,6 +176,8 @@ def analyze(records):
              'One process/allocation per scheme/layout/block; 30 warmups and checks before every capture.',
              'FP counters count speculative operations of all precisions, not modelled useful FLOPs.',
              'Empty controls retained without subtraction. Rates use the timed loop bracketed by both counters.', '']
+    if repeat_counts == LONG_REPEAT_COUNTS:
+        lines.append('Counter-window repeats: 30, 60, 90; normal timing paired with 60. Acceptance limits unchanged.')
     for scheme in ('fo','darwish'):
         normal_means = {}
         for layout in ('atomic','packed'):
@@ -157,20 +187,20 @@ def analyze(records):
             normal = [r for r in group if r['kind']=='normal']
             identity = all(r['write_bytes']==r['component_write_bytes'] for r in sweep+empty)
             windows = all(0.99 <= r[k]/r['seconds'] <= 1.10 for r in sweep for k in ('scf_seconds','core_seconds'))
-            shortest = [r for r in sweep if r['repeat']==10]
+            shortest = [r for r in sweep if r['repeat']==repeat_counts[0]]
             empty_ok = all(r['read_bytes']+r['write_bytes'] <= .01*min(s['read_bytes']+s['write_bytes'] for s in shortest)
                            and r['fp_ops'] <= .01*min(s['fp_ops'] for s in shortest) for r in empty)
             direct = [{k:r[k]/r['repeat'] for k in ('read_bytes','write_bytes','fp_ops')} for r in sweep]
             slopes = []
             for block in range(6):
                 by_repeat = {r['repeat']:r for r in sweep if r['block']==block}
-                for lo,hi in ((10,40),(40,70)):
+                for lo,hi in zip(repeat_counts,repeat_counts[1:]):
                     slopes.append({k:(by_repeat[hi][k]-by_repeat[lo][k])/(hi-lo) for k in direct[0]})
             stable = all(spread([s[k] for s in samples]) <= .10 for samples in (direct,slopes) for k in direct[0])
             stable = stable and all(spread([s['read_bytes']+s['write_bytes'] for s in samples]) <= .10 for samples in (direct,slopes))
             paired_overhead = []
             for r in normal:
-                full = next(s for s in sweep if s['block']==r['block'] and s['repeat']==40)
+                full = next(s for s in sweep if s['block']==r['block'] and s['repeat']==repeat_counts[1])
                 paired_overhead.append(full['seconds']/r['seconds']-1)
             overhead_ok = abs(statistics.mean(paired_overhead)) <= .10
             checks += [identity,windows,empty_ok,stable,overhead_ok]
@@ -179,6 +209,8 @@ def analyze(records):
             lines += [scheme+' '+layout+': identity={}, windows={}, empty={}, count_stability={}, mean_timing_overhead={}'.format(identity,windows,empty_ok,stable,overhead_ok),
                       '  normal ms/sweep mean={:.6f}, range=[{:.6f}, {:.6f}]'.format(statistics.mean(normal_ms),min(normal_ms),max(normal_ms)),
                       '  paired instrumentation overhead mean={:+.2f}%, range=[{:+.2f}%, {:+.2f}%]'.format(100*statistics.mean(paired_overhead),100*min(paired_overhead),100*max(paired_overhead))]
+            if repeat_counts == LONG_REPEAT_COUNTS:
+                lines += stability_details(direct,slopes)
             for label,values in (
                 ('counted ms/sweep',[1000*r['seconds']/r['repeat'] for r in sweep]),
                 ('read bytes/sweep',[s['read_bytes'] for s in direct]),
@@ -208,24 +240,30 @@ def calibration_reference(folder):
     for name,digest in json.loads((folder/'files.sha256.json').read_text()).items():
         if hashlib.sha256((folder/name).read_bytes()).hexdigest() != digest:
             raise ValueError('control capture hash mismatch')
+    memory_policy.verify_reference(folder, records)
     lines=['Same-allocation STREAM-style references; transported bytes / timed sweep, not an official STREAM score.']
+    if memory_policy.selected():
+        lines.append('Memory policy: THP disabled for every benchmark worker, including calibration; controllers and system settings unchanged.')
     for mode in ('copy','triad'):
         values=[(r['read_bytes']+r['write_bytes'])/r['seconds']/1e9 for r in records if r['mode']==mode and r['kind']=='sweep']
         lines.append('{} transported GB/s mean={:.6f}, range=[{:.6f}, {:.6f}]'.format(mode,statistics.mean(values),min(values),max(values)))
     return json.loads((folder/'topology.json').read_text()),'\n'.join(lines)+'\n'
 
 
-def collect(binary, out, calibration):
+def collect(binary, out, calibration, repeat_counts=REPEAT_COUNTS):
+    repeat_counts = checked_repeat_counts(repeat_counts)
     control_topo,control_report=calibration_reference(calibration)
     topo,binary,env=prepare_capture(binary,out,128**3,'residual-reuse',('cmem_wb_data','cmem_wr_data'))
     if topo != control_topo:
         raise ValueError('controls and operators must share the same allocation/topology')
     (out/'control-reference.txt').write_text(control_report)
+    (out/'collection.json').write_text(json.dumps(dict(mode='residual-reuse',
+        repeat_counts=repeat_counts, warmup=30, normal_repeat=repeat_counts[1]),indent=2)+'\n')
     scf,core=counter_events(topo)
     scf += [topo['pmu']+'/'+e+'/' for e in ('cmem_wb_data','cmem_wr_data')]
     records=[]
     try:
-        for group in groups():
+        for group in groups(repeat_counts):
             block,scheme,layout,unused_kind,unused_repeat=group[0]
             session=None
             try:
@@ -250,7 +288,7 @@ def collect(binary, out, calibration):
                 session=None
             finally:
                 if session is not None: session.close(abort=True)
-        report,ok=analyze(records)
+        report,ok=analyze(records,repeat_counts)
         (out/'summary.txt').write_text(control_report+'\n'+report)
         print(control_report+'\n'+report,end='')
         if not ok: raise ValueError('operator campaign checks failed; retain every capture')
@@ -265,9 +303,11 @@ if __name__=='__main__':
     parser.add_argument('--binary',type=Path,required=True)
     parser.add_argument('--out',type=Path,required=True)
     parser.add_argument('--calibration',type=Path,required=True)
+    parser.add_argument('--long-windows',action='store_true',help='use fixed 30/60/90-sweep windows')
     args=parser.parse_args()
     try:
-        collect(args.binary,args.out.resolve(),args.calibration.resolve())
+        collect(args.binary,args.out.resolve(),args.calibration.resolve(),
+                LONG_REPEAT_COUNTS if args.long_windows else REPEAT_COUNTS)
     except (ValueError,OSError,subprocess.SubprocessError) as error:
         print('ROOFLINE OPERATOR CAMPAIGN FAILED: '+str(error),file=sys.stderr)
         sys.exit(1)

@@ -1,0 +1,98 @@
+{
+  "T1_geometry": {
+    "narrow_faster_pairs": 12,
+    "narrow_first": {
+      "narrow_faster_pairs": 6,
+      "ratio_mean": 1.549423126056736,
+      "ratio_median": 1.5981569668155067,
+      "samples": 6
+    },
+    "narrow_ms_mean": 4.731180750000001,
+    "ratio_mean": 1.5533767467641963,
+    "ratio_median": 1.5801266068637774,
+    "ratio_range": [
+      1.2533396118328828,
+      1.69783708526132
+    ],
+    "samples": 12,
+    "wide_first": {
+      "narrow_faster_pairs": 6,
+      "ratio_mean": 1.5573303674716565,
+      "ratio_median": 1.5652757829054755,
+      "samples": 6
+    },
+    "wide_ms_mean": 7.302858400000001
+  },
+  "T1_graph": {
+    "narrow_faster_pairs": 6,
+    "narrow_first": {
+      "narrow_faster_pairs": 0,
+      "ratio_mean": 0.9467870696937014,
+      "ratio_median": 0.9434924860914957,
+      "samples": 6
+    },
+    "narrow_ms_mean": 3.9624968333333337,
+    "ratio_mean": 1.0140987494290428,
+    "ratio_median": 1.0148209535164359,
+    "ratio_range": [
+      0.9342900005863931,
+      1.0902928619901529
+    ],
+    "samples": 12,
+    "wide_first": {
+      "narrow_faster_pairs": 6,
+      "ratio_mean": 1.081410429164384,
+      "ratio_median": 1.084142528378607,
+      "samples": 6
+    },
+    "wide_ms_mean": 4.008789316666667
+  },
+  "T72_geometry": {
+    "narrow_faster_pairs": 12,
+    "narrow_first": {
+      "narrow_faster_pairs": 6,
+      "ratio_mean": 1.9209734936401843,
+      "ratio_median": 1.9004411551599056,
+      "samples": 6
+    },
+    "narrow_ms_mean": 0.19762588333333334,
+    "ratio_mean": 1.8382151367310564,
+    "ratio_median": 1.854902199433215,
+    "ratio_range": [
+      1.4322383273758625,
+      2.172990651804835
+    ],
+    "samples": 12,
+    "wide_first": {
+      "narrow_faster_pairs": 6,
+      "ratio_mean": 1.7554567798219285,
+      "ratio_median": 1.796997359316714,
+      "samples": 6
+    },
+    "wide_ms_mean": 0.36048525000000003
+  },
+  "T72_graph": {
+    "narrow_faster_pairs": 7,
+    "narrow_first": {
+      "narrow_faster_pairs": 1,
+      "ratio_mean": 1.2673481281674055,
+      "ratio_median": 0.9149580801664312,
+      "samples": 6
+    },
+    "narrow_ms_mean": 0.12856511666666667,
+    "ratio_mean": 1.209465477923983,
+    "ratio_median": 1.1193105011139566,
+    "ratio_range": [
+      0.8064831410289339,
+      3.1468476334997755
+    ],
+    "samples": 12,
+    "wide_first": {
+      "narrow_faster_pairs": 6,
+      "ratio_mean": 1.1515828276805609,
+      "ratio_median": 1.1510567552104705,
+      "samples": 6
+    },
+    "wide_ms_mean": 0.15638123333333334
+  }
+}

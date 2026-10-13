@@ -1,0 +1,29 @@
+>>> verification matrix  00:29:18
+    spike root : /private/tmp/claude-501/-Users-gandanie-scratch-santis-mars/0b3fce66-e872-4113-82d7-061d77fabca9/scratchpad/sfem/spikes/cvfem
+    driver     : /private/tmp/pasc-public-validation-20261013/mms-driver
+    output     : /private/tmp/pasc-public-validation-20261013/conv-unfrozen
+    groups     : conv
+    solver     : direct (SFEM_PRECOND=direct)
+    level      : 1
+    p_exact(outlet) = -0.16   exact step flux = 0.111111111111
+  conv     lo_n4          exit=1      2s  u_linf: 3.225438e-01  p_linf: 3.401538e-01
+  conv     lo_n8          exit=1      3s  u_linf: 1.710054e-01  p_linf: 1.742624e-01
+  conv     lo_n16         exit=1     12s  u_linf: 1.098873e-01  p_linf: 5.856866e-02
+  conv     ho_lim0_n4     exit=1      1s  u_linf: 3.210648e-01  p_linf: 2.940188e-01
+  conv     ho_lim0_n8     exit=1      4s  u_linf: 1.500844e-01  p_linf: 1.306093e-01
+  conv     ho_lim0_n16    exit=1     16s  u_linf: 4.150784e-02  p_linf: 4.172043e-02
+  conv     ho_lim1_n4     exit=1      2s  u_linf: 3.422438e-01  p_linf: 2.918361e-01
+  conv     ho_lim1_n8     exit=1      6s  u_linf: 1.674206e-01  p_linf: 1.264110e-01
+  conv     ho_lim1_n16    exit=1     68s  u_linf: 4.437100e-02  p_linf: 4.216664e-02
+  conv     ho_lim2_k0_n4  exit=1      1s  u_linf: 3.478500e-01  p_linf: 2.909437e-01
+  conv     ho_lim2_k0_n8  exit=1      6s  u_linf: 1.683835e-01  p_linf: 1.267927e-01
+  conv     ho_lim2_k0_n16 exit=1     30s  u_linf: 4.448365e-02  p_linf: 4.209964e-02
+  conv     ho_lim3_n4     exit=1      1s  u_linf: 3.703535e-01  p_linf: 2.809898e-01
+  conv     ho_lim3_n8     exit=1      5s  u_linf: 1.718859e-01  p_linf: 1.267076e-01
+  conv     ho_lim3_n16    exit=1     26s  u_linf: 4.431780e-02  p_linf: 4.133848e-02
+    manifest   : 15 run(s)
+<<< done  00:32:21
+
+Build the report with:
+  python3 /private/tmp/claude-501/-Users-gandanie-scratch-santis-mars/0b3fce66-e872-4113-82d7-061d77fabca9/scratchpad/sfem/spikes/cvfem/python/cvfem_verify_report.py /private/tmp/pasc-public-validation-20261013/conv-unfrozen \
+      -o /private/tmp/claude-501/-Users-gandanie-scratch-santis-mars/0b3fce66-e872-4113-82d7-061d77fabca9/scratchpad/sfem/spikes/cvfem/docs/CVFEM_Verification_Report.md --html

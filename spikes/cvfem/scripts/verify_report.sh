@@ -19,7 +19,7 @@ set -u
 # SLURM_SUBMIT_DIR first: sbatch copies the batch script to /var/spool/slurmd/job<id>/,
 # so anything derived from the running script's own path resolves somewhere useless.
 for cand in "${SLURM_SUBMIT_DIR:-}" "$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/.." && pwd)" "$PWD"; do
-    [ -n "$cand" ] && [ -f "$cand/CMakeLists.txt" ] && [ -d "$cand/drivers" ] && SPIKE_ROOT="$cand" && break
+    [ -n "$cand" ] && [ -f "$cand/CMakeLists.txt" ] && [ -d "$cand/src/drivers" ] && SPIKE_ROOT="$cand" && break
 done
 if [ -z "${SPIKE_ROOT:-}" ]; then
     echo "verify_report: cannot locate the spike root (tried SLURM_SUBMIT_DIR, script dir, cwd)" >&2
@@ -28,6 +28,7 @@ fi
 
 BUILD=${BUILD:-$SPIKE_ROOT/build}
 DRIVER=${DRIVER:-$BUILD/cvfem_hex8_ns_ssgmg}
+VERIFY_PYTHON=${VERIFY_PYTHON:-python3}
 OUT=${OUT:-$SPIKE_ROOT/verification_runs/$(date +%Y%m%d-%H%M%S)}
 # Absolute, because each case is run from its own directory so that the tracer's
 # hard-coded smesh.trace.csv lands per run rather than being overwritten twenty-two times.
@@ -166,7 +167,7 @@ run() {
     [ "$rc" -eq 124 ] && echo "run: TIMEOUT after ${VERIFY_RUN_TIMEOUT}s" >> "$OUT/$log"
     printf "exit=%-3s %4ds  %s\n" "$rc" "$((SECONDS - t0))" \
         "$(grep -m1 -E 'u_linf:|sum of continuity' "$OUT/$log" | cut -c1-60)"
-    printf "%s\t%s\t%s\t%s\n" "$group" "$label" "$log" "$extra" >> "$TSV"
+    printf "%s\t%s\t%s\t%s\n" "$group" "$label" "$log" "${extra:+$extra,}exit_code=$rc" >> "$TSV"
 }
 
 # ---- unit tests: the layer that names a line rather than a case ----
@@ -222,7 +223,8 @@ if want conv; then
     CONV_LADDER=${CONV_LADDER:-"8 16 32"}
     # The mms ladder's solver, and for its reason: this ladder is deliberately flat, so
     # multigrid is unavailable and the dense coarse factor does not fit.
-    CONV_SOLVER="SFEM_FGMRES=1 SFEM_GMG=0 SFEM_PRECOND=bjacobi"
+    CONV_SOLVER="SFEM_FGMRES=1 SFEM_GMG=0 SFEM_PRECOND=bjacobi SFEM_FGMRES_RESTART=$VERIFY_RESTART"
+    echo "    conv solver : $CONV_SOLVER (unfrozen unless the arm names freezing)"
     # Overridable, because the full list is ten arms times a ladder and the interesting subset
     # is rarely all of it. It also fixes an ordering hazard: the arms added most recently sit
     # at the end, so a run that meets its wall clock loses precisely the ones it was submitted
@@ -257,10 +259,11 @@ if want conv; then
             # the higher-order term and the step counts above mean nothing.
             ho_lim0_frozen)    ARM_ENV="SFEM_CONV_HO=1 SFEM_CONV_LIMITER=0 SFEM_CONV_FREEZE=1" ;;
             ho_lim2_k0_frozen) ARM_ENV="SFEM_CONV_HO=1 SFEM_CONV_LIMITER=2 SFEM_VENKAT_K=0 SFEM_CONV_FREEZE=1" ;;
+            *) echo "verify_report: unknown convective arm '$arm'" >&2; exit 1 ;;
         esac
         for n in $CONV_LADDER; do
             run conv "${arm}_n$n" "conv_arm=$arm" -- SFEM_CASE=mms SFEM_N=$(lvl_n $n) $LEVEL_ENV \
-                $CONV_SOLVER SFEM_MU=0.01 SFEM_RHO=1 $ARM_ENV
+                $CONV_SOLVER SFEM_MU=0.01 SFEM_RHO=1 SFEM_CONV_FREEZE=0 $ARM_ENV
         done
     done
 fi
@@ -527,8 +530,8 @@ fi
 
 # ---- assemble the manifest ----
 # Exported so the heredoc below can read them; a shell variable is not in its environment.
-export SPIKE_ROOT CTEST_TOTAL CTEST_PASS CTEST_FAIL CTEST_FAILING VERIFY_SOLVER VERIFY_RESTART VERIFY_LEVEL
-python3 - "$OUT" "$TSV" <<'PYEOF'
+export SPIKE_ROOT CTEST_TOTAL CTEST_PASS CTEST_FAIL CTEST_FAILING VERIFY_SOLVER VERIFY_RESTART VERIFY_LEVEL CONV_SOLVER
+"$VERIFY_PYTHON" - "$OUT" "$TSV" <<'PYEOF'
 import json, os, subprocess, sys, platform
 out, tsv = sys.argv[1], sys.argv[2]
 runs = []
@@ -563,6 +566,7 @@ manifest = {
     "solver": (os.environ.get("VERIFY_SOLVER", "direct") +
                ("" if os.environ.get("VERIFY_SOLVER") != "fgmres"
                 else ", restart %s" % os.environ.get("VERIFY_RESTART", "?"))),
+    "conv_solver": os.environ.get("CONV_SOLVER", "not selected"),
 }
 ct_total = int(os.environ.get("CTEST_TOTAL", "0") or 0)
 if ct_total:

@@ -1,0 +1,43 @@
+mesh coords checksum: 125 125 125
+pressure pin: DISABLED
+constraints: uvw_nodes=98  uz_nodes=0  p_pin=0  sh_uv=0  sh_phi=0
+case: cavity_reg  geom: affine  refine_level: 2  semi_structured: 1
+channel: L=(2,2,2)  cells=(2,2,2)
+nnodes: 125  nelements: 8  ndof: 500
+rho: 1  mu: 2  U: 1  Re: 1
+initial state checksum: 4.515625   p_exact: 0
+constrained dofs: 294
+pressure gauge: zero mean  (125 of 125 pressure dofs free)
+continuation: 1 stages, Re = 1
+stage 1/1: rho: 1  Re: 1
+newton 0  ||R||: 7.615386e-01  rel: 1.000000e+00
+preconditioner: bjacobi (no multigrid)
+linear_check: step=0 stage=1 newton=0 iterations=31 status=converged true_abs=5.9371082130721493e-07 rhs_norm=0.76153859673493673 target=7.6153859673493668e-07 at_limit=0
+  lin_it: 31  |dx|_inf: 9.083995e+00  alpha: 1
+newton 1  ||R||: 4.487755e-02  rel: 5.893010e-02
+linear_check: step=0 stage=1 newton=1 iterations=33 status=converged true_abs=3.0549424561133838e-08 rhs_norm=0.044877545535036339 target=4.4877545535036339e-08 at_limit=0
+  lin_it: 33  |dx|_inf: 8.522933e-02  alpha: 1
+newton 2  ||R||: 9.101288e-05  rel: 1.195118e-04
+linear_check: step=0 stage=1 newton=2 iterations=33 status=converged true_abs=7.1441845797577925e-11 rhs_norm=9.1012883408039431e-05 target=9.1012883408039428e-11 at_limit=0
+  lin_it: 33  |dx|_inf: 7.188665e-05  alpha: 1
+newton 3  ||R||: 2.687180e-10  rel: 3.528620e-10
+continuation: highest Re SOLVED = 1 of 1 target  (AT TARGET)
+newton_converged: 1  newton_it: 3 (last stage)  newton_total: 3 over 1 stage(s)  lin_it_total: 97
+linear_check_summary: checked=3 failed=0 nonlinear_abs=2.6871802564846924e-10 nonlinear_initial=0.76153859673493673 nonlinear_rtol=1e-08 nonlinear_atol=9.9999999999999998e-13 dofs=500
+matrix_free: 1  t_operator: 0.0000 s  t_precond: 0.0002 s  t_solve: 0.0044 s  us_per_lin_it: 45.60
+
+phase breakdown (0.003 s in top-level phases; shares are of that)
+  phase                     seconds      calls      us/call   share
+  outer_op                    0.003        100         31.0   89.6%
+  hessian_block_diag          0.000          3         60.3    5.2%
+  newton_residual             0.000          4         44.6    5.2%
+  precond_total               0.000         97          0.7    2.1%  (container: the rows above it
+                                                                      marked op/smooth/transfer/coarse are inside)
+cavity: ux in [-0.158524, 1.000000]   uy in [-0.271809, 0.274112]
+cavity: u_x on the vertical centreline (x=1, z=1)
+   y/Ly 0.0000   ux +0.000000   uy +0.000000
+   y/Ly 0.5000   ux -0.158524   uy +0.002271
+   y/Ly 1.0000   ux +1.000000   uy +0.000000
+   y/Ly 0.2500   ux -0.072740   uy -0.000602
+   y/Ly 0.7500   ux -0.148408   uy -0.002027
+cvfem_hex8_ns_ssgmg: 0.00604296 seconds

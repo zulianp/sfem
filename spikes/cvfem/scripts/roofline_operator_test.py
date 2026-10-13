@@ -27,10 +27,10 @@ def refused(call):
     raise AssertionError('invalid evidence accepted')
 
 
-def synthetic_records():
+def synthetic_records(repeat_counts=op.REPEAT_COUNTS):
     result=[]
     indices={}
-    for block,scheme,layout,kind,repeat in op.cases():
+    for block,scheme,layout,kind,repeat in op.cases(repeat_counts):
         row=dict(block=block,scheme=scheme,layout=layout,kind=kind,repeat=repeat,seconds=.01*repeat)
         name=op.session_name(block,scheme,layout)
         index=indices.get(name,0);indices[name]=index+1
@@ -68,12 +68,23 @@ def accounting_tests():
     normal=op.capture_command(topo,Path('/bench'),Path('/capture'),'fo','atomic','normal',40,[])
     assert 'perf' not in normal and '--perf-fds' not in normal
     refused(lambda:op.capture_command(topo,Path('/bench'),Path('/capture'),'fo','packed','sweep',40,[3]*8))
+    longer=synthetic_records(op.LONG_REPEAT_COUNTS)
+    assert op.analyze(longer,op.LONG_REPEAT_COUNTS)[1]
+    refused(lambda:op.analyze(longer))
+    refused(lambda:op.analyze(records,op.LONG_REPEAT_COUNTS))
+    for counts in ((10,40,90),(30,30,90),(90,60,30)):
+        refused(lambda:op.cases(counts))
+    for kind,key,value in (('sweep','scf_seconds',99),('sweep','component_write_bytes',0),
+                            ('sweep','fp_ops',1),('empty-before','fp_ops',1e20),('normal','seconds',.01)):
+        bad=copy.deepcopy(longer)
+        next(r for r in bad if r['kind']==kind)[key]=value
+        assert not op.analyze(bad,op.LONG_REPEAT_COUNTS)[1],(kind,key)
     print('Operator accounting: completeness, scopes and failed acceptance checks PASS (synthetic)')
 
 
-def collection_tests():
+def collection_tests(repeat_counts=op.REPEAT_COUNTS):
     topo=dict(cpus=list(range(72)),node=0,scf_cpu=0,pmu='nvidia_scf_pmu_0')
-    fixture=synthetic_records()
+    fixture=synthetic_records(repeat_counts)
     with tempfile.TemporaryDirectory() as directory:
         for fault in (None,'coverage','marker','command','timeout','identity','shutdown','stability'):
             out=Path(directory)/(fault or 'good')
@@ -94,7 +105,7 @@ def collection_tests():
                     if fault=='command':raise subprocess.CalledProcessError(1,'mock')
                     if fault=='timeout':raise subprocess.TimeoutExpired('mock',1)
                     if fault=='identity' and self.index==1:self.identity=dict(self.identity,pid=9999)
-                    if fault=='stability' and kind=='sweep' and repeat==40 and row['block']==0:row['write_bytes']*=1.3
+                    if fault=='stability' and kind=='sweep' and repeat==repeat_counts[1] and row['block']==0:row['write_bytes']*=1.3
                     phase='normal' if kind=='normal' else ('sweep' if kind=='sweep' else 'sweep-empty')
                     output=''
                     for stage in ('before','after'):
@@ -117,14 +128,17 @@ def collection_tests():
                     if fault=='shutdown' and not abort:raise ValueError('worker failed at shutdown')
             with patch.object(op,'prepare_capture',prepare),patch.object(op,'OperatorSession',FakeSession),patch.object(op,'calibration_reference',return_value=(topo,'control fixture\n')),contextlib.redirect_stdout(io.StringIO()) as log:
                 if fault:
-                    try:op.collect(Path('/bench'),out,Path('/control'))
+                    try:op.collect(Path('/bench'),out,Path('/control'),repeat_counts)
                     except (ValueError,subprocess.SubprocessError):pass
                     else:raise AssertionError('failed collection accepted')
                     assert 'CAMPAIGN PASSED' not in log.getvalue()
                 else:
-                    op.collect(Path('/bench'),out,Path('/control'))
+                    op.collect(Path('/bench'),out,Path('/control'),repeat_counts)
                     assert len(json.loads((out/'records.json').read_text()))==144
                     assert len(sessions)==24 and all(s.index==6 for s in sessions)
+                    metadata=json.loads((out/'collection.json').read_text())
+                    assert metadata['repeat_counts']==list(repeat_counts)
+                    assert metadata['normal_repeat']==repeat_counts[1]
                 assert (out/'files.sha256.json').exists() and all(s.closed for s in sessions)
     print('Operator collection: 144 captures in 24 retained workers; coverage/result/lifetime/timeout/shutdown/stability refusal PASS (synthetic)')
 
@@ -214,7 +228,7 @@ def binary_tests(binary):
                     run_binary(binary,layout,scheme,kind,threads)
     for controller in (0,1): run_binary(binary,'packed','darwish','sweep',2,fault=controller)
     env=dict(os.environ,OMP_NUM_THREADS='1',OMPI_MCA_btl='self',OMPI_MCA_pml='ob1')
-    for extra in ([],['--jac-action'],['--boundary'],['--grad-precision','single'],['--conv-ho','2'],['--pgrad-per-apply'],['--repeat','0'],['--warp','0.1'],['--rho','2'],['--no-sfc']):
+    for extra in ([],['--assemble'],['--boundary'],['--grad-precision','single'],['--conv-ho','2'],['--pgrad-per-apply'],['--repeat','0'],['--warp','0.1'],['--rho','2'],['--no-sfc']):
         command=[str(binary),'--n','4','--perturb','0.017','--roofline-window','normal']
         if extra: command+=['--rhie-chow']+extra
         result=subprocess.run(command,env=env,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,universal_newlines=True,timeout=30)
@@ -228,13 +242,14 @@ def session_tests(binary):
         out=Path(temp);mock=out/'mock.py';mock.write_text(MOCK)
         for threads in (1,2):
             env=dict(os.environ,OMP_NUM_THREADS=str(threads),OMP_DYNAMIC='FALSE',OMPI_MCA_btl='self',OMPI_MCA_pml='ob1')
+            low,middle,high=op.REPEAT_COUNTS if threads==1 else op.LONG_REPEAT_COUNTS
             for layout in ('atomic','packed'):
                 for scheme in ('fo','darwish'):
                     name='{}-{}-{}-reuse'.format(scheme,layout,threads)
                     session=op.OperatorSession(topo,binary,env,out,name,scheme,layout,n=4,threads=threads,launcher=False)
                     descriptors=list(session.fds)
                     try:
-                        for index,(kind,repeat) in enumerate((('normal',40),('empty-before',10),('sweep',70),('sweep',40),('sweep',10),('empty-after',10))):
+                        for index,(kind,repeat) in enumerate((('normal',middle),('empty-before',low),('sweep',high),('sweep',middle),('sweep',low),('empty-after',low))):
                             stem=out/(name+'-'+str(index))
                             output=session.capture(topo,binary,stem,kind,repeat,monitor_prefix=[sys.executable,str(mock),'good'])
                             assert op.parse_output(output,scheme,layout,kind,repeat,n=4,threads=threads,warmup=30)['seconds']>0
@@ -281,6 +296,7 @@ def session_tests(binary):
 if __name__=='__main__':
     accounting_tests()
     collection_tests()
+    collection_tests(op.LONG_REPEAT_COUNTS)
     reference_tests()
     if len(sys.argv)>1:
         binary=Path(sys.argv[1]).resolve()

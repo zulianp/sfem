@@ -1,0 +1,34 @@
+{
+  "binary_sha256": "85173f5e2ec7daffe5212c5fdcb5efedd8cec660fc9a49df17c9dd3107dc6d26",
+  "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+  "collected_utc": "2026-10-12T22:42:36.364622+00:00",
+  "scope": "CPU first-order exact-RC matrix-free regularized cavity; same semi-structured mesh per pair; no timings accepted",
+  "preconditioners": {
+    "bjacobi": "3x3 velocity block and scalar pressure inverse per node; omega=1",
+    "vanka": "multiplicative diagonal Vanka; 32-dof microcell patches; FP64 storage; omega=0.35"
+  },
+  "source_mode": "git",
+  "git_revision": "7727797df9a69086ffb1351fe3f1fb5c06a259aa",
+  "driver_patch_sha256": "e5348da3958088e68e90900a3e539a285c133a9e965a8d9d003c9ff5b357bb49",
+  "sources": {
+    "spikes/cvfem/scripts/solver_iteration_study.py": "20f33bf89089c47dd8cb9e454b46f104475069c6224226f0e4657ac5e43c7bf7",
+    "spikes/cvfem/src/drivers/cvfem_hex8_ns_ssgmg.cpp": "700d67ccf6ad2b0304f7432ed1ea05f9fb77d9db0ad0bc991e66dd57e8c29978",
+    "spikes/cvfem/src/support/cvfem_fgmres.hpp": "3f7c885a0d1848c64e619acb5f071596d8fc1d371323cd55736c69e0f7ad9b34",
+    "spikes/cvfem/src/frontend/galerkin/cvfem_ss_vanka.cpp": "968fe6f48f7796fa544062f688227f0f2efc1fb51718eb95172d3707b47b5843"
+  },
+  "measurement_platform": "local_cpu",
+  "threads": 1,
+  "hardware": {
+    "chip": "Apple M2 Pro",
+    "cores": 12,
+    "performance_cores": 8,
+    "efficiency_cores": 4,
+    "memory_gb": 32
+  },
+  "compiler": "GCC 14.2.0 (Homebrew)",
+  "build_type": "Release",
+  "affinity": "libgomp reports affinity unsupported; no core-type binding claim",
+  "readback_collector_sha256": "a371fa8e114f11c7f1682ca8a9d4043bd7ecdb4ccdc21c03b7b8656af3e68ab5",
+  "archive_note": "Commands with local absolute paths omitted; each row retains the complete controlled environment. Logs are copied byte for byte. Selected source hashes describe capture time; the readback collector additionally guards invalid SS levels and malformed geometry records.",
+  "collector_readback_patch_sha256": "3932c21cb713c8ca79266843af3b73e1c1e23d3f13181eb61e7bdf80622522ae"
+}

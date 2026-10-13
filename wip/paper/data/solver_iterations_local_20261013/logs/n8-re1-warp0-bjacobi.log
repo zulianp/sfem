@@ -1,0 +1,52 @@
+
+libgomp: Affinity not supported on this configuration
+mesh coords checksum: 729 729 729
+pressure pin: DISABLED
+constraints: uvw_nodes=386  uz_nodes=0  p_pin=0  sh_uv=0  sh_phi=0
+case: cavity_reg  geom: affine  refine_level: 2  semi_structured: 1
+channel: L=(2,2,2)  cells=(4,4,4)
+nnodes: 729  nelements: 64  ndof: 2916
+rho: 1  mu: 2  U: 1  Re: 1
+initial state checksum: 18.195556640625   p_exact: 0
+constrained dofs: 1158
+pressure gauge: zero mean  (729 of 729 pressure dofs free)
+continuation: 1 stages, Re = 1
+stage 1/1: rho: 1  Re: 1
+newton 0  ||R||: 1.336480e+00  rel: 1.000000e+00
+preconditioner: bjacobi (no multigrid)
+50: residual abs: 3.0053e-05, rel: 2.24867e-05
+linear_check: step=0 stage=1 newton=0 iterations=69 status=converged true_abs=1.2673747163598004e-06 rhs_norm=1.3364800848101432 target=1.3364800848101432e-06 at_limit=0
+  lin_it: 69  |dx|_inf: 1.334359e+01  alpha: 1
+newton 1  ||R||: 1.259405e-02  rel: 9.423300e-03
+50: residual abs: 3.87438e-07, rel: 3.07636e-05
+linear_check: step=0 stage=1 newton=1 iterations=76 status=converged true_abs=1.0385729552117885e-08 rhs_norm=0.012594052723393119 target=1.2594052723393118e-08 at_limit=0
+  lin_it: 76  |dx|_inf: 7.144341e-02  alpha: 1
+newton 2  ||R||: 3.995403e-06  rel: 2.989497e-06
+50: residual abs: 1.34093e-10, rel: 3.35617e-05
+linear_check: step=0 stage=1 newton=2 iterations=78 status=converged true_abs=3.2498460050459751e-12 rhs_norm=3.9954026691993333e-06 target=3.9954026691993334e-12 at_limit=0
+  lin_it: 78  |dx|_inf: 8.364072e-06  alpha: 1
+newton 3  ||R||: 3.240235e-12  rel: 2.424454e-12
+continuation: highest Re SOLVED = 1 of 1 target  (AT TARGET)
+newton_converged: 1  newton_it: 3 (last stage)  newton_total: 3 over 1 stage(s)  lin_it_total: 223
+linear_check_summary: checked=3 failed=0 nonlinear_abs=3.240234778171827e-12 nonlinear_initial=1.3364800848101432 nonlinear_rtol=1e-08 nonlinear_atol=9.9999999999999998e-13 dofs=2916
+matrix_free: 1  t_operator: 0.0000 s  t_precond: 0.0015 s  t_solve: 0.0733 s  us_per_lin_it: 328.80
+
+phase breakdown (0.055 s in top-level phases; shares are of that)
+  phase                     seconds      calls      us/call   share
+  outer_op                    0.052        229        227.9   95.7%
+  hessian_block_diag          0.001          3        467.3    2.6%
+  newton_residual             0.001          4        230.0    1.7%
+  precond_total               0.001        223          3.4    1.4%  (container: the rows above it
+                                                                      marked op/smooth/transfer/coarse are inside)
+cavity: ux in [-0.124268, 1.000000]   uy in [-0.247259, 0.246949]
+cavity: u_x on the vertical centreline (x=1, z=1)
+   y/Ly 0.0000   ux +0.000000   uy +0.000000
+   y/Ly 0.2500   ux -0.070131   uy +0.000046
+   y/Ly 0.5000   ux -0.124268   uy +0.000286
+   y/Ly 0.7500   ux -0.042164   uy +0.000990
+   y/Ly 1.0000   ux +1.000000   uy +0.000000
+   y/Ly 0.1250   ux -0.039836   uy +0.000006
+   y/Ly 0.3750   ux -0.096287   uy +0.000054
+   y/Ly 0.6250   ux -0.119718   uy +0.000497
+   y/Ly 0.8750   ux +0.238018   uy +0.000882
+cvfem_hex8_ns_ssgmg: 0.078028 seconds

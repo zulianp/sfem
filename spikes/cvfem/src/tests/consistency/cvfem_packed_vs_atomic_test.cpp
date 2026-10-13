@@ -201,10 +201,44 @@ static void compare_skin(sfem::Context &ctx, const ptrdiff_t expect) {
 //
 // Nothing here checked it. tests/cvfem_ns_op_gate.cpp runs the whole gate with
 // SFEM_RC_EXACT_JAC=0 on purpose, so the exact term is off there by construction.
-static void compare_jacobian(sfem::Context &ctx, const bool lshape, const char *name) {
+using KeyedField = std::map<std::array<long long, 3>, std::array<scalar_t, 4>>;
+
+static bool box_tie_jump_matches(const KeyedField &atomic, const KeyedField &packed,
+                                 scalar_t *branch_factor = nullptr) {
+    const std::array<long long, 3> lower{5000000, 1500000, 0}, upper{5000000, 1500000, 250000};
+    if (atomic.size() != packed.size() || !atomic.count(lower) || !packed.count(lower)) return false;
+    // This edge has zero normal velocity at its midpoint. The donor derivatives differ by
+    // dm times the endpoint velocity jump, over the four incident sub-control surfaces.
+    const scalar_t dm = scalar_t(0.27625) * scalar_t(1.25) * scalar_t(0.5);
+    const scalar_t jump[3] = {-scalar_t(0.0125) * dm, scalar_t(0.01) * dm, -scalar_t(0.03) * dm};
+    const scalar_t factor = (atomic.at(lower)[2] - packed.at(lower)[2]) / jump[2];
+    if (branch_factor) *branch_factor = factor;
+    if (!std::isfinite(factor) || std::fabs(factor) > scalar_t(1) + scalar_t(1e-10)) return false;
+    for (const auto &kv : atomic) {
+        const auto it = packed.find(kv.first);
+        if (it == packed.end()) return false;
+        for (int c = 0; c < 4; ++c) {
+            const scalar_t sign = kv.first == lower ? scalar_t(1) : kv.first == upper ? scalar_t(-1) : scalar_t(0);
+            const scalar_t want = c < 3 ? sign * factor * jump[c] : scalar_t(0);
+            const scalar_t difference = kv.second[c] - it->second[c];
+            if (!std::isfinite(difference) || std::fabs(difference - want) > scalar_t(1e-12)) return false;
+        }
+    }
+    return true;
+}
+
+static void compare_jacobian(sfem::Context &ctx, const bool lshape, const char *name,
+                              const scalar_t velocity_shift = scalar_t(0)) {
     Run a, b;
     build(a, 0, lshape, ctx);     // atomic
     build(b, 2048, lshape, ctx);  // packed
+    for (Run *r : {&a, &b}) {
+        for (ptrdiff_t i = 0; i < r->d.nnodes; ++i) {
+            r->d.ux[i] += velocity_shift;
+            r->d.uy[i] += velocity_shift;
+            r->d.uz[i] += velocity_shift;
+        }
+    }
 
     auto keyed_jv = [](Run &r) {
         MeshData &d = r.d;
@@ -250,8 +284,25 @@ static void compare_jacobian(sfem::Context &ctx, const bool lshape, const char *
     std::printf("\n--- %s Jacobian action (Rhie-Chow on) ---\n", name);
     std::printf("  worst |packed - atomic| = %.6e   relative %.6e\n", (double)worst, (double)rel);
     char msg[192];
-    std::snprintf(msg, sizeof(msg), "%s: packed and atomic Jacobian actions agree", name);
-    check(rel < 1e-12, msg);
+    if (!lshape && velocity_shift == scalar_t(0)) {
+        scalar_t factor = 0;
+        const bool matches = box_tie_jump_matches(ja, jb, &factor);
+        std::printf("  zero-flux diagnostic: donor jump factor %.6e; this is not a smooth Jacobian comparison\n",
+                    (double)factor);
+        check(matches, "box: the action difference has the derived donor-jump form");
+        auto wrong = jb;
+        wrong.at({5000000, 1500000, 0})[3] += scalar_t(1e-4);
+        check(!box_tie_jump_matches(ja, wrong), "the tie check rejects a changed continuity row");
+        wrong = jb;
+        wrong.at({5000000, 1500000, 0})[0] += scalar_t(1e-4);
+        check(!box_tie_jump_matches(ja, wrong), "the tie check rejects a changed transverse jump at the edge");
+        wrong = jb;
+        wrong.begin()->second[0] += scalar_t(1e-4);
+        check(!box_tie_jump_matches(ja, wrong), "the tie check rejects an error away from the tied edge");
+    } else {
+        std::snprintf(msg, sizeof(msg), "%s: packed and atomic Jacobian actions agree", name);
+        check(rel < 1e-12, msg);
+    }
 }
 
 int main(int argc, char **argv) {
@@ -263,6 +314,8 @@ int main(int argc, char **argv) {
     // 1765 nodes on the 40x8x4 L-shape, 771 of them strictly interior.
     compare_skin(*ctx, 994);
     compare_jacobian(*ctx, false, "box");
+    compare_jacobian(*ctx, false, "box, positive velocity shift", scalar_t(0.017));
+    compare_jacobian(*ctx, false, "box, negative velocity shift", scalar_t(-0.017));
     compare_jacobian(*ctx, true, "L-shape");
 
     if (g_failures) {

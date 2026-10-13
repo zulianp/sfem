@@ -1,0 +1,16 @@
+--------------------
+| PackedMesh |
+n_packs: 22
+elements_per_pack: 16
+Memory PackedMesh: 15.2326 KB
+Original:      9.11628 KB
+--------------------
+validation,cube,graph_bit_equal=1,geometry_max_relative=4.4703492463323526e-08
+--------------------
+| PackedMesh |
+n_packs: 22
+elements_per_pack: 16
+Memory PackedMesh: 15.2326 KB
+Original:      9.11628 KB
+--------------------
+validation,sheared_affine_at_coordinate_precision,graph_bit_equal=1,geometry_max_relative=5.9260075835376487e-08

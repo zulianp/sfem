@@ -12,7 +12,7 @@ date -u
 hostname
 printf 'RESULTS=%s\n' "$out"
 [[ ${SLURM_CPUS_PER_TASK:-0} == 72 ]] || { echo 'Request 72 CPU cores'; exit 1; }
-sources=("$root/src/drivers/cvfem_perf_control.hpp" "$root/src/drivers/cvfem_calibration_session.hpp" "$root/src/drivers/cvfem_roofline_calibration.cpp" "$root/scripts/roofline_calibration.py" "$root/jobs/roofline_calibration.sh")
+sources=("$root/scripts/roofline_memory_policy.py" "$root/scripts/roofline_thp_exec.py" "$root/src/drivers/cvfem_perf_control.hpp" "$root/src/drivers/cvfem_calibration_session.hpp" "$root/src/drivers/cvfem_roofline_calibration.cpp" "$root/scripts/roofline_calibration.py" "$root/jobs/roofline_calibration.sh")
 if [[ "$mode" == --diagnose-phases || "$mode" == --validate-sweeps || "$mode" == --diagnose-warmup || "$mode" == --diagnose-reuse || "$mode" == --validate-reuse ]]; then
     sources+=("$root/scripts/roofline_phase_control_test.py")
 fi
@@ -34,20 +34,20 @@ build_command=("${CXX:-g++}" "${flags[@]}" "$root/src/drivers/cvfem_roofline_cal
 printf '%q ' "${build_command[@]}" > "$out/build-command.txt"
 printf '\n' >> "$out/build-command.txt"
 "${build_command[@]}"
-python3 "$root/scripts/roofline_calibration.py" --selftest
+env -u CVFEM_ROOFLINE_THP_POLICY python3 "$root/scripts/roofline_calibration.py" --selftest
 if [[ "$mode" == --diagnose-phases || "$mode" == --validate-sweeps || "$mode" == --diagnose-warmup || "$mode" == --diagnose-reuse || "$mode" == --validate-reuse ]]; then
-    python3 "$root/scripts/roofline_phase_control_test.py" "$out/calibration"
+    env -u CVFEM_ROOFLINE_THP_POLICY python3 "$root/scripts/roofline_phase_control_test.py" "$out/calibration"
 fi
 collector_command=(python3 "$root/scripts/roofline_calibration.py" --binary "$out/calibration" --out "$out/captures")
 if [[ "$mode" == --validate-sweeps ]]; then
-    python3 "$root/scripts/roofline_sweep_validation_test.py"
+    env -u CVFEM_ROOFLINE_THP_POLICY python3 "$root/scripts/roofline_sweep_validation_test.py"
     collector_command=(python3 "$root/scripts/roofline_sweep_validation.py" --binary "$out/calibration" --out "$out/captures")
 elif [[ "$mode" == --diagnose-reuse || "$mode" == --validate-reuse ]]; then
-    python3 "$root/scripts/roofline_reuse_diagnostic_test.py" "$out/calibration"
+    env -u CVFEM_ROOFLINE_THP_POLICY python3 "$root/scripts/roofline_reuse_diagnostic_test.py" "$out/calibration"
     collector_command=(python3 "$root/scripts/roofline_reuse_diagnostic.py" --binary "$out/calibration" --out "$out/captures")
     if [[ "$mode" == --validate-reuse ]]; then collector_command+=(--validate-reuse); fi
 elif [[ "$mode" == --diagnose-warmup ]]; then
-    python3 "$root/scripts/roofline_warmup_diagnostic.py" --selftest
+    env -u CVFEM_ROOFLINE_THP_POLICY python3 "$root/scripts/roofline_warmup_diagnostic.py" --selftest
     collector_command=(python3 "$root/scripts/roofline_warmup_diagnostic.py" --binary "$out/calibration" --out "$out/captures")
 elif [[ -n "$mode" ]]; then
     collector_command+=("$mode")

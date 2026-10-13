@@ -1,0 +1,53 @@
+
+libgomp: Affinity not supported on this configuration
+cavity_warp: fraction=0.025000000000000001 max_displacement=0.050000011920928955 jacobian_perturbation_bound=0.18270860592009461 determinant_ratio_lower_bound=0.54592222816940783
+sscvfem: 64 of 64 macro elements are curved -- their micro cells get their own geometry
+mesh coords checksum: 728.99999743700027 728.99999941885471 728.99999986588955
+pressure pin: DISABLED
+constraints: uvw_nodes=386  uz_nodes=0  p_pin=0  sh_uv=0  sh_phi=0
+case: cavity_reg  geom: isoparam  refine_level: 2  semi_structured: 1
+channel: L=(2,2,2)  cells=(4,4,4)
+nnodes: 729  nelements: 64  ndof: 2916
+rho: 1  mu: 2  U: 1  Re: 1
+initial state checksum: 18.195556640625   p_exact: 0
+constrained dofs: 1158
+pressure gauge: zero mean  (729 of 729 pressure dofs free)
+continuation: 1 stages, Re = 1
+stage 1/1: rho: 1  Re: 1
+newton 0  ||R||: 1.326482e+00  rel: 1.000000e+00
+preconditioner: vanka (no multigrid)
+50: residual abs: 1.29445e-06, rel: 9.75849e-07
+linear_check: step=0 stage=1 newton=0 iterations=50 status=converged true_abs=1.2944463245216702e-06 rhs_norm=1.3264824674291498 target=1.3264824674291496e-06 at_limit=0
+  lin_it: 50  |dx|_inf: 1.331498e+01  alpha: 1
+newton 1  ||R||: 1.449795e-02  rel: 1.092962e-02
+linear_check: step=0 stage=1 newton=1 iterations=48 status=converged true_abs=1.2111604744516964e-08 rhs_norm=0.014497950833784653 target=1.4497950833784653e-08 at_limit=0
+  lin_it: 48  |dx|_inf: 6.359223e-02  alpha: 1
+newton 2  ||R||: 2.080964e-06  rel: 1.568784e-06
+50: residual abs: 2.48094e-12, rel: 1.19221e-06
+linear_check: step=0 stage=1 newton=2 iterations=51 status=converged true_abs=1.8355673845269442e-12 rhs_norm=2.0809638313180433e-06 target=2.0809638313180433e-12 at_limit=0
+  lin_it: 51  |dx|_inf: 4.150115e-06  alpha: 1
+newton 3  ||R||: 1.861904e-12  rel: 1.403640e-12
+continuation: highest Re SOLVED = 1 of 1 target  (AT TARGET)
+newton_converged: 1  newton_it: 3 (last stage)  newton_total: 3 over 1 stage(s)  lin_it_total: 149
+linear_check_summary: checked=3 failed=0 nonlinear_abs=1.8619039973979275e-12 nonlinear_initial=1.3264824674291498 nonlinear_rtol=1e-08 nonlinear_atol=9.9999999999999998e-13 dofs=2916
+matrix_free: 1  t_operator: 0.0000 s  t_precond: 0.0131 s  t_solve: 0.1326 s  us_per_lin_it: 889.76
+
+phase breakdown (0.056 s in top-level phases; shares are of that)
+  phase                     seconds      calls      us/call   share
+  outer_op                    0.042        152        274.9   74.7%
+  vanka_setup                 0.013          3       4360.0   23.4%
+  newton_residual             0.001          4        273.0    2.0%
+  precond_total               0.077        149        518.9  138.1%  (container: the rows above it
+                                                                      marked op/smooth/transfer/coarse are inside)
+cavity: ux in [-0.122745, 1.000000]   uy in [-0.252453, 0.240867]
+cavity: u_x on the vertical centreline (x=1, z=1)
+   y/Ly 0.0000   ux +0.000000   uy +0.000000
+   y/Ly 0.2500   ux -0.068682   uy +0.001188
+   y/Ly 0.5000   ux -0.122745   uy +0.002797
+   y/Ly 0.7500   ux -0.044702   uy +0.008311
+   y/Ly 1.0000   ux +1.000000   uy +0.000000
+   y/Ly 0.1250   ux -0.039063   uy +0.000686
+   y/Ly 0.3750   ux -0.094814   uy +0.001816
+   y/Ly 0.6250   ux -0.120351   uy +0.003920
+   y/Ly 0.8750   ux +0.233566   uy +0.018639
+cvfem_hex8_ns_ssgmg: 0.149479 seconds

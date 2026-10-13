@@ -1,0 +1,61 @@
+{
+  "scope": "local macOS FP64 public affine Farrell MMS; five schemes, three grids; no asymptotic-order claim",
+  "binary_snapshot_sha256": "0de697a5de6d834be034c3bc6f82196413a62fff24782f3871c3b6d20d5cf6de",
+  "binary_source_revision": "existing local build; binary retained in validation evidence directory",
+  "checkout_revision_at_archive": "7727797df9a69086ffb1351fe3f1fb5c06a259aa",
+  "parameters": {
+    "n": [
+      4,
+      8,
+      16
+    ],
+    "domain": [
+      2,
+      2,
+      2
+    ],
+    "rho": 1,
+    "mu": 0.01,
+    "mms_parameter_re": 100,
+    "driver_length_based_final_re": 200,
+    "geometry": "affine",
+    "precision": "FP64",
+    "threads": 2,
+    "conv_freeze": 0,
+    "rc_exact_jac": 1,
+    "fgmres_restart": 480,
+    "preconditioner": "bjacobi",
+    "gmg": 0,
+    "nonlinear_rtol_requested": 1e-10,
+    "linear_rtol": 1e-06,
+    "nl_max_it": 40,
+    "per_case_timeout_seconds": 120
+  },
+  "acceptance": {
+    "nonlinear_final_max_relative": 7.593695e-11,
+    "all_driver_exits": 1,
+    "exit_reason": "every coarse-mesh u_linf exceeds separate default absolute accuracy threshold0.01",
+    "intermediate_floor_acceptance": "two-node clip n16 at rel2.226e-7; final stage rel2.662705e-12"
+  },
+  "files": {
+    "MMS-SHA256.txt": "1dd6d245028f6a4bb63465bd7308bbe1bddc7a0195a39d408fc775c86a7568af",
+    "conv-rates.csv": "29fd33e15da398e1ce0c25bed4cc9451e9d849e3669248395e32e00e6d3bbb60",
+    "conv-summary.csv": "17cf5aa2653d2828e75ec76cd89868b90feb740c5563d989e74ce27e96978620",
+    "conv_ho_lim0_n16.out": "9fa00bb9a96e88803d2bdfbf27415883cafbec6cd671d28f50dbc346b3fce864",
+    "conv_ho_lim0_n4.out": "ca677628abcccf950560b42330efff0f6dfb2e128528a75f06cb35bb598f93ad",
+    "conv_ho_lim0_n8.out": "b74ac8e09a673afc0900f411d73228a82b8a020af78c97dc1435bf4b05a76c72",
+    "conv_ho_lim1_n16.out": "2baa09b5b4eb8d9c98b29b6d82635aa311ca4841c91db73cc112a1000d467bbc",
+    "conv_ho_lim1_n4.out": "4ce6d2f374da648f62dc90f11d55171ad64425217a484b3de844a7da95ea0497",
+    "conv_ho_lim1_n8.out": "81aebd546543b946a2e7f65ffe7bf7f37295c7ec2795a9b5592005837dafc349",
+    "conv_ho_lim2_k0_n16.out": "caec886b1e47fd6918a6270d3aef2c8ce9b5acca74d2d4c69f8b61da61ae6fe1",
+    "conv_ho_lim2_k0_n4.out": "d66e6dc9876eff86debb3265d80da9fb5f10631013f4ac3f86084de61748d984",
+    "conv_ho_lim2_k0_n8.out": "5abad796d231c3e07ffcf638de4e1057ec1dfdd7b0516fbad0a55ebf3ddce6bf",
+    "conv_ho_lim3_n16.out": "af2c5f18a6511f971a8cdd4ecfd13fd9f1a3b7edfc8aa0d0f8c384277a11e90d",
+    "conv_ho_lim3_n4.out": "18b2a98a0665d9561da2d633a81268034d2e5e71229c15c06dcd4673f14373dd",
+    "conv_ho_lim3_n8.out": "3c68a1a1b6b89b4ca7a70593cce246a804b6436524a3a645b00c03c8fa55fbed",
+    "conv_lo_n16.out": "5bda6f0df8b333d83362be13fa57a693ded5753f1b257b894a8cddc50c099fae",
+    "conv_lo_n4.out": "2becdc5bbe25b4acf4166469f99714a3cd9297aea90c91e658b36e7aa1da052c",
+    "conv_lo_n8.out": "f3e4cff97ec77dd2b6e238072b0a670f87825d167a00d1b9667df264748dc000",
+    "runner.out": "245512f883ed91f1b951818a0e9bb3c7eaa96c6f5c9411d12ac30286699b0000"
+  }
+}

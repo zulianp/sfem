@@ -713,7 +713,7 @@ int main(int argc, char **argv) {
                     "  --mesh-footprint  print the bytes each representation of the mesh occupies,\n"
                     "                 array by array, and exit. Every figure is the allocation's\n"
                     "                 own nbytes(), so nothing here is a hand computation.\n"
-                    "  --roofline-window normal|sweep|sweep-empty|session  checked RC residual measurement\n"
+                    "  --roofline-window normal|sweep|sweep-empty|session  checked RC residual/action measurement\n"
                     "  --perf-fds C1 A1 C2 A2  two perf control/acknowledgement channels\n"
                     "  --scatter-study  paired residual accumulation timings and element-output checks\n"
                     "                   affine packed/atomic, FP64, steady interior only\n"
@@ -1010,17 +1010,19 @@ int main(int argc, char **argv) {
         const bool session = roofline_window == "session";
         if ((!normal && !counted && !session) || (normal ? !perf_fds.empty() : perf_fds.size() != 4) ||
             (session && warmup != 30) ||
-            !residual_op || geom != "affine" || sizeof(scalar_t) != sizeof(double) ||
+            !(residual_op || jac_action || bsr_apply) || geom != "affine" || sizeof(scalar_t) != sizeof(double) ||
             !(layout == "packed" || layout == "atomic") || !rhie_chow || rc_scale != scalar_t(1) ||
             (conv_ho && conv_limiter != 3) || boundary || dt != scalar_t(0) ||
             grad_single || pgrad_per_apply || rebuild_state_gradients || partial_assembly ||
             mesh_footprint || verify || verify_jac || verify_ho || verify_ho_jac || verify_coupled_jac ||
-            g_kernel_only || g_dense_flush || g_breakdown || lagged_rc || lagged_ho || live_vectors ||
+            g_kernel_only || g_dense_flush || g_breakdown || lagged_ho || live_vectors || bsr_single ||
+            (lagged_rc && (!jac_action || conv_ho)) || (bsr_apply && (conv_ho || layout != "packed")) ||
             scatter_study || !csv_path.empty() || !dump_path.empty() || n < 2 || repeat < 1 || warmup < 1 ||
             perturb != scalar_t(0.017) || rho != scalar_t(1) || mu != scalar_t(0.01) ||
             warp != scalar_t(0) || !use_sfc || venkat_k != scalar_t(0) || g_qgrad_atomic || g_qgrad_packed) {
-            std::fprintf(stderr, "--roofline-window requires an FP64 affine packed/atomic RC residual, "
-                                 "first-order or Darwish, cached gradients, no boundary/transient or other diagnostics, "
+            std::fprintf(stderr, "--roofline-window requires an FP64 affine packed/atomic RC residual/action, "
+                                 "first-order or Darwish (lagged/SpMV first-order only), cached state gradients, "
+                                 "no boundary/transient or other diagnostics, "
                                  "rho=1, mu=0.01, perturb=0.017, SFC, no warp, positive repeats/warmup, "
                                  "and two control channels only for counted windows\n");
             if (own_mpi) MPI_Finalize();
@@ -2043,7 +2045,7 @@ int main(int argc, char **argv) {
         if (boundary) apply_boundary_scs_residual_pass(d, rho, mu, geom_kind == GeomKind::Isoparam ? 1 : 0);
         apply_transient_pass(d, rho);
     };
-    if (!roofline_window.empty()) {
+    if (!roofline_window.empty() && residual_op) {
         auto reference = [&]() {
             apply_residual_atomic_sumfact_simd(
                 d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.nnodes, d.p.data(),
@@ -2119,6 +2121,33 @@ int main(int argc, char **argv) {
         jac_out.assign((size_t)d.nnodes * N_FIELDS, 0.0);
 #pragma omp parallel for schedule(static)
         for (ptrdiff_t i = 0; i < d.nnodes * N_FIELDS; ++i) jac_dir[(size_t)i] = 1.0 + 0.01 * scalar_t(i % 7);
+        if (!roofline_window.empty()) {
+            // Renumbering must not change the physical direction in paired layout runs.
+            uint64_t fingerprint_xor = 0, fingerprint_sum = 0;
+#pragma omp parallel for schedule(static) reduction(^:fingerprint_xor) reduction(+:fingerprint_sum)
+            for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+                uint64_t key = 14695981039346656037ull;
+                for (int c = 0; c < 3; ++c) {
+                    const float coordinate = float(d.points[c][i]);
+                    uint32_t bits = 0;
+                    std::memcpy(&bits, &coordinate, sizeof(bits));
+                    key = (key ^ bits) * 1099511628211ull;
+                }
+                uint64_t sample = key;
+                for (int c = 0; c < N_FIELDS; ++c) {
+                    key = (key ^ (key >> 27)) * 0x3c79ac492ba7b653ull + uint64_t(c + 1);
+                    const double value = 1.0 + double((key >> 16) & 1023u) / 1024.0;
+                    jac_dir[(size_t)i * N_FIELDS + c] = scalar_t(value);
+                    uint64_t bits = 0;
+                    std::memcpy(&bits, &value, sizeof(bits));
+                    sample = (sample ^ bits) * 1099511628211ull;
+                }
+                fingerprint_xor ^= sample;
+                fingerprint_sum += sample;
+            }
+            std::printf("ROOFLINE_DIRECTION source=coordinates nodes=%td xor=%016llx sum=%016llx\n",
+                        d.nnodes, (unsigned long long)fingerprint_xor, (unsigned long long)fingerprint_sum);
+        }
     }
 
     // The Krylov working set, when --live-vectors asks for it.
@@ -2427,6 +2456,47 @@ int main(int argc, char **argv) {
         }
     }
     auto bsr_apply_fn = [&]() { bsr_apply_op->apply(jac_dir.data(), jac_out.data()); };
+
+    if (!roofline_window.empty() && (jac_action || bsr_apply)) {
+        auto reference = [&]() {
+            // Reconstruct the direction independently; share only the fixed state cache.
+            std::vector<scalar_t> reference_velocity;
+            if (with_qgrad) {
+                const scalar_t *srcs[4] = {jac_dir.data() + 3, jac_dir.data(),
+                                           jac_dir.data() + 1, jac_dir.data() + 2};
+                const int strides[4] = {N_FIELDS, N_FIELDS, N_FIELDS, N_FIELDS};
+                scalar_t *out[12] = {d.qgx.data(), d.qgy.data(), d.qgz.data()};
+                ptrdiff_t out_stride[12] = {1, 1, 1};
+                if (with_hograd) {
+                    reference_velocity.resize((size_t)d.nnodes * 9);
+                    for (int c = 0; c < 9; ++c) {
+                        out[c + 3] = reference_velocity.data() + c;
+                        out_stride[c + 3] = 9;
+                    }
+                }
+                cvfem_hex8_assemble_nodal_grads_atomic(d, 0, srcs, strides,
+                        with_hograd ? 4 : 1, out, out_stride);
+            }
+            if (cvfem_hex8_extras_of(d).with_rc) cvfem_hex8_build_rc_coeff(d, rho, mu);
+            apply_jacobian_action_atomic_simd(
+                d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.nnodes, d.p.data(),
+                d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points,
+                d.qgx.data(), d.qgy.data(), d.qgz.data(), d.rc_coeff.data(), d.rc_w.data(),
+                d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(),
+                cvfem_hex8_extras_of(d), rho, mu, jac_dir.data(), jac_out.data(),
+                with_hograd ? ugrad.data() : nullptr,
+                with_hograd ? reference_velocity.data() : nullptr, conv_limiter, venkat_c);
+        };
+        const char *operation = bsr_apply ? "spmv" : lagged_rc ? "lagged" : "jacobian";
+        auto production = [&]() { if (bsr_apply) bsr_apply_fn(); else jac_action_fn(); };
+        const int status = roofline_window == "session"
+            ? run_roofline_session(d, perf_fds, layout, conv_ho ? 3 : -1, pack_size,
+                                  production, reference, &jac_out, operation)
+            : run_roofline_window(d, roofline_window, perf_fds, layout, conv_ho ? 3 : -1,
+                                 pack_size, repeat, warmup, production, reference, &jac_out, operation);
+        if (own_mpi) MPI_Finalize();
+        return status;
+    }
 
     // Two comparisons here go against the ASSEMBLED matrix and one goes across the
     // matrix-free implementations, and Rhie-Chow separates them. The assembled Jacobian

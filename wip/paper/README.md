@@ -99,6 +99,7 @@ tree carrying it, and the generator picks the newest file per prefix, so these a
 | instruction mix | 5003851 | `data/kmix_5003851.out` |
 | residual accumulation diagnostic | 5026072 (nid006544) | `data/scatter_5026072/` |
 | checked residual traffic and work | 5039102 (nid006550) | `data/residual_counters_5039102/` |
+| matched residual/action/SpMV and compute references | 5047137 (nid006550) | `data/matched_counters_5047137/` |
 | higher-order size sweep | 5005800 | `data/hosize_5005800.out` |
 
 The rows naming jobs 5005763-5005800 were measured again after the limiter derivatives' rounding
@@ -180,6 +181,9 @@ public raw counts, requests, outputs, source records and patch chain.
 `python/residual_counter_figures.py`, called by `make figures` and `make selftest`,
 checks the archive and captured analysis, reconstructs every count and numerical
 check, and reproduces the acceptance summaries before emitting the table/macros.
+It uses `python/roofline_operator_5039102.py` and the captured helpers in
+`python/counter_sources_5039102/`, checked byte for byte against the archive,
+so later measurement recipes cannot change this campaign's acceptance.
 The source verification also checked 4,273 bundle entries, 7 operator and 11
 calibration source hashes, 144 operator records and 60 controls. All 1,152
 per-field before/after checks pass; maximum relative error is 4.145e-16.
@@ -201,6 +205,59 @@ experiment is independent evidence for the benefit of the accumulation method.
 The reference rates use transported bytes; the work counts are speculative PMU
 operations, not a useful-FLOP model. No Jacobian, compute ceiling, solver result
 or complete replacement roofline is accepted by this campaign.
+
+## Accepted matched campaign (13 October 2026)
+
+Job 5047137 on nid006550 completes the same-allocation copy/triad, residual,
+cached exact/lagged action, equivalent SpMV and DGEMM campaign. All 492 captures,
+4,089 capture-file hashes, 3,240 numerical checks and 4,299 bundle source checks
+are retained and verified. The archive includes captured measurement sources,
+requests, raw counters, policy observations, summaries and build provenance.
+The measurement sources match the reviewed checkout; every summary reproduces.
+
+`python/matched_counter_figures.py` checks the archive and runs
+`python/verify_matched_counters.py` in an isolated process using the captured
+analysis. It reconstructs raw counts and numerical checks, verifies retained
+worker identities, coordinate direction, CPU/PMU scopes and THP policy, and
+reapplies every acceptance screen before generating tables/macros. Corrupted
+coverage, incomplete records, changed policy and wrong-direction controls are
+rejected. The older accepted residual evidence remains independently checked.
+
+The benchmark workers disable transparent huge pages before allocation. This
+applies equally to copy/triad, both matrix-free layouts, SpMV and DGEMM; parent
+collectors, perf monitors and global settings remain unchanged. Job 5046420's
+paired diagnostic reproduced long pauses under the default policy and none with
+THP disabled. It motivated this prospective, separately calibrated campaign;
+earlier failed campaigns remain rejected. Every sample and the original limits
+are retained. This does not identify a particular kernel call or establish a
+universal benefit from disabling THP.
+
+FP64 affine interior scope: n=128, pack=1024, 72 threads, RC on and a fixed
+perturbed state. State gradients are cached; exact actions reconstruct direction
+gradients on each apply. The common direction is keyed on coordinates. No boundary
+or transient terms, assembly cost or solver speedup is measured. Six blocks per
+arm retain all 30/60/90-apply permutations and 30 warmups; normal time uses 60
+applies. Calibration retains 10/40/70 sweeps. DGEMM uses N=8192, three warmups,
+six retained workers and all 1/2/3-call permutations, with normal time at two calls.
+
+Ordinary packed speedups over atomic are 1.97x/1.44x for first-order/Darwish
+residuals and 1.85x/1.86x for their exact Jacobian actions. Equivalent packed
+lagged action/SpMV times are 6.503/19.368 ms: 2.978x. Their transported bytes are
+1,277.5/7,720.7 MB per apply, not their storage footprints. SpMV's paired mean
+instrumentation overhead is -0.030%; its ordinary range is 19.339--19.399 ms.
+The rejected 3.468x ratio from job 5043387 is not used.
+
+Copy and triad achieve 401.2/411.4 transported GB/s. Runtime-identified LP64
+OpenBLAS 0.3.30 uses 72 threads and achieves 2,453 useful GFLOP/s in ordinary
+DGEMM; counted speculative work is 2,448 Gop/s. These are empirical references,
+not strict CVFEM ceilings or a proof of a bottleneck. Ordinary sample ranges are
+reported separately from counted throughput; no confidence intervals are claimed.
+
+The draft now uses this matched campaign for the main residual and action tables.
+Historical FP32/colouring and rebuilt-state results remain in their original data
+and generated artifacts, with their stated scope. The manuscript remains a local
+proposal for Patrick's review; no author, submission or publication decision is
+made by this update.
 
 ## Claims discipline
 
@@ -355,3 +412,38 @@ should not be compared with any number recorded before `a3253433f`.
 
 `perf/baseline_grace.csv` has deliberately NOT been re-recorded: doing so would bake the 17.5%
 in as the new normal before the cause is pinned down.
+
+## Public numerical validation and storage-width probe (2026-10-13)
+
+`data/mms_20261013/` preserves a local FP64 Farrell manufactured-solution ladder:
+five convective schemes on affine n=4/8/16 grids over [0,2]^3, with Rhie--Chow,
+unfrozen corrections and FGMRES/block-Jacobi. Physical-h velocity L2 fits range
+from 0.747 for first-order convection to 1.879--1.916 for the reconstructed arms.
+The local rates vary, so three coarse grids do not establish an asymptotic order
+or a common order across limiter branches. Every final nonlinear residual meets
+the requested 1e-10 relative tolerance. Every driver run also retains exit 1 from
+its separate coarse-grid absolute velocity-error threshold. The clip n16 run's
+intermediate residual-floor acceptance is recorded in the provenance.
+
+The public packed/atomic gate retains its zero-flux box fixture as a localized
+signed donor-derivative diagnostic and tests smooth agreement on both sides of
+the switch. Boundary and transient gates test their stated individual terms;
+they do not establish every composed limited, coupled or unsteady action.
+
+`cvfem_storage_width_probe` and `src/tests/verification/cvfem_storage_width.sh`
+prepare a bounded SFC-ordered graph-reduction and geometry-gather experiment.
+The real reduction graph is copied to checked uint32 offsets/indices; the
+FP32 geometry cache is widened into double scratch through the existing gather.
+Original wide copies remain allocated. Clearing is excluded equally from graph
+timing, conversion is included in geometry timing, and samples alternate after
+warmups. These phase costs do not measure total footprint, operator speedup or
+solver acceleration. Cube/sheared geometry checks and actual-reducer bitwise
+parity precede and follow timing. Grace job 5039923 is now archived in
+`data/storage_width_5039923/`. All checks pass at one and 72 threads. Narrow graph
+timings depend strongly on which arm runs first, so they do not support an
+index-width speedup claim. FP32 geometry gathering is faster in all 24 retained
+pairs, including conversion, but its impact on a full operator remains unmeasured.
+
+The historical RC slowdown above is associated with coefficient and linearization
+changes; its exact cause has not been re-established here. This work does not
+restore an old coefficient or treat it as an equivalent-operator optimization baseline.

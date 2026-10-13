@@ -1,0 +1,17 @@
+sfem base: 7797b6d17e6858cf92870efabc4705f7af89e3ec (local changes in reviewed-changes.patch)
+smesh: 3b473c6769d359106159dba26a746e117ccee120 (clean committed source)
+mpi-sort: f76f088c451b13fe0fa2dc95667883a51ea2d929
+matrix.io: 69c8cfc4a5312cbb3fc6ec30dc4cce68d6cdc734
+rapidyaml: 25348f828c1eb63242ff805aaadc896ddb0592ff
+The cache, limiter and coupled-derivative verification scripts/headers are included as complete files.
+Update 2026-10-10: whole-vector derivative gate and fail-closed timing job; numerical kernels unchanged.
+Update 2026-10-10: full pressure/velocity FD gate with RC on and omitted-sensitivity controls.
+No Mac binaries, dependency portability patch, Git credentials or private geometry are included.
+Update 2026-10-11: validated residual accumulation probe and paired timing script; normal residual arithmetic unchanged.
+Local sfem commits: 1b46a53, b3cc0ed, eacafe6; uncommitted scatter changes are in the patch and complete new files.
+Update 2026-10-12: residual counter windows and same-allocation controls in roofline-operator.patch; no numerical kernel changes. Grace operator measurements pending.
+Update 2026-10-12: paired3/30-warmup diagnostic in roofline-warmup.patch; standard collectors retain3 warmups and unchanged acceptance limits. No operator run is accepted by this diagnostic.
+Update 2026-10-12: fresh versus reused worker/allocation diagnostic in roofline-reuse.patch; both arms use30 warmups, fresh monitors and unchanged acceptance limits. Calibration and CVFEM measurements remain unvalidated.
+Update 2026-10-12: separate60-capture reuse control validation in roofline-reuse-validation.patch; same tested worker/30 warmups and unchanged acceptance limits. Old diagnostic status is retained; no CVFEM measurement is accepted.
+Update 2026-10-12: reuse controls validated in job5038994/nid006544. Operator workers now retain mesh/state/scratch for six captures with30 warmups, using the same counter protocol and unchanged acceptance limits; roofline-operator-reuse.patch records this increment. A new same-allocation control pass and actual CVFEM acceptance remain required. Supersedes the old fresh-process operator recipe.
+Update 2026-10-13: local sfem/pasc27-review at 7727797df9a69086ffb1351fe3f1fb5c06a259aa plus current uncommitted completion sources. completion-changes.patch records tracked CVFEM changes against the original base; new scripts/drivers are complete files, all bound by SOURCE-SHA256.txt. Includes coordinate-matched cached action/SpMV counters, explicit-library DGEMM reference, checked CPU solver study and storage-width phase probes. Residual campaign5039102 remains accepted in its stated scope. These new Grace campaigns are not yet executed; production kernels are unchanged.

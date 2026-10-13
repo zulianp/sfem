@@ -1,0 +1,40 @@
+{
+  "binary_sha256": "cac804afe2c6f281d233af1847c4a6c6935d8fcebedb717873bde40a503d8cc1",
+  "host": "nid006545",
+  "platform": "Linux-6.4.0-150600.23.125-64kb-aarch64-with-glibc2.17",
+  "collected_utc": "2026-10-12T23:27:14.297595+00:00",
+  "scope": "CPU first-order exact-RC matrix-free regularized cavity; same semi-structured mesh per pair; no timings accepted",
+  "preconditioners": {
+    "bjacobi": "3x3 velocity block and scalar pressure inverse per node; omega=1",
+    "vanka": "multiplicative diagonal Vanka; 32-dof microcell patches; FP64 storage; omega=0.35"
+  },
+  "source_mode": "source_only",
+  "git_revision": null,
+  "supplied_revisions_sha256": "d6f0d4992e5610e372e973146d390b2ea432a431f9754c05874025024d182f51",
+  "driver_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "sources": {
+    "spikes/cvfem/scripts/solver_iteration_study.py": "a371fa8e114f11c7f1682ca8a9d4043bd7ecdb4ccdc21c03b7b8656af3e68ab5",
+    "spikes/cvfem/src/drivers/cvfem_hex8_ns_ssgmg.cpp": "700d67ccf6ad2b0304f7432ed1ea05f9fb77d9db0ad0bc991e66dd57e8c29978",
+    "spikes/cvfem/src/support/cvfem_fgmres.hpp": "3f7c885a0d1848c64e619acb5f071596d8fc1d371323cd55736c69e0f7ad9b34",
+    "spikes/cvfem/src/frontend/galerkin/cvfem_ss_vanka.cpp": "968fe6f48f7796fa544062f688227f0f2efc1fb51718eb95172d3707b47b5843"
+  },
+  "measurement_platform": "grace_cpu",
+  "threads": 1,
+  "hardware": {
+    "chip": "NVIDIA GH200 Grace CPU",
+    "node": "nid006545"
+  },
+  "compiler": "GCC 14.3.0 (Spack)",
+  "build_type": "Release",
+  "readback_collector_sha256": "a371fa8e114f11c7f1682ca8a9d4043bd7ecdb4ccdc21c03b7b8656af3e68ab5",
+  "binary_readback_sha256": "cac804afe2c6f281d233af1847c4a6c6935d8fcebedb717873bde40a503d8cc1",
+  "campaign": "validation-5039923-vfXOQo",
+  "archive_note": "Study and gate logs/results copied byte for byte; trace files omitted. Binary digest independently checked against executable retrieved after the campaign; executable not archived. SOURCE-SHA256 and build log bind the source bundle and build. No timings are used.",
+  "provenance_files": {
+    "compiler.txt": "aa06fb4b131bba780725f87de62b2eabde61a8113d1626c5ae3379367580fd47",
+    "CMakeCache.txt": "5976cf22e1eb31e2b48b74a7cccab0290abeb7ee1291efcfcd0ac72a608ee18d",
+    "build.log": "cba4ff603ebfba509277cabcdd1acde1ed8200d576ebcf8042c8c3e7d368be10",
+    "SOURCE-SHA256.txt": "566c6cff8213442562966e34e29c759ab535bacc20a31695865fb24e815f8f1d",
+    "SOURCE-REVISIONS.txt": "d6f0d4992e5610e372e973146d390b2ea432a431f9754c05874025024d182f51"
+  }
+}

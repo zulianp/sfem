@@ -16,6 +16,7 @@ import time
 import roofline_sweep_validation as sweep
 import roofline_warmup_diagnostic as warmup
 from roofline_calibration import counter_events, parse_perf, prepare_capture
+import roofline_memory_policy as memory_policy
 
 
 def groups(validate_reuse=False):
@@ -70,10 +71,13 @@ class Session:
     def __init__(self, topo, binary, env, out, name, elements, threads=72, launcher=True):
         self.fds, self.process, self.pending = [], None, b''
         self.name, self.index, self.env = name, 0, env
+        self.disable_thp = memory_policy.selected(env)
         try:
             for unused in range(4):
                 self.fds.extend(os.pipe())
             command = self.worker_command(binary,elements,threads)
+            if self.disable_thp:
+                command = memory_policy.command(command)
             if launcher:
                 command = ['numactl','--physcpubind='+','.join(map(str,topo['cpus'])),
                            '--membind='+str(topo['node'])]+command
@@ -89,6 +93,9 @@ class Session:
             if not match or int(match.group(1)) != self.process.pid:
                 raise ValueError('invalid session identity')
             self.identity = dict(pid=int(match.group(1)),buffers=list(match.groups()[1:]))
+            if self.disable_thp:
+                memory_policy.check_launch(ready, self.process.pid)
+                memory_policy.save(out/(name+'.policy-ready.json'), self.process.pid)
         except BaseException:
             self.close(abort=True)
             raise
@@ -133,6 +140,8 @@ class Session:
             index=self.index,request=request,identity=self.identity))+'\n')
         monitor = None
         try:
+            if self.disable_thp:
+                memory_policy.save(stem.with_suffix('.policy-before.json'), self.process.pid)
             with stem.with_suffix('.monitor.log').open('w') as log:
                 if command is not None:
                     monitor = subprocess.Popen(command,env=self.env,stdin=subprocess.PIPE,stdout=log,
@@ -150,6 +159,8 @@ class Session:
                     code = monitor.wait(timeout=timeout)
                     if code:
                         raise subprocess.CalledProcessError(code,command)
+                if self.disable_thp:
+                    memory_policy.save(stem.with_suffix('.policy-after.json'), self.process.pid)
                 self.index += 1
                 return output
         except BaseException:

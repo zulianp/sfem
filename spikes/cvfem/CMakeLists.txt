@@ -138,6 +138,9 @@ cvfem_target_defaults(cvfem_ns_op)
 set(CVFEM_OP_DRIVERS cvfem_hex8_ns_ssgmg cvfem_ns_apply_bench cvfem_sshex8_bench)
 
 file(GLOB_RECURSE CVFEM_DRIVERS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/drivers/*.cpp")
+# The measured DGEMM reference requires an explicit library and its recorded runtime identity.
+# jobs/build_roofline_gemm.sh builds it with that provenance.
+list(FILTER CVFEM_DRIVERS EXCLUDE REGEX "/cvfem_roofline_gemm\\.cpp$")
 foreach(DRIVER ${CVFEM_DRIVERS})
     get_filename_component(DRIVER_NAME ${DRIVER} NAME_WE)
     add_executable(${DRIVER_NAME} ${DRIVER})
@@ -353,6 +356,20 @@ if(CVFEM_REPORT_PYTHON)
     add_test(NAME cvfem_verify_report_selftest
              COMMAND ${CVFEM_REPORT_PYTHON}
                      ${CMAKE_CURRENT_SOURCE_DIR}/python/cvfem_verify_report.py --selftest)
+    add_test(NAME cvfem_solver_iteration_gate
+             COMMAND ${CVFEM_REPORT_PYTHON}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_solver_iteration_gate.py
+                     $<TARGET_FILE:cvfem_hex8_ns_ssgmg>)
+    add_test(NAME cvfem_roofline_actions
+             COMMAND ${CVFEM_REPORT_PYTHON}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/scripts/roofline_actions_test.py
+                     $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)
+    set_tests_properties(cvfem_solver_iteration_gate cvfem_roofline_actions
+                         PROPERTIES TIMEOUT 300)
+    add_test(NAME cvfem_storage_width
+             COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_storage_width.sh
+                     $<TARGET_FILE:cvfem_storage_width_probe>)
+    set_tests_properties(cvfem_storage_width PROPERTIES TIMEOUT 180)
     # The kernel report's job is to keep a throughput next to the operator it was measured
     # on. A wrong rate is caught by anyone who knows the kernel; the right rate under the
     # wrong operator is not, and that is the failure the report exists to prevent -- so its

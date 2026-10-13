@@ -1,0 +1,216 @@
+diff --git a/spikes/cvfem/src/drivers/cvfem_hex8_ns_ssgmg.cpp b/spikes/cvfem/src/drivers/cvfem_hex8_ns_ssgmg.cpp
+index fb9feea..63a399d 100644
+--- a/spikes/cvfem/src/drivers/cvfem_hex8_ns_ssgmg.cpp
++++ b/spikes/cvfem/src/drivers/cvfem_hex8_ns_ssgmg.cpp
+@@ -39,6 +39,7 @@
+ #include "smesh_mesh.hpp"
+ #include "smesh_mesh_reorder.hpp"
+ #include "smesh_semistructured.hpp"
++#include "smesh_sshex8.hpp"
+ 
+ #include <functional>
+ #include <algorithm>
+@@ -473,6 +474,8 @@ private:
+                      "  SFEM_RHO SFEM_MU SFEM_U   density, viscosity, velocity scale\n"
+                      "  SFEM_GEOM            affine | isoparam (default affine)\n"
+                      "  SFEM_NL_MAX_IT SFEM_NL_RTOL SFEM_NL_ATOL\n"
++                     "  SFEM_CHECK_LINEAR_RESIDUAL  check A*dx against each Newton right-hand side (default 0)\n"
++                     "  SFEM_CAVITY_WARP     boundary-preserving displacement / box size, 0..0.05 (default 0)\n"
+                      "  SFEM_DT              timestep; <= 0 (default) is the steady solve\n"
+                      "  SFEM_NSTEPS          time steps to take (default 1)\n"
+                      "  SFEM_BDF_ORDER       1 or 2 (default 2; step 1 falls back to BDF1)\n"
+@@ -4262,6 +4265,13 @@ int main(int argc, char **argv) {
+     const real_t      lin_rtol   = smesh::Env::read<real_t>("SFEM_LSOLVE_RTOL", 1e-3);
+     const real_t      lin_atol   = smesh::Env::read<real_t>("SFEM_LSOLVE_ATOL", 1e-14);
+     const int         lin_max_it = smesh::Env::read<int>("SFEM_LSOLVE_MAX_IT", 1000);
++    const bool        check_linear_residual = smesh::Env::read<int>("SFEM_CHECK_LINEAR_RESIDUAL", 0) != 0;
++    if (check_linear_residual &&
++        (!std::isfinite(lin_rtol) || !std::isfinite(lin_atol) || lin_rtol < 0 || lin_atol < 0 ||
++         (lin_rtol == 0 && lin_atol == 0) || lin_max_it < 1)) {
++        std::fprintf(stderr, "linear residual check needs finite nonnegative tolerances and a positive iteration limit\n");
++        return EXIT_FAILURE;
++    }
+     const int         pack_size  = smesh::Env::read<int>("SFEM_PACK_SIZE", 1024);
+     // Matrix-free by default. 0 assembles a BSR once per Newton step and hands the
+     // Krylov method an SpMV instead; that path stays fully supported and gated, and at
+@@ -4755,6 +4765,80 @@ int main(int argc, char **argv) {
+             return EXIT_FAILURE;
+         }
+     }
++    const double cavity_warp = smesh::Env::read<double>("SFEM_CAVITY_WARP", 0);
++    if (!std::isfinite(cavity_warp) || cavity_warp < 0 || cavity_warp > 0.05) {
++        std::fprintf(stderr, "SFEM_CAVITY_WARP must be finite and between 0 and 0.05\n");
++        return EXIT_FAILURE;
++    }
++    if (cavity_warp > 0) {
++        if (flow != cvfem_case::FlowCase::CavityRegularized || refine_level < 2 || geom_name != "isoparam") {
++            std::fprintf(stderr, "SFEM_CAVITY_WARP requires cavity_reg, a semi-structured mesh and SFEM_GEOM=isoparam\n");
++            return EXIT_FAILURE;
++        }
++        auto points = mesh->points()->data();
++        const double extent[3] = {(double)Lx, (double)Ly, (double)Lz};
++        for (double length : extent) {
++            if (!std::isfinite(length) || length <= 0) {
++                std::fprintf(stderr, "cavity warp requires finite positive box lengths\n");
++                return EXIT_FAILURE;
++            }
++        }
++        const double amplitude = cavity_warp * std::min({extent[0], extent[1], extent[2]});
++        const double direction[3] = {1, 0.7, -0.4};
++        double max_displacement = 0;
++        for (ptrdiff_t i = 0; i < mesh->n_nodes(); ++i) {
++            const double X = points[0][i], Y = points[1][i], Z = points[2][i];
++            // Keep the boundary coordinates exactly unchanged, including roundoff at sin(pi).
++            if (X == 0 || X == extent[0] || Y == 0 || Y == extent[1] || Z == 0 || Z == extent[2]) continue;
++            const double w = std::sin(2 * M_PI * X / extent[0]) * std::sin(M_PI * Y / extent[1]) *
++                             std::sin(M_PI * Z / extent[2]);
++            for (int k = 0; k < 3; ++k) {
++                const double old = points[k][i];
++                points[k][i] = (geom_t)(old + amplitude * direction[k] * w);
++                if (!std::isfinite((double)points[k][i])) {
++                    std::fprintf(stderr, "cavity warp produced a nonfinite coordinate\n");
++                    return EXIT_FAILURE;
++                }
++                max_displacement = std::max(max_displacement, std::fabs((double)points[k][i] - old));
++            }
++        }
++        const double h[3] = {extent[0] / (nx * refine_level), extent[1] / (ny * refine_level),
++                             extent[2] / (nz * refine_level)};
++        auto elements = mesh->elements(0)->data();
++        double worst_bound = 0;
++        for (ptrdiff_t e = 0; e < mesh->n_elements(0); ++e)
++            for (int z = 0; z < refine_level; ++z)
++                for (int y = 0; y < refine_level; ++y)
++                    for (int x = 0; x < refine_level; ++x) {
++                        double bound[3][3] = {};
++                        for (int j = 0; j < 3; ++j)
++                            for (int a = 0; a < 2; ++a)
++                                for (int b = 0; b < 2; ++b) {
++                                    int lo[3] = {x, y, z};
++                                    lo[(j + 1) % 3] += a;
++                                    lo[(j + 2) % 3] += b;
++                                    int hi[3] = {lo[0], lo[1], lo[2]};
++                                    ++hi[j];
++                                    const auto i0 = elements[smesh::sshex8_lidx(refine_level, lo[0], lo[1], lo[2])][e];
++                                    const auto i1 = elements[smesh::sshex8_lidx(refine_level, hi[0], hi[1], hi[2])][e];
++                                    for (int k = 0; k < 3; ++k)
++                                        bound[k][j] = std::max(bound[k][j], std::fabs(
++                                                ((double)points[k][i1] - points[k][i0]) / h[j] - (k == j ? 1.0 : 0.0)));
++                                }
++                        double norm2 = 0;
++                        for (const auto &row : bound) for (double value : row) norm2 += value * value;
++                        worst_bound = std::max(worst_bound, std::sqrt(norm2));
++                    }
++        // Each trilinear derivative is a convex combination of four edge differences.
++        // A bound below one keeps I+B nonsingular throughout every cell and fixes its orientation.
++        if (!std::isfinite(worst_bound) || worst_bound >= 1 || max_displacement == 0) {
++            std::fprintf(stderr, "cavity warp has no positive-Jacobian certificate or no displaced nodes\n");
++            return EXIT_FAILURE;
++        }
++        std::printf("cavity_warp: fraction=%.17g max_displacement=%.17g jacobian_perturbation_bound=%.17g "
++                    "determinant_ratio_lower_bound=%.17g\n", cavity_warp, max_displacement, worst_bound,
++                    std::pow(1 - worst_bound, 3));
++    }
+     auto fs   = sfem::FunctionSpace::create(mesh, N_FIELDS);
+     auto f    = sfem::Function::create(fs);
+ 
+@@ -6070,6 +6154,7 @@ int main(int argc, char **argv) {
+ 
+     int  newton_it    = 0;
+     int  lin_it_total = 0;
++    int  linear_checks = 0, linear_check_failures = 0;
+     // Newton steps summed over every continuation stage. `newton_it` below is the inner loop
+     // variable and restarts at each stage, so on its own it reports only the last stage --
+     // which, after a good ramp, is the cheapest one. Printing it beside the cumulative
+@@ -6942,7 +7027,7 @@ int main(int argc, char **argv) {
+         std::function<void(const std::shared_ptr<sfem::Operator<real_t>> &)> set_prec;
+         std::function<int()>                                                 get_its;
+         std::function<bool()>                                                lin_failed;
+-        std::function<void(const real_t *, real_t *)>                        do_solve;
++        std::function<int(const real_t *, real_t *)>                         do_solve;
+ 
+         // SFEM_ASSEMBLE_FINE=1 replaces the matrix-free fine operator with an assembled
+         // BSR one, probed the same way the Galerkin levels are. The point is determinism:
+@@ -6982,7 +7067,7 @@ int main(int argc, char **argv) {
+                                        : p);
+             };
+             get_its  = [fsolver]() { return fsolver->iterations(); };
+-            do_solve = [fsolver](const real_t *b, real_t *x) { fsolver->apply(b, x); };
++            do_solve = [fsolver](const real_t *b, real_t *x) { return fsolver->apply(b, x); };
+             lin_failed = [fsolver]() { return fsolver->has_diverged(); };
+         } else {
+             bsolver = sfem::create_bcgs<real_t>(linop_timed, sfem::EXECUTION_SPACE_HOST);
+@@ -7000,7 +7085,7 @@ int main(int argc, char **argv) {
+                                        : p);
+             };
+             get_its  = [bsolver]() { return bsolver->iterations(); };
+-            do_solve = [bsolver](const real_t *b, real_t *x) { bsolver->apply(b, x); };
++            do_solve = [bsolver](const real_t *b, real_t *x) { return bsolver->apply(b, x); };
+             lin_failed = [bsolver]() { return bsolver->has_diverged(); };
+         }
+         {
+@@ -7382,9 +7467,10 @@ int main(int argc, char **argv) {
+             }
+             t_prec += smesh::time_seconds() - t0;
+         }
++        int linear_return = 0;
+         {
+             const double t0 = smesh::time_seconds();
+-            do_solve(rhs.data(), dx.data());
++            linear_return = do_solve(rhs.data(), dx.data());
+             t_solve += smesh::time_seconds() - t0;
+         }
+         // The correction carries no constant-pressure component; the gauge is fixed, so
+@@ -7392,6 +7478,40 @@ int main(int argc, char **argv) {
+         gauge.project(dx.data());
+         lin_it_total += get_its();
+ 
++        if (check_linear_residual) {
++            // Check the correction Newton will use against the same A and b as Krylov.
++            // Keep constrained rows and the pressure mean: projecting the error could hide it.
++            std::vector<real_t> ax((size_t)ndof, real_t(0));
++            const int apply_return = linop->apply(dx.data(), ax.data());
++            real_t error2 = 0, rhs2 = 0;
++            for (ptrdiff_t i = 0; i < ndof_owned; ++i) {
++                const real_t e = rhs[(size_t)i] - ax[(size_t)i];
++                error2 += e * e;
++                rhs2 += rhs[(size_t)i] * rhs[(size_t)i];
++            }
++            const real_t error = std::sqrt(cvfem::sum(domain, error2));
++            const real_t bnorm = std::sqrt(cvfem::sum(domain, rhs2));
++            const real_t target = std::max(lin_atol, lin_rtol * bnorm);
++            const bool finite = std::isfinite(error) && std::isfinite(bnorm) && std::isfinite(target);
++            const int local_failed = linear_return != 0 || apply_return != 0 || (lin_failed && lin_failed());
++            const bool solver_failed = cvfem::max(domain, local_failed) != 0;
++            const bool at_limit = get_its() >= lin_max_it;
++            const bool accepted = finite && !solver_failed && error < target;
++            const char *status = accepted ? "converged" : !finite ? "nonfinite" : solver_failed ? "solver_failure"
++                                                : at_limit ? "iteration_limit" : "residual_failed";
++            ++linear_checks;
++            if (!accepted) ++linear_check_failures;
++            if (domain.is_root())
++                std::printf("linear_check: step=%d stage=%zu newton=%d iterations=%d status=%s "
++                            "true_abs=%.17g rhs_norm=%.17g target=%.17g at_limit=%d\n",
++                            tstep, stage + 1, newton_it, get_its(), status, (double)error, (double)bnorm,
++                            (double)target, at_limit ? 1 : 0);
++            if (!accepted) {
++                diverged = true;
++                break;
++            }
++        }
++
+         // React to a divergent linear solve immediately. The correction it returns cannot be
+         // trusted, and continuing would only spend a line search discovering that. Abandoning
+         // here lets the continuation shrink its step while the failure is still cheap.
+@@ -8066,6 +8186,11 @@ int main(int argc, char **argv) {
+     std::printf("newton_converged: %d  newton_it: %d (last stage)  newton_total: %d over %d stage(s)  "
+                 "lin_it_total: %d\n",
+                 converged ? 1 : 0, newton_it, newton_total, stages_run, lin_it_total);
++    if (check_linear_residual)
++        std::printf("linear_check_summary: checked=%d failed=%d nonlinear_abs=%.17g nonlinear_initial=%.17g "
++                    "nonlinear_rtol=%.17g nonlinear_atol=%.17g dofs=%td\n",
++                    linear_checks, linear_check_failures, (double)step_last_rnorm, (double)r0,
++                    (double)nl_rtol, (double)nl_atol, ndof_owned);
+     std::printf("matrix_free: %d  t_operator: %.4f s  t_precond: %.4f s  t_solve: %.4f s  us_per_lin_it: %.2f\n",
+                 matrix_free,
+                 t_op,

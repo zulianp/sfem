@@ -119,6 +119,16 @@ def parse_log(path):
         m = re.search(pat, text, re.MULTILINE)
         if m:
             out[key] = m.group(1).strip()
+    mesh = re.search(r"channel: L=\(([^)]+)\)\s+cells=\(([^)]+)\)", text)
+    level = re.search(r"\brefine_level:\s+(\d+)", text)
+    if mesh:
+        lengths = [float(v) for v in mesh.group(1).split(",")]
+        cells = [int(v) for v in mesh.group(2).split(",")]
+        refinement = int(level.group(1)) if level else 1
+        if len(lengths) == len(cells) == 3 and refinement > 0 and all(v > 0 for v in cells):
+            out["mesh_h"] = max(length / (count * refinement)
+                                for length, count in zip(lengths, cells))
+            out["h_source"] = "logged mesh spacing"
     # `newton_converged: 1` is the only place the driver states convergence, and it is the
     # field most often clipped by interleaving, so it is read on its own and left absent
     # rather than defaulted -- "did not converge" and "did not say" are different claims.
@@ -128,6 +138,10 @@ def parse_log(path):
     m = re.search(r"\bnewton_converged:\s+(\d+)", text)
     if m:
         out["converged"] = m.group(1) == "1"
+    residuals = re.findall(r"newton\s+\d+\s+\|\|R\|\|:\s+(\S+)\s+rel:\s+(\S+)", text)
+    if residuals:
+        out["final_nl_abs"], out["final_nl_rel"] = map(float, residuals[-1])
+    out["floor_accepted"] = "residual floor, accepting as converged" in text
     if re.search(r"^traction \(flat\):", text, re.MULTILINE):
         out["bc"] = "traction"
     elif re.search(r"^pressure \(flat\):", text, re.MULTILINE):
@@ -138,6 +152,14 @@ def parse_log(path):
 
 
 # --------------------------------------------------------------------------- fitting
+
+def set_mesh_spacing(rows):
+    # Mixing physical spacing and a DOF proxy would corrupt a single ladder's slope.
+    physical = all(row.get("mesh_h", 0) > 0 for row in rows)
+    for row in rows:
+        row["h"] = row["mesh_h"] if physical else row["ndof"] ** (-1.0 / 3.0)
+        row["h_source"] = "logged mesh spacing" if physical else "historical DOF proxy"
+
 
 def fit_convergence_rate(scales, errors):
     """Log-log least squares, returning (rate, intercept, r_squared, n).
@@ -343,15 +365,15 @@ def section_mms(runs, checks):
     body = ["## Spatial order of accuracy", "",
             "Manufactured solution, volume-weighted L2 against the exact field, with the",
             "pressure gauge offset removed (`p_l2_shifted`). The rate is fitted by log-log",
-            "least squares against `h ~ ndof^(-1/3)`.", ""]
+            "least squares against the logged mesh spacing; old logs without mesh counts",
+            "use the historical `ndof^(-1/3)` proxy, labelled in the table.", ""]
 
     for re_key in res:
         rows = sorted((r for r in allrows if r.get("mms_re", "") == re_key),
                       key=lambda r: r["ndof"])
         if len(rows) < 2:
             continue
-        for r in rows:
-            r["h"] = r["ndof"] ** (-1.0 / 3.0)
+        set_mesh_spacing(rows)
 
         # Re = 1 keeps the historical thresholds; anything else is judged on convergence
         # rather than on order, for the reason in the docstring.
@@ -389,9 +411,9 @@ def section_mms(runs, checks):
                 er = rows[i - 1]["u_l2"] / r["u_l2"]
                 if hr > 1 and er > 0:
                     loc = "%.2f" % (math.log(er) / math.log(hr))
-            trows.append([r["ndof"], "%.4f" % r["h"], fmt(r.get("u_l2")), loc,
+            trows.append([r["ndof"], "%.4f" % r["h"], r["h_source"], fmt(r.get("u_l2")), loc,
                           fmt(r.get("p_l2")), fmt(r.get("p_l2_shifted"))])
-        body.append(table(["ndof", "h", "u L2", "local rate", "p L2", "p L2 shifted"], trows))
+        body.append(table(["ndof", "h", "h source", "u L2", "local rate", "p L2", "p L2 shifted"], trows))
 
         tag = "" if re_key == "" else " (Re %g)" % re_key
         fits, series = [], []
@@ -419,7 +441,7 @@ def section_mms(runs, checks):
                            [(lo, math.exp(inter) * lo ** rate), (hi, math.exp(inter) * hi ** rate)], "dash"))
         if fits:
             body.append(table(["quantity", "fitted rate", "R^2", "levels", "threshold", "status"], fits))
-            body.append(svg_xy(series, "h  (~ ndof^-1/3)", "L2 error", logx=True, logy=True,
+            body.append(svg_xy(series, "h (logged spacing or historical proxy)", "L2 error", logx=True, logy=True,
                                caption="MMS convergence%s" % tag) + "\n")
     return "\n".join(body) + "\n"
 
@@ -431,7 +453,7 @@ def section_mms(runs, checks):
 CONV_ARMS = [
     ("lo",          "first-order donor-cell upwind (the default)"),
     ("ho_lim0",     "deferred correction, unlimited -- the ceiling"),
-    ("ho_lim1",     "bounded-face clip (Barth-Jespersen on two nodes)"),
+    ("ho_lim1",     "two-node clip (Barth-Jespersen type)"),
     ("ho_lim2_k0",  "Venkatakrishnan, K = 0 -- the zero-severity control"),
     ("ho_lim2_k1",  "Venkatakrishnan, K = 1"),
     ("ho_lim2_k5",  "Venkatakrishnan, K = 5 -- the step case's best convergence"),
@@ -471,8 +493,7 @@ def section_conv(runs, checks):
         arm_rows = sorted((r for r in rows if r.get("conv_arm") == arm), key=lambda r: r["ndof"])
         if len(arm_rows) < 2:
             continue
-        for r in arm_rows:
-            r["h"] = r["ndof"] ** (-1.0 / 3.0)
+        set_mesh_spacing(arm_rows)
         data = [(r["h"], r["u_l2"]) for r in arm_rows if r.get("u_l2")]
         f = fit_convergence_rate([d[0] for d in data], [d[1] for d in data])
         if f:
@@ -497,30 +518,40 @@ def section_conv(runs, checks):
         if ceiling is not None and base is not None and ceiling - base > 1e-9 and arm not in ("lo", "ho_lim0"):
             gap = "%.0f%%" % (100.0 * (rate - base) / (ceiling - base))
         ok = rate >= 0.5
-        checks.append(("Convective arm %s converges" % arm,
+        checks.append(("Convective arm %s error decreases" % arm,
                        "fitted u L2 rate %.3f (expect >= 0.50)" % rate, ok))
-        trows.append([arm, what, n, "%.3f" % rate, "%.4f" % r2, gap,
-                      fmt(finest.get("u_l2")), status(ok)])
+        h_source = ", ".join(sorted({r["h_source"] for r in arm_rows}))
+        nonlinear = ("yes" if all(r.get("converged") is True for r in arm_rows)
+                     else "no" if any(r.get("converged") is False for r in arm_rows) else "unreported")
+        final_rel = [r["final_nl_rel"] for r in arm_rows if "final_nl_rel" in r]
+        exits = ", ".join(str(int(r["exit_code"])) for r in arm_rows) if all("exit_code" in r for r in arm_rows) else "unreported"
+        floor = "yes" if any(r.get("floor_accepted") for r in arm_rows) else "no"
+        trows.append([arm, what, n, h_source, "%.3f" % rate, "%.4f" % r2, gap,
+                      fmt(finest.get("u_l2")), nonlinear, fmt(max(final_rel)) if final_rel else "--",
+                      floor, exits, status(ok)])
         series.append(("%s: rate %.2f" % (arm, rate), data, "points"))
 
     body = ["## The convective scheme, arm by arm", "",
             "Manufactured solution at Re = 100, where the donor split is active and a limiter",
             "therefore does something. One ladder per arm; the rate is fitted by log-log least",
-            "squares against `h ~ ndof^(-1/3)`, the same fit the order-of-accuracy section uses.", "",
-            "`gap recovered` is the share of the distance between the default scheme and the",
-            "unlimited reconstruction that an arm gets back. 100% means the arm is as accurate",
-            "as no limiter at all, which is a warning and not a win: the arm exists to bound the",
-            "reconstruction, and one that recovers the full gap is very likely not bounding it",
-            "anywhere. Read it beside whether the arm converges on the step case, which is the",
-            "measurement it was added for and which lives in jobs/conv_limiter.sbatch.", "",
+            "squares against logged mesh spacing. Old logs without mesh counts use the",
+            "historical `ndof^(-1/3)` proxy, labelled in the table.", "",
+            "The rate check is separate from the driver's stated nonlinear convergence and",
+            "exit code. A nonzero exit still records a failed driver check; floor acceptance",
+            "is reported even when the final stage reaches its requested tolerance.", "",
+            "`gap recovered` compares fitted rates with the first-order and unlimited arms.",
+            "A matching rate does not show whether a limiter is active; limiter activity and",
+            "boundedness require separate checks. Three coarse meshes do not establish an",
+            "asymptotic order or an order shared by all limiter branches.", "",
             "`ho_lim2_k0` is bit-for-bit `ho_lim2` with the deactivation term switched off --",
             "proved over 512 input combinations in tests/cvfem_venkata_test.cpp -- so it is the",
             "control: if its row ever differs from an unswept Venkatakrishnan run, SFEM_VENKAT_K",
             "has acquired an effect at zero and every other K row is suspect.", ""]
-    body.append(table(["arm", "what it is", "levels", "u L2 rate", "R^2",
-                       "gap recovered", "finest u L2", "status"], trows))
+    body.append(table(["arm", "what it is", "levels", "h source", "u L2 rate", "R^2",
+                       "gap recovered", "finest u L2", "nonlinear stated", "max final NL rel",
+                       "any floor acceptance", "driver exits", "rate check"], trows))
     if series:
-        body.append(svg_xy(series, "h  (~ ndof^-1/3)", "L2 error", logx=True, logy=True,
+        body.append(svg_xy(series, "h (logged spacing or historical proxy)", "L2 error", logx=True, logy=True,
                            caption="Convective arms, Re = 100") + "\n")
     return "\n".join(body) + "\n"
 
@@ -1027,6 +1058,16 @@ def selftest():
     # And the group is absent from the default matrix, so no rows must produce no section --
     # otherwise every ordinary run grows an empty heading.
     ck(section_conv([], []) == "", "no convective runs produces no section")
+    physical_runs = [{"group": "conv", "conv_arm": "ho_lim0", "ndof": 4 * (n + 1) ** 3,
+                      "mesh_h": 2.0 / n, "u_l2": (2.0 / n) ** 2, "label": "physical"}
+                     for n in (4, 8, 16)]
+    physical_out = section_conv(physical_runs, [])
+    ck("2.000" in physical_out and "logged mesh spacing" in physical_out,
+       "physical spacing recovers the planted order on coarse meshes")
+    del physical_runs[0]["mesh_h"]
+    set_mesh_spacing(physical_runs)
+    ck(all(r["h_source"] == "historical DOF proxy" for r in physical_runs),
+       "a partial geometry record uses one explicit proxy for the whole ladder")
 
     # Exact power laws: the fit must return the exponent it was built from.
     for expect in (1.0, 1.3, 2.0, 3.0):
@@ -1055,6 +1096,10 @@ def selftest():
         log = os.path.join(d, "x.log")
         with open(log, "w") as fh:
             fh.write("nnodes: 8281  nelements: 6912  ndof: 33124\n"
+                     "case: mms geom: affine refine_level: 2 semi_structured: 1\n"
+                     "channel: L=(2,2,2) cells=(4,4,4)\n"
+                     "newton 8 ||R||: 2e-12 rel: 3e-11\n"
+                     "line search -- residual floor, accepting as converged\n"
                      "mms_err: u_l2 1.5e-03  p_l2 2.5e-02  p_l2_shifted 3.5e-03  (dp_mean 1e-9, vol 4.0)\n"
                      "newton_converged: 0  newton_it: 8 (last stage)  newton_total: 8 "
                      "oververification failed (converged=0, u_linf=1.7e-01, tol=0.01)\n"
@@ -1065,6 +1110,10 @@ def selftest():
        and r.get("p_l2_shifted") == 3.5e-03, "every labelled field is read")
     ck(r.get("newton_it") == 8 and r.get("converged") is False,
        "a line clipped by stdout/stderr interleaving still parses")
+    ck(r.get("mesh_h") == 0.25 and r.get("h_source") == "logged mesh spacing",
+       "the parser includes refinement in the physical mesh spacing")
+    ck(r.get("final_nl_abs") == 2e-12 and r.get("final_nl_rel") == 3e-11 and r.get("floor_accepted"),
+       "the final nonlinear residual and floor acceptance remain visible")
     ck(r.get("p_bar") == 1.5 and r.get("bc") == "pressure" and r.get("bc_sideset") == "outlet",
        "the boundary condition is identified")
 

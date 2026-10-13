@@ -1400,7 +1400,7 @@ def parse_peak(path):
 HO_NAME = {
     "first_order": "first-order upwind",
     "ho_unlimited": "deferred correction, unlimited",
-    "ho_clip": r"${}+{}$ Barth--Jespersen",
+    "ho_clip": r"${}+{}$ two-node clip",
     "ho_venkatakrishnan": r"${}+{}$ Venkatakrishnan",
     "ho_darwish_moukalled": r"${}+{}$ Darwish--Moukalled",
 }
@@ -1448,7 +1448,7 @@ def macros_jacho(rows):
         if d.get("gen") and d.get("atomic"):
             out.append(r"\newcommand{\jacho%sLayoutRatio}{%.2f}" % (tag, d["gen"] / d["atomic"]))
     if loose.get("ho_unlim_lagged"):
-        out.append(r"\newcommand{\jachoLaggedPacked}{%.0f}" % loose["ho_unlim_lagged"])
+        out.append(r"\newcommand{\jachoCorrectionLaggedPacked}{%.0f}" % loose["ho_unlim_lagged"])
     return "\n".join(out) + "\n" if out else ""
 
 
@@ -1584,7 +1584,7 @@ def fig_scheme_bars(rows, spmv=None, ylabel="MDOF/s"):
                          "ho_darwish_moukalled") if a in by]
     if not order:
         return None
-    short = {"first_order": "upwind", "ho_unlimited": "unlimited", "ho_clip": "Barth--J.",
+    short = {"first_order": "upwind", "ho_unlimited": "unlimited", "ho_clip": "two-node clip",
              "ho_venkatakrishnan": "Venkat.", "ho_darwish_moukalled": "Darwish--M."}
     coords = ",".join(short[a] for a in order)
 
@@ -1970,9 +1970,9 @@ def macros_hoexact(rates, checks, frac=None):
     def put(name, key):
         if key in rates:
             out.append(r"\newcommand{\hox%s}{%.0f}" % (name, rates[key]))
-    put("LaggedPacked", "jac_ho_lagged_packed")
+    put("CorrectionLaggedPacked", "jac_ho_lagged_packed")
     put("ExactPacked", "jac_ho_exact_packed")
-    put("LaggedAtomic", "jac_ho_lagged_atomic")
+    put("CorrectionLaggedAtomic", "jac_ho_lagged_atomic")
     put("ExactAtomic", "jac_ho_exact_atomic")
     for name, a, b in (("CostPacked", "jac_ho_lagged_packed", "jac_ho_exact_packed"),
                        ("CostAtomic", "jac_ho_lagged_atomic", "jac_ho_exact_atomic")):
@@ -1980,7 +1980,7 @@ def macros_hoexact(rates, checks, frac=None):
             out.append(r"\newcommand{\hox%s}{%.2f}" % (name, rates[a] / rates[b]))
     # The layout ratio on each form. That it collapses is the result, so it is generated rather
     # than left to a reader to divide two numbers in a table.
-    for name, lay in (("LayoutLagged", "lagged"), ("LayoutExact", "exact")):
+    for name, lay in (("LayoutCorrectionLagged", "lagged"), ("LayoutExact", "exact")):
         p, a = "jac_ho_%s_packed" % lay, "jac_ho_%s_atomic" % lay
         if p in rates and a in rates:
             out.append(r"\newcommand{\hox%s}{%.2f}" % (name, rates[p] / rates[a]))
@@ -2008,12 +2008,10 @@ def macros_hoexact(rates, checks, frac=None):
 # The operator symbols of the setup section's Operators paragraph, so a row says which
 # differentiations it carried instead of leaving "exact" to be resolved against the caption.
 #
-# EVERY ROW IS FULLY EXACT OR FULLY LAGGED. The job used to lag the Rhie-Chow sensitivity while
-# differentiating the correction, and those mixed arms are gone: the operator is the Jacobian of
-# no residual at all, so the row priced something nobody would apply.
+# These rows distinguish the measured exact actions from the implemented lagged matrix.
 JF_NAME = {
     "jac_exact":      r"$\Jex(u)\,v$, first-order upwind",
-    "jac_clip_exact": r"$\Jhoex(u)\,v$, Barth--Jespersen",
+    "jac_clip_exact": r"$\Jhoex(u)\,v$, two-node clip",
     "jac_ho_exact":   r"$\Jhoex(u)\,v$, Darwish--Moukalled",
     "jac_lagged":     r"$\Jlag(u)\,v$, any of these",
     "spmv_f64":       r"SpMV with $\Jlag$, \texttt{f64}",
@@ -2427,6 +2425,14 @@ def build(out_dir, tab_dir):
     counters = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(counters)
     written.extend(counters.build(DATA, out_dir, tab_dir))
+    spec = importlib.util.spec_from_file_location("matched_counter_figures", os.path.join(HERE, "matched_counter_figures.py"))
+    matched = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(matched)
+    written.extend(matched.build(DATA, out_dir, tab_dir))
+    spec = importlib.util.spec_from_file_location("solver_iterations", os.path.join(HERE, "solver_iterations.py"))
+    solver = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(solver)
+    written.extend(solver.build(DATA, out_dir, tab_dir))
     return written
 
 
@@ -2711,6 +2717,14 @@ def selftest():
         counters = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(counters)
         check(counters.selftest(), "residual counters: raw events, output checks and provenance")
+        spec = importlib.util.spec_from_file_location("matched_counter_figures", os.path.join(HERE, "matched_counter_figures.py"))
+        matched = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(matched)
+        check(matched.selftest(), "matched counters: all stages, raw checks, policy and failed controls")
+        spec = importlib.util.spec_from_file_location("solver_iterations", os.path.join(HERE, "solver_iterations.py"))
+        solver = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(solver)
+        check(solver.selftest(), "solver iterations: true residuals, configurations and raw logs")
 
         # Missing data must be absent, not fabricated.
         with tempfile.TemporaryDirectory() as td2:

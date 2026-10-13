@@ -176,7 +176,11 @@ def analyze(records, elements):
 
 
 def prepare_capture(binary, out, elements, mode, extra_events=()):
+    import roofline_memory_policy
+    if roofline_memory_policy.selected() and mode not in ('reuse-validation', 'residual-reuse', 'action-reuse', 'gemm-reuse'):
+        raise ValueError('selected memory policy requires the matched retained-worker campaign')
     out.mkdir()  # Do not overwrite a previous measurement.
+    roofline_memory_policy.record(out, os.environ)
     topo = topology(extra_events)
     (out/'topology.json').write_text(json.dumps(topo, indent=2)+'\n')
     (out/'collection.json').write_text(json.dumps(dict(
