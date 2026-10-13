@@ -20,6 +20,11 @@ def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def samples(rows):
+    fields = ('block', 'repeat', 'seconds', 'fp_ops', 'read_bytes', 'write_bytes')
+    return [{key: row[key] for key in fields} for row in rows if row['kind'] == 'sweep']
+
+
 def verify(job):
     study = job/'study'
     sources = {}
@@ -57,6 +62,7 @@ def verify(job):
     require(control_topo == topo, 'different control topology')
     result = dict(job=topo['job'], host=topo['host'], policy='disabled', stages={}, sources=sources)
     metrics = {}
+    counted_samples = {}
     checks = 0
     for name, module, count in (('calibration/captures', reuse, 60), ('residuals', op, 144), ('actions', act, 252), ('gemm', gemm, 36)):
         folder = study/name
@@ -129,6 +135,7 @@ def verify(job):
                 selected = [row for row in rows if tuple(row[k] for k in keys) == arm]
                 normal = [1e3*row['seconds']/row['repeat'] for row in selected if row['kind']=='normal']
                 counted = [row for row in selected if row['kind']=='sweep']
+                counted_samples[('-'.join(arm) if module == act else 'residual-'+'-'.join(arm))] = samples(counted)
                 metrics[('-'.join(arm) if module == act else 'residual-'+'-'.join(arm))] = dict(
                     normal_ms=statistics.mean(normal), normal_range=[min(normal),max(normal)],
                     mb=statistics.mean((row['read_bytes']+row['write_bytes'])/row['repeat']/1e6 for row in counted),
@@ -136,11 +143,13 @@ def verify(job):
                     gop=statistics.mean(row['fp_ops']/row['repeat']/1e9 for row in counted),
                     gops=statistics.mean(row['fp_ops']/row['seconds']/1e9 for row in counted))
         elif module == gemm:
+            counted_samples['dgemm'] = samples(rows)
             metrics['dgemm'] = dict(useful_gflops=statistics.mean(row['repeat']*row['useful_flops']/row['seconds']/1e9 for row in rows if row['kind']=='normal'),
                                    speculative_gops=statistics.mean(row['fp_ops']/row['seconds']/1e9 for row in rows if row['kind']=='sweep'))
             result['blas'] = rows[0]['library']
         else:
             for mode in ('copy','triad'):
+                counted_samples[mode] = samples([row for row in rows if row['mode'] == mode])
                 metrics[mode] = dict(gbps=statistics.mean((row['read_bytes']+row['write_bytes'])/row['seconds']/1e9
                     for row in rows if row['kind']=='sweep' and row['mode']==mode))
     require((study/'residuals/binary.sha256').read_text() == (study/'actions/binary.sha256').read_text(), 'operator binary mismatch')
@@ -156,7 +165,8 @@ def verify(job):
     require(inputs[library['path']] == library['sha256'], 'DGEMM library hash changed after build')
     require(read(job/'gemm-build/runtime-library.json') == result['blas'], 'DGEMM preflight identity differs')
     require('MATCHED RESIDUAL, ACTION AND COMPUTE STUDY PASSED:' in (study/'run.log').read_text(), 'campaign incomplete')
-    result.update(numerical_checks=checks, bundle_checks=len(source_checks), metrics=metrics)
+    result.update(numerical_checks=checks, bundle_checks=len(source_checks), metrics=metrics,
+                  counted_samples=counted_samples)
     return result
 
 

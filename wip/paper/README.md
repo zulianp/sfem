@@ -9,7 +9,12 @@ make           build main.pdf
 make figures   regenerate every figure and table input from the measurements
 make selftest  run the generators' own checks
 make check     the submission gates (clean build, no undefined refs, page limit)
+make roofline  build the empirical roofline in the companion material
 ```
+
+The [companion counter analysis](reproducibility/README.md) documents the current
+roofline, its scope and reproduction commands. It is outside the main paper;
+the manuscript retains its matched timing/traffic tables and accumulation study.
 
 ## The rule this directory is built around
 
@@ -30,6 +35,7 @@ owns it (see `figures/packed_counts.tex`).
 |---|---|---|
 | `python/packed_format_figures.py` | `figures/packed_{decomposition,id_space,reduction,scatters}.tex`, `figures/scheme_passes.tex`, `figures/packed_counts.tex` | nothing --- it reimplements the format's documented rules and draws the result |
 | `python/perf_figures.py` | `figures/{throughput_size,scaling,packsize,roofline}.tex`, `tables/{throughput,ladder,footprint,convho,jacfair}.tex` and their macro files | the campaign CSVs and per-measurement `.out` files below |
+| `python/matched_counter_figures.py` and `python/matched_roofline.py` (called by `perf_figures.py`) | matched tables/macros and `reproducibility/roofline-{data.json,residuals.tex,actions.tex,values.tex}` | verified job 5047137 archive |
 
 Both are stdlib-only and carry `--selftest`, following the repository's report generators: the
 Alps uenv has no numpy or matplotlib, and a generator that cannot run where the measurements run
@@ -144,6 +150,10 @@ returned, the file was fetched, and the measured lines match the transcription e
 
 ## Roofline audit (11 October 2026)
 
+This section records the historical audit. The replacement measurement campaign
+is now accepted and supplies the [separate companion figure](reproducibility/README.md).
+The old `figures/roofline.tex` remains historical and is not included in the paper.
+
 The historical plot combines different nodes. `data/roofline_sources.json` now pins
 six input files and their hashes; `tables/roofline_sources.tex` records the jobs and
 hostnames. The traffic file has no hostname, raw event rows, source SHA, binary hash,
@@ -165,7 +175,7 @@ removed. DGEMM remains a benchmark reference rather than a universal upper bound
 The documented GH200 nominal 500 GB/s is retained in the hardware table, while the
 unsupported 3.55 TFLOP/s specification and dashed vendor roof are removed.
 
-The new counter-calibration job is the first required Grace gate before collecting
+The counter-calibration job was the first required Grace gate before collecting
 replacement operator points. Raw historical logs and ordinary throughput figures
 remain unchanged. Remeasurement must record the selected node, CPU/memory binding,
 PMU instance, event coverage, binary/source hashes, and each operator's dispatched
@@ -219,7 +229,8 @@ The measurement sources match the reviewed checkout; every summary reproduces.
 `python/verify_matched_counters.py` in an isolated process using the captured
 analysis. It reconstructs raw counts and numerical checks, verifies retained
 worker identities, coordinate direction, CPU/PMU scopes and THP policy, and
-reapplies every acceptance screen before generating tables/macros. Corrupted
+reapplies every acceptance screen before generating tables/macros and exporting
+the per-capture samples for the companion roofline. Corrupted
 coverage, incomplete records, changed policy and wrong-direction controls are
 rejected. The older accepted residual evidence remains independently checked.
 

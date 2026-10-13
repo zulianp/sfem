@@ -12,7 +12,7 @@ TABDIR   = tables
 # No extensions are granted, so this is a gate rather than a guideline.
 PAGELIMIT ?= 10
 
-.PHONY: all figures check clean selftest
+.PHONY: all figures check clean selftest roofline
 
 all: main.pdf
 
@@ -28,6 +28,12 @@ figures:
 selftest:
 	$(PY) python/packed_format_figures.py --selftest
 	@if [ -f python/perf_figures.py ]; then $(PY) python/perf_figures.py --selftest; fi
+
+# The companion figure is separate from the manuscript's page budget.
+roofline: figures selftest
+	latexmk -cd -pdf -interaction=nonstopmode -halt-on-error reproducibility/roofline.tex
+	@! grep -qaE "^! |undefined (citation|reference)" reproducibility/roofline.log
+	@! grep -aoE "Overfull \\\\hbox \\(([0-9.]+)pt" reproducibility/roofline.log | awk -F'[(]' '$$2+0>5' | grep -q .
 
 # The gates, in the order a failure is cheapest to fix.
 check: selftest main.pdf
@@ -45,4 +51,5 @@ check: selftest main.pdf
 
 clean:
 	latexmk -C main.tex
+	latexmk -cd -C reproducibility/roofline.tex
 	rm -f main.bbl

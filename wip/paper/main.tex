@@ -1061,7 +1061,7 @@ The same-allocation copy and triad achieve
 \SI{\matchedTriadBandwidth}{\giga\byte\per\second} in the same transported-byte
 convention. These are achieved reference rates, not universal bandwidth ceilings.
 PMU work counts speculative floating-point operations of all precisions and is
-kept distinct from the element FLOP model in the historical comparison below.
+kept distinct from source-level useful work~\cite{NvidiaGraceCounters}.
 The same allocation supplies the actions in Table~\ref{tab:jacfair} and DGEMM
 reference in Table~\ref{tab:platform}. An earlier residual campaign, job 5039102,
 gave $\counterFoSpeedup\times$ and $\counterDarwishSpeedup\times$; its complete
@@ -1071,20 +1071,13 @@ evidence is retained separately.
 
 
 
-\paragraph{Historical accounting.} Campaign 5003779 used \texttt{nid005994};
-residual job 5006526 used \texttt{nid006545}, and action job 5006527 used
-\texttt{nid005791}. STREAM job 4789412 and DGEMM job 4811812 used
-\texttt{nid006544}. Traffic archive 5005775 lacks hostname, source/binary
-identity and CPU/PMU mapping; its manifest cannot recover them. Read beats mean
-32 bytes, writes bytes~\cite{NvidiaGraceCounters}. Two-capture slopes need not
-cancel setup, warmup or background traffic; missing rows are rejected. SpMV
-traffic is modelled.
-
-First-order points omit RC; higher-order traffic covers only Darwish with RC.
-Element-work counts omit reconstruction and RC, giving \rlResidualAiSpan{}
-FLOP/byte bare residual versus \rlSpmvFSixFourAi{} lagged FP64 SpMV
-(\rlMfOverSpmv{} ratio). These models establish neither full-operator
-intensity/efficiency nor an accumulation cost or hardware bottleneck.
+\paragraph{Reproducibility material.} The accompanying manuscript sources contain
+the raw matched measurements, captured analysis and regeneration commands in
+\path{wip/paper/reproducibility/README.md}. A separate empirical roofline uses
+the same counted-work and transported-byte conventions for operators and reference
+lines. Historical roofline accounting is documented there separately; the main
+comparisons here use ordinary runtime, transported traffic and the controlled
+accumulation probe.
 
 \begin{table*}[t]
   \centering
@@ -1155,11 +1148,14 @@ For equivalent $\Jlag$ applications, packed is $\matchedLaggedSpmv\times$
 faster than BSR SpMV and $\matchedLaggedAtomic\times$ faster than atomic.
 SpMV transports $\matchedTrafficSpmvLagged\times$ as many bytes per apply;
 these counts include cache/write-allocation effects and are not stored sizes.
+The matrix-free action trades additional arithmetic for lower transported traffic.
+SpMV approaches the achieved copy/triad bandwidth yet takes
+$\matchedLaggedSpmv\times$ as long as the packed equivalent: high bandwidth
+use does not imply lower runtime.
 
 Packed $\Jex$ costs $\matchedExactLagged\times$ $\Jlag$. Darwish $\Jhoex$
 is slower than SpMV, which stores $\Jlag$ without reconstruction sensitivities;
-no assembled exact Jacobian is measured. SpMV approaches the achieved copy/triad
-bandwidth, while the other actions remain below it. These comparisons alone
+no assembled exact Jacobian is measured. These comparisons alone
 identify neither a hardware bottleneck nor a solver speedup.
 
 \subsection{A bounded CPU solver check}
