@@ -470,16 +470,23 @@ int solve_prony_visco_torsion(const std::shared_ptr<sfem::Communicator> &comm, i
         step_linear_it = 0;
         converged      = false;
 
+        // Set when the line search accepted the trial it evaluated last: its
+        // gradient, already in `rhs`, is the gradient at the new iterate.
+        bool rhs_at_u = false;
+
         for (; newton_it < c.solver.nl_max_it; ++newton_it) {
             f->update(u->data());
 
-            blas->zeros(ndofs, rhs->data());
-            if (f->gradient(u->data(), rhs->data()) != SFEM_SUCCESS) {
-                fclose(history);
-                return SFEM_FAILURE;
-            }
+            if (!rhs_at_u) {
+                blas->zeros(ndofs, rhs->data());
+                if (f->gradient(u->data(), rhs->data()) != SFEM_SUCCESS) {
+                    fclose(history);
+                    return SFEM_FAILURE;
+                }
 
-            f->set_value_to_constrained_dofs(0, rhs->data());
+                f->set_value_to_constrained_dofs(0, rhs->data());
+            }
+            rhs_at_u = false;
 
             gnorm = blas->norm2(ndofs, rhs->data());
             if (newton_it == 0) {
@@ -551,6 +558,10 @@ int solve_prony_visco_torsion(const std::shared_ptr<sfem::Communicator> &comm, i
                     }
 
                     if (std::isfinite((double)trial_norm) && trial_norm < gnorm) {
+                        // The iterate becomes this trial, bit for bit, so its
+                        // gradient is the next iteration's.
+                        blas->copy(ndofs, react->data(), rhs->data());
+                        rhs_at_u = true;
                         break;
                     }
                 }
@@ -733,6 +744,14 @@ int solve_prony_visco_torsion(const std::shared_ptr<sfem::Communicator> &comm, i
     if (!comm->rank()) {
         printf("Total linear iterations: %td\n", total_linear_iterations);
         printf("Final displacement norm: %.12e\n", (double)blas->norm2(ndofs, u_n->data()));
+        printf("Relaxation state: %zu bytes\n", visco->relaxation_groups().bytes());
+        for (const auto &block : mesh->blocks()) {
+            const auto &relaxation = visco->relaxation_groups().relaxation(block->name(), "iso");
+            printf("  block %s: %d of %d terms stored\n",
+                   block->name().c_str(),
+                   relaxation.n_stored_terms(),
+                   relaxation.series().n_terms());
+        }
         printf("History written to %s\n", c.output.history_csv.c_str());
     }
 
