@@ -1,0 +1,143 @@
+Start testing: Oct 14 10:58 CEST
+----------------------------------------------------------
+13/67 Testing: cvfem_packed_vs_atomic_test
+13/67 Test: cvfem_packed_vs_atomic_test
+Command: "/capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/build/cvfem/cvfem_packed_vs_atomic_test"
+Directory: /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/build/cvfem
+"cvfem_packed_vs_atomic_test" start time: Oct 14 10:58 CEST
+Output:
+----------------------------------------------------------
+--------------------
+| PackedMesh |
+n_packs: 1
+elements_per_pack: 128
+Memory PackedMesh: 1.74086 KB
+Original:      3.40199 KB
+--------------------
+
+--- box: 225 nodes, 128 elements ---
+box: both runs see the same node set                     OK
+  worst |packed - atomic| per dof : 2.220446e-16  (0 dofs over 1e-12)
+  net mass flux  atomic 8.400000000e+00   packed 8.400000000e+00
+box: packed and atomic residuals agree                   OK
+box: net mass flux agrees                                OK
+--------------------
+| PackedMesh |
+n_packs: 1
+elements_per_pack: 1216
+Memory PackedMesh: 16.1993 KB
+Original:      32.3189 KB
+--------------------
+
+--- L-shape: 1765 nodes, 1216 elements ---
+L-shape: both runs see the same node set                 OK
+  worst |packed - atomic| per dof : 9.020562e-17  (0 dofs over 1e-12)
+  net mass flux  atomic 8.635000000e+00   packed 8.635000000e+00
+L-shape: packed and atomic residuals agree               OK
+L-shape: net mass flux agrees                            OK
+--------------------
+| PackedMesh |
+n_packs: 1
+elements_per_pack: 1216
+Memory PackedMesh: 16.1993 KB
+Original:      32.3189 KB
+--------------------
+
+--- L-shape skin after a pre-pack skin call ---
+  skin nodes  atomic 994   packed 994   (closed form 994)
+the unpacked skin matches the closed form                OK
+the packed skin matches the closed form                  OK
+packed and unpacked select the same skin nodes           OK
+--------------------
+| PackedMesh |
+n_packs: 1
+elements_per_pack: 128
+Memory PackedMesh: 1.74086 KB
+Original:      3.40199 KB
+--------------------
+
+--- box Jacobian action (Rhie-Chow on) ---
+  worst |packed - atomic| = 1.110223e-16   relative 5.998103e-16
+  zero-flux diagnostic: donor jump factor -6.698178e-16; this is not a smooth Jacobian comparison
+box: the action difference has the derived donor-jump form OK
+the tie check rejects a changed continuity row           OK
+the tie check rejects a changed transverse jump at the edge OK
+the tie check rejects an error away from the tied edge   OK
+--------------------
+| PackedMesh |
+n_packs: 1
+elements_per_pack: 128
+Memory PackedMesh: 1.74086 KB
+Original:      3.40199 KB
+--------------------
+
+--- box, positive velocity shift Jacobian action (Rhie-Chow on) ---
+  worst |packed - atomic| = 1.665335e-16   relative 8.961146e-16
+box, positive velocity shift: packed and atomic Jacobian actions agree OK
+--------------------
+| PackedMesh |
+n_packs: 1
+elements_per_pack: 128
+Memory PackedMesh: 1.74086 KB
+Original:      3.40199 KB
+--------------------
+
+--- box, negative velocity shift Jacobian action (Rhie-Chow on) ---
+  worst |packed - atomic| = 1.110223e-16   relative 6.022301e-16
+box, negative velocity shift: packed and atomic Jacobian actions agree OK
+--------------------
+| PackedMesh |
+n_packs: 1
+elements_per_pack: 1216
+Memory PackedMesh: 16.1993 KB
+Original:      32.3189 KB
+--------------------
+
+--- L-shape Jacobian action (Rhie-Chow on) ---
+  worst |packed - atomic| = 4.857226e-17   relative 9.202219e-16
+L-shape: packed and atomic Jacobian actions agree        OK
+--------------------
+| PackedMesh |
+n_packs: 2
+elements_per_pack: 64
+Memory PackedMesh: 2.65781 KB
+Original:      3.40199 KB
+--------------------
+transient BDF1: RC inv_dt_a0=0, residual rel=7.871914301e-16
+transient packed and atomic solver residuals agree       OK
+--------------------
+| PackedMesh |
+n_packs: 2
+elements_per_pack: 64
+Memory PackedMesh: 2.65781 KB
+Original:      3.40199 KB
+--------------------
+transient BDF2: RC inv_dt_a0=0, residual rel=8.225279466e-16
+transient packed and atomic solver residuals agree       OK
+
+packed and atomic agree on both domains
+<end of output>
+Test time =   2.26 sec
+----------------------------------------------------------
+Test Passed.
+"cvfem_packed_vs_atomic_test" end time: Oct 14 10:58 CEST
+"cvfem_packed_vs_atomic_test" time elapsed: 00:00:02
+----------------------------------------------------------
+
+17/67 Testing: cvfem_isoparam_rc_test
+17/67 Test: cvfem_isoparam_rc_test
+Command: "/capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/build/cvfem/cvfem_isoparam_rc_test"
+Directory: /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/build/cvfem
+"cvfem_isoparam_rc_test" start time: Oct 14 10:58 CEST
+Output:
+----------------------------------------------------------
+linear pressure on distorted HEX8: corrected=0 old_affine_edges=0.0594551496738
+<end of output>
+Test time =   2.19 sec
+----------------------------------------------------------
+Test Passed.
+"cvfem_isoparam_rc_test" end time: Oct 14 10:58 CEST
+"cvfem_isoparam_rc_test" time elapsed: 00:00:02
+----------------------------------------------------------
+
+End testing: Oct 14 10:58 CEST

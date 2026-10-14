@@ -1,0 +1,33 @@
+THP_LAUNCH policy=disabled disabled=1 pid=61868 PASS
+--------------------
+| PackedMesh |
+n_packs: 45
+elements_per_pack: 64
+Memory PackedMesh: 94.392 KB
+Original:      76.1196 KB
+--------------------
+geometry,min_sampled_det=4.44604325697e-06
+linear_gradient,layout=atomic,error=1.33226762955e-15
+linear_gradient,layout=packed,error=1.33226762955e-15
+scope,first_order_RC,isoparametric,steady_interior,rho=1.3,mu=0.027,threads=1,elements=2864,nodes=3848,pack=64
+fd,atomic,direction=0,eps=1.0e-06,error=1.4672137575e-09,no_qgrad=0.93686894264
+fd,atomic,direction=0,eps=1.0e-07,error=1.57770341094e-08,no_qgrad=0.936868949229
+fd,atomic,direction=1,eps=1.0e-06,error=2.44898732139e-09,no_qgrad=0.858962848343
+fd,atomic,direction=1,eps=1.0e-07,error=2.60292648113e-08,no_qgrad=0.858962851077
+fd,atomic,direction=2,eps=1.0e-06,error=3.90773579809e-09,no_qgrad=0.819569786723
+fd,atomic,direction=2,eps=1.0e-07,error=2.66098880131e-08,no_qgrad=0.819569782439
+fd,packed,direction=0,eps=1.0e-06,error=1.75294468245e-09,no_qgrad=0.93686894264
+fd,packed,direction=0,eps=1.0e-07,error=1.46097062643e-08,no_qgrad=0.936868949229
+fd,packed,direction=1,eps=1.0e-06,error=2.47611108678e-09,no_qgrad=0.85896284725
+fd,packed,direction=1,eps=1.0e-07,error=3.31264021949e-08,no_qgrad=0.85896285381
+fd,packed,direction=2,eps=1.0e-06,error=3.90773552471e-09,no_qgrad=0.819569787199
+fd,packed,direction=2,eps=1.0e-07,error=2.66919628811e-08,no_qgrad=0.819569794339
+agreement,op=0,direction=0,error=4.96154709576e-16
+agreement,op=1,direction=0,error=5.85172563897e-16
+agreement,op=1,direction=1,error=7.78356072804e-16
+agreement,op=1,direction=2,error=5.46275358183e-16
+payload,layout=atomic,field_capacity_bytes=584896,packed_arena_bytes=0,harness_capacity_bytes=492544
+payload,layout=packed,field_capacity_bytes=662200,packed_arena_bytes=35800,harness_capacity_bytes=492544
+storage,atomic_mesh=137824,packed_retained_mesh=137824,additional_packed_topology=129040,ghost_buffer=103072
+setup,atomic_ordering=0.000263936,packed_ordering=0.000221184,packing=0.00080768,packs=45,ghost_entries=3221,max_pack_nodes=179,ghost_rows=2339
+UNSTRUCTURED NUMERICAL CHECKS PASSED

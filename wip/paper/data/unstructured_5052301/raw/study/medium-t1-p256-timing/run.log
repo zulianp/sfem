@@ -1,0 +1,81 @@
+THP_LAUNCH policy=disabled disabled=1 pid=62108 PASS
+--------------------
+| PackedMesh |
+n_packs: 292
+elements_per_pack: 256
+Memory PackedMesh: 2026.86 KB
+Original:      1984.43 KB
+--------------------
+geometry,min_sampled_det=3.66349295568e-07
+linear_gradient,layout=atomic,error=2.6645352591e-15
+linear_gradient,layout=packed,error=2.22044604925e-15
+scope,first_order_RC,isoparametric,steady_interior,rho=1.3,mu=0.027,threads=1,elements=74664,nodes=87472,pack=256
+fd,atomic,direction=0,eps=1.0e-06,error=3.71329773664e-09,no_qgrad=0.416266729486
+fd,atomic,direction=0,eps=1.0e-07,error=3.35237907502e-08,no_qgrad=0.416266743349
+fd,atomic,direction=1,eps=1.0e-06,error=4.29778047065e-09,no_qgrad=0.461685957606
+fd,atomic,direction=1,eps=1.0e-07,error=4.32162689998e-08,no_qgrad=0.46168595444
+fd,atomic,direction=2,eps=1.0e-06,error=4.29429408032e-09,no_qgrad=0.408727005666
+fd,atomic,direction=2,eps=1.0e-07,error=4.48821779041e-08,no_qgrad=0.408727024287
+fd,packed,direction=0,eps=1.0e-06,error=4.34427609305e-09,no_qgrad=0.41626672881
+fd,packed,direction=0,eps=1.0e-07,error=3.26074209879e-08,no_qgrad=0.416266739195
+fd,packed,direction=1,eps=1.0e-06,error=4.63362414912e-09,no_qgrad=0.461685957982
+fd,packed,direction=1,eps=1.0e-07,error=5.50440982735e-08,no_qgrad=0.461685954977
+fd,packed,direction=2,eps=1.0e-06,error=4.37341039495e-09,no_qgrad=0.408727004839
+fd,packed,direction=2,eps=1.0e-07,error=4.36906326951e-08,no_qgrad=0.40872702526
+agreement,op=0,direction=0,error=9.14893538106e-16
+agreement,op=1,direction=0,error=6.63676386467e-16
+agreement,op=1,direction=1,error=9.87838221938e-16
+agreement,op=1,direction=2,error=1.10253289516e-15
+payload,layout=atomic,field_capacity_bytes=13295744,packed_arena_bytes=0,harness_capacity_bytes=11196416
+payload,layout=packed,field_capacity_bytes=14711936,packed_arena_bytes=114000,harness_capacity_bytes=11196416
+storage,atomic_mesh=3438912,packed_retained_mesh=3438912,additional_packed_topology=2790232,ghost_buffer=1888256
+setup,atomic_ordering=0.007344384,packed_ordering=0.006509056,packing=0.016133632,packs=292,ghost_entries=59008,max_pack_nodes=570,ghost_rows=44216
+sample,op=residual,block=0,order=0,layout=atomic,repeat=12,seconds=0.079731409,error=0
+sample,op=residual,block=0,order=1,layout=packed,repeat=12,seconds=0.0509424471667,error=9.14893538106e-16
+sample,op=residual,block=1,order=0,layout=packed,repeat=12,seconds=0.0508629535833,error=9.14893538106e-16
+sample,op=residual,block=1,order=1,layout=atomic,repeat=12,seconds=0.079731361,error=0
+sample,op=residual,block=2,order=0,layout=atomic,repeat=12,seconds=0.0796882396667,error=0
+sample,op=residual,block=2,order=1,layout=packed,repeat=12,seconds=0.0508445408333,error=9.14893538106e-16
+sample,op=residual,block=3,order=0,layout=packed,repeat=12,seconds=0.050840045,error=9.14893538106e-16
+sample,op=residual,block=3,order=1,layout=atomic,repeat=12,seconds=0.0797488005833,error=0
+sample,op=residual,block=4,order=0,layout=atomic,repeat=12,seconds=0.0797699225833,error=0
+sample,op=residual,block=4,order=1,layout=packed,repeat=12,seconds=0.0508852355833,error=9.14893538106e-16
+sample,op=residual,block=5,order=0,layout=packed,repeat=12,seconds=0.0508472180833,error=9.14893538106e-16
+sample,op=residual,block=5,order=1,layout=atomic,repeat=12,seconds=0.07966250175,error=0
+sample,op=residual,block=6,order=0,layout=atomic,repeat=12,seconds=0.0799154543333,error=0
+sample,op=residual,block=6,order=1,layout=packed,repeat=12,seconds=0.0509570708333,error=9.14893538106e-16
+sample,op=residual,block=7,order=0,layout=packed,repeat=12,seconds=0.0508656681667,error=9.14893538106e-16
+sample,op=residual,block=7,order=1,layout=atomic,repeat=12,seconds=0.0796946180833,error=0
+sample,op=residual,block=8,order=0,layout=atomic,repeat=12,seconds=0.0807276810833,error=0
+sample,op=residual,block=8,order=1,layout=packed,repeat=12,seconds=0.0508701000833,error=9.14893538106e-16
+sample,op=residual,block=9,order=0,layout=packed,repeat=12,seconds=0.05093114625,error=9.14893538106e-16
+sample,op=residual,block=9,order=1,layout=atomic,repeat=12,seconds=0.0797312541667,error=0
+sample,op=residual,block=10,order=0,layout=atomic,repeat=12,seconds=0.0798123985,error=0
+sample,op=residual,block=10,order=1,layout=packed,repeat=12,seconds=0.0508337785833,error=9.14893538106e-16
+sample,op=residual,block=11,order=0,layout=packed,repeat=12,seconds=0.05085402325,error=9.14893538106e-16
+sample,op=residual,block=11,order=1,layout=atomic,repeat=12,seconds=0.0796864395,error=0
+sample,op=jacobian,block=0,order=0,layout=atomic,repeat=12,seconds=0.0907991640833,error=0
+sample,op=jacobian,block=0,order=1,layout=packed,repeat=12,seconds=0.0636718040833,error=1.10253289516e-15
+sample,op=jacobian,block=1,order=0,layout=packed,repeat=12,seconds=0.0636609083333,error=1.10253289516e-15
+sample,op=jacobian,block=1,order=1,layout=atomic,repeat=12,seconds=0.0909575220833,error=0
+sample,op=jacobian,block=2,order=0,layout=atomic,repeat=12,seconds=0.0910540738333,error=0
+sample,op=jacobian,block=2,order=1,layout=packed,repeat=12,seconds=0.06370402175,error=1.10253289516e-15
+sample,op=jacobian,block=3,order=0,layout=packed,repeat=12,seconds=0.0636500234167,error=1.10253289516e-15
+sample,op=jacobian,block=3,order=1,layout=atomic,repeat=12,seconds=0.09088443625,error=0
+sample,op=jacobian,block=4,order=0,layout=atomic,repeat=12,seconds=0.0908896280833,error=0
+sample,op=jacobian,block=4,order=1,layout=packed,repeat=12,seconds=0.0636262720833,error=1.10253289516e-15
+sample,op=jacobian,block=5,order=0,layout=packed,repeat=12,seconds=0.0637250050833,error=1.10253289516e-15
+sample,op=jacobian,block=5,order=1,layout=atomic,repeat=12,seconds=0.0909060728333,error=0
+sample,op=jacobian,block=6,order=0,layout=atomic,repeat=12,seconds=0.0910422901667,error=0
+sample,op=jacobian,block=6,order=1,layout=packed,repeat=12,seconds=0.0636624096667,error=1.10253289516e-15
+sample,op=jacobian,block=7,order=0,layout=packed,repeat=12,seconds=0.0636578738333,error=1.10253289516e-15
+sample,op=jacobian,block=7,order=1,layout=atomic,repeat=12,seconds=0.0908903533333,error=0
+sample,op=jacobian,block=8,order=0,layout=atomic,repeat=12,seconds=0.0909463250833,error=0
+sample,op=jacobian,block=8,order=1,layout=packed,repeat=12,seconds=0.06368198775,error=1.10253289516e-15
+sample,op=jacobian,block=9,order=0,layout=packed,repeat=12,seconds=0.06361893625,error=1.10253289516e-15
+sample,op=jacobian,block=9,order=1,layout=atomic,repeat=12,seconds=0.0909448530833,error=0
+sample,op=jacobian,block=10,order=0,layout=atomic,repeat=12,seconds=0.09090034775,error=0
+sample,op=jacobian,block=10,order=1,layout=packed,repeat=12,seconds=0.0636152270833,error=1.10253289516e-15
+sample,op=jacobian,block=11,order=0,layout=packed,repeat=12,seconds=0.0637158534167,error=1.10253289516e-15
+sample,op=jacobian,block=11,order=1,layout=atomic,repeat=12,seconds=0.09090509425,error=0
+UNSTRUCTURED OPERATOR STUDY PASSED

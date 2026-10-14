@@ -1,0 +1,1168 @@
+diff --git a/spikes/cvfem/src/frontend/staging/cvfem_hex8_packed_launch.hpp b/spikes/cvfem/src/frontend/staging/cvfem_hex8_packed_launch.hpp
+--- a/spikes/cvfem/src/frontend/staging/cvfem_hex8_packed_launch.hpp
++++ b/spikes/cvfem/src/frontend/staging/cvfem_hex8_packed_launch.hpp
+@@ -220,7 +220,7 @@
+     if (geom == GeomKind::Isoparam) {
+ #pragma omp parallel
+         apply_residual_packed_isoparam_range(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
+-                d.nelements, d.p.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, rx, ry, rz, rc, scratch_n);
++                d.nelements, d.p.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, rx, ry, rz, rc, scratch_n, d.pgx.data(), d.pgy.data(), d.pgz.data(), cvfem_hex8_rc_config_for(d), with_rc);
+     } else {
+         const Hex8RcConfig rc_cfg = cvfem_hex8_rc_config_for(d);
+ #pragma omp parallel
+@@ -325,7 +325,7 @@
+     // Hoisted out of the face loops -- see Hex8RhieChowPack::coeff. Its own cache key makes
+     // this free after the first call, so --warmup absorbs the build and the timed loop
+     // measures what the solver's Krylov iterations measure.
+-    cvfem_hex8_build_rc_coeff(d, rho, mu);
++    if (geom == GeomKind::Affine) cvfem_hex8_build_rc_coeff(d, rho, mu);
+     const size_t scratch_n = packed_scratch_n(p.max_actual_nodes_per_pack);
+     // Rhie-Chow staged per pack, exactly as apply_residual_packed does it and exactly as
+     // the solver's own packed Jacobian does (cvfem_hex8_ns_packed.hpp). Slot 3 grows from
+@@ -340,7 +340,7 @@
+ if (geom == GeomKind::Isoparam) {
+ #pragma omp parallel
+         apply_jacobian_action_packed_isoparam_range(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
+-                d.elems, d.nelements, d.p.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, dir, jv, ugrad, vgrad, limiter, venkat_c, with_ho, scratch_n, slot3_n);
++                d.elems, d.nelements, d.p.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, dir, jv, ugrad, vgrad, limiter, venkat_c, with_ho, scratch_n, slot3_n, d.pgx.data(), d.pgy.data(), d.pgz.data(), d.qgx.data(), d.qgy.data(), d.qgz.data(), cvfem_hex8_rc_config_for(d), with_rc, with_qg);
+     } else {
+ #pragma omp parallel
+         apply_jacobian_action_packed_affine_range(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
+diff --git a/spikes/cvfem/src/kernels/cvfem_hex8_element_gather.hpp b/spikes/cvfem/src/kernels/cvfem_hex8_element_gather.hpp
+--- a/spikes/cvfem/src/kernels/cvfem_hex8_element_gather.hpp
++++ b/spikes/cvfem/src/kernels/cvfem_hex8_element_gather.hpp
+@@ -137,7 +137,7 @@
+                           const scalar_t *const SFEM_RESTRICT uz_src,
+                           const scalar_t *const *const SFEM_RESTRICT adj_ptr,
+                           const scalar_t *const SFEM_RESTRICT        det_ptr,
+-                          const Hex8Extras &opt, const ptrdiff_t e) {
++                          const Hex8Extras &opt, const ptrdiff_t e, const bool affine_edges = true) {
+         if (!opt.with_rc && !opt.with_bnd) return;
+         gather_element_coords(elems, points, e, x, y, z);
+         if (opt.with_bnd) fmask = (int)face_mask[(size_t)e];
+@@ -162,7 +162,7 @@
+             // while the kernel under test takes the Jacobian column, and the two disagree
+             // wherever the mesh is not exactly affine in floating point -- amplified by the
+             // near-cancellation in the Rhie-Chow correction into a visible error.
+-            {
++            if (affine_edges) {
+                 scalar_t adj_[9], det_;
+                 load_hex8_adj(adj_ptr, det_ptr, e, adj_, &det_);
+                 scalar_t ex_[3], ey_[3], ez_[3];
+diff --git a/spikes/cvfem/src/kernels/microkernels/hex8/isoparametric/cvfem_hex8_ns_upwind_isoparam.hpp b/spikes/cvfem/src/kernels/microkernels/hex8/isoparametric/cvfem_hex8_ns_upwind_isoparam.hpp
+--- a/spikes/cvfem/src/kernels/microkernels/hex8/isoparametric/cvfem_hex8_ns_upwind_isoparam.hpp
++++ b/spikes/cvfem/src/kernels/microkernels/hex8/isoparametric/cvfem_hex8_ns_upwind_isoparam.hpp
+@@ -289,13 +289,52 @@
+     }
+ }
+ 
++// Use the same face coefficient and its velocity derivative as the scalar path.
++template <bool Action, typename T>
++static SFEM_INLINE void cvfem_hex8_isoparam_rc_flux(
++        const T rho, const T mu, const Hex8CoordPackT<T> &xyz,
++        const Hex8InputPackT<T> &u, const Hex8InputPackT<T> &du,
++        const Hex8RhieChowPackT<T> &rc, const T scale, const bool with_qg,
++        const int i, const int j, const int lane, const T ax, const T ay, const T az,
++        T &flux, T &dflux) {
++    const T half = T(0.5);
++    const T dx = xyz.x[j][lane] - xyz.x[i][lane];
++    const T dy = xyz.y[j][lane] - xyz.y[i][lane];
++    const T dz = xyz.z[j][lane] - xyz.z[i][lane];
++    const T ux = half * (u.ux[i][lane] + u.ux[j][lane]);
++    const T uy = half * (u.uy[i][lane] + u.uy[j][lane]);
++    const T uz = half * (u.uz[i][lane] + u.uz[j][lane]);
++    const T coeff = cvfem_hex8_rhie_chow_mdot_coeff(rho, mu, scale, dx, dy, dz,
++        ax, ay, az, rc.tau.u2_scale * (ux*ux + uy*uy + uz*uz), rc.tau.inv_dt_a0);
++    flux = dflux = T(0);
++    if (coeff == T(0)) return;
++    const T corr = (u.p[j][lane] - u.p[i][lane]) - half *
++        ((rc.pgx[i][lane] + rc.pgx[j][lane]) * dx +
++         (rc.pgy[i][lane] + rc.pgy[j][lane]) * dy +
++         (rc.pgz[i][lane] + rc.pgz[j][lane]) * dz);
++    flux = -coeff * corr;
++    if constexpr (Action) {
++        T qcorr = du.p[j][lane] - du.p[i][lane];
++        if (with_qg) qcorr -= half *
++            ((rc.qgx[i][lane] + rc.qgx[j][lane]) * dx +
++             (rc.qgy[i][lane] + rc.qgy[j][lane]) * dy +
++             (rc.qgz[i][lane] + rc.qgz[j][lane]) * dz);
++        const T w = cvfem_hex8_rhie_chow_du_weight(scale, ax*ax + ay*ay + az*az,
++            ax*dx + ay*dy + az*dz, dx*dx + dy*dy + dz*dz, rc.tau.u2_scale);
++        const T udotv = half * (ux * (du.ux[i][lane] + du.ux[j][lane]) +
++            uy * (du.uy[i][lane] + du.uy[j][lane]) + uz * (du.uz[i][lane] + du.uz[j][lane]));
++        dflux = -coeff * qcorr + cvfem_hex8_rhie_chow_coeff_du(coeff, w) * corr * udotv;
++    }
++}
++
+ template <typename scalar_t>
+ static SFEM_INLINE void cvfem_hex8_ns_upwind_residual_isoparam_simd(const scalar_t      rho_s,
+                                                                    const scalar_t      mu_s,
+                                                                    const Hex8CoordPackT<scalar_t> &xyz,
+                                                                    const Hex8InputPackT<scalar_t> &in,
+                                                                    Hex8ResidualPackT<scalar_t>    &out,
+-                                               const scalar_t ueps = scalar_t(0)) {
++                                               const scalar_t ueps = scalar_t(0),
++        const Hex8RhieChowPackT<scalar_t> *rc = nullptr, const scalar_t rc_scale = scalar_t(0)) {
+     const scalar_t rho  = rho_s;
+     const scalar_t mu   = mu_s;
+     const scalar_t half = scalar_t(0.5);
+@@ -373,7 +412,10 @@
+             const scalar_t adv_x = half * (in.ux[i][lane] + in.ux[j][lane]);
+             const scalar_t adv_y = half * (in.uy[i][lane] + in.uy[j][lane]);
+             const scalar_t adv_z = half * (in.uz[i][lane] + in.uz[j][lane]);
+-            const scalar_t mdot  = rho * (adv_x * ax + adv_y * ay + adv_z * az);
++            scalar_t rc_flux = 0, unused = 0;
++            if (rc) cvfem_hex8_isoparam_rc_flux<false>(rho, mu, xyz, in, in, *rc,
++                rc_scale, false, i, j, lane, ax, ay, az, rc_flux, unused);
++            const scalar_t mdot = rho * (adv_x * ax + adv_y * ay + adv_z * az) + rc_flux;
+             scalar_t amdot, sgn;
+             cvfem_upwind_abs(mdot, ueps, amdot, sgn);
+             const scalar_t mpos  = half * (mdot + amdot);
+@@ -401,7 +443,9 @@
+                                                                           const Hex8InputPackT<scalar_t> &u,
+                                                                           const Hex8InputPackT<scalar_t> &du,
+                                                                           Hex8ResidualPackT<scalar_t>    &out,
+-                                               const scalar_t ueps = scalar_t(0)) {
++                                               const scalar_t ueps = scalar_t(0),
++        const Hex8RhieChowPackT<scalar_t> *rc = nullptr, const scalar_t rc_scale = scalar_t(0),
++        const bool with_qg = false) {
+     const scalar_t rho  = rho_s;
+     const scalar_t mu   = mu_s;
+     const scalar_t half = scalar_t(0.5);
+@@ -477,7 +521,10 @@
+             const scalar_t adv_x = half * (u.ux[i][lane] + u.ux[j][lane]);
+             const scalar_t adv_y = half * (u.uy[i][lane] + u.uy[j][lane]);
+             const scalar_t adv_z = half * (u.uz[i][lane] + u.uz[j][lane]);
+-            const scalar_t mdot  = rho * (adv_x * ax + adv_y * ay + adv_z * az);
++            scalar_t rc_flux = 0, rc_dflux = 0;
++            if (rc) cvfem_hex8_isoparam_rc_flux<true>(rho, mu, xyz, u, du, *rc,
++                rc_scale, with_qg, i, j, lane, ax, ay, az, rc_flux, rc_dflux);
++            const scalar_t mdot = rho * (adv_x * ax + adv_y * ay + adv_z * az) + rc_flux;
+             scalar_t amdot, sgn;
+             cvfem_upwind_abs(mdot, ueps, amdot, sgn);
+             const scalar_t mpos  = half * (mdot + amdot);
+@@ -486,7 +533,7 @@
+             const scalar_t d_neg = half * (one - sgn);
+             const scalar_t dmdot = rho * half *
+                                    ((du.ux[i][lane] + du.ux[j][lane]) * ax + (du.uy[i][lane] + du.uy[j][lane]) * ay +
+-                                    (du.uz[i][lane] + du.uz[j][lane]) * az);
++                                    (du.uz[i][lane] + du.uz[j][lane]) * az) + rc_dflux;
+             const scalar_t dpos = d_pos * dmdot;
+             const scalar_t dneg = d_neg * dmdot;
+             const scalar_t qmid = half * (du.p[i][lane] + du.p[j][lane]);
+diff --git a/spikes/cvfem/src/kernels/packed/cvfem_hex8_pack_staging.hpp b/spikes/cvfem/src/kernels/packed/cvfem_hex8_pack_staging.hpp
+--- a/spikes/cvfem/src/kernels/packed/cvfem_hex8_pack_staging.hpp
++++ b/spikes/cvfem/src/kernels/packed/cvfem_hex8_pack_staging.hpp
+@@ -686,10 +686,7 @@
+ }
+ 
+ 
+-// ONE PACK'S LANE LOOP FOR THE JACOBIAN ACTION, ISOPARAMETRIC. The Jacobian comes per
+-// sub-control surface from the coordinates the pack staged, so this takes no adjugate table and
+-// no Rhie-Chow -- the isoparametric SIMD kernel carries no such term, which is why the driver
+-// refuses --rhie-chow on this geometry for a pack-based layout.
++// Isoparametric actions use staged coordinates and optional RC gradients.
+ template <typename scalar_t, typename idx_t, typename pack_idx_t>
+ static SFEM_INLINE void cvfem_hex8_action_lanes_isoparam(
+         const Hex8PackExtentT<idx_t>       &x,
+@@ -699,11 +696,15 @@
+         const scalar_t *const SFEM_RESTRICT pack_dir,
+         scalar_t *const SFEM_RESTRICT       pack_out,
+         const scalar_t                      rho,
+-        const scalar_t                      mu) {
++        const scalar_t                      mu,
++        const Hex8PackQGradT<scalar_t> *qg = nullptr,
++        const Hex8RcConfigT<scalar_t> *rc_cfg = nullptr,
++        const bool with_rc = false, const bool with_qg = false) {
+     Hex8InputPackT<scalar_t>    u_pack;
+     Hex8InputPackT<scalar_t>    du_pack;
+     Hex8ResidualPackT<scalar_t> outp;
+     Hex8CoordPackT<scalar_t>    xyz;
++    Hex8RhieChowPackT<scalar_t> rcp;
+         for (ptrdiff_t begin = x.e_start; begin < x.e_end; begin += cvfem_hex8_vec_size<scalar_t>) {
+             const int nlanes = int(MIN((ptrdiff_t)cvfem_hex8_vec_size<scalar_t>, x.e_end - begin));
+             gather_hex8_isoparam_action_simd_from_pack(pack_elems,
+@@ -717,7 +718,13 @@
+                                                        u_pack,
+                                                        du_pack,
+                                                        xyz);
+-            cvfem_hex8_ns_upwind_jacobian_action_isoparam_simd(rho, mu, xyz, u_pack, du_pack, outp);
++            if (with_rc) cvfem_hex8_gather_rc_from_pack(pack_elems, pk.pgx, pk.pgy, pk.pgz,
++                begin, nlanes, rcp, rc_cfg->tau);
++            if (with_qg) cvfem_hex8_gather_qg_from_pack(pack_elems, qg->x, qg->y, qg->z,
++                begin, nlanes, rcp);
++            cvfem_hex8_ns_upwind_jacobian_action_isoparam_simd(rho, mu, xyz, u_pack, du_pack,
++                outp, scalar_t(0), with_rc ? &rcp : nullptr,
++                with_rc ? rc_cfg->scale : scalar_t(0), with_qg);
+             scatter_hex8_simd_to_pack(pack_elems, pack_out, begin, nlanes, outp);
+         }
+ }
+diff --git a/spikes/cvfem/src/kernels/packed/isoparametric/cvfem_hex8_best_packed_isoparam.hpp b/spikes/cvfem/src/kernels/packed/isoparametric/cvfem_hex8_best_packed_isoparam.hpp
+--- a/spikes/cvfem/src/kernels/packed/isoparametric/cvfem_hex8_best_packed_isoparam.hpp
++++ b/spikes/cvfem/src/kernels/packed/isoparametric/cvfem_hex8_best_packed_isoparam.hpp
+@@ -10,12 +10,7 @@
+ // These sweeps derive the Jacobian per sub-control surface from the element's node
+ // coordinates, which the pack stages for them -- so they take `points` and no adjugate table.
+ //
+-// SIX PARAMETERS FEWER THAN THE TEMPLATED SWEEP THEY CAME FROM, which is the clause the
+-// template could not satisfy: "the signatures of the functions are lean-and-mean only arguments
+-// that are acually used are passed". The isoparametric SIMD kernels carry no Rhie-Chow term --
+-// it was never put into them -- so the driver refuses --rhie-chow on this geometry for any
+-// pack-based layout, and with_rc was dead here. Gone with it: adj_ptr, det_ptr, pgx, pgy, pgz,
+-// rhie_chow_scale and the staging call that filled a pressure gradient nothing read.
++// Rhie-Chow uses each surface geometry and the staged nodal pressure gradients.
+ 
+ #include "kernels/packed/cvfem_hex8_best_packed.hpp"
+ #include "kernels/packed/cvfem_hex8_best_store.hpp"
+@@ -47,11 +42,13 @@
+         scalar_t *const SFEM_RESTRICT ry,
+         scalar_t *const SFEM_RESTRICT rz,
+         scalar_t *const SFEM_RESTRICT rc,
+-        const size_t scratch_n) {
++        const size_t scratch_n,
++        const scalar_t *pgx, const scalar_t *pgy, const scalar_t *pgz,
++        const Hex8RcConfigT<scalar_t> &rc_cfg, const int with_rc) {
+         scalar_t *const SFEM_RESTRICT pack_u   = thread_scratch<scalar_t>(0, scratch_n);
+         scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(1, scratch_n);
+         // Coordinates always: this geometry derives its Jacobian from them.
+-        const Hex8PackCoordsT<scalar_t> pk = cvfem_hex8_pack_coords<scalar_t>(true, 0, max_actual_nodes_per_pack);
++        const Hex8PackCoordsT<scalar_t> pk = cvfem_hex8_pack_coords<scalar_t>(true, with_rc, max_actual_nodes_per_pack);
+ 
+ 
+ 
+@@ -63,7 +60,8 @@
+ 
+             fill_pack_fields(owned_nodes_ptr, ux, uy, uz, pres, pack, x.n_contiguous, x.n_ghost, x.ghosts, pack_u);
+ 
+-            fill_pack_xyz(owned_nodes_ptr, points, pack, x.n_contiguous, x.n_ghost, x.ghosts, pk.x, pk.y, pk.z);
++            cvfem_hex8_fill_pack_xyz_pgrad(owned_nodes_ptr, points, pgx, pgy, pgz, with_rc,
++                pack, x.n_contiguous, x.n_ghost, x.ghosts, pk.x, pk.y, pk.z, pk.pgx, pk.pgy, pk.pgz);
+             // THE LANE LOOP IS WRITTEN OUT HERE, AND IN THE PACK-COLOURED SWEEP BELOW, AND
+             // THE REASON IS NOT THE ONE THIS COMMENT USED TO GIVE.
+             //
+@@ -89,11 +87,15 @@
+                 Hex8InputPackT<scalar_t>    in;
+                 Hex8CoordPackT<scalar_t>    xyz;
+                 Hex8ResidualPackT<scalar_t> outp;
++                Hex8RhieChowPackT<scalar_t> rcp;
+             for (ptrdiff_t begin = x.e_start; begin < x.e_end; begin += cvfem_hex8_vec_size<scalar_t>) {
+                 const int nlanes = int(MIN((ptrdiff_t)cvfem_hex8_vec_size<scalar_t>, x.e_end - begin));
+                 gather_hex8_isoparam_simd_from_pack(pack_elems, pack_u, pk.x, pk.y, pk.z, begin, nlanes,
+                                                     in, xyz);
+-                cvfem_hex8_ns_upwind_residual_isoparam_simd(rho, mu, xyz, in, outp);
++                if (with_rc) cvfem_hex8_gather_rc_from_pack(pack_elems, pk.pgx, pk.pgy, pk.pgz,
++                    begin, nlanes, rcp, rc_cfg.tau);
++                cvfem_hex8_ns_upwind_residual_isoparam_simd(rho, mu, xyz, in, outp,
++                    scalar_t(0), with_rc ? &rcp : nullptr, rc_cfg.scale);
+                 scatter_hex8_simd_to_pack(pack_elems, pack_out, begin, nlanes, outp);
+             }
+ 
+@@ -105,12 +107,7 @@
+ // The ISOPARAMETRIC Jacobian action. It derives the Jacobian per sub-control surface from the
+ // element's node coordinates, which the pack stages for it.
+ //
+-// TWELVE PARAMETERS FEWER than the templated sweep it came from. Its SIMD kernel takes the
+-// coordinates and the two lane packs and nothing else: no Rhie-Chow term (never put into the
+-// isoparametric kernels, which is why the driver refuses --rhie-chow on this geometry for a
+-// pack-based layout), no staged direction gradient, no adjugate table, no boundary extras. All
+-// of that was dead in this half of the `if constexpr` and had to be in the signature anyway,
+-// because a sweep templated on the geometry takes the union of both halves' needs.
++// State gradients are reused; direction gradients change with each action.
+ template <typename scalar_t, typename idx_t, typename pack_idx_t, typename geom_t, typename grad_t>
+ static SFEM_NOINLINE void apply_jacobian_action_packed_isoparam_range(
+         const cvfem_range packs,
+@@ -142,7 +139,10 @@
+         const scalar_t venkat_c,
+         const bool with_ho,
+         const size_t scratch_n,
+-        const size_t slot3_n) {
++        const size_t slot3_n,
++        const scalar_t *pgx, const scalar_t *pgy, const scalar_t *pgz,
++        const scalar_t *qgx, const scalar_t *qgy, const scalar_t *qgz,
++        const Hex8RcConfigT<scalar_t> &rc_cfg, const int with_rc, const bool with_qg) {
+         // The breakdown covered packed assembly and the colored matvec but not this one --
+         // the operator the solver's Krylov loop actually applies. Without it nothing here
+         // could be attributed to a phase.
+@@ -151,7 +151,8 @@
+         scalar_t *const SFEM_RESTRICT pack_dir = thread_scratch<scalar_t>(1, scratch_n);
+         scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(2, scratch_n);
+         const Hex8PackCoordsT<scalar_t> pk =
+-                cvfem_hex8_pack_coords<scalar_t>(/*want_xyz=*/true, /*with_rc=*/0, max_actual_nodes_per_pack);
++                cvfem_hex8_pack_coords<scalar_t>(/*want_xyz=*/true, with_rc, max_actual_nodes_per_pack);
++        const auto qg = cvfem_hex8_pack_qgrad<scalar_t>(with_qg, max_actual_nodes_per_pack);
+ 
+ 
+ 
+@@ -166,19 +167,15 @@
+             fill_pack_fields(owned_nodes_ptr, ux, uy, uz, pres, pack, x.n_contiguous, x.n_ghost, x.ghosts, pack_u);
+             fill_pack_interleaved(owned_nodes_ptr, pack, x.n_contiguous, x.n_ghost, x.ghosts, dir, pack_dir);
+ 
+-            Hex8RhieChowPackT<scalar_t> rcp;
+-            // The two gradient packs, staged exactly as apply_residual_packed_defcor stages its
+-            // one. The limiter and eps^2 live on the state pack because that is where the
+-            // correction's own kernel reads them; the direction pack carries only the field.
+-            Hex8UGradPackT<scalar_t>    hop, hovp;
+-            hop.limiter  = limiter;
+-            hop.venkat_c = venkat_c;
+             // Coordinates always: this geometry derives its Jacobian from them.
+-                fill_pack_xyz(owned_nodes_ptr, points, pack, x.n_contiguous, x.n_ghost, x.ghosts, pk.x, pk.y, pk.z);
++                cvfem_hex8_fill_pack_xyz_pgrad(owned_nodes_ptr, points, pgx, pgy, pgz, with_rc,
++                pack, x.n_contiguous, x.n_ghost, x.ghosts, pk.x, pk.y, pk.z, pk.pgx, pk.pgy, pk.pgz);
++            if (with_qg) cvfem_hex8_fill_pack_qgrad(owned_nodes_ptr, qgx, qgy, qgz,
++                pack, x.n_contiguous, x.n_ghost, x.ghosts, qg.x, qg.y, qg.z);
+             CVFEM_PHASE_MARK(acc, _t, PH_GATHER);
+ 
+             cvfem_hex8_action_lanes_isoparam(x, pk, pack_elems, pack_u, pack_dir, pack_out,
+-                                             rho, mu);
++                                             rho, mu, &qg, &rc_cfg, with_rc, with_qg);
+             CVFEM_PHASE_MARK(acc, _t, PH_KERNEL);
+ 
+             cvfem_hex8_drain_pack_aos(x, pack_out, n_ghost_entries, ghost_buf, jv);
+diff --git a/spikes/cvfem/src/kernels/standard/isoparametric/cvfem_hex8_best_atomic_isoparam.hpp b/spikes/cvfem/src/kernels/standard/isoparametric/cvfem_hex8_best_atomic_isoparam.hpp
+--- a/spikes/cvfem/src/kernels/standard/isoparametric/cvfem_hex8_best_atomic_isoparam.hpp
++++ b/spikes/cvfem/src/kernels/standard/isoparametric/cvfem_hex8_best_atomic_isoparam.hpp
+@@ -51,7 +51,7 @@
+     for (ptrdiff_t e = 0; e < nelements; ++e) {
+         scalar_t         ux[8], uy[8], uz[8], p[8], vx[8], vy[8], vz[8], q[8], r[CVFEM_HEX8_N_DOF];
+         Hex8ExtraScratch ex;
+-        ex.load(mesh_elems, points, face_mask, pgx, pgy, pgz, qgx, qgy, qgz, ux_src, uy_src, uz_src, adj_ptr, det_ptr, opt, e);
++        ex.load(mesh_elems, points, face_mask, pgx, pgy, pgz, qgx, qgy, qgz, ux_src, uy_src, uz_src, adj_ptr, det_ptr, opt, e, false);
+         if (!opt.with_rc && !opt.with_bnd) gather_element_coords(mesh_elems, points, e, ex.x, ex.y, ex.z);
+         gather_element_fields(mesh_elems, ux_src, uy_src, uz_src, pres, e, ux, uy, uz, p);
+         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+@@ -109,7 +109,7 @@
+     for (ptrdiff_t e = 0; e < nelements; ++e) {
+         scalar_t         ux[8], uy[8], uz[8], p[8], r[CVFEM_HEX8_N_DOF];
+         Hex8ExtraScratch ex;
+-        ex.load(mesh_elems, points, face_mask, pgx, pgy, pgz, qgx, qgy, qgz, ux_src, uy_src, uz_src, adj_ptr, det_ptr, opt, e);
++        ex.load(mesh_elems, points, face_mask, pgx, pgy, pgz, qgx, qgy, qgz, ux_src, uy_src, uz_src, adj_ptr, det_ptr, opt, e, false);
+         if (!opt.with_rc && !opt.with_bnd) gather_element_coords(mesh_elems, points, e, ex.x, ex.y, ex.z);
+         gather_element_fields(mesh_elems, ux_src, uy_src, uz_src, pres, e, ux, uy, uz, p);
+         cvfem_hex8_ns_upwind_residual_isoparam(rho, mu, ex.x, ex.y, ex.z, ux, uy, uz, p, r, ex.rc);
+@@ -284,7 +284,7 @@
+         ptrdiff_t        sl[64];
+         scalar_t         ux[8], uy[8], uz[8], p[8];
+         Hex8ExtraScratch ex;
+-        ex.load(mesh_elems, points, face_mask, pgx, pgy, pgz, qgx, qgy, qgz, ux_src, uy_src, uz_src, adj_ptr, det_ptr, opt, e);
++        ex.load(mesh_elems, points, face_mask, pgx, pgy, pgz, qgx, qgy, qgz, ux_src, uy_src, uz_src, adj_ptr, det_ptr, opt, e, false);
+         if (!opt.with_rc && !opt.with_bnd) gather_element_coords(mesh_elems, points, e, ex.x, ex.y, ex.z);
+         diag_node_slots(mesh_elems, e, sl);
+         gather_element_fields(mesh_elems, ux_src, uy_src, uz_src, pres, e, ux, uy, uz, p);
+diff --git a/spikes/cvfem/src/drivers/cvfem_hex8_unstructured_bench.cpp b/spikes/cvfem/src/drivers/cvfem_hex8_unstructured_bench.cpp
+new file mode 100644
+--- /dev/null
++++ b/spikes/cvfem/src/drivers/cvfem_hex8_unstructured_bench.cpp
+@@ -0,0 +1,272 @@
++#include "frontend/staging/cvfem_hex8_best_common.hpp"
++#include "kernels/standard/isoparametric/cvfem_hex8_best_atomic_isoparam.hpp"
++#include "frontend/staging/cvfem_hex8_packed_launch.hpp"
++#include <array>
++#include <stdexcept>
++#include <string>
++
++struct UnstructuredRun {
++    MeshData d;
++    PackedData p;
++    bool packed = false;
++    std::vector<scalar_t> grad_buffer, out;
++    std::array<std::vector<scalar_t>, 3> direction;
++    std::array<std::vector<scalar_t>, 4> state;
++    double packing_seconds = 0, ordering_seconds = 0;
++};
++
++static void require(bool ok, const char *message) {
++    if (!ok) throw std::runtime_error(message);
++}
++
++static void load_run(UnstructuredRun &r, const std::string &path, int pack) {
++    r.d.mesh = smesh::Mesh::create_from_file(smesh::Communicator::self(), smesh::Path(path));
++    require(r.d.mesh && r.d.mesh->n_nodes() > 0 && r.d.mesh->element_type(0) == smesh::HEX8,
++            "expected a nonempty HEX8 mesh");
++    double t = wall_time();
++    smesh::SFC::create_from_env()->reorder(*r.d.mesh);
++    r.ordering_seconds = wall_time()-t;
++    r.packed = pack > 0;
++    if (r.packed) { t=wall_time(); r.p=make_packed(r.d.mesh,pack); r.packing_seconds=wall_time()-t; }
++    auto &d=r.d;
++    d.nnodes=d.mesh->n_nodes(); d.nelements=d.mesh->n_elements(0);
++    d.points=d.mesh->points()->data(); d.elems=d.mesh->elements(0)->data();
++    fill_fields(d);
++    d.rhie_chow_scale=1;
++    r.out.resize(size_t(d.nnodes)*4);
++    for (auto &v:r.direction) v.resize(r.out.size());
++}
++
++static void gradient(UnstructuredRun &r, const scalar_t *src, int stride,
++                     std::vector<scalar_t> &gx, std::vector<scalar_t> &gy, std::vector<scalar_t> &gz) {
++    if(r.packed) cvfem_hex8_assemble_nodal_grads_packed(r.d,r.p,1,src,stride,gx,gy,gz,r.grad_buffer);
++    else cvfem_hex8_assemble_nodal_grads_atomic(r.d,1,src,stride,gx,gy,gz);
++}
++
++static void state_gradient(UnstructuredRun &r) {
++    gradient(r,r.d.p.data(),1,r.d.pgx,r.d.pgy,r.d.pgz);
++}
++
++static void verify_linear_gradient(UnstructuredRun &r) {
++    std::vector<scalar_t> pressure(size_t(r.d.nnodes)), gx, gy, gz;
++    for(ptrdiff_t i=0;i<r.d.nnodes;++i)
++        pressure[i]=r.d.points[0][i]+2.*r.d.points[1][i]+3.*r.d.points[2][i];
++    gradient(r,pressure.data(),1,gx,gy,gz);
++    double error=0;
++    for(ptrdiff_t i=0;i<r.d.nnodes;++i) {
++        require(std::isfinite(gx[i])&&std::isfinite(gy[i])&&std::isfinite(gz[i]),"nonfinite reconstructed gradient");
++        error=std::max({error,std::abs(gx[i]-1),std::abs(gy[i]-2),std::abs(gz[i]-3)});
++    }
++    std::printf("linear_gradient,layout=%s,error=%.12g\n",r.packed?"packed":"atomic",error);
++    require(error<1e-11,"physical linear gradient is not reproduced");
++}
++
++static void apply(UnstructuredRun &r, bool jacobian, int direction=0, bool omit_qgrad=false) {
++    auto &d=r.d;
++    constexpr scalar_t rho=1.3, mu=.027;
++    if(jacobian) {
++        const auto &v=r.direction[direction];
++        gradient(r,v.data()+3,4,d.qgx,d.qgy,d.qgz);
++        if(omit_qgrad) { d.qgx.clear();d.qgy.clear();d.qgz.clear(); }
++        if(r.packed) apply_jacobian_action_packed(d,r.p,rho,mu,GeomKind::Isoparam,v.data(),r.out.data());
++        else apply_jacobian_action_atomic_isoparam(d.adj_ptr,d.det_ptr,d.elems,d.face_mask.data(),
++            d.nelements,d.nnodes,d.p.data(),d.pgx.data(),d.pgy.data(),d.pgz.data(),d.points,
++            d.qgx.data(),d.qgy.data(),d.qgz.data(),d.ux.data(),d.uy.data(),d.uz.data(),
++            cvfem_hex8_extras_of(d),rho,mu,v.data(),r.out.data());
++    } else {
++        state_gradient(r);
++        if(r.packed) apply_residual_packed(d,r.p,rho,mu,GeomKind::Isoparam);
++        else apply_residual_atomic_isoparam(d.adj_ptr,d.det_ptr,d.elems,d.face_mask.data(),
++            d.nelements,d.nnodes,d.p.data(),d.pgx.data(),d.pgy.data(),d.pgz.data(),d.points,
++            d.qgx.data(),d.qgy.data(),d.qgz.data(),d.rc.data(),d.rx.data(),d.ry.data(),d.rz.data(),
++            d.ux.data(),d.uy.data(),d.uz.data(),cvfem_hex8_extras_of(d),rho,mu);
++        // Result packing is checked outside timing; the residual writes its native SoA.
++    }
++}
++
++static std::vector<scalar_t> output(const UnstructuredRun &r, bool jacobian) {
++    if(jacobian) return r.out;
++    std::vector<scalar_t> v(size_t(r.d.nnodes)*4);
++    for(ptrdiff_t i=0;i<r.d.nnodes;++i) {
++        v[4*i]=r.d.rx[i];v[4*i+1]=r.d.ry[i];v[4*i+2]=r.d.rz[i];v[4*i+3]=r.d.rc[i];
++    }
++    return v;
++}
++
++static double relative_error(const std::vector<scalar_t> &a, const std::vector<scalar_t> &b) {
++    require(a.size()==b.size()&&!a.empty(),"incompatible vectors");
++    std::array<double,4> error{},scale{};
++    for(size_t i=0;i<a.size();++i) {
++        require(std::isfinite(a[i])&&std::isfinite(b[i]),"nonfinite operator output");
++        error[i%4]=std::max(error[i%4],std::abs(a[i]-b[i]));
++        scale[i%4]=std::max(scale[i%4],std::max(std::abs(a[i]),std::abs(b[i])));
++    }
++    double worst=0;
++    for(int c=0;c<4;++c) {
++        require(scale[c]>0,"zero equation reference");
++        worst=std::max(worst,error[c]/scale[c]);
++    }
++    return worst;
++}
++
++static void conservation(const std::vector<scalar_t> &v) {
++    std::array<long double,4> sum{},scale{};
++    for(size_t i=0;i<v.size();++i) { require(std::isfinite(v[i]),"nonfinite flux");sum[i%4]+=v[i];scale[i%4]+=std::abs(v[i]); }
++    for(int c=0;c<4;++c) require(std::abs(sum[c])<=1e-11L*scale[c],"interior face cancellation failed");
++}
++
++static void set_step(UnstructuredRun &r, double step, int k) {
++    auto &d=r.d;std::vector<scalar_t>* fields[]={&d.ux,&d.uy,&d.uz,&d.p};
++    for(int c=0;c<4;++c) for(ptrdiff_t i=0;i<d.nnodes;++i)
++        (*fields[c])[i]=r.state[c][i]+step*r.direction[k][4*i+c];
++    ++d.state_stamp;
++}
++
++static void verify_fd(UnstructuredRun &r) {
++    for(int k=0;k<3;++k) {
++        set_step(r,0,k);state_gradient(r);apply(r,true,k);auto exact=r.out;
++        apply(r,true,k,true);auto omitted=r.out;
++        for(double eps:{1e-6,1e-7}) {
++            set_step(r,eps,k);apply(r,false);auto plus=output(r,false);
++            set_step(r,-eps,k);apply(r,false);auto minus=output(r,false);
++            for(size_t i=0;i<plus.size();++i) plus[i]=(plus[i]-minus[i])/(2*eps);
++            double err=relative_error(exact,plus),control=relative_error(omitted,plus);
++            std::printf("fd,%s,direction=%d,eps=%.1e,error=%.12g,no_qgrad=%.12g\n",
++                        r.packed?"packed":"atomic",k,eps,err,control);
++            require(err<1e-6,"composed isoparametric finite difference failed");
++            require(control>1e-5,"direction-gradient omission control was not detected");
++        }
++    }
++    set_step(r,0,0);state_gradient(r);
++}
++
++static void geometry_check(const MeshData &d) {
++    double smallest=std::numeric_limits<double>::infinity();
++    for(ptrdiff_t e=0;e<d.nelements;++e) {
++        scalar_t x[8],y[8],z[8];
++        for(int a=0;a<8;++a) {const auto i=d.elems[a][e];x[a]=d.points[0][i];y[a]=d.points[1][i];z[a]=d.points[2][i];}
++        for(double qx:{0.,.5,1.}) for(double qy:{0.,.5,1.}) for(double qz:{0.,.5,1.}) {
++            scalar_t adj[9],det;cvfem_hex8_geom_at(x,y,z,qx,qy,qz,adj,&det);
++            require(std::isfinite(det)&&det>0,"invalid element Jacobian");smallest=std::min(smallest,det);
++        }
++    }
++    std::printf("geometry,min_sampled_det=%.12g\n",smallest);
++}
++
++static size_t mesh_bytes(const UnstructuredRun &r) {
++    return r.d.mesh->points()->nbytes()+r.d.mesh->elements(0)->nbytes();
++}
++
++static int run(int argc,char **argv) {
++    std::string path;int pack=1024,repeat=3,warmup=3,blocks=12;bool verify_only=false;
++    for(int i=1;i<argc;++i) {
++        std::string arg=argv[i];
++        if(arg=="--verify-only") {verify_only=true;continue;}
++        require(i+1<argc,"missing argument value");
++        std::string value=argv[++i];
++        if(arg=="--mesh") path=value;
++        else {
++            size_t pos=0;int n=std::stoi(value,&pos);require(pos==value.size()&&n>0,"invalid positive integer");
++            if(arg=="--pack-size")pack=n;else if(arg=="--repeat")repeat=n;
++            else if(arg=="--warmup")warmup=n;else if(arg=="--blocks")blocks=n;
++            else throw std::runtime_error("unknown argument: "+arg);
++        }
++    }
++    require(!path.empty()&&pack<=8192&&blocks<=100&&repeat<=1000&&warmup<=100,"unsupported run scope");
++    int threads=1;
++#pragma omp parallel
++    {
++#pragma omp single
++        threads=omp_get_num_threads();
++    }
++    UnstructuredRun atomic,packed;
++    load_run(atomic,path,0);load_run(packed,path,pack);
++    require(atomic.d.nnodes==packed.d.nnodes&&atomic.d.nelements==packed.d.nelements,"different meshes");
++    geometry_check(atomic.d);
++    verify_linear_gradient(atomic);verify_linear_gradient(packed);
++    const auto *map=packed.p.packed->node_map()->data();
++    std::vector<unsigned char> seen(size_t(atomic.d.nnodes),0);
++    for(ptrdiff_t i=0;i<atomic.d.nnodes;++i) {
++        const auto j=map[i];require(j>=0&&j<packed.d.nnodes&&!seen[j],"invalid node permutation");seen[j]=1;
++        for(int c=0;c<3;++c)require(atomic.d.points[c][i]==packed.d.points[c][j],"coordinate permutation mismatch");
++        const double x=atomic.d.points[0][i],y=atomic.d.points[1][i],z=atomic.d.points[2][i];
++        atomic.d.p[i]=.3*std::sin(2*x+3*y+5*z)+.17*x*y;
++        std::vector<scalar_t>* a[]={&atomic.d.ux,&atomic.d.uy,&atomic.d.uz,&atomic.d.p};
++        std::vector<scalar_t>* b[]={&packed.d.ux,&packed.d.uy,&packed.d.uz,&packed.d.p};
++        for(int c=0;c<4;++c)(*b[c])[j]=(*a[c])[i];
++        for(int k=0;k<3;++k)for(int c=0;c<4;++c) {
++            const double value=.11*std::sin((c+1.3)*x+(k+2.1)*y+(c+k+.7)*z+.3)+.03*(c+1);
++            atomic.direction[k][4*i+c]=value;packed.direction[k][4*j+c]=value;
++        }
++    }
++    for(auto *r:{&atomic,&packed}) {
++        r->state={r->d.ux,r->d.uy,r->d.uz,r->d.p};
++        const auto cfg=cvfem_hex8_rc_config_for(r->d);
++        require(cfg.scale==1&&cfg.tau.u2_scale==1&&cfg.tau.inv_dt_a0==0,"requires the steady combined RC coefficient");
++        state_gradient(*r);
++    }
++    std::printf("scope,first_order_RC,isoparametric,steady_interior,rho=1.3,mu=0.027,threads=%d,elements=%td,nodes=%td,pack=%d\n",
++        threads,atomic.d.nelements,atomic.d.nnodes,pack);
++    verify_fd(atomic);verify_fd(packed);
++    std::array<std::array<std::vector<scalar_t>,3>,2> reference;
++    for(int op=0;op<2;++op)for(int k=0;k<(op?3:1);++k) {
++        apply(atomic,op,k);apply(packed,op,k);
++        auto a=output(atomic,op),b=output(packed,op);conservation(a);conservation(b);
++        std::vector<scalar_t> ordered(a.size());
++        for(ptrdiff_t i=0;i<atomic.d.nnodes;++i)for(int c=0;c<4;++c)ordered[4*i+c]=b[4*map[i]+c];
++        double err=relative_error(a,ordered);
++        std::printf("agreement,op=%d,direction=%d,error=%.12g\n",op,k,err);
++        require(err<1e-11,"packed/atomic operator mismatch");reference[op][k]=a;
++    }
++    // Count resident numeric arrays, not allocator overhead, stacks, or peak RSS.
++    for(auto *r:{&atomic,&packed}) {
++        size_t fields=0, harness=0;
++        for(const auto *v:{&r->d.ux,&r->d.uy,&r->d.uz,&r->d.p,&r->d.rx,&r->d.ry,&r->d.rz,&r->d.rc,
++                         &r->d.pgx,&r->d.pgy,&r->d.pgz,&r->d.qgx,&r->d.qgy,&r->d.qgz,&r->d.grad_w_inv,
++                         &r->out,&r->grad_buffer}) fields+=v->capacity()*sizeof(scalar_t);
++        for(const auto &v:r->state)harness+=v.capacity()*sizeof(scalar_t);
++        for(const auto &v:r->direction)harness+=v.capacity()*sizeof(scalar_t);
++        // Slots 0/1/2 hold 4 fields each; 3 holds xyz+pg; 4 holds qg;
++        // reconstruction slots 7/8 hold one input and three outputs.
++        const size_t arena=r->packed?size_t(threads)*25*size_t(r->p.max_actual_nodes_per_pack)*sizeof(scalar_t):0;
++        std::printf("payload,layout=%s,field_capacity_bytes=%zu,packed_arena_bytes=%zu,harness_capacity_bytes=%zu\n",
++            r->packed?"packed":"atomic",fields,arena,harness);
++    }
++    const auto pm=packed.p.packed;
++    const size_t topology=pm->elements(0)->nbytes()+pm->owned_nodes_ptr(0)->nbytes()+
++        pm->n_shared(0)->nbytes()+pm->ghost_ptr(0)->nbytes()+pm->ghost_idx(0)->nbytes()+
++        pm->ghost_reduce_ptr(0)->nbytes()+pm->ghost_reduce_idx(0)->nbytes()+
++        pm->ghost_reduce_dest(0)->nbytes()+pm->node_map()->nbytes();
++    std::printf("storage,atomic_mesh=%zu,packed_retained_mesh=%zu,additional_packed_topology=%zu,ghost_buffer=%zu\n",
++        mesh_bytes(atomic),mesh_bytes(packed),topology,packed.p.ghost_buf.size()*sizeof(scalar_t));
++    std::printf("setup,atomic_ordering=%.9g,packed_ordering=%.9g,packing=%.9g,packs=%td,ghost_entries=%td,max_pack_nodes=%td,ghost_rows=%td\n",
++        atomic.ordering_seconds,packed.ordering_seconds,packed.packing_seconds,packed.p.n_packs,packed.p.n_ghost_entries,packed.p.max_actual_nodes_per_pack,packed.p.n_ghost_reduce_rows);
++    if(verify_only) {std::puts("UNSTRUCTURED NUMERICAL CHECKS PASSED");return 0;}
++    // Both layouts retain their allocation and alternate order in each block.
++    for(int op=0;op<2;++op) {
++        for(auto *r:{&atomic,&packed})for(int w=0;w<10;++w)apply(*r,op,w%3);
++        for(int block=0;block<blocks;++block)for(int arm=0;arm<2;++arm) {
++            bool use_packed=((block+arm)%2)!=0;auto &r=use_packed?packed:atomic;
++            for(int w=0;w<warmup;++w)apply(r,op,w%3);
++            const auto start=std::chrono::steady_clock::now();
++            for(int n=0;n<repeat;++n)apply(r,op,n%3);
++            const double seconds=std::chrono::duration<double>(std::chrono::steady_clock::now()-start).count()/repeat;
++            require(seconds>0&&std::isfinite(seconds),"invalid elapsed time");
++            auto actual=output(r,op);
++            if(use_packed) {auto copy=actual;for(ptrdiff_t i=0;i<r.d.nnodes;++i)for(int c=0;c<4;++c)actual[4*i+c]=copy[4*map[i]+c];}
++            const double err=relative_error(actual,reference[op][op?(repeat-1)%3:0]);
++            require(err<1e-11,"post-timing numerical check failed");
++            std::printf("sample,op=%s,block=%d,order=%d,layout=%s,repeat=%d,seconds=%.12g,error=%.12g\n",
++                op?"jacobian":"residual",block,arm,use_packed?"packed":"atomic",repeat,seconds,err);
++            std::fflush(stdout);
++        }
++    }
++    std::puts("UNSTRUCTURED OPERATOR STUDY PASSED");return 0;
++}
++
++int main(int argc,char **argv) {
++    MPI_Init(&argc,&argv);int size=0;MPI_Comm_size(MPI_COMM_WORLD,&size);int result=1;
++    try {require(size==1,"single MPI rank required");result=run(argc,argv);}
++    catch(const std::exception &e) {std::fprintf(stderr,"UNSTRUCTURED CHECK FAILED: %s\n",e.what());}
++    MPI_Finalize();return result;
++}
+diff --git a/spikes/cvfem/src/tests/regression/cvfem_isoparam_rc_test.cpp b/spikes/cvfem/src/tests/regression/cvfem_isoparam_rc_test.cpp
+new file mode 100644
+--- /dev/null
++++ b/spikes/cvfem/src/tests/regression/cvfem_isoparam_rc_test.cpp
+@@ -0,0 +1,55 @@
++#include "frontend/staging/cvfem_hex8_best_common.hpp"
++#include "kernels/standard/isoparametric/cvfem_hex8_best_atomic_isoparam.hpp"
++
++// A physical linear pressure must have zero Rhie-Chow correction even when
++// opposite edges differ. The old affine-edge shortcut fails this check.
++int main(int argc, char **argv) {
++    MPI_Init(&argc, &argv);
++    int result = 0;
++    {
++        MeshData d;
++        d.mesh = smesh::Mesh::create_hex8_cube(smesh::Communicator::self(), 1, 1, 1, 0, 0, 0, 1, 1, 1);
++        d.nnodes=d.mesh->n_nodes(); d.nelements=d.mesh->n_elements(0);
++        d.elems=d.mesh->elements(0)->data(); d.points=d.mesh->points()->data();
++        if(d.nelements!=1 || d.nnodes!=8) result=1;
++        else {
++            d.points[0][d.elems[6][0]] += geom_t(.25);
++            precompute_affine_geometry(d);
++            fill_fields(d);
++            d.pgx.assign(8,1); d.pgy.assign(8,2); d.pgz.assign(8,3);
++            for(int i=0;i<8;++i) d.p[i]=d.points[0][i]+2.*d.points[1][i]+3.*d.points[2][i];
++            const auto run=[&](scalar_t scale) {
++                d.rhie_chow_scale=scale;
++                apply_residual_atomic_isoparam(d.adj_ptr,d.det_ptr,d.elems,d.face_mask.data(),
++                    d.nelements,d.nnodes,d.p.data(),d.pgx.data(),d.pgy.data(),d.pgz.data(),d.points,
++                    d.qgx.data(),d.qgy.data(),d.qgz.data(),d.rc.data(),d.rx.data(),d.ry.data(),d.rz.data(),
++                    d.ux.data(),d.uy.data(),d.uz.data(),cvfem_hex8_extras_of(d),scalar_t(1.3),scalar_t(.027));
++                std::vector<scalar_t> v;
++                for(const auto *a:{&d.rx,&d.ry,&d.rz,&d.rc}) v.insert(v.end(),a->begin(),a->end());
++                return v;
++            };
++            const auto bare=run(0), corrected=run(1);
++            double good=0, bad=0;
++            for(size_t i=0;i<bare.size();++i) {
++                if(!std::isfinite(bare[i]) || !std::isfinite(corrected[i])) result=1;
++                good=std::max(good,std::abs(bare[i]-corrected[i]));
++            }
++            Hex8ExtraScratch old;
++            old.load(d.elems,d.points,d.face_mask.data(),d.pgx.data(),d.pgy.data(),d.pgz.data(),
++                d.qgx.data(),d.qgy.data(),d.qgz.data(),d.ux.data(),d.uy.data(),d.uz.data(),
++                d.adj_ptr,d.det_ptr,cvfem_hex8_extras_of(d),0,true);
++            scalar_t ux[8],uy[8],uz[8],p[8],r[32];
++            gather_element_fields(d.elems,d.ux.data(),d.uy.data(),d.uz.data(),d.p.data(),0,ux,uy,uz,p);
++            cvfem_hex8_ns_upwind_residual_isoparam(scalar_t(1.3),scalar_t(.027),old.x,old.y,old.z,
++                ux,uy,uz,p,r,old.rc);
++            for(int a=0;a<8;++a)for(int c=0;c<4;++c) {
++                if(!std::isfinite(r[4*a+c])) result=1;
++                bad=std::max(bad,std::abs(r[4*a+c]-bare[8*c+d.elems[a][0]]));
++            }
++            std::printf("linear pressure on distorted HEX8: corrected=%.12g old_affine_edges=%.12g\n",good,bad);
++            if(good>1e-12 || bad<1e-5) result=1;
++        }
++    }
++    MPI_Finalize();
++    return result;
++}
+diff --git a/spikes/cvfem/scripts/unstructured_hex_mesh.py b/spikes/cvfem/scripts/unstructured_hex_mesh.py
+new file mode 100644
+--- /dev/null
++++ b/spikes/cvfem/scripts/unstructured_hex_mesh.py
+@@ -0,0 +1,103 @@
++#!/usr/bin/env python3
++"""Generate a public graded box-with-hole mesh using Gmsh's all-hex subdivision."""
++import argparse
++import hashlib
++import json
++from pathlib import Path
++import numpy as np
++
++CORNERS = np.array([[0,0,0],[1,0,0],[1,1,0],[0,1,0],
++                    [0,0,1],[1,0,1],[1,1,1],[0,1,1]])
++FACES = np.array([[0,1,2,3],[4,5,6,7],[0,1,5,4],
++                  [1,2,6,5],[2,3,7,6],[3,0,4,7]])
++
++
++def certify(points, cells):
++    # det(J) is at most quadratic in each reference coordinate. Positive
++    # tensor-product Bernstein coefficients bound it throughout each cell.
++    lower = float('inf'); upper = 0.0
++    for start in range(0, len(cells), 4096):
++        xyz = points[cells[start:start+4096]].astype(np.float64)
++        values = np.empty((len(xyz), 3, 3, 3))
++        for ix, x in enumerate((0., .5, 1.)):
++            for iy, y in enumerate((0., .5, 1.)):
++                for iz, z in enumerate((0., .5, 1.)):
++                    q = np.array([x,y,z]); factors = np.where(CORNERS, q, 1-q)
++                    dn = np.empty((8,3))
++                    for d in range(3):
++                        axes = [k for k in range(3) if k != d]
++                        dn[:,d] = (2*CORNERS[:,d]-1)*factors[:,axes[0]]*factors[:,axes[1]]
++                    values[:,ix,iy,iz] = np.linalg.det(np.einsum('eac,ad->ecd',xyz,dn))
++        for axis in (1,2,3):
++            middle = [slice(None)]*4; middle[axis]=1
++            lo=list(middle);lo[axis]=0
++            hi=list(middle);hi[axis]=2
++            values[tuple(middle)] = 2*values[tuple(middle)]-.5*(values[tuple(lo)]+values[tuple(hi)])
++        local_lo=values.min(axis=(1,2,3));local_hi=values.max(axis=(1,2,3))
++        if not (np.isfinite(values).all() and np.all(local_lo > 1e-10*local_hi)):
++            raise ValueError('a cell lacks a positive Bernstein Jacobian certificate')
++        lower=min(lower,float(local_lo.min()));upper=max(upper,float(local_hi.max()))
++    return lower, upper
++
++
++def generate(out, h):
++    import gmsh
++    if gmsh.__version__ != '4.15.0': raise ValueError('use gmsh==4.15.0')
++    if not np.isfinite(h) or not 0 < h <= .4: raise ValueError('invalid mesh size')
++    out=Path(out);out.mkdir(parents=True,exist_ok=False)
++    gmsh.initialize()
++    try:
++        gmsh.option.setNumber('General.NumThreads',1)
++        gmsh.option.setNumber('General.Terminal',0)
++        gmsh.option.setNumber('Mesh.RandomSeed',314159)
++        box=gmsh.model.occ.addBox(0,0,0,1,1,1)
++        hole=gmsh.model.occ.addCylinder(.5,.5,0,0,0,1,.18)
++        gmsh.model.occ.cut([(3,box)],[(3,hole)])
++        gmsh.model.occ.synchronize()
++        f=gmsh.model.mesh.field.add('MathEval')
++        gmsh.model.mesh.field.setString(f,'F','{}*(0.55+0.45*x)'.format(h))
++        gmsh.model.mesh.field.setAsBackgroundMesh(f)
++        for name in ('MeshSizeExtendFromBoundary','MeshSizeFromPoints','MeshSizeFromCurvature'):
++            gmsh.option.setNumber('Mesh.'+name,0)
++        gmsh.option.setNumber('Mesh.Algorithm3D',1)
++        gmsh.option.setNumber('Mesh.SubdivisionAlgorithm',2)
++        gmsh.model.mesh.generate(3)
++        tags, xyz, _ = gmsh.model.mesh.getNodes()
++        types, _, conn = gmsh.model.mesh.getElements(3)
++        if list(types) != [5]: raise ValueError('mesh contains non-HEX8 cells')
++        order=np.argsort(tags);tags=tags[order]
++        points=np.asarray(xyz).reshape(-1,3)[order].astype('<f4')
++        cells=np.searchsorted(tags,np.asarray(conn[0])).reshape(-1,8).astype('<i4')
++        used=np.unique(cells)
++        remap=np.full(len(points),-1,dtype=np.int32);remap[used]=np.arange(len(used))
++        points=points[used];cells=remap[cells]
++    finally:
++        gmsh.finalize()
++    if len(points) >= 2**31 or len(cells)==0: raise ValueError('unsupported mesh size')
++    if np.any(np.diff(np.sort(cells,axis=1),axis=1)==0): raise ValueError('repeated cell nodes')
++    lo,hi=certify(points,cells)
++    faces=np.sort(cells[:,FACES].reshape(-1,4),axis=1)
++    unique,counts=np.unique(faces,axis=0,return_counts=True)
++    if not np.all((counts==1)|(counts==2)): raise ValueError('nonmanifold mesh')
++    boundary=np.unique(unique[counts==1]); interior=np.ones(len(points),dtype=bool);interior[boundary]=False
++    degree=np.bincount(cells.ravel(),minlength=len(points))
++    values,numbers=np.unique(degree[interior],return_counts=True)
++    if len(values)<2 or np.all(values==8): raise ValueError('fixture lacks irregular interior connectivity')
++    for d,name in enumerate('xyz'): points[:,d].tofile(out/(name+'.float32'))
++    for a in range(8): cells[:,a].astype('<i4').tofile(out/('i{}.int32'.format(a)))
++    meta='spatial_dimension: 3\nelem_num_nodes: 8\nelement_type: HEX8\ngeom_map: IsoParametric\nn_elements: {}\nn_nodes: {}\nelements:\n'.format(len(cells),len(points))
++    meta+=''.join('- i{0}: i{0}.int32\n'.format(a) for a in range(8))
++    meta+='points:\n'+''.join('- {0}: {0}.float32\n'.format(c) for c in 'xyz')+'rpath: true\n'
++    (out/'meta.yaml').write_text(meta)
++    report=dict(generator='gmsh 4.15.0, Delaunay then all-hex subdivision',seed=314159,
++        geometry='unit box minus through-cylinder radius 0.18',h=h,nodes=len(points),elements=len(cells),
++        coordinate_dtype='float32',index_dtype='int32',bernstein_det_lower=lo,bernstein_det_upper=hi,
++        interior_incident_cells={str(int(v)):int(n) for v,n in zip(values,numbers)},
++        scope='procedural public mesh; not an industrial mesh or PDE accuracy result')
++    report['files']={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(out.iterdir())}
++    (out/'mesh.json').write_text(json.dumps(report,indent=2)+'\n')
++    print(json.dumps(report))
++
++if __name__=='__main__':
++    parser=argparse.ArgumentParser();parser.add_argument('out');parser.add_argument('--h',type=float,required=True)
++    args=parser.parse_args();generate(args.out,args.h)
+diff --git a/spikes/cvfem/scripts/unstructured_study.py b/spikes/cvfem/scripts/unstructured_study.py
+new file mode 100644
+--- /dev/null
++++ b/spikes/cvfem/scripts/unstructured_study.py
+@@ -0,0 +1,182 @@
++#!/usr/bin/env python3
++"""Run and check paired residual/action timings on the hashed public meshes."""
++import argparse
++import hashlib
++import json
++import math
++import os
++from pathlib import Path
++import statistics
++import subprocess
++import sys
++
++
++def require(ok, message):
++    if not ok:
++        raise ValueError(message)
++
++
++def mesh_identity(path):
++    path = Path(path)
++    data = json.loads((path/'mesh.json').read_text())
++    expected = {'meta.yaml'} | {'i{}.int32'.format(i) for i in range(8)} | {c+'.float32' for c in 'xyz'}
++    require(set(data['files']) == expected, 'incomplete mesh manifest')
++    require(data['generator'] == 'gmsh 4.15.0, Delaunay then all-hex subdivision', 'unknown generator')
++    require(data['coordinate_dtype'] == 'float32' and data['index_dtype'] == 'int32', 'unsupported mesh types')
++    require(data['nodes'] > 0 and data['elements'] > 0, 'empty mesh')
++    require(math.isfinite(data['bernstein_det_lower']) and data['bernstein_det_lower'] > 0, 'uncertified geometry')
++    require(len(data['interior_incident_cells']) > 1, 'no irregular interior connectivity')
++    for name, digest in data['files'].items():
++        p = path/name
++        require(hashlib.sha256(p.read_bytes()).hexdigest() == digest, 'mesh hash mismatch: '+name)
++        if name != 'meta.yaml':
++            count = data['elements'] if name.startswith('i') else data['nodes']
++            require(p.stat().st_size == 4*count, 'mesh size mismatch: '+name)
++    return data
++
++
++def rows(text, kind):
++    result = []
++    for line in text.splitlines():
++        if line.startswith(kind+','):
++            parts = line.split(',')[1:]
++            result.append(dict(p.split('=', 1) for p in parts if '=' in p))
++    return result
++
++
++def number(row, key):
++    value = float(row[key])
++    require(math.isfinite(value), 'nonfinite '+key)
++    return value
++
++
++def check(text, mesh, threads, pack, blocks=12, repeat=12, verify=False):
++    marker = 'UNSTRUCTURED NUMERICAL CHECKS PASSED' if verify else 'UNSTRUCTURED OPERATOR STUDY PASSED'
++    require(text.splitlines()[-1] == marker, 'missing final success marker')
++    scope = rows(text, 'scope')
++    require(len(scope) == 1, 'missing or duplicate scope')
++    for key, value in (('threads', threads), ('pack', pack), ('nodes', mesh['nodes']), ('elements', mesh['elements'])):
++        require(int(scope[0][key]) == value, 'wrong '+key)
++    require('scope,first_order_RC,isoparametric,steady_interior,' in text, 'wrong operator scope')
++    geometry = rows(text, 'geometry')
++    require(len(geometry) == 1 and number(geometry[0], 'min_sampled_det') > 0, 'invalid geometry check')
++    linear=rows(text,'linear_gradient')
++    require(len(linear)==2 and {r['layout'] for r in linear}=={'atomic','packed'} and
++            all(0 <= number(r,'error') < 1e-11 for r in linear), 'failed linear-gradient check')
++    fd = rows(text, 'fd')
++    require(len(fd) == 12, 'incomplete derivative check')
++    seen = set()
++    for line in text.splitlines():
++        if not line.startswith('fd,'):
++            continue
++        layout = line.split(',')[1]
++        row = rows(line, 'fd')[0]
++        key = (layout, int(row['direction']), number(row, 'eps'))
++        require(key not in seen, 'duplicate derivative check')
++        seen.add(key)
++        require(0 <= number(row, 'error') < 1e-6 and number(row, 'no_qgrad') > 1e-5, 'failed derivative or negative control')
++    require(seen == {(layout,k,e) for layout in ('atomic','packed') for k in range(3) for e in (1e-6,1e-7)}, 'wrong derivative coverage')
++    agreement = rows(text, 'agreement')
++    require(len(agreement) == 4 and {(int(r['op']),int(r['direction'])) for r in agreement} == {(0,0),(1,0),(1,1),(1,2)}, 'incomplete layout check')
++    require(all(0 <= number(r,'error') < 1e-11 for r in agreement), 'layout mismatch')
++    storage, setup, payload = rows(text,'storage'), rows(text,'setup'), rows(text,'payload')
++    require(len(storage) == len(setup) == 1 and len(payload) == 2, 'incomplete setup or storage accounting')
++    require({r['layout'] for r in payload} == {'atomic','packed'}, 'wrong storage layouts')
++    for row in storage+setup+payload:
++        for key in row:
++            if key != 'layout':
++                require(number(row,key) >= 0, 'negative accounting value')
++    samples = rows(text,'sample')
++    require(len(samples) == (0 if verify else 4*blocks), 'incomplete timing blocks')
++    seen = set()
++    for r in samples:
++        key = (r['op'],int(r['block']),r['layout'])
++        require(key not in seen, 'duplicate timing sample')
++        seen.add(key)
++        require(int(r['repeat']) == repeat and number(r,'seconds') > 0 and 0 <= number(r,'error') < 1e-11, 'invalid timing or changed output')
++        require(int(r['order']) == (int(r['block'])%2 if r['layout']=='atomic' else 1-int(r['block'])%2), 'wrong paired order')
++    if not verify:
++        require(seen == {(op,b,layout) for op in ('residual','jacobian') for b in range(blocks) for layout in ('atomic','packed')}, 'wrong timing coverage')
++    return dict(storage=storage[0],setup=setup[0],payload=payload,samples=samples)
++
++
++def summary(records):
++    lines = ['Paired normal wall times; each arm includes its pressure-gradient reconstruction.',
++             'Jacobian state gradients are cached; direction gradients are rebuilt per apply.',
++             'Ranges show all sample variation, not confidence intervals. No samples are removed.',
++             'Storage is an explicit array ledger, not peak process memory or a solver footprint.',
++             '', '| Mesh | Threads | Pack | Operator | Atomic ms range | Packed ms range | Mean time ratio | Paired ratio range |',
++             '|---|---:|---:|---|---|---|---:|---|']
++    for rec in records:
++        if rec['verify']:
++            continue
++        for op in ('residual','jacobian'):
++            s = [r for r in rec['result']['samples'] if r['op']==op]
++            a = [float(r['seconds'])*1000 for r in s if r['layout']=='atomic']
++            p = [float(r['seconds'])*1000 for r in s if r['layout']=='packed']
++            ratios = [x/y for x,y in zip(a,p)]
++            lines.append('| {} | {} | {} | {} | {:.6f} [{:.6f}, {:.6f}] | {:.6f} [{:.6f}, {:.6f}] | {:.6f} | [{:.6f}, {:.6f}] |'.format(
++                rec['mesh'],rec['threads'],rec['pack'],op,statistics.mean(a),min(a),max(a),
++                statistics.mean(p),min(p),max(p),statistics.mean(a)/statistics.mean(p),min(ratios),max(ratios)))
++    lines += ['', 'All setup times, array capacities, mesh identities, commands and samples are retained in records.json.',
++              'This tests a procedural irregular mesh and interior operators; it does not establish PDE accuracy or solver speedup.']
++    return '\n'.join(lines)+'\n'
++
++
++def collect(binary, meshes, out, local=False):
++    binary=Path(binary).resolve();meshes=Path(meshes).resolve();out=Path(out).resolve()
++    out.mkdir(parents=True,exist_ok=False)
++    records=[]
++    if local:
++        cases=[('small',t,p,True) for t in (1,2) for p in (64,256)] + [('small',2,256,False)]
++        blocks,repeat,warmup=4,3,3
++    else:
++        require(os.environ.get('SLURM_CPUS_PER_TASK') == '72', 'request 72 cores')
++        cases=[('small',t,p,True) for t in (1,72) for p in (64,256)]
++        # Alternate pack order across grid/thread combinations as well as arm order within each run.
++        for index,(m,t) in enumerate((m,t) for m in ('medium','large') for t in (1,72)):
++            cases += [(m,t,p,False) for p in ((256,1024) if index%2==0 else (1024,256))]
++        blocks,repeat,warmup=12,12,10
++    identity={m:mesh_identity(meshes/('mesh-'+m)) for m in {c[0] for c in cases}}
++    for m,t,p,verify in cases:
++        name='{}-t{}-p{}-{}'.format(m,t,p,'check' if verify else 'timing')
++        work=out/name;work.mkdir()
++        command=[str(binary),'--mesh',str(meshes/('mesh-'+m)),'--pack-size',str(p)]
++        command += ['--verify-only'] if verify else ['--blocks',str(blocks),'--repeat',str(repeat),'--warmup',str(warmup)]
++        if not local:
++            # Only the benchmark worker changes policy; the wrapper reads it back before exec.
++            command=[sys.executable,str(Path(__file__).with_name('roofline_thp_exec.py')),'disabled','--']+command
++        env=os.environ.copy()
++        for key in list(env):
++            if key.startswith(('SFEM_','CVFEM_')):
++                del env[key]
++        env.update(OMP_NUM_THREADS=str(t),OMP_DYNAMIC='FALSE',OMP_PLACES='cores',OMP_PROC_BIND='close')
++        rec=dict(mesh=m,threads=t,pack=p,verify=verify,command=command,identity=identity[m],
++                 binary_sha256=hashlib.sha256(binary.read_bytes()).hexdigest(),memory_policy='default' if local else 'THP disabled')
++        (work/'command.json').write_text(json.dumps(rec,indent=2)+'\n')
++        with (work/'run.log').open('w') as log:
++            code=subprocess.call(command,cwd=str(work),env=env,stdout=log,stderr=subprocess.STDOUT)
++        require(code == 0, 'failed '+name+'; retain '+str(work/'run.log'))
++        captured=(work/'run.log').read_text()
++        if not local:
++            require('THP_LAUNCH policy=disabled disabled=1 ' in captured, 'missing worker memory-policy readback')
++        rec['result']=check(captured,identity[m],t,p,blocks,repeat,verify)
++        records.append(rec)
++        (out/'records.json').write_text(json.dumps(records,indent=2)+'\n')
++        print('PASSED: '+name,flush=True)
++    report=summary(records)
++    (out/'summary.md').write_text(report)
++    print(report,end='')
++    print('UNSTRUCTURED CAMPAIGN PASSED')
++
++
++if __name__=='__main__':
++    parser=argparse.ArgumentParser()
++    parser.add_argument('--binary',required=True);parser.add_argument('--meshes',required=True)
++    parser.add_argument('--out',required=True);parser.add_argument('--local-check',action='store_true')
++    args=parser.parse_args()
++    try:
++        collect(args.binary,args.meshes,args.out,args.local_check)
++    except (ValueError,KeyError,OSError) as error:
++        print('UNSTRUCTURED CAMPAIGN FAILED: '+str(error),file=sys.stderr)
++        sys.exit(1)
+diff --git a/spikes/cvfem/scripts/test_unstructured_study.py b/spikes/cvfem/scripts/test_unstructured_study.py
+new file mode 100644
+--- /dev/null
++++ b/spikes/cvfem/scripts/test_unstructured_study.py
+@@ -0,0 +1,50 @@
++#!/usr/bin/env python3
++"""Check refusal paths using one real, complete local campaign capture."""
++import argparse
++import json
++from pathlib import Path
++import tempfile
++import shutil
++from unstructured_study import check, mesh_identity
++
++
++def main(log, mesh):
++    text=Path(log).read_text();identity=mesh_identity(mesh)
++    def accept(value):
++        return check(value,identity,2,256,4,3,False)
++    accept(text)
++    lines=text.splitlines()
++    sample=next(line for line in lines if line.startswith('sample,'))
++    fd=next(line for line in lines if line.startswith('fd,'))
++    bad=[text.replace('UNSTRUCTURED OPERATOR STUDY PASSED',''),
++         text.replace(sample+'\n',''),text.replace(sample,sample+'\n'+sample),
++         text.replace(fd+'\n',''),text.replace(fd,fd+'\n'+fd),
++         text.replace('threads=2,','threads=1,'),text.replace('repeat=3,','repeat=4,'),
++         text.replace('op=residual','op=unknown')]
++    for key,value in (('seconds','nan'),('seconds','-1'),('error','1')):
++        parts=sample.split(',')
++        changed=','.join(key+'='+value if p.startswith(key+'=') else p for p in parts)
++        bad.append(text.replace(sample,changed))
++    changed=','.join('no_qgrad=0' if p.startswith('no_qgrad=') else p for p in fd.split(','))
++    bad.append(text.replace(fd,changed))
++    for index,value in enumerate(bad):
++        try:
++            accept(value)
++        except ValueError:
++            continue
++        raise AssertionError('accepted invalid capture {}'.format(index))
++    with tempfile.TemporaryDirectory() as tmp:
++        dst=Path(tmp)/'mesh';shutil.copytree(str(mesh),str(dst))
++        p=dst/'x.float32';data=bytearray(p.read_bytes());data[0]^=1;p.write_bytes(data)
++        try:
++            mesh_identity(dst)
++        except ValueError:
++            pass
++        else:
++            raise AssertionError('accepted changed mesh bytes')
++    print('Unstructured accounting: real capture and 13 incomplete/invalid/hash refusal controls PASS')
++
++
++if __name__=='__main__':
++    parser=argparse.ArgumentParser();parser.add_argument('--log',required=True);parser.add_argument('--mesh',required=True)
++    args=parser.parse_args();main(args.log,Path(args.mesh))
+diff --git a/spikes/cvfem/docs/unstructured_study.md b/spikes/cvfem/docs/unstructured_study.md
+new file mode 100644
+--- /dev/null
++++ b/spikes/cvfem/docs/unstructured_study.md
+@@ -0,0 +1,126 @@
++# Public irregular-HEX8 operator comparison
++
++This experiment compares atomic and packed first-order residuals and exact
++Jacobian actions on a public, procedurally generated irregular mesh. It extends
++the affine-cube experiments to non-affine geometry and irregular connectivity.
++It does not measure a nonlinear solve or establish spatial accuracy.
++
++## Mesh and reproduction
++
++`scripts/unstructured_hex_mesh.py` uses Gmsh 4.15.0 to subtract a cylindrical
++through-hole of radius 0.18 from the unit box. Delaunay tetrahedra are subdivided
++into HEX8 cells with `Mesh.SubdivisionAlgorithm=2`. The target size varies as
++`h*(0.55+0.45*x)`. Meshing is single-threaded with seed 314159.
++
++The small numerical fixture uses `h=0.3` (2,864 cells); the two timing fixtures
++use `h=0.085` (74,664 cells) and `h=0.055` (265,636 cells). Their interior node
++incidence varies, so these are not Cartesian meshes with perturbed coordinates.
++The geometry has no private input. Gmsh's algorithm is described in its
++[official manual](https://gmsh.info/doc/texinfo/gmsh.html).
++
++Generate each directory with Python, NumPy and `gmsh==4.15.0`, for example:
++
++```sh
++python scripts/unstructured_hex_mesh.py mesh-small --h 0.3
++python scripts/unstructured_hex_mesh.py mesh-medium --h 0.085
++python scripts/unstructured_hex_mesh.py mesh-large --h 0.055
++```
++
++The mesh is rounded to the production float32 coordinates and int32 connectivity
++before validation. The generator checks node uniqueness within each cell,
++manifold face incidence and irregular interior connectivity. It evaluates the
++triquadratic Jacobian determinant's tensor-product Bernstein coefficients and
++requires a positive lower bound with a relative margin of `1e-10`. This is a
++floating-point geometry check, not an interval-arithmetic proof. The complete
++arrays, settings, counts and SHA256 hashes are saved. Transfer those arrays for
++measurement; a different Gmsh build is not assumed to reproduce identical bytes.
++
++## Operator and correctness contract
++
++The unknowns are three velocity components and physical pressure. Density is
++1.3, dynamic viscosity 0.027, and the Rhie–Chow scale is one with the steady
++combined time scale. First-order upwinding is used. Only interior sub-control
++surface fluxes are applied; boundary closure, boundary elimination and transient
++terms are excluded. There is no Reynolds-number or physical flow claim.
++
++Every face uses its trilinear geometric mapping and the physical edge
++`d = x_j - x_i`. The pressure correction is
++`C = p_j - p_i - 0.5*(grad(p)_i + grad(p)_j) dot d`, with mass-flux correction
++`-c*C`. Its directional derivative includes both the reconstructed direction
++gradient and the velocity derivative of `c`. The packed SIMD kernel uses the
++existing coefficient and derivative helpers. The scalar isoparametric gather
++now uses physical edges instead of the affine-column shortcut. A regression
++checks zero correction for physical linear pressure on a distorted cell and
++requires the old shortcut to fail that same check.
++
++Both layouts start from the same SFC ordering. Packing then permutes node
++storage. A checked bijection and exact coordinate match transfer the nonlinear
++state and three directions without recomputing their floating-point values.
++The state pressure is `0.3*sin(2*x+3*y+5*z)+0.17*x*y`; directions are smooth,
++nonzero in all four fields and differ from one another. Before timing:
++
++- every cell has positive determinant at all 27 reference samples;
++- the reconstructed gradient of `x+2*y+3*z` matches `(1,2,3)` within `1e-11`;
++- all four equations pass finite-output and interior-flux cancellation checks;
++- packed and atomic outputs agree within `1e-11`, using each equation's own
++  infinity-norm scale;
++- both layouts' full Jacobian actions match centered differences at `1e-6` and
++  `1e-7`, with relative error below `1e-6`, for all three directions;
++- omitting the reconstructed pressure-direction gradient must produce relative
++  error above `1e-5` in every difference check.
++
++These gates exercise this first-order, steady interior configuration. They do
++not validate arbitrary limiter switches, curved high-order elements, assembled
++Jacobians, general boundary conditions, time integration or solver convergence.
++
++## Timing and storage
++
++`cvfem_hex8_unstructured_bench` retains both layouts in one process. A residual
++includes pressure-gradient reconstruction; a Jacobian action reuses the fixed
++state gradient and reconstructs the current direction gradient. Neither arm
++caches direction gradients. Geometry is evaluated in the operator, and neither
++arm builds an unused affine Rhie–Chow coefficient table.
++
++The Grace recipe measures both timing meshes at 1 and 72 threads with pack sizes
++256 and 1024. Each operator has ten initial warmups, twelve paired blocks, ten
++warmups before each arm and twelve timed applications per arm. Atomic/packed
++order alternates by block. Actions cycle through all three directions. The
++steady clock measures only application calls; post-capture output checks are
++outside the interval. Every sample is retained. Speedup is the ratio of mean
++normal times, with individual ranges and paired-ratio ranges also reported.
++There is no speedup threshold for acceptance and no PMU instrumentation.
++
++Both mesh objects and all validation allocations coexist; this is a warm
++repeated-application experiment, not a cold-memory or isolated-process result.
++On Grace, the existing process-local wrapper disables transparent huge pages
++for each benchmark worker and verifies the setting before exec. System settings
++are unchanged. The CPU allocation, compiler, binary hashes and launch commands
++are retained. The larger pack on the smaller grid leaves only 73 packs for 72
++threads; the smaller pack is included to expose that parallelism tradeoff.
++
++The logs retain separate SFC-ordering and packing times. Storage is an explicit
++array ledger: original coordinate/connectivity arrays, additional packed
++connectivity/ownership/ghost/reduction/map arrays, ghost output buffer, resident
++field/vector capacities, and the packed thread arena. The arena uses 25 scalars
++per maximum pack node per thread after residual/action validation. State backups
++and test directions are listed separately as harness allocations. Shared result
++references, temporary validation vectors, allocator metadata, stacks and other
++library/runtime storage are excluded. Thus this ledger is not peak RSS or a
++complete solver footprint, and retaining the original connectivity must not be
++presented as a total-memory saving.
++
++## Running and inspecting
++
++Build the new driver and `cvfem_isoparam_rc_test` through the standalone CVFEM
++CMake project. `scripts/unstructured_study.py --local-check` runs four small
++numerical fixtures at 1/2 threads and a short paired timing smoke test. Production
++collection requires the 72-core Slurm allocation and the hashed mesh directories.
++The public handoff's `run-unstructured-on-grace.sh` records provenance, runs the
++cell and existing packed/atomic gates, then invokes the study controller.
++
++The controller refuses missing cases, changed mesh bytes, wrong scopes or teams,
++nonfinite values, failed differences/negative controls and changed timed
++outputs. A failed job's logs must be kept. `records.json` preserves identities,
++commands, setup, storage and every accepted capture; `summary.md` reports the
++paired times. No manuscript result is updated until the complete Grace run has
++been reviewed.

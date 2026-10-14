@@ -1,0 +1,10 @@
+{
+  "source_hashes": 4352,
+  "cases": 12,
+  "timing_samples": 384,
+  "fd_steps": 144,
+  "max_fd_error": 5.96445273132e-08,
+  "min_no_qgrad_error": 0.214875086531,
+  "max_layout_error": 1.52424242424e-15,
+  "max_linear_gradient_error": 2.6645352591e-15
+}
