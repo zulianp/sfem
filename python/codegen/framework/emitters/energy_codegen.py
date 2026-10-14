@@ -7914,66 +7914,97 @@ def _sfem_soa_direct_hessian_point_geometry_lines(dim, indent):
     return lines
 
 
-def _sfem_soa_direct_hessian_trial_gradient_lines(
-    dim,
-    reference_gradient_expr,
-    indent,
-):
-    """The trial basis function's physical gradient, staged for the material.
+def _sfem_soa_direct_hessian_tangent_lines(material, dim, indent, declare=True):
+    """The point's physical tangent D, as `s_t D[(NC * ND) * (NC * ND)]`.
 
-    `trial_grad` is the field gradient a *single* trial degree of freedom
-    produces: zero everywhere but the component it belongs to, which is what
-    makes the material evaluated against it that degree of freedom's column.
-    `reference_gradient_expr(k)` is however the caller's element spells the
-    reference gradient -- a one-dimensional product on a tensor-product element,
-    a table lookup elsewhere.
-
-    A field gradient has one row per field component and one column per spatial
-    direction, so it is `NC * ND` entries strided by `ND`.  Both used to be
-    spelled `NC`, which is right only for a displacement: a scalar field in two
-    dimensions then declared `trial_grad[1]` and wrote index 1, which the
-    compiler will tell you about under `-Warray-bounds` and which no material
-    reached until laplace was written as an energy.
+    `material` is the response to a trial gradient and is linear in it, so its
+    coefficients are the tangent, a function of the state and the geometry
+    alone, evaluated once per point rather than once per column.  The element
+    matrix of an energy is symmetric and so is D: the upper triangle is
+    eliminated and mirrored, which roughly halves the elimination.  The
+    symmetry is checked at a pseudo-random point before it is relied on.
     """
-    lines = [
-        "%sconst s_t trial_grad_ref%d = %s;" % (indent, k, reference_gradient_expr(k))
-        for k in range(dim)
-    ]
+    n = len(material)
+    trial = [sp.Symbol("trial_grad[%d]" % j) for j in range(n)]
+    upper, targets = [], []
+    for a in range(n):
+        for b in range(a, n):
+            upper.append(sp.diff(material[a], trial[b]))
+            targets.append("D[%d] =" % (a * n + b))
+    _check_tangent_symmetry(material, trial)
+    body = []
+    _append_cse_array_assignments(body, tuple(upper), targets, "weak_hess_tmp")
+    lines = ["%ss_t D[%d];" % (indent, n * n)] if declare else []
+    lines.extend("%s%s" % (indent, line.strip()) for line in body)
     lines.extend(
-        [
-            "%ss_t trial_grad[NC * ND];" % indent,
-            "%sfor (int i = 0; i < NC * ND; ++i) {" % indent,
-            "%s  trial_grad[i] = s_t(0);" % indent,
-            "%s}" % indent,
-        ]
+        "%sD[%d] = D[%d];" % (indent, b * n + a, a * n + b) for a in range(n) for b in range(a + 1, n)
     )
-    for phys_component in range(dim):
-        terms = [
-            "trial_grad_ref%d * %s"
-            % (
-                ref_component,
-                current_target().work_item_name("adj", ref_component * dim + phys_component),
-            )
-            for ref_component in range(dim)
-        ]
-        lines.append(
-            "%strial_grad[trial_component * ND + %d] = (%s) * idet;"
-            % (indent, phys_component, " + ".join(terms))
-        )
     return lines
 
 
-def _sfem_soa_direct_hessian_material_lines(material, dim, indent):
-    """The material's response to that trial gradient, eliminated once."""
-    lines = ["%ss_t material[NC * ND];" % indent]
-    body = []
-    _append_cse_array_assignments(
-        body,
-        tuple(material),
-        ["material[%d] =" % i for i in range(dim * dim)],
-        "weak_hess_tmp",
-    )
-    lines.extend("%s%s" % (indent, line.strip()) for line in body)
+def _check_tangent_symmetry(material, trial):
+    """Refuse a tangent that is not symmetric, at one pseudo-random point.
+
+    The assembly relies on it twice -- D's lower triangle is a mirror and so is
+    the element matrix's -- and an energy's second variation always has it, so
+    a failure here is a material that reached this path without being one.
+    """
+    import random
+
+    n = len(material)
+    tangent = [[sp.diff(material[a], trial[b]) for b in range(n)] for a in range(n)]
+    symbols = set()
+    for row in tangent:
+        for entry in row:
+            symbols |= entry.free_symbols
+    generator = random.Random(1234)
+    point = {symbol: sp.Float(0.1 + 0.05 * generator.random()) for symbol in sorted(symbols, key=str)}
+    for a in range(n):
+        for b in range(a + 1, n):
+            lower = complex(tangent[b][a].xreplace(point).evalf())
+            upper = complex(tangent[a][b].xreplace(point).evalf())
+            if abs(lower - upper) > 1e-9 * (1 + abs(upper)):
+                raise ValueError(
+                    "hessian assembly: the tangent is not symmetric (entry %d, %d: %r vs %r)"
+                    % (a, b, upper, lower)
+                )
+
+
+def _sfem_soa_direct_hessian_pullback_lines(n_components, dim, target, indent, adj_name="adj_q", weight="weight"):
+    """D pulled back to the reference element and weighted, into `target % index`:
+
+        A[(i, k), (j, l)] = qw / det sum_{d, e} adj[k][d] D[(i, d), (j, e)] adj[l][e],
+
+    index (i * ND + k) * NC * ND + j * ND + l, written as two 3x3 products per
+    block.  What a slab's columns contract against their reference gradients.
+    """
+    n = n_components * dim
+
+    def adj(k, d):
+        return "%s[%d]" % (adj_name, k * dim + d)
+
+    lines = ["%sconst s_t pullback_weight = %s;" % (indent, weight)]
+    for i in range(n_components):
+        for j in range(n_components):
+            for k in range(dim):
+                for e in range(dim):
+                    lines.append(
+                        "%sconst s_t pullback_%d_%d_%d_%d = %s;"
+                        % (
+                            indent, i, j, k, e,
+                            " + ".join("%s * D[%d]" % (adj(k, d), (i * dim + d) * n + j * dim + e) for d in range(dim)),
+                        )
+                    )
+            for k in range(dim):
+                for l in range(dim):
+                    lines.append(
+                        "%s%s = pullback_weight * (%s);"
+                        % (
+                            indent,
+                            target % ((i * dim + k) * n + j * dim + l),
+                            " + ".join("pullback_%d_%d_%d_%d * %s" % (i, j, k, e, adj(l, e)) for e in range(dim)),
+                        )
+                    )
     return lines
 
 
@@ -8141,26 +8172,31 @@ def _sfem_soa_direct_hessian_sum_factorized_assembly_lines(
     indent,
     emit_tensor_product_static_constants=True,
 ):
-    """The element matrix of a tensor-product element, a column at a time.
+    """The element matrix of a tensor-product element, accumulated as the rule is walked.
 
-    The shape this element's evaluation strategy asks for, and the reason it is
-    not the quadrature shape is complexity.  Contracting the test functions
-    point by point costs `NQ * NDOFS` per column, which is `p^6` for a degree-`p`
-    element in three dimensions and `p^9` for the whole matrix.
-    `tensor_test_scalar` is the same contraction taken one dimension at a time,
-    at `p^4` a column and `p^7` in all, and it is the routine the matrix-free
-    apply on this element already calls.  The state is evaluated the same way,
-    once, by `tensor_gradient_contiguous_scalar`.
+    Only the tangent of the points in hand is ever held.  Holding it at every
+    point -- so that each trial column could be contracted over the whole rule
+    in one factorised pass -- costs a tangent per point of memory for nothing
+    the walk below does not do faster.  The walk is the element's:
 
-    The `_scalar` micro-kernels are the ones this kernel wants.  Assembly has a
-    single element in hand -- it scatters into a sparse row and has nowhere to
-    put a block of them -- so the lane-blocked ones would carry a lane loop that
-    runs once and stage buffers with `VS - 1` slots nobody writes.
+    - one point at a time where the 1-D basis has two functions (HEX8, QUAD4):
+      there is nothing to factorise, and the point's contribution is a dense,
+      symmetric outer product (`point_test_symmetric_scalar`), upper triangle
+      only, mirrored once at the end;
+    - one slab at a time otherwise -- every point with the last coordinate
+      fixed: the slab's tangent is pulled back and every trial column is
+      contracted over the slab one dimension at a time
+      (`tensor_slab_test_scalar`).  The matrix is symmetric, so a column is
+      written as the row it equals, contiguously.
 
-    The loop order is the other half of the change.  Quadrature was outermost
-    and the trial degree of freedom inside it; the factorised contraction wants
-    every quadrature point of one column in hand at once, so the column is
-    outermost now and `flux` spans the rule.
+    Measured on Grace, one thread: on HEX8 the point walk takes 4.0 us an
+    element against 5.4 us for the slab walk and 7.2 us for the tangent held at
+    every point; on PROTEUS_HEX27 the slab walk takes 76 us against 84 us and
+    151 us for the point walk.
+
+    The state is evaluated once, factorised, by
+    `tensor_gradient_contiguous_scalar`.  The `_scalar` micro-kernels are the
+    ones assembly wants: it has a single element in hand.
     """
     n_field_components = form_n_field_components(form, dim)
     uses_current = form_reads_current(form, default=True)
@@ -8178,6 +8214,7 @@ def _sfem_soa_direct_hessian_sum_factorized_assembly_lines(
             for i in range(weak_form.n_field_components * dim)
         ),
     )
+    n_tangent = len(material)
     lines = [
         "%sfor (int entry = 0; entry < NDOFS * NDOFS; ++entry) {" % indent,
         "%s  element_matrix[entry] = s_t(0);" % indent,
@@ -8194,119 +8231,134 @@ def _sfem_soa_direct_hessian_sum_factorized_assembly_lines(
         lines.extend(
             _sfem_soa_direct_hessian_state_gradient_lines(dim, reference_prefix, indent)
         )
-    lines.extend(
-        [
-            # One column's reference flux at every quadrature point, which is
-            # what the factorised contraction consumes.
-            "%ss_t flux[NC * NQ * ND];" % indent,
-            # Where the column lands.  `tensor_test_scalar` accumulates through
-            # a stream per degree of freedom, so pointing those streams straight
-            # into the matrix writes the column with no scratch vector and no
-            # copy after it.
-            "%ss_t *column[NC * NS];" % indent,
-            "%sfor (int trial_component = 0; trial_component < NC; ++trial_component) {"
-            % indent,
-            "%s  for (int trial_shape = 0; trial_shape < NS; ++trial_shape) {" % indent,
-        ]
-    )
-    lines.extend(
-        _tensor_product_shape_coordinate_lines(dim, "trial_shape", "trial", "%s    " % indent)
-    )
-    lines.append("%s    for (int q = 0; q < NQ; ++q) {" % indent)
-    lines.extend(tensor_product_q_index_lines(dim, "%s      " % indent))
-    lines.append(
-        "%s      const s_t qw = %s;"
-        % (indent, tensor_product_quadrature_weight_expr(dim, "%sq_weight_1d" % reference_prefix))
-    )
-    lines.extend(
-        _sfem_soa_direct_hessian_point_geometry_lines(dim, "%s      " % indent)
-    )
     point_streams = quadrature_fields.quadrature_field_streams(form)
-    lines.extend(quadrature_fields.point_base_lines(point_streams, "%s      " % indent))
+    # The tangent at point q, its adjugate and its weight qw / det: what both
+    # walks need from a point.  One evaluation, called by whichever walk this
+    # element takes; the header is shared by every element of the dimension, so
+    # the walk is chosen from NS1 at compile time.
+    lines.append(
+        "%sauto point_tangent = [&](const int q, s_t *const RSTR D, s_t *const RSTR adj_q, s_t &weight) {" % indent
+    )
+    point_indent = "%s  " % indent
+    lines.extend(tensor_product_q_index_lines(dim, point_indent))
+    lines.append(
+        "%sconst s_t qw = %s;"
+        % (point_indent, tensor_product_quadrature_weight_expr(dim, "%sq_weight_1d" % reference_prefix))
+    )
+    lines.extend(_sfem_soa_direct_hessian_point_geometry_lines(dim, point_indent))
+    lines.extend(quadrature_fields.point_base_lines(point_streams, point_indent))
     lines.extend(
-        quadrature_fields.load_lines(point_streams, "%s      " % indent, quadrature_fields.SINGLE_ELEMENT)
+        quadrature_fields.load_lines(point_streams, point_indent, quadrature_fields.SINGLE_ELEMENT)
     )
     if uses_current:
         lines.extend(
             _sfem_soa_direct_hessian_current_gradient_lines(
-                weak_form,
-                dim,
-                n_field_components,
-                reference_inputs,
-                True,
-                False,
-                reference_prefix,
-                "%s      " % indent,
+                weak_form, dim, n_field_components, reference_inputs, True, False,
+                reference_prefix, point_indent,
             )
         )
+    lines.extend(_sfem_soa_direct_hessian_tangent_lines(material, dim, point_indent, declare=False))
     lines.extend(
-        _sfem_soa_direct_hessian_trial_gradient_lines(
-            dim,
-            lambda k: _sfem_soa_reference_gradient_expr_for_shape(
-                dim,
-                k,
-                True,
-                False,
-                reference_inputs,
-                "trial_shape",
-                coord_prefix="trial",
-                reference_prefix=reference_prefix,
-            ),
-            "%s      " % indent,
-        )
+        "%sadj_q[%d] = %s;" % (point_indent, c, current_target().work_item_name("adj", c))
+        for c in range(dim * dim)
     )
-    lines.extend(
-        _sfem_soa_direct_hessian_material_lines(material, dim, "%s      " % indent)
-    )
-    # Back to the reference element, weighted: this is what the contraction
-    # integrates, and it is the same expression the point-by-point shape
-    # multiplied a test gradient by, with the test function taken out of it.
-    for row in range(n_field_components):
-        for k in range(dim):
-            terms = [
-                "material[%s] * %s"
-                % (
-                    c_sum(c_product(row, "ND"), d),
-                    current_target().work_item_name("adj", k * dim + d),
-                )
-                for d in range(dim)
-            ]
-            lines.append(
-                "%s      flux[%s] = qw * (%s);"
-                % (
-                    indent,
-                    c_sum(c_product(c_group(c_sum(c_product(row, "NQ"), "q")), "ND"), k),
-                    " + ".join(terms),
-                )
-            )
-    lines.append("%s    }" % indent)
+    lines.extend(["%sweight = qw * idet;" % point_indent, "%s};" % indent])
+
+    # One point at a time.
     lines.extend(
         [
-            "%s    for (int out_shape = 0; out_shape < NS; ++out_shape) {" % indent,
-            *(
-                "%s      column[out_shape * NC + %d] = "
-                "&element_matrix[(%d * NS + out_shape) * NDOFS "
-                "+ trial_component * NS + trial_shape];" % (indent, row, row)
-                for row in range(n_field_components)
-            ),
-            "%s    }" % indent,
+            "%sif constexpr (NS1 == 2) {" % indent,
+            "%s  for (int q = 0; q < NQ; ++q) {" % indent,
+            "%s    s_t D[%d], adj_q[ND * ND], weight;" % (indent, n_tangent * n_tangent),
+            "%s    point_tangent(q, D, adj_q, weight);" % indent,
+            "%s    s_t g_ref[ND * NS];" % indent,
+            "%s    tensor_point_reference_gradients_scalar<s_t, NQ, NS, ND>(%sshape_1d, %sgrad_1d, q, g_ref);"
+            % (indent, reference_prefix, reference_prefix),
+            "%s    point_test_symmetric_scalar<s_t, NS, ND, NC>(g_ref, adj_q, weight, D, element_matrix);" % indent,
+            "%s  }" % indent,
+            "%s  mirror_upper_triangle_scalar<s_t, NDOFS>(element_matrix);" % indent,
+            "%s} else {" % indent,
         ]
     )
-    for row in range(n_field_components):
+    # One slab at a time.
+    walk = "%s  " % indent
+    slab = "NQ1 * NQ1" if dim == 3 else "NQ1"
+    lines.extend(
+        [
+            "%sstatic constexpr int NP = %s;" % (walk, slab),
+            "%ss_t slab_tangent[NP * %d];" % (walk, n_tangent * n_tangent),
+            "%ss_t flux[NC * ND * NP];" % walk,
+            "%sfor (int q_last = 0; q_last < NQ1; ++q_last) {" % walk,
+            "%s  for (int p = 0; p < NP; ++p) {" % walk,
+            "%s    s_t D[%d], adj_q[ND * ND], weight;" % (walk, n_tangent * n_tangent),
+            "%s    point_tangent(p + NP * q_last, D, adj_q, weight);" % walk,
+        ]
+    )
+    lines.extend(
+        _sfem_soa_direct_hessian_pullback_lines(
+            n_field_components, dim, "slab_tangent[p * %d + %%d]" % (n_tangent * n_tangent), "%s    " % walk
+        )
+    )
+    lines.append("%s  }" % walk)
+    lines.extend(
+        [
+            "%s  for (int trial_component = 0; trial_component < NC; ++trial_component) {" % walk,
+            "%s    for (int trial_shape = 0; trial_shape < NS; ++trial_shape) {" % walk,
+        ]
+    )
+    lines.extend(
+        _tensor_product_shape_coordinate_lines(dim, "trial_shape", "trial", "%s      " % walk)
+    )
+    last = "trial_sz" if dim == 3 else "trial_sy"
+    lines.append(
+        "%s      const s_t b_last = %sshape_1d[q_last * NS1 + %s], g_last = %sgrad_1d[q_last * NS1 + %s];"
+        % (walk, reference_prefix, last, reference_prefix, last)
+    )
+    lines.append("%s      for (int p = 0; p < NP; ++p) {" % walk)
+    inner = "%s        " % walk
+    if dim == 3:
         lines.extend(
             [
-                "%s    tensor_test_scalar<s_t, NQ, NS, %d, NC>(" % (indent, dim),
-                "%s        %sshape_1d, %sgrad_1d, flux + %s, column, %d);"
-                % (
-                    indent,
-                    reference_prefix,
-                    reference_prefix,
-                    c_product(row, "NQ", "ND"),
-                    row,
-                ),
+                "%sconst int qx = p %% NQ1, qy = p / NQ1;" % inner,
+                "%sconst s_t bx = %sshape_1d[qx * NS1 + trial_sx], gx = %sgrad_1d[qx * NS1 + trial_sx];"
+                % (inner, reference_prefix, reference_prefix),
+                "%sconst s_t by = %sshape_1d[qy * NS1 + trial_sy], gy = %sgrad_1d[qy * NS1 + trial_sy];"
+                % (inner, reference_prefix, reference_prefix),
+                "%sconst s_t r0 = gx * by * b_last, r1 = bx * gy * b_last, r2 = bx * by * g_last;" % inner,
             ]
         )
-    lines.extend(["%s  }" % indent, "%s}" % indent])
+    else:
+        lines.extend(
+            [
+                "%sconst int qx = p;" % inner,
+                "%sconst s_t bx = %sshape_1d[qx * NS1 + trial_sx], gx = %sgrad_1d[qx * NS1 + trial_sx];"
+                % (inner, reference_prefix, reference_prefix),
+                "%sconst s_t r0 = gx * b_last, r1 = bx * g_last;" % inner,
+            ]
+        )
+    lines.extend(
+        [
+            "%sconst s_t *const RSTR tangent_p = &slab_tangent[p * %d + trial_component * ND];"
+            % (inner, n_tangent * n_tangent),
+            # Written out over the trial gradient's components: as a loop over
+            # them, the slab walk was 6% slower on Grace (gcc 13).
+            "%sfor (int row = 0; row < NC * ND; ++row) {" % inner,
+            "%s  flux[row * NP + p] = %s;"
+            % (inner, " + ".join("tangent_p[row * NC * ND + %d] * r%d" % (l, l) for l in range(dim))),
+            "%s}" % inner,
+            "%s      }" % walk,
+            # The matrix is symmetric, so the column is written as the row it equals.
+            "%s      for (int component = 0; component < NC; ++component) {" % walk,
+            "%s        tensor_slab_test_scalar<s_t, NQ1, NS1, ND>(%sshape_1d, %sgrad_1d, q_last, &flux[component * ND * NP],"
+            % (walk, reference_prefix, reference_prefix),
+            "%s            &element_matrix[(trial_component * NS + trial_shape) * NDOFS + component * NS]);" % walk,
+            "%s      }" % walk,
+            "%s    }" % walk,
+            "%s  }" % walk,
+            "%s}" % walk,
+            "%s}" % indent,
+        ]
+    )
     return lines
 
 
@@ -8390,139 +8442,42 @@ def _sfem_soa_direct_hessian_matrix_assembly_lines(
                 "%s  " % indent,
             )
         )
+    lines.extend(_sfem_soa_direct_hessian_tangent_lines(material, dim, "%s  " % indent))
+    # The point's reference gradients, every shape, laid out [k][s].
     lines.extend(
         [
-            "%s  for (int trial_component = 0; trial_component < NC; ++trial_component) {"
-            % indent,
-            "%s    for (int trial_shape = 0; trial_shape < NS; ++trial_shape) {"
-            % indent,
+            "%s  s_t g_ref[ND * NS];" % indent,
+            "%s  for (int shape = 0; shape < NS; ++shape) {" % indent,
         ]
     )
     if use_tensor_product_reference:
-        lines.extend(
-            _tensor_product_shape_coordinate_lines(
-                dim,
-                "trial_shape",
-                "trial",
-                "%s      " % indent,
-            )
-        )
-    for ref_component in range(dim):
+        lines.extend(_tensor_product_shape_coordinate_lines(dim, "shape", "point", "%s    " % indent))
+    for k in range(dim):
         lines.append(
-            "%s      const s_t trial_grad_ref%d = %s;"
+            "%s    g_ref[%d * NS + shape] = %s;"
             % (
                 indent,
-                ref_component,
+                k,
                 _sfem_soa_reference_gradient_expr_for_shape(
                     dim,
-                    ref_component,
+                    k,
                     use_tensor_product_reference,
                     use_reference_gradient_vectors,
                     reference_inputs,
-                    "trial_shape",
-                    coord_prefix="trial",
+                    "shape",
+                    coord_prefix="point",
                     reference_prefix=reference_prefix,
                 ),
             )
         )
-    # A field gradient has one row per field component and one column per
-    # spatial direction, so it is `NC * ND` entries
-    # strided by ND.  Both used to be spelled NC,
-    # which is right only for a displacement: a scalar field in two dimensions
-    # then declared `trial_grad[1]` and wrote index 1, which the compiler will
-    # tell you about under -Warray-bounds and which no material reached until
-    # laplace was written as an energy.
     lines.extend(
         [
-            "%s      s_t trial_grad[NC * ND];" % indent,
-            "%s      for (int i = 0; i < NC * ND; ++i) {" % indent,
-            "%s        trial_grad[i] = s_t(0);" % indent,
-            "%s      }" % indent,
-        ]
-    )
-    for phys_component in range(dim):
-        terms = [
-            "trial_grad_ref%d * %s"
-            % (
-                ref_component,
-                current_target().work_item_name("adj", ref_component * dim + phys_component),
-            )
-            for ref_component in range(dim)
-        ]
-        lines.append(
-            "%s      trial_grad[trial_component * ND + %d] = (%s) * idet;"
-            % (indent, phys_component, " + ".join(terms))
-        )
-    lines.append("%s      s_t material[NC * ND];" % indent)
-    local_material_lines = []
-    _append_cse_array_assignments(
-        local_material_lines,
-        tuple(material),
-        ["material[%d] =" % i for i in range(dim * dim)],
-        "weak_hess_tmp",
-    )
-    lines.extend("%s      %s" % (indent, line.strip()) for line in local_material_lines)
-    lines.extend(
-        [
-            "%s      for (int test_component = 0; test_component < NC; ++test_component) {"
-            % indent,
-            "%s        for (int test_shape = 0; test_shape < NS; ++test_shape) {"
-            % indent,
-        ]
-    )
-    if use_tensor_product_reference:
-        lines.extend(
-            _tensor_product_shape_coordinate_lines(
-                dim,
-                "test_shape",
-                "test",
-                "%s          " % indent,
-            )
-        )
-    for ref_component in range(dim):
-        lines.append(
-            "%s          const s_t test_grad_ref%d = %s;"
-            % (
-                indent,
-                ref_component,
-                _sfem_soa_reference_gradient_expr_for_shape(
-                    dim,
-                    ref_component,
-                    use_tensor_product_reference,
-                    use_reference_gradient_vectors,
-                    reference_inputs,
-                    "test_shape",
-                    coord_prefix="test",
-                    reference_prefix=reference_prefix,
-                ),
-            )
-        )
-    lines.append("%s          s_t entry = s_t(0);" % indent)
-    for ref_component in range(dim):
-        terms = [
-            "material[%s] * %s"
-            % (
-                c_sum(c_product("test_component", "ND"), k),
-                current_target().work_item_name("adj", ref_component * dim + k),
-            )
-            for k in range(dim)
-        ]
-        lines.append(
-            "%s          entry += test_grad_ref%d * qw * (%s);"
-            % (indent, ref_component, " + ".join(terms))
-        )
-    lines.extend(
-        [
-            "%s          const int row = test_component * NS + test_shape;"
-            % indent,
-            "%s          const int col = trial_component * NS + trial_shape;"
-            % indent,
-            "%s          element_matrix[row * NDOFS + col] += entry;" % indent,
-            "%s        }" % indent,
-            "%s      }" % indent,
-            "%s    }" % indent,
             "%s  }" % indent,
+            "%s  const s_t adj_q[ND * ND] = {%s};"
+            % (indent, ", ".join(current_target().work_item_name("adj", c) for c in range(dim * dim))),
+            "%s  point_test_symmetric_scalar<s_t, NS, ND, NC>(g_ref, adj_q, qw * idet, D, element_matrix);" % indent,
             "%s}" % indent,
+            "%smirror_upper_triangle_scalar<s_t, NDOFS>(element_matrix);" % indent,
         ]
     )
     return lines

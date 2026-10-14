@@ -60,34 +60,20 @@ static SFEM_INLINE void laplace_d2_simplex_direct_hessian_reference_element_matr
     const s_t adj_lane3 = badj3[goff];
     const s_t det_lane0 = bdet0[goff];
     const s_t idet = s_t(1) / det_lane0;
-    for (int trial_component = 0; trial_component < NC; ++trial_component) {
-      for (int trial_shape = 0; trial_shape < NS; ++trial_shape) {
-        const s_t trial_grad_ref0 = grad_ref_x[q * NS + trial_shape];
-        const s_t trial_grad_ref1 = grad_ref_y[q * NS + trial_shape];
-        s_t trial_grad[NC * ND];
-        for (int i = 0; i < NC * ND; ++i) {
-          trial_grad[i] = s_t(0);
-        }
-        trial_grad[trial_component * ND + 0] = (trial_grad_ref0 * adj_lane0 + trial_grad_ref1 * adj_lane2) * idet;
-        trial_grad[trial_component * ND + 1] = (trial_grad_ref0 * adj_lane1 + trial_grad_ref1 * adj_lane3) * idet;
-        s_t material[NC * ND];
-        material[0] = kappa*trial_grad[0];
-        material[1] = kappa*trial_grad[1];
-        for (int test_component = 0; test_component < NC; ++test_component) {
-          for (int test_shape = 0; test_shape < NS; ++test_shape) {
-            const s_t test_grad_ref0 = grad_ref_x[q * NS + test_shape];
-            const s_t test_grad_ref1 = grad_ref_y[q * NS + test_shape];
-            s_t entry = s_t(0);
-            entry += test_grad_ref0 * qw * (material[test_component * ND] * adj_lane0 + material[test_component * ND + 1] * adj_lane1);
-            entry += test_grad_ref1 * qw * (material[test_component * ND] * adj_lane2 + material[test_component * ND + 1] * adj_lane3);
-            const int row = test_component * NS + test_shape;
-            const int col = trial_component * NS + trial_shape;
-            element_matrix[row * NDOFS + col] += entry;
-          }
-        }
-      }
+    s_t D[4];
+    D[0] = kappa;
+    D[1] = 0;
+    D[3] = kappa;
+    D[2] = D[1];
+    s_t g_ref[ND * NS];
+    for (int shape = 0; shape < NS; ++shape) {
+      g_ref[0 * NS + shape] = grad_ref_x[q * NS + shape];
+      g_ref[1 * NS + shape] = grad_ref_y[q * NS + shape];
     }
+    const s_t adj_q[ND * ND] = {adj_lane0, adj_lane1, adj_lane2, adj_lane3};
+    point_test_symmetric_scalar<s_t, NS, ND, NC>(g_ref, adj_q, qw * idet, D, element_matrix);
   }
+  mirror_upper_triangle_scalar<s_t, NDOFS>(element_matrix);
 }
 
 template <typename s_t, int NS>
