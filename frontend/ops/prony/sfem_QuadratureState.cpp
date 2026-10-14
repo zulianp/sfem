@@ -1,5 +1,6 @@
 #include "sfem_QuadratureState.hpp"
 
+#include <algorithm>
 #include <cstring>
 
 #include "sfem_prony_kernels.hpp"
@@ -54,7 +55,7 @@ namespace sfem {
         // Zero is the all-zero bit pattern in every storage format.
         std::memset(data_->data(), 0, data_->size());
         scaling_t *const s = scales_->data();
-        for (ptrdiff_t i = 0; i < scales_->size(); i++) s[i] = 1;
+        std::fill(s, s + scales_->size(), scaling_t(1));
     }
 
     void QuadratureState::encode(const int t, const real_t *const values) {

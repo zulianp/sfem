@@ -2401,7 +2401,10 @@ def _append_sfem_soa_tensor_weak_form_lines(
         "      const s_t %s = det_q0[%s];"
         % (_work_item_name(source_builder, "det", 0), work_item)
     )
-    lines.extend(quadrature_fields.load_lines(point_streams, "      ", work_item))
+    # With steps, this loop only maps the two gradients and the step loop,
+    # which evaluates the density, reads the integration-point fields.
+    for _unstepped in [candidate for candidate in (step_loop,) if candidate is None]:
+        lines.extend(quadrature_fields.load_lines(point_streams, "      ", work_item))
     def geometry_value(name, component):
         return _work_item_name(source_builder, name, component)
 
@@ -5388,6 +5391,7 @@ def _append_mesh_operator_compact_stream_buffers(
     reference_inputs,
     use_reference_gradient_vectors,
     use_tensor_product_reference,
+    integrated=True,
 ):
     """The compacted stream buffers a mesh operator stages into.
 
@@ -5404,6 +5408,7 @@ def _append_mesh_operator_compact_stream_buffers(
             emit_reference_basis=(
                 not omit_reference_basis_inputs or geometry_mode == "isoparametric"
             ),
+            integrated=integrated,
         )
     )
 
@@ -5888,6 +5893,7 @@ def _sfem_soa_mesh_operator_function(
         reference_inputs,
         use_reference_gradient_vectors,
         use_tensor_product_reference,
+        integrated=form_is_integrated(form),
     )
     if use_tensor_product_reference:
         lines.extend(
@@ -12078,20 +12084,26 @@ def _quadrature_mesh_reference_alias_lines(
     use_reference_gradient_vectors,
     geometry_mode,
     emit_reference_basis=True,
+    integrated=True,
 ):
     lines = []
     reference_prefix = "%s_" % geometry_mode
+    # A quadrature output writes at the points and weights nothing, so its
+    # kernel takes no weights (`form_is_integrated`) and the operator names none.
+    weights = ("q_weight",) if integrated else ()
     if not emit_reference_basis:
-        lines.append(
-            "  const s_t *const %sq_weight = %s;"
-            % (
-                reference_prefix,
-                quadrature_reference_accessor(quadrature_rule, "q_weight"),
+        for name in weights:
+            lines.append(
+                "  const s_t *const %s%s = %s;"
+                % (
+                    reference_prefix,
+                    name,
+                    quadrature_reference_accessor(quadrature_rule, name),
+                )
             )
-        )
         return lines
     if use_tensor_product_reference:
-        for name in ("shape_1d", "grad_1d", "q_weight_1d"):
+        for name in ("shape_1d", "grad_1d") + tuple("%s_1d" % weight for weight in weights):
             lines.append(
                 "  const s_t *const %s = %s;"
                 % (
@@ -12111,13 +12123,15 @@ def _quadrature_mesh_reference_alias_lines(
                     quadrature_reference_accessor(quadrature_rule, reference_name),
                 )
             )
-        lines.append(
-            "  const s_t *const %sq_weight = %s;"
-            % (
-                reference_prefix,
-                quadrature_reference_accessor(quadrature_rule, "q_weight"),
+        for name in weights:
+            lines.append(
+                "  const s_t *const %s%s = %s;"
+                % (
+                    reference_prefix,
+                    name,
+                    quadrature_reference_accessor(quadrature_rule, name),
+                )
             )
-        )
         return lines
     for array_input in reference_inputs:
         if array_input.name != "grad_ref":
@@ -12130,13 +12144,15 @@ def _quadrature_mesh_reference_alias_lines(
                 quadrature_reference_accessor(quadrature_rule, array_input.name),
             )
         )
-    lines.append(
-        "  const s_t *const %sq_weight = %s;"
-        % (
-            reference_prefix,
-            quadrature_reference_accessor(quadrature_rule, "q_weight"),
+    for name in weights:
+        lines.append(
+            "  const s_t *const %s%s = %s;"
+            % (
+                reference_prefix,
+                name,
+                quadrature_reference_accessor(quadrature_rule, name),
+            )
         )
-    )
     return lines
 
 

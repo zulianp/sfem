@@ -116,7 +116,6 @@ static __host__ __device__ __forceinline__ void mooney_rivlin_prony_d3_tensor_pr
       const s_t adj_value7 = adj_q7[0];
       const s_t adj_value8 = adj_q8[0];
       const s_t det_value0 = det_q0[0];
-      const s_t iso_history_qp[6] = {iso_history_q[0], iso_history_q[1 * NQ * qp_stride + 0], iso_history_q[2 * NQ * qp_stride + 0], iso_history_q[3 * NQ * qp_stride + 0], iso_history_q[4 * NQ * qp_stride + 0], iso_history_q[5 * NQ * qp_stride + 0]};
       const s_t idet = s_t(1) / det_value0;
       gu_base_v[0] = (gu_ref0[0] * adj_value0 + gu_ref1[0] * adj_value3 + gu_ref2[0] * adj_value6) * idet;
       trial_grad_v[0] = (grad_h_ref0[0] * adj_value0 + grad_h_ref1[0] * adj_value3 + grad_h_ref2[0] * adj_value6) * idet;
