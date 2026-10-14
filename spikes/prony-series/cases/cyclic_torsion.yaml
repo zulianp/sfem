@@ -44,6 +44,7 @@ material:
     tau: 10.0
   wlf:
     enabled: false
+  history_storage: float32
 time:
   dt: 0.02
   t_end: 36.0

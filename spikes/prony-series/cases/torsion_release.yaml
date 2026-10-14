@@ -29,6 +29,9 @@ material:
   wlf:
     enabled: false
 
+  # How H_i is stored per integration point; arithmetic stays in full precision.
+  history_storage: int8_scaled
+
 time:
   dt: 0.2
   t_end: 40.0

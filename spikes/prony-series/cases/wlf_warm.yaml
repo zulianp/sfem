@@ -30,6 +30,7 @@ material:
     C2: 47.4781
     T_ref: -54.29
     temperature: -50.0
+  history_storage: float32
 time:
   dt: 0.05
   t_end: 20.0

@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 
+#include "sfem_HistoryStorage.hpp"
 #include "sfem_base.hpp"
 
 namespace prony {
@@ -33,6 +34,10 @@ namespace prony {
         real_t wlf_C2{47.4781};
         real_t wlf_T_ref{-54.29};
         real_t temperature{20.0};
+
+        // How the history H_i is stored per integration point. Arithmetic is always in real_t;
+        // only the store is reduced. The spike defaults to float32, half the memory of full.
+        sfem::HistoryStorage history_storage{sfem::HistoryStorage::FLOAT32};
     };
 
     struct Time {

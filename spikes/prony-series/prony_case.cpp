@@ -143,6 +143,12 @@ namespace prony {
                 read(wlf, "temperature", m.temperature);
             }
 
+            if (has(node, "history_storage")) {
+                std::string name;
+                read(node, "history_storage", name);
+                m.history_storage = sfem::history_storage_from_string(name);
+            }
+
             return SFEM_SUCCESS;
         }
 
@@ -438,6 +444,7 @@ namespace prony {
             sum_g += material.prony[i].g;
         }
         os << "    g_inf: " << (1 - sum_g) << "\n";
+        os << "    history_storage: " << sfem::to_string(material.history_storage) << "\n";
 
         if (material.wlf_enabled) {
             os << "    wlf: C1=" << material.wlf_C1 << " C2=" << material.wlf_C2 << " T_ref=" << material.wlf_T_ref
