@@ -61,6 +61,22 @@ extern "C" const sfem::codegen::KernelDiagnostics * cu_linear_elasticity_proteus
         void
 );
 
+namespace {
+  //! Reorder a device table of connectivity rows on the device.
+  template <int N>
+  struct ConnectivityOrder {
+    int source[N];
+  };
+
+  template <typename T, int N>
+  __global__ void permute_connectivity(T *const *const elements,
+                                       const ConnectivityOrder<N> order,
+                                       T **const permuted) {
+    const int k = threadIdx.x;
+    if (k < N) permuted[k] = elements[order.source[k]];
+  }
+}  // namespace
+
 extern "C" int cu_linear_elasticity_quad4_apply_i_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
@@ -77,13 +93,13 @@ extern "C" int cu_linear_elasticity_quad4_apply_i_msoa(
         void *const RSTR outy,
         void *const stream
 ) {
-    idx_t *proteus_elements[4] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2]
-    };
-    return cu_linear_elasticity_proteus_quad4_apply_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy, stream);
+    idx_t **proteus_elements = nullptr;
+    if (cudaMallocAsync((void **)&proteus_elements, 4 * sizeof(idx_t *), (cudaStream_t)stream) != cudaSuccess) return SFEM_FAILURE;
+    const ConnectivityOrder<4> proteus_elements_order{{0, 1, 3, 2}};
+    permute_connectivity<idx_t, 4><<<1, 4, 0, (cudaStream_t)stream>>>(elements, proteus_elements_order, proteus_elements);
+    const int status = cu_linear_elasticity_proteus_quad4_apply_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy, stream);
+    cudaFreeAsync(proteus_elements, (cudaStream_t)stream);
+    return status;
 }
 
 extern "C" int cu_linear_elasticity_quad4_gradient_i_msoa(
@@ -102,13 +118,13 @@ extern "C" int cu_linear_elasticity_quad4_gradient_i_msoa(
         void *const RSTR outy,
         void *const stream
 ) {
-    idx_t *proteus_elements[4] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2]
-    };
-    return cu_linear_elasticity_proteus_quad4_gradient_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy, stream);
+    idx_t **proteus_elements = nullptr;
+    if (cudaMallocAsync((void **)&proteus_elements, 4 * sizeof(idx_t *), (cudaStream_t)stream) != cudaSuccess) return SFEM_FAILURE;
+    const ConnectivityOrder<4> proteus_elements_order{{0, 1, 3, 2}};
+    permute_connectivity<idx_t, 4><<<1, 4, 0, (cudaStream_t)stream>>>(elements, proteus_elements_order, proteus_elements);
+    const int status = cu_linear_elasticity_proteus_quad4_gradient_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy, stream);
+    cudaFreeAsync(proteus_elements, (cudaStream_t)stream);
+    return status;
 }
 
 extern "C" int cu_linear_elasticity_quad4_objective_steps_i_msoa(
@@ -130,13 +146,13 @@ extern "C" int cu_linear_elasticity_quad4_objective_steps_i_msoa(
         void *const RSTR value,
         void *const stream
 ) {
-    idx_t *proteus_elements[4] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2]
-    };
-    return cu_linear_elasticity_proteus_quad4_objective_steps_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value, stream);
+    idx_t **proteus_elements = nullptr;
+    if (cudaMallocAsync((void **)&proteus_elements, 4 * sizeof(idx_t *), (cudaStream_t)stream) != cudaSuccess) return SFEM_FAILURE;
+    const ConnectivityOrder<4> proteus_elements_order{{0, 1, 3, 2}};
+    permute_connectivity<idx_t, 4><<<1, 4, 0, (cudaStream_t)stream>>>(elements, proteus_elements_order, proteus_elements);
+    const int status = cu_linear_elasticity_proteus_quad4_objective_steps_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value, stream);
+    cudaFreeAsync(proteus_elements, (cudaStream_t)stream);
+    return status;
 }
 
 extern "C" const sfem::codegen::KernelDiagnostics * cu_linear_elasticity_quad4_apply_soa_diagnostics(

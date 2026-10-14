@@ -987,14 +987,14 @@ class CUDATarget(TargetPlatform):
         return (
             "namespace {",
             "  //! Reorder a device table of connectivity rows on the device.",
-            "  template <typename T, int N>",
+            "  template <int N>",
             "  struct ConnectivityOrder {",
             "    int source[N];",
             "  };",
             "",
             "  template <typename T, int N>",
             "  __global__ void permute_connectivity(T *const *const elements,",
-            "                                       const ConnectivityOrder<T, N> order,",
+            "                                       const ConnectivityOrder<N> order,",
             "                                       T **const permuted) {",
             "    const int k = threadIdx.x;",
             "    if (k < N) permuted[k] = elements[order.source[k]];",
@@ -1015,8 +1015,8 @@ class CUDATarget(TargetPlatform):
             "    %s **%s = nullptr;" % (pointer_type, name),
             "    if (cudaMallocAsync((void **)&%s, %d * sizeof(%s *), %s) != cudaSuccess) return SFEM_FAILURE;"
             % (name, n, pointer_type, stream),
-            "    const ConnectivityOrder<%s, %d> %s_order{{%s}};"
-            % (pointer_type, n, name, ", ".join(str(index) for index in shape_order)),
+            "    const ConnectivityOrder<%d> %s_order{{%s}};"
+            % (n, name, ", ".join(str(index) for index in shape_order)),
             "    permute_connectivity<%s, %d><<<1, %d, 0, %s>>>(elements, %s_order, %s);"
             % (pointer_type, n, n, stream, name, name),
         )

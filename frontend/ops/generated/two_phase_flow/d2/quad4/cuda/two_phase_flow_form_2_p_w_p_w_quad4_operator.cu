@@ -85,6 +85,22 @@ extern "C" const sfem::codegen::KernelDiagnostics * cu_two_phase_flow_form_2_p_w
         void
 );
 
+namespace {
+  //! Reorder a device table of connectivity rows on the device.
+  template <int N>
+  struct ConnectivityOrder {
+    int source[N];
+  };
+
+  template <typename T, int N>
+  __global__ void permute_connectivity(T *const *const elements,
+                                       const ConnectivityOrder<N> order,
+                                       T **const permuted) {
+    const int k = threadIdx.x;
+    if (k < N) permuted[k] = elements[order.source[k]];
+  }
+}  // namespace
+
 extern "C" int cu_two_phase_flow_form_2_p_w_p_w_quad4_jacobian_action_i_maos(
         const int scalar_bytes,
         const ptrdiff_t nelements,
@@ -97,13 +113,13 @@ extern "C" int cu_two_phase_flow_form_2_p_w_p_w_quad4_jacobian_action_i_maos(
         void *const RSTR output,
         void *const stream
 ) {
-    idx_t *proteus_elements[4] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2]
-    };
-    return cu_two_phase_flow_form_2_p_w_p_w_proteus_quad4_jacobian_action_i_maos(scalar_bytes, nelements, nnodes, proteus_elements, points, parameters, current, direction, output, stream);
+    idx_t **proteus_elements = nullptr;
+    if (cudaMallocAsync((void **)&proteus_elements, 4 * sizeof(idx_t *), (cudaStream_t)stream) != cudaSuccess) return SFEM_FAILURE;
+    const ConnectivityOrder<4> proteus_elements_order{{0, 1, 3, 2}};
+    permute_connectivity<idx_t, 4><<<1, 4, 0, (cudaStream_t)stream>>>(elements, proteus_elements_order, proteus_elements);
+    const int status = cu_two_phase_flow_form_2_p_w_p_w_proteus_quad4_jacobian_action_i_maos(scalar_bytes, nelements, nnodes, proteus_elements, points, parameters, current, direction, output, stream);
+    cudaFreeAsync(proteus_elements, (cudaStream_t)stream);
+    return status;
 }
 
 extern "C" int cu_two_phase_flow_form_2_p_w_p_w_quad4_jacobian_action_i_msoa(
@@ -137,13 +153,13 @@ extern "C" int cu_two_phase_flow_form_2_p_w_p_w_quad4_jacobian_action_i_msoa(
         void *const RSTR p_c_out,
         void *const stream
 ) {
-    idx_t *proteus_elements[4] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2]
-    };
-    return cu_two_phase_flow_form_2_p_w_p_w_proteus_quad4_jacobian_action_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out, stream);
+    idx_t **proteus_elements = nullptr;
+    if (cudaMallocAsync((void **)&proteus_elements, 4 * sizeof(idx_t *), (cudaStream_t)stream) != cudaSuccess) return SFEM_FAILURE;
+    const ConnectivityOrder<4> proteus_elements_order{{0, 1, 3, 2}};
+    permute_connectivity<idx_t, 4><<<1, 4, 0, (cudaStream_t)stream>>>(elements, proteus_elements_order, proteus_elements);
+    const int status = cu_two_phase_flow_form_2_p_w_p_w_proteus_quad4_jacobian_action_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out, stream);
+    cudaFreeAsync(proteus_elements, (cudaStream_t)stream);
+    return status;
 }
 
 extern "C" int cu_two_phase_flow_form_2_p_w_p_w_quad4_jacobian_action_a_msoa(
@@ -181,13 +197,13 @@ extern "C" int cu_two_phase_flow_form_2_p_w_p_w_quad4_jacobian_action_a_msoa(
         void *const RSTR p_c_out,
         void *const stream
 ) {
-    idx_t *proteus_elements[4] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2]
-    };
-    return cu_two_phase_flow_form_2_p_w_p_w_proteus_quad4_jacobian_action_a_msoa(scalar_bytes, nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out, stream);
+    idx_t **proteus_elements = nullptr;
+    if (cudaMallocAsync((void **)&proteus_elements, 4 * sizeof(idx_t *), (cudaStream_t)stream) != cudaSuccess) return SFEM_FAILURE;
+    const ConnectivityOrder<4> proteus_elements_order{{0, 1, 3, 2}};
+    permute_connectivity<idx_t, 4><<<1, 4, 0, (cudaStream_t)stream>>>(elements, proteus_elements_order, proteus_elements);
+    const int status = cu_two_phase_flow_form_2_p_w_p_w_proteus_quad4_jacobian_action_a_msoa(scalar_bytes, nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out, stream);
+    cudaFreeAsync(proteus_elements, (cudaStream_t)stream);
+    return status;
 }
 
 extern "C" const sfem::codegen::KernelDiagnostics * cu_two_phase_flow_form_2_p_w_p_w_quad4_jacobian_action_esoa_diagnostics(
