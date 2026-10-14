@@ -233,6 +233,19 @@ namespace sfem {
       }
     }
 
+    //! Whether the stored-tangent path assembles this element.
+    //!
+    //! Its tangent is built from the cached adjugate, so the cache is built for
+    //! these elements whether or not an affine option is on -- and only for
+    //! these: smesh has no adjugate fill for every element (HEX27, for one),
+    //! and asking for one it cannot fill aborts inside `initialize`.
+    bool geometry_assembles_inexact(const smesh::ElemType element_type) {
+      switch (element_type) {
+        default:
+          return false;
+      }
+    }
+
     int cache_affine_geometry(const std::shared_ptr<FunctionSpace> &space,
                                   MultiDomainOp &domains,
                                   const bool requested) {
@@ -241,7 +254,8 @@ namespace sfem {
           false ||
           false;
       for (auto &entry : domains.domains()) {
-        if (!requested && !geometry_is_forced_affine(entry.second.element_type)) {
+        if (!requested && !geometry_is_forced_affine(entry.second.element_type) &&
+            !geometry_assembles_inexact(entry.second.element_type)) {
           continue;
         }
         const smesh::block_idx_t block_id =
