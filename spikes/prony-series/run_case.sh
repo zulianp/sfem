@@ -65,7 +65,7 @@ PRONY_EXE="$EXE" PRONYRUN_DIR="$WORKDIR/logs" \
     "$HERE/tools/pronyrun.sh" "$CASE_NAME" "$CASE_NAME.yaml"
 
 if [[ -f "$WORKDIR/$RESULTS/out/time.txt" ]]; then
-    "$ROOT_DIR/workflows/hyperelasticity_bdf2/write_transient_xdmf.sh" \
+    bash "$ROOT_DIR/workflows/hyperelasticity_bdf2/write_transient_xdmf.sh" \
         "$WORKDIR/$RESULTS/mesh" "$WORKDIR/$RESULTS" "$WORKDIR/$RESULTS/output.xdmf" \
         || echo "[warn] XDMF export failed; the raw fields are still in $RESULTS/out" >&2
 fi
@@ -80,5 +80,5 @@ fi
 echo
 echo "$CASE_NAME:"
 echo "  history:  $WORKDIR/$RESULTS/history.csv"
-echo "  paraview: $WORKDIR/$RESULTS/output.xdmf"
+[[ -f "$WORKDIR/$RESULTS/output.xdmf" ]] && echo "  paraview: $WORKDIR/$RESULTS/output.xdmf"
 echo "  raw log:  $WORKDIR/logs/$CASE_NAME.log"
