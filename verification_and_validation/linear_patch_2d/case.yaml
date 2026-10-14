@@ -166,7 +166,7 @@ variants:
       <<: *driver
       environment:
         <<: *driver_environment
-        SFEM_EXECUTION_SPACE: DEVICE
+        SFEM_EXECUTION_SPACE: device
     expected_output: *expected_output
     tolerances: *variant_tolerances
     requires: [cuda_device]

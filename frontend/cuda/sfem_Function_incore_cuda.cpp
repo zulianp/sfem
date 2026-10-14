@@ -96,10 +96,18 @@ namespace sfem {
             }
         }
 
+        // A condition carries either one value or one value per node, as on the
+        // host; the per-node values were copied to the device above and are the
+        // ones prescribed when present.
         int apply(real_t *const x) override {
             for (auto &c : conditions) {
-                d_constraint_nodes_to_value_vec(
-                        c.nodeset->size(), c.nodeset->data(), space->block_size(), c.component, c.value, x);
+                if (c.values) {
+                    d_constraint_nodes_to_values_vec(
+                            c.nodeset->size(), c.nodeset->data(), space->block_size(), c.component, c.values->data(), x);
+                } else {
+                    d_constraint_nodes_to_value_vec(
+                            c.nodeset->size(), c.nodeset->data(), space->block_size(), c.component, c.value, x);
+                }
             }
 
             return SFEM_SUCCESS;
@@ -107,8 +115,13 @@ namespace sfem {
 
         int gradient(const real_t *const x, real_t *const g) override {
             for (auto &c : conditions) {
-                d_constraint_gradient_nodes_to_value_vec(
-                        c.nodeset->size(), c.nodeset->data(), space->block_size(), c.component, c.value, x, g);
+                if (c.values) {
+                    d_constraint_gradient_nodes_to_values_vec(
+                            c.nodeset->size(), c.nodeset->data(), space->block_size(), c.component, c.values->data(), x, g);
+                } else {
+                    d_constraint_gradient_nodes_to_value_vec(
+                            c.nodeset->size(), c.nodeset->data(), space->block_size(), c.component, c.value, x, g);
+                }
             }
 
             return SFEM_SUCCESS;

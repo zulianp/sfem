@@ -16,6 +16,7 @@
 int lsolve(const std::shared_ptr<sfem::Function>          &f,
            const std::shared_ptr<sfem::Op>                &material_op,
            const std::shared_ptr<sfem::NeumannConditions> &neumann_conditions,
+           const std::shared_ptr<sfem::Op>                &neumann_op,
            const smesh::Path                              &output_dir) {
     auto              es           = f->execution_space();
     auto              fs           = f->space();
@@ -52,7 +53,9 @@ int lsolve(const std::shared_ptr<sfem::Function>          &f,
             SFEM_ERROR("linear_elasticity does not support follower pressure; use a nonlinear driver\n");
             return SFEM_FAILURE;
         }
-        if (neumann_conditions->gradient(x->data(), rhs->data()) != SFEM_SUCCESS) return SFEM_FAILURE;
+        // The operator in the solve's memory space, which on the device is not
+        // `neumann_conditions` itself.
+        if (neumann_op->gradient(x->data(), rhs->data()) != SFEM_SUCCESS) return SFEM_FAILURE;
         blas->scal(fs->n_dofs(), -1, rhs->data());
     }
 
@@ -181,22 +184,32 @@ int solve_linear_elasticity(const std::shared_ptr<sfem::Communicator> &comm, int
 
     if (!op) return SFEM_FAILURE;
 
-    auto f = sfem::Function::create(fs);
+    // The conditions are read on the host and, for a device run, moved to the
+    // device beside the operator: the host versions would write device vectors.
+    const bool on_device = es == sfem::EXECUTION_SPACE_DEVICE;
+    auto       f         = sfem::Function::create(fs);
     if (dirichlet_path.to_string() != "NONE") {
         auto conds = sfem::DirichletConditions::create_from_file(fs, dirichlet_path);
         if (!conds) return SFEM_FAILURE;
-        f->add_constraint(conds);
+        if (on_device) {
+            f->add_constraint(sfem::to_device(conds));
+        } else {
+            f->add_constraint(conds);
+        }
     }
     f->add_operator(op);
 
     std::shared_ptr<sfem::NeumannConditions> neumann_conditions;
+    std::shared_ptr<sfem::Op>                neumann_op;
     if (neumann_path.to_string() != "NONE") {
         neumann_conditions = sfem::NeumannConditions::create_from_file(fs, neumann_path);
         if (!neumann_conditions) return SFEM_FAILURE;
-        f->add_operator(neumann_conditions);
+        neumann_op = on_device ? sfem::to_device(neumann_conditions) : std::shared_ptr<sfem::Op>(neumann_conditions);
+        if (!neumann_op) return SFEM_FAILURE;
+        f->add_operator(neumann_op);
     }
 
-    return lsolve(f, op, neumann_conditions, output_dir);
+    return lsolve(f, op, neumann_conditions, neumann_op, output_dir);
 }
 
 int main(int argc, char *argv[]) {
