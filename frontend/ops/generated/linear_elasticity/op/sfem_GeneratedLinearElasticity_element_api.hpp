@@ -5,7 +5,10 @@
 #include "linear_elasticity_proteus_quad4_element.hpp"
 #include "linear_elasticity_quad4_element.hpp"
 #include "linear_elasticity_tri3_element.hpp"
+#include "linear_elasticity_tri6_element.hpp"
+#include "linear_elasticity_hex27_element.hpp"
 #include "linear_elasticity_hex8_element.hpp"
+#include "linear_elasticity_proteus_hex27_element.hpp"
 #include "linear_elasticity_proteus_hex8_element.hpp"
 #include "linear_elasticity_tet10_element.hpp"
 #include "linear_elasticity_tet4_element.hpp"
@@ -28,6 +31,8 @@ static SFEM_INLINE int linear_elasticity_energy_2d_esoa(
       return linear_elasticity_tri3_energy_esoa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, values);
     case 40:
       return linear_elasticity_quad4_energy_esoa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, values);
+    case 6:
+      return linear_elasticity_tri6_energy_esoa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, values);
     case 400000:
       return linear_elasticity_proteus_quad4_energy_esoa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, values);
     default:
@@ -52,6 +57,10 @@ static SFEM_INLINE int linear_elasticity_energy_3d_esoa(
       return linear_elasticity_tet10_energy_esoa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, values);
     case 8:
       return linear_elasticity_hex8_energy_esoa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, values);
+    case 27:
+      return linear_elasticity_hex27_energy_esoa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, values);
+    case 270000:
+      return linear_elasticity_proteus_hex27_energy_esoa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, values);
     case 100008:
       return linear_elasticity_proteus_hex8_energy_esoa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, values);
     default:
@@ -74,6 +83,8 @@ static SFEM_INLINE int linear_elasticity_energy_2d_ecoords_soa(
       return linear_elasticity_tri3_energy_ecoords_soa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, values);
     case 40:
       return linear_elasticity_quad4_energy_ecoords_soa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, values);
+    case 6:
+      return linear_elasticity_tri6_energy_ecoords_soa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, values);
     case 400000:
       return linear_elasticity_proteus_quad4_energy_ecoords_soa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, values);
     default:
@@ -98,6 +109,10 @@ static SFEM_INLINE int linear_elasticity_energy_3d_ecoords_soa(
       return linear_elasticity_tet10_energy_ecoords_soa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, values);
     case 8:
       return linear_elasticity_hex8_energy_ecoords_soa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, values);
+    case 27:
+      return linear_elasticity_hex27_energy_ecoords_soa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, values);
+    case 270000:
+      return linear_elasticity_proteus_hex27_energy_ecoords_soa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, values);
     case 100008:
       return linear_elasticity_proteus_hex8_energy_ecoords_soa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, values);
     default:
@@ -121,6 +136,8 @@ static SFEM_INLINE int linear_elasticity_energy_2d_egeometry_soa(
       return linear_elasticity_tri3_energy_egeometry_soa<s_t, VS>(nelements, adj, det, lmbda, mu, u_streams, values);
     case 40:
       return linear_elasticity_quad4_energy_egeometry_soa<s_t, VS>(nelements, adj, det, lmbda, mu, u_streams, values);
+    case 6:
+      return linear_elasticity_tri6_energy_egeometry_soa<s_t, VS>(nelements, adj, det, lmbda, mu, u_streams, values);
     case 400000:
       return linear_elasticity_proteus_quad4_energy_egeometry_soa<s_t, VS>(nelements, adj, det, lmbda, mu, u_streams, values);
     default:
@@ -146,6 +163,10 @@ static SFEM_INLINE int linear_elasticity_energy_3d_egeometry_soa(
       return linear_elasticity_tet10_energy_egeometry_soa<s_t, VS>(nelements, adj, det, lmbda, mu, u_streams, values);
     case 8:
       return linear_elasticity_hex8_energy_egeometry_soa<s_t, VS>(nelements, adj, det, lmbda, mu, u_streams, values);
+    case 27:
+      return linear_elasticity_hex27_energy_egeometry_soa<s_t, VS>(nelements, adj, det, lmbda, mu, u_streams, values);
+    case 270000:
+      return linear_elasticity_proteus_hex27_energy_egeometry_soa<s_t, VS>(nelements, adj, det, lmbda, mu, u_streams, values);
     case 100008:
       return linear_elasticity_proteus_hex8_energy_egeometry_soa<s_t, VS>(nelements, adj, det, lmbda, mu, u_streams, values);
     default:
@@ -168,6 +189,8 @@ static SFEM_INLINE int linear_elasticity_gradient_2d_esoa(
       return linear_elasticity_tri3_gradient_esoa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, out_streams);
     case 40:
       return linear_elasticity_quad4_gradient_esoa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, out_streams);
+    case 6:
+      return linear_elasticity_tri6_gradient_esoa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, out_streams);
     case 400000:
       return linear_elasticity_proteus_quad4_gradient_esoa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, out_streams);
     default:
@@ -192,6 +215,10 @@ static SFEM_INLINE int linear_elasticity_gradient_3d_esoa(
       return linear_elasticity_tet10_gradient_esoa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, out_streams);
     case 8:
       return linear_elasticity_hex8_gradient_esoa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, out_streams);
+    case 27:
+      return linear_elasticity_hex27_gradient_esoa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, out_streams);
+    case 270000:
+      return linear_elasticity_proteus_hex27_gradient_esoa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, out_streams);
     case 100008:
       return linear_elasticity_proteus_hex8_gradient_esoa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, out_streams);
     default:
@@ -214,6 +241,8 @@ static SFEM_INLINE int linear_elasticity_gradient_2d_ecoords_soa(
       return linear_elasticity_tri3_gradient_ecoords_soa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, out_streams);
     case 40:
       return linear_elasticity_quad4_gradient_ecoords_soa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, out_streams);
+    case 6:
+      return linear_elasticity_tri6_gradient_ecoords_soa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, out_streams);
     case 400000:
       return linear_elasticity_proteus_quad4_gradient_ecoords_soa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, out_streams);
     default:
@@ -238,6 +267,10 @@ static SFEM_INLINE int linear_elasticity_gradient_3d_ecoords_soa(
       return linear_elasticity_tet10_gradient_ecoords_soa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, out_streams);
     case 8:
       return linear_elasticity_hex8_gradient_ecoords_soa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, out_streams);
+    case 27:
+      return linear_elasticity_hex27_gradient_ecoords_soa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, out_streams);
+    case 270000:
+      return linear_elasticity_proteus_hex27_gradient_ecoords_soa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, out_streams);
     case 100008:
       return linear_elasticity_proteus_hex8_gradient_ecoords_soa<s_t, VS>(nelements, coords, lmbda, mu, u_streams, out_streams);
     default:
@@ -261,6 +294,8 @@ static SFEM_INLINE int linear_elasticity_gradient_2d_egeometry_soa(
       return linear_elasticity_tri3_gradient_egeometry_soa<s_t, VS>(nelements, adj, det, lmbda, mu, u_streams, out_streams);
     case 40:
       return linear_elasticity_quad4_gradient_egeometry_soa<s_t, VS>(nelements, adj, det, lmbda, mu, u_streams, out_streams);
+    case 6:
+      return linear_elasticity_tri6_gradient_egeometry_soa<s_t, VS>(nelements, adj, det, lmbda, mu, u_streams, out_streams);
     case 400000:
       return linear_elasticity_proteus_quad4_gradient_egeometry_soa<s_t, VS>(nelements, adj, det, lmbda, mu, u_streams, out_streams);
     default:
@@ -286,6 +321,10 @@ static SFEM_INLINE int linear_elasticity_gradient_3d_egeometry_soa(
       return linear_elasticity_tet10_gradient_egeometry_soa<s_t, VS>(nelements, adj, det, lmbda, mu, u_streams, out_streams);
     case 8:
       return linear_elasticity_hex8_gradient_egeometry_soa<s_t, VS>(nelements, adj, det, lmbda, mu, u_streams, out_streams);
+    case 27:
+      return linear_elasticity_hex27_gradient_egeometry_soa<s_t, VS>(nelements, adj, det, lmbda, mu, u_streams, out_streams);
+    case 270000:
+      return linear_elasticity_proteus_hex27_gradient_egeometry_soa<s_t, VS>(nelements, adj, det, lmbda, mu, u_streams, out_streams);
     case 100008:
       return linear_elasticity_proteus_hex8_gradient_egeometry_soa<s_t, VS>(nelements, adj, det, lmbda, mu, u_streams, out_streams);
     default:
@@ -307,6 +346,8 @@ static SFEM_INLINE int linear_elasticity_hessian_2d_esoa(
       return linear_elasticity_tri3_hessian_esoa<s_t, VS>(nelements, coords, lmbda, mu, matrix_streams);
     case 40:
       return linear_elasticity_quad4_hessian_esoa<s_t, VS>(nelements, coords, lmbda, mu, matrix_streams);
+    case 6:
+      return linear_elasticity_tri6_hessian_esoa<s_t, VS>(nelements, coords, lmbda, mu, matrix_streams);
     case 400000:
       return linear_elasticity_proteus_quad4_hessian_esoa<s_t, VS>(nelements, coords, lmbda, mu, matrix_streams);
     default:
@@ -330,6 +371,10 @@ static SFEM_INLINE int linear_elasticity_hessian_3d_esoa(
       return linear_elasticity_tet10_hessian_esoa<s_t, VS>(nelements, coords, lmbda, mu, matrix_streams);
     case 8:
       return linear_elasticity_hex8_hessian_esoa<s_t, VS>(nelements, coords, lmbda, mu, matrix_streams);
+    case 27:
+      return linear_elasticity_hex27_hessian_esoa<s_t, VS>(nelements, coords, lmbda, mu, matrix_streams);
+    case 270000:
+      return linear_elasticity_proteus_hex27_hessian_esoa<s_t, VS>(nelements, coords, lmbda, mu, matrix_streams);
     case 100008:
       return linear_elasticity_proteus_hex8_hessian_esoa<s_t, VS>(nelements, coords, lmbda, mu, matrix_streams);
     default:
@@ -351,6 +396,8 @@ static SFEM_INLINE int linear_elasticity_hessian_2d_ecoords_soa(
       return linear_elasticity_tri3_hessian_ecoords_soa<s_t, VS>(nelements, coords, lmbda, mu, matrix_streams);
     case 40:
       return linear_elasticity_quad4_hessian_ecoords_soa<s_t, VS>(nelements, coords, lmbda, mu, matrix_streams);
+    case 6:
+      return linear_elasticity_tri6_hessian_ecoords_soa<s_t, VS>(nelements, coords, lmbda, mu, matrix_streams);
     case 400000:
       return linear_elasticity_proteus_quad4_hessian_ecoords_soa<s_t, VS>(nelements, coords, lmbda, mu, matrix_streams);
     default:
@@ -374,6 +421,10 @@ static SFEM_INLINE int linear_elasticity_hessian_3d_ecoords_soa(
       return linear_elasticity_tet10_hessian_ecoords_soa<s_t, VS>(nelements, coords, lmbda, mu, matrix_streams);
     case 8:
       return linear_elasticity_hex8_hessian_ecoords_soa<s_t, VS>(nelements, coords, lmbda, mu, matrix_streams);
+    case 27:
+      return linear_elasticity_hex27_hessian_ecoords_soa<s_t, VS>(nelements, coords, lmbda, mu, matrix_streams);
+    case 270000:
+      return linear_elasticity_proteus_hex27_hessian_ecoords_soa<s_t, VS>(nelements, coords, lmbda, mu, matrix_streams);
     case 100008:
       return linear_elasticity_proteus_hex8_hessian_ecoords_soa<s_t, VS>(nelements, coords, lmbda, mu, matrix_streams);
     default:
@@ -396,6 +447,8 @@ static SFEM_INLINE int linear_elasticity_hessian_2d_egeometry_soa(
       return linear_elasticity_tri3_hessian_egeometry_soa<s_t, VS>(nelements, adj, det, lmbda, mu, matrix_streams);
     case 40:
       return linear_elasticity_quad4_hessian_egeometry_soa<s_t, VS>(nelements, adj, det, lmbda, mu, matrix_streams);
+    case 6:
+      return linear_elasticity_tri6_hessian_egeometry_soa<s_t, VS>(nelements, adj, det, lmbda, mu, matrix_streams);
     case 400000:
       return linear_elasticity_proteus_quad4_hessian_egeometry_soa<s_t, VS>(nelements, adj, det, lmbda, mu, matrix_streams);
     default:
@@ -420,6 +473,10 @@ static SFEM_INLINE int linear_elasticity_hessian_3d_egeometry_soa(
       return linear_elasticity_tet10_hessian_egeometry_soa<s_t, VS>(nelements, adj, det, lmbda, mu, matrix_streams);
     case 8:
       return linear_elasticity_hex8_hessian_egeometry_soa<s_t, VS>(nelements, adj, det, lmbda, mu, matrix_streams);
+    case 27:
+      return linear_elasticity_hex27_hessian_egeometry_soa<s_t, VS>(nelements, adj, det, lmbda, mu, matrix_streams);
+    case 270000:
+      return linear_elasticity_proteus_hex27_hessian_egeometry_soa<s_t, VS>(nelements, adj, det, lmbda, mu, matrix_streams);
     case 100008:
       return linear_elasticity_proteus_hex8_hessian_egeometry_soa<s_t, VS>(nelements, adj, det, lmbda, mu, matrix_streams);
     default:

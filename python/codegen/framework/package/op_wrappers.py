@@ -705,25 +705,28 @@ namespace sfem {
     }
 
 
-def _inexact_needs_affine(material):
-    """The split always needs the affine geometry, whatever the apply chose.
+def _inexact_affine_elements(material, kernel_sources):
+    """The elements the stored-tangent path assembles, from its own dispatch.
 
-    `initialize` builds the cache only when one of the affine options is on, and
-    the inexact path is not one of them: its tangent is assembled from the
-    adjugate and the determinant, so without this an Op whose exact apply runs
-    isoparametrically would offer `inexact_update` and then fail in it for want
-    of a cache the caller has no way to ask for.
+    The split always needs the affine geometry for these, whatever the apply
+    chose: `inexact_update` assembles the tangent from the adjugate and the
+    determinant, so an Op whose exact apply runs isoparametrically would
+    otherwise offer `inexact_update` and then fail in it for want of a cache
+    the caller has no way to ask for.  Asking per element rather than per
+    dimension is what keeps an element the split does not serve -- and smesh
+    cannot fill an adjugate for, like HEX27 -- out of the cache.
     """
     if not _emits_inexact_apply(material):
-        return ""
-    # Only where the cache can actually be built.  smesh's adjugate fill has no
-    # TRI3 or QUAD4 case and aborts rather than returning, so asking for the
-    # cache on a 2D mesh kills the process inside `initialize` -- which is how
-    # enabling the split first broke 2D linear elasticity outright.  The split
-    # needs affine geometry; affine geometry exists in three dimensions.
-    return (" ||\n                (impl_->space->mesh_ptr()->spatial_dimension() == 3"
-            " /* the inexact path assembles from the affine geometry,"
-            " which smesh fills for 3D elements only */)")
+        return ()
+    elements = []
+    for dim in (2, 3):
+        name = "%s_inexact_apply_tangent_%dd_a_msoa" % (material.name, dim)
+        if not _c_abi_function_exists(kernel_sources, name, public_only=True):
+            continue
+        for element in _c_abi_public_dispatch_case_elements(kernel_sources, name):
+            if element not in elements:
+                elements.append(element)
+    return tuple(elements)
 
 
 def _inexact_cache_field(material):
@@ -1442,6 +1445,19 @@ namespace sfem {
       }
     }
 
+    //! Whether the stored-tangent path assembles this element.
+    //!
+    //! Its tangent is built from the cached adjugate, so the cache is built for
+    //! these elements whether or not an affine option is on -- and only for
+    //! these: smesh has no adjugate fill for every element (HEX27, for one),
+    //! and asking for one it cannot fill aborts inside `initialize`.
+    bool geometry_assembles_inexact(const smesh::ElemType element_type) {
+      switch (element_type) {
+%(inexact_affine_element_cases)s        default:
+          return false;
+      }
+    }
+
     int cache_affine_geometry(const std::shared_ptr<FunctionSpace> &space,
                                   MultiDomainOp &domains,
                                   const bool requested) {
@@ -1450,7 +1466,8 @@ namespace sfem {
           %(gradient_affine_uses_jacobian_aos)s ||
           %(apply_affine_uses_jacobian_aos)s;
       for (auto &entry : domains.domains()) {
-        if (!requested && !geometry_is_forced_affine(entry.second.element_type)) {
+        if (!requested && !geometry_is_forced_affine(entry.second.element_type) &&
+            !geometry_assembles_inexact(entry.second.element_type)) {
           continue;
         }
         const smesh::block_idx_t block_id =
@@ -1597,7 +1614,7 @@ namespace sfem {
     const bool needs_affine_geometry =
         impl_->objective_uses_affine ||
         impl_->gradient_uses_affine ||
-        impl_->apply_uses_affine%(inexact_needs_affine)s;
+        impl_->apply_uses_affine;
     for (auto &entry : impl_->domains->domains()) {
       seed_parameters(*entry.second.parameters);
       impl_->element_capacity =
@@ -2101,7 +2118,9 @@ namespace sfem {
             {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
         ),
         "inexact_cache_field": _inexact_cache_field(material),
-        "inexact_needs_affine": _inexact_needs_affine(material),
+        "inexact_affine_element_cases": _forced_affine_element_cases(
+            _inexact_affine_elements(material, kernel_sources)
+        ),
         "performance_methods": _performance_methods(_op_class_name(material), material.name, elements, performance_cases),
         "affine_options": _affine_option_entries(
             "objective_uses_affine",
@@ -3382,7 +3401,6 @@ namespace sfem {
         "scheme_argument": _RESIDUAL_SCHEME_ARGUMENT[holds_scheme],
         "laplace_packed_apply_fast_path": laplace_packed_apply_fast_path,
         "inexact_cache_field": _inexact_cache_field(material),
-        "inexact_needs_affine": _inexact_needs_affine(material),
         "performance_methods": _performance_methods(_op_class_name(material), material.name, elements, performance_cases),
         # The merit and the linear work both use std::vector, so either brings
         # the header.
@@ -3666,7 +3684,12 @@ def _anonymous_namespace_entities(lines, opening):
                 if candidate.strip() and not candidate.strip().startswith("//")
             )
             name = None
-            head = text.split("{", 1)[0]
+            # The name comes from code only: a documentation comment that says
+            # "every element (HEX27, ...)" would otherwise name the helper
+            # `element`, and liveness would then be judged on the wrong word.
+            head = "\n".join(
+                candidate.split("//", 1)[0] for candidate in lines[start:index + 1]
+            ).split("{", 1)[0]
             match = _HELPER_NAME.search(head)
             if (
                 match
