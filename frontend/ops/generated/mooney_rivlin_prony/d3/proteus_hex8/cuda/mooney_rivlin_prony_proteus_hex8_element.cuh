@@ -20,6 +20,7 @@ static __host__ __device__ __forceinline__ int mooney_rivlin_prony_proteus_hex8_
         const s_t C10,
         const s_t K,
         const s_t iso_relaxation_gamma,
+        const s_t *const RSTR iso_history,
         const s_t *const *const RSTR u_streams,
         s_t *const RSTR values
 ) {
@@ -82,7 +83,7 @@ static __host__ __device__ __forceinline__ int mooney_rivlin_prony_proteus_hex8_
         bdet0_q[0] = det_q[0];
       }
     }
-    mooney_rivlin_prony_d3_tensor_product_objective_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), C01, C10, K, iso_relaxation_gamma, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    mooney_rivlin_prony_d3_tensor_product_objective_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), C01, C10, K, iso_relaxation_gamma, iso_history + evb, nelements, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -95,6 +96,7 @@ static __host__ __device__ __forceinline__ int mooney_rivlin_prony_proteus_hex8_
         const s_t C10,
         const s_t K,
         const s_t iso_relaxation_gamma,
+        const s_t *const RSTR iso_history,
         const s_t *const *const RSTR u_streams,
         s_t *const RSTR values
 ) {
@@ -136,7 +138,7 @@ static __host__ __device__ __forceinline__ int mooney_rivlin_prony_proteus_hex8_
     tensor_gradient_contiguous_scalar<s_t, NQ, NS, 3>(sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 2, coordinate_grad_ref + 2 * NQ * ND);
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
     geometry_jacobian_adjugate_and_determinant_scalar<s_t, ND, NQ>(coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
-    mooney_rivlin_prony_d3_tensor_product_objective_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), C01, C10, K, iso_relaxation_gamma, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    mooney_rivlin_prony_d3_tensor_product_objective_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), C01, C10, K, iso_relaxation_gamma, iso_history + evb, nelements, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -149,6 +151,7 @@ static __host__ __device__ __forceinline__ int mooney_rivlin_prony_proteus_hex8_
         const s_t C10,
         const s_t K,
         const s_t iso_relaxation_gamma,
+        const s_t *const RSTR iso_history,
         const s_t *const *const RSTR u_streams,
         s_t *const RSTR values
 ) {
@@ -190,7 +193,7 @@ static __host__ __device__ __forceinline__ int mooney_rivlin_prony_proteus_hex8_
     tensor_gradient_contiguous_scalar<s_t, NQ, NS, 3>(sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 2, coordinate_grad_ref + 2 * NQ * ND);
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
     geometry_jacobian_adjugate_and_determinant_scalar<s_t, ND, NQ>(coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
-    mooney_rivlin_prony_d3_tensor_product_objective_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), C01, C10, K, iso_relaxation_gamma, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    mooney_rivlin_prony_d3_tensor_product_objective_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), C01, C10, K, iso_relaxation_gamma, iso_history + evb, nelements, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -205,6 +208,7 @@ static __host__ __device__ __forceinline__ int mooney_rivlin_prony_proteus_hex8_
         const s_t C10,
         const s_t K,
         const s_t iso_relaxation_gamma,
+        const s_t *const RSTR iso_history,
         const s_t *const *const RSTR u_streams,
         s_t *const *const RSTR out_streams
 ) {
@@ -269,7 +273,7 @@ static __host__ __device__ __forceinline__ int mooney_rivlin_prony_proteus_hex8_
         bdet0_q[0] = det_q[0];
       }
     }
-    mooney_rivlin_prony_d3_tensor_product_gradient_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), C01, C10, K, iso_relaxation_gamma, bu_streams, bout_streams);
+    mooney_rivlin_prony_d3_tensor_product_gradient_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), C01, C10, K, iso_relaxation_gamma, iso_history + evb, nelements, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
@@ -282,6 +286,7 @@ static __host__ __device__ __forceinline__ int mooney_rivlin_prony_proteus_hex8_
         const s_t C10,
         const s_t K,
         const s_t iso_relaxation_gamma,
+        const s_t *const RSTR iso_history,
         const s_t *const *const RSTR u_streams,
         s_t *const *const RSTR out_streams
 ) {
@@ -325,7 +330,7 @@ static __host__ __device__ __forceinline__ int mooney_rivlin_prony_proteus_hex8_
     tensor_gradient_contiguous_scalar<s_t, NQ, NS, 3>(sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 2, coordinate_grad_ref + 2 * NQ * ND);
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
     geometry_jacobian_adjugate_and_determinant_scalar<s_t, ND, NQ>(coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
-    mooney_rivlin_prony_d3_tensor_product_gradient_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), C01, C10, K, iso_relaxation_gamma, bu_streams, bout_streams);
+    mooney_rivlin_prony_d3_tensor_product_gradient_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), C01, C10, K, iso_relaxation_gamma, iso_history + evb, nelements, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
@@ -338,6 +343,7 @@ static __host__ __device__ __forceinline__ int mooney_rivlin_prony_proteus_hex8_
         const s_t C10,
         const s_t K,
         const s_t iso_relaxation_gamma,
+        const s_t *const RSTR iso_history,
         const s_t *const *const RSTR u_streams,
         s_t *const *const RSTR out_streams
 ) {
@@ -381,7 +387,7 @@ static __host__ __device__ __forceinline__ int mooney_rivlin_prony_proteus_hex8_
     tensor_gradient_contiguous_scalar<s_t, NQ, NS, 3>(sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 2, coordinate_grad_ref + 2 * NQ * ND);
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
     geometry_jacobian_adjugate_and_determinant_scalar<s_t, ND, NQ>(coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
-    mooney_rivlin_prony_d3_tensor_product_gradient_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), C01, C10, K, iso_relaxation_gamma, bu_streams, bout_streams);
+    mooney_rivlin_prony_d3_tensor_product_gradient_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), C01, C10, K, iso_relaxation_gamma, iso_history + evb, nelements, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
@@ -396,6 +402,7 @@ static __host__ __device__ __forceinline__ int mooney_rivlin_prony_proteus_hex8_
         const s_t C10,
         const s_t K,
         const s_t iso_relaxation_gamma,
+        const s_t *const RSTR iso_history,
         const s_t *const *const RSTR u_streams,
         s_t *const *const RSTR matrix_streams
 ) {
@@ -466,7 +473,7 @@ static __host__ __device__ __forceinline__ int mooney_rivlin_prony_proteus_hex8_
           bout_data[stream] = s_t(0);
         }
       }
-      mooney_rivlin_prony_d3_tensor_product_apply_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), C01, C10, K, iso_relaxation_gamma, bu_streams, bh_streams, bout_streams);
+      mooney_rivlin_prony_d3_tensor_product_apply_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), C01, C10, K, iso_relaxation_gamma, iso_history + evb, nelements, bu_streams, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         {
@@ -486,6 +493,7 @@ static __host__ __device__ __forceinline__ int mooney_rivlin_prony_proteus_hex8_
         const s_t C10,
         const s_t K,
         const s_t iso_relaxation_gamma,
+        const s_t *const RSTR iso_history,
         const s_t *const *const RSTR u_streams,
         s_t *const *const RSTR matrix_streams
 ) {
@@ -535,7 +543,7 @@ static __host__ __device__ __forceinline__ int mooney_rivlin_prony_proteus_hex8_
           bout_data[stream] = s_t(0);
         }
       }
-      mooney_rivlin_prony_d3_tensor_product_apply_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), C01, C10, K, iso_relaxation_gamma, bu_streams, bh_streams, bout_streams);
+      mooney_rivlin_prony_d3_tensor_product_apply_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), C01, C10, K, iso_relaxation_gamma, iso_history + evb, nelements, bu_streams, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         {
@@ -555,6 +563,7 @@ static __host__ __device__ __forceinline__ int mooney_rivlin_prony_proteus_hex8_
         const s_t C10,
         const s_t K,
         const s_t iso_relaxation_gamma,
+        const s_t *const RSTR iso_history,
         const s_t *const *const RSTR u_streams,
         s_t *const *const RSTR matrix_streams
 ) {
@@ -604,7 +613,7 @@ static __host__ __device__ __forceinline__ int mooney_rivlin_prony_proteus_hex8_
           bout_data[stream] = s_t(0);
         }
       }
-      mooney_rivlin_prony_d3_tensor_product_apply_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), C01, C10, K, iso_relaxation_gamma, bu_streams, bh_streams, bout_streams);
+      mooney_rivlin_prony_d3_tensor_product_apply_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), C01, C10, K, iso_relaxation_gamma, iso_history + evb, nelements, bu_streams, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         {
