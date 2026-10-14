@@ -164,6 +164,7 @@ int solve_prony_visco_torsion(const std::shared_ptr<sfem::Communicator> &comm, i
         // The shift is evaluated at every begin_step, so the temperature is read per step rather
         // than baked into coefficients computed once.
         sfem::PronyRelaxation::Options options;
+        options.history_storage = c.material.history_storage;
         if (c.material.wlf_enabled) {
             options.shift       = std::make_shared<sfem::WLFShift>(c.material.wlf_C1, c.material.wlf_C2, c.material.wlf_T_ref);
             options.temperature = c.material.temperature;
