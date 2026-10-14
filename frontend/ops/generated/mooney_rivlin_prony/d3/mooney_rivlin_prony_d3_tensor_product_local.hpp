@@ -122,7 +122,6 @@ static SFEM_INLINE void mooney_rivlin_prony_d3_tensor_product_objective_block(
       const s_t adj_lane7 = adj_q7[lane];
       const s_t adj_lane8 = adj_q8[lane];
       const s_t det_lane0 = det_q0[lane];
-      const s_t iso_history_qp[6] = {iso_history_q[lane], iso_history_q[1 * NQ * qp_stride + lane], iso_history_q[2 * NQ * qp_stride + lane], iso_history_q[3 * NQ * qp_stride + lane], iso_history_q[4 * NQ * qp_stride + lane], iso_history_q[5 * NQ * qp_stride + lane]};
       const s_t idet = s_t(1) / det_lane0;
       gu_base_v[0 * VS + lane] = (gu_ref0[lane] * adj_lane0 + gu_ref1[lane] * adj_lane3 + gu_ref2[lane] * adj_lane6) * idet;
       trial_grad_v[0 * VS + lane] = (grad_h_ref0[lane] * adj_lane0 + grad_h_ref1[lane] * adj_lane3 + grad_h_ref2[lane] * adj_lane6) * idet;

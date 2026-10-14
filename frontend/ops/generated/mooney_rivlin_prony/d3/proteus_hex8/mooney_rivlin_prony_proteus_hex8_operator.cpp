@@ -3927,7 +3927,6 @@ static SFEM_INLINE int mooney_rivlin_prony_proteus_hex8_quadrature_output_a_msoa
   static constexpr int NS = 8;
   const s_t *const affine_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
   const s_t *const affine_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
-  const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
 
 #pragma omp parallel for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -4065,7 +4064,6 @@ static SFEM_INLINE int mooney_rivlin_prony_proteus_hex8_quadrature_output_i_msoa
   const g_t *const RSTR z = points[2];
   const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
   const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
-  const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
 
 #pragma omp parallel for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
