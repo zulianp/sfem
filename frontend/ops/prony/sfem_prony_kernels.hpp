@@ -83,6 +83,49 @@ namespace sfem {
             }
         }
 
+        /// Multiply one tensor of a store by `factor` in place:
+        ///     H <- factor * H,
+        /// re-encoded under fresh scales.
+        template <class Codec>
+        void scale(const ptrdiff_t                            rows,
+                   const ptrdiff_t                            n,
+                   const real_t                               factor,
+                   typename Codec::storage_t *const SFEM_RESTRICT H,
+                   scaling_t *const SFEM_RESTRICT             H_scales) {
+#pragma omp parallel for
+            for (ptrdiff_t e0 = 0; e0 < n; e0 += BLOCK) {
+                const ptrdiff_t nb = std::min(BLOCK, n - e0);
+
+                real_t old_scale[BLOCK];
+                real_t inv[BLOCK];
+                for (ptrdiff_t l = 0; l < nb; l++) old_scale[l] = H_scales[e0 + l];
+
+                if constexpr (Codec::scaled) {
+                    real_t max_abs[BLOCK];
+                    for (ptrdiff_t l = 0; l < nb; l++) max_abs[l] = 0;
+
+                    for (ptrdiff_t r = 0; r < rows; r++) {
+                        const typename Codec::storage_t *const h = &H[r * n + e0];
+                        for (ptrdiff_t l = 0; l < nb; l++) {
+                            max_abs[l] = std::max(max_abs[l], std::abs(factor * Codec::decode(h[l], old_scale[l])));
+                        }
+                    }
+
+                    for (ptrdiff_t l = 0; l < nb; l++) {
+                        H_scales[e0 + l] = Codec::scale_for(max_abs[l]);
+                        inv[l]           = 1 / static_cast<real_t>(H_scales[e0 + l]);
+                    }
+                } else {
+                    for (ptrdiff_t l = 0; l < nb; l++) inv[l] = 1;
+                }
+
+                for (ptrdiff_t r = 0; r < rows; r++) {
+                    typename Codec::storage_t *const h = &H[r * n + e0];
+                    for (ptrdiff_t l = 0; l < nb; l++) h[l] = Codec::encode(factor * Codec::decode(h[l], old_scale[l]), inv[l]);
+                }
+            }
+        }
+
         /// The frozen history of a step:
         ///     out = sum_i alpha_i H_i - b_sum * S_n.
         ///

@@ -58,6 +58,68 @@ namespace sfem {
         std::fill(s, s + scales_->size(), scaling_t(1));
     }
 
+    void QuadratureState::zero_tensor(const int t, void *const stream) {
+        const ptrdiff_t tensor_bytes = values_per_tensor() * n_elements_ * bytes_per_value(storage_);
+        uint8_t *const   data        = data_->data() + t * tensor_bytes;
+        scaling_t *const s           = scales_->data() + t * n_elements_;
+#ifndef SFEM_ENABLE_CUDA
+        (void)stream;
+#else
+        if (es_ == EXECUTION_SPACE_DEVICE) {
+            if (cu_prony_zero(tensor_bytes, data, n_elements_, s, stream) != SFEM_SUCCESS) {
+                SFEM_ERROR("QuadratureState::zero_tensor failed on the device\n");
+            }
+            return;
+        }
+#endif
+        std::memset(data, 0, tensor_bytes);
+        std::fill(s, s + n_elements_, scaling_t(1));
+    }
+
+    void QuadratureState::copy_tensor(const QuadratureState &src, const int from, const int to, void *const stream) {
+        if (src.storage_ != storage_ || src.values_per_tensor() != values_per_tensor() || src.n_elements_ != n_elements_ ||
+            src.es_ != es_) {
+            SFEM_ERROR("QuadratureState::copy_tensor: the two stores do not hold the same kind of tensor\n");
+        }
+        const ptrdiff_t tensor_bytes = values_per_tensor() * n_elements_ * bytes_per_value(storage_);
+        const uint8_t  *src_data     = src.data_->data() + from * tensor_bytes;
+        uint8_t        *dst_data     = data_->data() + to * tensor_bytes;
+        const scaling_t *src_scales  = src.scales_->data() + from * n_elements_;
+        scaling_t       *dst_scales  = scales_->data() + to * n_elements_;
+#ifndef SFEM_ENABLE_CUDA
+        (void)stream;
+#else
+        if (es_ == EXECUTION_SPACE_DEVICE) {
+            if (cu_prony_copy(tensor_bytes, src_data, dst_data, n_elements_, src_scales, dst_scales, stream) != SFEM_SUCCESS) {
+                SFEM_ERROR("QuadratureState::copy_tensor failed on the device\n");
+            }
+            return;
+        }
+#endif
+        std::memcpy(dst_data, src_data, tensor_bytes);
+        std::memcpy(dst_scales, src_scales, n_elements_ * sizeof(scaling_t));
+    }
+
+    void QuadratureState::scale_tensor(const int t, const real_t factor, void *const stream) {
+        void *const      data = data_->data() + t * values_per_tensor() * n_elements_ * bytes_per_value(storage_);
+        scaling_t *const s    = scales_->data() + t * n_elements_;
+#ifndef SFEM_ENABLE_CUDA
+        (void)stream;
+#else
+        if (es_ == EXECUTION_SPACE_DEVICE) {
+            if (cu_prony_scale(storage_, values_per_tensor(), n_elements_, factor, data, s, stream) != SFEM_SUCCESS) {
+                SFEM_ERROR("QuadratureState::scale_tensor failed on the device\n");
+            }
+            return;
+        }
+#endif
+        dispatch_history_codec(storage_, [&](auto codec) {
+            using Codec = decltype(codec);
+            prony::scale<Codec>(values_per_tensor(), n_elements_, factor, static_cast<typename Codec::storage_t *>(data), s);
+            return 0;
+        });
+    }
+
     void QuadratureState::encode(const int t, const real_t *const values) {
         if (es_ != EXECUTION_SPACE_HOST) SFEM_ERROR("QuadratureState::encode is a host convenience\n");
         dispatch_history_codec(storage_, [&](auto codec) {

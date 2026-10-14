@@ -161,6 +161,34 @@ namespace sfem {
             }
         }
 
+        template <class Codec>
+        __global__ void scale_kernel(const ptrdiff_t                                 rows,
+                                     const ptrdiff_t                                 n,
+                                     const real_t                                    factor,
+                                     typename Codec::storage_t *const SFEM_RESTRICT H,
+                                     scaling_t *const SFEM_RESTRICT                 H_scales) {
+            for (ptrdiff_t e = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; e < n;
+                 e += (ptrdiff_t)blockDim.x * gridDim.x) {
+                const real_t old_scale = H_scales[e];
+
+                real_t inv = 1;
+                if constexpr (Codec::scaled) {
+                    real_t max_abs = 0;
+                    for (ptrdiff_t r = 0; r < rows; r++) {
+                        max_abs = fmax(max_abs, fabs(factor * Codec::decode(H[r * n + e], old_scale)));
+                    }
+                    const scaling_t scale = Codec::scale_for(max_abs);
+                    H_scales[e]           = scale;
+                    inv                   = 1 / static_cast<real_t>(scale);
+                }
+
+                for (ptrdiff_t r = 0; r < rows; r++) {
+                    const ptrdiff_t k = r * n + e;
+                    H[k]              = Codec::encode(factor * Codec::decode(H[k], old_scale), inv);
+                }
+            }
+        }
+
         __global__ void fill_scales_kernel(const ptrdiff_t n, scaling_t *const SFEM_RESTRICT scales) {
             for (ptrdiff_t k = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; k < n;
                  k += (ptrdiff_t)blockDim.x * gridDim.x) {
@@ -237,6 +265,44 @@ namespace sfem {
         });
         SFEM_DEBUG_SYNCHRONIZE();
         return ret;
+    }
+
+    int cu_prony_scale(const HistoryStorage storage,
+                       const ptrdiff_t      rows,
+                       const ptrdiff_t      n,
+                       const real_t         factor,
+                       void *const          H,
+                       scaling_t *const     H_scales,
+                       void *const          stream) {
+        SFEM_DEBUG_SYNCHRONIZE();
+        const int block = 128;
+        const int ret   = dispatch(storage, [&](auto codec) {
+            using Codec = decltype(codec);
+            scale_kernel<Codec><<<grid_for(n, block), block, 0, (cudaStream_t)stream>>>(
+                    rows, n, factor, static_cast<typename Codec::storage_t *>(H), H_scales);
+            return launched();
+        });
+        SFEM_DEBUG_SYNCHRONIZE();
+        return ret;
+    }
+
+    int cu_prony_copy(const ptrdiff_t        bytes,
+                      const void *const      src,
+                      void *const            dst,
+                      const ptrdiff_t        n_scales,
+                      const scaling_t *const src_scales,
+                      scaling_t *const       dst_scales,
+                      void *const            stream) {
+        if (bytes > 0 && cudaMemcpyAsync(dst, src, bytes, cudaMemcpyDeviceToDevice, (cudaStream_t)stream) != cudaSuccess) {
+            return SFEM_FAILURE;
+        }
+        if (n_scales > 0 &&
+            cudaMemcpyAsync(dst_scales, src_scales, n_scales * sizeof(scaling_t), cudaMemcpyDeviceToDevice, (cudaStream_t)stream) !=
+                    cudaSuccess) {
+            return SFEM_FAILURE;
+        }
+        SFEM_DEBUG_SYNCHRONIZE();
+        return SFEM_SUCCESS;
     }
 
     int cu_prony_zero(const ptrdiff_t  bytes,

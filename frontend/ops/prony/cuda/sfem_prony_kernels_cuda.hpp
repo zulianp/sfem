@@ -46,6 +46,22 @@ namespace sfem {
                          void *const          stream);
 
     /// Zero `bytes` bytes and set `n_scales` scales to one.
+    int cu_prony_scale(const HistoryStorage storage,
+                       const ptrdiff_t      rows,
+                       const ptrdiff_t      n,
+                       const real_t         factor,
+                       void *const          H,
+                       scaling_t *const     H_scales,
+                       void *const          stream);
+
+    int cu_prony_copy(const ptrdiff_t        bytes,
+                      const void *const      src,
+                      void *const            dst,
+                      const ptrdiff_t        n_scales,
+                      const scaling_t *const src_scales,
+                      scaling_t *const       dst_scales,
+                      void *const            stream);
+
     int cu_prony_zero(const ptrdiff_t bytes,
                       void *const     data,
                       const ptrdiff_t n_scales,
