@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <map>
 #include <memory>
 #include <string>
@@ -24,26 +25,29 @@ namespace sfem {
     };
 
     /// The relaxation state of one operator: a `PronyRelaxation` per block and
-    /// per relaxation group the material declares, and the converged
-    /// displacement the next step starts from.
+    /// per relaxation group the material declares, and the relaxed stress the
+    /// next step starts from.
     ///
     /// Material independent.  A generated operator whose energy relaxes holds
     /// one of these, asks it for a group's step weight and frozen history, and
-    /// at the step boundaries evaluates the relaxed stresses it needs into the
-    /// workspaces it lends:
+    /// at the step boundaries evaluates the relaxed stresses into its two
+    /// stress slots:
     ///
-    ///     begin_step:  acquire_workspace(1); S_r(previous_state()) -> slot 0;
-    ///                  begin_step(t, dt); release_workspace()
-    ///     advance(x):  acquire_workspace(2); S_r(previous_state()) -> slot 0,
-    ///                  S_r(x) -> slot 1; advance(); release_workspace();
-    ///                  set_previous_state(x)
+    ///     begin_step(t, dt, S_r):  reads slot 0, S_r^n
+    ///     advance(x, S_r):         S_r(x) -> slot 1; commit; slot 1 becomes
+    ///                              slot 0, the next step's S_r^n
+    ///     reset(x, S_r):           H_i = 0; S_r(x) -> slot 0
     ///
-    /// The relaxed stress S_r^n is never stored.  It is evaluated from the
-    /// previous displacement each time, so the persistent state is H_i, the
-    /// frozen history the kernels read, and one nodal vector.  The workspaces
-    /// exist only for the length of one of these calls: three tensors' worth
-    /// of memory per element is not held between steps, at the price of an
-    /// allocation per call.  Configuration (spectra, time-temperature shift,
+    /// where `S_r` is the operator's evaluation of the relaxed stresses into a
+    /// slot.  Before the first `advance` or `reset`, slot 0 is evaluated at the
+    /// reference configuration, the zero displacement.
+    ///
+    /// Each relaxed stress is evaluated once, at the end of the step it closes,
+    /// and the next step starts from that very tensor, so the increments
+    /// telescope bit for bit.  The slots are allocated once, at the first
+    /// evaluation, and held: `advance` needs both at the same time anyway, so
+    /// holding them between steps does not raise the peak, and no step
+    /// allocates.  Configuration (spectra, time-temperature shift,
     /// integrator, storage of H_i) arrives through `set_series` or YAML; a
     /// group never configured has the empty series, gamma = 1 and a zero frozen
     /// history, which is the parent hyperelastic material.
@@ -65,11 +69,15 @@ namespace sfem {
     class RelaxationGroups {
     public:
         /// `es` is where the operator's vectors live: the history, the frozen
-        /// history the kernels read, the previous displacement and the
-        /// workspaces are all allocated there.
+        /// history the kernels read and the stress slots are all allocated
+        /// there.
         RelaxationGroups(std::vector<RelaxationGroupDeclaration> declarations,
                          const ptrdiff_t                         n_dofs,
                          const ExecutionSpace                    es = EXECUTION_SPACE_HOST);
+
+        /// The operator's evaluation of every group's relaxed stress at the
+        /// displacement `x` into stress slot `slot`.
+        using StressEvaluation = std::function<int(const real_t *const x, const int slot)>;
 
         const std::vector<RelaxationGroupDeclaration> &declarations() const { return declarations_; }
 
@@ -96,32 +104,29 @@ namespace sfem {
         /// they read are written by kernels on it.
         void set_stream(void *const stream);
 
-        /// The converged displacement the open or next step starts from.
-        /// Zero -- the reference configuration -- until the first `advance`.
-        const real_t *previous_state() const { return previous_state_->data(); }
-        void          set_previous_state(const real_t *const x);
-
-        /// Lend `n_slots` stress workspaces per block and group, laid out like
-        /// the history.  Held until `release_workspace`.
-        void    acquire_workspace(const int n_slots);
-        void    release_workspace();
+        /// Stress slot `slot` of a group, laid out like the history: slot 0 is
+        /// the relaxed stress the open or next step starts from, slot 1 the one
+        /// `advance` commits.  Allocated, for every block and group, at first use.
         real_t *stress_scratch(const std::string &block, const std::string &stress_name, const int slot);
 
-        /// Open a step at the relaxed stresses in slot 0.
-        void begin_step(const real_t t, const real_t dt);
+        /// Open a step at the relaxed stresses in slot 0, evaluating them at the
+        /// reference configuration first if no step or reset has set them.
+        void begin_step(const real_t t, const real_t dt, const StressEvaluation &evaluate);
 
-        /// Commit every group of every block: slot 0 holds the stress the step
-        /// started from, slot 1 the one it ends at.
-        void advance();
+        /// Commit every group of every block at the converged displacement
+        /// `x`: its relaxed stress goes to slot 1, the step is committed from
+        /// slot 0 to slot 1, and the slots swap, so slot 0 is the next step's
+        /// start.
+        void advance(const real_t *const x, const StressEvaluation &evaluate);
 
         /// Restart every group at rest at the displacement `x`.
-        void reset(const real_t *const x);
+        void reset(const real_t *const x, const StressEvaluation &evaluate);
 
         /// Whether any group has a non-empty series; an operator with none
         /// need not evaluate stresses at all.
         bool relaxes() const;
 
-        /// Persistent bytes: the history and the previous displacement.
+        /// Persistent bytes: the history and the stress slots.
         std::size_t bytes() const;
 
 #ifdef SFEM_ENABLE_RYAML
@@ -134,8 +139,8 @@ namespace sfem {
             ptrdiff_t                                     n_elements{0};
             int                                           n_qp{0};
             std::vector<std::shared_ptr<PronyRelaxation>> groups;
-            //! [slot][group], allocated only while a workspace is held.
-            std::vector<std::vector<std::shared_ptr<Buffer<real_t>>>> workspace;
+            //! [slot][group]: slot 0 the step's start, slot 1 its end.
+            std::vector<std::vector<std::shared_ptr<Buffer<real_t>>>> stress;
         };
 
         int          group_index(const std::string &group) const;
@@ -144,13 +149,19 @@ namespace sfem {
         Block       &block(const std::string &name);
         const Block &block(const std::string &name) const;
         const real_t *slot(const Block &b, const int slot, const size_t group) const;
+        void          allocate_stress();
+        void          evaluate(const real_t *const x, const int slot, const StressEvaluation &evaluate);
 
         std::vector<RelaxationGroupDeclaration> declarations_;
         std::map<std::string, Block>            blocks_;
+        ptrdiff_t                               n_dofs_;
         ExecutionSpace                          es_;
-        std::shared_ptr<Buffer<real_t>>         previous_state_;
         void                                   *stream_{nullptr};
-        int                                     n_slots_{0};
+        //! Slot 0 holds the stress of the state the next step starts from.
+        bool start_stress_current_{false};
+        //! That state was committed without its stress: not the reference
+        //! configuration, and no longer known.
+        bool start_unknown_{false};
     };
 
 }  // namespace sfem

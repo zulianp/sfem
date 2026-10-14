@@ -603,41 +603,25 @@ namespace sfem {
     return *impl_->relaxation;
   }
 
-  // The relaxed stress the step starts from is evaluated from the previous
-  // displacement, never stored: it is then exactly what the last `advance`
-  // committed, and the history is the only state carried between steps.  With
-  // no spectrum anywhere there is nothing to evaluate.
+  // The relaxed stress the step starts from is the one the last `advance`
+  // evaluated at the converged state, kept by the relaxation: each stress is
+  // evaluated once, and with no spectrum anywhere not at all.
   void GPUGeneratedMooneyRivlinProny::begin_step(const real_t t, const real_t dt) {
     SFEM_TRACE_SCOPE("GPUGeneratedMooneyRivlinProny::begin_step");
-    auto &relaxation = relaxation_groups();
-    if (relaxation.relaxes()) {
-      relaxation.acquire_workspace(1);
-      if (quadrature_output(relaxation.previous_state(), 0) != SFEM_SUCCESS) {
-        SFEM_ERROR("GPUGeneratedMooneyRivlinProny::begin_step: evaluating the relaxed stress failed\n");
-      }
-    }
-    relaxation.begin_step(t, dt);
-    relaxation.release_workspace();
+    relaxation_groups().begin_step(
+        t, dt, [this](const real_t *const state, const int slot) { return quadrature_output(state, slot); });
   }
 
   void GPUGeneratedMooneyRivlinProny::advance(const real_t *const x) {
     SFEM_TRACE_SCOPE("GPUGeneratedMooneyRivlinProny::advance");
-    auto &relaxation = relaxation_groups();
-    if (relaxation.relaxes()) {
-      relaxation.acquire_workspace(2);
-      if (quadrature_output(relaxation.previous_state(), 0) != SFEM_SUCCESS ||
-          quadrature_output(x, 1) != SFEM_SUCCESS) {
-        SFEM_ERROR("GPUGeneratedMooneyRivlinProny::advance: evaluating the relaxed stress failed\n");
-      }
-    }
-    relaxation.advance();
-    relaxation.release_workspace();
-    relaxation.set_previous_state(x);
+    relaxation_groups().advance(
+        x, [this](const real_t *const state, const int slot) { return quadrature_output(state, slot); });
   }
 
   void GPUGeneratedMooneyRivlinProny::reset_history(const real_t *const x) {
     SFEM_TRACE_SCOPE("GPUGeneratedMooneyRivlinProny::reset_history");
-    relaxation_groups().reset(x);
+    relaxation_groups().reset(
+        x, [this](const real_t *const state, const int slot) { return quadrature_output(state, slot); });
   }
 
   int GPUGeneratedMooneyRivlinProny::quadrature_output(const real_t *const x, const int slot) {
