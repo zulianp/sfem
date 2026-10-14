@@ -80,57 +80,47 @@ static SFEM_INLINE void saint_venant_kirchhoff_d2_simplex_direct_hessian_referen
     const s_t gu1 = (gu_ref0 * adj_lane1 + gu_ref1 * adj_lane3) * idet;
     const s_t gu2 = (gu_ref2 * adj_lane0 + gu_ref3 * adj_lane2) * idet;
     const s_t gu3 = (gu_ref2 * adj_lane1 + gu_ref3 * adj_lane3) * idet;
-    for (int trial_component = 0; trial_component < NC; ++trial_component) {
-      for (int trial_shape = 0; trial_shape < NS; ++trial_shape) {
-        const s_t trial_grad_ref0 = grad_ref_x[q * NS + trial_shape];
-        const s_t trial_grad_ref1 = grad_ref_y[q * NS + trial_shape];
-        s_t trial_grad[NC * ND];
-        for (int i = 0; i < NC * ND; ++i) {
-          trial_grad[i] = s_t(0);
-        }
-        trial_grad[trial_component * ND + 0] = (trial_grad_ref0 * adj_lane0 + trial_grad_ref1 * adj_lane2) * idet;
-        trial_grad[trial_component * ND + 1] = (trial_grad_ref0 * adj_lane1 + trial_grad_ref1 * adj_lane3) * idet;
-        s_t material[NC * ND];
-        const s_t weak_hess_tmp0 = gu1*gu2;
-        const s_t weak_hess_tmp1 = gu3 + s_t(1);
-        const s_t weak_hess_tmp2 = gu0 + s_t(1);
-        const s_t weak_hess_tmp3 = weak_hess_tmp1*weak_hess_tmp2;
-        const s_t weak_hess_tmp4 = lmbda*weak_hess_tmp3 + mu*weak_hess_tmp0;
-        const s_t weak_hess_tmp5 = gu1*weak_hess_tmp2;
-        const s_t weak_hess_tmp6 = gu2*weak_hess_tmp1;
-        const s_t weak_hess_tmp7 = lmbda*weak_hess_tmp5 + mu*(s_t(2)*weak_hess_tmp5 + weak_hess_tmp6);
-        const s_t weak_hess_tmp8 = gu2*weak_hess_tmp2;
-        const s_t weak_hess_tmp9 = gu1*weak_hess_tmp1;
-        const s_t weak_hess_tmp10 = lmbda*weak_hess_tmp8 + mu*(s_t(2)*weak_hess_tmp8 + weak_hess_tmp9);
-        const s_t weak_hess_tmp11 = pow_2(weak_hess_tmp2);
-        const s_t weak_hess_tmp12 = pow_2(gu1);
-        const s_t weak_hess_tmp13 = pow_2(gu2);
-        const s_t weak_hess_tmp14 = weak_hess_tmp12 + weak_hess_tmp13 + s_t(-1);
-        const s_t weak_hess_tmp15 = lmbda*(((s_t(1) / s_t(2)))*pow_2(gu0) + gu0 + ((s_t(1) / s_t(2)))*pow_2(gu3) + gu3 + ((s_t(1) / s_t(2)))*weak_hess_tmp12 + ((s_t(1) / s_t(2)))*weak_hess_tmp13);
-        const s_t weak_hess_tmp16 = lmbda*weak_hess_tmp0 + mu*weak_hess_tmp3;
-        const s_t weak_hess_tmp17 = lmbda*weak_hess_tmp9 + mu*(weak_hess_tmp8 + s_t(2)*weak_hess_tmp9);
-        const s_t weak_hess_tmp18 = pow_2(weak_hess_tmp1);
-        const s_t weak_hess_tmp19 = weak_hess_tmp11 + weak_hess_tmp18 + s_t(-1);
-        const s_t weak_hess_tmp20 = lmbda*weak_hess_tmp6 + mu*(weak_hess_tmp5 + s_t(2)*weak_hess_tmp6);
-        material[0] = trial_grad[0]*(lmbda*weak_hess_tmp11 + mu*(s_t(3)*weak_hess_tmp11 + weak_hess_tmp14) + weak_hess_tmp15) + trial_grad[1]*weak_hess_tmp7 + trial_grad[2]*weak_hess_tmp10 + trial_grad[3]*weak_hess_tmp4;
-        material[1] = trial_grad[0]*weak_hess_tmp7 + trial_grad[1]*(lmbda*weak_hess_tmp12 + mu*(s_t(3)*weak_hess_tmp12 + weak_hess_tmp19) + weak_hess_tmp15) + trial_grad[2]*weak_hess_tmp16 + trial_grad[3]*weak_hess_tmp17;
-        material[2] = trial_grad[0]*weak_hess_tmp10 + trial_grad[1]*weak_hess_tmp16 + trial_grad[2]*(lmbda*weak_hess_tmp13 + mu*(s_t(3)*weak_hess_tmp13 + weak_hess_tmp19) + weak_hess_tmp15) + trial_grad[3]*weak_hess_tmp20;
-        material[3] = trial_grad[0]*weak_hess_tmp4 + trial_grad[1]*weak_hess_tmp17 + trial_grad[2]*weak_hess_tmp20 + trial_grad[3]*(lmbda*weak_hess_tmp18 + mu*(weak_hess_tmp14 + s_t(3)*weak_hess_tmp18) + weak_hess_tmp15);
-        for (int test_component = 0; test_component < NC; ++test_component) {
-          for (int test_shape = 0; test_shape < NS; ++test_shape) {
-            const s_t test_grad_ref0 = grad_ref_x[q * NS + test_shape];
-            const s_t test_grad_ref1 = grad_ref_y[q * NS + test_shape];
-            s_t entry = s_t(0);
-            entry += test_grad_ref0 * qw * (material[test_component * ND] * adj_lane0 + material[test_component * ND + 1] * adj_lane1);
-            entry += test_grad_ref1 * qw * (material[test_component * ND] * adj_lane2 + material[test_component * ND + 1] * adj_lane3);
-            const int row = test_component * NS + test_shape;
-            const int col = trial_component * NS + trial_shape;
-            element_matrix[row * NDOFS + col] += entry;
-          }
-        }
-      }
+    s_t D[16];
+    const s_t weak_hess_tmp0 = gu0 + s_t(1);
+    const s_t weak_hess_tmp1 = pow_2(weak_hess_tmp0);
+    const s_t weak_hess_tmp2 = pow_2(gu1);
+    const s_t weak_hess_tmp3 = pow_2(gu2);
+    const s_t weak_hess_tmp4 = weak_hess_tmp2 + weak_hess_tmp3 + s_t(-1);
+    const s_t weak_hess_tmp5 = lmbda*(((s_t(1) / s_t(2)))*pow_2(gu0) + gu0 + ((s_t(1) / s_t(2)))*pow_2(gu3) + gu3 + ((s_t(1) / s_t(2)))*weak_hess_tmp2 + ((s_t(1) / s_t(2)))*weak_hess_tmp3);
+    const s_t weak_hess_tmp6 = gu1*weak_hess_tmp0;
+    const s_t weak_hess_tmp7 = gu3 + s_t(1);
+    const s_t weak_hess_tmp8 = gu2*weak_hess_tmp7;
+    const s_t weak_hess_tmp9 = gu2*weak_hess_tmp0;
+    const s_t weak_hess_tmp10 = gu1*weak_hess_tmp7;
+    const s_t weak_hess_tmp11 = gu1*gu2;
+    const s_t weak_hess_tmp12 = weak_hess_tmp0*weak_hess_tmp7;
+    const s_t weak_hess_tmp13 = pow_2(weak_hess_tmp7);
+    const s_t weak_hess_tmp14 = weak_hess_tmp1 + weak_hess_tmp13 + s_t(-1);
+    D[0] = lmbda*weak_hess_tmp1 + mu*(s_t(3)*weak_hess_tmp1 + weak_hess_tmp4) + weak_hess_tmp5;
+    D[1] = lmbda*weak_hess_tmp6 + mu*(s_t(2)*weak_hess_tmp6 + weak_hess_tmp8);
+    D[2] = lmbda*weak_hess_tmp9 + mu*(weak_hess_tmp10 + s_t(2)*weak_hess_tmp9);
+    D[3] = lmbda*weak_hess_tmp12 + mu*weak_hess_tmp11;
+    D[5] = lmbda*weak_hess_tmp2 + mu*(weak_hess_tmp14 + s_t(3)*weak_hess_tmp2) + weak_hess_tmp5;
+    D[6] = lmbda*weak_hess_tmp11 + mu*weak_hess_tmp12;
+    D[7] = lmbda*weak_hess_tmp10 + mu*(s_t(2)*weak_hess_tmp10 + weak_hess_tmp9);
+    D[10] = lmbda*weak_hess_tmp3 + mu*(weak_hess_tmp14 + s_t(3)*weak_hess_tmp3) + weak_hess_tmp5;
+    D[11] = lmbda*weak_hess_tmp8 + mu*(weak_hess_tmp6 + s_t(2)*weak_hess_tmp8);
+    D[15] = lmbda*weak_hess_tmp13 + mu*(s_t(3)*weak_hess_tmp13 + weak_hess_tmp4) + weak_hess_tmp5;
+    D[4] = D[1];
+    D[8] = D[2];
+    D[12] = D[3];
+    D[9] = D[6];
+    D[13] = D[7];
+    D[14] = D[11];
+    s_t g_ref[ND * NS];
+    for (int shape = 0; shape < NS; ++shape) {
+      g_ref[0 * NS + shape] = grad_ref_x[q * NS + shape];
+      g_ref[1 * NS + shape] = grad_ref_y[q * NS + shape];
     }
+    const s_t adj_q[ND * ND] = {adj_lane0, adj_lane1, adj_lane2, adj_lane3};
+    point_test_symmetric_scalar<s_t, NS, ND, NC>(g_ref, adj_q, qw * idet, D, element_matrix);
   }
+  mirror_upper_triangle_scalar<s_t, NDOFS>(element_matrix);
 }
 
 template <typename s_t, int NS>

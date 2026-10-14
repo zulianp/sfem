@@ -72,52 +72,99 @@ static SFEM_INLINE void linear_elasticity_d3_simplex_direct_hessian_reference_el
     const s_t adj_lane8 = badj8[goff];
     const s_t det_lane0 = bdet0[goff];
     const s_t idet = s_t(1) / det_lane0;
-    for (int trial_component = 0; trial_component < NC; ++trial_component) {
-      for (int trial_shape = 0; trial_shape < NS; ++trial_shape) {
-        const s_t trial_grad_ref0 = grad_ref_x[q * NS + trial_shape];
-        const s_t trial_grad_ref1 = grad_ref_y[q * NS + trial_shape];
-        const s_t trial_grad_ref2 = grad_ref_z[q * NS + trial_shape];
-        s_t trial_grad[NC * ND];
-        for (int i = 0; i < NC * ND; ++i) {
-          trial_grad[i] = s_t(0);
-        }
-        trial_grad[trial_component * ND + 0] = (trial_grad_ref0 * adj_lane0 + trial_grad_ref1 * adj_lane3 + trial_grad_ref2 * adj_lane6) * idet;
-        trial_grad[trial_component * ND + 1] = (trial_grad_ref0 * adj_lane1 + trial_grad_ref1 * adj_lane4 + trial_grad_ref2 * adj_lane7) * idet;
-        trial_grad[trial_component * ND + 2] = (trial_grad_ref0 * adj_lane2 + trial_grad_ref1 * adj_lane5 + trial_grad_ref2 * adj_lane8) * idet;
-        s_t material[NC * ND];
-        const s_t weak_hess_tmp0 = s_t(2)*trial_grad[0];
-        const s_t weak_hess_tmp1 = s_t(2)*trial_grad[4];
-        const s_t weak_hess_tmp2 = s_t(2)*trial_grad[8];
-        const s_t weak_hess_tmp3 = ((s_t(1) / s_t(2)))*lmbda*(weak_hess_tmp0 + weak_hess_tmp1 + weak_hess_tmp2);
-        const s_t weak_hess_tmp4 = mu*(trial_grad[1] + trial_grad[3]);
-        const s_t weak_hess_tmp5 = mu*(trial_grad[2] + trial_grad[6]);
-        const s_t weak_hess_tmp6 = mu*(trial_grad[5] + trial_grad[7]);
-        material[0] = mu*weak_hess_tmp0 + weak_hess_tmp3;
-        material[1] = weak_hess_tmp4;
-        material[2] = weak_hess_tmp5;
-        material[3] = weak_hess_tmp4;
-        material[4] = mu*weak_hess_tmp1 + weak_hess_tmp3;
-        material[5] = weak_hess_tmp6;
-        material[6] = weak_hess_tmp5;
-        material[7] = weak_hess_tmp6;
-        material[8] = mu*weak_hess_tmp2 + weak_hess_tmp3;
-        for (int test_component = 0; test_component < NC; ++test_component) {
-          for (int test_shape = 0; test_shape < NS; ++test_shape) {
-            const s_t test_grad_ref0 = grad_ref_x[q * NS + test_shape];
-            const s_t test_grad_ref1 = grad_ref_y[q * NS + test_shape];
-            const s_t test_grad_ref2 = grad_ref_z[q * NS + test_shape];
-            s_t entry = s_t(0);
-            entry += test_grad_ref0 * qw * (material[test_component * ND] * adj_lane0 + material[test_component * ND + 1] * adj_lane1 + material[test_component * ND + 2] * adj_lane2);
-            entry += test_grad_ref1 * qw * (material[test_component * ND] * adj_lane3 + material[test_component * ND + 1] * adj_lane4 + material[test_component * ND + 2] * adj_lane5);
-            entry += test_grad_ref2 * qw * (material[test_component * ND] * adj_lane6 + material[test_component * ND + 1] * adj_lane7 + material[test_component * ND + 2] * adj_lane8);
-            const int row = test_component * NS + test_shape;
-            const int col = trial_component * NS + trial_shape;
-            element_matrix[row * NDOFS + col] += entry;
-          }
-        }
-      }
+    s_t D[81];
+    const s_t weak_hess_tmp0 = lmbda + s_t(2)*mu;
+    D[0] = weak_hess_tmp0;
+    D[1] = 0;
+    D[2] = 0;
+    D[3] = 0;
+    D[4] = lmbda;
+    D[5] = 0;
+    D[6] = 0;
+    D[7] = 0;
+    D[8] = lmbda;
+    D[10] = mu;
+    D[11] = 0;
+    D[12] = mu;
+    D[13] = 0;
+    D[14] = 0;
+    D[15] = 0;
+    D[16] = 0;
+    D[17] = 0;
+    D[20] = mu;
+    D[21] = 0;
+    D[22] = 0;
+    D[23] = 0;
+    D[24] = mu;
+    D[25] = 0;
+    D[26] = 0;
+    D[30] = mu;
+    D[31] = 0;
+    D[32] = 0;
+    D[33] = 0;
+    D[34] = 0;
+    D[35] = 0;
+    D[40] = weak_hess_tmp0;
+    D[41] = 0;
+    D[42] = 0;
+    D[43] = 0;
+    D[44] = lmbda;
+    D[50] = mu;
+    D[51] = 0;
+    D[52] = mu;
+    D[53] = 0;
+    D[60] = mu;
+    D[61] = 0;
+    D[62] = 0;
+    D[70] = mu;
+    D[71] = 0;
+    D[80] = weak_hess_tmp0;
+    D[9] = D[1];
+    D[18] = D[2];
+    D[27] = D[3];
+    D[36] = D[4];
+    D[45] = D[5];
+    D[54] = D[6];
+    D[63] = D[7];
+    D[72] = D[8];
+    D[19] = D[11];
+    D[28] = D[12];
+    D[37] = D[13];
+    D[46] = D[14];
+    D[55] = D[15];
+    D[64] = D[16];
+    D[73] = D[17];
+    D[29] = D[21];
+    D[38] = D[22];
+    D[47] = D[23];
+    D[56] = D[24];
+    D[65] = D[25];
+    D[74] = D[26];
+    D[39] = D[31];
+    D[48] = D[32];
+    D[57] = D[33];
+    D[66] = D[34];
+    D[75] = D[35];
+    D[49] = D[41];
+    D[58] = D[42];
+    D[67] = D[43];
+    D[76] = D[44];
+    D[59] = D[51];
+    D[68] = D[52];
+    D[77] = D[53];
+    D[69] = D[61];
+    D[78] = D[62];
+    D[79] = D[71];
+    s_t g_ref[ND * NS];
+    for (int shape = 0; shape < NS; ++shape) {
+      g_ref[0 * NS + shape] = grad_ref_x[q * NS + shape];
+      g_ref[1 * NS + shape] = grad_ref_y[q * NS + shape];
+      g_ref[2 * NS + shape] = grad_ref_z[q * NS + shape];
     }
+    const s_t adj_q[ND * ND] = {adj_lane0, adj_lane1, adj_lane2, adj_lane3, adj_lane4, adj_lane5, adj_lane6, adj_lane7, adj_lane8};
+    point_test_symmetric_scalar<s_t, NS, ND, NC>(g_ref, adj_q, qw * idet, D, element_matrix);
   }
+  mirror_upper_triangle_scalar<s_t, NDOFS>(element_matrix);
 }
 
 template <typename s_t, int NS>
