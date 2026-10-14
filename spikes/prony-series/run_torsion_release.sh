@@ -69,9 +69,11 @@ fi
 # ParaView-ready transient files. The driver already writes out/disp.N.*.* and out/time.txt in
 # exactly the layout this script expects, so it is reused unchanged rather than reimplemented.
 XDMF_WRITER="$ROOT_DIR/workflows/hyperelasticity_bdf2/write_transient_xdmf.sh"
-if [[ -x "$XDMF_WRITER" ]]; then
-    "$XDMF_WRITER" "$WORKDIR/results_release/mesh" "$WORKDIR/results_release" \
+if [[ -f "$XDMF_WRITER" ]]; then
+    bash "$XDMF_WRITER" "$WORKDIR/results_release/mesh" "$WORKDIR/results_release" \
         "$WORKDIR/results_release/output.xdmf" || echo "[warn] XDMF export failed; fields are still in results_release/out" >&2
+else
+    echo "[warn] no XDMF writer at $XDMF_WRITER; fields are still in results_release/out" >&2
 fi
 
 VALIDATE_ARGS=("$WORKDIR/results_release/history.csv" --case "$WORKDIR/torsion_release.yaml")
@@ -85,5 +87,5 @@ echo
 echo "Prony-series torsion-with-release scenario completed:"
 echo "  history:  $WORKDIR/results_release/history.csv"
 echo "  fields:   $WORKDIR/results_release/out"
-echo "  paraview: $WORKDIR/results_release/output.xdmf"
+[[ -f "$WORKDIR/results_release/output.xdmf" ]] && echo "  paraview: $WORKDIR/results_release/output.xdmf"
 echo "  raw logs: $WORKDIR/logs"
