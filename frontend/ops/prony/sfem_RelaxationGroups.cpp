@@ -77,7 +77,9 @@ namespace sfem {
         placed.stream                   = stream_;
         for (auto &entry : blocks_) {
             if (!block_name.empty() && entry.first != block_name) continue;
-            Block &b    = entry.second;
+            Block &b = entry.second;
+            // Released first, so the old state and the new are never held together.
+            b.groups[g].reset();
             b.groups[g] = std::make_shared<PronyRelaxation>(
                     series, declarations_[g].n_components, b.n_qp, b.n_elements, placed);
         }
