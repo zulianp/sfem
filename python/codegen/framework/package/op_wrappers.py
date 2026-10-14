@@ -2961,13 +2961,34 @@ namespace sfem {
       std::shared_ptr<smesh::FFF> metric_aos;
     };
 
+    //! Whether this element leaves the operator no choice of geometry.
+    //!
+    //! A constant-P1 simplex publishes no isoparametric residual or action
+    //! kernel, and assembly takes the affine kernel of every element that has
+    //! one, so the operator reads a cached adjugate for these elements
+    //! whatever the caller asked.  Every other element still caches only when
+    //! asked.
+    bool geometry_is_forced_affine(const smesh::ElemType element_type) {
+      switch (element_type) {
+%(forced_affine_element_cases)s        default:
+          return false;
+      }
+    }
+
     int cache_affine_geometry(const std::shared_ptr<FunctionSpace> &space,
                                   MultiDomainOp &domains,
-                                  const bool needs_jacobian,
-                                  const bool needs_metric_soa,
-                                  const bool needs_metric_aos) {
+                                  const bool requested_jacobian,
+                                  const bool requested_metric_soa,
+                                  const bool requested_metric_aos) {
       auto mesh = space->mesh_ptr();
       for (auto &entry : domains.domains()) {
+        const bool forced = geometry_is_forced_affine(entry.second.element_type);
+        const bool needs_jacobian = requested_jacobian || forced;
+        const bool needs_metric_soa = requested_metric_soa || (forced && %(forced_affine_uses_metric_soa)s);
+        const bool needs_metric_aos = requested_metric_aos || (forced && %(forced_affine_uses_metric_aos)s);
+        if (!needs_jacobian && !needs_metric_soa && !needs_metric_aos) {
+          continue;
+        }
         auto cache = std::static_pointer_cast<AffineGeometryCache>(
             entry.second.user_data);
         if (!cache) {
@@ -3130,16 +3151,17 @@ namespace sfem {
     const bool needs_affine_jacobian =
         (impl_->residual_uses_affine && %(residual_affine_uses_jacobian)s) ||
         (impl_->jacobian_action_uses_affine && %(action_affine_uses_jacobian)s);
-    const bool needs_affine_metric =
-        (impl_->residual_uses_affine && (%(residual_affine_uses_metric_soa)s || %(residual_affine_uses_metric_aos)s)) ||
-        (impl_->jacobian_action_uses_affine && (%(action_affine_uses_metric_soa)s || %(action_affine_uses_metric_aos)s));
     const bool needs_a_met_soa =
         (impl_->residual_uses_affine && %(residual_affine_uses_metric_soa)s) ||
         (impl_->jacobian_action_uses_affine && %(action_affine_uses_metric_soa)s);
     const bool needs_affine_metric_aos =
         (impl_->residual_uses_affine && %(residual_affine_uses_metric_aos)s) ||
         (impl_->jacobian_action_uses_affine && %(action_affine_uses_metric_aos)s);
-    if (needs_affine_jacobian || needs_affine_metric) {
+    // Unconditionally, because the builder skips a domain that neither asked
+    // for affine geometry nor is an element that forces it.  Gating the call
+    // on the request alone left a constant-P1 simplex with no cached adjugate
+    // and an affine kernel as its only route.
+    {
       const int status = cache_affine_geometry(impl_->space,
                                                      *impl_->domains,
                                                      needs_affine_jacobian,
@@ -3392,6 +3414,7 @@ namespace sfem {
                 "metric_aos": _cpp_bool(residual_affine_uses_metric_aos),
             },
             residual_dispatch_body,
+            operation_forced_affine_elements(kernel_sources, dispatch_stem, ("residual",)),
         ),
         "apply_affine_geometry": _residual_affine_geometry_lines(
             _op_class_name(material),
@@ -3403,6 +3426,16 @@ namespace sfem {
                 "metric_aos": _cpp_bool(action_affine_uses_metric_aos),
             },
             action_dispatch_body,
+            operation_forced_affine_elements(kernel_sources, dispatch_stem, ("jacobian_action",)),
+        ),
+        "forced_affine_element_cases": _forced_affine_element_cases(
+            _residual_cached_geometry_elements(kernel_sources, dispatch_stem)
+        ),
+        "forced_affine_uses_metric_soa": _cpp_bool(
+            residual_affine_uses_metric_soa or action_affine_uses_metric_soa
+        ),
+        "forced_affine_uses_metric_aos": _cpp_bool(
+            residual_affine_uses_metric_aos or action_affine_uses_metric_aos
         ),
         "hessian_crs_body": (
             "%s\n"
@@ -3764,7 +3797,7 @@ def _parameter_name(name, read):
     return name if read else "/*%s*/" % name
 
 
-def _residual_affine_geometry_lines(op_name, label, affine_flag, uses, body):
+def _residual_affine_geometry_lines(op_name, label, affine_flag, uses, body, forced_elements=()):
     """The cached affine geometry an operation body reads, and only that.
 
     Each pointer is declared, and assigned out of the cache, only where `body`
@@ -3817,7 +3850,13 @@ def _residual_affine_geometry_lines(op_name, label, affine_flag, uses, body):
     ]
     lines.extend(
         [
-            "      if (impl_->%s) {" % affine_flag,
+            "      if (%s) {"
+            % (
+                "impl_->%s || %s"
+                % (affine_flag, _element_condition("domain.element_type", forced_elements))
+                if forced_elements
+                else "impl_->%s" % affine_flag
+            ),
             "        auto cache = std::static_pointer_cast<AffineGeometryCache>(",
             "            domain.user_data);",
             "        if (!cache) {",
@@ -9315,6 +9354,30 @@ def operation_forced_affine_elements(kernel_sources, material_name, operations):
                 if element not in forced:
                     forced.append(element)
     return tuple(forced)
+
+
+def _residual_cached_geometry_elements(kernel_sources, dispatch_stem):
+    """The elements a residual operator reads cached geometry for whatever it was asked.
+
+    The residual and the action take the affine route for an element with no
+    isoparametric kernel, and assembly takes it for every element that has an
+    affine assembly kernel (`_residual_hessian_dispatch_body`), so all of them
+    need the adjugate in the cache before the first call.
+    """
+    elements = list(
+        operation_forced_affine_elements(
+            kernel_sources, dispatch_stem, ("residual", "jacobian_action")
+        )
+    )
+    for operation in ("hessian_crs", "hessian_bsr"):
+        for dim in (2, 3):
+            name = "%s_%s_%dd_a_msoa" % (dispatch_stem, operation, dim)
+            if not _c_abi_function_exists(kernel_sources, name, public_only=True):
+                continue
+            for element in _c_abi_public_dispatch_case_elements(kernel_sources, name):
+                if element not in elements:
+                    elements.append(element)
+    return tuple(elements)
 
 
 def _forced_affine_element_cases(forced_elements):

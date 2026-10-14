@@ -233,13 +233,38 @@ namespace sfem {
       std::shared_ptr<smesh::FFF> metric_aos;
     };
 
+    //! Whether this element leaves the operator no choice of geometry.
+    //!
+    //! A constant-P1 simplex publishes no isoparametric residual or action
+    //! kernel, and assembly takes the affine kernel of every element that has
+    //! one, so the operator reads a cached adjugate for these elements
+    //! whatever the caller asked.  Every other element still caches only when
+    //! asked.
+    bool geometry_is_forced_affine(const smesh::ElemType element_type) {
+      switch (element_type) {
+        case smesh::TET4:
+          return true;
+        case smesh::TRI3:
+          return true;
+        default:
+          return false;
+      }
+    }
+
     int cache_affine_geometry(const std::shared_ptr<FunctionSpace> &space,
                                   MultiDomainOp &domains,
-                                  const bool needs_jacobian,
-                                  const bool needs_metric_soa,
-                                  const bool needs_metric_aos) {
+                                  const bool requested_jacobian,
+                                  const bool requested_metric_soa,
+                                  const bool requested_metric_aos) {
       auto mesh = space->mesh_ptr();
       for (auto &entry : domains.domains()) {
+        const bool forced = geometry_is_forced_affine(entry.second.element_type);
+        const bool needs_jacobian = requested_jacobian || forced;
+        const bool needs_metric_soa = requested_metric_soa || (forced && false);
+        const bool needs_metric_aos = requested_metric_aos || (forced && false);
+        if (!needs_jacobian && !needs_metric_soa && !needs_metric_aos) {
+          continue;
+        }
         auto cache = std::static_pointer_cast<AffineGeometryCache>(
             entry.second.user_data);
         if (!cache) {
@@ -593,16 +618,17 @@ namespace sfem {
     const bool needs_affine_jacobian =
         (impl_->residual_uses_affine && true) ||
         (impl_->jacobian_action_uses_affine && true);
-    const bool needs_affine_metric =
-        (impl_->residual_uses_affine && (false || false)) ||
-        (impl_->jacobian_action_uses_affine && (false || false));
     const bool needs_a_met_soa =
         (impl_->residual_uses_affine && false) ||
         (impl_->jacobian_action_uses_affine && false);
     const bool needs_affine_metric_aos =
         (impl_->residual_uses_affine && false) ||
         (impl_->jacobian_action_uses_affine && false);
-    if (needs_affine_jacobian || needs_affine_metric) {
+    // Unconditionally, because the builder skips a domain that neither asked
+    // for affine geometry nor is an element that forces it.  Gating the call
+    // on the request alone left a constant-P1 simplex with no cached adjugate
+    // and an affine kernel as its only route.
+    {
       const int status = cache_affine_geometry(impl_->space,
                                                      *impl_->domains,
                                                      needs_affine_jacobian,
@@ -641,7 +667,7 @@ namespace sfem {
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const geom_t *const *adjugate = nullptr;
       const geom_t *determinant = nullptr;
-      if (impl_->residual_uses_affine) {
+      if (impl_->residual_uses_affine || domain.element_type == smesh::TET4 || domain.element_type == smesh::TRI3) {
         auto cache = std::static_pointer_cast<AffineGeometryCache>(
             domain.user_data);
         if (!cache) {
@@ -711,7 +737,7 @@ namespace sfem {
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const geom_t *const *adjugate = nullptr;
       const geom_t *determinant = nullptr;
-      if (impl_->jacobian_action_uses_affine) {
+      if (impl_->jacobian_action_uses_affine || domain.element_type == smesh::TET4 || domain.element_type == smesh::TRI3) {
         auto cache = std::static_pointer_cast<AffineGeometryCache>(
             domain.user_data);
         if (!cache) {
