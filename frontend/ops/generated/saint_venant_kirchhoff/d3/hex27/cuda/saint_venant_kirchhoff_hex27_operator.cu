@@ -159,6 +159,22 @@ extern "C" const sfem::codegen::KernelDiagnostics * cu_saint_venant_kirchhoff_pr
         void
 );
 
+namespace {
+  //! Reorder a device table of connectivity rows on the device.
+  template <int N>
+  struct ConnectivityOrder {
+    int source[N];
+  };
+
+  template <typename T, int N>
+  __global__ void permute_connectivity(T *const *const elements,
+                                       const ConnectivityOrder<N> order,
+                                       T **const permuted) {
+    const int k = threadIdx.x;
+    if (k < N) permuted[k] = elements[order.source[k]];
+  }
+}  // namespace
+
 extern "C" int cu_saint_venant_kirchhoff_hex27_apply_i_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
@@ -181,36 +197,13 @@ extern "C" int cu_saint_venant_kirchhoff_hex27_apply_i_msoa(
         void *const RSTR outz,
         void *const stream
 ) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return cu_saint_venant_kirchhoff_proteus_hex27_apply_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz, stream);
+    idx_t **proteus_elements = nullptr;
+    if (cudaMallocAsync((void **)&proteus_elements, 27 * sizeof(idx_t *), (cudaStream_t)stream) != cudaSuccess) return SFEM_FAILURE;
+    const ConnectivityOrder<27> proteus_elements_order{{0, 8, 1, 11, 24, 9, 3, 10, 2, 16, 20, 17, 23, 26, 21, 19, 22, 18, 4, 12, 5, 15, 25, 13, 7, 14, 6}};
+    permute_connectivity<idx_t, 27><<<1, 27, 0, (cudaStream_t)stream>>>(elements, proteus_elements_order, proteus_elements);
+    const int status = cu_saint_venant_kirchhoff_proteus_hex27_apply_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz, stream);
+    cudaFreeAsync(proteus_elements, (cudaStream_t)stream);
+    return status;
 }
 
 extern "C" int cu_saint_venant_kirchhoff_hex27_gradient_i_msoa(
@@ -231,36 +224,13 @@ extern "C" int cu_saint_venant_kirchhoff_hex27_gradient_i_msoa(
         void *const RSTR outz,
         void *const stream
 ) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return cu_saint_venant_kirchhoff_proteus_hex27_gradient_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz, stream);
+    idx_t **proteus_elements = nullptr;
+    if (cudaMallocAsync((void **)&proteus_elements, 27 * sizeof(idx_t *), (cudaStream_t)stream) != cudaSuccess) return SFEM_FAILURE;
+    const ConnectivityOrder<27> proteus_elements_order{{0, 8, 1, 11, 24, 9, 3, 10, 2, 16, 20, 17, 23, 26, 21, 19, 22, 18, 4, 12, 5, 15, 25, 13, 7, 14, 6}};
+    permute_connectivity<idx_t, 27><<<1, 27, 0, (cudaStream_t)stream>>>(elements, proteus_elements_order, proteus_elements);
+    const int status = cu_saint_venant_kirchhoff_proteus_hex27_gradient_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz, stream);
+    cudaFreeAsync(proteus_elements, (cudaStream_t)stream);
+    return status;
 }
 
 extern "C" int cu_saint_venant_kirchhoff_hex27_objective_steps_i_msoa(
@@ -284,36 +254,13 @@ extern "C" int cu_saint_venant_kirchhoff_hex27_objective_steps_i_msoa(
         void *const RSTR value,
         void *const stream
 ) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return cu_saint_venant_kirchhoff_proteus_hex27_objective_steps_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value, stream);
+    idx_t **proteus_elements = nullptr;
+    if (cudaMallocAsync((void **)&proteus_elements, 27 * sizeof(idx_t *), (cudaStream_t)stream) != cudaSuccess) return SFEM_FAILURE;
+    const ConnectivityOrder<27> proteus_elements_order{{0, 8, 1, 11, 24, 9, 3, 10, 2, 16, 20, 17, 23, 26, 21, 19, 22, 18, 4, 12, 5, 15, 25, 13, 7, 14, 6}};
+    permute_connectivity<idx_t, 27><<<1, 27, 0, (cudaStream_t)stream>>>(elements, proteus_elements_order, proteus_elements);
+    const int status = cu_saint_venant_kirchhoff_proteus_hex27_objective_steps_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value, stream);
+    cudaFreeAsync(proteus_elements, (cudaStream_t)stream);
+    return status;
 }
 
 extern "C" int cu_saint_venant_kirchhoff_hex27_apply_a_msoa(
@@ -347,36 +294,13 @@ extern "C" int cu_saint_venant_kirchhoff_hex27_apply_a_msoa(
         void *const RSTR outz,
         void *const stream
 ) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return cu_saint_venant_kirchhoff_proteus_hex27_apply_a_msoa(scalar_bytes, nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz, stream);
+    idx_t **proteus_elements = nullptr;
+    if (cudaMallocAsync((void **)&proteus_elements, 27 * sizeof(idx_t *), (cudaStream_t)stream) != cudaSuccess) return SFEM_FAILURE;
+    const ConnectivityOrder<27> proteus_elements_order{{0, 8, 1, 11, 24, 9, 3, 10, 2, 16, 20, 17, 23, 26, 21, 19, 22, 18, 4, 12, 5, 15, 25, 13, 7, 14, 6}};
+    permute_connectivity<idx_t, 27><<<1, 27, 0, (cudaStream_t)stream>>>(elements, proteus_elements_order, proteus_elements);
+    const int status = cu_saint_venant_kirchhoff_proteus_hex27_apply_a_msoa(scalar_bytes, nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz, stream);
+    cudaFreeAsync(proteus_elements, (cudaStream_t)stream);
+    return status;
 }
 
 extern "C" int cu_saint_venant_kirchhoff_hex27_gradient_a_msoa(
@@ -406,36 +330,13 @@ extern "C" int cu_saint_venant_kirchhoff_hex27_gradient_a_msoa(
         void *const RSTR outz,
         void *const stream
 ) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return cu_saint_venant_kirchhoff_proteus_hex27_gradient_a_msoa(scalar_bytes, nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz, stream);
+    idx_t **proteus_elements = nullptr;
+    if (cudaMallocAsync((void **)&proteus_elements, 27 * sizeof(idx_t *), (cudaStream_t)stream) != cudaSuccess) return SFEM_FAILURE;
+    const ConnectivityOrder<27> proteus_elements_order{{0, 8, 1, 11, 24, 9, 3, 10, 2, 16, 20, 17, 23, 26, 21, 19, 22, 18, 4, 12, 5, 15, 25, 13, 7, 14, 6}};
+    permute_connectivity<idx_t, 27><<<1, 27, 0, (cudaStream_t)stream>>>(elements, proteus_elements_order, proteus_elements);
+    const int status = cu_saint_venant_kirchhoff_proteus_hex27_gradient_a_msoa(scalar_bytes, nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz, stream);
+    cudaFreeAsync(proteus_elements, (cudaStream_t)stream);
+    return status;
 }
 
 extern "C" int cu_saint_venant_kirchhoff_hex27_objective_steps_a_msoa(
@@ -468,36 +369,13 @@ extern "C" int cu_saint_venant_kirchhoff_hex27_objective_steps_a_msoa(
         void *const RSTR value,
         void *const stream
 ) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return cu_saint_venant_kirchhoff_proteus_hex27_objective_steps_a_msoa(scalar_bytes, nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value, stream);
+    idx_t **proteus_elements = nullptr;
+    if (cudaMallocAsync((void **)&proteus_elements, 27 * sizeof(idx_t *), (cudaStream_t)stream) != cudaSuccess) return SFEM_FAILURE;
+    const ConnectivityOrder<27> proteus_elements_order{{0, 8, 1, 11, 24, 9, 3, 10, 2, 16, 20, 17, 23, 26, 21, 19, 22, 18, 4, 12, 5, 15, 25, 13, 7, 14, 6}};
+    permute_connectivity<idx_t, 27><<<1, 27, 0, (cudaStream_t)stream>>>(elements, proteus_elements_order, proteus_elements);
+    const int status = cu_saint_venant_kirchhoff_proteus_hex27_objective_steps_a_msoa(scalar_bytes, nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value, stream);
+    cudaFreeAsync(proteus_elements, (cudaStream_t)stream);
+    return status;
 }
 
 extern "C" const sfem::codegen::KernelDiagnostics * cu_saint_venant_kirchhoff_hex27_apply_soa_diagnostics(
