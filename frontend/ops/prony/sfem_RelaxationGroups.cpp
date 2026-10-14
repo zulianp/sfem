@@ -1,6 +1,7 @@
 #include "sfem_RelaxationGroups.hpp"
 
 #include <cassert>
+#include <utility>
 
 #include "sfem_API.hpp"
 #include "sfem_logger.hpp"
@@ -10,9 +11,7 @@ namespace sfem {
     RelaxationGroups::RelaxationGroups(std::vector<RelaxationGroupDeclaration> declarations,
                                        const ptrdiff_t                         n_dofs,
                                        const ExecutionSpace                    es)
-        : declarations_(std::move(declarations)), es_(es), previous_state_(create_buffer<real_t>(n_dofs, es)) {
-        sfem::blas<real_t>(es_)->zeros(n_dofs, previous_state_->data());
-    }
+        : declarations_(std::move(declarations)), n_dofs_(n_dofs), es_(es) {}
 
     int RelaxationGroups::group_index(const std::string &group) const {
         for (size_t i = 0; i < declarations_.size(); i++) {
@@ -116,63 +115,78 @@ namespace sfem {
         }
     }
 
-    void RelaxationGroups::set_previous_state(const real_t *const x) {
-        sfem::blas<real_t>(es_)->copy(previous_state_->size(), x, previous_state_->data());
-    }
-
-    void RelaxationGroups::acquire_workspace(const int n_slots) {
-        if (n_slots_) {
-            SFEM_ERROR("RelaxationGroups: a workspace is already held\n");
-        }
-        n_slots_ = n_slots;
+    void RelaxationGroups::allocate_stress() {
         for (auto &entry : blocks_) {
             Block &b = entry.second;
-            b.workspace.assign(n_slots, {});
-            for (int s = 0; s < n_slots; s++) {
+            if (!b.stress.empty()) continue;
+            b.stress.assign(2, {});
+            for (int s = 0; s < 2; s++) {
                 for (const auto &d : declarations_) {
-                    b.workspace[s].push_back(
+                    b.stress[s].push_back(
                             create_buffer<real_t>(static_cast<ptrdiff_t>(d.n_components) * b.n_qp * b.n_elements, es_));
                 }
             }
         }
     }
 
-    void RelaxationGroups::release_workspace() {
-        for (auto &entry : blocks_) entry.second.workspace.clear();
-        n_slots_ = 0;
-    }
-
     real_t *RelaxationGroups::stress_scratch(const std::string &block_name, const std::string &stress_name, const int s) {
-        Block &b = block(block_name);
-        if (s < 0 || s >= n_slots_) {
-            SFEM_ERROR("RelaxationGroups: workspace slot %d is not held (%d held)\n", s, n_slots_);
+        if (s < 0 || s > 1) {
+            SFEM_ERROR("RelaxationGroups: there is no stress slot %d (0 and 1 exist)\n", s);
         }
-        return b.workspace[s][stress_index(stress_name)]->data();
+        allocate_stress();
+        return block(block_name).stress[s][stress_index(stress_name)]->data();
     }
 
     const real_t *RelaxationGroups::slot(const Block &b, const int s, const size_t group) const {
-        return s < n_slots_ ? b.workspace[s][group]->data() : nullptr;
+        return b.stress.empty() ? nullptr : b.stress[s][group]->data();
     }
 
-    void RelaxationGroups::begin_step(const real_t t, const real_t dt) {
+    void RelaxationGroups::evaluate(const real_t *const x, const int slot, const StressEvaluation &evaluate) {
+        allocate_stress();
+        if (evaluate(x, slot) != SFEM_SUCCESS) {
+            SFEM_ERROR("RelaxationGroups: evaluating the relaxed stress failed\n");
+        }
+    }
+
+    void RelaxationGroups::begin_step(const real_t t, const real_t dt, const StressEvaluation &evaluate) {
+        if (relaxes() && !start_stress_current_) {
+            if (start_unknown_) {
+                // The step starts from a state committed while nothing relaxed,
+                // so its stress was never evaluated and its displacement is gone.
+                SFEM_ERROR("RelaxationGroups: a series was configured after a step or reset; call reset(x) first\n");
+            }
+            auto reference = create_buffer<real_t>(n_dofs_, es_);
+            sfem::blas<real_t>(es_)->zeros(n_dofs_, reference->data());
+            this->evaluate(reference->data(), 0, evaluate);
+            start_stress_current_ = true;
+        }
         for (auto &entry : blocks_) {
             Block &b = entry.second;
             for (size_t g = 0; g < b.groups.size(); g++) b.groups[g]->begin_step(t, dt, slot(b, 0, g));
         }
     }
 
-    void RelaxationGroups::advance() {
+    void RelaxationGroups::advance(const real_t *const x, const StressEvaluation &evaluate) {
+        const bool relaxing = relaxes();
+        if (relaxing) this->evaluate(x, 1, evaluate);
         for (auto &entry : blocks_) {
             Block &b = entry.second;
             for (size_t g = 0; g < b.groups.size(); g++) b.groups[g]->advance(slot(b, 0, g), slot(b, 1, g));
+            // The stress the step ended at is the one the next step starts from.
+            if (!b.stress.empty()) std::swap(b.stress[0], b.stress[1]);
         }
+        start_stress_current_ = relaxing;
+        start_unknown_        = !relaxing;
     }
 
-    void RelaxationGroups::reset(const real_t *const x) {
+    void RelaxationGroups::reset(const real_t *const x, const StressEvaluation &evaluate) {
         for (auto &entry : blocks_) {
             for (auto &group : entry.second.groups) group->reset();
         }
-        set_previous_state(x);
+        const bool relaxing = relaxes();
+        if (relaxing) this->evaluate(x, 0, evaluate);
+        start_stress_current_ = relaxing;
+        start_unknown_        = !relaxing;
     }
 
     bool RelaxationGroups::relaxes() const {
@@ -189,7 +203,12 @@ namespace sfem {
         for (const auto &entry : blocks_) {
             for (const auto &group : entry.second.groups) ret += group->bytes();
         }
-        return ret + previous_state_->size() * sizeof(real_t);
+        for (const auto &entry : blocks_) {
+            for (const auto &slots : entry.second.stress) {
+                for (const auto &buffer : slots) ret += buffer->size() * sizeof(real_t);
+            }
+        }
+        return ret;
     }
 
 #ifdef SFEM_ENABLE_RYAML

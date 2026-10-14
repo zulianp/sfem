@@ -181,6 +181,12 @@ def unused_parameters(source):
         # generated `Op` has one such constructor, which is why every material
         # contributed one entry per target to the count.
         parameters = match.group("params")
+        # A call whose last argument is a lambda -- `groups().begin_step(t, dt,
+        # [this](const real_t *const x, const int slot) {` -- ends like a
+        # definition, and the pattern takes the call for one.  A parameter list
+        # holds neither a member call nor a lambda introducer.
+        if re.search(r"\)\s*\.|\]\s*\(", parameters):
+            continue
         separator = parameters.find(") :")
         if separator >= 0:
             body = parameters[separator:] + body
