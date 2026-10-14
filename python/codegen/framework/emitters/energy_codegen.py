@@ -11431,6 +11431,14 @@ def _sfem_soa_element_api_common_params(form, dim, include_coords):
         params.append("const s_t *const *const RSTR adj")
         params.append("const s_t *const RSTR det")
     params.extend(_form_material_parameter_declarations(form))
+    # The integration-point fields the form reads, laid out like the mesh
+    # kernels' -- [component][point][element], `nelements` apart -- so a caller
+    # hands the element API the same arrays it hands the operator.
+    params.extend(
+        quadrature_fields.mesh_parameters(
+            quadrature_fields.quadrature_read_streams(getattr(form, "dependencies", None))
+        )
+    )
     params.extend(
         "const s_t *const *const RSTR %s_streams" % stream_prefix
         for _role, stream_prefix in element_api_field_roles(form)
@@ -11595,6 +11603,14 @@ def _sfem_soa_element_api_block_call(
         *(reference_args + specialized_reference_args)[0],
         *form_material_parameter_names(form),
     ]
+    # Each read stream at the tile's first element, strided by the block.
+    args.extend(
+        quadrature_fields.block_call_arguments(
+            quadrature_fields.quadrature_read_streams(getattr(form, "dependencies", None)),
+            "evb",
+            "nelements",
+        )
+    )
     args.extend(
         "b%s_streams" % stream_prefix
         for _role, stream_prefix in element_api_field_roles(form)

@@ -17,14 +17,15 @@ static SFEM_INLINE int mooney_rivlin_prony_energy_3d_esoa(
         const s_t C10,
         const s_t K,
         const s_t iso_relaxation_gamma,
+        const s_t *const RSTR iso_history,
         const s_t *const *const RSTR u_streams,
         s_t *const RSTR values
 ) {
   switch ((int)element_type) {
     case 8:
-      return mooney_rivlin_prony_hex8_energy_esoa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, u_streams, values);
+      return mooney_rivlin_prony_hex8_energy_esoa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, values);
     case 100008:
-      return mooney_rivlin_prony_proteus_hex8_energy_esoa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, u_streams, values);
+      return mooney_rivlin_prony_proteus_hex8_energy_esoa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, values);
     default:
       return SFEM_FAILURE;
   }
@@ -39,14 +40,15 @@ static SFEM_INLINE int mooney_rivlin_prony_energy_3d_ecoords_soa(
         const s_t C10,
         const s_t K,
         const s_t iso_relaxation_gamma,
+        const s_t *const RSTR iso_history,
         const s_t *const *const RSTR u_streams,
         s_t *const RSTR values
 ) {
   switch ((int)element_type) {
     case 8:
-      return mooney_rivlin_prony_hex8_energy_ecoords_soa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, u_streams, values);
+      return mooney_rivlin_prony_hex8_energy_ecoords_soa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, values);
     case 100008:
-      return mooney_rivlin_prony_proteus_hex8_energy_ecoords_soa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, u_streams, values);
+      return mooney_rivlin_prony_proteus_hex8_energy_ecoords_soa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, values);
     default:
       return SFEM_FAILURE;
   }
@@ -62,14 +64,15 @@ static SFEM_INLINE int mooney_rivlin_prony_energy_3d_egeometry_soa(
         const s_t C10,
         const s_t K,
         const s_t iso_relaxation_gamma,
+        const s_t *const RSTR iso_history,
         const s_t *const *const RSTR u_streams,
         s_t *const RSTR values
 ) {
   switch ((int)element_type) {
     case 8:
-      return mooney_rivlin_prony_hex8_energy_egeometry_soa<s_t, VS>(nelements, adj, det, C01, C10, K, iso_relaxation_gamma, u_streams, values);
+      return mooney_rivlin_prony_hex8_energy_egeometry_soa<s_t, VS>(nelements, adj, det, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, values);
     case 100008:
-      return mooney_rivlin_prony_proteus_hex8_energy_egeometry_soa<s_t, VS>(nelements, adj, det, C01, C10, K, iso_relaxation_gamma, u_streams, values);
+      return mooney_rivlin_prony_proteus_hex8_energy_egeometry_soa<s_t, VS>(nelements, adj, det, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, values);
     default:
       return SFEM_FAILURE;
   }
@@ -84,14 +87,15 @@ static SFEM_INLINE int mooney_rivlin_prony_gradient_3d_esoa(
         const s_t C10,
         const s_t K,
         const s_t iso_relaxation_gamma,
+        const s_t *const RSTR iso_history,
         const s_t *const *const RSTR u_streams,
         s_t *const *const RSTR out_streams
 ) {
   switch ((int)element_type) {
     case 8:
-      return mooney_rivlin_prony_hex8_gradient_esoa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, u_streams, out_streams);
+      return mooney_rivlin_prony_hex8_gradient_esoa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, out_streams);
     case 100008:
-      return mooney_rivlin_prony_proteus_hex8_gradient_esoa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, u_streams, out_streams);
+      return mooney_rivlin_prony_proteus_hex8_gradient_esoa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, out_streams);
     default:
       return SFEM_FAILURE;
   }
@@ -106,14 +110,15 @@ static SFEM_INLINE int mooney_rivlin_prony_gradient_3d_ecoords_soa(
         const s_t C10,
         const s_t K,
         const s_t iso_relaxation_gamma,
+        const s_t *const RSTR iso_history,
         const s_t *const *const RSTR u_streams,
         s_t *const *const RSTR out_streams
 ) {
   switch ((int)element_type) {
     case 8:
-      return mooney_rivlin_prony_hex8_gradient_ecoords_soa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, u_streams, out_streams);
+      return mooney_rivlin_prony_hex8_gradient_ecoords_soa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, out_streams);
     case 100008:
-      return mooney_rivlin_prony_proteus_hex8_gradient_ecoords_soa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, u_streams, out_streams);
+      return mooney_rivlin_prony_proteus_hex8_gradient_ecoords_soa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, out_streams);
     default:
       return SFEM_FAILURE;
   }
@@ -129,14 +134,15 @@ static SFEM_INLINE int mooney_rivlin_prony_gradient_3d_egeometry_soa(
         const s_t C10,
         const s_t K,
         const s_t iso_relaxation_gamma,
+        const s_t *const RSTR iso_history,
         const s_t *const *const RSTR u_streams,
         s_t *const *const RSTR out_streams
 ) {
   switch ((int)element_type) {
     case 8:
-      return mooney_rivlin_prony_hex8_gradient_egeometry_soa<s_t, VS>(nelements, adj, det, C01, C10, K, iso_relaxation_gamma, u_streams, out_streams);
+      return mooney_rivlin_prony_hex8_gradient_egeometry_soa<s_t, VS>(nelements, adj, det, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, out_streams);
     case 100008:
-      return mooney_rivlin_prony_proteus_hex8_gradient_egeometry_soa<s_t, VS>(nelements, adj, det, C01, C10, K, iso_relaxation_gamma, u_streams, out_streams);
+      return mooney_rivlin_prony_proteus_hex8_gradient_egeometry_soa<s_t, VS>(nelements, adj, det, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, out_streams);
     default:
       return SFEM_FAILURE;
   }
@@ -151,14 +157,15 @@ static SFEM_INLINE int mooney_rivlin_prony_hessian_3d_esoa(
         const s_t C10,
         const s_t K,
         const s_t iso_relaxation_gamma,
+        const s_t *const RSTR iso_history,
         const s_t *const *const RSTR u_streams,
         s_t *const *const RSTR matrix_streams
 ) {
   switch ((int)element_type) {
     case 8:
-      return mooney_rivlin_prony_hex8_hessian_esoa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, u_streams, matrix_streams);
+      return mooney_rivlin_prony_hex8_hessian_esoa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, matrix_streams);
     case 100008:
-      return mooney_rivlin_prony_proteus_hex8_hessian_esoa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, u_streams, matrix_streams);
+      return mooney_rivlin_prony_proteus_hex8_hessian_esoa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, matrix_streams);
     default:
       return SFEM_FAILURE;
   }
@@ -173,14 +180,15 @@ static SFEM_INLINE int mooney_rivlin_prony_hessian_3d_ecoords_soa(
         const s_t C10,
         const s_t K,
         const s_t iso_relaxation_gamma,
+        const s_t *const RSTR iso_history,
         const s_t *const *const RSTR u_streams,
         s_t *const *const RSTR matrix_streams
 ) {
   switch ((int)element_type) {
     case 8:
-      return mooney_rivlin_prony_hex8_hessian_ecoords_soa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, u_streams, matrix_streams);
+      return mooney_rivlin_prony_hex8_hessian_ecoords_soa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, matrix_streams);
     case 100008:
-      return mooney_rivlin_prony_proteus_hex8_hessian_ecoords_soa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, u_streams, matrix_streams);
+      return mooney_rivlin_prony_proteus_hex8_hessian_ecoords_soa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, matrix_streams);
     default:
       return SFEM_FAILURE;
   }
@@ -196,14 +204,15 @@ static SFEM_INLINE int mooney_rivlin_prony_hessian_3d_egeometry_soa(
         const s_t C10,
         const s_t K,
         const s_t iso_relaxation_gamma,
+        const s_t *const RSTR iso_history,
         const s_t *const *const RSTR u_streams,
         s_t *const *const RSTR matrix_streams
 ) {
   switch ((int)element_type) {
     case 8:
-      return mooney_rivlin_prony_hex8_hessian_egeometry_soa<s_t, VS>(nelements, adj, det, C01, C10, K, iso_relaxation_gamma, u_streams, matrix_streams);
+      return mooney_rivlin_prony_hex8_hessian_egeometry_soa<s_t, VS>(nelements, adj, det, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, matrix_streams);
     case 100008:
-      return mooney_rivlin_prony_proteus_hex8_hessian_egeometry_soa<s_t, VS>(nelements, adj, det, C01, C10, K, iso_relaxation_gamma, u_streams, matrix_streams);
+      return mooney_rivlin_prony_proteus_hex8_hessian_egeometry_soa<s_t, VS>(nelements, adj, det, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, matrix_streams);
     default:
       return SFEM_FAILURE;
   }

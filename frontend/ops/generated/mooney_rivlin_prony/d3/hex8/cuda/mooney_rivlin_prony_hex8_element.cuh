@@ -15,6 +15,7 @@ static __host__ __device__ __forceinline__ int mooney_rivlin_prony_hex8_energy_e
         const s_t C10,
         const s_t K,
         const s_t iso_relaxation_gamma,
+        const s_t *const RSTR iso_history,
         const s_t *const *const RSTR u_streams,
         s_t *const RSTR values
 ) {
@@ -22,7 +23,7 @@ static __host__ __device__ __forceinline__ int mooney_rivlin_prony_hex8_energy_e
   static constexpr int NS = 8;
   static constexpr int NDOFS = NC * NS;
   const s_t *const ordered_u_streams[NDOFS] = {u_streams[0], u_streams[1], u_streams[2], u_streams[3], u_streams[4], u_streams[5], u_streams[9], u_streams[10], u_streams[11], u_streams[6], u_streams[7], u_streams[8], u_streams[12], u_streams[13], u_streams[14], u_streams[15], u_streams[16], u_streams[17], u_streams[21], u_streams[22], u_streams[23], u_streams[18], u_streams[19], u_streams[20]};
-  return mooney_rivlin_prony_proteus_hex8_energy_egeometry_soa<s_t>(nelements, adj, det, C01, C10, K, iso_relaxation_gamma, ordered_u_streams, values);
+  return mooney_rivlin_prony_proteus_hex8_energy_egeometry_soa<s_t>(nelements, adj, det, C01, C10, K, iso_relaxation_gamma, iso_history, ordered_u_streams, values);
 }
 
 template <typename s_t>
@@ -33,6 +34,7 @@ static __host__ __device__ __forceinline__ int mooney_rivlin_prony_hex8_energy_e
         const s_t C10,
         const s_t K,
         const s_t iso_relaxation_gamma,
+        const s_t *const RSTR iso_history,
         const s_t *const *const RSTR u_streams,
         s_t *const RSTR values
 ) {
@@ -41,7 +43,7 @@ static __host__ __device__ __forceinline__ int mooney_rivlin_prony_hex8_energy_e
   static constexpr int NDOFS = NC * NS;
   const s_t *const ordered_coords[NDOFS] = {coords[0], coords[1], coords[2], coords[3], coords[4], coords[5], coords[9], coords[10], coords[11], coords[6], coords[7], coords[8], coords[12], coords[13], coords[14], coords[15], coords[16], coords[17], coords[21], coords[22], coords[23], coords[18], coords[19], coords[20]};
   const s_t *const ordered_u_streams[NDOFS] = {u_streams[0], u_streams[1], u_streams[2], u_streams[3], u_streams[4], u_streams[5], u_streams[9], u_streams[10], u_streams[11], u_streams[6], u_streams[7], u_streams[8], u_streams[12], u_streams[13], u_streams[14], u_streams[15], u_streams[16], u_streams[17], u_streams[21], u_streams[22], u_streams[23], u_streams[18], u_streams[19], u_streams[20]};
-  return mooney_rivlin_prony_proteus_hex8_energy_ecoords_soa<s_t>(nelements, ordered_coords, C01, C10, K, iso_relaxation_gamma, ordered_u_streams, values);
+  return mooney_rivlin_prony_proteus_hex8_energy_ecoords_soa<s_t>(nelements, ordered_coords, C01, C10, K, iso_relaxation_gamma, iso_history, ordered_u_streams, values);
 }
 
 template <typename s_t>
@@ -52,6 +54,7 @@ static __host__ __device__ __forceinline__ int mooney_rivlin_prony_hex8_energy_e
         const s_t C10,
         const s_t K,
         const s_t iso_relaxation_gamma,
+        const s_t *const RSTR iso_history,
         const s_t *const *const RSTR u_streams,
         s_t *const RSTR values
 ) {
@@ -60,7 +63,7 @@ static __host__ __device__ __forceinline__ int mooney_rivlin_prony_hex8_energy_e
   static constexpr int NDOFS = NC * NS;
   const s_t *const ordered_coords[NDOFS] = {coords[0], coords[1], coords[2], coords[3], coords[4], coords[5], coords[9], coords[10], coords[11], coords[6], coords[7], coords[8], coords[12], coords[13], coords[14], coords[15], coords[16], coords[17], coords[21], coords[22], coords[23], coords[18], coords[19], coords[20]};
   const s_t *const ordered_u_streams[NDOFS] = {u_streams[0], u_streams[1], u_streams[2], u_streams[3], u_streams[4], u_streams[5], u_streams[9], u_streams[10], u_streams[11], u_streams[6], u_streams[7], u_streams[8], u_streams[12], u_streams[13], u_streams[14], u_streams[15], u_streams[16], u_streams[17], u_streams[21], u_streams[22], u_streams[23], u_streams[18], u_streams[19], u_streams[20]};
-  return mooney_rivlin_prony_proteus_hex8_energy_esoa<s_t>(nelements, ordered_coords, C01, C10, K, iso_relaxation_gamma, ordered_u_streams, values);
+  return mooney_rivlin_prony_proteus_hex8_energy_esoa<s_t>(nelements, ordered_coords, C01, C10, K, iso_relaxation_gamma, iso_history, ordered_u_streams, values);
 }
 
 template <typename s_t>
@@ -72,6 +75,7 @@ static __host__ __device__ __forceinline__ int mooney_rivlin_prony_hex8_gradient
         const s_t C10,
         const s_t K,
         const s_t iso_relaxation_gamma,
+        const s_t *const RSTR iso_history,
         const s_t *const *const RSTR u_streams,
         s_t *const *const RSTR out_streams
 ) {
@@ -80,7 +84,7 @@ static __host__ __device__ __forceinline__ int mooney_rivlin_prony_hex8_gradient
   static constexpr int NDOFS = NC * NS;
   const s_t *const ordered_u_streams[NDOFS] = {u_streams[0], u_streams[1], u_streams[2], u_streams[3], u_streams[4], u_streams[5], u_streams[9], u_streams[10], u_streams[11], u_streams[6], u_streams[7], u_streams[8], u_streams[12], u_streams[13], u_streams[14], u_streams[15], u_streams[16], u_streams[17], u_streams[21], u_streams[22], u_streams[23], u_streams[18], u_streams[19], u_streams[20]};
   s_t *const ordered_out_streams[NDOFS] = {out_streams[0], out_streams[1], out_streams[2], out_streams[3], out_streams[4], out_streams[5], out_streams[9], out_streams[10], out_streams[11], out_streams[6], out_streams[7], out_streams[8], out_streams[12], out_streams[13], out_streams[14], out_streams[15], out_streams[16], out_streams[17], out_streams[21], out_streams[22], out_streams[23], out_streams[18], out_streams[19], out_streams[20]};
-  return mooney_rivlin_prony_proteus_hex8_gradient_egeometry_soa<s_t>(nelements, adj, det, C01, C10, K, iso_relaxation_gamma, ordered_u_streams, ordered_out_streams);
+  return mooney_rivlin_prony_proteus_hex8_gradient_egeometry_soa<s_t>(nelements, adj, det, C01, C10, K, iso_relaxation_gamma, iso_history, ordered_u_streams, ordered_out_streams);
 }
 
 template <typename s_t>
@@ -91,6 +95,7 @@ static __host__ __device__ __forceinline__ int mooney_rivlin_prony_hex8_gradient
         const s_t C10,
         const s_t K,
         const s_t iso_relaxation_gamma,
+        const s_t *const RSTR iso_history,
         const s_t *const *const RSTR u_streams,
         s_t *const *const RSTR out_streams
 ) {
@@ -100,7 +105,7 @@ static __host__ __device__ __forceinline__ int mooney_rivlin_prony_hex8_gradient
   const s_t *const ordered_coords[NDOFS] = {coords[0], coords[1], coords[2], coords[3], coords[4], coords[5], coords[9], coords[10], coords[11], coords[6], coords[7], coords[8], coords[12], coords[13], coords[14], coords[15], coords[16], coords[17], coords[21], coords[22], coords[23], coords[18], coords[19], coords[20]};
   const s_t *const ordered_u_streams[NDOFS] = {u_streams[0], u_streams[1], u_streams[2], u_streams[3], u_streams[4], u_streams[5], u_streams[9], u_streams[10], u_streams[11], u_streams[6], u_streams[7], u_streams[8], u_streams[12], u_streams[13], u_streams[14], u_streams[15], u_streams[16], u_streams[17], u_streams[21], u_streams[22], u_streams[23], u_streams[18], u_streams[19], u_streams[20]};
   s_t *const ordered_out_streams[NDOFS] = {out_streams[0], out_streams[1], out_streams[2], out_streams[3], out_streams[4], out_streams[5], out_streams[9], out_streams[10], out_streams[11], out_streams[6], out_streams[7], out_streams[8], out_streams[12], out_streams[13], out_streams[14], out_streams[15], out_streams[16], out_streams[17], out_streams[21], out_streams[22], out_streams[23], out_streams[18], out_streams[19], out_streams[20]};
-  return mooney_rivlin_prony_proteus_hex8_gradient_ecoords_soa<s_t>(nelements, ordered_coords, C01, C10, K, iso_relaxation_gamma, ordered_u_streams, ordered_out_streams);
+  return mooney_rivlin_prony_proteus_hex8_gradient_ecoords_soa<s_t>(nelements, ordered_coords, C01, C10, K, iso_relaxation_gamma, iso_history, ordered_u_streams, ordered_out_streams);
 }
 
 template <typename s_t>
@@ -111,6 +116,7 @@ static __host__ __device__ __forceinline__ int mooney_rivlin_prony_hex8_gradient
         const s_t C10,
         const s_t K,
         const s_t iso_relaxation_gamma,
+        const s_t *const RSTR iso_history,
         const s_t *const *const RSTR u_streams,
         s_t *const *const RSTR out_streams
 ) {
@@ -120,7 +126,7 @@ static __host__ __device__ __forceinline__ int mooney_rivlin_prony_hex8_gradient
   const s_t *const ordered_coords[NDOFS] = {coords[0], coords[1], coords[2], coords[3], coords[4], coords[5], coords[9], coords[10], coords[11], coords[6], coords[7], coords[8], coords[12], coords[13], coords[14], coords[15], coords[16], coords[17], coords[21], coords[22], coords[23], coords[18], coords[19], coords[20]};
   const s_t *const ordered_u_streams[NDOFS] = {u_streams[0], u_streams[1], u_streams[2], u_streams[3], u_streams[4], u_streams[5], u_streams[9], u_streams[10], u_streams[11], u_streams[6], u_streams[7], u_streams[8], u_streams[12], u_streams[13], u_streams[14], u_streams[15], u_streams[16], u_streams[17], u_streams[21], u_streams[22], u_streams[23], u_streams[18], u_streams[19], u_streams[20]};
   s_t *const ordered_out_streams[NDOFS] = {out_streams[0], out_streams[1], out_streams[2], out_streams[3], out_streams[4], out_streams[5], out_streams[9], out_streams[10], out_streams[11], out_streams[6], out_streams[7], out_streams[8], out_streams[12], out_streams[13], out_streams[14], out_streams[15], out_streams[16], out_streams[17], out_streams[21], out_streams[22], out_streams[23], out_streams[18], out_streams[19], out_streams[20]};
-  return mooney_rivlin_prony_proteus_hex8_gradient_esoa<s_t>(nelements, ordered_coords, C01, C10, K, iso_relaxation_gamma, ordered_u_streams, ordered_out_streams);
+  return mooney_rivlin_prony_proteus_hex8_gradient_esoa<s_t>(nelements, ordered_coords, C01, C10, K, iso_relaxation_gamma, iso_history, ordered_u_streams, ordered_out_streams);
 }
 
 template <typename s_t>
@@ -132,6 +138,7 @@ static __host__ __device__ __forceinline__ int mooney_rivlin_prony_hex8_hessian_
         const s_t C10,
         const s_t K,
         const s_t iso_relaxation_gamma,
+        const s_t *const RSTR iso_history,
         const s_t *const *const RSTR u_streams,
         s_t *const *const RSTR matrix_streams
 ) {
@@ -156,7 +163,7 @@ static __host__ __device__ __forceinline__ int mooney_rivlin_prony_hex8_hessian_
       }
     }
   }
-  return mooney_rivlin_prony_proteus_hex8_hessian_egeometry_soa<s_t>(nelements, adj, det, C01, C10, K, iso_relaxation_gamma, ordered_u_streams, ordered_matrix_streams);
+  return mooney_rivlin_prony_proteus_hex8_hessian_egeometry_soa<s_t>(nelements, adj, det, C01, C10, K, iso_relaxation_gamma, iso_history, ordered_u_streams, ordered_matrix_streams);
 }
 
 template <typename s_t>
@@ -167,6 +174,7 @@ static __host__ __device__ __forceinline__ int mooney_rivlin_prony_hex8_hessian_
         const s_t C10,
         const s_t K,
         const s_t iso_relaxation_gamma,
+        const s_t *const RSTR iso_history,
         const s_t *const *const RSTR u_streams,
         s_t *const *const RSTR matrix_streams
 ) {
@@ -192,7 +200,7 @@ static __host__ __device__ __forceinline__ int mooney_rivlin_prony_hex8_hessian_
       }
     }
   }
-  return mooney_rivlin_prony_proteus_hex8_hessian_ecoords_soa<s_t>(nelements, ordered_coords, C01, C10, K, iso_relaxation_gamma, ordered_u_streams, ordered_matrix_streams);
+  return mooney_rivlin_prony_proteus_hex8_hessian_ecoords_soa<s_t>(nelements, ordered_coords, C01, C10, K, iso_relaxation_gamma, iso_history, ordered_u_streams, ordered_matrix_streams);
 }
 
 template <typename s_t>
@@ -203,6 +211,7 @@ static __host__ __device__ __forceinline__ int mooney_rivlin_prony_hex8_hessian_
         const s_t C10,
         const s_t K,
         const s_t iso_relaxation_gamma,
+        const s_t *const RSTR iso_history,
         const s_t *const *const RSTR u_streams,
         s_t *const *const RSTR matrix_streams
 ) {
@@ -228,7 +237,7 @@ static __host__ __device__ __forceinline__ int mooney_rivlin_prony_hex8_hessian_
       }
     }
   }
-  return mooney_rivlin_prony_proteus_hex8_hessian_esoa<s_t>(nelements, ordered_coords, C01, C10, K, iso_relaxation_gamma, ordered_u_streams, ordered_matrix_streams);
+  return mooney_rivlin_prony_proteus_hex8_hessian_esoa<s_t>(nelements, ordered_coords, C01, C10, K, iso_relaxation_gamma, iso_history, ordered_u_streams, ordered_matrix_streams);
 }
 
 } // namespace codegen
