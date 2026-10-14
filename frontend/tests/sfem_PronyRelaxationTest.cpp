@@ -159,6 +159,36 @@ int test_variable_steps_stay_exact() {
     return SFEM_TEST_SUCCESS;
 }
 
+int test_completely_relaxed_terms_are_not_stored() {
+    // A term a thousand times faster than the step relaxes completely within
+    // it and is held as a coefficient, not a tensor.  Shrinking the step ten
+    // thousand times in the middle of the ramp brings it back -- materialised
+    // from that coefficient -- and growing it again lets it go.  The history
+    // stays the closed form throughout.
+    const sfem::PronySeries fast({real_t(0.3), real_t(0.25), real_t(0.15)}, {real_t(1e-3), real_t(1), real_t(10)});
+    const real_t            t_ramp = 20;
+
+    std::vector<real_t> coarse{0}, fine, again;
+    while (coarse.back() < 5) coarse.push_back(coarse.back() + 1);
+    fine = coarse;
+    for (int k = 0; k < 20; k++) fine.push_back(fine.back() + real_t(1e-4));
+    again = fine;
+    while (again.back() < 15) again.push_back(again.back() + 1);  // inside the ramp: no kink off the grid
+
+    sfem::PronyRelaxation coarse_run(fast, N_COMPONENTS, N_QP, N_ELEMENTS);
+    SFEM_TEST_ASSERT(drive(coarse_run, coarse, t_ramp) < real_t(1e-12));
+    SFEM_TEST_ASSERT(coarse_run.n_stored_terms() == 2);
+
+    sfem::PronyRelaxation fine_run(fast, N_COMPONENTS, N_QP, N_ELEMENTS);
+    SFEM_TEST_ASSERT(drive(fine_run, fine, t_ramp) < real_t(1e-12));
+    SFEM_TEST_ASSERT(fine_run.n_stored_terms() == 3);
+
+    sfem::PronyRelaxation again_run(fast, N_COMPONENTS, N_QP, N_ELEMENTS);
+    SFEM_TEST_ASSERT(drive(again_run, again, t_ramp) < real_t(1e-12));
+    SFEM_TEST_ASSERT(again_run.n_stored_terms() == 2);
+    return SFEM_TEST_SUCCESS;
+}
+
 int test_midpoint_is_second_order() {
     // On a smooth history (a ramp that never ends) the midpoint recursion
     // converges at second order.
@@ -201,8 +231,8 @@ int test_wlf_shifts_time_and_nothing_else() {
 
     std::vector<real_t> h0(N_ENTRIES), h1(N_ENTRIES);
     for (int i = 0; i < series().n_terms(); i++) {
-        shifted.internal_variables().decode(i, h0.data());
-        reference.internal_variables().decode(i, h1.data());
+        shifted.decode_history(i, h0.data());
+        reference.decode_history(i, h1.data());
         for (ptrdiff_t k = 0; k < N_ENTRIES; k++) {
             SFEM_TEST_ASSERT(std::abs(h0[k] - h1[k]) <= real_t(1e-12) * (std::abs(h1[k]) + 1e-30));
         }
@@ -337,6 +367,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_the_weights_have_their_limits);
     SFEM_RUN_TEST(test_linear_interpolation_is_exact_for_a_ramp);
     SFEM_RUN_TEST(test_variable_steps_stay_exact);
+    SFEM_RUN_TEST(test_completely_relaxed_terms_are_not_stored);
     SFEM_RUN_TEST(test_midpoint_is_second_order);
     SFEM_RUN_TEST(test_wlf_shifts_time_and_nothing_else);
     SFEM_RUN_TEST(test_every_codec_round_trips_within_its_bound);

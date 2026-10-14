@@ -48,6 +48,17 @@ namespace sfem {
     /// a stress-free state.  A series with no terms reads no stress, and its
     /// callers may pass null.
     ///
+    /// A term that relaxes completely within the step -- alpha_i below half a
+    /// unit of real_t's precision, so alpha_i H_i is below the rounding of H_i
+    /// itself -- contributes only b_i to gamma, and its update is
+    /// H_i^{n+1} = b_i (S_r^{n+1} - S_r^n): the same tensor for every such
+    /// term, up to a scalar.  Those terms are therefore not stored: they hold
+    /// a coefficient c_i on one shared increment D, and H_i = c_i D is
+    /// materialised into a slot only if a shorter step brings the term back.
+    /// Every term starts this way, at c_i = 0.  A spectrum fitted over many
+    /// decades -- most of whose terms relax inside any step a solver takes --
+    /// then stores only the terms that are still relaxing.
+    ///
     /// Arrays are laid out [component][qp][element] like `QuadratureState`;
     /// the integration-point order is the kernels' and is never interpreted
     /// here.
@@ -104,14 +115,21 @@ namespace sfem {
         real_t alpha(const int i) const { return alpha_[i]; }
         real_t b(const int i) const { return b_[i]; }
 
-        /// The committed state: tensor i of `internal_variables()` is H_i.
-        const QuadratureState &internal_variables() const { return H_; }
+        /// The committed H_i, decoded into `values` (laid out [c][q][e]).  A
+        /// host convenience.
+        void decode_history(const int i, real_t *const values) const;
+
+        /// How many terms hold a stored tensor.
+        int n_stored_terms() const { return n_live_; }
 
         /// Bytes of state held, frozen history included.
         std::size_t bytes() const;
 
     private:
         void zero_history();
+        void reserve(const int n_slots);
+        void store(const int i);
+        void unstore(const int i);
 
         PronySeries                     series_;
         Options                         options_;
@@ -119,12 +137,24 @@ namespace sfem {
         int                             n_qp_;
         ptrdiff_t                       n_elements_;
         real_t                          temperature_;
-        QuadratureState                 H_;
-        std::shared_ptr<Buffer<real_t>> history_;
-        std::vector<real_t>             alpha_;
-        std::vector<real_t>             b_;
-        real_t                          gamma_{1};
-        bool                            step_open_{false};
+        //! The stored terms, one tensor per slot; slots [0, n_live_) are in use.
+        std::shared_ptr<QuadratureState> H_;
+        int                              n_live_{0};
+        std::vector<int>                 slot_;          ///< per term, -1 if not stored
+        std::vector<int>                 term_of_slot_;  ///< per slot
+        //! H_i = coefficient_[i] D for a term that is not stored.
+        std::vector<real_t>              coefficient_;
+        std::shared_ptr<QuadratureState> D_;
+        //! Per term: relaxes completely within the open step.
+        std::vector<char>                relaxed_;
+        //! The open step's weights per slot, the relaxed slots' alpha zeroed.
+        std::vector<real_t>              slot_alpha_;
+        std::vector<real_t>              slot_b_;
+        std::shared_ptr<Buffer<real_t>>  history_;
+        std::vector<real_t>              alpha_;
+        std::vector<real_t>              b_;
+        real_t                           gamma_{1};
+        bool                             step_open_{false};
     };
 
 }  // namespace sfem
