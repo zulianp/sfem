@@ -788,7 +788,8 @@ namespace sfem {
               const idx_t *const /*colidx*/,
               real_t *const /*values*/) {
     SFEM_TRACE_SCOPE("GeneratedBodyForce::hessian_crs");
-    return SFEM_FAILURE;
+    // Linear work: the Jacobian is zero.
+    return SFEM_SUCCESS;
   }
 
   int GeneratedBodyForce::hessian_bsr(const real_t *const /*state*/,
@@ -796,7 +797,8 @@ namespace sfem {
               const idx_t *const /*colidx*/,
               real_t *const /*values*/) {
     SFEM_TRACE_SCOPE("GeneratedBodyForce::hessian_bsr");
-    return SFEM_FAILURE;
+    // Linear work: the Jacobian is zero.
+    return SFEM_SUCCESS;
   }
 
 

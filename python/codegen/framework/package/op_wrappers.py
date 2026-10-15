@@ -559,7 +559,7 @@ def _inexact_declarations(material):
 
 
 def _header(material, residual, publishes_value_steps=None, node_wise=False,
-            holds_time_scheme=None, relaxes=False):
+            holds_time_scheme=None, relaxes=False, state_independent=False):
     """The Op's declared interface.
 
     ``publishes_value_steps`` says whether this Op offers the Newton
@@ -601,6 +601,12 @@ def _header(material, residual, publishes_value_steps=None, node_wise=False,
     bool energy_or_potential_based() const override { return %s; }""" % (
         "false" if node_wise else "true"
     )
+    # A residual that does not read the state -- a forcing, linear work -- says
+    # so, as the boundary forcings do: its Jacobian is zero, and the line search
+    # assembles it once instead of at every trial step.
+    if state_independent:
+        value_steps += """
+    bool residual_depends_on_state() const override { return false; }"""
     # A material with a rate must hold a scheme, because its kernels cannot be
     # evaluated without the shift and the history.  An energy material may hold
     # one without having a rate at all: the scheme's separable term is a
@@ -3491,7 +3497,7 @@ namespace sfem {
                 ),
             )
             if hessian_crs_cases
-            else "    return SFEM_FAILURE;"
+            else _residual_without_assembly(emits_linear_work)
         ),
         "hessian_bsr_body": (
             "%s\n"
@@ -3529,7 +3535,7 @@ namespace sfem {
                 ),
             )
             if hessian_bsr_cases
-            else "    return SFEM_FAILURE;"
+            else _residual_without_assembly(emits_linear_work)
         ),
         "affine_options": _affine_option_entries(
             "residual_uses_affine",
@@ -3600,7 +3606,20 @@ namespace sfem {
     # A volume forcing publishes the stepped 0-form too, now that the energy
     # merit asks every operator for it.
     return _header(material, True, publishes_value_steps=emits_linear_work,
-                   node_wise=emits_merit), source
+                   node_wise=emits_merit, state_independent=emits_linear_work), source
+
+
+def _residual_without_assembly(linear_work):
+    """The assembled Jacobian of a residual material that publishes no kernel for it.
+
+    Linear work has none because its Jacobian is identically zero, and adding
+    nothing to the matrix is assembling it; refusing would fail every
+    `Function::hessian_*` that holds a forcing. Any other residual without a
+    kernel refuses.
+    """
+    if linear_work:
+        return "    // Linear work: the Jacobian is zero.\n    return SFEM_SUCCESS;"
+    return "    return SFEM_FAILURE;"
 
 
 def _hyperelastic_signature_names(substitutions):
