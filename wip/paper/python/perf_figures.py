@@ -2433,6 +2433,10 @@ def build(out_dir, tab_dir):
     solver = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(solver)
     written.extend(solver.build(DATA, out_dir, tab_dir))
+    spec = importlib.util.spec_from_file_location("unstructured_figures", os.path.join(HERE, "unstructured_figures.py"))
+    unstructured = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(unstructured)
+    written.extend(unstructured.build(DATA, out_dir, tab_dir))
     return written
 
 
@@ -2725,6 +2729,10 @@ def selftest():
         solver = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(solver)
         check(solver.selftest(), "solver iterations: true residuals, configurations and raw logs")
+        spec = importlib.util.spec_from_file_location("unstructured_figures", os.path.join(HERE, "unstructured_figures.py"))
+        unstructured = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(unstructured)
+        check(unstructured.selftest(), "unstructured results: raw replay, scope and slower case retained")
 
         # Missing data must be absent, not fabricated.
         with tempfile.TemporaryDirectory() as td2:

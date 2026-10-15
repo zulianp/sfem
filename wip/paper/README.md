@@ -389,6 +389,29 @@ and every captured element contribution was bit-identical between probe modes.
 failed checks and altered input files. `make figures` now propagates generator
 errors so it cannot quietly reuse a stale table after failed validation.
 
+## Public irregular-mesh comparison (14 October 2026)
+
+[Job 5052301](data/unstructured_5052301/README.md) adds two graded procedural
+HEX8 timing meshes with irregular connectivity and non-affine cells. It compares
+the first-order interior Rhie--Chow residual and exact action at 1/72 threads
+and packs 256/1024. All twelve cases and 384 timing samples are retained.
+The 72-thread table includes the medium-grid pack1024 action slowdown as well
+as the speedups. Full absolute times, paired ranges, setup costs and the explicit
+array ledger remain in the archived result. These are operator measurements,
+not a spatial-accuracy or nonlinear-solver result.
+
+`python/unstructured_figures.py`, called by `make figures`, checks every raw-file
+hash, the captured parser identity, case coverage, commands, binary/policy records
+and numerical/timing reports before generating `tables/unstructured.tex` and
+`figures/unstructured_macros.tex`. The complete table must replay exactly from
+the raw logs. `make check` also exercises archive rejection and preserves the
+slower case in the generated table. No new cluster run is needed to regenerate it.
+
+The [measurement protocol](../../spikes/cvfem/docs/unstructured_study.md) describes
+the public generator and kernel correction. This dataset is separate from the
+matched affine counter campaign; it supplies no new roofline points or traffic
+attribution. The empirical roofline remains in the companion material.
+
 ## Open
 
 - `refs.bib` holds one placeholder entry so the first build succeeds. Populate and delete it.

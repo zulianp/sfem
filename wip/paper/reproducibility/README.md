@@ -139,6 +139,17 @@ a reference line is not necessarily the faster way to apply an equivalent operat
 The scatter-bypass experiment supplies separate evidence for lower marginal
 accumulation cost; this figure does not isolate that cost.
 
+## Separate irregular-mesh evidence
+
+The main paper's irregular-mesh table comes from
+[job 5052301](../data/unstructured_5052301/README.md), with all raw logs, hashes,
+absolute timings, paired ranges, setup costs and explicit array accounting.
+`make figures` replays that archive through `python/unstructured_figures.py`.
+These non-affine first-order residual/action timings have no PMU measurements
+and do not enter the empirical roofline. The medium-mesh pack1024 action slowdown
+is retained alongside the gains. The meshes are procedural public fixtures;
+full solver performance and spatial accuracy are not measured.
+
 ## Historical roofline accounting
 
 The old [source manifest](../data/roofline_sources.json) and generated
