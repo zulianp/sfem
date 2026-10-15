@@ -11,7 +11,8 @@ PYTHON="${PYTHON:-$ROOT_DIR/venv/bin/python}"
 MESH="$1"
 OUTPUT_DIR="$2"
 XDMF="${3:-$OUTPUT_DIR/output.xdmf}"
-TIME_FILE="$OUTPUT_DIR/out/time.txt"
+FIELDS_DIR="${SFEM_FIELDS_DIR:-$OUTPUT_DIR/out}"
+TIME_FILE="$FIELDS_DIR/time.txt"
 XDMF_DIR="$(cd -- "$(dirname -- "$XDMF")" >/dev/null 2>&1 && pwd -P)"
 XDMF_NAME="$(basename -- "$XDMF")"
 XDMF_MESH="$OUTPUT_DIR/.xdmf_mesh"
@@ -23,18 +24,18 @@ fi
 
 shopt -s nullglob
 patterns=()
-for field in disp velocity acceleration; do
+for field in disp velocity acceleration gap contact_force; do
     for component in 0 1 2; do
-        files=("$OUTPUT_DIR"/out/"$field.$component".*.*)
+        files=("$FIELDS_DIR/$field.$component".*.*)
         if ((${#files[@]})); then
-            patterns+=("$OUTPUT_DIR/out/$field.$component.*.*")
+            patterns+=("$FIELDS_DIR/$field.$component.*.*")
         fi
     done
 done
 shopt -u nullglob
 
 if ((${#patterns[@]} == 0)); then
-    echo "no transient raw fields found in $OUTPUT_DIR/out" >&2
+    echo "no transient raw fields found in $FIELDS_DIR" >&2
     exit 1
 fi
 
