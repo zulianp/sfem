@@ -244,6 +244,7 @@ namespace sfem {
             const ptrdiff_t    n    = node_mapping->size();
             const idx_t *const idx  = node_mapping->data();
             const int          dim  = mesh->spatial_dimension();
+            const int          pdim = static_cast<int>(surface_points->extent(0));
 
             for (int d = 0; d < dim; d++) {
                 const geom_t *const x   = mesh->points()->data()[d];
@@ -252,6 +253,14 @@ namespace sfem {
 #pragma omp parallel for
                 for (ptrdiff_t i = 0; i < n; ++i) {
                     x_s[i] = x[idx[i]];
+                }
+            }
+
+            for (int d = dim; d < pdim; ++d) {
+                geom_t *const x_s = surface_points->data()[d];
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < n; ++i) {
+                    x_s[i] = geom_t(0);
                 }
             }
         }
@@ -279,8 +288,9 @@ namespace sfem {
 #ifdef SFEM_ENABLE_CUDA
             if (EXECUTION_SPACE_DEVICE == this->execution_space) {
                 if (!surface_points_device) {
-                    // Lazy initialization of the device buffer
-                    surface_points_device = smesh::create_device_buffer<geom_t>(dim, n);
+                    // Lazy initialization of the device buffer, from the rest positions so the
+                    // coordinates beyond dim are their zeros
+                    surface_points_device = smesh::to_device(surface_points);
                 }
 
                 cu_displace_surface_points(dim,
@@ -348,7 +358,9 @@ namespace sfem {
         ret->impl_->sidesets        = sidesets;
         ret->impl_->sides           = sides;
         ret->impl_->node_mapping    = node_mapping;
-        ret->impl_->surface_points  = create_host_buffer<geom_t>(mesh->spatial_dimension(), node_mapping->size());
+        // Three coordinates in 2D too, the last zero, as SSMeshContactSurface: the shell samplers
+        // read x, y and z.
+        ret->impl_->surface_points  = create_host_buffer<geom_t>(3, node_mapping->size());
         ret->impl_->element_type    = shell_type(side_type(space->element_type()));
         if (ret->impl_->element_type == smesh::INVALID) {
             SFEM_ERROR("Invalid element type: %d\n", space->element_type());

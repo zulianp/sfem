@@ -1,6 +1,10 @@
 #include "sfem_SDFObstacle.hpp"
 
+#include "node_interpolate.hpp"
 #include "sfem_resample_gap.hpp"
+#include "sfem_sdf_sampling.hpp"
+
+#include <stdlib.h>
 
 #ifdef SFEM_ENABLE_CUDA
 #include "cu_resample_gap.hpp"
@@ -8,30 +12,108 @@
 
 namespace sfem {
 
+    std::shared_ptr<SDFBSpline> SDFBSpline::create(const std::shared_ptr<smesh::Grid<geom_t>> &sdf) {
+        return create(sdf->nlocal(), sdf->stride(), sdf->data());
+    }
+
+    std::shared_ptr<SDFBSpline> SDFBSpline::create(const ptrdiff_t *const n,
+                                                   const ptrdiff_t *const sample_stride,
+                                                   const geom_t *const    samples) {
+        SFEM_TRACE_SCOPE("SDFBSpline::create");
+
+        auto ret    = std::make_shared<SDFBSpline>();
+        ret->stride = create_host_buffer<ptrdiff_t>(3);
+        ptrdiff_t *const stride = ret->stride->data();
+        stride[0]               = 1;
+        stride[1]               = n[0] + 2;
+        stride[2]               = (n[0] + 2) * (n[1] + 2);
+        ret->coefficients       = create_host_buffer<geom_t>((n[0] + 2) * (n[1] + 2) * (n[2] + 2));
+        ret->offset_            = stride[0] + stride[1] + stride[2];
+
+        if (sdf_bspline_coefficients(n, sample_stride, samples, stride, ret->origin_coefficient()) != SFEM_SUCCESS) {
+            SFEM_ERROR("SDFBSpline: the SDF grid needs at least 2 nodes per axis\n");
+        }
+        return ret;
+    }
+
+#ifdef SFEM_ENABLE_CUDA
+    std::shared_ptr<SDFBSpline> SDFBSpline::to_device() const {
+        auto ret          = std::make_shared<SDFBSpline>();
+        ret->coefficients = smesh::to_device(coefficients);
+        ret->stride       = smesh::to_device(stride);
+        ret->offset_      = offset_;
+        return ret;
+    }
+#endif
+
     class SDFObstacle::Impl {
     public:
-        std::shared_ptr<smesh::Grid<geom_t>> sdf;
-        bool                          variational{true};
-        enum ExecutionSpace           execution_space { EXECUTION_SPACE_HOST };
+        // What every sampling kernel reads: the SDF's cubic B-spline over the part of the grid
+        // this rank holds, n nodes per axis from `origin`, spaced `delta`.
+        std::shared_ptr<SDFBSpline> spline;
+        ptrdiff_t                   n[3];
+        geom_t                      origin[3];
+        geom_t                      delta[3];
+        bool                        variational{true};
+        enum ExecutionSpace         execution_space { EXECUTION_SPACE_HOST };
     };
 
     std::shared_ptr<SDFObstacle> SDFObstacle::create_from_file(const std::shared_ptr<Communicator> &comm,
                                                                const std::string                   &path,
+                                                               const ptrdiff_t                      nnodes,
+                                                               const geom_t *const                  z,
                                                                const enum ExecutionSpace            es) {
-        return create(smesh::Grid<geom_t>::create_from_file(comm, path.c_str()), es);
+        return create(smesh::Grid<geom_t>::create_from_file(comm, path.c_str()), comm, nnodes, z, es);
     }
 
     std::shared_ptr<SDFObstacle> SDFObstacle::create(const std::shared_ptr<smesh::Grid<geom_t>> &sdf,
-                                                     const enum ExecutionSpace            execution_space) {
+                                                     const std::shared_ptr<Communicator>        &comm,
+                                                     const ptrdiff_t                             nnodes,
+                                                     const geom_t *const                         z,
+                                                     const enum ExecutionSpace                   execution_space) {
         auto obs = std::make_shared<SDFObstacle>();
+        for (int d = 0; d < 3; ++d) {
+            obs->impl_->n[d]      = sdf->nlocal()[d];
+            obs->impl_->origin[d] = sdf->origin(d);
+            obs->impl_->delta[d]  = sdf->delta(d);
+        }
+
+        // A grid read from file under MPI is split into z-slabs, each with the whole grid's
+        // origin, while the rank's points can lie anywhere in z. The spline is then built on the
+        // z-range the points cover, widened by 12 layers: the prefilter's reach to float
+        // precision, so there it equals the whole grid's spline.
+        const bool slabs = comm->size() > 1 && comm->max<ptrdiff_t>(sdf->nglobal(2) - sdf->nlocal()[2]) > 0;
+
+        std::shared_ptr<SDFBSpline> spline;
+        if (slabs) {
+            geom_t *view = nullptr;
+            if (sdf_view_ensure_margin(comm->get(),
+                                       nnodes,
+                                       z,
+                                       sdf->nlocal(),
+                                       sdf->nglobal(),
+                                       sdf->stride(),
+                                       sdf->origin(),
+                                       sdf->delta(),
+                                       sdf->data(),
+                                       12,
+                                       &view,
+                                       &obs->impl_->n[2],
+                                       &obs->impl_->origin[2]) != SFEM_SUCCESS) {
+                SFEM_ERROR("SDFObstacle: unable to gather the SDF slab of this rank's points\n");
+            }
+            spline = SDFBSpline::create(obs->impl_->n, sdf->stride(), view);
+            free(view);
+        } else {
+            spline = SDFBSpline::create(sdf);
+        }
+
 #ifdef SFEM_ENABLE_CUDA
         if (execution_space == EXECUTION_SPACE_DEVICE) {
-            obs->impl_->sdf = to_device(sdf);
-        } else
-#endif
-        {
-            obs->impl_->sdf = sdf;
+            spline = spline->to_device();
         }
+#endif
+        obs->impl_->spline          = spline;
         obs->impl_->execution_space = execution_space;
         return obs;
     }
@@ -48,7 +130,7 @@ namespace sfem {
                             geom_t **const SFEM_RESTRICT points,
                             real_t **const SFEM_RESTRICT normals,
                             real_t *const SFEM_RESTRICT  gap) {
-        auto sdf = impl_->sdf;
+        SFEM_TRACE_SCOPE("SDFObstacle::sample");
 
 #ifdef SFEM_ENABLE_CUDA
         if (impl_->execution_space == EXECUTION_SPACE_DEVICE) {
@@ -60,11 +142,11 @@ namespace sfem {
                     elements,
                     points,
                     // SDF
-                    sdf->nlocal(),
-                    sdf->stride(),
-                    sdf->origin(),
-                    sdf->delta(),
-                    sdf->data(),
+                    impl_->n,
+                    impl_->spline->stride->data(),
+                    impl_->origin,
+                    impl_->delta,
+                    impl_->spline->origin_coefficient(),
                     // Output
                     gap,
                     normals);
@@ -78,11 +160,11 @@ namespace sfem {
                 elements,
                 points,
                 // SDF
-                sdf->nlocal(),
-                sdf->stride(),
-                sdf->origin(),
-                sdf->delta(),
-                sdf->data(),
+                impl_->n,
+                impl_->spline->stride->data(),
+                impl_->origin,
+                impl_->delta,
+                impl_->spline->origin_coefficient(),
                 // Output
                 gap,
                 normals[0],
@@ -96,7 +178,7 @@ namespace sfem {
                                     idx_t **const SFEM_RESTRICT  elements,
                                     geom_t **const SFEM_RESTRICT points,
                                     real_t **const SFEM_RESTRICT normals) {
-        auto sdf = impl_->sdf;
+        SFEM_TRACE_SCOPE("SDFObstacle::sample_normals");
 
 #ifdef SFEM_ENABLE_CUDA
         if (impl_->execution_space == EXECUTION_SPACE_DEVICE) {
@@ -108,11 +190,11 @@ namespace sfem {
                     elements,
                     points,
                     // SDF
-                    sdf->nlocal(),
-                    sdf->stride(),
-                    sdf->origin(),
-                    sdf->delta(),
-                    sdf->data(),
+                    impl_->n,
+                    impl_->spline->stride->data(),
+                    impl_->origin,
+                    impl_->delta,
+                    impl_->spline->origin_coefficient(),
                     // Output
                     normals);
         }
@@ -125,11 +207,11 @@ namespace sfem {
                 elements,
                 points,
                 // SDF
-                sdf->nlocal(),
-                sdf->stride(),
-                sdf->origin(),
-                sdf->delta(),
-                sdf->data(),
+                impl_->n,
+                impl_->spline->stride->data(),
+                impl_->origin,
+                impl_->delta,
+                impl_->spline->origin_coefficient(),
                 // Output
                 normals[0],
                 normals[1],
@@ -142,17 +224,18 @@ namespace sfem {
                                                idx_t **const SFEM_RESTRICT  elements,
                                                geom_t **const SFEM_RESTRICT points,
                                                real_t **const SFEM_RESTRICT normals) {
-        auto sdf = impl_->sdf;
+        SFEM_TRACE_SCOPE("SDFObstacle::sample_normals_accumulate");
+
         return resample_gap_normals_local(element_type,
                                           nelements,
                                           nnodes,
                                           elements,
                                           points,
-                                          sdf->nlocal(),
-                                          sdf->stride(),
-                                          sdf->origin(),
-                                          sdf->delta(),
-                                          sdf->data(),
+                                          impl_->n,
+                                          impl_->spline->stride->data(),
+                                          impl_->origin,
+                                          impl_->delta,
+                                          impl_->spline->origin_coefficient(),
                                           normals[0],
                                           normals[1],
                                           normals[2]);
@@ -164,17 +247,18 @@ namespace sfem {
                                              idx_t **const SFEM_RESTRICT  elements,
                                              geom_t **const SFEM_RESTRICT points,
                                              real_t *const SFEM_RESTRICT  gap) {
-        auto sdf = impl_->sdf;
+        SFEM_TRACE_SCOPE("SDFObstacle::sample_value_accumulate");
+
         return resample_gap_value_local(element_type,
                                         nelements,
                                         nnodes,
                                         elements,
                                         points,
-                                        sdf->nlocal(),
-                                        sdf->stride(),
-                                        sdf->origin(),
-                                        sdf->delta(),
-                                        sdf->data(),
+                                        impl_->n,
+                                        impl_->spline->stride->data(),
+                                        impl_->origin,
+                                        impl_->delta,
+                                        impl_->spline->origin_coefficient(),
                                         gap);
     }
 
@@ -184,7 +268,8 @@ namespace sfem {
                                   idx_t **const SFEM_RESTRICT  elements,
                                   geom_t **const SFEM_RESTRICT points,
                                   real_t *const SFEM_RESTRICT  gap) {
-        auto sdf = impl_->sdf;
+        SFEM_TRACE_SCOPE("SDFObstacle::sample_value");
+
 #ifdef SFEM_ENABLE_CUDA
         if (impl_->execution_space == EXECUTION_SPACE_DEVICE) {
             return cu_resample_gap_value(
@@ -195,11 +280,11 @@ namespace sfem {
                     elements,
                     points,
                     // SDF
-                    sdf->nlocal(),
-                    sdf->stride(),
-                    sdf->origin(),
-                    sdf->delta(),
-                    sdf->data(),
+                    impl_->n,
+                    impl_->spline->stride->data(),
+                    impl_->origin,
+                    impl_->delta,
+                    impl_->spline->origin_coefficient(),
                     // Output
                     gap);
         }
@@ -212,12 +297,60 @@ namespace sfem {
                 elements,
                 points,
                 // SDF
-                sdf->nlocal(),
-                sdf->stride(),
-                sdf->origin(),
-                sdf->delta(),
-                sdf->data(),
+                impl_->n,
+                impl_->spline->stride->data(),
+                impl_->origin,
+                impl_->delta,
+                impl_->spline->origin_coefficient(),
                 // Output
                 gap);
+    }
+
+    int SDFObstacle::sample_nodes(const ptrdiff_t                   nnodes,
+                                  const idx_t *const SFEM_RESTRICT  idx,
+                                  geom_t **const SFEM_RESTRICT      points,
+                                  const real_t *const SFEM_RESTRICT disp,
+                                  real_t *const SFEM_RESTRICT       gap,
+                                  real_t **const SFEM_RESTRICT      normals) {
+        SFEM_TRACE_SCOPE("SDFObstacle::sample_nodes");
+
+        if (impl_->execution_space == EXECUTION_SPACE_DEVICE) {
+            SFEM_ERROR("SDFObstacle::sample_nodes: nodal sampling is host only\n");
+            return SFEM_FAILURE;
+        }
+        return interpolate_displaced_gap(nnodes,
+                                         idx,
+                                         points,
+                                         disp,
+                                         impl_->n,
+                                         impl_->spline->stride->data(),
+                                         impl_->origin,
+                                         impl_->delta,
+                                         impl_->spline->origin_coefficient(),
+                                         gap,
+                                         normals);
+    }
+
+    int SDFObstacle::sample_nodes_curvature(const ptrdiff_t                   nnodes,
+                                            const idx_t *const SFEM_RESTRICT  idx,
+                                            geom_t **const SFEM_RESTRICT      points,
+                                            const real_t *const SFEM_RESTRICT disp,
+                                            real_t **const SFEM_RESTRICT      curvature) {
+        SFEM_TRACE_SCOPE("SDFObstacle::sample_nodes_curvature");
+
+        if (impl_->execution_space == EXECUTION_SPACE_DEVICE) {
+            SFEM_ERROR("SDFObstacle::sample_nodes_curvature: nodal sampling is host only\n");
+            return SFEM_FAILURE;
+        }
+        return interpolate_displaced_curvature(nnodes,
+                                               idx,
+                                               points,
+                                               disp,
+                                               impl_->n,
+                                               impl_->spline->stride->data(),
+                                               impl_->origin,
+                                               impl_->delta,
+                                               impl_->spline->origin_coefficient(),
+                                               curvature);
     }
 }  // namespace sfem
