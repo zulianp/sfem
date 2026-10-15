@@ -94,6 +94,8 @@ static SFEM_NOINLINE void apply_residual_colored(MeshData           &d,
     const size_t                  scratch_n = packed_scratch_n(p.max_actual_nodes_per_pack);
     const int                     with_rc   = !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0);
 
+    const Hex8RcConfig rc_cfg = cvfem_hex8_rc_config_for(d);
+
 #pragma omp parallel
     {
         for (int color = 0; color < c.n_colors; ++color) {
@@ -122,7 +124,7 @@ static SFEM_NOINLINE void apply_residual_colored(MeshData           &d,
                 else
                     apply_residual_packcolored_affine_range(
                             r, c.pack_order.data(), d.adj_ptr, d.det_ptr, d.nelements, d.p.data(),
-                            d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale,
+                            d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, rc_cfg,
                             d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_idx, p.ghost_ptr,
                             p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.owned_nodes_ptr,
                             rho, mu, rx, ry, rz, rc, scratch_n, with_rc);

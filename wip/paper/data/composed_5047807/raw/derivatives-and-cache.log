@@ -1,0 +1,855 @@
+Start testing: Oct 14 00:09 CEST
+----------------------------------------------------------
+49/66 Testing: cvfem_jacobian_coupled
+49/66 Test: cvfem_jacobian_coupled
+Command: "/usr/bin/bash" "/capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/sfem/spikes/cvfem/src/tests/verification/cvfem_jacobian_coupled.sh" "/capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/build/cvfem/cvfem_hex8_ns_upwind_bench"
+Directory: /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/build/cvfem
+"cvfem_jacobian_coupled" start time: Oct 14 00:09 CEST
+Output:
+----------------------------------------------------------
+threads=1 scheme=first
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-04 required 0 rel 1.252707350e-09 fields 7.122e-10 1.091e-09 1.419e-09 1.911e-09 no_qgrad 5.515e-02 no_coeff_du 7.978e-03 boundary 0 bdf 0 no_boundary 0.000e+00 no_transient 0.000e+00
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-05 required 0 rel 3.131564121e-11 fields 3.132e-11 2.228e-11 2.228e-11 3.176e-11 no_qgrad 5.515e-02 no_coeff_du 7.978e-03 boundary 0 bdf 0 no_boundary 0.000e+00 no_transient 0.000e+00
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-06 required 1 rel 3.416312799e-10 fields 3.416e-10 2.035e-10 2.385e-10 2.569e-10 no_qgrad 5.515e-02 no_coeff_du 7.978e-03 boundary 0 bdf 0 no_boundary 0.000e+00 no_transient 0.000e+00
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-07 required 1 rel 3.140416548e-09 fields 3.140e-09 1.846e-09 2.519e-09 2.805e-09 no_qgrad 5.515e-02 no_coeff_du 7.978e-03 boundary 0 bdf 0 no_boundary 0.000e+00 no_transient 0.000e+00
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=0
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-04 required 0 rel 1.242709443e-09 fields 8.028e-10 1.091e-09 1.496e-09 1.911e-09 no_qgrad 5.517e-02 no_coeff_du 7.914e-03 boundary 0 bdf 0 no_boundary 0.000e+00 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-05 required 0 rel 2.820014466e-11 fields 2.820e-11 2.467e-11 2.497e-11 3.176e-11 no_qgrad 5.517e-02 no_coeff_du 7.914e-03 boundary 0 bdf 0 no_boundary 0.000e+00 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-06 required 1 rel 3.514575642e-10 fields 3.515e-10 1.898e-10 2.132e-10 2.569e-10 no_qgrad 5.517e-02 no_coeff_du 7.914e-03 boundary 0 bdf 0 no_boundary 0.000e+00 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-07 required 1 rel 2.640380526e-09 fields 2.640e-09 2.322e-09 2.277e-09 2.805e-09 no_qgrad 5.517e-02 no_coeff_du 7.914e-03 boundary 0 bdf 0 no_boundary 0.000e+00 no_transient 0.000e+00
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=1
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-04 required 0 rel 1.450047494e-02 fields 1.450e-02 1.051e-03 1.820e-02 1.911e-09 no_qgrad 5.964e-02 no_coeff_du 1.519e-02 boundary 0 bdf 0 no_boundary 0.000e+00 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-05 required 0 rel 3.212830926e-11 fields 3.213e-11 2.506e-11 2.857e-11 3.176e-11 no_qgrad 5.964e-02 no_coeff_du 8.580e-03 boundary 0 bdf 0 no_boundary 0.000e+00 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-06 required 1 rel 4.244760862e-10 fields 4.245e-10 1.937e-10 2.827e-10 2.569e-10 no_qgrad 5.964e-02 no_coeff_du 8.580e-03 boundary 0 bdf 0 no_boundary 0.000e+00 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-07 required 1 rel 3.521372236e-09 fields 3.521e-09 2.066e-09 2.646e-09 2.805e-09 no_qgrad 5.964e-02 no_coeff_du 8.580e-03 boundary 0 bdf 0 no_boundary 0.000e+00 no_transient 0.000e+00
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=2
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-04 required 0 rel 8.854428960e-04 fields 8.854e-04 1.067e-03 9.883e-06 1.911e-09 no_qgrad 6.053e-02 no_coeff_du 8.714e-03 boundary 0 bdf 0 no_boundary 0.000e+00 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-05 required 0 rel 1.949608934e-07 fields 1.316e-08 3.303e-07 9.883e-08 3.176e-11 no_qgrad 6.053e-02 no_coeff_du 8.714e-03 boundary 0 bdf 0 no_boundary 0.000e+00 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-06 required 1 rel 1.985590053e-09 fields 3.872e-10 3.364e-09 1.050e-09 2.569e-10 no_qgrad 6.053e-02 no_coeff_du 8.714e-03 boundary 0 bdf 0 no_boundary 0.000e+00 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-07 required 1 rel 2.677519565e-09 fields 2.678e-09 2.056e-09 2.805e-09 2.805e-09 no_qgrad 6.053e-02 no_coeff_du 8.714e-03 boundary 0 bdf 0 no_boundary 0.000e+00 no_transient 0.000e+00
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=3
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-04 required 0 rel 1.790593715e-03 fields 1.791e-03 2.180e-03 6.807e-06 1.911e-09 no_qgrad 6.114e-02 no_coeff_du 8.805e-03 boundary 0 bdf 0 no_boundary 0.000e+00 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-05 required 0 rel 3.199216530e-07 fields 7.006e-08 5.519e-07 6.806e-08 3.176e-11 no_qgrad 6.114e-02 no_coeff_du 8.805e-03 boundary 0 bdf 0 no_boundary 0.000e+00 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-06 required 1 rel 3.184772995e-09 fields 7.651e-10 5.494e-09 7.971e-10 2.569e-10 no_qgrad 6.114e-02 no_coeff_du 8.805e-03 boundary 0 bdf 0 no_boundary 0.000e+00 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-07 required 1 rel 3.595117577e-09 fields 3.595e-09 2.499e-09 2.421e-09 2.805e-09 no_qgrad 6.114e-02 no_coeff_du 8.805e-03 boundary 0 bdf 0 no_boundary 0.000e+00 no_transient 0.000e+00
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=first
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-04 required 0 rel 1.252707350e-09 fields 7.122e-10 1.091e-09 1.419e-09 1.911e-09 no_qgrad 5.515e-02 no_coeff_du 7.978e-03 boundary 0 bdf 0 no_boundary 0.000e+00 no_transient 0.000e+00
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-05 required 0 rel 3.131564121e-11 fields 3.132e-11 2.228e-11 2.288e-11 3.176e-11 no_qgrad 5.515e-02 no_coeff_du 7.978e-03 boundary 0 bdf 0 no_boundary 0.000e+00 no_transient 0.000e+00
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-06 required 1 rel 3.416312799e-10 fields 3.416e-10 2.035e-10 2.385e-10 2.569e-10 no_qgrad 5.515e-02 no_coeff_du 7.978e-03 boundary 0 bdf 0 no_boundary 0.000e+00 no_transient 0.000e+00
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-07 required 1 rel 3.140416548e-09 fields 3.140e-09 1.846e-09 2.519e-09 2.805e-09 no_qgrad 5.515e-02 no_coeff_du 7.978e-03 boundary 0 bdf 0 no_boundary 0.000e+00 no_transient 0.000e+00
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=0
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-04 required 0 rel 1.242709443e-09 fields 8.028e-10 1.091e-09 1.496e-09 1.911e-09 no_qgrad 5.517e-02 no_coeff_du 7.914e-03 boundary 0 bdf 0 no_boundary 0.000e+00 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-05 required 0 rel 2.820014466e-11 fields 2.820e-11 2.467e-11 2.395e-11 3.176e-11 no_qgrad 5.517e-02 no_coeff_du 7.914e-03 boundary 0 bdf 0 no_boundary 0.000e+00 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-06 required 1 rel 3.514575642e-10 fields 3.515e-10 1.767e-10 2.372e-10 2.569e-10 no_qgrad 5.517e-02 no_coeff_du 7.914e-03 boundary 0 bdf 0 no_boundary 0.000e+00 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-07 required 1 rel 2.640380526e-09 fields 2.640e-09 2.322e-09 2.277e-09 2.805e-09 no_qgrad 5.517e-02 no_coeff_du 7.914e-03 boundary 0 bdf 0 no_boundary 0.000e+00 no_transient 0.000e+00
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=1
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-04 required 0 rel 1.450047494e-02 fields 1.450e-02 1.051e-03 1.820e-02 1.911e-09 no_qgrad 5.964e-02 no_coeff_du 1.519e-02 boundary 0 bdf 0 no_boundary 0.000e+00 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-05 required 0 rel 3.212830926e-11 fields 3.213e-11 2.506e-11 2.666e-11 3.176e-11 no_qgrad 5.964e-02 no_coeff_du 8.580e-03 boundary 0 bdf 0 no_boundary 0.000e+00 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-06 required 1 rel 4.244760862e-10 fields 4.245e-10 2.092e-10 2.827e-10 2.569e-10 no_qgrad 5.964e-02 no_coeff_du 8.580e-03 boundary 0 bdf 0 no_boundary 0.000e+00 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-07 required 1 rel 3.521372236e-09 fields 3.521e-09 2.066e-09 2.646e-09 2.805e-09 no_qgrad 5.964e-02 no_coeff_du 8.580e-03 boundary 0 bdf 0 no_boundary 0.000e+00 no_transient 0.000e+00
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=2
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-04 required 0 rel 8.854428960e-04 fields 8.854e-04 1.067e-03 9.883e-06 1.911e-09 no_qgrad 6.053e-02 no_coeff_du 8.714e-03 boundary 0 bdf 0 no_boundary 0.000e+00 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-05 required 0 rel 1.949608934e-07 fields 1.316e-08 3.303e-07 9.883e-08 3.176e-11 no_qgrad 6.053e-02 no_coeff_du 8.714e-03 boundary 0 bdf 0 no_boundary 0.000e+00 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-06 required 1 rel 1.985590053e-09 fields 3.872e-10 3.364e-09 1.050e-09 2.569e-10 no_qgrad 6.053e-02 no_coeff_du 8.714e-03 boundary 0 bdf 0 no_boundary 0.000e+00 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-07 required 1 rel 2.677519565e-09 fields 2.678e-09 2.056e-09 2.578e-09 2.805e-09 no_qgrad 6.053e-02 no_coeff_du 8.714e-03 boundary 0 bdf 0 no_boundary 0.000e+00 no_transient 0.000e+00
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=3
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-04 required 0 rel 1.790593715e-03 fields 1.791e-03 2.180e-03 6.807e-06 1.911e-09 no_qgrad 6.114e-02 no_coeff_du 8.805e-03 boundary 0 bdf 0 no_boundary 0.000e+00 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-05 required 0 rel 3.199216530e-07 fields 7.006e-08 5.519e-07 6.806e-08 3.176e-11 no_qgrad 6.114e-02 no_coeff_du 8.805e-03 boundary 0 bdf 0 no_boundary 0.000e+00 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-06 required 1 rel 3.184772995e-09 fields 7.651e-10 5.494e-09 7.971e-10 2.569e-10 no_qgrad 6.114e-02 no_coeff_du 8.805e-03 boundary 0 bdf 0 no_boundary 0.000e+00 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-07 required 1 rel 3.595117577e-09 fields 3.595e-09 2.499e-09 2.421e-09 2.805e-09 no_qgrad 6.114e-02 no_coeff_du 8.805e-03 boundary 0 bdf 0 no_boundary 0.000e+00 no_transient 0.000e+00
+verify_jac_coupled: PASSED (all four fields at both required steps)
+cvfem_jacobian_coupled: PASSED
+<end of output>
+Test time =  44.20 sec
+----------------------------------------------------------
+Test Passed.
+"cvfem_jacobian_coupled" end time: Oct 14 00:10 CEST
+"cvfem_jacobian_coupled" time elapsed: 00:00:44
+----------------------------------------------------------
+
+51/66 Testing: cvfem_jacobian_composed
+51/66 Test: cvfem_jacobian_composed
+Command: "/usr/bin/bash" "/capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/sfem/spikes/cvfem/src/tests/verification/cvfem_jacobian_composed.sh" "/capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/build/cvfem/cvfem_hex8_ns_upwind_bench"
+Directory: /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/build/cvfem
+"cvfem_jacobian_composed" start time: Oct 14 00:10 CEST
+Output:
+----------------------------------------------------------
+threads=1 scheme=first mode=boundary rc_time=0
+verify_jac_coupled_scope: boundary 1 bdf 0 dt 0 rc_inv_dt_a0 0 threads 1
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-04 required 0 rel 7.970098330e-10 fields 5.668e-10 7.859e-10 1.064e-09 1.355e-09 no_qgrad 4.343e-02 no_coeff_du 5.811e-03 boundary 1 bdf 0 no_boundary 7.192e-01 no_transient 0.000e+00
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-05 required 0 rel 2.665592142e-11 fields 2.666e-11 2.093e-11 2.605e-11 2.676e-11 no_qgrad 4.343e-02 no_coeff_du 5.811e-03 boundary 1 bdf 0 no_boundary 7.192e-01 no_transient 0.000e+00
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-06 required 1 rel 2.642532463e-10 fields 2.643e-10 1.775e-10 2.305e-10 3.497e-10 no_qgrad 4.343e-02 no_coeff_du 5.811e-03 boundary 1 bdf 0 no_boundary 7.192e-01 no_transient 0.000e+00
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-07 required 1 rel 2.861450595e-09 fields 2.861e-09 2.316e-09 1.860e-09 2.990e-09 no_qgrad 4.343e-02 no_coeff_du 5.811e-03 boundary 1 bdf 0 no_boundary 7.192e-01 no_transient 0.000e+00
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=0 mode=boundary rc_time=0
+verify_jac_coupled_scope: boundary 1 bdf 0 dt 0 rc_inv_dt_a0 0 threads 1
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-04 required 0 rel 8.093430896e-10 fields 6.512e-10 7.994e-10 1.120e-09 1.355e-09 no_qgrad 4.381e-02 no_coeff_du 5.813e-03 boundary 1 bdf 0 no_boundary 7.194e-01 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-05 required 0 rel 2.690584617e-11 fields 2.691e-11 1.798e-11 2.560e-11 2.676e-11 no_qgrad 4.381e-02 no_coeff_du 5.813e-03 boundary 1 bdf 0 no_boundary 7.194e-01 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-06 required 1 rel 3.058946250e-10 fields 3.059e-10 1.535e-10 3.097e-10 3.497e-10 no_qgrad 4.381e-02 no_coeff_du 5.813e-03 boundary 1 bdf 0 no_boundary 7.194e-01 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-07 required 1 rel 3.410132857e-09 fields 3.410e-09 1.533e-09 1.866e-09 2.990e-09 no_qgrad 4.381e-02 no_coeff_du 5.813e-03 boundary 1 bdf 0 no_boundary 7.194e-01 no_transient 0.000e+00
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=1 mode=boundary rc_time=0
+verify_jac_coupled_scope: boundary 1 bdf 0 dt 0 rc_inv_dt_a0 0 threads 1
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-04 required 0 rel 1.588489798e-02 fields 1.588e-02 1.107e-03 1.889e-02 1.355e-09 no_qgrad 4.870e-02 no_coeff_du 1.642e-02 boundary 1 bdf 0 no_boundary 8.020e-01 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-05 required 0 rel 3.122594645e-11 fields 3.123e-11 1.888e-11 2.199e-11 2.676e-11 no_qgrad 4.870e-02 no_coeff_du 6.481e-03 boundary 1 bdf 0 no_boundary 8.020e-01 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-06 required 1 rel 3.969784173e-10 fields 3.970e-10 2.281e-10 2.719e-10 3.497e-10 no_qgrad 4.870e-02 no_coeff_du 6.481e-03 boundary 1 bdf 0 no_boundary 8.020e-01 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-07 required 1 rel 2.601704240e-09 fields 2.602e-09 2.229e-09 2.429e-09 2.990e-09 no_qgrad 4.870e-02 no_coeff_du 6.481e-03 boundary 1 bdf 0 no_boundary 8.020e-01 no_transient 0.000e+00
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=2 mode=boundary rc_time=0
+verify_jac_coupled_scope: boundary 1 bdf 0 dt 0 rc_inv_dt_a0 0 threads 1
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-04 required 0 rel 9.628905183e-04 fields 9.629e-04 1.124e-03 1.026e-05 1.355e-09 no_qgrad 4.918e-02 no_coeff_du 6.550e-03 boundary 1 bdf 0 no_boundary 8.106e-01 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-05 required 0 rel 2.125678215e-07 fields 1.426e-08 3.486e-07 1.026e-07 2.676e-11 no_qgrad 4.918e-02 no_coeff_du 6.550e-03 boundary 1 bdf 0 no_boundary 8.106e-01 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-06 required 1 rel 2.169039687e-09 fields 3.570e-10 3.557e-09 1.023e-09 3.497e-10 no_qgrad 4.918e-02 no_coeff_du 6.550e-03 boundary 1 bdf 0 no_boundary 8.106e-01 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-07 required 1 rel 2.828718368e-09 fields 2.829e-09 2.185e-09 2.066e-09 2.990e-09 no_qgrad 4.918e-02 no_coeff_du 6.550e-03 boundary 1 bdf 0 no_boundary 8.106e-01 no_transient 0.000e+00
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=3 mode=boundary rc_time=0
+verify_jac_coupled_scope: boundary 1 bdf 0 dt 0 rc_inv_dt_a0 0 threads 1
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-04 required 0 rel 1.961731849e-03 fields 1.962e-03 2.301e-03 7.078e-06 1.355e-09 no_qgrad 5.005e-02 no_coeff_du 6.668e-03 boundary 1 bdf 0 no_boundary 8.252e-01 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-05 required 0 rel 3.511002660e-07 fields 7.671e-08 5.828e-07 7.078e-08 2.676e-11 no_qgrad 5.005e-02 no_coeff_du 6.668e-03 boundary 1 bdf 0 no_boundary 8.252e-01 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-06 required 1 rel 3.518066038e-09 fields 8.352e-10 5.840e-09 7.498e-10 3.497e-10 no_qgrad 5.005e-02 no_coeff_du 6.668e-03 boundary 1 bdf 0 no_boundary 8.252e-01 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-07 required 1 rel 2.720083214e-09 fields 2.720e-09 2.199e-09 1.948e-09 2.990e-09 no_qgrad 5.005e-02 no_coeff_du 6.668e-03 boundary 1 bdf 0 no_boundary 8.252e-01 no_transient 0.000e+00
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=first mode=bdf1 rc_time=0
+verify_jac_coupled_scope: boundary 0 bdf 1 dt 0.1 rc_inv_dt_a0 0 threads 1
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-04 required 0 rel 6.170372063e-10 fields 4.389e-10 5.857e-10 7.743e-10 1.355e-09 no_qgrad 3.362e-02 no_coeff_du 4.499e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.344e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-05 required 0 rel 2.227092648e-11 fields 2.227e-11 1.547e-11 1.978e-11 2.676e-11 no_qgrad 3.362e-02 no_coeff_du 4.499e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.344e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-06 required 1 rel 2.248788117e-10 fields 2.249e-10 1.330e-10 1.865e-10 3.497e-10 no_qgrad 3.362e-02 no_coeff_du 4.499e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.344e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-07 required 1 rel 2.245764873e-09 fields 2.246e-09 1.867e-09 1.442e-09 2.990e-09 no_qgrad 3.362e-02 no_coeff_du 4.499e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.344e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=0 mode=bdf1 rc_time=0
+verify_jac_coupled_scope: boundary 0 bdf 1 dt 0.1 rc_inv_dt_a0 0 threads 1
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-04 required 0 rel 6.267048754e-10 fields 5.038e-10 5.949e-10 8.221e-10 1.355e-09 no_qgrad 3.391e-02 no_coeff_du 4.500e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.344e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-05 required 0 rel 2.302184121e-11 fields 2.302e-11 1.325e-11 1.943e-11 2.676e-11 no_qgrad 3.391e-02 no_coeff_du 4.500e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.344e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-06 required 1 rel 2.745468184e-10 fields 2.745e-10 1.244e-10 1.506e-10 3.497e-10 no_qgrad 3.391e-02 no_coeff_du 4.500e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.344e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-07 required 1 rel 2.670434833e-09 fields 2.670e-09 1.276e-09 1.484e-09 2.990e-09 no_qgrad 3.391e-02 no_coeff_du 4.500e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.344e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=1 mode=bdf1 rc_time=0
+verify_jac_coupled_scope: boundary 0 bdf 1 dt 0.1 rc_inv_dt_a0 0 threads 1
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-04 required 0 rel 1.224844869e-02 fields 1.225e-02 7.847e-04 1.343e-02 1.355e-09 no_qgrad 3.755e-02 no_coeff_du 1.266e-02 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.603e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-05 required 0 rel 2.738346149e-11 fields 2.738e-11 1.421e-11 1.775e-11 2.676e-11 no_qgrad 3.755e-02 no_coeff_du 4.997e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.603e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-06 required 1 rel 3.480067846e-10 fields 3.480e-10 1.686e-10 2.140e-10 3.497e-10 no_qgrad 3.755e-02 no_coeff_du 4.997e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.603e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-07 required 1 rel 2.174876483e-09 fields 2.175e-09 1.581e-09 1.848e-09 2.990e-09 no_qgrad 3.755e-02 no_coeff_du 4.997e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.603e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=2 mode=bdf1 rc_time=0
+verify_jac_coupled_scope: boundary 0 bdf 1 dt 0.1 rc_inv_dt_a0 0 threads 1
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-04 required 0 rel 7.246676899e-04 fields 7.247e-04 7.937e-04 7.181e-06 1.355e-09 no_qgrad 3.702e-02 no_coeff_du 4.929e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.568e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-05 required 0 rel 1.599777795e-07 fields 1.074e-08 2.461e-07 7.180e-08 2.676e-11 no_qgrad 3.702e-02 no_coeff_du 4.929e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.568e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-06 required 1 rel 1.629609485e-09 fields 2.898e-10 2.507e-09 7.217e-10 3.497e-10 no_qgrad 3.702e-02 no_coeff_du 4.929e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.568e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-07 required 1 rel 2.430275976e-09 fields 2.430e-09 1.706e-09 1.361e-09 2.990e-09 no_qgrad 3.702e-02 no_coeff_du 4.929e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.568e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=3 mode=bdf1 rc_time=0
+verify_jac_coupled_scope: boundary 0 bdf 1 dt 0.1 rc_inv_dt_a0 0 threads 1
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-04 required 0 rel 1.504345248e-03 fields 1.504e-03 1.610e-03 4.983e-06 1.355e-09 no_qgrad 3.838e-02 no_coeff_du 5.113e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.664e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-05 required 0 rel 2.692388451e-07 fields 5.882e-08 4.079e-07 4.983e-08 2.676e-11 no_qgrad 3.838e-02 no_coeff_du 5.113e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.664e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-06 required 1 rel 2.691954164e-09 fields 6.156e-10 4.078e-09 5.216e-10 3.497e-10 no_qgrad 3.838e-02 no_coeff_du 5.113e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.664e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-07 required 1 rel 2.357239611e-09 fields 2.357e-09 1.706e-09 1.372e-09 2.990e-09 no_qgrad 3.838e-02 no_coeff_du 5.113e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.664e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=first mode=bdf2 rc_time=0
+verify_jac_coupled_scope: boundary 0 bdf 2 dt 0.1 rc_inv_dt_a0 0 threads 1
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-04 required 0 rel 5.544383961e-10 fields 3.944e-10 5.195e-10 6.742e-10 1.355e-09 no_qgrad 3.021e-02 no_coeff_du 4.043e-03 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.159e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-05 required 0 rel 2.138237304e-11 fields 2.138e-11 1.358e-11 1.827e-11 2.676e-11 no_qgrad 3.021e-02 no_coeff_du 4.043e-03 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.159e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-06 required 1 rel 2.155827697e-10 fields 2.156e-10 1.183e-10 1.720e-10 3.497e-10 no_qgrad 3.021e-02 no_coeff_du 4.043e-03 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.159e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-07 required 1 rel 2.102179441e-09 fields 2.102e-09 1.702e-09 1.334e-09 2.990e-09 no_qgrad 3.021e-02 no_coeff_du 4.043e-03 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.159e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=0 mode=bdf2 rc_time=0
+verify_jac_coupled_scope: boundary 0 bdf 2 dt 0.1 rc_inv_dt_a0 0 threads 1
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-04 required 0 rel 5.631828231e-10 fields 4.526e-10 5.274e-10 7.156e-10 1.355e-09 no_qgrad 3.047e-02 no_coeff_du 4.043e-03 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.160e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-05 required 0 rel 2.205697283e-11 fields 2.206e-11 1.160e-11 1.719e-11 2.676e-11 no_qgrad 3.047e-02 no_coeff_du 4.043e-03 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.160e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-06 required 1 rel 2.540498317e-10 fields 2.540e-10 1.140e-10 1.282e-10 3.497e-10 no_qgrad 3.047e-02 no_coeff_du 4.043e-03 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.160e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-07 required 1 rel 2.413165755e-09 fields 2.413e-09 1.177e-09 1.354e-09 2.990e-09 no_qgrad 3.047e-02 no_coeff_du 4.043e-03 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.160e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=1 mode=bdf2 rc_time=0
+verify_jac_coupled_scope: boundary 0 bdf 2 dt 0.1 rc_inv_dt_a0 0 threads 1
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-04 required 0 rel 1.088364275e-02 fields 1.088e-02 6.850e-04 1.153e-02 1.355e-09 no_qgrad 3.336e-02 no_coeff_du 1.125e-02 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.470e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-05 required 0 rel 2.580093947e-11 fields 2.580e-11 1.279e-11 1.644e-11 2.676e-11 no_qgrad 3.336e-02 no_coeff_du 4.440e-03 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.470e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-06 required 1 rel 3.173119735e-10 fields 3.173e-10 1.502e-10 1.943e-10 3.497e-10 no_qgrad 3.336e-02 no_coeff_du 4.440e-03 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.470e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-07 required 1 rel 2.103679677e-09 fields 2.104e-09 1.370e-09 1.672e-09 2.990e-09 no_qgrad 3.336e-02 no_coeff_du 4.440e-03 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.470e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=2 mode=bdf2 rc_time=0
+verify_jac_coupled_scope: boundary 0 bdf 2 dt 0.1 rc_inv_dt_a0 0 threads 1
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-04 required 0 rel 6.448931620e-04 fields 6.449e-04 6.920e-04 6.165e-06 1.355e-09 no_qgrad 3.294e-02 no_coeff_du 4.387e-03 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.428e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-05 required 0 rel 1.423667311e-07 fields 9.558e-09 2.146e-07 6.165e-08 2.676e-11 no_qgrad 3.294e-02 no_coeff_du 4.387e-03 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.428e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-06 required 1 rel 1.448317998e-09 fields 2.673e-10 2.183e-09 6.223e-10 3.497e-10 no_qgrad 3.294e-02 no_coeff_du 4.387e-03 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.428e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-07 required 1 rel 2.322522641e-09 fields 2.323e-09 1.539e-09 1.191e-09 2.990e-09 no_qgrad 3.294e-02 no_coeff_du 4.387e-03 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.428e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=3 mode=bdf2 rc_time=0
+verify_jac_coupled_scope: boundary 0 bdf 2 dt 0.1 rc_inv_dt_a0 0 threads 1
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-04 required 0 rel 1.333271446e-03 fields 1.333e-03 1.400e-03 4.267e-06 1.355e-09 no_qgrad 3.401e-02 no_coeff_du 4.532e-03 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.541e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-05 required 0 rel 2.386217376e-07 fields 5.213e-08 3.547e-07 4.267e-08 2.676e-11 no_qgrad 3.401e-02 no_coeff_du 4.532e-03 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.541e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-06 required 1 rel 2.388646986e-09 fields 5.463e-10 3.550e-09 4.440e-10 3.497e-10 no_qgrad 3.401e-02 no_coeff_du 4.532e-03 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.541e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-07 required 1 rel 2.254233443e-09 fields 2.254e-09 1.536e-09 1.262e-09 2.990e-09 no_qgrad 3.401e-02 no_coeff_du 4.532e-03 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.541e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=first mode=boundary-bdf1 rc_time=0
+verify_jac_coupled_scope: boundary 1 bdf 1 dt 0.1 rc_inv_dt_a0 0 threads 1
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-04 required 0 rel 6.170372063e-10 fields 4.389e-10 5.857e-10 7.743e-10 1.355e-09 no_qgrad 3.362e-02 no_coeff_du 4.499e-03 boundary 1 bdf 1 no_boundary 5.568e-01 no_transient 2.344e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-05 required 0 rel 2.227092648e-11 fields 2.227e-11 1.547e-11 1.978e-11 2.676e-11 no_qgrad 3.362e-02 no_coeff_du 4.499e-03 boundary 1 bdf 1 no_boundary 5.568e-01 no_transient 2.344e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-06 required 1 rel 2.248788117e-10 fields 2.249e-10 1.330e-10 1.865e-10 3.497e-10 no_qgrad 3.362e-02 no_coeff_du 4.499e-03 boundary 1 bdf 1 no_boundary 5.568e-01 no_transient 2.344e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-07 required 1 rel 2.245764873e-09 fields 2.246e-09 1.867e-09 1.442e-09 2.990e-09 no_qgrad 3.362e-02 no_coeff_du 4.499e-03 boundary 1 bdf 1 no_boundary 5.568e-01 no_transient 2.344e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=0 mode=boundary-bdf1 rc_time=0
+verify_jac_coupled_scope: boundary 1 bdf 1 dt 0.1 rc_inv_dt_a0 0 threads 1
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-04 required 0 rel 6.267048754e-10 fields 5.038e-10 5.949e-10 8.221e-10 1.355e-09 no_qgrad 3.391e-02 no_coeff_du 4.500e-03 boundary 1 bdf 1 no_boundary 5.569e-01 no_transient 2.344e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-05 required 0 rel 2.302184121e-11 fields 2.302e-11 1.325e-11 1.943e-11 2.676e-11 no_qgrad 3.391e-02 no_coeff_du 4.500e-03 boundary 1 bdf 1 no_boundary 5.569e-01 no_transient 2.344e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-06 required 1 rel 2.745468184e-10 fields 2.745e-10 1.244e-10 2.319e-10 3.497e-10 no_qgrad 3.391e-02 no_coeff_du 4.500e-03 boundary 1 bdf 1 no_boundary 5.569e-01 no_transient 2.344e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-07 required 1 rel 2.670434833e-09 fields 2.670e-09 1.276e-09 1.484e-09 2.990e-09 no_qgrad 3.391e-02 no_coeff_du 4.500e-03 boundary 1 bdf 1 no_boundary 5.569e-01 no_transient 2.344e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=1 mode=boundary-bdf1 rc_time=0
+verify_jac_coupled_scope: boundary 1 bdf 1 dt 0.1 rc_inv_dt_a0 0 threads 1
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-04 required 0 rel 1.224844869e-02 fields 1.225e-02 7.847e-04 1.343e-02 1.355e-09 no_qgrad 3.755e-02 no_coeff_du 1.266e-02 boundary 1 bdf 1 no_boundary 6.184e-01 no_transient 2.603e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-05 required 0 rel 2.738346149e-11 fields 2.738e-11 1.421e-11 1.775e-11 2.676e-11 no_qgrad 3.755e-02 no_coeff_du 4.997e-03 boundary 1 bdf 1 no_boundary 6.184e-01 no_transient 2.603e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-06 required 1 rel 3.480067846e-10 fields 3.480e-10 1.686e-10 2.140e-10 3.497e-10 no_qgrad 3.755e-02 no_coeff_du 4.997e-03 boundary 1 bdf 1 no_boundary 6.184e-01 no_transient 2.603e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-07 required 1 rel 2.174876483e-09 fields 2.175e-09 1.581e-09 1.848e-09 2.990e-09 no_qgrad 3.755e-02 no_coeff_du 4.997e-03 boundary 1 bdf 1 no_boundary 6.184e-01 no_transient 2.603e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=2 mode=boundary-bdf1 rc_time=0
+verify_jac_coupled_scope: boundary 1 bdf 1 dt 0.1 rc_inv_dt_a0 0 threads 1
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-04 required 0 rel 7.246676899e-04 fields 7.247e-04 7.937e-04 7.181e-06 1.355e-09 no_qgrad 3.702e-02 no_coeff_du 4.929e-03 boundary 1 bdf 1 no_boundary 6.101e-01 no_transient 2.568e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-05 required 0 rel 1.599777795e-07 fields 1.074e-08 2.461e-07 7.180e-08 2.676e-11 no_qgrad 3.702e-02 no_coeff_du 4.929e-03 boundary 1 bdf 1 no_boundary 6.101e-01 no_transient 2.568e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-06 required 1 rel 1.629609485e-09 fields 2.898e-10 2.507e-09 7.217e-10 3.497e-10 no_qgrad 3.702e-02 no_coeff_du 4.929e-03 boundary 1 bdf 1 no_boundary 6.101e-01 no_transient 2.568e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-07 required 1 rel 2.430275976e-09 fields 2.430e-09 1.706e-09 1.361e-09 2.990e-09 no_qgrad 3.702e-02 no_coeff_du 4.929e-03 boundary 1 bdf 1 no_boundary 6.101e-01 no_transient 2.568e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=3 mode=boundary-bdf1 rc_time=0
+verify_jac_coupled_scope: boundary 1 bdf 1 dt 0.1 rc_inv_dt_a0 0 threads 1
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-04 required 0 rel 1.504345248e-03 fields 1.504e-03 1.610e-03 4.983e-06 1.355e-09 no_qgrad 3.838e-02 no_coeff_du 5.113e-03 boundary 1 bdf 1 no_boundary 6.328e-01 no_transient 2.664e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-05 required 0 rel 2.692397359e-07 fields 5.882e-08 4.079e-07 4.983e-08 2.676e-11 no_qgrad 3.838e-02 no_coeff_du 5.113e-03 boundary 1 bdf 1 no_boundary 6.328e-01 no_transient 2.664e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-06 required 1 rel 2.696268328e-09 fields 6.156e-10 4.085e-09 5.216e-10 3.497e-10 no_qgrad 3.838e-02 no_coeff_du 5.113e-03 boundary 1 bdf 1 no_boundary 6.328e-01 no_transient 2.664e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-07 required 1 rel 2.357239611e-09 fields 2.357e-09 1.706e-09 1.372e-09 2.990e-09 no_qgrad 3.838e-02 no_coeff_du 5.113e-03 boundary 1 bdf 1 no_boundary 6.328e-01 no_transient 2.664e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=first mode=boundary-bdf2 rc_time=0
+verify_jac_coupled_scope: boundary 1 bdf 2 dt 0.1 rc_inv_dt_a0 0 threads 1
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-04 required 0 rel 5.544383961e-10 fields 3.944e-10 5.195e-10 6.742e-10 1.355e-09 no_qgrad 3.021e-02 no_coeff_du 4.043e-03 boundary 1 bdf 2 no_boundary 5.003e-01 no_transient 3.159e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-05 required 0 rel 2.138237304e-11 fields 2.138e-11 1.358e-11 1.827e-11 2.676e-11 no_qgrad 3.021e-02 no_coeff_du 4.043e-03 boundary 1 bdf 2 no_boundary 5.003e-01 no_transient 3.159e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-06 required 1 rel 2.155827697e-10 fields 2.156e-10 1.183e-10 1.720e-10 3.497e-10 no_qgrad 3.021e-02 no_coeff_du 4.043e-03 boundary 1 bdf 2 no_boundary 5.003e-01 no_transient 3.159e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-07 required 1 rel 2.102179441e-09 fields 2.102e-09 1.702e-09 1.334e-09 2.990e-09 no_qgrad 3.021e-02 no_coeff_du 4.043e-03 boundary 1 bdf 2 no_boundary 5.003e-01 no_transient 3.159e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=0 mode=boundary-bdf2 rc_time=0
+verify_jac_coupled_scope: boundary 1 bdf 2 dt 0.1 rc_inv_dt_a0 0 threads 1
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-04 required 0 rel 5.631828231e-10 fields 4.526e-10 5.274e-10 7.156e-10 1.355e-09 no_qgrad 3.047e-02 no_coeff_du 4.043e-03 boundary 1 bdf 2 no_boundary 5.004e-01 no_transient 3.160e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-05 required 0 rel 2.205697283e-11 fields 2.206e-11 1.160e-11 1.719e-11 2.676e-11 no_qgrad 3.047e-02 no_coeff_du 4.043e-03 boundary 1 bdf 2 no_boundary 5.004e-01 no_transient 3.160e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-06 required 1 rel 2.540498317e-10 fields 2.540e-10 1.140e-10 2.069e-10 3.497e-10 no_qgrad 3.047e-02 no_coeff_du 4.043e-03 boundary 1 bdf 2 no_boundary 5.004e-01 no_transient 3.160e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-07 required 1 rel 2.413165755e-09 fields 2.413e-09 1.177e-09 1.354e-09 2.990e-09 no_qgrad 3.047e-02 no_coeff_du 4.043e-03 boundary 1 bdf 2 no_boundary 5.004e-01 no_transient 3.160e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=1 mode=boundary-bdf2 rc_time=0
+verify_jac_coupled_scope: boundary 1 bdf 2 dt 0.1 rc_inv_dt_a0 0 threads 1
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-04 required 0 rel 1.088364275e-02 fields 1.088e-02 6.850e-04 1.153e-02 1.355e-09 no_qgrad 3.336e-02 no_coeff_du 1.125e-02 boundary 1 bdf 2 no_boundary 5.495e-01 no_transient 3.470e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-05 required 0 rel 2.580093947e-11 fields 2.580e-11 1.279e-11 1.644e-11 2.676e-11 no_qgrad 3.336e-02 no_coeff_du 4.440e-03 boundary 1 bdf 2 no_boundary 5.495e-01 no_transient 3.470e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-06 required 1 rel 3.173119735e-10 fields 3.173e-10 1.502e-10 1.943e-10 3.497e-10 no_qgrad 3.336e-02 no_coeff_du 4.440e-03 boundary 1 bdf 2 no_boundary 5.495e-01 no_transient 3.470e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-07 required 1 rel 2.103679677e-09 fields 2.104e-09 1.370e-09 1.672e-09 2.990e-09 no_qgrad 3.336e-02 no_coeff_du 4.440e-03 boundary 1 bdf 2 no_boundary 5.495e-01 no_transient 3.470e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=2 mode=boundary-bdf2 rc_time=0
+verify_jac_coupled_scope: boundary 1 bdf 2 dt 0.1 rc_inv_dt_a0 0 threads 1
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-04 required 0 rel 6.448931620e-04 fields 6.449e-04 6.920e-04 6.165e-06 1.355e-09 no_qgrad 3.294e-02 no_coeff_du 4.387e-03 boundary 1 bdf 2 no_boundary 5.429e-01 no_transient 3.428e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-05 required 0 rel 1.423667311e-07 fields 9.558e-09 2.146e-07 6.165e-08 2.676e-11 no_qgrad 3.294e-02 no_coeff_du 4.387e-03 boundary 1 bdf 2 no_boundary 5.429e-01 no_transient 3.428e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-06 required 1 rel 1.448317998e-09 fields 2.673e-10 2.183e-09 6.223e-10 3.497e-10 no_qgrad 3.294e-02 no_coeff_du 4.387e-03 boundary 1 bdf 2 no_boundary 5.429e-01 no_transient 3.428e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-07 required 1 rel 2.322522641e-09 fields 2.323e-09 1.539e-09 1.191e-09 2.990e-09 no_qgrad 3.294e-02 no_coeff_du 4.387e-03 boundary 1 bdf 2 no_boundary 5.429e-01 no_transient 3.428e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=3 mode=boundary-bdf2 rc_time=0
+verify_jac_coupled_scope: boundary 1 bdf 2 dt 0.1 rc_inv_dt_a0 0 threads 1
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-04 required 0 rel 1.333271446e-03 fields 1.333e-03 1.400e-03 4.267e-06 1.355e-09 no_qgrad 3.401e-02 no_coeff_du 4.532e-03 boundary 1 bdf 2 no_boundary 5.608e-01 no_transient 3.541e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-05 required 0 rel 2.386218887e-07 fields 5.213e-08 3.547e-07 4.267e-08 2.676e-11 no_qgrad 3.401e-02 no_coeff_du 4.532e-03 boundary 1 bdf 2 no_boundary 5.608e-01 no_transient 3.541e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-06 required 1 rel 2.388964584e-09 fields 5.463e-10 3.551e-09 4.440e-10 3.497e-10 no_qgrad 3.401e-02 no_coeff_du 4.532e-03 boundary 1 bdf 2 no_boundary 5.608e-01 no_transient 3.541e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-07 required 1 rel 2.254233443e-09 fields 2.254e-09 1.536e-09 1.262e-09 2.990e-09 no_qgrad 3.401e-02 no_coeff_du 4.532e-03 boundary 1 bdf 2 no_boundary 5.608e-01 no_transient 3.541e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=first mode=bdf1 rc_time=1
+verify_jac_coupled_scope: boundary 0 bdf 1 dt 0.1 rc_inv_dt_a0 10 threads 1
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-04 required 0 rel 2.708857367e-10 fields 2.709e-10 2.072e-10 3.370e-10 2.929e-10 no_qgrad 2.420e-02 no_coeff_du 1.391e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.446e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-05 required 0 rel 2.547331736e-11 fields 2.547e-11 1.440e-11 1.836e-11 3.298e-11 no_qgrad 2.420e-02 no_coeff_du 1.391e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.446e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-06 required 1 rel 2.674171065e-10 fields 2.674e-10 1.543e-10 1.640e-10 2.849e-10 no_qgrad 2.420e-02 no_coeff_du 1.391e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.446e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-07 required 1 rel 2.067588039e-09 fields 2.068e-09 1.397e-09 1.312e-09 2.975e-09 no_qgrad 2.420e-02 no_coeff_du 1.391e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.446e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=0 mode=bdf1 rc_time=1
+verify_jac_coupled_scope: boundary 0 bdf 1 dt 0.1 rc_inv_dt_a0 10 threads 1
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-04 required 0 rel 2.846010347e-10 fields 2.846e-10 2.127e-10 3.558e-10 2.929e-10 no_qgrad 2.442e-02 no_coeff_du 1.399e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.448e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-05 required 0 rel 2.424408800e-11 fields 2.424e-11 1.207e-11 1.511e-11 3.298e-11 no_qgrad 2.442e-02 no_coeff_du 1.399e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.448e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-06 required 1 rel 2.498839477e-10 fields 2.499e-10 1.230e-10 1.455e-10 2.849e-10 no_qgrad 2.442e-02 no_coeff_du 1.399e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.448e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-07 required 1 rel 2.601490375e-09 fields 2.601e-09 1.191e-09 1.591e-09 2.975e-09 no_qgrad 2.442e-02 no_coeff_du 1.399e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.448e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=1 mode=bdf1 rc_time=1
+verify_jac_coupled_scope: boundary 0 bdf 1 dt 0.1 rc_inv_dt_a0 10 threads 1
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-04 required 0 rel 1.285920336e-02 fields 1.286e-02 8.087e-04 1.363e-02 2.929e-10 no_qgrad 2.717e-02 no_coeff_du 1.304e-02 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.732e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-05 required 0 rel 2.265904754e-11 fields 2.266e-11 1.391e-11 1.969e-11 3.298e-11 no_qgrad 2.717e-02 no_coeff_du 1.560e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.732e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-06 required 1 rel 2.920721866e-10 fields 2.921e-10 1.260e-10 1.435e-10 2.849e-10 no_qgrad 2.717e-02 no_coeff_du 1.560e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.732e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-07 required 1 rel 2.245793492e-09 fields 2.246e-09 1.250e-09 1.504e-09 2.975e-09 no_qgrad 2.717e-02 no_coeff_du 1.560e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.732e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=2 mode=bdf1 rc_time=1
+verify_jac_coupled_scope: boundary 0 bdf 1 dt 0.1 rc_inv_dt_a0 10 threads 1
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-04 required 0 rel 7.587724046e-04 fields 7.588e-04 8.182e-04 7.290e-06 2.929e-10 no_qgrad 2.677e-02 no_coeff_du 1.537e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.693e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-05 required 0 rel 1.678620359e-07 fields 1.121e-08 2.540e-07 7.290e-08 3.298e-11 no_qgrad 2.677e-02 no_coeff_du 1.537e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.693e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-06 required 1 rel 1.687029573e-09 fields 2.999e-10 2.552e-09 7.453e-10 2.849e-10 no_qgrad 2.677e-02 no_coeff_du 1.537e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.693e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-07 required 1 rel 2.171226027e-09 fields 2.171e-09 1.302e-09 1.685e-09 2.975e-09 no_qgrad 2.677e-02 no_coeff_du 1.537e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.693e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=3 mode=bdf1 rc_time=1
+verify_jac_coupled_scope: boundary 0 bdf 1 dt 0.1 rc_inv_dt_a0 10 threads 1
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-04 required 0 rel 1.577995251e-03 fields 1.578e-03 1.661e-03 5.064e-06 2.929e-10 no_qgrad 2.781e-02 no_coeff_du 1.597e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.798e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-05 required 0 rel 2.828112207e-07 fields 6.166e-08 4.208e-07 5.063e-08 3.298e-11 no_qgrad 2.781e-02 no_coeff_du 1.597e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.798e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-06 required 1 rel 2.839601479e-09 fields 6.569e-10 4.226e-09 5.139e-10 2.849e-10 no_qgrad 2.781e-02 no_coeff_du 1.597e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.798e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-07 required 1 rel 2.195959587e-09 fields 2.196e-09 1.231e-09 1.519e-09 2.975e-09 no_qgrad 2.781e-02 no_coeff_du 1.597e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.798e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=first mode=bdf2 rc_time=1
+verify_jac_coupled_scope: boundary 0 bdf 2 dt 0.1 rc_inv_dt_a0 15 threads 1
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-04 required 0 rel 1.444280399e-10 fields 1.444e-10 9.216e-11 1.529e-10 1.879e-10 no_qgrad 1.719e-02 no_coeff_du 6.552e-04 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.353e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-05 required 0 rel 2.554110217e-11 fields 2.554e-11 1.155e-11 2.207e-11 3.655e-11 no_qgrad 1.719e-02 no_coeff_du 6.552e-04 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.353e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-06 required 1 rel 2.626580167e-10 fields 2.627e-10 9.994e-11 1.618e-10 3.103e-10 no_qgrad 1.719e-02 no_coeff_du 6.552e-04 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.353e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-07 required 1 rel 2.114581790e-09 fields 2.115e-09 1.356e-09 1.309e-09 2.884e-09 no_qgrad 1.719e-02 no_coeff_du 6.552e-04 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.353e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=0 mode=bdf2 rc_time=1
+verify_jac_coupled_scope: boundary 0 bdf 2 dt 0.1 rc_inv_dt_a0 15 threads 1
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-04 required 0 rel 1.506310886e-10 fields 1.506e-10 9.215e-11 1.603e-10 1.879e-10 no_qgrad 1.737e-02 no_coeff_du 6.576e-04 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.356e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-05 required 0 rel 2.246595291e-11 fields 2.247e-11 1.118e-11 1.501e-11 3.655e-11 no_qgrad 1.737e-02 no_coeff_du 6.576e-04 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.356e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-06 required 1 rel 2.446514549e-10 fields 2.447e-10 1.022e-10 1.240e-10 3.103e-10 no_qgrad 1.737e-02 no_coeff_du 6.576e-04 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.356e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-07 required 1 rel 2.145640783e-09 fields 2.146e-09 1.162e-09 1.135e-09 2.884e-09 no_qgrad 1.737e-02 no_coeff_du 6.576e-04 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.356e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=1 mode=bdf2 rc_time=1
+verify_jac_coupled_scope: boundary 0 bdf 2 dt 0.1 rc_inv_dt_a0 15 threads 1
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-04 required 0 rel 1.163953897e-02 fields 1.164e-02 7.139e-04 1.176e-02 1.879e-10 no_qgrad 1.915e-02 no_coeff_du 1.172e-02 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.708e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-05 required 0 rel 2.584830384e-11 fields 2.585e-11 1.293e-11 1.648e-11 3.655e-11 no_qgrad 1.915e-02 no_coeff_du 7.271e-04 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.708e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-06 required 1 rel 2.553895371e-10 fields 2.554e-10 1.287e-10 1.219e-10 3.103e-10 no_qgrad 1.915e-02 no_coeff_du 7.271e-04 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.708e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-07 required 1 rel 2.273773131e-09 fields 2.274e-09 1.294e-09 1.367e-09 2.884e-09 no_qgrad 1.915e-02 no_coeff_du 7.271e-04 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.708e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=2 mode=bdf2 rc_time=1
+verify_jac_coupled_scope: boundary 0 bdf 2 dt 0.1 rc_inv_dt_a0 15 threads 1
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-04 required 0 rel 6.869627737e-04 fields 6.870e-04 7.215e-04 6.287e-06 1.879e-10 no_qgrad 1.889e-02 no_coeff_du 7.175e-04 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.660e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-05 required 0 rel 1.521566892e-07 fields 1.014e-08 2.241e-07 6.287e-08 3.655e-11 no_qgrad 1.889e-02 no_coeff_du 7.176e-04 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.660e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-06 required 1 rel 1.532891693e-09 fields 2.679e-10 2.257e-09 6.579e-10 3.103e-10 no_qgrad 1.889e-02 no_coeff_du 7.176e-04 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.660e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-07 required 1 rel 2.258612343e-09 fields 2.259e-09 1.188e-09 1.164e-09 2.884e-09 no_qgrad 1.889e-02 no_coeff_du 7.176e-04 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.660e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=3 mode=bdf2 rc_time=1
+verify_jac_coupled_scope: boundary 0 bdf 2 dt 0.1 rc_inv_dt_a0 15 threads 1
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-04 required 0 rel 1.423420910e-03 fields 1.423e-03 1.461e-03 4.358e-06 1.879e-10 no_qgrad 1.956e-02 no_coeff_du 1.317e-03 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.789e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-05 required 0 rel 2.553073925e-07 fields 5.561e-08 3.702e-07 4.357e-08 3.655e-11 no_qgrad 1.956e-02 no_coeff_du 7.430e-04 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.789e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-06 required 1 rel 2.557095922e-09 fields 6.158e-10 3.708e-09 4.388e-10 3.103e-10 no_qgrad 1.956e-02 no_coeff_du 7.430e-04 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.789e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-07 required 1 rel 2.171494128e-09 fields 2.171e-09 1.449e-09 1.270e-09 2.884e-09 no_qgrad 1.956e-02 no_coeff_du 7.430e-04 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.789e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=first mode=boundary-bdf1 rc_time=1
+verify_jac_coupled_scope: boundary 1 bdf 1 dt 0.1 rc_inv_dt_a0 10 threads 1
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-04 required 0 rel 2.708857367e-10 fields 2.709e-10 2.072e-10 3.370e-10 2.929e-10 no_qgrad 2.420e-02 no_coeff_du 1.391e-03 boundary 1 bdf 1 no_boundary 5.811e-01 no_transient 2.446e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-05 required 0 rel 2.912898398e-11 fields 2.913e-11 1.440e-11 1.836e-11 3.298e-11 no_qgrad 2.420e-02 no_coeff_du 1.391e-03 boundary 1 bdf 1 no_boundary 5.811e-01 no_transient 2.446e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-06 required 1 rel 2.674171065e-10 fields 2.674e-10 1.543e-10 1.640e-10 2.849e-10 no_qgrad 2.420e-02 no_coeff_du 1.391e-03 boundary 1 bdf 1 no_boundary 5.811e-01 no_transient 2.446e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-07 required 1 rel 2.067588039e-09 fields 2.068e-09 1.397e-09 1.312e-09 2.975e-09 no_qgrad 2.420e-02 no_coeff_du 1.391e-03 boundary 1 bdf 1 no_boundary 5.811e-01 no_transient 2.446e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=0 mode=boundary-bdf1 rc_time=1
+verify_jac_coupled_scope: boundary 1 bdf 1 dt 0.1 rc_inv_dt_a0 10 threads 1
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-04 required 0 rel 2.846010347e-10 fields 2.846e-10 2.127e-10 3.558e-10 2.929e-10 no_qgrad 2.442e-02 no_coeff_du 1.399e-03 boundary 1 bdf 1 no_boundary 5.815e-01 no_transient 2.448e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-05 required 0 rel 2.424408800e-11 fields 2.424e-11 1.235e-11 1.511e-11 3.298e-11 no_qgrad 2.442e-02 no_coeff_du 1.399e-03 boundary 1 bdf 1 no_boundary 5.815e-01 no_transient 2.448e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-06 required 1 rel 2.498839477e-10 fields 2.499e-10 1.230e-10 1.456e-10 2.849e-10 no_qgrad 2.442e-02 no_coeff_du 1.399e-03 boundary 1 bdf 1 no_boundary 5.815e-01 no_transient 2.448e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-07 required 1 rel 2.601490375e-09 fields 2.601e-09 1.191e-09 1.591e-09 2.975e-09 no_qgrad 2.442e-02 no_coeff_du 1.399e-03 boundary 1 bdf 1 no_boundary 5.815e-01 no_transient 2.448e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=1 mode=boundary-bdf1 rc_time=1
+verify_jac_coupled_scope: boundary 1 bdf 1 dt 0.1 rc_inv_dt_a0 10 threads 1
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-04 required 0 rel 1.285920336e-02 fields 1.286e-02 8.087e-04 1.363e-02 2.929e-10 no_qgrad 2.717e-02 no_coeff_du 1.304e-02 boundary 1 bdf 1 no_boundary 6.489e-01 no_transient 2.732e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-05 required 0 rel 2.265904754e-11 fields 2.266e-11 1.391e-11 1.969e-11 3.298e-11 no_qgrad 2.717e-02 no_coeff_du 1.560e-03 boundary 1 bdf 1 no_boundary 6.489e-01 no_transient 2.732e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-06 required 1 rel 2.920721866e-10 fields 2.921e-10 1.260e-10 1.435e-10 2.849e-10 no_qgrad 2.717e-02 no_coeff_du 1.560e-03 boundary 1 bdf 1 no_boundary 6.489e-01 no_transient 2.732e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-07 required 1 rel 2.245793492e-09 fields 2.246e-09 1.250e-09 1.504e-09 2.975e-09 no_qgrad 2.717e-02 no_coeff_du 1.560e-03 boundary 1 bdf 1 no_boundary 6.489e-01 no_transient 2.732e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=2 mode=boundary-bdf1 rc_time=1
+verify_jac_coupled_scope: boundary 1 bdf 1 dt 0.1 rc_inv_dt_a0 10 threads 1
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-04 required 0 rel 7.587724046e-04 fields 7.588e-04 8.182e-04 7.290e-06 2.929e-10 no_qgrad 2.677e-02 no_coeff_du 1.537e-03 boundary 1 bdf 1 no_boundary 6.397e-01 no_transient 2.693e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-05 required 0 rel 1.678620359e-07 fields 1.121e-08 2.540e-07 7.290e-08 3.298e-11 no_qgrad 2.677e-02 no_coeff_du 1.537e-03 boundary 1 bdf 1 no_boundary 6.397e-01 no_transient 2.693e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-06 required 1 rel 1.687029573e-09 fields 2.999e-10 2.552e-09 7.453e-10 2.849e-10 no_qgrad 2.677e-02 no_coeff_du 1.537e-03 boundary 1 bdf 1 no_boundary 6.397e-01 no_transient 2.693e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-07 required 1 rel 2.171226027e-09 fields 2.171e-09 1.302e-09 1.685e-09 2.975e-09 no_qgrad 2.677e-02 no_coeff_du 1.537e-03 boundary 1 bdf 1 no_boundary 6.397e-01 no_transient 2.693e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=3 mode=boundary-bdf1 rc_time=1
+verify_jac_coupled_scope: boundary 1 bdf 1 dt 0.1 rc_inv_dt_a0 10 threads 1
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-04 required 0 rel 1.577995251e-03 fields 1.578e-03 1.661e-03 5.064e-06 2.929e-10 no_qgrad 2.781e-02 no_coeff_du 1.597e-03 boundary 1 bdf 1 no_boundary 6.647e-01 no_transient 2.798e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-05 required 0 rel 2.828121564e-07 fields 6.166e-08 4.208e-07 5.063e-08 3.298e-11 no_qgrad 2.781e-02 no_coeff_du 1.597e-03 boundary 1 bdf 1 no_boundary 6.647e-01 no_transient 2.798e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-06 required 1 rel 2.846228265e-09 fields 6.569e-10 4.235e-09 5.139e-10 2.849e-10 no_qgrad 2.781e-02 no_coeff_du 1.597e-03 boundary 1 bdf 1 no_boundary 6.647e-01 no_transient 2.798e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-07 required 1 rel 2.385323189e-09 fields 2.385e-09 1.231e-09 1.519e-09 2.975e-09 no_qgrad 2.781e-02 no_coeff_du 1.597e-03 boundary 1 bdf 1 no_boundary 6.647e-01 no_transient 2.798e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=first mode=boundary-bdf2 rc_time=1
+verify_jac_coupled_scope: boundary 1 bdf 2 dt 0.1 rc_inv_dt_a0 15 threads 1
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-04 required 0 rel 1.444280399e-10 fields 1.444e-10 9.216e-11 1.529e-10 1.879e-10 no_qgrad 1.719e-02 no_coeff_du 6.552e-04 boundary 1 bdf 2 no_boundary 5.310e-01 no_transient 3.353e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-05 required 0 rel 2.554110217e-11 fields 2.554e-11 1.155e-11 2.207e-11 3.655e-11 no_qgrad 1.719e-02 no_coeff_du 6.552e-04 boundary 1 bdf 2 no_boundary 5.310e-01 no_transient 3.353e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-06 required 1 rel 2.626580167e-10 fields 2.627e-10 9.994e-11 1.618e-10 3.103e-10 no_qgrad 1.719e-02 no_coeff_du 6.552e-04 boundary 1 bdf 2 no_boundary 5.310e-01 no_transient 3.353e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-07 required 1 rel 2.114581790e-09 fields 2.115e-09 1.356e-09 1.309e-09 2.884e-09 no_qgrad 1.719e-02 no_coeff_du 6.552e-04 boundary 1 bdf 2 no_boundary 5.310e-01 no_transient 3.353e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=0 mode=boundary-bdf2 rc_time=1
+verify_jac_coupled_scope: boundary 1 bdf 2 dt 0.1 rc_inv_dt_a0 15 threads 1
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-04 required 0 rel 1.506310886e-10 fields 1.506e-10 9.215e-11 1.603e-10 1.879e-10 no_qgrad 1.737e-02 no_coeff_du 6.576e-04 boundary 1 bdf 2 no_boundary 5.314e-01 no_transient 3.356e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-05 required 0 rel 2.246595291e-11 fields 2.247e-11 1.118e-11 1.501e-11 3.655e-11 no_qgrad 1.737e-02 no_coeff_du 6.576e-04 boundary 1 bdf 2 no_boundary 5.314e-01 no_transient 3.356e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-06 required 1 rel 2.446514549e-10 fields 2.447e-10 1.022e-10 1.394e-10 3.103e-10 no_qgrad 1.737e-02 no_coeff_du 6.576e-04 boundary 1 bdf 2 no_boundary 5.314e-01 no_transient 3.356e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-07 required 1 rel 2.145640783e-09 fields 2.146e-09 1.162e-09 1.135e-09 2.884e-09 no_qgrad 1.737e-02 no_coeff_du 6.576e-04 boundary 1 bdf 2 no_boundary 5.314e-01 no_transient 3.356e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=1 mode=boundary-bdf2 rc_time=1
+verify_jac_coupled_scope: boundary 1 bdf 2 dt 0.1 rc_inv_dt_a0 15 threads 1
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-04 required 0 rel 1.163953897e-02 fields 1.164e-02 7.139e-04 1.176e-02 1.879e-10 no_qgrad 1.915e-02 no_coeff_du 1.172e-02 boundary 1 bdf 2 no_boundary 5.872e-01 no_transient 3.708e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-05 required 0 rel 2.584830384e-11 fields 2.585e-11 1.233e-11 1.648e-11 3.655e-11 no_qgrad 1.915e-02 no_coeff_du 7.271e-04 boundary 1 bdf 2 no_boundary 5.872e-01 no_transient 3.708e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-06 required 1 rel 2.553895371e-10 fields 2.554e-10 1.287e-10 1.342e-10 3.103e-10 no_qgrad 1.915e-02 no_coeff_du 7.271e-04 boundary 1 bdf 2 no_boundary 5.872e-01 no_transient 3.708e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-07 required 1 rel 2.273773131e-09 fields 2.274e-09 1.294e-09 1.367e-09 2.884e-09 no_qgrad 1.915e-02 no_coeff_du 7.271e-04 boundary 1 bdf 2 no_boundary 5.872e-01 no_transient 3.708e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=2 mode=boundary-bdf2 rc_time=1
+verify_jac_coupled_scope: boundary 1 bdf 2 dt 0.1 rc_inv_dt_a0 15 threads 1
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-04 required 0 rel 6.869627736e-04 fields 6.870e-04 7.215e-04 6.287e-06 1.879e-10 no_qgrad 1.889e-02 no_coeff_du 7.175e-04 boundary 1 bdf 2 no_boundary 5.796e-01 no_transient 3.660e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-05 required 0 rel 1.521566892e-07 fields 1.014e-08 2.241e-07 6.287e-08 3.655e-11 no_qgrad 1.889e-02 no_coeff_du 7.176e-04 boundary 1 bdf 2 no_boundary 5.796e-01 no_transient 3.660e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-06 required 1 rel 1.532891693e-09 fields 2.679e-10 2.257e-09 6.579e-10 3.103e-10 no_qgrad 1.889e-02 no_coeff_du 7.176e-04 boundary 1 bdf 2 no_boundary 5.796e-01 no_transient 3.660e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-07 required 1 rel 2.258612343e-09 fields 2.259e-09 1.213e-09 1.287e-09 2.884e-09 no_qgrad 1.889e-02 no_coeff_du 7.176e-04 boundary 1 bdf 2 no_boundary 5.796e-01 no_transient 3.660e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=1 scheme=3 mode=boundary-bdf2 rc_time=1
+verify_jac_coupled_scope: boundary 1 bdf 2 dt 0.1 rc_inv_dt_a0 15 threads 1
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-04 required 0 rel 1.423420910e-03 fields 1.423e-03 1.461e-03 4.358e-06 1.879e-10 no_qgrad 1.956e-02 no_coeff_du 1.317e-03 boundary 1 bdf 2 no_boundary 6.001e-01 no_transient 3.789e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-05 required 0 rel 2.553075541e-07 fields 5.561e-08 3.702e-07 4.357e-08 3.655e-11 no_qgrad 1.956e-02 no_coeff_du 7.430e-04 boundary 1 bdf 2 no_boundary 6.001e-01 no_transient 3.789e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-06 required 1 rel 2.556084767e-09 fields 6.158e-10 3.706e-09 4.388e-10 3.103e-10 no_qgrad 1.956e-02 no_coeff_du 7.430e-04 boundary 1 bdf 2 no_boundary 6.001e-01 no_transient 3.789e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-07 required 1 rel 2.171494128e-09 fields 2.171e-09 1.449e-09 1.270e-09 2.884e-09 no_qgrad 1.956e-02 no_coeff_du 7.430e-04 boundary 1 bdf 2 no_boundary 6.001e-01 no_transient 3.789e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=first mode=boundary rc_time=0
+verify_jac_coupled_scope: boundary 1 bdf 0 dt 0 rc_inv_dt_a0 0 threads 72
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-04 required 0 rel 7.970098330e-10 fields 5.668e-10 7.859e-10 1.064e-09 1.355e-09 no_qgrad 4.343e-02 no_coeff_du 5.811e-03 boundary 1 bdf 0 no_boundary 7.192e-01 no_transient 0.000e+00
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-05 required 0 rel 2.665592142e-11 fields 2.666e-11 2.093e-11 2.605e-11 2.676e-11 no_qgrad 4.343e-02 no_coeff_du 5.811e-03 boundary 1 bdf 0 no_boundary 7.192e-01 no_transient 0.000e+00
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-06 required 1 rel 2.642532463e-10 fields 2.643e-10 1.775e-10 2.305e-10 3.497e-10 no_qgrad 4.343e-02 no_coeff_du 5.811e-03 boundary 1 bdf 0 no_boundary 7.192e-01 no_transient 0.000e+00
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-07 required 1 rel 2.861450595e-09 fields 2.861e-09 2.316e-09 1.860e-09 2.990e-09 no_qgrad 4.343e-02 no_coeff_du 5.811e-03 boundary 1 bdf 0 no_boundary 7.192e-01 no_transient 0.000e+00
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=0 mode=boundary rc_time=0
+verify_jac_coupled_scope: boundary 1 bdf 0 dt 0 rc_inv_dt_a0 0 threads 72
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-04 required 0 rel 8.093430896e-10 fields 6.512e-10 7.994e-10 1.120e-09 1.355e-09 no_qgrad 4.381e-02 no_coeff_du 5.813e-03 boundary 1 bdf 0 no_boundary 7.194e-01 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-05 required 0 rel 2.690584617e-11 fields 2.691e-11 1.798e-11 2.560e-11 2.676e-11 no_qgrad 4.381e-02 no_coeff_du 5.813e-03 boundary 1 bdf 0 no_boundary 7.194e-01 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-06 required 1 rel 2.783097212e-10 fields 2.783e-10 1.430e-10 3.097e-10 3.497e-10 no_qgrad 4.381e-02 no_coeff_du 5.813e-03 boundary 1 bdf 0 no_boundary 7.194e-01 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-07 required 1 rel 3.410132857e-09 fields 3.410e-09 1.533e-09 1.866e-09 2.990e-09 no_qgrad 4.381e-02 no_coeff_du 5.813e-03 boundary 1 bdf 0 no_boundary 7.194e-01 no_transient 0.000e+00
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=1 mode=boundary rc_time=0
+verify_jac_coupled_scope: boundary 1 bdf 0 dt 0 rc_inv_dt_a0 0 threads 72
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-04 required 0 rel 1.588489798e-02 fields 1.588e-02 1.107e-03 1.889e-02 1.355e-09 no_qgrad 4.870e-02 no_coeff_du 1.642e-02 boundary 1 bdf 0 no_boundary 8.020e-01 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-05 required 0 rel 3.122594645e-11 fields 3.123e-11 1.888e-11 2.199e-11 2.676e-11 no_qgrad 4.870e-02 no_coeff_du 6.481e-03 boundary 1 bdf 0 no_boundary 8.020e-01 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-06 required 1 rel 3.662231495e-10 fields 3.662e-10 2.281e-10 2.639e-10 3.497e-10 no_qgrad 4.870e-02 no_coeff_du 6.481e-03 boundary 1 bdf 0 no_boundary 8.020e-01 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-07 required 1 rel 2.601704240e-09 fields 2.602e-09 2.229e-09 2.429e-09 2.990e-09 no_qgrad 4.870e-02 no_coeff_du 6.481e-03 boundary 1 bdf 0 no_boundary 8.020e-01 no_transient 0.000e+00
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=2 mode=boundary rc_time=0
+verify_jac_coupled_scope: boundary 1 bdf 0 dt 0 rc_inv_dt_a0 0 threads 72
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-04 required 0 rel 9.628905183e-04 fields 9.629e-04 1.124e-03 1.026e-05 1.355e-09 no_qgrad 4.918e-02 no_coeff_du 6.550e-03 boundary 1 bdf 0 no_boundary 8.106e-01 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-05 required 0 rel 2.125678215e-07 fields 1.426e-08 3.486e-07 1.026e-07 2.676e-11 no_qgrad 4.918e-02 no_coeff_du 6.550e-03 boundary 1 bdf 0 no_boundary 8.106e-01 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-06 required 1 rel 2.169039687e-09 fields 3.570e-10 3.557e-09 1.023e-09 3.497e-10 no_qgrad 4.918e-02 no_coeff_du 6.550e-03 boundary 1 bdf 0 no_boundary 8.106e-01 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-07 required 1 rel 2.828718368e-09 fields 2.829e-09 2.185e-09 2.354e-09 2.990e-09 no_qgrad 4.918e-02 no_coeff_du 6.550e-03 boundary 1 bdf 0 no_boundary 8.106e-01 no_transient 0.000e+00
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=3 mode=boundary rc_time=0
+verify_jac_coupled_scope: boundary 1 bdf 0 dt 0 rc_inv_dt_a0 0 threads 72
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-04 required 0 rel 1.961731849e-03 fields 1.962e-03 2.301e-03 7.078e-06 1.355e-09 no_qgrad 5.005e-02 no_coeff_du 6.668e-03 boundary 1 bdf 0 no_boundary 8.252e-01 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-05 required 0 rel 3.511002660e-07 fields 7.671e-08 5.828e-07 7.078e-08 2.676e-11 no_qgrad 5.005e-02 no_coeff_du 6.668e-03 boundary 1 bdf 0 no_boundary 8.252e-01 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-06 required 1 rel 3.518066038e-09 fields 8.352e-10 5.840e-09 7.498e-10 3.497e-10 no_qgrad 5.005e-02 no_coeff_du 6.668e-03 boundary 1 bdf 0 no_boundary 8.252e-01 no_transient 0.000e+00
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-07 required 1 rel 2.662851448e-09 fields 2.663e-09 2.199e-09 2.046e-09 2.990e-09 no_qgrad 5.005e-02 no_coeff_du 6.668e-03 boundary 1 bdf 0 no_boundary 8.252e-01 no_transient 0.000e+00
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=first mode=bdf1 rc_time=0
+verify_jac_coupled_scope: boundary 0 bdf 1 dt 0.1 rc_inv_dt_a0 0 threads 72
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-04 required 0 rel 6.170372063e-10 fields 4.389e-10 5.857e-10 7.743e-10 1.355e-09 no_qgrad 3.362e-02 no_coeff_du 4.499e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.344e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-05 required 0 rel 2.227092648e-11 fields 2.227e-11 1.547e-11 1.978e-11 2.676e-11 no_qgrad 3.362e-02 no_coeff_du 4.499e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.344e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-06 required 1 rel 2.248788117e-10 fields 2.249e-10 1.330e-10 1.865e-10 3.497e-10 no_qgrad 3.362e-02 no_coeff_du 4.499e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.344e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-07 required 1 rel 2.245764873e-09 fields 2.246e-09 1.867e-09 1.442e-09 2.990e-09 no_qgrad 3.362e-02 no_coeff_du 4.499e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.344e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=0 mode=bdf1 rc_time=0
+verify_jac_coupled_scope: boundary 0 bdf 1 dt 0.1 rc_inv_dt_a0 0 threads 72
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-04 required 0 rel 6.267048754e-10 fields 5.038e-10 5.949e-10 8.221e-10 1.355e-09 no_qgrad 3.391e-02 no_coeff_du 4.500e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.344e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-05 required 0 rel 2.302184121e-11 fields 2.302e-11 1.325e-11 1.943e-11 2.676e-11 no_qgrad 3.391e-02 no_coeff_du 4.500e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.344e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-06 required 1 rel 2.531918202e-10 fields 2.532e-10 1.166e-10 1.506e-10 3.497e-10 no_qgrad 3.391e-02 no_coeff_du 4.500e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.344e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-07 required 1 rel 2.670434833e-09 fields 2.670e-09 1.276e-09 1.460e-09 2.990e-09 no_qgrad 3.391e-02 no_coeff_du 4.500e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.344e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=1 mode=bdf1 rc_time=0
+verify_jac_coupled_scope: boundary 0 bdf 1 dt 0.1 rc_inv_dt_a0 0 threads 72
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-04 required 0 rel 1.224844869e-02 fields 1.225e-02 7.847e-04 1.343e-02 1.355e-09 no_qgrad 3.755e-02 no_coeff_du 1.266e-02 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.603e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-05 required 0 rel 2.738346149e-11 fields 2.738e-11 1.421e-11 1.753e-11 2.676e-11 no_qgrad 3.755e-02 no_coeff_du 4.997e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.603e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-06 required 1 rel 3.242921645e-10 fields 3.243e-10 1.686e-10 1.369e-10 3.497e-10 no_qgrad 3.755e-02 no_coeff_du 4.997e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.603e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-07 required 1 rel 2.174876483e-09 fields 2.175e-09 1.581e-09 1.848e-09 2.990e-09 no_qgrad 3.755e-02 no_coeff_du 4.997e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.603e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=2 mode=bdf1 rc_time=0
+verify_jac_coupled_scope: boundary 0 bdf 1 dt 0.1 rc_inv_dt_a0 0 threads 72
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-04 required 0 rel 7.246676899e-04 fields 7.247e-04 7.937e-04 7.181e-06 1.355e-09 no_qgrad 3.702e-02 no_coeff_du 4.929e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.568e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-05 required 0 rel 1.599777795e-07 fields 1.074e-08 2.461e-07 7.180e-08 2.676e-11 no_qgrad 3.702e-02 no_coeff_du 4.929e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.568e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-06 required 1 rel 1.629609485e-09 fields 2.898e-10 2.507e-09 7.217e-10 3.497e-10 no_qgrad 3.702e-02 no_coeff_du 4.929e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.568e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-07 required 1 rel 2.430275976e-09 fields 2.430e-09 1.706e-09 1.487e-09 2.990e-09 no_qgrad 3.702e-02 no_coeff_du 4.929e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.568e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=3 mode=bdf1 rc_time=0
+verify_jac_coupled_scope: boundary 0 bdf 1 dt 0.1 rc_inv_dt_a0 0 threads 72
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-04 required 0 rel 1.504345248e-03 fields 1.504e-03 1.610e-03 4.983e-06 1.355e-09 no_qgrad 3.838e-02 no_coeff_du 5.113e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.664e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-05 required 0 rel 2.692388451e-07 fields 5.882e-08 4.079e-07 4.983e-08 2.676e-11 no_qgrad 3.838e-02 no_coeff_du 5.113e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.664e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-06 required 1 rel 2.691954164e-09 fields 6.156e-10 4.078e-09 5.216e-10 3.497e-10 no_qgrad 3.838e-02 no_coeff_du 5.113e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.664e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-07 required 1 rel 2.357239611e-09 fields 2.357e-09 1.706e-09 1.372e-09 2.990e-09 no_qgrad 3.838e-02 no_coeff_du 5.113e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.664e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=first mode=bdf2 rc_time=0
+verify_jac_coupled_scope: boundary 0 bdf 2 dt 0.1 rc_inv_dt_a0 0 threads 72
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-04 required 0 rel 5.544383961e-10 fields 3.944e-10 5.195e-10 6.742e-10 1.355e-09 no_qgrad 3.021e-02 no_coeff_du 4.043e-03 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.159e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-05 required 0 rel 2.138237304e-11 fields 2.138e-11 1.358e-11 1.827e-11 2.676e-11 no_qgrad 3.021e-02 no_coeff_du 4.043e-03 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.159e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-06 required 1 rel 2.155827697e-10 fields 2.156e-10 1.183e-10 1.720e-10 3.497e-10 no_qgrad 3.021e-02 no_coeff_du 4.043e-03 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.159e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-07 required 1 rel 2.102179441e-09 fields 2.102e-09 1.702e-09 1.334e-09 2.990e-09 no_qgrad 3.021e-02 no_coeff_du 4.043e-03 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.159e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=0 mode=bdf2 rc_time=0
+verify_jac_coupled_scope: boundary 0 bdf 2 dt 0.1 rc_inv_dt_a0 0 threads 72
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-04 required 0 rel 5.631828231e-10 fields 4.526e-10 5.274e-10 7.156e-10 1.355e-09 no_qgrad 3.047e-02 no_coeff_du 4.043e-03 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.160e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-05 required 0 rel 2.205697283e-11 fields 2.206e-11 1.160e-11 1.719e-11 2.676e-11 no_qgrad 3.047e-02 no_coeff_du 4.043e-03 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.160e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-06 required 1 rel 2.348616127e-10 fields 2.349e-10 1.070e-10 1.282e-10 3.497e-10 no_qgrad 3.047e-02 no_coeff_du 4.043e-03 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.160e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-07 required 1 rel 2.413165755e-09 fields 2.413e-09 1.177e-09 1.323e-09 2.990e-09 no_qgrad 3.047e-02 no_coeff_du 4.043e-03 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.160e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=1 mode=bdf2 rc_time=0
+verify_jac_coupled_scope: boundary 0 bdf 2 dt 0.1 rc_inv_dt_a0 0 threads 72
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-04 required 0 rel 1.088364275e-02 fields 1.088e-02 6.850e-04 1.153e-02 1.355e-09 no_qgrad 3.336e-02 no_coeff_du 1.125e-02 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.470e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-05 required 0 rel 2.580093947e-11 fields 2.580e-11 1.279e-11 1.620e-11 2.676e-11 no_qgrad 3.336e-02 no_coeff_du 4.440e-03 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.470e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-06 required 1 rel 2.962397987e-10 fields 2.962e-10 1.502e-10 1.215e-10 3.497e-10 no_qgrad 3.336e-02 no_coeff_du 4.440e-03 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.470e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-07 required 1 rel 2.103679677e-09 fields 2.104e-09 1.370e-09 1.672e-09 2.990e-09 no_qgrad 3.336e-02 no_coeff_du 4.440e-03 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.470e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=2 mode=bdf2 rc_time=0
+verify_jac_coupled_scope: boundary 0 bdf 2 dt 0.1 rc_inv_dt_a0 0 threads 72
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-04 required 0 rel 6.448931620e-04 fields 6.449e-04 6.920e-04 6.165e-06 1.355e-09 no_qgrad 3.294e-02 no_coeff_du 4.387e-03 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.428e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-05 required 0 rel 1.423667311e-07 fields 9.558e-09 2.146e-07 6.165e-08 2.676e-11 no_qgrad 3.294e-02 no_coeff_du 4.387e-03 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.428e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-06 required 1 rel 1.448317998e-09 fields 2.673e-10 2.183e-09 6.223e-10 3.497e-10 no_qgrad 3.294e-02 no_coeff_du 4.387e-03 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.428e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-07 required 1 rel 2.322522641e-09 fields 2.323e-09 1.539e-09 1.192e-09 2.990e-09 no_qgrad 3.294e-02 no_coeff_du 4.387e-03 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.428e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=3 mode=bdf2 rc_time=0
+verify_jac_coupled_scope: boundary 0 bdf 2 dt 0.1 rc_inv_dt_a0 0 threads 72
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-04 required 0 rel 1.333271446e-03 fields 1.333e-03 1.400e-03 4.267e-06 1.355e-09 no_qgrad 3.401e-02 no_coeff_du 4.532e-03 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.541e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-05 required 0 rel 2.386217376e-07 fields 5.213e-08 3.547e-07 4.267e-08 2.676e-11 no_qgrad 3.401e-02 no_coeff_du 4.532e-03 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.541e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-06 required 1 rel 2.388646986e-09 fields 5.463e-10 3.550e-09 4.440e-10 3.497e-10 no_qgrad 3.401e-02 no_coeff_du 4.532e-03 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.541e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-07 required 1 rel 2.254233443e-09 fields 2.254e-09 1.536e-09 1.262e-09 2.990e-09 no_qgrad 3.401e-02 no_coeff_du 4.532e-03 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.541e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=first mode=boundary-bdf1 rc_time=0
+verify_jac_coupled_scope: boundary 1 bdf 1 dt 0.1 rc_inv_dt_a0 0 threads 72
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-04 required 0 rel 6.170372063e-10 fields 4.389e-10 5.857e-10 7.743e-10 1.355e-09 no_qgrad 3.362e-02 no_coeff_du 4.499e-03 boundary 1 bdf 1 no_boundary 5.568e-01 no_transient 2.344e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-05 required 0 rel 2.227092648e-11 fields 2.227e-11 1.547e-11 1.978e-11 2.676e-11 no_qgrad 3.362e-02 no_coeff_du 4.499e-03 boundary 1 bdf 1 no_boundary 5.568e-01 no_transient 2.344e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-06 required 1 rel 2.248788117e-10 fields 2.249e-10 1.330e-10 1.865e-10 3.497e-10 no_qgrad 3.362e-02 no_coeff_du 4.499e-03 boundary 1 bdf 1 no_boundary 5.568e-01 no_transient 2.344e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-07 required 1 rel 2.245764873e-09 fields 2.246e-09 1.867e-09 1.442e-09 2.990e-09 no_qgrad 3.362e-02 no_coeff_du 4.499e-03 boundary 1 bdf 1 no_boundary 5.568e-01 no_transient 2.344e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=0 mode=boundary-bdf1 rc_time=0
+verify_jac_coupled_scope: boundary 1 bdf 1 dt 0.1 rc_inv_dt_a0 0 threads 72
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-04 required 0 rel 6.267048754e-10 fields 5.038e-10 5.949e-10 8.221e-10 1.355e-09 no_qgrad 3.391e-02 no_coeff_du 4.500e-03 boundary 1 bdf 1 no_boundary 5.569e-01 no_transient 2.344e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-05 required 0 rel 2.302184121e-11 fields 2.302e-11 1.325e-11 1.943e-11 2.676e-11 no_qgrad 3.391e-02 no_coeff_du 4.500e-03 boundary 1 bdf 1 no_boundary 5.569e-01 no_transient 2.344e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-06 required 1 rel 2.531918202e-10 fields 2.532e-10 1.166e-10 2.319e-10 3.497e-10 no_qgrad 3.391e-02 no_coeff_du 4.500e-03 boundary 1 bdf 1 no_boundary 5.569e-01 no_transient 2.344e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-07 required 1 rel 2.670434833e-09 fields 2.670e-09 1.276e-09 1.460e-09 2.990e-09 no_qgrad 3.391e-02 no_coeff_du 4.500e-03 boundary 1 bdf 1 no_boundary 5.569e-01 no_transient 2.344e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=1 mode=boundary-bdf1 rc_time=0
+verify_jac_coupled_scope: boundary 1 bdf 1 dt 0.1 rc_inv_dt_a0 0 threads 72
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-04 required 0 rel 1.224844869e-02 fields 1.225e-02 7.847e-04 1.343e-02 1.355e-09 no_qgrad 3.755e-02 no_coeff_du 1.266e-02 boundary 1 bdf 1 no_boundary 6.184e-01 no_transient 2.603e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-05 required 0 rel 2.738346149e-11 fields 2.738e-11 1.421e-11 1.753e-11 2.676e-11 no_qgrad 3.755e-02 no_coeff_du 4.997e-03 boundary 1 bdf 1 no_boundary 6.184e-01 no_transient 2.603e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-06 required 1 rel 3.242921645e-10 fields 3.243e-10 1.686e-10 1.946e-10 3.497e-10 no_qgrad 3.755e-02 no_coeff_du 4.997e-03 boundary 1 bdf 1 no_boundary 6.184e-01 no_transient 2.603e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-07 required 1 rel 2.174876483e-09 fields 2.175e-09 1.581e-09 1.848e-09 2.990e-09 no_qgrad 3.755e-02 no_coeff_du 4.997e-03 boundary 1 bdf 1 no_boundary 6.184e-01 no_transient 2.603e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=2 mode=boundary-bdf1 rc_time=0
+verify_jac_coupled_scope: boundary 1 bdf 1 dt 0.1 rc_inv_dt_a0 0 threads 72
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-04 required 0 rel 7.246676899e-04 fields 7.247e-04 7.937e-04 7.181e-06 1.355e-09 no_qgrad 3.702e-02 no_coeff_du 4.929e-03 boundary 1 bdf 1 no_boundary 6.101e-01 no_transient 2.568e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-05 required 0 rel 1.599777795e-07 fields 1.074e-08 2.461e-07 7.180e-08 2.676e-11 no_qgrad 3.702e-02 no_coeff_du 4.929e-03 boundary 1 bdf 1 no_boundary 6.101e-01 no_transient 2.568e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-06 required 1 rel 1.629609485e-09 fields 2.898e-10 2.507e-09 7.217e-10 3.497e-10 no_qgrad 3.702e-02 no_coeff_du 4.929e-03 boundary 1 bdf 1 no_boundary 6.101e-01 no_transient 2.568e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-07 required 1 rel 2.430275976e-09 fields 2.430e-09 1.706e-09 1.487e-09 2.990e-09 no_qgrad 3.702e-02 no_coeff_du 4.929e-03 boundary 1 bdf 1 no_boundary 6.101e-01 no_transient 2.568e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=3 mode=boundary-bdf1 rc_time=0
+verify_jac_coupled_scope: boundary 1 bdf 1 dt 0.1 rc_inv_dt_a0 0 threads 72
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-04 required 0 rel 1.504345248e-03 fields 1.504e-03 1.610e-03 4.983e-06 1.355e-09 no_qgrad 3.838e-02 no_coeff_du 5.113e-03 boundary 1 bdf 1 no_boundary 6.328e-01 no_transient 2.664e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-05 required 0 rel 2.692397359e-07 fields 5.882e-08 4.079e-07 4.983e-08 2.676e-11 no_qgrad 3.838e-02 no_coeff_du 5.113e-03 boundary 1 bdf 1 no_boundary 6.328e-01 no_transient 2.664e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-06 required 1 rel 2.696268328e-09 fields 6.156e-10 4.085e-09 5.216e-10 3.497e-10 no_qgrad 3.838e-02 no_coeff_du 5.113e-03 boundary 1 bdf 1 no_boundary 6.328e-01 no_transient 2.664e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-07 required 1 rel 2.357239611e-09 fields 2.357e-09 1.706e-09 1.429e-09 2.990e-09 no_qgrad 3.838e-02 no_coeff_du 5.113e-03 boundary 1 bdf 1 no_boundary 6.328e-01 no_transient 2.664e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=first mode=boundary-bdf2 rc_time=0
+verify_jac_coupled_scope: boundary 1 bdf 2 dt 0.1 rc_inv_dt_a0 0 threads 72
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-04 required 0 rel 5.544383961e-10 fields 3.944e-10 5.195e-10 6.742e-10 1.355e-09 no_qgrad 3.021e-02 no_coeff_du 4.043e-03 boundary 1 bdf 2 no_boundary 5.003e-01 no_transient 3.159e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-05 required 0 rel 2.138237304e-11 fields 2.138e-11 1.358e-11 1.827e-11 2.676e-11 no_qgrad 3.021e-02 no_coeff_du 4.043e-03 boundary 1 bdf 2 no_boundary 5.003e-01 no_transient 3.159e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-06 required 1 rel 2.155827697e-10 fields 2.156e-10 1.183e-10 1.720e-10 3.497e-10 no_qgrad 3.021e-02 no_coeff_du 4.043e-03 boundary 1 bdf 2 no_boundary 5.003e-01 no_transient 3.159e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-07 required 1 rel 2.102179441e-09 fields 2.102e-09 1.702e-09 1.334e-09 2.990e-09 no_qgrad 3.021e-02 no_coeff_du 4.043e-03 boundary 1 bdf 2 no_boundary 5.003e-01 no_transient 3.159e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=0 mode=boundary-bdf2 rc_time=0
+verify_jac_coupled_scope: boundary 1 bdf 2 dt 0.1 rc_inv_dt_a0 0 threads 72
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-04 required 0 rel 5.631828231e-10 fields 4.526e-10 5.274e-10 7.156e-10 1.355e-09 no_qgrad 3.047e-02 no_coeff_du 4.043e-03 boundary 1 bdf 2 no_boundary 5.004e-01 no_transient 3.160e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-05 required 0 rel 2.205697283e-11 fields 2.206e-11 1.160e-11 1.719e-11 2.676e-11 no_qgrad 3.047e-02 no_coeff_du 4.043e-03 boundary 1 bdf 2 no_boundary 5.004e-01 no_transient 3.160e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-06 required 1 rel 2.348616127e-10 fields 2.349e-10 1.070e-10 2.069e-10 3.497e-10 no_qgrad 3.047e-02 no_coeff_du 4.043e-03 boundary 1 bdf 2 no_boundary 5.004e-01 no_transient 3.160e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-07 required 1 rel 2.413165755e-09 fields 2.413e-09 1.177e-09 1.323e-09 2.990e-09 no_qgrad 3.047e-02 no_coeff_du 4.043e-03 boundary 1 bdf 2 no_boundary 5.004e-01 no_transient 3.160e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=1 mode=boundary-bdf2 rc_time=0
+verify_jac_coupled_scope: boundary 1 bdf 2 dt 0.1 rc_inv_dt_a0 0 threads 72
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-04 required 0 rel 1.088364275e-02 fields 1.088e-02 6.850e-04 1.153e-02 1.355e-09 no_qgrad 3.336e-02 no_coeff_du 1.125e-02 boundary 1 bdf 2 no_boundary 5.495e-01 no_transient 3.470e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-05 required 0 rel 2.580093947e-11 fields 2.580e-11 1.279e-11 1.620e-11 2.676e-11 no_qgrad 3.336e-02 no_coeff_du 4.440e-03 boundary 1 bdf 2 no_boundary 5.495e-01 no_transient 3.470e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-06 required 1 rel 2.962397987e-10 fields 2.962e-10 1.502e-10 1.693e-10 3.497e-10 no_qgrad 3.336e-02 no_coeff_du 4.440e-03 boundary 1 bdf 2 no_boundary 5.495e-01 no_transient 3.470e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-07 required 1 rel 2.103679677e-09 fields 2.104e-09 1.370e-09 1.672e-09 2.990e-09 no_qgrad 3.336e-02 no_coeff_du 4.440e-03 boundary 1 bdf 2 no_boundary 5.495e-01 no_transient 3.470e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=2 mode=boundary-bdf2 rc_time=0
+verify_jac_coupled_scope: boundary 1 bdf 2 dt 0.1 rc_inv_dt_a0 0 threads 72
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-04 required 0 rel 6.448931620e-04 fields 6.449e-04 6.920e-04 6.165e-06 1.355e-09 no_qgrad 3.294e-02 no_coeff_du 4.387e-03 boundary 1 bdf 2 no_boundary 5.429e-01 no_transient 3.428e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-05 required 0 rel 1.423667311e-07 fields 9.558e-09 2.146e-07 6.165e-08 2.676e-11 no_qgrad 3.294e-02 no_coeff_du 4.387e-03 boundary 1 bdf 2 no_boundary 5.429e-01 no_transient 3.428e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-06 required 1 rel 1.448317998e-09 fields 2.673e-10 2.183e-09 6.223e-10 3.497e-10 no_qgrad 3.294e-02 no_coeff_du 4.387e-03 boundary 1 bdf 2 no_boundary 5.429e-01 no_transient 3.428e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-07 required 1 rel 2.322522641e-09 fields 2.323e-09 1.539e-09 1.192e-09 2.990e-09 no_qgrad 3.294e-02 no_coeff_du 4.387e-03 boundary 1 bdf 2 no_boundary 5.429e-01 no_transient 3.428e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=3 mode=boundary-bdf2 rc_time=0
+verify_jac_coupled_scope: boundary 1 bdf 2 dt 0.1 rc_inv_dt_a0 0 threads 72
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-04 required 0 rel 1.333271446e-03 fields 1.333e-03 1.400e-03 4.267e-06 1.355e-09 no_qgrad 3.401e-02 no_coeff_du 4.532e-03 boundary 1 bdf 2 no_boundary 5.608e-01 no_transient 3.541e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-05 required 0 rel 2.386218887e-07 fields 5.213e-08 3.547e-07 4.267e-08 2.676e-11 no_qgrad 3.401e-02 no_coeff_du 4.532e-03 boundary 1 bdf 2 no_boundary 5.608e-01 no_transient 3.541e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-06 required 1 rel 2.388964584e-09 fields 5.463e-10 3.551e-09 4.440e-10 3.497e-10 no_qgrad 3.401e-02 no_coeff_du 4.532e-03 boundary 1 bdf 2 no_boundary 5.608e-01 no_transient 3.541e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-07 required 1 rel 2.254233443e-09 fields 2.254e-09 1.536e-09 1.262e-09 2.990e-09 no_qgrad 3.401e-02 no_coeff_du 4.532e-03 boundary 1 bdf 2 no_boundary 5.608e-01 no_transient 3.541e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=first mode=bdf1 rc_time=1
+verify_jac_coupled_scope: boundary 0 bdf 1 dt 0.1 rc_inv_dt_a0 10 threads 72
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-04 required 0 rel 2.708857367e-10 fields 2.709e-10 2.072e-10 3.370e-10 2.929e-10 no_qgrad 2.420e-02 no_coeff_du 1.391e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.446e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-05 required 0 rel 2.547331736e-11 fields 2.547e-11 1.440e-11 1.752e-11 3.298e-11 no_qgrad 2.420e-02 no_coeff_du 1.391e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.446e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-06 required 1 rel 2.674171065e-10 fields 2.674e-10 1.543e-10 1.640e-10 2.849e-10 no_qgrad 2.420e-02 no_coeff_du 1.391e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.446e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-07 required 1 rel 2.067588039e-09 fields 2.068e-09 1.397e-09 1.312e-09 2.975e-09 no_qgrad 2.420e-02 no_coeff_du 1.391e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.446e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=0 mode=bdf1 rc_time=1
+verify_jac_coupled_scope: boundary 0 bdf 1 dt 0.1 rc_inv_dt_a0 10 threads 72
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-04 required 0 rel 2.846010347e-10 fields 2.846e-10 2.127e-10 3.558e-10 2.929e-10 no_qgrad 2.442e-02 no_coeff_du 1.399e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.448e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-05 required 0 rel 2.424408800e-11 fields 2.424e-11 1.207e-11 1.462e-11 3.298e-11 no_qgrad 2.442e-02 no_coeff_du 1.399e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.448e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-06 required 1 rel 2.498839477e-10 fields 2.499e-10 1.208e-10 1.505e-10 2.849e-10 no_qgrad 2.442e-02 no_coeff_du 1.399e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.448e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-07 required 1 rel 2.601490375e-09 fields 2.601e-09 1.191e-09 1.254e-09 2.975e-09 no_qgrad 2.442e-02 no_coeff_du 1.399e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.448e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=1 mode=bdf1 rc_time=1
+verify_jac_coupled_scope: boundary 0 bdf 1 dt 0.1 rc_inv_dt_a0 10 threads 72
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-04 required 0 rel 1.285920336e-02 fields 1.286e-02 8.087e-04 1.363e-02 2.929e-10 no_qgrad 2.717e-02 no_coeff_du 1.304e-02 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.732e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-05 required 0 rel 2.265904754e-11 fields 2.266e-11 1.391e-11 1.691e-11 3.298e-11 no_qgrad 2.717e-02 no_coeff_du 1.560e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.732e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-06 required 1 rel 2.920721866e-10 fields 2.921e-10 1.206e-10 1.435e-10 2.849e-10 no_qgrad 2.717e-02 no_coeff_du 1.560e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.732e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-07 required 1 rel 2.245793492e-09 fields 2.246e-09 1.250e-09 1.504e-09 2.975e-09 no_qgrad 2.717e-02 no_coeff_du 1.560e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.732e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=2 mode=bdf1 rc_time=1
+verify_jac_coupled_scope: boundary 0 bdf 1 dt 0.1 rc_inv_dt_a0 10 threads 72
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-04 required 0 rel 7.587724046e-04 fields 7.588e-04 8.182e-04 7.290e-06 2.929e-10 no_qgrad 2.677e-02 no_coeff_du 1.537e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.693e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-05 required 0 rel 1.678620359e-07 fields 1.121e-08 2.540e-07 7.290e-08 3.298e-11 no_qgrad 2.677e-02 no_coeff_du 1.537e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.693e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-06 required 1 rel 1.687029573e-09 fields 2.999e-10 2.552e-09 7.453e-10 2.849e-10 no_qgrad 2.677e-02 no_coeff_du 1.537e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.693e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-07 required 1 rel 2.171226027e-09 fields 2.171e-09 1.302e-09 1.826e-09 2.975e-09 no_qgrad 2.677e-02 no_coeff_du 1.537e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.693e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=3 mode=bdf1 rc_time=1
+verify_jac_coupled_scope: boundary 0 bdf 1 dt 0.1 rc_inv_dt_a0 10 threads 72
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-04 required 0 rel 1.577995251e-03 fields 1.578e-03 1.661e-03 5.064e-06 2.929e-10 no_qgrad 2.781e-02 no_coeff_du 1.597e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.798e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-05 required 0 rel 2.828112207e-07 fields 6.166e-08 4.208e-07 5.063e-08 3.298e-11 no_qgrad 2.781e-02 no_coeff_du 1.597e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.798e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-06 required 1 rel 2.839601479e-09 fields 6.569e-10 4.226e-09 5.139e-10 2.849e-10 no_qgrad 2.781e-02 no_coeff_du 1.597e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.798e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-07 required 1 rel 2.195959587e-09 fields 2.196e-09 1.231e-09 1.546e-09 2.975e-09 no_qgrad 2.781e-02 no_coeff_du 1.597e-03 boundary 0 bdf 1 no_boundary 0.000e+00 no_transient 2.798e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=first mode=bdf2 rc_time=1
+verify_jac_coupled_scope: boundary 0 bdf 2 dt 0.1 rc_inv_dt_a0 15 threads 72
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-04 required 0 rel 1.444280399e-10 fields 1.444e-10 9.216e-11 1.529e-10 1.879e-10 no_qgrad 1.719e-02 no_coeff_du 6.552e-04 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.353e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-05 required 0 rel 2.554110217e-11 fields 2.554e-11 1.155e-11 2.207e-11 3.655e-11 no_qgrad 1.719e-02 no_coeff_du 6.552e-04 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.353e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-06 required 1 rel 2.626580167e-10 fields 2.627e-10 9.994e-11 1.618e-10 3.103e-10 no_qgrad 1.719e-02 no_coeff_du 6.552e-04 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.353e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-07 required 1 rel 2.114581790e-09 fields 2.115e-09 1.356e-09 1.309e-09 3.009e-09 no_qgrad 1.719e-02 no_coeff_du 6.552e-04 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.353e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=0 mode=bdf2 rc_time=1
+verify_jac_coupled_scope: boundary 0 bdf 2 dt 0.1 rc_inv_dt_a0 15 threads 72
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-04 required 0 rel 1.506310886e-10 fields 1.506e-10 9.215e-11 1.603e-10 1.879e-10 no_qgrad 1.737e-02 no_coeff_du 6.576e-04 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.356e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-05 required 0 rel 2.405005247e-11 fields 2.405e-11 1.118e-11 1.415e-11 3.655e-11 no_qgrad 1.737e-02 no_coeff_du 6.576e-04 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.356e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-06 required 1 rel 2.446514549e-10 fields 2.447e-10 1.022e-10 1.178e-10 3.103e-10 no_qgrad 1.737e-02 no_coeff_du 6.576e-04 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.356e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-07 required 1 rel 2.145640783e-09 fields 2.146e-09 1.162e-09 1.045e-09 3.009e-09 no_qgrad 1.737e-02 no_coeff_du 6.576e-04 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.356e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=1 mode=bdf2 rc_time=1
+verify_jac_coupled_scope: boundary 0 bdf 2 dt 0.1 rc_inv_dt_a0 15 threads 72
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-04 required 0 rel 1.163953897e-02 fields 1.164e-02 7.139e-04 1.176e-02 1.879e-10 no_qgrad 1.915e-02 no_coeff_du 1.172e-02 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.708e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-05 required 0 rel 2.584830384e-11 fields 2.585e-11 1.293e-11 1.648e-11 3.655e-11 no_qgrad 1.915e-02 no_coeff_du 7.271e-04 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.708e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-06 required 1 rel 2.553895371e-10 fields 2.554e-10 1.287e-10 1.269e-10 3.103e-10 no_qgrad 1.915e-02 no_coeff_du 7.271e-04 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.708e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-07 required 1 rel 2.273773131e-09 fields 2.274e-09 1.294e-09 1.148e-09 3.009e-09 no_qgrad 1.915e-02 no_coeff_du 7.271e-04 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.708e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=2 mode=bdf2 rc_time=1
+verify_jac_coupled_scope: boundary 0 bdf 2 dt 0.1 rc_inv_dt_a0 15 threads 72
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-04 required 0 rel 6.869627737e-04 fields 6.870e-04 7.215e-04 6.287e-06 1.879e-10 no_qgrad 1.889e-02 no_coeff_du 7.175e-04 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.660e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-05 required 0 rel 1.521566892e-07 fields 1.014e-08 2.241e-07 6.287e-08 3.655e-11 no_qgrad 1.889e-02 no_coeff_du 7.176e-04 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.660e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-06 required 1 rel 1.532891693e-09 fields 2.679e-10 2.257e-09 6.579e-10 3.103e-10 no_qgrad 1.889e-02 no_coeff_du 7.176e-04 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.660e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-07 required 1 rel 2.258612343e-09 fields 2.259e-09 1.188e-09 1.200e-09 3.009e-09 no_qgrad 1.889e-02 no_coeff_du 7.176e-04 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.660e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=3 mode=bdf2 rc_time=1
+verify_jac_coupled_scope: boundary 0 bdf 2 dt 0.1 rc_inv_dt_a0 15 threads 72
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-04 required 0 rel 1.423420910e-03 fields 1.423e-03 1.461e-03 4.358e-06 1.879e-10 no_qgrad 1.956e-02 no_coeff_du 1.317e-03 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.789e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-05 required 0 rel 2.553073925e-07 fields 5.561e-08 3.702e-07 4.357e-08 3.655e-11 no_qgrad 1.956e-02 no_coeff_du 7.430e-04 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.789e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-06 required 1 rel 2.557095922e-09 fields 6.158e-10 3.708e-09 4.388e-10 3.103e-10 no_qgrad 1.956e-02 no_coeff_du 7.430e-04 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.789e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-07 required 1 rel 2.171494128e-09 fields 2.171e-09 1.449e-09 1.132e-09 3.009e-09 no_qgrad 1.956e-02 no_coeff_du 7.430e-04 boundary 0 bdf 2 no_boundary 0.000e+00 no_transient 3.789e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=first mode=boundary-bdf1 rc_time=1
+verify_jac_coupled_scope: boundary 1 bdf 1 dt 0.1 rc_inv_dt_a0 10 threads 72
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-04 required 0 rel 2.708857367e-10 fields 2.709e-10 2.072e-10 3.370e-10 2.929e-10 no_qgrad 2.420e-02 no_coeff_du 1.391e-03 boundary 1 bdf 1 no_boundary 5.811e-01 no_transient 2.446e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-05 required 0 rel 2.912898398e-11 fields 2.913e-11 1.440e-11 1.752e-11 3.298e-11 no_qgrad 2.420e-02 no_coeff_du 1.391e-03 boundary 1 bdf 1 no_boundary 5.811e-01 no_transient 2.446e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-06 required 1 rel 2.674171065e-10 fields 2.674e-10 1.543e-10 1.640e-10 2.849e-10 no_qgrad 2.420e-02 no_coeff_du 1.391e-03 boundary 1 bdf 1 no_boundary 5.811e-01 no_transient 2.446e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-07 required 1 rel 2.067588039e-09 fields 2.068e-09 1.397e-09 1.312e-09 2.975e-09 no_qgrad 2.420e-02 no_coeff_du 1.391e-03 boundary 1 bdf 1 no_boundary 5.811e-01 no_transient 2.446e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=0 mode=boundary-bdf1 rc_time=1
+verify_jac_coupled_scope: boundary 1 bdf 1 dt 0.1 rc_inv_dt_a0 10 threads 72
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-04 required 0 rel 2.846010347e-10 fields 2.846e-10 2.127e-10 3.558e-10 2.929e-10 no_qgrad 2.442e-02 no_coeff_du 1.399e-03 boundary 1 bdf 1 no_boundary 5.815e-01 no_transient 2.448e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-05 required 0 rel 2.424408800e-11 fields 2.424e-11 1.235e-11 1.462e-11 3.298e-11 no_qgrad 2.442e-02 no_coeff_du 1.399e-03 boundary 1 bdf 1 no_boundary 5.815e-01 no_transient 2.448e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-06 required 1 rel 2.498839477e-10 fields 2.499e-10 1.150e-10 1.505e-10 2.849e-10 no_qgrad 2.442e-02 no_coeff_du 1.399e-03 boundary 1 bdf 1 no_boundary 5.815e-01 no_transient 2.448e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-07 required 1 rel 2.601490375e-09 fields 2.601e-09 1.191e-09 1.254e-09 2.975e-09 no_qgrad 2.442e-02 no_coeff_du 1.399e-03 boundary 1 bdf 1 no_boundary 5.815e-01 no_transient 2.448e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=1 mode=boundary-bdf1 rc_time=1
+verify_jac_coupled_scope: boundary 1 bdf 1 dt 0.1 rc_inv_dt_a0 10 threads 72
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-04 required 0 rel 1.285920336e-02 fields 1.286e-02 8.087e-04 1.363e-02 2.929e-10 no_qgrad 2.717e-02 no_coeff_du 1.304e-02 boundary 1 bdf 1 no_boundary 6.489e-01 no_transient 2.732e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-05 required 0 rel 2.265904754e-11 fields 2.266e-11 1.391e-11 1.691e-11 3.298e-11 no_qgrad 2.717e-02 no_coeff_du 1.560e-03 boundary 1 bdf 1 no_boundary 6.489e-01 no_transient 2.732e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-06 required 1 rel 2.920721866e-10 fields 2.921e-10 1.168e-10 1.435e-10 2.849e-10 no_qgrad 2.717e-02 no_coeff_du 1.560e-03 boundary 1 bdf 1 no_boundary 6.489e-01 no_transient 2.732e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-07 required 1 rel 2.245793492e-09 fields 2.246e-09 1.250e-09 1.504e-09 2.975e-09 no_qgrad 2.717e-02 no_coeff_du 1.560e-03 boundary 1 bdf 1 no_boundary 6.489e-01 no_transient 2.732e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=2 mode=boundary-bdf1 rc_time=1
+verify_jac_coupled_scope: boundary 1 bdf 1 dt 0.1 rc_inv_dt_a0 10 threads 72
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-04 required 0 rel 7.587724046e-04 fields 7.588e-04 8.182e-04 7.290e-06 2.929e-10 no_qgrad 2.677e-02 no_coeff_du 1.537e-03 boundary 1 bdf 1 no_boundary 6.397e-01 no_transient 2.693e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-05 required 0 rel 1.678620359e-07 fields 1.121e-08 2.540e-07 7.290e-08 3.298e-11 no_qgrad 2.677e-02 no_coeff_du 1.537e-03 boundary 1 bdf 1 no_boundary 6.397e-01 no_transient 2.693e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-06 required 1 rel 1.687029573e-09 fields 2.999e-10 2.552e-09 7.453e-10 2.849e-10 no_qgrad 2.677e-02 no_coeff_du 1.537e-03 boundary 1 bdf 1 no_boundary 6.397e-01 no_transient 2.693e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-07 required 1 rel 2.171226027e-09 fields 2.171e-09 1.302e-09 1.826e-09 2.975e-09 no_qgrad 2.677e-02 no_coeff_du 1.537e-03 boundary 1 bdf 1 no_boundary 6.397e-01 no_transient 2.693e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=3 mode=boundary-bdf1 rc_time=1
+verify_jac_coupled_scope: boundary 1 bdf 1 dt 0.1 rc_inv_dt_a0 10 threads 72
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-04 required 0 rel 1.577995251e-03 fields 1.578e-03 1.661e-03 5.064e-06 2.929e-10 no_qgrad 2.781e-02 no_coeff_du 1.597e-03 boundary 1 bdf 1 no_boundary 6.647e-01 no_transient 2.798e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-05 required 0 rel 2.828121564e-07 fields 6.166e-08 4.208e-07 5.063e-08 3.298e-11 no_qgrad 2.781e-02 no_coeff_du 1.597e-03 boundary 1 bdf 1 no_boundary 6.647e-01 no_transient 2.798e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-06 required 1 rel 2.846228265e-09 fields 6.569e-10 4.235e-09 5.139e-10 2.849e-10 no_qgrad 2.781e-02 no_coeff_du 1.597e-03 boundary 1 bdf 1 no_boundary 6.647e-01 no_transient 2.798e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-07 required 1 rel 2.385323189e-09 fields 2.385e-09 1.231e-09 1.546e-09 2.975e-09 no_qgrad 2.781e-02 no_coeff_du 1.597e-03 boundary 1 bdf 1 no_boundary 6.647e-01 no_transient 2.798e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=first mode=boundary-bdf2 rc_time=1
+verify_jac_coupled_scope: boundary 1 bdf 2 dt 0.1 rc_inv_dt_a0 15 threads 72
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-04 required 0 rel 1.444280399e-10 fields 1.444e-10 9.216e-11 1.529e-10 1.879e-10 no_qgrad 1.719e-02 no_coeff_du 6.552e-04 boundary 1 bdf 2 no_boundary 5.310e-01 no_transient 3.353e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-05 required 0 rel 2.554110217e-11 fields 2.554e-11 1.155e-11 2.207e-11 3.655e-11 no_qgrad 1.719e-02 no_coeff_du 6.552e-04 boundary 1 bdf 2 no_boundary 5.310e-01 no_transient 3.353e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-06 required 1 rel 2.626580167e-10 fields 2.627e-10 9.994e-11 1.618e-10 3.103e-10 no_qgrad 1.719e-02 no_coeff_du 6.552e-04 boundary 1 bdf 2 no_boundary 5.310e-01 no_transient 3.353e-01
+verify_jac_coupled: ho 0 limiter 0 eps 1.0e-07 required 1 rel 2.114581790e-09 fields 2.115e-09 1.356e-09 1.309e-09 3.009e-09 no_qgrad 1.719e-02 no_coeff_du 6.552e-04 boundary 1 bdf 2 no_boundary 5.310e-01 no_transient 3.353e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=0 mode=boundary-bdf2 rc_time=1
+verify_jac_coupled_scope: boundary 1 bdf 2 dt 0.1 rc_inv_dt_a0 15 threads 72
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-04 required 0 rel 1.506310886e-10 fields 1.506e-10 9.215e-11 1.603e-10 1.879e-10 no_qgrad 1.737e-02 no_coeff_du 6.576e-04 boundary 1 bdf 2 no_boundary 5.314e-01 no_transient 3.356e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-05 required 0 rel 2.405005247e-11 fields 2.405e-11 1.118e-11 1.415e-11 3.655e-11 no_qgrad 1.737e-02 no_coeff_du 6.576e-04 boundary 1 bdf 2 no_boundary 5.314e-01 no_transient 3.356e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-06 required 1 rel 2.446514549e-10 fields 2.447e-10 1.022e-10 1.394e-10 3.103e-10 no_qgrad 1.737e-02 no_coeff_du 6.576e-04 boundary 1 bdf 2 no_boundary 5.314e-01 no_transient 3.356e-01
+verify_jac_coupled: ho 1 limiter 0 eps 1.0e-07 required 1 rel 2.145640783e-09 fields 2.146e-09 1.162e-09 1.045e-09 3.009e-09 no_qgrad 1.737e-02 no_coeff_du 6.576e-04 boundary 1 bdf 2 no_boundary 5.314e-01 no_transient 3.356e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=1 mode=boundary-bdf2 rc_time=1
+verify_jac_coupled_scope: boundary 1 bdf 2 dt 0.1 rc_inv_dt_a0 15 threads 72
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-04 required 0 rel 1.163953897e-02 fields 1.164e-02 7.139e-04 1.176e-02 1.879e-10 no_qgrad 1.915e-02 no_coeff_du 1.172e-02 boundary 1 bdf 2 no_boundary 5.872e-01 no_transient 3.708e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-05 required 0 rel 2.584830384e-11 fields 2.585e-11 1.233e-11 1.648e-11 3.655e-11 no_qgrad 1.915e-02 no_coeff_du 7.271e-04 boundary 1 bdf 2 no_boundary 5.872e-01 no_transient 3.708e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-06 required 1 rel 2.553895371e-10 fields 2.554e-10 1.287e-10 1.342e-10 3.103e-10 no_qgrad 1.915e-02 no_coeff_du 7.271e-04 boundary 1 bdf 2 no_boundary 5.872e-01 no_transient 3.708e-01
+verify_jac_coupled: ho 1 limiter 1 eps 1.0e-07 required 1 rel 2.273773131e-09 fields 2.274e-09 1.294e-09 1.148e-09 3.009e-09 no_qgrad 1.915e-02 no_coeff_du 7.271e-04 boundary 1 bdf 2 no_boundary 5.872e-01 no_transient 3.708e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=2 mode=boundary-bdf2 rc_time=1
+verify_jac_coupled_scope: boundary 1 bdf 2 dt 0.1 rc_inv_dt_a0 15 threads 72
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-04 required 0 rel 6.869627736e-04 fields 6.870e-04 7.215e-04 6.287e-06 1.879e-10 no_qgrad 1.889e-02 no_coeff_du 7.175e-04 boundary 1 bdf 2 no_boundary 5.796e-01 no_transient 3.660e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-05 required 0 rel 1.521566892e-07 fields 1.014e-08 2.241e-07 6.287e-08 3.655e-11 no_qgrad 1.889e-02 no_coeff_du 7.176e-04 boundary 1 bdf 2 no_boundary 5.796e-01 no_transient 3.660e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-06 required 1 rel 1.532891693e-09 fields 2.679e-10 2.257e-09 6.579e-10 3.103e-10 no_qgrad 1.889e-02 no_coeff_du 7.176e-04 boundary 1 bdf 2 no_boundary 5.796e-01 no_transient 3.660e-01
+verify_jac_coupled: ho 1 limiter 2 eps 1.0e-07 required 1 rel 2.258612343e-09 fields 2.259e-09 1.213e-09 1.200e-09 3.009e-09 no_qgrad 1.889e-02 no_coeff_du 7.176e-04 boundary 1 bdf 2 no_boundary 5.796e-01 no_transient 3.660e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+threads=72 scheme=3 mode=boundary-bdf2 rc_time=1
+verify_jac_coupled_scope: boundary 1 bdf 2 dt 0.1 rc_inv_dt_a0 15 threads 72
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-04 required 0 rel 1.423420910e-03 fields 1.423e-03 1.461e-03 4.358e-06 1.879e-10 no_qgrad 1.956e-02 no_coeff_du 1.317e-03 boundary 1 bdf 2 no_boundary 6.001e-01 no_transient 3.789e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-05 required 0 rel 2.553075541e-07 fields 5.561e-08 3.702e-07 4.357e-08 3.655e-11 no_qgrad 1.956e-02 no_coeff_du 7.430e-04 boundary 1 bdf 2 no_boundary 6.001e-01 no_transient 3.789e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-06 required 1 rel 2.556084767e-09 fields 6.158e-10 3.706e-09 4.388e-10 3.103e-10 no_qgrad 1.956e-02 no_coeff_du 7.430e-04 boundary 1 bdf 2 no_boundary 6.001e-01 no_transient 3.789e-01
+verify_jac_coupled: ho 1 limiter 3 eps 1.0e-07 required 1 rel 2.171494128e-09 fields 2.171e-09 1.449e-09 1.132e-09 3.009e-09 no_qgrad 1.956e-02 no_coeff_du 7.430e-04 boundary 1 bdf 2 no_boundary 6.001e-01 no_transient 3.789e-01
+verify_jac_coupled: PASSED (all four fields at both required steps)
+cvfem_jacobian_composed: PASSED
+<end of output>
+Test time = 199.60 sec
+----------------------------------------------------------
+Test Passed.
+"cvfem_jacobian_composed" end time: Oct 14 00:13 CEST
+"cvfem_jacobian_composed" time elapsed: 00:03:19
+----------------------------------------------------------
+
+52/66 Testing: cvfem_jacobian_fd
+52/66 Test: cvfem_jacobian_fd
+Command: "/usr/bin/bash" "/capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/sfem/spikes/cvfem/src/tests/verification/cvfem_jacobian_fd.sh" "/capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/build/cvfem/cvfem_hex8_ns_upwind_bench"
+Directory: /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/build/cvfem
+"cvfem_jacobian_fd" start time: Oct 14 00:13 CEST
+Output:
+----------------------------------------------------------
+verify_jac_ho: limiter 0  exact_rel 2.101e-09 (0.0000% of dofs disagree)  lagged_rel 5.436e-02 (75.0000%)
+verify_jac_ho: limiter 1  exact_rel 1.880e-09 (0.0000% of dofs disagree)  lagged_rel 2.425e-01 (75.0000%)
+verify_jac_ho: limiter 2  exact_rel 1.473e-09 (0.0000% of dofs disagree)  lagged_rel 1.868e-01 (75.0000%)
+verify_jac_ho: limiter 3  exact_rel 1.521e-09 (0.0000% of dofs disagree)  lagged_rel 1.848e-01 (75.0000%)
+verify_jac_ho: limiter 0  exact_rel 1.924e-08 (0.0000% of dofs disagree)  lagged_rel 5.436e-02 (75.0000%)
+verify_jac_ho: limiter 1  exact_rel 1.632e-08 (0.0000% of dofs disagree)  lagged_rel 2.425e-01 (75.0000%)
+verify_jac_ho: limiter 2  exact_rel 1.493e-08 (0.0000% of dofs disagree)  lagged_rel 1.868e-01 (75.0000%)
+verify_jac_ho: limiter 3  exact_rel 1.555e-08 (0.0000% of dofs disagree)  lagged_rel 1.848e-01 (75.0000%)
+verify_jac_ho: limiter 0  exact_rel 2.101e-09 (0.0000% of dofs disagree)  lagged_rel 5.436e-02 (75.0000%)
+verify_jac_ho: limiter 1  exact_rel 1.880e-09 (0.0000% of dofs disagree)  lagged_rel 2.425e-01 (75.0000%)
+verify_jac_ho: limiter 2  exact_rel 1.473e-09 (0.0000% of dofs disagree)  lagged_rel 1.868e-01 (75.0000%)
+verify_jac_ho: limiter 3  exact_rel 1.521e-09 (0.0000% of dofs disagree)  lagged_rel 1.848e-01 (75.0000%)
+verify_jac_ho: limiter 0  exact_rel 1.924e-08 (0.0000% of dofs disagree)  lagged_rel 5.436e-02 (75.0000%)
+verify_jac_ho: limiter 1  exact_rel 1.632e-08 (0.0000% of dofs disagree)  lagged_rel 2.425e-01 (75.0000%)
+verify_jac_ho: limiter 2  exact_rel 1.493e-08 (0.0000% of dofs disagree)  lagged_rel 1.868e-01 (75.0000%)
+verify_jac_ho: limiter 3  exact_rel 1.555e-08 (0.0000% of dofs disagree)  lagged_rel 1.848e-01 (75.0000%)
+cvfem_jacobian_fd: PASSED
+<end of output>
+Test time =  46.21 sec
+----------------------------------------------------------
+Test Passed.
+"cvfem_jacobian_fd" end time: Oct 14 00:14 CEST
+"cvfem_jacobian_fd" time elapsed: 00:00:46
+----------------------------------------------------------
+
+53/66 Testing: cvfem_jacobian_cache
+53/66 Test: cvfem_jacobian_cache
+Command: "/usr/bin/bash" "/capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/sfem/spikes/cvfem/src/tests/verification/cvfem_jacobian_cache.sh" "/capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/build/cvfem/cvfem_hex8_ns_upwind_bench"
+Directory: /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/build/cvfem
+"cvfem_jacobian_cache" start time: Oct 14 00:14 CEST
+Output:
+----------------------------------------------------------
+PASS: packed/1/first_order (bit-identical)
+PASS: packed/1/limiter_0 (bit-identical)
+PASS: packed/1/limiter_0_float_grad (bit-identical)
+PASS: packed/1/limiter_1 (bit-identical)
+PASS: packed/1/limiter_1_float_grad (bit-identical)
+PASS: packed/1/limiter_2 (bit-identical)
+PASS: packed/1/limiter_2_float_grad (bit-identical)
+PASS: packed/1/limiter_3 (bit-identical)
+PASS: packed/1/limiter_3_float_grad (bit-identical)
+PASS: packed/1/rc_off (relative infinity error 2.292e-16)
+PASS: packed/1/rc_off_float_grad (relative infinity error 9.167e-17)
+PASS: packed/1/closure (bit-identical)
+PASS: packed/1/correction_lagged (bit-identical)
+PASS: packed/72/first_order (bit-identical)
+PASS: packed/72/limiter_0 (bit-identical)
+PASS: packed/72/limiter_0_float_grad (bit-identical)
+PASS: packed/72/limiter_1 (bit-identical)
+PASS: packed/72/limiter_1_float_grad (bit-identical)
+PASS: packed/72/limiter_2 (bit-identical)
+PASS: packed/72/limiter_2_float_grad (bit-identical)
+PASS: packed/72/limiter_3 (bit-identical)
+PASS: packed/72/limiter_3_float_grad (bit-identical)
+PASS: packed/72/rc_off (relative infinity error 2.292e-16)
+PASS: packed/72/rc_off_float_grad (relative infinity error 9.167e-17)
+PASS: packed/72/closure (bit-identical)
+PASS: packed/72/correction_lagged (bit-identical)
+PASS: packed/1/unperturbed_0 (bit-identical)
+PASS: packed/1/unperturbed_1 (bit-identical)
+PASS: atomic/1/first_order (bit-identical)
+PASS: atomic/1/unlimited (relative infinity error 3.653e-16)
+PASS: ecolor/1/first_order (bit-identical)
+PASS: ecolor/1/unlimited (relative infinity error 3.653e-16)
+PASS: atomic/1/isoparam (bit-identical)
+cvfem_jacobian_cache: PASSED
+<end of output>
+Test time = 149.60 sec
+----------------------------------------------------------
+Test Passed.
+"cvfem_jacobian_cache" end time: Oct 14 00:16 CEST
+"cvfem_jacobian_cache" time elapsed: 00:02:29
+----------------------------------------------------------
+
+54/66 Testing: cvfem_jacobian_cache_f32
+54/66 Test: cvfem_jacobian_cache_f32
+Command: "/usr/bin/bash" "/capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/sfem/spikes/cvfem/src/tests/verification/cvfem_jacobian_cache.sh" "/capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/build/cvfem/cvfem_hex8_ns_upwind_bench_f32"
+Directory: /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/build/cvfem
+"cvfem_jacobian_cache_f32" start time: Oct 14 00:16 CEST
+Output:
+----------------------------------------------------------
+PASS: packed/1/first_order (bit-identical)
+PASS: packed/1/limiter_0 (bit-identical)
+PASS: packed/1/limiter_0_float_grad (bit-identical)
+PASS: packed/1/limiter_1 (bit-identical)
+PASS: packed/1/limiter_1_float_grad (bit-identical)
+PASS: packed/1/limiter_2 (bit-identical)
+PASS: packed/1/limiter_2_float_grad (bit-identical)
+PASS: packed/1/limiter_3 (bit-identical)
+PASS: packed/1/limiter_3_float_grad (bit-identical)
+PASS: packed/1/rc_off (relative infinity error 9.843e-08)
+PASS: packed/1/rc_off_float_grad (relative infinity error 9.843e-08)
+PASS: packed/1/closure (bit-identical)
+PASS: packed/1/correction_lagged (bit-identical)
+PASS: packed/72/first_order (bit-identical)
+PASS: packed/72/limiter_0 (bit-identical)
+PASS: packed/72/limiter_0_float_grad (bit-identical)
+PASS: packed/72/limiter_1 (bit-identical)
+PASS: packed/72/limiter_1_float_grad (bit-identical)
+PASS: packed/72/limiter_2 (bit-identical)
+PASS: packed/72/limiter_2_float_grad (bit-identical)
+PASS: packed/72/limiter_3 (bit-identical)
+PASS: packed/72/limiter_3_float_grad (bit-identical)
+PASS: packed/72/rc_off (relative infinity error 9.843e-08)
+PASS: packed/72/rc_off_float_grad (relative infinity error 9.843e-08)
+PASS: packed/72/closure (bit-identical)
+PASS: packed/72/correction_lagged (bit-identical)
+PASS: packed/1/unperturbed_0 (bit-identical)
+PASS: packed/1/unperturbed_1 (bit-identical)
+PASS: atomic/1/first_order (bit-identical)
+PASS: atomic/1/unlimited (bit-identical)
+PASS: ecolor/1/first_order (bit-identical)
+PASS: ecolor/1/unlimited (bit-identical)
+PASS: atomic/1/isoparam (bit-identical)
+cvfem_jacobian_cache: PASSED
+<end of output>
+Test time = 149.64 sec
+----------------------------------------------------------
+Test Passed.
+"cvfem_jacobian_cache_f32" end time: Oct 14 00:19 CEST
+"cvfem_jacobian_cache_f32" time elapsed: 00:02:29
+----------------------------------------------------------
+
+End testing: Oct 14 00:19 CEST

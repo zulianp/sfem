@@ -782,7 +782,7 @@ int main(int argc, char **argv) {
                     "                   on, and it is what this driver computed before the exact\n"
                     "                   form existed. Had no help entry at all until now.\n"
                     "  --verify-jac-coupled  standalone FP64 full (u,p) derivative check; requires\n"
-                    "                 packed affine geometry, steady RC and double gradients.\n"
+                    "                 packed affine geometry, RC and double gradients; boundary/BDF supported.\n"
                     "  --rhie-chow [S]  include the Rhie-Chow pressure-velocity coupling at scale\n"
                     "                 S (default 1), and the nodal pressure gradient it needs.\n"
                     "                 sumfact only -- the hand-written and generated kernels carry\n"
@@ -863,11 +863,13 @@ int main(int argc, char **argv) {
     }
 
     if (verify_coupled_jac && (layout != "packed" || geom != "affine" || !rhie_chow ||
-        boundary || dt != scalar_t(0) || grad_single || lagged_rc || lagged_ho ||
+        dt < scalar_t(0) || !std::isfinite(dt) ||
+        (dt > scalar_t(0) && bdf_order != 1 && bdf_order != 2) ||
+        grad_single || lagged_rc || lagged_ho ||
         partial_assembly || assemble || bsr_apply || nodal_grad || verify || verify_jac ||
         verify_ho || verify_ho_jac || !(rho > scalar_t(0)) || !(mu > scalar_t(0)) ||
         !(rc_scale > scalar_t(0)) || !std::isfinite(rho) || !std::isfinite(mu) || !std::isfinite(rc_scale))) {
-        std::fprintf(stderr, "--verify-jac-coupled requires a standalone packed affine steady RC action "
+        std::fprintf(stderr, "--verify-jac-coupled requires a standalone packed affine RC action "
                              "with positive finite rho, mu and RC scale and double gradients\n");
         if (own_mpi) MPI_Finalize();
         return 2;

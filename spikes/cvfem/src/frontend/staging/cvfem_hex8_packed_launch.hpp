@@ -160,12 +160,12 @@ static SFEM_NOINLINE void apply_residual_packed_defcor(MeshData       &d,
     scalar_t *const SFEM_RESTRICT rz = d.rz.data();
     scalar_t *const SFEM_RESTRICT rc = d.rc.data();
     const size_t                  scratch_n = packed_scratch_n(p.max_actual_nodes_per_pack);
-    const Hex8Extras              opt = cvfem_hex8_extras_of(d);
+    const Hex8RcConfig            rc_cfg = cvfem_hex8_rc_config_for(d);
     const int                     with_rc = !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0);
 
 #pragma omp parallel
     apply_residual_packed_defcor_range<ScatterProbe>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
-            d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, ugrad, limiter, venkat_c, rx, ry, rz, rc, scratch_n, with_rc);
+            d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, rc_cfg, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, ugrad, limiter, venkat_c, rx, ry, rz, rc, scratch_n, with_rc);
 
     if constexpr (ScatterProbe) {
         if (!g_scatter_accumulate) return;
@@ -222,9 +222,10 @@ static SFEM_NOINLINE void apply_residual_packed(MeshData        &d,
         apply_residual_packed_isoparam_range(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
                 d.nelements, d.p.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, rx, ry, rz, rc, scratch_n, d.pgx.data(), d.pgy.data(), d.pgz.data(), cvfem_hex8_rc_config_for(d), with_rc);
     } else {
+        const Hex8RcConfig rc_cfg = cvfem_hex8_rc_config_for(d);
 #pragma omp parallel
         apply_residual_packed_affine_range<ScatterProbe>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
-                d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, rx, ry, rz, rc, scratch_n, with_rc);
+                d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, rc_cfg, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, rx, ry, rz, rc, scratch_n, with_rc);
     }
 
     if constexpr (ScatterProbe) {

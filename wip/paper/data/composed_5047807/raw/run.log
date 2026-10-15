@@ -1,0 +1,97 @@
+Tue Oct 13 10:03:39 PM UTC 2026
+nid006553
+RESULTS=/capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/results/composed-5047807-lJoaXi
+g++ (Spack GCC) 14.3.0
+Copyright (C) 2024 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+-- Found MPI: TRUE (found version "4.1") found components: C
+-- Found MPI: TRUE (found version "4.1") found components: C CXX
+-- Found OpenMP_CXX: -fopenmp (found version "4.5")
+-- Found OpenMP: TRUE (found version "4.5") found components: C CXX
+-- Found OpenMP_CXX: -fopenmp (found version "4.5")
+-- Found OpenMP: TRUE (found version "4.5") found components: CXX
+-- cvfem performance flags: -O3;-DNDEBUG;-ffast-math;-fno-finite-math-only;-funroll-loops;-fomit-frame-pointer;-fno-math-errno;-fno-trapping-math;-ffp-contract=fast;-mcpu=native;-mtune=native;-ftree-vectorize
+-- cvfem: generator checks skipped -- /user-environment/env/default/bin/python3 has no sympy
+-- cvfem: temporal-order gate skipped -- /user-environment/env/default/bin/python3 has no numpy
+-- cvfem: MPI guard gate enabled (/usr/bin/srun)
+-- Configuring done (1.9s)
+-- Generating done (4.6s)
+-- Build files have been written to: /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/build/cvfem
+[ 50%] Building CXX object CMakeFiles/cvfem_hex8_ns_upwind_bench.dir/src/drivers/cvfem_hex8_ns_upwind_bench.cpp.o
+[100%] Linking CXX executable cvfem_hex8_ns_upwind_bench
+[100%] Built target cvfem_hex8_ns_upwind_bench
+[ 50%] Building CXX object CMakeFiles/cvfem_hex8_ns_upwind_bench_f32.dir/src/drivers/cvfem_hex8_ns_upwind_bench.cpp.o
+[100%] Linking CXX executable cvfem_hex8_ns_upwind_bench_f32
+[100%] Built target cvfem_hex8_ns_upwind_bench_f32
+[ 50%] Building CXX object CMakeFiles/cvfem_packed_vs_atomic_test.dir/src/tests/consistency/cvfem_packed_vs_atomic_test.cpp.o
+[100%] Linking CXX executable cvfem_packed_vs_atomic_test
+[100%] Built target cvfem_packed_vs_atomic_test
+[ 50%] Building CXX object CMakeFiles/cvfem_packed_fixed_input_test.dir/src/tests/regression/cvfem_packed_fixed_input_test.cpp.o
+[100%] Linking CXX executable cvfem_packed_fixed_input_test
+[100%] Built target cvfem_packed_fixed_input_test
+[ 50%] Building CXX object CMakeFiles/cvfem_bench_transient_test.dir/src/tests/unit/cvfem_bench_transient_test.cpp.o
+[100%] Linking CXX executable cvfem_bench_transient_test
+[100%] Built target cvfem_bench_transient_test
+[100%] Built target cvfem_boundary_jacobian_test
+[ 50%] Building CXX object CMakeFiles/cvfem_transient_test.dir/src/tests/unit/cvfem_transient_test.cpp.o
+[100%] Linking CXX executable cvfem_transient_test
+[100%] Built target cvfem_transient_test
+Internal ctest changing into directory: /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/build/cvfem
+Test project /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/build/cvfem
+    Start 13: cvfem_packed_vs_atomic_test
+1/5 Test #13: cvfem_packed_vs_atomic_test ......   Passed    2.56 sec
+    Start 18: cvfem_bench_transient_test
+2/5 Test #18: cvfem_bench_transient_test .......   Passed    2.19 sec
+    Start 19: cvfem_boundary_jacobian_test
+3/5 Test #19: cvfem_boundary_jacobian_test .....   Passed    0.02 sec
+    Start 26: cvfem_transient_test
+4/5 Test #26: cvfem_transient_test .............   Passed    2.20 sec
+    Start 50: cvfem_packed_transient_rc
+5/5 Test #50: cvfem_packed_transient_rc ........   Passed    2.19 sec
+
+100% tests passed, 0 tests failed out of 5
+
+Total Test time (real) =   9.18 sec
+Internal ctest changing into directory: /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/build/cvfem
+Test project /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/build/cvfem
+    Start 13: cvfem_packed_vs_atomic_test
+1/5 Test #13: cvfem_packed_vs_atomic_test ......   Passed    2.27 sec
+    Start 18: cvfem_bench_transient_test
+2/5 Test #18: cvfem_bench_transient_test .......   Passed    2.25 sec
+    Start 19: cvfem_boundary_jacobian_test
+3/5 Test #19: cvfem_boundary_jacobian_test .....   Passed    0.02 sec
+    Start 26: cvfem_transient_test
+4/5 Test #26: cvfem_transient_test .............   Passed    2.20 sec
+    Start 50: cvfem_packed_transient_rc
+5/5 Test #50: cvfem_packed_transient_rc ........   Passed    2.29 sec
+
+100% tests passed, 0 tests failed out of 5
+
+Total Test time (real) =   9.04 sec
+Internal ctest changing into directory: /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/build/cvfem
+Test project /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/build/cvfem
+    Start 17: cvfem_packed_fixed_input_test
+1/1 Test #17: cvfem_packed_fixed_input_test ....   Passed    2.47 sec
+
+100% tests passed, 0 tests failed out of 1
+
+Total Test time (real) =   2.48 sec
+Internal ctest changing into directory: /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/build/cvfem
+Test project /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/build/cvfem
+    Start 49: cvfem_jacobian_coupled
+1/5 Test #49: cvfem_jacobian_coupled ...........   Passed   44.20 sec
+    Start 51: cvfem_jacobian_composed
+2/5 Test #51: cvfem_jacobian_composed ..........   Passed  199.60 sec
+    Start 52: cvfem_jacobian_fd
+3/5 Test #52: cvfem_jacobian_fd ................   Passed   46.21 sec
+    Start 53: cvfem_jacobian_cache
+4/5 Test #53: cvfem_jacobian_cache .............   Passed  149.60 sec
+    Start 54: cvfem_jacobian_cache_f32
+5/5 Test #54: cvfem_jacobian_cache_f32 .........   Passed  149.64 sec
+
+100% tests passed, 0 tests failed out of 5
+
+Total Test time (real) = 589.26 sec
+COMPOSED BOUNDARY/TRANSIENT CHECKS PASSED: /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/results/composed-5047807-lJoaXi

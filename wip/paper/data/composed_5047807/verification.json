@@ -1,0 +1,13 @@
+{
+  "cases": 90,
+  "ctest_invocations": 16,
+  "max_field_relative_error": 5.84e-09,
+  "max_relative_error": 3.518066038e-09,
+  "minimum_omitted_term_errors": {
+    "no_boundary": 0.5003,
+    "no_coeff_du": 0.0006552,
+    "no_qgrad": 0.01719,
+    "no_transient": 0.2344
+  },
+  "required_steps": 180
+}

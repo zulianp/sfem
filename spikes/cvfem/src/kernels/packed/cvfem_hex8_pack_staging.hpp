@@ -651,7 +651,7 @@ static SFEM_INLINE void cvfem_hex8_action_lanes_affine(
                                               det);
             if (with_rc) {
                 cvfem_hex8_gather_rc_from_pack(pack_elems, pk.pgx, pk.pgy, pk.pgz,
-                                               begin, nlanes, rcp);
+                                               begin, nlanes, rcp, rc_cfg.tau);
                 cvfem_hex8_gather_rc_coeff(rc_coeff, rc_w, rc_cfg, begin, nlanes, rcp);
             }
             if (with_qg)

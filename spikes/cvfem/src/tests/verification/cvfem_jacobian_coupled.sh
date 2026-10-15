@@ -20,17 +20,17 @@ for threads in ${COUPLED_TEST_THREADS:-1 2}; do
         test "$(grep -c 'required 1' check.log)" -eq 2
     done
 done
-for option in '--lagged-rc' '--lagged-ho' '--boundary' '--transient 0.1' \
+for option in '--lagged-rc' '--lagged-ho' '--transient -0.1' '--transient nan' '--transient inf' '--transient 0.1 --bdf 3' \
               '--geom isoparam' '--grad-precision single' '--layout atomic'; do
     if OMP_NUM_THREADS=1 "$bench" "${args[@]}" $option > refused.log 2>&1; then
         echo "FAIL: coupled check accepted unsupported option $option"
         exit 1
     fi
-    grep -q 'requires a standalone packed affine steady RC action' refused.log
+    grep -q 'requires a standalone packed affine RC action' refused.log
 done
 if OMP_NUM_THREADS=1 SFEM_RC_TAU=0 "$bench" "${args[@]}" > refused.log 2>&1; then
     echo 'FAIL: coupled check accepted a velocity-independent RC coefficient'
     exit 1
 fi
-grep -q 'requires the default steady RC coefficient' refused.log
+grep -q 'requires the default RC coefficient' refused.log
 echo 'cvfem_jacobian_coupled: PASSED'

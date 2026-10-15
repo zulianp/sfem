@@ -415,6 +415,14 @@ add_test(NAME cvfem_kernel_only
 add_test(NAME cvfem_jacobian_coupled
          COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_jacobian_coupled.sh
                  $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)
+add_test(NAME cvfem_packed_transient_rc
+         COMMAND $<TARGET_FILE:cvfem_packed_vs_atomic_test>)
+set_tests_properties(cvfem_packed_transient_rc PROPERTIES
+                    ENVIRONMENT "SFEM_RC_TAU=1;SFEM_RC_TAU_TRANSIENT=1")
+add_test(NAME cvfem_jacobian_composed
+         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_jacobian_composed.sh
+                 $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)
+set_tests_properties(cvfem_jacobian_composed PROPERTIES TIMEOUT 300)
 add_test(NAME cvfem_jacobian_fd
          COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_jacobian_fd.sh
                  $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)

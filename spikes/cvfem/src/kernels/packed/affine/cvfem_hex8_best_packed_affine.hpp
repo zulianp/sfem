@@ -51,7 +51,7 @@ static SFEM_NOINLINE void apply_residual_packed_affine_range(
         const scalar_t *const SFEM_RESTRICT pgy,
         const scalar_t *const SFEM_RESTRICT pgz,
         geom_t **const SFEM_RESTRICT points,
-        const scalar_t rhie_chow_scale,
+        const Hex8RcConfigT<scalar_t> &rc_cfg,
         const scalar_t *const SFEM_RESTRICT ux,
         const scalar_t *const SFEM_RESTRICT uy,
         const scalar_t *const SFEM_RESTRICT uz,
@@ -123,11 +123,11 @@ static SFEM_NOINLINE void apply_residual_packed_affine_range(
                 gather_hex8_simd_from_pack(pack_elems, pack_u, adj_ptr, det_ptr, begin, nlanes, in,
                                            cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det);
                 if (with_rc) {
-                    cvfem_hex8_gather_rc_from_pack(pack_elems, pk.pgx, pk.pgy, pk.pgz, begin, nlanes, rcp);
+                    cvfem_hex8_gather_rc_from_pack(pack_elems, pk.pgx, pk.pgy, pk.pgz, begin, nlanes, rcp, rc_cfg.tau);
                 }
                 cvfem_hex8_ns_upwind_residual_sumfact_simd(
                         rho, mu, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det, in, outp,
-                        with_rc ? &rcp : nullptr, rhie_chow_scale);
+                        with_rc ? &rcp : nullptr, rc_cfg.scale);
                 if constexpr (ScatterProbe) {
                     if (!cvfem_scatter_probe(outp, begin, nlanes)) continue;
                 }
@@ -536,7 +536,7 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_range(
         const scalar_t *const SFEM_RESTRICT pgy,
         const scalar_t *const SFEM_RESTRICT pgz,
         geom_t **const SFEM_RESTRICT points,
-        const scalar_t rhie_chow_scale,
+        const Hex8RcConfigT<scalar_t> &rc_cfg,
         const scalar_t *const SFEM_RESTRICT ux,
         const scalar_t *const SFEM_RESTRICT uy,
         const scalar_t *const SFEM_RESTRICT uz,
@@ -598,12 +598,12 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_range(
                                            cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, detv);
                 if (with_rc) {
                     cvfem_hex8_gather_rc_from_pack(pack_elems, pk.pgx,
-                                                   pk.pgy, pk.pgz, begin, nlanes, rcp);
+                                                   pk.pgy, pk.pgz, begin, nlanes, rcp, rc_cfg.tau);
                 }
                 cvfem_hex8_gather_ugrad_from_pack(pack_elems, ug.g, begin, nlanes, hop);
                 cvfem_hex8_ns_upwind_residual_sumfact_simd(
                         rho, mu, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, detv, in,
-                        outp, with_rc ? &rcp : nullptr, rhie_chow_scale, scalar_t(0), &hop);
+                        outp, with_rc ? &rcp : nullptr, rc_cfg.scale, scalar_t(0), &hop);
                 if constexpr (ScatterProbe) {
                     if (!cvfem_scatter_probe(outp, begin, nlanes)) continue;
                 }
@@ -761,7 +761,7 @@ static SFEM_NOINLINE void apply_residual_packcolored_affine_range(
         const scalar_t *const SFEM_RESTRICT pgy,
         const scalar_t *const SFEM_RESTRICT pgz,
         geom_t **const SFEM_RESTRICT points,
-        const scalar_t rhie_chow_scale,
+        const Hex8RcConfigT<scalar_t> &rc_cfg,
         const scalar_t *const SFEM_RESTRICT ux,
         const scalar_t *const SFEM_RESTRICT uy,
         const scalar_t *const SFEM_RESTRICT uz,
@@ -831,11 +831,11 @@ static SFEM_NOINLINE void apply_residual_packcolored_affine_range(
                 gather_hex8_simd_from_pack(pack_elems, pack_u, adj_ptr, det_ptr, begin, nlanes, in,
                                            cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det);
                 if (with_rc) {
-                    cvfem_hex8_gather_rc_from_pack(pack_elems, pk.pgx, pk.pgy, pk.pgz, begin, nlanes, rcp);
+                    cvfem_hex8_gather_rc_from_pack(pack_elems, pk.pgx, pk.pgy, pk.pgz, begin, nlanes, rcp, rc_cfg.tau);
                 }
                 cvfem_hex8_ns_upwind_residual_sumfact_simd(
                         rho, mu, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det, in, outp,
-                        with_rc ? &rcp : nullptr, rhie_chow_scale);
+                        with_rc ? &rcp : nullptr, rc_cfg.scale);
                 scatter_hex8_simd_to_pack(pack_elems, pack_out, begin, nlanes, outp);
             }
 

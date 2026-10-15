@@ -305,6 +305,47 @@ static void compare_jacobian(sfem::Context &ctx, const bool lshape, const char *
     }
 }
 
+static void compare_transient_residual(sfem::Context &ctx, const int order) {
+    Run a, b;
+    build(a, 0, false, ctx);
+    build(b, 64, false, ctx);
+    for (Run *run : {&a, &b}) {
+        auto &d = run->d;
+        d.dt = scalar_t(0.1);
+        d.bdf_order = order;
+        d.u_prev.resize(size_t(d.nnodes) * 3);
+        if (order == 2) d.u_prev2.resize(size_t(d.nnodes) * 3);
+        for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+            // Linear pressure would hide a missing Rhie-Chow coefficient.
+            d.p[i] += scalar_t(0.13) * std::sin(scalar_t(2) * d.points[0][i] +
+                scalar_t(3) * d.points[1][i] + scalar_t(5) * d.points[2][i]);
+            const scalar_t u[3] = {d.ux[i], d.uy[i], d.uz[i]};
+            for (int c = 0; c < 3; ++c) {
+                d.u_prev[size_t(i) * 3 + c] = scalar_t(0.97) * u[c];
+                if (order == 2) d.u_prev2[size_t(i) * 3 + c] = scalar_t(0.93) * u[c];
+            }
+        }
+        ++d.state_stamp;
+    }
+    const auto ra = keyed_residual(a), rb = keyed_residual(b);
+    bool valid = ra.size() == rb.size() && ra.size() == size_t(a.d.nnodes);
+    scalar_t worst = 0, scale = 0;
+    for (const auto &kv : ra) {
+        const auto it = rb.find(kv.first);
+        if (it == rb.end()) { valid = false; continue; }
+        for (int c = 0; c < 4; ++c) {
+            valid &= std::isfinite(kv.second[c]) && std::isfinite(it->second[c]);
+            worst = std::max(worst, std::fabs(kv.second[c] - it->second[c]));
+            scale = std::max(scale, std::fabs(kv.second[c]));
+        }
+    }
+    const auto cfg = cvfem_hex8_rc_config_for(b.d);
+    std::printf("transient BDF%d: RC inv_dt_a0=%g, residual rel=%.9e\n",
+                order, double(cfg.tau.inv_dt_a0), double(worst / scale));
+    check(valid && scale > 0 && worst < scalar_t(1e-12) * scale,
+          "transient packed and atomic solver residuals agree");
+}
+
 int main(int argc, char **argv) {
     auto ctx = sfem::initialize(argc, argv);
     // The box first: it is the case that already works, so if it fails the harness is at
@@ -317,6 +358,8 @@ int main(int argc, char **argv) {
     compare_jacobian(*ctx, false, "box, positive velocity shift", scalar_t(0.017));
     compare_jacobian(*ctx, false, "box, negative velocity shift", scalar_t(-0.017));
     compare_jacobian(*ctx, true, "L-shape");
+    compare_transient_residual(*ctx, 1);
+    compare_transient_residual(*ctx, 2);
 
     if (g_failures) {
         std::fprintf(stderr, "\ncvfem_packed_vs_atomic_test: %d check(s) failed\n", g_failures);
