@@ -109,6 +109,10 @@ int resample_gap(
 
     smesh::ElemType st = shell_type(element_type);
     memset(g, 0, nnodes * sizeof(real_t));
+    // The local kernels accumulate the normals too
+    memset(xnormal, 0, nnodes * sizeof(real_t));
+    memset(ynormal, 0, nnodes * sizeof(real_t));
+    memset(znormal, 0, nnodes * sizeof(real_t));
 
     if (resample_gap_local(st, nelements, nnodes, elems, xyz, n, stride, origin, delta, data, g, xnormal, ynormal, znormal) !=
         SFEM_SUCCESS) {
@@ -299,6 +303,11 @@ int resample_gap_normals(
         real_t* const SFEM_RESTRICT znormal) {
     if (!nelements) return SFEM_SUCCESS;
 
+    // The local kernels accumulate
+    memset(xnormal, 0, nnodes * sizeof(real_t));
+    memset(ynormal, 0, nnodes * sizeof(real_t));
+    memset(znormal, 0, nnodes * sizeof(real_t));
+
     if (resample_gap_normals_local(shell_type(element_type),
                                    nelements,
                                    nnodes,
@@ -392,6 +401,10 @@ int sdf_view_ensure_margin(MPI_Comm                             comm,
     sdf_start = MAX(0, sdf_start - 1 - z_margin);
     sdf_end   = MIN(nglobal[2],
                   sdf_end + 2 + z_margin);  // 1 for the rightside of the cell 1 for the exclusive range
+
+    // Points beyond either end of the grid still get two layers, the least a grid can have
+    sdf_start = MIN(sdf_start, nglobal[2] - 2);
+    sdf_end   = MAX(sdf_end, sdf_start + 2);
 
     ptrdiff_t pnlocal_z = (sdf_end - sdf_start);
     geom_t*   psdf      = (geom_t*)malloc(pnlocal_z * stride[2] * sizeof(geom_t));

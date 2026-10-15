@@ -441,7 +441,16 @@ namespace sfem {
                                                                  const std::vector<std::shared_ptr<Sideset>> &sidesets,
                                                                  const enum ExecutionSpace                    es) {
         auto cc = std::make_unique<ContactConditions>(space);
-        cc->impl_->obstacles.push_back(SDFObstacle::create(sdf, es));
+        {
+            // The mesh's z-range bounds where the contact surface samples the obstacle
+            auto mesh = space->mesh_ptr();
+            const bool has_z = mesh->spatial_dimension() == 3;
+            cc->impl_->obstacles.push_back(SDFObstacle::create(sdf,
+                                                               mesh->comm(),
+                                                               has_z ? mesh->n_nodes() : 0,
+                                                               has_z ? mesh->points()->data()[2] : nullptr,
+                                                               es));
+        }
 
         if (space->has_semi_structured_mesh()) {
             cc->impl_->contact_surface = SSMeshContactSurface::create(space, sidesets, es);

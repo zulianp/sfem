@@ -1,16 +1,15 @@
 #include "cu_quadshell4_resample.hpp"
 
 #include "line_quadrature.hpp"
+#include "sfem_sdf_sampling.hpp"
 #include "sfem_macros.hpp"
 
 #include "sfem_cuda_base.hpp"
 
-static const scalar_t infty             = 10000;
+static const scalar_t infty             = SFEM_SDF_UNREACHABLE;
 static const real_t   SFEM_SDF_GRAD_EPS = 1e-12;
 
 // #define SFEM_RESAMPLE_GAP_DUAL
-
-static SFEM_INLINE __device__ real_t cu_put_inside(const real_t v) { return MIN(MAX(1e-7, v), 1 - 1e-7); }
 
 SFEM_INLINE __device__ static real_t cu_quadshell4_measure_and_normal(
         // X-coordinates
@@ -123,92 +122,6 @@ SFEM_INLINE __device__ static void cu_quadshell4_transform(
     *out_z = pz0 * x5 + pz1 * x2 + pz2 * x0 + pz3 * x4;
 }
 
-SFEM_INLINE __device__ static void cu_hex_aa_8_eval_fun(
-        // Quadrature point (local coordinates)
-        const real_t x,
-        const real_t y,
-        const real_t z,
-        // Output
-        real_t* const SFEM_RESTRICT f) {
-    f[0] = (1.0 - x) * (1.0 - y) * (1.0 - z);
-    f[1] = x * (1.0 - y) * (1.0 - z);
-    f[2] = x * y * (1.0 - z);
-    f[3] = (1.0 - x) * y * (1.0 - z);
-    f[4] = (1.0 - x) * (1.0 - y) * z;
-    f[5] = x * (1.0 - y) * z;
-    f[6] = x * y * z;
-    f[7] = (1.0 - x) * y * z;
-}
-
-SFEM_INLINE __device__ static void cu_hex_aa_8_collect_coeffs(const ptrdiff_t* const SFEM_RESTRICT stride,
-                                                              const ptrdiff_t                      i,
-                                                              const ptrdiff_t                      j,
-                                                              const ptrdiff_t                      k,
-                                                              // Attention this is geometric data transformed to solver data!
-                                                              const geom_t* const SFEM_RESTRICT data,
-                                                              real_t* const SFEM_RESTRICT       out) {
-    const ptrdiff_t i0 = i * stride[0] + j * stride[1] + k * stride[2];
-    const ptrdiff_t i1 = (i + 1) * stride[0] + j * stride[1] + k * stride[2];
-    const ptrdiff_t i2 = (i + 1) * stride[0] + (j + 1) * stride[1] + k * stride[2];
-    const ptrdiff_t i3 = i * stride[0] + (j + 1) * stride[1] + k * stride[2];
-    const ptrdiff_t i4 = i * stride[0] + j * stride[1] + (k + 1) * stride[2];
-    const ptrdiff_t i5 = (i + 1) * stride[0] + j * stride[1] + (k + 1) * stride[2];
-    const ptrdiff_t i6 = (i + 1) * stride[0] + (j + 1) * stride[1] + (k + 1) * stride[2];
-    const ptrdiff_t i7 = i * stride[0] + (j + 1) * stride[1] + (k + 1) * stride[2];
-
-    out[0] = data[i0];
-    out[1] = data[i1];
-    out[2] = data[i2];
-    out[3] = data[i3];
-    out[4] = data[i4];
-    out[5] = data[i5];
-    out[6] = data[i6];
-    out[7] = data[i7];
-}
-
-SFEM_INLINE __device__ static void cu_hex_aa_8_eval_grad(
-        // Quadrature point (local coordinates)
-        const real_t x,
-        const real_t y,
-        const real_t z,
-        // Output
-        real_t* const SFEM_RESTRICT gx,
-        real_t* const SFEM_RESTRICT gy,
-        real_t* const SFEM_RESTRICT gz) {
-    // Transformation to ref element
-    gx[0] = -(1.0 - y) * (1.0 - z);
-    gy[0] = -(1.0 - x) * (1.0 - z);
-    gz[0] = -(1.0 - x) * (1.0 - y);
-
-    gx[1] = (1.0 - y) * (1.0 - z);
-    gy[1] = -x * (1.0 - z);
-    gz[1] = -x * (1.0 - y);
-
-    gx[2] = y * (1.0 - z);
-    gy[2] = x * (1.0 - z);
-    gz[2] = -x * y;
-
-    gx[3] = -y * (1.0 - z);
-    gy[3] = (1.0 - x) * (1.0 - z);
-    gz[3] = -(1.0 - x) * y;
-
-    gx[4] = -(1.0 - y) * z;
-    gy[4] = -(1.0 - x) * z;
-    gz[4] = (1.0 - x) * (1.0 - y);
-
-    gx[5] = (1.0 - y) * z;
-    gy[5] = -x * z;
-    gz[5] = x * (1.0 - y);
-
-    gx[6] = y * z;
-    gy[6] = x * z;
-    gz[6] = x * y;
-
-    gx[7] = -y * z;
-    gy[7] = (1.0 - x) * z;
-    gz[7] = (1.0 - x) * y;
-}
-
 __global__ void cu_quadshell4_resample_gap_local_kernel(
         // Mesh
         const ptrdiff_t              nelements,
@@ -224,13 +137,6 @@ __global__ void cu_quadshell4_resample_gap_local_kernel(
         // Output
         real_t* const SFEM_RESTRICT  wg,
         real_t** const SFEM_RESTRICT normals) {
-    const real_t ox = (real_t)origin[0];
-    const real_t oy = (real_t)origin[1];
-    const real_t oz = (real_t)origin[2];
-
-    const real_t dx = (real_t)delta[0];
-    const real_t dy = (real_t)delta[1];
-    const real_t dz = (real_t)delta[2];
 
     static const int      n_qp  = 6;
     static const scalar_t qx[6] = {0.03376524290, 0.1693953068, 0.3806904070, 0.6193095930, 0.8306046932, 0.9662347571};
@@ -239,12 +145,6 @@ __global__ void cu_quadshell4_resample_gap_local_kernel(
     for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements; e += blockDim.x * gridDim.x) {
         idx_t  ev[4];
         geom_t x[4], y[4], z[4];
-
-        real_t hex8_f[8];
-        real_t hex8_grad_x[8];
-        real_t hex8_grad_y[8];
-        real_t hex8_grad_z[8];
-        real_t coeffs[8];
 
         real_t quad4_f[4];
         real_t element_gap[4];
@@ -337,15 +237,8 @@ __global__ void cu_quadshell4_resample_gap_local_kernel(
 #endif
                 const real_t dV = measure * qw[q_ix] * qw[q_iy];
 
-                const real_t grid_x = (g_qx - ox) / dx;
-                const real_t grid_y = (g_qy - oy) / dy;
-                const real_t grid_z = (g_qz - oz) / dz;
-
-                const ptrdiff_t i = floor(grid_x);
-                const ptrdiff_t j = floor(grid_y);
-                const ptrdiff_t k = floor(grid_z);
-
-                if (i < 0 || j < 0 || k < 0 || (i + 1 >= n[0]) || (j + 1 >= n[1]) || (k + 1 >= n[2])) {
+                real_t eval_value, eval_grad[3];
+                if (!sdf_sample<1>(n, stride, origin, delta, data, g_qx, g_qy, g_qz, &eval_value, eval_grad, nullptr)) {
                     for (int edof_i = 0; edof_i < 4; edof_i++) {
                         element_gap[edof_i] += -infty * quad4_f[edof_i] * dV;
                         element_xnormal[edof_i] += face_nx * quad4_f[edof_i] * dV;
@@ -356,32 +249,9 @@ __global__ void cu_quadshell4_resample_gap_local_kernel(
                     continue;
                 }
 
-                // Get the reminder [0, 1]
-                real_t l_x = (grid_x - i);
-                real_t l_y = (grid_y - j);
-                real_t l_z = (grid_z - k);
-
-                assert(l_x >= -1e-8);
-                assert(l_y >= -1e-8);
-                assert(l_z >= -1e-8);
-
-                assert(l_x <= 1 + 1e-8);
-                assert(l_y <= 1 + 1e-8);
-                assert(l_z <= 1 + 1e-8);
-
-                cu_hex_aa_8_eval_fun(l_x, l_y, l_z, hex8_f);
-                cu_hex_aa_8_eval_grad(
-                        cu_put_inside(l_x), cu_put_inside(l_y), cu_put_inside(l_z), hex8_grad_x, hex8_grad_y, hex8_grad_z);
-                cu_hex_aa_8_collect_coeffs(stride, i, j, k, data, coeffs);
-
                 // Integrate gap function
                 {
-                    real_t eval_gap = 0;
-
-#pragma unroll(8)
-                    for (int edof_j = 0; edof_j < 8; edof_j++) {
-                        eval_gap += hex8_f[edof_j] * coeffs[edof_j];
-                    }
+                    const real_t eval_gap = eval_value;
 
 #pragma unroll(4)
                     for (int edof_i = 0; edof_i < 4; edof_i++) {
@@ -390,21 +260,9 @@ __global__ void cu_quadshell4_resample_gap_local_kernel(
                 }
 
                 {
-                    real_t eval_xnormal = 0;
-                    real_t eval_ynormal = 0;
-                    real_t eval_znormal = 0;
-
-#pragma unroll(8)
-                    for (int edof_j = 0; edof_j < 8; edof_j++) {
-                        eval_xnormal += hex8_grad_x[edof_j] * coeffs[edof_j];
-                        eval_ynormal += hex8_grad_y[edof_j] * coeffs[edof_j];
-                        eval_znormal += hex8_grad_z[edof_j] * coeffs[edof_j];
-                    }
-
-                    // Physical gradient (anisotropic voxel spacing)
-                    eval_xnormal /= dx;
-                    eval_ynormal /= dy;
-                    eval_znormal /= dz;
+                    real_t eval_xnormal = eval_grad[0];
+                    real_t eval_ynormal = eval_grad[1];
+                    real_t eval_znormal = eval_grad[2];
 
                     const real_t denom =
                             sqrt(eval_xnormal * eval_xnormal + eval_ynormal * eval_ynormal + eval_znormal * eval_znormal);
@@ -592,13 +450,6 @@ __global__ void cu_quadshell4_resample_gap_value_local_kernel(
         const geom_t* const SFEM_RESTRICT    data,
         // Output
         real_t* const SFEM_RESTRICT wg) {
-    const real_t ox = (real_t)origin[0];
-    const real_t oy = (real_t)origin[1];
-    const real_t oz = (real_t)origin[2];
-
-    const real_t dx = (real_t)delta[0];
-    const real_t dy = (real_t)delta[1];
-    const real_t dz = (real_t)delta[2];
 
     static const int      n_qp  = 6;
     static const scalar_t qx[6] = {0.03376524290, 0.1693953068, 0.3806904070, 0.6193095930, 0.8306046932, 0.9662347571};
@@ -607,9 +458,6 @@ __global__ void cu_quadshell4_resample_gap_value_local_kernel(
     for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements; e += blockDim.x * gridDim.x) {
         idx_t  ev[4];
         geom_t x[4], y[4], z[4];
-
-        real_t hex8_f[8];
-        real_t coeffs[8];
 
         real_t quad4_f[4];
         real_t element_gap[4];
@@ -680,19 +528,12 @@ __global__ void cu_quadshell4_resample_gap_value_local_kernel(
 #endif
                 const real_t dV = measure * qw[q_ix] * qw[q_iy];
 
-                const real_t grid_x = (g_qx - ox) / dx;
-                const real_t grid_y = (g_qy - oy) / dy;
-                const real_t grid_z = (g_qz - oz) / dz;
-
-                const ptrdiff_t i = floor(grid_x);
-                const ptrdiff_t j = floor(grid_y);
-                const ptrdiff_t k = floor(grid_z);
-
+                real_t eval_value;
                 // If outside grid: inject -infty before wg -= so stored gap becomes +infty.
                 // sample_value() feeds ShiftedPenalty upper bounds (n·u ≤ ub); +infty keeps the
                 // constraint inactive. (gap_local uses +infty here instead → stored -infty for
                 // signed-distance / viz semantics.)
-                if (i < 0 || j < 0 || k < 0 || (i + 1 >= n[0]) || (j + 1 >= n[1]) || (k + 1 >= n[2])) {
+                if (!sdf_sample<0>(n, stride, origin, delta, data, g_qx, g_qy, g_qz, &eval_value, nullptr, nullptr)) {
                     for (int edof_i = 0; edof_i < 4; edof_i++) {
                         element_gap[edof_i] += -infty * quad4_f[edof_i] * dV;
                     }
@@ -700,30 +541,9 @@ __global__ void cu_quadshell4_resample_gap_value_local_kernel(
                     continue;
                 }
 
-                // Get the reminder [0, 1]
-                real_t l_x = (grid_x - i);
-                real_t l_y = (grid_y - j);
-                real_t l_z = (grid_z - k);
-
-                assert(l_x >= -1e-8);
-                assert(l_y >= -1e-8);
-                assert(l_z >= -1e-8);
-
-                assert(l_x <= 1 + 1e-8);
-                assert(l_y <= 1 + 1e-8);
-                assert(l_z <= 1 + 1e-8);
-
-                cu_hex_aa_8_eval_fun(l_x, l_y, l_z, hex8_f);
-                cu_hex_aa_8_collect_coeffs(stride, i, j, k, data, coeffs);
-
                 // Integrate gap function
                 {
-                    real_t eval_gap = 0;
-
-#pragma unroll(8)
-                    for (int edof_j = 0; edof_j < 8; edof_j++) {
-                        eval_gap += hex8_f[edof_j] * coeffs[edof_j];
-                    }
+                    const real_t eval_gap = eval_value;
 
 #pragma unroll(4)
                     for (int edof_i = 0; edof_i < 4; edof_i++) {
@@ -781,13 +601,6 @@ __global__ void cu_quadshell4_resample_gap_normals_local_kernel(
         const geom_t* const SFEM_RESTRICT    data,
         // Output
         real_t** const SFEM_RESTRICT normals) {
-    const real_t ox = (real_t)origin[0];
-    const real_t oy = (real_t)origin[1];
-    const real_t oz = (real_t)origin[2];
-
-    const real_t dx = (real_t)delta[0];
-    const real_t dy = (real_t)delta[1];
-    const real_t dz = (real_t)delta[2];
 
     static const int      n_qp  = 6;
     static const scalar_t qx[6] = {0.03376524290, 0.1693953068, 0.3806904070, 0.6193095930, 0.8306046932, 0.9662347571};
@@ -796,11 +609,6 @@ __global__ void cu_quadshell4_resample_gap_normals_local_kernel(
     for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements; e += blockDim.x * gridDim.x) {
         idx_t  ev[4];
         geom_t x[4], y[4], z[4];
-
-        real_t hex8_grad_x[8];
-        real_t hex8_grad_y[8];
-        real_t hex8_grad_z[8];
-        real_t coeffs[8];
 
         real_t quad4_f[4];
         real_t element_xnormal[4];
@@ -892,16 +700,9 @@ __global__ void cu_quadshell4_resample_gap_normals_local_kernel(
                 const real_t dV = measure * qw[q_ix] * qw[q_iy];
                 assert(dV > 0);
 
-                const real_t grid_x = (g_qx - ox) / dx;
-                const real_t grid_y = (g_qy - oy) / dy;
-                const real_t grid_z = (g_qz - oz) / dz;
-
-                const ptrdiff_t i = floor(grid_x);
-                const ptrdiff_t j = floor(grid_y);
-                const ptrdiff_t k = floor(grid_z);
-
+                real_t eval_value, eval_grad[3];
                 // If outside
-                if (i < 0 || j < 0 || k < 0 || (i + 1 >= n[0]) || (j + 1 >= n[1]) || (k + 1 >= n[2])) {
+                if (!sdf_sample<1>(n, stride, origin, delta, data, g_qx, g_qy, g_qz, &eval_value, eval_grad, nullptr)) {
                     for (int edof_i = 0; edof_i < 4; edof_i++) {
                         element_xnormal[edof_i] += face_nx * quad4_f[edof_i] * dV;
                         element_ynormal[edof_i] += face_ny * quad4_f[edof_i] * dV;
@@ -911,39 +712,10 @@ __global__ void cu_quadshell4_resample_gap_normals_local_kernel(
                     continue;
                 }
 
-                // Get the reminder [0, 1]
-                real_t l_x = (grid_x - i);
-                real_t l_y = (grid_y - j);
-                real_t l_z = (grid_z - k);
-
-                assert(l_x >= -1e-8);
-                assert(l_y >= -1e-8);
-                assert(l_z >= -1e-8);
-
-                assert(l_x <= 1 + 1e-8);
-                assert(l_y <= 1 + 1e-8);
-                assert(l_z <= 1 + 1e-8);
-
-                cu_hex_aa_8_eval_grad(
-                        cu_put_inside(l_x), cu_put_inside(l_y), cu_put_inside(l_z), hex8_grad_x, hex8_grad_y, hex8_grad_z);
-                cu_hex_aa_8_collect_coeffs(stride, i, j, k, data, coeffs);
-
                 {
-                    real_t eval_xnormal = 0;
-                    real_t eval_ynormal = 0;
-                    real_t eval_znormal = 0;
-
-#pragma unroll(8)
-                    for (int edof_j = 0; edof_j < 8; edof_j++) {
-                        eval_xnormal += hex8_grad_x[edof_j] * coeffs[edof_j];
-                        eval_ynormal += hex8_grad_y[edof_j] * coeffs[edof_j];
-                        eval_znormal += hex8_grad_z[edof_j] * coeffs[edof_j];
-                    }
-
-                    // Physical gradient (anisotropic voxel spacing)
-                    eval_xnormal /= dx;
-                    eval_ynormal /= dy;
-                    eval_znormal /= dz;
+                    real_t eval_xnormal = eval_grad[0];
+                    real_t eval_ynormal = eval_grad[1];
+                    real_t eval_znormal = eval_grad[2];
 
                     const real_t denom =
                             sqrt(eval_xnormal * eval_xnormal + eval_ynormal * eval_ynormal + eval_znormal * eval_znormal);

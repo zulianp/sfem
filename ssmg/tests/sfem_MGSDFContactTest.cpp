@@ -46,7 +46,7 @@ struct EnvOptions {
         EnvOptions ret{.execution_space      = sfem::EXECUTION_SPACE_HOST,
                        .base_resolution      = smesh::Env::read("SFEM_BASE_RESOLUTION", int(1)),
                        .disp_y               = smesh::Env::read("SFEM_DISP_Y", real_t(-0.05)),
-                       .enable_output        = smesh::Env::read("SFEM_ENABLE_OUTPUT", int(1)),
+                       .enable_output        = smesh::Env::read("SFEM_ENABLE_OUTPUT", int(0)),
                        .element_refine_level = smesh::Env::read("SFEM_ELEMENT_REFINE_LEVEL", int(2)),
                        .y_top                = smesh::Env::read("SFEM_Y_TOP", geom_t(0.05)),
                        .operator_name        = smesh::Env::read_string("SFEM_OPERATOR", "LinearElasticity"),
@@ -77,6 +77,30 @@ static void write_sdf_output(const std::shared_ptr<sfem::Communicator> &comm, co
     if (comm) {
         comm->barrier();
     }
+}
+
+// The contact side may enter the obstacle by no more than this at the solution, 2e-3 of the
+// imposed 0.05. The solver converges the linearised constraint, so what is left geometrically is
+// the last linearisation's error, which the solver settings set: 2e-9 to 6e-6 across the cases
+// with the defaults, up to 3.5e-5 with bench_MaMAL's (SFEM_ATOL=1e-8, capped coarse solve), as
+// much as with trilinear sampling (3.4e-5).
+static const real_t penetration_tol = 1e-4;
+
+// The deepest penetration of the contact side into the obstacle at the displacement x: the gap
+// sampled at the deformed contact nodes, over all ranks. Host data only.
+static real_t max_penetration(const std::shared_ptr<sfem::ContactConditions> &contact_conds,
+                              const std::shared_ptr<sfem::Communicator>      &comm,
+                              const real_t *const                             x) {
+    const ptrdiff_t     n = contact_conds->n_constrained_dofs();
+    std::vector<real_t> g(n > 0 ? n : 1, 0);
+    contact_conds->signed_distance(x, g.data());
+    real_t deepest = 0;
+    for (ptrdiff_t i = 0; i < n; ++i) {
+        deepest = std::max(deepest, -g[i]);
+    }
+    deepest = comm ? comm->max(deepest) : deepest;
+    printf("max penetration %g\n", (double)deepest);
+    return deepest;
 }
 
 std::shared_ptr<sfem::ContactConditions> build_cuboid_sphere_contact(const std::shared_ptr<sfem::Function> &f,
@@ -387,10 +411,14 @@ int test_contact() {
         }
 
         auto solver = sfem::create_ssmgc(f, contact_conds, in);
-        solver->apply(rhs->data(), x->data());
+        SFEM_TEST_ASSERT(solver->apply(rhs->data(), x->data()) == SFEM_SUCCESS);
     } else {
         auto solver = sfem::create_shifted_penalty(f, contact_conds, nullptr);
-        solver->apply(rhs->data(), x->data());
+        SFEM_TEST_ASSERT(solver->apply(rhs->data(), x->data()) == SFEM_SUCCESS);
+    }
+
+    if (es != sfem::EXECUTION_SPACE_DEVICE) {
+        SFEM_TEST_ASSERT(max_penetration(contact_conds, comm, x->data()) < penetration_tol);
     }
 
     if (opts.enable_output) {
@@ -508,8 +536,9 @@ static int run_ssmgc_on_ss_mesh(const std::shared_ptr<sfem::Mesh>               
         nrm += x->data()[i] * x->data()[i];
     }
     SFEM_TEST_ASSERT(std::isfinite(nrm));
+    SFEM_TEST_ASSERT(max_penetration(contact_conds, comm, x->data()) < penetration_tol);
 
-    const int enable_output = smesh::Env::read("SFEM_ENABLE_OUTPUT", int(1));
+    const int enable_output = smesh::Env::read("SFEM_ENABLE_OUTPUT", int(0));
     if (enable_output && out_dir && out_dir[0]) {
         const smesh::Path root(out_dir);
         smesh::create_directory(root);

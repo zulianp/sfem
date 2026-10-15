@@ -3,96 +3,89 @@
 #include <math.h>
 #include <stdio.h>
 
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
+#include "sfem_sdf_sampling.hpp"
 
-static SFEM_INLINE real_t put_inside(const real_t v) { return MIN(MAX(1e-7, v), 1 - 1e-7); }
+// Nodal sampling of an SDF grid's interpolating cubic B-spline: `data` and `stride` are its
+// coefficients (sfem_sdf_sampling.hpp). The gap is -sdf / |grad sdf| (-sdf for the value alone),
+// the normal the field's unit gradient.
 
-SFEM_INLINE static void hex_aa_8_eval_fun(
-        // Quadrature point (local coordinates)
-        const real_t x,
-        const real_t y,
-        const real_t z,
-        // Output
-        real_t* const SFEM_RESTRICT f) {
-    f[0] = (1.0 - x) * (1.0 - y) * (1.0 - z);
-    f[1] = x * (1.0 - y) * (1.0 - z);
-    f[2] = x * y * (1.0 - z);
-    f[3] = (1.0 - x) * y * (1.0 - z);
-    f[4] = (1.0 - x) * (1.0 - y) * z;
-    f[5] = x * (1.0 - y) * z;
-    f[6] = x * y * z;
-    f[7] = (1.0 - x) * y * z;
-}
+namespace {
+    // The ORDER-th derivatives of the B-spline s at the points X[node] + disp[3 node + d], for
+    // node = idx[i] (i when idx is null; disp may be null), summed in real_t. Writes entry i of
+    // whichever outputs are given:
+    //   gap        -s, with ORDER >= 1 -s / |grad s|
+    //   normals    grad s / |grad s|                              (ORDER >= 1, 3 rows)
+    //   curvature  (H - n m^T - m n^T) / |grad s|, m = H n        (ORDER >= 2, 6 rows)
+    // Outside the grid the gap is SFEM_SDF_UNREACHABLE and the normal and curvature are zero; so
+    // are they where the gradient vanishes.
+    template <int ORDER>
+    void sample_nodes(const ptrdiff_t                      nnodes,
+                      const idx_t* const SFEM_RESTRICT     idx,
+                      geom_t** const SFEM_RESTRICT         xyz,
+                      const real_t* const SFEM_RESTRICT    disp,
+                      const ptrdiff_t* const SFEM_RESTRICT n,
+                      const ptrdiff_t* const SFEM_RESTRICT stride,
+                      const geom_t* const SFEM_RESTRICT    origin,
+                      const geom_t* const SFEM_RESTRICT    delta,
+                      const geom_t* const SFEM_RESTRICT    data,
+                      real_t* const SFEM_RESTRICT          gap,
+                      real_t** const SFEM_RESTRICT         normals,
+                      real_t** const SFEM_RESTRICT         curvature) {
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < nnodes; ++i) {
+            const ptrdiff_t node = idx ? (ptrdiff_t)idx[i] : i;
+            real_t          p[3];
+            for (int d = 0; d < 3; ++d) {
+                p[d] = (real_t)xyz[d][node] + (disp ? disp[node * 3 + d] : real_t(0));
+            }
 
-SFEM_INLINE static void hex_aa_8_collect_coeffs(const ptrdiff_t* const SFEM_RESTRICT stride,
-                                                const ptrdiff_t                      i,
-                                                const ptrdiff_t                      j,
-                                                const ptrdiff_t                      k,
-                                                // Attention this is geometric data transformed to solver data!
-                                                const geom_t* const SFEM_RESTRICT data,
-                                                real_t* const SFEM_RESTRICT       out) {
-    const ptrdiff_t i0 = i * stride[0] + j * stride[1] + k * stride[2];
-    const ptrdiff_t i1 = (i + 1) * stride[0] + j * stride[1] + k * stride[2];
-    const ptrdiff_t i2 = (i + 1) * stride[0] + (j + 1) * stride[1] + k * stride[2];
-    const ptrdiff_t i3 = i * stride[0] + (j + 1) * stride[1] + k * stride[2];
-    const ptrdiff_t i4 = i * stride[0] + j * stride[1] + (k + 1) * stride[2];
-    const ptrdiff_t i5 = (i + 1) * stride[0] + j * stride[1] + (k + 1) * stride[2];
-    const ptrdiff_t i6 = (i + 1) * stride[0] + (j + 1) * stride[1] + (k + 1) * stride[2];
-    const ptrdiff_t i7 = i * stride[0] + (j + 1) * stride[1] + (k + 1) * stride[2];
+            real_t s, g[3] = {0, 0, 0}, H[6] = {0, 0, 0, 0, 0, 0};
+            if (!sdf_sample<ORDER>(n, stride, origin, delta, data, p[0], p[1], p[2], &s, g, H)) {
+                if (gap) gap[i] = SFEM_SDF_UNREACHABLE;
+                if (normals) {
+                    for (int d = 0; d < 3; ++d) normals[d][i] = 0;
+                }
+                if (curvature) {
+                    for (int c = 0; c < 6; ++c) curvature[c][i] = 0;
+                }
+                continue;
+            }
 
-    out[0] = data[i0];
-    out[1] = data[i1];
-    out[2] = data[i2];
-    out[3] = data[i3];
-    out[4] = data[i4];
-    out[5] = data[i5];
-    out[6] = data[i6];
-    out[7] = data[i7];
-}
+            const real_t q = sqrt(g[0] * g[0] + g[1] * g[1] + g[2] * g[2]);
+            if (ORDER == 0 || q == 0) {
+                if (gap) gap[i] = -s;
+                if (normals) {
+                    for (int d = 0; d < 3; ++d) normals[d][i] = 0;
+                }
+                if (curvature) {
+                    for (int c = 0; c < 6; ++c) curvature[c][i] = 0;
+                }
+                continue;
+            }
 
-SFEM_INLINE static void hex_aa_8_eval_grad(
-        // Quadrature point (local coordinates)
-        const real_t x,
-        const real_t y,
-        const real_t z,
-        // Output
-        real_t* const SFEM_RESTRICT gx,
-        real_t* const SFEM_RESTRICT gy,
-        real_t* const SFEM_RESTRICT gz) {
-    // Transformation to ref element
-    gx[0] = -(1.0 - y) * (1.0 - z);
-    gy[0] = -(1.0 - x) * (1.0 - z);
-    gz[0] = -(1.0 - x) * (1.0 - y);
+            const real_t nn[3] = {g[0] / q, g[1] / q, g[2] / q};
+            if (gap) gap[i] = -s / q;
+            if (normals) {
+                for (int d = 0; d < 3; ++d) normals[d][i] = nn[d];
+            }
 
-    gx[1] = (1.0 - y) * (1.0 - z);
-    gy[1] = -x * (1.0 - z);
-    gz[1] = -x * (1.0 - y);
-
-    gx[2] = y * (1.0 - z);
-    gy[2] = x * (1.0 - z);
-    gz[2] = -x * y;
-
-    gx[3] = -y * (1.0 - z);
-    gy[3] = (1.0 - x) * (1.0 - z);
-    gz[3] = -(1.0 - x) * y;
-
-    gx[4] = -(1.0 - y) * z;
-    gy[4] = -(1.0 - x) * z;
-    gz[4] = (1.0 - x) * (1.0 - y);
-
-    gx[5] = (1.0 - y) * z;
-    gy[5] = -x * z;
-    gz[5] = x * (1.0 - y);
-
-    gx[6] = y * z;
-    gy[6] = x * z;
-    gz[6] = x * y;
-
-    gx[7] = -y * z;
-    gy[7] = (1.0 - x) * z;
-    gz[7] = (1.0 - x) * y;
-}
+            if (ORDER >= 2 && curvature) {
+                // m = H n = grad |grad s|; the Hessian of the gap -s / |grad s| at s = 0 is
+                // -(H - n m^T - m n^T) / |grad s|.
+                const real_t m[3] = {H[0] * nn[0] + H[1] * nn[1] + H[2] * nn[2],
+                                     H[1] * nn[0] + H[3] * nn[1] + H[4] * nn[2],
+                                     H[2] * nn[0] + H[4] * nn[1] + H[5] * nn[2]};
+                int c = 0;
+                for (int a = 0; a < 3; ++a) {
+                    for (int b = a; b < 3; ++b) {
+                        curvature[c][i] = (H[c] - nn[a] * m[b] - m[a] * nn[b]) / q;
+                        c++;
+                    }
+                }
+            }
+        }
+    }
+}  // namespace
 
 int interpolate_gap(const ptrdiff_t              nnodes,
                     geom_t** const SFEM_RESTRICT xyz,
@@ -107,114 +100,9 @@ int interpolate_gap(const ptrdiff_t              nnodes,
                     real_t* const SFEM_RESTRICT xnormal,
                     real_t* const SFEM_RESTRICT ynormal,
                     real_t* const SFEM_RESTRICT znormal) {
-    if (!nnodes) return 0;
-
-    const real_t ox = (real_t)origin[0];
-    const real_t oy = (real_t)origin[1];
-    const real_t oz = (real_t)origin[2];
-
-    const real_t dx = (real_t)delta[0];
-    const real_t dy = (real_t)delta[1];
-    const real_t dz = (real_t)delta[2];
-
-#pragma omp parallel for
-    for (ptrdiff_t node = 0; node < nnodes; ++node) {
-        real_t hex8_f[8];
-        real_t hex8_grad_x[8];
-        real_t hex8_grad_y[8];
-        real_t hex8_grad_z[8];
-        real_t coeffs[8];
-
-        const real_t x = xyz[0][node];
-        const real_t y = xyz[1][node];
-        const real_t z = xyz[2][node];
-
-        const real_t grid_x = (x - ox) / dx;
-        const real_t grid_y = (y - oy) / dy;
-        const real_t grid_z = (z - oz) / dz;
-
-        const ptrdiff_t i = floor(grid_x);
-        const ptrdiff_t j = floor(grid_y);
-        const ptrdiff_t k = floor(grid_z);
-
-        // If outside
-        if (i < 0 || j < 0 || k < 0 || (i + 1 >= n[0]) || (j + 1 >= n[1]) || (k + 1 >= n[2])) {
-            SFEM_ERROR(
-                    "(%g, %g, %g) (%ld, %ld, %ld) outside domain  (%ld, %ld, "
-                    "%ld)!\n",
-                    x,
-                    y,
-                    z,
-                    i,
-                    j,
-                    k,
-                    n[0],
-                    n[1],
-                    n[2]);
-            continue;
-        }
-
-        // Get the reminder [0, 1]
-        real_t l_x = (grid_x - i);
-        real_t l_y = (grid_y - j);
-        real_t l_z = (grid_z - k);
-
-        assert(l_x >= -1e-8);
-        assert(l_y >= -1e-8);
-        assert(l_z >= -1e-8);
-
-        assert(l_x <= 1 + 1e-8);
-        assert(l_y <= 1 + 1e-8);
-        assert(l_z <= 1 + 1e-8);
-
-        hex_aa_8_eval_fun(l_x, l_y, l_z, hex8_f);
-        hex_aa_8_eval_grad(put_inside(l_x), put_inside(l_y), put_inside(l_z), hex8_grad_x, hex8_grad_y, hex8_grad_z);
-
-        hex_aa_8_collect_coeffs(stride, i, j, k, data, coeffs);
-
-        // Interpolate gap function
-        {
-            real_t eval_gap = 0;
-
-#pragma unroll(8)
-            for (int edof_j = 0; edof_j < 8; edof_j++) {
-                eval_gap += hex8_f[edof_j] * coeffs[edof_j];
-            }
-
-            g[node] = -eval_gap;
-        }
-
-        // Interpolate normals
-        {
-            real_t eval_xnormal = 0;
-            real_t eval_ynormal = 0;
-            real_t eval_znormal = 0;
-
-#pragma unroll(8)
-            for (int edof_j = 0; edof_j < 8; edof_j++) {
-                eval_xnormal += hex8_grad_x[edof_j] * coeffs[edof_j];
-                eval_ynormal += hex8_grad_y[edof_j] * coeffs[edof_j];
-                eval_znormal += hex8_grad_z[edof_j] * coeffs[edof_j];
-            }
-
-            {
-                // Normalize
-                real_t denom = sqrt(eval_xnormal * eval_xnormal + eval_ynormal * eval_ynormal + eval_znormal * eval_znormal);
-
-                assert(denom != 0);
-
-                eval_xnormal /= denom;
-                eval_ynormal /= denom;
-                eval_znormal /= denom;
-            }
-
-            xnormal[node] = eval_xnormal;
-            ynormal[node] = eval_ynormal;
-            znormal[node] = eval_znormal;
-        }
-    }
-
-    return 0;
+    real_t* normals[3] = {xnormal, ynormal, znormal};
+    sample_nodes<1>(nnodes, nullptr, xyz, nullptr, n, stride, origin, delta, data, g, normals, nullptr);
+    return SFEM_SUCCESS;
 }
 
 int interpolate_gap_normals(const ptrdiff_t              nnodes,
@@ -229,101 +117,8 @@ int interpolate_gap_normals(const ptrdiff_t              nnodes,
                             real_t* const SFEM_RESTRICT xnormal,
                             real_t* const SFEM_RESTRICT ynormal,
                             real_t* const SFEM_RESTRICT znormal) {
-    if (!nnodes) return 0;
-
-    const real_t ox = (real_t)origin[0];
-    const real_t oy = (real_t)origin[1];
-    const real_t oz = (real_t)origin[2];
-
-    const real_t dx = (real_t)delta[0];
-    const real_t dy = (real_t)delta[1];
-    const real_t dz = (real_t)delta[2];
-
-#pragma omp parallel for  // nowait
-    for (ptrdiff_t node = 0; node < nnodes; ++node) {
-        real_t hex8_f[8];
-        real_t hex8_grad_x[8];
-        real_t hex8_grad_y[8];
-        real_t hex8_grad_z[8];
-        real_t coeffs[8];
-
-        const real_t x = xyz[0][node];
-        const real_t y = xyz[1][node];
-        const real_t z = xyz[2][node];
-
-        const real_t grid_x = (x - ox) / dx;
-        const real_t grid_y = (y - oy) / dy;
-        const real_t grid_z = (z - oz) / dz;
-
-        const ptrdiff_t i = floor(grid_x);
-        const ptrdiff_t j = floor(grid_y);
-        const ptrdiff_t k = floor(grid_z);
-
-        // If outside
-        if (i < 0 || j < 0 || k < 0 || (i + 1 >= n[0]) || (j + 1 >= n[1]) || (k + 1 >= n[2])) {
-            SFEM_ERROR(
-                    "(%g, %g, %g) (%ld, %ld, %ld) outside domain  (%ld, %ld, "
-                    "%ld)!\n",
-                    x,
-                    y,
-                    z,
-                    i,
-                    j,
-                    k,
-                    n[0],
-                    n[1],
-                    n[2]);
-            continue;
-        }
-
-        // Get the reminder [0, 1]
-        real_t l_x = (grid_x - i);
-        real_t l_y = (grid_y - j);
-        real_t l_z = (grid_z - k);
-
-        assert(l_x >= -1e-8);
-        assert(l_y >= -1e-8);
-        assert(l_z >= -1e-8);
-
-        assert(l_x <= 1 + 1e-8);
-        assert(l_y <= 1 + 1e-8);
-        assert(l_z <= 1 + 1e-8);
-
-        hex_aa_8_eval_fun(l_x, l_y, l_z, hex8_f);
-        hex_aa_8_eval_grad(put_inside(l_x), put_inside(l_y), put_inside(l_z), hex8_grad_x, hex8_grad_y, hex8_grad_z);
-
-        hex_aa_8_collect_coeffs(stride, i, j, k, data, coeffs);
-
-        // Interpolate normals
-        {
-            real_t eval_xnormal = 0;
-            real_t eval_ynormal = 0;
-            real_t eval_znormal = 0;
-
-#pragma unroll(8)
-            for (int edof_j = 0; edof_j < 8; edof_j++) {
-                eval_xnormal += hex8_grad_x[edof_j] * coeffs[edof_j];
-                eval_ynormal += hex8_grad_y[edof_j] * coeffs[edof_j];
-                eval_znormal += hex8_grad_z[edof_j] * coeffs[edof_j];
-            }
-
-            {
-                // Normalize
-                real_t denom = sqrt(eval_xnormal * eval_xnormal + eval_ynormal * eval_ynormal + eval_znormal * eval_znormal);
-
-                assert(denom != 0);
-
-                eval_xnormal /= denom;
-                eval_ynormal /= denom;
-                eval_znormal /= denom;
-            }
-
-            xnormal[node] = eval_xnormal;
-            ynormal[node] = eval_ynormal;
-            znormal[node] = eval_znormal;
-        }
-    }
-
+    real_t* normals[3] = {xnormal, ynormal, znormal};
+    sample_nodes<1>(nnodes, nullptr, xyz, nullptr, n, stride, origin, delta, data, nullptr, normals, nullptr);
     return SFEM_SUCCESS;
 }
 
@@ -337,67 +132,39 @@ int interpolate_gap_value(const ptrdiff_t              nnodes,
                           const geom_t* const SFEM_RESTRICT    data,
                           // Output
                           real_t* const SFEM_RESTRICT g) {
-    if (!nnodes) return 0;
+    sample_nodes<0>(nnodes, nullptr, xyz, nullptr, n, stride, origin, delta, data, g, nullptr, nullptr);
+    return SFEM_SUCCESS;
+}
 
-    const real_t ox = (real_t)origin[0];
-    const real_t oy = (real_t)origin[1];
-    const real_t oz = (real_t)origin[2];
+int interpolate_displaced_gap(const ptrdiff_t                   nnodes,
+                              const idx_t* const SFEM_RESTRICT  idx,
+                              geom_t** const SFEM_RESTRICT      xyz,
+                              const real_t* const SFEM_RESTRICT disp,
+                              // SDF
+                              const ptrdiff_t* const SFEM_RESTRICT n,
+                              const ptrdiff_t* const SFEM_RESTRICT stride,
+                              const geom_t* const SFEM_RESTRICT    origin,
+                              const geom_t* const SFEM_RESTRICT    delta,
+                              const geom_t* const SFEM_RESTRICT    data,
+                              // Output
+                              real_t* const SFEM_RESTRICT  g,
+                              real_t** const SFEM_RESTRICT normals) {
+    sample_nodes<1>(nnodes, idx, xyz, disp, n, stride, origin, delta, data, g, normals, nullptr);
+    return SFEM_SUCCESS;
+}
 
-    const real_t dx = (real_t)delta[0];
-    const real_t dy = (real_t)delta[1];
-    const real_t dz = (real_t)delta[2];
-
-#pragma omp parallel for
-    for (ptrdiff_t node = 0; node < nnodes; ++node) {
-        real_t hex8_f[8];
-        real_t coeffs[8];
-
-        const real_t x = xyz[0][node];
-        const real_t y = xyz[1][node];
-        const real_t z = xyz[2][node];
-
-        const real_t grid_x = (x - ox) / dx;
-        const real_t grid_y = (y - oy) / dy;
-        const real_t grid_z = (z - oz) / dz;
-
-        const ptrdiff_t i = floor(grid_x);
-        const ptrdiff_t j = floor(grid_y);
-        const ptrdiff_t k = floor(grid_z);
-
-        // If outside
-        if (i < 0 || j < 0 || k < 0 || (i + 1 >= n[0]) || (j + 1 >= n[1]) || (k + 1 >= n[2])) {
-            SFEM_ERROR("(%g, %g, %g) (%ld, %ld, %ld) outside domain  (%ld, %ld, %ld)!\n", x, y, z, i, j, k, n[0], n[1], n[2]);
-            continue;
-        }
-
-        // Get the reminder [0, 1]
-        real_t l_x = (grid_x - i);
-        real_t l_y = (grid_y - j);
-        real_t l_z = (grid_z - k);
-
-        assert(l_x >= -1e-8);
-        assert(l_y >= -1e-8);
-        assert(l_z >= -1e-8);
-
-        assert(l_x <= 1 + 1e-8);
-        assert(l_y <= 1 + 1e-8);
-        assert(l_z <= 1 + 1e-8);
-
-        hex_aa_8_eval_fun(l_x, l_y, l_z, hex8_f);
-        hex_aa_8_collect_coeffs(stride, i, j, k, data, coeffs);
-
-        // Interpolate gap function
-        {
-            real_t eval_gap = 0;
-
-#pragma unroll(8)
-            for (int edof_j = 0; edof_j < 8; edof_j++) {
-                eval_gap += hex8_f[edof_j] * coeffs[edof_j];
-            }
-
-            g[node] = -eval_gap;
-        }
-    }
-
+int interpolate_displaced_curvature(const ptrdiff_t                   nnodes,
+                                    const idx_t* const SFEM_RESTRICT  idx,
+                                    geom_t** const SFEM_RESTRICT      xyz,
+                                    const real_t* const SFEM_RESTRICT disp,
+                                    // SDF
+                                    const ptrdiff_t* const SFEM_RESTRICT n,
+                                    const ptrdiff_t* const SFEM_RESTRICT stride,
+                                    const geom_t* const SFEM_RESTRICT    origin,
+                                    const geom_t* const SFEM_RESTRICT    delta,
+                                    const geom_t* const SFEM_RESTRICT    data,
+                                    // Output
+                                    real_t** const SFEM_RESTRICT curvature) {
+    sample_nodes<2>(nnodes, idx, xyz, disp, n, stride, origin, delta, data, nullptr, nullptr, curvature);
     return SFEM_SUCCESS;
 }
