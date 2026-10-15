@@ -11,196 +11,521 @@
 #include "sfem_API.hpp"
 #include "sfem_BSR.hpp"
 #include "sfem_Function.hpp"
+#include "sfem_mprgp.hpp"
 #include "sfem_prony_test_material.hpp"
 #include "sfem_test.hpp"
+#include "smesh_grid.hpp"
 #include "smesh_sideset.hpp"
 
-namespace smesh {
-    SharedBuffer<idx_t> create_nodeset_from_sidesets(const std::shared_ptr<Mesh>&                 mesh,
-                                                     const std::vector<std::shared_ptr<Sideset>>& sidesets);
+#include "sfem_SDFObstacle.hpp"
+
+// The obstacle as a signed distance function, positive inside: a shape cut off by a box wide
+// enough for the mesh to fall onto it and spread over it, the cut's edges rounded with `edge`.
+// It is sampled on an SDF grid over the box and a margin (see obstacle_grid); the grid is the
+// obstacle the contact sees. The body approaches the obstacle along -dir.
+//
+// SFEM_OBSTACLE_TYPE:
+//   0: a plane at SFEM_CONTACT_PLANE along dir
+//   1: a plane sloping by SFEM_OBSTACLE_SLOPE along SFEM_SLOPE_DIR, highest under the mesh at
+//      SFEM_CONTACT_PLANE
+//   2: a staircase descending along SFEM_SLOPE_DIR from SFEM_CONTACT_PLANE under the mesh,
+//      treads SFEM_STEP_HEIGHT wide, each SFEM_STEP_DEPTH (< 0) below the last
+//   4: a hemisphere on a floor; by default centred under the mesh, its top at SFEM_CONTACT_PLANE
+//
+// A contact node is held along one normal, so the normal must not jump and the curvature must
+// stay bounded: the obstacles' concave creases (the hemisphere and the floor, a riser and the
+// tread below) and convex edges (a step's nose) are rounded with radius SFEM_OBSTACLE_FILLET.
+// Elsewhere each is an exact signed distance outside the obstacle, where contact is decided.
+struct Obstacle {
+    std::function<real_t(const real_t, const real_t, const real_t)> sdf;
+    real_t                                                          lo[3], hi[3];  // the grid's box
+    real_t                                                          fillet;
+};
+
+// The union of two obstacles, positive inside, rounded within k of a crease (polynomial smooth
+// maximum; the plain maximum for k = 0).
+static real_t rounded_union(const real_t a, const real_t b, const real_t k) {
+    const real_t blend = k > 0 ? std::max(k - std::abs(a - b), real_t(0)) / k : 0;
+    return std::max(a, b) + blend * blend * k / 4;
 }
 
-static void compute_contact_lower_bound(real_t*          lower_bound,
-                                        const real_t*    displacement,
-                                        geom_t* const*   ref_coords,  // Reference coordinates: ref_coords[dim][node]
-                                        const ptrdiff_t* contact_nodes,
-                                        const ptrdiff_t  n_contact_nodes,
-                                        const real_t     contact_plane,  // ABSOLUTE coordinate of contact plane (e.g., z=0)
-                                        const int        contact_dir,
-                                        const int        block_size,
-                                        const ptrdiff_t  ndofs,
-                                        const real_t     default_lb = -1000.0) {
-    for (ptrdiff_t i = 0; i < ndofs; i++) {
-        lower_bound[i] = default_lb;
+static Obstacle create_obstacle(const real_t* const min_c, const real_t* const max_c, const int dir) {
+    const int h1 = dir == 0 ? 1 : 0;
+    const int h2 = dir == 2 ? 1 : 2;
+
+    int    SFEM_OBSTACLE_TYPE  = 4;
+    real_t SFEM_CONTACT_PLANE  = 0;
+    real_t SFEM_OBSTACLE_SLOPE = 0.2;
+    int    SFEM_SLOPE_DIR      = h1;
+    real_t SFEM_STEP_HEIGHT    = 0.25;
+    real_t SFEM_STEP_DEPTH     = -0.05;
+    SFEM_READ_ENV(SFEM_OBSTACLE_TYPE, atoi);
+    SFEM_READ_ENV(SFEM_CONTACT_PLANE, atof);
+    SFEM_READ_ENV(SFEM_OBSTACLE_SLOPE, atof);
+    SFEM_READ_ENV(SFEM_SLOPE_DIR, atoi);
+    SFEM_READ_ENV(SFEM_STEP_HEIGHT, atof);
+    SFEM_READ_ENV(SFEM_STEP_DEPTH, atof);
+
+    real_t SFEM_HEMISPHERE_RADIUS = 0.25 * std::min(max_c[h1] - min_c[h1], max_c[h2] - min_c[h2]);
+    SFEM_READ_ENV(SFEM_HEMISPHERE_RADIUS, atof);
+    real_t center[3];
+    center[h1]                      = (min_c[h1] + max_c[h1]) / 2;
+    center[h2]                      = (min_c[h2] + max_c[h2]) / 2;
+    center[dir]                     = SFEM_CONTACT_PLANE - SFEM_HEMISPHERE_RADIUS;
+    real_t SFEM_HEMISPHERE_CENTER_X = center[0];
+    real_t SFEM_HEMISPHERE_CENTER_Y = center[1];
+    real_t SFEM_HEMISPHERE_CENTER_Z = center[2];
+    SFEM_READ_ENV(SFEM_HEMISPHERE_CENTER_X, atof);
+    SFEM_READ_ENV(SFEM_HEMISPHERE_CENTER_Y, atof);
+    SFEM_READ_ENV(SFEM_HEMISPHERE_CENTER_Z, atof);
+
+    if ((SFEM_OBSTACLE_TYPE == 1 || SFEM_OBSTACLE_TYPE == 2) &&
+        (SFEM_SLOPE_DIR == dir || SFEM_SLOPE_DIR < 0 || SFEM_SLOPE_DIR > 2)) {
+        SFEM_ERROR("SFEM_SLOPE_DIR=%d must be a tangential axis of SFEM_CONTACT_DIR=%d\n", SFEM_SLOPE_DIR, dir);
     }
-    for (ptrdiff_t i = 0; i < n_contact_nodes; i++) {
-        const ptrdiff_t node_idx     = contact_nodes[i];
-        const ptrdiff_t dof_idx      = node_idx * block_size + contact_dir;
-        const real_t    current_disp = displacement[dof_idx];
-        const real_t    ref_coord    = ref_coords[contact_dir][node_idx];
-        // Constraint: ref_coord + disp + delta >= contact_plane
-        // => delta >= contact_plane - ref_coord - disp
-        lower_bound[dof_idx] = contact_plane - ref_coord - current_disp;
-    }
-}
-
-// Stepped obstacle: contact plane varies with y coordinate in steps
-// Creates a staircase-like obstacle that works with box constraints
-// Uses REFERENCE coordinates to keep constraints stable throughout simulation
-static void compute_contact_lower_bound_stepped(
-        real_t*          lower_bound,
-        const real_t*    displacement,
-        geom_t* const*   ref_coords,  // Reference coordinates: ref_coords[dim][node]
-        const ptrdiff_t* contact_nodes,
-        const ptrdiff_t  n_contact_nodes,
-        const real_t     base_plane,   // Base contact plane (at y=0)
-        const real_t     step_height,  // Height of each step in y direction
-        const real_t     step_depth,   // Depth change per step in x direction (negative = deeper)
-        const int        contact_dir,  // Direction of contact constraint (0=x)
-        const int        slope_dir,    // Direction for steps (1=y)
-        const int        block_size,
-        const ptrdiff_t  ndofs,
-        const real_t     default_lb = -1000.0) {
-    for (ptrdiff_t i = 0; i < ndofs; i++) {
-        lower_bound[i] = default_lb;
-    }
-    for (ptrdiff_t i = 0; i < n_contact_nodes; i++) {
-        const ptrdiff_t node_idx = contact_nodes[i];
-        const ptrdiff_t dof_idx  = node_idx * block_size + contact_dir;
-
-        // Use REFERENCE coordinate (stable constraint throughout simulation)
-        const real_t ref_slope_coord = ref_coords[slope_dir][node_idx] + displacement[node_idx * block_size + slope_dir];
-
-        // Compute which step this node is on based on reference y position
-        int step_num = (int)(ref_slope_coord / step_height);
-        if (step_num < 0) step_num = 0;  // Clamp to first step
-
-        // Compute local contact plane position for this step
-        const real_t local_plane = base_plane + step_num * step_depth;
-
-        const real_t current_disp = displacement[dof_idx];
-        lower_bound[dof_idx]      = local_plane - current_disp;
-    }
-}
-
-// Triangular obstacle: contact plane varies with y coordinate
-// Creates a V-shaped or ramp obstacle
-static void compute_contact_lower_bound_triangular(real_t*          lower_bound,
-                                                   const real_t*    displacement,
-                                                   geom_t* const*   ref_coords,  // Reference coordinates: ref_coords[dim][node]
-                                                   const ptrdiff_t* contact_nodes,
-                                                   const ptrdiff_t  n_contact_nodes,
-                                                   const real_t     base_plane,   // Base contact plane (at y=0)
-                                                   const real_t     slope,        // Slope: how much plane moves per unit y
-                                                   const int        contact_dir,  // Direction of contact constraint (0=x)
-                                                   const int        slope_dir,    // Direction for slope calculation (1=y)
-                                                   const int        block_size,
-                                                   const ptrdiff_t  ndofs,
-                                                   const real_t     default_lb = -1000.0) {
-    for (ptrdiff_t i = 0; i < ndofs; i++) {
-        lower_bound[i] = default_lb;
-    }
-    for (ptrdiff_t i = 0; i < n_contact_nodes; i++) {
-        const ptrdiff_t node_idx = contact_nodes[i];
-        const ptrdiff_t dof_idx  = node_idx * block_size + contact_dir;
-
-        // Get reference coordinate in slope direction (coords stored as [dim][node])
-        const real_t ref_slope_coord = ref_coords[slope_dir][node_idx] + displacement[node_idx * block_size + slope_dir];
-
-        // Compute local contact plane position: plane = base + slope * y
-        const real_t local_plane = base_plane + slope * ref_slope_coord;
-
-        const real_t current_disp = displacement[dof_idx];
-        lower_bound[dof_idx]      = local_plane - current_disp;
-    }
-}
-
-// Hemisphere obstacle: contact with a hemispherical surface
-// Hemisphere equation: (x-cx)² + (y-cy)² + (z-cz)² = R²
-static void compute_contact_lower_bound_hemisphere(real_t*          lower_bound,
-                                                   const real_t*    displacement,
-                                                   geom_t* const*   ref_coords,
-                                                   const ptrdiff_t* contact_nodes,
-                                                   const ptrdiff_t  n_contact_nodes,
-                                                   const real_t     center_x,
-                                                   const real_t     center_y,
-                                                   const real_t     center_z,
-                                                   const real_t     radius,
-                                                   const int        contact_dir,  // Direction of constraint (0=x)
-                                                   const int        block_size,
-                                                   const ptrdiff_t  ndofs,
-                                                   const real_t     default_lb = -1000.0) {
-    for (ptrdiff_t i = 0; i < ndofs; i++) {
-        lower_bound[i] = default_lb;
+    if (SFEM_OBSTACLE_TYPE == 2 && !(SFEM_STEP_DEPTH < 0 && SFEM_STEP_HEIGHT > 0)) {
+        SFEM_ERROR("SFEM_STEP_DEPTH=%g must be negative and SFEM_STEP_HEIGHT=%g positive\n", SFEM_STEP_DEPTH, SFEM_STEP_HEIGHT);
     }
 
-    // Determine the two perpendicular directions
-    int h1, h2;
-    if (contact_dir == 0) {
-        h1 = 1;
-        h2 = 2;
-    }  // contact in x, perpendicular: y,z
-    else if (contact_dir == 1) {
-        h1 = 0;
-        h2 = 2;
-    }  // contact in y, perpendicular: x,z
-    else {
-        h1 = 0;
-        h2 = 1;
-    }  // contact in z, perpendicular: x,y
+    // A step is rounded over its whole depth: the interpolating B-spline does not smooth, and a
+    // tighter nose resolved by two grid cells left Newton unable to slide the body over it.
+    real_t SFEM_OBSTACLE_FILLET =
+            SFEM_OBSTACLE_TYPE == 2 ? std::min(SFEM_STEP_HEIGHT, -SFEM_STEP_DEPTH) : SFEM_HEMISPHERE_RADIUS / 2;
+    SFEM_READ_ENV(SFEM_OBSTACLE_FILLET, atof);
 
-    real_t center[3] = {center_x, center_y, center_z};
+    const int    s      = SFEM_SLOPE_DIR;
+    const real_t plane  = SFEM_CONTACT_PLANE;
+    const real_t fillet = SFEM_OBSTACLE_FILLET;
 
-    static bool first_call = true;
-
-    for (ptrdiff_t i = 0; i < n_contact_nodes; i++) {
-        const ptrdiff_t node_idx = contact_nodes[i];
-        const ptrdiff_t dof_idx  = node_idx * block_size + contact_dir;
-
-        // Current position in perpendicular directions
-        real_t cur_h1 = ref_coords[h1][node_idx] + displacement[node_idx * block_size + h1];
-        real_t cur_h2 = ref_coords[h2][node_idx] + displacement[node_idx * block_size + h2];
-
-        // Distance squared from center in perpendicular plane
-        real_t dh1       = cur_h1 - center[h1];
-        real_t dh2       = cur_h2 - center[h2];
-        real_t dist_h_sq = dh1 * dh1 + dh2 * dh2;
-
-        // Hemisphere surface position in contact direction
-        real_t surface_coord;
-        if (dist_h_sq < radius * radius) {
-            // Inside hemisphere projection: surface = center + sqrt(R² - d²)
-            surface_coord = center[contact_dir] + sqrt(radius * radius - dist_h_sq);
-        } else {
-            // Outside hemisphere: use flat plane at hemisphere center
-            surface_coord = center[contact_dir];
+    std::function<real_t(const real_t, const real_t, const real_t)> sdf;
+    real_t                                                          lowest = plane;
+    switch (SFEM_OBSTACLE_TYPE) {
+        case 0: {
+            printf("Obstacle: plane at %g along axis %d\n", plane, dir);
+            sdf = [=](const real_t x, const real_t y, const real_t z) -> real_t {
+                const real_t p[3] = {x, y, z};
+                return plane - p[dir];
+            };
+            break;
         }
-
-        // Constraint: current_pos >= surface_coord
-        // current_pos = ref_coord + disp, so: disp >= surface_coord - ref_coord
-        // lower_bound = surface_coord - ref_coord - current_disp
-        const real_t ref_coord    = ref_coords[contact_dir][node_idx];
-        const real_t current_disp = displacement[dof_idx];
-        lower_bound[dof_idx]      = surface_coord - ref_coord - current_disp;
-
-        // Debug output for first call
-        if (first_call && i < 5) {
-            printf("  DEBUG hemisphere node %ld: ref_xy=(%.3f,%.3f) ref_z=%.3f dh=(%.3f,%.3f) dist=%.3f surface=%.3f disp=%.3f "
-                   "lb=%.3f\n",
-                   (long)node_idx,
-                   ref_coords[h1][node_idx],
-                   ref_coords[h2][node_idx],
-                   ref_coord,
-                   dh1,
-                   dh2,
-                   sqrt(dist_h_sq),
-                   surface_coord,
-                   current_disp,
-                   lower_bound[dof_idx]);
+        case 1: {
+            const real_t slope = SFEM_OBSTACLE_SLOPE;
+            const real_t top   = slope > 0 ? max_c[s] : min_c[s];
+            printf("Obstacle: plane sloping by %g along axis %d, at %g along axis %d where %g\n", slope, s, plane, dir, top);
+            const real_t scale = 1 / std::sqrt(1 + slope * slope);
+            sdf                = [=](const real_t x, const real_t y, const real_t z) -> real_t {
+                const real_t p[3] = {x, y, z};
+                return (plane + slope * (p[s] - top) - p[dir]) * scale;
+            };
+            lowest = plane - std::abs(slope) * (max_c[s] - min_c[s]);
+            break;
+        }
+        case 2: {
+            const real_t width = SFEM_STEP_HEIGHT;
+            const real_t drop  = SFEM_STEP_DEPTH;
+            const real_t start = min_c[s];
+            const int    steps = (int)std::ceil((max_c[s] - min_c[s]) / width) + 1;
+            printf("Obstacle: %d steps descending along axis %d from %g, %g wide, %g apart, fillet %g\n",
+                   steps,
+                   s,
+                   plane,
+                   width,
+                   drop,
+                   fillet);
+            // Under the stairs is the union of the quarter-spaces {p_s <= start + (k + 1) w,
+            // p_dir <= plane + k drop}; the last one runs on, the floor beyond. Each is inset by
+            // the fillet and offset back out, which rounds its nose and keeps its faces.
+            sdf = [=](const real_t x, const real_t y, const real_t z) -> real_t {
+                const real_t p[3] = {x, y, z};
+                real_t       d    = plane + (steps - 1) * drop - p[dir];
+                for (int k = 0; k + 1 < steps; ++k) {
+                    const real_t a = start + (k + 1) * width - p[s] - fillet;
+                    const real_t b = plane + k * drop - p[dir] - fillet;
+                    d = rounded_union(d, ((a < 0 && b < 0) ? -std::sqrt(a * a + b * b) : std::min(a, b)) + fillet, fillet);
+                }
+                return d;
+            };
+            lowest = plane + (steps - 1) * drop;
+            break;
+        }
+        case 4: {
+            const real_t c[3] = {SFEM_HEMISPHERE_CENTER_X, SFEM_HEMISPHERE_CENTER_Y, SFEM_HEMISPHERE_CENTER_Z};
+            const real_t r    = SFEM_HEMISPHERE_RADIUS;
+            printf("Obstacle: hemisphere centre (%g, %g, %g), radius %g, on a floor at %g along axis %d, fillet %g\n",
+                   c[0],
+                   c[1],
+                   c[2],
+                   r,
+                   c[dir],
+                   dir,
+                   fillet);
+            sdf = [=](const real_t x, const real_t y, const real_t z) -> real_t {
+                const real_t p[3]   = {x, y, z};
+                const real_t sphere = r - std::sqrt((x - c[0]) * (x - c[0]) + (y - c[1]) * (y - c[1]) + (z - c[2]) * (z - c[2]));
+                return rounded_union(sphere, c[dir] - p[dir], fillet);
+            };
+            lowest = c[dir];
+            break;
+        }
+        default: {
+            SFEM_ERROR("Unknown SFEM_OBSTACLE_TYPE=%d (0, 1, 2 or 4)\n", SFEM_OBSTACLE_TYPE);
         }
     }
-    first_call = false;
+
+    // Where the box cuts the obstacle a body slides over the edge with its face, and node-to-
+    // obstacle contact cannot keep a sharp edge from entering a face between nodes: the edge is
+    // rounded on the scale of the body, at least an eighth of its footprint.
+    const real_t edge = std::max(fillet, std::min(max_c[h1] - min_c[h1], max_c[h2] - min_c[h2]) / 8);
+
+    real_t extent = 0;
+    for (int d = 0; d < 3; ++d) {
+        extent = std::max(extent, max_c[d] - min_c[d]);
+    }
+    real_t lo[3], hi[3];
+    for (int d = 0; d < 3; ++d) {
+        lo[d] = min_c[d] - extent / 2;
+        hi[d] = max_c[d] + extent / 2;
+    }
+    lo[dir] = std::min(lowest, min_c[dir]) - extent / 2;
+
+    Obstacle obstacle;
+    obstacle.fillet = fillet;
+    obstacle.sdf    = [=](const real_t x, const real_t y, const real_t z) -> real_t {
+        // The box's signed distance, positive inside; the intersection is the smaller field.
+        const real_t p[3]    = {x, y, z};
+        real_t       outside = 0, inside = std::numeric_limits<real_t>::max(), beyond = -std::numeric_limits<real_t>::max();
+        for (int d = 0; d < 3; ++d) {
+            const real_t a = std::max(lo[d] - p[d], p[d] - hi[d]);
+            beyond         = std::max(beyond, a);
+            inside         = std::min(inside, -a);
+            if (a > 0) outside += a * a;
+        }
+        const real_t box = beyond <= 0 ? inside : -std::sqrt(outside);
+        return -rounded_union(-sdf(x, y, z), -box, edge);
+    };
+    // The grid reaches past the box, so the cut and its rounding are on it.
+    for (int d = 0; d < 3; ++d) {
+        obstacle.lo[d] = lo[d] - 2 * edge;
+        obstacle.hi[d] = hi[d] + 2 * edge;
+    }
+    return obstacle;
 }
+
+// The obstacle on an SDF grid over its box, SFEM_OBSTACLE_GRID cells along the longest side, or
+// finer: at most half the fillet apart, so the grid resolves the rounding whose curvature the
+// contact tangent uses. This grid is the obstacle the contact sees, and the one written for
+// visualisation.
+static std::shared_ptr<smesh::Grid<geom_t>> obstacle_grid(const std::shared_ptr<sfem::Communicator>& comm,
+                                                          const Obstacle&                            obstacle) {
+    int SFEM_OBSTACLE_GRID = 128;
+    SFEM_READ_ENV(SFEM_OBSTACLE_GRID, atoi);
+
+    real_t extent = 0;
+    for (int d = 0; d < 3; ++d) {
+        extent = std::max(extent, obstacle.hi[d] - obstacle.lo[d]);
+    }
+    const real_t h =
+            obstacle.fillet > 0 ? std::min(extent / SFEM_OBSTACLE_GRID, obstacle.fillet / 2) : extent / SFEM_OBSTACLE_GRID;
+
+    // And 8 cells more on every side: the B-spline's prefilter extends each grid line beyond its
+    // ends (sfem_sdf_sampling.cpp), which pulls the curvature towards zero within a few cells of
+    // them (by 0.268^k at k cells), so the obstacle's box keeps clear of that layer.
+    real_t    lo[3], hi[3];
+    ptrdiff_t n[3];
+    for (int d = 0; d < 3; ++d) {
+        lo[d] = obstacle.lo[d] - 8 * h;
+        hi[d] = obstacle.hi[d] + 8 * h;
+        n[d]  = (ptrdiff_t)std::ceil((hi[d] - lo[d]) / h) + 1;
+    }
+    return smesh::create_sdf(
+            comm,
+            n[0],
+            n[1],
+            n[2],
+            lo[0],
+            lo[1],
+            lo[2],
+            hi[0],
+            hi[1],
+            hi[2],
+            [&obstacle](const geom_t x, const geom_t y, const geom_t z) -> geom_t { return obstacle.sdf(x, y, z); });
+}
+
+// The diagonal block of `node` in a BSR matrix with 3x3 blocks, or null.
+static real_t* bsr_diagonal_block(const count_t* const rowptr, const idx_t* const colidx, real_t* const values, const ptrdiff_t node) {
+    for (count_t k = rowptr[node]; k < rowptr[node + 1]; ++k) {
+        if (colidx[k] == (idx_t)node) return &values[k * 9];
+    }
+    return nullptr;
+}
+
+// Frictionless contact of a set of mesh nodes with a rigid obstacle, given by its SDF grid
+// (positive inside) and sampled by the library at the displaced nodes (SDFObstacle::sample_nodes,
+// node_interpolate.hpp): the grid's interpolating cubic B-spline, whose gradient and curvature
+// are continuous. Node i keeps out of it: gap_i = -sdf(X_i + u_i) / |grad sdf| >= 0; outside the
+// grid there is no obstacle.
+// A step dx changes the gap by -n_i . dx_i to first order, n_i the unit gradient there, so the
+// linearised step is the QP with the constraints n_i . dx_i <= gap_i. In each contact node's
+// frame [n_i, t1_i, t2_i] that is an upper bound on one component, which a box-constrained QP
+// solver takes as it is.
+class NodeObstacleContact {
+public:
+    NodeObstacleContact(const std::shared_ptr<smesh::Grid<geom_t>>& sdf,
+                        const std::shared_ptr<sfem::Communicator>&  comm,
+                        const sfem::SharedBuffer<idx_t>&            nodes,
+                        const sfem::SharedBuffer<geom_t*>&          points,
+                        const ptrdiff_t                             ndofs,
+                        const int                                   dir)
+        : nodes_(nodes), points_(points), ndofs_(ndofs), dir_(dir) {
+        obstacle_ = sfem::SDFObstacle::create(sdf, comm, points->extent(1), points->data()[2], sfem::EXECUTION_SPACE_HOST);
+
+        const ptrdiff_t n = nodes->size();
+        normals_          = smesh::create_host_buffer<real_t>(3, n);
+        curvature_        = smesh::create_host_buffer<real_t>(6, n);
+        gap_              = smesh::create_host_buffer<real_t>(n);
+        frames_           = smesh::create_host_buffer<real_t>(9 * n);
+        ahead_            = smesh::create_host_buffer<real_t>(ndofs);
+        ahead_gap_        = smesh::create_host_buffer<real_t>(n);
+        ahead_normals_    = smesh::create_host_buffer<real_t>(3, n);
+    }
+
+    ptrdiff_t                         size() const { return nodes_->size(); }
+    const sfem::SharedBuffer<idx_t>&  nodes() const { return nodes_; }
+    const sfem::SharedBuffer<real_t>& gap() const { return gap_; }
+
+    // Samples the gap, the normals and the frames with the nodes displaced by x.
+    void update(const real_t* const x) {
+        obstacle_->sample_nodes(size(), nodes_->data(), points_->data(), x, gap_->data(), normals_->data());
+
+        // t1 is n crossed with the axis least aligned with it, t2 = n x t1. A node outside the
+        // grid has no normal and an unreachable gap; its frame is that of the contact direction.
+        real_t* const* const nn = normals_->data();
+        real_t* const        Q  = frames_->data();
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < size(); ++i) {
+            real_t n[3] = {nn[0][i], nn[1][i], nn[2][i]};
+            if (n[0] == 0 && n[1] == 0 && n[2] == 0) n[dir_] = 1;
+            int axis = 0;
+            for (int d = 1; d < 3; ++d) {
+                if (std::abs(n[d]) < std::abs(n[axis])) axis = d;
+            }
+            real_t e[3]        = {0, 0, 0};
+            e[axis]            = 1;
+            real_t       t1[3] = {n[1] * e[2] - n[2] * e[1], n[2] * e[0] - n[0] * e[2], n[0] * e[1] - n[1] * e[0]};
+            const real_t len   = std::sqrt(t1[0] * t1[0] + t1[1] * t1[1] + t1[2] * t1[2]);
+            for (int d = 0; d < 3; ++d) t1[d] /= len;
+            const real_t t2[3] = {n[1] * t1[2] - n[2] * t1[1], n[2] * t1[0] - n[0] * t1[2], n[0] * t1[1] - n[1] * t1[0]};
+
+            real_t* const q = &Q[9 * i];
+            for (int d = 0; d < 3; ++d) {
+                q[d]     = n[d];
+                q[3 + d] = t1[d];
+                q[6 + d] = t2[d];
+            }
+        }
+    }
+
+    // v <- Q^T v at the contact nodes: into their frames.
+    void to_frame(real_t* const v) const {
+        const idx_t* const  idx = nodes_->data();
+        const real_t* const Q   = frames_->data();
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < size(); ++i) {
+            real_t* const       vi   = &v[(ptrdiff_t)idx[i] * 3];
+            const real_t* const q    = &Q[9 * i];
+            const real_t        w[3] = {vi[0], vi[1], vi[2]};
+            for (int c = 0; c < 3; ++c) {
+                vi[c] = q[3 * c] * w[0] + q[3 * c + 1] * w[1] + q[3 * c + 2] * w[2];
+            }
+        }
+    }
+
+    // v <- Q v at the contact nodes: back from their frames.
+    void from_frame(real_t* const v) const {
+        const idx_t* const  idx = nodes_->data();
+        const real_t* const Q   = frames_->data();
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < size(); ++i) {
+            real_t* const       vi   = &v[(ptrdiff_t)idx[i] * 3];
+            const real_t* const q    = &Q[9 * i];
+            const real_t        w[3] = {vi[0], vi[1], vi[2]};
+            for (int d = 0; d < 3; ++d) {
+                vi[d] = q[d] * w[0] + q[3 + d] * w[1] + q[6 + d] * w[2];
+            }
+        }
+    }
+
+    // The step's upper bound in the frames: the gap on each contact node's normal component,
+    // `unbounded` everywhere else.
+    void upper_bound(const real_t unbounded, real_t* const ub) const {
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < ndofs_; ++i) {
+            ub[i] = unbounded;
+        }
+        const idx_t* const  idx = nodes_->data();
+        const real_t* const gap = gap_->data();
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < size(); ++i) {
+            ub[(ptrdiff_t)idx[i] * 3] = gap[i];
+        }
+    }
+
+    // First-order optimality of the step. At the solution the residual r is the obstacle's
+    // reaction mu_i n_i at the nodes it touches: along the normal, pushing out (mu_i >= 0),
+    // and zero where the node is clear of the obstacle (min(mu_i, gap_i) = 0).
+    //
+    // Writes r less the admissible reaction, mu_i = max(0, -n_i . r_i), to `projected` and
+    // returns sqrt(|projected|^2 + sum_i min(mu_i, k_i gap_i)^2) over the nodes clear of the
+    // obstacle: stationarity and complementarity, both forces, with k_i the stiffness of the
+    // node's equation. Penetration is a length, max_i -gap_i, and goes to *penetration.
+    real_t kkt_residual(const real_t* const r,
+                        const real_t* const k,  // per dof
+                        real_t* const       projected,
+                        real_t* const       penetration) const {
+        const idx_t* const   idx = nodes_->data();
+        real_t* const* const n   = normals_->data();
+        const real_t* const  gap = gap_->data();
+
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < ndofs_; ++i) {
+            projected[i] = r[i];
+        }
+
+        real_t deepest       = 0;
+        real_t complementary = 0;
+#pragma omp parallel for reduction(max : deepest) reduction(+ : complementary)
+        for (ptrdiff_t i = 0; i < size(); ++i) {
+            const ptrdiff_t node = idx[i];
+            real_t* const   ri   = &projected[node * 3];
+            const real_t    mu   = std::max(real_t(0), -(n[0][i] * ri[0] + n[1][i] * ri[1] + n[2][i] * ri[2]));
+            for (int d = 0; d < 3; ++d) {
+                ri[d] += mu * n[d][i];
+            }
+            const real_t c = std::min(mu, k[node * 3] * std::max(gap[i], real_t(0)));
+            complementary += c * c;
+            deepest = std::max(deepest, -gap[i]);
+        }
+
+        *penetration = deepest;
+        real_t norm  = complementary;
+#pragma omp parallel for reduction(+ : norm)
+        for (ptrdiff_t i = 0; i < ndofs_; ++i) {
+            norm += projected[i] * projected[i];
+        }
+        return std::sqrt(norm);
+    }
+
+    // The constraints' share of the Newton tangent at the nodes displaced by x. The Lagrangian
+    // E - sum_i mu_i gap_i adds -mu_i hess(gap_i), and on a curved obstacle that term is what
+    // keeps Newton quadratic for a body sliding over it. At a node on the surface -hess(gap_i)
+    // is the library's curvature (H - n m^T - m n^T) / |grad sdf|, m = H n, the B-spline's
+    // Hessian H corrected for its gradient not being exactly unit (for a sphere it is
+    // -(I - n n^T) / R). mu_i is the reaction at a node in contact, read from the residual r as
+    // in kkt_residual. Adds each node's 3x3 block to the diagonal block of the BSR tangent.
+    //
+    // Away from the solution that estimate can be large, and on a convex obstacle the term is
+    // negative across it, enough to make the tangent indefinite. With `capped`, each node's
+    // share is scaled so that its most negative part (bounded by row sums) stays within half
+    // of the node's inertia stiffness k_i = c0 m_i. `sign` -1 takes back an earlier call.
+    void add_curvature(const real_t* const  x,
+                       const real_t* const  r,
+                       const real_t* const  k,
+                       const bool           capped,
+                       const real_t         sign,
+                       const count_t* const rowptr,
+                       const idx_t* const   colidx,
+                       real_t* const        values) {
+        obstacle_->sample_nodes_curvature(size(), nodes_->data(), points_->data(), x, curvature_->data());
+
+        const idx_t* const   idx = nodes_->data();
+        real_t* const* const n   = normals_->data();
+        real_t* const* const C   = curvature_->data();
+        const real_t* const  gap = gap_->data();
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < size(); ++i) {
+            const ptrdiff_t     node = idx[i];
+            const real_t* const ri   = &r[node * 3];
+            const real_t        mu   = std::max(real_t(0), -(n[0][i] * ri[0] + n[1][i] * ri[1] + n[2][i] * ri[2]));
+            if (mu == 0 || gap[i] > mu / k[node * 3]) continue;
+
+            const real_t H[9] = {C[0][i], C[1][i], C[2][i], C[1][i], C[3][i], C[4][i], C[2][i], C[4][i], C[5][i]};
+
+            real_t lowest = 0;
+            for (int a = 0; a < 3; ++a) {
+                real_t off = 0;
+                for (int b = 0; b < 3; ++b) {
+                    if (b != a) off += std::abs(H[a * 3 + b]);
+                }
+                lowest = std::min(lowest, mu * (H[a * 3 + a] - off));
+            }
+            const real_t scale = capped && lowest < -k[node * 3] / 2 ? k[node * 3] / (2 * -lowest) : 1;
+
+            real_t* const B = bsr_diagonal_block(rowptr, colidx, values, node);
+            for (int c = 0; c < 9; ++c) {
+                B[c] += sign * scale * mu * H[c];
+            }
+        }
+    }
+
+    // The velocity correction of the contact-stabilised Newmark method (Deuflhard, Krause and
+    // Ertel 2008, in the form of Klapproth 2012, ZIB-Report 12-18, eq. 12f): with a lumped mass
+    // the L2 projection of x + dt v onto the admissible set is pointwise, so every contact node
+    // whose next position x_i + dt v_i would be inside the obstacle is moved to its surface
+    // along the normal, and v_i is what reaches that point. Its normal velocity into the
+    // obstacle is gone; nothing else changes.
+    void stabilise_velocity(const real_t* const x, real_t* const v, const real_t dt) {
+        real_t* const ahead = ahead_->data();
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < ndofs_; ++i) {
+            ahead[i] = x[i] + dt * v[i];
+        }
+        obstacle_->sample_nodes(size(), nodes_->data(), points_->data(), ahead, ahead_gap_->data(), ahead_normals_->data());
+
+        const idx_t* const   idx = nodes_->data();
+        real_t* const* const n   = ahead_normals_->data();
+        const real_t* const  gap = ahead_gap_->data();
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < size(); ++i) {
+            if (gap[i] < 0) {
+                real_t* const vi = &v[(ptrdiff_t)idx[i] * 3];
+                for (int d = 0; d < 3; ++d) {
+                    vi[d] += gap[i] * n[d][i] / dt;
+                }
+            }
+        }
+    }
+
+    // gap_i n_i at the contact nodes, zero elsewhere: the vector to the obstacle's surface.
+    void gap_field(real_t* const out) const {
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < ndofs_; ++i) {
+            out[i] = 0;
+        }
+        const idx_t* const   idx = nodes_->data();
+        real_t* const* const n   = normals_->data();
+        const real_t* const  gap = gap_->data();
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < size(); ++i) {
+            for (int d = 0; d < 3; ++d) {
+                out[(ptrdiff_t)idx[i] * 3 + d] = gap[i] * n[d][i];
+            }
+        }
+    }
+
+private:
+    std::shared_ptr<sfem::SDFObstacle> obstacle_;
+    sfem::SharedBuffer<idx_t>          nodes_;
+    sfem::SharedBuffer<geom_t*>        points_;
+    ptrdiff_t                          ndofs_;
+    int                                dir_;
+    sfem::SharedBuffer<real_t*>        normals_;
+    sfem::SharedBuffer<real_t*>        curvature_;
+    sfem::SharedBuffer<real_t>         gap_;
+    sfem::SharedBuffer<real_t>         frames_;
+    sfem::SharedBuffer<real_t>         ahead_;
+    sfem::SharedBuffer<real_t>         ahead_gap_;
+    sfem::SharedBuffer<real_t*>        ahead_normals_;
+};
 
 std::shared_ptr<sfem::Output> create_output(const std::shared_ptr<sfem::Function>& f, const smesh::Path& output_dir) {
     auto fs = f->space();
@@ -218,438 +543,9 @@ std::shared_ptr<sfem::Output> create_output(const std::shared_ptr<sfem::Function
     return output;
 }
 
-// Export sloped obstacle geometry as a simple quad mesh (triangular/plane with slope)
-void export_obstacle_mesh(const smesh::Path& output_dir,
-                          real_t             base_plane,
-                          real_t             slope,
-                          int                slope_dir,
-                          real_t             y_min,
-                          real_t             y_max,
-                          real_t             z_min,
-                          real_t             z_max) {
-    smesh::Path obstacle_dir = output_dir / "obstacle";
-    smesh::create_directory(obstacle_dir);
-
-    // Create 4 corner points of the obstacle plane
-    // The plane equation: x = base_plane + slope * y (if slope_dir=1)
-    std::vector<float> x_coords(4), y_coords(4), z_coords(4);
-
-    if (slope_dir == 1) {  // slope in y direction
-        // Point 0: (y_min, z_min)
-        x_coords[0] = base_plane + slope * y_min;
-        y_coords[0] = y_min;
-        z_coords[0] = z_min;
-
-        // Point 1: (y_max, z_min)
-        x_coords[1] = base_plane + slope * y_max;
-        y_coords[1] = y_max;
-        z_coords[1] = z_min;
-
-        // Point 2: (y_max, z_max)
-        x_coords[2] = base_plane + slope * y_max;
-        y_coords[2] = y_max;
-        z_coords[2] = z_max;
-
-        // Point 3: (y_min, z_max)
-        x_coords[3] = base_plane + slope * y_min;
-        y_coords[3] = y_min;
-        z_coords[3] = z_max;
-    } else {  // slope in z direction
-        // Point 0: (y_min, z_min)
-        x_coords[0] = base_plane + slope * z_min;
-        y_coords[0] = y_min;
-        z_coords[0] = z_min;
-
-        // Point 1: (y_max, z_min)
-        x_coords[1] = base_plane + slope * z_min;
-        y_coords[1] = y_max;
-        z_coords[1] = z_min;
-
-        // Point 2: (y_max, z_max)
-        x_coords[2] = base_plane + slope * z_max;
-        y_coords[2] = y_max;
-        z_coords[2] = z_max;
-
-        // Point 3: (y_min, z_max)
-        x_coords[3] = base_plane + slope * z_max;
-        y_coords[3] = y_min;
-        z_coords[3] = z_max;
-    }
-
-    // Write coordinates
-    FILE* fx = fopen((obstacle_dir / "x.raw").c_str(), "wb");
-    FILE* fy = fopen((obstacle_dir / "y.raw").c_str(), "wb");
-    FILE* fz = fopen((obstacle_dir / "z.raw").c_str(), "wb");
-    fwrite(x_coords.data(), sizeof(float), 4, fx);
-    fwrite(y_coords.data(), sizeof(float), 4, fy);
-    fwrite(z_coords.data(), sizeof(float), 4, fz);
-    fclose(fx);
-    fclose(fy);
-    fclose(fz);
-
-    // Write quad element (as two triangles: 0-1-2 and 0-2-3)
-    std::vector<int32_t> i0 = {0, 0};
-    std::vector<int32_t> i1 = {1, 2};
-    std::vector<int32_t> i2 = {2, 3};
-
-    FILE* fi0 = fopen((obstacle_dir / "i0.raw").c_str(), "wb");
-    FILE* fi1 = fopen((obstacle_dir / "i1.raw").c_str(), "wb");
-    FILE* fi2 = fopen((obstacle_dir / "i2.raw").c_str(), "wb");
-    fwrite(i0.data(), sizeof(int32_t), 2, fi0);
-    fwrite(i1.data(), sizeof(int32_t), 2, fi1);
-    fwrite(i2.data(), sizeof(int32_t), 2, fi2);
-    fclose(fi0);
-    fclose(fi1);
-    fclose(fi2);
-
-    printf("Obstacle mesh exported to: %s\n", obstacle_dir.c_str());
-    printf("  Corners: (%.3f,%.3f,%.3f) - (%.3f,%.3f,%.3f) - (%.3f,%.3f,%.3f) - (%.3f,%.3f,%.3f)\n",
-           x_coords[0],
-           y_coords[0],
-           z_coords[0],
-           x_coords[1],
-           y_coords[1],
-           z_coords[1],
-           x_coords[2],
-           y_coords[2],
-           z_coords[2],
-           x_coords[3],
-           y_coords[3],
-           z_coords[3]);
-}
-
-// Export flat obstacle geometry as a simple quad mesh for a given contact direction
-void export_flat_obstacle_mesh(const smesh::Path& output_dir,
-                               real_t             contact_plane,
-                               int                contact_dir,
-                               real_t             a_min,
-                               real_t             a_max,
-                               real_t             b_min,
-                               real_t             b_max) {
-    smesh::Path obstacle_dir = output_dir / "obstacle";
-    smesh::create_directory(obstacle_dir);
-
-    int h1, h2;
-    if (contact_dir == 0) {
-        h1 = 1;
-        h2 = 2;
-    }  // x = const, span y,z
-    else if (contact_dir == 1) {
-        h1 = 0;
-        h2 = 2;
-    }  // y = const, span x,z
-    else {
-        h1 = 0;
-        h2 = 1;
-    }  // z = const, span x,y
-
-    // Create 4 corner points of the obstacle plane
-    std::vector<float> x_coords(4), y_coords(4), z_coords(4);
-
-    float coords[4][3] = {
-            {0.f, 0.f, 0.f},
-            {0.f, 0.f, 0.f},
-            {0.f, 0.f, 0.f},
-            {0.f, 0.f, 0.f},
-    };
-
-    const float a_vals[2] = {static_cast<float>(a_min), static_cast<float>(a_max)};
-    const float b_vals[2] = {static_cast<float>(b_min), static_cast<float>(b_max)};
-
-    coords[0][contact_dir] = static_cast<float>(contact_plane);
-    coords[0][h1]          = a_vals[0];
-    coords[0][h2]          = b_vals[0];
-
-    coords[1][contact_dir] = static_cast<float>(contact_plane);
-    coords[1][h1]          = a_vals[1];
-    coords[1][h2]          = b_vals[0];
-
-    coords[2][contact_dir] = static_cast<float>(contact_plane);
-    coords[2][h1]          = a_vals[1];
-    coords[2][h2]          = b_vals[1];
-
-    coords[3][contact_dir] = static_cast<float>(contact_plane);
-    coords[3][h1]          = a_vals[0];
-    coords[3][h2]          = b_vals[1];
-
-    for (int i = 0; i < 4; ++i) {
-        x_coords[i] = coords[i][0];
-        y_coords[i] = coords[i][1];
-        z_coords[i] = coords[i][2];
-    }
-
-    // Write coordinates
-    FILE* fx = fopen((obstacle_dir / "x.raw").c_str(), "wb");
-    FILE* fy = fopen((obstacle_dir / "y.raw").c_str(), "wb");
-    FILE* fz = fopen((obstacle_dir / "z.raw").c_str(), "wb");
-    fwrite(x_coords.data(), sizeof(float), 4, fx);
-    fwrite(y_coords.data(), sizeof(float), 4, fy);
-    fwrite(z_coords.data(), sizeof(float), 4, fz);
-    fclose(fx);
-    fclose(fy);
-    fclose(fz);
-
-    // Write quad element (as two triangles: 0-1-2 and 0-2-3)
-    std::vector<int32_t> i0 = {0, 0};
-    std::vector<int32_t> i1 = {1, 2};
-    std::vector<int32_t> i2 = {2, 3};
-
-    FILE* fi0 = fopen((obstacle_dir / "i0.raw").c_str(), "wb");
-    FILE* fi1 = fopen((obstacle_dir / "i1.raw").c_str(), "wb");
-    FILE* fi2 = fopen((obstacle_dir / "i2.raw").c_str(), "wb");
-    fwrite(i0.data(), sizeof(int32_t), 2, fi0);
-    fwrite(i1.data(), sizeof(int32_t), 2, fi1);
-    fwrite(i2.data(), sizeof(int32_t), 2, fi2);
-    fclose(fi0);
-    fclose(fi1);
-    fclose(fi2);
-
-    printf("Obstacle mesh exported to: %s\n", obstacle_dir.c_str());
-    printf("  Corners: (%.3f,%.3f,%.3f) - (%.3f,%.3f,%.3f) - (%.3f,%.3f,%.3f) - (%.3f,%.3f,%.3f)\n",
-           x_coords[0],
-           y_coords[0],
-           z_coords[0],
-           x_coords[1],
-           y_coords[1],
-           z_coords[1],
-           x_coords[2],
-           y_coords[2],
-           z_coords[2],
-           x_coords[3],
-           y_coords[3],
-           z_coords[3]);
-}
-
-// Export stepped obstacle geometry as multiple quads
-void export_stepped_obstacle_mesh(const smesh::Path& output_dir,
-                                  real_t             base_plane,
-                                  real_t             step_height,
-                                  real_t             step_depth,
-                                  int                n_steps,
-                                  real_t             z_min,
-                                  real_t             z_max) {
-    smesh::Path obstacle_dir = output_dir / "obstacle";
-    smesh::create_directory(obstacle_dir);
-
-    // Each step has 4 corners (forms a horizontal surface)
-    // Plus vertical risers between steps
-    int n_horizontal_quads = n_steps;
-    int n_vertical_quads   = n_steps - 1;
-    int n_quads            = n_horizontal_quads + n_vertical_quads;
-    int n_points           = 4 * n_quads;
-
-    std::vector<float> x_coords(n_points), y_coords(n_points), z_coords(n_points);
-
-    int pt_idx = 0;
-    // Create horizontal surfaces for each step
-    for (int s = 0; s < n_steps; s++) {
-        real_t y0      = s * step_height;
-        real_t y1      = (s + 1) * step_height;
-        real_t x_plane = base_plane + s * step_depth;
-
-        // 4 corners of horizontal surface
-        x_coords[pt_idx] = x_plane;
-        y_coords[pt_idx] = y0;
-        z_coords[pt_idx] = z_min;
-        pt_idx++;
-        x_coords[pt_idx] = x_plane;
-        y_coords[pt_idx] = y1;
-        z_coords[pt_idx] = z_min;
-        pt_idx++;
-        x_coords[pt_idx] = x_plane;
-        y_coords[pt_idx] = y1;
-        z_coords[pt_idx] = z_max;
-        pt_idx++;
-        x_coords[pt_idx] = x_plane;
-        y_coords[pt_idx] = y0;
-        z_coords[pt_idx] = z_max;
-        pt_idx++;
-    }
-
-    // Create vertical risers between steps
-    for (int s = 0; s < n_steps - 1; s++) {
-        real_t y  = (s + 1) * step_height;
-        real_t x0 = base_plane + s * step_depth;
-        real_t x1 = base_plane + (s + 1) * step_depth;
-
-        // 4 corners of vertical riser
-        x_coords[pt_idx] = x0;
-        y_coords[pt_idx] = y;
-        z_coords[pt_idx] = z_min;
-        pt_idx++;
-        x_coords[pt_idx] = x1;
-        y_coords[pt_idx] = y;
-        z_coords[pt_idx] = z_min;
-        pt_idx++;
-        x_coords[pt_idx] = x1;
-        y_coords[pt_idx] = y;
-        z_coords[pt_idx] = z_max;
-        pt_idx++;
-        x_coords[pt_idx] = x0;
-        y_coords[pt_idx] = y;
-        z_coords[pt_idx] = z_max;
-        pt_idx++;
-    }
-
-    // Write coordinates
-    FILE* fx = fopen((obstacle_dir / "x.raw").c_str(), "wb");
-    FILE* fy = fopen((obstacle_dir / "y.raw").c_str(), "wb");
-    FILE* fz = fopen((obstacle_dir / "z.raw").c_str(), "wb");
-    fwrite(x_coords.data(), sizeof(float), n_points, fx);
-    fwrite(y_coords.data(), sizeof(float), n_points, fy);
-    fwrite(z_coords.data(), sizeof(float), n_points, fz);
-    fclose(fx);
-    fclose(fy);
-    fclose(fz);
-
-    // Write triangles (each quad = 2 triangles)
-    std::vector<int32_t> i0(2 * n_quads), i1(2 * n_quads), i2(2 * n_quads);
-    for (int q = 0; q < n_quads; q++) {
-        int base = q * 4;
-        // Triangle 1: 0-1-2
-        i0[2 * q] = base;
-        i1[2 * q] = base + 1;
-        i2[2 * q] = base + 2;
-        // Triangle 2: 0-2-3
-        i0[2 * q + 1] = base;
-        i1[2 * q + 1] = base + 2;
-        i2[2 * q + 1] = base + 3;
-    }
-
-    FILE* fi0 = fopen((obstacle_dir / "i0.raw").c_str(), "wb");
-    FILE* fi1 = fopen((obstacle_dir / "i1.raw").c_str(), "wb");
-    FILE* fi2 = fopen((obstacle_dir / "i2.raw").c_str(), "wb");
-    fwrite(i0.data(), sizeof(int32_t), 2 * n_quads, fi0);
-    fwrite(i1.data(), sizeof(int32_t), 2 * n_quads, fi1);
-    fwrite(i2.data(), sizeof(int32_t), 2 * n_quads, fi2);
-    fclose(fi0);
-    fclose(fi1);
-    fclose(fi2);
-
-    printf("Stepped obstacle mesh exported to: %s\n", obstacle_dir.c_str());
-    printf("  %d steps, step_height=%.3f, step_depth=%.3f\n", n_steps, step_height, step_depth);
-}
-
-// Export hemisphere obstacle geometry
-void export_hemisphere_obstacle_mesh(const smesh::Path& output_dir,
-                                     real_t             center_x,
-                                     real_t             center_y,
-                                     real_t             center_z,
-                                     real_t             radius,
-                                     int                contact_dir,
-                                     int                n_segments = 16) {
-    smesh::Path obstacle_dir = output_dir / "obstacle";
-    smesh::create_directory(obstacle_dir);
-
-    int h1, h2;
-    if (contact_dir == 0) {
-        h1 = 1;
-        h2 = 2;
-    } else if (contact_dir == 1) {
-        h1 = 0;
-        h2 = 2;
-    } else {
-        h1 = 0;
-        h2 = 1;
-    }
-
-    real_t center[3] = {center_x, center_y, center_z};
-
-    // Generate hemisphere mesh using spherical coordinates
-    int n_rings     = n_segments / 2;                               // Number of latitude rings
-    int n_points    = 1 + n_rings * n_segments;                     // Tip point + ring points
-    int n_triangles = n_segments + (n_rings - 1) * n_segments * 2;  // Tip cap + body
-
-    std::vector<float> x_coords(n_points), y_coords(n_points), z_coords(n_points);
-
-    // Tip point of hemisphere (facing +contact_dir)
-    {
-        float coords[3]     = {static_cast<float>(center_x), static_cast<float>(center_y), static_cast<float>(center_z)};
-        coords[contact_dir] = static_cast<float>(center[contact_dir] + radius);
-        x_coords[0]         = coords[0];
-        y_coords[0]         = coords[1];
-        z_coords[0]         = coords[2];
-    }
-
-    int pt_idx = 1;
-    for (int ring = 1; ring <= n_rings; ring++) {
-        real_t phi    = M_PI / 2.0 * ring / n_rings;  // 0 to pi/2 (tip to equator)
-        real_t r_ring = radius * sin(phi);
-        real_t c_ring = center[contact_dir] + radius * cos(phi);
-
-        for (int seg = 0; seg < n_segments; seg++) {
-            real_t theta        = 2.0 * M_PI * seg / n_segments;
-            float  coords[3]    = {static_cast<float>(center_x), static_cast<float>(center_y), static_cast<float>(center_z)};
-            coords[contact_dir] = static_cast<float>(c_ring);
-            coords[h1]          = static_cast<float>(center[h1] + r_ring * cos(theta));
-            coords[h2]          = static_cast<float>(center[h2] + r_ring * sin(theta));
-            x_coords[pt_idx]    = coords[0];
-            y_coords[pt_idx]    = coords[1];
-            z_coords[pt_idx]    = coords[2];
-            pt_idx++;
-        }
-    }
-
-    // Write coordinates
-    FILE* fx = fopen((obstacle_dir / "x.raw").c_str(), "wb");
-    FILE* fy = fopen((obstacle_dir / "y.raw").c_str(), "wb");
-    FILE* fz = fopen((obstacle_dir / "z.raw").c_str(), "wb");
-    fwrite(x_coords.data(), sizeof(float), n_points, fx);
-    fwrite(y_coords.data(), sizeof(float), n_points, fy);
-    fwrite(z_coords.data(), sizeof(float), n_points, fz);
-    fclose(fx);
-    fclose(fy);
-    fclose(fz);
-
-    // Generate triangles
-    std::vector<int32_t> i0(n_triangles), i1(n_triangles), i2(n_triangles);
-    int                  tri_idx = 0;
-
-    // Top cap triangles (connect to top point)
-    for (int seg = 0; seg < n_segments; seg++) {
-        i0[tri_idx] = 0;  // Top point
-        i1[tri_idx] = 1 + seg;
-        i2[tri_idx] = 1 + (seg + 1) % n_segments;
-        tri_idx++;
-    }
-
-    // Body triangles (between rings)
-    for (int ring = 0; ring < n_rings - 1; ring++) {
-        int ring_start      = 1 + ring * n_segments;
-        int next_ring_start = 1 + (ring + 1) * n_segments;
-
-        for (int seg = 0; seg < n_segments; seg++) {
-            int next_seg = (seg + 1) % n_segments;
-
-            // First triangle
-            i0[tri_idx] = ring_start + seg;
-            i1[tri_idx] = next_ring_start + seg;
-            i2[tri_idx] = ring_start + next_seg;
-            tri_idx++;
-
-            // Second triangle
-            i0[tri_idx] = ring_start + next_seg;
-            i1[tri_idx] = next_ring_start + seg;
-            i2[tri_idx] = next_ring_start + next_seg;
-            tri_idx++;
-        }
-    }
-
-    FILE* fi0 = fopen((obstacle_dir / "i0.raw").c_str(), "wb");
-    FILE* fi1 = fopen((obstacle_dir / "i1.raw").c_str(), "wb");
-    FILE* fi2 = fopen((obstacle_dir / "i2.raw").c_str(), "wb");
-    fwrite(i0.data(), sizeof(int32_t), n_triangles, fi0);
-    fwrite(i1.data(), sizeof(int32_t), n_triangles, fi1);
-    fwrite(i2.data(), sizeof(int32_t), n_triangles, fi2);
-    fclose(fi0);
-    fclose(fi1);
-    fclose(fi2);
-
-    printf("Hemisphere obstacle mesh exported to: %s\n", obstacle_dir.c_str());
-    printf("  Center: (%.3f, %.3f, %.3f), Radius: %.3f, contact_dir=%d\n", center_x, center_y, center_z, radius, contact_dir);
-}
-
-int test_mooney_rivlin_gravity() {
+// A block falling under gravity, without contact (hanging from a clamped side) or onto an
+// obstacle. `output_dir` is where SFEM_ENABLE_OUTPUT writes.
+static int run_mooney_rivlin_gravity(const bool contact, const char* const output_dir) {
     auto es = sfem::EXECUTION_SPACE_HOST;
 
     int SFEM_BASE_RESOLUTION = 2;
@@ -702,9 +598,6 @@ int test_mooney_rivlin_gravity() {
     material.K   = SFEM_BULK_MODULUS;
 
     real_t dt = SFEM_DT;
-
-    int SFEM_ENABLE_CONTACT = false;
-    SFEM_READ_ENV(SFEM_ENABLE_CONTACT, atoi);
 
     // WLF temperature shift parameters (set BEFORE Prony terms to avoid redundant calculations)
     int    SFEM_USE_WLF     = 1;
@@ -785,6 +678,7 @@ int test_mooney_rivlin_gravity() {
             std::numeric_limits<real_t>::max(), std::numeric_limits<real_t>::max(), std::numeric_limits<real_t>::max()};
     real_t max_c[3] = {
             std::numeric_limits<real_t>::lowest(), std::numeric_limits<real_t>::lowest(), std::numeric_limits<real_t>::lowest()};
+#pragma omp parallel for reduction(min : min_c[:3]) reduction(max : max_c[:3])
     for (ptrdiff_t i = 0; i < mesh->n_nodes(); ++i) {
         for (int d = 0; d < 3; ++d) {
             const real_t v = coords_ptr[d][i];
@@ -838,7 +732,7 @@ int test_mooney_rivlin_gravity() {
     int SFEM_FIX_SIDE = 1;
     SFEM_READ_ENV(SFEM_FIX_SIDE, atoi);
 
-    if (!SFEM_ENABLE_CONTACT) {
+    if (!contact) {
         // No contact: fix one side completely based on SFEM_FIX_SIDE
         auto fixed_sideset = (SFEM_FIX_SIDE == 0) ? contact_sideset : opposite_sideset;
         printf("Fixing %s side in %s direction (all DOFs)\n",
@@ -849,23 +743,11 @@ int test_mooney_rivlin_gravity() {
         sfem::DirichletConditions::Condition bc_z{.sidesets = fixed_sideset, .value = 0, .component = 2};
         auto                                 conds = sfem::create_dirichlet_conditions(fs, {bc_x, bc_y, bc_z}, es);
         f->add_constraint(conds);
-    } else if (SFEM_CONTACT_DIR == 1) {
-        // Y-direction contact (vertical drop): fix max-y surface in x and z only (allow vertical motion)
-        // This prevents lateral drift while allowing the object to fall
-        sfem::DirichletConditions::Condition top_bc_x{.sidesets = max_sideset_y, .value = 0, .component = 0};
-        sfem::DirichletConditions::Condition top_bc_z{.sidesets = max_sideset_y, .value = 0, .component = 2};
-        auto                                 conds = sfem::create_dirichlet_conditions(fs, {top_bc_x, top_bc_z}, es);
-        f->add_constraint(conds);
-        printf("Y-direction contact: fixed top surface in x,z directions\n");
-    } else if (SFEM_CONTACT_DIR == 2) {
-        // Z-direction contact: fix max-z surface in x and y only (allow vertical motion)
-        sfem::DirichletConditions::Condition top_bc_x{.sidesets = max_sideset_z, .value = 0, .component = 0};
-        sfem::DirichletConditions::Condition top_bc_y{.sidesets = max_sideset_z, .value = 0, .component = 1};
-        auto                                 conds = sfem::create_dirichlet_conditions(fs, {top_bc_x, top_bc_y}, es);
-        f->add_constraint(conds);
-        printf("Z-direction contact: fixed max-z surface in x,y directions\n");
+    } else {
+        // With contact the body is free: the obstacle is all that holds it, and c0 M keeps the
+        // Newton tangent definite on its rigid motions.
+        printf("Contact: no Dirichlet conditions, the body is free\n");
     }
-    // For x-direction contact (CONTACT_DIR=0), no BC is needed - object is free to move in -x
 
     // **GRAVITY as body force instead of Neumann surface force**
     real_t SFEM_GRAVITY = 9.81;  // Positive value, direction handled below
@@ -926,7 +808,7 @@ int test_mooney_rivlin_gravity() {
     // Output setup
     bool SFEM_ENABLE_OUTPUT = false;
     SFEM_READ_ENV(SFEM_ENABLE_OUTPUT, atoi);
-    auto output = create_output(f, smesh::Path("test_mooney_rivlin_gravity"));
+    auto output = create_output(f, smesh::Path(output_dir));
 
     // Newmark state
     auto v      = sfem::create_buffer<real_t>(ndofs, es);
@@ -967,45 +849,18 @@ int test_mooney_rivlin_gravity() {
 
     std::shared_ptr<sfem::MatrixFreeLinearSolver<real_t>> solver;
     auto                                                  jacobi = sfem::create_shiftable_jacobi(diag, es);
-    sfem::SharedBuffer<real_t>                            lower_bound;
 
-    // Contact parameters (LEFT side contact, same as original)
-    real_t SFEM_CONTACT_PLANE = -0.1;  // Position of contact plane (left of x=0)
-    // Note: SFEM_CONTACT_DIR is declared earlier (before gravity setup)
-    SFEM_READ_ENV(SFEM_CONTACT_PLANE, atof);
+    // Contact: every node of the body's surface (it is free, any face can touch), the gap and
+    // normals sampled at every Newton iterate, and the linearised step solved as a QP.
+    Obstacle                             obstacle_field;
+    std::shared_ptr<smesh::Grid<geom_t>> obstacle_sdf;
+    std::shared_ptr<NodeObstacleContact> obstacle;
+    std::shared_ptr<sfem::MPRGP<real_t>> contact_qp;
+    sfem::SharedBuffer<real_t>           upper_bound, qp_rhs, projected, gap_viz, contact_force, inertia_stiffness, x_prev;
+    real_t                               gap_tol = 0, max_inertia_stiffness = 0;
+    bool                                 touched = false;  // the obstacle pushed back in some step
 
-    // Obstacle type: 0=flat, 1=triangular (NOT RECOMMENDED), 2=stepped, 4=hemisphere
-    int    SFEM_OBSTACLE_TYPE  = 4;
-    real_t SFEM_OBSTACLE_SLOPE = 0.2;  // For triangular: slope per unit y
-    int    SFEM_SLOPE_DIR      = 1;    // Direction for slope (1=y, 2=z)
-
-    // Stepped obstacle parameters
-    real_t SFEM_STEP_HEIGHT = 0.25;   // Height of each step
-    real_t SFEM_STEP_DEPTH  = -0.05;  // Depth change per step (negative = deeper into -x)
-
-    SFEM_READ_ENV(SFEM_OBSTACLE_TYPE, atoi);
-    SFEM_READ_ENV(SFEM_OBSTACLE_SLOPE, atof);
-    SFEM_READ_ENV(SFEM_SLOPE_DIR, atoi);
-    SFEM_READ_ENV(SFEM_STEP_HEIGHT, atof);
-    SFEM_READ_ENV(SFEM_STEP_DEPTH, atof);
-
-    // Hemisphere obstacle parameters (type=4)
-    real_t SFEM_HEMISPHERE_CENTER_X = 1.0;   // Default: center of mesh in x
-    real_t SFEM_HEMISPHERE_CENTER_Y = -0.3;  // Below the mesh
-    real_t SFEM_HEMISPHERE_CENTER_Z = 0.5;   // Center of mesh in z
-    real_t SFEM_HEMISPHERE_RADIUS   = 0.5;
-    SFEM_READ_ENV(SFEM_HEMISPHERE_CENTER_X, atof);
-    SFEM_READ_ENV(SFEM_HEMISPHERE_CENTER_Y, atof);
-    SFEM_READ_ENV(SFEM_HEMISPHERE_CENTER_Z, atof);
-    SFEM_READ_ENV(SFEM_HEMISPHERE_RADIUS, atof);
-
-    // Get reference coordinates for obstacle
-    // coords already retrieved above for bounds
-
-    // Store contact node indices
-    std::vector<ptrdiff_t> contact_node_indices;
-
-    if (!SFEM_ENABLE_CONTACT) {
+    if (!contact) {
         auto cg = sfem::create_cg<real_t>(linear_op_apply, es);
         cg->set_n_dofs(ndofs);
         cg->set_max_it(2000);
@@ -1017,94 +872,65 @@ int test_mooney_rivlin_gravity() {
 
         solver = cg;
     } else {
-        auto mprgp  = sfem::create_mprgp(linear_op_apply, es);
-        lower_bound = sfem::create_buffer<real_t>(ndofs, es);
-
-        // For hemisphere (type=4): only use bottom boundary nodes for stability
-        // For other types: use ALL nodes
-        if (SFEM_OBSTACLE_TYPE == 4) {
-            // Hemisphere: only constrain bottom boundary nodes
-            auto      mesh_for_sidesets = fs->mesh_ptr();
-            auto      nodeset           = smesh::create_nodeset_from_sidesets(mesh_for_sidesets, contact_sideset);
-            auto      nodeset_data      = nodeset->data();
-            ptrdiff_t n_boundary_nodes  = nodeset->size();
-            contact_node_indices.resize(n_boundary_nodes);
-            for (ptrdiff_t i = 0; i < n_boundary_nodes; i++) {
-                contact_node_indices[i] = nodeset_data[i];
-            }
-            printf("Hemisphere obstacle (type=4): using %ld BOUNDARY nodes for contact\n", (long)contact_node_indices.size());
-        } else {
-            // Other obstacle types: use all nodes
-            contact_node_indices.resize(n_nodes);
-            for (ptrdiff_t i = 0; i < n_nodes; i++) {
-                contact_node_indices[i] = i;
-            }
-            printf("Obstacle (type=%d): using ALL %ld nodes for contact detection\n", SFEM_OBSTACLE_TYPE, (long)n_nodes);
+        real_t extent = 0;
+        for (int d = 0; d < 3; ++d) {
+            extent = std::max(extent, max_c[d] - min_c[d]);
         }
 
-        // Initial lower bound computation (displacement = 0 at start)
-        geom_t* const* coords_ptr = coords->data();
-        if (SFEM_OBSTACLE_TYPE == 2) {
-            // Stepped obstacle
-            compute_contact_lower_bound_stepped(lower_bound->data(),
-                                                x->data(),
-                                                coords_ptr,
-                                                contact_node_indices.data(),
-                                                (ptrdiff_t)contact_node_indices.size(),
-                                                SFEM_CONTACT_PLANE,
-                                                SFEM_STEP_HEIGHT,
-                                                SFEM_STEP_DEPTH,
-                                                SFEM_CONTACT_DIR,
-                                                SFEM_SLOPE_DIR,
-                                                block_size,
-                                                ndofs);
-        } else if (SFEM_OBSTACLE_TYPE == 1) {
-            // Triangular obstacle (warning: may have penetration issues!)
-            compute_contact_lower_bound_triangular(lower_bound->data(),
-                                                   x->data(),
-                                                   coords_ptr,
-                                                   contact_node_indices.data(),
-                                                   (ptrdiff_t)contact_node_indices.size(),
-                                                   SFEM_CONTACT_PLANE,
-                                                   SFEM_OBSTACLE_SLOPE,
-                                                   SFEM_CONTACT_DIR,
-                                                   SFEM_SLOPE_DIR,
-                                                   block_size,
-                                                   ndofs);
-        } else if (SFEM_OBSTACLE_TYPE == 4) {
-            // Hemisphere obstacle
-            compute_contact_lower_bound_hemisphere(lower_bound->data(),
-                                                   x->data(),
-                                                   coords_ptr,
-                                                   contact_node_indices.data(),
-                                                   (ptrdiff_t)contact_node_indices.size(),
-                                                   SFEM_HEMISPHERE_CENTER_X,
-                                                   SFEM_HEMISPHERE_CENTER_Y,
-                                                   SFEM_HEMISPHERE_CENTER_Z,
-                                                   SFEM_HEMISPHERE_RADIUS,
-                                                   SFEM_CONTACT_DIR,
-                                                   block_size,
-                                                   ndofs);
-        } else {
-            // Flat plane
-            compute_contact_lower_bound(lower_bound->data(),
-                                        x->data(),
-                                        coords_ptr,
-                                        contact_node_indices.data(),
-                                        (ptrdiff_t)contact_node_indices.size(),
-                                        SFEM_CONTACT_PLANE,
-                                        SFEM_CONTACT_DIR,
-                                        block_size,
-                                        ndofs);
+        obstacle_field = create_obstacle(min_c, max_c, SFEM_CONTACT_DIR);
+        obstacle_sdf   = obstacle_grid(mesh->comm(), obstacle_field);
+        obstacle       = std::make_shared<NodeObstacleContact>(obstacle_sdf,
+                                                         mesh->comm(),
+                                                         smesh::create_nodeset_from_sidesets(mesh, smesh::skin_sidesets(mesh)),
+                                                         coords,
+                                                         ndofs,
+                                                         SFEM_CONTACT_DIR);
+        SFEM_TEST_ASSERT(obstacle->size() > 0);
+        printf("Contact: %ld nodes, the body's surface\n", (long)obstacle->size());
+
+        projected     = sfem::create_buffer<real_t>(ndofs, es);
+        gap_viz       = sfem::create_buffer<real_t>(ndofs, es);
+        contact_force = sfem::create_buffer<real_t>(ndofs, es);
+
+        // Contact is resolved to this fraction of the mesh's size.
+        gap_tol = 1e-10 * extent;
+
+        // The scale of each node's equation, c0 M: what turns a reaction into a displacement.
+        inertia_stiffness = sfem::create_buffer<real_t>(ndofs, es);
+        blas->copy(ndofs, mass_diag->data(), inertia_stiffness->data());
+        blas->scal(ndofs, c0, inertia_stiffness->data());
+        {
+            const real_t* const k     = inertia_stiffness->data();
+            const idx_t* const  nodes = obstacle->nodes()->data();
+#pragma omp parallel for reduction(max : max_inertia_stiffness)
+            for (ptrdiff_t i = 0; i < obstacle->size(); ++i) {
+                max_inertia_stiffness = std::max(max_inertia_stiffness, k[(ptrdiff_t)nodes[i] * 3]);
+            }
         }
+        x_prev = sfem::create_buffer<real_t>(ndofs, es);
 
-        mprgp->verbose = false;
-        mprgp->set_lower_bound(lower_bound);
-        mprgp->set_preconditioner_op(jacobi);  // Must set preconditioner!
-        mprgp->set_max_it(2000);
-        mprgp->set_rtol(1e-5);
+        // The step in the contact nodes' frames, Q^T K Q dx' = -Q^T R with dx'_n <= gap_i,
+        // by MPRGP: the constraints hold exactly at every iterate.
+        auto framed    = sfem::create_buffer<real_t>(ndofs, es);
+        auto framed_op = sfem::make_op<real_t>(
+                ndofs,
+                ndofs,
+                [=](const real_t* const in, real_t* const out) {
+                    blas->copy(ndofs, in, framed->data());
+                    obstacle->from_frame(framed->data());
+                    linear_op_apply->apply(framed->data(), out);
+                    obstacle->to_frame(out);
+                },
+                es);
 
-        solver = mprgp;
+        upper_bound            = sfem::create_buffer<real_t>(ndofs, es);
+        qp_rhs                 = sfem::create_buffer<real_t>(ndofs, es);
+        contact_qp             = sfem::create_mprgp(framed_op, es);
+        contact_qp->verbose    = false;
+        contact_qp->check_each = std::numeric_limits<int>::max();
+        contact_qp->set_max_it(20000);
+        contact_qp->set_rtol(1e-10);
+        contact_qp->set_upper_bound(upper_bound);
     }
 
     // 5. Time Loop with Full Newmark Integration
@@ -1129,103 +955,11 @@ int test_mooney_rivlin_gravity() {
     printf("Newmark parameters: beta=%.2f, gamma=%.2f, c0=%.2e, dt=%.3f, density=%.1f\n", beta_nm, gamma_nm, c0, dt, density);
     printf("Time: T=%.2f, dt=%.3f\n", SFEM_T, dt);
     printf("Gravity: %.2f m/s^2 in direction %d\n", SFEM_GRAVITY, -SFEM_CONTACT_DIR);
-    printf("Contact: enabled=%d, obstacle_type=%d\n", SFEM_ENABLE_CONTACT, SFEM_OBSTACLE_TYPE);
-    if (SFEM_OBSTACLE_TYPE == 1) {
-        printf("Triangular obstacle (MPRGP): slope=%.3f in direction %d\n", SFEM_OBSTACLE_SLOPE, SFEM_SLOPE_DIR);
-        printf("  WARNING: May have penetration issues with box constraints!\n");
-        printf("  Obstacle equation: x_contact = %.2f + %.3f * coord[%d]\n",
-               SFEM_CONTACT_PLANE,
-               SFEM_OBSTACLE_SLOPE,
-               SFEM_SLOPE_DIR);
-    } else if (SFEM_OBSTACLE_TYPE == 2) {
-        printf("Stepped obstacle (MPRGP): step_height=%.3f, step_depth=%.3f\n", SFEM_STEP_HEIGHT, SFEM_STEP_DEPTH);
-        printf("  Obstacle equation: x_contact = %.2f + floor(coord[%d]/%.3f) * %.3f\n",
-               SFEM_CONTACT_PLANE,
-               SFEM_SLOPE_DIR,
-               SFEM_STEP_HEIGHT,
-               SFEM_STEP_DEPTH);
-    } else if (SFEM_OBSTACLE_TYPE == 4) {
-        printf("Hemisphere obstacle (MPRGP): center=(%.3f, %.3f, %.3f), radius=%.3f\n",
-               SFEM_HEMISPHERE_CENTER_X,
-               SFEM_HEMISPHERE_CENTER_Y,
-               SFEM_HEMISPHERE_CENTER_Z,
-               SFEM_HEMISPHERE_RADIUS);
-    }
+    printf("Contact: %s\n", contact ? "enabled" : "disabled");
 
-    // Export obstacle mesh for visualization
-    if (SFEM_ENABLE_OUTPUT && SFEM_ENABLE_CONTACT) {
-        // Get mesh bounds for all axes
-        real_t min_c[3] = {
-                std::numeric_limits<real_t>::max(), std::numeric_limits<real_t>::max(), std::numeric_limits<real_t>::max()};
-        real_t         max_c[3]   = {std::numeric_limits<real_t>::lowest(),
-                                     std::numeric_limits<real_t>::lowest(),
-                                     std::numeric_limits<real_t>::lowest()};
-        geom_t* const* coords_ptr = coords->data();
-        for (ptrdiff_t i = 0; i < n_nodes; ++i) {
-            for (int d = 0; d < 3; ++d) {
-                const real_t v = coords_ptr[d][i];
-                if (v < min_c[d]) min_c[d] = v;
-                if (v > max_c[d]) max_c[d] = v;
-            }
-        }
-
-        // Export obstacle geometry based on type
-        if (SFEM_OBSTACLE_TYPE == 2) {
-            // Stepped obstacle
-            const real_t y_max   = max_c[1];
-            const real_t z_min   = min_c[2];
-            const real_t z_max   = max_c[2];
-            int          n_steps = (int)(y_max / SFEM_STEP_HEIGHT) + 1;
-            export_stepped_obstacle_mesh(smesh::Path("test_mooney_rivlin_gravity"),
-                                         SFEM_CONTACT_PLANE,
-                                         SFEM_STEP_HEIGHT,
-                                         SFEM_STEP_DEPTH,
-                                         n_steps,
-                                         z_min,
-                                         z_max);
-        } else if (SFEM_OBSTACLE_TYPE == 4) {
-            // Hemisphere obstacle
-            export_hemisphere_obstacle_mesh(smesh::Path("test_mooney_rivlin_gravity"),
-                                            SFEM_HEMISPHERE_CENTER_X,
-                                            SFEM_HEMISPHERE_CENTER_Y,
-                                            SFEM_HEMISPHERE_CENTER_Z,
-                                            SFEM_HEMISPHERE_RADIUS,
-                                            SFEM_CONTACT_DIR);
-        } else if (SFEM_OBSTACLE_TYPE == 1) {
-            // Triangular obstacle
-            const real_t y_min = min_c[1];
-            const real_t y_max = max_c[1];
-            const real_t z_min = min_c[2];
-            const real_t z_max = max_c[2];
-            export_obstacle_mesh(smesh::Path("test_mooney_rivlin_gravity"),
-                                 SFEM_CONTACT_PLANE,
-                                 SFEM_OBSTACLE_SLOPE,
-                                 SFEM_SLOPE_DIR,
-                                 y_min,
-                                 y_max,
-                                 z_min,
-                                 z_max);
-        } else {
-            // Flat obstacle (type 0) - plane at z=0 (absolute coordinate)
-            int h1, h2;
-            if (SFEM_CONTACT_DIR == 0) {
-                h1 = 1;
-                h2 = 2;
-            } else if (SFEM_CONTACT_DIR == 1) {
-                h1 = 0;
-                h2 = 2;
-            } else {
-                h1 = 0;
-                h2 = 1;
-            }
-            export_flat_obstacle_mesh(smesh::Path("test_mooney_rivlin_gravity"),
-                                      0.0,  // Contact plane at absolute coordinate 0
-                                      SFEM_CONTACT_DIR,
-                                      min_c[h1],
-                                      max_c[h1],
-                                      min_c[h2],
-                                      max_c[h2]);
-        }
+    // The obstacle's SDF grid, for visualisation: contour sdf/sdf.xdmf at 0.
+    if (SFEM_ENABLE_OUTPUT && contact) {
+        obstacle_sdf->to_file(smesh::Path(output_dir) / "sdf");
     }
 
     // Output
@@ -1233,6 +967,12 @@ int test_mooney_rivlin_gravity() {
         output->write_time_step("disp", t, x->data());
         output->write_time_step("velocity", t, v->data());
         output->write_time_step("acceleration", t, a->data());
+        if (contact) {
+            obstacle->gap_field(gap_viz->data());
+            blas->zeros(ndofs, contact_force->data());
+            output->write_time_step("gap", t, gap_viz->data());
+            output->write_time_step("contact_force", t, contact_force->data());
+        }
         output->log_time(t);
     }
 
@@ -1252,82 +992,50 @@ int test_mooney_rivlin_gravity() {
         blas->copy(ndofs, v->data(), v_pred->data());
         blas->axpy(ndofs, (1.0 - gamma_nm) * dt, a->data(), v_pred->data());
 
-        // Use prediction as initial guess for Newton
-        blas->copy(ndofs, u_pred->data(), x->data());
+        // The Dirichlet values are imposed, not predicted: Newton never moves a constrained
+        // dof, so whatever the predictor put there would stay.
+        f->apply_constraints(u_pred->data());
 
-        // Compute lower_bound based on current displacement (before solve)
-        if (SFEM_ENABLE_CONTACT && !contact_node_indices.empty()) {
-            geom_t* const* coords_ptr = coords->data();
-            if (SFEM_OBSTACLE_TYPE == 2) {
-                // Stepped obstacle
-                compute_contact_lower_bound_stepped(lower_bound->data(),
-                                                    x->data(),
-                                                    coords_ptr,
-                                                    contact_node_indices.data(),
-                                                    (ptrdiff_t)contact_node_indices.size(),
-                                                    SFEM_CONTACT_PLANE,
-                                                    SFEM_STEP_HEIGHT,
-                                                    SFEM_STEP_DEPTH,
-                                                    SFEM_CONTACT_DIR,
-                                                    SFEM_SLOPE_DIR,
-                                                    block_size,
-                                                    ndofs);
-            } else if (SFEM_OBSTACLE_TYPE == 4) {
-                // Hemisphere obstacle
-                compute_contact_lower_bound_hemisphere(lower_bound->data(),
-                                                       x->data(),
-                                                       coords_ptr,
-                                                       contact_node_indices.data(),
-                                                       (ptrdiff_t)contact_node_indices.size(),
-                                                       SFEM_HEMISPHERE_CENTER_X,
-                                                       SFEM_HEMISPHERE_CENTER_Y,
-                                                       SFEM_HEMISPHERE_CENTER_Z,
-                                                       SFEM_HEMISPHERE_RADIUS,
-                                                       SFEM_CONTACT_DIR,
-                                                       block_size,
-                                                       ndofs);
-            } else if (SFEM_OBSTACLE_TYPE == 1) {
-                // Triangular obstacle
-                compute_contact_lower_bound_triangular(lower_bound->data(),
-                                                       x->data(),
-                                                       coords_ptr,
-                                                       contact_node_indices.data(),
-                                                       (ptrdiff_t)contact_node_indices.size(),
-                                                       SFEM_CONTACT_PLANE,
-                                                       SFEM_OBSTACLE_SLOPE,
-                                                       SFEM_CONTACT_DIR,
-                                                       SFEM_SLOPE_DIR,
-                                                       block_size,
-                                                       ndofs);
-            } else {
-                // Flat obstacle (type 0)
-                compute_contact_lower_bound(lower_bound->data(),
-                                            x->data(),
-                                            coords_ptr,
-                                            contact_node_indices.data(),
-                                            (ptrdiff_t)contact_node_indices.size(),
-                                            SFEM_CONTACT_PLANE,
-                                            SFEM_CONTACT_DIR,
-                                            block_size,
-                                            ndofs);
-            }
+        if (contact) {
+            // With contact, Newton starts from u_n + dt v_n (x still holds u_n): the stabilised
+            // velocity makes it admissible, while the predictor's dt^2/4 a, whose material
+            // acceleration at a contact node grows as the mesh is refined, can start Newton
+            // deep inside the obstacle.
+            blas->copy(ndofs, x->data(), x_prev->data());
+            blas->axpy(ndofs, dt, v->data(), x->data());
+            f->apply_constraints(x->data());
+        } else {
+            // Use prediction as initial guess for Newton
+            blas->copy(ndofs, u_pred->data(), x->data());
         }
 
         // The step being solved ends at t + dt; its history is fixed here.
         op->begin_step(t + dt, dt);
 
         // Newton Loop with Inertia
-        for (int iter = 0; iter < 20; ++iter) {
+        //
+        // The residual, its norms and, with contact, the KKT measures at the current x.
+        struct Evaluation {
+            real_t r_norm, kkt, penetration, inertia_norm, f_int_norm;
+        };
+        auto evaluate = [&]() -> Evaluation {
+            Evaluation e;
             // Residual: R = M*a + F_int(u) - F_ext + F_contact
             // where a = c0*(u - u_pred) from Newmark relation
             blas->zeros(ndofs, rhs->data());
 
             // Inertia term: c0 * M * (u - u_pred)
-            blas->zeros(ndofs, inertia_term->data());
-            for (ptrdiff_t i = 0; i < ndofs; ++i) {
-                inertia_term->data()[i] = c0 * mass_diag->data()[i] * (x->data()[i] - u_pred->data()[i]);
+            {
+                const real_t* const m  = mass_diag->data();
+                const real_t* const xx = x->data();
+                const real_t* const up = u_pred->data();
+                real_t* const       it = inertia_term->data();
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < ndofs; ++i) {
+                    it[i] = c0 * m[i] * (xx[i] - up[i]);
+                }
             }
-            real_t inertia_norm = blas->norm2(ndofs, inertia_term->data());
+            e.inertia_norm = blas->norm2(ndofs, inertia_term->data());
             blas->axpy(ndofs, 1.0, inertia_term->data(), rhs->data());
 
             // F_int(x) and the gravity load together: `Function::gradient` runs
@@ -1335,27 +1043,58 @@ int test_mooney_rivlin_gravity() {
             // being one.
             blas->zeros(ndofs, f_int->data());
             f->gradient(x->data(), f_int->data());
-            real_t f_int_norm = blas->norm2(ndofs, f_int->data());
+            e.f_int_norm = blas->norm2(ndofs, f_int->data());
             blas->axpy(ndofs, 1.0, f_int->data(), rhs->data());
-
 
             // Apply BC to residual
             f->set_value_to_constrained_dofs(0.0, rhs->data());
-            real_t r_norm = blas->norm2(ndofs, rhs->data());
-            real_t x_norm = blas->norm2(ndofs, x->data());
+            e.r_norm = blas->norm2(ndofs, rhs->data());
 
-            printf("  Iter %d: |R|=%e |u|=%e |M*a|=%e |F_int+F_grav|=%e\n",
+            // With contact the residual does not vanish at the solution: where the obstacle is
+            // touched it is the obstacle's reaction. The step converges on what remains.
+            e.kkt         = e.r_norm;
+            e.penetration = 0;
+            if (contact) {
+                obstacle->update(x->data());
+                e.kkt = obstacle->kkt_residual(rhs->data(), inertia_stiffness->data(), projected->data(), &e.penetration);
+            }
+            return e;
+        };
+
+        bool       step_converged = false;
+        real_t     kkt_tol        = 0;
+        Evaluation e              = evaluate();
+        if (contact && !std::isfinite(e.kkt)) {
+            // On a fine mesh dt v can invert elements away from the obstacle right after an
+            // impact; u_n, converged and admissible, is a start that always evaluates.
+            blas->copy(ndofs, x_prev->data(), x->data());
+            e = evaluate();
+        }
+        for (int iter = 0; iter < 20; ++iter) {
+            if (iter == 0) {
+                // Relative to the forces in balance: with contact the residual's reaction part
+                // can far exceed what remains of it, and sets the rounding floor.
+                kkt_tol = std::max(real_t(1e-8), real_t(1e-9) * std::max(e.kkt, e.r_norm));
+            }
+
+            printf("  Iter %d: |R|=%e |KKT|=%e penetration=%e |u|=%e |M*a|=%e |F_int+F_grav|=%e\n",
                    iter,
-                   r_norm,
-                   x_norm,
-                   inertia_norm,
-                   f_int_norm);
-            if (r_norm < 1e-8) break;
+                   e.r_norm,
+                   e.kkt,
+                   e.penetration,
+                   blas->norm2(ndofs, x->data()),
+                   e.inertia_norm,
+                   e.f_int_norm);
+            if (!std::isfinite(e.kkt)) break;
+            if (e.kkt < kkt_tol && e.penetration <= gap_tol) {
+                step_converged = true;
+                break;
+            }
 
             // ===== Tangent Stiffness: K_eff = K_tan + c0*M =====
             blas->zeros(values->size(), values->data());
             auto t_start = std::chrono::high_resolution_clock::now();
-            op->hessian_bsr(x->data(), graph->rowptr()->data(), graph->colidx()->data(), values->data());
+            f->hessian_bsr(x->data(), graph->rowptr()->data(), graph->colidx()->data(), values->data());
             auto t_end = std::chrono::high_resolution_clock::now();
             total_hessian_time += std::chrono::duration<double>(t_end - t_start).count();
 
@@ -1364,37 +1103,113 @@ int test_mooney_rivlin_gravity() {
             auto      vals   = values->data();
             const int bs2    = block_size * block_size;
 
-            for (ptrdiff_t node = 0; node < n_nodes; ++node) {
-                for (count_t k = rowptr[node]; k < rowptr[node + 1]; ++k) {
-                    if (colidx[k] == (idx_t)node) {
-                        for (int d = 0; d < block_size; ++d) {
-                            ptrdiff_t dof_idx = node * block_size + d;
-                            vals[k * bs2 + d * block_size + d] += c0 * mass_diag->data()[dof_idx];
-                        }
-                        break;
+            {
+                const real_t* const m = mass_diag->data();
+#pragma omp parallel for
+                for (ptrdiff_t node = 0; node < n_nodes; ++node) {
+                    real_t* const B = bsr_diagonal_block(rowptr, colidx, vals, node);
+                    for (int d = 0; d < block_size; ++d) {
+                        B[d * block_size + d] += c0 * m[node * block_size + d];
                     }
                 }
             }
 
-            // Extract diagonal for Jacobi preconditioner
-            blas->zeros(ndofs, diag->data());
-            for (ptrdiff_t node = 0; node < n_nodes; ++node) {
-                for (count_t k = rowptr[node]; k < rowptr[node + 1]; ++k) {
-                    if (colidx[k] == (idx_t)node) {
-                        for (int d = 0; d < block_size; ++d) {
-                            ptrdiff_t dof_idx     = node * block_size + d;
-                            diag->data()[dof_idx] = vals[k * bs2 + d * block_size + d];
+            // MPRGP's expansion step needs an upper bound on the largest eigenvalue; the
+            // largest row sum bounds it, and the frames do not change it.
+            auto max_row_sum = [&]() {
+                real_t bound = 0;
+#pragma omp parallel for reduction(max : bound)
+                for (ptrdiff_t node = 0; node < n_nodes; ++node) {
+                    for (int r = 0; r < block_size; ++r) {
+                        real_t row_sum = 0;
+                        for (count_t k = rowptr[node]; k < rowptr[node + 1]; ++k) {
+                            for (int c = 0; c < block_size; ++c) {
+                                row_sum += std::abs(vals[k * bs2 + r * block_size + c]);
+                            }
                         }
-                        break;
+                        bound = std::max(bound, row_sum);
                     }
                 }
+                return bound;
+            };
+
+            if (contact) {
+                obstacle->add_curvature(x->data(), rhs->data(), inertia_stiffness->data(), false, 1, rowptr, colidx, vals);
+                contact_qp->set_atol(real_t(0.1) * kkt_tol);
+                obstacle->upper_bound(contact_qp->infty, upper_bound->data());
+            } else {
+                // Extract diagonal for Jacobi preconditioner
+                real_t* const dg = diag->data();
+#pragma omp parallel for
+                for (ptrdiff_t node = 0; node < n_nodes; ++node) {
+                    const real_t* const B = bsr_diagonal_block(rowptr, colidx, vals, node);
+                    for (int d = 0; d < block_size; ++d) {
+                        dg[node * block_size + d] = B[d * block_size + d];
+                    }
+                }
+
+                jacobi->set_diag(diag);
             }
 
-            jacobi->set_diag(diag);
+            if (contact) {
+                // -R in the frames; rhs keeps R for a second attempt.
+                auto solve_step = [&]() {
+                    contact_qp->set_max_eig(max_row_sum());
+                    blas->copy(ndofs, rhs->data(), qp_rhs->data());
+                    blas->scal(ndofs, -1.0, qp_rhs->data());
+                    obstacle->to_frame(qp_rhs->data());
+                    blas->zeros(ndofs, delta_x->data());
+                    return contact_qp->apply(qp_rhs->data(), delta_x->data());
+                };
+                if (solve_step() != SFEM_SUCCESS) {
+                    // MPRGP stops at negative curvature. Away from the solution the residual
+                    // overstates the reactions and the curvature term can make the tangent
+                    // indefinite: solve again with it capped.
+                    obstacle->add_curvature(x->data(), rhs->data(), inertia_stiffness->data(), false, -1, rowptr, colidx, vals);
+                    obstacle->add_curvature(x->data(), rhs->data(), inertia_stiffness->data(), true, 1, rowptr, colidx, vals);
 
-            blas->scal(ndofs, -1.0, rhs->data());
-            blas->zeros(ndofs, delta_x->data());
-            solver->apply(rhs->data(), delta_x->data());
+                    // The material's tangent can be indefinite too (a hyperelastic block under
+                    // compression, on a mesh fine enough that c0 M no longer outweighs it): shift
+                    // its diagonal by a growing fraction of itself until the step solves. A
+                    // shifted step still descends, and a stable solution needs no shift.
+                    real_t shift = 0;
+                    while (solve_step() != SFEM_SUCCESS) {
+                        if (shift >= 100) {
+                            printf("  contact QP did not reach its tolerance\n");
+                            break;
+                        }
+                        real_t* const dg = diag->data();
+                        if (shift == 0) {
+#pragma omp parallel for
+                            for (ptrdiff_t node = 0; node < n_nodes; ++node) {
+                                const real_t* const B = bsr_diagonal_block(rowptr, colidx, vals, node);
+                                for (int d = 0; d < block_size; ++d) {
+                                    dg[node * block_size + d] = B[d * block_size + d];
+                                }
+                            }
+                        }
+                        const real_t next = shift == 0 ? real_t(1e-2) : 10 * shift;
+#pragma omp parallel for
+                        for (ptrdiff_t node = 0; node < n_nodes; ++node) {
+                            real_t* const B = bsr_diagonal_block(rowptr, colidx, vals, node);
+                            for (int d = 0; d < block_size; ++d) {
+                                B[d * block_size + d] += (next - shift) * std::abs(dg[node * block_size + d]);
+                            }
+                        }
+                        shift = next;
+                        printf("  tangent shifted by %g of its diagonal\n", shift);
+                    }
+                }
+                obstacle->from_frame(delta_x->data());
+                // MPRGP's recurrences leave rounding in the identity rows of the constrained dofs.
+                f->apply_zero_constraints(delta_x->data());
+            } else {
+                blas->scal(ndofs, -1.0, rhs->data());
+                blas->zeros(ndofs, delta_x->data());
+                if (solver->apply(rhs->data(), delta_x->data()) != SFEM_SUCCESS) {
+                    printf("  linear step did not reach its tolerance\n");
+                }
+            }
 
             // u = u + dx (with optional damping for stability)
             // For fine meshes, damping < 1 may be needed
@@ -1408,16 +1223,71 @@ int test_mooney_rivlin_gravity() {
                 }
             }
             real_t damping = SFEM_NEWTON_DAMPING;
-            blas->axpy(ndofs, damping, delta_x->data(), x->data());
 
-            if (SFEM_ENABLE_CONTACT) {
-                blas->axpy(ndofs, -damping, delta_x->data(), lower_bound->data());
+            if (contact) {
+                // Backtracking on the KKT residual, penetration counted as a force. Where the
+                // obstacle's normal turns quickly (a crease, a corner) the full step can cycle
+                // between two contact states.
+                const real_t merit0 = e.kkt + max_inertia_stiffness * e.penetration;
+                blas->copy(ndofs, x->data(), x_prev->data());
+                // A trial that cannot be evaluated (an inverted element) is never accepted: the
+                // step keeps halving, and if none evaluates the step fails below.
+                real_t alpha = 1;
+                for (;;) {
+                    blas->copy(ndofs, x_prev->data(), x->data());
+                    blas->axpy(ndofs, alpha * damping, delta_x->data(), x->data());
+                    e                  = evaluate();
+                    const real_t merit = e.kkt + max_inertia_stiffness * e.penetration;
+                    if (std::isfinite(merit) && (merit <= (1 - real_t(1e-4) * alpha) * merit0 || alpha <= real_t(1) / 64)) break;
+                    if (alpha <= real_t(1e-6)) break;
+                    alpha /= 2;
+                }
+                if (alpha < 1) {
+                    printf("  step length %g\n", alpha);
+                }
+            } else {
+                blas->axpy(ndofs, damping, delta_x->data(), x->data());
+                e = evaluate();
             }
         }
 
-        for (ptrdiff_t i = 0; i < ndofs; ++i) {
-            a->data()[i] = c0 * (x->data()[i] - u_pred->data()[i]);
-            v->data()[i] = v_pred->data()[i] + gamma_nm * dt * a->data()[i];
+        if (!step_converged) {
+            fprintf(stderr, "Step %zu (t=%g) did not converge\n", steps, double(t));
+            return SFEM_TEST_FAILURE;
+        }
+
+        {
+            const real_t* const xx = x->data();
+            const real_t* const up = u_pred->data();
+            const real_t* const vp = v_pred->data();
+            real_t* const       aa = a->data();
+            real_t* const       vv = v->data();
+#pragma omp parallel for
+            for (ptrdiff_t i = 0; i < ndofs; ++i) {
+                aa[i] = c0 * (xx[i] - up[i]);
+                vv[i] = vp[i] + gamma_nm * dt * aa[i];
+            }
+        }
+
+        if (contact) {
+            // Contact-stabilised Newmark. The contact force is implicit only: the acceleration
+            // carried into the next predictor is the material's, -M^{-1} F(u), without the
+            // obstacle's reaction; carrying the reaction forward is what makes plain Newmark
+            // chatter at contact. And the velocity is projected so that the next predicted
+            // position is admissible.
+            const real_t* const r  = rhs->data();
+            const real_t* const pr = projected->data();
+            const real_t* const m  = mass_diag->data();
+            real_t* const       aa = a->data();
+            bool                pushed = false;
+#pragma omp parallel for reduction(|| : pushed)
+            for (ptrdiff_t i = 0; i < ndofs; ++i) {
+                const real_t reaction = r[i] - pr[i];
+                aa[i] -= reaction / m[i];
+                pushed = pushed || reaction != 0;
+            }
+            touched = touched || pushed;
+            obstacle->stabilise_velocity(x->data(), v->data(), dt);
         }
 
         // Update history
@@ -1431,8 +1301,23 @@ int test_mooney_rivlin_gravity() {
             output->write_time_step("disp", t, x->data());
             output->write_time_step("velocity", t, v->data());
             output->write_time_step("acceleration", t, a->data());
+            if (contact) {
+                // The residual of the converged step, less what remains of it, is the obstacle's
+                // reaction in the step's scaling, where the material force enters at both ends of
+                // the step with dt^2/4 and the contact force once: the force is half of it.
+                obstacle->gap_field(gap_viz->data());
+                blas->zaxpby(ndofs, real_t(0.5), rhs->data(), real_t(-0.5), projected->data(), contact_force->data());
+                output->write_time_step("gap", t, gap_viz->data());
+                output->write_time_step("contact_force", t, contact_force->data());
+            }
             output->log_time(t);
         }
+    }
+
+    // A contact run in which nothing touched the obstacle has not tested contact.
+    if (contact && !touched) {
+        fprintf(stderr, "The body never touched the obstacle\n");
+        return SFEM_TEST_FAILURE;
     }
 
     printf("===== Test Completed =====\n");
@@ -1440,8 +1325,17 @@ int test_mooney_rivlin_gravity() {
     return SFEM_TEST_SUCCESS;
 }
 
+int test_mooney_rivlin_gravity() { return run_mooney_rivlin_gravity(false, "test_mooney_rivlin_gravity"); }
+
+int test_mooney_rivlin_gravity_contact() { return run_mooney_rivlin_gravity(true, "test_mooney_rivlin_gravity_contact"); }
+
 int main(int argc, char* argv[]) {
+    // Line by line: the solvers' warnings go to stderr, and a log taking both must not have them
+    // inside a progress line.
+    setvbuf(stdout, nullptr, _IOLBF, 0);
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_mooney_rivlin_gravity);
+    SFEM_RUN_TEST(test_mooney_rivlin_gravity_contact);
     SFEM_UNIT_TEST_FINALIZE();
+    return SFEM_UNIT_TEST_ERR();
 }
