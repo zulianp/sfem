@@ -1,0 +1,24 @@
+# The HEX8 box, clamped at its inlet, pulled along x at its outlet and twisted there by 4 rad about
+# the axis through (0, 0.5, 0.5) over 12 quasi-static steps. Run by hyperelasticity_hex8.sh.
+mesh:
+  path: geometry_hex8/box
+  sidesets:
+    - {name: inlet, file: geometry_hex8/inlet}
+    - {name: outlet, file: geometry_hex8/outlet}
+material: {type: NeoHookeanOgdenPacked}
+dirichlet_conditions:
+  - {type: sideset, format: name, name: inlet, value: [0, 0, 0], component: [0, 1, 2]}
+  - {type: sideset, format: name, name: outlet, value: 0.2, component: 0}
+constraints:
+  - type: rotation
+    sideset: outlet
+    axis: x
+    center: [0, 0.5, 0.5]
+    angle: 4
+    profile: {type: linear_ramp, start_time: 0, end_time: 12, start_value: 0, end_value: 1}
+regime: quasi_static
+time: {dt: 1, steps: 12}
+solver:
+  newton: {line_search: {enabled: false}}
+  linear: {format: MF, preconditioner: none}
+output: {path: output_hex8}

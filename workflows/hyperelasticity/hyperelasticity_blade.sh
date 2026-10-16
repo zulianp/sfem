@@ -43,5 +43,5 @@ export SMESH_TRACE_FILE=output_blade/hyperelasticity.trace.csv
 
 rm -rf output_blade
 export SFEM_NEOHOOKEAN_OGDEN_USE_AOS=1
-$LAUNCH hyperelasticy geometry_blade/blade dirichlet_blade.yaml output_blade
+$LAUNCH playground hyperelasticity_blade.yaml
 raw_to_db output_blade/mesh output_blade.vtk -p 'output_blade/out/*.*' $EXTRA_OPTIONS

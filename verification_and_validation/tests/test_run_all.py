@@ -51,9 +51,9 @@ def valid_v2_case():
                 "element": "QUAD4",
                 "resolution": {"nx": 8, "ny": 8},
                 "driver": {
-                    "executable": "{build_dir}/linear_elasticity",
-                    "arguments": ["{mesh}", "{output}/dirichlet.yaml", "{output}/solution"],
-                    "environment": {"SFEM_OPERATOR": "{operator}"},
+                    "executable": "{build_dir}/playground",
+                    "arguments": ["{output}/case.yaml"],
+                    "environment": {"OMP_NUM_THREADS": "1"},
                 },
                 "expected_output": {
                     "required": [{"pattern": "converged", "count": 1}],

@@ -39,21 +39,15 @@ then
 	cd $HERE
 fi
 
-export SFEM_ROTATE_SIDESET=geometry/outlet
-export SFEM_ROTATE_ANGLE=7.5
-export SFEM_ROTATE_STEPS=24
 export SFEM_NEOHOOKEAN_OGDEN_USE_AOS=1
 export SFEM_USE_PARTIAL_ASSEMBLY=1
 export SFEM_ELEMENTS_PER_PACK=2048 
-export SFEM_USE_PACKED_MESH=1
-export SFEM_USE_PRECONDITIONER=0
-export SFEM_ENABLE_LINE_SEARCH=0
 export SMESH_TRACE_FILE=output/hyperelasticity.trace.csv
 
 rm -rf output
 
-$LAUNCH hyperelasticy geometry/mesh dirichlet.yaml output
+$LAUNCH playground hyperelasticity.yaml
 
 cd output
-raw_to_db mesh output.xdmf -p "out/disp.0.*.*,out/disp.1.*.*,out/disp.2.*.*" --transient --n_time_steps=$(( SFEM_ROTATE_STEPS + 1 ))
+raw_to_db mesh output.xdmf -p "out/disp.0.*.*,out/disp.1.*.*,out/disp.2.*.*" --transient --n_time_steps=25
 cd $HERE

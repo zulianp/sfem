@@ -35,6 +35,7 @@ mesh:
     - "{resolution_nz}"
 
 inputs:
+  - {template: operator.yaml, output: "{output}/operator.yaml"}
   - {template: dirichlet_undeformed.yaml, output: "{output}/dirichlet_undeformed.yaml"}
   - {template: dirichlet_compatible.yaml, output: "{output}/dirichlet_compatible.yaml"}
 
@@ -56,38 +57,103 @@ variants:
     operator: NeoHookeanOgdenActiveStrainPacked
     element: HEX8
     resolution: {nx: 4, ny: 4, nz: 4, backend: matrix_free}
-    driver: &neo_driver
+    driver: &driver_mf_initialized_packed
       executable: "{python}"
-      arguments: ["{suite_dir}/common/run_affine_modes.py", --kind, hyperelastic, --driver, "{build_dir}/hyperelasticy", --mesh, "{mesh}", --input-dir, "{output}", --output, "{output}/solution", undeformed, compatible]
-      environment: &neo_environment
+      arguments:
+        - "{suite_dir}/common/run_affine_modes.py"
+        - --driver
+        - "{build_dir}/playground"
+        - --mesh
+        - "{mesh}"
+        - --input-dir
+        - "{output}"
+        - --output
+        - "{output}/solution"
+        - --initialize
+        - --field
+        - "active_strain={mesh}/fields/Fa.float64.raw"
+        - --set
+        - "solver.newton.atol=1.0e-11"
+        - --set
+        - "solver.newton.rtol=0"
+        - --set
+        - "solver.newton.max_it=30"
+        - --set
+        - "solver.newton.line_search.enabled=false"
+        - --set
+        - "solver.linear.preconditioner=none"
+        - --set
+        - "solver.linear.rtol=1.0e-12"
+        - --set
+        - "solver.linear.atol=1.0e-11"
+        - --set
+        - "solver.linear.max_it=20000"
+        - --set
+        - "solver.newton.verbose=false"
+        - --set
+        - "solver.linear.format=MF"
+        - --set
+        - "mesh.packed=true"
+        - --set
+        - "mesh.renumber=false"
+        - undeformed
+        - compatible
+      environment:
         OMP_NUM_THREADS: 1
-        SFEM_OPERATOR: NeoHookeanOgdenActiveStrainPacked
-        SFEM_USE_PACKED_MESH: 1
-        SFEM_ACTIVE_STRAIN_FILE: "{mesh}/fields/Fa.float64.raw"
-        SFEM_AFFINE_INITIALIZE: 1
-        SFEM_MU: "{material_lambda}"
-        SFEM_LAMBDA: "{material_mu}"
-        SFEM_OP_TYPE: MF
-        SFEM_VERBOSE: 0
-        SFEM_NL_TOL: 1.0e-11
-        SFEM_NL_MAX_IT: 30
-        SFEM_LSOLVE_RTOL: 1.0e-12
-        SFEM_ENABLE_LINE_SEARCH: 0
     expected_output: &expected_output
-      required: [{pattern: SFEM_AFFINE_MODE_COMPLETE, count: 2}]
-      forbidden: [Newton did not converge, No progress made, "(max iterations)"]
+      required:
+      - {pattern: SFEM_AFFINE_MODE_COMPLETE, count: 2}
+      forbidden: [Newton did not converge, No progress made, (max iterations)]
     tolerances: &variant_tolerances
-      undeformed_displacement_relative_l2: 1.0e-9
+      undeformed_displacement_relative_l2: 1.0e-09
 
   - id: neohookean_hex8_bsr
     operator: NeoHookeanOgdenActiveStrainPacked
     element: HEX8
     resolution: {nx: 4, ny: 4, nz: 4, backend: bsr}
-    driver:
-      <<: *neo_driver
+    driver: &driver_bsr_initialized_packed
+      executable: "{python}"
+      arguments:
+        - "{suite_dir}/common/run_affine_modes.py"
+        - --driver
+        - "{build_dir}/playground"
+        - --mesh
+        - "{mesh}"
+        - --input-dir
+        - "{output}"
+        - --output
+        - "{output}/solution"
+        - --initialize
+        - --field
+        - "active_strain={mesh}/fields/Fa.float64.raw"
+        - --set
+        - "solver.newton.atol=1.0e-11"
+        - --set
+        - "solver.newton.rtol=0"
+        - --set
+        - "solver.newton.max_it=30"
+        - --set
+        - "solver.newton.line_search.enabled=false"
+        - --set
+        - "solver.linear.preconditioner=none"
+        - --set
+        - "solver.linear.rtol=1.0e-12"
+        - --set
+        - "solver.linear.atol=1.0e-11"
+        - --set
+        - "solver.linear.max_it=20000"
+        - --set
+        - "solver.newton.verbose=false"
+        - --set
+        - "solver.linear.format=BSR"
+        - --set
+        - "mesh.packed=true"
+        - --set
+        - "mesh.renumber=false"
+        - undeformed
+        - compatible
       environment:
-        <<: *neo_environment
-        SFEM_OP_TYPE: BSR
+        OMP_NUM_THREADS: 1
     expected_output: *expected_output
     tolerances: *variant_tolerances
 
@@ -95,14 +161,7 @@ variants:
     operator: MooneyRivlinActiveStrainPacked
     element: HEX8
     resolution: {nx: 4, ny: 4, nz: 4, backend: matrix_free}
-    driver: &mooney_driver
-      <<: *neo_driver
-      environment: &mooney_environment
-        <<: *neo_environment
-        SFEM_OPERATOR: MooneyRivlinActiveStrainPacked
-        SFEM_MU: "{material_lambda}"
-        SFEM_LAMBDA: "{material_mu}"
-        SFEM_LMDA: "{material_lambda}"
+    driver: *driver_mf_initialized_packed
     expected_output: *expected_output
     tolerances: *variant_tolerances
 
@@ -110,10 +169,6 @@ variants:
     operator: MooneyRivlinActiveStrainPacked
     element: HEX8
     resolution: {nx: 4, ny: 4, nz: 4, backend: bsr}
-    driver:
-      <<: *mooney_driver
-      environment:
-        <<: *mooney_environment
-        SFEM_OP_TYPE: BSR
+    driver: *driver_bsr_initialized_packed
     expected_output: *expected_output
     tolerances: *variant_tolerances

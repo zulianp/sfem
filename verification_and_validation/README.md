@@ -76,18 +76,20 @@ reusing the same physical tolerances.
 
 ## Driver inputs
 
-The static linear-elasticity driver accepts both its original command and the
-extended YAML form:
+Static linear-elastic cases run the elasticity playground
+(`drivers/mech/playground.exe.cpp`) through `common/run_static.py`,
+`common/run_affine_modes.py` and `common/run_linear_refinements.py`.
+They compose one playground case from the mesh, `operator.yaml` and the
+condition files, and pass solver settings as `--set key=value`:
 
 ```text
-linear_elasticity <mesh> <dirichlet.yaml> <output>
-linear_elasticity <mesh> <dirichlet.yaml|NONE> <neumann.yaml|NONE> <operator.yaml|NONE> <output>
+playground case.yaml [--set solver.linear.format=BSR]... [--dry-run]
 ```
 
-The extended form preserves generated mesh numbering so file-backed node and
-side sets remain valid. Set `SFEM_REORDER=1` only when the input sets use the
-driver's reordered numbering. Operator YAML accepts top-level parameters and
-per-block overrides:
+The case keeps the generated mesh numbering (`mesh.reorder: none`), so
+file-backed node and side sets remain valid. The fields land in
+`<output>/out` and the objective and reactions in `<output>/quantities.yaml`.
+Operator YAML accepts top-level parameters and per-block overrides:
 
 ```yaml
 operator:

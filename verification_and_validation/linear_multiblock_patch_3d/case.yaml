@@ -42,16 +42,33 @@ variants:
     element: HEX8
     resolution: {nx: 4, ny: 4, nz: 4, backend: matrix_free}
     driver: &driver
-      executable: "{build_dir}/linear_elasticity"
-      arguments: ["{mesh}", "{output}/dirichlet.yaml", NONE, "{output}/operator.yaml", "{output}/solution"]
+      executable: "{python}"
+      arguments:
+        - "{suite_dir}/common/run_static.py"
+        - --driver
+        - "{build_dir}/playground"
+        - --mesh
+        - "{mesh}"
+        - --operator
+        - "{output}/operator.yaml"
+        - --dirichlet
+        - "{output}/dirichlet.yaml"
+        - --output
+        - "{output}/solution"
+        - --set
+        - "mesh.packed=false"
+        - --set
+        - "solver.linear.format=MF"
+        - --set
+        - "solver.linear.preconditioner=none"
+        - --set
+        - "solver.linear.rtol=1.0e-13"
+        - --set
+        - "solver.linear.max_it=20000"
+        - --set
+        - "solver.newton.verbose=false"
       environment: &driver_environment
         OMP_NUM_THREADS: 1
-        SFEM_REORDER: 0
-        SFEM_USE_PACKED_MESH: 0
-        SFEM_OP_TYPE: MF
-        SFEM_VERBOSE: 0
-        SFEM_RTOL: 1.0e-13
-        SFEM_MAX_IT: 20000
     expected_output: &expected_output
       required: []
       forbidden: [No progress made, "(max iterations)"]
@@ -63,9 +80,31 @@ variants:
     element: HEX8
     resolution: {nx: 4, ny: 4, nz: 4, backend: bsr}
     driver:
-      <<: *driver
-      environment:
-        <<: *driver_environment
-        SFEM_OP_TYPE: BSR
+      executable: "{python}"
+      arguments:
+        - "{suite_dir}/common/run_static.py"
+        - --driver
+        - "{build_dir}/playground"
+        - --mesh
+        - "{mesh}"
+        - --operator
+        - "{output}/operator.yaml"
+        - --dirichlet
+        - "{output}/dirichlet.yaml"
+        - --output
+        - "{output}/solution"
+        - --set
+        - "mesh.packed=false"
+        - --set
+        - "solver.linear.format=BSR"
+        - --set
+        - "solver.linear.preconditioner=none"
+        - --set
+        - "solver.linear.rtol=1.0e-13"
+        - --set
+        - "solver.linear.max_it=20000"
+        - --set
+        - "solver.newton.verbose=false"
+      environment: *driver_environment
     expected_output: *expected_output
     tolerances: *variant_tolerances
