@@ -168,6 +168,7 @@ if(SFEM_ENABLE_CUDA)
         operators/tet4/cuda
         resampling/surface/cuda
         resampling/quadshell4/cuda
+        resampling/interpolate/cuda
         ssmg/cuda
         frontend/ops/cuda
         frontend/ops/prony/cuda

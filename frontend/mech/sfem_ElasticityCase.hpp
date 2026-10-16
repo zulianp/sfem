@@ -51,7 +51,7 @@ namespace sfem {
     /// initial_conditions:
     ///   displacement: {components: [u.0.raw, u.1.raw, u.2.raw]}   # or file: interleaved
     ///   velocity: {file: v.raw}              # dynamic, Newmark or BDF2
-    /// obstacle:                              # host only; regime dynamic, scheme newmark
+    /// obstacle:                              # regime dynamic, scheme newmark; host or device
     ///   backend: node_sdf                    # nodes against the SDF's B-spline, MPRGP in frames
     ///   nodes: skin                          # or a named sideset
     ///   direction: z                         # the body approaches along -direction

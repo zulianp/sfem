@@ -30,7 +30,7 @@ namespace sfem {
     /// The inertia stiffness k = c0 M, which scales complementarity, is read from the Newmark the
     /// step's scheme composes, so it needs inertia. When MPRGP stops (an indefinite tangent during
     /// an impact) the step is solved again with the curvature term capped, then with the
-    /// tangent's diagonal shifted by a growing fraction of itself. Host only.
+    /// tangent's diagonal shifted by a growing fraction of itself. It runs where the function does.
     class NodeObstacleStep final : public LinearizedStep {
     public:
         static std::shared_ptr<NodeObstacleStep> create(const std::shared_ptr<Function>            &f,

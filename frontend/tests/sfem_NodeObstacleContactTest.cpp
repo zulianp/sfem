@@ -137,11 +137,126 @@ int test_project_velocity() {
     return SFEM_TEST_SUCCESS;
 }
 
+#ifdef SFEM_ENABLE_CUDA
+namespace {
+    std::vector<real_t> host_copy(const real_t *const device, const ptrdiff_t n) {
+        auto h = smesh::to_host(sfem::Buffer<real_t>::wrap(n, const_cast<real_t *>(device), sfem::MEMORY_SPACE_DEVICE));
+        return std::vector<real_t>(h->data(), h->data() + n);
+    }
+
+    real_t worst(const std::vector<real_t> &a, const std::vector<real_t> &b) {
+        real_t w = 0, scale = 0;
+        for (size_t i = 0; i < a.size(); ++i) {
+            w     = std::max(w, std::abs(a[i] - b[i]));
+            scale = std::max(scale, std::abs(a[i]));
+        }
+        return w / std::max(scale, real_t(1e-300));
+    }
+}  // namespace
+
+// Every operation on the device against the host, on a sphere where normals and curvature vary
+// from node to node and some nodes start inside.
+int test_device_matches_host() {
+    auto comm = sfem::Communicator::world();
+    auto mesh = sfem::Mesh::create_hex8_cube(comm, 4, 4, 4, 0, 0, 0, 1, 1, 1);
+    auto fs   = sfem::FunctionSpace::create(mesh, 3);
+    const ptrdiff_t nnodes = mesh->n_nodes(), ndofs = 3 * nnodes;
+
+    // A ball of radius 0.6 about (0.5, 0.5, -0.4), positive inside: its top cuts the block's base.
+    auto sdf = smesh::create_sdf(comm, 61, 61, 61, -1, -1, -1.5, 2, 2, 1.5, [](const geom_t x, const geom_t y, const geom_t z) -> geom_t {
+        return geom_t(0.6) - std::sqrt((x - 0.5) * (x - 0.5) + (y - 0.5) * (y - 0.5) + (z + 0.4) * (z + 0.4));
+    });
+    auto nodes = sfem::create_host_buffer<idx_t>(nnodes);
+    for (ptrdiff_t i = 0; i < nnodes; ++i) nodes->data()[i] = (idx_t)i;
+    sfem::NodeObstacleContact host(sdf, comm, nodes, mesh->points(), ndofs, 2);
+    sfem::NodeObstacleContact device(sdf, comm, nodes, mesh->points(), ndofs, 2, sfem::EXECUTION_SPACE_DEVICE);
+
+    auto to_device = [](const std::vector<real_t> &h) {
+        return smesh::to_device(sfem::Buffer<real_t>::wrap(h.size(), const_cast<real_t *>(h.data())));
+    };
+
+    std::vector<real_t> x(ndofs), r(ndofs), k(ndofs), v(ndofs);
+    for (ptrdiff_t i = 0; i < ndofs; ++i) {
+        x[i] = real_t(0.05) * pseudo_random(i, 1);
+        r[i] = pseudo_random(i, 2);
+        k[i] = 1 + real_t(0.5) * pseudo_random(i, 3);
+        v[i] = pseudo_random(i, 4);
+    }
+    auto dx = to_device(x), dr = to_device(r), dk = to_device(k), dv = to_device(v);
+
+    host.update(x.data());
+    device.update(dx->data());
+    const real_t g = worst(std::vector<real_t>(host.gap()->data(), host.gap()->data() + nnodes), host_copy(device.gap()->data(), nnodes));
+    printf("  gap %.3g\n", (double)g);
+    SFEM_TEST_ASSERT(g < 1e-12);
+
+    std::vector<real_t> w = v;
+    auto                dw = to_device(v);
+    host.to_frame(w.data());
+    device.to_frame(dw->data());
+    SFEM_TEST_ASSERT(worst(w, host_copy(dw->data(), ndofs)) < 1e-12);
+    host.from_frame(w.data());
+    device.from_frame(dw->data());
+    SFEM_TEST_ASSERT(worst(w, host_copy(dw->data(), ndofs)) < 1e-12);
+
+    std::vector<real_t> projected(ndofs);
+    auto                dprojected = to_device(projected);
+    real_t              pen_h = 0, pen_d = 0;
+    const real_t        kkt_h = host.kkt_residual(r.data(), k.data(), projected.data(), &pen_h);
+    const real_t        kkt_d = device.kkt_residual(dr->data(), dk->data(), dprojected->data(), &pen_d);
+    printf("  kkt %.12g / %.12g, penetration %.6g / %.6g\n", (double)kkt_h, (double)kkt_d, (double)pen_h, (double)pen_d);
+    SFEM_TEST_ASSERT(pen_h > 0);
+    SFEM_TEST_ASSERT(std::abs(kkt_h - kkt_d) <= 1e-12 * kkt_h && std::abs(pen_h - pen_d) <= 1e-12 * pen_h);
+    SFEM_TEST_ASSERT(worst(projected, host_copy(dprojected->data(), ndofs)) < 1e-12);
+
+    std::vector<real_t> reaction(ndofs);
+    auto                dreaction = to_device(reaction);
+    host.reaction(reaction.data());
+    device.reaction(dreaction->data());
+    SFEM_TEST_ASSERT(worst(reaction, host_copy(dreaction->data(), ndofs)) < 1e-12);
+
+    std::vector<real_t> ub(ndofs);
+    auto                dub = to_device(ub);
+    host.upper_bound(real_t(1e30), ub.data());
+    device.upper_bound(real_t(1e30), dub->data());
+    SFEM_TEST_ASSERT(worst(ub, host_copy(dub->data(), ndofs)) < 1e-12);
+
+    // The curvature into the diagonal blocks of the node graph's BSR values, capped and not.
+    auto graph = fs->node_to_node_graph();
+    auto dgraph_rowptr = smesh::to_device(graph->rowptr());
+    auto dgraph_colidx = smesh::to_device(graph->colidx());
+    for (const bool capped : {false, true}) {
+        std::vector<real_t> values(graph->nnz() * 9, 0);
+        auto                dvalues = to_device(values);
+        host.add_curvature(x.data(), r.data(), k.data(), capped, 1, graph->rowptr()->data(), graph->colidx()->data(), values.data());
+        device.add_curvature(dx->data(), dr->data(), dk->data(), capped, 1, dgraph_rowptr->data(), dgraph_colidx->data(), dvalues->data());
+        const real_t c = worst(values, host_copy(dvalues->data(), values.size()));
+        printf("  curvature (capped %d) %.3g\n", (int)capped, (double)c);
+        SFEM_TEST_ASSERT(c < 1e-12);
+    }
+
+    std::vector<real_t> field(ndofs);
+    auto                dfield = to_device(field);
+    host.gap_field(field.data());
+    device.gap_field(dfield->data());
+    SFEM_TEST_ASSERT(worst(field, host_copy(dfield->data(), ndofs)) < 1e-12);
+
+    std::vector<real_t> vh = v;
+    host.project_velocity(x.data(), vh.data(), real_t(0.1));
+    device.project_velocity(dx->data(), dv->data(), real_t(0.1));
+    SFEM_TEST_ASSERT(worst(vh, host_copy(dv->data(), ndofs)) < 1e-12);
+    return SFEM_TEST_SUCCESS;
+}
+#endif
+
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_gap_and_frames);
     SFEM_RUN_TEST(test_reaction);
     SFEM_RUN_TEST(test_project_velocity);
+#ifdef SFEM_ENABLE_CUDA
+    SFEM_RUN_TEST(test_device_matches_host);
+#endif
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }

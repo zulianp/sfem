@@ -3,93 +3,132 @@
 #include <algorithm>
 #include <cmath>
 
+#include "sfem_API.hpp"
 #include "sfem_BSR.hpp"
 #include "sfem_aliases.hpp"
+#include "sfem_node_obstacle_kernels.hpp"
+
+#ifdef SFEM_ENABLE_CUDA
+#include "sfem_NodeObstacleContact_cuda.hpp"
+#endif
 
 namespace sfem {
+
+#ifdef SFEM_ENABLE_CUDA
+    namespace {
+        // normals and curvature are flat: rows of n entries.
+        NodeObstacleDevice device_view(const ptrdiff_t             n,
+                                       const SharedBuffer<idx_t>  &idx,
+                                       const SharedBuffer<real_t> &normals,
+                                       const SharedBuffer<real_t> &curvature,
+                                       const SharedBuffer<real_t> &gap,
+                                       const SharedBuffer<real_t> &frames,
+                                       const SharedBuffer<real_t> &mu) {
+            NodeObstacleDevice c;
+            c.size = n;
+            c.idx  = idx->data();
+            for (int d = 0; d < 3; ++d) c.normals[d] = normals->data() + d * n;
+            for (int k = 0; k < 6; ++k) c.curvature[k] = curvature ? curvature->data() + k * n : nullptr;
+            c.gap    = gap->data();
+            c.frames = frames ? frames->data() : nullptr;
+            c.mu     = mu ? mu->data() : nullptr;
+            return c;
+        }
+    }  // namespace
+#endif
 
     NodeObstacleContact::NodeObstacleContact(const std::shared_ptr<smesh::Grid<geom_t>> &sdf,
                                              const std::shared_ptr<Communicator>        &comm,
                                              const SharedBuffer<idx_t>                  &nodes,
                                              const SharedBuffer<geom_t *>               &points,
                                              const ptrdiff_t                             ndofs,
-                                             const int                                   dir)
-        : nodes_(nodes), points_(points), ndofs_(ndofs), dir_(dir) {
-        obstacle_ = SDFObstacle::create(sdf, comm, points->extent(1), points->data()[2], EXECUTION_SPACE_HOST);
+                                             const int                                   dir,
+                                             const ExecutionSpace                        es)
+        : nodes_(nodes), idx_(nodes), points_(points), es_(es), ndofs_(ndofs), dir_(dir) {
+        obstacle_ = SDFObstacle::create(sdf, comm, points->extent(1), points->data()[2], es);
+
+        for (int d = 0; d < 3; ++d) xyz_[d] = points->data()[d];
+#ifdef SFEM_ENABLE_CUDA
+        if (es == EXECUTION_SPACE_DEVICE) {
+            idx_ = smesh::to_device(nodes);
+            for (int d = 0; d < 3; ++d) {
+                point_rows_.push_back(smesh::to_device(Buffer<geom_t>::wrap(points->extent(1), points->data()[d])));
+                xyz_[d] = point_rows_.back()->data();
+            }
+        }
+#endif
 
         const ptrdiff_t n = nodes->size();
-        normals_          = smesh::create_host_buffer<real_t>(3, n);
-        curvature_        = smesh::create_host_buffer<real_t>(6, n);
-        gap_              = smesh::create_host_buffer<real_t>(n);
-        mu_               = smesh::create_host_buffer<real_t>(n);
-        frames_           = smesh::create_host_buffer<real_t>(9 * n);
-        ahead_            = smesh::create_host_buffer<real_t>(ndofs);
-        ahead_gap_        = smesh::create_host_buffer<real_t>(n);
-        ahead_normals_    = smesh::create_host_buffer<real_t>(3, n);
+        normals_          = create_buffer<real_t>(3 * n, es);
+        curvature_        = create_buffer<real_t>(6 * n, es);
+        gap_              = create_buffer<real_t>(n, es);
+        mu_               = create_buffer<real_t>(n, es);
+        frames_           = create_buffer<real_t>(9 * n, es);
+        ahead_            = create_buffer<real_t>(ndofs, es);
+        ahead_gap_        = create_buffer<real_t>(n, es);
+        ahead_normals_    = create_buffer<real_t>(3 * n, es);
+        complementarity_  = create_buffer<real_t>(n, es);
+        penetration_      = create_buffer<real_t>(n, es);
     }
 
     void NodeObstacleContact::update(const real_t *const x) {
         SFEM_TRACE_SCOPE("NodeObstacleContact::update");
 
-        obstacle_->sample_nodes(size(), nodes_->data(), points_->data(), x, gap_->data(), normals_->data());
+        real_t *nn[3];
+        rows(normals_, 3, nn);
+        obstacle_->sample_nodes(size(), idx_->data(), xyz_, x, gap_->data(), nn);
 
-        // t1 is n crossed with the axis least aligned with it, t2 = n x t1. A node outside the
-        // grid has no normal and an unreachable gap; its frame is that of the contact direction.
-        real_t *const *const nn = normals_->data();
-        real_t *const        Q  = frames_->data();
+#ifdef SFEM_ENABLE_CUDA
+        if (es_ == EXECUTION_SPACE_DEVICE) {
+            d_node_obstacle_frames(device_view(size(), idx_, normals_, nullptr, gap_, frames_, mu_), dir_);
+            return;
+        }
+#endif
+
+        real_t *const Q = frames_->data();
 #pragma omp parallel for
         for (ptrdiff_t i = 0; i < size(); ++i) {
-            real_t n[3] = {nn[0][i], nn[1][i], nn[2][i]};
-            if (n[0] == 0 && n[1] == 0 && n[2] == 0) n[dir_] = 1;
-            int axis = 0;
-            for (int d = 1; d < 3; ++d) {
-                if (std::abs(n[d]) < std::abs(n[axis])) axis = d;
-            }
-            real_t e[3]        = {0, 0, 0};
-            e[axis]            = 1;
-            real_t       t1[3] = {n[1] * e[2] - n[2] * e[1], n[2] * e[0] - n[0] * e[2], n[0] * e[1] - n[1] * e[0]};
-            const real_t len   = std::sqrt(t1[0] * t1[0] + t1[1] * t1[1] + t1[2] * t1[2]);
-            for (int d = 0; d < 3; ++d) t1[d] /= len;
-            const real_t t2[3] = {n[1] * t1[2] - n[2] * t1[1], n[2] * t1[0] - n[0] * t1[2], n[0] * t1[1] - n[1] * t1[0]};
-
-            real_t *const q = &Q[9 * i];
-            for (int d = 0; d < 3; ++d) {
-                q[d]     = n[d];
-                q[3 + d] = t1[d];
-                q[6 + d] = t2[d];
-            }
+            node_obstacle_frame(nn[0][i], nn[1][i], nn[2][i], dir_, &Q[9 * i]);
         }
     }
 
     void NodeObstacleContact::to_frame(real_t *const v) const {
+#ifdef SFEM_ENABLE_CUDA
+        if (es_ == EXECUTION_SPACE_DEVICE) {
+            d_node_obstacle_to_frame(device_view(size(), idx_, normals_, nullptr, gap_, frames_, mu_), v);
+            return;
+        }
+#endif
         const idx_t *const  idx = nodes_->data();
         const real_t *const Q   = frames_->data();
 #pragma omp parallel for
         for (ptrdiff_t i = 0; i < size(); ++i) {
-            real_t *const       vi   = &v[(ptrdiff_t)idx[i] * 3];
-            const real_t *const q    = &Q[9 * i];
-            const real_t        w[3] = {vi[0], vi[1], vi[2]};
-            for (int c = 0; c < 3; ++c) {
-                vi[c] = q[3 * c] * w[0] + q[3 * c + 1] * w[1] + q[3 * c + 2] * w[2];
-            }
+            node_obstacle_to_frame(&Q[9 * i], &v[(ptrdiff_t)idx[i] * 3]);
         }
     }
 
     void NodeObstacleContact::from_frame(real_t *const v) const {
+#ifdef SFEM_ENABLE_CUDA
+        if (es_ == EXECUTION_SPACE_DEVICE) {
+            d_node_obstacle_from_frame(device_view(size(), idx_, normals_, nullptr, gap_, frames_, mu_), v);
+            return;
+        }
+#endif
         const idx_t *const  idx = nodes_->data();
         const real_t *const Q   = frames_->data();
 #pragma omp parallel for
         for (ptrdiff_t i = 0; i < size(); ++i) {
-            real_t *const       vi   = &v[(ptrdiff_t)idx[i] * 3];
-            const real_t *const q    = &Q[9 * i];
-            const real_t        w[3] = {vi[0], vi[1], vi[2]};
-            for (int d = 0; d < 3; ++d) {
-                vi[d] = q[d] * w[0] + q[3 + d] * w[1] + q[6 + d] * w[2];
-            }
+            node_obstacle_from_frame(&Q[9 * i], &v[(ptrdiff_t)idx[i] * 3]);
         }
     }
 
     void NodeObstacleContact::upper_bound(const real_t unbounded, real_t *const ub) const {
+#ifdef SFEM_ENABLE_CUDA
+        if (es_ == EXECUTION_SPACE_DEVICE) {
+            d_node_obstacle_upper_bound(device_view(size(), idx_, normals_, nullptr, gap_, frames_, mu_), ndofs_, unbounded, ub);
+            return;
+        }
+#endif
 #pragma omp parallel for
         for (ptrdiff_t i = 0; i < ndofs_; ++i) {
             ub[i] = unbounded;
@@ -108,10 +147,26 @@ namespace sfem {
                                              real_t *const       penetration) {
         SFEM_TRACE_SCOPE("NodeObstacleContact::kkt_residual");
 
-        const idx_t *const   idx = nodes_->data();
-        real_t *const *const n   = normals_->data();
-        const real_t *const  gap = gap_->data();
-        real_t *const        mus = mu_->data();
+#ifdef SFEM_ENABLE_CUDA
+        if (es_ == EXECUTION_SPACE_DEVICE) {
+            auto blas = sfem::blas<real_t>(es_);
+            blas->copy(ndofs_, r, projected);
+            d_node_obstacle_kkt(device_view(size(), idx_, normals_, nullptr, gap_, frames_, mu_),
+                                k,
+                                projected,
+                                complementarity_->data(),
+                                penetration_->data());
+            *penetration = d_max_or_zero(size(), penetration_->data());
+            const real_t c = blas->dot(size(), complementarity_->data(), complementarity_->data());
+            return std::sqrt(blas->dot(ndofs_, projected, projected) + c);
+        }
+#endif
+
+        const idx_t *const  idx = nodes_->data();
+        real_t             *n[3];
+        rows(normals_, 3, n);
+        const real_t *const gap = gap_->data();
+        real_t *const       mus = mu_->data();
 
 #pragma omp parallel for
         for (ptrdiff_t i = 0; i < ndofs_; ++i) {
@@ -122,14 +177,10 @@ namespace sfem {
         real_t complementary = 0;
 #pragma omp parallel for reduction(max : deepest) reduction(+ : complementary)
         for (ptrdiff_t i = 0; i < size(); ++i) {
-            const ptrdiff_t node = idx[i];
-            real_t *const   ri   = &projected[node * 3];
-            const real_t    mu   = std::max(real_t(0), -(n[0][i] * ri[0] + n[1][i] * ri[1] + n[2][i] * ri[2]));
-            for (int d = 0; d < 3; ++d) {
-                ri[d] += mu * n[d][i];
-            }
-            mus[i]         = mu;
-            const real_t c = std::min(mu, k[node * 3] * std::max(gap[i], real_t(0)));
+            const ptrdiff_t node  = idx[i];
+            const real_t    ni[3] = {n[0][i], n[1][i], n[2][i]};
+            real_t          c;
+            mus[i] = node_obstacle_kkt(ni, &projected[node * 3], gap[i], k[node * 3], &c);
             complementary += c * c;
             deepest = std::max(deepest, -gap[i]);
         }
@@ -153,46 +204,44 @@ namespace sfem {
                                             real_t *const        values) {
         SFEM_TRACE_SCOPE("NodeObstacleContact::add_curvature");
 
-        obstacle_->sample_nodes_curvature(size(), nodes_->data(), points_->data(), x, curvature_->data());
+        real_t *Crows[6];
+        rows(curvature_, 6, Crows);
+        obstacle_->sample_nodes_curvature(size(), idx_->data(), xyz_, x, Crows);
 
-        const idx_t *const   idx = nodes_->data();
-        real_t *const *const n   = normals_->data();
-        real_t *const *const C   = curvature_->data();
+#ifdef SFEM_ENABLE_CUDA
+        if (es_ == EXECUTION_SPACE_DEVICE) {
+            d_node_obstacle_curvature(
+                    device_view(size(), idx_, normals_, curvature_, gap_, frames_, mu_), r, k, capped, sign, rowptr, colidx, values);
+            return;
+        }
+#endif
+
+        const idx_t *const  idx = nodes_->data();
+        real_t             *n[3];
+        rows(normals_, 3, n);
+        real_t *const *const C   = Crows;
         const real_t *const  gap = gap_->data();
 #pragma omp parallel for
         for (ptrdiff_t i = 0; i < size(); ++i) {
-            const ptrdiff_t     node = idx[i];
-            const real_t *const ri   = &r[node * 3];
-            const real_t        mu   = std::max(real_t(0), -(n[0][i] * ri[0] + n[1][i] * ri[1] + n[2][i] * ri[2]));
-            if (mu == 0 || gap[i] > mu / k[node * 3]) continue;
-
-            const real_t H[9] = {C[0][i], C[1][i], C[2][i], C[1][i], C[3][i], C[4][i], C[2][i], C[4][i], C[5][i]};
-
-            real_t lowest = 0;
-            for (int a = 0; a < 3; ++a) {
-                real_t off = 0;
-                for (int b = 0; b < 3; ++b) {
-                    if (b != a) off += std::abs(H[a * 3 + b]);
-                }
-                lowest = std::min(lowest, mu * (H[a * 3 + a] - off));
-            }
-            const real_t scale = capped && lowest < -k[node * 3] / 2 ? k[node * 3] / (2 * -lowest) : 1;
-
-            real_t *const B = bsr_diagonal_block(node, rowptr, colidx, 3, values);
-            for (int c = 0; c < 9; ++c) {
-                B[c] += sign * scale * mu * H[c];
-            }
+            const ptrdiff_t node  = idx[i];
+            const real_t    ni[3] = {n[0][i], n[1][i], n[2][i]};
+            const real_t    Ci[6] = {C[0][i], C[1][i], C[2][i], C[3][i], C[4][i], C[5][i]};
+            node_obstacle_curvature(ni, Ci, &r[node * 3], gap[i], k[node * 3], capped, sign, bsr_diagonal_block(node, rowptr, colidx, 3, values));
         }
     }
 
     void NodeObstacleContact::reaction(real_t *const out) const {
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < ndofs_; ++i) {
-            out[i] = 0;
+        sfem::blas<real_t>(es_)->zeros(ndofs_, out);
+#ifdef SFEM_ENABLE_CUDA
+        if (es_ == EXECUTION_SPACE_DEVICE) {
+            d_node_obstacle_reaction(device_view(size(), idx_, normals_, nullptr, gap_, frames_, mu_), out);
+            return;
         }
-        const idx_t *const   idx = nodes_->data();
-        real_t *const *const n   = normals_->data();
-        const real_t *const  mus = mu_->data();
+#endif
+        const idx_t *const  idx = nodes_->data();
+        real_t             *n[3];
+        rows(normals_, 3, n);
+        const real_t *const mus = mu_->data();
 #pragma omp parallel for
         for (ptrdiff_t i = 0; i < size(); ++i) {
             for (int d = 0; d < 3; ++d) {
@@ -204,15 +253,20 @@ namespace sfem {
     void NodeObstacleContact::project_velocity(const real_t *const x, real_t *const v, const real_t dt) {
         SFEM_TRACE_SCOPE("NodeObstacleContact::project_velocity");
 
-        real_t *const ahead = ahead_->data();
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < ndofs_; ++i) {
-            ahead[i] = x[i] + dt * v[i];
+        sfem::blas<real_t>(es_)->zaxpby(ndofs_, 1, x, dt, v, ahead_->data());
+        real_t *an[3];
+        rows(ahead_normals_, 3, an);
+        obstacle_->sample_nodes(size(), idx_->data(), xyz_, ahead_->data(), ahead_gap_->data(), an);
+
+#ifdef SFEM_ENABLE_CUDA
+        if (es_ == EXECUTION_SPACE_DEVICE) {
+            d_node_obstacle_project_velocity(device_view(size(), idx_, ahead_normals_, nullptr, ahead_gap_, nullptr, nullptr), v, dt);
+            return;
         }
-        obstacle_->sample_nodes(size(), nodes_->data(), points_->data(), ahead, ahead_gap_->data(), ahead_normals_->data());
+#endif
 
         const idx_t *const   idx = nodes_->data();
-        real_t *const *const n   = ahead_normals_->data();
+        real_t *const *const n   = an;
         const real_t *const  gap = ahead_gap_->data();
 #pragma omp parallel for
         for (ptrdiff_t i = 0; i < size(); ++i) {
@@ -226,13 +280,17 @@ namespace sfem {
     }
 
     void NodeObstacleContact::gap_field(real_t *const out) const {
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < ndofs_; ++i) {
-            out[i] = 0;
+        sfem::blas<real_t>(es_)->zeros(ndofs_, out);
+#ifdef SFEM_ENABLE_CUDA
+        if (es_ == EXECUTION_SPACE_DEVICE) {
+            d_node_obstacle_gap_field(device_view(size(), idx_, normals_, nullptr, gap_, frames_, mu_), out);
+            return;
         }
-        const idx_t *const   idx = nodes_->data();
-        real_t *const *const n   = normals_->data();
-        const real_t *const  gap = gap_->data();
+#endif
+        const idx_t *const  idx = nodes_->data();
+        real_t             *n[3];
+        rows(normals_, 3, n);
+        const real_t *const gap = gap_->data();
 #pragma omp parallel for
         for (ptrdiff_t i = 0; i < size(); ++i) {
             for (int d = 0; d < 3; ++d) {

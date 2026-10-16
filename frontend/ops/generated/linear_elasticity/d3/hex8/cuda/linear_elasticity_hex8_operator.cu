@@ -36,6 +36,19 @@ extern "C" int cu_linear_elasticity_proteus_hex8_gradient_i_msoa(
         void *const RSTR outz,
         void *const stream
 );
+extern "C" int cu_linear_elasticity_proteus_hex8_hessian_bsr_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t lmbda,
+        const real_t mu,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values,
+        void *const stream
+);
 extern "C" int cu_linear_elasticity_proteus_hex8_objective_steps_i_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
@@ -217,6 +230,28 @@ extern "C" int cu_linear_elasticity_hex8_gradient_i_msoa(
     const ConnectivityOrder<8> proteus_elements_order{{0, 1, 3, 2, 4, 5, 7, 6}};
     permute_connectivity<idx_t, 8><<<1, 8, 0, (cudaStream_t)stream>>>(elements, proteus_elements_order, proteus_elements);
     const int status = cu_linear_elasticity_proteus_hex8_gradient_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz, stream);
+    cudaFreeAsync(proteus_elements, (cudaStream_t)stream);
+    return status;
+}
+
+extern "C" int cu_linear_elasticity_hex8_hessian_bsr_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t lmbda,
+        const real_t mu,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values,
+        void *const stream
+) {
+    idx_t **proteus_elements = nullptr;
+    if (cudaMallocAsync((void **)&proteus_elements, 8 * sizeof(idx_t *), (cudaStream_t)stream) != cudaSuccess) return SFEM_FAILURE;
+    const ConnectivityOrder<8> proteus_elements_order{{0, 1, 3, 2, 4, 5, 7, 6}};
+    permute_connectivity<idx_t, 8><<<1, 8, 0, (cudaStream_t)stream>>>(elements, proteus_elements_order, proteus_elements);
+    const int status = cu_linear_elasticity_proteus_hex8_hessian_bsr_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, lmbda, mu, rowptr, colidx, values, stream);
     cudaFreeAsync(proteus_elements, (cudaStream_t)stream);
     return status;
 }

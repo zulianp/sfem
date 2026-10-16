@@ -862,15 +862,34 @@ namespace sfem {
       return SFEM_FAILURE;
     }
     auto mesh = impl_->space->mesh_ptr();
-    return impl_->domains->iterate([&](const OpDomain &/*domain*/) {
+    auto points = element_points(mesh);
+    return impl_->domains->iterate([&](const OpDomain &domain) {
+      const geom_t *const *adjugate = nullptr;
+      const geom_t *determinant = nullptr;
+      if (domain.element_type == smesh::TET4 || domain.element_type == smesh::TRI3) {
+        auto cache = std::static_pointer_cast<AffineGeometryCache>(
+            domain.user_data);
+        if (!cache || !cache->jacobian_soa) {
+          SFEM_ERROR("saint_venant_kirchhoff affine hessian_bsr requires cached geometry\n");
+          return SFEM_FAILURE;
+        }
+        adjugate = reinterpret_cast<const geom_t *const *>(
+            cache->jacobian_soa->jacobian_adjugate_SoA()->data());
+        determinant = reinterpret_cast<const geom_t *>(
+            cache->jacobian_soa->jacobian_determinant()->data());
+      }
       const int dim = mesh->spatial_dimension();
       if (dim == 2) {
-        SFEM_ERROR("saint_venant_kirchhoff hessian_bsr 2d dispatch was not generated\n");
-        return SFEM_FAILURE;
+        if (domain.element_type == smesh::TRI3) {
+          return cu_saint_venant_kirchhoff_hessian_bsr_2d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, current + 0, current + 1, rowptr, colidx, values, stream);
+        }
+        return cu_saint_venant_kirchhoff_hessian_bsr_2d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, current + 0, current + 1, rowptr, colidx, values, stream);
       }
       else if (dim == 3) {
-        SFEM_ERROR("saint_venant_kirchhoff hessian_bsr 3d dispatch was not generated\n");
-        return SFEM_FAILURE;
+        if (domain.element_type == smesh::TET4) {
+          return cu_saint_venant_kirchhoff_hessian_bsr_3d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, current + 0, current + 1, current + 2, rowptr, colidx, values, stream);
+        }
+        return cu_saint_venant_kirchhoff_hessian_bsr_3d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, current + 0, current + 1, current + 2, rowptr, colidx, values, stream);
       }
       SFEM_ERROR("saint_venant_kirchhoff hessian_bsr does not support spatial dimension %d\n", dim);
       return SFEM_FAILURE;

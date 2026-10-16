@@ -100,10 +100,11 @@ namespace sfem {
         SFEM_TRACE_SCOPE("BSRTangent::max_abs_row_sum");
 
         auto &impl = *impl_;
-        if (impl.es != EXECUTION_SPACE_HOST) {
-            SFEM_ERROR("BSRTangent::max_abs_row_sum is host only\n");
-            return 0;
+#ifdef SFEM_ENABLE_CUDA
+        if (impl.es == EXECUTION_SPACE_DEVICE) {
+            return d_bsr_max_abs_row_sum<count_t, idx_t, real_t, real_t>(block_rows(), impl.block_size, rowptr(), colidx(), impl.values->data());
         }
+#endif
         return bsr_max_abs_row_sum<count_t, idx_t, real_t, real_t>(block_rows(), impl.block_size, rowptr(), colidx(), impl.values->data());
     }
 
@@ -111,10 +112,11 @@ namespace sfem {
         SFEM_TRACE_SCOPE("BSRTangent::shift_diagonal");
 
         auto &impl = *impl_;
-        if (impl.es != EXECUTION_SPACE_HOST) {
-            SFEM_ERROR("BSRTangent::shift_diagonal is host only\n");
-            return SFEM_FAILURE;
+#ifdef SFEM_ENABLE_CUDA
+        if (impl.es == EXECUTION_SPACE_DEVICE) {
+            return d_bsr_shift_diagonal<count_t, idx_t, real_t>(block_rows(), impl.block_size, rowptr(), colidx(), factor, reference, impl.values->data());
         }
+#endif
         bsr_shift_diagonal(block_rows(), impl.block_size, rowptr(), colidx(), factor, reference, impl.values->data());
         return SFEM_SUCCESS;
     }

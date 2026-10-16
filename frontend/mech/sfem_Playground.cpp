@@ -117,6 +117,33 @@ namespace sfem {
             return false;
         }
 
+        struct Box {
+            real_t lo[3]{0, 0, 0};
+            real_t hi[3]{0, 0, 0};
+        };
+
+        /// The mesh's bounding box, reduced across the threads. smesh's
+        /// Mesh::compute_bounding_box updates one shared min and max from every thread of a
+        /// parallel loop; at 72 threads it returns a different box from run to run (a hemisphere
+        /// centred at x = 0.75 instead of 1, its radius 0.1875 instead of 0.25).
+        Box bounding_box(const std::shared_ptr<Mesh> &mesh) {
+            const int            dim    = mesh->spatial_dimension();
+            const geom_t *const *points = mesh->points()->data();
+            const ptrdiff_t      n      = mesh->n_nodes();
+            Box                  box;
+            for (int d = 0; d < dim; ++d) {
+                real_t lo = points[d][0], hi = points[d][0];
+#pragma omp parallel for reduction(min : lo) reduction(max : hi)
+                for (ptrdiff_t i = 0; i < n; ++i) {
+                    lo = std::min(lo, (real_t)points[d][i]);
+                    hi = std::max(hi, (real_t)points[d][i]);
+                }
+                box.lo[d] = lo;
+                box.hi[d] = hi;
+            }
+            return box;
+        }
+
         int axis_of(const std::string &name) {
             if (name == "x" || name == "0") return 0;
             if (name == "y" || name == "1") return 1;
@@ -194,7 +221,7 @@ namespace sfem {
 
             if (!has(node, "sidesets")) return SFEM_SUCCESS;
 
-            auto bbox = mesh->compute_bounding_box();
+            const Box bbox = bounding_box(mesh);
             for (auto s : node["sidesets"].children()) {
                 const std::string name = read_string(s, "name", "");
                 if (name.empty()) {
@@ -212,8 +239,8 @@ namespace sfem {
                         fprintf(stderr, "Playground: sideset %s: plane needs an axis (x, y, z) and at (min, max, a value)\n", name.c_str());
                         return SFEM_FAILURE;
                     }
-                    const real_t lo     = bbox.first->data()[axis];
-                    const real_t hi     = bbox.second->data()[axis];
+                    const real_t lo     = bbox.lo[axis];
+                    const real_t hi     = bbox.hi[axis];
                     const real_t target = at == "min" ? lo : at == "max" ? hi : (real_t)std::stod(at);
                     const real_t tol    = read<real_t>(plane, "tol", real_t(1e-6)) * std::max(hi - lo, real_t(1e-30));
 
@@ -430,9 +457,9 @@ namespace sfem {
                 } else if (has(field, "inclusion")) {
                     // An active strain a11 along x inside a ball, a11(t) = 1 - (1 - a11) profile(t).
                     auto inclusion = field["inclusion"];
-                    auto bbox      = mesh->compute_bounding_box();
-                    auto lo        = bbox.first->data();
-                    auto hi        = bbox.second->data();
+                    const Box bbox = bounding_box(mesh);
+                    auto      lo   = bbox.lo;
+                    auto      hi   = bbox.hi;
                     real_t span    = std::min(hi[0] - lo[0], std::min(hi[1] - lo[1], hi[2] - lo[2]));
                     auto center    = read_list<real_t>(inclusion, "center",
                                                      {(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2});
@@ -539,10 +566,6 @@ namespace sfem {
                 fprintf(stderr, "Playground: unknown obstacle backend \"%s\" (node_sdf)\n", read_string(node, "backend", "").c_str());
                 return SFEM_FAILURE;
             }
-            if (es != EXECUTION_SPACE_HOST) {
-                fprintf(stderr, "Playground: the node_sdf obstacle is host only (SDFObstacle::sample_nodes)\n");
-                return SFEM_FAILURE;
-            }
             if (regime != "dynamic" || read_string(child(config.root(), "dynamics"), "scheme", "newmark") != "newmark") {
                 fprintf(stderr, "Playground: the node_sdf obstacle needs regime dynamic with the newmark scheme, which it stabilises\n");
                 return SFEM_FAILURE;
@@ -555,11 +578,11 @@ namespace sfem {
                 return SFEM_FAILURE;
             }
 
-            auto   bbox = m->compute_bounding_box();
-            real_t lo[3], hi[3];
+            const Box bbox = bounding_box(m);
+            real_t    lo[3], hi[3];
             for (int d = 0; d < 3; ++d) {
-                lo[d]  = bbox.first->data()[d];
-                hi[d]  = bbox.second->data()[d];
+                lo[d]  = bbox.lo[d];
+                hi[d]  = bbox.hi[d];
                 extent = std::max(extent, hi[d] - lo[d]);
             }
 
@@ -616,7 +639,7 @@ namespace sfem {
                 }
                 nodes = smesh::create_nodeset_from_sidesets(m, sidesets);
             }
-            contact = std::make_shared<NodeObstacleContact>(obstacle_sdf, m->comm(), nodes, m->points(), fs->n_dofs(), dir);
+            contact = std::make_shared<NodeObstacleContact>(obstacle_sdf, m->comm(), nodes, m->points(), fs->n_dofs(), dir, es);
             if (contact->size() == 0) {
                 fprintf(stderr, "Playground: the obstacle has no contact nodes\n");
                 return SFEM_FAILURE;

@@ -1162,6 +1162,14 @@ def _sfem_soa_hessian_header(
         "",
     ]
     lines = [line for line in lines if line != ""]
+    # The direct element matrix calls `point_test_symmetric_scalar` and
+    # `mirror_upper_triangle_scalar` on every family, and they live in the
+    # tensor-product header.  A target that includes that header only for
+    # tensor-product elements leaves a simplex's Hessian without them.
+    tensor_include = '#include "%s"' % tensor_product_name
+    if tensor_include not in lines:
+        math_include = '#include "%s"' % math_name
+        lines.insert(lines.index(math_include) + 1, tensor_include)
     lines.extend(["namespace sfem {", "namespace codegen {", ""])
 
     emitted = set()
@@ -9018,7 +9026,13 @@ def _holding_one_element_hessian_matrix_assembly_function(
     lines.extend(
         [
             "template <typename s_t, typename g_t, int FORMAT>",
-            "static int %s(" % implementation_name,
+            # A device kernel is declared as the target declares one; the host
+            # keeps the spelling its tracked tree has.
+            (
+                current_target().mesh_function_line(implementation_name)
+                if current_target().supports_device_kernels
+                else "static int %s(" % implementation_name
+            ),
             "    const ptrdiff_t nelements,",
             "    const ptrdiff_t nnodes,",
             "    idx_t **const RSTR elements,",
@@ -9495,7 +9509,7 @@ def _sfem_soa_hessian_scatter_lines(function_base, dim, n_nodes, formats, n_fiel
     lines = ["namespace sfem {", "namespace codegen {", ""]
     if pattern_scattered_formats(formats):
         find_cols_lines = [
-            "static SFEM_INLINE void %s_find_cols(" % function_base,
+            "%s void %s_find_cols(" % (current_target().function_qualifier(), function_base),
             "    const idx_t *const RSTR targets,",
             "    const idx_t *const RSTR row,",
             "    const int lenrow,",
@@ -9559,6 +9573,7 @@ def _print_scatter_function(node):
     printer = CLikeKernelASTPrinter(
         atomic_update_pragma=target.atomic_update_pragma() or "",
         layout=SCATTER_LAYOUT,
+        atomic_add_lines=None if target.atomic_update_pragma() else target.scatter_add_lines,
     )
     return list(printer.print_node(node)) + [""]
 
@@ -9728,7 +9743,7 @@ def _sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes, assembly=No
                 "s_t *const RSTR values",
             ),
             body=tuple(body),
-            qualifier="static SFEM_INLINE",
+            qualifier=current_target().function_qualifier(),
             template_params=("typename s_t",),
         )
     )
@@ -10106,15 +10121,16 @@ def _sfem_soa_hessian_matrix_public_wrapper(
     return runtime_typed_entry_point_lines(
         public_name,
         params,
-        lambda scalar_type, _positional: [
-            "  return sfem::codegen::%s<%s, geom_t, %d>(%s);"
-            % (
+        # The target's launch: on the host the call itself, on a device the
+        # kernel launch on the caller's stream.
+        lambda scalar_type, _positional: list(
+            current_target().mesh_launch_lines(
                 implementation_name,
-                scalar_type,
-                format_tag,
-                ", ".join(cast_arguments(params, impl_args, scalar_type)),
-            ),
-        ],
+                "%s, geom_t, %d" % (scalar_type, format_tag),
+                cast_arguments(params, impl_args, scalar_type),
+                indent="  ",
+            )
+        ),
         parameter_lines=parameter_list_lines,
     )
 

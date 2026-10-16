@@ -317,7 +317,27 @@ class CUDAEnergySoAEmitter:
         # it unpacked, which is the kind of decision that survives only as long
         # as nobody tidies the argument list -- passing the plan whole brought
         # the formats back and two backend tests caught it immediately.
+        #
+        # (Since the energy assembly kernel is spelled through the target --
+        # its declaration, qualifiers, atomics and launch -- BSR on the standard
+        # layout assembles here too.  The CRS scatters and the packed passes
+        # still spell OpenMP pragmas, so they stay off this target.)
+        from codegen.framework.plans.matrix_formats import (
+            MatrixFormat,
+            MatrixFormatPlan,
+            MatrixMeshLayout,
+        )
+
+        formats = plan.matrix_format_plan
+        if formats is not None:
+            device = tuple(
+                variant
+                for variant in formats.variants
+                if variant.matrix_format is MatrixFormat.BSR
+                and variant.mesh_layout is MatrixMeshLayout.STANDARD
+            )
+            formats = MatrixFormatPlan(device) if device else None
         return generate_sfem_soa_cpp_files_for_element(
-            dataclasses.replace(plan, matrix_format_plan=None),
+            dataclasses.replace(plan, matrix_format_plan=formats),
             source_builder=self._source_builder(),
         )
