@@ -741,7 +741,13 @@ namespace sfem {
 
         auto contractor = merit_contractor(impl_->ops);
 
-        if (!contractor && !impl_->ops.empty()) {
+        // A contracting operator adds its gradient to the accumulator after the constraints
+        // have set their rows, and squares the sum: a constrained row would carry the operator's
+        // reaction on top of x - value, where `gradient` leaves x - value alone. With
+        // constraints, every step is assembled whole.
+        const bool constrained = impl_->handle_constraints && !impl_->constraints.empty();
+
+        if ((!contractor || constrained) && !impl_->ops.empty()) {
             bool any_moves = false;
             for (auto &op : impl_->ops) {
                 any_moves = any_moves || op->residual_depends_on_state();
