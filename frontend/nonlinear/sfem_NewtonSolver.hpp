@@ -20,6 +20,9 @@ namespace sfem {
         real_t rtol{real_t(1e-8)};
         /// Diverged when the measure exceeds this multiple of its first value.
         real_t divergence_factor{real_t(1e4)};
+        /// A step whose prescribed values moved carries the increment in fractions, halving one
+        /// whose solve fails at most this many times.
+        int increment_halvings{6};
         /// "auto", "energy" or "residual"; a step with a merit of its own overrides it.
         std::string       merit{"auto"};
         LineSearchOptions line_search;

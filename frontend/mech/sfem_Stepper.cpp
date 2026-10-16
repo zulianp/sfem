@@ -94,8 +94,9 @@ namespace sfem {
         record.x      = x;
         record.scheme = impl.scheme;
 
+        // x is the initial state as given: the solver of the first step carries it onto the
+        // prescribed values (NewtonSolver's first iteration), rather than setting them here.
         if (impl.set_time(opts.t0, tol) != SFEM_SUCCESS) return SFEM_FAILURE;
-        f->apply_constraints(x);
         blas->copy(ndofs, x, x_n->data());
         if (impl.notify([&](StepObserver &o) { return o.initial(record); }) != SFEM_SUCCESS) return SFEM_FAILURE;
 
@@ -126,13 +127,11 @@ namespace sfem {
                 } else {
                     blas->copy(ndofs, x_n->data(), x);
                 }
-                f->apply_constraints(x);
                 report = impl.solver->solve(context, x);
                 attempts++;
 
                 if (predicted && report.status == NonlinearReport::NON_FINITE && report.iterations == 0) {
                     blas->copy(ndofs, x_n->data(), x);
-                    f->apply_constraints(x);
                     report = impl.solver->solve(context, x);
                     attempts++;
                 }

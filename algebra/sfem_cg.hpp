@@ -45,9 +45,19 @@ namespace sfem {
         bool           apply_overwrites_output{false};
         // Use fused CG vector kernels from impl (OpenMP / CUDA). Set false for separate BLAS baseline.
         bool           fusion{true};
+        // Inside Newton on an energy: stop at the first direction of non-positive curvature,
+        // returning the iterate so far (a descent direction, its directions all of positive
+        // curvature), or on the first direction that direction itself scaled by |curvature|
+        // (Nocedal and Wright, Algorithm 7.1). Off, the iteration runs on and loses its meaning.
+        bool           stop_on_negative_curvature{false};
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
 
         int iterations() const override { return iterations_; }
+
+        /// Whether the last apply stopped on a direction of non-positive curvature.
+        bool negative_curvature() const { return negative_curvature_; }
+
+        void set_stop_on_negative_curvature(const bool val) { stop_on_negative_curvature = val; }
 
         ExecutionSpace execution_space() const override { return execution_space_; }
 
@@ -141,6 +151,7 @@ namespace sfem {
 
         int apply(const ptrdiff_t n, const T* const b, T* const x) {
             SFEM_TRACE_SCOPE("ConjugateGradient::apply");
+            negative_curvature_ = false;
 
             if (preconditioner_op) {
                 return aux_apply_precond(n, b, x);
@@ -164,6 +175,7 @@ namespace sfem {
         ~ConjugateGradient() { destroy_workspace(); }
 
     private:
+        bool      negative_curvature_{false};
         T*        work_r_{nullptr};
         T*        work_z_{nullptr};
         T*        work_p_{nullptr};
@@ -281,6 +293,11 @@ namespace sfem {
                 apply_op->apply(p, Ap);
 
                 const T ptAp  = blas->dot(n, p, Ap);
+                if (stop_on_negative_curvature && !(ptAp > 0)) {
+                    negative_curvature_ = true;
+                    if (iterations_ == 0) blas->axpby(n, rtr / std::abs(ptAp), p, T(1), x);
+                    return SFEM_SUCCESS;
+                }
                 const T alpha = rtr / ptAp;
 
                 assert(ptAp == ptAp);
@@ -350,6 +367,12 @@ namespace sfem {
 
             {
                 const T ptAp  = blas->dot(n, p, Ap);
+                if (stop_on_negative_curvature && !(ptAp > 0)) {
+                    negative_curvature_ = true;
+                    iterations_         = 0;
+                    blas->axpby(n, rtz / std::abs(ptAp), p, T(1), x);
+                    return SFEM_SUCCESS;
+                }
                 assert(ptAp != 0);
                 const T alpha = rtz / ptAp;
                 update_x_r(n, alpha, p, Ap, x, r, false);
@@ -372,6 +395,10 @@ namespace sfem {
                 apply_op->apply(p, Ap);
 
                 const T ptAp  = blas->dot(n, p, Ap);
+                if (stop_on_negative_curvature && !(ptAp > 0)) {
+                    negative_curvature_ = true;
+                    return SFEM_SUCCESS;
+                }
                 const T alpha = rtz / ptAp;
 
                 update_x_r(n, alpha, p, Ap, x, r, false);

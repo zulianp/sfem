@@ -38,6 +38,9 @@ namespace sfem {
         /// Build the linearisation at x.
         virtual int linearize(const real_t *const x, const real_t *const r) = 0;
 
+        /// dx arrives zero but on the constrained dofs, where it holds the increment the correction
+        /// must make there (nonzero only on the first iteration of a step whose prescribed values
+        /// moved), and keeps it.
         /// The correction dx at x: K dx = -r, or the constrained problem it stands for. Returns
         /// SFEM_SUCCESS when the inner solver met its tolerance; a solve stopped by its cap
         /// returns SFEM_FAILURE with its last iterate in dx, for the line search to judge.

@@ -64,6 +64,12 @@ namespace sfem {
             return parent.readable() && parent.has_child(ryml::to_csubstr(key));
         }
 
+        /// The child, or an empty node that every reader here treats as absent. Indexing a
+        /// missing key and then indexing below it is undefined in ryml.
+        ryml::ConstNodeRef child(const ryml::ConstNodeRef &parent, const char *key) {
+            return has(parent, key) ? parent[ryml::to_csubstr(key)] : ryml::ConstNodeRef();
+        }
+
         /// The active strain of a spherical inclusion, per element: diag(a11, 1, 1) / det inside the
         /// ball, the identity outside, 9 entries per element, row-major.
         void fill_inclusion(const std::shared_ptr<Mesh> &mesh,
@@ -138,7 +144,7 @@ namespace sfem {
         std::list<ryml::Tree>                              documents;
 
         int build_mesh(const std::shared_ptr<Communicator> &comm, const ElasticityCase &config) {
-            auto node = config.root()["mesh"];
+            auto node = child(config.root(), "mesh");
             if (has(node, "path")) {
                 mesh = Mesh::create_from_file(comm, smesh::Path(config.resolve(read_string(node, "path", ""))));
             } else if (has(node, "box")) {
@@ -266,7 +272,7 @@ namespace sfem {
             }
             f->add_operator(material);
 
-            auto loads = root["loads"];
+            auto loads = child(root, "loads");
             if (has(loads, "body_force")) {
                 auto bf = loads["body_force"];
                 auto op = create_op(fs, "GeneratedBodyForce", es);
@@ -450,7 +456,7 @@ namespace sfem {
         }
 
         int initial_conditions(const ElasticityCase &config) {
-            auto node = config.root()["initial_conditions"];
+            auto node = child(config.root(), "initial_conditions");
             if (!node.readable()) return SFEM_SUCCESS;
 
             auto read_into = [&](const ryml::ConstNodeRef &entry, real_t *const out) {
@@ -523,7 +529,7 @@ namespace sfem {
             }
             if (regime != "dynamic") return SFEM_SUCCESS;
 
-            auto        dynamics = config.root()["dynamics"];
+            auto        dynamics = child(config.root(), "dynamics");
             const auto  type     = read_string(dynamics, "scheme", "newmark");
             const real_t density = read<real_t>(dynamics, "density", 1);
 
@@ -571,9 +577,9 @@ namespace sfem {
         }
 
         int build_solver(const ElasticityCase &config) {
-            auto solver = config.root()["solver"];
-            auto nn     = solver["newton"];
-            auto ln     = solver["linear"];
+            auto solver = child(config.root(), "solver");
+            auto nn     = child(solver, "newton");
+            auto ln     = child(solver, "linear");
 
             NewtonOptions newton_options;
             newton_options.max_it            = read<int>(nn, "max_it", newton_options.max_it);
@@ -599,6 +605,8 @@ namespace sfem {
             linear.atol           = read<real_t>(ln, "atol", linear.atol);
             linear.max_it         = read<int>(ln, "max_it", linear.max_it);
             linear.storage_bytes  = read<int>(ln, "storage_bytes", linear.storage_bytes);
+            // A truncated direction needs the line search to scale it.
+            linear.stop_on_negative_curvature = newton_options.line_search.enabled;
             // A linear problem is solved by one Newton step, so its linear solve goes as far as
             // the Newton tolerance; a nonlinear one stops where the Newton direction stops being
             // accurate.
@@ -631,7 +639,7 @@ namespace sfem {
         }
 
         int build_stepper(const ElasticityCase &config, const std::string &regime) {
-            auto           time = config.root()["time"];
+            auto           time = child(config.root(), "time");
             StepperOptions options;
             if (regime == "steady") {
                 options.dt    = 1;
@@ -659,7 +667,7 @@ namespace sfem {
             for (auto &set : time_dependent) stepper->add_time_dependent(set);
             for (auto &release : releases) stepper->add_release(release.first, release.second);
 
-            auto output = config.root()["output"];
+            auto output = child(config.root(), "output");
             if (has(output, "path")) {
                 const smesh::Path path(config.resolve(read_string(output, "path", "")));
                 auto              fields = std::make_shared<FieldExport>(f, path, read<int>(output, "export_freq", 1));

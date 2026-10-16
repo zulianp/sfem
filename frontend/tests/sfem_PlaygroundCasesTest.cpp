@@ -330,6 +330,83 @@ int test_torque_control() {
     return SFEM_TEST_SUCCESS;
 }
 
+// A twist of 0.24 rad in one step moves the corners of the end face by about 2.7 of these
+// elements. Set on the face alone, the increment inverts the layer behind it and the step fails;
+// carried by Newton's first iteration, the interior follows and it converges. The case also has
+// no solver section, which reads the defaults.
+int test_boundary_increment_is_carried() {
+    const char *const yaml = R"(
+mesh:
+  box: {n: [8, 16, 16], min: [0, 0, 0], max: [0.05, 0.1, 0.1]}
+  packed: false
+  sidesets:
+    - {name: left, plane: {axis: x, at: min}}
+    - {name: right, plane: {axis: x, at: max}}
+material: {type: GeneratedMooneyRivlinProny, C10: 0.3, C01: 0.05, K: 50}
+dirichlet_conditions:
+  - {type: sideset, format: name, name: left, component: [0, 1, 2], value: [0, 0, 0]}
+constraints:
+  - {type: rotation, sideset: right, axis: x, center: [0, 0.05, 0.05], angle: 0.24}
+regime: quasi_static
+time: {dt: 1, steps: 1}
+)";
+    auto pg = assemble(yaml);
+    SFEM_TEST_ASSERT(pg != nullptr);
+    SFEM_TEST_ASSERT(pg->run() == SFEM_SUCCESS);
+
+    auto         mesh = pg->function()->space()->mesh_ptr();
+    auto         xyz  = mesh->points()->data();
+    const auto   u    = pg->solution()->data();
+    const real_t c = std::cos(real_t(0.24)), s = std::sin(real_t(0.24));
+    int          twisted = 0;
+    for (ptrdiff_t i = 0; i < mesh->n_nodes(); ++i) {
+        if (std::abs(xyz[0][i] - real_t(0.05)) > 1e-8) continue;
+        const real_t q1 = xyz[1][i] - real_t(0.05), q2 = xyz[2][i] - real_t(0.05);
+        SFEM_TEST_ASSERT(std::abs(u[i * 3 + 1] - (c * q1 - s * q2 - q1)) < 1e-12);
+        SFEM_TEST_ASSERT(std::abs(u[i * 3 + 2] - (s * q1 + c * q2 - q2)) < 1e-12);
+        twisted++;
+    }
+    SFEM_TEST_ASSERT(twisted == 17 * 17);
+    return SFEM_TEST_SUCCESS;
+}
+
+// A twist of 0.3 rad in one step of a nearly incompressible bar, with no profile to cut back:
+// carried whole, the lifted state lands where the tangent is indefinite and Newton stalls;
+// carried in fractions, each from the last converged state, it converges.
+int test_large_increment_in_fractions() {
+    const char *const yaml = R"(
+mesh:
+  box: {n: [40, 8, 8], min: [0, 0, 0], max: [1, 0.2, 0.2]}
+  packed: false
+  sidesets:
+    - {name: left, plane: {axis: x, at: min}}
+    - {name: right, plane: {axis: x, at: max}}
+material: {type: GeneratedNeoHookeanOgden, mu: 0.6, lmbda: 50}
+dirichlet_conditions:
+  - {type: sideset, format: name, name: left, component: [0, 1, 2], value: [0, 0, 0]}
+constraints:
+  - {type: rotation, sideset: right, axis: x, center: [0, 0.1, 0.1], angle: 0.3}
+regime: quasi_static
+time: {dt: 1, steps: 1}
+solver: {newton: {verbose: false}}
+)";
+    auto pg = assemble(yaml);
+    SFEM_TEST_ASSERT(pg != nullptr);
+    SFEM_TEST_ASSERT(pg->run() == SFEM_SUCCESS);
+
+    auto         mesh = pg->function()->space()->mesh_ptr();
+    auto         xyz  = mesh->points()->data();
+    const auto   u    = pg->solution()->data();
+    const real_t c = std::cos(real_t(0.3)), s = std::sin(real_t(0.3));
+    for (ptrdiff_t i = 0; i < mesh->n_nodes(); ++i) {
+        if (std::abs(xyz[0][i] - 1) > 1e-8) continue;
+        const real_t q1 = xyz[1][i] - real_t(0.1), q2 = xyz[2][i] - real_t(0.1);
+        SFEM_TEST_ASSERT(std::abs(u[i * 3 + 1] - (c * q1 - s * q2 - q1)) < 1e-12);
+        SFEM_TEST_ASSERT(std::abs(u[i * 3 + 2] - (s * q1 + c * q2 - q2)) < 1e-12);
+    }
+    return SFEM_TEST_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_steady_linear_patch);
@@ -339,6 +416,8 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_sine_rotation);
     SFEM_RUN_TEST(test_prony_torsion_release);
     SFEM_RUN_TEST(test_torque_control);
+    SFEM_RUN_TEST(test_boundary_increment_is_carried);
+    SFEM_RUN_TEST(test_large_increment_in_fractions);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }
