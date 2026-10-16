@@ -68,7 +68,6 @@ namespace sfem {
         real_t          torque = 0, previous_theta = 0, previous_torque = 0;
         for (int it = 0; it < impl.options.max_it; ++it) {
             impl.rotation->set_angle(impl.theta);
-            impl.f->apply_constraints(x);
             const NonlinearReport report = impl.inner->solve(context, x);
 
             if (it == 0) total.reference = report.reference;

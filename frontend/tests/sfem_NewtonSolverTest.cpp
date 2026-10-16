@@ -5,6 +5,7 @@
 #include <limits>
 #include <vector>
 
+#include "sfem_API.hpp"
 #include "sfem_NewtonSolver.hpp"
 #include "sfem_UnconstrainedStep.hpp"
 #include "sfem_elasticity_test_problem.hpp"
@@ -193,11 +194,52 @@ int test_fails_fast() {
     return SFEM_TEST_SUCCESS;
 }
 
+// CG on an indefinite matrix stops at the first direction of non-positive curvature and returns
+// a direction of descent for the quadratic 1/2 x'Ax - b'x: b'x > 0 from x = 0.
+int test_cg_stops_on_negative_curvature() {
+    for (const bool preconditioned : {false, true}) {
+        for (const std::vector<real_t> &diagonal : {std::vector<real_t>{2, 1, -1, 3}, std::vector<real_t>{-1, -2, -1, -3}}) {
+            const ptrdiff_t n  = diagonal.size();
+            auto            op = sfem::make_op<real_t>(
+                    n,
+                    n,
+                    [diagonal, n](const real_t *const x, real_t *const y) {
+                        for (ptrdiff_t i = 0; i < n; ++i) y[i] += diagonal[i] * x[i];
+                    },
+                    sfem::EXECUTION_SPACE_HOST);
+            auto cg     = sfem::create_cg<real_t>(op, sfem::EXECUTION_SPACE_HOST);
+            cg->verbose = false;
+            cg->set_n_dofs(n);
+            cg->set_max_it(100);
+            cg->set_rtol(1e-12);
+            cg->set_stop_on_negative_curvature(true);
+            if (preconditioned) {
+                cg->set_preconditioner_op(sfem::make_op<real_t>(
+                        n,
+                        n,
+                        [n](const real_t *const x, real_t *const y) {
+                            for (ptrdiff_t i = 0; i < n; ++i) y[i] += x[i];
+                        },
+                        sfem::EXECUTION_SPACE_HOST));
+            }
+
+            std::vector<real_t> b(n, 1), x(n, 0);
+            SFEM_TEST_ASSERT(cg->apply(b.data(), x.data()) == SFEM_SUCCESS);
+            SFEM_TEST_ASSERT(cg->negative_curvature());
+            real_t descent = 0;
+            for (ptrdiff_t i = 0; i < n; ++i) descent += b[i] * x[i];
+            SFEM_TEST_ASSERT(descent > 0);
+        }
+    }
+    return SFEM_TEST_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_linear_one_iteration);
     SFEM_RUN_TEST(test_neohookean_quadratic);
     SFEM_RUN_TEST(test_fails_fast);
+    SFEM_RUN_TEST(test_cg_stops_on_negative_curvature);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }

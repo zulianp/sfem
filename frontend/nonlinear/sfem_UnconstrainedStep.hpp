@@ -25,6 +25,9 @@ namespace sfem {
         real_t rtol{real_t(1e-3)};
         real_t atol{real_t(1e-16)};
         int    max_it{2000};
+        /// CG stops at a direction of non-positive curvature and returns the descent direction it
+        /// has built: a direction for a line search to scale, so only with one.
+        bool stop_on_negative_curvature{true};
         /// Bytes per stored value of an assembled BSR tangent: 2, 4 or sizeof(real_t).
         int storage_bytes{(int)sizeof(real_t)};
     };

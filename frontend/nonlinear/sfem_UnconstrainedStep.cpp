@@ -29,6 +29,9 @@ namespace sfem {
             if (options.type == "cg") {
                 auto cg     = create_cg<real_t>(op, es);
                 cg->verbose = false;
+                // The tangent away from the solution can be indefinite: the step is then the
+                // descent direction CG has built before it met negative curvature.
+                cg->set_stop_on_negative_curvature(options.stop_on_negative_curvature);
                 cg->set_rtol(options.rtol);
                 cg->set_atol(options.atol);
                 solver = cg;
@@ -140,8 +143,13 @@ namespace sfem {
         SFEM_TRACE_SCOPE("UnconstrainedStep::solve");
 
         auto &impl = *impl_;
+        // The constrained rows are the identity: their right-hand side is the increment dx
+        // arrives with, and a Krylov start that already holds it keeps the iteration on the
+        // interior, which follows the increment through the tangent's coupling.
         impl.blas->zaxpby(impl.ndofs, -1, r, 0, r, impl.rhs->data());
+        impl.f->copy_constrained_dofs(dx, impl.rhs->data());
         impl.blas->zeros(impl.ndofs, dx);
+        impl.f->copy_constrained_dofs(impl.rhs->data(), dx);
         const int status = impl.solver->apply(impl.rhs->data(), dx);
         impl.iterations  = impl.solver->iterations();
         return status;

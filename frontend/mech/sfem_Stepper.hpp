@@ -56,6 +56,7 @@ namespace sfem {
     ///   1. the time-dependent conditions move to the step's end, scheduled releases happen;
     ///   2. the time scheme and the history-dependent materials open the step;
     ///   3. the nonlinear solve starts from the scheme's start, or from the last state;
+    ///      the solver carries its constrained values onto the prescribed ones;
     ///   4. the solution is committed: the solver, the histories, the scheme;
     ///
     /// with the observers around it. A failed step is solved again from the last state, then with
