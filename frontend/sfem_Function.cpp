@@ -151,7 +151,15 @@ namespace sfem {
 
     int Output::write_time_step(const char *name, const real_t /*t*/, const real_t *const x) {
         SFEM_TRACE_SCOPE("Output::write_time_step");
+        return write_numbered(name, x, [this]() { return impl_->export_counter++; });
+    }
 
+    int Output::write_step(const char *name, const size_t step, const real_t *const x) {
+        SFEM_TRACE_SCOPE("Output::write_step");
+        return write_numbered(name, x, [step]() { return step; });
+    }
+
+    int Output::write_numbered(const char *name, const real_t *const x, const std::function<size_t()> &next_index) {
         auto      space      = impl_->space;
         const int block_size = space->block_size();
 
@@ -177,7 +185,7 @@ namespace sfem {
                          impl_->time_dependent_file_format.c_str(),
                          impl_->output_dir.c_str(),
                          b_name,
-                         impl_->export_counter++,
+                         (int)next_index(),
                          smesh::str(smesh::TypeToEnum<real_t>::value()).c_str());
 
                 if (buff->to_file(smesh::Path(path))) {
@@ -191,7 +199,7 @@ namespace sfem {
                      impl_->time_dependent_file_format.c_str(),
                      impl_->output_dir.c_str(),
                      name,
-                     impl_->export_counter++,
+                     (int)next_index(),
                      smesh::str(smesh::TypeToEnum<real_t>::value()).c_str());
 
             auto out = Buffer<real_t>::wrap(space->n_dofs(), const_cast<real_t *>(x));
@@ -288,6 +296,16 @@ namespace sfem {
         impl_->ops.push_back(op);
     }
     void Function::add_constraint(const std::shared_ptr<Constraint> &c) { impl_->constraints.push_back(c); }
+
+    void Function::remove_constraint(const std::shared_ptr<Constraint> &c) {
+        auto it = std::find(impl_->constraints.begin(), impl_->constraints.end(), c);
+
+        if (it == impl_->constraints.end()) {
+            SFEM_ERROR("remove_constraint: constraint does not exist!");
+        }
+
+        impl_->constraints.erase(it);
+    }
 
     void Function::clear_constraints() { impl_->constraints.clear(); }
 

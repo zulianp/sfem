@@ -1,0 +1,161 @@
+#include "sfem_UnconstrainedStep.hpp"
+
+#include "sfem_API.hpp"
+#include "sfem_BSRTangent.hpp"
+#include "sfem_Function.hpp"
+
+namespace sfem {
+
+    class UnconstrainedStep::Impl {
+    public:
+        std::shared_ptr<Function>     f;
+        ExecutionSpace                es{EXECUTION_SPACE_HOST};
+        LinearSolverOptions           options;
+        std::shared_ptr<BLAS<real_t>> blas;
+        ptrdiff_t                     ndofs{0};
+
+        std::shared_ptr<BSRTangent>                       tangent;  // format BSR
+        SharedBuffer<real_t>                              state;    // the iterate the formats that read one see
+        std::shared_ptr<Operator<real_t>>                 op;
+        std::shared_ptr<MatrixFreeLinearSolver<real_t>>   solver;
+        SharedBuffer<real_t>                              diag;
+        std::shared_ptr<ShiftableJacobi<real_t>>          jacobi;
+        SharedBuffer<real_t>                              rhs;
+        int                                               iterations{0};
+
+        bool is_bsr() const { return options.format == op_type::BSR && f->space()->block_size() > 1; }
+
+        int create_solver() {
+            if (options.type == "cg") {
+                auto cg     = create_cg<real_t>(op, es);
+                cg->verbose = false;
+                cg->set_rtol(options.rtol);
+                cg->set_atol(options.atol);
+                solver = cg;
+            } else if (options.type == "bcgs") {
+                auto bcgs     = create_bcgs<real_t>(op, es);
+                bcgs->verbose = false;
+                bcgs->set_rtol(options.rtol);
+                bcgs->set_atol(options.atol);
+                solver = bcgs;
+            } else {
+                fprintf(stderr, "UnconstrainedStep: unknown linear solver \"%s\" (cg or bcgs)\n", options.type.c_str());
+                return SFEM_FAILURE;
+            }
+
+            solver->set_n_dofs(ndofs);
+            solver->set_max_it(options.max_it);
+            if (jacobi) {
+                solver->set_preconditioner_op(jacobi);
+            }
+            return SFEM_SUCCESS;
+        }
+    };
+
+    UnconstrainedStep::UnconstrainedStep() : impl_(std::make_unique<Impl>()) {}
+    UnconstrainedStep::~UnconstrainedStep() = default;
+
+    std::shared_ptr<UnconstrainedStep> UnconstrainedStep::create(const std::shared_ptr<Function> &f,
+                                                                 const ExecutionSpace             es,
+                                                                 const LinearSolverOptions       &options) {
+        std::shared_ptr<UnconstrainedStep> ret(new UnconstrainedStep());
+        auto                              &impl = *ret->impl_;
+        impl.f                                  = f;
+        impl.es                                 = es;
+        impl.options                            = options;
+        impl.blas                               = blas<real_t>(es);
+        impl.ndofs                              = f->space()->n_dofs();
+        impl.state                              = create_buffer<real_t>(impl.ndofs, es);
+        impl.rhs                                = create_buffer<real_t>(impl.ndofs, es);
+
+        if (options.preconditioner == "jacobi") {
+            impl.diag   = create_buffer<real_t>(impl.ndofs, es);
+            impl.jacobi = create_shiftable_jacobi(impl.diag, es);
+        } else if (options.preconditioner != "none") {
+            fprintf(stderr, "UnconstrainedStep: unknown preconditioner \"%s\" (jacobi or none)\n", options.preconditioner.c_str());
+            return nullptr;
+        }
+
+        if (impl.is_bsr()) {
+            impl.tangent = BSRTangent::create(f, es);
+        } else if (options.format == op_type::MATRIX_FREE ||
+                   (options.format == op_type::INEXACT && !f->inexact_supported())) {
+            // Reads the iterate the Newton loop handed to `Function::update`; built once.
+            impl.op = create_linear_operator(op_type::MATRIX_FREE, f, impl.state, es);
+        } else if (options.format == op_type::INEXACT) {
+            impl.op = create_linear_operator(op_type::INEXACT, f, impl.state, es);
+        }
+
+        return ret;
+    }
+
+    StepMeasure UnconstrainedStep::measure(const real_t *const, const real_t *const r) {
+        StepMeasure m;
+        m.value     = impl_->blas->norm2(impl_->ndofs, r);
+        m.reference = m.value;
+        return m;
+    }
+
+    int UnconstrainedStep::linearize(const real_t *const x, const real_t *const) {
+        SFEM_TRACE_SCOPE("UnconstrainedStep::linearize");
+
+        auto &impl = *impl_;
+        impl.blas->copy(impl.ndofs, x, impl.state->data());
+
+        if (impl.tangent) {
+            if (impl.tangent->assemble(x) != SFEM_SUCCESS) return SFEM_FAILURE;
+            impl.op = impl.tangent->op(impl.options.storage_bytes);
+            if (impl.jacobi && impl.tangent->diagonal(impl.diag->data()) != SFEM_SUCCESS) return SFEM_FAILURE;
+        } else {
+            if (impl.options.format == op_type::INEXACT && impl.f->inexact_supported()) {
+                if (impl.f->inexact_update(x) != SFEM_SUCCESS) return SFEM_FAILURE;
+            } else if (impl.options.format != op_type::MATRIX_FREE && impl.options.format != op_type::INEXACT) {
+                impl.op = create_linear_operator(impl.options.format, impl.f, impl.state, impl.es);
+                if (!impl.op) return SFEM_FAILURE;
+            }
+
+            if (impl.jacobi) {
+                impl.blas->zeros(impl.ndofs, impl.diag->data());
+                if (impl.f->hessian_diag(x, impl.diag->data()) != SFEM_SUCCESS) {
+                    fprintf(stderr,
+                            "UnconstrainedStep: the Jacobi preconditioner needs Function::hessian_diag, which an "
+                            "operator here does not provide; use format BSR or preconditioner none\n");
+                    return SFEM_FAILURE;
+                }
+            }
+        }
+
+        if (impl.jacobi) {
+            // The constrained rows of the operator are the identity (compose_constraints_op).
+            impl.f->set_value_to_constrained_dofs(1, impl.diag->data());
+            impl.jacobi->set_diag(impl.diag);
+        }
+
+        if (!impl.solver) return impl.create_solver();
+        impl.solver->set_op(impl.op);
+        return SFEM_SUCCESS;
+    }
+
+    int UnconstrainedStep::solve(const real_t *const, const real_t *const r, real_t *const dx) {
+        SFEM_TRACE_SCOPE("UnconstrainedStep::solve");
+
+        auto &impl = *impl_;
+        impl.blas->zaxpby(impl.ndofs, -1, r, 0, r, impl.rhs->data());
+        impl.blas->zeros(impl.ndofs, dx);
+        const int status = impl.solver->apply(impl.rhs->data(), dx);
+        impl.iterations  = impl.solver->iterations();
+        return status;
+    }
+
+    int UnconstrainedStep::iterations() const { return impl_->iterations; }
+
+    void UnconstrainedStep::set_rtol(const real_t rtol) {
+        impl_->options.rtol = rtol;
+        if (!impl_->solver) return;
+        if (auto cg = std::dynamic_pointer_cast<ConjugateGradient<real_t>>(impl_->solver)) cg->set_rtol(rtol);
+        if (auto bcgs = std::dynamic_pointer_cast<BiCGStab<real_t>>(impl_->solver)) bcgs->set_rtol(rtol);
+    }
+
+    const LinearSolverOptions &UnconstrainedStep::options() const { return impl_->options; }
+
+}  // namespace sfem

@@ -70,6 +70,9 @@ namespace sfem {
                          real_t *const       velocity,
                          real_t *const       acceleration) const override;
 
+        void start(real_t *const x) const override;
+        void carried_state(real_t *const velocity, real_t *const acceleration) const override;
+
         /// Both halves of the method are reported, so the exported
         /// acceleration is the one `inertia_op` assembles.
         bool has_acceleration() const override { return true; }

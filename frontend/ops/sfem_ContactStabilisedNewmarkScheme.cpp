@@ -78,6 +78,10 @@ namespace sfem {
                             x);
     }
 
+    void ContactStabilisedNewmarkScheme::carried_state(real_t *const velocity, real_t *const acceleration) const {
+        impl_->newmark->carried_state(velocity, acceleration);
+    }
+
     const std::shared_ptr<NewmarkScheme> &ContactStabilisedNewmarkScheme::newmark() const { return impl_->newmark; }
 
 }  // namespace sfem

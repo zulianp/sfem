@@ -10,10 +10,16 @@
 
 #include "sfem_ForwardDeclarations.hpp"
 #include "sfem_LoadProfile.hpp"
+#include "sfem_SidesetLookup.hpp"
 #include "sfem_aliases.hpp"
 #include "sfem_base.hpp"
 #include "sfem_defs.hpp"
 #include "smesh_mesh.hpp"
+
+#ifdef SFEM_ENABLE_RYAML
+#include <ryml.hpp>
+#include <ryml_std.hpp>
+#endif
 
 // Operator includes
 #include "sfem_Op.hpp"
@@ -42,6 +48,14 @@ namespace sfem {
                                                          const std::vector<struct Condition>  &conditions);
 
         static std::shared_ptr<NeumannConditions> create_from_yaml(const std::shared_ptr<FunctionSpace> &space, std::string yaml);
+
+#ifdef SFEM_ENABLE_RYAML
+        /// The list under `neumann_conditions`; `lookup` resolves `format: name` sidesets and
+        /// relative paths.
+        static std::shared_ptr<NeumannConditions> create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+                                                                   const ryml::ConstNodeRef             &conditions,
+                                                                   const SidesetLookup                  &lookup = SidesetLookup());
+#endif
 
         static std::shared_ptr<NeumannConditions> create_from_file(const std::shared_ptr<FunctionSpace> &space,
                                                                    const smesh::Path                    &path);

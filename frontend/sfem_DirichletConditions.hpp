@@ -11,6 +11,7 @@
 #include "sfem_Constraint.hpp"
 #include "sfem_ForwardDeclarations.hpp"
 #include "sfem_LoadProfile.hpp"
+#include "sfem_SidesetLookup.hpp"
 #include "sfem_aliases.hpp"
 #include "sfem_base.hpp"
 #include "sfem_defs.hpp"
@@ -50,8 +51,10 @@ namespace sfem {
                                                                      std::string                           yaml);
 
 #ifdef SFEM_ENABLE_RYAML
+        /// `lookup` resolves `format: name` sidesets and relative paths.
         static std::shared_ptr<DirichletConditions> create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
-                                                                     const ryml::NodeRef                  &node);
+                                                                     const ryml::ConstNodeRef             &node,
+                                                                     const SidesetLookup                  &lookup = SidesetLookup());
 #endif
 
         static std::shared_ptr<DirichletConditions> create(const std::shared_ptr<FunctionSpace> &space,

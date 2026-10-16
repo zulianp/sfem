@@ -98,6 +98,17 @@ namespace sfem {
                                  real_t *const       velocity,
                                  real_t *const       acceleration) const = 0;
 
+        /// Where Newton starts the step `begin_step` opened: the method's
+        /// predictor, or the state carried out of the last step.
+        virtual void start(real_t *const x) const = 0;
+
+        /// The derived states carried out of the last `advance`, the ones the
+        /// next step is built from -- for a method that modifies them on the
+        /// way out, not what `reconstruct` gives at the solution.  Valid until
+        /// the next `begin_step`.  `acceleration` may be null, and must be for
+        /// a method without one.
+        virtual void carried_state(real_t *const velocity, real_t *const acceleration) const = 0;
+
         /// Whether `reconstruct` can fill an acceleration.  True exactly when
         /// the method carries a separable second-derivative term, which is the
         /// same condition as `inertia_op` being non-null.

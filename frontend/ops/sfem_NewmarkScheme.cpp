@@ -129,6 +129,16 @@ namespace sfem {
         impl_->blas->copy(impl_->space->n_dofs(), x, impl_->u_n->data());
     }
 
+    void NewmarkScheme::start(real_t *const x) const {
+        impl_->blas->copy(impl_->space->n_dofs(), impl_->u_hat->data(), x);
+    }
+
+    void NewmarkScheme::carried_state(real_t *const velocity, real_t *const acceleration) const {
+        const ptrdiff_t ndofs = impl_->space->n_dofs();
+        impl_->blas->copy(ndofs, impl_->v_n->data(), velocity);
+        if (acceleration) impl_->blas->copy(ndofs, impl_->a_n->data(), acceleration);
+    }
+
     std::shared_ptr<Op> NewmarkScheme::inertia_op() const { return impl_->inertia; }
 
     std::shared_ptr<Buffer<real_t>> NewmarkScheme::state() const { return impl_->u_n; }
