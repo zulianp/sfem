@@ -8,6 +8,7 @@
 
 #include "sfem_API.hpp"
 #include "sfem_Function.hpp"
+#include "sfem_NewmarkScheme.hpp"
 #include "sfem_prony_test_material.hpp"
 #include "sfem_BSR.hpp"
 #include "sfem_test.hpp"
@@ -76,10 +77,6 @@ int test_mooney_rivlin_visco_relaxation() {
 
     auto fs = sfem::FunctionSpace::create(mesh, 3);  // 3D displacement
     auto f  = sfem::Function::create(fs);
-
-    // LumpedMass
-    auto mass_op = sfem::create_op(fs, "LumpedMass", es);
-    mass_op->initialize();
 
     // Material Parameters from environment
     real_t SFEM_C10          = 1.0;
@@ -208,36 +205,27 @@ int test_mooney_rivlin_visco_relaxation() {
     auto            delta_x = sfem::create_buffer<real_t>(ndofs, es);
     auto            diag    = sfem::create_buffer<real_t>(ndofs, es);
 
-    // Lumped mass vector (diagonal of M)
     real_t SFEM_DENSITY = 1000.0;
     SFEM_READ_ENV(SFEM_DENSITY, atof);
-    real_t density   = SFEM_DENSITY;
-    auto   mass_diag = sfem::create_buffer<real_t>(ndofs, es);
-    mass_op->hessian_diag(nullptr, mass_diag->data());
-    // Scale mass by density
-    auto blas = sfem::blas<real_t>(es);
-    blas->scal(ndofs, density, mass_diag->data());
-    f->set_value_to_constrained_dofs(1.0, mass_diag->data());  // Set 1 for BC nodes
+    real_t density = SFEM_DENSITY;
+    auto   blas    = sfem::blas<real_t>(es);
+
+    // Newmark (implicit, unconditionally stable), held by the material: its inertia
+    // c0 M (x - u_hat), c0 = 1/(beta dt^2) and M the lumped mass, is in the material's gradient
+    // and Hessians.
+    auto newmark = std::make_shared<sfem::NewmarkScheme>(fs, es);
+    newmark->set_beta(0.25);
+    newmark->set_gamma(0.5);
+    newmark->set_density(density);
+    SFEM_TEST_ASSERT(newmark->initialize() == SFEM_SUCCESS);
+    op->set_time_scheme(newmark);
 
     // Output setup
     bool SFEM_ENABLE_OUTPUT = false;
     SFEM_READ_ENV(SFEM_ENABLE_OUTPUT, atoi);
     auto output = create_output(f, smesh::Path("test_mooney_rivlin_visco"));
 
-    // Newmark state
-    auto v      = sfem::create_buffer<real_t>(ndofs, es);
-    auto a      = sfem::create_buffer<real_t>(ndofs, es);
-    auto u_pred = sfem::create_buffer<real_t>(ndofs, es);  // Predicted displacement
-    auto v_pred = sfem::create_buffer<real_t>(ndofs, es);  // Predicted velocity
-
     blas->zeros(ndofs, x->data());
-    blas->zeros(ndofs, v->data());
-    blas->zeros(ndofs, a->data());
-
-    // Newmark parameters (implicit, unconditionally stable)
-    real_t beta_nm  = 0.25;
-    real_t gamma_nm = 0.5;
-    real_t c0       = 1.0 / (beta_nm * dt * dt);  // Coefficient for M in effective stiffness
 
     // Matrix assembly buffers (BSR format: 3x3 blocks)
     auto      graph      = fs->node_to_node_graph();
@@ -328,20 +316,20 @@ int test_mooney_rivlin_visco_relaxation() {
     size_t steps       = 0;
     size_t export_freq = 1;
 
-    auto f_int        = sfem::create_buffer<real_t>(ndofs, es);
-    auto f_neumann    = sfem::create_buffer<real_t>(ndofs, es);
-    auto inertia_term = sfem::create_buffer<real_t>(ndofs, es);
-
     printf("===== Mooney-Rivlin Viscoelastic Test =====\n");
     printf("Mesh: %ld nodes, %ld DOFs\n", (long)n_nodes, (long)ndofs);
-    printf("Newmark parameters: beta=%.2f, gamma=%.2f, c0=%.2e, dt=%.3f, density=%.1f\n", beta_nm, gamma_nm, c0, dt, density);
+    printf("Newmark parameters: beta=%.2f, gamma=%.2f, dt=%.3f, density=%.1f\n",
+           newmark->weight("beta"),
+           newmark->weight("gamma"),
+           dt,
+           density);
     printf("Time: T=%.2f, dt=%.3f\n", SFEM_T, dt);
 
     // Output
     if (SFEM_ENABLE_OUTPUT) {
         output->write_time_step("disp", t, x->data());
-        output->write_time_step("velocity", t, v->data());
-        output->write_time_step("acceleration", t, a->data());
+        output->write_time_step("velocity", t, newmark->velocity()->data());
+        output->write_time_step("acceleration", t, newmark->acceleration()->data());
         output->log_time(t);
     }
 
@@ -351,18 +339,12 @@ int test_mooney_rivlin_visco_relaxation() {
     while (t < SFEM_T) {
         printf("Step %zu: t=%.3f\n", steps, t);
 
-        // Newmark Prediction Step
-        // u_pred = u_n + dt*v_n + (0.5-beta)*dt^2*a_n
-        // v_pred = v_n + (1-gamma)*dt*a_n
-        blas->copy(ndofs, x->data(), u_pred->data());
-        blas->axpy(ndofs, dt, v->data(), u_pred->data());
-        blas->axpy(ndofs, (0.5 - beta_nm) * dt * dt, a->data(), u_pred->data());
-
-        blas->copy(ndofs, v->data(), v_pred->data());
-        blas->axpy(ndofs, (1.0 - gamma_nm) * dt, a->data(), v_pred->data());
+        // Newmark Prediction Step: the scheme's predictor, shift and history for the step.
+        newmark->begin_step(t, dt);
 
         // Use prediction as initial guess for Newton
-        blas->copy(ndofs, u_pred->data(), x->data());
+        blas->copy(ndofs, newmark->predictor()->data(), x->data());
+        f->apply_constraints(x->data());
 
         // Compute lower_bound based on current displacement (before solve)
         if (SFEM_ENABLE_CONTACT && !contact_node_indices.empty()) {
@@ -382,25 +364,12 @@ int test_mooney_rivlin_visco_relaxation() {
         // Newton Loop with Inertia
         for (int iter = 0; iter < 20; ++iter) {
             // Residual: R = M*a + F_int(u) - F_ext
-            // where a = c0*(u - u_pred) from Newmark relation
+            // where a = c0*(u - u_hat) from Newmark relation
+            //
+            // `Function::gradient` runs every operator it owns: the material, whose held scheme
+            // adds the inertia, and the Neumann load (its gradient gives -F_ext).
             blas->zeros(ndofs, rhs->data());
-
-            // Inertia term: c0 * M * (u - u_pred)
-            blas->zeros(ndofs, inertia_term->data());
-            for (ptrdiff_t i = 0; i < ndofs; ++i) {
-                inertia_term->data()[i] = c0 * mass_diag->data()[i] * (x->data()[i] - u_pred->data()[i]);
-            }
-            blas->axpy(ndofs, 1.0, inertia_term->data(), rhs->data());
-
-            // F_int(x)
-            blas->zeros(ndofs, f_int->data());
-            op->gradient(x->data(), f_int->data());
-            blas->axpy(ndofs, 1.0, f_int->data(), rhs->data());
-
-            // F_ext (Neumann) - note: gradient gives -F_ext
-            blas->zeros(ndofs, f_neumann->data());
-            neumann_op->gradient(x->data(), f_neumann->data());
-            blas->axpy(ndofs, 1.0, f_neumann->data(), rhs->data());
+            f->gradient(x->data(), rhs->data());
 
             if (iter == 0) {
                 // printf("    |u|=%e, |M*a|=%e, |F_int|=%e, |F_ext|=%e\n", x_norm, inertia_norm, f_int_norm, f_ext_norm);
@@ -416,41 +385,21 @@ int test_mooney_rivlin_visco_relaxation() {
             // ===== Tangent Stiffness: K_eff = K_tan + c0*M =====
             blas->zeros(values->size(), values->data());
             auto t_start = std::chrono::high_resolution_clock::now();
-            op->hessian_bsr(x->data(), graph->rowptr()->data(), graph->colidx()->data(), values->data());
+            f->hessian_bsr(x->data(), graph->rowptr()->data(), graph->colidx()->data(), values->data());
             auto t_end = std::chrono::high_resolution_clock::now();
             total_hessian_time += std::chrono::duration<double>(t_end - t_start).count();
 
-            auto      rowptr = graph->rowptr()->data();
-            auto      colidx = graph->colidx()->data();
-            auto      vals   = values->data();
-            const int bs2    = block_size * block_size;
-
-            for (ptrdiff_t node = 0; node < n_nodes; ++node) {
-                for (count_t k = rowptr[node]; k < rowptr[node + 1]; ++k) {
-                    if (colidx[k] == (idx_t)node) {
-                        for (int d = 0; d < block_size; ++d) {
-                            ptrdiff_t dof_idx = node * block_size + d;
-                            vals[k * bs2 + d * block_size + d] += c0 * mass_diag->data()[dof_idx];
-                        }
-                        break;
-                    }
-                }
-            }
-
-            // Apply Dirichlet BC
-            // conds->hessian_bsr(x->data(), rowptr, colidx, vals);
+            auto rowptr = graph->rowptr()->data();
+            auto colidx = graph->colidx()->data();
+            auto vals   = values->data();
 
             // Extract diagonal for Jacobi preconditioner
-            blas->zeros(ndofs, diag->data());
+            real_t* const dg = diag->data();
+#pragma omp parallel for
             for (ptrdiff_t node = 0; node < n_nodes; ++node) {
-                for (count_t k = rowptr[node]; k < rowptr[node + 1]; ++k) {
-                    if (colidx[k] == (idx_t)node) {
-                        for (int d = 0; d < block_size; ++d) {
-                            ptrdiff_t dof_idx     = node * block_size + d;
-                            diag->data()[dof_idx] = vals[k * bs2 + d * block_size + d];
-                        }
-                        break;
-                    }
+                const real_t* const B = sfem::bsr_diagonal_block(node, rowptr, colidx, block_size, vals);
+                for (int d = 0; d < block_size; ++d) {
+                    dg[node * block_size + d] = B[d * block_size + d];
                 }
             }
             jacobi->set_diag(diag);
@@ -470,13 +419,9 @@ int test_mooney_rivlin_visco_relaxation() {
             }
         }
 
-        for (ptrdiff_t i = 0; i < ndofs; ++i) {
-            a->data()[i] = c0 * (x->data()[i] - u_pred->data()[i]);
-            v->data()[i] = v_pred->data()[i] + gamma_nm * dt * a->data()[i];
-        }
-
         // Update history
         op->advance(x->data());
+        newmark->advance(x->data());
 
         t += dt;
         steps++;
@@ -489,8 +434,8 @@ int test_mooney_rivlin_visco_relaxation() {
         // Output
         if (SFEM_ENABLE_OUTPUT && steps % export_freq == 0) {
             output->write_time_step("disp", t, x->data());
-            output->write_time_step("velocity", t, v->data());
-            output->write_time_step("acceleration", t, a->data());
+            output->write_time_step("velocity", t, newmark->velocity()->data());
+            output->write_time_step("acceleration", t, newmark->acceleration()->data());
             output->log_time(t);
         }
     }
