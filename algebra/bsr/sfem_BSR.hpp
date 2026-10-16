@@ -289,6 +289,19 @@ namespace sfem {
         }
     }
 
+    /// The diagonal block of block row `row`, or null if the row stores none.
+    template <typename R, typename C, typename TStorage>
+    TStorage* bsr_diagonal_block(const ptrdiff_t                     row,
+                                 const R* const SFEM_RESTRICT        rowptr,
+                                 const C* const SFEM_RESTRICT        colidx,
+                                 const int                           block_size,
+                                 TStorage* const SFEM_RESTRICT       values) {
+        for (R k = rowptr[row]; k < rowptr[row + 1]; ++k) {
+            if ((ptrdiff_t)colidx[k] == row) return &values[(ptrdiff_t)k * block_size * block_size];
+        }
+        return nullptr;
+    }
+
     template <typename TStorage>
     void bsr_block_mm_acc(const TStorage* const SFEM_RESTRICT a_block,
                           const TStorage* const SFEM_RESTRICT b_block,

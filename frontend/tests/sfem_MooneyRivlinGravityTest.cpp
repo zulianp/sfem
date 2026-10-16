@@ -17,7 +17,9 @@
 #include "smesh_grid.hpp"
 #include "smesh_sideset.hpp"
 
-#include "sfem_SDFObstacle.hpp"
+#include "sfem_ContactStabilisedNewmarkScheme.hpp"
+#include "sfem_NewmarkScheme.hpp"
+#include "sfem_NodeObstacleContact.hpp"
 
 // The obstacle as a signed distance function, positive inside: a shape cut off by a box wide
 // enough for the mesh to fall onto it and spread over it, the cut's edges rounded with `edge`.
@@ -251,282 +253,6 @@ static std::shared_ptr<smesh::Grid<geom_t>> obstacle_grid(const std::shared_ptr<
             [&obstacle](const geom_t x, const geom_t y, const geom_t z) -> geom_t { return obstacle.sdf(x, y, z); });
 }
 
-// The diagonal block of `node` in a BSR matrix with 3x3 blocks, or null.
-static real_t* bsr_diagonal_block(const count_t* const rowptr, const idx_t* const colidx, real_t* const values, const ptrdiff_t node) {
-    for (count_t k = rowptr[node]; k < rowptr[node + 1]; ++k) {
-        if (colidx[k] == (idx_t)node) return &values[k * 9];
-    }
-    return nullptr;
-}
-
-// Frictionless contact of a set of mesh nodes with a rigid obstacle, given by its SDF grid
-// (positive inside) and sampled by the library at the displaced nodes (SDFObstacle::sample_nodes,
-// node_interpolate.hpp): the grid's interpolating cubic B-spline, whose gradient and curvature
-// are continuous. Node i keeps out of it: gap_i = -sdf(X_i + u_i) / |grad sdf| >= 0; outside the
-// grid there is no obstacle.
-// A step dx changes the gap by -n_i . dx_i to first order, n_i the unit gradient there, so the
-// linearised step is the QP with the constraints n_i . dx_i <= gap_i. In each contact node's
-// frame [n_i, t1_i, t2_i] that is an upper bound on one component, which a box-constrained QP
-// solver takes as it is.
-class NodeObstacleContact {
-public:
-    NodeObstacleContact(const std::shared_ptr<smesh::Grid<geom_t>>& sdf,
-                        const std::shared_ptr<sfem::Communicator>&  comm,
-                        const sfem::SharedBuffer<idx_t>&            nodes,
-                        const sfem::SharedBuffer<geom_t*>&          points,
-                        const ptrdiff_t                             ndofs,
-                        const int                                   dir)
-        : nodes_(nodes), points_(points), ndofs_(ndofs), dir_(dir) {
-        obstacle_ = sfem::SDFObstacle::create(sdf, comm, points->extent(1), points->data()[2], sfem::EXECUTION_SPACE_HOST);
-
-        const ptrdiff_t n = nodes->size();
-        normals_          = smesh::create_host_buffer<real_t>(3, n);
-        curvature_        = smesh::create_host_buffer<real_t>(6, n);
-        gap_              = smesh::create_host_buffer<real_t>(n);
-        frames_           = smesh::create_host_buffer<real_t>(9 * n);
-        ahead_            = smesh::create_host_buffer<real_t>(ndofs);
-        ahead_gap_        = smesh::create_host_buffer<real_t>(n);
-        ahead_normals_    = smesh::create_host_buffer<real_t>(3, n);
-    }
-
-    ptrdiff_t                         size() const { return nodes_->size(); }
-    const sfem::SharedBuffer<idx_t>&  nodes() const { return nodes_; }
-    const sfem::SharedBuffer<real_t>& gap() const { return gap_; }
-
-    // Samples the gap, the normals and the frames with the nodes displaced by x.
-    void update(const real_t* const x) {
-        obstacle_->sample_nodes(size(), nodes_->data(), points_->data(), x, gap_->data(), normals_->data());
-
-        // t1 is n crossed with the axis least aligned with it, t2 = n x t1. A node outside the
-        // grid has no normal and an unreachable gap; its frame is that of the contact direction.
-        real_t* const* const nn = normals_->data();
-        real_t* const        Q  = frames_->data();
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < size(); ++i) {
-            real_t n[3] = {nn[0][i], nn[1][i], nn[2][i]};
-            if (n[0] == 0 && n[1] == 0 && n[2] == 0) n[dir_] = 1;
-            int axis = 0;
-            for (int d = 1; d < 3; ++d) {
-                if (std::abs(n[d]) < std::abs(n[axis])) axis = d;
-            }
-            real_t e[3]        = {0, 0, 0};
-            e[axis]            = 1;
-            real_t       t1[3] = {n[1] * e[2] - n[2] * e[1], n[2] * e[0] - n[0] * e[2], n[0] * e[1] - n[1] * e[0]};
-            const real_t len   = std::sqrt(t1[0] * t1[0] + t1[1] * t1[1] + t1[2] * t1[2]);
-            for (int d = 0; d < 3; ++d) t1[d] /= len;
-            const real_t t2[3] = {n[1] * t1[2] - n[2] * t1[1], n[2] * t1[0] - n[0] * t1[2], n[0] * t1[1] - n[1] * t1[0]};
-
-            real_t* const q = &Q[9 * i];
-            for (int d = 0; d < 3; ++d) {
-                q[d]     = n[d];
-                q[3 + d] = t1[d];
-                q[6 + d] = t2[d];
-            }
-        }
-    }
-
-    // v <- Q^T v at the contact nodes: into their frames.
-    void to_frame(real_t* const v) const {
-        const idx_t* const  idx = nodes_->data();
-        const real_t* const Q   = frames_->data();
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < size(); ++i) {
-            real_t* const       vi   = &v[(ptrdiff_t)idx[i] * 3];
-            const real_t* const q    = &Q[9 * i];
-            const real_t        w[3] = {vi[0], vi[1], vi[2]};
-            for (int c = 0; c < 3; ++c) {
-                vi[c] = q[3 * c] * w[0] + q[3 * c + 1] * w[1] + q[3 * c + 2] * w[2];
-            }
-        }
-    }
-
-    // v <- Q v at the contact nodes: back from their frames.
-    void from_frame(real_t* const v) const {
-        const idx_t* const  idx = nodes_->data();
-        const real_t* const Q   = frames_->data();
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < size(); ++i) {
-            real_t* const       vi   = &v[(ptrdiff_t)idx[i] * 3];
-            const real_t* const q    = &Q[9 * i];
-            const real_t        w[3] = {vi[0], vi[1], vi[2]};
-            for (int d = 0; d < 3; ++d) {
-                vi[d] = q[d] * w[0] + q[3 + d] * w[1] + q[6 + d] * w[2];
-            }
-        }
-    }
-
-    // The step's upper bound in the frames: the gap on each contact node's normal component,
-    // `unbounded` everywhere else.
-    void upper_bound(const real_t unbounded, real_t* const ub) const {
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < ndofs_; ++i) {
-            ub[i] = unbounded;
-        }
-        const idx_t* const  idx = nodes_->data();
-        const real_t* const gap = gap_->data();
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < size(); ++i) {
-            ub[(ptrdiff_t)idx[i] * 3] = gap[i];
-        }
-    }
-
-    // First-order optimality of the step. At the solution the residual r is the obstacle's
-    // reaction mu_i n_i at the nodes it touches: along the normal, pushing out (mu_i >= 0),
-    // and zero where the node is clear of the obstacle (min(mu_i, gap_i) = 0).
-    //
-    // Writes r less the admissible reaction, mu_i = max(0, -n_i . r_i), to `projected` and
-    // returns sqrt(|projected|^2 + sum_i min(mu_i, k_i gap_i)^2) over the nodes clear of the
-    // obstacle: stationarity and complementarity, both forces, with k_i the stiffness of the
-    // node's equation. Penetration is a length, max_i -gap_i, and goes to *penetration.
-    real_t kkt_residual(const real_t* const r,
-                        const real_t* const k,  // per dof
-                        real_t* const       projected,
-                        real_t* const       penetration) const {
-        const idx_t* const   idx = nodes_->data();
-        real_t* const* const n   = normals_->data();
-        const real_t* const  gap = gap_->data();
-
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < ndofs_; ++i) {
-            projected[i] = r[i];
-        }
-
-        real_t deepest       = 0;
-        real_t complementary = 0;
-#pragma omp parallel for reduction(max : deepest) reduction(+ : complementary)
-        for (ptrdiff_t i = 0; i < size(); ++i) {
-            const ptrdiff_t node = idx[i];
-            real_t* const   ri   = &projected[node * 3];
-            const real_t    mu   = std::max(real_t(0), -(n[0][i] * ri[0] + n[1][i] * ri[1] + n[2][i] * ri[2]));
-            for (int d = 0; d < 3; ++d) {
-                ri[d] += mu * n[d][i];
-            }
-            const real_t c = std::min(mu, k[node * 3] * std::max(gap[i], real_t(0)));
-            complementary += c * c;
-            deepest = std::max(deepest, -gap[i]);
-        }
-
-        *penetration = deepest;
-        real_t norm  = complementary;
-#pragma omp parallel for reduction(+ : norm)
-        for (ptrdiff_t i = 0; i < ndofs_; ++i) {
-            norm += projected[i] * projected[i];
-        }
-        return std::sqrt(norm);
-    }
-
-    // The constraints' share of the Newton tangent at the nodes displaced by x. The Lagrangian
-    // E - sum_i mu_i gap_i adds -mu_i hess(gap_i), and on a curved obstacle that term is what
-    // keeps Newton quadratic for a body sliding over it. At a node on the surface -hess(gap_i)
-    // is the library's curvature (H - n m^T - m n^T) / |grad sdf|, m = H n, the B-spline's
-    // Hessian H corrected for its gradient not being exactly unit (for a sphere it is
-    // -(I - n n^T) / R). mu_i is the reaction at a node in contact, read from the residual r as
-    // in kkt_residual. Adds each node's 3x3 block to the diagonal block of the BSR tangent.
-    //
-    // Away from the solution that estimate can be large, and on a convex obstacle the term is
-    // negative across it, enough to make the tangent indefinite. With `capped`, each node's
-    // share is scaled so that its most negative part (bounded by row sums) stays within half
-    // of the node's inertia stiffness k_i = c0 m_i. `sign` -1 takes back an earlier call.
-    void add_curvature(const real_t* const  x,
-                       const real_t* const  r,
-                       const real_t* const  k,
-                       const bool           capped,
-                       const real_t         sign,
-                       const count_t* const rowptr,
-                       const idx_t* const   colidx,
-                       real_t* const        values) {
-        obstacle_->sample_nodes_curvature(size(), nodes_->data(), points_->data(), x, curvature_->data());
-
-        const idx_t* const   idx = nodes_->data();
-        real_t* const* const n   = normals_->data();
-        real_t* const* const C   = curvature_->data();
-        const real_t* const  gap = gap_->data();
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < size(); ++i) {
-            const ptrdiff_t     node = idx[i];
-            const real_t* const ri   = &r[node * 3];
-            const real_t        mu   = std::max(real_t(0), -(n[0][i] * ri[0] + n[1][i] * ri[1] + n[2][i] * ri[2]));
-            if (mu == 0 || gap[i] > mu / k[node * 3]) continue;
-
-            const real_t H[9] = {C[0][i], C[1][i], C[2][i], C[1][i], C[3][i], C[4][i], C[2][i], C[4][i], C[5][i]};
-
-            real_t lowest = 0;
-            for (int a = 0; a < 3; ++a) {
-                real_t off = 0;
-                for (int b = 0; b < 3; ++b) {
-                    if (b != a) off += std::abs(H[a * 3 + b]);
-                }
-                lowest = std::min(lowest, mu * (H[a * 3 + a] - off));
-            }
-            const real_t scale = capped && lowest < -k[node * 3] / 2 ? k[node * 3] / (2 * -lowest) : 1;
-
-            real_t* const B = bsr_diagonal_block(rowptr, colidx, values, node);
-            for (int c = 0; c < 9; ++c) {
-                B[c] += sign * scale * mu * H[c];
-            }
-        }
-    }
-
-    // The velocity correction of the contact-stabilised Newmark method (Deuflhard, Krause and
-    // Ertel 2008, in the form of Klapproth 2012, ZIB-Report 12-18, eq. 12f): with a lumped mass
-    // the L2 projection of x + dt v onto the admissible set is pointwise, so every contact node
-    // whose next position x_i + dt v_i would be inside the obstacle is moved to its surface
-    // along the normal, and v_i is what reaches that point. Its normal velocity into the
-    // obstacle is gone; nothing else changes.
-    void stabilise_velocity(const real_t* const x, real_t* const v, const real_t dt) {
-        real_t* const ahead = ahead_->data();
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < ndofs_; ++i) {
-            ahead[i] = x[i] + dt * v[i];
-        }
-        obstacle_->sample_nodes(size(), nodes_->data(), points_->data(), ahead, ahead_gap_->data(), ahead_normals_->data());
-
-        const idx_t* const   idx = nodes_->data();
-        real_t* const* const n   = ahead_normals_->data();
-        const real_t* const  gap = ahead_gap_->data();
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < size(); ++i) {
-            if (gap[i] < 0) {
-                real_t* const vi = &v[(ptrdiff_t)idx[i] * 3];
-                for (int d = 0; d < 3; ++d) {
-                    vi[d] += gap[i] * n[d][i] / dt;
-                }
-            }
-        }
-    }
-
-    // gap_i n_i at the contact nodes, zero elsewhere: the vector to the obstacle's surface.
-    void gap_field(real_t* const out) const {
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < ndofs_; ++i) {
-            out[i] = 0;
-        }
-        const idx_t* const   idx = nodes_->data();
-        real_t* const* const n   = normals_->data();
-        const real_t* const  gap = gap_->data();
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < size(); ++i) {
-            for (int d = 0; d < 3; ++d) {
-                out[(ptrdiff_t)idx[i] * 3 + d] = gap[i] * n[d][i];
-            }
-        }
-    }
-
-private:
-    std::shared_ptr<sfem::SDFObstacle> obstacle_;
-    sfem::SharedBuffer<idx_t>          nodes_;
-    sfem::SharedBuffer<geom_t*>        points_;
-    ptrdiff_t                          ndofs_;
-    int                                dir_;
-    sfem::SharedBuffer<real_t*>        normals_;
-    sfem::SharedBuffer<real_t*>        curvature_;
-    sfem::SharedBuffer<real_t>         gap_;
-    sfem::SharedBuffer<real_t>         frames_;
-    sfem::SharedBuffer<real_t>         ahead_;
-    sfem::SharedBuffer<real_t>         ahead_gap_;
-    sfem::SharedBuffer<real_t*>        ahead_normals_;
-};
-
 std::shared_ptr<sfem::Output> create_output(const std::shared_ptr<sfem::Function>& f, const smesh::Path& output_dir) {
     auto fs = f->space();
 
@@ -577,10 +303,6 @@ static int run_mooney_rivlin_gravity(const bool contact, const char* const outpu
 
     auto fs = sfem::FunctionSpace::create(mesh, 3);  // 3D displacement
     auto f  = sfem::Function::create(fs);
-
-    // LumpedMass
-    auto mass_op = sfem::create_op(fs, "LumpedMass", es);
-    mass_op->initialize();
 
     // Material Parameters from environment
     real_t SFEM_C10          = 1.0;
@@ -765,16 +487,20 @@ static int run_mooney_rivlin_gravity(const bool contact, const char* const outpu
     auto            delta_x = sfem::create_buffer<real_t>(ndofs, es);
     auto            diag    = sfem::create_buffer<real_t>(ndofs, es);
 
-    // Lumped mass vector (diagonal of M)
     real_t SFEM_DENSITY = 1000.0;
     SFEM_READ_ENV(SFEM_DENSITY, atof);
-    real_t density   = SFEM_DENSITY;
-    auto   mass_diag = sfem::create_buffer<real_t>(ndofs, es);
-    mass_op->hessian_diag(nullptr, mass_diag->data());
-    // Scale mass by density
-    auto blas = sfem::blas<real_t>(es);
-    blas->scal(ndofs, density, mass_diag->data());
-    f->set_value_to_constrained_dofs(1.0, mass_diag->data());  // Set 1 for BC nodes
+    real_t density = SFEM_DENSITY;
+    auto   blas    = sfem::blas<real_t>(es);
+
+    // Newmark (implicit, unconditionally stable), held by the material: its inertia
+    // c0 M (x - u_hat), c0 = 1/(beta dt^2) and M the lumped mass, is in the material's gradient
+    // and Hessians. With contact the material holds the contact-stabilised variant instead.
+    auto newmark = std::make_shared<sfem::NewmarkScheme>(fs, es);
+    newmark->set_beta(0.25);
+    newmark->set_gamma(0.5);
+    newmark->set_density(density);
+    SFEM_TEST_ASSERT(newmark->initialize() == SFEM_SUCCESS);
+    std::shared_ptr<sfem::TimeScheme> scheme = newmark;
 
     // **Gravity as an operator the Function owns**
     //
@@ -810,20 +536,7 @@ static int run_mooney_rivlin_gravity(const bool contact, const char* const outpu
     SFEM_READ_ENV(SFEM_ENABLE_OUTPUT, atoi);
     auto output = create_output(f, smesh::Path(output_dir));
 
-    // Newmark state
-    auto v      = sfem::create_buffer<real_t>(ndofs, es);
-    auto a      = sfem::create_buffer<real_t>(ndofs, es);
-    auto u_pred = sfem::create_buffer<real_t>(ndofs, es);  // Predicted displacement
-    auto v_pred = sfem::create_buffer<real_t>(ndofs, es);  // Predicted velocity
-
     blas->zeros(ndofs, x->data());
-    blas->zeros(ndofs, v->data());
-    blas->zeros(ndofs, a->data());
-
-    // Newmark parameters (implicit, unconditionally stable)
-    real_t beta_nm  = 0.25;
-    real_t gamma_nm = 0.5;
-    real_t c0       = 1.0 / (beta_nm * dt * dt);  // Coefficient for M in effective stiffness
 
     // Matrix assembly buffers (BSR format: 3x3 blocks)
     auto      graph      = fs->node_to_node_graph();
@@ -854,7 +567,8 @@ static int run_mooney_rivlin_gravity(const bool contact, const char* const outpu
     // normals sampled at every Newton iterate, and the linearised step solved as a QP.
     Obstacle                             obstacle_field;
     std::shared_ptr<smesh::Grid<geom_t>> obstacle_sdf;
-    std::shared_ptr<NodeObstacleContact> obstacle;
+    std::shared_ptr<sfem::NodeObstacleContact>            obstacle;
+    std::shared_ptr<sfem::ContactStabilisedNewmarkScheme> stabilised;
     std::shared_ptr<sfem::MPRGP<real_t>> contact_qp;
     sfem::SharedBuffer<real_t>           upper_bound, qp_rhs, projected, gap_viz, contact_force, inertia_stiffness, x_prev;
     real_t                               gap_tol = 0, max_inertia_stiffness = 0;
@@ -879,7 +593,7 @@ static int run_mooney_rivlin_gravity(const bool contact, const char* const outpu
 
         obstacle_field = create_obstacle(min_c, max_c, SFEM_CONTACT_DIR);
         obstacle_sdf   = obstacle_grid(mesh->comm(), obstacle_field);
-        obstacle       = std::make_shared<NodeObstacleContact>(obstacle_sdf,
+        obstacle       = std::make_shared<sfem::NodeObstacleContact>(obstacle_sdf,
                                                          mesh->comm(),
                                                          smesh::create_nodeset_from_sidesets(mesh, smesh::skin_sidesets(mesh)),
                                                          coords,
@@ -887,6 +601,8 @@ static int run_mooney_rivlin_gravity(const bool contact, const char* const outpu
                                                          SFEM_CONTACT_DIR);
         SFEM_TEST_ASSERT(obstacle->size() > 0);
         printf("Contact: %ld nodes, the body's surface\n", (long)obstacle->size());
+        stabilised = std::make_shared<sfem::ContactStabilisedNewmarkScheme>(newmark, obstacle);
+        scheme     = stabilised;
 
         projected     = sfem::create_buffer<real_t>(ndofs, es);
         gap_viz       = sfem::create_buffer<real_t>(ndofs, es);
@@ -895,19 +611,8 @@ static int run_mooney_rivlin_gravity(const bool contact, const char* const outpu
         // Contact is resolved to this fraction of the mesh's size.
         gap_tol = 1e-10 * extent;
 
-        // The scale of each node's equation, c0 M: what turns a reaction into a displacement.
         inertia_stiffness = sfem::create_buffer<real_t>(ndofs, es);
-        blas->copy(ndofs, mass_diag->data(), inertia_stiffness->data());
-        blas->scal(ndofs, c0, inertia_stiffness->data());
-        {
-            const real_t* const k     = inertia_stiffness->data();
-            const idx_t* const  nodes = obstacle->nodes()->data();
-#pragma omp parallel for reduction(max : max_inertia_stiffness)
-            for (ptrdiff_t i = 0; i < obstacle->size(); ++i) {
-                max_inertia_stiffness = std::max(max_inertia_stiffness, k[(ptrdiff_t)nodes[i] * 3]);
-            }
-        }
-        x_prev = sfem::create_buffer<real_t>(ndofs, es);
+        x_prev            = sfem::create_buffer<real_t>(ndofs, es);
 
         // The step in the contact nodes' frames, Q^T K Q dx' = -Q^T R with dx'_n <= gap_i,
         // by MPRGP: the constraints hold exactly at every iterate.
@@ -933,6 +638,8 @@ static int run_mooney_rivlin_gravity(const bool contact, const char* const outpu
         contact_qp->set_upper_bound(upper_bound);
     }
 
+    op->set_time_scheme(scheme);
+
     // 5. Time Loop with Full Newmark Integration
     real_t SFEM_T = 0.2;
     SFEM_READ_ENV(SFEM_T, atof);
@@ -952,7 +659,11 @@ static int run_mooney_rivlin_gravity(const bool contact, const char* const outpu
 
     printf("===== Mooney-Rivlin Gravity Contact Test =====\n");
     printf("Mesh: %ld nodes, %ld DOFs\n", (long)n_nodes, (long)ndofs);
-    printf("Newmark parameters: beta=%.2f, gamma=%.2f, c0=%.2e, dt=%.3f, density=%.1f\n", beta_nm, gamma_nm, c0, dt, density);
+    printf("Newmark parameters: beta=%.2f, gamma=%.2f, dt=%.3f, density=%.1f\n",
+           newmark->weight("beta"),
+           newmark->weight("gamma"),
+           dt,
+           density);
     printf("Time: T=%.2f, dt=%.3f\n", SFEM_T, dt);
     printf("Gravity: %.2f m/s^2 in direction %d\n", SFEM_GRAVITY, -SFEM_CONTACT_DIR);
     printf("Contact: %s\n", contact ? "enabled" : "disabled");
@@ -965,8 +676,8 @@ static int run_mooney_rivlin_gravity(const bool contact, const char* const outpu
     // Output
     if (SFEM_ENABLE_OUTPUT) {
         output->write_time_step("disp", t, x->data());
-        output->write_time_step("velocity", t, v->data());
-        output->write_time_step("acceleration", t, a->data());
+        output->write_time_step("velocity", t, newmark->velocity()->data());
+        output->write_time_step("acceleration", t, newmark->acceleration()->data());
         if (contact) {
             obstacle->gap_field(gap_viz->data());
             blas->zeros(ndofs, contact_force->data());
@@ -982,32 +693,32 @@ static int run_mooney_rivlin_gravity(const bool contact, const char* const outpu
     while (t < SFEM_T) {
         printf("Step %zu: t=%.3f\n", steps, t);
 
-        // Newmark Prediction Step
-        // u_pred = u_n + dt*v_n + (0.5-beta)*dt^2*a_n
-        // v_pred = v_n + (1-gamma)*dt*a_n
-        blas->copy(ndofs, x->data(), u_pred->data());
-        blas->axpy(ndofs, dt, v->data(), u_pred->data());
-        blas->axpy(ndofs, (0.5 - beta_nm) * dt * dt, a->data(), u_pred->data());
+        // Newmark Prediction Step: the scheme's predictor, shift and history for the step.
+        scheme->begin_step(t, dt);
+        const real_t c0 = scheme->weight("alpha_a");
 
-        blas->copy(ndofs, v->data(), v_pred->data());
-        blas->axpy(ndofs, (1.0 - gamma_nm) * dt, a->data(), v_pred->data());
+        if (contact) {
+            // u_n + dt v_n (ContactStabilisedNewmarkScheme::start).
+            stabilised->start(x->data());
+
+            // The scale of each node's equation, c0 M: what turns a reaction into a displacement.
+            blas->copy(ndofs, newmark->mass()->data(), inertia_stiffness->data());
+            blas->scal(ndofs, c0, inertia_stiffness->data());
+            const real_t* const k     = inertia_stiffness->data();
+            const idx_t* const  nodes = obstacle->nodes()->data();
+            max_inertia_stiffness     = 0;
+#pragma omp parallel for reduction(max : max_inertia_stiffness)
+            for (ptrdiff_t i = 0; i < obstacle->size(); ++i) {
+                max_inertia_stiffness = std::max(max_inertia_stiffness, k[(ptrdiff_t)nodes[i] * 3]);
+            }
+        } else {
+            // Use prediction as initial guess for Newton
+            blas->copy(ndofs, newmark->predictor()->data(), x->data());
+        }
 
         // The Dirichlet values are imposed, not predicted: Newton never moves a constrained
         // dof, so whatever the predictor put there would stay.
-        f->apply_constraints(u_pred->data());
-
-        if (contact) {
-            // With contact, Newton starts from u_n + dt v_n (x still holds u_n): the stabilised
-            // velocity makes it admissible, while the predictor's dt^2/4 a, whose material
-            // acceleration at a contact node grows as the mesh is refined, can start Newton
-            // deep inside the obstacle.
-            blas->copy(ndofs, x->data(), x_prev->data());
-            blas->axpy(ndofs, dt, v->data(), x->data());
-            f->apply_constraints(x->data());
-        } else {
-            // Use prediction as initial guess for Newton
-            blas->copy(ndofs, u_pred->data(), x->data());
-        }
+        f->apply_constraints(x->data());
 
         // The step being solved ends at t + dt; its history is fixed here.
         op->begin_step(t + dt, dt);
@@ -1021,30 +732,20 @@ static int run_mooney_rivlin_gravity(const bool contact, const char* const outpu
         auto evaluate = [&]() -> Evaluation {
             Evaluation e;
             // Residual: R = M*a + F_int(u) - F_ext + F_contact
-            // where a = c0*(u - u_pred) from Newmark relation
-            blas->zeros(ndofs, rhs->data());
-
-            // Inertia term: c0 * M * (u - u_pred)
-            {
-                const real_t* const m  = mass_diag->data();
-                const real_t* const xx = x->data();
-                const real_t* const up = u_pred->data();
-                real_t* const       it = inertia_term->data();
-#pragma omp parallel for
-                for (ptrdiff_t i = 0; i < ndofs; ++i) {
-                    it[i] = c0 * m[i] * (xx[i] - up[i]);
-                }
-            }
-            e.inertia_norm = blas->norm2(ndofs, inertia_term->data());
-            blas->axpy(ndofs, 1.0, inertia_term->data(), rhs->data());
-
+            // where a = c0*(u - u_hat) from Newmark relation
+            //
             // F_int(x) and the gravity load together: `Function::gradient` runs
             // every operator it owns, which is the point of the body force
-            // being one.
-            blas->zeros(ndofs, f_int->data());
-            f->gradient(x->data(), f_int->data());
+            // being one. The inertia comes with the material, which holds the scheme.
+            blas->zeros(ndofs, rhs->data());
+            f->gradient(x->data(), rhs->data());
+
+            // Inertia term: c0 * M * (u - u_hat), and what is left of R without it
+            blas->zeros(ndofs, inertia_term->data());
+            scheme->inertia_op()->gradient(x->data(), inertia_term->data());
+            e.inertia_norm = blas->norm2(ndofs, inertia_term->data());
+            blas->zaxpby(ndofs, 1, rhs->data(), -1, inertia_term->data(), f_int->data());
             e.f_int_norm = blas->norm2(ndofs, f_int->data());
-            blas->axpy(ndofs, 1.0, f_int->data(), rhs->data());
 
             // Apply BC to residual
             f->set_value_to_constrained_dofs(0.0, rhs->data());
@@ -1067,7 +768,7 @@ static int run_mooney_rivlin_gravity(const bool contact, const char* const outpu
         if (contact && !std::isfinite(e.kkt)) {
             // On a fine mesh dt v can invert elements away from the obstacle right after an
             // impact; u_n, converged and admissible, is a start that always evaluates.
-            blas->copy(ndofs, x_prev->data(), x->data());
+            blas->copy(ndofs, newmark->state()->data(), x->data());
             e = evaluate();
         }
         for (int iter = 0; iter < 20; ++iter) {
@@ -1103,17 +804,6 @@ static int run_mooney_rivlin_gravity(const bool contact, const char* const outpu
             auto      vals   = values->data();
             const int bs2    = block_size * block_size;
 
-            {
-                const real_t* const m = mass_diag->data();
-#pragma omp parallel for
-                for (ptrdiff_t node = 0; node < n_nodes; ++node) {
-                    real_t* const B = bsr_diagonal_block(rowptr, colidx, vals, node);
-                    for (int d = 0; d < block_size; ++d) {
-                        B[d * block_size + d] += c0 * m[node * block_size + d];
-                    }
-                }
-            }
-
             // MPRGP's expansion step needs an upper bound on the largest eigenvalue; the
             // largest row sum bounds it, and the frames do not change it.
             auto max_row_sum = [&]() {
@@ -1142,7 +832,7 @@ static int run_mooney_rivlin_gravity(const bool contact, const char* const outpu
                 real_t* const dg = diag->data();
 #pragma omp parallel for
                 for (ptrdiff_t node = 0; node < n_nodes; ++node) {
-                    const real_t* const B = bsr_diagonal_block(rowptr, colidx, vals, node);
+                    const real_t* const B = sfem::bsr_diagonal_block(node, rowptr, colidx, block_size, vals);
                     for (int d = 0; d < block_size; ++d) {
                         dg[node * block_size + d] = B[d * block_size + d];
                     }
@@ -1182,7 +872,7 @@ static int run_mooney_rivlin_gravity(const bool contact, const char* const outpu
                         if (shift == 0) {
 #pragma omp parallel for
                             for (ptrdiff_t node = 0; node < n_nodes; ++node) {
-                                const real_t* const B = bsr_diagonal_block(rowptr, colidx, vals, node);
+                                const real_t* const B = sfem::bsr_diagonal_block(node, rowptr, colidx, block_size, vals);
                                 for (int d = 0; d < block_size; ++d) {
                                     dg[node * block_size + d] = B[d * block_size + d];
                                 }
@@ -1191,7 +881,7 @@ static int run_mooney_rivlin_gravity(const bool contact, const char* const outpu
                         const real_t next = shift == 0 ? real_t(1e-2) : 10 * shift;
 #pragma omp parallel for
                         for (ptrdiff_t node = 0; node < n_nodes; ++node) {
-                            real_t* const B = bsr_diagonal_block(rowptr, colidx, vals, node);
+                            real_t* const B = sfem::bsr_diagonal_block(node, rowptr, colidx, block_size, vals);
                             for (int d = 0; d < block_size; ++d) {
                                 B[d * block_size + d] += (next - shift) * std::abs(dg[node * block_size + d]);
                             }
@@ -1256,42 +946,15 @@ static int run_mooney_rivlin_gravity(const bool contact, const char* const outpu
             return SFEM_TEST_FAILURE;
         }
 
-        {
-            const real_t* const xx = x->data();
-            const real_t* const up = u_pred->data();
-            const real_t* const vp = v_pred->data();
-            real_t* const       aa = a->data();
-            real_t* const       vv = v->data();
-#pragma omp parallel for
-            for (ptrdiff_t i = 0; i < ndofs; ++i) {
-                aa[i] = c0 * (xx[i] - up[i]);
-                vv[i] = vp[i] + gamma_nm * dt * aa[i];
-            }
-        }
-
         if (contact) {
-            // Contact-stabilised Newmark. The contact force is implicit only: the acceleration
-            // carried into the next predictor is the material's, -M^{-1} F(u), without the
-            // obstacle's reaction; carrying the reaction forward is what makes plain Newmark
-            // chatter at contact. And the velocity is projected so that the next predicted
-            // position is admissible.
-            const real_t* const r  = rhs->data();
-            const real_t* const pr = projected->data();
-            const real_t* const m  = mass_diag->data();
-            real_t* const       aa = a->data();
-            bool                pushed = false;
-#pragma omp parallel for reduction(|| : pushed)
-            for (ptrdiff_t i = 0; i < ndofs; ++i) {
-                const real_t reaction = r[i] - pr[i];
-                aa[i] -= reaction / m[i];
-                pushed = pushed || reaction != 0;
-            }
-            touched = touched || pushed;
-            obstacle->stabilise_velocity(x->data(), v->data(), dt);
+            // The obstacle's reaction in the converged step: whether it pushed back.
+            obstacle->reaction(contact_force->data());
+            touched = touched || blas->norm2(ndofs, contact_force->data()) > 0;
         }
 
         // Update history
         op->advance(x->data());
+        scheme->advance(x->data());
 
         t += dt;
         steps++;
@@ -1299,14 +962,14 @@ static int run_mooney_rivlin_gravity(const bool contact, const char* const outpu
         // Output
         if (SFEM_ENABLE_OUTPUT && steps % export_freq == 0) {
             output->write_time_step("disp", t, x->data());
-            output->write_time_step("velocity", t, v->data());
-            output->write_time_step("acceleration", t, a->data());
+            output->write_time_step("velocity", t, newmark->velocity()->data());
+            output->write_time_step("acceleration", t, newmark->acceleration()->data());
             if (contact) {
                 // The residual of the converged step, less what remains of it, is the obstacle's
                 // reaction in the step's scaling, where the material force enters at both ends of
                 // the step with dt^2/4 and the contact force once: the force is half of it.
                 obstacle->gap_field(gap_viz->data());
-                blas->zaxpby(ndofs, real_t(0.5), rhs->data(), real_t(-0.5), projected->data(), contact_force->data());
+                blas->scal(ndofs, real_t(0.5), contact_force->data());
                 output->write_time_step("gap", t, gap_viz->data());
                 output->write_time_step("contact_force", t, contact_force->data());
             }
