@@ -17,6 +17,7 @@
 #include "sfem_Function.hpp"
 #include "sfem_BDF2Scheme.hpp"
 #include "sfem_BackwardEulerScheme.hpp"
+#include "sfem_ContactStabilisedNewmarkScheme.hpp"
 #include "sfem_NewmarkScheme.hpp"
 #include "sfem_TimeScheme.hpp"
 
@@ -991,6 +992,125 @@ int test_holding_the_scheme_equals_adding_its_operator() {
     return SFEM_TEST_SUCCESS;
 }
 
+namespace {
+
+    /// A contact that never touches: no reaction, nothing to project.
+    class NoContact final : public sfem::ContactStabilisedNewmarkScheme::Contact {
+    public:
+        explicit NoContact(const ptrdiff_t ndofs) : ndofs_(ndofs) {}
+        void reaction(real_t *const out) const override { std::fill(out, out + ndofs_, real_t(0)); }
+        void project_velocity(const real_t *const, real_t *const, const real_t) override {}
+
+    private:
+        ptrdiff_t ndofs_;
+    };
+
+    /// Every node's third displacement component kept above `floor`, with a given reaction.
+    class FloorContact final : public sfem::ContactStabilisedNewmarkScheme::Contact {
+    public:
+        FloorContact(const std::vector<real_t> &reaction, const real_t floor) : reaction_(reaction), floor_(floor) {}
+        void reaction(real_t *const out) const override { std::copy(reaction_.begin(), reaction_.end(), out); }
+        void project_velocity(const real_t *const x, real_t *const v, const real_t dt) override {
+            for (size_t i = 2; i < reaction_.size(); i += 3) {
+                if (x[i] + dt * v[i] < floor_) v[i] = (floor_ - x[i]) / dt;
+            }
+        }
+
+    private:
+        std::vector<real_t> reaction_;
+        real_t              floor_;
+    };
+
+}  // namespace
+
+// Without contact the stabilised scheme is Newmark, bit for bit: within a step it is the Newmark
+// it composes, and an advance with no reaction and nothing to project changes nothing.
+int test_contact_stabilisation_without_contact_is_newmark() {
+    const real_t dt      = real_t(0.05);
+    auto         fixture = make_fixture();
+
+    std::shared_ptr<sfem::NewmarkScheme> plain, inner;
+    SFEM_TEST_ASSERT(make_scheme(fixture, real_t(0.25), real_t(0.5), dt, plain) == SFEM_TEST_SUCCESS);
+    SFEM_TEST_ASSERT(make_scheme(fixture, real_t(0.25), real_t(0.5), dt, inner) == SFEM_TEST_SUCCESS);
+    auto stabilised =
+            std::make_shared<sfem::ContactStabilisedNewmarkScheme>(inner, std::make_shared<NoContact>(fixture.ndofs));
+
+    const ptrdiff_t     n = fixture.ndofs;
+    std::vector<real_t> x(n);
+    for (int step = 0; step < 3; ++step) {
+        plain->begin_step(step * dt, dt);
+        stabilised->begin_step(step * dt, dt);
+        SFEM_TEST_ASSERT(stabilised->shift() == plain->shift());
+        SFEM_TEST_ASSERT(stabilised->weight("alpha_a") == plain->weight("alpha_a"));
+        for (ptrdiff_t i = 0; i < n; ++i) {
+            SFEM_TEST_ASSERT(stabilised->history()[i] == plain->history()[i]);
+            SFEM_TEST_ASSERT(inner->predictor()->data()[i] == plain->predictor()->data()[i]);
+        }
+
+        seed_state(n, 10 + step, x.data());
+        plain->advance(x.data());
+        stabilised->advance(x.data());
+        for (ptrdiff_t i = 0; i < n; ++i) {
+            SFEM_TEST_ASSERT(inner->state()->data()[i] == plain->state()->data()[i]);
+            SFEM_TEST_ASSERT(inner->velocity()->data()[i] == plain->velocity()->data()[i]);
+            SFEM_TEST_ASSERT(inner->acceleration()->data()[i] == plain->acceleration()->data()[i]);
+        }
+    }
+    return SFEM_TEST_SUCCESS;
+}
+
+// With contact the step carries the material's acceleration, a - M^{-1} reaction, and a velocity
+// whose next predicted position is admissible; Newton starts from u_n + dt v_n.
+int test_contact_stabilisation_carries_the_material_acceleration() {
+    const real_t dt      = real_t(0.05);
+    auto         fixture = make_fixture();
+    const ptrdiff_t n    = fixture.ndofs;
+
+    std::shared_ptr<sfem::NewmarkScheme> plain, inner;
+    SFEM_TEST_ASSERT(make_scheme(fixture, real_t(0.25), real_t(0.5), dt, plain) == SFEM_TEST_SUCCESS);
+    SFEM_TEST_ASSERT(make_scheme(fixture, real_t(0.25), real_t(0.5), dt, inner) == SFEM_TEST_SUCCESS);
+
+    std::vector<real_t> x(n), reaction(n);
+    seed_state(n, 20, x.data());
+    seed_state(n, 21, reaction.data());
+
+    // Plain Newmark's answer, and a floor that half of its next positions are below.
+    plain->advance(x.data());
+    std::vector<real_t> ahead;
+    for (ptrdiff_t i = 2; i < n; i += 3) ahead.push_back(x[i] + dt * plain->velocity()->data()[i]);
+    std::nth_element(ahead.begin(), ahead.begin() + ahead.size() / 2, ahead.end());
+    const real_t floor = ahead[ahead.size() / 2];
+
+    auto stabilised = std::make_shared<sfem::ContactStabilisedNewmarkScheme>(inner, std::make_shared<FloorContact>(reaction, floor));
+    stabilised->advance(x.data());
+
+    const real_t *const m        = inner->mass()->data();
+    const real_t *const a        = inner->acceleration()->data();
+    const real_t *const v        = inner->velocity()->data();
+    const real_t *const a_plain  = plain->acceleration()->data();
+    const real_t *const v_plain  = plain->velocity()->data();
+    int                 projected = 0;
+    for (ptrdiff_t i = 0; i < n; ++i) {
+        const real_t want = a_plain[i] - reaction[i] / m[i];
+        SFEM_TEST_ASSERT(std::abs(a[i] - want) <= real_t(1e-14) * (1 + std::abs(want)));
+        if (i % 3 != 2 || x[i] + dt * v_plain[i] >= floor) {
+            SFEM_TEST_ASSERT(v[i] == v_plain[i]);
+        } else {
+            SFEM_TEST_ASSERT(std::abs(x[i] + dt * v[i] - floor) <= real_t(1e-14));
+            projected++;
+        }
+    }
+    SFEM_TEST_ASSERT(projected > 0);
+
+    stabilised->begin_step(dt, dt);
+    std::vector<real_t> start(n);
+    stabilised->start(start.data());
+    for (ptrdiff_t i = 0; i < n; ++i) {
+        SFEM_TEST_ASSERT(std::abs(start[i] - (x[i] + dt * v[i])) <= real_t(1e-15));
+    }
+    return SFEM_TEST_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_the_material_reads_the_scheme_it_was_handed);
@@ -1004,6 +1124,8 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_the_schemes_potential_differentiates_to_its_residual);
     SFEM_RUN_TEST(test_an_energy_material_carries_the_schemes_potential);
     SFEM_RUN_TEST(test_holding_the_scheme_equals_adding_its_operator);
+    SFEM_RUN_TEST(test_contact_stabilisation_without_contact_is_newmark);
+    SFEM_RUN_TEST(test_contact_stabilisation_carries_the_material_acceleration);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }

@@ -134,5 +134,7 @@ namespace sfem {
     std::shared_ptr<Buffer<real_t>> NewmarkScheme::state() const { return impl_->u_n; }
     std::shared_ptr<Buffer<real_t>> NewmarkScheme::velocity() const { return impl_->v_n; }
     std::shared_ptr<Buffer<real_t>> NewmarkScheme::acceleration() const { return impl_->a_n; }
+    std::shared_ptr<Buffer<real_t>> NewmarkScheme::predictor() const { return impl_->u_hat; }
+    std::shared_ptr<Buffer<real_t>> NewmarkScheme::mass() const { return impl_->inertia->mass(); }
 
 }  // namespace sfem
