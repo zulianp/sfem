@@ -15,6 +15,12 @@ namespace sfem {
 
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space);
 
+#ifdef SFEM_ENABLE_RYAML
+        /// `type: NeoHookeanOgdenActiveStrainPacked` with mu, lambda; the ones not given keep their defaults.
+        std::shared_ptr<Op> create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+                                             const ryml::ConstNodeRef             &node) override;
+#endif
+
         std::shared_ptr<Op> lor_op(const std::shared_ptr<FunctionSpace> &space) override;
         std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override;
 

@@ -1,6 +1,8 @@
 #ifndef SFEM_BSR_SPMV_HPP
 #define SFEM_BSR_SPMV_HPP
 
+#include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <iostream>
 #include <limits>
@@ -300,6 +302,70 @@ namespace sfem {
             if ((ptrdiff_t)colidx[k] == row) return &values[(ptrdiff_t)k * block_size * block_size];
         }
         return nullptr;
+    }
+
+    /// The scalar diagonal, `out[row * block_size + d]` the entry (d, d) of the row's diagonal
+    /// block; zero where a row stores none.
+    template <typename R, typename C, typename TStorage, typename T>
+    void bsr_extract_diagonal(const ptrdiff_t                     block_rows,
+                              const int                           block_size,
+                              const R* const SFEM_RESTRICT        rowptr,
+                              const C* const SFEM_RESTRICT        colidx,
+                              const TStorage* const SFEM_RESTRICT values,
+                              T* const SFEM_RESTRICT              out) {
+#pragma omp parallel for
+        for (ptrdiff_t row = 0; row < block_rows; ++row) {
+            const TStorage* const B = bsr_diagonal_block(row, rowptr, colidx, block_size, values);
+            for (int d = 0; d < block_size; ++d) {
+                out[row * block_size + d] = B ? (T)B[d * block_size + d] : T(0);
+            }
+        }
+    }
+
+    /// The largest absolute scalar row sum, max_i sum_j |a_ij|: a bound on the largest
+    /// eigenvalue in modulus (Gershgorin).
+    template <typename R, typename C, typename TStorage, typename T>
+    T bsr_max_abs_row_sum(const ptrdiff_t                     block_rows,
+                          const int                           block_size,
+                          const R* const SFEM_RESTRICT        rowptr,
+                          const C* const SFEM_RESTRICT        colidx,
+                          const TStorage* const SFEM_RESTRICT values) {
+        SFEM_UNUSED(colidx);
+        const int bs2   = block_size * block_size;
+        T         bound = 0;
+#pragma omp parallel for reduction(max : bound)
+        for (ptrdiff_t row = 0; row < block_rows; ++row) {
+            for (int r = 0; r < block_size; ++r) {
+                T row_sum = 0;
+                for (R k = rowptr[row]; k < rowptr[row + 1]; ++k) {
+                    for (int c = 0; c < block_size; ++c) {
+                        row_sum += std::abs((T)values[(ptrdiff_t)k * bs2 + r * block_size + c]);
+                    }
+                }
+                bound = std::max(bound, row_sum);
+            }
+        }
+        return bound;
+    }
+
+    /// Adds `factor * |reference[row * block_size + d]|` to the entry (d, d) of each row's
+    /// diagonal block.
+    template <typename R, typename C, typename TStorage, typename T>
+    void bsr_shift_diagonal(const ptrdiff_t              block_rows,
+                            const int                    block_size,
+                            const R* const SFEM_RESTRICT rowptr,
+                            const C* const SFEM_RESTRICT colidx,
+                            const T                      factor,
+                            const T* const SFEM_RESTRICT reference,
+                            TStorage* const SFEM_RESTRICT values) {
+#pragma omp parallel for
+        for (ptrdiff_t row = 0; row < block_rows; ++row) {
+            TStorage* const B = bsr_diagonal_block(row, rowptr, colidx, block_size, values);
+            if (!B) continue;
+            for (int d = 0; d < block_size; ++d) {
+                B[d * block_size + d] += (TStorage)(factor * std::abs(reference[row * block_size + d]));
+            }
+        }
     }
 
     template <typename TStorage>

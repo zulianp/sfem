@@ -41,12 +41,16 @@ namespace sfem {
         void set_output_dir(const smesh::Path &path);
         int  write(const char *name, const real_t *const x);
         int  write_time_step(const char *name, const real_t t, const real_t *const x);
+        /// Every component of every field written at one step shares the step's index.
+        int  write_step(const char *name, const size_t step, const real_t *const x);
         void enable_AoS_to_SoA(const bool val);
         void clear();
 
         void log_time(const real_t t);
 
     private:
+        int write_numbered(const char *name, const real_t *const x, const std::function<size_t()> &next_index);
+
         class Impl;
         std::unique_ptr<Impl> impl_;
     };
@@ -71,6 +75,7 @@ namespace sfem {
         void remove_operator(const std::shared_ptr<Op> &op);
         void add_operator(const std::shared_ptr<Op> &op);
         void add_constraint(const std::shared_ptr<Constraint> &c);
+        void remove_constraint(const std::shared_ptr<Constraint> &c);
         void clear_constraints();
         void add_dirichlet_conditions(const std::shared_ptr<DirichletConditions> &c);
 

@@ -63,7 +63,10 @@ namespace sfem {
         std::shared_ptr<Op> inertia_op() const override;
 
         /// Newton's start for the step opened by the last `begin_step`: u_n + dt v_n.
-        void start(real_t *const x) const;
+        void start(real_t *const x) const override;
+
+        /// The projected velocity and the material acceleration.
+        void carried_state(real_t *const velocity, real_t *const acceleration) const override;
 
         const std::shared_ptr<NewmarkScheme> &newmark() const;
 

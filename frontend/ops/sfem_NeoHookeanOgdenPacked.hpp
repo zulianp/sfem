@@ -54,6 +54,12 @@ namespace sfem {
          */
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space);
 
+#ifdef SFEM_ENABLE_RYAML
+        /// `type: NeoHookeanOgdenPacked` with mu, lambda; the ones not given keep their defaults.
+        std::shared_ptr<Op> create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+                                             const ryml::ConstNodeRef             &node) override;
+#endif
+
         /**
          * @brief Create a level-of-refinement (LOR) version
          * @param space Function space for LOR operator

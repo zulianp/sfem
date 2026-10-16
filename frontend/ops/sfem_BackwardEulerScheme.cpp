@@ -18,6 +18,7 @@ namespace sfem {
         std::shared_ptr<Buffer<real_t>> z;
         real_t                          dt{0};
         real_t                          shift{0};
+        bool                            stepped{false};
 
         Impl(const std::shared_ptr<FunctionSpace> &sp, const ExecutionSpace space_of)
             : space(sp), es(space_of), blas(sfem::blas<real_t>(space_of)) {}
@@ -69,6 +70,27 @@ namespace sfem {
         SFEM_TRACE_SCOPE("BackwardEulerScheme::advance");
 
         impl_->blas->copy(impl_->space->n_dofs(), x, impl_->u_n->data());
+        impl_->stepped = true;
+    }
+
+    void BackwardEulerScheme::start(real_t *const x) const {
+        impl_->blas->copy(impl_->space->n_dofs(), impl_->u_n->data(), x);
+    }
+
+    void BackwardEulerScheme::carried_state(real_t *const velocity, real_t *const acceleration) const {
+        if (acceleration) {
+            SFEM_ERROR(
+                    "BackwardEulerScheme is first order and defines no acceleration; "
+                    "ask has_acceleration() before requesting one\n");
+        }
+
+        const ptrdiff_t ndofs = impl_->space->n_dofs();
+        if (!impl_->stepped) {
+            impl_->blas->zeros(ndofs, velocity);
+            return;
+        }
+        // Not carried: the last step's velocity, from its solution, which `advance` left in u_n.
+        impl_->blas->zaxpby(ndofs, impl_->shift, impl_->u_n->data(), 1, impl_->z->data(), velocity);
     }
 
     void BackwardEulerScheme::reconstruct(const real_t *const x,
