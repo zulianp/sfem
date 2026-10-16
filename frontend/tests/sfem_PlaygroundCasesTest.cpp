@@ -11,6 +11,7 @@
 #include "sfem_ElasticityCase.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_Playground.hpp"
+#include "sfem_playground_test_history.hpp"
 #include "sfem_test.hpp"
 
 namespace {
@@ -20,25 +21,6 @@ namespace {
         return sfem::Playground::create(sfem::Communicator::world(), *config);
     }
 
-    /// The rows of a step history CSV, each column by name.
-    std::vector<std::map<std::string, double>> read_history(const std::string &path) {
-        std::ifstream                              is(path);
-        std::string                                line, cell;
-        std::vector<std::string>                   names;
-        std::vector<std::map<std::string, double>> rows;
-        std::getline(is, line);
-        for (std::stringstream ss(line); std::getline(ss, cell, ',');) names.push_back(cell);
-        while (std::getline(is, line)) {
-            std::map<std::string, double> row;
-            std::stringstream             ss(line);
-            for (const auto &name : names) {
-                std::getline(ss, cell, ',');
-                row[name] = name == "status" ? (cell == "initial" ? -1 : 0) : std::stod(cell);
-            }
-            rows.push_back(row);
-        }
-        return rows;
-    }
 }  // namespace
 
 // Linear elasticity with the affine displacement u = A X on the whole boundary: trilinear elements
@@ -291,7 +273,7 @@ int test_prony_torsion_release() {
     SFEM_TEST_ASSERT(pg != nullptr);
     SFEM_TEST_ASSERT(pg->run() == SFEM_SUCCESS);
 
-    auto rows = read_history(csv);
+    auto rows = sfem::test::read_history(csv);
     SFEM_TEST_ASSERT(rows.size() == 9);
     // Rows 1..8 end at t = 0.5, 1, ..., 4: ramp to t = 1, hold to 2, released from 2.5.
     for (int k = 1; k <= 8; ++k) printf("  t = %g: angle %g, released %g, torque %g\n", rows[k]["t"], rows[k]["angle"], rows[k]["released"], rows[k]["torque"]);
@@ -317,7 +299,7 @@ int test_torque_control() {
     SFEM_TEST_ASSERT(pg != nullptr);
     SFEM_TEST_ASSERT(pg->run() == SFEM_SUCCESS);
 
-    auto rows = read_history(csv);
+    auto rows = sfem::test::read_history(csv);
     SFEM_TEST_ASSERT(rows.size() == 9);
     for (int k = 1; k <= 8; ++k) {
         const double target = T * std::min(1.0, rows[k]["t"]);

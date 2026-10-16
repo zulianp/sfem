@@ -1,0 +1,42 @@
+# A free 2 x 1 x 1 block of Prony-series Mooney-Rivlin, no Dirichlet conditions, falling 0.05
+# under gravity onto a hemisphere of radius 0.25 on a floor: frictionless contact of its whole
+# surface with the obstacle's signed distance, contact-stabilised Newmark.
+#
+# Stiff enough that the hemisphere does not punch into the block on a fine mesh: with C10 = 50
+# the bump inverts elements at 24 elements per edge. `--set mesh.box.n=[24,24,24]` refines it.
+mesh:
+  box: {n: [8, 8, 8], min: [0, 0, 0.05], max: [2, 1, 1]}
+  packed: false
+material:
+  type: GeneratedMooneyRivlinProny
+  C10: 4000
+  C01: 2000
+  K: 160000
+  relaxation:
+    iso:
+      prony:
+        - {g: 0.15, tau: 0.1}
+        - {g: 0.15, tau: 1.0}
+        - {g: 0.10, tau: 10.0}
+        - {g: 0.05, tau: 100.0}
+loads:
+  body_force: {density: 10, g: [0, 0, -9.81]}
+obstacle:
+  backend: node_sdf
+  nodes: skin
+  direction: z
+  # plane | slope (slope 0.2, slope_axis) | staircase (step_width 0.25, step_drop -0.05) | hemisphere
+  shape: {type: hemisphere, plane: 0}
+regime: dynamic
+dynamics: {scheme: newmark, density: 10, beta: 0.25, gamma: 0.5}
+time: {dt: 0.01, t_end: 2}
+solver:
+  # Relative to the forces in balance: with contact the residual's reaction part can far exceed
+  # what remains of it, and sets the rounding floor.
+  newton: {max_it: 19, atol: 1e-8, rtol: 1e-9, verbose: false}
+output:
+  path: output/contact
+  export_freq: 5
+  history_csv: output/contact/history.csv
+  fields: [gap, contact_force]
+  probes: [{type: contact}]

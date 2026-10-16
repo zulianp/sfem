@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Response and Newton history of a sfem_MooneyRivlinGravityTest run.
+"""Response and Newton history of a playground run of cantilever.yaml or contact.yaml.
 
-usage: plot_response.py cantilever|contact <output-dir> <fields-dir>
+usage: plot_response.py cantilever|contact <output-dir> <case.yaml> [key=value ...]
 
-Reads <output-dir>/run.log and the raw fields in <fields-dir>; writes response.csv,
-newton.csv and gravity_response.png to <output-dir>.
+Reads <output-dir>/run.log, <output-dir>/history.csv, the mesh in <output-dir>/mesh and the raw
+fields in <output-dir>/out, and the case with the run's overrides for the body force; writes
+response.csv, newton.csv and gravity_response.png to <output-dir>.
 
   cantilever  the mean displacement of the free end
   contact     the mean descent of the block's underside, and the obstacle's total reaction
@@ -12,12 +13,13 @@ newton.csv and gravity_response.png to <output-dir>.
 """
 
 import argparse
-import os
+import csv
 import re
 import sys
 from pathlib import Path
 
 import numpy as np
+import yaml
 
 DTYPES = {"float64": np.float64, "float32": np.float32, "raw": np.float64}
 
@@ -25,19 +27,26 @@ DTYPES = {"float64": np.float64, "float32": np.float32, "raw": np.float64}
 HEX8_TETS = [(0, 1, 2, 6), (0, 2, 3, 6), (0, 3, 7, 6), (0, 7, 4, 6), (0, 4, 5, 6), (0, 5, 1, 6)]
 
 
-def read_newton(log: Path):
+def read_newton(history: Path):
     steps = []
-    for line in log.read_text().splitlines():
-        # Numbers only: stderr warnings can land in the middle of a line.
-        m = re.match(r"Step (\d+): t=([0-9.eE+-]+)", line)
-        if m:
-            steps.append({"step": int(m.group(1)), "t": float(m.group(2)), "iters": 0, "kkt": float("nan")})
+    for row in csv.DictReader(history.open()):
+        if row["status"] == "initial":
             continue
-        m = re.match(r"\s+Iter (\d+): \|R\|=\S+ \|KKT\|=([0-9.eE+-]+|nan)", line)
-        if m and steps:
-            steps[-1]["iters"] = int(m.group(1))
-            steps[-1]["kkt"] = float(m.group(2))
+        steps.append({"step": int(row["step"]), "t": float(row["t"]), "iters": int(row["newton"]), "kkt": float(row["final"])})
     return steps
+
+
+def read_case(path: Path, overrides):
+    """The case with `key.path=value` overrides applied, values read as YAML."""
+    case = yaml.safe_load(path.read_text())
+    for kv in overrides:
+        key, value = kv.split("=", 1)
+        node = case
+        keys = key.split(".")
+        for k in keys[:-1]:
+            node = node.setdefault(k, {})
+        node[keys[-1]] = yaml.safe_load(value)
+    return case
 
 
 def read_series(fields: Path, name: str, component: int):
@@ -63,17 +72,19 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("case", choices=["cantilever", "contact"])
     parser.add_argument("output_dir", type=Path)
-    parser.add_argument("fields_dir", type=Path)
+    parser.add_argument("case_file", type=Path)
+    parser.add_argument("overrides", nargs="*")
     args = parser.parse_args()
 
-    out, fields = args.output_dir, args.fields_dir
+    out, fields, mesh_dir = args.output_dir, args.output_dir / "out", args.output_dir / "mesh"
+    case = read_case(args.case_file, args.overrides)
     log = (out / "run.log").read_text()
 
-    mesh = re.search(r"Mesh: (\d+) nodes, (\d+) DOFs", log)
-    n_elements = re.search(r"n_elements: (\d+)", (fields / "meta.yaml").read_text())
-    steps = read_newton(out / "run.log")
+    size_line = re.search(r"Playground: .*, (\d+) elements, (\d+) dofs", log)
+    n_nodes = re.search(r"n_nodes: (\d+)", (mesh_dir / "meta.yaml").read_text())
+    steps = read_newton(out / "history.csv")
     times = np.loadtxt(fields / "time.txt", ndmin=1)
-    points = [np.fromfile(fields / f"{c}.float32", dtype=np.float32).astype(np.float64) for c in "xyz"]
+    points = [np.fromfile(mesh_dir / f"{c}.float32", dtype=np.float32).astype(np.float64) for c in "xyz"]
     disp = [read_series(fields, "disp", c) for c in range(3)]
     n_frames = min(len(times), *(len(d) for d in disp))
     times = times[:n_frames]
@@ -87,7 +98,7 @@ def main() -> int:
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    size = f"{n_elements.group(1)} HEX8, {mesh.group(1)} nodes, {mesh.group(2)} dofs"
+    size = f"{size_line.group(1)} HEX8, {n_nodes.group(1)} nodes, {size_line.group(2)} dofs"
     if args.case == "cantilever":
         x = points[0]
         tip = np.abs(x - x.max()) <= 1e-6 * max(1.0, abs(x.max()))
@@ -100,10 +111,11 @@ def main() -> int:
         axes = [ax_r]
         summary = f"final tip u_y = {response[-1, 1]:.6g}"
     else:
-        d = int(os.environ.get("SFEM_CONTACT_DIR", 2))
-        density = float(os.environ.get("SFEM_DENSITY", 1000))
-        gravity = float(os.environ.get("SFEM_GRAVITY", 9.81))
-        weight = density * gravity * hex8_volume(fields, points)
+        d = "xyz".index(case["obstacle"].get("direction", "z"))
+        body_force = case["loads"]["body_force"]
+        density = float(body_force["density"])
+        gravity = float(np.linalg.norm(body_force["g"]))
+        weight = density * gravity * hex8_volume(mesh_dir, points)
         under = np.abs(points[d] - points[d].min()) <= 1e-6 * max(1.0, np.ptp(points[d]))
         force = read_series(fields, "contact_force", d)
         descent = np.array([disp[d][k][under].mean() for k in range(n_frames)])
@@ -124,7 +136,7 @@ def main() -> int:
 
     np.savetxt(out / "response.csv", np.column_stack([times, response]), delimiter=",", header=header, comments="", fmt="%.10g")
     with open(out / "newton.csv", "w") as f:
-        f.write("step,t,iterations,final_kkt\n")
+        f.write("step,t,iterations,final_measure\n")
         for s in steps:
             f.write(f"{s['step']},{s['t']:.10g},{s['iters']},{s['kkt']:.6g}\n")
 

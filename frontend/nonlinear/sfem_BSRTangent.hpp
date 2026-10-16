@@ -25,7 +25,8 @@ namespace sfem {
         /// read the state). The constrained rows are what the constraints leave in them.
         int assemble(const real_t *const x);
 
-        /// y += K x, the constrained dofs of y replaced by those of x. With `storage_bytes` below
+        /// y += K x, its constrained rows the identity (on the host the assembled ones; on the
+        /// device the constrained dofs of y replaced by those of x). With `storage_bytes` below
         /// sizeof(real_t) the values are stored in half or single precision: a copy of the values
         /// as last assembled, so it is taken again after each `assemble`. Reduced storage is host
         /// only.

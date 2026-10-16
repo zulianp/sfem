@@ -13,15 +13,20 @@
 #include "sfem_API.hpp"
 #include "sfem_BDF2Scheme.hpp"
 #include "sfem_BackwardEulerScheme.hpp"
+#include "sfem_ContactStabilisedNewmarkScheme.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_HistoryDependent.hpp"
 #include "sfem_NewmarkScheme.hpp"
+#include "sfem_NodeObstacleContact.hpp"
+#include "sfem_NodeObstacleStep.hpp"
+#include "sfem_ObstacleShape.hpp"
 #include "sfem_Observers.hpp"
 #include "sfem_Rotation.hpp"
 #include "sfem_StateField.hpp"
 #include "sfem_TorqueControl.hpp"
 #include "sfem_UnconstrainedStep.hpp"
 #include "smesh_mesh_reorder.hpp"
+#include "smesh_sideset.hpp"
 
 namespace sfem {
 
@@ -142,6 +147,10 @@ namespace sfem {
         std::shared_ptr<Rotation>                          torque_controlled;
         TorqueControlOptions                               torque_control;
         std::list<ryml::Tree>                              documents;
+        std::shared_ptr<NodeObstacleContact>               contact;
+        std::shared_ptr<smesh::Grid<geom_t>>               obstacle_sdf;
+        std::shared_ptr<NewmarkScheme>                     newmark;
+        real_t                                             extent{0};
 
         int build_mesh(const std::shared_ptr<Communicator> &comm, const ElasticityCase &config) {
             auto node = child(config.root(), "mesh");
@@ -497,7 +506,7 @@ namespace sfem {
             };
 
             SharedBuffer<real_t> state, velocity;
-            if (auto newmark = std::dynamic_pointer_cast<NewmarkScheme>(scheme)) {
+            if (newmark) {
                 state    = newmark->state();
                 velocity = newmark->velocity();
             } else if (auto bdf2 = std::dynamic_pointer_cast<BDF2Scheme>(scheme)) {
@@ -518,6 +527,101 @@ namespace sfem {
                 }
                 if (read_into(node["velocity"], velocity->data()) != SFEM_SUCCESS) return SFEM_FAILURE;
             }
+            return SFEM_SUCCESS;
+        }
+
+        /// The rigid obstacle and the contact of the body's nodes with it.
+        int build_obstacle(const ElasticityCase &config, const std::string &regime) {
+            auto node = child(config.root(), "obstacle");
+            if (!node.readable()) return SFEM_SUCCESS;
+
+            if (read_string(node, "backend", "node_sdf") != "node_sdf") {
+                fprintf(stderr, "Playground: unknown obstacle backend \"%s\" (node_sdf)\n", read_string(node, "backend", "").c_str());
+                return SFEM_FAILURE;
+            }
+            if (es != EXECUTION_SPACE_HOST) {
+                fprintf(stderr, "Playground: the node_sdf obstacle is host only (SDFObstacle::sample_nodes)\n");
+                return SFEM_FAILURE;
+            }
+            if (regime != "dynamic" || read_string(child(config.root(), "dynamics"), "scheme", "newmark") != "newmark") {
+                fprintf(stderr, "Playground: the node_sdf obstacle needs regime dynamic with the newmark scheme, which it stabilises\n");
+                return SFEM_FAILURE;
+            }
+
+            auto      m   = fs->mesh_ptr();
+            const int dir = axis_of(read_string(node, "direction", "z"));
+            if (dir < 0 || m->spatial_dimension() != 3) {
+                fprintf(stderr, "Playground: obstacle.direction must be x, y or z of a three-dimensional mesh\n");
+                return SFEM_FAILURE;
+            }
+
+            auto   bbox = m->compute_bounding_box();
+            real_t lo[3], hi[3];
+            for (int d = 0; d < 3; ++d) {
+                lo[d]  = bbox.first->data()[d];
+                hi[d]  = bbox.second->data()[d];
+                extent = std::max(extent, hi[d] - lo[d]);
+            }
+
+            if (has(node, "sdf")) {
+                obstacle_sdf = smesh::Grid<geom_t>::create_from_file(m->comm(), config.resolve(read_string(child(node, "sdf"), "file", "")));
+            } else {
+                auto          s = child(node, "shape");
+                ObstacleShape shape;
+                const auto    type = read_string(s, "type", "hemisphere");
+                if (type == "plane") {
+                    shape.type = ObstacleShape::Type::PLANE;
+                } else if (type == "slope") {
+                    shape.type = ObstacleShape::Type::SLOPE;
+                } else if (type == "staircase") {
+                    shape.type = ObstacleShape::Type::STAIRCASE;
+                } else if (type == "hemisphere") {
+                    shape.type = ObstacleShape::Type::HEMISPHERE;
+                } else {
+                    fprintf(stderr, "Playground: unknown obstacle shape \"%s\" (plane, slope, staircase, hemisphere)\n", type.c_str());
+                    return SFEM_FAILURE;
+                }
+                shape.dir        = dir;
+                shape.plane      = read<real_t>(s, "plane", shape.plane);
+                shape.slope      = read<real_t>(s, "slope", shape.slope);
+                shape.slope_axis = has(s, "slope_axis") ? axis_of(read_string(s, "slope_axis", "")) : -1;
+                shape.step_width = read<real_t>(s, "step_width", shape.step_width);
+                shape.step_drop  = read<real_t>(s, "step_drop", shape.step_drop);
+                shape.radius     = read<real_t>(s, "radius", shape.radius);
+                shape.fillet     = read<real_t>(s, "fillet", shape.fillet);
+                shape.grid_cells = read<int>(s, "grid_cells", shape.grid_cells);
+                if (has(s, "center")) {
+                    auto center = read_list<real_t>(s, "center", {});
+                    if (center.size() != 3) {
+                        fprintf(stderr, "Playground: obstacle.shape.center needs three coordinates\n");
+                        return SFEM_FAILURE;
+                    }
+                    shape.has_center = true;
+                    std::copy(center.begin(), center.end(), shape.center);
+                }
+                obstacle_sdf = create_obstacle_sdf(m->comm(), shape, lo, hi);
+            }
+            if (!obstacle_sdf) return SFEM_FAILURE;
+
+            // Every node of the body's surface by default: a free body can touch with any face.
+            const auto          which = read_string(node, "nodes", "skin");
+            SharedBuffer<idx_t> nodes;
+            if (which == "skin") {
+                nodes = smesh::create_nodeset_from_sidesets(m, smesh::skin_sidesets(m));
+            } else {
+                auto sidesets = lookup.find(which);
+                if (sidesets.empty() || (packed && renumber)) {
+                    fprintf(stderr, "Playground: obstacle.nodes is skin or a named sideset of an unpacked or unrenumbered mesh\n");
+                    return SFEM_FAILURE;
+                }
+                nodes = smesh::create_nodeset_from_sidesets(m, sidesets);
+            }
+            contact = std::make_shared<NodeObstacleContact>(obstacle_sdf, m->comm(), nodes, m->points(), fs->n_dofs(), dir);
+            if (contact->size() == 0) {
+                fprintf(stderr, "Playground: the obstacle has no contact nodes\n");
+                return SFEM_FAILURE;
+            }
+            printf("Contact: %td nodes\n", contact->size());
             return SFEM_SUCCESS;
         }
 
@@ -552,7 +656,10 @@ namespace sfem {
                 newmark->set_gamma(gamma);
                 newmark->set_density(density);
                 if (newmark->initialize() != SFEM_SUCCESS) return SFEM_FAILURE;
-                scheme = newmark;
+                scheme        = newmark;
+                this->newmark = newmark;
+                // Plain Newmark carries the obstacle's reaction into the next predictor and chatters.
+                if (contact) scheme = std::make_shared<ContactStabilisedNewmarkScheme>(newmark, contact);
             } else if (type == "bdf2") {
                 auto bdf2 = std::make_shared<BDF2Scheme>(fs, es);
                 bdf2->set_density(density);
@@ -612,7 +719,20 @@ namespace sfem {
             // accurate.
             linear.rtol = read<real_t>(ln, "rtol", f->is_linear() ? newton_options.rtol : linear.rtol);
 
-            auto step = UnconstrainedStep::create(f, es, linear);
+            std::shared_ptr<LinearizedStep> step;
+            if (contact) {
+                NodeObstacleStepOptions obstacle;
+                obstacle.atol = newton_options.atol;
+                obstacle.rtol = newton_options.rtol;
+                // Contact is resolved to this fraction of the mesh's size.
+                obstacle.gap_tol   = real_t(1e-10) * extent;
+                auto qp            = child(child(config.root(), "obstacle"), "qp");
+                obstacle.qp_max_it = read<int>(qp, "max_it", obstacle.qp_max_it);
+                obstacle.qp_rtol   = read<real_t>(qp, "rtol", obstacle.qp_rtol);
+                step               = NodeObstacleStep::create(f, contact, newmark, obstacle);
+            } else {
+                step = UnconstrainedStep::create(f, es, linear);
+            }
             if (!step) return SFEM_FAILURE;
             newton = std::make_shared<NewtonSolver>(f, step, newton_options);
             nonlinear = newton;
@@ -658,7 +778,15 @@ namespace sfem {
                     fprintf(stderr, "Playground: time needs steps or t_end\n");
                     return SFEM_FAILURE;
                 }
-                options.max_cutbacks = read<int>(time, "max_cutbacks", 0);
+                // A failed step is retried with half its length: hard contact steps need it (a
+                // hemisphere impact at dt 0.08, a staircase at 0.04). BDF2 is a constant-step
+                // method, whose coefficients a shorter step would make wrong, so it has none.
+                const bool bdf2      = std::dynamic_pointer_cast<BDF2Scheme>(scheme) != nullptr;
+                options.max_cutbacks = read<int>(time, "max_cutbacks", bdf2 ? 0 : 4);
+                if (bdf2 && options.max_cutbacks > 0) {
+                    fprintf(stderr, "Playground: BDF2 is a constant-step method; time.max_cutbacks must be 0 with it\n");
+                    return SFEM_FAILURE;
+                }
             }
 
             stepper = std::make_unique<Stepper>(f, nonlinear, options);
@@ -680,12 +808,37 @@ namespace sfem {
                             blas->zeros(n, out);
                             return op->gradient(record.x, out);
                         });
+                    } else if ((name == "gap" || name == "contact_force") && contact) {
+                        auto c    = contact;
+                        auto blas = sfem::blas<real_t>(es);
+                        auto n    = fs->n_dofs();
+                        if (name == "gap") {
+                            fields->add_field(name, [c](const StepRecord &record, real_t *const out) {
+                                c->update(record.x);
+                                c->gap_field(out);
+                                return SFEM_SUCCESS;
+                            });
+                        } else {
+                            // In this trapezoidal form the material force enters both ends of the
+                            // step and the contact force once: the force is half the reaction.
+                            fields->add_field(name, [c, blas, n](const StepRecord &record, real_t *const out) {
+                                blas->zeros(n, out);
+                                if (record.step == 0) return SFEM_SUCCESS;
+                                c->reaction(out);
+                                blas->scal(n, real_t(0.5), out);
+                                return SFEM_SUCCESS;
+                            });
+                        }
                     } else {
-                        fprintf(stderr, "Playground: unknown output field \"%s\" (material_reaction)\n", name.c_str());
+                        fprintf(stderr,
+                                "Playground: unknown output field \"%s\" (material_reaction; gap, contact_force with an obstacle)\n",
+                                name.c_str());
                         return SFEM_FAILURE;
                     }
                 }
                 stepper->add_observer(fields);
+                // The obstacle's grid: contour sdf/sdf.xdmf at 0.
+                if (obstacle_sdf) obstacle_sdf->to_file(path / "sdf");
 
                 if (read<bool>(output, "quantities", false)) {
                     stepper->add_observer(std::make_shared<Quantities>(f, material, host_dirichlet, path));
@@ -710,8 +863,10 @@ namespace sfem {
                             return SFEM_FAILURE;
                         }
                         history->add_probe(create_torque_probe(f, rotations[which], material));
+                    } else if (type == "contact" && contact) {
+                        history->add_probe(create_contact_probe(contact, fs->n_dofs(), real_t(1e-6) * extent));
                     } else {
-                        fprintf(stderr, "Playground: unknown probe \"%s\" (control_point, torque)\n", type.c_str());
+                        fprintf(stderr, "Playground: unknown probe \"%s\" (control_point, torque; contact with an obstacle)\n", type.c_str());
                         return SFEM_FAILURE;
                     }
                 }
@@ -763,6 +918,7 @@ namespace sfem {
         if (impl.build_function(config) != SFEM_SUCCESS) return nullptr;
         if (impl.build_constraints(config) != SFEM_SUCCESS) return nullptr;
         if (impl.build_fields(config) != SFEM_SUCCESS) return nullptr;
+        if (impl.build_obstacle(config, regime) != SFEM_SUCCESS) return nullptr;
         if (impl.build_scheme(config, regime) != SFEM_SUCCESS) return nullptr;
         if (impl.build_solver(config) != SFEM_SUCCESS) return nullptr;
         if (impl.build_stepper(config, regime) != SFEM_SUCCESS) return nullptr;

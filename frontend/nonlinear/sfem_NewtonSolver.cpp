@@ -47,12 +47,15 @@ namespace sfem {
             for (auto &m : monitors) m(iteration);
         }
 
-        /// The residual at x, the constrained rows zero, and its measure.
-        int residual(const real_t *const x, StepMeasure &measure) {
+        /// The residual at x, the constrained rows zero, and its measure. With `known` the
+        /// residual is already in r.
+        int residual(const real_t *const x, StepMeasure &measure, const bool known = false) {
             f->update(x);
-            blas->zeros(ndofs, r->data());
-            if (f->gradient(x, r->data()) != SFEM_SUCCESS) return SFEM_FAILURE;
-            f->set_value_to_constrained_dofs(0, r->data());
+            if (!known) {
+                blas->zeros(ndofs, r->data());
+                if (f->gradient(x, r->data()) != SFEM_SUCCESS) return SFEM_FAILURE;
+                f->set_value_to_constrained_dofs(0, r->data());
+            }
             measure = step->measure(x, r->data());
             return SFEM_SUCCESS;
         }
@@ -129,10 +132,11 @@ namespace sfem {
         // Newton from x, its constrained values held where they are (the corrections are zero
         // there). `solved`: the step that led to x solved a linear problem.
         auto iterate = [&](bool solved) -> NonlinearReport::Status {
+            bool known = false;
             for (int it = 0;; ++it) {
                 log.iteration = count;
 
-                if (impl.residual(x, log.measure) != SFEM_SUCCESS) return NonlinearReport::STEP_FAILED;
+                if (impl.residual(x, log.measure, known) != SFEM_SUCCESS) return NonlinearReport::STEP_FAILED;
                 report.final_measure = log.measure.value;
                 if (count == 0) {
                     report.reference = log.measure.reference;
@@ -187,6 +191,7 @@ namespace sfem {
                 report.min_alpha = std::min(report.min_alpha, log.line_search.alpha);
                 impl.blas->axpy(ndofs, log.line_search.alpha, dx, x);
                 solved = linear && !log.linear_capped && log.line_search.alpha == 1;
+                known  = merit && merit->residual_at(log.line_search.alpha, r);
             }
         };
 

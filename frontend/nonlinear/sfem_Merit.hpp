@@ -34,6 +34,11 @@ namespace sfem {
         /// Whether one call evaluates many steps for about the cost of one, so a line search
         /// asks for its whole schedule at once rather than step by step.
         virtual bool batched() const = 0;
+
+        /// The residual at x + step h, the constrained rows zero, into r when the last trial this
+        /// merit evaluated was that step and it computed the residual there; false otherwise.
+        /// Saves Newton recomputing what the line search already has.
+        virtual bool residual_at(const real_t /*step*/, real_t *const /*r*/) const { return false; }
     };
 
     /// The sum of the operators' potentials, `Function::energy_merit`. Its slope is r . h.

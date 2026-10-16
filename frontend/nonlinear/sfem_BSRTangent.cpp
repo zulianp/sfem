@@ -64,32 +64,22 @@ namespace sfem {
         }
 #endif
 
+        // On the host the constraints write identity rows into the assembled values
+        // (Function::hessian_bsr), so the product is the constrained operator as it stands:
+        // replacing the constrained entries after each product, as the device does, would only
+        // repeat them, once per Krylov iteration.
         switch (storage_bytes) {
             case 2:
-                return compose_constraints_op(impl.f,
-                                              h_bsr_spmv<count_t, idx_t, half_t, real_t>(nrows,
-                                                                                         nrows,
-                                                                                         impl.block_size,
-                                                                                         impl.graph->rowptr(),
-                                                                                         impl.graph->colidx(),
-                                                                                         astype<half_t>(impl.values),
-                                                                                         (real_t)1));
+                return h_bsr_spmv<count_t, idx_t, half_t, real_t>(
+                        nrows, nrows, impl.block_size, impl.graph->rowptr(), impl.graph->colidx(), astype<half_t>(impl.values), (real_t)1);
 #if !SFEM_REAL_T_IS_FLOAT32
             case 4:
-                return compose_constraints_op(impl.f,
-                                              h_bsr_spmv<count_t, idx_t, float, real_t>(nrows,
-                                                                                        nrows,
-                                                                                        impl.block_size,
-                                                                                        impl.graph->rowptr(),
-                                                                                        impl.graph->colidx(),
-                                                                                        astype<float>(impl.values),
-                                                                                        (real_t)1));
+                return h_bsr_spmv<count_t, idx_t, float, real_t>(
+                        nrows, nrows, impl.block_size, impl.graph->rowptr(), impl.graph->colidx(), astype<float>(impl.values), (real_t)1);
 #endif
             default:
-                return compose_constraints_op(
-                        impl.f,
-                        h_bsr_spmv<count_t, idx_t, real_t>(
-                                nrows, nrows, impl.block_size, impl.graph->rowptr(), impl.graph->colidx(), impl.values, (real_t)1));
+                return h_bsr_spmv<count_t, idx_t, real_t>(
+                        nrows, nrows, impl.block_size, impl.graph->rowptr(), impl.graph->colidx(), impl.values, (real_t)1);
         }
     }
 

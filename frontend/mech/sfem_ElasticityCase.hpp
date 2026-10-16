@@ -51,8 +51,18 @@ namespace sfem {
     /// initial_conditions:
     ///   displacement: {components: [u.0.raw, u.1.raw, u.2.raw]}   # or file: interleaved
     ///   velocity: {file: v.raw}              # dynamic, Newmark or BDF2
+    /// obstacle:                              # host only; regime dynamic, scheme newmark
+    ///   backend: node_sdf                    # nodes against the SDF's B-spline, MPRGP in frames
+    ///   nodes: skin                          # or a named sideset
+    ///   direction: z                         # the body approaches along -direction
+    ///   shape: {type: hemisphere, plane: 0, radius: 0.25, fillet: 0.125, grid_cells: 128}
+    ///                                        # plane | slope (slope, slope_axis) | staircase
+    ///                                        # (step_width, step_drop) | hemisphere (radius, center)
+    ///   sdf: {file: obstacle}                # an SDF grid instead of a shape
+    ///   qp: {max_it: 20000, rtol: 1e-10}
     /// regime: quasi_static                   # steady | quasi_static | dynamic
-    /// time: {dt: 0.1, t_end: 1, max_cutbacks: 0}      # or steps instead of t_end
+    /// time: {dt: 0.1, t_end: 1, max_cutbacks: 4}      # or steps instead of t_end; cutbacks
+    ///                                        # halve a failed step, 0 and the only choice with bdf2
     /// dynamics: {scheme: newmark, density: 1, beta: 0.25, gamma: 0.5}  # newmark | bdf2 | backward_euler
     /// solver:
     ///   newton: {max_it: 30, atol: 1e-9, rtol: 1e-8, divergence_factor: 1e4, merit: auto,
@@ -62,10 +72,12 @@ namespace sfem {
     ///   path: output
     ///   export_freq: 1
     ///   history_csv: history.csv
-    ///   fields: [material_reaction]          # exported beside disp (and velocity, acceleration)
+    ///   fields: [material_reaction]          # exported beside disp (and velocity, acceleration);
+    ///                                        # gap and contact_force with an obstacle
     ///   quantities: true                     # path/quantities.yaml: objective and reactions
     ///   probes: [{type: control_point, at: [1, 0.5, 0.5], rates: true},
-    ///            {type: torque, constraint: 0}]       # angle, released, torque of constraints[0]
+    ///            {type: torque, constraint: 0},       # angle, released, torque of constraints[0]
+    ///            {type: contact}]                     # the obstacle's force and whether it touched
     /// ```
     ///
     /// Relative paths are read against the case file's directory.
