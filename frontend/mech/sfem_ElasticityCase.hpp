@@ -42,6 +42,9 @@ namespace sfem {
     ///   - {type: rotation, sideset: right, axis: x, center: [0, 0.5, 0.5], angle: 0.5,
     ///      profile: {type: linear_ramp, start_time: 0, end_time: 1, start_value: 0, end_value: 1},
     ///      release: 2}                       # angle * profile(t); removed at the first step ending at release
+    ///   - {type: rotation, sideset: right, axis: x, center: [0, 0.5, 0.5],
+    ///      control: {torque: 1e-3, tol: 1e-6, max_it: 20}}   # the angle at which the torque is
+    ///                                        # torque * profile(t), instead of an angle
     /// fields:                                # Op::set_field on the material
     ///   - {name: active_strain, file: Fa.raw, values_per_element: 9}
     ///   - {name: active_strain, inclusion: {a11: 0.5, radius: 0.25, center: [0.5, 0.5, 0.5]}, profile: {...}}
@@ -61,7 +64,8 @@ namespace sfem {
     ///   history_csv: history.csv
     ///   fields: [material_reaction]          # exported beside disp (and velocity, acceleration)
     ///   quantities: true                     # path/quantities.yaml: objective and reactions
-    ///   probes: [{type: control_point, at: [1, 0.5, 0.5], rates: true}]
+    ///   probes: [{type: control_point, at: [1, 0.5, 0.5], rates: true},
+    ///            {type: torque, constraint: 0}]       # angle, released, torque of constraints[0]
     /// ```
     ///
     /// Relative paths are read against the case file's directory.

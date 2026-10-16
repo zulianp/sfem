@@ -19,6 +19,7 @@
 #include "sfem_Observers.hpp"
 #include "sfem_Rotation.hpp"
 #include "sfem_StateField.hpp"
+#include "sfem_TorqueControl.hpp"
 #include "sfem_UnconstrainedStep.hpp"
 #include "smesh_mesh_reorder.hpp"
 
@@ -122,6 +123,7 @@ namespace sfem {
         std::shared_ptr<Op>                                material;
         std::shared_ptr<TimeScheme>                        scheme;
         std::shared_ptr<NewtonSolver>                      newton;
+        std::shared_ptr<NonlinearSolver>                   nonlinear;
         std::unique_ptr<Stepper>                           stepper;
         SharedBuffer<real_t>                               x;
         SidesetLookup                                      lookup;
@@ -131,6 +133,8 @@ namespace sfem {
         std::shared_ptr<DirichletConditions>               host_dirichlet;
         std::vector<std::pair<std::shared_ptr<Constraint>, real_t>> releases;
         std::vector<std::shared_ptr<Rotation>>             rotations;
+        std::shared_ptr<Rotation>                          torque_controlled;
+        TorqueControlOptions                               torque_control;
         std::list<ryml::Tree>                              documents;
 
         int build_mesh(const std::shared_ptr<Communicator> &comm, const ElasticityCase &config) {
@@ -350,8 +354,11 @@ namespace sfem {
                 auto       sidesets = lookup.find(name);
                 const int  axis     = axis_of(read_string(c, "axis", ""));
                 auto       center   = read_list<real_t>(c, "center", {0, 0, 0});
-                if (sidesets.empty() || axis < 0 || center.size() != 3 || !has(c, "angle")) {
-                    fprintf(stderr, "Playground: a rotation needs a named sideset, an axis (x, y, z), a center [x, y, z] and an angle\n");
+                const bool torque   = has(c, "control");
+                if (sidesets.empty() || axis < 0 || center.size() != 3 || has(c, "angle") == torque) {
+                    fprintf(stderr,
+                            "Playground: a rotation needs a named sideset, an axis (x, y, z), a center [x, y, z], and an "
+                            "angle or a torque control\n");
                     return SFEM_FAILURE;
                 }
                 LoadProfile profile;
@@ -361,7 +368,27 @@ namespace sfem {
                 if (!rotation) return SFEM_FAILURE;
                 f->add_constraint(rotation);
                 rotations.push_back(rotation);
-                time_dependent.push_back([rotation](const real_t t) { return rotation->set_time(t); });
+                if (torque) {
+                    // The profile scales the torque, and the control sets the angle.
+                    if (torque_controlled) {
+                        fprintf(stderr, "Playground: one rotation at most may be torque controlled\n");
+                        return SFEM_FAILURE;
+                    }
+                    auto control           = c["control"];
+                    torque_controlled      = rotation;
+                    torque_control.torque  = read<real_t>(control, "torque", 0);
+                    torque_control.tol     = read<real_t>(control, "tol", torque_control.tol);
+                    torque_control.max_it  = read<int>(control, "max_it", torque_control.max_it);
+                    torque_control.profile = profile;
+                    if (torque_control.torque == 0) {
+                        fprintf(stderr, "Playground: a torque control needs a non-zero torque\n");
+                        return SFEM_FAILURE;
+                    }
+                    // Untwisted until the control's first solve.
+                    if (rotation->set_angle(0) != SFEM_SUCCESS) return SFEM_FAILURE;
+                } else {
+                    time_dependent.push_back([rotation](const real_t t) { return rotation->set_time(t); });
+                }
                 if (has(c, "release")) releases.push_back({rotation, read<real_t>(c, "release", 0)});
             }
             return SFEM_SUCCESS;
@@ -580,6 +607,10 @@ namespace sfem {
             auto step = UnconstrainedStep::create(f, es, linear);
             if (!step) return SFEM_FAILURE;
             newton = std::make_shared<NewtonSolver>(f, step, newton_options);
+            nonlinear = newton;
+            if (torque_controlled) {
+                nonlinear = std::make_shared<TorqueControl>(f, newton, torque_controlled, material, torque_control);
+            }
             if (verbose) {
                 newton->add_monitor([](const NewtonIteration &it) {
                     if (it.iteration == 0) {
@@ -622,7 +653,7 @@ namespace sfem {
                 options.max_cutbacks = read<int>(time, "max_cutbacks", 0);
             }
 
-            stepper = std::make_unique<Stepper>(f, newton, options);
+            stepper = std::make_unique<Stepper>(f, nonlinear, options);
             stepper->set_time_scheme(scheme);
             if (auto history = std::dynamic_pointer_cast<HistoryDependent>(material)) stepper->add_history(history);
             for (auto &set : time_dependent) stepper->add_time_dependent(set);
@@ -664,8 +695,15 @@ namespace sfem {
                     const auto type = read_string(p, "type", "");
                     if (type == "control_point") {
                         history->add_probe(create_control_point_probe(f, read_list<real_t>(p, "at", {}), read<bool>(p, "rates", scheme != nullptr)));
+                    } else if (type == "torque") {
+                        const int which = read<int>(p, "constraint", 0);
+                        if (which < 0 || which >= (int)rotations.size()) {
+                            fprintf(stderr, "Playground: a torque probe needs constraint, the index of a rotation in constraints\n");
+                            return SFEM_FAILURE;
+                        }
+                        history->add_probe(create_torque_probe(f, rotations[which], material));
                     } else {
-                        fprintf(stderr, "Playground: unknown probe \"%s\" (control_point)\n", type.c_str());
+                        fprintf(stderr, "Playground: unknown probe \"%s\" (control_point, torque)\n", type.c_str());
                         return SFEM_FAILURE;
                     }
                 }
@@ -723,14 +761,14 @@ namespace sfem {
 
         impl.x = create_buffer<real_t>(impl.fs->n_dofs(), impl.es);
         if (impl.initial_conditions(config) != SFEM_SUCCESS) return nullptr;
-        if (impl.verbose) {
-            printf("Playground: %s, %s, %td dofs, %d steps of %g\n",
-                   regime.c_str(),
-                   impl.material->name(),
-                   impl.fs->n_dofs(),
-                   impl.stepper->options().steps,
-                   (double)impl.stepper->options().dt);
-        }
+        // The problem size, whatever the Newton verbosity: a timing is read against it.
+        printf("Playground: %s, %s, %td elements, %td dofs, %d steps of %g\n",
+               regime.c_str(),
+               impl.material->name(),
+               impl.mesh->n_elements(),
+               impl.fs->n_dofs(),
+               impl.stepper->options().steps,
+               (double)impl.stepper->options().dt);
         return ret;
     }
 

@@ -68,6 +68,9 @@ namespace sfem {
     public:
         virtual ~Probe()                                                                       = default;
         virtual std::vector<std::string> columns() const                                       = 0;
+        /// The step's solution before it is committed (StepObserver::converged), for what has to
+        /// be read while the step's history and scheme are still open.
+        virtual int                      converged(const StepRecord &) { return SFEM_SUCCESS; }
         virtual int                      sample(const StepRecord &record, real_t *const values) = 0;
     };
 
@@ -88,6 +91,7 @@ namespace sfem {
         void add_probe(const std::shared_ptr<Probe> &probe);
 
         int initial(const StepRecord &record) override;
+        int converged(const StepRecord &record) override;
         int committed(const StepRecord &record) override;
         int failed(const StepRecord &record) override;
 

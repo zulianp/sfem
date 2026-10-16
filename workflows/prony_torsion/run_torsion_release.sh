@@ -11,14 +11,11 @@ set -euo pipefail
 HERE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd -P)"
 ROOT_DIR="$(cd -- "$HERE/../.." >/dev/null 2>&1 && pwd -P)"
 PYTHON="${PRONY_PYTHON:-$ROOT_DIR/venv/bin/python}"
-EXE="${PRONY_EXE:-$HERE/build/prony_visco_torsion}"
+EXE="${PRONY_EXE:-$ROOT_DIR/build/playground}"
 WORKDIR="${1:-$HERE/output}"
 
 if [[ ! -x "$EXE" ]]; then
-    echo "missing executable: $EXE" >&2
-    echo "configure and build the spike first, e.g." >&2
-    echo "  cmake -S $HERE -B $HERE/build -DSFEM_DIR=<prefix>/lib/cmake" >&2
-    echo "  cmake --build $HERE/build -j" >&2
+    echo "missing executable: $EXE -- build SFEM's playground first (or set PRONY_EXE)" >&2
     exit 1
 fi
 

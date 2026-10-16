@@ -32,6 +32,10 @@ namespace sfem {
                 const real_t a     = (time - times_[i0]) / (times_[i1] - times_[i0]);
                 return values_[i0] + a * (values_[i1] - values_[i0]);
             }
+            case Type::SINE: {
+                constexpr real_t two_pi = real_t(6.283185307179586476925286766559);
+                return value_ * std::sin(two_pi * (time - start_time_) / period_);
+            }
         }
 
         return 1;
@@ -131,6 +135,19 @@ namespace sfem {
             read_optional(node, "value", profile.value_);
             if (profile.end_time_ < profile.start_time_) {
                 SFEM_ERROR("pulse end_time must not precede start_time\n");
+                return SFEM_FAILURE;
+            }
+            return SFEM_SUCCESS;
+        }
+
+        if (type == "sine") {
+            // value * sin(2 pi (t - start_time) / period)
+            profile.type_ = Type::SINE;
+            read_optional(node, "value", profile.value_);
+            read_optional(node, "start_time", profile.start_time_);
+            read_optional(node, "period", profile.period_);
+            if (!(profile.period_ > 0)) {
+                SFEM_ERROR("sine period must be positive\n");
                 return SFEM_FAILURE;
             }
             return SFEM_SUCCESS;

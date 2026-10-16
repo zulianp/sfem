@@ -16,6 +16,7 @@ namespace sfem {
         int                                  a0{1}, a1{2};
         real_t                               center[3]{0, 0, 0};
         real_t                               angle{0};
+        real_t                               prescribed{0};
         LoadProfile                          profile;
     };
 
@@ -58,8 +59,11 @@ namespace sfem {
 
     int Rotation::set_time(const real_t t) { return set_angle(angle_at(t)); }
 
+    real_t Rotation::angle() const { return impl_->prescribed; }
+
     int Rotation::set_angle(const real_t angle) {
         auto           &impl  = *impl_;
+        impl.prescribed       = angle;
         auto            xyz   = impl.space->points()->data();
         const real_t    c     = std::cos(angle);
         const real_t    s     = std::sin(angle);

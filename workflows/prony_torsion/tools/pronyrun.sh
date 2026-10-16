@@ -24,7 +24,7 @@ fi
 tag=$1; shift
 case_file=$1; shift
 
-EXE="${PRONY_EXE:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." >/dev/null 2>&1 && pwd -P)/build/prony_visco_torsion}"
+EXE="${PRONY_EXE:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../.." >/dev/null 2>&1 && pwd -P)/build/playground}"
 if [[ ! -x "$EXE" ]]; then
     echo "missing executable: $EXE (set PRONY_EXE)" >&2
     exit 1
@@ -32,7 +32,8 @@ fi
 
 # The per-step line starts with the step number; the ndof line, the release announcement and
 # the totals all matter too. Anything not matched still lands in the raw log.
-: "${PRONYRUN_FILTER:=^[0-9]+ |^nnodes:|^Solving |^--- torsion released|^control point|^Total linear|^Final |^\[prony\]|^prony::Case|^ +}"
+# (The playground's per-step line starts with "step", its problem size with "Playground:".)
+: "${PRONYRUN_FILTER:=^step |^Playground|^TorqueControl|^TorqueProbe|^Stepper|^ +}"
 
 echo ">>> START $tag  $(date +%H:%M:%S)  raw: $PRONYRUN_DIR/$tag.log"
 # stdbuf on the BINARY as well as on the filter. Line-buffering only the filter is not enough:

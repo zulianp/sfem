@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import csv
 import math
 import os
 import re
@@ -51,6 +52,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from validate_torsion_release import fit_relaxation, read_history  # noqa: E402
+from playground_case import TorsionCase  # noqa: E402
 from analyse_hysteresis import analyse as analyse_hysteresis, prony_complex_modulus  # noqa: E402
 
 import yaml
@@ -61,7 +63,8 @@ def run_case(exe: Path, workdir: Path, base: dict, name: str, overrides) -> dict
     case = copy.deepcopy(base)
     overrides(case)
     case["output"]["path"] = f"results_{name}"
-    case["verbose"] = False
+    case["output"]["history_csv"] = f"results_{name}/history.csv"
+    case["solver"]["newton"]["verbose"] = False
 
     case_path = workdir / f"{name}.yaml"
     case_path.write_text(yaml.safe_dump(case, sort_keys=False))
@@ -76,23 +79,25 @@ def run_case(exe: Path, workdir: Path, base: dict, name: str, overrides) -> dict
     wall = time.time() - start
 
     text = log.read_text()
-    size = re.search(r"^nnodes: (\d+)\s+nelements: (\d+)\s+ndof: (\d+)", text, re.M)
-    total_lin = re.search(r"^Total linear iterations: (\d+)", text, re.M)
+    size = re.search(r"^Playground: .*, (\d+) elements, (\d+) dofs", text, re.M)
 
     row = {
         "name": name,
         "ok": rc == 0,
         "wall": wall,
-        "ndof": int(size.group(3)) if size else 0,
-        "nelements": int(size.group(2)) if size else 0,
-        "linear_its": int(total_lin.group(1)) if total_lin else 0,
+        "ndof": int(size.group(2)) if size else 0,
+        "nelements": int(size.group(1)) if size else 0,
+        "linear_its": 0,
         "threads": int(env["OMP_NUM_THREADS"]),
     }
 
     if rc != 0:
         return row
 
-    rows = read_history(str(workdir / case["output"]["path"] / case["output"].get("history_csv", "history.csv")))
+    history = workdir / case["output"]["history_csv"]
+    with history.open() as fh:
+        row["linear_its"] = sum(int(r["linear"]) for r in csv.DictReader(fh))
+    rows = read_history(str(history))
     held = [r for r in rows if not r.released]
     if not held:
         return row
@@ -104,10 +109,10 @@ def run_case(exe: Path, workdir: Path, base: dict, name: str, overrides) -> dict
     row["peak_torque"] = peak
     row["relaxed_fraction"] = (abs(plateau[0].torque) - abs(plateau[-1].torque)) / peak if plateau else 0.0
 
-    terms = (case.get("material") or {}).get("prony") or []
+    terms = TorsionCase(case).terms
     if terms and len(plateau) >= 2 * (len(terms) + 1):
         taus = [float(t["tau"]) for t in terms]
-        ramp = float((case.get("torsion") or {}).get("ramp_time", 0.0))
+        ramp = TorsionCase(case).ramp_time
         weights, rms = fit_relaxation(plateau, taus, ramp)
         row["weights"] = weights
         row["fit_rms"] = rms
@@ -149,7 +154,7 @@ def main() -> int:
     here = Path(__file__).resolve().parent.parent
     ap = argparse.ArgumentParser()
     ap.add_argument("--sweep", choices=["dt", "angle", "bulk", "frequency", "control", "all"], default="all")
-    ap.add_argument("--exe", default=str(here / "build" / "prony_visco_torsion"))
+    ap.add_argument("--exe", default=os.environ.get("PRONY_EXE", str(here.parent.parent / "build" / "playground")))
     ap.add_argument("--case", default=str(here / "cases" / "torsion_release.yaml"))
     ap.add_argument("--mesh", help="an existing SFEM HEX8 mesh folder; one is built if omitted")
     ap.add_argument("--workdir", default=str(here / "sweep"))
@@ -183,14 +188,11 @@ def main() -> int:
         )
 
     base = yaml.safe_load(Path(args.case).read_text())
-    base["mesh"] = "mesh"
-    for cond in base.get("dirichlet_conditions", []):
-        cond["path"] = cond["path"].replace("mesh/", "mesh/", 1)
-    base["torsion"]["sideset"] = "mesh/surface/sidesets/right"
+    base["mesh"]["path"] = "mesh"
 
     # The release is not part of this measurement -- the weights are recovered from the hold --
     # and dropping it keeps each sweep point cheap.
-    base["torsion"]["release"] = {"mode": "hold"}
+    base["constraints"][0].pop("release", None)
     base["output"]["export_freq"] = 1000
 
     rc = 0
@@ -215,7 +217,7 @@ def main() -> int:
         for angle in values:
             rows.append(
                 run_case(
-                    exe, workdir, base, f"angle_{angle}", lambda c, a=angle: c["torsion"].__setitem__("angle", a)
+                    exe, workdir, base, f"angle_{angle}", lambda c, a=angle: c["constraints"][0].__setitem__("angle", a)
                 )
             )
         print_table(
@@ -240,7 +242,7 @@ def main() -> int:
     if args.sweep in ("frequency", "all"):
         periods = [60.0, 20.0, 12.0, 4.0, 2.0]
         amplitude = 0.15
-        terms = (base.get("material") or {}).get("prony") or []
+        terms = TorsionCase(base).terms
         g = [float(t["g"]) for t in terms]
         tau = [float(t["tau"]) for t in terms]
 
@@ -254,10 +256,8 @@ def main() -> int:
 
         for period in periods:
             def cyclic(c, period=period, amplitude=amplitude):
-                c["torsion"]["profile"] = "cyclic"
-                c["torsion"]["period"] = period
-                c["torsion"]["angle"] = amplitude
-                c["torsion"].pop("ramp_time", None)
+                c["constraints"][0]["profile"] = {"type": "sine", "period": period}
+                c["constraints"][0]["angle"] = amplitude
                 # 80 samples per cycle, three cycles: the first two let the transient from the
                 # impulsive start decay, the last one is what gets fitted.
                 c["time"] = {"dt": period / 80.0, "t_end": 3 * period}
@@ -285,7 +285,7 @@ def main() -> int:
 
     if args.sweep in ("control", "all"):
         def no_prony(c):
-            c["material"].pop("prony", None)
+            c["material"]["relaxation"]["iso"].pop("prony", None)
 
         row = run_case(exe, workdir, base, "control_elastic", no_prony)
         print()

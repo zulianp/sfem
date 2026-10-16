@@ -30,66 +30,65 @@
 # The amplitude is 0.15 rad rather than the 0.6 the relaxation case uses, because the phase
 # is read from the fundamental harmonic and a large twist makes the loop non-elliptic
 # through geometric nonlinearity. The analysis reports its own fit residual as the guard.
+#
+# (In the playground the cycle is the rotation's sine profile, angle * sin(2 pi t / period),
+# and the saw-tooth guard is the torque probe's.)
 
-mesh: mesh
-verbose: false
+mesh:
+  path: mesh
+  packed: false
+  sidesets:
+    - {name: left, file: mesh/surface/sidesets/left}
+    - {name: right, file: mesh/surface/sidesets/right}
+
 material:
+  type: GeneratedMooneyRivlinProny
   C10: 0.3
   C01: 0.05
   K: 50.0
-  prony:
-  - g: 0.4
-    tau: 1.0
-  - g: 0.3
-    tau: 10.0
-  wlf:
-    enabled: false
-  history_storage: float32
+  relaxation:
+    iso:
+      prony:
+        - {g: 0.4, tau: 1.0}
+        - {g: 0.3, tau: 10.0}
+      history_storage: float32
+
 time:
   dt: 0.02
   t_end: 36.0
-dynamics:
-  type: quasi_static
-torsion:
-  sideset: mesh/surface/sidesets/right
-  axis: x
-  rotation_center:
-  - 0.0
-  - 0.1
-  - 0.1
-  angle: 0.5
-  release:
-    mode: hold
-  profile: cyclic
-  period: 12.0
+
+regime: quasi_static
+
+constraints:
+  - type: rotation
+    sideset: right
+    axis: x
+    center: [0.0, 0.1, 0.1]
+    angle: 0.5
+    profile: {type: sine, period: 12.0}
+
 solver:
   newton:
     max_it: 300
-    tol: 1.0e-08
-    alpha: 1.0
-    line_search: true
+    atol: 1.0e-08
+    rtol: 0
+    verbose: false
   linear:
     type: cg
-    rtol: 1.0e-10
+    preconditioner: jacobi
     max_it: 4000
-    preconditioner: true
+
 output:
   path: results_cyclic
   export_freq: 8
-  control_point:
-  - 1.0
-  - 0.2
-  - 0.2
-  history_csv: history.csv
+  history_csv: results_cyclic/history.csv
+  probes:
+    - {type: control_point, at: [1.0, 0.2, 0.2]}
+    - {type: torque, constraint: 0}
+
 dirichlet_conditions:
-- type: sideset
-  format: file
-  path: mesh/surface/sidesets/left
-  value:
-  - 0
-  - 0
-  - 0
-  component:
-  - 0
-  - 1
-  - 2
+  - type: sideset
+    format: name
+    name: left
+    value: [0, 0, 0]
+    component: [0, 1, 2]

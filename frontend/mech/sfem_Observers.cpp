@@ -336,6 +336,8 @@ namespace sfem {
     StepHistory::StepHistory(const std::string &csv_path, const bool verbose) : impl_(std::make_unique<Impl>()) {
         impl_->verbose = verbose;
         if (!csv_path.empty()) {
+            const smesh::Path path(csv_path);
+            if (!path.parent().to_string().empty()) smesh::create_directory(path.parent());
             impl_->csv = fopen(csv_path.c_str(), "w");
             if (!impl_->csv) SFEM_ERROR("StepHistory: unable to open %s\n", csv_path.c_str());
         }
@@ -363,6 +365,13 @@ namespace sfem {
         const int ret          = impl.row(at_start, "initial");
         impl.verbose           = verbose;
         return ret;
+    }
+
+    int StepHistory::converged(const StepRecord &record) {
+        for (auto &p : impl_->probes) {
+            if (p->converged(record) != SFEM_SUCCESS) return SFEM_FAILURE;
+        }
+        return SFEM_SUCCESS;
     }
 
     int StepHistory::committed(const StepRecord &record) { return impl_->row(record, to_string(record.report.status)); }
