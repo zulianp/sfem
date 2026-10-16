@@ -1,17 +1,17 @@
 # Mooney-Rivlin gravity test
 
-Runs `sfem_MooneyRivlinGravityTest` (`frontend/tests/sfem_MooneyRivlinGravityTest.cpp`)
-and visualises it. The material is the Prony-series Mooney-Rivlin, integrated in time
-with implicit Newmark (beta = 1/4, gamma = 1/2).
+Runs the elasticity playground (`drivers/mech/playground.exe.cpp`) on `cantilever.yaml` or
+`contact.yaml` and visualises it. The material is the Prony-series Mooney-Rivlin, integrated in
+time with implicit Newmark (beta = 1/4, gamma = 1/2). The cases were the two modes of
+`sfem_MooneyRivlinGravityTest`, which the playground replaced.
 
 ```bash
-workflows/mooney_rivlin_gravity/run.sh [cantilever|contact] [output-dir]
+workflows/mooney_rivlin_gravity/run.sh [cantilever|contact] [output-dir] [key=value ...]
 ```
 
 ## Cases
 
-**`cantilever`** runs the test `test_mooney_rivlin_gravity`, the case the visco history
-comparisons used:
+**`cantilever`** (`cantilever.yaml`) is the case the visco history comparisons used:
 
 - **Geometry:** a 10 x 1 x 1 HEX8 box, clamped on the min-x face.
 - **Load:** sags under gravity along -y, with density 1 and g = 0.5.
@@ -20,7 +20,7 @@ comparisons used:
 - **Time:** dt = 0.005 to T = 7.5.
 - **Size:** 640 elements and 3,075 dofs by default, about 20 s on a laptop.
 
-**`contact`** runs `test_mooney_rivlin_gravity_contact`:
+**`contact`** (`contact.yaml`):
 
 - **Geometry:** a free 2 x 1 x 1 block, with no Dirichlet conditions. It falls 0.05 under
   gravity onto a hemisphere of radius 0.25 that stands on a floor. Every node of its
@@ -34,15 +34,17 @@ comparisons used:
   stiff and lightly damped. Averaged over time, the obstacle's reaction carries the
   block's weight.
 
-`run.sh --help` lists the environment overrides. `SFEM_OBSTACLE_TYPE` picks a plane (0),
-a sloping plane (1), a staircase (2) or the hemisphere (4).
+`run.sh --help` lists the options; every `key=value` after the output directory is a
+playground `--set`. `obstacle.shape.type` picks a `plane`, a sloping plane (`slope`), a
+`staircase` or the `hemisphere`.
 
-On the sloping plane (`SFEM_OBSTACLE_TYPE=1`, slope 0.2) the block slides down it. Its
+On the sloping plane (`obstacle.shape.type=slope`, slope 0.2) the block slides down it. Its
 fitted acceleration along x is -1.8880, against the frictionless incline's
 -g sin(theta) cos(theta) = -1.8865.
 
-`SFEM_BASE_RESOLUTION` refines the body. With `contact` it sets the number of elements
-along each edge of the block. Measured with the defaults on a laptop, 8 threads:
+`mesh.box.n` refines the body; with `contact` it is the number of elements along each edge of
+the block (8 by default). Measured with the defaults on a laptop, 8 threads, with the retired
+test:
 
 | Resolution | Dofs | Max Newton iterations per step | Reaction / weight, mean over t > 1 | Time |
 |---|---|---|---|---|
@@ -58,18 +60,21 @@ The mean is below 1 because the block spends part of the time in the air.
 The default output is `workflows/mooney_rivlin_gravity/output/<case>`:
 
 ```text
-run.log                 the test's log
+run.log                 the playground's log
+history.csv             per step: Newton and linear iterations, the final measure; the tip
+                        (cantilever) or the obstacle's force and whether it touched (contact)
+mesh/, out/             the mesh and the raw fields
 output.xdmf, output.h5  disp/velocity/acceleration over time for ParaView;
                         with contact also gap (to the obstacle) and contact_force
-<test>/sdf/sdf.xdmf     contact: the obstacle's signed distance; contour it at 0
+sdf/sdf.xdmf            contact: the obstacle's signed distance; contour it at 0
 response.csv            cantilever: tip displacement; contact: the mean descent of
                         the underside and the obstacle's reaction over the weight
-newton.csv              Newton iterations and the final KKT residual per step
+newton.csv              Newton iterations and the final measure (KKT with contact) per step
 gravity_response.png    the response and the Newton iterations over time
 deformed.png            the last frame, deformed and coloured by |u| (needs pvbatch)
 ```
 
-The test fails when a step does not converge. The workflow then stops and shows the
+The run stops when a step does not converge. The workflow then stops and shows the
 end of the log.
 
 ## Contact
@@ -89,7 +94,9 @@ The contact is frictionless and node-to-obstacle.
 - **Convergence:** a step converges on its KKT residual: the residual with the obstacle's
   admissible normal reaction removed, plus the complementarity min(mu, c0 m gap) of the
   nodes clear of it, both forces, below 1e-9 of the forces in balance. Penetration must
-  also stay below 1e-10 of the mesh size. A step that does not converge fails the test.
+  also stay below 1e-10 of the mesh size. A step that does not converge stops the run. In the
+playground this is `sfem::NodeObstacleStep` (`frontend/mech`), the obstacle's
+`LinearizedStep`, and the shapes are `sfem::ObstacleShape`.
 - **Globalisation:** a backtracking line search on that residual guards the full step.
   Newton starts from u + dt v, which the stabilised velocity keeps admissible, and falls
   back to u_n if that start cannot be evaluated. When the tangent is indefinite during an
@@ -106,5 +113,5 @@ The contact is frictionless and node-to-obstacle.
   trapezoidal form the material force enters at both ends of the step and the contact
   force once.
 - **Obstacle shape:** a node is held along one normal. Concave creases and convex edges
-  of an obstacle are therefore rounded with `SFEM_OBSTACLE_FILLET`; a jump in the normal
+  of an obstacle are therefore rounded with `obstacle.shape.fillet`; a jump in the normal
   makes Newton cycle.
