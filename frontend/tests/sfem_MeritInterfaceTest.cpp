@@ -19,6 +19,7 @@
 #include "sfem_Function.hpp"
 #include "generated/neumann/op/sfem_GeneratedNeumann.hpp"
 #include "sfem_NeumannConditions.hpp"
+#include "sfem_elasticity_test_problem.hpp"
 
 #include <cmath>
 #include <cstdio>
@@ -413,6 +414,28 @@ namespace {
         return SFEM_TEST_SUCCESS;
     }
 
+    /// With Dirichlet conditions the merit is still the norm of what `Function::gradient`
+    /// assembles, where a constrained row is x - value and not the material's reaction there.
+    int test_constrained_rows_are_the_constraints() {
+        auto            p     = sfem::test::make_cube_problem("GeneratedNeoHookeanOgden", 2, real_t(0.1));
+        const ptrdiff_t ndofs = p.fs->n_dofs();
+        auto            h     = sfem::create_host_buffer<real_t>(ndofs);
+        seed(ndofs, 1, p.x->data());
+        for (ptrdiff_t i = 0; i < ndofs; ++i) p.x->data()[i] *= real_t(0.01);
+        p.f->apply_constraints(p.x->data());
+        seed(ndofs, 2, h->data());
+        p.f->apply_zero_constraints(h->data());
+
+        std::vector<real_t> merits(4, 0);
+        SFEM_TEST_ASSERT(p.f->residual_merit(p.x->data(), h->data(), 4, kSteps, merits.data()) == SFEM_SUCCESS);
+        for (int step = 0; step < 4; ++step) {
+            const real_t reference = merit_the_long_way(p.f, ndofs, p.x->data(), h->data(), kSteps[step]);
+            SFEM_TEST_ASSERT(reference > 0);
+            SFEM_TEST_ASSERT(std::abs(merits[step] - reference) <= real_t(1e-10) * reference);
+        }
+        return SFEM_TEST_SUCCESS;
+    }
+
 }  // namespace
 
 int main(int argc, char *argv[]) {
@@ -426,6 +449,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_a_body_force_can_be_line_searched);
     SFEM_RUN_TEST(test_a_traction_steps_match_the_stepped_value);
     SFEM_RUN_TEST(test_a_multi_block_mesh_still_gets_its_merit);
+    SFEM_RUN_TEST(test_constrained_rows_are_the_constraints);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }
