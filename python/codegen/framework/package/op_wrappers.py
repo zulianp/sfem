@@ -558,8 +558,40 @@ def _inexact_declarations(material):
     int inexact_apply(const real_t *const h, real_t *const out) override;"""
 
 
+def _tangent_is_constant(form_collections):
+    """Whether the material is linear: its tangent, the 2-form, reads no state.
+
+    The 2-form is written in the directions and the parameters, and in the
+    state wherever the material is nonlinear -- the variables the form layer
+    derives from the fields (the deformation gradient) or the field components
+    themselves.  A tangent free of both is the same at every state, so the
+    residual is affine in it, which is what `Op::is_linear` promises: one
+    linear solve is the whole of a solve.  No 2-form, no claim.
+    """
+    import sympy as sp
+
+    from codegen.framework.forms.forms import FormOrder
+
+    if not form_collections:
+        return False
+    for collection in form_collections.values():
+        state = {str(symbol) for symbol in getattr(collection, "variables", ())}
+        for field in collection.fields:
+            components = int(getattr(field, "components", 1) or 1)
+            for component in range(components):
+                state.add("%s%d" % (field.name, component))
+                state.add("%s[%d]" % (field.name, component))
+        tangents = [form for form in getattr(collection, "forms", ()) if getattr(form, "order", None) is FormOrder.TWO]
+        if not tangents:
+            return False
+        for form in tangents:
+            if any(str(symbol) in state for symbol in sp.sympify(form.expression).free_symbols):
+                return False
+    return True
+
+
 def _header(material, residual, publishes_value_steps=None, node_wise=False,
-            holds_time_scheme=None, relaxes=False, state_independent=False):
+            holds_time_scheme=None, relaxes=False, state_independent=False, linear=False):
     """The Op's declared interface.
 
     ``publishes_value_steps`` says whether this Op offers the Newton
@@ -649,7 +681,7 @@ namespace sfem {
     //! "Invalid __global__ atomic of size 8 bytes ... Address 0x3aa240f8 is
     //! out of bounds".
     ExecutionSpace execution_space() const override { return %(execution_space)s; }
-    bool is_linear() const override { return false; }
+    bool is_linear() const override { return %(linear)s; }
     ptrdiff_t n_dofs_domain() const override;
     ptrdiff_t n_dofs_image() const override;
     double flops_value() const override;
@@ -696,6 +728,7 @@ namespace sfem {
 """ % {
         "op": _op_class_name(material),
         "execution_space": current_target().execution_space(),
+        "linear": "true" if linear else "false",
         "header_stem": _op_file_stem(material),
         "stream_member": _op_stream_member(),
         "extra": extra,
@@ -2162,7 +2195,16 @@ namespace sfem {
             inexact % {"op": _op_class_name(material)} + marker,
             1,
         )
-    return _header(material, False, holds_time_scheme=True, relaxes=bool(relaxation)), source
+    return (
+        _header(
+            material,
+            False,
+            holds_time_scheme=True,
+            relaxes=bool(relaxation),
+            linear=_tangent_is_constant(form_collections),
+        ),
+        source,
+    )
 
 
 def _residual_op(material, elements, c_abi_header=None, form_collections=None, kernel_sources=None):
@@ -3606,7 +3648,8 @@ namespace sfem {
     # A volume forcing publishes the stepped 0-form too, now that the energy
     # merit asks every operator for it.
     return _header(material, True, publishes_value_steps=emits_linear_work,
-                   node_wise=emits_merit, state_independent=emits_linear_work), source
+                   node_wise=emits_merit, state_independent=emits_linear_work,
+                   linear=_tangent_is_constant(form_collections)), source
 
 
 def _residual_without_assembly(linear_work):

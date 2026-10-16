@@ -21,7 +21,7 @@ namespace sfem {
     //! "Invalid __global__ atomic of size 8 bytes ... Address 0x3aa240f8 is
     //! out of bounds".
     ExecutionSpace execution_space() const override { return EXECUTION_SPACE_DEVICE; }
-    bool is_linear() const override { return false; }
+    bool is_linear() const override { return true; }
     ptrdiff_t n_dofs_domain() const override;
     ptrdiff_t n_dofs_image() const override;
     double flops_value() const override;
@@ -48,6 +48,7 @@ namespace sfem {
             const real_t *const steps,
             real_t *const out) override;
     bool energy_or_potential_based() const override { return true; }
+    bool residual_depends_on_state() const override { return false; }
     int hessian_crs(const real_t *const x,
             const count_t *const rowptr,
             const idx_t *const colidx,
