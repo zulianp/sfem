@@ -29,14 +29,14 @@ class Row:
     __slots__ = ("time", "angle", "released", "torque", "ux", "uy", "uz", "gnorm")
 
     def __init__(self, d):
-        self.time = float(d["time"])
+        self.time = float(d["t"])
         self.angle = float(d["angle"])
-        self.released = int(d["released"]) != 0
+        self.released = int(float(d["released"])) != 0
         self.torque = float(d["torque"])
         self.ux = float(d["ux"])
         self.uy = float(d["uy"])
         self.uz = float(d["uz"])
-        self.gnorm = float(d["gnorm"])
+        self.gnorm = float(d["final"])
 
     @property
     def twist_magnitude(self) -> float:
@@ -46,7 +46,8 @@ class Row:
 
 def read_history(path: str) -> List[Row]:
     with open(path, newline="") as fh:
-        rows = [Row(d) for d in csv.DictReader(fh)]
+        # The playground's history opens with the initial state, which no step has measured.
+        rows = [Row(d) for d in csv.DictReader(fh) if d["status"] != "initial"]
     if not rows:
         raise SystemExit(f"[validate] {path} has no rows")
     return rows
@@ -146,7 +147,7 @@ def fit_relaxation(rows: List[Row], taus: List[float], t_ramp: float):
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("history", help="history.csv written by prony_visco_torsion")
+    ap.add_argument("history", help="history.csv written by the playground, with a control_point and a torque probe")
     ap.add_argument("--control", help="history.csv of the never-released control run")
     ap.add_argument(
         "--case",
@@ -184,6 +185,11 @@ def main() -> int:
             "tolerance the step converged to, not by machine precision"
         ),
     )
+    ap.add_argument(
+        "--no-prony-recovery",
+        action="store_true",
+        help="report the recovered Prony weights without gating on them",
+    )
     args = ap.parse_args()
 
     rows = read_history(args.history)
@@ -197,27 +203,22 @@ def main() -> int:
     case_terms: List[dict] = []
     ramp_time = 0.0
     if args.case:
-        try:
-            import yaml as _yaml
-        except ImportError:
-            pass
-        else:
-            with open(args.case) as fh:
-                _case = _yaml.safe_load(fh)
-            dynamic_run = (_case.get("dynamics") or {}).get("type", "quasi_static") != "quasi_static"
-            _torsion = _case.get("torsion") or {}
-            creep_run = _torsion.get("control", "angle") == "torque"
-            ramp_time = float(_torsion.get("ramp_time", 0.0))
-            case_terms = (_case.get("material") or {}).get("prony") or []
-            # A case can opt out of the Prony recovery gate. The fit assumes the reported moment
-            # is proportional to the deviatoric relaxation function, which is a good assumption
-            # for torsion of this beam and a poor one for anything that stretches fibres --
-            # bending carries a much larger unrelaxed share, and the fit hands it to g_inf. The
-            # residual does not catch that: the exponentials still describe the decay, it is the
-            # decomposition that is wrong.
-            gate_recovery = bool((_case.get("validate") or {}).get("prony_recovery", True))
-            if dynamic_run:
-                print("[validate] dynamic run: the released end may ring through the undeformed state")
+        from playground_case import load as _load
+
+        _case = _load(args.case)
+        dynamic_run = _case.dynamic
+        creep_run = _case.creep
+        ramp_time = _case.ramp_time
+        case_terms = _case.terms
+        # A case can opt out of the Prony recovery gate. The fit assumes the reported moment
+        # is proportional to the deviatoric relaxation function, which is a good assumption
+        # for torsion of this beam and a poor one for anything that stretches fibres --
+        # bending carries a much larger unrelaxed share, and the fit hands it to g_inf. The
+        # residual does not catch that: the exponentials still describe the decay, it is the
+        # decomposition that is wrong.
+        gate_recovery = not args.no_prony_recovery
+        if dynamic_run:
+            print("[validate] dynamic run: the released end may ring through the undeformed state")
 
     for r in rows:
         if not math.isfinite(r.gnorm) or not math.isfinite(r.torque):
@@ -369,77 +370,69 @@ def main() -> int:
             "proportional to the relaxation function, which it is not once inertia contributes"
         )
     elif args.case:
-        try:
-            import yaml
-        except ImportError:
-            print("[validate] PyYAML not available; skipping the Prony recovery check")
+        case = _case
+        terms = case.terms
+        taus = [float(t["tau"]) for t in terms]
+        g_in = [float(t["g"]) for t in terms]
+        ramp = case.ramp_time
+
+        # WLF shifts the relaxation times, so the basis to fit in is tau/a_T, not the
+        # nominal tau. Fitting the nominal ones against a shifted response is fitting the
+        # wrong exponentials and returns weights that mean nothing.
+        wlf = case.wlf
+        if wlf:
+            dT = float(case.temperature if case.temperature is not None else 20.0) - float(wlf["T_ref"])
+            denom = float(wlf["C2"]) + dT
+            a_T = 10.0 ** (float(wlf["C1"]) * dT / denom) if abs(denom) > 1e-10 else 1.0
+            taus = [t / a_T for t in taus]
+            print(f"[validate] WLF is on: a_T = {a_T:.4g}, fitting shifted tau = "
+                  + ", ".join(f"{t:.4g}" for t in taus))
+
+        if not taus:
+            print("[validate] the case has no Prony terms; nothing to recover")
+        elif len(plateau) < 2 * (len(taus) + 1):
+            failures.append(
+                f"the hold phase has {len(plateau)} samples, too few to recover "
+                f"{len(taus) + 1} coefficients"
+            )
         else:
-            with open(args.case) as fh:
-                case = yaml.safe_load(fh)
-
-            material = case.get("material") or {}
-            terms = material.get("prony") or []
-            taus = [float(t["tau"]) for t in terms]
-            g_in = [float(t["g"]) for t in terms]
-            ramp = float((case.get("torsion") or {}).get("ramp_time", 0.0))
-
-            # WLF shifts the relaxation times, so the basis to fit in is tau/a_T, not the
-            # nominal tau. Fitting the nominal ones against a shifted response is fitting the
-            # wrong exponentials and returns weights that mean nothing.
-            wlf = material.get("wlf") or {}
-            if wlf.get("enabled"):
-                dT = float(wlf.get("temperature", 20.0)) - float(wlf.get("T_ref", -54.29))
-                denom = float(wlf.get("C2", 47.4781)) + dT
-                a_T = 10.0 ** (float(wlf.get("C1", 16.6253)) * dT / denom) if abs(denom) > 1e-10 else 1.0
-                taus = [t / a_T for t in taus]
-                print(f"[validate] WLF is on: a_T = {a_T:.4g}, fitting shifted tau = "
-                      + ", ".join(f"{t:.4g}" for t in taus))
-
-            if not taus:
-                print("[validate] the case has no Prony terms; nothing to recover")
-            elif len(plateau) < 2 * (len(taus) + 1):
-                failures.append(
-                    f"the hold phase has {len(plateau)} samples, too few to recover "
-                    f"{len(taus) + 1} coefficients"
-                )
+            g_out, rms = fit_relaxation(plateau, taus, ramp)
+            if abs(plateau[0].torque) <= 0:
+                failures.append("the torque at the start of the hold is zero")
             else:
-                g_out, rms = fit_relaxation(plateau, taus, ramp)
-                if abs(plateau[0].torque) <= 0:
-                    failures.append("the torque at the start of the hold is zero")
-                else:
-                    g_inf_in = 1.0 - sum(g_in)
+                g_inf_in = 1.0 - sum(g_in)
 
+                print(
+                    f"[validate] recovered relaxation function from the hold "
+                    f"({len(plateau)} samples, relative rms {rms:.3e}):"
+                )
+                print(f"    g_inf: asked {g_inf_in:.4f}  recovered {g_out[0]:.4f}")
+                for i, tau in enumerate(taus):
                     print(
-                        f"[validate] recovered relaxation function from the hold "
-                        f"({len(plateau)} samples, relative rms {rms:.3e}):"
+                        f"    g[{i}] (tau={tau:g}): asked {g_in[i]:.4f}  "
+                        f"recovered {g_out[i + 1]:.4f}"
                     )
-                    print(f"    g_inf: asked {g_inf_in:.4f}  recovered {g_out[0]:.4f}")
-                    for i, tau in enumerate(taus):
-                        print(
-                            f"    g[{i}] (tau={tau:g}): asked {g_in[i]:.4f}  "
-                            f"recovered {g_out[i + 1]:.4f}"
-                        )
 
-                    # The recovered weights are the measurement; the torque is proportional to
-                    # the relaxation function only to the extent that the response is quasi
-                    # linear, so a large twist will not reproduce the inputs exactly and the
-                    # tolerance is a statement about how far from linear the case is.
+                # The recovered weights are the measurement; the torque is proportional to
+                # the relaxation function only to the extent that the response is quasi
+                # linear, so a large twist will not reproduce the inputs exactly and the
+                # tolerance is a statement about how far from linear the case is.
+                if not gate_recovery:
+                    print("[validate] the case opts out of gating on the recovered weights; "
+                          "reported above for information only")
+                elif abs(g_out[0] - g_inf_in) > args.fit_tol:
+                    failures.append(
+                        f"recovered g_inf {g_out[0]:.4f} differs from the case's "
+                        f"{g_inf_in:.4f} by more than {args.fit_tol}"
+                    )
+                for i, tau in enumerate(taus):
                     if not gate_recovery:
-                        print("[validate] the case opts out of gating on the recovered weights; "
-                              "reported above for information only")
-                    elif abs(g_out[0] - g_inf_in) > args.fit_tol:
+                        break
+                    if abs(g_out[i + 1] - g_in[i]) > args.fit_tol:
                         failures.append(
-                            f"recovered g_inf {g_out[0]:.4f} differs from the case's "
-                            f"{g_inf_in:.4f} by more than {args.fit_tol}"
+                            f"recovered g[{i}] (tau={tau:g}) {g_out[i + 1]:.4f} differs "
+                            f"from the case's {g_in[i]:.4f} by more than {args.fit_tol}"
                         )
-                    for i, tau in enumerate(taus):
-                        if not gate_recovery:
-                            break
-                        if abs(g_out[i + 1] - g_in[i]) > args.fit_tol:
-                            failures.append(
-                                f"recovered g[{i}] (tau={tau:g}) {g_out[i + 1]:.4f} differs "
-                                f"from the case's {g_in[i]:.4f} by more than {args.fit_tol}"
-                            )
 
     # --- against the control run -----------------------------------------------------------
     if args.control:

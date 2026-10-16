@@ -76,6 +76,7 @@ namespace sfem {
         void add_operator(const std::shared_ptr<Op> &op);
         void add_constraint(const std::shared_ptr<Constraint> &c);
         void remove_constraint(const std::shared_ptr<Constraint> &c);
+        bool has_constraint(const std::shared_ptr<Constraint> &c) const;
         void clear_constraints();
         void add_dirichlet_conditions(const std::shared_ptr<DirichletConditions> &c);
 

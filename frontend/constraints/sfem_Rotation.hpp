@@ -31,6 +31,8 @@ namespace sfem {
 
         /// Prescribes `angle` directly, whatever the profile says.
         int set_angle(const real_t angle);
+        /// The angle prescribed last.
+        real_t angle() const;
 
         /// The moment about the axis exerted by `force` on the rotated nodes, with the lever
         /// arms in the configuration displaced by `x`: sum_n (p_a0 f_a1 - p_a1 f_a0). With the

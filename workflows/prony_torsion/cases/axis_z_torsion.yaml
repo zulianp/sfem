@@ -11,73 +11,71 @@
 # nonsense -- a moment that changed sign every few steps and a 'recovery' that ran backwards.
 # The angle is small for the same reason bending is not torsion: 0.05 rad of rotation about
 # an in-plane axis already sweeps the free end a long way.
-
-mesh: mesh
-verbose: false
+#
+# (The playground's rotation takes its axis at run time, sfem::Rotation.)
 
 # Bending stretches fibres, so a much larger share of the moment is carried by the part the
 # Prony series does not relax, and the recovery fit hands that share to g_inf. The fit residual
 # does not catch it -- the exponentials still describe the decay -- so the gate is switched off
 # here and the recovered weights are reported for information only.
-validate:
-  prony_recovery: false
+# validate_args: --no-prony-recovery
+
+mesh:
+  path: mesh
+  packed: false
+  sidesets:
+    - {name: left, file: mesh/surface/sidesets/left}
+    - {name: right, file: mesh/surface/sidesets/right}
+
 material:
+  type: GeneratedMooneyRivlinProny
   C10: 0.3
   C01: 0.05
   K: 50.0
-  prony:
-  - g: 0.4
-    tau: 1.0
-  - g: 0.3
-    tau: 10.0
-  wlf:
-    enabled: false
-  history_storage: float32
+  relaxation:
+    iso:
+      prony:
+        - {g: 0.4, tau: 1.0}
+        - {g: 0.3, tau: 10.0}
+      history_storage: float32
+
 time:
   dt: 0.2
   t_end: 24.0
-dynamics:
-  type: quasi_static
-torsion:
-  sideset: mesh/surface/sidesets/right
-  axis: z
-  rotation_center:
-  - 0.0
-  - 0.1
-  - 0.1
-  angle: 0.05
-  ramp_time: 1.0
-  release:
-    mode: free
-    time: 12.0
+
+regime: quasi_static
+
+constraints:
+  - type: rotation
+    sideset: right
+    axis: z
+    center: [0.0, 0.1, 0.1]
+    angle: 0.05
+    profile: {type: linear_ramp, start_time: 0, end_time: 1.0, start_value: 0, end_value: 1}
+    release: 12.0
+
 solver:
   newton:
     max_it: 300
-    tol: 1.0e-08
-    alpha: 1.0
-    line_search: true
+    atol: 1.0e-08
+    rtol: 0
+    verbose: false
   linear:
     type: cg
-    rtol: 1.0e-10
+    preconditioner: jacobi
     max_it: 4000
-    preconditioner: true
+
 output:
   path: results_axis_z
   export_freq: 1000
-  control_point:
-  - 1.0
-  - 0.2
-  - 0.2
-  history_csv: history.csv
+  history_csv: results_axis_z/history.csv
+  probes:
+    - {type: control_point, at: [1.0, 0.2, 0.2]}
+    - {type: torque, constraint: 0}
+
 dirichlet_conditions:
-- type: sideset
-  format: file
-  path: mesh/surface/sidesets/left
-  value:
-  - 0
-  - 0
-  - 0
-  component:
-  - 0
-  - 1
-  - 2
+  - type: sideset
+    format: name
+    name: left
+    value: [0, 0, 0]
+    component: [0, 1, 2]

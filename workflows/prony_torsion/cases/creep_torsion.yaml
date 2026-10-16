@@ -16,9 +16,11 @@
 # The twist is now the unknown: the driver wraps the nonlinear solve in a scalar secant
 # iteration on the angle, driving the reaction torque onto the target. It is warm-started
 # from the previous step, so it costs one or two extra solves per step.
+#
+# (In the playground that is the rotation's `control`: sfem::TorqueControl around Newton, the
+# profile scaling the target torque. The Newton and linear columns of the history count every
+# solve of the secant iteration.)
 
-mesh: mesh
-verbose: false
 #
 # The torque is ramped over a single step, not over a second. The creep factor is measured
 # against the INSTANTANEOUS twist, and a ramp comparable to tau_fast lets the fast mode creep
@@ -29,63 +31,61 @@ verbose: false
 # t_end is long because the creep RETARDATION time is not the relaxation time: it is longer
 # by roughly 1/g_inf, so tau_slow = 10 s here means the structure is still turning at t = 60.
 
+mesh:
+  path: mesh
+  packed: false
+  sidesets:
+    - {name: left, file: mesh/surface/sidesets/left}
+    - {name: right, file: mesh/surface/sidesets/right}
+
 material:
+  type: GeneratedMooneyRivlinProny
   C10: 0.3
   C01: 0.05
   K: 50.0
-  prony:
-  - g: 0.4
-    tau: 1.0
-  - g: 0.3
-    tau: 10.0
-  wlf:
-    enabled: false
-  history_storage: float32
+  relaxation:
+    iso:
+      prony:
+        - {g: 0.4, tau: 1.0}
+        - {g: 0.3, tau: 10.0}
+      history_storage: float32
+
 time:
   dt: 0.2
   t_end: 120.0
-dynamics:
-  type: quasi_static
-torsion:
-  sideset: mesh/surface/sidesets/right
-  axis: x
-  rotation_center:
-  - 0.0
-  - 0.1
-  - 0.1
-  ramp_time: 0.2
-  release:
-    mode: hold
-  control: torque
-  torque: 8.0e-05
+
+regime: quasi_static
+
+constraints:
+  - type: rotation
+    sideset: right
+    axis: x
+    center: [0.0, 0.1, 0.1]
+    control: {torque: 8.0e-05}
+    profile: {type: linear_ramp, start_time: 0, end_time: 0.2, start_value: 0, end_value: 1}
+
 solver:
   newton:
     max_it: 300
-    tol: 1.0e-08
-    alpha: 1.0
-    line_search: true
+    atol: 1.0e-08
+    rtol: 0
+    verbose: false
   linear:
     type: cg
-    rtol: 1.0e-10
+    preconditioner: jacobi
     max_it: 4000
-    preconditioner: true
+
 output:
   path: results_creep
   export_freq: 10
-  control_point:
-  - 1.0
-  - 0.2
-  - 0.2
-  history_csv: history.csv
+  history_csv: results_creep/history.csv
+  probes:
+    - {type: control_point, at: [1.0, 0.2, 0.2]}
+    - {type: torque, constraint: 0}
+
 dirichlet_conditions:
-- type: sideset
-  format: file
-  path: mesh/surface/sidesets/left
-  value:
-  - 0
-  - 0
-  - 0
-  component:
-  - 0
-  - 1
-  - 2
+  - type: sideset
+    format: name
+    name: left
+    value: [0, 0, 0]
+    component: [0, 1, 2]

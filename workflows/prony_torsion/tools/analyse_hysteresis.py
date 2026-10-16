@@ -106,7 +106,7 @@ def analyse(rows, period: float, amplitude: float):
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("history", help="history.csv from a run with torsion.profile: cyclic")
+    ap.add_argument("history", help="history.csv from a run whose rotation has a sine profile")
     ap.add_argument("--case", help="the case YAML, for the period, amplitude and Prony terms")
     ap.add_argument("--period", type=float)
     ap.add_argument("--amplitude", type=float)
@@ -118,13 +118,12 @@ def main() -> int:
 
     period, amplitude, g, tau = args.period, args.amplitude, [], []
     if args.case:
-        import yaml
+        from playground_case import load
 
-        case = yaml.safe_load(Path(args.case).read_text())
-        torsion = case.get("torsion") or {}
-        period = period or float(torsion.get("period", 0))
-        amplitude = amplitude or float(torsion.get("angle", 0))
-        terms = (case.get("material") or {}).get("prony") or []
+        case = load(args.case)
+        period = period or float(case.period or 0)
+        amplitude = amplitude or case.amplitude
+        terms = case.terms
         g = [float(t["g"]) for t in terms]
         tau = [float(t["tau"]) for t in terms]
 
@@ -133,8 +132,9 @@ def main() -> int:
         return 1
 
     rows = [
-        (float(r["time"]), float(r["angle"]), float(r["torque"]))
+        (float(r["t"]), float(r["angle"]), float(r["torque"]))
         for r in csv.DictReader(open(args.history))
+        if r["status"] != "initial"
     ]
     m = analyse(rows, period, amplitude)
 

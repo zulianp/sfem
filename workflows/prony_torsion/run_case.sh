@@ -12,7 +12,7 @@ set -euo pipefail
 HERE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd -P)"
 ROOT_DIR="$(cd -- "$HERE/../.." >/dev/null 2>&1 && pwd -P)"
 PYTHON="${PRONY_PYTHON:-$ROOT_DIR/venv/bin/python}"
-EXE="${PRONY_EXE:-$HERE/build/prony_visco_torsion}"
+EXE="${PRONY_EXE:-$ROOT_DIR/build/playground}"
 
 if [[ $# -lt 1 ]]; then
     echo "usage: $0 <case-name> [workdir]" >&2
@@ -30,7 +30,7 @@ CASE_FILE="$HERE/cases/$CASE_NAME.yaml"
 WORKDIR="${2:-$HERE/output}"
 
 [[ -f "$CASE_FILE" ]] || { echo "no such case: $CASE_FILE" >&2; exit 1; }
-[[ -x "$EXE" ]] || { echo "missing executable: $EXE -- build the spike first" >&2; exit 1; }
+[[ -x "$EXE" ]] || { echo "missing executable: $EXE -- build SFEM's playground first (or set PRONY_EXE)" >&2; exit 1; }
 [[ -x "$PYTHON" ]] || { echo "missing python: $PYTHON (set PRONY_PYTHON)" >&2; exit 1; }
 
 mkdir -p "$WORKDIR"
@@ -50,8 +50,8 @@ cp "$CASE_FILE" "$WORKDIR/"
 # iteration costs more to hand to an OpenMP team than to run. See the README.
 export OMP_NUM_THREADS="${OMP_NUM_THREADS:-1}"
 
-RESULTS="$(sed -n 's/^  path: *//p' "$CASE_FILE" | head -1)"
-RESULTS="${RESULTS:-output}"
+# output.path, read as YAML: mesh.path is the first `path:` in the file.
+RESULTS="$("$PYTHON" -c 'import sys, yaml; print(yaml.safe_load(open(sys.argv[1]))["output"]["path"])' "$CASE_FILE")"
 
 # Clear this case's results before running, and only this case's -- the mesh beside it is
 # deliberately reused. Field files are named by an export counter, not by time, so a shorter
@@ -71,10 +71,13 @@ if [[ -f "$WORKDIR/$RESULTS/out/time.txt" ]]; then
 fi
 
 echo
-if grep -q '^  profile: cyclic' "$CASE_NAME.yaml"; then
+# A case may name extra validator arguments on a `# validate_args:` line.
+VALIDATE_ARGS="$(sed -n 's/^# validate_args: *//p' "$CASE_NAME.yaml" | head -1)"
+if grep -q 'type: sine' "$CASE_NAME.yaml"; then
     "$PYTHON" "$HERE/tools/analyse_hysteresis.py" "$WORKDIR/$RESULTS/history.csv" --case "$WORKDIR/$CASE_NAME.yaml"
 else
-    "$PYTHON" "$HERE/tools/validate_torsion_release.py" "$WORKDIR/$RESULTS/history.csv" --case "$WORKDIR/$CASE_NAME.yaml"
+    # shellcheck disable=SC2086
+    "$PYTHON" "$HERE/tools/validate_torsion_release.py" "$WORKDIR/$RESULTS/history.csv" --case "$WORKDIR/$CASE_NAME.yaml" $VALIDATE_ARGS
 fi
 
 echo

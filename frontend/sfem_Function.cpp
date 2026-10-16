@@ -307,6 +307,10 @@ namespace sfem {
         impl_->constraints.erase(it);
     }
 
+    bool Function::has_constraint(const std::shared_ptr<Constraint> &c) const {
+        return std::find(impl_->constraints.begin(), impl_->constraints.end(), c) != impl_->constraints.end();
+    }
+
     void Function::clear_constraints() { impl_->constraints.clear(); }
 
     void Function::add_dirichlet_conditions(const std::shared_ptr<DirichletConditions> &c) { add_constraint(c); }

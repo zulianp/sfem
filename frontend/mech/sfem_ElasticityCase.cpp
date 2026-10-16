@@ -43,6 +43,9 @@ namespace sfem {
                 "constraints[].angle",
                 "constraints[].profile.*",
                 "constraints[].release",
+                "constraints[].control.torque",
+                "constraints[].control.tol",
+                "constraints[].control.max_it",
                 "fields[].name",
                 "fields[].file",
                 "fields[].values_per_element",
@@ -88,6 +91,7 @@ namespace sfem {
                 "output.probes[].type",
                 "output.probes[].at",
                 "output.probes[].rates",
+                "output.probes[].constraint",
         };
 
         bool starts_with(const std::string &s, const std::string &prefix) { return s.compare(0, prefix.size(), prefix) == 0; }
