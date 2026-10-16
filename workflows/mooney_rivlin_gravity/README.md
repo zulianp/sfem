@@ -99,7 +99,9 @@ The contact is frictionless and node-to-obstacle.
   (2008) in Klapproth's form (ZIB-Report 12-18, eqs. 12d-12f). The reaction is implicit
   only, so the acceleration carried forward is the material's. The velocity is projected
   so the next predicted position is admissible. Plain Newmark carries the reaction into
-  the next predictor and chatters.
+  the next predictor and chatters. The material holds the method as a time scheme,
+  `sfem::ContactStabilisedNewmarkScheme` (`frontend/ops`), with the contact
+  `sfem::NodeObstacleContact` (`frontend`); the cantilever case holds `sfem::NewmarkScheme`.
 - **Contact force:** the reported force is half the contact residual. In this
   trapezoidal form the material force enters at both ends of the step and the contact
   force once.
