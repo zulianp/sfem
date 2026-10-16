@@ -151,6 +151,7 @@ def load_affine_mesh(output):
 
 
 def _find_component(folder, name, component):
+    """The component file of a field; of a transient field, the one of its last export."""
     candidates = []
     for path in sorted(Path(folder).glob(f"{name}.{component}.*")):
         if not path.is_file():
@@ -160,9 +161,11 @@ def _find_component(folder, name, component):
         except ValueError:
             continue
         candidates.append(path)
-    if len(candidates) != 1:
+    if not candidates:
+        raise ValueError(f"expected a {name} component {component} in {folder}, found none")
+    if len(candidates) > 1 and not all(path.name.split(".")[2].isdigit() for path in candidates):
         raise ValueError(f"expected one {name} component {component} in {folder}, found {len(candidates)}")
-    return candidates[0]
+    return candidates[-1]
 
 
 def read_component_output(folder, name, dimension, node_count):
@@ -176,29 +179,25 @@ def read_component_output(folder, name, dimension, node_count):
     return np.column_stack(components)
 
 
-def read_mode_solution(solution_root, mode, driver_kind, dimension, node_count):
-    solution = Path(solution_root) / mode
-    if driver_kind == "linear":
-        field_dir = solution
-        displacement_name = "x"
-    elif driver_kind == "hyperelastic":
-        field_dir = solution / "out"
-        displacement_name = "disp"
-    else:
-        raise ValueError(f"unsupported affine driver kind: {driver_kind}")
-
-    displacement = read_component_output(field_dir, displacement_name, dimension, node_count)
-    reaction = read_component_output(field_dir, "material_reaction", dimension, node_count)
-    quantities_path = solution / "quantities.yaml"
+def read_final_objective(solution):
+    """The material objective of the last step in `solution/quantities.yaml`."""
+    quantities_path = Path(solution) / "quantities.yaml"
     quantities = yaml.safe_load(quantities_path.read_text(encoding="utf-8"))
-    if driver_kind == "linear":
-        objective = quantities.get("material_objective")
-    else:
-        history = quantities.get("material_objective_history")
-        objective = history[-1].get("value") if isinstance(history, list) and history else None
+    history = quantities.get("material_objective_history")
+    objective = history[-1].get("value") if isinstance(history, list) and history else None
     if not isinstance(objective, (int, float)) or not np.isfinite(float(objective)):
         raise ValueError(f"missing finite material objective in {quantities_path}")
-    return displacement, reaction, float(objective)
+    return float(objective)
+
+
+def read_mode_solution(solution_root, mode, dimension, node_count):
+    """The displacement, the material reaction and the objective a solve left in
+    `solution_root/mode`: fields under `out/`, the objective in `quantities.yaml`."""
+    solution = Path(solution_root) / mode
+    field_dir = solution / "out"
+    displacement = read_component_output(field_dir, "disp", dimension, node_count)
+    reaction = read_component_output(field_dir, "material_reaction", dimension, node_count)
+    return displacement, reaction, read_final_objective(solution)
 
 
 def affine_checks(

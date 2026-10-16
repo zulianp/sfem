@@ -1,0 +1,15 @@
+# The blade, clamped at its inlet and pulled along x at its outlet. Run by hyperelasticity_blade.sh.
+mesh:
+  path: geometry_blade/blade
+  packed: false
+  sidesets:
+    - {name: inlet, file: geometry_blade/inlet}
+    - {name: outlet, file: geometry_blade/outlet}
+material: {type: NeoHookeanOgden}
+dirichlet_conditions:
+  - {type: sideset, format: name, name: inlet, value: [0, 0, 0], component: [0, 1, 2]}
+  - {type: sideset, format: name, name: outlet, value: [0.2, 0.0, 0], component: [0, 1, 2]}
+regime: steady
+solver:
+  linear: {format: MF, preconditioner: none}
+output: {path: output_blade}

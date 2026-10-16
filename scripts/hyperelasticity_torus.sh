@@ -51,6 +51,6 @@ echo "OMP_PROC_BIND=$OMP_PROC_BIND"
 
 rm -rf torus_output
 export SFEM_NEOHOOKEAN_OGDEN_USE_AOS=1
-$LAUNCH hyperelasticy torus_geometry/torus dirichlet_torus.yaml torus_output
+$LAUNCH playground hyperelasticity_torus.yaml
 raw_to_db.py torus_output/mesh torus_output.vtk -p 'torus_output/out/*.raw' $EXTRA_OPTIONS
 

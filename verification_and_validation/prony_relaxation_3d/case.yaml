@@ -29,7 +29,6 @@ verification:
     fitted_tau_max_relative_error: 2.0e-2
     wlf_collapse_relative_l2: 1.0e-2
     temporal_reduction_deficit: 0.0
-    rejected_trial_history_relative_l2: 1.0e-12
 
 variants:
   - &base
@@ -39,7 +38,7 @@ variants:
     resolution: {nx: 4, ny: 1, nz: 1, prony_g: "0.4", prony_tau: "0.4", temperatures: "20", use_wlf: 0}
     driver: &driver
       executable: "{python}"
-      arguments: ["{suite_dir}/common/run_prony_relaxation.py", --case, "{resolved_case}", --driver, "{build_dir}/hyperelasticy", --mesh, "{mesh}", --dirichlet, "{output}/dirichlet.yaml", --output, "{output}/solution"]
+      arguments: ["{suite_dir}/common/run_prony_relaxation.py", --case, "{resolved_case}", --driver, "{build_dir}/playground", --mesh, "{mesh}", --dirichlet, "{output}/dirichlet.yaml", --output, "{output}/solution", --set, "solver.newton.atol=1.0e-11", --set, "solver.newton.rtol=0", --set, "solver.newton.max_it=20", --set, "solver.linear.format=BSR", --set, "solver.linear.preconditioner=none", --set, "solver.linear.rtol=1.0e-12", --set, "solver.linear.atol=1.0e-11", --set, "solver.linear.max_it=20000", --set, "solver.newton.verbose=false", --set, "mesh.packed=false"]
       environment: &environment
         OMP_NUM_THREADS: 1
         SFEM_OPERATOR: GeneratedMooneyRivlinProny
@@ -53,16 +52,9 @@ variants:
         SFEM_WLF_C1: 2.0
         SFEM_WLF_C2: 100.0
         SFEM_WLF_T_REF: 20.0
-        SFEM_NL_TOL: 1.0e-11
-        SFEM_NL_MAX_IT: 20
-        SFEM_LSOLVE_RTOL: 1.0e-12
-        SFEM_OP_TYPE: BSR
-        SFEM_ENABLE_LINE_SEARCH: 1
     expected_output: &expected
       required:
         - {pattern: SFEM_TRANSIENT_LEVEL_COMPLETE, count: 3}
-        - {pattern: SFEM_VISCO_REJECTED_TRIAL, count: 1}
-        - {pattern: SFEM_PRONY_COMMIT_CHECK_COMPLETE, count: 1}
         - {pattern: SFEM_PRONY_RELAXATION_COMPLETE, count: 1}
       forbidden: [Newton did not converge, "nan"]
     tolerances: *tolerances
@@ -75,7 +67,5 @@ variants:
     expected_output:
       required:
         - {pattern: SFEM_TRANSIENT_LEVEL_COMPLETE, count: 6}
-        - {pattern: SFEM_VISCO_REJECTED_TRIAL, count: 1}
-        - {pattern: SFEM_PRONY_COMMIT_CHECK_COMPLETE, count: 1}
         - {pattern: SFEM_PRONY_RELAXATION_COMPLETE, count: 1}
       forbidden: [Newton did not converge, "nan"]

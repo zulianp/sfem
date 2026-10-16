@@ -17,7 +17,7 @@ and step count.  Nothing here asserts: it is a characterisation, read beside the
 bound `sfem_PronyRelaxationTest` holds the codecs to.
 
     sweep_storage.py --variant-dir <run_all output>/prony_relaxation_3d/generated_multi_term_reference \
-                     --driver <build>/hyperelasticy --out <dir>
+                     --driver <build>/playground --out <dir>
 """
 
 import argparse
@@ -35,8 +35,7 @@ for path in (SUITE_DIR, CASE_DIR):
         sys.path.insert(0, str(path))
 
 from common.metrics import relative_l2_error  # noqa: E402
-from common.run_prony_relaxation import generated_operator_config  # noqa: E402
-from common.transient import run_checked  # noqa: E402
+from common.run_prony_relaxation import run_level  # noqa: E402
 from oracle import elastic_axial_reaction, parse_series, relaxation_factor  # noqa: E402
 from verify import reaction_history  # noqa: E402
 
@@ -72,14 +71,12 @@ def main():
     duration = float(case["time"]["duration"])
     dt = float(case["time"]["time_steps"][-1])
     steps = round(duration / dt)
-    environment.update(
-        {
-            "SFEM_DT": str(dt),
-            "SFEM_LOAD_STEPS": str(steps),
-            "SFEM_TEMPERATURE": str(temperature),
-            "SFEM_EXPORT_FREQ": str(steps),
-            "SFEM_VISCO_REJECT_TRIAL": "0",
-        }
+    arguments = [str(value) for value in case["driver"]["arguments"]]
+    run_args = argparse.Namespace(
+        driver=args.driver,
+        mesh=args.variant_dir / "mesh",
+        dirichlet=args.variant_dir / "dirichlet.yaml",
+        overrides=[arguments[i + 1] for i, value in enumerate(arguments[:-1]) if value == "--set"],
     )
 
     g = parse_series(str(resolution["prony_g"]))
@@ -96,16 +93,7 @@ def main():
         output.mkdir(parents=True, exist_ok=True)
         run_environment = dict(environment)
         run_environment["SFEM_PRONY_HISTORY_STORAGE"] = storage
-        config = output / "operator.yaml"
-        config.write_text(
-            yaml.safe_dump(generated_operator_config(run_environment, temperature), sort_keys=False),
-            encoding="utf-8",
-        )
-        run_environment["SFEM_OPERATOR_CONFIG"] = str(config)
-        run_checked(
-            [args.driver, args.variant_dir / "mesh", args.variant_dir / "dirichlet.yaml", output],
-            run_environment,
-        )
+        run_level(run_args, output, duration, dt, temperature, run_environment)
         times, reaction = reaction_history(output, expected_times)
         results[storage] = (times, reaction / elastic)
 

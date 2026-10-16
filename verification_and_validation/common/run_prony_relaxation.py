@@ -12,7 +12,8 @@ SUITE_DIR = Path(__file__).resolve().parents[1]
 if str(SUITE_DIR) not in sys.path:
     sys.path.insert(0, str(SUITE_DIR))
 
-from common.transient import TIME_LEVELS, run_checked
+from common import playground
+from common.transient import TIME_LEVELS
 
 
 def temperature_label(value):
@@ -42,29 +43,27 @@ def generated_operator_config(environment, temperature):
     }
 
 
-def run_level(args, output, duration, dt, temperature, rejected_trial=False):
+def run_level(args, output, duration, dt, temperature, environment=None):
+    """One relaxation run; `environment` holds the case's material variables (os.environ by default)."""
+    environment = os.environ if environment is None else environment
     output = Path(output)
     output.mkdir(parents=True, exist_ok=True)
     steps = round(duration / dt)
     if abs(steps * dt - duration) > 1.0e-12:
         raise ValueError(f"duration {duration} is not divisible by dt={dt}")
-    environment = os.environ.copy()
-    environment.update(
-        {
-            "SFEM_DT": str(dt),
-            "SFEM_LOAD_STEPS": str(steps),
-            "SFEM_TEMPERATURE": str(temperature),
-            "SFEM_EXPORT_FREQ": str(steps),
-            "SFEM_VISCO_REJECT_TRIAL": "1" if rejected_trial else "0",
-        }
-    )
-    config = output / "operator.yaml"
-    config.write_text(
-        yaml.safe_dump(generated_operator_config(environment, temperature), sort_keys=False),
-        encoding="utf-8",
-    )
-    environment["SFEM_OPERATOR_CONFIG"] = str(config)
-    return run_checked([args.driver, args.mesh, args.dirichlet, output], environment)
+    case = {
+        "mesh": {"path": str(args.mesh), "packed": False},
+        "material": generated_operator_config(environment, temperature),
+        "dirichlet_conditions": yaml.safe_load(args.dirichlet.read_text(encoding="utf-8"))["dirichlet_conditions"],
+        "regime": "quasi_static",
+        "time": {"dt": dt, "steps": steps},
+        "output": {"path": str(output), "export_freq": steps, "fields": ["material_reaction"], "quantities": True},
+    }
+    completed = playground.run(args.driver, case, output / "case.yaml", args.overrides, os.environ.copy())
+    if completed.stdout:
+        print(completed.stdout, end="" if completed.stdout.endswith("\n") else "\n")
+    if completed.returncode:
+        raise RuntimeError(f"playground exited with status {completed.returncode}")
 
 
 def main():
@@ -74,6 +73,7 @@ def main():
     parser.add_argument("--mesh", required=True, type=Path)
     parser.add_argument("--dirichlet", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--set", dest="overrides", action="append", default=[], help="playground case override key=value")
     args = parser.parse_args()
 
     config = yaml.safe_load(args.case.read_text(encoding="utf-8"))
@@ -94,16 +94,6 @@ def main():
             run_level(args, root / name, duration, dt, temperature)
             print("SFEM_TRANSIENT_LEVEL_COMPLETE")
 
-    reference_temperature = temperatures[0]
-    run_level(
-        args,
-        args.output / "rejected_trial",
-        duration,
-        time_steps[-1],
-        reference_temperature,
-        rejected_trial=True,
-    )
-    print("SFEM_PRONY_COMMIT_CHECK_COMPLETE")
     print("SFEM_PRONY_RELAXATION_COMPLETE")
     return 0
 

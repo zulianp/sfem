@@ -88,48 +88,58 @@ variants:
     operator: GeneratedNeoHookeanOgden
     element: TET4
     resolution: {nx: 4, ny: 4, nz: 4, transform: skewed}
-    driver: &generated_driver
+    driver: &driver_mf
       executable: "{python}"
       arguments:
         - "{suite_dir}/common/run_affine_modes.py"
-        - --kind
-        - hyperelastic
         - --driver
-        - "{build_dir}/hyperelasticy"
+        - "{build_dir}/playground"
         - --mesh
         - "{mesh}"
         - --input-dir
         - "{output}"
         - --output
         - "{output}/solution"
+        - --set
+        - "solver.newton.atol=1.0e-11"
+        - --set
+        - "solver.newton.rtol=0"
+        - --set
+        - "solver.newton.max_it=30"
+        - --set
+        - "solver.newton.line_search.enabled=false"
+        - --set
+        - "solver.linear.preconditioner=none"
+        - --set
+        - "solver.linear.rtol=1.0e-12"
+        - --set
+        - "solver.linear.atol=1.0e-11"
+        - --set
+        - "solver.linear.max_it=20000"
+        - --set
+        - "solver.newton.verbose=false"
+        - --set
+        - "solver.linear.format=MF"
+        - --set
+        - "mesh.packed=false"
         - uniaxial_extension
         - simple_shear
         - isotropic_dilation
         - combined_nonsymmetric
-      environment: &generated_environment
+      environment:
         OMP_NUM_THREADS: 1
-        SFEM_OPERATOR_CONFIG: "{output}/operator.yaml"
-        SFEM_OP_TYPE: MF
-        SFEM_VERBOSE: 0
-        SFEM_NL_TOL: 1.0e-11
-        SFEM_NL_MAX_IT: 30
-        SFEM_LSOLVE_RTOL: 1.0e-12
-        SFEM_ENABLE_LINE_SEARCH: 0
     expected_output: &expected_output
       required:
-        - {pattern: SFEM_AFFINE_MODE_COMPLETE, count: 4}
-      forbidden:
-        - Newton did not converge
-        - No progress made
-        - "(max iterations)"
+      - {pattern: SFEM_AFFINE_MODE_COMPLETE, count: 4}
+      forbidden: [Newton did not converge, No progress made, (max iterations)]
     tolerances: &variant_tolerances
-      uniaxial_extension_displacement_relative_l2: 1.0e-9
+      uniaxial_extension_displacement_relative_l2: 1.0e-09
 
   - id: generated_neohookean_hex8
     operator: GeneratedNeoHookeanOgden
     element: HEX8
     resolution: {nx: 4, ny: 4, nz: 4, transform: aligned}
-    driver: *generated_driver
+    driver: *driver_mf
     expected_output: *expected_output
     tolerances: *variant_tolerances
 
@@ -137,7 +147,7 @@ variants:
     operator: GeneratedModifiedMooneyRivlin
     element: TET4
     resolution: {nx: 4, ny: 4, nz: 4, transform: skewed}
-    driver: *generated_driver
+    driver: *driver_mf
     expected_output: *expected_output
     tolerances: *variant_tolerances
 
@@ -145,7 +155,7 @@ variants:
     operator: GeneratedModifiedMooneyRivlin
     element: HEX8
     resolution: {nx: 4, ny: 4, nz: 4, transform: aligned}
-    driver: *generated_driver
+    driver: *driver_mf
     expected_output: *expected_output
     tolerances: *variant_tolerances
 
@@ -153,7 +163,7 @@ variants:
     operator: GeneratedSaintVenantKirchhoff
     element: TET4
     resolution: {nx: 4, ny: 4, nz: 4, transform: skewed}
-    driver: *generated_driver
+    driver: *driver_mf
     expected_output: *expected_output
     tolerances: *variant_tolerances
 
@@ -161,7 +171,7 @@ variants:
     operator: GeneratedSaintVenantKirchhoff
     element: HEX8
     resolution: {nx: 4, ny: 4, nz: 4, transform: aligned}
-    driver: *generated_driver
+    driver: *driver_mf
     expected_output: *expected_output
     tolerances: *variant_tolerances
 
@@ -169,34 +179,7 @@ variants:
     operator: NeoHookeanOgden
     element: TET4
     resolution: {nx: 4, ny: 4, nz: 4, transform: skewed}
-    driver: &legacy_driver
-      executable: "{python}"
-      arguments:
-        - "{suite_dir}/common/run_affine_modes.py"
-        - --kind
-        - hyperelastic
-        - --driver
-        - "{build_dir}/hyperelasticy"
-        - --mesh
-        - "{mesh}"
-        - --input-dir
-        - "{output}"
-        - --output
-        - "{output}/solution"
-        - uniaxial_extension
-        - simple_shear
-        - isotropic_dilation
-        - combined_nonsymmetric
-      environment:
-        OMP_NUM_THREADS: 1
-        SFEM_OPERATOR: NeoHookeanOgden
-        SFEM_SHEAR_MODULUS: "{material_mu}"
-        SFEM_FIRST_LAME_PARAMETER: "{material_lambda}"
-        SFEM_VERBOSE: 0
-        SFEM_NL_TOL: 1.0e-11
-        SFEM_NL_MAX_IT: 30
-        SFEM_LSOLVE_RTOL: 1.0e-12
-        SFEM_ENABLE_LINE_SEARCH: 0
+    driver: *driver_mf
     expected_output: *expected_output
     tolerances: *variant_tolerances
 
@@ -204,7 +187,7 @@ variants:
     operator: NeoHookeanOgden
     element: HEX8
     resolution: {nx: 4, ny: 4, nz: 4, transform: aligned}
-    driver: *legacy_driver
+    driver: *driver_mf
     expected_output: *expected_output
     tolerances: *variant_tolerances
 
@@ -212,11 +195,47 @@ variants:
     operator: GeneratedNeoHookeanOgden
     element: TET10
     resolution: {nx: 4, ny: 4, nz: 4, transform: skewed, backend: matrix_free}
-    driver: &initialized_generated_driver
-      <<: *generated_driver
+    driver: &driver_mf_initialized
+      executable: "{python}"
+      arguments:
+        - "{suite_dir}/common/run_affine_modes.py"
+        - --driver
+        - "{build_dir}/playground"
+        - --mesh
+        - "{mesh}"
+        - --input-dir
+        - "{output}"
+        - --output
+        - "{output}/solution"
+        - --initialize
+        - --set
+        - "solver.newton.atol=1.0e-11"
+        - --set
+        - "solver.newton.rtol=0"
+        - --set
+        - "solver.newton.max_it=30"
+        - --set
+        - "solver.newton.line_search.enabled=false"
+        - --set
+        - "solver.linear.preconditioner=none"
+        - --set
+        - "solver.linear.rtol=1.0e-12"
+        - --set
+        - "solver.linear.atol=1.0e-11"
+        - --set
+        - "solver.linear.max_it=20000"
+        - --set
+        - "solver.newton.verbose=false"
+        - --set
+        - "solver.linear.format=MF"
+        - --set
+        - "mesh.packed=false"
+        - uniaxial_extension
+        - simple_shear
+        - isotropic_dilation
+        - combined_nonsymmetric
       environment:
-        <<: *generated_environment
-        SFEM_AFFINE_INITIALIZE: 1
+        OMP_NUM_THREADS: 1
     expected_output: *expected_output
     tolerances: *variant_tolerances
 
@@ -224,7 +243,7 @@ variants:
     operator: GeneratedModifiedMooneyRivlin
     element: TET10
     resolution: {nx: 4, ny: 4, nz: 4, transform: skewed, backend: matrix_free}
-    driver: *initialized_generated_driver
+    driver: *driver_mf_initialized
     expected_output: *expected_output
     tolerances: *variant_tolerances
 
@@ -232,7 +251,7 @@ variants:
     operator: GeneratedSaintVenantKirchhoff
     element: TET10
     resolution: {nx: 4, ny: 4, nz: 4, transform: skewed, backend: matrix_free}
-    driver: *generated_driver
+    driver: *driver_mf
     expected_output: *expected_output
     tolerances: *variant_tolerances
 
@@ -240,7 +259,7 @@ variants:
     operator: GeneratedNeoHookeanOgden
     element: HEX27
     resolution: {nx: 3, ny: 3, nz: 3, transform: aligned, backend: matrix_free}
-    driver: *initialized_generated_driver
+    driver: *driver_mf_initialized
     expected_output: *expected_output
     tolerances: *variant_tolerances
 
@@ -248,7 +267,7 @@ variants:
     operator: GeneratedModifiedMooneyRivlin
     element: HEX27
     resolution: {nx: 3, ny: 3, nz: 3, transform: aligned, backend: matrix_free}
-    driver: *initialized_generated_driver
+    driver: *driver_mf_initialized
     expected_output: *expected_output
     tolerances: *variant_tolerances
 
@@ -256,7 +275,7 @@ variants:
     operator: GeneratedSaintVenantKirchhoff
     element: HEX27
     resolution: {nx: 3, ny: 3, nz: 3, transform: aligned, backend: matrix_free}
-    driver: *generated_driver
+    driver: *driver_mf
     expected_output: *expected_output
     tolerances: *variant_tolerances
 
@@ -264,7 +283,7 @@ variants:
     operator: GeneratedNeoHookeanOgden
     element: PROTEUS_HEX8
     resolution: {nx: 4, ny: 4, nz: 4, transform: aligned, backend: matrix_free}
-    driver: *generated_driver
+    driver: *driver_mf
     expected_output: *expected_output
     tolerances: *variant_tolerances
 
@@ -272,7 +291,7 @@ variants:
     operator: GeneratedNeoHookeanOgden
     element: PROTEUS_HEX27
     resolution: {nx: 3, ny: 3, nz: 3, transform: aligned, backend: semi_structured_matrix_free}
-    driver: *initialized_generated_driver
+    driver: *driver_mf_initialized
     expected_output: *expected_output
     tolerances: *variant_tolerances
 
@@ -280,10 +299,45 @@ variants:
     operator: GeneratedNeoHookeanOgden
     element: HEX8
     resolution: {nx: 4, ny: 4, nz: 4, transform: aligned, backend: bsr}
-    driver:
-      <<: *generated_driver
+    driver: &driver_bsr
+      executable: "{python}"
+      arguments:
+        - "{suite_dir}/common/run_affine_modes.py"
+        - --driver
+        - "{build_dir}/playground"
+        - --mesh
+        - "{mesh}"
+        - --input-dir
+        - "{output}"
+        - --output
+        - "{output}/solution"
+        - --set
+        - "solver.newton.atol=1.0e-11"
+        - --set
+        - "solver.newton.rtol=0"
+        - --set
+        - "solver.newton.max_it=30"
+        - --set
+        - "solver.newton.line_search.enabled=false"
+        - --set
+        - "solver.linear.preconditioner=none"
+        - --set
+        - "solver.linear.rtol=1.0e-12"
+        - --set
+        - "solver.linear.atol=1.0e-11"
+        - --set
+        - "solver.linear.max_it=20000"
+        - --set
+        - "solver.newton.verbose=false"
+        - --set
+        - "solver.linear.format=BSR"
+        - --set
+        - "mesh.packed=false"
+        - uniaxial_extension
+        - simple_shear
+        - isotropic_dilation
+        - combined_nonsymmetric
       environment:
-        <<: *generated_environment
-        SFEM_OP_TYPE: BSR
+        OMP_NUM_THREADS: 1
     expected_output: *expected_output
     tolerances: *variant_tolerances

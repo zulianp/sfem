@@ -1,0 +1,24 @@
+# The cylinder, clamped at its inlet, pulled along x at its outlet and twisted there by 7.5 rad
+# about x over 24 quasi-static steps. Run by hyperelasticity.sh.
+mesh:
+  path: geometry/mesh
+  sidesets:
+    - {name: inlet, file: geometry/inlet}
+    - {name: outlet, file: geometry/outlet}
+material: {type: NeoHookeanOgden}
+dirichlet_conditions:
+  - {type: sideset, format: name, name: inlet, value: [0, 0, 0], component: [0, 1, 2]}
+  - {type: sideset, format: name, name: outlet, value: 0.1, component: 0}
+constraints:
+  - type: rotation
+    sideset: outlet
+    axis: x
+    center: [0, 0, 0]
+    angle: 7.5
+    profile: {type: linear_ramp, start_time: 0, end_time: 24, start_value: 0, end_value: 1}
+regime: quasi_static
+time: {dt: 1, steps: 24}
+solver:
+  newton: {line_search: {enabled: false}}
+  linear: {format: MF, preconditioner: none}
+output: {path: output}
