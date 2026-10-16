@@ -35,10 +35,10 @@ namespace sfem {
         /// The scalar diagonal, block_rows() * block_size() entries.
         int diagonal(real_t *const out) const;
 
-        /// max_i sum_j |K_ij|, a bound on the largest eigenvalue. Host only for now.
+        /// max_i sum_j |K_ij|, a bound on the largest eigenvalue.
         real_t max_abs_row_sum() const;
 
-        /// K_dd += factor * |reference_d| on the diagonal. Host only for now.
+        /// K_dd += factor * |reference_d| on the diagonal.
         int shift_diagonal(const real_t factor, const real_t *const reference);
 
         ptrdiff_t      block_rows() const;

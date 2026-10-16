@@ -900,15 +900,15 @@ namespace sfem {
       return SFEM_FAILURE;
     }
     auto mesh = impl_->space->mesh_ptr();
-    return impl_->domains->iterate([&](const OpDomain &/*domain*/) {
+    auto points = element_points(mesh);
+    return impl_->domains->iterate([&](const OpDomain &domain) {
       const int dim = mesh->spatial_dimension();
       if (dim == 2) {
         SFEM_ERROR("mooney_rivlin_prony hessian_bsr 2d dispatch was not generated\n");
         return SFEM_FAILURE;
       }
       else if (dim == 3) {
-        SFEM_ERROR("mooney_rivlin_prony hessian_bsr 3d dispatch was not generated\n");
-        return SFEM_FAILURE;
+        return cu_mooney_rivlin_prony_hessian_bsr_3d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("C01"), domain.parameters->require_real_value("C10"), domain.parameters->require_real_value("K"), impl_->relaxation->gamma(domain.block->name(), "iso"), impl_->relaxation->history(domain.block->name(), "iso_history"), 3, current + 0, current + 1, current + 2, rowptr, colidx, values, stream);
       }
       SFEM_ERROR("mooney_rivlin_prony hessian_bsr does not support spatial dimension %d\n", dim);
       return SFEM_FAILURE;

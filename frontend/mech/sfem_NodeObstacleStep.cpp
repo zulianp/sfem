@@ -16,6 +16,16 @@
 
 namespace sfem {
 
+    namespace {
+        /// The buffer itself on the host, a host copy of it on the device.
+        SharedBuffer<real_t> on_host(const SharedBuffer<real_t> &buffer) {
+#ifdef SFEM_ENABLE_CUDA
+            if (buffer->mem_space() == MEMORY_SPACE_DEVICE) return smesh::to_host(buffer);
+#endif
+            return buffer;
+        }
+    }  // namespace
+
     class NodeObstacleStep::Impl {
     public:
         std::shared_ptr<Function>            f;
@@ -83,8 +93,9 @@ namespace sfem {
                      const Value                         &value,
                      const SharedBuffer<real_t>          &residual,
                      const std::shared_ptr<BLAS<real_t>> &blas,
-                     const ptrdiff_t                      ndofs)
-                : at_(at), value_(value), residual_(residual), blas_(blas), ndofs_(ndofs), trial_(create_host_buffer<real_t>(ndofs)) {}
+                     const ptrdiff_t                      ndofs,
+                     const ExecutionSpace                 es)
+                : at_(at), value_(value), residual_(residual), blas_(blas), ndofs_(ndofs), trial_(create_buffer<real_t>(ndofs, es)) {}
 
             const char *name() const override { return "kkt"; }
 
@@ -136,8 +147,9 @@ namespace sfem {
                                                                const std::shared_ptr<NodeObstacleContact> &contact,
                                                                const std::shared_ptr<NewmarkScheme>       &newmark,
                                                                const NodeObstacleStepOptions              &options) {
-        if (f->execution_space() != EXECUTION_SPACE_HOST) {
-            fprintf(stderr, "NodeObstacleStep: the nodal SDF obstacle is host only (SDFObstacle::sample_nodes)\n");
+        const ExecutionSpace es = f->execution_space();
+        if (contact->execution_space() != es) {
+            fprintf(stderr, "NodeObstacleStep: the contact and the function must share an execution space\n");
             return nullptr;
         }
 
@@ -147,13 +159,13 @@ namespace sfem {
         impl.contact                           = contact;
         impl.newmark                           = newmark;
         impl.options                           = options;
-        impl.blas                              = blas<real_t>(EXECUTION_SPACE_HOST);
+        impl.blas                              = blas<real_t>(es);
         impl.ndofs                             = f->space()->n_dofs();
-        impl.tangent                           = BSRTangent::create(f, EXECUTION_SPACE_HOST);
+        impl.tangent                           = BSRTangent::create(f, es);
         if (!impl.tangent) return nullptr;
 
         for (auto *buffer : {&impl.k, &impl.projected, &impl.upper_bound, &impl.qp_rhs, &impl.framed, &impl.lift, &impl.diag, &impl.trial_r}) {
-            *buffer = create_host_buffer<real_t>(impl.ndofs);
+            *buffer = create_buffer<real_t>(impl.ndofs, es);
         }
 
         // The step in the contact nodes' frames, Q^T K Q dx' = -Q^T R with dx'_n <= gap_i: the
@@ -161,7 +173,7 @@ namespace sfem {
         // The QP is the step's, so it reads the step's state through `self`. MPRGP zeros the
         // output before every product, which the frames then turn whole: out = Q^T K Q in.
         Impl *const self   = &impl;
-        auto        framed = create_host_buffer<real_t>(impl.ndofs);
+        auto        framed = create_buffer<real_t>(impl.ndofs, es);
         auto        op     = make_op<real_t>(
                 impl.ndofs,
                 impl.ndofs,
@@ -171,8 +183,8 @@ namespace sfem {
                     self->tangent_op->apply(framed->data(), out);
                     self->contact->to_frame(out);
                 },
-                EXECUTION_SPACE_HOST);
-        impl.qp             = create_mprgp(op, EXECUTION_SPACE_HOST);
+                es);
+        impl.qp             = create_mprgp(op, es);
         impl.qp->verbose    = false;
         impl.qp->check_each = std::numeric_limits<int>::max();
         impl.qp->set_max_it(options.qp_max_it);
@@ -191,7 +203,9 @@ namespace sfem {
         // The scale of each node's equation, c0 M: what turns a reaction into a displacement.
         impl.blas->copy(impl.ndofs, impl.newmark->mass()->data(), impl.k->data());
         impl.blas->scal(impl.ndofs, context.scheme->weight("alpha_a"), impl.k->data());
-        const real_t *const k     = impl.k->data();
+        // Read on the host: once per step.
+        auto                host  = on_host(impl.k);
+        const real_t *const k     = host->data();
         const idx_t *const  nodes = impl.contact->nodes()->data();
         real_t              k_max = 0;
 #pragma omp parallel for reduction(max : k_max)
@@ -284,7 +298,8 @@ namespace sfem {
                                           [self](const real_t *const x) { return self->merit_value(x); },
                                           impl_->trial_r,
                                           impl_->blas,
-                                          impl_->ndofs);
+                                          impl_->ndofs,
+                                          impl_->f->execution_space());
     }
 
     int NodeObstacleStep::iterations() const { return impl_->iterations; }
@@ -295,15 +310,15 @@ namespace sfem {
         class ContactProbe final : public Probe {
         public:
             ContactProbe(const std::shared_ptr<NodeObstacleContact> &contact, const ptrdiff_t ndofs, const real_t touch_gap)
-                : contact_(contact), force_(create_host_buffer<real_t>(ndofs)), touch_gap_(touch_gap) {}
+                : contact_(contact), force_(create_buffer<real_t>(ndofs, contact->execution_space())), touch_gap_(touch_gap) {}
 
             std::vector<std::string> columns() const override { return {"reaction_x", "reaction_y", "reaction_z", "touched"}; }
 
             int converged(const StepRecord &) override {
                 const ptrdiff_t n = force_->size();
-                std::fill(force_->data(), force_->data() + n, real_t(0));
                 contact_->reaction(force_->data());
-                const real_t *const r = force_->data();
+                auto                force = on_host(force_);
+                const real_t *const r     = force->data();
                 real_t              x = 0, y = 0, z = 0;
 #pragma omp parallel for reduction(+ : x, y, z)
                 for (ptrdiff_t i = 0; i < n / 3; ++i) {
@@ -315,7 +330,8 @@ namespace sfem {
                 resultant_[1] = y / 2;
                 resultant_[2] = z / 2;
 
-                const real_t *const gap = contact_->gap()->data();
+                auto                gaps = on_host(contact_->gap());
+                const real_t *const gap  = gaps->data();
                 real_t              low = std::numeric_limits<real_t>::max();
 #pragma omp parallel for reduction(min : low)
                 for (ptrdiff_t i = 0; i < contact_->size(); ++i) low = std::min(low, gap[i]);

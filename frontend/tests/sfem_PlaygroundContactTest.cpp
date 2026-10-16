@@ -62,6 +62,33 @@ int test_block_lands_on_the_hemisphere() {
     return SFEM_TEST_SUCCESS;
 }
 
+#ifdef SFEM_ENABLE_CUDA
+// The same drop on the device: the contact, the QP and the time scheme there, and the run the
+// host's to rounding.
+int test_device_matches_host() {
+    double first[2] = {-1, -1}, impulse[2] = {0, 0};
+    int    newton[2] = {0, 0};
+    for (int device = 0; device < 2; ++device) {
+        const std::string csv = std::string("test_device_matches_host_") + (device ? "device" : "host") + ".csv";
+        auto              pg  = assemble(DROP, {"output.history_csv=" + csv, std::string("execution_space=") + (device ? "device" : "host")});
+        SFEM_TEST_ASSERT(pg != nullptr);
+        SFEM_TEST_ASSERT(pg->run() == SFEM_SUCCESS);
+        for (auto &row : sfem::test::read_history(csv)) {
+            if (row["status"] < 0) continue;
+            if (row["touched"] > 0 && first[device] < 0) first[device] = row["t"];
+            impulse[device] += row["reaction_z"] * row["dt"];
+            newton[device] += (int)row["newton"];
+        }
+        std::remove(csv.c_str());
+    }
+    printf("  host: contact at %g, impulse %.12g, %d Newton; device: contact at %g, impulse %.12g, %d Newton\n",
+           first[0], impulse[0], newton[0], first[1], impulse[1], newton[1]);
+    SFEM_TEST_ASSERT(first[0] == first[1]);
+    SFEM_TEST_ASSERT(std::abs(impulse[1] - impulse[0]) <= 1e-6 * std::abs(impulse[0]));
+    return SFEM_TEST_SUCCESS;
+}
+#endif
+
 // The obstacle stabilises Newmark: a regime without it, or another scheme, is refused.
 int test_obstacle_needs_newmark() {
     SFEM_TEST_ASSERT(assemble(DROP, {"dynamics.scheme=bdf2"}) == nullptr);
@@ -73,6 +100,9 @@ int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_block_lands_on_the_hemisphere);
     SFEM_RUN_TEST(test_obstacle_needs_newmark);
+#ifdef SFEM_ENABLE_CUDA
+    SFEM_RUN_TEST(test_device_matches_host);
+#endif
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }

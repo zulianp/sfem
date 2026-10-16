@@ -51,6 +51,43 @@ int test_device_diagonal_matches_host() {
         SFEM_TEST_ASSERT(h_diag->data()[i] != 0);
         SFEM_TEST_ASSERT(from_device->data()[i] == h_diag->data()[i]);
     }
+
+    // The product, against the host's.
+    {
+        const ptrdiff_t n = rows * bs;
+        auto            v = create_host_buffer<real_t>(n);
+        auto            y = create_host_buffer<real_t>(n);
+        for (ptrdiff_t i = 0; i < n; ++i) v->data()[i] = std::sin(real_t(0.3 * i));
+        tangent->op()->apply(v->data(), y->data());
+        auto d_v = smesh::to_device(v);
+        auto d_y = create_buffer<real_t>(n, EXECUTION_SPACE_DEVICE);
+        const int product_status =
+                d_bsr_spmv_native<count_t, idx_t, real_t, real_t>(rows, bs, d_rowptr->data(), d_colidx->data(), d_values->data(), real_t(0), d_v->data(), d_y->data());
+        SFEM_TEST_ASSERT(product_status == SFEM_SUCCESS);
+        auto   from_device = smesh::to_host(d_y);
+        real_t worst = 0, scale = 0;
+        for (ptrdiff_t i = 0; i < n; ++i) {
+            worst = std::max(worst, std::abs(from_device->data()[i] - y->data()[i]));
+            scale = std::max(scale, std::abs(y->data()[i]));
+        }
+        printf("  product: worst relative difference %.3g\n", (double)(worst / scale));
+        SFEM_TEST_ASSERT(worst <= 1e-14 * scale);
+    }
+
+    // The largest absolute row sum, and the diagonal shifted by a fraction of a reference.
+    const real_t h_sum = tangent->max_abs_row_sum();
+    const real_t d_sum = d_bsr_max_abs_row_sum<count_t, idx_t, real_t, real_t>(rows, bs, d_rowptr->data(), d_colidx->data(), d_values->data());
+    printf("  max |row| sum: host %.17g, device %.17g\n", (double)h_sum, (double)d_sum);
+    SFEM_TEST_ASSERT(h_sum > 0 && std::abs(h_sum - d_sum) <= 1e-14 * h_sum);
+
+    SFEM_TEST_ASSERT(tangent->shift_diagonal(real_t(0.25), h_diag->data()) == SFEM_SUCCESS);
+    const int shifted_status =
+            d_bsr_shift_diagonal<count_t, idx_t, real_t>(rows, bs, d_rowptr->data(), d_colidx->data(), real_t(0.25), d_diag->data(), d_values->data());
+    SFEM_TEST_ASSERT(shifted_status == SFEM_SUCCESS);
+    auto shifted = smesh::to_host(d_values);
+    for (ptrdiff_t i = 0; i < nnz * bs * bs; ++i) {
+        SFEM_TEST_ASSERT(shifted->data()[i] == tangent->values()[i]);
+    }
     return SFEM_TEST_SUCCESS;
 }
 

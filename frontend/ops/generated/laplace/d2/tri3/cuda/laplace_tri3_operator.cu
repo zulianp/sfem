@@ -1,6 +1,7 @@
 #include <type_traits>
 #include <cuda_runtime.h>
 #include "laplace_d2_simplex_local.cuh"
+#include "laplace_d2_simplex_hessian.cuh"
 #include "geometry_kernels.cuh"
 #include "kernel_diagnostics.cuh"
 #include <cstdint>
@@ -439,4 +440,156 @@ extern "C" int cu_laplace_tri3_apply_a_msoa(
       break;
   }
   return sfem::codegen::unsupported_dispatch("laplace_tri3_apply_a_msoa", -1, (int)scalar_bytes);
+}
+
+
+namespace sfem {
+namespace codegen {
+
+__host__ __device__ __forceinline__ void laplace_tri3_hessian_a_msoa_find_cols(
+    const idx_t *const RSTR targets,
+    const idx_t *const RSTR row,
+    const int lenrow,
+    idx_t *const RSTR ks) {
+#pragma unroll(3)
+  for (int d = 0; d < 3; ++d) {
+    ks[d] = 0;
+  }
+  for (int k = 0; k < lenrow; ++k) {
+#pragma unroll(3)
+    for (int d = 0; d < 3; ++d) {
+      ks[d] += row[k] < targets[d];
+    }
+  }
+}
+
+template <typename s_t>
+__host__ __device__ __forceinline__ void laplace_tri3_hessian_a_msoa_scatter_bsr(
+    const idx_t *const RSTR ev,
+    const s_t *const RSTR element_matrix,
+    const count_t *const RSTR rowptr,
+    const idx_t *const RSTR colidx,
+    s_t *const RSTR values) {
+  static constexpr int NC = 1;
+  static constexpr int NS = 3;
+  count_t entries[NS * NS];
+  idx_t ks[NS];
+  for (int i = 0; i < NS; ++i) {
+    const idx_t dof_i = ev[i];
+    const count_t row_begin = rowptr[dof_i];
+    const int lenrow = (int)(rowptr[dof_i + 1] - row_begin);
+    const idx_t *const RSTR cols = &colidx[row_begin];
+    laplace_tri3_hessian_a_msoa_find_cols(ev, cols, lenrow, ks);
+    for (int j = 0; j < NS; ++j) {
+      entries[i * NS + j] = row_begin + ks[j];
+    }
+  }
+  for (int i = 0; i < NS; ++i) {
+    for (int j = 0; j < NS; ++j) {
+      s_t *const block = &values[entries[i * NS + j] * NC * NC];
+      for (int bi = 0; bi < NC; ++bi) {
+        const int row = bi * NS + i;
+        for (int bj = 0; bj < NC; ++bj) {
+          const int col = bj * NS + j;
+          atomicAdd(&(block[bi * NC + bj]), element_matrix[row * (NC * NS) + col]);
+        }
+      }
+    }
+  }
+}
+
+template <typename s_t, typename g_t, int FORMAT>
+__global__ void laplace_tri3_hessian_a_msoa_assemble_impl(
+    const ptrdiff_t nelements,
+    const ptrdiff_t,
+    idx_t **const RSTR elements,
+    const g_t *const RSTR g_adj0,
+    const g_t *const RSTR g_adj1,
+    const g_t *const RSTR g_adj2,
+    const g_t *const RSTR g_adj3,
+    const g_t *const RSTR g_det0,
+    const s_t kappa,
+    const count_t *const RSTR rowptr,
+    const idx_t *const RSTR colidx,
+    s_t *const RSTR values,
+    const int *const RSTR,
+    const ptrdiff_t,
+    const ptrdiff_t,
+    const idx_t *const RSTR,
+    const idx_t *const RSTR,
+    idx_t *const RSTR,
+    idx_t *const RSTR) {
+  static constexpr int NC = 1;
+  static constexpr int NQ = 1;
+  static constexpr int NS = 3;
+  static constexpr int NDOFS = NC * NS;
+
+  static_assert(FORMAT == 1,
+                "this kernel has no scatter for the requested matrix format");
+  for (ptrdiff_t element = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; element < nelements; element += (ptrdiff_t)blockDim.x * gridDim.x) {
+    idx_t ev[NS];
+    s_t element_matrix[NDOFS * NDOFS];
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t bdet0[NQ];
+
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t node = elements[shape][element];
+      ev[shape] = node;
+    }
+
+
+    badj0[0] = s_t(g_adj0[element]);
+    badj1[0] = s_t(g_adj1[element]);
+    badj2[0] = s_t(g_adj2[element]);
+    badj3[0] = s_t(g_adj3[element]);
+    bdet0[0] = s_t(g_det0[element]);
+
+    laplace_d2_simplex_tri3_direct_hessian_element_matrix<s_t, NS>(badj0, badj1, badj2, badj3, bdet0, kappa, element_matrix);
+
+    if constexpr (FORMAT == 1) {
+      laplace_tri3_hessian_a_msoa_scatter_bsr(ev, element_matrix, rowptr, colidx, values);
+    }
+  }
+
+}
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" int cu_laplace_tri3_hessian_bsr_a_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
+        const real_t kappa,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values,
+        void *const stream
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        const int block_size = 256;
+        const int grid_size = (int)((nelements + block_size - 1) / block_size);
+        sfem::codegen::laplace_tri3_hessian_a_msoa_assemble_impl<double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, kappa, rowptr, colidx, (double *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+        return sfem::codegen::launch_status("laplace_tri3_hessian_a_msoa_assemble_impl");
+    }
+    case (int)sizeof(float): {
+        const int block_size = 256;
+        const int grid_size = (int)((nelements + block_size - 1) / block_size);
+        sfem::codegen::laplace_tri3_hessian_a_msoa_assemble_impl<float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, kappa, rowptr, colidx, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+        return sfem::codegen::launch_status("laplace_tri3_hessian_a_msoa_assemble_impl");
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("laplace_tri3_hessian_bsr_a_msoa", -1, (int)scalar_bytes);
 }

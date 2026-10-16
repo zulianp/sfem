@@ -57,6 +57,11 @@ class CLikeKernelASTPrinter:
     vectorize_pragma: str = ""
     atomic_update_pragma: str = ""
     layout: PrinterLayout = PrinterLayout()
+    #: How a target without an atomic pragma spells an atomic accumulation:
+    #: ``(lhs, rhs, indent) -> lines`` (``TargetPlatform.scatter_add_lines``).
+    #: Without it such a scatter would print a plain ``+=`` -- a race on a
+    #: device, where many threads add into the node an element shares.
+    atomic_add_lines: object = None
 
     def print_ast(self, ast):
         if not isinstance(ast, KernelAST):
@@ -204,6 +209,14 @@ class CLikeKernelASTPrinter:
                 ),
             )
         if isinstance(node, ScatterNode):
+            if node.atomic and not self.atomic_update_pragma and self.atomic_add_lines is not None:
+                if node.operator != "+=":
+                    raise ValueError("an atomic scatter without a pragma accumulates with += only")
+                return tuple(
+                    self.atomic_add_lines(
+                        self.render_entity(node.target), self.render_entity(node.value), indent
+                    )
+                )
             lines = []
             if node.atomic and self.atomic_update_pragma:
                 pragma_indent = (

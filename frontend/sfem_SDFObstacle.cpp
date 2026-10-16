@@ -1,12 +1,14 @@
 #include "sfem_SDFObstacle.hpp"
 
 #include "node_interpolate.hpp"
+#include "node_interpolate_kernel.hpp"
 #include "sfem_resample_gap.hpp"
 #include "sfem_sdf_sampling.hpp"
 
 #include <stdlib.h>
 
 #ifdef SFEM_ENABLE_CUDA
+#include "cu_node_interpolate.hpp"
 #include "cu_resample_gap.hpp"
 #endif
 
@@ -54,8 +56,22 @@ namespace sfem {
         ptrdiff_t                   n[3];
         geom_t                      origin[3];
         geom_t                      delta[3];
+        // The spline's strides on the host, for kernels that take the grid by value.
+        ptrdiff_t                   stride[3];
         bool                        variational{true};
         enum ExecutionSpace         execution_space { EXECUTION_SPACE_HOST };
+
+        NodeSamplerGrid grid() const {
+            NodeSamplerGrid g;
+            for (int d = 0; d < 3; ++d) {
+                g.n[d]      = n[d];
+                g.stride[d] = stride[d];
+                g.origin[d] = origin[d];
+                g.delta[d]  = delta[d];
+            }
+            g.data = spline->origin_coefficient();
+            return g;
+        }
     };
 
     std::shared_ptr<SDFObstacle> SDFObstacle::create_from_file(const std::shared_ptr<Communicator> &comm,
@@ -108,6 +124,7 @@ namespace sfem {
             spline = SDFBSpline::create(sdf);
         }
 
+        for (int d = 0; d < 3; ++d) obs->impl_->stride[d] = spline->stride->data()[d];
 #ifdef SFEM_ENABLE_CUDA
         if (execution_space == EXECUTION_SPACE_DEVICE) {
             spline = spline->to_device();
@@ -314,10 +331,12 @@ namespace sfem {
                                   real_t **const SFEM_RESTRICT      normals) {
         SFEM_TRACE_SCOPE("SDFObstacle::sample_nodes");
 
+#ifdef SFEM_ENABLE_CUDA
         if (impl_->execution_space == EXECUTION_SPACE_DEVICE) {
-            SFEM_ERROR("SDFObstacle::sample_nodes: nodal sampling is host only\n");
-            return SFEM_FAILURE;
+            NodeSamplerOutput out = {gap, {normals[0], normals[1], normals[2]}, {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr}};
+            return cu_sample_nodes(1, nnodes, idx, {{points[0], points[1], points[2]}}, disp, impl_->grid(), out);
         }
+#endif
         return interpolate_displaced_gap(nnodes,
                                          idx,
                                          points,
@@ -338,10 +357,12 @@ namespace sfem {
                                             real_t **const SFEM_RESTRICT      curvature) {
         SFEM_TRACE_SCOPE("SDFObstacle::sample_nodes_curvature");
 
+#ifdef SFEM_ENABLE_CUDA
         if (impl_->execution_space == EXECUTION_SPACE_DEVICE) {
-            SFEM_ERROR("SDFObstacle::sample_nodes_curvature: nodal sampling is host only\n");
-            return SFEM_FAILURE;
+            NodeSamplerOutput out = {nullptr, {nullptr, nullptr, nullptr}, {curvature[0], curvature[1], curvature[2], curvature[3], curvature[4], curvature[5]}};
+            return cu_sample_nodes(2, nnodes, idx, {{points[0], points[1], points[2]}}, disp, impl_->grid(), out);
         }
+#endif
         return interpolate_displaced_curvature(nnodes,
                                                idx,
                                                points,

@@ -105,6 +105,7 @@ namespace sfem {
 
         // At nodes: the gap, unit normals (3 rows) and curvature (6 rows) of node_interpolate.hpp
         // at the points X[idx[i]] + disp[3 idx[i] + d] (idx and disp may be null). Host only.
+        // (Also on the device, with the points, idx, disp and outputs in device memory.)
         int sample_nodes(const ptrdiff_t                   nnodes,
                          const idx_t *const SFEM_RESTRICT  idx,
                          geom_t **const SFEM_RESTRICT      points,

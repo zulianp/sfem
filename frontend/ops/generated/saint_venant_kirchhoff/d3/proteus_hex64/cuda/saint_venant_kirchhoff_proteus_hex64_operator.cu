@@ -1,6 +1,7 @@
 #include <type_traits>
 #include <cuda_runtime.h>
 #include "saint_venant_kirchhoff_d3_tensor_product_local.cuh"
+#include "saint_venant_kirchhoff_d3_tensor_product_hessian.cuh"
 #include "line_p3_q4.cuh"
 #include "quad_line_q4.cuh"
 #include "line_p3_q5.cuh"
@@ -1209,4 +1210,181 @@ extern "C" int cu_saint_venant_kirchhoff_proteus_hex64_apply_i_msoa(
       break;
   }
   return sfem::codegen::unsupported_dispatch("saint_venant_kirchhoff_proteus_hex64_apply_i_msoa", -1, (int)scalar_bytes);
+}
+
+
+namespace sfem {
+namespace codegen {
+
+__host__ __device__ __forceinline__ void saint_venant_kirchhoff_proteus_hex64_hessian_i_msoa_find_cols(
+    const idx_t *const RSTR targets,
+    const idx_t *const RSTR row,
+    const int lenrow,
+    idx_t *const RSTR ks) {
+  for (int d = 0; d < 64; ++d) {
+    ks[d] = 0;
+  }
+  for (int k = 0; k < lenrow; ++k) {
+    for (int d = 0; d < 64; ++d) {
+      ks[d] += row[k] < targets[d];
+    }
+  }
+}
+
+template <typename s_t>
+__host__ __device__ __forceinline__ void saint_venant_kirchhoff_proteus_hex64_hessian_i_msoa_scatter_bsr(
+    const idx_t *const RSTR ev,
+    const s_t *const RSTR element_matrix,
+    const count_t *const RSTR rowptr,
+    const idx_t *const RSTR colidx,
+    s_t *const RSTR values) {
+  static constexpr int NC = 3;
+  static constexpr int NS = 64;
+  count_t entries[NS * NS];
+  idx_t ks[NS];
+  for (int i = 0; i < NS; ++i) {
+    const idx_t dof_i = ev[i];
+    const count_t row_begin = rowptr[dof_i];
+    const int lenrow = (int)(rowptr[dof_i + 1] - row_begin);
+    const idx_t *const RSTR cols = &colidx[row_begin];
+    saint_venant_kirchhoff_proteus_hex64_hessian_i_msoa_find_cols(ev, cols, lenrow, ks);
+    for (int j = 0; j < NS; ++j) {
+      entries[i * NS + j] = row_begin + ks[j];
+    }
+  }
+  for (int i = 0; i < NS; ++i) {
+    for (int j = 0; j < NS; ++j) {
+      s_t *const block = &values[entries[i * NS + j] * NC * NC];
+      for (int bi = 0; bi < NC; ++bi) {
+        const int row = bi * NS + i;
+        for (int bj = 0; bj < NC; ++bj) {
+          const int col = bj * NS + j;
+          atomicAdd(&(block[bi * NC + bj]), element_matrix[row * (NC * NS) + col]);
+        }
+      }
+    }
+  }
+}
+
+template <typename s_t, typename g_t, int FORMAT>
+__global__ void saint_venant_kirchhoff_proteus_hex64_hessian_i_msoa_assemble_impl(
+    const ptrdiff_t nelements,
+    const ptrdiff_t,
+    idx_t **const RSTR elements,
+    const g_t *const *const RSTR points,
+    const s_t lmbda,
+    const s_t mu,
+    const ptrdiff_t u_stride,
+    const s_t *const RSTR ux,
+    const s_t *const RSTR uy,
+    const s_t *const RSTR uz,
+    const count_t *const RSTR rowptr,
+    const idx_t *const RSTR colidx,
+    s_t *const RSTR values,
+    const int *const RSTR,
+    const ptrdiff_t,
+    const ptrdiff_t,
+    const idx_t *const RSTR,
+    const idx_t *const RSTR,
+    idx_t *const RSTR,
+    idx_t *const RSTR) {
+  static constexpr int NC = 3;
+  static constexpr int ND = 3;
+  static constexpr int NQ = 125;
+  static constexpr int NS = 64;
+  static constexpr int NDOFS = NC * NS;
+  const s_t *const u_components[NC] = {ux, uy, uz};
+  const g_t *const RSTR x = points[0];
+  const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p3_q5<s_t>::shape_1d();
+  const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p3_q5<s_t>::grad_1d();
+  const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q5<s_t>::q_weight_1d();
+
+  static_assert(FORMAT == 1,
+                "this kernel has no scatter for the requested matrix format");
+  for (ptrdiff_t element = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; element < nelements; element += (ptrdiff_t)blockDim.x * gridDim.x) {
+    idx_t ev[NS];
+    s_t element_matrix[NDOFS * NDOFS];
+    s_t bcoordinate_data[NS * ND];
+    s_t bu_data[NS * NC];
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t badj4[NQ];
+    s_t badj5[NQ];
+    s_t badj6[NQ];
+    s_t badj7[NQ];
+    s_t badj8[NQ];
+    s_t bdet0[NQ];
+
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t node = elements[shape][element];
+      ev[shape] = node;
+      for (int d = 0; d < ND; ++d) {
+        bcoordinate_data[shape * ND + d] = s_t(points[d][node]);
+        bu_data[shape * NC + d] = u_components[d][node * u_stride];
+      }
+    }
+
+    s_t coordinate_grad_ref[ND * NQ * ND];
+    tensor_gradient_contiguous_scalar<s_t, NQ, NS, 3>(
+        isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 0,
+        coordinate_grad_ref + 0);
+    tensor_gradient_contiguous_scalar<s_t, NQ, NS, 3>(
+        isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 1,
+        coordinate_grad_ref + NQ * ND);
+    tensor_gradient_contiguous_scalar<s_t, NQ, NS, 3>(
+        isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 2,
+        coordinate_grad_ref + 2 * NQ * ND);
+
+    s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
+    geometry_jacobian_adjugate_and_determinant_scalar<s_t, ND, NQ>(
+        coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
+
+    saint_venant_kirchhoff_d3_tensor_product_direct_hessian_tensor_product_element_matrix<s_t, NQ, NS>(badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, bu_data, element_matrix);
+
+    if constexpr (FORMAT == 1) {
+      saint_venant_kirchhoff_proteus_hex64_hessian_i_msoa_scatter_bsr(ev, element_matrix, rowptr, colidx, values);
+    }
+  }
+
+}
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" int cu_saint_venant_kirchhoff_proteus_hex64_hessian_bsr_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t lmbda,
+        const real_t mu,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values,
+        void *const stream
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        const int block_size = 256;
+        const int grid_size = (int)((nelements + block_size - 1) / block_size);
+        sfem::codegen::saint_venant_kirchhoff_proteus_hex64_hessian_i_msoa_assemble_impl<double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, rowptr, colidx, (double *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+        return sfem::codegen::launch_status("saint_venant_kirchhoff_proteus_hex64_hessian_i_msoa_assemble_impl");
+    }
+    case (int)sizeof(float): {
+        const int block_size = 256;
+        const int grid_size = (int)((nelements + block_size - 1) / block_size);
+        sfem::codegen::saint_venant_kirchhoff_proteus_hex64_hessian_i_msoa_assemble_impl<float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, rowptr, colidx, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+        return sfem::codegen::launch_status("saint_venant_kirchhoff_proteus_hex64_hessian_i_msoa_assemble_impl");
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("saint_venant_kirchhoff_proteus_hex64_hessian_bsr_i_msoa", -1, (int)scalar_bytes);
 }

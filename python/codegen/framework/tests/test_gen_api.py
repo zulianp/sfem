@@ -2706,6 +2706,28 @@ int main() {
                 self.assertNotIn("const ptrdiff_t thread = 0", source)
                 self.assertNotIn("SFEM_INLINE", source)
 
+    def test_cuda_backend_assembles_an_energy_hessian_in_bsr(self):
+        # An energy material's tangent assembles on the device too: the direct
+        # element-matrix kernel under a grid-stride loop, scattered into the BSR
+        # blocks with `atomicAdd` -- a plain `+=` there is a race between the
+        # threads of elements sharing a node -- and launched on the caller's
+        # stream.  The device used to drop the matrix-format plan altogether.
+        with tempfile.TemporaryDirectory() as out_dir:
+            gen.generate(neohookean_ogden, out_dir, elements=("QUAD4",), target="cuda")
+            operator_path = os.path.join(
+                out_dir, "d2", "proteus_quad4", "cuda", "neohookean_ogden_proteus_quad4_operator.cu"
+            )
+            with open(operator_path, encoding="utf-8") as input_file:
+                source = input_file.read()
+            self.assertIn("__global__ void neohookean_ogden_proteus_quad4_hessian_i_msoa_assemble_impl", source)
+            self.assertIn("atomicAdd(&(block[bi * NC + bj])", source)
+            self.assertIn('extern "C" int cu_neohookean_ogden_proteus_quad4_hessian_bsr_i_msoa(', source)
+            self.assertIn("hessian_i_msoa_assemble_impl<double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>", source)
+            self.assertNotIn("#pragma omp", source)
+            self.assertNotIn("SFEM_INLINE", source)
+            # The scatters that still spell OpenMP pragmas stay off the device.
+            self.assertNotIn("hessian_crs", source)
+
     def test_hip_backend_emits_material_energy_kernels_from_plan(self):
         with tempfile.TemporaryDirectory() as out_dir:
             result = gen.generate(

@@ -2,6 +2,7 @@
 #define SFEM_NODE_OBSTACLE_CONTACT_HPP
 
 #include <memory>
+#include <vector>
 
 #include "sfem_ContactStabilisedNewmarkScheme.hpp"
 #include "sfem_SDFObstacle.hpp"
@@ -22,19 +23,26 @@ namespace sfem {
     //
     // It is the contact of a ContactStabilisedNewmarkScheme: the reaction of the last KKT measure
     // and the velocity projection. Host only, as SDFObstacle::sample_nodes is.
+    // (Both are on the device as well: with a device execution space every buffer here, and every
+    // array a method takes, is device memory.)
     class NodeObstacleContact final : public ContactStabilisedNewmarkScheme::Contact {
     public:
-        // `dir` is the axis whose frame a node outside the grid gets.
+        // `dir` is the axis whose frame a node outside the grid gets. `nodes` and `points` are on the
+        // host; with a device `es` the contact copies them.
         NodeObstacleContact(const std::shared_ptr<smesh::Grid<geom_t>> &sdf,
                             const std::shared_ptr<Communicator>        &comm,
                             const SharedBuffer<idx_t>                  &nodes,
                             const SharedBuffer<geom_t *>               &points,
                             const ptrdiff_t                             ndofs,
-                            const int                                   dir);
+                            const int                                   dir,
+                            const ExecutionSpace                        es = EXECUTION_SPACE_HOST);
 
         ptrdiff_t                   size() const { return nodes_->size(); }
+        // On the host, whatever the execution space.
         const SharedBuffer<idx_t>  &nodes() const { return nodes_; }
+        // In the execution space.
         const SharedBuffer<real_t> &gap() const { return gap_; }
+        ExecutionSpace              execution_space() const { return es_; }
 
         // Samples the gap, the normals and the frames with the nodes displaced by x.
         void update(const real_t *const x);
@@ -102,17 +110,29 @@ namespace sfem {
     private:
         std::shared_ptr<SDFObstacle> obstacle_;
         SharedBuffer<idx_t>          nodes_;
+        SharedBuffer<idx_t>          idx_;  // nodes_ in the execution space
         SharedBuffer<geom_t *>       points_;
+        // The coordinates by axis in the execution space, as a host array of rows: a device
+        // SharedBuffer<T *> keeps its row pointers on the device, where the host cannot read them.
+        std::vector<SharedBuffer<geom_t>> point_rows_;
+        geom_t                           *xyz_[3];
+        ExecutionSpace               es_;
+        SharedBuffer<real_t>         complementarity_, penetration_;
         ptrdiff_t                    ndofs_;
         int                          dir_;
-        SharedBuffer<real_t *>       normals_;
-        SharedBuffer<real_t *>       curvature_;
+        // Rows of size() entries, stored flat for the same reason (rows()).
+        SharedBuffer<real_t>         normals_;    // 3 rows
+        SharedBuffer<real_t>         curvature_;  // 6 rows
         SharedBuffer<real_t>         gap_;
         SharedBuffer<real_t>         mu_;
         SharedBuffer<real_t>         frames_;
         SharedBuffer<real_t>         ahead_;
         SharedBuffer<real_t>         ahead_gap_;
-        SharedBuffer<real_t *>       ahead_normals_;
+        SharedBuffer<real_t>         ahead_normals_;  // 3 rows
+
+        void rows(const SharedBuffer<real_t> &flat, const int k, real_t **const out) const {
+            for (int c = 0; c < k; ++c) out[c] = flat->data() + c * size();
+        }
     };
 
 }  // namespace sfem
