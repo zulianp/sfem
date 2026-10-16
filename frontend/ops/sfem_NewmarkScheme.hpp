@@ -80,6 +80,14 @@ namespace sfem {
         std::shared_ptr<Buffer<real_t>> velocity() const;
         std::shared_ptr<Buffer<real_t>> acceleration() const;
 
+        /// The step's predictor `u_hat`, as of the last `begin_step`: the
+        /// state the step reaches with no force, and Newton's start.
+        std::shared_ptr<Buffer<real_t>> predictor() const;
+
+        /// The lumped mass the inertia assembles, density included.  Built by
+        /// `initialize`.
+        std::shared_ptr<Buffer<real_t>> mass() const;
+
     private:
         class Impl;
         std::unique_ptr<Impl> impl_;

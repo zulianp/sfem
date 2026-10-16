@@ -28,6 +28,7 @@
 #include "sfem_BDF2Scheme.hpp"
 #include "sfem_BSR.hpp"
 #include "sfem_BackwardEulerScheme.hpp"
+#include "sfem_ContactStabilisedNewmarkScheme.hpp"
 #include "sfem_NewmarkScheme.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_GeneratedMooneyRivlinProny.hpp"
@@ -352,8 +353,21 @@ int test_evaluation_is_pure() {
 /// with a scheme attached, value and gradient are the relaxing material's plus the scheme's
 /// separable term, and the gradient still differentiates to the apply.  Run under every scheme
 /// the library has, with a non-trivial history, so neither policy can mask the other.
+namespace {
+    /// A contact that never touches: no reaction, nothing to project.
+    class NoContact final : public sfem::ContactStabilisedNewmarkScheme::Contact {
+    public:
+        explicit NoContact(const ptrdiff_t ndofs) : ndofs_(ndofs) {}
+        void reaction(real_t *const out) const override { std::fill(out, out + ndofs_, real_t(0)); }
+        void project_velocity(const real_t *const, real_t *const, const real_t) override {}
+
+    private:
+        ptrdiff_t ndofs_;
+    };
+}  // namespace
+
 int test_relaxation_composes_with_every_time_scheme() {
-    for (int which = 0; which < 3; which++) {
+    for (int which = 0; which < 4; which++) {
         Setup s    = make_setup(3, 2, 0.15, 3);
         auto  blas = sfem::blas<real_t>(sfem::EXECUTION_SPACE_HOST);
         auto  op   = s.generated;
@@ -376,8 +390,13 @@ int test_relaxation_composes_with_every_time_scheme() {
             newmark->set_density(real_t(2));
             SFEM_TEST_ASSERT(newmark->initialize() == SFEM_SUCCESS);
             fill_pseudo_random(s.ndofs, 0.01, newmark->velocity()->data(), 77);
-            scheme = newmark;
-            name   = "Newmark";
+            if (which == 2) {
+                scheme = newmark;
+                name   = "Newmark";
+            } else {
+                scheme = std::make_shared<sfem::ContactStabilisedNewmarkScheme>(newmark, std::make_shared<NoContact>(s.ndofs));
+                name   = "contact-stabilised Newmark";
+            }
         }
         scheme->begin_step(test_dt, test_dt);
 
