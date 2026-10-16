@@ -32,6 +32,8 @@ namespace sfem {
         const real_t               *x{nullptr};
         NonlinearReport             report;
         int                         attempts{0};
+        /// The step that ends the run.
+        bool                        last{false};
         std::shared_ptr<TimeScheme> scheme;
     };
 

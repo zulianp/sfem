@@ -27,6 +27,35 @@ def static_case(mesh, operator, output, dirichlet=None, neumann=None):
     return case
 
 
+def load_ramp_case(mesh, material, output, dirichlet, neumann, dt, steps, ramp, export_freq=1):
+    """A quasi-static case whose Neumann loads ramp linearly to their full value over `ramp`
+    seconds (none: at once), in `steps` steps of `dt`. `material` is the operator YAML as a dict.
+    Exports the displacement every `export_freq` steps and at the last."""
+    profile = (
+        {"type": "linear_ramp", "start_time": 0, "end_time": ramp, "start_value": 0, "end_value": 1}
+        if ramp
+        else {"type": "constant", "value": 1}
+    )
+    return {
+        "mesh": {"path": str(mesh), "packed": False},
+        "material": material,
+        "dirichlet_conditions": {"file": str(dirichlet)},
+        "loads": {"neumann": {"file": str(neumann)}, "profile": profile},
+        "regime": "quasi_static",
+        "time": {"dt": dt, "steps": steps},
+        "output": {"path": str(output), "export_freq": export_freq},
+    }
+
+
+def material(operator, parameters):
+    """The operator YAML for `operator` with `parameters`, a list of name=value."""
+    document = {"type": operator}
+    for parameter in parameters:
+        name, value = parameter.split("=", 1)
+        document[name] = float(value)
+    return document
+
+
 def run(executable, case, case_path, overrides, environment):
     """Writes `case` to `case_path` and runs the playground on it with `overrides` (key=value)."""
     case_path = Path(case_path)

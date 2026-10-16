@@ -16,8 +16,8 @@ namespace sfem {
     class Op;
     class DirichletConditions;
 
-    /// Writes the solution and its derived fields every `export_freq` committed steps, and the
-    /// initial state: `<path>/mesh`, and `<path>/out/<field>.<component>.<index>.raw` with
+    /// Writes the solution and its derived fields every `export_freq` committed steps, the last
+    /// step, and the initial state: `<path>/mesh`, and `<path>/out/<field>.<component>.<index>.raw` with
     /// `<path>/out/time.txt`, one index per export shared by every field.
     class FieldExport final : public StepObserver {
     public:
