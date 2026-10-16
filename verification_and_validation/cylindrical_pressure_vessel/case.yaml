@@ -47,30 +47,49 @@ driver:
     - --case
     - "{case}"
     - --driver
-    - "{build_dir}/hyperelasticity_bdf2"
+    - "{build_dir}/playground"
     - --mesh
     - "{mesh}"
     - --input-dir
     - "{output}"
     - --output
     - "{output}/solution"
+    - --operator
+    - GeneratedModifiedMooneyRivlin
+    - --param
+    - "c1=80"
+    - --param
+    - "c2=20"
+    - --param
+    - "kappa=9933.333333333334"
+    - --dt
+    - "0.05"
+    - --steps
+    - "20"
+    - --ramp
+    - "1"
+    - --export-freq
+    - "20"
+    - --set
+    - "solver.newton.max_it=100"
+    - --set
+    - "solver.newton.atol=1.0e-4"
+    - --set
+    - "solver.newton.rtol=1.0e-8"
+    - --set
+    - "solver.linear.format=BSR"
+    - --set
+    - "solver.linear.preconditioner=none"
+    - --set
+    - "solver.linear.rtol=1.0e-4"
+    - --set
+    - "solver.linear.atol=1.0e-12"
+    - --set
+    - "solver.linear.max_it=20000"
+    - --set
+    - "solver.newton.verbose=false"
   environment:
     OMP_NUM_THREADS: "1"
-    SFEM_OPERATOR: GeneratedModifiedMooneyRivlin
-    SFEM_C1: "80"
-    SFEM_C2: "20"
-    SFEM_KAPPA: "9933.333333333334"
-    SFEM_RHO: "0"
-    SFEM_DT: "0.05"
-    SFEM_T_END: "1"
-    SFEM_STEPS: "20"
-    SFEM_EXPORT_FREQ: "20"
-    SFEM_LOAD_RAMP_TIME: "1"
-    SFEM_NL_MAX_IT: "100"
-    SFEM_NL_TOL: "1e-4"
-    SFEM_LSOLVE_RTOL: "1e-4"
-    SFEM_LSOLVE_MAX_IT: "20000"
-    SFEM_ENABLE_LINE_SEARCH: "1"
 
 verification:
   command:
@@ -87,7 +106,7 @@ verification:
     - No progress made
     - "(max iterations)"
   required_output:
-    - pattern: "(converged)"
+    - pattern: ": converged"
       count: 60
     - pattern: SFEM_REFINEMENT_COMPLETE
       count: 3

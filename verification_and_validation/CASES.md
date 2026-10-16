@@ -167,7 +167,7 @@ outside this material-focused catalog.
 
 - **Type:** published-data validation; medium gate; already implemented.
 - **Target:** `GeneratedModifiedMooneyRivlin` on a quarter-cylinder `QUAD4`
-  mesh using `hyperelasticity_bdf2` with zero density and ramped follower
+  mesh, solved by the playground's quasi-static regime under a ramped follower
   pressure.
 - **Setup:** inner radius `7 m`, outer radius `18.625 m`, `20 x 20` cells,
   `c10 = 80 MPa`, `c01 = 20 MPa`, and final pressure `100 MPa`, matching the

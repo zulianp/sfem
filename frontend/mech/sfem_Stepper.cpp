@@ -101,14 +101,17 @@ namespace sfem {
 
         real_t t    = opts.t0;
         int    step = 0;
+        // While every step has its full length, step k ends at t0 + k dt exactly rather than at a
+        // sum that has gathered rounding.
+        bool uniform = true;
         while (t < t_end - tol) {
-            real_t dt   = std::min(opts.dt, t_end - t);
+            real_t dt   = uniform ? opts.dt : std::min(opts.dt, t_end - t);
             int    cuts = 0;
 
             NonlinearReport report;
             int             attempts = 0;
             for (;;) {
-                const real_t t_new = t + dt;
+                const real_t t_new = uniform && cuts == 0 ? opts.t0 + (step + 1) * opts.dt : t + dt;
                 if (impl.set_time(t_new, tol) != SFEM_SUCCESS) return SFEM_FAILURE;
                 if (impl.scheme) impl.scheme->begin_step(t, dt);
                 for (auto &h : impl.histories) h->begin_step(t_new, dt);
@@ -148,17 +151,19 @@ namespace sfem {
                     return SFEM_FAILURE;
                 }
                 cuts++;
+                uniform = false;
                 dt /= 2;
             }
 
+            t = uniform ? opts.t0 + (step + 1) * opts.dt : t + dt;
             step++;
-            t += dt;
 
             record.step     = step;
             record.t        = t;
             record.dt       = dt;
             record.report   = report;
             record.attempts = attempts;
+            record.last     = t >= t_end - tol;
             if (impl.notify([&](StepObserver &o) { return o.converged(record); }) != SFEM_SUCCESS) return SFEM_FAILURE;
 
             if (impl.solver->commit(x) != SFEM_SUCCESS) return SFEM_FAILURE;

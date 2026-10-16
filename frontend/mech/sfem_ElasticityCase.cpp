@@ -34,6 +34,7 @@ namespace sfem {
                 "loads.body_force.density",
                 "loads.body_force.g",
                 "loads.neumann.*",
+                "loads.profile.*",
                 "dirichlet_conditions.*",
                 "constraints[].type",
                 "constraints[].sideset",

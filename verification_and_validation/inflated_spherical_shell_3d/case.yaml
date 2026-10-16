@@ -82,35 +82,56 @@ variants:
         - --case
         - "{resolved_case}"
         - --driver
-        - "{build_dir}/hyperelasticity_bdf2"
+        - "{build_dir}/playground"
         - --mesh
         - "{mesh}"
         - --input-dir
         - "{output}"
         - --output
         - "{output}/solution"
+        - --operator
+        - "{operator}"
+        - --param
+        - "mu={material_mu}"
+        - --param
+        - "lmbda={material_lambda}"
+        - --param
+        - "c1={material_c1}"
+        - --param
+        - "c2={material_c2}"
+        - --param
+        - "kappa={material_kappa}"
+        - --dt
+        - "{loading_dt_s}"
+        - --steps
+        - "{loading_steps}"
+        - --ramp
+        - "{loading_ramp_duration_s}"
+        - --export-freq
+        - "1"
+        - --set
+        - "solver.newton.max_it=100"
+        - --set
+        - "solver.newton.atol=1.0e-7"
+        - --set
+        - "solver.newton.rtol=1.0e-8"
+        - --set
+        - "solver.linear.format=BSR"
+        - --set
+        - "solver.linear.preconditioner=none"
+        - --set
+        - "solver.linear.rtol=1.0e-5"
+        - --set
+        - "solver.linear.atol=1.0e-12"
+        - --set
+        - "solver.linear.max_it=20000"
+        - --set
+        - "solver.newton.verbose=false"
       environment:
         OMP_NUM_THREADS: 1
-        SFEM_OPERATOR: "{operator}"
-        SFEM_MU: "{material_mu}"
-        SFEM_LAMBDA: "{material_lambda}"
-        SFEM_C1: "{material_c1}"
-        SFEM_C2: "{material_c2}"
-        SFEM_KAPPA: "{material_kappa}"
-        SFEM_RHO: 0
-        SFEM_DT: "{loading_dt_s}"
-        SFEM_T_END: "{loading_ramp_duration_s}"
-        SFEM_STEPS: "{loading_steps}"
-        SFEM_EXPORT_FREQ: 1
-        SFEM_LOAD_RAMP_TIME: "{loading_ramp_duration_s}"
-        SFEM_NL_MAX_IT: 100
-        SFEM_NL_TOL: 1.0e-7
-        SFEM_LSOLVE_RTOL: 1.0e-5
-        SFEM_LSOLVE_MAX_IT: 20000
-        SFEM_ENABLE_LINE_SEARCH: 1
     expected_output: &expected_output
       required:
-        - {pattern: "(converged)", count: 12}
+        - {pattern: ": converged", count: 12}
         - {pattern: SFEM_HYPERELASTIC_REFINEMENT_COMPLETE, count: 3}
       forbidden:
         - No progress made

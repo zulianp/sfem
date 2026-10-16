@@ -105,7 +105,7 @@ namespace sfem {
     }
 
     int FieldExport::committed(const StepRecord &record) {
-        if (record.step % impl_->export_freq != 0) return SFEM_SUCCESS;
+        if (record.step % impl_->export_freq != 0 && !record.last) return SFEM_SUCCESS;
         return impl_->write(record);
     }
 

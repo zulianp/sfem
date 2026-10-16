@@ -35,7 +35,9 @@ namespace sfem {
     /// loads:
     ///   body_force: {density: 1, g: [0, 0, -9.81]}
     ///   neumann: [...]                       # NeumannConditions YAML; format: name, name: right
+    ///   profile: {type: linear_ramp, ...}    # scales every Neumann condition, on its own profile
     /// dirichlet_conditions: [...]            # DirichletConditions YAML; format: name, name: left
+    ///                                        # either list may be {file: dirichlet.yaml} instead
     /// constraints:                           # host only
     ///   - {type: rotation, sideset: right, axis: x, center: [0, 0.5, 0.5], angle: 0.5,
     ///      profile: {type: linear_ramp, start_time: 0, end_time: 1, start_value: 0, end_value: 1},

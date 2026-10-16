@@ -4,6 +4,9 @@
 
 #include <cmath>
 #include <cstdio>
+#include <fstream>
+#include <list>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -128,6 +131,7 @@ namespace sfem {
         std::shared_ptr<DirichletConditions>               host_dirichlet;
         std::vector<std::pair<std::shared_ptr<Constraint>, real_t>> releases;
         std::vector<std::shared_ptr<Rotation>>             rotations;
+        std::list<ryml::Tree>                              documents;
 
         int build_mesh(const std::shared_ptr<Communicator> &comm, const ElasticityCase &config) {
             auto node = config.root()["mesh"];
@@ -211,6 +215,28 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
 
+        /// A list of conditions, given in the case or as {file: path} to a YAML document whose `key`
+        /// holds it. The document is kept: the conditions are read from its nodes.
+        ryml::ConstNodeRef conditions(const ElasticityCase &config, const ryml::ConstNodeRef &node, const char *key) {
+            if (!node.is_map() || !node.has_child("file")) return node;
+
+            const std::string path = config.resolve(read_string(node, "file", ""));
+            std::ifstream     is(path);
+            if (!is.good()) {
+                fprintf(stderr, "Playground: unable to read %s\n", path.c_str());
+                return ryml::ConstNodeRef();
+            }
+            std::stringstream contents;
+            contents << is.rdbuf();
+            documents.push_back(ryml::parse_in_arena(ryml::to_csubstr(contents.str())));
+            auto root = documents.back().crootref();
+            if (!root.is_map() || !root.has_child(ryml::to_csubstr(key))) {
+                fprintf(stderr, "Playground: %s has no %s\n", path.c_str(), key);
+                return ryml::ConstNodeRef();
+            }
+            return root[ryml::to_csubstr(key)];
+        }
+
         int build_function(const ElasticityCase &config) {
             auto root = config.root();
 
@@ -258,11 +284,13 @@ namespace sfem {
 
             lookup.base_dir = config.base_dir();
             if (has(loads, "neumann")) {
-                auto neumann = NeumannConditions::create_from_yaml(fs, loads["neumann"], lookup);
+                auto list = conditions(config, loads["neumann"], "neumann_conditions");
+                if (!list.readable()) return SFEM_FAILURE;
+                auto neumann = NeumannConditions::create_from_yaml(fs, list, lookup);
                 if (!neumann) return SFEM_FAILURE;
 #ifdef SFEM_ENABLE_CUDA
                 if (es == EXECUTION_SPACE_DEVICE) {
-                    if (has_profile(loads["neumann"])) {
+                    if (has_profile(list) || has(loads, "profile")) {
                         fprintf(stderr, "Playground: time-dependent Neumann conditions are host only\n");
                         return SFEM_FAILURE;
                     }
@@ -270,17 +298,24 @@ namespace sfem {
                 } else
 #endif
                 {
+                    // Every condition's own profile, times the loads' common one.
+                    LoadProfile scale;
+                    if (has(loads, "profile") && LoadProfile::from_yaml(loads["profile"], scale) != SFEM_SUCCESS) {
+                        return SFEM_FAILURE;
+                    }
                     f->add_operator(neumann);
-                    time_dependent.push_back([neumann](const real_t t) { return neumann->set_time(t); });
+                    time_dependent.push_back([neumann, scale](const real_t t) { return neumann->set_time(t, scale.value(t)); });
                 }
             }
 
             if (has(root, "dirichlet_conditions")) {
-                auto dirichlet = DirichletConditions::create_from_yaml(fs, root["dirichlet_conditions"], lookup);
+                auto list = conditions(config, root["dirichlet_conditions"], "dirichlet_conditions");
+                if (!list.readable()) return SFEM_FAILURE;
+                auto dirichlet = DirichletConditions::create_from_yaml(fs, list, lookup);
                 if (!dirichlet) return SFEM_FAILURE;
 #ifdef SFEM_ENABLE_CUDA
                 if (es == EXECUTION_SPACE_DEVICE) {
-                    if (has_profile(root["dirichlet_conditions"])) {
+                    if (has_profile(list)) {
                         fprintf(stderr, "Playground: time-dependent Dirichlet conditions are host only\n");
                         return SFEM_FAILURE;
                     }
@@ -622,7 +657,8 @@ namespace sfem {
             }
 
             const std::string csv = has(output, "history_csv") ? config.resolve(read_string(output, "history_csv", "")) : "";
-            auto              history = std::make_shared<StepHistory>(csv, verbose);
+            // One line per step whatever the Newton verbosity, which is about its iterations.
+            auto history = std::make_shared<StepHistory>(csv, true);
             if (has(output, "probes")) {
                 for (auto p : output["probes"].children()) {
                     const auto type = read_string(p, "type", "");
