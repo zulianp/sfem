@@ -16,6 +16,9 @@ namespace sfem {
         ~InertiaPotential() override;
 
         const char *name() const override { return "InertiaPotential"; }
+        /// The lumped mass is a diagonal, which fits any graph; the consistent one couples an
+        /// element's nodes.
+        bool        assembles_micro_elements() const override;
 
         //! 1/2 alpha (x - u_hat)^T M (x - u_hat)
 
@@ -63,6 +66,9 @@ namespace sfem {
 
         void set_alpha(real_t alpha);
         void set_density(real_t density);
+        /// The consistent mass (GeneratedVectorMass) in the potential instead of the lumped one.
+        /// Before initialize. `mass()` stays the lumped mass either way, for its other readers.
+        void set_consistent_mass(bool consistent);
         void set_u_hat(const std::shared_ptr<Buffer<real_t>> &u_hat);
         void set_mass(const std::shared_ptr<Buffer<real_t>> &mass);
         void set_field(const char *name, const std::shared_ptr<Buffer<real_t>> &values, const int component) override;

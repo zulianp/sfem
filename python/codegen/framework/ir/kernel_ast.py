@@ -816,6 +816,42 @@ def _copied_name(node):
     return None
 
 
+#: The per-point geometry locals a lane body opens with: the offset, the determinant and the
+#: adjugate components.
+_GEOMETRY_LOCAL = re.compile(r"^(goff|det|adj[0-9]+)$")
+
+
+def drop_unread_geometry_loads(body):
+    """Drop a geometry local nothing after it in its scope reads.
+
+    The geometry a lane body loads is decided per form, and a form that contracts only values --
+    a mass -- reads the determinant where it weights the test function, not where it evaluates
+    the coefficients, so the load there was declared and never read: a compile error under
+    -Wunused-variable. Only these names, so no other declaration changes.
+    """
+    nodes = [
+        replace(node, body=drop_unread_geometry_loads(node.body))
+        if getattr(node, "body", None)
+        else node
+        for node in body
+    ]
+    changed = True
+    while changed:
+        changed = False
+        for index, node in enumerate(nodes):
+            if not isinstance(node, BufferDeclNode) or node.extents:
+                continue
+            name = node.name.name
+            if not _GEOMETRY_LOCAL.match(name):
+                continue
+            word = re.compile(r"\b%s\b" % re.escape(name))
+            if not any(word.search(_expression_text(later)) for later in nodes[index + 1 :]):
+                del nodes[index]
+                changed = True
+                break
+    return tuple(nodes)
+
+
 def fuse_single_use_copies(body):
     """Give a copied-once temporary's expression straight to the store.
 

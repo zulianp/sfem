@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from codegen.framework.ir.passes import SingleUseCopyPass, VectorizationContractPass
+from codegen.framework.ir.passes import SingleUseCopyPass, UnreadGeometryLoadPass, VectorizationContractPass
 from codegen.framework.targets import current_target
 
 from codegen.framework.ir.kernel_ast import (
@@ -263,7 +263,7 @@ class CLikeKernelASTPrinter:
 #: Analyses every kernel passes through on its way to text.  Kept here, at the
 #: one place every AST is rendered, so no emitter can route around it.
 DEFAULT_PASSES = KernelASTPassPipeline(
-    (SingleUseCopyPass(), VectorizationContractPass())
+    (SingleUseCopyPass(), UnreadGeometryLoadPass(), VectorizationContractPass())
 )
 
 

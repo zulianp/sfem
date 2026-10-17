@@ -4,6 +4,7 @@ namespace sfem {
   void register_GeneratedBodyForce_cuda_generated_op();
   void register_GeneratedLaplace_cuda_generated_op();
   void register_GeneratedLinearElasticity_cuda_generated_op();
+  void register_GeneratedLinearKelvinVoigt_cuda_generated_op();
   void register_GeneratedModifiedMooneyRivlin_cuda_generated_op();
   void register_GeneratedMooneyRivlinKelvinVoigt_cuda_generated_op();
   void register_GeneratedMooneyRivlinProny_cuda_generated_op();
@@ -13,11 +14,13 @@ namespace sfem {
   void register_GeneratedNeumannGeneral_cuda_generated_op();
   void register_GeneratedSaintVenantKirchhoff_cuda_generated_op();
   void register_GeneratedTwoPhaseFlow_cuda_generated_op();
+  void register_GeneratedVectorMass_cuda_generated_op();
 
   void register_generated_device_ops() {
     register_GeneratedBodyForce_cuda_generated_op();
     register_GeneratedLaplace_cuda_generated_op();
     register_GeneratedLinearElasticity_cuda_generated_op();
+    register_GeneratedLinearKelvinVoigt_cuda_generated_op();
     register_GeneratedModifiedMooneyRivlin_cuda_generated_op();
     register_GeneratedMooneyRivlinKelvinVoigt_cuda_generated_op();
     register_GeneratedMooneyRivlinProny_cuda_generated_op();
@@ -27,5 +30,6 @@ namespace sfem {
     register_GeneratedNeumannGeneral_cuda_generated_op();
     register_GeneratedSaintVenantKirchhoff_cuda_generated_op();
     register_GeneratedTwoPhaseFlow_cuda_generated_op();
+    register_GeneratedVectorMass_cuda_generated_op();
   }
 }  // namespace sfem

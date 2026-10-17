@@ -51,6 +51,7 @@ namespace sfem {
     /// initial_conditions:
     ///   displacement: {components: [u.0.raw, u.1.raw, u.2.raw]}   # or file: interleaved
     ///   velocity: {file: v.raw}              # dynamic, Newmark or BDF2
+    ///   acceleration: {file: a.raw}          # dynamic, Newmark; otherwise it starts from a = 0
     /// obstacle:                              # regime dynamic, scheme newmark; host or device
     ///   backend: node_sdf                    # nodes against the SDF's B-spline, MPRGP in frames
     ///   nodes: skin                          # or a named sideset
@@ -64,6 +65,7 @@ namespace sfem {
     /// time: {dt: 0.1, t_end: 1, max_cutbacks: 4}      # or steps instead of t_end; cutbacks
     ///                                        # halve a failed step, 0 and the only choice with bdf2
     /// dynamics: {scheme: newmark, density: 1, beta: 0.25, gamma: 0.5}  # newmark | bdf2 | backward_euler
+    ///   mass: lumped                         # or consistent (GeneratedVectorMass), Newmark and BDF2
     /// solver:
     ///   newton: {max_it: 30, atol: 1e-9, rtol: 1e-8, divergence_factor: 1e4, merit: auto,
     ///            line_search: {enabled: true, steps: [1, 0.5, 0.25], c1: 1e-4, batched: true}}

@@ -46,6 +46,8 @@ namespace sfem {
         ~BDF2Scheme() override;
 
         void set_density(real_t density);
+        /// The inertia with the consistent mass instead of the lumped one (before initialize).
+        void set_consistent_mass(bool consistent);
 
         /// Build the mass and the state buffers.  `block_names` is forwarded to
         /// the lumped mass, which is the only thing here that integrates.

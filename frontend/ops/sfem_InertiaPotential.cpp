@@ -26,6 +26,10 @@ namespace sfem {
         std::shared_ptr<BLAS<real_t>>   blas;
         real_t                          alpha{1};
         real_t                          density{1};
+        bool                            consistent_mass{false};
+        //! The consistent mass, with its density set to alpha * density: its action and its
+        //! matrix are the potential's Hessian as they stand.
+        std::shared_ptr<Op>             consistent;
 
         //! Room for the three vectors the quadratic form needs.  Allocated once
         //! rather than per call, and in the caller's space like everything else.
@@ -49,6 +53,24 @@ namespace sfem {
             }
 
             return SFEM_SUCCESS;
+        }
+
+        void sync_consistent() {
+            if (!consistent) return;
+            for (const auto &block : space->mesh_ptr()->blocks()) {
+                consistent->set_value_in_block(block->name(), "density", alpha * density);
+            }
+        }
+
+        //! out = beta * out + alpha M v, with the consistent mass.
+        int consistent_times(const real_t *const v, const real_t beta, real_t *const out) {
+            if (beta == 0) blas->zeros(space->n_dofs(), out);
+            return consistent->apply(nullptr, v, out);
+        }
+
+        int no_format(const char *format) const {
+            fprintf(stderr, "InertiaPotential: the consistent mass has no %s format\n", format);
+            return SFEM_FAILURE;
         }
     };
 
@@ -110,6 +132,15 @@ namespace sfem {
             impl_->u_hat = create_buffer<real_t>(ndofs, impl_->es);
         }
 
+        if (impl_->consistent_mass && !impl_->consistent) {
+            impl_->consistent = create_op(impl_->space, "GeneratedVectorMass", impl_->es);
+            if (!impl_->consistent || impl_->consistent->initialize(block_names) != SFEM_SUCCESS) {
+                SFEM_ERROR("InertiaPotential: unable to create the consistent mass\n");
+                return SFEM_FAILURE;
+            }
+            impl_->sync_consistent();
+        }
+
         impl_->offset   = create_buffer<real_t>(ndofs, impl_->es);
         impl_->scaled   = create_buffer<real_t>(ndofs, impl_->es);
         impl_->weighted = create_buffer<real_t>(ndofs, impl_->es);
@@ -126,6 +157,7 @@ namespace sfem {
         if (impl_->ensure_state() != SFEM_SUCCESS) {
             return SFEM_FAILURE;
         }
+        if (impl_->consistent) return impl_->consistent->hessian_crs(nullptr, rowptr, colidx, values);
 
         const ptrdiff_t     ndofs = impl_->space->n_dofs();
         const real_t        alpha = impl_->alpha;
@@ -161,6 +193,7 @@ namespace sfem {
         if (impl_->ensure_state() != SFEM_SUCCESS) {
             return SFEM_FAILURE;
         }
+        if (impl_->consistent) return impl_->consistent->hessian_bsr(nullptr, rowptr, colidx, values);
 
         const int           bs      = impl_->space->block_size();
         const ptrdiff_t     n_nodes = impl_->space->n_dofs() / bs;
@@ -198,6 +231,7 @@ namespace sfem {
         if (impl_->ensure_state() != SFEM_SUCCESS) {
             return SFEM_FAILURE;
         }
+        if (impl_->consistent) return impl_->no_format("diagonal");
 
         impl_->blas->axpy(impl_->space->n_dofs(), impl_->alpha, impl_->mass->data(), values);
         return SFEM_SUCCESS;
@@ -209,6 +243,7 @@ namespace sfem {
         if (impl_->ensure_state() != SFEM_SUCCESS) {
             return SFEM_FAILURE;
         }
+        if (impl_->consistent) return impl_->no_format("block-diagonal");
 
         const int       bs      = impl_->space->block_size();
         const ptrdiff_t n_nodes = impl_->space->n_dofs() / bs;
@@ -246,6 +281,10 @@ namespace sfem {
         // it runs wherever the caller's vectors are.
         const ptrdiff_t ndofs = impl_->space->n_dofs();
         auto            blas  = impl_->blas;
+        if (impl_->consistent) {
+            blas->zaxpby(ndofs, 1, x, -1, impl_->u_hat->data(), impl_->offset->data());
+            return impl_->consistent_times(impl_->offset->data(), 1, out);
+        }
         blas->zaxpby(ndofs, impl_->alpha, x, -impl_->alpha, impl_->u_hat->data(), impl_->scaled->data());
         blas->xypaz(ndofs, impl_->mass->data(), impl_->scaled->data(), 1, out);
         return SFEM_SUCCESS;
@@ -257,6 +296,8 @@ namespace sfem {
         if (impl_->ensure_state() != SFEM_SUCCESS) {
             return SFEM_FAILURE;
         }
+
+        if (impl_->consistent) return impl_->consistent_times(h, 1, out);
 
         const ptrdiff_t ndofs = impl_->space->n_dofs();
         auto            blas  = impl_->blas;
@@ -277,6 +318,13 @@ namespace sfem {
         const ptrdiff_t ndofs = impl_->space->n_dofs();
         auto            blas  = impl_->blas;
         blas->zaxpby(ndofs, 1, x, -1, impl_->u_hat->data(), impl_->offset->data());
+        if (impl_->consistent) {
+            if (impl_->consistent_times(impl_->offset->data(), 0, impl_->weighted->data()) != SFEM_SUCCESS) {
+                return SFEM_FAILURE;
+            }
+            *out += real_t(0.5) * blas->dot(ndofs, impl_->offset->data(), impl_->weighted->data());
+            return SFEM_SUCCESS;
+        }
         blas->xypaz(ndofs, impl_->mass->data(), impl_->offset->data(), 0, impl_->weighted->data());
         *out += real_t(0.5) * impl_->alpha *
                 blas->dot(ndofs, impl_->offset->data(), impl_->weighted->data());
@@ -313,6 +361,21 @@ namespace sfem {
 
         blas->zaxpby(ndofs, 1, x, -1, impl_->u_hat->data(), impl_->offset->data());
 
+        if (impl_->consistent) {
+            // The same quadratic with alpha M from the consistent mass, alpha folded in.
+            if (impl_->consistent_times(impl_->offset->data(), 0, impl_->weighted->data()) != SFEM_SUCCESS ||
+                impl_->consistent_times(h, 0, impl_->scaled->data()) != SFEM_SUCCESS) {
+                return SFEM_FAILURE;
+            }
+            const real_t a = real_t(0.5) * blas->dot(ndofs, impl_->offset->data(), impl_->weighted->data());
+            const real_t b = blas->dot(ndofs, h, impl_->weighted->data());
+            const real_t c = real_t(0.5) * blas->dot(ndofs, h, impl_->scaled->data());
+            for (int step = 0; step < nsteps; ++step) {
+                out[step] += a + steps[step] * b + steps[step] * steps[step] * c;
+            }
+            return SFEM_SUCCESS;
+        }
+
         // `M o` and `M h`, each once.  `weighted` and `scaled` are this
         // operator's own scratch, so no allocation happens here.
         blas->xypaz(ndofs, impl_->mass->data(), impl_->offset->data(), 0, impl_->weighted->data());
@@ -336,12 +399,24 @@ namespace sfem {
         ret->impl_->u_hat   = impl_->u_hat;
         ret->impl_->alpha   = impl_->alpha;
         ret->impl_->density = impl_->density;
+        ret->impl_->consistent_mass = impl_->consistent_mass;
+        ret->impl_->consistent      = impl_->consistent;
         return ret;
     }
 
-    void InertiaPotential::set_alpha(const real_t alpha) { impl_->alpha = alpha; }
+    void InertiaPotential::set_alpha(const real_t alpha) {
+        impl_->alpha = alpha;
+        impl_->sync_consistent();
+    }
 
-    void InertiaPotential::set_density(const real_t density) { impl_->density = density; }
+    void InertiaPotential::set_density(const real_t density) {
+        impl_->density = density;
+        impl_->sync_consistent();
+    }
+
+    void InertiaPotential::set_consistent_mass(const bool consistent) { impl_->consistent_mass = consistent; }
+
+    bool InertiaPotential::assembles_micro_elements() const { return !impl_->consistent_mass; }
 
     void InertiaPotential::set_u_hat(const std::shared_ptr<Buffer<real_t>> &u_hat) { impl_->u_hat = u_hat; }
 
@@ -361,6 +436,7 @@ namespace sfem {
         } else if (var_name == "density") {
             impl_->density = value;
         }
+        impl_->sync_consistent();
     }
 
     std::shared_ptr<Buffer<real_t>> InertiaPotential::mass() const { return impl_->mass; }

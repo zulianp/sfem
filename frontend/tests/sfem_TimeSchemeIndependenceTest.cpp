@@ -996,7 +996,16 @@ int test_holding_the_scheme_equals_adding_its_operator() {
 /// It used to assemble only the material's part: with the inertia dominant (small dt) Newton on
 /// the BSR tangent stalled in the line search, while the matrix-free one converged.
 int test_a_residual_material_assembles_the_schemes_term() {
+    // HEX8, and TET4, whose affine assembly read the determinant at every quadrature point from a
+    // buffer staged at the first only.
+    for (const bool tet4 : {false, true}) {
     Fixture fixture = make_fixture();
+    if (tet4) {
+        fixture.mesh  = sfem::Mesh::create_tet4_cube(sfem::Communicator::self(), 2, 2, 2);
+        fixture.space = sfem::FunctionSpace::create(fixture.mesh, 3);
+        fixture.op    = sfem::Factory::create_op(fixture.space, "GeneratedMooneyRivlinKelvinVoigt");
+        fixture.ndofs = fixture.space->n_dofs();
+    }
     const ptrdiff_t ndofs = fixture.ndofs;
 
     auto scheme = std::make_shared<sfem::NewmarkScheme>(fixture.space);
@@ -1036,9 +1045,10 @@ int test_a_residual_material_assembles_the_schemes_term() {
             scale = std::max(scale, std::abs(action->data()[i * bs + r]));
         }
     }
-    printf("  max |J d| %g, worst |K d - J d| %g\n", (double)scale, (double)worst);
+    printf("  %s: max |J d| %g, worst |K d - J d| %g\n", tet4 ? "TET4" : "HEX8", (double)scale, (double)worst);
     SFEM_TEST_ASSERT(scale > 0);
     SFEM_TEST_ASSERT(worst <= real_t(1e-10) * scale);
+    }
     return SFEM_TEST_SUCCESS;
 }
 

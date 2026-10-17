@@ -76,6 +76,11 @@ namespace sfem {
 
         std::shared_ptr<CRSGraph> dof_to_dof_graph();
         std::shared_ptr<CRSGraph> node_to_node_graph();
+        /// Every node of an element coupled to every other. On a semi-structured mesh the element is
+        /// the macro element, where node_to_node_graph couples only the nodes of a micro element; an
+        /// operator whose element spans the macro element (the generated high-order ones) needs this.
+        /// Elsewhere it is node_to_node_graph.
+        std::shared_ptr<CRSGraph> element_node_graph();
 
         friend class Op;
 

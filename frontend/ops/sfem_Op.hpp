@@ -330,6 +330,18 @@ namespace sfem {
         virtual bool energy_or_potential_based() const = 0;
 
         /**
+         * @brief Whether, on a semi-structured mesh, this operator assembles each macro element as
+         * its micro elements.
+         *
+         * Then its matrix fits `FunctionSpace::node_to_node_graph`, the micro-element graph.
+         * Otherwise its element spans the macro element -- the generated high-order elements read
+         * a semi-structured mesh that way -- and needs `FunctionSpace::element_node_graph`, a
+         * superset. False by default, because the superset is right for either and the micro
+         * graph is right only for the operators that say so.
+         */
+        virtual bool assembles_micro_elements() const { return false; }
+
+        /**
          * @brief Whether `gradient` reads the state at all.
          *
          * False is a promise that it does not -- a traction, a body force --

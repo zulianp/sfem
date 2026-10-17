@@ -3527,7 +3527,9 @@ namespace sfem {
             % (
                 hessian_state_alias,
                 hessian_state_check,
-                _RESIDUAL_SCHEME_HESSIAN_CRS[holds_scheme],
+                _RESIDUAL_SCHEME_HESSIAN_CRS[holds_scheme].replace(
+                    "(current,", "(current," if action_uses_current else "(nullptr,"
+                ),
                 _RESIDUAL_SCHEME_ARGUMENT[holds_scheme],
                 hessian_previous_alias,
                 _residual_hessian_dispatch_body(
@@ -3570,7 +3572,9 @@ namespace sfem {
             % (
                 hessian_state_alias,
                 hessian_state_check,
-                _RESIDUAL_SCHEME_HESSIAN_BSR[holds_scheme],
+                _RESIDUAL_SCHEME_HESSIAN_BSR[holds_scheme].replace(
+                    "(current,", "(current," if action_uses_current else "(nullptr,"
+                ),
                 _RESIDUAL_SCHEME_ARGUMENT[holds_scheme],
                 hessian_previous_alias,
                 _residual_hessian_dispatch_body(
@@ -5998,7 +6002,9 @@ _COUPLED_SCHEME_HESSIAN_BSR = {
 }
 
 #: The scheme's term in the residual template's assembled tangents, after the
-#: state check as in the gradient and the apply.
+#: state check as in the gradient and the apply.  Where the material's tangent
+#: reads no state there is no `current`, and the term gets none: the inertia's
+#: tangent is the mass whatever the state.
 _RESIDUAL_SCHEME_HESSIAN_CRS = {
     False: "",
     True: _COUPLED_SCHEME_HESSIAN_BSR[True].replace("hessian_bsr", "hessian_crs"),
@@ -9288,10 +9294,12 @@ def _residual_hessian_dispatch_body(
         affine_function = "%s_%s_%dd_a_msoa" % (material_name, operation, dim)
         prefix = "if" if not any(line.endswith("(dim == 2) {") or line.endswith("(dim == 3) {") for line in lines) else "else if"
         lines.append("%s%s (dim == %d) {" % (indent, prefix, dim))
-        lines.append(
-            "%s  static constexpr ptrdiff_t FIELD_STRIDE = %d;"
-            % (indent, block_size_by_dim[dim])
-        )
+        # Only where a field is passed: a constant tangent (a linear material) reads none.
+        if dependencies.current or dependencies.previous:
+            lines.append(
+                "%s  static constexpr ptrdiff_t FIELD_STRIDE = %d;"
+                % (indent, block_size_by_dim[dim])
+            )
         setup = []
         common = [
             "domain.element_type",
