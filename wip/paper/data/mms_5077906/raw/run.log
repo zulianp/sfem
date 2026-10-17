@@ -1,0 +1,60 @@
+Sat Oct 17 03:12:17 PM UTC 2026
+nid006550
+RESULTS=/capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/results/mms-fine-5077906-azilru
+g++ (Spack GCC) 14.3.0
+Copyright (C) 2024 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+-- Found MPI: TRUE (found version "4.1") found components: C
+-- Found MPI: TRUE (found version "4.1") found components: C CXX
+-- Found OpenMP_CXX: -fopenmp (found version "4.5")
+-- Found OpenMP: TRUE (found version "4.5") found components: C CXX
+-- Found OpenMP_CXX: -fopenmp (found version "4.5")
+-- Found OpenMP: TRUE (found version "4.5") found components: CXX
+-- cvfem performance flags: -O3;-DNDEBUG;-ffast-math;-fno-finite-math-only;-funroll-loops;-fomit-frame-pointer;-fno-math-errno;-fno-trapping-math;-ffp-contract=fast;-mcpu=native;-mtune=native;-ftree-vectorize
+-- cvfem: generator checks skipped -- /user-environment/env/default/bin/python3 has no sympy
+-- cvfem: temporal-order gate skipped -- /user-environment/env/default/bin/python3 has no numpy
+-- cvfem: MPI guard gate enabled (/usr/bin/srun)
+-- Configuring done (1.5s)
+-- Generating done (3.4s)
+-- Build files have been written to: /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/build/cvfem
+[ 66%] Built target cvfem_ns_op
+[100%] Built target cvfem_hex8_ns_ssgmg
+>>> verification matrix  17:13:06
+    spike root : /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/sfem/spikes/cvfem
+    driver     : /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/build/cvfem/cvfem_hex8_ns_ssgmg
+    output     : /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/results/mms-fine-5077906-azilru/study
+    groups     : conv
+    solver     : fgmres (SFEM_FGMRES=1 SFEM_FGMRES_RESTART=480 SFEM_PRECOND=bjacobi)
+    level      : 1
+    p_exact(outlet) = -0.16   exact step flux = 0.111111111111
+    conv solver : SFEM_FGMRES=1 SFEM_GMG=0 SFEM_PRECOND=bjacobi SFEM_FGMRES_RESTART=480 (unfrozen unless the arm names freezing)
+  conv     lo_n40         exit=1     81s  u_linf: 6.053920e-02  p_linf: 2.617384e-02
+  conv     ho_lim0_n40    exit=0     80s  u_linf: 8.564342e-03  p_linf: 1.621165e-02
+  conv     ho_lim1_n40    exit=0    167s  u_linf: 8.695268e-03  p_linf: 1.590083e-02
+  conv     ho_lim2_k0_n40 exit=0    152s  u_linf: 8.723744e-03  p_linf: 1.548857e-02
+  conv     ho_lim3_n40    exit=0    142s  u_linf: 8.738286e-03  p_linf: 1.538655e-02
+    manifest   : 5 run(s)
+<<< done  17:23:29
+
+Build the report with:
+  python3 /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/sfem/spikes/cvfem/python/cvfem_verify_report.py /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/results/mms-fine-5077906-azilru/study \
+      -o /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/sfem/spikes/cvfem/docs/CVFEM_Verification_Report.md --html
+All 5 final nonlinear targets met; spatial accuracy is reported separately.
+The fixed maximum-velocity-error limit remains 0.01.
+Adjacent-grid rates are observations, not a common asymptotic-order guarantee.
+
+| Scheme | n | Velocity L2 | Shifted pressure L2 | Velocity max | Accuracy gate | Velocity L2 rate |
+|---|---:|---:|---:|---:|---|---:|
+| lo | 40 | 0.06757192 | 0.02384001 | 0.0605392 | FAIL | - |
+| ho_lim0 | 40 | 0.003718764 | 0.001608478 | 0.008564342 | PASS | - |
+| ho_lim1 | 40 | 0.003502292 | 0.001567528 | 0.008695268 | PASS | - |
+| ho_lim2_k0 | 40 | 0.005266114 | 0.002227415 | 0.008723744 | PASS | - |
+| ho_lim3 | 40 | 0.006247547 | 0.002553279 | 0.008738286 | PASS | - |
+
+All logs and exit codes are retained, including failed accuracy gates.
+Scheme labels come from runs.tsv; source, binary and launch provenance need separate review.
+Intermediate residual-floor acceptance, where present, is recorded in summary.json.
+This is an affine MMS study, not an unstructured-mesh or solver-performance result.
+MMS REFINEMENT COLLECTED; inspect the separate accuracy gates: /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/results/mms-fine-5077906-azilru

@@ -449,6 +449,18 @@ in as the new normal before the cause is pinned down.
 
 ## Public numerical validation and storage-width probe (2026-10-13)
 
+The later Grace refinement in `data/mms_5077627/` and `data/mms_5077906/`
+extends the spatial-accuracy assessment to n=16/24/32/40 using one identical
+solver binary and unchanged physical inputs and solver targets. All twenty final
+nonlinear targets pass. At n=40 all four reconstructed schemes pass the fixed
+0.01 maximum velocity error target; first-order upwind remains above it. The
+finest-grid reconstructed velocity-L2 rates range from 1.36 to 2.07, so a common
+second-order claim remains unsupported. `python/mms_refinement.py` replays both
+archives and generates `figures/mms_macros.tex` and the complete supporting
+`reproducibility/mms-refinement.md` table. No solver-performance claim is made.
+This supersedes the coarse study as the latest spatial evidence; it does not
+erase that study's failed accuracy verdicts.
+
 `data/mms_20261013/` preserves a local FP64 Farrell manufactured-solution ladder:
 five convective schemes on affine n=4/8/16 grids over [0,2]^3, with Rhie--Chow,
 unfrozen corrections and FGMRES/block-Jacobi. Physical-h velocity L2 fits range

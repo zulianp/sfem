@@ -51,6 +51,7 @@
 \input{figures/roofline_macros}
 \input{figures/matched_counter_macros}
 \input{figures/unstructured_macros}
+\input{figures/mms_macros}
 \IfFileExists{figures/convho_macros.tex}{\input{figures/convho_macros}}{}
 \IfFileExists{figures/kmix_macros.tex}{\input{figures/kmix_macros}}{}
 \input{figures/scatter_macros}
@@ -608,10 +609,10 @@ order explicitly. The implicit operator therefore stays first order; this does
 not establish diagonal dominance of the coupled system. ``Higher-order'' names
 this reconstruction family, not a demonstrated common convergence order.
 We test unlimited reconstruction and three limiters (\S\ref{sec:res:convho}).
-A separate local manufactured-solution check shows decreasing velocity errors on
-three affine grids for all five schemes; its runs meet the nonlinear target but
-fail a separate absolute-accuracy gate, so they do not establish a common
-asymptotic order.
+All \mmsCases{} affine manufactured-solution solves on Grace meet the nonlinear
+target. At $n=\mmsFineN$, reconstructed schemes pass the fixed maximum velocity-error
+target \num{\mmsAccuracyTol}; first-order upwind does not. Their finest-grid
+velocity-$L^2$ rates span \mmsReconstructedMinRate--\mmsReconstructedMaxRate.
 Nodal gradients sum incident element gradients in a separate completed pass;
 pressure reconstruction also supplies Rhie--Chow coupling.
 

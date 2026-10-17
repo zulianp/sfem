@@ -1,0 +1,5 @@
+conv	lo_n40	conv_lo_n40.log	conv_arm=lo,exit_code=1
+conv	ho_lim0_n40	conv_ho_lim0_n40.log	conv_arm=ho_lim0,exit_code=0
+conv	ho_lim1_n40	conv_ho_lim1_n40.log	conv_arm=ho_lim1,exit_code=0
+conv	ho_lim2_k0_n40	conv_ho_lim2_k0_n40.log	conv_arm=ho_lim2_k0,exit_code=0
+conv	ho_lim3_n40	conv_ho_lim3_n40.log	conv_arm=ho_lim3,exit_code=0
