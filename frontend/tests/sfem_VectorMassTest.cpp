@@ -15,8 +15,10 @@ namespace {
     // The box's volume as the mesh stores it: its coordinates are geom_t.
     const real_t volume_of_box = real_t(geom_t(0.7)) * real_t(geom_t(0.5));
 
-    int check(const char *const label, const std::shared_ptr<sfem::Mesh> &mesh, const real_t volume, const bool row_sums) {
-        auto            fs = sfem::FunctionSpace::create(mesh, 3);
+    int check(const char *const label, const std::shared_ptr<sfem::Mesh> &mesh, const real_t volume, const bool row_sums,
+              const bool high_order = false) {
+        auto fs = sfem::FunctionSpace::create(mesh, 3);
+        if (high_order) fs->set_semi_structured_basis(sfem::FunctionSpace::SemiStructuredBasis::HIGH_ORDER);
         const ptrdiff_t n  = fs->n_dofs();
         auto            op = sfem::create_op(fs, "GeneratedVectorMass", sfem::EXECUTION_SPACE_HOST);
         SFEM_TEST_ASSERT(op != nullptr && op->initialize() == SFEM_SUCCESS);
@@ -40,12 +42,13 @@ namespace {
                 worst = std::max(worst, std::abs(m1[i] - rho * diag[i]));
                 scale = std::max(scale, std::abs(m1[i]));
             }
-            SFEM_TEST_ASSERT(worst <= 1e-12 * scale);
+            // The semi-structured LumpedMass works from single-precision Jacobians (jacobian_t).
+            SFEM_TEST_ASSERT(worst <= (fs->has_semi_structured_mesh() ? 1e-6 : 1e-12) * scale);
         }
 
         auto f = sfem::Function::create(fs);
         f->add_operator(op);
-        auto                graph = f->block_node_graph();
+        auto                graph = fs->element_node_graph();
         std::vector<real_t> values(graph->nnz() * 9, 0), h(n), kh(n, 0), mh(n, 0);
         SFEM_TEST_ASSERT(op->hessian_bsr(nullptr, graph->rowptr()->data(), graph->colidx()->data(), values.data()) == SFEM_SUCCESS);
         for (ptrdiff_t i = 0; i < n; ++i) h[i] = std::sin(real_t(0.37) * (i + 1));
@@ -79,11 +82,13 @@ int test_tet4() {
     return check("TET4", sfem::Mesh::create_tet4_cube(sfem::Communicator::self(), 2, 2, 2, 0, 0, 0, 1, real_t(0.7), real_t(0.5)), volume_of_box, true);
 }
 
-// The quadratic element on the macro element: its row sums are not a lumped mass, but its total
-// still is the body's.
+// The micro elements, whose row sums are the (micro) lumped mass; and the quadratic element on the
+// macro element, whose row sums are not a lumped mass but whose total still is the body's.
 int test_semi_structured() {
-    auto box = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 2, 2, 1, 0, 0, 0, 1, real_t(0.7), real_t(0.5));
-    return check("SSHEX8 level 2", smesh::to_semistructured(2, box, true, false), volume_of_box, false);
+    auto box  = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 2, 2, 1, 0, 0, 0, 1, real_t(0.7), real_t(0.5));
+    auto mesh = smesh::to_semistructured(2, box, true, false);
+    SFEM_TEST_ASSERT(check("SSHEX8 level 2, micro", mesh, volume_of_box, true) == SFEM_TEST_SUCCESS);
+    return check("SSHEX8 level 2, high-order", mesh, volume_of_box, false, true);
 }
 
 int main(int argc, char *argv[]) {

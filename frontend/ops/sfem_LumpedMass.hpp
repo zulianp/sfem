@@ -20,7 +20,6 @@ namespace sfem {
         //! a lumped mass is still the Hessian of a quadratic
         bool energy_or_potential_based() const override { return true; }
         inline bool is_linear() const override { return true; }
-        bool        assembles_micro_elements() const override { return true; }  // the diagonal only
         inline ptrdiff_t n_dofs_domain() const override;
         inline ptrdiff_t n_dofs_image() const override;
 

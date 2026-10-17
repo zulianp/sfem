@@ -404,6 +404,15 @@ namespace sfem {
         return ret;
     }
 
+    std::shared_ptr<Op> InertiaPotential::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
+        auto ret = std::make_shared<InertiaPotential>(space, impl_->es);
+        ret->set_density(impl_->density);
+        ret->set_consistent_mass(impl_->consistent_mass);
+        ret->set_alpha(impl_->alpha);
+        if (ret->initialize() != SFEM_SUCCESS) return nullptr;
+        return ret;
+    }
+
     void InertiaPotential::set_alpha(const real_t alpha) {
         impl_->alpha = alpha;
         impl_->sync_consistent();
@@ -415,8 +424,6 @@ namespace sfem {
     }
 
     void InertiaPotential::set_consistent_mass(const bool consistent) { impl_->consistent_mass = consistent; }
-
-    bool InertiaPotential::assembles_micro_elements() const { return !impl_->consistent_mass; }
 
     void InertiaPotential::set_u_hat(const std::shared_ptr<Buffer<real_t>> &u_hat) { impl_->u_hat = u_hat; }
 

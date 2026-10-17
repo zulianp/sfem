@@ -81,10 +81,6 @@ namespace sfem {
         void add_dirichlet_conditions(const std::shared_ptr<DirichletConditions> &c);
 
         std::shared_ptr<CRSGraph> crs_graph() const;
-        /// The node graph a block matrix of every operator fits: the space's micro-element graph when
-        /// each operator assembles micro elements (Op::assembles_micro_elements), else the element
-        /// graph. The two differ only on semi-structured meshes.
-        std::shared_ptr<CRSGraph> block_node_graph() const;
 
         int hessian_crs(const real_t *const x, const count_t *const rowptr, const idx_t *const colidx, real_t *const values);
 

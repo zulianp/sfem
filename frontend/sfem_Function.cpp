@@ -328,13 +328,6 @@ namespace sfem {
 
     std::shared_ptr<CRSGraph> Function::crs_graph() const { return impl_->space->dof_to_dof_graph(); }
 
-    std::shared_ptr<CRSGraph> Function::block_node_graph() const {
-        for (const auto &op : impl_->ops) {
-            if (!op->assembles_micro_elements()) return impl_->space->element_node_graph();
-        }
-        return impl_->space->node_to_node_graph();
-    }
-
     double Function::flops() const {
         double ret = 0;
         for (const auto &op : impl_->ops) {

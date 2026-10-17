@@ -321,7 +321,6 @@ int test_consistent_inertia_potential() {
     consistent.set_consistent_mass(true);
     SFEM_TEST_ASSERT(consistent.initialize() == SFEM_SUCCESS);
     SFEM_TEST_ASSERT(lumped.initialize() == SFEM_SUCCESS);
-    SFEM_TEST_ASSERT(!consistent.assembles_micro_elements() && lumped.assembles_micro_elements());
 
     // The value is quadratic: a central difference is exact up to rounding.
     std::vector<real_t> g(ndofs, 0);
@@ -343,7 +342,7 @@ int test_consistent_inertia_potential() {
     auto                f = sfem::Function::create(space);
     auto                held = consistent.clone();
     f->add_operator(held);
-    auto                graph = f->block_node_graph();
+    auto                graph = space->element_node_graph();
     std::vector<real_t> values(graph->nnz() * 9, 0), kh(ndofs, 0), mh(ndofs, 0), ones(ndofs, 1), m1(ndofs, 0),
             diag(ndofs, 0);
     SFEM_TEST_ASSERT(consistent.hessian_bsr(nullptr, graph->rowptr()->data(), graph->colidx()->data(), values.data()) ==

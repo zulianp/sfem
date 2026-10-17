@@ -67,6 +67,19 @@ namespace sfem {
         int iterate(const std::function<int(const OpDomain &)> &func);
 
         /**
+         * @brief Hand a semi-structured hex domain to `iterate` as its micro elements
+         *
+         * For an operator whose kernels are elements, not semi-structured macro elements (the
+         * generated ones), on a space whose basis is micro-element (FunctionSpace::micro_elements).
+         * A level-L domain is then L^3 HEX8 domains: micro position (i, j, k) of every macro
+         * element at once, its eight node rows the macro connectivity's rows at the micro element's
+         * corners -- views, nothing copied -- with the domain's parameters and no user data, so the
+         * kernels read their geometry from the micro nodes. Level-1 domains are HEX8 already.
+         */
+        void set_micro_elements(bool micro);
+        bool micro_elements() const { return micro_; }
+
+        /**
          * @brief Abort if any selected domain has no operator kernel
          *
          * WEDGE / PYRAMID (unstructured or SS) get an explicit hex-dominant message.
@@ -120,6 +133,10 @@ namespace sfem {
 
     private:
         std::map<std::string, OpDomain> domains_;  ///< Map of domain name to domain info
+        bool                            micro_{false};
+        /// The micro-element views of each semi-structured domain, built on first use.
+        std::map<std::string, std::vector<OpDomain>> micro_views_;
+        const std::vector<OpDomain>                 &micro_views(const std::string &name, const OpDomain &domain);
     };
 
 } // namespace sfem 

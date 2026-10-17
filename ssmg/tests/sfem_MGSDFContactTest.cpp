@@ -470,8 +470,9 @@ static int run_ssmgc_on_ss_mesh(const std::shared_ptr<sfem::Mesh>               
                                 const std::vector<std::shared_ptr<sfem::Sideset>> &contact_sides,
                                 const std::shared_ptr<smesh::Grid<geom_t>>        &sdf,
                                 const geom_t                                       disp_y,
-                                const char                                        *op_name = "LinearElasticity",
-                                const char                                        *out_dir = nullptr) {
+                                const char                                        *op_name  = "LinearElasticity",
+                                const char                                        *out_dir  = nullptr,
+                                std::vector<real_t>                               *solution = nullptr) {
     SFEM_TEST_ASSERT(ss != nullptr);
     SFEM_TEST_ASSERT(!contact_sides.empty());
     auto comm = ss->comm();
@@ -489,11 +490,9 @@ static int run_ssmgc_on_ss_mesh(const std::shared_ptr<sfem::Mesh>               
     SFEM_TEST_ASSERT(op != nullptr);
     SFEM_TEST_ASSERT(op->initialize() == SFEM_SUCCESS);
     f->add_operator(op);
-    if (std::string(op_name) == "LinearElasticity") {
-        SFEM_TEST_ASSERT(f->is_linear());
-    } else {
-        SFEM_TEST_ASSERT(!f->is_linear());
-    }
+    // The linear materials take SSMGC's linear path, the others its nonlinear one.
+    const bool linear = std::string(op_name) == "LinearElasticity" || std::string(op_name) == "GeneratedLinearElasticity";
+    SFEM_TEST_ASSERT(f->is_linear() == linear);
 
     const int dim  = ss->spatial_dimension();
     auto      wall = sfem::Sideset::create_from_selector(ss, [](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool {
@@ -537,6 +536,7 @@ static int run_ssmgc_on_ss_mesh(const std::shared_ptr<sfem::Mesh>               
     }
     SFEM_TEST_ASSERT(std::isfinite(nrm));
     SFEM_TEST_ASSERT(max_penetration(contact_conds, comm, x->data()) < penetration_tol);
+    if (solution) solution->assign(x->data(), x->data() + ndofs);
 
     const int enable_output = smesh::Env::read("SFEM_ENABLE_OUTPUT", int(0));
     if (enable_output && out_dir && out_dir[0]) {
@@ -594,6 +594,38 @@ int test_checkerboard_hex_ssmgc() {
                 return radius - sqrt(dx * dx + dy * dy + dz * dz);
             });
     return run_ssmgc_on_ss_mesh(ss, 3, contact_ss, sdf, real_t(-0.05));
+}
+
+// The generated material on the same problem: on a micro-element space it is the hand-written
+// operator's discretisation, and every coarse level is its derefine_op. The two solutions agree to
+// the hand-written operator's single-precision Jacobians and SSMGC's tolerance.
+int test_checkerboard_hex_ssmgc_generated() {
+    auto hex = sfem::Mesh::create_hex8_checkerboard_cube(sfem::Communicator::self(), 2, 2, 2);
+    auto ss  = smesh::to_semistructured(4, hex, true, false);
+    SFEM_TEST_ASSERT(ss != nullptr);
+
+    auto contact_ss = sfem::Sideset::create_from_selector(
+            ss, [](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool { return y > -1e-5 && y < 1e-5; });
+    auto comm = ss->comm();
+    auto sdf  = smesh::create_sdf(
+            comm, 16, 8, 16, -0.1, -0.2, -0.1, 1.1, 0.2, 1.1, [](const geom_t x, const geom_t y, const geom_t z) -> geom_t {
+                const geom_t cx = 0.5, cy = -0.5, cz = 0.5, radius = 0.5;
+                const geom_t dx = cx - x, dy = cy - y, dz = cz - z;
+                return radius - sqrt(dx * dx + dy * dy + dz * dz);
+            });
+    std::vector<real_t> hand, generated;
+    SFEM_TEST_ASSERT(run_ssmgc_on_ss_mesh(ss, 3, contact_ss, sdf, real_t(-0.05), "LinearElasticity", nullptr, &hand) ==
+                     SFEM_TEST_SUCCESS);
+    SFEM_TEST_ASSERT(run_ssmgc_on_ss_mesh(ss, 3, contact_ss, sdf, real_t(-0.05), "GeneratedLinearElasticity", nullptr,
+                                          &generated) == SFEM_TEST_SUCCESS);
+    real_t worst = 0, scale = 0;
+    for (size_t i = 0; i < hand.size(); ++i) {
+        worst = std::max(worst, std::abs(hand[i] - generated[i]));
+        scale = std::max(scale, std::abs(hand[i]));
+    }
+    printf("  SSMGC, level 4: generated against hand-written %.3g (max |u| %g)\n", (double)(worst / scale), (double)scale);
+    SFEM_TEST_ASSERT(worst <= 1e-5 * scale);
+    return SFEM_TEST_SUCCESS;
 }
 
 int test_tet_ssmgc() {
@@ -691,6 +723,7 @@ int main(int argc, char *argv[]) {
 
     SFEM_RUN_TEST(test_contact);
     SFEM_RUN_TEST(test_checkerboard_hex_ssmgc);
+    SFEM_RUN_TEST(test_checkerboard_hex_ssmgc_generated);
     SFEM_RUN_TEST(test_tet_ssmgc);
     SFEM_RUN_TEST(test_quad2d_ssmgc);
     SFEM_RUN_TEST(test_function_is_linear);

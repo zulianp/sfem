@@ -16,9 +16,6 @@ namespace sfem {
         ~InertiaPotential() override;
 
         const char *name() const override { return "InertiaPotential"; }
-        /// The lumped mass is a diagonal, which fits any graph; the consistent one couples an
-        /// element's nodes.
-        bool        assembles_micro_elements() const override;
 
         //! 1/2 alpha (x - u_hat)^T M (x - u_hat)
 
@@ -63,6 +60,9 @@ namespace sfem {
                         real_t *const       out) override;
 
         std::shared_ptr<Op> clone() const override;
+        /// The same potential on a coarser space: its density, mass kind and alpha, the mass
+        /// rediscretised there. No predictor (a coarse level applies and assembles only).
+        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override;
 
         void set_alpha(real_t alpha);
         void set_density(real_t density);

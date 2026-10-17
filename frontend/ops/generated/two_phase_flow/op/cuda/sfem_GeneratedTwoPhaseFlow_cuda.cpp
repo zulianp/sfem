@@ -5,6 +5,7 @@
 
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_MultiDomainOp.hpp"
+#include "sfem_DerefinedTimeScheme.hpp"
 #include "sfem_OpTracer.hpp"
 #include "sfem_Parameters.hpp"
 #include "smesh_kernel_data.hpp"
@@ -603,6 +604,9 @@ namespace sfem {
   int GPUGeneratedTwoPhaseFlow::initialize(const std::vector<std::string> &block_names) {
     SFEM_TRACE_SCOPE("GPUGeneratedTwoPhaseFlow::initialize");
     impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
+    // A micro-element space hands each semi-structured macro element over as its micro
+    // elements, which these kernels assemble as HEX8.
+    impl_->domains->set_micro_elements(impl_->space->micro_elements());
     {
       auto dof_graph = impl_->space->dof_to_dof_graph();
       if (!dof_graph ||
@@ -809,6 +813,20 @@ namespace sfem {
                   const real_t value) {
     SFEM_TRACE_SCOPE("GPUGeneratedTwoPhaseFlow::set_value_in_block");
     impl_->domains->set_value_in_block(block_name, var_name, value);
+  }
+
+  std::shared_ptr<Op> GPUGeneratedTwoPhaseFlow::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
+    SFEM_TRACE_SCOPE("GPUGeneratedTwoPhaseFlow::derefine_op");
+    auto ret = std::make_shared<GPUGeneratedTwoPhaseFlow>(space);
+    if (ret->initialize() != SFEM_SUCCESS) return nullptr;
+    for (const auto &entry : impl_->domains->domains()) {
+      for (int i = 0; i < N_DEFINED_MATERIAL_PARAMETERS; ++i) {
+        ret->set_value_in_block(entry.first,
+                                MATERIAL_PARAMETER_NAMES[i],
+                                entry.second.parameters->require_real_value(MATERIAL_PARAMETER_NAMES[i]));
+      }
+    }
+    return ret;
   }
 
   void GPUGeneratedTwoPhaseFlow::set_option(const std::string &name, const bool val) {
