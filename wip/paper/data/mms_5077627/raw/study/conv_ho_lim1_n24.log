@@ -1,0 +1,221 @@
+--------------------
+| PackedMesh |
+n_packs: 14
+elements_per_pack: 1024
+Memory PackedMesh: 262.993 KB
+Original:      367.415 KB
+--------------------
+mesh coords checksum: 15625.000004656613 15625.000004656613 15625.000004656613
+pressure pin: DISABLED
+mms: forcing recomputed per continuation stage (rho varies, mu=0.01, Re=100)
+constraints: uvw_nodes=3458  uz_nodes=0  p_pin=0  sh_uv=0  sh_phi=0
+case: mms  geom: affine  refine_level: 1  semi_structured: 0
+channel: L=(2,2,2)  cells=(24,24,24)
+nnodes: 15625  nelements: 13824  ndof: 62500
+rho: 1  mu: 0.01  mms_Re (=1/mu, the parameter in p): 100   [continuation ramps rho to 1]
+initial state checksum: 296.81302587372625   p_exact: -10.91937824281932
+constrained dofs: 10374
+pressure gauge: zero mean  (15625 of 15625 pressure dofs free)
+continuation: 5 stages, Re = 1 4 16 64 200
+stage 1/5: rho: 0.005  Re: 1
+newton 0  ||R||: 1.454868e-02  rel: 1.000000e+00
+preconditioner: bjacobi (no multigrid)
+50: residual abs: 0.000123046, rel: 0.00845754
+100: residual abs: 3.28803e-06, rel: 0.000226002
+150: residual abs: 2.13665e-08, rel: 1.46862e-06
+  lin_it: 166  |dx|_inf: 8.023001e-01  alpha: 1
+newton 1  ||R||: 6.649091e-05  rel: 4.570236e-03
+50: residual abs: 1.02493e-06, rel: 0.0154146
+100: residual abs: 1.33327e-08, rel: 0.00020052
+150: residual abs: 2.88208e-09, rel: 4.33455e-05
+200: residual abs: 7.32392e-10, rel: 1.10149e-05
+250: residual abs: 1.46874e-10, rel: 2.20893e-06
+  lin_it: 285  |dx|_inf: 2.333948e-03  alpha: 1
+newton 2  ||R||: 5.806700e-09  rel: 3.991220e-07
+50: residual abs: 1.57792e-10, rel: 0.0271741
+100: residual abs: 4.33037e-11, rel: 0.00745753
+150: residual abs: 1.50306e-11, rel: 0.0025885
+200: residual abs: 4.78172e-12, rel: 0.000823483
+250: residual abs: 1.19699e-12, rel: 0.00020614
+300: residual abs: 2.05881e-13, rel: 3.54557e-05
+350: residual abs: 3.31883e-14, rel: 5.71553e-06
+  lin_it: 381  |dx|_inf: 1.617920e-06  alpha: 1
+newton 3  ||R||: 1.946799e-11  rel: 1.338127e-09
+50: residual abs: 3.96324e-13, rel: 0.0203577
+100: residual abs: 6.81088e-14, rel: 0.0034985
+150: residual abs: 1.43605e-14, rel: 0.000737647
+  lin_it: 168  |dx|_inf: 1.903152e-08  alpha: 1
+newton 4  ||R||: 9.858453e-15  rel: 6.776183e-13
+stage 2/5: rho: 0.02  Re: 4
+newton 0  ||R||: 7.824870e-06  rel: 5.378405e-04
+50: residual abs: 1.71147e-07, rel: 0.0218721
+100: residual abs: 6.84709e-09, rel: 0.000875043
+150: residual abs: 1.22501e-09, rel: 0.000156554
+200: residual abs: 2.09143e-10, rel: 2.6728e-05
+250: residual abs: 3.66084e-11, rel: 4.67846e-06
+  lin_it: 292  |dx|_inf: 2.849155e-04  alpha: 1
+newton 1  ||R||: 2.440286e-08  rel: 1.677325e-06
+50: residual abs: 2.12023e-10, rel: 0.00868846
+100: residual abs: 2.05707e-11, rel: 0.000842964
+150: residual abs: 5.36232e-12, rel: 0.000219741
+200: residual abs: 8.08846e-13, rel: 3.31455e-05
+250: residual abs: 1.12595e-13, rel: 4.614e-06
+  lin_it: 290  |dx|_inf: 1.184976e-05  alpha: 1
+newton 2  ||R||: 5.999931e-10  rel: 4.124038e-08
+50: residual abs: 2.65084e-12, rel: 0.00441811
+100: residual abs: 2.85299e-13, rel: 0.000475503
+150: residual abs: 6.78423e-14, rel: 0.000113072
+200: residual abs: 1.19362e-14, rel: 1.9894e-05
+  lin_it: 206  |dx|_inf: 2.189159e-07  alpha: 1
+newton 3  ||R||: 1.909690e-13  rel: 1.312621e-11
+stage 3/5: rho: 0.08  Re: 16
+newton 0  ||R||: 3.115008e-05  rel: 2.141093e-03
+50: residual abs: 8.70526e-07, rel: 0.0279462
+100: residual abs: 3.33531e-08, rel: 0.00107072
+150: residual abs: 2.95426e-09, rel: 9.48396e-05
+200: residual abs: 3.1695e-10, rel: 1.01749e-05
+  lin_it: 228  |dx|_inf: 1.038453e-03  alpha: 1
+newton 1  ||R||: 1.680161e-07  rel: 1.154854e-05
+50: residual abs: 4.49024e-10, rel: 0.00267251
+100: residual abs: 5.59607e-11, rel: 0.000333067
+150: residual abs: 9.59581e-12, rel: 5.71125e-05
+200: residual abs: 1.02206e-12, rel: 6.08309e-06
+250: residual abs: 1.63967e-13, rel: 9.75903e-07
+  lin_it: 250  |dx|_inf: 1.931883e-05  alpha: 1
+newton 2  ||R||: 9.657515e-09  rel: 6.638069e-07
+50: residual abs: 1.05685e-11, rel: 0.00109433
+100: residual abs: 1.21206e-12, rel: 0.000125505
+150: residual abs: 2.31443e-13, rel: 2.39651e-05
+200: residual abs: 3.82778e-14, rel: 3.96353e-06
+  lin_it: 227  |dx|_inf: 1.714334e-06  alpha: 1
+newton 3  ||R||: 8.005455e-11  rel: 5.502529e-09
+50: residual abs: 9.66991e-14, rel: 0.00120791
+  lin_it: 96  |dx|_inf: 2.010598e-08  alpha: 1
+newton 4  ||R||: 4.052173e-14  rel: 2.785251e-12
+stage 4/5: rho: 0.32  Re: 64
+newton 0  ||R||: 1.451258e-04  rel: 9.975186e-03
+50: residual abs: 1.11941e-05, rel: 0.077134
+100: residual abs: 1.1732e-06, rel: 0.00808399
+150: residual abs: 2.46315e-07, rel: 0.00169725
+200: residual abs: 2.81072e-08, rel: 0.000193675
+250: residual abs: 1.38329e-09, rel: 9.53163e-06
+  lin_it: 283  |dx|_inf: 4.966291e-03  alpha: 1
+newton 1  ||R||: 3.640429e-06  rel: 2.502240e-04
+50: residual abs: 2.67061e-08, rel: 0.00733599
+100: residual abs: 4.05092e-09, rel: 0.00111276
+150: residual abs: 7.53048e-10, rel: 0.000206857
+200: residual abs: 1.44956e-10, rel: 3.98185e-05
+250: residual abs: 1.45053e-11, rel: 3.98452e-06
+  lin_it: 272  |dx|_inf: 1.618673e-04  alpha: 1
+newton 2  ||R||: 1.337011e-07  rel: 9.189910e-06
+50: residual abs: 2.31749e-10, rel: 0.00173333
+100: residual abs: 3.59207e-11, rel: 0.000268664
+150: residual abs: 6.79736e-12, rel: 5.084e-05
+200: residual abs: 1.17061e-12, rel: 8.75539e-06
+250: residual abs: 1.85269e-13, rel: 1.3857e-06
+  lin_it: 259  |dx|_inf: 1.414028e-05  alpha: 1
+newton 3  ||R||: 3.302950e-09  rel: 2.270274e-07
+50: residual abs: 5.65672e-12, rel: 0.00171263
+100: residual abs: 7.18892e-13, rel: 0.000217652
+150: residual abs: 1.04003e-13, rel: 3.14878e-05
+200: residual abs: 1.4976e-14, rel: 4.53414e-06
+  lin_it: 215  |dx|_inf: 4.986158e-07  alpha: 1
+newton 4  ||R||: 3.091461e-11  rel: 2.124908e-09
+50: residual abs: 1.48626e-14, rel: 0.000480762
+  lin_it: 56  |dx|_inf: 9.220000e-09  alpha: 1
+newton 5  ||R||: 9.625136e-15  rel: 6.615813e-13
+stage 5/5: rho: 1  Re: 200
+newton 0  ||R||: 5.562084e-04  rel: 3.823085e-02
+50: residual abs: 0.000124322, rel: 0.223517
+100: residual abs: 5.66187e-05, rel: 0.101794
+150: residual abs: 2.01102e-05, rel: 0.0361559
+200: residual abs: 9.77642e-06, rel: 0.0175769
+250: residual abs: 5.61204e-06, rel: 0.0100898
+300: residual abs: 2.11388e-06, rel: 0.00380052
+350: residual abs: 8.89043e-07, rel: 0.0015984
+400: residual abs: 3.88684e-07, rel: 0.00069881
+450: residual abs: 3.03915e-07, rel: 0.000546405
+500: residual abs: 9.00462e-08, rel: 0.000161893
+550: residual abs: 5.23157e-08, rel: 9.40578e-05
+600: residual abs: 4.714e-08, rel: 8.47524e-05
+650: residual abs: 3.87628e-08, rel: 6.96911e-05
+700: residual abs: 2.30047e-08, rel: 4.13598e-05
+750: residual abs: 9.40687e-09, rel: 1.69125e-05
+800: residual abs: 2.29879e-09, rel: 4.13296e-06
+850: residual abs: 9.15673e-10, rel: 1.64628e-06
+  lin_it: 871  |dx|_inf: 7.556054e-03  alpha: 1
+newton 1  ||R||: 1.546462e-05  rel: 1.062957e-03
+50: residual abs: 5.51577e-07, rel: 0.0356671
+100: residual abs: 1.9607e-07, rel: 0.0126786
+150: residual abs: 7.28204e-08, rel: 0.00470884
+200: residual abs: 2.4085e-08, rel: 0.00155743
+250: residual abs: 9.58163e-09, rel: 0.000619584
+300: residual abs: 2.54995e-09, rel: 0.000164889
+350: residual abs: 9.95485e-10, rel: 6.43718e-05
+400: residual abs: 3.73046e-10, rel: 2.41225e-05
+450: residual abs: 1.42369e-10, rel: 9.20612e-06
+500: residual abs: 5.4847e-11, rel: 3.54661e-06
+550: residual abs: 3.58567e-11, rel: 2.31863e-06
+600: residual abs: 2.09877e-11, rel: 1.35714e-06
+  lin_it: 629  |dx|_inf: 2.899068e-04  alpha: 1
+newton 2  ||R||: 7.591401e-07  rel: 5.217930e-05
+50: residual abs: 1.67484e-08, rel: 0.0220623
+100: residual abs: 5.90565e-09, rel: 0.00777939
+150: residual abs: 3.57494e-09, rel: 0.0047092
+200: residual abs: 1.69603e-09, rel: 0.00223414
+250: residual abs: 6.90048e-10, rel: 0.000908987
+300: residual abs: 2.23841e-10, rel: 0.000294861
+350: residual abs: 6.47683e-11, rel: 8.53179e-05
+400: residual abs: 1.95487e-11, rel: 2.57511e-05
+450: residual abs: 3.31782e-12, rel: 4.37049e-06
+500: residual abs: 1.39773e-12, rel: 1.8412e-06
+550: residual abs: 9.09204e-13, rel: 1.19768e-06
+  lin_it: 569  |dx|_inf: 8.641722e-05  alpha: 1
+newton 3  ||R||: 7.391744e-08  rel: 5.080697e-06
+50: residual abs: 1.46502e-09, rel: 0.0198196
+100: residual abs: 1.97091e-10, rel: 0.00266636
+150: residual abs: 7.54319e-11, rel: 0.00102049
+200: residual abs: 2.39883e-11, rel: 0.000324528
+250: residual abs: 6.95558e-12, rel: 9.40994e-05
+300: residual abs: 1.84487e-12, rel: 2.49586e-05
+350: residual abs: 9.16453e-13, rel: 1.23983e-05
+400: residual abs: 4.39254e-13, rel: 5.9425e-06
+450: residual abs: 1.48177e-13, rel: 2.00463e-06
+  lin_it: 478  |dx|_inf: 2.632219e-05  alpha: 1
+newton 4  ||R||: 1.016264e-08  rel: 6.985262e-07
+50: residual abs: 1.75237e-10, rel: 0.0172433
+100: residual abs: 2.49049e-11, rel: 0.00245063
+150: residual abs: 1.13738e-11, rel: 0.00111918
+200: residual abs: 4.25703e-12, rel: 0.00041889
+250: residual abs: 1.38977e-12, rel: 0.000136753
+300: residual abs: 4.76961e-13, rel: 4.69328e-05
+350: residual abs: 2.0772e-13, rel: 2.04396e-05
+400: residual abs: 1.03597e-13, rel: 1.01939e-05
+450: residual abs: 3.08259e-14, rel: 3.03326e-06
+500: residual abs: 1.24722e-14, rel: 1.22726e-06
+  lin_it: 537  |dx|_inf: 3.493956e-06  alpha: 1
+newton 5  ||R||: 3.548375e-12  rel: 2.438967e-10
+50: residual abs: 1.47901e-14, rel: 0.00416814
+  lin_it: 69  |dx|_inf: 1.385214e-09  alpha: 1
+newton 6  ||R||: 9.890722e-15  rel: 6.798363e-13
+continuation: highest Re SOLVED = 200 of 200 target  (AT TARGET)
+newton_converged: 1  newton_it: 6 (last stage)  newton_total: 22 over 5 stage(s)  lin_it_total: 6827
+matrix_free: 1  t_operator: 0.0000 s  t_precond: 0.0611 s  t_solve: 21.9770 s  us_per_lin_it: 3219.14
+output: wrote mesh and solution to /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/results/mms-5077627-Scm2Cw/study/out_conv_ho_lim1_n24 (vel.0 vel.1 vel.2 = u, p = pressure)
+mms_err: u_l2 1.011878e-02  p_l2 4.489750e-03  p_l2_shifted 4.088535e-03  (dp_mean 6.559089e-04, vol 8.000000)
+mms_pin: pin at (0.0000,0.0000,0.0000)  h=0.0833
+mms_pin: worst u err 2.1546e-02 at (1.9167,1.9167,1.9167), dist_to_pin 3.3198 (39.8 h)
+mms_pin: worst p err 2.5044e-02 at (2.0000,2.0000,2.0000), dist_to_pin 3.4641 (41.6 h)
+mms_pin: u_linf excluding r<=0h 2.1546e-02  1h 2.1546e-02  2h 2.1546e-02  4h 2.1546e-02
+mms_pin: p_linf excluding r<=0h 2.5044e-02  1h 2.5044e-02  2h 2.5044e-02  4h 2.5044e-02
+
+phase breakdown (8.978 s in top-level phases; shares are of that)
+  phase                     seconds      calls      us/call   share
+  outer_op                    8.884       6853       1296.3   98.9%
+  hessian_block_diag          0.055         22       2518.5    0.6%
+  newton_residual             0.039         27       1441.1    0.4%
+  precond_total               0.100       6827         14.7    1.1%  (container: the rows above it
+                                                                      marked op/smooth/transfer/coarse are inside)
+u_linf: 2.154610e-02  p_linf: 2.504423e-02
+cvfem_hex8_ns_ssgmg: 22.2224 seconds
+verification failed (converged=1, u_linf=2.154610e-02, tol=0.01)
