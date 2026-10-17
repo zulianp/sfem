@@ -1,0 +1,115 @@
+{
+  "runs": [
+    {
+      "group": "conv",
+      "label": "lo_n16",
+      "log": "conv_lo_n16.log",
+      "conv_arm": "lo",
+      "exit_code": 1.0
+    },
+    {
+      "group": "conv",
+      "label": "lo_n24",
+      "log": "conv_lo_n24.log",
+      "conv_arm": "lo",
+      "exit_code": 1.0
+    },
+    {
+      "group": "conv",
+      "label": "lo_n32",
+      "log": "conv_lo_n32.log",
+      "conv_arm": "lo",
+      "exit_code": 1.0
+    },
+    {
+      "group": "conv",
+      "label": "ho_lim0_n16",
+      "log": "conv_ho_lim0_n16.log",
+      "conv_arm": "ho_lim0",
+      "exit_code": 1.0
+    },
+    {
+      "group": "conv",
+      "label": "ho_lim0_n24",
+      "log": "conv_ho_lim0_n24.log",
+      "conv_arm": "ho_lim0",
+      "exit_code": 1.0
+    },
+    {
+      "group": "conv",
+      "label": "ho_lim0_n32",
+      "log": "conv_ho_lim0_n32.log",
+      "conv_arm": "ho_lim0",
+      "exit_code": 1.0
+    },
+    {
+      "group": "conv",
+      "label": "ho_lim1_n16",
+      "log": "conv_ho_lim1_n16.log",
+      "conv_arm": "ho_lim1",
+      "exit_code": 1.0
+    },
+    {
+      "group": "conv",
+      "label": "ho_lim1_n24",
+      "log": "conv_ho_lim1_n24.log",
+      "conv_arm": "ho_lim1",
+      "exit_code": 1.0
+    },
+    {
+      "group": "conv",
+      "label": "ho_lim1_n32",
+      "log": "conv_ho_lim1_n32.log",
+      "conv_arm": "ho_lim1",
+      "exit_code": 1.0
+    },
+    {
+      "group": "conv",
+      "label": "ho_lim2_k0_n16",
+      "log": "conv_ho_lim2_k0_n16.log",
+      "conv_arm": "ho_lim2_k0",
+      "exit_code": 1.0
+    },
+    {
+      "group": "conv",
+      "label": "ho_lim2_k0_n24",
+      "log": "conv_ho_lim2_k0_n24.log",
+      "conv_arm": "ho_lim2_k0",
+      "exit_code": 1.0
+    },
+    {
+      "group": "conv",
+      "label": "ho_lim2_k0_n32",
+      "log": "conv_ho_lim2_k0_n32.log",
+      "conv_arm": "ho_lim2_k0",
+      "exit_code": 1.0
+    },
+    {
+      "group": "conv",
+      "label": "ho_lim3_n16",
+      "log": "conv_ho_lim3_n16.log",
+      "conv_arm": "ho_lim3",
+      "exit_code": 1.0
+    },
+    {
+      "group": "conv",
+      "label": "ho_lim3_n24",
+      "log": "conv_ho_lim3_n24.log",
+      "conv_arm": "ho_lim3",
+      "exit_code": 1.0
+    },
+    {
+      "group": "conv",
+      "label": "ho_lim3_n32",
+      "log": "conv_ho_lim3_n32.log",
+      "conv_arm": "ho_lim3",
+      "exit_code": 1.0
+    }
+  ],
+  "machine": "nid006551",
+  "threads": "8",
+  "commit": "--",
+  "level": "1",
+  "solver": "fgmres, restart 480",
+  "conv_solver": "SFEM_FGMRES=1 SFEM_GMG=0 SFEM_PRECOND=bjacobi SFEM_FGMRES_RESTART=480"
+}

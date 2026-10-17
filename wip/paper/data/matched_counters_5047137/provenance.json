@@ -1,0 +1,19 @@
+{
+  "job": "5047137",
+  "host": "nid006550",
+  "threads": 72,
+  "n": 128,
+  "pack_size": 1024,
+  "precision": "fp64",
+  "geometry": "affine",
+  "rhie_chow": true,
+  "state_gradients": "cached",
+  "direction": "coordinate_fixed",
+  "boundary": false,
+  "transient": false,
+  "thp": "disabled",
+  "archive": "captures.tar.gz",
+  "sha256": "edf02cf387612936773f32853e4c5d030cc68f0da2798c5314f47000f50f0389",
+  "archive_files": 4146,
+  "note": "Same-allocation copy/triad, residuals, exact/lagged actions, equivalent SpMV and DGEMM. All captures retained."
+}

@@ -9,7 +9,12 @@ make           build main.pdf
 make figures   regenerate every figure and table input from the measurements
 make selftest  run the generators' own checks
 make check     the submission gates (clean build, no undefined refs, page limit)
+make roofline  build the empirical roofline in the companion material
 ```
+
+The [companion counter analysis](reproducibility/README.md) documents the current
+roofline, its scope and reproduction commands. It is outside the main paper;
+the manuscript retains its matched timing/traffic tables and accumulation study.
 
 ## The rule this directory is built around
 
@@ -30,6 +35,7 @@ owns it (see `figures/packed_counts.tex`).
 |---|---|---|
 | `python/packed_format_figures.py` | `figures/packed_{decomposition,id_space,reduction,scatters}.tex`, `figures/scheme_passes.tex`, `figures/packed_counts.tex` | nothing --- it reimplements the format's documented rules and draws the result |
 | `python/perf_figures.py` | `figures/{throughput_size,scaling,packsize,roofline}.tex`, `tables/{throughput,ladder,footprint,convho,jacfair}.tex` and their macro files | the campaign CSVs and per-measurement `.out` files below |
+| `python/matched_counter_figures.py` and `python/matched_roofline.py` (called by `perf_figures.py`) | matched tables/macros and `reproducibility/roofline-{data.json,residuals.tex,actions.tex,values.tex}` | verified job 5047137 archive |
 
 Both are stdlib-only and carry `--selftest`, following the repository's report generators: the
 Alps uenv has no numpy or matplotlib, and a generator that cannot run where the measurements run
@@ -97,6 +103,9 @@ tree carrying it, and the generator picks the newest file per prefix, so these a
 | f32 against f64, every layout (ladder f32 group) | 5006525 | `data/f32_5006525.out` |
 | exact higher-order Jacobian breakdown | 5005769 | `data/hoexact_5005769.out` |
 | instruction mix | 5003851 | `data/kmix_5003851.out` |
+| residual accumulation diagnostic | 5026072 (nid006544) | `data/scatter_5026072/` |
+| checked residual traffic and work | 5039102 (nid006550) | `data/residual_counters_5039102/` |
+| matched residual/action/SpMV and compute references | 5047137 (nid006550) | `data/matched_counters_5047137/` |
 | higher-order size sweep | 5005800 | `data/hosize_5005800.out` |
 
 The rows naming jobs 5005763-5005800 were measured again after the limiter derivatives' rounding
@@ -119,10 +128,11 @@ Three things the rerun turned up that are not about the kernels:
 - `jobs/camp_full.sbatch` failed in its first seconds on a tree made with `git archive`, because
   `scripts/layout_campaign.sh` is tracked without its executable bit. Restoring the bit and
   resubmitting (5003779) is what produced the campaign above; the bit should be fixed in git.
-- The instruction-mix job's kernel-only throughput was a single run, and three consecutive jobs
-  each produced one kernel-only figure *below* its own full sweep, which is impossible. The job
-  now takes the best of three for both sides of that pair (jobs/kernel_mix.sbatch); 5003851 is
-  the first run of that form, and the scatter shares it reports are back under 1%.
+- In the reviewed source, the instruction-mix job's `--kernel-only` flag has no effect
+  on the residual path. The saved log does not identify its source revision, so its
+  paired rates do not establish scatter cost. The job no longer runs that
+  comparison, and the generator omits its row and macros. Historical raw logs are retained;
+  their instruction counters and ordinary throughput remain separate measurements.
 - The thread-scaling rows for the standard and element-coloured **Jacobian action with the
   Rhie--Chow term** fell from 510 to 335 and from 587 to 438 MDOF/s against the 2 October run
   (4967671). An interleaved check of the reference tree (9b62d097f, the commit the previous
@@ -138,40 +148,127 @@ Three things the rerun turned up that are not about the kernels:
 returned, the file was fetched, and the measured lines match the transcription exactly
 (PEAK_FP64_GFLOPS 2305.3). The file is now the fetched copy and the caveat is withdrawn.
 
-## The roofline is built on measured traffic, after a model that was wrong
+## Roofline audit (11 October 2026)
 
-The intensity of every matrix-free point used to come from a compulsory-traffic model, and the model
-was wrong in a way that inverted a conclusion. It counted, per dof, 16 B of field vectors plus 6.8 B
-of "mesh" (connectivity and nodal coordinates). But the bare affine kernel reads no nodal
-coordinates -- they are staged only when Rhie--Chow or the boundary closure is on -- and it does read
-the cached affine geometry, `jacobian_adjugate[9]` and `jacobian_determinant`, **ten doubles per
-element**, which is 19.5 B/dof: larger than every term the model did count. Two further faults: the
-atomic points were drawn with the *packed* connectivity width, so their intensity was identical to
-the packed points' by construction and the prose then reasoned from that identity; and the mesh
-figure was taken from the smallest problem size in the campaign rather than the n=128 the figure is
-drawn at.
+This section records the historical audit. The replacement measurement campaign
+is now accepted and supplies the [separate companion figure](reproducibility/README.md).
+The old `figures/roofline.tex` remains historical and is not included in the paper.
 
-Rather than repair the model, the points are now placed on **measured DRAM traffic** from the Grace
-SCF counters, differenced across two repeat counts so setup and warmup cancel exactly. Units were
-established rather than assumed: `cmem_rd_access` is exactly half `cmem_rd_data` in every row, which
-fixes `cmem_rd_data` as 32-byte flits, and the interpretation is corroborated by the atomic sweep
-reading more than the packed one in both operators and writing more on the residual, as its wider
-index, node re-reads, zeroing pass and read-modify-write updates require.
+The historical plot combines different nodes. `data/roofline_sources.json` now pins
+six input files and their hashes; `tables/roofline_sources.tex` records the jobs and
+hostnames. The traffic file has no hostname, raw event rows, source SHA, binary hash,
+or CPU/PMU mapping. Hashing the archive now preserves it; it does not recover that
+missing provenance. No older DRAM row is silently substituted for a missing new row.
 
-Effect on the conclusions, which is why this is recorded here rather than only in the commit:
+The first-order points are bare kernels without Rhie--Chow. The higher-order traffic
+was captured for Darwish with coupling, so only that limiter is plotted. Its action
+predates the state-gradient cache correction. The FLOP model counts element work,
+including a correction increment, but omits separate reconstruction and RC work.
+Both axes now say modelled work; the plot cannot establish full-operator intensity.
 
-| | old model | corrected model | measured |
-|---|---:|---:|---:|
-| traffic, packed residual | 22.8 B/dof | 39.5 | **51.5** |
-| intensity, packed residual | 8.1 | 4.7 | **3.6** |
-| intensity, atomic residual | 8.1 (identical by construction) | 4.2 | **3.2** |
+NVIDIA documents read data beats times 32 plus write bytes. A 2:1 ratio of read
+beats to accesses is not an independent calibration of the unit. Subtracting two
+process-wide captures estimates a slope; setup and background traffic need not
+cancel exactly. STREAM useful bytes and SCF transported bytes can differ because
+of write allocation. The earlier percentages and bottleneck conclusions have been
+removed. DGEMM remains a benchmark reference rather than a universal upper bound.
+The documented GH200 nominal 500 GB/s is retained in the hardware table, while the
+unsupported 3.55 TFLOP/s specification and dashed vendor roof are removed.
 
-Measured intensity is below the measured ridge of 5.1 for every matrix-free arm, so the memory roof
-binds -- but each attains only 11--29% of it, while the assembled SpMV attains 92% of its own. The
-format's contribution is to need less traffic, not to use bandwidth better; the matrix-free kernels
-are limited by the element kernel's instruction mix and retain headroom, and the assembled operator
-does not. An intermediate draft of this analysis said "bandwidth-bound", which the attained
-fractions contradict; it does not.
+The counter-calibration job was the first required Grace gate before collecting
+replacement operator points. Raw historical logs and ordinary throughput figures
+remain unchanged. Remeasurement must record the selected node, CPU/memory binding,
+PMU instance, event coverage, binary/source hashes, and each operator's dispatched
+terms and cache mode. Use the same transported-byte convention for the bandwidth
+reference and operator points; report PMU operations separately from the source
+FLOP model, since the PMU events count speculative operations of all precisions.
+
+## Accepted residual counter campaign (12 October 2026)
+
+Job 5039102 on nid006550 passes the fixed reuse controls and the actual residual
+campaign. `data/residual_counters_5039102/` contains a hash-bound archive of the
+public raw counts, requests, outputs, source records and patch chain.
+`python/residual_counter_figures.py`, called by `make figures` and `make selftest`,
+checks the archive and captured analysis, reconstructs every count and numerical
+check, and reproduces the acceptance summaries before emitting the table/macros.
+It uses `python/roofline_operator_5039102.py` and the captured helpers in
+`python/counter_sources_5039102/`, checked byte for byte against the archive,
+so later measurement recipes cannot change this campaign's acceptance.
+The source verification also checked 4,273 bundle entries, 7 operator and 11
+calibration source hashes, 144 operator records and 60 controls. All 1,152
+per-field before/after checks pass; maximum relative error is 4.145e-16.
+
+Scope is fixed-state FP64 affine interior residuals at n=128, pack=1024, 72 threads,
+Rhie--Chow on, first-order/Darwish, cached state gradients, without boundary or
+transient terms. Each scheme/layout uses six worker blocks with retained arrays,
+30 warmups before every capture and all six orders of 10/40/70 sweeps. A normal
+40-sweep capture alternates before/after each block; empty controls bracket its
+counted captures. Normal samples have no perf monitors. All acceptance limits
+are unchanged; no samples or background counts are subtracted.
+
+Normal atomic/packed times are 9.624/4.960 ms (1.940x) for first-order and
+15.137/10.659 ms (1.420x) for Darwish. Mean transported bytes change by +3.75%
+and -3.11%, respectively. Comparable traffic alongside these speedups rules out
+a large reduction in transferred bytes as their explanation in this fixture;
+it does not isolate the hardware bottleneck. The earlier controlled accumulation
+experiment is independent evidence for the benefit of the accumulation method.
+The reference rates use transported bytes; the work counts are speculative PMU
+operations, not a useful-FLOP model. No Jacobian, compute ceiling, solver result
+or complete replacement roofline is accepted by this campaign.
+
+## Accepted matched campaign (13 October 2026)
+
+Job 5047137 on nid006550 completes the same-allocation copy/triad, residual,
+cached exact/lagged action, equivalent SpMV and DGEMM campaign. All 492 captures,
+4,089 capture-file hashes, 3,240 numerical checks and 4,299 bundle source checks
+are retained and verified. The archive includes captured measurement sources,
+requests, raw counters, policy observations, summaries and build provenance.
+The measurement sources match the reviewed checkout; every summary reproduces.
+
+`python/matched_counter_figures.py` checks the archive and runs
+`python/verify_matched_counters.py` in an isolated process using the captured
+analysis. It reconstructs raw counts and numerical checks, verifies retained
+worker identities, coordinate direction, CPU/PMU scopes and THP policy, and
+reapplies every acceptance screen before generating tables/macros and exporting
+the per-capture samples for the companion roofline. Corrupted
+coverage, incomplete records, changed policy and wrong-direction controls are
+rejected. The older accepted residual evidence remains independently checked.
+
+The benchmark workers disable transparent huge pages before allocation. This
+applies equally to copy/triad, both matrix-free layouts, SpMV and DGEMM; parent
+collectors, perf monitors and global settings remain unchanged. Job 5046420's
+paired diagnostic reproduced long pauses under the default policy and none with
+THP disabled. It motivated this prospective, separately calibrated campaign;
+earlier failed campaigns remain rejected. Every sample and the original limits
+are retained. This does not identify a particular kernel call or establish a
+universal benefit from disabling THP.
+
+FP64 affine interior scope: n=128, pack=1024, 72 threads, RC on and a fixed
+perturbed state. State gradients are cached; exact actions reconstruct direction
+gradients on each apply. The common direction is keyed on coordinates. No boundary
+or transient terms, assembly cost or solver speedup is measured. Six blocks per
+arm retain all 30/60/90-apply permutations and 30 warmups; normal time uses 60
+applies. Calibration retains 10/40/70 sweeps. DGEMM uses N=8192, three warmups,
+six retained workers and all 1/2/3-call permutations, with normal time at two calls.
+
+Ordinary packed speedups over atomic are 1.97x/1.44x for first-order/Darwish
+residuals and 1.85x/1.86x for their exact Jacobian actions. Equivalent packed
+lagged action/SpMV times are 6.503/19.368 ms: 2.978x. Their transported bytes are
+1,277.5/7,720.7 MB per apply, not their storage footprints. SpMV's paired mean
+instrumentation overhead is -0.030%; its ordinary range is 19.339--19.399 ms.
+The rejected 3.468x ratio from job 5043387 is not used.
+
+Copy and triad achieve 401.2/411.4 transported GB/s. Runtime-identified LP64
+OpenBLAS 0.3.30 uses 72 threads and achieves 2,453 useful GFLOP/s in ordinary
+DGEMM; counted speculative work is 2,448 Gop/s. These are empirical references,
+not strict CVFEM ceilings or a proof of a bottleneck. Ordinary sample ranges are
+reported separately from counted throughput; no confidence intervals are claimed.
+
+The draft now uses this matched campaign for the main residual and action tables.
+Historical FP32/colouring and rebuilt-state results remain in their original data
+and generated artifacts, with their stated scope. The manuscript remains a local
+proposal for Patrick's review; no author, submission or publication decision is
+made by this update.
 
 ## Claims discipline
 
@@ -237,6 +334,84 @@ These are written down because each has already cost something.
 | the discretisation | `spikes/cvfem/docs/CVFEM_NSE.tex` |
 | roofline script | `notebook/compressed/roofline.py` |
 
+## Residual accumulation measurement
+
+`--scatter-study` replaces the unsupported residual use of `--kernel-only` with
+a separate FP64 affine diagnostic. Each sample times the normal residual, the
+instrumented full residual, and the same instrumented sweep with accumulation
+bypassed. Twelve samples use all six execution orders twice. The element kernel,
+input staging and existing buffer clearing remain; state-gradient reconstruction
+is outside the timed region. Boundary and transient terms are excluded.
+
+The atomic bypass skips the four nodal atomic additions per element node. The
+packed bypass skips pack-local additions, the owned/ghost drain and the final
+ghost reduction. A compiler escape consumes the full SIMD result in both probe
+arms, so bypassing its additions cannot delete the element calculations. Normal
+calls instantiate the original loop without this instrumentation.
+
+Before timing each case, the diagnostic captures every element's 32 contributions
+in both arms and requires finite, nonzero, bit-identical arrays. Its full nodal
+result must agree with the normal residual within `1e-11` relative infinity norm
+in each equation, and the bypass must leave a zero output. Captures are freed
+before timing; timed loops retain the compiler escape and accumulation switch.
+The job stops on a failed check.
+
+Run `spikes/cvfem/jobs/scatter_study.sh BENCH NEW_OUTPUT_DIRECTORY` inside one
+72-core allocation. It records first-order and Darwish residuals with Rhie--Chow,
+`n=128`, pack size 1024, at one and 72 threads. Analyze the eight logs with
+`spikes/cvfem/scripts/analyze_scatter.py --expect-full OUTPUT_DIRECTORY/*.log`.
+The summary gives mean times, signed paired differences, their range and the
+full-probe overhead relative to normal execution. The atomic-minus-packed gap
+is also split into the bypass gap and the difference in accumulation costs.
+
+This measures the marginal cost of accumulation in the probe, including changes
+in memory traffic and synchronization. It is not an additive instruction cost:
+inspect instrumentation overhead and sample variation before relating the result
+to production performance.
+
+Grace job 5026072 on nid006544 (GNU 14.3.0) passes both CTest gates and all eight
+timed cases. All 96 paired differences are positive. At 72 threads the mean costs
+are 5.385 ms atomic versus 0.987 ms packed for first-order upwind, and 5.438 ms
+versus 0.893 ms for Darwish. The difference in accumulation costs accounts for
+92.9% and 95.4% of the corresponding full-probe gaps. Normal execution gives
+2.02x and 1.43x packed speedups in the same allocation. Full-probe deviations from
+normal range from -2.38% to +0.75% across all eight cases. These observations
+support accumulation as the main contributor in this diagnostic; they do not
+measure isolated atomic latency or establish a universal production fraction.
+
+The raw logs are copied verbatim, with the suffix changed to `.out`, under
+`data/scatter_5026072/`. Its `provenance.json` binds their hashes, source manifest,
+source patch, binary hash and verification output. All 4250 source checks passed;
+the largest full-probe/normal residual difference was 2.972e-16 per equation,
+and every captured element contribution was bit-identical between probe modes.
+`python/scatter_figures.py`, called by `perf_figures.py`, generates
+`tables/scatter.tex` and `figures/scatter_macros.tex`. It rejects missing cases,
+failed checks and altered input files. `make figures` now propagates generator
+errors so it cannot quietly reuse a stale table after failed validation.
+
+## Public irregular-mesh comparison (14 October 2026)
+
+[Job 5052301](data/unstructured_5052301/README.md) adds two graded procedural
+HEX8 timing meshes with irregular connectivity and non-affine cells. It compares
+the first-order interior Rhie--Chow residual and exact action at 1/72 threads
+and packs 256/1024. All twelve cases and 384 timing samples are retained.
+The 72-thread table includes the medium-grid pack1024 action slowdown as well
+as the speedups. Full absolute times, paired ranges, setup costs and the explicit
+array ledger remain in the archived result. These are operator measurements,
+not a spatial-accuracy or nonlinear-solver result.
+
+`python/unstructured_figures.py`, called by `make figures`, checks every raw-file
+hash, the captured parser identity, case coverage, commands, binary/policy records
+and numerical/timing reports before generating `tables/unstructured.tex` and
+`figures/unstructured_macros.tex`. The complete table must replay exactly from
+the raw logs. `make check` also exercises archive rejection and preserves the
+slower case in the generated table. No new cluster run is needed to regenerate it.
+
+The [measurement protocol](../../spikes/cvfem/docs/unstructured_study.md) describes
+the public generator and kernel correction. This dataset is separate from the
+matched affine counter campaign; it supplies no new roofline points or traffic
+attribution. The empirical roofline remains in the companion material.
+
 ## Open
 
 - `refs.bib` holds one placeholder entry so the first build succeeds. Populate and delete it.
@@ -271,3 +446,50 @@ should not be compared with any number recorded before `a3253433f`.
 
 `perf/baseline_grace.csv` has deliberately NOT been re-recorded: doing so would bake the 17.5%
 in as the new normal before the cause is pinned down.
+
+## Public numerical validation and storage-width probe (2026-10-13)
+
+The later Grace refinement in `data/mms_5077627/` and `data/mms_5077906/`
+extends the spatial-accuracy assessment to n=16/24/32/40 using one identical
+solver binary and unchanged physical inputs and solver targets. All twenty final
+nonlinear targets pass. At n=40 all four reconstructed schemes pass the fixed
+0.01 maximum velocity error target; first-order upwind remains above it. The
+finest-grid reconstructed velocity-L2 rates range from 1.36 to 2.07, so a common
+second-order claim remains unsupported. `python/mms_refinement.py` replays both
+archives and generates `figures/mms_macros.tex` and the complete supporting
+`reproducibility/mms-refinement.md` table. No solver-performance claim is made.
+This supersedes the coarse study as the latest spatial evidence; it does not
+erase that study's failed accuracy verdicts.
+
+`data/mms_20261013/` preserves a local FP64 Farrell manufactured-solution ladder:
+five convective schemes on affine n=4/8/16 grids over [0,2]^3, with Rhie--Chow,
+unfrozen corrections and FGMRES/block-Jacobi. Physical-h velocity L2 fits range
+from 0.747 for first-order convection to 1.879--1.916 for the reconstructed arms.
+The local rates vary, so three coarse grids do not establish an asymptotic order
+or a common order across limiter branches. Every final nonlinear residual meets
+the requested 1e-10 relative tolerance. Every driver run also retains exit 1 from
+its separate coarse-grid absolute velocity-error threshold. The clip n16 run's
+intermediate residual-floor acceptance is recorded in the provenance.
+
+The public packed/atomic gate retains its zero-flux box fixture as a localized
+signed donor-derivative diagnostic and tests smooth agreement on both sides of
+the switch. Boundary and transient gates test their stated individual terms;
+they do not establish every composed limited, coupled or unsteady action.
+
+`cvfem_storage_width_probe` and `src/tests/verification/cvfem_storage_width.sh`
+prepare a bounded SFC-ordered graph-reduction and geometry-gather experiment.
+The real reduction graph is copied to checked uint32 offsets/indices; the
+FP32 geometry cache is widened into double scratch through the existing gather.
+Original wide copies remain allocated. Clearing is excluded equally from graph
+timing, conversion is included in geometry timing, and samples alternate after
+warmups. These phase costs do not measure total footprint, operator speedup or
+solver acceleration. Cube/sheared geometry checks and actual-reducer bitwise
+parity precede and follow timing. Grace job 5039923 is now archived in
+`data/storage_width_5039923/`. All checks pass at one and 72 threads. Narrow graph
+timings depend strongly on which arm runs first, so they do not support an
+index-width speedup claim. FP32 geometry gathering is faster in all 24 retained
+pairs, including conversion, but its impact on a full operator remains unmeasured.
+
+The historical RC slowdown above is associated with coefficient and linearization
+changes; its exact cause has not been re-established here. This work does not
+restore an old coefficient or treat it as an equivalent-operator optimization baseline.

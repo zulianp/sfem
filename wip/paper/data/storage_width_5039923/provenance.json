@@ -1,0 +1,14 @@
+{
+  "job": "5039923",
+  "node": "nid006545",
+  "run_path": "/capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/results/validation-5039923-vfXOQo",
+  "recorded_start_utc": "2026-10-12 23:21:50 UTC",
+  "review_date": "2026-10-13",
+  "source_manifest_entries_verified": 4290,
+  "probe_binary_sha256": "67f4b1a9d14273cef15dacbafc5520b37880329cdc7e599a4f8fbef28ac668f5",
+  "binary_hash_scope": "retrieved after the job; probe did not record an independent in-job binary digest",
+  "solver_binary_sha256": "cac804afe2c6f281d233af1847c4a6c6935d8fcebedb717873bde40a503d8cc1",
+  "solver_binary_verification": "matches in-job manifest",
+  "timing_scope": "isolated graph reduction and escaped geometry gather; no integrated operator result",
+  "sample_policy": "all12pairs retained at1 and72threads, including graph sample9 at72threads"
+}

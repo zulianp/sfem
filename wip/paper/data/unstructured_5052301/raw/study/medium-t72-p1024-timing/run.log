@@ -1,0 +1,81 @@
+THP_LAUNCH policy=disabled disabled=1 pid=62946 PASS
+--------------------
+| PackedMesh |
+n_packs: 73
+elements_per_pack: 1024
+Memory PackedMesh: 1604.4 KB
+Original:      1984.43 KB
+--------------------
+geometry,min_sampled_det=3.66349295568e-07
+linear_gradient,layout=atomic,error=2.22044604925e-15
+linear_gradient,layout=packed,error=2.22044604925e-15
+scope,first_order_RC,isoparametric,steady_interior,rho=1.3,mu=0.027,threads=72,elements=74664,nodes=87472,pack=1024
+fd,atomic,direction=0,eps=1.0e-06,error=3.76557573416e-09,no_qgrad=0.416266729486
+fd,atomic,direction=0,eps=1.0e-07,error=3.4440160443e-08,no_qgrad=0.416266743349
+fd,atomic,direction=1,eps=1.0e-06,error=4.30186134696e-09,no_qgrad=0.461685958412
+fd,atomic,direction=1,eps=1.0e-07,error=4.26422250256e-08,no_qgrad=0.461685952293
+fd,atomic,direction=2,eps=1.0e-06,error=4.01121904436e-09,no_qgrad=0.408727005325
+fd,atomic,direction=2,eps=1.0e-07,error=4.05886255414e-08,no_qgrad=0.408727019911
+fd,packed,direction=0,eps=1.0e-06,error=3.97772807848e-09,no_qgrad=0.416266728603
+fd,packed,direction=0,eps=1.0e-07,error=3.92597308478e-08,no_qgrad=0.416266739195
+fd,packed,direction=1,eps=1.0e-06,error=4.63362414912e-09,no_qgrad=0.461685957768
+fd,packed,direction=1,eps=1.0e-07,error=5.50440982735e-08,no_qgrad=0.461685954977
+fd,packed,direction=2,eps=1.0e-06,error=3.64902769376e-09,no_qgrad=0.408727004839
+fd,packed,direction=2,eps=1.0e-07,error=4.18796759877e-08,no_qgrad=0.40872702526
+agreement,op=0,direction=0,error=9.14893538106e-16
+agreement,op=1,direction=0,error=7.1018651191e-16
+agreement,op=1,direction=1,error=8.9464593685e-16
+agreement,op=1,direction=2,error=1.10253289516e-15
+payload,layout=atomic,field_capacity_bytes=13295744,packed_arena_bytes=0,harness_capacity_bytes=11196416
+payload,layout=packed,field_capacity_bytes=14087624,packed_arena_bytes=25257600,harness_capacity_bytes=11196416
+storage,atomic_mesh=3438912,packed_retained_mesh=3438912,additional_packed_topology=2281588,ghost_buffer=1055840
+setup,atomic_ordering=0.00572928,packed_ordering=0.005236992,packing=0.013003008,packs=73,ghost_entries=32995,max_pack_nodes=1754,ghost_rows=28280
+sample,op=residual,block=0,order=0,layout=atomic,repeat=12,seconds=0.00146555566667,error=4.32773251989e-16
+sample,op=residual,block=0,order=1,layout=packed,repeat=12,seconds=0.00146893691667,error=9.14893538106e-16
+sample,op=residual,block=1,order=0,layout=packed,repeat=12,seconds=0.00146673966667,error=9.14893538106e-16
+sample,op=residual,block=1,order=1,layout=atomic,repeat=12,seconds=0.00150126925,error=4.32773251989e-16
+sample,op=residual,block=2,order=0,layout=atomic,repeat=12,seconds=0.001477358,error=4.32773251989e-16
+sample,op=residual,block=2,order=1,layout=packed,repeat=12,seconds=0.001464017,error=9.14893538106e-16
+sample,op=residual,block=3,order=0,layout=packed,repeat=12,seconds=0.0014485215,error=9.14893538106e-16
+sample,op=residual,block=3,order=1,layout=atomic,repeat=12,seconds=0.00147180608333,error=4.32773251989e-16
+sample,op=residual,block=4,order=0,layout=atomic,repeat=12,seconds=0.00147828591667,error=4.32773251989e-16
+sample,op=residual,block=4,order=1,layout=packed,repeat=12,seconds=0.00145955583333,error=9.14893538106e-16
+sample,op=residual,block=5,order=0,layout=packed,repeat=12,seconds=0.00145854525,error=9.14893538106e-16
+sample,op=residual,block=5,order=1,layout=atomic,repeat=12,seconds=0.00171377483333,error=4.32773251989e-16
+sample,op=residual,block=6,order=0,layout=atomic,repeat=12,seconds=0.00148150725,error=4.32773251989e-16
+sample,op=residual,block=6,order=1,layout=packed,repeat=12,seconds=0.00145733725,error=9.14893538106e-16
+sample,op=residual,block=7,order=0,layout=packed,repeat=12,seconds=0.00145253733333,error=9.14893538106e-16
+sample,op=residual,block=7,order=1,layout=atomic,repeat=12,seconds=0.00147719,error=4.32773251989e-16
+sample,op=residual,block=8,order=0,layout=atomic,repeat=12,seconds=0.00146553966667,error=4.18237045991e-16
+sample,op=residual,block=8,order=1,layout=packed,repeat=12,seconds=0.00145245475,error=9.14893538106e-16
+sample,op=residual,block=9,order=0,layout=packed,repeat=12,seconds=0.00144988416667,error=9.14893538106e-16
+sample,op=residual,block=9,order=1,layout=atomic,repeat=12,seconds=0.00148044591667,error=4.32773251989e-16
+sample,op=residual,block=10,order=0,layout=atomic,repeat=12,seconds=0.00148137916667,error=4.32773251989e-16
+sample,op=residual,block=10,order=1,layout=packed,repeat=12,seconds=0.00144817491667,error=9.14893538106e-16
+sample,op=residual,block=11,order=0,layout=packed,repeat=12,seconds=0.00145095608333,error=9.14893538106e-16
+sample,op=residual,block=11,order=1,layout=atomic,repeat=12,seconds=0.00147400875,error=4.32773251989e-16
+sample,op=jacobian,block=0,order=0,layout=atomic,repeat=12,seconds=0.00159843433333,error=2.94008772043e-16
+sample,op=jacobian,block=0,order=1,layout=packed,repeat=12,seconds=0.00174245133333,error=1.10253289516e-15
+sample,op=jacobian,block=1,order=0,layout=packed,repeat=12,seconds=0.00173342758333,error=1.10253289516e-15
+sample,op=jacobian,block=1,order=1,layout=atomic,repeat=12,seconds=0.00160139958333,error=5.88017544087e-16
+sample,op=jacobian,block=2,order=0,layout=atomic,repeat=12,seconds=0.0015943385,error=6.24768640592e-16
+sample,op=jacobian,block=2,order=1,layout=packed,repeat=12,seconds=0.00172628916667,error=1.10253289516e-15
+sample,op=jacobian,block=3,order=0,layout=packed,repeat=12,seconds=0.00172751841667,error=1.10253289516e-15
+sample,op=jacobian,block=3,order=1,layout=atomic,repeat=12,seconds=0.00160400491667,error=2.94008772043e-16
+sample,op=jacobian,block=4,order=0,layout=atomic,repeat=12,seconds=0.001596349,error=2.13496484087e-16
+sample,op=jacobian,block=4,order=1,layout=packed,repeat=12,seconds=0.00172265991667,error=1.10253289516e-15
+sample,op=jacobian,block=5,order=0,layout=packed,repeat=12,seconds=0.0017246465,error=1.10253289516e-15
+sample,op=jacobian,block=5,order=1,layout=atomic,repeat=12,seconds=0.00159950366667,error=2.94008772043e-16
+sample,op=jacobian,block=6,order=0,layout=atomic,repeat=12,seconds=0.00159661841667,error=2.94008772043e-16
+sample,op=jacobian,block=6,order=1,layout=packed,repeat=12,seconds=0.00173643283333,error=1.10253289516e-15
+sample,op=jacobian,block=7,order=0,layout=packed,repeat=12,seconds=0.00172249725,error=1.10253289516e-15
+sample,op=jacobian,block=7,order=1,layout=atomic,repeat=12,seconds=0.0015939385,error=2.94008772043e-16
+sample,op=jacobian,block=8,order=0,layout=atomic,repeat=12,seconds=0.00159299183333,error=2.94008772043e-16
+sample,op=jacobian,block=8,order=1,layout=packed,repeat=12,seconds=0.0017341155,error=1.10253289516e-15
+sample,op=jacobian,block=9,order=0,layout=packed,repeat=12,seconds=0.00173256358333,error=1.10253289516e-15
+sample,op=jacobian,block=9,order=1,layout=atomic,repeat=12,seconds=0.001596789,error=2.94008772043e-16
+sample,op=jacobian,block=10,order=0,layout=atomic,repeat=12,seconds=0.00159038391667,error=2.94008772043e-16
+sample,op=jacobian,block=10,order=1,layout=packed,repeat=12,seconds=0.00171879333333,error=1.10253289516e-15
+sample,op=jacobian,block=11,order=0,layout=packed,repeat=12,seconds=0.0017240705,error=1.10253289516e-15
+sample,op=jacobian,block=11,order=1,layout=atomic,repeat=12,seconds=0.00159591175,error=2.94008772043e-16
+UNSTRUCTURED OPERATOR STUDY PASSED

@@ -302,7 +302,7 @@ static SFEM_NOINLINE void cvfem_hex8_apply_residual_packed_range(
         const scalar_t *const SFEM_RESTRICT pgz,
         geom_t **const SFEM_RESTRICT points,
         scalar_t *const SFEM_RESTRICT rc_out,
-        const scalar_t rhie_chow_scale,
+        const Hex8RcConfigT<scalar_t> &rc_cfg,
         scalar_t *const SFEM_RESTRICT rx,
         scalar_t *const SFEM_RESTRICT ry,
         scalar_t *const SFEM_RESTRICT rz,
@@ -378,7 +378,7 @@ static SFEM_NOINLINE void cvfem_hex8_apply_residual_packed_range(
                                                  det);
                 if (with_rc) {
                     cvfem_hex8_gather_rc_from_pack(pack_elems, pack_pgx, pack_pgy, pack_pgz, begin,
-                                                   nlanes, rcp);
+                                                   nlanes, rcp, rc_cfg.tau);
                 }
                 cvfem_hex8_ns_upwind_residual_sumfact_simd(rho,
                                                            mu,
@@ -395,7 +395,7 @@ static SFEM_NOINLINE void cvfem_hex8_apply_residual_packed_range(
                                                            in,
                                                            outp,
                                                            with_rc ? &rcp : nullptr,
-                                                           rhie_chow_scale,
+                                                           rc_cfg.scale,
                                                            upwind_eps);
                 cvfem_hex8_scatter_simd_to_pack(pack_elems, pack_out, begin, nlanes, outp);
             }
@@ -569,7 +569,7 @@ static SFEM_NOINLINE void cvfem_hex8_apply_jacobian_action_packed_range(
                                                         det);
                 if (with_rc) {
                     cvfem_hex8_gather_rc_from_pack(pack_elems, pack_pgx, pack_pgy, pack_pgz, begin,
-                                                   nlanes, rcp);
+                                                   nlanes, rcp, rc_cfg.tau);
                     cvfem_hex8_gather_rc_coeff(rc_coeff, rc_w, rc_cfg, begin, nlanes, rcp);
                 }
                 if (with_qg)

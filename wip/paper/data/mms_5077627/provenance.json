@@ -1,0 +1,22 @@
+{
+  "job": "5077627",
+  "node": "nid006551",
+  "date": "2026-10-17",
+  "cluster": "Daint",
+  "remote_result": "/capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/results/mms-5077627-Scm2Cw",
+  "raw_files": 29,
+  "configured_threads": 8,
+  "source_identity": "raw/SOURCE-SHA256.txt",
+  "binary_identity": "raw/BUILD-SHA256.txt",
+  "raw_summary_reader": "sources/original_summary.py",
+  "replay_reader": "sources/mms_refinement_summary.py",
+  "collector": "sources/verify_report.sh",
+  "scope": "steady affine FP64 Farrell MMS on [0,2]^3; five schemes; n=16,24,32; nonlinear convergence separate from fixed 0.01 maximum velocity error",
+  "limitations": [
+    "Not an unstructured solve or a solver-performance measurement.",
+    "No common asymptotic order established.",
+    "All 15 absolute-accuracy gates fail; exits remain 1.",
+    "The copied source bundle has no Git metadata; use its source manifest.",
+    "Scheme identity comes from the source-pinned collector and settings, not limiter readback in the driver log."
+  ]
+}

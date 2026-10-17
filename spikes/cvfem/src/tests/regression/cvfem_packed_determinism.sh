@@ -1,24 +1,7 @@
 #!/usr/bin/env bash
-# THE PACKED LAYOUT IS DETERMINISTIC BY DESIGN, and this is the test that says so.
-#
-# Every pack accumulates into a thread-private buffer indexed by pack-local node ids, writes the
-# rows it owns straight out, and hands the rows it shares to a reduction whose order is fixed by
-# a graph built once. No atomic anywhere, so the result does not depend on how the threads were
-# scheduled -- which is the property the format is for, and the reason its throughput can be
-# compared against the atomic layout's at all.
-#
-# A bitwise fingerprint at the same thread count, twice, is the whole test. It exists because
-# nothing else catches the failure mode cheaply: a stray `#pragma omp parallel` left above a
-# dispatch turned the dispatch itself into a parallel region, so each outer thread entered a
-# NESTED one-thread team -- where cvfem_n_threads() is 1 and cvfem_thread_index() is 0 -- and
-# every one of them swept the whole pack range. The assembled matrix then came out different on
-# every run.
-#
-# The fingerprint sweep that found it did so only by luck: it compares against a recorded
-# baseline, so a race that happened to reproduce the baseline would have passed. Comparing a run
-# against ITSELF cannot be fooled that way. It has now happened twice in this spike -- the other
-# instance was a launcher wrapping a still-self-parallel reduction -- which is what makes it
-# worth a gate rather than a note.
+# Repeat each configuration to catch schedule-dependent changes.
+# The separate fixed-input test varies thread count while keeping inputs and packing fixed.
+# This gate previously caught nested parallel regions that made every thread sweep all packs.
 set -u
 BENCH=${1:?usage: $0 <cvfem_hex8_ns_upwind_bench>}
 N=${N:-20}

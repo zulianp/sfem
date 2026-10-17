@@ -1,0 +1,51 @@
+\documentclass[10pt]{article}
+\usepackage[a4paper,landscape,margin=14mm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\definecolor{rlBlue}{HTML}{0072B2}
+\definecolor{rlOrange}{HTML}{D55E00}
+\definecolor{rlGreen}{HTML}{009E73}
+\input{roofline-values}
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+\begin{document}
+{\Large\bfseries Empirical counter-based roofline}\hfill Companion to the packed-mesh paper
+\par\smallskip
+Grace CPU, job 5047137, \texttt{nid006550}: 72 threads, $n=128$, pack size 1024.
+FP64 affine interior operators; Rhie--Chow on; cached state gradients; worker THP disabled.
+\par\medskip
+\begin{minipage}[t]{0.485\textwidth}
+  \vspace{0pt}
+  \input{roofline-residuals}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.485\textwidth}
+  \vspace{0pt}
+  \input{roofline-actions}
+\end{minipage}
+\par\medskip
+\textbf{Reading the plot.} Small marks show all 18 counted captures per operator;
+large marks show the arithmetic mean of their coordinates. Open marks are atomic;
+filled marks are packed, with a black diamond for BSR SpMV. Both panels use the same axes.
+No background subtraction or sample removal is applied.
+\par\smallskip
+\textbf{Measured references, not ceilings.} Dashed and dotted diagonals use copy
+(\rlCompCopy{} GB/s) and triad (\rlCompTriad{} GB/s) transported bandwidth.
+The dash-dot horizontal uses counted DGEMM (\rlCompGemm{} speculative Gop/s).
+Gray bands show the full observed ranges, combining copy and triad for bandwidth;
+they are not confidence intervals. Workload-specific instruction costs and
+synchronization are not modelled by these lines.
+\par\smallskip
+\textbf{Throughput is not speedup.} The equivalent packed lagged action takes
+\rlCompLaggedTime{} ms versus \rlCompSpmvTime{} ms for BSR SpMV in ordinary execution:
+\rlCompSpeedup{}$\times$ faster. Its counted work is \rlCompWorkRatio{}$\times$ larger,
+so its \rlCompRateRatio{}$\times$ operation-rate ratio is not the speedup.
+Exact Jacobians apply different operators from the lagged matrix.
+\par\smallskip
+\footnotesize
+Reproduction, raw-data provenance and interpretation:
+\texttt{wip/paper/reproducibility/README.md}. Generated coordinates:
+\texttt{roofline-data.json}. This figure supplies performance context; it does
+not identify a hardware bottleneck, a universal efficiency bound or a solver speedup.
+\end{document}

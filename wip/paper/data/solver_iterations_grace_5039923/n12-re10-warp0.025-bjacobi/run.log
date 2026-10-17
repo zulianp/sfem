@@ -1,0 +1,83 @@
+cavity_warp: fraction=0.025000000000000001 max_displacement=0.050000011920928955 jacobian_perturbation_bound=0.19290226891290058 determinant_ratio_lower_bound=0.52574890794301643
+sscvfem: 216 of 216 macro elements are curved -- their micro cells get their own geometry
+mesh coords checksum: 2197.0000154227018 2197.0000130981207 2197.0000130236149
+pressure pin: DISABLED
+constraints: uvw_nodes=866  uz_nodes=0  p_pin=0  sh_uv=0  sh_phi=0
+case: cavity_reg  geom: isoparam  refine_level: 2  semi_structured: 1
+channel: L=(2,2,2)  cells=(6,6,6)
+nnodes: 2197  nelements: 216  ndof: 8788
+rho: 1  mu: 0.2  U: 1  Re: 10
+initial state checksum: 40.956050889581263   p_exact: 0
+constrained dofs: 2598
+pressure gauge: zero mean  (2197 of 2197 pressure dofs free)
+continuation: 3 stages, Re = 1 4 10
+stage 1/3: rho: 0.1  Re: 1
+newton 0  ||R||: 1.474917e-01  rel: 1.000000e+00
+preconditioner: bjacobi (no multigrid)
+50: residual abs: 1.85838e-05, rel: 0.000125999
+100: residual abs: 5.40681e-07, rel: 3.66584e-06
+linear_check: step=0 stage=1 newton=0 iterations=135 status=converged true_abs=1.4208606731811288e-07 rhs_norm=0.14749167088127663 target=1.4749167088127661e-07 at_limit=0
+  lin_it: 135  |dx|_inf: 1.380599e+00  alpha: 1
+newton 1  ||R||: 9.394715e-04  rel: 6.369658e-03
+50: residual abs: 4.63105e-07, rel: 0.000492942
+100: residual abs: 1.63827e-08, rel: 1.74383e-05
+linear_check: step=0 stage=1 newton=1 iterations=147 status=converged true_abs=9.1777620523826147e-10 rhs_norm=0.00093947150744674499 target=9.3947150744674488e-10 at_limit=0
+  lin_it: 147  |dx|_inf: 5.489527e-03  alpha: 1
+newton 2  ||R||: 7.359787e-08  rel: 4.989968e-07
+50: residual abs: 4.11417e-10, rel: 0.00559006
+100: residual abs: 2.2739e-11, rel: 0.000308962
+150: residual abs: 6.34404e-13, rel: 8.61987e-06
+linear_check: step=0 stage=1 newton=2 iterations=186 status=converged true_abs=6.9567455373343542e-14 rhs_norm=7.359787129545886e-08 target=7.3597871295458861e-14 at_limit=0
+  lin_it: 186  |dx|_inf: 1.798833e-06  alpha: 1
+newton 3  ||R||: 6.970317e-14  rel: 4.725905e-13
+stage 2/3: rho: 0.4  Re: 4
+newton 0  ||R||: 3.206952e-03  rel: 2.174328e-02
+50: residual abs: 5.94013e-07, rel: 0.000185227
+100: residual abs: 6.46137e-09, rel: 2.0148e-06
+linear_check: step=0 stage=2 newton=0 iterations=105 status=converged true_abs=3.188486067347286e-09 rhs_norm=0.0032069520148879501 target=3.2069520148879501e-09 at_limit=0
+  lin_it: 105  |dx|_inf: 2.335710e-02  alpha: 1
+newton 1  ||R||: 2.995116e-06  rel: 2.030702e-05
+50: residual abs: 2.33388e-09, rel: 0.00077923
+100: residual abs: 3.00371e-11, rel: 1.00287e-05
+linear_check: step=0 stage=2 newton=1 iterations=122 status=converged true_abs=2.8983256384108435e-12 rhs_norm=2.9951163906985047e-06 target=2.9951163906985045e-12 at_limit=0
+  lin_it: 122  |dx|_inf: 2.651878e-05  alpha: 1
+newton 2  ||R||: 1.023127e-11  rel: 6.936845e-11
+stage 3/3: rho: 1  Re: 10
+newton 0  ||R||: 6.348495e-03  rel: 4.304308e-02
+50: residual abs: 1.78213e-06, rel: 0.000280716
+linear_check: step=0 stage=3 newton=0 iterations=96 status=converged true_abs=5.6671239254804883e-09 rhs_norm=0.0063484954688487203 target=6.3484954688487197e-09 at_limit=0
+  lin_it: 96  |dx|_inf: 4.832493e-02  alpha: 1
+newton 1  ||R||: 9.322374e-06  rel: 6.320610e-05
+50: residual abs: 2.39356e-09, rel: 0.000256754
+100: residual abs: 1.0411e-11, rel: 1.11677e-06
+linear_check: step=0 stage=3 newton=1 iterations=102 status=converged true_abs=8.312847059996029e-12 rhs_norm=9.3223739466214097e-06 target=9.3223739466214085e-12 at_limit=0
+  lin_it: 102  |dx|_inf: 6.599029e-05  alpha: 1
+newton 2  ||R||: 6.116478e-11  rel: 4.146999e-10
+continuation: highest Re SOLVED = 10 of 10 target  (AT TARGET)
+newton_converged: 1  newton_it: 2 (last stage)  newton_total: 7 over 3 stage(s)  lin_it_total: 893
+linear_check_summary: checked=7 failed=0 nonlinear_abs=6.116477602667999e-11 nonlinear_initial=0.14749167088127663 nonlinear_rtol=1e-08 nonlinear_atol=9.9999999999999998e-13 dofs=8788
+matrix_free: 1  t_operator: 0.0000 s  t_precond: 0.0107 s  t_solve: 0.9486 s  us_per_lin_it: 1062.26
+
+phase breakdown (0.808 s in top-level phases; shares are of that)
+  phase                     seconds      calls      us/call   share
+  outer_op                    0.790        912        866.3   97.8%
+  hessian_block_diag          0.010          7       1465.5    1.3%
+  newton_residual             0.008         10        782.0    1.0%
+  precond_total               0.006        893          7.2    0.8%  (container: the rows above it
+                                                                      marked op/smooth/transfer/coarse are inside)
+cavity: ux in [-0.116085, 1.000000]   uy in [-0.235839, 0.216821]
+cavity: u_x on the vertical centreline (x=1, z=1)
+   y/Ly 0.0000   ux +0.000000   uy +0.000000
+   y/Ly 0.1667   ux -0.048842   uy +0.000588
+   y/Ly 0.3333   ux -0.084585   uy +0.001652
+   y/Ly 0.5000   ux -0.114034   uy +0.004837
+   y/Ly 0.6667   ux -0.095670   uy +0.011820
+   y/Ly 0.8333   ux +0.120289   uy +0.021084
+   y/Ly 1.0000   ux +1.000000   uy +0.000000
+   y/Ly 0.0833   ux -0.027945   uy +0.000379
+   y/Ly 0.2500   ux -0.066960   uy +0.000923
+   y/Ly 0.4167   ux -0.100951   uy +0.002757
+   y/Ly 0.5833   ux -0.116085   uy +0.007730
+   y/Ly 0.7500   ux -0.029117   uy +0.016185
+   y/Ly 0.9167   ux +0.418093   uy +0.022422
+cvfem_hex8_ns_ssgmg: 0.982449 seconds

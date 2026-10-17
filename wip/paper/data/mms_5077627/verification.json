@@ -1,0 +1,33 @@
+{
+  "absolute_accuracy_passes": 0,
+  "cases": 15,
+  "configured_threads": 8,
+  "intermediate_floor_cases": [
+    "ho_lim1_n16"
+  ],
+  "maximum_final_relative_residual": 7.593783e-11,
+  "recorded_binary_sha256": "cfd304b95e44292685970128b6311c3c95f55bd725232639cd2405659b092162",
+  "source_checks": 4355,
+  "velocity_l2_rates": {
+    "ho_lim0": [
+      2.043136284650126,
+      2.0478152867766912
+    ],
+    "ho_lim1": [
+      2.131002894619794,
+      2.0859225220411846
+    ],
+    "ho_lim2_k0": [
+      1.890226976160385,
+      1.668017505589158
+    ],
+    "ho_lim3": [
+      1.7693081436223292,
+      1.5245766684519635
+    ],
+    "lo": [
+      0.5249903877430612,
+      0.6650120299691133
+    ]
+  }
+}

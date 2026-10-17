@@ -17,6 +17,8 @@ Usage:
 import argparse
 import collections
 import math
+import hashlib
+import json
 import os
 import re
 import sys
@@ -1068,44 +1070,77 @@ def compulsory_bytes_per_dof(nelems, nnodes, layout):
 
 
 def parse_dram(path):
-    """Measured DRAM bytes per dof, from two SCF captures differenced across repeat count.
+    """Estimate incremental bytes from independent low/high-repeat captures.
 
-    The counters cover a whole process, so a single capture includes mesh setup, pack
-    construction and warmup. Differencing two runs that differ ONLY in the number of timed
-    applies cancels all of it exactly, which is why the file carries a pair of repeat counts
-    rather than one. Format, one row per configuration:
-
-        operation layout repeat_lo repeat_hi bytes_lo bytes_hi dofs
+    A two-point slope cannot establish cancellation of setup or background traffic.
+    Reject incomplete or invalid inputs rather than filling them from an older run.
     """
     out = {}
     for line in open(path):
         f = line.split()
-        if len(f) != 7 or f[0].startswith("#"):
+        if not f:
             continue
-        try:
-            op, lay = f[0], f[1]
-            r_lo, r_hi = int(f[2]), int(f[3])
-            b_lo, b_hi = float(f[4]), float(f[5])
-            dofs = int(f[6])
-        except ValueError:
+        if f[0].startswith("#"):
+            if "MISSING" in f:
+                raise ValueError(f"incomplete DRAM capture: {path}")
             continue
-        if r_hi <= r_lo or dofs <= 0:
-            continue
-        # A capture that did not increase with the repeat count did not measure the applies. One
-        # came back with the high-repeat read three orders of magnitude BELOW the low-repeat one,
-        # which would have placed a negative intensity on the roofline without complaint. Rows
-        # from an earlier file survive, because the merge takes files in order.
-        if b_hi <= b_lo:
-            continue
-        out[(op, lay)] = (b_hi - b_lo) / float(r_hi - r_lo) / dofs
+        if len(f) != 7:
+            raise ValueError(f"invalid DRAM row: {line.strip()}")
+        op, lay = f[:2]
+        r_lo, r_hi, dofs = int(f[2]), int(f[3]), int(f[6])
+        b_lo, b_hi = float(f[4]), float(f[5])
+        if not (0 <= r_lo < r_hi and dofs > 0 and
+                math.isfinite(b_lo) and math.isfinite(b_hi) and 0 <= b_lo < b_hi):
+            raise ValueError(f"invalid DRAM slope: {line.strip()}")
+        if (op, lay) in out:
+            raise ValueError(f"duplicate DRAM configuration: {op} {lay}")
+        out[op, lay] = (b_hi - b_lo) / (r_hi - r_lo) / dofs
+    if not out:
+        raise ValueError(f"empty DRAM capture: {path}")
     return out
+
+
+def roofline_sources(data_dir=None):
+    """Pin each input explicitly; hashes identify files, not the historical binaries."""
+    data_dir = DATA if data_dir is None else data_dir
+    manifest = json.load(open(os.path.join(data_dir, "roofline_sources.json")))
+    if set(manifest) != {"campaign", "stream", "peak", "dram", "convho", "jacho"}:
+        raise ValueError("incomplete roofline source manifest")
+    paths = {}
+    for key, entry in manifest.items():
+        name = entry["file"]
+        if os.path.basename(name) != name:
+            raise ValueError("roofline sources must be local files")
+        path = os.path.join(data_dir, name)
+        if hashlib.sha256(open(path, "rb").read()).hexdigest() != entry["sha256"]:
+            raise ValueError(f"roofline source changed: {name}")
+        if entry["host"] is not None:
+            if key == "campaign":
+                hosts = {r["host"] for r in read_campaign(path)[0]}
+            else:
+                hosts = set(re.findall(r"^### host (\S+)", open(path).read(), re.M))
+            if hosts != {entry["host"]}:
+                raise ValueError(f"roofline host mismatch: {name}")
+        paths[key] = path
+    return manifest, paths
+
+
+def roofline_source_table(manifest):
+    out = [PREAMBLE, r"\begin{tabular}{@{}lll@{}}", r"\toprule",
+           r"Input & Job & Node \\", r"\midrule"]
+    for key, label in (("campaign", "Bare kernels / SpMV"), ("stream", "STREAM"),
+                       ("peak", "DGEMM"), ("convho", "Darwish residual"),
+                       ("jacho", "Darwish action"), ("dram", "SCF traffic")):
+        entry = manifest[key]
+        out.append(f"{label} & {entry['job']} & {entry['host'] or 'not recorded'}" + r" \\")
+    return "\n".join(out + [r"\bottomrule", r"\end{tabular}", ""])
 
 
 def roofline_points(rows, n=128, measured_bytes=None):
     """(label, intensity FLOP/byte, achieved GFLOP/s, measured?) for the representations compared.
 
     ``measured_bytes`` maps (operation, layout) to DRAM bytes per dof, from the Grace SCF
-    counters differenced across two repeat counts so that setup and warmup cancel. Where a pair
+    counters differenced across two repeat counts to estimate incremental traffic. Where a pair
     is present it is used; where it is absent the model above is, and the flag in the returned
     tuple records which, so the figure can distinguish them rather than implying one provenance.
     """
@@ -1153,10 +1188,8 @@ def roofline_points(rows, n=128, measured_bytes=None):
     return pts
 
 
-# Vendor figures for one Grace die, against which the measured roofs are reported. Quoted rather
-# than derived, and cited in the paper where they appear.
+# Nominal GH200 bandwidth in NVIDIA's platform table; not a calibrated byte roof.
 SPEC_BW_GBS = 500.0
-SPEC_PEAK_GFLOPS = 3550.0
 
 
 def _roof(ai_lo, ai_hi, bw, peak):
@@ -1166,21 +1199,10 @@ def _roof(ai_lo, ai_hi, bw, peak):
 
 
 def roofline_ho_points(rows, dram_ho, n=128, dram_key="residual-ho"):
-    """The higher-order convective arms, on the same axes as the first-order operators.
+    """Only Darwish has a matching traffic capture in the pinned historical job.
 
-    ``dram_key`` names the operator whose DRAM capture places these points -- "residual-ho" for
-    the residual sweep, "jac_action-ho" for the exact higher-order Jacobian action. The two are
-    separate captures because the action reads a second nodal gradient, the direction's, which
-    the residual never touches.
-
-    Traffic is measured once per layout and shared by the four schemes. They read the same
-    arrays -- the mesh, the fields and the hoisted nodal velocity gradient -- and differ only
-    in arithmetic applied to values already in registers, so a limiter moves a point to the
-    right along the roofline and never changes what it moves. That is the claim the figure
-    makes, and it is why one capture per layout is enough to place four points.
-
-    Returns {layout: [(scheme label, intensity, GFLOP/s), ...]} ordered by intensity, which is
-    also the order of increasing limiter arithmetic.
+    Equal source arrays do not guarantee equal DRAM traffic across limiters.
+    The action measurements predate state-gradient caching.
     """
     out = {}
     for lay in ("packed", "atomic"):
@@ -1188,165 +1210,47 @@ def roofline_ho_points(rows, dram_ho, n=128, dram_key="residual-ho"):
         if not byts:
             continue
         pts = []
-        for arm in ("ho_unlimited", "ho_clip", "ho_darwish_moukalled", "ho_venkatakrishnan"):
+        for arm in ("ho_darwish_moukalled",):
             r = next((r for r in rows if r.arm == arm and r.layout == lay and r.prec == "f64"),
                      None)
             if r is None or not r.flops_elem or not r.elems:
                 continue
             flop_per_dof = r.flops_elem * r.elems / float(r.dofs)
             pts.append((HO_NAME[arm], flop_per_dof / byts, r.mdof * 1e6 * flop_per_dof * 1e-9))
-        if len(pts) >= 2:
+        if pts:
             out[lay] = sorted(pts, key=lambda p: p[1])
     return out
 
 
-def fig_roofline(pts, bandwidth_gbs, peak_gflops, ho=None, ho_jac=None,
-                 spec_bw=SPEC_BW_GBS, spec_peak=SPEC_PEAK_GFLOPS):
-    """F8. Measured and vendor roofs together, with the kernels placed on measured traffic.
-
-    Both roofs are drawn because they answer different questions. The measured pair bounds what
-    this node delivered to a benchmark under the same conditions as the kernels, and is the
-    correct reference for an efficiency. The vendor pair bounds what the hardware is specified to
-    do, and the gap between the two is itself information -- it is where a library GEMM and a
-    triad stop short of nominal, which no kernel measured here can recover.
-
-    The higher-order arms are drawn as a path per layout rather than as four more legend
-    entries: what they show is a trajectory, one operator gaining arithmetic at fixed traffic,
-    and a path says that where four scattered markers would not.
-    """
-    # The axis is sized to the DATA, not left at a round decade. A fixed 0.15--64 spent well over
-    # half its width on intensities nothing occupies -- every point lies between the lagged
-    # product and the richest limiter -- and compressed the cluster the figure is actually about
-    # into the middle third. The lower end clears the leftmost point; the upper end clears the
-    # rightmost point AND the vendor ridge, since the caption quotes where both roofs bend and a
-    # roof whose knee is off the axis cannot be read. The margin past each is what keeps a marker
-    # off the frame and leaves the plateau a run for its label.
-    ai_all = [a for _l, a, _g, _m in pts]
-    for fam in (ho, ho_jac):
-        ai_all += [a for path in (fam or {}).values() for _n, a, _g in path]
-    ai_all = ai_all or [0.15, 64.0]
-    xmin = min(ai_all) / 1.35
-    xmax = max(max(ai_all), spec_peak / spec_bw) * 1.9
-    # Head room above the vendor plateau, because its label goes above its own line and a
-    # tighter ceiling clips the label against the axis frame rather than crossing the roof.
-    ymin, ymax = 20.0, max(peak_gflops, spec_peak) * 2.6
-    # Axis geometry, so an annotation can be laid ALONG a roof instead of across it. The sloped
-    # segment has unit slope in decades, but the axis box is not square in decades per unit
-    # length, so its drawn angle is not 45 degrees and a label rotated to 45 crosses the line it
-    # is labelling. This is that angle.
-    h_over_w = 0.50
-    ang = math.degrees(math.atan2(h_over_w / math.log10(ymax / ymin),
-                                  1.0 / math.log10(xmax / xmin)))
-    out = [PREAMBLE,
-           r"\begin{tikzpicture}",
-           r"\begin{loglogaxis}[",
-           r"  width=\columnwidth, height=%.2f\columnwidth," % h_over_w,
-           r"  xlabel={operational intensity [FLOP/byte]}, ylabel={GFLOP/s},",
-           r"  xmin=%.2f, xmax=%.0f, ymin=%.0f, ymax=%.0f," % (xmin, xmax, ymin, ymax),
-           # Below the axis, not inside it: with the higher-order paths the key needs eight
-           # entries, and any corner large enough to hold them also holds a roof or a point.
-           r"  legend cell align=left, legend columns=3,",
-           r"  legend style={font=\tiny, draw=none, fill=none, inner sep=1pt,",
-           r"    at={(0.5,-0.34)}, anchor=north, column sep=6pt},",
-           r"  grid=both, major grid style={black!12}, minor grid style={black!6},",
-           r"  tick label style={font=\tiny}, label style={font=\scriptsize},",
-           r"]"]
-
-    def roof_plot(bw, peak, style, label, above):
-        coords = " ".join("(%.3f,%.1f)" % c for c in _roof(xmin, xmax, bw, peak))
-        out.append(r"\addplot[%s,no marks,forget plot] coordinates {%s};" % (style, coords))
-        # Set against the right edge and clear of its own line: above it for the upper roof,
-        # below it for the lower one, so neither label crosses a roof and neither is clipped.
-        # The lower one hangs further below than the upper one rises, because what it has to
-        # clear is not its own roof but the OTHER roof's sloped segment, which on the tightened
-        # axis passes close above the plateau in the stretch the label occupies.
-        out.append(r"\node[black!55,font=\tiny,anchor=%s] at (axis cs:%.2f,%.1f) {%s};"
-                   % ("south east" if above else "north east",
-                      xmax * 0.97, peak * (1.13 if above else 0.74), label))
-
-    # Vendor first, so the measured roof is drawn over it.
-    roof_plot(spec_bw, spec_peak, "black!45,thick,densely dashed",
-              r"spec %.2f TFLOP/s" % (spec_peak / 1000.0), True)
-    roof_plot(bandwidth_gbs, peak_gflops, "black,thick",
-              r"measured %.2f TFLOP/s" % (peak_gflops / 1000.0), False)
-    # The bandwidth labels run ALONG their own sloped segment, at the drawn angle, and at two
-    # well-separated intensities: the roofs are only a few per cent apart there, so two labels
-    # at one place would sit on top of each other whatever the offset.
-    #
-    # Both positions are MULTIPLES OF xmin rather than fixed intensities. They were fixed, and
-    # when the axis was tightened onto the data the measured label stayed at 2.2 -- which had been
-    # empty on a 0.15--64 axis and is now the middle of the point cluster, so the label ran across
-    # the markers. Tying them to the axis keeps them in its left quarter, which is where the two
-    # roofs are and the points are not.
-    x_spec, x_meas = xmin * 2.3, xmin * 4.9
-    out.append(r"\node[black!55,font=\tiny,anchor=south,rotate=%.1f] "
-               r"at (axis cs:%.2f,%.1f) {%.0f GB/s};"
-               % (ang, x_spec, x_spec * spec_bw * 1.14, spec_bw))
-    out.append(r"\node[black!70,font=\tiny,anchor=north,rotate=%.1f] "
-               r"at (axis cs:%.2f,%.1f) {%.0f GB/s};"
-               % (ang, x_meas, x_meas * bandwidth_gbs * 0.88, bandwidth_gbs))
-
+def fig_roofline(pts, bandwidth_gbs, peak_gflops, ho=None, ho_jac=None):
+    """Historical kernel-work model with explicitly qualified benchmark references."""
+    out = [PREAMBLE, r"\begin{tikzpicture}", r"\begin{loglogaxis}[",
+           r"width=\columnwidth,height=0.63\columnwidth,",
+           r"xlabel={modelled kernel FLOP / byte},ylabel={modelled GFLOP/s},",
+           r"xmin=0.15,xmax=12,ymin=20,ymax=4500,",
+           r"legend cell align=left,legend columns=2,",
+           r"legend style={font=\tiny,draw=none,at={(0.5,-0.34)},anchor=north},",
+           r"grid=both,major grid style={black!12},minor grid style={black!6},",
+           r"tick label style={font=\tiny},label style={font=\scriptsize}]"]
+    coords = " ".join("(%.3f,%.1f)" % c for c in _roof(0.15, 12, bandwidth_gbs, peak_gflops))
+    out += [r"\addplot[black,dashed,no marks,forget plot] coordinates {%s};" % coords,
+            r"\node[font=\tiny,anchor=south east] at (axis cs:11,2500) {STREAM / DGEMM references};"]
     marks = ["*", "square*", "triangle*", "diamond*", "pentagon*", "otimes*"]
     cols = ["PackA", "PackD", "PackC", "PackE", "PackB", "PackF"]
-    for i, (label, ai, gf, meas) in enumerate(pts):
-        # A hollow marker says the intensity rests on the compulsory-traffic model rather than
-        # on a DRAM capture. The distinction is the figure's own provenance and belongs in it.
-        fill = "" if meas else ",fill=white"
-        out.append(r"\addplot[%s,mark=%s,mark size=2.1pt,only marks,mark options={%s%s}] "
-                   r"coordinates {(%.3f,%.1f)};"
-                   % (cols[i % len(cols)], marks[i % len(marks)],
-                      "draw=" + cols[i % len(cols)], fill or ",fill=" + cols[i % len(cols)],
-                      ai, gf))
-        out.append(r"\addlegendentry{%s}" % label)
-
-    # COLOUR is the layout, SHAPE is the scheme. The four schemes used to share one marker and be
-    # named by two floating labels on the packed path, which left the atomic path's schemes
-    # anonymous and the middle two unnamed on both. Now each scheme carries its own shape and its
-    # own legend entry, drawn in black there because the shape is what the entry is about.
-    #
-    # The shapes are deliberately none of the six the first-order points use: the unlimited
-    # higher-order point sits beside its own layout's residual point, and sharing a shape with it
-    # there would be exactly where the confusion lands. Filled, because a hollow marker already
-    # means something else in this figure -- modelled rather than measured traffic.
-    #
-    # The schemes are drawn as POINTS, not joined. A line between them would assert a path
-    # through intensities that nothing traverses: they are four separate operators measured
-    # independently, and the ordering among them is a fact about their arithmetic, which the
-    # legend states, not a trajectory.
-    # The colours are the SAME four the first-order points use, and they mean the same thing
-    # there: operator and layout together. So the residual's higher-order arms are drawn in the
-    # residual colours and the exact higher-order Jacobian action's in the Jacobian colours, and
-    # a reader who has read the first six legend entries already knows which family a point is in
-    # without the key having to say it again.
-    HO_MARKS = ["oplus*", "halfsquare*", "halfcircle*", "star"]
-    # The mark is looked up by SCHEME NAME, not by position in the path. Each path is sorted by
-    # intensity, and the two families happen to sort their four schemes the same way today --
-    # which is exactly the kind of coincidence that breaks silently. Keying on the name means a
-    # shape stands for one scheme in both families whatever the ordering turns out to be.
-    ho_mark = {}
-    ho_seen = []
-    for family, (cp, ca) in ((ho, ("PackA", "PackD")), (ho_jac, ("PackC", "PackE"))):
-        for lay, col in (("packed", cp), ("atomic", ca)):
-            path = (family or {}).get(lay)
-            if not path:
-                continue
-            for name, ai, gf in path:
-                if name not in ho_mark:
-                    ho_mark[name] = HO_MARKS[len(ho_seen) % len(HO_MARKS)]
-                    ho_seen.append(name)
-                mk = ho_mark[name]
-                out.append(r"\addplot[%s,mark=%s,mark size=2.0pt,only marks,forget plot,"
-                           r"mark options={draw=%s,fill=%s}] coordinates {(%.3f,%.1f)};"
-                           % (col, mk, col, col, ai, gf))
-    # One legend entry per SCHEME, once, after the plots so the order reads with the path.
-    for name in ho_seen:
-        out.append(r"\addlegendimage{black,mark=%s,mark size=2.0pt,only marks,"
-                   r"mark options={draw=black,fill=black}}" % ho_mark[name])
-        out.append(r"\addlegendentry{%s}" % name)
-
-    out.append(r"\end{loglogaxis}")
-    out.append(r"\end{tikzpicture}")
-    return "\n".join(out) + "\n"
+    for i, (label, ai, gf, measured) in enumerate(pts):
+        col = cols[i]
+        shown = label.replace("residual,", "bare residual,").replace("Jacobian,", "bare action,")
+        out += [r"\addplot[%s,mark=%s,only marks,mark options={fill=%s}] coordinates {(%.3f,%.1f)};"
+                % (col, marks[i], col if measured else "white", ai, gf),
+                r"\addlegendentry{%s}" % shown]
+    for family, colors in ((ho, ("PackA", "PackD")), (ho_jac, ("PackC", "PackE"))):
+        for lay, col in zip(("packed", "atomic"), colors):
+            for _name, ai, gf in (family or {}).get(lay, []):
+                out.append(r"\addplot[%s,mark=star,only marks,forget plot] coordinates {(%.3f,%.1f)};"
+                           % (col, ai, gf))
+    if ho or ho_jac:
+        out += [r"\addlegendimage{black,mark=star,only marks}", r"\addlegendentry{Darwish + RC}"]
+    return "\n".join(out + [r"\end{loglogaxis}", r"\end{tikzpicture}", ""])
 
 
 def macros_coloring(measured):
@@ -1496,7 +1400,7 @@ def parse_peak(path):
 HO_NAME = {
     "first_order": "first-order upwind",
     "ho_unlimited": "deferred correction, unlimited",
-    "ho_clip": r"${}+{}$ Barth--Jespersen",
+    "ho_clip": r"${}+{}$ two-node clip",
     "ho_venkatakrishnan": r"${}+{}$ Venkatakrishnan",
     "ho_darwish_moukalled": r"${}+{}$ Darwish--Moukalled",
 }
@@ -1544,7 +1448,7 @@ def macros_jacho(rows):
         if d.get("gen") and d.get("atomic"):
             out.append(r"\newcommand{\jacho%sLayoutRatio}{%.2f}" % (tag, d["gen"] / d["atomic"]))
     if loose.get("ho_unlim_lagged"):
-        out.append(r"\newcommand{\jachoLaggedPacked}{%.0f}" % loose["ho_unlim_lagged"])
+        out.append(r"\newcommand{\jachoCorrectionLaggedPacked}{%.0f}" % loose["ho_unlim_lagged"])
     return "\n".join(out) + "\n" if out else ""
 
 
@@ -1680,7 +1584,7 @@ def fig_scheme_bars(rows, spmv=None, ylabel="MDOF/s"):
                          "ho_darwish_moukalled") if a in by]
     if not order:
         return None
-    short = {"first_order": "upwind", "ho_unlimited": "unlimited", "ho_clip": "Barth--J.",
+    short = {"first_order": "upwind", "ho_unlimited": "unlimited", "ho_clip": "two-node clip",
              "ho_venkatakrishnan": "Venkat.", "ho_darwish_moukalled": "Darwish--M."}
     coords = ",".join(short[a] for a in order)
 
@@ -1946,11 +1850,7 @@ def macros_kmix(mix):
         put("kmixStallPct" + tag, 100.0 * m["STALL_BACKEND"] / m["cycles"], "%.0f")
         put("kmixStallMemPct" + tag,
             100.0 * m["STALL_BACKEND_MEM"] / m["STALL_BACKEND"], "%.0f")
-        put("kmixScatterPct" + tag,
-            abs(100.0 * (m["mdof_kernel_only"] / m["mdof"] - 1.0)), "%.1f")
-    # The reading the higher-order arm was measured for: the throughput ratio between the layouts
-    # and the retirement-rate ratio, on each arm. If retirement is what separates the layouts then
-    # the two must move together as the scheme adds arithmetic, and only a second arm can say so.
+    # Compare throughput and retirement ratios without attributing a cause.
     for sfx, tag in (("", "Fo"), ("_ho", "Ho")):
         if "packed" + sfx not in mix:
             continue
@@ -2026,20 +1926,6 @@ def table_kmix(mix):
     out.append(row(r"\quad of which waiting on memory",
                    lambda c: 100.0 * mix[c]["STALL_BACKEND_MEM"] / mix[c]["STALL_BACKEND"],
                    "%.0f"))
-    out.append(r"\midrule")
-    # The staging is gather, scatter, ghost reduction and zeroing. Dropping it with --kernel-only
-    # says how much of the sweep is the element kernel, which is what the roofline's y-axis counts.
-    # What this row actually measures, which is NOT what it used to claim. --kernel-only has the
-    # element kernel write to a dense stack buffer and skip the SCATTER; it does not remove the
-    # gather or the staging. So the ratio is the scatter's share of the sweep, not the element
-    # kernel's, and the label said the latter. It is also small enough to sit at the resolution
-    # limit of two separate runs -- the standard layout measured 0.5% FASTER with the scatter than
-    # without, which printed as "101%" of the sweep and is simply noise. Reported as a signed
-    # delta with one decimal so that a value inside the noise reads as inside the noise.
-    out.append(row(r"scatter removed, \% rate change" if wide
-                   else r"scatter, change in sweep rate when removed",
-                   lambda c: 100.0 * (mix[c]["mdof_kernel_only"] / mix[c]["mdof"] - 1.0),
-                   "%+.1f"))
     out += [r"\bottomrule", r"\end{tabular}"]
     return "\n".join(out) + "\n"
 
@@ -2084,9 +1970,9 @@ def macros_hoexact(rates, checks, frac=None):
     def put(name, key):
         if key in rates:
             out.append(r"\newcommand{\hox%s}{%.0f}" % (name, rates[key]))
-    put("LaggedPacked", "jac_ho_lagged_packed")
+    put("CorrectionLaggedPacked", "jac_ho_lagged_packed")
     put("ExactPacked", "jac_ho_exact_packed")
-    put("LaggedAtomic", "jac_ho_lagged_atomic")
+    put("CorrectionLaggedAtomic", "jac_ho_lagged_atomic")
     put("ExactAtomic", "jac_ho_exact_atomic")
     for name, a, b in (("CostPacked", "jac_ho_lagged_packed", "jac_ho_exact_packed"),
                        ("CostAtomic", "jac_ho_lagged_atomic", "jac_ho_exact_atomic")):
@@ -2094,7 +1980,7 @@ def macros_hoexact(rates, checks, frac=None):
             out.append(r"\newcommand{\hox%s}{%.2f}" % (name, rates[a] / rates[b]))
     # The layout ratio on each form. That it collapses is the result, so it is generated rather
     # than left to a reader to divide two numbers in a table.
-    for name, lay in (("LayoutLagged", "lagged"), ("LayoutExact", "exact")):
+    for name, lay in (("LayoutCorrectionLagged", "lagged"), ("LayoutExact", "exact")):
         p, a = "jac_ho_%s_packed" % lay, "jac_ho_%s_atomic" % lay
         if p in rates and a in rates:
             out.append(r"\newcommand{\hox%s}{%.2f}" % (name, rates[p] / rates[a]))
@@ -2122,12 +2008,10 @@ def macros_hoexact(rates, checks, frac=None):
 # The operator symbols of the setup section's Operators paragraph, so a row says which
 # differentiations it carried instead of leaving "exact" to be resolved against the caption.
 #
-# EVERY ROW IS FULLY EXACT OR FULLY LAGGED. The job used to lag the Rhie-Chow sensitivity while
-# differentiating the correction, and those mixed arms are gone: the operator is the Jacobian of
-# no residual at all, so the row priced something nobody would apply.
+# These rows distinguish the measured exact actions from the implemented lagged matrix.
 JF_NAME = {
     "jac_exact":      r"$\Jex(u)\,v$, first-order upwind",
-    "jac_clip_exact": r"$\Jhoex(u)\,v$, Barth--Jespersen",
+    "jac_clip_exact": r"$\Jhoex(u)\,v$, two-node clip",
     "jac_ho_exact":   r"$\Jhoex(u)\,v$, Darwish--Moukalled",
     "jac_lagged":     r"$\Jlag(u)\,v$, any of these",
     "spmv_f64":       r"SpMV with $\Jlag$, \texttt{f64}",
@@ -2500,71 +2384,63 @@ def build(out_dir, tab_dir):
                 fh.write(macros_jacfair(jr))
             written += ["tables/jacfair.tex", "figures/jacfair_macros.tex"]
 
-    # F8 needs three things from three different jobs: the campaign (points), STREAM (memory
-    # roof) and the GEMM peak (compute roof). Emitted only when all three are present, so a
-    # roofline is never drawn with a roof that was assumed.
-    pk = [f for f in sorted(os.listdir(DATA)) if f.startswith("peak_")] if os.path.isdir(DATA) else []
-    if camp and st and pk and rows:
-        peak = parse_peak(os.path.join(DATA, pk[-1]))
-        rates = parse_stream(os.path.join(DATA, st[-1]))
-        bw = rates.get(max(rates)) if rates else None
-        # Measured DRAM traffic per dof, if a differenced SCF capture is present. Preferred over
-        # the model; see roofline_points.
-        # EVERY dram_ file, not the newest: the captures were made by different jobs for
-        # different operators, each file named for the jobs behind it, and taking one would
-        # silently drop whichever operator was measured first.
-        dm = [f for f in sorted(os.listdir(DATA)) if f.startswith("dram_")]
-        measured_dram = {}
-        for name in dm:
-            measured_dram.update(parse_dram(os.path.join(DATA, name)))
-        mc = macros_coloring(measured_dram)
-        if mc:
-            with open(os.path.join(out_dir, "coloring_macros.tex"), "w") as fh:
-                fh.write(PREAMBLE + mc)
-            written.append("figures/coloring_macros.tex")
-        if peak and bw:
-            pts = roofline_points(rows, n=128, measured_bytes=measured_dram)
-            ho_path = roofline_ho_points(convho_rows, measured_dram)
-            ho_jac = roofline_ho_points(jacho_rows, measured_dram,
-                                        dram_key="jac_action-ho")
-            if pts:
-                with open(os.path.join(out_dir, "roofline.tex"), "w") as fh:
-                    fh.write(fig_roofline(pts, bw, peak, ho=ho_path, ho_jac=ho_jac))
-                with open(os.path.join(out_dir, "roofline_macros.tex"), "w") as fh:
-                    fh.write(PREAMBLE
-                             + "\\newcommand{\\rlPeak}{%.0f}\n" % peak
-                             + "\\newcommand{\\rlBw}{%.0f}\n" % bw
-                             + "\\newcommand{\\rlRidge}{%.1f}\n" % (peak / bw)
-                             + macros_traffic_ratio(measured_dram, 2097152, 2146689)
-                             + macros_roofline_ho(ho_path, measured_dram, ho_jac)
-                             + "\\newcommand{\\rlSpecPeak}{%.2f}\n" % (SPEC_PEAK_GFLOPS / 1000.0)
-                             + "\\newcommand{\\rlSpecBw}{%.0f}\n" % SPEC_BW_GBS
-                             + "\\newcommand{\\rlSpecRidge}{%.1f}\n"
-                               % (SPEC_PEAK_GFLOPS / SPEC_BW_GBS)
-                             + "\\newcommand{\\rlPeakPctSpec}{%.0f}\n"
-                               % (100.0 * peak / SPEC_PEAK_GFLOPS)
-                             + "\\newcommand{\\rlBwPctSpec}{%.0f}\n"
-                               % (100.0 * bw / SPEC_BW_GBS)
-                             + "".join("\\newcommand{\\rl%s}{%.0f}\n" % (_macro_name(l), g)
-                                       for l, a, g, _m in pts)
-                             + "".join("\\newcommand{\\rl%sAi}{%.1f}\n" % (_macro_name(l), a)
-                                       for l, a, g, _m in pts)
-                             # Each point as a percentage of the roof BINDING AT ITS OWN
-                             # intensity -- memory below the ridge, compute above. This is the
-                             # comparison the figure invites and it is easy to state wrongly by
-                             # dividing everything by the compute peak.
-                             + "".join("\\newcommand{\\rl%sPct}{%.0f}\n"
-                                       % (_macro_name(l), 100.0 * g / min(peak, bw * a))
-                                       for l, a, g, _m in pts)
-                             + "\\newcommand{\\rlTrafficSource}{%s}\n"
-                               % ("measured" if any(m for _l, _a, _g, m in pts) else "modelled")
-                             # How far below the matrix-free kernels the lagged product sits on
-                             # the intensity axis. The text used to call this "a factor of
-                             # twenty"; it is 13.5 to 15.0, and the rounded macros invite the
-                             # same mistake again -- 3.6/0.2 reads as 18 -- so the ratio is taken
-                             # from the unrounded intensities here.
-                             + _rl_spmv_factor(pts))
-                written += ["figures/roofline.tex", "figures/roofline_macros.tex"]
+    # Historical inputs are pinned together; other figures keep their own campaigns.
+    sources, paths = roofline_sources()
+    rl_rows, _ = read_campaign(paths["campaign"])
+    peak = parse_peak(paths["peak"])
+    rates = parse_stream(paths["stream"])
+    bw = rates[72]
+    measured_dram = parse_dram(paths["dram"])
+    pts = roofline_points(rl_rows, n=128, measured_bytes=measured_dram)
+    ho = roofline_ho_points(parse_convho(paths["convho"]), measured_dram)
+    ho_jac = roofline_ho_points(parse_convho(paths["jacho"]), measured_dram,
+                               dram_key="jac_action-ho")
+    if len(pts) != 6 or set(ho) != {"packed", "atomic"} or set(ho_jac) != {"packed", "atomic"}:
+        raise ValueError("incomplete historical roofline")
+    with open(os.path.join(out_dir, "roofline.tex"), "w") as fh:
+        fh.write(fig_roofline(pts, bw, peak, ho, ho_jac))
+    with open(os.path.join(tab_dir, "roofline_sources.tex"), "w") as fh:
+        fh.write(roofline_source_table(sources))
+    with open(os.path.join(out_dir, "coloring_macros.tex"), "w") as fh:
+        fh.write(PREAMBLE + macros_coloring(measured_dram))
+    with open(os.path.join(out_dir, "roofline_macros.tex"), "w") as fh:
+        fh.write(PREAMBLE
+                 + "\\newcommand{\\rlPeak}{%.0f}\n" % peak
+                 + "\\newcommand{\\rlBw}{%.0f}\n" % bw
+                 + "\\newcommand{\\rlSpecBw}{%.0f}\n" % SPEC_BW_GBS
+                 + macros_traffic_ratio(measured_dram, 2097152, 2146689)
+                 + macros_roofline_ho(None, measured_dram)
+                 + "".join("\\newcommand{\\rl%sAi}{%.1f}\n" % (_macro_name(l), a)
+                           for l, a, g, _m in pts)
+                 + _rl_spmv_factor(pts))
+    written += ["figures/roofline.tex", "figures/roofline_macros.tex",
+                "figures/coloring_macros.tex", "tables/roofline_sources.tex"]
+    # Keep the accumulation study separate from the historical instruction counters.
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("scatter_figures", os.path.join(HERE, "scatter_figures.py"))
+    scatter = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(scatter)
+    written.extend(scatter.build(DATA, out_dir, tab_dir))
+    spec = importlib.util.spec_from_file_location("residual_counter_figures", os.path.join(HERE, "residual_counter_figures.py"))
+    counters = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(counters)
+    written.extend(counters.build(DATA, out_dir, tab_dir))
+    spec = importlib.util.spec_from_file_location("matched_counter_figures", os.path.join(HERE, "matched_counter_figures.py"))
+    matched = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(matched)
+    written.extend(matched.build(DATA, out_dir, tab_dir))
+    spec = importlib.util.spec_from_file_location("solver_iterations", os.path.join(HERE, "solver_iterations.py"))
+    solver = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(solver)
+    written.extend(solver.build(DATA, out_dir, tab_dir))
+    spec = importlib.util.spec_from_file_location("unstructured_figures", os.path.join(HERE, "unstructured_figures.py"))
+    unstructured = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(unstructured)
+    written.extend(unstructured.build(DATA, out_dir, tab_dir))
+    spec = importlib.util.spec_from_file_location("mms_refinement", os.path.join(HERE, "mms_refinement.py"))
+    mms = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mms)
+    written.extend(mms.build(DATA, out_dir, os.path.join(os.path.dirname(out_dir), "reproducibility")))
     return written
 
 
@@ -2728,6 +2604,46 @@ def selftest():
             check(("residual", "colored") not in dm,
                   "a configuration absent from the capture yields no entry")
 
+        # Incomplete new captures must not inherit a plausible row from an older job.
+        with tempfile.TemporaryDirectory() as td4:
+            dp = os.path.join(td4, "dram_bad.out")
+            good = "residual packed 10 40 1000 4000 100\n"
+            for bad in (good + good, "# MISSING residual packed hi\n", good.replace("4000", "nan"),
+                        good.replace("4000", "500"), good.replace("1000", "-1"), "residual packed\n"):
+                open(dp, "w").write(bad)
+                try:
+                    parse_dram(dp)
+                except ValueError:
+                    accepted = False
+                else:
+                    accepted = True
+                check(not accepted, "invalid or incomplete DRAM capture is rejected", bad)
+
+        import shutil
+        with tempfile.TemporaryDirectory() as td4:
+            sources, paths = roofline_sources()
+            for path in paths.values():
+                shutil.copy(path, td4)
+            mp = os.path.join(td4, "roofline_sources.json")
+            shutil.copy(os.path.join(DATA, "roofline_sources.json"), mp)
+            # A newly appearing file cannot silently replace the pinned traffic capture.
+            open(os.path.join(td4, "dram_9999999.out"), "w").write("broken\n")
+            _, pinned = roofline_sources(td4)
+            check(os.path.basename(pinned["dram"]) == sources["dram"]["file"], "newest file cannot override pinned provenance")
+            with open(pinned["dram"], "a") as fh:
+                fh.write("# changed\n")
+            try:
+                roofline_sources(td4)
+            except ValueError:
+                rejected = True
+            else:
+                rejected = False
+            check(rejected, "changed evidence hash is rejected")
+            dm = parse_dram(paths["dram"])
+            hp = roofline_ho_points(parse_convho(paths["convho"]), dm)
+            check(set(hp) == {"packed", "atomic"} and all(len(v) == 1 and v[0][0] == HO_NAME["ho_darwish_moukalled"] for v in hp.values()),
+                  "Darwish traffic never supplies an unmeasured limiter")
+
         # A point with measured traffic must report it as measured, and one without must not.
         camp_pts = [{"_n": 128, "_dofs": 400, "_mdof": 100.0, "operation": "residual",
                      "ran_layout": "packed", "GFLOP_s_model": "40", "elements": "100",
@@ -2786,6 +2702,45 @@ def selftest():
         p32 = parse_f32(fp)
         check(p32 == {("res_rc", "packed"): (110.0, 190.0)},
               "the f32 job's n=128 best columns are read, other sizes are not", repr(p32))
+
+        mix = {layout: dict(instructions=200, cycles=100, STALL_BACKEND=50,
+                            STALL_BACKEND_MEM=10, INST_SPEC=200, ASE_SPEC=40,
+                            VFP_SPEC=20, LD_SPEC=30, ST_SPEC=10, DP_SPEC=80, mdof=100)
+               for layout in ("packed", "atomic", "packed_ho", "atomic_ho")}
+        km_table, km_macros = table_kmix(mix), macros_kmix(mix)
+        check("instructions per cycle" in km_table and "scatter" not in km_table
+              and "kmixIpcPacked" in km_macros and "kmixScatter" not in km_macros,
+              "instruction mix needs no unsupported scatter measurement")
+        for values in mix.values():
+            values["mdof_kernel_only"] = float("nan")
+        check(table_kmix(mix) == km_table and macros_kmix(mix) == km_macros,
+              "historical kernel-only rows cannot change the generated table or macros")
+
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("scatter_figures", os.path.join(HERE, "scatter_figures.py"))
+        scatter = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(scatter)
+        check(scatter.selftest(), "scatter arithmetic and invalid-data rejection")
+        spec = importlib.util.spec_from_file_location("residual_counter_figures", os.path.join(HERE, "residual_counter_figures.py"))
+        counters = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(counters)
+        check(counters.selftest(), "residual counters: raw events, output checks and provenance")
+        spec = importlib.util.spec_from_file_location("matched_counter_figures", os.path.join(HERE, "matched_counter_figures.py"))
+        matched = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(matched)
+        check(matched.selftest(), "matched counters: all stages, raw checks, policy and failed controls")
+        spec = importlib.util.spec_from_file_location("solver_iterations", os.path.join(HERE, "solver_iterations.py"))
+        solver = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(solver)
+        check(solver.selftest(), "solver iterations: true residuals, configurations and raw logs")
+        spec = importlib.util.spec_from_file_location("unstructured_figures", os.path.join(HERE, "unstructured_figures.py"))
+        unstructured = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(unstructured)
+        check(unstructured.selftest(), "unstructured results: raw replay, scope and slower case retained")
+        spec = importlib.util.spec_from_file_location("mms_refinement", os.path.join(HERE, "mms_refinement.py"))
+        mms = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mms)
+        check(mms.selftest(), "MMS refinement: matching binary/settings, raw replay and accuracy failures retained")
 
         # Missing data must be absent, not fabricated.
         with tempfile.TemporaryDirectory() as td2:

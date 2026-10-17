@@ -201,10 +201,44 @@ static void compare_skin(sfem::Context &ctx, const ptrdiff_t expect) {
 //
 // Nothing here checked it. tests/cvfem_ns_op_gate.cpp runs the whole gate with
 // SFEM_RC_EXACT_JAC=0 on purpose, so the exact term is off there by construction.
-static void compare_jacobian(sfem::Context &ctx, const bool lshape, const char *name) {
+using KeyedField = std::map<std::array<long long, 3>, std::array<scalar_t, 4>>;
+
+static bool box_tie_jump_matches(const KeyedField &atomic, const KeyedField &packed,
+                                 scalar_t *branch_factor = nullptr) {
+    const std::array<long long, 3> lower{5000000, 1500000, 0}, upper{5000000, 1500000, 250000};
+    if (atomic.size() != packed.size() || !atomic.count(lower) || !packed.count(lower)) return false;
+    // This edge has zero normal velocity at its midpoint. The donor derivatives differ by
+    // dm times the endpoint velocity jump, over the four incident sub-control surfaces.
+    const scalar_t dm = scalar_t(0.27625) * scalar_t(1.25) * scalar_t(0.5);
+    const scalar_t jump[3] = {-scalar_t(0.0125) * dm, scalar_t(0.01) * dm, -scalar_t(0.03) * dm};
+    const scalar_t factor = (atomic.at(lower)[2] - packed.at(lower)[2]) / jump[2];
+    if (branch_factor) *branch_factor = factor;
+    if (!std::isfinite(factor) || std::fabs(factor) > scalar_t(1) + scalar_t(1e-10)) return false;
+    for (const auto &kv : atomic) {
+        const auto it = packed.find(kv.first);
+        if (it == packed.end()) return false;
+        for (int c = 0; c < 4; ++c) {
+            const scalar_t sign = kv.first == lower ? scalar_t(1) : kv.first == upper ? scalar_t(-1) : scalar_t(0);
+            const scalar_t want = c < 3 ? sign * factor * jump[c] : scalar_t(0);
+            const scalar_t difference = kv.second[c] - it->second[c];
+            if (!std::isfinite(difference) || std::fabs(difference - want) > scalar_t(1e-12)) return false;
+        }
+    }
+    return true;
+}
+
+static void compare_jacobian(sfem::Context &ctx, const bool lshape, const char *name,
+                              const scalar_t velocity_shift = scalar_t(0)) {
     Run a, b;
     build(a, 0, lshape, ctx);     // atomic
     build(b, 2048, lshape, ctx);  // packed
+    for (Run *r : {&a, &b}) {
+        for (ptrdiff_t i = 0; i < r->d.nnodes; ++i) {
+            r->d.ux[i] += velocity_shift;
+            r->d.uy[i] += velocity_shift;
+            r->d.uz[i] += velocity_shift;
+        }
+    }
 
     auto keyed_jv = [](Run &r) {
         MeshData &d = r.d;
@@ -250,8 +284,66 @@ static void compare_jacobian(sfem::Context &ctx, const bool lshape, const char *
     std::printf("\n--- %s Jacobian action (Rhie-Chow on) ---\n", name);
     std::printf("  worst |packed - atomic| = %.6e   relative %.6e\n", (double)worst, (double)rel);
     char msg[192];
-    std::snprintf(msg, sizeof(msg), "%s: packed and atomic Jacobian actions agree", name);
-    check(rel < 1e-12, msg);
+    if (!lshape && velocity_shift == scalar_t(0)) {
+        scalar_t factor = 0;
+        const bool matches = box_tie_jump_matches(ja, jb, &factor);
+        std::printf("  zero-flux diagnostic: donor jump factor %.6e; this is not a smooth Jacobian comparison\n",
+                    (double)factor);
+        check(matches, "box: the action difference has the derived donor-jump form");
+        auto wrong = jb;
+        wrong.at({5000000, 1500000, 0})[3] += scalar_t(1e-4);
+        check(!box_tie_jump_matches(ja, wrong), "the tie check rejects a changed continuity row");
+        wrong = jb;
+        wrong.at({5000000, 1500000, 0})[0] += scalar_t(1e-4);
+        check(!box_tie_jump_matches(ja, wrong), "the tie check rejects a changed transverse jump at the edge");
+        wrong = jb;
+        wrong.begin()->second[0] += scalar_t(1e-4);
+        check(!box_tie_jump_matches(ja, wrong), "the tie check rejects an error away from the tied edge");
+    } else {
+        std::snprintf(msg, sizeof(msg), "%s: packed and atomic Jacobian actions agree", name);
+        check(rel < 1e-12, msg);
+    }
+}
+
+static void compare_transient_residual(sfem::Context &ctx, const int order) {
+    Run a, b;
+    build(a, 0, false, ctx);
+    build(b, 64, false, ctx);
+    for (Run *run : {&a, &b}) {
+        auto &d = run->d;
+        d.dt = scalar_t(0.1);
+        d.bdf_order = order;
+        d.u_prev.resize(size_t(d.nnodes) * 3);
+        if (order == 2) d.u_prev2.resize(size_t(d.nnodes) * 3);
+        for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+            // Linear pressure would hide a missing Rhie-Chow coefficient.
+            d.p[i] += scalar_t(0.13) * std::sin(scalar_t(2) * d.points[0][i] +
+                scalar_t(3) * d.points[1][i] + scalar_t(5) * d.points[2][i]);
+            const scalar_t u[3] = {d.ux[i], d.uy[i], d.uz[i]};
+            for (int c = 0; c < 3; ++c) {
+                d.u_prev[size_t(i) * 3 + c] = scalar_t(0.97) * u[c];
+                if (order == 2) d.u_prev2[size_t(i) * 3 + c] = scalar_t(0.93) * u[c];
+            }
+        }
+        ++d.state_stamp;
+    }
+    const auto ra = keyed_residual(a), rb = keyed_residual(b);
+    bool valid = ra.size() == rb.size() && ra.size() == size_t(a.d.nnodes);
+    scalar_t worst = 0, scale = 0;
+    for (const auto &kv : ra) {
+        const auto it = rb.find(kv.first);
+        if (it == rb.end()) { valid = false; continue; }
+        for (int c = 0; c < 4; ++c) {
+            valid &= std::isfinite(kv.second[c]) && std::isfinite(it->second[c]);
+            worst = std::max(worst, std::fabs(kv.second[c] - it->second[c]));
+            scale = std::max(scale, std::fabs(kv.second[c]));
+        }
+    }
+    const auto cfg = cvfem_hex8_rc_config_for(b.d);
+    std::printf("transient BDF%d: RC inv_dt_a0=%g, residual rel=%.9e\n",
+                order, double(cfg.tau.inv_dt_a0), double(worst / scale));
+    check(valid && scale > 0 && worst < scalar_t(1e-12) * scale,
+          "transient packed and atomic solver residuals agree");
 }
 
 int main(int argc, char **argv) {
@@ -263,7 +355,11 @@ int main(int argc, char **argv) {
     // 1765 nodes on the 40x8x4 L-shape, 771 of them strictly interior.
     compare_skin(*ctx, 994);
     compare_jacobian(*ctx, false, "box");
+    compare_jacobian(*ctx, false, "box, positive velocity shift", scalar_t(0.017));
+    compare_jacobian(*ctx, false, "box, negative velocity shift", scalar_t(-0.017));
     compare_jacobian(*ctx, true, "L-shape");
+    compare_transient_residual(*ctx, 1);
+    compare_transient_residual(*ctx, 2);
 
     if (g_failures) {
         std::fprintf(stderr, "\ncvfem_packed_vs_atomic_test: %d check(s) failed\n", g_failures);

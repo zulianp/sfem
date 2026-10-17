@@ -1,0 +1,72 @@
+
+libgomp: Affinity not supported on this configuration
+mesh coords checksum: 729 729 729
+pressure pin: DISABLED
+constraints: uvw_nodes=386  uz_nodes=0  p_pin=0  sh_uv=0  sh_phi=0
+case: cavity_reg  geom: affine  refine_level: 2  semi_structured: 1
+channel: L=(2,2,2)  cells=(4,4,4)
+nnodes: 729  nelements: 64  ndof: 2916
+rho: 1  mu: 0.2  U: 1  Re: 10
+initial state checksum: 18.195556640625   p_exact: 0
+constrained dofs: 1158
+pressure gauge: zero mean  (729 of 729 pressure dofs free)
+continuation: 3 stages, Re = 1 4 10
+stage 1/3: rho: 0.1  Re: 1
+newton 0  ||R||: 1.336480e-01  rel: 1.000000e+00
+preconditioner: bjacobi (no multigrid)
+50: residual abs: 3.0053e-06, rel: 2.24867e-05
+linear_check: step=0 stage=1 newton=0 iterations=69 status=converged true_abs=1.2673747371293702e-07 rhs_norm=0.13364800848101435 target=1.3364800848101435e-07 at_limit=0
+  lin_it: 69  |dx|_inf: 1.334359e+00  alpha: 1
+newton 1  ||R||: 1.259405e-03  rel: 9.423300e-03
+50: residual abs: 3.87438e-08, rel: 3.07636e-05
+linear_check: step=0 stage=1 newton=1 iterations=76 status=converged true_abs=1.0385838694399288e-09 rhs_norm=0.001259405272341604 target=1.2594052723416039e-09 at_limit=0
+  lin_it: 76  |dx|_inf: 7.144341e-03  alpha: 1
+newton 2  ||R||: 3.995403e-07  rel: 2.989497e-06
+50: residual abs: 1.34093e-11, rel: 3.35619e-05
+linear_check: step=0 stage=1 newton=2 iterations=78 status=converged true_abs=3.2363510544349186e-13 rhs_norm=3.9954027377962546e-07 target=3.9954027377962545e-13 at_limit=0
+  lin_it: 78  |dx|_inf: 2.993790e-06  alpha: 1
+newton 3  ||R||: 3.226255e-13  rel: 2.413994e-12
+stage 2/3: rho: 0.4  Re: 4
+newton 0  ||R||: 5.130157e-03  rel: 3.838558e-02
+50: residual abs: 2.86052e-08, rel: 5.5759e-06
+linear_check: step=0 stage=2 newton=0 iterations=60 status=converged true_abs=3.6421270992362422e-09 rhs_norm=0.0051301567883582418 target=5.1301567883582417e-09 at_limit=0
+  lin_it: 60  |dx|_inf: 2.864160e-02  alpha: 1
+newton 1  ||R||: 2.194371e-06  rel: 1.641903e-05
+50: residual abs: 2.2189e-11, rel: 1.01118e-05
+linear_check: step=0 stage=2 newton=1 iterations=64 status=converged true_abs=2.0379612246530695e-12 rhs_norm=2.1943705468402298e-06 target=2.1943705468402298e-12 at_limit=0
+  lin_it: 64  |dx|_inf: 9.982503e-06  alpha: 1
+newton 2  ||R||: 2.206044e-12  rel: 1.650637e-11
+stage 3/3: rho: 1  Re: 10
+newton 0  ||R||: 1.011638e-02  rel: 7.569419e-02
+50: residual abs: 1.47574e-07, rel: 1.45876e-05
+linear_check: step=0 stage=3 newton=0 iterations=66 status=converged true_abs=9.0738257062494899e-09 rhs_norm=0.010116378150053928 target=1.0116378150053927e-08 at_limit=0
+  lin_it: 66  |dx|_inf: 5.897464e-02  alpha: 1
+newton 1  ||R||: 1.802117e-05  rel: 1.348406e-04
+50: residual abs: 9.79512e-11, rel: 5.43534e-06
+linear_check: step=0 stage=3 newton=1 iterations=58 status=converged true_abs=1.7247645440899793e-11 rhs_norm=1.8021174006997287e-05 target=1.8021174006997284e-11 at_limit=0
+  lin_it: 58  |dx|_inf: 8.203224e-05  alpha: 1
+newton 2  ||R||: 7.572693e-11  rel: 5.666147e-10
+continuation: highest Re SOLVED = 10 of 10 target  (AT TARGET)
+newton_converged: 1  newton_it: 2 (last stage)  newton_total: 7 over 3 stage(s)  lin_it_total: 471
+linear_check_summary: checked=7 failed=0 nonlinear_abs=7.572693225730419e-11 nonlinear_initial=0.13364800848101435 nonlinear_rtol=1e-08 nonlinear_atol=9.9999999999999998e-13 dofs=2916
+matrix_free: 1  t_operator: 0.0000 s  t_precond: 0.0036 s  t_solve: 0.1630 s  us_per_lin_it: 346.15
+
+phase breakdown (0.121 s in top-level phases; shares are of that)
+  phase                     seconds      calls      us/call   share
+  outer_op                    0.116        484        238.8   95.4%
+  hessian_block_diag          0.003          7        477.2    2.8%
+  newton_residual             0.002         10        221.7    1.8%
+  precond_total               0.002        471          3.4    1.3%  (container: the rows above it
+                                                                      marked op/smooth/transfer/coarse are inside)
+cavity: ux in [-0.122117, 1.000000]   uy in [-0.246034, 0.243256]
+cavity: u_x on the vertical centreline (x=1, z=1)
+   y/Ly 0.0000   ux +0.000000   uy +0.000000
+   y/Ly 0.2500   ux -0.070940   uy +0.000429
+   y/Ly 0.5000   ux -0.122117   uy +0.002612
+   y/Ly 0.7500   ux -0.038563   uy +0.009059
+   y/Ly 1.0000   ux +1.000000   uy +0.000000
+   y/Ly 0.1250   ux -0.041189   uy +0.000090
+   y/Ly 0.3750   ux -0.097875   uy +0.000662
+   y/Ly 0.6250   ux -0.117665   uy +0.004669
+   y/Ly 0.8750   ux +0.232475   uy +0.007908
+cvfem_hex8_ns_ssgmg: 0.173428 seconds

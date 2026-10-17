@@ -1,0 +1,18 @@
+Internal ctest changing into directory: /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/build/cvfem
+Test project /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/build/cvfem
+    Start 11: cvfem_operator_consistency_test
+1/6 Test #11: cvfem_operator_consistency_test ...   Passed    2.62 sec
+    Start 13: cvfem_packed_vs_atomic_test
+2/6 Test #13: cvfem_packed_vs_atomic_test .......   Passed    2.24 sec
+    Start 17: cvfem_bench_transient_test
+3/6 Test #17: cvfem_bench_transient_test ........   Passed    2.20 sec
+    Start 18: cvfem_boundary_jacobian_test
+4/6 Test #18: cvfem_boundary_jacobian_test ......   Passed    0.02 sec
+    Start 24: cvfem_ss_transient_test
+5/6 Test #24: cvfem_ss_transient_test ...........   Passed    2.18 sec
+    Start 25: cvfem_transient_test
+6/6 Test #25: cvfem_transient_test ..............   Passed    2.22 sec
+
+100% tests passed, 0 tests failed out of 6
+
+Total Test time (real) =  11.51 sec

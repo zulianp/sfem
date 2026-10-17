@@ -361,7 +361,9 @@ static SFEM_INLINE void cvfem_hex8_gather_rc_from_pack(pack_idx_t **const SFEM_R
                                                        const scalar_t *const SFEM_RESTRICT pack_pgz,
                                                        const ptrdiff_t                     begin,
                                                        const int                           nlanes,
-                                                       Hex8RhieChowPackT<scalar_t>                   &rc) {
+                                                       Hex8RhieChowPackT<scalar_t>                   &rc,
+                                                       const Hex8RcTauT<scalar_t> &tau = {}) {
+    rc.tau = tau;
     for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
         if (lane < nlanes) {
             const ptrdiff_t e = begin + lane;
@@ -649,7 +651,7 @@ static SFEM_INLINE void cvfem_hex8_action_lanes_affine(
                                               det);
             if (with_rc) {
                 cvfem_hex8_gather_rc_from_pack(pack_elems, pk.pgx, pk.pgy, pk.pgz,
-                                               begin, nlanes, rcp);
+                                               begin, nlanes, rcp, rc_cfg.tau);
                 cvfem_hex8_gather_rc_coeff(rc_coeff, rc_w, rc_cfg, begin, nlanes, rcp);
             }
             if (with_qg)
@@ -684,10 +686,7 @@ static SFEM_INLINE void cvfem_hex8_action_lanes_affine(
 }
 
 
-// ONE PACK'S LANE LOOP FOR THE JACOBIAN ACTION, ISOPARAMETRIC. The Jacobian comes per
-// sub-control surface from the coordinates the pack staged, so this takes no adjugate table and
-// no Rhie-Chow -- the isoparametric SIMD kernel carries no such term, which is why the driver
-// refuses --rhie-chow on this geometry for a pack-based layout.
+// Isoparametric actions use staged coordinates and optional RC gradients.
 template <typename scalar_t, typename idx_t, typename pack_idx_t>
 static SFEM_INLINE void cvfem_hex8_action_lanes_isoparam(
         const Hex8PackExtentT<idx_t>       &x,
@@ -697,11 +696,15 @@ static SFEM_INLINE void cvfem_hex8_action_lanes_isoparam(
         const scalar_t *const SFEM_RESTRICT pack_dir,
         scalar_t *const SFEM_RESTRICT       pack_out,
         const scalar_t                      rho,
-        const scalar_t                      mu) {
+        const scalar_t                      mu,
+        const Hex8PackQGradT<scalar_t> *qg = nullptr,
+        const Hex8RcConfigT<scalar_t> *rc_cfg = nullptr,
+        const bool with_rc = false, const bool with_qg = false) {
     Hex8InputPackT<scalar_t>    u_pack;
     Hex8InputPackT<scalar_t>    du_pack;
     Hex8ResidualPackT<scalar_t> outp;
     Hex8CoordPackT<scalar_t>    xyz;
+    Hex8RhieChowPackT<scalar_t> rcp;
         for (ptrdiff_t begin = x.e_start; begin < x.e_end; begin += cvfem_hex8_vec_size<scalar_t>) {
             const int nlanes = int(MIN((ptrdiff_t)cvfem_hex8_vec_size<scalar_t>, x.e_end - begin));
             gather_hex8_isoparam_action_simd_from_pack(pack_elems,
@@ -715,7 +718,13 @@ static SFEM_INLINE void cvfem_hex8_action_lanes_isoparam(
                                                        u_pack,
                                                        du_pack,
                                                        xyz);
-            cvfem_hex8_ns_upwind_jacobian_action_isoparam_simd(rho, mu, xyz, u_pack, du_pack, outp);
+            if (with_rc) cvfem_hex8_gather_rc_from_pack(pack_elems, pk.pgx, pk.pgy, pk.pgz,
+                begin, nlanes, rcp, rc_cfg->tau);
+            if (with_qg) cvfem_hex8_gather_qg_from_pack(pack_elems, qg->x, qg->y, qg->z,
+                begin, nlanes, rcp);
+            cvfem_hex8_ns_upwind_jacobian_action_isoparam_simd(rho, mu, xyz, u_pack, du_pack,
+                outp, scalar_t(0), with_rc ? &rcp : nullptr,
+                with_rc ? rc_cfg->scale : scalar_t(0), with_qg);
             scatter_hex8_simd_to_pack(pack_elems, pack_out, begin, nlanes, outp);
         }
 }

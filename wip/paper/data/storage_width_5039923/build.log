@@ -1,0 +1,287 @@
+Mon Oct 12 11:21:50 PM UTC 2026
+nid006545
+RESULTS=/capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/results/validation-5039923-vfXOQo
+-- Found MPI: TRUE (found version "4.1") found components: C
+-- Found MPI: TRUE (found version "4.1") found components: C CXX
+-- Found OpenMP_CXX: -fopenmp (found version "4.5")
+-- Found OpenMP: TRUE (found version "4.5") found components: C CXX
+-- Found OpenMP_CXX: -fopenmp (found version "4.5")
+-- Found OpenMP: TRUE (found version "4.5") found components: CXX
+-- cvfem performance flags: -O3;-DNDEBUG;-ffast-math;-fno-finite-math-only;-funroll-loops;-fomit-frame-pointer;-fno-math-errno;-fno-trapping-math;-ffp-contract=fast;-mcpu=native;-mtune=native;-ftree-vectorize
+-- cvfem: generator checks skipped -- /user-environment/env/default/bin/python3 has no sympy
+-- cvfem: temporal-order gate skipped -- /user-environment/env/default/bin/python3 has no numpy
+-- cvfem: MPI guard gate enabled (/usr/bin/srun)
+-- Configuring done (1.7s)
+-- Generating done (5.7s)
+-- Build files have been written to: /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/build/cvfem
+[ 50%] Building CXX object CMakeFiles/cvfem_ns_op.dir/src/frontend/galerkin/cvfem_ss_galerkin.cpp.o
+[ 50%] Building CXX object CMakeFiles/cvfem_ns_op.dir/src/frontend/galerkin/cvfem_ss_vanka.cpp.o
+[ 50%] Building CXX object CMakeFiles/cvfem_ns_op.dir/src/frontend/op/cvfem_hex8_ns_op.cpp.o
+In file included from /user-environment/linux-neoverse_v2/gcc-14.3.0-srqoowoegvjlwawb2ymkolvl7hjesmzk/lib/gcc/aarch64-unknown-linux-gnu/14.3.0/../../../../include/c++/14.3.0/bits/specfun.h:43,
+                 from /user-environment/linux-neoverse_v2/gcc-14.3.0-srqoowoegvjlwawb2ymkolvl7hjesmzk/lib/gcc/aarch64-unknown-linux-gnu/14.3.0/../../../../include/c++/14.3.0/cmath:3906,
+                 from /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/install/include/smesh_buffer.hpp:5,
+                 from /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/install/include/smesh_crs_graph.hpp:5,
+                 from /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/install/include/sfem_ForwardDeclarations.hpp:5,
+                 from /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/install/include/sfem_FunctionSpace.hpp:4,
+                 from /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/sfem/spikes/cvfem/src/frontend/op/cvfem_hex8_ns_op.hpp:23,
+                 from /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/sfem/spikes/cvfem/src/frontend/op/cvfem_hex8_ns_op.cpp:1:
+In function 'typename __gnu_cxx::__enable_if<std::__is_scalar<_Tp>::__value, void>::__type std::__fill_a1(_ForwardIterator, _ForwardIterator, const _Tp&) [with _ForwardIterator = double*; _Tp = double]',
+    inlined from 'void std::__fill_a(_FIte, _FIte, const _Tp&) [with _FIte = double*; _Tp = double]' at /user-environment/linux-neoverse_v2/gcc-14.3.0-srqoowoegvjlwawb2ymkolvl7hjesmzk/lib/gcc/aarch64-unknown-linux-gnu/14.3.0/../../../../include/c++/14.3.0/bits/stl_algobase.h:998:21,
+    inlined from 'void std::fill(_ForwardIterator, _ForwardIterator, const _Tp&) [with _ForwardIterator = double*; _Tp = double]' at /user-environment/linux-neoverse_v2/gcc-14.3.0-srqoowoegvjlwawb2ymkolvl7hjesmzk/lib/gcc/aarch64-unknown-linux-gnu/14.3.0/../../../../include/c++/14.3.0/bits/stl_algobase.h:1029:20,
+    inlined from 'void sscvfem_nodal_grad_scatter_isoparam(idx_t**, int, int, geom_t**, ptrdiff_t, const ptrdiff_t*, const ptrdiff_t*, const idx_t*, const int*, scalar_t*, ptrdiff_t, const scalar_t*, int, scalar_t*, scalar_t*, scalar_t*, cvfem_range, const ptrdiff_t*) [with scalar_t = double; geom_t = float; idx_t = int]' at /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/sfem/spikes/cvfem/src/kernels/semistructured/isoparametric/cvfem_sshex8_ns_isoparam.hpp:250:28:
+/user-environment/linux-neoverse_v2/gcc-14.3.0-srqoowoegvjlwawb2ymkolvl7hjesmzk/lib/gcc/aarch64-unknown-linux-gnu/14.3.0/../../../../include/c++/14.3.0/bits/stl_algobase.h:952:18: warning: 'void* __builtin_memset(void*, int, long unsigned int)' specified bound between 18446744022169944064 and 18446744073709551592 exceeds maximum object size 9223372036854775807 [-Wstringop-overflow=]
+  952 |         *__first = __tmp;
+      |         ~~~~~~~~~^~~~~~~
+[ 66%] Linking CXX static library libcvfem_ns_op.a
+[ 66%] Built target cvfem_ns_op
+[ 83%] Building CXX object CMakeFiles/cvfem_hex8_ns_ssgmg.dir/src/drivers/cvfem_hex8_ns_ssgmg.cpp.o
+[100%] Linking CXX executable cvfem_hex8_ns_ssgmg
+[100%] Built target cvfem_hex8_ns_ssgmg
+[ 50%] Building CXX object CMakeFiles/cvfem_storage_width_probe.dir/src/drivers/cvfem_storage_width_probe.cpp.o
+[100%] Linking CXX executable cvfem_storage_width_probe
+[100%] Built target cvfem_storage_width_probe
+[ 66%] Built target cvfem_ns_op
+[ 83%] Building CXX object CMakeFiles/cvfem_operator_consistency_test.dir/src/tests/consistency/cvfem_operator_consistency_test.cpp.o
+In file included from /user-environment/linux-neoverse_v2/gcc-14.3.0-srqoowoegvjlwawb2ymkolvl7hjesmzk/lib/gcc/aarch64-unknown-linux-gnu/14.3.0/../../../../include/c++/14.3.0/bits/specfun.h:43,
+                 from /user-environment/linux-neoverse_v2/gcc-14.3.0-srqoowoegvjlwawb2ymkolvl7hjesmzk/lib/gcc/aarch64-unknown-linux-gnu/14.3.0/../../../../include/c++/14.3.0/cmath:3906,
+                 from /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/install/include/smesh_buffer.hpp:5,
+                 from /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/install/include/smesh_crs_graph.hpp:5,
+                 from /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/install/include/sfem_ForwardDeclarations.hpp:5,
+                 from /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/install/include/sfem_FunctionSpace.hpp:4,
+                 from /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/sfem/spikes/cvfem/src/frontend/op/cvfem_hex8_ns_op.hpp:23,
+                 from /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/sfem/spikes/cvfem/src/tests/consistency/cvfem_operator_consistency_test.cpp:72:
+In function 'typename __gnu_cxx::__enable_if<std::__is_scalar<_Tp>::__value, void>::__type std::__fill_a1(_ForwardIterator, _ForwardIterator, const _Tp&) [with _ForwardIterator = double*; _Tp = double]',
+    inlined from 'void std::__fill_a(_FIte, _FIte, const _Tp&) [with _FIte = double*; _Tp = double]' at /user-environment/linux-neoverse_v2/gcc-14.3.0-srqoowoegvjlwawb2ymkolvl7hjesmzk/lib/gcc/aarch64-unknown-linux-gnu/14.3.0/../../../../include/c++/14.3.0/bits/stl_algobase.h:998:21,
+    inlined from 'void std::fill(_ForwardIterator, _ForwardIterator, const _Tp&) [with _ForwardIterator = double*; _Tp = double]' at /user-environment/linux-neoverse_v2/gcc-14.3.0-srqoowoegvjlwawb2ymkolvl7hjesmzk/lib/gcc/aarch64-unknown-linux-gnu/14.3.0/../../../../include/c++/14.3.0/bits/stl_algobase.h:1029:20,
+    inlined from 'void sscvfem_nodal_grad_scatter_isoparam(idx_t**, int, int, geom_t**, ptrdiff_t, const ptrdiff_t*, const ptrdiff_t*, const idx_t*, const int*, scalar_t*, ptrdiff_t, const scalar_t*, int, scalar_t*, scalar_t*, scalar_t*, cvfem_range, const ptrdiff_t*) [with scalar_t = double; geom_t = float; idx_t = int]' at /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/sfem/spikes/cvfem/src/kernels/semistructured/isoparametric/cvfem_sshex8_ns_isoparam.hpp:250:28:
+/user-environment/linux-neoverse_v2/gcc-14.3.0-srqoowoegvjlwawb2ymkolvl7hjesmzk/lib/gcc/aarch64-unknown-linux-gnu/14.3.0/../../../../include/c++/14.3.0/bits/stl_algobase.h:952:18: warning: 'void* __builtin_memset(void*, int, long unsigned int)' specified bound between 18446744022169944064 and 18446744073709551592 exceeds maximum object size 9223372036854775807 [-Wstringop-overflow=]
+  952 |         *__first = __tmp;
+      |         ~~~~~~~~~^~~~~~~
+[100%] Linking CXX executable cvfem_operator_consistency_test
+[100%] Built target cvfem_operator_consistency_test
+[ 50%] Building CXX object CMakeFiles/cvfem_packed_vs_atomic_test.dir/src/tests/consistency/cvfem_packed_vs_atomic_test.cpp.o
+[100%] Linking CXX executable cvfem_packed_vs_atomic_test
+[100%] Built target cvfem_packed_vs_atomic_test
+[ 50%] Building CXX object CMakeFiles/cvfem_bench_transient_test.dir/src/tests/unit/cvfem_bench_transient_test.cpp.o
+[100%] Linking CXX executable cvfem_bench_transient_test
+[100%] Built target cvfem_bench_transient_test
+[ 50%] Building CXX object CMakeFiles/cvfem_boundary_jacobian_test.dir/src/tests/unit/cvfem_boundary_jacobian_test.cpp.o
+[100%] Linking CXX executable cvfem_boundary_jacobian_test
+[100%] Built target cvfem_boundary_jacobian_test
+[ 50%] Building CXX object CMakeFiles/cvfem_ss_transient_test.dir/src/tests/unit/cvfem_ss_transient_test.cpp.o
+[100%] Linking CXX executable cvfem_ss_transient_test
+[100%] Built target cvfem_ss_transient_test
+[ 50%] Building CXX object CMakeFiles/cvfem_transient_test.dir/src/tests/unit/cvfem_transient_test.cpp.o
+[100%] Linking CXX executable cvfem_transient_test
+[100%] Built target cvfem_transient_test
+Internal ctest changing into directory: /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/build/cvfem
+Test project /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/build/cvfem
+    Start 11: cvfem_operator_consistency_test
+1/6 Test #11: cvfem_operator_consistency_test ...   Passed    2.62 sec
+    Start 13: cvfem_packed_vs_atomic_test
+2/6 Test #13: cvfem_packed_vs_atomic_test .......   Passed    2.24 sec
+    Start 17: cvfem_bench_transient_test
+3/6 Test #17: cvfem_bench_transient_test ........   Passed    2.20 sec
+    Start 18: cvfem_boundary_jacobian_test
+4/6 Test #18: cvfem_boundary_jacobian_test ......   Passed    0.02 sec
+    Start 24: cvfem_ss_transient_test
+5/6 Test #24: cvfem_ss_transient_test ...........   Passed    2.18 sec
+    Start 25: cvfem_transient_test
+6/6 Test #25: cvfem_transient_test ..............   Passed    2.22 sec
+
+100% tests passed, 0 tests failed out of 6
+
+Total Test time (real) =  11.51 sec
+Internal ctest changing into directory: /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/build/cvfem
+Test project /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/build/cvfem
+    Start 11: cvfem_operator_consistency_test
+1/6 Test #11: cvfem_operator_consistency_test ...   Passed    2.29 sec
+    Start 13: cvfem_packed_vs_atomic_test
+2/6 Test #13: cvfem_packed_vs_atomic_test .......   Passed    2.22 sec
+    Start 17: cvfem_bench_transient_test
+3/6 Test #17: cvfem_bench_transient_test ........   Passed    2.24 sec
+    Start 18: cvfem_boundary_jacobian_test
+4/6 Test #18: cvfem_boundary_jacobian_test ......   Passed    0.02 sec
+    Start 24: cvfem_ss_transient_test
+5/6 Test #24: cvfem_ss_transient_test ...........   Passed    2.19 sec
+    Start 25: cvfem_transient_test
+6/6 Test #25: cvfem_transient_test ..............   Passed    2.22 sec
+
+100% tests passed, 0 tests failed out of 6
+
+Total Test time (real) =  11.19 sec
+Mon Oct 12 11:26:58 PM UTC 2026
+nid006545
+[ 66%] Built target cvfem_ns_op
+[100%] Built target cvfem_hex8_ns_ssgmg
+solver table parser: convergence, residual, cap, nonfinite and missing evidence checks PASS
+CPU solver residual gate: unchanged counts, both preconditioners, capped and nonfinite controls PASS
+Logs retained at /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/results/validation-5039923-vfXOQo/solver/gate
+n4-re1-warp0-bjacobi: converged Newton=3 linear=97
+n4-re1-warp0-vanka: converged Newton=3 linear=66
+n4-re1-warp0.025-vanka: converged Newton=3 linear=68
+n4-re1-warp0.025-bjacobi: converged Newton=3 linear=106
+n4-re10-warp0-bjacobi: converged Newton=9 linear=323
+n4-re10-warp0-vanka: converged Newton=9 linear=208
+n4-re10-warp0.025-vanka: converged Newton=9 linear=209
+n4-re10-warp0.025-bjacobi: converged Newton=9 linear=335
+n8-re1-warp0-bjacobi: converged Newton=3 linear=223
+n8-re1-warp0-vanka: converged Newton=3 linear=145
+n8-re1-warp0.025-vanka: converged Newton=3 linear=149
+n8-re1-warp0.025-bjacobi: converged Newton=3 linear=252
+n8-re10-warp0-bjacobi: converged Newton=7 linear=471
+n8-re10-warp0-vanka: converged Newton=7 linear=298
+n8-re10-warp0.025-vanka: converged Newton=7 linear=304
+n8-re10-warp0.025-bjacobi: converged Newton=7 linear=509
+n12-re1-warp0-bjacobi: converged Newton=3 linear=429
+n12-re1-warp0-vanka: converged Newton=3 linear=298
+n12-re1-warp0.025-vanka: converged Newton=3 linear=297
+n12-re1-warp0.025-bjacobi: converged Newton=3 linear=468
+n12-re10-warp0-bjacobi: converged Newton=7 linear=832
+n12-re10-warp0-vanka: converged Newton=7 linear=549
+n12-re10-warp0.025-vanka: converged Newton=7 linear=554
+n12-re10-warp0.025-bjacobi: converged Newton=7 linear=893
+--------------------
+| PackedMesh |
+n_packs: 22
+elements_per_pack: 16
+Memory PackedMesh: 15.2326 KB
+Original:      9.11628 KB
+--------------------
+validation,cube,graph_bit_equal=1,geometry_max_relative=4.4703492463323526e-08
+--------------------
+| PackedMesh |
+n_packs: 22
+elements_per_pack: 16
+Memory PackedMesh: 15.2326 KB
+Original:      9.11628 KB
+--------------------
+validation,sheared_affine_at_coordinate_precision,graph_bit_equal=1,geometry_max_relative=5.9260075835376487e-08
+--------------------
+| PackedMesh |
+n_packs: 22
+elements_per_pack: 16
+Memory PackedMesh: 15.2326 KB
+Original:      9.11628 KB
+--------------------
+validation,cube,graph_bit_equal=1,geometry_max_relative=4.4703492463323526e-08
+--------------------
+| PackedMesh |
+n_packs: 22
+elements_per_pack: 16
+Memory PackedMesh: 15.2326 KB
+Original:      9.11628 KB
+--------------------
+validation,sheared_affine_at_coordinate_precision,graph_bit_equal=1,geometry_max_relative=5.9260075835376487e-08
+--------------------
+| PackedMesh |
+n_packs: 2048
+elements_per_pack: 1024
+Memory PackedMesh: 40214.8 KB
+Original:      55738.3 KB
+--------------------
+validation,timed_cube,graph_bit_equal=1,geometry_max_relative=0
+scope,graph_reduction_and_escaped_geometry_gather_only,no_operator_speedup,no_total_footprint_saving
+metadata,n=128,pack=1024,threads=1,elements=2097152,ghost_entries=673407,rows=561177,ordering=SFC
+allocations,retained_graph64=9876680,additional_graph32=4938340,retained_geometry64=167772160,additional_geometry32=83886080
+timing_contract,serial_output_clearing_excluded_from_both_graph_arms,geometry_float_to_double_included,warmup=3,repeat=5,repeated_warm_cache_probe
+sample,phase,first,wide_seconds,narrow_seconds,wide_over_narrow
+0,graph,wide,0.0040519186000000009,0.0037163580000000003,1.0902928619901529
+0,geometry,wide,0.0072979485999999996,0.0046477850000000006,1.5701992669626497
+1,graph,narrow,0.0038111326000000003,0.0040791752000000001,0.93429000058639311
+1,geometry,narrow,0.0074161276000000017,0.0043679854000000006,1.69783708526132
+2,graph,wide,0.0041513010000000005,0.0038375828000000002,1.0817489071506159
+2,geometry,wide,0.0078888552000000011,0.0052864146000000008,1.4922884028051828
+3,graph,narrow,0.0038600076000000006,0.0041175360000000006,0.93745570166235337
+3,geometry,narrow,0.0071835841999999999,0.0045178242000000002,1.5900539467649051
+4,graph,wide,0.0041095168,0.0037822182000000005,1.0865361496065984
+4,geometry,wide,0.007211525600000001,0.0044193378,1.6318113541807102
+5,graph,narrow,0.0038181084000000007,0.0040750666000000007,0.93694380356875639
+5,geometry,narrow,0.0075621262000000015,0.0045013894000000007,1.6799537938219697
+6,graph,wide,0.0041356728000000002,0.0038542418000000003,1.0730185117083209
+6,geometry,wide,0.0071479886000000012,0.0043895084000000004,1.6284257708676444
+7,graph,narrow,0.0038839306000000005,0.0040903748000000002,0.94952927052063796
+7,geometry,narrow,0.0071779650000000006,0.0044687442000000011,1.6062599868661085
+8,graph,wide,0.0041959780000000004,0.0038503118000000006,1.0897761578685652
+8,geometry,wide,0.0071751814000000002,0.0049114630000000013,1.4609051111654507
+9,graph,narrow,0.0039746538000000001,0.0041404726000000003,0.95995172145324659
+9,geometry,narrow,0.007223704600000002,0.0049171142000000011,1.4690943317932295
+10,graph,wide,0.0041490101999999999,0.003888154,1.0670899866620509
+10,geometry,wide,0.0070212274000000007,0.0044997706000000004,1.5603522988483014
+11,graph,narrow,0.0039642414000000004,0.0041184702000000009,0.96255192037082105
+11,geometry,narrow,0.0073280664000000013,0.0058468322000000007,1.2533396118328828
+validation,after_timing,graph_bit_equal=1,geometry_max_relative=0
+probe_complete,1
+--------------------
+| PackedMesh |
+n_packs: 22
+elements_per_pack: 16
+Memory PackedMesh: 15.2326 KB
+Original:      9.11628 KB
+--------------------
+validation,cube,graph_bit_equal=1,geometry_max_relative=4.4703492463323526e-08
+--------------------
+| PackedMesh |
+n_packs: 22
+elements_per_pack: 16
+Memory PackedMesh: 15.2326 KB
+Original:      9.11628 KB
+--------------------
+validation,sheared_affine_at_coordinate_precision,graph_bit_equal=1,geometry_max_relative=5.9260075835376487e-08
+--------------------
+| PackedMesh |
+n_packs: 22
+elements_per_pack: 16
+Memory PackedMesh: 15.2326 KB
+Original:      9.11628 KB
+--------------------
+validation,cube,graph_bit_equal=1,geometry_max_relative=4.4703492463323526e-08
+--------------------
+| PackedMesh |
+n_packs: 22
+elements_per_pack: 16
+Memory PackedMesh: 15.2326 KB
+Original:      9.11628 KB
+--------------------
+validation,sheared_affine_at_coordinate_precision,graph_bit_equal=1,geometry_max_relative=5.9260075835376487e-08
+--------------------
+| PackedMesh |
+n_packs: 2048
+elements_per_pack: 1024
+Memory PackedMesh: 40214.8 KB
+Original:      55738.3 KB
+--------------------
+validation,timed_cube,graph_bit_equal=1,geometry_max_relative=0
+scope,graph_reduction_and_escaped_geometry_gather_only,no_operator_speedup,no_total_footprint_saving
+metadata,n=128,pack=1024,threads=72,elements=2097152,ghost_entries=673407,rows=561177,ordering=SFC
+allocations,retained_graph64=9876680,additional_graph32=4938340,retained_geometry64=167772160,additional_geometry32=83886080
+timing_contract,serial_output_clearing_excluded_from_both_graph_arms,geometry_float_to_double_included,warmup=3,repeat=5,repeated_warm_cache_probe
+sample,phase,first,wide_seconds,narrow_seconds,wide_over_narrow
+0,graph,wide,0.00012936560000000001,0.00010795800000000001,1.1982956334870967
+0,geometry,wide,0.00039845160000000007,0.00020981100000000004,1.8990977594120422
+1,graph,narrow,0.00011668780000000002,0.00012920560000000004,0.90311720235036241
+1,geometry,narrow,0.0003707982,0.00019236520000000002,1.9275742182057876
+2,graph,wide,0.00013230920000000004,0.00011533100000000001,1.1472128048833361
+2,geometry,wide,0.00037533560000000007,0.00019601300000000001,1.9148505456270759
+3,graph,narrow,0.00012178820000000001,0.00013102320000000001,0.92951629940346436
+3,geometry,narrow,0.00034425160000000005,0.00018745020000000004,1.8364963067524067
+4,graph,wide,0.00013397960000000001,0.00012137860000000002,1.1038156643757631
+4,geometry,wide,0.00035017800000000003,0.00020689260000000001,1.6925593278831625
+5,graph,narrow,0.00011618180000000003,0.00014405980000000001,0.80648314102893393
+5,geometry,narrow,0.00035732640000000001,0.00019074620000000003,1.8733080921140235
+6,graph,wide,0.00013393540000000001,0.00011802500000000001,1.1348053378521499
+6,geometry,wide,0.00034868660000000006,0.00019786280000000001,1.762264559078311
+7,graph,narrow,0.00013133040000000001,0.00014734280000000002,0.8913255347393968
+7,geometry,narrow,0.00037219940000000006,0.00017128440000000001,2.172990651804835
+8,graph,wide,0.00013746760000000002,0.00011902980000000003,1.1549007055376048
+8,geometry,wide,0.00034803420000000006,0.00024300020000000001,1.4322383273758625
+9,graph,narrow,0.00044543880000000004,0.0001415508,3.1468476334997755
+9,geometry,narrow,0.00034570420000000008,0.00017393400000000002,1.9875596490622882
+10,graph,wide,0.00014325320000000002,0.00012238980000000001,1.170466819947414
+10,geometry,wide,0.00035244320000000004,0.00019240999999999998,1.831730159555117
+11,graph,narrow,0.0001348372,0.00014548700000000003,0.9267989579825
+11,geometry,narrow,0.00036241400000000008,0.00020974100000000002,1.7279120439017648
+validation,after_timing,graph_bit_equal=1,geometry_max_relative=0
+probe_complete,1
+storage_width_check: PASSED; logs=/capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/results/validation-5039923-vfXOQo/storage-width
+PUBLIC NUMERICAL GATES PASSED; STORAGE PHASE MEASUREMENTS COLLECTED: /capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/results/validation-5039923-vfXOQo

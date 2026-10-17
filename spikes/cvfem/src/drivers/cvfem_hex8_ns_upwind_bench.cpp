@@ -29,6 +29,10 @@ static void pack_residual(const MeshData &d, std::vector<scalar_t> &r) {
     }
 }
 
+#include "tests/verification/cvfem_coupled_jacobian_fd.hpp"
+#include "tests/verification/cvfem_scatter_study.hpp"
+#include "tests/verification/cvfem_roofline_window.hpp"
+
 static void bsr4_spmv(const BSR4 &b, const ptrdiff_t nnodes, const scalar_t *const x, scalar_t *const y) {
     std::fill(y, y + nnodes * 4, scalar_t(0));
 
@@ -81,32 +85,18 @@ static void bench_nodal_grad(MeshData &d, PackedData &p, const GeomKind geom_kin
 // same shape of vacuous gate this driver has already shipped once, when a packed sweep with no
 // pack built compared two zeros.
 //
-// Central difference, so the error is O(eps^2) and the comparison is not dominated by the
+// On a smooth branch, central differencing has O(eps^2) truncation error rather than the
 // truncation of a one-sided one. Returns max|fd - jv| / max|fd|, and prints the lagged action
 // against the same reference beside it, because the number that matters to a solver is not
 // whether the exact action is right but how wrong the lagged one is.
 static scalar_t verify_ho_action_fd(MeshData &d, PackedData &p, const scalar_t rho, const scalar_t mu,
                                     const int limiter, const GeomKind geom_kind, scalar_t &lagged_rel,
-                                    // The fraction of degrees of freedom where the two disagree by
-                                    // more than the tolerance. A max norm cannot verify a
-                                    // piecewise-differentiable operator: the limiters switch branch
-                                    // somewhere inside the +/- eps step for a handful of surfaces,
-                                    // and at such a surface the difference quotient is not a
-                                    // derivative of anything. What must hold is that those surfaces
-                                    // are a vanishing fraction and that everywhere else the
-                                    // agreement is the unlimited arm's.
+                                    // Disagreement fractions are diagnostics, not acceptance criteria.
                                     scalar_t &frac_bad, scalar_t &lagged_frac_bad) {
     const ptrdiff_t n   = d.nnodes;
     const int       iso = geom_kind == GeomKind::Isoparam ? 1 : 0;
-    // THE STATE IS PERTURBED FIRST, and this is not cosmetic. On a uniform hex mesh with a
-    // smooth field the reconstruction lands EXACTLY on a limiter bound for a structural sixth of
-    // the sub-control surfaces -- measured, 1024 of 6144 at n=8 -- and at such a surface the
-    // limiter has a kink at the evaluation point. A central difference across a kink returns the
-    // average of the two one-sided derivatives, which equals neither, so the reference is invalid
-    // there however right the derivative is. Each node touches many surfaces, so a sixth of the
-    // surfaces contaminates three quarters of the nodes, which is exactly the disagreement this
-    // check reported before the ties were broken. A small deterministic perturbation moves the
-    // state off the degenerate set; it changes nothing about the operator being verified.
+    // Break structural ties, but still require agreement on every component: a finite
+    // difference can cross a switch even after this perturbation.
     for (ptrdiff_t i = 0; i < n; ++i) {
         const uint32_t h = (uint32_t)i * 2246822519u + 374761393u;
         d.ux[i] += scalar_t(1e-3) * (scalar_t((h >> 5) & 0xffffu) / scalar_t(65535) - scalar_t(0.5));
@@ -148,6 +138,10 @@ static scalar_t verify_ho_action_fd(MeshData &d, PackedData &p, const scalar_t r
     // branch-crossing artefact shrinks with the step, and that is what tells them apart.
     const char *eps_env = std::getenv("CVFEM_FD_EPS");
     const scalar_t eps = eps_env ? (scalar_t)std::atof(eps_env) : scalar_t(1e-6);
+    if (!(eps > scalar_t(0)) || !std::isfinite(eps)) {
+        std::fprintf(stderr, "FAIL: CVFEM_FD_EPS must be finite and positive\n");
+        return std::numeric_limits<scalar_t>::infinity();
+    }
     residual_at(scalar_t(+1), rp, eps);
     residual_at(scalar_t(-1), rm, eps);
     d.ux = ux0; d.uy = uy0; d.uz = uz0;
@@ -170,6 +164,10 @@ static scalar_t verify_ho_action_fd(MeshData &d, PackedData &p, const scalar_t r
 
     scalar_t den = 0, num = 0, numl = 0;
     for (size_t i = 0; i < fd.size(); ++i) {
+        if (!std::isfinite(fd[i]) || !std::isfinite(jv[i]) || !std::isfinite(jl[i])) {
+            std::fprintf(stderr, "FAIL: nonfinite value in higher-order derivative check\n");
+            return std::numeric_limits<scalar_t>::infinity();
+        }
         den  = std::max(den, std::fabs(fd[i]));
         num  = std::max(num, std::fabs(fd[i] - jv[i]));
         numl = std::max(numl, std::fabs(fd[i] - jl[i]));
@@ -347,6 +345,7 @@ struct CsvRow {
     // matvec that caps the problem size per node is the trade full assembly already loses,
     // so the price belongs beside the rate.
     double      pa_bytes_per_dof;
+    const char *state_gradients;
     const double *phase;  // PH_N entries, thread-summed ms per call, or nullptr
 };
 
@@ -365,7 +364,7 @@ static void csv_write(const std::string &path, const CsvRow &r) {
             "n_colors,packs_per_color_min,packs_per_color_max,checksum,"
             "rhie_chow,rhie_chow_scale,boundary,"
             "ran_kernel,ran_rc,ran_boundary,exact_rc,pgrad_per_apply,live_vectors,"
-            "upwind_eps,transient,s_qgrad,frac_qgrad,pa_bytes_per_dof";
+            "upwind_eps,transient,s_qgrad,frac_qgrad,pa_bytes_per_dof,jac_state_gradients";
     for (int i = 0; i < PH_N; ++i) header += std::string(",ms_") + g_phase_name[i];
 
     bool need_header = true;
@@ -415,7 +414,7 @@ static void csv_write(const std::string &path, const CsvRow &r) {
         std::fprintf(f, ",%.9e,%.6f", r.qgrad_seconds, r.qgrad_frac);
     else
         std::fprintf(f, ",,");
-    std::fprintf(f, ",%.3f", r.pa_bytes_per_dof);
+    std::fprintf(f, ",%.3f,%s", r.pa_bytes_per_dof, r.state_gradients);
     for (int i = 0; i < PH_N; ++i) {
         if (r.phase)
             std::fprintf(f, ",%.6f", 1000.0 * r.phase[i] / double(r.repeat));
@@ -519,6 +518,7 @@ int main(int argc, char **argv) {
     // holds and what this driver computed before the exact form existed.
     int         lagged_ho    = 0;
     int         verify_ho_jac = 0;
+    int         verify_coupled_jac = 0;
     // The nodal gradient reconstruction as an operation in its own right, at nf fields: 1 is the
     // pressure gradient every Rhie-Chow residual builds, 3 the velocity gradient the exact
     // higher-order Jacobian action rebuilds on every matvec. It has only ever been timed from
@@ -532,10 +532,15 @@ int main(int argc, char **argv) {
     // rather than a column of the timing CSV: it needs the packed mesh built and nothing else
     // run, and the numbers it prints are sizes, not rates.
     int         mesh_footprint = 0;
+    std::string roofline_window;
+    std::vector<int> perf_fds;
+    int         scatter_study = 0;
+    int         scatter_samples = 12;
     // Whether the nodal pressure gradient is rebuilt inside every apply or hoisted out of
     // the timed loop. This is the difference SFEM_PGRAD_CACHE makes in the solver, and it
     // is the other half of the cascade: the gradient is a full element sweep.
     int         pgrad_per_apply = 0;
+    int         rebuild_state_gradients = 0;
     int         live_vectors    = 0;
     // Steady by default -- dt <= 0 means no transient term, which is what every recorded
     // baseline was measured with.
@@ -596,6 +601,22 @@ int main(int argc, char **argv) {
             g_breakdown = 1;
         else if (arg == "--mesh-footprint")
             mesh_footprint = 1;
+        else if (arg == "--roofline-window" && i + 1 < argc)
+            roofline_window = argv[++i];
+        else if (arg == "--perf-fds" && i + 4 < argc) {
+            try {
+                if (!perf_fds.empty()) throw std::runtime_error("duplicate --perf-fds");
+                for (int j = 0; j < 4; ++j) perf_fds.push_back(CounterPhase::descriptor(argv[++i]));
+            } catch (const std::exception &e) {
+                std::fprintf(stderr, "%s\n", e.what());
+                if (own_mpi) MPI_Finalize();
+                return 2;
+            }
+        }
+        else if (arg == "--scatter-study")
+            scatter_study = 1;
+        else if (arg == "--scatter-samples" && i + 1 < argc)
+            scatter_samples = std::atoi(argv[++i]);
         else if (arg == "--kernel-only")
             g_kernel_only = 1;
         else if (arg == "--dense-flush")
@@ -611,6 +632,9 @@ int main(int argc, char **argv) {
                 std::fprintf(stderr, "--nodal-grad takes 1 (pressure) or 3 (velocity)\n");
                 return 2;
             }
+        } else if (arg == "--verify-jac-coupled") {
+            verify_coupled_jac = 1;
+            jac_action = 1;
         } else if (arg == "--verify-jac-ho") {
             verify_ho_jac = 1;
         } else if (arg == "--venkat-k") {
@@ -628,6 +652,8 @@ int main(int argc, char **argv) {
             boundary = 1;
         else if (arg == "--pgrad-per-apply")
             pgrad_per_apply = 1;
+        else if (arg == "--rebuild-state-gradients")
+            rebuild_state_gradients = 1;
         else if (arg == "--qgrad-atomic")
             g_qgrad_atomic = 1;
         else if (arg == "--qgrad-packed")
@@ -687,8 +713,14 @@ int main(int argc, char **argv) {
                     "  --mesh-footprint  print the bytes each representation of the mesh occupies,\n"
                     "                 array by array, and exit. Every figure is the allocation's\n"
                     "                 own nbytes(), so nothing here is a hand computation.\n"
-                    "  --kernel-only  element kernel writes to a dense stack buffer (no scatter);\n"
-                    "                 measures the arithmetic floor of the element kernel\n"
+                    "  --roofline-window normal|sweep|sweep-empty|session  checked RC residual/action measurement\n"
+                    "  --perf-fds C1 A1 C2 A2  two perf control/acknowledgement channels\n"
+                    "  --scatter-study  paired residual accumulation timings and element-output checks\n"
+                    "                   affine packed/atomic, FP64, steady interior only\n"
+                    "  --scatter-samples N  multiple of 6, default 12; --repeat applies to each sample\n"
+                    "  --kernel-only  dense-element assembly diagnostic: --assemble with packed\n"
+                    "                 (affine/isoparam) or store (affine only). It does not\n"
+                    "                 measure the residual's scatter cost or produce its operator.\n"
                     "  --dense-flush  sumfact only: stage ke densely, then flush 64 contiguous\n"
                     "                 blocks (measured slower than direct scatter on Apple M1)\n"
                     "  --csv FILE     append one machine-readable row per run (header written if\n"
@@ -749,6 +781,8 @@ int main(int argc, char **argv) {
                     "                   like-for-like partner for --bsr-apply once --conv-ho is\n"
                     "                   on, and it is what this driver computed before the exact\n"
                     "                   form existed. Had no help entry at all until now.\n"
+                    "  --verify-jac-coupled  standalone FP64 full (u,p) derivative check; requires\n"
+                    "                 packed affine geometry, RC and double gradients; boundary/BDF supported.\n"
                     "  --rhie-chow [S]  include the Rhie-Chow pressure-velocity coupling at scale\n"
                     "                 S (default 1), and the nodal pressure gradient it needs.\n"
                     "                 sumfact only -- the hand-written and generated kernels carry\n"
@@ -765,6 +799,10 @@ int main(int argc, char **argv) {
                     "                 instead of over packs. Same operator; the packed one has no\n"
                     "                 atomics and is deterministic. Here to measure the difference,\n"
                     "                 not as a mode to run in.\n"
+                    "  --rebuild-state-gradients  rebuild fixed-state gradients inside each\n"
+                    "                 Jacobian action, reproducing the original timing scope.\n"
+                    "                 By default they are cached; direction gradients are always\n"
+                    "                 rebuilt. Requires an action with an exact RC or HO term.\n"
                     "  --transient DT   make the operator unsteady with timestep DT: the BDF mass\n"
                     "                 term rho V a0 / dt on the velocity diagonal, applied as a\n"
                     "                 per-node post-pass because in a control-volume scheme the mass\n"
@@ -782,13 +820,8 @@ int main(int argc, char **argv) {
                     "                     every time. BiCGStab holds about 7, which is what makes N=7\n"
                     "                     the interesting value. Only the apply is timed -- the churn\n"
                     "                     runs between applies, outside the clock.\n"
-                    "  --pgrad-per-apply  rebuild the nodal pressure gradient inside every apply\n"
-                    "                     (--jac-action always rebuilds the DIRECTION's gradient,\n"
-                    "                      which cannot be hoisted, and reports it separately)\n"
-                    "                 instead of hoisting it out of the timed loop. The gradient is\n"
-                    "                 a full element sweep, about 39%% of an apply, and hoisting it\n"
-                    "                 across a Krylov solve is worth 1.26x off the whole linear\n"
-                    "                 solve -- so which of the two is measured has to be said.\n"
+                    "  --pgrad-per-apply  rebuild the state pressure gradient inside each residual\n"
+                    "                 evaluation. For Jacobian actions use --rebuild-state-gradients.\n"
                     "                 Requires --rhie-chow.\n"
                     "  --boundary     close the boundary control volumes with the boundary\n"
                     "                 sub-control-surface terms. Off by default; the benchmark\n"
@@ -820,12 +853,25 @@ int main(int argc, char **argv) {
     // correct float operator produces. What holds the f32 build is the cross-precision gate:
     // both builds --dump the same operator, and the f32 output is compared with the f64 one and
     // the f32 layouts with each other, at bounds stated for single precision.
-    if (sizeof(scalar_t) != sizeof(double) && (verify || verify_jac || verify_ho || verify_ho_jac)) {
+    if (sizeof(scalar_t) != sizeof(double) && (verify || verify_jac || verify_ho || verify_ho_jac || verify_coupled_jac)) {
         std::fprintf(stderr,
                      "the --verify oracles are double-precision checks; this build computes in %zu-byte "
                      "scalars. Use src/tests/verification/cvfem_bench_f32.sh, which holds this build "
                      "to the double one through --dump.\n",
                      sizeof(scalar_t));
+        return 2;
+    }
+
+    if (verify_coupled_jac && (layout != "packed" || geom != "affine" || !rhie_chow ||
+        dt < scalar_t(0) || !std::isfinite(dt) ||
+        (dt > scalar_t(0) && bdf_order != 1 && bdf_order != 2) ||
+        grad_single || lagged_rc || lagged_ho ||
+        partial_assembly || assemble || bsr_apply || nodal_grad || verify || verify_jac ||
+        verify_ho || verify_ho_jac || !(rho > scalar_t(0)) || !(mu > scalar_t(0)) ||
+        !(rc_scale > scalar_t(0)) || !std::isfinite(rho) || !std::isfinite(mu) || !std::isfinite(rc_scale))) {
+        std::fprintf(stderr, "--verify-jac-coupled requires a standalone packed affine RC action "
+                             "with positive finite rho, mu and RC scale and double gradients\n");
+        if (own_mpi) MPI_Finalize();
         return 2;
     }
 
@@ -884,6 +930,18 @@ int main(int argc, char **argv) {
         std::fprintf(stderr, "--pgrad-per-apply is meaningless without --rhie-chow\n");
         if (own_mpi) MPI_Finalize();
         return 1;
+    }
+    if (pgrad_per_apply && jac_action) {
+        std::fprintf(stderr, "use --rebuild-state-gradients for Jacobian actions, not --pgrad-per-apply\n");
+        if (own_mpi) MPI_Finalize();
+        return 2;
+    }
+    if (rebuild_state_gradients &&
+        (!jac_action || assemble || assemble_diag || bsr_apply || nodal_grad ||
+         (!(rhie_chow && !lagged_rc) && !(conv_ho && !lagged_ho)))) {
+        std::fprintf(stderr, "--rebuild-state-gradients requires --jac-action with an exact RC or HO term\n");
+        if (own_mpi) MPI_Finalize();
+        return 2;
     }
     // THE ONE MIXED FORM THAT IS THE JACOBIAN OF NO RESIDUAL.
     //
@@ -947,6 +1005,57 @@ int main(int argc, char **argv) {
     // operation there is nothing left to misname -- the row records what the layout, the
     // geometry and the term set select, which is the only thing that was ever true.
     const bool residual_op = !(assemble || assemble_diag || jac_action || bsr_apply || nodal_grad);
+
+    if (!roofline_window.empty() || !perf_fds.empty()) {
+        const bool normal = roofline_window == "normal";
+        const bool counted = roofline_window == "sweep" || roofline_window == "sweep-empty";
+        const bool session = roofline_window == "session";
+        if ((!normal && !counted && !session) || (normal ? !perf_fds.empty() : perf_fds.size() != 4) ||
+            (session && warmup != 30) ||
+            !(residual_op || jac_action || bsr_apply) || geom != "affine" || sizeof(scalar_t) != sizeof(double) ||
+            !(layout == "packed" || layout == "atomic") || !rhie_chow || rc_scale != scalar_t(1) ||
+            (conv_ho && conv_limiter != 3) || boundary || dt != scalar_t(0) ||
+            grad_single || pgrad_per_apply || rebuild_state_gradients || partial_assembly ||
+            mesh_footprint || verify || verify_jac || verify_ho || verify_ho_jac || verify_coupled_jac ||
+            g_kernel_only || g_dense_flush || g_breakdown || lagged_ho || live_vectors || bsr_single ||
+            (lagged_rc && (!jac_action || conv_ho)) || (bsr_apply && (conv_ho || layout != "packed")) ||
+            scatter_study || !csv_path.empty() || !dump_path.empty() || n < 2 || repeat < 1 || warmup < 1 ||
+            perturb != scalar_t(0.017) || rho != scalar_t(1) || mu != scalar_t(0.01) ||
+            warp != scalar_t(0) || !use_sfc || venkat_k != scalar_t(0) || g_qgrad_atomic || g_qgrad_packed) {
+            std::fprintf(stderr, "--roofline-window requires an FP64 affine packed/atomic RC residual/action, "
+                                 "first-order or Darwish (lagged/SpMV first-order only), cached state gradients, "
+                                 "no boundary/transient or other diagnostics, "
+                                 "rho=1, mu=0.01, perturb=0.017, SFC, no warp, positive repeats/warmup, "
+                                 "and two control channels only for counted windows\n");
+            if (own_mpi) MPI_Finalize();
+            return 2;
+        }
+    }
+
+    if (scatter_study && (!residual_op || geom != "affine" ||
+        !(layout == "packed" || layout == "atomic") || sizeof(scalar_t) != sizeof(double) ||
+        boundary || dt != scalar_t(0) || grad_single || pgrad_per_apply || rebuild_state_gradients ||
+        partial_assembly || mesh_footprint || verify || verify_jac || verify_ho ||
+        verify_ho_jac || verify_coupled_jac || g_kernel_only || g_dense_flush || g_breakdown ||
+        lagged_rc || lagged_ho || live_vectors || !csv_path.empty() || !dump_path.empty() ||
+        repeat < 1 || warmup < 1 || scatter_samples < 6 || scatter_samples % 6 != 0)) {
+        std::fprintf(stderr, "--scatter-study requires a standalone FP64 affine packed/atomic residual, "
+                             "cached gradients, no boundary/transient terms, warmup/repeat >= 1, "
+                             "and a positive multiple of 6 samples\n");
+        if (own_mpi) MPI_Finalize();
+        return 2;
+    }
+
+    // Only these assembly paths consume the dense element slots.
+    if (g_kernel_only && (!assemble ||
+        !(layout == "packed" || (layout == "store" && geom == "affine")) ||
+        partial_assembly || mesh_footprint || verify || verify_jac || verify_ho ||
+        verify_ho_jac || verify_coupled_jac)) {
+        std::fprintf(stderr, "--kernel-only requires standalone --assemble with --layout packed "
+                             "(affine/isoparam) or store (affine); it does not remove residual scatter\n");
+        if (own_mpi) MPI_Finalize();
+        return 2;
+    }
 
     // Read only inside the sumfact branch of the colored and store assemblies.
     if (g_dense_flush && !(assemble && (layout == "colored" || layout == "store"))) {
@@ -1369,6 +1478,12 @@ int main(int argc, char **argv) {
         bench_nodal_grad(d, packed, geom_kind, d.p.data(), 1, d.pgx, d.pgy, d.pgz);
         std::printf("rhie_chow: scale %g, nodal gradient %s\n", (double)rc_scale,
                     pgrad_per_apply ? "rebuilt per apply" : "hoisted out of the timed loop");
+    }
+
+    if (verify_coupled_jac) {
+        const int result = verify_coupled_jacobian_fd(d, packed, rho, mu, conv_ho, conv_limiter, venkat_c);
+        if (own_mpi) MPI_Finalize();
+        return result;
     }
 
     // Built here, once, for the same reason the nodal gradient is: it is a function of the
@@ -1807,13 +1922,8 @@ int main(int argc, char **argv) {
         // anything, so it goes with the sweep.
     }
 
-    // The boundary closure is one extra element sweep after the layout's own, which is
-    // how the solver arranges it too -- see apply_boundary_scs_residual_pass. Doing it
-    // Nodal velocity gradient for the deferred correction: nine interleaved components per
-    // node. Hoisted, because the solver lags the correction one Newton step -- so what the
-    // timed apply measures is the higher-order FLUX, not the reconstruction that feeds it,
-    // exactly as the Rhie-Chow state gradient is hoisted by default. The same fused
-    // multi-field sweep the solver uses, so this is not a second code path.
+    // The state is fixed throughout this benchmark. Cache its velocity reconstruction;
+    // an exact Jacobian still reconstructs the direction on every application below.
     std::vector<scalar_t> ugrad;
     std::vector<float>    ugrad32;  // the same field under --grad-precision single
     if (conv_ho) {
@@ -1854,24 +1964,14 @@ int main(int argc, char **argv) {
         // The lagged action differing from the finite difference is the POINT, not a failure, so
         // only the exact arm is gated. A lagged arm that agreed would mean the correction never
         // reached the residual and the whole comparison is vacuous, so it is gated from below.
-        // Two standards, because the operators differ. The unlimited arm is differentiable
-        // everywhere, so its max norm must hold. A limited arm is differentiable almost
-        // everywhere, so what must hold is that the exceptions are a vanishing fraction of the
-        // mesh -- the surfaces whose limiter branch the perturbation crosses -- and that the
-        // lagged action is wrong on a far larger share.
+        // A small set of wrong rows is still a failure. A switch crossing needs a
+        // separate diagnosis; it cannot be excused by the fraction of affected rows.
         const scalar_t tol = scalar_t(1e-6);
-        const bool ok = conv_limiter == 0 ? (rel < tol) : (fbad < scalar_t(0.01));
+        const bool ok = rel < tol;
         if (!ok) {
             std::fprintf(stderr, "FAIL: exact higher-order action differs from the finite "
                                  "difference: max %.3e, %.4f%% of dofs (limiter %d)\n",
                          (double)rel, 100.0 * (double)fbad, conv_limiter);
-            if (own_mpi) MPI_Finalize();
-            return 1;
-        }
-        if (conv_limiter != 0 && !(fbadl > scalar_t(20) * fbad + scalar_t(0.05))) {
-            std::fprintf(stderr, "FAIL: the lagged action disagrees on %.4f%% of dofs against the "
-                                 "exact one's %.4f%% -- too close to call this a check\n",
-                         100.0 * (double)fbadl, 100.0 * (double)fbad);
             if (own_mpi) MPI_Finalize();
             return 1;
         }
@@ -1947,6 +2047,29 @@ int main(int argc, char **argv) {
         if (boundary) apply_boundary_scs_residual_pass(d, rho, mu, geom_kind == GeomKind::Isoparam ? 1 : 0);
         apply_transient_pass(d, rho);
     };
+    if (!roofline_window.empty() && residual_op) {
+        auto reference = [&]() {
+            apply_residual_atomic_sumfact_simd(
+                d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.nnodes, d.p.data(),
+                d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rc.data(), d.rhie_chow_scale,
+                d.rx.data(), d.ry.data(), d.rz.data(), d.ux.data(), d.uy.data(), d.uz.data(),
+                cvfem_hex8_extras_of(d), rho, mu, conv_ho ? ugrad.data() : nullptr,
+                conv_limiter, venkat_c);
+        };
+        const int status = roofline_window == "session"
+            ? run_roofline_session(d, perf_fds, layout, conv_ho ? 3 : -1, pack_size, apply_fn, reference)
+            : run_roofline_window(d, roofline_window, perf_fds, layout,
+                                  conv_ho ? 3 : -1, pack_size, repeat, warmup, apply_fn, reference);
+        if (own_mpi) MPI_Finalize();
+        return status;
+    }
+    if (scatter_study) {
+        const int status = run_scatter_study(d, packed, layout == "packed", rho, mu,
+                                             conv_ho ? ugrad.data() : nullptr, conv_limiter,
+                                             venkat_c, repeat, warmup, scatter_samples, apply_fn);
+        if (own_mpi) MPI_Finalize();
+        return status;
+    }
     auto jac_fn = [&]() {
         if (geom_kind == GeomKind::Isoparam) {
             if (layout == "store")
@@ -2000,6 +2123,33 @@ int main(int argc, char **argv) {
         jac_out.assign((size_t)d.nnodes * N_FIELDS, 0.0);
 #pragma omp parallel for schedule(static)
         for (ptrdiff_t i = 0; i < d.nnodes * N_FIELDS; ++i) jac_dir[(size_t)i] = 1.0 + 0.01 * scalar_t(i % 7);
+        if (!roofline_window.empty()) {
+            // Renumbering must not change the physical direction in paired layout runs.
+            uint64_t fingerprint_xor = 0, fingerprint_sum = 0;
+#pragma omp parallel for schedule(static) reduction(^:fingerprint_xor) reduction(+:fingerprint_sum)
+            for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+                uint64_t key = 14695981039346656037ull;
+                for (int c = 0; c < 3; ++c) {
+                    const float coordinate = float(d.points[c][i]);
+                    uint32_t bits = 0;
+                    std::memcpy(&bits, &coordinate, sizeof(bits));
+                    key = (key ^ bits) * 1099511628211ull;
+                }
+                uint64_t sample = key;
+                for (int c = 0; c < N_FIELDS; ++c) {
+                    key = (key ^ (key >> 27)) * 0x3c79ac492ba7b653ull + uint64_t(c + 1);
+                    const double value = 1.0 + double((key >> 16) & 1023u) / 1024.0;
+                    jac_dir[(size_t)i * N_FIELDS + c] = scalar_t(value);
+                    uint64_t bits = 0;
+                    std::memcpy(&bits, &value, sizeof(bits));
+                    sample = (sample ^ bits) * 1099511628211ull;
+                }
+                fingerprint_xor ^= sample;
+                fingerprint_sum += sample;
+            }
+            std::printf("ROOFLINE_DIRECTION source=coordinates nodes=%td xor=%016llx sum=%016llx\n",
+                        d.nnodes, (unsigned long long)fingerprint_xor, (unsigned long long)fingerprint_sum);
+        }
     }
 
     // The Krylov working set, when --live-vectors asks for it.
@@ -2087,34 +2237,12 @@ int main(int argc, char **argv) {
     std::vector<float>    vgrad32;  // the direction's field under --grad-precision single
     std::vector<float>    qp32;     // float scratch for the pressure gradients of the fused sweep
     double                hograd_seconds = 0;
-    auto jac_action_fn = [&]() {
-        // A Krylov iteration never sees the same direction twice, so neither does this when
-        // the live set exists: the rotation is what stops the direction being resident.
-        const scalar_t *const dir_v = live.empty() ? jac_dir.data() : live[(size_t)(live_k++ % (long)live.size())].data();
-        last_dir                    = dir_v;
-        // BOTH DIRECTION GRADIENTS IN ONE SWEEP when both are wanted. They read different fields
-        // of the SAME array at the same stride -- the direction's three velocity components and
-        // its pressure -- so together they are one four-field sweep instead of a one-field and a
-        // three-field one, and the half of a sweep that does not scale with the field count is
-        // paid once. Each keeps the layout its consumer reads, which is what the per-component
-        // output stride is for. The whole cost lands in the qgrad phase, since it is one pass.
-        // THE EXACT ACTION RECONSTRUCTS THE STATE'S GRADIENTS TOO, ON EVERY APPLICATION.
-        //
-        // It used to rebuild only the direction's and read the state's from a cache filled once
-        // at setup, which makes the operator exact in its sensitivities and frozen in the fields
-        // those sensitivities are evaluated at -- and makes the measured rate exclude two full
-        // element sweeps the operator needs. An exact application is self-contained: it
-        // evaluates every reconstruction it reads. The frozen-state form is the LAGGED one, and
-        // it keeps the cache.
-        //
-        // All of it is ONE sweep, which is the only reason this is affordable. The sweep takes a
-        // base pointer and a stride per field, so the direction's four interleaved fields and
-        // the state's four contiguous ones go in together: eight fields on the higher-order arm,
-        // two on the first-order one. Outputs run three per field in field order, which is what
-        // fixes the index arithmetic below.
+    // Caching G(u) at a fixed u retains G(v) and every derivative in the element kernel.
+    // Refresh the cache when the state or geometry changes, before another Krylov solve.
+    auto reconstruct_jac_gradients = [&](const scalar_t *dir_v, const bool rebuild_state) {
         const int iso_ng = geom_kind == GeomKind::Isoparam ? 1 : 0;
         if (with_qgrad && with_hograd) {
-            const double    t0      = wall_time();
+            const int nf = rebuild_state ? 8 : 4;
             const scalar_t *srcs[8] = {dir_v + 0,     dir_v + 1,     dir_v + 2,     dir_v + 3,
                                        d.ux.data(),   d.uy.data(),   d.uz.data(),   d.p.data()};
             const int       st[8]   = {N_FIELDS, N_FIELDS, N_FIELDS, N_FIELDS, 1, 1, 1, 1};
@@ -2127,9 +2255,7 @@ int main(int argc, char **argv) {
             d.pgy.resize((size_t)d.nnodes);
             d.pgz.resize((size_t)d.nnodes);
             if (grad_single) {
-                // One output type per sweep, so the six pressure-gradient components go through
-                // a float scratch and are widened back into the double arrays their consumers
-                // read -- a nodal pass over six values, against the eight-field sweep it rides on.
+                // Preserve the fused sweep's pressure-gradient rounding in both modes.
                 vgrad32.resize((size_t)d.nnodes * 9);
                 ugrad32.resize((size_t)d.nnodes * 9);
                 qp32.resize((size_t)d.nnodes * 6);
@@ -2140,17 +2266,19 @@ int main(int argc, char **argv) {
                 for (int c = 0; c < 9; ++c) { outp[12 + c] = ugrad32.data() + c; ostr[12 + c] = 9; }
                 for (int c = 0; c < 3; ++c) { outp[21 + c] = qp32.data() + 3 + c; ostr[21 + c] = 6; }
                 if (packed.n_packs > 0 && !g_qgrad_atomic)
-                    cvfem_hex8_assemble_nodal_grads_packed(d, packed, iso_ng, srcs, st, 8, outp, ostr, vgbuf);
+                    cvfem_hex8_assemble_nodal_grads_packed(d, packed, iso_ng, srcs, st, nf, outp, ostr, vgbuf);
                 else
-                    cvfem_hex8_assemble_nodal_grads_atomic(d, iso_ng, srcs, st, 8, outp, ostr);
+                    cvfem_hex8_assemble_nodal_grads_atomic(d, iso_ng, srcs, st, nf, outp, ostr);
 #pragma omp parallel for schedule(static)
                 for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
                     d.qgx[(size_t)i] = scalar_t(qp32[(size_t)i * 6 + 0]);
                     d.qgy[(size_t)i] = scalar_t(qp32[(size_t)i * 6 + 1]);
                     d.qgz[(size_t)i] = scalar_t(qp32[(size_t)i * 6 + 2]);
-                    d.pgx[(size_t)i] = scalar_t(qp32[(size_t)i * 6 + 3]);
-                    d.pgy[(size_t)i] = scalar_t(qp32[(size_t)i * 6 + 4]);
-                    d.pgz[(size_t)i] = scalar_t(qp32[(size_t)i * 6 + 5]);
+                    if (rebuild_state) {
+                        d.pgx[(size_t)i] = scalar_t(qp32[(size_t)i * 6 + 3]);
+                        d.pgy[(size_t)i] = scalar_t(qp32[(size_t)i * 6 + 4]);
+                        d.pgz[(size_t)i] = scalar_t(qp32[(size_t)i * 6 + 5]);
+                    }
                 }
             } else {
                 scalar_t *outp[24];
@@ -2164,21 +2292,12 @@ int main(int argc, char **argv) {
                 outp[22] = d.pgy.data(); ostr[22] = 1;
                 outp[23] = d.pgz.data(); ostr[23] = 1;
                 if (packed.n_packs > 0 && !g_qgrad_atomic)
-                    cvfem_hex8_assemble_nodal_grads_packed(d, packed, iso_ng, srcs, st, 8, outp, ostr, vgbuf);
+                    cvfem_hex8_assemble_nodal_grads_packed(d, packed, iso_ng, srcs, st, nf, outp, ostr, vgbuf);
                 else
-                    cvfem_hex8_assemble_nodal_grads_atomic(d, iso_ng, srcs, st, 8, outp, ostr);
+                    cvfem_hex8_assemble_nodal_grads_atomic(d, iso_ng, srcs, st, nf, outp, ostr);
             }
-            // Charged ONCE, to the higher-order account, because it is one pass. Adding it to
-            // both would make the two fractions sum past the application they are fractions of.
-            // What frac_jac_action_hograd then reports on a fused arm is the whole
-            // reconstruction -- all four gradients -- which is the quantity section 7.8 wants.
-            const double dt = wall_time() - t0;
-            hograd_seconds += dt;
-            if (g_breakdown) g_phase[PH_QGRAD] += dt;
         } else if (with_qgrad) {
-            // First-order exact: the coupling's sensitivity needs the direction's pressure
-            // gradient, and the coupling itself the state's. Two fields, one sweep.
-            const double    t0      = wall_time();
+            const int nf = rebuild_state ? 2 : 1;
             const scalar_t *srcs[2] = {dir_v + 3, d.p.data()};
             const int       st[2]   = {N_FIELDS, 1};
             d.qgx.resize((size_t)d.nnodes);
@@ -2191,28 +2310,12 @@ int main(int argc, char **argv) {
                                  d.pgx.data(), d.pgy.data(), d.pgz.data()};
             ptrdiff_t ostr[6] = {1, 1, 1, 1, 1, 1};
             if (packed.n_packs > 0 && !g_qgrad_atomic)
-                cvfem_hex8_assemble_nodal_grads_packed(d, packed, iso_ng, srcs, st, 2, outp, ostr, vgbuf);
+                cvfem_hex8_assemble_nodal_grads_packed(d, packed, iso_ng, srcs, st, nf, outp, ostr, vgbuf);
             else
-                cvfem_hex8_assemble_nodal_grads_atomic(d, iso_ng, srcs, st, 2, outp, ostr);
-            const double dt_qg = wall_time() - t0;
-            qgrad_seconds += dt_qg;
-            // Also into the phase table, so the pass that dominates this application appears
-            // beside the phases of the sweep it precedes rather than only in a stdout line.
-            if (g_breakdown) g_phase[PH_QGRAD] += dt_qg;
+                cvfem_hex8_assemble_nodal_grads_atomic(d, iso_ng, srcs, st, nf, outp, ostr);
         }
         if (with_hograd && !with_qgrad) {
-            // The direction's nodal velocity gradient, reconstructed from scratch on every
-            // matvec because the direction changes every Krylov iteration. This is the pass the
-            // lagged action does not run, and it is what the exact form costs.
-            //
-            // Read in place: the direction arrives interleaved by node, and the sweep takes a
-            // base pointer and a stride per field, so its three velocity components are three
-            // views of the same array. This used to de-interleave them into scratch first --
-            // three full-length copies inside the timed region on every matvec.
-            // The state's velocity gradient goes in with it, for the reason above: six fields,
-            // one sweep. The Rhie--Chow term is lagged on this arm, so its state pressure
-            // gradient stays cached -- that is what lagging it means.
-            const double    t0       = wall_time();
+            const int nf = rebuild_state ? 6 : 3;
             const scalar_t *vsrcs[6] = {dir_v + 0,   dir_v + 1,   dir_v + 2,
                                         d.ux.data(), d.uy.data(), d.uz.data()};
             const int       vst[6]   = {N_FIELDS, N_FIELDS, N_FIELDS, 1, 1, 1};
@@ -2224,9 +2327,9 @@ int main(int argc, char **argv) {
                 for (int c = 0; c < 9; ++c) { outp[c] = vgrad32.data() + c; ostr[c] = 9; }
                 for (int c = 0; c < 9; ++c) { outp[9 + c] = ugrad32.data() + c; ostr[9 + c] = 9; }
                 if (packed.n_packs > 0 && !g_qgrad_atomic)
-                    cvfem_hex8_assemble_nodal_grads_packed(d, packed, iso_ng, vsrcs, vst, 6, outp, ostr, vgbuf);
+                    cvfem_hex8_assemble_nodal_grads_packed(d, packed, iso_ng, vsrcs, vst, nf, outp, ostr, vgbuf);
                 else
-                    cvfem_hex8_assemble_nodal_grads_atomic(d, iso_ng, vsrcs, vst, 6, outp, ostr);
+                    cvfem_hex8_assemble_nodal_grads_atomic(d, iso_ng, vsrcs, vst, nf, outp, ostr);
             } else {
                 vgrad.resize((size_t)d.nnodes * 9);
                 ugrad.resize((size_t)d.nnodes * 9);
@@ -2235,11 +2338,28 @@ int main(int argc, char **argv) {
                 for (int c = 0; c < 9; ++c) { outp[c] = vgrad.data() + c; ostr[c] = 9; }
                 for (int c = 0; c < 9; ++c) { outp[9 + c] = ugrad.data() + c; ostr[9 + c] = 9; }
                 if (packed.n_packs > 0 && !g_qgrad_atomic)
-                    cvfem_hex8_assemble_nodal_grads_packed(d, packed, iso_ng, vsrcs, vst, 6, outp, ostr, vgbuf);
+                    cvfem_hex8_assemble_nodal_grads_packed(d, packed, iso_ng, vsrcs, vst, nf, outp, ostr, vgbuf);
                 else
-                    cvfem_hex8_assemble_nodal_grads_atomic(d, iso_ng, vsrcs, vst, 6, outp, ostr);
+                    cvfem_hex8_assemble_nodal_grads_atomic(d, iso_ng, vsrcs, vst, nf, outp, ostr);
             }
-            hograd_seconds += wall_time() - t0;
+        }
+    };
+    if (!rebuild_state_gradients && (with_qgrad || with_hograd))
+        reconstruct_jac_gradients(jac_dir.data(), true);
+
+    const char *state_gradient_mode = jac_action && (rhie_chow || with_hograd)
+                                         ? (rebuild_state_gradients ? "per_apply" : "cached") : "n/a";
+    auto jac_action_fn = [&]() {
+        const scalar_t *const dir_v = live.empty() ? jac_dir.data() : live[(size_t)(live_k++ % (long)live.size())].data();
+        last_dir = dir_v;
+        if (with_qgrad || with_hograd) {
+            const double t0 = wall_time();
+            reconstruct_jac_gradients(dir_v, rebuild_state_gradients);
+            const double elapsed = wall_time() - t0;
+            // A fused pressure/velocity sweep is charged once, to the HO account.
+            if (with_hograd) hograd_seconds += elapsed;
+            else qgrad_seconds += elapsed;
+            if (g_breakdown) g_phase[PH_QGRAD] += elapsed;
         }
         // THE SAME LADDER FOR EITHER STORAGE OF THE GRADIENT FIELDS. The launchers deduce the
         // storage type from the pointers, so the choice is made once here and never inside a
@@ -2338,6 +2458,47 @@ int main(int argc, char **argv) {
         }
     }
     auto bsr_apply_fn = [&]() { bsr_apply_op->apply(jac_dir.data(), jac_out.data()); };
+
+    if (!roofline_window.empty() && (jac_action || bsr_apply)) {
+        auto reference = [&]() {
+            // Reconstruct the direction independently; share only the fixed state cache.
+            std::vector<scalar_t> reference_velocity;
+            if (with_qgrad) {
+                const scalar_t *srcs[4] = {jac_dir.data() + 3, jac_dir.data(),
+                                           jac_dir.data() + 1, jac_dir.data() + 2};
+                const int strides[4] = {N_FIELDS, N_FIELDS, N_FIELDS, N_FIELDS};
+                scalar_t *out[12] = {d.qgx.data(), d.qgy.data(), d.qgz.data()};
+                ptrdiff_t out_stride[12] = {1, 1, 1};
+                if (with_hograd) {
+                    reference_velocity.resize((size_t)d.nnodes * 9);
+                    for (int c = 0; c < 9; ++c) {
+                        out[c + 3] = reference_velocity.data() + c;
+                        out_stride[c + 3] = 9;
+                    }
+                }
+                cvfem_hex8_assemble_nodal_grads_atomic(d, 0, srcs, strides,
+                        with_hograd ? 4 : 1, out, out_stride);
+            }
+            if (cvfem_hex8_extras_of(d).with_rc) cvfem_hex8_build_rc_coeff(d, rho, mu);
+            apply_jacobian_action_atomic_simd(
+                d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.nnodes, d.p.data(),
+                d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points,
+                d.qgx.data(), d.qgy.data(), d.qgz.data(), d.rc_coeff.data(), d.rc_w.data(),
+                d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(),
+                cvfem_hex8_extras_of(d), rho, mu, jac_dir.data(), jac_out.data(),
+                with_hograd ? ugrad.data() : nullptr,
+                with_hograd ? reference_velocity.data() : nullptr, conv_limiter, venkat_c);
+        };
+        const char *operation = bsr_apply ? "spmv" : lagged_rc ? "lagged" : "jacobian";
+        auto production = [&]() { if (bsr_apply) bsr_apply_fn(); else jac_action_fn(); };
+        const int status = roofline_window == "session"
+            ? run_roofline_session(d, perf_fds, layout, conv_ho ? 3 : -1, pack_size,
+                                  production, reference, &jac_out, operation)
+            : run_roofline_window(d, roofline_window, perf_fds, layout, conv_ho ? 3 : -1,
+                                 pack_size, repeat, warmup, production, reference, &jac_out, operation);
+        if (own_mpi) MPI_Finalize();
+        return status;
+    }
 
     // Two comparisons here go against the ASSEMBLED matrix and one goes across the
     // matrix-free implementations, and Rhie-Chow separates them. The assembled Jacobian
@@ -2485,6 +2646,8 @@ int main(int argc, char **argv) {
     }
 
     phase_reset();
+    qgrad_seconds = 0;
+    hograd_seconds = 0;
     // With a live set the clock has to be stopped for the churn: what is being measured is
     // still the apply, only now with the caches in the state a Krylov iteration leaves them
     // in. Without one this is the same single interval it always was, so the default path's
@@ -2864,6 +3027,7 @@ int main(int argc, char **argv) {
         std::printf("  flops_per_element_assemble_model: %.1f\n", assemble_flops);
     }
     if (jac_action) {
+        std::printf("  state_gradients: %s\n", state_gradient_mode);
         std::printf("  seconds_per_jac_action: %.6e\n", seconds_per_call);
         std::printf("  MDOF/s_jac_action: %.3f\n", mdofs);
         std::printf("  MELEM/s_jac_action: %.3f\n", melems);
@@ -2987,6 +3151,7 @@ int main(int argc, char **argv) {
         row.upwind_eps      = 0.0;
         row.transient       = dt > scalar_t(0) ? 1 : 0;
         row.pa_bytes_per_dof = partial_assembly ? cvfem_hex8_pa_bytes_per_dof(d) : 0.0;
+        row.state_gradients = state_gradient_mode;
         row.qgrad_seconds   = with_qgrad ? qgrad_seconds / double(repeat) : -1.0;
         row.qgrad_frac      = with_qgrad ? qgrad_seconds / seconds : -1.0;
         row.phase                = g_breakdown ? g_phase : nullptr;

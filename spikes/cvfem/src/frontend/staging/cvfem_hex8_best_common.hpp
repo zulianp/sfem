@@ -376,7 +376,7 @@ static double wall_time() {
 
 static SFEM_INLINE double phase_now() { return g_breakdown ? wall_time() : 0.0; }
 static int g_dense_flush = 0;  // --dense-flush: stage ke densely, then flush 64 contiguous blocks
-static int g_kernel_only = 0;  // --kernel-only: element kernel writes to a dense stack buffer (no scatter)
+static int g_kernel_only = 0;  // Dense-element assembly diagnostic; the driver rejects unsupported paths.
 static int g_identity_slots[64];
 
 // WHAT THE ASSEMBLY SWEEPS GET INSTEAD OF THESE GLOBALS. The sweeps used to read

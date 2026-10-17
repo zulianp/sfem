@@ -22,8 +22,7 @@ endif()
 find_package(ryml CONFIG REQUIRED)
 find_package(matrixio CONFIG REQUIRED)
 find_package(smesh CONFIG REQUIRED)
-find_package(SCCD CONFIG REQUIRED)
-find_package(ssdf CONFIG REQUIRED)
+# SFEM resolves its optional collision dependencies when they are enabled in the install.
 find_package(SFEM CONFIG REQUIRED)
 
 # Header-only CUDA Thrust is sometimes exported by SFEM as -lThrust.
@@ -139,6 +138,9 @@ cvfem_target_defaults(cvfem_ns_op)
 set(CVFEM_OP_DRIVERS cvfem_hex8_ns_ssgmg cvfem_ns_apply_bench cvfem_sshex8_bench)
 
 file(GLOB_RECURSE CVFEM_DRIVERS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/drivers/*.cpp")
+# The measured DGEMM reference requires an explicit library and its recorded runtime identity.
+# jobs/build_roofline_gemm.sh builds it with that provenance.
+list(FILTER CVFEM_DRIVERS EXCLUDE REGEX "/cvfem_roofline_gemm\\.cpp$")
 foreach(DRIVER ${CVFEM_DRIVERS})
     get_filename_component(DRIVER_NAME ${DRIVER} NAME_WE)
     add_executable(${DRIVER_NAME} ${DRIVER})
@@ -351,9 +353,26 @@ if(CVFEM_REPORT_PYTHON)
 endif()
 
 if(CVFEM_REPORT_PYTHON)
+    add_test(NAME cvfem_check_dump
+             COMMAND ${CVFEM_REPORT_PYTHON}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_check_dump_test.py)
     add_test(NAME cvfem_verify_report_selftest
              COMMAND ${CVFEM_REPORT_PYTHON}
                      ${CMAKE_CURRENT_SOURCE_DIR}/python/cvfem_verify_report.py --selftest)
+    add_test(NAME cvfem_solver_iteration_gate
+             COMMAND ${CVFEM_REPORT_PYTHON}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_solver_iteration_gate.py
+                     $<TARGET_FILE:cvfem_hex8_ns_ssgmg>)
+    add_test(NAME cvfem_roofline_actions
+             COMMAND ${CVFEM_REPORT_PYTHON}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/scripts/roofline_actions_test.py
+                     $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)
+    set_tests_properties(cvfem_solver_iteration_gate cvfem_roofline_actions
+                         PROPERTIES TIMEOUT 300)
+    add_test(NAME cvfem_storage_width
+             COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_storage_width.sh
+                     $<TARGET_FILE:cvfem_storage_width_probe>)
+    set_tests_properties(cvfem_storage_width PROPERTIES TIMEOUT 180)
     # The kernel report's job is to keep a throughput next to the operator it was measured
     # on. A wrong rate is caught by anyone who knows the kernel; the right rate under the
     # wrong operator is not, and that is the failure the report exists to prevent -- so its
@@ -373,17 +392,13 @@ endif()
 # thing holding its kernels together was a person remembering to pass --verify by hand. That
 # became load-bearing when thirteen micro-kernel arms were reduced to three and the packed
 # assembly changed kernel; a reduction defended by an oracle nobody runs is not defended.
-# The packed layout's determinism, which is the property that makes its throughput comparable
-# with the atomic layout's at all. It is checked by running the same configuration twice and
-# comparing the bitwise fingerprint -- a run against ITSELF, which a race cannot satisfy by
-# luck. The fingerprint sweep compares against a recorded baseline instead, so a race that
-# happened to reproduce the baseline would pass it; that is how a nested parallel region
-# survived long enough to be found by accident. Shown to fire before being committed: with the
-# stray pragma back, it failed exactly the three affected configurations and nothing else.
+# Repeat runs catch scheduling-dependent changes. The separate fixed-input test
+# changes thread count without regenerating the mesh, packing or state.
 add_test(NAME cvfem_packed_determinism
          COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/regression/cvfem_packed_determinism.sh
                  $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)
 set_tests_properties(cvfem_packed_determinism PROPERTIES SKIP_RETURN_CODE 77)
+set_tests_properties(cvfem_packed_fixed_input_test PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 120)
 
 add_test(NAME cvfem_tet4_bench_verify
          COMMAND cvfem_tet4_ns_upwind_bench --n 10 --repeat 1 --warmup 0 --verify --verify-jac)
@@ -391,6 +406,32 @@ add_test(NAME cvfem_tet4_bench_verify
 add_test(NAME cvfem_bench_staging
          COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_bench_staging.sh
                  $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)
+add_test(NAME cvfem_scatter_study
+         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_scatter_study.sh
+                 $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)
+add_test(NAME cvfem_kernel_only
+         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_kernel_only.sh
+                 $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)
+add_test(NAME cvfem_jacobian_coupled
+         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_jacobian_coupled.sh
+                 $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)
+add_test(NAME cvfem_packed_transient_rc
+         COMMAND $<TARGET_FILE:cvfem_packed_vs_atomic_test>)
+set_tests_properties(cvfem_packed_transient_rc PROPERTIES
+                    ENVIRONMENT "SFEM_RC_TAU=1;SFEM_RC_TAU_TRANSIENT=1")
+add_test(NAME cvfem_jacobian_composed
+         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_jacobian_composed.sh
+                 $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)
+set_tests_properties(cvfem_jacobian_composed PROPERTIES TIMEOUT 300)
+add_test(NAME cvfem_jacobian_fd
+         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_jacobian_fd.sh
+                 $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)
+add_test(NAME cvfem_jacobian_cache
+         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_jacobian_cache.sh
+                 $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)
+add_test(NAME cvfem_jacobian_cache_f32
+         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_jacobian_cache.sh
+                 $<TARGET_FILE:cvfem_hex8_ns_upwind_bench_f32>)
 # The script asserts that every quarantined configuration is REFUSED, which is true of the
 # default build and false of this one -- the flag exists to make them reachable. So it is told
 # which build it is in rather than inferring it.

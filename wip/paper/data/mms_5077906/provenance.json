@@ -1,0 +1,17 @@
+{
+  "job": "5077906",
+  "node": "nid006550",
+  "date": "2026-10-17",
+  "cluster": "Daint",
+  "configured_threads": 8,
+  "raw_files": 19,
+  "remote_result": "/capstor/scratch/cscs/gandanie/git/sfem-pasc27-cache-20261010/results/mms-fine-5077906-azilru",
+  "previous_dataset": "mms_5077627",
+  "scope": "Same steady affine FP64 Farrell MMS, now n=40; five schemes and unchanged physical inputs and solver targets.",
+  "limitations": [
+    "All reconstructed schemes pass the fixed maximum velocity error threshold; first-order upwind does not.",
+    "Four grids do not establish a common asymptotic order or an unstructured solve.",
+    "Jobs ran on separate Grace allocations and are not a performance comparison.",
+    "Scheme labels require the pinned collector/settings; the driver does not echo limiter settings."
+  ]
+}

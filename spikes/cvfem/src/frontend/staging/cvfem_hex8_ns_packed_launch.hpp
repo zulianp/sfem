@@ -59,9 +59,11 @@ static SFEM_NOINLINE void cvfem_hex8_apply_residual_packed(MeshData &d, PackedDa
     const int    with_rc   = d.rhie_chow_scale != scalar_t(0);
 
 
+    const Hex8RcConfig rc_cfg = cvfem_hex8_rc_config_for(d);
+
 #pragma omp parallel
     cvfem_hex8_apply_residual_packed_range(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
-            d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rc.data(), d.rhie_chow_scale, d.rx.data(), d.ry.data(), d.rz.data(), d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, scratch_n, rc_n, with_rc);
+            d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rc.data(), rc_cfg, d.rx.data(), d.ry.data(), d.rz.data(), d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, scratch_n, rc_n, with_rc);
 
 
     scalar_t *const fields[CVFEM_HEX8_N_FIELDS] = {d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data()};

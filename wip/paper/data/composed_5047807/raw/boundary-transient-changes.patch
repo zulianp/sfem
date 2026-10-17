@@ -1,0 +1,778 @@
+diff --git a/spikes/cvfem/CMakeLists.txt b/spikes/cvfem/CMakeLists.txt
+index 2eb0724..adfa9a2 100644
+--- a/spikes/cvfem/CMakeLists.txt
++++ b/spikes/cvfem/CMakeLists.txt
+@@ -353,6 +353,9 @@ if(CVFEM_REPORT_PYTHON)
+ endif()
+ 
+ if(CVFEM_REPORT_PYTHON)
++    add_test(NAME cvfem_check_dump
++             COMMAND ${CVFEM_REPORT_PYTHON}
++                     ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_check_dump_test.py)
+     add_test(NAME cvfem_verify_report_selftest
+              COMMAND ${CVFEM_REPORT_PYTHON}
+                      ${CMAKE_CURRENT_SOURCE_DIR}/python/cvfem_verify_report.py --selftest)
+@@ -389,17 +392,13 @@ endif()
+ # thing holding its kernels together was a person remembering to pass --verify by hand. That
+ # became load-bearing when thirteen micro-kernel arms were reduced to three and the packed
+ # assembly changed kernel; a reduction defended by an oracle nobody runs is not defended.
+-# The packed layout's determinism, which is the property that makes its throughput comparable
+-# with the atomic layout's at all. It is checked by running the same configuration twice and
+-# comparing the bitwise fingerprint -- a run against ITSELF, which a race cannot satisfy by
+-# luck. The fingerprint sweep compares against a recorded baseline instead, so a race that
+-# happened to reproduce the baseline would pass it; that is how a nested parallel region
+-# survived long enough to be found by accident. Shown to fire before being committed: with the
+-# stray pragma back, it failed exactly the three affected configurations and nothing else.
++# Repeat runs catch scheduling-dependent changes. The separate fixed-input test
++# changes thread count without regenerating the mesh, packing or state.
+ add_test(NAME cvfem_packed_determinism
+          COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/regression/cvfem_packed_determinism.sh
+                  $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)
+ set_tests_properties(cvfem_packed_determinism PROPERTIES SKIP_RETURN_CODE 77)
++set_tests_properties(cvfem_packed_fixed_input_test PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 120)
+ 
+ add_test(NAME cvfem_tet4_bench_verify
+          COMMAND cvfem_tet4_ns_upwind_bench --n 10 --repeat 1 --warmup 0 --verify --verify-jac)
+@@ -416,6 +415,14 @@ add_test(NAME cvfem_kernel_only
+ add_test(NAME cvfem_jacobian_coupled
+          COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_jacobian_coupled.sh
+                  $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)
++add_test(NAME cvfem_packed_transient_rc
++         COMMAND $<TARGET_FILE:cvfem_packed_vs_atomic_test>)
++set_tests_properties(cvfem_packed_transient_rc PROPERTIES
++                    ENVIRONMENT "SFEM_RC_TAU=1;SFEM_RC_TAU_TRANSIENT=1")
++add_test(NAME cvfem_jacobian_composed
++         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_jacobian_composed.sh
++                 $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)
++set_tests_properties(cvfem_jacobian_composed PROPERTIES TIMEOUT 300)
+ add_test(NAME cvfem_jacobian_fd
+          COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_jacobian_fd.sh
+                  $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)
+diff --git a/spikes/cvfem/src/drivers/cvfem_hex8_ns_upwind_bench.cpp b/spikes/cvfem/src/drivers/cvfem_hex8_ns_upwind_bench.cpp
+index 86e6a2f..7437d5e 100644
+--- a/spikes/cvfem/src/drivers/cvfem_hex8_ns_upwind_bench.cpp
++++ b/spikes/cvfem/src/drivers/cvfem_hex8_ns_upwind_bench.cpp
+@@ -782,7 +782,7 @@ int main(int argc, char **argv) {
+                     "                   on, and it is what this driver computed before the exact\n"
+                     "                   form existed. Had no help entry at all until now.\n"
+                     "  --verify-jac-coupled  standalone FP64 full (u,p) derivative check; requires\n"
+-                    "                 packed affine geometry, steady RC and double gradients.\n"
++                    "                 packed affine geometry, RC and double gradients; boundary/BDF supported.\n"
+                     "  --rhie-chow [S]  include the Rhie-Chow pressure-velocity coupling at scale\n"
+                     "                 S (default 1), and the nodal pressure gradient it needs.\n"
+                     "                 sumfact only -- the hand-written and generated kernels carry\n"
+@@ -863,11 +863,13 @@ int main(int argc, char **argv) {
+     }
+ 
+     if (verify_coupled_jac && (layout != "packed" || geom != "affine" || !rhie_chow ||
+-        boundary || dt != scalar_t(0) || grad_single || lagged_rc || lagged_ho ||
++        dt < scalar_t(0) || !std::isfinite(dt) ||
++        (dt > scalar_t(0) && bdf_order != 1 && bdf_order != 2) ||
++        grad_single || lagged_rc || lagged_ho ||
+         partial_assembly || assemble || bsr_apply || nodal_grad || verify || verify_jac ||
+         verify_ho || verify_ho_jac || !(rho > scalar_t(0)) || !(mu > scalar_t(0)) ||
+         !(rc_scale > scalar_t(0)) || !std::isfinite(rho) || !std::isfinite(mu) || !std::isfinite(rc_scale))) {
+-        std::fprintf(stderr, "--verify-jac-coupled requires a standalone packed affine steady RC action "
++        std::fprintf(stderr, "--verify-jac-coupled requires a standalone packed affine RC action "
+                              "with positive finite rho, mu and RC scale and double gradients\n");
+         if (own_mpi) MPI_Finalize();
+         return 2;
+diff --git a/spikes/cvfem/src/frontend/staging/cvfem_hex8_best_colored.hpp b/spikes/cvfem/src/frontend/staging/cvfem_hex8_best_colored.hpp
+index 74cb87e..cc93521 100644
+--- a/spikes/cvfem/src/frontend/staging/cvfem_hex8_best_colored.hpp
++++ b/spikes/cvfem/src/frontend/staging/cvfem_hex8_best_colored.hpp
+@@ -94,6 +94,8 @@ static SFEM_NOINLINE void apply_residual_colored(MeshData           &d,
+     const size_t                  scratch_n = packed_scratch_n(p.max_actual_nodes_per_pack);
+     const int                     with_rc   = !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0);
+ 
++    const Hex8RcConfig rc_cfg = cvfem_hex8_rc_config_for(d);
++
+ #pragma omp parallel
+     {
+         for (int color = 0; color < c.n_colors; ++color) {
+@@ -122,7 +124,7 @@ static SFEM_NOINLINE void apply_residual_colored(MeshData           &d,
+                 else
+                     apply_residual_packcolored_affine_range(
+                             r, c.pack_order.data(), d.adj_ptr, d.det_ptr, d.nelements, d.p.data(),
+-                            d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale,
++                            d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, rc_cfg,
+                             d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_idx, p.ghost_ptr,
+                             p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.owned_nodes_ptr,
+                             rho, mu, rx, ry, rz, rc, scratch_n, with_rc);
+diff --git a/spikes/cvfem/src/frontend/staging/cvfem_hex8_ns_packed_launch.hpp b/spikes/cvfem/src/frontend/staging/cvfem_hex8_ns_packed_launch.hpp
+index f07709b..0b1081b 100644
+--- a/spikes/cvfem/src/frontend/staging/cvfem_hex8_ns_packed_launch.hpp
++++ b/spikes/cvfem/src/frontend/staging/cvfem_hex8_ns_packed_launch.hpp
+@@ -59,9 +59,11 @@ static SFEM_NOINLINE void cvfem_hex8_apply_residual_packed(MeshData &d, PackedDa
+     const int    with_rc   = d.rhie_chow_scale != scalar_t(0);
+ 
+ 
++    const Hex8RcConfig rc_cfg = cvfem_hex8_rc_config_for(d);
++
+ #pragma omp parallel
+     cvfem_hex8_apply_residual_packed_range(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
+-            d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rc.data(), d.rhie_chow_scale, d.rx.data(), d.ry.data(), d.rz.data(), d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, scratch_n, rc_n, with_rc);
++            d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rc.data(), rc_cfg, d.rx.data(), d.ry.data(), d.rz.data(), d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, scratch_n, rc_n, with_rc);
+ 
+ 
+     scalar_t *const fields[CVFEM_HEX8_N_FIELDS] = {d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data()};
+diff --git a/spikes/cvfem/src/frontend/staging/cvfem_hex8_packed_launch.hpp b/spikes/cvfem/src/frontend/staging/cvfem_hex8_packed_launch.hpp
+index 9aa7bc9..0abd811 100644
+--- a/spikes/cvfem/src/frontend/staging/cvfem_hex8_packed_launch.hpp
++++ b/spikes/cvfem/src/frontend/staging/cvfem_hex8_packed_launch.hpp
+@@ -160,12 +160,12 @@ static SFEM_NOINLINE void apply_residual_packed_defcor(MeshData       &d,
+     scalar_t *const SFEM_RESTRICT rz = d.rz.data();
+     scalar_t *const SFEM_RESTRICT rc = d.rc.data();
+     const size_t                  scratch_n = packed_scratch_n(p.max_actual_nodes_per_pack);
+-    const Hex8Extras              opt = cvfem_hex8_extras_of(d);
++    const Hex8RcConfig            rc_cfg = cvfem_hex8_rc_config_for(d);
+     const int                     with_rc = !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0);
+ 
+ #pragma omp parallel
+     apply_residual_packed_defcor_range<ScatterProbe>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
+-            d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, ugrad, limiter, venkat_c, rx, ry, rz, rc, scratch_n, with_rc);
++            d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, rc_cfg, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, ugrad, limiter, venkat_c, rx, ry, rz, rc, scratch_n, with_rc);
+ 
+     if constexpr (ScatterProbe) {
+         if (!g_scatter_accumulate) return;
+@@ -222,9 +222,10 @@ static SFEM_NOINLINE void apply_residual_packed(MeshData        &d,
+         apply_residual_packed_isoparam_range(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
+                 d.nelements, d.p.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, rx, ry, rz, rc, scratch_n);
+     } else {
++        const Hex8RcConfig rc_cfg = cvfem_hex8_rc_config_for(d);
+ #pragma omp parallel
+         apply_residual_packed_affine_range<ScatterProbe>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
+-                d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, rx, ry, rz, rc, scratch_n, with_rc);
++                d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, rc_cfg, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, rx, ry, rz, rc, scratch_n, with_rc);
+     }
+ 
+     if constexpr (ScatterProbe) {
+diff --git a/spikes/cvfem/src/kernels/packed/affine/cvfem_hex8_best_packed_affine.hpp b/spikes/cvfem/src/kernels/packed/affine/cvfem_hex8_best_packed_affine.hpp
+index f2d251c..158a7e8 100644
+--- a/spikes/cvfem/src/kernels/packed/affine/cvfem_hex8_best_packed_affine.hpp
++++ b/spikes/cvfem/src/kernels/packed/affine/cvfem_hex8_best_packed_affine.hpp
+@@ -51,7 +51,7 @@ static SFEM_NOINLINE void apply_residual_packed_affine_range(
+         const scalar_t *const SFEM_RESTRICT pgy,
+         const scalar_t *const SFEM_RESTRICT pgz,
+         geom_t **const SFEM_RESTRICT points,
+-        const scalar_t rhie_chow_scale,
++        const Hex8RcConfigT<scalar_t> &rc_cfg,
+         const scalar_t *const SFEM_RESTRICT ux,
+         const scalar_t *const SFEM_RESTRICT uy,
+         const scalar_t *const SFEM_RESTRICT uz,
+@@ -123,11 +123,11 @@ static SFEM_NOINLINE void apply_residual_packed_affine_range(
+                 gather_hex8_simd_from_pack(pack_elems, pack_u, adj_ptr, det_ptr, begin, nlanes, in,
+                                            cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det);
+                 if (with_rc) {
+-                    cvfem_hex8_gather_rc_from_pack(pack_elems, pk.pgx, pk.pgy, pk.pgz, begin, nlanes, rcp);
++                    cvfem_hex8_gather_rc_from_pack(pack_elems, pk.pgx, pk.pgy, pk.pgz, begin, nlanes, rcp, rc_cfg.tau);
+                 }
+                 cvfem_hex8_ns_upwind_residual_sumfact_simd(
+                         rho, mu, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det, in, outp,
+-                        with_rc ? &rcp : nullptr, rhie_chow_scale);
++                        with_rc ? &rcp : nullptr, rc_cfg.scale);
+                 if constexpr (ScatterProbe) {
+                     if (!cvfem_scatter_probe(outp, begin, nlanes)) continue;
+                 }
+@@ -536,7 +536,7 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_range(
+         const scalar_t *const SFEM_RESTRICT pgy,
+         const scalar_t *const SFEM_RESTRICT pgz,
+         geom_t **const SFEM_RESTRICT points,
+-        const scalar_t rhie_chow_scale,
++        const Hex8RcConfigT<scalar_t> &rc_cfg,
+         const scalar_t *const SFEM_RESTRICT ux,
+         const scalar_t *const SFEM_RESTRICT uy,
+         const scalar_t *const SFEM_RESTRICT uz,
+@@ -598,12 +598,12 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_range(
+                                            cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, detv);
+                 if (with_rc) {
+                     cvfem_hex8_gather_rc_from_pack(pack_elems, pk.pgx,
+-                                                   pk.pgy, pk.pgz, begin, nlanes, rcp);
++                                                   pk.pgy, pk.pgz, begin, nlanes, rcp, rc_cfg.tau);
+                 }
+                 cvfem_hex8_gather_ugrad_from_pack(pack_elems, ug.g, begin, nlanes, hop);
+                 cvfem_hex8_ns_upwind_residual_sumfact_simd(
+                         rho, mu, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, detv, in,
+-                        outp, with_rc ? &rcp : nullptr, rhie_chow_scale, scalar_t(0), &hop);
++                        outp, with_rc ? &rcp : nullptr, rc_cfg.scale, scalar_t(0), &hop);
+                 if constexpr (ScatterProbe) {
+                     if (!cvfem_scatter_probe(outp, begin, nlanes)) continue;
+                 }
+@@ -761,7 +761,7 @@ static SFEM_NOINLINE void apply_residual_packcolored_affine_range(
+         const scalar_t *const SFEM_RESTRICT pgy,
+         const scalar_t *const SFEM_RESTRICT pgz,
+         geom_t **const SFEM_RESTRICT points,
+-        const scalar_t rhie_chow_scale,
++        const Hex8RcConfigT<scalar_t> &rc_cfg,
+         const scalar_t *const SFEM_RESTRICT ux,
+         const scalar_t *const SFEM_RESTRICT uy,
+         const scalar_t *const SFEM_RESTRICT uz,
+@@ -831,11 +831,11 @@ static SFEM_NOINLINE void apply_residual_packcolored_affine_range(
+                 gather_hex8_simd_from_pack(pack_elems, pack_u, adj_ptr, det_ptr, begin, nlanes, in,
+                                            cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det);
+                 if (with_rc) {
+-                    cvfem_hex8_gather_rc_from_pack(pack_elems, pk.pgx, pk.pgy, pk.pgz, begin, nlanes, rcp);
++                    cvfem_hex8_gather_rc_from_pack(pack_elems, pk.pgx, pk.pgy, pk.pgz, begin, nlanes, rcp, rc_cfg.tau);
+                 }
+                 cvfem_hex8_ns_upwind_residual_sumfact_simd(
+                         rho, mu, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det, in, outp,
+-                        with_rc ? &rcp : nullptr, rhie_chow_scale);
++                        with_rc ? &rcp : nullptr, rc_cfg.scale);
+                 scatter_hex8_simd_to_pack(pack_elems, pack_out, begin, nlanes, outp);
+             }
+ 
+diff --git a/spikes/cvfem/src/kernels/packed/cvfem_hex8_ns_packed.hpp b/spikes/cvfem/src/kernels/packed/cvfem_hex8_ns_packed.hpp
+index 6c8e8d6..655e5ca 100644
+--- a/spikes/cvfem/src/kernels/packed/cvfem_hex8_ns_packed.hpp
++++ b/spikes/cvfem/src/kernels/packed/cvfem_hex8_ns_packed.hpp
+@@ -302,7 +302,7 @@ static SFEM_NOINLINE void cvfem_hex8_apply_residual_packed_range(
+         const scalar_t *const SFEM_RESTRICT pgz,
+         geom_t **const SFEM_RESTRICT points,
+         scalar_t *const SFEM_RESTRICT rc_out,
+-        const scalar_t rhie_chow_scale,
++        const Hex8RcConfigT<scalar_t> &rc_cfg,
+         scalar_t *const SFEM_RESTRICT rx,
+         scalar_t *const SFEM_RESTRICT ry,
+         scalar_t *const SFEM_RESTRICT rz,
+@@ -378,7 +378,7 @@ static SFEM_NOINLINE void cvfem_hex8_apply_residual_packed_range(
+                                                  det);
+                 if (with_rc) {
+                     cvfem_hex8_gather_rc_from_pack(pack_elems, pack_pgx, pack_pgy, pack_pgz, begin,
+-                                                   nlanes, rcp);
++                                                   nlanes, rcp, rc_cfg.tau);
+                 }
+                 cvfem_hex8_ns_upwind_residual_sumfact_simd(rho,
+                                                            mu,
+@@ -395,7 +395,7 @@ static SFEM_NOINLINE void cvfem_hex8_apply_residual_packed_range(
+                                                            in,
+                                                            outp,
+                                                            with_rc ? &rcp : nullptr,
+-                                                           rhie_chow_scale,
++                                                           rc_cfg.scale,
+                                                            upwind_eps);
+                 cvfem_hex8_scatter_simd_to_pack(pack_elems, pack_out, begin, nlanes, outp);
+             }
+@@ -569,7 +569,7 @@ static SFEM_NOINLINE void cvfem_hex8_apply_jacobian_action_packed_range(
+                                                         det);
+                 if (with_rc) {
+                     cvfem_hex8_gather_rc_from_pack(pack_elems, pack_pgx, pack_pgy, pack_pgz, begin,
+-                                                   nlanes, rcp);
++                                                   nlanes, rcp, rc_cfg.tau);
+                     cvfem_hex8_gather_rc_coeff(rc_coeff, rc_w, rc_cfg, begin, nlanes, rcp);
+                 }
+                 if (with_qg)
+diff --git a/spikes/cvfem/src/kernels/packed/cvfem_hex8_pack_staging.hpp b/spikes/cvfem/src/kernels/packed/cvfem_hex8_pack_staging.hpp
+index 6ed7340..a122fac 100644
+--- a/spikes/cvfem/src/kernels/packed/cvfem_hex8_pack_staging.hpp
++++ b/spikes/cvfem/src/kernels/packed/cvfem_hex8_pack_staging.hpp
+@@ -361,7 +361,9 @@ static SFEM_INLINE void cvfem_hex8_gather_rc_from_pack(pack_idx_t **const SFEM_R
+                                                        const scalar_t *const SFEM_RESTRICT pack_pgz,
+                                                        const ptrdiff_t                     begin,
+                                                        const int                           nlanes,
+-                                                       Hex8RhieChowPackT<scalar_t>                   &rc) {
++                                                       Hex8RhieChowPackT<scalar_t>                   &rc,
++                                                       const Hex8RcTauT<scalar_t> &tau) {
++    rc.tau = tau;
+     for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
+         if (lane < nlanes) {
+             const ptrdiff_t e = begin + lane;
+@@ -649,7 +651,7 @@ static SFEM_INLINE void cvfem_hex8_action_lanes_affine(
+                                               det);
+             if (with_rc) {
+                 cvfem_hex8_gather_rc_from_pack(pack_elems, pk.pgx, pk.pgy, pk.pgz,
+-                                               begin, nlanes, rcp);
++                                               begin, nlanes, rcp, rc_cfg.tau);
+                 cvfem_hex8_gather_rc_coeff(rc_coeff, rc_w, rc_cfg, begin, nlanes, rcp);
+             }
+             if (with_qg)
+diff --git a/spikes/cvfem/src/tests/consistency/cvfem_packed_vs_atomic_test.cpp b/spikes/cvfem/src/tests/consistency/cvfem_packed_vs_atomic_test.cpp
+index 6e289e0..a9fdbd8 100644
+--- a/spikes/cvfem/src/tests/consistency/cvfem_packed_vs_atomic_test.cpp
++++ b/spikes/cvfem/src/tests/consistency/cvfem_packed_vs_atomic_test.cpp
+@@ -305,6 +305,47 @@ static void compare_jacobian(sfem::Context &ctx, const bool lshape, const char *
+     }
+ }
+ 
++static void compare_transient_residual(sfem::Context &ctx, const int order) {
++    Run a, b;
++    build(a, 0, false, ctx);
++    build(b, 64, false, ctx);
++    for (Run *run : {&a, &b}) {
++        auto &d = run->d;
++        d.dt = scalar_t(0.1);
++        d.bdf_order = order;
++        d.u_prev.resize(size_t(d.nnodes) * 3);
++        if (order == 2) d.u_prev2.resize(size_t(d.nnodes) * 3);
++        for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
++            // Linear pressure would hide a missing Rhie-Chow coefficient.
++            d.p[i] += scalar_t(0.13) * std::sin(scalar_t(2) * d.points[0][i] +
++                scalar_t(3) * d.points[1][i] + scalar_t(5) * d.points[2][i]);
++            const scalar_t u[3] = {d.ux[i], d.uy[i], d.uz[i]};
++            for (int c = 0; c < 3; ++c) {
++                d.u_prev[size_t(i) * 3 + c] = scalar_t(0.97) * u[c];
++                if (order == 2) d.u_prev2[size_t(i) * 3 + c] = scalar_t(0.93) * u[c];
++            }
++        }
++        ++d.state_stamp;
++    }
++    const auto ra = keyed_residual(a), rb = keyed_residual(b);
++    bool valid = ra.size() == rb.size() && ra.size() == size_t(a.d.nnodes);
++    scalar_t worst = 0, scale = 0;
++    for (const auto &kv : ra) {
++        const auto it = rb.find(kv.first);
++        if (it == rb.end()) { valid = false; continue; }
++        for (int c = 0; c < 4; ++c) {
++            valid &= std::isfinite(kv.second[c]) && std::isfinite(it->second[c]);
++            worst = std::max(worst, std::fabs(kv.second[c] - it->second[c]));
++            scale = std::max(scale, std::fabs(kv.second[c]));
++        }
++    }
++    const auto cfg = cvfem_hex8_rc_config_for(b.d);
++    std::printf("transient BDF%d: RC inv_dt_a0=%g, residual rel=%.9e\n",
++                order, double(cfg.tau.inv_dt_a0), double(worst / scale));
++    check(valid && scale > 0 && worst < scalar_t(1e-12) * scale,
++          "transient packed and atomic solver residuals agree");
++}
++
+ int main(int argc, char **argv) {
+     auto ctx = sfem::initialize(argc, argv);
+     // The box first: it is the case that already works, so if it fails the harness is at
+@@ -317,6 +358,8 @@ int main(int argc, char **argv) {
+     compare_jacobian(*ctx, false, "box, positive velocity shift", scalar_t(0.017));
+     compare_jacobian(*ctx, false, "box, negative velocity shift", scalar_t(-0.017));
+     compare_jacobian(*ctx, true, "L-shape");
++    compare_transient_residual(*ctx, 1);
++    compare_transient_residual(*ctx, 2);
+ 
+     if (g_failures) {
+         std::fprintf(stderr, "\ncvfem_packed_vs_atomic_test: %d check(s) failed\n", g_failures);
+diff --git a/spikes/cvfem/src/tests/regression/cvfem_packed_determinism.sh b/spikes/cvfem/src/tests/regression/cvfem_packed_determinism.sh
+index 03f10c7..96eff89 100755
+--- a/spikes/cvfem/src/tests/regression/cvfem_packed_determinism.sh
++++ b/spikes/cvfem/src/tests/regression/cvfem_packed_determinism.sh
+@@ -1,24 +1,7 @@
+ #!/usr/bin/env bash
+-# THE PACKED LAYOUT IS DETERMINISTIC BY DESIGN, and this is the test that says so.
+-#
+-# Every pack accumulates into a thread-private buffer indexed by pack-local node ids, writes the
+-# rows it owns straight out, and hands the rows it shares to a reduction whose order is fixed by
+-# a graph built once. No atomic anywhere, so the result does not depend on how the threads were
+-# scheduled -- which is the property the format is for, and the reason its throughput can be
+-# compared against the atomic layout's at all.
+-#
+-# A bitwise fingerprint at the same thread count, twice, is the whole test. It exists because
+-# nothing else catches the failure mode cheaply: a stray `#pragma omp parallel` left above a
+-# dispatch turned the dispatch itself into a parallel region, so each outer thread entered a
+-# NESTED one-thread team -- where cvfem_n_threads() is 1 and cvfem_thread_index() is 0 -- and
+-# every one of them swept the whole pack range. The assembled matrix then came out different on
+-# every run.
+-#
+-# The fingerprint sweep that found it did so only by luck: it compares against a recorded
+-# baseline, so a race that happened to reproduce the baseline would have passed. Comparing a run
+-# against ITSELF cannot be fooled that way. It has now happened twice in this spike -- the other
+-# instance was a launcher wrapping a still-self-parallel reduction -- which is what makes it
+-# worth a gate rather than a note.
++# Repeat each configuration to catch schedule-dependent changes.
++# The separate fixed-input test varies thread count while keeping inputs and packing fixed.
++# This gate previously caught nested parallel regions that made every thread sweep all packs.
+ set -u
+ BENCH=${1:?usage: $0 <cvfem_hex8_ns_upwind_bench>}
+ N=${N:-20}
+diff --git a/spikes/cvfem/src/tests/regression/cvfem_packed_fixed_input_test.cpp b/spikes/cvfem/src/tests/regression/cvfem_packed_fixed_input_test.cpp
+new file mode 100644
+index 0000000..118cd0e
+--- /dev/null
++++ b/spikes/cvfem/src/tests/regression/cvfem_packed_fixed_input_test.cpp
+@@ -0,0 +1,131 @@
++#include "frontend/staging/cvfem_hex8_best_common.hpp"
++#include "frontend/staging/cvfem_hex8_packed_launch.hpp"
++#include "sfem_context.hpp"
++#include "smesh_sfc.hpp"
++
++#include <cmath>
++#include <cstdio>
++#include <cstring>
++#include <limits>
++#include <vector>
++
++static bool same_finite_bits(const std::vector<scalar_t> &a,
++                             const std::vector<scalar_t> &b) {
++    if (a.empty() || a.size() != b.size()) return false;
++    for (size_t i = 0; i < a.size(); ++i)
++        if (!std::isfinite(a[i]) || !std::isfinite(b[i])) return false;
++    return std::memcmp(a.data(), b.data(), a.size() * sizeof(scalar_t)) == 0;
++}
++
++int main(int argc, char **argv) {
++#ifndef _OPENMP
++    std::puts("OpenMP is required for a cross-thread check");
++    return 77;
++#else
++    sfem::Context context(argc, argv);
++    omp_set_dynamic(0);
++
++    const std::vector<scalar_t> control{scalar_t(1)};
++    const std::vector<scalar_t> changed{std::nextafter(scalar_t(1), scalar_t(2))};
++    const std::vector<scalar_t> nan{std::numeric_limits<scalar_t>::quiet_NaN()};
++    if (!same_finite_bits(control, control) || same_finite_bits(control, changed) ||
++        same_finite_bits(nan, nan) || same_finite_bits(control, {})) return 1;
++
++    // n=24 includes non-dyadic coordinates and the input-tail case found in review.
++    for (const int n : {8, 24}) {
++        omp_set_num_threads(1);
++        MeshData d;
++        d.mesh = smesh::Mesh::create_hex8_cube(context.communicator(), n, n, n, 0, 0, 0, 1, 1, 1);
++        auto sfc = smesh::SFC::create_from_env();
++        sfc->reorder(*d.mesh);
++        auto packed = make_packed(d.mesh, 64);
++        d.nnodes = d.mesh->n_nodes();
++        d.nelements = d.mesh->n_elements(0);
++        d.elems = d.mesh->elements(0)->data();
++        d.points = d.mesh->points()->data();
++        precompute_affine_geometry(d);
++        fill_fields(d);
++        if (packed.n_packs < 4 || packed.n_ghost_reduce_rows == 0) return 1;
++
++        // Initialize once: changing arithmetic in a parallel initializer would
++        // compare different inputs instead of testing operator reproducibility.
++        std::vector<scalar_t> direction(size_t(d.nnodes) * N_FIELDS);
++        for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
++            const uint32_t h = uint32_t(i) * 2246822519u + 374761393u;
++            const auto noise = [&](const int shift) {
++                return scalar_t((h >> shift) & 255u) / scalar_t(255) - scalar_t(0.5);
++            };
++            d.ux[i] += scalar_t(0.03) * noise(0);
++            d.uy[i] += scalar_t(0.03) * noise(8);
++            d.uz[i] += scalar_t(0.03) * noise(16);
++            d.p[i] += scalar_t(0.03) * noise(3);
++            for (int f = 0; f < N_FIELDS; ++f)
++                direction[size_t(i) * N_FIELDS + f] = scalar_t(0.25) + noise(f * 5);
++        }
++        const auto ux = d.ux, uy = d.uy, uz = d.uz, pressure = d.p;
++        const auto saved_direction = direction;
++        std::vector<scalar_t> buffer, gu, gv, baseline_residual, baseline_action;
++        for (const int scheme : {-2, -1, 0, 1, 2, 3}) {
++            d.rhie_chow_scale = scheme == -2 ? 0 : 1;
++            for (const int threads : {1, 2, 3, 4, 2, 1}) {
++                omp_set_num_threads(threads);
++                int actual_threads = 0;
++#pragma omp parallel
++                {
++#pragma omp single
++                    actual_threads = omp_get_num_threads();
++                }
++                if (actual_threads != threads) {
++                    std::fprintf(stderr, "requested %d threads, got %d\n", threads, actual_threads);
++                    return 1;
++                }
++                if (scheme != -2) {
++                    cvfem_hex8_assemble_nodal_grads_packed(d, packed, 0, d.p.data(), 1,
++                                                         d.pgx, d.pgy, d.pgz, buffer);
++                    cvfem_hex8_assemble_nodal_grads_packed(d, packed, 0, direction.data() + 3, N_FIELDS,
++                                                         d.qgx, d.qgy, d.qgz, buffer);
++                }
++                if (scheme >= 0) {
++                    const scalar_t *state[3] = {d.ux.data(), d.uy.data(), d.uz.data()};
++                    const scalar_t *dir[3] = {direction.data(), direction.data() + 1, direction.data() + 2};
++                    const int strides[3] = {N_FIELDS, N_FIELDS, N_FIELDS};
++                    cvfem_hex8_assemble_nodal_grads_packed(d, packed, 0, state, 3, gu, buffer);
++                    cvfem_hex8_assemble_nodal_grads_packed(d, packed, 0, dir, 3, gv, buffer, strides);
++                    apply_residual_packed_defcor(d, packed, scalar_t(1), scalar_t(0.01),
++                                                gu.data(), scheme, scalar_t(0));
++                } else {
++                    apply_residual_packed(d, packed, scalar_t(1), scalar_t(0.01), GeomKind::Affine);
++                }
++                std::vector<scalar_t> residual;
++                for (const auto *field : {&d.rx, &d.ry, &d.rz, &d.rc})
++                    residual.insert(residual.end(), field->begin(), field->end());
++                std::vector<scalar_t> action(direction.size());
++                apply_jacobian_action_packed(d, packed, scalar_t(1), scalar_t(0.01),
++                    GeomKind::Affine, direction.data(), action.data(),
++                    scheme >= 0 ? gu.data() : nullptr, scheme >= 0 ? gv.data() : nullptr,
++                    scheme >= 0 ? scheme : 0);
++                if (baseline_residual.empty()) {
++                    baseline_residual = residual;
++                    baseline_action = action;
++                }
++                if (!same_finite_bits(baseline_residual, residual) ||
++                    !same_finite_bits(baseline_action, action) ||
++                    !same_finite_bits(ux, d.ux) || !same_finite_bits(uy, d.uy) ||
++                    !same_finite_bits(uz, d.uz) || !same_finite_bits(pressure, d.p) ||
++                    !same_finite_bits(saved_direction, direction)) {
++                    std::fprintf(stderr, "FAIL: n=%d scheme=%d threads=%d\n", n, scheme, threads);
++                    return 1;
++                }
++                bool residual_nonzero = false, action_nonzero = false;
++                for (const auto v : residual) residual_nonzero |= v != scalar_t(0);
++                for (const auto v : action) action_nonzero |= v != scalar_t(0);
++                if (!residual_nonzero || !action_nonzero) return 1;
++            }
++            std::printf("PASS: n=%d pack=64 scheme=%d residual/action bits at 1/2/3/4 threads\n", n, scheme);
++            baseline_residual.clear();
++            baseline_action.clear();
++        }
++    }
++    return 0;
++#endif
++}
+diff --git a/spikes/cvfem/src/tests/verification/cvfem_check_dump.sh b/spikes/cvfem/src/tests/verification/cvfem_check_dump.sh
+new file mode 100644
+index 0000000..b0fa453
+--- /dev/null
++++ b/spikes/cvfem/src/tests/verification/cvfem_check_dump.sh
+@@ -0,0 +1,14 @@
++#!/usr/bin/env bash
++# Validate the whole native-double dump before comparing or accepting equal bytes.
++set -euo pipefail
++file=${1:?usage: cvfem_check_dump.sh FILE EXPECTED_VALUES}
++expected=${2:?expected value count is required}
++[[ $expected =~ ^[1-9][0-9]*$ ]] || exit 1
++if [[ $(wc -c < "$file") -ne $((8 * expected)) ]]; then
++    echo "FAIL: wrong dump size: $file" >&2
++    exit 1
++fi
++LC_ALL=C od -An -v -t f8 "$file" | LC_ALL=C awk -v expected="$expected" '
++    toupper($0) ~ /NAN|INF/ { bad=1 }
++    { for (i=1; i<=NF; ++i) { print $i; count++ } }
++    END { exit bad || count != expected }'
+diff --git a/spikes/cvfem/src/tests/verification/cvfem_check_dump_test.py b/spikes/cvfem/src/tests/verification/cvfem_check_dump_test.py
+new file mode 100644
+index 0000000..e08b432
+--- /dev/null
++++ b/spikes/cvfem/src/tests/verification/cvfem_check_dump_test.py
+@@ -0,0 +1,37 @@
++"""Nonfinite and malformed dumps must fail even when both files would be identical."""
++import math
++from pathlib import Path
++import struct
++import subprocess
++import tempfile
++
++
++def main():
++    checker = Path(__file__).with_name('cvfem_check_dump.sh')
++    with tempfile.TemporaryDirectory() as work:
++        path = Path(work) / 'values.bin'
++        good = struct.pack('=4d', 0.0, -1.5, 2.0, 3.25)
++        cases = [('finite', good, True), ('empty', b'', False),
++                 ('truncated', good[:-1], False),
++                 ('missing_value', good[:-8], False),
++                 ('extra_value', good + good[:8], False)]
++        for value in (float('nan'), float('inf'), -float('inf')):
++            for index in (0, 3):
++                bad = bytearray(good)
++                struct.pack_into('=d', bad, 8 * index, value)
++                cases.append(('nonfinite', bad, False))
++        for name, payload, accepted in cases:
++            path.write_bytes(payload)
++            result = subprocess.run(['bash', str(checker), str(path), '4'],
++                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
++            if (result.returncode == 0) != accepted:
++                raise AssertionError('wrong acceptance for ' + name)
++            if accepted:
++                values = [float(x) for x in result.stdout.split()]
++                if values != [0.0, -1.5, 2.0, 3.25] or not all(map(math.isfinite, values)):
++                    raise AssertionError('changed finite values')
++    print('dump validation: finite values, NaN/Inf, truncation and size controls PASS')
++
++
++if __name__ == '__main__':
++    main()
+diff --git a/spikes/cvfem/src/tests/verification/cvfem_coupled_jacobian_fd.hpp b/spikes/cvfem/src/tests/verification/cvfem_coupled_jacobian_fd.hpp
+index e71f484..510c7d3 100644
+--- a/spikes/cvfem/src/tests/verification/cvfem_coupled_jacobian_fd.hpp
++++ b/spikes/cvfem/src/tests/verification/cvfem_coupled_jacobian_fd.hpp
+@@ -10,11 +10,31 @@ static int verify_coupled_jacobian_fd(MeshData &d, PackedData &p, const scalar_t
+                                       const int limiter, const scalar_t venkat_c) {
+     const ptrdiff_t n = d.nnodes;
+     const auto cfg = cvfem_hex8_rc_config_for(d);
+-    if (cfg.tau.u2_scale != scalar_t(1) || cfg.tau.inv_dt_a0 != scalar_t(0) ||
++    if (cfg.tau.u2_scale != scalar_t(1) || !std::isfinite(cfg.tau.inv_dt_a0) ||
++        (cfg.tau.inv_dt_a0 != scalar_t(0) &&
++         cfg.tau.inv_dt_a0 != transient_diag_weight(d, scalar_t(1))) ||
+         cfg.scale != d.rhie_chow_scale) {
+-        std::fprintf(stderr, "FAIL: coupled verification requires the default steady RC coefficient\n");
++        std::fprintf(stderr, "FAIL: coupled verification requires the default RC coefficient\n");
+         return 2;
+     }
++    const bool with_boundary = !d.face_mask.empty();
++    const bool with_transient = d.dt > scalar_t(0);
++    if (with_transient && (d.u_prev.size() != size_t(3 * n) ||
++        (d.bdf_order == 2 && d.u_prev2.size() != size_t(3 * n)))) {
++        std::fprintf(stderr, "FAIL: coupled verification requires complete BDF history\n");
++        return 2;
++    }
++    int actual_threads = 1;
++#ifdef _OPENMP
++#pragma omp parallel
++    {
++#pragma omp single
++        actual_threads = omp_get_num_threads();
++    }
++#endif
++    std::printf("verify_jac_coupled_scope: boundary %d bdf %d dt %g rc_inv_dt_a0 %g threads %d\n",
++                int(with_boundary), with_transient ? bdf_coeffs(d).order : 0,
++                double(d.dt), double(cfg.tau.inv_dt_a0), actual_threads);
+     std::vector<scalar_t> dir(size_t(n) * N_FIELDS);
+     for (ptrdiff_t i = 0; i < n; ++i) {
+         const uint32_t h = uint32_t(i) * 2246822519u + 374761393u;
+@@ -31,6 +51,7 @@ static int verify_coupled_jacobian_fd(MeshData &d, PackedData &p, const scalar_t
+     const auto ux = d.ux, uy = d.uy, uz = d.uz, pressure = d.p;
+     std::vector<scalar_t> gu, gv, buffer, rp, rm;
+     std::vector<scalar_t> exact(dir.size()), no_qgrad(dir.size()), no_coeff_du(dir.size());
++    std::vector<scalar_t> no_boundary(dir.size()), no_transient(dir.size());
+     auto set_state = [&](const scalar_t step) {
+         for (ptrdiff_t i = 0; i < n; ++i) {
+             d.ux[i] = ux[i] + step * dir[size_t(i) * N_FIELDS];
+@@ -45,12 +66,14 @@ static int verify_coupled_jacobian_fd(MeshData &d, PackedData &p, const scalar_t
+             cvfem_hex8_assemble_nodal_grads_packed(d, p, 0, src, 3, gu, buffer);
+         }
+     };
+-    auto action = [&](std::vector<scalar_t> &out) {
++    auto action = [&](std::vector<scalar_t> &out, const bool boundary = true, const bool transient = true) {
+         if (with_ho)
+             apply_jacobian_action_packed(d, p, rho, mu, GeomKind::Affine, dir.data(), out.data(),
+                                         gu.data(), gv.data(), limiter, venkat_c);
+         else
+             apply_jacobian_action_packed(d, p, rho, mu, GeomKind::Affine, dir.data(), out.data());
++        if (boundary) apply_boundary_scs_jacobian_action_pass(d, rho, mu, 0, dir.data(), out.data());
++        if (transient) apply_transient_action_pass(d, rho, dir.data(), out.data());
+     };
+     set_state(scalar_t(0));
+     cvfem_hex8_assemble_nodal_grads_packed(d, p, 0, dir.data() + 3, N_FIELDS,
+@@ -61,6 +84,8 @@ static int verify_coupled_jacobian_fd(MeshData &d, PackedData &p, const scalar_t
+         cvfem_hex8_assemble_nodal_grads_packed(d, p, 0, src, 3, gv, buffer, strides);
+     }
+     action(exact);
++    if (with_boundary) action(no_boundary, false, true);
++    if (with_transient) action(no_transient, true, false);
+ 
+     // Each omitted sensitivity must be visible to the finite-difference oracle.
+     auto qgx = d.qgx, qgy = d.qgy, qgz = d.qgz;
+@@ -79,6 +104,8 @@ static int verify_coupled_jacobian_fd(MeshData &d, PackedData &p, const scalar_t
+         set_state(step);
+         if (with_ho) apply_residual_packed_defcor(d, p, rho, mu, gu.data(), limiter, venkat_c);
+         else apply_residual_packed(d, p, rho, mu, GeomKind::Affine);
++        apply_boundary_scs_residual_pass(d, rho, mu, 0);
++        apply_transient_pass(d, rho);
+         pack_residual(d, out);
+     };
+     const scalar_t tolerance = scalar_t(1e-6);
+@@ -89,10 +116,13 @@ static int verify_coupled_jacobian_fd(MeshData &d, PackedData &p, const scalar_t
+         residual(-eps, rm);
+         std::array<scalar_t, N_FIELDS> scale{}, error{};
+         scalar_t scale_all = 0, error_all = 0, qgrad_error = 0, coeff_error = 0;
++        scalar_t boundary_error = 0, transient_error = 0;
+         for (size_t i = 0; i < exact.size(); ++i) {
+             const scalar_t fd = (rp[i] - rm[i]) / (scalar_t(2) * eps);
+             if (!std::isfinite(fd) || !std::isfinite(exact[i]) || !std::isfinite(no_qgrad[i]) ||
+-                !std::isfinite(no_coeff_du[i])) {
++                !std::isfinite(no_coeff_du[i]) ||
++                (with_boundary && !std::isfinite(no_boundary[i])) ||
++                (with_transient && !std::isfinite(no_transient[i]))) {
+                 std::fprintf(stderr, "FAIL: nonfinite value in coupled derivative check\n");
+                 return 1;
+             }
+@@ -103,6 +133,8 @@ static int verify_coupled_jacobian_fd(MeshData &d, PackedData &p, const scalar_t
+             error_all = std::max(error_all, delta);
+             qgrad_error = std::max(qgrad_error, std::fabs(fd - no_qgrad[i]));
+             coeff_error = std::max(coeff_error, std::fabs(fd - no_coeff_du[i]));
++            if (with_boundary) boundary_error = std::max(boundary_error, std::fabs(fd - no_boundary[i]));
++            if (with_transient) transient_error = std::max(transient_error, std::fabs(fd - no_transient[i]));
+         }
+         if (!(scale_all > scalar_t(0))) {
+             std::fprintf(stderr, "FAIL: zero coupled finite-difference reference\n");
+@@ -115,13 +147,18 @@ static int verify_coupled_jacobian_fd(MeshData &d, PackedData &p, const scalar_t
+         }
+         const bool required = eps <= scalar_t(1e-6);
+         const bool controls_fail = qgrad_error > scalar_t(10) * tolerance * scale_all &&
+-                                   coeff_error > scalar_t(10) * tolerance * scale_all;
++                                   coeff_error > scalar_t(10) * tolerance * scale_all &&
++                                   (!with_boundary || boundary_error > scalar_t(10) * tolerance * scale_all) &&
++                                   (!with_transient || transient_error > scalar_t(10) * tolerance * scale_all);
+         std::printf("verify_jac_coupled: ho %d limiter %d eps %.1e required %d rel %.9e "
+-                    "fields %.3e %.3e %.3e %.3e no_qgrad %.3e no_coeff_du %.3e\n",
++                    "fields %.3e %.3e %.3e %.3e no_qgrad %.3e no_coeff_du %.3e "
++                    "boundary %d bdf %d no_boundary %.3e no_transient %.3e\n",
+                     int(with_ho), limiter, double(eps), int(required), double(error_all / scale_all),
+                     double(error[0] / scale[0]), double(error[1] / scale[1]),
+                     double(error[2] / scale[2]), double(error[3] / scale[3]),
+-                    double(qgrad_error / scale_all), double(coeff_error / scale_all));
++                    double(qgrad_error / scale_all), double(coeff_error / scale_all),
++                    int(with_boundary), with_transient ? bdf_coeffs(d).order : 0,
++                    double(boundary_error / scale_all), double(transient_error / scale_all));
+         if (required) {
+             ++required_steps;
+             passed &= fields_pass && controls_fail;
+diff --git a/spikes/cvfem/src/tests/verification/cvfem_jacobian_cache.sh b/spikes/cvfem/src/tests/verification/cvfem_jacobian_cache.sh
+index 9307f2e..9a1617f 100644
+--- a/spikes/cvfem/src/tests/verification/cvfem_jacobian_cache.sh
++++ b/spikes/cvfem/src/tests/verification/cvfem_jacobian_cache.sh
+@@ -2,6 +2,7 @@
+ # Compare complete actions while the Krylov direction changes at a fixed state.
+ set -euo pipefail
+ bench=${1:?usage: cvfem_jacobian_cache.sh /absolute/path/to/bench}
++checker=$(cd "$(dirname "$0")" && pwd)/cvfem_check_dump.sh
+ work=$(mktemp -d)
+ trap 'rm -rf "$work"' EXIT
+ cd "$work"
+@@ -9,6 +10,12 @@ cd "$work"
+ check() {
+     local layout=$1 threads=$2 label=$3
+     shift 3
++    local n=10 previous='' arg
++    for arg in "$@"; do
++        if [[ $previous == --n ]]; then n=$arg; fi
++        previous=$arg
++    done
++    local expected=$((4 * (n + 1) * (n + 1) * (n + 1)))
+     for mode in cached per_apply; do
+         local extra=(--repeat 3)
+         if [[ $mode == per_apply ]]; then extra+=(--rebuild-state-gradients); fi
+@@ -27,7 +34,10 @@ check() {
+         ' "$mode.csv"
+         # Warmup must not enter a phase fraction whose denominator excludes warmup.
+         awk '/^  frac_jac_action_(qgrad|hograd):/ { if ($2 < 0 || $2 > 1.001) exit 1 }' "$mode.log"
+-        test -s "$mode.bin"
++        if ! bash "$checker" "$mode.bin" "$expected" > "$mode.txt"; then
++            echo "FAIL: $layout/$threads/$label ($mode): invalid output dump"
++            exit 1
++        fi
+         rm "$mode.csv"
+     done
+     if cmp -s cached.bin per_apply.bin; then
+@@ -38,9 +48,6 @@ check() {
+     # Allow 64 scalar rounding units in the infinity norm, not a limiter-sized error.
+     local tolerance=1.4210854715202004e-14
+     if grep -q '^  scalar: f32' cached.log; then tolerance=7.62939453125e-6; fi
+-    for mode in cached per_apply; do
+-        LC_ALL=C od -An -v -t f8 "$mode.bin" | awk '{ for (i=1; i<=NF; ++i) print $i }' > "$mode.txt"
+-    done
+     paste cached.txt per_apply.txt | LC_ALL=C awk -v tolerance="$tolerance" \
+         -v label="$layout/$threads/$label" '
+         function abs(x) { return x < 0 ? -x : x }
+diff --git a/spikes/cvfem/src/tests/verification/cvfem_jacobian_coupled.sh b/spikes/cvfem/src/tests/verification/cvfem_jacobian_coupled.sh
+index 4f7d4df..80d00b1 100644
+--- a/spikes/cvfem/src/tests/verification/cvfem_jacobian_coupled.sh
++++ b/spikes/cvfem/src/tests/verification/cvfem_jacobian_coupled.sh
+@@ -20,17 +20,17 @@ for threads in ${COUPLED_TEST_THREADS:-1 2}; do
+         test "$(grep -c 'required 1' check.log)" -eq 2
+     done
+ done
+-for option in '--lagged-rc' '--lagged-ho' '--boundary' '--transient 0.1' \
++for option in '--lagged-rc' '--lagged-ho' '--transient -0.1' '--transient nan' '--transient inf' '--transient 0.1 --bdf 3' \
+               '--geom isoparam' '--grad-precision single' '--layout atomic'; do
+     if OMP_NUM_THREADS=1 "$bench" "${args[@]}" $option > refused.log 2>&1; then
+         echo "FAIL: coupled check accepted unsupported option $option"
+         exit 1
+     fi
+-    grep -q 'requires a standalone packed affine steady RC action' refused.log
++    grep -q 'requires a standalone packed affine RC action' refused.log
+ done
+ if OMP_NUM_THREADS=1 SFEM_RC_TAU=0 "$bench" "${args[@]}" > refused.log 2>&1; then
+     echo 'FAIL: coupled check accepted a velocity-independent RC coefficient'
+     exit 1
+ fi
+-grep -q 'requires the default steady RC coefficient' refused.log
++grep -q 'requires the default RC coefficient' refused.log
+ echo 'cvfem_jacobian_coupled: PASSED'
