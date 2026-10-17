@@ -705,6 +705,7 @@ namespace sfem {
     void set_value_in_block(const std::string &block_name,
                 const std::string &var_name,
                 real_t value) override;
+    std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override;
 #ifdef SFEM_ENABLE_RYAML
     std::shared_ptr<Op> create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
                                              const ryml::ConstNodeRef             &node) override;
@@ -1408,6 +1409,7 @@ def _hyperelastic_op(
 
 %(element_scratch_include)s#include "sfem_FunctionSpace.hpp"
 #include "sfem_MultiDomainOp.hpp"
+#include "sfem_DerefinedTimeScheme.hpp"
 #include "sfem_OpTracer.hpp"
 #include "sfem_Parameters.hpp"
 #include "smesh_kernel_data.hpp"
@@ -1636,6 +1638,9 @@ namespace sfem {
   int %(op)s::initialize(const std::vector<std::string> &block_names) {
     SFEM_TRACE_SCOPE("%(op)s::initialize");
     impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
+    // A micro-element space hands each semi-structured macro element over as its micro
+    // elements, which these kernels assemble as HEX8.
+    impl_->domains->set_micro_elements(impl_->space->micro_elements());
     {
       auto dof_graph = impl_->space->dof_to_dof_graph();
       if (!dof_graph ||
@@ -1914,7 +1919,7 @@ namespace sfem {
     SFEM_TRACE_SCOPE("%(op)s::set_value_in_block");
     impl_->domains->set_value_in_block(block_name, var_name, value);
   }
-
+%(derefine_op)s
 #ifdef SFEM_ENABLE_RYAML
   std::shared_ptr<Op> %(op)s::create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
                                                  const ryml::ConstNodeRef             &node) {
@@ -1981,6 +1986,7 @@ namespace sfem {
     )
     substitutions = {
         "op": _op_class_name(material),
+        "derefine_op": _derefine_op_source(_op_class_name(material), True),
         "header_stem": _op_file_stem(material),
         "stream_member": _op_stream_member(),
         "c_abi_include": '#include "%s"' % c_abi_header if c_abi_header else "",
@@ -2976,6 +2982,7 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
 
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_MultiDomainOp.hpp"
+#include "sfem_DerefinedTimeScheme.hpp"
 #include "sfem_OpTracer.hpp"
 #include "sfem_Parameters.hpp"
 #include "smesh_kernel_data.hpp"
@@ -3203,6 +3210,9 @@ namespace sfem {
   int %(op)s::initialize(const std::vector<std::string> &block_names) {
     SFEM_TRACE_SCOPE("%(op)s::initialize");
     impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
+    // A micro-element space hands each semi-structured macro element over as its micro
+    // elements, which these kernels assemble as HEX8.
+    impl_->domains->set_micro_elements(impl_->space->micro_elements());
     {
       auto dof_graph = impl_->space->dof_to_dof_graph();
       if (!dof_graph ||
@@ -3306,7 +3316,7 @@ namespace sfem {
     SFEM_TRACE_SCOPE("%(op)s::set_value_in_block");
     impl_->domains->set_value_in_block(block_name, var_name, value);
   }
-
+%(derefine_op)s
   void %(op)s::set_option(const std::string &name, const bool val) {
     SFEM_TRACE_SCOPE("%(op)s::set_option");
     AffineOption options[] = {
@@ -3406,6 +3416,7 @@ namespace sfem {
 """
     substitutions = {
         "op": _op_class_name(material),
+        "derefine_op": _derefine_op_source(_op_class_name(material), holds_scheme),
         "header_stem": _op_file_stem(material),
         "stream_member": _op_stream_member(),
         "c_abi_include": '#include "%s"' % c_abi_header if c_abi_header else "",
@@ -4463,6 +4474,9 @@ namespace sfem {
   int %(op)s::initialize(const std::vector<std::string> &block_names) {
     SFEM_TRACE_SCOPE("%(op)s::initialize");
     impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
+    // A micro-element space hands each semi-structured macro element over as its micro
+    // elements, which these kernels assemble as HEX8.
+    impl_->domains->set_micro_elements(impl_->space->micro_elements());
     {
       auto dof_graph = impl_->space->dof_to_dof_graph();
       if (!dof_graph ||
@@ -4787,6 +4801,7 @@ def _coupled_energy_residual_op(
 
 %(element_scratch_include)s#include "sfem_FunctionSpace.hpp"
 #include "sfem_MultiDomainOp.hpp"
+#include "sfem_DerefinedTimeScheme.hpp"
 #include "sfem_OpTracer.hpp"
 #include "sfem_Parameters.hpp"
 #include "smesh_kernel_data.hpp"
@@ -4966,6 +4981,9 @@ namespace sfem {
   int %(op)s::initialize(const std::vector<std::string> &block_names) {
     SFEM_TRACE_SCOPE("%(op)s::initialize");
     impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
+    // A micro-element space hands each semi-structured macro element over as its micro
+    // elements, which these kernels assemble as HEX8.
+    impl_->domains->set_micro_elements(impl_->space->micro_elements());
     {
       auto dof_graph = impl_->space->dof_to_dof_graph();
       if (!dof_graph ||
@@ -5120,7 +5138,7 @@ namespace sfem {
     SFEM_TRACE_SCOPE("%(op)s::set_value_in_block");
     impl_->domains->set_value_in_block(block_name, var_name, value);
   }
-
+%(derefine_op)s
 #ifdef SFEM_ENABLE_RYAML
   std::shared_ptr<Op> %(op)s::create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
                                                  const ryml::ConstNodeRef             &node) {
@@ -5185,6 +5203,7 @@ namespace sfem {
 %(hessian_bsr_method)s}  // namespace sfem
 """ % {
         "op": _op_class_name(material),
+        "derefine_op": _derefine_op_source(_op_class_name(material), _has_time_rate(material)),
         "header_stem": _op_file_stem(material),
         "stream_member": _op_stream_member(),
         "hessian_bsr_method": _coupled_hessian_bsr_method(
@@ -6064,6 +6083,42 @@ _HEADER_TIME_SCHEME_DECLARATION = {
 }
 
 _HEADER_TIME_SCHEME_INCLUDE = {False: "", True: '#include "sfem_TimeScheme.hpp"\n'}
+
+#: A coarser level of a semi-structured hierarchy (SSMGC, SSGMG) asks every operator of the
+#: Function for itself on the coarse space.  The same material there, its parameters block by
+#: block, and a held scheme seen from that level (`derefine_time_scheme`: the fine shift and
+#: weights, the inertia rediscretised).  Affine options are not carried: they are a speed choice,
+#: and a micro-element view reads its geometry isoparametrically.
+_DEREFINE_OP = """
+  std::shared_ptr<Op> %(op)s::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
+    SFEM_TRACE_SCOPE("%(op)s::derefine_op");
+    auto ret = std::make_shared<%(op)s>(space);%(scheme)s
+    if (ret->initialize() != SFEM_SUCCESS) return nullptr;
+    for (const auto &entry : impl_->domains->domains()) {
+      for (int i = 0; i < N_DEFINED_MATERIAL_PARAMETERS; ++i) {
+        ret->set_value_in_block(entry.first,
+                                MATERIAL_PARAMETER_NAMES[i],
+                                entry.second.parameters->require_real_value(MATERIAL_PARAMETER_NAMES[i]));
+      }
+    }
+    return ret;
+  }
+"""
+
+_DEREFINE_SCHEME = {
+    False: "",
+    True: """
+    if (impl_->time_scheme) {
+      auto coarse_scheme = derefine_time_scheme(impl_->time_scheme, space);
+      if (!coarse_scheme) return nullptr;
+      ret->set_time_scheme(coarse_scheme);
+    }""",
+}
+
+
+def _derefine_op_source(op_name, holds_scheme):
+    return _DEREFINE_OP % {"op": op_name, "scheme": _DEREFINE_SCHEME[holds_scheme]}
+
 
 #: `TimeSteppable` is what a caller casts to in order to attach a scheme, so an
 #: operator inherits it exactly when its form has a rate to discretise.

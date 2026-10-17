@@ -23,6 +23,7 @@ namespace sfem {
                 "mesh.reorder",
                 "mesh.promote_to_p2",
                 "mesh.refine",
+                "mesh.basis",
                 "mesh.packed",
                 "mesh.renumber",
                 "mesh.sidesets[].name",

@@ -76,10 +76,20 @@ namespace sfem {
 
         std::shared_ptr<CRSGraph> dof_to_dof_graph();
         std::shared_ptr<CRSGraph> node_to_node_graph();
-        /// Every node of an element coupled to every other. On a semi-structured mesh the element is
-        /// the macro element, where node_to_node_graph couples only the nodes of a micro element; an
-        /// operator whose element spans the macro element (the generated high-order ones) needs this.
-        /// Elsewhere it is node_to_node_graph.
+        /// How a semi-structured mesh is discretised. MICRO: each macro element as its micro elements,
+        /// trilinear -- what SFEM's semi-structured kernels and solvers (SSGMG, SSMGC) mean, and the
+        /// default. HIGH_ORDER: one Lagrange element of the mesh's level per macro element, which the
+        /// generated operators also offer (PROTEUS_HEX(L+1)^3). Hand-written semi-structured kernels
+        /// are micro only.
+        enum class SemiStructuredBasis { MICRO, HIGH_ORDER };
+        void                set_semi_structured_basis(SemiStructuredBasis basis);
+        SemiStructuredBasis semi_structured_basis() const;
+        /// Whether operators see this space's semi-structured domains as their micro elements.
+        bool micro_elements() const;
+
+        /// Every two nodes of an element of the basis coupled: the graph a block matrix on this space
+        /// fits. node_to_node_graph, except on a HIGH_ORDER semi-structured space, where the element
+        /// is the macro element and node_to_node_graph couples only the nodes of a micro element.
         std::shared_ptr<CRSGraph> element_node_graph();
 
         friend class Op;

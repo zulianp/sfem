@@ -168,6 +168,7 @@ namespace sfem {
         bool                                               verbose{true};
         bool                                               packed{true};
         bool                                               renumber{true};
+        FunctionSpace::SemiStructuredBasis                 basis{FunctionSpace::SemiStructuredBasis::MICRO};
         std::shared_ptr<DirichletConditions>               host_dirichlet;
         std::vector<std::pair<std::shared_ptr<Constraint>, real_t>> releases;
         std::vector<std::shared_ptr<Rotation>>             rotations;
@@ -218,6 +219,13 @@ namespace sfem {
             }
             packed   = read<bool>(node, "packed", true);
             renumber = read<bool>(node, "renumber", true);
+            const auto basis_name = read_string(node, "basis", "micro");
+            if (basis_name != "micro" && basis_name != "high_order") {
+                fprintf(stderr, "Playground: unknown mesh.basis \"%s\" (micro or high_order)\n", basis_name.c_str());
+                return SFEM_FAILURE;
+            }
+            basis = basis_name == "micro" ? FunctionSpace::SemiStructuredBasis::MICRO
+                                          : FunctionSpace::SemiStructuredBasis::HIGH_ORDER;
 
             if (!has(node, "sidesets")) return SFEM_SUCCESS;
 
@@ -295,6 +303,7 @@ namespace sfem {
                 fs = FunctionSpace::create(mesh, mesh->spatial_dimension());
                 if (packed && fs->initialize_packed_mesh() != SFEM_SUCCESS) return SFEM_FAILURE;
             }
+            fs->set_semi_structured_basis(basis);
             f = Function::create(fs);
 
             if (!has(root, "material")) {

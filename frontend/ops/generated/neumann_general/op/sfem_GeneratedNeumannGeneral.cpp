@@ -317,6 +317,9 @@ namespace sfem {
   int GeneratedNeumannGeneral::initialize(const std::vector<std::string> &block_names) {
     SFEM_TRACE_SCOPE("GeneratedNeumannGeneral::initialize");
     impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
+    // A micro-element space hands each semi-structured macro element over as its micro
+    // elements, which these kernels assemble as HEX8.
+    impl_->domains->set_micro_elements(impl_->space->micro_elements());
     {
       auto dof_graph = impl_->space->dof_to_dof_graph();
       if (!dof_graph ||

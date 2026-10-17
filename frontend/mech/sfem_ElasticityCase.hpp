@@ -25,6 +25,8 @@ namespace sfem {
     ///   reorder: none                        # none | hilbert3 | morton3, before the sidesets are read
     ///   promote_to_p2: false                 # TET4 to TET10
     ///   refine: 0                            # semi-structured refinement level
+    ///   basis: micro                         # refined: trilinear micro elements, or high_order (one
+    ///                                        # Lagrange element of the level per macro element)
     ///   packed: true                         # the packed element layout
     ///   renumber: true                       # packing renumbers the nodes; false keeps the numbering on
     ///                                        # disk, for exports compared node by node with it

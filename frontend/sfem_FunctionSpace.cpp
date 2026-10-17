@@ -26,6 +26,7 @@ namespace sfem {
         std::shared_ptr<CRSGraph>              node_to_node_graph;
         std::shared_ptr<CRSGraph>              dof_to_dof_graph;
         std::shared_ptr<CRSGraph>              element_node_graph;
+        SemiStructuredBasis                    basis{SemiStructuredBasis::MICRO};
         std::shared_ptr<FunctionSpace::PackedMesh> packed_mesh;
         //: old node id -> new node id, for the renumbering `packed_mesh` applied
         //: to `mesh` in place.  Kept because nothing else records it: anything
@@ -173,9 +174,20 @@ namespace sfem {
         return impl_->node_to_node_graph;
     }
 
+    void FunctionSpace::set_semi_structured_basis(const SemiStructuredBasis basis) {
+        impl_->basis              = basis;
+        impl_->element_node_graph = nullptr;
+    }
+
+    FunctionSpace::SemiStructuredBasis FunctionSpace::semi_structured_basis() const { return impl_->basis; }
+
+    bool FunctionSpace::micro_elements() const {
+        return impl_->basis == SemiStructuredBasis::MICRO && has_semi_structured_mesh();
+    }
+
     std::shared_ptr<CRSGraph> FunctionSpace::element_node_graph() {
         auto &mesh = *impl_->mesh;
-        if (!Impl::mesh_all_semistructured(mesh)) return node_to_node_graph();
+        if (!Impl::mesh_all_semistructured(mesh) || impl_->basis == SemiStructuredBasis::MICRO) return node_to_node_graph();
         if (impl_->element_node_graph) return impl_->element_node_graph;
 
         const auto                        n_blocks = static_cast<smesh::block_idx_t>(mesh.n_blocks());
@@ -224,7 +236,9 @@ namespace sfem {
             }
         }
 
-        return std::make_shared<FunctionSpace>(derefined_mesh, impl_->block_size);
+        auto ret = std::make_shared<FunctionSpace>(derefined_mesh, impl_->block_size);
+        ret->set_semi_structured_basis(impl_->basis);
+        return ret;
     }
 
     FunctionSpace::FunctionSpace() : impl_(std::make_unique<Impl>()) {}

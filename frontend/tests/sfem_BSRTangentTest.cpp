@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <string>
 #include <vector>
 
 #include "sfem_API.hpp"
@@ -106,27 +107,28 @@ int test_operator() {
     return SFEM_TEST_SUCCESS;
 }
 
-// On a level-2 semi-structured mesh. The generated element spans the macro element, so its matrix
-// needs every node of the macro element coupled; the micro-element graph dropped those couplings and
-// the product was 9% off the action. The hand-written micro-element operator keeps the smaller graph.
+// On a level-2 semi-structured mesh, in both bases. Micro: the generated operator takes each macro
+// element as its eight trilinear micro elements, as the hand-written one does, and the two assemble
+// the same matrix on the micro-element graph. High-order: the generated element spans the macro
+// element and needs every macro node coupled -- on the micro-element graph it lost those couplings
+// and the product was 9% off the action.
 int test_semi_structured_mesh() {
-    auto box   = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 2, 2, 1, 0, 0, 0, 1, real_t(0.7), real_t(0.5));
-    auto mesh  = smesh::to_semistructured(2, box, true, false);
-    auto fs    = sfem::FunctionSpace::create(mesh, 3);
-    const ptrdiff_t n = fs->n_dofs();
+    auto box  = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 2, 2, 1, 0, 0, 0, 1, real_t(0.7), real_t(0.5));
+    auto mesh = smesh::to_semistructured(2, box, true, false);
 
-    for (const char *name : {"GeneratedLinearElasticity", "LinearElasticity"}) {
-        auto op = sfem::create_op(fs, name, sfem::EXECUTION_SPACE_HOST);
+    std::vector<real_t> h;
+    auto assemble = [&](const std::shared_ptr<sfem::FunctionSpace> &fs, const char *name, std::vector<real_t> &y) -> int {
+        const ptrdiff_t n  = fs->n_dofs();
+        auto            op = sfem::create_op(fs, name, sfem::EXECUTION_SPACE_HOST);
         SFEM_TEST_ASSERT(op != nullptr && op->initialize() == SFEM_SUCCESS);
         auto f = sfem::Function::create(fs);
         f->add_operator(op);
-        auto graph = f->block_node_graph();
-        SFEM_TEST_ASSERT(graph == (op->assembles_micro_elements() ? fs->node_to_node_graph() : fs->element_node_graph()));
-
         auto tangent = sfem::BSRTangent::create(f, sfem::EXECUTION_SPACE_HOST);
         SFEM_TEST_ASSERT(tangent->assemble(nullptr) == SFEM_SUCCESS);
-        std::vector<real_t> h(n), y(n, 0), mf(n, 0);
+        h.resize(n);
         for (ptrdiff_t i = 0; i < n; ++i) h[i] = std::sin(real_t(0.37) * (i + 1));
+        y.assign(n, 0);
+        std::vector<real_t> mf(n, 0);
         SFEM_TEST_ASSERT(tangent->op()->apply(h.data(), y.data()) == SFEM_SUCCESS);
         SFEM_TEST_ASSERT(f->apply(nullptr, h.data(), mf.data()) == SFEM_SUCCESS);
         real_t scale = 0, error = 0;
@@ -134,11 +136,32 @@ int test_semi_structured_mesh() {
             scale = std::max(scale, std::abs(mf[i]));
             error = std::max(error, std::abs(mf[i] - y[i]));
         }
-        printf("  %s: %td nonzero blocks, |K h - J h| / |J h| = %.3g\n", name, (ptrdiff_t)graph->nnz(), (double)(error / scale));
+        printf("  %s, %s basis: %td nonzero blocks, |K h - J h| / |J h| = %.3g\n",
+               name, fs->micro_elements() ? "micro" : "high-order", (ptrdiff_t)fs->element_node_graph()->nnz(),
+               (double)(error / scale));
         // The hand-written operator's element Jacobians are single precision (jacobian_t).
-        SFEM_TEST_ASSERT(error <= (op->assembles_micro_elements() ? 1e-6 : 1e-12) * scale);
+        SFEM_TEST_ASSERT(error <= (std::string(name) == "LinearElasticity" ? 1e-6 : 1e-12) * scale);
+        return SFEM_TEST_SUCCESS;
+    };
+
+    auto micro = sfem::FunctionSpace::create(mesh, 3);
+    SFEM_TEST_ASSERT(micro->micro_elements() && micro->element_node_graph() == micro->node_to_node_graph());
+    std::vector<real_t> generated, hand;
+    SFEM_TEST_ASSERT(assemble(micro, "GeneratedLinearElasticity", generated) == SFEM_TEST_SUCCESS);
+    SFEM_TEST_ASSERT(assemble(micro, "LinearElasticity", hand) == SFEM_TEST_SUCCESS);
+    real_t scale = 0, error = 0;
+    for (size_t i = 0; i < hand.size(); ++i) {
+        scale = std::max(scale, std::abs(hand[i]));
+        error = std::max(error, std::abs(hand[i] - generated[i]));
     }
-    SFEM_TEST_ASSERT(fs->node_to_node_graph()->nnz() < fs->element_node_graph()->nnz());
+    printf("  micro: generated against hand-written %.3g\n", (double)(error / scale));
+    SFEM_TEST_ASSERT(error <= 1e-6 * scale);
+
+    auto high = sfem::FunctionSpace::create(mesh, 3);
+    high->set_semi_structured_basis(sfem::FunctionSpace::SemiStructuredBasis::HIGH_ORDER);
+    SFEM_TEST_ASSERT(high->node_to_node_graph()->nnz() < high->element_node_graph()->nnz());
+    std::vector<real_t> quadratic;
+    SFEM_TEST_ASSERT(assemble(high, "GeneratedLinearElasticity", quadratic) == SFEM_TEST_SUCCESS);
     return SFEM_TEST_SUCCESS;
 }
 

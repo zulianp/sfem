@@ -30,7 +30,7 @@ namespace sfem {
         impl.f                           = f;
         impl.es                          = es;
         impl.block_size                  = f->space()->block_size();
-        impl.graph                       = f->block_node_graph();
+        impl.graph                       = f->space()->element_node_graph();
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
             impl.graph = smesh::to_device(impl.graph);
