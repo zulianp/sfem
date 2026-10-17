@@ -870,6 +870,11 @@ namespace sfem {
       SFEM_ERROR("GeneratedMooneyRivlinKelvinVoigt requires current and previous states\n");
       return SFEM_FAILURE;
     }
+    if (auto term = time_scheme_term(impl_->time_scheme)) {
+      if (term->hessian_bsr(current, rowptr, colidx, values) != SFEM_SUCCESS) {
+        return SFEM_FAILURE;
+      }
+    }
     auto mesh = impl_->space->mesh_ptr();
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {

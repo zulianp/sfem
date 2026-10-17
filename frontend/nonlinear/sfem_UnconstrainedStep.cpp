@@ -71,6 +71,33 @@ namespace sfem {
         impl.state                              = create_buffer<real_t>(impl.ndofs, es);
         impl.rhs                                = create_buffer<real_t>(impl.ndofs, es);
 
+        // create_linear_operator turns a name it does not know into BSR_SYM, which an operator
+        // without a symmetric block assembly aborts on: a misspelt format has to stop here.
+        {
+            const OperatorType formats[] = {op_type::MATRIX_FREE,
+                                            op_type::CRS,
+                                            op_type::SPLITCRS,
+                                            op_type::ALIGNEDCRS,
+                                            op_type::CRS_SYM,
+                                            op_type::BSR,
+                                            op_type::BSR_SYM,
+                                            op_type::DIA,
+                                            op_type::COO_SYM,
+                                            op_type::SPLITDACRS,
+                                            op_type::SELL,
+                                            op_type::INEXACT};
+            bool known = false;
+            std::string names;
+            for (auto name : formats) {
+                known = known || options.format == name;
+                names += (names.empty() ? "" : ", ") + std::string(name);
+            }
+            if (!known) {
+                fprintf(stderr, "UnconstrainedStep: unknown format \"%s\" (%s)\n", options.format.c_str(), names.c_str());
+                return nullptr;
+            }
+        }
+
         if (options.preconditioner == "jacobi") {
             impl.diag   = create_buffer<real_t>(impl.ndofs, es);
             impl.jacobi = create_shiftable_jacobi(impl.diag, es);

@@ -3506,6 +3506,10 @@ namespace sfem {
         "hessian_crs_body": (
             "%s\n"
             "%s\n"
+            # The inertia, as in the gradient and the apply: a tangent without
+            # it is the static one, and Newton on it stalls once the mass
+            # dominates (small dt).
+            "%s"
             "    auto mesh = impl_->space->mesh_ptr();\n"
             "    auto points = element_points(mesh);\n"
             "    return impl_->domains->iterate([&](const OpDomain &domain) {\n"
@@ -3523,6 +3527,7 @@ namespace sfem {
             % (
                 hessian_state_alias,
                 hessian_state_check,
+                _RESIDUAL_SCHEME_HESSIAN_CRS[holds_scheme],
                 _RESIDUAL_SCHEME_ARGUMENT[holds_scheme],
                 hessian_previous_alias,
                 _residual_hessian_dispatch_body(
@@ -3544,6 +3549,10 @@ namespace sfem {
         "hessian_bsr_body": (
             "%s\n"
             "%s\n"
+            # The inertia, as in the gradient and the apply: a tangent without
+            # it is the static one, and Newton on it stalls once the mass
+            # dominates (small dt).
+            "%s"
             "    auto mesh = impl_->space->mesh_ptr();\n"
             "    auto points = element_points(mesh);\n"
             "    return impl_->domains->iterate([&](const OpDomain &domain) {\n"
@@ -3561,6 +3570,7 @@ namespace sfem {
             % (
                 hessian_state_alias,
                 hessian_state_check,
+                _RESIDUAL_SCHEME_HESSIAN_BSR[holds_scheme],
                 _RESIDUAL_SCHEME_ARGUMENT[holds_scheme],
                 hessian_previous_alias,
                 _residual_hessian_dispatch_body(
@@ -5986,6 +5996,15 @@ _COUPLED_SCHEME_HESSIAN_BSR = {
     }
 """,
 }
+
+#: The scheme's term in the residual template's assembled tangents, after the
+#: state check as in the gradient and the apply.
+_RESIDUAL_SCHEME_HESSIAN_CRS = {
+    False: "",
+    True: _COUPLED_SCHEME_HESSIAN_BSR[True].replace("hessian_bsr", "hessian_crs"),
+}
+
+_RESIDUAL_SCHEME_HESSIAN_BSR = _COUPLED_SCHEME_HESSIAN_BSR
 
 _COUPLED_SCHEME_MEMBER = {
     False: "",
