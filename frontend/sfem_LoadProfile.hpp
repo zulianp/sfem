@@ -14,7 +14,7 @@ namespace sfem {
 
     class LoadProfile {
     public:
-        enum class Type { CONSTANT, LINEAR_RAMP, HOLD, PULSE, TABULATED, SINE };
+        enum class Type { CONSTANT, LINEAR_RAMP, SMOOTH_RAMP, HOLD, PULSE, TABULATED, SINE };
 
         real_t value(const real_t time) const;
 

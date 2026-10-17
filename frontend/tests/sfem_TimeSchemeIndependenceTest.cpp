@@ -992,6 +992,56 @@ int test_holding_the_scheme_equals_adding_its_operator() {
     return SFEM_TEST_SUCCESS;
 }
 
+/// The residual-based material's assembled tangent carries the scheme's term as its action does.
+/// It used to assemble only the material's part: with the inertia dominant (small dt) Newton on
+/// the BSR tangent stalled in the line search, while the matrix-free one converged.
+int test_a_residual_material_assembles_the_schemes_term() {
+    Fixture fixture = make_fixture();
+    const ptrdiff_t ndofs = fixture.ndofs;
+
+    auto scheme = std::make_shared<sfem::NewmarkScheme>(fixture.space);
+    scheme->set_density(real_t(2));
+    SFEM_TEST_ASSERT(scheme->initialize() == SFEM_SUCCESS);
+    seed_state(ndofs, 0, scheme->state()->data());
+    seed_state(ndofs, 1, scheme->velocity()->data());
+    std::dynamic_pointer_cast<sfem::TimeSteppable>(fixture.op)->set_time_scheme(scheme);
+    SFEM_TEST_ASSERT(fixture.op->initialize() == SFEM_SUCCESS);
+    scheme->begin_step(real_t(0), real_t(1e-3));
+
+    auto x = sfem::create_host_buffer<real_t>(ndofs);
+    auto d = sfem::create_host_buffer<real_t>(ndofs);
+    seed_state(ndofs, 5, x->data());
+    seed_state(ndofs, 6, d->data());
+
+    auto graph = fixture.space->node_to_node_graph();
+    const int       bs     = fixture.space->block_size();
+    const count_t  *rowptr = graph->rowptr()->data();
+    const idx_t    *colidx = graph->colidx()->data();
+    auto            values = sfem::create_host_buffer<real_t>(graph->nnz() * bs * bs);
+    SFEM_TEST_ASSERT(fixture.op->hessian_bsr(x->data(), rowptr, colidx, values->data()) == SFEM_SUCCESS);
+
+    auto action = sfem::create_host_buffer<real_t>(ndofs);
+    SFEM_TEST_ASSERT(fixture.op->apply(x->data(), d->data(), action->data()) == SFEM_SUCCESS);
+
+    real_t worst = 0, scale = 0;
+    for (ptrdiff_t i = 0; i < ndofs / bs; ++i) {
+        for (int r = 0; r < bs; ++r) {
+            real_t product = 0;
+            for (count_t k = rowptr[i]; k < rowptr[i + 1]; ++k) {
+                for (int c = 0; c < bs; ++c) {
+                    product += values->data()[(k * bs + r) * bs + c] * d->data()[colidx[k] * bs + c];
+                }
+            }
+            worst = std::max(worst, std::abs(product - action->data()[i * bs + r]));
+            scale = std::max(scale, std::abs(action->data()[i * bs + r]));
+        }
+    }
+    printf("  max |J d| %g, worst |K d - J d| %g\n", (double)scale, (double)worst);
+    SFEM_TEST_ASSERT(scale > 0);
+    SFEM_TEST_ASSERT(worst <= real_t(1e-10) * scale);
+    return SFEM_TEST_SUCCESS;
+}
+
 namespace {
 
     /// A contact that never touches: no reaction, nothing to project.
@@ -1124,6 +1174,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_the_schemes_potential_differentiates_to_its_residual);
     SFEM_RUN_TEST(test_an_energy_material_carries_the_schemes_potential);
     SFEM_RUN_TEST(test_holding_the_scheme_equals_adding_its_operator);
+    SFEM_RUN_TEST(test_a_residual_material_assembles_the_schemes_term);
     SFEM_RUN_TEST(test_contact_stabilisation_without_contact_is_newmark);
     SFEM_RUN_TEST(test_contact_stabilisation_carries_the_material_acceleration);
     SFEM_UNIT_TEST_FINALIZE();
