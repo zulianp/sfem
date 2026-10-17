@@ -103,6 +103,16 @@ class ManifestTests(unittest.TestCase):
         self.assertEqual({"mu": 2.0, "lambda": 3.0}, variant["material"])
         self.assertEqual("lmbda", variant["material_parameter_map"]["lambda"])
 
+    def test_variant_time_overrides_the_case_time(self):
+        case = valid_v2_case()
+        case["time"] = {"duration": 1.0, "time_steps": [0.1, 0.05, 0.025]}
+        case["variants"].append(dict(case["variants"][0], id="finer", time={"duration": 1.0, "time_steps": [0.05, 0.025, 0.0125]}))
+        run_all.validate_case(case)
+        coarse, finer = run_all.normalized_variants(case)
+
+        self.assertEqual([0.1, 0.05, 0.025], run_all._resolved_manifest(case, coarse)["time"]["time_steps"])
+        self.assertEqual([0.05, 0.025, 0.0125], run_all._resolved_manifest(case, finer)["time"]["time_steps"])
+
     def test_loading_and_geometry_scalars_are_available_to_yaml_templates(self):
         case = valid_v2_case()
         case["geometry"] = {"inner_radius_m": 1.0, "mesh_levels": [8, 16]}
