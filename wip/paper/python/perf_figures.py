@@ -2433,6 +2433,14 @@ def build(out_dir, tab_dir):
     solver = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(solver)
     written.extend(solver.build(DATA, out_dir, tab_dir))
+    spec = importlib.util.spec_from_file_location("unstructured_figures", os.path.join(HERE, "unstructured_figures.py"))
+    unstructured = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(unstructured)
+    written.extend(unstructured.build(DATA, out_dir, tab_dir))
+    spec = importlib.util.spec_from_file_location("mms_refinement", os.path.join(HERE, "mms_refinement.py"))
+    mms = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mms)
+    written.extend(mms.build(DATA, out_dir, os.path.join(os.path.dirname(out_dir), "reproducibility")))
     return written
 
 
@@ -2725,6 +2733,14 @@ def selftest():
         solver = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(solver)
         check(solver.selftest(), "solver iterations: true residuals, configurations and raw logs")
+        spec = importlib.util.spec_from_file_location("unstructured_figures", os.path.join(HERE, "unstructured_figures.py"))
+        unstructured = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(unstructured)
+        check(unstructured.selftest(), "unstructured results: raw replay, scope and slower case retained")
+        spec = importlib.util.spec_from_file_location("mms_refinement", os.path.join(HERE, "mms_refinement.py"))
+        mms = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mms)
+        check(mms.selftest(), "MMS refinement: matching binary/settings, raw replay and accuracy failures retained")
 
         # Missing data must be absent, not fabricated.
         with tempfile.TemporaryDirectory() as td2:

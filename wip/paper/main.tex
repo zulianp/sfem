@@ -50,6 +50,8 @@
 \input{figures/packsize_macros}
 \input{figures/roofline_macros}
 \input{figures/matched_counter_macros}
+\input{figures/unstructured_macros}
+\input{figures/mms_macros}
 \IfFileExists{figures/convho_macros.tex}{\input{figures/convho_macros}}{}
 \IfFileExists{figures/kmix_macros.tex}{\input{figures/kmix_macros}}{}
 \input{figures/scatter_macros}
@@ -118,8 +120,8 @@ ghost reduction. Stored index arrays fix the summation order when one thread own
 each pack, while the solution vector retains one entry per global unknown.
 
 We evaluate residuals and Jacobian actions of a colocated CVFEM Navier--Stokes
-discretisation on an NVIDIA Grace CPU, using affine hexahedral test meshes.
-Matched FP64 residual measurements with Rhie--Chow coupling give packed speedups
+discretisation on an NVIDIA Grace CPU, using affine and procedural irregular
+hexahedral meshes. Matched affine FP64 residual measurements with Rhie--Chow coupling give packed speedups
 of $\matchedFoSpeedup\times$ for first-order convection and
 $\matchedDarwishSpeedup\times$ for the Darwish correction. Counted memory traffic
 is comparable between layouts. Separate controlled probes find substantial
@@ -594,9 +596,10 @@ checks; the diagnostic does not identify a particular kernel mechanism.
 
 \paragraph{Discretisation and geometry.} Colocated CVFEM integrates
 incompressible Navier--Stokes fluxes over hexahedral sub-control-surfaces,
-with three velocities and pressure at each node. All rates use affine geometry:
-one Jacobian, adjugate and determinant are cached per element. The selectable
-isoparametric implementation is not measured.
+with three velocities and pressure at each node. The cube campaigns use affine
+geometry, caching one Jacobian, adjugate and determinant per element.
+The irregular-mesh experiment (\S\ref{sec:res:unstructured}) instead evaluates
+trilinear geometry at each sub-control-surface.
 
 First-order upwinding uses a hard donor switch, with no blending band.
 Deferred correction~\cite{KhoslaRubin1974,XuePhanThienTanner2002} reconstructs
@@ -606,10 +609,10 @@ order explicitly. The implicit operator therefore stays first order; this does
 not establish diagonal dominance of the coupled system. ``Higher-order'' names
 this reconstruction family, not a demonstrated common convergence order.
 We test unlimited reconstruction and three limiters (\S\ref{sec:res:convho}).
-A separate local manufactured-solution check shows decreasing velocity errors on
-three affine grids for all five schemes; its runs meet the nonlinear target but
-fail a separate absolute-accuracy gate, so they do not establish a common
-asymptotic order.
+All \mmsCases{} affine manufactured-solution solves on Grace meet the nonlinear
+target. At $n=\mmsFineN$, reconstructed schemes pass the fixed maximum velocity-error
+target \num{\mmsAccuracyTol}; first-order upwind does not. Their finest-grid
+velocity-$L^2$ rates span \mmsReconstructedMinRate--\mmsReconstructedMaxRate.
 Nodal gradients sum incident element gradients in a separate completed pass;
 pressure reconstruction also supplies Rhie--Chow coupling.
 
@@ -730,7 +733,7 @@ the colocated pressure checkerboard; all named residuals/actions include it.
 Boundary and transient terms are switchable extra sweeps. The completeness
 ladder adds these terms to the bare measurement kernel.
 Cube sizes $n=64$--192 cover \SI{1.1e6}{}--\SI{2.9e7}{} DOFs;
-cross-layout comparisons use $n\ge128$, beyond residual saturation.
+their cross-layout comparisons use $n\ge128$, beyond residual saturation.
 Timing arms interleave within each allocation and record dispatched terms.
 Node variation is 5--11\%; historical accounting combines separate runs
 (\S\ref{sec:res:spmv}).
@@ -1007,24 +1010,18 @@ share. Historical phase fractions counted reconstruction warmup but excluded it
 from total time. Both counters now reset before measurement; corrected fractions
 require new runs.
 
-In the historical unlimited check, Rhie--Chow is disabled and only velocity is
-perturbed. Rebuilding $\Gop u$ at each perturbed state gives finite-difference
-agreement with the higher-order action to \hoxFdUnlim{}; the first-order
-action with the correction omitted differs by \num{6e-2}. This control is not a
-test of the RC-enabled $\Jlag$ defined above. It does not validate all limiter
-branches. For limited cases, a central difference that crosses a limiter or donor
-switch is not a reference for the action's chosen branch. Validation must distinguish
-such crossings from errors on unchanged branches; a small fraction of disagreeing
-nodes alone does not establish correctness. The regressions require a relative infinity
-error below \num{1e-6} at two prescribed step sizes on perturbed states. The first
-checks velocity directions without Rhie--Chow coupling. A separate coupled check
-perturbs all four unknowns, rebuilds the state reconstructions, and checks each
-momentum and continuity equation separately. It also requires controls omitting the
-pressure-gradient sensitivity or the coefficient's velocity sensitivity to fail.
-These checks cover the tested steady, affine interior operators; they do not establish
-nonlinear convergence or boundary and transient consistency. Residual agreement
-between layouts also does not establish agreement of their selected linearizations
-at a switch.
+The historical unlimited, RC-off check perturbs velocity and rebuilds $\Gop u$:
+finite differences agree with the higher-order action to \hoxFdUnlim{}, while
+omitting the correction gives \num{6e-2} error. This is not the RC-enabled
+$\Jlag$ or a check of every limiter branch. New regressions require relative
+infinity error below \num{1e-6} at two step sizes, first for RC-off velocity
+directions, then all four coupled unknowns with rebuilt state reconstructions
+and separate equation checks. Omitting pressure-gradient or coefficient-velocity
+sensitivity must fail. These steady affine interior checks do not establish
+nonlinear convergence or boundary/transient consistency. A difference crossing
+a limiter or donor switch does not test a single branch; neither a small fraction
+of disagreeing nodes nor residual agreement establishes agreement of selected
+linearizations at switches.
 
 \subsection{Accumulation, counters and the lagged matrix}
 \label{sec:res:spmv}
@@ -1079,13 +1076,10 @@ evidence is retained separately.
 
 
 
-\paragraph{Reproducibility material.} The accompanying manuscript sources contain
-the raw matched measurements, captured analysis and regeneration commands in
-\path{wip/paper/reproducibility/README.md}. A separate empirical roofline uses
-the same counted-work and transported-byte conventions for operators and reference
-lines. Historical roofline accounting is documented there separately; the main
-comparisons here use ordinary runtime, transported traffic and the controlled
-accumulation probe.
+\paragraph{Reproducibility material.} The manuscript's
+\path{reproducibility/README.md} records raw data, analysis and regeneration commands.
+The separate empirical roofline uses consistent counted-work and transported-byte
+conventions; historical accounting remains distinct.
 
 \begin{table*}[t]
   \centering
@@ -1103,15 +1097,13 @@ accumulation probe.
 \end{table*}
 
 \paragraph{Accumulation cost.}
-The diagnostic in Table~\ref{tab:scatter} switches accumulation within the same compiled
-sweep. A compiler escape consumes every element result in both modes, preserving the
-element calculations when accumulation is bypassed. Input staging and existing buffer
-clearing remain; state gradients are reconstructed before timing. The atomic bypass omits
-nodal additions. The packed bypass omits pack-local additions, owned/ghost draining and
-the final ghost reduction. Before timing each case, all element contributions must be
-finite, nonzero as a vector and bit-identical between modes; the full nodal result must
-match normal execution within $10^{-11}$ relative infinity norm per equation, and bypass
-must leave a zero output. These checks pass for every reported case.
+Table~\ref{tab:scatter} switches accumulation within one compiled sweep. A compiler
+escape consumes every element result in both modes. Input staging and buffer
+clearing remain; state gradients are reconstructed before timing. Atomic bypass
+omits nodal additions; packed bypass omits local additions, owned/ghost draining
+and ghost reduction. Every case passes finite, nonzero and bit-identical element
+contributions, full-result agreement with normal execution within $10^{-11}$
+relative infinity norm per equation, and zero bypass output.
 
 At 72 threads, the first-order accumulation costs are
 \SI{\scatterFoAtomicDelta}{\milli\second} for atomic and
@@ -1166,6 +1158,39 @@ is slower than SpMV, which stores $\Jlag$ without reconstruction sensitivities;
 no assembled exact Jacobian is measured. These comparisons alone
 identify neither a hardware bottleneck nor a solver speedup.
 
+\subsection{Irregular connectivity and non-affine cells}
+\label{sec:res:unstructured}
+
+Gmsh~4.15.0 subdivides Delaunay tetrahedra into two graded box-with-hole
+HEX8 meshes with irregular node incidence and non-affine cells
+(Table~\ref{tab:unstructured}). Both layouts use SFC ordering and matched
+physical inputs. First-order steady interior Rhie--Chow operators use
+$\rho=1.3$, $\mu=0.027$: residuals rebuild pressure gradients; actions cache
+state gradients and rebuild direction gradients. Linear-pressure, conservation,
+layout and whole-vector derivative checks pass; omitted direction gradients fail.
+Physical edges correct the scalar reference's affine shortcut.
+
+\begin{table}[t]
+  \centering
+  \caption{Irregular-mesh FP64 operators on \texttt{\unstrHost{}}, job
+    \unstrJob{}, \unstrThreads{} threads. M: \num{\unstrMediumCells} cells;
+    L: \num{\unstrLargeCells} cells. Ratios are mean atomic/packed times;
+    brackets span all \unstrBlocks{} paired ratios, not confidence intervals.
+    Each arm uses \unstrWarmup{} warmups and \unstrRepeat{} timed applications.}
+  \label{tab:unstructured}
+  \small
+  \setlength{\tabcolsep}{3pt}
+  \input{tables/unstructured}
+\end{table}
+
+With 256 elements per pack both operators benefit; at 1024 the medium-mesh action is
+\unstrMediumBigSlowdown{}\% slower. Its \unstrMediumBigPacks{} packs for
+\unstrThreads{} threads suggest coarse partitioning, without isolating it from
+locality/storage effects. The companion retains all one-/72-thread samples,
+setup costs and an array ledger: retained connectivity, packed metadata, ghost
+buffers and thread scratch cost extra storage, not a total-footprint saving.
+These public fixtures do not establish spatial accuracy or solver speedup.
+
 \subsection{A bounded CPU solver check}
 \label{sec:res:solver}
 
@@ -1198,26 +1223,18 @@ packed solver performance is established.
 \label{sec:discussion}
 \label{sec:conclusion}
 
-Pack ownership and a sorted ghost gather remove atomics and colour barriers,
-with completion between phases. With fixed inputs, packing and arithmetic,
-one thread per pack fixes summation order across thread counts.
-Colouring also gives reproducibility;
-packing improves throughput.
+Ownership and a sorted gather remove atomics and colour barriers, with completion
+between phases. Fixed inputs, packing and arithmetic fix summation order with
+one thread per pack; colouring is also reproducible.
+Probes show lower marginal accumulation costs; matched counters show comparable traffic.
+The lagged action beats equivalent SpMV; exact Darwish does different work.
+Benefits depend on terms, convection and packing, including the irregular-mesh
+slowdown. Ordering and amortised setup are prerequisites; smaller topology does
+not imply lower total memory.
 
-Controlled residual probes show lower marginal accumulation costs at one and 72
-threads. Matched 72-thread counters show comparable transported bytes. The lagged
-action reaches
-$\matchedLaggedSpmv\times$ its equivalent FP64 sparse product. The tested
-Darwish exact action performs different work and is slower than that sparse product. Packed topology is
-$\fpMatrixRatioFSixFour\times$ smaller than the lagged matrix per DOF.
-
-The benefit varies with physical terms and convection. Ordering is required;
-setup is amortised across applications. Performance scope is one Grace CPU and
-affine CVFEM test meshes; the one-thread semi-structured solver check is separate.
-Boundary and transient Jacobian checks and packed unstructured solver performance
-remain open. Other architectures and
-geometries need measurements. No isolated atomic latency or universal bottleneck
-is established.
+Evidence covers these operators on one Grace CPU. Packed unstructured solver
+performance, broader boundary/transient configurations and other architectures
+remain open. Neither isolated atomic latency nor a universal bottleneck is established.
 
 \begin{acks}
 The author thanks the Swiss National Science Foundation (project no.~215627), the PASC Program

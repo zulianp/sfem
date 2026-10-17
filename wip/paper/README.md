@@ -389,6 +389,29 @@ and every captured element contribution was bit-identical between probe modes.
 failed checks and altered input files. `make figures` now propagates generator
 errors so it cannot quietly reuse a stale table after failed validation.
 
+## Public irregular-mesh comparison (14 October 2026)
+
+[Job 5052301](data/unstructured_5052301/README.md) adds two graded procedural
+HEX8 timing meshes with irregular connectivity and non-affine cells. It compares
+the first-order interior Rhie--Chow residual and exact action at 1/72 threads
+and packs 256/1024. All twelve cases and 384 timing samples are retained.
+The 72-thread table includes the medium-grid pack1024 action slowdown as well
+as the speedups. Full absolute times, paired ranges, setup costs and the explicit
+array ledger remain in the archived result. These are operator measurements,
+not a spatial-accuracy or nonlinear-solver result.
+
+`python/unstructured_figures.py`, called by `make figures`, checks every raw-file
+hash, the captured parser identity, case coverage, commands, binary/policy records
+and numerical/timing reports before generating `tables/unstructured.tex` and
+`figures/unstructured_macros.tex`. The complete table must replay exactly from
+the raw logs. `make check` also exercises archive rejection and preserves the
+slower case in the generated table. No new cluster run is needed to regenerate it.
+
+The [measurement protocol](../../spikes/cvfem/docs/unstructured_study.md) describes
+the public generator and kernel correction. This dataset is separate from the
+matched affine counter campaign; it supplies no new roofline points or traffic
+attribution. The empirical roofline remains in the companion material.
+
 ## Open
 
 - `refs.bib` holds one placeholder entry so the first build succeeds. Populate and delete it.
@@ -425,6 +448,18 @@ should not be compared with any number recorded before `a3253433f`.
 in as the new normal before the cause is pinned down.
 
 ## Public numerical validation and storage-width probe (2026-10-13)
+
+The later Grace refinement in `data/mms_5077627/` and `data/mms_5077906/`
+extends the spatial-accuracy assessment to n=16/24/32/40 using one identical
+solver binary and unchanged physical inputs and solver targets. All twenty final
+nonlinear targets pass. At n=40 all four reconstructed schemes pass the fixed
+0.01 maximum velocity error target; first-order upwind remains above it. The
+finest-grid reconstructed velocity-L2 rates range from 1.36 to 2.07, so a common
+second-order claim remains unsupported. `python/mms_refinement.py` replays both
+archives and generates `figures/mms_macros.tex` and the complete supporting
+`reproducibility/mms-refinement.md` table. No solver-performance claim is made.
+This supersedes the coarse study as the latest spatial evidence; it does not
+erase that study's failed accuracy verdicts.
 
 `data/mms_20261013/` preserves a local FP64 Farrell manufactured-solution ladder:
 five convective schemes on affine n=4/8/16 grids over [0,2]^3, with Rhie--Chow,

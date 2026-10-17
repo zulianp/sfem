@@ -139,6 +139,33 @@ a reference line is not necessarily the faster way to apply an equivalent operat
 The scatter-bypass experiment supplies separate evidence for lower marginal
 accumulation cost; this figure does not isolate that cost.
 
+## Separate irregular-mesh evidence
+
+The main paper's irregular-mesh table comes from
+[job 5052301](../data/unstructured_5052301/README.md), with all raw logs, hashes,
+absolute timings, paired ranges, setup costs and explicit array accounting.
+`make figures` replays that archive through `python/unstructured_figures.py`.
+These non-affine first-order residual/action timings have no PMU measurements
+and do not enter the empirical roofline. The medium-mesh pack1024 action slowdown
+is retained alongside the gains. The meshes are procedural public fixtures;
+full solver performance and spatial accuracy are not measured.
+
+## Separate manufactured-solution evidence
+
+The [generated refinement table](mms-refinement.md) combines Grace jobs
+[5077627](../data/mms_5077627/README.md) and
+[5077906](../data/mms_5077906/README.md). The identical solver binary evaluates
+five schemes on affine n=16/24/32/40 grids. All final nonlinear targets are met.
+At n=40 all four reconstructed schemes meet the unchanged maximum velocity error
+target; first-order upwind still fails. Every earlier failed accuracy gate remains
+visible. The limited schemes do not share a demonstrated second-order rate.
+
+`make figures` verifies both archives and generates the manuscript values and
+supporting table through `python/mms_refinement.py`. This is a steady affine
+accuracy study, separate from the irregular-mesh operator experiment, solver
+iteration table and empirical roofline. It establishes no solver speedup or
+arbitrary-mesh accuracy guarantee.
+
 ## Historical roofline accounting
 
 The old [source manifest](../data/roofline_sources.json) and generated
