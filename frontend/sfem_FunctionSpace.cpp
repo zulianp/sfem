@@ -7,6 +7,7 @@
 #include "sfem_aliases.hpp"
 #include "smesh_mesh.hpp"
 #include "smesh_packed_mesh.hpp"
+#include "smesh_multiblock_graph.hpp"
 
 namespace sfem {
 
@@ -24,6 +25,7 @@ namespace sfem {
         // CRS graph
         std::shared_ptr<CRSGraph>              node_to_node_graph;
         std::shared_ptr<CRSGraph>              dof_to_dof_graph;
+        std::shared_ptr<CRSGraph>              element_node_graph;
         std::shared_ptr<FunctionSpace::PackedMesh> packed_mesh;
         //: old node id -> new node id, for the renumbering `packed_mesh` applied
         //: to `mesh` in place.  Kept because nothing else records it: anything
@@ -169,6 +171,34 @@ namespace sfem {
         impl_->initialize_dof_to_dof_graph(this->block_size());
 
         return impl_->node_to_node_graph;
+    }
+
+    std::shared_ptr<CRSGraph> FunctionSpace::element_node_graph() {
+        auto &mesh = *impl_->mesh;
+        if (!Impl::mesh_all_semistructured(mesh)) return node_to_node_graph();
+        if (impl_->element_node_graph) return impl_->element_node_graph;
+
+        const auto                        n_blocks = static_cast<smesh::block_idx_t>(mesh.n_blocks());
+        std::vector<smesh::ElemType>      types(n_blocks);
+        std::vector<ptrdiff_t>            n_elements(n_blocks);
+        std::vector<const idx_t *const *> elements(n_blocks);
+        for (smesh::block_idx_t b = 0; b < n_blocks; ++b) {
+            types[b]      = mesh.element_type(b);
+            n_elements[b] = mesh.n_elements(b);
+            elements[b]   = mesh.elements(b)->data();
+        }
+        count_t *rowptr{nullptr};
+        idx_t   *colidx{nullptr};
+        if (smesh::create_multiblock_crs_graph<idx_t, count_t>(
+                    n_blocks, types.data(), n_elements.data(), elements.data(), mesh.n_nodes(), &rowptr, &colidx) !=
+            SFEM_SUCCESS) {
+            return nullptr;
+        }
+        const ptrdiff_t n = mesh.n_nodes();
+        impl_->element_node_graph =
+                std::make_shared<CRSGraph>(smesh::Buffer<count_t>::own(n + 1, rowptr, free, smesh::MEMORY_SPACE_HOST),
+                                           smesh::Buffer<idx_t>::own(rowptr[n], colidx, free, smesh::MEMORY_SPACE_HOST));
+        return impl_->element_node_graph;
     }
 
     smesh::ElemType FunctionSpace::element_type(const int block) const { return impl_->get_element_type_for_block(block); }

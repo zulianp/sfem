@@ -1,9 +1,11 @@
 // BSRTangent against the arrays it assembles: its diagonal, its row-sum bound, its diagonal shift,
 // and the operator `sfem::hessian_bsr` returns, which it now builds.
 
+#include <algorithm>
 #include <cmath>
 #include <vector>
 
+#include "sfem_API.hpp"
 #include "sfem_BSRTangent.hpp"
 #include "sfem_elasticity_test_problem.hpp"
 #include "sfem_test.hpp"
@@ -104,10 +106,47 @@ int test_operator() {
     return SFEM_TEST_SUCCESS;
 }
 
+// On a level-2 semi-structured mesh. The generated element spans the macro element, so its matrix
+// needs every node of the macro element coupled; the micro-element graph dropped those couplings and
+// the product was 9% off the action. The hand-written micro-element operator keeps the smaller graph.
+int test_semi_structured_mesh() {
+    auto box   = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 2, 2, 1, 0, 0, 0, 1, real_t(0.7), real_t(0.5));
+    auto mesh  = smesh::to_semistructured(2, box, true, false);
+    auto fs    = sfem::FunctionSpace::create(mesh, 3);
+    const ptrdiff_t n = fs->n_dofs();
+
+    for (const char *name : {"GeneratedLinearElasticity", "LinearElasticity"}) {
+        auto op = sfem::create_op(fs, name, sfem::EXECUTION_SPACE_HOST);
+        SFEM_TEST_ASSERT(op != nullptr && op->initialize() == SFEM_SUCCESS);
+        auto f = sfem::Function::create(fs);
+        f->add_operator(op);
+        auto graph = f->block_node_graph();
+        SFEM_TEST_ASSERT(graph == (op->assembles_micro_elements() ? fs->node_to_node_graph() : fs->element_node_graph()));
+
+        auto tangent = sfem::BSRTangent::create(f, sfem::EXECUTION_SPACE_HOST);
+        SFEM_TEST_ASSERT(tangent->assemble(nullptr) == SFEM_SUCCESS);
+        std::vector<real_t> h(n), y(n, 0), mf(n, 0);
+        for (ptrdiff_t i = 0; i < n; ++i) h[i] = std::sin(real_t(0.37) * (i + 1));
+        SFEM_TEST_ASSERT(tangent->op()->apply(h.data(), y.data()) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(f->apply(nullptr, h.data(), mf.data()) == SFEM_SUCCESS);
+        real_t scale = 0, error = 0;
+        for (ptrdiff_t i = 0; i < n; ++i) {
+            scale = std::max(scale, std::abs(mf[i]));
+            error = std::max(error, std::abs(mf[i] - y[i]));
+        }
+        printf("  %s: %td nonzero blocks, |K h - J h| / |J h| = %.3g\n", name, (ptrdiff_t)graph->nnz(), (double)(error / scale));
+        // The hand-written operator's element Jacobians are single precision (jacobian_t).
+        SFEM_TEST_ASSERT(error <= (op->assembles_micro_elements() ? 1e-6 : 1e-12) * scale);
+    }
+    SFEM_TEST_ASSERT(fs->node_to_node_graph()->nnz() < fs->element_node_graph()->nnz());
+    return SFEM_TEST_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_diagonal_and_row_sums);
     SFEM_RUN_TEST(test_operator);
+    SFEM_RUN_TEST(test_semi_structured_mesh);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }

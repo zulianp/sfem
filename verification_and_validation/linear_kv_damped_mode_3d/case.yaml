@@ -32,40 +32,23 @@ verification:
 variants:
   - &base
     id: hex8
-    operator: KelvinVoigtNewmark
+    operator: GeneratedLinearKelvinVoigt
     element: HEX8
     resolution: {nx: 64, ny: 1, nz: 1, refine_level: 0}
     driver: &driver
       executable: "{python}"
-      arguments: ["{suite_dir}/common/run_linear_kv_mode.py", --case, "{resolved_case}", --driver, "{build_dir}/kelvin_voigt_newmark", --mesh, "{mesh}", --dirichlet, "{output}/dirichlet.yaml", --output, "{output}/solution"]
+      arguments: ["{suite_dir}/common/run_linear_kv_mode.py", --case, "{resolved_case}", --driver, "{build_dir}/playground", --mesh, "{mesh}", --dirichlet, "{output}/dirichlet.yaml", --output, "{output}/solution", --refine, "{resolution_refine_level}"]
       environment:
         OMP_NUM_THREADS: 1
-        SFEM_SHEAR_STIFFNESS_KV: "{material_shear_stiffness}"
-        SFEM_BULK_MODULUS: "{material_bulk_modulus}"
-        SFEM_DAMPING_RATIO: "{material_damping}"
-        SFEM_DENSITY: "{material_density}"
-        SFEM_ELEMENT_REFINE_LEVEL: "{resolution_refine_level}"
-        SFEM_USE_SSGMG: 0
-        SFEM_USE_BJACOBI: 1
-        SFEM_NLITER: 1
     expected_output: &expected
       required:
         - {pattern: SFEM_TRANSIENT_LEVEL_COMPLETE, count: 3}
         - {pattern: SFEM_LINEAR_KV_MODE_COMPLETE, count: 1}
       forbidden: ["nan", "inf"]
     tolerances: *tolerances
+  # The level-2 semi-structured mesh, which the generated material discretises with one quadratic
+  # element per macro element (PROTEUS_HEX27), not eight trilinear micro elements.
   - <<: *base
     id: sshex8_level2
     element: SSHEX8
     resolution: {nx: 32, ny: 1, nz: 1, refine_level: 2}
-    driver:
-      <<: *driver
-      environment:
-        OMP_NUM_THREADS: 1
-        SFEM_SHEAR_STIFFNESS_KV: "{material_shear_stiffness}"
-        SFEM_BULK_MODULUS: "{material_bulk_modulus}"
-        SFEM_DAMPING_RATIO: "{material_damping}"
-        SFEM_DENSITY: "{material_density}"
-        SFEM_ELEMENT_REFINE_LEVEL: "{resolution_refine_level}"
-        SFEM_USE_SSGMG: 0
-        SFEM_NLITER: 2

@@ -44,6 +44,7 @@ namespace sfem {
         //! the strain energy
         bool energy_or_potential_based() const override { return true; }
         inline bool is_linear() const override { return true; }
+        bool        assembles_micro_elements() const override { return true; }
         ptrdiff_t   n_dofs_domain() const override;
         ptrdiff_t   n_dofs_image() const override;
 

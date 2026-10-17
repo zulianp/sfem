@@ -532,10 +532,11 @@ namespace sfem {
                 return SFEM_SUCCESS;
             };
 
-            SharedBuffer<real_t> state, velocity;
+            SharedBuffer<real_t> state, velocity, acceleration;
             if (newmark) {
-                state    = newmark->state();
-                velocity = newmark->velocity();
+                state        = newmark->state();
+                velocity     = newmark->velocity();
+                acceleration = newmark->acceleration();
             } else if (auto bdf2 = std::dynamic_pointer_cast<BDF2Scheme>(scheme)) {
                 state    = bdf2->state();
                 velocity = bdf2->velocity();
@@ -553,6 +554,14 @@ namespace sfem {
                     return SFEM_FAILURE;
                 }
                 if (read_into(node["velocity"], velocity->data()) != SFEM_SUCCESS) return SFEM_FAILURE;
+            }
+            if (has(node, "acceleration")) {
+                // Newmark starts from it; without one it starts from rest, a = 0.
+                if (!acceleration) {
+                    fprintf(stderr, "Playground: an initial acceleration needs a Newmark scheme\n");
+                    return SFEM_FAILURE;
+                }
+                if (read_into(node["acceleration"], acceleration->data()) != SFEM_SUCCESS) return SFEM_FAILURE;
             }
             return SFEM_SUCCESS;
         }
@@ -659,6 +668,18 @@ namespace sfem {
             auto        dynamics = child(config.root(), "dynamics");
             const auto  type     = read_string(dynamics, "scheme", "newmark");
             const real_t density = read<real_t>(dynamics, "density", 1);
+            const auto   mass    = read_string(dynamics, "mass", "lumped");
+            if (mass != "lumped" && mass != "consistent") {
+                fprintf(stderr, "Playground: unknown mass \"%s\" (lumped or consistent)\n", mass.c_str());
+                return SFEM_FAILURE;
+            }
+            const bool consistent = mass == "consistent";
+            // Backward Euler carries no inertia; the obstacle's step and its reaction are built on
+            // the lumped mass.
+            if (consistent && (type == "backward_euler" || contact)) {
+                fprintf(stderr, "Playground: the consistent mass needs Newmark or BDF2 and no obstacle\n");
+                return SFEM_FAILURE;
+            }
 
             if (type == "newmark") {
                 const real_t beta  = read<real_t>(dynamics, "beta", real_t(0.25));
@@ -678,6 +699,7 @@ namespace sfem {
                 newmark->set_beta(beta);
                 newmark->set_gamma(gamma);
                 newmark->set_density(density);
+                newmark->set_consistent_mass(consistent);
                 if (newmark->initialize() != SFEM_SUCCESS) return SFEM_FAILURE;
                 scheme        = newmark;
                 this->newmark = newmark;
@@ -686,6 +708,7 @@ namespace sfem {
             } else if (type == "bdf2") {
                 auto bdf2 = std::make_shared<BDF2Scheme>(fs, es);
                 bdf2->set_density(density);
+                bdf2->set_consistent_mass(consistent);
                 if (bdf2->initialize() != SFEM_SUCCESS) return SFEM_FAILURE;
                 scheme = bdf2;
             } else if (type == "backward_euler") {

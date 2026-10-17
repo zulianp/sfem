@@ -44,6 +44,8 @@ namespace sfem {
         void set_beta(real_t beta);
         void set_gamma(real_t gamma);
         void set_density(real_t density);
+        /// The inertia with the consistent mass instead of the lumped one (before initialize).
+        void set_consistent_mass(bool consistent);
 
         /// Build the mass and the state buffers.  `block_names` is forwarded to
         /// the lumped mass, which is the only thing here that integrates.

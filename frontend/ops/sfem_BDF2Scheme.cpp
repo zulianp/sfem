@@ -44,6 +44,7 @@ namespace sfem {
     BDF2Scheme::~BDF2Scheme() = default;
 
     void BDF2Scheme::set_density(const real_t density) { impl_->inertia->set_density(density); }
+    void BDF2Scheme::set_consistent_mass(const bool consistent) { impl_->inertia->set_consistent_mass(consistent); }
 
     int BDF2Scheme::initialize(const std::vector<std::string> &block_names) {
         SFEM_TRACE_SCOPE("BDF2Scheme::initialize");

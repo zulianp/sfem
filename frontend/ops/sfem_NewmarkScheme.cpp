@@ -42,6 +42,7 @@ namespace sfem {
     void NewmarkScheme::set_beta(const real_t beta) { impl_->beta = beta; }
     void NewmarkScheme::set_gamma(const real_t gamma) { impl_->gamma = gamma; }
     void NewmarkScheme::set_density(const real_t density) { impl_->inertia->set_density(density); }
+    void NewmarkScheme::set_consistent_mass(const bool consistent) { impl_->inertia->set_consistent_mass(consistent); }
 
     int NewmarkScheme::initialize(const std::vector<std::string> &block_names) {
         SFEM_TRACE_SCOPE("NewmarkScheme::initialize");
