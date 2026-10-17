@@ -510,6 +510,7 @@ def normalized_variants(case):
                 "verification": verification,
                 "tolerances": merged_tolerances,
                 "material": copy.deepcopy(item.get("material", case.get("material", {}))),
+                "time": copy.deepcopy(item.get("time", case.get("time"))),
                 "material_parameter_map": copy.deepcopy(
                     item.get("material_parameter_map", case.get("material_parameter_map", {}))
                 ),
@@ -648,6 +649,8 @@ def _resolved_manifest(case, variant):
     resolved["driver"] = copy.deepcopy(variant["driver"])
     resolved["verification"] = copy.deepcopy(variant["verification"])
     resolved["material"] = copy.deepcopy(variant.get("material", {}))
+    if variant.get("time") is not None:
+        resolved["time"] = copy.deepcopy(variant["time"])
     resolved["material_parameter_map"] = copy.deepcopy(variant.get("material_parameter_map", {}))
     return resolved
 

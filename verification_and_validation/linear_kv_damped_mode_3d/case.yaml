@@ -47,8 +47,12 @@ variants:
       forbidden: ["nan", "inf"]
     tolerances: *tolerances
   # The level-2 semi-structured mesh, which the generated material discretises with one quadratic
-  # element per macro element (PROTEUS_HEX27), not eight trilinear micro elements.
+  # element per macro element (PROTEUS_HEX27), not eight trilinear micro elements. Its spatial
+  # error is negligible, so what is left is Newmark's period error, (omega dt)^2 / 12: at the
+  # case's steps 2.1e-3 in the amplitude, over the tolerance that the trilinear elements meet
+  # because their frequency error cancels part of it. Half the steps.
   - <<: *base
     id: sshex8_level2
     element: SSHEX8
     resolution: {nx: 32, ny: 1, nz: 1, refine_level: 2}
+    time: {duration: 1.2, time_steps: [0.01, 0.005, 0.0025]}
