@@ -2728,6 +2728,28 @@ int main() {
             # The scatters that still spell OpenMP pragmas stay off the device.
             self.assertNotIn("hessian_crs", source)
 
+    def test_cuda_backend_assembles_the_symmetric_block_diagonal(self):
+        # The block-Jacobi smoothers of SSMGC read the symmetric block diagonal, so a
+        # material that plans it assembles it on the device too: the same direct
+        # element-matrix kernel, its scatter a device function adding with
+        # `atomicAdd`, launched on the caller's stream.
+        with tempfile.TemporaryDirectory() as out_dir:
+            gen.generate(linear_elasticity, out_dir, elements=("HEX8",), target="cuda")
+            operator_path = os.path.join(
+                out_dir, "d3", "proteus_hex8", "cuda", "linear_elasticity_proteus_hex8_operator.cu"
+            )
+            with open(operator_path, encoding="utf-8") as input_file:
+                source = input_file.read()
+            self.assertIn(
+                "__host__ __device__ __forceinline__ void linear_elasticity_proteus_hex8_hessian_i_msoa_scatter_block_diag_sym(",
+                source,
+            )
+            self.assertIn("atomicAdd(&(block[sym++])", source)
+            self.assertIn('extern "C" int cu_linear_elasticity_proteus_hex8_hessian_block_diag_sym_i_msoa(', source)
+            self.assertIn("hessian_i_msoa_assemble_impl<double, geom_t, 6><<<grid_size, block_size, 0, (cudaStream_t)stream>>>", source)
+            self.assertNotIn("#pragma omp", source)
+            self.assertNotIn("SFEM_INLINE", source)
+
     def test_hip_backend_emits_material_energy_kernels_from_plan(self):
         with tempfile.TemporaryDirectory() as out_dir:
             result = gen.generate(

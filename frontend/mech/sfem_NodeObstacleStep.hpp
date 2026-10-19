@@ -47,6 +47,8 @@ namespace sfem {
         int                    solve(const real_t *const x, const real_t *const r, real_t *const dx) override;
         std::shared_ptr<Merit> merit() override;
         int                    iterations() const override;
+        /// The obstacle's gap is linearised: Newton measures every iterate.
+        bool solves_linear_function_exactly() const override { return false; }
 
         /// The obstacle's reaction at the last measured state, -mu_i n_i: in the step's scaling,
         /// where the material force enters both ends of a trapezoidal step and the contact force
@@ -60,13 +62,6 @@ namespace sfem {
         std::unique_ptr<Impl> impl_;
     };
 
-    /// Columns reaction_x, reaction_y, reaction_z and touched: the resultant of the obstacle's
-    /// physical force (half the step's reaction, see NodeObstacleStep::reaction) on the body, and
-    /// whether a node is on the obstacle (its gap at most `touch_gap`; the reaction of a body in
-    /// flight is the residual's rounding, not zero), read before the step is committed.
-    std::shared_ptr<Probe> create_contact_probe(const std::shared_ptr<NodeObstacleContact> &contact,
-                                                const ptrdiff_t                             ndofs,
-                                                const real_t                                touch_gap);
 
 }  // namespace sfem
 

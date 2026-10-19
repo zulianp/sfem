@@ -165,11 +165,98 @@ int test_semi_structured_mesh() {
     return SFEM_TEST_SUCCESS;
 }
 
+// The micro basis on a distorted mesh, where a macro element is not a parallelepiped and its micro
+// elements differ, against the same micro elements as a plain HEX8 mesh: the generated operator,
+// and the hand-written one on its isoparametric route. Its default takes one macro Jacobian per
+// element (`ASSUME_AFFINE`), exact only on the box above.
+int test_semi_structured_mesh_non_affine() {
+    auto box = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 2, 2, 2, 0, 0, 0, 1, 1, 1);
+    {
+        geom_t *const *const xyz = box->points()->data();
+        for (ptrdiff_t i = 0; i < box->n_nodes(); ++i) {
+            const geom_t x = xyz[0][i], y = xyz[1][i], z = xyz[2][i];
+            xyz[0][i] += geom_t(0.15) * y * z;
+            xyz[1][i] += geom_t(0.1) * x * x;
+            xyz[2][i] -= geom_t(0.12) * x * y;
+        }
+    }
+    auto ss = smesh::to_semistructured(2, box, true, false);
+    // Written out and read back as HEX8, with the same node numbering.
+    SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(ss, smesh::Path("bsr_tangent_non_affine_hex8")) == SFEM_SUCCESS);
+    auto hex8 = sfem::Mesh::create_from_file(sfem::Communicator::self(), smesh::Path("bsr_tangent_non_affine_hex8"));
+    SFEM_TEST_ASSERT(hex8 && hex8->n_nodes() == ss->n_nodes());
+
+    auto            fs      = sfem::FunctionSpace::create(ss, 3);
+    auto            fs_hex8 = sfem::FunctionSpace::create(hex8, 3);
+    const ptrdiff_t n       = fs->n_dofs();
+
+    std::vector<real_t> h(n);
+    for (ptrdiff_t i = 0; i < n; ++i) h[i] = std::sin(real_t(0.37) * (i + 1));
+    std::vector<real_t> blocks, diagonal;
+    auto action = [&](const std::shared_ptr<sfem::FunctionSpace> &space, const char *name, std::vector<real_t> &y) -> int {
+        auto op = sfem::create_op(space, name, sfem::EXECUTION_SPACE_HOST);
+        SFEM_TEST_ASSERT(op != nullptr);
+        // The hand-written operator on its isoparametric route, set before initialize, which builds
+        // the per-element Jacobians only for the affine one.
+        op->set_option("ASSUME_AFFINE", false);
+        SFEM_TEST_ASSERT(op->initialize() == SFEM_SUCCESS);
+        y.assign(n, 0);
+        SFEM_TEST_ASSERT(op->apply(nullptr, h.data(), y.data()) == SFEM_SUCCESS);
+        // And its diagonal blocks, packed 00 01 02 11 12 22 per node, and its diagonal.
+        blocks.assign(n / 3 * 6, 0);
+        SFEM_TEST_ASSERT(op->hessian_block_diag_sym(nullptr, blocks.data()) == SFEM_SUCCESS);
+        diagonal.assign(n, 0);
+        if (std::string(name) == "LinearElasticity") {
+            SFEM_TEST_ASSERT(op->hessian_diag(nullptr, diagonal.data()) == SFEM_SUCCESS);
+        }
+        return SFEM_TEST_SUCCESS;
+    };
+    std::vector<real_t> micro, hand_micro, generated_hex8, hand_hex8;
+    SFEM_TEST_ASSERT(action(fs, "GeneratedLinearElasticity", micro) == SFEM_TEST_SUCCESS);
+    SFEM_TEST_ASSERT(action(fs, "LinearElasticity", hand_micro) == SFEM_TEST_SUCCESS);
+    const std::vector<real_t> hand_micro_blocks = blocks, hand_micro_diagonal = diagonal;
+    SFEM_TEST_ASSERT(action(fs_hex8, "GeneratedLinearElasticity", generated_hex8) == SFEM_TEST_SUCCESS);
+    const std::vector<real_t> reference_blocks = blocks;
+    SFEM_TEST_ASSERT(action(fs_hex8, "LinearElasticity", hand_hex8) == SFEM_TEST_SUCCESS);
+
+    real_t block_scale = 0, e_blocks = 0, e_diagonal = 0;
+    for (ptrdiff_t i = 0; i < n / 3; ++i) {
+        for (int k = 0; k < 6; ++k) {
+            block_scale = std::max(block_scale, std::abs(reference_blocks[i * 6 + k]));
+            e_blocks    = std::max(e_blocks, std::abs(hand_micro_blocks[i * 6 + k] - reference_blocks[i * 6 + k]));
+        }
+        const int packed_diagonal[3] = {0, 3, 5};
+        for (int d = 0; d < 3; ++d) {
+            e_diagonal = std::max(e_diagonal, std::abs(hand_micro_diagonal[i * 3 + d] - reference_blocks[i * 6 + packed_diagonal[d]]));
+        }
+    }
+    printf("  distorted: hand-written micro diagonal blocks against generated HEX8 %.3g, diagonal %.3g\n",
+           (double)(e_blocks / block_scale), (double)(e_diagonal / block_scale));
+    SFEM_TEST_ASSERT(e_blocks <= 1e-6 * block_scale);
+    SFEM_TEST_ASSERT(e_diagonal <= 1e-6 * block_scale);
+
+    real_t scale = 0, e_micro = 0, e_hand_micro = 0, e_hand = 0;
+    for (ptrdiff_t i = 0; i < n; ++i) {
+        scale        = std::max(scale, std::abs(generated_hex8[i]));
+        e_micro      = std::max(e_micro, std::abs(micro[i] - generated_hex8[i]));
+        e_hand_micro = std::max(e_hand_micro, std::abs(hand_micro[i] - generated_hex8[i]));
+        e_hand       = std::max(e_hand, std::abs(hand_hex8[i] - generated_hex8[i]));
+    }
+    printf("  distorted, %td dofs, against generated HEX8: generated micro %.3g, hand-written micro %.3g, "
+           "hand-written HEX8 %.3g\n",
+           n, (double)(e_micro / scale), (double)(e_hand_micro / scale), (double)(e_hand / scale));
+    SFEM_TEST_ASSERT(e_micro <= 1e-12 * scale);
+    SFEM_TEST_ASSERT(e_hand_micro <= 1e-6 * scale);
+    SFEM_TEST_ASSERT(e_hand <= 1e-6 * scale);
+    return SFEM_TEST_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_diagonal_and_row_sums);
     SFEM_RUN_TEST(test_operator);
     SFEM_RUN_TEST(test_semi_structured_mesh);
+    SFEM_RUN_TEST(test_semi_structured_mesh_non_affine);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }

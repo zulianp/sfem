@@ -9930,7 +9930,7 @@ def _sfem_soa_hessian_scatter_block_diag_sym_lines(
                 "s_t *const RSTR %s" % value_stream,
             ),
             body=tuple(body),
-            qualifier="static SFEM_INLINE",
+            qualifier=current_target().function_qualifier(),
             template_params=("typename s_t",),
         )
     )

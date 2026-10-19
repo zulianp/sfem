@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "sfem_ContactStabilisedNewmarkScheme.hpp"
+#include "sfem_NodeObstacleView.hpp"
 #include "sfem_SDFObstacle.hpp"
 #include "sfem_aliases.hpp"
 #include "smesh_grid.hpp"
@@ -107,6 +108,9 @@ namespace sfem {
         // gap_i n_i at the contact nodes, zero elsewhere: the vector to the obstacle's surface.
         void gap_field(real_t *const out) const;
 
+        // The smallest gap of the contact nodes at the last update, read on the host.
+        real_t min_gap() const;
+
     private:
         std::shared_ptr<SDFObstacle> obstacle_;
         SharedBuffer<idx_t>          nodes_;
@@ -129,6 +133,9 @@ namespace sfem {
         SharedBuffer<real_t>         ahead_;
         SharedBuffer<real_t>         ahead_gap_;
         SharedBuffer<real_t>         ahead_normals_;  // 3 rows
+
+        // The contact nodes with these normals and gaps (the current or the ahead samples).
+        NodeObstacleView view(const SharedBuffer<real_t> &normals, const SharedBuffer<real_t> &gap) const;
 
         void rows(const SharedBuffer<real_t> &flat, const int k, real_t **const out) const {
             for (int c = 0; c < k; ++c) out[c] = flat->data() + c * size();

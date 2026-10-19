@@ -50,13 +50,7 @@ namespace sfem {
                   const real_t *const h,
                   real_t *const out) override;
     int value(const real_t *x, real_t *const out) override;
-    int value_steps(const real_t *x,
-            const real_t *h,
-            const int nsteps,
-            const real_t *const steps,
-            real_t *const out) override;
-    bool energy_or_potential_based() const override { return true; }
-    bool residual_depends_on_state() const override { return false; }
+    bool energy_or_potential_based() const override { return false; }
     int hessian_crs(const real_t *const x,
             const count_t *const rowptr,
             const idx_t *const colidx,

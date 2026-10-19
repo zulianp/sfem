@@ -18,6 +18,10 @@
 #include "sfem_HistoryDependent.hpp"
 #include "sfem_NewmarkScheme.hpp"
 #include "sfem_NodeObstacleContact.hpp"
+#include "sfem_ContactCommon.hpp"
+#include "sfem_ContactConditions.hpp"
+#include "sfem_Input.hpp"
+#include "sfem_SSMGCStep.hpp"
 #include "sfem_NodeObstacleStep.hpp"
 #include "sfem_ObstacleShape.hpp"
 #include "sfem_Observers.hpp"
@@ -176,6 +180,11 @@ namespace sfem {
         TorqueControlOptions                               torque_control;
         std::list<ryml::Tree>                              documents;
         std::shared_ptr<NodeObstacleContact>               contact;
+        /// The obstacle of the ssmgc back-end, and its step (built with the scheme it serves).
+        std::shared_ptr<ContactConditions>                 ssmgc_contact;
+        std::shared_ptr<SSMGCStep>                         ssmgc_step;
+        /// Whichever back-end there is, as the contact-stabilised scheme reads it.
+        std::shared_ptr<ContactStabilisedNewmarkScheme::Contact> obstacle;
         std::shared_ptr<smesh::Grid<geom_t>>               obstacle_sdf;
         std::shared_ptr<NewmarkScheme>                     newmark;
         real_t                                             extent{0};
@@ -580,12 +589,17 @@ namespace sfem {
             auto node = child(config.root(), "obstacle");
             if (!node.readable()) return SFEM_SUCCESS;
 
-            if (read_string(node, "backend", "node_sdf") != "node_sdf") {
-                fprintf(stderr, "Playground: unknown obstacle backend \"%s\" (node_sdf)\n", read_string(node, "backend", "").c_str());
+            const auto backend = read_string(node, "backend", "node_sdf");
+            if (backend != "node_sdf" && backend != "ssmgc") {
+                fprintf(stderr, "Playground: unknown obstacle backend \"%s\" (node_sdf, ssmgc)\n", backend.c_str());
                 return SFEM_FAILURE;
             }
             if (regime != "dynamic" || read_string(child(config.root(), "dynamics"), "scheme", "newmark") != "newmark") {
-                fprintf(stderr, "Playground: the node_sdf obstacle needs regime dynamic with the newmark scheme, which it stabilises\n");
+                fprintf(stderr, "Playground: the obstacle needs regime dynamic with the newmark scheme, which it stabilises\n");
+                return SFEM_FAILURE;
+            }
+            if (backend == "ssmgc" && !fs->micro_elements()) {
+                fprintf(stderr, "Playground: the ssmgc obstacle needs a refined mesh (mesh.refine >= 2) with the micro basis\n");
                 return SFEM_FAILURE;
             }
 
@@ -645,7 +659,29 @@ namespace sfem {
             if (!obstacle_sdf) return SFEM_FAILURE;
 
             // Every node of the body's surface by default: a free body can touch with any face.
-            const auto          which = read_string(node, "nodes", "skin");
+            const auto which = read_string(node, "nodes", "skin");
+            if (backend == "ssmgc") {
+                // SSMGC restricts the contact surface level by level: it takes sidesets.
+                auto sidesets = which == "skin" ? smesh::skin_sidesets(m) : lookup.find(which);
+                if (sidesets.empty()) {
+                    fprintf(stderr, "Playground: obstacle.nodes is skin or a named sideset\n");
+                    return SFEM_FAILURE;
+                }
+                ssmgc_contact = ContactConditions::create(fs, obstacle_sdf, sidesets, es);
+                if (!ssmgc_contact || ssmgc_contact->n_constrained_dofs() == 0) {
+                    fprintf(stderr, "Playground: the obstacle has no contact nodes\n");
+                    return SFEM_FAILURE;
+                }
+                const auto gap = read_string(node, "gap", "nodal");
+                if (gap != "nodal" && gap != "dual_weighted") {
+                    fprintf(stderr, "Playground: unknown obstacle.gap \"%s\" (nodal, dual_weighted)\n", gap.c_str());
+                    return SFEM_FAILURE;
+                }
+                ssmgc_contact->set_gap(gap == "nodal" ? ContactConditions::Gap::NODAL : ContactConditions::Gap::DUAL_WEIGHTED);
+                printf("Contact: %td nodes (ssmgc)\n", ssmgc_contact->n_constrained_dofs());
+                return SFEM_SUCCESS;
+            }
+
             SharedBuffer<idx_t> nodes;
             if (which == "skin") {
                 nodes = smesh::create_nodeset_from_sidesets(m, smesh::skin_sidesets(m));
@@ -657,7 +693,8 @@ namespace sfem {
                 }
                 nodes = smesh::create_nodeset_from_sidesets(m, sidesets);
             }
-            contact = std::make_shared<NodeObstacleContact>(obstacle_sdf, m->comm(), nodes, m->points(), fs->n_dofs(), dir, es);
+            contact  = std::make_shared<NodeObstacleContact>(obstacle_sdf, m->comm(), nodes, m->points(), fs->n_dofs(), dir, es);
+            obstacle = contact;
             if (contact->size() == 0) {
                 fprintf(stderr, "Playground: the obstacle has no contact nodes\n");
                 return SFEM_FAILURE;
@@ -685,7 +722,7 @@ namespace sfem {
             const bool consistent = mass == "consistent";
             // Backward Euler carries no inertia; the obstacle's step and its reaction are built on
             // the lumped mass.
-            if (consistent && (type == "backward_euler" || contact)) {
+            if (consistent && (type == "backward_euler" || contact || ssmgc_contact)) {
                 fprintf(stderr, "Playground: the consistent mass needs Newmark or BDF2 and no obstacle\n");
                 return SFEM_FAILURE;
             }
@@ -713,7 +750,12 @@ namespace sfem {
                 scheme        = newmark;
                 this->newmark = newmark;
                 // Plain Newmark carries the obstacle's reaction into the next predictor and chatters.
-                if (contact) scheme = std::make_shared<ContactStabilisedNewmarkScheme>(newmark, contact);
+                if (ssmgc_contact) {
+                    ssmgc_step = SSMGCStep::create(f, ssmgc_contact, newmark, SSMGCStepOptions{});
+                    if (!ssmgc_step) return SFEM_FAILURE;
+                    obstacle = ssmgc_step;
+                }
+                if (obstacle) scheme = std::make_shared<ContactStabilisedNewmarkScheme>(newmark, obstacle);
             } else if (type == "bdf2") {
                 auto bdf2 = std::make_shared<BDF2Scheme>(fs, es);
                 bdf2->set_density(density);
@@ -785,6 +827,51 @@ namespace sfem {
                 obstacle.qp_max_it = read<int>(qp, "max_it", obstacle.qp_max_it);
                 obstacle.qp_rtol   = read<real_t>(qp, "rtol", obstacle.qp_rtol);
                 step               = NodeObstacleStep::create(f, contact, newmark, obstacle);
+            } else if (ssmgc_step) {
+                SSMGCStepOptions options;
+                options.atol    = newton_options.atol;
+                options.rtol    = newton_options.rtol;
+                // A shifted-penalty solve meets the bound to its penalty's accuracy, not exactly as
+                // node_sdf's QP does.
+                options.gap_tol = real_t(1e-8) * extent;
+                // The curvature term is the nodal gap's.
+                const auto obstacle_node = child(config.root(), "obstacle");
+                const bool nodal         = ssmgc_contact->gap() == ContactConditions::Gap::NODAL;
+                options.curvature        = read<bool>(obstacle_node, "curvature", nodal);
+                if (options.curvature && !nodal) {
+                    fprintf(stderr, "Playground: obstacle.curvature needs obstacle.gap nodal\n");
+                    return SFEM_FAILURE;
+                }
+                // SSMGC's own keys, handed over as it reads them. Full precision unless the case asks
+                // for mixed: SSMGC's own default is mixed, whose single-precision smoothers leave a
+                // penetration above the step's tolerance.
+                // SSMGC solves the step's linearisation to the step's tolerances, so a linear step
+                // takes one Newton iteration: its atol bounds the penetration (norm_pen, which
+                // bounds the largest penetration only to a factor: a tenth of the step's), its rtol
+                // the residual against one at least the Newton residual (the Newton rtol). The
+                // contact drop needs up to 104 iterations to meet them, past SSMGC's 100.
+                char tolerances[128];
+                snprintf(tolerances,
+                         sizeof(tolerances),
+                         "atol: %.17g\nrtol: %.17g\nmax_it: 300\n",
+                         (double)(options.gap_tol / 10),
+                         (double)newton_options.rtol);
+                // Newton re-linearises the obstacle at every iteration (SSMGCStep::solve updates it at
+                // the iterate), so SSMGC solves that linearisation and does not re-sample the obstacle
+                // between its own iterations: its convergence test would judge a linearisation it has
+                // since moved away from.
+                std::string text = std::string("enable_mixed_precision: false\nenable_nl_obstacle: 0\n") + tolerances;
+                auto        keys = child(child(config.root(), "obstacle"), "ssmgc");
+                if (keys.readable() && keys.is_map()) {
+                    for (auto k : keys.children()) {
+                        text += std::string(k.key().str, k.key().len) + ": " + std::string(k.val().str, k.val().len) + "\n";
+                    }
+                }
+                auto input = std::make_shared<YAMLNoIndent>();
+                if (input->parse(text) != SFEM_SUCCESS) return SFEM_FAILURE;
+                options.input = input;
+                ssmgc_step->set_options(options);
+                step = ssmgc_step;
             } else {
                 step = UnconstrainedStep::create(f, es, linear);
             }
@@ -863,12 +950,16 @@ namespace sfem {
                             blas->zeros(n, out);
                             return op->gradient(record.x, out);
                         });
-                    } else if ((name == "gap" || name == "contact_force") && contact) {
-                        auto c    = contact;
+                    } else if ((name == "gap" || name == "contact_force") && obstacle) {
+                        auto c    = obstacle;
                         auto blas = sfem::blas<real_t>(es);
                         auto n    = fs->n_dofs();
-                        if (name == "gap") {
-                            fields->add_field(name, [c](const StepRecord &record, real_t *const out) {
+                        if (name == "gap" && ssmgc_step) {
+                            fields->add_field(name, [s = ssmgc_step](const StepRecord &record, real_t *const out) {
+                                return s->gap_field(record.x, out);
+                            });
+                        } else if (name == "gap") {
+                            fields->add_field(name, [c = contact](const StepRecord &record, real_t *const out) {
                                 c->update(record.x);
                                 c->gap_field(out);
                                 return SFEM_SUCCESS;
@@ -918,8 +1009,14 @@ namespace sfem {
                             return SFEM_FAILURE;
                         }
                         history->add_probe(create_torque_probe(f, rotations[which], material));
-                    } else if (type == "contact" && contact) {
-                        history->add_probe(create_contact_probe(contact, fs->n_dofs(), real_t(1e-6) * extent));
+                    } else if (type == "contact" && obstacle) {
+                        std::function<real_t()> min_gap = [c = contact] { return c->min_gap(); };
+                        if (ssmgc_step) min_gap = [s = ssmgc_step] { return s->min_gap(); };
+                        history->add_probe(create_contact_probe([c = obstacle](real_t *const out) { c->reaction(out); },
+                                                                min_gap,
+                                                                fs->n_dofs(),
+                                                                es,
+                                                                real_t(1e-6) * extent));
                     } else {
                         fprintf(stderr, "Playground: unknown probe \"%s\" (control_point, torque; contact with an obstacle)\n", type.c_str());
                         return SFEM_FAILURE;

@@ -63,9 +63,8 @@ namespace sfem {
         /// state, without advancing the step.
         ///
         /// Newmark's `v = shift * x + z` and `a = (x - u_hat)/(beta*dt^2)` are
-        /// functions of the state, so an operator that takes them as fields --
-        /// the hand-written `KelvinVoigtNewmark` does -- needs them refreshed
-        /// at every Newton iterate, not once per step.  That is the same
+        /// functions of the state, so an operator that takes them as fields
+        /// needs them refreshed at every Newton iterate, not once per step.  That is the same
         /// arithmetic `advance` ends with, which is why `advance` is this
         /// followed by a rotation rather than a second copy of it.
         void reconstruct(const real_t *const x,

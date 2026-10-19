@@ -9,7 +9,6 @@
 #include "generated/neumann_general/op/sfem_GeneratedNeumannGeneral.hpp"
 #include "sfem_Gradient.hpp"
 #include "sfem_Hyperelasticity.hpp"
-#include "sfem_KelvinVoigtNewmark.hpp"
 #include "sfem_Laplacian.hpp"
 #include "sfem_LinearElasticity.hpp"
 #include "sfem_LumpedMass.hpp"
@@ -52,7 +51,6 @@ namespace sfem {
         static Factory instance_;
 
         if (instance_.impl_->name_to_create.empty()) {
-            instance_.private_register_op("KelvinVoigtNewmark", KelvinVoigtNewmark::create);
             instance_.private_register_op("InertiaPotential", InertiaPotential::create);
             // The two names this operator used to have.  It never implemented
             // either method -- it is a lumped mass about a predictor, and the

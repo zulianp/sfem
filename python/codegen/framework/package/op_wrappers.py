@@ -1553,6 +1553,67 @@ namespace sfem {
     ptrdiff_t block_size_for_dim(const int dim) {
 %(block_size_lines)s
     }
+
+    // The graph an assembly was last handed and found well formed.
+    struct CheckedGraph {
+      const count_t *rowptr{nullptr};
+      const idx_t *colidx{nullptr};
+      ptrdiff_t n_rows{-1};
+    };
+
+    // Establish once per graph, at the first assembly into it, that the graph is well formed:
+    // rows in order, every column in range, each row sorted and duplicate free.
+    // The assembly kernels assume it -- they locate an entry and write to it
+    // without re-checking that it is there -- so this is where the assumption
+    // is earned.
+    //
+    // It used to be earned per element instead: every scatter walked its
+    // NS x NS candidates, tested each with a three-condition branch
+    // and reported through std::fprintf from inside the caller's parallel
+    // region.  That paid O(elements x NS^2) on every assembly for a
+    // property of the mesh and the graph together, which cannot change between
+    // elements or between calls.  Here it is O(nnz), once.
+    //
+    // Not at setup: `initialize` built the space's scalar dof graph for this, which a
+    // matrix-free solver never uses -- on a 76.6M-dof semi-structured mesh 6.2e9 entries,
+    // past count_t -- while the block assembly writes into the node graph, which it never
+    // checked.  `checked` remembers the last graph that passed.
+    //
+    // Raw pointers rather than the graph type, so this does not depend on which
+    // headers the generated wrapper happens to pull in.
+    int check_graph(CheckedGraph &checked,
+                    const count_t *const rowptr,
+                    const idx_t *const colidx,
+                    const ptrdiff_t n_rows) {
+      if (rowptr == checked.rowptr && colidx == checked.colidx && n_rows == checked.n_rows) {
+        return SFEM_SUCCESS;
+      }
+      if (!rowptr || !colidx || n_rows < 0) {
+        return SFEM_FAILURE;
+      }
+%(graph_host_view)s
+      if (h_rowptr[0] != 0) {
+        return SFEM_FAILURE;
+      }
+      const ptrdiff_t nnz = (ptrdiff_t)h_rowptr[n_rows];
+      for (ptrdiff_t i = 0; i < n_rows; ++i) {
+        const count_t begin = h_rowptr[i];
+        const count_t end = h_rowptr[i + 1];
+        if (end < begin || (ptrdiff_t)end > nnz) {
+          return SFEM_FAILURE;
+        }
+        for (count_t k = begin; k < end; ++k) {
+          if (h_colidx[k] < 0 || (ptrdiff_t)h_colidx[k] >= n_rows) {
+            return SFEM_FAILURE;
+          }
+          if (k > begin && h_colidx[k] <= h_colidx[k - 1]) {
+            return SFEM_FAILURE;
+          }
+        }
+      }
+      checked = CheckedGraph{rowptr, colidx, n_rows};
+      return SFEM_SUCCESS;
+    }
   }  // namespace
 
   class %(op)s::Impl {
@@ -1568,6 +1629,8 @@ namespace sfem {
     bool apply_uses_affine{false};
     bool use_packed_two_pass{false};
     std::vector<SharedBuffer<real_t>> packed_ghost_buf;
+    CheckedGraph crs_graph;
+    CheckedGraph bsr_graph;
   };
 
   std::unique_ptr<Op> %(op)s::create(const std::shared_ptr<FunctionSpace> &space) {
@@ -1592,66 +1655,12 @@ namespace sfem {
 
 %(performance_methods)s
 
-  // Establish once, at setup, that this operator's dof graph is well formed:
-  // rows in order, every column in range, each row sorted and duplicate free.
-  // The assembly kernels assume it -- they locate an entry and write to it
-  // without re-checking that it is there -- so this is where the assumption
-  // is earned.
-  //
-  // It used to be earned per element instead: every scatter walked its
-  // NS x NS candidates, tested each with a three-condition branch
-  // and reported through std::fprintf from inside the caller's parallel
-  // region.  That paid O(elements x NS^2) on every assembly for a
-  // property of the mesh and the graph together, which cannot change between
-  // elements or between calls.  Here it is O(nnz), once.
-  //
-  // Raw pointers rather than the graph type, so this does not depend on which
-  // headers the generated wrapper happens to pull in.
-  static int validate_dof_graph(const count_t *const rowptr,
-                                  const idx_t *const colidx,
-                                  const ptrdiff_t n_nodes,
-                                  const ptrdiff_t nnz) {
-    if (!rowptr || !colidx || n_nodes < 0) {
-      return SFEM_FAILURE;
-    }
-    if (rowptr[0] != 0 || (ptrdiff_t)rowptr[n_nodes] != nnz) {
-      return SFEM_FAILURE;
-    }
-    for (ptrdiff_t i = 0; i < n_nodes; ++i) {
-      const count_t begin = rowptr[i];
-      const count_t end = rowptr[i + 1];
-      if (end < begin || (ptrdiff_t)end > nnz) {
-        return SFEM_FAILURE;
-      }
-      for (count_t k = begin; k < end; ++k) {
-        if (colidx[k] < 0 || (ptrdiff_t)colidx[k] >= n_nodes) {
-          return SFEM_FAILURE;
-        }
-        if (k > begin && colidx[k] <= colidx[k - 1]) {
-          return SFEM_FAILURE;
-        }
-      }
-    }
-    return SFEM_SUCCESS;
-  }
-
   int %(op)s::initialize(const std::vector<std::string> &block_names) {
     SFEM_TRACE_SCOPE("%(op)s::initialize");
     impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
     // A micro-element space hands each semi-structured macro element over as its micro
     // elements, which these kernels assemble as HEX8.
     impl_->domains->set_micro_elements(impl_->space->micro_elements());
-    {
-      auto dof_graph = impl_->space->dof_to_dof_graph();
-      if (!dof_graph ||
-        validate_dof_graph(dof_graph->rowptr()->data(),
-                                   dof_graph->colidx()->data(),
-                                   dof_graph->n_nodes(),
-                                   dof_graph->nnz()) != SFEM_SUCCESS) {
-        SFEM_ERROR("%(op)s::initialize: the dof graph is malformed; the assembly kernels assume it is not\\n");
-        return SFEM_FAILURE;
-      }
-    }
     // Not only what the caller asked for.  An element whose geometry is
     // constant by construction has no isoparametric kernel, so the operator
     // takes the affine route for it either way and needs the cache either way.
@@ -1849,7 +1858,7 @@ namespace sfem {
               const idx_t *const colidx,
               real_t *const values) {
     SFEM_TRACE_SCOPE("%(op)s::hessian_crs");
-    if (auto term = time_scheme_term(impl_->time_scheme)) {
+%(hessian_crs_graph_check)s    if (auto term = time_scheme_term(impl_->time_scheme)) {
       if (term->hessian_crs(x, rowptr, colidx, values) != SFEM_SUCCESS) {
         return SFEM_FAILURE;
       }
@@ -1866,7 +1875,7 @@ namespace sfem {
               const idx_t *const colidx,
               real_t *const values) {
     SFEM_TRACE_SCOPE("%(op)s::hessian_bsr");
-    if (auto term = time_scheme_term(impl_->time_scheme)) {
+%(hessian_bsr_graph_check)s    if (auto term = time_scheme_term(impl_->time_scheme)) {
       if (term->hessian_bsr(x, rowptr, colidx, values) != SFEM_SUCCESS) {
         return SFEM_FAILURE;
       }
@@ -2023,6 +2032,7 @@ namespace sfem {
         "element_connectivity": _element_connectivity_expression(),
         "execution_space": current_target().execution_space(),
         "points_accessor": _points_accessor_expression(),
+        "graph_host_view": _graph_host_view(),
         "geometry_memory_space": _geometry_memory_space_expression(),
         "block_size_lines": _residual_block_size_lines(n_field_components_by_dim),
         "metric_declaration": _metric_declaration(any(affine_metric_flags)),
@@ -2120,6 +2130,8 @@ namespace sfem {
             indent="      ",
             n_field_components_by_dim=n_field_components_by_dim,
         ),
+        "hessian_crs_graph_check": _graph_check_lines(_op_class_name(material), "crs"),
+        "hessian_bsr_graph_check": _graph_check_lines(_op_class_name(material), "bsr"),
         "hessian_crs_current_parameter": _hyperelastic_hessian_current_parameter(
             {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
         ),
@@ -3126,6 +3138,67 @@ namespace sfem {
 %(block_size_lines)s
     }
 %(laplace_packed_helpers)s
+
+    // The graph an assembly was last handed and found well formed.
+    struct CheckedGraph {
+      const count_t *rowptr{nullptr};
+      const idx_t *colidx{nullptr};
+      ptrdiff_t n_rows{-1};
+    };
+
+    // Establish once per graph, at the first assembly into it, that the graph is well formed:
+    // rows in order, every column in range, each row sorted and duplicate free.
+    // The assembly kernels assume it -- they locate an entry and write to it
+    // without re-checking that it is there -- so this is where the assumption
+    // is earned.
+    //
+    // It used to be earned per element instead: every scatter walked its
+    // NS x NS candidates, tested each with a three-condition branch
+    // and reported through std::fprintf from inside the caller's parallel
+    // region.  That paid O(elements x NS^2) on every assembly for a
+    // property of the mesh and the graph together, which cannot change between
+    // elements or between calls.  Here it is O(nnz), once.
+    //
+    // Not at setup: `initialize` built the space's scalar dof graph for this, which a
+    // matrix-free solver never uses -- on a 76.6M-dof semi-structured mesh 6.2e9 entries,
+    // past count_t -- while the block assembly writes into the node graph, which it never
+    // checked.  `checked` remembers the last graph that passed.
+    //
+    // Raw pointers rather than the graph type, so this does not depend on which
+    // headers the generated wrapper happens to pull in.
+    int check_graph(CheckedGraph &checked,
+                    const count_t *const rowptr,
+                    const idx_t *const colidx,
+                    const ptrdiff_t n_rows) {
+      if (rowptr == checked.rowptr && colidx == checked.colidx && n_rows == checked.n_rows) {
+        return SFEM_SUCCESS;
+      }
+      if (!rowptr || !colidx || n_rows < 0) {
+        return SFEM_FAILURE;
+      }
+%(graph_host_view)s
+      if (h_rowptr[0] != 0) {
+        return SFEM_FAILURE;
+      }
+      const ptrdiff_t nnz = (ptrdiff_t)h_rowptr[n_rows];
+      for (ptrdiff_t i = 0; i < n_rows; ++i) {
+        const count_t begin = h_rowptr[i];
+        const count_t end = h_rowptr[i + 1];
+        if (end < begin || (ptrdiff_t)end > nnz) {
+          return SFEM_FAILURE;
+        }
+        for (count_t k = begin; k < end; ++k) {
+          if (h_colidx[k] < 0 || (ptrdiff_t)h_colidx[k] >= n_rows) {
+            return SFEM_FAILURE;
+          }
+          if (k > begin && h_colidx[k] <= h_colidx[k - 1]) {
+            return SFEM_FAILURE;
+          }
+        }
+      }
+      checked = CheckedGraph{rowptr, colidx, n_rows};
+      return SFEM_SUCCESS;
+    }
   }  // namespace
 
   class %(op)s::Impl {
@@ -3140,6 +3213,8 @@ namespace sfem {
     const real_t *current{nullptr};
     bool residual_uses_affine{false};
     bool jacobian_action_uses_affine{false};
+    CheckedGraph crs_graph;
+    CheckedGraph bsr_graph;
 %(previous_state_accessor)s  };
 
   std::unique_ptr<Op> %(op)s::create(const std::shared_ptr<FunctionSpace> &space) {
@@ -3164,66 +3239,12 @@ namespace sfem {
 
 %(performance_methods)s
 
-  // Establish once, at setup, that this operator's dof graph is well formed:
-  // rows in order, every column in range, each row sorted and duplicate free.
-  // The assembly kernels assume it -- they locate an entry and write to it
-  // without re-checking that it is there -- so this is where the assumption
-  // is earned.
-  //
-  // It used to be earned per element instead: every scatter walked its
-  // NS x NS candidates, tested each with a three-condition branch
-  // and reported through std::fprintf from inside the caller's parallel
-  // region.  That paid O(elements x NS^2) on every assembly for a
-  // property of the mesh and the graph together, which cannot change between
-  // elements or between calls.  Here it is O(nnz), once.
-  //
-  // Raw pointers rather than the graph type, so this does not depend on which
-  // headers the generated wrapper happens to pull in.
-  static int validate_dof_graph(const count_t *const rowptr,
-                                  const idx_t *const colidx,
-                                  const ptrdiff_t n_nodes,
-                                  const ptrdiff_t nnz) {
-    if (!rowptr || !colidx || n_nodes < 0) {
-      return SFEM_FAILURE;
-    }
-    if (rowptr[0] != 0 || (ptrdiff_t)rowptr[n_nodes] != nnz) {
-      return SFEM_FAILURE;
-    }
-    for (ptrdiff_t i = 0; i < n_nodes; ++i) {
-      const count_t begin = rowptr[i];
-      const count_t end = rowptr[i + 1];
-      if (end < begin || (ptrdiff_t)end > nnz) {
-        return SFEM_FAILURE;
-      }
-      for (count_t k = begin; k < end; ++k) {
-        if (colidx[k] < 0 || (ptrdiff_t)colidx[k] >= n_nodes) {
-          return SFEM_FAILURE;
-        }
-        if (k > begin && colidx[k] <= colidx[k - 1]) {
-          return SFEM_FAILURE;
-        }
-      }
-    }
-    return SFEM_SUCCESS;
-  }
-
   int %(op)s::initialize(const std::vector<std::string> &block_names) {
     SFEM_TRACE_SCOPE("%(op)s::initialize");
     impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
     // A micro-element space hands each semi-structured macro element over as its micro
     // elements, which these kernels assemble as HEX8.
     impl_->domains->set_micro_elements(impl_->space->micro_elements());
-    {
-      auto dof_graph = impl_->space->dof_to_dof_graph();
-      if (!dof_graph ||
-        validate_dof_graph(dof_graph->rowptr()->data(),
-                                   dof_graph->colidx()->data(),
-                                   dof_graph->n_nodes(),
-                                   dof_graph->nnz()) != SFEM_SUCCESS) {
-        SFEM_ERROR("%(op)s::initialize: the dof graph is malformed; the assembly kernels assume it is not\\n");
-        return SFEM_FAILURE;
-      }
-    }
     seed_material(*impl_->domains);
     const bool needs_affine_jacobian =
         (impl_->residual_uses_affine && %(residual_affine_uses_jacobian)s) ||
@@ -3441,6 +3462,7 @@ namespace sfem {
         "element_connectivity": _element_connectivity_expression(),
         "execution_space": current_target().execution_space(),
         "points_accessor": _points_accessor_expression(),
+        "graph_host_view": _graph_host_view(),
         "geometry_memory_space": _geometry_memory_space_expression(),
         "block_size_lines": _residual_block_size_lines(block_size_by_dim),
         "laplace_packed_helpers": laplace_packed_helpers,
@@ -3515,6 +3537,7 @@ namespace sfem {
             residual_affine_uses_metric_aos or action_affine_uses_metric_aos
         ),
         "hessian_crs_body": (
+            _graph_check_lines(_op_class_name(material), "crs") +
             "%s\n"
             "%s\n"
             # The inertia, as in the gradient and the apply: a tangent without
@@ -3560,6 +3583,7 @@ namespace sfem {
             else _residual_without_assembly(emits_linear_work)
         ),
         "hessian_bsr_body": (
+            _graph_check_lines(_op_class_name(material), "bsr") +
             "%s\n"
             "%s\n"
             # The inertia, as in the gradient and the apply: a tangent without
@@ -3672,9 +3696,28 @@ namespace sfem {
     source = template % substitutions
     # A volume forcing publishes the stepped 0-form too, now that the energy
     # merit asks every operator for it.
+    # A potential this emitter cannot evaluate is no potential to the line
+    # search: the operator reduces node-wise with the residual it assembles,
+    # rather than declaring a 0-form whose `value` refuses.
     return _header(material, True, publishes_value_steps=emits_linear_work,
-                   node_wise=emits_merit, state_independent=emits_linear_work,
+                   node_wise=not emits_linear_work, state_independent=emits_linear_work,
                    linear=_tangent_is_constant(form_collections)), source
+
+
+_GRAPH_ROWS = {
+    "crs": "impl_->space->n_dofs()",
+    "bsr": "impl_->space->n_dofs() / impl_->space->block_size()",
+}
+
+
+def _graph_check_lines(op_name, fmt):
+    """An assembly's refusal of a malformed graph (`check_graph`): CRS rows are dofs, BSR rows nodes."""
+    return (
+        "    if (check_graph(impl_->%s_graph, rowptr, colidx, %s) != SFEM_SUCCESS) {\n"
+        '      SFEM_ERROR("%s::hessian_%s: the graph is malformed; the assembly kernels assume it is not\\n");\n'
+        "      return SFEM_FAILURE;\n"
+        "    }\n" % (fmt, _GRAPH_ROWS[fmt], op_name, fmt)
+    )
 
 
 def _residual_without_assembly(linear_work):
@@ -4174,22 +4217,28 @@ def _boundary_potential_is_linear_work(form_collections):
 
     from codegen.framework.forms.forms import FormOrder
 
+    # The state is every symbol the form layer derives from the fields -- their
+    # gradients as well as their values, as `_tangent_is_constant` reads it.  A
+    # potential written in the gradients (an elastic energy) is free of the
+    # values themselves, and testing the values alone called it linear work.
     seen = False
     for collection in (form_collections or {}).values():
-        field_symbols = []
+        state = {str(symbol) for symbol in getattr(collection, "variables", ())}
         for field in collection.fields:
             components = int(getattr(field, "components", 1) or 1)
-            field_symbols.extend(
-                sp.Symbol("%s%d" % (field.name, component))
-                for component in range(components)
-            )
+            for component in range(components):
+                state.add("%s%d" % (field.name, component))
+                state.add("%s[%d]" % (field.name, component))
         for form in getattr(collection, "forms", ()):
             if getattr(form, "order", None) is not FormOrder.ZERO:
                 continue
             seen = True
             expression = sp.sympify(form.expression)
-            for symbol in field_symbols:
-                if sp.diff(expression, symbol, 2) != 0:
+            for symbol in expression.free_symbols:
+                if str(symbol) not in state:
+                    continue
+                slope = sp.diff(expression, symbol)
+                if any(str(other) in state for other in slope.free_symbols):
                     return False
     return seen
 
@@ -4395,6 +4444,67 @@ namespace sfem {
       return nullptr;
     }
 #endif  // SFEM_ENABLE_RYAML
+
+    // The graph an assembly was last handed and found well formed.
+    struct CheckedGraph {
+      const count_t *rowptr{nullptr};
+      const idx_t *colidx{nullptr};
+      ptrdiff_t n_rows{-1};
+    };
+
+    // Establish once per graph, at the first assembly into it, that the graph is well formed:
+    // rows in order, every column in range, each row sorted and duplicate free.
+    // The assembly kernels assume it -- they locate an entry and write to it
+    // without re-checking that it is there -- so this is where the assumption
+    // is earned.
+    //
+    // It used to be earned per element instead: every scatter walked its
+    // NS x NS candidates, tested each with a three-condition branch
+    // and reported through std::fprintf from inside the caller's parallel
+    // region.  That paid O(elements x NS^2) on every assembly for a
+    // property of the mesh and the graph together, which cannot change between
+    // elements or between calls.  Here it is O(nnz), once.
+    //
+    // Not at setup: `initialize` built the space's scalar dof graph for this, which a
+    // matrix-free solver never uses -- on a 76.6M-dof semi-structured mesh 6.2e9 entries,
+    // past count_t -- while the block assembly writes into the node graph, which it never
+    // checked.  `checked` remembers the last graph that passed.
+    //
+    // Raw pointers rather than the graph type, so this does not depend on which
+    // headers the generated wrapper happens to pull in.
+    int check_graph(CheckedGraph &checked,
+                    const count_t *const rowptr,
+                    const idx_t *const colidx,
+                    const ptrdiff_t n_rows) {
+      if (rowptr == checked.rowptr && colidx == checked.colidx && n_rows == checked.n_rows) {
+        return SFEM_SUCCESS;
+      }
+      if (!rowptr || !colidx || n_rows < 0) {
+        return SFEM_FAILURE;
+      }
+%(graph_host_view)s
+      if (h_rowptr[0] != 0) {
+        return SFEM_FAILURE;
+      }
+      const ptrdiff_t nnz = (ptrdiff_t)h_rowptr[n_rows];
+      for (ptrdiff_t i = 0; i < n_rows; ++i) {
+        const count_t begin = h_rowptr[i];
+        const count_t end = h_rowptr[i + 1];
+        if (end < begin || (ptrdiff_t)end > nnz) {
+          return SFEM_FAILURE;
+        }
+        for (count_t k = begin; k < end; ++k) {
+          if (h_colidx[k] < 0 || (ptrdiff_t)h_colidx[k] >= n_rows) {
+            return SFEM_FAILURE;
+          }
+          if (k > begin && h_colidx[k] <= h_colidx[k - 1]) {
+            return SFEM_FAILURE;
+          }
+        }
+      }
+      checked = CheckedGraph{rowptr, colidx, n_rows};
+      return SFEM_SUCCESS;
+    }
   }  // namespace
 
   class %(op)s::Impl {
@@ -4428,66 +4538,12 @@ namespace sfem {
 
 %(performance_methods)s
 
-  // Establish once, at setup, that this operator's dof graph is well formed:
-  // rows in order, every column in range, each row sorted and duplicate free.
-  // The assembly kernels assume it -- they locate an entry and write to it
-  // without re-checking that it is there -- so this is where the assumption
-  // is earned.
-  //
-  // It used to be earned per element instead: every scatter walked its
-  // NS x NS candidates, tested each with a three-condition branch
-  // and reported through std::fprintf from inside the caller's parallel
-  // region.  That paid O(elements x NS^2) on every assembly for a
-  // property of the mesh and the graph together, which cannot change between
-  // elements or between calls.  Here it is O(nnz), once.
-  //
-  // Raw pointers rather than the graph type, so this does not depend on which
-  // headers the generated wrapper happens to pull in.
-  static int validate_dof_graph(const count_t *const rowptr,
-                                  const idx_t *const colidx,
-                                  const ptrdiff_t n_nodes,
-                                  const ptrdiff_t nnz) {
-    if (!rowptr || !colidx || n_nodes < 0) {
-      return SFEM_FAILURE;
-    }
-    if (rowptr[0] != 0 || (ptrdiff_t)rowptr[n_nodes] != nnz) {
-      return SFEM_FAILURE;
-    }
-    for (ptrdiff_t i = 0; i < n_nodes; ++i) {
-      const count_t begin = rowptr[i];
-      const count_t end = rowptr[i + 1];
-      if (end < begin || (ptrdiff_t)end > nnz) {
-        return SFEM_FAILURE;
-      }
-      for (count_t k = begin; k < end; ++k) {
-        if (colidx[k] < 0 || (ptrdiff_t)colidx[k] >= n_nodes) {
-          return SFEM_FAILURE;
-        }
-        if (k > begin && colidx[k] <= colidx[k - 1]) {
-          return SFEM_FAILURE;
-        }
-      }
-    }
-    return SFEM_SUCCESS;
-  }
-
   int %(op)s::initialize(const std::vector<std::string> &block_names) {
     SFEM_TRACE_SCOPE("%(op)s::initialize");
     impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
     // A micro-element space hands each semi-structured macro element over as its micro
     // elements, which these kernels assemble as HEX8.
     impl_->domains->set_micro_elements(impl_->space->micro_elements());
-    {
-      auto dof_graph = impl_->space->dof_to_dof_graph();
-      if (!dof_graph ||
-        validate_dof_graph(dof_graph->rowptr()->data(),
-                                   dof_graph->colidx()->data(),
-                                   dof_graph->n_nodes(),
-                                   dof_graph->nnz()) != SFEM_SUCCESS) {
-        SFEM_ERROR("%(op)s::initialize: the dof graph is malformed; the assembly kernels assume it is not\\n");
-        return SFEM_FAILURE;
-      }
-    }
     seed_material(*impl_->domains);
     return SFEM_SUCCESS;
   }
@@ -4635,6 +4691,7 @@ namespace sfem {
         "element_connectivity": _element_connectivity_expression(),
         "execution_space": current_target().execution_space(),
         "points_accessor": _points_accessor_expression(),
+        "graph_host_view": _graph_host_view(),
         "geometry_memory_space": _geometry_memory_space_expression(),
         "block_size_lines": _residual_block_size_lines(block_size_by_dim),
         "performance_methods": _performance_methods(_op_class_name(material), material.name, elements, {}),
@@ -4893,6 +4950,67 @@ namespace sfem {
           return 0;
       }
     }
+
+    // The graph an assembly was last handed and found well formed.
+    struct CheckedGraph {
+      const count_t *rowptr{nullptr};
+      const idx_t *colidx{nullptr};
+      ptrdiff_t n_rows{-1};
+    };
+
+    // Establish once per graph, at the first assembly into it, that the graph is well formed:
+    // rows in order, every column in range, each row sorted and duplicate free.
+    // The assembly kernels assume it -- they locate an entry and write to it
+    // without re-checking that it is there -- so this is where the assumption
+    // is earned.
+    //
+    // It used to be earned per element instead: every scatter walked its
+    // NS x NS candidates, tested each with a three-condition branch
+    // and reported through std::fprintf from inside the caller's parallel
+    // region.  That paid O(elements x NS^2) on every assembly for a
+    // property of the mesh and the graph together, which cannot change between
+    // elements or between calls.  Here it is O(nnz), once.
+    //
+    // Not at setup: `initialize` built the space's scalar dof graph for this, which a
+    // matrix-free solver never uses -- on a 76.6M-dof semi-structured mesh 6.2e9 entries,
+    // past count_t -- while the block assembly writes into the node graph, which it never
+    // checked.  `checked` remembers the last graph that passed.
+    //
+    // Raw pointers rather than the graph type, so this does not depend on which
+    // headers the generated wrapper happens to pull in.
+    int check_graph(CheckedGraph &checked,
+                    const count_t *const rowptr,
+                    const idx_t *const colidx,
+                    const ptrdiff_t n_rows) {
+      if (rowptr == checked.rowptr && colidx == checked.colidx && n_rows == checked.n_rows) {
+        return SFEM_SUCCESS;
+      }
+      if (!rowptr || !colidx || n_rows < 0) {
+        return SFEM_FAILURE;
+      }
+%(graph_host_view)s
+      if (h_rowptr[0] != 0) {
+        return SFEM_FAILURE;
+      }
+      const ptrdiff_t nnz = (ptrdiff_t)h_rowptr[n_rows];
+      for (ptrdiff_t i = 0; i < n_rows; ++i) {
+        const count_t begin = h_rowptr[i];
+        const count_t end = h_rowptr[i + 1];
+        if (end < begin || (ptrdiff_t)end > nnz) {
+          return SFEM_FAILURE;
+        }
+        for (count_t k = begin; k < end; ++k) {
+          if (h_colidx[k] < 0 || (ptrdiff_t)h_colidx[k] >= n_rows) {
+            return SFEM_FAILURE;
+          }
+          if (k > begin && h_colidx[k] <= h_colidx[k - 1]) {
+            return SFEM_FAILURE;
+          }
+        }
+      }
+      checked = CheckedGraph{rowptr, colidx, n_rows};
+      return SFEM_SUCCESS;
+    }
   }  // namespace
 
   class %(op)s::Impl {
@@ -4910,6 +5028,7 @@ namespace sfem {
     bool apply_uses_affine{false};
     bool residual_uses_affine{false};
     bool jacobian_action_uses_affine{false};
+    CheckedGraph bsr_graph;
 %(previous_state_accessor)s
   };
 
@@ -4935,66 +5054,12 @@ namespace sfem {
 
 %(performance_methods)s
 
-  // Establish once, at setup, that this operator's dof graph is well formed:
-  // rows in order, every column in range, each row sorted and duplicate free.
-  // The assembly kernels assume it -- they locate an entry and write to it
-  // without re-checking that it is there -- so this is where the assumption
-  // is earned.
-  //
-  // It used to be earned per element instead: every scatter walked its
-  // NS x NS candidates, tested each with a three-condition branch
-  // and reported through std::fprintf from inside the caller's parallel
-  // region.  That paid O(elements x NS^2) on every assembly for a
-  // property of the mesh and the graph together, which cannot change between
-  // elements or between calls.  Here it is O(nnz), once.
-  //
-  // Raw pointers rather than the graph type, so this does not depend on which
-  // headers the generated wrapper happens to pull in.
-  static int validate_dof_graph(const count_t *const rowptr,
-                                  const idx_t *const colidx,
-                                  const ptrdiff_t n_nodes,
-                                  const ptrdiff_t nnz) {
-    if (!rowptr || !colidx || n_nodes < 0) {
-      return SFEM_FAILURE;
-    }
-    if (rowptr[0] != 0 || (ptrdiff_t)rowptr[n_nodes] != nnz) {
-      return SFEM_FAILURE;
-    }
-    for (ptrdiff_t i = 0; i < n_nodes; ++i) {
-      const count_t begin = rowptr[i];
-      const count_t end = rowptr[i + 1];
-      if (end < begin || (ptrdiff_t)end > nnz) {
-        return SFEM_FAILURE;
-      }
-      for (count_t k = begin; k < end; ++k) {
-        if (colidx[k] < 0 || (ptrdiff_t)colidx[k] >= n_nodes) {
-          return SFEM_FAILURE;
-        }
-        if (k > begin && colidx[k] <= colidx[k - 1]) {
-          return SFEM_FAILURE;
-        }
-      }
-    }
-    return SFEM_SUCCESS;
-  }
-
   int %(op)s::initialize(const std::vector<std::string> &block_names) {
     SFEM_TRACE_SCOPE("%(op)s::initialize");
     impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
     // A micro-element space hands each semi-structured macro element over as its micro
     // elements, which these kernels assemble as HEX8.
     impl_->domains->set_micro_elements(impl_->space->micro_elements());
-    {
-      auto dof_graph = impl_->space->dof_to_dof_graph();
-      if (!dof_graph ||
-        validate_dof_graph(dof_graph->rowptr()->data(),
-                                   dof_graph->colidx()->data(),
-                                   dof_graph->n_nodes(),
-                                   dof_graph->nnz()) != SFEM_SUCCESS) {
-        SFEM_ERROR("%(op)s::initialize: the dof graph is malformed; the assembly kernels assume it is not\\n");
-        return SFEM_FAILURE;
-      }
-    }
     seed_material(*impl_->domains);
     auto mesh = impl_->space->mesh_ptr();
     const bool needs_affine_geometry =
@@ -5232,6 +5297,7 @@ namespace sfem {
         "element_connectivity": _element_connectivity_expression(),
         "execution_space": current_target().execution_space(),
         "points_accessor": _points_accessor_expression(),
+        "graph_host_view": _graph_host_view(),
         "geometry_memory_space": _geometry_memory_space_expression(),
         "block_size_lines": _coupled_block_size_lines(systems_by_dim),
         "performance_methods": _performance_methods(_op_class_name(material), material.name, elements, cases["performance"]),
@@ -5832,7 +5898,7 @@ def _coupled_hessian_bsr_method(op_name, scheme_argument, scheme_hessian_bsr, he
               const idx_t *const colidx,
               real_t *const values) {
     SFEM_TRACE_SCOPE("%(op)s::hessian_bsr");
-    const real_t *const current = state ? state : impl_->current;
+%(graph_check)s    const real_t *const current = state ? state : impl_->current;
     if (!current || !impl_->previous_state()) {
       SFEM_ERROR("%(op)s::hessian_bsr requires current and previous states\\n");
       return SFEM_FAILURE;
@@ -5856,6 +5922,7 @@ def _coupled_hessian_bsr_method(op_name, scheme_argument, scheme_hessian_bsr, he
         "op": op_name,
         "scheme_argument": scheme_argument,
         "scheme_hessian_bsr": scheme_hessian_bsr,
+        "graph_check": _graph_check_lines(op_name, "bsr"),
         "cases": "\n".join(hessian_bsr_cases),
     }
 
@@ -6168,7 +6235,7 @@ def _op_stream_member():
 def _op_class_name(material):
     """The class the generated wrapper declares.
 
-    `GPULaplacian`, `GPULinearElasticity`, `GPUKelvinVoigtNewmark`: SFEM names
+    `GPULaplacian`, `GPULinearElasticity`: SFEM names
     its device Ops for the device and registers them under a `gpu:` key, so a
     host and a device Op for one material are two classes and two factory
     entries rather than one of each fighting over a name.
@@ -6266,6 +6333,10 @@ def _geometry_memory_space_expression():
 
 def _points_accessor_expression():
     return current_target().points_accessor()
+
+
+def _graph_host_view():
+    return "\n".join(current_target().graph_host_view())
 
 
 def _element_connectivity_expression():

@@ -30,7 +30,7 @@ solid-related source file.
 | Hyperelastic | `MooneyRivlin`, `MooneyRivlinActiveStrainPacked` | Legacy packed 3D `HEX8` path | Pure-material mode belongs in the homogeneous case; active strain gets a separate case. |
 | Hyperelastic | `GeneratedSaintVenantKirchhoff` | Generated 2D/3D simplex and tensor-product families | Required in the homogeneous mode cases. |
 | Viscoelastic | `GeneratedMooneyRivlinKelvinVoigtNewmark` | Generated 2D and 3D element families | Canonical finite-strain Kelvin-Voigt target in both dimensions. |
-| Viscoelastic | `KelvinVoigtNewmark` | Legacy 3D `HEX8` and semi-structured hex only | Cover with the analytical damped-mode case. |
+| Viscoelastic | `GeneratedLinearKelvinVoigt` | Generated element families; semi-structured hex in the micro basis | Cover with the analytical damped-mode case. |
 | Viscoelastic | `GeneratedMooneyRivlinProny` | 3D `HEX8`; Prony series and optional WLF shift | Cover with homogeneous relaxation and reduced-time WLF variants. |
 
 `Hyperelasticity` is a generic/plugin-facing operator rather than a distinct
@@ -236,7 +236,7 @@ outside this material-focused catalog.
 ### VE-3D-02: `linear_kv_damped_mode_3d`
 
 - **Type:** analytical transient verification; medium gate.
-- **Target:** legacy `KelvinVoigtNewmark` on `HEX8` and one semi-structured hex
+- **Target:** `GeneratedLinearKelvinVoigt` on `HEX8` and one semi-structured hex
   variant.
 - **Setup:** rectangular bar with lateral displacement constrained and an
   initial axial mode `sin(pi x/L)`. Release it with no external load in the

@@ -241,6 +241,7 @@ struct TestOutput gen_test_data(enum ExecutionSpace es) {
                     x->data(),
                     10,
                     nullptr,
+                    nullptr,
                     upper_bound->data(),
                     nullptr,
                     lagrange_ub->data(),
@@ -251,6 +252,7 @@ struct TestOutput gen_test_data(enum ExecutionSpace es) {
                     rhs->data(),
                     10,
                     nullptr,
+                    nullptr,
                     upper_bound->data(),
                     nullptr,
                     lagrange_ub->data(),
@@ -259,7 +261,7 @@ struct TestOutput gen_test_data(enum ExecutionSpace es) {
     auto e_pen = impl.sq_norm_ramp_p(contact_conds->n_constrained_dofs(), x->data(), upper_bound->data());
 
     auto lagr_ub = sfem::create_buffer<real_t>(contact_conds->n_constrained_dofs(), es);
-    impl.update_lagr_p(contact_conds->n_constrained_dofs(), 10, x->data(), upper_bound->data(), lagr_ub->data());
+    impl.update_lagr_p(contact_conds->n_constrained_dofs(), 10, nullptr, x->data(), upper_bound->data(), lagr_ub->data());
 
     const bool is_ml = fs->has_semi_structured_mesh();
 

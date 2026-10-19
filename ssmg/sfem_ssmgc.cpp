@@ -479,6 +479,60 @@ namespace sfem {
             }
         }
 
+        // The penalty of each contact row relative to the stiffness it constrains: w_i = sum_d D_id / (dim m_i),
+        // D the material's diagonal at the node and m_i its surface mass (the contact force is m_i times the
+        // multiplier). penalty_param is then a multiple of the local stiffness whatever the material, the
+        // inertia and the mesh size; a nonlinear material's at the state the hierarchy is built at.
+        SharedBuffer<T> penalty_weights() {
+            auto            f    = levels[0]->function;
+            auto            fs   = f->space();
+            const int       bs   = fs->block_size();
+            const ptrdiff_t n    = contact_conds->n_constrained_dofs();
+            const auto      es   = f->execution_space();
+            // What the smoothers are built from: a linear material's symmetric diagonal blocks (xx, xy, xz,
+            // yy, yz, zz; in 2D xx, xy, yy), a nonlinear one's diagonal.
+            const bool      blocks   = f->is_linear();
+            const int       per_node = blocks ? (bs == 3 ? 6 : 3) : bs;
+            auto            diag     = sfem::create_buffer<T>(fs->n_dofs() / bs * per_node, es);
+            auto            x0       = sfem::create_buffer<T>(fs->n_dofs(), es);
+            auto            b        = sfem::blas<T>(es);
+            b->zeros(diag->size(), diag->data());
+            b->zeros(x0->size(), x0->data());
+            if (blocks) {
+                f->hessian_block_diag_sym(x0->data(), diag->data());
+            } else {
+                f->hessian_diag(x0->data(), diag->data());
+            }
+
+            SharedBuffer<T> d = diag, m = contact_conds->surface_mass();
+#ifdef SFEM_ENABLE_CUDA
+            if (es == EXECUTION_SPACE_DEVICE) {
+                d = smesh::to_host(d);
+                m = smesh::to_host(m);
+            }
+#endif
+            auto               w   = sfem::create_host_buffer<T>(n);
+            const idx_t *const idx = contact_conds->node_mapping()->data();
+            const T *const     dd  = d->data();
+            const T *const     mm  = m->data();
+            T *const           ww  = w->data();
+#pragma omp parallel for
+            for (ptrdiff_t i = 0; i < n; ++i) {
+                const T *const di = &dd[(ptrdiff_t)idx[i] * per_node];
+                T              tr = 0;
+                if (!blocks) {
+                    for (int c = 0; c < bs; ++c) tr += di[c];
+                } else {
+                    tr = bs == 3 ? di[0] + di[3] + di[5] : di[0] + di[2];
+                }
+                ww[i] = mm[i] > 0 ? tr / (bs * mm[i]) : T(1);
+            }
+#ifdef SFEM_ENABLE_CUDA
+            if (es == EXECUTION_SPACE_DEVICE) return smesh::to_device(w);
+#endif
+            return w;
+        }
+
         int update_contact(const T *const disp) {
             SFEM_TRACE_SCOPE("SPMG::update_contact");
             contact_conds->update(disp);
@@ -653,9 +707,10 @@ namespace sfem {
 
             real_t atol              = smesh::Env::read("SFEM_ATOL", is_double ? 1e-9 : 5e-7);
             real_t rtol              = smesh::Env::read("SFEM_RTOL", is_double ? 1e-8 : 5e-6);
-            real_t max_penalty_param = smesh::Env::read(
-                    "SFEM_MAX_PENALTY_PARAM", (enable_mixed_precision ? (is_double ? 1e5 : 1e4) : (is_double ? 1e6 : 1e4)));
-            real_t penalty_param          = smesh::Env::read("SFEM_PENALTY_PARAM", 1e4);
+            // Multiples of each contact node's stiffness (penalty_weights): one start and cap serve any
+            // material, inertia, mesh size and precision.
+            real_t max_penalty_param      = smesh::Env::read("SFEM_MAX_PENALTY_PARAM", 1e3);
+            real_t penalty_param          = smesh::Env::read("SFEM_PENALTY_PARAM", 10.);
             real_t penalty_param_increase = 10;
             real_t coarse_rtol            = smesh::Env::read("SFEM_COARSE_RTOL", 1e-6);
 
@@ -974,6 +1029,7 @@ namespace sfem {
 
             mg->set_upper_bound(upper_bound);
             mg->set_constraints_op(linear_constraints_op, linear_constraints_op_transpose);
+            mg->set_penalty_weights(penalty_weights());
 
             auto fine = levels[0];
             mg->add_level_constraint_op_x_op(fine->sbv);
@@ -989,10 +1045,14 @@ namespace sfem {
 
                 assert(size_t(i - 1) < restrict_penalization.size());
                 mg->add_constraints_restriction(restrict_penalization[i - 1]);
+                mg->add_constraints_block_restriction(restrict_sbv[i - 1]);
             }
 
             ////////////////////////////////////////////////////////////////////////////////////
-            mg->set_debug(1);
+            // The `debug` key (SFEM_SSMGC_DEBUG): the per-inner-iteration log and the vector NaN traps,
+            // which scan every vector each iteration (with a device-to-host copy on the GPU). The norms
+            // are trapped either way.
+            mg->set_debug(debug);
             mg->enable_line_search(enable_line_search);
             mg->set_max_it(max_it);
             mg->set_max_inner_it(max_inner_it);
@@ -1054,6 +1114,26 @@ namespace sfem {
     template <typename T>
     int SSMGC<T>::apply(const T *const rhs, T *const x) {
         return impl_->mg->apply(rhs, x);
+    }
+
+    template <typename T>
+    int SSMGC<T>::iterations() const {
+        return impl_->mg->iterations();
+    }
+
+    template <typename T>
+    void SSMGC<T>::set_residual_atol(const T val) {
+        impl_->mg->set_residual_atol(val);
+    }
+
+    template <typename T>
+    void SSMGC<T>::set_curvature(const SharedBuffer<T> &blocks) {
+        impl_->mg->set_fine_blocks(blocks);
+    }
+
+    template <typename T>
+    void SSMGC<T>::apply_curvature(const T *const x, T *const y) {
+        impl_->mg->apply_fine_blocks(x, y);
     }
 
     template <typename T>

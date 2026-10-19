@@ -494,6 +494,8 @@ namespace sfem {
     int Function::hessian_diag(const real_t *const x, real_t *const values) {
         SFEM_TRACE_SCOPE("Function::hessian_diag");
         for (auto &op : impl_->ops) {
+            // A residual that does not read the state (a load) has no tangent.
+            if (!op->residual_depends_on_state()) continue;
             if (op->hessian_diag(x, values) != SFEM_SUCCESS) {
                 std::cerr << "Failed hessian_diag in op: " << op->name() << "\n";
                 return SFEM_FAILURE;
@@ -513,6 +515,8 @@ namespace sfem {
         SFEM_TRACE_SCOPE("Function::hessian_block_diag_sym");
 
         for (auto &op : impl_->ops) {
+            // A residual that does not read the state (a load) has no tangent.
+            if (!op->residual_depends_on_state()) continue;
             if (op->hessian_block_diag_sym(x, values) != SFEM_SUCCESS) {
                 std::cerr << "Failed hessian_block_diag_sym in op: " << op->name() << "\n";
                 return SFEM_FAILURE;
@@ -586,6 +590,8 @@ namespace sfem {
         SFEM_TRACE_SCOPE("Function::apply");
 
         for (auto &op : impl_->ops) {
+            // A residual that does not read the state (a load) has no tangent.
+            if (!op->residual_depends_on_state()) continue;
             if (op->apply(x, h, out, scope) != SFEM_SUCCESS) {
                 std::cerr << "Failed apply in op: " << op->name() << "\n";
                 return SFEM_FAILURE;

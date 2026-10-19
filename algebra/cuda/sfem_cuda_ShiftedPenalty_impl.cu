@@ -173,18 +173,21 @@ namespace sfem {
     template <typename T>
     __global__ void ramp_p_kernel(const ptrdiff_t n,
                                   const T         penalty_param,
+                                  const T* const SFEM_RESTRICT weights,
                                   const T* const SFEM_RESTRICT x,
                                   const T* const SFEM_RESTRICT ub,
                                   const T* const SFEM_RESTRICT lagr_ub,
                                   T* const SFEM_RESTRICT out) {
         for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
-            out[i] -= penalty_param * tmax(T(0), x[i] - ub[i] + lagr_ub[i] / penalty_param);
+            const T rho = weights ? penalty_param * weights[i] : penalty_param;
+            out[i] -= tmax(T(0), rho * (x[i] - ub[i]) + lagr_ub[i]);
         }
     }
 
     template <typename T>
     static void ramp_p_tpl(const ptrdiff_t n,
                            const T         penalty_param,
+                           const T* const  weights,
                            const T* const  x,
                            const T* const  ub,
                            const T* const  lagr_ub,
@@ -194,7 +197,7 @@ namespace sfem {
         int       kernel_block_size = SFEM_WARP_SIZE * SFEM_N_WARPS_PER_BLOCK;
         ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
 
-        ramp_p_kernel<<<n_blocks, kernel_block_size>>>(n, penalty_param, x, ub, lagr_ub, out);
+        ramp_p_kernel<<<n_blocks, kernel_block_size>>>(n, penalty_param, weights, x, ub, lagr_ub, out);
 
         SFEM_DEBUG_SYNCHRONIZE();
     }
@@ -204,18 +207,21 @@ namespace sfem {
     template <typename T>
     __global__ void ramp_m_kernel(const ptrdiff_t n,
                                   const T         penalty_param,
+                                  const T* const SFEM_RESTRICT weights,
                                   const T* const SFEM_RESTRICT x,
                                   const T* const SFEM_RESTRICT lb,
                                   const T* const SFEM_RESTRICT lagr_lb,
                                   T* const SFEM_RESTRICT out) {
         for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
-            out[i] -= penalty_param * tmin(T(0), x[i] - lb[i] + lagr_lb[i] / penalty_param);
+            const T rho = weights ? penalty_param * weights[i] : penalty_param;
+            out[i] -= tmin(T(0), rho * (x[i] - lb[i]) + lagr_lb[i]);
         }
     }
 
     template <typename T>
     static void ramp_m_tpl(const ptrdiff_t n,
                            const T         penalty_param,
+                           const T* const  weights,
                            const T* const  x,
                            const T* const  lb,
                            const T* const  lagr_lb,
@@ -225,7 +231,7 @@ namespace sfem {
         int       kernel_block_size = SFEM_WARP_SIZE * SFEM_N_WARPS_PER_BLOCK;
         ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
 
-        ramp_m_kernel<<<n_blocks, kernel_block_size>>>(n, penalty_param, x, lb, lagr_lb, out);
+        ramp_m_kernel<<<n_blocks, kernel_block_size>>>(n, penalty_param, weights, x, lb, lagr_lb, out);
 
         SFEM_DEBUG_SYNCHRONIZE();
     }
@@ -235,17 +241,20 @@ namespace sfem {
     template <typename T>
     __global__ void update_lagr_p_kernel(const ptrdiff_t n,
                                          const T         penalty_param,
+                                         const T* const SFEM_RESTRICT weights,
                                          const T* const SFEM_RESTRICT x,
                                          const T* const SFEM_RESTRICT ub,
                                          T* const SFEM_RESTRICT lagr_ub) {
         for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
-            lagr_ub[i] = tmax(T(0), lagr_ub[i] + penalty_param * (x[i] - ub[i]));
+            const T rho = weights ? penalty_param * weights[i] : penalty_param;
+            lagr_ub[i]  = tmax(T(0), lagr_ub[i] + rho * (x[i] - ub[i]));
         }
     }
 
     template <typename T>
     static void update_lagr_p_tpl(const ptrdiff_t n,
                                   const T         penalty_param,
+                                  const T* const  weights,
                                   const T* const  x,
                                   const T* const  ub,
                                   T* const        lagr_ub) {
@@ -254,7 +263,7 @@ namespace sfem {
         int       kernel_block_size = SFEM_WARP_SIZE * SFEM_N_WARPS_PER_BLOCK;
         ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
 
-        update_lagr_p_kernel<<<n_blocks, kernel_block_size>>>(n, penalty_param, x, ub, lagr_ub);
+        update_lagr_p_kernel<<<n_blocks, kernel_block_size>>>(n, penalty_param, weights, x, ub, lagr_ub);
 
         SFEM_DEBUG_SYNCHRONIZE();
     }
@@ -264,17 +273,20 @@ namespace sfem {
     template <typename T>
     __global__ void update_lagr_m_kernel(const ptrdiff_t n,
                                          const T         penalty_param,
+                                         const T* const SFEM_RESTRICT weights,
                                          const T* const SFEM_RESTRICT x,
                                          const T* const SFEM_RESTRICT lb,
                                          T* const SFEM_RESTRICT lagr_lb) {
         for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
-            lagr_lb[i] = tmin(T(0), lagr_lb[i] + penalty_param * (x[i] - lb[i]));
+            const T rho = weights ? penalty_param * weights[i] : penalty_param;
+            lagr_lb[i]  = tmin(T(0), lagr_lb[i] + rho * (x[i] - lb[i]));
         }
     }
 
     template <typename T>
     static void update_lagr_m_tpl(const ptrdiff_t n,
                                   const T         penalty_param,
+                                  const T* const  weights,
                                   const T* const  x,
                                   const T* const  lb,
                                   T* const        lagr_lb) {
@@ -283,7 +295,7 @@ namespace sfem {
         int       kernel_block_size = SFEM_WARP_SIZE * SFEM_N_WARPS_PER_BLOCK;
         ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
 
-        update_lagr_m_kernel<<<n_blocks, kernel_block_size>>>(n, penalty_param, x, lb, lagr_lb);
+        update_lagr_m_kernel<<<n_blocks, kernel_block_size>>>(n, penalty_param, weights, x, lb, lagr_lb);
 
         SFEM_DEBUG_SYNCHRONIZE();
     }
@@ -292,11 +304,13 @@ namespace sfem {
     __global__ void calc_J_pen_p_kernel(const ptrdiff_t n,
                                         const T* const SFEM_RESTRICT x,
                                         const T         penalty_param,
+                                        const T* const SFEM_RESTRICT weights,
                                         const T* const SFEM_RESTRICT ub,
                                         const T* const SFEM_RESTRICT lagr_ub,
                                         T* const SFEM_RESTRICT result) {
         for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
-            result[i] += ((x[i] - ub[i] + lagr_ub[i] / penalty_param) >= 0) * penalty_param;
+            const T rho = weights ? penalty_param * weights[i] : penalty_param;
+            result[i] += ((rho * (x[i] - ub[i]) + lagr_ub[i]) >= 0) * rho;
         }
     }
 
@@ -304,11 +318,13 @@ namespace sfem {
     __global__ void calc_J_pen_m_kernel(const ptrdiff_t n,
                                         const T* const SFEM_RESTRICT x,
                                         const T         penalty_param,
+                                        const T* const SFEM_RESTRICT weights,
                                         const T* const SFEM_RESTRICT lb,
                                         const T* const SFEM_RESTRICT lagr_lb,
                                         T* const SFEM_RESTRICT result) {
         for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
-            result[i] += ((x[i] - lb[i] + lagr_lb[i] / penalty_param) <= 0) * penalty_param;
+            const T rho = weights ? penalty_param * weights[i] : penalty_param;
+            result[i] += ((rho * (x[i] - lb[i]) + lagr_lb[i]) <= 0) * rho;
         }
     }
 
@@ -317,6 +333,7 @@ namespace sfem {
     static void calc_J_pen_tpl(const ptrdiff_t n,
                                const T* const  x,
                                const T         penalty_param,
+                               const T* const  weights,
                                const T* const  lb,
                                const T* const  ub,
                                const T* const  lagr_lb,
@@ -328,12 +345,83 @@ namespace sfem {
         ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
 
         if (lb) {
-            calc_J_pen_m_kernel<<<n_blocks, kernel_block_size>>>(n, x, penalty_param, lb, lagr_lb, result);
+            calc_J_pen_m_kernel<<<n_blocks, kernel_block_size>>>(n, x, penalty_param, weights, lb, lagr_lb, result);
         }
 
         if (ub) {
-            calc_J_pen_p_kernel<<<n_blocks, kernel_block_size>>>(n, x, penalty_param, ub, lagr_ub, result);
+            calc_J_pen_p_kernel<<<n_blocks, kernel_block_size>>>(n, x, penalty_param, weights, ub, lagr_ub, result);
         }
+
+        SFEM_DEBUG_SYNCHRONIZE();
+    }
+
+    template <typename T, bool UPPER>
+    __global__ void sq_norm_kkt_kernel(const ptrdiff_t              n,
+                                       const T                      penalty_param,
+                                       const T* const SFEM_RESTRICT weights,
+                                       const T* const SFEM_RESTRICT x,
+                                       const T* const SFEM_RESTRICT bound,
+                                       const T* const SFEM_RESTRICT lagr,
+                                       T* const SFEM_RESTRICT       result) {
+        T acc = 0;
+        for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
+            const T rho = weights ? penalty_param * weights[i] : penalty_param;
+            const T v   = UPPER ? tmax(x[i] - bound[i], -lagr[i] / rho) : tmin(x[i] - bound[i], -lagr[i] / rho);
+            acc += v * v;
+        }
+
+        __shared__ T block_accumulator[SFEM_N_WARPS_PER_BLOCK];
+        t_warp_reduce(acc, block_accumulator, result);
+    }
+
+    template <typename T, bool UPPER>
+    static T sq_norm_kkt_tpl(const ptrdiff_t n,
+                             const T         penalty_param,
+                             const T* const  weights,
+                             const T* const  x,
+                             const T* const  bound,
+                             const T* const  lagr) {
+        SFEM_DEBUG_SYNCHRONIZE();
+
+        int       kernel_block_size = SFEM_WARP_SIZE * SFEM_N_WARPS_PER_BLOCK;
+        ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
+
+        T* device_value = nullptr;
+
+        cudaMalloc((void**)&device_value, sizeof(T));
+        cudaMemset((void*)device_value, 0, sizeof(T));
+
+        sq_norm_kkt_kernel<T, UPPER><<<n_blocks, kernel_block_size>>>(n, penalty_param, weights, x, bound, lagr, device_value);
+        SFEM_DEBUG_SYNCHRONIZE();
+
+        T host_value = -1;
+        cudaMemcpy(&host_value, device_value, sizeof(T), cudaMemcpyDeviceToHost);
+        cudaFree(device_value);
+
+        return host_value;
+    }
+
+    template <typename T>
+    __global__ void scale_blocks_kernel(const ptrdiff_t n_blocks,
+                                        const int       block_size,
+                                        const T* const SFEM_RESTRICT scale,
+                                        const T* const SFEM_RESTRICT blocks,
+                                        T* const SFEM_RESTRICT out) {
+        const ptrdiff_t n = n_blocks * block_size;
+        for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < n; e += blockDim.x * gridDim.x) {
+            out[e] = scale[e / block_size] * blocks[e];
+        }
+    }
+
+    template <typename T>
+    static void scale_blocks_tpl(const ptrdiff_t n_blocks, const int block_size, const T* const scale, const T* const blocks, T* const out) {
+        SFEM_DEBUG_SYNCHRONIZE();
+
+        const ptrdiff_t n                 = n_blocks * block_size;
+        int             kernel_block_size = SFEM_WARP_SIZE * SFEM_N_WARPS_PER_BLOCK;
+        ptrdiff_t       n_cuda_blocks     = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
+
+        scale_blocks_kernel<<<n_cuda_blocks, kernel_block_size>>>(n_blocks, block_size, scale, blocks, out);
 
         SFEM_DEBUG_SYNCHRONIZE();
     }
@@ -352,17 +440,21 @@ namespace sfem {
         tpl.calc_r_pen = [ramp_m, ramp_p](const ptrdiff_t n,
                                           T* const        x,
                                           const T         penalty_param,
+                                          const T* const  weights,
                                           const T* const  lb,
                                           const T* const  ub,
                                           const T* const  lagr_lb,
                                           const T* const  lagr_ub,
                                           T*              result) {
             // Ramp negative and positive parts
-            if (lb) ramp_m(n, penalty_param, x, lb, lagr_lb, result);
-            if (ub) ramp_p(n, penalty_param, x, ub, lagr_ub, result);
+            if (lb) ramp_m(n, penalty_param, weights, x, lb, lagr_lb, result);
+            if (ub) ramp_p(n, penalty_param, weights, x, ub, lagr_ub, result);
         };
 
         tpl.calc_J_pen = &calc_J_pen_tpl<T>;
+        tpl.scale_blocks = &scale_blocks_tpl<T>;
+        tpl.sq_norm_kkt_p = &sq_norm_kkt_tpl<T, true>;
+        tpl.sq_norm_kkt_m = &sq_norm_kkt_tpl<T, false>;
 
         assert(tpl.good());
     }

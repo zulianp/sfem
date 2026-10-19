@@ -18,14 +18,15 @@
 
 // CPU
 #include "sshex8_laplacian.hpp"
+#include "sshex8.hpp"
 #include "sshex8_linear_elasticity.hpp"
+#include "cu_sshex8_linear_elasticity.hpp"
 
 // GPU
 #include "cu_boundary_condition.hpp"
 #include "cu_hex8_adjugate.hpp"
 #include "cu_hex8_fff.hpp"
 #include "cu_integrate_values.hpp"
-#include "cu_kelvin_voigt_newmark.hpp"
 #include "cu_laplacian.hpp"
 #include "cu_linear_elasticity.hpp"
 #include "cu_mask.hpp"
@@ -393,6 +394,9 @@ namespace sfem {
             std::shared_ptr<Buffer<idx_t *>>    elements;
             std::shared_ptr<Buffer<jacobian_t>> jacobian_adjugate;
             std::shared_ptr<Buffer<geom_t>>     jacobian_determinant;
+            /// A semi-structured hex domain without the affine approximation: its macro elements'
+            /// corners, which the isoparametric kernels evaluate the Jacobian from (null otherwise).
+            std::shared_ptr<Buffer<geom_t>> corners;
 
             ptrdiff_t nelements() const {
                 assert(elements);
@@ -475,7 +479,42 @@ namespace sfem {
             ret->elements             = coarse_domain.block->device_elements_SoA();
             ret->jacobian_adjugate    = fine->jacobian_adjugate;
             ret->jacobian_determinant = fine->jacobian_determinant;
+            // Every semi-structured level has the same macro elements; the coarsest, plain HEX8,
+            // takes the affine kernels.
+            if (sfem::is_semistructured_type(coarse_domain.element_type)) {
+                ret->corners = fine->corners;
+            }
             return ret;
+        }
+
+        /// The corners of a semi-structured hex domain's macro elements on the device, for the
+        /// isoparametric kernels: `corners[(d * 8 + v) * nelements + e]` is coordinate d of corner v,
+        /// in HEX8 order.
+        static std::shared_ptr<Buffer<geom_t>> create_gpu_sshex8_corners(const std::shared_ptr<FunctionSpace> &space,
+                                                                         const OpDomain                       &domain) {
+            const int       level     = smesh::semistructured_level(domain.element_type);
+            const ptrdiff_t nelements = domain.block->n_elements();
+            idx_t **const   elements  = domain.block->elements()->data();
+            geom_t **const  xyz       = space->mesh_ptr()->points()->data();
+            const int       corner[8] = {sshex8_lidx(level, 0, 0, 0),
+                                         sshex8_lidx(level, level, 0, 0),
+                                         sshex8_lidx(level, level, level, 0),
+                                         sshex8_lidx(level, 0, level, 0),
+                                         sshex8_lidx(level, 0, 0, level),
+                                         sshex8_lidx(level, level, 0, level),
+                                         sshex8_lidx(level, level, level, level),
+                                         sshex8_lidx(level, 0, level, level)};
+
+            auto corners = sfem::create_host_buffer<geom_t>(24 * nelements);
+            auto c       = corners->data();
+            for (ptrdiff_t e = 0; e < nelements; ++e) {
+                for (int v = 0; v < 8; ++v) {
+                    for (int d = 0; d < 3; ++d) {
+                        c[(d * 8 + v) * nelements + e] = xyz[d][elements[corner[v]][e]];
+                    }
+                }
+            }
+            return smesh::to_device(corners);
         }
 
         static int populate_gpu_le_domains_sharing_jacobians(const MultiDomainOp                  &fine_domains,
@@ -494,65 +533,6 @@ namespace sfem {
                 n2d.second.user_data = std::static_pointer_cast<void>(domain_op);
             }
             return SFEM_SUCCESS;
-        }
-
-        class GPUKelvinVoigtNewmarkOpData {
-        public:
-            std::shared_ptr<Buffer<idx_t *>>    elements;
-            std::shared_ptr<Buffer<jacobian_t>> jacobian_adjugate;
-            std::shared_ptr<Buffer<geom_t>>     jacobian_determinant;
-
-            ptrdiff_t nelements() const {
-                assert(elements);
-                return elements->extent(1);
-            }
-        };
-
-        static void gpu_kv_seed_material(MultiDomainOp &m,
-                                         const real_t   k,
-                                         const real_t   K,
-                                         const real_t   eta,
-                                         const real_t   dt,
-                                         const real_t   gamma,
-                                         const real_t   beta,
-                                         const real_t   rho) {
-            for (auto &kv : m.domains()) {
-                kv.second.parameters->set_value("k", k);
-                kv.second.parameters->set_value("K", K);
-                kv.second.parameters->set_value("eta", eta);
-                kv.second.parameters->set_value("dt", dt);
-                kv.second.parameters->set_value("gamma", gamma);
-                kv.second.parameters->set_value("beta", beta);
-                kv.second.parameters->set_value("rho", rho);
-            }
-        }
-
-        static void gpu_kv_copy_material(const MultiDomainOp &from, MultiDomainOp &to) {
-            for (const auto &kv : from.domains()) {
-                auto it = to.domains().find(kv.first);
-                if (it == to.domains().end()) {
-                    continue;
-                }
-
-                it->second.parameters->set_value("k", kv.second.parameters->require_real_value("k"));
-                it->second.parameters->set_value("K", kv.second.parameters->require_real_value("K"));
-                it->second.parameters->set_value("eta", kv.second.parameters->require_real_value("eta"));
-                it->second.parameters->set_value("dt", kv.second.parameters->require_real_value("dt"));
-                it->second.parameters->set_value("gamma", kv.second.parameters->require_real_value("gamma"));
-                it->second.parameters->set_value("beta", kv.second.parameters->require_real_value("beta"));
-                it->second.parameters->set_value("rho", kv.second.parameters->require_real_value("rho"));
-            }
-        }
-
-        static std::shared_ptr<GPUKelvinVoigtNewmarkOpData> create_gpu_kv_op_data(const std::shared_ptr<FunctionSpace> &space,
-                                                                                  const OpDomain                       &domain) {
-            auto ret      = std::make_shared<GPUKelvinVoigtNewmarkOpData>();
-            ret->elements = domain.block->device_elements_SoA();
-
-            const auto block_id       = block_id_for_domain(*space->mesh_ptr(), *domain.block);
-            ret->jacobian_adjugate    = create_gpu_jacobian_adjugate(space, block_id);
-            ret->jacobian_determinant = create_gpu_jacobian_determinant(space, block_id);
-            return ret;
         }
 
         /// Device SoA view of elements[:, begin:end). begin==0 reuses the device pointer
@@ -860,18 +840,39 @@ namespace sfem {
         enum smesh::PrimitiveType      real_type{smesh::SMESH_DEFAULT};
         void                          *stream{SFEM_DEFAULT_STREAM};
         smesh::ElemType                element_type{smesh::INVALID};
+        /// One Jacobian per (macro) element, as the host operator: on a semi-structured hex mesh
+        /// without it the kernels evaluate the macro element's Jacobian at every quadrature point.
+        bool use_affine_approximation{true};
 
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
             assert(space->mesh_ptr()->spatial_dimension() == space->block_size());
-            return std::make_unique<GPULinearElasticity>(space);
+            auto ret = std::make_unique<GPULinearElasticity>(space);
+
+            int SFEM_HEX8_ASSUME_AFFINE = ret->use_affine_approximation ? 1 : 0;
+            SFEM_READ_ENV(SFEM_HEX8_ASSUME_AFFINE, atoi);
+            ret->use_affine_approximation = SFEM_HEX8_ASSUME_AFFINE;
+            return ret;
+        }
+
+        void set_option(const std::string &name, const bool val) override {
+            if (name == "ASSUME_AFFINE") {
+                use_affine_approximation = val;
+            }
+        }
+
+        /// The isoparametric kernels' corners, on a semi-structured hex domain only.
+        static const geom_t *isoparametric_corners(const OpDomain &domain) {
+            auto domain_op = std::static_pointer_cast<GPULinearElasticityOpData>(domain.user_data);
+            return domain_op && domain_op->corners ? domain_op->corners->data() : nullptr;
         }
 
         std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &derefined_space) override {
             const auto block_names = selected_block_names();
 
             if (derefined_space->has_semi_structured_mesh() && is_semistructured_type(derefined_space->element_type())) {
-                auto ret     = std::make_shared<GPULinearElasticity>(derefined_space);
-                ret->domains = std::make_shared<MultiDomainOp>(derefined_space, block_names);
+                auto ret                      = std::make_shared<GPULinearElasticity>(derefined_space);
+                ret->use_affine_approximation = use_affine_approximation;
+                ret->domains                  = std::make_shared<MultiDomainOp>(derefined_space, block_names);
                 gpu_linear_elasticity_copy_material(*domains, *ret->domains);
                 if (populate_gpu_le_domains_sharing_jacobians(*domains, ret->domains) != SFEM_SUCCESS) {
                     return nullptr;
@@ -880,8 +881,9 @@ namespace sfem {
             }
 
             if (space->has_semi_structured_mesh() && is_semistructured_type(element_type)) {
-                auto ret     = std::make_shared<GPULinearElasticity>(derefined_space);
-                ret->domains = std::make_shared<MultiDomainOp>(derefined_space, block_names);
+                auto ret                      = std::make_shared<GPULinearElasticity>(derefined_space);
+                ret->use_affine_approximation = use_affine_approximation;
+                ret->domains                  = std::make_shared<MultiDomainOp>(derefined_space, block_names);
                 gpu_linear_elasticity_copy_material(*domains, *ret->domains);
                 if (populate_gpu_le_domains_sharing_jacobians(*domains, ret->domains) != SFEM_SUCCESS) {
                     return nullptr;
@@ -889,8 +891,9 @@ namespace sfem {
                 return ret;
             }
 
-            auto ret     = std::make_shared<GPULinearElasticity>(derefined_space);
-            ret->domains = domains->derefine_op(derefined_space, block_names);
+            auto ret                      = std::make_shared<GPULinearElasticity>(derefined_space);
+            ret->use_affine_approximation = use_affine_approximation;
+            ret->domains                  = domains->derefine_op(derefined_space, block_names);
             gpu_linear_elasticity_copy_material(*domains, *ret->domains);
 
             for (auto &n2d : ret->domains->domains()) {
@@ -938,6 +941,13 @@ namespace sfem {
                 auto      domain_op = create_gpu_linear_elasticity_op_data(space, domain);
                 if (!domain_op || !domain_op->jacobian_adjugate || !domain_op->jacobian_determinant) {
                     return SFEM_FAILURE;
+                }
+                if (!use_affine_approximation && sfem::is_semistructured_type(domain.element_type) &&
+                    smesh::is_hex_ss_family(domain.element_type)) {
+                    domain_op->corners = create_gpu_sshex8_corners(space, domain);
+                    if (!domain_op->corners) {
+                        return SFEM_FAILURE;
+                    }
                 }
 
                 domain.user_data = std::static_pointer_cast<void>(domain_op);
@@ -1012,6 +1022,22 @@ namespace sfem {
                 auto mu        = domain.parameters->require_real_value("mu");
                 auto lambda    = domain.parameters->require_real_value("lambda");
 
+                if (const geom_t *const corners = isoparametric_corners(domain)) {
+                    return cu_sshex8_linear_elasticity_diag(smesh::semistructured_level(domain.element_type),
+                                                            domain_op->nelements(),
+                                                            domain_op->elements->data(),
+                                                            domain_op->nelements(),
+                                                            corners,
+                                                            mu,
+                                                            lambda,
+                                                            real_type,
+                                                            3,
+                                                            values,
+                                                            &values[1],
+                                                            &values[2],
+                                                            stream);
+                }
+
                 return cu_linear_elasticity_diag(domain.element_type,
                                                  domain_op->nelements(),
                                                  domain_op->elements->data(),
@@ -1033,6 +1059,26 @@ namespace sfem {
                 auto domain_op = std::static_pointer_cast<GPULinearElasticityOpData>(domain.user_data);
                 auto mu        = domain.parameters->require_real_value("mu");
                 auto lambda    = domain.parameters->require_real_value("lambda");
+
+                if (const geom_t *const corners = isoparametric_corners(domain)) {
+                    return cu_sshex8_linear_elasticity_apply(smesh::semistructured_level(domain.element_type),
+                                                             domain_op->nelements(),
+                                                             domain_op->elements->data(),
+                                                             domain_op->nelements(),
+                                                             corners,
+                                                             mu,
+                                                             lambda,
+                                                             real_type,
+                                                             3,
+                                                             x,
+                                                             &x[1],
+                                                             &x[2],
+                                                             3,
+                                                             out,
+                                                             &out[1],
+                                                             &out[2],
+                                                             stream);
+                }
 
                 return cu_linear_elasticity_apply(domain.element_type,
                                                   domain_op->nelements(),
@@ -1057,6 +1103,26 @@ namespace sfem {
                 auto mu        = domain.parameters->require_real_value("mu");
                 auto lambda    = domain.parameters->require_real_value("lambda");
 
+                if (const geom_t *const corners = isoparametric_corners(domain)) {
+                    return cu_sshex8_linear_elasticity_apply(smesh::semistructured_level(domain.element_type),
+                                                             domain_op->nelements(),
+                                                             domain_op->elements->data(),
+                                                             domain_op->nelements(),
+                                                             corners,
+                                                             mu,
+                                                             lambda,
+                                                             real_type,
+                                                             3,
+                                                             h,
+                                                             &h[1],
+                                                             &h[2],
+                                                             3,
+                                                             out,
+                                                             &out[1],
+                                                             &out[2],
+                                                             stream);
+                }
+
                 return cu_linear_elasticity_apply(domain.element_type,
                                                   domain_op->nelements(),
                                                   domain_op->elements->data(),
@@ -1078,6 +1144,25 @@ namespace sfem {
                 auto domain_op = std::static_pointer_cast<GPULinearElasticityOpData>(domain.user_data);
                 auto mu        = domain.parameters->require_real_value("mu");
                 auto lambda    = domain.parameters->require_real_value("lambda");
+
+                if (const geom_t *const corners = isoparametric_corners(domain)) {
+                    return cu_sshex8_linear_elasticity_block_diag_sym(smesh::semistructured_level(domain.element_type),
+                                                                      domain_op->nelements(),
+                                                                      domain_op->elements->data(),
+                                                                      domain_op->nelements(),
+                                                                      corners,
+                                                                      mu,
+                                                                      lambda,
+                                                                      6,
+                                                                      real_type,
+                                                                      &values[0],
+                                                                      &values[1],
+                                                                      &values[2],
+                                                                      &values[3],
+                                                                      &values[4],
+                                                                      &values[5],
+                                                                      stream);
+                }
 
                 return cu_linear_elasticity_block_diag_sym_aos(domain.element_type,
                                                                domain_op->nelements(),
@@ -1102,332 +1187,11 @@ namespace sfem {
         ExecutionSpace execution_space() const override { return EXECUTION_SPACE_DEVICE; }
 
         std::shared_ptr<Op> clone() const override {
-            auto ret       = std::make_shared<GPULinearElasticity>(space);
-            ret->domains   = domains;
-            ret->real_type = real_type;
-            ret->stream    = stream;
-            return ret;
-        }
-
-        void set_value_in_block(const std::string &block_name, const std::string &var_name, const real_t value) override {
-            if (domains) {
-                domains->set_value_in_block(block_name, var_name, value);
-            }
-        }
-
-        void override_element_types(const std::vector<smesh::ElemType> &element_types) override {
-            if (domains) {
-                domains->override_element_types(element_types);
-            }
-        }
-    };
-
-    class GPUKelvinVoigtNewmark final : public Op {
-    public:
-        std::shared_ptr<FunctionSpace>  space;
-        std::shared_ptr<MultiDomainOp>  domains;
-        enum smesh::PrimitiveType       real_type{smesh::SMESH_DEFAULT};
-        void                           *stream{SFEM_DEFAULT_STREAM};
-        smesh::ElemType                 element_type{smesh::INVALID};
-        real_t                          dt{0.1};
-        real_t                          gamma{0.5};
-        real_t                          beta{0.25};
-        std::shared_ptr<Buffer<real_t>> vel_[3];
-        std::shared_ptr<Buffer<real_t>> acc_[3];
-
-        static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
-            assert(space->mesh_ptr()->spatial_dimension() == space->block_size());
-            return std::make_unique<GPUKelvinVoigtNewmark>(space);
-        }
-
-        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &derefined_space) override {
-            const auto block_names = selected_block_names();
-
-            if (derefined_space->has_semi_structured_mesh() && is_semistructured_type(derefined_space->element_type())) {
-                auto ret = std::make_shared<GPUKelvinVoigtNewmark>(derefined_space);
-                ret->initialize(block_names);
-                gpu_kv_copy_material(*domains, *ret->domains);
-                ret->real_type = real_type;
-                ret->stream    = stream;
-                ret->dt        = dt;
-                ret->gamma     = gamma;
-                ret->beta      = beta;
-                for (int c = 0; c < 3; c++) {
-                    ret->vel_[c] = vel_[c];
-                    ret->acc_[c] = acc_[c];
-                }
-                return ret;
-            }
-
-            if (space->has_semi_structured_mesh() && is_semistructured_type(element_type)) {
-                auto ret = std::make_shared<GPUKelvinVoigtNewmark>(derefined_space);
-                ret->initialize(block_names);
-                gpu_kv_copy_material(*domains, *ret->domains);
-                ret->real_type = real_type;
-                ret->stream    = stream;
-                ret->dt        = dt;
-                ret->gamma     = gamma;
-                ret->beta      = beta;
-                for (int c = 0; c < 3; c++) {
-                    ret->vel_[c] = vel_[c];
-                    ret->acc_[c] = acc_[c];
-                }
-                return ret;
-            }
-
-            auto ret     = std::make_shared<GPUKelvinVoigtNewmark>(derefined_space);
-            ret->domains = domains->derefine_op(derefined_space, block_names);
-            gpu_kv_copy_material(*domains, *ret->domains);
-            ret->real_type = real_type;
-            ret->stream    = stream;
-            ret->dt        = dt;
-            ret->gamma     = gamma;
-            ret->beta      = beta;
-            for (int c = 0; c < 3; c++) {
-                ret->vel_[c] = vel_[c];
-                ret->acc_[c] = acc_[c];
-            }
-
-            for (auto &n2d : ret->domains->domains()) {
-                OpDomain &domain    = n2d.second;
-                auto      domain_op = create_gpu_kv_op_data(derefined_space, domain);
-                if (!domain_op || !domain_op->jacobian_adjugate || !domain_op->jacobian_determinant) {
-                    return nullptr;
-                }
-                domain.user_data = std::static_pointer_cast<void>(domain_op);
-            }
-
-            return ret;
-        }
-
-        const char *name() const override {
-            return "gpu:KelvinVoigtNewmark";
-        }
-        //! a viscous stress has no stored energy, as on the host
-        bool energy_or_potential_based() const override { return false; }
-        inline bool is_linear() const override { return true; }
-        ptrdiff_t   n_dofs_domain() const override { return space->n_dofs(); }
-        ptrdiff_t   n_dofs_image() const override { return space->n_dofs(); }
-
-        void set_field(const char *name, const std::shared_ptr<Buffer<real_t>> &vel, int component) override {
-            if (strcmp(name, "velocity") == 0) {
-                vel_[component] = vel;
-            } else if (strcmp(name, "acceleration") == 0) {
-                acc_[component] = vel;
-            } else {
-                SFEM_ERROR(
-                        "Invalid field name! Call set_field(\"velocity\", buffer, 0/1/2) or set_field(\"acceleration\", buffer, "
-                        "0/1/2) first.\n");
-            }
-        }
-
-        int initialize(const std::vector<std::string> &block_names = {}) override {
-            SFEM_TRACE_SCOPE("GPUKelvinVoigtNewmark:initialize");
-            domains = std::make_shared<MultiDomainOp>(space, block_names);
-
-            real_t SFEM_SHEAR_STIFFNESS_KV = 4;
-            real_t SFEM_BULK_MODULUS       = 3;
-            real_t SFEM_DAMPING_RATIO      = 0.1;
-            real_t SFEM_DENSITY            = 1.0;
-
-            SFEM_READ_ENV(SFEM_SHEAR_STIFFNESS_KV, atof);
-            SFEM_READ_ENV(SFEM_BULK_MODULUS, atof);
-            SFEM_READ_ENV(SFEM_DAMPING_RATIO, atof);
-            SFEM_READ_ENV(SFEM_DENSITY, atof);
-            // Optional Newmark parameters from env (defaults: beta=1/4, gamma=1/2)
-            real_t SFEM_DT            = dt;
-            real_t SFEM_NEWMARK_GAMMA = gamma;
-            real_t SFEM_NEWMARK_BETA  = beta;
-            SFEM_READ_ENV(SFEM_DT, atof);
-            SFEM_READ_ENV(SFEM_NEWMARK_GAMMA, atof);
-            SFEM_READ_ENV(SFEM_NEWMARK_BETA, atof);
-            dt    = SFEM_DT;
-            gamma = SFEM_NEWMARK_GAMMA;
-            beta  = SFEM_NEWMARK_BETA;
-
-            gpu_kv_seed_material(
-                    *domains, SFEM_SHEAR_STIFFNESS_KV, SFEM_BULK_MODULUS, SFEM_DAMPING_RATIO, dt, gamma, beta, SFEM_DENSITY);
-
-            for (auto &n2d : domains->domains()) {
-                OpDomain &domain    = n2d.second;
-                auto      domain_op = create_gpu_kv_op_data(space, domain);
-                if (!domain_op || !domain_op->jacobian_adjugate || !domain_op->jacobian_determinant) {
-                    return SFEM_FAILURE;
-                }
-                domain.user_data = std::static_pointer_cast<void>(domain_op);
-            }
-            return SFEM_SUCCESS;
-        }
-
-        GPUKelvinVoigtNewmark(const std::shared_ptr<FunctionSpace> &space) : space(space), element_type(space->element_type()) {}
-
-        int iterate(const std::function<int(const OpDomain &)> &func) const {
-            assert(domains);
-            return domains->iterate(func);
-        }
-
-        std::vector<std::string> selected_block_names() const {
-            std::vector<std::string> ret;
-            if (!domains) {
-                return ret;
-            }
-
-            for (const auto &it : domains->domains()) {
-                ret.push_back(it.first);
-            }
-
-            return ret;
-        }
-
-        int hessian_crs(const real_t *const  x,
-                        const count_t *const rowptr,
-                        const idx_t *const   colidx,
-                        real_t *const        values) override {
-            SFEM_IMPLEMENT_ME();
-            return SFEM_FAILURE;
-        }
-
-        int hessian_bsr(const real_t *const  x,
-                        const count_t *const rowptr,
-                        const idx_t *const   colidx,
-                        real_t *const        values) override {
-            SFEM_IMPLEMENT_ME();
-            return SFEM_FAILURE;
-        }
-
-        int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
-            return iterate([&](const OpDomain &domain) {
-                auto         domain_op = std::static_pointer_cast<GPUKelvinVoigtNewmarkOpData>(domain.user_data);
-                const auto   params    = domain.parameters;
-                const real_t k         = params->require_real_value("k");
-                const real_t K         = params->require_real_value("K");
-                const real_t eta       = params->require_real_value("eta");
-                const real_t rho       = params->require_real_value("rho");
-                const real_t dt_       = params->require_real_value("dt");
-                const real_t gamma_    = params->require_real_value("gamma");
-                const real_t beta_     = params->require_real_value("beta");
-                return cu_kelvin_voigt_newmark_diag(domain.element_type,
-                                                    domain_op->nelements(),
-                                                    domain_op->elements->data(),
-                                                    domain_op->nelements(),
-                                                    domain_op->jacobian_adjugate->data(),
-                                                    domain_op->jacobian_determinant->data(),
-                                                    k,
-                                                    K,
-                                                    eta,
-                                                    rho,
-                                                    dt_,
-                                                    gamma_,
-                                                    beta_,
-                                                    real_type,
-                                                    values,
-                                                    stream);
-            });
-        }
-
-        int gradient(const real_t *const x, real_t *const out) override {
-            return iterate([&](const OpDomain &domain) {
-                auto          domain_op = std::static_pointer_cast<GPUKelvinVoigtNewmarkOpData>(domain.user_data);
-                const auto    params    = domain.parameters;
-                const real_t  k         = params->require_real_value("k");
-                const real_t  K         = params->require_real_value("K");
-                const real_t  eta       = params->require_real_value("eta");
-                const real_t  rho       = params->require_real_value("rho");
-                const real_t  dt_       = params->require_real_value("dt");
-                const real_t  gamma_    = params->require_real_value("gamma");
-                const real_t  beta_     = params->require_real_value("beta");
-                const real_t *v         = vel_[0]->data();
-                const real_t *a         = acc_[0]->data();
-
-                SFEM_TRACE_SCOPE("cu_kelvin_voigt_newmark_apply");
-                return cu_kelvin_voigt_newmark_apply(domain.element_type,
-                                                     domain_op->nelements(),
-                                                     domain_op->elements->data(),
-                                                     domain_op->nelements(),
-                                                     domain_op->jacobian_adjugate->data(),
-                                                     domain_op->jacobian_determinant->data(),
-                                                     k,
-                                                     K,
-                                                     eta,
-                                                     rho,
-                                                     dt_,
-                                                     gamma_,
-                                                     beta_,
-                                                     real_type,
-                                                     x,
-                                                     v,
-                                                     a,
-                                                     out,
-                                                     stream);
-            });
-        }
-
-        int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
-            const ptrdiff_t ndofs = space->n_dofs();
-            return iterate([&](const OpDomain &domain) {
-                auto         domain_op = std::static_pointer_cast<GPUKelvinVoigtNewmarkOpData>(domain.user_data);
-                const auto   params    = domain.parameters;
-                const real_t k         = params->require_real_value("k");
-                const real_t K         = params->require_real_value("K");
-                const real_t eta       = params->require_real_value("eta");
-                const real_t rho       = params->require_real_value("rho");
-                const real_t dt_       = params->require_real_value("dt");
-                const real_t gamma_    = params->require_real_value("gamma");
-                const real_t beta_     = params->require_real_value("beta");
-
-                const real_t v_scale = (dt_ != 0 && beta_ != 0) ? (gamma_ / (beta_ * dt_)) : 0.0;
-                const real_t a_scale = (dt_ != 0 && beta_ != 0) ? (1.0 / (beta_ * dt_ * dt_)) : 0.0;
-
-                auto v_lin_tmp = smesh::create_device_buffer<real_t>(ndofs);
-                auto a_lin_tmp = smesh::create_device_buffer<real_t>(ndofs);
-                d_copy(ndofs, h, v_lin_tmp->data());
-                d_scal(ndofs, v_scale, v_lin_tmp->data());
-                d_copy(ndofs, h, a_lin_tmp->data());
-                d_scal(ndofs, a_scale, a_lin_tmp->data());
-
-                SFEM_TRACE_SCOPE("cu_kelvin_voigt_newmark_apply");
-                return cu_kelvin_voigt_newmark_apply(domain.element_type,
-                                                     domain_op->nelements(),
-                                                     domain_op->elements->data(),
-                                                     domain_op->nelements(),
-                                                     domain_op->jacobian_adjugate->data(),
-                                                     domain_op->jacobian_determinant->data(),
-                                                     k,
-                                                     K,
-                                                     eta,
-                                                     rho,
-                                                     dt_,
-                                                     gamma_,
-                                                     beta_,
-                                                     real_type,
-                                                     h,
-                                                     v_lin_tmp->data(),
-                                                     a_lin_tmp->data(),
-                                                     out,
-                                                     stream);
-            });
-        }
-
-        int value(const real_t *x, real_t *const out) override {
-            SFEM_IMPLEMENT_ME();
-            return SFEM_FAILURE;
-        }
-
-        int            report(const real_t *const) override { return SFEM_SUCCESS; }
-        ExecutionSpace execution_space() const override { return EXECUTION_SPACE_DEVICE; }
-
-        std::shared_ptr<Op> clone() const override {
-            auto ret       = std::make_shared<GPUKelvinVoigtNewmark>(space);
-            ret->domains   = domains;
-            ret->real_type = real_type;
-            ret->stream    = stream;
-            ret->dt        = dt;
-            ret->gamma     = gamma;
-            ret->beta      = beta;
-            for (int c = 0; c < 3; c++) {
-                ret->vel_[c] = vel_[c];
-                ret->acc_[c] = acc_[c];
-            }
+            auto ret                      = std::make_shared<GPULinearElasticity>(space);
+            ret->domains                  = domains;
+            ret->real_type                = real_type;
+            ret->stream                   = stream;
+            ret->use_affine_approximation = use_affine_approximation;
             return ret;
         }
 
@@ -2237,7 +2001,6 @@ namespace sfem {
         Factory::register_op("gpu:EMWarpOp", &GPUEMWarpOp::create);
         Factory::register_op("gpu:EMMultiVectorWarpOp", &GPUEMMultiVectorWarpOp::create);
         Factory::register_op("gpu:EMVectorWarpOp", &GPUEMVectorWarpOp::create);
-        Factory::register_op("gpu:KelvinVoigtNewmark", &GPUKelvinVoigtNewmark::create);
         register_generated_device_ops();
     }
 

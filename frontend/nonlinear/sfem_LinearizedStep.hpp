@@ -54,6 +54,11 @@ namespace sfem {
 
         /// Inner iterations of the last `solve`.
         virtual int iterations() const = 0;
+
+        /// Whether a converged solve of a linear function lands on its solution: true when the
+        /// linearisation is the function's own, false for a constraint the step linearises (an
+        /// obstacle's gap), whose iterate Newton must measure like any other.
+        virtual bool solves_linear_function_exactly() const { return true; }
     };
 
 }  // namespace sfem

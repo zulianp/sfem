@@ -436,9 +436,14 @@ int test_nodal_curvature() {
 
 // Every shell the contact path samples (QUADSHELL4 on hexahedra, TRISHELL3 on tetrahedra,
 // EDGESHELL2 in 2D) reads the B-spline through ContactConditions. A tilted plane is reproduced,
-// so the normal is exact at every node of the contact side and the gap at the interior ones
-// (the lumped projection averages over a boundary node's half support).
-static int check_tilted_plane(const std::shared_ptr<sfem::Mesh> &mesh, const int dim, const char *name) {
+// so the normal and the gap are exact at every node of the contact side, with either gap: the
+// nodal one is the distance along the normal, -sdf / |grad sdf| (this sdf's gradient is not a unit
+// vector), and the dual-weighted one, -sdf weighted with the dual basis, reproduces a linear field
+// at the boundary nodes too.
+static int check_tilted_plane(const std::shared_ptr<sfem::Mesh> &mesh,
+                              const int                          dim,
+                              const char                        *name,
+                              const sfem::ContactConditions::Gap gap_type) {
     const real_t delta = 0.05, slope = 0.1;
 
     auto fs   = sfem::FunctionSpace::create(mesh, dim);
@@ -456,6 +461,7 @@ static int check_tilted_plane(const std::shared_ptr<sfem::Mesh> &mesh, const int
                                  dim == 3 ? 1.2 : 0.1,
                                  [=](const geom_t x, const geom_t y, const geom_t) -> geom_t { return -delta - y + slope * x; });
     auto cc = sfem::ContactConditions::create(fs, sdf, side, sfem::EXECUTION_SPACE_HOST);
+    cc->set_gap(gap_type);
     SFEM_TEST_ASSERT(cc->init() == SFEM_SUCCESS);
 
     const ptrdiff_t     n_c   = cc->n_constrained_dofs();
@@ -474,20 +480,17 @@ static int check_tilted_plane(const std::shared_ptr<sfem::Mesh> &mesh, const int
     geom_t *const *const points = mesh->points()->data();
     const real_t         len    = std::sqrt(1 + slope * slope);
     const real_t         n_ex[3] = {slope / len, -1 / len, 0};
-    ptrdiff_t            n_interior = 0;
     for (ptrdiff_t i = 0; i < n_c; ++i) {
         for (int d = 0; d < dim; ++d) {
             SFEM_TEST_APPROXEQ(normals[d * n_c + i], n_ex[d], 1e-5);
         }
-        const real_t x        = points[0][nodes[i]];
-        const bool   interior = x > 1e-5 && x < 1 - 1e-5 && (dim == 2 || (points[2][nodes[i]] > 1e-5 && points[2][nodes[i]] < 1 - 1e-5));
-        if (interior) {
-            SFEM_TEST_APPROXEQ(gap[i], delta - slope * x, 1e-5);
-            n_interior++;
-        }
+        const real_t vertical = delta - slope * points[0][nodes[i]];
+        SFEM_TEST_APPROXEQ(gap[i], gap_type == sfem::ContactConditions::Gap::NODAL ? vertical / len : vertical, 1e-5);
     }
-    SFEM_TEST_ASSERT(n_interior > 0);
-    printf("%s: %ld contact nodes, gap exact at %ld interior ones, normals at all\n", name, (long)n_c, (long)n_interior);
+    printf("%s (%s gap): %ld contact nodes, gap and normals exact at all\n",
+           name,
+           gap_type == sfem::ContactConditions::Gap::NODAL ? "nodal" : "dual-weighted",
+           (long)n_c);
     return SFEM_TEST_SUCCESS;
 }
 
@@ -555,9 +558,11 @@ int test_normals_follow_the_update() {
 
 int test_contact_surfaces_sample_planes() {
     auto comm = sfem::Communicator::self();
-    SFEM_TEST_ASSERT(check_tilted_plane(sfem::Mesh::create_hex8_cube(comm, 4, 4, 4), 3, "QUADSHELL4") == SFEM_TEST_SUCCESS);
-    SFEM_TEST_ASSERT(check_tilted_plane(sfem::Mesh::create_tet4_cube(comm, 4, 4, 4), 3, "TRISHELL3") == SFEM_TEST_SUCCESS);
-    SFEM_TEST_ASSERT(check_tilted_plane(sfem::Mesh::create_quad4_square(comm, 4, 4), 2, "EDGESHELL2") == SFEM_TEST_SUCCESS);
+    for (auto gap : {sfem::ContactConditions::Gap::NODAL, sfem::ContactConditions::Gap::DUAL_WEIGHTED}) {
+        SFEM_TEST_ASSERT(check_tilted_plane(sfem::Mesh::create_hex8_cube(comm, 4, 4, 4), 3, "QUADSHELL4", gap) == SFEM_TEST_SUCCESS);
+        SFEM_TEST_ASSERT(check_tilted_plane(sfem::Mesh::create_tet4_cube(comm, 4, 4, 4), 3, "TRISHELL3", gap) == SFEM_TEST_SUCCESS);
+        SFEM_TEST_ASSERT(check_tilted_plane(sfem::Mesh::create_quad4_square(comm, 4, 4), 2, "EDGESHELL2", gap) == SFEM_TEST_SUCCESS);
+    }
     return SFEM_TEST_SUCCESS;
 }
 

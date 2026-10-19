@@ -693,6 +693,28 @@ __host__ __device__ __forceinline__ void linear_elasticity_proteus_quad4_hessian
   }
 }
 
+template <typename s_t>
+__host__ __device__ __forceinline__ void linear_elasticity_proteus_quad4_hessian_i_msoa_scatter_block_diag_sym(
+    const idx_t *const RSTR ev,
+    const s_t *const RSTR element_matrix,
+    s_t *const RSTR values) {
+  static constexpr int NC = 2;
+  static constexpr int NS = 4;
+  static constexpr int NDOFS = NC * NS;
+  static constexpr int SYM_DIM = (NC * (NC + 1)) / 2;
+  for (int i = 0; i < NS; ++i) {
+    s_t *const block = &values[(ptrdiff_t)ev[i] * SYM_DIM];
+    int sym = 0;
+    for (int bi = 0; bi < NC; ++bi) {
+      const int row = bi * NS + i;
+      for (int bj = bi; bj < NC; ++bj) {
+        const int col = bj * NS + i;
+        atomicAdd(&(block[sym++]), element_matrix[row * NDOFS + col]);
+      }
+    }
+  }
+}
+
 template <typename s_t, typename g_t, int FORMAT>
 __global__ void linear_elasticity_proteus_quad4_hessian_i_msoa_assemble_impl(
     const ptrdiff_t nelements,
@@ -721,7 +743,7 @@ __global__ void linear_elasticity_proteus_quad4_hessian_i_msoa_assemble_impl(
   const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
   const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
 
-  static_assert(FORMAT == 1,
+  static_assert(FORMAT == 1 || FORMAT == 6,
                 "this kernel has no scatter for the requested matrix format");
   for (ptrdiff_t element = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; element < nelements; element += (ptrdiff_t)blockDim.x * gridDim.x) {
     idx_t ev[NS];
@@ -757,6 +779,8 @@ __global__ void linear_elasticity_proteus_quad4_hessian_i_msoa_assemble_impl(
 
     if constexpr (FORMAT == 1) {
       linear_elasticity_proteus_quad4_hessian_i_msoa_scatter_bsr(ev, element_matrix, rowptr, colidx, values);
+    } else if constexpr (FORMAT == 6) {
+      linear_elasticity_proteus_quad4_hessian_i_msoa_scatter_block_diag_sym(ev, element_matrix, values);
     }
   }
 
@@ -795,4 +819,34 @@ extern "C" int cu_linear_elasticity_proteus_quad4_hessian_bsr_i_msoa(
       break;
   }
   return sfem::codegen::unsupported_dispatch("linear_elasticity_proteus_quad4_hessian_bsr_i_msoa", -1, (int)scalar_bytes);
+}
+
+extern "C" int cu_linear_elasticity_proteus_quad4_hessian_block_diag_sym_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t lmbda,
+        const real_t mu,
+        void *const RSTR values,
+        void *const stream
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        const int block_size = 256;
+        const int grid_size = (int)((nelements + block_size - 1) / block_size);
+        sfem::codegen::linear_elasticity_proteus_quad4_hessian_i_msoa_assemble_impl<double, geom_t, 6><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, nullptr, nullptr, (double *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+        return sfem::codegen::launch_status("linear_elasticity_proteus_quad4_hessian_i_msoa_assemble_impl");
+    }
+    case (int)sizeof(float): {
+        const int block_size = 256;
+        const int grid_size = (int)((nelements + block_size - 1) / block_size);
+        sfem::codegen::linear_elasticity_proteus_quad4_hessian_i_msoa_assemble_impl<float, geom_t, 6><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, nullptr, nullptr, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+        return sfem::codegen::launch_status("linear_elasticity_proteus_quad4_hessian_i_msoa_assemble_impl");
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("linear_elasticity_proteus_quad4_hessian_block_diag_sym_i_msoa", -1, (int)scalar_bytes);
 }
