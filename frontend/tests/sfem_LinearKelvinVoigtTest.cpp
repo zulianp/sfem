@@ -1,14 +1,14 @@
-// The generated linear Kelvin-Voigt material against the hand-written `KelvinVoigtNewmark` it
-// replaces, and its merit against its residual.
+// The generated linear Kelvin-Voigt material against the hand-written linear elasticity, and its
+// merit against its residual.
 //
-// The hand-written operator's law is sigma = K tr(eps) I + k dev(eps) + eta dev(eps_dot), and it
-// takes the velocity and the acceleration as fields with Newmark's dt, beta and gamma as its own
-// parameters. The generated one holds the scheme, with the standard parameters: mu = k/2,
-// lmbda = K - k/3, eta_s = eta/2, eta_b = 0.
+// The law is sigma = K tr(eps) I + k dev(eps) + eta dev(eps_dot): in the generated material's
+// parameters mu = k/2, lmbda = K - k/3, eta_s = eta/2, eta_b = 0. Both stresses are linear
+// elasticity: the elastic one with (k/2, K - k/3) in the state, the viscous one with
+// (eta/2, -eta/3) in the velocity the scheme implies, whose derivative in the state is its shift.
 //
-// On a semi-structured mesh they are the same discretisation in the micro-element basis -- each
-// level-2 macro element as eight trilinear micro elements -- and different ones in the high-order
-// basis, where the generated operator is one quadratic element on the same 27 nodes.
+// On a semi-structured mesh the micro-element basis is the hand-written discretisation -- each
+// level-2 macro element as eight trilinear micro elements -- and the high-order basis a different
+// one, where the generated operator is one quadratic element on the same 27 nodes.
 
 #include <algorithm>
 #include <cmath>
@@ -17,7 +17,6 @@
 
 #include "sfem_API.hpp"
 #include "sfem_Function.hpp"
-#include "sfem_KelvinVoigtNewmark.hpp"
 #include "sfem_NewmarkScheme.hpp"
 #include "sfem_test.hpp"
 
@@ -52,9 +51,18 @@ namespace {
         return op;
     }
 
-    // Without inertia, where the two masses (the scheme's lumped, the hand-written consistent)
-    // cannot differ: the residual and the tangent action, at the same state and the velocity and
-    // acceleration Newmark implies there.
+    std::shared_ptr<sfem::Op> hand_written(const std::shared_ptr<sfem::FunctionSpace> &fs, const real_t mu, const real_t lambda) {
+        auto op = sfem::create_op(fs, "LinearElasticity", sfem::EXECUTION_SPACE_HOST);
+        if (!op || op->initialize() != SFEM_SUCCESS) return nullptr;
+        for (const auto &block : fs->mesh_ptr()->blocks()) {
+            op->set_value_in_block(block->name(), "mu", mu);
+            op->set_value_in_block(block->name(), "lambda", lambda);
+        }
+        return op;
+    }
+
+    // Without inertia: the residual and the tangent action, at the same state and the velocity
+    // Newmark implies there.
     int compare(const char *const label, const std::shared_ptr<sfem::Mesh> &mesh) {
         auto            fs    = sfem::FunctionSpace::create(mesh, 3);
         const ptrdiff_t ndofs = fs->n_dofs();
@@ -77,29 +85,24 @@ namespace {
         seed(ndofs, 6, d->data());
         scheme->reconstruct(x->data(), v->data(), a->data());
 
-        auto hand = std::dynamic_pointer_cast<sfem::KelvinVoigtNewmark>(
-                sfem::create_op(fs, "KelvinVoigtNewmark", sfem::EXECUTION_SPACE_HOST));
-        SFEM_TEST_ASSERT(hand != nullptr);
-        SFEM_TEST_ASSERT(hand->initialize() == SFEM_SUCCESS);
-        hand->set_k(k);
-        hand->set_K(K);
-        hand->set_eta(eta);
-        hand->set_dt(dt);
-        hand->set_beta(real_t(0.25));
-        hand->set_gamma(real_t(0.5));
-        hand->set_rho(0);
-        hand->set_field("velocity", v, 0);
-        hand->set_field("acceleration", a, 0);
+        auto elastic = hand_written(fs, k / 2, K - k / 3);
+        auto viscous = hand_written(fs, eta / 2, -eta / 3);
+        SFEM_TEST_ASSERT(elastic != nullptr && viscous != nullptr);
 
         auto g_gen  = sfem::create_host_buffer<real_t>(ndofs);
         auto g_hand = sfem::create_host_buffer<real_t>(ndofs);
         SFEM_TEST_ASSERT(gen->gradient(x->data(), g_gen->data()) == SFEM_SUCCESS);
-        SFEM_TEST_ASSERT(hand->gradient(x->data(), g_hand->data()) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(elastic->gradient(x->data(), g_hand->data()) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(viscous->gradient(v->data(), g_hand->data()) == SFEM_SUCCESS);
+
+        auto shifted = sfem::create_host_buffer<real_t>(ndofs);
+        for (ptrdiff_t i = 0; i < ndofs; ++i) shifted->data()[i] = scheme->shift() * d->data()[i];
 
         auto h_gen  = sfem::create_host_buffer<real_t>(ndofs);
         auto h_hand = sfem::create_host_buffer<real_t>(ndofs);
         SFEM_TEST_ASSERT(gen->apply(x->data(), d->data(), h_gen->data()) == SFEM_SUCCESS);
-        SFEM_TEST_ASSERT(hand->apply(x->data(), d->data(), h_hand->data()) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(elastic->apply(x->data(), d->data(), h_hand->data()) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(viscous->apply(v->data(), shifted->data(), h_hand->data()) == SFEM_SUCCESS);
 
         const real_t eg = worst_relative(ndofs, g_gen->data(), g_hand->data());
         const real_t eh = worst_relative(ndofs, h_gen->data(), h_hand->data());
@@ -108,10 +111,7 @@ namespace {
                ndofs,
                (double)eg,
                (double)eh);
-        // The hand-written operator stores its element Jacobians as jacobian_t, single precision.
-        // On a semi-structured mesh its gradient is not the residual its action linearises (it is
-        // 30% off K x at zero velocity), so there only the action is compared.
-        if (!fs->has_semi_structured_mesh()) SFEM_TEST_ASSERT(eg < 1e-6);
+        SFEM_TEST_ASSERT(eg < 1e-6);
         SFEM_TEST_ASSERT(eh < 1e-6);
         return SFEM_TEST_SUCCESS;
     }
@@ -174,9 +174,11 @@ int test_matches_the_hand_written_operator_on_sshex8() {
     return compare("SSHEX8 level 2, micro", smesh::to_semistructured(2, box, true, false));
 }
 
-// The material says it is potential-based, so the merit a line search minimises is a potential:
-// its derivative along d is the residual's projection on d, with the scheme's inertia in both.
-// The potential is quadratic, so a central difference is exact up to round-off.
+// The generator cannot evaluate this material's potential, so the material declares none and the
+// merit a line search minimises is the residual's, 1/2 ||R||^2: its derivative along d is R . J d,
+// with the scheme's inertia in both. The residual is affine, so the merit is quadratic and a
+// central difference is exact up to round-off. J d is `Function::apply`, which skips only the
+// operators whose residual does not read the state: this one does.
 int test_the_merit_differentiates_to_the_residual() {
     auto            mesh  = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 3, 2, 2);
     auto            fs    = sfem::FunctionSpace::create(mesh, 3);
@@ -190,24 +192,28 @@ int test_the_merit_differentiates_to_the_residual() {
     seed(ndofs, 2, scheme->acceleration()->data());
     auto op = generated(fs, scheme);
     SFEM_TEST_ASSERT(op != nullptr);
-    SFEM_TEST_ASSERT(op->energy_or_potential_based());
+    SFEM_TEST_ASSERT(!op->energy_or_potential_based());
+    SFEM_TEST_ASSERT(op->residual_depends_on_state());
     scheme->begin_step(0, dt);
 
     auto f = sfem::Function::create(fs);
     f->add_operator(op);
+    SFEM_TEST_ASSERT(!f->has_energy_merit());
 
-    auto x = sfem::create_host_buffer<real_t>(ndofs);
-    auto d = sfem::create_host_buffer<real_t>(ndofs);
-    auto g = sfem::create_host_buffer<real_t>(ndofs);
+    auto x  = sfem::create_host_buffer<real_t>(ndofs);
+    auto d  = sfem::create_host_buffer<real_t>(ndofs);
+    auto g  = sfem::create_host_buffer<real_t>(ndofs);
+    auto jd = sfem::create_host_buffer<real_t>(ndofs);
     seed(ndofs, 5, x->data());
     seed(ndofs, 6, d->data());
     SFEM_TEST_ASSERT(f->gradient(x->data(), g->data()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(f->apply(x->data(), d->data(), jd->data()) == SFEM_SUCCESS);
     real_t slope = 0;
-    for (ptrdiff_t i = 0; i < ndofs; ++i) slope += g->data()[i] * d->data()[i];
+    for (ptrdiff_t i = 0; i < ndofs; ++i) slope += g->data()[i] * jd->data()[i];
 
     const real_t eps = real_t(1e-3), steps[2] = {eps, -eps};
     real_t       values[2] = {0, 0};
-    SFEM_TEST_ASSERT(f->energy_merit(x->data(), d->data(), 2, steps, values) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(f->residual_merit(x->data(), d->data(), 2, steps, values) == SFEM_SUCCESS);
     const real_t fd = (values[0] - values[1]) / (2 * eps);
     printf("  slope %.12g, central difference %.12g\n", (double)slope, (double)fd);
     SFEM_TEST_ASSERT(std::abs(slope) > 0);

@@ -34,6 +34,23 @@ namespace sfem {
                                  idx_t **const SFEM_RESTRICT  elements,
                                  geom_t **const SFEM_RESTRICT points,
                                  real_t *const SFEM_RESTRICT  gap) = 0;
+
+        // At nodes: the gap and unit normals (3 rows; either output may be null) at the points
+        // X[idx[i]] + disp[3 idx[i] + d] (idx and disp may be null), in the obstacle's memory space.
+        virtual int sample_nodes(const ptrdiff_t                   nnodes,
+                                 const idx_t *const SFEM_RESTRICT  idx,
+                                 geom_t **const SFEM_RESTRICT      points,
+                                 const real_t *const SFEM_RESTRICT disp,
+                                 real_t *const SFEM_RESTRICT       gap,
+                                 real_t **const SFEM_RESTRICT      normals) = 0;
+
+        // At the same points: the curvature of the gap's constraint (6 packed rows [xx, xy, xz, yy,
+        // yz, zz]), minus the Hessian of -sdf / |grad sdf|.
+        virtual int sample_nodes_curvature(const ptrdiff_t                   nnodes,
+                                           const idx_t *const SFEM_RESTRICT  idx,
+                                           geom_t **const SFEM_RESTRICT      points,
+                                           const real_t *const SFEM_RESTRICT disp,
+                                           real_t **const SFEM_RESTRICT      curvature) = 0;
     };
 
     // The interpolating cubic B-spline coefficients of an SDF grid (sfem_sdf_sampling.hpp), padded
@@ -111,12 +128,12 @@ namespace sfem {
                          geom_t **const SFEM_RESTRICT      points,
                          const real_t *const SFEM_RESTRICT disp,
                          real_t *const SFEM_RESTRICT       gap,
-                         real_t **const SFEM_RESTRICT      normals);
+                         real_t **const SFEM_RESTRICT      normals) override;
         int sample_nodes_curvature(const ptrdiff_t                   nnodes,
                                    const idx_t *const SFEM_RESTRICT  idx,
                                    geom_t **const SFEM_RESTRICT      points,
                                    const real_t *const SFEM_RESTRICT disp,
-                                   real_t **const SFEM_RESTRICT      curvature);
+                                   real_t **const SFEM_RESTRICT      curvature) override;
 
         // `nnodes` points with z-coordinates `z` are where this rank will sample: a grid split
         // into z-slabs across the ranks (Grid::create_from_file under MPI) is gathered to the

@@ -429,7 +429,7 @@ class TargetPlatform:
         """What a generated `Op` class is called here.
 
         SFEM names its device Ops for the device -- `GPULaplacian`,
-        `GPULinearElasticity`, `GPUKelvinVoigtNewmark` -- so a host and a device
+        `GPULinearElasticity` -- so a host and a device
         Op for one material are two classes rather than one name fought over.
         """
         return ""
@@ -524,6 +524,17 @@ class TargetPlatform:
         merit came out exact at one mesh size and nonsense at the next.
         """
         return "mesh->points()->data()"
+
+    def graph_host_view(self):
+        """Source lines giving a generated `Op`'s `check_graph` host views of the graph it checks.
+
+        `check_graph` walks `rowptr` and `colidx` on the host, and names them `h_rowptr` and
+        `h_colidx`.  On the host they are the arrays the assembly was handed.
+        """
+        return (
+            "      const count_t *const h_rowptr = rowptr;",
+            "      const idx_t *const h_colidx = colidx;",
+        )
 
     def permuted_connectivity_preamble(self):
         """Source lines a file of permuting forwarders needs once, above them."""
@@ -972,6 +983,24 @@ class CUDATarget(TargetPlatform):
     def points_accessor(self):
         #: `device_points_SoA()` is smesh's device copy of the same array.
         return "mesh->device_points_SoA()->data()"
+
+    def graph_host_view(self):
+        #: A device assembly is handed the graph's device arrays, which the host must not
+        #: dereference (on a Grace Hopper node it segfaults).  The check reads a host copy,
+        #: taken once per graph: `check_graph` returns before this for a graph it has passed.
+        return (
+            "      std::vector<count_t> rowptr_copy(n_rows + 1);",
+            "      if (cudaMemcpy(rowptr_copy.data(), rowptr, rowptr_copy.size() * sizeof(count_t), cudaMemcpyDeviceToHost) != cudaSuccess ||",
+            "          rowptr_copy[n_rows] < 0) {",
+            "        return SFEM_FAILURE;",
+            "      }",
+            "      std::vector<idx_t> colidx_copy(rowptr_copy[n_rows]);",
+            "      if (cudaMemcpy(colidx_copy.data(), colidx, colidx_copy.size() * sizeof(idx_t), cudaMemcpyDeviceToHost) != cudaSuccess) {",
+            "        return SFEM_FAILURE;",
+            "      }",
+            "      const count_t *const h_rowptr = rowptr_copy.data();",
+            "      const idx_t *const h_colidx = colidx_copy.data();",
+        )
 
     def element_connectivity_accessor(self):
         #: `device_elements_SoA()` hands back `idx_t *const *` where the C ABI

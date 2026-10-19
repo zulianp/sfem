@@ -6,7 +6,7 @@
 #include "sfem_base.hpp"
 
 // One contact node of NodeObstacleContact, for its host loops and its device kernels
-// (cuda/sfem_NodeObstacleContact_cuda.cu) alike. A node's frame q is [n, t1, t2] by rows.
+// (cuda/sfem_NodeObstacleView_cuda.cu) alike. A node's frame q is [n, t1, t2] by rows.
 
 // t1 is n crossed with the axis least aligned with it, t2 = n x t1. A node outside the grid has
 // no normal and an unreachable gap; its frame is that of the contact direction.
@@ -89,6 +89,16 @@ SFEM_HOST_DEVICE SFEM_INLINE void node_obstacle_curvature(const real_t *const n,
     for (int c = 0; c < 9; ++c) {
         B[c] += sign * scale * mu * H[c];
     }
+}
+
+// The upper triangle of a symmetric 3x3 block B, packed [xx, xy, xz, yy, yz, zz].
+SFEM_HOST_DEVICE SFEM_INLINE void node_obstacle_pack_sym(const real_t *const B, real_t *const packed) {
+    packed[0] = B[0];
+    packed[1] = B[1];
+    packed[2] = B[2];
+    packed[3] = B[4];
+    packed[4] = B[5];
+    packed[5] = B[8];
 }
 
 #endif  // SFEM_NODE_OBSTACLE_KERNELS_HPP

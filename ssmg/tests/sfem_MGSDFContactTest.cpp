@@ -472,7 +472,8 @@ static int run_ssmgc_on_ss_mesh(const std::shared_ptr<sfem::Mesh>               
                                 const geom_t                                       disp_y,
                                 const char                                        *op_name  = "LinearElasticity",
                                 const char                                        *out_dir  = nullptr,
-                                std::vector<real_t>                               *solution = nullptr) {
+                                std::vector<real_t>                               *solution = nullptr,
+                                const sfem::ExecutionSpace                         es       = sfem::EXECUTION_SPACE_HOST) {
     SFEM_TEST_ASSERT(ss != nullptr);
     SFEM_TEST_ASSERT(!contact_sides.empty());
     auto comm = ss->comm();
@@ -486,7 +487,7 @@ static int run_ssmgc_on_ss_mesh(const std::shared_ptr<sfem::Mesh>               
 
     auto fs = sfem::FunctionSpace::create(ss, block_size);
     auto f  = sfem::Function::create(fs);
-    auto op = sfem::create_op(fs, op_name, sfem::EXECUTION_SPACE_HOST);
+    auto op = sfem::create_op(fs, op_name, es);
     SFEM_TEST_ASSERT(op != nullptr);
     SFEM_TEST_ASSERT(op->initialize() == SFEM_SUCCESS);
     f->add_operator(op);
@@ -507,9 +508,9 @@ static int run_ssmgc_on_ss_mesh(const std::shared_ptr<sfem::Mesh>               
         dcs.push_back(
                 sfem::DirichletConditions::Condition{.sidesets = wall, .value = (c == 1 ? disp_y : real_t(0)), .component = c});
     }
-    f->add_constraint(sfem::create_dirichlet_conditions(fs, dcs, sfem::EXECUTION_SPACE_HOST));
+    f->add_constraint(sfem::create_dirichlet_conditions(fs, dcs, es));
 
-    auto contact_conds = sfem::ContactConditions::create(fs, sdf, contact_sides, sfem::EXECUTION_SPACE_HOST);
+    auto contact_conds = sfem::ContactConditions::create(fs, sdf, contact_sides, es);
     SFEM_TEST_ASSERT(contact_conds != nullptr);
     if (comm->sum(real_t(contact_conds->n_constrained_dofs())) <= 0) {
         SFEM_ERROR("run_ssmgc_on_ss_mesh: no constrained contact dofs on any rank\n");
@@ -517,10 +518,11 @@ static int run_ssmgc_on_ss_mesh(const std::shared_ptr<sfem::Mesh>               
     SFEM_TEST_ASSERT(contact_conds->ss_sides() != nullptr);
 
     const ptrdiff_t ndofs = fs->n_dofs();
-    auto            x     = sfem::create_host_buffer<real_t>(ndofs);
-    auto            rhs   = sfem::create_host_buffer<real_t>(ndofs);
-    std::fill(x->data(), x->data() + ndofs, real_t(0));
-    std::fill(rhs->data(), rhs->data() + ndofs, real_t(0));
+    auto            x     = sfem::create_buffer<real_t>(ndofs, es);
+    auto            rhs   = sfem::create_buffer<real_t>(ndofs, es);
+    auto            blas  = sfem::blas<real_t>(es);
+    blas->zeros(ndofs, x->data());
+    blas->zeros(ndofs, rhs->data());
     f->apply_constraints(rhs->data());
     contact_conds->init();
     f->apply_constraints(x->data());
@@ -528,6 +530,12 @@ static int run_ssmgc_on_ss_mesh(const std::shared_ptr<sfem::Mesh>               
     auto solver = sfem::create_ssmgc(f, contact_conds, nullptr);
     SFEM_TEST_ASSERT(solver != nullptr);
     SFEM_TEST_ASSERT(solver->apply(rhs->data(), x->data()) == SFEM_SUCCESS);
+    if (es != sfem::EXECUTION_SPACE_HOST) {
+        // The rest reads the solution on the host; a device solution is judged against a host one.
+        x = smesh::to_host(x);
+        if (solution) solution->assign(x->data(), x->data() + ndofs);
+        return SFEM_TEST_SUCCESS;
+    }
 
     real_t nrm = 0;
     for (ptrdiff_t i = 0; i < ndofs; ++i) {
@@ -598,7 +606,9 @@ int test_checkerboard_hex_ssmgc() {
 
 // The generated material on the same problem: on a micro-element space it is the hand-written
 // operator's discretisation, and every coarse level is its derefine_op. The two solutions agree to
-// the hand-written operator's single-precision Jacobians and SSMGC's tolerance.
+// the hand-written operator's single-precision Jacobians and SSMGC's tolerance. With
+// SFEM_EXECUTION_SPACE=device the generated one runs on the device against the hand-written one on
+// the host.
 int test_checkerboard_hex_ssmgc_generated() {
     auto hex = sfem::Mesh::create_hex8_checkerboard_cube(sfem::Communicator::self(), 2, 2, 2);
     auto ss  = smesh::to_semistructured(4, hex, true, false);
@@ -617,13 +627,16 @@ int test_checkerboard_hex_ssmgc_generated() {
     SFEM_TEST_ASSERT(run_ssmgc_on_ss_mesh(ss, 3, contact_ss, sdf, real_t(-0.05), "LinearElasticity", nullptr, &hand) ==
                      SFEM_TEST_SUCCESS);
     SFEM_TEST_ASSERT(run_ssmgc_on_ss_mesh(ss, 3, contact_ss, sdf, real_t(-0.05), "GeneratedLinearElasticity", nullptr,
-                                          &generated) == SFEM_TEST_SUCCESS);
+                                          &generated, EnvOptions::read().execution_space) == SFEM_TEST_SUCCESS);
     real_t worst = 0, scale = 0;
     for (size_t i = 0; i < hand.size(); ++i) {
         worst = std::max(worst, std::abs(hand[i] - generated[i]));
         scale = std::max(scale, std::abs(hand[i]));
     }
-    printf("  SSMGC, level 4: generated against hand-written %.3g (max |u| %g)\n", (double)(worst / scale), (double)scale);
+    printf("  SSMGC, level 4: generated (%s) against hand-written %.3g (max |u| %g)\n",
+           EnvOptions::read().execution_space == sfem::EXECUTION_SPACE_DEVICE ? "device" : "host",
+           (double)(worst / scale),
+           (double)scale);
     SFEM_TEST_ASSERT(worst <= 1e-5 * scale);
     return SFEM_TEST_SUCCESS;
 }

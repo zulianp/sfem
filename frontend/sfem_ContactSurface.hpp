@@ -26,6 +26,16 @@ namespace sfem {
         virtual SharedBuffer<idx_t>    node_mapping_device() = 0;
 #endif
 
+        /// The rest positions of points() (host), and the displacement displace_points last added, in
+        /// real_t (3 components per point, AoS, zero beyond the mesh's dimension; zero after
+        /// reset_points; in the execution space): points() rounds their sum to geom_t. A sampler
+        /// that adds them keeps the displacement's precision.
+        virtual SharedBuffer<geom_t *> rest_points()  = 0;
+        virtual SharedBuffer<real_t>   displacement() = 0;
+#ifdef SFEM_ENABLE_CUDA
+        virtual SharedBuffer<geom_t *> rest_points_device() = 0;
+#endif
+
         virtual std::shared_ptr<Buffer<idx_t *>> semi_structured_elements() { return nullptr; }
 
         virtual void displace_points(const real_t *disp) = 0;
@@ -48,9 +58,12 @@ namespace sfem {
         SharedBuffer<geom_t *> points() override;
         SharedBuffer<idx_t *>  elements() override;
         SharedBuffer<idx_t>    node_mapping() override;
+        SharedBuffer<geom_t *> rest_points() override;
+        SharedBuffer<real_t>   displacement() override;
 
 #ifdef SFEM_ENABLE_CUDA
         SharedBuffer<geom_t *> points_device() override;
+        SharedBuffer<geom_t *> rest_points_device() override;
         SharedBuffer<idx_t *>  elements_device() override;
         SharedBuffer<idx_t>    node_mapping_device() override;
 #endif
@@ -72,10 +85,13 @@ namespace sfem {
         SharedBuffer<geom_t *> points() override;
         SharedBuffer<idx_t *>  elements() override;
         SharedBuffer<idx_t>    node_mapping() override;
+        SharedBuffer<geom_t *> rest_points() override;
+        SharedBuffer<real_t>   displacement() override;
         SharedBuffer<idx_t>    geometry_node_mapping() override;
 
 #ifdef SFEM_ENABLE_CUDA
         SharedBuffer<geom_t *> points_device() override;
+        SharedBuffer<geom_t *> rest_points_device() override;
         SharedBuffer<idx_t *>  elements_device() override;
         SharedBuffer<idx_t>    node_mapping_device() override;
 #endif

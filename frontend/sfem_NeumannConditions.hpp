@@ -69,8 +69,9 @@ namespace sfem {
         //! Its `gradient` ignores `x` -- the traction is integrated over the
         //! sideset and does not move with the state -- so it is assembled once
         //! into the accumulator rather than at every trial step.  This promise
-        //! is what takes the forcing out of the line search.
-        bool residual_depends_on_state() const override { return false; }
+        //! is what takes the forcing out of the line search.  A follower
+        //! pressure turns with the surface and reads the state.
+        bool residual_depends_on_state() const override { return !is_linear(); }
 
         NeumannConditions(const std::shared_ptr<FunctionSpace> &space);
         ~NeumannConditions();

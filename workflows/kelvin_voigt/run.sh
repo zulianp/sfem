@@ -20,7 +20,7 @@ Defaults: output-dir workflows/kelvin_voigt/output
 
 Examples:
   run.sh out execution_space=device                   on the GPU
-  run.sh out mesh.refine=2                             a level-2 semi-structured mesh (quadratic elements)
+  run.sh out mesh.refine=2                             a level-2 semi-structured mesh (micro HEX8 elements)
   run.sh out material.eta_s=0.5                        more damping
 
 Useful environment:

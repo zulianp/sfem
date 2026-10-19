@@ -333,7 +333,9 @@ namespace sfem {
 
 #ifdef SFEM_ENABLE_CUDA
         if (impl_->execution_space == EXECUTION_SPACE_DEVICE) {
-            NodeSamplerOutput out = {gap, {normals[0], normals[1], normals[2]}, {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr}};
+            NodeSamplerOutput out = {gap,
+                                     {normals ? normals[0] : nullptr, normals ? normals[1] : nullptr, normals ? normals[2] : nullptr},
+                                     {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr}};
             return cu_sample_nodes(1, nnodes, idx, {{points[0], points[1], points[2]}}, disp, impl_->grid(), out);
         }
 #endif

@@ -41,7 +41,8 @@ __global__ void cu_displace_surface_points_kernel(const int                     
                                                   const idx_t *const SFEM_RESTRICT  idx,
                                                   geom_t **const SFEM_RESTRICT      surface_points_rest,
                                                   const real_t *const SFEM_RESTRICT disp,
-                                                  geom_t **const SFEM_RESTRICT      surface_points) {
+                                                  geom_t **const SFEM_RESTRICT      surface_points,
+                                                  real_t *const SFEM_RESTRICT       surface_disp) {
     ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= n_nodes) return;
 
@@ -50,6 +51,9 @@ __global__ void cu_displace_surface_points_kernel(const int                     
     for (int d = 0; d < dim; d++) {
         surface_points[d][i] = surface_points_rest[d][i] + disp[b * dim + d];
     }
+    for (int d = 0; d < 3; d++) {
+        surface_disp[i * 3 + d] = d < dim ? disp[b * dim + d] : real_t(0);
+    }
 }
 
 int cu_displace_surface_points(const int          dim,
@@ -57,13 +61,14 @@ int cu_displace_surface_points(const int          dim,
                                const idx_t *const idx,
                                geom_t **const     surface_points_rest,
                                const real_t      *disp,
-                               geom_t **const     surface_points) {
+                               geom_t **const     surface_points,
+                               real_t *const      surface_disp) {
     SFEM_DEBUG_SYNCHRONIZE();
 
     int             block_size = 128;
     const ptrdiff_t n_blocks   = MAX(ptrdiff_t(1), (n_nodes + block_size - 1) / block_size);
 
-    cu_displace_surface_points_kernel<<<n_blocks, block_size>>>(dim, n_nodes, idx, surface_points_rest, disp, surface_points);
+    cu_displace_surface_points_kernel<<<n_blocks, block_size>>>(dim, n_nodes, idx, surface_points_rest, disp, surface_points, surface_disp);
 
     SFEM_DEBUG_SYNCHRONIZE();
     return SFEM_SUCCESS;

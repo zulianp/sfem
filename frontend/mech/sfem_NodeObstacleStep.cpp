@@ -9,6 +9,7 @@
 #include "sfem_API.hpp"
 #include "sfem_BSRTangent.hpp"
 #include "sfem_Function.hpp"
+#include "sfem_ContactCommon.hpp"
 #include "sfem_Merit.hpp"
 #include "sfem_NewmarkScheme.hpp"
 #include "sfem_NodeObstacleContact.hpp"
@@ -80,65 +81,6 @@ namespace sfem {
         }
     };
 
-    namespace {
-        // The KKT residual with the penetration counted as a force, k_max times it. Where the
-        // obstacle's normal turns quickly (a crease, a corner) the full step can cycle between two
-        // contact states; a step must decrease this.
-        class KKTMerit final : public Merit {
-        public:
-            using At    = std::function<real_t(const real_t *const, const real_t *const)>;
-            using Value = std::function<real_t(const real_t *const)>;
-
-            KKTMerit(const At                            &at,
-                     const Value                         &value,
-                     const SharedBuffer<real_t>          &residual,
-                     const std::shared_ptr<BLAS<real_t>> &blas,
-                     const ptrdiff_t                      ndofs,
-                     const ExecutionSpace                 es)
-                : at_(at), value_(value), residual_(residual), blas_(blas), ndofs_(ndofs), trial_(create_buffer<real_t>(ndofs, es)) {}
-
-            const char *name() const override { return "kkt"; }
-
-            int evaluate(const real_t *const x,
-                         const real_t *const h,
-                         const int           nsteps,
-                         const real_t *const steps,
-                         real_t *const       out) override {
-                for (int i = 0; i < nsteps; ++i) {
-                    blas_->copy(ndofs_, x, trial_->data());
-                    blas_->axpy(ndofs_, steps[i], h, trial_->data());
-                    out[i] = value_(trial_->data());
-                    last_  = steps[i];
-                    known_ = std::isfinite(out[i]);
-                }
-                return SFEM_SUCCESS;
-            }
-
-            // The residual of the last trial, which `value` left in the step's trial residual.
-            bool residual_at(const real_t step, real_t *const r) const override {
-                if (!known_ || step != last_) return false;
-                blas_->copy(ndofs_, residual_->data(), r);
-                return true;
-            }
-
-            real_t at(const real_t *const x, const real_t *const r) override { return at_(x, r); }
-
-            // A decrease in proportion to the merit itself: m(s) <= (1 - c1 s) m0.
-            real_t slope(const real_t *const, const real_t *const, const real_t *const, const real_t m0) override { return -m0; }
-
-            bool batched() const override { return false; }
-
-        private:
-            At                            at_;
-            Value                         value_;
-            SharedBuffer<real_t>          residual_;
-            std::shared_ptr<BLAS<real_t>> blas_;
-            ptrdiff_t                     ndofs_;
-            SharedBuffer<real_t>          trial_;
-            real_t                        last_{0};
-            bool                          known_{false};
-        };
-    }  // namespace
 
     NodeObstacleStep::NodeObstacleStep() : impl_(std::make_unique<Impl>()) {}
     NodeObstacleStep::~NodeObstacleStep() = default;
@@ -306,59 +248,5 @@ namespace sfem {
 
     void NodeObstacleStep::reaction(real_t *const out) const { impl_->contact->reaction(out); }
 
-    namespace {
-        class ContactProbe final : public Probe {
-        public:
-            ContactProbe(const std::shared_ptr<NodeObstacleContact> &contact, const ptrdiff_t ndofs, const real_t touch_gap)
-                : contact_(contact), force_(create_buffer<real_t>(ndofs, contact->execution_space())), touch_gap_(touch_gap) {}
-
-            std::vector<std::string> columns() const override { return {"reaction_x", "reaction_y", "reaction_z", "touched"}; }
-
-            int converged(const StepRecord &) override {
-                const ptrdiff_t n = force_->size();
-                contact_->reaction(force_->data());
-                auto                force = on_host(force_);
-                const real_t *const r     = force->data();
-                real_t              x = 0, y = 0, z = 0;
-#pragma omp parallel for reduction(+ : x, y, z)
-                for (ptrdiff_t i = 0; i < n / 3; ++i) {
-                    x += r[i * 3];
-                    y += r[i * 3 + 1];
-                    z += r[i * 3 + 2];
-                }
-                resultant_[0] = x / 2;
-                resultant_[1] = y / 2;
-                resultant_[2] = z / 2;
-
-                auto                gaps = on_host(contact_->gap());
-                const real_t *const gap  = gaps->data();
-                real_t              low = std::numeric_limits<real_t>::max();
-#pragma omp parallel for reduction(min : low)
-                for (ptrdiff_t i = 0; i < contact_->size(); ++i) low = std::min(low, gap[i]);
-                touched_ = low <= touch_gap_;
-                return SFEM_SUCCESS;
-            }
-
-            int sample(const StepRecord &record, real_t *const values) override {
-                const bool measured = record.step > 0;
-                for (int d = 0; d < 3; ++d) values[d] = measured ? resultant_[d] : real_t(0);
-                values[3] = measured && touched_ ? 1 : 0;
-                return SFEM_SUCCESS;
-            }
-
-        private:
-            std::shared_ptr<NodeObstacleContact> contact_;
-            SharedBuffer<real_t>                 force_;
-            real_t                               touch_gap_;
-            real_t                               resultant_[3]{0, 0, 0};
-            bool                                 touched_{false};
-        };
-    }  // namespace
-
-    std::shared_ptr<Probe> create_contact_probe(const std::shared_ptr<NodeObstacleContact> &contact,
-                                                const ptrdiff_t                             ndofs,
-                                                const real_t                                touch_gap) {
-        return std::make_shared<ContactProbe>(contact, ndofs, touch_gap);
-    }
 
 }  // namespace sfem

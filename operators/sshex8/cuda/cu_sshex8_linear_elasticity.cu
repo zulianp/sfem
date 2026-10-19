@@ -1858,22 +1858,25 @@ static int cu_affine_sshex8_linear_elasticity_apply_tpl(const int               
                                                         void                                    *stream) {
     switch (level) {
         case 2: {
-            return my_kernel<real_t, 2>(nelements,
-                                        elements,
-                                        jacobian_stride,
-                                        (cu_jacobian_t *)jacobian_adjugate,
-                                        (cu_jacobian_t *)jacobian_determinant,
-                                        mu,
-                                        lambda,
-                                        u_stride,
-                                        (real_t *)ux,
-                                        (real_t *)uy,
-                                        (real_t *)uz,
-                                        out_stride,
-                                        (real_t *)outx,
-                                        (real_t *)outy,
-                                        (real_t *)outz,
-                                        stream);
+            // One thread per macro element. The warp kernel takes a block of LEVEL^3 threads, eight
+            // here: a quarter of each warp, at the same register-bound 8 warps per SM. GH200,
+            // workflows/rough level 2 (76.6M dofs), one SSMGC solve: 34.9 s against 46.3 s.
+            return my_kernel_local_mem_original<real_t, 2>(nelements,
+                                                           elements,
+                                                           jacobian_stride,
+                                                           (cu_jacobian_t *)jacobian_adjugate,
+                                                           (cu_jacobian_t *)jacobian_determinant,
+                                                           mu,
+                                                           lambda,
+                                                           u_stride,
+                                                           (real_t *)ux,
+                                                           (real_t *)uy,
+                                                           (real_t *)uz,
+                                                           out_stride,
+                                                           (real_t *)outx,
+                                                           (real_t *)outy,
+                                                           (real_t *)outz,
+                                                           stream);
         }
         case 4: {
             return my_kernel<real_t, 4>(nelements,
@@ -2574,4 +2577,356 @@ extern int cu_affine_sshex8_linear_elasticity_block_diag_sym(const int          
             return SFEM_FAILURE;
         }
     }
+}
+
+// The isoparametric route: each micro element at the macro element's Jacobian at every quadrature
+// point, from the macro element's corners (`corners[(d * 8 + v) * corners_stride + e]` is
+// coordinate d of corner v, in HEX8 order), as the host's sshex8_linear_elasticity_apply. One
+// thread per macro element; two Gauss points per direction, the host's default.
+
+template <typename T>
+static __device__ void cu_sshex8_isoparametric_corners(const ptrdiff_t                    corners_stride,
+                                                       const geom_t *const SFEM_RESTRICT corners,
+                                                       const ptrdiff_t                    e,
+                                                       T *const SFEM_RESTRICT             x,
+                                                       T *const SFEM_RESTRICT             y,
+                                                       T *const SFEM_RESTRICT             z) {
+    for (int v = 0; v < 8; v++) {
+        x[v] = corners[(0 * 8 + v) * corners_stride + e];
+        y[v] = corners[(1 * 8 + v) * corners_stride + e];
+        z[v] = corners[(2 * 8 + v) * corners_stride + e];
+    }
+}
+
+// The micro element (xi, yi, zi)'s adjugate and determinant at its reference point (qx, qy, qz):
+// the macro element's at that point's macro coordinates, scaled to the micro element.
+template <typename T>
+static __device__ void cu_sshex8_isoparametric_sub_adjugate(const int                    level,
+                                                            const T *const SFEM_RESTRICT x,
+                                                            const T *const SFEM_RESTRICT y,
+                                                            const T *const SFEM_RESTRICT z,
+                                                            const int                    xi,
+                                                            const int                    yi,
+                                                            const int                    zi,
+                                                            const T                      qx,
+                                                            const T                      qy,
+                                                            const T                      qz,
+                                                            T *const SFEM_RESTRICT       sub_adjugate,
+                                                            T *const SFEM_RESTRICT       sub_determinant) {
+    const T h = T(1) / level;
+    T       adjugate[9];
+    T       determinant;
+    cu_hex8_adjugate_and_det<T, T, T>(x, y, z, (xi + qx) * h, (yi + qy) * h, (zi + qz) * h, 1, adjugate, &determinant);
+    cu_hex8_sub_adj_0<T, T, T>(1, adjugate, determinant, h, sub_adjugate, sub_determinant);
+}
+
+static __device__ void cu_sshex8_micro_nodes(const int                         level,
+                                             idx_t **const SFEM_RESTRICT       elements,
+                                             const ptrdiff_t                   e,
+                                             const int                         xi,
+                                             const int                         yi,
+                                             const int                         zi,
+                                             ptrdiff_t *const SFEM_RESTRICT    ev) {
+    ev[0] = elements[cu_sshex8_lidx(level, xi, yi, zi)][e];
+    ev[1] = elements[cu_sshex8_lidx(level, xi + 1, yi, zi)][e];
+    ev[2] = elements[cu_sshex8_lidx(level, xi + 1, yi + 1, zi)][e];
+    ev[3] = elements[cu_sshex8_lidx(level, xi, yi + 1, zi)][e];
+    ev[4] = elements[cu_sshex8_lidx(level, xi, yi, zi + 1)][e];
+    ev[5] = elements[cu_sshex8_lidx(level, xi + 1, yi, zi + 1)][e];
+    ev[6] = elements[cu_sshex8_lidx(level, xi + 1, yi + 1, zi + 1)][e];
+    ev[7] = elements[cu_sshex8_lidx(level, xi, yi + 1, zi + 1)][e];
+}
+
+template <typename T>
+__global__ void cu_sshex8_linear_elasticity_apply_kernel(const int                         level,
+                                                         const ptrdiff_t                   nelements,
+                                                         idx_t **const SFEM_RESTRICT       elements,
+                                                         const ptrdiff_t                   corners_stride,
+                                                         const geom_t *const SFEM_RESTRICT corners,
+                                                         const T                           mu,
+                                                         const T                           lambda,
+                                                         const ptrdiff_t                   u_stride,
+                                                         const T *const SFEM_RESTRICT      ux,
+                                                         const T *const SFEM_RESTRICT      uy,
+                                                         const T *const SFEM_RESTRICT      uz,
+                                                         const ptrdiff_t                   out_stride,
+                                                         T *const SFEM_RESTRICT            outx,
+                                                         T *const SFEM_RESTRICT            outy,
+                                                         T *const SFEM_RESTRICT            outz) {
+    const T        qx[2]    = {0.2113248654, 0.7886751346};
+    const T        qw[2]    = {1. / 2, 1. / 2};
+    const T *const g_u[3]   = {ux, uy, uz};
+    T *const       g_out[3] = {outx, outy, outz};
+
+    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements; e += blockDim.x * gridDim.x) {
+        T x[8], y[8], z[8];
+        cu_sshex8_isoparametric_corners<T>(corners_stride, corners, e, x, y, z);
+
+        for (int zi = 0; zi < level; zi++) {
+            for (int yi = 0; yi < level; yi++) {
+                for (int xi = 0; xi < level; xi++) {
+                    ptrdiff_t ev[8];
+                    cu_sshex8_micro_nodes(level, elements, e, xi, yi, zi, ev);
+
+                    T u[3][8];
+                    T out[3][8];
+                    for (int d = 0; d < 3; d++) {
+                        for (int v = 0; v < 8; v++) {
+                            u[d][v]   = g_u[d][ev[v] * u_stride];
+                            out[d][v] = 0;
+                        }
+                    }
+
+                    for (int kz = 0; kz < 2; kz++) {
+                        for (int ky = 0; ky < 2; ky++) {
+                            for (int kx = 0; kx < 2; kx++) {
+                                T sub_adjugate[9];
+                                T sub_determinant;
+                                cu_sshex8_isoparametric_sub_adjugate<T>(
+                                        level, x, y, z, xi, yi, zi, qx[kx], qx[ky], qx[kz], sub_adjugate, &sub_determinant);
+                                cu_hex8_linear_elasticity_apply_adj<T, T>(mu,
+                                                                          lambda,
+                                                                          sub_adjugate,
+                                                                          sub_determinant,
+                                                                          qx[kx],
+                                                                          qx[ky],
+                                                                          qx[kz],
+                                                                          qw[kx] * qw[ky] * qw[kz],
+                                                                          u[0],
+                                                                          u[1],
+                                                                          u[2],
+                                                                          out[0],
+                                                                          out[1],
+                                                                          out[2]);
+                            }
+                        }
+                    }
+
+                    for (int d = 0; d < 3; d++) {
+                        for (int v = 0; v < 8; v++) {
+                            atomicAdd(&g_out[d][ev[v] * out_stride], out[d][v]);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// The diagonal blocks, packed 00 01 02 11 12 22, into out[0..5]; with `diag_only` only the
+// diagonal, the packed entries 0, 3 and 5, into out[0..2].
+template <typename T>
+__global__ void cu_sshex8_linear_elasticity_block_diag_sym_kernel(const int                         level,
+                                                                  const ptrdiff_t                   nelements,
+                                                                  idx_t **const SFEM_RESTRICT       elements,
+                                                                  const ptrdiff_t                   corners_stride,
+                                                                  const geom_t *const SFEM_RESTRICT corners,
+                                                                  const T                           mu,
+                                                                  const T                           lambda,
+                                                                  const ptrdiff_t                   out_stride,
+                                                                  const int                         diag_only,
+                                                                  T *const                          out0,
+                                                                  T *const                          out1,
+                                                                  T *const                          out2,
+                                                                  T *const                          out3,
+                                                                  T *const                          out4,
+                                                                  T *const                          out5) {
+    const T   qx[2]              = {0.2113248654, 0.7886751346};
+    const T   qw[2]              = {1. / 2, 1. / 2};
+    const int packed_diagonal[3] = {0, 3, 5};
+    T *const  out[6]             = {out0, out1, out2, out3, out4, out5};
+
+    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements; e += blockDim.x * gridDim.x) {
+        T x[8], y[8], z[8];
+        cu_sshex8_isoparametric_corners<T>(corners_stride, corners, e, x, y, z);
+
+        for (int zi = 0; zi < level; zi++) {
+            for (int yi = 0; yi < level; yi++) {
+                for (int xi = 0; xi < level; xi++) {
+                    ptrdiff_t ev[8];
+                    cu_sshex8_micro_nodes(level, elements, e, xi, yi, zi, ev);
+
+                    T blocks[8][6];
+                    for (int v = 0; v < 8; v++) {
+                        for (int k = 0; k < 6; k++) {
+                            blocks[v][k] = 0;
+                        }
+                    }
+
+                    for (int kz = 0; kz < 2; kz++) {
+                        for (int ky = 0; ky < 2; ky++) {
+                            for (int kx = 0; kx < 2; kx++) {
+                                T sub_adjugate[9];
+                                T sub_determinant;
+                                cu_sshex8_isoparametric_sub_adjugate<T>(
+                                        level, x, y, z, xi, yi, zi, qx[kx], qx[ky], qx[kz], sub_adjugate, &sub_determinant);
+                                const T w = qw[kx] * qw[ky] * qw[kz];
+                                for (int v = 0; v < 8; v++) {
+                                    T grad[3];
+                                    cu_hex8_ref_shape_grad<T>(v, qx[kx], qx[ky], qx[kz], grad);
+                                    cu_linear_elasticity_matrix_sym<T>(
+                                            mu, lambda, sub_adjugate, sub_determinant, grad, grad, w, blocks[v]);
+                                }
+                            }
+                        }
+                    }
+
+                    for (int v = 0; v < 8; v++) {
+                        const ptrdiff_t idx = ev[v] * out_stride;
+                        if (diag_only) {
+                            for (int c = 0; c < 3; c++) {
+                                atomicAdd(&out[c][idx], blocks[v][packed_diagonal[c]]);
+                            }
+                        } else {
+                            for (int c = 0; c < 6; c++) {
+                                atomicAdd(&out[c][idx], blocks[v][c]);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+static ptrdiff_t cu_sshex8_isoparametric_n_blocks(const ptrdiff_t nelements, const int block_size) {
+    return MAX(ptrdiff_t(1), (nelements + block_size - 1) / block_size);
+}
+
+static cudaStream_t cu_sshex8_isoparametric_stream(void *stream) {
+    return stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+}
+
+// Calls f with a value of the scalar type `real_type` names.
+template <typename F>
+static int cu_sshex8_with_real_type(const enum smesh::PrimitiveType real_type, const char *const name, F &&f) {
+    switch (real_type) {
+        case smesh::SMESH_DEFAULT:
+            return f(real_t(0));
+        case smesh::SMESH_FLOAT32:
+            return f(float(0));
+        case smesh::SMESH_FLOAT64:
+            return f(double(0));
+        default:
+            SFEM_ERROR("[Error] %s: not implemented for type %s (code %d)\n", name, smesh::to_string(real_type), real_type);
+            return SFEM_FAILURE;
+    }
+}
+
+extern int cu_sshex8_linear_elasticity_apply(const int                         level,
+                                             const ptrdiff_t                   nelements,
+                                             idx_t **const SFEM_RESTRICT       elements,
+                                             const ptrdiff_t                   corners_stride,
+                                             const geom_t *const SFEM_RESTRICT corners,
+                                             const real_t                      mu,
+                                             const real_t                      lambda,
+                                             const enum smesh::PrimitiveType   real_type,
+                                             const ptrdiff_t                   u_stride,
+                                             const void *const SFEM_RESTRICT   ux,
+                                             const void *const SFEM_RESTRICT   uy,
+                                             const void *const SFEM_RESTRICT   uz,
+                                             const ptrdiff_t                   out_stride,
+                                             void *const SFEM_RESTRICT         outx,
+                                             void *const SFEM_RESTRICT         outy,
+                                             void *const SFEM_RESTRICT         outz,
+                                             void                             *stream) {
+    return cu_sshex8_with_real_type(real_type, "cu_sshex8_linear_elasticity_apply", [&](auto zero) {
+        using T              = decltype(zero);
+        const int block_size = 128;
+        cu_sshex8_linear_elasticity_apply_kernel<T>
+                <<<cu_sshex8_isoparametric_n_blocks(nelements, block_size), block_size, 0, cu_sshex8_isoparametric_stream(stream)>>>(
+                        level,
+                        nelements,
+                        elements,
+                        corners_stride,
+                        corners,
+                        T(mu),
+                        T(lambda),
+                        u_stride,
+                        (const T *)ux,
+                        (const T *)uy,
+                        (const T *)uz,
+                        out_stride,
+                        (T *)outx,
+                        (T *)outy,
+                        (T *)outz);
+        SFEM_DEBUG_SYNCHRONIZE();
+        return SFEM_SUCCESS;
+    });
+}
+
+static int cu_sshex8_isoparametric_block_diag(const int                         level,
+                                              const ptrdiff_t                   nelements,
+                                              idx_t **const SFEM_RESTRICT       elements,
+                                              const ptrdiff_t                   corners_stride,
+                                              const geom_t *const SFEM_RESTRICT corners,
+                                              const real_t                      mu,
+                                              const real_t                      lambda,
+                                              const ptrdiff_t                   out_stride,
+                                              const enum smesh::PrimitiveType   real_type,
+                                              const int                         diag_only,
+                                              void *const *const                out,
+                                              void                             *stream) {
+    return cu_sshex8_with_real_type(real_type, "cu_sshex8_linear_elasticity_block_diag_sym", [&](auto zero) {
+        using T              = decltype(zero);
+        const int block_size = 128;
+        cu_sshex8_linear_elasticity_block_diag_sym_kernel<T>
+                <<<cu_sshex8_isoparametric_n_blocks(nelements, block_size), block_size, 0, cu_sshex8_isoparametric_stream(stream)>>>(
+                        level,
+                        nelements,
+                        elements,
+                        corners_stride,
+                        corners,
+                        T(mu),
+                        T(lambda),
+                        out_stride,
+                        diag_only,
+                        (T *)out[0],
+                        (T *)out[1],
+                        (T *)out[2],
+                        (T *)out[3],
+                        (T *)out[4],
+                        (T *)out[5]);
+        SFEM_DEBUG_SYNCHRONIZE();
+        return SFEM_SUCCESS;
+    });
+}
+
+extern int cu_sshex8_linear_elasticity_diag(const int                         level,
+                                            const ptrdiff_t                   nelements,
+                                            idx_t **const SFEM_RESTRICT       elements,
+                                            const ptrdiff_t                   corners_stride,
+                                            const geom_t *const SFEM_RESTRICT corners,
+                                            const real_t                      mu,
+                                            const real_t                      lambda,
+                                            const enum smesh::PrimitiveType   real_type,
+                                            const ptrdiff_t                   out_stride,
+                                            void *const SFEM_RESTRICT         outx,
+                                            void *const SFEM_RESTRICT         outy,
+                                            void *const SFEM_RESTRICT         outz,
+                                            void                             *stream) {
+    void *const out[6] = {outx, outy, outz, nullptr, nullptr, nullptr};
+    return cu_sshex8_isoparametric_block_diag(
+            level, nelements, elements, corners_stride, corners, mu, lambda, out_stride, real_type, 1, out, stream);
+}
+
+extern int cu_sshex8_linear_elasticity_block_diag_sym(const int                         level,
+                                                      const ptrdiff_t                   nelements,
+                                                      idx_t **const SFEM_RESTRICT       elements,
+                                                      const ptrdiff_t                   corners_stride,
+                                                      const geom_t *const SFEM_RESTRICT corners,
+                                                      const real_t                      mu,
+                                                      const real_t                      lambda,
+                                                      const ptrdiff_t                   out_stride,
+                                                      const enum smesh::PrimitiveType   real_type,
+                                                      void *const                       out0,
+                                                      void *const                       out1,
+                                                      void *const                       out2,
+                                                      void *const                       out3,
+                                                      void *const                       out4,
+                                                      void *const                       out5,
+                                                      void                             *stream) {
+    void *const out[6] = {out0, out1, out2, out3, out4, out5};
+    return cu_sshex8_isoparametric_block_diag(
+            level, nelements, elements, corners_stride, corners, mu, lambda, out_stride, real_type, 0, out, stream);
 }

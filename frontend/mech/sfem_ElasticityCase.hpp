@@ -55,14 +55,23 @@ namespace sfem {
     ///   velocity: {file: v.raw}              # dynamic, Newmark or BDF2
     ///   acceleration: {file: a.raw}          # dynamic, Newmark; otherwise it starts from a = 0
     /// obstacle:                              # regime dynamic, scheme newmark; host or device
-    ///   backend: node_sdf                    # nodes against the SDF's B-spline, MPRGP in frames
+    ///   backend: node_sdf                    # nodes against the SDF's B-spline, MPRGP in frames;
+    ///                                        # ssmgc: the shifted-penalty multigrid (refined mesh,
+    ///                                        # micro basis, linear material; host or device)
     ///   nodes: skin                          # or a named sideset
     ///   direction: z                         # the body approaches along -direction
+    ///   gap: nodal                           # ssmgc: nodal (the SDF at each node) or dual_weighted
+    ///                                        # (over each node's surface patch, dual basis)
+    ///   curvature: true                      # ssmgc: mu_i C_i in the tangent (nodal gap; default
+    ///                                        # with it); node_sdf always adds it
     ///   shape: {type: hemisphere, plane: 0, radius: 0.25, fillet: 0.125, grid_cells: 128}
     ///                                        # plane | slope (slope, slope_axis) | staircase
     ///                                        # (step_width, step_drop) | hemisphere (radius, center)
     ///   sdf: {file: obstacle}                # an SDF grid instead of a shape
     ///   qp: {max_it: 20000, rtol: 1e-10}
+    ///   ssmgc: {penalty_param: 10, coarse_op_type: BSR}    # SSMGC's own keys, over the step's:
+    ///                                        # atol gap/10, rtol newton.rtol, max_it 300, full precision,
+    ///                                        # enable_nl_obstacle 0 (Newton re-linearises the obstacle)
     /// regime: quasi_static                   # steady | quasi_static | dynamic
     /// time: {dt: 0.1, t_end: 1, max_cutbacks: 4}      # or steps instead of t_end; cutbacks
     ///                                        # halve a failed step, 0 and the only choice with bdf2

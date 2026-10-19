@@ -166,11 +166,63 @@ int test_ss_gpu_em_linear_elasticity_vs_linear_elasticity() {
     return compare_host_device("em:LinearElasticity vs LinearElasticity", smesh::to_host(y_le), y_em, tol);
 }
 
+// LinearElasticity without the affine approximation on a distorted semi-structured mesh, where it
+// differs from it by about 1%: the device's isoparametric kernels against the host's (which
+// sfem_BSRTangentTest holds to the HEX8 operator) -- the action, the diagonal and the diagonal blocks.
+int test_ss_gpu_linear_elasticity_isoparametric_vs_host() {
+    auto hex = Mesh::create_hex8_cube(Communicator::self(), 2, 2, 2, 0, 0, 0, 1, 1, 1);
+    {
+        geom_t *const *const xyz = hex->points()->data();
+        for (ptrdiff_t i = 0; i < hex->n_nodes(); ++i) {
+            const geom_t x = xyz[0][i], y = xyz[1][i], z = xyz[2][i];
+            xyz[0][i] += geom_t(0.15) * y * z;
+            xyz[1][i] += geom_t(0.1) * x * x;
+            xyz[2][i] -= geom_t(0.12) * x * y;
+        }
+    }
+    auto            fs  = FunctionSpace::create(smesh::to_semistructured(2, hex, true, false), 3);
+    const ptrdiff_t n   = fs->n_dofs();
+    const real_t    tol = sizeof(real_t) == sizeof(double) ? real_t(1e-10) : real_t(1e-4);
+
+    auto op_h = create_op(fs, "LinearElasticity", EXECUTION_SPACE_HOST);
+    auto op_d = create_op(fs, "LinearElasticity", EXECUTION_SPACE_DEVICE);
+    SFEM_TEST_ASSERT(op_h != nullptr && op_d != nullptr);
+    // Before initialize, which builds what the chosen route reads.
+    op_h->set_option("ASSUME_AFFINE", false);
+    op_d->set_option("ASSUME_AFFINE", false);
+    SFEM_TEST_ASSERT(op_h->initialize() == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(op_d->initialize() == SFEM_SUCCESS);
+
+    auto x_h = fill_vector_host(*fs);
+    auto x_d = smesh::to_device(x_h);
+    auto y_h = host_zeros(n);
+    auto y_d = create_buffer<real_t>(n, EXECUTION_SPACE_DEVICE);
+    device_zeros(y_d);
+    SFEM_TEST_ASSERT(op_h->apply(nullptr, x_h->data(), y_h->data()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(op_d->apply(nullptr, x_d->data(), y_d->data()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(compare_host_device("isoparametric apply", y_h, y_d, tol) == SFEM_TEST_SUCCESS);
+
+    auto diag_h = host_zeros(n);
+    auto diag_d = create_buffer<real_t>(n, EXECUTION_SPACE_DEVICE);
+    device_zeros(diag_d);
+    SFEM_TEST_ASSERT(op_h->hessian_diag(nullptr, diag_h->data()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(op_d->hessian_diag(nullptr, diag_d->data()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(compare_host_device("isoparametric diagonal", diag_h, diag_d, tol) == SFEM_TEST_SUCCESS);
+
+    auto blocks_h = host_zeros(n / 3 * 6);
+    auto blocks_d = create_buffer<real_t>(n / 3 * 6, EXECUTION_SPACE_DEVICE);
+    device_zeros(blocks_d);
+    SFEM_TEST_ASSERT(op_h->hessian_block_diag_sym(nullptr, blocks_h->data()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(op_d->hessian_block_diag_sym(nullptr, blocks_d->data()) == SFEM_SUCCESS);
+    return compare_host_device("isoparametric diagonal blocks", blocks_h, blocks_d, tol);
+}
+
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_checkerboard_ss_gpu_laplacian_vs_host);
     SFEM_RUN_TEST(test_ss_gpu_em_laplacian_vs_host);
     SFEM_RUN_TEST(test_ss_gpu_em_linear_elasticity_vs_linear_elasticity);
+    SFEM_RUN_TEST(test_ss_gpu_linear_elasticity_isoparametric_vs_host);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }

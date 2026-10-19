@@ -9,7 +9,11 @@
 static const scalar_t infty             = SFEM_SDF_UNREACHABLE;
 static const real_t   SFEM_SDF_GRAD_EPS = 1e-12;
 
-// #define SFEM_RESAMPLE_GAP_DUAL
+// The gap is weighted with the dual (biorthogonal) basis, as on TRISHELL3 and BEAM2: then
+// int psi_i phi_j = delta_ij m_j, the weighted gap's linearisation is the nodal n . u the
+// constraint operator applies, and re-linearising at the solution converges at once instead of
+// like I - M_l^-1 M_c.
+#define SFEM_RESAMPLE_GAP_DUAL
 
 SFEM_INLINE __device__ static real_t cu_quadshell4_measure_and_normal(
         // X-coordinates
@@ -229,10 +233,10 @@ __global__ void cu_quadshell4_resample_gap_local_kernel(
                     const scalar_t f2 = qx[q_ix] * qx[q_iy];
                     const scalar_t f3 = qx[q_iy] * x0;
 
-                    quad4_f[0] = 4 * f0 - 2 * f1 - f2 - 2 * f3;
-                    quad4_f[1] = -2 * f0 + 4 * f1 - 2 * f2 - f3;
-                    quad4_f[2] = -f0 - 2 * f1 + 4 * f2 - 2 * f3;
-                    quad4_f[3] = -2 * f0 - f1 - 2 * f2 + 4 * f3;
+                    quad4_f[0] = 4 * f0 - 2 * f1 + f2 - 2 * f3;
+                    quad4_f[1] = -2 * f0 + 4 * f1 - 2 * f2 + f3;
+                    quad4_f[2] = f0 - 2 * f1 + 4 * f2 - 2 * f3;
+                    quad4_f[3] = -2 * f0 + f1 - 2 * f2 + 4 * f3;
                 }
 #endif
                 const real_t dV = measure * qw[q_ix] * qw[q_iy];
@@ -390,10 +394,10 @@ __global__ void cu_quadshell4_resample_weight_local_kernel(
                     const scalar_t f2 = qx[q_ix] * qx[q_iy];
                     const scalar_t f3 = qx[q_iy] * x0;
 
-                    quad4_f[0] = 4 * f0 - 2 * f1 - f2 - 2 * f3;
-                    quad4_f[1] = -2 * f0 + 4 * f1 - 2 * f2 - f3;
-                    quad4_f[2] = -f0 - 2 * f1 + 4 * f2 - 2 * f3;
-                    quad4_f[3] = -2 * f0 - f1 - 2 * f2 + 4 * f3;
+                    quad4_f[0] = 4 * f0 - 2 * f1 + f2 - 2 * f3;
+                    quad4_f[1] = -2 * f0 + 4 * f1 - 2 * f2 + f3;
+                    quad4_f[2] = f0 - 2 * f1 + 4 * f2 - 2 * f3;
+                    quad4_f[3] = -2 * f0 + f1 - 2 * f2 + 4 * f3;
                 }
 #endif
                 const real_t dV = measure * qw[q_ix] * qw[q_iy];
@@ -520,10 +524,10 @@ __global__ void cu_quadshell4_resample_gap_value_local_kernel(
                     const scalar_t f2 = qx[q_ix] * qx[q_iy];
                     const scalar_t f3 = qx[q_iy] * x0;
 
-                    quad4_f[0] = 4 * f0 - 2 * f1 - f2 - 2 * f3;
-                    quad4_f[1] = -2 * f0 + 4 * f1 - 2 * f2 - f3;
-                    quad4_f[2] = -f0 - 2 * f1 + 4 * f2 - 2 * f3;
-                    quad4_f[3] = -2 * f0 - f1 - 2 * f2 + 4 * f3;
+                    quad4_f[0] = 4 * f0 - 2 * f1 + f2 - 2 * f3;
+                    quad4_f[1] = -2 * f0 + 4 * f1 - 2 * f2 + f3;
+                    quad4_f[2] = f0 - 2 * f1 + 4 * f2 - 2 * f3;
+                    quad4_f[3] = -2 * f0 + f1 - 2 * f2 + 4 * f3;
                 }
 #endif
                 const real_t dV = measure * qw[q_ix] * qw[q_iy];
@@ -691,10 +695,10 @@ __global__ void cu_quadshell4_resample_gap_normals_local_kernel(
                     const scalar_t f2 = qx[q_ix] * qx[q_iy];
                     const scalar_t f3 = qx[q_iy] * x0;
 
-                    quad4_f[0] = 4 * f0 - 2 * f1 - f2 - 2 * f3;
-                    quad4_f[1] = -2 * f0 + 4 * f1 - 2 * f2 - f3;
-                    quad4_f[2] = -f0 - 2 * f1 + 4 * f2 - 2 * f3;
-                    quad4_f[3] = -2 * f0 - f1 - 2 * f2 + 4 * f3;
+                    quad4_f[0] = 4 * f0 - 2 * f1 + f2 - 2 * f3;
+                    quad4_f[1] = -2 * f0 + 4 * f1 - 2 * f2 + f3;
+                    quad4_f[2] = f0 - 2 * f1 + 4 * f2 - 2 * f3;
+                    quad4_f[3] = -2 * f0 + f1 - 2 * f2 + 4 * f3;
                 }
 #endif
                 const real_t dV = measure * qw[q_ix] * qw[q_iy];

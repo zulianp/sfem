@@ -318,6 +318,68 @@ namespace sfem {
       }
     }
 
+
+    // The graph an assembly was last handed and found well formed.
+    struct CheckedGraph {
+      const count_t *rowptr{nullptr};
+      const idx_t *colidx{nullptr};
+      ptrdiff_t n_rows{-1};
+    };
+
+    // Establish once per graph, at the first assembly into it, that the graph is well formed:
+    // rows in order, every column in range, each row sorted and duplicate free.
+    // The assembly kernels assume it -- they locate an entry and write to it
+    // without re-checking that it is there -- so this is where the assumption
+    // is earned.
+    //
+    // It used to be earned per element instead: every scatter walked its
+    // NS x NS candidates, tested each with a three-condition branch
+    // and reported through std::fprintf from inside the caller's parallel
+    // region.  That paid O(elements x NS^2) on every assembly for a
+    // property of the mesh and the graph together, which cannot change between
+    // elements or between calls.  Here it is O(nnz), once.
+    //
+    // Not at setup: `initialize` built the space's scalar dof graph for this, which a
+    // matrix-free solver never uses -- on a 76.6M-dof semi-structured mesh 6.2e9 entries,
+    // past count_t -- while the block assembly writes into the node graph, which it never
+    // checked.  `checked` remembers the last graph that passed.
+    //
+    // Raw pointers rather than the graph type, so this does not depend on which
+    // headers the generated wrapper happens to pull in.
+    int check_graph(CheckedGraph &checked,
+                    const count_t *const rowptr,
+                    const idx_t *const colidx,
+                    const ptrdiff_t n_rows) {
+      if (rowptr == checked.rowptr && colidx == checked.colidx && n_rows == checked.n_rows) {
+        return SFEM_SUCCESS;
+      }
+      if (!rowptr || !colidx || n_rows < 0) {
+        return SFEM_FAILURE;
+      }
+      const count_t *const h_rowptr = rowptr;
+      const idx_t *const h_colidx = colidx;
+      if (h_rowptr[0] != 0) {
+        return SFEM_FAILURE;
+      }
+      const ptrdiff_t nnz = (ptrdiff_t)h_rowptr[n_rows];
+      for (ptrdiff_t i = 0; i < n_rows; ++i) {
+        const count_t begin = h_rowptr[i];
+        const count_t end = h_rowptr[i + 1];
+        if (end < begin || (ptrdiff_t)end > nnz) {
+          return SFEM_FAILURE;
+        }
+        for (count_t k = begin; k < end; ++k) {
+          if (h_colidx[k] < 0 || (ptrdiff_t)h_colidx[k] >= n_rows) {
+            return SFEM_FAILURE;
+          }
+          if (k > begin && h_colidx[k] <= h_colidx[k - 1]) {
+            return SFEM_FAILURE;
+          }
+        }
+      }
+      checked = CheckedGraph{rowptr, colidx, n_rows};
+      return SFEM_SUCCESS;
+    }
   }  // namespace
 
   class GeneratedMooneyRivlinKelvinVoigt::Impl {
@@ -333,6 +395,8 @@ namespace sfem {
     const real_t *current{nullptr};
     bool residual_uses_affine{false};
     bool jacobian_action_uses_affine{false};
+    CheckedGraph crs_graph;
+    CheckedGraph bsr_graph;
 
     //! The history the form reads: the scheme's when one is attached, and the
     //! buffer a caller set otherwise.
@@ -493,66 +557,12 @@ namespace sfem {
     return total;
   }
 
-  // Establish once, at setup, that this operator's dof graph is well formed:
-  // rows in order, every column in range, each row sorted and duplicate free.
-  // The assembly kernels assume it -- they locate an entry and write to it
-  // without re-checking that it is there -- so this is where the assumption
-  // is earned.
-  //
-  // It used to be earned per element instead: every scatter walked its
-  // NS x NS candidates, tested each with a three-condition branch
-  // and reported through std::fprintf from inside the caller's parallel
-  // region.  That paid O(elements x NS^2) on every assembly for a
-  // property of the mesh and the graph together, which cannot change between
-  // elements or between calls.  Here it is O(nnz), once.
-  //
-  // Raw pointers rather than the graph type, so this does not depend on which
-  // headers the generated wrapper happens to pull in.
-  static int validate_dof_graph(const count_t *const rowptr,
-                                  const idx_t *const colidx,
-                                  const ptrdiff_t n_nodes,
-                                  const ptrdiff_t nnz) {
-    if (!rowptr || !colidx || n_nodes < 0) {
-      return SFEM_FAILURE;
-    }
-    if (rowptr[0] != 0 || (ptrdiff_t)rowptr[n_nodes] != nnz) {
-      return SFEM_FAILURE;
-    }
-    for (ptrdiff_t i = 0; i < n_nodes; ++i) {
-      const count_t begin = rowptr[i];
-      const count_t end = rowptr[i + 1];
-      if (end < begin || (ptrdiff_t)end > nnz) {
-        return SFEM_FAILURE;
-      }
-      for (count_t k = begin; k < end; ++k) {
-        if (colidx[k] < 0 || (ptrdiff_t)colidx[k] >= n_nodes) {
-          return SFEM_FAILURE;
-        }
-        if (k > begin && colidx[k] <= colidx[k - 1]) {
-          return SFEM_FAILURE;
-        }
-      }
-    }
-    return SFEM_SUCCESS;
-  }
-
   int GeneratedMooneyRivlinKelvinVoigt::initialize(const std::vector<std::string> &block_names) {
     SFEM_TRACE_SCOPE("GeneratedMooneyRivlinKelvinVoigt::initialize");
     impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
     // A micro-element space hands each semi-structured macro element over as its micro
     // elements, which these kernels assemble as HEX8.
     impl_->domains->set_micro_elements(impl_->space->micro_elements());
-    {
-      auto dof_graph = impl_->space->dof_to_dof_graph();
-      if (!dof_graph ||
-        validate_dof_graph(dof_graph->rowptr()->data(),
-                                   dof_graph->colidx()->data(),
-                                   dof_graph->n_nodes(),
-                                   dof_graph->nnz()) != SFEM_SUCCESS) {
-        SFEM_ERROR("GeneratedMooneyRivlinKelvinVoigt::initialize: the dof graph is malformed; the assembly kernels assume it is not\n");
-        return SFEM_FAILURE;
-      }
-    }
     seed_material(*impl_->domains);
     const bool needs_affine_jacobian =
         (impl_->residual_uses_affine && true) ||
@@ -888,6 +898,10 @@ namespace sfem {
               const idx_t *const colidx,
               real_t *const values) {
     SFEM_TRACE_SCOPE("GeneratedMooneyRivlinKelvinVoigt::hessian_bsr");
+    if (check_graph(impl_->bsr_graph, rowptr, colidx, impl_->space->n_dofs() / impl_->space->block_size()) != SFEM_SUCCESS) {
+      SFEM_ERROR("GeneratedMooneyRivlinKelvinVoigt::hessian_bsr: the graph is malformed; the assembly kernels assume it is not\n");
+      return SFEM_FAILURE;
+    }
     const real_t *const current = state ? state : impl_->current;
     if (!current || !impl_->previous_state()) {
       SFEM_ERROR("GeneratedMooneyRivlinKelvinVoigt requires current and previous states\n");

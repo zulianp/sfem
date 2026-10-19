@@ -154,6 +154,7 @@ namespace sfem {
                         impl.calc_r_pen(n_constrained_dofs,
                                         r_pen->data(),
                                         penalty_param_,
+                                        nullptr,
                                         lb,
                                         ub,
                                         lagr_lb ? lagr_lb->data() : nullptr,
@@ -188,6 +189,7 @@ namespace sfem {
                         impl.calc_r_pen(n_dofs,
                                         x,
                                         penalty_param_,
+                                        nullptr,
                                         lb,
                                         ub,
                                         lagr_lb ? lagr_lb->data() : nullptr,
@@ -222,6 +224,7 @@ namespace sfem {
                             impl.calc_J_pen(n_constrained_dofs,
                                             c->data(),
                                             penalty_param_,
+                                            nullptr,
                                             lb,
                                             ub,
                                             lagr_lb ? lagr_lb->data() : nullptr,
@@ -240,6 +243,7 @@ namespace sfem {
                             impl.calc_J_pen(n_dofs,
                                             x,
                                             penalty_param_,
+                                            nullptr,
                                             lb,
                                             ub,
                                             lagr_lb ? lagr_lb->data() : nullptr,
@@ -288,8 +292,8 @@ namespace sfem {
                 if (norm_pen < penetration_tol) {
                     // FIXME check if the lagrange mult update makes sense (the distance should probably be the one before the
                     // correction)
-                    if (ub) impl.update_lagr_p(n_constrained_dofs, penalty_param_, Tx, ub, lagr_ub->data());
-                    if (lb) impl.update_lagr_m(n_constrained_dofs, penalty_param_, Tx, lb, lagr_lb->data());
+                    if (ub) impl.update_lagr_p(n_constrained_dofs, penalty_param_, nullptr, Tx, ub, lagr_ub->data());
+                    if (lb) impl.update_lagr_m(n_constrained_dofs, penalty_param_, nullptr, Tx, lb, lagr_lb->data());
 
                     penetration_tol = std::max(1e-20, penetration_tol / pow(penalty_param_, 0.9));
                     omega           = omega / penalty_param_;

@@ -60,6 +60,29 @@ namespace sfem {
         std::shared_ptr<FunctionSpace> space();
 
         const SharedBuffer<idx_t> node_mapping();
+        /// The obstacle's normal at each contact node (component-major, dim rows), pointing towards
+        /// the obstacle: the constraint is n . u <= gap + n . u_k. Sampled by init / update.
+        SharedBuffer<real_t *> normals() const;
+        /// The normals' rows (dim of them; the rest null), readable on the host whatever the
+        /// execution space: a device two-level buffer keeps its row pointers on the device.
+        void normal_rows(real_t **const rows) const;
+        /// Each contact node's share of the surface measure (lumped), in the execution space: the
+        /// contact force at node i is m_i times its multiplier.
+        SharedBuffer<real_t> surface_mass() const;
+
+        /// How the gap and its normals are taken from the obstacle at the contact nodes; both are
+        /// linearised by the nodal normal projection n . u. NODAL (the default) samples the signed
+        /// distance at each node, the normal being its gradient there. DUAL_WEIGHTED integrates it over
+        /// each node's surface patch against the dual basis, biorthogonal to the nodal one (so n . u is
+        /// still the linearisation), and mixes the faces that meet at a sharp edge. Set before init().
+        enum class Gap { NODAL, DUAL_WEIGHTED };
+        void set_gap(const Gap gap);
+        Gap  gap() const;
+        /// The curvature of the nodal gap's constraint at the contact nodes as last updated, minus the
+        /// Hessian of the gap -sdf / |grad sdf|, into 6 packed rows [xx, xy, xz, yy, yz, zz] of
+        /// n_constrained_dofs values in the execution space. Its multiple mu_i C_i is the contact
+        /// force's share of a Newton tangent. The NODAL gap only.
+        int curvature(real_t **const C);
 
         static std::shared_ptr<ContactConditions> create_from_env(const std::shared_ptr<FunctionSpace> &space,
                                                                   const enum ExecutionSpace             es);

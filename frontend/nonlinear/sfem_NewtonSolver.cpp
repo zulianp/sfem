@@ -121,7 +121,7 @@ namespace sfem {
 
         // A linear function is solved by one full step whose linear solve met its tolerance: its
         // accuracy is the linear solver's, and a second step would only repeat the solve.
-        const bool linear = impl.f->is_linear();
+        const bool linear = impl.f->is_linear() && impl.step->solves_linear_function_exactly();
 
         NewtonIteration log;
         real_t          tol = 0;

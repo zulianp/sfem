@@ -330,10 +330,12 @@ class CUDAEnergySoAEmitter:
 
         formats = plan.matrix_format_plan
         if formats is not None:
+            # The symmetric block diagonal scatters through the same atomics, and
+            # it is what the block-Jacobi smoothers of SSMGC read on the device.
             device = tuple(
                 variant
                 for variant in formats.variants
-                if variant.matrix_format is MatrixFormat.BSR
+                if variant.matrix_format in (MatrixFormat.BSR, MatrixFormat.BLOCK_DIAG_SYM)
                 and variant.mesh_layout is MatrixMeshLayout.STANDARD
             )
             formats = MatrixFormatPlan(device) if device else None
