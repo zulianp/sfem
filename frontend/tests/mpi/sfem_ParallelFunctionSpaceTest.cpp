@@ -7,6 +7,10 @@
 #include <cmath>
 #include <vector>
 
+#ifdef SFEM_ENABLE_CUDA
+#include "smesh_device_buffer.hpp"
+#endif
+
 namespace {
 
     int check_space_counts(const std::shared_ptr<sfem::FunctionSpace> &space,
@@ -137,6 +141,18 @@ int test_synchronize_after_packing() {
         int wrong = 0;
         for (ptrdiff_t i = 0; i < n; ++i) wrong += std::abs(x[i] - field(i / 3, int(i % 3))) > 1e-14;
         SFEM_TEST_EQ(wrong, 0);
+
+#ifdef SFEM_ENABLE_CUDA
+        // The same gather of device memory, by GPU-aware MPI: the host's values, bitwise.
+        std::vector<real_t> y(n, 0);
+        for (ptrdiff_t i = 0; i < space->n_owned_dofs(); ++i) y[i] = field(i / 3, int(i % 3));
+        auto on_device = smesh::to_device(sfem::Buffer<real_t>::wrap(n, y.data()));
+        SFEM_TEST_ASSERT(space->synchronize(on_device->data(), sfem::EXECUTION_SPACE_DEVICE) == SFEM_SUCCESS);
+        auto back   = smesh::to_host(on_device);
+        int  differ = 0;
+        for (ptrdiff_t i = 0; i < n; ++i) differ += back->data()[i] != x[i];
+        SFEM_TEST_EQ(differ, 0);
+#endif
     }
     return SFEM_TEST_SUCCESS;
 }

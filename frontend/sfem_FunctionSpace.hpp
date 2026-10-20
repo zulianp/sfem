@@ -12,6 +12,10 @@
 #include <string>
 #include <vector>
 
+namespace smesh {
+    class Exchange;
+}
+
 namespace sfem {
 
     class FunctionSpace final {
@@ -70,8 +74,13 @@ namespace sfem {
 
         /// The owned prefix of x (n_dofs() long) copied into its ghost and aura slots, from the
         /// ranks that own them: what every evaluation over all local elements reads. Nothing on a
-        /// space that is not distributed.
-        int synchronize(real_t *x);
+        /// space that is not distributed. x lives in `es` (on the device: GPU-aware MPI).
+        int synchronize(real_t *x, ExecutionSpace es = EXECUTION_SPACE_HOST);
+        /// synchronize in two halves: begin sends x's owned values, end receives the ghost and
+        /// aura ones into x. Between them x's owned values must stay as they are; computation that
+        /// reads only those can run while the messages travel.
+        int synchronize_begin(real_t *x, ExecutionSpace es = EXECUTION_SPACE_HOST);
+        int synchronize_end(ExecutionSpace es = EXECUTION_SPACE_HOST);
 
         smesh::ElemType element_type(const int block = 0) const;
         std::vector<smesh::ElemType> element_types() const;
@@ -105,6 +114,9 @@ namespace sfem {
     private:
         class Impl;
         std::unique_ptr<Impl> impl_;
+
+        // synchronize's exchange for buffers in `es`; null where there is nothing to exchange.
+        smesh::Exchange *exchange_for(ExecutionSpace es, int *status);
     };
 
 }  // namespace sfem

@@ -3,7 +3,8 @@
 // released over four quasi-static steps to convergence. Every rank solves the case alone too, and
 // each owned node is compared with the node of the serial solve at its coordinates. Then a block
 // of a mesh read from disk, written by both: rank 0 writes the distributed run's output as the
-// serial run does, each node by its id in the file.
+// serial run does, each node by its id in the file. With CUDA, both cases again with the
+// distributed solve on the device.
 
 #include <algorithm>
 #include <cmath>
@@ -21,6 +22,10 @@
 #include "sfem_Function.hpp"
 #include "sfem_Playground.hpp"
 #include "sfem_test.hpp"
+
+#ifdef SFEM_ENABLE_CUDA
+#include "smesh_device_buffer.hpp"
+#endif
 
 namespace {
     const char *const BOX = R"(
@@ -60,11 +65,17 @@ output: {probes: [{type: contact}]}
     }
 
     // max over owned nodes of |u_distributed - u_serial| against max |u_serial|, over all ranks;
-    // the Newton iterations of both solves, all steps, in `iterations`.
-    int compare(const std::vector<std::string> &overrides, real_t *const relative, int iterations[2]) {
+    // the Newton iterations of both solves, all steps, in `iterations`. `distributed_only` applies
+    // to the distributed solve alone (e.g. its execution space).
+    int compare(const std::vector<std::string> &overrides,
+                real_t *const                   relative,
+                int                             iterations[2],
+                const std::vector<std::string> &distributed_only = {}) {
         auto world  = sfem::Communicator::world();
         auto serial = assemble(sfem::Communicator::self(), overrides);
-        auto dist   = assemble(world, overrides);
+        auto both   = overrides;
+        both.insert(both.end(), distributed_only.begin(), distributed_only.end());
+        auto dist = assemble(world, both);
         if (!serial || !dist) return SFEM_FAILURE;
         iterations[0] = iterations[1] = 0;
         serial->newton().add_monitor([&](const sfem::NewtonIteration &it) { iterations[0] += it.iteration > 0; });
@@ -80,7 +91,11 @@ output: {probes: [{type: contact}]}
         const geom_t *const *dp    = dm->points()->data();
         const ptrdiff_t      owned = dist->function()->space()->n_owned_dofs() / 3;
         const real_t        *us    = serial->solution()->data();
-        const real_t        *ud    = dist->solution()->data();
+        auto                 dsol  = dist->solution();
+#ifdef SFEM_ENABLE_CUDA
+        if (dsol->mem_space() == sfem::MEMORY_SPACE_DEVICE) dsol = smesh::to_host(dsol);
+#endif
+        const real_t *ud = dsol->data();
         real_t               worst = 0, scale = 0;
         for (ptrdiff_t i = 0; i < owned; ++i) {
             auto found = at.find(key(dp[0][i], dp[1][i], dp[2][i]));
@@ -126,6 +141,29 @@ int test_release_matches_serial() {
     SFEM_TEST_ASSERT(its[0] == its[1]);
     return SFEM_TEST_SUCCESS;
 }
+
+#ifdef SFEM_ENABLE_CUDA
+// Both cases with the distributed solve on the device, a GPU per rank, its gathers by GPU-aware
+// MPI, against the serial solve on the host.
+int test_device_matches_serial() {
+    for (const auto &overrides : {std::vector<std::string>{}, RELEASE}) {
+        real_t relative = 1;
+        int    its[2]   = {0, 0};
+        SFEM_TEST_ASSERT(compare(overrides, &relative, its, {"execution_space=device"}) == SFEM_SUCCESS);
+        if (sfem::Communicator::world()->rank() == 0) {
+            printf("  %s on the device: %d ranks against one on the host, %.3g relative, %d and %d Newton\n",
+                   overrides.empty() ? "utopia scheme" : "release",
+                   sfem::Communicator::world()->size(),
+                   (double)relative,
+                   its[1],
+                   its[0]);
+        }
+        SFEM_TEST_ASSERT(relative < 1e-8);
+        SFEM_TEST_ASSERT(its[0] == its[1]);
+    }
+    return SFEM_TEST_SUCCESS;
+}
+#endif
 
 namespace {
     // out/<name>.<d>.<step> of a playground output, each node's values by its id in the file (its
@@ -230,6 +268,9 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_utopia_scheme_matches_serial);
     SFEM_RUN_TEST(test_release_matches_serial);
     SFEM_RUN_TEST(test_block_read_and_output_match_serial);
+#ifdef SFEM_ENABLE_CUDA
+    SFEM_RUN_TEST(test_device_matches_serial);
+#endif
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }

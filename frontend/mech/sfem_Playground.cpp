@@ -1157,11 +1157,6 @@ namespace sfem {
             return nullptr;
         }
 
-        if (comm->size() > 1 && impl.es != EXECUTION_SPACE_HOST) {
-            fprintf(stderr, "Playground: a distributed run is on the host\n");
-            return nullptr;
-        }
-
         const auto regime = read_string(root, "regime", "steady");
         if (regime != "steady" && regime != "quasi_static" && regime != "dynamic") {
             fprintf(stderr, "Playground: unknown regime \"%s\" (steady, quasi_static, dynamic)\n", regime.c_str());

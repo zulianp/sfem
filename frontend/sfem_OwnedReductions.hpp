@@ -23,6 +23,9 @@ namespace sfem {
         real_t sum(const real_t local) const { return comm_->size() > 1 ? comm_->sum(local) : local; }
         real_t max(const real_t local) const { return comm_->size() > 1 ? comm_->max(local) : local; }
         real_t min(const real_t local) const { return comm_->size() > 1 ? -comm_->max(-local) : local; }
+        /// Whether `local` holds on every rank: a decision all ranks take alike, so that one rank's
+        /// failure does not leave the others waiting for it in a collective.
+        bool all(const bool local) const { return comm_->size() > 1 ? comm_->max(local ? 0 : 1) == 0 : local; }
 
         ptrdiff_t                            n_owned() const { return n_owned_; }
         const std::shared_ptr<Communicator> &comm() const { return comm_; }
