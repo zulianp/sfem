@@ -17,6 +17,46 @@ using namespace sfem;
 
 namespace {
     std::shared_ptr<Mesh> cube() { return Mesh::create_hex8_cube(Communicator::world(), 4, 3, 3, 0, 0, 0, 1, 1, 1); }
+    // TET4 takes the affine kernels, with the geometry the op caches on the device.
+    std::shared_ptr<Mesh> tet_cube() { return Mesh::create_tet4_cube(Communicator::world(), 4, 3, 3, 0, 0, 0, 1, 1, 1); }
+
+    // The deformed state both sides evaluate.
+    SharedBuffer<real_t> deformed(const std::shared_ptr<Mesh> &mesh, const ptrdiff_t ndofs) {
+        auto                 x   = create_host_buffer<real_t>(ndofs);
+        const geom_t *const *xyz = mesh->points()->data();
+        for (ptrdiff_t i = 0; i < mesh->n_nodes(); ++i) {
+            x->data()[i * 3 + 0] = real_t(0.05) * xyz[0][i] * xyz[1][i];
+            x->data()[i * 3 + 1] = real_t(-0.03) * xyz[0][i] + real_t(0.02) * xyz[2][i];
+            x->data()[i * 3 + 2] = real_t(0.04) * xyz[1][i] * xyz[2][i];
+        }
+        return x;
+    }
+
+    // max |device - host| / max |host| over the gradient at the deformed state.
+    real_t gradient_and_compare(const std::shared_ptr<Mesh> &mesh, const char *const yaml) {
+        auto       fs   = FunctionSpace::create(mesh, 3);
+        ryml::Tree tree = ryml::parse_in_arena(ryml::to_csubstr(yaml));
+        auto       host = create_op_from_yaml(fs, tree.crootref(), EXECUTION_SPACE_HOST);
+        auto       dev  = create_op_from_yaml(fs, tree.crootref(), EXECUTION_SPACE_DEVICE);
+        if (!host || !dev) return 1;
+
+        const ptrdiff_t ndofs = fs->n_dofs();
+        auto            x     = deformed(mesh, ndofs);
+        auto            g     = create_host_buffer<real_t>(ndofs);
+        if (host->gradient(x->data(), g->data()) != SFEM_SUCCESS) return 1;
+        auto d_x = smesh::to_device(x);
+        auto d_g = create_buffer<real_t>(ndofs, EXECUTION_SPACE_DEVICE);
+        if (dev->gradient(d_x->data(), d_g->data()) != SFEM_SUCCESS) return 1;
+        auto from_device = smesh::to_host(d_g);
+
+        real_t worst = 0, scale = 0;
+        for (ptrdiff_t i = 0; i < ndofs; ++i) {
+            worst = std::max(worst, std::abs(from_device->data()[i] - g->data()[i]));
+            scale = std::max(scale, std::abs(g->data()[i]));
+        }
+        printf("  %s gradient: max |g| %g, worst relative difference %.3g\n", dev->name(), (double)scale, (double)(worst / scale));
+        return scale > 0 ? worst / scale : 1;
+    }
 
     // max |device - host| / max |host| over the BSR values, on `mesh` (a semi-structured one through
     // its micro elements).
@@ -32,14 +72,8 @@ namespace {
             if (auto history = std::dynamic_pointer_cast<HistoryDependent>(op)) history->begin_step(real_t(0.1), real_t(0.1));
         }
 
-        const ptrdiff_t      ndofs = fs->n_dofs();
-        auto                 x     = create_host_buffer<real_t>(ndofs);
-        const geom_t *const *xyz   = mesh->points()->data();
-        for (ptrdiff_t i = 0; i < mesh->n_nodes(); ++i) {
-            x->data()[i * 3 + 0] = real_t(0.05) * xyz[0][i] * xyz[1][i];
-            x->data()[i * 3 + 1] = real_t(-0.03) * xyz[0][i] + real_t(0.02) * xyz[2][i];
-            x->data()[i * 3 + 2] = real_t(0.04) * xyz[1][i] * xyz[2][i];
-        }
+        const ptrdiff_t ndofs = fs->n_dofs();
+        auto            x     = deformed(mesh, ndofs);
 
         auto       graph  = fs->node_to_node_graph();
         const auto nvals  = graph->nnz() * 9;
@@ -106,8 +140,13 @@ int test_linear_elasticity_bsr_on_device() {
     return SFEM_TEST_SUCCESS;
 }
 
+// HEX8 through the isoparametric kernels, TET4 through the affine ones and their cached geometry,
+// whose components the launch reads on the host.
 int test_neohookean_bsr_on_device() {
-    SFEM_TEST_ASSERT(assemble_and_compare(cube(), "{type: GeneratedNeoHookeanOgden, mu: 1, lmbda: 2}") < 1e-12);
+    const char *const yaml = "{type: GeneratedNeoHookeanOgden, mu: 1, lmbda: 2}";
+    SFEM_TEST_ASSERT(assemble_and_compare(cube(), yaml) < 1e-12);
+    SFEM_TEST_ASSERT(assemble_and_compare(tet_cube(), yaml) < 1e-12);
+    SFEM_TEST_ASSERT(gradient_and_compare(tet_cube(), yaml) < 1e-12);
     return SFEM_TEST_SUCCESS;
 }
 
