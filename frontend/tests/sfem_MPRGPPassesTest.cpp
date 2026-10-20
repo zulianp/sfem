@@ -159,12 +159,27 @@ namespace {
         }
         SFEM_TEST_ASSERT(chopped > n / 16);
 
-        // step, along d and without one
+        // step, along d with the convergence norm weighted, and without d unweighted
         const real_t alpha = real_t(0.01);
+        V            w(n);
+        for (ptrdiff_t i = 0; i < n; ++i) w[i] = real_t(0.75) + real_t(0.25) * pseudo_random(i, 8);
+        real_t *dw = s.put(w);
         for (const bool along : {true, false}) {
             V       x1 = p.x, g1 = p.g, gf(n, 0);
             real_t *dgf = s.put(gf);
-            s.impl.step(n, dlb, dub, alpha, along ? dd : nullptr, along ? dAd : nullptr, dx, dg, dgf, eps, out, s.work_buffer());
+            s.impl.step(n,
+                        dlb,
+                        dub,
+                        alpha,
+                        along ? dd : nullptr,
+                        along ? dAd : nullptr,
+                        dx,
+                        dg,
+                        dgf,
+                        eps,
+                        along ? dw : nullptr,
+                        out,
+                        s.work_buffer());
             V xs(n), gs(n), gfs(n);
             s.get(dx, xs);
             s.get(dg, gs);
@@ -181,7 +196,8 @@ namespace {
                 if (along) Adgf += p.Ad[i] * f;
                 gf2 += f * f;
                 gc2 += c * c;
-                gp2 += (f + c) * (f + c);
+                const real_t pi = along ? w[i] * (f + c) : f + c;
+                gp2 += pi * pi;
             }
             printf("  %s, step%s: x %.3g g %.3g gf %.3g, sums %.3g %.3g %.3g %.3g\n",
                    name,
@@ -196,7 +212,7 @@ namespace {
             SFEM_TEST_ASSERT(worst(xs, x1) < 1e-14 && worst(gs, g1) < 1e-14 && worst(gfs, gf) < 1e-14);
             SFEM_TEST_ASSERT(along ? relative(out[0], Adgf) < 1e-11 : out[0] == 0);
             SFEM_TEST_ASSERT(relative(out[1], gf2) < 1e-11 && relative(out[2], gc2) < 1e-11 && relative(out[3], gp2) < 1e-11);
-            SFEM_TEST_ASSERT(gc2 > 0 && gp2 > gf2);
+            SFEM_TEST_ASSERT(gc2 > 0 && (along || gp2 > gf2));
 
             // Back to the start for what follows.
             x = p.x;

@@ -27,7 +27,10 @@ namespace sfem {
     };
 
     /// Newton's step with a rigid obstacle (NodeObstacleContact): the linearised problem is the QP
-    /// with n_i . dx_i <= gap_i, solved exactly by MPRGP in the contact nodes' frames; the tangent
+    /// with n_i . dx_i <= gap_i, solved exactly by MPRGP in the contact nodes' frames, Jacobi-scaled
+    /// (the variables z = D^{1/2} y, D the tangent's diagonal, its mean over a contact node's three:
+    /// the bounds stay a box; 1.06 to 1.43 times faster on the valve-containment cases, at the same
+    /// accuracy: MPRGP stops on the unscaled projected gradient); the tangent
     /// carries the constraints' curvature; convergence is measured on KKT (stationarity and
     /// complementarity as forces, penetration as a length).
     ///

@@ -27,6 +27,16 @@ namespace sfem {
 #endif
             return buffer;
         }
+
+        /// A host buffer where `like` lives.
+        SharedBuffer<real_t> where(const SharedBuffer<real_t> &like, const SharedBuffer<real_t> &host) {
+#ifdef SFEM_ENABLE_CUDA
+            if (like->mem_space() == MEMORY_SPACE_DEVICE) return smesh::to_device(host);
+#else
+            (void)like;
+#endif
+            return host;
+        }
     }  // namespace
 
     class NodeObstacleStep::Impl {
@@ -42,6 +52,9 @@ namespace sfem {
         std::shared_ptr<Operator<real_t>>    tangent_op;
         std::shared_ptr<MPRGP<real_t>>       qp;
         SharedBuffer<real_t>                 k, k_ref, projected, upper_bound, qp_rhs, framed, lift, diag, trial_r;
+        // The QP's variables are y / scale, its bounds upper_bound / scale (scaled_bound), its
+        // operator scale Q^T K Q scale; qp_tmp holds the unscaled product.
+        SharedBuffer<real_t>                 scale, inverse_scale, scaled_bound, qp_tmp;
         real_t                               k_max{0};
         real_t                               tol{0};
         bool                                 first_measure{true};
@@ -51,8 +64,47 @@ namespace sfem {
             return contact->kkt_residual(r, k->data(), projected->data(), &penetration);
         }
 
+        // scale = D^{-1/2} from the tangent as it stands, D its diagonal with each contact node's
+        // three entries replaced by their mean (the trace, which the frames keep); the QP's bounds.
+        int update_scaling() {
+            if (tangent->diagonal(diag->data()) != SFEM_SUCCESS) return SFEM_FAILURE;
+            auto           d     = on_host(diag);
+            auto           u     = on_host(upper_bound);
+            real_t *const  dd    = d->data();
+            const idx_t   *nodes = contact->nodes()->data();
+            for (ptrdiff_t i = 0; i < contact->size(); ++i) {
+                const ptrdiff_t node = nodes[i];
+                const real_t    mean = (dd[node * 3] + dd[node * 3 + 1] + dd[node * 3 + 2]) / 3;
+                for (int c = 0; c < 3; ++c) dd[node * 3 + c] = mean;
+            }
+            auto   s = create_host_buffer<real_t>(ndofs), inv = create_host_buffer<real_t>(ndofs), b = create_host_buffer<real_t>(ndofs);
+            for (ptrdiff_t i = 0; i < ndofs; ++i) {
+                const real_t root = dd[i] > 0 ? std::sqrt(dd[i]) : real_t(1);
+                s->data()[i]      = 1 / root;
+                inv->data()[i]    = root;
+                b->data()[i]      = u->data()[i] * root;
+            }
+            scale         = where(upper_bound, s);
+            inverse_scale = where(upper_bound, inv);
+            scaled_bound  = where(upper_bound, b);
+            qp->set_upper_bound(scaled_bound);
+            // Converged as the unscaled QP is, on the gradient of y = S z: S^{-1} times z's.
+            qp->set_norm_weight(inverse_scale);
+            qp->set_atol(real_t(0.1) * tol);
+            return SFEM_SUCCESS;
+        }
+
+        // y <- v .* y through qp_tmp (the BLAS takes no aliased arguments).
+        void multiply(const SharedBuffer<real_t> &v, real_t *const y) {
+            blas->xypaz(ndofs, v->data(), y, 0, qp_tmp->data());
+            blas->copy(ndofs, qp_tmp->data(), y);
+        }
+
         int solve_qp(const real_t *const r) {
-            qp->set_max_eig(tangent->max_abs_row_sum());
+            if (update_scaling() != SFEM_SUCCESS) return SFEM_FAILURE;
+            // Gershgorin's bound for S K S: the scale is one per contact node, so it commutes with
+            // the node's frame, and S Q^T K Q S = Q^T (S K S) Q has the same eigenvalues.
+            qp->set_max_eig(tangent->max_abs_row_sum(scale->data()));
             blas->zaxpby(ndofs, -1, r, 0, r, qp_rhs->data());
             // The constrained rows are the identity: their right-hand side and start are the
             // increment the step arrived with.
@@ -60,7 +112,10 @@ namespace sfem {
             contact->to_frame(qp_rhs->data());
             blas->copy(ndofs, lift->data(), framed->data());
             contact->to_frame(framed->data());
+            multiply(scale, qp_rhs->data());
+            multiply(inverse_scale, framed->data());
             const int status = qp->apply(qp_rhs->data(), framed->data());
+            multiply(scale, framed->data());
             iterations += qp->iterations();
             return status;
         }
@@ -110,7 +165,7 @@ namespace sfem {
         impl.tangent                           = BSRTangent::create(f, es);
         if (!impl.tangent) return nullptr;
 
-        for (auto *buffer : {&impl.k, &impl.k_ref, &impl.projected, &impl.upper_bound, &impl.qp_rhs, &impl.framed, &impl.lift, &impl.diag, &impl.trial_r}) {
+        for (auto *buffer : {&impl.k, &impl.k_ref, &impl.projected, &impl.upper_bound, &impl.qp_rhs, &impl.framed, &impl.lift, &impl.diag, &impl.trial_r, &impl.qp_tmp}) {
             *buffer = create_buffer<real_t>(impl.ndofs, es);
         }
 
@@ -137,10 +192,14 @@ namespace sfem {
                 impl.ndofs,
                 impl.ndofs,
                 [self, framed](const real_t *const in, real_t *const out) {
-                    self->blas->copy(self->ndofs, in, framed->data());
+                    // scale Q^T K Q scale: out (zero, from MPRGP) += scale .* (Q^T K Q (scale .* in)).
+                    real_t *const tmp = self->qp_tmp->data();
+                    self->blas->xypaz(self->ndofs, self->scale->data(), in, 0, framed->data());
                     self->contact->from_frame(framed->data());
-                    self->tangent_op->apply(framed->data(), out);
-                    self->contact->to_frame(out);
+                    self->blas->zeros(self->ndofs, tmp);
+                    self->tangent_op->apply(framed->data(), tmp);
+                    self->contact->to_frame(tmp);
+                    self->blas->xypaz(self->ndofs, self->scale->data(), tmp, 1, out);
                 },
                 es);
         impl.qp             = create_mprgp<real_t>(op, es);
@@ -148,7 +207,6 @@ namespace sfem {
         impl.qp->check_each = std::numeric_limits<int>::max();
         impl.qp->set_max_it(options.qp_max_it);
         impl.qp->set_rtol(options.qp_rtol);
-        impl.qp->set_upper_bound(impl.upper_bound);
         return ret;
     }
 
@@ -212,7 +270,6 @@ namespace sfem {
                     x, r, impl.k->data(), false, 1, impl.tangent->rowptr(), impl.tangent->colidx(), impl.tangent->values());
         }
         impl.contact->upper_bound(impl.qp->infty, impl.upper_bound->data());
-        impl.qp->set_atol(real_t(0.1) * impl.tol);
         return SFEM_SUCCESS;
     }
 
