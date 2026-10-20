@@ -4,6 +4,7 @@
 #include <math.h>
 
 #include "sfem_base.hpp"
+#include "sfem_sdf_sampling.hpp"
 
 // One contact node of NodeObstacleContact, for its host loops and its device kernels
 // (cuda/sfem_NodeObstacleView_cuda.cu) alike. A node's frame q is [n, t1, t2] by rows.
@@ -89,6 +90,28 @@ SFEM_HOST_DEVICE SFEM_INLINE void node_obstacle_curvature(const real_t *const n,
     for (int c = 0; c < 9; ++c) {
         B[c] += sign * scale * mu * H[c];
     }
+}
+
+// The gap the constraints see, from the sampled one: less `shift`, plus `admitted` (the share of
+// the starting penetration still allowed). Past `cutoff`, as outside the grid, there is no
+// obstacle: the gap is unreachable and the normal zero.
+SFEM_HOST_DEVICE SFEM_INLINE void node_obstacle_offset_gap(const real_t  shift,
+                                                           const real_t  cutoff,
+                                                           const real_t  admitted,
+                                                           real_t *const gap,
+                                                           real_t *const n0,
+                                                           real_t *const n1,
+                                                           real_t *const n2) {
+    if (*gap >= SFEM_SDF_UNREACHABLE) return;
+    const real_t g = *gap - shift + admitted;
+    if (g > cutoff) {
+        *gap = SFEM_SDF_UNREACHABLE;
+        *n0  = 0;
+        *n1  = 0;
+        *n2  = 0;
+        return;
+    }
+    *gap = g;
 }
 
 // The upper triangle of a symmetric 3x3 block B, packed [xx, xy, xz, yy, yz, zz].

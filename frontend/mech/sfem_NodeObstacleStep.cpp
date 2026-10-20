@@ -38,7 +38,7 @@ namespace sfem {
         std::shared_ptr<BSRTangent>          tangent;
         std::shared_ptr<Operator<real_t>>    tangent_op;
         std::shared_ptr<MPRGP<real_t>>       qp;
-        SharedBuffer<real_t>                 k, projected, upper_bound, qp_rhs, framed, lift, diag, trial_r;
+        SharedBuffer<real_t>                 k, k_ref, projected, upper_bound, qp_rhs, framed, lift, diag, trial_r;
         real_t                               k_max{0};
         real_t                               tol{0};
         bool                                 first_measure{true};
@@ -106,8 +106,16 @@ namespace sfem {
         impl.tangent                           = BSRTangent::create(f, es);
         if (!impl.tangent) return nullptr;
 
-        for (auto *buffer : {&impl.k, &impl.projected, &impl.upper_bound, &impl.qp_rhs, &impl.framed, &impl.lift, &impl.diag, &impl.trial_r}) {
+        for (auto *buffer : {&impl.k, &impl.k_ref, &impl.projected, &impl.upper_bound, &impl.qp_rhs, &impl.framed, &impl.lift, &impl.diag, &impl.trial_r}) {
             *buffer = create_buffer<real_t>(impl.ndofs, es);
+        }
+
+        // Each dof's stiffness, what turns a reaction into a displacement: the tangent's diagonal
+        // at the reference configuration, where no element is inverted. Once: it only scales.
+        {
+            auto reference = create_buffer<real_t>(impl.ndofs, es);
+            if (impl.tangent->assemble(reference->data()) != SFEM_SUCCESS) return nullptr;
+            if (impl.tangent->diagonal(impl.k_ref->data()) != SFEM_SUCCESS) return nullptr;
         }
 
         // The step in the contact nodes' frames, Q^T K Q dx' = -Q^T R with dx'_n <= gap_i: the
@@ -137,14 +145,16 @@ namespace sfem {
 
     int NodeObstacleStep::begin_step(const StepContext &context) {
         auto &impl = *impl_;
-        if (!context.scheme) {
-            fprintf(stderr, "NodeObstacleStep: the obstacle needs inertia (a Newmark scheme)\n");
+        if (impl.newmark && !context.scheme) {
+            fprintf(stderr, "NodeObstacleStep: a Newmark step needs its scheme\n");
             return SFEM_FAILURE;
         }
 
-        // The scale of each node's equation, c0 M: what turns a reaction into a displacement.
-        impl.blas->copy(impl.ndofs, impl.newmark->mass()->data(), impl.k->data());
-        impl.blas->scal(impl.ndofs, context.scheme->weight("alpha_a"), impl.k->data());
+        // The scale of each node's equation: its stiffness, plus the inertia c0 M in a dynamic step.
+        impl.blas->copy(impl.ndofs, impl.k_ref->data(), impl.k->data());
+        if (impl.newmark) {
+            impl.blas->axpy(impl.ndofs, context.scheme->weight("alpha_a"), impl.newmark->mass()->data(), impl.k->data());
+        }
         // Read on the host: once per step.
         auto                host  = on_host(impl.k);
         const real_t *const k     = host->data();
@@ -170,7 +180,9 @@ namespace sfem {
         StepMeasure m;
         real_t      penetration = 0;
         m.value                 = impl.kkt(r, penetration);
-        m.reference             = std::max(m.value, impl.blas->norm2(impl.ndofs, r));
+        // A start inside the obstacle and otherwise at rest has no force to measure against: its
+        // penetration, as the merit counts it, is the force that removing it takes.
+        m.reference             = std::max(m.value + impl.k_max * penetration, impl.blas->norm2(impl.ndofs, r));
         m.infeasibility         = penetration;
         m.admissible            = penetration <= impl.options.gap_tol;
         if (impl.first_measure) {
@@ -186,8 +198,10 @@ namespace sfem {
         auto &impl = *impl_;
         if (impl.tangent->assemble(x) != SFEM_SUCCESS) return SFEM_FAILURE;
         impl.tangent_op = impl.tangent->op();
-        impl.contact->add_curvature(
-                x, r, impl.k->data(), false, 1, impl.tangent->rowptr(), impl.tangent->colidx(), impl.tangent->values());
+        if (impl.options.curvature) {
+            impl.contact->add_curvature(
+                    x, r, impl.k->data(), false, 1, impl.tangent->rowptr(), impl.tangent->colidx(), impl.tangent->values());
+        }
         impl.contact->upper_bound(impl.qp->infty, impl.upper_bound->data());
         impl.qp->set_atol(real_t(0.1) * impl.tol);
         return SFEM_SUCCESS;
@@ -201,13 +215,16 @@ namespace sfem {
         impl.iterations = 0;
         impl.blas->copy(impl.ndofs, dx, impl.lift->data());
 
-        int status = impl.solve_qp(r);
-        if (status != SFEM_SUCCESS) {
+        int        status = impl.solve_qp(r);
+        const bool capped = status != SFEM_SUCCESS && impl.qp->iterations() >= impl.options.qp_max_it;
+        if (status != SFEM_SUCCESS && !(capped && impl.options.qp_accept_capped)) {
             // MPRGP stops at negative curvature. Away from the solution the residual overstates the
             // reactions and the curvature term can make the tangent indefinite: solve again with
             // it capped.
-            impl.contact->add_curvature(x, r, impl.k->data(), false, -1, tangent.rowptr(), tangent.colidx(), tangent.values());
-            impl.contact->add_curvature(x, r, impl.k->data(), true, 1, tangent.rowptr(), tangent.colidx(), tangent.values());
+            if (impl.options.curvature) {
+                impl.contact->add_curvature(x, r, impl.k->data(), false, -1, tangent.rowptr(), tangent.colidx(), tangent.values());
+                impl.contact->add_curvature(x, r, impl.k->data(), true, 1, tangent.rowptr(), tangent.colidx(), tangent.values());
+            }
 
             // The material's tangent can be indefinite too (a hyperelastic block under
             // compression, on a mesh fine enough that c0 M no longer outweighs it): shift its

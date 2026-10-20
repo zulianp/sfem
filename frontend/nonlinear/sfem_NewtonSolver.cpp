@@ -17,6 +17,8 @@ namespace sfem {
                 return "converged_at_resolution";
             case NonlinearReport::MAX_IT:
                 return "max_it";
+            case NonlinearReport::ITERATIONS_DONE:
+                return "iterations_done";
             case NonlinearReport::DIVERGED:
                 return "diverged";
             case NonlinearReport::NON_FINITE:
@@ -148,7 +150,7 @@ namespace sfem {
                 if (!std::isfinite(log.measure.value)) return NonlinearReport::NON_FINITE;
                 if ((log.measure.value <= tol || solved) && log.measure.admissible) return NonlinearReport::CONVERGED;
                 if (log.measure.value > opts.divergence_factor * std::max(report.reference, tol)) return NonlinearReport::DIVERGED;
-                if (it == opts.max_it) return NonlinearReport::MAX_IT;
+                if (it == opts.max_it) return opts.fixed_iterations ? NonlinearReport::ITERATIONS_DONE : NonlinearReport::MAX_IT;
 
                 {
                     SFEM_TRACE_SCOPE("NewtonSolver::linearize");
@@ -278,7 +280,8 @@ namespace sfem {
             log.line_search.alpha  = 1;
 
             const auto status = iterate(linear && !log.linear_capped);
-            if (status == NonlinearReport::CONVERGED || status == NonlinearReport::CONVERGED_AT_RESOLUTION) {
+            if (status == NonlinearReport::CONVERGED || status == NonlinearReport::CONVERGED_AT_RESOLUTION ||
+                status == NonlinearReport::ITERATIONS_DONE) {
                 done += s;
                 if (done == 1) {
                     report.status = status;

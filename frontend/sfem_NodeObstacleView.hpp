@@ -60,6 +60,18 @@ namespace sfem {
     // v += gap n / dt where gap < 0, with the gap and normals of `c` the samples ahead.
     void node_obstacle_project_velocity(const NodeObstacleView &c, real_t *const v, const real_t dt);
 
+    // The sampled gap and normals of `size` contact nodes (in es) to what the constraints see
+    // (node_obstacle_offset_gap): gap - shift + release * p0_i (p0 may be null: zero), and past
+    // `cutoff` no obstacle.
+    void node_obstacle_offset_gap(const ExecutionSpace es,
+                                  const ptrdiff_t      size,
+                                  const real_t         shift,
+                                  const real_t         cutoff,
+                                  const real_t         release,
+                                  const real_t *const  p0,
+                                  real_t *const        gap,
+                                  real_t *const *const normals);
+
     // max(0, max_i x_i) over n values in es.
     real_t max_or_zero(const ExecutionSpace es, const ptrdiff_t n, const real_t *const x);
 

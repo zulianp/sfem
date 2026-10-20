@@ -33,6 +33,20 @@ namespace sfem {
             SFEM_NODE_LOOP(i, c.size) { ub[(ptrdiff_t)c.idx[i] * 3] = c.gap[i]; }
         }
 
+        __global__ void offset_gap_kernel(const ptrdiff_t     size,
+                                          const real_t        shift,
+                                          const real_t        cutoff,
+                                          const real_t        release,
+                                          const real_t *const p0,
+                                          real_t *const       gap,
+                                          real_t *const       n0,
+                                          real_t *const       n1,
+                                          real_t *const       n2) {
+            SFEM_NODE_LOOP(i, size) {
+                ::node_obstacle_offset_gap(shift, cutoff, p0 ? release * p0[i] : real_t(0), &gap[i], &n0[i], &n1[i], &n2[i]);
+            }
+        }
+
         __global__ void kkt_kernel(const NodeObstacleView c,
                                    const real_t *const      k,
                                    real_t *const            projected,
@@ -124,6 +138,17 @@ namespace sfem {
     void d_node_obstacle_upper_bound(const NodeObstacleView &c, const ptrdiff_t ndofs, const real_t unbounded, real_t *const ub) {
         fill_kernel<<<blocks_for(ndofs), block_size>>>(ndofs, unbounded, ub);
         upper_bound_kernel<<<blocks_for(c.size), block_size>>>(c, ub);
+        SFEM_DEBUG_SYNCHRONIZE();
+    }
+
+    void d_node_obstacle_offset_gap(const ptrdiff_t      size,
+                                    const real_t         shift,
+                                    const real_t         cutoff,
+                                    const real_t         release,
+                                    const real_t *const  p0,
+                                    real_t *const        gap,
+                                    real_t *const *const normals) {
+        offset_gap_kernel<<<blocks_for(size), block_size>>>(size, shift, cutoff, release, p0, gap, normals[0], normals[1], normals[2]);
         SFEM_DEBUG_SYNCHRONIZE();
     }
 

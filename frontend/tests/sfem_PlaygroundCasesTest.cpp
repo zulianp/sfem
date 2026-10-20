@@ -1,7 +1,9 @@
 // Small cases through the whole playground, one per regime.
 
+#include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <filesystem>
 #include <fstream>
 #include <map>
 #include <sstream>
@@ -120,6 +122,150 @@ int test_quasi_static_stretch() {
     printf("  %d nodes on the pulled face, largest deviation %g\n", on_face, (double)worst);
     SFEM_TEST_ASSERT(on_face == 16);
     SFEM_TEST_ASSERT(worst < 1e-14);
+    return SFEM_TEST_SUCCESS;
+}
+
+// mesh.blocks: of a bar split at x = 0.5 into two blocks only "near" is read and stretched. The
+// space holds only its nodes, and through packing each keeps its id in the file.
+int test_mesh_blocks() {
+    auto bar = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 6, 3, 3, 0, 0, 0, 1, 0.5, 0.5);
+    auto picked = bar->select_elements([](const geom_t x, const geom_t, const geom_t) { return x < 0.5; });
+    SFEM_TEST_ASSERT(picked.size() == 1);
+    SFEM_TEST_ASSERT(bar->split_block(picked[0].second, "near") == SFEM_SUCCESS);
+    const auto dir = (std::filesystem::temp_directory_path() /
+                      ("sfem_mesh_blocks_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count())))
+                             .string();
+    std::filesystem::create_directories(dir);
+    SFEM_TEST_ASSERT(bar->write(smesh::Path(dir) / "bar") == SFEM_SUCCESS);
+
+    std::string yaml = std::string("mesh: {path: ") + dir + R"(/bar, blocks: [near],
+  sidesets: [{name: left, plane: {axis: x, at: min}}, {name: right, plane: {axis: x, at: max}}]}
+material: {type: GeneratedNeoHookeanOgden, mu: 1, lmbda: 2}
+dirichlet_conditions:
+  - {type: sideset, format: name, name: left, component: [0, 1, 2], value: [0, 0, 0]}
+  - {type: sideset, format: name, name: right, component: 0, value: 0.1}
+regime: steady
+solver: {newton: {verbose: false}}
+)";
+    auto pg = assemble(yaml.c_str());
+    SFEM_TEST_ASSERT(pg != nullptr);
+    SFEM_TEST_ASSERT(pg->run() == SFEM_SUCCESS);
+
+    auto mesh = pg->function()->space()->mesh_ptr();
+    SFEM_TEST_EQ(mesh->n_nodes(), (ptrdiff_t)(4 * 4 * 4));
+    auto map = mesh->node_mapping();
+    SFEM_TEST_ASSERT(map != nullptr);
+    const auto u        = pg->solution()->data();
+    int        on_right = 0;
+    for (ptrdiff_t i = 0; i < mesh->n_nodes(); ++i) {
+        for (int d = 0; d < 3; ++d) {
+            SFEM_TEST_ASSERT(mesh->points()->data()[d][i] == bar->points()->data()[d][map->data()[i]]);
+        }
+        if (std::abs(mesh->points()->data()[0][i] - 0.5) < 1e-6) {
+            SFEM_TEST_ASSERT(std::abs(u[i * 3] - real_t(0.1)) < 1e-14);
+            on_right++;
+        }
+    }
+    SFEM_TEST_EQ(on_right, 16);
+
+    // Read whole, the packed mesh still maps its nodes to the file's.
+    auto whole = assemble((std::string("mesh: {path: ") + dir + "/bar}\nmaterial: {type: GeneratedNeoHookeanOgden, mu: 1, lmbda: 2}\n").c_str());
+    SFEM_TEST_ASSERT(whole != nullptr);
+    auto wm   = whole->function()->space()->mesh_ptr();
+    auto wmap = wm->node_mapping();
+    SFEM_TEST_ASSERT(wmap != nullptr);
+    SFEM_TEST_EQ(wm->n_nodes(), bar->n_nodes());
+    for (ptrdiff_t i = 0; i < wm->n_nodes(); ++i) {
+        for (int d = 0; d < 3; ++d) {
+            SFEM_TEST_ASSERT(wm->points()->data()[d][i] == bar->points()->data()[d][wmap->data()[i]]);
+        }
+    }
+
+    // Initial conditions in the file's numbering (component d of file node k is 3k + d) reach each
+    // node through node_mapping, read by blocks and read whole and packed alike.
+    for (int d = 0; d < 3; ++d) {
+        std::ofstream file(dir + "/u" + std::to_string(d) + ".float64", std::ios::binary);
+        for (ptrdiff_t k = 0; k < bar->n_nodes(); ++k) {
+            const double v = 3 * k + d;
+            file.write(reinterpret_cast<const char *>(&v), sizeof(v));
+        }
+    }
+    const std::string ic = "initial_conditions:\n  displacement: {components: [" + dir + "/u0.float64, " + dir + "/u1.float64, " + dir +
+                           "/u2.float64]}\n";
+    for (const std::string blocks : {", blocks: [near]", ""}) {
+        auto read = assemble(
+                (std::string("mesh: {path: ") + dir + "/bar" + blocks + "}\nmaterial: {type: GeneratedNeoHookeanOgden, mu: 1, lmbda: 2}\n" + ic)
+                        .c_str());
+        SFEM_TEST_ASSERT(read != nullptr);
+        auto       rm  = read->function()->space()->mesh_ptr();
+        const auto ids = rm->node_mapping()->data();
+        const auto x   = read->solution()->data();
+        for (ptrdiff_t i = 0; i < rm->n_nodes(); ++i) {
+            for (int d = 0; d < 3; ++d) SFEM_TEST_ASSERT(x[i * 3 + d] == real_t(3 * ids[i] + d));
+        }
+    }
+    std::filesystem::remove_all(dir);
+    return SFEM_TEST_SUCCESS;
+}
+
+// A TET4 mesh with a hyperelastic material: the packed layout (the default) solves the stretch as
+// the plain one does, node for node through node_mapping. TET4 has only an affine kernel, whatever
+// the operator's affine preference. Packing reorders this mesh's nodes, so packed with
+// renumber: false is refused rather than computed in the wrong numbering. Whole, and split at
+// x = 0.5 into two blocks, each packed on its own.
+int tet4_packed_matches_plain(const bool split) {
+    auto cube = sfem::Mesh::create_tet4_cube(sfem::Communicator::self(), 3, 3, 3, 0, 0, 0, 1, 1, 1);
+    if (split) {
+        auto picked = cube->select_elements([](const geom_t x, const geom_t, const geom_t) { return x < 0.5; });
+        SFEM_TEST_ASSERT(picked.size() == 1);
+        SFEM_TEST_ASSERT(cube->split_block(picked[0].second, "near") == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(cube->n_blocks() == 2);
+    }
+    const auto dir  = (std::filesystem::temp_directory_path() /
+                      ("sfem_tet4_packed_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count())))
+                             .string();
+    std::filesystem::create_directories(dir);
+    SFEM_TEST_ASSERT(cube->write(smesh::Path(dir) / "cube") == SFEM_SUCCESS);
+
+    const std::string yaml = std::string("mesh: {path: ") + dir + R"(/cube,
+  sidesets: [{name: left, plane: {axis: x, at: min}}, {name: right, plane: {axis: x, at: max}}]}
+material: {type: GeneratedNeoHookeanOgden, young_modulus: 2.4, poisson_ratio: 0.2}
+dirichlet_conditions:
+  - {type: sideset, format: name, name: left, component: [0, 1, 2], value: [0, 0, 0]}
+  - {type: sideset, format: name, name: right, component: 0, value: 0.2}
+regime: steady
+solver: {newton: {verbose: false}}
+)";
+    // Each run's displacement in the file's numbering.
+    std::vector<real_t> u[2];
+    for (const bool packed : {true, false}) {
+        auto pg = assemble(yaml.c_str(), {std::string("mesh.packed=") + (packed ? "true" : "false")});
+        SFEM_TEST_ASSERT(pg != nullptr);
+        SFEM_TEST_ASSERT(pg->run() == SFEM_SUCCESS);
+        const auto x    = pg->solution();
+        auto       mesh = pg->function()->space()->mesh_ptr();
+        auto       map  = mesh->node_mapping();
+        u[packed].assign(x->size(), 0);
+        for (ptrdiff_t i = 0; i < mesh->n_nodes(); ++i) {
+            const ptrdiff_t file = map ? map->data()[i] : i;
+            for (int d = 0; d < 3; ++d) u[packed][file * 3 + d] = x->data()[i * 3 + d];
+        }
+    }
+    SFEM_TEST_ASSERT(assemble(yaml.c_str(), {"mesh.renumber=false"}) == nullptr);
+    real_t worst = 0, scale = 0;
+    for (size_t i = 0; i < u[0].size(); ++i) {
+        worst = std::max(worst, std::abs(u[0][i] - u[1][i]));
+        scale = std::max(scale, std::abs(u[0][i]));
+    }
+    printf("  packed against plain (%s): %.3g of %.3g\n", split ? "two blocks" : "one block", (double)worst, (double)scale);
+    SFEM_TEST_ASSERT(scale > 0.1 && worst <= 1e-10 * scale);
+    std::filesystem::remove_all(dir);
+    return SFEM_TEST_SUCCESS;
+}
+
+int test_tet4_packed_matches_plain() {
+    SFEM_TEST_ASSERT(tet4_packed_matches_plain(false) == SFEM_TEST_SUCCESS);
+    SFEM_TEST_ASSERT(tet4_packed_matches_plain(true) == SFEM_TEST_SUCCESS);
     return SFEM_TEST_SUCCESS;
 }
 
@@ -393,6 +539,8 @@ int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_steady_linear_patch);
     SFEM_RUN_TEST(test_quasi_static_stretch);
+    SFEM_RUN_TEST(test_mesh_blocks);
+    SFEM_RUN_TEST(test_tet4_packed_matches_plain);
     SFEM_RUN_TEST(test_dynamic_cantilever);
     SFEM_RUN_TEST(test_rotation_constraint);
     SFEM_RUN_TEST(test_sine_rotation);

@@ -188,11 +188,17 @@ namespace sfem {
         std::shared_ptr<smesh::Grid<geom_t>>               obstacle_sdf;
         std::shared_ptr<NewmarkScheme>                     newmark;
         real_t                                             extent{0};
+        /// obstacle.release: the penetration of the start is captured once it is set.
+        bool                                               release_from_start{false};
 
         int build_mesh(const std::shared_ptr<Communicator> &comm, const ElasticityCase &config) {
             auto node = child(config.root(), "mesh");
+            const auto blocks = read_list<std::string>(node, "blocks", {});
             if (has(node, "path")) {
-                mesh = Mesh::create_from_file(comm, smesh::Path(config.resolve(read_string(node, "path", ""))));
+                mesh = Mesh::create_from_file(comm, smesh::Path(config.resolve(read_string(node, "path", ""))), blocks);
+            } else if (!blocks.empty()) {
+                fprintf(stderr, "Playground: mesh.blocks selects blocks of a mesh read from a path\n");
+                return SFEM_FAILURE;
             } else if (has(node, "box")) {
                 auto box = node["box"];
                 auto n   = read_list<ptrdiff_t>(box, "n", {1, 1, 1});
@@ -307,6 +313,19 @@ namespace sfem {
                 // Packed in the numbering on disk, for cases that bring per-node data of their own.
                 auto packed_mesh = FunctionSpace::PackedMesh::create(mesh, {}, false);
                 if (!packed_mesh) return SFEM_FAILURE;
+                // The kernels index the state by the packs' numbering, the mesh keeps its own,
+                // and nothing translates between them: that holds only where the packing keeps
+                // every node where it is.
+                const idx_t *const map = packed_mesh->node_map()->data();
+                for (ptrdiff_t i = 0; i < mesh->n_nodes(); ++i) {
+                    if (map[i] != (idx_t)i) {
+                        fprintf(stderr,
+                                "Playground: packing reorders this mesh's nodes, which mesh.renumber: false forbids; "
+                                "use mesh.renumber: true (written fields keep their file ids in node_mapping) or "
+                                "mesh.packed: false\n");
+                        return SFEM_FAILURE;
+                    }
+                }
                 fs = FunctionSpace::create(packed_mesh, mesh->spatial_dimension());
             } else {
                 fs = FunctionSpace::create(mesh, mesh->spatial_dimension());
@@ -513,33 +532,28 @@ namespace sfem {
             auto node = child(config.root(), "initial_conditions");
             if (!node.readable()) return SFEM_SUCCESS;
 
+            // The files speak the numbering on disk: the mesh's node_mapping names each node's entry
+            // there, after a block-selective read or packing's renumbering.
+            const auto         file_ids   = mesh->node_mapping();
+            const idx_t *const file_nodes = file_ids && (ptrdiff_t)file_ids->size() == mesh->n_nodes() ? file_ids->data() : nullptr;
+
             auto read_into = [&](const ryml::ConstNodeRef &entry, real_t *const out) {
                 const ptrdiff_t ndofs = fs->n_dofs();
                 auto            host  = create_host_buffer<real_t>(ndofs);
                 int             status;
                 if (has(entry, "file")) {
-                    status = read_state_field(config.resolve(read_string(entry, "file", "")), ndofs, host->data());
+                    status = read_state_field(config.resolve(read_string(entry, "file", "")), ndofs, host->data(), fs->block_size(), file_nodes);
                 } else if (has(entry, "components")) {
                     std::string paths;
                     for (const auto &p : read_list<std::string>(entry, "components", {})) {
                         paths += (paths.empty() ? "" : ",") + config.resolve(p);
                     }
-                    status = read_state_field_components(paths, mesh->n_nodes(), fs->block_size(), host->data());
+                    status = read_state_field_components(paths, mesh->n_nodes(), fs->block_size(), host->data(), file_nodes);
                 } else {
                     fprintf(stderr, "Playground: an initial condition needs a file or components\n");
                     return SFEM_FAILURE;
                 }
                 if (status != SFEM_SUCCESS) return status;
-                if (auto map = fs->packed_node_map()) {
-                    // The files speak the numbering on disk; packing renumbered the nodes.
-                    auto       renumbered = create_host_buffer<real_t>(ndofs);
-                    const int  bs         = fs->block_size();
-                    const auto to_new     = map->data();
-                    for (ptrdiff_t node = 0; node < (ptrdiff_t)map->size(); ++node) {
-                        for (int d = 0; d < bs; ++d) renumbered->data()[to_new[node] * bs + d] = host->data()[node * bs + d];
-                    }
-                    host = renumbered;
-                }
 #ifdef SFEM_ENABLE_CUDA
                 if (es == EXECUTION_SPACE_DEVICE) {
                     sfem::blas<real_t>(es)->copy(ndofs, smesh::to_device(host)->data(), out);
@@ -594,8 +608,14 @@ namespace sfem {
                 fprintf(stderr, "Playground: unknown obstacle backend \"%s\" (node_sdf, ssmgc)\n", backend.c_str());
                 return SFEM_FAILURE;
             }
-            if (regime != "dynamic" || read_string(child(config.root(), "dynamics"), "scheme", "newmark") != "newmark") {
-                fprintf(stderr, "Playground: the obstacle needs regime dynamic with the newmark scheme, which it stabilises\n");
+            // Under inertia the obstacle needs the Newmark scheme, which it stabilises; node_sdf also
+            // solves steady and quasi-static contact.
+            const bool newmark_dynamics =
+                    regime == "dynamic" && read_string(child(config.root(), "dynamics"), "scheme", "newmark") == "newmark";
+            if (regime == "dynamic" ? !newmark_dynamics : backend == "ssmgc") {
+                fprintf(stderr,
+                        "Playground: the obstacle needs regime dynamic with the newmark scheme (node_sdf also steady or "
+                        "quasi_static)\n");
                 return SFEM_FAILURE;
             }
             if (backend == "ssmgc" && !fs->micro_elements()) {
@@ -660,6 +680,10 @@ namespace sfem {
 
             // Every node of the body's surface by default: a free body can touch with any face.
             const auto which = read_string(node, "nodes", "skin");
+            if (backend == "ssmgc" && (has(node, "shift") || has(node, "cutoff") || has(node, "release"))) {
+                fprintf(stderr, "Playground: obstacle.shift, cutoff and release are node_sdf's\n");
+                return SFEM_FAILURE;
+            }
             if (backend == "ssmgc") {
                 // SSMGC restricts the contact surface level by level: it takes sidesets.
                 auto sidesets = which == "skin" ? smesh::skin_sidesets(m) : lookup.find(which);
@@ -698,6 +722,20 @@ namespace sfem {
             if (contact->size() == 0) {
                 fprintf(stderr, "Playground: the obstacle has no contact nodes\n");
                 return SFEM_FAILURE;
+            }
+            contact->set_shift(read<real_t>(node, "shift", 0));
+            contact->set_cutoff(read<real_t>(node, "cutoff", real_t(SFEM_SDF_UNREACHABLE)));
+            if (has(node, "release")) {
+                // A start inside the obstacle, let out of it as the profile goes from 0 to 1.
+                LoadProfile release;
+                if (LoadProfile::from_yaml(node["release"], release) != SFEM_SUCCESS) return SFEM_FAILURE;
+                release_from_start = true;
+                auto c             = contact;
+                c->set_release(release.value(0));
+                time_dependent.push_back([c, release](const real_t t) {
+                    c->set_release(release.value(t));
+                    return SFEM_SUCCESS;
+                });
             }
             printf("Contact: %td nodes\n", contact->size());
             return SFEM_SUCCESS;
@@ -787,6 +825,7 @@ namespace sfem {
 
             NewtonOptions newton_options;
             newton_options.max_it            = read<int>(nn, "max_it", newton_options.max_it);
+            newton_options.fixed_iterations  = read<bool>(nn, "fixed_iterations", newton_options.fixed_iterations);
             newton_options.atol              = read<real_t>(nn, "atol", newton_options.atol);
             newton_options.rtol              = read<real_t>(nn, "rtol", newton_options.rtol);
             newton_options.divergence_factor = read<real_t>(nn, "divergence_factor", newton_options.divergence_factor);
@@ -800,6 +839,18 @@ namespace sfem {
                 newton_options.line_search.steps   = read_list<real_t>(ls, "steps", newton_options.line_search.steps);
                 newton_options.line_search.c1      = read<real_t>(ls, "c1", newton_options.line_search.c1);
                 newton_options.line_search.batched = read<bool>(ls, "batched", newton_options.line_search.batched);
+                const auto rule                    = read_string(ls, "rule", "armijo");
+                if (rule != "armijo" && rule != "damped") {
+                    fprintf(stderr, "Playground: unknown solver.newton.line_search.rule \"%s\" (armijo, damped)\n", rule.c_str());
+                    return SFEM_FAILURE;
+                }
+                newton_options.line_search.rule =
+                        rule == "damped" ? LineSearchOptions::Rule::DAMPED : LineSearchOptions::Rule::ARMIJO;
+                newton_options.line_search.damping = read<real_t>(ls, "damping", newton_options.line_search.damping);
+                if (!(newton_options.line_search.damping > 0 && newton_options.line_search.damping <= 1)) {
+                    fprintf(stderr, "Playground: solver.newton.line_search.damping must be in (0, 1]\n");
+                    return SFEM_FAILURE;
+                }
             }
 
             LinearSolverOptions linear;
@@ -826,6 +877,8 @@ namespace sfem {
                 auto qp            = child(child(config.root(), "obstacle"), "qp");
                 obstacle.qp_max_it = read<int>(qp, "max_it", obstacle.qp_max_it);
                 obstacle.qp_rtol   = read<real_t>(qp, "rtol", obstacle.qp_rtol);
+                obstacle.qp_accept_capped = read<bool>(qp, "accept_capped", obstacle.qp_accept_capped);
+                obstacle.curvature = read<bool>(child(config.root(), "obstacle"), "curvature", obstacle.curvature);
                 step               = NodeObstacleStep::create(f, contact, newmark, obstacle);
             } else if (ssmgc_step) {
                 SSMGCStepOptions options;
@@ -1077,6 +1130,7 @@ namespace sfem {
 
         impl.x = create_buffer<real_t>(impl.fs->n_dofs(), impl.es);
         if (impl.initial_conditions(config) != SFEM_SUCCESS) return nullptr;
+        if (impl.release_from_start) impl.contact->capture_penetration(impl.x->data());
         // The problem size, whatever the Newton verbosity: a timing is read against it.
         printf("Playground: %s, %s, %td elements, %td dofs, %d steps of %g\n",
                regime.c_str(),

@@ -61,6 +61,26 @@ namespace sfem {
         }
     }
 
+    void node_obstacle_offset_gap(const ExecutionSpace es,
+                                  const ptrdiff_t      size,
+                                  const real_t         shift,
+                                  const real_t         cutoff,
+                                  const real_t         release,
+                                  const real_t *const  p0,
+                                  real_t *const        gap,
+                                  real_t *const *const normals) {
+#ifdef SFEM_ENABLE_CUDA
+        if (es == EXECUTION_SPACE_DEVICE) return d_node_obstacle_offset_gap(size, shift, cutoff, release, p0, gap, normals);
+#else
+        (void)es;
+#endif
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < size; ++i) {
+            ::node_obstacle_offset_gap(
+                    shift, cutoff, p0 ? release * p0[i] : real_t(0), &gap[i], &normals[0][i], &normals[1][i], &normals[2][i]);
+        }
+    }
+
     void node_obstacle_kkt(const NodeObstacleView &c,
                            const real_t *const     k,
                            real_t *const           projected,

@@ -1,6 +1,7 @@
 #ifndef SFEM_MPRGP_HPP
 #define SFEM_MPRGP_HPP
 
+#include <limits>
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
@@ -182,7 +183,8 @@ namespace sfem {
 
             this->blas->axpby(n_dofs, -alpha_feas, Ap, 1, g);
 
-            switch (expansion_type_) {
+            // A flat direction (alpha_cg infty) has no CG step past the bound to project.
+            switch (alpha_cg < infty ? expansion_type_ : EXPANSION_TYPE_ORGINAL) {
                 case EXPANSION_TYPE_PROJECTED_CG: {
                     this->blas->axpby(n_dofs, -alpha_cg, p, 1, x);
 
@@ -212,8 +214,28 @@ namespace sfem {
             }
         }
 
-        void proportioning_step(T* const p, T* const Agc, T* const g, T* const gf_or_gc,
-                                T* const x) {
+        /// Whether direction d, with dAd = d . A d, sees no curvature to rounding: on a singular or
+        /// indefinite operator (a body free to move) the energy does not rise along it, and only a
+        /// bound ends the step.
+        bool no_curvature(const T dAd, const T* const d) const {
+            const T dd = this->blas->dot(n_dofs, d, d);
+            return dd > 0 && dAd <= 64 * std::numeric_limits<T>::epsilon() * max_eig_ * dd;
+        }
+
+        /// Whether no bound stops a step of alpha_feas along d: none limits it (max_alpha's infty),
+        /// or only the bounds that stand for none (infty) do.
+        bool unbounded(const T alpha_feas, const T* const d) const {
+            return alpha_feas >= infty || alpha_feas * this->blas->norm2(n_dofs, d) >= infty / 2;
+        }
+
+        /// The step along a direction without curvature: to the first bound, but no longer than the
+        /// expansion step's alpha_bar. The energy falls along all of it; a bound far away (a free
+        /// body's rigid motion barely touching one) would otherwise send the iterate as far.
+        T flat_step(const T alpha_feas, const T alpha_bar) const { return std::min(alpha_feas, alpha_bar); }
+
+        /// False where the chopped gradient sees no curvature (no_curvature) and no bound stops it.
+        bool proportioning_step(T* const p, T* const Agc, T* const g, T* const gf_or_gc,
+                                T* const x, const T alpha_bar) {
             // Attention!
             T* gc = gf_or_gc;
             T* gf = gf_or_gc;
@@ -222,7 +244,16 @@ namespace sfem {
 
             this->blas->zeros(n_dofs, Agc);
             apply_op(gc, Agc);
-            T alpha_cg = this->blas->dot(n_dofs, g, gc) / this->blas->dot(n_dofs, gc, Agc);
+            const T dot_gcAgc = this->blas->dot(n_dofs, gc, Agc);
+            T       alpha_cg;
+            if (no_curvature(dot_gcAgc, gc)) {
+                // The energy falls along -gc until a bound stops it.
+                const T alpha_feas = this->max_alpha(x, gc);
+                if (unbounded(alpha_feas, gc)) return false;
+                alpha_cg = flat_step(alpha_feas, alpha_bar);
+            } else {
+                alpha_cg = this->blas->dot(n_dofs, g, gc) / dot_gcAgc;
+            }
 
             this->blas->axpby(n_dofs, -alpha_cg, gc, 1, x);
 
@@ -230,6 +261,7 @@ namespace sfem {
             this->free_gradient(x, g, gf);
 
             this->blas->copy(n_dofs, gf, p);
+            return true;
         }
 
         void gradient(const T* const x, const T* const b, T* const g) {
@@ -306,12 +338,16 @@ namespace sfem {
                     this->apply_op(p, Ap_or_Ag);
                     const T dot_pAp = this->blas->dot(n_dofs, p, Ap_or_Ag);
 
-                    if (dot_pAp < 0) {
-                        fprintf(stderr, "[Warning][MPRGP] Detected negative curvature\n");
-                        return SFEM_FAILURE;
+                    // Without positive curvature the energy falls along -p until a bound stops
+                    // it: the expansion step, at the bound. A free body's rigid motions are such
+                    // directions, held only by the bounds.
+                    const bool flat = no_curvature(dot_pAp, p);
+                    if (flat && unbounded(alpha_feas, p)) {
+                        fprintf(stderr, "[Warning][MPRGP] No positive curvature and no bound along the search direction (%g)\n", (double)dot_pAp);
+                        break;
                     }
 
-                    alpha_cg = this->blas->dot(n_dofs, g, p) / dot_pAp;
+                    alpha_cg = flat ? infty : this->blas->dot(n_dofs, g, p) / dot_pAp;
 
                     if (alpha_cg <= alpha_feas) {
                         this->cg_step(alpha_cg, dot_pAp, Ap_or_Ag, p, g, gf_or_gc, x);
@@ -319,7 +355,7 @@ namespace sfem {
                         count_cg_steps++;
                     } else {
                         // apply_op inside!
-                        this->expansion_step(alpha_feas,
+                        this->expansion_step(flat ? flat_step(alpha_feas, alpha_bar) : alpha_feas,
                                              alpha_bar,
                                              alpha_cg,
                                              dot_pAp,
@@ -334,7 +370,10 @@ namespace sfem {
                     }
                 } else {
                     // apply_op inside!
-                    this->proportioning_step(p, Ap_or_Ag, g, gf_or_gc, x);
+                    if (!this->proportioning_step(p, Ap_or_Ag, g, gf_or_gc, x, alpha_bar)) {
+                        fprintf(stderr, "[Warning][MPRGP] No positive curvature and no bound along the chopped gradient\n");
+                        break;
+                    }
 
                     count_proportioning_steps++;
                 }
