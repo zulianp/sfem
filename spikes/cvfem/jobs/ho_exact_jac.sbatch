@@ -17,11 +17,11 @@
 # action already rebuilds for the pressure.
 #
 # Both layouts, because the operator is the same one and a layout comparison that carried the term
-# on one side only would report the term as a layout effect. Both arms verified against a finite
-# difference of the higher-order residual first (--verify-jac-ho), so a throughput row cannot be
-# reported for an operator that does not compute what it claims.
+# on one side only would report the term as a layout effect. The packed finite-difference gate
+# runs before timing. Its failure stops the campaign and its full output is retained; passing
+# it does not establish derivative equivalence at a nonsmooth donor or limiter switch.
 
-set -uo pipefail
+set -euo pipefail
 cd "$SLURM_SUBMIT_DIR" || exit 1
 source scripts/alps_env.sh || exit 1
 
@@ -69,10 +69,13 @@ echo "### the correction is Venkatakrishnan unless the label says otherwise"
 echo
 
 echo "### verification first -- a throughput row for an unverified operator is not a result"
-for L in 0 1 2 3; do
-    srun -u --ntasks=1 --cpus-per-task=72 --uenv="$CVFEM_UENV" --view="$CVFEM_VIEW" \
-      bash -lc "cd $PWD && OMP_NUM_THREADS=72 $B --n 24 --repeat 1 --warmup 0 --layout packed --jac-action --conv-ho $L --verify-jac-ho" \
-      2>&1 | sed -n 's/^verify_jac_ho: /  /p'
+# Small perturbed state; both steps must pass the whole-vector tolerance.
+for eps in 1e-7 1e-8; do
+    for L in 0 1 2 3; do
+        srun -u --ntasks=1 --cpus-per-task=72 --uenv="$CVFEM_UENV" --view="$CVFEM_VIEW" \
+          bash -lc "cd $PWD && OMP_NUM_THREADS=72 CVFEM_FD_EPS=$eps $B --n 8 --pack-size 64 --perturb 0.017 --repeat 1 --warmup 0 --layout packed --jac-action --conv-ho $L --verify-jac-ho" \
+          2>&1 | tee "$OUT/verify_limiter_${L}_eps_${eps}.log"
+    done
 done
 echo
 
