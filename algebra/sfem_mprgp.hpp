@@ -17,6 +17,7 @@
 #include "sfem_PowerMethod.hpp"
 
 #include "sfem_openmp_blas.hpp"
+#include "sfem_mprgp_control.hpp"
 #include "sfem_openmp_mprgp_impl.hpp"
 
 namespace sfem {
@@ -123,29 +124,66 @@ namespace sfem {
         }
         T min(const T local) const { return comm_ ? -comm_->max(-local) : local; }
 
-        /// Along d, with Ad = A d.
-        struct Curvature {
-            T dAd, dd, gd, alpha_feas;
-        };
-        Curvature curvature(const T* const x, const T* const g, const T* const d, const T* const Ad, T* const work) const {
-            T out[4];
-            impl.curvature(n_dofs, lb(), ub(), x, g, d, Ad, infty, out, work);
-            // The three sums and the step bound in one message.
-            if (comm_) comm_->sum_and_min_last(out, 4, smesh::TypeToEnum<T>::value());
-            return {out[0], out[1], out[2], out[3]};
-        }
-
         /// At the iterate a step reaches: Ad.gf for the next direction, and the norms that choose
         /// the next step and test convergence.
         struct Gradients {
             T Adgf, norm_gf, norm_gc, norm_gp;
         };
-        /// x -= alpha d, g -= alpha Ad (neither without d), gf <- the free gradient.
-        Gradients step(const T alpha, const T* const d, const T* const Ad, T* const x, T* const g, T* const gf, T* const work) const {
-            T out[4];
-            impl.step(n_dofs, lb(), ub(), alpha, d, Ad, x, g, gf, eps, norm_weight_ ? norm_weight_->data() : nullptr, out, work);
-            sum(out, 4);
-            return {out[0], std::sqrt(out[1]), std::sqrt(out[2]), std::sqrt(out[3])};
+
+        // The iteration's record (MPRGPControl) in the execution space, its copy on the host, and
+        // the constants of its decisions.
+        T*              control_{nullptr};
+        MPRGPControl<T> record_{};
+        MPRGPParams<T>  params_{};
+
+        /// The curvature pass along d (Ad = A d), then the decision. On one rank both are the
+        /// pass's; across ranks its sums are completed here and the same decision taken on the host.
+        void curvature(const T* const x, const T* const g, const T* const d, const T* const Ad, const MPRGPDecision decision,
+                       T* const work) {
+            impl.curvature(n_dofs, lb(), ub(), x, g, d, Ad, infty, comm_ ? MPRGP_DECIDE_NONE : decision, params_, control_, work);
+            if (comm_) {
+                impl.read_control(control_, &record_);
+                T v[4] = {record_.dAd, record_.dd, record_.gd, record_.alpha_feas};
+                // The three sums and the step bound in one message.
+                comm_->sum_and_min_last(v, 4, smesh::TypeToEnum<T>::value());
+                record_.dAd        = v[0];
+                record_.dd         = v[1];
+                record_.gd         = v[2];
+                record_.alpha_feas = v[3];
+                mprgp_decide(record_, decision, params_);
+                impl.write_control(record_, control_);
+            }
+        }
+
+        /// x -= alpha d, g -= alpha Ad (along d only where the record's move is a step; neither
+        /// without d), gf <- the free gradient; completed across ranks like curvature(). With `cg`
+        /// the next direction's beta.
+        void step(const T* const d, const T* const Ad, T* const x, T* const g, T* const gf, const bool cg, T* const work) {
+            impl.step(n_dofs, lb(), ub(), d, Ad, x, g, gf, eps, norm_weight_ ? norm_weight_->data() : nullptr, comm_ ? false : cg,
+                      control_, work);
+            if (comm_ && (!d || record_.move == T(MPRGP_MOVE_STEP))) {
+                impl.read_control(control_, &record_);
+                T v[4] = {record_.Adgf, record_.gf2, record_.gc2, record_.gp2};
+                sum(v, 4);
+                record_.Adgf = v[0];
+                record_.gf2  = v[1];
+                record_.gc2  = v[2];
+                record_.gp2  = v[3];
+                if (cg) {
+                    mprgp_after_cg_step(record_);
+                    impl.write_control(record_, control_);
+                }
+            }
+        }
+
+        /// The record on the host; on one rank the read is the iteration's one return to it.
+        const MPRGPControl<T>& record() {
+            if (!comm_) impl.read_control(control_, &record_);
+            return record_;
+        }
+
+        static Gradients gradients(const MPRGPControl<T>& c) {
+            return {c.Adgf, std::sqrt(c.gf2), std::sqrt(c.gc2), std::sqrt(c.gp2)};
         }
 
         bool good() const {
@@ -161,9 +199,11 @@ namespace sfem {
         }
 
         /// To the bound along p, then a projected step along the free gradient there (or, projected
-        /// CG, the CG step past the bound, projected); p restarts from the free gradient.
-        Gradients expansion_step(const T alpha_feas, const T alpha_bar, const T alpha_cg, const T* const b, T* const p,
-                                 const T* const Ap, T* const g, T* const x, T* const work) {
+        /// CG, the CG step past the bound, projected); p restarts from the free gradient. The
+        /// record holds the step to the bound (alpha) and the CG step (alpha_cg).
+        Gradients expansion_step(const MPRGPControl<T>& c, const T* const b, T* const p, const T* const Ap, T* const g,
+                                 T* const x, T* const work) {
+            const T alpha_feas = c.alpha, alpha_cg = c.alpha_cg, alpha_bar = params_.alpha_bar;
             // A flat direction (alpha_cg infty) has no CG step past the bound to project.
             if (alpha_cg < infty && expansion_type_ == EXPANSION_TYPE_PROJECTED_CG) {
                 this->blas->axpby(n_dofs, -alpha_feas, p, 1, x);
@@ -173,46 +213,23 @@ namespace sfem {
                 impl.expand(n_dofs, lb(), ub(), alpha_feas, alpha_bar, p, Ap, x, g);
             }
             this->gradient(x, b, g);
-            return this->step(0, nullptr, nullptr, x, g, p, work);
+            this->step(nullptr, nullptr, x, g, p, false, work);
+            return gradients(record());
         }
-
-        /// Whether direction d, with dAd = d . A d, sees no curvature to rounding: on a singular or
-        /// indefinite operator (a body free to move) the energy does not rise along it, and only a
-        /// bound ends the step.
-        bool no_curvature(const T dAd, const T dd) const {
-            return dd > 0 && dAd <= 64 * std::numeric_limits<T>::epsilon() * max_eig_ * dd;
-        }
-
-        /// Whether no bound stops a step of alpha_feas along d (d.d = dd): none limits it
-        /// (infty), or only the bounds that stand for none (infty) do.
-        bool unbounded(const T alpha_feas, const T dd) const {
-            return alpha_feas >= infty || alpha_feas * std::sqrt(dd) >= infty / 2;
-        }
-
-        /// The step along a direction without curvature: to the first bound, but no longer than the
-        /// expansion step's alpha_bar. The energy falls along all of it; a bound far away (a free
-        /// body's rigid motion barely touching one) would otherwise send the iterate as far.
-        T flat_step(const T alpha_feas, const T alpha_bar) const { return std::min(alpha_feas, alpha_bar); }
 
         /// A step along the chopped gradient gc; p restarts from the free gradient. False where gc
-        /// sees no curvature (no_curvature) and no bound stops it.
-        bool proportioning_step(T* const p, T* const Agc, T* const g, T* const gc, T* const x, const T alpha_bar,
-                                T* const work, Gradients* const grads) {
+        /// sees no curvature (mprgp_no_curvature) and no bound stops it.
+        bool proportioning_step(T* const p, T* const Agc, T* const g, T* const gc, T* const x, T* const work,
+                                Gradients* const grads) {
             impl.chopped_gradient(n_dofs, lb(), ub(), x, g, gc, eps);
 
             this->blas->zeros(n_dofs, Agc);
             apply_op(gc, Agc);
-            const Curvature c = curvature(x, g, gc, Agc, work);
-            T               alpha_cg;
-            if (no_curvature(c.dAd, c.dd)) {
-                // The energy falls along -gc until a bound stops it.
-                if (unbounded(c.alpha_feas, c.dd)) return false;
-                alpha_cg = flat_step(c.alpha_feas, alpha_bar);
-            } else {
-                alpha_cg = c.gd / c.dAd;
-            }
-
-            *grads = this->step(alpha_cg, gc, Agc, x, g, p, work);
+            curvature(x, g, gc, Agc, MPRGP_DECIDE_PROPORTIONING, work);
+            this->step(gc, Agc, x, g, p, false, work);
+            const MPRGPControl<T>& c = record();
+            if (c.move == T(MPRGP_MOVE_UNBOUNDED)) return false;
+            *grads = gradients(c);
             return true;
         }
 
@@ -245,6 +262,7 @@ namespace sfem {
             T* Ap_or_Ag = this->blas->allocate(allocation_size());
             T* gf_or_gc = this->blas->allocate(allocation_size());  // Free Gradient or Chopped Gradient
             T* work     = impl.work_size > 0 ? this->blas->allocate(impl.work_size) : nullptr;
+            control_    = this->blas->allocate(mprgp_control_size<T>());
 
             T alpha_bar = 1;
             if (expansion_type_ == EXPANSION_TYPE_ORGINAL) {
@@ -261,6 +279,9 @@ namespace sfem {
                 printf("Skipping power method!\n");
             }
 
+            params_ = {max_eig_, alpha_bar, infty, std::numeric_limits<T>::epsilon()};
+            record_ = MPRGPControl<T>{};
+
             this->project(x);  // Make iterate feasible
             this->gradient(x, b, g);
 
@@ -271,7 +292,8 @@ namespace sfem {
             T norm_gp0 = norm_g;
 
             // The first direction: the free gradient at the feasible start.
-            Gradients grads = this->step(0, nullptr, nullptr, x, g, p, work);
+            this->step(nullptr, nullptr, x, g, p, false, work);
+            Gradients grads = gradients(record());
 
             int count_cg_steps = 0;
             int count_expansion_steps = 0;
@@ -283,42 +305,32 @@ namespace sfem {
                 if (grads.norm_gc <= this->gamma * grads.norm_gf) {
                     this->blas->zeros(n_dofs, Ap_or_Ag);
                     this->apply_op(p, Ap_or_Ag);
-                    const Curvature c = curvature(x, g, p, Ap_or_Ag, work);
+                    // The decision, the CG step and the next direction p <- gf - beta p, the last
+                    // two only where the move is a step; then the record, read once.
+                    curvature(x, g, p, Ap_or_Ag, MPRGP_DECIDE_CG, work);
+                    this->step(p, Ap_or_Ag, x, g, gf_or_gc, true, work);
+                    impl.update_direction(n_dofs, gf_or_gc, p, control_);
+                    const MPRGPControl<T>& c = record();
 
                     // Without positive curvature the energy falls along -p until a bound stops
                     // it: the expansion step, at the bound. A free body's rigid motions are such
                     // directions, held only by the bounds.
-                    const bool flat = no_curvature(c.dAd, c.dd);
-                    if (flat && unbounded(c.alpha_feas, c.dd)) {
+                    if (c.move == T(MPRGP_MOVE_UNBOUNDED)) {
                         fprintf(stderr, "[Warning][MPRGP] No positive curvature and no bound along the search direction (%g)\n", (double)c.dAd);
                         break;
                     }
 
-                    const T alpha_cg = flat ? infty : c.gd / c.dAd;
-
-                    if (alpha_cg <= c.alpha_feas) {
-                        grads        = this->step(alpha_cg, p, Ap_or_Ag, x, g, gf_or_gc, work);
-                        const T beta = grads.Adgf / c.dAd;
-                        this->blas->axpby(n_dofs, 1, gf_or_gc, -beta, p);
-
+                    if (c.move == T(MPRGP_MOVE_STEP)) {
+                        grads = gradients(c);
                         count_cg_steps++;
                     } else {
                         // apply_op inside!
-                        grads = this->expansion_step(flat ? flat_step(c.alpha_feas, alpha_bar) : c.alpha_feas,
-                                                     alpha_bar,
-                                                     alpha_cg,
-                                                     b,
-                                                     p,
-                                                     Ap_or_Ag,
-                                                     g,
-                                                     x,
-                                                     work);
-
+                        grads = this->expansion_step(c, b, p, Ap_or_Ag, g, x, work);
                         count_expansion_steps++;
                     }
                 } else {
                     // apply_op inside!
-                    if (!this->proportioning_step(p, Ap_or_Ag, g, gf_or_gc, x, alpha_bar, work, &grads)) {
+                    if (!this->proportioning_step(p, Ap_or_Ag, g, gf_or_gc, x, work, &grads)) {
                         fprintf(stderr, "[Warning][MPRGP] No positive curvature and no bound along the chopped gradient\n");
                         break;
                     }
@@ -348,6 +360,8 @@ namespace sfem {
             this->blas->destroy(Ap_or_Ag);
             this->blas->destroy(gf_or_gc);
             if (work) this->blas->destroy(work);
+            this->blas->destroy(control_);
+            control_ = nullptr;
             return converged ? SFEM_SUCCESS : SFEM_FAILURE;
         }
     };

@@ -3,6 +3,7 @@
 
 #include "sfem_cuda_base.hpp"
 #include "sfem_mprgp_bounds.hpp"
+#include "sfem_mprgp_control.hpp"
 
 #include <algorithm>
 #include <type_traits>
@@ -14,8 +15,8 @@ namespace sfem {
         constexpr int MAX_BLOCKS = 1024;  // the loops stride over dofs past the grid
         constexpr int N_VALUES   = 4;     // reductions of one pass
 
-        // Per-block partials, value-major (k * MAX_BLOCKS + block), then the N_VALUES results.
-        constexpr ptrdiff_t WORK_SIZE = N_VALUES * MAX_BLOCKS + N_VALUES;
+        // Per-block partials, value-major (k * MAX_BLOCKS + block).
+        constexpr ptrdiff_t WORK_SIZE = N_VALUES * MAX_BLOCKS;
 
         int n_blocks(const ptrdiff_t n) {
             return int(std::min<ptrdiff_t>(MAX_BLOCKS, std::max<ptrdiff_t>(1, (n + N_THREADS - 1) / N_THREADS)));
@@ -65,9 +66,47 @@ namespace sfem {
             }
         }
 
-        // One block: the partials of n_blocks blocks into the results at work + N_VALUES * MAX_BLOCKS.
-        template <typename T, int N_SUM>
-        __global__ void finish_kernel(const int n_blocks, const T infty, T* const SFEM_RESTRICT work) {
+        template <typename T>
+        __device__ MPRGPControl<T>& record(T* const control) {
+            return *reinterpret_cast<MPRGPControl<T>*>(control);
+        }
+
+        // The curvature pass's results into the record, then the decision.
+        template <typename T>
+        struct CurvatureResult {
+            T* control;
+            MPRGPDecision decision;
+            MPRGPParams<T> params;
+            __device__ void operator()(const T (&v)[N_VALUES]) const {
+                MPRGPControl<T>& c = record(control);
+                c.dAd              = v[0];
+                c.dd               = v[1];
+                c.gd               = v[2];
+                c.alpha_feas       = v[3];
+                mprgp_decide(c, decision, params);
+            }
+        };
+
+        // The step pass's results into the record, none where the step along d did not run; with
+        // `cg` the next direction's beta.
+        template <typename T>
+        struct StepResult {
+            T*   control;
+            bool along, cg;
+            __device__ void operator()(const T (&v)[N_VALUES]) const {
+                MPRGPControl<T>& c = record(control);
+                if (along && c.move != T(MPRGP_MOVE_STEP)) return;
+                c.Adgf = v[0];
+                c.gf2  = v[1];
+                c.gc2  = v[2];
+                c.gp2  = v[3];
+                if (cg) mprgp_after_cg_step(c);
+            }
+        };
+
+        // One block: the partials of n_blocks blocks, their results to `result` on thread 0.
+        template <typename T, int N_SUM, class Result>
+        __global__ void finish_kernel(const int n_blocks, const T infty, const T* const SFEM_RESTRICT work, const Result result) {
             T v[N_VALUES];
             for (int k = 0; k < N_VALUES; ++k) {
                 v[k] = identity<T, N_SUM>(k, infty);
@@ -76,17 +115,21 @@ namespace sfem {
                 }
             }
             block_reduce<T, N_SUM>(v, infty);
-            if (!threadIdx.x) {
-                for (int k = 0; k < N_VALUES; ++k) work[N_VALUES * MAX_BLOCKS + k] = v[k];
-            }
+            if (!threadIdx.x) result(v);
         }
 
-        template <typename T, int N_SUM>
-        void finish(const int n_blocks, const T infty, T* const work, T* const out) {
-            finish_kernel<T, N_SUM><<<1, N_THREADS>>>(n_blocks, infty, work);
+        template <typename T, int N_SUM, class Result>
+        void finish(const int n_blocks, const T infty, const T* const work, const Result& result) {
+            finish_kernel<T, N_SUM, Result><<<1, N_THREADS>>>(n_blocks, infty, work, result);
             SFEM_DEBUG_SYNCHRONIZE();
-            SFEM_CUDA_CHECK(cudaMemcpy(out, work + N_VALUES * MAX_BLOCKS, N_VALUES * sizeof(T), cudaMemcpyDeviceToHost));
         }
+
+        // Rounded as written, never contracted: the direction update matches the BLAS's scal and
+        // axpy, which round the product and the sum one at a time.
+        __device__ inline double mul_rn(const double a, const double b) { return __dmul_rn(a, b); }
+        __device__ inline float  mul_rn(const float a, const float b) { return __fmul_rn(a, b); }
+        __device__ inline double add_rn(const double a, const double b) { return __dadd_rn(a, b); }
+        __device__ inline float  add_rn(const float a, const float b) { return __fadd_rn(a, b); }
 
         template <typename T, class B>
         __global__ void project_kernel(const ptrdiff_t n, const B b, T* const SFEM_RESTRICT x) {
@@ -130,7 +173,7 @@ namespace sfem {
         template <typename T, class B, bool ALONG>
         __global__ void step_kernel(const ptrdiff_t              n,
                                     const B                      b,
-                                    const T                      alpha,
+                                    const T* const SFEM_RESTRICT control,
                                     const T* const SFEM_RESTRICT d,
                                     const T* const SFEM_RESTRICT Ad,
                                     T* const SFEM_RESTRICT       x,
@@ -139,7 +182,11 @@ namespace sfem {
                                     const T                      eps,
                                     const T* const SFEM_RESTRICT w,
                                     T* const SFEM_RESTRICT       work) {
-            T v[N_VALUES] = {0, 0, 0, 0};
+            const MPRGPControl<T>& c = *reinterpret_cast<const MPRGPControl<T>*>(control);
+            // The same for every thread: the step along d is the record's, or none.
+            if (ALONG && c.move != T(MPRGP_MOVE_STEP)) return;
+            const T alpha = ALONG ? c.alpha : T(0);
+            T       v[N_VALUES] = {0, 0, 0, 0};
             for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
                 T xi = x[i], gi = g[i];
                 if constexpr (ALONG) {
@@ -158,6 +205,19 @@ namespace sfem {
                 v[3] += p * p;
             }
             write_partials<T, N_VALUES>(v, T(0), work);
+        }
+
+        template <typename T>
+        __global__ void update_direction_kernel(const ptrdiff_t              n,
+                                                const T* const SFEM_RESTRICT gf,
+                                                T* const SFEM_RESTRICT       p,
+                                                const T* const SFEM_RESTRICT control) {
+            const MPRGPControl<T>& c = *reinterpret_cast<const MPRGPControl<T>*>(control);
+            if (c.move != T(MPRGP_MOVE_STEP)) return;
+            const T beta = -c.beta;
+            for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
+                p[i] = add_rn(gf[i], mul_rn(beta, p[i]));
+            }
         }
 
         template <typename T, class B>
@@ -199,29 +259,30 @@ namespace sfem {
         }
 
         template <typename T>
-        void curvature(const ptrdiff_t n,
-                       const T* const  lb,
-                       const T* const  ub,
-                       const T* const  x,
-                       const T* const  g,
-                       const T* const  d,
-                       const T* const  Ad,
-                       const T         infty,
-                       T* const        out,
-                       T* const        work) {
+        void curvature(const ptrdiff_t       n,
+                       const T* const        lb,
+                       const T* const        ub,
+                       const T* const        x,
+                       const T* const        g,
+                       const T* const        d,
+                       const T* const        Ad,
+                       const T               infty,
+                       const MPRGPDecision   decision,
+                       const MPRGPParams<T>& params,
+                       T* const              control,
+                       T* const              work) {
             const int nb = n_blocks(n);
             with_mprgp_bounds(lb, ub, [&](const auto b) {
                 curvature_kernel<T, Bounds<decltype(b)>><<<nb, N_THREADS>>>(n, b, x, g, d, Ad, infty, work);
                 SFEM_DEBUG_SYNCHRONIZE();
             });
-            finish<T, 3>(nb, infty, work, out);
+            finish<T, 3>(nb, infty, work, CurvatureResult<T>{control, decision, params});
         }
 
         template <typename T>
         void step(const ptrdiff_t n,
                   const T* const  lb,
                   const T* const  ub,
-                  const T         alpha,
                   const T* const  d,
                   const T* const  Ad,
                   T* const        x,
@@ -229,18 +290,52 @@ namespace sfem {
                   T* const        gf,
                   const T         eps,
                   const T* const  w,
-                  T* const        out,
+                  const bool      cg,
+                  T* const        control,
                   T* const        work) {
             const int nb = n_blocks(n);
             with_mprgp_bounds(lb, ub, [&](const auto b) {
                 if (d) {
-                    step_kernel<T, Bounds<decltype(b)>, true><<<nb, N_THREADS>>>(n, b, alpha, d, Ad, x, g, gf, eps, w, work);
+                    step_kernel<T, Bounds<decltype(b)>, true><<<nb, N_THREADS>>>(n, b, control, d, Ad, x, g, gf, eps, w, work);
                 } else {
-                    step_kernel<T, Bounds<decltype(b)>, false><<<nb, N_THREADS>>>(n, b, alpha, d, Ad, x, g, gf, eps, w, work);
+                    step_kernel<T, Bounds<decltype(b)>, false><<<nb, N_THREADS>>>(n, b, control, d, Ad, x, g, gf, eps, w, work);
                 }
                 SFEM_DEBUG_SYNCHRONIZE();
             });
-            finish<T, N_VALUES>(nb, T(0), work, out);
+            finish<T, N_VALUES>(nb, T(0), work, StepResult<T>{control, d != nullptr, cg});
+        }
+
+        template <typename T>
+        void update_direction(const ptrdiff_t n, const T* const gf, T* const p, const T* const control) {
+            update_direction_kernel<T><<<n_blocks(n), N_THREADS>>>(n, gf, p, control);
+            SFEM_DEBUG_SYNCHRONIZE();
+        }
+
+        // The record's pinned copy on the host, one per thread: a write to the device is then
+        // asynchronous, ordered before the passes that read it. The next write follows a read,
+        // which waits for the previous one.
+        template <typename T>
+        MPRGPControl<T>* staging() {
+            static thread_local MPRGPControl<T>* pinned = [] {
+                MPRGPControl<T>* p = nullptr;
+                SFEM_CUDA_CHECK(cudaMallocHost(&p, sizeof(MPRGPControl<T>)));
+                return p;
+            }();
+            return pinned;
+        }
+
+        template <typename T>
+        void read_control(const T* const control, MPRGPControl<T>* const host) {
+            MPRGPControl<T>* const s = staging<T>();
+            SFEM_CUDA_CHECK(cudaMemcpy(s, control, sizeof(MPRGPControl<T>), cudaMemcpyDeviceToHost));
+            *host = *s;
+        }
+
+        template <typename T>
+        void write_control(const MPRGPControl<T>& host, T* const control) {
+            MPRGPControl<T>* const s = staging<T>();
+            *s                       = host;
+            SFEM_CUDA_CHECK(cudaMemcpyAsync(control, s, sizeof(MPRGPControl<T>), cudaMemcpyHostToDevice, 0));
         }
 
         template <typename T>
@@ -267,6 +362,9 @@ namespace sfem {
         tpl.curvature        = curvature<T>;
         tpl.step             = step<T>;
         tpl.expand           = expand<T>;
+        tpl.update_direction = update_direction<T>;
+        tpl.read_control     = read_control<T>;
+        tpl.write_control    = write_control<T>;
         tpl.work_size        = WORK_SIZE;
     }
 
