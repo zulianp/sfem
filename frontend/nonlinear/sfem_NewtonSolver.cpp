@@ -6,6 +6,7 @@
 
 #include "sfem_API.hpp"
 #include "sfem_Function.hpp"
+#include "sfem_OwnedReductions.hpp"
 
 namespace sfem {
 
@@ -38,6 +39,7 @@ namespace sfem {
         NewtonOptions                                             options;
         std::shared_ptr<BLAS<real_t>>                             blas;
         ptrdiff_t                                                 ndofs{0};
+        std::unique_ptr<OwnedReductions>                          reductions;
         SharedBuffer<real_t>                                      r;
         SharedBuffer<real_t>                                      dx;
         SharedBuffer<real_t>                                      moved;
@@ -81,6 +83,7 @@ namespace sfem {
         const ExecutionSpace es = f->execution_space();
         impl.blas               = blas<real_t>(es);
         impl.ndofs              = f->space()->n_dofs();
+        impl.reductions         = std::make_unique<OwnedReductions>(f->space(), es);
         impl.r                  = create_buffer<real_t>(impl.ndofs, es);
         impl.dx                 = create_buffer<real_t>(impl.ndofs, es);
     }
@@ -108,6 +111,12 @@ namespace sfem {
 
         NonlinearReport report;
         if (impl.step->begin_step(context) != SFEM_SUCCESS) {
+            report.status = NonlinearReport::STEP_FAILED;
+            return report;
+        }
+        // Every evaluation reads x over all local elements: its ghost and aura copies from their
+        // owners, once; the steps then keep them.
+        if (impl.f->space()->synchronize(x) != SFEM_SUCCESS) {
             report.status = NonlinearReport::STEP_FAILED;
             return report;
         }
@@ -162,12 +171,14 @@ namespace sfem {
                     impl.blas->zeros(ndofs, dx);
                     log.linear_capped = impl.step->solve(x, r, dx) != SFEM_SUCCESS;
                 }
+                // The solve sets the owned rows; x + s dx keeps every copy consistent from here.
+                if (impl.f->space()->synchronize(dx) != SFEM_SUCCESS) return NonlinearReport::STEP_FAILED;
                 log.linear_iterations = impl.step->iterations();
                 report.linear_iterations += log.linear_iterations;
                 report.capped_linear_solves += log.linear_capped;
                 report.iterations = ++count;
 
-                if (!std::isfinite(impl.blas->norm2(ndofs, dx))) return NonlinearReport::STEP_FAILED;
+                if (!std::isfinite(impl.reductions->norm2(dx))) return NonlinearReport::STEP_FAILED;
 
                 if (merit) {
                     const real_t m0    = merit->at(x, r);
@@ -210,7 +221,7 @@ namespace sfem {
         impl.blas->copy(ndofs, x, increment);
         impl.f->apply_constraints(increment);
         impl.blas->axpy(ndofs, -1, x, increment);
-        if (!(impl.blas->norm2(ndofs, increment) > 0)) {
+        if (!(impl.reductions->norm2(increment) > 0)) {
             report.status = iterate(false);
             return report;
         }
@@ -264,11 +275,15 @@ namespace sfem {
                 impl.blas->zaxpby(ndofs, s, increment, 0, increment, dx);
                 log.linear_capped = impl.step->solve(x, r, dx) != SFEM_SUCCESS;
             }
+            if (impl.f->space()->synchronize(dx) != SFEM_SUCCESS) {
+                report.status = NonlinearReport::STEP_FAILED;
+                return report;
+            }
             log.linear_iterations = impl.step->iterations();
             report.linear_iterations += log.linear_iterations;
             report.capped_linear_solves += log.linear_capped;
             report.iterations = count;
-            if (!std::isfinite(impl.blas->norm2(ndofs, dx))) {
+            if (!std::isfinite(impl.reductions->norm2(dx))) {
                 report.status = NonlinearReport::STEP_FAILED;
                 return report;
             }

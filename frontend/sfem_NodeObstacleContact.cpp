@@ -29,9 +29,10 @@ namespace sfem {
                                              const SharedBuffer<idx_t>                  &nodes,
                                              const SharedBuffer<geom_t *>               &points,
                                              const ptrdiff_t                             ndofs,
+                                             const ptrdiff_t                             owned_dofs,
                                              const int                                   dir,
                                              const ExecutionSpace                        es)
-        : nodes_(nodes), idx_(nodes), points_(points), es_(es), ndofs_(ndofs), dir_(dir) {
+        : nodes_(nodes), idx_(nodes), points_(points), es_(es), comm_(comm), ndofs_(ndofs), owned_dofs_(owned_dofs), dir_(dir) {
         obstacle_ = SDFObstacle::create(sdf, comm, points->extent(1), points->data()[2], es);
 
         for (int d = 0; d < 3; ++d) xyz_[d] = points->data()[d];
@@ -113,9 +114,17 @@ namespace sfem {
         auto blas = sfem::blas<real_t>(es_);
         blas->copy(ndofs_, r, projected);
         node_obstacle_kkt(view(normals_, gap_), k, projected, complementarity_->data(), penetration_->data());
-        *penetration   = max_or_zero(es_, size(), penetration_->data());
-        const real_t c = blas->dot(size(), complementarity_->data(), complementarity_->data());
-        return std::sqrt(blas->dot(ndofs_, projected, projected) + c);
+        // Summed over the ranks in one reduction, the penetration with them: a non-finite one on any
+        // rank reaches every rank through the sum.
+        real_t local[2] = {blas->dot(owned_dofs_, projected, projected) +
+                                   blas->dot(size(), complementarity_->data(), complementarity_->data()),
+                           max_or_zero(es_, size(), penetration_->data())};
+        if (comm_->size() > 1) {
+            comm_->sum(&local[0], 1, smesh::TypeToEnum<real_t>::value());
+            local[1] = comm_->max(local[1]);
+        }
+        *penetration = local[1];
+        return std::sqrt(local[0]);
     }
 
     void NodeObstacleContact::add_curvature(const real_t *const  x,
@@ -159,7 +168,7 @@ namespace sfem {
         real_t              low = std::numeric_limits<real_t>::max();
 #pragma omp parallel for reduction(min : low)
         for (ptrdiff_t i = 0; i < size(); ++i) low = std::min(low, gap[i]);
-        return low;
+        return comm_->size() > 1 ? -comm_->max(-low) : low;
     }
 
     void NodeObstacleContact::gap_field(real_t *const out) const {

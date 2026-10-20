@@ -540,6 +540,16 @@ if(SFEM_ENABLE_TESTING)
             COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 4 $<TARGET_FILE:sfem_ParallelSSGMGTest>)
         set_tests_properties(sfem_ParallelSSGMGTest PROPERTIES ENVIRONMENT "OMP_NUM_THREADS=1")
         list(APPEND SFEM_TARGETS sfem_ParallelSSGMGTest)
+
+        if(SFEM_ENABLE_RYAML)
+            add_executable(sfem_ParallelObstacleTest frontend/tests/mpi/sfem_ParallelObstacleTest.cpp)
+            target_link_libraries(sfem_ParallelObstacleTest PRIVATE sfem)
+            add_test(
+                NAME sfem_ParallelObstacleTest
+                COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 4 $<TARGET_FILE:sfem_ParallelObstacleTest>)
+            set_tests_properties(sfem_ParallelObstacleTest PROPERTIES ENVIRONMENT "OMP_NUM_THREADS=1" TIMEOUT 300)
+            list(APPEND SFEM_TARGETS sfem_ParallelObstacleTest)
+        endif()
     endif()
 endif()
 

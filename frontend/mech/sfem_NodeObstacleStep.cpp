@@ -13,6 +13,8 @@
 #include "sfem_Merit.hpp"
 #include "sfem_NewmarkScheme.hpp"
 #include "sfem_NodeObstacleContact.hpp"
+#include "sfem_OwnedReductions.hpp"
+#include "sfem_ParallelOperator.hpp"
 #include "sfem_mprgp.hpp"
 
 namespace sfem {
@@ -35,6 +37,7 @@ namespace sfem {
         NodeObstacleStepOptions              options;
         std::shared_ptr<BLAS<real_t>>        blas;
         ptrdiff_t                            ndofs{0};
+        std::unique_ptr<OwnedReductions>     reductions;
         std::shared_ptr<BSRTangent>          tangent;
         std::shared_ptr<Operator<real_t>>    tangent_op;
         std::shared_ptr<MPRGP<real_t>>       qp;
@@ -103,6 +106,7 @@ namespace sfem {
         impl.options                           = options;
         impl.blas                              = blas<real_t>(es);
         impl.ndofs                             = f->space()->n_dofs();
+        impl.reductions                        = std::make_unique<OwnedReductions>(f->space(), es);
         impl.tangent                           = BSRTangent::create(f, es);
         if (!impl.tangent) return nullptr;
 
@@ -124,7 +128,12 @@ namespace sfem {
         // output before every product, which the frames then turn whole: out = Q^T K Q in.
         Impl *const self   = &impl;
         auto        framed = create_buffer<real_t>(impl.ndofs, es);
-        auto        op     = make_op<real_t>(
+        // Under MPI the owned rows, as the tangent's product computes them.
+        const ptrdiff_t owned = f->space()->n_owned_dofs();
+        auto            op    = make_parallel_op<real_t>(
+                f->space()->mesh_ptr()->comm(),
+                owned,
+                owned,
                 impl.ndofs,
                 impl.ndofs,
                 [self, framed](const real_t *const in, real_t *const out) {
@@ -134,7 +143,7 @@ namespace sfem {
                     self->contact->to_frame(out);
                 },
                 es);
-        impl.qp             = create_mprgp(op, es);
+        impl.qp             = create_mprgp<real_t>(op, es);
         impl.qp->verbose    = false;
         impl.qp->check_each = std::numeric_limits<int>::max();
         impl.qp->set_max_it(options.qp_max_it);
@@ -164,7 +173,7 @@ namespace sfem {
         for (ptrdiff_t i = 0; i < impl.contact->size(); ++i) {
             k_max = std::max(k_max, k[(ptrdiff_t)nodes[i] * 3]);
         }
-        impl.k_max         = k_max;
+        impl.k_max         = impl.reductions->max(k_max);
         impl.first_measure = true;
         return SFEM_SUCCESS;
     }
@@ -182,7 +191,7 @@ namespace sfem {
         m.value                 = impl.kkt(r, penetration);
         // A start inside the obstacle and otherwise at rest has no force to measure against: its
         // penetration, as the merit counts it, is the force that removing it takes.
-        m.reference             = std::max(m.value + impl.k_max * penetration, impl.blas->norm2(impl.ndofs, r));
+        m.reference             = std::max(m.value + impl.k_max * penetration, impl.reductions->norm2(r));
         m.infeasibility         = penetration;
         m.admissible            = penetration <= impl.options.gap_tol;
         if (impl.first_measure) {

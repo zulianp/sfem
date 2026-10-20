@@ -80,7 +80,8 @@ namespace sfem {
                                                 const std::function<real_t()>             &min_gap,
                                                 const ptrdiff_t                           ndofs,
                                                 const ExecutionSpace                      es,
-                                                const real_t                              touch_gap);
+                                                const real_t                              touch_gap,
+                                                const std::shared_ptr<Communicator>      &comm);
 
 }  // namespace sfem
 

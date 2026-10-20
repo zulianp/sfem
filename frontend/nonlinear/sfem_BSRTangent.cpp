@@ -3,6 +3,7 @@
 #include "sfem_API.hpp"
 #include "sfem_BSR.hpp"
 #include "sfem_Function.hpp"
+#include "sfem_ParallelOperator.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_cuda_BSR.hpp"
@@ -17,6 +18,10 @@ namespace sfem {
         std::shared_ptr<CRSGraph> graph;  // in `es`
         int                       block_size{0};
         SharedBuffer<real_t>      values;
+        // Rows of the nodes this rank owns, a prefix of the graph's: under MPI the only complete
+        // ones (the assembly runs over the aura) and the only ones the product computes.
+        ptrdiff_t                 owned_rows{0};
+        bool                      distributed{false};
     };
 
     BSRTangent::BSRTangent() : impl_(std::make_unique<Impl>()) {}
@@ -37,6 +42,12 @@ namespace sfem {
         }
 #endif
         impl.values = create_buffer<real_t>(impl.graph->nnz() * impl.block_size * impl.block_size, es);
+        impl.owned_rows  = f->space()->n_owned_dofs() / impl.block_size;
+        impl.distributed = f->space()->mesh_ptr()->comm()->size() > 1;
+        if (impl.distributed && es != EXECUTION_SPACE_HOST) {
+            SFEM_ERROR("BSRTangent: a distributed tangent is host only\n");
+            return nullptr;
+        }
         return ret;
     }
 
@@ -63,6 +74,30 @@ namespace sfem {
                     d_bsr_spmv(nrows, nrows, impl.block_size, impl.graph->rowptr(), impl.graph->colidx(), impl.values, (real_t)1));
         }
 #endif
+
+        if (impl.distributed) {
+            // The owned rows against every local column: x's ghost and aura entries first taken
+            // from their owners. x and y are space-sized; the owned prefix of y is the result.
+            if (storage_bytes != (int)sizeof(real_t)) {
+                SFEM_ERROR("BSRTangent::op: a distributed tangent stores full precision\n");
+                return nullptr;
+            }
+            auto            space = impl.f->space();
+            const ptrdiff_t owned = impl.owned_rows * impl.block_size;
+            auto            spmv  = h_bsr_spmv<count_t, idx_t, real_t>(
+                    impl.owned_rows, nrows, impl.block_size, impl.graph->rowptr(), impl.graph->colidx(), impl.values, (real_t)1);
+            return make_parallel_op<real_t>(
+                    space->mesh_ptr()->comm(),
+                    owned,
+                    owned,
+                    space->n_dofs(),
+                    space->n_dofs(),
+                    [space, spmv](const real_t *const x, real_t *const y) {
+                        space->synchronize(const_cast<real_t *>(x));
+                        spmv->apply(x, y);
+                    },
+                    impl.es);
+        }
 
         // On the host the constraints write identity rows into the assembled values
         // (Function::hessian_bsr), so the product is the constrained operator as it stands:
@@ -105,6 +140,10 @@ namespace sfem {
             return d_bsr_max_abs_row_sum<count_t, idx_t, real_t, real_t>(block_rows(), impl.block_size, rowptr(), colidx(), impl.values->data());
         }
 #endif
+        if (impl.distributed) {
+            return impl.f->space()->mesh_ptr()->comm()->max(
+                    bsr_max_abs_row_sum<count_t, idx_t, real_t, real_t>(impl.owned_rows, impl.block_size, rowptr(), colidx(), impl.values->data()));
+        }
         return bsr_max_abs_row_sum<count_t, idx_t, real_t, real_t>(block_rows(), impl.block_size, rowptr(), colidx(), impl.values->data());
     }
 

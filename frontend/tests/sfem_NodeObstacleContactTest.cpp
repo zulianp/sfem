@@ -35,7 +35,7 @@ namespace {
 
         auto nodes = sfem::create_host_buffer<idx_t>(f.nnodes);
         for (ptrdiff_t i = 0; i < f.nnodes; ++i) nodes->data()[i] = (idx_t)i;
-        f.contact = std::make_shared<sfem::NodeObstacleContact>(sdf, comm, nodes, f.mesh->points(), f.ndofs, 2);
+        f.contact = std::make_shared<sfem::NodeObstacleContact>(sdf, comm, nodes, f.mesh->points(), f.ndofs, f.ndofs, 2);
         return f;
     }
 
@@ -208,8 +208,8 @@ int test_device_matches_host() {
     });
     auto nodes = sfem::create_host_buffer<idx_t>(nnodes);
     for (ptrdiff_t i = 0; i < nnodes; ++i) nodes->data()[i] = (idx_t)i;
-    sfem::NodeObstacleContact host(sdf, comm, nodes, mesh->points(), ndofs, 2);
-    sfem::NodeObstacleContact device(sdf, comm, nodes, mesh->points(), ndofs, 2, sfem::EXECUTION_SPACE_DEVICE);
+    sfem::NodeObstacleContact host(sdf, comm, nodes, mesh->points(), ndofs, ndofs, 2);
+    sfem::NodeObstacleContact device(sdf, comm, nodes, mesh->points(), ndofs, ndofs, 2, sfem::EXECUTION_SPACE_DEVICE);
 
     auto to_device = [](const std::vector<real_t> &h) {
         return smesh::to_device(sfem::Buffer<real_t>::wrap(h.size(), const_cast<real_t *>(h.data())));

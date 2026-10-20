@@ -142,8 +142,9 @@ namespace sfem {
                     lo = std::min(lo, (real_t)points[d][i]);
                     hi = std::max(hi, (real_t)points[d][i]);
                 }
-                box.lo[d] = lo;
-                box.hi[d] = hi;
+                // Over the ranks: every rank's box is the same, the mesh's.
+                box.lo[d] = mesh->comm()->size() > 1 ? -mesh->comm()->max(-lo) : lo;
+                box.hi[d] = mesh->comm()->size() > 1 ? mesh->comm()->max(hi) : hi;
             }
             return box;
         }
@@ -223,6 +224,10 @@ namespace sfem {
                 if (sfc.reorder(*mesh) != SFEM_SUCCESS) return SFEM_FAILURE;
             }
             const int refine = read<int>(node, "refine", 0);
+            if (comm->size() > 1 && (refine > 0 || read<bool>(node, "promote_to_p2", false))) {
+                fprintf(stderr, "Playground: mesh.refine and mesh.promote_to_p2 run on one rank\n");
+                return SFEM_FAILURE;
+            }
             if (read<bool>(node, "promote_to_p2", false)) {
                 if (refine > 0) {
                     fprintf(stderr, "Playground: mesh.promote_to_p2 and mesh.refine exclude each other\n");
@@ -531,6 +536,10 @@ namespace sfem {
         int initial_conditions(const ElasticityCase &config) {
             auto node = child(config.root(), "initial_conditions");
             if (!node.readable()) return SFEM_SUCCESS;
+            if (mesh->comm()->size() > 1) {
+                fprintf(stderr, "Playground: initial_conditions are read on one rank\n");
+                return SFEM_FAILURE;
+            }
 
             // The files speak the numbering on disk: the mesh's node_mapping names each node's entry
             // there, after a block-selective read or packing's renumbering.
@@ -616,6 +625,10 @@ namespace sfem {
                 fprintf(stderr,
                         "Playground: the obstacle needs regime dynamic with the newmark scheme (node_sdf also steady or "
                         "quasi_static)\n");
+                return SFEM_FAILURE;
+            }
+            if (backend == "ssmgc" && fs->mesh_ptr()->comm()->size() > 1) {
+                fprintf(stderr, "Playground: the ssmgc obstacle runs on one rank\n");
                 return SFEM_FAILURE;
             }
             if (backend == "ssmgc" && !fs->micro_elements()) {
@@ -717,7 +730,18 @@ namespace sfem {
                 }
                 nodes = smesh::create_nodeset_from_sidesets(m, sidesets);
             }
-            contact  = std::make_shared<NodeObstacleContact>(obstacle_sdf, m->comm(), nodes, m->points(), fs->n_dofs(), dir, es);
+            if (m->comm()->size() > 1) {
+                // Each node by the rank that owns it: the others' copies are not constrained twice.
+                const ptrdiff_t owned_nodes = fs->n_owned_dofs() / fs->block_size();
+                std::vector<idx_t> owned;
+                for (ptrdiff_t i = 0; i < (ptrdiff_t)nodes->size(); ++i) {
+                    if (nodes->data()[i] < owned_nodes) owned.push_back(nodes->data()[i]);
+                }
+                nodes = create_host_buffer<idx_t>(owned.size());
+                std::copy(owned.begin(), owned.end(), nodes->data());
+            }
+            contact  = std::make_shared<NodeObstacleContact>(
+                    obstacle_sdf, m->comm(), nodes, m->points(), fs->n_dofs(), fs->n_owned_dofs(), dir, es);
             obstacle = contact;
             if (contact->size() == 0) {
                 fprintf(stderr, "Playground: the obstacle has no contact nodes\n");
@@ -737,7 +761,8 @@ namespace sfem {
                     return SFEM_SUCCESS;
                 });
             }
-            printf("Contact: %td nodes\n", contact->size());
+            const ptrdiff_t n_contact = m->comm()->size() > 1 ? m->comm()->sum(contact->size()) : contact->size();
+            if (m->comm()->rank() == 0) printf("Contact: %td nodes\n", n_contact);
             return SFEM_SUCCESS;
         }
 
@@ -934,7 +959,7 @@ namespace sfem {
             if (torque_controlled) {
                 nonlinear = std::make_shared<TorqueControl>(f, newton, torque_controlled, material, torque_control);
             }
-            if (verbose) {
+            if (verbose && mesh->comm()->rank() == 0) {
                 newton->add_monitor([](const NewtonIteration &it) {
                     if (it.iteration == 0) {
                         printf("  Newton %2d: |r| = %.6e (tol %.3e)\n", it.iteration, (double)it.measure.value, (double)it.tolerance);
@@ -994,6 +1019,23 @@ namespace sfem {
             if (has(output, "path")) {
                 const smesh::Path path(config.resolve(read_string(output, "path", "")));
                 auto              fields = std::make_shared<FieldExport>(f, path, read<int>(output, "export_freq", 1));
+                if (mesh->comm()->size() > 1) {
+                    // Written by rank 0 in the numbering of the mesh read there alone, as a serial run
+                    // writes it.
+                    auto node = child(config.root(), "mesh");
+                    if (!has(node, "path")) {
+                        fprintf(stderr, "Playground: a distributed run writes output for a mesh read from a path\n");
+                        return SFEM_FAILURE;
+                    }
+                    std::shared_ptr<Mesh> serial;
+                    if (mesh->comm()->rank() == 0) {
+                        serial = Mesh::create_from_file(Communicator::self(),
+                                                        smesh::Path(config.resolve(read_string(node, "path", ""))),
+                                                        read_list<std::string>(node, "blocks", {}));
+                        if (!serial) return SFEM_FAILURE;
+                    }
+                    if (fields->gather_to(serial) != SFEM_SUCCESS) return SFEM_FAILURE;
+                }
                 for (const auto &name : read_list<std::string>(output, "fields", {})) {
                     if (name == "material_reaction") {
                         auto op   = material;
@@ -1036,9 +1078,13 @@ namespace sfem {
                     }
                 }
                 stepper->add_observer(fields);
-                // The obstacle's grid: contour sdf/sdf.xdmf at 0.
-                if (obstacle_sdf) obstacle_sdf->to_file(path / "sdf");
+                // The obstacle's grid: contour sdf/sdf.xdmf at 0. Every rank holds it whole.
+                if (obstacle_sdf && mesh->comm()->rank() == 0) obstacle_sdf->to_file(path / "sdf");
 
+                if (read<bool>(output, "quantities", false) && mesh->comm()->size() > 1) {
+                    fprintf(stderr, "Playground: output.quantities is written on one rank\n");
+                    return SFEM_FAILURE;
+                }
                 if (read<bool>(output, "quantities", false)) {
                     stepper->add_observer(std::make_shared<Quantities>(f, material, host_dirichlet, path));
                 }
@@ -1049,7 +1095,9 @@ namespace sfem {
 
             const std::string csv = has(output, "history_csv") ? config.resolve(read_string(output, "history_csv", "")) : "";
             // One line per step whatever the Newton verbosity, which is about its iterations.
-            auto history = std::make_shared<StepHistory>(csv, true);
+            // Written and printed by rank 0; every rank samples the probes, which reduce over them.
+            const bool root    = mesh->comm()->rank() == 0;
+            auto       history = std::make_shared<StepHistory>(root ? csv : "", root);
             if (has(output, "probes")) {
                 for (auto p : output["probes"].children()) {
                     const auto type = read_string(p, "type", "");
@@ -1069,7 +1117,8 @@ namespace sfem {
                                                                 min_gap,
                                                                 fs->n_dofs(),
                                                                 es,
-                                                                real_t(1e-6) * extent));
+                                                                real_t(1e-6) * extent,
+                                                                mesh->comm()));
                     } else {
                         fprintf(stderr, "Playground: unknown probe \"%s\" (control_point, torque; contact with an obstacle)\n", type.c_str());
                         return SFEM_FAILURE;
@@ -1089,11 +1138,6 @@ namespace sfem {
     std::unique_ptr<Playground> Playground::create(const std::shared_ptr<Communicator> &comm, const ElasticityCase &config) {
         SFEM_TRACE_SCOPE("Playground::create");
 
-        if (comm->size() > 1) {
-            fprintf(stderr, "Playground: runs on one rank\n");
-            return nullptr;
-        }
-
         std::unique_ptr<Playground> ret(new Playground());
         auto                       &impl = *ret->impl_;
         auto                        root = config.root();
@@ -1110,6 +1154,11 @@ namespace sfem {
 #endif
         } else {
             fprintf(stderr, "Playground: unknown execution_space \"%s\" (host, device)\n", es.c_str());
+            return nullptr;
+        }
+
+        if (comm->size() > 1 && impl.es != EXECUTION_SPACE_HOST) {
+            fprintf(stderr, "Playground: a distributed run is on the host\n");
             return nullptr;
         }
 
@@ -1131,14 +1180,23 @@ namespace sfem {
         impl.x = create_buffer<real_t>(impl.fs->n_dofs(), impl.es);
         if (impl.initial_conditions(config) != SFEM_SUCCESS) return nullptr;
         if (impl.release_from_start) impl.contact->capture_penetration(impl.x->data());
-        // The problem size, whatever the Newton verbosity: a timing is read against it.
-        printf("Playground: %s, %s, %td elements, %td dofs, %d steps of %g\n",
-               regime.c_str(),
-               impl.material->name(),
-               impl.mesh->n_elements(),
-               impl.fs->n_dofs(),
-               impl.stepper->options().steps,
-               (double)impl.stepper->options().dt);
+        // The problem size, whatever the Newton verbosity: a timing is read against it. Over the
+        // ranks, the owned elements and dofs.
+        ptrdiff_t n_elements = impl.mesh->n_elements(), n_dofs = impl.fs->n_dofs();
+        if (comm->size() > 1) {
+            n_elements = comm->sum(impl.mesh->distributed()->n_elements_owned());
+            n_dofs     = comm->sum(impl.fs->n_owned_dofs());
+        }
+        if (comm->rank() == 0) {
+            printf("Playground: %s, %s, %td elements, %td dofs, %d steps of %g%s\n",
+                   regime.c_str(),
+                   impl.material->name(),
+                   n_elements,
+                   n_dofs,
+                   impl.stepper->options().steps,
+                   (double)impl.stepper->options().dt,
+                   comm->size() > 1 ? (", " + std::to_string(comm->size()) + " ranks").c_str() : "");
+        }
         return ret;
     }
 
