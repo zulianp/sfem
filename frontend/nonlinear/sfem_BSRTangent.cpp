@@ -234,7 +234,7 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    real_t BSRTangent::max_abs_row_sum() const {
+    real_t BSRTangent::max_abs_row_sum(const real_t *const scale) const {
         SFEM_TRACE_SCOPE("BSRTangent::max_abs_row_sum");
 
         auto &impl = *impl_;
@@ -243,11 +243,11 @@ namespace sfem {
         real_t          local;
 #ifdef SFEM_ENABLE_CUDA
         if (impl.es == EXECUTION_SPACE_DEVICE) {
-            local = d_bsr_max_abs_row_sum<count_t, idx_t, real_t, real_t>(rows, impl.block_size, rowptr(), colidx(), impl.values->data());
+            local = d_bsr_max_abs_row_sum<count_t, idx_t, real_t, real_t>(rows, impl.block_size, rowptr(), colidx(), impl.values->data(), scale);
         } else
 #endif
         {
-            local = bsr_max_abs_row_sum<count_t, idx_t, real_t, real_t>(rows, impl.block_size, rowptr(), colidx(), impl.values->data());
+            local = bsr_max_abs_row_sum<count_t, idx_t, real_t, real_t>(rows, impl.block_size, rowptr(), colidx(), impl.values->data(), scale);
         }
         return impl.distributed ? impl.f->space()->mesh_ptr()->comm()->max(local) : local;
     }

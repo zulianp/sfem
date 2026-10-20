@@ -36,7 +36,9 @@ namespace sfem {
         int diagonal(real_t *const out) const;
 
         /// max_i sum_j |K_ij|, a bound on the largest eigenvalue.
-        real_t max_abs_row_sum() const;
+        /// Gershgorin's bound on the largest eigenvalue, of S A S with `scale` (in the tangent's
+        /// execution space).
+        real_t max_abs_row_sum(const real_t *scale = nullptr) const;
 
         /// K_dd += factor * |reference_d| on the diagonal.
         int shift_diagonal(const real_t factor, const real_t *const reference);

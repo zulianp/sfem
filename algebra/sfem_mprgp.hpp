@@ -45,6 +45,10 @@ namespace sfem {
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
         SharedBuffer<T> upper_bound_;
         SharedBuffer<T> lower_bound_;
+        // Convergence on the projected gradient weighted entry by entry, |w g_P| (and rtol relative
+        // to |w g_0|): with variables z = S^{-1} y, w = S^{-1} measures the gradient in y. The
+        // steps are the iteration's own; only the test changes. Null: unweighted.
+        SharedBuffer<T> norm_weight_;
 
         std::function<void(const T* const, T* const)> apply_op;
 
@@ -92,6 +96,7 @@ namespace sfem {
 
         void set_upper_bound(const SharedBuffer<T>& ub) { upper_bound_ = ub; }
         void set_lower_bound(const SharedBuffer<T>& lb) { lower_bound_ = lb; }
+        void set_norm_weight(const SharedBuffer<T>& w) { norm_weight_ = w; }
 
         void ensure_power_method() {
             if (!power_method) {
@@ -137,7 +142,7 @@ namespace sfem {
         /// x -= alpha d, g -= alpha Ad (neither without d), gf <- the free gradient.
         Gradients step(const T alpha, const T* const d, const T* const Ad, T* const x, T* const g, T* const gf, T* const work) const {
             T out[4];
-            impl.step(n_dofs, lb(), ub(), alpha, d, Ad, x, g, gf, eps, out, work);
+            impl.step(n_dofs, lb(), ub(), alpha, d, Ad, x, g, gf, eps, norm_weight_ ? norm_weight_->data() : nullptr, out, work);
             sum(out, 4);
             return {out[0], std::sqrt(out[1]), std::sqrt(out[2]), std::sqrt(out[3])};
         }
@@ -258,7 +263,9 @@ namespace sfem {
             this->project(x);  // Make iterate feasible
             this->gradient(x, b, g);
 
-            T norm_g = norm2(g);
+            // |w g| (Ap_or_Ag, zero from the allocation, as scratch).
+            if (norm_weight_) this->blas->xypaz(n_dofs, norm_weight_->data(), g, 0, Ap_or_Ag);
+            T norm_g = norm2(norm_weight_ ? Ap_or_Ag : g);
             this->monitor(0, norm_g, 1);
             T norm_gp0 = norm_g;
 

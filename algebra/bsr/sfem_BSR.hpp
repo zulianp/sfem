@@ -323,14 +323,15 @@ namespace sfem {
     }
 
     /// The largest absolute scalar row sum, max_i sum_j |a_ij|: a bound on the largest
-    /// eigenvalue in modulus (Gershgorin).
+    /// eigenvalue in modulus (Gershgorin). With `scale`, of S A S, S = diag(scale): max_i
+    /// sum_j |scale_i a_ij scale_j|.
     template <typename R, typename C, typename TStorage, typename T>
     T bsr_max_abs_row_sum(const ptrdiff_t                     block_rows,
                           const int                           block_size,
                           const R* const SFEM_RESTRICT        rowptr,
                           const C* const SFEM_RESTRICT        colidx,
-                          const TStorage* const SFEM_RESTRICT values) {
-        SFEM_UNUSED(colidx);
+                          const TStorage* const SFEM_RESTRICT values,
+                          const T* const SFEM_RESTRICT        scale = nullptr) {
         const int bs2   = block_size * block_size;
         T         bound = 0;
 #pragma omp parallel for reduction(max : bound)
@@ -339,10 +340,11 @@ namespace sfem {
                 T row_sum = 0;
                 for (R k = rowptr[row]; k < rowptr[row + 1]; ++k) {
                     for (int c = 0; c < block_size; ++c) {
-                        row_sum += std::abs((T)values[(ptrdiff_t)k * bs2 + r * block_size + c]);
+                        const T a = std::abs((T)values[(ptrdiff_t)k * bs2 + r * block_size + c]);
+                        row_sum += scale ? a * scale[(ptrdiff_t)colidx[k] * block_size + c] : a;
                     }
                 }
-                bound = std::max(bound, row_sum);
+                bound = std::max(bound, scale ? row_sum * scale[row * block_size + r] : row_sum);
             }
         }
         return bound;

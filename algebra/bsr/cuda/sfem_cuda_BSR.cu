@@ -37,6 +37,7 @@ namespace sfem {
                                                const R* const SFEM_RESTRICT        rowptr,
                                                const C* const SFEM_RESTRICT        colidx,
                                                const TStorage* const SFEM_RESTRICT values,
+                                               const T* const SFEM_RESTRICT        scale,
                                                T* const SFEM_RESTRICT              out) {
             const ptrdiff_t rows = block_rows * block_size;
             for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < rows; i += blockDim.x * gridDim.x) {
@@ -45,9 +46,12 @@ namespace sfem {
                 T               sum = 0;
                 for (R k = rowptr[row]; k < rowptr[row + 1]; ++k) {
                     const TStorage* const B = &values[(ptrdiff_t)k * block_size * block_size];
-                    for (int c = 0; c < block_size; ++c) sum += fabs((T)B[r * block_size + c]);
+                    for (int c = 0; c < block_size; ++c) {
+                        const T a = fabs((T)B[r * block_size + c]);
+                        sum += scale ? a * scale[(ptrdiff_t)colidx[k] * block_size + c] : a;
+                    }
                 }
-                out[i] = sum;
+                out[i] = scale ? sum * scale[i] : sum;
             }
         }
 
@@ -185,14 +189,15 @@ namespace sfem {
                             const int                           block_size,
                             const R* const SFEM_RESTRICT        rowptr,
                             const C* const SFEM_RESTRICT        colidx,
-                            const TStorage* const SFEM_RESTRICT values) {
+                            const TStorage* const SFEM_RESTRICT values,
+                            const T* const SFEM_RESTRICT        scale) {
         const ptrdiff_t rows = block_rows * block_size;
         if (rows <= 0) return T(0);
         T *sums = nullptr;
         SFEM_CUDA_CHECK(cudaMalloc(&sums, rows * sizeof(T)));
         const int       kernel_block_size = 128;
         const ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (rows + kernel_block_size - 1) / kernel_block_size);
-        bsr_abs_row_sum_kernel<R, C, TStorage, T><<<n_blocks, kernel_block_size, 0>>>(block_rows, block_size, rowptr, colidx, values, sums);
+        bsr_abs_row_sum_kernel<R, C, TStorage, T><<<n_blocks, kernel_block_size, 0>>>(block_rows, block_size, rowptr, colidx, values, scale, sums);
         const T ret = d_max(rows, sums, T(0));
         SFEM_CUDA_CHECK(cudaFree(sums));
         return ret;
@@ -217,6 +222,7 @@ namespace sfem {
                                                                           const int,
                                                                           const count_t* const SFEM_RESTRICT,
                                                                           const idx_t* const SFEM_RESTRICT,
+                                                                          const real_t* const SFEM_RESTRICT,
                                                                           const real_t* const SFEM_RESTRICT);
     template int d_bsr_shift_diagonal<count_t, idx_t, real_t>(const ptrdiff_t,
                                                               const int,

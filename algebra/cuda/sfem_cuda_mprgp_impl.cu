@@ -137,6 +137,7 @@ namespace sfem {
                                     T* const SFEM_RESTRICT       g,
                                     T* const SFEM_RESTRICT       gf,
                                     const T                      eps,
+                                    const T* const SFEM_RESTRICT w,
                                     T* const SFEM_RESTRICT       work) {
             T v[N_VALUES] = {0, 0, 0, 0};
             for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
@@ -153,7 +154,8 @@ namespace sfem {
                 if constexpr (ALONG) v[0] += Ad[i] * f;
                 v[1] += f * f;
                 v[2] += c * c;
-                v[3] += (f + c) * (f + c);
+                const T p = w ? w[i] * (f + c) : f + c;
+                v[3] += p * p;
             }
             write_partials<T, N_VALUES>(v, T(0), work);
         }
@@ -226,14 +228,15 @@ namespace sfem {
                   T* const        g,
                   T* const        gf,
                   const T         eps,
+                  const T* const  w,
                   T* const        out,
                   T* const        work) {
             const int nb = n_blocks(n);
             with_mprgp_bounds(lb, ub, [&](const auto b) {
                 if (d) {
-                    step_kernel<T, Bounds<decltype(b)>, true><<<nb, N_THREADS>>>(n, b, alpha, d, Ad, x, g, gf, eps, work);
+                    step_kernel<T, Bounds<decltype(b)>, true><<<nb, N_THREADS>>>(n, b, alpha, d, Ad, x, g, gf, eps, w, work);
                 } else {
-                    step_kernel<T, Bounds<decltype(b)>, false><<<nb, N_THREADS>>>(n, b, alpha, d, Ad, x, g, gf, eps, work);
+                    step_kernel<T, Bounds<decltype(b)>, false><<<nb, N_THREADS>>>(n, b, alpha, d, Ad, x, g, gf, eps, w, work);
                 }
                 SFEM_DEBUG_SYNCHRONIZE();
             });

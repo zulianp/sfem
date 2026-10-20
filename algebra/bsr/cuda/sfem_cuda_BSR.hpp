@@ -61,13 +61,15 @@ namespace sfem {
                           T* const SFEM_RESTRICT              y,
                           void* const                         stream = nullptr);
 
-    /// Device version of `bsr_max_abs_row_sum`: max over the scalar rows of sum_j |A_ij|.
+    /// Device version of `bsr_max_abs_row_sum`: max over the scalar rows of sum_j |A_ij|, of
+    /// S A S with `scale` (on the device).
     template <typename R, typename C, typename TStorage, typename T>
     T d_bsr_max_abs_row_sum(const ptrdiff_t                     block_rows,
                             const int                           block_size,
                             const R* const SFEM_RESTRICT        rowptr,
                             const C* const SFEM_RESTRICT        colidx,
-                            const TStorage* const SFEM_RESTRICT values);
+                            const TStorage* const SFEM_RESTRICT values,
+                            const T* const SFEM_RESTRICT        scale = nullptr);
 
     /// Device version of `bsr_shift_diagonal`: A_dd += factor |reference_d|.
     template <typename R, typename C, typename T>

@@ -42,7 +42,8 @@ namespace sfem {
                 curvature;
 
         /// x -= alpha d and g -= alpha Ad (neither when d is null), then gf <- the free gradient at
-        /// (x, g); out = {Ad.gf (0 without d), |gf|^2, |gc|^2, |gf + gc|^2}, gc the chopped gradient.
+        /// (x, g); out = {Ad.gf (0 without d), |gf|^2, |gc|^2, |w (gf + gc)|^2}, gc the chopped
+        /// gradient, w the entrywise weight (1 where null).
         std::function<void(const ptrdiff_t n,
                            const T* const  lb,
                            const T* const  ub,
@@ -53,6 +54,7 @@ namespace sfem {
                            T* const        g,
                            T* const        gf,
                            const T         eps,
+                           const T* const  w,
                            T* const        out,
                            T* const        work)>
                 step;
@@ -146,6 +148,7 @@ namespace sfem {
                          T* const        g,
                          T* const        gf,
                          const T         eps,
+                         const T* const  w,
                          T* const        out,
                          T* const) {
             with_mprgp_bounds(lb, ub, [&](const auto b) {
@@ -157,23 +160,25 @@ namespace sfem {
                         const T gi = g[i] - alpha * Ad[i];
                         const T f  = b.free(i, xi, gi);
                         const T c  = b.chopped(i, xi, gi, eps);
+                        const T p  = w ? w[i] * (f + c) : f + c;
                         x[i]       = xi;
                         g[i]       = gi;
                         gf[i]      = f;
                         Adgf += Ad[i] * f;
                         gf2 += f * f;
                         gc2 += c * c;
-                        gp2 += (f + c) * (f + c);
+                        gp2 += p * p;
                     }
                 } else {
 #pragma omp parallel for reduction(+ : gf2, gc2, gp2)
                     for (ptrdiff_t i = 0; i < n; i++) {
                         const T f = b.free(i, x[i], g[i]);
                         const T c = b.chopped(i, x[i], g[i], eps);
+                        const T p = w ? w[i] * (f + c) : f + c;
                         gf[i]     = f;
                         gf2 += f * f;
                         gc2 += c * c;
-                        gp2 += (f + c) * (f + c);
+                        gp2 += p * p;
                     }
                 }
                 out[0] = Adgf;
