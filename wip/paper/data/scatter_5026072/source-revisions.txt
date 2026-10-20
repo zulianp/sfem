@@ -1,0 +1,11 @@
+sfem base: 7797b6d17e6858cf92870efabc4705f7af89e3ec (local changes in reviewed-changes.patch)
+smesh: 3b473c6769d359106159dba26a746e117ccee120 (clean committed source)
+mpi-sort: f76f088c451b13fe0fa2dc95667883a51ea2d929
+matrix.io: 69c8cfc4a5312cbb3fc6ec30dc4cce68d6cdc734
+rapidyaml: 25348f828c1eb63242ff805aaadc896ddb0592ff
+The cache, limiter and coupled-derivative verification scripts/headers are included as complete files.
+Update 2026-10-10: whole-vector derivative gate and fail-closed timing job; numerical kernels unchanged.
+Update 2026-10-10: full pressure/velocity FD gate with RC on and omitted-sensitivity controls.
+No Mac binaries, dependency portability patch, Git credentials or private geometry are included.
+Update 2026-10-11: validated residual accumulation probe and paired timing script; normal residual arithmetic unchanged.
+Local sfem commits: 1b46a53, b3cc0ed, eacafe6; uncommitted scatter changes are in the patch and complete new files.

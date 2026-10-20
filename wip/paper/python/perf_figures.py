@@ -1625,10 +1625,8 @@ def table_convho(rows):
                 "ho_darwish_moukalled"):
         if not by["f64"].get(arm):
             continue
-        # Two ratios, because the element-coloured layout is the more informative baseline: it
-        # removes the atomics without the packed format's staging, so packed-over-coloured is
-        # what the format is worth beyond the scatter strategy, and packed-over-atomic is the
-        # headline both together are worth.
+        # Report both implementation comparisons; colouring changes traversal and barriers
+        # as well as accumulation, so neither ratio isolates atomic-update cost.
         cell = {}
         for pr in precs:
             d = by[pr].get(arm)
@@ -1742,9 +1740,7 @@ def fig_scheme_bars(rows, spmv=None, ylabel="MDOF/s"):
         r"                fill=none, inner sep=1pt, column sep=6pt},",
         r"  tick label style={font=\scriptsize}, label style={font=\scriptsize},",
         r"  ymajorgrids, major grid style={black!12}]",
-        # packed | coloured | atomic, left to right within each group: the two that avoid
-        # atomics stand together, so the step from coloured to atomic is the scatter strategy
-        # and the step from packed to coloured is the format.
+        # Keep the two implementations without atomics adjacent for comparison.
     ] + bars
       + _convho_spmv_lines(spmv, short[order[0]]) + [
         r"\end{axis}",
@@ -1821,9 +1817,7 @@ def macros_convho(rows):
             out.append(r"\newcommand{\ho%sAtomic}{%.0f}" % (tag, at))
         if pk and at:
             out.append(r"\newcommand{\ho%sLayoutRatio}{%.2f}" % (tag, pk / at))
-        # The COLOURING's own margin over the standard sweep, which is the scatter strategy with
-        # the format held out of it. The paper reads this against the ratio above: the two answer
-        # different halves of what the packed layout is worth.
+        # Compare the complete coloured and atomic sweeps, including traversal differences.
         ec = d.get("ecolor")
         if ec:
             out.append(r"\newcommand{\ho%sColoured}{%.0f}" % (tag, ec))
@@ -1946,11 +1940,7 @@ def macros_kmix(mix):
         put("kmixStallPct" + tag, 100.0 * m["STALL_BACKEND"] / m["cycles"], "%.0f")
         put("kmixStallMemPct" + tag,
             100.0 * m["STALL_BACKEND_MEM"] / m["STALL_BACKEND"], "%.0f")
-        put("kmixScatterPct" + tag,
-            abs(100.0 * (m["mdof_kernel_only"] / m["mdof"] - 1.0)), "%.1f")
-    # The reading the higher-order arm was measured for: the throughput ratio between the layouts
-    # and the retirement-rate ratio, on each arm. If retirement is what separates the layouts then
-    # the two must move together as the scheme adds arithmetic, and only a second arm can say so.
+    # Compare throughput and retirement ratios without attributing a cause.
     for sfx, tag in (("", "Fo"), ("_ho", "Ho")):
         if "packed" + sfx not in mix:
             continue
@@ -2026,20 +2016,6 @@ def table_kmix(mix):
     out.append(row(r"\quad of which waiting on memory",
                    lambda c: 100.0 * mix[c]["STALL_BACKEND_MEM"] / mix[c]["STALL_BACKEND"],
                    "%.0f"))
-    out.append(r"\midrule")
-    # The staging is gather, scatter, ghost reduction and zeroing. Dropping it with --kernel-only
-    # says how much of the sweep is the element kernel, which is what the roofline's y-axis counts.
-    # What this row actually measures, which is NOT what it used to claim. --kernel-only has the
-    # element kernel write to a dense stack buffer and skip the SCATTER; it does not remove the
-    # gather or the staging. So the ratio is the scatter's share of the sweep, not the element
-    # kernel's, and the label said the latter. It is also small enough to sit at the resolution
-    # limit of two separate runs -- the standard layout measured 0.5% FASTER with the scatter than
-    # without, which printed as "101%" of the sweep and is simply noise. Reported as a signed
-    # delta with one decimal so that a value inside the noise reads as inside the noise.
-    out.append(row(r"scatter removed, \% rate change" if wide
-                   else r"scatter, change in sweep rate when removed",
-                   lambda c: 100.0 * (mix[c]["mdof_kernel_only"] / mix[c]["mdof"] - 1.0),
-                   "%+.1f"))
     out += [r"\bottomrule", r"\end{tabular}"]
     return "\n".join(out) + "\n"
 
@@ -2565,6 +2541,12 @@ def build(out_dir, tab_dir):
                              # from the unrounded intensities here.
                              + _rl_spmv_factor(pts))
                 written += ["figures/roofline.tex", "figures/roofline_macros.tex"]
+    # Keep the accumulation study separate from the historical instruction counters.
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("scatter_figures", os.path.join(HERE, "scatter_figures.py"))
+    scatter = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(scatter)
+    written.extend(scatter.build(DATA, out_dir, tab_dir))
     return written
 
 
@@ -2786,6 +2768,25 @@ def selftest():
         p32 = parse_f32(fp)
         check(p32 == {("res_rc", "packed"): (110.0, 190.0)},
               "the f32 job's n=128 best columns are read, other sizes are not", repr(p32))
+
+        mix = {layout: dict(instructions=200, cycles=100, STALL_BACKEND=50,
+                            STALL_BACKEND_MEM=10, INST_SPEC=200, ASE_SPEC=40,
+                            VFP_SPEC=20, LD_SPEC=30, ST_SPEC=10, DP_SPEC=80, mdof=100)
+               for layout in ("packed", "atomic", "packed_ho", "atomic_ho")}
+        km_table, km_macros = table_kmix(mix), macros_kmix(mix)
+        check("instructions per cycle" in km_table and "scatter" not in km_table
+              and "kmixIpcPacked" in km_macros and "kmixScatter" not in km_macros,
+              "instruction mix needs no unsupported scatter measurement")
+        for values in mix.values():
+            values["mdof_kernel_only"] = float("nan")
+        check(table_kmix(mix) == km_table and macros_kmix(mix) == km_macros,
+              "historical kernel-only rows cannot change the generated table or macros")
+
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("scatter_figures", os.path.join(HERE, "scatter_figures.py"))
+        scatter = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(scatter)
+        check(scatter.selftest(), "scatter arithmetic and invalid-data rejection")
 
         # Missing data must be absent, not fabricated.
         with tempfile.TemporaryDirectory() as td2:

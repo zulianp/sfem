@@ -147,7 +147,7 @@ static void build_pack_local_crs(PackedData               &p,
 // grad_t is the STORAGE type of the nodal gradient fields the correction reads -- scalar_t, or
 // float under the mixed-precision option (SFEM_GRAD_PRECISION / --grad-precision). The sweeps
 // convert at the gather and compute in scalar_t throughout.
-template <typename grad_t>
+template <bool ScatterProbe = false, typename grad_t>
 static SFEM_NOINLINE void apply_residual_packed_defcor(MeshData       &d,
                                                        PackedData     &p,
                                                        const scalar_t  rho,
@@ -164,8 +164,12 @@ static SFEM_NOINLINE void apply_residual_packed_defcor(MeshData       &d,
     const int                     with_rc = !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0);
 
 #pragma omp parallel
-    apply_residual_packed_defcor_range(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
+    apply_residual_packed_defcor_range<ScatterProbe>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
             d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, ugrad, limiter, venkat_c, rx, ry, rz, rc, scratch_n, with_rc);
+
+    if constexpr (ScatterProbe) {
+        if (!g_scatter_accumulate) return;
+    }
 
     scalar_t *const fields[CVFEM_HEX8_N_FIELDS] = {d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data()};
 #pragma omp parallel for schedule(static)
@@ -187,6 +191,7 @@ static SFEM_NOINLINE void apply_residual_packed_defcor(MeshData       &d,
 // provides such enums) and it can be overriden at runtime." The two sweeps are separate
 // functions in packed/affine/ and packed/isoparametric/, and this is the only place that
 // chooses between them -- nothing below here tests the geometry.
+template <bool ScatterProbe = false>
 static SFEM_NOINLINE void apply_residual_packed(MeshData        &d,
                                                 PackedData      &p,
                                                 const scalar_t   rho,
@@ -218,8 +223,12 @@ static SFEM_NOINLINE void apply_residual_packed(MeshData        &d,
                 d.nelements, d.p.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, rx, ry, rz, rc, scratch_n);
     } else {
 #pragma omp parallel
-        apply_residual_packed_affine_range(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
+        apply_residual_packed_affine_range<ScatterProbe>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
                 d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, rx, ry, rz, rc, scratch_n, with_rc);
+    }
+
+    if constexpr (ScatterProbe) {
+        if (!g_scatter_accumulate) return;
     }
 
     scalar_t *const fields[CVFEM_HEX8_N_FIELDS] = {d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data()};

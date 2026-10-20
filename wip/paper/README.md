@@ -97,6 +97,7 @@ tree carrying it, and the generator picks the newest file per prefix, so these a
 | f32 against f64, every layout (ladder f32 group) | 5006525 | `data/f32_5006525.out` |
 | exact higher-order Jacobian breakdown | 5005769 | `data/hoexact_5005769.out` |
 | instruction mix | 5003851 | `data/kmix_5003851.out` |
+| residual accumulation diagnostic | 5026072 (nid006544) | `data/scatter_5026072/` |
 | higher-order size sweep | 5005800 | `data/hosize_5005800.out` |
 
 The rows naming jobs 5005763-5005800 were measured again after the limiter derivatives' rounding
@@ -119,10 +120,11 @@ Three things the rerun turned up that are not about the kernels:
 - `jobs/camp_full.sbatch` failed in its first seconds on a tree made with `git archive`, because
   `scripts/layout_campaign.sh` is tracked without its executable bit. Restoring the bit and
   resubmitting (5003779) is what produced the campaign above; the bit should be fixed in git.
-- The instruction-mix job's kernel-only throughput was a single run, and three consecutive jobs
-  each produced one kernel-only figure *below* its own full sweep, which is impossible. The job
-  now takes the best of three for both sides of that pair (jobs/kernel_mix.sbatch); 5003851 is
-  the first run of that form, and the scatter shares it reports are back under 1%.
+- In the reviewed source, the instruction-mix job's `--kernel-only` flag has no effect
+  on the residual path. The saved log does not identify its source revision, so its
+  paired rates do not establish scatter cost. The job no longer runs that
+  comparison, and the generator omits its row and macros. Historical raw logs are retained;
+  their instruction counters and ordinary throughput remain separate measurements.
 - The thread-scaling rows for the standard and element-coloured **Jacobian action with the
   Rhie--Chow term** fell from 510 to 335 and from 587 to 438 MDOF/s against the 2 October run
   (4967671). An interleaved check of the reference tree (9b62d097f, the commit the previous
@@ -236,6 +238,64 @@ These are written down because each has already cost something.
 | related work | `spikes/cvfem/docs/CVFEM_SotA.tex` |
 | the discretisation | `spikes/cvfem/docs/CVFEM_NSE.tex` |
 | roofline script | `notebook/compressed/roofline.py` |
+
+## Residual accumulation measurement
+
+`--scatter-study` replaces the unsupported residual use of `--kernel-only` with
+a separate FP64 affine diagnostic. Each sample times the normal residual, the
+instrumented full residual, and the same instrumented sweep with accumulation
+bypassed. Twelve samples use all six execution orders twice. The element kernel,
+input staging and existing buffer clearing remain; state-gradient reconstruction
+is outside the timed region. Boundary and transient terms are excluded.
+
+The atomic bypass skips the four nodal atomic additions per element node. The
+packed bypass skips pack-local additions, the owned/ghost drain and the final
+ghost reduction. A compiler escape consumes the full SIMD result in both probe
+arms, so bypassing its additions cannot delete the element calculations. Normal
+calls instantiate the original loop without this instrumentation.
+
+Before timing each case, the diagnostic captures every element's 32 contributions
+in both arms and requires finite, nonzero, bit-identical arrays. Its full nodal
+result must agree with the normal residual within `1e-11` relative infinity norm
+in each equation, and the bypass must leave a zero output. Captures are freed
+before timing; timed loops retain the compiler escape and accumulation switch.
+The job stops on a failed check.
+
+Run `spikes/cvfem/jobs/scatter_study.sh BENCH NEW_OUTPUT_DIRECTORY` inside one
+72-core allocation. It records first-order and Darwish residuals with Rhie--Chow,
+`n=128`, pack size 1024, at one and 72 threads. Analyze the eight logs with
+`spikes/cvfem/scripts/analyze_scatter.py --expect-full OUTPUT_DIRECTORY/*.log`.
+The summary gives mean times, signed paired differences, their range and the
+full-probe overhead relative to normal execution. The atomic-minus-packed gap
+is also split into the bypass gap and the difference in accumulation costs.
+
+This measures the marginal cost of accumulation in the probe, including changes
+in memory traffic and synchronization. It is not an additive instruction cost:
+inspect instrumentation overhead and sample variation before relating the result
+to production performance.
+
+Grace job 5026072 on nid006544 (GNU 14.3.0) passes both CTest gates and all eight
+timed cases. All 96 paired differences are positive. At 72 threads the mean costs
+are 5.385 ms atomic versus 0.987 ms packed for first-order upwind, and 5.438 ms
+versus 0.893 ms for Darwish. The difference in accumulation costs accounts for
+92.9% and 95.4% of the corresponding full-probe gaps. Normal execution gives
+2.02x and 1.43x packed speedups in the same allocation. Full-probe deviations from
+normal range from -2.38% to +0.75% across all eight cases. These observations
+support accumulation as the main contributor in this diagnostic; they do not
+measure isolated atomic latency or establish a universal production fraction.
+
+The raw logs are copied verbatim, with the suffix changed to `.out`, under
+`data/scatter_5026072/`. Its `provenance.json` binds their hashes, source manifest,
+source patch, binary hash and verification output. All 4250 source checks passed;
+the largest full-probe/normal residual difference was 2.972e-16 per equation,
+and every captured element contribution was bit-identical between probe modes.
+The archived source patch describes the original measurement checkout, including
+earlier Jacobian-only changes. It is retained unchanged for provenance; the
+residual accumulation study can be reviewed independently of those changes.
+`python/scatter_figures.py`, called by `perf_figures.py`, generates
+`tables/scatter.tex` and `figures/scatter_macros.tex`. It rejects missing cases,
+failed checks and altered input files. `make figures` now propagates generator
+errors so it cannot quietly reuse a stale table after failed validation.
 
 ## Open
 

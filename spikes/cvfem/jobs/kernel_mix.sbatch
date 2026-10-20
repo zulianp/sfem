@@ -43,7 +43,7 @@
 # keeping `cycles` and `instructions`, because those carry no slash. The trailing slash goes
 # first.
 
-set -uo pipefail
+set -euo pipefail
 cd "$SLURM_SUBMIT_DIR" || exit 1
 source scripts/alps_env.sh || exit 1
 
@@ -71,43 +71,27 @@ for arm in "|" "_ho|--conv-ho 3"; do
   extra=${arm#*|}
   for lay in packed atomic; do
     key="${lay}${suffix}"
-    # The throughput, and the kernel-only figure the table reports beside it. BEST OF THREE for
-    # each, measured as a pair: the ratio mdof_kernel_only/mdof is what the table turns into the
-    # scatter's share, and a single run of either side can land 5-15% low on this node -- three
-    # consecutive jobs each produced one kernel-only figure BELOW its own full sweep, which is
-    # impossible and was noise. The best of three on each side is what the other arms here do.
-    mdof=""; mdofk=""
+    # Keep the throughput convention used by the saved campaign.
+    mdof=""
     for pass in $(seq 1 "${PASSES:-3}"); do
-    out=$(srun -u --ntasks=1 --cpus-per-task=72 --uenv="$CVFEM_UENV" --view="$CVFEM_VIEW" \
-            bash -lc "cd $PWD && OMP_NUM_THREADS=72 OMP_PROC_BIND=true OMP_PLACES=cores \
-                      $B --n $N --repeat $REPEAT --warmup 3 --layout $lay \
-                      $([ "$lay" = packed ] && echo "--pack-size $PACK") --rhie-chow $extra" 2>&1)
-    v=$(printf '%s\n' "$out" | sed -n 's/^  MDOF\/s: \(.*\)$/\1/p' | head -1)
-    [ -n "$v" ] && mdof=$(awk -v a="${mdof:-0}" -v b="$v" 'BEGIN{print (b+0>a+0)?b:a}')
-
-    # The same sweep with --kernel-only, which has the element kernel write to a dense stack
-    # buffer and skip the scatter entirely. The table reports mdof/mdof_kernel_only as the share
-    # of the sweep the scatter and its staging cost, so this must be a SEPARATE run rather than
-    # a phase timing: deriving it from ms_element_kernel does not work, because the standard
-    # layout does not report those phase fields at all and the ratio would be silently wrong for
-    # one of the two columns.
-    outk=$(srun -u --ntasks=1 --cpus-per-task=72 --uenv="$CVFEM_UENV" --view="$CVFEM_VIEW" \
-             bash -lc "cd $PWD && OMP_NUM_THREADS=72 OMP_PROC_BIND=true OMP_PLACES=cores \
-                       $B --n $N --repeat $REPEAT --warmup 3 --layout $lay \
-                       $([ "$lay" = packed ] && echo "--pack-size $PACK") --rhie-chow $extra --kernel-only" 2>&1)
-    vk=$(printf '%s\n' "$outk" | sed -n 's/^  MDOF\/s: \(.*\)$/\1/p' | head -1)
-    [ -n "$vk" ] && mdofk=$(awk -v a="${mdofk:-0}" -v b="$vk" 'BEGIN{print (b+0>a+0)?b:a}')
+      out=$(srun -u --ntasks=1 --cpus-per-task=72 --uenv="$CVFEM_UENV" --view="$CVFEM_VIEW" \
+              bash -lc "cd $PWD && OMP_NUM_THREADS=72 OMP_PROC_BIND=true OMP_PLACES=cores \
+                        $B --n $N --repeat $REPEAT --warmup 3 --layout $lay \
+                        $([ "$lay" = packed ] && echo "--pack-size $PACK") --rhie-chow $extra" 2>&1) || { printf '%s\n' "$out" >&2; exit 1; }
+      v=$(printf '%s\n' "$out" | sed -n 's/^  MDOF\/s: \(.*\)$/\1/p' | head -1)
+      [ -n "$v" ] && mdof=$(awk -v a="${mdof:-0}" -v b="$v" 'BEGIN{print (b+0>a+0)?b:a}')
     done
     [ -n "$mdof" ] && echo "kmix $key mdof $mdof"
-    [ -n "$mdofk" ] && echo "kmix $key mdof_kernel_only $mdofk"
 
     # Group 1: the instruction mix.
-    printf '%s\n' "$(run_group "$lay" 'armv8_pmuv3_0/INST_SPEC/,armv8_pmuv3_0/ASE_SPEC/,armv8_pmuv3_0/VFP_SPEC/,armv8_pmuv3_0/DP_SPEC/,armv8_pmuv3_0/LD_SPEC/,armv8_pmuv3_0/ST_SPEC/' "$extra")" \
+    counters=$(run_group "$lay" 'armv8_pmuv3_0/INST_SPEC/,armv8_pmuv3_0/ASE_SPEC/,armv8_pmuv3_0/VFP_SPEC/,armv8_pmuv3_0/DP_SPEC/,armv8_pmuv3_0/LD_SPEC/,armv8_pmuv3_0/ST_SPEC/' "$extra") || { printf '%s\n' "$counters" >&2; exit 1; }
+    printf '%s\n' "$counters" \
       | awk -F, -v l="$key" '$1 ~ /^[0-9]/ && $3 != "" {
             k=$3; sub(/\/$/,"",k); sub(/^.*\//,"",k); if (k != "") printf "kmix %s %s %s\n", l, k, $1 }'
 
     # Group 2: cycles, instructions and the stall split.
-    printf '%s\n' "$(run_group "$lay" 'cycles,instructions,armv8_pmuv3_0/STALL_BACKEND/,armv8_pmuv3_0/STALL_BACKEND_MEM/' "$extra")" \
+    counters=$(run_group "$lay" 'cycles,instructions,armv8_pmuv3_0/STALL_BACKEND/,armv8_pmuv3_0/STALL_BACKEND_MEM/' "$extra") || { printf '%s\n' "$counters" >&2; exit 1; }
+    printf '%s\n' "$counters" \
       | awk -F, -v l="$key" '$1 ~ /^[0-9]/ && $3 != "" {
             k=$3; sub(/\/$/,"",k); sub(/^.*\//,"",k); if (k != "") printf "kmix %s %s %s\n", l, k, $1 }'
   done
