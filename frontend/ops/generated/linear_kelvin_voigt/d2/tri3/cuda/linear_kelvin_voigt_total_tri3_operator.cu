@@ -508,12 +508,14 @@ extern "C" int cu_linear_kelvin_voigt_total_tri3_residual_a_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
+        if (nelements <= 0) return SFEM_SUCCESS;
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::linear_kelvin_voigt_total_tri3_residual_a_msoa_impl<double, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, (const double *)u0, (const double *)u1, previous_stride, (const double *)u0_old, (const double *)u1_old, out_stride, (double *)u0_out, (double *)u1_out);
         return sfem::codegen::launch_status("linear_kelvin_voigt_total_tri3_residual_a_msoa_impl");
     }
     case (int)sizeof(float): {
+        if (nelements <= 0) return SFEM_SUCCESS;
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::linear_kelvin_voigt_total_tri3_residual_a_msoa_impl<float, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, (const float *)u0, (const float *)u1, previous_stride, (const float *)u0_old, (const float *)u1_old, out_stride, (float *)u0_out, (float *)u1_out);
@@ -661,12 +663,14 @@ extern "C" int cu_linear_kelvin_voigt_total_tri3_jacobian_action_a_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
+        if (nelements <= 0) return SFEM_SUCCESS;
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::linear_kelvin_voigt_total_tri3_jacobian_action_a_msoa_impl<double, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, direction_stride, (const double *)u0_direction, (const double *)u1_direction, out_stride, (double *)u0_out, (double *)u1_out);
         return sfem::codegen::launch_status("linear_kelvin_voigt_total_tri3_jacobian_action_a_msoa_impl");
     }
     case (int)sizeof(float): {
+        if (nelements <= 0) return SFEM_SUCCESS;
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::linear_kelvin_voigt_total_tri3_jacobian_action_a_msoa_impl<float, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, direction_stride, (const float *)u0_direction, (const float *)u1_direction, out_stride, (float *)u0_out, (float *)u1_out);
@@ -806,12 +810,14 @@ extern "C" int cu_linear_kelvin_voigt_total_tri3_hessian_bsr_a_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
+      if (nelements <= 0) return SFEM_SUCCESS;
       const int block_size = 256;
       const int grid_size = (int)((nelements + block_size - 1) / block_size);
       sfem::codegen::linear_kelvin_voigt_total_tri3_hessian_crs_a_msoa_impl<double><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, rowptr, colidx, (double *)values);
       return sfem::codegen::launch_status("linear_kelvin_voigt_total_tri3_hessian_crs_a_msoa_impl");
     }
     case (int)sizeof(float): {
+      if (nelements <= 0) return SFEM_SUCCESS;
       const int block_size = 256;
       const int grid_size = (int)((nelements + block_size - 1) / block_size);
       sfem::codegen::linear_kelvin_voigt_total_tri3_hessian_crs_a_msoa_impl<float><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, rowptr, colidx, (float *)values);

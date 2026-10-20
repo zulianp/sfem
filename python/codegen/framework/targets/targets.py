@@ -1078,6 +1078,9 @@ class CUDATarget(TargetPlatform):
         self, implementation_name, template_args, arguments, indent="  ", extent="nelements"
     ):
         return (
+            #: A part of a mesh without elements (a rank holding none of a block) has nothing to
+            #: launch, and CUDA refuses a grid of zero blocks.
+            "%sif (%s <= 0) return SFEM_SUCCESS;" % (indent, extent),
             "%sconst int block_size = 256;" % indent,
             "%sconst int grid_size = (int)((%s + block_size - 1) / block_size);"
             % (indent, extent),

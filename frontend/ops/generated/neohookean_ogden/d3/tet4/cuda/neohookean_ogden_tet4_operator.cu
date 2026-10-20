@@ -231,12 +231,14 @@ extern "C" int cu_neohookean_ogden_tet4_objective_steps_a_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
+        if (nelements <= 0) return SFEM_SUCCESS;
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::neohookean_ogden_tet4_objective_steps_a_msoa_impl<double, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
         return sfem::codegen::launch_status("neohookean_ogden_tet4_objective_steps_a_msoa_impl");
     }
     case (int)sizeof(float): {
+        if (nelements <= 0) return SFEM_SUCCESS;
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::neohookean_ogden_tet4_objective_steps_a_msoa_impl<float, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
@@ -450,12 +452,14 @@ extern "C" int cu_neohookean_ogden_tet4_gradient_a_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
+        if (nelements <= 0) return SFEM_SUCCESS;
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::neohookean_ogden_tet4_gradient_a_msoa_impl<double, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
         return sfem::codegen::launch_status("neohookean_ogden_tet4_gradient_a_msoa_impl");
     }
     case (int)sizeof(float): {
+        if (nelements <= 0) return SFEM_SUCCESS;
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::neohookean_ogden_tet4_gradient_a_msoa_impl<float, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
@@ -684,12 +688,14 @@ extern "C" int cu_neohookean_ogden_tet4_apply_a_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
+        if (nelements <= 0) return SFEM_SUCCESS;
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::neohookean_ogden_tet4_apply_a_msoa_impl<double, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
         return sfem::codegen::launch_status("neohookean_ogden_tet4_apply_a_msoa_impl");
     }
     case (int)sizeof(float): {
+        if (nelements <= 0) return SFEM_SUCCESS;
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::neohookean_ogden_tet4_apply_a_msoa_impl<float, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
@@ -872,12 +878,14 @@ extern "C" int cu_neohookean_ogden_tet4_hessian_bsr_a_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
+        if (nelements <= 0) return SFEM_SUCCESS;
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::neohookean_ogden_tet4_hessian_a_msoa_assemble_impl<double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, rowptr, colidx, (double *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
         return sfem::codegen::launch_status("neohookean_ogden_tet4_hessian_a_msoa_assemble_impl");
     }
     case (int)sizeof(float): {
+        if (nelements <= 0) return SFEM_SUCCESS;
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::neohookean_ogden_tet4_hessian_a_msoa_assemble_impl<float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, rowptr, colidx, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);

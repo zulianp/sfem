@@ -251,12 +251,14 @@ extern "C" int cu_body_force_proteus_hex8_residual_a_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
+        if (nelements <= 0) return SFEM_SUCCESS;
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::body_force_proteus_hex8_residual_a_msoa_impl<double, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_det0, density, g0, g1, g2, out_stride, (double *)u0_out, (double *)u1_out, (double *)u2_out);
         return sfem::codegen::launch_status("body_force_proteus_hex8_residual_a_msoa_impl");
     }
     case (int)sizeof(float): {
+        if (nelements <= 0) return SFEM_SUCCESS;
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::body_force_proteus_hex8_residual_a_msoa_impl<float, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_det0, density, g0, g1, g2, out_stride, (float *)u0_out, (float *)u1_out, (float *)u2_out);
@@ -371,12 +373,14 @@ extern "C" int cu_body_force_proteus_hex8_residual_i_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
+        if (nelements <= 0) return SFEM_SUCCESS;
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::body_force_proteus_hex8_residual_i_msoa_impl<double><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, density, g0, g1, g2, out_stride, (double *)u0_out, (double *)u1_out, (double *)u2_out);
         return sfem::codegen::launch_status("body_force_proteus_hex8_residual_i_msoa_impl");
     }
     case (int)sizeof(float): {
+        if (nelements <= 0) return SFEM_SUCCESS;
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::body_force_proteus_hex8_residual_i_msoa_impl<float><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, density, g0, g1, g2, out_stride, (float *)u0_out, (float *)u1_out, (float *)u2_out);

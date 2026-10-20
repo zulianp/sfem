@@ -750,12 +750,14 @@ extern "C" int cu_vector_mass_proteus_hex8_residual_a_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
+        if (nelements <= 0) return SFEM_SUCCESS;
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::vector_mass_proteus_hex8_residual_a_msoa_impl<double, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_det0, density, current_stride, (const double *)u0, (const double *)u1, (const double *)u2, out_stride, (double *)u0_out, (double *)u1_out, (double *)u2_out);
         return sfem::codegen::launch_status("vector_mass_proteus_hex8_residual_a_msoa_impl");
     }
     case (int)sizeof(float): {
+        if (nelements <= 0) return SFEM_SUCCESS;
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::vector_mass_proteus_hex8_residual_a_msoa_impl<float, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_det0, density, current_stride, (const float *)u0, (const float *)u1, (const float *)u2, out_stride, (float *)u0_out, (float *)u1_out, (float *)u2_out);
@@ -885,12 +887,14 @@ extern "C" int cu_vector_mass_proteus_hex8_residual_i_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
+        if (nelements <= 0) return SFEM_SUCCESS;
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::vector_mass_proteus_hex8_residual_i_msoa_impl<double><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, density, current_stride, (const double *)u0, (const double *)u1, (const double *)u2, out_stride, (double *)u0_out, (double *)u1_out, (double *)u2_out);
         return sfem::codegen::launch_status("vector_mass_proteus_hex8_residual_i_msoa_impl");
     }
     case (int)sizeof(float): {
+        if (nelements <= 0) return SFEM_SUCCESS;
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::vector_mass_proteus_hex8_residual_i_msoa_impl<float><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, density, current_stride, (const float *)u0, (const float *)u1, (const float *)u2, out_stride, (float *)u0_out, (float *)u1_out, (float *)u2_out);
@@ -1042,12 +1046,14 @@ extern "C" int cu_vector_mass_proteus_hex8_jacobian_action_a_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
+        if (nelements <= 0) return SFEM_SUCCESS;
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::vector_mass_proteus_hex8_jacobian_action_a_msoa_impl<double, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_det0, density, direction_stride, (const double *)u0_direction, (const double *)u1_direction, (const double *)u2_direction, out_stride, (double *)u0_out, (double *)u1_out, (double *)u2_out);
         return sfem::codegen::launch_status("vector_mass_proteus_hex8_jacobian_action_a_msoa_impl");
     }
     case (int)sizeof(float): {
+        if (nelements <= 0) return SFEM_SUCCESS;
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::vector_mass_proteus_hex8_jacobian_action_a_msoa_impl<float, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_det0, density, direction_stride, (const float *)u0_direction, (const float *)u1_direction, (const float *)u2_direction, out_stride, (float *)u0_out, (float *)u1_out, (float *)u2_out);
@@ -1177,12 +1183,14 @@ extern "C" int cu_vector_mass_proteus_hex8_jacobian_action_i_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
+        if (nelements <= 0) return SFEM_SUCCESS;
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::vector_mass_proteus_hex8_jacobian_action_i_msoa_impl<double><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, density, direction_stride, (const double *)u0_direction, (const double *)u1_direction, (const double *)u2_direction, out_stride, (double *)u0_out, (double *)u1_out, (double *)u2_out);
         return sfem::codegen::launch_status("vector_mass_proteus_hex8_jacobian_action_i_msoa_impl");
     }
     case (int)sizeof(float): {
+        if (nelements <= 0) return SFEM_SUCCESS;
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::vector_mass_proteus_hex8_jacobian_action_i_msoa_impl<float><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, density, direction_stride, (const float *)u0_direction, (const float *)u1_direction, (const float *)u2_direction, out_stride, (float *)u0_out, (float *)u1_out, (float *)u2_out);
@@ -1346,12 +1354,14 @@ extern "C" int cu_vector_mass_proteus_hex8_hessian_bsr_i_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
+      if (nelements <= 0) return SFEM_SUCCESS;
       const int block_size = 256;
       const int grid_size = (int)((nelements + block_size - 1) / block_size);
       sfem::codegen::vector_mass_proteus_hex8_hessian_crs_i_msoa_impl<double><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, density, rowptr, colidx, (double *)values);
       return sfem::codegen::launch_status("vector_mass_proteus_hex8_hessian_crs_i_msoa_impl");
     }
     case (int)sizeof(float): {
+      if (nelements <= 0) return SFEM_SUCCESS;
       const int block_size = 256;
       const int grid_size = (int)((nelements + block_size - 1) / block_size);
       sfem::codegen::vector_mass_proteus_hex8_hessian_crs_i_msoa_impl<float><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, density, rowptr, colidx, (float *)values);
