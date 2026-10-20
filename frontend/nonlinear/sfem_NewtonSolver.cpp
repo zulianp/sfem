@@ -57,7 +57,7 @@ namespace sfem {
             f->update(x);
             if (!known) {
                 blas->zeros(ndofs, r->data());
-                if (f->gradient(x, r->data()) != SFEM_SUCCESS) return SFEM_FAILURE;
+                if (!reductions->all(f->gradient(x, r->data()) == SFEM_SUCCESS)) return SFEM_FAILURE;
                 f->set_value_to_constrained_dofs(0, r->data());
             }
             measure = step->measure(x, r->data());
@@ -110,13 +110,14 @@ namespace sfem {
         LineSearch      line_search(opts.line_search);
 
         NonlinearReport report;
-        if (impl.step->begin_step(context) != SFEM_SUCCESS) {
+        // Every failure below is decided by all ranks together (OwnedReductions::all).
+        if (!impl.reductions->all(impl.step->begin_step(context) == SFEM_SUCCESS)) {
             report.status = NonlinearReport::STEP_FAILED;
             return report;
         }
         // Every evaluation reads x over all local elements: its ghost and aura copies from their
         // owners, once; the steps then keep them.
-        if (impl.f->space()->synchronize(x) != SFEM_SUCCESS) {
+        if (impl.f->space()->synchronize(x, impl.f->execution_space()) != SFEM_SUCCESS) {
             report.status = NonlinearReport::STEP_FAILED;
             return report;
         }
@@ -163,16 +164,16 @@ namespace sfem {
 
                 {
                     SFEM_TRACE_SCOPE("NewtonSolver::linearize");
-                    if (impl.step->linearize(x, r) != SFEM_SUCCESS) return NonlinearReport::STEP_FAILED;
+                    if (!impl.reductions->all(impl.step->linearize(x, r) == SFEM_SUCCESS)) return NonlinearReport::STEP_FAILED;
                 }
 
                 {
                     SFEM_TRACE_SCOPE("NewtonSolver::step");
                     impl.blas->zeros(ndofs, dx);
-                    log.linear_capped = impl.step->solve(x, r, dx) != SFEM_SUCCESS;
+                    log.linear_capped = !impl.reductions->all(impl.step->solve(x, r, dx) == SFEM_SUCCESS);
                 }
                 // The solve sets the owned rows; x + s dx keeps every copy consistent from here.
-                if (impl.f->space()->synchronize(dx) != SFEM_SUCCESS) return NonlinearReport::STEP_FAILED;
+                if (impl.f->space()->synchronize(dx, impl.f->execution_space()) != SFEM_SUCCESS) return NonlinearReport::STEP_FAILED;
                 log.linear_iterations = impl.step->iterations();
                 report.linear_iterations += log.linear_iterations;
                 report.capped_linear_solves += log.linear_capped;
@@ -265,7 +266,7 @@ namespace sfem {
             }
             {
                 SFEM_TRACE_SCOPE("NewtonSolver::linearize");
-                if (impl.step->linearize(x, r) != SFEM_SUCCESS) {
+                if (!impl.reductions->all(impl.step->linearize(x, r) == SFEM_SUCCESS)) {
                     report.status = NonlinearReport::STEP_FAILED;
                     return report;
                 }
@@ -273,9 +274,9 @@ namespace sfem {
             {
                 SFEM_TRACE_SCOPE("NewtonSolver::step");
                 impl.blas->zaxpby(ndofs, s, increment, 0, increment, dx);
-                log.linear_capped = impl.step->solve(x, r, dx) != SFEM_SUCCESS;
+                log.linear_capped = !impl.reductions->all(impl.step->solve(x, r, dx) == SFEM_SUCCESS);
             }
-            if (impl.f->space()->synchronize(dx) != SFEM_SUCCESS) {
+            if (impl.f->space()->synchronize(dx, impl.f->execution_space()) != SFEM_SUCCESS) {
                 report.status = NonlinearReport::STEP_FAILED;
                 return report;
             }

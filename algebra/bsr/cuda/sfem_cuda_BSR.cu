@@ -71,7 +71,8 @@ namespace sfem {
         template <typename R, typename C, typename TStorage, typename T>
         __global__ void bsr_spmv_kernel(const ptrdiff_t                     block_rows,
                                         const int                           block_size,
-                                        const R* const SFEM_RESTRICT        rowptr,
+                                        const R* const SFEM_RESTRICT        rows_begin,
+                                        const R* const SFEM_RESTRICT        rows_end,
                                         const C* const SFEM_RESTRICT        colidx,
                                         const TStorage* const SFEM_RESTRICT values,
                                         const T                             scale_output,
@@ -82,7 +83,7 @@ namespace sfem {
                 const ptrdiff_t row = i / block_size;
                 const int       r   = i % block_size;
                 T               acc = 0;
-                for (R k = rowptr[row]; k < rowptr[row + 1]; ++k) {
+                for (R k = rows_begin[row]; k < rows_end[row]; ++k) {
                     const TStorage* const B   = &values[(ptrdiff_t)k * block_size * block_size + r * block_size];
                     const T* const        xj  = &x[(ptrdiff_t)colidx[k] * block_size];
                     for (int c = 0; c < block_size; ++c) acc += (T)B[c] * xj[c];
@@ -93,6 +94,27 @@ namespace sfem {
     }  // namespace
 
     template <typename R, typename C, typename TStorage, typename T>
+    int d_bsr_spmv_ranges(const ptrdiff_t                     block_rows,
+                          const int                           block_size,
+                          const R* const SFEM_RESTRICT        rows_begin,
+                          const R* const SFEM_RESTRICT        rows_end,
+                          const C* const SFEM_RESTRICT        colidx,
+                          const TStorage* const SFEM_RESTRICT values,
+                          const T                             scale_output,
+                          const T* const SFEM_RESTRICT        x,
+                          T* const SFEM_RESTRICT              y,
+                          void* const                         stream) {
+        const ptrdiff_t rows = block_rows * block_size;
+        if (rows <= 0) return SFEM_SUCCESS;
+        const int       kernel_block_size = 128;
+        const ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (rows + kernel_block_size - 1) / kernel_block_size);
+        bsr_spmv_kernel<R, C, TStorage, T><<<n_blocks, kernel_block_size, 0, (cudaStream_t)stream>>>(
+                block_rows, block_size, rows_begin, rows_end, colidx, values, scale_output, x, y);
+        SFEM_DEBUG_SYNCHRONIZE();
+        return SFEM_SUCCESS;
+    }
+
+    template <typename R, typename C, typename TStorage, typename T>
     int d_bsr_spmv_native(const ptrdiff_t                     block_rows,
                           const int                           block_size,
                           const R* const SFEM_RESTRICT        rowptr,
@@ -101,13 +123,19 @@ namespace sfem {
                           const T                             scale_output,
                           const T* const SFEM_RESTRICT        x,
                           T* const SFEM_RESTRICT              y) {
-        const ptrdiff_t rows              = block_rows * block_size;
-        const int       kernel_block_size = 128;
-        const ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (rows + kernel_block_size - 1) / kernel_block_size);
-        bsr_spmv_kernel<R, C, TStorage, T><<<n_blocks, kernel_block_size, 0>>>(block_rows, block_size, rowptr, colidx, values, scale_output, x, y);
-        SFEM_DEBUG_SYNCHRONIZE();
-        return SFEM_SUCCESS;
+        return d_bsr_spmv_ranges(block_rows, block_size, rowptr, rowptr + 1, colidx, values, scale_output, x, y);
     }
+
+    template int d_bsr_spmv_ranges<count_t, idx_t, real_t, real_t>(const ptrdiff_t,
+                                                                   const int,
+                                                                   const count_t* const SFEM_RESTRICT,
+                                                                   const count_t* const SFEM_RESTRICT,
+                                                                   const idx_t* const SFEM_RESTRICT,
+                                                                   const real_t* const SFEM_RESTRICT,
+                                                                   const real_t,
+                                                                   const real_t* const SFEM_RESTRICT,
+                                                                   real_t* const SFEM_RESTRICT,
+                                                                   void* const);
 
     template int d_bsr_spmv_native<count_t, idx_t, real_t, real_t>(const ptrdiff_t,
                                                                    const int,
@@ -117,6 +145,40 @@ namespace sfem {
                                                                    const real_t,
                                                                    const real_t* const SFEM_RESTRICT,
                                                                    real_t* const SFEM_RESTRICT);
+
+    class DeviceSideStream::Impl {
+    public:
+        cudaStream_t stream{nullptr};
+        cudaEvent_t  on_default{nullptr}, on_side{nullptr};
+    };
+
+    DeviceSideStream::DeviceSideStream() : impl_(std::make_unique<Impl>()) {}
+
+    DeviceSideStream::~DeviceSideStream() {
+        if (impl_->on_default) cudaEventDestroy(impl_->on_default);
+        if (impl_->on_side) cudaEventDestroy(impl_->on_side);
+        if (impl_->stream) cudaStreamDestroy(impl_->stream);
+    }
+
+    std::shared_ptr<DeviceSideStream> DeviceSideStream::create() {
+        std::shared_ptr<DeviceSideStream> ret(new DeviceSideStream());
+        SFEM_CUDA_CHECK(cudaStreamCreateWithFlags(&ret->impl_->stream, cudaStreamNonBlocking));
+        SFEM_CUDA_CHECK(cudaEventCreateWithFlags(&ret->impl_->on_default, cudaEventDisableTiming));
+        SFEM_CUDA_CHECK(cudaEventCreateWithFlags(&ret->impl_->on_side, cudaEventDisableTiming));
+        return ret;
+    }
+
+    void *DeviceSideStream::stream() const { return impl_->stream; }
+
+    void DeviceSideStream::wait_for_default() {
+        SFEM_CUDA_CHECK(cudaEventRecord(impl_->on_default, cudaStreamLegacy));
+        SFEM_CUDA_CHECK(cudaStreamWaitEvent(impl_->stream, impl_->on_default, 0));
+    }
+
+    void DeviceSideStream::join_default() {
+        SFEM_CUDA_CHECK(cudaEventRecord(impl_->on_side, impl_->stream));
+        SFEM_CUDA_CHECK(cudaStreamWaitEvent(cudaStreamLegacy, impl_->on_side, 0));
+    }
 
     template <typename R, typename C, typename TStorage, typename T>
     T d_bsr_max_abs_row_sum(const ptrdiff_t                     block_rows,

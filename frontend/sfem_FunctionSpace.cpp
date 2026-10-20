@@ -34,8 +34,9 @@ namespace sfem {
         //: still speaking the numbering the mesh had -- a nodeset read from a
         //: file, most of all -- is unreconstructable without it.
         SharedBuffer<idx_t> packed_node_map;
-        //: synchronize's exchange, built on first use: packing renumbers the nodes it names.
-        std::shared_ptr<smesh::Exchange> exchange;
+        //: synchronize's exchanges, host and device, built on first use: packing renumbers the
+        //: nodes they name.
+        std::shared_ptr<smesh::Exchange> exchange[2];
 
         ~Impl() {}
 
@@ -351,7 +352,7 @@ namespace sfem {
 
         impl_->packed_mesh = FunctionSpace::PackedMesh::create(impl_->mesh, {}, true);
         // Everything keyed by node number describes the numbering before.
-        impl_->exchange.reset();
+        for (auto &e : impl_->exchange) e.reset();
         impl_->node_to_node_graph.reset();
         impl_->dof_to_dof_graph.reset();
         impl_->element_node_graph.reset();
@@ -360,13 +361,33 @@ namespace sfem {
 
     bool FunctionSpace::has_packed_mesh() const { return static_cast<bool>(impl_->packed_mesh); }
 
-    int FunctionSpace::synchronize(real_t *const x) {
-        if (!impl_->mesh->is_distributed() || impl_->mesh->comm()->size() == 1) return SFEM_SUCCESS;
-        if (!impl_->exchange) {
-            impl_->exchange = smesh::Exchange::create_nodal(impl_->mesh, smesh::Exchange::ExchangeScope::GhostsAndAura);
-            if (!impl_->exchange) return SFEM_FAILURE;
+    smesh::Exchange *FunctionSpace::exchange_for(const ExecutionSpace es, int *const status) {
+        auto &impl = *impl_;
+        *status    = SFEM_SUCCESS;
+        if (!impl.mesh->is_distributed() || impl.mesh->comm()->size() == 1) return nullptr;
+        auto &exchange = impl.exchange[es == EXECUTION_SPACE_DEVICE ? 1 : 0];
+        if (!exchange) {
+            exchange = smesh::Exchange::create_nodal(impl.mesh, smesh::Exchange::ExchangeScope::GhostsAndAura, es);
+            if (!exchange) *status = SFEM_FAILURE;
         }
-        return impl_->exchange->gather(x, impl_->block_size);
+        return exchange.get();
+    }
+
+    int FunctionSpace::synchronize(real_t *const x, const ExecutionSpace es) {
+        if (synchronize_begin(x, es) != SFEM_SUCCESS) return SFEM_FAILURE;
+        return synchronize_end(es);
+    }
+
+    int FunctionSpace::synchronize_begin(real_t *const x, const ExecutionSpace es) {
+        int  status   = SFEM_SUCCESS;
+        auto exchange = exchange_for(es, &status);
+        return exchange ? exchange->gather_begin(x, impl_->block_size) : status;
+    }
+
+    int FunctionSpace::synchronize_end(const ExecutionSpace es) {
+        int  status   = SFEM_SUCCESS;
+        auto exchange = exchange_for(es, &status);
+        return exchange ? exchange->gather_wait() : status;
     }
 
     std::shared_ptr<FunctionSpace::PackedMesh> FunctionSpace::packed_mesh() { return impl_->packed_mesh; }
