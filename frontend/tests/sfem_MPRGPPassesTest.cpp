@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <limits>
 #include <vector>
 
 #include "sfem_API.hpp"
@@ -118,6 +119,20 @@ namespace {
             if (!work) work = sfem::create_buffer<real_t>(impl.work_size, es);
             return work->data();
         }
+
+        sfem::SharedBuffer<real_t> control;
+        real_t                    *control_buffer() {
+            if (!control) control = sfem::create_buffer<real_t>(sfem::mprgp_control_size<real_t>(), es);
+            return control->data();
+        }
+
+        sfem::MPRGPControl<real_t> read() {
+            sfem::MPRGPControl<real_t> c;
+            impl.read_control(control_buffer(), &c);
+            return c;
+        }
+
+        void write(const sfem::MPRGPControl<real_t> &c) { impl.write_control(c, control_buffer()); }
     };
 
     int check_passes(Space &s, const bool has_lb, const bool has_ub) {
@@ -128,8 +143,10 @@ namespace {
         const char *const name = has_lb && has_ub ? "both bounds" : (has_lb ? "lower bound" : "upper bound");
 
         // curvature
-        real_t out[4];
-        s.impl.curvature(n, dlb, dub, dx, dg, dd, dAd, infty, out, s.work_buffer());
+        const sfem::MPRGPParams<real_t> params{real_t(3), real_t(0.5), infty, std::numeric_limits<real_t>::epsilon()};
+        s.impl.curvature(n, dlb, dub, dx, dg, dd, dAd, infty, sfem::MPRGP_DECIDE_NONE, params, s.control_buffer(), s.work_buffer());
+        sfem::MPRGPControl<real_t> rec = s.read();
+        real_t                     out[4] = {rec.dAd, rec.dd, rec.gd, rec.alpha_feas};
         real_t dAd_r = 0, dd_r = 0, gd_r = 0, alpha_r = infty;
         for (ptrdiff_t i = 0; i < n; ++i) {
             dAd_r += p.d[i] * p.Ad[i];
@@ -146,6 +163,21 @@ namespace {
                (double)relative(out[3], alpha_r));
         SFEM_TEST_ASSERT(relative(out[0], dAd_r) < 1e-11 && relative(out[1], dd_r) < 1e-11 && relative(out[2], gd_r) < 1e-11);
         SFEM_TEST_ASSERT(out[3] == alpha_r);
+
+        // The decisions in the pass, from its own sums, against the same decisions taken here.
+        for (const auto decision : {sfem::MPRGP_DECIDE_CG, sfem::MPRGP_DECIDE_PROPORTIONING}) {
+            s.impl.curvature(n, dlb, dub, dx, dg, dd, dAd, infty, decision, params, s.control_buffer(), s.work_buffer());
+            const sfem::MPRGPControl<real_t> in_pass = s.read();
+            sfem::MPRGPControl<real_t>       here    = in_pass;
+            sfem::mprgp_decide(here, decision, params);
+            printf("  %s, decision %d: move %g alpha %.6g alpha_cg %.6g\n",
+                   name,
+                   int(decision),
+                   (double)in_pass.move,
+                   (double)in_pass.alpha,
+                   (double)in_pass.alpha_cg);
+            SFEM_TEST_ASSERT(in_pass.move == here.move && in_pass.alpha == here.alpha && in_pass.alpha_cg == here.alpha_cg);
+        }
 
         // chopped gradient
         V       gc(n, 0);
@@ -167,10 +199,14 @@ namespace {
         for (const bool along : {true, false}) {
             V       x1 = p.x, g1 = p.g, gf(n, 0);
             real_t *dgf = s.put(gf);
+            sfem::MPRGPControl<real_t> c{};
+            c.move  = real_t(sfem::MPRGP_MOVE_STEP);
+            c.alpha = alpha;
+            c.dAd   = real_t(2);
+            s.write(c);
             s.impl.step(n,
                         dlb,
                         dub,
-                        alpha,
                         along ? dd : nullptr,
                         along ? dAd : nullptr,
                         dx,
@@ -178,8 +214,14 @@ namespace {
                         dgf,
                         eps,
                         along ? dw : nullptr,
-                        out,
+                        along,
+                        s.control_buffer(),
                         s.work_buffer());
+            rec    = s.read();
+            out[0] = rec.Adgf;
+            out[1] = rec.gf2;
+            out[2] = rec.gc2;
+            out[3] = rec.gp2;
             V xs(n), gs(n), gfs(n);
             s.get(dx, xs);
             s.get(dg, gs);
@@ -213,6 +255,38 @@ namespace {
             SFEM_TEST_ASSERT(along ? relative(out[0], Adgf) < 1e-11 : out[0] == 0);
             SFEM_TEST_ASSERT(relative(out[1], gf2) < 1e-11 && relative(out[2], gc2) < 1e-11 && relative(out[3], gp2) < 1e-11);
             SFEM_TEST_ASSERT(gc2 > 0 && (along || gp2 > gf2));
+            // With cg, the next direction's beta from the final sums.
+            SFEM_TEST_ASSERT(!along || relative(rec.beta, rec.Adgf / c.dAd) < 1e-15);
+
+            if (along) {
+                // p <- gf - beta p, only where the move is a step.
+                V       pv = p.d;
+                real_t *dp = s.put(pv);
+                s.impl.update_direction(n, dgf, dp, s.control_buffer());
+                V ps(n);
+                s.get(dp, ps);
+                real_t err = 0;
+                for (ptrdiff_t i = 0; i < n; ++i) err = std::max(err, std::abs(ps[i] - (gfs[i] - rec.beta * p.d[i])));
+                printf("  %s, direction: %.3g (beta %.3g)\n", name, (double)err, (double)rec.beta);
+                SFEM_TEST_ASSERT(err < 1e-14 * (1 + std::abs(rec.beta)));
+
+                c       = s.read();
+                c.move  = real_t(sfem::MPRGP_MOVE_EXPAND);
+                s.write(c);
+                s.impl.update_direction(n, dgf, dp, s.control_buffer());
+                V again(n);
+                s.get(dp, again);
+                SFEM_TEST_ASSERT(again == ps);
+
+                // No step along d unless the move is one: x, g and the sums stay as they are.
+                V xb(n);
+                s.get(dx, xb);
+                s.impl.step(n, dlb, dub, dd, dAd, dx, dg, dgf, eps, dw, true, s.control_buffer(), s.work_buffer());
+                V xa(n);
+                s.get(dx, xa);
+                const sfem::MPRGPControl<real_t> kept = s.read();
+                SFEM_TEST_ASSERT(xa == xb && kept.gf2 == c.gf2 && kept.beta == c.beta);
+            }
 
             // Back to the start for what follows.
             x = p.x;
