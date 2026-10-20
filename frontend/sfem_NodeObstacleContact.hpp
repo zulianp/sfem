@@ -30,12 +30,15 @@ namespace sfem {
     class NodeObstacleContact final : public ContactStabilisedNewmarkScheme::Contact {
     public:
         // `dir` is the axis whose frame a node outside the grid gets. `nodes` and `points` are on the
-        // host; with a device `es` the contact copies them.
+        // host; with a device `es` the contact copies them. Under MPI the vectors are ndofs long, of
+        // which the first owned_dofs are this rank's, `nodes` are among its owned ones, and every
+        // measure (kkt_residual, min_gap) is over all ranks.
         NodeObstacleContact(const std::shared_ptr<smesh::Grid<geom_t>> &sdf,
                             const std::shared_ptr<Communicator>        &comm,
                             const SharedBuffer<idx_t>                  &nodes,
                             const SharedBuffer<geom_t *>               &points,
                             const ptrdiff_t                             ndofs,
+                            const ptrdiff_t                             owned_dofs,
                             const int                                   dir,
                             const ExecutionSpace                        es = EXECUTION_SPACE_HOST);
 
@@ -134,7 +137,9 @@ namespace sfem {
         geom_t                           *xyz_[3];
         ExecutionSpace               es_;
         SharedBuffer<real_t>         complementarity_, penetration_;
+        std::shared_ptr<Communicator> comm_;
         ptrdiff_t                    ndofs_;
+        ptrdiff_t                    owned_dofs_;
         int                          dir_;
         // Rows of size() entries, stored flat for the same reason (rows()).
         SharedBuffer<real_t>         normals_;    // 3 rows

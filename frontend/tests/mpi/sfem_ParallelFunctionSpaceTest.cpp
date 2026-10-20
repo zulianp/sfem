@@ -4,6 +4,9 @@
 
 #include "smesh_mesh.hpp"
 
+#include <cmath>
+#include <vector>
+
 namespace {
 
     int check_space_counts(const std::shared_ptr<sfem::FunctionSpace> &space,
@@ -114,12 +117,37 @@ namespace {
 
 }  // namespace
 
+// synchronize copies each owned value to the ranks holding it as a ghost or in their aura, packed
+// or not. Packing renumbers this rank's owned-not-shared nodes, and the aura reaches some of them:
+// a neighbour addresses them by the position they were created at.
+int test_synchronize_after_packing() {
+    for (const bool packed : {false, true}) {
+        auto mesh  = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(), 6, 6, 6, 0, 0, 0, 1, 1, 1);
+        auto space = sfem::FunctionSpace::create(mesh, 3);
+        if (packed) SFEM_TEST_ASSERT(space->initialize_packed_mesh() == SFEM_SUCCESS);
+
+        // A smooth field of the coordinates: on the owned nodes, then expected everywhere.
+        auto            m = space->mesh_ptr();
+        auto            p = m->points()->data();
+        const ptrdiff_t n = space->n_dofs();
+        auto field        = [&](const ptrdiff_t node, const int d) { return std::sin(7 * p[0][node] + 3 * p[1][node] + d) * p[2][node]; };
+        std::vector<real_t> x(n, 0);
+        for (ptrdiff_t i = 0; i < space->n_owned_dofs(); ++i) x[i] = field(i / 3, int(i % 3));
+        SFEM_TEST_ASSERT(space->synchronize(x.data()) == SFEM_SUCCESS);
+        int wrong = 0;
+        for (ptrdiff_t i = 0; i < n; ++i) wrong += std::abs(x[i] - field(i / 3, int(i % 3))) > 1e-14;
+        SFEM_TEST_EQ(wrong, 0);
+    }
+    return SFEM_TEST_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_parallel_function_space_hex8_cube);
     SFEM_RUN_TEST(test_parallel_function_space_checkerboard);
     SFEM_RUN_TEST(test_parallel_function_space_hex8_tet4);
     SFEM_RUN_TEST(test_parallel_function_space_tet4_cube);
+    SFEM_RUN_TEST(test_synchronize_after_packing);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }

@@ -12,6 +12,7 @@
 #include <memory>
 
 #include "sfem_MatrixFreeLinearSolver.hpp"
+#include "sfem_ParallelOperator.hpp"
 
 #include "sfem_PowerMethod.hpp"
 
@@ -50,6 +51,16 @@ namespace sfem {
 
         std::shared_ptr<BLAS<T>> blas;
         MPRGP_Tpl<T> impl;
+        // Under MPI (a ParallelOperator of more than one rank): the vectors are the owned prefix
+        // of space-sized buffers, n_dofs the owned length, n_alloc the buffers'; every reduction
+        // spans the ranks, so every branch is taken alike on all of them.
+        std::shared_ptr<Communicator> comm_;
+        ptrdiff_t n_alloc_{-1};
+
+        T sum(const T local) const { return comm_ ? comm_->sum(local) : local; }
+        T dot(const T* const x, const T* const y) const { return sum(this->blas->dot(n_dofs, x, y)); }
+        T norm2(const T* const x) const { return std::sqrt(dot(x, x)); }
+        ptrdiff_t allocation_size() const { return n_alloc_ > 0 ? n_alloc_ : n_dofs; }
         std::shared_ptr<PowerMethod<T>> power_method;
 
         ExecutionSpace execution_space() const override { return execution_space_; }
@@ -61,6 +72,14 @@ namespace sfem {
         void set_op(const std::shared_ptr<Operator<T>>& op) override {
             this->apply_op = [=](const T* const x, T* const y) { op->apply(x, y); };
             n_dofs = op->rows();
+            comm_.reset();
+            n_alloc_ = -1;
+            if (auto parallel = std::dynamic_pointer_cast<ParallelOperator<T>>(op)) {
+                if (parallel->comm()->size() > 1) {
+                    comm_    = parallel->comm();
+                    n_alloc_ = std::max(parallel->row_allocation_size(), parallel->col_allocation_size());
+                }
+            }
         }
         void set_preconditioner_op(const std::shared_ptr<Operator<T>>& /*op*/) override {
             // Ignoring op!
@@ -79,7 +98,11 @@ namespace sfem {
             if (!power_method) {
                 auto blas_impl = blas;
                 power_method = std::make_shared<PowerMethod<T>>();
-                power_method->norm2 = [blas_impl](const std::ptrdiff_t n, const T* const x) { return blas_impl->norm2(n, x); };
+                auto comm = comm_;
+                power_method->norm2 = [blas_impl, comm](const std::ptrdiff_t n, const T* const x) {
+                    const T local = blas_impl->dot(n, x, x);
+                    return std::sqrt(comm ? comm->sum(local) : local);
+                };
                 power_method->scal = [blas_impl](const std::ptrdiff_t n, const T alpha, T* const x) { blas_impl->scal(n, alpha, x); };
                 power_method->zeros = [blas_impl](const std::size_t n, T* const x) { blas_impl->zeros(n, x); };
             }
@@ -91,7 +114,7 @@ namespace sfem {
             impl.project(n_dofs, lb, ub, x);
 
             if (debug) {
-                T norm_project = this->blas->norm2(n_dofs, x);
+                T norm_project = norm2(x);
                 printf("norm_project: %g\n", (double)norm_project);
             }
         }
@@ -100,6 +123,7 @@ namespace sfem {
             const T* const lb = lower_bound_ ? lower_bound_->data() : nullptr;
             const T* const ub = upper_bound_ ? upper_bound_->data() : nullptr;
             auto ret = impl.norm_projected_gradient(n_dofs, lb, ub, x, g, eps);
+            if (comm_) ret = std::sqrt(comm_->sum(ret * ret));
 
             if (debug) {
                 printf("norm_projected_gradient: %g\n", (double)ret);
@@ -114,6 +138,12 @@ namespace sfem {
             const T* const ub = upper_bound_ ? upper_bound_->data() : nullptr;
             impl.norm_gradients(
                     n_dofs, lb, ub, x, g, norm_free_gradient, norm_chopped_gradient, eps);
+            if (comm_) {
+                T squares[2] = {*norm_free_gradient * *norm_free_gradient, *norm_chopped_gradient * *norm_chopped_gradient};
+                comm_->sum(squares, 2, smesh::TypeToEnum<T>::value());
+                *norm_free_gradient    = std::sqrt(squares[0]);
+                *norm_chopped_gradient = std::sqrt(squares[1]);
+            }
 
             if (debug) {
                 printf("norm_free_gradient: %g, norm_chopped_gradient: %g\n",
@@ -134,7 +164,7 @@ namespace sfem {
             impl.free_gradient(n_dofs, lb, ub, x, g, gf);
 
             if (debug) {
-                T norm_fg = this->blas->norm2(n_dofs, gf);
+                T norm_fg = norm2(gf);
                 printf("norm_fg: %g\n", (double)norm_fg);
             }
         }
@@ -143,6 +173,7 @@ namespace sfem {
             const T* const lb = lower_bound_ ? lower_bound_->data() : nullptr;
             const T* const ub = upper_bound_ ? upper_bound_->data() : nullptr;
             auto ret = impl.max_alpha(n_dofs, lb, ub, x, p, infty);
+            if (comm_) ret = -comm_->max(-ret);
 
             if (debug) {
                 printf("max_alpha: %g\n", (double)ret);
@@ -171,7 +202,7 @@ namespace sfem {
 
             this->free_gradient(x, g, gf);
 
-            const T beta = this->blas->dot(n_dofs, Ap, gf) / dot_pAp;
+            const T beta = dot(Ap, gf) / dot_pAp;
 
             this->blas->axpby(n_dofs, 1, gf, -beta, p);
         }
@@ -191,7 +222,7 @@ namespace sfem {
                     if (alpha_cg <= alpha_feas) {
                         this->blas->axpby(n_dofs, -alpha_cg, Ap, 1, g);
                         this->free_gradient(x, g, gf);
-                        T beta = this->blas->dot(n_dofs, Ap, gf) / dot_pAp;
+                        T beta = dot(Ap, gf) / dot_pAp;
                         this->blas->axpby(n_dofs, 1, gf, -beta, p);
                     } else {
                         this->project(x);
@@ -218,14 +249,14 @@ namespace sfem {
         /// indefinite operator (a body free to move) the energy does not rise along it, and only a
         /// bound ends the step.
         bool no_curvature(const T dAd, const T* const d) const {
-            const T dd = this->blas->dot(n_dofs, d, d);
+            const T dd = dot(d, d);
             return dd > 0 && dAd <= 64 * std::numeric_limits<T>::epsilon() * max_eig_ * dd;
         }
 
         /// Whether no bound stops a step of alpha_feas along d: none limits it (max_alpha's infty),
         /// or only the bounds that stand for none (infty) do.
         bool unbounded(const T alpha_feas, const T* const d) const {
-            return alpha_feas >= infty || alpha_feas * this->blas->norm2(n_dofs, d) >= infty / 2;
+            return alpha_feas >= infty || alpha_feas * norm2(d) >= infty / 2;
         }
 
         /// The step along a direction without curvature: to the first bound, but no longer than the
@@ -244,7 +275,7 @@ namespace sfem {
 
             this->blas->zeros(n_dofs, Agc);
             apply_op(gc, Agc);
-            const T dot_gcAgc = this->blas->dot(n_dofs, gc, Agc);
+            const T dot_gcAgc = dot(gc, Agc);
             T       alpha_cg;
             if (no_curvature(dot_gcAgc, gc)) {
                 // The energy falls along -gc until a bound stops it.
@@ -252,7 +283,7 @@ namespace sfem {
                 if (unbounded(alpha_feas, gc)) return false;
                 alpha_cg = flat_step(alpha_feas, alpha_bar);
             } else {
-                alpha_cg = this->blas->dot(n_dofs, g, gc) / dot_gcAgc;
+                alpha_cg = dot(g, gc) / dot_gcAgc;
             }
 
             this->blas->axpby(n_dofs, -alpha_cg, gc, 1, x);
@@ -293,10 +324,10 @@ namespace sfem {
             T alpha_feas = -1;  // maximal feasbile step
             T alpha_cg = -1;
 
-            T* g = this->blas->allocate(n_dofs);  // Gradient
-            T* p = this->blas->allocate(n_dofs);
-            T* Ap_or_Ag = this->blas->allocate(n_dofs);
-            T* gf_or_gc = this->blas->allocate(n_dofs);  // Free Gradient or Chopped Gradient
+            T* g = this->blas->allocate(allocation_size());  // Gradient
+            T* p = this->blas->allocate(allocation_size());
+            T* Ap_or_Ag = this->blas->allocate(allocation_size());
+            T* gf_or_gc = this->blas->allocate(allocation_size());  // Free Gradient or Chopped Gradient
 
             T alpha_bar = 1;
             if (expansion_type_ == EXPANSION_TYPE_ORGINAL) {
@@ -316,7 +347,7 @@ namespace sfem {
             this->project(x);  // Make iterate feasible
             this->gradient(x, b, g);
 
-            T norm_g = this->blas->norm2(n_dofs, g);
+            T norm_g = norm2(g);
             this->monitor(0, norm_g, 1);
             T norm_gp0 = norm_g;
 
@@ -336,7 +367,7 @@ namespace sfem {
                     alpha_feas = this->max_alpha(x, p);
                     this->blas->zeros(n_dofs, Ap_or_Ag);
                     this->apply_op(p, Ap_or_Ag);
-                    const T dot_pAp = this->blas->dot(n_dofs, p, Ap_or_Ag);
+                    const T dot_pAp = dot(p, Ap_or_Ag);
 
                     // Without positive curvature the energy falls along -p until a bound stops
                     // it: the expansion step, at the bound. A free body's rigid motions are such
@@ -347,7 +378,7 @@ namespace sfem {
                         break;
                     }
 
-                    alpha_cg = flat ? infty : this->blas->dot(n_dofs, g, p) / dot_pAp;
+                    alpha_cg = flat ? infty : dot(g, p) / dot_pAp;
 
                     if (alpha_cg <= alpha_feas) {
                         this->cg_step(alpha_cg, dot_pAp, Ap_or_Ag, p, g, gf_or_gc, x);

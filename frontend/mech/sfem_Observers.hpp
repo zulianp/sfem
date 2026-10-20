@@ -27,6 +27,13 @@ namespace sfem {
         /// A field filled at each export, n_dofs entries in the function's execution space.
         void add_field(const std::string &name, const std::function<int(const StepRecord &, real_t *const)> &fill);
 
+        /// Under MPI: every rank's owned values written by rank 0, in the numbering of
+        /// `serial_mesh`, the case's mesh read there on its own (null on the other ranks). Each
+        /// node is placed by its id in the file, which the distributed mesh's node_mapping and
+        /// the serial mesh's carry alike, so the output is the one a serial run writes.
+        /// Collective.
+        int gather_to(const std::shared_ptr<Mesh> &serial_mesh);
+
         int initial(const StepRecord &record) override;
         int committed(const StepRecord &record) override;
 

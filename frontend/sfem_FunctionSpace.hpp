@@ -68,6 +68,11 @@ namespace sfem {
         ptrdiff_t n_owned_dofs() const;
         ptrdiff_t n_dofs_global() const;
 
+        /// The owned prefix of x (n_dofs() long) copied into its ghost and aura slots, from the
+        /// ranks that own them: what every evaluation over all local elements reads. Nothing on a
+        /// space that is not distributed.
+        int synchronize(real_t *x);
+
         smesh::ElemType element_type(const int block = 0) const;
         std::vector<smesh::ElemType> element_types() const;
 
