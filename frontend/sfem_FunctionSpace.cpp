@@ -336,7 +336,21 @@ namespace sfem {
         if (!probe) return SFEM_FAILURE;
         impl_->packed_node_map = probe->node_map();
 
+        // The renumbering moves the mesh's node_mapping with the nodes. A mesh read whole has none;
+        // give it the identity, so that a written mesh still says which node of its file each of
+        // its nodes is (a block-selective read already set one).
+        if (impl_->mesh->comm()->size() == 1 && !impl_->mesh->node_mapping()) {
+            const ptrdiff_t n_nodes = impl_->mesh->n_nodes();
+            auto            ids     = create_host_buffer<idx_t>(n_nodes);
+            for (ptrdiff_t i = 0; i < n_nodes; ++i) ids->data()[i] = static_cast<idx_t>(i);
+            impl_->mesh->set_node_mapping(ids);
+        }
+
         impl_->packed_mesh = FunctionSpace::PackedMesh::create(impl_->mesh, {}, true);
+        // Everything keyed by node number describes the numbering before.
+        impl_->node_to_node_graph.reset();
+        impl_->dof_to_dof_graph.reset();
+        impl_->element_node_graph.reset();
         return SFEM_SUCCESS;
     }
 

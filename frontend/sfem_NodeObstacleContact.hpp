@@ -7,6 +7,7 @@
 #include "sfem_ContactStabilisedNewmarkScheme.hpp"
 #include "sfem_NodeObstacleView.hpp"
 #include "sfem_SDFObstacle.hpp"
+#include "sfem_sdf_sampling.hpp"
 #include "sfem_aliases.hpp"
 #include "smesh_grid.hpp"
 
@@ -47,6 +48,17 @@ namespace sfem {
 
         // Samples the gap, the normals and the frames with the nodes displaced by x.
         void update(const real_t *const x);
+
+        // What the constraints see of the sampled gap g (every method, from the next update on):
+        // g - shift + (1 - release) * p0_i, and no obstacle past `cutoff`. `shift` keeps a
+        // clearance; p0_i = max(0, -(g - shift)) at the state of capture_penetration is how far
+        // that state is inside, of which a share 1 - release is still admitted: a start inside
+        // the obstacle is released from it as `release` goes from 0 to 1. Defaults: shift 0, no
+        // cutoff, nothing captured.
+        void set_shift(const real_t shift) { shift_ = shift; }
+        void set_cutoff(const real_t cutoff) { cutoff_ = cutoff; }
+        void capture_penetration(const real_t *const x);
+        void set_release(const real_t release) { release_ = release; }
 
         // v <- Q^T v at the contact nodes: into their frames.
         void to_frame(real_t *const v) const;
@@ -133,6 +145,13 @@ namespace sfem {
         SharedBuffer<real_t>         ahead_;
         SharedBuffer<real_t>         ahead_gap_;
         SharedBuffer<real_t>         ahead_normals_;  // 3 rows
+        SharedBuffer<real_t>         p0_;             // null until capture_penetration
+        real_t                       shift_{0};
+        real_t                       cutoff_{SFEM_SDF_UNREACHABLE};
+        real_t                       release_{1};
+
+        // The sampled gap and normals to what the constraints see.
+        void offset(const SharedBuffer<real_t> &gap, const SharedBuffer<real_t> &normals) const;
 
         // The contact nodes with these normals and gaps (the current or the ahead samples).
         NodeObstacleView view(const SharedBuffer<real_t> &normals, const SharedBuffer<real_t> &gap) const;

@@ -12,6 +12,14 @@ namespace sfem {
     void d_node_obstacle_from_frame(const NodeObstacleView &c, real_t *const v);
     void d_node_obstacle_upper_bound(const NodeObstacleView &c, const ptrdiff_t ndofs, const real_t unbounded, real_t *const ub);
 
+    void d_node_obstacle_offset_gap(const ptrdiff_t      size,
+                                    const real_t         shift,
+                                    const real_t         cutoff,
+                                    const real_t         release,
+                                    const real_t *const  p0,
+                                    real_t *const        gap,
+                                    real_t *const *const normals);
+
     // projected (a copy of the residual) less the reaction, mu kept; complementarity into c and
     // -gap into penetration, per contact node.
     void d_node_obstacle_kkt(const NodeObstacleView &c,

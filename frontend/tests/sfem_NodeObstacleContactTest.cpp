@@ -3,6 +3,7 @@
 // The obstacle is the half-space z < 0, its SDF -z (positive inside): at a node at height z the
 // gap is z and the normal (0, 0, -1). The block's nodes start above it.
 
+#include <algorithm>
 #include <cmath>
 #include <memory>
 #include <vector>
@@ -80,6 +81,45 @@ int test_gap_and_frames() {
 
 // The reaction is the admissible part of the residual, -mu n with mu = max(0, -n . r): here
 // max(0, r_z) along +z, nothing tangential.
+// What the constraints see of the gap: the shift is a clearance, past the cutoff there is no
+// obstacle, and a start inside it is released as the release goes from 0 to 1.
+int test_shift_cutoff_release() {
+    auto                f = make_fixture();
+    const geom_t *const z = f.mesh->points()->data()[2];
+    const real_t        shift = 0.05, cutoff = 0.5, sink = 0.2;
+
+    f.contact->set_shift(shift);
+    f.contact->set_cutoff(cutoff);
+    std::vector<real_t> x(f.ndofs, 0);
+    f.contact->update(x.data());
+    for (ptrdiff_t i = 0; i < f.nnodes; ++i) {
+        const real_t g = f.contact->gap()->data()[i];
+        if (z[i] - shift > cutoff) {
+            SFEM_TEST_ASSERT(g >= real_t(SFEM_SDF_UNREACHABLE));
+        } else {
+            SFEM_TEST_ASSERT(std::abs(g - (z[i] - shift)) < 1e-6);
+        }
+    }
+
+    // Sunk by `sink`, the bottom nodes start inside: released, nothing is; half released, half the
+    // starting penetration is still admitted.
+    for (ptrdiff_t i = 0; i < f.nnodes; ++i) x[i * 3 + 2] = -sink;
+    f.contact->capture_penetration(x.data());
+    for (const real_t release : {real_t(0), real_t(0.5), real_t(1)}) {
+        f.contact->set_release(release);
+        f.contact->update(x.data());
+        for (ptrdiff_t i = 0; i < f.nnodes; ++i) {
+            const real_t raw = z[i] - sink - shift;
+            if (raw > cutoff) continue;
+            const real_t p0 = std::max(real_t(0), -raw);
+            SFEM_TEST_ASSERT(std::abs(f.contact->gap()->data()[i] - (raw + (1 - release) * p0)) < 1e-6);
+        }
+        if (release == 0) SFEM_TEST_ASSERT(f.contact->min_gap() > -1e-6);
+        if (release == 1) SFEM_TEST_ASSERT(f.contact->min_gap() < -0.1);
+    }
+    return SFEM_TEST_SUCCESS;
+}
+
 int test_reaction() {
     auto                f = make_fixture();
     std::vector<real_t> x(f.ndofs, 0), r(f.ndofs), k(f.ndofs, 1), projected(f.ndofs), reaction(f.ndofs);
@@ -245,6 +285,21 @@ int test_device_matches_host() {
     host.project_velocity(x.data(), vh.data(), real_t(0.1));
     device.project_velocity(dx->data(), dv->data(), real_t(0.1));
     SFEM_TEST_ASSERT(worst(vh, host_copy(dv->data(), ndofs)) < 1e-12);
+
+    // The gap with a clearance, a cutoff and half of the start's penetration released.
+    for (auto *c : {&host, &device}) {
+        c->set_shift(real_t(0.01));
+        c->set_cutoff(real_t(0.2));
+    }
+    host.capture_penetration(x.data());
+    device.capture_penetration(dx->data());
+    host.set_release(real_t(0.5));
+    device.set_release(real_t(0.5));
+    host.update(x.data());
+    device.update(dx->data());
+    const real_t go = worst(std::vector<real_t>(host.gap()->data(), host.gap()->data() + nnodes), host_copy(device.gap()->data(), nnodes));
+    printf("  offset gap %.3g\n", (double)go);
+    SFEM_TEST_ASSERT(go < 1e-12);
     return SFEM_TEST_SUCCESS;
 }
 #endif
@@ -252,6 +307,7 @@ int test_device_matches_host() {
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_gap_and_frames);
+    SFEM_RUN_TEST(test_shift_cutoff_release);
     SFEM_RUN_TEST(test_reaction);
     SFEM_RUN_TEST(test_project_velocity);
 #ifdef SFEM_ENABLE_CUDA

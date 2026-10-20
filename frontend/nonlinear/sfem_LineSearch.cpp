@@ -45,6 +45,25 @@ namespace sfem {
         const int   n     = (int)steps.size();
         values_.assign(n, std::numeric_limits<real_t>::infinity());
 
+        if (options_.rule == LineSearchOptions::Rule::DAMPED) {
+            // The damped step, shortened only where the state cannot be evaluated.
+            for (int i = 0; i < n; ++i) {
+                const real_t s = options_.damping * steps[i];
+                merit.evaluate(x, h, 1, &s, &values_[i]);
+                result.evaluations++;
+                if (std::isfinite(values_[i])) {
+                    result.status = LineSearchResult::ACCEPTED;
+                    result.alpha  = s;
+                    result.merit  = values_[i];
+                    return result;
+                }
+            }
+            result.status = LineSearchResult::NON_FINITE;
+            result.alpha  = 0;
+            result.merit  = m0;
+            return result;
+        }
+
         // Armijo needs a descent direction; along an ascent one only a measured decrease counts.
         auto armijo = [&](const int i) {
             return slope < 0 && values_[i] <= m0 + options_.c1 * steps[i] * slope;

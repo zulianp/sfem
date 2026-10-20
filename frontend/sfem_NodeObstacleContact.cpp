@@ -64,7 +64,36 @@ namespace sfem {
         real_t *nn[3];
         rows(normals_, 3, nn);
         obstacle_->sample_nodes(size(), idx_->data(), xyz_, x, gap_->data(), nn);
+        offset(gap_, normals_);
         node_obstacle_frames(view(normals_, gap_), dir_);
+    }
+
+    void NodeObstacleContact::offset(const SharedBuffer<real_t> &gap, const SharedBuffer<real_t> &normals) const {
+        real_t *nn[3];
+        rows(normals, 3, nn);
+        node_obstacle_offset_gap(es_, size(), shift_, cutoff_, 1 - release_, p0_ ? p0_->data() : nullptr, gap->data(), nn);
+    }
+
+    void NodeObstacleContact::capture_penetration(const real_t *const x) {
+        SFEM_TRACE_SCOPE("NodeObstacleContact::capture_penetration");
+
+        // The penetration of x with everything admitted so far dropped: what remains to release.
+        p0_ = nullptr;
+        update(x);
+        // Once, on the host: p0 = max(0, -gap); unreachable gaps are large and positive, giving 0.
+        auto gaps = gap_;
+#ifdef SFEM_ENABLE_CUDA
+        if (gaps->mem_space() == MEMORY_SPACE_DEVICE) gaps = smesh::to_host(gaps);
+#endif
+        auto p0 = create_host_buffer<real_t>(size());
+        for (ptrdiff_t i = 0; i < size(); ++i) {
+            p0->data()[i] = std::max(real_t(0), -gaps->data()[i]);
+        }
+#ifdef SFEM_ENABLE_CUDA
+        if (es_ == EXECUTION_SPACE_DEVICE) p0 = smesh::to_device(p0);
+#endif
+        p0_ = p0;
+        update(x);
     }
 
     void NodeObstacleContact::to_frame(real_t *const v) const { node_obstacle_to_frame(view(normals_, gap_), v); }
@@ -117,6 +146,7 @@ namespace sfem {
         real_t *an[3];
         rows(ahead_normals_, 3, an);
         obstacle_->sample_nodes(size(), idx_->data(), xyz_, ahead_->data(), ahead_gap_->data(), an);
+        offset(ahead_gap_, ahead_normals_);
         node_obstacle_project_velocity(view(ahead_normals_, ahead_gap_), v, dt);
     }
 
