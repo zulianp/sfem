@@ -130,8 +130,9 @@ namespace sfem {
         Curvature curvature(const T* const x, const T* const g, const T* const d, const T* const Ad, T* const work) const {
             T out[4];
             impl.curvature(n_dofs, lb(), ub(), x, g, d, Ad, infty, out, work);
-            sum(out, 3);
-            return {out[0], out[1], out[2], min(out[3])};
+            // The three sums and the step bound in one message.
+            if (comm_) comm_->sum_and_min_last(out, 4, smesh::TypeToEnum<T>::value());
+            return {out[0], out[1], out[2], out[3]};
         }
 
         /// At the iterate a step reaches: Ad.gf for the next direction, and the norms that choose

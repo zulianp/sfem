@@ -157,6 +157,20 @@ int test_synchronize_after_packing() {
     return SFEM_TEST_SUCCESS;
 }
 
+// A solver's dot products and its step bound reduced in one message: the sums of the first
+// entries, the minimum of the last, on every rank, for f64 and f32.
+int test_sum_and_min_last() {
+    auto      comm = sfem::Communicator::world();
+    const int r = comm->rank(), p = comm->size();
+    double    d[4] = {1.0 * r, 1.0, 2.5, 10.0 - r};
+    float     f[3] = {2.0f * r, 0.5f, 3.0f + r};
+    comm->sum_and_min_last(d, 4, smesh::SMESH_FLOAT64);
+    comm->sum_and_min_last(f, 3, smesh::SMESH_FLOAT32);
+    SFEM_TEST_ASSERT(d[0] == p * (p - 1) / 2.0 && d[1] == p && d[2] == 2.5 * p && d[3] == 10.0 - (p - 1));
+    SFEM_TEST_ASSERT(f[0] == float(p * (p - 1)) && f[1] == 0.5f * p && f[2] == 3.0f);
+    return SFEM_TEST_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_parallel_function_space_hex8_cube);
@@ -164,6 +178,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_parallel_function_space_hex8_tet4);
     SFEM_RUN_TEST(test_parallel_function_space_tet4_cube);
     SFEM_RUN_TEST(test_synchronize_after_packing);
+    SFEM_RUN_TEST(test_sum_and_min_last);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }
