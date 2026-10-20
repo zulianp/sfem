@@ -15,4 +15,6 @@ __pycache__/
 # files under data/ are measurement provenance that the figure generators read, so a fresh clone
 # without them produces a paper full of placeholders. Un-ignored explicitly.
 !data/*.out
-!data/scatter_*/*.out
+
+# Raw scatter evidence is supplied separately from the review changes.
+/data/pasc27-scatter-5026072.zip

@@ -2788,10 +2788,20 @@ def selftest():
         spec.loader.exec_module(scatter)
         check(scatter.selftest(), "scatter arithmetic and invalid-data rejection")
 
-        # Missing data must be absent, not fabricated.
+        # A source-only checkout can run the checks, but cannot regenerate missing evidence.
         with tempfile.TemporaryDirectory() as td2:
-            written = build(os.path.join(td2, "f"), os.path.join(td2, "t"))
-            check(isinstance(written, list), "build returns the list of files it wrote")
+            archive = os.environ.get("SFEM_SCATTER_ARCHIVE", os.path.join(DATA, scatter.ARCHIVE_NAME))
+            if os.path.isfile(archive):
+                written = build(os.path.join(td2, "f"), os.path.join(td2, "t"))
+                check(isinstance(written, list), "build returns the list of files it wrote")
+            else:
+                try:
+                    build(os.path.join(td2, "f"), os.path.join(td2, "t"))
+                except FileNotFoundError as error:
+                    check("Missing scatter evidence archive:" in str(error),
+                          "regeneration refuses missing scatter evidence")
+                else:
+                    check(False, "regeneration accepted missing scatter evidence")
 
     print()
     if fails:

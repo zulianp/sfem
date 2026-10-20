@@ -11,6 +11,10 @@ make selftest  run the generators' own checks
 make check     the submission gates (clean build, no undefined refs, page limit)
 ```
 
+`make` uses the committed figure and table inputs. To regenerate the scatter
+results with `make figures`, first supply the evidence archive described under
+"Residual accumulation measurement" below. Missing evidence is an error.
+
 ## The rule this directory is built around
 
 **No measured number is typed into `main.tex`.** Everything arrives through `\input{}` of a
@@ -97,7 +101,7 @@ tree carrying it, and the generator picks the newest file per prefix, so these a
 | f32 against f64, every layout (ladder f32 group) | 5006525 | `data/f32_5006525.out` |
 | exact higher-order Jacobian breakdown | 5005769 | `data/hoexact_5005769.out` |
 | instruction mix | 5003851 | `data/kmix_5003851.out` |
-| residual accumulation diagnostic | 5026072 (nid006544) | `data/scatter_5026072/` |
+| residual accumulation diagnostic | 5026072 (nid006544) | external `pasc27-scatter-5026072.zip` (instructions below) |
 | higher-order size sweep | 5005800 | `data/hosize_5005800.out` |
 
 The rows naming jobs 5005763-5005800 were measured again after the limiter derivatives' rounding
@@ -284,8 +288,9 @@ normal range from -2.38% to +0.75% across all eight cases. These observations
 support accumulation as the main contributor in this diagnostic; they do not
 measure isolated atomic latency or establish a universal production fraction.
 
-The raw logs are copied verbatim, with the suffix changed to `.out`, under
-`data/scatter_5026072/`. Its `provenance.json` binds their hashes, source manifest,
+The raw logs are preserved verbatim, with the suffix changed to `.out`, in the
+separate `pasc27-scatter-5026072.zip` archive. It contains the original 15 files
+under `scatter_5026072/`. Its `provenance.json` binds their hashes, source manifest,
 source patch, binary hash and verification output. All 4250 source checks passed;
 the largest full-probe/normal residual difference was 2.972e-16 per equation,
 and every captured element contribution was bit-identical between probe modes.
@@ -294,8 +299,59 @@ earlier Jacobian-only changes. It is retained unchanged for provenance; the
 residual accumulation study can be reviewed independently of those changes.
 `python/scatter_figures.py`, called by `perf_figures.py`, generates
 `tables/scatter.tex` and `figures/scatter_macros.tex`. It rejects missing cases,
-failed checks and altered input files. `make figures` now propagates generator
-errors so it cannot quietly reuse a stale table after failed validation.
+failed checks and altered input files. It also requires the exact archive checksum
+and member list. `make figures` checks the archive before generating any figures,
+so missing evidence cannot quietly reuse a stale scatter table.
+
+### Obtaining and checking the scatter archive
+
+The archive SHA256 is:
+
+```
+1b34fdb16838fc53d455d9d61b1cd74b813aae117f961b9f907ca53b0b14945e
+```
+
+Keep the archive outside Git. From `wip/paper`, point the generator to it:
+
+```bash
+export SFEM_SCATTER_ARCHIVE=/path/to/pasc27-scatter-5026072.zip
+python3 python/scatter_figures.py
+make figures
+```
+
+Alternatively, put it at the ignored path
+`wip/paper/data/pasc27-scatter-5026072.zip`; no environment variable is then needed.
+The generator reads it in a temporary directory and checks the original provenance.
+The measured values and generated table are unchanged.
+
+Until a supplementary archive download is published, the complete evidence remains
+recoverable from the original review commit
+`9ce344db3a1b08bea273f97c9f16d84aa553ae07`, also retained in this branch's history.
+With that commit available locally, run from `wip/paper`:
+
+```bash
+python3 python/scatter_figures.py --recover-archive-from-git
+make figures
+```
+
+Recovery uses local Git objects, verifies the archive checksum, and never overwrites
+an existing archive. If a shallow checkout lacks the commit, fetch it first:
+
+```bash
+git fetch origin 9ce344db3a1b08bea273f97c9f16d84aa553ae07
+```
+
+This removes raw evidence from the review's final file diff; it does not remove the
+original files from Git history or reduce the size of a full historical clone.
+
+### File scope for subsequent review contributions
+
+Keep implementation changes, focused regression tests, required analysis scripts,
+paper source and generated paper inputs together. Supply raw captures, per-run
+source snapshots and detailed environment records in separate checksummed evidence
+archives. Each contribution must explain how to obtain its evidence and regenerate
+its outputs; absent or changed evidence must fail regeneration. Keep temporary
+builds, local handoff notes and duplicate run wrappers out of the review.
 
 ## Open
 
