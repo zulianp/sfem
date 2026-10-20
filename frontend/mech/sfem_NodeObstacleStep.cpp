@@ -57,6 +57,8 @@ namespace sfem {
         SharedBuffer<real_t>                 scale, inverse_scale, scaled_bound, qp_tmp;
         real_t                               k_max{0};
         real_t                               tol{0};
+        // The merit of the iterate measured last: the reference of the QP's forcing term.
+        real_t                               merit{0};
         bool                                 first_measure{true};
         int                                  iterations{0};
 
@@ -90,7 +92,7 @@ namespace sfem {
             qp->set_upper_bound(scaled_bound);
             // Converged as the unscaled QP is, on the gradient of y = S z: S^{-1} times z's.
             qp->set_norm_weight(inverse_scale);
-            qp->set_atol(real_t(0.1) * tol);
+            qp->set_atol(std::max(real_t(0.1) * tol, options.qp_rtol * merit));
             return SFEM_SUCCESS;
         }
 
@@ -206,7 +208,8 @@ namespace sfem {
         impl.qp->verbose    = false;
         impl.qp->check_each = std::numeric_limits<int>::max();
         impl.qp->set_max_it(options.qp_max_it);
-        impl.qp->set_rtol(options.qp_rtol);
+        // The QP's tolerance is the step's forcing term (update_scaling), not relative to its start.
+        impl.qp->set_rtol(0);
         return ret;
     }
 
@@ -251,6 +254,7 @@ namespace sfem {
         // penetration, as the merit counts it, is the force that removing it takes.
         m.reference             = std::max(m.value + impl.k_max * penetration, impl.reductions->norm2(r));
         m.infeasibility         = penetration;
+        impl.merit              = m.value + impl.k_max * penetration;
         m.admissible            = penetration <= impl.options.gap_tol;
         if (impl.first_measure) {
             impl.tol           = std::max(impl.options.atol, impl.options.rtol * m.reference);

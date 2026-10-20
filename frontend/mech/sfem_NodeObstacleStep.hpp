@@ -19,6 +19,11 @@ namespace sfem {
         /// Penetration admitted, a length.
         real_t gap_tol{0};
         int    qp_max_it{20000};
+        /// The forcing term of an inexact Newton step: the QP stops once its projected gradient is
+        /// qp_rtol times the iterate's merit (KKT residual and penetration), at the latest at a
+        /// tenth of the Newton tolerance. Relative to the QP's own start it would not do: a node
+        /// a rounding error off its bound counts its whole reaction there, which the KKT residual
+        /// does not, so that start stays of the size of the reactions however far Newton is.
         real_t qp_rtol{real_t(1e-10)};
         /// A QP stopped by qp_max_it is the step as it stands, not a failure to retry.
         bool qp_accept_capped{false};
