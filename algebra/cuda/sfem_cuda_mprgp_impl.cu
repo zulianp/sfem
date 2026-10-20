@@ -2,652 +2,269 @@
 #include "sfem_cuda_mprgp_impl.hpp"
 
 #include "sfem_cuda_base.hpp"
+#include "sfem_mprgp_bounds.hpp"
 
-#include <cassert>
-
-#define SFEM_N_WARPS_PER_BLOCK 8
+#include <algorithm>
+#include <type_traits>
 
 namespace sfem {
-    inline __device__ unsigned int lane_id() { return threadIdx.x % SFEM_WARP_SIZE; }
+    namespace {
+        constexpr int N_THREADS  = 256;  // per block
+        constexpr int N_WARPS    = N_THREADS / SFEM_WARP_SIZE;
+        constexpr int MAX_BLOCKS = 1024;  // the loops stride over dofs past the grid
+        constexpr int N_VALUES   = 4;     // reductions of one pass
 
-    template <typename T>
-    __device__ T warp_reduce_32(const T in) {
-        static_assert(SFEM_WARP_SIZE == 32, "Only implemented for CUDA!");
-        T out = in;
-        out += __shfl_xor_sync(SFEM_WARP_FULL_MASK, out, 16, SFEM_WARP_SIZE);  // 0-16, 1-17, ..., 15-31
-        out += __shfl_xor_sync(SFEM_WARP_FULL_MASK, out, 8, SFEM_WARP_SIZE);   // 0-8, ..., 1-7, ..., 23-31
-        out += __shfl_xor_sync(SFEM_WARP_FULL_MASK, out, 4, SFEM_WARP_SIZE);
-        out += __shfl_xor_sync(SFEM_WARP_FULL_MASK, out, 2, SFEM_WARP_SIZE);
-        out += __shfl_xor_sync(SFEM_WARP_FULL_MASK, out, 1, SFEM_WARP_SIZE);
-        return out;
-    }
+        // Per-block partials, value-major (k * MAX_BLOCKS + block), then the N_VALUES results.
+        constexpr ptrdiff_t WORK_SIZE = N_VALUES * MAX_BLOCKS + N_VALUES;
 
-    template <typename T>
-    inline static __device__ __host__ T tmin(const T a, const T b) {
-        return (a < b) ? a : b;
-    }
-
-    template <typename T>
-    inline static __device__ __host__ T tmax(const T a, const T b) {
-        return (a > b) ? a : b;
-    }
-
-    template <typename T>
-    __device__ T warp_min_32(const T in) {
-        static_assert(SFEM_WARP_SIZE == 32, "Only implemented for CUDA!");
-        T out = in;
-        out   = tmin(out, __shfl_xor_sync(SFEM_WARP_FULL_MASK, out, 16, SFEM_WARP_SIZE));  // 0-16, 1-17, ..., 15-31
-        out   = tmin(out, __shfl_xor_sync(SFEM_WARP_FULL_MASK, out, 8, SFEM_WARP_SIZE));   // 0-8, ..., 1-7, ..., 23-31
-        out   = tmin(out, __shfl_xor_sync(SFEM_WARP_FULL_MASK, out, 4, SFEM_WARP_SIZE));
-        out   = tmin(out, __shfl_xor_sync(SFEM_WARP_FULL_MASK, out, 2, SFEM_WARP_SIZE));
-        out   = tmin(out, __shfl_xor_sync(SFEM_WARP_FULL_MASK, out, 1, SFEM_WARP_SIZE));
-        return out;
-    }
-
-    template <typename T>
-    __device__ T warp_max_32(const T in) {
-        static_assert(SFEM_WARP_SIZE == 32, "Only implemented for CUDA!");
-        T out = in;
-        out   = tmax(out, __shfl_xor_sync(SFEM_WARP_FULL_MASK, out, 16, SFEM_WARP_SIZE));  // 0-16, 1-17, ..., 15-31
-        out   = tmax(out, __shfl_xor_sync(SFEM_WARP_FULL_MASK, out, 8, SFEM_WARP_SIZE));   // 0-8, ..., 1-7, ..., 23-31
-        out   = tmax(out, __shfl_xor_sync(SFEM_WARP_FULL_MASK, out, 4, SFEM_WARP_SIZE));
-        out   = tmax(out, __shfl_xor_sync(SFEM_WARP_FULL_MASK, out, 2, SFEM_WARP_SIZE));
-        out   = tmax(out, __shfl_xor_sync(SFEM_WARP_FULL_MASK, out, 1, SFEM_WARP_SIZE));
-        return out;
-    }
-
-    template <typename T>
-    __device__ void t_warp_reduce(const T val, T* block_accumulator, T* result) {
-        T                  acc     = warp_reduce_32(val);
-        const unsigned int warp_id = threadIdx.x / SFEM_WARP_SIZE;
-        const unsigned int lid     = lane_id();
-        const unsigned int n_warps = (blockDim.x + SFEM_WARP_SIZE - 1) / SFEM_WARP_SIZE;
-
-        if (!lid) {
-            block_accumulator[warp_id] = acc;
+        int n_blocks(const ptrdiff_t n) {
+            return int(std::min<ptrdiff_t>(MAX_BLOCKS, std::max<ptrdiff_t>(1, (n + N_THREADS - 1) / N_THREADS)));
         }
 
-        __syncthreads();
+        template <class B>
+        using Bounds = typename std::decay<B>::type;
 
-        if (!warp_id) {
-            assert(warp_id < SFEM_N_WARPS_PER_BLOCK);
-            acc = lid < n_warps ? block_accumulator[lid] : 0;
-            acc = warp_reduce_32(acc);
+        // The first N_SUM values are sums, the others minima.
+        template <typename T, int N_SUM>
+        __device__ T combine(const int k, const T a, const T b) {
+            return k < N_SUM ? a + b : ((b < a) ? b : a);
+        }
 
-            if (!threadIdx.x) {
-                assert(acc == acc);
-                atomicAdd(result, acc);
+        template <typename T, int N_SUM>
+        __device__ T identity(const int k, const T infty) {
+            return k < N_SUM ? T(0) : infty;
+        }
+
+        // Reduces each thread's values over the block, in a fixed order; thread 0 holds the result.
+        template <typename T, int N_SUM>
+        __device__ void block_reduce(T (&v)[N_VALUES], const T infty) {
+            __shared__ T shared[N_VALUES][N_WARPS];
+            const int    lane = threadIdx.x % SFEM_WARP_SIZE, warp = threadIdx.x / SFEM_WARP_SIZE;
+            for (int k = 0; k < N_VALUES; ++k) {
+                for (int offset = SFEM_WARP_SIZE / 2; offset > 0; offset /= 2) {
+                    v[k] = combine<T, N_SUM>(k, v[k], __shfl_down_sync(SFEM_WARP_FULL_MASK, v[k], offset));
+                }
+                if (!lane) shared[k][warp] = v[k];
+            }
+            __syncthreads();
+            if (!warp) {
+                for (int k = 0; k < N_VALUES; ++k) {
+                    v[k] = lane < N_WARPS ? shared[k][lane] : identity<T, N_SUM>(k, infty);
+                    for (int offset = SFEM_WARP_SIZE / 2; offset > 0; offset /= 2) {
+                        v[k] = combine<T, N_SUM>(k, v[k], __shfl_down_sync(SFEM_WARP_FULL_MASK, v[k], offset));
+                    }
+                }
             }
         }
-    }
 
-    template <typename T>
-    __device__ void t_warp_min(const T val, T* block_accumulator, T* result) {
-        T acc = warp_min_32(val);
-
-        const unsigned int warp_id = threadIdx.x / SFEM_WARP_SIZE;
-        const unsigned int lid     = lane_id();
-        const unsigned int n_warps = (blockDim.x + SFEM_WARP_SIZE - 1) / SFEM_WARP_SIZE;
-
-        if (!lid) {
-            block_accumulator[warp_id] = acc;
-        }
-
-        __syncthreads();
-
-        if (!warp_id) {
-            assert(warp_id < SFEM_N_WARPS_PER_BLOCK);
-            acc = lid < n_warps ? block_accumulator[lid] : block_accumulator[0];
-            acc = warp_min_32(acc);
-
+        template <typename T, int N_SUM>
+        __device__ void write_partials(T (&v)[N_VALUES], const T infty, T* const SFEM_RESTRICT work) {
+            block_reduce<T, N_SUM>(v, infty);
             if (!threadIdx.x) {
-                assert(acc == acc);
-                result[blockIdx.x] = acc;
+                for (int k = 0; k < N_VALUES; ++k) work[k * MAX_BLOCKS + blockIdx.x] = v[k];
             }
         }
-    }
 
-    // template <typename T>
-    // __device__ void t_warp_max(const T val, T* block_accumulator, T* result) {
-    //     T acc = warp_max_32(val);
-
-    //     const unsigned int warp_id = threadIdx.x / SFEM_WARP_SIZE;
-    //     const unsigned int lid = lane_id();
-
-    //     if (!lid) {
-    //         block_accumulator[warp_id] = acc;
-    //     }
-
-    //     __syncthreads();
-
-    //     if (!warp_id) {
-    //         assert(warp_id < SFEM_N_WARPS_PER_BLOCK);
-    //         acc = block_accumulator[lid];
-    //         acc = warp_max_32(acc);
-
-    //         if (!threadIdx.x) {
-    //             atomicMax(result, acc);
-    //         }
-    //     }
-    // }
-
-    inline static __device__ __host__ double tabs(const double a) { return fabs(a); }
-    inline static __device__ __host__ float  tabs(const float a) { return fabsf(a); }
-
-    template <typename T>
-    inline static __device__ __host__ T gf_lb_ub(const T lbi, const T ubi, const T xi, const T gi) {
-#if 1
-        return (xi <= lbi || xi >= ubi) ? T(0) : gi;
-#else
-        return ((tabs(lbi - xi) < eps) || (tabs(ubi - xi) < eps)) ? T(0) : gi;
-#endif
-    }
-
-    template <typename T>
-    inline static __device__ __host__ T gf_lb(const T lbi, const T xi, const T gi) {
-#if 1
-        return (xi <= lbi) ? T(0) : gi;
-#else
-        return (tabs(lbi - xi) < eps) ? T(0) : gi;
-#endif
-    }
-
-    template <typename T>
-    inline static __device__ __host__ T gf_ub(const T ubi, const T xi, const T gi) {
-#if 1
-        return (xi >= ubi) ? T(0) : gi;
-#else
-        return (tabs(ubi - xi) < eps) ? T(0) : gi;
-#endif
-    }
-
-    template <typename T>
-    inline static __device__ __host__ T gc_lb_ub(const T lbi, const T ubi, const T xi, const T gi, const T eps) {
-        return ((tabs(lbi - xi) < eps) ? tmin(T(0), gi) : ((tabs(ubi - xi) < eps) ? tmax(T(0), gi) : T(0)));
-    }
-
-    template <typename T>
-    inline static __device__ __host__ T gc_lb(const T lbi, const T xi, const T gi, const T eps) {
-        return ((tabs(lbi - xi) < eps) ? tmin(T(0), gi) : T(0));
-    }
-
-    template <typename T>
-    inline static __device__ __host__ T gc_ub(const T ubi, const T xi, const T gi, const T eps) {
-        return ((tabs(ubi - xi) < eps) ? tmax(T(0), gi) : T(0));
-    }
-
-    template <typename T>
-    __global__ void project_lb_ub_kernel(const ptrdiff_t              n,
-                                         const T* const SFEM_RESTRICT lb,
-                                         const T* const SFEM_RESTRICT ub,
-                                         T* const SFEM_RESTRICT       x) {
-        for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
-            x[i] = tmax(tmin(x[i], ub[i]), lb[i]);
-        }
-    }
-
-    template <typename T>
-    __global__ void project_lb_kernel(const ptrdiff_t n, const T* const SFEM_RESTRICT lb, T* const SFEM_RESTRICT x) {
-        for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
-            x[i] = tmax(x[i], lb[i]);
-        }
-    }
-
-    template <typename T>
-    __global__ void project_ub_kernel(const ptrdiff_t n, const T* const SFEM_RESTRICT ub, T* const SFEM_RESTRICT x) {
-        for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
-            x[i] = tmin(x[i], ub[i]);
-        }
-    }
-
-    template <typename T>
-    static void project(const ptrdiff_t              n,
-                        const T* const SFEM_RESTRICT lb,
-                        const T* const SFEM_RESTRICT ub,
-                        T* const SFEM_RESTRICT       x) {
-        int       kernel_block_size = SFEM_WARP_SIZE * SFEM_N_WARPS_PER_BLOCK;
-        ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
-
-        if (lb && ub) {
-            project_lb_ub_kernel<<<n_blocks, kernel_block_size>>>(n, lb, ub, x);
-        } else if (ub) {
-            project_ub_kernel<<<n_blocks, kernel_block_size>>>(n, ub, x);
-        } else if (lb) {
-            project_lb_kernel<<<n_blocks, kernel_block_size>>>(n, lb, x);
-        }
-    }
-
-    template <typename T>
-    __global__ void norm_projected_gradient_lb_ub_kernel(const ptrdiff_t              n,
-                                                         const T* const SFEM_RESTRICT lb,
-                                                         const T* const SFEM_RESTRICT ub,
-                                                         const T* const SFEM_RESTRICT x,
-                                                         const T* const SFEM_RESTRICT g,
-                                                         const T                      eps,
-                                                         T* SFEM_RESTRICT             result) {
-        T acc = 0;
-        for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
-            const T d = gf_lb_ub(lb[i], ub[i], x[i], g[i]) + gc_lb_ub(lb[i], ub[i], x[i], g[i], eps);
-            acc += d * d;
+        // One block: the partials of n_blocks blocks into the results at work + N_VALUES * MAX_BLOCKS.
+        template <typename T, int N_SUM>
+        __global__ void finish_kernel(const int n_blocks, const T infty, T* const SFEM_RESTRICT work) {
+            T v[N_VALUES];
+            for (int k = 0; k < N_VALUES; ++k) {
+                v[k] = identity<T, N_SUM>(k, infty);
+                for (int b = threadIdx.x; b < n_blocks; b += blockDim.x) {
+                    v[k] = combine<T, N_SUM>(k, v[k], work[k * MAX_BLOCKS + b]);
+                }
+            }
+            block_reduce<T, N_SUM>(v, infty);
+            if (!threadIdx.x) {
+                for (int k = 0; k < N_VALUES; ++k) work[N_VALUES * MAX_BLOCKS + k] = v[k];
+            }
         }
 
-        __shared__ T block_accumulator[SFEM_N_WARPS_PER_BLOCK];
-        t_warp_reduce(acc, block_accumulator, result);
-    }
-
-    template <typename T>
-    __global__ void norm_projected_gradient_lb_kernel(const ptrdiff_t              n,
-                                                      const T* const SFEM_RESTRICT lb,
-                                                      const T* const SFEM_RESTRICT x,
-                                                      const T* const SFEM_RESTRICT g,
-                                                      const T                      eps,
-                                                      T* SFEM_RESTRICT             result) {
-        T acc = 0;
-        for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
-            const T d = gf_lb(lb[i], x[i], g[i]) + gc_lb(lb[i], x[i], g[i], eps);
-            acc += d * d;
-        }
-
-        __shared__ T block_accumulator[SFEM_N_WARPS_PER_BLOCK];
-        t_warp_reduce(acc, block_accumulator, result);
-    }
-
-    template <typename T>
-    __global__ void norm_projected_gradient_ub_kernel(const ptrdiff_t              n,
-                                                      const T* const SFEM_RESTRICT ub,
-                                                      const T* const SFEM_RESTRICT x,
-                                                      const T* const SFEM_RESTRICT g,
-                                                      const T                      eps,
-                                                      T*                           result) {
-        T acc = 0;
-        for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
-            const T d = gf_ub(ub[i], x[i], g[i]) + gc_ub(ub[i], x[i], g[i], eps);
-            acc += d * d;
-        }
-
-        __shared__ T block_accumulator[SFEM_N_WARPS_PER_BLOCK];
-        t_warp_reduce(acc, block_accumulator, result);
-    }
-
-    template <typename T>
-    static T norm_projected_gradient(const ptrdiff_t              n,
-                                     const T* const SFEM_RESTRICT lb,
-                                     const T* const SFEM_RESTRICT ub,
-                                     const T* const SFEM_RESTRICT x,
-                                     const T* const SFEM_RESTRICT g,
-                                     const T                      eps) {
-        int       kernel_block_size = SFEM_WARP_SIZE * SFEM_N_WARPS_PER_BLOCK;
-        ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
-
-        T* device_value = nullptr;
-
-        cudaMalloc((void**)&device_value, sizeof(T));
-        cudaMemset((void*)device_value, 0, sizeof(T));
-
-        if (lb && ub) {
-            norm_projected_gradient_lb_ub_kernel<<<n_blocks, kernel_block_size>>>(n, lb, ub, x, g, eps, device_value);
+        template <typename T, int N_SUM>
+        void finish(const int n_blocks, const T infty, T* const work, T* const out) {
+            finish_kernel<T, N_SUM><<<1, N_THREADS>>>(n_blocks, infty, work);
             SFEM_DEBUG_SYNCHRONIZE();
-        } else if (ub) {
-            norm_projected_gradient_ub_kernel<<<n_blocks, kernel_block_size>>>(n, ub, x, g, eps, device_value);
-            SFEM_DEBUG_SYNCHRONIZE();
-
-        } else if (lb) {
-            norm_projected_gradient_lb_kernel<<<n_blocks, kernel_block_size>>>(n, lb, x, g, eps, device_value);
-            SFEM_DEBUG_SYNCHRONIZE();
-        } else {
-            assert(false);
+            SFEM_CUDA_CHECK(cudaMemcpy(out, work + N_VALUES * MAX_BLOCKS, N_VALUES * sizeof(T), cudaMemcpyDeviceToHost));
         }
 
-        T host_value = -1;
-        cudaMemcpy(&host_value, device_value, sizeof(T), cudaMemcpyDeviceToHost);
-        cudaFree(device_value);
+        template <typename T, class B>
+        __global__ void project_kernel(const ptrdiff_t n, const B b, T* const SFEM_RESTRICT x) {
+            for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
+                x[i] = b.project(i, x[i]);
+            }
+        }
 
-        return sqrt(host_value);
-    }
-
-    template <typename T>
-    __global__ void norm_gradients_lb_ub_kernel(const ptrdiff_t              n,
-                                                const T* const SFEM_RESTRICT lb,
-                                                const T* const SFEM_RESTRICT ub,
+        template <typename T, class B>
+        __global__ void chopped_gradient_kernel(const ptrdiff_t              n,
+                                                const B                      b,
                                                 const T* const SFEM_RESTRICT x,
                                                 const T* const SFEM_RESTRICT g,
-                                                T* const SFEM_RESTRICT       norm_free_gradient,
-                                                T* const SFEM_RESTRICT       norm_chopped_gradient,
+                                                T* const SFEM_RESTRICT       gc,
                                                 const T                      eps) {
-        T acc_gf = 0;
-        T acc_gc = 0;
-
-        for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
-            const T val_gf = gf_lb_ub(lb[i], ub[i], x[i], g[i]);
-            const T val_gc = gc_lb_ub(lb[i], ub[i], x[i], g[i], eps);
-
-            acc_gf += val_gf * val_gf;
-            acc_gc += val_gc * val_gc;
+            for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
+                gc[i] = b.chopped(i, x[i], g[i], eps);
+            }
         }
 
-        __shared__ T block_accumulator[SFEM_N_WARPS_PER_BLOCK];
-        t_warp_reduce(acc_gf, block_accumulator, norm_free_gradient);
-        t_warp_reduce(acc_gc, block_accumulator, norm_chopped_gradient);
-    }
-
-    template <typename T>
-    __global__ void norm_gradients_lb_kernel(const ptrdiff_t              n,
-                                             const T* const SFEM_RESTRICT lb,
-                                             const T* const SFEM_RESTRICT x,
-                                             const T* const SFEM_RESTRICT g,
-                                             T* const SFEM_RESTRICT       norm_free_gradient,
-                                             T* const SFEM_RESTRICT       norm_chopped_gradient,
-                                             const T                      eps) {
-        T acc_gf = 0;
-        T acc_gc = 0;
-
-        for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
-            const T val_gf = gf_lb(lb[i], x[i], g[i]);
-            const T val_gc = gc_lb(lb[i], x[i], g[i], eps);
-
-            acc_gf += val_gf * val_gf;
-            acc_gc += val_gc * val_gc;
+        template <typename T, class B>
+        __global__ void curvature_kernel(const ptrdiff_t              n,
+                                         const B                      b,
+                                         const T* const SFEM_RESTRICT x,
+                                         const T* const SFEM_RESTRICT g,
+                                         const T* const SFEM_RESTRICT d,
+                                         const T* const SFEM_RESTRICT Ad,
+                                         const T                      infty,
+                                         T* const SFEM_RESTRICT       work) {
+            T v[N_VALUES] = {0, 0, 0, infty};
+            for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
+                const T di = d[i];
+                v[0] += di * Ad[i];
+                v[1] += di * di;
+                v[2] += g[i] * di;
+                v[3] = B::min(v[3], b.max_alpha(i, x[i], di, infty));
+            }
+            write_partials<T, 3>(v, infty, work);
         }
 
-        __shared__ T block_accumulator[SFEM_N_WARPS_PER_BLOCK];
-        t_warp_reduce(acc_gf, block_accumulator, norm_free_gradient);
-        t_warp_reduce(acc_gc, block_accumulator, norm_chopped_gradient);
-    }
-
-    template <typename T>
-    __global__ void norm_gradients_ub_kernel(const ptrdiff_t              n,
-                                             const T* const SFEM_RESTRICT ub,
-                                             const T* const SFEM_RESTRICT x,
-                                             const T* const SFEM_RESTRICT g,
-                                             T* const SFEM_RESTRICT       norm_free_gradient,
-                                             T* const SFEM_RESTRICT       norm_chopped_gradient,
-                                             const T                      eps) {
-        T acc_gf = 0;
-        T acc_gc = 0;
-
-        for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
-            const T val_gf = gf_ub(ub[i], x[i], g[i]);
-            const T val_gc = gc_ub(ub[i], x[i], g[i], eps);
-
-            acc_gf += val_gf * val_gf;
-            acc_gc += val_gc * val_gc;
+        template <typename T, class B, bool ALONG>
+        __global__ void step_kernel(const ptrdiff_t              n,
+                                    const B                      b,
+                                    const T                      alpha,
+                                    const T* const SFEM_RESTRICT d,
+                                    const T* const SFEM_RESTRICT Ad,
+                                    T* const SFEM_RESTRICT       x,
+                                    T* const SFEM_RESTRICT       g,
+                                    T* const SFEM_RESTRICT       gf,
+                                    const T                      eps,
+                                    T* const SFEM_RESTRICT       work) {
+            T v[N_VALUES] = {0, 0, 0, 0};
+            for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
+                T xi = x[i], gi = g[i];
+                if constexpr (ALONG) {
+                    xi -= alpha * d[i];
+                    gi -= alpha * Ad[i];
+                    x[i] = xi;
+                    g[i] = gi;
+                }
+                const T f = b.free(i, xi, gi);
+                const T c = b.chopped(i, xi, gi, eps);
+                gf[i]     = f;
+                if constexpr (ALONG) v[0] += Ad[i] * f;
+                v[1] += f * f;
+                v[2] += c * c;
+                v[3] += (f + c) * (f + c);
+            }
+            write_partials<T, N_VALUES>(v, T(0), work);
         }
 
-        assert(acc_gf == acc_gf);
-        assert(acc_gc == acc_gc);
-
-        __shared__ T block_accumulator[SFEM_N_WARPS_PER_BLOCK];
-        t_warp_reduce(acc_gf, block_accumulator, norm_free_gradient);
-        t_warp_reduce(acc_gc, block_accumulator, norm_chopped_gradient);
-    }
-
-    template <typename T>
-    static void norm_gradients(const ptrdiff_t              n,
-                               const T* const SFEM_RESTRICT lb,
-                               const T* const SFEM_RESTRICT ub,
-                               const T* const SFEM_RESTRICT x,
-                               const T* const SFEM_RESTRICT g,
-                               T* const SFEM_RESTRICT       norm_free_gradient,
-                               T* const SFEM_RESTRICT       norm_chopped_gradient,
-                               const T                      eps) {
-        SFEM_DEBUG_SYNCHRONIZE();
-
-        int       kernel_block_size = SFEM_WARP_SIZE * SFEM_N_WARPS_PER_BLOCK;
-        ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
-
-        T* device_value_gf = nullptr;
-        T* device_value_gc = nullptr;
-
-        cudaMalloc((void**)&device_value_gf, sizeof(T));
-        cudaMemset((void*)device_value_gf, 0, sizeof(T));
-
-        cudaMalloc((void**)&device_value_gc, sizeof(T));
-        cudaMemset((void*)device_value_gc, 0, sizeof(T));
-
-        if (lb && ub) {
-            norm_gradients_lb_ub_kernel<<<n_blocks, kernel_block_size>>>(n, lb, ub, x, g, device_value_gf, device_value_gc, eps);
-            SFEM_DEBUG_SYNCHRONIZE();
-        } else if (ub) {
-            norm_gradients_ub_kernel<<<n_blocks, kernel_block_size>>>(n, ub, x, g, device_value_gf, device_value_gc, eps);
-            SFEM_DEBUG_SYNCHRONIZE();
-        } else if (lb) {
-            norm_gradients_lb_kernel<<<n_blocks, kernel_block_size>>>(n, lb, x, g, device_value_gf, device_value_gc, eps);
-            SFEM_DEBUG_SYNCHRONIZE();
-        } else {
-            assert(false);
+        template <typename T, class B>
+        __global__ void expand_kernel(const ptrdiff_t              n,
+                                      const B                      b,
+                                      const T                      alpha,
+                                      const T                      alpha_bar,
+                                      const T* const SFEM_RESTRICT d,
+                                      const T* const SFEM_RESTRICT Ad,
+                                      T* const SFEM_RESTRICT       x,
+                                      const T* const SFEM_RESTRICT g) {
+            for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
+                const T xi = x[i] - alpha * d[i];
+                const T gi = g[i] - alpha * Ad[i];
+                x[i]       = b.project(i, xi - alpha_bar * b.free(i, xi, gi));
+            }
         }
 
-        T host_value_gf = -1;
-        cudaMemcpy(&host_value_gf, device_value_gf, sizeof(T), cudaMemcpyDeviceToHost);
-        cudaFree(device_value_gf);
-
-        T host_value_gc = -1;
-        cudaMemcpy(&host_value_gc, device_value_gc, sizeof(T), cudaMemcpyDeviceToHost);
-        cudaFree(device_value_gc);
-
-        *norm_free_gradient    = sqrt(host_value_gf);
-        *norm_chopped_gradient = sqrt(host_value_gc);
-    }
-
-    template <typename T>
-    __global__ void chopped_gradient_lb_ub_kernel(const ptrdiff_t              n,
-                                                  const T* const SFEM_RESTRICT lb,
-                                                  const T* const SFEM_RESTRICT ub,
-                                                  const T* const SFEM_RESTRICT x,
-                                                  const T* const SFEM_RESTRICT g,
-                                                  T* SFEM_RESTRICT             gc,
-                                                  const T                      eps) {
-        for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
-            gc[i] = gc_lb_ub(lb[i], ub[i], x[i], g[i], eps);
-        }
-    }
-
-    template <typename T>
-    __global__ void chopped_gradient_lb_kernel(const ptrdiff_t              n,
-                                               const T* const SFEM_RESTRICT lb,
-                                               const T* const SFEM_RESTRICT x,
-                                               const T* const SFEM_RESTRICT g,
-                                               T* SFEM_RESTRICT             gc,
-                                               const T                      eps) {
-        for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
-            gc[i] = gc_lb(lb[i], x[i], g[i], eps);
-        }
-    }
-
-    template <typename T>
-    __global__ void chopped_gradient_ub_kernel(const ptrdiff_t              n,
-                                               const T* const SFEM_RESTRICT ub,
-                                               const T* const SFEM_RESTRICT x,
-                                               const T* const SFEM_RESTRICT g,
-                                               T* SFEM_RESTRICT             gc,
-                                               const T                      eps) {
-        for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
-            gc[i] = gc_ub(ub[i], x[i], g[i], eps);
-        }
-    }
-
-    template <typename T>
-    static void chopped_gradient(const ptrdiff_t              n,
-                                 const T* const SFEM_RESTRICT lb,
-                                 const T* const SFEM_RESTRICT ub,
-                                 const T* const SFEM_RESTRICT x,
-                                 const T* const SFEM_RESTRICT g,
-                                 T* SFEM_RESTRICT             gc,
-                                 const T                      eps) {
-        int       kernel_block_size = SFEM_WARP_SIZE * SFEM_N_WARPS_PER_BLOCK;
-        ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
-
-        if (lb && ub) {
-            chopped_gradient_lb_ub_kernel<<<n_blocks, kernel_block_size>>>(n, lb, ub, x, g, gc, eps);
-            SFEM_DEBUG_SYNCHRONIZE();
-        } else if (ub) {
-            chopped_gradient_ub_kernel<<<n_blocks, kernel_block_size>>>(n, ub, x, g, gc, eps);
-            SFEM_DEBUG_SYNCHRONIZE();
-        } else if (lb) {
-            chopped_gradient_lb_kernel<<<n_blocks, kernel_block_size>>>(n, lb, x, g, gc, eps);
-            SFEM_DEBUG_SYNCHRONIZE();
-        }
-    }
-
-    template <typename T>
-    __global__ void free_gradient_lb_ub_kernel(const ptrdiff_t              n,
-                                               const T* const SFEM_RESTRICT lb,
-                                               const T* const SFEM_RESTRICT ub,
-                                               const T* const SFEM_RESTRICT x,
-                                               const T* const SFEM_RESTRICT g,
-                                               T* SFEM_RESTRICT             gf) {
-        for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
-            gf[i] = gf_lb_ub(lb[i], ub[i], x[i], g[i]);
-        }
-    }
-
-    template <typename T>
-    __global__ void free_gradient_lb_kernel(const ptrdiff_t              n,
-                                            const T* const SFEM_RESTRICT lb,
-                                            const T* const SFEM_RESTRICT x,
-                                            const T* const SFEM_RESTRICT g,
-                                            T* SFEM_RESTRICT             gf) {
-        for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
-            gf[i] = gf_lb(lb[i], x[i], g[i]);
-        }
-    }
-
-    template <typename T>
-    __global__ void free_gradient_ub_kernel(const ptrdiff_t              n,
-                                            const T* const SFEM_RESTRICT ub,
-                                            const T* const SFEM_RESTRICT x,
-                                            const T* const SFEM_RESTRICT g,
-                                            T* SFEM_RESTRICT             gf) {
-        for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
-            gf[i] = gf_ub(ub[i], x[i], g[i]);
-        }
-    }
-
-    template <typename T>
-    static void free_gradient(const ptrdiff_t              n,
-                              const T* const SFEM_RESTRICT lb,
-                              const T* const SFEM_RESTRICT ub,
-                              const T* const SFEM_RESTRICT x,
-                              const T* const SFEM_RESTRICT g,
-                              T* SFEM_RESTRICT             gf) {
-        int       kernel_block_size = SFEM_WARP_SIZE * SFEM_N_WARPS_PER_BLOCK;
-        ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
-
-        if (lb && ub) {
-            free_gradient_lb_ub_kernel<<<n_blocks, kernel_block_size>>>(n, lb, ub, x, g, gf);
-            SFEM_DEBUG_SYNCHRONIZE();
-        } else if (ub) {
-            free_gradient_ub_kernel<<<n_blocks, kernel_block_size>>>(n, ub, x, g, gf);
-            SFEM_DEBUG_SYNCHRONIZE();
-        } else if (lb) {
-            free_gradient_lb_kernel<<<n_blocks, kernel_block_size>>>(n, lb, x, g, gf);
-            SFEM_DEBUG_SYNCHRONIZE();
-        }
-    }
-
-    template <typename T>
-    __global__ void max_alpha_lb_ub_kernel(const ptrdiff_t              n,
-                                           const T* const SFEM_RESTRICT lb,
-                                           const T* const SFEM_RESTRICT ub,
-                                           const T* const SFEM_RESTRICT x,
-                                           const T* const SFEM_RESTRICT p,
-                                           const T                      infty,
-                                           T* SFEM_RESTRICT             result) {
-        T acc = infty;
-        for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
-            const T alpha_lb = (p[i] > 0) ? ((x[i] - lb[i]) / p[i]) : infty;
-            const T alpha_ub = (p[i] < 0) ? ((x[i] - ub[i]) / p[i]) : infty;
-            const T alpha    = tmin(alpha_lb, alpha_ub);
-            acc              = tmin(alpha, acc);
+        template <typename T>
+        void project(const ptrdiff_t n, const T* const lb, const T* const ub, T* const x) {
+            with_mprgp_bounds(lb, ub, [&](const auto b) {
+                project_kernel<T, Bounds<decltype(b)>><<<n_blocks(n), N_THREADS>>>(n, b, x);
+                SFEM_DEBUG_SYNCHRONIZE();
+            });
         }
 
-        __shared__ T block_accumulator[SFEM_N_WARPS_PER_BLOCK];
-        t_warp_min(acc, block_accumulator, result);
-    }
-
-    template <typename T>
-    __global__ void max_alpha_lb_kernel(const ptrdiff_t              n,
-                                        const T* const SFEM_RESTRICT lb,
-                                        const T* const SFEM_RESTRICT x,
-                                        const T* const SFEM_RESTRICT p,
-                                        const T                      infty,
-                                        T* SFEM_RESTRICT             result) {
-        T acc = infty;
-        for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
-            const T alpha = (p[i] > 0) ? ((x[i] - lb[i]) / p[i]) : infty;
-            acc           = tmin(alpha, acc);
+        template <typename T>
+        void chopped_gradient(const ptrdiff_t n,
+                              const T* const  lb,
+                              const T* const  ub,
+                              const T* const  x,
+                              const T* const  g,
+                              T* const        gc,
+                              const T         eps) {
+            with_mprgp_bounds(lb, ub, [&](const auto b) {
+                chopped_gradient_kernel<T, Bounds<decltype(b)>><<<n_blocks(n), N_THREADS>>>(n, b, x, g, gc, eps);
+                SFEM_DEBUG_SYNCHRONIZE();
+            });
         }
 
-        __shared__ T block_accumulator[SFEM_N_WARPS_PER_BLOCK];
-        t_warp_min(acc, block_accumulator, result);
-    }
-
-    template <typename T>
-    __global__ void max_alpha_ub_kernel(const ptrdiff_t              n,
-                                        const T* const SFEM_RESTRICT ub,
-                                        const T* const SFEM_RESTRICT x,
-                                        const T* const SFEM_RESTRICT p,
-                                        const T                      infty,
-                                        T* SFEM_RESTRICT             result) {
-        T acc = infty;
-        for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
-            const T alpha = (p[i] < 0) ? ((x[i] - ub[i]) / p[i]) : infty;
-            acc           = tmin(alpha, acc);
+        template <typename T>
+        void curvature(const ptrdiff_t n,
+                       const T* const  lb,
+                       const T* const  ub,
+                       const T* const  x,
+                       const T* const  g,
+                       const T* const  d,
+                       const T* const  Ad,
+                       const T         infty,
+                       T* const        out,
+                       T* const        work) {
+            const int nb = n_blocks(n);
+            with_mprgp_bounds(lb, ub, [&](const auto b) {
+                curvature_kernel<T, Bounds<decltype(b)>><<<nb, N_THREADS>>>(n, b, x, g, d, Ad, infty, work);
+                SFEM_DEBUG_SYNCHRONIZE();
+            });
+            finish<T, 3>(nb, infty, work, out);
         }
 
-        __shared__ T block_accumulator[SFEM_N_WARPS_PER_BLOCK];
-        t_warp_min(acc, block_accumulator, result);
-    }
-
-    template <typename T>
-    static T max_alpha(const ptrdiff_t              n,
-                       const T* const SFEM_RESTRICT lb,
-                       const T* const SFEM_RESTRICT ub,
-                       const T* const SFEM_RESTRICT x,
-                       const T* const SFEM_RESTRICT p,
-                       const T                      infty) {
-        int       kernel_block_size = SFEM_WARP_SIZE * SFEM_N_WARPS_PER_BLOCK;
-        ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
-
-        T* device_value = nullptr;
-
-        cudaMalloc((void**)&device_value, n_blocks * sizeof(T));
-        cudaMemset((void*)device_value, 0, n_blocks * sizeof(T));
-
-        if (lb && ub) {
-            max_alpha_lb_ub_kernel<<<n_blocks, kernel_block_size>>>(n, lb, ub, x, p, infty, device_value);
-            SFEM_DEBUG_SYNCHRONIZE();
-        } else if (ub) {
-            max_alpha_ub_kernel<<<n_blocks, kernel_block_size>>>(n, ub, x, p, infty, device_value);
-            SFEM_DEBUG_SYNCHRONIZE();
-        } else if (lb) {
-            max_alpha_lb_kernel<<<n_blocks, kernel_block_size>>>(n, lb, x, p, infty, device_value);
-            SFEM_DEBUG_SYNCHRONIZE();
+        template <typename T>
+        void step(const ptrdiff_t n,
+                  const T* const  lb,
+                  const T* const  ub,
+                  const T         alpha,
+                  const T* const  d,
+                  const T* const  Ad,
+                  T* const        x,
+                  T* const        g,
+                  T* const        gf,
+                  const T         eps,
+                  T* const        out,
+                  T* const        work) {
+            const int nb = n_blocks(n);
+            with_mprgp_bounds(lb, ub, [&](const auto b) {
+                if (d) {
+                    step_kernel<T, Bounds<decltype(b)>, true><<<nb, N_THREADS>>>(n, b, alpha, d, Ad, x, g, gf, eps, work);
+                } else {
+                    step_kernel<T, Bounds<decltype(b)>, false><<<nb, N_THREADS>>>(n, b, alpha, d, Ad, x, g, gf, eps, work);
+                }
+                SFEM_DEBUG_SYNCHRONIZE();
+            });
+            finish<T, N_VALUES>(nb, T(0), work, out);
         }
 
-        T* host_value = (T*)malloc(n_blocks * sizeof(T));
-
-        cudaMemcpy(host_value, device_value, n_blocks * sizeof(T), cudaMemcpyDeviceToHost);
-        cudaFree(device_value);
-
-        T ret = host_value[0];
-
-        for (int i = 1; i < n_blocks; i++) {
-            ret = tmin(host_value[i], ret);
+        template <typename T>
+        void expand(const ptrdiff_t n,
+                    const T* const  lb,
+                    const T* const  ub,
+                    const T         alpha,
+                    const T         alpha_bar,
+                    const T* const  d,
+                    const T* const  Ad,
+                    T* const        x,
+                    const T* const  g) {
+            with_mprgp_bounds(lb, ub, [&](const auto b) {
+                expand_kernel<T, Bounds<decltype(b)>><<<n_blocks(n), N_THREADS>>>(n, b, alpha, alpha_bar, d, Ad, x, g);
+                SFEM_DEBUG_SYNCHRONIZE();
+            });
         }
-
-        free(host_value);
-        return ret;
-    }
+    }  // namespace
 
     template <typename T>
     void CUDA_MPRGP<T>::build_mprgp(struct MPRGP_Tpl<T>& tpl) {
-        tpl.project                 = project<T>;
-        tpl.norm_projected_gradient = norm_projected_gradient<T>;
-        tpl.norm_gradients          = norm_gradients<T>;
-        tpl.chopped_gradient        = chopped_gradient<T>;
-        tpl.free_gradient           = free_gradient<T>;
-        tpl.max_alpha               = max_alpha<T>;
+        tpl.project          = project<T>;
+        tpl.chopped_gradient = chopped_gradient<T>;
+        tpl.curvature        = curvature<T>;
+        tpl.step             = step<T>;
+        tpl.expand           = expand<T>;
+        tpl.work_size        = WORK_SIZE;
     }
 
     template class CUDA_MPRGP<float>;

@@ -38,7 +38,6 @@ namespace sfem {
         ptrdiff_t n_dofs{SFEM_PTRDIFF_INVALID};
         bool verbose{true};
         T max_eig_{0};
-        bool debug{false};
 
         int iterations_{0};
         int iterations() const override { return iterations_; }
@@ -108,78 +107,39 @@ namespace sfem {
             }
         }
 
-        void project(T* const x) {
-            const T* const lb = lower_bound_ ? lower_bound_->data() : nullptr;
-            const T* const ub = upper_bound_ ? upper_bound_->data() : nullptr;
-            impl.project(n_dofs, lb, ub, x);
+        const T* lb() const { return lower_bound_ ? lower_bound_->data() : nullptr; }
+        const T* ub() const { return upper_bound_ ? upper_bound_->data() : nullptr; }
 
-            if (debug) {
-                T norm_project = norm2(x);
-                printf("norm_project: %g\n", (double)norm_project);
-            }
+        void project(T* const x) { impl.project(n_dofs, lb(), ub(), x); }
+
+        /// Sums the ranks' partial reductions in place, one message for all of them.
+        void sum(T* const values, const int count) const {
+            if (comm_) comm_->sum(values, count, smesh::TypeToEnum<T>::value());
+        }
+        T min(const T local) const { return comm_ ? -comm_->max(-local) : local; }
+
+        /// Along d, with Ad = A d.
+        struct Curvature {
+            T dAd, dd, gd, alpha_feas;
+        };
+        Curvature curvature(const T* const x, const T* const g, const T* const d, const T* const Ad, T* const work) const {
+            T out[4];
+            impl.curvature(n_dofs, lb(), ub(), x, g, d, Ad, infty, out, work);
+            sum(out, 3);
+            return {out[0], out[1], out[2], min(out[3])};
         }
 
-        T norm_projected_gradient(const T* const x, const T* const g) const {
-            const T* const lb = lower_bound_ ? lower_bound_->data() : nullptr;
-            const T* const ub = upper_bound_ ? upper_bound_->data() : nullptr;
-            auto ret = impl.norm_projected_gradient(n_dofs, lb, ub, x, g, eps);
-            if (comm_) ret = std::sqrt(comm_->sum(ret * ret));
-
-            if (debug) {
-                printf("norm_projected_gradient: %g\n", (double)ret);
-            }
-
-            return ret;
-        }
-
-        void norm_gradients(const T* const x, const T* const g, T* const norm_free_gradient,
-                            T* const norm_chopped_gradient) const {
-            const T* const lb = lower_bound_ ? lower_bound_->data() : nullptr;
-            const T* const ub = upper_bound_ ? upper_bound_->data() : nullptr;
-            impl.norm_gradients(
-                    n_dofs, lb, ub, x, g, norm_free_gradient, norm_chopped_gradient, eps);
-            if (comm_) {
-                T squares[2] = {*norm_free_gradient * *norm_free_gradient, *norm_chopped_gradient * *norm_chopped_gradient};
-                comm_->sum(squares, 2, smesh::TypeToEnum<T>::value());
-                *norm_free_gradient    = std::sqrt(squares[0]);
-                *norm_chopped_gradient = std::sqrt(squares[1]);
-            }
-
-            if (debug) {
-                printf("norm_free_gradient: %g, norm_chopped_gradient: %g\n",
-                       (double)*norm_free_gradient,
-                       (double)*norm_chopped_gradient);
-            }
-        }
-
-        void chopped_gradient(const T* const x, const T* const g, T* gc) const {
-            const T* const lb = lower_bound_ ? lower_bound_->data() : nullptr;
-            const T* const ub = upper_bound_ ? upper_bound_->data() : nullptr;
-            impl.chopped_gradient(n_dofs, lb, ub, x, g, gc, eps);
-        }
-
-        void free_gradient(const T* const x, const T* const g, T* gf) const {
-            const T* const lb = lower_bound_ ? lower_bound_->data() : nullptr;
-            const T* const ub = upper_bound_ ? upper_bound_->data() : nullptr;
-            impl.free_gradient(n_dofs, lb, ub, x, g, gf);
-
-            if (debug) {
-                T norm_fg = norm2(gf);
-                printf("norm_fg: %g\n", (double)norm_fg);
-            }
-        }
-
-        T max_alpha(const T* const x, const T* const p) const {
-            const T* const lb = lower_bound_ ? lower_bound_->data() : nullptr;
-            const T* const ub = upper_bound_ ? upper_bound_->data() : nullptr;
-            auto ret = impl.max_alpha(n_dofs, lb, ub, x, p, infty);
-            if (comm_) ret = -comm_->max(-ret);
-
-            if (debug) {
-                printf("max_alpha: %g\n", (double)ret);
-            }
-
-            return ret;
+        /// At the iterate a step reaches: Ad.gf for the next direction, and the norms that choose
+        /// the next step and test convergence.
+        struct Gradients {
+            T Adgf, norm_gf, norm_gc, norm_gp;
+        };
+        /// x -= alpha d, g -= alpha Ad (neither without d), gf <- the free gradient.
+        Gradients step(const T alpha, const T* const d, const T* const Ad, T* const x, T* const g, T* const gf, T* const work) const {
+            T out[4];
+            impl.step(n_dofs, lb(), ub(), alpha, d, Ad, x, g, gf, eps, out, work);
+            sum(out, 4);
+            return {out[0], std::sqrt(out[1]), std::sqrt(out[2]), std::sqrt(out[3])};
         }
 
         bool good() const {
@@ -194,69 +154,33 @@ namespace sfem {
             execution_space_ = EXECUTION_SPACE_HOST;
         }
 
-        void cg_step(const T alpha_cg, const T dot_pAp, const T* const Ap, T* const p, T* const g,
-                     T* const gf, T* const x) {
-            this->blas->axpby(n_dofs, -alpha_cg, p, 1, x);
-
-            this->blas->axpby(n_dofs, -alpha_cg, Ap, 1, g);
-
-            this->free_gradient(x, g, gf);
-
-            const T beta = dot(Ap, gf) / dot_pAp;
-
-            this->blas->axpby(n_dofs, 1, gf, -beta, p);
-        }
-
-        void expansion_step(const T alpha_feas, const T alpha_bar, const T alpha_cg,
-                            const T dot_pAp, const T* const b, T* const p, const T* const Ap,
-                            T* const g, T* const gf, T* const x) {
-            this->blas->axpby(n_dofs, -alpha_feas, p, 1, x);
-
-            this->blas->axpby(n_dofs, -alpha_feas, Ap, 1, g);
-
+        /// To the bound along p, then a projected step along the free gradient there (or, projected
+        /// CG, the CG step past the bound, projected); p restarts from the free gradient.
+        Gradients expansion_step(const T alpha_feas, const T alpha_bar, const T alpha_cg, const T* const b, T* const p,
+                                 const T* const Ap, T* const g, T* const x, T* const work) {
             // A flat direction (alpha_cg infty) has no CG step past the bound to project.
-            switch (alpha_cg < infty ? expansion_type_ : EXPANSION_TYPE_ORGINAL) {
-                case EXPANSION_TYPE_PROJECTED_CG: {
-                    this->blas->axpby(n_dofs, -alpha_cg, p, 1, x);
-
-                    if (alpha_cg <= alpha_feas) {
-                        this->blas->axpby(n_dofs, -alpha_cg, Ap, 1, g);
-                        this->free_gradient(x, g, gf);
-                        T beta = dot(Ap, gf) / dot_pAp;
-                        this->blas->axpby(n_dofs, 1, gf, -beta, p);
-                    } else {
-                        this->project(x);
-                        this->gradient(x, b, g);
-                        this->free_gradient(x, g, gf);
-                        this->blas->copy(n_dofs, gf, p);
-                    }
-                    break;
-                }
-                default: {
-                    // EXPANSION_TYPE_ORGINAL
-                    this->free_gradient(x, g, gf);
-                    this->blas->axpby(n_dofs, -alpha_bar, gf, 1, x);
-                    this->project(x);
-                    this->gradient(x, b, g);
-                    this->free_gradient(x, g, gf);
-                    this->blas->copy(n_dofs, gf, p);
-                    break;
-                }
+            if (alpha_cg < infty && expansion_type_ == EXPANSION_TYPE_PROJECTED_CG) {
+                this->blas->axpby(n_dofs, -alpha_feas, p, 1, x);
+                this->blas->axpby(n_dofs, -alpha_cg, p, 1, x);
+                this->project(x);
+            } else {
+                impl.expand(n_dofs, lb(), ub(), alpha_feas, alpha_bar, p, Ap, x, g);
             }
+            this->gradient(x, b, g);
+            return this->step(0, nullptr, nullptr, x, g, p, work);
         }
 
         /// Whether direction d, with dAd = d . A d, sees no curvature to rounding: on a singular or
         /// indefinite operator (a body free to move) the energy does not rise along it, and only a
         /// bound ends the step.
-        bool no_curvature(const T dAd, const T* const d) const {
-            const T dd = dot(d, d);
+        bool no_curvature(const T dAd, const T dd) const {
             return dd > 0 && dAd <= 64 * std::numeric_limits<T>::epsilon() * max_eig_ * dd;
         }
 
-        /// Whether no bound stops a step of alpha_feas along d: none limits it (max_alpha's infty),
-        /// or only the bounds that stand for none (infty) do.
-        bool unbounded(const T alpha_feas, const T* const d) const {
-            return alpha_feas >= infty || alpha_feas * norm2(d) >= infty / 2;
+        /// Whether no bound stops a step of alpha_feas along d (d.d = dd): none limits it
+        /// (infty), or only the bounds that stand for none (infty) do.
+        bool unbounded(const T alpha_feas, const T dd) const {
+            return alpha_feas >= infty || alpha_feas * std::sqrt(dd) >= infty / 2;
         }
 
         /// The step along a direction without curvature: to the first bound, but no longer than the
@@ -264,34 +188,25 @@ namespace sfem {
         /// body's rigid motion barely touching one) would otherwise send the iterate as far.
         T flat_step(const T alpha_feas, const T alpha_bar) const { return std::min(alpha_feas, alpha_bar); }
 
-        /// False where the chopped gradient sees no curvature (no_curvature) and no bound stops it.
-        bool proportioning_step(T* const p, T* const Agc, T* const g, T* const gf_or_gc,
-                                T* const x, const T alpha_bar) {
-            // Attention!
-            T* gc = gf_or_gc;
-            T* gf = gf_or_gc;
-
-            this->chopped_gradient(x, g, gc);
+        /// A step along the chopped gradient gc; p restarts from the free gradient. False where gc
+        /// sees no curvature (no_curvature) and no bound stops it.
+        bool proportioning_step(T* const p, T* const Agc, T* const g, T* const gc, T* const x, const T alpha_bar,
+                                T* const work, Gradients* const grads) {
+            impl.chopped_gradient(n_dofs, lb(), ub(), x, g, gc, eps);
 
             this->blas->zeros(n_dofs, Agc);
             apply_op(gc, Agc);
-            const T dot_gcAgc = dot(gc, Agc);
-            T       alpha_cg;
-            if (no_curvature(dot_gcAgc, gc)) {
+            const Curvature c = curvature(x, g, gc, Agc, work);
+            T               alpha_cg;
+            if (no_curvature(c.dAd, c.dd)) {
                 // The energy falls along -gc until a bound stops it.
-                const T alpha_feas = this->max_alpha(x, gc);
-                if (unbounded(alpha_feas, gc)) return false;
-                alpha_cg = flat_step(alpha_feas, alpha_bar);
+                if (unbounded(c.alpha_feas, c.dd)) return false;
+                alpha_cg = flat_step(c.alpha_feas, alpha_bar);
             } else {
-                alpha_cg = dot(g, gc) / dot_gcAgc;
+                alpha_cg = c.gd / c.dAd;
             }
 
-            this->blas->axpby(n_dofs, -alpha_cg, gc, 1, x);
-
-            this->blas->axpby(n_dofs, -alpha_cg, Agc, 1, g);
-            this->free_gradient(x, g, gf);
-
-            this->blas->copy(n_dofs, gf, p);
+            *grads = this->step(alpha_cg, gc, Agc, x, g, p, work);
             return true;
         }
 
@@ -319,15 +234,11 @@ namespace sfem {
 
             bool converged = false;
 
-            T norm_gf = -1;
-            T norm_gc = -1;
-            T alpha_feas = -1;  // maximal feasbile step
-            T alpha_cg = -1;
-
             T* g = this->blas->allocate(allocation_size());  // Gradient
             T* p = this->blas->allocate(allocation_size());
             T* Ap_or_Ag = this->blas->allocate(allocation_size());
             T* gf_or_gc = this->blas->allocate(allocation_size());  // Free Gradient or Chopped Gradient
+            T* work     = impl.work_size > 0 ? this->blas->allocate(impl.work_size) : nullptr;
 
             T alpha_bar = 1;
             if (expansion_type_ == EXPANSION_TYPE_ORGINAL) {
@@ -351,8 +262,8 @@ namespace sfem {
             this->monitor(0, norm_g, 1);
             T norm_gp0 = norm_g;
 
-            this->free_gradient(x, g, gf_or_gc);
-            this->blas->copy(n_dofs, gf_or_gc, p);
+            // The first direction: the free gradient at the feasible start.
+            Gradients grads = this->step(0, nullptr, nullptr, x, g, p, work);
 
             int count_cg_steps = 0;
             int count_expansion_steps = 0;
@@ -361,47 +272,45 @@ namespace sfem {
             iterations_ = 0;
 
             while (!converged) {
-                norm_gradients(x, g, &norm_gf, &norm_gc);
-
-                if (norm_gc <= this->gamma * norm_gf) {
-                    alpha_feas = this->max_alpha(x, p);
+                if (grads.norm_gc <= this->gamma * grads.norm_gf) {
                     this->blas->zeros(n_dofs, Ap_or_Ag);
                     this->apply_op(p, Ap_or_Ag);
-                    const T dot_pAp = dot(p, Ap_or_Ag);
+                    const Curvature c = curvature(x, g, p, Ap_or_Ag, work);
 
                     // Without positive curvature the energy falls along -p until a bound stops
                     // it: the expansion step, at the bound. A free body's rigid motions are such
                     // directions, held only by the bounds.
-                    const bool flat = no_curvature(dot_pAp, p);
-                    if (flat && unbounded(alpha_feas, p)) {
-                        fprintf(stderr, "[Warning][MPRGP] No positive curvature and no bound along the search direction (%g)\n", (double)dot_pAp);
+                    const bool flat = no_curvature(c.dAd, c.dd);
+                    if (flat && unbounded(c.alpha_feas, c.dd)) {
+                        fprintf(stderr, "[Warning][MPRGP] No positive curvature and no bound along the search direction (%g)\n", (double)c.dAd);
                         break;
                     }
 
-                    alpha_cg = flat ? infty : dot(g, p) / dot_pAp;
+                    const T alpha_cg = flat ? infty : c.gd / c.dAd;
 
-                    if (alpha_cg <= alpha_feas) {
-                        this->cg_step(alpha_cg, dot_pAp, Ap_or_Ag, p, g, gf_or_gc, x);
+                    if (alpha_cg <= c.alpha_feas) {
+                        grads        = this->step(alpha_cg, p, Ap_or_Ag, x, g, gf_or_gc, work);
+                        const T beta = grads.Adgf / c.dAd;
+                        this->blas->axpby(n_dofs, 1, gf_or_gc, -beta, p);
 
                         count_cg_steps++;
                     } else {
                         // apply_op inside!
-                        this->expansion_step(flat ? flat_step(alpha_feas, alpha_bar) : alpha_feas,
-                                             alpha_bar,
-                                             alpha_cg,
-                                             dot_pAp,
-                                             b,
-                                             p,
-                                             Ap_or_Ag,
-                                             g,
-                                             gf_or_gc,
-                                             x);
+                        grads = this->expansion_step(flat ? flat_step(c.alpha_feas, alpha_bar) : c.alpha_feas,
+                                                     alpha_bar,
+                                                     alpha_cg,
+                                                     b,
+                                                     p,
+                                                     Ap_or_Ag,
+                                                     g,
+                                                     x,
+                                                     work);
 
                         count_expansion_steps++;
                     }
                 } else {
                     // apply_op inside!
-                    if (!this->proportioning_step(p, Ap_or_Ag, g, gf_or_gc, x, alpha_bar)) {
+                    if (!this->proportioning_step(p, Ap_or_Ag, g, gf_or_gc, x, alpha_bar, work, &grads)) {
                         fprintf(stderr, "[Warning][MPRGP] No positive curvature and no bound along the chopped gradient\n");
                         break;
                     }
@@ -410,7 +319,7 @@ namespace sfem {
                 }
 
                 // Check for convergence
-                const T norm_gp = this->norm_projected_gradient(x, g);
+                const T norm_gp = grads.norm_gp;
                 const T rel_norm_gp = norm_gp / norm_gp0;
                 converged = norm_gp < atol || rel_norm_gp < rtol;
 
@@ -430,6 +339,7 @@ namespace sfem {
             this->blas->destroy(p);
             this->blas->destroy(Ap_or_Ag);
             this->blas->destroy(gf_or_gc);
+            if (work) this->blas->destroy(work);
             return converged ? SFEM_SUCCESS : SFEM_FAILURE;
         }
     };
