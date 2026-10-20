@@ -20,10 +20,10 @@ main.pdf: main.tex refs.bib $(wildcard $(FIGDIR)/*.tex) $(wildcard $(TABDIR)/*.t
 	latexmk -pdf -interaction=nonstopmode main.tex
 
 figures:
+	$(PY) python/scatter_figures.py
 	$(PY) python/packed_format_figures.py --out $(FIGDIR)
 	@if [ -f python/perf_figures.py ]; then \
-	  $(PY) python/perf_figures.py --out $(FIGDIR) --tables $(TABDIR) || \
-	    echo "perf_figures: no measurements yet -- see README.md"; \
+	  $(PY) python/perf_figures.py --out $(FIGDIR) --tables $(TABDIR); \
 	fi
 
 selftest:

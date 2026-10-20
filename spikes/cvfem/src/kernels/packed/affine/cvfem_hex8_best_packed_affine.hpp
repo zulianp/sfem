@@ -17,6 +17,7 @@
 // Every geometric quantity it needs comes from that constant Jacobian, which is what makes the
 // variant affine; true per-element geometry belongs to the isoparametric sweep beside it.
 
+#include "kernels/cvfem_scatter_probe.hpp"
 #include "kernels/packed/cvfem_hex8_best_packed.hpp"
 #include "kernels/packed/cvfem_hex8_best_store.hpp"
 #include "kernels/standard/cvfem_hex8_best_atomic.hpp"
@@ -36,7 +37,7 @@
 // nodes this part owns -- that is what the packed layout is for -- so the parts need no
 // synchronisation between them, and the ghost rows they do share are reduced afterwards in the
 // launcher, which is the second and independent parallel loop.
-template <typename scalar_t, typename idx_t, typename pack_idx_t, typename geom_t>
+template <bool ScatterProbe = false, typename scalar_t, typename idx_t, typename pack_idx_t, typename geom_t>
 static SFEM_NOINLINE void apply_residual_packed_affine_range(
         const cvfem_range packs,
         // The mesh and the pack are staging objects -- they own vectors and a shared_ptr to a
@@ -127,9 +128,15 @@ static SFEM_NOINLINE void apply_residual_packed_affine_range(
                 cvfem_hex8_ns_upwind_residual_sumfact_simd(
                         rho, mu, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det, in, outp,
                         with_rc ? &rcp : nullptr, rhie_chow_scale);
+                if constexpr (ScatterProbe) {
+                    if (!cvfem_scatter_probe(outp, begin, nlanes)) continue;
+                }
                 scatter_hex8_simd_to_pack(pack_elems, pack_out, begin, nlanes, outp);
             }
 
+            if constexpr (ScatterProbe) {
+                if (!g_scatter_accumulate) continue;
+            }
             cvfem_hex8_drain_pack_soa(x, pack_out, n_ghost_entries, ghost_buf, rx, ry, rz, rc);
     }
 }
@@ -515,7 +522,7 @@ static SFEM_NOINLINE void assemble_jacobian_store_affine_range(
 // nodes this part owns -- that is what the packed layout is for -- so the parts need no
 // synchronisation between them, and the ghost rows they do share are reduced afterwards in the
 // launcher, which is the second and independent parallel loop.
-template <typename scalar_t, typename idx_t, typename pack_idx_t, typename geom_t, typename grad_t>
+template <bool ScatterProbe = false, typename scalar_t, typename idx_t, typename pack_idx_t, typename geom_t, typename grad_t>
 static SFEM_NOINLINE void apply_residual_packed_defcor_range(
         const cvfem_range packs,
         // The mesh and the pack are staging objects -- they own vectors and a shared_ptr to a
@@ -597,7 +604,13 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_range(
                 cvfem_hex8_ns_upwind_residual_sumfact_simd(
                         rho, mu, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, detv, in,
                         outp, with_rc ? &rcp : nullptr, rhie_chow_scale, scalar_t(0), &hop);
+                if constexpr (ScatterProbe) {
+                    if (!cvfem_scatter_probe(outp, begin, nlanes)) continue;
+                }
                 scatter_hex8_simd_to_pack(pack_elems, pack_out, begin, nlanes, outp);
+            }
+            if constexpr (ScatterProbe) {
+                if (!g_scatter_accumulate) continue;
             }
             cvfem_hex8_drain_pack_soa(x, pack_out, n_ghost_entries, ghost_buf, rx, ry, rz, rc);
     }

@@ -391,6 +391,12 @@ add_test(NAME cvfem_tet4_bench_verify
 add_test(NAME cvfem_bench_staging
          COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_bench_staging.sh
                  $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)
+add_test(NAME cvfem_scatter_study
+         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_scatter_study.sh
+                 $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)
+add_test(NAME cvfem_kernel_only
+         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_kernel_only.sh
+                 $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)
 # The script asserts that every quarantined configuration is REFUSED, which is true of the
 # default build and false of this one -- the flag exists to make them reachable. So it is told
 # which build it is in rather than inferring it.

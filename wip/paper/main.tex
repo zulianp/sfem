@@ -51,6 +51,7 @@
 \input{figures/roofline_macros}
 \IfFileExists{figures/convho_macros.tex}{\input{figures/convho_macros}}{}
 \IfFileExists{figures/kmix_macros.tex}{\input{figures/kmix_macros}}{}
+\input{figures/scatter_macros}
 \IfFileExists{figures/jacho_macros.tex}{\input{figures/jacho_macros}}{}
 \IfFileExists{figures/meshfoot_macros.tex}{\input{figures/meshfoot_macros}}{}
 \IfFileExists{figures/jacfair_macros.tex}{\input{figures/jacfair_macros}}{}
@@ -108,8 +109,8 @@
 Performance work on matrix-free operators has concentrated on high-order discretisations, where
 sum factorisation makes the element kernel cheap. Low-order unstructured operators have had less
 of that attention and are commonly taken to be bandwidth-bound and therefore settled. The
-measurements here put them far from both roofs, and what is left to recover is in the data
-layout rather than in the kernel. The layout's problem is the scatter: every element
+measurements here show a substantial benefit from changing how element contributions
+are accumulated. The layout's problem is the scatter: every element
 contributes to nodes it shares with its neighbours, and that conflict is usually resolved with
 atomics, which fix no summation order and leave the operator not bitwise reproducible; with
 graph colouring, which adds a barrier per colour and reads back the destination it accumulates
@@ -120,8 +121,8 @@ We present a \emph{packed} mesh format that removes the conflict structurally. E
 owned by exactly one pack of elements and the owned ranges partition the node numbering, so a
 pack accumulates into a private buffer and writes its owned rows out without contention; the
 nodes it touches but does not own are closed by a gather that visits each destination once. No
-atomic appears on any path, no barrier separates the packs, and the summation order is fixed by
-stored index arrays rather than by thread arrival. The format is thus reproducible where atomics
+atomic addition is used in the packed application; the local phase completes before the
+ghost reduction, and stored index arrays fix the summation order. The format is thus reproducible where atomics
 are not, free of both costs colouring pays, and reads a mesh where the assembled operator stores
 a matrix and streams it.
 
@@ -134,9 +135,9 @@ cached geometry and field vectors as well, its arithmetic intensity is \rlMfOver
 product's. The Jacobian
 action is reported in both forms, since they are not the same operator: lagged, it is what the
 matrix holds, at $\jfLaggedVsF\times$ the product; differentiated, what a Newton--Krylov solve
-applies, it costs $\jfExactCost\times$ and is $\jfExactVsF\times$. Most of the advantage is
-present at one thread, where no contention exists, which places it in what the layout reads
-rather than in the atomics it removes.
+applies, it costs $\jfExactCost\times$ and is $\jfExactVsF\times$. A controlled residual
+experiment finds lower accumulation costs for the packed layout at both one and 72 threads.
+The single-thread advantage therefore cannot be attributed solely to input staging.
 \end{abstract}
 
 \begin{CCSXML}
@@ -971,10 +972,10 @@ well. Table~\ref{tab:ladder} adds them one at a time.
 \begin{table*}[t]
   \centering
   \caption{\provwarn \fostag{} Throughput as solver terms are added, residual at $n=\campN$, on
-    the three matrix-free layouts. \emph{col.} and \emph{standard} both read the standard mesh
-    and differ in the scatter, an element colouring against atomics; so packed over \emph{col.}
-    is what the format is worth beyond removing the atomics, and packed over \emph{standard}
-    what the two together are worth. \texttt{f32}: the same driver with every field and kernel
+    the three matrix-free layouts. \emph{col.} uses element colouring with plain nodal
+    additions; \emph{standard} uses atomic additions. Colouring also changes traversal
+    and adds barriers, so the ratios compare implementations without isolating the
+    cost of atomic updates. \texttt{f32}: the same driver with every field and kernel
     in single precision, measured in a separate allocation, so ratios are read within a group.}
   \label{tab:ladder}
   \input{tables/ladder}
@@ -1022,20 +1023,17 @@ established separately, by matching nodes on coordinates.
 
 \paragraph{Single thread.} The packed and coloured sweeps reach \scalePackedResOne{} and
 \scaleColoredResOne{}~MDOF/s, equal to each other, against \scaleAtomicResOne{} for the atomic
-sweep. Two candidate explanations are excluded by construction here. Contention is excluded
-because there is one thread. Vectorisation is excluded because all three sweeps are lane-blocked
-over the same element group and call the same element kernel: the standard layout is measured
-lane-blocked throughout this paper, which is worth saying because it is not how such a sweep is
-usually written, and a scalar baseline would credit the format with a difference that is not the
-format's. What is left is what the two fast layouts share and the third does not --- the
-pack-local gather and the narrowed index width --- so the factor of $\scaleResLayoutOne$ is
-attributable to what the sweep reads, as \S\ref{sec:cost} predicts.
+sweep. All three sweeps are lane-blocked over the same element group and call the same
+element kernel. One thread excludes contention between threads, but atomic additions
+still have a cost. The factor of $\scaleResLayoutOne$ therefore does not isolate
+pack-local input staging or narrower indices from output accumulation.
+Table~\ref{tab:scatter} measures the latter in a separate controlled experiment.
 
 \paragraph{Atomic scaling.} The atomic sweep reaches $\scaleAtomicResSpeedup\times$ on 72 threads,
-an efficiency of \scaleAtomicResEff\%, above the packed layout's \scalePackedResEff\%. Contention
-on shared nodes does not worsen with thread count at this problem size: the atomic sweep is slower
-throughout because each thread does more work, not because threads obstruct one another. Since
-contention is the usual argument for removing atomics, it is not what the removal buys here.
+an efficiency of \scaleAtomicResEff\%, above the packed layout's \scalePackedResEff\%.
+This scaling does not show a growing parallel-efficiency penalty for the atomic sweep
+over the measured range, but it cannot quantify contention by itself. The accumulation
+diagnostic shows that a substantial atomic-layout cost is already present at one thread.
 
 \paragraph{Colouring, of packs and of elements.} Measured on the same sweep but left off the
 figure. The pack-coloured layout starts level with the packed one --- \scaleColoredResOne{}
@@ -1051,12 +1049,14 @@ At one thread it reaches \scaleEcolorResOne{}~MDOF/s against the packed layout's
 \scalePackedResOne{} --- the locality a pack-based sweep is credited with is largely intact,
 because the colouring is greedy over an already space-filling element order and a colour's
 elements are therefore strided through the curve rather than scattered. That is \scaleEcolorOfPackedOnePct\% of the packed
-layout's single-thread rate and $\scaleEcolorOverAtomicOne\times$ the atomic sweep's, so most of
-the advantage is the layout rather than the absence of atomics. At 72 threads it reaches
+layout's single-thread rate and $\scaleEcolorOverAtomicOne\times$ the atomic sweep's.
+Element colouring thus recovers a substantial part of the packed rate while using standard
+connectivity; it changes accumulation and traversal order together, so it does not isolate
+index width. At 72 threads it reaches
 \scaleEcolorResTop{} against the pack colouring's \scaleColoredResTop{}, and scales better than
 either pack-based layout --- \scaleEcolorResEff\% efficiency against \scalePackedResEff\% and
-\scaleColoredResEff\% --- because it pays no ghost reduction and no pack-local staging, only its
-barriers. The Jacobian action behaves the same way, \scaleEcolorJacTop{}~MDOF/s at
+\scaleColoredResEff\%. Its sweep has no ghost reduction or pack-local staging, but retains
+colour barriers. The Jacobian action behaves the same way, \scaleEcolorJacTop{}~MDOF/s at
 \scaleEcolorJacEff\% efficiency.
 
 \paragraph{Packed efficiency.} The unit of parallel work is the pack, and there are
@@ -1121,9 +1121,9 @@ to it.
   \caption{Convective schemes, residual only, at $n=128$, carrying the Rhie--Chow coupling as
     every other complete-operator measurement here does. The nodal velocity gradient is hoisted,
     so the timing is of the flux rather than of the reconstruction feeding it. Each column is
-    that layout's shipped kernel. \emph{col.} and \emph{standard} both read the standard mesh
-    and differ in the scatter, so the two ratios separate the format from the scatter strategy,
-    as in Table~\ref{tab:ladder}. The \texttt{f32} group is the single-precision build, measured in
+    that layout's shipped kernel. As in Table~\ref{tab:ladder}, the ratios compare whole
+    implementations: element colouring also changes traversal and synchronization,
+    so it does not isolate atomic-update cost. The \texttt{f32} group is the single-precision build, measured in
     the same allocation.}
   \label{tab:convho}
   \inputifready{tables/convho}{convective scheme arms, jobs/conv\_ho\_bench.sbatch}
@@ -1166,22 +1166,26 @@ five variants.
 \paragraph{Scheme dependence.} The ratio falls with the arithmetic each scheme adds:
 $\hoFirstLayoutRatio\times$ on first-order upwind, $\hoUnlimLayoutRatio\times$ with the unlimited
 reconstruction, and $\hoLimLayoutRatioLo$--$\hoLimLayoutRatioHi\times$ across the three limiters,
-which land within a few percent of one another. The
-format accelerates what the sweep reads and how it writes; the correction adds arithmetic per
-sub-control surface, which no layout can help with, so its share of the run grows and the ratio
-falls. The reconstruction itself is affine arithmetic on the element Jacobian --- the
+which land within a few percent of one another. The correction adds arithmetic per
+sub-control surface and changes the balance of work. These total-time ratios alone
+do not identify which part of the layout advantage loses relative importance. The reconstruction itself is affine arithmetic on the element Jacobian --- the
 node-to-centroid vectors are the Jacobian applied to constant reference offsets, so no coordinate
 is read --- and the twenty-four node-to-surface increments are formed once per element before
 the twelve face loops, which is why the unlimited arm costs the packed layout only
 $\hoUnlimCostPacked\times$. The completeness ladder of \S\ref{sec:res:ladder} shows the same dependence across
 physical terms.
 
-The coloured column says which half of that falls. Against the standard sweep the colouring is
-worth $\hoFirstColOverStd\times$ at first order and $\hoHoColOverStdLo$--$\hoHoColOverStdHi\times$
-on every higher-order arm --- next to nothing. The format keeps
-$\hoFirstPackedOverCol\times$ falling to $\hoDmPackedOverCol\times$ over the same arms. So the
-convergence is the \emph{scatter} advantage disappearing, not the format's: once a surface costs
-enough arithmetic, removing the atomics buys nothing and what still pays is what the sweep reads.
+The coloured sweep gives $\hoFirstColOverStd\times$ over the standard sweep at
+first order and $\hoHoColOverStdLo$--$\hoHoColOverStdHi\times$ on the higher-order
+arms. Packed over coloured falls from $\hoFirstPackedOverCol\times$ to
+$\hoDmPackedOverCol\times$. These comparisons include colour barriers and
+changes in memory-access order as well as accumulation. Similar coloured and
+atomic times therefore do not establish that atomic updates are cost-free.
+In the separate Darwish probe (Table~\ref{tab:scatter}), marginal accumulation
+costs at 72 threads are \SI{\scatterHoAtomicDelta}{\milli\second} for atomic
+and \SI{\scatterHoPackedDelta}{\milli\second} for packed. This supports a benefit
+from packed accumulation in that tested case. These costs include memory and
+synchronization effects and do not isolate atomic-instruction latency.
 
 \paragraph{Cost of the correction.} Within the standard layout the unlimited reconstruction costs
 $\hoUnlimCostAtomic\times$ and the limiters $\hoLimCostAtomicLo\times$ to
@@ -1327,12 +1331,10 @@ ridge of
 \rlRidge{}~FLOP/byte, so the memory roof is the binding one --- but none of them is close to it.
 Against the roof binding at its own intensity the packed residual attains
 \rlResidualPackedPct\%, the packed Jacobian action \rlJacobianPackedPct\%, and the atomic sweeps
-\rlResidualAtomicPct\%, while the lagged SpMV attains \rlSpmvFSixFourPct\%. The asymmetry is the
-result: the lagged operator is genuinely bandwidth-bound and has almost nothing left to recover,
-whereas the matrix-free kernels are limited neither by bandwidth nor by arithmetic but by the
-element kernel's instruction mix and dependencies, and retain the corresponding headroom. The
-format's contribution is to need far less traffic in the first place, not to use the available
-bandwidth better.
+\rlResidualAtomicPct\%, while the lagged SpMV attains \rlSpmvFSixFourPct\%. The lagged product reaches a larger fraction of this roof than the matrix-free kernels.
+These fractions alone do not identify the limiting mechanism: low attained bandwidth can
+also reflect latency or dependencies. The instruction counters below provide additional
+observations, without isolating the cost of scatter.
 
 \begin{table}[t]
   \centering
@@ -1348,30 +1350,64 @@ bandwidth better.
   \inputifready{tables/kmix}{instruction mix, jobs/kernel\_mix.sbatch}
 \end{table}
 
-Table~\ref{tab:kmix} says which. The mixes are similar and removing the scatter moves either
-sweep by under \SI{1}{\percent} (\kmixScatterPctPacked\% and \kmixScatterPctAtomic\%), so neither
-explains the gap; retirement does, at \kmixIpcPacked{} instructions per cycle against
-\kmixIpcAtomic{} from a back-end stalled \kmixStallPctPacked\% of cycles against
-\kmixStallPctAtomic\%. That stall is not a wait on memory where it hurts ---
-\kmixStallMemPctAtomic\% of the standard layout's stall cycles against \kmixStallMemPctPacked\% of
-the packed layout's --- which fits the atomic updates serialising, and is outside what the
-roofline's axes can express.
+Table~\ref{tab:kmix} reports similar instruction mixes but different retirement rates:
+\kmixIpcPacked{} instructions per cycle for packed against \kmixIpcAtomic{} for standard.
+The back-end stall shares are \kmixStallPctPacked\% and \kmixStallPctAtomic\%, respectively;
+the reported memory-wait fractions of those stalls are \kmixStallMemPctPacked\% and
+\kmixStallMemPctAtomic\%. These counters do not isolate the effects of atomic updates,
+indexing or accumulation; a separate controlled measurement below addresses accumulation.
 
-The second scheme is what tests that reading. Adding the limited correction issues
-$\kmixInstGrowthPacked\times$ and $\kmixInstGrowthAtomic\times$ the instructions and shifts the
-mix the same way on each --- loads and stores take a markedly larger share as the hoisted nodal
-gradient is read, and addressing arithmetic and the vector share give up the room --- so the
-\emph{composition} still does not separate them. Retirement again does,
-and it moves with the throughput: the standard layout's rate rises from \kmixIpcAtomic{} to
-\kmixIpcAtomicHo{} instructions per cycle while the packed layout's rises only from
-\kmixIpcPacked{} to \kmixIpcPackedHo{}, so the retirement ratio falls from
-$\kmixIpcRatioFo\times$ to $\kmixIpcRatioHo\times$ against a throughput ratio that falls from
-$\kmixRateFo\times$ to $\kmixRateHo\times$. The two track each other, which is the evidence that
-retirement is the mechanism and not a correlate of it: arithmetic the scatter cannot serialise
-gives the stalled layout work to issue between its atomic updates, and its stall share falls from
-\kmixStallPctAtomic\% to \kmixStallPctAtomicHo\% while the packed layout's does not move
-(\kmixStallPctPacked\% to \kmixStallPctPackedHo\%). The format's advantage is largest exactly
-where there is least other work to hide the serialisation behind.
+Adding the limited correction increases the instruction counts by
+$\kmixInstGrowthPacked\times$ and $\kmixInstGrowthAtomic\times$. The standard layout's
+retirement rate rises from \kmixIpcAtomic{} to \kmixIpcAtomicHo{} instructions per cycle,
+while the packed layout's rises from \kmixIpcPacked{} to \kmixIpcPackedHo{}.
+The retirement-rate ratio falls from $\kmixIpcRatioFo\times$ to $\kmixIpcRatioHo\times$,
+alongside a throughput ratio that falls from $\kmixRateFo\times$ to $\kmixRateHo\times$.
+This association is consistent with a change in instruction throughput, but the counters
+alone do not establish why the layouts differ.
+
+\begin{table*}[t]
+  \centering
+  \caption{Steady affine FP64 interior residual accumulation on \scatterHost{}, job \scatterJob{}, with Rhie--Chow,
+    $n=\scatterN$ and pack size \scatterPackSize{}. Times are milliseconds per sweep:
+    normal execution $t_0$, full probe $t_+$, and bypass $t_-$.
+    Each mean uses \scatterSamples{} samples of \scatterRepeat{} sweeps, with
+    \scatterWarmup{} warmups per mode. All six mode orders occur twice.
+    $\Delta=t_+-t_-$; brackets give the range of paired differences, not a confidence
+    interval. The last columns give $100\Delta/t_+$ and $100(t_+/t_0-1)$.}
+  \label{tab:scatter}
+  \footnotesize
+  \setlength{\tabcolsep}{3pt}
+  \input{tables/scatter}
+\end{table*}
+
+\paragraph{Accumulation cost.}
+The diagnostic in Table~\ref{tab:scatter} switches accumulation within the same compiled
+sweep. A compiler escape consumes every element result in both modes, preserving the
+element calculations when accumulation is bypassed. Input staging and existing buffer
+clearing remain; state gradients are reconstructed before timing. The atomic bypass omits
+nodal additions. The packed bypass omits pack-local additions, owned/ghost draining and
+the final ghost reduction. Before timing each case, all element contributions must be
+finite, nonzero as a vector and bit-identical between modes; the full nodal result must
+match normal execution within $10^{-11}$ relative infinity norm per equation, and bypass
+must leave a zero output. These checks pass for every reported case.
+
+At 72 threads, the first-order accumulation costs are
+\SI{\scatterFoAtomicDelta}{\milli\second} for atomic and
+\SI{\scatterFoPackedDelta}{\milli\second} for packed.
+The limited scheme costs \SI{\scatterHoAtomicDelta}{\milli\second} and
+\SI{\scatterHoPackedDelta}{\milli\second}, respectively. The differences account for
+\scatterFoGapShare\% and \scatterHoGapShare\% of the respective full-probe layout gaps.
+Normal execution in this allocation gives packed speedups of
+$\scatterFoNormalSpeedup\times$ and $\scatterHoNormalSpeedup\times$.
+Across the table, full-probe times differ from normal execution by
+\scatterOverheadMin\% to \scatterOverheadMax\%.
+The accumulation advantage persists at one thread, so it cannot be attributed solely
+to contention between threads. These are marginal costs, including changes in memory
+traffic and synchronization; the compiler escape can also affect scheduling. The
+measurement supports accumulation as the main contributor to the gap in these probes,
+without identifying an isolated atomic-instruction cost or a universal fraction of
+production runtime.
 
 \paragraph{Measured against specified.} The two roof pairs differ by more than any kernel here can
 recover: the triad attains \rlBwPctSpec\% of specified bandwidth and the \textsc{gemm}
@@ -1385,8 +1421,8 @@ kernel by those factors.
   \caption{The Jacobian action, each form fully exact or fully lagged, on the three matrix-free
     layouts against the double-precision product (the \texttt{f64} row, which the ratios divide
     by and which has no layout of its own). \emph{col.} is the \emph{element}-coloured layout,
-    not the pack colouring; it reads the standard mesh as \emph{standard} does and differs from
-    it in the scatter alone. $\Jlag$ is one row because deferred correction leaves the implicit
+    not the pack colouring; it reads the standard mesh as \emph{standard} does but changes
+    accumulation, traversal order and synchronization together. $\Jlag$ is one row because deferred correction leaves the implicit
     operator scheme-independent by construction: the first-order row \emph{is} the lagged action,
     and a control at every limiter reproduces its result bit for bit. It is also the only form the
     matrix can hold; the $\Jhoex$ rows have no matrix counterpart at all. The limiters are the
@@ -1446,17 +1482,18 @@ invites.
 The scatter in a matrix-free operator is usually treated as a synchronisation problem. Treating
 it as a data-layout problem instead --- giving every node exactly one owning pack, so that the
 owned ranges partition the numbering, and closing the remainder with a gather built by sorting
---- removes the synchronisation entirely rather than making it cheaper. The operator then has no
-atomic on any path and a summation order fixed by stored index arrays, so it returns the same
-bits at every thread count.
+--- removes atomic additions and colour barriers from the packed application. The local phase
+completes before the ghost reduction; stored index arrays fix each node's summation order.
+With one thread per pack, the result is bit-identical across the tested thread counts.
 
 Measured on the residual and matrix-free Jacobian action of a colocated CVFEM Navier--Stokes
 discretisation on one Grace socket, the format is faster than a standard atomic sweep, than a
 coloured one, and than sparse matrix--vector products with the lagged matrix, whose matrix it
 replaces with a mesh $\fpMatrixRatioFSixFour\times$ smaller per degree of freedom, at an arithmetic
-intensity a factor of \rlMfOverSpmv{} higher. The thread sweep
-locates the advantage: most of it is present at a single thread, where no contention exists, so it
-comes from what the layout reads rather than what it avoids contending on. The margin depends on the
+intensity a factor of \rlMfOverSpmv{} higher. The controlled residual diagnostic finds
+substantially lower accumulation costs for the packed layout at both one and 72 threads.
+These costs account for most of the layout gap within the diagnostic, including the
+single-thread case where there is no contention between threads. The margin depends on the
 operator: across convective schemes it runs from $\hoFirstLayoutRatio\times$ down to
 $\hoDmLayoutRatio\times$ as arithmetic per sub-control surface grows, so a format is worth
 reporting against the operator a solver applies rather than the cheapest kernel available.
