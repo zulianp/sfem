@@ -1,0 +1,5 @@
+case,ranks,total,qp,newton
+FP70_similar_coarse,8,127.857,122.539,10
+FP70_similar,8,242.603,237.213,4
+FF200_ExodusMesh,8,80.8703,77.3853,4
+FF200_mesh_refined,8,680.482,666.125,4

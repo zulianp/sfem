@@ -1,0 +1,15 @@
+node=nid006553
+cpu=Neoverse-V2
+sockets=4
+cores_per_socket=72
+numa_nodes=36
+host_memory_gb=856
+gpu=0, NVIDIA GH200 120GB, 97871 MiB, 595.91.07
+gpu=1, NVIDIA GH200 120GB, 97871 MiB, 595.91.07
+gpu=2, NVIDIA GH200 120GB, 97871 MiB, 595.91.07
+gpu=3, NVIDIA GH200 120GB, 97871 MiB, 595.91.07
+cuda=12.6
+gcc=13.3.0
+mpich=8.1.30
+libfabric=1.15.2.0
+uenv=prgenv-gnu/24.11:v2

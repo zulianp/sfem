@@ -1,0 +1,291 @@
+%% Valve containment in liquid diaphragm pumps: contact on a signed distance field, on Grace and
+%% Hopper.
+%%
+%% Build:  make          (latexmk -pdf)
+%%         make figures  (regenerate every figure, table and macro from data/)
+%%
+%% NOTHING IN THIS FILE IS A TYPED-IN MEASUREMENT. Every measured quantity arrives through
+%% \input{tables/...} or a macro of figures/ldp_macros.tex, emitted by python/ldp_figures.py from
+%% data/, so a re-measurement propagates. README.md names the job behind each data file.
+\documentclass[sigconf,nonacm]{acmart}
+
+\usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage{booktabs}
+\usepackage{siunitx}
+\sisetup{group-separator={,},group-minimum-digits=4,group-digits=integer}
+\usepackage{draftwatermark}
+\SetWatermarkText{DRAFT}
+\SetWatermarkScale{1.1}
+\SetWatermarkLightness{0.93}
+
+\input{figures/ldp_colors}
+\input{figures/ldp_macros}
+
+\begin{document}
+
+\title{Valve containment by obstacle contact on a signed distance field: a matrix-based
+Newton--MPRGP solver on Grace and Hopper}
+
+\author{Patrick Zulian}
+\orcid{0000-0002-5822-3288}
+\affiliation{%
+  \institution{Euler Institute, Universit\`a della Svizzera italiana}
+  \streetaddress{Via Buffi 13}
+  \city{Lugano}
+  \postcode{6900}
+  \country{Switzerland}}
+\affiliation{%
+  \institution{UniDistance Suisse}
+  \city{Brig}
+  \country{Switzerland}}
+\affiliation{%
+  \institution{University of Victoria}
+  \city{Victoria}
+  \state{British Columbia}
+  \country{Canada}}
+\email{patrick.zulian@usi.ch}
+
+\begin{abstract}
+Before a fluid simulation of a liquid diaphragm pump can start, the valves of its solid model
+must be pushed out of the fluid domain into which the meshing has placed them. We solve this
+containment problem as hyperelastic contact with a rigid obstacle given by a signed distance
+field: Newton's method with a bound-constrained quadratic program per step, solved by MPRGP. The
+solver runs on Grace CPUs and Hopper GPUs, on one and two nodes of the Alps GH200 system, from a
+single implementation. On four industrial meshes with \dofsMin{} to \dofsMax{} degrees of
+freedom, all host and device configurations produce the same converged displacement to a
+relative \agreeParallel{}, and the converged solutions have a KKT residual \kktRatioMin{} to
+\kktRatioMax{} times smaller than the production solver they replace. The QP iteration is
+latency bound at these sizes: one GPU is the fastest configuration on the smaller meshes, and
+several GPUs on the larger ones.
+\end{abstract}
+
+\maketitle
+
+\section{Introduction}
+
+A liquid diaphragm pump moves fluid with a membrane and directs it with a suction and a pressure
+valve. The fluid and solid meshes of such a pump are generated separately, and the valves of the
+solid model overlap the fluid domain by up to a few element sizes. A fluid--structure simulation
+requires the two to be compatible, so the first step of the workflow deforms the valves until
+they lie inside the cavity that the fluid mesh leaves free, at a prescribed distance from its
+boundary. The valves are free bodies: no Dirichlet condition holds them, only the obstacle.
+
+This containment problem has been solved with the production code utopia~\cite{zulian2021utopia}
+by a fixed number of damped Newton steps, each a quadratic program (QP) with the distance to the
+obstacle as a bound, solved by MPRGP~\cite{dostal2005mprgp}. We report a reimplementation in the
+SFEM library with three properties: one code path for multi-core CPUs and GPUs, distributed memory
+on both, and solutions that satisfy the Karush--Kuhn--Tucker (KKT) conditions to a stated
+tolerance. The contributions are
+\begin{itemize}
+\item a Newton--MPRGP solver for obstacle contact on a sampled signed distance field, with the
+  QP iteration reduced to two global reductions and one ghost exchange, the exchange overlapped
+  with the local part of the operator application on host and device;
+\item a comparison of every configuration with the single-process result and of the converged
+  states with utopia's, by displacement, penetration, contact set and KKT residual;
+\item time to solution and cost per QP iteration on one Grace module up to eight Hopper GPUs on
+  two nodes.
+\end{itemize}
+
+\section{Problem and method}
+
+\paragraph{Mechanics.} Each valve is a compressible neo-Hookean body (Ogden's volumetric term)
+with $E=\SI{9.174}{\mega\pascal}$ and $\nu=0.4$, discretised by linear tetrahedra. Only the valve
+blocks of the solid mesh are loaded and solved; the membrane carries no unknowns.
+Table~\ref{tab:cases} lists the four cases.
+
+\paragraph{Obstacle.} The obstacle is the complement of the fluid domain, represented by its
+signed distance $\phi$, positive inside the obstacle, on a uniform grid built from the fluid
+mesh's boundary. $\phi$ and its derivatives are evaluated through a cubic B-spline whose
+coefficients come from the recursive prefilter of the samples~\cite{unser1999}, so the sampled
+field is $C^2$. A skin node $i$ with reference position $X_i$ and displacement $u_i$ satisfies
+\begin{equation}
+  \phi(X_i + u_i) + s \le 0 ,
+\end{equation}
+with a clearance $s=\SI{10}{\micro\metre}$; nodes farther than \SI{100}{\micro\metre} beyond
+the clearance are unconstrained. The overlap is removed in a single load step.
+
+\paragraph{Newton step.} At the iterate $u$ the constraint is linearised in a frame per contact
+node whose first axis is $n_i=\nabla\phi(X_i+u_i)$, so it bounds one component of the increment.
+The Hessian of $\phi$ enters the tangent through the contact term~\cite{wriggers2006}. In the frame
+the step solves the bound-constrained QP
+\begin{equation}
+  \min_{y}\ \tfrac12 y^\top K y - r^\top y \quad \text{subject to}\quad y \le b ,
+\end{equation}
+with $K$ the tangent stiffness in the rotated basis and $b$ infinite away from contact. As in
+utopia the step is damped by $0.8$, shortened further only past an inverted element, and a fixed
+number of Newton steps is taken (Table~\ref{tab:cases}).
+
+\paragraph{MPRGP.} The QP is solved by MPRGP~\cite{dostal2005mprgp,dostal2009} on the Jacobi-scaled
+operator $D^{-1/2}KD^{-1/2}$, $z=D^{1/2}y$. On a contact node the three diagonal entries are
+replaced by their mean, which commutes with the frame rotation and keeps the bound a bound. The
+expansion step length uses a Gershgorin bound of the scaled operator's largest eigenvalue, and
+the stopping test is evaluated on the projected gradient in unscaled units. The free valves make
+$K$ singular at the start; along a direction of zero curvature the iteration steps to the first
+bound it meets and expands the active set, and declares the QP unbounded when no bound limits the
+direction. The Newton step is inexact: the QP stops once its weighted projected gradient falls
+below $10^{-3}$ times the merit of the current iterate, the KKT residual plus the penetration
+weighted by the largest contact stiffness, and at the latest at a tenth of the Newton tolerance or
+after \qpCap{} iterations. The QP's own starting gradient is no reference for this test: it counts
+the full reaction of a contact node a rounding error off its bound, which the complementarity term
+of the KKT residual discounts, and so stays of the size of the contact forces however far Newton
+has converged.
+
+\section{Parallel implementation}
+
+\paragraph{Distribution.} The mesh is partitioned by elements; each rank owns a contiguous range of
+nodes and holds ghost copies of the nodes its elements share with other ranks. Every operator
+works on all local elements, so owned rows are complete without a reduction across ranks, and the
+ghosts of a vector are refreshed by a point-to-point exchange after each update. Global inner
+products, norms and minima sum or reduce over owned entries only.
+
+\paragraph{Tangent and operator application.} The tangent is assembled per Newton step into
+$3\times3$ block compressed sparse rows (BSR) from generated element kernels. Each row is split
+into a diagonal part (owned columns) and an off-diagonal part (ghost columns). An operator
+application posts the ghost exchange, applies the diagonal part, and applies the off-diagonal
+part once the ghosts have arrived. On Grace one thread completes the communication while the
+others compute; on the GPU the diagonal part runs on a second stream concurrently with the
+GPU-aware transfers.
+
+\paragraph{The QP iteration.} The vector operations of one MPRGP iteration are fused into two
+passes over the owned unknowns. The first returns $p^\top Kp$, $p^\top p$, $g^\top p$ and the
+largest feasible step, the second the four norms and inner products of the gradient split that
+decide the next step. The minimum travels with the sums in one reduction through a user-defined
+MPI operation, so an iteration synchronises at two global reductions and one ghost exchange. On
+the GPU each pass reduces per thread block and finishes in a second kernel, which fixes the
+summation order.
+
+\paragraph{Devices.} One rank drives one GPU. The device exchange packs, sends and unpacks device
+buffers with GPU-aware MPI. Ranks are bound to GPUs before MPI is initialised, from the launcher's
+node-local rank: when a job spans nodes, Cray MPICH initialises CUDA during MPI initialisation,
+after which the visible devices of a process can no longer be restricted, and all ranks of a node
+would share its first GPU.
+
+\section{Experimental setup}
+
+The measurements run on Alps (CSCS). A node holds \machineModules{} GH200 modules, each a
+\machineCPU{} CPU with \machineCores{} cores and an \machineGPU{} GPU with \machineGPUMemory{} of
+device memory; the node has \machineHostMemory{} of host memory. The nodes are connected by HPE
+Slingshot through libfabric \machineLibfabric{}. The software is GCC \machineGCC{}, CUDA
+\machineCUDA{}, Cray MPICH \machineMPICH{} and NVIDIA driver \machineDriver{}.
+
+Grace configurations are written $R\times T$ for $R$ ranks of $T$ threads, with one rank per
+module ($4\times72$ per node) or four per module ($16\times18$), threads bound to cores. GPU
+configurations run one rank per GPU with its module's \machineCores{} cores. Cray MPICH's GPU
+support is disabled on Grace runs, since it checks every buffer with the CUDA driver; GPU runs
+use GPU-aware MPI with the driver-query override that CSCS provides for the current
+driver~\cite{cscsmpich}. Every case runs in every configuration \benchRepeats{} times, the
+repeats outermost; we report medians. The spread between repeats of the cost per QP iteration
+has a median of \benchSpreadMedian\% over the configurations and is largest, \benchSpread\%, for
+\benchSpreadWhere{}. All \benchRuns{} runs completed. Time to solution is the nonlinear
+solve, excluding mesh input, partitioning and loading of the distance field.
+
+\begin{table}
+\caption{Cases. Degrees of freedom of the valve blocks; contact nodes are the skin nodes within
+the cutoff of the obstacle at the start.}
+\label{tab:cases}
+\small
+\input{tables/cases}
+\end{table}
+
+\section{Results}
+
+\subsection{Accuracy}
+
+\paragraph{Configurations.} On the cases that converge (\convergedCases{}), the final displacement
+of the single-GPU run agrees with the single-process Grace run to a relative \agreeSerial{} and
+that of every multi-rank run, host or device, to \agreeParallel{} (\agreeParallelAbs{}\,\si{\metre}
+absolute). The multi-rank differences depend on the number of ranks, not on host or device, and
+are of the order of the float32 spacing of the mesh coordinates, \coordUlp{} to
+\coordUlpMax{}\,\si{\metre}. On \unconvergedCases{}, whose Newton budget ends at a relative
+residual of \finalUnconverged{}, the configurations differ by up to \agreeUnconverged{}: each
+inexact QP stops at the first iterate below its tolerance, which the summation order of the
+reductions moves, and a state reached after a fixed number of steps keeps the difference. For the
+same reason QP iteration counts differ by up to \qpSpreadMax\% between configurations.
+
+\paragraph{Utopia.} Table~\ref{tab:accuracy} compares SFEM's single-process result with utopia's on
+the valve nodes. SFEM's contact nodes stay outside the obstacle, $\max\phi \le \abSdfSfemMax$\,\si{\metre},
+while utopia's penetrate by up to \abPenUtopiaMax\,\si{\metre}. The contact sets overlap with a
+Jaccard index of at least \abJaccardMin{}. The KKT measure, the residual of the optimality
+conditions evaluated at each final state, separates the two. Where SFEM's Newton iteration
+converges within its budget (\convergedCases{}, last residual below \convergedTol{} of the
+first), its KKT measure is \kktRatioMin{} to \kktRatioMax{} times smaller than utopia's, and the
+remaining displacement difference is utopia's error. On \unconvergedCases{} neither state is
+converged. Evaluating utopia's state on its own grid instead of SFEM's changes its KKT measure by
+at most \kktGridChange\%.
+
+\begin{table*}
+\caption{SFEM ($S$, single process) against utopia ($U$) on the valve nodes: displacement
+difference relative to utopia's displacement, largest signed distance of a contact node (positive
+inside the obstacle), KKT measure of the final state, and Jaccard index of the contact sets.}
+\label{tab:accuracy}
+\small
+\input{tables/accuracy}
+\end{table*}
+
+\subsection{Performance}
+
+\begin{figure}[t]
+\centering
+\input{figures/breakdown}
+\caption{Time to solution of FF200 refined (\dofsFFf{} dofs) by phase.}
+\label{fig:breakdown}
+\end{figure}
+
+Table~\ref{tab:performance} and Figure~\ref{fig:per-iteration} give the cost per QP iteration and
+the time to solution. The QP accounts for at least \qpShareFFf\% of the solve time on FF200 refined
+in every configuration (Figure~\ref{fig:breakdown}), so the cost per QP iteration determines the
+time to solution.
+
+\paragraph{GPUs.} One GPU is the fastest configuration on \oneGpuBestCases{}; on FP70 and FF200
+refined the fastest are \bestFPf{} and \bestFFf{}. Per case, the fastest GPU configuration solves
+\gpuOverGraceMin{} to \gpuOverGraceMax{} times faster than the fastest Grace configuration. Four
+GPUs on two nodes cost \gpuInternodeMin{} to \gpuInternodeMax{} times as much per QP iteration as
+four GPUs on one node: crossing the network adds no measurable cost at these message sizes.
+
+\paragraph{Grace.} At equal core count, $16\times18$ is \hostThreadsMin{} to \hostThreadsMax{}
+times faster per iteration than $4\times72$, and $4\times72$ on one node is slower than
+$1\times72$ on \fourSlowerThanOneCases{}. The difference lies outside the ghost exchange, in the fused
+passes and the reductions; we attribute it to the fork and join of \machineCores{} threads around
+passes over few unknowns per rank, an attribution this study does not isolate.
+
+\paragraph{Latency.} The cheapest iteration of each case costs \itBestMin{} to
+\itBestMax\,\si{\micro\second}, while the work per iteration grows \dofsRatio-fold from the smallest
+to the largest case: the QP iteration is latency bound. Its fixed cost is the two global reductions, the
+ghost exchange and, on the GPU, the kernel launches and the transfer of each reduction's result to
+the host. Adding ranks shrinks the work per rank but not these costs, which bounds the strong
+scaling of every case.
+
+\paragraph{Reference.} Utopia solved the four cases in \utopiaTimeFPc, \utopiaTimeFFc,
+\utopiaTimeFPf{} and \utopiaTimeFFf\,\si{\second} on \utopiaRanks{} MPI ranks of an unrecorded
+machine, with \utopiaNewtonFPc, \utopiaNewtonFFc, \utopiaNewtonFPf{} and \utopiaNewtonFFf{} Newton
+steps. Without the machine and at different accuracies the times are no basis for a speed-up.
+
+\begin{table*}
+\caption{Cost per QP iteration (\si{\micro\second}) and time to solution (\si{\second}), median of
+\benchRepeats{} runs. Grace configurations are ranks $\times$ threads.}
+\label{tab:performance}
+\small
+\input{tables/performance}
+\end{table*}
+
+\begin{figure*}
+\centering
+\input{figures/per_iteration}
+\caption{Cost per QP iteration of every configuration.}
+\label{fig:per-iteration}
+\end{figure*}
+
+\section{Limitations}
+
+In the single-process runs \qpCapped{} QP solves stop at the iteration cap
+(\qpCappedCases{}); the Newton iteration continues from the capped increment. The Newton budget
+of \unconvergedCases{} ends before the KKT tolerance is reached. The comparison with utopia samples
+the distance field trilinearly for both states, so penetrations below the grid's interpolation
+error are not resolved. All measurements are on one system; utopia was not rerun on it.
+
+\bibliographystyle{ACM-Reference-Format}
+\bibliography{refs}
+
+\end{document}
