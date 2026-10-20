@@ -174,6 +174,7 @@ extern "C" int cu_neumann_proteus_quad4_edgeshell2_boundary_residual_soa(
     real_t *const RSTR out0,
     real_t *const RSTR out1,
     void *const stream) {
+  if (nelements <= 0) return SFEM_SUCCESS;
   const int block_size = 256;
   const int grid_size = (int)((nelements + block_size - 1) / block_size);
   sfem::codegen::neumann_proteus_quad4_edgeshell2_boundary_residual_soa_impl<real_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(
@@ -190,6 +191,7 @@ extern "C" int cu_neumann_proteus_quad4_edgeshell2_boundary_residual_soa_float(
     float *const RSTR out0,
     float *const RSTR out1,
     void *const stream) {
+  if (nelements <= 0) return SFEM_SUCCESS;
   const int block_size = 256;
   const int grid_size = (int)((nelements + block_size - 1) / block_size);
   sfem::codegen::neumann_proteus_quad4_edgeshell2_boundary_residual_soa_impl<float><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(
@@ -208,6 +210,7 @@ extern "C" int cu_neumann_proteus_quad4_edgeshell2_boundary_residual_ss_soa(
     real_t *const RSTR out0,
     real_t *const RSTR out1,
     void *const stream) {
+  if (nsides <= 0) return SFEM_SUCCESS;
   const int block_size = 256;
   const int grid_size = (int)((nsides + block_size - 1) / block_size);
   sfem::codegen::neumann_proteus_quad4_edgeshell2_boundary_residual_ss_soa_impl<real_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(
@@ -226,6 +229,7 @@ extern "C" int cu_neumann_proteus_quad4_edgeshell2_boundary_residual_ss_soa_floa
     float *const RSTR out0,
     float *const RSTR out1,
     void *const stream) {
+  if (nsides <= 0) return SFEM_SUCCESS;
   const int block_size = 256;
   const int grid_size = (int)((nsides + block_size - 1) / block_size);
   sfem::codegen::neumann_proteus_quad4_edgeshell2_boundary_residual_ss_soa_impl<float><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(

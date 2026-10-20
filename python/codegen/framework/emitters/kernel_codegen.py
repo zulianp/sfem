@@ -229,6 +229,7 @@ def generate_cuda_kernel(
             "",
             'extern "C" void %s(%s)' % (function_name, ", ".join(kernel_arguments)),
             "{",
+            "  if (nelements <= 0) return;",
             "  const int block_size = 256;",
             "  const int grid_size = (int)((nelements + block_size - 1) / block_size);",
             "  %s<<<grid_size, block_size>>>(nelements%s%s);" % (
