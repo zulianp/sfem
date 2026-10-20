@@ -29,6 +29,8 @@ static void pack_residual(const MeshData &d, std::vector<scalar_t> &r) {
     }
 }
 
+#include "tests/verification/cvfem_scatter_study.hpp"
+
 static void bsr4_spmv(const BSR4 &b, const ptrdiff_t nnodes, const scalar_t *const x, scalar_t *const y) {
     std::fill(y, y + nnodes * 4, scalar_t(0));
 
@@ -532,6 +534,8 @@ int main(int argc, char **argv) {
     // rather than a column of the timing CSV: it needs the packed mesh built and nothing else
     // run, and the numbers it prints are sizes, not rates.
     int         mesh_footprint = 0;
+    int         scatter_study = 0;
+    int         scatter_samples = 12;
     // Whether the nodal pressure gradient is rebuilt inside every apply or hoisted out of
     // the timed loop. This is the difference SFEM_PGRAD_CACHE makes in the solver, and it
     // is the other half of the cascade: the gradient is a full element sweep.
@@ -596,6 +600,10 @@ int main(int argc, char **argv) {
             g_breakdown = 1;
         else if (arg == "--mesh-footprint")
             mesh_footprint = 1;
+        else if (arg == "--scatter-study")
+            scatter_study = 1;
+        else if (arg == "--scatter-samples" && i + 1 < argc)
+            scatter_samples = std::atoi(argv[++i]);
         else if (arg == "--kernel-only")
             g_kernel_only = 1;
         else if (arg == "--dense-flush")
@@ -687,8 +695,12 @@ int main(int argc, char **argv) {
                     "  --mesh-footprint  print the bytes each representation of the mesh occupies,\n"
                     "                 array by array, and exit. Every figure is the allocation's\n"
                     "                 own nbytes(), so nothing here is a hand computation.\n"
-                    "  --kernel-only  element kernel writes to a dense stack buffer (no scatter);\n"
-                    "                 measures the arithmetic floor of the element kernel\n"
+                    "  --scatter-study  paired residual accumulation timings and element-output checks\n"
+                    "                   affine packed/atomic, FP64, steady interior only\n"
+                    "  --scatter-samples N  multiple of 6, default 12; --repeat applies to each sample\n"
+                    "  --kernel-only  dense-element assembly diagnostic: --assemble with packed\n"
+                    "                 (affine/isoparam) or store (affine only). It does not\n"
+                    "                 measure the residual's scatter cost or produce its operator.\n"
                     "  --dense-flush  sumfact only: stage ke densely, then flush 64 contiguous\n"
                     "                 blocks (measured slower than direct scatter on Apple M1)\n"
                     "  --csv FILE     append one machine-readable row per run (header written if\n"
@@ -947,6 +959,31 @@ int main(int argc, char **argv) {
     // operation there is nothing left to misname -- the row records what the layout, the
     // geometry and the term set select, which is the only thing that was ever true.
     const bool residual_op = !(assemble || assemble_diag || jac_action || bsr_apply || nodal_grad);
+
+    if (scatter_study && (!residual_op || geom != "affine" ||
+        !(layout == "packed" || layout == "atomic") || sizeof(scalar_t) != sizeof(double) ||
+        boundary || dt != scalar_t(0) || grad_single || pgrad_per_apply ||
+        partial_assembly || mesh_footprint || verify || verify_jac || verify_ho ||
+        verify_ho_jac || g_kernel_only || g_dense_flush || g_breakdown ||
+        lagged_rc || lagged_ho || live_vectors || !csv_path.empty() || !dump_path.empty() ||
+        repeat < 1 || warmup < 1 || scatter_samples < 6 || scatter_samples % 6 != 0)) {
+        std::fprintf(stderr, "--scatter-study requires a standalone FP64 affine packed/atomic residual, "
+                             "cached gradients, no boundary/transient terms, warmup/repeat >= 1, "
+                             "and a positive multiple of 6 samples\n");
+        if (own_mpi) MPI_Finalize();
+        return 2;
+    }
+
+    // Only these assembly paths consume the dense element slots.
+    if (g_kernel_only && (!assemble ||
+        !(layout == "packed" || (layout == "store" && geom == "affine")) ||
+        partial_assembly || mesh_footprint || verify || verify_jac || verify_ho ||
+        verify_ho_jac)) {
+        std::fprintf(stderr, "--kernel-only requires standalone --assemble with --layout packed "
+                             "(affine/isoparam) or store (affine); it does not remove residual scatter\n");
+        if (own_mpi) MPI_Finalize();
+        return 2;
+    }
 
     // Read only inside the sumfact branch of the colored and store assemblies.
     if (g_dense_flush && !(assemble && (layout == "colored" || layout == "store"))) {
@@ -1947,6 +1984,13 @@ int main(int argc, char **argv) {
         if (boundary) apply_boundary_scs_residual_pass(d, rho, mu, geom_kind == GeomKind::Isoparam ? 1 : 0);
         apply_transient_pass(d, rho);
     };
+    if (scatter_study) {
+        const int status = run_scatter_study(d, packed, layout == "packed", rho, mu,
+                                             conv_ho ? ugrad.data() : nullptr, conv_limiter,
+                                             venkat_c, repeat, warmup, scatter_samples, apply_fn);
+        if (own_mpi) MPI_Finalize();
+        return status;
+    }
     auto jac_fn = [&]() {
         if (geom_kind == GeomKind::Isoparam) {
             if (layout == "store")

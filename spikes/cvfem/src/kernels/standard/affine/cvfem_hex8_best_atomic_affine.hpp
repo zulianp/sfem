@@ -1,5 +1,7 @@
 #pragma once
 
+#include "kernels/cvfem_scatter_probe.hpp"
+
 // The standard layout's affine sweeps.
 //
 // Separated by geometry as DESIGN.md asks, by MOVING whole functions: these two sets were always
@@ -425,7 +427,7 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact(
 // another layout. Measured at n=128 on Grace, bare and with Rhie-Chow: lane-blocking the atomic
 // sweep alone is worth 1.29x and 1.37x, and what remains between the layouts -- 2.45x and 1.76x
 // -- is the format.
-template <typename scalar_t, typename geom_t, typename idx_t, typename grad_t = scalar_t>
+template <bool ScatterProbe = false, typename scalar_t, typename geom_t, typename idx_t, typename grad_t = scalar_t>
 static SFEM_NOINLINE void apply_residual_atomic_sumfact_simd(
         // The staging objects are gone; what this sweep reads out of them is what it takes.
         const scalar_t *const *const SFEM_RESTRICT adj_ptr,
@@ -549,6 +551,9 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact_simd(
                                                        opt.with_rc ? &rcp : nullptr, rhie_chow_scale,
                                                        scalar_t(0), with_ho ? &hop : nullptr);
 
+            if constexpr (ScatterProbe) {
+                if (!cvfem_scatter_probe(outp, e0, nlanes)) continue;
+            }
             for (int lane = 0; lane < nlanes; ++lane) {
                 const ptrdiff_t e = e0 + lane;
                 for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
