@@ -585,7 +585,7 @@ static SFEM_INLINE void scatter_hex8_simd_to_pack(pack_idx_t **const SFEM_RESTRI
 // fields arrive STAGED IN THE PACK (ug, vg), filled by the sweep per pack like every other field,
 // so this reads no global array and no standard connectivity. The pack-coloured sweep passes
 // empty packs and with_ho false, so that branch folds away for it.
-template <typename scalar_t, typename idx_t, typename pack_idx_t>
+template <DarwishCacheMode Cache = DarwishCacheMode::Off, typename scalar_t, typename idx_t, typename pack_idx_t>
 static SFEM_INLINE void cvfem_hex8_action_lanes_affine(
         const Hex8PackExtentT<idx_t>              &x,
         const Hex8PackCoordsT<scalar_t>           &pk,
@@ -610,7 +610,7 @@ static SFEM_INLINE void cvfem_hex8_action_lanes_affine(
         // The limiter and its coefficient, read by the higher-order correction. They travel in
         // the gradient pack, which is where the element kernel looks for them.
         const int                                  limiter,
-        const scalar_t                             venkat_c) {
+        const scalar_t                             venkat_c, DarwishCacheExperiment<scalar_t> *cache = nullptr) {
     Hex8InputPackT<scalar_t>    u_pack;
     Hex8InputPackT<scalar_t>    du_pack;
     Hex8ResidualPackT<scalar_t> outp;
@@ -654,11 +654,14 @@ static SFEM_INLINE void cvfem_hex8_action_lanes_affine(
             }
             if (with_qg)
                 cvfem_hex8_gather_qg_from_pack(pack_elems, qg.x, qg.y, qg.z, begin, nlanes, rcp);
+            if constexpr (Cache == DarwishCacheMode::Read) hop.darwish_read = cache->read(begin);
+            if constexpr (Cache == DarwishCacheMode::Build) hop.darwish_build = cache->build(begin);
             if (with_ho) {
-                cvfem_hex8_gather_ugrad_from_pack(pack_elems, ug.g, begin, nlanes, hop);
+                if constexpr (Cache != DarwishCacheMode::Read)
+                    cvfem_hex8_gather_ugrad_from_pack(pack_elems, ug.g, begin, nlanes, hop);
                 cvfem_hex8_gather_ugrad_from_pack(pack_elems, vg.g, begin, nlanes, hovp);
             }
-            cvfem_hex8_ns_upwind_jacobian_action_simd(rho,
+            cvfem_hex8_ns_upwind_jacobian_action_simd<scalar_t, Cache>(rho,
                                                       mu,
                                                       cof0,
                                                       cof1,
@@ -679,6 +682,7 @@ static SFEM_INLINE void cvfem_hex8_action_lanes_affine(
                                                       scalar_t(0),
                                                       with_ho ? &hop : nullptr,
                                                       with_ho ? &hovp : nullptr);
+            if constexpr (Cache == DarwishCacheMode::Build) cache->mark_built(begin);
             scatter_hex8_simd_to_pack(pack_elems, pack_out, begin, nlanes, outp);
         }
 }

@@ -424,6 +424,8 @@ static void csv_write(const std::string &path, const CsvRow &r) {
     std::fclose(f);
 }
 
+#include "cvfem_retained_timing.hpp"
+
 int main(int argc, char **argv) {
     int own_mpi = 0;
     MPI_Initialized(&own_mpi);
@@ -545,6 +547,10 @@ int main(int argc, char **argv) {
     int         bdf_order  = 1;
     // Partial assembly: build the element tangent once and let the matvec read it.
     int         partial_assembly = 0;
+    int retained_windows = 0;
+    bool darwish_cache = false;
+    bool darwish_rebuild_check = false;
+    bool darwish_cache_control = false;
 
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
@@ -643,6 +649,14 @@ int main(int argc, char **argv) {
             g_qgrad_atomic = 1;
         else if (arg == "--qgrad-packed")
             g_qgrad_packed = 1;
+        else if (arg == "--darwish-cache-rebuild-check") darwish_rebuild_check = true;
+        else if (arg == "--darwish-cache-experiment")
+            darwish_cache = true;
+        else if (arg == "--darwish-cache-control") {
+            darwish_cache = true;
+            darwish_cache_control = true;
+        }
+        else if (arg == "--retained-windows" && i + 1 < argc) retained_windows = std::stoi(argv[++i]);
         else if (arg == "--partial-assembly")
             partial_assembly = 1;
         else if (arg == "--live-vectors" && i + 1 < argc)
@@ -829,6 +843,29 @@ int main(int argc, char **argv) {
     // -- rather than qualifying it at each of the four sites downstream -- keeps one meaning
     // for the variable: "the SpMV reads float values".
     bsr_single &= bsr_apply;
+    if (retained_windows && !(retained_windows > 0 && retained_windows <= 12 &&
+        sizeof(scalar_t)==8 && (jac_action || bsr_apply) && layout=="packed" && geom=="affine" &&
+        rhie_chow && !grad_single && !boundary && dt==scalar_t(0) && !partial_assembly &&
+        !rebuild_state_gradients && !lagged_ho && !live_vectors && !bsr_single &&
+        !verify && !verify_jac && !verify_ho && !verify_ho_jac && !verify_coupled_jac &&
+        !nodal_grad && !assemble_diag && csv_path.empty() &&
+        (!conv_ho || (conv_limiter==3 && jac_action && !lagged_rc)))) {
+        std::fprintf(stderr,"unsupported retained action scope\n"); return 2;
+    }
+
+    if (darwish_rebuild_check && (!darwish_cache || live_vectors || n > 16)) {
+        std::fprintf(stderr, "Darwish cache rebuild check requires a small cached case without live vectors\n");
+        return 2;
+    }
+    if (darwish_cache && !(jac_action && layout == "packed" && geom == "affine" &&
+        conv_ho && conv_limiter == 3 && rhie_chow && !lagged_rc && !lagged_ho &&
+        !rebuild_state_gradients && !grad_single && !boundary && dt == scalar_t(0) &&
+        !partial_assembly && !assemble && !assemble_diag && !bsr_apply && !nodal_grad &&
+        !verify && !verify_jac && !verify_ho && !verify_ho_jac && !verify_coupled_jac && csv_path.empty())) {
+        std::fprintf(stderr, "Darwish cache experiment requires a fixed-state packed affine interior consistent Darwish action with RC\n");
+        return 2;
+    }
+
 
     // THE --verify ORACLES ARE WRITTEN FOR DOUBLE, and an f32 build refuses them rather than
     // running them against thresholds chosen for 53 bits. Their finite differences cannot resolve
@@ -2062,6 +2099,33 @@ int main(int argc, char **argv) {
         jac_out.assign((size_t)d.nnodes * N_FIELDS, 0.0);
 #pragma omp parallel for schedule(static)
         for (ptrdiff_t i = 0; i < d.nnodes * N_FIELDS; ++i) jac_dir[(size_t)i] = 1.0 + 0.01 * scalar_t(i % 7);
+        if (retained_windows > 0) {
+            // Renumbering must not change the physical direction in paired layout runs.
+            uint64_t fingerprint_xor = 0, fingerprint_sum = 0;
+#pragma omp parallel for schedule(static) reduction(^:fingerprint_xor) reduction(+:fingerprint_sum)
+            for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+                uint64_t key = 14695981039346656037ull;
+                for (int c = 0; c < 3; ++c) {
+                    const float coordinate = float(d.points[c][i]);
+                    uint32_t bits = 0;
+                    std::memcpy(&bits, &coordinate, sizeof(bits));
+                    key = (key ^ bits) * 1099511628211ull;
+                }
+                uint64_t sample = key;
+                for (int c = 0; c < N_FIELDS; ++c) {
+                    key = (key ^ (key >> 27)) * 0x3c79ac492ba7b653ull + uint64_t(c + 1);
+                    const double value = 1.0 + double((key >> 16) & 1023u) / 1024.0;
+                    jac_dir[(size_t)i * N_FIELDS + c] = scalar_t(value);
+                    uint64_t bits = 0;
+                    std::memcpy(&bits, &value, sizeof(bits));
+                    sample = (sample ^ bits) * 1099511628211ull;
+                }
+                fingerprint_xor ^= sample;
+                fingerprint_sum += sample;
+            }
+            std::printf("ROOFLINE_DIRECTION source=coordinates nodes=%td xor=%016llx sum=%016llx\n",
+                        d.nnodes, (unsigned long long)fingerprint_xor, (unsigned long long)fingerprint_sum);
+        }
     }
 
     // The Krylov working set, when --live-vectors asks for it.
@@ -2261,6 +2325,8 @@ int main(int argc, char **argv) {
 
     const char *state_gradient_mode = jac_action && (rhie_chow || with_hograd)
                                          ? (rebuild_state_gradients ? "per_apply" : "cached") : "n/a";
+    DarwishCacheExperiment<scalar_t> experiment;
+    DarwishCacheMode cache_mode = DarwishCacheMode::Off;
     auto jac_action_fn = [&]() {
         const scalar_t *const dir_v = live.empty() ? jac_dir.data() : live[(size_t)(live_k++ % (long)live.size())].data();
         last_dir = dir_v;
@@ -2277,7 +2343,13 @@ int main(int argc, char **argv) {
         // storage type from the pointers, so the choice is made once here and never inside a
         // sweep; null pointers of the double type are the lagged action, as before.
         auto run_jac = [&](const auto *ug, const auto *vg) {
-            if (partial_assembly)
+            if (cache_mode == DarwishCacheMode::Build)
+                apply_jacobian_action_packed<std::remove_cv_t<std::remove_pointer_t<decltype(ug)>>, DarwishCacheMode::Build>(
+                    d, packed, rho, mu, geom_kind, dir_v, jac_out.data(), ug, vg, conv_limiter, venkat_c, &experiment);
+            else if (cache_mode == DarwishCacheMode::Read)
+                apply_jacobian_action_packed<std::remove_cv_t<std::remove_pointer_t<decltype(ug)>>, DarwishCacheMode::Read>(
+                    d, packed, rho, mu, geom_kind, dir_v, jac_out.data(), ug, vg, conv_limiter, venkat_c, &experiment);
+            else if (partial_assembly)
                 apply_jacobian_action_packed_pa(d, packed, rho, mu, dir_v, jac_out.data());
             else if (layout == "ecolor")
                 apply_jacobian_action_ecolored(d, ecolors, rho, mu, dir_v, jac_out.data(),
@@ -2501,6 +2573,143 @@ int main(int argc, char **argv) {
         }
     }
 
+    // The cache is scoped to this fixed state; it is never retained by the solver.
+    if (darwish_cache) {
+        if (packed.n_elements_per_pack % cvfem_hex8_vec_size<scalar_t>) {
+            std::fprintf(stderr, "Darwish cache requires lane-aligned packs\n");
+            return 2;
+        }
+        const auto saved_dir = jac_dir;
+        const auto saved_live_k = live_k;
+        const double setup_start = wall_time();
+        experiment.allocate(d.nelements, d.state_stamp);
+        cache_mode = DarwishCacheMode::Build;
+        jac_action_fn();
+        experiment.finish_build();
+        cache_mode = DarwishCacheMode::Read;
+        const double setup_seconds = wall_time() - setup_start;
+        std::printf("darwish_cache_bytes: %zu\ndarwish_cache_setup_seconds: %.9g\n",
+                    experiment.bytes(), setup_seconds);
+        double worst = 0;
+        for (int k = 0; k < 3; ++k) {
+            if (live.empty())
+                for (size_t j = 0; j < jac_dir.size(); ++j)
+                    jac_dir[j] = saved_dir[j] * scalar_t(k + 1) +
+                                 scalar_t(0.03) * scalar_t(int((j * 7 + k * 3) % 19) - 9);
+            live_k = saved_live_k + k;
+            cache_mode = DarwishCacheMode::Off;
+            jac_action_fn();
+            const auto reference = jac_out;
+            live_k = saved_live_k + k;
+            cache_mode = DarwishCacheMode::Read;
+            jac_action_fn();
+            for (int f = 0; f < N_FIELDS; ++f) {
+                double error = 0, scale = 0;
+                for (size_t j = f; j < jac_out.size(); j += N_FIELDS) {
+                    if (!std::isfinite(double(jac_out[j])) || !std::isfinite(double(reference[j])))
+                        throw std::runtime_error("nonfinite cached action");
+                    error = std::max(error, std::abs(double(jac_out[j]) - double(reference[j])));
+                    scale = std::max(scale, std::abs(double(reference[j])));
+                }
+                const double rel = error / std::max(scale, 1e-30);
+                worst = std::max(worst, rel);
+                if (rel > (sizeof(scalar_t) == 8 ? 5e-12 : 5e-5)) {
+                    std::fprintf(stderr, "cached action differs from direct action: direction=%d field=%d relative=%.9g\n",k,f,rel);
+                    return 2;
+                }
+            }
+        }
+        if (darwish_rebuild_check) {
+            const auto saved_ux=d.ux, saved_uy=d.uy, saved_uz=d.uz, saved_p=d.p;
+            int stale_refusals=0;
+            double rebuild_worst=0;
+            for (int state=0; state<3; ++state) {
+                ++d.state_stamp;
+                try { experiment.require_ready(d.state_stamp); }
+                catch (const std::runtime_error &) { ++stale_refusals; }
+                experiment.invalidate();
+                for (ptrdiff_t j=0; j<d.nnodes; ++j) {
+                    const scalar_t x=d.points[0][j], y=d.points[1][j], z=d.points[2][j];
+                    d.ux[j]=saved_ux[j]+(state==2 ? scalar_t(0) : scalar_t(.037)*scalar_t(state+1)*(x*y+scalar_t(.2)));
+                    d.uy[j]=saved_uy[j]+(state==2 ? scalar_t(0) : scalar_t(-.023)*scalar_t(state+1)*(y*z+scalar_t(.1)));
+                    d.uz[j]=saved_uz[j]+(state==2 ? scalar_t(0) : scalar_t(.019)*scalar_t(state+1)*(x*z+scalar_t(.3)));
+                    d.p[j]=saved_p[j]+(state==2 ? scalar_t(0) : scalar_t(.041)*scalar_t(state+1)*(x*y*z+z));
+                }
+                reconstruct_jac_gradients(saved_dir.data(),true);
+                experiment.allocate(d.nelements,d.state_stamp);
+                cache_mode=DarwishCacheMode::Build;
+                jac_action_fn();
+                experiment.finish_build();
+                for (int k=0;k<3;++k) {
+                    for (size_t j=0;j<jac_dir.size();++j)
+                        jac_dir[j]=saved_dir[j]*scalar_t(k+1)+scalar_t(.013)*scalar_t(int(j%13)-6);
+                    cache_mode=DarwishCacheMode::Off;
+                    jac_action_fn();
+                    const auto direct=jac_out;
+                    cache_mode=DarwishCacheMode::Read;
+                    jac_action_fn();
+                    for (int f=0;f<N_FIELDS;++f) {
+                        double error=0, scale=0;
+                        for (size_t j=f;j<jac_out.size();j+=N_FIELDS) {
+                            if (!std::isfinite(double(jac_out[j])) || !std::isfinite(double(direct[j])))
+                                throw std::runtime_error("nonfinite rebuilt Darwish action");
+                            error=std::max(error,std::abs(double(jac_out[j])-double(direct[j])));
+                            scale=std::max(scale,std::abs(double(direct[j])));
+                        }
+                        const double relative=error/std::max(scale,1e-30);
+                        rebuild_worst=std::max(rebuild_worst,relative);
+                        if (relative>(sizeof(scalar_t)==8?5e-12:5e-5))
+                            throw std::runtime_error("rebuilt Darwish action mismatch");
+                    }
+                }
+            }
+            if (stale_refusals!=3) throw std::runtime_error("stale Darwish cache accepted");
+            std::printf("darwish_rebuild_checks: 36\ndarwish_stale_refusals: %d\ndarwish_rebuild_max_relative: %.9g\n",stale_refusals,rebuild_worst);
+        }
+        jac_dir = saved_dir;
+        live_k = saved_live_k;
+        if (darwish_cache_control) cache_mode = DarwishCacheMode::Off;
+        std::printf("darwish_cache_mode: %s\n", darwish_cache_control ? "control" : "read");
+        std::printf("darwish_cache_checks: 12\ndarwish_cache_max_relative: %.9g\n", worst);
+    }
+
+
+    if (retained_windows) {
+        auto reference = [&]() {
+            // Reconstruct the direction independently; share only the fixed state cache.
+            std::vector<scalar_t> reference_velocity;
+            if (with_qgrad) {
+                const scalar_t *srcs[4] = {jac_dir.data() + 3, jac_dir.data(),
+                                           jac_dir.data() + 1, jac_dir.data() + 2};
+                const int strides[4] = {N_FIELDS, N_FIELDS, N_FIELDS, N_FIELDS};
+                scalar_t *out[12] = {d.qgx.data(), d.qgy.data(), d.qgz.data()};
+                ptrdiff_t out_stride[12] = {1, 1, 1};
+                if (with_hograd) {
+                    reference_velocity.resize((size_t)d.nnodes * 9);
+                    for (int c = 0; c < 9; ++c) {
+                        out[c + 3] = reference_velocity.data() + c;
+                        out_stride[c + 3] = 9;
+                    }
+                }
+                cvfem_hex8_assemble_nodal_grads_atomic(d, 0, srcs, strides,
+                        with_hograd ? 4 : 1, out, out_stride);
+            }
+            if (cvfem_hex8_extras_of(d).with_rc) cvfem_hex8_build_rc_coeff(d, rho, mu);
+            apply_jacobian_action_atomic_simd(
+                d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.nnodes, d.p.data(),
+                d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points,
+                d.qgx.data(), d.qgy.data(), d.qgz.data(), d.rc_coeff.data(), d.rc_w.data(),
+                d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(),
+                cvfem_hex8_extras_of(d), rho, mu, jac_dir.data(), jac_out.data(),
+                with_hograd ? ugrad.data() : nullptr,
+                with_hograd ? reference_velocity.data() : nullptr, conv_limiter, venkat_c);
+        };
+
+        auto production = [&]() { if (bsr_apply) bsr_apply_fn(); else jac_action_fn(); };
+        retained_action_timing(production,reference,jac_out,jac_dir.data(),retained_windows,warmup,dump_path);
+        if (own_mpi) MPI_Finalize();
+        return 0;
+    }
     for (int i = 0; i < warmup; ++i) {
         if (assemble)
             jac_fn();
@@ -2902,8 +3111,8 @@ int main(int argc, char **argv) {
         std::printf("  seconds_per_jac_action: %.6e\n", seconds_per_call);
         std::printf("  MDOF/s_jac_action: %.3f\n", mdofs);
         std::printf("  MELEM/s_jac_action: %.3f\n", melems);
-        std::printf("  GFLOP/s_jac_action_model: %.3f\n", elem_apps * jac_action_flops / seconds / 1.0e9);
-        std::printf("  flops_per_element_jac_action_model: %.1f\n", jac_action_flops);
+        if (!darwish_cache) std::printf("  GFLOP/s_jac_action_model: %.3f\n", elem_apps * jac_action_flops / seconds / 1.0e9);
+        if (!darwish_cache) std::printf("  flops_per_element_jac_action_model: %.1f\n", jac_action_flops);
         if (with_qgrad) {
             // Reported next to the matvec, not subtracted from it: it IS part of every
             // matvec the solver performs. Splitting it out says how much of the gap
