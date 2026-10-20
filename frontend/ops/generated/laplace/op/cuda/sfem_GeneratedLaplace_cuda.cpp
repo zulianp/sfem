@@ -111,11 +111,14 @@ namespace sfem {
                 real_t *const values) {
       copy_material_parameters(base, values);
       bool changed = false;
+      bool read[N_MATERIAL_PARAMETERS] = {false};
       for (int i = 0; i < N_DEFINED_MATERIAL_PARAMETERS; ++i) {
-        changed |= yaml_read_parameter(node,
+        read[i] = yaml_read_parameter(node,
                                                MATERIAL_PARAMETER_NAMES[i],
                                                values[i]);
+        changed |= read[i];
       }
+      (void)read;
       return changed;
     }
 
@@ -653,7 +656,7 @@ namespace sfem {
           return SFEM_FAILURE;
         }
         adjugate = reinterpret_cast<const geom_t *const *>(
-            cache->jacobian_soa->jacobian_adjugate_SoA()->data());
+            cache->jacobian_soa->adjugate_components());
         determinant = reinterpret_cast<const geom_t *>(
             cache->jacobian_soa->jacobian_determinant()->data());
         if (false) {
@@ -716,7 +719,7 @@ namespace sfem {
           return SFEM_FAILURE;
         }
         adjugate = reinterpret_cast<const geom_t *const *>(
-            cache->jacobian_soa->jacobian_adjugate_SoA()->data());
+            cache->jacobian_soa->adjugate_components());
         determinant = reinterpret_cast<const geom_t *>(
             cache->jacobian_soa->jacobian_determinant()->data());
         if (false) {
@@ -812,7 +815,7 @@ namespace sfem {
           return SFEM_FAILURE;
         }
         adjugate = reinterpret_cast<const geom_t *const *>(
-            cache->jacobian_soa->jacobian_adjugate_SoA()->data());
+            cache->jacobian_soa->adjugate_components());
         determinant = reinterpret_cast<const geom_t *>(
             cache->jacobian_soa->jacobian_determinant()->data());
         if (!cache->metric_soa) {
@@ -932,7 +935,7 @@ namespace sfem {
           return SFEM_FAILURE;
         }
         adjugate = reinterpret_cast<const geom_t *const *>(
-            cache->jacobian_soa->jacobian_adjugate_SoA()->data());
+            cache->jacobian_soa->adjugate_components());
         determinant = reinterpret_cast<const geom_t *>(
             cache->jacobian_soa->jacobian_determinant()->data());
       }

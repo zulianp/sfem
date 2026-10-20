@@ -111,11 +111,14 @@ namespace sfem {
                 real_t *const values) {
       copy_material_parameters(base, values);
       bool changed = false;
+      bool read[N_MATERIAL_PARAMETERS] = {false};
       for (int i = 0; i < N_DEFINED_MATERIAL_PARAMETERS; ++i) {
-        changed |= yaml_read_parameter(node,
+        read[i] = yaml_read_parameter(node,
                                                MATERIAL_PARAMETER_NAMES[i],
                                                values[i]);
+        changed |= read[i];
       }
+      (void)read;
       return changed;
     }
 
@@ -665,7 +668,7 @@ namespace sfem {
           return SFEM_FAILURE;
         }
         adjugate = reinterpret_cast<const geom_t *const *>(
-            cache->jacobian_soa->jacobian_adjugate_SoA()->data());
+            cache->jacobian_soa->adjugate_components());
         determinant = reinterpret_cast<const geom_t *>(
             cache->jacobian_soa->jacobian_determinant()->data());
         if (false) {
@@ -683,7 +686,7 @@ namespace sfem {
         geom_metric = reinterpret_cast<const geom_t *const *>(
             cache->metric_soa->fff_SoA()->data());
             }
-      if (impl_->gradient_uses_affine && impl_->space->has_packed_mesh()) {
+      if ((impl_->gradient_uses_affine || domain.element_type == smesh::TET4 || domain.element_type == smesh::TRI3) && impl_->space->has_packed_mesh()) {
         auto packed = impl_->space->packed_mesh();
         const int packed_block = packed_block_id_for_domain(*packed, *domain.block);
         if (packed_block >= 0) {
@@ -710,7 +713,7 @@ namespace sfem {
           }
         }
       }
-      if (!impl_->gradient_uses_affine && impl_->space->has_packed_mesh()) {
+      if (!(impl_->gradient_uses_affine || domain.element_type == smesh::TET4 || domain.element_type == smesh::TRI3) && impl_->space->has_packed_mesh()) {
         auto packed = impl_->space->packed_mesh();
         const int packed_block = packed_block_id_for_domain(*packed, *domain.block);
         if (packed_block >= 0) {
@@ -775,7 +778,7 @@ namespace sfem {
           return SFEM_FAILURE;
         }
         adjugate = reinterpret_cast<const geom_t *const *>(
-            cache->jacobian_soa->jacobian_adjugate_SoA()->data());
+            cache->jacobian_soa->adjugate_components());
         determinant = reinterpret_cast<const geom_t *>(
             cache->jacobian_soa->jacobian_determinant()->data());
         if (false) {
@@ -913,7 +916,7 @@ namespace sfem {
           return SFEM_FAILURE;
         }
         adjugate = reinterpret_cast<const geom_t *const *>(
-            cache->jacobian_soa->jacobian_adjugate_SoA()->data());
+            cache->jacobian_soa->adjugate_components());
         determinant = reinterpret_cast<const geom_t *>(
             cache->jacobian_soa->jacobian_determinant()->data());
         if (!cache->metric_soa) {
@@ -932,7 +935,7 @@ namespace sfem {
                       impl_->element_values.get() + nvalues,
                       real_t(0));
       int status = SFEM_FAILURE;
-      if (impl_->objective_uses_affine && impl_->space->has_packed_mesh()) {
+      if ((impl_->objective_uses_affine || domain.element_type == smesh::TET4 || domain.element_type == smesh::TRI3) && impl_->space->has_packed_mesh()) {
         auto packed = impl_->space->packed_mesh();
         const int packed_block = packed_block_id_for_domain(*packed, *domain.block);
         if (packed_block >= 0) {
@@ -947,7 +950,7 @@ namespace sfem {
           }
         }
       }
-      if (!impl_->objective_uses_affine && impl_->space->has_packed_mesh()) {
+      if (!(impl_->objective_uses_affine || domain.element_type == smesh::TET4 || domain.element_type == smesh::TRI3) && impl_->space->has_packed_mesh()) {
         auto packed = impl_->space->packed_mesh();
         const int packed_block = packed_block_id_for_domain(*packed, *domain.block);
         if (packed_block >= 0) {
@@ -1028,7 +1031,7 @@ namespace sfem {
           return SFEM_FAILURE;
         }
         adjugate = reinterpret_cast<const geom_t *const *>(
-            cache->jacobian_soa->jacobian_adjugate_SoA()->data());
+            cache->jacobian_soa->adjugate_components());
         determinant = reinterpret_cast<const geom_t *>(
             cache->jacobian_soa->jacobian_determinant()->data());
       }
@@ -1078,7 +1081,7 @@ namespace sfem {
           return SFEM_FAILURE;
         }
         adjugate = reinterpret_cast<const geom_t *const *>(
-            cache->jacobian_soa->jacobian_adjugate_SoA()->data());
+            cache->jacobian_soa->adjugate_components());
         determinant = reinterpret_cast<const geom_t *>(
             cache->jacobian_soa->jacobian_determinant()->data());
       }

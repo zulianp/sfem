@@ -113,10 +113,32 @@ namespace sfem {
                 real_t *const values) {
       copy_material_parameters(base, values);
       bool changed = false;
+      bool read[N_MATERIAL_PARAMETERS] = {false};
       for (int i = 0; i < N_DEFINED_MATERIAL_PARAMETERS; ++i) {
-        changed |= yaml_read_parameter(node,
+        read[i] = yaml_read_parameter(node,
                                                MATERIAL_PARAMETER_NAMES[i],
                                                values[i]);
+        changed |= read[i];
+      }
+      // Young's modulus and Poisson's ratio in place of the Lame parameters.
+      real_t young_modulus = 0;
+      real_t poisson_ratio = 0;
+      const bool has_young = yaml_read_parameter(node, "young_modulus", young_modulus);
+      const bool has_poisson = yaml_read_parameter(node, "poisson_ratio", poisson_ratio);
+      if (has_young || has_poisson) {
+        if (!has_young || !has_poisson) {
+          SFEM_ERROR("material: young_modulus and poisson_ratio are given together\n");
+        }
+        if (read[0] || read[1]) {
+          SFEM_ERROR("material: give young_modulus and poisson_ratio or mu and lmbda, not both\n");
+        }
+        if (!(young_modulus > 0) || !(poisson_ratio >= 0 && poisson_ratio < real_t(0.5))) {
+          SFEM_ERROR("material: young_modulus > 0 and 0 <= poisson_ratio < 0.5 (got %g, %g)\n",
+                     (double)young_modulus, (double)poisson_ratio);
+        }
+        values[0] = young_modulus / (2 * (1 + poisson_ratio));
+        values[1] = young_modulus * poisson_ratio / ((1 + poisson_ratio) * (1 - 2 * poisson_ratio));
+        changed = true;
       }
       return changed;
     }
@@ -649,7 +671,7 @@ namespace sfem {
           return SFEM_FAILURE;
         }
         adjugate = reinterpret_cast<const geom_t *const *>(
-            cache->jacobian_soa->jacobian_adjugate_SoA()->data());
+            cache->jacobian_soa->adjugate_components());
         determinant = reinterpret_cast<const geom_t *>(
             cache->jacobian_soa->jacobian_determinant()->data());
         if (true) {
@@ -707,7 +729,7 @@ namespace sfem {
           return SFEM_FAILURE;
         }
         adjugate = reinterpret_cast<const geom_t *const *>(
-            cache->jacobian_soa->jacobian_adjugate_SoA()->data());
+            cache->jacobian_soa->adjugate_components());
         determinant = reinterpret_cast<const geom_t *>(
             cache->jacobian_soa->jacobian_determinant()->data());
         if (true) {
@@ -793,7 +815,7 @@ namespace sfem {
           return SFEM_FAILURE;
         }
         adjugate = reinterpret_cast<const geom_t *const *>(
-            cache->jacobian_soa->jacobian_adjugate_SoA()->data());
+            cache->jacobian_soa->adjugate_components());
         determinant = reinterpret_cast<const geom_t *>(
             cache->jacobian_soa->jacobian_determinant()->data());
             }
@@ -903,7 +925,7 @@ namespace sfem {
           return SFEM_FAILURE;
         }
         adjugate = reinterpret_cast<const geom_t *const *>(
-            cache->jacobian_soa->jacobian_adjugate_SoA()->data());
+            cache->jacobian_soa->adjugate_components());
         determinant = reinterpret_cast<const geom_t *>(
             cache->jacobian_soa->jacobian_determinant()->data());
       }
@@ -950,7 +972,7 @@ namespace sfem {
           return SFEM_FAILURE;
         }
         adjugate = reinterpret_cast<const geom_t *const *>(
-            cache->jacobian_soa->jacobian_adjugate_SoA()->data());
+            cache->jacobian_soa->adjugate_components());
         determinant = reinterpret_cast<const geom_t *>(
             cache->jacobian_soa->jacobian_determinant()->data());
       }

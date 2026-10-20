@@ -999,7 +999,7 @@ def _inexact_definitions(
             sfem::create_host_buffer<metric_tensor_t>(tangent_stride * components);
       }
       auto adjugate = reinterpret_cast<const geom_t *const *>(
-          cache->jacobian_soa->jacobian_adjugate_SoA()->data());
+          cache->jacobian_soa->adjugate_components());
       auto determinant = reinterpret_cast<const geom_t *>(
           cache->jacobian_soa->jacobian_determinant()->data());
 %(update_body)s
@@ -1721,7 +1721,7 @@ namespace sfem {
           return SFEM_FAILURE;
         }
         adjugate = reinterpret_cast<const geom_t *const *>(
-            cache->jacobian_soa->jacobian_adjugate_SoA()->data());
+            cache->jacobian_soa->adjugate_components());
         determinant = reinterpret_cast<const geom_t *>(
             cache->jacobian_soa->jacobian_determinant()->data());
         if (%(gradient_affine_uses_jacobian_aos)s) {
@@ -1760,7 +1760,7 @@ namespace sfem {
           return SFEM_FAILURE;
         }
         adjugate = reinterpret_cast<const geom_t *const *>(
-            cache->jacobian_soa->jacobian_adjugate_SoA()->data());
+            cache->jacobian_soa->adjugate_components());
         determinant = reinterpret_cast<const geom_t *>(
             cache->jacobian_soa->jacobian_determinant()->data());
         if (%(apply_affine_uses_jacobian_aos)s) {
@@ -1832,7 +1832,7 @@ namespace sfem {
           return SFEM_FAILURE;
         }
         adjugate = reinterpret_cast<const geom_t *const *>(
-            cache->jacobian_soa->jacobian_adjugate_SoA()->data());
+            cache->jacobian_soa->adjugate_components());
         determinant = reinterpret_cast<const geom_t *>(
             cache->jacobian_soa->jacobian_determinant()->data());
 %(objective_steps_metric_binding)s            }
@@ -3965,7 +3965,7 @@ def _residual_affine_geometry_lines(op_name, label, affine_flag, uses, body, for
             "jacobian geometry",
             (
                 ("adjugate", "const geom_t *const *",
-                 "cache->jacobian->jacobian_adjugate_SoA()->data()"),
+                 "cache->jacobian->adjugate_components()"),
                 ("determinant", "const geom_t *",
                  "cache->jacobian->jacobian_determinant()->data()"),
             ),
@@ -5118,7 +5118,7 @@ namespace sfem {
           return SFEM_FAILURE;
         }
         adjugate = reinterpret_cast<const geom_t *const *>(
-            jacobian->jacobian_adjugate_SoA()->data());
+            jacobian->adjugate_components());
         determinant = reinterpret_cast<const geom_t *>(
             jacobian->jacobian_determinant()->data());
       }
@@ -5155,7 +5155,7 @@ namespace sfem {
           return SFEM_FAILURE;
         }
         adjugate = reinterpret_cast<const geom_t *const *>(
-            jacobian->jacobian_adjugate_SoA()->data());
+            jacobian->adjugate_components());
         determinant = reinterpret_cast<const geom_t *>(
             jacobian->jacobian_determinant()->data());
       }
@@ -6603,7 +6603,7 @@ def _relaxation_fragments(
           return SFEM_FAILURE;
         }
         adjugate = reinterpret_cast<const geom_t *const *>(
-            cache->jacobian_soa->jacobian_adjugate_SoA()->data());
+            cache->jacobian_soa->adjugate_components());
         determinant = reinterpret_cast<const geom_t *>(
             cache->jacobian_soa->jacobian_determinant()->data());
       }
@@ -9401,7 +9401,7 @@ def _residual_hessian_dispatch_body(
                 "%s    return SFEM_FAILURE;" % indent,
                 "%s  }" % indent,
                 "%s  adjugate = reinterpret_cast<const geom_t *const *>(" % indent,
-                "%s      cache->jacobian->jacobian_adjugate_SoA()->data());" % indent,
+                "%s      cache->jacobian->adjugate_components());" % indent,
                 "%s  determinant = reinterpret_cast<const geom_t *>(" % indent,
                 "%s      cache->jacobian->jacobian_determinant()->data());" % indent,
                 "%s}" % indent,
@@ -10727,8 +10727,11 @@ def _hyperelastic_apply_dispatch_body(material_name, kernel_sources, apply_depen
 
 
 def _hyperelastic_gradient_packed_dispatch_body(material_name, kernel_sources, gradient_dependencies_by_dim, indent, n_field_components_by_dim=None):
+    # The packed route takes the element's mode as the preamble does: the flag, widened by the
+    # elements with only an affine kernel (TET4 and TRI3, whose geometry the preamble caches).
+    affine = _affine_preamble_condition(kernel_sources, material_name, ("gradient",), "gradient_uses_affine")
     affine_lines = [
-        "%sif (impl_->gradient_uses_affine && impl_->space->has_packed_mesh()) {" % indent,
+        "%sif ((%s) && impl_->space->has_packed_mesh()) {" % (indent, affine),
         "%s  auto packed = impl_->space->packed_mesh();" % indent,
         "%s  const int packed_block = packed_block_id_for_domain(*packed, *domain.block);" % indent,
         "%s  if (packed_block >= 0) {" % indent,
@@ -10782,7 +10785,7 @@ def _hyperelastic_gradient_packed_dispatch_body(material_name, kernel_sources, g
         ]
     )
     lines = [
-        "%sif (!impl_->gradient_uses_affine && impl_->space->has_packed_mesh()) {" % indent,
+        "%sif (!(%s) && impl_->space->has_packed_mesh()) {" % (indent, affine),
         "%s  auto packed = impl_->space->packed_mesh();" % indent,
         "%s  const int packed_block = packed_block_id_for_domain(*packed, *domain.block);" % indent,
         "%s  if (packed_block >= 0) {" % indent,
@@ -10844,8 +10847,12 @@ def _hyperelastic_gradient_packed_dispatch_body(material_name, kernel_sources, g
 
 
 def _hyperelastic_objective_steps_packed_dispatch_body(material_name, kernel_sources, apply_dependencies_by_dim, indent, n_field_components_by_dim=None):
+    # As the gradient's: the preamble's mode, the flag widened by the affine-only elements.
+    affine = _affine_preamble_condition(
+        kernel_sources, material_name, ("objective", "objective_steps"), "objective_uses_affine"
+    )
     affine_lines = [
-        "%sif (impl_->objective_uses_affine && impl_->space->has_packed_mesh()) {" % indent,
+        "%sif ((%s) && impl_->space->has_packed_mesh()) {" % (indent, affine),
         "%s  auto packed = impl_->space->packed_mesh();" % indent,
         "%s  const int packed_block = packed_block_id_for_domain(*packed, *domain.block);" % indent,
         "%s  if (packed_block >= 0) {" % indent,
@@ -10911,7 +10918,7 @@ def _hyperelastic_objective_steps_packed_dispatch_body(material_name, kernel_sou
         ]
     )
     lines = [
-        "%sif (!impl_->objective_uses_affine && impl_->space->has_packed_mesh()) {" % indent,
+        "%sif (!(%s) && impl_->space->has_packed_mesh()) {" % (indent, affine),
         "%s  auto packed = impl_->space->packed_mesh();" % indent,
         "%s  const int packed_block = packed_block_id_for_domain(*packed, *domain.block);" % indent,
         "%s  if (packed_block >= 0) {" % indent,
@@ -11023,7 +11030,7 @@ def _hyperelastic_hessian_dispatch_body(material_name, operation, kernel_sources
                 "%s    return SFEM_FAILURE;" % indent,
                 "%s  }" % indent,
                 "%s  adjugate = reinterpret_cast<const geom_t *const *>(" % indent,
-                "%s      cache->jacobian_soa->jacobian_adjugate_SoA()->data());" % indent,
+                "%s      cache->jacobian_soa->adjugate_components());" % indent,
                 "%s  determinant = reinterpret_cast<const geom_t *>(" % indent,
                 "%s      cache->jacobian_soa->jacobian_determinant()->data());" % indent,
                 "%s}" % indent,
@@ -11294,12 +11301,14 @@ def _yaml_helpers(defaults):
                 real_t *const values) {
       copy_material_parameters(base, values);
       bool changed = false;
+      bool read[N_MATERIAL_PARAMETERS] = {false};
       for (int i = 0; i < N_DEFINED_MATERIAL_PARAMETERS; ++i) {
-        changed |= yaml_read_parameter(node,
+        read[i] = yaml_read_parameter(node,
                                                MATERIAL_PARAMETER_NAMES[i],
                                                values[i]);
+        changed |= read[i];
       }
-      return changed;
+%(lame_from_engineering)s      return changed;
     }
 
     void set_material(MultiDomainOp &domains,
@@ -11356,7 +11365,37 @@ def _yaml_helpers(defaults):
         "storage_size": storage_size,
         "names": names,
         "default_lines": "\n".join(default_lines),
+        "lame_from_engineering": _lame_from_engineering_lines([name for name, _ in defaults]),
     }
+
+
+def _lame_from_engineering_lines(names):
+    """`material_from_yaml`'s reading of Young's modulus and Poisson's ratio, for a material whose
+    parameters include the Lame pair (mu, lmbda): engineering data comes as E and nu. Nothing for
+    the others."""
+    if "mu" not in names or "lmbda" not in names:
+        return "      (void)read;\n"
+    return """      // Young's modulus and Poisson's ratio in place of the Lame parameters.
+      real_t young_modulus = 0;
+      real_t poisson_ratio = 0;
+      const bool has_young = yaml_read_parameter(node, "young_modulus", young_modulus);
+      const bool has_poisson = yaml_read_parameter(node, "poisson_ratio", poisson_ratio);
+      if (has_young || has_poisson) {
+        if (!has_young || !has_poisson) {
+          SFEM_ERROR("material: young_modulus and poisson_ratio are given together\\n");
+        }
+        if (read[%(mu)d] || read[%(lmbda)d]) {
+          SFEM_ERROR("material: give young_modulus and poisson_ratio or mu and lmbda, not both\\n");
+        }
+        if (!(young_modulus > 0) || !(poisson_ratio >= 0 && poisson_ratio < real_t(0.5))) {
+          SFEM_ERROR("material: young_modulus > 0 and 0 <= poisson_ratio < 0.5 (got %%g, %%g)\\n",
+                     (double)young_modulus, (double)poisson_ratio);
+        }
+        values[%(mu)d] = young_modulus / (2 * (1 + poisson_ratio));
+        values[%(lmbda)d] = young_modulus * poisson_ratio / ((1 + poisson_ratio) * (1 - 2 * poisson_ratio));
+        changed = true;
+      }
+""" % {"mu": names.index("mu"), "lmbda": names.index("lmbda")}
 
 
 def _parameter_args(parameters):
