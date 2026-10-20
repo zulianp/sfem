@@ -52,6 +52,7 @@
 \IfFileExists{figures/convho_macros.tex}{\input{figures/convho_macros}}{}
 \IfFileExists{figures/kmix_macros.tex}{\input{figures/kmix_macros}}{}
 \input{figures/scatter_macros}
+\input{tables/darwish_cache_macros}
 \IfFileExists{figures/jacho_macros.tex}{\input{figures/jacho_macros}}{}
 \IfFileExists{figures/meshfoot_macros.tex}{\input{figures/meshfoot_macros}}{}
 \IfFileExists{figures/jacfair_macros.tex}{\input{figures/jacfair_macros}}{}
@@ -830,6 +831,22 @@ During a Krylov solve, $u$ is fixed: $g(u)$ can be reused while $g'(u)v$ is eval
 each direction. Both terms are retained in the exact action. The state cache must be
 refreshed when the state or geometry changes.
 
+For the consistent Darwish correction, further fixed-state work can be reused.
+Write its face contribution to one velocity component as
+$H=m^+L_i+m^-L_j$. At a fixed state, the implemented limiter derivative gives
+$\delta L_i=a_i\delta\mathrm{inc}_i+b_i(v_j-v_i)$ and the corresponding expression
+with $i,j$ exchanged. Hence
+\begin{equation}
+ \delta H=c_0\delta m+c_1\delta\mathrm{inc}_i+
+          c_2\delta\mathrm{inc}_j+c_3(v_j-v_i).
+ \label{eq:darwishcache}
+\end{equation}
+The four coefficients per component and face are obtained from the existing
+limiter derivative and cached. The direction reconstruction and complete
+Rhie--Chow mass-flux sensitivity remain live. This trades additional storage
+and setup for less arithmetic per application; coefficients must be rebuilt
+after changes to the state, geometry, packing or physical parameters.
+
 The assembled matrix holds $\Jlag$ alone, for the sparsity reason of
 \S\ref{sec:cost}. Algorithm~\ref{alg:jacaction} is where the forms part, and the driver
 records which one ran.
@@ -1452,8 +1469,8 @@ kernel by those factors.
     not the pack colouring; it reads the standard mesh as \emph{standard} does but changes
     accumulation, traversal order and synchronization together. $\Jlag$ is one row because deferred correction leaves the implicit
     operator scheme-independent by construction: the first-order row \emph{is} the lagged action,
-    and a control at every limiter reproduces its result bit for bit. It is also the only form the
-    matrix can hold; the $\Jhoex$ rows have no matrix counterpart at all. The limiters are the
+    and a control at every limiter reproduces its result bit for bit. It is also the only form encoded by the
+    measured matrix; the $\Jhoex$ rows have no measured matrix counterpart. The limiters are the
     cheapest and among the dearest, so they bracket what one costs. The \texttt{f32} group is the
     single-precision build in the same allocation, against its own SpMV, whose matrix and vectors
     are both float. Exact-action rows are historical rebuild-mode measurements;
@@ -1475,18 +1492,47 @@ appearing as throughput. Quoting $\Jex$ against the SpMV would report $\jfExactV
 than $\jfLaggedVsF\times$, understating the matrix-free side by more than a quarter while
 appearing to favour it; both are given because they answer different questions.
 
-The $\Jhoex$ rows are where the comparison stops being one. Packed $\Jhoex$ lands
-below the double-precision SpMV under both limiters: $\jfClipExactVsF\times$
-(Barth--Jespersen), $\jfHoExactVsF\times$ (Darwish--Moukalled), the latter costing
-$\jfHoCostExact\times$ its first-order self. Read as a throughput ratio that
-is a loss, and it would be, if the matrix held the same operator. It cannot: the higher-order
-correction differentiates through a nodal reconstruction, so the coupling it induces reaches
-past the one ring the matrix's sparsity is built on, and assembling it would mean a different
-and far larger matrix. The row therefore prices the higher-order scheme against the best the
-assembled representation can offer \emph{at all}, which is a first-order operator, and what it
-says is that the scheme costs about what that representation's whole advantage is worth. A
-solver that wants $\Jhoex$ has no matrix to fall back on; the question is what it costs
-matrix-free, and Table~\ref{tab:jacfair} answers that in the same units.
+The historical rebuild-mode $\Jhoex$ rows are slower than double-precision
+SpMV under both limiters: throughput ratios $\jfClipExactVsF\times$
+(Barth--Jespersen) and $\jfHoExactVsF\times$ (Darwish--Moukalled).
+These rows do not measure the coefficient-cached action below. The matrix
+encodes $\Jlag$, whereas the consistent higher-order action differentiates
+through a nodal reconstruction and induces couplings beyond that matrix's
+one-ring sparsity. No assembled consistent higher-order Jacobian was measured.
+
+\paragraph{Reusing Darwish coefficients.}
+Table~\ref{tab:darwishcache} compares the direct and coefficient-cached consistent
+Darwish actions in a separate matched Grace run. The direct control builds and
+retains the same cache but recomputes the coefficients during application.
+Caching reduces application time by \dcTimeReduction\% relative to the original
+direct action ($\dcSpeedup\times$ speedup), with every paired primary window
+favouring the cache. The cached consistent action also takes \dcSpmvReduction\%
+less time than the assembled \emph{lagged} SpMV. This is a cost comparison of
+different operators; only the packed lagged action and SpMV encode the same one.
+
+\begin{table}[t]
+  \centering
+  \small
+  \caption{Matched FP64 application times on 72 Grace cores: affine interior,
+    $n=128$, pack size 1024, Rhie--Chow enabled, state perturbation 0.017.
+    Means and full sample ranges from six 60-application windows per arm;
+    ranges are not confidence intervals. Every arm includes direction-gradient
+    work where required; setup, assembly, checks and warmups are excluded.}
+  \label{tab:darwishcache}
+  \input{tables/darwish_cache}
+\end{table}
+
+Each block retains one worker per arm. Directions are defined from node
+coordinates, with 30 warmups before each capture and transparent huge pages disabled. All six
+permutations of 30/60/90 applications are retained, including the additional
+windows outside the primary comparison. The cache adds \dcGiB{}\,GiB and takes
+\dcSetup{}\,s to allocate, build and check. At the mean measured saving, this
+setup is repaid after approximately \dcPayoff{} applications at an unchanged
+state, relative to direct Darwish; solver amortisation was not measured.
+The cache retains all reconstruction sensitivities and passes full-vector
+comparisons for the measured perturbed state. An exactly unperturbed small
+state still produces numerical disagreements and remains outside this claim
+(see the reproducibility documentation). The cache is therefore opt-in.
 
 \section{Discussion and limitations}
 \label{sec:discussion}

@@ -12,7 +12,7 @@ TABDIR   = tables
 # No extensions are granted, so this is a gate rather than a guideline.
 PAGELIMIT ?= 10
 
-.PHONY: all figures check clean selftest
+.PHONY: all figures check clean selftest darwish-cache
 
 all: main.pdf
 
@@ -20,6 +20,7 @@ main.pdf: main.tex refs.bib $(wildcard $(FIGDIR)/*.tex) $(wildcard $(TABDIR)/*.t
 	latexmk -pdf -interaction=nonstopmode main.tex
 
 figures:
+	$(PY) python/darwish_cache_figures.py
 	$(PY) python/scatter_figures.py
 	$(PY) python/packed_format_figures.py --out $(FIGDIR)
 	@if [ -f python/perf_figures.py ]; then \
@@ -65,3 +66,8 @@ check: selftest main.pdf
 clean:
 	latexmk -C main.tex
 	rm -f main.bbl
+
+# This target needs the external archive; ordinary builds use the committed table.
+darwish-cache:
+	$(PY) python/darwish_cache_figures.py --selftest
+	$(PY) python/darwish_cache_figures.py
