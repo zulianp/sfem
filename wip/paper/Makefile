@@ -12,7 +12,7 @@ TABDIR   = tables
 # No extensions are granted, so this is a gate rather than a guideline.
 PAGELIMIT ?= 10
 
-.PHONY: all figures check clean selftest darwish-cache
+.PHONY: all figures check clean selftest darwish-cache consistent-matrix
 
 all: main.pdf
 
@@ -20,6 +20,7 @@ main.pdf: main.tex refs.bib $(wildcard $(FIGDIR)/*.tex) $(wildcard $(TABDIR)/*.t
 	latexmk -pdf -interaction=nonstopmode main.tex
 
 figures:
+	$(PY) python/darwish_cache_figures.py --consistent-matrix
 	$(PY) python/darwish_cache_figures.py
 	$(PY) python/scatter_figures.py
 	$(PY) python/packed_format_figures.py --out $(FIGDIR)
@@ -71,3 +72,7 @@ clean:
 darwish-cache:
 	$(PY) python/darwish_cache_figures.py --selftest
 	$(PY) python/darwish_cache_figures.py
+
+consistent-matrix:
+	$(PY) python/darwish_cache_figures.py --consistent-matrix --selftest
+	$(PY) python/darwish_cache_figures.py --consistent-matrix
