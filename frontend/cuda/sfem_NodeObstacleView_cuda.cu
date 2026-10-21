@@ -18,12 +18,16 @@ namespace sfem {
             SFEM_NODE_LOOP(i, c.size) { ::node_obstacle_frame(c.normals[0][i], c.normals[1][i], c.normals[2][i], dir, &c.frames[9 * i]); }
         }
 
-        __global__ void to_frame_kernel(const NodeObstacleView c, real_t *const v) {
-            SFEM_NODE_LOOP(i, c.size) { ::node_obstacle_to_frame(&c.frames[9 * i], &v[(ptrdiff_t)c.idx[i] * 3]); }
+        __global__ void to_frame_kernel(const NodeObstacleView c, const real_t *const s, const real_t *const in, real_t *const out) {
+            SFEM_NODE_LOOP(node, c.n_nodes) {
+                ::node_obstacle_scaled_to_frame(c.frame_of[node] < 0 ? nullptr : &c.frames[9 * (ptrdiff_t)c.frame_of[node]], s ? &s[node * 3] : nullptr, &in[node * 3], &out[node * 3]);
+            }
         }
 
-        __global__ void from_frame_kernel(const NodeObstacleView c, real_t *const v) {
-            SFEM_NODE_LOOP(i, c.size) { ::node_obstacle_from_frame(&c.frames[9 * i], &v[(ptrdiff_t)c.idx[i] * 3]); }
+        __global__ void from_frame_kernel(const NodeObstacleView c, const real_t *const s, const real_t *const in, real_t *const out) {
+            SFEM_NODE_LOOP(node, c.n_nodes) {
+                ::node_obstacle_scaled_from_frame(c.frame_of[node] < 0 ? nullptr : &c.frames[9 * (ptrdiff_t)c.frame_of[node]], s ? &s[node * 3] : nullptr, &in[node * 3], &out[node * 3]);
+            }
         }
 
         __global__ void fill_kernel(const ptrdiff_t n, const real_t value, real_t *const x) {
@@ -127,13 +131,13 @@ namespace sfem {
         SFEM_DEBUG_SYNCHRONIZE();
     }
 
-    void d_node_obstacle_to_frame(const NodeObstacleView &c, real_t *const v) {
-        to_frame_kernel<<<blocks_for(c.size), block_size>>>(c, v);
+    void d_node_obstacle_to_frame(const NodeObstacleView &c, const real_t *const s, const real_t *const in, real_t *const out) {
+        to_frame_kernel<<<blocks_for(c.n_nodes), block_size>>>(c, s, in, out);
         SFEM_DEBUG_SYNCHRONIZE();
     }
 
-    void d_node_obstacle_from_frame(const NodeObstacleView &c, real_t *const v) {
-        from_frame_kernel<<<blocks_for(c.size), block_size>>>(c, v);
+    void d_node_obstacle_from_frame(const NodeObstacleView &c, const real_t *const s, const real_t *const in, real_t *const out) {
+        from_frame_kernel<<<blocks_for(c.n_nodes), block_size>>>(c, s, in, out);
         SFEM_DEBUG_SYNCHRONIZE();
     }
 

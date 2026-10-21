@@ -58,7 +58,7 @@ int test_gap_and_frames() {
 
     std::vector<real_t> v(f.ndofs), w(f.ndofs);
     for (ptrdiff_t i = 0; i < f.ndofs; ++i) v[i] = w[i] = pseudo_random(i, 1);
-    f.contact->to_frame(w.data());
+    f.contact->to_frame(nullptr, w.data(), w.data());
     for (ptrdiff_t i = 0; i < f.nnodes; ++i) {
         // The normal component, and the length kept.
         SFEM_TEST_ASSERT(std::abs(w[i * 3] + v[i * 3 + 2]) < 1e-6);
@@ -66,7 +66,7 @@ int test_gap_and_frames() {
         const real_t lw = w[i * 3] * w[i * 3] + w[i * 3 + 1] * w[i * 3 + 1] + w[i * 3 + 2] * w[i * 3 + 2];
         SFEM_TEST_ASSERT(std::abs(lv - lw) < 1e-12);
     }
-    f.contact->from_frame(w.data());
+    f.contact->from_frame(nullptr, w.data(), w.data());
     for (ptrdiff_t i = 0; i < f.ndofs; ++i) {
         SFEM_TEST_ASSERT(std::abs(w[i] - v[i]) < 1e-12);
     }
@@ -77,6 +77,51 @@ int test_gap_and_frames() {
         SFEM_TEST_ASSERT(std::abs(to_surface[i * 3] - 0) < 1e-6);
         SFEM_TEST_ASSERT(std::abs(to_surface[i * 3 + 2] + z[i]) < 1e-6);
     }
+    return SFEM_TEST_SUCCESS;
+}
+
+// With a scale, each sweep rounds as the frames and the scaling one after the other: s .* (Q^T v)
+// and Q (s .* v), bitwise; nodes without contact are only scaled.
+int test_scaled_frames() {
+    auto f    = make_fixture();
+    auto comm = sfem::Communicator::world();
+    auto sdf  = smesh::create_sdf(comm, 41, 41, 41, -1, -1, -1, 2, 2, 2, [](const geom_t x, const geom_t y, const geom_t z) -> geom_t {
+        return -(z + geom_t(0.3) * x - geom_t(0.2) * y);
+    });
+    // Every other node in contact.
+    auto nodes = sfem::create_host_buffer<idx_t>((f.nnodes + 1) / 2);
+    for (ptrdiff_t i = 0; i < (ptrdiff_t)nodes->size(); ++i) nodes->data()[i] = (idx_t)(2 * i);
+    sfem::NodeObstacleContact contact(sdf, comm, nodes, f.mesh->points(), f.ndofs, f.ndofs, 2);
+    std::vector<real_t> x(f.ndofs, 0);
+    contact.update(x.data());
+
+    std::vector<real_t> v(f.ndofs), s(f.ndofs);
+    for (ptrdiff_t i = 0; i < f.ndofs; ++i) {
+        v[i] = pseudo_random(i, 1);
+        s[i] = 1 + real_t(0.5) * pseudo_random(i, 2);
+    }
+    std::vector<real_t> turned(f.ndofs), out(f.ndofs), sv(f.ndofs), in_place = v;
+    contact.to_frame(nullptr, v.data(), turned.data());
+    contact.to_frame(s.data(), v.data(), out.data());
+    contact.to_frame(s.data(), in_place.data(), in_place.data());
+    for (ptrdiff_t i = 0; i < f.ndofs; ++i) {
+        SFEM_TEST_ASSERT(out[i] == s[i] * turned[i]);
+        SFEM_TEST_ASSERT(in_place[i] == out[i]);
+        if ((i / 3) % 2) SFEM_TEST_ASSERT(turned[i] == v[i]);
+    }
+    for (ptrdiff_t i = 0; i < f.ndofs; ++i) sv[i] = s[i] * v[i];
+    contact.from_frame(nullptr, sv.data(), turned.data());
+    contact.from_frame(s.data(), v.data(), out.data());
+    ptrdiff_t turned_dofs = 0;
+    for (ptrdiff_t i = 0; i < f.ndofs; ++i) {
+        SFEM_TEST_ASSERT(out[i] == turned[i]);
+        if ((i / 3) % 2) {
+            SFEM_TEST_ASSERT(out[i] == sv[i]);
+        } else {
+            turned_dofs += out[i] != sv[i];
+        }
+    }
+    SFEM_TEST_ASSERT(turned_dofs > 0);
     return SFEM_TEST_SUCCESS;
 }
 
@@ -233,11 +278,11 @@ int test_device_matches_host() {
 
     std::vector<real_t> w = v;
     auto                dw = to_device(v);
-    host.to_frame(w.data());
-    device.to_frame(dw->data());
+    host.to_frame(k.data(), w.data(), w.data());
+    device.to_frame(dk->data(), dw->data(), dw->data());
     SFEM_TEST_ASSERT(worst(w, host_copy(dw->data(), ndofs)) < 1e-12);
-    host.from_frame(w.data());
-    device.from_frame(dw->data());
+    host.from_frame(k.data(), w.data(), w.data());
+    device.from_frame(dk->data(), dw->data(), dw->data());
     SFEM_TEST_ASSERT(worst(w, host_copy(dw->data(), ndofs)) < 1e-12);
 
     std::vector<real_t> projected(ndofs);
@@ -326,6 +371,7 @@ int test_device_matches_host() {
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_gap_and_frames);
+    SFEM_RUN_TEST(test_scaled_frames);
     SFEM_RUN_TEST(test_shift_cutoff_release);
     SFEM_RUN_TEST(test_reaction);
     SFEM_RUN_TEST(test_project_velocity);

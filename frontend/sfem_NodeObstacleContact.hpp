@@ -63,11 +63,13 @@ namespace sfem {
         void capture_penetration(const real_t *const x);
         void set_release(const real_t release) { release_ = release; }
 
-        // v <- Q^T v at the contact nodes: into their frames.
-        void to_frame(real_t *const v) const;
+        // out <- s .* (Q^T in) at the contact nodes and s .* in elsewhere: into their frames, then
+        // scaled. Over all ndofs, s per dof or null for none, in may be out.
+        void to_frame(const real_t *const s, const real_t *const in, real_t *const out) const;
 
-        // v <- Q v at the contact nodes: back from their frames.
-        void from_frame(real_t *const v) const;
+        // out <- Q (s .* in) at the contact nodes and s .* in elsewhere: scaled, then back from
+        // their frames. One sweep each, where the scaling and the frames would take two.
+        void from_frame(const real_t *const s, const real_t *const in, real_t *const out) const;
 
         // The step's upper bound in the frames: the gap on each contact node's normal component,
         // `unbounded` everywhere else.
@@ -131,6 +133,7 @@ namespace sfem {
         std::shared_ptr<SDFObstacle> obstacle_;
         SharedBuffer<idx_t>          nodes_;
         SharedBuffer<idx_t>          idx_;  // nodes_ in the execution space
+        SharedBuffer<idx_t>          frame_of_;  // per node of the vectors its contact node, -1 if none
         SharedBuffer<geom_t *>       points_;
         // The coordinates by axis in the execution space, as a host array of rows: a device
         // SharedBuffer<T *> keeps its row pointers on the device, where the host cannot read them.

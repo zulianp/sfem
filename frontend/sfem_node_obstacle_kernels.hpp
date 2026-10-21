@@ -47,6 +47,28 @@ SFEM_HOST_DEVICE SFEM_INLINE void node_obstacle_from_frame(const real_t *const q
     }
 }
 
+// out <- si .* (q ini), q null for the identity, si null for no scaling: into the node's frame,
+// then scaled, as the two passes would round it. ini may be out.
+SFEM_HOST_DEVICE SFEM_INLINE void node_obstacle_scaled_to_frame(const real_t *const q,
+                                                                const real_t *const si,
+                                                                const real_t *const ini,
+                                                                real_t *const       out) {
+    real_t v[3] = {ini[0], ini[1], ini[2]};
+    if (q) node_obstacle_to_frame(q, v);
+    for (int d = 0; d < 3; ++d) out[d] = si ? si[d] * v[d] : v[d];
+}
+
+// out <- q^T (si .* ini): scaled, then back from the node's frame. ini may be out.
+SFEM_HOST_DEVICE SFEM_INLINE void node_obstacle_scaled_from_frame(const real_t *const q,
+                                                                  const real_t *const si,
+                                                                  const real_t *const ini,
+                                                                  real_t *const       out) {
+    real_t v[3];
+    for (int d = 0; d < 3; ++d) v[d] = si ? si[d] * ini[d] : ini[d];
+    if (q) node_obstacle_from_frame(q, v);
+    for (int d = 0; d < 3; ++d) out[d] = v[d];
+}
+
 // The admissible reaction mu = max(0, -n . ri), removed from ri; *c is the complementarity
 // min(mu, k max(gap, 0)).
 SFEM_HOST_DEVICE SFEM_INLINE real_t node_obstacle_kkt(const real_t *const n,
