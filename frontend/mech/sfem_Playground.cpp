@@ -1159,6 +1159,15 @@ namespace sfem {
             return nullptr;
         }
 
+        // NCCL within a node (smesh::DeviceCommunicator), its set-up beside the rest of this one.
+        if (read<bool>(root, "nccl", false)) {
+            if (impl.es != EXECUTION_SPACE_DEVICE) {
+                fprintf(stderr, "Playground: nccl needs execution_space device\n");
+                return nullptr;
+            }
+            if (comm->size() > 1) comm->enable_device();
+        }
+
         const auto regime = read_string(root, "regime", "steady");
         if (regime != "steady" && regime != "quasi_static" && regime != "dynamic") {
             fprintf(stderr, "Playground: unknown regime \"%s\" (steady, quasi_static, dynamic)\n", regime.c_str());

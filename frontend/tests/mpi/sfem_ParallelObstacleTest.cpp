@@ -143,26 +143,40 @@ int test_release_matches_serial() {
 }
 
 #ifdef SFEM_ENABLE_CUDA
-// Both cases with the distributed solve on the device, a GPU per rank, its gathers by GPU-aware
-// MPI, against the serial solve on the host.
-int test_device_matches_serial() {
-    for (const auto &overrides : {std::vector<std::string>{}, RELEASE}) {
-        real_t relative = 1;
-        int    its[2]   = {0, 0};
-        SFEM_TEST_ASSERT(compare(overrides, &relative, its, {"execution_space=device"}) == SFEM_SUCCESS);
-        if (sfem::Communicator::world()->rank() == 0) {
-            printf("  %s on the device: %d ranks against one on the host, %.3g relative, %d and %d Newton\n",
-                   overrides.empty() ? "utopia scheme" : "release",
-                   sfem::Communicator::world()->size(),
-                   (double)relative,
-                   its[1],
-                   its[0]);
+namespace {
+    // Both cases with the distributed solve on the device, a GPU per rank, against the serial
+    // solve on the host.
+    int device_matches_serial(const std::vector<std::string> &device, const char *const how) {
+        for (const auto &overrides : {std::vector<std::string>{}, RELEASE}) {
+            real_t relative = 1;
+            int    its[2]   = {0, 0};
+            SFEM_TEST_ASSERT(compare(overrides, &relative, its, device) == SFEM_SUCCESS);
+            if (sfem::Communicator::world()->rank() == 0) {
+                printf("  %s on the device%s: %d ranks against one on the host, %.3g relative, %d and %d Newton\n",
+                       overrides.empty() ? "utopia scheme" : "release",
+                       how,
+                       sfem::Communicator::world()->size(),
+                       (double)relative,
+                       its[1],
+                       its[0]);
+            }
+            SFEM_TEST_ASSERT(relative < 1e-8);
+            SFEM_TEST_ASSERT(its[0] == its[1]);
         }
-        SFEM_TEST_ASSERT(relative < 1e-8);
-        SFEM_TEST_ASSERT(its[0] == its[1]);
+        return SFEM_TEST_SUCCESS;
     }
-    return SFEM_TEST_SUCCESS;
+}  // namespace
+
+// The gathers by GPU-aware MPI, the QP's sums completed on the host.
+int test_device_matches_serial() { return device_matches_serial({"execution_space=device"}, ""); }
+
+#ifdef SMESH_ENABLE_NCCL
+// With NCCL within the node (gathers, and the QP's sums where one node holds every rank). Last:
+// the communicator's device communication stays enabled for the process.
+int test_device_nccl_matches_serial() {
+    return device_matches_serial({"execution_space=device", "nccl=true"}, " with NCCL");
 }
+#endif
 #endif
 
 namespace {
@@ -270,6 +284,9 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_block_read_and_output_match_serial);
 #ifdef SFEM_ENABLE_CUDA
     SFEM_RUN_TEST(test_device_matches_serial);
+#ifdef SMESH_ENABLE_NCCL
+    SFEM_RUN_TEST(test_device_nccl_matches_serial);
+#endif
 #endif
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();

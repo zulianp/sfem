@@ -283,6 +283,20 @@ up to \agreeDouble{}; on \unconvergedCases{} the two figures are \agreeSingleUnc
 \agreeDoubleUnconverged{}. Double precision remains the default and is used everywhere else in
 this paper.
 
+\paragraph{Communication within a node.} As an option, the GPUs of one node exchange ghost values
+by NCCL~\cite{nccl}, queued on the GPU's stream, and, where one node holds every rank, MPRGP's two
+reductions complete on the GPU as well, so that an iteration returns to the host once, as on one
+GPU. Between nodes GPU-aware MPI remains: in our tests NCCL's point-to-point messages between nodes
+delivered wrong values. Table~\ref{tab:nccl} compares the option with MPI in \ncclRuns{} runs
+alternating per repeat, with the build of Table~\ref{tab:precision}; the Newton step counts are
+the same. On one node NCCL lowers the cost per QP iteration by \ncclOneGainMin{} to
+\ncclOneGainMax\%, but its set-up costs \ncclCostMin{} to \ncclCostMax\,\si{\second} once per
+process, most of it in calls to the GPU driver, and the time to solution
+grows by \ncclExtraMin{} to \ncclExtraMax\,\si{\second} on every case: the option repays its
+set-up from about \ncclBreakEven{} QP iterations. On two nodes the change per iteration is a loss of
+\ncclTwoPerNodeLossMin{} to \ncclTwoPerNodeLossMax\% with two GPUs per node and a gain of \ncclEightGainMin{} to \ncclEightGainMax\% with four. The option
+is off by default.
+
 \begin{table*}
 \caption{Cost per QP iteration (\si{\micro\second}) and time to solution (\si{\second}), median of
 \benchRepeats{} runs. Grace configurations are ranks $\times$ threads.}
@@ -298,6 +312,15 @@ time to solution, median of \benchRepeats{} runs each.}
 \small
 \setlength{\tabcolsep}{3.5pt}
 \input{tables/precision}
+\end{table}
+
+\begin{table}
+\caption{Communication within a node by MPI and by NCCL: cost per QP iteration and time to
+solution (set-up and solve), median of \benchRepeats{} runs each.}
+\label{tab:nccl}
+\small
+\setlength{\tabcolsep}{3.5pt}
+\input{tables/nccl}
 \end{table}
 
 \begin{figure*}

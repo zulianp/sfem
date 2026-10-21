@@ -1,8 +1,9 @@
 // The fused vector passes of an MPRGP iteration (project, chopped gradient, curvature, step,
 // expansion) against plain loops written from the definitions, for a lower bound, an upper bound
 // and both, on the host and, with CUDA, on the device. Dofs sit on a bound, within eps of one, and
-// inside; the device runs more dofs than its grid has threads. Then a bound-constrained solve
-// checked by its KKT conditions, computed here.
+// inside; the device runs more dofs than its grid has threads. The passes' completion over the
+// ranks is played by two identical ranks: the decisions must take the completed sums. Then a
+// bound-constrained solve checked by its KKT conditions, computed here.
 
 #include <algorithm>
 #include <cmath>
@@ -15,6 +16,8 @@
 #include "sfem_test.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
+#include <cuda_runtime.h>
+
 #include "sfem_cuda_mprgp_impl.hpp"
 #endif
 
@@ -132,7 +135,30 @@ namespace {
             return c;
         }
 
+        // `count` values from the host to `to` in this space.
+        void set(const real_t *const from, const ptrdiff_t count, real_t *const to) {
+            if (es == sfem::EXECUTION_SPACE_HOST) {
+                std::copy(from, from + count, to);
+                return;
+            }
+#ifdef SFEM_ENABLE_CUDA
+            cudaMemcpy(to, from, count * sizeof(real_t), cudaMemcpyHostToDevice);
+#endif
+        }
+
         void write(const sfem::MPRGPControl<real_t> &c) { impl.write_control(c, control_buffer()); }
+
+        // Two ranks with this rank's values: the sums doubled, the minimum as it is.
+        sfem::MPRGPReduce<real_t> two_ranks() {
+            return [this](real_t *const values, const int count, const bool min_last) {
+                V h(count);
+                get(values, h);
+                for (int k = 0; k < count; ++k) {
+                    if (!(min_last && k == count - 1)) h[k] *= 2;
+                }
+                set(h.data(), count, values);
+            };
+        }
     };
 
     int check_passes(Space &s, const bool has_lb, const bool has_ub) {
@@ -144,7 +170,7 @@ namespace {
 
         // curvature
         const sfem::MPRGPParams<real_t> params{real_t(3), real_t(0.5), infty, std::numeric_limits<real_t>::epsilon()};
-        s.impl.curvature(n, dlb, dub, dx, dg, dd, dAd, infty, sfem::MPRGP_DECIDE_NONE, params, s.control_buffer(), s.work_buffer());
+        s.impl.curvature(n, dlb, dub, dx, dg, dd, dAd, infty, sfem::MPRGP_DECIDE_NONE, params, s.control_buffer(), s.work_buffer(), {});
         sfem::MPRGPControl<real_t> rec = s.read();
         real_t                     out[4] = {rec.dAd, rec.dd, rec.gd, rec.alpha_feas};
         real_t dAd_r = 0, dd_r = 0, gd_r = 0, alpha_r = infty;
@@ -166,7 +192,7 @@ namespace {
 
         // The decisions in the pass, from its own sums, against the same decisions taken here.
         for (const auto decision : {sfem::MPRGP_DECIDE_CG, sfem::MPRGP_DECIDE_PROPORTIONING}) {
-            s.impl.curvature(n, dlb, dub, dx, dg, dd, dAd, infty, decision, params, s.control_buffer(), s.work_buffer());
+            s.impl.curvature(n, dlb, dub, dx, dg, dd, dAd, infty, decision, params, s.control_buffer(), s.work_buffer(), {});
             const sfem::MPRGPControl<real_t> in_pass = s.read();
             sfem::MPRGPControl<real_t>       here    = in_pass;
             sfem::mprgp_decide(here, decision, params);
@@ -177,6 +203,20 @@ namespace {
                    (double)in_pass.alpha,
                    (double)in_pass.alpha_cg);
             SFEM_TEST_ASSERT(in_pass.move == here.move && in_pass.alpha == here.alpha && in_pass.alpha_cg == here.alpha_cg);
+
+            // Over two ranks: their sums (to rounding: threaded sums vary in order between passes),
+            // the same step bound, and the decision taken from the completed sums.
+            s.impl.curvature(n, dlb, dub, dx, dg, dd, dAd, infty, decision, params, s.control_buffer(), s.work_buffer(), s.two_ranks());
+            const sfem::MPRGPControl<real_t> two = s.read();
+            SFEM_TEST_ASSERT(relative(two.dAd, 2 * in_pass.dAd) < 1e-11 && relative(two.dd, 2 * in_pass.dd) < 1e-11 &&
+                             relative(two.gd, 2 * in_pass.gd) < 1e-11 && two.alpha_feas == in_pass.alpha_feas);
+            sfem::MPRGPControl<real_t> two_here{};
+            two_here.dAd        = two.dAd;
+            two_here.dd         = two.dd;
+            two_here.gd         = two.gd;
+            two_here.alpha_feas = two.alpha_feas;
+            sfem::mprgp_decide(two_here, decision, params);
+            SFEM_TEST_ASSERT(two.move == two_here.move && two.alpha == two_here.alpha && two.alpha_cg == two_here.alpha_cg);
         }
 
         // chopped gradient
@@ -216,7 +256,8 @@ namespace {
                         along ? dw : nullptr,
                         along,
                         s.control_buffer(),
-                        s.work_buffer());
+                        s.work_buffer(),
+                        {});
             rec    = s.read();
             out[0] = rec.Adgf;
             out[1] = rec.gf2;
@@ -258,6 +299,33 @@ namespace {
             // With cg, the next direction's beta from the final sums.
             SFEM_TEST_ASSERT(!along || relative(rec.beta, rec.Adgf / c.dAd) < 1e-15);
 
+            // Over two ranks: the sums doubled, and beta from them.
+            {
+                s.write(c);
+                V xt = p.x, gt = p.g;
+                real_t *dxt = s.put(xt), *dgt = s.put(gt);
+                s.impl.step(n,
+                            dlb,
+                            dub,
+                            along ? dd : nullptr,
+                            along ? dAd : nullptr,
+                            dxt,
+                            dgt,
+                            dgf,
+                            eps,
+                            along ? dw : nullptr,
+                            along,
+                            s.control_buffer(),
+                            s.work_buffer(),
+                            s.two_ranks());
+                const sfem::MPRGPControl<real_t> two = s.read();
+                SFEM_TEST_ASSERT((along ? relative(two.Adgf, 2 * rec.Adgf) < 1e-11 : two.Adgf == 0) &&
+                                 relative(two.gf2, 2 * rec.gf2) < 1e-11 && relative(two.gc2, 2 * rec.gc2) < 1e-11 &&
+                                 relative(two.gp2, 2 * rec.gp2) < 1e-11);
+                SFEM_TEST_ASSERT(!along || two.beta == two.Adgf / c.dAd);
+                s.write(rec);
+            }
+
             if (along) {
                 // p <- gf - beta p, only where the move is a step.
                 V       pv = p.d;
@@ -281,7 +349,7 @@ namespace {
                 // No step along d unless the move is one: x, g and the sums stay as they are.
                 V xb(n);
                 s.get(dx, xb);
-                s.impl.step(n, dlb, dub, dd, dAd, dx, dg, dgf, eps, dw, true, s.control_buffer(), s.work_buffer());
+                s.impl.step(n, dlb, dub, dd, dAd, dx, dg, dgf, eps, dw, true, s.control_buffer(), s.work_buffer(), {});
                 V xa(n);
                 s.get(dx, xa);
                 const sfem::MPRGPControl<real_t> kept = s.read();

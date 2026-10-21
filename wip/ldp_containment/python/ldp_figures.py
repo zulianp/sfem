@@ -17,6 +17,8 @@ Inputs (../data, copied from the jobs that produced them; README.md names the jo
                           alternating per repeat on one node, same columns as summary/runs
   precision_agreement.csv each such run's last displacement against the same configuration's
                           first double run
+  nccl.csv, nccl_runs.csv GPU configurations with the communication within a node by MPI and by
+                          NCCL (nccl: true), alternating per repeat, same columns as summary/runs
   machine.txt             the node and the software, key=value
 
 Usage:
@@ -67,6 +69,12 @@ PRECISION_CONFIGS = [
     ("host_16x18", r"$16\times18$", "HostSixteen"),
     ("gpu_1", "1 GPU", "GpuOne"),
     ("gpu_4", "4 GPUs", "GpuFour"),
+]
+# The configurations of the NCCL comparison: (config, nodes, label, macro key).
+NCCL_CONFIGS = [
+    ("gpu_4", "1", "4 GPUs", "One"),
+    ("gpu_4", "2", "4 GPUs, 2 nodes", "TwoPerNode"),
+    ("gpu_8", "2", "8 GPUs, 2 nodes", "Eight"),
 ]
 COLORS = ["LdpA", "LdpB", "LdpC", "LdpD"]
 QP_CAP = 15000
@@ -167,6 +175,27 @@ def precision_index(rows):
     return index
 
 
+def nccl_index(rows):
+    """(case, config, nodes, communication) -> row, failing on a missing or duplicated one."""
+    index = {}
+    for r in rows:
+        key = (r["case"], r["config"], r["nodes"], r["communication"])
+        if key in index:
+            sys.exit("ldp_figures: %s appears twice in nccl.csv" % (key,))
+        index[key] = r
+    for case, _, _ in CASES:
+        for config, nodes, _, _ in NCCL_CONFIGS:
+            for c in ("mpi", "nccl"):
+                if (case, config, nodes, c) not in index:
+                    sys.exit("ldp_figures: nccl.csv has no %s %s on %s node(s) by %s" % (case, config, nodes, c))
+    return index
+
+
+def to_solution(r):
+    """Set-up and solve: the time to solution with the set-up NCCL's adds to."""
+    return float(r["setup_median"]) + solve_time(r)
+
+
 def per_iteration(r):
     return float(r["qp_per_iteration_median"])
 
@@ -180,7 +209,7 @@ def solve_time(r):
 # ---------------------------------------------------------------------------------------------
 
 def macros(index, runs, agreement, ab, kkt, newton, utopia, coords, machine, precision, precision_runs,
-           precision_agreement):
+           precision_agreement, nccl, nccl_runs):
     out = [PREAMBLE]
     m = lambda name, value: out.append(macro(name, value))
 
@@ -387,6 +416,46 @@ def macros(index, runs, agreement, ab, kkt, newton, utopia, coords, machine, pre
         double = [rel(r) for r in precision_agreement if r["case"] in cases and r["storage_bytes"] == "8"]
         m("agreeSingle" + group, num(max(single), 2))
         m("agreeDouble" + group, num(max(double), 2))
+
+    # Communication within a node by NCCL against MPI
+    m("ncclRuns", integer(len(nccl_runs)))
+    if any(r["rc"] != "0" for r in nccl_runs):
+        sys.exit("ldp_figures: an NCCL comparison run failed")
+    change = {}
+    for case, _, _ in CASES:
+        for config, nodes, _, _ in NCCL_CONFIGS:
+            a, b = nccl[(case, config, nodes, "mpi")], nccl[(case, config, nodes, "nccl")]
+            if a["newton"] != b["newton"]:
+                sys.exit("ldp_figures: %s %s takes %s Newton steps by MPI, %s by NCCL" % (case, config, a["newton"], b["newton"]))
+            change[(case, config, nodes)] = per_iteration(b) / per_iteration(a) - 1
+    # The change per QP iteration, as a gain (NCCL faster) or a loss, whichever the text states.
+    for config, nodes, _, key in NCCL_CONFIGS:
+        c = [change[(case, config, nodes)] for case, _, _ in CASES]
+        if max(c) < 0:
+            m("nccl" + key + "GainMin", num(-100 * max(c), 2))
+            m("nccl" + key + "GainMax", num(-100 * min(c), 2))
+        elif min(c) > 0:
+            m("nccl" + key + "LossMin", num(100 * min(c), 2))
+            m("nccl" + key + "LossMax", num(100 * max(c), 2))
+        else:
+            m("nccl" + key + "ChangeMin", num(100 * min(c), 2))
+            m("nccl" + key + "ChangeMax", num(100 * max(c), 2))
+    # On one node: what NCCL's set-up costs once (the time to solution it adds, plus what its
+    # iterations saved), and the QP iterations a process needs to repay it.
+    extra, cost, even = [], [], []
+    for case, _, _ in CASES:
+        a, b = nccl[(case, "gpu_4", "1", "mpi")], nccl[(case, "gpu_4", "1", "nccl")]
+        saved = 1e-6 * (per_iteration(a) - per_iteration(b))
+        extra.append(to_solution(b) - to_solution(a))
+        cost.append(extra[-1] + saved * int(b["qp_iterations"]))
+        if saved > 0: even.append(cost[-1] / saved)
+    if min(extra) <= 0:
+        sys.exit("ldp_figures: NCCL no longer lengthens a solution on one node; the text says it does")
+    m("ncclExtraMin", num(min(extra), 2))
+    m("ncclExtraMax", num(max(extra), 2))
+    m("ncclCostMin", num(min(cost), 2))
+    m("ncclCostMax", num(max(cost), 2))
+    m("ncclBreakEven", integer(1000 * round(min(even) / 1000)))
     return "".join(out)
 
 
@@ -474,6 +543,24 @@ def table_precision(precision):
     return "\n".join(lines) + "\n"
 
 
+def table_nccl(nccl):
+    lines = [PREAMBLE,
+             r"\begin{tabular}{@{}llrrrrr@{}}", r"\toprule",
+             r" & & \multicolumn{3}{c}{\si{\micro\second} per QP iteration} & \multicolumn{2}{c}{To solution (\si{\second})} \\",
+             r"\cmidrule(lr){3-5}\cmidrule(l){6-7}",
+             r"Case & Configuration & MPI & NCCL & change & MPI & NCCL \\", r"\midrule"]
+    for i, (case, label, _) in enumerate(CASES):
+        if i:
+            lines.append(r"\addlinespace")
+        for j, (config, nodes, clabel, _) in enumerate(NCCL_CONFIGS):
+            a, b = nccl[(case, config, nodes, "mpi")], nccl[(case, config, nodes, "nccl")]
+            lines.append("%s & %s & %s & %s & \\num{%.1f}\\%% & %s & %s \\\\" % (
+                label if j == 0 else "", clabel, integer(per_iteration(a)), integer(per_iteration(b)),
+                100 * (per_iteration(b) / per_iteration(a) - 1), num(to_solution(a), 3), num(to_solution(b), 3)))
+    lines += [r"\bottomrule", r"\end{tabular}"]
+    return "\n".join(lines) + "\n"
+
+
 # ---------------------------------------------------------------------------------------------
 # Figures
 # ---------------------------------------------------------------------------------------------
@@ -552,10 +639,12 @@ def generate(out, tables):
     runs = read_csv("runs.csv")
     utopia = read_csv("utopia.csv")
     precision = precision_index(read_csv("precision.csv"))
+    nccl = nccl_index(read_csv("nccl.csv"))
     write(os.path.join(out, "ldp_macros.tex"),
           macros(index, runs, read_csv("agreement.csv"), read_csv("ab.csv"), read_csv("kkt.csv"),
                  read_csv("newton.csv"), utopia, read_csv("coordinates.csv"), read_machine(),
-                 precision, read_csv("precision_runs.csv"), read_csv("precision_agreement.csv")))
+                 precision, read_csv("precision_runs.csv"), read_csv("precision_agreement.csv"),
+                 nccl, read_csv("nccl_runs.csv")))
     write(os.path.join(out, "ldp_colors.tex"), colors())
     write(os.path.join(out, "per_iteration.tex"), figure_per_iteration(index))
     write(os.path.join(out, "breakdown.tex"), figure_breakdown(index, "FF200_mesh_refined"))
@@ -563,6 +652,7 @@ def generate(out, tables):
     write(os.path.join(tables, "accuracy.tex"), table_accuracy(read_csv("ab.csv"), read_csv("kkt.csv")))
     write(os.path.join(tables, "performance.tex"), table_performance(index))
     write(os.path.join(tables, "precision.tex"), table_precision(precision))
+    write(os.path.join(tables, "nccl.tex"), table_nccl(nccl))
 
 
 def selftest():
@@ -594,6 +684,8 @@ def selftest():
     assert len(read_csv("precision_runs.csv")) == len(CASES) * len(PRECISION_CONFIGS) * 2 * 3
     # Per configuration: double's repeats 2 and 3 and single's 1 to 3 against double's first.
     assert len(read_csv("precision_agreement.csv")) == len(CASES) * len(PRECISION_CONFIGS) * 5
+    nccl_index(read_csv("nccl.csv"))
+    assert len(read_csv("nccl_runs.csv")) == len(CASES) * len(NCCL_CONFIGS) * 2 * 3
     print("ldp_figures selftest passed")
 
 
