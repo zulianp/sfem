@@ -53,6 +53,7 @@
 \IfFileExists{figures/kmix_macros.tex}{\input{figures/kmix_macros}}{}
 \input{figures/scatter_macros}
 \input{tables/darwish_cache_macros}
+\input{tables/consistent_matrix_macros}
 \IfFileExists{figures/jacho_macros.tex}{\input{figures/jacho_macros}}{}
 \IfFileExists{figures/meshfoot_macros.tex}{\input{figures/meshfoot_macros}}{}
 \IfFileExists{figures/jacfair_macros.tex}{\input{figures/jacfair_macros}}{}
@@ -145,6 +146,9 @@ matrix holds, at $\jfLaggedVsF\times$ the product; differentiated, what a Newton
 applies, it costs $\jfExactCost\times$ and is $\jfExactVsF\times$. A controlled residual
 experiment finds lower accumulation costs for the packed layout at both one and 72 threads.
 The single-thread advantage therefore cannot be attributed solely to input staging.
+For a fixed perturbed state, a coefficient-cached consistent Darwish action is
+$\cmCsrSpeedup\times$ faster than an equivalent assembled CSR application on
+the measured affine fixture.
 \end{abstract}
 
 \begin{CCSXML}
@@ -1470,7 +1474,7 @@ kernel by those factors.
     accumulation, traversal order and synchronization together. $\Jlag$ is one row because deferred correction leaves the implicit
     operator scheme-independent by construction: the first-order row \emph{is} the lagged action,
     and a control at every limiter reproduces its result bit for bit. It is also the only form encoded by the
-    measured matrix; the $\Jhoex$ rows have no measured matrix counterpart. The limiters are the
+    matrix in this historical table; its $\Jhoex$ rows have no measured matrix counterpart. The limiters are the
     cheapest and among the dearest, so they bracket what one costs. The \texttt{f32} group is the
     single-precision build in the same allocation, against its own SpMV, whose matrix and vectors
     are both float. Exact-action rows are historical rebuild-mode measurements;
@@ -1498,17 +1502,20 @@ SpMV under both limiters: throughput ratios $\jfClipExactVsF\times$
 These rows do not measure the coefficient-cached action below. The matrix
 encodes $\Jlag$, whereas the consistent higher-order action differentiates
 through a nodal reconstruction and induces couplings beyond that matrix's
-one-ring sparsity. No assembled consistent higher-order Jacobian was measured.
+one-ring sparsity. Those historical rows did not measure an assembled consistent
+higher-order Jacobian; the separate experiment below does.
 
 \paragraph{Reusing Darwish coefficients.}
 Table~\ref{tab:darwishcache} compares the direct and coefficient-cached consistent
 Darwish actions in a separate matched Grace run. The direct control builds and
-retains the same cache but recomputes the coefficients during application.
+retains the same cache but recomputes the coefficients during application;
+its mean time matches the original to the precision shown.
 Caching reduces application time by \dcTimeReduction\% relative to the original
 direct action ($\dcSpeedup\times$ speedup), with every paired primary window
 favouring the cache. The cached consistent action also takes \dcSpmvReduction\%
 less time than the assembled \emph{lagged} SpMV. This is a cost comparison of
-different operators; only the packed lagged action and SpMV encode the same one.
+different operators; within that table, only the packed lagged action and SpMV
+encode the same one.
 
 \begin{table}[t]
   \centering
@@ -1533,6 +1540,46 @@ The cache retains all reconstruction sensitivities and passes full-vector
 comparisons for the measured perturbed state. An exactly unperturbed small
 state still produces numerical disagreements and remains outside this claim
 (see the reproducibility documentation). The cache is therefore opt-in.
+
+
+\paragraph{Equivalent consistent matrix.}
+Table~\ref{tab:consistentmatrix} compares the same consistent Darwish Jacobian
+in matrix-free, scalar CSR and $4\times4$ block BSR forms. Differentiating the
+nodal reconstruction extends the coupling beyond one element. On this Cartesian
+fixture the support fits a $5\times5\times5$ node box, permitting recovery of the
+matrix by 125 colour seeds per field applied to the analytic action. Only exactly
+zero entries (CSR) or blocks (BSR) are removed. Basis-column and mixed-field
+checks establish agreement with the direct action at roundoff level under the
+row-norm-scaled error measure; omitting the wider couplings fails the check.
+
+The cached action takes \cmCachedMs{}\,ms versus \cmCsrMs{}\,ms for CSR, the
+faster assembled format tested: a $\cmCsrSpeedup\times$ application speedup.
+Against BSR the speedup is $\cmBsrSpeedup\times$. Every one of the 24 paired
+windows favours the cached action against both matrices. Caching itself reduces
+the direct matrix-free time by \cmTimeReduction\% in this run, corroborating
+the separate \dcTimeReduction\% result in Table~\ref{tab:darwishcache}.
+
+\begin{table}[t]
+  \centering
+  \small
+  \caption{Equivalent consistent Darwish applications: FP64, 72 Grace cores,
+    affine interior, $n=128$, pack size 1024, Rhie--Chow enabled, perturbation
+    0.017. Means and full ranges of 24 windows per arm, each with 60 applications.
+    Three workers each retain both matrices and the cache through eight balanced
+    four-arm blocks. Coordinate-based directions, 30 warmups and THP disabled;
+    setup and checks excluded. Ranges are not confidence intervals.}
+  \label{tab:consistentmatrix}
+  \input{tables/consistent_matrix}
+\end{table}
+
+The cache adds \cmCacheGiB{}\,GiB; CSR and BSR store \cmCsrGiB{} and
+\cmBsrGiB{}\,GiB respectively in matrix arrays, not total solver footprints.
+Cache setup takes \cmCacheSetup{}\,s. Matrix probing and compaction take
+\cmAssembly{}\,s, plus \cmConversion{}\,s for CSR conversion; these are
+reference-construction costs, not timings of an optimised direct assembler.
+The result concerns fixed-state applications with these SFEM sparse kernels,
+subject to the perturbed-state limitation above; solver speedup and universal
+superiority over assembled implementations are not established.
 
 \section{Discussion and limitations}
 \label{sec:discussion}
@@ -1572,6 +1619,14 @@ single-thread case where there is no contention between threads. The margin depe
 operator: across convective schemes it runs from $\hoFirstLayoutRatio\times$ down to
 $\hoDmLayoutRatio\times$ as arithmetic per sub-control surface grows, so a format is worth
 reporting against the operator a solver applies rather than the cheapest kernel available.
+
+For the consistent Darwish action, fixed-state coefficient reuse saves
+\dcTimeReduction\% in the cache comparison and \cmTimeReduction\% in the
+same-operator matrix comparison. The cached action is $\cmCsrSpeedup\times$
+faster than the equivalent CSR application on the measured affine fixture,
+while adding \cmCacheGiB{}\,GiB of cache storage. These application results
+include all reconstruction sensitivities; setup and solver amortisation remain
+separate from the reported speedups.
 
 \begin{acks}
 The author thanks the Swiss National Science Foundation (project no.~215627), the PASC Program
