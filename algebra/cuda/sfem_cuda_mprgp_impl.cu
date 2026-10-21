@@ -15,8 +15,10 @@ namespace sfem {
         constexpr int MAX_BLOCKS = 1024;  // the loops stride over dofs past the grid
         constexpr int N_VALUES   = 4;     // reductions of one pass
 
-        // Per-block partials, value-major (k * MAX_BLOCKS + block).
-        constexpr ptrdiff_t WORK_SIZE = N_VALUES * MAX_BLOCKS;
+        // Per-block partials, value-major (k * MAX_BLOCKS + block), then a pass's N_VALUES results
+        // while the ranks complete them (REDUCED).
+        constexpr ptrdiff_t REDUCED   = N_VALUES * MAX_BLOCKS;
+        constexpr ptrdiff_t WORK_SIZE = REDUCED + N_VALUES;
 
         int n_blocks(const ptrdiff_t n) {
             return int(std::min<ptrdiff_t>(MAX_BLOCKS, std::max<ptrdiff_t>(1, (n + N_THREADS - 1) / N_THREADS)));
@@ -104,6 +106,23 @@ namespace sfem {
             }
         };
 
+        // A pass's results kept for the ranks to complete.
+        template <typename T>
+        struct Store {
+            T* values;
+            __device__ void operator()(const T (&v)[N_VALUES]) const {
+                for (int k = 0; k < N_VALUES; ++k) values[k] = v[k];
+            }
+        };
+
+        // One thread: the completed results to `result`.
+        template <typename T, class Result>
+        __global__ void apply_kernel(const T* const SFEM_RESTRICT values, const Result result) {
+            T v[N_VALUES];
+            for (int k = 0; k < N_VALUES; ++k) v[k] = values[k];
+            result(v);
+        }
+
         // One block: the partials of n_blocks blocks, their results to `result` on thread 0.
         template <typename T, int N_SUM, class Result>
         __global__ void finish_kernel(const int n_blocks, const T infty, const T* const SFEM_RESTRICT work, const Result result) {
@@ -118,9 +137,23 @@ namespace sfem {
             if (!threadIdx.x) result(v);
         }
 
+        // On one rank the partials' results go to `result`; across ranks they are completed first,
+        // on the stream (reduce), and the results of all go to it.
         template <typename T, int N_SUM, class Result>
-        void finish(const int n_blocks, const T infty, const T* const work, const Result& result) {
-            finish_kernel<T, N_SUM, Result><<<1, N_THREADS>>>(n_blocks, infty, work, result);
+        void finish(const int                n_blocks,
+                    const T                  infty,
+                    T* const                 work,
+                    const MPRGPReduce<T>&    reduce,
+                    const Result&            result) {
+            if (!reduce) {
+                finish_kernel<T, N_SUM, Result><<<1, N_THREADS>>>(n_blocks, infty, work, result);
+                SFEM_DEBUG_SYNCHRONIZE();
+                return;
+            }
+            T* const reduced = work + REDUCED;
+            finish_kernel<T, N_SUM, Store<T>><<<1, N_THREADS>>>(n_blocks, infty, work, Store<T>{reduced});
+            reduce(reduced, N_VALUES, N_SUM < N_VALUES);
+            apply_kernel<T, Result><<<1, 1>>>(reduced, result);
             SFEM_DEBUG_SYNCHRONIZE();
         }
 
@@ -270,13 +303,14 @@ namespace sfem {
                        const MPRGPDecision   decision,
                        const MPRGPParams<T>& params,
                        T* const              control,
-                       T* const              work) {
+                       T* const              work,
+                       const MPRGPReduce<T>& reduce) {
             const int nb = n_blocks(n);
             with_mprgp_bounds(lb, ub, [&](const auto b) {
                 curvature_kernel<T, Bounds<decltype(b)>><<<nb, N_THREADS>>>(n, b, x, g, d, Ad, infty, work);
                 SFEM_DEBUG_SYNCHRONIZE();
             });
-            finish<T, 3>(nb, infty, work, CurvatureResult<T>{control, decision, params});
+            finish<T, 3>(nb, infty, work, reduce, CurvatureResult<T>{control, decision, params});
         }
 
         template <typename T>
@@ -290,9 +324,10 @@ namespace sfem {
                   T* const        gf,
                   const T         eps,
                   const T* const  w,
-                  const bool      cg,
-                  T* const        control,
-                  T* const        work) {
+                  const bool            cg,
+                  T* const              control,
+                  T* const              work,
+                  const MPRGPReduce<T>& reduce) {
             const int nb = n_blocks(n);
             with_mprgp_bounds(lb, ub, [&](const auto b) {
                 if (d) {
@@ -302,7 +337,8 @@ namespace sfem {
                 }
                 SFEM_DEBUG_SYNCHRONIZE();
             });
-            finish<T, N_VALUES>(nb, T(0), work, StepResult<T>{control, d != nullptr, cg});
+            // Where the step along d did not run, its stale partials are completed and not used.
+            finish<T, N_VALUES>(nb, T(0), work, reduce, StepResult<T>{control, d != nullptr, cg});
         }
 
         template <typename T>

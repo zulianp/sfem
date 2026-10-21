@@ -20,6 +20,10 @@
 #include "sfem_mprgp_control.hpp"
 #include "sfem_openmp_mprgp_impl.hpp"
 
+#ifdef SFEM_ENABLE_CUDA
+#include "smesh_device_communicator.hpp"
+#endif
+
 namespace sfem {
     // From Active set expansion strategies in MPRGP algorithm, Kruzik et al. 2020
     template <typename T>
@@ -60,6 +64,30 @@ namespace sfem {
         // spans the ranks, so every branch is taken alike on all of them.
         std::shared_ptr<Communicator> comm_;
         ptrdiff_t n_alloc_{-1};
+        // On the device, with every rank on one node and the communicator's device communication
+        // enabled (smesh::Communicator::enable_device): the passes complete their sums there, by
+        // NCCL on the stream, and the iteration returns to the host once, as on one rank.
+        // Otherwise empty, and the sums are completed on the host from the record.
+        MPRGPReduce<T> device_reduce_;
+
+        MPRGPReduce<T> make_device_reduce() const {
+#ifdef SFEM_ENABLE_CUDA
+            auto device = comm_ && execution_space_ == EXECUTION_SPACE_DEVICE ? comm_->device() : nullptr;
+            if (device && device->whole()) {
+                return [device](T* const values, const int count, const bool min_last) {
+                    if (min_last) {
+                        device->sum_and_min_last(values, count, smesh::TypeToEnum<T>::value());
+                    } else {
+                        device->sum(values, count, smesh::TypeToEnum<T>::value());
+                    }
+                };
+            }
+#endif
+            return {};
+        }
+
+        // Whether the sums are completed on the host, from the record.
+        bool on_host() const { return comm_ && !device_reduce_; }
 
         T sum(const T local) const { return comm_ ? comm_->sum(local) : local; }
         T dot(const T* const x, const T* const y) const { return sum(this->blas->dot(n_dofs, x, y)); }
@@ -137,11 +165,13 @@ namespace sfem {
         MPRGPParams<T>  params_{};
 
         /// The curvature pass along d (Ad = A d), then the decision. On one rank both are the
-        /// pass's; across ranks its sums are completed here and the same decision taken on the host.
+        /// pass's; across ranks its sums are completed here and the same decision taken on the host
+        /// (with device_reduce_ both stay the pass's).
         void curvature(const T* const x, const T* const g, const T* const d, const T* const Ad, const MPRGPDecision decision,
                        T* const work) {
-            impl.curvature(n_dofs, lb(), ub(), x, g, d, Ad, infty, comm_ ? MPRGP_DECIDE_NONE : decision, params_, control_, work);
-            if (comm_) {
+            impl.curvature(
+                    n_dofs, lb(), ub(), x, g, d, Ad, infty, on_host() ? MPRGP_DECIDE_NONE : decision, params_, control_, work, device_reduce_);
+            if (on_host()) {
                 impl.read_control(control_, &record_);
                 T v[4] = {record_.dAd, record_.dd, record_.gd, record_.alpha_feas};
                 // The three sums and the step bound in one message.
@@ -159,9 +189,9 @@ namespace sfem {
         /// without d), gf <- the free gradient; completed across ranks like curvature(). With `cg`
         /// the next direction's beta.
         void step(const T* const d, const T* const Ad, T* const x, T* const g, T* const gf, const bool cg, T* const work) {
-            impl.step(n_dofs, lb(), ub(), d, Ad, x, g, gf, eps, norm_weight_ ? norm_weight_->data() : nullptr, comm_ ? false : cg,
-                      control_, work);
-            if (comm_ && (!d || record_.move == T(MPRGP_MOVE_STEP))) {
+            impl.step(n_dofs, lb(), ub(), d, Ad, x, g, gf, eps, norm_weight_ ? norm_weight_->data() : nullptr, on_host() ? false : cg,
+                      control_, work, device_reduce_);
+            if (on_host() && (!d || record_.move == T(MPRGP_MOVE_STEP))) {
                 impl.read_control(control_, &record_);
                 T v[4] = {record_.Adgf, record_.gf2, record_.gc2, record_.gp2};
                 sum(v, 4);
@@ -178,7 +208,7 @@ namespace sfem {
 
         /// The record on the host; on one rank the read is the iteration's one return to it.
         const MPRGPControl<T>& record() {
-            if (!comm_) impl.read_control(control_, &record_);
+            if (!on_host()) impl.read_control(control_, &record_);
             return record_;
         }
 
@@ -279,8 +309,9 @@ namespace sfem {
                 printf("Skipping power method!\n");
             }
 
-            params_ = {max_eig_, alpha_bar, infty, std::numeric_limits<T>::epsilon()};
-            record_ = MPRGPControl<T>{};
+            params_        = {max_eig_, alpha_bar, infty, std::numeric_limits<T>::epsilon()};
+            record_        = MPRGPControl<T>{};
+            device_reduce_ = make_device_reduce();
 
             this->project(x);  // Make iterate feasible
             this->gradient(x, b, g);

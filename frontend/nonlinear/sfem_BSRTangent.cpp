@@ -198,14 +198,15 @@ namespace sfem {
                         const count_t *rp = rowptr->data(), *sp = split->data();
                         const idx_t   *ci = colidx->data();
                         const V       *v  = values->data();
-                        if (space->synchronize_begin(xs, es) != SFEM_SUCCESS) return;
 #ifdef SFEM_ENABLE_CUDA
                         if (es == EXECUTION_SPACE_DEVICE) {
                             // Launched before the wait, on a stream of its own: on the default
                             // stream it would hold back MPI's copies until it ended (measured on
-                            // GH200, Cray MPICH). It reads only owned columns, which the unpack of
-                            // the aura does not touch.
+                            // GH200, Cray MPICH), and follow NCCL's messages, queued there. It
+                            // reads only owned columns, which the unpack of the aura does not
+                            // touch, so it waits only for what came before the gather.
                             side->wait_for_default();
+                            if (space->synchronize_begin(xs, es) != SFEM_SUCCESS) return;
                             d_bsr_spmv_ranges<count_t, idx_t, V, real_t>(rows, bs, rp, sp, ci, v, 1, x, y, side->stream());
                             space->synchronize_end(es);
                             side->join_default();
@@ -214,6 +215,7 @@ namespace sfem {
                             return;
                         }
 #endif
+                        if (space->synchronize_begin(xs, es) != SFEM_SUCCESS) return;
                         // One thread waits for the messages while the others take the diagonal
                         // block, row ranges of it each.
                         int threads = 1;

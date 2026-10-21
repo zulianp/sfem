@@ -13,6 +13,12 @@
 
 namespace sfem {
 
+    /// Completes a pass's reductions over the ranks in the execution space, in place on `count`
+    /// values: all summed, or with `min_last` the last the minimum. Empty where the sums are
+    /// completed afterwards, from the record, or there is one rank.
+    template <typename T>
+    using MPRGPReduce = std::function<void(T* const values, const int count, const bool min_last)>;
+
     /// The vector passes of an MPRGP iteration, each one sweep over the dofs. lb and ub may be
     /// null, not both. Reductions, over this rank's dofs, and the decisions taken from them arrive
     /// in `control`, an MPRGPControl of mprgp_control_size() entries in the execution space; the
@@ -34,8 +40,9 @@ namespace sfem {
                 chopped_gradient;
 
         /// Along d, with Ad = A d: the record's d.Ad, d.d, g.d and the longest feasible step
-        /// x - alpha d (infty when no bound limits it); then the decision, which takes final sums
-        /// (MPRGP_DECIDE_NONE where they are summed over the ranks afterwards).
+        /// x - alpha d (infty when no bound limits it), completed over the ranks by `reduce`; then
+        /// the decision, which takes final sums (MPRGP_DECIDE_NONE where they are summed over the
+        /// ranks afterwards).
         std::function<void(const ptrdiff_t           n,
                            const T* const            lb,
                            const T* const            ub,
@@ -47,14 +54,15 @@ namespace sfem {
                            const MPRGPDecision       decision,
                            const MPRGPParams<T>&     params,
                            T* const                  control,
-                           T* const                  work)>
+                           T* const                  work,
+                           const MPRGPReduce<T>&     reduce)>
                 curvature;
 
         /// x -= alpha d and g -= alpha Ad with the record's alpha, only where its move is a step
         /// (always, with nothing to move, when d is null); then gf <- the free gradient at (x, g)
         /// and the record's Ad.gf (0 without d), |gf|^2, |gc|^2, |w (gf + gc)|^2, gc the chopped
-        /// gradient, w the entrywise weight (1 where null). With `cg` (final sums) also the next
-        /// direction's beta.
+        /// gradient, w the entrywise weight (1 where null), completed over the ranks by `reduce`.
+        /// With `cg` (final sums) also the next direction's beta.
         std::function<void(const ptrdiff_t n,
                            const T* const  lb,
                            const T* const  ub,
@@ -67,7 +75,8 @@ namespace sfem {
                            const T* const  w,
                            const bool      cg,
                            T* const        control,
-                           T* const        work)>
+                           T* const        work,
+                           const MPRGPReduce<T>& reduce)>
                 step;
 
         /// p <- gf - beta p with the record's beta, only where its move is a step.
@@ -151,7 +160,8 @@ namespace sfem {
                               const MPRGPDecision   decision,
                               const MPRGPParams<T>& params,
                               T* const              control,
-                              T* const) {
+                              T* const,
+                              const MPRGPReduce<T>& reduce) {
             with_mprgp_bounds(lb, ub, [&](const auto b) {
                 T dAd = 0, dd = 0, gd = 0, alpha = infty;
 #pragma omp parallel for reduction(+ : dAd, dd, gd) reduction(min : alpha)
@@ -161,6 +171,15 @@ namespace sfem {
                     dd += di * di;
                     gd += g[i] * di;
                     alpha = b.min(alpha, b.max_alpha(i, x[i], di, infty));
+                }
+                if (reduce) {
+                    // The three sums and the step bound in one message.
+                    T v[4] = {dAd, dd, gd, alpha};
+                    reduce(v, 4, true);
+                    dAd   = v[0];
+                    dd    = v[1];
+                    gd    = v[2];
+                    alpha = v[3];
                 }
                 MPRGPControl<T>& c = record(control);
                 c.dAd              = dAd;
@@ -183,7 +202,8 @@ namespace sfem {
                          const T* const  w,
                          const bool      cg,
                          T* const        control,
-                         T* const) {
+                         T* const,
+                         const MPRGPReduce<T>& reduce) {
             MPRGPControl<T>& c = record(control);
             if (d && c.move != T(MPRGP_MOVE_STEP)) return;
             const T alpha = c.alpha;
@@ -216,6 +236,14 @@ namespace sfem {
                         gc2 += c * c;
                         gp2 += p * p;
                     }
+                }
+                if (reduce) {
+                    T v[4] = {Adgf, gf2, gc2, gp2};
+                    reduce(v, 4, false);
+                    Adgf = v[0];
+                    gf2  = v[1];
+                    gc2  = v[2];
+                    gp2  = v[3];
                 }
                 c.Adgf = Adgf;
                 c.gf2  = gf2;

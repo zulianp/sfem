@@ -16,6 +16,7 @@ namespace sfem {
         /// trailing ".*" hands the whole subtree to the reader that owns it.
         const char *const SCHEMA[] = {
                 "execution_space",
+                "nccl",
                 "mesh.path",
                 "mesh.blocks",
                 "mesh.box.n",
