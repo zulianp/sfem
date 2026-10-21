@@ -2,6 +2,7 @@
 
 #include <algorithm>
 
+#include "sfem_TangentValues.hpp"
 #include "sfem_cuda_base.hpp"
 
 namespace sfem {
@@ -33,13 +34,14 @@ namespace sfem {
 
         /// One thread per node.  The diagonal block takes one mass entry per
         /// component, which is the same contraction the host loop makes.
+        template <typename V>
         __global__ void inertia_potential_bsr_diagonal(const ptrdiff_t                    n_nodes,
                                                        const int                          block_size,
                                                        const count_t *const SFEM_RESTRICT rowptr,
                                                        const idx_t *const SFEM_RESTRICT   colidx,
                                                        const real_t *const SFEM_RESTRICT  mass,
                                                        const real_t                       alpha,
-                                                       real_t *const SFEM_RESTRICT        values) {
+                                                       V *const SFEM_RESTRICT             values) {
             const ptrdiff_t bs2 = (ptrdiff_t)block_size * block_size;
             for (ptrdiff_t node = blockIdx.x * blockDim.x + threadIdx.x; node < n_nodes;
                  node += blockDim.x * gridDim.x) {
@@ -47,9 +49,9 @@ namespace sfem {
                 const count_t end   = rowptr[node + 1];
                 for (count_t k = begin; k < end; ++k) {
                     if (colidx[k] == node) {
-                        real_t *const block = &values[k * bs2];
+                        V *const block = &values[k * bs2];
                         for (int d = 0; d < block_size; ++d) {
-                            block[d * block_size + d] += alpha * mass[node * block_size + d];
+                            block[d * block_size + d] = V(block[d * block_size + d] + alpha * mass[node * block_size + d]);
                         }
                         break;
                     }
@@ -100,15 +102,16 @@ namespace sfem {
                                          const idx_t *const   colidx,
                                          const real_t *const  mass,
                                          const real_t         alpha,
-                                         real_t *const        values) {
+                                         const smesh::PrimitiveType values_type,
+                                         void *const          values) {
         SFEM_DEBUG_SYNCHRONIZE();
 
         const int block = 128;
-        inertia_potential_bsr_diagonal<<<grid_for(n_nodes, block), block>>>(
-                n_nodes, block_size, rowptr, colidx, mass, alpha, values);
-
-        SFEM_DEBUG_SYNCHRONIZE();
-        return SFEM_SUCCESS;
+        return with_tangent_values(values_type, values, [&](auto *const v) {
+            inertia_potential_bsr_diagonal<<<grid_for(n_nodes, block), block>>>(n_nodes, block_size, rowptr, colidx, mass, alpha, v);
+            SFEM_DEBUG_SYNCHRONIZE();
+            return SFEM_SUCCESS;
+        });
     }
 
     int cu_inertia_potential_hessian_block_diag_sym(const ptrdiff_t     n_nodes,

@@ -132,15 +132,16 @@ namespace sfem {
                                             const real_t *const  k,
                                             const bool           capped,
                                             const real_t         sign,
-                                            const count_t *const rowptr,
-                                            const idx_t *const   colidx,
-                                            real_t *const        values) {
+                                            const count_t *const       rowptr,
+                                            const idx_t *const         colidx,
+                                            const smesh::PrimitiveType values_type,
+                                            void *const                values) {
         SFEM_TRACE_SCOPE("NodeObstacleContact::add_curvature");
 
         real_t *Crows[6];
         rows(curvature_, 6, Crows);
         obstacle_->sample_nodes_curvature(size(), idx_->data(), xyz_, x, Crows);
-        node_obstacle_curvature_bsr(view(normals_, gap_), r, k, capped, sign, rowptr, colidx, values);
+        node_obstacle_curvature_bsr(view(normals_, gap_), r, k, capped, sign, rowptr, colidx, values_type, values);
     }
 
     void NodeObstacleContact::reaction(real_t *const out) const {

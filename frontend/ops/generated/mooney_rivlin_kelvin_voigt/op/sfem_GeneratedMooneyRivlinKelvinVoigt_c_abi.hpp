@@ -39,6 +39,7 @@ typedef double geom_t;
 extern "C" int mooney_rivlin_kelvin_voigt_total_hessian_bsr_2d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
+        const enum smesh::PrimitiveType values_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -66,6 +67,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_total_hessian_bsr_2d_a_msoa(
 extern "C" int mooney_rivlin_kelvin_voigt_total_hessian_bsr_2d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
+        const enum smesh::PrimitiveType values_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -89,6 +91,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_total_hessian_bsr_2d_i_msoa(
 extern "C" int mooney_rivlin_kelvin_voigt_total_hessian_bsr_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
+        const enum smesh::PrimitiveType values_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -123,6 +126,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_total_hessian_bsr_3d_a_msoa(
 extern "C" int mooney_rivlin_kelvin_voigt_total_hessian_bsr_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
+        const enum smesh::PrimitiveType values_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,

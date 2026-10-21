@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <memory>
 #include <vector>
 
@@ -268,11 +269,29 @@ int test_device_matches_host() {
     for (const bool capped : {false, true}) {
         std::vector<real_t> values(graph->nnz() * 9, 0);
         auto                dvalues = to_device(values);
-        host.add_curvature(x.data(), r.data(), k.data(), capped, 1, graph->rowptr()->data(), graph->colidx()->data(), values.data());
-        device.add_curvature(dx->data(), dr->data(), dk->data(), capped, 1, dgraph_rowptr->data(), dgraph_colidx->data(), dvalues->data());
+        host.add_curvature(
+                x.data(), r.data(), k.data(), capped, 1, graph->rowptr()->data(), graph->colidx()->data(), smesh::SMESH_DEFAULT, values.data());
+        device.add_curvature(
+                dx->data(), dr->data(), dk->data(), capped, 1, dgraph_rowptr->data(), dgraph_colidx->data(), smesh::SMESH_DEFAULT, dvalues->data());
         const real_t c = worst(values, host_copy(dvalues->data(), values.size()));
         printf("  curvature (capped %d) %.3g\n", (int)capped, (double)c);
         SFEM_TEST_ASSERT(c < 1e-12);
+#if !SFEM_REAL_T_IS_FLOAT32
+        // Into a tangent stored in single precision: the host's double values, rounded.
+        auto hsingle = sfem::create_host_buffer<float>(values.size());
+        std::fill(hsingle->data(), hsingle->data() + values.size(), 0.f);
+        auto dsingle = smesh::to_device(hsingle);
+        device.add_curvature(
+                dx->data(), dr->data(), dk->data(), capped, 1, dgraph_rowptr->data(), dgraph_colidx->data(), smesh::SMESH_FLOAT32, dsingle->data());
+        auto   single = smesh::to_host(dsingle);
+        real_t vmax = 0, verr = 0;
+        for (size_t i = 0; i < values.size(); ++i) {
+            vmax = std::max(vmax, std::abs(values[i]));
+            verr = std::max(verr, std::abs(real_t(single->data()[i]) - values[i]));
+        }
+        printf("  curvature into single precision %.3g\n", (double)(verr / vmax));
+        SFEM_TEST_ASSERT(vmax > 0 && verr <= std::numeric_limits<float>::epsilon() * vmax);
+#endif
     }
 
     std::vector<real_t> field(ndofs);

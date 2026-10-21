@@ -107,7 +107,8 @@ namespace sfem {
         }
 
         if (impl.is_bsr()) {
-            impl.tangent = BSRTangent::create(f, es);
+            impl.tangent = BSRTangent::create(f, es, options.storage_bytes);
+            if (!impl.tangent) return nullptr;
         } else if (options.format == op_type::MATRIX_FREE ||
                    (options.format == op_type::INEXACT && !f->inexact_supported())) {
             // Reads the iterate the Newton loop handed to `Function::update`; built once.
@@ -134,7 +135,7 @@ namespace sfem {
 
         if (impl.tangent) {
             if (impl.tangent->assemble(x) != SFEM_SUCCESS) return SFEM_FAILURE;
-            impl.op = impl.tangent->op(impl.options.storage_bytes);
+            impl.op = impl.tangent->op();
             if (impl.jacobi && impl.tangent->diagonal(impl.diag->data()) != SFEM_SUCCESS) return SFEM_FAILURE;
         } else {
             if (impl.options.format == op_type::INEXACT && impl.f->inexact_supported()) {

@@ -728,13 +728,13 @@ __host__ __device__ __forceinline__ void neohookean_ogden_tet4_hessian_a_msoa_fi
   }
 }
 
-template <typename s_t>
+template <typename s_t, typename v_t>
 __host__ __device__ __forceinline__ void neohookean_ogden_tet4_hessian_a_msoa_scatter_bsr(
     const idx_t *const RSTR ev,
     const s_t *const RSTR element_matrix,
     const count_t *const RSTR rowptr,
     const idx_t *const RSTR colidx,
-    s_t *const RSTR values) {
+    v_t *const RSTR values) {
   static constexpr int NC = 3;
   static constexpr int NS = 4;
   count_t entries[NS * NS];
@@ -751,19 +751,19 @@ __host__ __device__ __forceinline__ void neohookean_ogden_tet4_hessian_a_msoa_sc
   }
   for (int i = 0; i < NS; ++i) {
     for (int j = 0; j < NS; ++j) {
-      s_t *const block = &values[entries[i * NS + j] * NC * NC];
+      v_t *const block = &values[entries[i * NS + j] * NC * NC];
       for (int bi = 0; bi < NC; ++bi) {
         const int row = bi * NS + i;
         for (int bj = 0; bj < NC; ++bj) {
           const int col = bj * NS + j;
-          atomicAdd(&(block[bi * NC + bj]), element_matrix[row * (NC * NS) + col]);
+          atomicAdd(&(block[bi * NC + bj]), v_t(element_matrix[row * (NC * NS) + col]));
         }
       }
     }
   }
 }
 
-template <typename s_t, typename g_t, int FORMAT>
+template <typename s_t, typename v_t, typename g_t, int FORMAT>
 __global__ void neohookean_ogden_tet4_hessian_a_msoa_assemble_impl(
     const ptrdiff_t nelements,
     const ptrdiff_t,
@@ -786,7 +786,7 @@ __global__ void neohookean_ogden_tet4_hessian_a_msoa_assemble_impl(
     const s_t *const RSTR uz,
     const count_t *const RSTR rowptr,
     const idx_t *const RSTR colidx,
-    s_t *const RSTR values,
+    v_t *const RSTR values,
     const int *const RSTR,
     const ptrdiff_t,
     const ptrdiff_t,
@@ -852,6 +852,7 @@ __global__ void neohookean_ogden_tet4_hessian_a_msoa_assemble_impl(
 
 extern "C" int cu_neohookean_ogden_tet4_hessian_bsr_a_msoa(
         const int scalar_bytes,
+        const int values_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -878,21 +879,42 @@ extern "C" int cu_neohookean_ogden_tet4_hessian_bsr_a_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        if (nelements <= 0) return SFEM_SUCCESS;
-        const int block_size = 256;
-        const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::neohookean_ogden_tet4_hessian_a_msoa_assemble_impl<double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, rowptr, colidx, (double *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
-        return sfem::codegen::launch_status("neohookean_ogden_tet4_hessian_a_msoa_assemble_impl");
+      switch (values_bytes) {
+        case (int)sizeof(double): {
+            if (nelements <= 0) return SFEM_SUCCESS;
+            const int block_size = 256;
+            const int grid_size = (int)((nelements + block_size - 1) / block_size);
+            sfem::codegen::neohookean_ogden_tet4_hessian_a_msoa_assemble_impl<double, double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, rowptr, colidx, (double *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+            return sfem::codegen::launch_status("neohookean_ogden_tet4_hessian_a_msoa_assemble_impl");
+        }
+        case (int)sizeof(float): {
+            if (nelements <= 0) return SFEM_SUCCESS;
+            const int block_size = 256;
+            const int grid_size = (int)((nelements + block_size - 1) / block_size);
+            sfem::codegen::neohookean_ogden_tet4_hessian_a_msoa_assemble_impl<double, float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, rowptr, colidx, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+            return sfem::codegen::launch_status("neohookean_ogden_tet4_hessian_a_msoa_assemble_impl");
+        }
+        default:
+          break;
+      }
+      break;
     }
     case (int)sizeof(float): {
-        if (nelements <= 0) return SFEM_SUCCESS;
-        const int block_size = 256;
-        const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::neohookean_ogden_tet4_hessian_a_msoa_assemble_impl<float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, rowptr, colidx, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
-        return sfem::codegen::launch_status("neohookean_ogden_tet4_hessian_a_msoa_assemble_impl");
+      switch (values_bytes) {
+        case (int)sizeof(float): {
+            if (nelements <= 0) return SFEM_SUCCESS;
+            const int block_size = 256;
+            const int grid_size = (int)((nelements + block_size - 1) / block_size);
+            sfem::codegen::neohookean_ogden_tet4_hessian_a_msoa_assemble_impl<float, float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, rowptr, colidx, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+            return sfem::codegen::launch_status("neohookean_ogden_tet4_hessian_a_msoa_assemble_impl");
+        }
+        default:
+          break;
+      }
+      break;
     }
     default:
       break;
   }
-  return sfem::codegen::unsupported_dispatch("neohookean_ogden_tet4_hessian_bsr_a_msoa", -1, (int)scalar_bytes);
+  return sfem::codegen::unsupported_values_dispatch("neohookean_ogden_tet4_hessian_bsr_a_msoa", (int)scalar_bytes, (int)values_bytes);
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "sfem_base.hpp"
+#include "smesh_types.hpp"
 
 namespace sfem {
 
@@ -18,14 +19,16 @@ namespace sfem {
                                          real_t *const        values);
 
     /// The same for BSR, where the diagonal of the `bs x bs` block on the
-    /// diagonal takes one mass entry per component.
+    /// diagonal takes one mass entry per component; values of `values_type`
+    /// (sfem_TangentValues.hpp).
     int cu_inertia_potential_hessian_bsr(const ptrdiff_t      n_nodes,
                                          const int            block_size,
                                          const count_t *const rowptr,
                                          const idx_t *const   colidx,
                                          const real_t *const  mass,
                                          const real_t         alpha,
-                                         real_t *const        values);
+                                         const smesh::PrimitiveType values_type,
+                                         void *const          values);
 
     /// The block-diagonal, upper-triangle-packed format.  `alpha * m * I` on
     /// each node's block, so only the packed diagonal entries are touched.

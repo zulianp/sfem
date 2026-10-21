@@ -40,6 +40,7 @@ extern "C" int neohookean_ogden_proteus_hex27_gradient_i_msoa(
 );
 extern "C" int neohookean_ogden_proteus_hex27_hessian_bsr_i_msoa(
         const int scalar_bytes,
+        const int values_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -604,6 +605,7 @@ extern "C" int neohookean_ogden_hex27_gradient_i_msoa(
 
 extern "C" int neohookean_ogden_hex27_hessian_bsr_i_msoa(
         const int scalar_bytes,
+        const int values_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -647,7 +649,7 @@ extern "C" int neohookean_ogden_hex27_hessian_bsr_i_msoa(
         elements[14],
         elements[6]
     };
-    return neohookean_ogden_proteus_hex27_hessian_bsr_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, rowptr, colidx, values);
+    return neohookean_ogden_proteus_hex27_hessian_bsr_i_msoa(scalar_bytes, values_bytes, nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, rowptr, colidx, values);
 }
 
 extern "C" int neohookean_ogden_hex27_objective_steps_i_msoa(

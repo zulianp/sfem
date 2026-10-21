@@ -646,13 +646,13 @@ __host__ __device__ __forceinline__ void vector_mass_tri3_hessian_crs_a_msoa_fin
   }
 }
 
-template <typename s_t>
+template <typename s_t, typename v_t>
 __host__ __device__ __forceinline__ void vector_mass_tri3_hessian_crs_a_msoa_scatter_crs(
     const idx_t *const RSTR ev,
     const s_t *const RSTR element_matrix,
     const count_t *const RSTR rowptr,
     const idx_t *const RSTR colidx,
-    s_t *const RSTR values) {
+    v_t *const RSTR values) {
   static constexpr int NS = 3;
   static constexpr int NC = 2;
   static constexpr int N_COL_STREAMS = 6;
@@ -672,15 +672,15 @@ __host__ __device__ __forceinline__ void vector_mass_tri3_hessian_crs_a_msoa_sca
       const s_t *const RSTR row = &element_matrix[(bi * NS + row_shape) * N_COL_STREAMS];
       for (int bj = 0; bj < NC; ++bj) {
         for (int col_shape = 0; col_shape < NS; ++col_shape) {
-          s_t *const block = &values[entries[row_shape * NS + col_shape] * NC * NC];
-          atomicAdd(&(block[bi * NC + bj]), row[bj * NS + col_shape]);
+          v_t *const block = &values[entries[row_shape * NS + col_shape] * NC * NC];
+          atomicAdd(&(block[bi * NC + bj]), v_t(row[bj * NS + col_shape]));
         }
       }
     }
   }
 }
 
-template <typename s_t>
+template <typename s_t, typename v_t>
 __global__ void vector_mass_tri3_hessian_crs_a_msoa_impl(
     const ptrdiff_t nelements,
     const ptrdiff_t,
@@ -693,7 +693,7 @@ __global__ void vector_mass_tri3_hessian_crs_a_msoa_impl(
     const s_t density,
     const count_t *const RSTR rowptr,
     const idx_t *const RSTR colidx,
-    s_t *const RSTR values
+    v_t *const RSTR values
 ) {
   static constexpr int ND = 2;
   static constexpr int NQ = 3;
@@ -731,6 +731,7 @@ __global__ void vector_mass_tri3_hessian_crs_a_msoa_impl(
 
 extern "C" int cu_vector_mass_tri3_hessian_bsr_a_msoa(
     const int scalar_bytes,
+    const int values_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -747,21 +748,42 @@ extern "C" int cu_vector_mass_tri3_hessian_bsr_a_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-      if (nelements <= 0) return SFEM_SUCCESS;
-      const int block_size = 256;
-      const int grid_size = (int)((nelements + block_size - 1) / block_size);
-      sfem::codegen::vector_mass_tri3_hessian_crs_a_msoa_impl<double><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, density, rowptr, colidx, (double *)values);
-      return sfem::codegen::launch_status("vector_mass_tri3_hessian_crs_a_msoa_impl");
+      switch (values_bytes) {
+        case (int)sizeof(double): {
+          if (nelements <= 0) return SFEM_SUCCESS;
+          const int block_size = 256;
+          const int grid_size = (int)((nelements + block_size - 1) / block_size);
+          sfem::codegen::vector_mass_tri3_hessian_crs_a_msoa_impl<double, double><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, density, rowptr, colidx, (double *)values);
+          return sfem::codegen::launch_status("vector_mass_tri3_hessian_crs_a_msoa_impl");
+        }
+        case (int)sizeof(float): {
+          if (nelements <= 0) return SFEM_SUCCESS;
+          const int block_size = 256;
+          const int grid_size = (int)((nelements + block_size - 1) / block_size);
+          sfem::codegen::vector_mass_tri3_hessian_crs_a_msoa_impl<double, float><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, density, rowptr, colidx, (float *)values);
+          return sfem::codegen::launch_status("vector_mass_tri3_hessian_crs_a_msoa_impl");
+        }
+        default:
+          break;
+      }
+      break;
     }
     case (int)sizeof(float): {
-      if (nelements <= 0) return SFEM_SUCCESS;
-      const int block_size = 256;
-      const int grid_size = (int)((nelements + block_size - 1) / block_size);
-      sfem::codegen::vector_mass_tri3_hessian_crs_a_msoa_impl<float><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, density, rowptr, colidx, (float *)values);
-      return sfem::codegen::launch_status("vector_mass_tri3_hessian_crs_a_msoa_impl");
+      switch (values_bytes) {
+        case (int)sizeof(float): {
+          if (nelements <= 0) return SFEM_SUCCESS;
+          const int block_size = 256;
+          const int grid_size = (int)((nelements + block_size - 1) / block_size);
+          sfem::codegen::vector_mass_tri3_hessian_crs_a_msoa_impl<float, float><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, density, rowptr, colidx, (float *)values);
+          return sfem::codegen::launch_status("vector_mass_tri3_hessian_crs_a_msoa_impl");
+        }
+        default:
+          break;
+      }
+      break;
     }
     default:
       break;
   }
-  return sfem::codegen::unsupported_dispatch("vector_mass_tri3_hessian_bsr_a_msoa", -1, (int)scalar_bytes);
+  return sfem::codegen::unsupported_values_dispatch("vector_mass_tri3_hessian_bsr_a_msoa", (int)scalar_bytes, (int)values_bytes);
 }

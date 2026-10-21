@@ -44,6 +44,7 @@ extern "C" int cu_modified_mooney_rivlin_proteus_hex27_gradient_i_msoa(
 );
 extern "C" int cu_modified_mooney_rivlin_proteus_hex27_hessian_bsr_i_msoa(
         const int scalar_bytes,
+        const int values_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -261,6 +262,7 @@ extern "C" int cu_modified_mooney_rivlin_hex27_gradient_i_msoa(
 
 extern "C" int cu_modified_mooney_rivlin_hex27_hessian_bsr_i_msoa(
         const int scalar_bytes,
+        const int values_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -281,7 +283,7 @@ extern "C" int cu_modified_mooney_rivlin_hex27_hessian_bsr_i_msoa(
     if (cudaMallocAsync((void **)&proteus_elements, 27 * sizeof(idx_t *), (cudaStream_t)stream) != cudaSuccess) return SFEM_FAILURE;
     const ConnectivityOrder<27> proteus_elements_order{{0, 8, 1, 11, 24, 9, 3, 10, 2, 16, 20, 17, 23, 26, 21, 19, 22, 18, 4, 12, 5, 15, 25, 13, 7, 14, 6}};
     permute_connectivity<idx_t, 27><<<1, 27, 0, (cudaStream_t)stream>>>(elements, proteus_elements_order, proteus_elements);
-    const int status = cu_modified_mooney_rivlin_proteus_hex27_hessian_bsr_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, c1, c2, kappa, u_stride, ux, uy, uz, rowptr, colidx, values, stream);
+    const int status = cu_modified_mooney_rivlin_proteus_hex27_hessian_bsr_i_msoa(scalar_bytes, values_bytes, nelements, nnodes, proteus_elements, points, c1, c2, kappa, u_stride, ux, uy, uz, rowptr, colidx, values, stream);
     cudaFreeAsync(proteus_elements, (cudaStream_t)stream);
     return status;
 }

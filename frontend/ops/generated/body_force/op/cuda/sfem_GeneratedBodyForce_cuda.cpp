@@ -769,10 +769,18 @@ namespace sfem {
     return SFEM_SUCCESS;
   }
 
-  int GPUGeneratedBodyForce::hessian_bsr(const real_t *const /*state*/,
+  int GPUGeneratedBodyForce::hessian_bsr(const real_t *const x,
+              const count_t *const rowptr,
+              const idx_t *const colidx,
+              real_t *const values) {
+    return hessian_bsr_typed(x, rowptr, colidx, smesh::SMESH_DEFAULT, values);
+  }
+
+  int GPUGeneratedBodyForce::hessian_bsr_typed(const real_t *const /*state*/,
               const count_t *const /*rowptr*/,
               const idx_t *const /*colidx*/,
-              real_t *const /*values*/) {
+              const enum smesh::PrimitiveType /*values_type*/,
+              void *const /*values*/) {
     SFEM_TRACE_SCOPE("GPUGeneratedBodyForce::hessian_bsr");
     // Linear work: the Jacobian is zero.
     return SFEM_SUCCESS;

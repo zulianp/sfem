@@ -104,9 +104,10 @@ namespace sfem {
                            const real_t *const  k,
                            const bool           capped,
                            const real_t         sign,
-                           const count_t *const rowptr,
-                           const idx_t *const   colidx,
-                           real_t *const        values);
+                           const count_t *const       rowptr,
+                           const idx_t *const         colidx,
+                           const smesh::PrimitiveType values_type,
+                           void *const                values);
 
         // -mu_i n_i at the contact nodes, with mu_i of the last kkt_residual, zero elsewhere: the
         // residual's part that is the obstacle's reaction.

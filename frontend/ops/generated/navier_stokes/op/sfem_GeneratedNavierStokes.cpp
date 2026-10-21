@@ -812,10 +812,18 @@ namespace sfem {
     return SFEM_FAILURE;
   }
 
-  int GeneratedNavierStokes::hessian_bsr(const real_t *const /*state*/,
+  int GeneratedNavierStokes::hessian_bsr(const real_t *const x,
+              const count_t *const rowptr,
+              const idx_t *const colidx,
+              real_t *const values) {
+    return hessian_bsr_typed(x, rowptr, colidx, smesh::SMESH_DEFAULT, values);
+  }
+
+  int GeneratedNavierStokes::hessian_bsr_typed(const real_t *const /*state*/,
               const count_t *const /*rowptr*/,
               const idx_t *const /*colidx*/,
-              real_t *const /*values*/) {
+              const enum smesh::PrimitiveType /*values_type*/,
+              void *const /*values*/) {
     SFEM_TRACE_SCOPE("GeneratedNavierStokes::hessian_bsr");
     return SFEM_FAILURE;
   }

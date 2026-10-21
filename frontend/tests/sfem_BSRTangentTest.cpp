@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -36,7 +37,7 @@ int test_diagonal_and_row_sums() {
     const int            bs    = tangent->block_size();
     const count_t *const rowptr = tangent->rowptr();
     const idx_t *const   colidx = tangent->colidx();
-    real_t *const        vals   = tangent->values();
+    real_t *const        vals   = static_cast<real_t *>(tangent->values());
 
     std::vector<real_t> diag(nrows * bs);
     SFEM_TEST_ASSERT(tangent->diagonal(diag.data()) == SFEM_SUCCESS);
@@ -105,6 +106,69 @@ int test_operator() {
     }
     SFEM_TEST_ASSERT(error <= 1e-10 * scale);
     return SFEM_TEST_SUCCESS;
+}
+
+// Stored in single precision (storage_bytes 4): assembled so, each entry summed from its element
+// matrices in float, so within float's rounding of the real_t tangent's (the Dirichlet rows exact);
+// the product, diagonal, bound and shift read the floats into real_t.
+int test_single_precision_storage() {
+#if SFEM_REAL_T_IS_FLOAT32
+    return SFEM_TEST_SUCCESS;
+#else
+    auto p = sfem::test::make_cube_problem("GeneratedNeoHookeanOgden", 3, real_t(0.1));
+    deform(p);
+
+    auto full   = sfem::BSRTangent::create(p.f, sfem::EXECUTION_SPACE_HOST);
+    auto single = sfem::BSRTangent::create(p.f, sfem::EXECUTION_SPACE_HOST, 4);
+    SFEM_TEST_ASSERT(full->values_type() == smesh::SMESH_FLOAT64 && single->values_type() == smesh::SMESH_FLOAT32);
+    SFEM_TEST_ASSERT(full->assemble(p.x->data()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(single->assemble(p.x->data()) == SFEM_SUCCESS);
+
+    const ptrdiff_t      nrows   = full->block_rows();
+    const int            bs      = full->block_size();
+    const ptrdiff_t      nvalues = full->rowptr()[nrows] * bs * bs;
+    const real_t *const  v64     = static_cast<const real_t *>(full->values());
+    const float *const   v32     = static_cast<const float *>(single->values());
+    const real_t         eps     = std::numeric_limits<float>::epsilon();
+    real_t               vmax = 0, verr = 0;
+    for (ptrdiff_t k = 0; k < nvalues; ++k) {
+        vmax = std::max(vmax, std::abs(v64[k]));
+        verr = std::max(verr, std::abs(real_t(v32[k]) - v64[k]));
+    }
+    printf("  values: |K32 - K64| / |K64| = %.3g (float eps %.3g)\n", (double)(verr / vmax), (double)eps);
+    SFEM_TEST_ASSERT(verr > 0 && verr <= 32 * eps * vmax);
+
+    const ptrdiff_t     n = p.fs->n_dofs();
+    std::vector<real_t> h(n), y64(n, 0), y32(n, 0);
+    for (ptrdiff_t i = 0; i < n; ++i) h[i] = std::sin(real_t(0.37) * (i + 1));
+    SFEM_TEST_ASSERT(full->op()->apply(h.data(), y64.data()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(single->op()->apply(h.data(), y32.data()) == SFEM_SUCCESS);
+    std::vector<mask_t> mask(mask_count(n), 0);
+    p.f->constraints_mask(mask.data());
+    real_t ymax = 0, yerr = 0;
+    for (ptrdiff_t i = 0; i < n; ++i) {
+        if (mask_get(i, mask.data())) SFEM_TEST_ASSERT(y32[i] == h[i]);
+        ymax = std::max(ymax, std::abs(y64[i]));
+        yerr = std::max(yerr, std::abs(y32[i] - y64[i]));
+    }
+    SFEM_TEST_ASSERT(yerr <= 32 * eps * ymax);
+
+    std::vector<real_t> d64(n), d32(n);
+    SFEM_TEST_ASSERT(full->diagonal(d64.data()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(single->diagonal(d32.data()) == SFEM_SUCCESS);
+    real_t dmax = 0;
+    for (ptrdiff_t i = 0; i < n; ++i) dmax = std::max(dmax, std::abs(d64[i]));
+    for (ptrdiff_t i = 0; i < n; ++i) SFEM_TEST_ASSERT(std::abs(d32[i] - d64[i]) <= 32 * eps * dmax);
+    SFEM_TEST_ASSERT(std::abs(single->max_abs_row_sum() - full->max_abs_row_sum()) <= 32 * eps * full->max_abs_row_sum());
+
+    SFEM_TEST_ASSERT(single->shift_diagonal(real_t(0.5), d64.data()) == SFEM_SUCCESS);
+    std::vector<real_t> shifted(n);
+    SFEM_TEST_ASSERT(single->diagonal(shifted.data()) == SFEM_SUCCESS);
+    for (ptrdiff_t i = 0; i < n; ++i) {
+        SFEM_TEST_ASSERT(std::abs(shifted[i] - (d32[i] + real_t(0.5) * std::abs(d64[i]))) <= 2 * eps * dmax);
+    }
+    return SFEM_TEST_SUCCESS;
+#endif
 }
 
 // On a level-2 semi-structured mesh, in both bases. Micro: the generated operator takes each macro
@@ -255,6 +319,7 @@ int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_diagonal_and_row_sums);
     SFEM_RUN_TEST(test_operator);
+    SFEM_RUN_TEST(test_single_precision_storage);
     SFEM_RUN_TEST(test_semi_structured_mesh);
     SFEM_RUN_TEST(test_semi_structured_mesh_non_affine);
     SFEM_UNIT_TEST_FINALIZE();

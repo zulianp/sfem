@@ -6,6 +6,7 @@
 #include "sfem_Operator.hpp"
 #include "sfem_aliases.hpp"
 #include "sfem_base.hpp"
+#include "smesh_types.hpp"
 
 namespace sfem {
 
@@ -16,9 +17,17 @@ namespace sfem {
     /// The one place a BSR tangent is assembled: its values are allocated once and reassembled in
     /// place at every linearisation, and every other view of it -- the operator a Krylov method
     /// applies, the Jacobi diagonal, the arrays a constraint adds its own share to -- reads them.
+    ///
+    /// `storage_bytes` is the width of a stored value. sizeof(real_t) by default; 4 stores them in
+    /// single precision, assembled so from the element matrices in real_t (each entry rounded as it
+    /// is added), on host and device, which halves the product's traffic; the products, diagonal
+    /// and bounds read them into real_t. 2 assembles them in real_t and the host product reads a
+    /// half-precision copy taken by `op` (host only, one process).
     class BSRTangent final {
     public:
-        static std::shared_ptr<BSRTangent> create(const std::shared_ptr<Function> &f, const ExecutionSpace es);
+        static std::shared_ptr<BSRTangent> create(const std::shared_ptr<Function> &f,
+                                                  const ExecutionSpace             es,
+                                                  const int                        storage_bytes = (int)sizeof(real_t));
         ~BSRTangent();
 
         /// Zero the values and assemble the Hessian of `f` at `x` (null for operators that do not
@@ -26,11 +35,9 @@ namespace sfem {
         int assemble(const real_t *const x);
 
         /// y += K x, its constrained rows the identity (on the host the assembled ones; on the
-        /// device the constrained dofs of y replaced by those of x). With `storage_bytes` below
-        /// sizeof(real_t) the values are stored in half or single precision: a copy of the values
-        /// as last assembled, so it is taken again after each `assemble`. Reduced storage is host
-        /// only.
-        std::shared_ptr<Operator<real_t>> op(const int storage_bytes = (int)sizeof(real_t)) const;
+        /// device the constrained dofs of y replaced by those of x). With storage_bytes 2 it reads
+        /// a copy of the values as last assembled, so it is taken again after each `assemble`.
+        std::shared_ptr<Operator<real_t>> op() const;
 
         /// The scalar diagonal, block_rows() * block_size() entries.
         int diagonal(real_t *const out) const;
@@ -47,11 +54,16 @@ namespace sfem {
         int            block_size() const;
         const count_t *rowptr() const;
         const idx_t   *colidx() const;
-        real_t        *values();
-        ExecutionSpace execution_space() const;
+        /// The values, of `values_type()` (sfem_TangentValues.hpp).
+        void                *values();
+        smesh::PrimitiveType values_type() const;
+        ExecutionSpace       execution_space() const;
 
     private:
         BSRTangent();
+
+        template <typename V>
+        std::shared_ptr<Operator<real_t>> op(const SharedBuffer<V> &stored) const;
 
         class Impl;
         std::unique_ptr<Impl> impl_;

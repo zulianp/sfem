@@ -904,6 +904,8 @@ namespace sfem {
                 obstacle.qp_rtol   = read<real_t>(qp, "rtol", obstacle.qp_rtol);
                 obstacle.qp_accept_capped = read<bool>(qp, "accept_capped", obstacle.qp_accept_capped);
                 obstacle.curvature = read<bool>(child(config.root(), "obstacle"), "curvature", obstacle.curvature);
+                // The step's tangent, as an unconstrained step's.
+                obstacle.storage_bytes = linear.storage_bytes;
                 step               = NodeObstacleStep::create(f, contact, newmark, obstacle);
             } else if (ssmgc_step) {
                 SSMGCStepOptions options;
