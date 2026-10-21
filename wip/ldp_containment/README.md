@@ -25,4 +25,6 @@ All runs on Alps GH200 (account c40, debug partition), build `build-cuda` of the
 | `newton.csv` | Newton residuals and QP iterations of the `host_1x72` runs | their `run.log` |
 | `utopia.csv` | utopia's timers (`summary.8.0.csv` next to each utopia case): 8 ranks, machine not recorded | copied |
 | `coordinates.csv` | coordinate ranges of the valve meshes (their float32 spacing) | the runs' `mesh/` |
+| `precision.csv`, `precision_runs.csv` | FF200 and FP70 cases in `host_16x18`, `gpu_1` and `gpu_4` with `solver.linear.storage_bytes` 8 and 4, alternating per repeat, 3 repeats each, build of commit 3edccac01 | `bench.sbatch.sh` once per repeat and precision (`LDP_REPEATS=1`, `LDP_SET`), collected by `python/collect.py` per precision: jobs 5109111, 5109112, 5109116 in `$SCRATCH/ldp_f32ab`; `storage_bytes` column added, repeats numbered in run order |
+| `precision_agreement.csv` | last displacement of every such run against the same configuration's first double run | `outcmp.py` on `$SCRATCH/ldp_f32ab/cmp` |
 | `machine.txt` | node, CPU, GPU, driver, compilers, MPI | job `ldp-machine` on a debug node |

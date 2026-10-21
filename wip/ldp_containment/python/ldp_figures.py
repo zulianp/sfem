@@ -12,6 +12,11 @@ Inputs (../data, copied from the jobs that produced them; README.md names the jo
   newton.csv              Newton residuals and QP iterations of the 1 x 72 runs
   utopia.csv              utopia's own timers (summary.8.0.csv), 8 ranks, machine unknown
   coordinates.csv         the meshes' coordinate ranges (their float32 resolution)
+  precision.csv, precision_runs.csv
+                          the tangent in double and in single precision (storage_bytes 8, 4),
+                          alternating per repeat on one node, same columns as summary/runs
+  precision_agreement.csv each such run's last displacement against the same configuration's
+                          first double run
   machine.txt             the node and the software, key=value
 
 Usage:
@@ -56,6 +61,12 @@ CONFIGS = [
     ("gpu_4", "1", "4 GPUs", "GpuFour"),
     ("gpu_4", "2", "4 GPUs", "GpuFourTwo"),
     ("gpu_8", "2", "8 GPUs", "GpuEight"),
+]
+# The configurations of the precision comparison: (config, label, macro key).
+PRECISION_CONFIGS = [
+    ("host_16x18", r"$16\times18$", "HostSixteen"),
+    ("gpu_1", "1 GPU", "GpuOne"),
+    ("gpu_4", "4 GPUs", "GpuFour"),
 ]
 COLORS = ["LdpA", "LdpB", "LdpC", "LdpD"]
 QP_CAP = 15000
@@ -140,6 +151,22 @@ def float32_ulp(x):
     return 2.0 ** (math.frexp(f)[1] - 24)
 
 
+def precision_index(rows):
+    """(case, config, storage_bytes) -> row, failing on a missing or duplicated one."""
+    index = {}
+    for r in rows:
+        key = (r["case"], r["config"], r["storage_bytes"])
+        if key in index:
+            sys.exit("ldp_figures: %s appears twice in precision.csv" % (key,))
+        index[key] = r
+    for case, _, _ in CASES:
+        for config, _, _ in PRECISION_CONFIGS:
+            for b in ("8", "4"):
+                if (case, config, b) not in index:
+                    sys.exit("ldp_figures: precision.csv has no %s %s in %s bytes" % (case, config, b))
+    return index
+
+
 def per_iteration(r):
     return float(r["qp_per_iteration_median"])
 
@@ -152,7 +179,8 @@ def solve_time(r):
 # Macros
 # ---------------------------------------------------------------------------------------------
 
-def macros(index, runs, agreement, ab, kkt, newton, utopia, coords, machine):
+def macros(index, runs, agreement, ab, kkt, newton, utopia, coords, machine, precision, precision_runs,
+           precision_agreement):
     out = [PREAMBLE]
     m = lambda name, value: out.append(macro(name, value))
 
@@ -306,6 +334,59 @@ def macros(index, runs, agreement, ab, kkt, newton, utopia, coords, machine):
     threads = [ratio(c, ("host_4x72", "1"), ("host_16x18", "1")) for c, _, _ in CASES]
     m("hostThreadsMin", num(min(threads), 2))
     m("hostThreadsMax", num(max(threads), 2))
+
+    # The tangent in single precision against double, per configuration
+    m("precisionRuns", integer(len(precision_runs)))
+    if any(r["rc"] != "0" for r in precision_runs):
+        sys.exit("ldp_figures: a precision run failed")
+    gains = {}
+    for case, _, _ in CASES:
+        for config, _, _ in PRECISION_CONFIGS:
+            d, s = precision[(case, config, "8")], precision[(case, config, "4")]
+            if d["newton"] != s["newton"]:
+                sys.exit("ldp_figures: %s %s takes %s Newton steps in double, %s in single"
+                         % (case, config, d["newton"], s["newton"]))
+            gains[(case, config)] = 1 - per_iteration(s) / per_iteration(d)
+    m("singleMax", num(100 * max(gains.values()), 2))
+    one_gpu = [gains[(c, "gpu_1")] for c, _, _ in CASES]
+    m("singleGpuOneMin", num(100 * min(one_gpu), 2))
+    m("singleGpuOneMax", num(100 * max(one_gpu), 2))
+    refined = "FF200_mesh_refined"
+    m("solveDoubleFFfGpuOne", num(solve_time(precision[(refined, "gpu_1", "8")]), 3))
+    m("solveSingleFFfGpuOne", num(solve_time(precision[(refined, "gpu_1", "4")]), 3))
+    m("singleRefinedGrace", num(100 * gains[(refined, "host_16x18")], 2))
+    m("singleRefinedFour", num(100 * gains[(refined, "gpu_4")], 2))
+    # Elsewhere (several ranks on the smaller cases) the change, negative where single is faster.
+    small = [-gains[(c, k)] for c, _, _ in CASES for k, _, _ in PRECISION_CONFIGS if k != "gpu_1" and c != refined]
+    m("singleSmallMin", num(100 * min(small), 2))
+    m("singleSmallMax", num(100 * max(small), 2))
+    # QP iterations: the change of the median between precisions against the spread between the
+    # repeats of double; the text claims the former stays inside the latter.
+    its = {}
+    for r in precision_runs:
+        its.setdefault((r["case"], r["config"], r["storage_bytes"]), []).append(int(r["qp_iterations"]))
+    changes, spreads = [], []
+    for case, _, _ in CASES:
+        for config, _, _ in PRECISION_CONFIGS:
+            d, s = its[(case, config, "8")], its[(case, config, "4")]
+            change = abs(statistics.median(s) / statistics.median(d) - 1)
+            spread = (max(d) - min(d)) / min(d)
+            if change > spread:
+                sys.exit("ldp_figures: %s %s: single changes the QP iterations by more than double's spread"
+                         % (case, config))
+            changes.append(change)
+            spreads.append(spread)
+    m("singleQpChange", num(100 * max(changes), 2))
+    m("doubleQpSpread", num(100 * max(spreads), 3))
+    # Displacements: single against double, and double against itself, in the same configuration
+    rel = lambda r: float(r["max_du"]) / float(r["max_u"])
+    for group, cases in (("", converged), ("Unconverged", unconverged)):
+        if not cases:
+            continue
+        single = [rel(r) for r in precision_agreement if r["case"] in cases and r["storage_bytes"] == "4"]
+        double = [rel(r) for r in precision_agreement if r["case"] in cases and r["storage_bytes"] == "8"]
+        m("agreeSingle" + group, num(max(single), 2))
+        m("agreeDouble" + group, num(max(double), 2))
     return "".join(out)
 
 
@@ -370,6 +451,25 @@ def table_performance(index):
             r = index[(case, config, nodes)]
             cells += [integer(per_iteration(r)), num(solve_time(r), 3)]
         lines.append("%s & %s & %s \\\\" % (nodes, label, " & ".join(cells)))
+    lines += [r"\bottomrule", r"\end{tabular}"]
+    return "\n".join(lines) + "\n"
+
+
+def table_precision(precision):
+    lines = [PREAMBLE,
+             r"\begin{tabular}{@{}llrrrrr@{}}", r"\toprule",
+             r" & & \multicolumn{3}{c}{\si{\micro\second} per QP iteration} & \multicolumn{2}{c}{Solve (\si{\second})} \\",
+             r"\cmidrule(lr){3-5}\cmidrule(l){6-7}",
+             r"Case & Configuration & double & single & change & double & single \\", r"\midrule"]
+    for i, (case, label, _) in enumerate(CASES):
+        if i:
+            lines.append(r"\addlinespace")
+        for j, (config, clabel, _) in enumerate(PRECISION_CONFIGS):
+            d, s = precision[(case, config, "8")], precision[(case, config, "4")]
+            lines.append("%s & %s & %s & %s & \\num{%.1f}\\%% & %s & %s \\\\" % (
+                label if j == 0 else "", clabel, integer(per_iteration(d)), integer(per_iteration(s)),
+                100 * (per_iteration(s) / per_iteration(d) - 1),
+                num(solve_time(d), 3), num(solve_time(s), 3)))
     lines += [r"\bottomrule", r"\end{tabular}"]
     return "\n".join(lines) + "\n"
 
@@ -451,15 +551,18 @@ def generate(out, tables):
     index = summary_index(summary)
     runs = read_csv("runs.csv")
     utopia = read_csv("utopia.csv")
+    precision = precision_index(read_csv("precision.csv"))
     write(os.path.join(out, "ldp_macros.tex"),
           macros(index, runs, read_csv("agreement.csv"), read_csv("ab.csv"), read_csv("kkt.csv"),
-                 read_csv("newton.csv"), utopia, read_csv("coordinates.csv"), read_machine()))
+                 read_csv("newton.csv"), utopia, read_csv("coordinates.csv"), read_machine(),
+                 precision, read_csv("precision_runs.csv"), read_csv("precision_agreement.csv")))
     write(os.path.join(out, "ldp_colors.tex"), colors())
     write(os.path.join(out, "per_iteration.tex"), figure_per_iteration(index))
     write(os.path.join(out, "breakdown.tex"), figure_breakdown(index, "FF200_mesh_refined"))
     write(os.path.join(tables, "cases.tex"), table_cases(index, utopia))
     write(os.path.join(tables, "accuracy.tex"), table_accuracy(read_csv("ab.csv"), read_csv("kkt.csv")))
     write(os.path.join(tables, "performance.tex"), table_performance(index))
+    write(os.path.join(tables, "precision.tex"), table_precision(precision))
 
 
 def selftest():
@@ -487,6 +590,10 @@ def selftest():
         assert r["qp_per_iteration_median"], r
     assert len(read_csv("agreement.csv")) == len(CASES) * (len(CONFIGS) - 1)
     assert {r["case"] for r in read_csv("ab.csv")} == set(CASE_LABEL)
+    precision_index(read_csv("precision.csv"))
+    assert len(read_csv("precision_runs.csv")) == len(CASES) * len(PRECISION_CONFIGS) * 2 * 3
+    # Per configuration: double's repeats 2 and 3 and single's 1 to 3 against double's first.
+    assert len(read_csv("precision_agreement.csv")) == len(CASES) * len(PRECISION_CONFIGS) * 5
     print("ldp_figures selftest passed")
 
 
