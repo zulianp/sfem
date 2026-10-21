@@ -209,7 +209,7 @@ def solve_time(r):
 # ---------------------------------------------------------------------------------------------
 
 def macros(index, runs, agreement, ab, kkt, newton, utopia, coords, machine, precision, precision_runs,
-           precision_agreement, nccl, nccl_runs):
+           precision_agreement, nccl, nccl_runs, omp_regions):
     out = [PREAMBLE]
     m = lambda name, value: out.append(macro(name, value))
 
@@ -269,7 +269,12 @@ def macros(index, runs, agreement, ab, kkt, newton, utopia, coords, machine, pre
     capped = [r for r in newton if int(r["qp_iterations"]) >= QP_CAP]
     m("qpCap", integer(QP_CAP))
     m("qpCapped", integer(len(capped)))
-    m("qpCappedCases", ", ".join(sorted({CASE_LABEL[r["case"]] for r in capped})) or "none")
+    # What the single-process runs' QP solves do at the cap, as a clause.
+    if capped:
+        m("qpCappedClause", "%s QP solves stop at the iteration cap (%s); the Newton iteration continues "
+          "from the capped increment" % (integer(len(capped)), ", ".join(sorted({CASE_LABEL[r["case"]] for r in capped}))))
+    else:
+        m("qpCappedClause", "no QP solve reaches the iteration cap of %s" % integer(QP_CAP))
 
     # Agreement between configurations (last displacement, against 1 x 72): the converged cases,
     # and apart the ones whose Newton budget ends first, whose state depends on where each inexact
@@ -351,9 +356,20 @@ def macros(index, runs, agreement, ab, kkt, newton, utopia, coords, machine, pre
     m("itBestMax", integer(max(bests)))
     m("gpuOverGraceMin", num(min(gains), 2))
     m("gpuOverGraceMax", num(max(gains), 2))
-    one_gpu = [CASE_LABEL[c] for c, _, _ in CASES
-               if min(CONFIGS, key=lambda k: solve_time(index[(c, k[0], k[1])]))[0] == "gpu_1"]
+    fastest = {c: min(CONFIGS, key=lambda k: solve_time(index[(c, k[0], k[1])])) for c, _, _ in CASES}
+    one_gpu = [CASE_LABEL[c] for c, _, _ in CASES if fastest[c][0] == "gpu_1"]
     m("oneGpuBestCases", listing(one_gpu) or "none")
+    # The other cases and their fastest configuration, as a clause.
+    others = [(CASE_LABEL[c], fastest[c][2] + (" on 2 nodes" if fastest[c][1] == "2" else ""))
+              for c, _, _ in CASES if fastest[c][0] != "gpu_1"]
+    if not others:
+        sys.exit("ldp_figures: one GPU is the fastest everywhere: the text says otherwise")
+    m("bestElsewhere", ("on %s it is %s" if len(others) == 1 else "on %s the fastest are %s")
+      % (listing(o for o, _ in others), listing(b for _, b in others)))
+    # The abstract: one GPU on all but the largest mesh, several GPUs on the largest.
+    largest = max(CASES, key=lambda c: int(index[(c[0], CONFIGS[0][0], CONFIGS[0][1])]["dofs"]))[0]
+    if [c for c, _, _ in CASES if fastest[c][0] != "gpu_1"] != [largest] or not fastest[largest][0].startswith("gpu"):
+        sys.exit("ldp_figures: the fastest configurations no longer fit the abstract's sentence")
     ratio = lambda case, a, b: per_iteration(index[(case,) + a]) / per_iteration(index[(case,) + b])
     internode = [ratio(c, ("gpu_4", "2"), ("gpu_4", "1")) for c, _, _ in CASES]
     m("gpuInternodeMin", num(min(internode), 3))
@@ -363,6 +379,25 @@ def macros(index, runs, agreement, ab, kkt, newton, utopia, coords, machine, pre
     threads = [ratio(c, ("host_4x72", "1"), ("host_16x18", "1")) for c, _, _ in CASES]
     m("hostThreadsMin", num(min(threads), 2))
     m("hostThreadsMax", num(max(threads), 2))
+    # OpenMP's fork and join on Grace: an empty region with 72 and with 18 threads per rank, the
+    # regions a QP iteration opens, and what they add to FF200's iteration on 4x72 over 16x18,
+    # which the text says is most of the difference.
+    region = {(r["ranks"], r["threads"]): float(r["empty_us"]) for r in omp_regions if r["kind"] == "cost"}
+    for r in omp_regions:
+        if r["kind"] == "cost" and abs(float(r["sweep_us"]) / float(r["empty_us"]) - 1) > 0.25:
+            sys.exit("ldp_figures: a pass over a rank's unknowns no longer costs about an empty region")
+    count = [r for r in omp_regions if r["kind"] == "count"]
+    per_it = int(count[0]["regions"]) / int(count[0]["qp_iterations"])
+    added = per_it * (region[("4", "72")] - region[("16", "18")])
+    gap = per_iteration(index[("FF200_ExodusMesh", "host_4x72", "1")]) - per_iteration(index[("FF200_ExodusMesh", "host_16x18", "1")])
+    if not gap / 2 < added <= gap:
+        sys.exit("ldp_figures: fork and join add %.0f us of FF200's %.0f us between 4x72 and 16x18: "
+                 "the text says most of it" % (added, gap))
+    m("regionCostWide", num(region[("4", "72")], 2))
+    m("regionCostNarrow", num(region[("16", "18")], 2))
+    m("regionsPerIteration", num(per_it, 2))
+    m("regionAddedFFc", integer(added))
+    m("hostGapFFc", integer(gap))
 
     # The tangent in single precision against double, per configuration
     m("precisionRuns", integer(len(precision_runs)))
@@ -390,23 +425,27 @@ def macros(index, runs, agreement, ab, kkt, newton, utopia, coords, machine, pre
     m("singleSmallMin", num(100 * min(small), 2))
     m("singleSmallMax", num(100 * max(small), 2))
     # QP iterations: the change of the median between precisions against the spread between the
-    # repeats of double; the text claims the former stays inside the latter.
+    # repeats of double, per configuration; the text names the configurations where the change is
+    # the larger, and by how much.
     its = {}
     for r in precision_runs:
         its.setdefault((r["case"], r["config"], r["storage_bytes"]), []).append(int(r["qp_iterations"]))
-    changes, spreads = [], []
+    changes, excess = [], []
     for case, _, _ in CASES:
         for config, _, _ in PRECISION_CONFIGS:
             d, s = its[(case, config, "8")], its[(case, config, "4")]
             change = abs(statistics.median(s) / statistics.median(d) - 1)
             spread = (max(d) - min(d)) / min(d)
-            if change > spread:
-                sys.exit("ldp_figures: %s %s: single changes the QP iterations by more than double's spread"
-                         % (case, config))
             changes.append(change)
-            spreads.append(spread)
+            if change > spread:
+                excess.append(change - spread)
+    if not excess:
+        sys.exit("ldp_figures: single changes the QP iterations within double's spread everywhere: "
+                 "the text says otherwise")
     m("singleQpChange", num(100 * max(changes), 2))
-    m("doubleQpSpread", num(100 * max(spreads), 3))
+    m("singleQpConfigs", integer(len(changes)))
+    m("singleQpOutside", integer(len(excess)))
+    m("singleQpExcess", num(100 * max(excess), 2))
     # Displacements: single against double, and double against itself, in the same configuration
     rel = lambda r: float(r["max_du"]) / float(r["max_u"])
     for group, cases in (("", converged), ("Unconverged", unconverged)):
@@ -644,7 +683,7 @@ def generate(out, tables):
           macros(index, runs, read_csv("agreement.csv"), read_csv("ab.csv"), read_csv("kkt.csv"),
                  read_csv("newton.csv"), utopia, read_csv("coordinates.csv"), read_machine(),
                  precision, read_csv("precision_runs.csv"), read_csv("precision_agreement.csv"),
-                 nccl, read_csv("nccl_runs.csv")))
+                 nccl, read_csv("nccl_runs.csv"), read_csv("omp_regions.csv")))
     write(os.path.join(out, "ldp_colors.tex"), colors())
     write(os.path.join(out, "per_iteration.tex"), figure_per_iteration(index))
     write(os.path.join(out, "breakdown.tex"), figure_breakdown(index, "FF200_mesh_refined"))

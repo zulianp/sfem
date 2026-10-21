@@ -57,8 +57,8 @@ single implementation. On four industrial meshes with \dofsMin{} to \dofsMax{} d
 freedom, all host and device configurations produce the same converged displacement to a
 relative \agreeParallel{}, and the converged solutions have a KKT residual \kktRatioMin{} to
 \kktRatioMax{} times smaller than the production solver they replace. The QP iteration is
-latency bound at these sizes: one GPU is the fastest configuration on the smaller meshes, and
-several GPUs on the larger ones. Storing the tangent in single precision lowers the cost per QP
+latency bound at these sizes: one GPU is the fastest configuration on all but the largest mesh,
+and several GPUs on the largest. Storing the tangent in single precision lowers the cost per QP
 iteration by up to \singleMax\% and changes the solution less than repeated runs do.
 \end{abstract}
 
@@ -155,7 +155,9 @@ largest feasible step, the second the four norms and inner products of the gradi
 decide the next step. The minimum travels with the sums in one reduction through a user-defined
 MPI operation, so an iteration synchronises at two global reductions and one ghost exchange. On
 the GPU each pass reduces per thread block and finishes in a second kernel, which fixes the
-summation order.
+summation order. The scaled operator $D^{-1/2}KD^{-1/2}$ takes three passes: on each side of the
+product with the assembled tangent, the scaling and the rotation into or out of the frames are one
+pass over all nodes, and the product overwrites its output, so no vector is zeroed before it.
 
 \paragraph{Devices.} One rank drives one GPU. The device exchange packs, sends and unpacks device
 buffers with GPU-aware MPI. Ranks are bound to GPUs before MPI is initialised, from the launcher's
@@ -239,17 +241,19 @@ the time to solution. The QP accounts for at least \qpShareFFf\% of the solve ti
 in every configuration (Figure~\ref{fig:breakdown}), so the cost per QP iteration determines the
 time to solution.
 
-\paragraph{GPUs.} One GPU is the fastest configuration on \oneGpuBestCases{}; on FP70 and FF200
-refined the fastest are \bestFPf{} and \bestFFf{}. Per case, the fastest GPU configuration solves
+\paragraph{GPUs.} One GPU is the fastest configuration on \oneGpuBestCases{}; \bestElsewhere{}. Per case, the fastest GPU configuration solves
 \gpuOverGraceMin{} to \gpuOverGraceMax{} times faster than the fastest Grace configuration. Four
 GPUs on two nodes cost \gpuInternodeMin{} to \gpuInternodeMax{} times as much per QP iteration as
 four GPUs on one node: crossing the network adds no measurable cost at these message sizes.
 
 \paragraph{Grace.} At equal core count, $16\times18$ is \hostThreadsMin{} to \hostThreadsMax{}
 times faster per iteration than $4\times72$, and $4\times72$ on one node is slower than
-$1\times72$ on \fourSlowerThanOneCases{}. The difference lies outside the ghost exchange, in the fused
-passes and the reductions; we attribute it to the fork and join of \machineCores{} threads around
-passes over few unknowns per rank, an attribution this study does not isolate.
+$1\times72$ on \fourSlowerThanOneCases{}. The difference is OpenMP's fork and join: on Grace an
+empty parallel region costs \regionCostWide\,\si{\micro\second} with \machineCores{} threads per rank
+and \regionCostNarrow\,\si{\micro\second} with 18, as much as a pass over a rank's unknowns, and a QP
+iteration opens \regionsPerIteration{} regions, which add \regionAddedFFc{} of the
+\hostGapFFc\,\si{\micro\second} by which FF200's iteration on $4\times72$ exceeds that on
+$16\times18$.
 
 \paragraph{Latency.} The cheapest iteration of each case costs \itBestMin{} to
 \itBestMax\,\si{\micro\second}, while the work per iteration grows \dofsRatio-fold from the smallest
@@ -269,14 +273,14 @@ assembled in this format directly, without a copy in double; the operator applic
 values into double and accumulates in double, and the vectors and the QP stay in double. This
 halves the bytes of matrix values each operator application reads. Table~\ref{tab:precision}
 compares the two precisions on one node in \precisionRuns{} runs that alternate between them per
-repeat. The build is later than that of Table~\ref{tab:performance}, with MPRGP's step decisions
-taken on the GPU, so its double columns are the reference. Single precision lowers the cost per QP
+repeat, with the build of Table~\ref{tab:performance}. Single precision lowers the cost per QP
 iteration by \singleGpuOneMin{} to \singleGpuOneMax\% on one GPU, and on FF200 refined by
 \singleRefinedGrace\% on $16\times18$ and \singleRefinedFour\% on four GPUs; there one GPU solves in
 \solveSingleFFfGpuOne{} instead of \solveDoubleFFfGpuOne\,\si{\second}. With several ranks on the
 smaller cases the change lies between \singleSmallMin{} and \singleSmallMax\%. The Newton step
-counts are unchanged, and the median QP iteration count changes by at most \singleQpChange\%,
-within the spread of up to \doubleQpSpread\% between repeats in double. In the same configuration
+counts are unchanged, and the median QP iteration count changes by at most \singleQpChange\%; in
+\singleQpOutside{} of \singleQpConfigs{} configurations that is more than the spread between the
+three double repeats, by at most \singleQpExcess{} percentage points. In the same configuration
 the final displacement in single precision differs from the first double run by at most a
 relative \agreeSingle{} on \convergedCases{}, while the double repeats differ from each other by
 up to \agreeDouble{}; on \unconvergedCases{} the two figures are \agreeSingleUnconverged{} and
@@ -293,8 +297,9 @@ the same. On one node NCCL lowers the cost per QP iteration by \ncclOneGainMin{}
 \ncclOneGainMax\%, but its set-up costs \ncclCostMin{} to \ncclCostMax\,\si{\second} once per
 process, most of it in calls to the GPU driver, and the time to solution
 grows by \ncclExtraMin{} to \ncclExtraMax\,\si{\second} on every case: the option repays its
-set-up from about \ncclBreakEven{} QP iterations. On two nodes the change per iteration is a loss of
-\ncclTwoPerNodeLossMin{} to \ncclTwoPerNodeLossMax\% with two GPUs per node and a gain of \ncclEightGainMin{} to \ncclEightGainMax\% with four. The option
+set-up from about \ncclBreakEven{} QP iterations. On two nodes the time per iteration changes by
+\ncclTwoPerNodeChangeMin{} to \ncclTwoPerNodeChangeMax\% with two GPUs per node and falls by
+\ncclEightGainMin{} to \ncclEightGainMax\% with four. The option
 is off by default.
 
 \begin{table*}
@@ -314,14 +319,13 @@ time to solution, median of \benchRepeats{} runs each.}
 \input{tables/precision}
 \end{table}
 
-\begin{table}
+\begin{table*}
 \caption{Communication within a node by MPI and by NCCL: cost per QP iteration and time to
 solution (set-up and solve), median of \benchRepeats{} runs each.}
 \label{tab:nccl}
 \small
-\setlength{\tabcolsep}{3.5pt}
 \input{tables/nccl}
-\end{table}
+\end{table*}
 
 \begin{figure*}
 \centering
@@ -332,8 +336,7 @@ solution (set-up and solve), median of \benchRepeats{} runs each.}
 
 \section{Limitations}
 
-In the single-process runs \qpCapped{} QP solves stop at the iteration cap
-(\qpCappedCases{}); the Newton iteration continues from the capped increment. The Newton budget
+In the single-process runs \qpCappedClause{}. The Newton budget
 of \unconvergedCases{} ends before the KKT tolerance is reached. The comparison with utopia samples
 the distance field trilinearly for both states, so penetrations below the grid's interpolation
 error are not resolved. All measurements are on one system; utopia was not rerun on it.
