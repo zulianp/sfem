@@ -96,12 +96,6 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
 
-        // y <- v .* y through qp_tmp (the BLAS takes no aliased arguments).
-        void multiply(const SharedBuffer<real_t> &v, real_t *const y) {
-            blas->xypaz(ndofs, v->data(), y, 0, qp_tmp->data());
-            blas->copy(ndofs, qp_tmp->data(), y);
-        }
-
         int solve_qp(const real_t *const r) {
             if (update_scaling() != SFEM_SUCCESS) return SFEM_FAILURE;
             // Gershgorin's bound for S K S: the scale is one per contact node, so it commutes with
@@ -111,13 +105,10 @@ namespace sfem {
             // The constrained rows are the identity: their right-hand side and start are the
             // increment the step arrived with.
             f->copy_constrained_dofs(lift->data(), qp_rhs->data());
-            contact->to_frame(qp_rhs->data());
-            blas->copy(ndofs, lift->data(), framed->data());
-            contact->to_frame(framed->data());
-            multiply(scale, qp_rhs->data());
-            multiply(inverse_scale, framed->data());
+            contact->to_frame(scale->data(), qp_rhs->data(), qp_rhs->data());
+            contact->to_frame(inverse_scale->data(), lift->data(), framed->data());
+            // framed is the scaled step in the frames (solve() takes it back).
             const int status = qp->apply(qp_rhs->data(), framed->data());
-            multiply(scale, framed->data());
             iterations += qp->iterations();
             return status;
         }
@@ -187,8 +178,9 @@ namespace sfem {
 
         // The step in the contact nodes' frames, Q^T K Q dx' = -Q^T R with dx'_n <= gap_i: the
         // constraints hold exactly at every iterate.
-        // The QP is the step's, so it reads the step's state through `self`. MPRGP zeros the
-        // output before every product, which the frames then turn whole: out = Q^T K Q in.
+        // The QP is the step's, so it reads the step's state through `self`. Each sweep writes its
+        // output whole (the tangent's product overwrites, tangent_op), so MPRGP need not zero it:
+        // out = Q^T K Q in, three sweeps.
         Impl *const self   = &impl;
         auto        framed = create_buffer<real_t>(impl.ndofs, es);
         // Under MPI the owned rows, as the tangent's product computes them.
@@ -200,17 +192,15 @@ namespace sfem {
                 impl.ndofs,
                 impl.ndofs,
                 [self, framed](const real_t *const in, real_t *const out) {
-                    // scale Q^T K Q scale: out (zero, from MPRGP) += scale .* (Q^T K Q (scale .* in)).
+                    // scale Q^T K Q scale: out = scale .* (Q^T K Q (scale .* in)).
                     real_t *const tmp = self->qp_tmp->data();
-                    self->blas->xypaz(self->ndofs, self->scale->data(), in, 0, framed->data());
-                    self->contact->from_frame(framed->data());
-                    self->blas->zeros(self->ndofs, tmp);
+                    self->contact->from_frame(self->scale->data(), in, framed->data());
                     self->tangent_op->apply(framed->data(), tmp);
-                    self->contact->to_frame(tmp);
-                    self->blas->xypaz(self->ndofs, self->scale->data(), tmp, 1, out);
+                    self->contact->to_frame(self->scale->data(), tmp, out);
                 },
                 es);
         impl.qp             = create_mprgp<real_t>(op, es);
+        impl.qp->set_op_overwrites(true);
         impl.qp->verbose    = false;
         impl.qp->check_each = std::numeric_limits<int>::max();
         impl.qp->set_max_it(options.qp_max_it);
@@ -274,7 +264,8 @@ namespace sfem {
 
         auto &impl = *impl_;
         if (impl.tangent->assemble(x) != SFEM_SUCCESS) return SFEM_FAILURE;
-        impl.tangent_op = impl.tangent->op();
+        // y = K x: the QP's product writes tmp whole.
+        impl.tangent_op = impl.tangent->op(0);
         if (impl.options.curvature) {
             impl.contact->add_curvature(
                     x, r, impl.k->data(), false, 1, impl.tangent->rowptr(), impl.tangent->colidx(), impl.tangent->values_type(), impl.tangent->values());
@@ -320,8 +311,7 @@ namespace sfem {
             }
         }
 
-        impl.blas->copy(impl.ndofs, impl.framed->data(), dx);
-        impl.contact->from_frame(dx);
+        impl.contact->from_frame(impl.scale->data(), impl.framed->data(), dx);
         // MPRGP's recurrences leave rounding in the identity rows of the constrained dofs.
         impl.f->copy_constrained_dofs(impl.lift->data(), dx);
         return status;

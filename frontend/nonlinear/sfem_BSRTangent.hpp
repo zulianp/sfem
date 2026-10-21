@@ -37,7 +37,8 @@ namespace sfem {
         /// y += K x, its constrained rows the identity (on the host the assembled ones; on the
         /// device the constrained dofs of y replaced by those of x). With storage_bytes 2 it reads
         /// a copy of the values as last assembled, so it is taken again after each `assemble`.
-        std::shared_ptr<Operator<real_t>> op() const;
+        /// More generally y = scale_output y + K x: with 0, y = K x and y's old values are not read.
+        std::shared_ptr<Operator<real_t>> op(const real_t scale_output = 1) const;
 
         /// The scalar diagonal, block_rows() * block_size() entries.
         int diagonal(real_t *const out) const;
@@ -63,7 +64,7 @@ namespace sfem {
         BSRTangent();
 
         template <typename V>
-        std::shared_ptr<Operator<real_t>> op(const SharedBuffer<V> &stored) const;
+        std::shared_ptr<Operator<real_t>> op(const SharedBuffer<V> &stored, const real_t scale_output) const;
 
         class Impl;
         std::unique_ptr<Impl> impl_;

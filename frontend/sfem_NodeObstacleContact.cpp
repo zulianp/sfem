@@ -16,6 +16,8 @@ namespace sfem {
         c.es   = es_;
         c.size = size();
         c.idx  = idx_->data();
+        c.n_nodes  = ndofs_ / 3;
+        c.frame_of = frame_of_->data();
         for (int d = 0; d < 3; ++d) c.normals[d] = normals->data() + d * size();
         for (int k = 0; k < 6; ++k) c.curvature[k] = curvature_->data() + k * size();
         c.gap    = gap->data();
@@ -36,9 +38,13 @@ namespace sfem {
         obstacle_ = SDFObstacle::create(sdf, comm, points->extent(1), points->data()[2], es);
 
         for (int d = 0; d < 3; ++d) xyz_[d] = points->data()[d];
+        frame_of_ = create_host_buffer<idx_t>(ndofs / 3);
+        std::fill(frame_of_->data(), frame_of_->data() + ndofs / 3, idx_t(-1));
+        for (ptrdiff_t i = 0; i < (ptrdiff_t)nodes->size(); ++i) frame_of_->data()[nodes->data()[i]] = (idx_t)i;
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
-            idx_ = smesh::to_device(nodes);
+            idx_      = smesh::to_device(nodes);
+            frame_of_ = smesh::to_device(frame_of_);
             for (int d = 0; d < 3; ++d) {
                 point_rows_.push_back(smesh::to_device(Buffer<geom_t>::wrap(points->extent(1), points->data()[d])));
                 xyz_[d] = point_rows_.back()->data();
@@ -97,9 +103,13 @@ namespace sfem {
         update(x);
     }
 
-    void NodeObstacleContact::to_frame(real_t *const v) const { node_obstacle_to_frame(view(normals_, gap_), v); }
+    void NodeObstacleContact::to_frame(const real_t *const s, const real_t *const in, real_t *const out) const {
+        node_obstacle_to_frame(view(normals_, gap_), s, in, out);
+    }
 
-    void NodeObstacleContact::from_frame(real_t *const v) const { node_obstacle_from_frame(view(normals_, gap_), v); }
+    void NodeObstacleContact::from_frame(const real_t *const s, const real_t *const in, real_t *const out) const {
+        node_obstacle_from_frame(view(normals_, gap_), s, in, out);
+    }
 
     void NodeObstacleContact::upper_bound(const real_t unbounded, real_t *const ub) const {
         node_obstacle_upper_bound(view(normals_, gap_), ndofs_, unbounded, ub);

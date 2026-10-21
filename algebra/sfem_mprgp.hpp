@@ -56,6 +56,9 @@ namespace sfem {
         SharedBuffer<T> norm_weight_;
 
         std::function<void(const T* const, T* const)> apply_op;
+        // Whether apply_op writes y = A x whole rather than adding to y: then y is not zeroed
+        // before each product.
+        bool op_overwrites_{false};
 
         std::shared_ptr<BLAS<T>> blas;
         MPRGP_Tpl<T> impl;
@@ -126,6 +129,13 @@ namespace sfem {
         void set_upper_bound(const SharedBuffer<T>& ub) { upper_bound_ = ub; }
         void set_lower_bound(const SharedBuffer<T>& lb) { lower_bound_ = lb; }
         void set_norm_weight(const SharedBuffer<T>& w) { norm_weight_ = w; }
+        void set_op_overwrites(const bool val) { op_overwrites_ = val; }
+
+        /// y <- A x.
+        void product(const T* const x, T* const y) {
+            if (!op_overwrites_) this->blas->zeros(n_dofs, y);
+            apply_op(x, y);
+        }
 
         void ensure_power_method() {
             if (!power_method) {
@@ -253,8 +263,7 @@ namespace sfem {
                                 Gradients* const grads) {
             impl.chopped_gradient(n_dofs, lb(), ub(), x, g, gc, eps);
 
-            this->blas->zeros(n_dofs, Agc);
-            apply_op(gc, Agc);
+            product(gc, Agc);
             curvature(x, g, gc, Agc, MPRGP_DECIDE_PROPORTIONING, work);
             this->step(gc, Agc, x, g, p, false, work);
             const MPRGPControl<T>& c = record();
@@ -264,8 +273,7 @@ namespace sfem {
         }
 
         void gradient(const T* const x, const T* const b, T* const g) {
-            this->blas->zeros(n_dofs, g);
-            this->apply_op(x, g);
+            product(x, g);
             this->blas->axpby(n_dofs, -1, b, 1, g);
         }
 
@@ -334,8 +342,7 @@ namespace sfem {
 
             while (!converged) {
                 if (grads.norm_gc <= this->gamma * grads.norm_gf) {
-                    this->blas->zeros(n_dofs, Ap_or_Ag);
-                    this->apply_op(p, Ap_or_Ag);
+                    product(p, Ap_or_Ag);
                     // The decision, the CG step and the next direction p <- gf - beta p, the last
                     // two only where the move is a step; then the record, read once.
                     curvature(x, g, p, Ap_or_Ag, MPRGP_DECIDE_CG, work);

@@ -15,6 +15,9 @@ namespace sfem {
         ExecutionSpace es{EXECUTION_SPACE_HOST};
         ptrdiff_t      size{0};
         const idx_t   *idx{nullptr};
+        // Every node of the vectors (n_nodes, 3 dofs each) to its contact node, -1 if it is none.
+        ptrdiff_t      n_nodes{0};
+        const idx_t   *frame_of{nullptr};
         const real_t  *normals[3]{nullptr, nullptr, nullptr};
         const real_t  *curvature[6]{nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
         const real_t  *gap{nullptr};
@@ -23,8 +26,10 @@ namespace sfem {
     };
 
     void node_obstacle_frames(const NodeObstacleView &c, const int dir);
-    void node_obstacle_to_frame(const NodeObstacleView &c, real_t *const v);
-    void node_obstacle_from_frame(const NodeObstacleView &c, real_t *const v);
+    // Over every node, in one sweep: out <- s .* (Q in) and out <- Q^T (s .* in), Q the frame at
+    // the contact nodes and the identity elsewhere; s per dof, null for none. in may be out.
+    void node_obstacle_to_frame(const NodeObstacleView &c, const real_t *const s, const real_t *const in, real_t *const out);
+    void node_obstacle_from_frame(const NodeObstacleView &c, const real_t *const s, const real_t *const in, real_t *const out);
     void node_obstacle_upper_bound(const NodeObstacleView &c, const ptrdiff_t ndofs, const real_t unbounded, real_t *const ub);
 
     // projected (a copy of the residual) less the reaction, mu kept; complementarity into c and

@@ -28,23 +28,23 @@ namespace sfem {
         }
     }
 
-    void node_obstacle_to_frame(const NodeObstacleView &c, real_t *const v) {
+    void node_obstacle_to_frame(const NodeObstacleView &c, const real_t *const s, const real_t *const in, real_t *const out) {
 #ifdef SFEM_ENABLE_CUDA
-        if (c.es == EXECUTION_SPACE_DEVICE) return d_node_obstacle_to_frame(c, v);
+        if (c.es == EXECUTION_SPACE_DEVICE) return d_node_obstacle_to_frame(c, s, in, out);
 #endif
 #pragma omp parallel for
-        for (ptrdiff_t i = 0; i < c.size; ++i) {
-            ::node_obstacle_to_frame(&c.frames[9 * i], &v[(ptrdiff_t)c.idx[i] * 3]);
+        for (ptrdiff_t node = 0; node < c.n_nodes; ++node) {
+            ::node_obstacle_scaled_to_frame(c.frame_of[node] < 0 ? nullptr : &c.frames[9 * (ptrdiff_t)c.frame_of[node]], s ? &s[node * 3] : nullptr, &in[node * 3], &out[node * 3]);
         }
     }
 
-    void node_obstacle_from_frame(const NodeObstacleView &c, real_t *const v) {
+    void node_obstacle_from_frame(const NodeObstacleView &c, const real_t *const s, const real_t *const in, real_t *const out) {
 #ifdef SFEM_ENABLE_CUDA
-        if (c.es == EXECUTION_SPACE_DEVICE) return d_node_obstacle_from_frame(c, v);
+        if (c.es == EXECUTION_SPACE_DEVICE) return d_node_obstacle_from_frame(c, s, in, out);
 #endif
 #pragma omp parallel for
-        for (ptrdiff_t i = 0; i < c.size; ++i) {
-            ::node_obstacle_from_frame(&c.frames[9 * i], &v[(ptrdiff_t)c.idx[i] * 3]);
+        for (ptrdiff_t node = 0; node < c.n_nodes; ++node) {
+            ::node_obstacle_scaled_from_frame(c.frame_of[node] < 0 ? nullptr : &c.frames[9 * (ptrdiff_t)c.frame_of[node]], s ? &s[node * 3] : nullptr, &in[node * 3], &out[node * 3]);
         }
     }
 

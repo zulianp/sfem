@@ -130,12 +130,12 @@ namespace sfem {
         return impl.f->hessian_bsr(x, impl.graph->rowptr()->data(), impl.graph->colidx()->data(), values_type(), values());
     }
 
-    std::shared_ptr<Operator<real_t>> BSRTangent::op() const {
-        return impl_->visit([&](const auto &stored) { return op(stored); });
+    std::shared_ptr<Operator<real_t>> BSRTangent::op(const real_t scale_output) const {
+        return impl_->visit([&](const auto &stored) { return op(stored, scale_output); });
     }
 
     template <typename V>
-    std::shared_ptr<Operator<real_t>> BSRTangent::op(const SharedBuffer<V> &stored) const {
+    std::shared_ptr<Operator<real_t>> BSRTangent::op(const SharedBuffer<V> &stored, const real_t scale_output) const {
         auto           &impl  = *impl_;
         const ptrdiff_t nrows = impl.graph->n_nodes();
 
@@ -145,7 +145,7 @@ namespace sfem {
             if (impl.es == EXECUTION_SPACE_DEVICE) {
                 if constexpr (std::is_same_v<V, real_t>) {
                     return compose_constraints_op(
-                            impl.f, d_bsr_spmv(rows, nrows, impl.block_size, impl.graph->rowptr(), impl.graph->colidx(), stored, (real_t)1));
+                            impl.f, d_bsr_spmv(rows, nrows, impl.block_size, impl.graph->rowptr(), impl.graph->colidx(), stored, scale_output));
                 } else {
                     // cuSPARSE multiplies no single-precision matrix into real_t vectors: the
                     // library's own kernel, as the distributed product uses.
@@ -158,14 +158,14 @@ namespace sfem {
                                                           nrows * bs,
                                                           [=](const real_t *const x, real_t *const y) {
                                                               d_bsr_spmv_native<count_t, idx_t, V, real_t>(
-                                                                      rows, bs, rowptr->data(), colidx->data(), stored->data(), 1, x, y);
+                                                                      rows, bs, rowptr->data(), colidx->data(), stored->data(), scale_output, x, y);
                                                           },
                                                           EXECUTION_SPACE_DEVICE));
                 }
             }
 #endif
             return h_bsr_spmv<count_t, idx_t, V, real_t>(
-                    rows, nrows, impl.block_size, impl.graph->rowptr(), impl.graph->colidx(), stored, (real_t)1);
+                    rows, nrows, impl.block_size, impl.graph->rowptr(), impl.graph->colidx(), stored, scale_output);
         };
 
         if (impl.distributed) {
@@ -207,7 +207,7 @@ namespace sfem {
                             // touch, so it waits only for what came before the gather.
                             side->wait_for_default();
                             if (space->synchronize_begin(xs, es) != SFEM_SUCCESS) return;
-                            d_bsr_spmv_ranges<count_t, idx_t, V, real_t>(rows, bs, rp, sp, ci, v, 1, x, y, side->stream());
+                            d_bsr_spmv_ranges<count_t, idx_t, V, real_t>(rows, bs, rp, sp, ci, v, scale_output, x, y, side->stream());
                             space->synchronize_end(es);
                             side->join_default();
                             d_bsr_spmv_ranges<count_t, idx_t, V, real_t>(rows, bs, sp, rp + 1, ci, v, 1, x, y);
@@ -237,11 +237,11 @@ namespace sfem {
                                     const ptrdiff_t begin = std::min(rows, (tid - 1) * chunk);
                                     const ptrdiff_t end   = std::min(rows, begin + chunk);
                                     bsr_spmv_ranges<count_t, idx_t, V, real_t>(
-                                            end - begin, bs, bs, rp + begin, sp + begin, ci, v, 1, x, y + begin * bs);
+                                            end - begin, bs, bs, rp + begin, sp + begin, ci, v, scale_output, x, y + begin * bs);
                                 }
                             }
                         } else {
-                            bsr_spmv_ranges<count_t, idx_t, V, real_t>(rows, bs, bs, rp, sp, ci, v, 1, x, y);
+                            bsr_spmv_ranges<count_t, idx_t, V, real_t>(rows, bs, bs, rp, sp, ci, v, scale_output, x, y);
                             space->synchronize_end(es);
                         }
                         bsr_spmv_ranges<count_t, idx_t, V, real_t>(rows, bs, bs, sp, rp + 1, ci, v, 1, x, y);
@@ -256,7 +256,7 @@ namespace sfem {
         // repeat them, once per Krylov iteration.
         if (impl.storage_bytes == 2) {
             return h_bsr_spmv<count_t, idx_t, half_t, real_t>(
-                    nrows, nrows, impl.block_size, impl.graph->rowptr(), impl.graph->colidx(), astype<half_t>(stored), (real_t)1);
+                    nrows, nrows, impl.block_size, impl.graph->rowptr(), impl.graph->colidx(), astype<half_t>(stored), scale_output);
         }
         return product(nrows);
     }

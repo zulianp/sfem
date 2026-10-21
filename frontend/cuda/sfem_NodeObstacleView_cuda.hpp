@@ -8,8 +8,8 @@ namespace sfem {
     // The device side of the NodeObstacleView loops (sfem_NodeObstacleView.hpp): every pointer in
     // the view and every array is device memory.
     void d_node_obstacle_frames(const NodeObstacleView &c, const int dir);
-    void d_node_obstacle_to_frame(const NodeObstacleView &c, real_t *const v);
-    void d_node_obstacle_from_frame(const NodeObstacleView &c, real_t *const v);
+    void d_node_obstacle_to_frame(const NodeObstacleView &c, const real_t *const s, const real_t *const in, real_t *const out);
+    void d_node_obstacle_from_frame(const NodeObstacleView &c, const real_t *const s, const real_t *const in, real_t *const out);
     void d_node_obstacle_upper_bound(const NodeObstacleView &c, const ptrdiff_t ndofs, const real_t unbounded, real_t *const ub);
 
     void d_node_obstacle_offset_gap(const ptrdiff_t      size,
