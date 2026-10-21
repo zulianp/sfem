@@ -2,6 +2,7 @@
 
 extern "C" int linear_kelvin_voigt_total_proteus_hex8_hessian_bsr_i_msoa(
         const int scalar_bytes,
+        const int values_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -151,6 +152,7 @@ extern "C" const sfem::codegen::KernelDiagnostics * linear_kelvin_voigt_total_pr
 
 extern "C" int linear_kelvin_voigt_total_hex8_hessian_bsr_i_msoa(
         const int scalar_bytes,
+        const int values_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -174,7 +176,7 @@ extern "C" int linear_kelvin_voigt_total_hex8_hessian_bsr_i_msoa(
         elements[7],
         elements[6]
     };
-    return linear_kelvin_voigt_total_proteus_hex8_hessian_bsr_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, rowptr, colidx, values);
+    return linear_kelvin_voigt_total_proteus_hex8_hessian_bsr_i_msoa(scalar_bytes, values_bytes, nelements, nnodes, proteus_elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, rowptr, colidx, values);
 }
 
 extern "C" int linear_kelvin_voigt_total_hex8_jacobian_action_i_maos(

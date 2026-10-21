@@ -1031,13 +1031,21 @@ namespace sfem {
               const count_t *const rowptr,
               const idx_t *const colidx,
               real_t *const values) {
+    return hessian_bsr_typed(x, rowptr, colidx, smesh::SMESH_DEFAULT, values);
+  }
+
+  int GeneratedLinearElasticity::hessian_bsr_typed(const real_t *const x,
+              const count_t *const rowptr,
+              const idx_t *const colidx,
+              const enum smesh::PrimitiveType values_type,
+              void *const values) {
     SFEM_TRACE_SCOPE("GeneratedLinearElasticity::hessian_bsr");
     if (check_graph(impl_->bsr_graph, rowptr, colidx, impl_->space->n_dofs() / impl_->space->block_size()) != SFEM_SUCCESS) {
       SFEM_ERROR("GeneratedLinearElasticity::hessian_bsr: the graph is malformed; the assembly kernels assume it is not\n");
       return SFEM_FAILURE;
     }
     if (auto term = time_scheme_term(impl_->time_scheme)) {
-      if (term->hessian_bsr(x, rowptr, colidx, values) != SFEM_SUCCESS) {
+      if (term->hessian_bsr_typed(x, rowptr, colidx, values_type, values) != SFEM_SUCCESS) {
         return SFEM_FAILURE;
       }
     }
@@ -1062,15 +1070,15 @@ namespace sfem {
       const int dim = mesh->spatial_dimension();
       if (dim == 2) {
         if (domain.element_type == smesh::TRI3) {
-          return linear_elasticity_hessian_bsr_2d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), rowptr, colidx, values);
+          return linear_elasticity_hessian_bsr_2d_a_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), rowptr, colidx, values);
         }
-        return linear_elasticity_hessian_bsr_2d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), rowptr, colidx, values);
+        return linear_elasticity_hessian_bsr_2d_i_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), rowptr, colidx, values);
       }
       else if (dim == 3) {
         if (domain.element_type == smesh::TET4) {
-          return linear_elasticity_hessian_bsr_3d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), rowptr, colidx, values);
+          return linear_elasticity_hessian_bsr_3d_a_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), rowptr, colidx, values);
         }
-        return linear_elasticity_hessian_bsr_3d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), rowptr, colidx, values);
+        return linear_elasticity_hessian_bsr_3d_i_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), rowptr, colidx, values);
       }
       SFEM_ERROR("linear_elasticity hessian_bsr does not support spatial dimension %d\n", dim);
       return SFEM_FAILURE;

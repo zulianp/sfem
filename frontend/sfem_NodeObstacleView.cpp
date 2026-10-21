@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include "sfem_BSR.hpp"
+#include "sfem_TangentValues.hpp"
 #include "sfem_node_obstacle_kernels.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
@@ -106,19 +107,26 @@ namespace sfem {
                                      const real_t            sign,
                                      const count_t *const    rowptr,
                                      const idx_t *const      colidx,
-                                     real_t *const           values) {
+                                     const smesh::PrimitiveType values_type,
+                                     void *const             values) {
 #ifdef SFEM_ENABLE_CUDA
-        if (c.es == EXECUTION_SPACE_DEVICE) return d_node_obstacle_curvature_bsr(c, r, k, capped, sign, rowptr, colidx, values);
-#endif
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < c.size; ++i) {
-            const ptrdiff_t node = c.idx[i];
-            real_t          n[3];
-            normal_at(c, i, n);
-            const real_t C[6] = {c.curvature[0][i], c.curvature[1][i], c.curvature[2][i], c.curvature[3][i], c.curvature[4][i], c.curvature[5][i]};
-            real_t *const B   = bsr_diagonal_block(node, rowptr, colidx, 3, values);
-            if (B) ::node_obstacle_curvature(n, C, &r[node * 3], c.gap[i], k[node * 3], capped, sign, B);
+        if (c.es == EXECUTION_SPACE_DEVICE) {
+            d_node_obstacle_curvature_bsr(c, r, k, capped, sign, rowptr, colidx, values_type, values);
+            return;
         }
+#endif
+        with_tangent_values(values_type, values, [&](auto *const v) {
+#pragma omp parallel for
+            for (ptrdiff_t i = 0; i < c.size; ++i) {
+                const ptrdiff_t node = c.idx[i];
+                real_t          n[3];
+                normal_at(c, i, n);
+                const real_t C[6] = {c.curvature[0][i], c.curvature[1][i], c.curvature[2][i], c.curvature[3][i], c.curvature[4][i], c.curvature[5][i]};
+                auto *const  B    = bsr_diagonal_block(node, rowptr, colidx, 3, v);
+                if (B) ::node_obstacle_curvature(n, C, &r[node * 3], c.gap[i], k[node * 3], capped, sign, B);
+            }
+            return SFEM_SUCCESS;
+        });
     }
 
     void node_obstacle_curvature_blocks(const NodeObstacleView &c,

@@ -278,13 +278,15 @@ def _runtime_typed_entry_point(function, params, arguments, body):
     `body(scalar_type, arguments)` spells the call.
     """
     prepared = [param.replace("g_t", "geom_t") for param in params]
-    return runtime_typed_entry_point_lines(
-        function,
-        prepared,
-        lambda scalar_type, _positional: body(
-            scalar_type, cast_arguments(prepared, arguments, scalar_type)
-        ),
-    )
+
+    # With matrix values of their own type (v_t) the body is told it too.
+    def call(scalar_type, _positional, values_type=None):
+        cast = cast_arguments(prepared, arguments, scalar_type, values_type)
+        if values_type is None:
+            return body(scalar_type, cast)
+        return body(scalar_type, cast, values_type)
+
+    return runtime_typed_entry_point_lines(function, prepared, call)
 
 
 def _assert_geometry_plans_agree(emission_plan):
@@ -8637,18 +8639,20 @@ def _scalar_crs_matrix_scatter_lines(function_base, n_shape, assembly=None):
     reduction = _crs_reduction_lines(
         assembly.reduction_policy,
         "%s[entries[i * NS + j]]" % value_stream,
-        "element_matrix[i * NS + j]",
+        "v_t(element_matrix[i * NS + j])",
         "      ",
         "",
     )
     return _crs_find_cols_lines(function_base, n_shape) + [
-        "template <typename s_t>",
+        # The values of their own type v_t: a BSR tangent may be stored in
+        # single precision (runtime_typed_abi.VALUES_TYPE_PARAMETER).
+        "template <typename s_t, typename v_t>",
         "%s void %s_scatter_crs(" % (_function_qualifier(), function_base),
         "    const idx_t *const RSTR ev,",
         "    const s_t *const RSTR element_matrix,",
         "    const count_t *const RSTR %s," % row_pointer,
         "    const idx_t *const RSTR %s," % column_index,
-        "    s_t *const RSTR values) {",
+        "    v_t *const RSTR values) {",
         kernel_constant("NS", n_shape, indent="  "),
         "  count_t entries[NS * NS];",
         "  idx_t ks[NS];",
@@ -8730,14 +8734,14 @@ def _block_scatter_loop_lines(n_shape, n_fields, row_streams, column_streams):
         + col_header
         + [
             "        for (int col_shape = 0; col_shape < NS; ++col_shape) {",
-            "          s_t *const block = "
+            "          v_t *const block = "
             "&values[entries[row_shape * NS + col_shape] * NC * NC];",
         ]
         + [
             line
             for line in _scatter_add_lines(
                 "block[%s * NC + %s]" % (bi, bj),
-                "row[bj * NS + col_shape]",
+                "v_t(row[bj * NS + col_shape])",
                 "          ",
                 "",
             )
@@ -8753,13 +8757,14 @@ def _block_scatter_loop_lines(n_shape, n_fields, row_streams, column_streams):
 
 def _compatible_crs_matrix_scatter_lines(function_base, n_shape, n_fields, row_streams, column_streams):
     return _crs_find_cols_lines(function_base, n_shape) + [
-        "template <typename s_t>",
+        # The values of their own type v_t, as in the scalar scatter.
+        "template <typename s_t, typename v_t>",
         "%s void %s_scatter_crs(" % (_function_qualifier(), function_base),
         "    const idx_t *const RSTR ev,",
         "    const s_t *const RSTR element_matrix,",
         "    const count_t *const RSTR rowptr,",
         "    const idx_t *const RSTR colidx,",
-        "    s_t *const RSTR values) {",
+        "    v_t *const RSTR values) {",
         kernel_constant("NS", n_shape, indent="  "),
         kernel_constant("NC", n_fields, indent="  "),
         kernel_constant("N_COL_STREAMS", len(column_streams), indent="  "),
@@ -8898,10 +8903,25 @@ def _scalar_crs_precision_entry_points(
             )
         )
 
+    def _forward_values(implementation):
+        #: The implementation instantiated on the scalar and the values' type.
+        return lambda scalar_type, arguments, values_type: list(
+            _target().mesh_launch_lines(
+                implementation, "%s, %s" % (scalar_type, values_type), arguments, indent=""
+            )
+        )
+
     if "crs" in matrix_formats:
+        # A CRS matrix stores the scalar.
+        crs_params = [param.replace("v_t", "s_t") for param in params]
         lines.extend(
             _runtime_typed_entry_point(
-                function_base, params, matrix_arguments, _forward(impl)
+                function_base,
+                crs_params,
+                matrix_arguments,
+                lambda scalar_type, arguments: _forward_values(impl)(
+                    scalar_type, arguments, scalar_type
+                ),
             )
         )
     if "bsr" in matrix_formats:
@@ -8910,7 +8930,7 @@ def _scalar_crs_precision_entry_points(
                 function_base.replace("_hessian_crs_", "_hessian_bsr_"),
                 params,
                 matrix_arguments,
-                _forward(impl),
+                _forward_values(impl),
             )
         )
     if "crs" in matrix_formats and "one_pass" in packed_crs_passes:
@@ -9436,7 +9456,9 @@ def _holding_one_element_crs_matrix_assembly_source(
         [
             "const count_t *const RSTR rowptr",
             "const idx_t *const RSTR colidx",
-            "s_t *const RSTR values",
+            # Of their own type: the BSR entry point stores them in v_t, the CRS
+            # one in s_t (_scalar_crs_precision_entry_points).
+            "v_t *const RSTR values",
         ]
     )
 
@@ -9469,7 +9491,7 @@ def _holding_one_element_crs_matrix_assembly_source(
         )
     lines.extend(
         [
-            "template <typename s_t>",
+            "template <typename s_t, typename v_t>",
             _target().mesh_function_line(impl),
         ]
     )

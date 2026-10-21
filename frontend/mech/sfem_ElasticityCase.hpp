@@ -97,6 +97,9 @@ namespace sfem {
     ///                                        # fixed_iterations: true ends the step after max_it
     ///                                        # iterations, its state accepted unconverged
     ///   linear: {type: cg, format: BSR, preconditioner: jacobi, rtol: 1e-3, atol: 1e-14, max_it: 2000}
+    ///                                        # storage_bytes: 4 stores the BSR tangent in single
+    ///                                        # precision, node_sdf's too (8 by default; 2, half,
+    ///                                        # for an unconstrained step on the host)
     /// output:
     ///   path: output
     ///   export_freq: 1

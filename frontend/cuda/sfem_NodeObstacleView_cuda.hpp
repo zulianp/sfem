@@ -35,7 +35,8 @@ namespace sfem {
                                    const real_t              sign,
                                    const count_t *const      rowptr,
                                    const idx_t *const        colidx,
-                                   real_t *const             values);
+                                   const smesh::PrimitiveType values_type,
+                                   void *const               values);
 
     void d_node_obstacle_curvature_blocks(const NodeObstacleView &c,
                                           const real_t *const     r,

@@ -1,6 +1,7 @@
 #include "sfem_NodeObstacleView_cuda.hpp"
 
 #include "sfem_cuda_base.hpp"
+#include "sfem_TangentValues.hpp"
 #include "sfem_cuda_max.hpp"
 #include "sfem_node_obstacle_kernels.hpp"
 
@@ -62,6 +63,7 @@ namespace sfem {
             }
         }
 
+        template <typename V>
         __global__ void curvature_kernel(const NodeObstacleView c,
                                          const real_t *const      r,
                                          const real_t *const      k,
@@ -69,13 +71,13 @@ namespace sfem {
                                          const real_t             sign,
                                          const count_t *const     rowptr,
                                          const idx_t *const       colidx,
-                                         real_t *const            values) {
+                                         V *const                 values) {
             SFEM_NODE_LOOP(i, c.size) {
                 const ptrdiff_t node = c.idx[i];
                 const real_t    n[3] = {c.normals[0][i], c.normals[1][i], c.normals[2][i]};
                 const real_t    C[6] = {c.curvature[0][i], c.curvature[1][i], c.curvature[2][i], c.curvature[3][i], c.curvature[4][i], c.curvature[5][i]};
                 // The node's diagonal block.
-                real_t *B = nullptr;
+                V *B = nullptr;
                 for (count_t kk = rowptr[node]; kk < rowptr[node + 1]; ++kk) {
                     if (colidx[kk] == node) B = &values[kk * 9];
                 }
@@ -168,9 +170,13 @@ namespace sfem {
                                    const real_t              sign,
                                    const count_t *const      rowptr,
                                    const idx_t *const        colidx,
-                                   real_t *const             values) {
-        curvature_kernel<<<blocks_for(c.size), block_size>>>(c, r, k, capped, sign, rowptr, colidx, values);
-        SFEM_DEBUG_SYNCHRONIZE();
+                                   const smesh::PrimitiveType values_type,
+                                   void *const               values) {
+        with_tangent_values(values_type, values, [&](auto *const v) {
+            curvature_kernel<<<blocks_for(c.size), block_size>>>(c, r, k, capped, sign, rowptr, colidx, v);
+            SFEM_DEBUG_SYNCHRONIZE();
+            return SFEM_SUCCESS;
+        });
     }
 
     void d_node_obstacle_curvature_blocks(const NodeObstacleView &c,

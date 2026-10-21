@@ -48,6 +48,17 @@ static SFEM_CODEGEN_HOST_INLINE int unsupported_dispatch(
   return SFEM_FAILURE;
 }
 
+//! Reports matrix values of a width this real type is not stored in.
+static SFEM_CODEGEN_HOST_INLINE int unsupported_values_dispatch(
+    const char *const name,
+    const int real_type,
+    const int values_type) {
+  std::fprintf(stderr,
+      "%s cannot store real type %d in matrix values of type %d\n",
+      name, real_type, values_type);
+  return SFEM_FAILURE;
+}
+
 #ifdef SFEM_CODEGEN_HAS_DEVICE_RUNTIME
 //! Reports a kernel launch that did not start.
 //!

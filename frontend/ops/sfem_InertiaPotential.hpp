@@ -38,6 +38,11 @@ namespace sfem {
                         const count_t *const rowptr,
                         const idx_t *const   colidx,
                         real_t *const        values) override;
+        int hessian_bsr_typed(const real_t *const          x,
+                              const count_t *const         rowptr,
+                              const idx_t *const           colidx,
+                              const smesh::PrimitiveType values_type,
+                              void *const                  values) override;
         int hessian_diag(const real_t *const x, real_t *const values) override;
 
         /// The block-diagonal, upper-triangle-packed format.

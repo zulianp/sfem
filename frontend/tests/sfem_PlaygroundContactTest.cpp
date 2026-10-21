@@ -90,6 +90,45 @@ int test_device_matches_host() {
 }
 #endif
 
+// The drop with the tangent stored in single precision (solver.linear.storage_bytes 4): the
+// material's, the inertia's and the obstacle curvature's shares assembled into floats, on the host
+// and the device. The Newton residual stays in double, so every step converges as in double, and
+// the contact is the same to float's rounding.
+int test_single_precision_tangent() {
+#if SFEM_REAL_T_IS_FLOAT32
+    return SFEM_TEST_SUCCESS;
+#else
+    struct Run {
+        const char *space;
+        int         bytes;
+    };
+    std::vector<Run> runs = {{"host", 8}, {"host", 4}};
+#ifdef SFEM_ENABLE_CUDA
+    runs.push_back({"device", 4});
+#endif
+    std::vector<double> first(runs.size(), -1), impulse(runs.size(), 0);
+    for (size_t k = 0; k < runs.size(); ++k) {
+        const std::string csv = std::string("test_single_precision_tangent_") + runs[k].space + std::to_string(runs[k].bytes) + ".csv";
+        auto pg = assemble(DROP, {"output.history_csv=" + csv, std::string("execution_space=") + runs[k].space,
+                                  "solver.linear.storage_bytes=" + std::to_string(runs[k].bytes)});
+        SFEM_TEST_ASSERT(pg != nullptr);
+        SFEM_TEST_ASSERT(pg->run() == SFEM_SUCCESS);
+        for (auto &row : sfem::test::read_history(csv)) {
+            if (row["status"] < 0) continue;
+            if (row["touched"] > 0 && first[k] < 0) first[k] = row["t"];
+            impulse[k] += row["reaction_z"] * row["dt"];
+        }
+        std::remove(csv.c_str());
+        printf("  %s, %d bytes: contact at %g, impulse %.12g\n", runs[k].space, runs[k].bytes, first[k], impulse[k]);
+    }
+    for (size_t k = 1; k < runs.size(); ++k) {
+        SFEM_TEST_ASSERT(first[k] == first[0]);
+        SFEM_TEST_ASSERT(std::abs(impulse[k] - impulse[0]) <= 1e-6 * std::abs(impulse[0]));
+    }
+    return SFEM_TEST_SUCCESS;
+#endif
+}
+
 // The ssmgc back-end on the same drop, linear and refined: in flight (t < 0.1) the body falls as it
 // does with node_sdf, the two obstacle steps solving the same unconstrained problem.
 int test_ssmgc_free_flight_matches_node_sdf() {
@@ -254,6 +293,7 @@ int test_obstacle_needs_newmark() {
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_block_lands_on_the_hemisphere);
+    SFEM_RUN_TEST(test_single_precision_tangent);
     SFEM_RUN_TEST(test_obstacle_needs_newmark);
     SFEM_RUN_TEST(test_release_from_penetration);
     SFEM_RUN_TEST(test_utopia_scheme);

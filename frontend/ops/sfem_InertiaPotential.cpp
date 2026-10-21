@@ -184,16 +184,24 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    int InertiaPotential::hessian_bsr(const real_t *const,
-                                          const count_t *const SFEM_RESTRICT rowptr,
-                                          const idx_t *const SFEM_RESTRICT   colidx,
-                                          real_t *const SFEM_RESTRICT        values) {
+    int InertiaPotential::hessian_bsr(const real_t *const                x,
+                                      const count_t *const SFEM_RESTRICT rowptr,
+                                      const idx_t *const SFEM_RESTRICT   colidx,
+                                      real_t *const SFEM_RESTRICT        values) {
+        return hessian_bsr_typed(x, rowptr, colidx, smesh::SMESH_DEFAULT, values);
+    }
+
+    int InertiaPotential::hessian_bsr_typed(const real_t *const,
+                                            const count_t *const SFEM_RESTRICT rowptr,
+                                            const idx_t *const SFEM_RESTRICT   colidx,
+                                            const smesh::PrimitiveType         values_type,
+                                            void *const                        values) {
         SFEM_TRACE_SCOPE("InertiaPotential::hessian_bsr");
 
         if (impl_->ensure_state() != SFEM_SUCCESS) {
             return SFEM_FAILURE;
         }
-        if (impl_->consistent) return impl_->consistent->hessian_bsr(nullptr, rowptr, colidx, values);
+        if (impl_->consistent) return impl_->consistent->hessian_bsr_typed(nullptr, rowptr, colidx, values_type, values);
 
         const int           bs      = impl_->space->block_size();
         const ptrdiff_t     n_nodes = impl_->space->n_dofs() / bs;
@@ -203,26 +211,27 @@ namespace sfem {
 
 #ifdef SFEM_ENABLE_CUDA
         if (impl_->es == EXECUTION_SPACE_DEVICE) {
-            return cu_inertia_potential_hessian_bsr(n_nodes, bs, rowptr, colidx, mass, alpha, values);
+            return cu_inertia_potential_hessian_bsr(n_nodes, bs, rowptr, colidx, mass, alpha, values_type, values);
         }
 #endif
 
+        return with_tangent_values(values_type, values, [&](auto *const v) {
 #pragma omp parallel for
-        for (ptrdiff_t node = 0; node < n_nodes; ++node) {
-            const count_t begin = rowptr[node];
-            const count_t end   = rowptr[node + 1];
-            for (count_t k = begin; k < end; ++k) {
-                if (colidx[k] == node) {
-                    real_t *const block = &values[k * bs2];
-                    for (int d = 0; d < bs; ++d) {
-                        block[d * bs + d] += alpha * mass[node * bs + d];
+            for (ptrdiff_t node = 0; node < n_nodes; ++node) {
+                const count_t begin = rowptr[node];
+                const count_t end   = rowptr[node + 1];
+                for (count_t k = begin; k < end; ++k) {
+                    if (colidx[k] == node) {
+                        auto *const block = &v[k * bs2];
+                        for (int d = 0; d < bs; ++d) {
+                            block[d * bs + d] += alpha * mass[node * bs + d];
+                        }
+                        break;
                     }
-                    break;
                 }
             }
-        }
-
-        return SFEM_SUCCESS;
+            return SFEM_SUCCESS;
+        });
     }
 
     int InertiaPotential::hessian_diag(const real_t *const, real_t *const SFEM_RESTRICT values) {

@@ -63,7 +63,9 @@ SFEM_HOST_DEVICE SFEM_INLINE real_t node_obstacle_kkt(const real_t *const n,
 }
 
 // B += sign scale mu H, the constraint's curvature C (6 packed) at a node in contact (mu > 0, gap
-// within mu / k); with `capped` scaled so that its most negative part stays within k / 2.
+// within mu / k); with `capped` scaled so that its most negative part stays within k / 2. B in the
+// tangent's value type, each entry rounded once.
+template <typename B_t>
 SFEM_HOST_DEVICE SFEM_INLINE void node_obstacle_curvature(const real_t *const n,
                                                           const real_t *const C,
                                                           const real_t *const ri,
@@ -71,7 +73,7 @@ SFEM_HOST_DEVICE SFEM_INLINE void node_obstacle_curvature(const real_t *const n,
                                                           const real_t        k,
                                                           const bool          capped,
                                                           const real_t        sign,
-                                                          real_t *const       B) {
+                                                          B_t *const          B) {
     const real_t mu = fmax(real_t(0), -(n[0] * ri[0] + n[1] * ri[1] + n[2] * ri[2]));
     if (mu == 0 || gap > mu / k) return;
 
@@ -88,7 +90,7 @@ SFEM_HOST_DEVICE SFEM_INLINE void node_obstacle_curvature(const real_t *const n,
     const real_t scale = capped && lowest < -k / 2 ? k / (2 * -lowest) : 1;
 
     for (int c = 0; c < 9; ++c) {
-        B[c] += sign * scale * mu * H[c];
+        B[c] = B_t(B[c] + sign * scale * mu * H[c]);
     }
 }
 

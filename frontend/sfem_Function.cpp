@@ -426,10 +426,18 @@ namespace sfem {
                               const count_t *const rowptr,
                               const idx_t *const   colidx,
                               real_t *const        values) {
+        return hessian_bsr(x, rowptr, colidx, smesh::SMESH_DEFAULT, values);
+    }
+
+    int Function::hessian_bsr(const real_t *const          x,
+                              const count_t *const         rowptr,
+                              const idx_t *const           colidx,
+                              const smesh::PrimitiveType values_type,
+                              void *const                  values) {
         SFEM_TRACE_SCOPE("Function::hessian_bsr");
 
         for (auto &op : impl_->ops) {
-            if (op->hessian_bsr(x, rowptr, colidx, values) != SFEM_SUCCESS) {
+            if (op->hessian_bsr_typed(x, rowptr, colidx, values_type, values) != SFEM_SUCCESS) {
                 std::cerr << "Failed hessian_bsr in op: " << op->name() << "\n";
                 return SFEM_FAILURE;
             }
@@ -437,7 +445,7 @@ namespace sfem {
 
         if (impl_->handle_constraints) {
             for (auto &c : impl_->constraints) {
-                c->hessian_bsr(x, rowptr, colidx, values);
+                c->hessian_bsr_typed(x, rowptr, colidx, values_type, values);
             }
         }
 

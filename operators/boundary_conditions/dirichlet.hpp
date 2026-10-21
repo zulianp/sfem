@@ -142,16 +142,46 @@ void crs_constraint_nodes_to_identity_vec(
     real_t *values
     );
 
-void bsr_constraint_nodes_to_identity_vec(const ptrdiff_t n_dirichlet_nodes,
-                                          const idx_t *dirichlet_nodes,
-                                          const int block_size,
-                                          const int component,
-                                          const real_t diag_value,
-                                          const count_t *rowptr,
-                                          const idx_t *colidx,
-                                          real_t *values);
-
 #ifdef __cplusplus
+}
+
+// The rows of `component` at the nodes, of BSR values in the tangent's value type V: diag_value on
+// the diagonal, zero elsewhere.
+template <typename V>
+void bsr_constraint_nodes_to_identity_vec(const ptrdiff_t n_dirichlet_nodes,
+                                          const idx_t    *dirichlet_nodes,
+                                          const int       block_size,
+                                          const int       component,
+                                          const real_t    diag_value,
+                                          const count_t  *rowptr,
+                                          const idx_t    *colidx,
+                                          V              *values) {
+    const int mat_block_size = block_size * block_size;
+    const int b_offset       = component * block_size;
+#pragma omp parallel for
+    for (ptrdiff_t node = 0; node < n_dirichlet_nodes; ++node) {
+        const idx_t i = dirichlet_nodes[node];
+
+        const count_t begin  = rowptr[i];
+        const count_t end    = rowptr[i + 1];
+        const count_t lenrow = end - begin;
+        const idx_t  *cols   = &colidx[begin];
+
+        for (count_t k = 0; k < lenrow; k++) {
+            const idx_t col   = cols[k];
+            V *const    block = &values[(begin + k) * mat_block_size];
+
+            if (col == i) {
+                for (int d = 0; d < block_size; d++) {
+                    block[b_offset + d] = V((d == component) * diag_value);
+                }
+            } else {
+                for (int d = 0; d < block_size; d++) {
+                    block[b_offset + d] = 0;
+                }
+            }
+        }
+    }
 }
 #endif
 #endif //SFEM_DIRICHLET_H

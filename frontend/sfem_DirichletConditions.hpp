@@ -85,6 +85,12 @@ namespace sfem {
                         const idx_t *const   colidx,
                         real_t *const        values) override;
 
+        int hessian_bsr_typed(const real_t *const          x,
+                              const count_t *const         rowptr,
+                              const idx_t *const           colidx,
+                              const smesh::PrimitiveType values_type,
+                              void *const                  values) override;
+
         void add_condition(const ptrdiff_t local_size,
                            const ptrdiff_t global_size,
                            idx_t *const    idx,

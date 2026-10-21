@@ -163,6 +163,7 @@ extern "C" const sfem::codegen::KernelDiagnostics *cu_mooney_rivlin_prony_gradie
 extern "C" int cu_mooney_rivlin_prony_hessian_bsr_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
+        const enum smesh::PrimitiveType values_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,

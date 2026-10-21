@@ -55,19 +55,21 @@ namespace sfem {
             }
         }
 
-        template <typename R, typename C, typename T>
-        __global__ void bsr_shift_diagonal_kernel(const ptrdiff_t              block_rows,
-                                                  const int                    block_size,
-                                                  const R* const SFEM_RESTRICT rowptr,
-                                                  const C* const SFEM_RESTRICT colidx,
-                                                  const T                      factor,
-                                                  const T* const SFEM_RESTRICT reference,
-                                                  T* const SFEM_RESTRICT       values) {
+        template <typename R, typename C, typename TStorage, typename T>
+        __global__ void bsr_shift_diagonal_kernel(const ptrdiff_t               block_rows,
+                                                  const int                     block_size,
+                                                  const R* const SFEM_RESTRICT  rowptr,
+                                                  const C* const SFEM_RESTRICT  colidx,
+                                                  const T                       factor,
+                                                  const T* const SFEM_RESTRICT  reference,
+                                                  TStorage* const SFEM_RESTRICT values) {
             for (ptrdiff_t row = blockIdx.x * blockDim.x + threadIdx.x; row < block_rows; row += blockDim.x * gridDim.x) {
                 for (R k = rowptr[row]; k < rowptr[row + 1]; ++k) {
                     if ((ptrdiff_t)colidx[k] != row) continue;
-                    T* const B = &values[(ptrdiff_t)k * block_size * block_size];
-                    for (int d = 0; d < block_size; ++d) B[d * block_size + d] += factor * fabs(reference[row * block_size + d]);
+                    TStorage* const B = &values[(ptrdiff_t)k * block_size * block_size];
+                    for (int d = 0; d < block_size; ++d) {
+                        B[d * block_size + d] = (TStorage)(B[d * block_size + d] + factor * fabs(reference[row * block_size + d]));
+                    }
                 }
             }
         }
@@ -130,26 +132,6 @@ namespace sfem {
         return d_bsr_spmv_ranges(block_rows, block_size, rowptr, rowptr + 1, colidx, values, scale_output, x, y);
     }
 
-    template int d_bsr_spmv_ranges<count_t, idx_t, real_t, real_t>(const ptrdiff_t,
-                                                                   const int,
-                                                                   const count_t* const SFEM_RESTRICT,
-                                                                   const count_t* const SFEM_RESTRICT,
-                                                                   const idx_t* const SFEM_RESTRICT,
-                                                                   const real_t* const SFEM_RESTRICT,
-                                                                   const real_t,
-                                                                   const real_t* const SFEM_RESTRICT,
-                                                                   real_t* const SFEM_RESTRICT,
-                                                                   void* const);
-
-    template int d_bsr_spmv_native<count_t, idx_t, real_t, real_t>(const ptrdiff_t,
-                                                                   const int,
-                                                                   const count_t* const SFEM_RESTRICT,
-                                                                   const idx_t* const SFEM_RESTRICT,
-                                                                   const real_t* const SFEM_RESTRICT,
-                                                                   const real_t,
-                                                                   const real_t* const SFEM_RESTRICT,
-                                                                   real_t* const SFEM_RESTRICT);
-
     class DeviceSideStream::Impl {
     public:
         cudaStream_t stream{nullptr};
@@ -203,34 +185,20 @@ namespace sfem {
         return ret;
     }
 
-    template <typename R, typename C, typename T>
-    int d_bsr_shift_diagonal(const ptrdiff_t              block_rows,
-                             const int                    block_size,
-                             const R* const SFEM_RESTRICT rowptr,
-                             const C* const SFEM_RESTRICT colidx,
-                             const T                      factor,
-                             const T* const SFEM_RESTRICT reference,
-                             T* const SFEM_RESTRICT       values) {
+    template <typename R, typename C, typename TStorage, typename T>
+    int d_bsr_shift_diagonal(const ptrdiff_t               block_rows,
+                             const int                     block_size,
+                             const R* const SFEM_RESTRICT  rowptr,
+                             const C* const SFEM_RESTRICT  colidx,
+                             const T                       factor,
+                             const T* const SFEM_RESTRICT  reference,
+                             TStorage* const SFEM_RESTRICT values) {
         const int       kernel_block_size = 128;
         const ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (block_rows + kernel_block_size - 1) / kernel_block_size);
-        bsr_shift_diagonal_kernel<R, C, T><<<n_blocks, kernel_block_size, 0>>>(block_rows, block_size, rowptr, colidx, factor, reference, values);
+        bsr_shift_diagonal_kernel<R, C, TStorage, T><<<n_blocks, kernel_block_size, 0>>>(block_rows, block_size, rowptr, colidx, factor, reference, values);
         SFEM_DEBUG_SYNCHRONIZE();
         return SFEM_SUCCESS;
     }
-
-    template real_t d_bsr_max_abs_row_sum<count_t, idx_t, real_t, real_t>(const ptrdiff_t,
-                                                                          const int,
-                                                                          const count_t* const SFEM_RESTRICT,
-                                                                          const idx_t* const SFEM_RESTRICT,
-                                                                          const real_t* const SFEM_RESTRICT,
-                                                                          const real_t* const SFEM_RESTRICT);
-    template int d_bsr_shift_diagonal<count_t, idx_t, real_t>(const ptrdiff_t,
-                                                              const int,
-                                                              const count_t* const SFEM_RESTRICT,
-                                                              const idx_t* const SFEM_RESTRICT,
-                                                              const real_t,
-                                                              const real_t* const SFEM_RESTRICT,
-                                                              real_t* const SFEM_RESTRICT);
 
     template <typename R, typename C, typename TStorage, typename T>
     int d_bsr_extract_diagonal(const ptrdiff_t                     block_rows,
@@ -250,10 +218,50 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    template int d_bsr_extract_diagonal<count_t, idx_t, real_t, real_t>(const ptrdiff_t,
-                                                                        const int,
-                                                                        const count_t* const SFEM_RESTRICT,
-                                                                        const idx_t* const SFEM_RESTRICT,
-                                                                        const real_t* const SFEM_RESTRICT,
-                                                                        real_t* const SFEM_RESTRICT);
+    // The tangent's values in real_t or, assembled in single precision, in float; the vectors in
+    // real_t.
+#define SFEM_D_BSR_INSTANTIATE(TStorage)                                                                                      \
+    template int    d_bsr_spmv_ranges<count_t, idx_t, TStorage, real_t>(const ptrdiff_t,                                     \
+                                                                     const int,                                           \
+                                                                     const count_t* const SFEM_RESTRICT,                  \
+                                                                     const count_t* const SFEM_RESTRICT,                  \
+                                                                     const idx_t* const SFEM_RESTRICT,                    \
+                                                                     const TStorage* const SFEM_RESTRICT,                 \
+                                                                     const real_t,                                        \
+                                                                     const real_t* const SFEM_RESTRICT,                   \
+                                                                     real_t* const SFEM_RESTRICT,                         \
+                                                                     void* const);                                        \
+    template int    d_bsr_spmv_native<count_t, idx_t, TStorage, real_t>(const ptrdiff_t,                                     \
+                                                                     const int,                                           \
+                                                                     const count_t* const SFEM_RESTRICT,                  \
+                                                                     const idx_t* const SFEM_RESTRICT,                    \
+                                                                     const TStorage* const SFEM_RESTRICT,                 \
+                                                                     const real_t,                                        \
+                                                                     const real_t* const SFEM_RESTRICT,                   \
+                                                                     real_t* const SFEM_RESTRICT);                        \
+    template real_t d_bsr_max_abs_row_sum<count_t, idx_t, TStorage, real_t>(const ptrdiff_t,                                 \
+                                                                         const int,                                       \
+                                                                         const count_t* const SFEM_RESTRICT,              \
+                                                                         const idx_t* const SFEM_RESTRICT,                \
+                                                                         const TStorage* const SFEM_RESTRICT,             \
+                                                                         const real_t* const SFEM_RESTRICT);              \
+    template int    d_bsr_shift_diagonal<count_t, idx_t, TStorage, real_t>(const ptrdiff_t,                                  \
+                                                                        const int,                                        \
+                                                                        const count_t* const SFEM_RESTRICT,               \
+                                                                        const idx_t* const SFEM_RESTRICT,                 \
+                                                                        const real_t,                                     \
+                                                                        const real_t* const SFEM_RESTRICT,                \
+                                                                        TStorage* const SFEM_RESTRICT);                   \
+    template int    d_bsr_extract_diagonal<count_t, idx_t, TStorage, real_t>(const ptrdiff_t,                                \
+                                                                          const int,                                      \
+                                                                          const count_t* const SFEM_RESTRICT,             \
+                                                                          const idx_t* const SFEM_RESTRICT,               \
+                                                                          const TStorage* const SFEM_RESTRICT,            \
+                                                                          real_t* const SFEM_RESTRICT);
+
+    SFEM_D_BSR_INSTANTIATE(real_t)
+#if !SFEM_REAL_T_IS_FLOAT32
+    SFEM_D_BSR_INSTANTIATE(float)
+#endif
+#undef SFEM_D_BSR_INSTANTIATE
 }  // namespace sfem

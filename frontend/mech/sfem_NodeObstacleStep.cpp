@@ -164,7 +164,13 @@ namespace sfem {
         impl.blas                              = blas<real_t>(es);
         impl.ndofs                             = f->space()->n_dofs();
         impl.reductions                        = std::make_unique<OwnedReductions>(f->space(), es);
-        impl.tangent                           = BSRTangent::create(f, es);
+        // Its values are changed in place after `op` (the curvature, the shifts), which a copy
+        // taken there would miss: stored in real_t or, assembled so, in float.
+        if (options.storage_bytes != (int)sizeof(real_t) && options.storage_bytes != 4) {
+            SFEM_ERROR("NodeObstacleStep: storage_bytes %d (4 or %d)\n", options.storage_bytes, (int)sizeof(real_t));
+            return nullptr;
+        }
+        impl.tangent = BSRTangent::create(f, es, options.storage_bytes);
         if (!impl.tangent) return nullptr;
 
         for (auto *buffer : {&impl.k, &impl.k_ref, &impl.projected, &impl.upper_bound, &impl.qp_rhs, &impl.framed, &impl.lift, &impl.diag, &impl.trial_r, &impl.qp_tmp}) {
@@ -271,7 +277,7 @@ namespace sfem {
         impl.tangent_op = impl.tangent->op();
         if (impl.options.curvature) {
             impl.contact->add_curvature(
-                    x, r, impl.k->data(), false, 1, impl.tangent->rowptr(), impl.tangent->colidx(), impl.tangent->values());
+                    x, r, impl.k->data(), false, 1, impl.tangent->rowptr(), impl.tangent->colidx(), impl.tangent->values_type(), impl.tangent->values());
         }
         impl.contact->upper_bound(impl.qp->infty, impl.upper_bound->data());
         return SFEM_SUCCESS;
@@ -292,8 +298,8 @@ namespace sfem {
             // reactions and the curvature term can make the tangent indefinite: solve again with
             // it capped.
             if (impl.options.curvature) {
-                impl.contact->add_curvature(x, r, impl.k->data(), false, -1, tangent.rowptr(), tangent.colidx(), tangent.values());
-                impl.contact->add_curvature(x, r, impl.k->data(), true, 1, tangent.rowptr(), tangent.colidx(), tangent.values());
+                impl.contact->add_curvature(x, r, impl.k->data(), false, -1, tangent.rowptr(), tangent.colidx(), tangent.values_type(), tangent.values());
+                impl.contact->add_curvature(x, r, impl.k->data(), true, 1, tangent.rowptr(), tangent.colidx(), tangent.values_type(), tangent.values());
             }
 
             // The material's tangent can be indefinite too (a hyperelastic block under

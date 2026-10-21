@@ -40,6 +40,7 @@ extern "C" int saint_venant_kirchhoff_proteus_hex8_gradient_i_msoa(
 );
 extern "C" int saint_venant_kirchhoff_proteus_hex8_hessian_bsr_i_msoa(
         const int scalar_bytes,
+        const int values_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -566,6 +567,7 @@ extern "C" int saint_venant_kirchhoff_hex8_gradient_i_msoa(
 
 extern "C" int saint_venant_kirchhoff_hex8_hessian_bsr_i_msoa(
         const int scalar_bytes,
+        const int values_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -590,7 +592,7 @@ extern "C" int saint_venant_kirchhoff_hex8_hessian_bsr_i_msoa(
         elements[7],
         elements[6]
     };
-    return saint_venant_kirchhoff_proteus_hex8_hessian_bsr_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, rowptr, colidx, values);
+    return saint_venant_kirchhoff_proteus_hex8_hessian_bsr_i_msoa(scalar_bytes, values_bytes, nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, rowptr, colidx, values);
 }
 
 extern "C" int saint_venant_kirchhoff_hex8_objective_steps_i_msoa(

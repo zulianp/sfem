@@ -1235,11 +1235,11 @@ namespace sfem {
     static inline std::shared_ptr<sfem::Operator<real_t>> hessian_bsr(const std::shared_ptr<sfem::Function> &f,
                                                                const SharedBuffer<real_t>            &x,
                                                                const sfem::ExecutionSpace             es) {
-        auto tangent = sfem::BSRTangent::create(f, es);
-        if (tangent->assemble(x ? x->data() : nullptr) != SFEM_SUCCESS) {
+        auto tangent = sfem::BSRTangent::create(f, es, smesh::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t)));
+        if (!tangent || tangent->assemble(x ? x->data() : nullptr) != SFEM_SUCCESS) {
             return nullptr;
         }
-        return tangent->op(smesh::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t)));
+        return tangent->op();
     }
 
     static inline auto hessian_bcrs_sym(const std::shared_ptr<sfem::Function> &f,

@@ -11,6 +11,7 @@ static_assert((int)smesh::SMESH_FLOAT32 == (int)sizeof(float),
 
 extern "C" int cu_mooney_rivlin_kelvin_voigt_total_tri3_hessian_bsr_a_msoa(
     const int scalar_bytes,
+    const int values_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -37,6 +38,7 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_total_tri3_hessian_bsr_a_msoa(
 );
 extern "C" int cu_mooney_rivlin_kelvin_voigt_total_tet4_hessian_bsr_a_msoa(
     const int scalar_bytes,
+    const int values_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -525,6 +527,7 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_total_tet4_residual_a_msoa(
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_total_hessian_bsr_2d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
+        const enum smesh::PrimitiveType values_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -553,9 +556,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_total_hes
       (real_type == smesh::SMESH_DEFAULT)
           ? smesh::TypeToEnum<real_t>::value()
           : real_type;
+  const enum smesh::PrimitiveType resolved_values_type =
+      (values_type == smesh::SMESH_DEFAULT)
+          ? resolved_real_type
+          : values_type;
   switch (element_type) {
     case smesh::TRI3:
-      return cu_mooney_rivlin_kelvin_voigt_total_tri3_hessian_bsr_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, previous_stride, u0_old, u1_old, rowptr, colidx, values, stream);
+      return cu_mooney_rivlin_kelvin_voigt_total_tri3_hessian_bsr_a_msoa((int)resolved_real_type, (int)resolved_values_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, previous_stride, u0_old, u1_old, rowptr, colidx, values, stream);
     default:
       break;
   }
@@ -566,6 +573,7 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_total_hes
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_total_hessian_bsr_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
+        const enum smesh::PrimitiveType values_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -601,9 +609,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_total_hes
       (real_type == smesh::SMESH_DEFAULT)
           ? smesh::TypeToEnum<real_t>::value()
           : real_type;
+  const enum smesh::PrimitiveType resolved_values_type =
+      (values_type == smesh::SMESH_DEFAULT)
+          ? resolved_real_type
+          : values_type;
   switch (element_type) {
     case smesh::TET4:
-      return cu_mooney_rivlin_kelvin_voigt_total_tet4_hessian_bsr_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, rowptr, colidx, values, stream);
+      return cu_mooney_rivlin_kelvin_voigt_total_tet4_hessian_bsr_a_msoa((int)resolved_real_type, (int)resolved_values_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, rowptr, colidx, values, stream);
     default:
       break;
   }

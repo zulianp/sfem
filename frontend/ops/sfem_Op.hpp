@@ -12,6 +12,7 @@
 #include "sfem_ElementScope.hpp"
 #include "sfem_ForwardDeclarations.hpp"
 #include "sfem_FunctionSpace.hpp"
+#include "sfem_TangentValues.hpp"
 #include "sfem_aliases.hpp"
 #include "sfem_defs.hpp"
 #include "sfem_logger.hpp"
@@ -218,6 +219,21 @@ namespace sfem {
                                 const idx_t *const /*colidx*/,
                                 real_t *const /*values*/) {
             SFEM_ERROR("BSR assembly not implemented for this operator");
+            return SFEM_FAILURE;
+        }
+
+        /// hessian_bsr into values of `values_type` (sfem_TangentValues.hpp): real_t, or float for
+        /// a tangent assembled in single precision. An operator that assembles only real_t
+        /// values takes that type alone.
+        virtual int hessian_bsr_typed(const real_t *const          x,
+                                      const count_t *const         rowptr,
+                                      const idx_t *const           colidx,
+                                      const smesh::PrimitiveType values_type,
+                                      void *const                  values) {
+            if (tangent_values_type(values_type) == smesh::TypeToEnum<real_t>::value()) {
+                return hessian_bsr(x, rowptr, colidx, static_cast<real_t *>(values));
+            }
+            SFEM_ERROR("%s: BSR assembly into single-precision values not implemented\n", name());
             return SFEM_FAILURE;
         }
 

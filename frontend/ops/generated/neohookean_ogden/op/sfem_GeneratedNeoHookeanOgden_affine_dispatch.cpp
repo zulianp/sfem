@@ -388,6 +388,7 @@ extern "C" int neohookean_ogden_tet4_gradient_a_msoa(
 );
 extern "C" int neohookean_ogden_tri3_hessian_bsr_a_msoa(
         const int scalar_bytes,
+        const int values_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -407,6 +408,7 @@ extern "C" int neohookean_ogden_tri3_hessian_bsr_a_msoa(
 );
 extern "C" int neohookean_ogden_tet4_hessian_bsr_a_msoa(
         const int scalar_bytes,
+        const int values_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -1155,6 +1157,7 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neohookean_ogden_gradient_3d_a_msoa(
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neohookean_ogden_hessian_bsr_2d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
+        const enum smesh::PrimitiveType values_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -1176,9 +1179,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neohookean_ogden_hessian_bsr_2d_a_msoa(
       (real_type == smesh::SMESH_DEFAULT)
           ? smesh::TypeToEnum<real_t>::value()
           : real_type;
+  const enum smesh::PrimitiveType resolved_values_type =
+      (values_type == smesh::SMESH_DEFAULT)
+          ? resolved_real_type
+          : values_type;
   switch (element_type) {
     case smesh::TRI3:
-      return neohookean_ogden_tri3_hessian_bsr_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, ux, uy, rowptr, colidx, values);
+      return neohookean_ogden_tri3_hessian_bsr_a_msoa((int)resolved_real_type, (int)resolved_values_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, ux, uy, rowptr, colidx, values);
     default:
       break;
   }
@@ -1189,6 +1196,7 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neohookean_ogden_hessian_bsr_2d_a_msoa(
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neohookean_ogden_hessian_bsr_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
+        const enum smesh::PrimitiveType values_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -1216,9 +1224,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neohookean_ogden_hessian_bsr_3d_a_msoa(
       (real_type == smesh::SMESH_DEFAULT)
           ? smesh::TypeToEnum<real_t>::value()
           : real_type;
+  const enum smesh::PrimitiveType resolved_values_type =
+      (values_type == smesh::SMESH_DEFAULT)
+          ? resolved_real_type
+          : values_type;
   switch (element_type) {
     case smesh::TET4:
-      return neohookean_ogden_tet4_hessian_bsr_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, rowptr, colidx, values);
+      return neohookean_ogden_tet4_hessian_bsr_a_msoa((int)resolved_real_type, (int)resolved_values_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, ux, uy, uz, rowptr, colidx, values);
     default:
       break;
   }

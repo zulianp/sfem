@@ -777,13 +777,13 @@ static SFEM_INLINE void neohookean_ogden_tri6_hessian_i_msoa_find_cols(
   }
 }
 
-template <typename s_t>
+template <typename s_t, typename v_t>
 static SFEM_INLINE void neohookean_ogden_tri6_hessian_i_msoa_scatter_bsr(
     const idx_t *const RSTR ev,
     const s_t *const RSTR element_matrix,
     const count_t *const RSTR rowptr,
     const idx_t *const RSTR colidx,
-    s_t *const RSTR values) {
+    v_t *const RSTR values) {
   static constexpr int NC = 2;
   static constexpr int NS = 6;
   count_t entries[NS * NS];
@@ -800,20 +800,20 @@ static SFEM_INLINE void neohookean_ogden_tri6_hessian_i_msoa_scatter_bsr(
   }
   for (int i = 0; i < NS; ++i) {
     for (int j = 0; j < NS; ++j) {
-      s_t *const block = &values[entries[i * NS + j] * NC * NC];
+      v_t *const block = &values[entries[i * NS + j] * NC * NC];
       for (int bi = 0; bi < NC; ++bi) {
         const int row = bi * NS + i;
         for (int bj = 0; bj < NC; ++bj) {
           const int col = bj * NS + j;
 #pragma omp atomic update
-          block[bi * NC + bj] += element_matrix[row * (NC * NS) + col];
+          block[bi * NC + bj] += v_t(element_matrix[row * (NC * NS) + col]);
         }
       }
     }
   }
 }
 
-template <typename s_t, typename g_t, int FORMAT>
+template <typename s_t, typename v_t, typename g_t, int FORMAT>
 static int neohookean_ogden_tri6_hessian_i_msoa_assemble_impl(
     const ptrdiff_t nelements,
     const ptrdiff_t,
@@ -826,7 +826,7 @@ static int neohookean_ogden_tri6_hessian_i_msoa_assemble_impl(
     const s_t *const RSTR uy,
     const count_t *const RSTR rowptr,
     const idx_t *const RSTR colidx,
-    s_t *const RSTR values,
+    v_t *const RSTR values,
     const int *const RSTR,
     const ptrdiff_t,
     const ptrdiff_t,
@@ -915,6 +915,7 @@ static int neohookean_ogden_tri6_hessian_i_msoa_assemble_impl(
 
 extern "C" int neohookean_ogden_tri6_hessian_bsr_i_msoa(
         const int scalar_bytes,
+        const int values_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -930,13 +931,30 @@ extern "C" int neohookean_ogden_tri6_hessian_bsr_i_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        return sfem::codegen::neohookean_ogden_tri6_hessian_i_msoa_assemble_impl<double, geom_t, 1>(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, rowptr, colidx, (double *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+      switch (values_bytes) {
+        case (int)sizeof(double): {
+            return sfem::codegen::neohookean_ogden_tri6_hessian_i_msoa_assemble_impl<double, double, geom_t, 1>(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, rowptr, colidx, (double *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+        }
+        case (int)sizeof(float): {
+            return sfem::codegen::neohookean_ogden_tri6_hessian_i_msoa_assemble_impl<double, float, geom_t, 1>(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, rowptr, colidx, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+        }
+        default:
+          break;
+      }
+      break;
     }
     case (int)sizeof(float): {
-        return sfem::codegen::neohookean_ogden_tri6_hessian_i_msoa_assemble_impl<float, geom_t, 1>(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, rowptr, colidx, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+      switch (values_bytes) {
+        case (int)sizeof(float): {
+            return sfem::codegen::neohookean_ogden_tri6_hessian_i_msoa_assemble_impl<float, float, geom_t, 1>(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, rowptr, colidx, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+        }
+        default:
+          break;
+      }
+      break;
     }
     default:
       break;
   }
-  return sfem::codegen::unsupported_dispatch("neohookean_ogden_tri6_hessian_bsr_i_msoa", -1, (int)scalar_bytes);
+  return sfem::codegen::unsupported_values_dispatch("neohookean_ogden_tri6_hessian_bsr_i_msoa", (int)scalar_bytes, (int)values_bytes);
 }

@@ -72,14 +72,14 @@ namespace sfem {
                             const T* const SFEM_RESTRICT        scale = nullptr);
 
     /// Device version of `bsr_shift_diagonal`: A_dd += factor |reference_d|.
-    template <typename R, typename C, typename T>
-    int d_bsr_shift_diagonal(const ptrdiff_t              block_rows,
-                             const int                    block_size,
-                             const R* const SFEM_RESTRICT rowptr,
-                             const C* const SFEM_RESTRICT colidx,
-                             const T                      factor,
-                             const T* const SFEM_RESTRICT reference,
-                             T* const SFEM_RESTRICT       values);
+    template <typename R, typename C, typename TStorage, typename T>
+    int d_bsr_shift_diagonal(const ptrdiff_t               block_rows,
+                             const int                     block_size,
+                             const R* const SFEM_RESTRICT  rowptr,
+                             const C* const SFEM_RESTRICT  colidx,
+                             const T                       factor,
+                             const T* const SFEM_RESTRICT  reference,
+                             TStorage* const SFEM_RESTRICT values);
 }  // namespace sfem
 
 #endif  // SFEM_CUDA_BSR_HPP

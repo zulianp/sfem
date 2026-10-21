@@ -3,6 +3,7 @@
 
 #include "sfem_aliases.hpp"
 #include "sfem_base.hpp"
+#include "smesh_types.hpp"
 
 namespace sfem {
 
@@ -35,7 +36,7 @@ namespace sfem {
                            real_t *const           penetration);
 
     // The curvature term (node_obstacle_curvature) added to each contact node's diagonal block of
-    // a BSR matrix.
+    // a BSR matrix, its values of `values_type` (sfem_TangentValues.hpp).
     void node_obstacle_curvature_bsr(const NodeObstacleView &c,
                                      const real_t *const     r,
                                      const real_t *const     k,
@@ -43,7 +44,8 @@ namespace sfem {
                                      const real_t            sign,
                                      const count_t *const    rowptr,
                                      const idx_t *const      colidx,
-                                     real_t *const           values);
+                                     const smesh::PrimitiveType values_type,
+                                     void *const             values);
 
     // The curvature term per contact node, a packed symmetric block [xx, xy, xz, yy, yz, zz]
     // (6 per node, overwritten; zero where the term is).
