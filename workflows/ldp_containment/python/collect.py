@@ -5,15 +5,19 @@ usage: collect.py <results> [<results> ...] [--out=folder]
 
 <results> is a folder bench.sbatch.sh wrote, or a parent of several (one per job): every run
 folder under it with an env.txt is a row of runs.csv. summary.csv has one row per case and
-configuration (and node count): the median, minimum and maximum of each time over the repeats
+configuration (and node count and overrides): the median, minimum and maximum of each time over the repeats
 that succeeded, and the problem's sizes and iteration counts, which do not depend on the repeat.
 
 Columns of runs.csv:
   case, config, kind (host/gpu), nodes, ranks, ranks_per_node, threads, gpus, repeat, job, rc,
   case_yaml_sha                          the case file the run solved (a prefix of its sha256)
+  set                                    the run's --set overrides (LDP_SET)
   elements, dofs, contact_nodes          the problem (global; owned elements and dofs under MPI)
   steps, newton, qp_iterations, final    pseudo-steps, Newton and MPRGP iterations over them, the
                                          last step's |r|/|r0|
+  cutbacks, failed_newton                attempts that failed and were retried with half the step,
+                                         and their Newton iterations (their QP iterations are not
+                                         logged; their time is in solve and qp)
   wall                                   srun to exit, start-up and output included (s)
   setup, solve, qp, linearize, assemble  Playground::create, Stepper::run, the QP solves, the
                                          linearisations, the tangent assemblies (s, rank 0's trace)
@@ -29,6 +33,7 @@ import statistics
 import sys
 
 STEP = re.compile(r"^step \d+ .*?: (\w+), (\d+) Newton iterations?, (\d+) linear, \|r\|/\|r0\| = ([0-9.eE+-]+)")
+FAILED = re.compile(r"^step \d+ .*?: attempt failed, \w+ after (\d+) Newton iterations?")
 PLAYGROUND = re.compile(r"^Playground: .*?, (\d+) elements, (\d+) dofs")
 CONTACT = re.compile(r"^Contact: (\d+) nodes")
 TRACE = {
@@ -41,8 +46,8 @@ TRACE = {
     "exchange_wait": "Exchange::gather_wait",
 }
 KEYS = ["case", "config", "kind", "nodes", "ranks", "ranks_per_node", "threads", "gpus", "repeat", "job", "rc",
-        "case_yaml_sha"]
-SIZES = ["elements", "dofs", "contact_nodes", "steps", "newton", "qp_iterations", "final"]
+        "case_yaml_sha", "set"]
+SIZES = ["elements", "dofs", "contact_nodes", "steps", "newton", "qp_iterations", "final", "cutbacks", "failed_newton"]
 TIMES = ["wall"] + list(TRACE) + ["qp_per_iteration"]
 
 
@@ -57,7 +62,8 @@ def read_env(path):
 
 
 def read_log(path):
-    out = {"elements": "", "dofs": "", "contact_nodes": "", "steps": 0, "newton": 0, "qp_iterations": 0, "final": ""}
+    out = {"elements": "", "dofs": "", "contact_nodes": "", "steps": 0, "newton": 0, "qp_iterations": 0, "final": "",
+           "cutbacks": 0, "failed_newton": 0}
     if not os.path.exists(path):
         return out
     with open(path, errors="replace") as f:
@@ -74,6 +80,10 @@ def read_log(path):
                 out["newton"] += int(m.group(2))
                 out["qp_iterations"] += int(m.group(3))
                 out["final"] = float(m.group(4))
+            m = FAILED.match(line)
+            if m:
+                out["cutbacks"] += 1
+                out["failed_newton"] += int(m.group(1))
     return out
 
 
@@ -108,9 +118,9 @@ def summarise(rows):
     groups = {}
     for r in rows:
         if r["rc"] == "0":
-            groups.setdefault((r["case"], r["config"], r["nodes"]), []).append(r)
+            groups.setdefault((r["case"], r["config"], r["nodes"], r["set"]), []).append(r)
     out = []
-    for (case, config, nodes), rs in sorted(groups.items()):
+    for (case, config, nodes, _), rs in sorted(groups.items()):
         shas = {r["case_yaml_sha"] for r in rs}
         if len(shas) > 1:
             sys.exit("collect.py: the repeats of %s %s on %s node(s) solved different case files %s"
