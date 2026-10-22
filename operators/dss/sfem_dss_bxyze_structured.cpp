@@ -5,7 +5,7 @@
 
 namespace {
 
-constexpr int SFEM_DSS_MAX_LEVEL      = 7;
+constexpr int SFEM_DSS_MAX_LEVEL      = 8;
 constexpr int SFEM_DSS_MAX_N          = SFEM_DSS_MAX_LEVEL + 1;
 constexpr int SFEM_DSS_MAX_FACE_NODES = SFEM_DSS_MAX_N * SFEM_DSS_MAX_N;
 

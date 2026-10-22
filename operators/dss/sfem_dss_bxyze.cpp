@@ -1,5 +1,7 @@
 #include "sfem_dss_bxyze.hpp"
 
+#include <limits>
+
 namespace {
 
 bool valid_shape(const int level, const ptrdiff_t nelements, const int element_block_size) {
@@ -69,6 +71,47 @@ int global_to_bxyze(const int                  level,
 }
 
 }  // namespace
+
+int sfem_dss_bxyze_create_layout(const int                      level,
+                                const ptrdiff_t                nelements,
+                                const int                      element_block_size,
+                                const int                      execution_block_size,
+                                sfem_dss_bxyze_layout_t *const layout) {
+    if (!layout || level < 1 || level == std::numeric_limits<int>::max() || nelements < 0 ||
+        element_block_size <= 0 || execution_block_size <= 0 || execution_block_size > element_block_size) {
+        return SFEM_FAILURE;
+    }
+
+    const ptrdiff_t max_size = std::numeric_limits<ptrdiff_t>::max();
+    const ptrdiff_t n        = (ptrdiff_t)level + 1;
+    if (n > max_size / n || n * n > max_size / n) {
+        return SFEM_FAILURE;
+    }
+
+    const ptrdiff_t n3 = n * n * n;
+    if (n3 > max_size / element_block_size) {
+        return SFEM_FAILURE;
+    }
+
+    const ptrdiff_t block_stride = (ptrdiff_t)element_block_size * n3;
+    const ptrdiff_t nblocks = nelements / element_block_size + (nelements % element_block_size != 0);
+    const int chunks = element_block_size / execution_block_size + (element_block_size % execution_block_size != 0);
+    if (nblocks > max_size / block_stride || nblocks > max_size / chunks) {
+        return SFEM_FAILURE;
+    }
+
+    layout->level                = level;
+    layout->n                    = (int)n;
+    layout->nelements            = nelements;
+    layout->element_block_size   = element_block_size;
+    layout->execution_block_size = execution_block_size;
+    layout->block_stride         = block_stride;
+    layout->execution_stride     = (ptrdiff_t)execution_block_size * n3;
+    layout->nblocks              = nblocks;
+    layout->chunks_per_block     = chunks;
+    layout->ntasks               = nblocks * (ptrdiff_t)chunks;
+    return SFEM_SUCCESS;
+}
 
 ptrdiff_t sfem_dss_bxyze_n_values(const int level, const ptrdiff_t nelements, const int element_block_size) {
     if (!valid_shape(level, nelements, element_block_size)) {

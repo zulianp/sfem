@@ -12,6 +12,9 @@
 
 #ifdef __cplusplus
 #include "sfem_dss_bxyze.hpp"
+#include "sfem_dss_bxyze_geometry.hpp"
+#include "sfem_dss_bxyze_laplacian.hpp"
+#include "sfem_dss_bxyze_spectral_laplacian.hpp"
 #endif
 
 #ifdef __cplusplus
