@@ -7,6 +7,7 @@
 #include <functional>
 #include <memory>
 
+#include "sfem_Team.hpp"
 #include "sfem_fixed_chunks.hpp"
 #include "sfem_mprgp_bounds.hpp"
 #include "sfem_mprgp_control.hpp"
@@ -117,11 +118,6 @@ namespace sfem {
         }
     };
 
-    // Defined in sfem_openmp_blas.hpp, which only an OpenMP translation unit may include; the table
-    // below is built in one (sfem_mprgp.hpp), the CUDA backend only shares MPRGP_Tpl.
-    template <typename T>
-    std::shared_ptr<BLAS<T>> make_openmp_blas();
-
     template <typename T>
     struct OpenMP_MPRGP {
         static void project(const ptrdiff_t n, const T* const lb, const T* const ub, T* const x) {
@@ -150,32 +146,121 @@ namespace sfem {
 
         static MPRGPControl<T>& record(T* const control) { return *reinterpret_cast<MPRGPControl<T>*>(control); }
 
-        /// A pass's four partial sums over the chunks of n fixed by its length (sfem_fixed_chunks.hpp),
-        /// pass(b, e, v) adding entries [b, e) to v, which starts from `init`; each chunk's into
-        /// `part`, then combined in index order: summed, with `min_last` the last the minimum. The
-        /// result does not depend on the number of threads.
-        template <typename F>
-        static void chunked(const ptrdiff_t n, const T (&init)[4], const bool min_last, T* const part, T (&out)[4], F pass) {
-            const ptrdiff_t nc = blas_chunk_count(n);
-            assert(part || nc == 1);
-            for (int k = 0; k < 4; k++) out[k] = init[k];
-            if (nc == 1) {
-                pass(ptrdiff_t(0), n, out);
-                return;
+        /// The curvature pass's sums over the entries [begin, end), added to s: d.Ad, d.d, g.d and,
+        /// the last, the longest feasible step x - alpha d (a minimum, from infty).
+        template <typename B>
+        static void curvature_sums(const B              b,
+                                   const ptrdiff_t      begin,
+                                   const ptrdiff_t      end,
+                                   const T* const       x,
+                                   const T* const       g,
+                                   const T* const       d,
+                                   const T* const       Ad,
+                                   const T              infty,
+                                   T (&s)[4]) {
+            T dAd = s[0], dd = s[1], gd = s[2], alpha = s[3];
+            for (ptrdiff_t i = begin; i < end; i++) {
+                const T di = d[i];
+                dAd += di * Ad[i];
+                dd += di * di;
+                gd += g[i] * di;
+                alpha = b.min(alpha, b.max_alpha(i, x[i], di, infty));
             }
-#pragma omp parallel for schedule(static)
-            for (ptrdiff_t c = 0; c < nc; c++) {
+            s[0] = dAd, s[1] = dd, s[2] = gd, s[3] = alpha;
+        }
+
+        /// The step's update of x, g and gf over the entries [begin, end) (along d, unless null) and
+        /// its sums, added to s: Ad.gf (without d none), |gf|^2, |gc|^2, |w (gf + gc)|^2.
+        template <typename B>
+        static void step_sums(const B              b,
+                              const ptrdiff_t      begin,
+                              const ptrdiff_t      end,
+                              const T* const       d,
+                              const T* const       Ad,
+                              const T              alpha,
+                              T* const             x,
+                              T* const             g,
+                              T* const             gf,
+                              const T              eps,
+                              const T* const       w,
+                              T (&s)[4]) {
+            if (d) {
+                T Adgf = s[0], gf2 = s[1], gc2 = s[2], gp2 = s[3];
+                for (ptrdiff_t i = begin; i < end; i++) {
+                    const T xi = x[i] - alpha * d[i];
+                    const T gi = g[i] - alpha * Ad[i];
+                    const T f  = b.free(i, xi, gi);
+                    const T c  = b.chopped(i, xi, gi, eps);
+                    const T p  = w ? w[i] * (f + c) : f + c;
+                    x[i]       = xi;
+                    g[i]       = gi;
+                    gf[i]      = f;
+                    Adgf += Ad[i] * f;
+                    gf2 += f * f;
+                    gc2 += c * c;
+                    gp2 += p * p;
+                }
+                s[0] = Adgf, s[1] = gf2, s[2] = gc2, s[3] = gp2;
+            } else {
+                T gf2 = s[1], gc2 = s[2], gp2 = s[3];
+                for (ptrdiff_t i = begin; i < end; i++) {
+                    const T f = b.free(i, x[i], g[i]);
+                    const T c = b.chopped(i, x[i], g[i], eps);
+                    const T p = w ? w[i] * (f + c) : f + c;
+                    gf[i]     = f;
+                    gf2 += f * f;
+                    gc2 += c * c;
+                    gp2 += p * p;
+                }
+                s[1] = gf2, s[2] = gc2, s[3] = gp2;
+            }
+        }
+
+        /// p <- gf - beta p over the entries [begin, end), as the BLAS's axpby(1, gf, -beta, p).
+        static void direction(const ptrdiff_t begin, const ptrdiff_t end, const T* const gf, const T beta, T* const p) {
+            const T alpha = 1, scale = -beta;
+            for (ptrdiff_t i = begin; i < end; i++) {
+                p[i] = alpha * gf[i] + scale * p[i];
+            }
+        }
+
+        /// The calling thread's chunks of `team`, each pass(b, e, v) from `init` into its four
+        /// entries of `part`.
+        template <typename F>
+        static void team_sums(const Team& team, const T (&init)[4], T* const part, F pass) {
+            for (ptrdiff_t c = team.first_chunk; c < team.end_chunk; c++) {
                 ptrdiff_t b, e;
-                blas_chunk_bounds(n, nc, c, &b, &e);
+                team.chunk_entries(c, &b, &e);
                 T v[4] = {init[0], init[1], init[2], init[3]};
                 pass(b, e, v);
                 for (int k = 0; k < 4; k++) part[4 * c + k] = v[k];
             }
-            for (ptrdiff_t c = 0; c < nc; c++) {
+        }
+
+        /// The chunks' sums in `part` combined in index order from `init`: summed, with `min_last`
+        /// the last the minimum.
+        static void combine(const ptrdiff_t chunks, const T* const part, const T (&init)[4], const bool min_last, T (&out)[4]) {
+            for (int k = 0; k < 4; k++) out[k] = init[k];
+            for (ptrdiff_t c = 0; c < chunks; c++) {
                 for (int k = 0; k < 3; k++) out[k] += part[4 * c + k];
                 const T last = part[4 * c + 3];
                 out[3]       = min_last ? (last < out[3] ? last : out[3]) : out[3] + last;
             }
+        }
+
+        /// A pass's four sums over the chunks of n a Team splits (sfem_Team.hpp), in a region of
+        /// its own, then combined: the result does not depend on the number of threads, and is the
+        /// one a region of the caller's takes (MPRGP's iteration in one region).
+        template <typename F>
+        static void chunked(const ptrdiff_t n, const T (&init)[4], const bool min_last, T* const part, T (&out)[4], F pass) {
+            assert(part);
+            if (team_chunk_count(n) == 1) {
+                team_sums(Team::of(n, 0, 1), init, part, pass);
+            } else {
+#pragma omp parallel
+                team_sums(Team::current(n), init, part, pass);
+            }
+            combine(team_chunk_count(n), part, init, min_last, out);
         }
 
         static void curvature(const ptrdiff_t       n,
@@ -194,15 +279,7 @@ namespace sfem {
             with_mprgp_bounds(lb, ub, [&](const auto b) {
                 T v[4];
                 chunked(n, {0, 0, 0, infty}, true, work, v, [&](const ptrdiff_t begin, const ptrdiff_t end, T (&s)[4]) {
-                    T dAd = s[0], dd = s[1], gd = s[2], alpha = s[3];
-                    for (ptrdiff_t i = begin; i < end; i++) {
-                        const T di = d[i];
-                        dAd += di * Ad[i];
-                        dd += di * di;
-                        gd += g[i] * di;
-                        alpha = b.min(alpha, b.max_alpha(i, x[i], di, infty));
-                    }
-                    s[0] = dAd, s[1] = dd, s[2] = gd, s[3] = alpha;
+                    curvature_sums(b, begin, end, x, g, d, Ad, infty, s);
                 });
                 T dAd = v[0], dd = v[1], gd = v[2], alpha = v[3];
                 if (reduce) {
@@ -242,40 +319,9 @@ namespace sfem {
             const T alpha = c.alpha;
             with_mprgp_bounds(lb, ub, [&](const auto b) {
                 T v[4];
-                if (d) {
-                    chunked(n, {0, 0, 0, 0}, false, work, v, [&](const ptrdiff_t begin, const ptrdiff_t end, T (&s)[4]) {
-                        T Adgf = s[0], gf2 = s[1], gc2 = s[2], gp2 = s[3];
-                        for (ptrdiff_t i = begin; i < end; i++) {
-                            const T xi = x[i] - alpha * d[i];
-                            const T gi = g[i] - alpha * Ad[i];
-                            const T f  = b.free(i, xi, gi);
-                            const T c  = b.chopped(i, xi, gi, eps);
-                            const T p  = w ? w[i] * (f + c) : f + c;
-                            x[i]       = xi;
-                            g[i]       = gi;
-                            gf[i]      = f;
-                            Adgf += Ad[i] * f;
-                            gf2 += f * f;
-                            gc2 += c * c;
-                            gp2 += p * p;
-                        }
-                        s[0] = Adgf, s[1] = gf2, s[2] = gc2, s[3] = gp2;
-                    });
-                } else {
-                    chunked(n, {0, 0, 0, 0}, false, work, v, [&](const ptrdiff_t begin, const ptrdiff_t end, T (&s)[4]) {
-                        T gf2 = s[1], gc2 = s[2], gp2 = s[3];
-                        for (ptrdiff_t i = begin; i < end; i++) {
-                            const T f = b.free(i, x[i], g[i]);
-                            const T c = b.chopped(i, x[i], g[i], eps);
-                            const T p = w ? w[i] * (f + c) : f + c;
-                            gf[i]     = f;
-                            gf2 += f * f;
-                            gc2 += c * c;
-                            gp2 += p * p;
-                        }
-                        s[1] = gf2, s[2] = gc2, s[3] = gp2;
-                    });
-                }
+                chunked(n, {0, 0, 0, 0}, false, work, v, [&](const ptrdiff_t begin, const ptrdiff_t end, T (&s)[4]) {
+                    step_sums(b, begin, end, d, Ad, alpha, x, g, gf, eps, w, s);
+                });
                 T Adgf = v[0], gf2 = v[1], gc2 = v[2], gp2 = v[3];
                 if (reduce) {
                     T v[4] = {Adgf, gf2, gc2, gp2};
@@ -327,15 +373,23 @@ namespace sfem {
             tpl.curvature        = curvature;
             tpl.step             = step;
             tpl.expand           = expand;
-            // Through the BLAS, as every other update of p: the same rounding as theirs.
-            tpl.update_direction = [blas = make_openmp_blas<T>()](const ptrdiff_t n, const T* const gf, T* const p, const T* const control) {
+            // The BLAS's axpby(1, gf, -beta, p), expression and all, as every other update of p: the
+            // same rounding as theirs. Thread by thread over a Team's shares, as the iteration in
+            // one region takes it.
+            tpl.update_direction = [](const ptrdiff_t n, const T* const gf, T* const p, const T* const control) {
                 const MPRGPControl<T>& c = *reinterpret_cast<const MPRGPControl<T>*>(control);
-                if (c.move == T(MPRGP_MOVE_STEP)) blas->axpby(n, 1, gf, -c.beta, p);
+                if (c.move != T(MPRGP_MOVE_STEP)) return;
+#pragma omp parallel
+                {
+                    const Team team = Team::current(n);
+                    direction(team.begin, team.end, gf, c.beta, p);
+                }
             };
             tpl.read_control     = read_control;
             tpl.write_control    = write_control;
-            // The passes' partial sums, four per chunk.
-            tpl.work_size        = 4 * blas_max_chunk_count;
+            // The passes' sums, four per chunk, twice: the curvature's and the step's, which the
+            // iteration in one region keeps apart (MPRGP).
+            tpl.work_size        = 8 * blas_max_chunk_count;
         }
     };
 

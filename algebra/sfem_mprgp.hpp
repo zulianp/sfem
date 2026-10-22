@@ -56,6 +56,9 @@ namespace sfem {
         SharedBuffer<T> norm_weight_;
 
         std::function<void(const T* const, T* const)> apply_op;
+        // The operator in team form (TeamParallelOperator, on the host), if it has one: then runs
+        // of CG steps take one parallel region (team_cg_steps).
+        std::shared_ptr<TeamParallelOperator<T>> team_op_;
         // Whether apply_op writes y = A x whole rather than adding to y: then y is not zeroed
         // before each product.
         bool op_overwrites_{false};
@@ -106,6 +109,7 @@ namespace sfem {
 
         void set_op(const std::shared_ptr<Operator<T>>& op) override {
             this->apply_op = [=](const T* const x, T* const y) { op->apply(x, y); };
+            team_op_       = std::dynamic_pointer_cast<TeamParallelOperator<T>>(op);
             n_dofs = op->rows();
             comm_.reset();
             n_alloc_ = -1;
@@ -277,6 +281,121 @@ namespace sfem {
             this->blas->axpby(n_dofs, -1, b, 1, g);
         }
 
+        /// How team_cg_steps returned: before a proportioning step (the chopped gradient grew),
+        /// at a CG decision that is not a step (its record and A p stand, for the expansion), or
+        /// with the solve over (converged, or max_it).
+        enum class TeamExit { PROPORTIONING, NOT_A_STEP, DONE };
+
+        /// CG steps in one parallel region, as many in a row as the loop of apply() takes: its CG
+        /// branch and the test after it, thread by thread over the operator's Team. Each pass takes
+        /// the calling thread's chunks, and every thread, after a barrier, combines all of them in
+        /// index order and takes the same decisions; under MPI thread 0, which has no rows,
+        /// completes the sums over the ranks. Three barriers a step on one rank: in the operator,
+        /// after the curvature and after the step; under MPI the operator's halo and each sum over
+        /// the ranks take one more. The chunks' sums alternate between two halves of `work`: a
+        /// thread still reading one half is never overwritten.
+        TeamExit team_cg_steps(T* const     x,
+                               T* const     g,
+                               T* const     p,
+                               T* const     Ap,
+                               T* const     gf,
+                               T* const     work,
+                               const T      norm_gp0,
+                               Gradients*   grads,
+                               int*         count_cg_steps,
+                               bool*        converged) {
+            using Pass                 = OpenMP_MPRGP<T>;
+            const T* const w           = norm_weight_ ? norm_weight_->data() : nullptr;
+            T* const       part[2]     = {work, work + 4 * blas_max_chunk_count};
+            const T        no_curv[4]  = {0, 0, 0, infty};
+            const T        no_step[4]  = {0, 0, 0, 0};
+            const auto     type        = smesh::TypeToEnum<T>::value();
+            T              by_ranks[4] = {0, 0, 0, 0};
+            TeamExit       exit        = TeamExit::PROPORTIONING;
+#pragma omp parallel
+            {
+                const Team      team = team_op_->team();
+                MPRGPControl<T> c    = record_;
+                Gradients       gr   = *grads;
+                int             it = iterations_, steps = *count_cg_steps;
+                bool            done = false;
+                TeamExit        why  = TeamExit::PROPORTIONING;
+                // The ranks' sums, by thread 0, then for every thread.
+                auto over_ranks = [&](T (&v)[4], const bool min_last) {
+                    if (!comm_) return;
+                    if (team.tid == 0) {
+                        if (min_last) {
+                            comm_->sum_and_min_last(v, 4, type);
+                        } else {
+                            comm_->sum(v, 4, type);
+                        }
+                        for (int k = 0; k < 4; k++) by_ranks[k] = v[k];
+                    }
+                    team.barrier();
+                    for (int k = 0; k < 4; k++) v[k] = by_ranks[k];
+                };
+                with_mprgp_bounds(lb(), ub(), [&](const auto bounds) {
+                    while (gr.norm_gc <= this->gamma * gr.norm_gf) {
+                        if (!op_overwrites_) {
+                            for (ptrdiff_t i = team.begin; i < team.end; i++) Ap[i] = 0;
+                        }
+                        if (!team_op_->input_in_share()) team.barrier();
+                        team_op_->team_apply(team, p, Ap);
+
+                        T v[4];
+                        Pass::team_sums(team, no_curv, part[0], [&](const ptrdiff_t b, const ptrdiff_t e, T (&s)[4]) {
+                            Pass::curvature_sums(bounds, b, e, x, g, p, Ap, infty, s);
+                        });
+                        team.barrier();
+                        Pass::combine(team.chunks, part[0], no_curv, true, v);
+                        over_ranks(v, true);
+                        c.dAd        = v[0];
+                        c.dd         = v[1];
+                        c.gd         = v[2];
+                        c.alpha_feas = v[3];
+                        mprgp_decide(c, MPRGP_DECIDE_CG, params_);
+                        if (c.move != T(MPRGP_MOVE_STEP)) {
+                            why = TeamExit::NOT_A_STEP;
+                            break;
+                        }
+
+                        Pass::team_sums(team, no_step, part[1], [&](const ptrdiff_t b, const ptrdiff_t e, T (&s)[4]) {
+                            Pass::step_sums(bounds, b, e, p, Ap, c.alpha, x, g, gf, eps, w, s);
+                        });
+                        team.barrier();
+                        Pass::combine(team.chunks, part[1], no_step, false, v);
+                        over_ranks(v, false);
+                        c.Adgf = v[0];
+                        c.gf2  = v[1];
+                        c.gc2  = v[2];
+                        c.gp2  = v[3];
+                        mprgp_after_cg_step(c);
+                        Pass::direction(team.begin, team.end, gf, c.beta, p);
+                        gr = gradients(c);
+                        steps++;
+
+                        const T rel_norm_gp = gr.norm_gp / norm_gp0;
+                        done                = gr.norm_gp < atol || rel_norm_gp < rtol;
+                        if (team.tid == 0) monitor(it, gr.norm_gp, rel_norm_gp);
+                        if (++it >= max_it || done) {
+                            why = TeamExit::DONE;
+                            break;
+                        }
+                    }
+                });
+                if (team.tid == 0) {
+                    record_         = c;
+                    *grads          = gr;
+                    iterations_     = it;
+                    *count_cg_steps = steps;
+                    *converged      = done;
+                    exit            = why;
+                }
+            }
+            impl.write_control(record_, control_);
+            return exit;
+        }
+
         void monitor(const int iter, const T residual, const T rel_residual) {
             if (iter == max_it || iter % check_each == 0 || residual < atol ||
                 rel_residual < rtol) {
@@ -342,12 +461,20 @@ namespace sfem {
 
             while (!converged) {
                 if (grads.norm_gc <= this->gamma * grads.norm_gf) {
-                    product(p, Ap_or_Ag);
-                    // The decision, the CG step and the next direction p <- gf - beta p, the last
-                    // two only where the move is a step; then the record, read once.
-                    curvature(x, g, p, Ap_or_Ag, MPRGP_DECIDE_CG, work);
-                    this->step(p, Ap_or_Ag, x, g, gf_or_gc, true, work);
-                    impl.update_direction(n_dofs, gf_or_gc, p, control_);
+                    if (team_op_) {
+                        // The CG steps in a row in one region; back here at the first that is no
+                        // step, for the expansion below.
+                        const TeamExit exit = team_cg_steps(x, g, p, Ap_or_Ag, gf_or_gc, work, norm_gp0, &grads, &count_cg_steps, &converged);
+                        if (exit == TeamExit::DONE) break;
+                        if (exit == TeamExit::PROPORTIONING) continue;
+                    } else {
+                        product(p, Ap_or_Ag);
+                        // The decision, the CG step and the next direction p <- gf - beta p, the
+                        // last two only where the move is a step; then the record, read once.
+                        curvature(x, g, p, Ap_or_Ag, MPRGP_DECIDE_CG, work);
+                        this->step(p, Ap_or_Ag, x, g, gf_or_gc, true, work);
+                        impl.update_direction(n_dofs, gf_or_gc, p, control_);
+                    }
                     const MPRGPControl<T>& c = record();
 
                     // Without positive curvature the energy falls along -p until a bound stops

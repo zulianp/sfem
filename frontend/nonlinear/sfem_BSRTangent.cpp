@@ -11,6 +11,7 @@
 #endif
 
 #include <algorithm>
+#include <cassert>
 
 namespace sfem {
 
@@ -224,11 +225,12 @@ namespace sfem {
                                         rows * bs,
                                         halo ? space->n_dofs() : rows * bs,
                                         halo ? space->n_dofs() : nrows * bs,
-                                        bs,
+                                        false,
                                         [=](const Team &team, const real_t *const x, real_t *const y) {
                                             const count_t  *rp    = rowptr->data();
                                             const idx_t    *ci    = colidx->data();
                                             const auto     *v     = values->data();
+                                            assert(team.begin % bs == 0 && team.end % bs == 0);
                                             const ptrdiff_t first = team.begin / bs, end = team.end / bs;
                                             if (!halo) {
                                                 bsr_spmv_rows(first, end, bs, bs, rp, rp + 1, ci, v, scale_output, x, y);

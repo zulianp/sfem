@@ -190,13 +190,14 @@ namespace sfem {
         std::shared_ptr<ParallelOperator<real_t>> op;
         if (es == EXECUTION_SPACE_HOST) {
             // One region: each thread takes its nodes into the frames, then, once every thread's
-            // are in, its rows of the product and back out of the frames.
+            // are in, its rows of the product and back out of the frames. It reads `in` only at
+            // its own nodes before the barrier (input_in_share).
             op = make_team_op<real_t>(f->space()->mesh_ptr()->comm(),
                                       owned,
                                       owned,
                                       impl.ndofs,
                                       impl.ndofs,
-                                      3,
+                                      true,
                                       [self, framed](const Team &team, const real_t *const in, real_t *const out) {
                                           real_t *const tmp = self->qp_tmp->data();
                                           self->contact->from_frame(team, self->scale->data(), in, framed->data());

@@ -113,12 +113,12 @@ namespace sfem {
     }
 
     void NodeObstacleContact::to_frame(const Team &team, const real_t *const s, const real_t *const in, real_t *const out) const {
-        assert(team.block == 3);
+        assert(team.begin % 3 == 0 && team.end % 3 == 0);
         node_obstacle_to_frame(view(normals_, gap_), s, in, out, team.begin / 3, team.end / 3);
     }
 
     void NodeObstacleContact::from_frame(const Team &team, const real_t *const s, const real_t *const in, real_t *const out) const {
-        assert(team.block == 3);
+        assert(team.begin % 3 == 0 && team.end % 3 == 0);
         node_obstacle_from_frame(view(normals_, gap_), s, in, out, team.begin / 3, team.end / 3);
     }
 

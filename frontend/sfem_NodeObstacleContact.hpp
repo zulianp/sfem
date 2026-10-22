@@ -73,7 +73,7 @@ namespace sfem {
         void from_frame(const real_t *const s, const real_t *const in, real_t *const out) const;
 
         // to_frame and from_frame over the nodes of the calling thread's share of the dofs, on the
-        // host, inside a region its caller opened (Team, blocks of 3).
+        // host, inside a region its caller opened (Team).
         void to_frame(const Team &team, const real_t *const s, const real_t *const in, real_t *const out) const;
         void from_frame(const Team &team, const real_t *const s, const real_t *const in, real_t *const out) const;
 
