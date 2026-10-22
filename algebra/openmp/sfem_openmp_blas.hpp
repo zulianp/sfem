@@ -91,6 +91,21 @@ namespace sfem {
     }
 
 
+    // Shared reduction policy for global and weighted cellwise vectors.
+    template <typename T, bool Weighted = false>
+    inline T openmp_dot(const ptrdiff_t n, const T* const x, const T* const y,
+                        const T* const weights = nullptr) {
+        const auto term = [=](const ptrdiff_t i) {
+            if constexpr (Weighted) return weights[i] * x[i] * y[i];
+            else return x[i] * y[i];
+        };
+        if (blas_deterministic()) return blas_fixed_chunk_sum<T>(n, term);
+        T sum = 0;
+#pragma omp parallel for simd schedule(static) reduction(+ : sum)
+        for (ptrdiff_t i = 0; i < n; ++i) sum += term(i);
+        return sum;
+    }
+
     template <typename T>
     class OpenMP_BLAS final : public BLAS<T> {
     public:
@@ -103,17 +118,7 @@ namespace sfem {
         }
 
         auto dot(const ptrdiff_t n, const T* const l, const T* const r) -> T override {
-            if (blas_deterministic())
-                return blas_fixed_chunk_sum<T>(n, [l, r](const ptrdiff_t i) { return l[i] * r[i]; });
-
-            T ret = 0;
-
-#pragma omp parallel for reduction(+ : ret)
-            for (ptrdiff_t i = 0; i < n; i++) {
-                ret += l[i] * r[i];
-            }
-
-            return ret;
+            return openmp_dot<T>(n, l, r);
         }
 
         void axpy(const ptrdiff_t n, const T alpha, const T* const x, T* const y) override {
@@ -158,17 +163,7 @@ namespace sfem {
         }
 
         auto norm2(const ptrdiff_t n, const T* const x) -> T override {
-            if (blas_deterministic())
-                return sqrt(blas_fixed_chunk_sum<T>(n, [x](const ptrdiff_t i) { return x[i] * x[i]; }));
-
-            T ret = 0;
-
-#pragma omp parallel for reduction(+ : ret)
-            for (ptrdiff_t i = 0; i < n; i++) {
-                ret += x[i] * x[i];
-            }
-
-            return sqrt(ret);
+            return sqrt(openmp_dot<T>(n, x, x));
         }
 
         void values(const std::size_t n, const T v, T* const x) override {

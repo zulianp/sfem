@@ -12,6 +12,29 @@
 #define SFEM_FAILURE 1
 #endif
 
+/* Storage and execution metadata shared by BXYZE fields and affine geometry.
+ * Strides refer to nodal fields; geometry uses 6 * element_block_size instead.
+ * No global structured element ordering is required by this layout.
+ */
+typedef struct sfem_dss_bxyze_layout {
+    int       level;
+    int       n;
+    ptrdiff_t nelements;
+    int       element_block_size;
+    int       execution_block_size;
+    ptrdiff_t block_stride;
+    ptrdiff_t execution_stride;
+    ptrdiff_t nblocks;
+    int       chunks_per_block;
+    ptrdiff_t ntasks;
+} sfem_dss_bxyze_layout_t;
+
+int sfem_dss_bxyze_create_layout(int level,
+                                ptrdiff_t nelements,
+                                int element_block_size,
+                                int execution_block_size,
+                                sfem_dss_bxyze_layout_t *layout);
+
 /*
  * Scalar nodal field conversion from SFEM global unique storage to blocked
  * element-wise BXYZE storage.

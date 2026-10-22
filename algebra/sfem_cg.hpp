@@ -3,6 +3,7 @@
 
 #include <cmath>
 #include <cstddef>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <functional>
@@ -30,6 +31,8 @@ namespace sfem {
         std::shared_ptr<BLAS<T>> blas;
         CG_Tpl<T>                impl;
 
+        // Optional metric. A custom fused residual reduction must use the same metric.
+        std::function<T(ptrdiff_t, const T*, const T*)> inner_product;
         std::function<void(T*)> interceptor;
 
         // Solver parameters
@@ -124,6 +127,7 @@ namespace sfem {
 
         void default_init() {
             blas             = make_openmp_blas<T>();
+            inner_product    = {};
             OpenMP_CG<T>::build(impl);
             execution_space_ = EXECUTION_SPACE_HOST;
         }
@@ -164,6 +168,10 @@ namespace sfem {
         ~ConjugateGradient() { destroy_workspace(); }
 
     private:
+        T dot(const ptrdiff_t n, const T* const x, const T* const y) const {
+            return inner_product ? inner_product(n, x, y) : blas->dot(n, x, y);
+        }
+
         T*        work_r_{nullptr};
         T*        work_z_{nullptr};
         T*        work_p_{nullptr};
@@ -236,7 +244,7 @@ namespace sfem {
 
             blas->axpby(n, alpha, p, T(1), x);
             blas->axpby(n, -alpha, Ap, T(1), r);
-            return with_rtr ? blas->dot(n, r, r) : T(0);
+            return with_rtr ? dot(n, r, r) : T(0);
         }
 
         void update_p(const ptrdiff_t n, const T beta, const T* const z, T* const p) const {
@@ -259,10 +267,10 @@ namespace sfem {
             T* Ap = work_Ap_;
 
             ensure_apply_buffer(n, r);
-            apply_op->apply(x, r);
+            if (apply_op->apply(x, r) != SFEM_SUCCESS) return SFEM_FAILURE;
             blas->axpby(n, T(1), b, T(-1), r);
 
-            const T rtr0    = blas->dot(n, r, r);
+            const T rtr0    = dot(n, r, r);
             const T r_norm0 = sqrt(rtr0);
             monitor(0, r_norm0, 1, 0);
 
@@ -278,9 +286,9 @@ namespace sfem {
             int info = SFEM_FAILURE;
             for (iterations_ = 0; iterations_ < max_it; iterations_++) {
                 ensure_apply_buffer(n, Ap);
-                apply_op->apply(p, Ap);
+                if (apply_op->apply(p, Ap) != SFEM_SUCCESS) return SFEM_FAILURE;
 
-                const T ptAp  = blas->dot(n, p, Ap);
+                const T ptAp  = dot(n, p, Ap);
                 const T alpha = rtr / ptAp;
 
                 assert(ptAp == ptAp);
@@ -323,10 +331,10 @@ namespace sfem {
             T* Ap = work_Ap_;
 
             ensure_apply_buffer(n, r);
-            apply_op->apply(x, r);
+            if (apply_op->apply(x, r) != SFEM_SUCCESS) return SFEM_FAILURE;
             blas->axpby(n, T(1), b, T(-1), r);
 
-            const T rtr0    = blas->dot(n, r, r);
+            const T rtr0    = dot(n, r, r);
             const T r_norm0 = sqrt(rtr0);
             monitor(0, r_norm0, 1, 0);
 
@@ -335,13 +343,13 @@ namespace sfem {
             }
 
             ensure_apply_buffer(n, z);
-            preconditioner_op->apply(r, z);
+            if (preconditioner_op->apply(r, z) != SFEM_SUCCESS) return SFEM_FAILURE;
             blas->copy(n, z, p);
 
             ensure_apply_buffer(n, Ap);
-            apply_op->apply(p, Ap);
+            if (apply_op->apply(p, Ap) != SFEM_SUCCESS) return SFEM_FAILURE;
 
-            const T rtz0 = blas->dot(n, r, z);
+            const T rtz0 = dot(n, r, z);
             T       rtz  = rtz0;
 
             if (rtz == 0) {
@@ -349,7 +357,7 @@ namespace sfem {
             }
 
             {
-                const T ptAp  = blas->dot(n, p, Ap);
+                const T ptAp  = dot(n, p, Ap);
                 assert(ptAp != 0);
                 const T alpha = rtz / ptAp;
                 update_x_r(n, alpha, p, Ap, x, r, false);
@@ -358,9 +366,9 @@ namespace sfem {
             int info = SFEM_FAILURE;
             for (iterations_ = 0; iterations_ < max_it; iterations_++) {
                 ensure_apply_buffer(n, z);
-                preconditioner_op->apply(r, z);
+                if (preconditioner_op->apply(r, z) != SFEM_SUCCESS) return SFEM_FAILURE;
 
-                const T rtz_new = blas->dot(n, r, z);
+                const T rtz_new = dot(n, r, z);
 
                 assert(rtz != 0);
                 const T beta = rtz_new / rtz;
@@ -369,9 +377,9 @@ namespace sfem {
                 update_p(n, beta, z, p);
 
                 ensure_apply_buffer(n, Ap);
-                apply_op->apply(p, Ap);
+                if (apply_op->apply(p, Ap) != SFEM_SUCCESS) return SFEM_FAILURE;
 
-                const T ptAp  = blas->dot(n, p, Ap);
+                const T ptAp  = dot(n, p, Ap);
                 const T alpha = rtz / ptAp;
 
                 update_x_r(n, alpha, p, Ap, x, r, false);
@@ -398,6 +406,43 @@ namespace sfem {
     std::shared_ptr<ConjugateGradient<T>> h_cg() {
         auto cg = std::make_shared<ConjugateGradient<T>>();
         cg->default_init();
+        return cg;
+    }
+
+    // Host CG on consistent cellwise copies. Weights are positive inverse nodal
+    // multiplicities in the same layout and are retained by the solver.
+    // op must overwrite assembled output (volume + DSS), preserving consistency
+    // and the homogeneous-Dirichlet subspace. Any preconditioner must do likewise.
+    // The recurrence, tolerances and iteration counting are those of h_cg().
+    template <typename T>
+    std::shared_ptr<ConjugateGradient<T>> h_cellwise_cg(
+            const std::shared_ptr<Operator<T>>& op, const SharedBuffer<T>& weights) {
+        if (!op || op->rows() < 0 || op->rows() != op->cols() ||
+            op->execution_space() != EXECUTION_SPACE_HOST || !weights ||
+            weights->mem_space() != MEMORY_SPACE_HOST || weights->size() != (size_t)op->rows()) {
+            std::fprintf(stderr, "h_cellwise_cg: incompatible host operator and weights\n");
+            return nullptr;
+        }
+        int invalid = 0;
+        const T* const w = weights->data();
+#pragma omp parallel for reduction(| : invalid)
+        for (ptrdiff_t i = 0; i < op->rows(); ++i) invalid |= !(w[i] > 0 && std::isfinite(w[i]));
+        if (invalid) return nullptr;
+
+        auto cg = h_cg<T>();
+        cg->set_op(op);
+        cg->set_apply_overwrites_output(true);
+        cg->inner_product = [weights](const ptrdiff_t n, const T* const x, const T* const y) {
+            assert(n == (ptrdiff_t)weights->size());
+            return openmp_dot<T, true>(n, x, y, weights->data());
+        };
+        cg->impl.update_x_r_and_rtr =
+                [weights](const ptrdiff_t n, const T alpha, const T* const p, const T* const Ap,
+                          T* const x, T* const r) {
+                    assert(n == (ptrdiff_t)weights->size());
+                    return OpenMP_CG<T>::template update_x_r_and_rtr_tpl<true>(
+                            n, alpha, p, Ap, x, r, weights->data());
+                };
         return cg;
     }
 }  // namespace sfem

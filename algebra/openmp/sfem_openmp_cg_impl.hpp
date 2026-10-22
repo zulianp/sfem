@@ -47,23 +47,37 @@ namespace sfem {
 
     template <typename T>
     struct OpenMP_CG {
-        static T update_x_r_and_rtr(const ptrdiff_t n,
-                                    const T         alpha,
-                                    const T* const  p,
-                                    const T* const  Ap,
-                                    T* const        x,
-                                    T* const        r) {
+        // Same vector updates, SIMD and scheduling for both representations.
+        // The weighted specialization adds only the inverse-multiplicity factor.
+        template <bool Weighted>
+        static T update_x_r_and_rtr_tpl(const ptrdiff_t n,
+                                        const T alpha,
+                                        const T* const p,
+                                        const T* const Ap,
+                                        T* const x,
+                                        T* const r,
+                                        const T* const weights) {
             T rtr = 0;
 #ifdef _OPENMP
-#pragma omp parallel for reduction(+ : rtr)
+#pragma omp parallel for simd schedule(static) reduction(+ : rtr)
 #endif
             for (ptrdiff_t i = 0; i < n; i++) {
                 x[i] += alpha * p[i];
                 const T ri = r[i] - alpha * Ap[i];
                 r[i]       = ri;
-                rtr += ri * ri;
+                if constexpr (Weighted) rtr += weights[i] * ri * ri;
+                else rtr += ri * ri;
             }
             return rtr;
+        }
+
+        static T update_x_r_and_rtr(const ptrdiff_t n,
+                                    const T alpha,
+                                    const T* const p,
+                                    const T* const Ap,
+                                    T* const x,
+                                    T* const r) {
+            return update_x_r_and_rtr_tpl<false>(n, alpha, p, Ap, x, r, nullptr);
         }
 
         static void update_x_r(const ptrdiff_t n,
@@ -73,7 +87,7 @@ namespace sfem {
                                T* const        x,
                                T* const        r) {
 #ifdef _OPENMP
-#pragma omp parallel for
+#pragma omp parallel for simd schedule(static)
 #endif
             for (ptrdiff_t i = 0; i < n; i++) {
                 x[i] += alpha * p[i];
@@ -83,7 +97,7 @@ namespace sfem {
 
         static void update_p(const ptrdiff_t n, const T beta, const T* const z, T* const p) {
 #ifdef _OPENMP
-#pragma omp parallel for
+#pragma omp parallel for simd schedule(static)
 #endif
             for (ptrdiff_t i = 0; i < n; i++) {
                 p[i] = z[i] + beta * p[i];
