@@ -2,13 +2,18 @@
 // pressed between two wavy obstacles, so that the active set changes often and the iteration takes
 // CG, expansion and proportioning steps. The solution is checked by its KKT conditions; the
 // iteration count, the steps of each kind and a checksum of the solution's bits are printed, so that
-// two builds of MPRGP can be compared bit for bit on the same operator.
+// two builds of MPRGP can be compared bit for bit on the same operator. On the host the solution's
+// bits do not depend on the number of threads.
 
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <vector>
+
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
 #include "sfem_API.hpp"
 #include "sfem_mprgp.hpp"
@@ -71,7 +76,7 @@ namespace {
         return h;
     }
 
-    int solve(const sfem::ExecutionSpace es) {
+    int solve(const sfem::ExecutionSpace es, uint64_t *const sum = nullptr) {
         sfem::SharedBuffer<count_t> rowptr;
         sfem::SharedBuffer<idx_t>   colidx;
         sfem::SharedBuffer<real_t>  values;
@@ -146,11 +151,27 @@ namespace {
                (unsigned long long)checksum(xs));
         SFEM_TEST_ASSERT(on_lb > 0 && on_ub > 0);
         SFEM_TEST_ASSERT(std::sqrt(kkt) < 1e-10 * std::sqrt(scale));
+        if (sum) *sum = checksum(xs);
         return SFEM_TEST_SUCCESS;
     }
 }  // namespace
 
-int test_host_solve() { return solve(sfem::EXECUTION_SPACE_HOST); }
+// The host passes sum over chunks fixed by the length (sfem_fixed_chunks.hpp): one thread and all of
+// them take the same steps.
+int test_host_solve() {
+    uint64_t all = 0;
+    SFEM_TEST_ASSERT(solve(sfem::EXECUTION_SPACE_HOST, &all) == SFEM_TEST_SUCCESS);
+#ifdef _OPENMP
+    const int threads = omp_get_max_threads();
+    uint64_t  one     = 0;
+    omp_set_num_threads(1);
+    const int err = solve(sfem::EXECUTION_SPACE_HOST, &one);
+    omp_set_num_threads(threads);
+    SFEM_TEST_ASSERT(err == SFEM_TEST_SUCCESS);
+    SFEM_TEST_ASSERT(one == all);
+#endif
+    return SFEM_TEST_SUCCESS;
+}
 
 #ifdef SFEM_ENABLE_CUDA
 int test_device_solve() { return solve(sfem::EXECUTION_SPACE_DEVICE); }
