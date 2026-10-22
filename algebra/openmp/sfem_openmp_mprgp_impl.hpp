@@ -7,6 +7,7 @@
 #include <functional>
 #include <memory>
 
+#include "sfem_fixed_chunks.hpp"
 #include "sfem_mprgp_bounds.hpp"
 #include "sfem_mprgp_control.hpp"
 #include "sfem_tpl_blas.hpp"
@@ -149,6 +150,34 @@ namespace sfem {
 
         static MPRGPControl<T>& record(T* const control) { return *reinterpret_cast<MPRGPControl<T>*>(control); }
 
+        /// A pass's four partial sums over the chunks of n fixed by its length (sfem_fixed_chunks.hpp),
+        /// pass(b, e, v) adding entries [b, e) to v, which starts from `init`; each chunk's into
+        /// `part`, then combined in index order: summed, with `min_last` the last the minimum. The
+        /// result does not depend on the number of threads.
+        template <typename F>
+        static void chunked(const ptrdiff_t n, const T (&init)[4], const bool min_last, T* const part, T (&out)[4], F pass) {
+            const ptrdiff_t nc = blas_chunk_count(n);
+            assert(part || nc == 1);
+            for (int k = 0; k < 4; k++) out[k] = init[k];
+            if (nc == 1) {
+                pass(ptrdiff_t(0), n, out);
+                return;
+            }
+#pragma omp parallel for schedule(static)
+            for (ptrdiff_t c = 0; c < nc; c++) {
+                ptrdiff_t b, e;
+                blas_chunk_bounds(n, nc, c, &b, &e);
+                T v[4] = {init[0], init[1], init[2], init[3]};
+                pass(b, e, v);
+                for (int k = 0; k < 4; k++) part[4 * c + k] = v[k];
+            }
+            for (ptrdiff_t c = 0; c < nc; c++) {
+                for (int k = 0; k < 3; k++) out[k] += part[4 * c + k];
+                const T last = part[4 * c + 3];
+                out[3]       = min_last ? (last < out[3] ? last : out[3]) : out[3] + last;
+            }
+        }
+
         static void curvature(const ptrdiff_t       n,
                               const T* const        lb,
                               const T* const        ub,
@@ -160,18 +189,22 @@ namespace sfem {
                               const MPRGPDecision   decision,
                               const MPRGPParams<T>& params,
                               T* const              control,
-                              T* const,
+                              T* const              work,
                               const MPRGPReduce<T>& reduce) {
             with_mprgp_bounds(lb, ub, [&](const auto b) {
-                T dAd = 0, dd = 0, gd = 0, alpha = infty;
-#pragma omp parallel for reduction(+ : dAd, dd, gd) reduction(min : alpha)
-                for (ptrdiff_t i = 0; i < n; i++) {
-                    const T di = d[i];
-                    dAd += di * Ad[i];
-                    dd += di * di;
-                    gd += g[i] * di;
-                    alpha = b.min(alpha, b.max_alpha(i, x[i], di, infty));
-                }
+                T v[4];
+                chunked(n, {0, 0, 0, infty}, true, work, v, [&](const ptrdiff_t begin, const ptrdiff_t end, T (&s)[4]) {
+                    T dAd = s[0], dd = s[1], gd = s[2], alpha = s[3];
+                    for (ptrdiff_t i = begin; i < end; i++) {
+                        const T di = d[i];
+                        dAd += di * Ad[i];
+                        dd += di * di;
+                        gd += g[i] * di;
+                        alpha = b.min(alpha, b.max_alpha(i, x[i], di, infty));
+                    }
+                    s[0] = dAd, s[1] = dd, s[2] = gd, s[3] = alpha;
+                });
+                T dAd = v[0], dd = v[1], gd = v[2], alpha = v[3];
                 if (reduce) {
                     // The three sums and the step bound in one message.
                     T v[4] = {dAd, dd, gd, alpha};
@@ -202,41 +235,48 @@ namespace sfem {
                          const T* const  w,
                          const bool      cg,
                          T* const        control,
-                         T* const,
+                         T* const        work,
                          const MPRGPReduce<T>& reduce) {
             MPRGPControl<T>& c = record(control);
             if (d && c.move != T(MPRGP_MOVE_STEP)) return;
             const T alpha = c.alpha;
             with_mprgp_bounds(lb, ub, [&](const auto b) {
-                T Adgf = 0, gf2 = 0, gc2 = 0, gp2 = 0;
+                T v[4];
                 if (d) {
-#pragma omp parallel for reduction(+ : Adgf, gf2, gc2, gp2)
-                    for (ptrdiff_t i = 0; i < n; i++) {
-                        const T xi = x[i] - alpha * d[i];
-                        const T gi = g[i] - alpha * Ad[i];
-                        const T f  = b.free(i, xi, gi);
-                        const T c  = b.chopped(i, xi, gi, eps);
-                        const T p  = w ? w[i] * (f + c) : f + c;
-                        x[i]       = xi;
-                        g[i]       = gi;
-                        gf[i]      = f;
-                        Adgf += Ad[i] * f;
-                        gf2 += f * f;
-                        gc2 += c * c;
-                        gp2 += p * p;
-                    }
+                    chunked(n, {0, 0, 0, 0}, false, work, v, [&](const ptrdiff_t begin, const ptrdiff_t end, T (&s)[4]) {
+                        T Adgf = s[0], gf2 = s[1], gc2 = s[2], gp2 = s[3];
+                        for (ptrdiff_t i = begin; i < end; i++) {
+                            const T xi = x[i] - alpha * d[i];
+                            const T gi = g[i] - alpha * Ad[i];
+                            const T f  = b.free(i, xi, gi);
+                            const T c  = b.chopped(i, xi, gi, eps);
+                            const T p  = w ? w[i] * (f + c) : f + c;
+                            x[i]       = xi;
+                            g[i]       = gi;
+                            gf[i]      = f;
+                            Adgf += Ad[i] * f;
+                            gf2 += f * f;
+                            gc2 += c * c;
+                            gp2 += p * p;
+                        }
+                        s[0] = Adgf, s[1] = gf2, s[2] = gc2, s[3] = gp2;
+                    });
                 } else {
-#pragma omp parallel for reduction(+ : gf2, gc2, gp2)
-                    for (ptrdiff_t i = 0; i < n; i++) {
-                        const T f = b.free(i, x[i], g[i]);
-                        const T c = b.chopped(i, x[i], g[i], eps);
-                        const T p = w ? w[i] * (f + c) : f + c;
-                        gf[i]     = f;
-                        gf2 += f * f;
-                        gc2 += c * c;
-                        gp2 += p * p;
-                    }
+                    chunked(n, {0, 0, 0, 0}, false, work, v, [&](const ptrdiff_t begin, const ptrdiff_t end, T (&s)[4]) {
+                        T gf2 = s[1], gc2 = s[2], gp2 = s[3];
+                        for (ptrdiff_t i = begin; i < end; i++) {
+                            const T f = b.free(i, x[i], g[i]);
+                            const T c = b.chopped(i, x[i], g[i], eps);
+                            const T p = w ? w[i] * (f + c) : f + c;
+                            gf[i]     = f;
+                            gf2 += f * f;
+                            gc2 += c * c;
+                            gp2 += p * p;
+                        }
+                        s[1] = gf2, s[2] = gc2, s[3] = gp2;
+                    });
                 }
+                T Adgf = v[0], gf2 = v[1], gc2 = v[2], gp2 = v[3];
                 if (reduce) {
                     T v[4] = {Adgf, gf2, gc2, gp2};
                     reduce(v, 4, false);
@@ -294,7 +334,8 @@ namespace sfem {
             };
             tpl.read_control     = read_control;
             tpl.write_control    = write_control;
-            tpl.work_size        = 0;
+            // The passes' partial sums, four per chunk.
+            tpl.work_size        = 4 * blas_max_chunk_count;
         }
     };
 
