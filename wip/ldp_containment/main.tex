@@ -277,6 +277,19 @@ scaling of every case.
 machine, with \utopiaNewtonFPc, \utopiaNewtonFFc, \utopiaNewtonFPf{} and \utopiaNewtonFFf{} Newton
 steps. Without the machine and at different accuracies the times are no basis for a speed-up.
 
+\paragraph{Load steps.} The overlap can instead be released over $n$ quasi-static pseudo-steps:
+the bound admits a share of the starting penetration that falls linearly to zero, and each
+pseudo-step is solved to convergence. Table~\ref{tab:release} compares $n=1$, 2 and 4 on
+$4\times72$, with utopia's damped step and with full Newton steps under an Armijo line search; a
+pseudo-step whose line search fails is retried with half its length. With the damped step a
+pseudo-step takes \releasePerStepMin{} to \releasePerStepMax{} times as many Newton steps as the
+single step, so two pseudo-steps take \releaseTwoMin{} to \releaseTwoMax{} and four
+\releaseFourMin{} to \releaseFourMax{} times as long. In one step the Armijo rule solves
+\armijoFasterCases{} \armijoGainMin{} to \armijoGainMax\% faster than the damped step, but on
+\armijoCutbackCase{} its line search fails in every repeat and the retry makes the solve
+\armijoCutbackSlower{} times as long. \armijoCutbackRuns{} of the \armijoRuns{} Armijo runs were
+retried, none of the damped ones. The cases therefore remove the overlap in one damped step.
+
 \paragraph{Single-precision tangent.} The tangent's values can be stored in single precision. Each
 entry of an element matrix is computed in double and rounded once as it is added, so the matrix is
 assembled in this format directly, without a copy in double; the operator application reads the
@@ -334,6 +347,15 @@ solution (set-up and solve), median of \benchRepeats{} runs each.}
 \label{tab:nccl}
 \small
 \input{tables/nccl}
+\end{table*}
+
+\begin{table*}
+\caption{The overlap released over 1, 2 and 4 pseudo-steps, each solved to convergence, on
+$4\times72$: Newton steps (those of failed attempts included) and solve time, median of
+\releaseRepeats{} runs each, alternating per repeat.}
+\label{tab:release}
+\small
+\input{tables/release}
 \end{table*}
 
 \begin{figure*}

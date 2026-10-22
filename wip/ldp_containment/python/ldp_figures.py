@@ -23,6 +23,9 @@ Inputs (../data, copied from the jobs that produced them; README.md names the jo
                           the regions FF200's QP iterations open on 1 x 72
   team_cost.csv           workflows/ldp_containment/omp/team_cost.c: a stand-in CG step, a region
                           per pass against one region with fixed-chunk sums, per run shape
+  release_runs.csv        the overlap released over 1, 2 and 4 quasi-static pseudo-steps, each
+                          converged, with the damped and the Armijo line search, on 4 x 72,
+                          alternating per repeat, same columns as runs.csv
   machine.txt             the node and the software, key=value
 
 Usage:
@@ -77,6 +80,9 @@ NCCL_CONFIGS = [
     ("gpu_4", "1", "4 GPUs", "One"),
     ("gpu_8", "2", "8 GPUs, 2 nodes", "Eight"),
 ]
+# The release comparison: the line-search rules (rule, label) and the numbers of pseudo-steps.
+RELEASE_RULES = [("damped", "damped"), ("armijo", "Armijo")]
+RELEASE_STEPS = ["1", "2", "4"]
 COLORS = ["LdpA", "LdpB", "LdpC", "LdpD"]
 QP_CAP = 15000
 # A run whose last Newton residual is this far below the first counts as converged.
@@ -192,6 +198,33 @@ def nccl_index(rows):
     return index
 
 
+def release_index(rows):
+    """(case, rule, pseudo-steps) -> its runs, failing on a missing, failed or unconverged run."""
+    index = {}
+    for r in rows:
+        if r["config"] != "host_4x72":
+            sys.exit("ldp_figures: release_runs.csv has a run on %s; the text says 4 x 72" % r["config"])
+        if r["rc"] != "0" or not float(r["final"]) <= 1e-8:
+            sys.exit("ldp_figures: release run %s %s n=%s r%s failed or did not converge"
+                     % (r["case"], r["rule"], r["pseudo_steps"], r["repeat"]))
+        index.setdefault((r["case"], r["rule"], r["pseudo_steps"]), []).append(r)
+    for case, _, _ in CASES:
+        for rule, _ in RELEASE_RULES:
+            for n in RELEASE_STEPS:
+                if len(index.get((case, rule, n), [])) != 3:
+                    sys.exit("ldp_figures: release_runs.csv lacks repeats of %s %s n=%s" % (case, rule, n))
+    return index
+
+
+def release_solve(runs):
+    return statistics.median(float(r["solve"]) for r in runs)
+
+
+def release_newton(runs):
+    """Newton iterations of every attempt, a cut-back's included."""
+    return statistics.median(int(r["newton"]) + int(r["failed_newton"]) for r in runs)
+
+
 def to_solution(r):
     """Set-up and solve: the time to solution with the set-up NCCL's adds to."""
     return float(r["setup_median"]) + solve_time(r)
@@ -210,7 +243,7 @@ def solve_time(r):
 # ---------------------------------------------------------------------------------------------
 
 def macros(index, runs, agreement, ab, kkt, newton, utopia, coords, machine, precision, precision_runs,
-           precision_agreement, nccl, nccl_runs, omp_regions, team_cost):
+           precision_agreement, nccl, nccl_runs, omp_regions, team_cost, release_runs):
     out = [PREAMBLE]
     m = lambda name, value: out.append(macro(name, value))
 
@@ -522,6 +555,49 @@ def macros(index, runs, agreement, ab, kkt, newton, utopia, coords, machine, pre
     m("ncclCostMin", num(min(cost), 2))
     m("ncclCostMax", num(max(cost), 2))
     m("ncclBreakEven", integer(1000 * round(min(even) / 1000)))
+
+    # The overlap released over pseudo-steps (release_runs.csv)
+    rel = release_index(release_runs)
+    m("releaseRepeats", integer(3))
+    if any(r["cutbacks"] != "0" for r in release_runs if r["rule"] == "damped"):
+        sys.exit("ldp_figures: a damped release run cut back; the text says none did")
+    two, four, per_step = [], [], []
+    for case, _, _ in CASES:
+        t = [release_solve(rel[(case, "damped", n)]) for n in RELEASE_STEPS]
+        if not t[0] < t[1] < t[2]:
+            sys.exit("ldp_figures: on %s more damped pseudo-steps are not slower: %s" % (case, t))
+        two.append(t[1] / t[0])
+        four.append(t[2] / t[0])
+        one = release_newton(rel[(case, "damped", "1")])
+        per_step += [release_newton(rel[(case, "damped", n)]) / int(n) / one for n in RELEASE_STEPS[1:]]
+    if not (0.8 <= min(per_step) and max(per_step) <= 1.25):
+        sys.exit("ldp_figures: a damped pseudo-step no longer takes about the single step's Newton "
+                 "iterations: %.2f to %.2f" % (min(per_step), max(per_step)))
+    m("releaseTwoMin", num(min(two), 2))
+    m("releaseTwoMax", num(max(two), 2))
+    m("releaseFourMin", num(min(four), 2))
+    m("releaseFourMax", num(max(four), 2))
+    m("releasePerStepMin", num(min(per_step), 2))
+    m("releasePerStepMax", num(max(per_step), 2))
+    cut = [c for c, _, _ in CASES if any(r["cutbacks"] != "0" for r in rel[(c, "armijo", "1")])]
+    if len(cut) != 1 or not all(r["cutbacks"] != "0" for r in rel[(cut[0], "armijo", "1")]):
+        sys.exit("ldp_figures: the text names one case whose single Armijo step cuts back in every "
+                 "repeat: %s" % cut)
+    damped = {c: release_solve(rel[(c, "damped", "1")]) for c, _, _ in CASES}
+    armijo = {c: release_solve(rel[(c, "armijo", "1")]) for c, _, _ in CASES}
+    faster = [c for c, _, _ in CASES if armijo[c] < damped[c]]
+    if set(faster) != set(CASE_LABEL) - set(cut):
+        sys.exit("ldp_figures: the single Armijo step is faster on %s, not on every case without a "
+                 "cut-back" % faster)
+    gain = [100 * (1 - armijo[c] / damped[c]) for c in faster]
+    m("armijoFasterCases", listing(CASE_LABEL[c] for c in faster))
+    m("armijoGainMin", num(min(gain), 2))
+    m("armijoGainMax", num(max(gain), 2))
+    m("armijoCutbackCase", CASE_LABEL[cut[0]])
+    m("armijoCutbackSlower", num(armijo[cut[0]] / damped[cut[0]], 2))
+    armijo_runs = [r for r in release_runs if r["rule"] == "armijo"]
+    m("armijoRuns", integer(len(armijo_runs)))
+    m("armijoCutbackRuns", integer(sum(r["cutbacks"] != "0" for r in armijo_runs)))
     return "".join(out)
 
 
@@ -627,6 +703,28 @@ def table_nccl(nccl):
     return "\n".join(lines) + "\n"
 
 
+def table_release(release_runs):
+    rel = release_index(release_runs)
+    head = " & ".join(r"\multicolumn{2}{c}{%s}" % ("1 step" if n == "1" else "%s steps" % n) for n in RELEASE_STEPS)
+    rules = "".join(r"\cmidrule(lr){%d-%d}" % (3 + 2 * i, 4 + 2 * i) for i in range(len(RELEASE_STEPS)))
+    lines = [PREAMBLE,
+             r"\begin{tabular}{@{}ll" + "rr" * len(RELEASE_STEPS) + "@{}}", r"\toprule",
+             r" & & " + head + r" \\", rules,
+             r"Case & Line search & " + " & ".join(["Newton", r"\si{\second}"] * len(RELEASE_STEPS)) + r" \\",
+             r"\midrule"]
+    for i, (case, label, _) in enumerate(CASES):
+        if i:
+            lines.append(r"\addlinespace")
+        for j, (rule, rlabel) in enumerate(RELEASE_RULES):
+            cells = []
+            for n in RELEASE_STEPS:
+                runs = rel[(case, rule, n)]
+                cells += [integer(release_newton(runs)), num(release_solve(runs), 3)]
+            lines.append("%s & %s & %s \\\\" % (label if j == 0 else "", rlabel, " & ".join(cells)))
+    lines += [r"\bottomrule", r"\end{tabular}"]
+    return "\n".join(lines) + "\n"
+
+
 # ---------------------------------------------------------------------------------------------
 # Figures
 # ---------------------------------------------------------------------------------------------
@@ -711,7 +809,7 @@ def generate(out, tables):
                  read_csv("newton.csv"), utopia, read_csv("coordinates.csv"), read_machine(),
                  precision, read_csv("precision_runs.csv"), read_csv("precision_agreement.csv"),
                  nccl, read_csv("nccl_runs.csv"), read_csv("omp_regions.csv"),
-                 read_csv("team_cost.csv")))
+                 read_csv("team_cost.csv"), read_csv("release_runs.csv")))
     write(os.path.join(out, "ldp_colors.tex"), colors())
     write(os.path.join(out, "per_iteration.tex"), figure_per_iteration(index))
     write(os.path.join(out, "breakdown.tex"), figure_breakdown(index, "FF200_mesh_refined"))
@@ -720,6 +818,7 @@ def generate(out, tables):
     write(os.path.join(tables, "performance.tex"), table_performance(index))
     write(os.path.join(tables, "precision.tex"), table_precision(precision))
     write(os.path.join(tables, "nccl.tex"), table_nccl(nccl))
+    write(os.path.join(tables, "release.tex"), table_release(read_csv("release_runs.csv")))
 
 
 def selftest():
@@ -753,6 +852,8 @@ def selftest():
     assert len(read_csv("precision_agreement.csv")) == len(CASES) * len(PRECISION_CONFIGS) * 5
     nccl_index(read_csv("nccl.csv"))
     assert len(read_csv("nccl_runs.csv")) == len(CASES) * len(NCCL_CONFIGS) * 2 * 3
+    release_index(read_csv("release_runs.csv"))
+    assert len(read_csv("release_runs.csv")) == len(CASES) * len(RELEASE_RULES) * len(RELEASE_STEPS) * 3
     print("ldp_figures selftest passed")
 
 
