@@ -7,6 +7,7 @@
 #include "sfem_ContactStabilisedNewmarkScheme.hpp"
 #include "sfem_NodeObstacleView.hpp"
 #include "sfem_SDFObstacle.hpp"
+#include "sfem_Team.hpp"
 #include "sfem_sdf_sampling.hpp"
 #include "sfem_aliases.hpp"
 #include "smesh_grid.hpp"
@@ -70,6 +71,11 @@ namespace sfem {
         // out <- Q (s .* in) at the contact nodes and s .* in elsewhere: scaled, then back from
         // their frames. One sweep each, where the scaling and the frames would take two.
         void from_frame(const real_t *const s, const real_t *const in, real_t *const out) const;
+
+        // to_frame and from_frame over the nodes of the calling thread's share of the dofs, on the
+        // host, inside a region its caller opened (Team, blocks of 3).
+        void to_frame(const Team &team, const real_t *const s, const real_t *const in, real_t *const out) const;
+        void from_frame(const Team &team, const real_t *const s, const real_t *const in, real_t *const out) const;
 
         // The step's upper bound in the frames: the gap on each contact node's normal component,
         // `unbounded` everywhere else.

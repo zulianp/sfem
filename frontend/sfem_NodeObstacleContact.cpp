@@ -1,6 +1,7 @@
 #include "sfem_NodeObstacleContact.hpp"
 
 #include <algorithm>
+#include <cassert>
 #include <limits>
 #include <cmath>
 
@@ -109,6 +110,16 @@ namespace sfem {
 
     void NodeObstacleContact::from_frame(const real_t *const s, const real_t *const in, real_t *const out) const {
         node_obstacle_from_frame(view(normals_, gap_), s, in, out);
+    }
+
+    void NodeObstacleContact::to_frame(const Team &team, const real_t *const s, const real_t *const in, real_t *const out) const {
+        assert(team.block == 3);
+        node_obstacle_to_frame(view(normals_, gap_), s, in, out, team.begin / 3, team.end / 3);
+    }
+
+    void NodeObstacleContact::from_frame(const Team &team, const real_t *const s, const real_t *const in, real_t *const out) const {
+        assert(team.block == 3);
+        node_obstacle_from_frame(view(normals_, gap_), s, in, out, team.begin / 3, team.end / 3);
     }
 
     void NodeObstacleContact::upper_bound(const real_t unbounded, real_t *const ub) const {

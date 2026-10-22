@@ -30,6 +30,20 @@ namespace sfem {
     // the contact nodes and the identity elsewhere; s per dof, null for none. in may be out.
     void node_obstacle_to_frame(const NodeObstacleView &c, const real_t *const s, const real_t *const in, real_t *const out);
     void node_obstacle_from_frame(const NodeObstacleView &c, const real_t *const s, const real_t *const in, real_t *const out);
+    // The same over the nodes [first, end) by the calling thread alone, on the host: a thread's
+    // share of a region it opened itself (Team).
+    void node_obstacle_to_frame(const NodeObstacleView &c,
+                                const real_t *const     s,
+                                const real_t *const     in,
+                                real_t *const           out,
+                                const ptrdiff_t         first,
+                                const ptrdiff_t         end);
+    void node_obstacle_from_frame(const NodeObstacleView &c,
+                                  const real_t *const     s,
+                                  const real_t *const     in,
+                                  real_t *const           out,
+                                  const ptrdiff_t         first,
+                                  const ptrdiff_t         end);
     void node_obstacle_upper_bound(const NodeObstacleView &c, const ptrdiff_t ndofs, const real_t unbounded, real_t *const ub);
 
     // projected (a copy of the residual) less the reaction, mu kept; complementarity into c and

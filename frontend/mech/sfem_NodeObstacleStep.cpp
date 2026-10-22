@@ -50,6 +50,8 @@ namespace sfem {
         std::unique_ptr<OwnedReductions>     reductions;
         std::shared_ptr<BSRTangent>          tangent;
         std::shared_ptr<Operator<real_t>>    tangent_op;
+        // tangent_op on the host, whose product the QP's runs inside its own region.
+        std::shared_ptr<TeamParallelOperator<real_t>> tangent_team;
         std::shared_ptr<MPRGP<real_t>>       qp;
         SharedBuffer<real_t>                 k, k_ref, projected, upper_bound, qp_rhs, framed, lift, diag, trial_r;
         // The QP's variables are y / scale, its bounds upper_bound / scale (scaled_bound), its
@@ -184,21 +186,40 @@ namespace sfem {
         Impl *const self   = &impl;
         auto        framed = create_buffer<real_t>(impl.ndofs, es);
         // Under MPI the owned rows, as the tangent's product computes them.
-        const ptrdiff_t owned = f->space()->n_owned_dofs();
-        auto            op    = make_parallel_op<real_t>(
-                f->space()->mesh_ptr()->comm(),
-                owned,
-                owned,
-                impl.ndofs,
-                impl.ndofs,
-                [self, framed](const real_t *const in, real_t *const out) {
-                    // scale Q^T K Q scale: out = scale .* (Q^T K Q (scale .* in)).
-                    real_t *const tmp = self->qp_tmp->data();
-                    self->contact->from_frame(self->scale->data(), in, framed->data());
-                    self->tangent_op->apply(framed->data(), tmp);
-                    self->contact->to_frame(self->scale->data(), tmp, out);
-                },
-                es);
+        const ptrdiff_t                           owned = f->space()->n_owned_dofs();
+        std::shared_ptr<ParallelOperator<real_t>> op;
+        if (es == EXECUTION_SPACE_HOST) {
+            // One region: each thread takes its nodes into the frames, then, once every thread's
+            // are in, its rows of the product and back out of the frames.
+            op = make_team_op<real_t>(f->space()->mesh_ptr()->comm(),
+                                      owned,
+                                      owned,
+                                      impl.ndofs,
+                                      impl.ndofs,
+                                      3,
+                                      [self, framed](const Team &team, const real_t *const in, real_t *const out) {
+                                          real_t *const tmp = self->qp_tmp->data();
+                                          self->contact->from_frame(team, self->scale->data(), in, framed->data());
+                                          team.barrier();
+                                          self->tangent_team->team_apply(team, framed->data(), tmp);
+                                          self->contact->to_frame(team, self->scale->data(), tmp, out);
+                                      });
+        } else {
+            op = make_parallel_op<real_t>(
+                    f->space()->mesh_ptr()->comm(),
+                    owned,
+                    owned,
+                    impl.ndofs,
+                    impl.ndofs,
+                    [self, framed](const real_t *const in, real_t *const out) {
+                        // scale Q^T K Q scale: out = scale .* (Q^T K Q (scale .* in)).
+                        real_t *const tmp = self->qp_tmp->data();
+                        self->contact->from_frame(self->scale->data(), in, framed->data());
+                        self->tangent_op->apply(framed->data(), tmp);
+                        self->contact->to_frame(self->scale->data(), tmp, out);
+                    },
+                    es);
+        }
         impl.qp             = create_mprgp<real_t>(op, es);
         impl.qp->set_op_overwrites(true);
         impl.qp->verbose    = false;
@@ -266,6 +287,10 @@ namespace sfem {
         if (impl.tangent->assemble(x) != SFEM_SUCCESS) return SFEM_FAILURE;
         // y = K x: the QP's product writes tmp whole.
         impl.tangent_op = impl.tangent->op(0);
+        if (impl.tangent->execution_space() == EXECUTION_SPACE_HOST) {
+            impl.tangent_team = std::dynamic_pointer_cast<TeamParallelOperator<real_t>>(impl.tangent_op);
+            if (!impl.tangent_team) SFEM_ERROR("NodeObstacleStep: the host tangent has no product for a region of its caller\n");
+        }
         if (impl.options.curvature) {
             impl.contact->add_curvature(
                     x, r, impl.k->data(), false, 1, impl.tangent->rowptr(), impl.tangent->colidx(), impl.tangent->values_type(), impl.tangent->values());
