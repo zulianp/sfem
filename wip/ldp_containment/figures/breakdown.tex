@@ -3,18 +3,18 @@
 
 \begin{tikzpicture}
 \begin{axis}[ybar stacked, bar width=7pt, width=\columnwidth, height=5.0cm,
-  symbolic x coords={c0,c1,c2,c3,c4,c5,c6,c7,c8,c9}, xtick=data,
-  xticklabels={{$1\times72$},{$4\times72$},{$16\times18$},{$4\times72$\\2 nodes},{$8\times72$\\2 nodes},{$32\times18$\\2 nodes},{1 GPU},{4 GPUs},{4 GPUs\\2 nodes},{8 GPUs\\2 nodes}}, xticklabel style={font=\tiny, align=center},
+  symbolic x coords={c0,c1,c2,c3,c4,c5,c6,c7}, xtick=data,
+  xticklabels={{$1\times72$},{$4\times72$},{$16\times18$},{$8\times72$\\2 nodes},{$32\times18$\\2 nodes},{1 GPU},{4 GPUs},{8 GPUs\\2 nodes}}, xticklabel style={font=\tiny, align=center},
   ymin=0, ylabel={time to solution (\si{\second})}, ymajorgrids,
   legend style={font=\scriptsize, at={(0.5,1.02)}, anchor=south, legend columns=2},
   enlarge x limits=0.07]
-\addplot[fill=LdpA, draw=none] coordinates {(c0,0.000) (c1,3.899) (c2,3.050) (c3,3.865) (c4,3.150) (c5,2.875) (c6,0.000) (c7,1.881) (c8,1.257) (c9,2.017)};
+\addplot[fill=LdpA, draw=none] coordinates {(c0,0.000) (c1,3.763) (c2,2.875) (c3,2.894) (c4,2.828) (c5,0.000) (c6,1.768) (c7,2.109)};
 \addlegendentry{QP exchange}
-\addplot[fill=LdpB, draw=none] coordinates {(c0,34.269) (c1,7.650) (c2,6.178) (c3,7.357) (c4,8.592) (c5,6.020) (c6,7.883) (c7,3.908) (c8,4.184) (c9,2.983)};
+\addplot[fill=LdpB, draw=none] coordinates {(c0,32.940) (c1,5.704) (c2,4.315) (c3,5.688) (c4,4.496) (c5,7.449) (c6,3.874) (c7,3.285)};
 \addlegendentry{QP other}
-\addplot[fill=LdpC, draw=none] coordinates {(c0,0.795) (c1,0.172) (c2,0.212) (c3,0.172) (c4,0.105) (c5,0.121) (c6,0.009) (c7,0.005) (c8,0.004) (c9,0.003)};
+\addplot[fill=LdpC, draw=none] coordinates {(c0,0.796) (c1,0.182) (c2,0.209) (c3,0.105) (c4,0.119) (c5,0.009) (c6,0.004) (c7,0.003)};
 \addlegendentry{Assembly}
-\addplot[fill=LdpD, draw=none] coordinates {(c0,0.552) (c1,0.483) (c2,0.454) (c3,0.468) (c4,0.464) (c5,0.557) (c6,0.351) (c7,0.762) (c8,0.488) (c9,0.974)};
+\addplot[fill=LdpD, draw=none] coordinates {(c0,0.529) (c1,0.435) (c2,0.400) (c3,0.428) (c4,0.428) (c5,0.338) (c6,0.759) (c7,0.989)};
 \addlegendentry{Other}
 \end{axis}
 \end{tikzpicture}

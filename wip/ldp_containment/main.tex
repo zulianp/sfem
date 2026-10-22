@@ -57,8 +57,9 @@ single implementation. On four industrial meshes with \dofsMin{} to \dofsMax{} d
 freedom, all host and device configurations produce the same converged displacement to a
 relative \agreeParallel{}, and the converged solutions have a KKT residual \kktRatioMin{} to
 \kktRatioMax{} times smaller than the production solver they replace. The QP iteration is
-latency bound at these sizes: one GPU is the fastest configuration on all but the largest mesh,
-and several GPUs on the largest. Storing the tangent in single precision lowers the cost per QP
+latency bound at these sizes: on the three smaller meshes the fastest Grace configuration and one
+GPU solve within \graceGpuCloseMax\% of each other, and several GPUs are the fastest on the
+largest. Storing the tangent in single precision lowers the cost per QP
 iteration by up to \singleMax\% and changes the solution less than repeated runs do.
 \end{abstract}
 
@@ -158,6 +159,11 @@ the GPU each pass reduces per thread block and finishes in a second kernel, whic
 summation order. The scaled operator $D^{-1/2}KD^{-1/2}$ takes three passes: on each side of the
 product with the assembled tangent, the scaling and the rotation into or out of the frames are one
 pass over all nodes, and the product overwrites its output, so no vector is zeroed before it.
+On Grace, consecutive conjugate-gradient steps of MPRGP run in one OpenMP parallel region, which
+ends at the next proportioning or expansion step. Each thread keeps one contiguous share of the
+owned unknowns through the operator and both passes, and a step synchronises the threads at three
+barriers. A pass sums over chunks fixed by the number of unknowns alone and adds them in index
+order, so the sums do not depend on the thread count.
 
 \paragraph{Devices.} One rank drives one GPU. The device exchange packs, sends and unpacks device
 buffers with GPU-aware MPI. Ranks are bound to GPUs before MPI is initialised, from the launcher's
@@ -174,7 +180,8 @@ Slingshot through libfabric \machineLibfabric{}. The software is GCC \machineGCC
 \machineCUDA{}, Cray MPICH \machineMPICH{} and NVIDIA driver \machineDriver{}.
 
 Grace configurations are written $R\times T$ for $R$ ranks of $T$ threads, with one rank per
-module ($4\times72$ per node) or four per module ($16\times18$), threads bound to cores. GPU
+module ($4\times72$ per node) or four per module ($16\times18$), threads bound to cores. A run on
+two nodes fills both. GPU
 configurations run one rank per GPU with its module's \machineCores{} cores. Cray MPICH's GPU
 support is disabled on Grace runs, since it checks every buffer with the CUDA driver; GPU runs
 use GPU-aware MPI with the driver-query override that CSCS provides for the current
@@ -241,24 +248,27 @@ the time to solution. The QP accounts for at least \qpShareFFf\% of the solve ti
 in every configuration (Figure~\ref{fig:breakdown}), so the cost per QP iteration determines the
 time to solution.
 
-\paragraph{GPUs.} One GPU is the fastest configuration on \oneGpuBestCases{}; \bestElsewhere{}. Per case, the fastest GPU configuration solves
-\gpuOverGraceMin{} to \gpuOverGraceMax{} times faster than the fastest Grace configuration. Four
-GPUs on two nodes cost \gpuInternodeMin{} to \gpuInternodeMax{} times as much per QP iteration as
-four GPUs on one node: crossing the network adds no measurable cost at these message sizes.
+\paragraph{GPUs.} One GPU is the fastest configuration on \oneGpuBestCases{}; \bestElsewhere{}. Per case, the fastest Grace configuration takes
+\gpuOverGraceMin{} to \gpuOverGraceMax{} times as long as the fastest GPU configuration.
 
-\paragraph{Grace.} At equal core count, $16\times18$ is \hostThreadsMin{} to \hostThreadsMax{}
-times faster per iteration than $4\times72$, and $4\times72$ on one node is slower than
-$1\times72$ on \fourSlowerThanOneCases{}. The difference is OpenMP's fork and join: on Grace an
-empty parallel region costs \regionCostWide\,\si{\micro\second} with \machineCores{} threads per rank
-and \regionCostNarrow\,\si{\micro\second} with 18, as much as a pass over a rank's unknowns, and a QP
-iteration opens \regionsPerIteration{} regions, which add \regionAddedFFc{} of the
-\hostGapFFc\,\si{\micro\second} by which FF200's iteration on $4\times72$ exceeds that on
-$16\times18$.
+\paragraph{Grace.} An empty OpenMP parallel region costs \regionCostWide\,\si{\micro\second} with
+\machineCores{} threads per rank and \regionCostNarrow\,\si{\micro\second} with 18, as much as a pass
+over a rank's unknowns. MPRGP's conjugate-gradient steps therefore share one region, and a QP
+iteration of FF200 on $1\times72$ opens \regionsPerIteration{}. Their sums are not OpenMP reduction
+clauses: GCC combines a clause of several variables under a global lock of its runtime, on which
+the threads of a rank serialise. In a stand-in for the step on FF200's unknowns, with a
+tridiagonal matrix in place of the tangent, a region per pass with such clauses costs
+\standinRegionsOne{} and \standinRegionsFour\,\si{\micro\second} per step on $1\times72$ and
+$4\times72$, one shared region \standinTeamOne{} and \standinTeamFour\,\si{\micro\second}. On one
+node $4\times72$ costs \hostThreadsMin{} to \hostThreadsMax{} times as much per iteration as
+$16\times18$, and more than $1\times72$ only on \fourSlowerThanOneCases{}, the case with the least
+work per rank, where the stand-in's synchronisation accounts for \standinGap{} of the
+\hostGapOneFour\,\si{\micro\second} difference.
 
 \paragraph{Latency.} The cheapest iteration of each case costs \itBestMin{} to
 \itBestMax\,\si{\micro\second}, while the work per iteration grows \dofsRatio-fold from the smallest
 to the largest case: the QP iteration is latency bound. Its fixed cost is the two global reductions, the
-ghost exchange and, on the GPU, the kernel launches and the transfer of each reduction's result to
+ghost exchange, on Grace the three barriers and, on the GPU, the kernel launches and the transfer of each reduction's result to
 the host. Adding ranks shrinks the work per rank but not these costs, which bounds the strong
 scaling of every case.
 
@@ -297,9 +307,8 @@ the same. On one node NCCL lowers the cost per QP iteration by \ncclOneGainMin{}
 \ncclOneGainMax\%, but its set-up costs \ncclCostMin{} to \ncclCostMax\,\si{\second} once per
 process, most of it in calls to the GPU driver, and the time to solution
 grows by \ncclExtraMin{} to \ncclExtraMax\,\si{\second} on every case: the option repays its
-set-up from about \ncclBreakEven{} QP iterations. On two nodes the time per iteration changes by
-\ncclTwoPerNodeChangeMin{} to \ncclTwoPerNodeChangeMax\% with two GPUs per node and falls by
-\ncclEightGainMin{} to \ncclEightGainMax\% with four. The option
+set-up from about \ncclBreakEven{} QP iterations. On two nodes, eight GPUs, the time per
+iteration falls by \ncclEightGainMin{} to \ncclEightGainMax\%. The option
 is off by default.
 
 \begin{table*}
@@ -310,14 +319,14 @@ is off by default.
 \input{tables/performance}
 \end{table*}
 
-\begin{table}
+\begin{table*}
 \caption{The tangent in double and in single precision on one node: cost per QP iteration and
 time to solution, median of \benchRepeats{} runs each.}
 \label{tab:precision}
 \small
 \setlength{\tabcolsep}{3.5pt}
 \input{tables/precision}
-\end{table}
+\end{table*}
 
 \begin{table*}
 \caption{Communication within a node by MPI and by NCCL: cost per QP iteration and time to

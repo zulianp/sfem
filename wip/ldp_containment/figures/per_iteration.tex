@@ -3,18 +3,18 @@
 
 \begin{tikzpicture}
 \begin{axis}[ybar, bar width=3.2pt, width=\textwidth, height=5.2cm,
-  symbolic x coords={c0,c1,c2,c3,c4,c5,c6,c7,c8,c9}, xtick=data,
-  xticklabels={{$1\times72$},{$4\times72$},{$16\times18$},{$4\times72$\\2 nodes},{$8\times72$\\2 nodes},{$32\times18$\\2 nodes},{1 GPU},{4 GPUs},{4 GPUs\\2 nodes},{8 GPUs\\2 nodes}}, xticklabel style={font=\scriptsize, align=center},
+  symbolic x coords={c0,c1,c2,c3,c4,c5,c6,c7}, xtick=data,
+  xticklabels={{$1\times72$},{$4\times72$},{$16\times18$},{$8\times72$\\2 nodes},{$32\times18$\\2 nodes},{1 GPU},{4 GPUs},{8 GPUs\\2 nodes}}, xticklabel style={font=\scriptsize, align=center},
   ymin=0, ylabel={\si{\micro\second} per QP iteration}, ymajorgrids,
   legend style={font=\scriptsize, at={(0.5,1.02)}, anchor=south, legend columns=4},
   enlarge x limits=0.06]
-\addplot[fill=LdpA, draw=none] coordinates {(c0,171.0) (c1,241.5) (c2,136.7) (c3,221.6) (c4,292.3) (c5,199.4) (c6,85.5) (c7,138.5) (c8,131.0) (c9,159.1)};
+\addplot[fill=LdpA, draw=none] coordinates {(c0,78.7) (c1,106.6) (c2,103.5) (c3,137.8) (c4,161.1) (c5,85.5) (c6,133.9) (c7,159.0)};
 \addlegendentry{FF200 (\num{150525} dofs)}
-\addplot[fill=LdpB, draw=none] coordinates {(c0,211.5) (c1,243.0) (c2,162.0) (c3,230.3) (c4,276.3) (c5,192.3) (c6,98.8) (c7,141.0) (c8,131.7) (c9,172.4)};
+\addplot[fill=LdpB, draw=none] coordinates {(c0,125.7) (c1,114.6) (c2,123.7) (c3,125.3) (c4,151.0) (c5,98.1) (c6,135.6) (c7,170.5)};
 \addlegendentry{FP70 coarse (\num{223332} dofs)}
-\addplot[fill=LdpC, draw=none] coordinates {(c0,531.2) (c1,298.7) (c2,210.9) (c3,278.4) (c4,322.4) (c5,219.6) (c6,173.2) (c7,181.1) (c8,163.0) (c9,173.8)};
+\addplot[fill=LdpC, draw=none] coordinates {(c0,460.9) (c1,163.7) (c2,170.2) (c3,167.9) (c4,193.2) (c5,174.3) (c6,171.7) (c7,175.1)};
 \addlegendentry{FP70 (\num{526809} dofs)}
-\addplot[fill=LdpD, draw=none] coordinates {(c0,1253.5) (c1,423.0) (c2,320.3) (c3,405.4) (c4,418.2) (c5,296.7) (c6,277.5) (c7,203.1) (c8,195.8) (c9,181.3)};
+\addplot[fill=LdpD, draw=none] coordinates {(c0,1169.0) (c1,323.1) (c2,249.3) (c3,303.2) (c4,252.4) (c5,280.8) (c6,197.6) (c7,180.7)};
 \addlegendentry{FF200 refined (\num{973812} dofs)}
 \end{axis}
 \end{tikzpicture}

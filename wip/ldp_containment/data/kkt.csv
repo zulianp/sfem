@@ -1,13 +1,13 @@
 case,state,grid,residual
 FP70_similar_coarse,utopia,legacy,2.985954e-02
 FP70_similar_coarse,utopia,sdf,2.984647e-02
-FP70_similar_coarse,sfem,sdf,4.896565e-07
+FP70_similar_coarse,sfem,sdf,5.488237e-07
 FP70_similar,utopia,legacy,2.353257e-02
 FP70_similar,utopia,sdf,2.351537e-02
-FP70_similar,sfem,sdf,6.947613e-03
+FP70_similar,sfem,sdf,6.890192e-03
 FF200_ExodusMesh,utopia,legacy,9.183929e-02
 FF200_ExodusMesh,utopia,sdf,9.184064e-02
-FF200_ExodusMesh,sfem,sdf,9.250405e-09
+FF200_ExodusMesh,sfem,sdf,9.224463e-09
 FF200_mesh_refined,utopia,legacy,9.894792e-02
 FF200_mesh_refined,utopia,sdf,9.898844e-02
-FF200_mesh_refined,sfem,sdf,6.605730e-09
+FF200_mesh_refined,sfem,sdf,6.474756e-09

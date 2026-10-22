@@ -19,6 +19,10 @@ Inputs (../data, copied from the jobs that produced them; README.md names the jo
                           first double run
   nccl.csv, nccl_runs.csv GPU configurations with the communication within a node by MPI and by
                           NCCL (nccl: true), alternating per repeat, same columns as summary/runs
+  omp_regions.csv         workflows/ldp_containment/omp: an empty OpenMP region per run shape and
+                          the regions FF200's QP iterations open on 1 x 72
+  team_cost.csv           workflows/ldp_containment/omp/team_cost.c: a stand-in CG step, a region
+                          per pass against one region with fixed-chunk sums, per run shape
   machine.txt             the node and the software, key=value
 
 Usage:
@@ -56,12 +60,10 @@ CONFIGS = [
     ("host_1x72", "1", r"$1\times72$", "HostOne"),
     ("host_4x72", "1", r"$4\times72$", "HostFour"),
     ("host_16x18", "1", r"$16\times18$", "HostSixteen"),
-    ("host_4x72", "2", r"$4\times72$", "HostFourTwo"),
     ("host_8x72", "2", r"$8\times72$", "HostEight"),
     ("host_32x18", "2", r"$32\times18$", "HostThirtyTwo"),
     ("gpu_1", "1", "1 GPU", "GpuOne"),
     ("gpu_4", "1", "4 GPUs", "GpuFour"),
-    ("gpu_4", "2", "4 GPUs", "GpuFourTwo"),
     ("gpu_8", "2", "8 GPUs", "GpuEight"),
 ]
 # The configurations of the precision comparison: (config, label, macro key).
@@ -73,7 +75,6 @@ PRECISION_CONFIGS = [
 # The configurations of the NCCL comparison: (config, nodes, label, macro key).
 NCCL_CONFIGS = [
     ("gpu_4", "1", "4 GPUs", "One"),
-    ("gpu_4", "2", "4 GPUs, 2 nodes", "TwoPerNode"),
     ("gpu_8", "2", "8 GPUs, 2 nodes", "Eight"),
 ]
 COLORS = ["LdpA", "LdpB", "LdpC", "LdpD"]
@@ -209,7 +210,7 @@ def solve_time(r):
 # ---------------------------------------------------------------------------------------------
 
 def macros(index, runs, agreement, ab, kkt, newton, utopia, coords, machine, precision, precision_runs,
-           precision_agreement, nccl, nccl_runs, omp_regions):
+           precision_agreement, nccl, nccl_runs, omp_regions, team_cost):
     out = [PREAMBLE]
     m = lambda name, value: out.append(macro(name, value))
 
@@ -364,40 +365,66 @@ def macros(index, runs, agreement, ab, kkt, newton, utopia, coords, machine, pre
               for c, _, _ in CASES if fastest[c][0] != "gpu_1"]
     if not others:
         sys.exit("ldp_figures: one GPU is the fastest everywhere: the text says otherwise")
-    m("bestElsewhere", ("on %s it is %s" if len(others) == 1 else "on %s the fastest are %s")
+    m("bestElsewhere", ("on %s it is %s" if len(others) == 1 else "on %s the fastest are %s, respectively")
       % (listing(o for o, _ in others), listing(b for _, b in others)))
-    # The abstract: one GPU on all but the largest mesh, several GPUs on the largest.
+    # The abstract: several GPUs fastest on the largest mesh; on the others one GPU is the fastest
+    # GPU configuration and the fastest Grace configuration solves close to it (within 25%).
     largest = max(CASES, key=lambda c: int(index[(c[0], CONFIGS[0][0], CONFIGS[0][1])]["dofs"]))[0]
-    if [c for c, _, _ in CASES if fastest[c][0] != "gpu_1"] != [largest] or not fastest[largest][0].startswith("gpu"):
-        sys.exit("ldp_figures: the fastest configurations no longer fit the abstract's sentence")
+    if fastest[largest][0] in ("gpu_1",) or not fastest[largest][0].startswith("gpu"):
+        sys.exit("ldp_figures: several GPUs are no longer the fastest on the largest mesh")
+    close = []
+    for c, _, _ in CASES:
+        if c == largest:
+            continue
+        best = lambda kind: min((k for k in CONFIGS if k[0].startswith(kind)),
+                                key=lambda k: solve_time(index[(c, k[0], k[1])]))
+        if best("gpu")[0] != "gpu_1":
+            sys.exit("ldp_figures: one GPU is not the fastest GPU configuration on " + c)
+        a, b = (solve_time(index[(c, k[0], k[1])]) for k in (best("host"), best("gpu")))
+        close.append(100 * (max(a, b) / min(a, b) - 1))
+    if max(close) > 25:
+        sys.exit("ldp_figures: Grace and one GPU are no longer close on the smaller meshes")
+    m("graceGpuCloseMax", integer(max(close)))
     ratio = lambda case, a, b: per_iteration(index[(case,) + a]) / per_iteration(index[(case,) + b])
-    internode = [ratio(c, ("gpu_4", "2"), ("gpu_4", "1")) for c, _, _ in CASES]
-    m("gpuInternodeMin", num(min(internode), 3))
-    m("gpuInternodeMax", num(max(internode), 3))
-    slower = [CASE_LABEL[c] for c, _, _ in CASES if ratio(c, ("host_4x72", "1"), ("host_1x72", "1")) > 1]
-    m("fourSlowerThanOneCases", listing(slower) or "none")
+    slower = [c for c, _, _ in CASES if ratio(c, ("host_4x72", "1"), ("host_1x72", "1")) > 1]
+    least = min(CASES, key=lambda c: int(index[(c[0], "host_1x72", "1")]["dofs"]))[0]
+    if slower != [least]:
+        sys.exit("ldp_figures: 4x72 is slower than 1x72 on %s: the text says only on the case with "
+                 "the least work per rank" % slower)
+    m("fourSlowerThanOneCases", listing(CASE_LABEL[c] for c in slower))
     threads = [ratio(c, ("host_4x72", "1"), ("host_16x18", "1")) for c, _, _ in CASES]
     m("hostThreadsMin", num(min(threads), 2))
     m("hostThreadsMax", num(max(threads), 2))
-    # OpenMP's fork and join on Grace: an empty region with 72 and with 18 threads per rank, the
-    # regions a QP iteration opens, and what they add to FF200's iteration on 4x72 over 16x18,
-    # which the text says is most of the difference.
+    # OpenMP on Grace: an empty region with 72 and with 18 threads per rank (as much as a pass over
+    # a rank's unknowns), the regions a QP iteration of FF200 on 1x72 opens, and the stand-in CG
+    # step (team_cost.c) on FF200's unknowns: a region per pass with reduction clauses against one
+    # region with chunk sums (256 chunks, as the solver on these sizes), on 1x72 and 4x72. Its
+    # synchronisation accounts for most of what 4x72 adds to FF200's iteration over 1x72.
     region = {(r["ranks"], r["threads"]): float(r["empty_us"]) for r in omp_regions if r["kind"] == "cost"}
     for r in omp_regions:
         if r["kind"] == "cost" and abs(float(r["sweep_us"]) / float(r["empty_us"]) - 1) > 0.25:
             sys.exit("ldp_figures: a pass over a rank's unknowns no longer costs about an empty region")
     count = [r for r in omp_regions if r["kind"] == "count"]
     per_it = int(count[0]["regions"]) / int(count[0]["qp_iterations"])
-    added = per_it * (region[("4", "72")] - region[("16", "18")])
-    gap = per_iteration(index[("FF200_ExodusMesh", "host_4x72", "1")]) - per_iteration(index[("FF200_ExodusMesh", "host_16x18", "1")])
+    if per_it >= 1:
+        sys.exit("ldp_figures: a QP iteration opens %.2f regions: the text says its CG steps share one" % per_it)
+    standin = {(r["ranks"], r["threads"]): r for r in team_cost if r["n"] == "150525" or
+               (r["ranks"], r["n"]) == ("4", "37631")}
+    one, four = standin[("1", "72")], standin[("4", "72")]
+    added = float(four["chunk256_us"]) - float(one["chunk256_us"])
+    gap = per_iteration(index[(least, "host_4x72", "1")]) - per_iteration(index[(least, "host_1x72", "1")])
     if not gap / 2 < added <= gap:
-        sys.exit("ldp_figures: fork and join add %.0f us of FF200's %.0f us between 4x72 and 16x18: "
-                 "the text says most of it" % (added, gap))
+        sys.exit("ldp_figures: the stand-in's synchronisation adds %.0f us of %s's %.0f us between "
+                 "4x72 and 1x72: the text says most of it" % (added, least, gap))
     m("regionCostWide", num(region[("4", "72")], 2))
     m("regionCostNarrow", num(region[("16", "18")], 2))
     m("regionsPerIteration", num(per_it, 2))
-    m("regionAddedFFc", integer(added))
-    m("hostGapFFc", integer(gap))
+    m("standinRegionsOne", integer(float(one["regions_us"])))
+    m("standinRegionsFour", integer(float(four["regions_us"])))
+    m("standinTeamOne", integer(float(one["chunk256_us"])))
+    m("standinTeamFour", integer(float(four["chunk256_us"])))
+    m("standinGap", integer(added))
+    m("hostGapOneFour", integer(gap))
 
     # The tangent in single precision against double, per configuration
     m("precisionRuns", integer(len(precision_runs)))
@@ -683,7 +710,8 @@ def generate(out, tables):
           macros(index, runs, read_csv("agreement.csv"), read_csv("ab.csv"), read_csv("kkt.csv"),
                  read_csv("newton.csv"), utopia, read_csv("coordinates.csv"), read_machine(),
                  precision, read_csv("precision_runs.csv"), read_csv("precision_agreement.csv"),
-                 nccl, read_csv("nccl_runs.csv"), read_csv("omp_regions.csv")))
+                 nccl, read_csv("nccl_runs.csv"), read_csv("omp_regions.csv"),
+                 read_csv("team_cost.csv")))
     write(os.path.join(out, "ldp_colors.tex"), colors())
     write(os.path.join(out, "per_iteration.tex"), figure_per_iteration(index))
     write(os.path.join(out, "breakdown.tex"), figure_breakdown(index, "FF200_mesh_refined"))
