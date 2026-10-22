@@ -76,7 +76,9 @@ namespace sfem {
     /// of the region calls team_apply with its team(), may wait for the others (team.barrier())
     /// and, on return, has computed the rows of its share, [team.begin, team.end). apply() is one
     /// region around it. Under MPI thread 0 takes no rows: it keeps the messages moving (a
-    /// rendezvous advances only while a thread is in MPI).
+    /// rendezvous advances only while a thread is in MPI). With input_in_share() team_apply reads
+    /// x beyond the calling thread's share only after a barrier of its own, so a caller that has
+    /// just written its share of x need not wait for the other threads first.
     template <typename T>
     class TeamParallelOperator final : public ParallelOperator<T> {
     public:
@@ -87,21 +89,20 @@ namespace sfem {
                              const std::ptrdiff_t                 cols,
                              const std::ptrdiff_t                 row_allocation_size,
                              const std::ptrdiff_t                 col_allocation_size,
-                             const int                            block_size,
+                             const bool                           input_in_share,
                              TeamApply                            team_apply)
             : comm_(comm),
               rows_(rows),
               cols_(cols),
               row_allocation_size_(row_allocation_size),
               col_allocation_size_(col_allocation_size),
-              block_size_(block_size),
+              input_in_share_(input_in_share),
               team_apply_(std::move(team_apply)) {
             assert(comm_);
             assert(rows_ >= 0);
             assert(cols_ >= 0);
             assert(row_allocation_size_ >= rows_);
             assert(col_allocation_size_ >= cols_);
-            assert(rows_ % block_size_ == 0);
         }
 
         int apply(const T* const x, T* const y) override {
@@ -111,12 +112,12 @@ namespace sfem {
         }
 
         /// Inside a region, the calling thread's share of the rows.
-        Team team() const { return Team::current(rows_, block_size_, comm_->size() > 1); }
+        Team team() const { return Team::current(rows_, comm_->size() > 1); }
 
         /// From inside a region, every thread with its own team().
         void team_apply(const Team& team, const T* const x, T* const y) const { team_apply_(team, x, y); }
 
-        int block_size() const { return block_size_; }
+        bool input_in_share() const { return input_in_share_; }
 
         std::ptrdiff_t rows() const override { return rows_; }
         std::ptrdiff_t cols() const override { return cols_; }
@@ -132,7 +133,7 @@ namespace sfem {
         std::ptrdiff_t                cols_{0};
         std::ptrdiff_t                row_allocation_size_{0};
         std::ptrdiff_t                col_allocation_size_{0};
-        int                           block_size_{1};
+        bool                          input_in_share_{false};
         TeamApply                     team_apply_;
     };
 
@@ -142,10 +143,10 @@ namespace sfem {
                                                                  const std::ptrdiff_t                          cols,
                                                                  const std::ptrdiff_t                          row_allocation_size,
                                                                  const std::ptrdiff_t                          col_allocation_size,
-                                                                 const int                                     block_size,
+                                                                 const bool                                    input_in_share,
                                                                  typename TeamParallelOperator<T>::TeamApply   team_apply) {
         return std::make_shared<TeamParallelOperator<T>>(
-                comm, rows, cols, row_allocation_size, col_allocation_size, block_size, std::move(team_apply));
+                comm, rows, cols, row_allocation_size, col_allocation_size, input_in_share, std::move(team_apply));
     }
 
     template <typename T>

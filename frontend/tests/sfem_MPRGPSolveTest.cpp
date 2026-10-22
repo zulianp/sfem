@@ -3,7 +3,8 @@
 // CG, expansion and proportioning steps. The solution is checked by its KKT conditions; the
 // iteration count, the steps of each kind and a checksum of the solution's bits are printed, so that
 // two builds of MPRGP can be compared bit for bit on the same operator. On the host the solution's
-// bits do not depend on the number of threads.
+// bits do not depend on the number of threads, nor on whether the CG steps run pass by pass or in
+// one region (an operator in team form).
 
 #include <cmath>
 #include <cstdint>
@@ -76,7 +77,9 @@ namespace {
         return h;
     }
 
-    int solve(const sfem::ExecutionSpace es, uint64_t *const sum = nullptr) {
+    enum class HostOp { LIBRARY, ROWS, TEAM };
+
+    int solve(const sfem::ExecutionSpace es, uint64_t *const sum = nullptr, const HostOp host_op = HostOp::LIBRARY) {
         sfem::SharedBuffer<count_t> rowptr;
         sfem::SharedBuffer<idx_t>   colidx;
         sfem::SharedBuffer<real_t>  values;
@@ -92,8 +95,29 @@ namespace {
         }
 
         std::shared_ptr<sfem::Operator<real_t>> op;
-        if (es == sfem::EXECUTION_SPACE_HOST) {
+        if (es == sfem::EXECUTION_SPACE_HOST && host_op == HostOp::LIBRARY) {
             op = sfem::h_crs_spmv<count_t, idx_t, real_t, real_t>(m, m, rowptr, colidx, values, real_t(1));
+        } else if (es == sfem::EXECUTION_SPACE_HOST) {
+            // One row function, either in a region of its own per product or in the caller's.
+            auto row = [rowptr, colidx, values](const ptrdiff_t i, const real_t *const x) {
+                real_t s = 0;
+                for (count_t k = rowptr->data()[i]; k < rowptr->data()[i + 1]; ++k) s += values->data()[k] * x[colidx->data()[k]];
+                return s;
+            };
+            if (host_op == HostOp::ROWS) {
+                op = sfem::make_op<real_t>(
+                        m,
+                        m,
+                        [row](const real_t *const x, real_t *const y) {
+#pragma omp parallel for
+                            for (ptrdiff_t i = 0; i < m; ++i) y[i] = row(i, x);
+                        },
+                        sfem::EXECUTION_SPACE_HOST);
+            } else {
+                op = sfem::make_team_op<real_t>(sfem::Communicator::world(), m, m, m, m, false, [row](const sfem::Team &team, const real_t *const x, real_t *const y) {
+                    for (ptrdiff_t i = team.begin; i < team.end; ++i) y[i] = row(i, x);
+                });
+            }
         }
 #ifdef SFEM_ENABLE_CUDA
         else {
@@ -173,6 +197,25 @@ int test_host_solve() {
     return SFEM_TEST_SUCCESS;
 }
 
+// The CG steps in one region (MPRGP::team_cg_steps) against the same steps pass by pass, on one
+// row function: the same bits, at all threads and at one.
+int test_host_team_solve() {
+    uint64_t rows = 0, team = 0;
+    SFEM_TEST_ASSERT(solve(sfem::EXECUTION_SPACE_HOST, &rows, HostOp::ROWS) == SFEM_TEST_SUCCESS);
+    SFEM_TEST_ASSERT(solve(sfem::EXECUTION_SPACE_HOST, &team, HostOp::TEAM) == SFEM_TEST_SUCCESS);
+    SFEM_TEST_ASSERT(rows == team);
+#ifdef _OPENMP
+    const int threads = omp_get_max_threads();
+    uint64_t  one     = 0;
+    omp_set_num_threads(1);
+    const int err = solve(sfem::EXECUTION_SPACE_HOST, &one, HostOp::TEAM);
+    omp_set_num_threads(threads);
+    SFEM_TEST_ASSERT(err == SFEM_TEST_SUCCESS);
+    SFEM_TEST_ASSERT(one == team);
+#endif
+    return SFEM_TEST_SUCCESS;
+}
+
 #ifdef SFEM_ENABLE_CUDA
 int test_device_solve() { return solve(sfem::EXECUTION_SPACE_DEVICE); }
 #endif
@@ -180,6 +223,7 @@ int test_device_solve() { return solve(sfem::EXECUTION_SPACE_DEVICE); }
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_host_solve);
+    SFEM_RUN_TEST(test_host_team_solve);
 #ifdef SFEM_ENABLE_CUDA
     SFEM_RUN_TEST(test_device_solve);
 #endif

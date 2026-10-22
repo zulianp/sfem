@@ -27,14 +27,17 @@ namespace sfem {
         return nc;
     }
 
-    // The chunks of n_blocks blocks of `block` entries a Team splits: as blas_chunk_count, but down
-    // to 16 blocks a chunk below 4096 blocks, since inside a region a chunk needs no team of its
-    // own and the threads need chunks to share.
-    inline ptrdiff_t team_chunk_count(const ptrdiff_t n_blocks, const ptrdiff_t block) {
-        ptrdiff_t nc = n_blocks / 16;
+    // Team chunks start at multiples of team_chunk_align entries: a whole number of blocks for
+    // blocks of 1, 2, 3, 4 and 6 entries, so a thread's share is whole blocks whatever they are.
+    constexpr ptrdiff_t team_chunk_align = 12;
+
+    // The chunks of n entries a Team splits: as blas_chunk_count, but down to 48 entries a chunk,
+    // since inside a region a chunk needs no team of its own and the threads need chunks to share.
+    inline ptrdiff_t team_chunk_count(const ptrdiff_t n) {
+        ptrdiff_t nc = n / 48;
         if (nc < 1) nc = 1;
         if (nc > 256) nc = 256;
-        while (nc < blas_max_chunk_count && n_blocks * block / nc > 8192) nc *= 2;
+        while (nc < blas_max_chunk_count && n / nc > 8192) nc *= 2;
         return nc;
     }
 
