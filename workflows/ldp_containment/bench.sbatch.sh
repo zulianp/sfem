@@ -33,7 +33,8 @@ OUT=$LDP_RESULTS/${SLURM_JOB_ID:-local}
 mkdir -p "$OUT"
 export OMP_PROC_BIND=true OMP_PLACES=cores
 
-# config -> kind ranks threads, or nothing for a config this job's nodes cannot hold.
+# config -> kind ranks threads, or nothing for a config this job's nodes cannot hold. On several
+# nodes a config must fill each one (288 Grace cores, 4 GPUs): a second node only after the first.
 parse() {
   local c=$1 kind ranks threads
   case $c in
@@ -45,6 +46,8 @@ parse() {
   [ $((per * NODES)) -eq "$ranks" ] && [ "$per" -ge 1 ] || return 1
   [ $((per * threads)) -le 288 ] || return 1
   [ "$kind" = host ] || [ "$per" -le 4 ] || return 1
+  [ "$NODES" -eq 1 ] || { [ "$kind" = host ] && [ $((per * threads)) -eq 288 ]; } || \
+    { [ "$kind" = gpu ] && [ "$per" -eq 4 ]; } || return 1
   echo "$kind $ranks $threads $per"
 }
 
