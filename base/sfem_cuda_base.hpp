@@ -33,11 +33,37 @@ inline int sfem_cuda_max_grid_dim_x() {
     return max_grid_x;
 }
 
+namespace sfem {
+    namespace details {
+        inline thread_local cudaStream_t launch_stream = nullptr;
+    }
+
+    /// The stream the library's kernels launch on from the calling thread: the legacy default
+    /// stream, unless a LaunchStreamScope set another, as a graph capture does (which the legacy
+    /// stream cannot take part in).
+    inline cudaStream_t launch_stream() { return details::launch_stream; }
+
+    /// Launches from the calling thread go to `stream` while it lives.
+    class LaunchStreamScope {
+    public:
+        explicit LaunchStreamScope(cudaStream_t stream) : previous_(details::launch_stream) { details::launch_stream = stream; }
+        ~LaunchStreamScope() { details::launch_stream = previous_; }
+        LaunchStreamScope(const LaunchStreamScope &)            = delete;
+        LaunchStreamScope &operator=(const LaunchStreamScope &) = delete;
+
+    private:
+        cudaStream_t previous_;
+    };
+}  // namespace sfem
+
 #ifndef NDEBUG
-#define SFEM_DEBUG_SYNCHRONIZE()                \
-    do {                                        \
-        cudaDeviceSynchronize();                \
-        SFEM_CUDA_CHECK(cudaPeekAtLastError()); \
+// Not inside a capture, which a device synchronisation would invalidate.
+#define SFEM_DEBUG_SYNCHRONIZE()                    \
+    do {                                            \
+        if (!sfem::launch_stream()) {               \
+            cudaDeviceSynchronize();                \
+            SFEM_CUDA_CHECK(cudaPeekAtLastError()); \
+        }                                           \
     } while (0)
 #else
 #define SFEM_DEBUG_SYNCHRONIZE()

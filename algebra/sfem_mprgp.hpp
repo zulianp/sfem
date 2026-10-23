@@ -62,6 +62,12 @@ namespace sfem {
         // Whether apply_op writes y = A x whole rather than adding to y: then y is not zeroed
         // before each product.
         bool op_overwrites_{false};
+        // Runs of CG steps in the execution space without returning to the host between them,
+        // where the passes take them (MPRGP_Tpl::cg_run): one rank, a product that writes A p
+        // whole. Off, the host takes each step's decision. run_state_ is the loop of this solve.
+        bool                  device_runs_{true};
+        std::shared_ptr<void> run_state_;
+        int                   device_run_count_{0};
 
         std::shared_ptr<BLAS<T>> blas;
         MPRGP_Tpl<T> impl;
@@ -134,6 +140,9 @@ namespace sfem {
         void set_lower_bound(const SharedBuffer<T>& lb) { lower_bound_ = lb; }
         void set_norm_weight(const SharedBuffer<T>& w) { norm_weight_ = w; }
         void set_op_overwrites(const bool val) { op_overwrites_ = val; }
+        void set_device_runs(const bool val) { device_runs_ = val; }
+        /// The runs of CG steps the last solve took in the execution space.
+        int device_run_count() const { return device_run_count_; }
 
         /// y <- A x.
         void product(const T* const x, T* const y) {
@@ -396,6 +405,55 @@ namespace sfem {
             return exit;
         }
 
+        /// The CG steps in a row in the execution space (MPRGP_Tpl::cg_run), as team_cg_steps takes
+        /// them on the host; false where they cannot be taken there, nothing done.
+        bool device_cg_steps(T* const x, T* const g, T* const p, T* const Ap, T* const gf, T* const work, const T norm_gp0,
+                             Gradients* grads, int* count_cg_steps, bool* converged, TeamExit* exit) {
+            if (!device_runs_ || !impl.cg_run || comm_ || !op_overwrites_) return false;
+            MPRGPRun<T> r;
+            r.n        = n_dofs;
+            r.lb       = lb();
+            r.ub       = ub();
+            r.x        = x;
+            r.g        = g;
+            r.p        = p;
+            r.Ap       = Ap;
+            r.gf       = gf;
+            r.eps      = eps;
+            r.w        = norm_weight_ ? norm_weight_->data() : nullptr;
+            r.infty    = infty;
+            r.params   = params_;
+            r.control  = control_;
+            r.work     = work;
+            r.gamma    = this->gamma;
+            r.atol     = atol;
+            r.rtol     = rtol;
+            r.norm_gp0 = norm_gp0;
+            r.max_it   = max_it;
+            r.product  = apply_op;
+            const MPRGPRunResult run = impl.cg_run(r, iterations_, run_state_);
+            if (!run.ran) return false;
+
+            device_run_count_++;
+            iterations_ = run.iterations;
+            *count_cg_steps += run.steps;
+            *grads     = gradients(record());
+            *converged = run.converged;
+            switch (run.exit) {
+                case MPRGPRunResult::PROPORTIONING:
+                    *exit = TeamExit::PROPORTIONING;
+                    break;
+                case MPRGPRunResult::NOT_A_STEP:
+                    *exit = TeamExit::NOT_A_STEP;
+                    break;
+                case MPRGPRunResult::DONE:
+                    *exit = TeamExit::DONE;
+                    monitor(iterations_, grads->norm_gp, grads->norm_gp / norm_gp0);
+                    break;
+            }
+            return true;
+        }
+
         void monitor(const int iter, const T residual, const T rel_residual) {
             if (iter == max_it || iter % check_each == 0 || residual < atol ||
                 rel_residual < rtol) {
@@ -439,6 +497,9 @@ namespace sfem {
             params_        = {max_eig_, alpha_bar, infty, std::numeric_limits<T>::epsilon()};
             record_        = MPRGPControl<T>{};
             device_reduce_ = make_device_reduce();
+            // The run loop takes this solve's operands: built at its first run.
+            run_state_.reset();
+            device_run_count_ = 0;
 
             this->project(x);  // Make iterate feasible
             this->gradient(x, b, g);
@@ -465,6 +526,10 @@ namespace sfem {
                         // The CG steps in a row in one region; back here at the first that is no
                         // step, for the expansion below.
                         const TeamExit exit = team_cg_steps(x, g, p, Ap_or_Ag, gf_or_gc, work, norm_gp0, &grads, &count_cg_steps, &converged);
+                        if (exit == TeamExit::DONE) break;
+                        if (exit == TeamExit::PROPORTIONING) continue;
+                    } else if (TeamExit exit;
+                               device_cg_steps(x, g, p, Ap_or_Ag, gf_or_gc, work, norm_gp0, &grads, &count_cg_steps, &converged, &exit)) {
                         if (exit == TeamExit::DONE) break;
                         if (exit == TeamExit::PROPORTIONING) continue;
                     } else {
@@ -527,6 +592,7 @@ namespace sfem {
             if (work) this->blas->destroy(work);
             this->blas->destroy(control_);
             control_ = nullptr;
+            run_state_.reset();
             return converged ? SFEM_SUCCESS : SFEM_FAILURE;
         }
     };

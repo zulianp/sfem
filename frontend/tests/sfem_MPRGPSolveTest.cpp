@@ -79,7 +79,17 @@ namespace {
 
     enum class HostOp { LIBRARY, ROWS, TEAM };
 
-    int solve(const sfem::ExecutionSpace es, uint64_t *const sum = nullptr, const HostOp host_op = HostOp::LIBRARY) {
+    // On the device, how the CG steps run: the product adds into its output and each step returns
+    // to the host (ADDS); the product writes it whole and the steps return to the host one by one
+    // (STEPS) or run in the execution space until the run ends (RUNS, MPRGP_Tpl::cg_run).
+    enum class DeviceCg { ADDS, STEPS, RUNS };
+
+    int solve(const sfem::ExecutionSpace es,
+              uint64_t *const            sum      = nullptr,
+              const HostOp               host_op  = HostOp::LIBRARY,
+              const DeviceCg             device   = DeviceCg::ADDS,
+              int *const                 iterations = nullptr,
+              int *const                 runs       = nullptr) {
         sfem::SharedBuffer<count_t> rowptr;
         sfem::SharedBuffer<idx_t>   colidx;
         sfem::SharedBuffer<real_t>  values;
@@ -122,7 +132,8 @@ namespace {
 #ifdef SFEM_ENABLE_CUDA
         else {
             // The library's own BSR kernel (1 x 1 blocks): row by row, a fixed summation order.
-            op    = sfem::d_bsr_spmv(m, m, 1, smesh::to_device(rowptr), smesh::to_device(colidx), smesh::to_device(values), real_t(1));
+            op    = sfem::d_bsr_spmv(m, m, 1, smesh::to_device(rowptr), smesh::to_device(colidx), smesh::to_device(values),
+                                     device == DeviceCg::ADDS ? real_t(1) : real_t(0));
             lower = smesh::to_device(lower);
             upper = smesh::to_device(upper);
             b     = smesh::to_device(b);
@@ -132,6 +143,8 @@ namespace {
 
         auto qp        = sfem::create_mprgp(op, es);
         qp->verbose    = true;
+        qp->set_op_overwrites(device != DeviceCg::ADDS);
+        qp->set_device_runs(device == DeviceCg::RUNS);
         qp->check_each = 1 << 30;
         qp->set_upper_bound(upper);
         qp->set_lower_bound(lower);
@@ -176,6 +189,8 @@ namespace {
         SFEM_TEST_ASSERT(on_lb > 0 && on_ub > 0);
         SFEM_TEST_ASSERT(std::sqrt(kkt) < 1e-10 * std::sqrt(scale));
         if (sum) *sum = checksum(xs);
+        if (iterations) *iterations = qp->iterations();
+        if (runs) *runs = qp->device_run_count();
         return SFEM_TEST_SUCCESS;
     }
 }  // namespace
@@ -218,6 +233,21 @@ int test_host_team_solve() {
 
 #ifdef SFEM_ENABLE_CUDA
 int test_device_solve() { return solve(sfem::EXECUTION_SPACE_DEVICE); }
+
+// The CG steps in runs on the device, without returning to the host between them (a CUDA graph
+// whose loop the device's decision continues), against the same steps returning to it one by one:
+// the same bits, the same iterations, and the runs taken there.
+int test_device_runs() {
+    uint64_t steps = 0, runs = 0;
+    int      it_steps = 0, it_runs = 0, n_steps = 0, n_runs = 0;
+    SFEM_TEST_ASSERT(solve(sfem::EXECUTION_SPACE_DEVICE, &steps, HostOp::LIBRARY, DeviceCg::STEPS, &it_steps, &n_steps) == SFEM_TEST_SUCCESS);
+    SFEM_TEST_ASSERT(solve(sfem::EXECUTION_SPACE_DEVICE, &runs, HostOp::LIBRARY, DeviceCg::RUNS, &it_runs, &n_runs) == SFEM_TEST_SUCCESS);
+    printf("  steps one by one: %d iterations; in runs: %d iterations in %d runs\n", it_steps, it_runs, n_runs);
+    SFEM_TEST_ASSERT(n_steps == 0 && n_runs > 0);
+    SFEM_TEST_ASSERT(it_runs == it_steps);
+    SFEM_TEST_ASSERT(runs == steps);
+    return SFEM_TEST_SUCCESS;
+}
 #endif
 
 int main(int argc, char *argv[]) {
@@ -226,6 +256,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_host_team_solve);
 #ifdef SFEM_ENABLE_CUDA
     SFEM_RUN_TEST(test_device_solve);
+    SFEM_RUN_TEST(test_device_runs);
 #endif
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();

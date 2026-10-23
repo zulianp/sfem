@@ -21,6 +21,36 @@ namespace sfem {
     template <typename T>
     using MPRGPReduce = std::function<void(T* const values, const int count, const bool min_last)>;
 
+    /// A run of MPRGP's CG steps (MPRGP::apply's CG branch and the test after it), taken where the
+    /// passes run: the operands, the operator's product (Ap <- A p, written whole), and the
+    /// constants of the decisions and of the stopping test.
+    template <typename T>
+    struct MPRGPRun {
+        ptrdiff_t      n{0};
+        const T       *lb{nullptr}, *ub{nullptr};
+        T             *x{nullptr}, *g{nullptr}, *p{nullptr}, *Ap{nullptr}, *gf{nullptr};
+        T              eps{0};
+        const T       *w{nullptr};
+        T              infty{0};
+        MPRGPParams<T> params{};
+        T             *control{nullptr}, *work{nullptr};
+        T              gamma{1}, atol{0}, rtol{0}, norm_gp0{1};
+        int            max_it{0};
+        std::function<void(const T *const, T *const)> product;
+    };
+
+    /// How a run ended: before a proportioning step (the chopped gradient grew), at a CG decision
+    /// that is not a step (its record and A p stand, for the expansion), or with the solve over
+    /// (converged, or max_it). `ran` false: the run could not be taken there, and nothing was done.
+    struct MPRGPRunResult {
+        enum Exit { PROPORTIONING = 1, NOT_A_STEP = 2, DONE = 3 };
+        bool ran{false};
+        Exit exit{DONE};
+        int  iterations{0};
+        int  steps{0};
+        bool converged{false};
+    };
+
     /// The vector passes of an MPRGP iteration, each one sweep over the dofs. lb and ub may be
     /// null, not both. Reductions, over this rank's dofs, and the decisions taken from them arrive
     /// in `control`, an MPRGPControl of mprgp_control_size() entries in the execution space; the
@@ -100,6 +130,12 @@ namespace sfem {
                            T* const        x,
                            const T* const  g)>
                 expand;
+
+        /// The CG steps of a run, from `iterations` done, without returning to the host between
+        /// them; null where the passes have no such loop (on the host the operator's Team runs
+        /// them, MPRGP::team_cg_steps). `state` is the loop's, kept between the runs of a solve
+        /// with the same operands, and reset for another.
+        std::function<MPRGPRunResult(const MPRGPRun<T> &run, int iterations, std::shared_ptr<void> &state)> cg_run;
 
         /// Entries of the work buffer curvature and step take.
         ptrdiff_t work_size{0};
