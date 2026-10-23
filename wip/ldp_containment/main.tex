@@ -313,16 +313,17 @@ this paper.
 \paragraph{Communication within a node.} As an option, the GPUs of one node exchange ghost values
 by NCCL~\cite{nccl}, queued on the GPU's stream, and, where one node holds every rank, MPRGP's two
 reductions complete on the GPU as well, so that an iteration returns to the host once, as on one
-GPU. Between nodes GPU-aware MPI remains: in our tests NCCL's point-to-point messages between nodes
-delivered wrong values. Table~\ref{tab:nccl} compares the option with MPI in \ncclRuns{} runs
-alternating per repeat, with the build of Table~\ref{tab:precision}; the Newton step counts are
-the same. On one node NCCL lowers the cost per QP iteration by \ncclOneGainMin{} to
-\ncclOneGainMax\%, but its set-up costs \ncclCostMin{} to \ncclCostMax\,\si{\second} once per
-process, most of it in calls to the GPU driver, and the time to solution
-grows by \ncclExtraMin{} to \ncclExtraMax\,\si{\second} on every case: the option repays its
-set-up from about \ncclBreakEven{} QP iterations. On two nodes, eight GPUs, the time per
-iteration falls by \ncclEightGainMin{} to \ncclEightGainMax\%. The option
-is off by default.
+GPU. Between nodes GPU-aware MPI remains for both: there NCCL's messages took longer than MPI's
+and, unless libfabric sends every message by rendezvous, delivered wrong values; with rendezvous,
+its reductions over two nodes saved no time. Table~\ref{tab:nccl} compares the option with MPI in
+\ncclRuns{} runs alternating per repeat; the Newton step counts are the same. On one node NCCL
+lowers the cost per QP iteration by \ncclOneGainMin{} to \ncclOneGainMax\%, on two nodes, eight
+GPUs, by \ncclEightGainMin{} to \ncclEightGainMax\%. Its set-up takes \ncclInitMin{} to
+\ncclInitMax\,\si{\second} once per process, most of it in calls to the GPU driver, on a thread of
+its own beside the rest of the set-up; the run waits for it, or is slowed by it, for
+\ncclCostMin{} to \ncclCostMax\,\si{\second}, and the time to solution grows by \ncclExtraMin{}
+to \ncclExtraMax\,\si{\second} on every case. The option repays its set-up after
+\ncclBreakEvenMin{} to \ncclBreakEvenMax{} QP iterations a process. It is off by default.
 
 \begin{table*}
 \caption{Cost per QP iteration (\si{\micro\second}) and time to solution (\si{\second}), median of
@@ -342,8 +343,9 @@ time to solution, median of \benchRepeats{} runs each.}
 \end{table*}
 
 \begin{table*}
-\caption{Communication within a node by MPI and by NCCL: cost per QP iteration and time to
-solution (set-up and solve), median of \benchRepeats{} runs each.}
+\caption{Communication within a node by MPI and by NCCL: cost per QP iteration, what NCCL's set-up
+costs a run (the longer set-up and the wait at the first communication) and the QP iterations
+that repay it, and time to solution (set-up and solve), median of \benchRepeats{} runs each.}
 \label{tab:nccl}
 \small
 \input{tables/nccl}

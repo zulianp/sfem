@@ -234,6 +234,18 @@ def per_iteration(r):
     return float(r["qp_per_iteration_median"])
 
 
+def nccl_setup(a, b):
+    """What NCCL's set-up costs a run once, measured: the set-up it lengthens (NCCL's own runs
+    beside it, on a thread) and the wait at the first communication (s); a by MPI, b by NCCL."""
+    return float(b["setup_median"]) - float(a["setup_median"]) + float(b["nccl_wait_median"])
+
+
+def nccl_break_even(a, b):
+    """The QP iterations a process needs to repay nccl_setup, None if NCCL saves nothing."""
+    saved = 1e-6 * (per_iteration(a) - per_iteration(b))
+    return nccl_setup(a, b) / saved if saved > 0 else None
+
+
 def solve_time(r):
     return float(r["solve_median"])
 
@@ -539,22 +551,28 @@ def macros(index, runs, agreement, ab, kkt, newton, utopia, coords, machine, pre
         else:
             m("nccl" + key + "ChangeMin", num(100 * min(c), 2))
             m("nccl" + key + "ChangeMax", num(100 * max(c), 2))
-    # On one node: what NCCL's set-up costs once (the time to solution it adds, plus what its
-    # iterations saved), and the QP iterations a process needs to repay it.
-    extra, cost, even = [], [], []
+    # What NCCL's set-up costs once, measured (nccl_setup), its own time on its thread, the time
+    # to solution it adds, and the QP iterations a process needs to repay it.
+    init, extra, cost, even = [], [], [], []
     for case, _, _ in CASES:
-        a, b = nccl[(case, "gpu_4", "1", "mpi")], nccl[(case, "gpu_4", "1", "nccl")]
-        saved = 1e-6 * (per_iteration(a) - per_iteration(b))
-        extra.append(to_solution(b) - to_solution(a))
-        cost.append(extra[-1] + saved * int(b["qp_iterations"]))
-        if saved > 0: even.append(cost[-1] / saved)
+        for config, nodes, _, _ in NCCL_CONFIGS:
+            a, b = nccl[(case, config, nodes, "mpi")], nccl[(case, config, nodes, "nccl")]
+            init.append(float(b["nccl_init_median"]))
+            extra.append(to_solution(b) - to_solution(a))
+            cost.append(nccl_setup(a, b))
+            even.append(nccl_break_even(a, b))
     if min(extra) <= 0:
-        sys.exit("ldp_figures: NCCL no longer lengthens a solution on one node; the text says it does")
+        sys.exit("ldp_figures: NCCL no longer lengthens a solution; the text says it does")
+    if None in even:
+        sys.exit("ldp_figures: NCCL saves nothing per QP iteration somewhere; the text says it repays its set-up")
+    m("ncclInitMin", num(min(init), 2))
+    m("ncclInitMax", num(max(init), 2))
     m("ncclExtraMin", num(min(extra), 2))
     m("ncclExtraMax", num(max(extra), 2))
     m("ncclCostMin", num(min(cost), 2))
     m("ncclCostMax", num(max(cost), 2))
-    m("ncclBreakEven", integer(1000 * round(min(even) / 1000)))
+    m("ncclBreakEvenMin", integer(1000 * round(min(even) / 1000)))
+    m("ncclBreakEvenMax", integer(1000 * round(max(even) / 1000)))
 
     # The overlap released over pseudo-steps (release_runs.csv)
     rel = release_index(release_runs)
@@ -687,18 +705,19 @@ def table_precision(precision):
 
 def table_nccl(nccl):
     lines = [PREAMBLE,
-             r"\begin{tabular}{@{}llrrrrr@{}}", r"\toprule",
-             r" & & \multicolumn{3}{c}{\si{\micro\second} per QP iteration} & \multicolumn{2}{c}{To solution (\si{\second})} \\",
-             r"\cmidrule(lr){3-5}\cmidrule(l){6-7}",
-             r"Case & Configuration & MPI & NCCL & change & MPI & NCCL \\", r"\midrule"]
+             r"\begin{tabular}{@{}llrrrrrrr@{}}", r"\toprule",
+             r" & & \multicolumn{3}{c}{\si{\micro\second} per QP iteration} & \multicolumn{2}{c}{NCCL's set-up} & \multicolumn{2}{c}{To solution (\si{\second})} \\",
+             r"\cmidrule(lr){3-5}\cmidrule(lr){6-7}\cmidrule(l){8-9}",
+             r"Case & Configuration & MPI & NCCL & change & \si{\second} & repaid after & MPI & NCCL \\", r"\midrule"]
     for i, (case, label, _) in enumerate(CASES):
         if i:
             lines.append(r"\addlinespace")
         for j, (config, nodes, clabel, _) in enumerate(NCCL_CONFIGS):
             a, b = nccl[(case, config, nodes, "mpi")], nccl[(case, config, nodes, "nccl")]
-            lines.append("%s & %s & %s & %s & \\num{%.1f}\\%% & %s & %s \\\\" % (
+            lines.append("%s & %s & %s & %s & \\num{%.1f}\\%% & %s & %s & %s & %s \\\\" % (
                 label if j == 0 else "", clabel, integer(per_iteration(a)), integer(per_iteration(b)),
-                100 * (per_iteration(b) / per_iteration(a) - 1), num(to_solution(a), 3), num(to_solution(b), 3)))
+                100 * (per_iteration(b) / per_iteration(a) - 1), num(nccl_setup(a, b), 2),
+                integer(1000 * round(nccl_break_even(a, b) / 1000)), num(to_solution(a), 3), num(to_solution(b), 3)))
     lines += [r"\bottomrule", r"\end{tabular}"]
     return "\n".join(lines) + "\n"
 
