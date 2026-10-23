@@ -150,7 +150,9 @@ namespace sfem {
         impl_->started = true;
     }
 
-    void BDF2Scheme::start(real_t *const x) const { impl_->blas->copy(impl_->space->n_dofs(), impl_->u_n->data(), x); }
+    void BDF2Scheme::start(real_t *const x) const {
+        impl_->blas->zaxpby(impl_->space->n_dofs(), 1, impl_->u_n->data(), impl_->dt, impl_->v_n->data(), x);
+    }
 
     void BDF2Scheme::carried_state(real_t *const velocity, real_t *const acceleration) const {
         const ptrdiff_t ndofs = impl_->space->n_dofs();
