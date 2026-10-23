@@ -3,6 +3,7 @@
 
 #include "sfem_aliases.hpp"
 #include "sfem_base.hpp"
+#include "smesh_types.hpp"
 
 namespace sfem {
 
@@ -14,6 +15,9 @@ namespace sfem {
         ExecutionSpace es{EXECUTION_SPACE_HOST};
         ptrdiff_t      size{0};
         const idx_t   *idx{nullptr};
+        // Every node of the vectors (n_nodes, 3 dofs each) to its contact node, -1 if it is none.
+        ptrdiff_t      n_nodes{0};
+        const idx_t   *frame_of{nullptr};
         const real_t  *normals[3]{nullptr, nullptr, nullptr};
         const real_t  *curvature[6]{nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
         const real_t  *gap{nullptr};
@@ -22,8 +26,24 @@ namespace sfem {
     };
 
     void node_obstacle_frames(const NodeObstacleView &c, const int dir);
-    void node_obstacle_to_frame(const NodeObstacleView &c, real_t *const v);
-    void node_obstacle_from_frame(const NodeObstacleView &c, real_t *const v);
+    // Over every node, in one sweep: out <- s .* (Q in) and out <- Q^T (s .* in), Q the frame at
+    // the contact nodes and the identity elsewhere; s per dof, null for none. in may be out.
+    void node_obstacle_to_frame(const NodeObstacleView &c, const real_t *const s, const real_t *const in, real_t *const out);
+    void node_obstacle_from_frame(const NodeObstacleView &c, const real_t *const s, const real_t *const in, real_t *const out);
+    // The same over the nodes [first, end) by the calling thread alone, on the host: a thread's
+    // share of a region it opened itself (Team).
+    void node_obstacle_to_frame(const NodeObstacleView &c,
+                                const real_t *const     s,
+                                const real_t *const     in,
+                                real_t *const           out,
+                                const ptrdiff_t         first,
+                                const ptrdiff_t         end);
+    void node_obstacle_from_frame(const NodeObstacleView &c,
+                                  const real_t *const     s,
+                                  const real_t *const     in,
+                                  real_t *const           out,
+                                  const ptrdiff_t         first,
+                                  const ptrdiff_t         end);
     void node_obstacle_upper_bound(const NodeObstacleView &c, const ptrdiff_t ndofs, const real_t unbounded, real_t *const ub);
 
     // projected (a copy of the residual) less the reaction, mu kept; complementarity into c and
@@ -35,7 +55,7 @@ namespace sfem {
                            real_t *const           penetration);
 
     // The curvature term (node_obstacle_curvature) added to each contact node's diagonal block of
-    // a BSR matrix.
+    // a BSR matrix, its values of `values_type` (sfem_TangentValues.hpp).
     void node_obstacle_curvature_bsr(const NodeObstacleView &c,
                                      const real_t *const     r,
                                      const real_t *const     k,
@@ -43,7 +63,8 @@ namespace sfem {
                                      const real_t            sign,
                                      const count_t *const    rowptr,
                                      const idx_t *const      colidx,
-                                     real_t *const           values);
+                                     const smesh::PrimitiveType values_type,
+                                     void *const             values);
 
     // The curvature term per contact node, a packed symmetric block [xx, xy, xz, yy, yz, zz]
     // (6 per node, overwritten; zero where the term is).
@@ -59,6 +80,18 @@ namespace sfem {
     void node_obstacle_gap_field(const NodeObstacleView &c, real_t *const out);
     // v += gap n / dt where gap < 0, with the gap and normals of `c` the samples ahead.
     void node_obstacle_project_velocity(const NodeObstacleView &c, real_t *const v, const real_t dt);
+
+    // The sampled gap and normals of `size` contact nodes (in es) to what the constraints see
+    // (node_obstacle_offset_gap): gap - shift + release * p0_i (p0 may be null: zero), and past
+    // `cutoff` no obstacle.
+    void node_obstacle_offset_gap(const ExecutionSpace es,
+                                  const ptrdiff_t      size,
+                                  const real_t         shift,
+                                  const real_t         cutoff,
+                                  const real_t         release,
+                                  const real_t *const  p0,
+                                  real_t *const        gap,
+                                  real_t *const *const normals);
 
     // max(0, max_i x_i) over n values in es.
     real_t max_or_zero(const ExecutionSpace es, const ptrdiff_t n, const real_t *const x);

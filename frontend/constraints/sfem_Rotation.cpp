@@ -134,6 +134,13 @@ namespace sfem {
                               real_t *const        values) {
         return impl_->conditions->hessian_bsr(x, rowptr, colidx, values);
     }
+    int Rotation::hessian_bsr_typed(const real_t *const          x,
+                                    const count_t *const         rowptr,
+                                    const idx_t *const           colidx,
+                                    const smesh::PrimitiveType values_type,
+                                    void *const                  values) {
+        return impl_->conditions->hessian_bsr_typed(x, rowptr, colidx, values_type, values);
+    }
     std::shared_ptr<Constraint> Rotation::derefine(const std::shared_ptr<FunctionSpace> &coarse_space, const bool as_zero) const {
         return impl_->conditions->derefine(coarse_space, as_zero);
     }

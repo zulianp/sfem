@@ -138,6 +138,14 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
         self.assertIn("isoparametric_grad_1d, bcoordinate_data,", hessian_source)
         self.assertNotIn("neohookean_ogden_proteus_hex8_hessian_crs_i_msoa", source)
         self.assertIn("neohookean_ogden_proteus_hex8_hessian_bsr_i_msoa", source)
+        # The BSR values carry a width of their own, after the scalar's.
+        self.assertIn(
+            'extern "C" int neohookean_ogden_proteus_hex8_hessian_bsr_i_msoa(\n'
+            "        const int scalar_bytes,\n"
+            "        const int values_bytes,",
+            source,
+        )
+        self.assertIn("assemble_impl<double, float, geom_t, 1>(", source)
         bsr_scatter = _static_function_body(
             source,
             "static SFEM_INLINE void neohookean_ogden_proteus_hex8_hessian_i_msoa_scatter_bsr",
@@ -151,11 +159,12 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
         self.assertNotIn("missing block graph entry", bsr_scatter)
         self.assertIn("neohookean_ogden_proteus_hex8_hessian_i_msoa_find_cols(ev, cols, lenrow, ks);", bsr_scatter)
         self.assertIn("entries[i * NS + j] = row_begin + ks[j];", bsr_scatter)
-        self.assertIn("s_t *const block = &values[entries[i * NS + j] * NC * NC];", bsr_scatter)
-        self.assertIn("block[bi * NC + bj] += element_matrix[row * (NC * NS) + col];", bsr_scatter)
+        self.assertIn("v_t *const block = &values[entries[i * NS + j] * NC * NC];", bsr_scatter)
+        # Into the values' own type: a single-precision tangent is assembled in place.
+        self.assertIn("block[bi * NC + bj] += v_t(element_matrix[row * (NC * NS) + col]);", bsr_scatter)
         self.assertLess(
             bsr_scatter.index("entries[i * NS + j] = row_begin + ks[j];"),
-            bsr_scatter.index("s_t *const block = &values[entries[i * NS + j] * NC * NC];"),
+            bsr_scatter.index("v_t *const block = &values[entries[i * NS + j] * NC * NC];"),
         )
         self.assertNotIn("std::vector", bsr_scatter)
         # The requested matrix format is settled at compile time: the kernel
@@ -499,7 +508,7 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
                 "const s_t *const RSTR row = &element_matrix[(bi * NS + row_shape) * N_COL_STREAMS];",
                 source,
             )
-            self.assertIn("block[bi * NC + bj] += row[bj * NS + col_shape];", source)
+            self.assertIn("block[bi * NC + bj] += v_t(row[bj * NS + col_shape]);", source)
             self.assertNotIn("ROW_STREAMS[", source)
             self.assertNotIn("COL_STREAMS[", source)
             self.assertNotIn("ROW_TENSOR_STREAMS[", source)

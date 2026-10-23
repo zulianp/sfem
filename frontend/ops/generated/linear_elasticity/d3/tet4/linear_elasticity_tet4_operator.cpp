@@ -2147,13 +2147,13 @@ static SFEM_INLINE void linear_elasticity_tet4_hessian_a_msoa_find_cols(
   }
 }
 
-template <typename s_t>
+template <typename s_t, typename v_t>
 static SFEM_INLINE void linear_elasticity_tet4_hessian_a_msoa_scatter_bsr(
     const idx_t *const RSTR ev,
     const s_t *const RSTR element_matrix,
     const count_t *const RSTR rowptr,
     const idx_t *const RSTR colidx,
-    s_t *const RSTR values) {
+    v_t *const RSTR values) {
   static constexpr int NC = 3;
   static constexpr int NS = 4;
   count_t entries[NS * NS];
@@ -2170,13 +2170,13 @@ static SFEM_INLINE void linear_elasticity_tet4_hessian_a_msoa_scatter_bsr(
   }
   for (int i = 0; i < NS; ++i) {
     for (int j = 0; j < NS; ++j) {
-      s_t *const block = &values[entries[i * NS + j] * NC * NC];
+      v_t *const block = &values[entries[i * NS + j] * NC * NC];
       for (int bi = 0; bi < NC; ++bi) {
         const int row = bi * NS + i;
         for (int bj = 0; bj < NC; ++bj) {
           const int col = bj * NS + j;
 #pragma omp atomic update
-          block[bi * NC + bj] += element_matrix[row * (NC * NS) + col];
+          block[bi * NC + bj] += v_t(element_matrix[row * (NC * NS) + col]);
         }
       }
     }
@@ -2206,7 +2206,7 @@ static SFEM_INLINE void linear_elasticity_tet4_hessian_a_msoa_scatter_block_diag
   }
 }
 
-template <typename s_t, typename g_t, int FORMAT>
+template <typename s_t, typename v_t, typename g_t, int FORMAT>
 static int linear_elasticity_tet4_hessian_a_msoa_assemble_impl(
     const ptrdiff_t nelements,
     const ptrdiff_t,
@@ -2225,7 +2225,7 @@ static int linear_elasticity_tet4_hessian_a_msoa_assemble_impl(
     const s_t mu,
     const count_t *const RSTR rowptr,
     const idx_t *const RSTR colidx,
-    s_t *const RSTR values,
+    v_t *const RSTR values,
     const int *const RSTR,
     const ptrdiff_t,
     const ptrdiff_t,
@@ -2289,6 +2289,7 @@ static int linear_elasticity_tet4_hessian_a_msoa_assemble_impl(
 
 extern "C" int linear_elasticity_tet4_hessian_bsr_a_msoa(
         const int scalar_bytes,
+        const int values_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -2310,15 +2311,32 @@ extern "C" int linear_elasticity_tet4_hessian_bsr_a_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        return sfem::codegen::linear_elasticity_tet4_hessian_a_msoa_assemble_impl<double, geom_t, 1>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, rowptr, colidx, (double *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+      switch (values_bytes) {
+        case (int)sizeof(double): {
+            return sfem::codegen::linear_elasticity_tet4_hessian_a_msoa_assemble_impl<double, double, geom_t, 1>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, rowptr, colidx, (double *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+        }
+        case (int)sizeof(float): {
+            return sfem::codegen::linear_elasticity_tet4_hessian_a_msoa_assemble_impl<double, float, geom_t, 1>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, rowptr, colidx, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+        }
+        default:
+          break;
+      }
+      break;
     }
     case (int)sizeof(float): {
-        return sfem::codegen::linear_elasticity_tet4_hessian_a_msoa_assemble_impl<float, geom_t, 1>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, rowptr, colidx, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+      switch (values_bytes) {
+        case (int)sizeof(float): {
+            return sfem::codegen::linear_elasticity_tet4_hessian_a_msoa_assemble_impl<float, float, geom_t, 1>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, rowptr, colidx, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+        }
+        default:
+          break;
+      }
+      break;
     }
     default:
       break;
   }
-  return sfem::codegen::unsupported_dispatch("linear_elasticity_tet4_hessian_bsr_a_msoa", -1, (int)scalar_bytes);
+  return sfem::codegen::unsupported_values_dispatch("linear_elasticity_tet4_hessian_bsr_a_msoa", (int)scalar_bytes, (int)values_bytes);
 }
 
 extern "C" int linear_elasticity_tet4_hessian_block_diag_sym_a_msoa(
@@ -2342,10 +2360,10 @@ extern "C" int linear_elasticity_tet4_hessian_block_diag_sym_a_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        return sfem::codegen::linear_elasticity_tet4_hessian_a_msoa_assemble_impl<double, geom_t, 6>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, nullptr, nullptr, (double *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+        return sfem::codegen::linear_elasticity_tet4_hessian_a_msoa_assemble_impl<double, double, geom_t, 6>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, nullptr, nullptr, (double *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
     }
     case (int)sizeof(float): {
-        return sfem::codegen::linear_elasticity_tet4_hessian_a_msoa_assemble_impl<float, geom_t, 6>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, nullptr, nullptr, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+        return sfem::codegen::linear_elasticity_tet4_hessian_a_msoa_assemble_impl<float, float, geom_t, 6>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, nullptr, nullptr, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
     }
     default:
       break;

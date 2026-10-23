@@ -144,11 +144,14 @@ namespace sfem {
                 real_t *const values) {
       copy_material_parameters(base, values);
       bool changed = false;
+      bool read[N_MATERIAL_PARAMETERS] = {false};
       for (int i = 0; i < N_DEFINED_MATERIAL_PARAMETERS; ++i) {
-        changed |= yaml_read_parameter(node,
+        read[i] = yaml_read_parameter(node,
                                                MATERIAL_PARAMETER_NAMES[i],
                                                values[i]);
+        changed |= read[i];
       }
+      (void)read;
       return changed;
     }
 
@@ -672,7 +675,7 @@ namespace sfem {
           return SFEM_FAILURE;
         }
         adjugate = reinterpret_cast<const geom_t *const *>(
-            cache->jacobian_soa->jacobian_adjugate_SoA()->data());
+            cache->jacobian_soa->adjugate_components());
         determinant = reinterpret_cast<const geom_t *>(
             cache->jacobian_soa->jacobian_determinant()->data());
       }
@@ -708,7 +711,7 @@ namespace sfem {
           return SFEM_FAILURE;
         }
         adjugate = reinterpret_cast<const geom_t *const *>(
-            cache->jacobian_soa->jacobian_adjugate_SoA()->data());
+            cache->jacobian_soa->adjugate_components());
         determinant = reinterpret_cast<const geom_t *>(
             cache->jacobian_soa->jacobian_determinant()->data());
         if (false) {
@@ -720,7 +723,7 @@ namespace sfem {
               cache->jacobian_aos->jacobian_determinant()->data());
         }
             }
-      if (impl_->gradient_uses_affine && impl_->space->has_packed_mesh()) {
+      if ((impl_->gradient_uses_affine) && impl_->space->has_packed_mesh()) {
         auto packed = impl_->space->packed_mesh();
         const int packed_block = packed_block_id_for_domain(*packed, *domain.block);
         if (packed_block >= 0) {
@@ -741,7 +744,7 @@ namespace sfem {
           }
         }
       }
-      if (!impl_->gradient_uses_affine && impl_->space->has_packed_mesh()) {
+      if (!(impl_->gradient_uses_affine) && impl_->space->has_packed_mesh()) {
         auto packed = impl_->space->packed_mesh();
         const int packed_block = packed_block_id_for_domain(*packed, *domain.block);
         if (packed_block >= 0) {
@@ -796,7 +799,7 @@ namespace sfem {
           return SFEM_FAILURE;
         }
         adjugate = reinterpret_cast<const geom_t *const *>(
-            cache->jacobian_soa->jacobian_adjugate_SoA()->data());
+            cache->jacobian_soa->adjugate_components());
         determinant = reinterpret_cast<const geom_t *>(
             cache->jacobian_soa->jacobian_determinant()->data());
         if (false) {
@@ -920,7 +923,7 @@ namespace sfem {
           return SFEM_FAILURE;
         }
         adjugate = reinterpret_cast<const geom_t *const *>(
-            cache->jacobian_soa->jacobian_adjugate_SoA()->data());
+            cache->jacobian_soa->adjugate_components());
         determinant = reinterpret_cast<const geom_t *>(
             cache->jacobian_soa->jacobian_determinant()->data());
             }
@@ -933,7 +936,7 @@ namespace sfem {
                       impl_->element_values.get() + nvalues,
                       real_t(0));
       int status = SFEM_FAILURE;
-      if (impl_->objective_uses_affine && impl_->space->has_packed_mesh()) {
+      if ((impl_->objective_uses_affine) && impl_->space->has_packed_mesh()) {
         auto packed = impl_->space->packed_mesh();
         const int packed_block = packed_block_id_for_domain(*packed, *domain.block);
         if (packed_block >= 0) {
@@ -948,7 +951,7 @@ namespace sfem {
           }
         }
       }
-      if (!impl_->objective_uses_affine && impl_->space->has_packed_mesh()) {
+      if (!(impl_->objective_uses_affine) && impl_->space->has_packed_mesh()) {
         auto packed = impl_->space->packed_mesh();
         const int packed_block = packed_block_id_for_domain(*packed, *domain.block);
         if (packed_block >= 0) {
@@ -1029,13 +1032,21 @@ namespace sfem {
               const count_t *const rowptr,
               const idx_t *const colidx,
               real_t *const values) {
+    return hessian_bsr_typed(x, rowptr, colidx, smesh::SMESH_DEFAULT, values);
+  }
+
+  int GeneratedMooneyRivlinProny::hessian_bsr_typed(const real_t *const x,
+              const count_t *const rowptr,
+              const idx_t *const colidx,
+              const enum smesh::PrimitiveType values_type,
+              void *const values) {
     SFEM_TRACE_SCOPE("GeneratedMooneyRivlinProny::hessian_bsr");
     if (check_graph(impl_->bsr_graph, rowptr, colidx, impl_->space->n_dofs() / impl_->space->block_size()) != SFEM_SUCCESS) {
       SFEM_ERROR("GeneratedMooneyRivlinProny::hessian_bsr: the graph is malformed; the assembly kernels assume it is not\n");
       return SFEM_FAILURE;
     }
     if (auto term = time_scheme_term(impl_->time_scheme)) {
-      if (term->hessian_bsr(x, rowptr, colidx, values) != SFEM_SUCCESS) {
+      if (term->hessian_bsr_typed(x, rowptr, colidx, values_type, values) != SFEM_SUCCESS) {
         return SFEM_FAILURE;
       }
     }
@@ -1053,7 +1064,7 @@ namespace sfem {
         return SFEM_FAILURE;
       }
       else if (dim == 3) {
-        return mooney_rivlin_prony_hessian_bsr_3d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("C01"), domain.parameters->require_real_value("C10"), domain.parameters->require_real_value("K"), impl_->relaxation->gamma(domain.block->name(), "iso"), impl_->relaxation->history(domain.block->name(), "iso_history"), 3, current + 0, current + 1, current + 2, rowptr, colidx, values);
+        return mooney_rivlin_prony_hessian_bsr_3d_i_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("C01"), domain.parameters->require_real_value("C10"), domain.parameters->require_real_value("K"), impl_->relaxation->gamma(domain.block->name(), "iso"), impl_->relaxation->history(domain.block->name(), "iso_history"), 3, current + 0, current + 1, current + 2, rowptr, colidx, values);
       }
       SFEM_ERROR("mooney_rivlin_prony hessian_bsr does not support spatial dimension %d\n", dim);
       return SFEM_FAILURE;

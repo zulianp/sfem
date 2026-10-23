@@ -51,6 +51,11 @@ namespace sfem {
             const count_t *const rowptr,
             const idx_t *const colidx,
             real_t *const values) override;
+    int hessian_bsr_typed(const real_t *const x,
+            const count_t *const rowptr,
+            const idx_t *const colidx,
+            const enum smesh::PrimitiveType values_type,
+            void *const values) override;
 
     void set_option(const std::string &name, bool val) override;
     void set_value_in_block(const std::string &block_name,

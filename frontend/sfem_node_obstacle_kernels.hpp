@@ -4,6 +4,7 @@
 #include <math.h>
 
 #include "sfem_base.hpp"
+#include "sfem_sdf_sampling.hpp"
 
 // One contact node of NodeObstacleContact, for its host loops and its device kernels
 // (cuda/sfem_NodeObstacleView_cuda.cu) alike. A node's frame q is [n, t1, t2] by rows.
@@ -46,6 +47,28 @@ SFEM_HOST_DEVICE SFEM_INLINE void node_obstacle_from_frame(const real_t *const q
     }
 }
 
+// out <- si .* (q ini), q null for the identity, si null for no scaling: into the node's frame,
+// then scaled, as the two passes would round it. ini may be out.
+SFEM_HOST_DEVICE SFEM_INLINE void node_obstacle_scaled_to_frame(const real_t *const q,
+                                                                const real_t *const si,
+                                                                const real_t *const ini,
+                                                                real_t *const       out) {
+    real_t v[3] = {ini[0], ini[1], ini[2]};
+    if (q) node_obstacle_to_frame(q, v);
+    for (int d = 0; d < 3; ++d) out[d] = si ? si[d] * v[d] : v[d];
+}
+
+// out <- q^T (si .* ini): scaled, then back from the node's frame. ini may be out.
+SFEM_HOST_DEVICE SFEM_INLINE void node_obstacle_scaled_from_frame(const real_t *const q,
+                                                                  const real_t *const si,
+                                                                  const real_t *const ini,
+                                                                  real_t *const       out) {
+    real_t v[3];
+    for (int d = 0; d < 3; ++d) v[d] = si ? si[d] * ini[d] : ini[d];
+    if (q) node_obstacle_from_frame(q, v);
+    for (int d = 0; d < 3; ++d) out[d] = v[d];
+}
+
 // The admissible reaction mu = max(0, -n . ri), removed from ri; *c is the complementarity
 // min(mu, k max(gap, 0)).
 SFEM_HOST_DEVICE SFEM_INLINE real_t node_obstacle_kkt(const real_t *const n,
@@ -62,7 +85,9 @@ SFEM_HOST_DEVICE SFEM_INLINE real_t node_obstacle_kkt(const real_t *const n,
 }
 
 // B += sign scale mu H, the constraint's curvature C (6 packed) at a node in contact (mu > 0, gap
-// within mu / k); with `capped` scaled so that its most negative part stays within k / 2.
+// within mu / k); with `capped` scaled so that its most negative part stays within k / 2. B in the
+// tangent's value type, each entry rounded once.
+template <typename B_t>
 SFEM_HOST_DEVICE SFEM_INLINE void node_obstacle_curvature(const real_t *const n,
                                                           const real_t *const C,
                                                           const real_t *const ri,
@@ -70,7 +95,7 @@ SFEM_HOST_DEVICE SFEM_INLINE void node_obstacle_curvature(const real_t *const n,
                                                           const real_t        k,
                                                           const bool          capped,
                                                           const real_t        sign,
-                                                          real_t *const       B) {
+                                                          B_t *const          B) {
     const real_t mu = fmax(real_t(0), -(n[0] * ri[0] + n[1] * ri[1] + n[2] * ri[2]));
     if (mu == 0 || gap > mu / k) return;
 
@@ -87,8 +112,30 @@ SFEM_HOST_DEVICE SFEM_INLINE void node_obstacle_curvature(const real_t *const n,
     const real_t scale = capped && lowest < -k / 2 ? k / (2 * -lowest) : 1;
 
     for (int c = 0; c < 9; ++c) {
-        B[c] += sign * scale * mu * H[c];
+        B[c] = B_t(B[c] + sign * scale * mu * H[c]);
     }
+}
+
+// The gap the constraints see, from the sampled one: less `shift`, plus `admitted` (the share of
+// the starting penetration still allowed). Past `cutoff`, as outside the grid, there is no
+// obstacle: the gap is unreachable and the normal zero.
+SFEM_HOST_DEVICE SFEM_INLINE void node_obstacle_offset_gap(const real_t  shift,
+                                                           const real_t  cutoff,
+                                                           const real_t  admitted,
+                                                           real_t *const gap,
+                                                           real_t *const n0,
+                                                           real_t *const n1,
+                                                           real_t *const n2) {
+    if (*gap >= SFEM_SDF_UNREACHABLE) return;
+    const real_t g = *gap - shift + admitted;
+    if (g > cutoff) {
+        *gap = SFEM_SDF_UNREACHABLE;
+        *n0  = 0;
+        *n1  = 0;
+        *n2  = 0;
+        return;
+    }
+    *gap = g;
 }
 
 // The upper triangle of a symmetric 3x3 block B, packed [xx, xy, xz, yy, yz, zz].

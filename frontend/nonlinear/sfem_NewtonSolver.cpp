@@ -6,6 +6,7 @@
 
 #include "sfem_API.hpp"
 #include "sfem_Function.hpp"
+#include "sfem_OwnedReductions.hpp"
 
 namespace sfem {
 
@@ -17,6 +18,8 @@ namespace sfem {
                 return "converged_at_resolution";
             case NonlinearReport::MAX_IT:
                 return "max_it";
+            case NonlinearReport::ITERATIONS_DONE:
+                return "iterations_done";
             case NonlinearReport::DIVERGED:
                 return "diverged";
             case NonlinearReport::NON_FINITE:
@@ -36,6 +39,7 @@ namespace sfem {
         NewtonOptions                                             options;
         std::shared_ptr<BLAS<real_t>>                             blas;
         ptrdiff_t                                                 ndofs{0};
+        std::unique_ptr<OwnedReductions>                          reductions;
         SharedBuffer<real_t>                                      r;
         SharedBuffer<real_t>                                      dx;
         SharedBuffer<real_t>                                      moved;
@@ -53,7 +57,7 @@ namespace sfem {
             f->update(x);
             if (!known) {
                 blas->zeros(ndofs, r->data());
-                if (f->gradient(x, r->data()) != SFEM_SUCCESS) return SFEM_FAILURE;
+                if (!reductions->all(f->gradient(x, r->data()) == SFEM_SUCCESS)) return SFEM_FAILURE;
                 f->set_value_to_constrained_dofs(0, r->data());
             }
             measure = step->measure(x, r->data());
@@ -79,6 +83,7 @@ namespace sfem {
         const ExecutionSpace es = f->execution_space();
         impl.blas               = blas<real_t>(es);
         impl.ndofs              = f->space()->n_dofs();
+        impl.reductions         = std::make_unique<OwnedReductions>(f->space(), es);
         impl.r                  = create_buffer<real_t>(impl.ndofs, es);
         impl.dx                 = create_buffer<real_t>(impl.ndofs, es);
     }
@@ -105,7 +110,14 @@ namespace sfem {
         LineSearch      line_search(opts.line_search);
 
         NonlinearReport report;
-        if (impl.step->begin_step(context) != SFEM_SUCCESS) {
+        // Every failure below is decided by all ranks together (OwnedReductions::all).
+        if (!impl.reductions->all(impl.step->begin_step(context) == SFEM_SUCCESS)) {
+            report.status = NonlinearReport::STEP_FAILED;
+            return report;
+        }
+        // Every evaluation reads x over all local elements: its ghost and aura copies from their
+        // owners, once; the steps then keep them.
+        if (impl.f->space()->synchronize(x, impl.f->execution_space()) != SFEM_SUCCESS) {
             report.status = NonlinearReport::STEP_FAILED;
             return report;
         }
@@ -148,24 +160,26 @@ namespace sfem {
                 if (!std::isfinite(log.measure.value)) return NonlinearReport::NON_FINITE;
                 if ((log.measure.value <= tol || solved) && log.measure.admissible) return NonlinearReport::CONVERGED;
                 if (log.measure.value > opts.divergence_factor * std::max(report.reference, tol)) return NonlinearReport::DIVERGED;
-                if (it == opts.max_it) return NonlinearReport::MAX_IT;
+                if (it == opts.max_it) return opts.fixed_iterations ? NonlinearReport::ITERATIONS_DONE : NonlinearReport::MAX_IT;
 
                 {
                     SFEM_TRACE_SCOPE("NewtonSolver::linearize");
-                    if (impl.step->linearize(x, r) != SFEM_SUCCESS) return NonlinearReport::STEP_FAILED;
+                    if (!impl.reductions->all(impl.step->linearize(x, r) == SFEM_SUCCESS)) return NonlinearReport::STEP_FAILED;
                 }
 
                 {
                     SFEM_TRACE_SCOPE("NewtonSolver::step");
                     impl.blas->zeros(ndofs, dx);
-                    log.linear_capped = impl.step->solve(x, r, dx) != SFEM_SUCCESS;
+                    log.linear_capped = !impl.reductions->all(impl.step->solve(x, r, dx) == SFEM_SUCCESS);
                 }
+                // The solve sets the owned rows; x + s dx keeps every copy consistent from here.
+                if (impl.f->space()->synchronize(dx, impl.f->execution_space()) != SFEM_SUCCESS) return NonlinearReport::STEP_FAILED;
                 log.linear_iterations = impl.step->iterations();
                 report.linear_iterations += log.linear_iterations;
                 report.capped_linear_solves += log.linear_capped;
                 report.iterations = ++count;
 
-                if (!std::isfinite(impl.blas->norm2(ndofs, dx))) return NonlinearReport::STEP_FAILED;
+                if (!std::isfinite(impl.reductions->norm2(dx))) return NonlinearReport::STEP_FAILED;
 
                 if (merit) {
                     const real_t m0    = merit->at(x, r);
@@ -208,7 +222,7 @@ namespace sfem {
         impl.blas->copy(ndofs, x, increment);
         impl.f->apply_constraints(increment);
         impl.blas->axpy(ndofs, -1, x, increment);
-        if (!(impl.blas->norm2(ndofs, increment) > 0)) {
+        if (!(impl.reductions->norm2(increment) > 0)) {
             report.status = iterate(false);
             return report;
         }
@@ -252,7 +266,7 @@ namespace sfem {
             }
             {
                 SFEM_TRACE_SCOPE("NewtonSolver::linearize");
-                if (impl.step->linearize(x, r) != SFEM_SUCCESS) {
+                if (!impl.reductions->all(impl.step->linearize(x, r) == SFEM_SUCCESS)) {
                     report.status = NonlinearReport::STEP_FAILED;
                     return report;
                 }
@@ -260,13 +274,17 @@ namespace sfem {
             {
                 SFEM_TRACE_SCOPE("NewtonSolver::step");
                 impl.blas->zaxpby(ndofs, s, increment, 0, increment, dx);
-                log.linear_capped = impl.step->solve(x, r, dx) != SFEM_SUCCESS;
+                log.linear_capped = !impl.reductions->all(impl.step->solve(x, r, dx) == SFEM_SUCCESS);
+            }
+            if (impl.f->space()->synchronize(dx, impl.f->execution_space()) != SFEM_SUCCESS) {
+                report.status = NonlinearReport::STEP_FAILED;
+                return report;
             }
             log.linear_iterations = impl.step->iterations();
             report.linear_iterations += log.linear_iterations;
             report.capped_linear_solves += log.linear_capped;
             report.iterations = count;
-            if (!std::isfinite(impl.blas->norm2(ndofs, dx))) {
+            if (!std::isfinite(impl.reductions->norm2(dx))) {
                 report.status = NonlinearReport::STEP_FAILED;
                 return report;
             }
@@ -278,7 +296,8 @@ namespace sfem {
             log.line_search.alpha  = 1;
 
             const auto status = iterate(linear && !log.linear_capped);
-            if (status == NonlinearReport::CONVERGED || status == NonlinearReport::CONVERGED_AT_RESOLUTION) {
+            if (status == NonlinearReport::CONVERGED || status == NonlinearReport::CONVERGED_AT_RESOLUTION ||
+                status == NonlinearReport::ITERATIONS_DONE) {
                 done += s;
                 if (done == 1) {
                     report.status = status;

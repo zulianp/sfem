@@ -11,6 +11,7 @@ static_assert((int)smesh::SMESH_FLOAT32 == (int)sizeof(float),
 
 extern "C" int cu_vector_mass_proteus_quad4_hessian_bsr_i_msoa(
     const int scalar_bytes,
+    const int values_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -23,6 +24,7 @@ extern "C" int cu_vector_mass_proteus_quad4_hessian_bsr_i_msoa(
 );
 extern "C" int cu_vector_mass_quad4_hessian_bsr_i_msoa(
     const int scalar_bytes,
+    const int values_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -35,6 +37,7 @@ extern "C" int cu_vector_mass_quad4_hessian_bsr_i_msoa(
 );
 extern "C" int cu_vector_mass_hex27_hessian_bsr_i_msoa(
     const int scalar_bytes,
+    const int values_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -47,6 +50,7 @@ extern "C" int cu_vector_mass_hex27_hessian_bsr_i_msoa(
 );
 extern "C" int cu_vector_mass_hex8_hessian_bsr_i_msoa(
     const int scalar_bytes,
+    const int values_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -59,6 +63,7 @@ extern "C" int cu_vector_mass_hex8_hessian_bsr_i_msoa(
 );
 extern "C" int cu_vector_mass_proteus_hex27_hessian_bsr_i_msoa(
     const int scalar_bytes,
+    const int values_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -71,6 +76,7 @@ extern "C" int cu_vector_mass_proteus_hex27_hessian_bsr_i_msoa(
 );
 extern "C" int cu_vector_mass_proteus_hex8_hessian_bsr_i_msoa(
     const int scalar_bytes,
+    const int values_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -83,6 +89,7 @@ extern "C" int cu_vector_mass_proteus_hex8_hessian_bsr_i_msoa(
 );
 extern "C" int cu_vector_mass_tet10_hessian_bsr_i_msoa(
     const int scalar_bytes,
+    const int values_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -481,6 +488,7 @@ extern "C" int cu_vector_mass_tet10_residual_i_msoa(
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_vector_mass_hessian_bsr_2d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
+        const enum smesh::PrimitiveType values_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -495,11 +503,15 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_vector_mass_hessian_bsr_2d_i_msoa(
       (real_type == smesh::SMESH_DEFAULT)
           ? smesh::TypeToEnum<real_t>::value()
           : real_type;
+  const enum smesh::PrimitiveType resolved_values_type =
+      (values_type == smesh::SMESH_DEFAULT)
+          ? resolved_real_type
+          : values_type;
   switch (element_type) {
     case smesh::PROTEUS_QUAD4:
-      return cu_vector_mass_proteus_quad4_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, density, rowptr, colidx, values, stream);
+      return cu_vector_mass_proteus_quad4_hessian_bsr_i_msoa((int)resolved_real_type, (int)resolved_values_type, nelements, nnodes, elements, points, density, rowptr, colidx, values, stream);
     case smesh::QUAD4:
-      return cu_vector_mass_quad4_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, density, rowptr, colidx, values, stream);
+      return cu_vector_mass_quad4_hessian_bsr_i_msoa((int)resolved_real_type, (int)resolved_values_type, nelements, nnodes, elements, points, density, rowptr, colidx, values, stream);
     default:
       break;
   }
@@ -510,6 +522,7 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_vector_mass_hessian_bsr_2d_i_msoa(
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_vector_mass_hessian_bsr_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
+        const enum smesh::PrimitiveType values_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -524,17 +537,21 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_vector_mass_hessian_bsr_3d_i_msoa(
       (real_type == smesh::SMESH_DEFAULT)
           ? smesh::TypeToEnum<real_t>::value()
           : real_type;
+  const enum smesh::PrimitiveType resolved_values_type =
+      (values_type == smesh::SMESH_DEFAULT)
+          ? resolved_real_type
+          : values_type;
   switch (element_type) {
     case smesh::HEX27:
-      return cu_vector_mass_hex27_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, density, rowptr, colidx, values, stream);
+      return cu_vector_mass_hex27_hessian_bsr_i_msoa((int)resolved_real_type, (int)resolved_values_type, nelements, nnodes, elements, points, density, rowptr, colidx, values, stream);
     case smesh::HEX8:
-      return cu_vector_mass_hex8_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, density, rowptr, colidx, values, stream);
+      return cu_vector_mass_hex8_hessian_bsr_i_msoa((int)resolved_real_type, (int)resolved_values_type, nelements, nnodes, elements, points, density, rowptr, colidx, values, stream);
     case smesh::PROTEUS_HEX27:
-      return cu_vector_mass_proteus_hex27_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, density, rowptr, colidx, values, stream);
+      return cu_vector_mass_proteus_hex27_hessian_bsr_i_msoa((int)resolved_real_type, (int)resolved_values_type, nelements, nnodes, elements, points, density, rowptr, colidx, values, stream);
     case smesh::PROTEUS_HEX8:
-      return cu_vector_mass_proteus_hex8_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, density, rowptr, colidx, values, stream);
+      return cu_vector_mass_proteus_hex8_hessian_bsr_i_msoa((int)resolved_real_type, (int)resolved_values_type, nelements, nnodes, elements, points, density, rowptr, colidx, values, stream);
     case smesh::TET10:
-      return cu_vector_mass_tet10_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, density, rowptr, colidx, values, stream);
+      return cu_vector_mass_tet10_hessian_bsr_i_msoa((int)resolved_real_type, (int)resolved_values_type, nelements, nnodes, elements, points, density, rowptr, colidx, values, stream);
     default:
       break;
   }

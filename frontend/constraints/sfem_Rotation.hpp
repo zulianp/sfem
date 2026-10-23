@@ -59,6 +59,11 @@ namespace sfem {
                         const count_t *const rowptr,
                         const idx_t *const   colidx,
                         real_t *const        values) override;
+        int hessian_bsr_typed(const real_t *const          x,
+                              const count_t *const         rowptr,
+                              const idx_t *const           colidx,
+                              const smesh::PrimitiveType values_type,
+                              void *const                  values) override;
 
         std::shared_ptr<Constraint> derefine(const std::shared_ptr<FunctionSpace> &coarse_space,
                                              const bool                            as_zero) const override;

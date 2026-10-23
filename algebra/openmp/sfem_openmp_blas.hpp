@@ -1,6 +1,7 @@
 #ifndef SFEM_OPENMP_BLAS_HPP
 #define SFEM_OPENMP_BLAS_HPP
 
+#include "sfem_fixed_chunks.hpp"
 #include "sfem_tpl_blas.hpp"
 
 #include <cmath>
@@ -48,23 +49,6 @@ namespace sfem {
         return on;
     }
 
-    // Chunk count, a function of the length alone and never of the thread count -- that is
-    // what makes the result identical however many threads run it.
-    //
-    // Below a few thousand elements the range is summed serially: a thread team costs more
-    // than the arithmetic, which is the same effect that made small multigrid levels slower
-    // on more cores. Above that the count grows with the length so a chunk stays around
-    // 8192 elements, which keeps each chunk's serial error bounded rather than letting it
-    // grow with the problem. The result is partially pairwise and so more accurate than a
-    // plain serial sum, which is why a deterministic single-threaded solve can converge
-    // where a non-deterministic one stagnates.
-    inline ptrdiff_t blas_chunk_count(const ptrdiff_t n) {
-        if (n < 4096) return 1;
-        ptrdiff_t nc = 256;
-        while (nc < 65536 && n / nc > 8192) nc *= 2;
-        return nc;
-    }
-
     template <typename T, typename F>
     inline T blas_fixed_chunk_sum(const ptrdiff_t n, F term) {
         const ptrdiff_t NC = blas_chunk_count(n);
@@ -75,13 +59,12 @@ namespace sfem {
             return acc;
         }
 
-        std::vector<T>  part((size_t)NC);
-        const ptrdiff_t q = n / NC, rem = n % NC;
+        std::vector<T> part((size_t)NC);
 #pragma omp parallel for schedule(static)
         for (ptrdiff_t c = 0; c < NC; ++c) {
-            const ptrdiff_t b   = c * q + (c < rem ? c : rem);
-            const ptrdiff_t e   = b + q + (c < rem ? 1 : 0);
-            T               acc = 0;
+            ptrdiff_t b, e;
+            blas_chunk_bounds(n, NC, c, &b, &e);
+            T acc = 0;
             for (ptrdiff_t i = b; i < e; ++i) acc += term(i);
             part[(size_t)c] = acc;
         }

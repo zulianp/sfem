@@ -65,6 +65,16 @@ int test_overrides() {
     listed->root()["dirichlet_conditions"][0]["value"][2].load(&z);
     SFEM_TEST_ASSERT(z == 1);
     SFEM_TEST_ASSERT(sfem::ElasticityCase::parse(BASE, "", {"dirichlet_conditions.3.value=1"}) == nullptr);
+
+    // A path through a missing key adds a mapping, one through a value replaces it by a mapping.
+    auto nested = sfem::ElasticityCase::parse(BASE, "", {"solver.linear.rtol=1e-3", "material.type.kind=1"});
+    SFEM_TEST_ASSERT(nested != nullptr);
+    real_t rtol = 0;
+    nested->root()["solver"]["linear"]["rtol"].load(&rtol);
+    SFEM_TEST_ASSERT(rtol == real_t(1e-3));
+    SFEM_TEST_ASSERT(!nested->root()["solver"]["linear"].has_val() && !nested->root()["material"]["type"].has_val());
+    const std::string emitted = nested->emit();
+    SFEM_TEST_ASSERT(emitted.find("rtol: 1e-3") != std::string::npos && emitted.find("kind: 1") != std::string::npos);
     return SFEM_TEST_SUCCESS;
 }
 

@@ -113,10 +113,32 @@ namespace sfem {
                 real_t *const values) {
       copy_material_parameters(base, values);
       bool changed = false;
+      bool read[N_MATERIAL_PARAMETERS] = {false};
       for (int i = 0; i < N_DEFINED_MATERIAL_PARAMETERS; ++i) {
-        changed |= yaml_read_parameter(node,
+        read[i] = yaml_read_parameter(node,
                                                MATERIAL_PARAMETER_NAMES[i],
                                                values[i]);
+        changed |= read[i];
+      }
+      // Young's modulus and Poisson's ratio in place of the Lame parameters.
+      real_t young_modulus = 0;
+      real_t poisson_ratio = 0;
+      const bool has_young = yaml_read_parameter(node, "young_modulus", young_modulus);
+      const bool has_poisson = yaml_read_parameter(node, "poisson_ratio", poisson_ratio);
+      if (has_young || has_poisson) {
+        if (!has_young || !has_poisson) {
+          SFEM_ERROR("material: young_modulus and poisson_ratio are given together\n");
+        }
+        if (read[0] || read[1]) {
+          SFEM_ERROR("material: give young_modulus and poisson_ratio or mu and lmbda, not both\n");
+        }
+        if (!(young_modulus > 0) || !(poisson_ratio >= 0 && poisson_ratio < real_t(0.5))) {
+          SFEM_ERROR("material: young_modulus > 0 and 0 <= poisson_ratio < 0.5 (got %g, %g)\n",
+                     (double)young_modulus, (double)poisson_ratio);
+        }
+        values[0] = young_modulus / (2 * (1 + poisson_ratio));
+        values[1] = young_modulus * poisson_ratio / ((1 + poisson_ratio) * (1 - 2 * poisson_ratio));
+        changed = true;
       }
       return changed;
     }
@@ -660,7 +682,7 @@ namespace sfem {
           return SFEM_FAILURE;
         }
         adjugate = reinterpret_cast<const geom_t *const *>(
-            cache->jacobian_soa->jacobian_adjugate_SoA()->data());
+            cache->jacobian_soa->adjugate_components());
         determinant = reinterpret_cast<const geom_t *>(
             cache->jacobian_soa->jacobian_determinant()->data());
         if (false) {
@@ -672,7 +694,7 @@ namespace sfem {
               cache->jacobian_aos->jacobian_determinant()->data());
         }
             }
-      if (impl_->gradient_uses_affine && impl_->space->has_packed_mesh()) {
+      if ((impl_->gradient_uses_affine || domain.element_type == smesh::TET4 || domain.element_type == smesh::TRI3) && impl_->space->has_packed_mesh()) {
         auto packed = impl_->space->packed_mesh();
         const int packed_block = packed_block_id_for_domain(*packed, *domain.block);
         if (packed_block >= 0) {
@@ -693,7 +715,7 @@ namespace sfem {
           }
         }
       }
-      if (!impl_->gradient_uses_affine && impl_->space->has_packed_mesh()) {
+      if (!(impl_->gradient_uses_affine || domain.element_type == smesh::TET4 || domain.element_type == smesh::TRI3) && impl_->space->has_packed_mesh()) {
         auto packed = impl_->space->packed_mesh();
         const int packed_block = packed_block_id_for_domain(*packed, *domain.block);
         if (packed_block >= 0) {
@@ -754,7 +776,7 @@ namespace sfem {
           return SFEM_FAILURE;
         }
         adjugate = reinterpret_cast<const geom_t *const *>(
-            cache->jacobian_soa->jacobian_adjugate_SoA()->data());
+            cache->jacobian_soa->adjugate_components());
         determinant = reinterpret_cast<const geom_t *>(
             cache->jacobian_soa->jacobian_determinant()->data());
         if (false) {
@@ -876,7 +898,7 @@ namespace sfem {
           return SFEM_FAILURE;
         }
         adjugate = reinterpret_cast<const geom_t *const *>(
-            cache->jacobian_soa->jacobian_adjugate_SoA()->data());
+            cache->jacobian_soa->adjugate_components());
         determinant = reinterpret_cast<const geom_t *>(
             cache->jacobian_soa->jacobian_determinant()->data());
             }
@@ -889,7 +911,7 @@ namespace sfem {
                       impl_->element_values.get() + nvalues,
                       real_t(0));
       int status = SFEM_FAILURE;
-      if (impl_->objective_uses_affine && impl_->space->has_packed_mesh()) {
+      if ((impl_->objective_uses_affine || domain.element_type == smesh::TET4 || domain.element_type == smesh::TRI3) && impl_->space->has_packed_mesh()) {
         auto packed = impl_->space->packed_mesh();
         const int packed_block = packed_block_id_for_domain(*packed, *domain.block);
         if (packed_block >= 0) {
@@ -904,7 +926,7 @@ namespace sfem {
           }
         }
       }
-      if (!impl_->objective_uses_affine && impl_->space->has_packed_mesh()) {
+      if (!(impl_->objective_uses_affine || domain.element_type == smesh::TET4 || domain.element_type == smesh::TRI3) && impl_->space->has_packed_mesh()) {
         auto packed = impl_->space->packed_mesh();
         const int packed_block = packed_block_id_for_domain(*packed, *domain.block);
         if (packed_block >= 0) {
@@ -992,13 +1014,21 @@ namespace sfem {
               const count_t *const rowptr,
               const idx_t *const colidx,
               real_t *const values) {
+    return hessian_bsr_typed(x, rowptr, colidx, smesh::SMESH_DEFAULT, values);
+  }
+
+  int GeneratedSaintVenantKirchhoff::hessian_bsr_typed(const real_t *const x,
+              const count_t *const rowptr,
+              const idx_t *const colidx,
+              const enum smesh::PrimitiveType values_type,
+              void *const values) {
     SFEM_TRACE_SCOPE("GeneratedSaintVenantKirchhoff::hessian_bsr");
     if (check_graph(impl_->bsr_graph, rowptr, colidx, impl_->space->n_dofs() / impl_->space->block_size()) != SFEM_SUCCESS) {
       SFEM_ERROR("GeneratedSaintVenantKirchhoff::hessian_bsr: the graph is malformed; the assembly kernels assume it is not\n");
       return SFEM_FAILURE;
     }
     if (auto term = time_scheme_term(impl_->time_scheme)) {
-      if (term->hessian_bsr(x, rowptr, colidx, values) != SFEM_SUCCESS) {
+      if (term->hessian_bsr_typed(x, rowptr, colidx, values_type, values) != SFEM_SUCCESS) {
         return SFEM_FAILURE;
       }
     }
@@ -1020,22 +1050,22 @@ namespace sfem {
           return SFEM_FAILURE;
         }
         adjugate = reinterpret_cast<const geom_t *const *>(
-            cache->jacobian_soa->jacobian_adjugate_SoA()->data());
+            cache->jacobian_soa->adjugate_components());
         determinant = reinterpret_cast<const geom_t *>(
             cache->jacobian_soa->jacobian_determinant()->data());
       }
       const int dim = mesh->spatial_dimension();
       if (dim == 2) {
         if (domain.element_type == smesh::TRI3) {
-          return saint_venant_kirchhoff_hessian_bsr_2d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, current + 0, current + 1, rowptr, colidx, values);
+          return saint_venant_kirchhoff_hessian_bsr_2d_a_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, current + 0, current + 1, rowptr, colidx, values);
         }
-        return saint_venant_kirchhoff_hessian_bsr_2d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, current + 0, current + 1, rowptr, colidx, values);
+        return saint_venant_kirchhoff_hessian_bsr_2d_i_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, current + 0, current + 1, rowptr, colidx, values);
       }
       else if (dim == 3) {
         if (domain.element_type == smesh::TET4) {
-          return saint_venant_kirchhoff_hessian_bsr_3d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, current + 0, current + 1, current + 2, rowptr, colidx, values);
+          return saint_venant_kirchhoff_hessian_bsr_3d_a_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, current + 0, current + 1, current + 2, rowptr, colidx, values);
         }
-        return saint_venant_kirchhoff_hessian_bsr_3d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, current + 0, current + 1, current + 2, rowptr, colidx, values);
+        return saint_venant_kirchhoff_hessian_bsr_3d_i_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, current + 0, current + 1, current + 2, rowptr, colidx, values);
       }
       SFEM_ERROR("saint_venant_kirchhoff hessian_bsr does not support spatial dimension %d\n", dim);
       return SFEM_FAILURE;

@@ -6,6 +6,7 @@
 #include "sfem_defs.hpp"
 #include "sfem_mask.hpp"
 #include "sfem_FunctionSpace.hpp"
+#include "sfem_TangentValues.hpp"
 
 namespace sfem {
 
@@ -35,6 +36,20 @@ public:
                             const idx_t *const /*colidx*/,
                             real_t *const /*values*/) {
         assert(false);
+        return SFEM_FAILURE;
+    }
+
+    /// hessian_bsr into values of `values_type` (sfem_TangentValues.hpp); a constraint that writes
+    /// only real_t values takes that type alone.
+    virtual int hessian_bsr_typed(const real_t *const          x,
+                                  const count_t *const         rowptr,
+                                  const idx_t *const           colidx,
+                                  const smesh::PrimitiveType values_type,
+                                  void *const                  values) {
+        if (tangent_values_type(values_type) == smesh::TypeToEnum<real_t>::value()) {
+            return hessian_bsr(x, rowptr, colidx, static_cast<real_t *>(values));
+        }
+        SFEM_ERROR("This constraint cannot write single-precision tangent values\n");
         return SFEM_FAILURE;
     }
 

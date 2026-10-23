@@ -9025,7 +9025,9 @@ def _holding_one_element_hessian_matrix_assembly_function(
         )
     lines.extend(
         [
-            "template <typename s_t, typename g_t, int FORMAT>",
+            # The matrix values are of their own type v_t (the BSR scatter's);
+            # the other formats are instantiated with v_t = s_t.
+            "template <typename s_t, typename v_t, typename g_t, int FORMAT>",
             # A device kernel is declared as the target declares one; the host
             # keeps the spelling its tracked tree has.
             (
@@ -9071,7 +9073,7 @@ def _holding_one_element_hessian_matrix_assembly_function(
         [
             "    const count_t *const RSTR rowptr,",
             "    const idx_t *const RSTR colidx,",
-            "    s_t *const RSTR values,",
+            "    v_t *const RSTR values,",
             "    const int *const RSTR diag_offsets,",
             "    const ptrdiff_t ndiag,",
             "    const ptrdiff_t coo_nnz,",
@@ -9639,6 +9641,10 @@ def _sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes, assembly=No
     The function can no longer fail, so it returns void and its caller does not
     fold a status -- which is the arrangement ``_scatter_block_diag_sym`` has
     always had.
+
+    The values are of their own type ``v_t``: a tangent stored in single
+    precision is assembled in place from the element matrix in ``s_t``, each
+    entry rounded once as it is added.
     """
     # The block is the field's components, not the spatial dimension.
     n_field_components = dim if n_field_components is None else n_field_components
@@ -9663,7 +9669,7 @@ def _sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes, assembly=No
         BufferDeclNode("const int", "col", (), expr_ref("bj * NS + j")),
         ScatterNode(
             expr_ref("block[bi * NC + bj]"),
-            expr_ref("element_matrix[row * (NC * NS) + col]"),
+            expr_ref("v_t(element_matrix[row * (NC * NS) + col])"),
             "+=",
             atomic=atomic,
         ),
@@ -9711,7 +9717,7 @@ def _sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes, assembly=No
                     expr_ref("NS"),
                     [
                         BufferDeclNode(
-                            "s_t *const",
+                            "v_t *const",
                             "block",
                             (),
                             expr_ref("&%s[entries[i * NS + j] * NC * NC]" % value_stream),
@@ -9740,11 +9746,11 @@ def _sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes, assembly=No
                 "const s_t *const RSTR element_matrix",
                 "const count_t *const RSTR rowptr",
                 "const idx_t *const RSTR colidx",
-                "s_t *const RSTR values",
+                "v_t *const RSTR values",
             ),
             body=tuple(body),
             qualifier=current_target().function_qualifier(),
-            template_params=("typename s_t",),
+            template_params=("typename s_t", "typename v_t"),
         )
     )
 
@@ -10122,12 +10128,13 @@ def _sfem_soa_hessian_matrix_public_wrapper(
         public_name,
         params,
         # The target's launch: on the host the call itself, on a device the
-        # kernel launch on the caller's stream.
-        lambda scalar_type, _positional: list(
+        # kernel launch on the caller's stream.  Only BSR values have a type of
+        # their own; the other formats store the scalar.
+        lambda scalar_type, _positional, values_type=None: list(
             current_target().mesh_launch_lines(
                 implementation_name,
-                "%s, geom_t, %d" % (scalar_type, format_tag),
-                cast_arguments(params, impl_args, scalar_type),
+                "%s, %s, geom_t, %d" % (scalar_type, values_type or scalar_type, format_tag),
+                cast_arguments(params, impl_args, scalar_type, values_type),
                 indent="  ",
             )
         ),
@@ -10166,7 +10173,8 @@ def _hessian_matrix_public_params(
             [
                 "const count_t *const RSTR rowptr",
                 "const idx_t *const RSTR colidx",
-                "%s *const RSTR values" % scalar_type,
+                # A BSR tangent's values are a type of their own (v_t).
+                "%s *const RSTR values" % ("v_t" if matrix_format == "bsr" else scalar_type),
             ]
         )
     elif matrix_format == "dia":
@@ -10496,6 +10504,17 @@ def _sfem_soa_diagnostics_header(
         '  std::fprintf(stderr,',
         '      "%s does not support element type %d with real type %d\\n",',
         "      name, element_type, real_type);",
+        "  return SFEM_FAILURE;",
+        "}",
+        "",
+        "//! Reports matrix values of a width this real type is not stored in.",
+        "static %s int unsupported_values_dispatch(" % host_inline,
+        "    const char *const name,",
+        "    const int real_type,",
+        "    const int values_type) {",
+        '  std::fprintf(stderr,',
+        '      "%s cannot store real type %d in matrix values of type %d\\n",',
+        "      name, real_type, values_type);",
         "  return SFEM_FAILURE;",
         "}",
         "",

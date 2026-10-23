@@ -1,6 +1,7 @@
 #ifndef SFEM_MPRGP_HPP
 #define SFEM_MPRGP_HPP
 
+#include <limits>
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
@@ -11,11 +12,17 @@
 #include <memory>
 
 #include "sfem_MatrixFreeLinearSolver.hpp"
+#include "sfem_ParallelOperator.hpp"
 
 #include "sfem_PowerMethod.hpp"
 
 #include "sfem_openmp_blas.hpp"
+#include "sfem_mprgp_control.hpp"
 #include "sfem_openmp_mprgp_impl.hpp"
+
+#ifdef SFEM_ENABLE_CUDA
+#include "smesh_device_communicator.hpp"
+#endif
 
 namespace sfem {
     // From Active set expansion strategies in MPRGP algorithm, Kruzik et al. 2020
@@ -36,7 +43,6 @@ namespace sfem {
         ptrdiff_t n_dofs{SFEM_PTRDIFF_INVALID};
         bool verbose{true};
         T max_eig_{0};
-        bool debug{false};
 
         int iterations_{0};
         int iterations() const override { return iterations_; }
@@ -44,11 +50,55 @@ namespace sfem {
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
         SharedBuffer<T> upper_bound_;
         SharedBuffer<T> lower_bound_;
+        // Convergence on the projected gradient weighted entry by entry, |w g_P| (and rtol relative
+        // to |w g_0|): with variables z = S^{-1} y, w = S^{-1} measures the gradient in y. The
+        // steps are the iteration's own; only the test changes. Null: unweighted.
+        SharedBuffer<T> norm_weight_;
 
         std::function<void(const T* const, T* const)> apply_op;
+        // The operator in team form (TeamParallelOperator, on the host), if it has one: then runs
+        // of CG steps take one parallel region (team_cg_steps).
+        std::shared_ptr<TeamParallelOperator<T>> team_op_;
+        // Whether apply_op writes y = A x whole rather than adding to y: then y is not zeroed
+        // before each product.
+        bool op_overwrites_{false};
 
         std::shared_ptr<BLAS<T>> blas;
         MPRGP_Tpl<T> impl;
+        // Under MPI (a ParallelOperator of more than one rank): the vectors are the owned prefix
+        // of space-sized buffers, n_dofs the owned length, n_alloc the buffers'; every reduction
+        // spans the ranks, so every branch is taken alike on all of them.
+        std::shared_ptr<Communicator> comm_;
+        ptrdiff_t n_alloc_{-1};
+        // On the device, with every rank on one node and the communicator's device communication
+        // enabled (smesh::Communicator::enable_device): the passes complete their sums there, by
+        // NCCL on the stream, and the iteration returns to the host once, as on one rank.
+        // Otherwise empty, and the sums are completed on the host from the record.
+        MPRGPReduce<T> device_reduce_;
+
+        MPRGPReduce<T> make_device_reduce() const {
+#ifdef SFEM_ENABLE_CUDA
+            auto device = comm_ && execution_space_ == EXECUTION_SPACE_DEVICE ? comm_->device() : nullptr;
+            if (device && device->whole()) {
+                return [device](T* const values, const int count, const bool min_last) {
+                    if (min_last) {
+                        device->sum_and_min_last(values, count, smesh::TypeToEnum<T>::value());
+                    } else {
+                        device->sum(values, count, smesh::TypeToEnum<T>::value());
+                    }
+                };
+            }
+#endif
+            return {};
+        }
+
+        // Whether the sums are completed on the host, from the record.
+        bool on_host() const { return comm_ && !device_reduce_; }
+
+        T sum(const T local) const { return comm_ ? comm_->sum(local) : local; }
+        T dot(const T* const x, const T* const y) const { return sum(this->blas->dot(n_dofs, x, y)); }
+        T norm2(const T* const x) const { return std::sqrt(dot(x, x)); }
+        ptrdiff_t allocation_size() const { return n_alloc_ > 0 ? n_alloc_ : n_dofs; }
         std::shared_ptr<PowerMethod<T>> power_method;
 
         ExecutionSpace execution_space() const override { return execution_space_; }
@@ -59,7 +109,16 @@ namespace sfem {
 
         void set_op(const std::shared_ptr<Operator<T>>& op) override {
             this->apply_op = [=](const T* const x, T* const y) { op->apply(x, y); };
+            team_op_       = std::dynamic_pointer_cast<TeamParallelOperator<T>>(op);
             n_dofs = op->rows();
+            comm_.reset();
+            n_alloc_ = -1;
+            if (auto parallel = std::dynamic_pointer_cast<ParallelOperator<T>>(op)) {
+                if (parallel->comm()->size() > 1) {
+                    comm_    = parallel->comm();
+                    n_alloc_ = std::max(parallel->row_allocation_size(), parallel->col_allocation_size());
+                }
+            }
         }
         void set_preconditioner_op(const std::shared_ptr<Operator<T>>& /*op*/) override {
             // Ignoring op!
@@ -73,81 +132,102 @@ namespace sfem {
 
         void set_upper_bound(const SharedBuffer<T>& ub) { upper_bound_ = ub; }
         void set_lower_bound(const SharedBuffer<T>& lb) { lower_bound_ = lb; }
+        void set_norm_weight(const SharedBuffer<T>& w) { norm_weight_ = w; }
+        void set_op_overwrites(const bool val) { op_overwrites_ = val; }
+
+        /// y <- A x.
+        void product(const T* const x, T* const y) {
+            if (!op_overwrites_) this->blas->zeros(n_dofs, y);
+            apply_op(x, y);
+        }
 
         void ensure_power_method() {
             if (!power_method) {
                 auto blas_impl = blas;
                 power_method = std::make_shared<PowerMethod<T>>();
-                power_method->norm2 = [blas_impl](const std::ptrdiff_t n, const T* const x) { return blas_impl->norm2(n, x); };
+                auto comm = comm_;
+                power_method->norm2 = [blas_impl, comm](const std::ptrdiff_t n, const T* const x) {
+                    const T local = blas_impl->dot(n, x, x);
+                    return std::sqrt(comm ? comm->sum(local) : local);
+                };
                 power_method->scal = [blas_impl](const std::ptrdiff_t n, const T alpha, T* const x) { blas_impl->scal(n, alpha, x); };
                 power_method->zeros = [blas_impl](const std::size_t n, T* const x) { blas_impl->zeros(n, x); };
             }
         }
 
-        void project(T* const x) {
-            const T* const lb = lower_bound_ ? lower_bound_->data() : nullptr;
-            const T* const ub = upper_bound_ ? upper_bound_->data() : nullptr;
-            impl.project(n_dofs, lb, ub, x);
+        const T* lb() const { return lower_bound_ ? lower_bound_->data() : nullptr; }
+        const T* ub() const { return upper_bound_ ? upper_bound_->data() : nullptr; }
 
-            if (debug) {
-                T norm_project = this->blas->norm2(n_dofs, x);
-                printf("norm_project: %g\n", (double)norm_project);
+        void project(T* const x) { impl.project(n_dofs, lb(), ub(), x); }
+
+        /// Sums the ranks' partial reductions in place, one message for all of them.
+        void sum(T* const values, const int count) const {
+            if (comm_) comm_->sum(values, count, smesh::TypeToEnum<T>::value());
+        }
+        T min(const T local) const { return comm_ ? -comm_->max(-local) : local; }
+
+        /// At the iterate a step reaches: Ad.gf for the next direction, and the norms that choose
+        /// the next step and test convergence.
+        struct Gradients {
+            T Adgf, norm_gf, norm_gc, norm_gp;
+        };
+
+        // The iteration's record (MPRGPControl) in the execution space, its copy on the host, and
+        // the constants of its decisions.
+        T*              control_{nullptr};
+        MPRGPControl<T> record_{};
+        MPRGPParams<T>  params_{};
+
+        /// The curvature pass along d (Ad = A d), then the decision. On one rank both are the
+        /// pass's; across ranks its sums are completed here and the same decision taken on the host
+        /// (with device_reduce_ both stay the pass's).
+        void curvature(const T* const x, const T* const g, const T* const d, const T* const Ad, const MPRGPDecision decision,
+                       T* const work) {
+            impl.curvature(
+                    n_dofs, lb(), ub(), x, g, d, Ad, infty, on_host() ? MPRGP_DECIDE_NONE : decision, params_, control_, work, device_reduce_);
+            if (on_host()) {
+                impl.read_control(control_, &record_);
+                T v[4] = {record_.dAd, record_.dd, record_.gd, record_.alpha_feas};
+                // The three sums and the step bound in one message.
+                comm_->sum_and_min_last(v, 4, smesh::TypeToEnum<T>::value());
+                record_.dAd        = v[0];
+                record_.dd         = v[1];
+                record_.gd         = v[2];
+                record_.alpha_feas = v[3];
+                mprgp_decide(record_, decision, params_);
+                impl.write_control(record_, control_);
             }
         }
 
-        T norm_projected_gradient(const T* const x, const T* const g) const {
-            const T* const lb = lower_bound_ ? lower_bound_->data() : nullptr;
-            const T* const ub = upper_bound_ ? upper_bound_->data() : nullptr;
-            auto ret = impl.norm_projected_gradient(n_dofs, lb, ub, x, g, eps);
-
-            if (debug) {
-                printf("norm_projected_gradient: %g\n", (double)ret);
-            }
-
-            return ret;
-        }
-
-        void norm_gradients(const T* const x, const T* const g, T* const norm_free_gradient,
-                            T* const norm_chopped_gradient) const {
-            const T* const lb = lower_bound_ ? lower_bound_->data() : nullptr;
-            const T* const ub = upper_bound_ ? upper_bound_->data() : nullptr;
-            impl.norm_gradients(
-                    n_dofs, lb, ub, x, g, norm_free_gradient, norm_chopped_gradient, eps);
-
-            if (debug) {
-                printf("norm_free_gradient: %g, norm_chopped_gradient: %g\n",
-                       (double)*norm_free_gradient,
-                       (double)*norm_chopped_gradient);
+        /// x -= alpha d, g -= alpha Ad (along d only where the record's move is a step; neither
+        /// without d), gf <- the free gradient; completed across ranks like curvature(). With `cg`
+        /// the next direction's beta.
+        void step(const T* const d, const T* const Ad, T* const x, T* const g, T* const gf, const bool cg, T* const work) {
+            impl.step(n_dofs, lb(), ub(), d, Ad, x, g, gf, eps, norm_weight_ ? norm_weight_->data() : nullptr, on_host() ? false : cg,
+                      control_, work, device_reduce_);
+            if (on_host() && (!d || record_.move == T(MPRGP_MOVE_STEP))) {
+                impl.read_control(control_, &record_);
+                T v[4] = {record_.Adgf, record_.gf2, record_.gc2, record_.gp2};
+                sum(v, 4);
+                record_.Adgf = v[0];
+                record_.gf2  = v[1];
+                record_.gc2  = v[2];
+                record_.gp2  = v[3];
+                if (cg) {
+                    mprgp_after_cg_step(record_);
+                    impl.write_control(record_, control_);
+                }
             }
         }
 
-        void chopped_gradient(const T* const x, const T* const g, T* gc) const {
-            const T* const lb = lower_bound_ ? lower_bound_->data() : nullptr;
-            const T* const ub = upper_bound_ ? upper_bound_->data() : nullptr;
-            impl.chopped_gradient(n_dofs, lb, ub, x, g, gc, eps);
+        /// The record on the host; on one rank the read is the iteration's one return to it.
+        const MPRGPControl<T>& record() {
+            if (!on_host()) impl.read_control(control_, &record_);
+            return record_;
         }
 
-        void free_gradient(const T* const x, const T* const g, T* gf) const {
-            const T* const lb = lower_bound_ ? lower_bound_->data() : nullptr;
-            const T* const ub = upper_bound_ ? upper_bound_->data() : nullptr;
-            impl.free_gradient(n_dofs, lb, ub, x, g, gf);
-
-            if (debug) {
-                T norm_fg = this->blas->norm2(n_dofs, gf);
-                printf("norm_fg: %g\n", (double)norm_fg);
-            }
-        }
-
-        T max_alpha(const T* const x, const T* const p) const {
-            const T* const lb = lower_bound_ ? lower_bound_->data() : nullptr;
-            const T* const ub = upper_bound_ ? upper_bound_->data() : nullptr;
-            auto ret = impl.max_alpha(n_dofs, lb, ub, x, p, infty);
-
-            if (debug) {
-                printf("max_alpha: %g\n", (double)ret);
-            }
-
-            return ret;
+        static Gradients gradients(const MPRGPControl<T>& c) {
+            return {c.Adgf, std::sqrt(c.gf2), std::sqrt(c.gc2), std::sqrt(c.gp2)};
         }
 
         bool good() const {
@@ -162,80 +242,158 @@ namespace sfem {
             execution_space_ = EXECUTION_SPACE_HOST;
         }
 
-        void cg_step(const T alpha_cg, const T dot_pAp, const T* const Ap, T* const p, T* const g,
-                     T* const gf, T* const x) {
-            this->blas->axpby(n_dofs, -alpha_cg, p, 1, x);
-
-            this->blas->axpby(n_dofs, -alpha_cg, Ap, 1, g);
-
-            this->free_gradient(x, g, gf);
-
-            const T beta = this->blas->dot(n_dofs, Ap, gf) / dot_pAp;
-
-            this->blas->axpby(n_dofs, 1, gf, -beta, p);
-        }
-
-        void expansion_step(const T alpha_feas, const T alpha_bar, const T alpha_cg,
-                            const T dot_pAp, const T* const b, T* const p, const T* const Ap,
-                            T* const g, T* const gf, T* const x) {
-            this->blas->axpby(n_dofs, -alpha_feas, p, 1, x);
-
-            this->blas->axpby(n_dofs, -alpha_feas, Ap, 1, g);
-
-            switch (expansion_type_) {
-                case EXPANSION_TYPE_PROJECTED_CG: {
-                    this->blas->axpby(n_dofs, -alpha_cg, p, 1, x);
-
-                    if (alpha_cg <= alpha_feas) {
-                        this->blas->axpby(n_dofs, -alpha_cg, Ap, 1, g);
-                        this->free_gradient(x, g, gf);
-                        T beta = this->blas->dot(n_dofs, Ap, gf) / dot_pAp;
-                        this->blas->axpby(n_dofs, 1, gf, -beta, p);
-                    } else {
-                        this->project(x);
-                        this->gradient(x, b, g);
-                        this->free_gradient(x, g, gf);
-                        this->blas->copy(n_dofs, gf, p);
-                    }
-                    break;
-                }
-                default: {
-                    // EXPANSION_TYPE_ORGINAL
-                    this->free_gradient(x, g, gf);
-                    this->blas->axpby(n_dofs, -alpha_bar, gf, 1, x);
-                    this->project(x);
-                    this->gradient(x, b, g);
-                    this->free_gradient(x, g, gf);
-                    this->blas->copy(n_dofs, gf, p);
-                    break;
-                }
+        /// To the bound along p, then a projected step along the free gradient there (or, projected
+        /// CG, the CG step past the bound, projected); p restarts from the free gradient. The
+        /// record holds the step to the bound (alpha) and the CG step (alpha_cg).
+        Gradients expansion_step(const MPRGPControl<T>& c, const T* const b, T* const p, const T* const Ap, T* const g,
+                                 T* const x, T* const work) {
+            const T alpha_feas = c.alpha, alpha_cg = c.alpha_cg, alpha_bar = params_.alpha_bar;
+            // A flat direction (alpha_cg infty) has no CG step past the bound to project.
+            if (alpha_cg < infty && expansion_type_ == EXPANSION_TYPE_PROJECTED_CG) {
+                this->blas->axpby(n_dofs, -alpha_feas, p, 1, x);
+                this->blas->axpby(n_dofs, -alpha_cg, p, 1, x);
+                this->project(x);
+            } else {
+                impl.expand(n_dofs, lb(), ub(), alpha_feas, alpha_bar, p, Ap, x, g);
             }
+            this->gradient(x, b, g);
+            this->step(nullptr, nullptr, x, g, p, false, work);
+            return gradients(record());
         }
 
-        void proportioning_step(T* const p, T* const Agc, T* const g, T* const gf_or_gc,
-                                T* const x) {
-            // Attention!
-            T* gc = gf_or_gc;
-            T* gf = gf_or_gc;
+        /// A step along the chopped gradient gc; p restarts from the free gradient. False where gc
+        /// sees no curvature (mprgp_no_curvature) and no bound stops it.
+        bool proportioning_step(T* const p, T* const Agc, T* const g, T* const gc, T* const x, T* const work,
+                                Gradients* const grads) {
+            impl.chopped_gradient(n_dofs, lb(), ub(), x, g, gc, eps);
 
-            this->chopped_gradient(x, g, gc);
-
-            this->blas->zeros(n_dofs, Agc);
-            apply_op(gc, Agc);
-            T alpha_cg = this->blas->dot(n_dofs, g, gc) / this->blas->dot(n_dofs, gc, Agc);
-
-            this->blas->axpby(n_dofs, -alpha_cg, gc, 1, x);
-
-            this->blas->axpby(n_dofs, -alpha_cg, Agc, 1, g);
-            this->free_gradient(x, g, gf);
-
-            this->blas->copy(n_dofs, gf, p);
+            product(gc, Agc);
+            curvature(x, g, gc, Agc, MPRGP_DECIDE_PROPORTIONING, work);
+            this->step(gc, Agc, x, g, p, false, work);
+            const MPRGPControl<T>& c = record();
+            if (c.move == T(MPRGP_MOVE_UNBOUNDED)) return false;
+            *grads = gradients(c);
+            return true;
         }
 
         void gradient(const T* const x, const T* const b, T* const g) {
-            this->blas->zeros(n_dofs, g);
-            this->apply_op(x, g);
+            product(x, g);
             this->blas->axpby(n_dofs, -1, b, 1, g);
+        }
+
+        /// How team_cg_steps returned: before a proportioning step (the chopped gradient grew),
+        /// at a CG decision that is not a step (its record and A p stand, for the expansion), or
+        /// with the solve over (converged, or max_it).
+        enum class TeamExit { PROPORTIONING, NOT_A_STEP, DONE };
+
+        /// CG steps in one parallel region, as many in a row as the loop of apply() takes: its CG
+        /// branch and the test after it, thread by thread over the operator's Team. Each pass takes
+        /// the calling thread's chunks, and every thread, after a barrier, combines all of them in
+        /// index order and takes the same decisions; under MPI thread 0, which has no rows,
+        /// completes the sums over the ranks. Three barriers a step on one rank: in the operator,
+        /// after the curvature and after the step; under MPI the operator's halo and each sum over
+        /// the ranks take one more. The chunks' sums alternate between two halves of `work`: a
+        /// thread still reading one half is never overwritten.
+        TeamExit team_cg_steps(T* const     x,
+                               T* const     g,
+                               T* const     p,
+                               T* const     Ap,
+                               T* const     gf,
+                               T* const     work,
+                               const T      norm_gp0,
+                               Gradients*   grads,
+                               int*         count_cg_steps,
+                               bool*        converged) {
+            using Pass                 = OpenMP_MPRGP<T>;
+            const T* const w           = norm_weight_ ? norm_weight_->data() : nullptr;
+            T* const       part[2]     = {work, work + 4 * blas_max_chunk_count};
+            const T        no_curv[4]  = {0, 0, 0, infty};
+            const T        no_step[4]  = {0, 0, 0, 0};
+            const auto     type        = smesh::TypeToEnum<T>::value();
+            T              by_ranks[4] = {0, 0, 0, 0};
+            TeamExit       exit        = TeamExit::PROPORTIONING;
+#pragma omp parallel
+            {
+                const Team      team = team_op_->team();
+                MPRGPControl<T> c    = record_;
+                Gradients       gr   = *grads;
+                int             it = iterations_, steps = *count_cg_steps;
+                bool            done = false;
+                TeamExit        why  = TeamExit::PROPORTIONING;
+                // The ranks' sums, by thread 0, then for every thread.
+                auto over_ranks = [&](T (&v)[4], const bool min_last) {
+                    if (!comm_) return;
+                    if (team.tid == 0) {
+                        if (min_last) {
+                            comm_->sum_and_min_last(v, 4, type);
+                        } else {
+                            comm_->sum(v, 4, type);
+                        }
+                        for (int k = 0; k < 4; k++) by_ranks[k] = v[k];
+                    }
+                    team.barrier();
+                    for (int k = 0; k < 4; k++) v[k] = by_ranks[k];
+                };
+                with_mprgp_bounds(lb(), ub(), [&](const auto bounds) {
+                    while (gr.norm_gc <= this->gamma * gr.norm_gf) {
+                        if (!op_overwrites_) {
+                            for (ptrdiff_t i = team.begin; i < team.end; i++) Ap[i] = 0;
+                        }
+                        if (!team_op_->input_in_share()) team.barrier();
+                        team_op_->team_apply(team, p, Ap);
+
+                        T v[4];
+                        Pass::team_sums(team, no_curv, part[0], [&](const ptrdiff_t b, const ptrdiff_t e, T (&s)[4]) {
+                            Pass::curvature_sums(bounds, b, e, x, g, p, Ap, infty, s);
+                        });
+                        team.barrier();
+                        Pass::combine(team.chunks, part[0], no_curv, true, v);
+                        over_ranks(v, true);
+                        c.dAd        = v[0];
+                        c.dd         = v[1];
+                        c.gd         = v[2];
+                        c.alpha_feas = v[3];
+                        mprgp_decide(c, MPRGP_DECIDE_CG, params_);
+                        if (c.move != T(MPRGP_MOVE_STEP)) {
+                            why = TeamExit::NOT_A_STEP;
+                            break;
+                        }
+
+                        Pass::team_sums(team, no_step, part[1], [&](const ptrdiff_t b, const ptrdiff_t e, T (&s)[4]) {
+                            Pass::step_sums(bounds, b, e, p, Ap, c.alpha, x, g, gf, eps, w, s);
+                        });
+                        team.barrier();
+                        Pass::combine(team.chunks, part[1], no_step, false, v);
+                        over_ranks(v, false);
+                        c.Adgf = v[0];
+                        c.gf2  = v[1];
+                        c.gc2  = v[2];
+                        c.gp2  = v[3];
+                        mprgp_after_cg_step(c);
+                        Pass::direction(team.begin, team.end, gf, c.beta, p);
+                        gr = gradients(c);
+                        steps++;
+
+                        const T rel_norm_gp = gr.norm_gp / norm_gp0;
+                        done                = gr.norm_gp < atol || rel_norm_gp < rtol;
+                        if (team.tid == 0) monitor(it, gr.norm_gp, rel_norm_gp);
+                        if (++it >= max_it || done) {
+                            why = TeamExit::DONE;
+                            break;
+                        }
+                    }
+                });
+                if (team.tid == 0) {
+                    record_         = c;
+                    *grads          = gr;
+                    iterations_     = it;
+                    *count_cg_steps = steps;
+                    *converged      = done;
+                    exit            = why;
+                }
+            }
+            impl.write_control(record_, control_);
+            return exit;
         }
 
         void monitor(const int iter, const T residual, const T rel_residual) {
@@ -256,15 +414,12 @@ namespace sfem {
 
             bool converged = false;
 
-            T norm_gf = -1;
-            T norm_gc = -1;
-            T alpha_feas = -1;  // maximal feasbile step
-            T alpha_cg = -1;
-
-            T* g = this->blas->allocate(n_dofs);  // Gradient
-            T* p = this->blas->allocate(n_dofs);
-            T* Ap_or_Ag = this->blas->allocate(n_dofs);
-            T* gf_or_gc = this->blas->allocate(n_dofs);  // Free Gradient or Chopped Gradient
+            T* g = this->blas->allocate(allocation_size());  // Gradient
+            T* p = this->blas->allocate(allocation_size());
+            T* Ap_or_Ag = this->blas->allocate(allocation_size());
+            T* gf_or_gc = this->blas->allocate(allocation_size());  // Free Gradient or Chopped Gradient
+            T* work     = impl.work_size > 0 ? this->blas->allocate(impl.work_size) : nullptr;
+            control_    = this->blas->allocate(mprgp_control_size<T>());
 
             T alpha_bar = 1;
             if (expansion_type_ == EXPANSION_TYPE_ORGINAL) {
@@ -281,15 +436,22 @@ namespace sfem {
                 printf("Skipping power method!\n");
             }
 
+            params_        = {max_eig_, alpha_bar, infty, std::numeric_limits<T>::epsilon()};
+            record_        = MPRGPControl<T>{};
+            device_reduce_ = make_device_reduce();
+
             this->project(x);  // Make iterate feasible
             this->gradient(x, b, g);
 
-            T norm_g = this->blas->norm2(n_dofs, g);
+            // |w g| (Ap_or_Ag, zero from the allocation, as scratch).
+            if (norm_weight_) this->blas->xypaz(n_dofs, norm_weight_->data(), g, 0, Ap_or_Ag);
+            T norm_g = norm2(norm_weight_ ? Ap_or_Ag : g);
             this->monitor(0, norm_g, 1);
             T norm_gp0 = norm_g;
 
-            this->free_gradient(x, g, gf_or_gc);
-            this->blas->copy(n_dofs, gf_or_gc, p);
+            // The first direction: the free gradient at the feasible start.
+            this->step(nullptr, nullptr, x, g, p, false, work);
+            Gradients grads = gradients(record());
 
             int count_cg_steps = 0;
             int count_expansion_steps = 0;
@@ -298,49 +460,51 @@ namespace sfem {
             iterations_ = 0;
 
             while (!converged) {
-                norm_gradients(x, g, &norm_gf, &norm_gc);
+                if (grads.norm_gc <= this->gamma * grads.norm_gf) {
+                    if (team_op_) {
+                        // The CG steps in a row in one region; back here at the first that is no
+                        // step, for the expansion below.
+                        const TeamExit exit = team_cg_steps(x, g, p, Ap_or_Ag, gf_or_gc, work, norm_gp0, &grads, &count_cg_steps, &converged);
+                        if (exit == TeamExit::DONE) break;
+                        if (exit == TeamExit::PROPORTIONING) continue;
+                    } else {
+                        product(p, Ap_or_Ag);
+                        // The decision, the CG step and the next direction p <- gf - beta p, the
+                        // last two only where the move is a step; then the record, read once.
+                        curvature(x, g, p, Ap_or_Ag, MPRGP_DECIDE_CG, work);
+                        this->step(p, Ap_or_Ag, x, g, gf_or_gc, true, work);
+                        impl.update_direction(n_dofs, gf_or_gc, p, control_);
+                    }
+                    const MPRGPControl<T>& c = record();
 
-                if (norm_gc <= this->gamma * norm_gf) {
-                    alpha_feas = this->max_alpha(x, p);
-                    this->blas->zeros(n_dofs, Ap_or_Ag);
-                    this->apply_op(p, Ap_or_Ag);
-                    const T dot_pAp = this->blas->dot(n_dofs, p, Ap_or_Ag);
-
-                    if (dot_pAp < 0) {
-                        fprintf(stderr, "[Warning][MPRGP] Detected negative curvature\n");
-                        return SFEM_FAILURE;
+                    // Without positive curvature the energy falls along -p until a bound stops
+                    // it: the expansion step, at the bound. A free body's rigid motions are such
+                    // directions, held only by the bounds.
+                    if (c.move == T(MPRGP_MOVE_UNBOUNDED)) {
+                        fprintf(stderr, "[Warning][MPRGP] No positive curvature and no bound along the search direction (%g)\n", (double)c.dAd);
+                        break;
                     }
 
-                    alpha_cg = this->blas->dot(n_dofs, g, p) / dot_pAp;
-
-                    if (alpha_cg <= alpha_feas) {
-                        this->cg_step(alpha_cg, dot_pAp, Ap_or_Ag, p, g, gf_or_gc, x);
-
+                    if (c.move == T(MPRGP_MOVE_STEP)) {
+                        grads = gradients(c);
                         count_cg_steps++;
                     } else {
                         // apply_op inside!
-                        this->expansion_step(alpha_feas,
-                                             alpha_bar,
-                                             alpha_cg,
-                                             dot_pAp,
-                                             b,
-                                             p,
-                                             Ap_or_Ag,
-                                             g,
-                                             gf_or_gc,
-                                             x);
-
+                        grads = this->expansion_step(c, b, p, Ap_or_Ag, g, x, work);
                         count_expansion_steps++;
                     }
                 } else {
                     // apply_op inside!
-                    this->proportioning_step(p, Ap_or_Ag, g, gf_or_gc, x);
+                    if (!this->proportioning_step(p, Ap_or_Ag, g, gf_or_gc, x, work, &grads)) {
+                        fprintf(stderr, "[Warning][MPRGP] No positive curvature and no bound along the chopped gradient\n");
+                        break;
+                    }
 
                     count_proportioning_steps++;
                 }
 
                 // Check for convergence
-                const T norm_gp = this->norm_projected_gradient(x, g);
+                const T norm_gp = grads.norm_gp;
                 const T rel_norm_gp = norm_gp / norm_gp0;
                 converged = norm_gp < atol || rel_norm_gp < rtol;
 
@@ -360,6 +524,9 @@ namespace sfem {
             this->blas->destroy(p);
             this->blas->destroy(Ap_or_Ag);
             this->blas->destroy(gf_or_gc);
+            if (work) this->blas->destroy(work);
+            this->blas->destroy(control_);
+            control_ = nullptr;
             return converged ? SFEM_SUCCESS : SFEM_FAILURE;
         }
     };

@@ -86,6 +86,13 @@ namespace sfem {
 
         int hessian_bsr(const real_t *const x, const count_t *const rowptr, const idx_t *const colidx, real_t *const values);
 
+        /// hessian_bsr into values of `values_type` (sfem_TangentValues.hpp).
+        int hessian_bsr(const real_t *const          x,
+                        const count_t *const         rowptr,
+                        const idx_t *const           colidx,
+                        const smesh::PrimitiveType values_type,
+                        void *const                  values);
+
         int hessian_dia(const real_t *const x, const int *const diag_offsets, const ptrdiff_t ndiag, real_t *const values);
 
         int hessian_bcrs_sym(const real_t *const  x,

@@ -2,7 +2,13 @@
 
 #include <algorithm>
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 #include "sfem_BSR.hpp"
+#include "sfem_fixed_chunks.hpp"
+#include "sfem_TangentValues.hpp"
 #include "sfem_node_obstacle_kernels.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
@@ -14,6 +20,16 @@ namespace sfem {
     namespace {
         void normal_at(const NodeObstacleView &c, const ptrdiff_t i, real_t *const n) {
             for (int d = 0; d < 3; ++d) n[d] = c.normals[d][i];
+        }
+
+        // Inside a region, the calling thread's share of n: contiguous, as schedule(static) gives.
+        void thread_share(const ptrdiff_t n, ptrdiff_t *const first, ptrdiff_t *const end) {
+            int tid = 0, threads = 1;
+#ifdef _OPENMP
+            tid     = omp_get_thread_num();
+            threads = omp_get_num_threads();
+#endif
+            blas_chunk_bounds(n, threads, tid, first, end);
         }
     }  // namespace
 
@@ -27,23 +43,49 @@ namespace sfem {
         }
     }
 
-    void node_obstacle_to_frame(const NodeObstacleView &c, real_t *const v) {
-#ifdef SFEM_ENABLE_CUDA
-        if (c.es == EXECUTION_SPACE_DEVICE) return d_node_obstacle_to_frame(c, v);
-#endif
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < c.size; ++i) {
-            ::node_obstacle_to_frame(&c.frames[9 * i], &v[(ptrdiff_t)c.idx[i] * 3]);
+    void node_obstacle_to_frame(const NodeObstacleView &c,
+                                const real_t *const     s,
+                                const real_t *const     in,
+                                real_t *const           out,
+                                const ptrdiff_t         first,
+                                const ptrdiff_t         end) {
+        for (ptrdiff_t node = first; node < end; ++node) {
+            ::node_obstacle_scaled_to_frame(c.frame_of[node] < 0 ? nullptr : &c.frames[9 * (ptrdiff_t)c.frame_of[node]], s ? &s[node * 3] : nullptr, &in[node * 3], &out[node * 3]);
         }
     }
 
-    void node_obstacle_from_frame(const NodeObstacleView &c, real_t *const v) {
+    void node_obstacle_from_frame(const NodeObstacleView &c,
+                                  const real_t *const     s,
+                                  const real_t *const     in,
+                                  real_t *const           out,
+                                  const ptrdiff_t         first,
+                                  const ptrdiff_t         end) {
+        for (ptrdiff_t node = first; node < end; ++node) {
+            ::node_obstacle_scaled_from_frame(c.frame_of[node] < 0 ? nullptr : &c.frames[9 * (ptrdiff_t)c.frame_of[node]], s ? &s[node * 3] : nullptr, &in[node * 3], &out[node * 3]);
+        }
+    }
+
+    void node_obstacle_to_frame(const NodeObstacleView &c, const real_t *const s, const real_t *const in, real_t *const out) {
 #ifdef SFEM_ENABLE_CUDA
-        if (c.es == EXECUTION_SPACE_DEVICE) return d_node_obstacle_from_frame(c, v);
+        if (c.es == EXECUTION_SPACE_DEVICE) return d_node_obstacle_to_frame(c, s, in, out);
 #endif
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < c.size; ++i) {
-            ::node_obstacle_from_frame(&c.frames[9 * i], &v[(ptrdiff_t)c.idx[i] * 3]);
+#pragma omp parallel
+        {
+            ptrdiff_t first, end;
+            thread_share(c.n_nodes, &first, &end);
+            node_obstacle_to_frame(c, s, in, out, first, end);
+        }
+    }
+
+    void node_obstacle_from_frame(const NodeObstacleView &c, const real_t *const s, const real_t *const in, real_t *const out) {
+#ifdef SFEM_ENABLE_CUDA
+        if (c.es == EXECUTION_SPACE_DEVICE) return d_node_obstacle_from_frame(c, s, in, out);
+#endif
+#pragma omp parallel
+        {
+            ptrdiff_t first, end;
+            thread_share(c.n_nodes, &first, &end);
+            node_obstacle_from_frame(c, s, in, out, first, end);
         }
     }
 
@@ -58,6 +100,26 @@ namespace sfem {
 #pragma omp parallel for
         for (ptrdiff_t i = 0; i < c.size; ++i) {
             ub[(ptrdiff_t)c.idx[i] * 3] = c.gap[i];
+        }
+    }
+
+    void node_obstacle_offset_gap(const ExecutionSpace es,
+                                  const ptrdiff_t      size,
+                                  const real_t         shift,
+                                  const real_t         cutoff,
+                                  const real_t         release,
+                                  const real_t *const  p0,
+                                  real_t *const        gap,
+                                  real_t *const *const normals) {
+#ifdef SFEM_ENABLE_CUDA
+        if (es == EXECUTION_SPACE_DEVICE) return d_node_obstacle_offset_gap(size, shift, cutoff, release, p0, gap, normals);
+#else
+        (void)es;
+#endif
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < size; ++i) {
+            ::node_obstacle_offset_gap(
+                    shift, cutoff, p0 ? release * p0[i] : real_t(0), &gap[i], &normals[0][i], &normals[1][i], &normals[2][i]);
         }
     }
 
@@ -86,19 +148,26 @@ namespace sfem {
                                      const real_t            sign,
                                      const count_t *const    rowptr,
                                      const idx_t *const      colidx,
-                                     real_t *const           values) {
+                                     const smesh::PrimitiveType values_type,
+                                     void *const             values) {
 #ifdef SFEM_ENABLE_CUDA
-        if (c.es == EXECUTION_SPACE_DEVICE) return d_node_obstacle_curvature_bsr(c, r, k, capped, sign, rowptr, colidx, values);
-#endif
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < c.size; ++i) {
-            const ptrdiff_t node = c.idx[i];
-            real_t          n[3];
-            normal_at(c, i, n);
-            const real_t C[6] = {c.curvature[0][i], c.curvature[1][i], c.curvature[2][i], c.curvature[3][i], c.curvature[4][i], c.curvature[5][i]};
-            real_t *const B   = bsr_diagonal_block(node, rowptr, colidx, 3, values);
-            if (B) ::node_obstacle_curvature(n, C, &r[node * 3], c.gap[i], k[node * 3], capped, sign, B);
+        if (c.es == EXECUTION_SPACE_DEVICE) {
+            d_node_obstacle_curvature_bsr(c, r, k, capped, sign, rowptr, colidx, values_type, values);
+            return;
         }
+#endif
+        with_tangent_values(values_type, values, [&](auto *const v) {
+#pragma omp parallel for
+            for (ptrdiff_t i = 0; i < c.size; ++i) {
+                const ptrdiff_t node = c.idx[i];
+                real_t          n[3];
+                normal_at(c, i, n);
+                const real_t C[6] = {c.curvature[0][i], c.curvature[1][i], c.curvature[2][i], c.curvature[3][i], c.curvature[4][i], c.curvature[5][i]};
+                auto *const  B    = bsr_diagonal_block(node, rowptr, colidx, 3, v);
+                if (B) ::node_obstacle_curvature(n, C, &r[node * 3], c.gap[i], k[node * 3], capped, sign, B);
+            }
+            return SFEM_SUCCESS;
+        });
     }
 
     void node_obstacle_curvature_blocks(const NodeObstacleView &c,

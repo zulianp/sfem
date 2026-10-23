@@ -37,6 +37,7 @@ extern "C" int modified_mooney_rivlin_proteus_quad4_gradient_i_msoa(
 );
 extern "C" int modified_mooney_rivlin_proteus_quad4_hessian_bsr_i_msoa(
         const int scalar_bytes,
+        const int values_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -135,6 +136,7 @@ extern "C" int modified_mooney_rivlin_quad4_gradient_i_msoa(
 
 extern "C" int modified_mooney_rivlin_quad4_hessian_bsr_i_msoa(
         const int scalar_bytes,
+        const int values_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -155,7 +157,7 @@ extern "C" int modified_mooney_rivlin_quad4_hessian_bsr_i_msoa(
         elements[3],
         elements[2]
     };
-    return modified_mooney_rivlin_proteus_quad4_hessian_bsr_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, c1, c2, kappa, u_stride, ux, uy, rowptr, colidx, values);
+    return modified_mooney_rivlin_proteus_quad4_hessian_bsr_i_msoa(scalar_bytes, values_bytes, nelements, nnodes, proteus_elements, points, c1, c2, kappa, u_stride, ux, uy, rowptr, colidx, values);
 }
 
 extern "C" int modified_mooney_rivlin_quad4_objective_steps_i_msoa(

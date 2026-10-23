@@ -34,7 +34,8 @@ int test_device_diagonal_matches_host() {
     auto values = create_host_buffer<real_t>(nnz * bs * bs);
     std::copy(tangent->rowptr(), tangent->rowptr() + rows + 1, rowptr->data());
     std::copy(tangent->colidx(), tangent->colidx() + nnz, colidx->data());
-    std::copy(tangent->values(), tangent->values() + nnz * bs * bs, values->data());
+    const real_t *const h_values = static_cast<const real_t *>(tangent->values());
+    std::copy(h_values, h_values + nnz * bs * bs, values->data());
 
     auto h_diag = create_host_buffer<real_t>(rows * bs);
     SFEM_TEST_ASSERT(tangent->diagonal(h_diag->data()) == SFEM_SUCCESS);
@@ -82,11 +83,11 @@ int test_device_diagonal_matches_host() {
 
     SFEM_TEST_ASSERT(tangent->shift_diagonal(real_t(0.25), h_diag->data()) == SFEM_SUCCESS);
     const int shifted_status =
-            d_bsr_shift_diagonal<count_t, idx_t, real_t>(rows, bs, d_rowptr->data(), d_colidx->data(), real_t(0.25), d_diag->data(), d_values->data());
+            d_bsr_shift_diagonal<count_t, idx_t, real_t, real_t>(rows, bs, d_rowptr->data(), d_colidx->data(), real_t(0.25), d_diag->data(), d_values->data());
     SFEM_TEST_ASSERT(shifted_status == SFEM_SUCCESS);
     auto shifted = smesh::to_host(d_values);
     for (ptrdiff_t i = 0; i < nnz * bs * bs; ++i) {
-        SFEM_TEST_ASSERT(shifted->data()[i] == tangent->values()[i]);
+        SFEM_TEST_ASSERT(shifted->data()[i] == static_cast<const real_t *>(tangent->values())[i]);
     }
     return SFEM_TEST_SUCCESS;
 }
