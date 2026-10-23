@@ -295,7 +295,7 @@ namespace sfem {
             int count_expansion_steps = 0;
             int count_proportioning_steps = 0;
 
-            int iterations_ = 0;
+            iterations_ = 0;
 
             while (!converged) {
                 norm_gradients(x, g, &norm_gf, &norm_gc);

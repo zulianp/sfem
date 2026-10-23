@@ -133,6 +133,9 @@ list(APPEND SFEM_MODULES
     frontend
     frontend/constraints
     frontend/ops
+    frontend/ops/prony
+    frontend/nonlinear
+    frontend/mech
 )
 
 if(SFEM_ENABLE_METIS)
@@ -148,8 +151,9 @@ if(SFEM_ENABLE_SSDF)
 endif()
 
 if(SFEM_ENABLE_CUDA)
-     list(APPEND SFEM_MODULES 
+     list(APPEND SFEM_MODULES
         algebra/cuda
+        algebra/bsr/cuda
         frontend/cuda
         operators/boundary_conditions/cuda
         operators/contact/cuda
@@ -164,8 +168,10 @@ if(SFEM_ENABLE_CUDA)
         operators/tet4/cuda
         resampling/surface/cuda
         resampling/quadshell4/cuda
+        resampling/interpolate/cuda
         ssmg/cuda
         frontend/ops/cuda
+        frontend/ops/prony/cuda
     )
 
     if(SFEM_ENABLE_AMG)

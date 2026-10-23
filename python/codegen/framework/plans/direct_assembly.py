@@ -176,12 +176,18 @@ def substituted_assembly_admits(
         return False
     if not dependencies.direction:
         return False
-    if not any(any(row) for row in dependencies.gradient_coefficients):
+    if not (
+        any(any(row) for row in dependencies.gradient_coefficients)
+        or any(dependencies.value_coefficients)
+    ):
         return False
+    # Both contractions: a form that contracts only the test function's value -- a mass -- is
+    # as much a matrix as one that contracts its gradient.
     return all(
         flux_is_linear_in_the_direction(sp.sympify(expression), field_names, dim)
         for coefficient in coefficients
-        for expression in coefficient.gradient
+        for expression in (*coefficient.gradient, coefficient.value)
+        if expression is not None
     )
 
 

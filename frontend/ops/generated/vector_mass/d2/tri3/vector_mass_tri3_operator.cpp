@@ -1,0 +1,763 @@
+#include <type_traits>
+#include <cstdint>
+#include <cstdlib>
+#include <string.h>
+#include "vector_mass_d2_simplex_local.hpp"
+#include "geometry_kernels.hpp"
+#include "kernel_diagnostics.hpp"
+#include "packed_thread_scratch.hpp"
+#include "quad_tri_q3.hpp"
+#include "tri3_q3.hpp"
+#if defined(__has_include)
+#if __has_include("smesh_types.hpp")
+#include "smesh_types.hpp"
+#endif
+#endif
+
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+#include <cstdio>
+
+namespace sfem {
+namespace codegen {
+
+template <typename s_t, typename g_t, int VS>
+SFEM_INLINE const s_t *ageom_stream(
+    const int,
+    const g_t *const RSTR source,
+    s_t *const RSTR,
+    std::true_type) {
+  return source;
+}
+
+template <typename s_t, typename g_t, int VS>
+SFEM_INLINE const s_t *ageom_stream(
+    const int ne,
+    const g_t *const RSTR source,
+    s_t *const RSTR converted,
+    std::false_type) {
+  #pragma omp simd
+  for (int lane = 0; lane < ne; ++lane) {
+    converted[lane] = s_t(source[lane]);
+  }
+  return converted;
+}
+
+} // namespace codegen
+} // namespace sfem
+namespace sfem {
+namespace codegen {
+
+static const KernelDiagnostics vector_mass_tri3_residual_esoa_diagnostics_data = {
+  "vector_mass_tri3_residual_esoa",
+  "TRI3",
+  2,
+  3,
+  3,
+  16,
+  2,
+  0,
+  4,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  5,
+  2,
+  4,
+  243,
+  324,
+  0,
+  3,
+  5,
+  27,
+  3,
+  1,
+  6,
+  0,
+  6,
+  1,
+  1,
+  1.0,
+  1.0,
+  8.0,
+  12.0,
+  16.0,
+  20.0,
+  20.0,
+  24.0,
+  1.0,
+  1.0
+};
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" const sfem::codegen::KernelDiagnostics *vector_mass_tri3_residual_esoa_diagnostics(void) {
+  return &sfem::codegen::vector_mass_tri3_residual_esoa_diagnostics_data;
+}
+
+namespace sfem {
+namespace codegen {
+
+static const KernelDiagnostics vector_mass_tri3_jacobian_u0_u0_diagnostics_data = {
+  "vector_mass_tri3_jacobian_u0_u0",
+  "TRI3",
+  2,
+  3,
+  3,
+  16,
+  2,
+  0,
+  2,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  3,
+  1,
+  2,
+  243,
+  324,
+  0,
+  3,
+  5,
+  27,
+  3,
+  1,
+  0,
+  6,
+  6,
+  1,
+  1,
+  1.0,
+  1.0,
+  8.0,
+  12.0,
+  16.0,
+  20.0,
+  20.0,
+  24.0,
+  1.0,
+  1.0
+};
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" const sfem::codegen::KernelDiagnostics *vector_mass_tri3_jacobian_u0_u0_diagnostics(void) {
+  return &sfem::codegen::vector_mass_tri3_jacobian_u0_u0_diagnostics_data;
+}
+
+namespace sfem {
+namespace codegen {
+
+static const KernelDiagnostics vector_mass_tri3_jacobian_u0_u1_diagnostics_data = {
+  "vector_mass_tri3_jacobian_u0_u1",
+  "TRI3",
+  2,
+  3,
+  3,
+  16,
+  2,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  1,
+  0,
+  243,
+  324,
+  0,
+  0,
+  5,
+  27,
+  3,
+  0,
+  0,
+  0,
+  6,
+  1,
+  1,
+  1.0,
+  1.0,
+  8.0,
+  12.0,
+  16.0,
+  20.0,
+  20.0,
+  24.0,
+  1.0,
+  1.0
+};
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" const sfem::codegen::KernelDiagnostics *vector_mass_tri3_jacobian_u0_u1_diagnostics(void) {
+  return &sfem::codegen::vector_mass_tri3_jacobian_u0_u1_diagnostics_data;
+}
+
+namespace sfem {
+namespace codegen {
+
+static const KernelDiagnostics vector_mass_tri3_jacobian_u1_u0_diagnostics_data = {
+  "vector_mass_tri3_jacobian_u1_u0",
+  "TRI3",
+  2,
+  3,
+  3,
+  16,
+  2,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  1,
+  0,
+  243,
+  324,
+  0,
+  0,
+  5,
+  27,
+  3,
+  0,
+  0,
+  0,
+  6,
+  1,
+  1,
+  1.0,
+  1.0,
+  8.0,
+  12.0,
+  16.0,
+  20.0,
+  20.0,
+  24.0,
+  1.0,
+  1.0
+};
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" const sfem::codegen::KernelDiagnostics *vector_mass_tri3_jacobian_u1_u0_diagnostics(void) {
+  return &sfem::codegen::vector_mass_tri3_jacobian_u1_u0_diagnostics_data;
+}
+
+namespace sfem {
+namespace codegen {
+
+static const KernelDiagnostics vector_mass_tri3_jacobian_u1_u1_diagnostics_data = {
+  "vector_mass_tri3_jacobian_u1_u1",
+  "TRI3",
+  2,
+  3,
+  3,
+  16,
+  2,
+  0,
+  2,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  3,
+  1,
+  2,
+  243,
+  324,
+  0,
+  3,
+  5,
+  27,
+  3,
+  1,
+  0,
+  6,
+  6,
+  1,
+  1,
+  1.0,
+  1.0,
+  8.0,
+  12.0,
+  16.0,
+  20.0,
+  20.0,
+  24.0,
+  1.0,
+  1.0
+};
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" const sfem::codegen::KernelDiagnostics *vector_mass_tri3_jacobian_u1_u1_diagnostics(void) {
+  return &sfem::codegen::vector_mass_tri3_jacobian_u1_u1_diagnostics_data;
+}
+
+namespace sfem {
+namespace codegen {
+
+static const KernelDiagnostics vector_mass_tri3_jacobian_action_esoa_diagnostics_data = {
+  "vector_mass_tri3_jacobian_action_esoa",
+  "TRI3",
+  2,
+  3,
+  3,
+  16,
+  2,
+  0,
+  4,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  5,
+  2,
+  4,
+  243,
+  324,
+  0,
+  3,
+  5,
+  27,
+  3,
+  1,
+  0,
+  6,
+  6,
+  1,
+  1,
+  1.0,
+  1.0,
+  8.0,
+  12.0,
+  16.0,
+  20.0,
+  20.0,
+  24.0,
+  1.0,
+  1.0
+};
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" const sfem::codegen::KernelDiagnostics *vector_mass_tri3_jacobian_action_esoa_diagnostics(void) {
+  return &sfem::codegen::vector_mass_tri3_jacobian_action_esoa_diagnostics_data;
+}
+
+extern "C" int vector_mass_tri3_residual_esoa(
+    const int scalar_bytes,
+    const int ne,
+    const ptrdiff_t geometry_stride,
+    const void *const RSTR determinant,
+    const void *const RSTR current[6],
+    const real_t density,
+    void *const RSTR output[6]
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        sfem::codegen::vector_mass_d2_simplex_tri3_residual_block<double, 3, 3, 16>(ne, geometry_stride, (const double *)determinant, sfem::codegen::ref_tri3_q3<double>::shape(), sfem::codegen::quad_tri_q3<double>::q_weight(), (const double *const *)current, density, (double *const *)output);
+        return SFEM_SUCCESS;
+    }
+    case (int)sizeof(float): {
+        sfem::codegen::vector_mass_d2_simplex_tri3_residual_block<float, 3, 3, 16>(ne, geometry_stride, (const float *)determinant, sfem::codegen::ref_tri3_q3<float>::shape(), sfem::codegen::quad_tri_q3<float>::q_weight(), (const float *const *)current, density, (float *const *)output);
+        return SFEM_SUCCESS;
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("vector_mass_tri3_residual_esoa", -1, (int)scalar_bytes);
+}
+
+namespace sfem {
+namespace codegen {
+
+template <typename s_t, typename g_t>
+static SFEM_INLINE int vector_mass_tri3_residual_a_msoa_impl(
+    const ptrdiff_t nelements,
+    const ptrdiff_t,
+    idx_t **const RSTR elements,
+    const g_t *const RSTR g_det0,
+    const s_t density,
+    const ptrdiff_t current_stride,
+    const s_t *const RSTR u0,
+    const s_t *const RSTR u1,
+    const ptrdiff_t out_stride,
+    s_t *const RSTR u0_out,
+    s_t *const RSTR u1_out
+) {
+  static constexpr int NQ = 3;
+  static constexpr int NS = 3;
+  static constexpr int NC = 2;
+  static constexpr int VS = 16;
+  const s_t *const affine_shape = sfem::codegen::ref_tri3_q3<s_t>::shape();
+  const s_t *const affine_q_weight = sfem::codegen::quad_tri_q3<s_t>::q_weight();
+
+#pragma omp parallel for schedule(static)
+  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
+    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+    s_t bcurrent[NC * NS][VS];
+    s_t boutput[NC * NS][VS];
+    const s_t *const current_components[NC] = {u0, u1};
+
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t *const RSTR element_shape = elements[shape];
+      for (int field = 0; field < NC; ++field) {
+        const int stream = shape * NC + field;
+        #pragma omp simd
+        for (int lane = 0; lane < ne; ++lane) {
+          const idx_t node = element_shape[evb + lane];
+          bcurrent[stream][lane] = current_components[field][node * current_stride];
+        }
+      }
+    }
+
+    for (int stream = 0; stream < 6; ++stream) {
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        boutput[stream][lane] = s_t(0);
+      }
+    }
+
+    const g_t *const affine_geometry_sources[1] = {g_det0 + evb};
+    s_t baffine_geometry_data[1][VS];
+    const s_t *bageom_streams[1];
+    bageom_streams[0] = ageom_stream<s_t, g_t, VS>(
+        ne, affine_geometry_sources[0], baffine_geometry_data[0], std::is_same<g_t, s_t>());
+
+    vector_mass_d2_simplex_tri3_residual_block_contiguous<s_t, NQ, NS, VS>(ne, 0, bageom_streams[0], affine_shape, affine_q_weight, bcurrent, density, boutput);
+
+    s_t *const output_components[NC] = {u0_out, u1_out};
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t *const RSTR element_shape = elements[shape];
+      for (int field = 0; field < NC; ++field) {
+        const int stream = shape * NC + field;
+        s_t *const RSTR out = output_components[field];
+        for (int scatter = 0; scatter < ne; ++scatter) {
+          #pragma omp atomic update
+          out[element_shape[evb + scatter] * out_stride] += boutput[stream][scatter];
+        }
+      }
+    }
+  }
+
+  return SFEM_SUCCESS;
+}
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" int vector_mass_tri3_residual_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const RSTR g_det0,
+    const real_t density,
+    const ptrdiff_t current_stride,
+    const void *const RSTR u0,
+    const void *const RSTR u1,
+    const ptrdiff_t out_stride,
+    void *const RSTR u0_out,
+    void *const RSTR u1_out
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::vector_mass_tri3_residual_a_msoa_impl<double, geom_t>(nelements, nnodes, elements, g_det0, density, current_stride, (const double *)u0, (const double *)u1, out_stride, (double *)u0_out, (double *)u1_out);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::vector_mass_tri3_residual_a_msoa_impl<float, geom_t>(nelements, nnodes, elements, g_det0, density, current_stride, (const float *)u0, (const float *)u1, out_stride, (float *)u0_out, (float *)u1_out);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("vector_mass_tri3_residual_a_msoa", -1, (int)scalar_bytes);
+}
+
+extern "C" int vector_mass_tri3_jacobian_action_esoa(
+    const int scalar_bytes,
+    const int ne,
+    const ptrdiff_t geometry_stride,
+    const void *const RSTR determinant,
+    const void *const RSTR direction[6],
+    const real_t density,
+    void *const RSTR output[6]
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        sfem::codegen::vector_mass_d2_simplex_tri3_jacobian_action_block<double, 3, 3, 16>(ne, geometry_stride, (const double *)determinant, sfem::codegen::ref_tri3_q3<double>::shape(), sfem::codegen::quad_tri_q3<double>::q_weight(), (const double *const *)direction, density, (double *const *)output);
+        return SFEM_SUCCESS;
+    }
+    case (int)sizeof(float): {
+        sfem::codegen::vector_mass_d2_simplex_tri3_jacobian_action_block<float, 3, 3, 16>(ne, geometry_stride, (const float *)determinant, sfem::codegen::ref_tri3_q3<float>::shape(), sfem::codegen::quad_tri_q3<float>::q_weight(), (const float *const *)direction, density, (float *const *)output);
+        return SFEM_SUCCESS;
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("vector_mass_tri3_jacobian_action_esoa", -1, (int)scalar_bytes);
+}
+
+namespace sfem {
+namespace codegen {
+
+template <typename s_t, typename g_t>
+static SFEM_INLINE int vector_mass_tri3_jacobian_action_a_msoa_impl(
+    const ptrdiff_t nelements,
+    const ptrdiff_t,
+    idx_t **const RSTR elements,
+    const g_t *const RSTR g_det0,
+    const s_t density,
+    const ptrdiff_t direction_stride,
+    const s_t *const RSTR u0_direction,
+    const s_t *const RSTR u1_direction,
+    const ptrdiff_t out_stride,
+    s_t *const RSTR u0_out,
+    s_t *const RSTR u1_out
+) {
+  static constexpr int NQ = 3;
+  static constexpr int NS = 3;
+  static constexpr int NC = 2;
+  static constexpr int VS = 16;
+  const s_t *const affine_shape = sfem::codegen::ref_tri3_q3<s_t>::shape();
+  const s_t *const affine_q_weight = sfem::codegen::quad_tri_q3<s_t>::q_weight();
+
+#pragma omp parallel for schedule(static)
+  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
+    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+    s_t bdirection[NC * NS][VS];
+    s_t boutput[NC * NS][VS];
+    const s_t *const direction_components[NC] = {u0_direction, u1_direction};
+
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t *const RSTR element_shape = elements[shape];
+      for (int field = 0; field < NC; ++field) {
+        const int stream = shape * NC + field;
+        #pragma omp simd
+        for (int lane = 0; lane < ne; ++lane) {
+          const idx_t node = element_shape[evb + lane];
+          bdirection[stream][lane] = direction_components[field][node * direction_stride];
+        }
+      }
+    }
+
+    for (int stream = 0; stream < 6; ++stream) {
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        boutput[stream][lane] = s_t(0);
+      }
+    }
+
+    const g_t *const affine_geometry_sources[1] = {g_det0 + evb};
+    s_t baffine_geometry_data[1][VS];
+    const s_t *bageom_streams[1];
+    bageom_streams[0] = ageom_stream<s_t, g_t, VS>(
+        ne, affine_geometry_sources[0], baffine_geometry_data[0], std::is_same<g_t, s_t>());
+
+    vector_mass_d2_simplex_tri3_jacobian_action_block_contiguous<s_t, NQ, NS, VS>(ne, 0, bageom_streams[0], affine_shape, affine_q_weight, bdirection, density, boutput);
+
+    s_t *const output_components[NC] = {u0_out, u1_out};
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t *const RSTR element_shape = elements[shape];
+      for (int field = 0; field < NC; ++field) {
+        const int stream = shape * NC + field;
+        s_t *const RSTR out = output_components[field];
+        for (int scatter = 0; scatter < ne; ++scatter) {
+          #pragma omp atomic update
+          out[element_shape[evb + scatter] * out_stride] += boutput[stream][scatter];
+        }
+      }
+    }
+  }
+
+  return SFEM_SUCCESS;
+}
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" int vector_mass_tri3_jacobian_action_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const RSTR g_det0,
+    const real_t density,
+    const ptrdiff_t direction_stride,
+    const void *const RSTR u0_direction,
+    const void *const RSTR u1_direction,
+    const ptrdiff_t out_stride,
+    void *const RSTR u0_out,
+    void *const RSTR u1_out
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::vector_mass_tri3_jacobian_action_a_msoa_impl<double, geom_t>(nelements, nnodes, elements, g_det0, density, direction_stride, (const double *)u0_direction, (const double *)u1_direction, out_stride, (double *)u0_out, (double *)u1_out);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::vector_mass_tri3_jacobian_action_a_msoa_impl<float, geom_t>(nelements, nnodes, elements, g_det0, density, direction_stride, (const float *)u0_direction, (const float *)u1_direction, out_stride, (float *)u0_out, (float *)u1_out);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("vector_mass_tri3_jacobian_action_a_msoa", -1, (int)scalar_bytes);
+}
+
+namespace sfem {
+namespace codegen {
+
+static SFEM_INLINE void vector_mass_tri3_hessian_crs_a_msoa_find_cols(
+    const idx_t *const RSTR targets,
+    const idx_t *const RSTR row,
+    const int lenrow,
+    idx_t *const RSTR ks) {
+#pragma unroll(3)
+  for (int d = 0; d < 3; ++d) {
+    ks[d] = 0;
+  }
+  for (int k = 0; k < lenrow; ++k) {
+#pragma unroll(3)
+    for (int d = 0; d < 3; ++d) {
+      ks[d] += row[k] < targets[d];
+    }
+  }
+}
+
+template <typename s_t>
+static SFEM_INLINE void vector_mass_tri3_hessian_crs_a_msoa_scatter_crs(
+    const idx_t *const RSTR ev,
+    const s_t *const RSTR element_matrix,
+    const count_t *const RSTR rowptr,
+    const idx_t *const RSTR colidx,
+    s_t *const RSTR values) {
+  static constexpr int NS = 3;
+  static constexpr int NC = 2;
+  static constexpr int N_COL_STREAMS = 6;
+  count_t entries[NS * NS];
+  idx_t ks[NS];
+  for (int i = 0; i < NS; ++i) {
+    const count_t row_begin = rowptr[ev[i]];
+    const int lenrow = (int)(rowptr[ev[i] + 1] - row_begin);
+    const idx_t *const RSTR cols = &colidx[row_begin];
+    vector_mass_tri3_hessian_crs_a_msoa_find_cols(ev, cols, lenrow, ks);
+    for (int j = 0; j < NS; ++j) {
+      entries[i * NS + j] = row_begin + ks[j];
+    }
+  }
+  for (int bi = 0; bi < NC; ++bi) {
+    for (int row_shape = 0; row_shape < NS; ++row_shape) {
+      const s_t *const RSTR row = &element_matrix[(bi * NS + row_shape) * N_COL_STREAMS];
+      for (int bj = 0; bj < NC; ++bj) {
+        for (int col_shape = 0; col_shape < NS; ++col_shape) {
+          s_t *const block = &values[entries[row_shape * NS + col_shape] * NC * NC];
+#pragma omp atomic update
+          block[bi * NC + bj] += row[bj * NS + col_shape];
+        }
+      }
+    }
+  }
+}
+
+template <typename s_t>
+static SFEM_INLINE int vector_mass_tri3_hessian_crs_a_msoa_impl(
+    const ptrdiff_t nelements,
+    const ptrdiff_t,
+    idx_t **const RSTR elements,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_det0,
+    const s_t density,
+    const count_t *const RSTR rowptr,
+    const idx_t *const RSTR colidx,
+    s_t *const RSTR values
+) {
+  static constexpr int ND = 2;
+  static constexpr int NQ = 3;
+  static constexpr int NS = 3;
+  const s_t *const isoparametric_shape = sfem::codegen::ref_tri3_q3<s_t>::shape();
+  const s_t *const isoparametric_q_weight = sfem::codegen::quad_tri_q3<s_t>::q_weight();
+
+#pragma omp parallel for schedule(static)
+  for (ptrdiff_t element = 0; element < nelements; ++element) {
+    idx_t ev[NS];
+    s_t element_matrix[36];
+    s_t badjugate_data[ND * ND][NQ];
+    s_t bdeterminant[NQ];
+
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t node = elements[shape][element];
+      ev[shape] = node;
+    }
+
+
+    badjugate_data[0][0] = s_t(g_adj0[element]);
+    badjugate_data[1][0] = s_t(g_adj1[element]);
+    badjugate_data[2][0] = s_t(g_adj2[element]);
+    badjugate_data[3][0] = s_t(g_adj3[element]);
+    bdeterminant[0] = s_t(g_det0[element]);
+
+    vector_mass_d2_simplex_hessian_block<s_t, NQ, NS>(0, bdeterminant, isoparametric_shape, isoparametric_q_weight, density, element_matrix);
+
+    vector_mass_tri3_hessian_crs_a_msoa_scatter_crs(ev, element_matrix, rowptr, colidx, values);
+  }
+
+  return SFEM_SUCCESS;
+}
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" int vector_mass_tri3_hessian_bsr_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_det0,
+    const real_t density,
+    const count_t *const RSTR rowptr,
+    const idx_t *const RSTR colidx,
+    void *const RSTR values
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+      return sfem::codegen::vector_mass_tri3_hessian_crs_a_msoa_impl<double>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, density, rowptr, colidx, (double *)values);
+    }
+    case (int)sizeof(float): {
+      return sfem::codegen::vector_mass_tri3_hessian_crs_a_msoa_impl<float>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, density, rowptr, colidx, (float *)values);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("vector_mass_tri3_hessian_bsr_a_msoa", -1, (int)scalar_bytes);
+}

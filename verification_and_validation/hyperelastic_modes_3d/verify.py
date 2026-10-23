@@ -38,7 +38,7 @@ def main():
     diagnostics = {"reference_volume": volume, "operator": operator, "modes": {}}
     for mode, deformation in deformation_gradients().items():
         displacement, reaction, objective = read_mode_solution(
-            args.output / "solution", mode, "hyperelastic", mesh.dimension, mesh.n_points
+            args.output / "solution", mode, mesh.dimension, mesh.n_points
         )
         kinematics = element_kinematics(mesh, displacement)
         energy_density, first_piola = response(operator, deformation, material)

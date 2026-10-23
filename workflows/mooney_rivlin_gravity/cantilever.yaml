@@ -1,0 +1,35 @@
+# A 10 x 1 x 1 box of Prony-series Mooney-Rivlin, clamped on its min-x end, sagging under gravity
+# along -y: the case the visco history comparisons used. Implicit Newmark, full Newton steps.
+mesh:
+  box: {n: [40, 4, 4], min: [0, 0, 0], max: [10, 1, 1]}
+  packed: false
+  sidesets:
+    # Within 5% of the length of the end, as the gravity test clamped it.
+    - {name: clamp, plane: {axis: x, at: min, tol: 0.05}}
+material:
+  type: GeneratedMooneyRivlinProny
+  C10: 800.622
+  C01: 800.108
+  K: 4000
+  relaxation:
+    iso:
+      prony:
+        - {g: 0.4, tau: 1}
+        - {g: 0.4, tau: 2}
+        - {g: 0.1, tau: 5}
+        - {g: 0.05, tau: 10}
+loads:
+  body_force: {density: 1, g: [0, -0.5, 0]}
+dirichlet_conditions:
+  - {type: sideset, format: name, name: clamp, component: [0, 1, 2], value: [0, 0, 0]}
+regime: dynamic
+dynamics: {scheme: newmark, density: 1, beta: 0.25, gamma: 0.5}
+time: {dt: 0.005, t_end: 7.5}
+solver:
+  newton: {max_it: 19, atol: 1e-8, rtol: 1e-9, verbose: false, line_search: {enabled: false}}
+  linear: {type: cg, format: BSR, preconditioner: jacobi, rtol: 1e-5, max_it: 2000}
+output:
+  path: output/cantilever
+  export_freq: 5
+  history_csv: output/cantilever/history.csv
+  probes: [{type: control_point, at: [10, 0.5, 0.5]}]

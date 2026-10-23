@@ -4,6 +4,28 @@ from typing import Mapping, Tuple
 import sympy as sp
 
 from codegen.framework.symbolic import ExpressionRole, KernelExpressions
+from codegen.framework.symbolic.operators import det, inner
+
+
+def isochoric_invariants(F, dim):
+    """(I1, I2, J) of the deformation gradient F, embedded in 3D.
+
+    The first two invariants of C = F^T F, unmodified -- a material divides by
+    J^(2/3) and J^(4/3) itself, so the isochoric and the volumetric part of an
+    energy stay separately readable.  In 2D the problem is plane strain,
+    F_zz = 1, and I1 and I2 are those of the 3D embedding, so a 3D law means
+    the same thing in both.
+    """
+    F_value = getattr(F, "value", F)
+    C = F_value.T * F_value
+    J = det(F_value)
+    I1 = inner(F_value, F_value)
+    I2 = sp.Rational(1, 2) * (I1 * I1 - inner(C, C))
+    if dim == 2:
+        # Plane-strain 3D embedding (F_zz = 1): I1 += F_zz^2, I2 from block structure of C
+        I2 = I2 + I1
+        I1 = I1 + 1
+    return I1, I2, J
 
 
 def _dataclass_value_tuple(instance):

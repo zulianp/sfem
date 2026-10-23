@@ -44,7 +44,9 @@ for dim in (2, 3):
 material = gen.CodeGenerator(
     "neohookean_ogden",
     systems,
-    elements=gen.sfem_default_element_types(),
+    # The default set plus the higher-order elements the V&V patch and mode
+    # cases verify this material on.
+    elements=gen.sfem_default_element_types() + ("TRI6", "HEX27", "PROTEUS_HEX27"),
     op_name="GeneratedNeoHookeanOgden",
     parameter_defaults=(("mu", 1.0), ("lmbda", 1.0)),
     matrix_formats=("bsr",),

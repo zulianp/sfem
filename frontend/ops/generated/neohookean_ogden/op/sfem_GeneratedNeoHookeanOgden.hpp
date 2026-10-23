@@ -68,6 +68,7 @@ namespace sfem {
     void set_value_in_block(const std::string &block_name,
                 const std::string &var_name,
                 real_t value) override;
+    std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override;
 #ifdef SFEM_ENABLE_RYAML
     std::shared_ptr<Op> create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
                                              const ryml::ConstNodeRef             &node) override;

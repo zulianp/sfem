@@ -26,6 +26,16 @@ namespace sfem {
 
         int            apply(const T *const rhs, T *const x) override;
         int            update(const T *const disp);
+        /// Outer (shifted-penalty) iterations of the last apply.
+        int            iterations() const;
+        /// An absolute tolerance for the residual, apart from the penetration's atol (0: atol).
+        void           set_residual_atol(const T val);
+        /// The constraints' curvature, a packed symmetric block per contact node (6 in 3D; null:
+        /// none, and nothing is allocated for it): added to the fine operator, its smoother and,
+        /// restricted, the coarse penalties. apply then solves (K + C) x = rhs under the contact.
+        void           set_curvature(const SharedBuffer<T> &blocks);
+        /// y += C x, C of set_curvature.
+        void           apply_curvature(const T *const x, T *const y);
         std::ptrdiff_t rows() const override;
         std::ptrdiff_t cols() const override;
         ExecutionSpace execution_space() const override;

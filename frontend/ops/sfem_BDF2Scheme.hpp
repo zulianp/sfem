@@ -46,6 +46,8 @@ namespace sfem {
         ~BDF2Scheme() override;
 
         void set_density(real_t density);
+        /// The inertia with the consistent mass instead of the lumped one (before initialize).
+        void set_consistent_mass(bool consistent);
 
         /// Build the mass and the state buffers.  `block_names` is forwarded to
         /// the lumped mass, which is the only thing here that integrates.
@@ -65,6 +67,9 @@ namespace sfem {
         void reconstruct(const real_t *const x,
                          real_t *const       velocity,
                          real_t *const       acceleration) const override;
+
+        void start(real_t *const x) const override;
+        void carried_state(real_t *const velocity, real_t *const acceleration) const override;
 
         /// Both halves of the method are reported, so the exported
         /// acceleration is the one `inertia_op` assembles.

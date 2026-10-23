@@ -1,0 +1,15 @@
+# The bone, clamped at its inlet and pulled along x at its outlet. Run by bone.sh.
+mesh:
+  path: bone_geometry/bone
+  packed: false
+  sidesets:
+    - {name: inlet, file: bone_geometry/inlet}
+    - {name: outlet, file: bone_geometry/outlet}
+material: {type: NeoHookeanOgden}
+dirichlet_conditions:
+  - {type: sideset, format: name, name: inlet, value: [0, 0, 0], component: [0, 1, 2]}
+  - {type: sideset, format: name, name: outlet, value: 1, component: 0}
+regime: steady
+solver:
+  linear: {format: MF, preconditioner: none}
+output: {path: output}

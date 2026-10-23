@@ -15,6 +15,7 @@
 #include "smesh_spaces.hpp"
 #include "smesh_ssquad4.hpp"
 #include "smesh_ssquad4_mesh.hpp"
+#include "sshex8_linear_elasticity.hpp"
 
 #include "sfem_ElasticityParameters.hpp"
 #include "sfem_ElementScope.hpp"
@@ -180,6 +181,14 @@ namespace sfem {
         bool domain_supports_adjugate_cache(const smesh::ElemType et) {
             return et == smesh::HEX8 ||
                    (sfem::is_semistructured_type(et) && smesh::is_hex_ss_family(et));
+        }
+
+        // A semi-structured hex domain without the affine approximation: `initialize` caches the
+        // macro Jacobians only for it, and the apply then takes the macro element's Jacobian at
+        // every quadrature point -- so must its diagonals.
+        bool isoparametric_sshex8(const OpDomain &domain) {
+            return !domain.user_data && sfem::is_semistructured_type(domain.element_type) &&
+                   smesh::is_hex_ss_family(domain.element_type);
         }
 
         ElementRange domain_element_range(const smesh::Mesh &mesh, const OpDomain &domain, const ElementScope scope) {
@@ -638,6 +647,23 @@ namespace sfem {
                                                                     values);
             }
 
+            if (isoparametric_sshex8(domain)) {
+                return sshex8_linear_elasticity_block_diag_sym(smesh::semistructured_level(element_type),
+                                                               block->n_elements(),
+                                                               mesh->n_nodes(),
+                                                               block->elements()->data(),
+                                                               mesh->points()->data(),
+                                                               mu,
+                                                               lambda,
+                                                               6,
+                                                               &values[0],
+                                                               &values[1],
+                                                               &values[2],
+                                                               &values[3],
+                                                               &values[4],
+                                                               &values[5]);
+            }
+
             return linear_elasticity_block_diag_sym_aos(element_type,
                                                         block->n_elements(),
                                                         mesh->n_nodes(),
@@ -663,6 +689,23 @@ namespace sfem {
             auto mu           = domain.parameters->require_real_value("mu");
             auto element_type = domain.element_type;
 
+            if (isoparametric_sshex8(domain)) {
+                return sshex8_linear_elasticity_block_diag_sym(smesh::semistructured_level(element_type),
+                                                               block->n_elements(),
+                                                               mesh->n_nodes(),
+                                                               block->elements()->data(),
+                                                               mesh->points()->data(),
+                                                               mu,
+                                                               lambda,
+                                                               1,
+                                                               values[0],
+                                                               values[1],
+                                                               values[2],
+                                                               values[3],
+                                                               values[4],
+                                                               values[5]);
+            }
+
             return linear_elasticity_block_diag_sym_soa(element_type,
                                                         block->n_elements(),
                                                         mesh->n_nodes(),
@@ -687,6 +730,20 @@ namespace sfem {
             auto lambda       = domain.parameters->require_real_value("lambda");
             auto mu           = domain.parameters->require_real_value("mu");
             auto element_type = domain.element_type;
+
+            if (isoparametric_sshex8(domain)) {
+                return sshex8_linear_elasticity_diag(smesh::semistructured_level(element_type),
+                                                     block->n_elements(),
+                                                     mesh->n_nodes(),
+                                                     block->elements()->data(),
+                                                     mesh->points()->data(),
+                                                     mu,
+                                                     lambda,
+                                                     3,
+                                                     &out[0],
+                                                     &out[1],
+                                                     &out[2]);
+            }
 
             return linear_elasticity_assemble_diag_aos(element_type,
                                                        block->n_elements(),

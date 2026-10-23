@@ -41,7 +41,59 @@ extern "C" int cu_linear_elasticity_quad4_apply_i_msoa(
         void *const RSTR outy,
         void *const stream
 );
+extern "C" int cu_linear_elasticity_tri6_apply_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t lmbda,
+        const real_t mu,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const stream
+);
+extern "C" int cu_linear_elasticity_hex27_apply_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t lmbda,
+        const real_t mu,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz,
+        void *const stream
+);
 extern "C" int cu_linear_elasticity_hex8_apply_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t lmbda,
+        const real_t mu,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz,
+        void *const stream
+);
+extern "C" int cu_linear_elasticity_proteus_hex27_apply_i_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -127,7 +179,59 @@ extern "C" int cu_linear_elasticity_quad4_gradient_i_msoa(
         void *const RSTR outy,
         void *const stream
 );
+extern "C" int cu_linear_elasticity_tri6_gradient_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t lmbda,
+        const real_t mu,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const stream
+);
+extern "C" int cu_linear_elasticity_hex27_gradient_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t lmbda,
+        const real_t mu,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz,
+        void *const stream
+);
 extern "C" int cu_linear_elasticity_hex8_gradient_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t lmbda,
+        const real_t mu,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz,
+        void *const stream
+);
+extern "C" int cu_linear_elasticity_proteus_hex27_gradient_i_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -181,6 +285,198 @@ extern "C" int cu_linear_elasticity_tet10_gradient_i_msoa(
         void *const RSTR outz,
         void *const stream
 );
+extern "C" int cu_linear_elasticity_proteus_quad4_hessian_block_diag_sym_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t lmbda,
+        const real_t mu,
+        void *const RSTR values,
+        void *const stream
+);
+extern "C" int cu_linear_elasticity_quad4_hessian_block_diag_sym_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t lmbda,
+        const real_t mu,
+        void *const RSTR values,
+        void *const stream
+);
+extern "C" int cu_linear_elasticity_tri6_hessian_block_diag_sym_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t lmbda,
+        const real_t mu,
+        void *const RSTR values,
+        void *const stream
+);
+extern "C" int cu_linear_elasticity_hex27_hessian_block_diag_sym_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t lmbda,
+        const real_t mu,
+        void *const RSTR values,
+        void *const stream
+);
+extern "C" int cu_linear_elasticity_hex8_hessian_block_diag_sym_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t lmbda,
+        const real_t mu,
+        void *const RSTR values,
+        void *const stream
+);
+extern "C" int cu_linear_elasticity_proteus_hex27_hessian_block_diag_sym_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t lmbda,
+        const real_t mu,
+        void *const RSTR values,
+        void *const stream
+);
+extern "C" int cu_linear_elasticity_proteus_hex8_hessian_block_diag_sym_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t lmbda,
+        const real_t mu,
+        void *const RSTR values,
+        void *const stream
+);
+extern "C" int cu_linear_elasticity_tet10_hessian_block_diag_sym_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t lmbda,
+        const real_t mu,
+        void *const RSTR values,
+        void *const stream
+);
+extern "C" int cu_linear_elasticity_proteus_quad4_hessian_bsr_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t lmbda,
+        const real_t mu,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values,
+        void *const stream
+);
+extern "C" int cu_linear_elasticity_quad4_hessian_bsr_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t lmbda,
+        const real_t mu,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values,
+        void *const stream
+);
+extern "C" int cu_linear_elasticity_tri6_hessian_bsr_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t lmbda,
+        const real_t mu,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values,
+        void *const stream
+);
+extern "C" int cu_linear_elasticity_hex27_hessian_bsr_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t lmbda,
+        const real_t mu,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values,
+        void *const stream
+);
+extern "C" int cu_linear_elasticity_hex8_hessian_bsr_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t lmbda,
+        const real_t mu,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values,
+        void *const stream
+);
+extern "C" int cu_linear_elasticity_proteus_hex27_hessian_bsr_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t lmbda,
+        const real_t mu,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values,
+        void *const stream
+);
+extern "C" int cu_linear_elasticity_proteus_hex8_hessian_bsr_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t lmbda,
+        const real_t mu,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values,
+        void *const stream
+);
+extern "C" int cu_linear_elasticity_tet10_hessian_bsr_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t lmbda,
+        const real_t mu,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values,
+        void *const stream
+);
 extern "C" int cu_linear_elasticity_proteus_quad4_objective_steps_i_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
@@ -219,7 +515,68 @@ extern "C" int cu_linear_elasticity_quad4_objective_steps_i_msoa(
         void *const RSTR value,
         void *const stream
 );
+extern "C" int cu_linear_elasticity_tri6_objective_steps_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t lmbda,
+        const real_t mu,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const int nsteps,
+        const void *const RSTR steps,
+        void *const RSTR value,
+        void *const stream
+);
+extern "C" int cu_linear_elasticity_hex27_objective_steps_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t lmbda,
+        const real_t mu,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
+        const int nsteps,
+        const void *const RSTR steps,
+        void *const RSTR value,
+        void *const stream
+);
 extern "C" int cu_linear_elasticity_hex8_objective_steps_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t lmbda,
+        const real_t mu,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
+        const int nsteps,
+        const void *const RSTR steps,
+        void *const RSTR value,
+        void *const stream
+);
+extern "C" int cu_linear_elasticity_proteus_hex27_objective_steps_i_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -309,6 +666,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_linear_elasticity_apply_2d_i_msoa(
       return cu_linear_elasticity_proteus_quad4_apply_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy, stream);
     case smesh::QUAD4:
       return cu_linear_elasticity_quad4_apply_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy, stream);
+    case smesh::TRI6:
+      return cu_linear_elasticity_tri6_apply_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy, stream);
     default:
       break;
   }
@@ -340,8 +699,12 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_linear_elasticity_apply_3d_i_msoa(
           ? smesh::TypeToEnum<real_t>::value()
           : real_type;
   switch (element_type) {
+    case smesh::HEX27:
+      return cu_linear_elasticity_hex27_apply_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz, stream);
     case smesh::HEX8:
       return cu_linear_elasticity_hex8_apply_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz, stream);
+    case smesh::PROTEUS_HEX27:
+      return cu_linear_elasticity_proteus_hex27_apply_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz, stream);
     case smesh::PROTEUS_HEX8:
       return cu_linear_elasticity_proteus_hex8_apply_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz, stream);
     case smesh::TET10:
@@ -379,6 +742,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_linear_elasticity_gradient_2d_i_msoa
       return cu_linear_elasticity_proteus_quad4_gradient_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy, stream);
     case smesh::QUAD4:
       return cu_linear_elasticity_quad4_gradient_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy, stream);
+    case smesh::TRI6:
+      return cu_linear_elasticity_tri6_gradient_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy, stream);
     default:
       break;
   }
@@ -410,8 +775,12 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_linear_elasticity_gradient_3d_i_msoa
           ? smesh::TypeToEnum<real_t>::value()
           : real_type;
   switch (element_type) {
+    case smesh::HEX27:
+      return cu_linear_elasticity_hex27_gradient_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz, stream);
     case smesh::HEX8:
       return cu_linear_elasticity_hex8_gradient_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz, stream);
+    case smesh::PROTEUS_HEX27:
+      return cu_linear_elasticity_proteus_hex27_gradient_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz, stream);
     case smesh::PROTEUS_HEX8:
       return cu_linear_elasticity_proteus_hex8_gradient_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz, stream);
     case smesh::TET10:
@@ -421,6 +790,138 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_linear_elasticity_gradient_3d_i_msoa
   }
   return sfem::codegen::unsupported_dispatch(
       "linear_elasticity_gradient_3d_i_msoa", (int)element_type, (int)real_type);
+}
+
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_linear_elasticity_hessian_block_diag_sym_2d_i_msoa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t lmbda,
+        const real_t mu,
+        void *const RSTR values,
+        void *const stream
+) {
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::PROTEUS_QUAD4:
+      return cu_linear_elasticity_proteus_quad4_hessian_block_diag_sym_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, values, stream);
+    case smesh::QUAD4:
+      return cu_linear_elasticity_quad4_hessian_block_diag_sym_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, values, stream);
+    case smesh::TRI6:
+      return cu_linear_elasticity_tri6_hessian_block_diag_sym_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, values, stream);
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch(
+      "linear_elasticity_hessian_block_diag_sym_2d_i_msoa", (int)element_type, (int)real_type);
+}
+
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_linear_elasticity_hessian_block_diag_sym_3d_i_msoa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t lmbda,
+        const real_t mu,
+        void *const RSTR values,
+        void *const stream
+) {
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::HEX27:
+      return cu_linear_elasticity_hex27_hessian_block_diag_sym_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, values, stream);
+    case smesh::HEX8:
+      return cu_linear_elasticity_hex8_hessian_block_diag_sym_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, values, stream);
+    case smesh::PROTEUS_HEX27:
+      return cu_linear_elasticity_proteus_hex27_hessian_block_diag_sym_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, values, stream);
+    case smesh::PROTEUS_HEX8:
+      return cu_linear_elasticity_proteus_hex8_hessian_block_diag_sym_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, values, stream);
+    case smesh::TET10:
+      return cu_linear_elasticity_tet10_hessian_block_diag_sym_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, values, stream);
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch(
+      "linear_elasticity_hessian_block_diag_sym_3d_i_msoa", (int)element_type, (int)real_type);
+}
+
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_linear_elasticity_hessian_bsr_2d_i_msoa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t lmbda,
+        const real_t mu,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values,
+        void *const stream
+) {
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::PROTEUS_QUAD4:
+      return cu_linear_elasticity_proteus_quad4_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values, stream);
+    case smesh::QUAD4:
+      return cu_linear_elasticity_quad4_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values, stream);
+    case smesh::TRI6:
+      return cu_linear_elasticity_tri6_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values, stream);
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch(
+      "linear_elasticity_hessian_bsr_2d_i_msoa", (int)element_type, (int)real_type);
+}
+
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_linear_elasticity_hessian_bsr_3d_i_msoa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t lmbda,
+        const real_t mu,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values,
+        void *const stream
+) {
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::HEX27:
+      return cu_linear_elasticity_hex27_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values, stream);
+    case smesh::HEX8:
+      return cu_linear_elasticity_hex8_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values, stream);
+    case smesh::PROTEUS_HEX27:
+      return cu_linear_elasticity_proteus_hex27_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values, stream);
+    case smesh::PROTEUS_HEX8:
+      return cu_linear_elasticity_proteus_hex8_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values, stream);
+    case smesh::TET10:
+      return cu_linear_elasticity_tet10_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values, stream);
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch(
+      "linear_elasticity_hessian_bsr_3d_i_msoa", (int)element_type, (int)real_type);
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_linear_elasticity_objective_steps_2d_i_msoa(
@@ -452,6 +953,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_linear_elasticity_objective_steps_2d
       return cu_linear_elasticity_proteus_quad4_objective_steps_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value, stream);
     case smesh::QUAD4:
       return cu_linear_elasticity_quad4_objective_steps_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value, stream);
+    case smesh::TRI6:
+      return cu_linear_elasticity_tri6_objective_steps_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value, stream);
     default:
       break;
   }
@@ -486,8 +989,12 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_linear_elasticity_objective_steps_3d
           ? smesh::TypeToEnum<real_t>::value()
           : real_type;
   switch (element_type) {
+    case smesh::HEX27:
+      return cu_linear_elasticity_hex27_objective_steps_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value, stream);
     case smesh::HEX8:
       return cu_linear_elasticity_hex8_objective_steps_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value, stream);
+    case smesh::PROTEUS_HEX27:
+      return cu_linear_elasticity_proteus_hex27_objective_steps_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value, stream);
     case smesh::PROTEUS_HEX8:
       return cu_linear_elasticity_proteus_hex8_objective_steps_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value, stream);
     case smesh::TET10:

@@ -1,0 +1,33 @@
+# A free 2 x 1 x 1 block of linear elastic material, no Dirichlet conditions, falling 0.05 under
+# gravity onto a hemisphere of radius 0.25 on a floor: frictionless contact of its whole surface
+# with the obstacle's signed distance, implicit Newmark with the lumped mass.
+#
+# The mesh is 8 x 4 x 4 HEX8 refined to a semi-structured mesh of level 4 (28,611 dofs), with the
+# micro-element basis: the obstacle is solved by SSMGC (shifted-penalty multigrid on the
+# semi-structured levels). `--set mesh.refine=2` (4,131 dofs) or 8 (212,355) changes it; on Grace at
+# 72 threads SSMGC takes 4.8 s, 21 s and 162 s to t = 0.2 at levels 2, 4 and 8, the nodal-SDF MPRGP
+# (`--set obstacle.backend=node_sdf`) 1.0 s, 1.9 s and 6.6 s, with the same Newton iterations per
+# step (at most 3) and the same impulse to 1e-9. `--set execution_space=device` runs it on the GPU:
+# on one GH200, SSMGC 2.3 s, 14 s and 139 s, with the same Newton iterations and impulse.
+mesh:
+  box: {n: [8, 4, 4], min: [0, 0, 0.05], max: [2, 1, 1]}
+  refine: 4
+  packed: false
+material: {type: GeneratedLinearElasticity, mu: 12000, lmbda: 152000}
+loads:
+  body_force: {density: 10, g: [0, 0, -9.81]}
+obstacle:
+  backend: ssmgc
+  nodes: skin
+  direction: z
+  shape: {type: hemisphere, plane: 0}
+regime: dynamic
+dynamics: {scheme: newmark, density: 10}
+time: {dt: 0.01, t_end: 0.5}
+solver:
+  newton: {max_it: 19, atol: 1e-8, rtol: 1e-9, verbose: false}
+output:
+  path: output
+  export_freq: 2
+  fields: [gap, contact_force]
+  probes: [{type: contact}]

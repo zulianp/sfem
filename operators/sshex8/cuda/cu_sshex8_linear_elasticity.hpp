@@ -61,6 +61,57 @@ int cu_affine_sshex8_linear_elasticity_block_diag_sym(const int                 
                                                       void *const                     out5,
                                                       void                           *stream);
 
+// The isoparametric route: the macro element's Jacobian at every quadrature point, from its corners,
+// `corners[(d * 8 + v) * corners_stride + e]` being coordinate d of corner v in HEX8 order.
+int cu_sshex8_linear_elasticity_apply(const int                         level,
+                                      const ptrdiff_t                   nelements,
+                                      idx_t **const SFEM_RESTRICT       elements,
+                                      const ptrdiff_t                   corners_stride,
+                                      const geom_t *const SFEM_RESTRICT corners,
+                                      const real_t                      mu,
+                                      const real_t                      lambda,
+                                      const enum smesh::PrimitiveType   real_type,
+                                      const ptrdiff_t                   u_stride,
+                                      const void *const SFEM_RESTRICT   ux,
+                                      const void *const SFEM_RESTRICT   uy,
+                                      const void *const SFEM_RESTRICT   uz,
+                                      const ptrdiff_t                   out_stride,
+                                      void *const SFEM_RESTRICT         outx,
+                                      void *const SFEM_RESTRICT         outy,
+                                      void *const SFEM_RESTRICT         outz,
+                                      void                             *stream);
+
+int cu_sshex8_linear_elasticity_diag(const int                         level,
+                                     const ptrdiff_t                   nelements,
+                                     idx_t **const SFEM_RESTRICT       elements,
+                                     const ptrdiff_t                   corners_stride,
+                                     const geom_t *const SFEM_RESTRICT corners,
+                                     const real_t                      mu,
+                                     const real_t                      lambda,
+                                     const enum smesh::PrimitiveType   real_type,
+                                     const ptrdiff_t                   out_stride,
+                                     void *const SFEM_RESTRICT         outx,
+                                     void *const SFEM_RESTRICT         outy,
+                                     void *const SFEM_RESTRICT         outz,
+                                     void                             *stream);
+
+int cu_sshex8_linear_elasticity_block_diag_sym(const int                         level,
+                                               const ptrdiff_t                   nelements,
+                                               idx_t **const SFEM_RESTRICT       elements,
+                                               const ptrdiff_t                   corners_stride,
+                                               const geom_t *const SFEM_RESTRICT corners,
+                                               const real_t                      mu,
+                                               const real_t                      lambda,
+                                               const ptrdiff_t                   out_stride,
+                                               const enum smesh::PrimitiveType   real_type,
+                                               void *const                       out0,
+                                               void *const                       out1,
+                                               void *const                       out2,
+                                               void *const                       out3,
+                                               void *const                       out4,
+                                               void *const                       out5,
+                                               void                             *stream);
+
 #ifdef __cplusplus
 }
 #endif

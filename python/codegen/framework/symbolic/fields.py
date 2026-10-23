@@ -506,6 +506,84 @@ def is_previous_symbol(name):
     return text.endswith(suffix) or ("%s_grad" % suffix) in text
 
 
+QUADRATURE_FIELD_MARKER = "_qp"
+
+
+def quadrature_field_symbol(name, component):
+    """Component `component` of the integration-point field `name`.
+
+    Spelled `<name>_qp[<component>]`: the kernels hold the values of one point
+    in a local array of that name, so the symbol prints as the read it stands
+    for and no substitution is needed downstream.  This is the only producer of
+    the spelling; `is_quadrature_symbol` and `quadrature_symbol_parts` are the
+    only readers.
+    """
+    return sp.Symbol("%s%s[%d]" % (name, QUADRATURE_FIELD_MARKER, int(component)))
+
+
+def is_quadrature_symbol(name):
+    """Whether a free symbol is a component of an integration-point field.
+
+    Like `is_previous_symbol`, asked of the spelling: an energy form classifies
+    every free symbol it cannot place as a material parameter, and a component
+    of a stored tensor sent to `require_real_value` is a runtime failure.
+    """
+    return ("%s[" % QUADRATURE_FIELD_MARKER) in str(name)
+
+
+def quadrature_symbol_parts(name):
+    """(field name, component) of a symbol `quadrature_field_symbol` produced."""
+    text = str(name)
+    head, _, tail = text.rpartition("%s[" % QUADRATURE_FIELD_MARKER)
+    if not head or not tail.endswith("]"):
+        raise ValueError("'%s' is not an integration-point field component" % text)
+    return head, int(tail[:-1])
+
+
+def symmetric_tensor_entries(dim):
+    """The stored order of a symmetric `dim x dim` tensor's independent entries.
+
+    Diagonal first, then the upper triangle row by row -- (xx, yy, zz, xy, xz,
+    yz) in 3D and (xx, yy, xy) in 2D.  Everything that writes or reads a
+    symmetric integration-point tensor takes its order from here.
+    """
+    dim = int(dim)
+    return tuple((i, i) for i in range(dim)) + tuple(
+        (i, j) for i in range(dim) for j in range(i + 1, dim)
+    )
+
+
+class QuadratureField:
+    """A symmetric tensor stored at the integration points.
+
+    The kernels read it per point and never interpolate it: it is the value of
+    some quantity at exactly the points the element's rule visits, which is what
+    an internal variable of a constitutive law is.  Its `value` is the
+    symmetric matrix built from `n_components` symbols, so a material uses it in
+    tensor algebra like any other matrix.
+    """
+
+    __slots__ = ("name", "dim", "symbols", "value")
+
+    def __init__(self, name, dim):
+        name = str(name)
+        if not name.isidentifier():
+            raise ValueError("integration-point field name must be an identifier")
+        self.name = name
+        self.dim = int(dim)
+        entries = symmetric_tensor_entries(self.dim)
+        self.symbols = tuple(quadrature_field_symbol(name, k) for k in range(len(entries)))
+        value = sp.zeros(self.dim, self.dim)
+        for symbol, (i, j) in zip(self.symbols, entries):
+            value[i, j] = symbol
+            value[j, i] = symbol
+        self.value = value
+
+    @property
+    def n_components(self):
+        return len(self.symbols)
+
+
 class TimeRate:
     """A field's time derivative, carried as a sum rather than discretised.
 

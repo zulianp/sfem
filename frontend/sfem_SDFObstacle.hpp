@@ -34,6 +34,47 @@ namespace sfem {
                                  idx_t **const SFEM_RESTRICT  elements,
                                  geom_t **const SFEM_RESTRICT points,
                                  real_t *const SFEM_RESTRICT  gap) = 0;
+
+        // At nodes: the gap and unit normals (3 rows; either output may be null) at the points
+        // X[idx[i]] + disp[3 idx[i] + d] (idx and disp may be null), in the obstacle's memory space.
+        virtual int sample_nodes(const ptrdiff_t                   nnodes,
+                                 const idx_t *const SFEM_RESTRICT  idx,
+                                 geom_t **const SFEM_RESTRICT      points,
+                                 const real_t *const SFEM_RESTRICT disp,
+                                 real_t *const SFEM_RESTRICT       gap,
+                                 real_t **const SFEM_RESTRICT      normals) = 0;
+
+        // At the same points: the curvature of the gap's constraint (6 packed rows [xx, xy, xz, yy,
+        // yz, zz]), minus the Hessian of -sdf / |grad sdf|.
+        virtual int sample_nodes_curvature(const ptrdiff_t                   nnodes,
+                                           const idx_t *const SFEM_RESTRICT  idx,
+                                           geom_t **const SFEM_RESTRICT      points,
+                                           const real_t *const SFEM_RESTRICT disp,
+                                           real_t **const SFEM_RESTRICT      curvature) = 0;
+    };
+
+    // The interpolating cubic B-spline coefficients of an SDF grid (sfem_sdf_sampling.hpp), padded
+    // by one node on every side, so the sampler's four-node stencil stays in the array for every
+    // point inside the grid. A sampler is given the SDF grid's n, origin and delta, `stride` and
+    // origin_coefficient(), the coefficient of the SDF grid's node (0, 0, 0).
+    class SDFBSpline {
+    public:
+        SharedBuffer<geom_t>    coefficients;  // (n[0] + 2) (n[1] + 2) (n[2] + 2), x fastest
+        SharedBuffer<ptrdiff_t> stride;        // of the padded array, in the coefficients' memory space
+
+        geom_t *origin_coefficient() const { return coefficients->data() + offset_; }
+
+        // From host SDF samples, n per axis with strides `stride`; computed on the host.
+        static std::shared_ptr<SDFBSpline> create(const ptrdiff_t *const n,
+                                                  const ptrdiff_t *const stride,
+                                                  const geom_t *const    samples);
+        static std::shared_ptr<SDFBSpline> create(const std::shared_ptr<smesh::Grid<geom_t>> &sdf);
+#ifdef SFEM_ENABLE_CUDA
+        std::shared_ptr<SDFBSpline> to_device() const;
+#endif
+
+    private:
+        ptrdiff_t offset_{0};
     };
 
     class SDFObstacle final : public Obstacle {
@@ -79,10 +120,34 @@ namespace sfem {
                                     geom_t **const SFEM_RESTRICT points,
                                     real_t *const SFEM_RESTRICT  gap);
 
+        // At nodes: the gap, unit normals (3 rows) and curvature (6 rows) of node_interpolate.hpp
+        // at the points X[idx[i]] + disp[3 idx[i] + d] (idx and disp may be null). Host only.
+        // (Also on the device, with the points, idx, disp and outputs in device memory.)
+        int sample_nodes(const ptrdiff_t                   nnodes,
+                         const idx_t *const SFEM_RESTRICT  idx,
+                         geom_t **const SFEM_RESTRICT      points,
+                         const real_t *const SFEM_RESTRICT disp,
+                         real_t *const SFEM_RESTRICT       gap,
+                         real_t **const SFEM_RESTRICT      normals) override;
+        int sample_nodes_curvature(const ptrdiff_t                   nnodes,
+                                   const idx_t *const SFEM_RESTRICT  idx,
+                                   geom_t **const SFEM_RESTRICT      points,
+                                   const real_t *const SFEM_RESTRICT disp,
+                                   real_t **const SFEM_RESTRICT      curvature) override;
+
+        // `nnodes` points with z-coordinates `z` are where this rank will sample: a grid split
+        // into z-slabs across the ranks (Grid::create_from_file under MPI) is gathered to the
+        // slab they need. A grid every rank holds whole needs no points.
         static std::shared_ptr<SDFObstacle> create_from_file(const std::shared_ptr<Communicator>& comm,
                                                              const std::string        &path,
+                                                             const ptrdiff_t           nnodes,
+                                                             const geom_t *const       z,
                                                              const enum ExecutionSpace es);
-        static std::shared_ptr<SDFObstacle> create(const std::shared_ptr<smesh::Grid<geom_t>> &sdf, const enum ExecutionSpace es);
+        static std::shared_ptr<SDFObstacle> create(const std::shared_ptr<smesh::Grid<geom_t>> &sdf,
+                                                   const std::shared_ptr<Communicator>        &comm,
+                                                   const ptrdiff_t                             nnodes,
+                                                   const geom_t *const                         z,
+                                                   const enum ExecutionSpace                   es);
 
     public:
         class Impl;

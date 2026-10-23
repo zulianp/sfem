@@ -30,6 +30,7 @@
 
 #ifdef SFEM_ENABLE_CUDA
 #include "cu_obstacle.hpp"
+#include "smesh_device_arrays.hpp"
 #include "sfem_cuda_blas.hpp"
 #endif
 
@@ -278,6 +279,7 @@ namespace sfem {
         std::shared_ptr<Buffer<real_t>>        mass_vector;
         bool                                   debug{false};
         bool                                   variational{false};
+        ContactConditions::Gap                 gap{ContactConditions::Gap::NODAL};
         enum ExecutionSpace                    execution_space { EXECUTION_SPACE_HOST };
         std::shared_ptr<BLAS<real_t>>          blas_;
         std::shared_ptr<smesh::Exchange>       volume_ex_;
@@ -339,6 +341,67 @@ namespace sfem {
                 return;
             }
             ex->gather(x, space->block_size());
+        }
+
+        // The rest positions of the surface's geometry nodes, to which the samplers add the
+        // displacement in real_t: the displaced points() are rounded to geom_t, whose error in the
+        // gap stalls Newton.
+        void rest_rows(geom_t **const xyz) {
+            auto points = contact_surface->rest_points();
+#ifdef SFEM_ENABLE_CUDA
+            if (EXECUTION_SPACE_DEVICE == execution_space) points = contact_surface->rest_points_device();
+#endif
+            host_rows(points, xyz);
+        }
+
+        // The gap and unit normals (either may be null) of the obstacles at the surface's n
+        // geometry nodes, at their current (displaced) positions.
+        int sample_nodes(const ptrdiff_t n, real_t *const gap, const SharedBuffer<real_t *> &normals_out) {
+            if (n <= 0) {
+                return SFEM_SUCCESS;
+            }
+            geom_t *xyz[3] = {nullptr, nullptr, nullptr};
+            real_t *nn[3]  = {nullptr, nullptr, nullptr};
+            rest_rows(xyz);
+            if (normals_out) host_rows(normals_out, nn);
+
+            const real_t *const u   = contact_surface->displacement()->data();
+            int                 err = 0;
+            for (auto &obs : obstacles) {
+                err += obs->sample_nodes(n, nullptr, xyz, u, gap, normals_out ? nn : nullptr);
+            }
+            return err;
+        }
+
+        // The curvature (6 rows) of the obstacles at the surface's n geometry nodes, at their current
+        // (displaced) positions.
+        int sample_nodes_curvature(const ptrdiff_t n, real_t **const C) {
+            if (n <= 0) {
+                return SFEM_SUCCESS;
+            }
+            geom_t *xyz[3] = {nullptr, nullptr, nullptr};
+            rest_rows(xyz);
+
+            const real_t *const u   = contact_surface->displacement()->data();
+            int                 err = 0;
+            for (auto &obs : obstacles) {
+                err += obs->sample_nodes_curvature(n, nullptr, xyz, u, C);
+            }
+            return err;
+        }
+
+        // The row pointers of a two-level buffer, readable on the host (a device buffer keeps its
+        // row pointers in device memory). Rows beyond the buffer's are null.
+        template <typename T>
+        static void host_rows(const SharedBuffer<T *> &b, T **rows) {
+            const int n = std::min<int>(3, (int)b->extent(0));
+#ifdef SFEM_ENABLE_CUDA
+            if (b->mem_space() == MEMORY_SPACE_DEVICE) {
+                smesh::device::device_to_host(n, b->data(), rows);
+                return;
+            }
+#endif
+            for (int d = 0; d < n; ++d) rows[d] = b->data()[d];
         }
 
         void assemble_mass_vector() {
@@ -428,6 +491,19 @@ namespace sfem {
 
     const std::shared_ptr<Buffer<idx_t>> ContactConditions::node_mapping() { return impl_->contact_surface->node_mapping(); }
 
+    SharedBuffer<real_t *> ContactConditions::normals() const { return impl_->normals; }
+
+    void ContactConditions::normal_rows(real_t **const rows) const {
+        for (int d = 0; d < 3; ++d) rows[d] = nullptr;
+        Impl::host_rows(impl_->normals, rows);
+    }
+
+    SharedBuffer<real_t> ContactConditions::surface_mass() const { return impl_->mass_vector; }
+
+    void ContactConditions::set_gap(const Gap gap) { impl_->gap = gap; }
+
+    ContactConditions::Gap ContactConditions::gap() const { return impl_->gap; }
+
     std::shared_ptr<FunctionSpace> ContactConditions::space() { return impl_->space; }
 
     ContactConditions::ContactConditions(const std::shared_ptr<FunctionSpace> &space) : impl_(std::make_unique<Impl>()) {
@@ -441,7 +517,16 @@ namespace sfem {
                                                                  const std::vector<std::shared_ptr<Sideset>> &sidesets,
                                                                  const enum ExecutionSpace                    es) {
         auto cc = std::make_unique<ContactConditions>(space);
-        cc->impl_->obstacles.push_back(SDFObstacle::create(sdf, es));
+        {
+            // The mesh's z-range bounds where the contact surface samples the obstacle
+            auto mesh = space->mesh_ptr();
+            const bool has_z = mesh->spatial_dimension() == 3;
+            cc->impl_->obstacles.push_back(SDFObstacle::create(sdf,
+                                                               mesh->comm(),
+                                                               has_z ? mesh->n_nodes() : 0,
+                                                               has_z ? mesh->points()->data()[2] : nullptr,
+                                                               es));
+        }
 
         if (space->has_semi_structured_mesh()) {
             cc->impl_->contact_surface = SSMeshContactSurface::create(space, sidesets, es);
@@ -613,6 +698,10 @@ namespace sfem {
         if (cs->node_mapping()->size() == 0 && !mpi) {
             return SFEM_SUCCESS;
         }
+        if (impl_->gap == Gap::NODAL) {
+            // The gradient of the gap signed_distance samples at the nodes.
+            return impl_->sample_nodes(n_geom, nullptr, impl_->normals);
+        }
         if (mpi && impl_->normals) {
             const int dim = impl_->space->mesh_ptr()->spatial_dimension();
             for (int d = 0; d < dim; ++d) {
@@ -690,6 +779,23 @@ namespace sfem {
         return err;
     }
 
+    int ContactConditions::curvature(real_t **const C) {
+        SFEM_TRACE_SCOPE("ContactConditions::curvature");
+
+        if (impl_->gap != Gap::NODAL) {
+            fprintf(stderr, "ContactConditions::curvature: the nodal gap only\n");
+            return SFEM_FAILURE;
+        }
+        auto            cs     = impl_->contact_surface;
+        const ptrdiff_t n_geom = contact_geometry_n_nodes(cs);
+        const ptrdiff_t n_con  = cs->node_mapping() ? cs->node_mapping()->size() : 0;
+        if (n_geom != n_con) {
+            fprintf(stderr, "ContactConditions::curvature: geometry nodes beyond the contact nodes (%ld of %ld)\n", (long)n_geom, (long)n_con);
+            return SFEM_FAILURE;
+        }
+        return impl_->sample_nodes_curvature(n_geom, C);
+    }
+
     int ContactConditions::update(const real_t *const x) {
         impl_->gather_volume(const_cast<real_t *>(x));
         impl_->contact_surface->displace_points(x);
@@ -724,6 +830,18 @@ namespace sfem {
         if (n_con == 0 && !mpi) {
             return SFEM_SUCCESS;
         }
+        if (impl_->gap == Gap::NODAL) {
+            if (n_geom == n_con) {
+                return impl_->sample_nodes(n_geom, g, nullptr);
+            }
+            auto      nodal = create_buffer<real_t>(n_geom, impl_->execution_space);
+            const int err   = impl_->sample_nodes(n_geom, nodal->data(), nullptr);
+            if (g && n_con > 0) {
+                impl_->blas_->copy(n_con, nodal->data(), g);
+            }
+            return err;
+        }
+
         int err = 0;
 
         real_t                             *gap = g;

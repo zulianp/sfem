@@ -53,5 +53,5 @@ fi
 export SFEM_USE_PARTIAL_ASSEMBLY=1
 export SFEM_USE_COMPRESSION=1
 export SFEM_NEOHOOKEAN_OGDEN_USE_AOS=1
-$LAUNCH hyperelasticy cables_geometry/cables dirichlet.yaml output
+$LAUNCH playground cables.yaml
 raw_to_db.py cables_geometry/cables output.vtk -p 'output/out/*.raw' $EXTRA_OPTIONS

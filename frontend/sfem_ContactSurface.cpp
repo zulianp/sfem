@@ -14,6 +14,7 @@
 #endif
 
 // C++
+#include "sfem_API.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_Input.hpp"
 #include "smesh_semistructured.hpp"
@@ -227,6 +228,8 @@ namespace sfem {
         std::shared_ptr<Buffer<idx_t *>>  sides;
         std::shared_ptr<Buffer<idx_t>>    node_mapping;
         std::shared_ptr<Buffer<geom_t *>> surface_points;
+        std::shared_ptr<Buffer<geom_t *>> surface_points_rest;
+        SharedBuffer<real_t>              surface_displacement;  // 3 per point, in the execution space
         smesh::ElemType                   element_type{smesh::INVALID};
         enum ExecutionSpace               execution_space { EXECUTION_SPACE_HOST };
 
@@ -244,6 +247,7 @@ namespace sfem {
             const ptrdiff_t    n    = node_mapping->size();
             const idx_t *const idx  = node_mapping->data();
             const int          dim  = mesh->spatial_dimension();
+            const int          pdim = static_cast<int>(surface_points->extent(0));
 
             for (int d = 0; d < dim; d++) {
                 const geom_t *const x   = mesh->points()->data()[d];
@@ -254,11 +258,21 @@ namespace sfem {
                     x_s[i] = x[idx[i]];
                 }
             }
+
+            for (int d = dim; d < pdim; ++d) {
+                geom_t *const x_s = surface_points->data()[d];
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < n; ++i) {
+                    x_s[i] = geom_t(0);
+                }
+            }
         }
 
         void reset_points() {
             SFEM_TRACE_SCOPE("MeshContactSurface::reset_points");
             collect_points(surface_points);
+            collect_points(surface_points_rest);
+            sfem::blas<real_t>(execution_space)->zeros(surface_displacement->size(), surface_displacement->data());
 
 #ifdef SFEM_ENABLE_CUDA
             if (EXECUTION_SPACE_DEVICE == this->execution_space) {
@@ -279,8 +293,9 @@ namespace sfem {
 #ifdef SFEM_ENABLE_CUDA
             if (EXECUTION_SPACE_DEVICE == this->execution_space) {
                 if (!surface_points_device) {
-                    // Lazy initialization of the device buffer
-                    surface_points_device = smesh::create_device_buffer<geom_t>(dim, n);
+                    // Lazy initialization of the device buffer, from the rest positions so the
+                    // coordinates beyond dim are their zeros
+                    surface_points_device = smesh::to_device(surface_points);
                 }
 
                 cu_displace_surface_points(dim,
@@ -288,7 +303,8 @@ namespace sfem {
                                            node_mapping_device->data(),
                                            surface_points_rest_device->data(),
                                            disp,
-                                           surface_points_device->data());
+                                           surface_points_device->data(),
+                                           surface_displacement->data());
                 return;
             }
 #endif
@@ -305,17 +321,27 @@ namespace sfem {
                     x_s[i]            = x[b] + disp[b * dim + d];
                 }
             }
+
+            real_t *const u_s = surface_displacement->data();
+#pragma omp parallel for
+            for (ptrdiff_t i = 0; i < n; ++i) {
+                const ptrdiff_t b = static_cast<ptrdiff_t>(idx[i]);
+                for (int d = 0; d < 3; ++d) u_s[i * 3 + d] = d < dim ? disp[b * dim + d] : real_t(0);
+            }
         }
     };
 
     MeshContactSurface::MeshContactSurface() : impl_(std::make_unique<Impl>()) {}
     MeshContactSurface::~MeshContactSurface() = default;
     SharedBuffer<geom_t *> MeshContactSurface::points() { return impl_->surface_points; }
+    SharedBuffer<geom_t *> MeshContactSurface::rest_points() { return impl_->surface_points_rest; }
+    SharedBuffer<real_t>   MeshContactSurface::displacement() { return impl_->surface_displacement; }
     SharedBuffer<idx_t *>  MeshContactSurface::elements() { return impl_->sides; }
     SharedBuffer<idx_t>    MeshContactSurface::node_mapping() { return impl_->node_mapping; }
 
 #ifdef SFEM_ENABLE_CUDA
     SharedBuffer<geom_t *> MeshContactSurface::points_device() { return impl_->surface_points_device; }
+    SharedBuffer<geom_t *> MeshContactSurface::rest_points_device() { return impl_->surface_points_rest_device; }
     SharedBuffer<idx_t *>  MeshContactSurface::elements_device() { return impl_->sides_device; }
     SharedBuffer<idx_t>    MeshContactSurface::node_mapping_device() { return impl_->node_mapping_device; }
 #endif
@@ -348,7 +374,11 @@ namespace sfem {
         ret->impl_->sidesets        = sidesets;
         ret->impl_->sides           = sides;
         ret->impl_->node_mapping    = node_mapping;
-        ret->impl_->surface_points  = create_host_buffer<geom_t>(mesh->spatial_dimension(), node_mapping->size());
+        // Three coordinates in 2D too, the last zero, as SSMeshContactSurface: the shell samplers
+        // read x, y and z.
+        ret->impl_->surface_points  = create_host_buffer<geom_t>(3, node_mapping->size());
+        ret->impl_->surface_points_rest  = create_host_buffer<geom_t>(3, node_mapping->size());
+        ret->impl_->surface_displacement = create_buffer<real_t>(3 * node_mapping->size(), es);
         ret->impl_->element_type    = shell_type(side_type(space->element_type()));
         if (ret->impl_->element_type == smesh::INVALID) {
             SFEM_ERROR("Invalid element type: %d\n", space->element_type());
@@ -383,6 +413,8 @@ namespace sfem {
         std::shared_ptr<Buffer<idx_t>>    node_mapping;
         std::shared_ptr<Buffer<idx_t>>    geometry_node_mapping;
         std::shared_ptr<Buffer<geom_t *>> surface_points;
+        std::shared_ptr<Buffer<geom_t *>> surface_points_rest;
+        SharedBuffer<real_t>              surface_displacement;  // 3 per point, in the execution space
         smesh::ElemType                   element_type{smesh::INVALID};
         enum ExecutionSpace               execution_space { EXECUTION_SPACE_HOST };
 
@@ -428,6 +460,8 @@ namespace sfem {
         void reset_points() {
             SFEM_TRACE_SCOPE("SSMeshContactSurface::reset_points");
             collect_points(surface_points);
+            collect_points(surface_points_rest);
+            sfem::blas<real_t>(execution_space)->zeros(surface_displacement->size(), surface_displacement->data());
 
 #ifdef SFEM_ENABLE_CUDA
             if (EXECUTION_SPACE_DEVICE == this->execution_space) {
@@ -458,7 +492,8 @@ namespace sfem {
                                            node_mapping_device->data(),
                                            surface_points_rest_device->data(),
                                            disp,
-                                           surface_points_device->data());
+                                           surface_points_device->data(),
+                                           surface_displacement->data());
                 return;
             }
 #endif
@@ -479,6 +514,13 @@ namespace sfem {
                 }
             }
 
+            real_t *const u_s = surface_displacement->data();
+#pragma omp parallel for
+            for (ptrdiff_t i = 0; i < n; ++i) {
+                const ptrdiff_t b = static_cast<ptrdiff_t>(idx[i]);
+                for (int d = 0; d < 3; ++d) u_s[i * 3 + d] = d < dim ? disp[b * dim + d] : real_t(0);
+            }
+
             for (int d = dim; d < pdim; ++d) {
                 geom_t *const x_s = surface_points->data()[d];
 #pragma omp parallel for
@@ -493,6 +535,8 @@ namespace sfem {
     SSMeshContactSurface::~SSMeshContactSurface() = default;
 
     SharedBuffer<geom_t *> SSMeshContactSurface::points() { return impl_->surface_points; }
+    SharedBuffer<geom_t *> SSMeshContactSurface::rest_points() { return impl_->surface_points_rest; }
+    SharedBuffer<real_t>   SSMeshContactSurface::displacement() { return impl_->surface_displacement; }
     SharedBuffer<idx_t *>  SSMeshContactSurface::elements() { return impl_->sides; }
     SharedBuffer<idx_t>    SSMeshContactSurface::node_mapping() { return impl_->node_mapping; }
     SharedBuffer<idx_t>    SSMeshContactSurface::geometry_node_mapping() {
@@ -501,6 +545,7 @@ namespace sfem {
 
 #ifdef SFEM_ENABLE_CUDA
     SharedBuffer<geom_t *> SSMeshContactSurface::points_device() { return impl_->surface_points_device; }
+    SharedBuffer<geom_t *> SSMeshContactSurface::rest_points_device() { return impl_->surface_points_rest_device; }
     SharedBuffer<idx_t *>  SSMeshContactSurface::elements_device() { return impl_->sides_device; }
     SharedBuffer<idx_t>    SSMeshContactSurface::node_mapping_device() { return impl_->node_mapping_device; }
 #endif
@@ -672,6 +717,8 @@ namespace sfem {
         ret->impl_->node_mapping          = node_mapping;
         ret->impl_->geometry_node_mapping = geometry_node_mapping;
         ret->impl_->surface_points        = create_host_buffer<geom_t>(3, geometry_node_mapping->size());
+        ret->impl_->surface_points_rest   = create_host_buffer<geom_t>(3, geometry_node_mapping->size());
+        ret->impl_->surface_displacement  = create_buffer<real_t>(3 * geometry_node_mapping->size(), es);
         ret->impl_->element_type          = elem_type;
         ret->impl_->execution_space       = es;
 #ifdef SFEM_ENABLE_CUDA

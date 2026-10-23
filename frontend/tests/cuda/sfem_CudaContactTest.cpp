@@ -79,6 +79,7 @@ struct TestOutput {
     std::shared_ptr<Buffer<real_t>> x;
     std::shared_ptr<Buffer<real_t>> rhs;
     std::shared_ptr<Buffer<real_t>> g;
+    std::shared_ptr<Buffer<real_t>> upper_bound;  // the gap the obstacle's SDF is sampled to
     std::shared_ptr<Buffer<real_t>> diag;
     std::shared_ptr<Buffer<mask_t>> mask;
     std::shared_ptr<Buffer<real_t>> normal_prod;
@@ -97,6 +98,8 @@ struct TestOutput {
         SFEM_TEST_ASSERT(other.rhs != nullptr);
         SFEM_TEST_ASSERT(g != nullptr);
         SFEM_TEST_ASSERT(other.g != nullptr);
+        SFEM_TEST_ASSERT(upper_bound != nullptr);
+        SFEM_TEST_ASSERT(other.upper_bound != nullptr);
         SFEM_TEST_ASSERT(diag != nullptr);
         SFEM_TEST_ASSERT(other.diag != nullptr);
         SFEM_TEST_ASSERT(mask != nullptr);
@@ -114,6 +117,7 @@ struct TestOutput {
         SFEM_TEST_EQ(x->size(), other.x->size());
         SFEM_TEST_EQ(rhs->size(), other.rhs->size());
         SFEM_TEST_EQ(g->size(), other.g->size());
+        SFEM_TEST_EQ(upper_bound->size(), other.upper_bound->size());
         SFEM_TEST_EQ(diag->size(), other.diag->size());
         SFEM_TEST_EQ(mask->size(), other.mask->size());
         SFEM_TEST_EQ(normal_prod->size(), other.normal_prod->size());
@@ -124,6 +128,7 @@ struct TestOutput {
         SFEM_ASSERT_ARRAY_APPROX_EQ(x->size(), x->data(), other.x->data(), tol);
         SFEM_ASSERT_ARRAY_APPROX_EQ(rhs->size(), rhs->data(), other.rhs->data(), tol);
         SFEM_ASSERT_ARRAY_APPROX_EQ(g->size(), g->data(), other.g->data(), tol);
+        SFEM_ASSERT_ARRAY_APPROX_EQ(upper_bound->size(), upper_bound->data(), other.upper_bound->data(), tol);
         SFEM_ASSERT_ARRAY_APPROX_EQ(diag->size(), diag->data(), other.diag->data(), tol);
         SFEM_ASSERT_ARRAY_EQ(mask->size(), mask->data(), other.mask->data());
         SFEM_ASSERT_ARRAY_APPROX_EQ(normal_prod->size(), normal_prod->data(), other.normal_prod->data(), tol);
@@ -145,7 +150,7 @@ struct TestOutput {
                       .x     = smesh::to_host(x),
                       .rhs = smesh::to_host(rhs),
                       .g   = smesh::to_host(g),
-                      // .upper_bound = sfem::to_host(upper_bound),
+                      .upper_bound = smesh::to_host(upper_bound),
                       .diag        = smesh::to_host(diag),
                       .mask        = smesh::to_host(mask),
                       .normal_prod = smesh::to_host(normal_prod),
@@ -210,6 +215,7 @@ struct TestOutput gen_test_data(enum ExecutionSpace es) {
     contact_conds->init();
 
     auto upper_bound = sfem::create_buffer<real_t>(contact_conds->n_constrained_dofs(), es);
+    contact_conds->signed_distance(upper_bound->data());
     auto normal_prod = sfem::create_buffer<real_t>(sym_block_size * contact_conds->n_constrained_dofs(), es);
     contact_conds->hessian_block_diag_sym(nullptr, normal_prod->data());
 
@@ -235,6 +241,7 @@ struct TestOutput gen_test_data(enum ExecutionSpace es) {
                     x->data(),
                     10,
                     nullptr,
+                    nullptr,
                     upper_bound->data(),
                     nullptr,
                     lagrange_ub->data(),
@@ -245,6 +252,7 @@ struct TestOutput gen_test_data(enum ExecutionSpace es) {
                     rhs->data(),
                     10,
                     nullptr,
+                    nullptr,
                     upper_bound->data(),
                     nullptr,
                     lagrange_ub->data(),
@@ -253,7 +261,7 @@ struct TestOutput gen_test_data(enum ExecutionSpace es) {
     auto e_pen = impl.sq_norm_ramp_p(contact_conds->n_constrained_dofs(), x->data(), upper_bound->data());
 
     auto lagr_ub = sfem::create_buffer<real_t>(contact_conds->n_constrained_dofs(), es);
-    impl.update_lagr_p(contact_conds->n_constrained_dofs(), 10, x->data(), upper_bound->data(), lagr_ub->data());
+    impl.update_lagr_p(contact_conds->n_constrained_dofs(), 10, nullptr, x->data(), upper_bound->data(), lagr_ub->data());
 
     const bool is_ml = fs->has_semi_structured_mesh();
 
@@ -261,7 +269,7 @@ struct TestOutput gen_test_data(enum ExecutionSpace es) {
                   .x     = x,
                   .rhs   = rhs,
                   .g     = g,
-                  /*.upper_bound = upper_bound,*/
+                  .upper_bound = upper_bound,
                   .diag        = diag,
                   .mask        = mask,
                   .normal_prod = normal_prod,

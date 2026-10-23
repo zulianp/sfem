@@ -44,6 +44,8 @@ namespace sfem {
         void set_beta(real_t beta);
         void set_gamma(real_t gamma);
         void set_density(real_t density);
+        /// The inertia with the consistent mass instead of the lumped one (before initialize).
+        void set_consistent_mass(bool consistent);
 
         /// Build the mass and the state buffers.  `block_names` is forwarded to
         /// the lumped mass, which is the only thing here that integrates.
@@ -61,14 +63,16 @@ namespace sfem {
         /// state, without advancing the step.
         ///
         /// Newmark's `v = shift * x + z` and `a = (x - u_hat)/(beta*dt^2)` are
-        /// functions of the state, so an operator that takes them as fields --
-        /// the hand-written `KelvinVoigtNewmark` does -- needs them refreshed
-        /// at every Newton iterate, not once per step.  That is the same
+        /// functions of the state, so an operator that takes them as fields
+        /// needs them refreshed at every Newton iterate, not once per step.  That is the same
         /// arithmetic `advance` ends with, which is why `advance` is this
         /// followed by a rotation rather than a second copy of it.
         void reconstruct(const real_t *const x,
                          real_t *const       velocity,
                          real_t *const       acceleration) const override;
+
+        void start(real_t *const x) const override;
+        void carried_state(real_t *const velocity, real_t *const acceleration) const override;
 
         /// Both halves of the method are reported, so the exported
         /// acceleration is the one `inertia_op` assembles.
@@ -79,6 +83,14 @@ namespace sfem {
         std::shared_ptr<Buffer<real_t>> state() const;
         std::shared_ptr<Buffer<real_t>> velocity() const;
         std::shared_ptr<Buffer<real_t>> acceleration() const;
+
+        /// The step's predictor `u_hat`, as of the last `begin_step`: the
+        /// state the step reaches with no force, and Newton's start.
+        std::shared_ptr<Buffer<real_t>> predictor() const;
+
+        /// The lumped mass the inertia assembles, density included.  Built by
+        /// `initialize`.
+        std::shared_ptr<Buffer<real_t>> mass() const;
 
     private:
         class Impl;

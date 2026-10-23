@@ -104,6 +104,8 @@ generate_materials() {
     run_generator codegen.framework.generators.laplace "$@"
     run_generator codegen.framework.generators.neohookean_ogden "$@"
     run_generator codegen.framework.generators.mooney_rivlin_kelvin_voigt "$@"
+    run_generator codegen.framework.generators.linear_kelvin_voigt "$@"
+    run_generator codegen.framework.generators.vector_mass "$@"
     run_generator codegen.framework.generators.body_force "$@"
     run_generator codegen.framework.generators.neumann "$@"
     # shellcheck disable=SC2086
@@ -112,6 +114,7 @@ generate_materials() {
     run_generator codegen.framework.generators.navier_stokes "$@"
     run_generator codegen.framework.generators.saint_venant_kirchhoff "$@"
     run_generator codegen.framework.generators.modified_mooney_rivlin "$@"
+    run_generator codegen.framework.generators.mooney_rivlin_prony "$@"
 }
 
 generate_materials

@@ -48,6 +48,9 @@ namespace sfem {
                          real_t *const       velocity,
                          real_t *const       acceleration) const override;
 
+        void start(real_t *const x) const override;
+        void carried_state(real_t *const velocity, real_t *const acceleration) const override;
+
         /// The state carried between steps.  Writable, because the initial
         /// condition is the caller's to set.
         std::shared_ptr<Buffer<real_t>> state() const;

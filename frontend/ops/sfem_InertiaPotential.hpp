@@ -60,9 +60,15 @@ namespace sfem {
                         real_t *const       out) override;
 
         std::shared_ptr<Op> clone() const override;
+        /// The same potential on a coarser space: its density, mass kind and alpha, the mass
+        /// rediscretised there. No predictor (a coarse level applies and assembles only).
+        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override;
 
         void set_alpha(real_t alpha);
         void set_density(real_t density);
+        /// The consistent mass (GeneratedVectorMass) in the potential instead of the lumped one.
+        /// Before initialize. `mass()` stays the lumped mass either way, for its other readers.
+        void set_consistent_mass(bool consistent);
         void set_u_hat(const std::shared_ptr<Buffer<real_t>> &u_hat);
         void set_mass(const std::shared_ptr<Buffer<real_t>> &mass);
         void set_field(const char *name, const std::shared_ptr<Buffer<real_t>> &values, const int component) override;

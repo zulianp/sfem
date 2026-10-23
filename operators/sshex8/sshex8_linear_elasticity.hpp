@@ -24,6 +24,35 @@ int sshex8_linear_elasticity_apply(const int                    level,
                                    real_t *const                outy,
                                    real_t *const                outz);
 
+// The diagonal and the packed (00 01 02 11 12 22) diagonal blocks of sshex8_linear_elasticity_apply:
+// the macro element's Jacobian at every quadrature point.
+int sshex8_linear_elasticity_diag(const int                    level,
+                                  const ptrdiff_t              nelements,
+                                  const ptrdiff_t              nnodes,
+                                  idx_t **const SFEM_RESTRICT  elements,
+                                  geom_t **const SFEM_RESTRICT points,
+                                  const real_t                 mu,
+                                  const real_t                 lambda,
+                                  const ptrdiff_t              out_stride,
+                                  real_t *const                outx,
+                                  real_t *const                outy,
+                                  real_t *const                outz);
+
+int sshex8_linear_elasticity_block_diag_sym(const int                    level,
+                                            const ptrdiff_t              nelements,
+                                            const ptrdiff_t              nnodes,
+                                            idx_t **const SFEM_RESTRICT  elements,
+                                            geom_t **const SFEM_RESTRICT points,
+                                            const real_t                 mu,
+                                            const real_t                 lambda,
+                                            const ptrdiff_t              out_stride,
+                                            real_t *const                out0,
+                                            real_t *const                out1,
+                                            real_t *const                out2,
+                                            real_t *const                out3,
+                                            real_t *const                out4,
+                                            real_t *const                out5);
+
 int affine_sshex8_linear_elasticity_apply(const int                    level,
                                           const ptrdiff_t              nelements,
                                           const ptrdiff_t              nnodes,

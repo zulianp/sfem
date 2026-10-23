@@ -14,9 +14,18 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <filesystem>
+#include <string>
 #include <vector>
 
 namespace {
+
+    // A ball of radius 0.5 touching the plane y = 0 from below at (0.5, 0, 0.5), positive inside
+    geom_t ball_sdf(const geom_t x, const geom_t y, const geom_t z) {
+        const geom_t cx = 0.5, cy = -0.5, cz = 0.5, radius = 0.5;
+        const geom_t dx = cx - x, dy = cy - y, dz = cz - z;
+        return radius - sqrt(dx * dx + dy * dy + dz * dz);
+    }
 
     std::shared_ptr<sfem::Function> make_homogeneous_checkerboard_ss_poisson(const int                          element_level,
                                                                              const std::shared_ptr<sfem::Mesh> &hex) {
@@ -409,11 +418,7 @@ namespace {
                                      1.1,
                                      0.2,
                                      1.1,
-                                     [](const geom_t x, const geom_t y, const geom_t z) -> geom_t {
-                                         const geom_t cx = 0.5, cy = -0.5, cz = 0.5, radius = 0.5;
-                                         const geom_t dx = cx - x, dy = cy - y, dz = cz - z;
-                                         return radius - sqrt(dx * dx + dy * dy + dz * dz);
-                                     });
+                                     ball_sdf);
 
         auto contact_conds = sfem::ContactConditions::create(fs, sdf, contact_ss, sfem::EXECUTION_SPACE_HOST);
         SFEM_TEST_ASSERT(contact_conds != nullptr);
@@ -487,6 +492,86 @@ namespace {
         return SFEM_TEST_SUCCESS;
     }
 
+    // An SDF read from file under MPI is split into z-slabs. Sampled by the contact surface it
+    // must give the gap and normals of the same grid held whole by every rank.
+    int test_parallel_sdf_slabs() {
+        SFEM_TRACE_SCOPE("test_parallel_sdf_slabs");
+        auto comm = sfem::Communicator::world();
+        auto hex  = sfem::Mesh::create_hex8_checkerboard_cube(comm, 2, 2, 2);
+        auto ss   = smesh::to_semistructured(2, hex, true, false);
+        SFEM_TEST_ASSERT(ss != nullptr);
+        auto fs = sfem::FunctionSpace::create(ss, 3);
+
+        auto contact_ss = sfem::Sideset::create_from_selector(
+                ss, [](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool { return y > -1e-5 && y < 1e-5; });
+
+        // Tall in z, so a rank's slab of the file ends well inside the grid and the slab the
+        // surface (z in [0, 1]) needs is cut from it.
+        auto whole = smesh::create_sdf(comm, 24, 12, 96, -0.1, -0.2, -0.1, 1.1, 0.2, 3.1, ball_sdf);
+
+        const std::string path = "sfem_ParallelSSGMGTest_sdf_" + std::to_string(comm->size());
+        if (comm->rank() == 0) {
+            SFEM_TEST_ASSERT(whole->to_file(smesh::Path(path)) == SFEM_SUCCESS);
+        }
+        comm->barrier();
+        auto slabs = smesh::Grid<geom_t>::create_from_file(comm, path);
+        SFEM_TEST_ASSERT(slabs != nullptr);
+        SFEM_TEST_ASSERT(comm->size() == 1 || slabs->nlocal()[2] < slabs->nglobal(2));
+
+        auto from_whole = sfem::ContactConditions::create(fs, whole, contact_ss, sfem::EXECUTION_SPACE_HOST);
+        auto from_slabs = sfem::ContactConditions::create(fs, slabs, contact_ss, sfem::EXECUTION_SPACE_HOST);
+        SFEM_TEST_ASSERT(from_whole->init() == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(from_slabs->init() == SFEM_SUCCESS);
+
+        const ptrdiff_t n = from_whole->n_constrained_dofs();
+        SFEM_TEST_EQ(n, from_slabs->n_constrained_dofs());
+        SFEM_TEST_ASSERT(comm->sum(real_t(n)) > 0);
+
+        // The gap, then each normal component as the projection of a unit field
+        const ptrdiff_t ndofs = fs->n_dofs();
+        auto            h     = sfem::create_host_buffer<real_t>(ndofs);
+        auto            a     = sfem::create_host_buffer<real_t>(n);
+        auto            b     = sfem::create_host_buffer<real_t>(n);
+        real_t          diff  = 0;
+        real_t          gmax  = 0;
+        for (int k = -1; k < 3; ++k) {
+            if (k < 0) {
+                SFEM_TEST_ASSERT(from_whole->signed_distance(a->data()) == SFEM_SUCCESS);
+                SFEM_TEST_ASSERT(from_slabs->signed_distance(b->data()) == SFEM_SUCCESS);
+                for (ptrdiff_t i = 0; i < n; ++i) {
+                    gmax = std::max(gmax, std::abs(a->data()[i]));
+                }
+            } else {
+                for (ptrdiff_t i = 0; i < ndofs; ++i) {
+                    h->data()[i] = i % 3 == k;
+                }
+                std::fill(a->data(), a->data() + n, real_t(0));
+                std::fill(b->data(), b->data() + n, real_t(0));
+                SFEM_TEST_ASSERT(from_whole->normal_project(h->data(), a->data()) == SFEM_SUCCESS);
+                SFEM_TEST_ASSERT(from_slabs->normal_project(h->data(), b->data()) == SFEM_SUCCESS);
+            }
+            for (ptrdiff_t i = 0; i < n; ++i) {
+                diff = std::max(diff, std::abs(a->data()[i] - b->data()[i]));
+            }
+        }
+        diff = comm->max(diff);
+        gmax = comm->max(gmax);
+        if (comm->rank() == 0) {
+            printf("SDF slabs: largest gap %g, largest gap or normal difference to the whole grid %g\n",
+                   (double)gmax,
+                   (double)diff);
+        }
+        // Gaps inside the grid (it is 0.2 deep below y = 0), equal to float precision
+        SFEM_TEST_ASSERT(gmax < 1);
+        SFEM_TEST_ASSERT(diff < 1e-5);
+
+        comm->barrier();
+        if (comm->rank() == 0) {
+            std::filesystem::remove_all(path);
+        }
+        return SFEM_TEST_SUCCESS;
+    }
+
     int test_parallel_checkerboard_ssmgc() {
         SFEM_TRACE_SCOPE("test_parallel_checkerboard_ssmgc");
         auto comm = sfem::Communicator::world();
@@ -511,6 +596,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_parallel_quad4_ssgmg);
     SFEM_RUN_TEST(test_parallel_tet4_ssgmg);
     SFEM_RUN_TEST(test_parallel_hex8_tet4_ssgmg);
+    SFEM_RUN_TEST(test_parallel_sdf_slabs);
     SFEM_RUN_TEST(test_parallel_checkerboard_ssmgc);
     SFEM_RUN_TEST(test_parallel_tet4_ssmgc);
     SFEM_UNIT_TEST_FINALIZE();

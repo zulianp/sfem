@@ -28,8 +28,10 @@ from codegen.framework.emitters.kernel_prologue import (
     kernel_local,
     resolve_kernel_constants,
 )
-from codegen.framework.forms.equations import total_residual_collection
+from codegen.framework.forms.equations import quadrature_output_dependencies, total_residual_collection
 from codegen.framework.symbolic.fields import is_time_rate_shift
+from codegen.framework.symbolic.relaxation import is_relaxation_gamma, relaxation_group_of_gamma
+from codegen.framework.plans.quadrature_fields import quadrature_read_streams
 from codegen.framework.plans.form_transformations import (
     symmetric_metric_component_count,
 )
@@ -54,7 +56,7 @@ def generate_op_registration_files(manifests, function_name="register_generated_
     }
 
 
-def generate_op_files(material, elements, kernel_sources=None):
+def generate_op_files(material, elements, kernel_sources=None, quadrature_points=None):
     c_abi_header = "sfem_%s_c_abi.hpp" % _op_file_stem(material) if kernel_sources else None
     kernel_sources = dict(kernel_sources or {})
     dispatch_sources, declared_signatures = (
@@ -135,7 +137,8 @@ def generate_op_files(material, elements, kernel_sources=None):
             )
         form_collections = _single_equation_form_collections(systems_by_dim, equations[0])
         header, source = _hyperelastic_op(
-            material, elements, c_abi_header, form_collections, abi_sources
+            material, elements, c_abi_header, form_collections, abi_sources,
+            quadrature_points=quadrature_points,
         )
     elif equations[0].is_residual:
         form_collections = _single_equation_form_collections(systems_by_dim, equations[0])
@@ -555,8 +558,40 @@ def _inexact_declarations(material):
     int inexact_apply(const real_t *const h, real_t *const out) override;"""
 
 
+def _tangent_is_constant(form_collections):
+    """Whether the material is linear: its tangent, the 2-form, reads no state.
+
+    The 2-form is written in the directions and the parameters, and in the
+    state wherever the material is nonlinear -- the variables the form layer
+    derives from the fields (the deformation gradient) or the field components
+    themselves.  A tangent free of both is the same at every state, so the
+    residual is affine in it, which is what `Op::is_linear` promises: one
+    linear solve is the whole of a solve.  No 2-form, no claim.
+    """
+    import sympy as sp
+
+    from codegen.framework.forms.forms import FormOrder
+
+    if not form_collections:
+        return False
+    for collection in form_collections.values():
+        state = {str(symbol) for symbol in getattr(collection, "variables", ())}
+        for field in collection.fields:
+            components = int(getattr(field, "components", 1) or 1)
+            for component in range(components):
+                state.add("%s%d" % (field.name, component))
+                state.add("%s[%d]" % (field.name, component))
+        tangents = [form for form in getattr(collection, "forms", ()) if getattr(form, "order", None) is FormOrder.TWO]
+        if not tangents:
+            return False
+        for form in tangents:
+            if any(str(symbol) in state for symbol in sp.sympify(form.expression).free_symbols):
+                return False
+    return True
+
+
 def _header(material, residual, publishes_value_steps=None, node_wise=False,
-            holds_time_scheme=None):
+            holds_time_scheme=None, relaxes=False, state_independent=False, linear=False):
     """The Op's declared interface.
 
     ``publishes_value_steps`` says whether this Op offers the Newton
@@ -598,6 +633,12 @@ def _header(material, residual, publishes_value_steps=None, node_wise=False,
     bool energy_or_potential_based() const override { return %s; }""" % (
         "false" if node_wise else "true"
     )
+    # A residual that does not read the state -- a forcing, linear work -- says
+    # so, as the boundary forcings do: its Jacobian is zero, and the line search
+    # assembles it once instead of at every trial step.
+    if state_independent:
+        value_steps += """
+    bool residual_depends_on_state() const override { return false; }"""
     # A material with a rate must hold a scheme, because its kernels cannot be
     # evaluated without the shift and the history.  An energy material may hold
     # one without having a rate at all: the scheme's separable term is a
@@ -621,9 +662,9 @@ def _header(material, residual, publishes_value_steps=None, node_wise=False,
 
 #include "sfem_Op.hpp"
 #include "sfem_NeumannConditions.hpp"
-%(time_scheme_include)s
+%(time_scheme_include)s%(relaxation_include)s
 namespace sfem {
-  class %(op)s final : public Op%(time_scheme_base)s {
+  class %(op)s final : public Op%(time_scheme_base)s%(relaxation_base)s {
   public:
     static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space);
 
@@ -640,7 +681,7 @@ namespace sfem {
     //! "Invalid __global__ atomic of size 8 bytes ... Address 0x3aa240f8 is
     //! out of bounds".
     ExecutionSpace execution_space() const override { return %(execution_space)s; }
-    bool is_linear() const override { return false; }
+    bool is_linear() const override { return %(linear)s; }
     ptrdiff_t n_dofs_domain() const override;
     ptrdiff_t n_dofs_image() const override;
     double flops_value() const override;
@@ -655,7 +696,7 @@ namespace sfem {
     int apply(const real_t *const x,
                   const real_t *const h,
                   real_t *const out) override;
-    int value(const real_t *x, real_t *const out) override;%(value_steps)s%(inexact_methods)s
+    int value(const real_t *x, real_t *const out) override;%(value_steps)s%(inexact_methods)s%(relaxation_declarations)s
     int hessian_crs(const real_t *const x,
             const count_t *const rowptr,
             const idx_t *const colidx,
@@ -664,6 +705,7 @@ namespace sfem {
     void set_value_in_block(const std::string &block_name,
                 const std::string &var_name,
                 real_t value) override;
+    std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override;
 #ifdef SFEM_ENABLE_RYAML
     std::shared_ptr<Op> create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
                                              const ryml::ConstNodeRef             &node) override;
@@ -687,6 +729,7 @@ namespace sfem {
 """ % {
         "op": _op_class_name(material),
         "execution_space": current_target().execution_space(),
+        "linear": "true" if linear else "false",
         "header_stem": _op_file_stem(material),
         "stream_member": _op_stream_member(),
         "extra": extra,
@@ -696,28 +739,34 @@ namespace sfem {
         "value_steps": value_steps,
         "matrix_methods": matrix_methods,
         "inexact_methods": _inexact_declarations(material),
+        "relaxation_include": _HEADER_RELAXATION_INCLUDE[bool(relaxes)],
+        "relaxation_base": _HEADER_RELAXATION_BASE[bool(relaxes)],
+        "relaxation_declarations": _HEADER_RELAXATION_DECLARATIONS[bool(relaxes)],
     }
 
 
-def _inexact_needs_affine(material):
-    """The split always needs the affine geometry, whatever the apply chose.
+def _inexact_affine_elements(material, kernel_sources):
+    """The elements the stored-tangent path assembles, from its own dispatch.
 
-    `initialize` builds the cache only when one of the affine options is on, and
-    the inexact path is not one of them: its tangent is assembled from the
-    adjugate and the determinant, so without this an Op whose exact apply runs
-    isoparametrically would offer `inexact_update` and then fail in it for want
-    of a cache the caller has no way to ask for.
+    The split always needs the affine geometry for these, whatever the apply
+    chose: `inexact_update` assembles the tangent from the adjugate and the
+    determinant, so an Op whose exact apply runs isoparametrically would
+    otherwise offer `inexact_update` and then fail in it for want of a cache
+    the caller has no way to ask for.  Asking per element rather than per
+    dimension is what keeps an element the split does not serve -- and smesh
+    cannot fill an adjugate for, like HEX27 -- out of the cache.
     """
     if not _emits_inexact_apply(material):
-        return ""
-    # Only where the cache can actually be built.  smesh's adjugate fill has no
-    # TRI3 or QUAD4 case and aborts rather than returning, so asking for the
-    # cache on a 2D mesh kills the process inside `initialize` -- which is how
-    # enabling the split first broke 2D linear elasticity outright.  The split
-    # needs affine geometry; affine geometry exists in three dimensions.
-    return (" ||\n                (impl_->space->mesh_ptr()->spatial_dimension() == 3"
-            " /* the inexact path assembles from the affine geometry,"
-            " which smesh fills for 3D elements only */)")
+        return ()
+    elements = []
+    for dim in (2, 3):
+        name = "%s_inexact_apply_tangent_%dd_a_msoa" % (material.name, dim)
+        if not _c_abi_function_exists(kernel_sources, name, public_only=True):
+            continue
+        for element in _c_abi_public_dispatch_case_elements(kernel_sources, name):
+            if element not in elements:
+                elements.append(element)
+    return tuple(elements)
 
 
 def _inexact_cache_field(material):
@@ -992,7 +1041,8 @@ def _inexact_definitions(
 
 
 def _hyperelastic_op(
-    material, elements, c_abi_header=None, form_collections=None, kernel_sources=None
+    material, elements, c_abi_header=None, form_collections=None, kernel_sources=None,
+    quadrature_points=None,
 ):
     if form_collections is None:
         raise ValueError("energy generated Op requires form collections")
@@ -1359,11 +1409,12 @@ def _hyperelastic_op(
 
 %(element_scratch_include)s#include "sfem_FunctionSpace.hpp"
 #include "sfem_MultiDomainOp.hpp"
+#include "sfem_DerefinedTimeScheme.hpp"
 #include "sfem_OpTracer.hpp"
 #include "sfem_Parameters.hpp"
 #include "smesh_kernel_data.hpp"
 #include "smesh_mesh.hpp"
-
+%(relaxation_include)s
 #include <algorithm>
 #include <cstring>
 #include <memory>
@@ -1376,7 +1427,7 @@ namespace sfem {
     void seed_parameters(Parameters &parameters) {
 %(defaults)s
     }
-
+%(relaxation_helpers)s
     void seed_material(MultiDomainOp &domains) {
       for (auto &entry : domains.domains()) {
         seed_parameters(*entry.second.parameters);
@@ -1435,6 +1486,19 @@ namespace sfem {
       }
     }
 
+    //! Whether the stored-tangent path assembles this element.
+    //!
+    //! Its tangent is built from the cached adjugate, so the cache is built for
+    //! these elements whether or not an affine option is on -- and only for
+    //! these: smesh has no adjugate fill for every element (HEX27, for one),
+    //! and asking for one it cannot fill aborts inside `initialize`.
+    bool geometry_assembles_inexact(const smesh::ElemType element_type) {
+      switch (element_type) {
+%(inexact_affine_element_cases)s        default:
+          return false;
+      }
+    }
+
     int cache_affine_geometry(const std::shared_ptr<FunctionSpace> &space,
                                   MultiDomainOp &domains,
                                   const bool requested) {
@@ -1443,7 +1507,8 @@ namespace sfem {
           %(gradient_affine_uses_jacobian_aos)s ||
           %(apply_affine_uses_jacobian_aos)s;
       for (auto &entry : domains.domains()) {
-        if (!requested && !geometry_is_forced_affine(entry.second.element_type)) {
+        if (!requested && !geometry_is_forced_affine(entry.second.element_type) &&
+            !geometry_assembles_inexact(entry.second.element_type)) {
           continue;
         }
         const smesh::block_idx_t block_id =
@@ -1488,6 +1553,67 @@ namespace sfem {
     ptrdiff_t block_size_for_dim(const int dim) {
 %(block_size_lines)s
     }
+
+    // The graph an assembly was last handed and found well formed.
+    struct CheckedGraph {
+      const count_t *rowptr{nullptr};
+      const idx_t *colidx{nullptr};
+      ptrdiff_t n_rows{-1};
+    };
+
+    // Establish once per graph, at the first assembly into it, that the graph is well formed:
+    // rows in order, every column in range, each row sorted and duplicate free.
+    // The assembly kernels assume it -- they locate an entry and write to it
+    // without re-checking that it is there -- so this is where the assumption
+    // is earned.
+    //
+    // It used to be earned per element instead: every scatter walked its
+    // NS x NS candidates, tested each with a three-condition branch
+    // and reported through std::fprintf from inside the caller's parallel
+    // region.  That paid O(elements x NS^2) on every assembly for a
+    // property of the mesh and the graph together, which cannot change between
+    // elements or between calls.  Here it is O(nnz), once.
+    //
+    // Not at setup: `initialize` built the space's scalar dof graph for this, which a
+    // matrix-free solver never uses -- on a 76.6M-dof semi-structured mesh 6.2e9 entries,
+    // past count_t -- while the block assembly writes into the node graph, which it never
+    // checked.  `checked` remembers the last graph that passed.
+    //
+    // Raw pointers rather than the graph type, so this does not depend on which
+    // headers the generated wrapper happens to pull in.
+    int check_graph(CheckedGraph &checked,
+                    const count_t *const rowptr,
+                    const idx_t *const colidx,
+                    const ptrdiff_t n_rows) {
+      if (rowptr == checked.rowptr && colidx == checked.colidx && n_rows == checked.n_rows) {
+        return SFEM_SUCCESS;
+      }
+      if (!rowptr || !colidx || n_rows < 0) {
+        return SFEM_FAILURE;
+      }
+%(graph_host_view)s
+      if (h_rowptr[0] != 0) {
+        return SFEM_FAILURE;
+      }
+      const ptrdiff_t nnz = (ptrdiff_t)h_rowptr[n_rows];
+      for (ptrdiff_t i = 0; i < n_rows; ++i) {
+        const count_t begin = h_rowptr[i];
+        const count_t end = h_rowptr[i + 1];
+        if (end < begin || (ptrdiff_t)end > nnz) {
+          return SFEM_FAILURE;
+        }
+        for (count_t k = begin; k < end; ++k) {
+          if (h_colidx[k] < 0 || (ptrdiff_t)h_colidx[k] >= n_rows) {
+            return SFEM_FAILURE;
+          }
+          if (k > begin && h_colidx[k] <= h_colidx[k - 1]) {
+            return SFEM_FAILURE;
+          }
+        }
+      }
+      checked = CheckedGraph{rowptr, colidx, n_rows};
+      return SFEM_SUCCESS;
+    }
   }  // namespace
 
   class %(op)s::Impl {
@@ -1497,12 +1623,14 @@ namespace sfem {
     std::shared_ptr<FunctionSpace> space;
     std::shared_ptr<MultiDomainOp> domains;
     std::shared_ptr<TimeScheme> time_scheme;
-%(element_scratch_fields)s
+%(relaxation_field)s%(element_scratch_fields)s
     bool objective_uses_affine{false};
     bool gradient_uses_affine{false};
     bool apply_uses_affine{false};
     bool use_packed_two_pass{false};
     std::vector<SharedBuffer<real_t>> packed_ghost_buf;
+    CheckedGraph crs_graph;
+    CheckedGraph bsr_graph;
   };
 
   std::unique_ptr<Op> %(op)s::create(const std::shared_ptr<FunctionSpace> &space) {
@@ -1527,70 +1655,19 @@ namespace sfem {
 
 %(performance_methods)s
 
-  // Establish once, at setup, that this operator's dof graph is well formed:
-  // rows in order, every column in range, each row sorted and duplicate free.
-  // The assembly kernels assume it -- they locate an entry and write to it
-  // without re-checking that it is there -- so this is where the assumption
-  // is earned.
-  //
-  // It used to be earned per element instead: every scatter walked its
-  // NS x NS candidates, tested each with a three-condition branch
-  // and reported through std::fprintf from inside the caller's parallel
-  // region.  That paid O(elements x NS^2) on every assembly for a
-  // property of the mesh and the graph together, which cannot change between
-  // elements or between calls.  Here it is O(nnz), once.
-  //
-  // Raw pointers rather than the graph type, so this does not depend on which
-  // headers the generated wrapper happens to pull in.
-  static int validate_dof_graph(const count_t *const rowptr,
-                                  const idx_t *const colidx,
-                                  const ptrdiff_t n_nodes,
-                                  const ptrdiff_t nnz) {
-    if (!rowptr || !colidx || n_nodes < 0) {
-      return SFEM_FAILURE;
-    }
-    if (rowptr[0] != 0 || (ptrdiff_t)rowptr[n_nodes] != nnz) {
-      return SFEM_FAILURE;
-    }
-    for (ptrdiff_t i = 0; i < n_nodes; ++i) {
-      const count_t begin = rowptr[i];
-      const count_t end = rowptr[i + 1];
-      if (end < begin || (ptrdiff_t)end > nnz) {
-        return SFEM_FAILURE;
-      }
-      for (count_t k = begin; k < end; ++k) {
-        if (colidx[k] < 0 || (ptrdiff_t)colidx[k] >= n_nodes) {
-          return SFEM_FAILURE;
-        }
-        if (k > begin && colidx[k] <= colidx[k - 1]) {
-          return SFEM_FAILURE;
-        }
-      }
-    }
-    return SFEM_SUCCESS;
-  }
-
   int %(op)s::initialize(const std::vector<std::string> &block_names) {
     SFEM_TRACE_SCOPE("%(op)s::initialize");
     impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
-    {
-      auto dof_graph = impl_->space->dof_to_dof_graph();
-      if (!dof_graph ||
-        validate_dof_graph(dof_graph->rowptr()->data(),
-                                   dof_graph->colidx()->data(),
-                                   dof_graph->n_nodes(),
-                                   dof_graph->nnz()) != SFEM_SUCCESS) {
-        SFEM_ERROR("%(op)s::initialize: the dof graph is malformed; the assembly kernels assume it is not\\n");
-        return SFEM_FAILURE;
-      }
-    }
+    // A micro-element space hands each semi-structured macro element over as its micro
+    // elements, which these kernels assemble as HEX8.
+    impl_->domains->set_micro_elements(impl_->space->micro_elements());
     // Not only what the caller asked for.  An element whose geometry is
     // constant by construction has no isoparametric kernel, so the operator
     // takes the affine route for it either way and needs the cache either way.
     const bool needs_affine_geometry =
         impl_->objective_uses_affine ||
         impl_->gradient_uses_affine ||
-        impl_->apply_uses_affine%(inexact_needs_affine)s;
+        impl_->apply_uses_affine;
     for (auto &entry : impl_->domains->domains()) {
       seed_parameters(*entry.second.parameters);
       impl_->element_capacity =
@@ -1608,7 +1685,7 @@ namespace sfem {
     if (cache_affine_geometry(impl_->space, *impl_->domains, needs_affine_geometry) != SFEM_SUCCESS) {
       return SFEM_FAILURE;
     }
-%(element_scratch_alloc)s
+%(relaxation_setup)s%(element_scratch_alloc)s
 %(packed_scratch_prealloc)s
     return SFEM_SUCCESS;
   }
@@ -1623,7 +1700,7 @@ namespace sfem {
       scheme->claim(this);
     }
   }
-
+%(relaxation_methods)s
   int %(op)s::gradient(const real_t *const x, real_t *const out) {
     SFEM_TRACE_SCOPE("%(op)s::gradient");
     if (auto term = time_scheme_term(impl_->time_scheme)) {
@@ -1781,7 +1858,7 @@ namespace sfem {
               const idx_t *const colidx,
               real_t *const values) {
     SFEM_TRACE_SCOPE("%(op)s::hessian_crs");
-    if (auto term = time_scheme_term(impl_->time_scheme)) {
+%(hessian_crs_graph_check)s    if (auto term = time_scheme_term(impl_->time_scheme)) {
       if (term->hessian_crs(x, rowptr, colidx, values) != SFEM_SUCCESS) {
         return SFEM_FAILURE;
       }
@@ -1798,7 +1875,7 @@ namespace sfem {
               const idx_t *const colidx,
               real_t *const values) {
     SFEM_TRACE_SCOPE("%(op)s::hessian_bsr");
-    if (auto term = time_scheme_term(impl_->time_scheme)) {
+%(hessian_bsr_graph_check)s    if (auto term = time_scheme_term(impl_->time_scheme)) {
       if (term->hessian_bsr(x, rowptr, colidx, values) != SFEM_SUCCESS) {
         return SFEM_FAILURE;
       }
@@ -1851,7 +1928,7 @@ namespace sfem {
     SFEM_TRACE_SCOPE("%(op)s::set_value_in_block");
     impl_->domains->set_value_in_block(block_name, var_name, value);
   }
-
+%(derefine_op)s
 #ifdef SFEM_ENABLE_RYAML
   std::shared_ptr<Op> %(op)s::create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
                                                  const ryml::ConstNodeRef             &node) {
@@ -1883,13 +1960,13 @@ namespace sfem {
     if (material_from_yaml(node, defaults, top_values)) {
       set_material(*ret->impl_->domains, top_values);
     }
-
+%(relaxation_yaml_top)s
     if (node.has_child("blocks")) {
       for (auto block : node["blocks"].children()) {
         if (!block.has_child("name")) {
           continue;
         }
-
+%(relaxation_yaml_block)s
         real_t block_values[N_MATERIAL_PARAMETERS];
         copy_material_parameters(top_values, block_values);
         if (!material_from_yaml(block, top_values, block_values)) {
@@ -1906,11 +1983,23 @@ namespace sfem {
 #endif  // SFEM_ENABLE_RYAML
 }  // namespace sfem
 """
+    relaxation = _relaxation_declarations_by_dim(material, elements)
+    relaxation_fragments = _relaxation_fragments(
+        material,
+        elements,
+        relaxation,
+        quadrature_points,
+        kernel_sources,
+        form_collections,
+        n_field_components_by_dim,
+    )
     substitutions = {
         "op": _op_class_name(material),
+        "derefine_op": _derefine_op_source(_op_class_name(material), True),
         "header_stem": _op_file_stem(material),
         "stream_member": _op_stream_member(),
         "c_abi_include": '#include "%s"' % c_abi_header if c_abi_header else "",
+        **relaxation_fragments,
         "packed_scratch_include": packed_scratch_include,
         "packed_scratch_prealloc": packed_scratch_prealloc,
         "element_scratch_include": _element_scratch_include(),
@@ -1943,6 +2032,7 @@ namespace sfem {
         "element_connectivity": _element_connectivity_expression(),
         "execution_space": current_target().execution_space(),
         "points_accessor": _points_accessor_expression(),
+        "graph_host_view": _graph_host_view(),
         "geometry_memory_space": _geometry_memory_space_expression(),
         "block_size_lines": _residual_block_size_lines(n_field_components_by_dim),
         "metric_declaration": _metric_declaration(any(affine_metric_flags)),
@@ -2040,6 +2130,8 @@ namespace sfem {
             indent="      ",
             n_field_components_by_dim=n_field_components_by_dim,
         ),
+        "hessian_crs_graph_check": _graph_check_lines(_op_class_name(material), "crs"),
+        "hessian_bsr_graph_check": _graph_check_lines(_op_class_name(material), "bsr"),
         "hessian_crs_current_parameter": _hyperelastic_hessian_current_parameter(
             {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
         ),
@@ -2083,7 +2175,9 @@ namespace sfem {
             {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
         ),
         "inexact_cache_field": _inexact_cache_field(material),
-        "inexact_needs_affine": _inexact_needs_affine(material),
+        "inexact_affine_element_cases": _forced_affine_element_cases(
+            _inexact_affine_elements(material, kernel_sources)
+        ),
         "performance_methods": _performance_methods(_op_class_name(material), material.name, elements, performance_cases),
         "affine_options": _affine_option_entries(
             "objective_uses_affine",
@@ -2119,7 +2213,16 @@ namespace sfem {
             inexact % {"op": _op_class_name(material)} + marker,
             1,
         )
-    return _header(material, False, holds_time_scheme=True), source
+    return (
+        _header(
+            material,
+            False,
+            holds_time_scheme=True,
+            relaxes=bool(relaxation),
+            linear=_tangent_is_constant(form_collections),
+        ),
+        source,
+    )
 
 
 def _residual_op(material, elements, c_abi_header=None, form_collections=None, kernel_sources=None):
@@ -2891,6 +2994,7 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
 
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_MultiDomainOp.hpp"
+#include "sfem_DerefinedTimeScheme.hpp"
 #include "sfem_OpTracer.hpp"
 #include "sfem_Parameters.hpp"
 #include "smesh_kernel_data.hpp"
@@ -2943,13 +3047,34 @@ namespace sfem {
       std::shared_ptr<smesh::FFF> metric_aos;
     };
 
+    //! Whether this element leaves the operator no choice of geometry.
+    //!
+    //! A constant-P1 simplex publishes no isoparametric residual or action
+    //! kernel, and assembly takes the affine kernel of every element that has
+    //! one, so the operator reads a cached adjugate for these elements
+    //! whatever the caller asked.  Every other element still caches only when
+    //! asked.
+    bool geometry_is_forced_affine(const smesh::ElemType element_type) {
+      switch (element_type) {
+%(forced_affine_element_cases)s        default:
+          return false;
+      }
+    }
+
     int cache_affine_geometry(const std::shared_ptr<FunctionSpace> &space,
                                   MultiDomainOp &domains,
-                                  const bool needs_jacobian,
-                                  const bool needs_metric_soa,
-                                  const bool needs_metric_aos) {
+                                  const bool requested_jacobian,
+                                  const bool requested_metric_soa,
+                                  const bool requested_metric_aos) {
       auto mesh = space->mesh_ptr();
       for (auto &entry : domains.domains()) {
+        const bool forced = geometry_is_forced_affine(entry.second.element_type);
+        const bool needs_jacobian = requested_jacobian || forced;
+        const bool needs_metric_soa = requested_metric_soa || (forced && %(forced_affine_uses_metric_soa)s);
+        const bool needs_metric_aos = requested_metric_aos || (forced && %(forced_affine_uses_metric_aos)s);
+        if (!needs_jacobian && !needs_metric_soa && !needs_metric_aos) {
+          continue;
+        }
         auto cache = std::static_pointer_cast<AffineGeometryCache>(
             entry.second.user_data);
         if (!cache) {
@@ -3013,6 +3138,67 @@ namespace sfem {
 %(block_size_lines)s
     }
 %(laplace_packed_helpers)s
+
+    // The graph an assembly was last handed and found well formed.
+    struct CheckedGraph {
+      const count_t *rowptr{nullptr};
+      const idx_t *colidx{nullptr};
+      ptrdiff_t n_rows{-1};
+    };
+
+    // Establish once per graph, at the first assembly into it, that the graph is well formed:
+    // rows in order, every column in range, each row sorted and duplicate free.
+    // The assembly kernels assume it -- they locate an entry and write to it
+    // without re-checking that it is there -- so this is where the assumption
+    // is earned.
+    //
+    // It used to be earned per element instead: every scatter walked its
+    // NS x NS candidates, tested each with a three-condition branch
+    // and reported through std::fprintf from inside the caller's parallel
+    // region.  That paid O(elements x NS^2) on every assembly for a
+    // property of the mesh and the graph together, which cannot change between
+    // elements or between calls.  Here it is O(nnz), once.
+    //
+    // Not at setup: `initialize` built the space's scalar dof graph for this, which a
+    // matrix-free solver never uses -- on a 76.6M-dof semi-structured mesh 6.2e9 entries,
+    // past count_t -- while the block assembly writes into the node graph, which it never
+    // checked.  `checked` remembers the last graph that passed.
+    //
+    // Raw pointers rather than the graph type, so this does not depend on which
+    // headers the generated wrapper happens to pull in.
+    int check_graph(CheckedGraph &checked,
+                    const count_t *const rowptr,
+                    const idx_t *const colidx,
+                    const ptrdiff_t n_rows) {
+      if (rowptr == checked.rowptr && colidx == checked.colidx && n_rows == checked.n_rows) {
+        return SFEM_SUCCESS;
+      }
+      if (!rowptr || !colidx || n_rows < 0) {
+        return SFEM_FAILURE;
+      }
+%(graph_host_view)s
+      if (h_rowptr[0] != 0) {
+        return SFEM_FAILURE;
+      }
+      const ptrdiff_t nnz = (ptrdiff_t)h_rowptr[n_rows];
+      for (ptrdiff_t i = 0; i < n_rows; ++i) {
+        const count_t begin = h_rowptr[i];
+        const count_t end = h_rowptr[i + 1];
+        if (end < begin || (ptrdiff_t)end > nnz) {
+          return SFEM_FAILURE;
+        }
+        for (count_t k = begin; k < end; ++k) {
+          if (h_colidx[k] < 0 || (ptrdiff_t)h_colidx[k] >= n_rows) {
+            return SFEM_FAILURE;
+          }
+          if (k > begin && h_colidx[k] <= h_colidx[k - 1]) {
+            return SFEM_FAILURE;
+          }
+        }
+      }
+      checked = CheckedGraph{rowptr, colidx, n_rows};
+      return SFEM_SUCCESS;
+    }
   }  // namespace
 
   class %(op)s::Impl {
@@ -3027,6 +3213,8 @@ namespace sfem {
     const real_t *current{nullptr};
     bool residual_uses_affine{false};
     bool jacobian_action_uses_affine{false};
+    CheckedGraph crs_graph;
+    CheckedGraph bsr_graph;
 %(previous_state_accessor)s  };
 
   std::unique_ptr<Op> %(op)s::create(const std::shared_ptr<FunctionSpace> &space) {
@@ -3051,77 +3239,27 @@ namespace sfem {
 
 %(performance_methods)s
 
-  // Establish once, at setup, that this operator's dof graph is well formed:
-  // rows in order, every column in range, each row sorted and duplicate free.
-  // The assembly kernels assume it -- they locate an entry and write to it
-  // without re-checking that it is there -- so this is where the assumption
-  // is earned.
-  //
-  // It used to be earned per element instead: every scatter walked its
-  // NS x NS candidates, tested each with a three-condition branch
-  // and reported through std::fprintf from inside the caller's parallel
-  // region.  That paid O(elements x NS^2) on every assembly for a
-  // property of the mesh and the graph together, which cannot change between
-  // elements or between calls.  Here it is O(nnz), once.
-  //
-  // Raw pointers rather than the graph type, so this does not depend on which
-  // headers the generated wrapper happens to pull in.
-  static int validate_dof_graph(const count_t *const rowptr,
-                                  const idx_t *const colidx,
-                                  const ptrdiff_t n_nodes,
-                                  const ptrdiff_t nnz) {
-    if (!rowptr || !colidx || n_nodes < 0) {
-      return SFEM_FAILURE;
-    }
-    if (rowptr[0] != 0 || (ptrdiff_t)rowptr[n_nodes] != nnz) {
-      return SFEM_FAILURE;
-    }
-    for (ptrdiff_t i = 0; i < n_nodes; ++i) {
-      const count_t begin = rowptr[i];
-      const count_t end = rowptr[i + 1];
-      if (end < begin || (ptrdiff_t)end > nnz) {
-        return SFEM_FAILURE;
-      }
-      for (count_t k = begin; k < end; ++k) {
-        if (colidx[k] < 0 || (ptrdiff_t)colidx[k] >= n_nodes) {
-          return SFEM_FAILURE;
-        }
-        if (k > begin && colidx[k] <= colidx[k - 1]) {
-          return SFEM_FAILURE;
-        }
-      }
-    }
-    return SFEM_SUCCESS;
-  }
-
   int %(op)s::initialize(const std::vector<std::string> &block_names) {
     SFEM_TRACE_SCOPE("%(op)s::initialize");
     impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
-    {
-      auto dof_graph = impl_->space->dof_to_dof_graph();
-      if (!dof_graph ||
-        validate_dof_graph(dof_graph->rowptr()->data(),
-                                   dof_graph->colidx()->data(),
-                                   dof_graph->n_nodes(),
-                                   dof_graph->nnz()) != SFEM_SUCCESS) {
-        SFEM_ERROR("%(op)s::initialize: the dof graph is malformed; the assembly kernels assume it is not\\n");
-        return SFEM_FAILURE;
-      }
-    }
+    // A micro-element space hands each semi-structured macro element over as its micro
+    // elements, which these kernels assemble as HEX8.
+    impl_->domains->set_micro_elements(impl_->space->micro_elements());
     seed_material(*impl_->domains);
     const bool needs_affine_jacobian =
         (impl_->residual_uses_affine && %(residual_affine_uses_jacobian)s) ||
         (impl_->jacobian_action_uses_affine && %(action_affine_uses_jacobian)s);
-    const bool needs_affine_metric =
-        (impl_->residual_uses_affine && (%(residual_affine_uses_metric_soa)s || %(residual_affine_uses_metric_aos)s)) ||
-        (impl_->jacobian_action_uses_affine && (%(action_affine_uses_metric_soa)s || %(action_affine_uses_metric_aos)s));
     const bool needs_a_met_soa =
         (impl_->residual_uses_affine && %(residual_affine_uses_metric_soa)s) ||
         (impl_->jacobian_action_uses_affine && %(action_affine_uses_metric_soa)s);
     const bool needs_affine_metric_aos =
         (impl_->residual_uses_affine && %(residual_affine_uses_metric_aos)s) ||
         (impl_->jacobian_action_uses_affine && %(action_affine_uses_metric_aos)s);
-    if (needs_affine_jacobian || needs_affine_metric) {
+    // Unconditionally, because the builder skips a domain that neither asked
+    // for affine geometry nor is an element that forces it.  Gating the call
+    // on the request alone left a constant-P1 simplex with no cached adjugate
+    // and an affine kernel as its only route.
+    {
       const int status = cache_affine_geometry(impl_->space,
                                                      *impl_->domains,
                                                      needs_affine_jacobian,
@@ -3199,7 +3337,7 @@ namespace sfem {
     SFEM_TRACE_SCOPE("%(op)s::set_value_in_block");
     impl_->domains->set_value_in_block(block_name, var_name, value);
   }
-
+%(derefine_op)s
   void %(op)s::set_option(const std::string &name, const bool val) {
     SFEM_TRACE_SCOPE("%(op)s::set_option");
     AffineOption options[] = {
@@ -3299,6 +3437,7 @@ namespace sfem {
 """
     substitutions = {
         "op": _op_class_name(material),
+        "derefine_op": _derefine_op_source(_op_class_name(material), holds_scheme),
         "header_stem": _op_file_stem(material),
         "stream_member": _op_stream_member(),
         "c_abi_include": '#include "%s"' % c_abi_header if c_abi_header else "",
@@ -3323,6 +3462,7 @@ namespace sfem {
         "element_connectivity": _element_connectivity_expression(),
         "execution_space": current_target().execution_space(),
         "points_accessor": _points_accessor_expression(),
+        "graph_host_view": _graph_host_view(),
         "geometry_memory_space": _geometry_memory_space_expression(),
         "block_size_lines": _residual_block_size_lines(block_size_by_dim),
         "laplace_packed_helpers": laplace_packed_helpers,
@@ -3342,7 +3482,6 @@ namespace sfem {
         "scheme_argument": _RESIDUAL_SCHEME_ARGUMENT[holds_scheme],
         "laplace_packed_apply_fast_path": laplace_packed_apply_fast_path,
         "inexact_cache_field": _inexact_cache_field(material),
-        "inexact_needs_affine": _inexact_needs_affine(material),
         "performance_methods": _performance_methods(_op_class_name(material), material.name, elements, performance_cases),
         # The merit and the linear work both use std::vector, so either brings
         # the header.
@@ -3374,6 +3513,7 @@ namespace sfem {
                 "metric_aos": _cpp_bool(residual_affine_uses_metric_aos),
             },
             residual_dispatch_body,
+            operation_forced_affine_elements(kernel_sources, dispatch_stem, ("residual",)),
         ),
         "apply_affine_geometry": _residual_affine_geometry_lines(
             _op_class_name(material),
@@ -3385,10 +3525,25 @@ namespace sfem {
                 "metric_aos": _cpp_bool(action_affine_uses_metric_aos),
             },
             action_dispatch_body,
+            operation_forced_affine_elements(kernel_sources, dispatch_stem, ("jacobian_action",)),
+        ),
+        "forced_affine_element_cases": _forced_affine_element_cases(
+            _residual_cached_geometry_elements(kernel_sources, dispatch_stem)
+        ),
+        "forced_affine_uses_metric_soa": _cpp_bool(
+            residual_affine_uses_metric_soa or action_affine_uses_metric_soa
+        ),
+        "forced_affine_uses_metric_aos": _cpp_bool(
+            residual_affine_uses_metric_aos or action_affine_uses_metric_aos
         ),
         "hessian_crs_body": (
+            _graph_check_lines(_op_class_name(material), "crs") +
             "%s\n"
             "%s\n"
+            # The inertia, as in the gradient and the apply: a tangent without
+            # it is the static one, and Newton on it stalls once the mass
+            # dominates (small dt).
+            "%s"
             "    auto mesh = impl_->space->mesh_ptr();\n"
             "    auto points = element_points(mesh);\n"
             "    return impl_->domains->iterate([&](const OpDomain &domain) {\n"
@@ -3406,6 +3561,9 @@ namespace sfem {
             % (
                 hessian_state_alias,
                 hessian_state_check,
+                _RESIDUAL_SCHEME_HESSIAN_CRS[holds_scheme].replace(
+                    "(current,", "(current," if action_uses_current else "(nullptr,"
+                ),
                 _RESIDUAL_SCHEME_ARGUMENT[holds_scheme],
                 hessian_previous_alias,
                 _residual_hessian_dispatch_body(
@@ -3422,11 +3580,16 @@ namespace sfem {
                 ),
             )
             if hessian_crs_cases
-            else "    return SFEM_FAILURE;"
+            else _residual_without_assembly(emits_linear_work)
         ),
         "hessian_bsr_body": (
+            _graph_check_lines(_op_class_name(material), "bsr") +
             "%s\n"
             "%s\n"
+            # The inertia, as in the gradient and the apply: a tangent without
+            # it is the static one, and Newton on it stalls once the mass
+            # dominates (small dt).
+            "%s"
             "    auto mesh = impl_->space->mesh_ptr();\n"
             "    auto points = element_points(mesh);\n"
             "    return impl_->domains->iterate([&](const OpDomain &domain) {\n"
@@ -3444,6 +3607,9 @@ namespace sfem {
             % (
                 hessian_state_alias,
                 hessian_state_check,
+                _RESIDUAL_SCHEME_HESSIAN_BSR[holds_scheme].replace(
+                    "(current,", "(current," if action_uses_current else "(nullptr,"
+                ),
                 _RESIDUAL_SCHEME_ARGUMENT[holds_scheme],
                 hessian_previous_alias,
                 _residual_hessian_dispatch_body(
@@ -3460,7 +3626,7 @@ namespace sfem {
                 ),
             )
             if hessian_bsr_cases
-            else "    return SFEM_FAILURE;"
+            else _residual_without_assembly(emits_linear_work)
         ),
         "affine_options": _affine_option_entries(
             "residual_uses_affine",
@@ -3530,8 +3696,41 @@ namespace sfem {
     source = template % substitutions
     # A volume forcing publishes the stepped 0-form too, now that the energy
     # merit asks every operator for it.
+    # A potential this emitter cannot evaluate is no potential to the line
+    # search: the operator reduces node-wise with the residual it assembles,
+    # rather than declaring a 0-form whose `value` refuses.
     return _header(material, True, publishes_value_steps=emits_linear_work,
-                   node_wise=emits_merit), source
+                   node_wise=not emits_linear_work, state_independent=emits_linear_work,
+                   linear=_tangent_is_constant(form_collections)), source
+
+
+_GRAPH_ROWS = {
+    "crs": "impl_->space->n_dofs()",
+    "bsr": "impl_->space->n_dofs() / impl_->space->block_size()",
+}
+
+
+def _graph_check_lines(op_name, fmt):
+    """An assembly's refusal of a malformed graph (`check_graph`): CRS rows are dofs, BSR rows nodes."""
+    return (
+        "    if (check_graph(impl_->%s_graph, rowptr, colidx, %s) != SFEM_SUCCESS) {\n"
+        '      SFEM_ERROR("%s::hessian_%s: the graph is malformed; the assembly kernels assume it is not\\n");\n'
+        "      return SFEM_FAILURE;\n"
+        "    }\n" % (fmt, _GRAPH_ROWS[fmt], op_name, fmt)
+    )
+
+
+def _residual_without_assembly(linear_work):
+    """The assembled Jacobian of a residual material that publishes no kernel for it.
+
+    Linear work has none because its Jacobian is identically zero, and adding
+    nothing to the matrix is assembling it; refusing would fail every
+    `Function::hessian_*` that holds a forcing. Any other residual without a
+    kernel refuses.
+    """
+    if linear_work:
+        return "    // Linear work: the Jacobian is zero.\n    return SFEM_SUCCESS;"
+    return "    return SFEM_FAILURE;"
 
 
 def _hyperelastic_signature_names(substitutions):
@@ -3615,7 +3814,12 @@ def _anonymous_namespace_entities(lines, opening):
                 if candidate.strip() and not candidate.strip().startswith("//")
             )
             name = None
-            head = text.split("{", 1)[0]
+            # The name comes from code only: a documentation comment that says
+            # "every element (HEX27, ...)" would otherwise name the helper
+            # `element`, and liveness would then be judged on the wrong word.
+            head = "\n".join(
+                candidate.split("//", 1)[0] for candidate in lines[start:index + 1]
+            ).split("{", 1)[0]
             match = _HELPER_NAME.search(head)
             if (
                 match
@@ -3746,7 +3950,7 @@ def _parameter_name(name, read):
     return name if read else "/*%s*/" % name
 
 
-def _residual_affine_geometry_lines(op_name, label, affine_flag, uses, body):
+def _residual_affine_geometry_lines(op_name, label, affine_flag, uses, body, forced_elements=()):
     """The cached affine geometry an operation body reads, and only that.
 
     Each pointer is declared, and assigned out of the cache, only where `body`
@@ -3799,7 +4003,13 @@ def _residual_affine_geometry_lines(op_name, label, affine_flag, uses, body):
     ]
     lines.extend(
         [
-            "      if (impl_->%s) {" % affine_flag,
+            "      if (%s) {"
+            % (
+                "impl_->%s || %s"
+                % (affine_flag, _element_condition("domain.element_type", forced_elements))
+                if forced_elements
+                else "impl_->%s" % affine_flag
+            ),
             "        auto cache = std::static_pointer_cast<AffineGeometryCache>(",
             "            domain.user_data);",
             "        if (!cache) {",
@@ -4007,22 +4217,28 @@ def _boundary_potential_is_linear_work(form_collections):
 
     from codegen.framework.forms.forms import FormOrder
 
+    # The state is every symbol the form layer derives from the fields -- their
+    # gradients as well as their values, as `_tangent_is_constant` reads it.  A
+    # potential written in the gradients (an elastic energy) is free of the
+    # values themselves, and testing the values alone called it linear work.
     seen = False
     for collection in (form_collections or {}).values():
-        field_symbols = []
+        state = {str(symbol) for symbol in getattr(collection, "variables", ())}
         for field in collection.fields:
             components = int(getattr(field, "components", 1) or 1)
-            field_symbols.extend(
-                sp.Symbol("%s%d" % (field.name, component))
-                for component in range(components)
-            )
+            for component in range(components):
+                state.add("%s%d" % (field.name, component))
+                state.add("%s[%d]" % (field.name, component))
         for form in getattr(collection, "forms", ()):
             if getattr(form, "order", None) is not FormOrder.ZERO:
                 continue
             seen = True
             expression = sp.sympify(form.expression)
-            for symbol in field_symbols:
-                if sp.diff(expression, symbol, 2) != 0:
+            for symbol in expression.free_symbols:
+                if str(symbol) not in state:
+                    continue
+                slope = sp.diff(expression, symbol)
+                if any(str(other) in state for other in slope.free_symbols):
                     return False
     return seen
 
@@ -4228,6 +4444,67 @@ namespace sfem {
       return nullptr;
     }
 #endif  // SFEM_ENABLE_RYAML
+
+    // The graph an assembly was last handed and found well formed.
+    struct CheckedGraph {
+      const count_t *rowptr{nullptr};
+      const idx_t *colidx{nullptr};
+      ptrdiff_t n_rows{-1};
+    };
+
+    // Establish once per graph, at the first assembly into it, that the graph is well formed:
+    // rows in order, every column in range, each row sorted and duplicate free.
+    // The assembly kernels assume it -- they locate an entry and write to it
+    // without re-checking that it is there -- so this is where the assumption
+    // is earned.
+    //
+    // It used to be earned per element instead: every scatter walked its
+    // NS x NS candidates, tested each with a three-condition branch
+    // and reported through std::fprintf from inside the caller's parallel
+    // region.  That paid O(elements x NS^2) on every assembly for a
+    // property of the mesh and the graph together, which cannot change between
+    // elements or between calls.  Here it is O(nnz), once.
+    //
+    // Not at setup: `initialize` built the space's scalar dof graph for this, which a
+    // matrix-free solver never uses -- on a 76.6M-dof semi-structured mesh 6.2e9 entries,
+    // past count_t -- while the block assembly writes into the node graph, which it never
+    // checked.  `checked` remembers the last graph that passed.
+    //
+    // Raw pointers rather than the graph type, so this does not depend on which
+    // headers the generated wrapper happens to pull in.
+    int check_graph(CheckedGraph &checked,
+                    const count_t *const rowptr,
+                    const idx_t *const colidx,
+                    const ptrdiff_t n_rows) {
+      if (rowptr == checked.rowptr && colidx == checked.colidx && n_rows == checked.n_rows) {
+        return SFEM_SUCCESS;
+      }
+      if (!rowptr || !colidx || n_rows < 0) {
+        return SFEM_FAILURE;
+      }
+%(graph_host_view)s
+      if (h_rowptr[0] != 0) {
+        return SFEM_FAILURE;
+      }
+      const ptrdiff_t nnz = (ptrdiff_t)h_rowptr[n_rows];
+      for (ptrdiff_t i = 0; i < n_rows; ++i) {
+        const count_t begin = h_rowptr[i];
+        const count_t end = h_rowptr[i + 1];
+        if (end < begin || (ptrdiff_t)end > nnz) {
+          return SFEM_FAILURE;
+        }
+        for (count_t k = begin; k < end; ++k) {
+          if (h_colidx[k] < 0 || (ptrdiff_t)h_colidx[k] >= n_rows) {
+            return SFEM_FAILURE;
+          }
+          if (k > begin && h_colidx[k] <= h_colidx[k - 1]) {
+            return SFEM_FAILURE;
+          }
+        }
+      }
+      checked = CheckedGraph{rowptr, colidx, n_rows};
+      return SFEM_SUCCESS;
+    }
   }  // namespace
 
   class %(op)s::Impl {
@@ -4261,63 +4538,12 @@ namespace sfem {
 
 %(performance_methods)s
 
-  // Establish once, at setup, that this operator's dof graph is well formed:
-  // rows in order, every column in range, each row sorted and duplicate free.
-  // The assembly kernels assume it -- they locate an entry and write to it
-  // without re-checking that it is there -- so this is where the assumption
-  // is earned.
-  //
-  // It used to be earned per element instead: every scatter walked its
-  // NS x NS candidates, tested each with a three-condition branch
-  // and reported through std::fprintf from inside the caller's parallel
-  // region.  That paid O(elements x NS^2) on every assembly for a
-  // property of the mesh and the graph together, which cannot change between
-  // elements or between calls.  Here it is O(nnz), once.
-  //
-  // Raw pointers rather than the graph type, so this does not depend on which
-  // headers the generated wrapper happens to pull in.
-  static int validate_dof_graph(const count_t *const rowptr,
-                                  const idx_t *const colidx,
-                                  const ptrdiff_t n_nodes,
-                                  const ptrdiff_t nnz) {
-    if (!rowptr || !colidx || n_nodes < 0) {
-      return SFEM_FAILURE;
-    }
-    if (rowptr[0] != 0 || (ptrdiff_t)rowptr[n_nodes] != nnz) {
-      return SFEM_FAILURE;
-    }
-    for (ptrdiff_t i = 0; i < n_nodes; ++i) {
-      const count_t begin = rowptr[i];
-      const count_t end = rowptr[i + 1];
-      if (end < begin || (ptrdiff_t)end > nnz) {
-        return SFEM_FAILURE;
-      }
-      for (count_t k = begin; k < end; ++k) {
-        if (colidx[k] < 0 || (ptrdiff_t)colidx[k] >= n_nodes) {
-          return SFEM_FAILURE;
-        }
-        if (k > begin && colidx[k] <= colidx[k - 1]) {
-          return SFEM_FAILURE;
-        }
-      }
-    }
-    return SFEM_SUCCESS;
-  }
-
   int %(op)s::initialize(const std::vector<std::string> &block_names) {
     SFEM_TRACE_SCOPE("%(op)s::initialize");
     impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
-    {
-      auto dof_graph = impl_->space->dof_to_dof_graph();
-      if (!dof_graph ||
-        validate_dof_graph(dof_graph->rowptr()->data(),
-                                   dof_graph->colidx()->data(),
-                                   dof_graph->n_nodes(),
-                                   dof_graph->nnz()) != SFEM_SUCCESS) {
-        SFEM_ERROR("%(op)s::initialize: the dof graph is malformed; the assembly kernels assume it is not\\n");
-        return SFEM_FAILURE;
-      }
-    }
+    // A micro-element space hands each semi-structured macro element over as its micro
+    // elements, which these kernels assemble as HEX8.
+    impl_->domains->set_micro_elements(impl_->space->micro_elements());
     seed_material(*impl_->domains);
     return SFEM_SUCCESS;
   }
@@ -4465,6 +4691,7 @@ namespace sfem {
         "element_connectivity": _element_connectivity_expression(),
         "execution_space": current_target().execution_space(),
         "points_accessor": _points_accessor_expression(),
+        "graph_host_view": _graph_host_view(),
         "geometry_memory_space": _geometry_memory_space_expression(),
         "block_size_lines": _residual_block_size_lines(block_size_by_dim),
         "performance_methods": _performance_methods(_op_class_name(material), material.name, elements, {}),
@@ -4631,6 +4858,7 @@ def _coupled_energy_residual_op(
 
 %(element_scratch_include)s#include "sfem_FunctionSpace.hpp"
 #include "sfem_MultiDomainOp.hpp"
+#include "sfem_DerefinedTimeScheme.hpp"
 #include "sfem_OpTracer.hpp"
 #include "sfem_Parameters.hpp"
 #include "smesh_kernel_data.hpp"
@@ -4722,6 +4950,67 @@ namespace sfem {
           return 0;
       }
     }
+
+    // The graph an assembly was last handed and found well formed.
+    struct CheckedGraph {
+      const count_t *rowptr{nullptr};
+      const idx_t *colidx{nullptr};
+      ptrdiff_t n_rows{-1};
+    };
+
+    // Establish once per graph, at the first assembly into it, that the graph is well formed:
+    // rows in order, every column in range, each row sorted and duplicate free.
+    // The assembly kernels assume it -- they locate an entry and write to it
+    // without re-checking that it is there -- so this is where the assumption
+    // is earned.
+    //
+    // It used to be earned per element instead: every scatter walked its
+    // NS x NS candidates, tested each with a three-condition branch
+    // and reported through std::fprintf from inside the caller's parallel
+    // region.  That paid O(elements x NS^2) on every assembly for a
+    // property of the mesh and the graph together, which cannot change between
+    // elements or between calls.  Here it is O(nnz), once.
+    //
+    // Not at setup: `initialize` built the space's scalar dof graph for this, which a
+    // matrix-free solver never uses -- on a 76.6M-dof semi-structured mesh 6.2e9 entries,
+    // past count_t -- while the block assembly writes into the node graph, which it never
+    // checked.  `checked` remembers the last graph that passed.
+    //
+    // Raw pointers rather than the graph type, so this does not depend on which
+    // headers the generated wrapper happens to pull in.
+    int check_graph(CheckedGraph &checked,
+                    const count_t *const rowptr,
+                    const idx_t *const colidx,
+                    const ptrdiff_t n_rows) {
+      if (rowptr == checked.rowptr && colidx == checked.colidx && n_rows == checked.n_rows) {
+        return SFEM_SUCCESS;
+      }
+      if (!rowptr || !colidx || n_rows < 0) {
+        return SFEM_FAILURE;
+      }
+%(graph_host_view)s
+      if (h_rowptr[0] != 0) {
+        return SFEM_FAILURE;
+      }
+      const ptrdiff_t nnz = (ptrdiff_t)h_rowptr[n_rows];
+      for (ptrdiff_t i = 0; i < n_rows; ++i) {
+        const count_t begin = h_rowptr[i];
+        const count_t end = h_rowptr[i + 1];
+        if (end < begin || (ptrdiff_t)end > nnz) {
+          return SFEM_FAILURE;
+        }
+        for (count_t k = begin; k < end; ++k) {
+          if (h_colidx[k] < 0 || (ptrdiff_t)h_colidx[k] >= n_rows) {
+            return SFEM_FAILURE;
+          }
+          if (k > begin && h_colidx[k] <= h_colidx[k - 1]) {
+            return SFEM_FAILURE;
+          }
+        }
+      }
+      checked = CheckedGraph{rowptr, colidx, n_rows};
+      return SFEM_SUCCESS;
+    }
   }  // namespace
 
   class %(op)s::Impl {
@@ -4739,6 +5028,7 @@ namespace sfem {
     bool apply_uses_affine{false};
     bool residual_uses_affine{false};
     bool jacobian_action_uses_affine{false};
+    CheckedGraph bsr_graph;
 %(previous_state_accessor)s
   };
 
@@ -4764,63 +5054,12 @@ namespace sfem {
 
 %(performance_methods)s
 
-  // Establish once, at setup, that this operator's dof graph is well formed:
-  // rows in order, every column in range, each row sorted and duplicate free.
-  // The assembly kernels assume it -- they locate an entry and write to it
-  // without re-checking that it is there -- so this is where the assumption
-  // is earned.
-  //
-  // It used to be earned per element instead: every scatter walked its
-  // NS x NS candidates, tested each with a three-condition branch
-  // and reported through std::fprintf from inside the caller's parallel
-  // region.  That paid O(elements x NS^2) on every assembly for a
-  // property of the mesh and the graph together, which cannot change between
-  // elements or between calls.  Here it is O(nnz), once.
-  //
-  // Raw pointers rather than the graph type, so this does not depend on which
-  // headers the generated wrapper happens to pull in.
-  static int validate_dof_graph(const count_t *const rowptr,
-                                  const idx_t *const colidx,
-                                  const ptrdiff_t n_nodes,
-                                  const ptrdiff_t nnz) {
-    if (!rowptr || !colidx || n_nodes < 0) {
-      return SFEM_FAILURE;
-    }
-    if (rowptr[0] != 0 || (ptrdiff_t)rowptr[n_nodes] != nnz) {
-      return SFEM_FAILURE;
-    }
-    for (ptrdiff_t i = 0; i < n_nodes; ++i) {
-      const count_t begin = rowptr[i];
-      const count_t end = rowptr[i + 1];
-      if (end < begin || (ptrdiff_t)end > nnz) {
-        return SFEM_FAILURE;
-      }
-      for (count_t k = begin; k < end; ++k) {
-        if (colidx[k] < 0 || (ptrdiff_t)colidx[k] >= n_nodes) {
-          return SFEM_FAILURE;
-        }
-        if (k > begin && colidx[k] <= colidx[k - 1]) {
-          return SFEM_FAILURE;
-        }
-      }
-    }
-    return SFEM_SUCCESS;
-  }
-
   int %(op)s::initialize(const std::vector<std::string> &block_names) {
     SFEM_TRACE_SCOPE("%(op)s::initialize");
     impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
-    {
-      auto dof_graph = impl_->space->dof_to_dof_graph();
-      if (!dof_graph ||
-        validate_dof_graph(dof_graph->rowptr()->data(),
-                                   dof_graph->colidx()->data(),
-                                   dof_graph->n_nodes(),
-                                   dof_graph->nnz()) != SFEM_SUCCESS) {
-        SFEM_ERROR("%(op)s::initialize: the dof graph is malformed; the assembly kernels assume it is not\\n");
-        return SFEM_FAILURE;
-      }
-    }
+    // A micro-element space hands each semi-structured macro element over as its micro
+    // elements, which these kernels assemble as HEX8.
+    impl_->domains->set_micro_elements(impl_->space->micro_elements());
     seed_material(*impl_->domains);
     auto mesh = impl_->space->mesh_ptr();
     const bool needs_affine_geometry =
@@ -4964,7 +5203,7 @@ namespace sfem {
     SFEM_TRACE_SCOPE("%(op)s::set_value_in_block");
     impl_->domains->set_value_in_block(block_name, var_name, value);
   }
-
+%(derefine_op)s
 #ifdef SFEM_ENABLE_RYAML
   std::shared_ptr<Op> %(op)s::create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
                                                  const ryml::ConstNodeRef             &node) {
@@ -5029,6 +5268,7 @@ namespace sfem {
 %(hessian_bsr_method)s}  // namespace sfem
 """ % {
         "op": _op_class_name(material),
+        "derefine_op": _derefine_op_source(_op_class_name(material), _has_time_rate(material)),
         "header_stem": _op_file_stem(material),
         "stream_member": _op_stream_member(),
         "hessian_bsr_method": _coupled_hessian_bsr_method(
@@ -5057,6 +5297,7 @@ namespace sfem {
         "element_connectivity": _element_connectivity_expression(),
         "execution_space": current_target().execution_space(),
         "points_accessor": _points_accessor_expression(),
+        "graph_host_view": _graph_host_view(),
         "geometry_memory_space": _geometry_memory_space_expression(),
         "block_size_lines": _coupled_block_size_lines(systems_by_dim),
         "performance_methods": _performance_methods(_op_class_name(material), material.name, elements, cases["performance"]),
@@ -5657,7 +5898,7 @@ def _coupled_hessian_bsr_method(op_name, scheme_argument, scheme_hessian_bsr, he
               const idx_t *const colidx,
               real_t *const values) {
     SFEM_TRACE_SCOPE("%(op)s::hessian_bsr");
-    const real_t *const current = state ? state : impl_->current;
+%(graph_check)s    const real_t *const current = state ? state : impl_->current;
     if (!current || !impl_->previous_state()) {
       SFEM_ERROR("%(op)s::hessian_bsr requires current and previous states\\n");
       return SFEM_FAILURE;
@@ -5681,6 +5922,7 @@ def _coupled_hessian_bsr_method(op_name, scheme_argument, scheme_hessian_bsr, he
         "op": op_name,
         "scheme_argument": scheme_argument,
         "scheme_hessian_bsr": scheme_hessian_bsr,
+        "graph_check": _graph_check_lines(op_name, "bsr"),
         "cases": "\n".join(hessian_bsr_cases),
     }
 
@@ -5845,6 +6087,17 @@ _COUPLED_SCHEME_HESSIAN_BSR = {
 """,
 }
 
+#: The scheme's term in the residual template's assembled tangents, after the
+#: state check as in the gradient and the apply.  Where the material's tangent
+#: reads no state there is no `current`, and the term gets none: the inertia's
+#: tangent is the mass whatever the state.
+_RESIDUAL_SCHEME_HESSIAN_CRS = {
+    False: "",
+    True: _COUPLED_SCHEME_HESSIAN_BSR[True].replace("hessian_bsr", "hessian_crs"),
+}
+
+_RESIDUAL_SCHEME_HESSIAN_BSR = _COUPLED_SCHEME_HESSIAN_BSR
+
 _COUPLED_SCHEME_MEMBER = {
     False: "",
     True: "    std::shared_ptr<TimeScheme> time_scheme;\n",
@@ -5898,9 +6151,66 @@ _HEADER_TIME_SCHEME_DECLARATION = {
 
 _HEADER_TIME_SCHEME_INCLUDE = {False: "", True: '#include "sfem_TimeScheme.hpp"\n'}
 
+#: A coarser level of a semi-structured hierarchy (SSMGC, SSGMG) asks every operator of the
+#: Function for itself on the coarse space.  The same material there, its parameters block by
+#: block, and a held scheme seen from that level (`derefine_time_scheme`: the fine shift and
+#: weights, the inertia rediscretised).  Affine options are not carried: they are a speed choice,
+#: and a micro-element view reads its geometry isoparametrically.
+_DEREFINE_OP = """
+  std::shared_ptr<Op> %(op)s::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
+    SFEM_TRACE_SCOPE("%(op)s::derefine_op");
+    auto ret = std::make_shared<%(op)s>(space);%(scheme)s
+    if (ret->initialize() != SFEM_SUCCESS) return nullptr;
+    for (const auto &entry : impl_->domains->domains()) {
+      for (int i = 0; i < N_DEFINED_MATERIAL_PARAMETERS; ++i) {
+        ret->set_value_in_block(entry.first,
+                                MATERIAL_PARAMETER_NAMES[i],
+                                entry.second.parameters->require_real_value(MATERIAL_PARAMETER_NAMES[i]));
+      }
+    }
+    return ret;
+  }
+"""
+
+_DEREFINE_SCHEME = {
+    False: "",
+    True: """
+    if (impl_->time_scheme) {
+      auto coarse_scheme = derefine_time_scheme(impl_->time_scheme, space);
+      if (!coarse_scheme) return nullptr;
+      ret->set_time_scheme(coarse_scheme);
+    }""",
+}
+
+
+def _derefine_op_source(op_name, holds_scheme):
+    return _DEREFINE_OP % {"op": op_name, "scheme": _DEREFINE_SCHEME[holds_scheme]}
+
+
 #: `TimeSteppable` is what a caller casts to in order to attach a scheme, so an
 #: operator inherits it exactly when its form has a rate to discretise.
 _HEADER_TIME_SCHEME_BASE = {False: "", True: ", public TimeSteppable"}
+
+#: A material whose energy relaxes carries integration-point history, so its
+#: operator is `HistoryDependent` and holds the material-independent relaxation
+#: state (`frontend/ops/prony`).  The rest of the wrapper does not change shape.
+_HEADER_RELAXATION_INCLUDE = {
+    False: "",
+    True: '#include "sfem_HistoryDependent.hpp"\n#include "sfem_RelaxationGroups.hpp"\n',
+}
+_HEADER_RELAXATION_BASE = {False: "", True: ", public HistoryDependent"}
+_HEADER_RELAXATION_DECLARATIONS = {
+    False: "",
+    True: """
+    void begin_step(const real_t t, const real_t dt) override;
+    void advance(const real_t *const x) override;
+    void reset_history(const real_t *const x) override;
+    //! The relaxation state: spectra, time-temperature shift, storage.
+    RelaxationGroups &relaxation_groups();
+    //! Evaluate the material's integration-point outputs at `x` into workspace
+    //! slot `slot` of the relaxation, which has to be holding one.
+    int quadrature_output(const real_t *const x, const int slot);""",
+}
 
 
 def _op_stream_member():
@@ -5925,7 +6235,7 @@ def _op_stream_member():
 def _op_class_name(material):
     """The class the generated wrapper declares.
 
-    `GPULaplacian`, `GPULinearElasticity`, `GPUKelvinVoigtNewmark`: SFEM names
+    `GPULaplacian`, `GPULinearElasticity`: SFEM names
     its device Ops for the device and registers them under a `gpu:` key, so a
     host and a device Op for one material are two classes and two factory
     entries rather than one of each fighting over a name.
@@ -6023,6 +6333,10 @@ def _geometry_memory_space_expression():
 
 def _points_accessor_expression():
     return current_target().points_accessor()
+
+
+def _graph_host_view():
+    return "\n".join(current_target().graph_host_view())
 
 
 def _element_connectivity_expression():
@@ -6145,11 +6459,320 @@ def _dependency_parameters(dependencies):
     return tuple(getattr(dependencies, "parameters", dependencies or ()))
 
 
+def _relaxation_declarations_by_dim(material, elements):
+    """{dim: (RelaxationDeclaration, ...)} for the dimensions that relax."""
+    ret = {}
+    for dim, system in _systems_by_dim(material, elements).items():
+        declarations = tuple(
+            declaration
+            for equation in system.equations
+            if equation.is_energy
+            for declaration in equation.relaxations
+        )
+        if declarations:
+            ret[dim] = declarations
+    return ret
+
+
+def _relaxation_outputs_by_dim(material, elements):
+    """{dim: ((name, components), ...)}, the energy's integration-point outputs."""
+    return {
+        dim: tuple(
+            output
+            for equation in system.equations
+            if equation.is_energy
+            for output in equation.quadrature_outputs
+        )
+        for dim, system in _systems_by_dim(material, elements).items()
+    }
+
+
+def _relaxation_fragments(
+    material, elements, relaxation, quadrature_points, kernel_sources, form_collections,
+    n_field_components_by_dim,
+):
+    """The C++ a relaxing material's operator adds, keyed by template slot.
+
+    Empty strings for a material that does not relax, so the template is one
+    text for both and nothing in it asks which it is.
+    """
+    slots = (
+        "relaxation_include",
+        "relaxation_helpers",
+        "relaxation_field",
+        "relaxation_setup",
+        "relaxation_methods",
+        "relaxation_yaml_top",
+        "relaxation_yaml_block",
+    )
+    if not relaxation:
+        return {slot: "" for slot in slots}
+
+    op = _op_class_name(material)
+    declaration_cases = "".join(
+        "        case %d:\n          return {%s};\n"
+        % (
+            dim,
+            ", ".join(
+                '{"%s", "%s", "%s", %d}'
+                % (declaration.group, declaration.history, declaration.stress, declaration.n_components)
+                for declaration in declarations
+            ),
+        )
+        for dim, declarations in sorted(relaxation.items())
+    )
+    point_cases = "".join(
+        "        case smesh::%s:\n          return %d;\n" % (element, n_qp)
+        for element, n_qp in _relaxation_point_counts(elements, quadrature_points)
+    )
+    helpers = """
+    //! The relaxation groups the material declares, per spatial dimension.
+    std::vector<RelaxationGroupDeclaration> relaxation_declarations(const int dim) {
+      switch (dim) {
+%(declaration_cases)s        default:
+          break;
+      }
+      SFEM_ERROR("%(op)s declares no relaxation groups in dimension %%d\\n", dim);
+      return {};
+    }
+
+    //! The points of the rule an element's kernels integrate with, which is
+    //! where its history lives.  Every kernel of an element reads one rule, so
+    //! the history the energy kernels read is the one the output kernel wrote.
+    int quadrature_points(const smesh::ElemType element_type) {
+      switch (element_type) {
+%(point_cases)s        default:
+          break;
+      }
+      SFEM_ERROR("%(op)s has no integration-point history for this element type\\n");
+      return 0;
+    }
+""" % {"declaration_cases": declaration_cases, "point_cases": point_cases, "op": op}
+    setup = """    impl_->relaxation = std::make_shared<RelaxationGroups>(
+        relaxation_declarations(impl_->space->mesh_ptr()->spatial_dimension()),
+        impl_->space->n_dofs(),
+        %(execution_space)s);
+    for (auto &entry : impl_->domains->domains()) {
+      impl_->relaxation->add_block(entry.second.block->name(),
+                                   entry.second.block->n_elements(),
+                                   quadrature_points(entry.second.element_type));
+    }
+"""
+    methods = """
+  // Null until `initialize`, which every factory route calls; an operator
+  // driven without it gets a message instead of a crash.
+  RelaxationGroups &%(op)s::relaxation_groups() {
+    if (!impl_->relaxation) {
+      SFEM_ERROR("%(op)s: call initialize() before using the relaxation\\n");
+    }
+%(stream_binding)s    return *impl_->relaxation;
+  }
+
+  // The relaxed stress the step starts from is the one the last `advance`
+  // evaluated at the converged state, kept by the relaxation: each stress is
+  // evaluated once, and with no spectrum anywhere not at all.
+  void %(op)s::begin_step(const real_t t, const real_t dt) {
+    SFEM_TRACE_SCOPE("%(op)s::begin_step");
+    relaxation_groups().begin_step(
+        t, dt, [this](const real_t *const state, const int slot) { return quadrature_output(state, slot); });
+  }
+
+  void %(op)s::advance(const real_t *const x) {
+    SFEM_TRACE_SCOPE("%(op)s::advance");
+    relaxation_groups().advance(
+        x, [this](const real_t *const state, const int slot) { return quadrature_output(state, slot); });
+  }
+
+  void %(op)s::reset_history(const real_t *const x) {
+    SFEM_TRACE_SCOPE("%(op)s::reset_history");
+    relaxation_groups().reset(
+        x, [this](const real_t *const state, const int slot) { return quadrature_output(state, slot); });
+  }
+
+  int %(op)s::quadrature_output(const real_t *const x, const int slot) {
+    SFEM_TRACE_SCOPE("%(op)s::quadrature_output");
+    auto mesh = impl_->space->mesh_ptr();
+    auto points = element_points(mesh);
+    return impl_->domains->iterate([&](const OpDomain &domain) {
+      const geom_t *const *adjugate = nullptr;
+      const geom_t *determinant = nullptr;
+      if (%(affine_condition)s) {
+        auto cache = std::static_pointer_cast<AffineGeometryCache>(domain.user_data);
+        if (!cache || !cache->jacobian_soa) {
+          SFEM_ERROR("%(op)s affine quadrature output requires cached geometry\\n");
+          return SFEM_FAILURE;
+        }
+        adjugate = reinterpret_cast<const geom_t *const *>(
+            cache->jacobian_soa->jacobian_adjugate_SoA()->data());
+        determinant = reinterpret_cast<const geom_t *>(
+            cache->jacobian_soa->jacobian_determinant()->data());
+      }
+%(dispatch_body)s
+    });
+  }
+""" % {
+        "op": op,
+        # The device loops of the relaxation run on the operator's stream, where
+        # the stresses they read are written; re-read on every use, because the
+        # caller may set the stream at any time.
+        "stream_binding": "".join(
+            "    impl_->relaxation->set_stream(%s);\n" % argument
+            for argument in current_target().op_stream_arguments()
+        ),
+        # The output and the gradient read the same rule, so they take the same
+        # geometry route.
+        "affine_condition": _affine_preamble_condition(
+            kernel_sources, material.name, ("gradient",), "gradient_uses_affine"
+        ),
+        "dispatch_body": _hyperelastic_quadrature_output_dispatch_body(
+            material,
+            elements,
+            kernel_sources,
+            form_collections,
+            n_field_components_by_dim,
+            indent="      ",
+        ),
+    }
+    return {
+        "relaxation_include": '#include "sfem_RelaxationGroups.hpp"\n',
+        "relaxation_helpers": helpers,
+        "relaxation_field": "    std::shared_ptr<RelaxationGroups> relaxation;\n",
+        "relaxation_setup": setup % {"execution_space": current_target().execution_space()},
+        "relaxation_methods": methods,
+        "relaxation_yaml_top": '    ret->impl_->relaxation->configure_from_yaml("", node);\n',
+        "relaxation_yaml_block": '        ret->impl_->relaxation->configure_from_yaml(yaml_read_string(block["name"]), block);\n',
+    }
+
+
+def _relaxation_point_counts(elements, quadrature_points):
+    """(element, points) for every element whose kernels read history.
+
+    The history is stored at one rule's points, so an element whose affine and
+    isoparametric kernels integrate with different rules cannot carry it: the
+    two would read different points.  That is refused here, at generation,
+    rather than discovered as a wrong answer.
+    """
+    if not quadrature_points:
+        raise ValueError("a relaxing material's operator needs the integration-point count per element")
+    counts = []
+    for element in elements:
+        name = _element_name(element)
+        rules = tuple(sorted(set(quadrature_points.get(name, ()))))
+        if len(rules) != 1:
+            raise ValueError(
+                "element %s integrates with %s points depending on the geometry route; "
+                "integration-point history needs one rule -- pin it with a quadrature setting"
+                % (name, " and ".join(str(n) for n in rules) or "an unknown number of")
+            )
+        counts.append((name, rules[0]))
+    return tuple(counts)
+
+
+def _hyperelastic_quadrature_output_dispatch_body(
+    material, elements, kernel_sources, form_collections, n_field_components_by_dim, indent
+):
+    """The call that writes a relaxing material's outputs into the scratch."""
+    outputs_by_dim = _relaxation_outputs_by_dim(material, elements)
+    lines = ["%sconst int dim = mesh->spatial_dimension();" % indent]
+    for dim in sorted(outputs_by_dim):
+        outputs = outputs_by_dim[dim]
+        dependencies = quadrature_output_dependencies(outputs, form_collections[dim].variables)
+        components = _components((n_field_components_by_dim or {}).get(dim, dim))
+        current_args = [str(arg) for arg in _energy_field_args(dependencies, components, current="x")]
+        write_args = [
+            'impl_->relaxation->stress_scratch(domain.block->name(), "%s", slot)' % name for name, _ in outputs
+        ]
+        affine = "%s_quadrature_output_%dd_a_msoa" % (material.name, dim)
+        isop = "%s_quadrature_output_%dd_i_msoa" % (material.name, dim)
+        lines.append("%sif (dim == %d) {" % (indent, dim))
+        if _c_abi_function_exists(kernel_sources, affine, public_only=True):
+            lines.append("%s  if (adjugate) {" % indent)
+            lines.append(
+                "%s    return %s(%s);"
+                % (
+                    indent,
+                    _entry_point_name(affine),
+                    _with_stream(
+                        ", ".join(
+                            [
+                                "domain.element_type",
+                                "real_type",
+                                "domain.block->n_elements()",
+                                "mesh->n_nodes()",
+                                "element_connectivity(domain)",
+                                *_affine_geometry_call_args(kernel_sources, affine, dim),
+                                *_c_abi_ordered_domain_parameter_args(kernel_sources, affine, dependencies),
+                                *write_args,
+                                *current_args,
+                            ]
+                        )
+                    ),
+                )
+            )
+            lines.append("%s  }" % indent)
+        lines.append(
+            "%s  return %s(%s);"
+            % (
+                indent,
+                _entry_point_name(isop),
+                _with_stream(
+                    ", ".join(
+                        [
+                            "domain.element_type",
+                            "real_type",
+                            "domain.block->n_elements()",
+                            "mesh->n_nodes()",
+                            "element_connectivity(domain)",
+                            "points",
+                            *_c_abi_ordered_domain_parameter_args(kernel_sources, isop, dependencies),
+                            *write_args,
+                            *current_args,
+                        ]
+                    )
+                ),
+            )
+        )
+        lines.append("%s}" % indent)
+    lines.extend(
+        [
+            '%sSFEM_ERROR("%s quadrature output does not support spatial dimension %%d\\n", dim);'
+            % (indent, material.name),
+            "%sreturn SFEM_FAILURE;" % indent,
+        ]
+    )
+    return "\n".join(lines)
+
+
+def _domain_parameter_value(parameter):
+    """Where a kernel's scalar argument comes from, per domain.
+
+    A material constant from the block's parameters, except a relaxation
+    group's step weight, which belongs to the step and is the relaxation
+    object's -- the same arrangement as a rate's shift and its `TimeScheme`.
+    """
+    parameter = str(parameter)
+    if is_relaxation_gamma(parameter):
+        return 'impl_->relaxation->gamma(domain.block->name(), "%s")' % relaxation_group_of_gamma(parameter)
+    return 'domain.parameters->require_real_value("%s")' % parameter
+
+
+def _domain_quadrature_stream_args(dependencies):
+    """The integration-point fields a kernel reads, after its parameters.
+
+    In the order the kernels declare them (`plans.quadrature_fields`).  Every
+    field the generated operators read is a relaxation group's frozen history.
+    """
+    return tuple(
+        'impl_->relaxation->history(domain.block->name(), "%s")' % stream.name
+        for stream in quadrature_read_streams(dependencies)
+    )
+
+
 def _dependency_domain_parameter_args(dependencies):
     return tuple(
-        'domain.parameters->require_real_value("%s")' % str(parameter)
+        _domain_parameter_value(parameter)
         for parameter in _dependency_parameters(getattr(dependencies, "parameters", ()))
-    )
+    ) + _domain_quadrature_stream_args(dependencies)
 
 
 def _compatible_element_for_field(element, field):
@@ -7934,7 +8557,7 @@ def _c_abi_parameter_names(kernel_sources, function_name, public_only=False):
 def _c_abi_ordered_domain_parameter_args(kernel_sources, function_name, dependencies):
     parameters = tuple(str(parameter) for parameter in _dependency_parameters(dependencies))
     if not parameters:
-        return ()
+        return _domain_quadrature_stream_args(dependencies)
     remaining = list(parameters)
     ordered = []
     for name in _c_abi_parameter_names(kernel_sources, function_name, public_only=True):
@@ -7942,9 +8565,8 @@ def _c_abi_ordered_domain_parameter_args(kernel_sources, function_name, dependen
             ordered.append(name)
             remaining.remove(name)
     ordered.extend(remaining)
-    return tuple(
-        'domain.parameters->require_real_value("%s")' % parameter
-        for parameter in ordered
+    return tuple(_domain_parameter_value(parameter) for parameter in ordered) + _domain_quadrature_stream_args(
+        dependencies
     )
 
 
@@ -8798,10 +9420,12 @@ def _residual_hessian_dispatch_body(
         affine_function = "%s_%s_%dd_a_msoa" % (material_name, operation, dim)
         prefix = "if" if not any(line.endswith("(dim == 2) {") or line.endswith("(dim == 3) {") for line in lines) else "else if"
         lines.append("%s%s (dim == %d) {" % (indent, prefix, dim))
-        lines.append(
-            "%s  static constexpr ptrdiff_t FIELD_STRIDE = %d;"
-            % (indent, block_size_by_dim[dim])
-        )
+        # Only where a field is passed: a constant tangent (a linear material) reads none.
+        if dependencies.current or dependencies.previous:
+            lines.append(
+                "%s  static constexpr ptrdiff_t FIELD_STRIDE = %d;"
+                % (indent, block_size_by_dim[dim])
+            )
         setup = []
         common = [
             "domain.element_type",
@@ -8952,6 +9576,30 @@ def operation_forced_affine_elements(kernel_sources, material_name, operations):
                 if element not in forced:
                     forced.append(element)
     return tuple(forced)
+
+
+def _residual_cached_geometry_elements(kernel_sources, dispatch_stem):
+    """The elements a residual operator reads cached geometry for whatever it was asked.
+
+    The residual and the action take the affine route for an element with no
+    isoparametric kernel, and assembly takes it for every element that has an
+    affine assembly kernel (`_residual_hessian_dispatch_body`), so all of them
+    need the adjugate in the cache before the first call.
+    """
+    elements = list(
+        operation_forced_affine_elements(
+            kernel_sources, dispatch_stem, ("residual", "jacobian_action")
+        )
+    )
+    for operation in ("hessian_crs", "hessian_bsr"):
+        for dim in (2, 3):
+            name = "%s_%s_%dd_a_msoa" % (dispatch_stem, operation, dim)
+            if not _c_abi_function_exists(kernel_sources, name, public_only=True):
+                continue
+            for element in _c_abi_public_dispatch_case_elements(kernel_sources, name):
+                if element not in elements:
+                    elements.append(element)
+    return tuple(elements)
 
 
 def _forced_affine_element_cases(forced_elements):

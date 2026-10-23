@@ -214,6 +214,38 @@ void d_constraint_gradient_nodes_to_value_vec(const ptrdiff_t n_dirichlet_nodes,
     SFEM_DEBUG_SYNCHRONIZE();
 }
 
+// The same with one prescribed value per constrained node, as
+// `d_constraint_nodes_to_values_vec` is to `d_constraint_nodes_to_value_vec`.
+__global__ void constraint_gradient_nodes_to_values_vec_kernel(const ptrdiff_t n_dirichlet_nodes,
+                                                               const idx_t *dirichlet_nodes,
+                                                               const int block_size,
+                                                               const int component,
+                                                               const real_t *const SFEM_RESTRICT dirichlet_values,
+                                                               const real_t *const SFEM_RESTRICT x,
+                                                               real_t *const SFEM_RESTRICT g) {
+    for (ptrdiff_t node = blockIdx.x * blockDim.x + threadIdx.x; node < n_dirichlet_nodes;
+         node += blockDim.x * gridDim.x) {
+        idx_t i = dirichlet_nodes[node] * block_size + component;
+        g[i]    = x[i] - dirichlet_values[node];
+    }
+}
+
+void d_constraint_gradient_nodes_to_values_vec(const ptrdiff_t n_dirichlet_nodes,
+                                               const idx_t *dirichlet_nodes,
+                                               const int block_size,
+                                               const int component,
+                                               const real_t *const SFEM_RESTRICT dirichlet_values,
+                                               const real_t *const SFEM_RESTRICT x,
+                                               real_t *const SFEM_RESTRICT g) {
+    const int kernel_block_size = 128;
+    ptrdiff_t n_blocks =
+            std::max(ptrdiff_t(1), (n_dirichlet_nodes + kernel_block_size - 1) / kernel_block_size);
+    constraint_gradient_nodes_to_values_vec_kernel<<<n_blocks, kernel_block_size, 0>>>(
+            n_dirichlet_nodes, dirichlet_nodes, block_size, component, dirichlet_values, x, g);
+
+    SFEM_DEBUG_SYNCHRONIZE();
+}
+
 __global__ void cu_crs_constraint_nodes_to_identity_vec_kernel(
         const ptrdiff_t n_dirichlet_nodes,
         const idx_t *const SFEM_RESTRICT dirichlet_nodes,

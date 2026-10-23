@@ -527,6 +527,7 @@ ABI_TRAVERSAL_UNIT = {
 #: that they are not canonical, and they are listed here because they are what
 #: the tree publishes today.
 ABI_VERBS = (
+    "quadrature_output",
     "hessian_block_diag_sym",
     "objective_steps",
     "merit",

@@ -448,27 +448,47 @@ namespace sfem {
         SFEM_TRACE_SCOPE("NeumannConditions::create_from_yaml");
 
 #ifdef SFEM_ENABLE_RYAML
+        ryml::Tree tree = ryml::parse_in_place(ryml::to_substr(yaml));
+        return create_from_yaml(space, tree["neumann_conditions"]);
+#else
+        SFEM_ERROR("This functionaly requires -DSFEM_ENABLE_RYAML=ON\n");
+        return nullptr;
+#endif
+    }
+
+#ifdef SFEM_ENABLE_RYAML
+    std::shared_ptr<NeumannConditions> NeumannConditions::create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+                                                                           const ryml::ConstNodeRef             &conds,
+                                                                           const SidesetLookup                  &lookup) {
+        SFEM_TRACE_SCOPE("NeumannConditions::create_from_yaml");
+
         std::vector<struct Condition> conditions;
 
-        ryml::Tree tree  = ryml::parse_in_place(ryml::to_substr(yaml));
-        auto       conds = tree["neumann_conditions"];
-
         for (auto c : conds.children()) {
-            std::shared_ptr<Sideset> sideset;
+            std::vector<std::shared_ptr<Sideset>> sidesets;
 
             const bool is_sideset  = c["type"].readable() && c["type"].val() == "sideset";
             const bool is_pressure = c["type"].readable() && c["type"].val() == "pressure";
             const bool is_file     = c["format"].readable() && c["format"].val() == "file";
             const bool is_expr     = c["format"].readable() && c["format"].val() == "expr";
+            const bool is_name     = c["format"].readable() && c["format"].val() == "name";
 
             assert(is_sideset || is_pressure);
             SFEM_UNUSED(is_sideset);
-            assert(is_file || is_expr);
+            assert(is_file || is_expr || is_name);
 
-            if (is_file) {
+            if (is_name) {
+                std::string name;
+                c["name"].load(&name);
+                sidesets = lookup.find(name);
+                if (sidesets.empty()) {
+                    fprintf(stderr, "NeumannConditions: no sideset named \"%s\"\n", name.c_str());
+                    return nullptr;
+                }
+            } else if (is_file) {
                 std::string path;
                 c["path"].load(&path);
-                sideset = Sideset::create_from_file(space->mesh_ptr()->comm(), smesh::Path(path));
+                sidesets = {Sideset::create_from_file(space->mesh_ptr()->comm(), smesh::Path(lookup.resolve(path)))};
             } else if (is_expr) {
                 assert(c["parent"].is_seq());
                 assert(c["lfi"].is_seq());
@@ -488,7 +508,7 @@ namespace sfem {
                 }
 
                 assert(lfi_count == parent_count);
-                sideset = std::make_shared<Sideset>(space->mesh_ptr()->comm(), parent, lfi);
+                sidesets = {std::make_shared<Sideset>(space->mesh_ptr()->comm(), parent, lfi)};
             }
 
             std::vector<int>     component;
@@ -502,7 +522,7 @@ namespace sfem {
             if (is_pressure) {
                 assert(!node_value.is_seq());
                 struct Condition nc;
-                nc.sidesets.push_back(sideset);
+                nc.sidesets = sidesets;
                 node_value.load(&nc.value);
                 nc.follower_pressure = true;
                 if (c.has_child("profile") && LoadProfile::from_yaml(c["profile"], nc.profile) != SFEM_SUCCESS) {
@@ -521,6 +541,7 @@ namespace sfem {
                 }
                 std::string value_path;
                 node_value["path"].load(&value_path);
+                value_path  = lookup.resolve(value_path);
                 file_values = Buffer<real_t>::from_file(smesh::Path(value_path));
                 if (!file_values) {
                     SFEM_ERROR("Unable to read Neumann value file %s\n", value_path.c_str());
@@ -555,7 +576,7 @@ namespace sfem {
 
             for (size_t i = 0; i < component.size(); i++) {
                 struct Condition nc;
-                nc.sidesets.push_back(sideset);
+                nc.sidesets = sidesets;
                 nc.value     = file_values ? 1 : value[i];
                 nc.values    = file_values;
                 nc.component = component[i];
@@ -565,11 +586,8 @@ namespace sfem {
         }
 
         return create(space, conditions);
-#else
-        SFEM_ERROR("This functionaly requires -DSFEM_ENABLE_RYAML=ON\n");
-        return nullptr;
-#endif
     }
+#endif
 
     std::shared_ptr<NeumannConditions> NeumannConditions::create_from_file(const std::shared_ptr<FunctionSpace> &space,
                                                                            const smesh::Path                    &path) {

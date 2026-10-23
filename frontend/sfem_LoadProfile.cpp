@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <fstream>
+#include <limits>
 #include <sstream>
 
 #include "sfem_logger.hpp"
@@ -19,6 +20,14 @@ namespace sfem {
                 const real_t alpha = (time - start_time_) / (end_time_ - start_time_);
                 return start_value_ + alpha * (end_value_ - start_value_);
             }
+            case Type::SMOOTH_RAMP: {
+                // The cosine blend: zero slope at both ends.
+                if (time <= start_time_) return start_value_;
+                if (time >= end_time_) return end_value_;
+                constexpr real_t pi    = real_t(3.1415926535897932384626433832795);
+                const real_t     alpha = (1 - std::cos(pi * (time - start_time_) / (end_time_ - start_time_))) / 2;
+                return start_value_ + alpha * (end_value_ - start_value_);
+            }
             case Type::HOLD:
                 return time < start_time_ ? before_value_ : value_;
             case Type::PULSE:
@@ -31,6 +40,11 @@ namespace sfem {
                 const size_t i0    = i1 - 1;
                 const real_t a     = (time - times_[i0]) / (times_[i1] - times_[i0]);
                 return values_[i0] + a * (values_[i1] - values_[i0]);
+            }
+            case Type::SINE: {
+                if (time > end_time_) return 0;
+                constexpr real_t two_pi = real_t(6.283185307179586476925286766559);
+                return value_ * std::sin(two_pi * (time - start_time_) / period_);
             }
         }
 
@@ -101,14 +115,14 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
 
-        if (type == "linear_ramp" || type == "ramp") {
-            profile.type_ = Type::LINEAR_RAMP;
+        if (type == "linear_ramp" || type == "ramp" || type == "smooth_ramp") {
+            profile.type_ = type == "smooth_ramp" ? Type::SMOOTH_RAMP : Type::LINEAR_RAMP;
             read_optional(node, "start_time", profile.start_time_);
             read_optional(node, "end_time", profile.end_time_);
             read_optional(node, "start_value", profile.start_value_);
             read_optional(node, "end_value", profile.end_value_);
             if (!(profile.end_time_ > profile.start_time_)) {
-                SFEM_ERROR("linear_ramp end_time must be greater than start_time\n");
+                SFEM_ERROR("%s end_time must be greater than start_time\n", type.c_str());
                 return SFEM_FAILURE;
             }
             return SFEM_SUCCESS;
@@ -131,6 +145,22 @@ namespace sfem {
             read_optional(node, "value", profile.value_);
             if (profile.end_time_ < profile.start_time_) {
                 SFEM_ERROR("pulse end_time must not precede start_time\n");
+                return SFEM_FAILURE;
+            }
+            return SFEM_SUCCESS;
+        }
+
+        if (type == "sine") {
+            // value * sin(2 pi (t - start_time) / period), zero after end_time: a half-sine pulse
+            // of length p is {period: 2p, end_time: p}.
+            profile.type_     = Type::SINE;
+            profile.end_time_ = std::numeric_limits<real_t>::infinity();
+            read_optional(node, "value", profile.value_);
+            read_optional(node, "start_time", profile.start_time_);
+            read_optional(node, "period", profile.period_);
+            read_optional(node, "end_time", profile.end_time_);
+            if (!(profile.period_ > 0)) {
+                SFEM_ERROR("sine period must be positive\n");
                 return SFEM_FAILURE;
             }
             return SFEM_SUCCESS;

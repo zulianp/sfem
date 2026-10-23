@@ -75,20 +75,27 @@ variants:
         - --case
         - "{resolved_case}"
         - --driver
-        - "{build_dir}/linear_elasticity"
+        - "{build_dir}/playground"
         - --mesh
         - "{mesh}"
         - --input-dir
         - "{output}"
         - --output
         - "{output}/solution"
+        - --set
+        - "mesh.packed=false"
+        - --set
+        - "solver.linear.format=MF"
+        - --set
+        - "solver.linear.preconditioner=none"
+        - --set
+        - "solver.linear.rtol=1.0e-12"
+        - --set
+        - "solver.linear.max_it=20000"
+        - --set
+        - "solver.newton.verbose=false"
       environment:
         OMP_NUM_THREADS: 1
-        SFEM_REORDER: 0
-        SFEM_USE_PACKED_MESH: 0
-        SFEM_VERBOSE: 0
-        SFEM_RTOL: 1.0e-12
-        SFEM_MAX_IT: 20000
     expected_output: &expected_output
       required:
         - {pattern: SFEM_LINEAR_REFINEMENT_COMPLETE, count: 3}

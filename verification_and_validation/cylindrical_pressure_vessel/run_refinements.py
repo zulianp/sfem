@@ -3,9 +3,15 @@
 import argparse
 import os
 from pathlib import Path
-import subprocess
+import sys
 
 import yaml
+
+SUITE_DIR = Path(__file__).resolve().parents[1]
+if str(SUITE_DIR) not in sys.path:
+    sys.path.insert(0, str(SUITE_DIR))
+
+from common import playground
 
 
 def _level_input(source, canonical_mesh, level_mesh, target):
@@ -26,7 +32,15 @@ def main():
     parser.add_argument("--mesh", required=True, type=Path)
     parser.add_argument("--input-dir", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--operator", required=True)
+    parser.add_argument("--param", dest="parameters", action="append", default=[], help="material parameter name=value")
+    parser.add_argument("--dt", required=True, type=float)
+    parser.add_argument("--steps", required=True, type=int)
+    parser.add_argument("--ramp", type=float, default=0, help="seconds over which the pressure ramps to its value")
+    parser.add_argument("--export-freq", type=int, default=1)
+    parser.add_argument("--set", dest="overrides", action="append", default=[], help="playground case override key=value")
     args = parser.parse_args()
+    material = playground.material(args.operator, args.parameters)
 
     case = yaml.safe_load(args.case.read_text(encoding="utf-8"))
     canonical_id = next(level["id"] for level in case["refinements"] if level["role"] == "canonical")
@@ -46,14 +60,10 @@ def main():
         solution = args.output / level_id
         solution.mkdir(parents=True, exist_ok=True)
         print(f"--- pressure-vessel refinement {level_id} ---", flush=True)
-        result = subprocess.run(
-            [str(args.driver), str(level_mesh), str(symmetry), str(pressure), str(solution)],
-            env=os.environ.copy(),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            check=False,
+        case = playground.load_ramp_case(
+            level_mesh, material, solution, symmetry, pressure, args.dt, args.steps, args.ramp, args.export_freq
         )
+        result = playground.run(args.driver, case, solution / "case.yaml", args.overrides, os.environ.copy())
         print(result.stdout, end="" if result.stdout.endswith("\n") else "\n")
         if result.returncode:
             return result.returncode
