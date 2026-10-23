@@ -23,4 +23,5 @@ time: {dt: 0.01, t_end: 2}
 output:
   path: output
   export_freq: 1
+  fields: [velocity, acceleration]
   probes: [{type: control_point, at: [0.5, 1, 0.5]}]

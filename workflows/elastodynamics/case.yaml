@@ -29,5 +29,5 @@ solver:
 output:
   path: output
   export_freq: 2
-  fields: [gap, contact_force]
+  fields: [velocity, acceleration, gap, contact_force]
   probes: [{type: contact}]

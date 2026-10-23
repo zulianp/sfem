@@ -39,7 +39,7 @@ namespace sfem {
         int                       export_freq{1};
         std::shared_ptr<Output>   output;  // null on the ranks that do not write
         std::vector<Field>        fields;
-        SharedBuffer<real_t>      scratch, rate;
+        SharedBuffer<real_t>      scratch;
         size_t                    index{0};
 
         // gather_to: the serial mesh (rank 0), each rank's owned values per gathered node, and
@@ -71,15 +71,6 @@ namespace sfem {
             const ptrdiff_t      ndofs = f->space()->n_dofs();
 
             if (emit("disp", on_host(es, record.x, ndofs)->data()) != SFEM_SUCCESS) return SFEM_FAILURE;
-
-            if (record.scheme) {
-                const bool with_acceleration = record.scheme->has_acceleration();
-                record.scheme->carried_state(scratch->data(), with_acceleration ? rate->data() : nullptr);
-                if (emit("velocity", on_host(es, scratch->data(), ndofs)->data()) != SFEM_SUCCESS) return SFEM_FAILURE;
-                if (with_acceleration && emit("acceleration", on_host(es, rate->data(), ndofs)->data()) != SFEM_SUCCESS)
-                    return SFEM_FAILURE;
-            }
-
             for (auto &field : fields) {
                 if (field.fill(record, scratch->data()) != SFEM_SUCCESS) return SFEM_FAILURE;
                 if (emit(field.name.c_str(), on_host(es, scratch->data(), ndofs)->data()) != SFEM_SUCCESS) return SFEM_FAILURE;
@@ -99,7 +90,6 @@ namespace sfem {
 
         const ptrdiff_t ndofs = f->space()->n_dofs();
         impl_->scratch        = create_buffer<real_t>(ndofs, f->execution_space());
-        impl_->rate           = create_buffer<real_t>(ndofs, f->execution_space());
     }
 
     FieldExport::~FieldExport() = default;

@@ -1069,8 +1069,28 @@ namespace sfem {
                     }
                     if (fields->gather_to(serial) != SFEM_SUCCESS) return SFEM_FAILURE;
                 }
+                // disp is always written; the rest only when named.
                 for (const auto &name : read_list<std::string>(output, "fields", {})) {
-                    if (name == "material_reaction") {
+                    if (name == "disp") continue;
+                    if (name == "velocity" || name == "acceleration") {
+                        const bool acceleration = name == "acceleration";
+                        if (!scheme || (acceleration && !scheme->has_acceleration())) {
+                            fprintf(stderr, "Playground: output field \"%s\" needs a dynamic regime whose scheme carries it\n", name.c_str());
+                            return SFEM_FAILURE;
+                        }
+                        if (acceleration) {
+                            auto velocity = create_buffer<real_t>(fs->n_dofs(), es);
+                            fields->add_field(name, [velocity](const StepRecord &record, real_t *const out) {
+                                record.scheme->carried_state(velocity->data(), out);
+                                return SFEM_SUCCESS;
+                            });
+                        } else {
+                            fields->add_field(name, [](const StepRecord &record, real_t *const out) {
+                                record.scheme->carried_state(out, nullptr);
+                                return SFEM_SUCCESS;
+                            });
+                        }
+                    } else if (name == "material_reaction") {
                         auto op   = material;
                         auto blas = sfem::blas<real_t>(es);
                         auto n    = fs->n_dofs();
@@ -1103,7 +1123,8 @@ namespace sfem {
                         }
                     } else {
                         fprintf(stderr,
-                                "Playground: unknown output field \"%s\" (material_reaction; gap, contact_force with an obstacle)\n",
+                                "Playground: unknown output field \"%s\" (disp, always written; velocity, acceleration in a dynamic "
+                                "regime; material_reaction; gap, contact_force with an obstacle)\n",
                                 name.c_str());
                         return SFEM_FAILURE;
                     }

@@ -21,5 +21,5 @@ time: {dt: 0.001, t_end: 1}
 output:
   path: output
   export_freq: 10
-  fields: [material_reaction]
+  fields: [velocity, acceleration, material_reaction]
   probes: [{type: control_point, at: [2, 0.5, 0.5]}]
