@@ -465,6 +465,58 @@ solver: {newton: {verbose: false}}
     return SFEM_TEST_SUCCESS;
 }
 
+// What is written is the case's to say: the displacement always, the velocity and the
+// acceleration only when output.fields names them, and only in a dynamic regime.
+int test_output_fields() {
+    const char *const yaml = R"(
+mesh:
+  box: {n: [3, 1, 1], min: [0, 0, 0], max: [3, 1, 1]}
+  packed: false
+  sidesets:
+    - {name: clamp, plane: {axis: x, at: min}}
+material: {type: GeneratedNeoHookeanOgden, mu: 50, lmbda: 100}
+loads:
+  body_force: {density: 1, g: [0, -1, 0]}
+dirichlet_conditions:
+  - {type: sideset, format: name, name: clamp, component: [0, 1, 2], value: [0, 0, 0]}
+regime: dynamic
+time: {dt: 0.05, steps: 2}
+dynamics: {scheme: newmark, density: 1}
+solver: {newton: {verbose: false}}
+)";
+    const auto dir = (std::filesystem::temp_directory_path() /
+                      ("sfem_output_fields_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count())))
+                             .string();
+    std::filesystem::create_directories(dir);
+    auto written = [&](const std::string &out, const char *field) {
+        int n = 0;
+        for (auto &entry : std::filesystem::directory_iterator(out + "/out")) {
+            n += entry.path().filename().string().rfind(std::string(field) + ".", 0) == 0;
+        }
+        return n;
+    };
+    const struct {
+        const char *fields;
+        int         velocity;
+    } cases[] = {{nullptr, 0}, {"[disp, velocity, acceleration]", 9}};
+    for (const auto &c : cases) {
+        const std::string out       = dir + (c.fields ? "/named" : "/default");
+        std::vector<std::string> overrides = {"output.path=" + out};
+        if (c.fields) overrides.push_back(std::string("output.fields=") + c.fields);
+        auto pg = assemble(yaml, overrides);
+        SFEM_TEST_ASSERT(pg != nullptr);
+        SFEM_TEST_ASSERT(pg->run() == SFEM_SUCCESS);
+        printf("  fields %s: disp %d, velocity %d, acceleration %d files\n", c.fields ? c.fields : "(none)", written(out, "disp"),
+               written(out, "velocity"), written(out, "acceleration"));
+        // Three exports (the initial state and two steps) of three components.
+        SFEM_TEST_ASSERT(written(out, "disp") == 9);
+        SFEM_TEST_ASSERT(written(out, "velocity") == c.velocity && written(out, "acceleration") == c.velocity);
+    }
+    SFEM_TEST_ASSERT(assemble(yaml, {"regime=quasi_static", "output.path=" + dir + "/static", "output.fields=[velocity]"}) == nullptr);
+    std::filesystem::remove_all(dir);
+    return SFEM_TEST_SUCCESS;
+}
+
 // A bar twisted at one end by a rotation about its axis, ramped over two quasi-static steps: the
 // twisted face sits at the rigid rotation of its reference positions.
 int test_rotation_constraint() {
@@ -778,6 +830,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_device_traction_matches_host);
 #endif
     SFEM_RUN_TEST(test_dynamic_cantilever);
+    SFEM_RUN_TEST(test_output_fields);
     SFEM_RUN_TEST(test_rotation_constraint);
     SFEM_RUN_TEST(test_sine_rotation);
     SFEM_RUN_TEST(test_prony_torsion_release);

@@ -38,5 +38,5 @@ output:
   path: output/contact
   export_freq: 5
   history_csv: output/contact/history.csv
-  fields: [gap, contact_force]
+  fields: [velocity, acceleration, gap, contact_force]
   probes: [{type: contact}]

@@ -32,4 +32,5 @@ output:
   path: output/cantilever
   export_freq: 5
   history_csv: output/cantilever/history.csv
+  fields: [velocity, acceleration]
   probes: [{type: control_point, at: [10, 0.5, 0.5]}]
