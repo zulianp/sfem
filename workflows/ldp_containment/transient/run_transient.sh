@@ -34,13 +34,12 @@ for stage in $STAGES; do
     if [ "$stage" = sim1 ]; then
         # Simulation 2's start, on the whole mesh in the file's numbering, and for ParaView.
         "$PYTHON" "$SMESH_PY/raw_point_data_to_parent.py" sim1/out sim1/mesh "$CASE/db/solid" sim1/whole --fields=disp
-        "$PYTHON" "$SMESH_PY/raw_point_data_to_parent.py" sim1/out sim1/mesh "$CASE/db/solid" sim1/view \
-            --all-steps --fields=disp,gap,contact_force
+        "$PYTHON" "$SMESH_PY/raw_point_data_to_parent.py" sim1/out sim1/mesh "$CASE/db/solid" sim1/view --all-steps
         [ $EXODUS = 0 ] || "$PYTHON" "$SMESH_PY/raw_to_exodusII.py" sim1/view sim1/released.e
     else
-        # The strokes for ParaView: every exported step on the whole mesh, with its time.
-        "$PYTHON" "$SMESH_PY/raw_point_data_to_parent.py" sim2/out sim2/mesh "$CASE/db/solid" sim2/view \
-            --all-steps --fields=disp,velocity,gap,contact_force
+        # The strokes for ParaView: every exported step of every field the case writes, on the
+        # whole mesh, with its time.
+        "$PYTHON" "$SMESH_PY/raw_point_data_to_parent.py" sim2/out sim2/mesh "$CASE/db/solid" sim2/view --all-steps
         [ $EXODUS = 0 ] || "$PYTHON" "$SMESH_PY/raw_to_exodusII.py" sim2/view sim2/strokes.e
     fi
 done

@@ -63,12 +63,13 @@ regime: dynamic
 # took 462 s with 357, its predicted starts inverting elements at the nodes on a seat.
 dynamics: {scheme: bdf2, density: 1150, mass: lumped}
 time: {dt: 1e-4, t_end: 0.18, max_cutbacks: 8}
-# The step's forces to 1e-6 N, 8e-8 of the outlet's load on the pressure valve (12.4 N).
-solver: {newton: {max_it: 20, atol: 1e-6, rtol: 0, verbose: false}}
+# The step's forces to 1e-6 N, 8e-8 of the outlet's load on the pressure valve (12.4 N). The
+# tangent stored in float32: the QP 15-19% faster, the strokes the same to rounding (FF200, 16 ms).
+solver: {newton: {max_it: 20, atol: 1e-6, rtol: 0, verbose: false}, linear: {storage_bytes: 4}}
 output:
-  # Every step, to follow the material's relaxation within a stroke.
+  # Every step, to follow the material's relaxation within a stroke: the displacement only (the
+  # movie's), the contact and the rates in the history's probes.
   export_freq: 1
-  fields: [gap, contact_force]
   # Each valve's centre and the two ends of its plate (x), at mid-thickness; the Prony series,
   # each term's overstress.
   probes:
