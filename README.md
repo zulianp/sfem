@@ -108,3 +108,38 @@ Cite SFEM if you use it for your work:
 https://deepwiki.com/zulianp/sfem
 
 
+
+## Jacobian state-gradient cache and derivative checks
+
+The benchmark now reuses velocity and pressure gradients at the fixed state.
+Every application still reconstructs the changing direction's gradients and
+retains the flux and reconstruction sensitivities. This brings the standalone
+benchmark into line with the reuse already present in the solver; it is not a
+new solver optimization. Refresh state gradients when the state or geometry
+changes.
+
+`--rebuild-state-gradients` restores the earlier per-application work for paired
+comparisons. The log and CSV identify the mode, and reconstruction timers reset
+after warmup. Historical exact-action rates in the paper remain explicitly
+labelled as rebuild-mode measurements.
+
+After building both precision targets, run:
+
+```bash
+ctest --test-dir build/cvfem --output-on-failure \
+  -R '^cvfem_(jacobian_cache(_f32)?|jacobian_fd|jacobian_coupled|check_dump)$'
+```
+
+The cache checks compare complete outputs with changing directions in both
+precisions, rejecting malformed or nonfinite dumps before comparing them.
+The FP64 derivative checks cover perturbed affine interior states: velocity
+variations without Rhie--Chow, and all four fields with Rhie--Chow. The latter
+also requires deliberately omitted coupling sensitivities to fail. These are
+checks of the tested states and branches, not a proof at every limiter switch
+or a solver-convergence result. Boundary/transient consistency is a separate
+review.
+
+Only the lagged matrix-free action and the existing BSR SpMV apply the same
+operator. The consistent higher-order action includes reconstruction
+sensitivities absent from that matrix, so a timing ratio against it is not an
+equivalent-operator speedup.

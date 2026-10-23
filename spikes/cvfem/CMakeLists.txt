@@ -351,6 +351,9 @@ if(CVFEM_REPORT_PYTHON)
 endif()
 
 if(CVFEM_REPORT_PYTHON)
+    add_test(NAME cvfem_check_dump
+             COMMAND ${CVFEM_REPORT_PYTHON}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_check_dump_test.py)
     add_test(NAME cvfem_verify_report_selftest
              COMMAND ${CVFEM_REPORT_PYTHON}
                      ${CMAKE_CURRENT_SOURCE_DIR}/python/cvfem_verify_report.py --selftest)
@@ -397,6 +400,18 @@ add_test(NAME cvfem_scatter_study
 add_test(NAME cvfem_kernel_only
          COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_kernel_only.sh
                  $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)
+add_test(NAME cvfem_jacobian_coupled
+         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_jacobian_coupled.sh
+                 $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)
+add_test(NAME cvfem_jacobian_fd
+         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_jacobian_fd.sh
+                 $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)
+add_test(NAME cvfem_jacobian_cache
+         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_jacobian_cache.sh
+                 $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)
+add_test(NAME cvfem_jacobian_cache_f32
+         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_jacobian_cache.sh
+                 $<TARGET_FILE:cvfem_hex8_ns_upwind_bench_f32>)
 # The script asserts that every quarantined configuration is REFUSED, which is true of the
 # default build and false of this one -- the flag exists to make them reachable. So it is told
 # which build it is in rather than inferring it.
