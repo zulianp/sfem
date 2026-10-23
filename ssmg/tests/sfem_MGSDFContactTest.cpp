@@ -46,7 +46,7 @@ struct EnvOptions {
         EnvOptions ret{.execution_space      = sfem::EXECUTION_SPACE_HOST,
                        .base_resolution      = smesh::Env::read("SFEM_BASE_RESOLUTION", int(1)),
                        .disp_y               = smesh::Env::read("SFEM_DISP_Y", real_t(-0.05)),
-                       .enable_output        = smesh::Env::read("SFEM_ENABLE_OUTPUT", int(1)),
+                       .enable_output        = smesh::Env::read("SFEM_ENABLE_OUTPUT", int(0)),
                        .element_refine_level = smesh::Env::read("SFEM_ELEMENT_REFINE_LEVEL", int(2)),
                        .y_top                = smesh::Env::read("SFEM_Y_TOP", geom_t(0.05)),
                        .operator_name        = smesh::Env::read_string("SFEM_OPERATOR", "LinearElasticity"),
@@ -77,6 +77,30 @@ static void write_sdf_output(const std::shared_ptr<sfem::Communicator> &comm, co
     if (comm) {
         comm->barrier();
     }
+}
+
+// The contact side may enter the obstacle by no more than this at the solution, 2e-3 of the
+// imposed 0.05. The solver converges the linearised constraint, so what is left geometrically is
+// the last linearisation's error, which the solver settings set: 2e-9 to 6e-6 across the cases
+// with the defaults, up to 3.5e-5 with bench_MaMAL's (SFEM_ATOL=1e-8, capped coarse solve), as
+// much as with trilinear sampling (3.4e-5).
+static const real_t penetration_tol = 1e-4;
+
+// The deepest penetration of the contact side into the obstacle at the displacement x: the gap
+// sampled at the deformed contact nodes, over all ranks. Host data only.
+static real_t max_penetration(const std::shared_ptr<sfem::ContactConditions> &contact_conds,
+                              const std::shared_ptr<sfem::Communicator>      &comm,
+                              const real_t *const                             x) {
+    const ptrdiff_t     n = contact_conds->n_constrained_dofs();
+    std::vector<real_t> g(n > 0 ? n : 1, 0);
+    contact_conds->signed_distance(x, g.data());
+    real_t deepest = 0;
+    for (ptrdiff_t i = 0; i < n; ++i) {
+        deepest = std::max(deepest, -g[i]);
+    }
+    deepest = comm ? comm->max(deepest) : deepest;
+    printf("max penetration %g\n", (double)deepest);
+    return deepest;
 }
 
 std::shared_ptr<sfem::ContactConditions> build_cuboid_sphere_contact(const std::shared_ptr<sfem::Function> &f,
@@ -387,10 +411,14 @@ int test_contact() {
         }
 
         auto solver = sfem::create_ssmgc(f, contact_conds, in);
-        solver->apply(rhs->data(), x->data());
+        SFEM_TEST_ASSERT(solver->apply(rhs->data(), x->data()) == SFEM_SUCCESS);
     } else {
         auto solver = sfem::create_shifted_penalty(f, contact_conds, nullptr);
-        solver->apply(rhs->data(), x->data());
+        SFEM_TEST_ASSERT(solver->apply(rhs->data(), x->data()) == SFEM_SUCCESS);
+    }
+
+    if (es != sfem::EXECUTION_SPACE_DEVICE) {
+        SFEM_TEST_ASSERT(max_penetration(contact_conds, comm, x->data()) < penetration_tol);
     }
 
     if (opts.enable_output) {
@@ -442,8 +470,10 @@ static int run_ssmgc_on_ss_mesh(const std::shared_ptr<sfem::Mesh>               
                                 const std::vector<std::shared_ptr<sfem::Sideset>> &contact_sides,
                                 const std::shared_ptr<smesh::Grid<geom_t>>        &sdf,
                                 const geom_t                                       disp_y,
-                                const char                                        *op_name = "LinearElasticity",
-                                const char                                        *out_dir = nullptr) {
+                                const char                                        *op_name  = "LinearElasticity",
+                                const char                                        *out_dir  = nullptr,
+                                std::vector<real_t>                               *solution = nullptr,
+                                const sfem::ExecutionSpace                         es       = sfem::EXECUTION_SPACE_HOST) {
     SFEM_TEST_ASSERT(ss != nullptr);
     SFEM_TEST_ASSERT(!contact_sides.empty());
     auto comm = ss->comm();
@@ -457,15 +487,13 @@ static int run_ssmgc_on_ss_mesh(const std::shared_ptr<sfem::Mesh>               
 
     auto fs = sfem::FunctionSpace::create(ss, block_size);
     auto f  = sfem::Function::create(fs);
-    auto op = sfem::create_op(fs, op_name, sfem::EXECUTION_SPACE_HOST);
+    auto op = sfem::create_op(fs, op_name, es);
     SFEM_TEST_ASSERT(op != nullptr);
     SFEM_TEST_ASSERT(op->initialize() == SFEM_SUCCESS);
     f->add_operator(op);
-    if (std::string(op_name) == "LinearElasticity") {
-        SFEM_TEST_ASSERT(f->is_linear());
-    } else {
-        SFEM_TEST_ASSERT(!f->is_linear());
-    }
+    // The linear materials take SSMGC's linear path, the others its nonlinear one.
+    const bool linear = std::string(op_name) == "LinearElasticity" || std::string(op_name) == "GeneratedLinearElasticity";
+    SFEM_TEST_ASSERT(f->is_linear() == linear);
 
     const int dim  = ss->spatial_dimension();
     auto      wall = sfem::Sideset::create_from_selector(ss, [](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool {
@@ -480,9 +508,9 @@ static int run_ssmgc_on_ss_mesh(const std::shared_ptr<sfem::Mesh>               
         dcs.push_back(
                 sfem::DirichletConditions::Condition{.sidesets = wall, .value = (c == 1 ? disp_y : real_t(0)), .component = c});
     }
-    f->add_constraint(sfem::create_dirichlet_conditions(fs, dcs, sfem::EXECUTION_SPACE_HOST));
+    f->add_constraint(sfem::create_dirichlet_conditions(fs, dcs, es));
 
-    auto contact_conds = sfem::ContactConditions::create(fs, sdf, contact_sides, sfem::EXECUTION_SPACE_HOST);
+    auto contact_conds = sfem::ContactConditions::create(fs, sdf, contact_sides, es);
     SFEM_TEST_ASSERT(contact_conds != nullptr);
     if (comm->sum(real_t(contact_conds->n_constrained_dofs())) <= 0) {
         SFEM_ERROR("run_ssmgc_on_ss_mesh: no constrained contact dofs on any rank\n");
@@ -490,10 +518,11 @@ static int run_ssmgc_on_ss_mesh(const std::shared_ptr<sfem::Mesh>               
     SFEM_TEST_ASSERT(contact_conds->ss_sides() != nullptr);
 
     const ptrdiff_t ndofs = fs->n_dofs();
-    auto            x     = sfem::create_host_buffer<real_t>(ndofs);
-    auto            rhs   = sfem::create_host_buffer<real_t>(ndofs);
-    std::fill(x->data(), x->data() + ndofs, real_t(0));
-    std::fill(rhs->data(), rhs->data() + ndofs, real_t(0));
+    auto            x     = sfem::create_buffer<real_t>(ndofs, es);
+    auto            rhs   = sfem::create_buffer<real_t>(ndofs, es);
+    auto            blas  = sfem::blas<real_t>(es);
+    blas->zeros(ndofs, x->data());
+    blas->zeros(ndofs, rhs->data());
     f->apply_constraints(rhs->data());
     contact_conds->init();
     f->apply_constraints(x->data());
@@ -501,6 +530,12 @@ static int run_ssmgc_on_ss_mesh(const std::shared_ptr<sfem::Mesh>               
     auto solver = sfem::create_ssmgc(f, contact_conds, nullptr);
     SFEM_TEST_ASSERT(solver != nullptr);
     SFEM_TEST_ASSERT(solver->apply(rhs->data(), x->data()) == SFEM_SUCCESS);
+    if (es != sfem::EXECUTION_SPACE_HOST) {
+        // The rest reads the solution on the host; a device solution is judged against a host one.
+        x = smesh::to_host(x);
+        if (solution) solution->assign(x->data(), x->data() + ndofs);
+        return SFEM_TEST_SUCCESS;
+    }
 
     real_t nrm = 0;
     for (ptrdiff_t i = 0; i < ndofs; ++i) {
@@ -508,8 +543,10 @@ static int run_ssmgc_on_ss_mesh(const std::shared_ptr<sfem::Mesh>               
         nrm += x->data()[i] * x->data()[i];
     }
     SFEM_TEST_ASSERT(std::isfinite(nrm));
+    SFEM_TEST_ASSERT(max_penetration(contact_conds, comm, x->data()) < penetration_tol);
+    if (solution) solution->assign(x->data(), x->data() + ndofs);
 
-    const int enable_output = smesh::Env::read("SFEM_ENABLE_OUTPUT", int(1));
+    const int enable_output = smesh::Env::read("SFEM_ENABLE_OUTPUT", int(0));
     if (enable_output && out_dir && out_dir[0]) {
         const smesh::Path root(out_dir);
         smesh::create_directory(root);
@@ -565,6 +602,43 @@ int test_checkerboard_hex_ssmgc() {
                 return radius - sqrt(dx * dx + dy * dy + dz * dz);
             });
     return run_ssmgc_on_ss_mesh(ss, 3, contact_ss, sdf, real_t(-0.05));
+}
+
+// The generated material on the same problem: on a micro-element space it is the hand-written
+// operator's discretisation, and every coarse level is its derefine_op. The two solutions agree to
+// the hand-written operator's single-precision Jacobians and SSMGC's tolerance. With
+// SFEM_EXECUTION_SPACE=device the generated one runs on the device against the hand-written one on
+// the host.
+int test_checkerboard_hex_ssmgc_generated() {
+    auto hex = sfem::Mesh::create_hex8_checkerboard_cube(sfem::Communicator::self(), 2, 2, 2);
+    auto ss  = smesh::to_semistructured(4, hex, true, false);
+    SFEM_TEST_ASSERT(ss != nullptr);
+
+    auto contact_ss = sfem::Sideset::create_from_selector(
+            ss, [](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool { return y > -1e-5 && y < 1e-5; });
+    auto comm = ss->comm();
+    auto sdf  = smesh::create_sdf(
+            comm, 16, 8, 16, -0.1, -0.2, -0.1, 1.1, 0.2, 1.1, [](const geom_t x, const geom_t y, const geom_t z) -> geom_t {
+                const geom_t cx = 0.5, cy = -0.5, cz = 0.5, radius = 0.5;
+                const geom_t dx = cx - x, dy = cy - y, dz = cz - z;
+                return radius - sqrt(dx * dx + dy * dy + dz * dz);
+            });
+    std::vector<real_t> hand, generated;
+    SFEM_TEST_ASSERT(run_ssmgc_on_ss_mesh(ss, 3, contact_ss, sdf, real_t(-0.05), "LinearElasticity", nullptr, &hand) ==
+                     SFEM_TEST_SUCCESS);
+    SFEM_TEST_ASSERT(run_ssmgc_on_ss_mesh(ss, 3, contact_ss, sdf, real_t(-0.05), "GeneratedLinearElasticity", nullptr,
+                                          &generated, EnvOptions::read().execution_space) == SFEM_TEST_SUCCESS);
+    real_t worst = 0, scale = 0;
+    for (size_t i = 0; i < hand.size(); ++i) {
+        worst = std::max(worst, std::abs(hand[i] - generated[i]));
+        scale = std::max(scale, std::abs(hand[i]));
+    }
+    printf("  SSMGC, level 4: generated (%s) against hand-written %.3g (max |u| %g)\n",
+           EnvOptions::read().execution_space == sfem::EXECUTION_SPACE_DEVICE ? "device" : "host",
+           (double)(worst / scale),
+           (double)scale);
+    SFEM_TEST_ASSERT(worst <= 1e-5 * scale);
+    return SFEM_TEST_SUCCESS;
 }
 
 int test_tet_ssmgc() {
@@ -662,6 +736,7 @@ int main(int argc, char *argv[]) {
 
     SFEM_RUN_TEST(test_contact);
     SFEM_RUN_TEST(test_checkerboard_hex_ssmgc);
+    SFEM_RUN_TEST(test_checkerboard_hex_ssmgc_generated);
     SFEM_RUN_TEST(test_tet_ssmgc);
     SFEM_RUN_TEST(test_quad2d_ssmgc);
     SFEM_RUN_TEST(test_function_is_linear);

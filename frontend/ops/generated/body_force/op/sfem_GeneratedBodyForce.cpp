@@ -5,6 +5,7 @@
 
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_MultiDomainOp.hpp"
+#include "sfem_DerefinedTimeScheme.hpp"
 #include "sfem_OpTracer.hpp"
 #include "sfem_Parameters.hpp"
 #include "smesh_kernel_data.hpp"
@@ -189,13 +190,38 @@ namespace sfem {
       std::shared_ptr<smesh::FFF> metric_aos;
     };
 
+    //! Whether this element leaves the operator no choice of geometry.
+    //!
+    //! A constant-P1 simplex publishes no isoparametric residual or action
+    //! kernel, and assembly takes the affine kernel of every element that has
+    //! one, so the operator reads a cached adjugate for these elements
+    //! whatever the caller asked.  Every other element still caches only when
+    //! asked.
+    bool geometry_is_forced_affine(const smesh::ElemType element_type) {
+      switch (element_type) {
+        case smesh::TET4:
+          return true;
+        case smesh::TRI3:
+          return true;
+        default:
+          return false;
+      }
+    }
+
     int cache_affine_geometry(const std::shared_ptr<FunctionSpace> &space,
                                   MultiDomainOp &domains,
-                                  const bool needs_jacobian,
-                                  const bool needs_metric_soa,
-                                  const bool needs_metric_aos) {
+                                  const bool requested_jacobian,
+                                  const bool requested_metric_soa,
+                                  const bool requested_metric_aos) {
       auto mesh = space->mesh_ptr();
       for (auto &entry : domains.domains()) {
+        const bool forced = geometry_is_forced_affine(entry.second.element_type);
+        const bool needs_jacobian = requested_jacobian || forced;
+        const bool needs_metric_soa = requested_metric_soa || (forced && false);
+        const bool needs_metric_aos = requested_metric_aos || (forced && false);
+        if (!needs_jacobian && !needs_metric_soa && !needs_metric_aos) {
+          continue;
+        }
         auto cache = std::static_pointer_cast<AffineGeometryCache>(
             entry.second.user_data);
         if (!cache) {
@@ -280,6 +306,14 @@ namespace sfem {
       }
     }
 
+
+    // The graph an assembly was last handed and found well formed.
+    struct CheckedGraph {
+      const count_t *rowptr{nullptr};
+      const idx_t *colidx{nullptr};
+      ptrdiff_t n_rows{-1};
+    };
+
   }  // namespace
 
   class GeneratedBodyForce::Impl {
@@ -294,6 +328,8 @@ namespace sfem {
     const real_t *current{nullptr};
     bool residual_uses_affine{false};
     bool jacobian_action_uses_affine{false};
+    CheckedGraph crs_graph;
+    CheckedGraph bsr_graph;
   };
 
   std::unique_ptr<Op> GeneratedBodyForce::create(const std::shared_ptr<FunctionSpace> &space) {
@@ -448,77 +484,27 @@ namespace sfem {
     return total;
   }
 
-  // Establish once, at setup, that this operator's dof graph is well formed:
-  // rows in order, every column in range, each row sorted and duplicate free.
-  // The assembly kernels assume it -- they locate an entry and write to it
-  // without re-checking that it is there -- so this is where the assumption
-  // is earned.
-  //
-  // It used to be earned per element instead: every scatter walked its
-  // NS x NS candidates, tested each with a three-condition branch
-  // and reported through std::fprintf from inside the caller's parallel
-  // region.  That paid O(elements x NS^2) on every assembly for a
-  // property of the mesh and the graph together, which cannot change between
-  // elements or between calls.  Here it is O(nnz), once.
-  //
-  // Raw pointers rather than the graph type, so this does not depend on which
-  // headers the generated wrapper happens to pull in.
-  static int validate_dof_graph(const count_t *const rowptr,
-                                  const idx_t *const colidx,
-                                  const ptrdiff_t n_nodes,
-                                  const ptrdiff_t nnz) {
-    if (!rowptr || !colidx || n_nodes < 0) {
-      return SFEM_FAILURE;
-    }
-    if (rowptr[0] != 0 || (ptrdiff_t)rowptr[n_nodes] != nnz) {
-      return SFEM_FAILURE;
-    }
-    for (ptrdiff_t i = 0; i < n_nodes; ++i) {
-      const count_t begin = rowptr[i];
-      const count_t end = rowptr[i + 1];
-      if (end < begin || (ptrdiff_t)end > nnz) {
-        return SFEM_FAILURE;
-      }
-      for (count_t k = begin; k < end; ++k) {
-        if (colidx[k] < 0 || (ptrdiff_t)colidx[k] >= n_nodes) {
-          return SFEM_FAILURE;
-        }
-        if (k > begin && colidx[k] <= colidx[k - 1]) {
-          return SFEM_FAILURE;
-        }
-      }
-    }
-    return SFEM_SUCCESS;
-  }
-
   int GeneratedBodyForce::initialize(const std::vector<std::string> &block_names) {
     SFEM_TRACE_SCOPE("GeneratedBodyForce::initialize");
     impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
-    {
-      auto dof_graph = impl_->space->dof_to_dof_graph();
-      if (!dof_graph ||
-        validate_dof_graph(dof_graph->rowptr()->data(),
-                                   dof_graph->colidx()->data(),
-                                   dof_graph->n_nodes(),
-                                   dof_graph->nnz()) != SFEM_SUCCESS) {
-        SFEM_ERROR("GeneratedBodyForce::initialize: the dof graph is malformed; the assembly kernels assume it is not\n");
-        return SFEM_FAILURE;
-      }
-    }
+    // A micro-element space hands each semi-structured macro element over as its micro
+    // elements, which these kernels assemble as HEX8.
+    impl_->domains->set_micro_elements(impl_->space->micro_elements());
     seed_material(*impl_->domains);
     const bool needs_affine_jacobian =
         (impl_->residual_uses_affine && true) ||
         (impl_->jacobian_action_uses_affine && true);
-    const bool needs_affine_metric =
-        (impl_->residual_uses_affine && (false || false)) ||
-        (impl_->jacobian_action_uses_affine && (false || false));
     const bool needs_a_met_soa =
         (impl_->residual_uses_affine && false) ||
         (impl_->jacobian_action_uses_affine && false);
     const bool needs_affine_metric_aos =
         (impl_->residual_uses_affine && false) ||
         (impl_->jacobian_action_uses_affine && false);
-    if (needs_affine_jacobian || needs_affine_metric) {
+    // Unconditionally, because the builder skips a domain that neither asked
+    // for affine geometry nor is an element that forces it.  Gating the call
+    // on the request alone left a constant-P1 simplex with no cached adjugate
+    // and an affine kernel as its only route.
+    {
       const int status = cache_affine_geometry(impl_->space,
                                                      *impl_->domains,
                                                      needs_affine_jacobian,
@@ -553,7 +539,7 @@ namespace sfem {
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const geom_t *determinant = nullptr;
-      if (impl_->residual_uses_affine) {
+      if (impl_->residual_uses_affine || domain.element_type == smesh::TET4 || domain.element_type == smesh::TRI3) {
         auto cache = std::static_pointer_cast<AffineGeometryCache>(
             domain.user_data);
         if (!cache) {
@@ -664,6 +650,20 @@ namespace sfem {
     impl_->domains->set_value_in_block(block_name, var_name, value);
   }
 
+  std::shared_ptr<Op> GeneratedBodyForce::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
+    SFEM_TRACE_SCOPE("GeneratedBodyForce::derefine_op");
+    auto ret = std::make_shared<GeneratedBodyForce>(space);
+    if (ret->initialize() != SFEM_SUCCESS) return nullptr;
+    for (const auto &entry : impl_->domains->domains()) {
+      for (int i = 0; i < N_DEFINED_MATERIAL_PARAMETERS; ++i) {
+        ret->set_value_in_block(entry.first,
+                                MATERIAL_PARAMETER_NAMES[i],
+                                entry.second.parameters->require_real_value(MATERIAL_PARAMETER_NAMES[i]));
+      }
+    }
+    return ret;
+  }
+
   void GeneratedBodyForce::set_option(const std::string &name, const bool val) {
     SFEM_TRACE_SCOPE("GeneratedBodyForce::set_option");
     AffineOption options[] = {
@@ -762,7 +762,8 @@ namespace sfem {
               const idx_t *const /*colidx*/,
               real_t *const /*values*/) {
     SFEM_TRACE_SCOPE("GeneratedBodyForce::hessian_crs");
-    return SFEM_FAILURE;
+    // Linear work: the Jacobian is zero.
+    return SFEM_SUCCESS;
   }
 
   int GeneratedBodyForce::hessian_bsr(const real_t *const /*state*/,
@@ -770,7 +771,8 @@ namespace sfem {
               const idx_t *const /*colidx*/,
               real_t *const /*values*/) {
     SFEM_TRACE_SCOPE("GeneratedBodyForce::hessian_bsr");
-    return SFEM_FAILURE;
+    // Linear work: the Jacobian is zero.
+    return SFEM_SUCCESS;
   }
 
 

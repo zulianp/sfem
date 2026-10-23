@@ -198,6 +198,14 @@ namespace sfem {
       return nullptr;
     }
 #endif  // SFEM_ENABLE_RYAML
+
+    // The graph an assembly was last handed and found well formed.
+    struct CheckedGraph {
+      const count_t *rowptr{nullptr};
+      const idx_t *colidx{nullptr};
+      ptrdiff_t n_rows{-1};
+    };
+
   }  // namespace
 
   class GeneratedNeumann::Impl {
@@ -253,63 +261,12 @@ namespace sfem {
     return 0;
   }
 
-  // Establish once, at setup, that this operator's dof graph is well formed:
-  // rows in order, every column in range, each row sorted and duplicate free.
-  // The assembly kernels assume it -- they locate an entry and write to it
-  // without re-checking that it is there -- so this is where the assumption
-  // is earned.
-  //
-  // It used to be earned per element instead: every scatter walked its
-  // NS x NS candidates, tested each with a three-condition branch
-  // and reported through std::fprintf from inside the caller's parallel
-  // region.  That paid O(elements x NS^2) on every assembly for a
-  // property of the mesh and the graph together, which cannot change between
-  // elements or between calls.  Here it is O(nnz), once.
-  //
-  // Raw pointers rather than the graph type, so this does not depend on which
-  // headers the generated wrapper happens to pull in.
-  static int validate_dof_graph(const count_t *const rowptr,
-                                  const idx_t *const colidx,
-                                  const ptrdiff_t n_nodes,
-                                  const ptrdiff_t nnz) {
-    if (!rowptr || !colidx || n_nodes < 0) {
-      return SFEM_FAILURE;
-    }
-    if (rowptr[0] != 0 || (ptrdiff_t)rowptr[n_nodes] != nnz) {
-      return SFEM_FAILURE;
-    }
-    for (ptrdiff_t i = 0; i < n_nodes; ++i) {
-      const count_t begin = rowptr[i];
-      const count_t end = rowptr[i + 1];
-      if (end < begin || (ptrdiff_t)end > nnz) {
-        return SFEM_FAILURE;
-      }
-      for (count_t k = begin; k < end; ++k) {
-        if (colidx[k] < 0 || (ptrdiff_t)colidx[k] >= n_nodes) {
-          return SFEM_FAILURE;
-        }
-        if (k > begin && colidx[k] <= colidx[k - 1]) {
-          return SFEM_FAILURE;
-        }
-      }
-    }
-    return SFEM_SUCCESS;
-  }
-
   int GeneratedNeumann::initialize(const std::vector<std::string> &block_names) {
     SFEM_TRACE_SCOPE("GeneratedNeumann::initialize");
     impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
-    {
-      auto dof_graph = impl_->space->dof_to_dof_graph();
-      if (!dof_graph ||
-        validate_dof_graph(dof_graph->rowptr()->data(),
-                                   dof_graph->colidx()->data(),
-                                   dof_graph->n_nodes(),
-                                   dof_graph->nnz()) != SFEM_SUCCESS) {
-        SFEM_ERROR("GeneratedNeumann::initialize: the dof graph is malformed; the assembly kernels assume it is not\n");
-        return SFEM_FAILURE;
-      }
-    }
+    // A micro-element space hands each semi-structured macro element over as its micro
+    // elements, which these kernels assemble as HEX8.
+    impl_->domains->set_micro_elements(impl_->space->micro_elements());
     seed_material(*impl_->domains);
     return SFEM_SUCCESS;
   }

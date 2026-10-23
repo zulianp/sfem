@@ -14,12 +14,15 @@ int cu_displace_points(const int          dim,
                        const real_t      *disp,
                        geom_t **const     surface_points);
 
+// surface_points = surface_points_rest + disp at idx, and the displacement itself in real_t,
+// surface_disp (3 components per point, AoS, zero beyond dim).
 int cu_displace_surface_points(const int          dim,
                                const ptrdiff_t    n_nodes,
                                const idx_t *const idx,
                                geom_t **const     surface_points_rest,
                                const real_t      *disp,
-                               geom_t **const     surface_points);
+                               geom_t **const     surface_points,
+                               real_t *const      surface_disp);
 
 #ifdef __cplusplus
 }

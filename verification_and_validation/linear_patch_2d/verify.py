@@ -36,7 +36,7 @@ def main():
     diagnostics = {"reference_volume": volume, "modes": {}}
     for mode, deformation in deformation_gradients().items():
         displacement, reaction, objective = read_mode_solution(
-            args.output / "solution", mode, "linear", mesh.dimension, mesh.n_points
+            args.output / "solution", mode, mesh.dimension, mesh.n_points
         )
         energy_density, stress = response(deformation, material)
         mode_checks, mode_diagnostics = affine_checks(

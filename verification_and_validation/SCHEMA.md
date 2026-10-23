@@ -79,13 +79,20 @@ variants:
       mu: mu
       lambda: lmbda
     driver:
-      executable: "{build_dir}/linear_elasticity"
+      executable: "{python}"
       arguments:
+        - "{suite_dir}/common/run_static.py"
+        - --driver
+        - "{build_dir}/playground"
+        - --mesh
         - "{mesh}"
+        - --operator
+        - "{output}/operator.yaml"
+        - --dirichlet
         - "{output}/dirichlet.yaml"
+        - --output
         - "{output}/solution"
       environment:
-        SFEM_OPERATOR: "{operator}"
         OMP_NUM_THREADS: 1
     expected_output:
       required: []

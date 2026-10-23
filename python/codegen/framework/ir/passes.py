@@ -28,6 +28,7 @@ from codegen.framework.ir.kernel_ast import (
     LoopHeaderNode,
     LoopNode,
     ScatterNode,
+    drop_unread_geometry_loads,
     fuse_single_use_copies,
 )
 
@@ -119,4 +120,17 @@ class SingleUseCopyPass(KernelASTPass):
 
     def apply(self, ast):
         after = replace(ast, nodes=fuse_single_use_copies(ast.nodes))
+        return KernelASTPassResult(self, ast, after, ())
+
+
+@dataclass(frozen=True)
+class UnreadGeometryLoadPass(KernelASTPass):
+    """A geometry local nothing reads is not declared: `drop_unread_geometry_loads`."""
+
+    name: str = "unread-geometry-load"
+    parity_preserving: bool = True
+    performance_changing: bool = False
+
+    def apply(self, ast):
+        after = replace(ast, nodes=drop_unread_geometry_loads(ast.nodes))
         return KernelASTPassResult(self, ast, after, ())

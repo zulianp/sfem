@@ -503,6 +503,31 @@ namespace sfem {
                                                                 off_diag_values);
         });
     }
+
+#ifdef SFEM_ENABLE_RYAML
+    std::shared_ptr<Op> MooneyRivlinActiveStrainPacked::create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+                                                                        const ryml::ConstNodeRef             &node) {
+        std::shared_ptr<MooneyRivlinActiveStrainPacked> op(static_cast<MooneyRivlinActiveStrainPacked *>(create(space).release()));
+        if (op->initialize({}) != SFEM_SUCCESS) return nullptr;
+        if (node.has_child("mu")) {
+            real_t value = 0;
+            node["mu"].load(&value);
+            op->set_mu(value);
+        }
+        if (node.has_child("lambda")) {
+            real_t value = 0;
+            node["lambda"].load(&value);
+            op->set_lambda(value);
+        }
+        if (node.has_child("lmda")) {
+            real_t value = 0;
+            node["lmda"].load(&value);
+            op->set_lmda(value);
+        }
+        return op;
+    }
+#endif
+
 }  // namespace sfem
 
 

@@ -151,7 +151,15 @@ namespace sfem {
 
     int Output::write_time_step(const char *name, const real_t /*t*/, const real_t *const x) {
         SFEM_TRACE_SCOPE("Output::write_time_step");
+        return write_numbered(name, x, [this]() { return impl_->export_counter++; });
+    }
 
+    int Output::write_step(const char *name, const size_t step, const real_t *const x) {
+        SFEM_TRACE_SCOPE("Output::write_step");
+        return write_numbered(name, x, [step]() { return step; });
+    }
+
+    int Output::write_numbered(const char *name, const real_t *const x, const std::function<size_t()> &next_index) {
         auto      space      = impl_->space;
         const int block_size = space->block_size();
 
@@ -177,7 +185,7 @@ namespace sfem {
                          impl_->time_dependent_file_format.c_str(),
                          impl_->output_dir.c_str(),
                          b_name,
-                         impl_->export_counter++,
+                         (int)next_index(),
                          smesh::str(smesh::TypeToEnum<real_t>::value()).c_str());
 
                 if (buff->to_file(smesh::Path(path))) {
@@ -191,7 +199,7 @@ namespace sfem {
                      impl_->time_dependent_file_format.c_str(),
                      impl_->output_dir.c_str(),
                      name,
-                     impl_->export_counter++,
+                     (int)next_index(),
                      smesh::str(smesh::TypeToEnum<real_t>::value()).c_str());
 
             auto out = Buffer<real_t>::wrap(space->n_dofs(), const_cast<real_t *>(x));
@@ -288,6 +296,20 @@ namespace sfem {
         impl_->ops.push_back(op);
     }
     void Function::add_constraint(const std::shared_ptr<Constraint> &c) { impl_->constraints.push_back(c); }
+
+    void Function::remove_constraint(const std::shared_ptr<Constraint> &c) {
+        auto it = std::find(impl_->constraints.begin(), impl_->constraints.end(), c);
+
+        if (it == impl_->constraints.end()) {
+            SFEM_ERROR("remove_constraint: constraint does not exist!");
+        }
+
+        impl_->constraints.erase(it);
+    }
+
+    bool Function::has_constraint(const std::shared_ptr<Constraint> &c) const {
+        return std::find(impl_->constraints.begin(), impl_->constraints.end(), c) != impl_->constraints.end();
+    }
 
     void Function::clear_constraints() { impl_->constraints.clear(); }
 
@@ -472,6 +494,8 @@ namespace sfem {
     int Function::hessian_diag(const real_t *const x, real_t *const values) {
         SFEM_TRACE_SCOPE("Function::hessian_diag");
         for (auto &op : impl_->ops) {
+            // A residual that does not read the state (a load) has no tangent.
+            if (!op->residual_depends_on_state()) continue;
             if (op->hessian_diag(x, values) != SFEM_SUCCESS) {
                 std::cerr << "Failed hessian_diag in op: " << op->name() << "\n";
                 return SFEM_FAILURE;
@@ -491,6 +515,8 @@ namespace sfem {
         SFEM_TRACE_SCOPE("Function::hessian_block_diag_sym");
 
         for (auto &op : impl_->ops) {
+            // A residual that does not read the state (a load) has no tangent.
+            if (!op->residual_depends_on_state()) continue;
             if (op->hessian_block_diag_sym(x, values) != SFEM_SUCCESS) {
                 std::cerr << "Failed hessian_block_diag_sym in op: " << op->name() << "\n";
                 return SFEM_FAILURE;
@@ -564,6 +590,8 @@ namespace sfem {
         SFEM_TRACE_SCOPE("Function::apply");
 
         for (auto &op : impl_->ops) {
+            // A residual that does not read the state (a load) has no tangent.
+            if (!op->residual_depends_on_state()) continue;
             if (op->apply(x, h, out, scope) != SFEM_SUCCESS) {
                 std::cerr << "Failed apply in op: " << op->name() << "\n";
                 return SFEM_FAILURE;
@@ -741,7 +769,13 @@ namespace sfem {
 
         auto contractor = merit_contractor(impl_->ops);
 
-        if (!contractor && !impl_->ops.empty()) {
+        // A contracting operator adds its gradient to the accumulator after the constraints
+        // have set their rows, and squares the sum: a constrained row would carry the operator's
+        // reaction on top of x - value, where `gradient` leaves x - value alone. With
+        // constraints, every step is assembled whole.
+        const bool constrained = impl_->handle_constraints && !impl_->constraints.empty();
+
+        if ((!contractor || constrained) && !impl_->ops.empty()) {
             bool any_moves = false;
             for (auto &op : impl_->ops) {
                 any_moves = any_moves || op->residual_depends_on_state();

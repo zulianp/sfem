@@ -1,3 +1,4 @@
+import re
 from dataclasses import dataclass
 
 import sympy as sp
@@ -3976,7 +3977,15 @@ def _tensor_element_matrix_nodes(system, coefficients, dependencies, block):
         )
         staging_quadrature_body = []
         staging_lane_body = []
-        if uses_determinant:
+        staging_hoists, staging_aliases = _tensor_field_alias_nodes(system, assembled)
+        # Only the geometry the staged state and tangent read: a constant material tangent
+        # (linear Kelvin-Voigt) reads none of it, and an unused load does not compile.
+        staged_text = " ".join(repr(node) for node in (*staging_aliases, *tangent_nodes))
+
+        def staged_reads(name):
+            return re.search(r"\b%s\b" % name, staged_text) is not None
+
+        if uses_determinant and staged_reads("det"):
             staging_quadrature_body.append(
                 BufferDeclNode(
                     "const s_t *const RSTR", "det_q", (),
@@ -3987,6 +3996,8 @@ def _tensor_element_matrix_nodes(system, coefficients, dependencies, block):
                 BufferDeclNode("const s_t", "det", (), expr_ref('det_q' + _ptr()))
             )
         for i in _adjugate_components(dependencies, dim):
+            if not staged_reads("adj%d" % i):
+                continue
             staging_quadrature_body.append(
                 BufferDeclNode(
                     "const s_t *const RSTR", "adj_q%d" % i, (),
@@ -3998,7 +4009,6 @@ def _tensor_element_matrix_nodes(system, coefficients, dependencies, block):
                     "const s_t", "adj%d" % i, (), expr_ref(('adj_q%d' + _ptr()) % i)
                 )
             )
-        staging_hoists, staging_aliases = _tensor_field_alias_nodes(system, assembled)
         staging_quadrature_body.extend(staging_hoists)
         staging_lane_body.extend(staging_aliases)
         staging_lane_body.extend(tangent_nodes)
@@ -9218,6 +9228,28 @@ def _scalar_crs_matrix_assembly_source(*arguments, **keywords):
         )
 
 
+def _drop_unread_adjugate_views(lines):
+    """Drop a `badjugate` view the code after it, up to the next one, never reads.
+
+    The element's adjugate is staged for every form, and a form that contracts only values -- a
+    mass -- passes the determinant alone: the view was declared and never read.
+    """
+    declaration = re.compile(r"^\s*const s_t \*const badjugate\[ND \* ND\] = ")
+    read = re.compile(r"\bbadjugate\b")
+    kept = []
+    for index, line in enumerate(lines):
+        if declaration.match(line):
+            following = []
+            for later in lines[index + 1 :]:
+                if declaration.match(later):
+                    break
+                following.append(later)
+            if not any(read.search(later) for later in following):
+                continue
+        kept.append(line)
+    return kept
+
+
 def _holding_one_element_crs_matrix_assembly_source(
     system,
     prefix,
@@ -9328,8 +9360,12 @@ def _holding_one_element_crs_matrix_assembly_source(
             )
         ]
     )
+    # The geometry stride: an affine loop stages the cached adjugate and determinant once per
+    # element, in slot 0, so every quadrature point reads that slot; a loop that maps the
+    # element stages one per point. A stride of 1 there read NQ - 1 slots nothing wrote -- unseen
+    # while every affine element assembled in closed form, which reads no geometry stream.
     element_matrix_call_args = (
-        list(_local_kernel_count_args(False, "1", "1"))
+        list(_local_kernel_count_args(False, "1", "1" if builds_its_own_jacobian else "0"))
         + _stream_call_arguments(
             local_kernel_stream_plans(
                 assembled_matrix_dependencies(dependencies),
@@ -10091,7 +10127,7 @@ def _holding_one_element_crs_matrix_assembly_source(
         state_dependencies,
         system,
     )
-    return lines
+    return _drop_unread_adjugate_views(lines)
 
 
 def _isoparametric_mesh_operator_source(

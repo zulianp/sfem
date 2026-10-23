@@ -130,6 +130,8 @@ namespace sfem {
     template <typename T>
     class ShiftedPenaltyMultigrid final : public Operator<T> {
     public:
+        /// Outer iterations of the last apply.
+        int iterations() const { return iterations_; }
         enum CycleType {
             V_CYCLE = 1,
             W_CYCLE = 2,
@@ -208,6 +210,7 @@ namespace sfem {
             SFEM_TRACE_SCOPE("ShiftedPenaltyMultigrid::apply");
 
             ensure_init();
+            prepare_fine_blocks();
 
             count_smoothing_steps = 0;
 
@@ -231,8 +234,19 @@ namespace sfem {
 
             T* lb               = (lower_bound_) ? lower_bound_->data() : nullptr;
             T* ub               = (upper_bound_) ? upper_bound_->data() : nullptr;
-            lagr_lb             = lb ? make_buffer(n_constrained_dofs) : nullptr;
-            lagr_ub             = ub ? make_buffer(n_constrained_dofs) : nullptr;
+            // The multipliers carry over from the previous apply on the same constraints: the next
+            // Newton iteration or time step starts from the reaction it found, not from the bare
+            // penalty, and the constraints re-linearised in between are corrected by the first update.
+            const auto keep_or_zero = [&](const T* const bound, SharedBuffer<T>& lagr) {
+                if (!bound) {
+                    lagr = nullptr;
+                } else if (!lagr || (ptrdiff_t)lagr->size() != n_constrained_dofs) {
+                    lagr = make_buffer(n_constrained_dofs);
+                    blas_->zeros(n_constrained_dofs, lagr->data());
+                }
+            };
+            keep_or_zero(lb, lagr_lb);
+            keep_or_zero(ub, lagr_ub);
 
             T penetration_tol  = 1 / (penalty_param_ * 0.1);
 
@@ -307,15 +321,21 @@ namespace sfem {
                     Tx = correction->data();
                 }
 
-                const T e_pen = ((ub) ? impl_.sq_norm_ramp_p(n_constrained_dofs, Tx, ub) : T(0)) +
-                                ((lb) ? impl_.sq_norm_ramp_m(n_constrained_dofs, Tx, lb) : T(0));
+                // With multipliers the violation is the augmented Lagrangian's: a row that carries force
+                // must also be closed, or the force and the gap are not complementary.
+                const T* const w     = penalty_weights_ ? penalty_weights_->data() : nullptr;
+                const T        e_pen = enable_shift
+                                               ? ((ub) ? impl_.sq_norm_kkt_p(n_constrained_dofs, penalty_param_, w, Tx, ub, lagr_ub->data()) : T(0)) +
+                                                  ((lb) ? impl_.sq_norm_kkt_m(n_constrained_dofs, penalty_param_, w, Tx, lb, lagr_lb->data()) : T(0))
+                                               : ((ub) ? impl_.sq_norm_ramp_p(n_constrained_dofs, Tx, ub) : T(0)) +
+                                                  ((lb) ? impl_.sq_norm_ramp_m(n_constrained_dofs, Tx, lb) : T(0));
 
                 const T norm_pen      = std::sqrt(reduce_sum(e_pen));
                 const T norm_residual = reduce_norm2(n_dofs, mem->work->data());
 
                 if (enable_shift) {
-                    if (ub) impl_.update_lagr_p(n_constrained_dofs, penalty_param_, Tx, ub, lagr_ub->data());
-                    if (lb) impl_.update_lagr_m(n_constrained_dofs, penalty_param_, Tx, lb, lagr_lb->data());
+                    if (ub) impl_.update_lagr_p(n_constrained_dofs, penalty_param_, penalty_weights_ ? penalty_weights_->data() : nullptr, Tx, ub, lagr_ub->data());
+                    if (lb) impl_.update_lagr_m(n_constrained_dofs, penalty_param_, penalty_weights_ ? penalty_weights_->data() : nullptr, Tx, lb, lagr_lb->data());
                     count_lagr_mult_updates++;
                 }
 
@@ -380,7 +400,10 @@ namespace sfem {
                                .omega                  = prev_omega,
                                .relative_residual      = norm_residual / residual_norm_0});
 
-                if (norm_pen < atol_ && (norm_residual < atol_ || norm_residual / residual_norm_0 < rtol_)) {
+                // The residual meets an absolute tolerance of its own when the caller sets one (it knows
+                // the residual it needs: rtol_ measures against this apply's start), atol_ otherwise.
+                const T residual_atol = residual_atol_ > 0 ? residual_atol_ : atol_;
+                if (norm_pen < atol_ && (norm_residual < residual_atol || norm_residual / residual_norm_0 < rtol_)) {
                     converged = true;
                     break;
                 }
@@ -417,6 +440,14 @@ namespace sfem {
             constraints_restriction_.push_back(restict_diag);
         }
 
+        /// Per level, the restriction of the constraint blocks (the operator that restricts
+        /// add_level_constraint_op_x_op's blocks). With it a coarse level's penalty is the restriction
+        /// of the fine active-weighted blocks, J n n^T m, not the restricted J times the restricted
+        /// n n^T m: a node out of contact then adds nothing to its coarse neighbour's penalty.
+        inline void add_constraints_block_restriction(const std::shared_ptr<Operator<T>>& restrict_blocks) {
+            constraints_block_restriction_.push_back(restrict_blocks);
+        }
+
         void set_nodal_block_size(const int block_size) { nodal_block_size_ = block_size > 0 ? block_size : 1; }
 
         void add_level_exchange(const std::shared_ptr<smesh::Exchange>& exchange) { exchanges_.push_back(exchange); }
@@ -433,6 +464,21 @@ namespace sfem {
         void set_max_inner_it(const int val) { max_inner_it = val; }
         void set_atol(const T val) { atol_ = val; }
         void set_rtol(const T val) { rtol_ = val; }
+        void set_residual_atol(const T val) { residual_atol_ = val; }
+        /// Per constraint row, the factor the penalty is scaled by (null: 1): the row's penalty is
+        /// penalty_param * weights[i], so penalty_param is relative to what the weights measure.
+        void set_penalty_weights(const SharedBuffer<T>& weights) { penalty_weights_ = weights; }
+        /// Symmetric blocks added to the fine level's operator at the constraint nodes, in the layout
+        /// of the finest add_level_constraint_op_x_op (null: none, and nothing is allocated for them).
+        /// The residual, the shifted operator, its smoother and the coarse penalties restricted from
+        /// the fine level carry them. Read at each apply.
+        void set_fine_blocks(const SharedBuffer<T>& blocks) { fine_block_values_ = blocks; }
+        /// y += the fine blocks (set_fine_blocks) times x.
+        void apply_fine_blocks(const T* const x, T* const y) {
+            ensure_init();
+            prepare_fine_blocks();
+            if (fine_blocks_op_) fine_blocks_op_->apply(x, y);
+        }
         void set_nlsmooth_steps(const int steps) { nlsmooth_steps = steps; }
         void set_cycle_type(const int val) { cycle_type_ = val; }
         void set_project_coarse_space_correction(const bool val) { project_coarse_space_correction_ = val; }
@@ -594,10 +640,8 @@ namespace sfem {
             }
         }
 
+        // Unconditional: a non-finite residual norm or step length stops the solve whatever `debug` says.
         void trap_finite_scalar(const char* tag, const T v) const {
-            if (!debug) {
-                return;
-            }
             if (v == v && std::isfinite(static_cast<double>(v))) {
                 return;
             }
@@ -616,6 +660,7 @@ namespace sfem {
             } else {
                 operator_[finest_level()]->apply(x, r);
             }
+            if (fine_blocks_op_) fine_blocks_op_->apply(x, r);
         }
 
         std::shared_ptr<Operator<T>> level_jacobian(const int level) {
@@ -664,7 +709,7 @@ namespace sfem {
                 constraints_op_->apply(mem->solution->data(), correction->data());
 
                 blas_->zeros(n_constrained_dofs, mem->work->data());
-                impl_.calc_r_pen(n_constrained_dofs, correction->data(), penalty_param_, lb, ub, l_lb, l_ub, mem->work->data());
+                impl_.calc_r_pen(n_constrained_dofs, correction->data(), penalty_param_, penalty_weights_ ? penalty_weights_->data() : nullptr, lb, ub, l_lb, l_ub, mem->work->data());
 
                 blas_->zeros(level_alloc(level), correction->data());
                 constraints_op_transpose_->apply(mem->work->data(), correction->data());
@@ -679,7 +724,7 @@ namespace sfem {
                 blas_->zeros(n_dofs, mem->work->data());
                 eval_material_residual(mem->solution->data(), mem->work->data());
                 blas_->axpby(n_dofs, 1, mem->rhs->data(), -1, mem->work->data());
-                impl_.calc_r_pen(n_dofs, mem->solution->data(), penalty_param_, lb, ub, l_lb, l_ub, mem->work->data());
+                impl_.calc_r_pen(n_dofs, mem->solution->data(), penalty_param_, penalty_weights_ ? penalty_weights_->data() : nullptr, lb, ub, l_lb, l_ub, mem->work->data());
             }
             trap_finite("r", mem->work->data(), n_dofs);
         }
@@ -717,14 +762,88 @@ namespace sfem {
                 }
             }
 
+            // Restricted active-weighted blocks: a coarse level's penalty is its blocks with unit weights.
+            penalty_op_x_op_.clear();
+            weighted_blocks_ = nullptr;
+            if (restricts_weighted_blocks()) {
+                const auto fine  = constraints_op_x_op_[finest_level()];
+                weighted_blocks_ = make_buffer(fine->n_blocks() * fine->block_size());
+                penalty_op_x_op_.resize(n_levels());
+                for (int l = coarser_level(finest_level()); l < n_levels(); l = coarser_level(l)) {
+                    const auto      geometric = constraints_op_x_op_[l];
+                    const ptrdiff_t nb        = geometric->n_blocks();
+                    auto            blocks    = make_buffer(nb * geometric->block_size());
+                    blas_->zeros(blocks->size(), blocks->data());
+                    penalty_op_x_op_[l] = sfem::create_sparse_block_vector(geometric->idx(), blocks);
+                    blas_->values(nb, 1, memory_[l]->diag->data());
+                }
+            }
+
             return SFEM_SUCCESS;
+        }
+
+        bool restricts_weighted_blocks() const {
+            return constraints_op_ && n_levels() > 1 && (int)constraints_block_restriction_.size() >= n_levels() - 1;
+        }
+
+        // The blocks the penalty weights at a level: the fine constraint blocks, or a coarse level's
+        // restricted active-weighted ones.
+        std::shared_ptr<SparseBlockVector<T>> level_op_x_op(const int level) const {
+            if (level == finest_level() && fine_shift_) return fine_shift_;
+            if (level != finest_level() && restricts_weighted_blocks()) return penalty_op_x_op_[level];
+            return constraints_op_x_op_[level];
+        }
+
+        // The weights of level_op_x_op's blocks: the penalty's, or one where the blocks are weighted
+        // already (the fine level with fine blocks).
+        SharedBuffer<T> level_op_x_op_weights(const int level) const {
+            if (level == finest_level() && fine_shift_) return unit_weights_;
+            return memory_[level]->diag;
+        }
+
+        // The fine blocks' views and their unit weights, for the blocks set_fine_blocks gave; none
+        // without them.
+        void prepare_fine_blocks() {
+            if (!fine_block_values_) {
+                fine_blocks_    = nullptr;
+                fine_shift_     = nullptr;
+                fine_blocks_op_ = nullptr;
+                unit_weights_   = nullptr;
+                return;
+            }
+            if (!restricts_weighted_blocks()) {
+                SFEM_ERROR("ShiftedPenaltyMultigrid: fine blocks need the constraint blocks' restrictions\n");
+            }
+            const auto      fine = constraints_op_x_op_[finest_level()];
+            const ptrdiff_t nb   = fine->n_blocks();
+            if ((ptrdiff_t)fine_block_values_->size() != nb * fine->block_size()) {
+                SFEM_ERROR("ShiftedPenaltyMultigrid: %ld fine block values for %ld blocks of %d\n",
+                           (long)fine_block_values_->size(),
+                           (long)nb,
+                           fine->block_size());
+            }
+            if (!unit_weights_ || (ptrdiff_t)unit_weights_->size() != nb) {
+                unit_weights_ = make_buffer(nb);
+                blas_->values(nb, 1, unit_weights_->data());
+            }
+            fine_blocks_    = sfem::create_sparse_block_vector(fine->idx(), fine_block_values_);
+            fine_shift_     = sfem::create_sparse_block_vector(fine->idx(), weighted_blocks_);
+            fine_blocks_op_ = sfem::create_sparse_block_vector_mult(operator_[finest_level()]->rows(), fine_blocks_, unit_weights_);
+        }
+
+        // The fine level's active-weighted penalty blocks J n n^T m, plus the fine blocks.
+        void weight_fine_blocks() {
+            const int  fl   = finest_level();
+            const auto fine = constraints_op_x_op_[fl];
+            impl_.scale_blocks(fine->n_blocks(), fine->block_size(), memory_[fl]->diag->data(), fine->data()->data(), weighted_blocks_->data());
+            if (fine_blocks_) blas_->axpy(weighted_blocks_->size(), 1, fine_blocks_->data()->data(), weighted_blocks_->data());
         }
 
         std::shared_ptr<Operator<T>> shifted_op(const int level) {
             std::shared_ptr<Operator<T>> jac = level_jacobian(level);
             std::shared_ptr<Operator<T>> sop;
             if (constraints_op_) {
-                sop = jac + sfem::create_sparse_block_vector_mult(jac->rows(), constraints_op_x_op_[level], memory_[level]->diag);
+                sop = jac + sfem::create_sparse_block_vector_mult(jac->rows(), level_op_x_op(level), level_op_x_op_weights(level));
             } else {
                 sop = jac + sfem::diag_op(memory_[level]->diag, execution_space());
             }
@@ -782,16 +901,31 @@ namespace sfem {
                 blas_->zeros(n_constrained_dofs, correction->data());
                 constraints_op_->apply(mem->solution->data(), correction->data());
                 blas_->zeros(n_constrained_dofs, mem->diag->data());
-                impl_.calc_J_pen(n_constrained_dofs, correction->data(), penalty_param_, lb, ub, l_lb, l_ub, mem->diag->data());
+                impl_.calc_J_pen(n_constrained_dofs, correction->data(), penalty_param_, penalty_weights_ ? penalty_weights_->data() : nullptr, lb, ub, l_lb, l_ub, mem->diag->data());
+                if (fine_shift_) weight_fine_blocks();
             } else {
                 blas_->zeros(n_dofs, mem->diag->data());
-                impl_.calc_J_pen(n_dofs, mem->solution->data(), penalty_param_, lb, ub, l_lb, l_ub, mem->diag->data());
+                impl_.calc_J_pen(n_dofs, mem->solution->data(), penalty_param_, penalty_weights_ ? penalty_weights_->data() : nullptr, lb, ub, l_lb, l_ub, mem->diag->data());
             }
             trap_finite("J_pen", mem->diag->data(), static_cast<ptrdiff_t>(mem->diag->size()));
         }
 
         void penalty_pseudo_galerkin_assembly() {
             SFEM_TRACE_SCOPE("ShiftedPenaltyMultigrid::penalty_pseudo_galerkin_assembly");
+
+            if (restricts_weighted_blocks()) {
+                const int fl = finest_level();
+                weight_fine_blocks();
+                const T* from = weighted_blocks_->data();
+                for (int l = fl; l != coarsest_level(); l = coarser_level(l)) {
+                    auto to = penalty_op_x_op_[coarser_level(l)]->data();
+                    blas_->zeros(to->size(), to->data());
+                    constraints_block_restriction_[l]->apply(from, to->data());
+                    trap_finite("J_pen_blocks_coarse", to->data(), static_cast<ptrdiff_t>(to->size()));
+                    from = to->data();
+                }
+                return;
+            }
 
             for (int l = finest_level(); l != coarsest_level(); l = coarser_level(l)) {
                 auto mem_coarse = memory_[coarser_level(l)];
@@ -820,7 +954,7 @@ namespace sfem {
                 eval_residual_and_jacobian();
 
                 if (constraints_op_) {
-                    smoother->set_op_and_diag_shift(sop, constraints_op_x_op_[level], mem->diag);
+                    smoother->set_op_and_diag_shift(sop, level_op_x_op(level), level_op_x_op_weights(level));
                 } else {
                     smoother->set_op_and_diag_shift(sop, mem->diag);
                 }
@@ -947,7 +1081,7 @@ namespace sfem {
 
             if (coarsest_level() == level) {
                 if (constraints_op_) {
-                    smoother->set_op_and_diag_shift(sop, constraints_op_x_op_[level], mem->diag);
+                    smoother->set_op_and_diag_shift(sop, level_op_x_op(level), level_op_x_op_weights(level));
                 } else {
                     smoother->set_op_and_diag_shift(sop, mem->diag);
                 }
@@ -972,7 +1106,7 @@ namespace sfem {
 
             for (int k = 0; k < this->cycle_type_; k++) {
                 if (constraints_op_) {
-                    smoother->set_op_and_diag_shift(sop, constraints_op_x_op_[level], mem->diag);
+                    smoother->set_op_and_diag_shift(sop, level_op_x_op(level), level_op_x_op_weights(level));
                 } else {
                     smoother->set_op_and_diag_shift(sop, mem->diag);
                 }
@@ -1080,6 +1214,15 @@ namespace sfem {
         std::shared_ptr<Operator<T>>                       constraints_op_transpose_;
         std::vector<std::shared_ptr<SparseBlockVector<T>>> constraints_op_x_op_;
         std::vector<std::shared_ptr<Operator<T>>>          constraints_restriction_;
+        std::vector<std::shared_ptr<Operator<T>>>          constraints_block_restriction_;
+        std::vector<std::shared_ptr<SparseBlockVector<T>>> penalty_op_x_op_;
+        SharedBuffer<T>                                    weighted_blocks_;
+        SharedBuffer<T>                                    fine_block_values_;
+        std::shared_ptr<SparseBlockVector<T>>              fine_blocks_;
+        std::shared_ptr<SparseBlockVector<T>>              fine_shift_;  // weighted_blocks_, unit weights
+        std::shared_ptr<Operator<T>>                       fine_blocks_op_;
+        SharedBuffer<T>                                    unit_weights_;
+        SharedBuffer<T>                                    penalty_weights_;
         std::vector<std::shared_ptr<smesh::Exchange>>      exchanges_;
         std::vector<std::function<void(T* const)>>         apply_zero_constraints_;
         std::function<void(const T* const)>                update_constraints_;
@@ -1114,6 +1257,7 @@ namespace sfem {
         T    penalty_param_increase{10};
         T    atol_{1e-10};
         T    rtol_{1e-10};
+        T    residual_atol_{0};  // 0: atol_
         T    penetration_tol_exp{0.9};
         T    omega_factor{100};
         T    stagnation_threshold{0.999};

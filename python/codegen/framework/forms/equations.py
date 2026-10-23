@@ -31,6 +31,7 @@ from codegen.framework.symbolic.fields import (
     TensorFunction,
     _family_from_qualifier,
     is_previous_symbol,
+    is_quadrature_symbol,
     scalar_field,
     geometric_dimension_context,
     tensor_field,
@@ -93,6 +94,13 @@ class Equation:
     kernels: tuple = ()
     diagnostics: bool = True
     measure: str = "dx"
+    #: Pointwise tensors the material publishes at its integration points, as
+    #: ((name, components), ...).  Evaluated, never integrated: the kernel that
+    #: writes them is a quadrature output, not a form.
+    quadrature_outputs: tuple = ()
+    #: The relaxation groups (`RelaxationDeclaration`) whose step weight,
+    #: history field and stress output this energy carries.
+    relaxations: tuple = ()
 
     def __post_init__(self):
         name = str(self.name)
@@ -121,6 +129,18 @@ class Equation:
         object.__setattr__(self, "kernels", tuple(self.kernels))
         object.__setattr__(self, "diagnostics", bool(self.diagnostics))
         object.__setattr__(self, "measure", str(self.measure))
+        quadrature_outputs = tuple(
+            (str(output_name), tuple(sp.sympify(entry) for entry in components))
+            for output_name, components in (
+                self.quadrature_outputs.items()
+                if isinstance(self.quadrature_outputs, dict)
+                else self.quadrature_outputs
+            )
+        )
+        if quadrature_outputs and form is not EquationForm.ENERGY:
+            raise ValueError("quadrature outputs are published by energy equations")
+        object.__setattr__(self, "quadrature_outputs", quadrature_outputs)
+        object.__setattr__(self, "relaxations", tuple(self.relaxations))
 
     @property
     def is_energy(self):
@@ -193,6 +213,8 @@ class EquationSystem:
         kernels=(),
         diagnostics=True,
         measure="dx",
+        quadrature_outputs=(),
+        relaxations=(),
     ):
         detected_measure = integral_measure(define)
         define = integral_integrand(define)
@@ -208,6 +230,8 @@ class EquationSystem:
             kernels=tuple(kernels),
             diagnostics=diagnostics,
             measure=measure,
+            quadrature_outputs=quadrature_outputs,
+            relaxations=relaxations,
         )
         if equation.name and any(existing.name == equation.name for existing in self._equations):
             raise ValueError("equation '%s' is already registered" % equation.name)
@@ -224,8 +248,13 @@ class EquationSystem:
         directions=(),
         kernels=("objective", "gradient", "apply"),
         diagnostics=True,
+        quadrature_outputs=(),
+        relaxations=(),
     ):
         _validate_energy_variable_groups(fields, variables)
+        quadrature_outputs, relaxations, kernels = _with_relaxation_outputs(
+            quadrature_outputs, relaxations, kernels
+        )
         return self.equation(
             name,
             EquationForm.ENERGY,
@@ -235,6 +264,8 @@ class EquationSystem:
             directions=directions,
             kernels=kernels,
             diagnostics=diagnostics,
+            quadrature_outputs=quadrature_outputs,
+            relaxations=relaxations,
         )
 
     def add_residual(
@@ -422,6 +453,8 @@ class EquationSystemBuilder:
         directions=None,
         kernels=("objective", "gradient", "apply"),
         diagnostics=True,
+        quadrature_outputs=(),
+        relaxations=(),
     ):
         if variables is None:
             raise ValueError("energy requires explicit variables")
@@ -438,6 +471,8 @@ class EquationSystemBuilder:
             directions=direction_symbols,
             kernels=kernels,
             diagnostics=diagnostics,
+            quadrature_outputs=quadrature_outputs,
+            relaxations=relaxations,
         )
 
     def add_residual(
@@ -746,6 +781,21 @@ def total_residual_collection(system, orders=(FormOrder.ONE,)):
     # dependency scan classifies them as parameters.  Anything left over would
     # be taken for field data, which is a runtime failure rather than a wrong
     # number: the kernel would ask for a stream that does not exist.
+    # The residual path carries no integration-point streams yet, and a
+    # component of one taken for a material constant would be a runtime
+    # failure; refuse it here, where the restriction is.
+    for entry in coefficients:
+        for expression in (entry.value,) + tuple(entry.gradient):
+            stored = sorted(
+                str(symbol)
+                for symbol in sp.sympify(expression).free_symbols
+                if is_quadrature_symbol(symbol)
+            )
+            if stored:
+                raise NotImplementedError(
+                    "the total residual does not read integration-point fields yet (%s)"
+                    % ", ".join(stored)
+                )
     reserved = set()
     for field in fields:
         reserved.update(field.current_symbols)
@@ -1116,6 +1166,49 @@ def _evaluation_metadata(evaluation, *, variables=(), directions=()):
     )
 
 
+QUADRATURE_OUTPUT_KERNEL = "quadrature_output"
+
+
+def quadrature_output_dependencies(quadrature_outputs, variables):
+    """What an energy's integration-point outputs read.
+
+    Their own dependency set rather than a form order's: the relaxed stress of
+    a Prony group names the parameters of the relaxed energy only, and reads no
+    history, so its kernel takes exactly those.
+    """
+    components = [
+        component
+        for _name, output_components in quadrature_outputs
+        for component in output_components
+    ]
+    return _expression_dependencies(sp.Matrix(components), variables=variables)
+
+
+def _with_relaxation_outputs(quadrature_outputs, relaxations, kernels):
+    """Fold relaxation groups into the outputs and kernels an energy publishes.
+
+    A group (`PronyRelaxation`) is handed in whole; what the equation keeps is its
+    declaration and the stress output its history update reads.  Any output at
+    all asks for the quadrature-output kernel.
+    """
+    outputs = dict(
+        quadrature_outputs.items() if isinstance(quadrature_outputs, dict) else quadrature_outputs
+    )
+    declarations = []
+    for group in relaxations:
+        declaration = group.declaration() if hasattr(group, "declaration") else group
+        if hasattr(group, "quadrature_outputs"):
+            for output_name, components in group.quadrature_outputs().items():
+                if output_name in outputs:
+                    raise ValueError("quadrature output '%s' is declared twice" % output_name)
+                outputs[output_name] = components
+        declarations.append(declaration)
+    kernels = tuple(kernels)
+    if outputs and QUADRATURE_OUTPUT_KERNEL not in kernels:
+        kernels = kernels + (QUADRATURE_OUTPUT_KERNEL,)
+    return tuple(outputs.items()), tuple(declarations), kernels
+
+
 def _expression_dependencies(expression, *, variables=(), directions=()):
     free_symbols = _free_symbols(expression)
     free_set = set(free_symbols)
@@ -1126,9 +1219,13 @@ def _expression_dependencies(expression, *, variables=(), directions=()):
     # would be classified as scalars a caller sets per block -- which is a
     # runtime failure asking `require_real_value` for `u_old_grad[0]`.
     previous_symbols = tuple(symbol for symbol in free_symbols if is_previous_symbol(symbol))
+    # Integration-point fields are streams read per point, not constants a
+    # caller sets per block.
+    quadrature_symbols = tuple(symbol for symbol in free_symbols if is_quadrature_symbol(symbol))
     categorized = set(current_symbols)
     categorized.update(direction_symbols)
     categorized.update(previous_symbols)
+    categorized.update(quadrature_symbols)
     parameters = tuple(symbol for symbol in free_symbols if symbol not in categorized)
     return FormDependencies(
         current=bool(current_symbols),
@@ -1138,6 +1235,7 @@ def _expression_dependencies(expression, *, variables=(), directions=()):
         current_symbols=current_symbols,
         previous_symbols=previous_symbols,
         direction_symbols=direction_symbols,
+        quadrature_symbols=quadrature_symbols,
         symbols=free_symbols,
     )
 

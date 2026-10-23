@@ -2,7 +2,7 @@
  * @file sfem_MRPureElasticValidation.cpp
  * @brief Pure elastic Mooney-Rivlin validation against analytical formulas
  * 
- * Validates the MooneyRivlinVisco class (C++ frontend + C backend) against
+ * Validates the GeneratedMooneyRivlinProny operator against
  * analytical engineering stress formulas from continuummechanics.org:
  * https://www.continuummechanics.org/mooneyrivlin.html
  * 
@@ -15,11 +15,11 @@
  *      The analytical formulas assume J=1 (volume preserving deformation).
  * 
  * Operators exercised:
- * - MooneyRivlinVisco::set_C10, set_C01, set_K
- * - MooneyRivlinVisco::set_prony_terms(0, ...) for pure elastic
- * - MooneyRivlinVisco::initialize, initialize_history
- * - MooneyRivlinVisco::gradient (to compute reaction forces)
- * - MooneyRivlinVisco::get_gamma, get_num_active_terms
+ * - C10, C01, K set per block
+ * - an empty Prony series for pure elastic
+ * - initialize
+ * - gradient (to compute reaction forces)
+ * - the relaxation's gamma and term count
  * 
  * C backend kernels exercised:
  * - hex8_mooney_rivlin_grad_flexible (algorithmic gradient)
@@ -38,7 +38,7 @@
 #include "sfem_API.hpp"
 #include "sfem_context.hpp"
 #include "sfem_Function.hpp"
-#include "sfem_MooneyRivlinVisco.hpp"
+#include "sfem_prony_test_material.hpp"
 
 // ============================================================================
 // Analytical formulas for UNIMODULAR (Isochoric) Mooney-Rivlin
@@ -192,26 +192,17 @@ int run_validation(TestMode mode, double C10, double C01, double K, bool use_fle
     
     auto fs = sfem::FunctionSpace::create(mesh, 3);
     
-    // Create operator
-    auto op = std::make_shared<sfem::MooneyRivlinVisco>(fs);
-    
-    // Set material parameters
-    op->set_C10(C10);
-    op->set_C01(C01);
-    op->set_K(K);
-    op->set_dt(0.01);  // Doesn't matter for pure elastic
-    
-    // KEY: Set zero Prony terms for PURE ELASTIC behavior
-    op->set_prony_terms(0, nullptr, nullptr);
-    
-    // Test both flexible and non-flexible paths
-    
-    op->initialize();
-    op->initialize_history();
-    
+    // Create operator: zero Prony terms is the pure elastic material.
+    sfem::test::PronyMooneyRivlin material;
+    material.C10 = C10;
+    material.C01 = C01;
+    material.K   = K;
+    auto op      = sfem::test::make_prony_mooney_rivlin(fs, material);
+    if (!op) return 1;
+
     // Verify pure elastic state
-    printf("  num_active_terms = %d (should be 0)\n", op->get_num_active_terms());
-    printf("  gamma = %.6f (should be ~1.0 for pure elastic)\n", op->get_gamma());
+    printf("  num_terms = %d (should be 0)\n", op->relaxation_groups().relaxation(mesh->blocks()[0]->name(), "iso").series().n_terms());
+    printf("  gamma = %.6f (should be ~1.0 for pure elastic)\n", sfem::test::prony_gamma(*op, fs));
     
     // Prepare buffers
     const ptrdiff_t ndofs = fs->n_dofs();
@@ -398,7 +389,7 @@ int main(int argc, char *argv[]) {
     printf("  Mooney-Rivlin Pure Elastic Validation Test\n");
     printf("==========================================================\n");
     printf("\n");
-    printf("This test validates your MooneyRivlinVisco class against\n");
+    printf("This test validates GeneratedMooneyRivlinProny against\n");
     printf("analytical formulas from continuummechanics.org.\n");
     printf("\n");
     printf("Your implementation: UNIMODULAR (I1b, I2b)\n");
@@ -409,11 +400,11 @@ int main(int argc, char *argv[]) {
     printf("This test uses UNIMODULAR analytical formulas to match your code.\n");
     printf("\n");
     printf("Operators being tested:\n");
-    printf("  - MooneyRivlinVisco::set_C10, set_C01, set_K\n");
-    printf("  - MooneyRivlinVisco::set_prony_terms(0, ...)\n");
-    printf("  - MooneyRivlinVisco::initialize(), initialize_history()\n");
-    printf("  - MooneyRivlinVisco::gradient()\n");
-    printf("  - MooneyRivlinVisco::get_gamma(), get_num_active_terms()\n");
+    printf("  - C10, C01, K per block\n");
+    printf("  - an empty Prony series\n");
+    printf("  - initialize()\n");
+    printf("  - gradient()\n");
+    printf("  - the relaxation's gamma and term count\n");
     printf("\n");
     printf("C backend kernels exercised:\n");
     printf("  - hex8_mooney_rivlin_grad_flexible\n");

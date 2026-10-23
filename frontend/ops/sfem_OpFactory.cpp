@@ -9,13 +9,11 @@
 #include "generated/neumann_general/op/sfem_GeneratedNeumannGeneral.hpp"
 #include "sfem_Gradient.hpp"
 #include "sfem_Hyperelasticity.hpp"
-#include "sfem_KelvinVoigtNewmark.hpp"
 #include "sfem_Laplacian.hpp"
 #include "sfem_LinearElasticity.hpp"
 #include "sfem_LumpedMass.hpp"
 #include "sfem_Mass.hpp"
 #include "sfem_MooneyRivlinActiveStrainPacked.hpp"
-#include "sfem_MooneyRivlinVisco.hpp"
 #include "sfem_InertiaPotential.hpp"
 #include "sfem_NeoHookeanOgden.hpp"
 #include "sfem_NeoHookeanOgdenActiveStrainPacked.hpp"
@@ -53,7 +51,6 @@ namespace sfem {
         static Factory instance_;
 
         if (instance_.impl_->name_to_create.empty()) {
-            instance_.private_register_op("KelvinVoigtNewmark", KelvinVoigtNewmark::create);
             instance_.private_register_op("InertiaPotential", InertiaPotential::create);
             // The two names this operator used to have.  It never implemented
             // either method -- it is a lumped mass about a predictor, and the
@@ -80,7 +77,6 @@ namespace sfem {
             instance_.private_register_op("NeoHookeanOgdenActiveStrainPacked", NeoHookeanOgdenActiveStrainPacked::create);
             instance_.private_register_op("MooneyRivlin", MooneyRivlinActiveStrainPacked::create);
             instance_.private_register_op("MooneyRivlinActiveStrainPacked", MooneyRivlinActiveStrainPacked::create);
-            instance_.private_register_op("MooneyRivlinVisco", MooneyRivlinVisco::create);
             instance_.private_register_op("Hyperelasticity", Hyperelasticity::create);
             instance_.private_register_op("PackedLaplacian", PackedLaplacian::create);
             instance_.private_register_op("Gradient", Gradient::create);

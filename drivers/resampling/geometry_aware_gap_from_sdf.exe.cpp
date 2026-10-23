@@ -20,6 +20,7 @@
 
 #include "mesh_utils.hpp"
 #include "sfem_API.hpp"
+#include "sfem_SDFObstacle.hpp"
 
 int main(int argc, char* argv[]) {
     MPI_Init(&argc, &argv);
@@ -117,22 +118,27 @@ int main(int argc, char* argv[]) {
 
     if (size > 1) {
         geom_t* psdf;
-        sdf_view(comm,
-                 mesh->n_nodes(),
-                 mesh->points()->data()[2],
-                 nlocal,
-                 nglobal,
-                 stride,
-                 origin,
-                 delta,
-                 sdf,
-                 &psdf,
-                 &nlocal[2],
-                 &origin[2]);
+        // A margin of 12 layers: the B-spline prefilter's reach to float precision.
+        sdf_view_ensure_margin(comm,
+                               mesh->n_nodes(),
+                               mesh->points()->data()[2],
+                               nlocal,
+                               nglobal,
+                               stride,
+                               origin,
+                               delta,
+                               sdf,
+                               12,
+                               &psdf,
+                               &nlocal[2],
+                               &origin[2]);
 
         free(sdf);
         sdf = psdf;
     }
+
+    // The interpolating cubic B-spline coefficients the sampling kernels read (sfem_sdf_sampling.hpp).
+    auto spline = sfem::SDFBSpline::create(nlocal, stride, sdf);
 
     // Edge graph for resampling on sharp edges
     ptrdiff_t n_sharp_edges = 0;
@@ -205,10 +211,10 @@ int main(int argc, char* argv[]) {
                 mesh->points()->data(),
                 // SDF
                 nlocal,
-                stride,
+                spline->stride->data(),
                 origin,
                 delta,
-                sdf,
+                spline->origin_coefficient(),
                 // Output
                 g,
                 xnormal,
@@ -229,10 +235,10 @@ int main(int argc, char* argv[]) {
                 mesh->points()->data(),
                 // SDF
                 nlocal,
-                stride,
+                spline->stride->data(),
                 origin,
                 delta,
-                sdf,
+                spline->origin_coefficient(),
                 // Output
                 g,
                 xnormal,
@@ -265,10 +271,10 @@ int main(int argc, char* argv[]) {
                     mesh->points()->data(),
                     // SDF
                     nlocal,
-                    stride,
+                    spline->stride->data(),
                     origin,
                     delta,
-                    sdf,
+                    spline->origin_coefficient(),
                     // Output
                     g,
                     xnormal,
@@ -301,10 +307,10 @@ int main(int argc, char* argv[]) {
                 corner_points,
                 // SDF
                 nlocal,
-                stride,
+                spline->stride->data(),
                 origin,
                 delta,
-                sdf,
+                spline->origin_coefficient(),
                 // Output
                 p_g,
                 p_xnormal,

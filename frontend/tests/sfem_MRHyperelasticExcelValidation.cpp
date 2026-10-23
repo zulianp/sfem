@@ -16,7 +16,7 @@
 
 #include "sfem_API.hpp"
 #include "sfem_Function.hpp"
-#include "sfem_MooneyRivlinVisco.hpp"
+#include "sfem_prony_test_material.hpp"
 
 enum TestMode {
     MODE_UNIAXIAL = 0,
@@ -130,20 +130,13 @@ TestResult run_hyperelastic_test(TestMode mode, const RefData& ref) {
     );
     
     auto fs = sfem::FunctionSpace::create(mesh, 3);
-    auto op = std::make_shared<sfem::MooneyRivlinVisco>(fs);
-    
-    // Set hyperelastic parameters only
-    op->set_C10(MARC_C10);
-    op->set_C01(MARC_C01);
-    op->set_K(MARC_K);
-    op->set_dt(1.0);  // Doesn't matter for pure hyperelastic
-    
-    // NO Prony series - pure hyperelastic
-    // NO WLF temperature shift
-    op->enable_wlf(false);
-    
-    op->initialize();
-    op->initialize_history();
+    // Pure hyperelastic: an empty Prony series, no WLF shift.
+    sfem::test::PronyMooneyRivlin material;
+    material.C10 = MARC_C10;
+    material.C01 = MARC_C01;
+    material.K   = MARC_K;
+    auto op      = sfem::test::make_prony_mooney_rivlin(fs, material);
+    if (!op) return TestResult{};
     
     printf("  C10=%.6f MPa, C01=%.6f MPa, K=%.1f MPa\n", MARC_C10, MARC_C01, MARC_K);
     printf("  Prony terms: 0 (pure hyperelastic)\n");

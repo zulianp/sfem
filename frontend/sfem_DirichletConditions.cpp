@@ -401,26 +401,36 @@ namespace sfem {
     }
 #ifdef SFEM_ENABLE_RYAML
     std::shared_ptr<DirichletConditions> DirichletConditions::create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
-                                                                               const ryml::NodeRef                  &node) {
+                                                                               const ryml::ConstNodeRef             &node,
+                                                                               const SidesetLookup                  &lookup) {
         SFEM_TRACE_SCOPE("DirichletConditions::create_from_yaml");
 
         auto dc = std::make_unique<DirichletConditions>(space);
 
         for (auto c : node.children()) {
-            std::shared_ptr<Sideset>       sideset;
-            std::shared_ptr<Buffer<idx_t>> nodeset;
+            std::vector<std::shared_ptr<Sideset>> sidesets;
+            std::shared_ptr<Buffer<idx_t>>        nodeset;
 
             const bool is_sideset = c["type"].readable() && c["type"].val() == "sideset";
             const bool is_file    = c["format"].readable() && c["format"].val() == "file";
             const bool is_expr    = c["format"].readable() && c["format"].val() == "expr";
+            const bool is_name    = c["format"].readable() && c["format"].val() == "name";
 
-            assert(is_file || is_expr);
+            assert(is_file || is_expr || (is_sideset && is_name));
 
             if (is_sideset) {
-                if (is_file) {
+                if (is_name) {
+                    std::string name;
+                    c["name"].load(&name);
+                    sidesets = lookup.find(name);
+                    if (sidesets.empty()) {
+                        fprintf(stderr, "DirichletConditions: no sideset named \"%s\"\n", name.c_str());
+                        return nullptr;
+                    }
+                } else if (is_file) {
                     std::string path;
                     c["path"].load(&path);
-                    sideset = Sideset::create_from_file(space->mesh_ptr()->comm(), smesh::Path(path));
+                    sidesets = {Sideset::create_from_file(space->mesh_ptr()->comm(), smesh::Path(lookup.resolve(path)))};
                 } else if (is_expr) {
                     assert(c["parent"].is_seq());
                     assert(c["lfi"].is_seq());
@@ -440,14 +450,16 @@ namespace sfem {
                     }
 
                     assert(lfi_count == parent_count);
-                    sideset = std::make_shared<Sideset>(space->mesh_ptr()->comm(), parent, lfi);
+                    sidesets = {std::make_shared<Sideset>(space->mesh_ptr()->comm(), parent, lfi)};
                 }
 
-                nodeset = smesh::create_nodeset_from_sideset(space->mesh_ptr(), sideset);
+                nodeset = sidesets.size() == 1 ? smesh::create_nodeset_from_sideset(space->mesh_ptr(), sidesets[0])
+                                               : smesh::create_nodeset_from_sidesets(space->mesh_ptr(), sidesets);
             } else {
                 if (is_file) {
                     std::string path;
                     c["path"].load(&path);
+                    path    = lookup.resolve(path);
                     nodeset = Buffer<idx_t>::from_file(smesh::Path(path));
                     if (!nodeset) {
                         SFEM_ERROR("Unable to read file %s!\n", path.c_str());
@@ -501,6 +513,7 @@ namespace sfem {
 
                 std::string value_path;
                 node_value["path"].load(&value_path);
+                value_path  = lookup.resolve(value_path);
                 file_values = Buffer<real_t>::from_file(smesh::Path(value_path));
                 if (!file_values || file_values->size() != nodeset->size()) {
                     SFEM_ERROR("Dirichlet value file %s has %td entries; expected %td\n",
@@ -541,7 +554,7 @@ namespace sfem {
                 cdc.component = component[i];
                 cdc.value     = file_values ? 0 : value[i];
                 cdc.values    = file_values;
-                cdc.sidesets.push_back(sideset);
+                cdc.sidesets = sidesets;
                 cdc.nodeset = nodeset;
                 cdc.profile = profile;
                 dc->impl_->conditions.push_back(cdc);

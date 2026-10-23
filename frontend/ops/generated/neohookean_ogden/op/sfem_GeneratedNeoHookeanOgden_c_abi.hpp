@@ -599,6 +599,12 @@ extern "C" int neohookean_ogden_hessian_bsr_3d_i_msoa(
         void *const RSTR values
 );
 
+extern "C" void neohookean_ogden_hex27_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
+
+extern "C" const sfem_MatrixAssemblyDiagnostics *neohookean_ogden_hex27_matrix_assembly_variant(const int variant);
+
+extern "C" int neohookean_ogden_hex27_matrix_assembly_variant_count();
+
 extern "C" void neohookean_ogden_hex8_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
 
 extern "C" const sfem_MatrixAssemblyDiagnostics *neohookean_ogden_hex8_matrix_assembly_variant(const int variant);
@@ -932,6 +938,12 @@ extern "C" int neohookean_ogden_objective_steps_packed_3d_i_msoa(
         void *const RSTR value
 );
 
+extern "C" void neohookean_ogden_proteus_hex27_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
+
+extern "C" const sfem_MatrixAssemblyDiagnostics *neohookean_ogden_proteus_hex27_matrix_assembly_variant(const int variant);
+
+extern "C" int neohookean_ogden_proteus_hex27_matrix_assembly_variant_count();
+
 extern "C" void neohookean_ogden_proteus_hex8_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
 
 extern "C" const sfem_MatrixAssemblyDiagnostics *neohookean_ogden_proteus_hex8_matrix_assembly_variant(const int variant);
@@ -1005,3 +1017,9 @@ extern "C" void neohookean_ogden_tri3_matrix_assembly_print_variant(const int va
 extern "C" const sfem_MatrixAssemblyDiagnostics *neohookean_ogden_tri3_matrix_assembly_variant(const int variant);
 
 extern "C" int neohookean_ogden_tri3_matrix_assembly_variant_count();
+
+extern "C" void neohookean_ogden_tri6_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
+
+extern "C" const sfem_MatrixAssemblyDiagnostics *neohookean_ogden_tri6_matrix_assembly_variant(const int variant);
+
+extern "C" int neohookean_ogden_tri6_matrix_assembly_variant_count();

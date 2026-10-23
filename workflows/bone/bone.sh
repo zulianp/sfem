@@ -40,5 +40,5 @@ fi
 export SFEM_USE_PARTIAL_ASSEMBLY=1
 export SFEM_USE_COMPRESSION=1
 export SFEM_NEOHOOKEAN_OGDEN_USE_AOS=1
-$LAUNCH hyperelasticy bone_geometry/bone dirichlet.yaml output
+$LAUNCH playground bone.yaml
 raw_to_db bone_geometry/bone output.vtk -p 'output/out/*.*' $EXTRA_OPTIONS

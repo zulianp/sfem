@@ -230,6 +230,75 @@ extern "C" int cu_laplace_gradient_3d_i_msoa(
 extern "C" const sfem::codegen::KernelDiagnostics *cu_laplace_gradient_3d_soa_diagnostics(
     const smesh::ElemType element_type);
 
+extern "C" int cu_laplace_hessian_bsr_2d_a_msoa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
+        const real_t kappa,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values,
+        void *const stream
+);
+
+extern "C" int cu_laplace_hessian_bsr_2d_i_msoa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t kappa,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values,
+        void *const stream
+);
+
+extern "C" int cu_laplace_hessian_bsr_3d_a_msoa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
+        const real_t kappa,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values,
+        void *const stream
+);
+
+extern "C" int cu_laplace_hessian_bsr_3d_i_msoa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t kappa,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values,
+        void *const stream
+);
+
 extern "C" void laplace_hex8_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
 
 extern "C" const sfem_MatrixAssemblyDiagnostics *laplace_hex8_matrix_assembly_variant(const int variant);

@@ -99,6 +99,8 @@ static int rescale_with_weight(const smesh::ElemType        element_type,
     return SFEM_SUCCESS;
 }
 
+static int cu_zero_normals(const ptrdiff_t nnodes, real_t** const SFEM_RESTRICT normals);
+
 extern "C" int cu_resample_gap(
         // Mesh
         const smesh::ElemType        element_type,
@@ -120,8 +122,8 @@ extern "C" int cu_resample_gap(
     smesh::ElemType st = smesh::shell_type(element_type);
     cudaMemset(g, 0, nnodes * sizeof(real_t));
 
-    int err = 0;
-    err     = cu_resample_gap_local(st, nelements, nnodes, elems, xyz, n, stride, origin, delta, data, g, normals);
+    int err = cu_zero_normals(nnodes, normals);
+    err |= cu_resample_gap_local(st, nelements, nnodes, elems, xyz, n, stride, origin, delta, data, g, normals);
     err |= rescale_with_weight(element_type, nelements, nnodes, elems, xyz, g);
     err |= cu_normalize(nnodes, normals);
 
@@ -213,6 +215,25 @@ extern "C" int cu_resample_gap_normals_local(
     }
 }
 
+__global__ void cu_zero_normals_kernel(const ptrdiff_t nnodes, real_t** const SFEM_RESTRICT normals) {
+    for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < nnodes; i += gridDim.x * blockDim.x) {
+        normals[0][i] = 0;
+        normals[1][i] = 0;
+        normals[2][i] = 0;
+    }
+}
+
+// The local kernels accumulate the normals
+static int cu_zero_normals(const ptrdiff_t nnodes, real_t** const SFEM_RESTRICT normals) {
+    if (!nnodes) return SFEM_SUCCESS;
+
+    int             block_size = 128;
+    const ptrdiff_t n_blocks   = MAX(ptrdiff_t(1), (nnodes + block_size - 1) / block_size);
+    cu_zero_normals_kernel<<<n_blocks, block_size, 0>>>(nnodes, normals);
+    SFEM_DEBUG_SYNCHRONIZE();
+    return SFEM_SUCCESS;
+}
+
 __global__ void cu_normalize_kernel(const ptrdiff_t nnodes, real_t** const SFEM_RESTRICT normals) {
     for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < nnodes; i += gridDim.x * blockDim.x) {
         const real_t nx = normals[0][i];
@@ -259,7 +280,8 @@ extern "C" int cu_resample_gap_normals(
         real_t** const SFEM_RESTRICT normals) {
     if (!nelements) return SFEM_SUCCESS;
 
-    int err = cu_resample_gap_normals_local(
+    int err = cu_zero_normals(nnodes, normals);
+    err |= cu_resample_gap_normals_local(
             smesh::shell_type(element_type), nelements, nnodes, elems, xyz, n, stride, origin, delta, data, normals);
     err |= cu_normalize(nnodes, normals);
     return err;

@@ -1,6 +1,8 @@
 #include "beam2_resample.hpp"
 #include "beam2_mass.hpp"
 
+#include "sfem_sdf_sampling.hpp"
+
 #include <math.h>
 #include <stdio.h>
 
@@ -9,7 +11,10 @@
 
 #define SFEM_RESAMPLE_GAP_DUAL
 
-static SFEM_INLINE real_t put_inside(const real_t v) { return MIN(MAX(1e-7, v), 1 - 1e-7); }
+// The gap where a point lies outside the SDF grid: large, so the constraint stays inactive,
+// as on the other shells.
+static const real_t infty = SFEM_SDF_UNREACHABLE;
+static const real_t SFEM_SDF_GRAD_EPS = 1e-12;
 
 #define EDGE2_NQP 12
 static real_t edge2_qx[EDGE2_NQP] = {0.009219682876640489244124410106451250612735748291015625000000,
@@ -72,92 +77,6 @@ SFEM_INLINE static void beam2_transform(
     *out_z = pz0 + x * (-pz0 + pz1);
 }
 
-SFEM_INLINE static void hex_aa_8_eval_fun(
-        // Quadrature point (local coordinates)
-        const real_t x,
-        const real_t y,
-        const real_t z,
-        // Output
-        real_t* const SFEM_RESTRICT f) {
-    f[0] = (1.0 - x) * (1.0 - y) * (1.0 - z);
-    f[1] = x * (1.0 - y) * (1.0 - z);
-    f[2] = x * y * (1.0 - z);
-    f[3] = (1.0 - x) * y * (1.0 - z);
-    f[4] = (1.0 - x) * (1.0 - y) * z;
-    f[5] = x * (1.0 - y) * z;
-    f[6] = x * y * z;
-    f[7] = (1.0 - x) * y * z;
-}
-
-SFEM_INLINE static void hex_aa_8_eval_grad(
-        // Quadrature point (local coordinates)
-        const real_t x,
-        const real_t y,
-        const real_t z,
-        // Output
-        real_t* const SFEM_RESTRICT gx,
-        real_t* const SFEM_RESTRICT gy,
-        real_t* const SFEM_RESTRICT gz) {
-    // Transformation to ref element
-    gx[0] = -(1.0 - y) * (1.0 - z);
-    gy[0] = -(1.0 - x) * (1.0 - z);
-    gz[0] = -(1.0 - x) * (1.0 - y);
-
-    gx[1] = (1.0 - y) * (1.0 - z);
-    gy[1] = -x * (1.0 - z);
-    gz[1] = -x * (1.0 - y);
-
-    gx[2] = y * (1.0 - z);
-    gy[2] = x * (1.0 - z);
-    gz[2] = -x * y;
-
-    gx[3] = -y * (1.0 - z);
-    gy[3] = (1.0 - x) * (1.0 - z);
-    gz[3] = -(1.0 - x) * y;
-
-    gx[4] = -(1.0 - y) * z;
-    gy[4] = -(1.0 - x) * z;
-    gz[4] = (1.0 - x) * (1.0 - y);
-
-    gx[5] = (1.0 - y) * z;
-    gy[5] = -x * z;
-    gz[5] = x * (1.0 - y);
-
-    gx[6] = y * z;
-    gy[6] = x * z;
-    gz[6] = x * y;
-
-    gx[7] = -y * z;
-    gy[7] = (1.0 - x) * z;
-    gz[7] = (1.0 - x) * y;
-}
-
-SFEM_INLINE static void hex_aa_8_collect_coeffs(const ptrdiff_t* const SFEM_RESTRICT stride,
-                                                const ptrdiff_t                      i,
-                                                const ptrdiff_t                      j,
-                                                const ptrdiff_t                      k,
-                                                // Attention this is geometric data transformed to solver data!
-                                                const geom_t* const SFEM_RESTRICT data,
-                                                real_t* const SFEM_RESTRICT       out) {
-    const ptrdiff_t i0 = i * stride[0] + j * stride[1] + k * stride[2];
-    const ptrdiff_t i1 = (i + 1) * stride[0] + j * stride[1] + k * stride[2];
-    const ptrdiff_t i2 = (i + 1) * stride[0] + (j + 1) * stride[1] + k * stride[2];
-    const ptrdiff_t i3 = i * stride[0] + (j + 1) * stride[1] + k * stride[2];
-    const ptrdiff_t i4 = i * stride[0] + j * stride[1] + (k + 1) * stride[2];
-    const ptrdiff_t i5 = (i + 1) * stride[0] + j * stride[1] + (k + 1) * stride[2];
-    const ptrdiff_t i6 = (i + 1) * stride[0] + (j + 1) * stride[1] + (k + 1) * stride[2];
-    const ptrdiff_t i7 = i * stride[0] + (j + 1) * stride[1] + (k + 1) * stride[2];
-
-    out[0] = data[i0];
-    out[1] = data[i1];
-    out[2] = data[i2];
-    out[3] = data[i3];
-    out[4] = data[i4];
-    out[5] = data[i5];
-    out[6] = data[i6];
-    out[7] = data[i7];
-}
-
 int beam2_resample_gap_local(
         // Mesh
         const ptrdiff_t              nelements,
@@ -175,24 +94,11 @@ int beam2_resample_gap_local(
         real_t* const SFEM_RESTRICT xnormal,
         real_t* const SFEM_RESTRICT ynormal,
         real_t* const SFEM_RESTRICT znormal) {
-    const real_t ox = (real_t)origin[0];
-    const real_t oy = (real_t)origin[1];
-    const real_t oz = (real_t)origin[2];
-
-    const real_t dx = (real_t)delta[0];
-    const real_t dy = (real_t)delta[1];
-    const real_t dz = (real_t)delta[2];
 
 #pragma omp parallel for  // nowait
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t  ev[3];
         geom_t x[3], y[3], z[3];
-
-        real_t hex8_f[8];
-        real_t hex8_grad_x[8];
-        real_t hex8_grad_y[8];
-        real_t hex8_grad_z[8];
-        real_t coeffs[8];
 
         real_t beam2_f[2];
         real_t element_gap[2];
@@ -220,6 +126,16 @@ int beam2_resample_gap_local(
 
         assert(measure > 0);
 
+        // The edge's own normal in the xy-plane, for points outside the grid and flat SDF cells.
+        real_t face_nx, face_ny;
+        const real_t face_nz = 0;
+        {
+            const real_t ux = x[1] - x[0], uy = y[1] - y[0];
+            const real_t len = sqrt(ux * ux + uy * uy);
+            face_nx          = uy / len;
+            face_ny          = -ux / len;
+        }
+
         for (int q = 0; q < EDGE2_NQP; q++) {
             real_t g_qx, g_qy, g_qz;
             beam2_transform(x[0], x[1], y[0], y[1], z[0], z[1], edge2_qx[q], &g_qx, &g_qy, &g_qz);
@@ -242,56 +158,21 @@ int beam2_resample_gap_local(
 
             const real_t dV = measure * edge2_qw[q];
 
-            const real_t grid_x = (g_qx - ox) / dx;
-            const real_t grid_y = (g_qy - oy) / dy;
-            const real_t grid_z = (g_qz - oz) / dz;
-
-            const ptrdiff_t i = floor(grid_x);
-            const ptrdiff_t j = floor(grid_y);
-            const ptrdiff_t k = floor(grid_z);
-
+            real_t eval_value, eval_grad[3];
             // If outside
-            if (i < 0 || j < 0 || k < 0 || (i + 1 >= n[0]) || (j + 1 >= n[1]) || (k + 1 >= n[2])) {
-                SFEM_ERROR(
-                        "(%g, %g, %g) (%ld, %ld, %ld) outside domain  (%ld, %ld, "
-                        "%ld)!\n",
-                        g_qx,
-                        g_qy,
-                        g_qz,
-                        i,
-                        j,
-                        k,
-                        n[0],
-                        n[1],
-                        n[2]);
+            if (!sdf_sample<1>(n, stride, origin, delta, data, g_qx, g_qy, g_qz, &eval_value, eval_grad, nullptr)) {
+                for (int edof_i = 0; edof_i < 2; edof_i++) {
+                    element_gap[edof_i] += -infty * beam2_f[edof_i] * dV;
+                    element_xnormal[edof_i] += face_nx * beam2_f[edof_i] * dV;
+                    element_ynormal[edof_i] += face_ny * beam2_f[edof_i] * dV;
+                    element_znormal[edof_i] += face_nz * beam2_f[edof_i] * dV;
+                }
                 continue;
             }
 
-            // Get the reminder [0, 1]
-            real_t l_x = (grid_x - i);
-            real_t l_y = (grid_y - j);
-            real_t l_z = (grid_z - k);
-
-            assert(l_x >= -1e-8);
-            assert(l_y >= -1e-8);
-            assert(l_z >= -1e-8);
-
-            assert(l_x <= 1 + 1e-8);
-            assert(l_y <= 1 + 1e-8);
-            assert(l_z <= 1 + 1e-8);
-
-            hex_aa_8_eval_fun(l_x, l_y, l_z, hex8_f);
-            hex_aa_8_eval_grad(put_inside(l_x), put_inside(l_y), put_inside(l_z), hex8_grad_x, hex8_grad_y, hex8_grad_z);
-            hex_aa_8_collect_coeffs(stride, i, j, k, data, coeffs);
-
             // Integrate gap function
             {
-                real_t eval_gap = 0;
-
-#pragma unroll(8)
-                for (int edof_j = 0; edof_j < 8; edof_j++) {
-                    eval_gap += hex8_f[edof_j] * coeffs[edof_j];
-                }
+                const real_t eval_gap = eval_value;
 
 #pragma unroll(2)
                 for (int edof_i = 0; edof_i < 2; edof_i++) {
@@ -300,26 +181,21 @@ int beam2_resample_gap_local(
             }
 
             {
-                real_t eval_xnormal = 0;
-                real_t eval_ynormal = 0;
-                real_t eval_znormal = 0;
+                real_t eval_xnormal = eval_grad[0];
+                real_t eval_ynormal = eval_grad[1];
+                real_t eval_znormal = eval_grad[2];
 
-#pragma unroll(8)
-                for (int edof_j = 0; edof_j < 8; edof_j++) {
-                    eval_xnormal += hex8_grad_x[edof_j] * coeffs[edof_j];
-                    eval_ynormal += hex8_grad_y[edof_j] * coeffs[edof_j];
-                    eval_znormal += hex8_grad_z[edof_j] * coeffs[edof_j];
-                }
+                const real_t denom = sqrt(eval_xnormal * eval_xnormal + eval_ynormal * eval_ynormal + eval_znormal * eval_znormal);
 
-                {
-                    // Normalize
-                    real_t denom = sqrt(eval_xnormal * eval_xnormal + eval_ynormal * eval_ynormal + eval_znormal * eval_znormal);
-
-                    assert(denom != 0);
-
+                if (denom >= SFEM_SDF_GRAD_EPS) {
                     eval_xnormal /= denom;
                     eval_ynormal /= denom;
                     eval_znormal /= denom;
+                } else {
+                    // Flat SDF cell: fall back to geometric face normal
+                    eval_xnormal = face_nx;
+                    eval_ynormal = face_ny;
+                    eval_znormal = face_nz;
                 }
 
 #pragma unroll(2)
@@ -347,7 +223,6 @@ int beam2_resample_gap_local(
     return SFEM_SUCCESS;
 }
 
-
 int beam2_resample_weight_local(
         // Mesh
         const ptrdiff_t              nelements,
@@ -359,5 +234,4 @@ int beam2_resample_weight_local(
 {
 	return beam2_assemble_lumped_mass(nelements, nnodes, elems, xyz, w);
 }
-
 

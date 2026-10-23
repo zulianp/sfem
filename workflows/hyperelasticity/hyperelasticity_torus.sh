@@ -43,12 +43,10 @@ fi
 echo "OMP_NUM_THREADS=$OMP_NUM_THREADS"
 echo "OMP_PROC_BIND=$OMP_PROC_BIND"
 
-export SFEM_FIRST_LAME_PARAMETER=2
-export SFEM_SHEAR_MODULUS=2
 
 rm -rf output_torus
 export SFEM_NEOHOOKEAN_OGDEN_USE_AOS=1
-$LAUNCH hyperelasticy geometry_torus/torus dirichlet_torus.yaml output_torus
+$LAUNCH playground hyperelasticity_torus.yaml
 
 raw_to_db output_torus/mesh output_torus/output_torus.vtk -p 'output_torus/out/*.*' $EXTRA_OPTIONS
 

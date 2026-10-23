@@ -316,7 +316,7 @@ namespace sfem {
             }
         }
 
-        return SFEM_FAILURE;
+        return SFEM_SUCCESS;
     }
 
     bool YAMLNoIndent::key_exists(const std::string &key) const { return impl_->key_exists(key); }

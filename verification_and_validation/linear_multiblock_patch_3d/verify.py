@@ -11,7 +11,7 @@ SUITE_DIR = Path(__file__).resolve().parents[1]
 if str(SUITE_DIR) not in sys.path:
     sys.path.insert(0, str(SUITE_DIR))
 
-from common.affine import read_component_output
+from common.affine import read_component_output, read_final_objective
 from common.mesh import read_mesh
 from common.metrics import relative_l2_error
 from common.raw import read_raw
@@ -33,10 +33,9 @@ def main():
     interior = read_raw(mesh_root / "sets/interior.int32.raw", np.int32).astype(np.int64)
     right = read_raw(mesh_root / "sets/right.int32.raw", np.int32).astype(np.int64)
     solution = args.output / "solution"
-    observed_displacement = read_component_output(solution, "x", 3, mesh.n_points)
-    reaction = read_component_output(solution, "material_reaction", 3, mesh.n_points)
-    quantities = yaml.safe_load((solution / "quantities.yaml").read_text(encoding="utf-8"))
-    observed_energy = float(quantities["material_objective"])
+    observed_displacement = read_component_output(solution / "out", "disp", 3, mesh.n_points)
+    reaction = read_component_output(solution / "out", "material_reaction", 3, mesh.n_points)
+    observed_energy = read_final_objective(solution)
 
     material = config["material"]
     exact = response(material)

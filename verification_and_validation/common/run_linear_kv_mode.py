@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+"""Run the linear Kelvin-Voigt damped mode at three time-step sizes on the elasticity playground."""
+
 import argparse
 import os
 from pathlib import Path
@@ -13,9 +15,10 @@ SUITE_DIR = Path(__file__).resolve().parents[1]
 if str(SUITE_DIR) not in sys.path:
     sys.path.insert(0, str(SUITE_DIR))
 
+from common import playground
 from common.mesh import read_mesh
 from common.sets import write_nodeset
-from common.transient import TIME_LEVELS, run_checked, write_modal_initial_fields
+from common.transient import TIME_LEVELS, write_modal_initial_fields
 
 
 def modal_initial_acceleration(material, length, amplitude, velocity):
@@ -28,6 +31,50 @@ def modal_initial_acceleration(material, length, amplitude, velocity):
     return -twice_decay * float(velocity) - omega_0_squared * float(amplitude)
 
 
+def generated_material(material):
+    """The case's law, sigma = K tr(eps) I + k dev(eps) + eta dev(eps_dot), in the generated
+    material's parameters: sigma = 2 mu eps + lmbda tr(eps) I + 2 eta_s dev(eps_dot)."""
+    k = float(material["shear_stiffness"])
+    K = float(material["bulk_modulus"])
+    return {
+        "type": "GeneratedLinearKelvinVoigt",
+        "mu": k / 2,
+        "lmbda": K - k / 3,
+        "eta_s": float(material["damping"]) / 2,
+        "eta_b": 0.0,
+    }
+
+
+def mode_case(args, material, density, output, dirichlet, dt=None, steps=None, initial=None):
+    case = {
+        "mesh": {"path": str(args.mesh), "refine": args.refine, "packed": False},
+        "material": material,
+        "regime": "dynamic",
+        # The consistent mass, as the hand-written operator this case was written against had.
+        "dynamics": {"scheme": "newmark", "density": density, "mass": "consistent"},
+        "time": {"dt": dt, "steps": steps},
+        "output": {"path": str(output), "export_freq": 1},
+    }
+    if dirichlet is not None:
+        case["dirichlet_conditions"] = {"file": str(dirichlet)}
+    if initial is not None:
+        displacement, velocity, acceleration = initial
+        case["initial_conditions"] = {
+            "displacement": {"components": displacement.split(",")},
+            "velocity": {"components": velocity.split(",")},
+            "acceleration": {"components": acceleration.split(",")},
+        }
+    return case
+
+
+def run(args, case, output):
+    completed = playground.run(args.driver, case, Path(output) / "case.yaml", args.overrides, os.environ.copy())
+    if completed.stdout:
+        print(completed.stdout, end="" if completed.stdout.endswith("\n") else "\n")
+    if completed.returncode:
+        raise RuntimeError(f"playground exited with status {completed.returncode}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Run the Kelvin-Voigt mode at three time-step sizes")
     parser.add_argument("--case", required=True, type=Path)
@@ -35,6 +82,8 @@ def main():
     parser.add_argument("--mesh", required=True, type=Path)
     parser.add_argument("--dirichlet", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--refine", type=int, default=0, help="semi-structured refinement level of the mesh")
+    parser.add_argument("--set", dest="overrides", action="append", default=[], help="playground case override key=value")
     args = parser.parse_args()
 
     config = yaml.safe_load(args.case.read_text(encoding="utf-8"))
@@ -43,6 +92,8 @@ def main():
     amplitude = float(config["initial_conditions"]["modal_amplitude"])
     velocity = float(config["initial_conditions"]["modal_velocity"])
     length = float(config["geometry"]["length"])
+    material = generated_material(config["material"])
+    density = float(config["material"]["density"])
     acceleration = modal_initial_acceleration(config["material"], length, amplitude, velocity)
     if len(time_steps) != len(TIME_LEVELS):
         raise ValueError("damped-mode verification requires exactly three time-step sizes")
@@ -51,19 +102,12 @@ def main():
         shutil.rmtree(args.output)
     args.output.mkdir(parents=True)
 
-    refine_level = int(os.environ.get("SFEM_ELEMENT_REFINE_LEVEL", "0"))
     run_dirichlet = args.dirichlet
-    if refine_level > 1:
+    if args.refine > 1:
+        # The refined mesh's nodes are numbered by the refinement: one step without conditions
+        # exports it, and the node sets and the initial fields are built on it.
         prepare = args.output / "prepared"
-        environment = os.environ.copy()
-        environment.update({"SFEM_T_END": "0", "SFEM_NEWMARK_ENABLE_OUTPUT": "0"})
-        environment.pop("SFEM_INITIAL_DISPLACEMENT", None)
-        environment.pop("SFEM_INITIAL_DISPLACEMENT_COMPONENTS", None)
-        environment.pop("SFEM_INITIAL_VELOCITY", None)
-        environment.pop("SFEM_INITIAL_VELOCITY_COMPONENTS", None)
-        environment.pop("SFEM_INITIAL_ACCELERATION", None)
-        environment.pop("SFEM_INITIAL_ACCELERATION_COMPONENTS", None)
-        run_checked([args.driver, args.mesh, args.dirichlet, "NONE", prepare], environment)
+        run(args, mode_case(args, material, density, prepare, None, time_steps[0], 1), prepare)
         initial_mesh = read_mesh(prepare / "mesh")
         refined_sets = args.output / "refined_sets"
         left = np.flatnonzero(np.isclose(initial_mesh.points[:, 0], 0.0, rtol=0.0, atol=1.0e-7))
@@ -98,31 +142,17 @@ def main():
     else:
         initial_mesh = read_mesh(args.mesh)
 
-    displacement_paths, velocity_paths, acceleration_paths = write_modal_initial_fields(
+    initial = write_modal_initial_fields(
         args.output / "initial", initial_mesh, amplitude, velocity, acceleration, length
     )
-
     for name, dt in zip(TIME_LEVELS, time_steps):
         steps = round(duration / dt)
         if abs(steps * dt - duration) > 1.0e-12:
             raise ValueError(f"duration {duration} is not divisible by dt={dt}")
-        environment = os.environ.copy()
-        environment.update(
-            {
-                "SFEM_DT": str(dt),
-                "SFEM_T_END": str(duration),
-                "SFEM_EXPORT_FREQ": "1",
-                "SFEM_NEWMARK_ENABLE_OUTPUT": "1",
-                "SFEM_INITIAL_DISPLACEMENT_COMPONENTS": displacement_paths,
-                "SFEM_INITIAL_VELOCITY_COMPONENTS": velocity_paths,
-                "SFEM_INITIAL_ACCELERATION_COMPONENTS": acceleration_paths,
-            }
-        )
-        run_checked(
-            [args.driver, args.mesh, run_dirichlet, "NONE", args.output / name],
-            environment,
-            marker="SFEM_TRANSIENT_LEVEL_COMPLETE",
-        )
+        output = args.output / name
+        run(args, mode_case(args, material, density, output, run_dirichlet, dt, steps, initial), output)
+        print("SFEM_TRANSIENT_LEVEL_COMPLETE")
+
     print("SFEM_LINEAR_KV_MODE_COMPLETE")
     return 0
 

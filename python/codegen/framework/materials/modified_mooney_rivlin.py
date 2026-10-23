@@ -14,15 +14,7 @@ V = gen.FunctionSpace(element)
 
 
 def _modified_mooney_rivlin_energy(F, dim):
-    F_value = F.value
-    C = F_value.T * F_value
-    J = gen.det(F_value)
-    I1 = gen.inner(F_value, F_value)
-    I2 = sp.Rational(1, 2) * (I1 * I1 - gen.inner(C, C))
-    if dim == 2:
-        # Plane-strain 3D embedding (F_zz = 1): I1 += F_zz^2, I2 from block structure of C
-        I2 = I2 + I1
-        I1 = I1 + 1
+    I1, I2, J = gen.isochoric_invariants(F, dim)
 
     return (
         c1 * (J ** sp.Rational(-2, 3) * I1 - 3)

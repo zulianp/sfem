@@ -44,6 +44,7 @@ namespace sfem {
     BDF2Scheme::~BDF2Scheme() = default;
 
     void BDF2Scheme::set_density(const real_t density) { impl_->inertia->set_density(density); }
+    void BDF2Scheme::set_consistent_mass(const bool consistent) { impl_->inertia->set_consistent_mass(consistent); }
 
     int BDF2Scheme::initialize(const std::vector<std::string> &block_names) {
         SFEM_TRACE_SCOPE("BDF2Scheme::initialize");
@@ -145,6 +146,20 @@ namespace sfem {
         blas->copy(ndofs, x, impl_->u_n->data());
 
         impl_->started = true;
+    }
+
+    void BDF2Scheme::start(real_t *const x) const { impl_->blas->copy(impl_->space->n_dofs(), impl_->u_n->data(), x); }
+
+    void BDF2Scheme::carried_state(real_t *const velocity, real_t *const acceleration) const {
+        const ptrdiff_t ndofs = impl_->space->n_dofs();
+        impl_->blas->copy(ndofs, impl_->v_n->data(), velocity);
+        if (!acceleration) return;
+        if (!impl_->started) {
+            impl_->blas->zeros(ndofs, acceleration);
+            return;
+        }
+        // Not carried: the step's acceleration at its solution, which `advance` left in u_n.
+        impl_->blas->zaxpby(ndofs, impl_->alpha_a, impl_->u_n->data(), -impl_->alpha_a, impl_->u_hat->data(), acceleration);
     }
 
     std::shared_ptr<Op> BDF2Scheme::inertia_op() const { return impl_->inertia; }

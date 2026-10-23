@@ -4,6 +4,7 @@
 #include "sfem_InertiaPotential.hpp"
 #include "sfem_Function.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <vector>
@@ -294,10 +295,89 @@ int test_inertia_potential_steps_match_the_stepped_value() {
     return SFEM_TEST_SUCCESS;
 }
 
+/// The consistent mass in the same potential: its value differentiates to its gradient, its
+/// steps are its value, its assembled matrix is its action, and its rows sum to the lumped
+/// inertia's diagonal -- the lumped mass is the row-summed consistent one on HEX8.
+int test_consistent_inertia_potential() {
+    auto mesh  = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 3, 2, 2, 0, 0, 0, 1, real_t(0.7), real_t(0.5));
+    auto space = sfem::FunctionSpace::create(mesh, 3);
+
+    const ptrdiff_t ndofs = space->n_dofs();
+    const real_t    alpha = real_t(7.25), density = real_t(2);
+    auto            u_hat = sfem::create_host_buffer<real_t>(ndofs);
+    std::vector<real_t> x(ndofs), h(ndofs);
+    for (ptrdiff_t i = 0; i < ndofs; ++i) {
+        u_hat->data()[i] = real_t(0.01) * ((i % 7) - 3);
+        x[i]             = real_t(0.02) * ((i % 11) - 5);
+        h[i]             = real_t(0.005) * ((i % 13) - 6);
+    }
+
+    sfem::InertiaPotential consistent(space), lumped(space);
+    for (auto *op : {&consistent, &lumped}) {
+        op->set_density(density);
+        op->set_alpha(alpha);
+        op->set_u_hat(u_hat);
+    }
+    consistent.set_consistent_mass(true);
+    SFEM_TEST_ASSERT(consistent.initialize() == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(lumped.initialize() == SFEM_SUCCESS);
+
+    // The value is quadratic: a central difference is exact up to rounding.
+    std::vector<real_t> g(ndofs, 0);
+    SFEM_TEST_ASSERT(consistent.gradient(x.data(), g.data()) == SFEM_SUCCESS);
+    const real_t steps[] = {real_t(1e-3), real_t(-1e-3), real_t(0), real_t(2.5)};
+    std::vector<real_t> stepped(4, 0);
+    SFEM_TEST_ASSERT(consistent.value_steps(x.data(), h.data(), 4, steps, stepped.data()) == SFEM_SUCCESS);
+    const real_t slope = dot(ndofs, g.data(), h.data());
+    SFEM_TEST_ASSERT(std::abs((stepped[0] - stepped[1]) / real_t(2e-3) - slope) <= 1e-8 * std::abs(slope));
+    for (int s = 0; s < 4; ++s) {
+        std::vector<real_t> point(ndofs);
+        for (ptrdiff_t i = 0; i < ndofs; ++i) point[i] = x[i] + steps[s] * h[i];
+        real_t direct = 0;
+        SFEM_TEST_ASSERT(consistent.value(point.data(), &direct) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(std::abs(stepped[s] - direct) <= 1e-12 * (1 + std::abs(direct)));
+    }
+
+    // The matrix against the action, and the action of ones against the lumped diagonal.
+    auto                f = sfem::Function::create(space);
+    auto                held = consistent.clone();
+    f->add_operator(held);
+    auto                graph = space->element_node_graph();
+    std::vector<real_t> values(graph->nnz() * 9, 0), kh(ndofs, 0), mh(ndofs, 0), ones(ndofs, 1), m1(ndofs, 0),
+            diag(ndofs, 0);
+    SFEM_TEST_ASSERT(consistent.hessian_bsr(nullptr, graph->rowptr()->data(), graph->colidx()->data(), values.data()) ==
+                     SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(consistent.apply(nullptr, h.data(), mh.data()) == SFEM_SUCCESS);
+    const count_t *rowptr = graph->rowptr()->data();
+    const idx_t   *colidx = graph->colidx()->data();
+    for (ptrdiff_t i = 0; i < ndofs / 3; ++i) {
+        for (count_t k = rowptr[i]; k < rowptr[i + 1]; ++k) {
+            for (int r = 0; r < 3; ++r) {
+                for (int c = 0; c < 3; ++c) kh[i * 3 + r] += values[(k * 3 + r) * 3 + c] * h[colidx[k] * 3 + c];
+            }
+        }
+    }
+    SFEM_TEST_ASSERT(consistent.apply(nullptr, ones.data(), m1.data()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(lumped.hessian_diag(nullptr, diag.data()) == SFEM_SUCCESS);
+    real_t worst = 0, mscale = 0, rows = 0, scale = 0;
+    for (ptrdiff_t i = 0; i < ndofs; ++i) {
+        worst  = std::max(worst, std::abs(kh[i] - mh[i]));
+        mscale = std::max(mscale, std::abs(mh[i]));
+        rows   = std::max(rows, std::abs(m1[i] - diag[i]));
+        scale  = std::max(scale, std::abs(diag[i]));
+    }
+    printf("  matrix against action %.3g, row sums against the lumped diagonal %.3g\n", (double)(worst / mscale),
+           (double)(rows / scale));
+    SFEM_TEST_ASSERT(worst <= 1e-12 * mscale);
+    SFEM_TEST_ASSERT(rows <= 1e-12 * scale);
+    return SFEM_TEST_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_bdf2_inertia_potential_derivatives);
     SFEM_RUN_TEST(test_inertia_potential_steps_match_the_stepped_value);
+    SFEM_RUN_TEST(test_consistent_inertia_potential);
 #ifdef SFEM_ENABLE_CUDA
     SFEM_RUN_TEST(test_inertia_potential_device_matches_host);
 #endif

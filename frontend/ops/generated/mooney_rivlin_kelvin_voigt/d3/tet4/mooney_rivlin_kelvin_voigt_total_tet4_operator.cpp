@@ -1134,7 +1134,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_total_tet4_hessian_crs_a_msoa_
     bdeterminant[0] = s_t(g_det0[element]);
     const s_t *const badjugate[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3], badjugate_data[4], badjugate_data[5], badjugate_data[6], badjugate_data[7], badjugate_data[8]};
 
-    mooney_rivlin_kelvin_voigt_total_d3_simplex_tet4_hessian_block<s_t, NQ, NS>(1, bdeterminant, badjugate, bcurrent, bprevious, eta_b, eta_s, lmbda, mu, u_dt_shift, element_matrix);
+    mooney_rivlin_kelvin_voigt_total_d3_simplex_tet4_hessian_block<s_t, NQ, NS>(0, bdeterminant, badjugate, bcurrent, bprevious, eta_b, eta_s, lmbda, mu, u_dt_shift, element_matrix);
 
     mooney_rivlin_kelvin_voigt_total_tet4_hessian_crs_a_msoa_scatter_crs(ev, element_matrix, rowptr, colidx, values);
   }

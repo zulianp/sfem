@@ -41,30 +41,16 @@ fi
 echo "OMP_NUM_THREADS=$OMP_NUM_THREADS"
 echo "OMP_PROC_BIND=$OMP_PROC_BIND"
 
-export SFEM_ROTATE_SIDESET=geometry_hex8/outlet
-export SFEM_ROTATE_ANGLE=4
-export SFEM_ROTATE_STEPS=12
-export SFEM_ROTATE_RCENTER_X=0
-export SFEM_ROTATE_RCENTER_Y=0.5
-export SFEM_ROTATE_RCENTER_Z=0.5
 
 rm -rf output_hex8
 export SFEM_NEOHOOKEAN_OGDEN_USE_AOS=1
 export SFEM_ELEMENTS_PER_PACK=4096 
-export SFEM_USE_PACKED_MESH=1
-export SFEM_USE_PRECONDITIONER=0
-export SFEM_ENABLE_LINE_SEARCH=0
 # export SFEM_OPERATOR=NeoHookeanOgdenPacked
-export SFEM_OPERATOR=NeoHookeanOgdenActiveStrainPacked
-export SFEM_ACTIVE_STRAIN_RADIUS=1 
-export SFEM_LSOLVE_RTOL=1e-3
-export SFEM_ACTIVE_STRAIN_XX=2
-export SFEM_USE_ACTIVE_STRAIN=1
 export SMESH_TRACE_FILE=output_hex8/active.trace.csv
 
-$LAUNCH hyperelasticy geometry_hex8/box dirichlet_hex8.yaml output_hex8
+$LAUNCH playground active_strain_hex8.yaml
 
 cd output_hex8
-raw_to_db mesh output_hex8.xdmf -p "out/disp.0.*.*,out/disp.1.*.*,out/disp.2.*.*" --transient --n_time_steps=$SFEM_ROTATE_STEPS 
+raw_to_db mesh output_hex8.xdmf -p "out/disp.0.*.*,out/disp.1.*.*,out/disp.2.*.*" --transient --n_time_steps=13 
 cd $HERE
 

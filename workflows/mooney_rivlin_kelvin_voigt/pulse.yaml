@@ -1,0 +1,25 @@
+# A 2 x 1 x 1 Mooney-Rivlin Kelvin-Voigt cantilever, clamped on its min-x face, struck on its
+# max-x face by a half-sine traction pulse along -y, then ringing down under the Kelvin-Voigt
+# damping. Implicit Newmark.
+mesh:
+  box: {n: [8, 4, 4], min: [0, 0, 0], max: [2, 1, 1]}
+  packed: false
+  sidesets:
+    - {name: left, plane: {axis: x, at: min}}
+    - {name: right, plane: {axis: x, at: max}}
+material: {type: GeneratedMooneyRivlinKelvinVoigt, mu: 1000, lmbda: 1000, eta_s: 0.00005, eta_b: 0}
+loads:
+  neumann:
+    - {type: sideset, format: name, name: right, component: [1], value: [-20]}
+  # Half a sine of length 0.05.
+  profile: {type: sine, value: 1, period: 0.1, end_time: 0.05}
+dirichlet_conditions:
+  - {type: sideset, format: name, name: left, component: [0, 1, 2], value: [0, 0, 0]}
+regime: dynamic
+dynamics: {scheme: newmark, density: 0.01}
+time: {dt: 0.001, t_end: 1}
+output:
+  path: output
+  export_freq: 10
+  fields: [material_reaction]
+  probes: [{type: control_point, at: [2, 0.5, 0.5]}]

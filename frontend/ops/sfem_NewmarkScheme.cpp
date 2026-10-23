@@ -42,6 +42,7 @@ namespace sfem {
     void NewmarkScheme::set_beta(const real_t beta) { impl_->beta = beta; }
     void NewmarkScheme::set_gamma(const real_t gamma) { impl_->gamma = gamma; }
     void NewmarkScheme::set_density(const real_t density) { impl_->inertia->set_density(density); }
+    void NewmarkScheme::set_consistent_mass(const bool consistent) { impl_->inertia->set_consistent_mass(consistent); }
 
     int NewmarkScheme::initialize(const std::vector<std::string> &block_names) {
         SFEM_TRACE_SCOPE("NewmarkScheme::initialize");
@@ -129,10 +130,22 @@ namespace sfem {
         impl_->blas->copy(impl_->space->n_dofs(), x, impl_->u_n->data());
     }
 
+    void NewmarkScheme::start(real_t *const x) const {
+        impl_->blas->copy(impl_->space->n_dofs(), impl_->u_hat->data(), x);
+    }
+
+    void NewmarkScheme::carried_state(real_t *const velocity, real_t *const acceleration) const {
+        const ptrdiff_t ndofs = impl_->space->n_dofs();
+        impl_->blas->copy(ndofs, impl_->v_n->data(), velocity);
+        if (acceleration) impl_->blas->copy(ndofs, impl_->a_n->data(), acceleration);
+    }
+
     std::shared_ptr<Op> NewmarkScheme::inertia_op() const { return impl_->inertia; }
 
     std::shared_ptr<Buffer<real_t>> NewmarkScheme::state() const { return impl_->u_n; }
     std::shared_ptr<Buffer<real_t>> NewmarkScheme::velocity() const { return impl_->v_n; }
     std::shared_ptr<Buffer<real_t>> NewmarkScheme::acceleration() const { return impl_->a_n; }
+    std::shared_ptr<Buffer<real_t>> NewmarkScheme::predictor() const { return impl_->u_hat; }
+    std::shared_ptr<Buffer<real_t>> NewmarkScheme::mass() const { return impl_->inertia->mass(); }
 
 }  // namespace sfem
