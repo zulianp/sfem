@@ -208,6 +208,167 @@ solver: {newton: {verbose: false}}
     return SFEM_TEST_SUCCESS;
 }
 
+// A plane restricted to a block: the bottom face of a cube split at x = 0.5 is cut by both blocks,
+// and a Dirichlet value on the plane within block "near" holds only that half. A block the mesh
+// lacks is refused.
+int test_plane_within_block() {
+    auto cube   = sfem::Mesh::create_tet4_cube(sfem::Communicator::self(), 4, 4, 4, 0, 0, 0, 1, 1, 1);
+    auto picked = cube->select_elements([](const geom_t x, const geom_t, const geom_t) { return x < 0.5; });
+    SFEM_TEST_ASSERT(picked.size() == 1);
+    SFEM_TEST_ASSERT(cube->split_block(picked[0].second, "near") == SFEM_SUCCESS);
+    const auto dir = (std::filesystem::temp_directory_path() /
+                      ("sfem_plane_block_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count())))
+                             .string();
+    std::filesystem::create_directories(dir);
+    SFEM_TEST_ASSERT(cube->write(smesh::Path(dir) / "cube") == SFEM_SUCCESS);
+
+    auto case_for = [&](const std::string &block) {
+        return std::string("mesh: {path: ") + dir + "/cube, packed: false,\n" +
+               "  sidesets: [{name: top, plane: {axis: y, at: max}}, {name: bottom, plane: {axis: y, at: min, block: " + block + "}}]}\n" +
+               R"(material: {type: GeneratedLinearElasticity, mu: 1, lmbda: 2}
+dirichlet_conditions:
+  - {type: sideset, format: name, name: top, component: [0, 1, 2], value: [0, 0, 0]}
+  - {type: sideset, format: name, name: bottom, component: 1, value: 0.1}
+regime: steady
+solver: {newton: {verbose: false}}
+)";
+    };
+    SFEM_TEST_ASSERT(assemble(case_for("far").c_str()) == nullptr);
+
+    auto pg = assemble(case_for("near").c_str());
+    SFEM_TEST_ASSERT(pg != nullptr);
+    SFEM_TEST_ASSERT(pg->run() == SFEM_SUCCESS);
+    auto       mesh = pg->function()->space()->mesh_ptr();
+    auto       xyz  = mesh->points()->data();
+    const auto u    = pg->solution()->data();
+    int        held = 0, free = 0;
+    for (ptrdiff_t i = 0; i < mesh->n_nodes(); ++i) {
+        if (std::abs(xyz[1][i]) > 1e-8) continue;
+        if (xyz[0][i] < 0.5 - 1e-8) {
+            SFEM_TEST_ASSERT(u[i * 3 + 1] == real_t(0.1));
+            held++;
+        } else if (xyz[0][i] > 0.5 + 1e-8) {
+            SFEM_TEST_ASSERT(u[i * 3 + 1] != real_t(0.1));
+            free++;
+        }
+    }
+    SFEM_TEST_ASSERT(held == 10 && free == 10);
+    std::filesystem::remove_all(dir);
+    return SFEM_TEST_SUCCESS;
+}
+
+// A tabulated profile names its table relative to the case, as every other path in it: a
+// condition's own profile and the loads' profile both read p.csv beside the case, from anywhere.
+int test_tabulated_beside_case() {
+    const auto dir = (std::filesystem::temp_directory_path() /
+                      ("sfem_tabulated_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count())))
+                             .string();
+    std::filesystem::create_directories(dir);
+    std::ofstream(dir + "/p.csv") << "0, 0\n1, 1\n";
+
+    const char *const yaml = R"(
+mesh:
+  box: {n: [2, 2, 2]}
+  sidesets:
+    - {name: x0, plane: {axis: x, at: min}}
+    - {name: x1, plane: {axis: x, at: max}}
+material: {type: GeneratedLinearElasticity, mu: 1, lmbda: 2}
+dirichlet_conditions:
+  - {type: sideset, format: name, name: x0, component: [0, 1, 2], value: [0, 0, 0]}
+loads:
+  neumann:
+    - {type: sideset, format: name, name: x1, component: 0, value: 0.1, profile: {type: tabulated, path: p.csv}}
+  profile: {type: tabulated, path: p.csv}
+regime: quasi_static
+time: {dt: 1, t_end: 1}
+solver: {newton: {verbose: false}}
+)";
+    auto config = sfem::ElasticityCase::parse(yaml, dir, {});
+    SFEM_TEST_ASSERT(config != nullptr);
+    auto pg = sfem::Playground::create(sfem::Communicator::world(), *config);
+    SFEM_TEST_ASSERT(pg != nullptr);
+    SFEM_TEST_ASSERT(pg->run() == SFEM_SUCCESS);
+    std::filesystem::remove_all(dir);
+    return SFEM_TEST_SUCCESS;
+}
+
+// Two control points in one history, told apart by their names: a bar pulled at its free end
+// moves there and not at its held end.
+int test_named_probes() {
+    const std::string csv  = "test_named_probes.csv";
+    const char *const yaml = R"(
+mesh:
+  box: {n: [4, 1, 1], max: [4, 1, 1]}
+  sidesets:
+    - {name: x0, plane: {axis: x, at: min}}
+    - {name: x1, plane: {axis: x, at: max}}
+material: {type: GeneratedLinearElasticity, mu: 1, lmbda: 2}
+dirichlet_conditions:
+  - {type: sideset, format: name, name: x0, component: [0, 1, 2], value: [0, 0, 0]}
+loads:
+  neumann:
+    - {type: sideset, format: name, name: x1, component: 0, value: 0.1}
+regime: quasi_static
+time: {dt: 1, t_end: 1}
+solver: {newton: {verbose: false}}
+output:
+  probes: [{type: control_point, at: [4, 0, 0], name: tip}, {type: control_point, at: [0, 0, 0], name: root}]
+)";
+    auto pg = assemble(yaml, {"output.history_csv=" + csv});
+    SFEM_TEST_ASSERT(pg != nullptr);
+    SFEM_TEST_ASSERT(pg->run() == SFEM_SUCCESS);
+    auto rows = sfem::test::read_history(csv);
+    SFEM_TEST_ASSERT(rows.size() == 2);
+    SFEM_TEST_ASSERT(rows[1].count("tip_ux") && rows[1].count("root_ux") && !rows[1].count("ux"));
+    SFEM_TEST_ASSERT(rows[1]["tip_ux"] > 0 && rows[1]["root_ux"] == 0);
+    std::remove(csv.c_str());
+    return SFEM_TEST_SUCCESS;
+}
+
+#ifdef SFEM_ENABLE_CUDA
+// A ramped traction on a TET4 block's face (TRI3) on the device: each step's displacement the
+// host's to rounding, so the device takes the traction's current value at every step.
+int test_device_traction_matches_host() {
+    auto       cube = sfem::Mesh::create_tet4_cube(sfem::Communicator::self(), 3, 3, 3, 0, 0, 0, 1, 1, 1);
+    const auto dir  = (std::filesystem::temp_directory_path() /
+                      ("sfem_device_traction_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count())))
+                             .string();
+    std::filesystem::create_directories(dir);
+    SFEM_TEST_ASSERT(cube->write(smesh::Path(dir) / "cube") == SFEM_SUCCESS);
+    const std::string yaml = std::string("mesh: {path: ") + dir + R"(/cube, packed: false,
+  sidesets: [{name: x0, plane: {axis: x, at: min}}, {name: x1, plane: {axis: x, at: max}}]}
+material: {type: GeneratedLinearElasticity, mu: 1, lmbda: 2}
+dirichlet_conditions:
+  - {type: sideset, format: name, name: x0, component: [0, 1, 2], value: [0, 0, 0]}
+loads:
+  neumann:
+    - {type: sideset, format: name, name: x1, component: 1, value: 0.05,
+       profile: {type: linear_ramp, start_time: 0, end_time: 3, start_value: 0, end_value: 1}}
+regime: quasi_static
+time: {dt: 1, t_end: 3}
+solver: {newton: {verbose: false, rtol: 1e-12}}
+output:
+  probes: [{type: control_point, at: [1, 1, 1]}]
+)";
+    std::vector<std::map<std::string, double>> rows[2];
+    for (int device = 0; device < 2; ++device) {
+        const std::string csv = dir + (device ? "/device.csv" : "/host.csv");
+        auto pg = assemble(yaml.c_str(), {"output.history_csv=" + csv, std::string("execution_space=") + (device ? "device" : "host")});
+        SFEM_TEST_ASSERT(pg != nullptr);
+        SFEM_TEST_ASSERT(pg->run() == SFEM_SUCCESS);
+        rows[device] = sfem::test::read_history(csv);
+    }
+    SFEM_TEST_ASSERT(rows[0].size() == 4 && rows[1].size() == 4);
+    for (int k = 1; k <= 3; ++k) {
+        printf("  t = %g: uy host %.12g, device %.12g\n", rows[0][k]["t"], rows[0][k]["uy"], rows[1][k]["uy"]);
+        SFEM_TEST_ASSERT(std::abs(rows[1][k]["uy"] - rows[0][k]["uy"]) <= 1e-10 * std::abs(rows[0][k]["uy"]));
+    }
+    SFEM_TEST_ASSERT(rows[0][3]["uy"] > rows[0][1]["uy"] && rows[0][1]["uy"] > 0);
+    std::filesystem::remove_all(dir);
+    return SFEM_TEST_SUCCESS;
+}
+#endif
+
 // A TET4 mesh with a hyperelastic material: the packed layout (the default) solves the stretch as
 // the plain one does, node for node through node_mapping. TET4 has only an affine kernel, whatever
 // the operator's affine preference. Packing reorders this mesh's nodes, so packed with
@@ -432,6 +593,31 @@ int test_prony_torsion_release() {
     return SFEM_TEST_SUCCESS;
 }
 
+// The Prony probe on the twisted bar: its one term (tau = 1) is loaded while the twist ramps, then
+// relaxes under the held twist at its own rate, and gamma is the step's factor, between g_inf = 0.5
+// and 1.
+int test_prony_probe() {
+    const std::string csv = "test_prony_probe.csv";
+    auto              pg  = assemble(PRONY_TORSION,
+                                     {"output.history_csv=" + csv,
+                                      "output.probes=[{type: torque, constraint: 0}, {type: prony}]",
+                                      "constraints=[{type: rotation, sideset: right, axis: x, center: [0, 0.5, 0.5], angle: 0.4, "
+                                      "profile: {type: linear_ramp, start_time: 0, end_time: 1, start_value: 0, end_value: 1}}]"});
+    SFEM_TEST_ASSERT(pg != nullptr);
+    SFEM_TEST_ASSERT(pg->run() == SFEM_SUCCESS);
+    auto rows = sfem::test::read_history(csv);
+    SFEM_TEST_ASSERT(rows.size() == 9);
+    SFEM_TEST_ASSERT(rows[1].count("iso_gamma") && rows[1].count("iso_H0") && !rows[1].count("iso_H1"));
+    for (int k = 1; k <= 8; ++k) printf("  t = %g: gamma %g, H0 %g\n", rows[k]["t"], rows[k]["iso_gamma"], rows[k]["iso_H0"]);
+    SFEM_TEST_ASSERT(rows[2]["iso_H0"] > rows[1]["iso_H0"] && rows[1]["iso_H0"] > 0);
+    // Under the held twist the relaxed stress hardly changes (the interior creeps a little), so
+    // each step decays the history by exp(-dt / tau) = exp(-0.5).
+    for (int k = 3; k <= 8; ++k) SFEM_TEST_ASSERT(std::abs(rows[k]["iso_H0"] / rows[k - 1]["iso_H0"] - std::exp(-0.5)) < 1e-4);
+    SFEM_TEST_ASSERT(rows[1]["iso_gamma"] > 0.5 && rows[1]["iso_gamma"] < 1);
+    std::remove(csv.c_str());
+    return SFEM_TEST_SUCCESS;
+}
+
 // The rotation driven by its torque: every step ends with the probe's torque on the ramped
 // target, and under the held torque the Prony solid keeps turning.
 int test_torque_control() {
@@ -455,6 +641,50 @@ int test_torque_control() {
     // Creep: the angle grows at constant torque.
     for (int k = 3; k <= 8; ++k) SFEM_TEST_ASSERT(rows[k]["angle"] > rows[k - 1]["angle"]);
     std::remove(csv.c_str());
+    return SFEM_TEST_SUCCESS;
+}
+
+// The Prony solid twisted and held with steps far longer than its relaxation time ends relaxed;
+// started from that twist in a second run, it is at rest there: under the same held twist and
+// short steps, the torque stays the relaxed one. Strained into the twist within the first step
+// instead, it would carry the instantaneous torque, twice the relaxed one at g = 0.5.
+int test_prony_starts_relaxed() {
+    const auto dir = (std::filesystem::temp_directory_path() /
+                      ("sfem_prony_relaxed_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count())))
+                             .string();
+    std::filesystem::create_directories(dir);
+    const std::string csv[2] = {dir + "/relax.csv", dir + "/restart.csv"};
+
+    auto relax = assemble(PRONY_TORSION,
+                          {"output.history_csv=" + csv[0],
+                           "output.path=" + dir + "/relax",
+                           "time={dt: 50, t_end: 100}",
+                           "constraints=[{type: rotation, sideset: right, axis: x, center: [0, 0.5, 0.5], angle: 0.4, "
+                           "profile: {type: linear_ramp, start_time: 0, end_time: 50, start_value: 0, end_value: 1}}]"});
+    SFEM_TEST_ASSERT(relax != nullptr);
+    SFEM_TEST_ASSERT(relax->run() == SFEM_SUCCESS);
+    auto         relaxed = sfem::test::read_history(csv[0]);
+    const double T       = relaxed.back()["torque"];
+    SFEM_TEST_ASSERT(relaxed.size() == 3 && T > 0);
+
+    std::string components;
+    for (int d = 0; d < 3; ++d) {
+        components += (d ? ", " : "") + dir + "/relax/out/disp." + std::to_string(d) + ".000000002.float64";
+    }
+    auto restart = assemble(PRONY_TORSION,
+                            {"output.history_csv=" + csv[1],
+                             "time={dt: 0.01, t_end: 0.05}",
+                             "initial_conditions={displacement: {components: [" + components + "]}}",
+                             "constraints=[{type: rotation, sideset: right, axis: x, center: [0, 0.5, 0.5], angle: 0.4}]"});
+    SFEM_TEST_ASSERT(restart != nullptr);
+    SFEM_TEST_ASSERT(restart->run() == SFEM_SUCCESS);
+    auto rows = sfem::test::read_history(csv[1]);
+    SFEM_TEST_ASSERT(rows.size() == 6);
+    for (int k = 1; k <= 5; ++k) {
+        printf("  t = %g: torque %g, relaxed %g\n", rows[k]["t"], rows[k]["torque"], T);
+        SFEM_TEST_ASSERT(std::abs(rows[k]["torque"] - T) <= 1e-6 * T);
+    }
+    std::filesystem::remove_all(dir);
     return SFEM_TEST_SUCCESS;
 }
 
@@ -541,11 +771,19 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_quasi_static_stretch);
     SFEM_RUN_TEST(test_mesh_blocks);
     SFEM_RUN_TEST(test_tet4_packed_matches_plain);
+    SFEM_RUN_TEST(test_plane_within_block);
+    SFEM_RUN_TEST(test_tabulated_beside_case);
+    SFEM_RUN_TEST(test_named_probes);
+#ifdef SFEM_ENABLE_CUDA
+    SFEM_RUN_TEST(test_device_traction_matches_host);
+#endif
     SFEM_RUN_TEST(test_dynamic_cantilever);
     SFEM_RUN_TEST(test_rotation_constraint);
     SFEM_RUN_TEST(test_sine_rotation);
     SFEM_RUN_TEST(test_prony_torsion_release);
     SFEM_RUN_TEST(test_torque_control);
+    SFEM_RUN_TEST(test_prony_starts_relaxed);
+    SFEM_RUN_TEST(test_prony_probe);
     SFEM_RUN_TEST(test_boundary_increment_is_carried);
     SFEM_RUN_TEST(test_large_increment_in_fractions);
     SFEM_UNIT_TEST_FINALIZE();

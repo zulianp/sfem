@@ -1,0 +1,1003 @@
+#include <type_traits>
+#include <cuda_runtime.h>
+#include "mooney_rivlin_prony_d2_simplex_local.cuh"
+#include "mooney_rivlin_prony_d2_simplex_hessian.cuh"
+#include "geometry_kernels.cuh"
+#include "kernel_diagnostics.cuh"
+#include <cstdint>
+#include <cstdlib>
+
+namespace sfem {
+namespace codegen {
+
+template <typename s_t, typename g_t>
+__host__ __device__ __forceinline__ const s_t *ageom_stream(
+    const g_t *const RSTR source,
+    s_t *const RSTR,
+    std::true_type) {
+  return source;
+}
+
+template <typename s_t, typename g_t>
+__host__ __device__ __forceinline__ const s_t *ageom_stream(
+    const g_t *const RSTR source,
+    s_t *const RSTR converted,
+    std::false_type) {
+  converted[0] = s_t(source[0]);
+  return converted;
+}
+
+} // namespace codegen
+} // namespace sfem
+
+namespace sfem {
+namespace codegen {
+
+static const KernelDiagnostics mooney_rivlin_prony_tri3_objective_soa_diagnostics_data = {
+  "mooney_rivlin_prony_tri3_objective_soa",
+  "TRI3",
+  2,
+  1,
+  3,
+  16,
+  1,
+  25,
+  23,
+  0,
+  0,
+  11,
+  0,
+  0,
+  0,
+  2,
+  13,
+  59,
+  44,
+  71,
+  12,
+  17,
+  5,
+  6,
+  1,
+  2,
+  6,
+  0,
+  1,
+  1,
+  1,
+  1.0,
+  1.0,
+  8.0,
+  12.0,
+  16.0,
+  20.0,
+  20.0,
+  24.0,
+  1.0,
+  1.0
+};
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" const sfem::codegen::KernelDiagnostics *cu_mooney_rivlin_prony_tri3_objective_soa_diagnostics(void) {
+  return &sfem::codegen::mooney_rivlin_prony_tri3_objective_soa_diagnostics_data;
+}
+
+
+namespace sfem {
+namespace codegen {
+
+template <typename s_t, typename g_t>
+__global__ void mooney_rivlin_prony_tri3_objective_steps_a_msoa_impl(
+        const ptrdiff_t nelements,
+        const ptrdiff_t,
+        idx_t **const RSTR elements,
+        const g_t *const RSTR g_adj0,
+        const g_t *const RSTR g_adj1,
+        const g_t *const RSTR g_adj2,
+        const g_t *const RSTR g_adj3,
+        const g_t *const RSTR g_det0,
+        const s_t C01,
+        const s_t C10,
+        const s_t K,
+        const s_t iso_relaxation_gamma,
+        const s_t *const RSTR iso_history,
+        const ptrdiff_t u_stride,
+        const s_t *const RSTR ux,
+        const s_t *const RSTR uy,
+        const ptrdiff_t h_stride,
+        const s_t *const RSTR hx,
+        const s_t *const RSTR hy,
+        const int nsteps,
+        const s_t *const RSTR steps,
+        s_t *const RSTR value
+) {
+  static constexpr int NC = 2;
+  static constexpr int NS = 3;
+
+  for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
+    idx_t ev[NS];
+    s_t bu_data[NS * NC];
+    s_t bh_data[NS * NC];
+
+    for (int element_node = 0; element_node < NS; ++element_node) {
+      const idx_t *const RSTR element_shape = elements[element_node] + evb;
+      idx_t *const RSTR ev_node = &ev[element_node];
+      {
+        ev_node[0] = element_shape[0];
+      }
+    }
+
+    const s_t *const u_components[NC] = {ux, uy};
+    const s_t *const h_components[NC] = {hx, hy};
+    const s_t *bu_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bu_streams[stream] = &bu_data[stream];
+    }
+    const s_t *bh_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bh_streams[stream] = &bh_data[stream];
+    }
+
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t *const RSTR ev_shape = &ev[shape];
+      for (int d = 0; d < NC; ++d) {
+        {
+          const idx_t node = ev_shape[0];
+          bu_data[shape * NC + d] = u_components[d][node * u_stride];
+          bh_data[shape * NC + d] = h_components[d][node * h_stride];
+        }
+      }
+    }
+    s_t badj0_data;
+    const s_t *const badj0 = ageom_stream<s_t, g_t>(
+        g_adj0 + evb, &badj0_data, std::is_same<g_t, s_t>());
+    s_t badj1_data;
+    const s_t *const badj1 = ageom_stream<s_t, g_t>(
+        g_adj1 + evb, &badj1_data, std::is_same<g_t, s_t>());
+    s_t badj2_data;
+    const s_t *const badj2 = ageom_stream<s_t, g_t>(
+        g_adj2 + evb, &badj2_data, std::is_same<g_t, s_t>());
+    s_t badj3_data;
+    const s_t *const badj3 = ageom_stream<s_t, g_t>(
+        g_adj3 + evb, &badj3_data, std::is_same<g_t, s_t>());
+    s_t bdet0_data;
+    const s_t *const bdet0 = ageom_stream<s_t, g_t>(
+        g_det0 + evb, &bdet0_data, std::is_same<g_t, s_t>());
+
+    for (int step = 0; step < nsteps; ++step) {
+      {
+        value[(ptrdiff_t)step * nelements + evb + 0] = s_t(0);
+      }
+    }
+
+    mooney_rivlin_prony_d2_simplex_tri3_objective_block<s_t, NS>(badj0, badj1, badj2, badj3, bdet0, C01, C10, K, iso_relaxation_gamma, iso_history + evb, nelements, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
+  }
+
+}
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" int cu_mooney_rivlin_prony_tri3_objective_steps_a_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
+        const real_t C01,
+        const real_t C10,
+        const real_t K,
+        const real_t iso_relaxation_gamma,
+        const void *const RSTR iso_history,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const int nsteps,
+        const void *const RSTR steps,
+        void *const RSTR value,
+        void *const stream
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        if (nelements <= 0) return SFEM_SUCCESS;
+        const int block_size = 256;
+        const int grid_size = (int)((nelements + block_size - 1) / block_size);
+        sfem::codegen::mooney_rivlin_prony_tri3_objective_steps_a_msoa_impl<double, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C01, C10, K, iso_relaxation_gamma, (const double *)iso_history, u_stride, (const double *)ux, (const double *)uy, h_stride, (const double *)hx, (const double *)hy, nsteps, (const double *)steps, (double *)value);
+        return sfem::codegen::launch_status("mooney_rivlin_prony_tri3_objective_steps_a_msoa_impl");
+    }
+    case (int)sizeof(float): {
+        if (nelements <= 0) return SFEM_SUCCESS;
+        const int block_size = 256;
+        const int grid_size = (int)((nelements + block_size - 1) / block_size);
+        sfem::codegen::mooney_rivlin_prony_tri3_objective_steps_a_msoa_impl<float, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C01, C10, K, iso_relaxation_gamma, (const float *)iso_history, u_stride, (const float *)ux, (const float *)uy, h_stride, (const float *)hx, (const float *)hy, nsteps, (const float *)steps, (float *)value);
+        return sfem::codegen::launch_status("mooney_rivlin_prony_tri3_objective_steps_a_msoa_impl");
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("mooney_rivlin_prony_tri3_objective_steps_a_msoa", -1, (int)scalar_bytes);
+}
+
+
+namespace sfem {
+namespace codegen {
+
+static const KernelDiagnostics mooney_rivlin_prony_tri3_gradient_soa_diagnostics_data = {
+  "mooney_rivlin_prony_tri3_gradient_soa",
+  "TRI3",
+  2,
+  1,
+  3,
+  16,
+  1,
+  55,
+  71,
+  1,
+  0,
+  9,
+  0,
+  0,
+  0,
+  2,
+  31,
+  143,
+  81,
+  108,
+  27,
+  24,
+  5,
+  6,
+  1,
+  2,
+  6,
+  0,
+  6,
+  6,
+  6,
+  1.0,
+  1.0,
+  8.0,
+  12.0,
+  16.0,
+  20.0,
+  20.0,
+  24.0,
+  1.0,
+  1.0
+};
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" const sfem::codegen::KernelDiagnostics *cu_mooney_rivlin_prony_tri3_gradient_soa_diagnostics(void) {
+  return &sfem::codegen::mooney_rivlin_prony_tri3_gradient_soa_diagnostics_data;
+}
+
+
+namespace sfem {
+namespace codegen {
+
+template <typename s_t, typename g_t>
+__global__ void mooney_rivlin_prony_tri3_gradient_a_msoa_impl(
+        const ptrdiff_t nelements,
+        const ptrdiff_t,
+        idx_t **const RSTR elements,
+        const g_t *const RSTR g_adj0,
+        const g_t *const RSTR g_adj1,
+        const g_t *const RSTR g_adj2,
+        const g_t *const RSTR g_adj3,
+        const g_t *const RSTR g_det0,
+        const s_t C01,
+        const s_t C10,
+        const s_t K,
+        const s_t iso_relaxation_gamma,
+        const s_t *const RSTR iso_history,
+        const ptrdiff_t u_stride,
+        const s_t *const RSTR ux,
+        const s_t *const RSTR uy,
+        const ptrdiff_t out_stride,
+        s_t *const RSTR outx,
+        s_t *const RSTR outy
+) {
+  static constexpr int NC = 2;
+  static constexpr int NS = 3;
+
+  for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
+    idx_t ev[NS];
+    s_t bu_data[NS * NC];
+    s_t bout_data[NS * NC];
+
+    for (int element_node = 0; element_node < NS; ++element_node) {
+      const idx_t *const RSTR element_shape = elements[element_node] + evb;
+      idx_t *const RSTR ev_node = &ev[element_node];
+      {
+        ev_node[0] = element_shape[0];
+      }
+    }
+    const s_t *const u_components[NC] = {ux, uy};
+
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t *const RSTR ev_shape = &ev[shape];
+      for (int d = 0; d < NC; ++d) {
+        {
+          const idx_t node = ev_shape[0];
+          bu_data[shape * NC + d] = u_components[d][node * u_stride];
+        }
+      }
+    }
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      {
+        bout_data[stream] = s_t(0);
+      }
+    }
+
+    const s_t *bu_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bu_streams[stream] = &bu_data[stream];
+    }
+    s_t *bout_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bout_streams[stream] = &bout_data[stream];
+    }
+    s_t badj0_data;
+    const s_t *const badj0 = ageom_stream<s_t, g_t>(
+        g_adj0 + evb, &badj0_data, std::is_same<g_t, s_t>());
+    s_t badj1_data;
+    const s_t *const badj1 = ageom_stream<s_t, g_t>(
+        g_adj1 + evb, &badj1_data, std::is_same<g_t, s_t>());
+    s_t badj2_data;
+    const s_t *const badj2 = ageom_stream<s_t, g_t>(
+        g_adj2 + evb, &badj2_data, std::is_same<g_t, s_t>());
+    s_t badj3_data;
+    const s_t *const badj3 = ageom_stream<s_t, g_t>(
+        g_adj3 + evb, &badj3_data, std::is_same<g_t, s_t>());
+    s_t bdet0_data;
+    const s_t *const bdet0 = ageom_stream<s_t, g_t>(
+        g_det0 + evb, &bdet0_data, std::is_same<g_t, s_t>());
+
+    mooney_rivlin_prony_d2_simplex_tri3_gradient_block<s_t, NS>(badj0, badj1, badj2, badj3, bdet0, C01, C10, K, iso_relaxation_gamma, iso_history + evb, nelements, bu_streams, bout_streams);
+
+    s_t *const out_components[NC] = {outx, outy};
+
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t *const RSTR ev_shape = &ev[shape];
+      for (int d = 0; d < NC; ++d) {
+        atomicAdd(&(out_components[d][ev_shape[0] * out_stride]), bout_data[shape * NC + d]);
+      }
+    }
+  }
+
+}
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" int cu_mooney_rivlin_prony_tri3_gradient_a_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
+        const real_t C01,
+        const real_t C10,
+        const real_t K,
+        const real_t iso_relaxation_gamma,
+        const void *const RSTR iso_history,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const stream
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        if (nelements <= 0) return SFEM_SUCCESS;
+        const int block_size = 256;
+        const int grid_size = (int)((nelements + block_size - 1) / block_size);
+        sfem::codegen::mooney_rivlin_prony_tri3_gradient_a_msoa_impl<double, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C01, C10, K, iso_relaxation_gamma, (const double *)iso_history, u_stride, (const double *)ux, (const double *)uy, out_stride, (double *)outx, (double *)outy);
+        return sfem::codegen::launch_status("mooney_rivlin_prony_tri3_gradient_a_msoa_impl");
+    }
+    case (int)sizeof(float): {
+        if (nelements <= 0) return SFEM_SUCCESS;
+        const int block_size = 256;
+        const int grid_size = (int)((nelements + block_size - 1) / block_size);
+        sfem::codegen::mooney_rivlin_prony_tri3_gradient_a_msoa_impl<float, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C01, C10, K, iso_relaxation_gamma, (const float *)iso_history, u_stride, (const float *)ux, (const float *)uy, out_stride, (float *)outx, (float *)outy);
+        return sfem::codegen::launch_status("mooney_rivlin_prony_tri3_gradient_a_msoa_impl");
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("mooney_rivlin_prony_tri3_gradient_a_msoa", -1, (int)scalar_bytes);
+}
+
+
+namespace sfem {
+namespace codegen {
+
+static const KernelDiagnostics mooney_rivlin_prony_tri3_apply_soa_diagnostics_data = {
+  "mooney_rivlin_prony_tri3_apply_soa",
+  "TRI3",
+  2,
+  1,
+  3,
+  16,
+  1,
+  126,
+  186,
+  1,
+  0,
+  12,
+  0,
+  0,
+  0,
+  2,
+  75,
+  332,
+  81,
+  108,
+  71,
+  51,
+  5,
+  6,
+  1,
+  2,
+  6,
+  6,
+  6,
+  6,
+  6,
+  1.0,
+  1.0,
+  8.0,
+  12.0,
+  16.0,
+  20.0,
+  20.0,
+  24.0,
+  1.0,
+  1.0
+};
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" const sfem::codegen::KernelDiagnostics *cu_mooney_rivlin_prony_tri3_apply_soa_diagnostics(void) {
+  return &sfem::codegen::mooney_rivlin_prony_tri3_apply_soa_diagnostics_data;
+}
+
+
+namespace sfem {
+namespace codegen {
+
+template <typename s_t, typename g_t>
+__global__ void mooney_rivlin_prony_tri3_apply_a_msoa_impl(
+        const ptrdiff_t nelements,
+        const ptrdiff_t,
+        idx_t **const RSTR elements,
+        const g_t *const RSTR g_adj0,
+        const g_t *const RSTR g_adj1,
+        const g_t *const RSTR g_adj2,
+        const g_t *const RSTR g_adj3,
+        const g_t *const RSTR g_det0,
+        const s_t C01,
+        const s_t C10,
+        const s_t K,
+        const s_t iso_relaxation_gamma,
+        const s_t *const RSTR iso_history,
+        const ptrdiff_t u_stride,
+        const s_t *const RSTR ux,
+        const s_t *const RSTR uy,
+        const ptrdiff_t h_stride,
+        const s_t *const RSTR hx,
+        const s_t *const RSTR hy,
+        const ptrdiff_t out_stride,
+        s_t *const RSTR outx,
+        s_t *const RSTR outy
+) {
+  static constexpr int NC = 2;
+  static constexpr int NS = 3;
+
+  for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
+    idx_t ev[NS];
+    s_t bu_data[NS * NC];
+    s_t bh_data[NS * NC];
+    s_t bout_data[NS * NC];
+
+    for (int element_node = 0; element_node < NS; ++element_node) {
+      const idx_t *const RSTR element_shape = elements[element_node] + evb;
+      idx_t *const RSTR ev_node = &ev[element_node];
+      {
+        ev_node[0] = element_shape[0];
+      }
+    }
+    const s_t *const u_components[NC] = {ux, uy};
+    const s_t *const h_components[NC] = {hx, hy};
+
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t *const RSTR ev_shape = &ev[shape];
+      for (int d = 0; d < NC; ++d) {
+        {
+          const idx_t node = ev_shape[0];
+          bu_data[shape * NC + d] = u_components[d][node * u_stride];
+          bh_data[shape * NC + d] = h_components[d][node * h_stride];
+        }
+      }
+    }
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      {
+        bout_data[stream] = s_t(0);
+      }
+    }
+
+    const s_t *bu_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bu_streams[stream] = &bu_data[stream];
+    }
+    const s_t *bh_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bh_streams[stream] = &bh_data[stream];
+    }
+    s_t *bout_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bout_streams[stream] = &bout_data[stream];
+    }
+    s_t badj0_data;
+    const s_t *const badj0 = ageom_stream<s_t, g_t>(
+        g_adj0 + evb, &badj0_data, std::is_same<g_t, s_t>());
+    s_t badj1_data;
+    const s_t *const badj1 = ageom_stream<s_t, g_t>(
+        g_adj1 + evb, &badj1_data, std::is_same<g_t, s_t>());
+    s_t badj2_data;
+    const s_t *const badj2 = ageom_stream<s_t, g_t>(
+        g_adj2 + evb, &badj2_data, std::is_same<g_t, s_t>());
+    s_t badj3_data;
+    const s_t *const badj3 = ageom_stream<s_t, g_t>(
+        g_adj3 + evb, &badj3_data, std::is_same<g_t, s_t>());
+    s_t bdet0_data;
+    const s_t *const bdet0 = ageom_stream<s_t, g_t>(
+        g_det0 + evb, &bdet0_data, std::is_same<g_t, s_t>());
+
+    mooney_rivlin_prony_d2_simplex_tri3_apply_block<s_t, NS>(badj0, badj1, badj2, badj3, bdet0, C01, C10, K, iso_relaxation_gamma, iso_history + evb, nelements, bu_streams, bh_streams, bout_streams);
+
+    s_t *const out_components[NC] = {outx, outy};
+
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t *const RSTR ev_shape = &ev[shape];
+      for (int d = 0; d < NC; ++d) {
+        atomicAdd(&(out_components[d][ev_shape[0] * out_stride]), bout_data[shape * NC + d]);
+      }
+    }
+  }
+
+}
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" int cu_mooney_rivlin_prony_tri3_apply_a_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
+        const real_t C01,
+        const real_t C10,
+        const real_t K,
+        const real_t iso_relaxation_gamma,
+        const void *const RSTR iso_history,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const stream
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        if (nelements <= 0) return SFEM_SUCCESS;
+        const int block_size = 256;
+        const int grid_size = (int)((nelements + block_size - 1) / block_size);
+        sfem::codegen::mooney_rivlin_prony_tri3_apply_a_msoa_impl<double, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C01, C10, K, iso_relaxation_gamma, (const double *)iso_history, u_stride, (const double *)ux, (const double *)uy, h_stride, (const double *)hx, (const double *)hy, out_stride, (double *)outx, (double *)outy);
+        return sfem::codegen::launch_status("mooney_rivlin_prony_tri3_apply_a_msoa_impl");
+    }
+    case (int)sizeof(float): {
+        if (nelements <= 0) return SFEM_SUCCESS;
+        const int block_size = 256;
+        const int grid_size = (int)((nelements + block_size - 1) / block_size);
+        sfem::codegen::mooney_rivlin_prony_tri3_apply_a_msoa_impl<float, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C01, C10, K, iso_relaxation_gamma, (const float *)iso_history, u_stride, (const float *)ux, (const float *)uy, h_stride, (const float *)hx, (const float *)hy, out_stride, (float *)outx, (float *)outy);
+        return sfem::codegen::launch_status("mooney_rivlin_prony_tri3_apply_a_msoa_impl");
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("mooney_rivlin_prony_tri3_apply_a_msoa", -1, (int)scalar_bytes);
+}
+
+
+namespace sfem {
+namespace codegen {
+
+__host__ __device__ __forceinline__ void mooney_rivlin_prony_tri3_hessian_a_msoa_find_cols(
+    const idx_t *const RSTR targets,
+    const idx_t *const RSTR row,
+    const int lenrow,
+    idx_t *const RSTR ks) {
+#pragma unroll(3)
+  for (int d = 0; d < 3; ++d) {
+    ks[d] = 0;
+  }
+  for (int k = 0; k < lenrow; ++k) {
+#pragma unroll(3)
+    for (int d = 0; d < 3; ++d) {
+      ks[d] += row[k] < targets[d];
+    }
+  }
+}
+
+template <typename s_t, typename v_t>
+__host__ __device__ __forceinline__ void mooney_rivlin_prony_tri3_hessian_a_msoa_scatter_bsr(
+    const idx_t *const RSTR ev,
+    const s_t *const RSTR element_matrix,
+    const count_t *const RSTR rowptr,
+    const idx_t *const RSTR colidx,
+    v_t *const RSTR values) {
+  static constexpr int NC = 2;
+  static constexpr int NS = 3;
+  count_t entries[NS * NS];
+  idx_t ks[NS];
+  for (int i = 0; i < NS; ++i) {
+    const idx_t dof_i = ev[i];
+    const count_t row_begin = rowptr[dof_i];
+    const int lenrow = (int)(rowptr[dof_i + 1] - row_begin);
+    const idx_t *const RSTR cols = &colidx[row_begin];
+    mooney_rivlin_prony_tri3_hessian_a_msoa_find_cols(ev, cols, lenrow, ks);
+    for (int j = 0; j < NS; ++j) {
+      entries[i * NS + j] = row_begin + ks[j];
+    }
+  }
+  for (int i = 0; i < NS; ++i) {
+    for (int j = 0; j < NS; ++j) {
+      v_t *const block = &values[entries[i * NS + j] * NC * NC];
+      for (int bi = 0; bi < NC; ++bi) {
+        const int row = bi * NS + i;
+        for (int bj = 0; bj < NC; ++bj) {
+          const int col = bj * NS + j;
+          atomicAdd(&(block[bi * NC + bj]), v_t(element_matrix[row * (NC * NS) + col]));
+        }
+      }
+    }
+  }
+}
+
+template <typename s_t, typename v_t, typename g_t, int FORMAT>
+__global__ void mooney_rivlin_prony_tri3_hessian_a_msoa_assemble_impl(
+    const ptrdiff_t nelements,
+    const ptrdiff_t,
+    idx_t **const RSTR elements,
+    const g_t *const RSTR g_adj0,
+    const g_t *const RSTR g_adj1,
+    const g_t *const RSTR g_adj2,
+    const g_t *const RSTR g_adj3,
+    const g_t *const RSTR g_det0,
+    const s_t C01,
+    const s_t C10,
+    const s_t K,
+    const s_t iso_relaxation_gamma,
+    const s_t *const RSTR iso_history,
+    const ptrdiff_t u_stride,
+    const s_t *const RSTR ux,
+    const s_t *const RSTR uy,
+    const count_t *const RSTR rowptr,
+    const idx_t *const RSTR colidx,
+    v_t *const RSTR values,
+    const int *const RSTR,
+    const ptrdiff_t,
+    const ptrdiff_t,
+    const idx_t *const RSTR,
+    const idx_t *const RSTR,
+    idx_t *const RSTR,
+    idx_t *const RSTR) {
+  static constexpr int NC = 2;
+  static constexpr int ND = 2;
+  static constexpr int NQ = 1;
+  static constexpr int NS = 3;
+  static constexpr int NDOFS = NC * NS;
+  const s_t *const u_components[NC] = {ux, uy};
+
+  static_assert(FORMAT == 1,
+                "this kernel has no scatter for the requested matrix format");
+  for (ptrdiff_t element = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; element < nelements; element += (ptrdiff_t)blockDim.x * gridDim.x) {
+    idx_t ev[NS];
+    s_t element_matrix[NDOFS * NDOFS];
+    s_t bu_data[NS * NC];
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t bdet0[NQ];
+
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t node = elements[shape][element];
+      ev[shape] = node;
+      for (int d = 0; d < ND; ++d) {
+        bu_data[shape * NC + d] = u_components[d][node * u_stride];
+      }
+    }
+
+
+    badj0[0] = s_t(g_adj0[element]);
+    badj1[0] = s_t(g_adj1[element]);
+    badj2[0] = s_t(g_adj2[element]);
+    badj3[0] = s_t(g_adj3[element]);
+    bdet0[0] = s_t(g_det0[element]);
+
+    mooney_rivlin_prony_d2_simplex_tri3_direct_hessian_element_matrix<s_t, NS>(badj0, badj1, badj2, badj3, bdet0, C01, C10, K, iso_relaxation_gamma, iso_history + element, nelements, bu_data, element_matrix);
+
+    if constexpr (FORMAT == 1) {
+      mooney_rivlin_prony_tri3_hessian_a_msoa_scatter_bsr(ev, element_matrix, rowptr, colidx, values);
+    }
+  }
+
+}
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" int cu_mooney_rivlin_prony_tri3_hessian_bsr_a_msoa(
+        const int scalar_bytes,
+        const int values_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
+        const real_t C01,
+        const real_t C10,
+        const real_t K,
+        const real_t iso_relaxation_gamma,
+        const void *const RSTR iso_history,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values,
+        void *const stream
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+      switch (values_bytes) {
+        case (int)sizeof(double): {
+            if (nelements <= 0) return SFEM_SUCCESS;
+            const int block_size = 256;
+            const int grid_size = (int)((nelements + block_size - 1) / block_size);
+            sfem::codegen::mooney_rivlin_prony_tri3_hessian_a_msoa_assemble_impl<double, double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C01, C10, K, iso_relaxation_gamma, (const double *)iso_history, u_stride, (const double *)ux, (const double *)uy, rowptr, colidx, (double *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+            return sfem::codegen::launch_status("mooney_rivlin_prony_tri3_hessian_a_msoa_assemble_impl");
+        }
+        case (int)sizeof(float): {
+            if (nelements <= 0) return SFEM_SUCCESS;
+            const int block_size = 256;
+            const int grid_size = (int)((nelements + block_size - 1) / block_size);
+            sfem::codegen::mooney_rivlin_prony_tri3_hessian_a_msoa_assemble_impl<double, float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C01, C10, K, iso_relaxation_gamma, (const double *)iso_history, u_stride, (const double *)ux, (const double *)uy, rowptr, colidx, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+            return sfem::codegen::launch_status("mooney_rivlin_prony_tri3_hessian_a_msoa_assemble_impl");
+        }
+        default:
+          break;
+      }
+      break;
+    }
+    case (int)sizeof(float): {
+      switch (values_bytes) {
+        case (int)sizeof(float): {
+            if (nelements <= 0) return SFEM_SUCCESS;
+            const int block_size = 256;
+            const int grid_size = (int)((nelements + block_size - 1) / block_size);
+            sfem::codegen::mooney_rivlin_prony_tri3_hessian_a_msoa_assemble_impl<float, float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C01, C10, K, iso_relaxation_gamma, (const float *)iso_history, u_stride, (const float *)ux, (const float *)uy, rowptr, colidx, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+            return sfem::codegen::launch_status("mooney_rivlin_prony_tri3_hessian_a_msoa_assemble_impl");
+        }
+        default:
+          break;
+      }
+      break;
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_values_dispatch("mooney_rivlin_prony_tri3_hessian_bsr_a_msoa", (int)scalar_bytes, (int)values_bytes);
+}
+
+
+namespace sfem {
+namespace codegen {
+
+static const KernelDiagnostics mooney_rivlin_prony_tri3_quadrature_output_soa_diagnostics_data = {
+  "mooney_rivlin_prony_tri3_quadrature_output_soa",
+  "TRI3",
+  2,
+  1,
+  3,
+  16,
+  1,
+  45,
+  63,
+  2,
+  0,
+  9,
+  0,
+  0,
+  0,
+  2,
+  31,
+  133,
+  81,
+  108,
+  28,
+  20,
+  5,
+  6,
+  1,
+  2,
+  6,
+  0,
+  0,
+  0,
+  0,
+  1.0,
+  1.0,
+  8.0,
+  12.0,
+  16.0,
+  20.0,
+  20.0,
+  24.0,
+  1.0,
+  1.0
+};
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" const sfem::codegen::KernelDiagnostics *cu_mooney_rivlin_prony_tri3_quadrature_output_soa_diagnostics(void) {
+  return &sfem::codegen::mooney_rivlin_prony_tri3_quadrature_output_soa_diagnostics_data;
+}
+
+
+namespace sfem {
+namespace codegen {
+
+template <typename s_t, typename g_t>
+__global__ void mooney_rivlin_prony_tri3_quadrature_output_a_msoa_impl(
+        const ptrdiff_t nelements,
+        const ptrdiff_t,
+        idx_t **const RSTR elements,
+        const g_t *const RSTR g_adj0,
+        const g_t *const RSTR g_adj1,
+        const g_t *const RSTR g_adj2,
+        const g_t *const RSTR g_adj3,
+        const g_t *const RSTR g_det0,
+        const s_t C01,
+        const s_t C10,
+        s_t *const RSTR iso_stress,
+        const ptrdiff_t u_stride,
+        const s_t *const RSTR ux,
+        const s_t *const RSTR uy
+) {
+  static constexpr int NC = 2;
+  static constexpr int NS = 3;
+
+  for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
+    idx_t ev[NS];
+    s_t bu_data[NS * NC];
+
+    for (int element_node = 0; element_node < NS; ++element_node) {
+      const idx_t *const RSTR element_shape = elements[element_node] + evb;
+      idx_t *const RSTR ev_node = &ev[element_node];
+      {
+        ev_node[0] = element_shape[0];
+      }
+    }
+    const s_t *const u_components[NC] = {ux, uy};
+
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t *const RSTR ev_shape = &ev[shape];
+      for (int d = 0; d < NC; ++d) {
+        {
+          const idx_t node = ev_shape[0];
+          bu_data[shape * NC + d] = u_components[d][node * u_stride];
+        }
+      }
+    }
+
+    const s_t *bu_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bu_streams[stream] = &bu_data[stream];
+    }
+    s_t badj0_data;
+    const s_t *const badj0 = ageom_stream<s_t, g_t>(
+        g_adj0 + evb, &badj0_data, std::is_same<g_t, s_t>());
+    s_t badj1_data;
+    const s_t *const badj1 = ageom_stream<s_t, g_t>(
+        g_adj1 + evb, &badj1_data, std::is_same<g_t, s_t>());
+    s_t badj2_data;
+    const s_t *const badj2 = ageom_stream<s_t, g_t>(
+        g_adj2 + evb, &badj2_data, std::is_same<g_t, s_t>());
+    s_t badj3_data;
+    const s_t *const badj3 = ageom_stream<s_t, g_t>(
+        g_adj3 + evb, &badj3_data, std::is_same<g_t, s_t>());
+    s_t bdet0_data;
+    const s_t *const bdet0 = ageom_stream<s_t, g_t>(
+        g_det0 + evb, &bdet0_data, std::is_same<g_t, s_t>());
+
+    mooney_rivlin_prony_d2_simplex_tri3_quadrature_output_block<s_t, NS>(badj0, badj1, badj2, badj3, bdet0, C01, C10, iso_stress + evb, nelements, bu_streams);
+
+  }
+
+}
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" int cu_mooney_rivlin_prony_tri3_quadrature_output_a_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
+        const real_t C01,
+        const real_t C10,
+        void *const RSTR iso_stress,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        void *const stream
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        if (nelements <= 0) return SFEM_SUCCESS;
+        const int block_size = 256;
+        const int grid_size = (int)((nelements + block_size - 1) / block_size);
+        sfem::codegen::mooney_rivlin_prony_tri3_quadrature_output_a_msoa_impl<double, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C01, C10, (double *)iso_stress, u_stride, (const double *)ux, (const double *)uy);
+        return sfem::codegen::launch_status("mooney_rivlin_prony_tri3_quadrature_output_a_msoa_impl");
+    }
+    case (int)sizeof(float): {
+        if (nelements <= 0) return SFEM_SUCCESS;
+        const int block_size = 256;
+        const int grid_size = (int)((nelements + block_size - 1) / block_size);
+        sfem::codegen::mooney_rivlin_prony_tri3_quadrature_output_a_msoa_impl<float, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C01, C10, (float *)iso_stress, u_stride, (const float *)ux, (const float *)uy);
+        return sfem::codegen::launch_status("mooney_rivlin_prony_tri3_quadrature_output_a_msoa_impl");
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("mooney_rivlin_prony_tri3_quadrature_output_a_msoa", -1, (int)scalar_bytes);
+}

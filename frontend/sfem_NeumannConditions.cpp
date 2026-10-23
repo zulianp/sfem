@@ -525,7 +525,7 @@ namespace sfem {
                 nc.sidesets = sidesets;
                 node_value.load(&nc.value);
                 nc.follower_pressure = true;
-                if (c.has_child("profile") && LoadProfile::from_yaml(c["profile"], nc.profile) != SFEM_SUCCESS) {
+                if (c.has_child("profile") && LoadProfile::from_yaml(c["profile"], nc.profile, lookup.base_dir) != SFEM_SUCCESS) {
                     return nullptr;
                 }
                 conditions.push_back(nc);
@@ -572,7 +572,7 @@ namespace sfem {
             }
 
             LoadProfile profile;
-            if (c.has_child("profile") && LoadProfile::from_yaml(c["profile"], profile) != SFEM_SUCCESS) return nullptr;
+            if (c.has_child("profile") && LoadProfile::from_yaml(c["profile"], profile, lookup.base_dir) != SFEM_SUCCESS) return nullptr;
 
             for (size_t i = 0; i < component.size(); i++) {
                 struct Condition nc;

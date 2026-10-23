@@ -26,7 +26,6 @@
 #include "cu_boundary_condition.hpp"
 #include "cu_hex8_adjugate.hpp"
 #include "cu_hex8_fff.hpp"
-#include "cu_integrate_values.hpp"
 #include "cu_laplacian.hpp"
 #include "cu_linear_elasticity.hpp"
 #include "cu_mask.hpp"
@@ -187,129 +186,78 @@ namespace sfem {
         return std::make_shared<GPUDirichletConditions>(dc);
     }
 
+    /// The tractions are dead loads: each condition's load is one vector, assembled once on the
+    /// host for a unit value (any surface element the host integrates) and added scaled by the
+    /// condition's current value, which `NeumannConditions::set_time` keeps on the host object.
     class GPUNeumannConditions final : public Op {
     public:
-        std::shared_ptr<FunctionSpace>                   space;
-        std::shared_ptr<NeumannConditions>               h_neumann;
-        std::vector<struct NeumannConditions::Condition> conditions;
+        std::shared_ptr<FunctionSpace>     space;
+        std::shared_ptr<NeumannConditions> h_neumann;
+        std::vector<SharedBuffer<real_t>>  loads;
 
         GPUNeumannConditions(const std::shared_ptr<NeumannConditions> &nc) : space(nc->space()), h_neumann(nc) {
-            for (auto &c : nc->conditions()) {
-                NeumannConditions::Condition cond{.element_type = c.element_type,
-                                                  .sidesets     = (!c.sidesets.empty()) ? smesh::to_device(c.sidesets)
-                                                                                        : std::vector<std::shared_ptr<Sideset>>(),
-                                                  .surface      = smesh::to_device(c.surface),
-                                                  .values       = (c.values) ? smesh::to_device(c.values) : nullptr,
-                                                  .value        = c.value,
-                                                  .component    = c.component};
-                conditions.push_back(cond);
+            const ptrdiff_t ndofs = space->n_dofs();
+            for (auto c : nc->conditions()) {
+                c.value   = 1;
+                auto unit = NeumannConditions::create(space, {c});
+                auto load = sfem::create_host_buffer<real_t>(ndofs);
+                if (unit->gradient(nullptr, load->data()) != SFEM_SUCCESS) {
+                    SFEM_ERROR("GPUNeumannConditions: assembling a condition's load failed\n");
+                }
+                loads.push_back(smesh::to_device(load));
             }
         }
 
         const char *name() const override { return "gpu:NeumannConditions"; }
         bool        energy_or_potential_based() const override { return true; }
+        bool        residual_depends_on_state() const override { return false; }
 
+        // A dead load has no tangent, in any format or precision.
         int hessian_crs(const real_t *const  x,
                         const count_t *const rowptr,
                         const idx_t *const   colidx,
                         real_t *const        values) override {
             return SFEM_SUCCESS;
         }
+        int hessian_bsr(const real_t *const, const count_t *const, const idx_t *const, real_t *const) override {
+            return SFEM_SUCCESS;
+        }
+        int hessian_bsr_typed(const real_t *const, const count_t *const, const idx_t *const, const smesh::PrimitiveType, void *const) override {
+            return SFEM_SUCCESS;
+        }
+        int hessian_block_diag_sym(const real_t *const, real_t *const) override { return SFEM_SUCCESS; }
 
         int gradient(const real_t *const x, real_t *const out) override {
             SFEM_TRACE_SCOPE("GPUNeumannConditions::gradient");
-
-            // Prepare points on host (mesh or semi-structured mesh)
-            auto space = this->space;
-            auto mesh  = space->mesh_ptr();
-
-            auto points = mesh->points();
-            if (space->has_semi_structured_mesh()) {
-                points = space->mesh().points();
+            const auto &conditions = h_neumann->conditions();
+            for (size_t i = 0; i < loads.size(); ++i) {
+                sfem::blas<real_t>(EXECUTION_SPACE_DEVICE)->axpy(space->n_dofs(), conditions[i].value, loads[i]->data(), out);
             }
-
-            // Device-only: assume 'out' is a device pointer
-            real_t *out_dev = out;
-
-            int err = 0;
-
-            // Use host NeumannConditions for host-side data (surface indices and values),
-            // and device-side copies held in this->conditions for GPU kernels
-            const auto &hconds = h_neumann->conditions();
-
-            for (size_t i = 0; i < conditions.size(); ++i) {
-                const auto &hc = hconds[i];
-                const auto &dc = conditions[i];
-
-                const smesh::ElemType st   = hc.element_type;
-                const int             nnxs = elem_num_nodes(st);
-                const int             dim  = mesh->spatial_dimension();
-                const ptrdiff_t       ne   = dc.surface->extent(1);
-
-                if (ne == 0) continue;
-
-                if (st != smesh::QUADSHELL4) {
-                    SFEM_ERROR(
-                            "GPUNeumannConditions::gradient: unsupported element type %s (GPU supports only smesh::QUADSHELL4)\n",
-                            type_to_string(st));
-                    return SFEM_FAILURE;
-                }
-
-                auto coords_h = sfem::create_host_buffer<geom_t>(dim, ne * nnxs);
-                for (int d = 0; d < dim; ++d) {
-                    const geom_t *const px = points->data()[d];
-                    geom_t *const       cx = coords_h->data()[d];
-
-                    for (ptrdiff_t e = 0; e < ne; ++e) {
-                        for (int v = 0; v < nnxs; ++v) {
-                            const idx_t node = hc.surface->data()[v][e];
-                            cx[v * ne + e]   = px[node];
-                        }
-                    }
-                }
-
-                auto coords_d = smesh::to_device(coords_h);
-
-                if (hc.values && hc.values->size() && dc.values) {
-                    auto scaled = smesh::create_device_buffer<real_t>(ne);
-
-                    d_copy(ne, dc.values->data(), scaled->data());
-                    d_scal(ne, -hc.value, scaled->data());
-
-                    int gpu_ret = cu_integrate_values(st,
-                                                      ne,
-                                                      dc.surface->data(),
-                                                      (const geom_t **)coords_d->data(),
-                                                      smesh::SMESH_DEFAULT,
-                                                      (void *)scaled->data(),
-                                                      space->block_size(),
-                                                      hc.component,
-                                                      (void *)out_dev,
-                                                      SFEM_DEFAULT_STREAM);
-                    err |= gpu_ret;
-                } else {
-                    int gpu_ret = cu_integrate_value(st,
-                                                     ne,
-                                                     dc.surface->data(),
-                                                     (const geom_t **)coords_d->data(),
-                                                     -hc.value,
-                                                     space->block_size(),
-                                                     hc.component,
-                                                     smesh::SMESH_DEFAULT,
-                                                     (void *)out_dev,
-                                                     SFEM_DEFAULT_STREAM);
-                    err |= gpu_ret;
-                }
-            }
-
-            if (err) return err;
-
             return SFEM_SUCCESS;
         }
 
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override { return SFEM_SUCCESS; }
 
-        int value(const real_t *x, real_t *const out) override { return SFEM_SUCCESS; }
+        /// The work of the tractions, linear in the state as on the host.
+        int value(const real_t *x, real_t *const out) override {
+            const auto &conditions = h_neumann->conditions();
+            for (size_t i = 0; i < loads.size(); ++i) {
+                *out += conditions[i].value * sfem::blas<real_t>(EXECUTION_SPACE_DEVICE)->dot(space->n_dofs(), loads[i]->data(), x);
+            }
+            return SFEM_SUCCESS;
+        }
+
+        /// The work at x + steps[i] h: linear, so two dots per condition for every step.
+        int value_steps(const real_t *x, const real_t *h, const int nsteps, const real_t *const steps, real_t *const out) override {
+            const auto &conditions = h_neumann->conditions();
+            auto        blas       = sfem::blas<real_t>(EXECUTION_SPACE_DEVICE);
+            for (size_t i = 0; i < loads.size(); ++i) {
+                const real_t at_x  = conditions[i].value * blas->dot(space->n_dofs(), loads[i]->data(), x);
+                const real_t along = conditions[i].value * blas->dot(space->n_dofs(), loads[i]->data(), h);
+                for (int k = 0; k < nsteps; ++k) out[k] += at_x + steps[k] * along;
+            }
+            return SFEM_SUCCESS;
+        }
 
         int hessian_diag(const real_t *const /*x*/, real_t *const /*values*/) override { return SFEM_SUCCESS; }
 
@@ -317,14 +265,19 @@ namespace sfem {
         inline ptrdiff_t n_dofs_domain() const override { return space->n_dofs(); }
         inline ptrdiff_t n_dofs_image() const override { return space->n_dofs(); }
 
-        int n_conditions() const;
-
         ExecutionSpace execution_space() const override { return EXECUTION_SPACE_DEVICE; }
 
         std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &derefined_space) override { return no_op(); }
     };
 
     std::shared_ptr<Op> to_device(const std::shared_ptr<NeumannConditions> &nc) {
+        // A follower pressure turns with the surface: its load is not one vector.
+        for (const auto &c : nc->conditions()) {
+            if (c.follower_pressure) {
+                SFEM_ERROR("to_device: a follower pressure is host only\n");
+                return nullptr;
+            }
+        }
         return std::make_shared<GPUNeumannConditions>(nc);
     }
 

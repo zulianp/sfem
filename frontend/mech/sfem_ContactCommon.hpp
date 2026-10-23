@@ -70,10 +70,10 @@ namespace sfem {
         };
 
     /// Columns reaction_x, reaction_y, reaction_z and touched: the resultant of the obstacle's
-    /// physical force on the body -- half the step's reaction (the reaction of the obstacle back-ends
-    /// is in the step's scaling, where the material force enters both ends of a trapezoidal step and
-    /// the contact force once) -- and whether a node is on the obstacle (the smallest gap at most
-    /// `touch_gap`; the reaction of a body in flight is the residual's rounding, not zero), read
+    /// physical force on the body -- `force_scale` times the step's reaction: 2 beta of it in a
+    /// Newmark step (the force on a body at rest on the obstacle, half for the trapezoidal rule),
+    /// the whole of it in a static one -- and whether a node is on the obstacle (the smallest gap
+    /// at most `touch_gap`; the reaction of a body in flight is the residual's rounding, not zero), read
     /// before the step is committed. `reaction` writes the step's reaction (ndofs, in `es`),
     /// `min_gap` returns the smallest gap of the contact nodes.
     std::shared_ptr<Probe> create_contact_probe(const std::function<void(real_t *const)> &reaction,
@@ -81,6 +81,7 @@ namespace sfem {
                                                 const ptrdiff_t                           ndofs,
                                                 const ExecutionSpace                      es,
                                                 const real_t                              touch_gap,
+                                                const real_t                              force_scale,
                                                 const std::shared_ptr<Communicator>      &comm);
 
 }  // namespace sfem

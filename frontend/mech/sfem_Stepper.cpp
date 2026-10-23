@@ -104,9 +104,10 @@ namespace sfem {
         int    step = 0;
         // While every step has its full length, step k ends at t0 + k dt exactly rather than at a
         // sum that has gathered rounding.
-        bool uniform = true;
+        bool   uniform = true;
+        real_t last_dt = opts.dt;
         while (t < t_end - tol) {
-            real_t dt   = uniform ? opts.dt : std::min(opts.dt, t_end - t);
+            real_t dt   = uniform ? opts.dt : std::min({opts.dt, t_end - t, opts.max_growth * last_dt});
             int    cuts = 0;
 
             NonlinearReport report;
@@ -155,6 +156,7 @@ namespace sfem {
             }
 
             t = uniform ? opts.t0 + (step + 1) * opts.dt : t + dt;
+            last_dt = dt;
             step++;
 
             record.step     = step;

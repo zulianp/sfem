@@ -126,12 +126,25 @@ def block_call_arguments(streams, element_offset, n_elements):
 
 
 def point_base_lines(streams, indent, point="q", scalar_type="s_t"):
-    """Each stream advanced to quadrature point `point`, once per point."""
+    """Each stream advanced to quadrature point `point`, once per point.
+
+    `SINGLE_POINT`, a rule of one point, leaves the stream where it is: its
+    point is the first.
+    """
     return [
-        "%s%s%s *const RSTR %s = %s + %s * %s;"
-        % (indent, stream.qualifier, scalar_type, stream.point_base, stream.name, point, QUADRATURE_STRIDE)
+        "%s%s%s *const RSTR %s = %s;"
+        % (indent, stream.qualifier, scalar_type, stream.point_base, _point_base(stream.name, point))
         for stream in streams
     ]
+
+
+#: The point of a rule that has only one, as `point_base_lines` takes it and as
+#: `load_lines` and `store_target` take the rule's point count.
+SINGLE_POINT = None
+
+
+def _point_base(name, point):
+    return name if point is SINGLE_POINT else "%s + %s * %s" % (name, point, QUADRATURE_STRIDE)
 
 
 def store_target(stream, component, lane, n_points="NQ"):
@@ -171,7 +184,13 @@ SINGLE_ELEMENT = None
 def _component_offset(component, n_points, lane):
     terms = []
     if component:
-        terms.append("%d * %s * %s" % (component, n_points, QUADRATURE_STRIDE))
+        terms.append(
+            " * ".join(
+                ["%d" % component]
+                + [str(n_points) for _ in (n_points,) if n_points is not SINGLE_POINT]
+                + [QUADRATURE_STRIDE]
+            )
+        )
     if lane is not SINGLE_ELEMENT:
         terms.append(str(lane))
     return " + ".join(terms) or "0"

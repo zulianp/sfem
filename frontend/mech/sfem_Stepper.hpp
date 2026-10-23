@@ -2,6 +2,7 @@
 #define SFEM_STEPPER_HPP
 
 #include <functional>
+#include <limits>
 #include <memory>
 
 #include "sfem_HistoryDependent.hpp"
@@ -22,6 +23,9 @@ namespace sfem {
         int steps{1};
         /// How often a failed step is retried with half its length.
         int max_cutbacks{0};
+        /// After a shortened step each step is at most this many times the last one's length, up
+        /// to dt: a multistep scheme stays stable only for a bounded ratio (BDF2, 1 + sqrt(2)).
+        real_t max_growth{std::numeric_limits<real_t>::infinity()};
     };
 
     /// A step as an observer sees it.
