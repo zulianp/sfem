@@ -73,6 +73,10 @@ namespace sfem {
                          real_t *const       velocity,
                          real_t *const       acceleration) const override;
 
+        /// Newton's start for the step opened by the last `begin_step`: u_n + dt v_n, the step taken
+        /// at the last velocity. Near the solution where the motion is smooth; at an impact fewer
+        /// contact nodes change state within the solve than from u_n (FF200's pump strokes, BDF2,
+        /// 30 ms: 6 failed attempts against 117, the QP in 21 s against 41).
         void start(real_t *const x) const override;
         void carried_state(real_t *const velocity, real_t *const acceleration) const override;
 

@@ -543,6 +543,13 @@ int test_bdf2_takes_steps_of_varying_length() {
         SFEM_TEST_ASSERT(std::abs(a2->data()[i] - a) <= 1e-10 * (1 + std::abs(a)));
     }
 
+    // Newton starts the step at the last velocity: u_n + dt v_n, the step's length dt.
+    auto start = sfem::create_host_buffer<real_t>(n);
+    scheme->start(start->data());
+    for (ptrdiff_t i = 0; i < n; ++i) {
+        SFEM_TEST_ASSERT(std::abs(start->data()[i] - (x1->data()[i] + h * v1->data()[i])) <= 1e-14 * (1 + std::abs(start->data()[i])));
+    }
+
     // u' = -u to t = 1 in steps alternating between 2/3 and 4/3 of H = 1 / (2 n_pairs).
     auto error_at_one = [&](const int n_pairs) -> real_t {
         auto s = std::make_shared<sfem::BDF2Scheme>(fixture.space);
