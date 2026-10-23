@@ -12,7 +12,7 @@ TABDIR   = tables
 # No extensions are granted, so this is a gate rather than a guideline.
 PAGELIMIT ?= 10
 
-.PHONY: all figures check clean selftest darwish-cache consistent-matrix
+.PHONY: all figures check clean selftest darwish-cache consistent-matrix state-gradients
 
 all: main.pdf
 
@@ -22,6 +22,7 @@ main.pdf: main.tex refs.bib $(wildcard $(FIGDIR)/*.tex) $(wildcard $(TABDIR)/*.t
 figures:
 	$(PY) python/darwish_cache_figures.py --consistent-matrix
 	$(PY) python/darwish_cache_figures.py
+	$(PY) python/state_gradient_figures.py
 	$(PY) python/scatter_figures.py
 	$(PY) python/packed_format_figures.py --out $(FIGDIR)
 	@if [ -f python/perf_figures.py ]; then \
@@ -29,6 +30,7 @@ figures:
 	fi
 
 selftest:
+	$(PY) python/state_gradient_figures.py --selftest
 	$(PY) python/packed_format_figures.py --selftest
 	@if [ -f python/perf_figures.py ]; then $(PY) python/perf_figures.py --selftest; fi
 
@@ -76,3 +78,7 @@ darwish-cache:
 consistent-matrix:
 	$(PY) python/darwish_cache_figures.py --consistent-matrix --selftest
 	$(PY) python/darwish_cache_figures.py --consistent-matrix
+
+# Regenerate only the isolated state-gradient study from its external archive.
+state-gradients:
+	$(PY) python/state_gradient_figures.py

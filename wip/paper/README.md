@@ -504,3 +504,90 @@ are costs of this probing reference, not an optimised direct assembler. No
 hardware counters were collected: storage and timing alone do not establish a
 bandwidth bottleneck. No full-solver speedup or universal comparison against
 all sparse kernels is claimed.
+
+## Fixed-state gradient reuse (PR #60)
+
+Grace job `5114021` on `nid006553`, GNU 14.3.0, measures only state-gradient
+reuse in commit `9cfefc2a67390cdf6e7aadc84c5db3244d2a5704`. Both arms use the
+same FP64 executable; `--rebuild-state-gradients` is the only computational
+switch. The Darwish coefficient-cache optimization from PR #61 is absent.
+
+Scope: affine interior, n128, packs of 1024, Rhie–Chow enabled, perturbation 0.017,
+72 cores bound to NUMA0, and transparent huge pages disabled per worker with
+readback. Five schemes, six fresh-process pairs each, three in each launch
+order. Each process performs 30 warmups and 70 timed applications, rotating seven
+live direction vectors. Application times exclude the intervening vector churn,
+setup, checks and output I/O; required direction reconstruction is included.
+This represents application cost with a changing input/live-vector working set,
+not complete Krylov or nonlinear solver time.
+
+All 60 windows are retained. Time saved is `100*(1-mean_reuse/mean_rebuild)`;
+paired ratios divide rebuild time by reuse time within the same block. Ranges
+are full sample variation, not confidence intervals. No sample is rejected
+because reuse is slower. The benefit is present in both launch-order groups.
+
+<!-- BEGIN GENERATED STATE GRADIENT RESULTS -->
+
+| Scheme | Rebuild mean ms [range] | Reuse mean ms [range] | Time saved | Paired time-ratio range | Pairs favor reuse |
+|---|---|---|---:|---|---:|
+| First-order | 9.332093 [9.273706, 9.430952] | 8.744212 [8.693610, 8.922551] | 6.30% | [1.056979, 1.075218] | 6/6 |
+| Unlimited | 18.543087 [18.413451, 18.820626] | 15.769150 [15.723780, 15.891021] | 14.96% | [1.158733, 1.196798] | 6/6 |
+| Barth–Jespersen | 21.174029 [21.070607, 21.232505] | 18.665304 [18.537026, 18.866264] | 11.85% | [1.122948, 1.141609] | 6/6 |
+| Venkatakrishnan | 25.695058 [25.534954, 25.809657] | 23.028365 [22.909407, 23.095486] | 10.38% | [1.105625, 1.124806] | 6/6 |
+| Darwish | 25.243216 [25.152728, 25.329357] | 22.633972 [22.539136, 22.720589] | 10.34% | [1.107192, 1.123188] | 6/6 |
+
+<!-- END GENERATED STATE GRADIENT RESULTS -->
+
+Both precision cache regressions, the limiter and coupled derivative regressions,
+and the dump checker pass (five CTests). Every timing capture passes its existing
+packed/atomic action check. Every pair compares complete final output vectors at
+the original cache tolerance (64 FP64 epsilons in the scaled infinity norm).
+All 30 pairs report zero difference. The first pair's full vectors per scheme are
+retained and independently rechecked; later vectors were fully compared and
+hashed before release. This does not check every intermediate direction in the
+timed loop or resolve the known unperturbed-state discrepancy.
+
+The paper's historical exact-action tables remain rebuild-mode measurements. This separate
+study quantifies the standalone benchmark correction; solver code already had
+fixed-state reuse. Its rotating-vector, fresh-process recipe differs from the
+later retained-worker coefficient-cache campaign, so multiplying the two
+speedups would not establish a measured combined improvement.
+
+### Evidence and regeneration
+
+Raw evidence and the complete run kit stay outside Git in
+`pasc27-state-gradients-5114021.zip` (about 622 MiB). SHA256:
+
+```
+436fd698025351559618b2c50bb9b6a38fcb269c52061f1dc2323d05e6104d6c
+```
+
+The author-held archive was made from the retained evidence directory
+`/capstor/scratch/cscs/gandanie/git/pasc27-state-gradient-study/results/state-gradients-5114021-4n6mUq`;
+request the pinned archive for the exact checksum (the zip container metadata is
+part of that checksum). No public download is claimed at this stage. The archive
+contains all logs/CSVs, records, retained vectors, source snapshot, recipe,
+compiler/build/dependency hashes, binding metadata and detailed numerical gates.
+The 151 source files were checked against the stated commit.
+
+From `wip/paper`, set the archive path and regenerate:
+
+```bash
+export SFEM_STATE_GRADIENT_ARCHIVE=/path/to/pasc27-state-gradients-5114021.zip
+make state-gradients
+```
+
+The generator checks the archive hash, source/binary identity, scope, commands,
+launch order, complete numerical records and hashed logs/CSVs before producing
+`figures/state_gradient_macros.tex` and the table above. Missing or altered evidence
+fails regeneration. `make figures` includes this gate; `make selftest` requires no
+external archive. No archived Python code is executed by the paper generator.
+
+For a full-vector replay, extract the archive and use its checked recipe:
+
+```bash
+python3 state-gradients-5114021/kit/study.py replay state-gradients-5114021/captures
+```
+
+Full replay rechecks the retained vectors as well as every log/CSV. The remaining
+pair checks retain their original errors and vector hashes, not the released arrays.

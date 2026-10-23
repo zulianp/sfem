@@ -54,6 +54,7 @@
 \input{figures/scatter_macros}
 \input{tables/darwish_cache_macros}
 \input{tables/consistent_matrix_macros}
+\input{figures/state_gradient_macros}
 \IfFileExists{figures/jacho_macros.tex}{\input{figures/jacho_macros}}{}
 \IfFileExists{figures/meshfoot_macros.tex}{\input{figures/meshfoot_macros}}{}
 \IfFileExists{figures/jacfair_macros.tex}{\input{figures/jacfair_macros}}{}
@@ -938,13 +939,14 @@ reconstruction because it drops that sensitivity, not because it caches the stat
 The assembled matrix performs no element sweep per application but pays for assembly once
 per Newton step.
 
-The exact-action timings currently reported in the results were obtained with the
+The historical exact-action timings in the original campaign were obtained with the
 earlier implementation, which also rebuilt the state gradients inside each application:
 two scalar input fields for $\Jex$ and eight for $\Jhoex$, fused in one sweep. The benchmark
 retains this scope through \texttt{--rebuild-state-gradients}; its default now caches the
-state reconstruction. Both modes retain the same derivatives. The existing measurements
+state reconstruction. Both modes retain the same derivatives. Those historical measurements
 must therefore be read as rates for the rebuild mode, not as measurements of the cached
-implementation. A performance comparison requires new runs with the mode recorded.
+implementation. The separate paired comparison in \S\ref{sec:res:hoexact} isolates
+state-gradient reuse without replacing those historical measurements.
 
 The driver times that sweep separately, so its share of the application appears beside the
 element kernel's rather than folded into it.
@@ -1278,7 +1280,7 @@ cancellation, so a term can be present at every node and absent from the total. 
 
 With the correction left an explicit source, $\Jex$ approximates the derivative of $\Fho$
 (\S\ref{sec:setup}). $\Jhoex$ also reconstructs $\Gop u(v)$ and differentiates the limiter.
-The measurements in this section use the rebuild mode: their fused sweep includes both
+The historical throughput measurements in this section use the rebuild mode: their fused sweep includes both
 state and direction gradients, eight scalar input fields for $\Jhoex$ against two for
 $\Jex$. Thus the measured cost includes redundant state reconstruction as well as the
 additional sensitivities. In this mode, the unlimited arm reaches
@@ -1333,6 +1335,25 @@ These checks cover the tested steady, affine interior operators; they do not est
 nonlinear convergence or boundary and transient consistency. Residual agreement
 between layouts also does not establish agreement of their selected linearizations
 at a switch.
+
+\paragraph{Reusing fixed-state gradients.}
+A separate paired study on 72 Grace cores isolates this benchmark change:
+FP64, affine interior, $n=128$, packs of 1024, Rhie--Chow enabled and
+state perturbation 0.017. Reuse reduces mean application time by
+\sgFirstSaved\% for first-order upwind and \sgHigherMin--\sgHigherMax\%
+across the four higher-order variants. Darwish takes
+\sgDarwishRebuildMean{}\,ms before and \sgDarwishReuseMean{}\,ms after reuse;
+full sample ranges are [\sgDarwishRebuildMin, \sgDarwishRebuildMax] and
+[\sgDarwishReuseMin, \sgDarwishReuseMax]\,ms, respectively.
+All \sgPositive{} of \sgPairs{} pairs favour reuse, with three pairs per scheme
+in each launch order. Each fresh process performs 30 warmups and 70 timed
+applications with seven rotating direction vectors; vector churn, setup and
+checks are excluded, while required direction reconstruction remains timed.
+Worker transparent huge pages are disabled. These are fixed-state application
+savings, not solver timings; no Darwish coefficient cache is used.
+Ranges describe sample variation, not confidence intervals. Full ranges for
+all schemes and the unchanged numerical gates are recorded in the
+reproducibility documentation.
 
 \subsection{Against the lagged matrix}
 \label{sec:res:spmv}
