@@ -22,6 +22,8 @@ Columns of runs.csv:
   setup, solve, qp, linearize, assemble  Playground::create, Stepper::run, the QP solves, the
                                          linearisations, the tangent assemblies (s, rank 0's trace)
   exchange_begin, exchange_wait          the ghost gathers' two halves (s)
+  nccl_init, nccl_wait                   with nccl: true, NCCL's set-up on its own thread and the
+                                         time the run waited for it at the first use (s)
   qp_per_iteration                       qp / qp_iterations (us)
 """
 
@@ -44,6 +46,8 @@ TRACE = {
     "assemble": "BSRTangent::assemble",
     "exchange_begin": "Exchange::gather_begin",
     "exchange_wait": "Exchange::gather_wait",
+    "nccl_init": "DeviceCommunicator::init",
+    "nccl_wait": "DeviceCommunicator::ready",
 }
 KEYS = ["case", "config", "kind", "nodes", "ranks", "ranks_per_node", "threads", "gpus", "repeat", "job", "rc",
         "case_yaml_sha", "set"]
