@@ -24,6 +24,8 @@ namespace sfem {
         std::shared_ptr<Buffer<real_t>> u_hat;
 
         real_t dt{0};
+        // The length of the last step taken, which the variable-step formula weighs against.
+        real_t dt_n{0};
         real_t shift{0};
         real_t alpha_a{0};
 
@@ -92,24 +94,23 @@ namespace sfem {
             blas->zaxpby(ndofs, 1, impl_->u_n->data(), dt, impl_->v_n->data(), impl_->u_hat->data());
             blas->zaxpby(ndofs, -impl_->shift, impl_->u_n->data(), 0, impl_->u_n->data(), impl_->z->data());
         } else {
-            impl_->shift   = real_t(1.5) / dt;
-            impl_->alpha_a = real_t(2.25) / (dt * dt);
+            // The variable-step formula, w = dt / dt_n the ratio of this step to the last:
+            // u' = c0 u + c1 u_n + c2 u_nm1 with c0 = (1 + 2w) / ((1 + w) dt), c1 = -(1 + w) / dt,
+            // c2 = w^2 / ((1 + w) dt); at w = 1 the constant-step (3u - 4u_n + u_nm1) / (2dt). The
+            // same on the velocity gives the acceleration c0^2 (u - u_hat), with
+            // u_hat = -(c1 u_n + c2 u_nm1) / c0 - (c1 v_n + c2 v_nm1) / c0^2.
+            const real_t w  = dt / impl_->dt_n;
+            const real_t c0 = (1 + 2 * w) / ((1 + w) * dt);
+            const real_t c1 = -(1 + w) / dt;
+            const real_t c2 = w * w / ((1 + w) * dt);
+            impl_->shift    = c0;
+            impl_->alpha_a  = c0 * c0;
 
-            blas->zaxpby(ndofs,
-                         real_t(4.0 / 3.0),
-                         impl_->u_n->data(),
-                         real_t(-1.0 / 3.0),
-                         impl_->u_nm1->data(),
-                         impl_->u_hat->data());
-            blas->axpy(ndofs, real_t(8.0 / 9.0) * dt, impl_->v_n->data(), impl_->u_hat->data());
-            blas->axpy(ndofs, real_t(-2.0 / 9.0) * dt, impl_->v_nm1->data(), impl_->u_hat->data());
+            blas->zaxpby(ndofs, -c1 / c0, impl_->u_n->data(), -c2 / c0, impl_->u_nm1->data(), impl_->u_hat->data());
+            blas->axpy(ndofs, -c1 / (c0 * c0), impl_->v_n->data(), impl_->u_hat->data());
+            blas->axpy(ndofs, -c2 / (c0 * c0), impl_->v_nm1->data(), impl_->u_hat->data());
 
-            blas->zaxpby(ndofs,
-                         real_t(-2.0) / dt,
-                         impl_->u_n->data(),
-                         real_t(0.5) / dt,
-                         impl_->u_nm1->data(),
-                         impl_->z->data());
+            blas->zaxpby(ndofs, c1, impl_->u_n->data(), c2, impl_->u_nm1->data(), impl_->z->data());
         }
 
         impl_->inertia->set_alpha(impl_->alpha_a);
@@ -145,6 +146,7 @@ namespace sfem {
         blas->copy(ndofs, impl_->u_n->data(), impl_->u_nm1->data());
         blas->copy(ndofs, x, impl_->u_n->data());
 
+        impl_->dt_n    = impl_->dt;
         impl_->started = true;
     }
 

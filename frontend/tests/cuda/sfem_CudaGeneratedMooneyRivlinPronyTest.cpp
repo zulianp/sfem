@@ -85,10 +85,18 @@ namespace {
         op.relaxation_groups().set_series("", "iso", PronySeries({0.40, 0.30}, {1.0, 10.0}), options);
     }
 
-    int host_vs_device(const HistoryStorage storage, const real_t tolerance) {
-        const int n    = 6;
-        auto      mesh = Mesh::create_hex8_cube(Communicator::self(), n, n, n, 0, 0, 0, 1, 1, 1);
+    int host_vs_device(const HistoryStorage storage, const real_t tolerance, const smesh::ElemType element = smesh::HEX8) {
+        const int n = 6;
+        std::shared_ptr<Mesh> mesh;
+        if (element == smesh::HEX8) {
+            mesh = Mesh::create_hex8_cube(Communicator::self(), n, n, n, 0, 0, 0, 1, 1, 1);
+        } else {
+            mesh = Mesh::create_tet4_cube(Communicator::self(), n, n, n, 0, 0, 0, 1, 1, 1);
+        }
+        // On the grid's vertices, so before TET10's midside nodes exist: promoted after, its
+        // elements stay straight.
         distort_interior(mesh, n, real_t(0.15));
+        if (element == smesh::TET10) mesh = smesh::promote_to(smesh::TET10, mesh);
         auto fs = FunctionSpace::create(mesh, 3);
 
         auto host_op   = std::dynamic_pointer_cast<GeneratedMooneyRivlinProny>(create_op(fs, "GeneratedMooneyRivlinProny", EXECUTION_SPACE_HOST));
@@ -102,7 +110,9 @@ namespace {
         const ptrdiff_t ndofs = fs->n_dofs();
         auto            u_h   = create_host_buffer<real_t>(ndofs);
         auto            d_h   = create_host_buffer<real_t>(ndofs);
-        fill_pseudo_random(ndofs, real_t(0.05), u_h->data(), 12345);
+        // Random nodal noise grown by 1.15 a step: the six tetrahedra of each cube, and TET10's
+        // midside nodes, invert where a hexahedron does not, so the simplices take a fifth of it.
+        fill_pseudo_random(ndofs, element == smesh::HEX8 ? real_t(0.05) : real_t(0.01), u_h->data(), 12345);
         fill_pseudo_random(ndofs, real_t(1), d_h->data(), 777);
         auto d_d = smesh::to_device(d_h);
 
@@ -138,11 +148,13 @@ namespace {
             const real_t value_error    = std::abs(v_h - v_d) / std::max(std::abs(v_h), real_t(1e-30));
             const real_t gradient_error = relative_difference(g_h, g_d);
             const real_t apply_error    = relative_difference(a_h, a_d);
-            printf("  %-15s step %d ndof=%td: value %.3e gradient %.3e apply %.3e\n",
+            printf("  %-6s %-15s step %d ndof=%td: value %.3e (host %.6g) gradient %.3e apply %.3e\n",
+                   smesh::type_to_string(element),
                    to_string(storage),
                    step,
                    ndofs,
                    (double)value_error,
+                   (double)v_h,
                    (double)gradient_error,
                    (double)apply_error);
             worst = std::max({worst, value_error, gradient_error, apply_error});
@@ -159,6 +171,10 @@ namespace {
 
 // Full storage: the two sides differ only in the order of floating-point operations.
 int test_device_matches_host_full_storage() { return host_vs_device(HistoryStorage::FULL, real_t(1e-10)); }
+
+// The simplices: TET4's one-point kernels and TET10's eleven-point ones.
+int test_device_matches_host_tet4() { return host_vs_device(HistoryStorage::FULL, real_t(1e-10), smesh::TET4); }
+int test_device_matches_host_tet10() { return host_vs_device(HistoryStorage::FULL, real_t(1e-10), smesh::TET10); }
 
 // Quantised H_i: identical codes except where a rounding tie falls differently; one code of
 // int16 is 1.5e-5 of an element's largest entry.
@@ -202,6 +218,8 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_device_matches_host_full_storage);
     SFEM_RUN_TEST(test_device_matches_host_int16_storage);
     SFEM_RUN_TEST(test_device_matches_host_float16_storage);
+    SFEM_RUN_TEST(test_device_matches_host_tet4);
+    SFEM_RUN_TEST(test_device_matches_host_tet10);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }

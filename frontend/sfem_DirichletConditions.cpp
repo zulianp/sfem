@@ -547,7 +547,7 @@ namespace sfem {
             }
 
             LoadProfile profile;
-            if (c.has_child("profile") && LoadProfile::from_yaml(c["profile"], profile) != SFEM_SUCCESS) return nullptr;
+            if (c.has_child("profile") && LoadProfile::from_yaml(c["profile"], profile, lookup.base_dir) != SFEM_SUCCESS) return nullptr;
 
             for (size_t i = 0; i < component.size(); i++) {
                 struct Condition cdc;

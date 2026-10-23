@@ -495,6 +495,80 @@ int test_bdf2_matches_the_hand_written_algebra() {
     return SFEM_TEST_SUCCESS;
 }
 
+/// A step of another length: the variable-step BDF2, w = dt / dt_n the ratio to the last step,
+/// against its coefficients written out, and still of second order when every step alternates
+/// between two lengths, twice and half the last.
+int test_bdf2_takes_steps_of_varying_length() {
+    auto         fixture = make_fixture();
+    const real_t dt      = real_t(0.05);
+
+    auto scheme = std::make_shared<sfem::BDF2Scheme>(fixture.space);
+    scheme->set_density(real_t(2));
+    SFEM_TEST_ASSERT(scheme->initialize() == SFEM_SUCCESS);
+
+    const ptrdiff_t n  = fixture.ndofs;
+    auto            u0 = sfem::create_host_buffer<real_t>(n);
+    auto            v0 = sfem::create_host_buffer<real_t>(n);
+    seed_state(n, 0, u0->data());
+    seed_state(n, 1, v0->data());
+    std::copy(u0->data(), u0->data() + n, scheme->state()->data());
+    std::copy(v0->data(), v0->data() + n, scheme->velocity()->data());
+
+    auto x1 = sfem::create_host_buffer<real_t>(n);
+    seed_state(n, 3, x1->data());
+    scheme->begin_step(dt, dt);
+    auto v1 = sfem::create_host_buffer<real_t>(n);
+    auto a1 = sfem::create_host_buffer<real_t>(n);
+    scheme->reconstruct(x1->data(), v1->data(), a1->data());
+    scheme->advance(x1->data());
+
+    // The second step half as long as the first.
+    const real_t h = dt / 2, w = h / dt;
+    const real_t c0 = (1 + 2 * w) / ((1 + w) * h), c1 = -(1 + w) / h, c2 = w * w / ((1 + w) * h);
+    scheme->begin_step(dt + h, h);
+    SFEM_TEST_ASSERT(std::abs(scheme->shift() - c0) <= 1e-12 * c0);
+    SFEM_TEST_ASSERT(std::abs(scheme->weight("alpha_a") - c0 * c0) <= 1e-12 * c0 * c0);
+
+    auto x2 = sfem::create_host_buffer<real_t>(n);
+    seed_state(n, 4, x2->data());
+    auto v2 = sfem::create_host_buffer<real_t>(n);
+    auto a2 = sfem::create_host_buffer<real_t>(n);
+    scheme->reconstruct(x2->data(), v2->data(), a2->data());
+    for (ptrdiff_t i = 0; i < n; ++i) {
+        const real_t u_n = x1->data()[i], u_nm1 = u0->data()[i];
+        const real_t v_n = v1->data()[i], v_nm1 = v0->data()[i];
+        const real_t v   = c0 * x2->data()[i] + c1 * u_n + c2 * u_nm1;
+        const real_t a   = c0 * v + c1 * v_n + c2 * v_nm1;
+        SFEM_TEST_ASSERT(std::abs(v2->data()[i] - v) <= 1e-10 * (1 + std::abs(v)));
+        SFEM_TEST_ASSERT(std::abs(a2->data()[i] - a) <= 1e-10 * (1 + std::abs(a)));
+    }
+
+    // u' = -u to t = 1 in steps alternating between 2/3 and 4/3 of H = 1 / (2 n_pairs).
+    auto error_at_one = [&](const int n_pairs) -> real_t {
+        auto s = std::make_shared<sfem::BDF2Scheme>(fixture.space);
+        s->set_density(real_t(1));
+        if (s->initialize() != SFEM_SUCCESS) return real_t(-1);
+        std::fill(s->state()->data(), s->state()->data() + n, real_t(1));
+        auto         x = sfem::create_host_buffer<real_t>(n);
+        const real_t H = real_t(1) / (2 * n_pairs);
+        real_t       t = 0;
+        for (int k = 0; k < 2 * n_pairs; ++k) {
+            const real_t step = (k % 2 ? real_t(4) : real_t(2)) / 3 * H;
+            t += step;
+            s->begin_step(t, step);
+            for (ptrdiff_t i = 0; i < n; ++i) x->data()[i] = -s->history()[i] / (s->shift() + 1);
+            s->advance(x->data());
+        }
+        return std::abs(x->data()[0] - std::exp(-t));
+    };
+    const real_t coarse = error_at_one(40), fine = error_at_one(80);
+    const real_t rate   = std::log2(coarse / fine);
+    printf("  alternating steps: error %g, %g; rate %g\n", (double)coarse, (double)fine, (double)rate);
+    SFEM_TEST_ASSERT(coarse > 0 && fine > 0);
+    SFEM_TEST_ASSERT(std::abs(rate - 2) < real_t(0.15));
+    return SFEM_TEST_SUCCESS;
+}
+
 /// The two schemes are of different order, and the published interface is
 /// enough to show it.
 ///
@@ -1179,6 +1253,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_advance_reconstructs_the_state);
     SFEM_RUN_TEST(test_a_first_order_scheme_runs_the_same_material);
     SFEM_RUN_TEST(test_bdf2_matches_the_hand_written_algebra);
+    SFEM_RUN_TEST(test_bdf2_takes_steps_of_varying_length);
     SFEM_RUN_TEST(test_the_schemes_have_the_order_they_claim);
     SFEM_RUN_TEST(test_the_diagnostic_matches_the_scheme);
     SFEM_RUN_TEST(test_the_schemes_potential_differentiates_to_its_residual);

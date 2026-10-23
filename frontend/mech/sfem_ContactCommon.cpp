@@ -22,8 +22,14 @@ namespace sfem {
                          const ptrdiff_t                           ndofs,
                          const ExecutionSpace                      es,
                          const real_t                              touch_gap,
+                         const real_t                              force_scale,
                          const std::shared_ptr<Communicator>      &comm)
-                : reaction_(reaction), min_gap_(min_gap), force_(create_buffer<real_t>(ndofs, es)), touch_gap_(touch_gap), comm_(comm) {}
+                : reaction_(reaction),
+                  min_gap_(min_gap),
+                  force_(create_buffer<real_t>(ndofs, es)),
+                  touch_gap_(touch_gap),
+                  force_scale_(force_scale),
+                  comm_(comm) {}
 
             std::vector<std::string> columns() const override { return {"reaction_x", "reaction_y", "reaction_z", "touched"}; }
 
@@ -42,9 +48,9 @@ namespace sfem {
                 // The reaction lives on the contact nodes, each owned by one rank.
                 real_t sums[3] = {x, y, z};
                 if (comm_->size() > 1) comm_->sum(sums, 3, smesh::TypeToEnum<real_t>::value());
-                resultant_[0] = sums[0] / 2;
-                resultant_[1] = sums[1] / 2;
-                resultant_[2] = sums[2] / 2;
+                resultant_[0] = force_scale_ * sums[0];
+                resultant_[1] = force_scale_ * sums[1];
+                resultant_[2] = force_scale_ * sums[2];
                 touched_      = min_gap_() <= touch_gap_;
                 return SFEM_SUCCESS;
             }
@@ -61,6 +67,7 @@ namespace sfem {
             std::function<real_t()>             min_gap_;
             SharedBuffer<real_t>                force_;
             real_t                              touch_gap_;
+            real_t                              force_scale_;
             std::shared_ptr<Communicator>       comm_;
             real_t                              resultant_[3]{0, 0, 0};
             bool                                touched_{false};
@@ -72,8 +79,9 @@ namespace sfem {
                                                 const ptrdiff_t                           ndofs,
                                                 const ExecutionSpace                      es,
                                                 const real_t                              touch_gap,
+                                                const real_t                              force_scale,
                                                 const std::shared_ptr<Communicator>      &comm) {
-        return std::make_shared<ContactProbe>(reaction, min_gap, ndofs, es, touch_gap, comm);
+        return std::make_shared<ContactProbe>(reaction, min_gap, ndofs, es, touch_gap, force_scale, comm);
     }
 
 }  // namespace sfem

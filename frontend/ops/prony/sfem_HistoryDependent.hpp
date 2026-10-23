@@ -4,6 +4,8 @@
 
 namespace sfem {
 
+    class RelaxationGroups;
+
     /// An `Op` whose material carries integration-point history -- a Prony
     /// series, for one -- and therefore has to be told where steps begin and
     /// end.
@@ -32,6 +34,10 @@ namespace sfem {
         /// Restart the history from rest at the configuration `x`.  Needed only
         /// when the initial configuration is not stress free.
         virtual void reset_history(const real_t *const x) = 0;
+
+        /// The relaxation state the history is held in, for diagnostics: null when the history is
+        /// not a Prony series's.
+        virtual RelaxationGroups *relaxation_state() { return nullptr; }
     };
 
 }  // namespace sfem

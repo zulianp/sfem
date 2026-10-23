@@ -33,6 +33,11 @@ namespace sfem {
     /// uses, with different coefficients -- which is the point of both being
     /// schemes rather than driver algebra.
     ///
+    /// The step may change length: the coefficients are the variable-step
+    /// formula's, weighted by the ratio w of the step to the last one, which
+    /// is zero-stable for w < 1 + sqrt(2) (a caller lengthening steps after a
+    /// cut-back grows them at most twofold, StepperOptions::max_growth).
+    ///
     /// BDF2 is not self-starting: the first step has no `u_nm1`, so it is taken
     /// with backward Euler (`shift = 1/dt`, `alpha = 1/dt^2`,
     /// `u_hat = u_n + dt*v_n`).  That startup is part of the method, so it

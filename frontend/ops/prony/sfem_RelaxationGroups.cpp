@@ -191,6 +191,12 @@ namespace sfem {
         start_unknown_        = !relaxing;
     }
 
+    std::vector<std::string> RelaxationGroups::block_names() const {
+        std::vector<std::string> names;
+        for (const auto &entry : blocks_) names.push_back(entry.first);
+        return names;
+    }
+
     bool RelaxationGroups::relaxes() const {
         for (const auto &entry : blocks_) {
             for (const auto &group : entry.second.groups) {

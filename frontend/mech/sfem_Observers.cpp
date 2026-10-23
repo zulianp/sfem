@@ -381,6 +381,105 @@ namespace sfem {
         return std::make_shared<ControlPoint>(f, point, with_rates);
     }
 
+    namespace {
+        class PronyProbe final : public Probe {
+        public:
+            PronyProbe(RelaxationGroups &relaxations, const std::shared_ptr<Communicator> &comm)
+                : relaxations_(relaxations), comm_(comm), blocks_(relaxations.block_names()) {
+                if (blocks_.empty()) SFEM_ERROR("Prony probe: the material has no blocks\n");
+                for (const auto &d : relaxations.declarations()) {
+                    const auto &series = relaxations.relaxation(blocks_[0], d.group).series();
+                    for (const auto &b : blocks_) {
+                        if (relaxations.relaxation(b, d.group).series().n_terms() != series.n_terms()) {
+                            SFEM_ERROR("Prony probe: blocks %s and %s hold different series in %s\n",
+                                       blocks_[0].c_str(),
+                                       b.c_str(),
+                                       d.group.c_str());
+                        }
+                    }
+                    for (int k = 0; k < series.n_terms(); ++k) {
+                        if (comm->rank() == 0) {
+                            printf("Prony probe: %s_H%d is the term g = %g, tau = %g\n", d.group.c_str(), k, (double)series.g(k), (double)series.tau(k));
+                        }
+                    }
+                }
+            }
+
+            std::vector<std::string> columns() const override {
+                std::vector<std::string> names;
+                for (const auto &d : relaxations_.declarations()) {
+                    names.push_back(d.group + "_gamma");
+                    const int n = relaxations_.relaxation(blocks_[0], d.group).series().n_terms();
+                    for (int k = 0; k < n; ++k) names.push_back(d.group + "_H" + std::to_string(k));
+                }
+                return names;
+            }
+
+            int sample(const StepRecord &, real_t *const values) override {
+                int c = 0;
+                std::vector<real_t> H;
+                for (const auto &d : relaxations_.declarations()) {
+                    values[c++] = relaxations_.relaxation(blocks_[0], d.group).gamma();
+                    const int n = relaxations_.relaxation(blocks_[0], d.group).series().n_terms();
+                    // A symmetric tensor's off-diagonal components (after the diagonal ones, 3 of 6 or
+                    // 1 of 3) count twice in its Frobenius norm.
+                    const int n_diagonal = d.n_components == 6 ? 3 : d.n_components == 3 ? 2 : d.n_components;
+                    for (int k = 0; k < n; ++k) {
+                        real_t sums[2] = {0, 0};  // sum of |H|^2 over the points, how many points
+                        for (const auto &b : blocks_) {
+                            const auto     &r      = relaxations_.relaxation(b, d.group);
+                            const ptrdiff_t points = static_cast<ptrdiff_t>(r.n_qp()) * r.n_elements();
+                            H.resize(static_cast<size_t>(r.n_components()) * points);
+                            r.decode_history(k, H.data());
+                            for (int comp = 0; comp < r.n_components(); ++comp) {
+                                const real_t weight = comp < n_diagonal ? 1 : 2;
+                                const real_t *const h = &H[comp * points];
+                                real_t              s = 0;
+#pragma omp parallel for reduction(+ : s)
+                                for (ptrdiff_t q = 0; q < points; ++q) s += h[q] * h[q];
+                                sums[0] += weight * s;
+                            }
+                            sums[1] += points;
+                        }
+                        if (comm_->size() > 1) comm_->sum(sums, 2, smesh::TypeToEnum<real_t>::value());
+                        values[c++] = sums[1] > 0 ? std::sqrt(sums[0] / sums[1]) : 0;
+                    }
+                }
+                return SFEM_SUCCESS;
+            }
+
+        private:
+            RelaxationGroups             &relaxations_;
+            std::shared_ptr<Communicator> comm_;
+            std::vector<std::string>      blocks_;
+        };
+
+        class NamedProbe final : public Probe {
+        public:
+            NamedProbe(const std::string &name, const std::shared_ptr<Probe> &probe) : name_(name), probe_(probe) {}
+
+            std::vector<std::string> columns() const override {
+                auto names = probe_->columns();
+                for (auto &n : names) n = name_ + "_" + n;
+                return names;
+            }
+            int converged(const StepRecord &record) override { return probe_->converged(record); }
+            int sample(const StepRecord &record, real_t *const values) override { return probe_->sample(record, values); }
+
+        private:
+            std::string            name_;
+            std::shared_ptr<Probe> probe_;
+        };
+    }  // namespace
+
+    std::shared_ptr<Probe> create_prony_probe(RelaxationGroups &relaxations, const std::shared_ptr<Communicator> &comm) {
+        return std::make_shared<PronyProbe>(relaxations, comm);
+    }
+
+    std::shared_ptr<Probe> create_named_probe(const std::string &name, const std::shared_ptr<Probe> &probe) {
+        return std::make_shared<NamedProbe>(name, probe);
+    }
+
     // ---------------------------------------------------------------------------------------------
 
     class StepHistory::Impl {

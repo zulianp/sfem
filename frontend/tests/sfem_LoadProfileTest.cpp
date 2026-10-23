@@ -11,7 +11,7 @@
 namespace {
     int parse(const char *const yaml, sfem::LoadProfile &profile) {
         ryml::Tree tree = ryml::parse_in_arena(ryml::to_csubstr(yaml));
-        return sfem::LoadProfile::from_yaml(tree.crootref(), profile);
+        return sfem::LoadProfile::from_yaml(tree.crootref(), profile, "");
     }
 }  // namespace
 

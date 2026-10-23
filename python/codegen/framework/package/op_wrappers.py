@@ -6248,6 +6248,7 @@ _HEADER_RELAXATION_DECLARATIONS = {
     void reset_history(const real_t *const x) override;
     //! The relaxation state: spectra, time-temperature shift, storage.
     RelaxationGroups &relaxation_groups();
+    RelaxationGroups *relaxation_state() override { return &relaxation_groups(); }
     //! Evaluate the material's integration-point outputs at `x` into workspace
     //! slot `slot` of the relaxation, which has to be holding one.
     int quadrature_output(const real_t *const x, const int slot);""",

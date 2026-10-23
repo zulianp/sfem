@@ -59,8 +59,11 @@ for dim in (2, 3):
 material = gen.CodeGenerator(
     "mooney_rivlin_prony",
     systems,
-    # HEX8 first: the other elements are realised once it is verified.
-    elements=("HEX8",),
+    elements=gen.sfem_default_element_types(),
+    # The history lives at one rule's points, and TET10's affine and
+    # isoparametric routes integrate with different rules: pinned to the
+    # isoparametric one, the more accurate.
+    quadrature_settings=(("TET10", 4),),
     op_name="GeneratedMooneyRivlinProny",
     parameter_defaults=(
         ("C01", 0.0),

@@ -11,7 +11,7 @@
 #include "sfem_Function.hpp"
 #include "sfem_ContactCommon.hpp"
 #include "sfem_Merit.hpp"
-#include "sfem_NewmarkScheme.hpp"
+#include "sfem_TimeScheme.hpp"
 #include "sfem_NodeObstacleContact.hpp"
 #include "sfem_OwnedReductions.hpp"
 #include "sfem_ParallelOperator.hpp"
@@ -43,7 +43,7 @@ namespace sfem {
     public:
         std::shared_ptr<Function>            f;
         std::shared_ptr<NodeObstacleContact> contact;
-        std::shared_ptr<NewmarkScheme>       newmark;
+        std::shared_ptr<TimeScheme>          scheme;
         NodeObstacleStepOptions              options;
         std::shared_ptr<BLAS<real_t>>        blas;
         ptrdiff_t                            ndofs{0};
@@ -58,6 +58,9 @@ namespace sfem {
         // operator scale Q^T K Q scale; qp_tmp holds the unscaled product.
         SharedBuffer<real_t>                 scale, inverse_scale, scaled_bound, qp_tmp;
         real_t                               k_max{0};
+        // The step length and the scheme's shift k_ref was assembled for (0: not yet).
+        real_t                               k_ref_dt{0};
+        real_t                               k_ref_shift{0};
         real_t                               tol{0};
         // The merit of the iterate measured last: the reference of the QP's forcing term.
         real_t                               merit{0};
@@ -140,7 +143,7 @@ namespace sfem {
 
     std::shared_ptr<NodeObstacleStep> NodeObstacleStep::create(const std::shared_ptr<Function>            &f,
                                                                const std::shared_ptr<NodeObstacleContact> &contact,
-                                                               const std::shared_ptr<NewmarkScheme>       &newmark,
+                                                               const std::shared_ptr<TimeScheme>          &scheme,
                                                                const NodeObstacleStepOptions              &options) {
         const ExecutionSpace es = f->execution_space();
         if (contact->execution_space() != es) {
@@ -152,7 +155,7 @@ namespace sfem {
         auto                             &impl = *ret->impl_;
         impl.f                                 = f;
         impl.contact                           = contact;
-        impl.newmark                           = newmark;
+        impl.scheme                            = scheme;
         impl.options                           = options;
         impl.blas                              = blas<real_t>(es);
         impl.ndofs                             = f->space()->n_dofs();
@@ -168,14 +171,6 @@ namespace sfem {
 
         for (auto *buffer : {&impl.k, &impl.k_ref, &impl.projected, &impl.upper_bound, &impl.qp_rhs, &impl.framed, &impl.lift, &impl.diag, &impl.trial_r, &impl.qp_tmp}) {
             *buffer = create_buffer<real_t>(impl.ndofs, es);
-        }
-
-        // Each dof's stiffness, what turns a reaction into a displacement: the tangent's diagonal
-        // at the reference configuration, where no element is inverted. Once: it only scales.
-        {
-            auto reference = create_buffer<real_t>(impl.ndofs, es);
-            if (impl.tangent->assemble(reference->data()) != SFEM_SUCCESS) return nullptr;
-            if (impl.tangent->diagonal(impl.k_ref->data()) != SFEM_SUCCESS) return nullptr;
         }
 
         // The step in the contact nodes' frames, Q^T K Q dx' = -Q^T R with dx'_n <= gap_i: the
@@ -233,16 +228,27 @@ namespace sfem {
 
     int NodeObstacleStep::begin_step(const StepContext &context) {
         auto &impl = *impl_;
-        if (impl.newmark && !context.scheme) {
-            fprintf(stderr, "NodeObstacleStep: a Newmark step needs its scheme\n");
+        if (impl.scheme && !context.scheme) {
+            fprintf(stderr, "NodeObstacleStep: a dynamic step needs its scheme\n");
             return SFEM_FAILURE;
         }
 
-        // The scale of each node's equation: its stiffness, plus the inertia c0 M in a dynamic step.
-        impl.blas->copy(impl.ndofs, impl.k_ref->data(), impl.k->data());
-        if (impl.newmark) {
-            impl.blas->axpy(impl.ndofs, context.scheme->weight("alpha_a"), impl.newmark->mass()->data(), impl.k->data());
+        // The scale of each node's equation, what turns a reaction into a displacement: the
+        // tangent's diagonal at the reference configuration, where no element is inverted, with
+        // the step's inertia c0 M in it in a dynamic step (the material holds the scheme). It
+        // only scales, so it is assembled again only when the step's length or the scheme's shift
+        // changes: a material with a history is as stiff as its relaxation over the step leaves it,
+        // glassy before its first step, and the inertia follows the shift (BDF2's with the ratio
+        // of the step to the last, and its backward-Euler start).
+        const real_t shift = context.scheme ? context.scheme->shift() : real_t(0);
+        if (context.dt != impl.k_ref_dt || shift != impl.k_ref_shift) {
+            auto reference = create_buffer<real_t>(impl.ndofs, impl.tangent->execution_space());
+            if (impl.tangent->assemble(reference->data()) != SFEM_SUCCESS) return SFEM_FAILURE;
+            if (impl.tangent->diagonal(impl.k_ref->data()) != SFEM_SUCCESS) return SFEM_FAILURE;
+            impl.k_ref_dt    = context.dt;
+            impl.k_ref_shift = shift;
         }
+        impl.blas->copy(impl.ndofs, impl.k_ref->data(), impl.k->data());
         // Read on the host: once per step.
         auto                host  = on_host(impl.k);
         const real_t *const k     = host->data();

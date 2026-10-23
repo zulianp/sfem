@@ -1,4 +1,5 @@
-// The generated Prony-series Mooney-Rivlin operator on HEX8, against the hand-written one.
+// The generated Prony-series Mooney-Rivlin operator: against the hand-written one on HEX8, and
+// against a closed form on every element it is generated for.
 //
 // `GeneratedMooneyRivlinProny` is the code generator's Mooney-Rivlin energy with its isochoric
 // part handed to `PronySeries.relax`: within a step it minimises
@@ -17,6 +18,8 @@
 //      the matrix-free apply, and the assembled BSR tangent applies like the apply.  Swept over
 //      the step size, because a single step cannot tell a wrong derivative from a bad step.
 //   3. Purity: gradient and apply mutate no history, so a rejected trial leaves no trace.
+//   4. Relaxation on every element: the face force of a held homogeneous deformation, which
+//      linear elements represent exactly, against the hereditary integral in closed form.
 
 #include <math.h>
 #include <stdio.h>
@@ -94,55 +97,90 @@ namespace {
         return tau;
     }
 
+    /// The unit cube in `n` cells per side, of HEX8, TET4 or TET10 elements, its interior
+    /// distorted.  TET10 is the distorted TET4 mesh promoted, so its elements stay straight
+    /// sided: moving its edge nodes on their own curves elements this coarse until some of
+    /// their points invert.
+    std::shared_ptr<sfem::Mesh> unit_cube(const smesh::ElemType element, const int n, const real_t distortion) {
+        auto comm = sfem::Communicator::world();
+        auto mesh = element == smesh::HEX8 ? sfem::Mesh::create_hex8_cube(comm, n, n, n, 0, 0, 0, 1, 1, 1)
+                                           : sfem::Mesh::create_tet4_cube(comm, n, n, n, 0, 0, 0, 1, 1, 1);
+        distort_interior(mesh, n, distortion);
+        return element == smesh::TET10 ? smesh::promote_to(smesh::TET10, mesh) : mesh;
+    }
+
     /// Both operators on one mesh, driven through `n_history_steps` committed steps of a
     /// growing displacement.  The history is what makes the relaxation terms non-zero, so a
-    /// check run without it cannot see a defect in them.
-    Setup make_setup(const int n, const int n_terms, const real_t distortion, const int n_history_steps) {
+    /// check run without it cannot see a defect in them.  The hand-written reference exists
+    /// for HEX8 only, so on another element the setup holds the generated operator alone.
+    /// A material other than the test's own: its moduli, its whole series and the step length
+    /// (the generated operator alone).
+    struct Material {
+        real_t              C10, C01, K, dt;
+        std::vector<real_t> g, tau;
+    };
+
+    Setup make_setup(const int                  n,
+                     const int                  n_terms,
+                     const real_t               distortion,
+                     const int                  n_history_steps,
+                     const smesh::ElemType      element  = smesh::HEX8,
+                     const Material *const      material = nullptr) {
+        const real_t C10 = material ? material->C10 : test_C10;
+        const real_t C01 = material ? material->C01 : test_C01;
+        const real_t K   = material ? material->K : test_K;
+        const real_t dt  = material ? material->dt : test_dt;
         Setup s;
-        s.mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(), n, n, n, 0, 0, 0, 1, 1, 1);
-        distort_interior(s.mesh, n, distortion);
+        s.mesh = unit_cube(element, n, distortion);
         s.fs = sfem::FunctionSpace::create(s.mesh, 3);
 
         s.generated = std::make_shared<sfem::GeneratedMooneyRivlinProny>(s.fs);
         s.generated->initialize();
         for (const auto &block : s.mesh->blocks()) {
-            s.generated->set_value_in_block(block->name(), "C10", test_C10);
-            s.generated->set_value_in_block(block->name(), "C01", test_C01);
-            s.generated->set_value_in_block(block->name(), "K", test_K);
+            s.generated->set_value_in_block(block->name(), "C10", C10);
+            s.generated->set_value_in_block(block->name(), "C01", C01);
+            s.generated->set_value_in_block(block->name(), "K", K);
         }
 
-        s.reference = std::make_shared<sfem::MooneyRivlinVisco>(s.fs);
-        s.reference->set_C10(test_C10);
-        s.reference->set_C01(test_C01);
-        s.reference->set_K(test_K);
-        s.reference->set_dt(test_dt);
+        if (element == smesh::HEX8 && !material) {
+            s.reference = std::make_shared<sfem::MooneyRivlinVisco>(s.fs);
+            s.reference->set_C10(test_C10);
+            s.reference->set_C01(test_C01);
+            s.reference->set_K(test_K);
+            s.reference->set_dt(test_dt);
+        }
 
-        if (n_terms > 0) {
+        if (material) {
+            s.generated->relaxation_groups().set_series("", "iso", sfem::PronySeries(material->g, material->tau));
+        } else if (n_terms > 0) {
             const std::vector<real_t> g(prony_g().begin(), prony_g().begin() + n_terms);
             const std::vector<real_t> tau(prony_tau().begin(), prony_tau().begin() + n_terms);
             s.generated->relaxation_groups().set_series("", "iso", sfem::PronySeries(g, tau));
-            s.reference->set_prony_terms(n_terms, g.data(), tau.data());
+            if (s.reference) s.reference->set_prony_terms(n_terms, g.data(), tau.data());
         }
 
-        s.reference->initialize();
-        s.reference->initialize_history();
+        if (s.reference) {
+            s.reference->initialize();
+            s.reference->initialize_history();
+        }
 
         s.ndofs = s.fs->n_dofs();
         s.u     = sfem::create_host_buffer<real_t>(s.ndofs);
-        fill_pseudo_random(s.ndofs, 0.05, s.u->data());
+        // TET10's nodes are twice as dense, so the same random field would invert its elements.
+        fill_pseudo_random(s.ndofs, element == smesh::TET10 ? 0.025 : 0.05, s.u->data());
 
         auto   blas = sfem::blas<real_t>(sfem::EXECUTION_SPACE_HOST);
         real_t t    = 0;
         for (int i = 0; i < n_history_steps; ++i) {
             blas->scal(s.ndofs, real_t(1.1), s.u->data());
-            t += test_dt;
-            s.generated->begin_step(t, test_dt);
+            t += dt;
+            s.generated->begin_step(t, dt);
             s.generated->advance(s.u->data());
-            s.reference->update_history(s.u->data());
+            if (s.reference) s.reference->update_history(s.u->data());
         }
 
         // The step the comparison is made in.
-        s.generated->begin_step(t + test_dt, test_dt);
+        s.generated->begin_step(t + dt, dt);
         return s;
     }
 
@@ -247,8 +285,11 @@ namespace {
         return best;
     }
 
-    int consistency(const int n_terms, const real_t distortion) {
-        Setup s    = make_setup(3, n_terms, distortion, 5);
+    int consistency(const int              n_terms,
+                    const real_t           distortion,
+                    const smesh::ElemType  element  = smesh::HEX8,
+                    const Material *const  material = nullptr) {
+        Setup s    = make_setup(3, n_terms, distortion, 5, element, material);
         auto  blas = sfem::blas<real_t>(sfem::EXECUTION_SPACE_HOST);
         auto  op   = s.generated;
 
@@ -289,7 +330,8 @@ namespace {
         op->apply(s.u->data(), d->data(), from_op->data());
         const real_t bsr_error = relative_difference(s.ndofs, from_bsr->data(), from_op->data());
 
-        printf("  consistency terms=%d distortion=%g ndof=%td: value %.3e, apply %.3e, bsr %.3e\n",
+        printf("  consistency %s terms=%d distortion=%g ndof=%td: value %.3e, apply %.3e, bsr %.3e\n",
+               smesh::type_to_string(element),
                n_terms,
                (double)distortion,
                s.ndofs,
@@ -321,8 +363,155 @@ int test_parity_elastic() { return parity(0, 0); }
 int test_parity_prony() { return parity(2, 0); }
 int test_parity_prony_distorted() { return parity(2, 0.15); }
 
+// The broadband EPDM of the LDP pump strokes: Felhos et al.'s 15 terms (tau 1.8e-27 to 1610 s,
+// g_inf = 2.24e-3) on its scaled Mooney-Rivlin backbone, at a step of 1e4 s, where all but the
+// slowest term relax within it.
+const Material &broadband_epdm(const real_t dt) {
+    static Material m{5.850e8, 1.463e8, 1.529e7, 0,
+                      {2.83e-04, 3.12e-04, 4.45e-04, 1.03e-03, 6.09e-03, 6.74e-02, 2.22e-01, 1.90e-01, 1.12e-01, 5.07e-02,
+                       6.91e-02, 4.59e-02, 8.62e-02, 6.76e-02, 7.87e-02},
+                      {1.61e+03, 1.29e+01, 1.53e-01, 9.89e-04, 1.18e-06, 8.51e-09, 1.42e-10, 1.80e-12, 1.27e-14, 2.00e-16,
+                       1.10e-19, 1.38e-22, 1.62e-24, 6.62e-26, 1.82e-27}};
+    m.dt = dt;
+    return m;
+}
+int test_consistency_broadband_tet4() { return consistency(15, 0.15, smesh::TET4, &broadband_epdm(1e4)); }
+int test_consistency_broadband_hex8() { return consistency(15, 0.15, smesh::HEX8, &broadband_epdm(1e4)); }
+int test_consistency_broadband_tet4_short() { return consistency(15, 0.15, smesh::TET4, &broadband_epdm(1e-4)); }
 int test_consistency_elastic() { return consistency(0, 0.15); }
 int test_consistency_prony_distorted() { return consistency(2, 0.15); }
+int test_consistency_prony_tet4() { return consistency(2, 0.15, smesh::TET4); }
+int test_consistency_prony_tet10() { return consistency(2, 0.15, smesh::TET10); }
+
+
+
+namespace {
+    std::shared_ptr<sfem::GeneratedMooneyRivlinProny> material_on(const std::shared_ptr<sfem::FunctionSpace> &fs,
+                                                                  const real_t                               C10,
+                                                                  const real_t                               C01,
+                                                                  const real_t                               K,
+                                                                  const bool                                 relaxing,
+                                                                  const bool                                 affine) {
+        auto op = std::make_shared<sfem::GeneratedMooneyRivlinProny>(fs);
+        if (affine) op->set_option("ASSUME_AFFINE", true);
+        op->initialize();
+        for (const auto &block : fs->mesh_ptr()->blocks()) {
+            op->set_value_in_block(block->name(), "C10", C10);
+            op->set_value_in_block(block->name(), "C01", C01);
+            op->set_value_in_block(block->name(), "K", K);
+        }
+        if (relaxing) op->relaxation_groups().set_series("", "iso", sfem::PronySeries(prony_g(), prony_tau()));
+        return op;
+    }
+
+    /// The force the face x = 1 carries: the gradient summed over its nodes, per component.
+    std::vector<real_t> face_force(const sfem::Mesh &mesh, const int dim, const real_t *const gradient) {
+        std::vector<real_t> force(dim, 0);
+        const auto          x = mesh.points()->data()[0];
+        for (ptrdiff_t i = 0; i < mesh.n_nodes(); ++i) {
+            if (std::abs(x[i] - geom_t(1)) > geom_t(1e-6)) continue;
+            for (int d = 0; d < dim; ++d) force[d] += gradient[i * dim + d];
+        }
+        return force;
+    }
+
+    /// The force on the face x = 1 at the start of every step of a homogeneous deformation
+    /// u = A X held from the first step on, for an operator stepped `n_steps` times.
+    std::vector<std::vector<real_t>> held_face_forces(sfem::GeneratedMooneyRivlinProny &op,
+                                                      const sfem::FunctionSpace       &fs,
+                                                      const real_t *const              u,
+                                                      const int                        n_steps,
+                                                      const real_t                     dt) {
+        const auto                       &mesh = *fs.mesh_ptr();
+        const int                         dim  = mesh.spatial_dimension();
+        std::vector<real_t>               gradient(fs.n_dofs());
+        std::vector<std::vector<real_t>>  forces;
+        for (int n = 1; n <= n_steps; ++n) {
+            op.begin_step(n * dt, dt);
+            std::fill(gradient.begin(), gradient.end(), real_t(0));
+            if (op.gradient(u, gradient.data()) != SFEM_SUCCESS) return {};
+            forces.push_back(face_force(mesh, dim, gradient.data()));
+            op.advance(u);
+        }
+        return forces;
+    }
+}  // namespace
+
+/// A homogeneous deformation u = A X, applied over the first step and held after it.  Linear
+/// elements represent it exactly and integrate its constant density exactly, so the force on the
+/// face x = 1 has a closed form on every element: the elastic volumetric part plus the isochoric
+/// part scaled by the relaxation modulus of that ramp and hold,
+///
+///     m(t_n) = g_inf + sum_i g_i tau_i / dt (1 - exp(-dt / tau_i)) exp(-(t_n - dt) / tau_i),
+///
+/// which the linear-interpolation recursion reproduces exactly.  The two elastic parts are the
+/// same operator with K = 0 and with C10 = C01 = 0, both without terms.  `affine` takes TET10's
+/// affine route, whose rule is pinned to the isoparametric one's points.
+int homogeneous_relaxation(const smesh::ElemType element, const bool affine = false) {
+    auto comm = sfem::Communicator::world();
+    std::shared_ptr<sfem::Mesh> mesh;
+    if (element == smesh::TRI3) {
+        mesh = sfem::Mesh::create_tri3_square(comm, 2, 2);
+    } else if (element == smesh::QUAD4) {
+        mesh = sfem::Mesh::create_quad4_square(comm, 2, 2);
+    } else {
+        mesh = unit_cube(element, 2, 0);
+    }
+    const int  dim = mesh->spatial_dimension();
+    auto       fs  = sfem::FunctionSpace::create(mesh, dim);
+
+    const real_t A[3][3] = {{0.04, 0.01, -0.02}, {0.0, -0.015, 0.01}, {0.02, 0.0, 0.03}};
+    std::vector<real_t> u(fs->n_dofs(), 0);
+    const auto          X = mesh->points()->data();
+    for (ptrdiff_t i = 0; i < mesh->n_nodes(); ++i) {
+        for (int d = 0; d < dim; ++d) {
+            for (int k = 0; k < dim; ++k) u[i * dim + d] += A[d][k] * X[k][i];
+        }
+    }
+
+    const int    n_steps = 12;
+    const real_t dt      = 0.25;
+    auto prony = material_on(fs, test_C10, test_C01, test_K, true, affine);
+    auto iso   = material_on(fs, test_C10, test_C01, 0, false, affine);
+    auto vol   = material_on(fs, 0, 0, test_K, false, affine);
+    const auto relaxed = held_face_forces(*prony, *fs, u.data(), n_steps, dt);
+    const auto R_iso   = held_face_forces(*iso, *fs, u.data(), 1, dt);
+    const auto R_vol   = held_face_forces(*vol, *fs, u.data(), 1, dt);
+    SFEM_TEST_ASSERT((int)relaxed.size() == n_steps && R_iso.size() == 1 && R_vol.size() == 1);
+
+    real_t g_inf = 1;
+    for (const real_t g : prony_g()) g_inf -= g;
+    real_t worst = 0, scale = 0;
+    for (int n = 1; n <= n_steps; ++n) {
+        real_t m = g_inf;
+        for (size_t i = 0; i < prony_g().size(); ++i) {
+            const real_t tau = prony_tau()[i];
+            m += prony_g()[i] * tau / dt * (1 - std::exp(-dt / tau)) * std::exp(-(n - 1) * dt / tau);
+        }
+        for (int d = 0; d < dim; ++d) {
+            const real_t want = R_vol[0][d] + m * R_iso[0][d];
+            worst             = std::max(worst, std::abs(relaxed[n - 1][d] - want));
+            scale             = std::max(scale, std::abs(want));
+        }
+    }
+    printf("  homogeneous relaxation %s%s, %td dofs, %d steps: worst force error %.3e of %.3e\n",
+           smesh::type_to_string(element),
+           affine ? " affine" : "",
+           fs->n_dofs(),
+           n_steps,
+           (double)worst,
+           (double)scale);
+    SFEM_TEST_ASSERT(scale > 0);
+    SFEM_TEST_ASSERT(worst <= real_t(1e-11) * scale);
+    return SFEM_TEST_SUCCESS;
+}
+
+int test_homogeneous_relaxation_hex8() { return homogeneous_relaxation(smesh::HEX8); }
+int test_homogeneous_relaxation_tet4() { return homogeneous_relaxation(smesh::TET4); }
+int test_homogeneous_relaxation_tet10() { return homogeneous_relaxation(smesh::TET10); }
+int test_homogeneous_relaxation_tet10_affine() { return homogeneous_relaxation(smesh::TET10, true); }
+int test_homogeneous_relaxation_tri3() { return homogeneous_relaxation(smesh::TRI3); }
+int test_homogeneous_relaxation_quad4() { return homogeneous_relaxation(smesh::QUAD4); }
 
 /// Nothing but `advance` moves the history: a trial gradient elsewhere, a repeated
 /// `begin_step`, and an apply leave the next gradient bitwise unchanged.
@@ -573,10 +762,21 @@ int test_affine_route_matches_isoparametric() {
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_parity_elastic);
+    SFEM_RUN_TEST(test_consistency_broadband_tet4);
+    SFEM_RUN_TEST(test_consistency_broadband_hex8);
+    SFEM_RUN_TEST(test_consistency_broadband_tet4_short);
     SFEM_RUN_TEST(test_parity_prony);
     SFEM_RUN_TEST(test_parity_prony_distorted);
     SFEM_RUN_TEST(test_consistency_elastic);
     SFEM_RUN_TEST(test_consistency_prony_distorted);
+    SFEM_RUN_TEST(test_consistency_prony_tet4);
+    SFEM_RUN_TEST(test_consistency_prony_tet10);
+    SFEM_RUN_TEST(test_homogeneous_relaxation_hex8);
+    SFEM_RUN_TEST(test_homogeneous_relaxation_tet4);
+    SFEM_RUN_TEST(test_homogeneous_relaxation_tet10);
+    SFEM_RUN_TEST(test_homogeneous_relaxation_tet10_affine);
+    SFEM_RUN_TEST(test_homogeneous_relaxation_tri3);
+    SFEM_RUN_TEST(test_homogeneous_relaxation_quad4);
     SFEM_RUN_TEST(test_evaluation_is_pure);
     SFEM_RUN_TEST(test_relaxation_composes_with_every_time_scheme);
     SFEM_RUN_TEST(test_reset_forgets_the_history);
