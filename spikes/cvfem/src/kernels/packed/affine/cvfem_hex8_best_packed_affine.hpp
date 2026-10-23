@@ -157,7 +157,7 @@ static SFEM_NOINLINE void apply_residual_packed_affine_range(
 // nodes this part owns -- that is what the packed layout is for -- so the parts need no
 // synchronisation between them, and the ghost rows they do share are reduced afterwards in the
 // launcher, which is the second and independent parallel loop.
-template <typename scalar_t, typename idx_t, typename pack_idx_t, typename geom_t, typename grad_t>
+template <DarwishCacheMode Cache = DarwishCacheMode::Off, typename scalar_t, typename idx_t, typename pack_idx_t, typename geom_t, typename grad_t>
 static SFEM_NOINLINE void apply_jacobian_action_packed_affine_range(
         const cvfem_range packs,
         // The mesh and the pack are staging objects -- they own vectors and a shared_ptr to a
@@ -207,7 +207,7 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_affine_range(
         // that gather the mesh instead, so the promotion did not see adj_ptr in the body and
         // did not add it here.
         const scalar_t *const *const SFEM_RESTRICT adj_ptr,
-        const scalar_t *const SFEM_RESTRICT        det_ptr) {
+        const scalar_t *const SFEM_RESTRICT        det_ptr, DarwishCacheExperiment<scalar_t> *cache = nullptr) {
         // The breakdown covered packed assembly and the colored matvec but not this one --
         // the operator the solver's Krylov loop actually applies. Without it nothing here
         // could be attributed to a phase.
@@ -245,7 +245,8 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_affine_range(
             if (with_qg)
                 cvfem_hex8_fill_pack_qgrad(owned_nodes_ptr, qgx, qgy, qgz, pack, x.n_contiguous, x.n_ghost, x.ghosts, qg.x, qg.y, qg.z);
             if (with_ho) {
-                cvfem_hex8_fill_pack_ugrad(owned_nodes_ptr, ugrad, pack, x.n_contiguous, x.n_ghost, x.ghosts, ug.g);
+                if constexpr (Cache != DarwishCacheMode::Read)
+                    cvfem_hex8_fill_pack_ugrad(owned_nodes_ptr, ugrad, pack, x.n_contiguous, x.n_ghost, x.ghosts, ug.g);
                 cvfem_hex8_fill_pack_ugrad(owned_nodes_ptr, vgrad, pack, x.n_contiguous, x.n_ghost, x.ghosts, vg.g);
             }
             // No coordinate staging for the geometry: the affine sweep reads one adjugate and
@@ -254,10 +255,10 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_affine_range(
             // branches above cover.
             CVFEM_PHASE_MARK(acc, _t, PH_GATHER);
 
-            cvfem_hex8_action_lanes_affine(x, pk, qg, adj_ptr, det_ptr,
+            cvfem_hex8_action_lanes_affine<Cache>(x, pk, qg, adj_ptr, det_ptr,
                                            pack_elems, pack_u, pack_dir, pack_out, rc_coeff, rc_w,
                                            ug, vg, rho, mu, rhie_chow_scale, with_rc,
-                                           with_qg, with_ho, rc_cfg, limiter, venkat_c);
+                                           with_qg, with_ho, rc_cfg, limiter, venkat_c, cache);
             CVFEM_PHASE_MARK(acc, _t, PH_KERNEL);
 
             cvfem_hex8_drain_pack_aos(x, pack_out, n_ghost_entries, ghost_buf, jv);

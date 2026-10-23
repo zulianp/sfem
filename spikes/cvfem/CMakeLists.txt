@@ -412,6 +412,15 @@ add_test(NAME cvfem_jacobian_cache
 add_test(NAME cvfem_jacobian_cache_f32
          COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_jacobian_cache.sh
                  $<TARGET_FILE:cvfem_hex8_ns_upwind_bench_f32>)
+foreach(precision IN ITEMS f64 f32)
+    set(darwish_binary cvfem_hex8_ns_upwind_bench)
+    if(precision STREQUAL "f32")
+        set(darwish_binary cvfem_hex8_ns_upwind_bench_f32)
+    endif()
+    add_test(NAME cvfem_darwish_cache_${precision}
+             COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_darwish_cache.sh
+                     $<TARGET_FILE:${darwish_binary}>)
+endforeach()
 # The script asserts that every quarantined configuration is REFUSED, which is true of the
 # default build and false of this one -- the flag exists to make them reachable. So it is told
 # which build it is in rather than inferring it.
