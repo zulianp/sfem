@@ -12,7 +12,7 @@ TABDIR   = tables
 # No extensions are granted, so this is a gate rather than a guideline.
 PAGELIMIT ?= 10
 
-.PHONY: all figures check clean selftest
+.PHONY: all figures check clean selftest state-gradients
 
 all: main.pdf
 
@@ -20,6 +20,7 @@ main.pdf: main.tex refs.bib $(wildcard $(FIGDIR)/*.tex) $(wildcard $(TABDIR)/*.t
 	latexmk -pdf -interaction=nonstopmode main.tex
 
 figures:
+	$(PY) python/state_gradient_figures.py
 	$(PY) python/scatter_figures.py
 	$(PY) python/packed_format_figures.py --out $(FIGDIR)
 	@if [ -f python/perf_figures.py ]; then \
@@ -27,6 +28,7 @@ figures:
 	fi
 
 selftest:
+	$(PY) python/state_gradient_figures.py --selftest
 	$(PY) python/packed_format_figures.py --selftest
 	@if [ -f python/perf_figures.py ]; then $(PY) python/perf_figures.py --selftest; fi
 
@@ -65,3 +67,7 @@ check: selftest main.pdf
 clean:
 	latexmk -C main.tex
 	rm -f main.bbl
+
+# Regenerate only the isolated state-gradient study from its external archive.
+state-gradients:
+	$(PY) python/state_gradient_figures.py
