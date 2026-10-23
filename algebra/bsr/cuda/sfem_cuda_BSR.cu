@@ -114,7 +114,8 @@ namespace sfem {
         if (rows <= 0) return SFEM_SUCCESS;
         const int       kernel_block_size = 128;
         const ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (rows + kernel_block_size - 1) / kernel_block_size);
-        bsr_spmv_kernel<R, C, TStorage, T><<<n_blocks, kernel_block_size, 0, (cudaStream_t)stream>>>(
+        // On the caller's stream, or the thread's launch stream (a capture's) without one.
+        bsr_spmv_kernel<R, C, TStorage, T><<<n_blocks, kernel_block_size, 0, stream ? (cudaStream_t)stream : launch_stream()>>>(
                 block_rows, block_size, rows_begin, rows_end, colidx, values, scale_output, x, y);
         SFEM_DEBUG_SYNCHRONIZE();
         return SFEM_SUCCESS;

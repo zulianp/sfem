@@ -59,7 +59,7 @@ void d_constraint_nodes_copy_vec(const ptrdiff_t n_dirichlet_nodes,
 
     ptrdiff_t n_blocks =
             std::max(ptrdiff_t(1), (n_dirichlet_nodes + kernel_block_size - 1) / kernel_block_size);
-    constraint_nodes_copy_vec_kernel<<<n_blocks, kernel_block_size, 0>>>(
+    constraint_nodes_copy_vec_kernel<<<n_blocks, kernel_block_size, 0, sfem::launch_stream()>>>(
             n_dirichlet_nodes, dirichlet_nodes, block_size, component, source, dest);
 
     SFEM_DEBUG_SYNCHRONIZE();

@@ -132,12 +132,12 @@ namespace sfem {
     }
 
     void d_node_obstacle_to_frame(const NodeObstacleView &c, const real_t *const s, const real_t *const in, real_t *const out) {
-        to_frame_kernel<<<blocks_for(c.n_nodes), block_size>>>(c, s, in, out);
+        to_frame_kernel<<<blocks_for(c.n_nodes), block_size, 0, launch_stream()>>>(c, s, in, out);
         SFEM_DEBUG_SYNCHRONIZE();
     }
 
     void d_node_obstacle_from_frame(const NodeObstacleView &c, const real_t *const s, const real_t *const in, real_t *const out) {
-        from_frame_kernel<<<blocks_for(c.n_nodes), block_size>>>(c, s, in, out);
+        from_frame_kernel<<<blocks_for(c.n_nodes), block_size, 0, launch_stream()>>>(c, s, in, out);
         SFEM_DEBUG_SYNCHRONIZE();
     }
 

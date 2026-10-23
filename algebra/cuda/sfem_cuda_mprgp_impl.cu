@@ -17,10 +17,12 @@ namespace sfem {
 
         // Per-block partials, value-major (k * MAX_BLOCKS + block), then a pass's N_VALUES results
         // while the ranks complete them (REDUCED), then the count of the pass's blocks that have
-        // written theirs (COUNTER, a T slot read as unsigned; zero between passes).
+        // written theirs (COUNTER, a T slot read as unsigned; zero between passes), then a run's
+        // state on the device (LOOP: iterations, steps, exit, converged).
         constexpr ptrdiff_t REDUCED   = N_VALUES * MAX_BLOCKS;
         constexpr ptrdiff_t COUNTER   = REDUCED + N_VALUES;
-        constexpr ptrdiff_t WORK_SIZE = COUNTER + 1;
+        constexpr ptrdiff_t LOOP      = COUNTER + 1;
+        constexpr ptrdiff_t WORK_SIZE = LOOP + 4;
 
         int n_blocks(const ptrdiff_t n) {
             return int(std::min<ptrdiff_t>(MAX_BLOCKS, std::max<ptrdiff_t>(1, (n + N_THREADS - 1) / N_THREADS)));
@@ -159,7 +161,7 @@ namespace sfem {
             T *const reduced = work + REDUCED;
             launch(Store<T>{reduced});
             reduce(reduced, N_VALUES, min_last);
-            apply_kernel<T, Result><<<1, 1>>>(reduced, result);
+            apply_kernel<T, Result><<<1, 1, 0, launch_stream()>>>(reduced, result);
             SFEM_DEBUG_SYNCHRONIZE();
         }
 
@@ -281,7 +283,7 @@ namespace sfem {
         template <typename T>
         void project(const ptrdiff_t n, const T* const lb, const T* const ub, T* const x) {
             with_mprgp_bounds(lb, ub, [&](const auto b) {
-                project_kernel<T, Bounds<decltype(b)>><<<n_blocks(n), N_THREADS>>>(n, b, x);
+                project_kernel<T, Bounds<decltype(b)>><<<n_blocks(n), N_THREADS, 0, launch_stream()>>>(n, b, x);
                 SFEM_DEBUG_SYNCHRONIZE();
             });
         }
@@ -295,7 +297,7 @@ namespace sfem {
                               T* const        gc,
                               const T         eps) {
             with_mprgp_bounds(lb, ub, [&](const auto b) {
-                chopped_gradient_kernel<T, Bounds<decltype(b)>><<<n_blocks(n), N_THREADS>>>(n, b, x, g, gc, eps);
+                chopped_gradient_kernel<T, Bounds<decltype(b)>><<<n_blocks(n), N_THREADS, 0, launch_stream()>>>(n, b, x, g, gc, eps);
                 SFEM_DEBUG_SYNCHRONIZE();
             });
         }
@@ -317,7 +319,7 @@ namespace sfem {
             const int nb = n_blocks(n);
             with_mprgp_bounds(lb, ub, [&](const auto b) {
                 run_pass(work, reduce, true, [&](const auto result) {
-                    curvature_kernel<<<nb, N_THREADS>>>(n, b, x, g, d, Ad, infty, work, result);
+                    curvature_kernel<<<nb, N_THREADS, 0, launch_stream()>>>(n, b, x, g, d, Ad, infty, work, result);
                 }, CurvatureResult<T>{control, decision, params});
             });
         }
@@ -345,9 +347,9 @@ namespace sfem {
                 run_pass(work, reduce, false, [&](const auto result) {
                     using Res = std::decay_t<decltype(result)>;
                     if (d) {
-                        step_kernel<T, Bnd, true, Res><<<nb, N_THREADS>>>(n, b, control, d, Ad, x, g, gf, eps, w, work, result);
+                        step_kernel<T, Bnd, true, Res><<<nb, N_THREADS, 0, launch_stream()>>>(n, b, control, d, Ad, x, g, gf, eps, w, work, result);
                     } else {
-                        step_kernel<T, Bnd, false, Res><<<nb, N_THREADS>>>(n, b, control, d, Ad, x, g, gf, eps, w, work, result);
+                        step_kernel<T, Bnd, false, Res><<<nb, N_THREADS, 0, launch_stream()>>>(n, b, control, d, Ad, x, g, gf, eps, w, work, result);
                     }
                 }, StepResult<T>{control, d != nullptr, cg});
             });
@@ -355,7 +357,7 @@ namespace sfem {
 
         template <typename T>
         void update_direction(const ptrdiff_t n, const T* const gf, T* const p, const T* const control) {
-            update_direction_kernel<T><<<n_blocks(n), N_THREADS>>>(n, gf, p, control);
+            update_direction_kernel<T><<<n_blocks(n), N_THREADS, 0, launch_stream()>>>(n, gf, p, control);
             SFEM_DEBUG_SYNCHRONIZE();
         }
 
@@ -397,9 +399,132 @@ namespace sfem {
                     T* const        x,
                     const T* const  g) {
             with_mprgp_bounds(lb, ub, [&](const auto b) {
-                expand_kernel<T, Bounds<decltype(b)>><<<n_blocks(n), N_THREADS>>>(n, b, alpha, alpha_bar, d, Ad, x, g);
+                expand_kernel<T, Bounds<decltype(b)>><<<n_blocks(n), N_THREADS, 0, launch_stream()>>>(n, b, alpha, alpha_bar, d, Ad, x, g);
                 SFEM_DEBUG_SYNCHRONIZE();
             });
+        }
+        // A run starts from `iterations` done, no step taken, nothing decided.
+        template <typename T>
+        __global__ void run_start_kernel(T* const SFEM_RESTRICT loop, const T iterations) {
+            loop[0] = iterations;
+            loop[1] = 0;
+            loop[2] = 0;
+            loop[3] = 0;
+        }
+
+        // After a CG iteration, as MPRGP::team_cg_steps takes it: a decision that is no step ends
+        // the run, not counted; a step is counted, then the run ends converged or at max_it, or
+        // before a proportioning step, or goes on (the graph's loop condition).
+        template <typename T>
+        __global__ void run_decide_kernel(const cudaGraphConditionalHandle handle,
+                                          const T* const SFEM_RESTRICT control,
+                                          T* const SFEM_RESTRICT       loop,
+                                          const T                      gamma,
+                                          const T                      atol,
+                                          const T                      rtol,
+                                          const T                      norm_gp0,
+                                          const int                    max_it) {
+            const MPRGPControl<T>& c  = *reinterpret_cast<const MPRGPControl<T>*>(control);
+            unsigned               go = 0;
+            if (c.move != T(MPRGP_MOVE_STEP)) {
+                loop[2] = T(MPRGPRunResult::NOT_A_STEP);
+            } else {
+                loop[1] += 1;
+                const T norm_gf = sqrt(c.gf2), norm_gc = sqrt(c.gc2), norm_gp = sqrt(c.gp2);
+                const T rel     = norm_gp / norm_gp0;
+                const bool done = norm_gp < atol || rel < rtol;
+                loop[0] += 1;
+                loop[3] = done;
+                if (loop[0] >= T(max_it) || done) {
+                    loop[2] = T(MPRGPRunResult::DONE);
+                } else if (!(norm_gc <= gamma * norm_gf)) {
+                    loop[2] = T(MPRGPRunResult::PROPORTIONING);
+                } else {
+                    go = 1;
+                }
+            }
+            cudaGraphSetConditional(handle, go);
+        }
+
+        // A solve's run graph: a WHILE node whose body is one CG iteration -- the operator's
+        // product, the curvature pass, the step pass, the next direction -- and the decision that
+        // sets its condition, captured from the launches themselves (LaunchStreamScope), so the
+        // iteration is the one the host would launch. The stream blocks: it follows the legacy
+        // stream's work and that follows it.
+        template <typename T>
+        struct RunGraph {
+            cudaStream_t    stream{nullptr};
+            cudaGraph_t     graph{nullptr};
+            cudaGraphExec_t exec{nullptr};
+            T*              host{nullptr};  // pinned: the run's state read back
+            bool            failed{false};
+
+            ~RunGraph() {
+                if (exec) cudaGraphExecDestroy(exec);
+                if (graph) cudaGraphDestroy(graph);
+                if (stream) cudaStreamDestroy(stream);
+                if (host) cudaFreeHost(host);
+            }
+
+            bool build(const MPRGPRun<T>& r) {
+                SFEM_CUDA_CHECK(cudaStreamCreate(&stream));
+                SFEM_CUDA_CHECK(cudaMallocHost(&host, 4 * sizeof(T)));
+                SFEM_CUDA_CHECK(cudaGraphCreate(&graph, 0));
+                cudaGraphConditionalHandle handle;
+                SFEM_CUDA_CHECK(cudaGraphConditionalHandleCreate(&handle, graph, 1, cudaGraphCondAssignDefault));
+                cudaGraphNodeParams params = {};
+                params.type                = cudaGraphNodeTypeConditional;
+                params.conditional.handle  = handle;
+                params.conditional.type    = cudaGraphCondTypeWhile;
+                params.conditional.size    = 1;
+                cudaGraphNode_t node;
+                SFEM_CUDA_CHECK(cudaGraphAddNode(&node, graph, nullptr, 0, &params));
+                cudaGraph_t body = params.conditional.phGraph_out[0];
+
+                SFEM_CUDA_CHECK(cudaStreamBeginCaptureToGraph(stream, body, nullptr, nullptr, 0, cudaStreamCaptureModeThreadLocal));
+                {
+                    LaunchStreamScope scope(stream);
+                    r.product(r.p, r.Ap);
+                    curvature<T>(r.n, r.lb, r.ub, r.x, r.g, r.p, r.Ap, r.infty, MPRGP_DECIDE_CG, r.params, r.control, r.work, {});
+                    step<T>(r.n, r.lb, r.ub, r.p, r.Ap, r.x, r.g, r.gf, r.eps, r.w, true, r.control, r.work, {});
+                    update_direction<T>(r.n, r.gf, r.p, r.control);
+                    run_decide_kernel<T><<<1, 1, 0, stream>>>(
+                            handle, r.control, r.work + LOOP, r.gamma, r.atol, r.rtol, r.norm_gp0, r.max_it);
+                }
+                cudaGraph_t captured = nullptr;
+                // A launch the capture could not take (on the legacy stream, a synchronisation)
+                // leaves it invalid: the run is then the host's, iteration by iteration.
+                if (cudaStreamEndCapture(stream, &captured) != cudaSuccess || !captured ||
+                    cudaGraphInstantiate(&exec, graph, 0) != cudaSuccess) {
+                    cudaGetLastError();
+                    return false;
+                }
+                return true;
+            }
+        };
+
+        template <typename T>
+        MPRGPRunResult cg_run(const MPRGPRun<T>& r, const int iterations, std::shared_ptr<void>& state) {
+            auto run = std::static_pointer_cast<RunGraph<T>>(state);
+            if (!run) {
+                run   = std::make_shared<RunGraph<T>>();
+                state = run;
+                if (!run->build(r)) run->failed = true;
+            }
+            MPRGPRunResult result;
+            if (run->failed) return result;
+
+            T* const loop = r.work + LOOP;
+            run_start_kernel<T><<<1, 1, 0, run->stream>>>(loop, T(iterations));
+            SFEM_CUDA_CHECK(cudaGraphLaunch(run->exec, run->stream));
+            SFEM_CUDA_CHECK(cudaMemcpyAsync(run->host, loop, 4 * sizeof(T), cudaMemcpyDeviceToHost, run->stream));
+            SFEM_CUDA_CHECK(cudaStreamSynchronize(run->stream));
+            result.ran        = true;
+            result.iterations = int(run->host[0]);
+            result.steps      = int(run->host[1]);
+            result.exit       = MPRGPRunResult::Exit(int(run->host[2]));
+            result.converged  = run->host[3] != T(0);
+            return result;
         }
     }  // namespace
 
@@ -413,6 +538,7 @@ namespace sfem {
         tpl.update_direction = update_direction<T>;
         tpl.read_control     = read_control<T>;
         tpl.write_control    = write_control<T>;
+        tpl.cg_run           = cg_run<T>;
         tpl.work_size        = WORK_SIZE;
     }
 
