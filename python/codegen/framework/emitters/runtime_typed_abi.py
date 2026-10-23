@@ -47,6 +47,20 @@ RUNTIME_TYPE_ARGUMENT = "scalar_bytes"
 #: pair of branches: adding a precision is a row here and nothing else.
 RUNTIME_SCALAR_TYPES = ("double", "float")
 
+#: The second width an assembled matrix's entry point takes: its values, spelled
+#: `v_t` in the parameter list, are a type of their own.  A tangent may be
+#: stored in single precision while the state it is computed from, and the
+#: element matrix, stay in double -- assembled in place, rather than copied
+#: and narrowed afterwards, so that there is one matrix and its traffic is
+#: halved.  It follows the scalar's slot, with the same width convention.
+VALUES_TYPE_PARAMETER = "const int values_bytes"
+VALUES_TYPE_ARGUMENT = "values_bytes"
+
+#: The value types each scalar's matrix may be stored in: its own, or a
+#: narrower one.  A wider store would only spend memory on digits the element
+#: matrix never had.
+RUNTIME_VALUES_TYPES = {"double": ("double", "float"), "float": ("float",)}
+
 
 def runtime_type_correspondence_lines():
     """Proof, where both are visible, that the widths and the enum agree."""
@@ -72,13 +86,21 @@ def carries_scalar(param):
     )
 
 
+def carries_values(param):
+    """Whether this parameter is an assembled matrix's values (`v_t`)."""
+    return bool(re.search(r"\bv_t\b", param))
+
+
 def runtime_typed_parameter(param):
     """One parameter as the merged entry point declares it.
 
     A pointer to the dispatched scalar crosses as `void *`; a scalar passed by
     value crosses as `real_t` and is converted on the way in, which is what the
-    public entry points already do with material parameters.
+    public entry points already do with material parameters.  Matrix values
+    (`v_t`) cross as `void *` too, typed by their own width.
     """
+    if carries_values(param):
+        return re.sub(r"\bv_t\b", "void", param, count=1)
     if not carries_scalar(param):
         return param
     if "*" in param:
@@ -86,9 +108,15 @@ def runtime_typed_parameter(param):
     return re.sub(_SCALAR_SPELLINGS, "real_t", param, count=1)
 
 
+def has_values(params):
+    """Whether an entry point stores matrix values of a type of their own."""
+    return any(carries_values(param) for param in params)
+
+
 def runtime_typed_parameters(params):
-    """The whole list, with the type parameter first."""
-    return (RUNTIME_TYPE_PARAMETER,) + tuple(
+    """The whole list, with the type parameters first."""
+    values = (VALUES_TYPE_PARAMETER,) if has_values(params) else ()
+    return (RUNTIME_TYPE_PARAMETER,) + values + tuple(
         runtime_typed_parameter(param) for param in params
     )
 
@@ -101,14 +129,19 @@ def parameter_name(param):
     return match.group(1)
 
 
-def runtime_typed_argument(param, scalar_type):
+def runtime_typed_argument(param, scalar_type, values_type=None):
     """One argument at a concrete instantiation, cast back from `void *`.
 
     Two shapes reach here.  A plain buffer is one pointer and casts to one.  A
     field handed as an array of pointers -- `const s_t *const u_data[3]` --
     decays to a pointer-to-pointer, so it casts to `const float *const *`.
+    Matrix values cast to `values_type`.
     """
     name = parameter_name(param)
+    if carries_values(param):
+        if values_type is None:
+            raise ValueError("%r is matrix values, but no values type was given" % param)
+        return "(%s *)%s" % (values_type, name)
     if not carries_scalar(param) or "*" not in param:
         return name
     const = "const " if param.lstrip().startswith("const ") else ""
@@ -117,12 +150,14 @@ def runtime_typed_argument(param, scalar_type):
     return "(%s%s *)%s" % (const, scalar_type, name)
 
 
-def runtime_typed_arguments(params, scalar_type):
+def runtime_typed_arguments(params, scalar_type, values_type=None):
     """Every argument for one instantiation, in declaration order."""
-    return tuple(runtime_typed_argument(param, scalar_type) for param in params)
+    return tuple(
+        runtime_typed_argument(param, scalar_type, values_type) for param in params
+    )
 
 
-def cast_arguments(params, argument_names, scalar_type):
+def cast_arguments(params, argument_names, scalar_type, values_type=None):
     """Cast a call's arguments back from `void *`, matched to the parameters.
 
     The emitters build a call's argument list by name rather than from the
@@ -133,7 +168,7 @@ def cast_arguments(params, argument_names, scalar_type):
     """
     by_name = {parameter_name(param): param for param in params}
     return tuple(
-        runtime_typed_argument(by_name[name], scalar_type)
+        runtime_typed_argument(by_name[name], scalar_type, values_type)
         if name in by_name
         else name
         for name in argument_names
@@ -161,7 +196,9 @@ def runtime_typed_entry_point_lines(
     `call(scalar_type, arguments)` returns the body lines that reach the
     template for that scalar -- the emitters differ in how they spell it, some
     forwarding to one implementation and some to a pair, so the call is the
-    caller's to write and only the shape around it is here.
+    caller's to write and only the shape around it is here.  An entry point
+    with matrix values (`v_t`) selects their type too, in a switch inside each
+    scalar's arm, and calls `call(scalar_type, arguments, values_type)`.
 
     `parameter_lines` formats the declaration, defaulting to one parameter per
     line at four spaces; a caller with its own indentation passes its own.
@@ -177,22 +214,49 @@ def runtime_typed_entry_point_lines(
         lines.extend(parameter_lines(declared))
     lines.append(") {")
     lines.append("%sswitch (%s) {" % (indent, RUNTIME_TYPE_ARGUMENT))
+    values = has_values(params)
     for scalar_type in RUNTIME_SCALAR_TYPES:
         # Each arm gets its own scope.  A body that declares anything -- the
         # two-pass packed assembly declares a graph status before it fills --
         # otherwise redefines that name in the next arm, and C++ refuses to
         # jump past an initialisation into a later case.
         lines.append("%s  case (int)sizeof(%s): {" % (indent, scalar_type))
-        for line in call(scalar_type, runtime_typed_arguments(params, scalar_type)):
-            lines.append("%s    %s" % (indent, line))
-        lines.append("%s  }" % indent)
+        if not values:
+            for line in call(scalar_type, runtime_typed_arguments(params, scalar_type)):
+                lines.append("%s    %s" % (indent, line))
+            lines.append("%s  }" % indent)
+            continue
+        lines.append("%s    switch (%s) {" % (indent, VALUES_TYPE_ARGUMENT))
+        for values_type in RUNTIME_VALUES_TYPES[scalar_type]:
+            lines.append("%s      case (int)sizeof(%s): {" % (indent, values_type))
+            for line in call(
+                scalar_type,
+                runtime_typed_arguments(params, scalar_type, values_type),
+                values_type,
+            ):
+                lines.append("%s        %s" % (indent, line))
+            lines.append("%s      }" % indent)
+        lines.extend(
+            [
+                "%s      default:" % indent,
+                "%s        break;" % indent,
+                "%s    }" % indent,
+                "%s    break;" % indent,
+                "%s  }" % indent,
+            ]
+        )
     lines.extend(
         [
             "%s  default:" % indent,
             "%s    break;" % indent,
             "%s}" % indent,
-            '%sreturn sfem::codegen::unsupported_dispatch("%s", -1, (int)%s);'
-            % (indent, public_name, RUNTIME_TYPE_ARGUMENT),
+            (
+                '%sreturn sfem::codegen::unsupported_values_dispatch("%s", (int)%s, (int)%s);'
+                % (indent, public_name, RUNTIME_TYPE_ARGUMENT, VALUES_TYPE_ARGUMENT)
+                if values
+                else '%sreturn sfem::codegen::unsupported_dispatch("%s", -1, (int)%s);'
+                % (indent, public_name, RUNTIME_TYPE_ARGUMENT)
+            ),
             "}",
             "",
         ]

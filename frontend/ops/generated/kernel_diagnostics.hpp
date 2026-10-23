@@ -38,6 +38,17 @@ static SFEM_INLINE int unsupported_dispatch(
   return SFEM_FAILURE;
 }
 
+//! Reports matrix values of a width this real type is not stored in.
+static SFEM_INLINE int unsupported_values_dispatch(
+    const char *const name,
+    const int real_type,
+    const int values_type) {
+  std::fprintf(stderr,
+      "%s cannot store real type %d in matrix values of type %d\n",
+      name, real_type, values_type);
+  return SFEM_FAILURE;
+}
+
 struct KernelDiagnostics {
   const char *kernel_name;
   const char *element_type;

@@ -1,305 +1,395 @@
 #ifndef SFEM_MPRGP_IMPL_HPP
 #define SFEM_MPRGP_IMPL_HPP
 
-#include <algorithm>
-#include <cmath>
-#include <functional>
 #include <cassert>
+#include <cstddef>
+#include <cstring>
+#include <functional>
+#include <memory>
+
+#include "sfem_Team.hpp"
+#include "sfem_fixed_chunks.hpp"
+#include "sfem_mprgp_bounds.hpp"
+#include "sfem_mprgp_control.hpp"
+#include "sfem_tpl_blas.hpp"
 
 namespace sfem {
 
+    /// Completes a pass's reductions over the ranks in the execution space, in place on `count`
+    /// values: all summed, or with `min_last` the last the minimum. Empty where the sums are
+    /// completed afterwards, from the record, or there is one rank.
+    template <typename T>
+    using MPRGPReduce = std::function<void(T* const values, const int count, const bool min_last)>;
+
+    /// The vector passes of an MPRGP iteration, each one sweep over the dofs. lb and ub may be
+    /// null, not both. Reductions, over this rank's dofs, and the decisions taken from them arrive
+    /// in `control`, an MPRGPControl of mprgp_control_size() entries in the execution space; the
+    /// passes after them read their scalars from there. `work` is a buffer of work_size() entries
+    /// in the execution space.
     template <typename T>
     struct MPRGP_Tpl {
-        std::function<
-                void(const ptrdiff_t n_dofs, const T* const lb, const T* const ub, T* const x)>
-                project;
+        /// x <- P(x)
+        std::function<void(const ptrdiff_t n, const T* const lb, const T* const ub, T* const x)> project;
 
-        std::function<T(const ptrdiff_t n_dofs,
-                        const T* const lb,
-                        const T* const ub,
-                        const T* const x,
-                        const T* const g,
-                        const T eps)>
-                norm_projected_gradient;
-
-        std::function<void(const ptrdiff_t n_dofs,
-                           const T* const lb,
-                           const T* const ub,
-                           const T* const x,
-                           const T* const g,
-                           T* const norm_free_gradient,
-                           T* const norm_chopped_gradient,
-                           const T eps)>
-                norm_gradients;
-
-        std::function<void(const ptrdiff_t n_dofs,
-                           const T* const lb,
-                           const T* const ub,
-                           const T* const x,
-                           const T* const g,
-                           T* gc,
-                           const T eps)>
+        /// gc <- the chopped gradient at (x, g)
+        std::function<void(const ptrdiff_t n,
+                           const T* const  lb,
+                           const T* const  ub,
+                           const T* const  x,
+                           const T* const  g,
+                           T* const        gc,
+                           const T         eps)>
                 chopped_gradient;
 
-        std::function<void(const ptrdiff_t n_dofs,
-                           const T* const lb,
-                           const T* const ub,
-                           const T* const x,
-                           const T* const g,
-                           T* gf)>
-                free_gradient;
+        /// Along d, with Ad = A d: the record's d.Ad, d.d, g.d and the longest feasible step
+        /// x - alpha d (infty when no bound limits it), completed over the ranks by `reduce`; then
+        /// the decision, which takes final sums (MPRGP_DECIDE_NONE where they are summed over the
+        /// ranks afterwards).
+        std::function<void(const ptrdiff_t           n,
+                           const T* const            lb,
+                           const T* const            ub,
+                           const T* const            x,
+                           const T* const            g,
+                           const T* const            d,
+                           const T* const            Ad,
+                           const T                   infty,
+                           const MPRGPDecision       decision,
+                           const MPRGPParams<T>&     params,
+                           T* const                  control,
+                           T* const                  work,
+                           const MPRGPReduce<T>&     reduce)>
+                curvature;
 
-        std::function<T(const ptrdiff_t n_dofs,
-                        const T* const lb,
-                        const T* const ub,
-                        const T* const x,
-                        const T* const p,
-                        const T infty)>
-                max_alpha;
+        /// x -= alpha d and g -= alpha Ad with the record's alpha, only where its move is a step
+        /// (always, with nothing to move, when d is null); then gf <- the free gradient at (x, g)
+        /// and the record's Ad.gf (0 without d), |gf|^2, |gc|^2, |w (gf + gc)|^2, gc the chopped
+        /// gradient, w the entrywise weight (1 where null), completed over the ranks by `reduce`.
+        /// With `cg` (final sums) also the next direction's beta.
+        std::function<void(const ptrdiff_t n,
+                           const T* const  lb,
+                           const T* const  ub,
+                           const T* const  d,
+                           const T* const  Ad,
+                           T* const        x,
+                           T* const        g,
+                           T* const        gf,
+                           const T         eps,
+                           const T* const  w,
+                           const bool      cg,
+                           T* const        control,
+                           T* const        work,
+                           const MPRGPReduce<T>& reduce)>
+                step;
+
+        /// p <- gf - beta p with the record's beta, only where its move is a step.
+        std::function<void(const ptrdiff_t n, const T* const gf, T* const p, const T* const control)> update_direction;
+
+        /// The record to and from the host.
+        std::function<void(const T* const control, MPRGPControl<T>* const host)>  read_control;
+        std::function<void(const MPRGPControl<T>& host, T* const control)>         write_control;
+
+        /// The expansion step: x <- P(x - alpha d - alpha_bar gf), gf the free gradient at
+        /// (x - alpha d, g - alpha Ad). g is left as it was.
+        std::function<void(const ptrdiff_t n,
+                           const T* const  lb,
+                           const T* const  ub,
+                           const T         alpha,
+                           const T         alpha_bar,
+                           const T* const  d,
+                           const T* const  Ad,
+                           T* const        x,
+                           const T* const  g)>
+                expand;
+
+        /// Entries of the work buffer curvature and step take.
+        ptrdiff_t work_size{0};
 
         bool good() const {
             assert(project);
-            assert(norm_projected_gradient);
-            assert(norm_gradients);
             assert(chopped_gradient);
-            assert(free_gradient);
-            assert(max_alpha);
-            return project && norm_projected_gradient && norm_gradients && chopped_gradient &&
-                   free_gradient && max_alpha;
+            assert(curvature);
+            assert(step);
+            assert(expand);
+            assert(update_direction);
+            assert(read_control);
+            assert(write_control);
+            return project && chopped_gradient && curvature && step && expand && update_direction && read_control &&
+                   write_control;
         }
     };
 
     template <typename T>
     struct OpenMP_MPRGP {
-        static inline T gf_lb_ub(const T lbi, const T ubi, const T xi, const T gi) {
-#if 1
-            return (xi <= lbi || xi >= ubi) ? T(0) : gi;
-#else
-            return ((std::abs(lbi - xi) < eps) || (std::abs(ubi - xi) < eps)) ? T(0) : gi;
-#endif
-        }
-
-        static inline T gf_lb(const T lbi, const T xi, const T gi) {
-#if 1
-            return (xi <= lbi) ? T(0) : gi;
-#else
-            return (std::abs(lbi - xi) < eps) ? T(0) : gi;
-#endif
-        }
-
-        static inline T gf_ub(const T ubi, const T xi, const T gi) {
-#if 1
-            return (xi >= ubi) ? T(0) : gi;
-#else
-            return (std::abs(ubi - xi) < eps) ? T(0) : gi;
-#endif
-        }
-
-        static inline T gc_lb_ub(const T lbi, const T ubi, const T xi, const T gi, const T eps) {
-            return ((std::abs(lbi - xi) < eps)
-                            ? std::min(T(0), gi)
-                            : ((std::abs(ubi - xi) < eps) ? std::max(T(0), gi) : T(0)));
-        }
-
-        static inline T gc_lb(const T lbi, const T xi, const T gi, const T eps) {
-            return ((std::abs(lbi - xi) < eps) ? std::min(T(0), gi) : T(0));
-        }
-
-        static inline T gc_ub(const T ubi, const T xi, const T gi, const T eps) {
-            return ((std::abs(ubi - xi) < eps) ? std::max(T(0), gi) : T(0));
-        }
-
-        static void project(const ptrdiff_t n_dofs,
-                            const T* const lb,
-                            const T* const ub,
-                            T* const x) {
-            if (lb && ub) {
+        static void project(const ptrdiff_t n, const T* const lb, const T* const ub, T* const x) {
+            with_mprgp_bounds(lb, ub, [&](const auto b) {
 #pragma omp parallel for
-                for (ptrdiff_t i = 0; i < n_dofs; i++) {
-                    x[i] = std::max(std::min(x[i], ub[i]), lb[i]);
+                for (ptrdiff_t i = 0; i < n; i++) {
+                    x[i] = b.project(i, x[i]);
                 }
-            } else if (ub) {
+            });
+        }
+
+        static void chopped_gradient(const ptrdiff_t n,
+                                     const T* const  lb,
+                                     const T* const  ub,
+                                     const T* const  x,
+                                     const T* const  g,
+                                     T* const        gc,
+                                     const T         eps) {
+            with_mprgp_bounds(lb, ub, [&](const auto b) {
 #pragma omp parallel for
-                for (ptrdiff_t i = 0; i < n_dofs; i++) {
-                    x[i] = std::min(x[i], ub[i]);
+                for (ptrdiff_t i = 0; i < n; i++) {
+                    gc[i] = b.chopped(i, x[i], g[i], eps);
                 }
-            } else if (lb) {
-#pragma omp parallel for
-                for (ptrdiff_t i = 0; i < n_dofs; i++) {
-                    x[i] = std::max(x[i], lb[i]);
-                }
+            });
+        }
+
+        static MPRGPControl<T>& record(T* const control) { return *reinterpret_cast<MPRGPControl<T>*>(control); }
+
+        /// The curvature pass's sums over the entries [begin, end), added to s: d.Ad, d.d, g.d and,
+        /// the last, the longest feasible step x - alpha d (a minimum, from infty).
+        template <typename B>
+        static void curvature_sums(const B              b,
+                                   const ptrdiff_t      begin,
+                                   const ptrdiff_t      end,
+                                   const T* const       x,
+                                   const T* const       g,
+                                   const T* const       d,
+                                   const T* const       Ad,
+                                   const T              infty,
+                                   T (&s)[4]) {
+            T dAd = s[0], dd = s[1], gd = s[2], alpha = s[3];
+            for (ptrdiff_t i = begin; i < end; i++) {
+                const T di = d[i];
+                dAd += di * Ad[i];
+                dd += di * di;
+                gd += g[i] * di;
+                alpha = b.min(alpha, b.max_alpha(i, x[i], di, infty));
             }
+            s[0] = dAd, s[1] = dd, s[2] = gd, s[3] = alpha;
         }
 
-        static T norm_projected_gradient(const ptrdiff_t n_dofs,
-                                         const T* const lb,
-                                         const T* const ub,
-                                         const T* const x,
-                                         const T* const g,
-                                         const T eps) {
-            T ret = 0;
-            if (lb && ub) {
-#pragma omp parallel for reduction(+ : ret)
-                for (ptrdiff_t i = 0; i < n_dofs; i++) {
-                    const T d = gf_lb_ub(lb[i], ub[i], x[i], g[i]) +
-                                gc_lb_ub(lb[i], ub[i], x[i], g[i], eps);
-                    ret += d * d;
+        /// The step's update of x, g and gf over the entries [begin, end) (along d, unless null) and
+        /// its sums, added to s: Ad.gf (without d none), |gf|^2, |gc|^2, |w (gf + gc)|^2.
+        template <typename B>
+        static void step_sums(const B              b,
+                              const ptrdiff_t      begin,
+                              const ptrdiff_t      end,
+                              const T* const       d,
+                              const T* const       Ad,
+                              const T              alpha,
+                              T* const             x,
+                              T* const             g,
+                              T* const             gf,
+                              const T              eps,
+                              const T* const       w,
+                              T (&s)[4]) {
+            if (d) {
+                T Adgf = s[0], gf2 = s[1], gc2 = s[2], gp2 = s[3];
+                for (ptrdiff_t i = begin; i < end; i++) {
+                    const T xi = x[i] - alpha * d[i];
+                    const T gi = g[i] - alpha * Ad[i];
+                    const T f  = b.free(i, xi, gi);
+                    const T c  = b.chopped(i, xi, gi, eps);
+                    const T p  = w ? w[i] * (f + c) : f + c;
+                    x[i]       = xi;
+                    g[i]       = gi;
+                    gf[i]      = f;
+                    Adgf += Ad[i] * f;
+                    gf2 += f * f;
+                    gc2 += c * c;
+                    gp2 += p * p;
                 }
-            } else if (ub) {
-#pragma omp parallel for reduction(+ : ret)
-                for (ptrdiff_t i = 0; i < n_dofs; i++) {
-                    const T d = gf_ub(ub[i], x[i], g[i]) + gc_ub(ub[i], x[i], g[i], eps);
-                    ret += d * d;
-                }
-            } else if (lb) {
-#pragma omp parallel for reduction(+ : ret)
-                for (ptrdiff_t i = 0; i < n_dofs; i++) {
-                    const T d = gf_lb(lb[i], x[i], g[i]) + gc_lb(lb[i], x[i], g[i], eps);
-                    ret += d * d;
-                }
+                s[0] = Adgf, s[1] = gf2, s[2] = gc2, s[3] = gp2;
             } else {
-                assert(false);
+                T gf2 = s[1], gc2 = s[2], gp2 = s[3];
+                for (ptrdiff_t i = begin; i < end; i++) {
+                    const T f = b.free(i, x[i], g[i]);
+                    const T c = b.chopped(i, x[i], g[i], eps);
+                    const T p = w ? w[i] * (f + c) : f + c;
+                    gf[i]     = f;
+                    gf2 += f * f;
+                    gc2 += c * c;
+                    gp2 += p * p;
+                }
+                s[1] = gf2, s[2] = gc2, s[3] = gp2;
             }
-
-            return sqrt(ret);
         }
 
-        static void norm_gradients(const ptrdiff_t n_dofs,
-                                   const T* const lb,
-                                   const T* const ub,
-                                   const T* const x,
-                                   const T* const g,
-                                   T* const norm_free_gradient,
-                                   T* const norm_chopped_gradient,
-                                   const T eps) {
-            T acc_gf = 0;
-            T acc_gc = 0;
+        /// p <- gf - beta p over the entries [begin, end), as the BLAS's axpby(1, gf, -beta, p).
+        static void direction(const ptrdiff_t begin, const ptrdiff_t end, const T* const gf, const T beta, T* const p) {
+            const T alpha = 1, scale = -beta;
+            for (ptrdiff_t i = begin; i < end; i++) {
+                p[i] = alpha * gf[i] + scale * p[i];
+            }
+        }
 
-            if (lb && ub) {
-#pragma omp parallel for reduction(+ : acc_gf), reduction(+ : acc_gc)
-                for (ptrdiff_t i = 0; i < n_dofs; i++) {
-                    const T val_gf = gf_lb_ub(lb[i], ub[i], x[i], g[i]);
-                    const T val_gc = gc_lb_ub(lb[i], ub[i], x[i], g[i], eps);
+        /// The calling thread's chunks of `team`, each pass(b, e, v) from `init` into its four
+        /// entries of `part`.
+        template <typename F>
+        static void team_sums(const Team& team, const T (&init)[4], T* const part, F pass) {
+            for (ptrdiff_t c = team.first_chunk; c < team.end_chunk; c++) {
+                ptrdiff_t b, e;
+                team.chunk_entries(c, &b, &e);
+                T v[4] = {init[0], init[1], init[2], init[3]};
+                pass(b, e, v);
+                for (int k = 0; k < 4; k++) part[4 * c + k] = v[k];
+            }
+        }
 
-                    acc_gf += val_gf * val_gf;
-                    acc_gc += val_gc * val_gc;
-                }
-            } else if (ub) {
-#pragma omp parallel for reduction(+ : acc_gf), reduction(+ : acc_gc)
-                for (ptrdiff_t i = 0; i < n_dofs; i++) {
-                    const T val_gf = gf_ub(ub[i], x[i], g[i]);
-                    const T val_gc = gc_ub(ub[i], x[i], g[i], eps);
+        /// The chunks' sums in `part` combined in index order from `init`: summed, with `min_last`
+        /// the last the minimum.
+        static void combine(const ptrdiff_t chunks, const T* const part, const T (&init)[4], const bool min_last, T (&out)[4]) {
+            for (int k = 0; k < 4; k++) out[k] = init[k];
+            for (ptrdiff_t c = 0; c < chunks; c++) {
+                for (int k = 0; k < 3; k++) out[k] += part[4 * c + k];
+                const T last = part[4 * c + 3];
+                out[3]       = min_last ? (last < out[3] ? last : out[3]) : out[3] + last;
+            }
+        }
 
-                    acc_gf += val_gf * val_gf;
-                    acc_gc += val_gc * val_gc;
-                }
-            } else if (lb) {
-#pragma omp parallel for reduction(+ : acc_gf), reduction(+ : acc_gc)
-                for (ptrdiff_t i = 0; i < n_dofs; i++) {
-                    const T val_gf = gf_lb(lb[i], x[i], g[i]);
-                    const T val_gc = gc_lb(lb[i], x[i], g[i], eps);
-
-                    acc_gf += val_gf * val_gf;
-                    acc_gc += val_gc * val_gc;
-                }
+        /// A pass's four sums over the chunks of n a Team splits (sfem_Team.hpp), in a region of
+        /// its own, then combined: the result does not depend on the number of threads, and is the
+        /// one a region of the caller's takes (MPRGP's iteration in one region).
+        template <typename F>
+        static void chunked(const ptrdiff_t n, const T (&init)[4], const bool min_last, T* const part, T (&out)[4], F pass) {
+            assert(part);
+            if (team_chunk_count(n) == 1) {
+                team_sums(Team::of(n, 0, 1), init, part, pass);
             } else {
-                assert(false);
+#pragma omp parallel
+                team_sums(Team::current(n), init, part, pass);
             }
-
-            *norm_free_gradient = sqrt(acc_gf);
-            *norm_chopped_gradient = sqrt(acc_gc);
+            combine(team_chunk_count(n), part, init, min_last, out);
         }
 
-        static void chopped_gradient(const ptrdiff_t n_dofs,
-                                     const T* const lb,
-                                     const T* const ub,
-                                     const T* const x,
-                                     const T* const g,
-                                     T* gc,
-                                     const T eps) {
-            if (lb && ub) {
-#pragma omp parallel for
-                for (ptrdiff_t i = 0; i < n_dofs; i++) {
-                    gc[i] = gc_lb_ub(lb[i], ub[i], x[i], g[i], eps);
+        static void curvature(const ptrdiff_t       n,
+                              const T* const        lb,
+                              const T* const        ub,
+                              const T* const        x,
+                              const T* const        g,
+                              const T* const        d,
+                              const T* const        Ad,
+                              const T               infty,
+                              const MPRGPDecision   decision,
+                              const MPRGPParams<T>& params,
+                              T* const              control,
+                              T* const              work,
+                              const MPRGPReduce<T>& reduce) {
+            with_mprgp_bounds(lb, ub, [&](const auto b) {
+                T v[4];
+                chunked(n, {0, 0, 0, infty}, true, work, v, [&](const ptrdiff_t begin, const ptrdiff_t end, T (&s)[4]) {
+                    curvature_sums(b, begin, end, x, g, d, Ad, infty, s);
+                });
+                T dAd = v[0], dd = v[1], gd = v[2], alpha = v[3];
+                if (reduce) {
+                    // The three sums and the step bound in one message.
+                    T v[4] = {dAd, dd, gd, alpha};
+                    reduce(v, 4, true);
+                    dAd   = v[0];
+                    dd    = v[1];
+                    gd    = v[2];
+                    alpha = v[3];
                 }
-            } else if (ub) {
-#pragma omp parallel for
-                for (ptrdiff_t i = 0; i < n_dofs; i++) {
-                    gc[i] = gc_ub(ub[i], x[i], g[i], eps);
-                }
-            } else if (lb) {
-#pragma omp parallel for
-                for (ptrdiff_t i = 0; i < n_dofs; i++) {
-                    gc[i] = gc_lb(lb[i], x[i], g[i], eps);
-                }
-            }
+                MPRGPControl<T>& c = record(control);
+                c.dAd              = dAd;
+                c.dd               = dd;
+                c.gd               = gd;
+                c.alpha_feas       = alpha;
+                mprgp_decide(c, decision, params);
+            });
         }
 
-        static void free_gradient(const ptrdiff_t n_dofs,
-                                  const T* const lb,
-                                  const T* const ub,
-                                  const T* const x,
-                                  const T* const g,
-                                  T* gf) {
-            if (lb && ub) {
-#pragma omp parallel for
-                for (ptrdiff_t i = 0; i < n_dofs; i++) {
-                    gf[i] = gf_lb_ub(lb[i], ub[i], x[i], g[i]);
+        static void step(const ptrdiff_t n,
+                         const T* const  lb,
+                         const T* const  ub,
+                         const T* const  d,
+                         const T* const  Ad,
+                         T* const        x,
+                         T* const        g,
+                         T* const        gf,
+                         const T         eps,
+                         const T* const  w,
+                         const bool      cg,
+                         T* const        control,
+                         T* const        work,
+                         const MPRGPReduce<T>& reduce) {
+            MPRGPControl<T>& c = record(control);
+            if (d && c.move != T(MPRGP_MOVE_STEP)) return;
+            const T alpha = c.alpha;
+            with_mprgp_bounds(lb, ub, [&](const auto b) {
+                T v[4];
+                chunked(n, {0, 0, 0, 0}, false, work, v, [&](const ptrdiff_t begin, const ptrdiff_t end, T (&s)[4]) {
+                    step_sums(b, begin, end, d, Ad, alpha, x, g, gf, eps, w, s);
+                });
+                T Adgf = v[0], gf2 = v[1], gc2 = v[2], gp2 = v[3];
+                if (reduce) {
+                    T v[4] = {Adgf, gf2, gc2, gp2};
+                    reduce(v, 4, false);
+                    Adgf = v[0];
+                    gf2  = v[1];
+                    gc2  = v[2];
+                    gp2  = v[3];
                 }
-            } else if (ub) {
-#pragma omp parallel for
-                for (ptrdiff_t i = 0; i < n_dofs; i++) {
-                    gf[i] = gf_ub(ub[i], x[i], g[i]);
-                }
-            } else if (lb) {
-#pragma omp parallel for
-                for (ptrdiff_t i = 0; i < n_dofs; i++) {
-                    gf[i] = gf_lb(lb[i], x[i], g[i]);
-                }
-            }
+                c.Adgf = Adgf;
+                c.gf2  = gf2;
+                c.gc2  = gc2;
+                c.gp2  = gp2;
+                if (cg) mprgp_after_cg_step(c);
+            });
         }
 
-        static T max_alpha(const ptrdiff_t n_dofs,
-                           const T* const lb,
-                           const T* const ub,
-                           const T* const x,
-                           const T* const p,
-                           const T infty) {
-            T ret = infty;
 
-            if (lb && ub) {
-#pragma omp parallel for reduction(min : ret)
-                for (ptrdiff_t i = 0; i < n_dofs; i++) {
-                    const T alpha_lb = (p[i] > 0) ? ((x[i] - lb[i]) / p[i]) : infty;
-                    const T alpha_ub = (p[i] < 0) ? ((x[i] - ub[i]) / p[i]) : infty;
-                    const T alpha = std::min(alpha_lb, alpha_ub);
-                    ret = std::min(alpha, ret);
-                }
+        static void read_control(const T* const control, MPRGPControl<T>* const host) {
+            std::memcpy(host, control, sizeof(MPRGPControl<T>));
+        }
 
-            } else if (ub) {
-#pragma omp parallel for reduction(min : ret)
-                for (ptrdiff_t i = 0; i < n_dofs; i++) {
-                    const T alpha = (p[i] < 0) ? ((x[i] - ub[i]) / p[i]) : infty;
-                    ret = std::min(alpha, ret);
-                }
-            } else if (lb) {
-#pragma omp parallel for reduction(min : ret)
-                for (ptrdiff_t i = 0; i < n_dofs; i++) {
-                    const T alpha = (p[i] > 0) ? ((x[i] - lb[i]) / p[i]) : infty;
-                    ret = std::min(alpha, ret);
-                }
-            }
+        static void write_control(const MPRGPControl<T>& host, T* const control) {
+            std::memcpy(control, &host, sizeof(MPRGPControl<T>));
+        }
 
-            return ret;
+        static void expand(const ptrdiff_t n,
+                           const T* const  lb,
+                           const T* const  ub,
+                           const T         alpha,
+                           const T         alpha_bar,
+                           const T* const  d,
+                           const T* const  Ad,
+                           T* const        x,
+                           const T* const  g) {
+            with_mprgp_bounds(lb, ub, [&](const auto b) {
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < n; i++) {
+                    const T xi = x[i] - alpha * d[i];
+                    const T gi = g[i] - alpha * Ad[i];
+                    x[i]       = b.project(i, xi - alpha_bar * b.free(i, xi, gi));
+                }
+            });
         }
 
         static void build_mprgp(struct MPRGP_Tpl<T>& tpl) {
-            tpl.project = project;
-            tpl.norm_projected_gradient = norm_projected_gradient;
-            tpl.norm_gradients = norm_gradients;
+            tpl.project          = project;
             tpl.chopped_gradient = chopped_gradient;
-            tpl.free_gradient = free_gradient;
-            tpl.max_alpha = max_alpha;
+            tpl.curvature        = curvature;
+            tpl.step             = step;
+            tpl.expand           = expand;
+            // The BLAS's axpby(1, gf, -beta, p), expression and all, as every other update of p: the
+            // same rounding as theirs. Thread by thread over a Team's shares, as the iteration in
+            // one region takes it.
+            tpl.update_direction = [](const ptrdiff_t n, const T* const gf, T* const p, const T* const control) {
+                const MPRGPControl<T>& c = *reinterpret_cast<const MPRGPControl<T>*>(control);
+                if (c.move != T(MPRGP_MOVE_STEP)) return;
+#pragma omp parallel
+                {
+                    const Team team = Team::current(n);
+                    direction(team.begin, team.end, gf, c.beta, p);
+                }
+            };
+            tpl.read_control     = read_control;
+            tpl.write_control    = write_control;
+            // The passes' sums, four per chunk, twice: the curvature's and the step's, which the
+            // iteration in one region keeps apart (MPRGP).
+            tpl.work_size        = 8 * blas_max_chunk_count;
         }
     };
 

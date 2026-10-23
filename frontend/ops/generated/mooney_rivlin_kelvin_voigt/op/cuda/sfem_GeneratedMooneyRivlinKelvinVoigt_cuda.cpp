@@ -120,10 +120,32 @@ namespace sfem {
                 real_t *const values) {
       copy_material_parameters(base, values);
       bool changed = false;
+      bool read[N_MATERIAL_PARAMETERS] = {false};
       for (int i = 0; i < N_DEFINED_MATERIAL_PARAMETERS; ++i) {
-        changed |= yaml_read_parameter(node,
+        read[i] = yaml_read_parameter(node,
                                                MATERIAL_PARAMETER_NAMES[i],
                                                values[i]);
+        changed |= read[i];
+      }
+      // Young's modulus and Poisson's ratio in place of the Lame parameters.
+      real_t young_modulus = 0;
+      real_t poisson_ratio = 0;
+      const bool has_young = yaml_read_parameter(node, "young_modulus", young_modulus);
+      const bool has_poisson = yaml_read_parameter(node, "poisson_ratio", poisson_ratio);
+      if (has_young || has_poisson) {
+        if (!has_young || !has_poisson) {
+          SFEM_ERROR("material: young_modulus and poisson_ratio are given together\n");
+        }
+        if (read[1] || read[0]) {
+          SFEM_ERROR("material: give young_modulus and poisson_ratio or mu and lmbda, not both\n");
+        }
+        if (!(young_modulus > 0) || !(poisson_ratio >= 0 && poisson_ratio < real_t(0.5))) {
+          SFEM_ERROR("material: young_modulus > 0 and 0 <= poisson_ratio < 0.5 (got %g, %g)\n",
+                     (double)young_modulus, (double)poisson_ratio);
+        }
+        values[1] = young_modulus / (2 * (1 + poisson_ratio));
+        values[0] = young_modulus * poisson_ratio / ((1 + poisson_ratio) * (1 - 2 * poisson_ratio));
+        changed = true;
       }
       return changed;
     }
@@ -644,7 +666,7 @@ namespace sfem {
             return SFEM_FAILURE;
           }
           adjugate = reinterpret_cast<const geom_t *const *>(
-              cache->jacobian->jacobian_adjugate_SoA()->data());
+              cache->jacobian->adjugate_components());
           determinant = reinterpret_cast<const geom_t *>(
               cache->jacobian->jacobian_determinant()->data());
         }
@@ -714,7 +736,7 @@ namespace sfem {
             return SFEM_FAILURE;
           }
           adjugate = reinterpret_cast<const geom_t *const *>(
-              cache->jacobian->jacobian_adjugate_SoA()->data());
+              cache->jacobian->adjugate_components());
           determinant = reinterpret_cast<const geom_t *>(
               cache->jacobian->jacobian_determinant()->data());
         }
@@ -902,10 +924,18 @@ namespace sfem {
     return SFEM_FAILURE;
   }
 
-  int GPUGeneratedMooneyRivlinKelvinVoigt::hessian_bsr(const real_t *const state,
+  int GPUGeneratedMooneyRivlinKelvinVoigt::hessian_bsr(const real_t *const x,
               const count_t *const rowptr,
               const idx_t *const colidx,
               real_t *const values) {
+    return hessian_bsr_typed(x, rowptr, colidx, smesh::SMESH_DEFAULT, values);
+  }
+
+  int GPUGeneratedMooneyRivlinKelvinVoigt::hessian_bsr_typed(const real_t *const state,
+              const count_t *const rowptr,
+              const idx_t *const colidx,
+              const enum smesh::PrimitiveType values_type,
+              void *const values) {
     SFEM_TRACE_SCOPE("GPUGeneratedMooneyRivlinKelvinVoigt::hessian_bsr");
     if (check_graph(impl_->bsr_graph, rowptr, colidx, impl_->space->n_dofs() / impl_->space->block_size()) != SFEM_SUCCESS) {
       SFEM_ERROR("GPUGeneratedMooneyRivlinKelvinVoigt::hessian_bsr: the graph is malformed; the assembly kernels assume it is not\n");
@@ -917,7 +947,7 @@ namespace sfem {
       return SFEM_FAILURE;
     }
     if (auto term = time_scheme_term(impl_->time_scheme)) {
-      if (term->hessian_bsr(current, rowptr, colidx, values) != SFEM_SUCCESS) {
+      if (term->hessian_bsr_typed(current, rowptr, colidx, values_type, values) != SFEM_SUCCESS) {
         return SFEM_FAILURE;
       }
     }
@@ -939,7 +969,7 @@ namespace sfem {
           return SFEM_FAILURE;
         }
         adjugate = reinterpret_cast<const geom_t *const *>(
-            cache->jacobian->jacobian_adjugate_SoA()->data());
+            cache->jacobian->adjugate_components());
         determinant = reinterpret_cast<const geom_t *>(
             cache->jacobian->jacobian_determinant()->data());
       }
@@ -949,18 +979,18 @@ namespace sfem {
           const real_t *const RSTR u_data[2] = {current + 0, current + 1};
           const real_t *const RSTR u_old_data[2] = {previous + 0, previous + 1};
         if (domain.element_type == smesh::TRI3) {
-          return cu_mooney_rivlin_kelvin_voigt_total_hessian_bsr_2d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], storage[1], storage[2], storage[3], storage[4], FIELD_STRIDE, u_data[0], u_data[1], FIELD_STRIDE, u_old_data[0], u_old_data[1], rowptr, colidx, values, stream);
+          return cu_mooney_rivlin_kelvin_voigt_total_hessian_bsr_2d_a_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], storage[1], storage[2], storage[3], storage[4], FIELD_STRIDE, u_data[0], u_data[1], FIELD_STRIDE, u_old_data[0], u_old_data[1], rowptr, colidx, values, stream);
         }
-        return cu_mooney_rivlin_kelvin_voigt_total_hessian_bsr_2d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, storage[0], storage[1], storage[2], storage[3], storage[4], FIELD_STRIDE, u_data[0], u_data[1], FIELD_STRIDE, u_old_data[0], u_old_data[1], rowptr, colidx, values, stream);
+        return cu_mooney_rivlin_kelvin_voigt_total_hessian_bsr_2d_i_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, storage[0], storage[1], storage[2], storage[3], storage[4], FIELD_STRIDE, u_data[0], u_data[1], FIELD_STRIDE, u_old_data[0], u_old_data[1], rowptr, colidx, values, stream);
       }
       else if (dim == 3) {
         static constexpr ptrdiff_t FIELD_STRIDE = 3;
           const real_t *const RSTR u_data[3] = {current + 0, current + 1, current + 2};
           const real_t *const RSTR u_old_data[3] = {previous + 0, previous + 1, previous + 2};
         if (domain.element_type == smesh::TET4) {
-          return cu_mooney_rivlin_kelvin_voigt_total_hessian_bsr_3d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], storage[1], storage[2], storage[3], storage[4], FIELD_STRIDE, u_data[0], u_data[1], u_data[2], FIELD_STRIDE, u_old_data[0], u_old_data[1], u_old_data[2], rowptr, colidx, values, stream);
+          return cu_mooney_rivlin_kelvin_voigt_total_hessian_bsr_3d_a_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], storage[1], storage[2], storage[3], storage[4], FIELD_STRIDE, u_data[0], u_data[1], u_data[2], FIELD_STRIDE, u_old_data[0], u_old_data[1], u_old_data[2], rowptr, colidx, values, stream);
         }
-        return cu_mooney_rivlin_kelvin_voigt_total_hessian_bsr_3d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, storage[0], storage[1], storage[2], storage[3], storage[4], FIELD_STRIDE, u_data[0], u_data[1], u_data[2], FIELD_STRIDE, u_old_data[0], u_old_data[1], u_old_data[2], rowptr, colidx, values, stream);
+        return cu_mooney_rivlin_kelvin_voigt_total_hessian_bsr_3d_i_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, storage[0], storage[1], storage[2], storage[3], storage[4], FIELD_STRIDE, u_data[0], u_data[1], u_data[2], FIELD_STRIDE, u_old_data[0], u_old_data[1], u_old_data[2], rowptr, colidx, values, stream);
       }
       SFEM_ERROR("mooney_rivlin_kelvin_voigt_total hessian_bsr does not support spatial dimension %d\n", dim);
       return SFEM_FAILURE;

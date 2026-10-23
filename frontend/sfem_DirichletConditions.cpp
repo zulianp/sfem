@@ -720,20 +720,29 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    int DirichletConditions::hessian_bsr(const real_t *const  /*x*/,
+    int DirichletConditions::hessian_bsr(const real_t *const  x,
                                          const count_t *const rowptr,
                                          const idx_t *const   colidx,
                                          real_t *const        values) {
+        return hessian_bsr_typed(x, rowptr, colidx, smesh::SMESH_DEFAULT, values);
+    }
+
+    int DirichletConditions::hessian_bsr_typed(const real_t *const /*x*/,
+                                               const count_t *const         rowptr,
+                                               const idx_t *const           colidx,
+                                               const smesh::PrimitiveType values_type,
+                                               void *const                  values) {
         SFEM_TRACE_SCOPE("DirichletConditions::hessian_bsr");
 
-        for (auto &c : impl_->conditions) {
-            if (c.nodeset->size() == 0) continue;
+        return with_tangent_values(values_type, values, [&](auto *const v) {
+            for (auto &c : impl_->conditions) {
+                if (c.nodeset->size() == 0) continue;
 
-            bsr_constraint_nodes_to_identity_vec(
-                    c.nodeset->size(), c.nodeset->data(), impl_->space->block_size(), c.component, 1, rowptr, colidx, values);
-        }
-
-        return SFEM_SUCCESS;
+                bsr_constraint_nodes_to_identity_vec(
+                        c.nodeset->size(), c.nodeset->data(), impl_->space->block_size(), c.component, 1, rowptr, colidx, v);
+            }
+            return SFEM_SUCCESS;
+        });
     }
 
     int DirichletConditions::mask(mask_t *mask) {

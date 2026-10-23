@@ -651,11 +651,21 @@ def _header(material, residual, publishes_value_steps=None, node_wise=False,
             const count_t *const rowptr,
             const idx_t *const colidx,
             real_t *const values) override;
+    int hessian_bsr_typed(const real_t *const x,
+            const count_t *const rowptr,
+            const idx_t *const colidx,
+            const enum smesh::PrimitiveType values_type,
+            void *const values) override;
 """ if residual else """
     int hessian_bsr(const real_t *const x,
             const count_t *const rowptr,
             const idx_t *const colidx,
             real_t *const values) override;
+    int hessian_bsr_typed(const real_t *const x,
+            const count_t *const rowptr,
+            const idx_t *const colidx,
+            const enum smesh::PrimitiveType values_type,
+            void *const values) override;
     int hessian_block_diag_sym(const real_t *const x,
                                    real_t *const values) override;"""
     return """#pragma once
@@ -999,7 +1009,7 @@ def _inexact_definitions(
             sfem::create_host_buffer<metric_tensor_t>(tangent_stride * components);
       }
       auto adjugate = reinterpret_cast<const geom_t *const *>(
-          cache->jacobian_soa->jacobian_adjugate_SoA()->data());
+          cache->jacobian_soa->adjugate_components());
       auto determinant = reinterpret_cast<const geom_t *>(
           cache->jacobian_soa->jacobian_determinant()->data());
 %(update_body)s
@@ -1721,7 +1731,7 @@ namespace sfem {
           return SFEM_FAILURE;
         }
         adjugate = reinterpret_cast<const geom_t *const *>(
-            cache->jacobian_soa->jacobian_adjugate_SoA()->data());
+            cache->jacobian_soa->adjugate_components());
         determinant = reinterpret_cast<const geom_t *>(
             cache->jacobian_soa->jacobian_determinant()->data());
         if (%(gradient_affine_uses_jacobian_aos)s) {
@@ -1760,7 +1770,7 @@ namespace sfem {
           return SFEM_FAILURE;
         }
         adjugate = reinterpret_cast<const geom_t *const *>(
-            cache->jacobian_soa->jacobian_adjugate_SoA()->data());
+            cache->jacobian_soa->adjugate_components());
         determinant = reinterpret_cast<const geom_t *>(
             cache->jacobian_soa->jacobian_determinant()->data());
         if (%(apply_affine_uses_jacobian_aos)s) {
@@ -1832,7 +1842,7 @@ namespace sfem {
           return SFEM_FAILURE;
         }
         adjugate = reinterpret_cast<const geom_t *const *>(
-            cache->jacobian_soa->jacobian_adjugate_SoA()->data());
+            cache->jacobian_soa->adjugate_components());
         determinant = reinterpret_cast<const geom_t *>(
             cache->jacobian_soa->jacobian_determinant()->data());
 %(objective_steps_metric_binding)s            }
@@ -1870,13 +1880,14 @@ namespace sfem {
     });
   }
 
-  int %(op)s::hessian_bsr(%(hessian_bsr_current_parameter)s,
+%(hessian_bsr_forwarder)s  int %(op)s::hessian_bsr_typed(%(hessian_bsr_current_parameter)s,
               const count_t *const rowptr,
               const idx_t *const colidx,
-              real_t *const values) {
+              const enum smesh::PrimitiveType values_type,
+              void *const values) {
     SFEM_TRACE_SCOPE("%(op)s::hessian_bsr");
 %(hessian_bsr_graph_check)s    if (auto term = time_scheme_term(impl_->time_scheme)) {
-      if (term->hessian_bsr(x, rowptr, colidx, values) != SFEM_SUCCESS) {
+      if (term->hessian_bsr_typed(x, rowptr, colidx, values_type, values) != SFEM_SUCCESS) {
         return SFEM_FAILURE;
       }
     }
@@ -2132,6 +2143,7 @@ namespace sfem {
         ),
         "hessian_crs_graph_check": _graph_check_lines(_op_class_name(material), "crs"),
         "hessian_bsr_graph_check": _graph_check_lines(_op_class_name(material), "bsr"),
+        "hessian_bsr_forwarder": _HESSIAN_BSR_FORWARDER % {"op": _op_class_name(material)},
         "hessian_crs_current_parameter": _hyperelastic_hessian_current_parameter(
             {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
         ),
@@ -3425,10 +3437,11 @@ namespace sfem {
 %(hessian_crs_body)s
   }
 
-  int %(op)s::hessian_bsr(const real_t *const %(hessian_bsr_state_parameter)s,
+%(hessian_bsr_forwarder)s  int %(op)s::hessian_bsr_typed(const real_t *const %(hessian_bsr_state_parameter)s,
               const count_t *const %(hessian_bsr_rowptr_parameter)s,
               const idx_t *const %(hessian_bsr_colidx_parameter)s,
-              real_t *const %(hessian_bsr_values_parameter)s) {
+              const enum smesh::PrimitiveType %(hessian_bsr_values_type_parameter)s,
+              void *const %(hessian_bsr_values_parameter)s) {
     SFEM_TRACE_SCOPE("%(op)s::hessian_bsr");
 %(hessian_bsr_body)s
   }
@@ -3938,10 +3951,14 @@ def _residual_signature_names(substitutions):
     }
     for method in ("hessian_crs", "hessian_bsr"):
         body = substitutions["%s_body" % method]
-        for parameter in ("state", "rowptr", "colidx", "values"):
+        parameters = ("state", "rowptr", "colidx", "values")
+        if method == "hessian_bsr":
+            parameters += ("values_type",)
+        for parameter in parameters:
             names["%s_%s_parameter" % (method, parameter)] = _parameter_name(
                 parameter, _wrapper_reads(body, parameter)
             )
+    names["hessian_bsr_forwarder"] = _HESSIAN_BSR_FORWARDER % {"op": substitutions["op"]}
     return names
 
 
@@ -3965,7 +3982,7 @@ def _residual_affine_geometry_lines(op_name, label, affine_flag, uses, body, for
             "jacobian geometry",
             (
                 ("adjugate", "const geom_t *const *",
-                 "cache->jacobian->jacobian_adjugate_SoA()->data()"),
+                 "cache->jacobian->adjugate_components()"),
                 ("determinant", "const geom_t *",
                  "cache->jacobian->jacobian_determinant()->data()"),
             ),
@@ -5118,7 +5135,7 @@ namespace sfem {
           return SFEM_FAILURE;
         }
         adjugate = reinterpret_cast<const geom_t *const *>(
-            jacobian->jacobian_adjugate_SoA()->data());
+            jacobian->adjugate_components());
         determinant = reinterpret_cast<const geom_t *>(
             jacobian->jacobian_determinant()->data());
       }
@@ -5155,7 +5172,7 @@ namespace sfem {
           return SFEM_FAILURE;
         }
         adjugate = reinterpret_cast<const geom_t *const *>(
-            jacobian->jacobian_adjugate_SoA()->data());
+            jacobian->adjugate_components());
         determinant = reinterpret_cast<const geom_t *>(
             jacobian->jacobian_determinant()->data());
       }
@@ -5610,6 +5627,11 @@ def _coupled_cases(
         common_iso = "domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points"
         common_affine = "domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), %s" % geometry_affine
         common_iso_dispatch = "domain.element_type, real_type, %s" % common_iso
+        # A BSR assembly's dispatchers also take the values' type.
+        common_iso_values_dispatch = "domain.element_type, %s, %s" % (
+            ", ".join(_runtime_type_arguments("hessian_bsr")),
+            common_iso,
+        )
         common_affine_dispatch = "domain.element_type, real_type, %s" % common_affine
         energy_grad_args = ", ".join(
             _nonempty(
@@ -5791,12 +5813,12 @@ def _coupled_cases(
                     ) % (
                         _coupled_dispatch_call(
                             energy_dispatch_stem, "hessian_bsr", dim, "i",
-                            "%s%s, %s" % (common_iso_dispatch, energy_apply_params,
+                            "%s%s, %s" % (common_iso_values_dispatch, energy_apply_params,
                                           energy_hessian_args),
                         ),
                         _coupled_dispatch_call(
                             residual_dispatch_stem, "hessian_bsr", dim, "i",
-                            "%s, %s" % (common_iso_dispatch, residual_hessian_args_common),
+                            "%s, %s" % (common_iso_values_dispatch, residual_hessian_args_common),
                         ),
                     ),
                 )
@@ -5875,6 +5897,18 @@ def _coupled_cases(
     return cases
 
 
+#: `Op::hessian_bsr`, into values of the scalar: the typed assembly with the
+#: values' type left to the scalar's.  One per op, before its typed method.
+_HESSIAN_BSR_FORWARDER = """  int %(op)s::hessian_bsr(const real_t *const x,
+              const count_t *const rowptr,
+              const idx_t *const colidx,
+              real_t *const values) {
+    return hessian_bsr_typed(x, rowptr, colidx, smesh::SMESH_DEFAULT, values);
+  }
+
+"""
+
+
 def _coupled_hessian_bsr_method(op_name, scheme_argument, scheme_hessian_bsr, hessian_bsr_cases):
     """The assembled Jacobian of a coupled material, or a refusal.
 
@@ -5885,18 +5919,20 @@ def _coupled_hessian_bsr_method(op_name, scheme_argument, scheme_hessian_bsr, he
     converges to a different problem.
     """
     if not hessian_bsr_cases:
-        return """  int %(op)s::hessian_bsr(const real_t *const,
+        return _HESSIAN_BSR_FORWARDER % {"op": op_name} + """  int %(op)s::hessian_bsr_typed(const real_t *const,
               const count_t *const,
               const idx_t *const,
-              real_t *const) {
+              const enum smesh::PrimitiveType,
+              void *const) {
     SFEM_TRACE_SCOPE("%(op)s::hessian_bsr");
     return SFEM_FAILURE;
   }
 """ % {"op": op_name}
-    return """  int %(op)s::hessian_bsr(const real_t *const state,
+    return _HESSIAN_BSR_FORWARDER % {"op": op_name} + """  int %(op)s::hessian_bsr_typed(const real_t *const state,
               const count_t *const rowptr,
               const idx_t *const colidx,
-              real_t *const values) {
+              const enum smesh::PrimitiveType values_type,
+              void *const values) {
     SFEM_TRACE_SCOPE("%(op)s::hessian_bsr");
 %(graph_check)s    const real_t *const current = state ? state : impl_->current;
     if (!current || !impl_->previous_state()) {
@@ -6080,7 +6116,7 @@ _RESIDUAL_SCHEME_APPLY = {
 _COUPLED_SCHEME_HESSIAN_BSR = {
     False: "",
     True: """    if (auto term = time_scheme_term(impl_->time_scheme)) {
-      if (term->hessian_bsr(current, rowptr, colidx, values) != SFEM_SUCCESS) {
+      if (term->hessian_bsr_typed(current, rowptr, colidx, values_type, values) != SFEM_SUCCESS) {
         return SFEM_FAILURE;
       }
     }
@@ -6093,7 +6129,12 @@ _COUPLED_SCHEME_HESSIAN_BSR = {
 #: tangent is the mass whatever the state.
 _RESIDUAL_SCHEME_HESSIAN_CRS = {
     False: "",
-    True: _COUPLED_SCHEME_HESSIAN_BSR[True].replace("hessian_bsr", "hessian_crs"),
+    True: """    if (auto term = time_scheme_term(impl_->time_scheme)) {
+      if (term->hessian_crs(current, rowptr, colidx, values) != SFEM_SUCCESS) {
+        return SFEM_FAILURE;
+      }
+    }
+""",
 }
 
 _RESIDUAL_SCHEME_HESSIAN_BSR = _COUPLED_SCHEME_HESSIAN_BSR
@@ -6603,7 +6644,7 @@ def _relaxation_fragments(
           return SFEM_FAILURE;
         }
         adjugate = reinterpret_cast<const geom_t *const *>(
-            cache->jacobian_soa->jacobian_adjugate_SoA()->data());
+            cache->jacobian_soa->adjugate_components());
         determinant = reinterpret_cast<const geom_t *>(
             cache->jacobian_soa->jacobian_determinant()->data());
       }
@@ -7400,6 +7441,9 @@ def _dispatch_groups(material, elements, declarations):
         runtime_typed = params[0] == _KERNEL_WIDTH_PARAMETER
         if runtime_typed:
             params = [_RUNTIME_TYPE_PARAMETER] + list(params[1:])
+            # An assembled matrix's values take a width of their own, next.
+            if len(params) > 1 and params[1] == _KERNEL_VALUES_WIDTH_PARAMETER:
+                params[1] = _VALUES_TYPE_PARAMETER
         key = (dispatch_name, tuple(params))
         groups.setdefault(
             key,
@@ -7583,6 +7627,14 @@ _RUNTIME_TYPE_ARGUMENT = "real_type"
 _KERNEL_WIDTH_PARAMETER = "const int scalar_bytes"
 _RESOLVED_RUNTIME_TYPE = "resolved_real_type"
 
+#: The same for an assembled matrix's values, which may be stored narrower
+#: than the scalar (`emitters/runtime_typed_abi.py`, VALUES_TYPE_PARAMETER).
+#: `SMESH_DEFAULT` stores them as the scalar.
+_VALUES_TYPE_PARAMETER = "const enum smesh::PrimitiveType values_type"
+_VALUES_TYPE_ARGUMENT = "values_type"
+_KERNEL_VALUES_WIDTH_PARAMETER = "const int values_bytes"
+_RESOLVED_VALUES_TYPE = "resolved_values_type"
+
 
 def _runtime_typed_parameter(param):
     """One parameter, as the merged entry point declares it.
@@ -7721,8 +7773,12 @@ def _runtime_typed_dispatch_function_lines(group):
     # `smesh::PrimitiveType` numbers its scalars by width, so the resolved
     # value crosses unchanged; `_dispatch_source_prelude` asserts that, in this
     # source, which is the only one that sees both spellings.
+    values = _VALUES_TYPE_PARAMETER in group["params"]
     arguments = ["(int)%s" % _RESOLVED_RUNTIME_TYPE] + [
-        _c_parameter_name(param) for param in group["params"][1:]
+        "(int)%s" % _RESOLVED_VALUES_TYPE
+        if param == _VALUES_TYPE_PARAMETER
+        else _c_parameter_name(param)
+        for param in group["params"][1:]
     ]
     lines = [
         'SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int %s(' % _entry_point_name(group["name"])
@@ -7735,6 +7791,16 @@ def _runtime_typed_dispatch_function_lines(group):
             "      (%s == smesh::SMESH_DEFAULT)" % _RUNTIME_TYPE_ARGUMENT,
             "          ? smesh::TypeToEnum<real_t>::value()",
             "          : %s;" % _RUNTIME_TYPE_ARGUMENT,
+            *(
+                [
+                    "  const enum smesh::PrimitiveType %s =" % _RESOLVED_VALUES_TYPE,
+                    "      (%s == smesh::SMESH_DEFAULT)" % _VALUES_TYPE_ARGUMENT,
+                    "          ? %s" % _RESOLVED_RUNTIME_TYPE,
+                    "          : %s;" % _VALUES_TYPE_ARGUMENT,
+                ]
+                if values
+                else []
+            ),
             "  switch (element_type) {",
         ]
     )
@@ -9354,6 +9420,13 @@ def _residual_hessian_entry_point(kernel_sources, stem, operation):
     return None
 
 
+def _runtime_type_arguments(operation):
+    """The runtime types an operation's dispatcher takes: the scalar, and for a
+    BSR assembly also its values (`_VALUES_TYPE_PARAMETER`), which the op's
+    `hessian_bsr_typed` is handed."""
+    return ("real_type", "values_type") if operation == "hessian_bsr" else ("real_type",)
+
+
 def _residual_hessian_dispatch_body(
     material_name,
     operation,
@@ -9401,7 +9474,7 @@ def _residual_hessian_dispatch_body(
                 "%s    return SFEM_FAILURE;" % indent,
                 "%s  }" % indent,
                 "%s  adjugate = reinterpret_cast<const geom_t *const *>(" % indent,
-                "%s      cache->jacobian->jacobian_adjugate_SoA()->data());" % indent,
+                "%s      cache->jacobian->adjugate_components());" % indent,
                 "%s  determinant = reinterpret_cast<const geom_t *>(" % indent,
                 "%s      cache->jacobian->jacobian_determinant()->data());" % indent,
                 "%s}" % indent,
@@ -9429,7 +9502,7 @@ def _residual_hessian_dispatch_body(
         setup = []
         common = [
             "domain.element_type",
-            "real_type",
+            *_runtime_type_arguments(operation),
             "domain.block->n_elements()",
             "mesh->n_nodes()",
             "element_connectivity(domain)",
@@ -10727,8 +10800,11 @@ def _hyperelastic_apply_dispatch_body(material_name, kernel_sources, apply_depen
 
 
 def _hyperelastic_gradient_packed_dispatch_body(material_name, kernel_sources, gradient_dependencies_by_dim, indent, n_field_components_by_dim=None):
+    # The packed route takes the element's mode as the preamble does: the flag, widened by the
+    # elements with only an affine kernel (TET4 and TRI3, whose geometry the preamble caches).
+    affine = _affine_preamble_condition(kernel_sources, material_name, ("gradient",), "gradient_uses_affine")
     affine_lines = [
-        "%sif (impl_->gradient_uses_affine && impl_->space->has_packed_mesh()) {" % indent,
+        "%sif ((%s) && impl_->space->has_packed_mesh()) {" % (indent, affine),
         "%s  auto packed = impl_->space->packed_mesh();" % indent,
         "%s  const int packed_block = packed_block_id_for_domain(*packed, *domain.block);" % indent,
         "%s  if (packed_block >= 0) {" % indent,
@@ -10782,7 +10858,7 @@ def _hyperelastic_gradient_packed_dispatch_body(material_name, kernel_sources, g
         ]
     )
     lines = [
-        "%sif (!impl_->gradient_uses_affine && impl_->space->has_packed_mesh()) {" % indent,
+        "%sif (!(%s) && impl_->space->has_packed_mesh()) {" % (indent, affine),
         "%s  auto packed = impl_->space->packed_mesh();" % indent,
         "%s  const int packed_block = packed_block_id_for_domain(*packed, *domain.block);" % indent,
         "%s  if (packed_block >= 0) {" % indent,
@@ -10844,8 +10920,12 @@ def _hyperelastic_gradient_packed_dispatch_body(material_name, kernel_sources, g
 
 
 def _hyperelastic_objective_steps_packed_dispatch_body(material_name, kernel_sources, apply_dependencies_by_dim, indent, n_field_components_by_dim=None):
+    # As the gradient's: the preamble's mode, the flag widened by the affine-only elements.
+    affine = _affine_preamble_condition(
+        kernel_sources, material_name, ("objective", "objective_steps"), "objective_uses_affine"
+    )
     affine_lines = [
-        "%sif (impl_->objective_uses_affine && impl_->space->has_packed_mesh()) {" % indent,
+        "%sif ((%s) && impl_->space->has_packed_mesh()) {" % (indent, affine),
         "%s  auto packed = impl_->space->packed_mesh();" % indent,
         "%s  const int packed_block = packed_block_id_for_domain(*packed, *domain.block);" % indent,
         "%s  if (packed_block >= 0) {" % indent,
@@ -10911,7 +10991,7 @@ def _hyperelastic_objective_steps_packed_dispatch_body(material_name, kernel_sou
         ]
     )
     lines = [
-        "%sif (!impl_->objective_uses_affine && impl_->space->has_packed_mesh()) {" % indent,
+        "%sif (!(%s) && impl_->space->has_packed_mesh()) {" % (indent, affine),
         "%s  auto packed = impl_->space->packed_mesh();" % indent,
         "%s  const int packed_block = packed_block_id_for_domain(*packed, *domain.block);" % indent,
         "%s  if (packed_block >= 0) {" % indent,
@@ -11023,7 +11103,7 @@ def _hyperelastic_hessian_dispatch_body(material_name, operation, kernel_sources
                 "%s    return SFEM_FAILURE;" % indent,
                 "%s  }" % indent,
                 "%s  adjugate = reinterpret_cast<const geom_t *const *>(" % indent,
-                "%s      cache->jacobian_soa->jacobian_adjugate_SoA()->data());" % indent,
+                "%s      cache->jacobian_soa->adjugate_components());" % indent,
                 "%s  determinant = reinterpret_cast<const geom_t *>(" % indent,
                 "%s      cache->jacobian_soa->jacobian_determinant()->data());" % indent,
                 "%s}" % indent,
@@ -11065,7 +11145,7 @@ def _hyperelastic_hessian_dispatch_body(material_name, operation, kernel_sources
                     indent, _entry_point_name(affine_function), _with_stream(", ".join(
                         [
                             "domain.element_type",
-                            "real_type",
+                            *_runtime_type_arguments(operation),
                             "domain.block->n_elements()",
                             "mesh->n_nodes()",
                             "element_connectivity(domain)",
@@ -11087,7 +11167,7 @@ def _hyperelastic_hessian_dispatch_body(material_name, operation, kernel_sources
                     indent, _entry_point_name(function), _with_stream(", ".join(
                         [
                             "domain.element_type",
-                            "real_type",
+                            *_runtime_type_arguments(operation),
                             "domain.block->n_elements()",
                             "mesh->n_nodes()",
                             "element_connectivity(domain)",
@@ -11294,12 +11374,14 @@ def _yaml_helpers(defaults):
                 real_t *const values) {
       copy_material_parameters(base, values);
       bool changed = false;
+      bool read[N_MATERIAL_PARAMETERS] = {false};
       for (int i = 0; i < N_DEFINED_MATERIAL_PARAMETERS; ++i) {
-        changed |= yaml_read_parameter(node,
+        read[i] = yaml_read_parameter(node,
                                                MATERIAL_PARAMETER_NAMES[i],
                                                values[i]);
+        changed |= read[i];
       }
-      return changed;
+%(lame_from_engineering)s      return changed;
     }
 
     void set_material(MultiDomainOp &domains,
@@ -11356,7 +11438,37 @@ def _yaml_helpers(defaults):
         "storage_size": storage_size,
         "names": names,
         "default_lines": "\n".join(default_lines),
+        "lame_from_engineering": _lame_from_engineering_lines([name for name, _ in defaults]),
     }
+
+
+def _lame_from_engineering_lines(names):
+    """`material_from_yaml`'s reading of Young's modulus and Poisson's ratio, for a material whose
+    parameters include the Lame pair (mu, lmbda): engineering data comes as E and nu. Nothing for
+    the others."""
+    if "mu" not in names or "lmbda" not in names:
+        return "      (void)read;\n"
+    return """      // Young's modulus and Poisson's ratio in place of the Lame parameters.
+      real_t young_modulus = 0;
+      real_t poisson_ratio = 0;
+      const bool has_young = yaml_read_parameter(node, "young_modulus", young_modulus);
+      const bool has_poisson = yaml_read_parameter(node, "poisson_ratio", poisson_ratio);
+      if (has_young || has_poisson) {
+        if (!has_young || !has_poisson) {
+          SFEM_ERROR("material: young_modulus and poisson_ratio are given together\\n");
+        }
+        if (read[%(mu)d] || read[%(lmbda)d]) {
+          SFEM_ERROR("material: give young_modulus and poisson_ratio or mu and lmbda, not both\\n");
+        }
+        if (!(young_modulus > 0) || !(poisson_ratio >= 0 && poisson_ratio < real_t(0.5))) {
+          SFEM_ERROR("material: young_modulus > 0 and 0 <= poisson_ratio < 0.5 (got %%g, %%g)\\n",
+                     (double)young_modulus, (double)poisson_ratio);
+        }
+        values[%(mu)d] = young_modulus / (2 * (1 + poisson_ratio));
+        values[%(lmbda)d] = young_modulus * poisson_ratio / ((1 + poisson_ratio) * (1 - 2 * poisson_ratio));
+        changed = true;
+      }
+""" % {"mu": names.index("mu"), "lmbda": names.index("lmbda")}
 
 
 def _parameter_args(parameters):

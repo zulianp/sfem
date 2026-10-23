@@ -2,6 +2,7 @@
 
 extern "C" int vector_mass_proteus_hex27_hessian_bsr_i_msoa(
         const int scalar_bytes,
+        const int values_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -104,6 +105,7 @@ extern "C" const sfem::codegen::KernelDiagnostics * vector_mass_proteus_hex27_re
 
 extern "C" int vector_mass_hex27_hessian_bsr_i_msoa(
         const int scalar_bytes,
+        const int values_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -142,7 +144,7 @@ extern "C" int vector_mass_hex27_hessian_bsr_i_msoa(
         elements[14],
         elements[6]
     };
-    return vector_mass_proteus_hex27_hessian_bsr_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, density, rowptr, colidx, values);
+    return vector_mass_proteus_hex27_hessian_bsr_i_msoa(scalar_bytes, values_bytes, nelements, nnodes, proteus_elements, points, density, rowptr, colidx, values);
 }
 
 extern "C" int vector_mass_hex27_jacobian_action_i_maos(

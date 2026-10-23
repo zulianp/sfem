@@ -46,6 +46,7 @@ extern "C" int linear_elasticity_proteus_hex8_hessian_block_diag_sym_i_msoa(
 );
 extern "C" int linear_elasticity_proteus_hex8_hessian_bsr_i_msoa(
         const int scalar_bytes,
+        const int values_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -567,6 +568,7 @@ extern "C" int linear_elasticity_hex8_hessian_block_diag_sym_i_msoa(
 
 extern "C" int linear_elasticity_hex8_hessian_bsr_i_msoa(
         const int scalar_bytes,
+        const int values_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -587,7 +589,7 @@ extern "C" int linear_elasticity_hex8_hessian_bsr_i_msoa(
         elements[7],
         elements[6]
     };
-    return linear_elasticity_proteus_hex8_hessian_bsr_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, lmbda, mu, rowptr, colidx, values);
+    return linear_elasticity_proteus_hex8_hessian_bsr_i_msoa(scalar_bytes, values_bytes, nelements, nnodes, proteus_elements, points, lmbda, mu, rowptr, colidx, values);
 }
 
 extern "C" int linear_elasticity_hex8_objective_steps_i_msoa(

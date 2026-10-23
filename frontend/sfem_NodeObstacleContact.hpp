@@ -7,6 +7,8 @@
 #include "sfem_ContactStabilisedNewmarkScheme.hpp"
 #include "sfem_NodeObstacleView.hpp"
 #include "sfem_SDFObstacle.hpp"
+#include "sfem_Team.hpp"
+#include "sfem_sdf_sampling.hpp"
 #include "sfem_aliases.hpp"
 #include "smesh_grid.hpp"
 
@@ -29,12 +31,15 @@ namespace sfem {
     class NodeObstacleContact final : public ContactStabilisedNewmarkScheme::Contact {
     public:
         // `dir` is the axis whose frame a node outside the grid gets. `nodes` and `points` are on the
-        // host; with a device `es` the contact copies them.
+        // host; with a device `es` the contact copies them. Under MPI the vectors are ndofs long, of
+        // which the first owned_dofs are this rank's, `nodes` are among its owned ones, and every
+        // measure (kkt_residual, min_gap) is over all ranks.
         NodeObstacleContact(const std::shared_ptr<smesh::Grid<geom_t>> &sdf,
                             const std::shared_ptr<Communicator>        &comm,
                             const SharedBuffer<idx_t>                  &nodes,
                             const SharedBuffer<geom_t *>               &points,
                             const ptrdiff_t                             ndofs,
+                            const ptrdiff_t                             owned_dofs,
                             const int                                   dir,
                             const ExecutionSpace                        es = EXECUTION_SPACE_HOST);
 
@@ -48,11 +53,29 @@ namespace sfem {
         // Samples the gap, the normals and the frames with the nodes displaced by x.
         void update(const real_t *const x);
 
-        // v <- Q^T v at the contact nodes: into their frames.
-        void to_frame(real_t *const v) const;
+        // What the constraints see of the sampled gap g (every method, from the next update on):
+        // g - shift + (1 - release) * p0_i, and no obstacle past `cutoff`. `shift` keeps a
+        // clearance; p0_i = max(0, -(g - shift)) at the state of capture_penetration is how far
+        // that state is inside, of which a share 1 - release is still admitted: a start inside
+        // the obstacle is released from it as `release` goes from 0 to 1. Defaults: shift 0, no
+        // cutoff, nothing captured.
+        void set_shift(const real_t shift) { shift_ = shift; }
+        void set_cutoff(const real_t cutoff) { cutoff_ = cutoff; }
+        void capture_penetration(const real_t *const x);
+        void set_release(const real_t release) { release_ = release; }
 
-        // v <- Q v at the contact nodes: back from their frames.
-        void from_frame(real_t *const v) const;
+        // out <- s .* (Q^T in) at the contact nodes and s .* in elsewhere: into their frames, then
+        // scaled. Over all ndofs, s per dof or null for none, in may be out.
+        void to_frame(const real_t *const s, const real_t *const in, real_t *const out) const;
+
+        // out <- Q (s .* in) at the contact nodes and s .* in elsewhere: scaled, then back from
+        // their frames. One sweep each, where the scaling and the frames would take two.
+        void from_frame(const real_t *const s, const real_t *const in, real_t *const out) const;
+
+        // to_frame and from_frame over the nodes of the calling thread's share of the dofs, on the
+        // host, inside a region its caller opened (Team).
+        void to_frame(const Team &team, const real_t *const s, const real_t *const in, real_t *const out) const;
+        void from_frame(const Team &team, const real_t *const s, const real_t *const in, real_t *const out) const;
 
         // The step's upper bound in the frames: the gap on each contact node's normal component,
         // `unbounded` everywhere else.
@@ -89,9 +112,10 @@ namespace sfem {
                            const real_t *const  k,
                            const bool           capped,
                            const real_t         sign,
-                           const count_t *const rowptr,
-                           const idx_t *const   colidx,
-                           real_t *const        values);
+                           const count_t *const       rowptr,
+                           const idx_t *const         colidx,
+                           const smesh::PrimitiveType values_type,
+                           void *const                values);
 
         // -mu_i n_i at the contact nodes, with mu_i of the last kkt_residual, zero elsewhere: the
         // residual's part that is the obstacle's reaction.
@@ -115,6 +139,7 @@ namespace sfem {
         std::shared_ptr<SDFObstacle> obstacle_;
         SharedBuffer<idx_t>          nodes_;
         SharedBuffer<idx_t>          idx_;  // nodes_ in the execution space
+        SharedBuffer<idx_t>          frame_of_;  // per node of the vectors its contact node, -1 if none
         SharedBuffer<geom_t *>       points_;
         // The coordinates by axis in the execution space, as a host array of rows: a device
         // SharedBuffer<T *> keeps its row pointers on the device, where the host cannot read them.
@@ -122,7 +147,9 @@ namespace sfem {
         geom_t                           *xyz_[3];
         ExecutionSpace               es_;
         SharedBuffer<real_t>         complementarity_, penetration_;
+        std::shared_ptr<Communicator> comm_;
         ptrdiff_t                    ndofs_;
+        ptrdiff_t                    owned_dofs_;
         int                          dir_;
         // Rows of size() entries, stored flat for the same reason (rows()).
         SharedBuffer<real_t>         normals_;    // 3 rows
@@ -133,6 +160,13 @@ namespace sfem {
         SharedBuffer<real_t>         ahead_;
         SharedBuffer<real_t>         ahead_gap_;
         SharedBuffer<real_t>         ahead_normals_;  // 3 rows
+        SharedBuffer<real_t>         p0_;             // null until capture_penetration
+        real_t                       shift_{0};
+        real_t                       cutoff_{SFEM_SDF_UNREACHABLE};
+        real_t                       release_{1};
+
+        // The sampled gap and normals to what the constraints see.
+        void offset(const SharedBuffer<real_t> &gap, const SharedBuffer<real_t> &normals) const;
 
         // The contact nodes with these normals and gaps (the current or the ahead samples).
         NodeObstacleView view(const SharedBuffer<real_t> &normals, const SharedBuffer<real_t> &gap) const;

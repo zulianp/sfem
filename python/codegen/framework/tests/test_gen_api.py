@@ -2722,7 +2722,9 @@ int main() {
             self.assertIn("__global__ void neohookean_ogden_proteus_quad4_hessian_i_msoa_assemble_impl", source)
             self.assertIn("atomicAdd(&(block[bi * NC + bj])", source)
             self.assertIn('extern "C" int cu_neohookean_ogden_proteus_quad4_hessian_bsr_i_msoa(', source)
-            self.assertIn("hessian_i_msoa_assemble_impl<double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>", source)
+            self.assertIn("hessian_i_msoa_assemble_impl<double, double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>", source)
+            # A double state assembled into single-precision values, on the device too.
+            self.assertIn("hessian_i_msoa_assemble_impl<double, float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>", source)
             self.assertNotIn("#pragma omp", source)
             self.assertNotIn("SFEM_INLINE", source)
             # The scatters that still spell OpenMP pragmas stay off the device.
@@ -2746,7 +2748,7 @@ int main() {
             )
             self.assertIn("atomicAdd(&(block[sym++])", source)
             self.assertIn('extern "C" int cu_linear_elasticity_proteus_hex8_hessian_block_diag_sym_i_msoa(', source)
-            self.assertIn("hessian_i_msoa_assemble_impl<double, geom_t, 6><<<grid_size, block_size, 0, (cudaStream_t)stream>>>", source)
+            self.assertIn("hessian_i_msoa_assemble_impl<double, double, geom_t, 6><<<grid_size, block_size, 0, (cudaStream_t)stream>>>", source)
             self.assertNotIn("#pragma omp", source)
             self.assertNotIn("SFEM_INLINE", source)
 

@@ -20,8 +20,14 @@ namespace sfem {
     ///
     /// ```yaml
     /// execution_space: host                  # host | device
+    /// nccl: false                            # device runs under MPI: within a node, the exchange and
+    ///                                        # the QP's reductions by NCCL (its set-up costs ~3 s
+    ///                                        # once; pays from ~90,000 QP iterations on Alps)
     /// mesh:
     ///   path: mesh                           # or box: {n: [8, 8, 8], min: [0, 0, 0], max: [1, 1, 1]}
+    ///   blocks: [valve]                      # only these blocks of path, and only their nodes (default
+    ///                                        # all); the written mesh's node_mapping gives each node's
+    ///                                        # id in path
     ///   reorder: none                        # none | hilbert3 | morton3, before the sidesets are read
     ///   promote_to_p2: false                 # TET4 to TET10
     ///   refine: 0                            # semi-structured refinement level
@@ -54,7 +60,8 @@ namespace sfem {
     ///   displacement: {components: [u.0.raw, u.1.raw, u.2.raw]}   # or file: interleaved
     ///   velocity: {file: v.raw}              # dynamic, Newmark or BDF2
     ///   acceleration: {file: a.raw}          # dynamic, Newmark; otherwise it starts from a = 0
-    /// obstacle:                              # regime dynamic, scheme newmark; host or device
+    /// obstacle:                              # regime dynamic, scheme newmark (node_sdf also steady
+    ///                                        # and quasi_static); host or device
     ///   backend: node_sdf                    # nodes against the SDF's B-spline, MPRGP in frames;
     ///                                        # ssmgc: the shifted-penalty multigrid (refined mesh,
     ///                                        # micro basis, linear material; host or device)
@@ -63,12 +70,19 @@ namespace sfem {
     ///   gap: nodal                           # ssmgc: nodal (the SDF at each node) or dual_weighted
     ///                                        # (over each node's surface patch, dual basis)
     ///   curvature: true                      # ssmgc: mu_i C_i in the tangent (nodal gap; default
-    ///                                        # with it); node_sdf always adds it
+    ///                                        # with it); node_sdf adds it unless false
     ///   shape: {type: hemisphere, plane: 0, radius: 0.25, fillet: 0.125, grid_cells: 128}
     ///                                        # plane | slope (slope, slope_axis) | staircase
     ///                                        # (step_width, step_drop) | hemisphere (radius, center)
     ///   sdf: {file: obstacle}                # an SDF grid instead of a shape
+    ///   shift: 0                             # node_sdf: keep this clearance from the obstacle
+    ///   cutoff: 1e-4                         # node_sdf: no contact for a node farther than this
+    ///   release: {type: linear_ramp, start_time: 0, end_time: 1, start_value: 0, end_value: 1}
+    ///                                        # node_sdf: a start inside the obstacle is let out of it
+    ///                                        # as this profile goes from 0 to 1 (quasi_static)
     ///   qp: {max_it: 20000, rtol: 1e-10}
+    ///                                        # node_sdf: accept_capped: true takes a QP its max_it
+    ///                                        # stopped as the step
     ///   ssmgc: {penalty_param: 10, coarse_op_type: BSR}    # SSMGC's own keys, over the step's:
     ///                                        # atol gap/10, rtol newton.rtol, max_it 300, full precision,
     ///                                        # enable_nl_obstacle 0 (Newton re-linearises the obstacle)
@@ -80,7 +94,15 @@ namespace sfem {
     /// solver:
     ///   newton: {max_it: 30, atol: 1e-9, rtol: 1e-8, divergence_factor: 1e4, merit: auto,
     ///            line_search: {enabled: true, steps: [1, 0.5, 0.25], c1: 1e-4, batched: true}}
+    ///                                        # line_search.rule: armijo (merit decrease) or damped
+    ///                                        # (damping x the step, shortened only past an inverted
+    ///                                        # element: line_search.damping: 0.8)
+    ///                                        # fixed_iterations: true ends the step after max_it
+    ///                                        # iterations, its state accepted unconverged
     ///   linear: {type: cg, format: BSR, preconditioner: jacobi, rtol: 1e-3, atol: 1e-14, max_it: 2000}
+    ///                                        # storage_bytes: 4 stores the BSR tangent in single
+    ///                                        # precision, node_sdf's too (8 by default; 2, half,
+    ///                                        # for an unconstrained step on the host)
     /// output:
     ///   path: output
     ///   export_freq: 1

@@ -16,7 +16,9 @@ namespace sfem {
         /// trailing ".*" hands the whole subtree to the reader that owns it.
         const char *const SCHEMA[] = {
                 "execution_space",
+                "nccl",
                 "mesh.path",
+                "mesh.blocks",
                 "mesh.box.n",
                 "mesh.box.min",
                 "mesh.box.max",
@@ -76,8 +78,12 @@ namespace sfem {
                 "obstacle.shape.center",
                 "obstacle.shape.fillet",
                 "obstacle.shape.grid_cells",
+                "obstacle.shift",
+                "obstacle.cutoff",
+                "obstacle.release.*",
                 "obstacle.qp.max_it",
                 "obstacle.qp.rtol",
+                "obstacle.qp.accept_capped",
                 "obstacle.ssmgc.*",
                 "regime",
                 "time.dt",
@@ -90,6 +96,7 @@ namespace sfem {
                 "dynamics.beta",
                 "dynamics.gamma",
                 "solver.newton.max_it",
+                "solver.newton.fixed_iterations",
                 "solver.newton.atol",
                 "solver.newton.rtol",
                 "solver.newton.divergence_factor",
@@ -99,6 +106,8 @@ namespace sfem {
                 "solver.newton.line_search.steps",
                 "solver.newton.line_search.c1",
                 "solver.newton.line_search.batched",
+                "solver.newton.line_search.rule",
+                "solver.newton.line_search.damping",
                 "solver.linear.type",
                 "solver.linear.format",
                 "solver.linear.preconditioner",
@@ -203,8 +212,10 @@ namespace sfem {
             parsed_values.push_back(ryml::parse_in_arena(ryml::to_csubstr(value)));
             ryml::Tree &parsed = parsed_values.back();
 
+            const auto    keys = split(path, '.');
             ryml::id_type node = tree.root_id();
-            for (const auto &key : split(path, '.')) {
+            for (size_t k = 0; k < keys.size(); ++k) {
+                const auto &key = keys[k];
                 if (tree.is_seq(node)) {
                     if (!is_index(key) || std::stoul(key) >= (size_t)tree.num_children(node)) {
                         fprintf(stderr, "ElasticityCase: override \"%s\": no item %s\n", path.c_str(), key.c_str());
@@ -214,16 +225,25 @@ namespace sfem {
                     continue;
                 }
 
-                if (!tree.is_map(node)) {
-                    if (tree.has_children(node)) tree.remove_children(node);
-                    tree.set_map(node);
-                }
-
+                // A key the path goes on through holds a mapping: a missing one is added as one, a
+                // value is replaced by one (a node made a map in place would still be a value).
+                const bool    leaf  = k + 1 == keys.size();
                 ryml::id_type child = tree.find_child(node, ryml::to_csubstr(key));
+                if (child != ryml::NONE && !leaf && !tree.is_container(child)) {
+                    const ryml::id_type before = tree.prev_sibling(child);
+                    tree.remove(child);
+                    child = tree.insert_child(node, before);
+                    tree.set_key(child, tree.to_arena(ryml::to_csubstr(key)));
+                    tree.set_map(child);
+                }
                 if (child == ryml::NONE) {
                     child = tree.append_child(node);
                     tree.set_key(child, tree.to_arena(ryml::to_csubstr(key)));
-                    tree.set_val(child, "");
+                    if (leaf) {
+                        tree.set_val(child, "");
+                    } else {
+                        tree.set_map(child);
+                    }
                 }
                 node = child;
             }

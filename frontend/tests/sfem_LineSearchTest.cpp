@@ -107,6 +107,25 @@ int test_best_decrease() {
     return SFEM_TEST_SUCCESS;
 }
 
+// The damped rule takes damping times the step whatever the merit does (a = 0.05: the merit rises
+// from 0.0025 to 0.5625 at s = 0.8), and shortens it only past a state it cannot evaluate.
+int test_damped_ignores_the_merit() {
+    Parabola                m(0.05, false);
+    sfem::LineSearchOptions options;
+    options.rule    = sfem::LineSearchOptions::Rule::DAMPED;
+    options.damping = real_t(0.8);
+    auto r          = search(m, options);
+    SFEM_TEST_ASSERT(r.status == sfem::LineSearchResult::ACCEPTED && r.alpha == real_t(0.8) && r.evaluations == 1);
+
+    m.unevaluable = {real_t(0.8)};
+    r             = search(m, options);
+    SFEM_TEST_ASSERT(r.status == sfem::LineSearchResult::ACCEPTED && r.alpha == real_t(0.4));
+
+    for (real_t s : sfem::LineSearchOptions().steps) m.unevaluable.insert(real_t(0.8) * s);
+    SFEM_TEST_ASSERT(search(m, options).status == sfem::LineSearchResult::NON_FINITE);
+    return SFEM_TEST_SUCCESS;
+}
+
 int test_disabled_takes_the_full_step() {
     Parabola                m(0.3, true);
     sfem::LineSearchOptions options;
@@ -122,6 +141,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_first_armijo_step);
     SFEM_RUN_TEST(test_batching_can_be_switched_off);
     SFEM_RUN_TEST(test_non_finite_trials_are_skipped);
+    SFEM_RUN_TEST(test_damped_ignores_the_merit);
     SFEM_RUN_TEST(test_ascent_direction_fails);
     SFEM_RUN_TEST(test_at_resolution);
     SFEM_RUN_TEST(test_best_decrease);

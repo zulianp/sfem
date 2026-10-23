@@ -23,6 +23,9 @@ namespace sfem {
             CONVERGED_AT_RESOLUTION,
             /// The iteration cap, not a tolerance, stopped it.
             MAX_IT,
+            /// A fixed-iteration scheme (NewtonOptions::fixed_iterations) ran its iterations: its
+            /// state is accepted, converged or not.
+            ITERATIONS_DONE,
             /// The measure grew past divergence_factor times its first value.
             DIVERGED,
             NON_FINITE,
@@ -41,6 +44,8 @@ namespace sfem {
         real_t min_alpha{1};
 
         bool converged() const { return status == CONVERGED || status == CONVERGED_AT_RESOLUTION; }
+        /// The step's state stands: converged, or the end of a fixed-iteration scheme.
+        bool accepted() const { return converged() || status == ITERATIONS_DONE; }
     };
 
     const char *to_string(const NonlinearReport::Status status);

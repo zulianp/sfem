@@ -90,6 +90,45 @@ int test_device_matches_host() {
 }
 #endif
 
+// The drop with the tangent stored in single precision (solver.linear.storage_bytes 4): the
+// material's, the inertia's and the obstacle curvature's shares assembled into floats, on the host
+// and the device. The Newton residual stays in double, so every step converges as in double, and
+// the contact is the same to float's rounding.
+int test_single_precision_tangent() {
+#if SFEM_REAL_T_IS_FLOAT32
+    return SFEM_TEST_SUCCESS;
+#else
+    struct Run {
+        const char *space;
+        int         bytes;
+    };
+    std::vector<Run> runs = {{"host", 8}, {"host", 4}};
+#ifdef SFEM_ENABLE_CUDA
+    runs.push_back({"device", 4});
+#endif
+    std::vector<double> first(runs.size(), -1), impulse(runs.size(), 0);
+    for (size_t k = 0; k < runs.size(); ++k) {
+        const std::string csv = std::string("test_single_precision_tangent_") + runs[k].space + std::to_string(runs[k].bytes) + ".csv";
+        auto pg = assemble(DROP, {"output.history_csv=" + csv, std::string("execution_space=") + runs[k].space,
+                                  "solver.linear.storage_bytes=" + std::to_string(runs[k].bytes)});
+        SFEM_TEST_ASSERT(pg != nullptr);
+        SFEM_TEST_ASSERT(pg->run() == SFEM_SUCCESS);
+        for (auto &row : sfem::test::read_history(csv)) {
+            if (row["status"] < 0) continue;
+            if (row["touched"] > 0 && first[k] < 0) first[k] = row["t"];
+            impulse[k] += row["reaction_z"] * row["dt"];
+        }
+        std::remove(csv.c_str());
+        printf("  %s, %d bytes: contact at %g, impulse %.12g\n", runs[k].space, runs[k].bytes, first[k], impulse[k]);
+    }
+    for (size_t k = 1; k < runs.size(); ++k) {
+        SFEM_TEST_ASSERT(first[k] == first[0]);
+        SFEM_TEST_ASSERT(std::abs(impulse[k] - impulse[0]) <= 1e-6 * std::abs(impulse[0]));
+    }
+    return SFEM_TEST_SUCCESS;
+#endif
+}
+
 // The ssmgc back-end on the same drop, linear and refined: in flight (t < 0.1) the body falls as it
 // does with node_sdf, the two obstacle steps solving the same unconstrained problem.
 int test_ssmgc_free_flight_matches_node_sdf() {
@@ -160,17 +199,104 @@ int test_ssmgc_refusals() {
     return SFEM_TEST_SUCCESS;
 }
 
-// The obstacle stabilises Newmark: a regime without it, or another scheme, is refused.
+// A block clamped at its top whose base starts 0.1 inside a plane: the release lets it out in four
+// quasi-static steps, each a converged equilibrium; at the end the base rests on the plane.
+int test_release_from_penetration() {
+    const char *const yaml = R"(
+mesh:
+  box: {n: [4, 4, 4]}
+  sidesets: [{name: top, plane: {axis: z, at: max}}]
+material: {type: GeneratedNeoHookeanOgden, mu: 1, lmbda: 2}
+dirichlet_conditions:
+  - {type: sideset, format: name, name: top, component: [0, 1, 2], value: [0, 0, 0]}
+obstacle:
+  backend: node_sdf
+  direction: z
+  shape: {type: plane, plane: 0.1}
+  release: {type: linear_ramp, start_time: 0, end_time: 1, start_value: 0, end_value: 1}
+regime: quasi_static
+time: {dt: 0.25, t_end: 1, max_cutbacks: 4}
+solver: {newton: {verbose: false}}
+)";
+    auto pg = assemble(yaml, {});
+    SFEM_TEST_ASSERT(pg != nullptr);
+    SFEM_TEST_ASSERT(pg->run() == SFEM_SUCCESS);
+
+    auto       mesh   = pg->function()->space()->mesh_ptr();
+    const auto z      = mesh->points()->data()[2];
+    const auto u      = pg->solution()->data();
+    real_t     lowest = 1;
+    for (ptrdiff_t i = 0; i < mesh->n_nodes(); ++i) lowest = std::min(lowest, z[i] + u[i * 3 + 2]);
+    printf("  lowest point %.12g (plane 0.1)\n", (double)lowest);
+    SFEM_TEST_ASSERT(std::abs(lowest - real_t(0.1)) < 1e-8);
+    return SFEM_TEST_SUCCESS;
+}
+
+// Utopia's scheme: the box 10% inside the plane, pushed out at once by four Newton steps damped by
+// 0.8, the obstacle's curvature left out. The four steps end the solve: the plane's gap is linear,
+// so each step's QP puts the box on it and 0.2^4 of the penetration is left. Without
+// fixed_iterations the same four steps are a failed solve. A QP its max_it stops is the step: no
+// retry, so the QP's iterations stay within its cap.
+int test_utopia_scheme() {
+    const char *const yaml = R"(
+mesh:
+  box: {n: [4, 4, 4]}
+  sidesets: [{name: top, plane: {axis: z, at: max}}]
+material: {type: GeneratedNeoHookeanOgden, mu: 1, lmbda: 2}
+dirichlet_conditions:
+  - {type: sideset, format: name, name: top, component: [0, 1, 2], value: [0, 0, 0]}
+obstacle:
+  backend: node_sdf
+  direction: z
+  shape: {type: plane, plane: 0.1}
+  curvature: false
+regime: steady
+solver: {newton: {max_it: 4, fixed_iterations: true, verbose: false, line_search: {rule: damped, damping: 0.8}}}
+)";
+    SFEM_TEST_ASSERT(assemble(yaml, {"solver.newton.fixed_iterations=false"})->run() != SFEM_SUCCESS);
+
+    auto pg = assemble(yaml, {});
+    SFEM_TEST_ASSERT(pg != nullptr);
+    SFEM_TEST_ASSERT(pg->run() == SFEM_SUCCESS);
+    auto       mesh   = pg->function()->space()->mesh_ptr();
+    const auto z      = mesh->points()->data()[2];
+    const auto u      = pg->solution()->data();
+    real_t     lowest = 1;
+    for (ptrdiff_t i = 0; i < mesh->n_nodes(); ++i) lowest = std::min(lowest, z[i] + u[i * 3 + 2]);
+    printf("  lowest point after four damped steps %.12g (expected %.12g)\n", (double)lowest, 0.1 - 0.1 * 0.0016);
+    SFEM_TEST_ASSERT(std::abs(lowest - real_t(0.1 - 0.1 * 0.0016)) < 1e-8);
+
+    const std::string history = "sfem_utopia_scheme_history.csv";
+    auto capped = assemble(yaml, {"obstacle.qp={max_it: 2, accept_capped: true}", "output.history_csv=" + history});
+    SFEM_TEST_ASSERT(capped != nullptr);
+    SFEM_TEST_ASSERT(capped->run() == SFEM_SUCCESS);
+    int linear = 0;
+    for (auto &row : sfem::test::read_history(history)) {
+        if (row["status"] >= 0) linear += (int)row["linear"];
+    }
+    printf("  QP iterations with max_it 2: %d over four steps\n", linear);
+    SFEM_TEST_ASSERT(linear > 0 && linear <= 4 * 2);
+    std::remove(history.c_str());
+    return SFEM_TEST_SUCCESS;
+}
+
+// Under inertia the obstacle stabilises Newmark: another scheme is refused. Without inertia
+// node_sdf solves steady and quasi-static contact; ssmgc does not.
 int test_obstacle_needs_newmark() {
     SFEM_TEST_ASSERT(assemble(DROP, {"dynamics.scheme=bdf2"}) == nullptr);
-    SFEM_TEST_ASSERT(assemble(DROP, {"regime=quasi_static"}) == nullptr);
+    SFEM_TEST_ASSERT(assemble(DROP, {"regime=quasi_static"}) != nullptr);
+    SFEM_TEST_ASSERT(assemble(DROP, {"regime=quasi_static", "obstacle.backend=ssmgc", "mesh.refine=2",
+                                     "material={type: GeneratedLinearElasticity}"}) == nullptr);
     return SFEM_TEST_SUCCESS;
 }
 
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_block_lands_on_the_hemisphere);
+    SFEM_RUN_TEST(test_single_precision_tangent);
     SFEM_RUN_TEST(test_obstacle_needs_newmark);
+    SFEM_RUN_TEST(test_release_from_penetration);
+    SFEM_RUN_TEST(test_utopia_scheme);
     SFEM_RUN_TEST(test_ssmgc_free_flight_matches_node_sdf);
     SFEM_RUN_TEST(test_ssmgc_refusals);
 #ifdef SFEM_ENABLE_CUDA

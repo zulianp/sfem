@@ -794,12 +794,14 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_total_tet4_residual_a_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
+        if (nelements <= 0) return SFEM_SUCCESS;
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::mooney_rivlin_kelvin_voigt_total_tet4_residual_a_msoa_impl<double, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, (const double *)u0, (const double *)u1, (const double *)u2, previous_stride, (const double *)u0_old, (const double *)u1_old, (const double *)u2_old, out_stride, (double *)u0_out, (double *)u1_out, (double *)u2_out);
         return sfem::codegen::launch_status("mooney_rivlin_kelvin_voigt_total_tet4_residual_a_msoa_impl");
     }
     case (int)sizeof(float): {
+        if (nelements <= 0) return SFEM_SUCCESS;
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::mooney_rivlin_kelvin_voigt_total_tet4_residual_a_msoa_impl<float, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, (const float *)u0, (const float *)u1, (const float *)u2, previous_stride, (const float *)u0_old, (const float *)u1_old, (const float *)u2_old, out_stride, (float *)u0_out, (float *)u1_out, (float *)u2_out);
@@ -985,12 +987,14 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_total_tet4_jacobian_action_a_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
+        if (nelements <= 0) return SFEM_SUCCESS;
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::mooney_rivlin_kelvin_voigt_total_tet4_jacobian_action_a_msoa_impl<double, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, (const double *)u0, (const double *)u1, (const double *)u2, previous_stride, (const double *)u0_old, (const double *)u1_old, (const double *)u2_old, direction_stride, (const double *)u0_direction, (const double *)u1_direction, (const double *)u2_direction, out_stride, (double *)u0_out, (double *)u1_out, (double *)u2_out);
         return sfem::codegen::launch_status("mooney_rivlin_kelvin_voigt_total_tet4_jacobian_action_a_msoa_impl");
     }
     case (int)sizeof(float): {
+        if (nelements <= 0) return SFEM_SUCCESS;
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::mooney_rivlin_kelvin_voigt_total_tet4_jacobian_action_a_msoa_impl<float, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, (const float *)u0, (const float *)u1, (const float *)u2, previous_stride, (const float *)u0_old, (const float *)u1_old, (const float *)u2_old, direction_stride, (const float *)u0_direction, (const float *)u1_direction, (const float *)u2_direction, out_stride, (float *)u0_out, (float *)u1_out, (float *)u2_out);
@@ -1022,13 +1026,13 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_tet4_h
   }
 }
 
-template <typename s_t>
+template <typename s_t, typename v_t>
 __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_tet4_hessian_crs_a_msoa_scatter_crs(
     const idx_t *const RSTR ev,
     const s_t *const RSTR element_matrix,
     const count_t *const RSTR rowptr,
     const idx_t *const RSTR colidx,
-    s_t *const RSTR values) {
+    v_t *const RSTR values) {
   static constexpr int NS = 4;
   static constexpr int NC = 3;
   static constexpr int N_COL_STREAMS = 12;
@@ -1048,15 +1052,15 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_tet4_h
       const s_t *const RSTR row = &element_matrix[(bi * NS + row_shape) * N_COL_STREAMS];
       for (int bj = 0; bj < NC; ++bj) {
         for (int col_shape = 0; col_shape < NS; ++col_shape) {
-          s_t *const block = &values[entries[row_shape * NS + col_shape] * NC * NC];
-          atomicAdd(&(block[bi * NC + bj]), row[bj * NS + col_shape]);
+          v_t *const block = &values[entries[row_shape * NS + col_shape] * NC * NC];
+          atomicAdd(&(block[bi * NC + bj]), v_t(row[bj * NS + col_shape]));
         }
       }
     }
   }
 }
 
-template <typename s_t>
+template <typename s_t, typename v_t>
 __global__ void mooney_rivlin_kelvin_voigt_total_tet4_hessian_crs_a_msoa_impl(
     const ptrdiff_t nelements,
     const ptrdiff_t,
@@ -1086,7 +1090,7 @@ __global__ void mooney_rivlin_kelvin_voigt_total_tet4_hessian_crs_a_msoa_impl(
     const s_t *const RSTR u2_old,
     const count_t *const RSTR rowptr,
     const idx_t *const RSTR colidx,
-    s_t *const RSTR values
+    v_t *const RSTR values
 ) {
   static constexpr int ND = 3;
   static constexpr int NQ = 1;
@@ -1138,6 +1142,7 @@ __global__ void mooney_rivlin_kelvin_voigt_total_tet4_hessian_crs_a_msoa_impl(
 
 extern "C" int cu_mooney_rivlin_kelvin_voigt_total_tet4_hessian_bsr_a_msoa(
     const int scalar_bytes,
+    const int values_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -1171,19 +1176,42 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_total_tet4_hessian_bsr_a_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-      const int block_size = 256;
-      const int grid_size = (int)((nelements + block_size - 1) / block_size);
-      sfem::codegen::mooney_rivlin_kelvin_voigt_total_tet4_hessian_crs_a_msoa_impl<double><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, (const double *)u0, (const double *)u1, (const double *)u2, previous_stride, (const double *)u0_old, (const double *)u1_old, (const double *)u2_old, rowptr, colidx, (double *)values);
-      return sfem::codegen::launch_status("mooney_rivlin_kelvin_voigt_total_tet4_hessian_crs_a_msoa_impl");
+      switch (values_bytes) {
+        case (int)sizeof(double): {
+          if (nelements <= 0) return SFEM_SUCCESS;
+          const int block_size = 256;
+          const int grid_size = (int)((nelements + block_size - 1) / block_size);
+          sfem::codegen::mooney_rivlin_kelvin_voigt_total_tet4_hessian_crs_a_msoa_impl<double, double><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, (const double *)u0, (const double *)u1, (const double *)u2, previous_stride, (const double *)u0_old, (const double *)u1_old, (const double *)u2_old, rowptr, colidx, (double *)values);
+          return sfem::codegen::launch_status("mooney_rivlin_kelvin_voigt_total_tet4_hessian_crs_a_msoa_impl");
+        }
+        case (int)sizeof(float): {
+          if (nelements <= 0) return SFEM_SUCCESS;
+          const int block_size = 256;
+          const int grid_size = (int)((nelements + block_size - 1) / block_size);
+          sfem::codegen::mooney_rivlin_kelvin_voigt_total_tet4_hessian_crs_a_msoa_impl<double, float><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, (const double *)u0, (const double *)u1, (const double *)u2, previous_stride, (const double *)u0_old, (const double *)u1_old, (const double *)u2_old, rowptr, colidx, (float *)values);
+          return sfem::codegen::launch_status("mooney_rivlin_kelvin_voigt_total_tet4_hessian_crs_a_msoa_impl");
+        }
+        default:
+          break;
+      }
+      break;
     }
     case (int)sizeof(float): {
-      const int block_size = 256;
-      const int grid_size = (int)((nelements + block_size - 1) / block_size);
-      sfem::codegen::mooney_rivlin_kelvin_voigt_total_tet4_hessian_crs_a_msoa_impl<float><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, (const float *)u0, (const float *)u1, (const float *)u2, previous_stride, (const float *)u0_old, (const float *)u1_old, (const float *)u2_old, rowptr, colidx, (float *)values);
-      return sfem::codegen::launch_status("mooney_rivlin_kelvin_voigt_total_tet4_hessian_crs_a_msoa_impl");
+      switch (values_bytes) {
+        case (int)sizeof(float): {
+          if (nelements <= 0) return SFEM_SUCCESS;
+          const int block_size = 256;
+          const int grid_size = (int)((nelements + block_size - 1) / block_size);
+          sfem::codegen::mooney_rivlin_kelvin_voigt_total_tet4_hessian_crs_a_msoa_impl<float, float><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, (const float *)u0, (const float *)u1, (const float *)u2, previous_stride, (const float *)u0_old, (const float *)u1_old, (const float *)u2_old, rowptr, colidx, (float *)values);
+          return sfem::codegen::launch_status("mooney_rivlin_kelvin_voigt_total_tet4_hessian_crs_a_msoa_impl");
+        }
+        default:
+          break;
+      }
+      break;
     }
     default:
       break;
   }
-  return sfem::codegen::unsupported_dispatch("mooney_rivlin_kelvin_voigt_total_tet4_hessian_bsr_a_msoa", -1, (int)scalar_bytes);
+  return sfem::codegen::unsupported_values_dispatch("mooney_rivlin_kelvin_voigt_total_tet4_hessian_bsr_a_msoa", (int)scalar_bytes, (int)values_bytes);
 }

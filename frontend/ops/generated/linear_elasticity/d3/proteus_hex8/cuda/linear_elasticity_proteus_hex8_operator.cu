@@ -237,12 +237,14 @@ extern "C" int cu_linear_elasticity_proteus_hex8_objective_steps_a_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
+        if (nelements <= 0) return SFEM_SUCCESS;
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::linear_elasticity_proteus_hex8_objective_steps_a_msoa_impl<double, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
         return sfem::codegen::launch_status("linear_elasticity_proteus_hex8_objective_steps_a_msoa_impl");
     }
     case (int)sizeof(float): {
+        if (nelements <= 0) return SFEM_SUCCESS;
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::linear_elasticity_proteus_hex8_objective_steps_a_msoa_impl<float, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
@@ -397,12 +399,14 @@ extern "C" int cu_linear_elasticity_proteus_hex8_objective_steps_i_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
+        if (nelements <= 0) return SFEM_SUCCESS;
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::linear_elasticity_proteus_hex8_objective_steps_i_msoa_impl<double, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
         return sfem::codegen::launch_status("linear_elasticity_proteus_hex8_objective_steps_i_msoa_impl");
     }
     case (int)sizeof(float): {
+        if (nelements <= 0) return SFEM_SUCCESS;
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::linear_elasticity_proteus_hex8_objective_steps_i_msoa_impl<float, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
@@ -620,12 +624,14 @@ extern "C" int cu_linear_elasticity_proteus_hex8_gradient_a_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
+        if (nelements <= 0) return SFEM_SUCCESS;
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::linear_elasticity_proteus_hex8_gradient_a_msoa_impl<double, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
         return sfem::codegen::launch_status("linear_elasticity_proteus_hex8_gradient_a_msoa_impl");
     }
     case (int)sizeof(float): {
+        if (nelements <= 0) return SFEM_SUCCESS;
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::linear_elasticity_proteus_hex8_gradient_a_msoa_impl<float, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
@@ -780,12 +786,14 @@ extern "C" int cu_linear_elasticity_proteus_hex8_gradient_i_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
+        if (nelements <= 0) return SFEM_SUCCESS;
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::linear_elasticity_proteus_hex8_gradient_i_msoa_impl<double, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
         return sfem::codegen::launch_status("linear_elasticity_proteus_hex8_gradient_i_msoa_impl");
     }
     case (int)sizeof(float): {
+        if (nelements <= 0) return SFEM_SUCCESS;
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::linear_elasticity_proteus_hex8_gradient_i_msoa_impl<float, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
@@ -1003,12 +1011,14 @@ extern "C" int cu_linear_elasticity_proteus_hex8_apply_a_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
+        if (nelements <= 0) return SFEM_SUCCESS;
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::linear_elasticity_proteus_hex8_apply_a_msoa_impl<double, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
         return sfem::codegen::launch_status("linear_elasticity_proteus_hex8_apply_a_msoa_impl");
     }
     case (int)sizeof(float): {
+        if (nelements <= 0) return SFEM_SUCCESS;
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::linear_elasticity_proteus_hex8_apply_a_msoa_impl<float, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
@@ -1163,12 +1173,14 @@ extern "C" int cu_linear_elasticity_proteus_hex8_apply_i_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
+        if (nelements <= 0) return SFEM_SUCCESS;
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::linear_elasticity_proteus_hex8_apply_i_msoa_impl<double, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
         return sfem::codegen::launch_status("linear_elasticity_proteus_hex8_apply_i_msoa_impl");
     }
     case (int)sizeof(float): {
+        if (nelements <= 0) return SFEM_SUCCESS;
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::linear_elasticity_proteus_hex8_apply_i_msoa_impl<float, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
@@ -1201,13 +1213,13 @@ __host__ __device__ __forceinline__ void linear_elasticity_proteus_hex8_hessian_
   }
 }
 
-template <typename s_t>
+template <typename s_t, typename v_t>
 __host__ __device__ __forceinline__ void linear_elasticity_proteus_hex8_hessian_i_msoa_scatter_bsr(
     const idx_t *const RSTR ev,
     const s_t *const RSTR element_matrix,
     const count_t *const RSTR rowptr,
     const idx_t *const RSTR colidx,
-    s_t *const RSTR values) {
+    v_t *const RSTR values) {
   static constexpr int NC = 3;
   static constexpr int NS = 8;
   count_t entries[NS * NS];
@@ -1224,12 +1236,12 @@ __host__ __device__ __forceinline__ void linear_elasticity_proteus_hex8_hessian_
   }
   for (int i = 0; i < NS; ++i) {
     for (int j = 0; j < NS; ++j) {
-      s_t *const block = &values[entries[i * NS + j] * NC * NC];
+      v_t *const block = &values[entries[i * NS + j] * NC * NC];
       for (int bi = 0; bi < NC; ++bi) {
         const int row = bi * NS + i;
         for (int bj = 0; bj < NC; ++bj) {
           const int col = bj * NS + j;
-          atomicAdd(&(block[bi * NC + bj]), element_matrix[row * (NC * NS) + col]);
+          atomicAdd(&(block[bi * NC + bj]), v_t(element_matrix[row * (NC * NS) + col]));
         }
       }
     }
@@ -1258,7 +1270,7 @@ __host__ __device__ __forceinline__ void linear_elasticity_proteus_hex8_hessian_
   }
 }
 
-template <typename s_t, typename g_t, int FORMAT>
+template <typename s_t, typename v_t, typename g_t, int FORMAT>
 __global__ void linear_elasticity_proteus_hex8_hessian_i_msoa_assemble_impl(
     const ptrdiff_t nelements,
     const ptrdiff_t,
@@ -1268,7 +1280,7 @@ __global__ void linear_elasticity_proteus_hex8_hessian_i_msoa_assemble_impl(
     const s_t mu,
     const count_t *const RSTR rowptr,
     const idx_t *const RSTR colidx,
-    s_t *const RSTR values,
+    v_t *const RSTR values,
     const int *const RSTR,
     const ptrdiff_t,
     const ptrdiff_t,
@@ -1342,6 +1354,7 @@ __global__ void linear_elasticity_proteus_hex8_hessian_i_msoa_assemble_impl(
 
 extern "C" int cu_linear_elasticity_proteus_hex8_hessian_bsr_i_msoa(
         const int scalar_bytes,
+        const int values_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -1355,21 +1368,44 @@ extern "C" int cu_linear_elasticity_proteus_hex8_hessian_bsr_i_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        const int block_size = 256;
-        const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::linear_elasticity_proteus_hex8_hessian_i_msoa_assemble_impl<double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, (double *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
-        return sfem::codegen::launch_status("linear_elasticity_proteus_hex8_hessian_i_msoa_assemble_impl");
+      switch (values_bytes) {
+        case (int)sizeof(double): {
+            if (nelements <= 0) return SFEM_SUCCESS;
+            const int block_size = 256;
+            const int grid_size = (int)((nelements + block_size - 1) / block_size);
+            sfem::codegen::linear_elasticity_proteus_hex8_hessian_i_msoa_assemble_impl<double, double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, (double *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+            return sfem::codegen::launch_status("linear_elasticity_proteus_hex8_hessian_i_msoa_assemble_impl");
+        }
+        case (int)sizeof(float): {
+            if (nelements <= 0) return SFEM_SUCCESS;
+            const int block_size = 256;
+            const int grid_size = (int)((nelements + block_size - 1) / block_size);
+            sfem::codegen::linear_elasticity_proteus_hex8_hessian_i_msoa_assemble_impl<double, float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+            return sfem::codegen::launch_status("linear_elasticity_proteus_hex8_hessian_i_msoa_assemble_impl");
+        }
+        default:
+          break;
+      }
+      break;
     }
     case (int)sizeof(float): {
-        const int block_size = 256;
-        const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::linear_elasticity_proteus_hex8_hessian_i_msoa_assemble_impl<float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
-        return sfem::codegen::launch_status("linear_elasticity_proteus_hex8_hessian_i_msoa_assemble_impl");
+      switch (values_bytes) {
+        case (int)sizeof(float): {
+            if (nelements <= 0) return SFEM_SUCCESS;
+            const int block_size = 256;
+            const int grid_size = (int)((nelements + block_size - 1) / block_size);
+            sfem::codegen::linear_elasticity_proteus_hex8_hessian_i_msoa_assemble_impl<float, float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+            return sfem::codegen::launch_status("linear_elasticity_proteus_hex8_hessian_i_msoa_assemble_impl");
+        }
+        default:
+          break;
+      }
+      break;
     }
     default:
       break;
   }
-  return sfem::codegen::unsupported_dispatch("linear_elasticity_proteus_hex8_hessian_bsr_i_msoa", -1, (int)scalar_bytes);
+  return sfem::codegen::unsupported_values_dispatch("linear_elasticity_proteus_hex8_hessian_bsr_i_msoa", (int)scalar_bytes, (int)values_bytes);
 }
 
 extern "C" int cu_linear_elasticity_proteus_hex8_hessian_block_diag_sym_i_msoa(
@@ -1385,15 +1421,17 @@ extern "C" int cu_linear_elasticity_proteus_hex8_hessian_block_diag_sym_i_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
+        if (nelements <= 0) return SFEM_SUCCESS;
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::linear_elasticity_proteus_hex8_hessian_i_msoa_assemble_impl<double, geom_t, 6><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, nullptr, nullptr, (double *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+        sfem::codegen::linear_elasticity_proteus_hex8_hessian_i_msoa_assemble_impl<double, double, geom_t, 6><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, nullptr, nullptr, (double *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
         return sfem::codegen::launch_status("linear_elasticity_proteus_hex8_hessian_i_msoa_assemble_impl");
     }
     case (int)sizeof(float): {
+        if (nelements <= 0) return SFEM_SUCCESS;
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::linear_elasticity_proteus_hex8_hessian_i_msoa_assemble_impl<float, geom_t, 6><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, nullptr, nullptr, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+        sfem::codegen::linear_elasticity_proteus_hex8_hessian_i_msoa_assemble_impl<float, float, geom_t, 6><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, nullptr, nullptr, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
         return sfem::codegen::launch_status("linear_elasticity_proteus_hex8_hessian_i_msoa_assemble_impl");
     }
     default:

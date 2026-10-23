@@ -1,7 +1,9 @@
 #include "sfem_Observers.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <limits>
+#include <unordered_map>
 
 #include "sfem_API.hpp"
 #include "sfem_Function.hpp"
@@ -35,10 +37,32 @@ namespace sfem {
         std::shared_ptr<Function> f;
         smesh::Path               path;
         int                       export_freq{1};
-        std::shared_ptr<Output>   output;
+        std::shared_ptr<Output>   output;  // null on the ranks that do not write
         std::vector<Field>        fields;
         SharedBuffer<real_t>      scratch, rate;
         size_t                    index{0};
+
+        // gather_to: the serial mesh (rank 0), each rank's owned values per gathered node, and
+        // where each gathered node goes in the serial numbering (rank 0).
+        bool                          gathered{false};
+        std::shared_ptr<Mesh>         serial_mesh;
+        std::shared_ptr<Communicator> comm;
+        std::vector<int>              counts, displs;  // values, block_size per node
+        std::vector<ptrdiff_t>        place;
+        std::vector<real_t>           all, serial;
+
+        /// `values` (n_dofs, on the host) written as `name`, by this rank or gathered to rank 0.
+        int emit(const char *const name, const real_t *const values) {
+            if (!gathered) return output->write_step(name, index, values);
+
+            const int bs = f->space()->block_size();
+            comm->allgatherv(values, (int)f->space()->n_owned_dofs(), all.data(), counts.data(), displs.data());
+            if (!output) return SFEM_SUCCESS;
+            for (size_t k = 0; k < place.size(); ++k) {
+                for (int d = 0; d < bs; ++d) serial[place[k] * bs + d] = all[k * bs + d];
+            }
+            return output->write_step(name, index, serial.data());
+        }
 
         int write(const StepRecord &record) {
             SFEM_TRACE_SCOPE("FieldExport::write");
@@ -46,25 +70,22 @@ namespace sfem {
             const ExecutionSpace es    = f->execution_space();
             const ptrdiff_t      ndofs = f->space()->n_dofs();
 
-            if (output->write_step("disp", index, on_host(es, record.x, ndofs)->data()) != SFEM_SUCCESS) return SFEM_FAILURE;
+            if (emit("disp", on_host(es, record.x, ndofs)->data()) != SFEM_SUCCESS) return SFEM_FAILURE;
 
             if (record.scheme) {
                 const bool with_acceleration = record.scheme->has_acceleration();
                 record.scheme->carried_state(scratch->data(), with_acceleration ? rate->data() : nullptr);
-                if (output->write_step("velocity", index, on_host(es, scratch->data(), ndofs)->data()) != SFEM_SUCCESS)
-                    return SFEM_FAILURE;
-                if (with_acceleration &&
-                    output->write_step("acceleration", index, on_host(es, rate->data(), ndofs)->data()) != SFEM_SUCCESS)
+                if (emit("velocity", on_host(es, scratch->data(), ndofs)->data()) != SFEM_SUCCESS) return SFEM_FAILURE;
+                if (with_acceleration && emit("acceleration", on_host(es, rate->data(), ndofs)->data()) != SFEM_SUCCESS)
                     return SFEM_FAILURE;
             }
 
             for (auto &field : fields) {
                 if (field.fill(record, scratch->data()) != SFEM_SUCCESS) return SFEM_FAILURE;
-                if (output->write_step(field.name.c_str(), index, on_host(es, scratch->data(), ndofs)->data()) != SFEM_SUCCESS)
-                    return SFEM_FAILURE;
+                if (emit(field.name.c_str(), on_host(es, scratch->data(), ndofs)->data()) != SFEM_SUCCESS) return SFEM_FAILURE;
             }
 
-            output->log_time(record.t);
+            if (output) output->log_time(record.t);
             index++;
             return SFEM_SUCCESS;
         }
@@ -87,9 +108,87 @@ namespace sfem {
         impl_->fields.push_back({name, fill});
     }
 
+    int FieldExport::gather_to(const std::shared_ptr<Mesh> &serial_mesh) {
+        auto &impl = *impl_;
+        auto  fs   = impl.f->space();
+        auto  mesh = fs->mesh_ptr();
+        impl.comm  = mesh->comm();
+        if (impl.comm->size() == 1 || !mesh->is_distributed()) {
+            SFEM_ERROR("FieldExport::gather_to: the function's mesh is not distributed\n");
+            return SFEM_FAILURE;
+        }
+        const bool root = impl.comm->rank() == 0;
+        if (root != (serial_mesh != nullptr)) {
+            SFEM_ERROR("FieldExport::gather_to: the serial mesh is rank 0's\n");
+            return SFEM_FAILURE;
+        }
+
+        // Each rank's owned nodes, by their ids in the file.
+        const int       size    = impl.comm->size();
+        const int       bs      = fs->block_size();
+        const ptrdiff_t n_owned = fs->n_owned_dofs() / bs;
+        std::vector<int> node_counts(size), node_displs(size + 1, 0);
+        const int        mine = (int)n_owned;
+        impl.comm->allgather(&mine, node_counts.data(), 1);
+        for (int r = 0; r < size; ++r) node_displs[r + 1] = node_displs[r] + node_counts[r];
+        std::vector<smesh::large_idx_t> ids(node_displs[size]);
+        impl.comm->allgatherv(mesh->distributed()->node_mapping()->data(), mine, ids.data(), node_counts.data(), node_displs.data());
+
+        impl.counts.resize(size);
+        impl.displs.resize(size);
+        for (int r = 0; r < size; ++r) {
+            impl.counts[r] = node_counts[r] * bs;
+            impl.displs[r] = node_displs[r] * bs;
+        }
+        impl.all.resize((size_t)node_displs[size] * bs);
+
+        if (root) {
+            // The serial mesh's node i is node node_mapping[i] of the file; a mesh read whole has
+            // none, and gets the identity, written with it: the output says which node of the file
+            // each is, whatever an earlier run left in the folder.
+            const ptrdiff_t n_serial = serial_mesh->n_nodes();
+            if (!serial_mesh->node_mapping()) {
+                auto identity = create_host_buffer<idx_t>(n_serial);
+                for (ptrdiff_t i = 0; i < n_serial; ++i) identity->data()[i] = (idx_t)i;
+                serial_mesh->set_node_mapping(identity);
+            }
+            auto                                      file_ids = serial_mesh->node_mapping();
+            std::unordered_map<smesh::large_idx_t, ptrdiff_t> at;
+            at.reserve(n_serial);
+            for (ptrdiff_t i = 0; i < n_serial; ++i) at[file_ids ? (smesh::large_idx_t)file_ids->data()[i] : (smesh::large_idx_t)i] = i;
+            if ((ptrdiff_t)ids.size() != n_serial) {
+                SFEM_ERROR("FieldExport::gather_to: %zu nodes owned over the ranks, %td in the serial mesh\n", ids.size(), n_serial);
+                return SFEM_FAILURE;
+            }
+            impl.place.resize(ids.size());
+            for (size_t k = 0; k < ids.size(); ++k) {
+                auto found = at.find(ids[k]);
+                if (found == at.end()) {
+                    SFEM_ERROR("FieldExport::gather_to: node %lld of the file is not in the serial mesh\n", (long long)ids[k]);
+                    return SFEM_FAILURE;
+                }
+                impl.place[k] = found->second;
+            }
+            impl.serial.assign((size_t)n_serial * bs, 0);
+        }
+        impl.serial_mesh = serial_mesh;
+        impl.gathered    = true;
+        return SFEM_SUCCESS;
+    }
+
     int FieldExport::initial(const StepRecord &record) {
         auto &impl = *impl_;
         auto  fs   = impl.f->space();
+        if (impl.gathered) {
+            if (impl.serial_mesh) {
+                smesh::create_directory(impl.path);
+                if (impl.serial_mesh->write(impl.path / "mesh") != SFEM_SUCCESS) return SFEM_FAILURE;
+                impl.output = std::make_shared<Output>(FunctionSpace::create(impl.serial_mesh, fs->block_size()));
+                impl.output->set_output_dir(impl.path / "out");
+                impl.output->enable_AoS_to_SoA(fs->block_size() > 1);
+            }
+            return impl.write(record);
+        }
 
         smesh::create_directory(impl.path);
         if (fs->has_semi_structured_mesh()) {
@@ -307,6 +406,13 @@ namespace sfem {
                        record.report.reference > 0 ? (double)(record.report.final_measure / record.report.reference) : 0.0);
                 fflush(stdout);
             }
+            // Every rank samples (a probe may reduce over the ranks); the one with the file writes.
+            std::vector<real_t> sampled;
+            for (auto &p : probes) {
+                values.assign(p->columns().size(), 0);
+                if (p->sample(record, values.data()) != SFEM_SUCCESS) return SFEM_FAILURE;
+                sampled.insert(sampled.end(), values.begin(), values.end());
+            }
             if (!csv) return SFEM_SUCCESS;
 
             fprintf(csv,
@@ -322,11 +428,7 @@ namespace sfem {
                     (double)record.report.reference,
                     (double)record.report.final_measure,
                     (double)record.report.min_alpha);
-            for (auto &p : probes) {
-                values.assign(p->columns().size(), 0);
-                if (p->sample(record, values.data()) != SFEM_SUCCESS) return SFEM_FAILURE;
-                for (real_t v : values) fprintf(csv, ",%.17g", (double)v);
-            }
+            for (real_t v : sampled) fprintf(csv, ",%.17g", (double)v);
             fprintf(csv, "\n");
             fflush(csv);
             return SFEM_SUCCESS;
@@ -349,13 +451,13 @@ namespace sfem {
 
     int StepHistory::initial(const StepRecord &record) {
         auto &impl = *impl_;
-        if (!impl.csv) return SFEM_SUCCESS;
-
-        fprintf(impl.csv, "step,t,dt,status,attempts,newton,linear,capped,reference,final,min_alpha");
-        for (auto &p : impl.probes) {
-            for (auto &c : p->columns()) fprintf(impl.csv, ",%s", c.c_str());
+        if (impl.csv) {
+            fprintf(impl.csv, "step,t,dt,status,attempts,newton,linear,capped,reference,final,min_alpha");
+            for (auto &p : impl.probes) {
+                for (auto &c : p->columns()) fprintf(impl.csv, ",%s", c.c_str());
+            }
+            fprintf(impl.csv, "\n");
         }
-        fprintf(impl.csv, "\n");
 
         StepRecord at_start    = record;
         at_start.report        = NonlinearReport();

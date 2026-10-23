@@ -136,7 +136,7 @@ namespace sfem {
                     attempts++;
                 }
 
-                if (report.converged()) break;
+                if (report.accepted()) break;
 
                 record.step     = step + 1;
                 record.t        = t_new;

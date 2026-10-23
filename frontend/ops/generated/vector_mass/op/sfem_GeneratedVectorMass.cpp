@@ -107,11 +107,14 @@ namespace sfem {
                 real_t *const values) {
       copy_material_parameters(base, values);
       bool changed = false;
+      bool read[N_MATERIAL_PARAMETERS] = {false};
       for (int i = 0; i < N_DEFINED_MATERIAL_PARAMETERS; ++i) {
-        changed |= yaml_read_parameter(node,
+        read[i] = yaml_read_parameter(node,
                                                MATERIAL_PARAMETER_NAMES[i],
                                                values[i]);
+        changed |= read[i];
       }
+      (void)read;
       return changed;
     }
 
@@ -815,10 +818,18 @@ namespace sfem {
     return SFEM_FAILURE;
   }
 
-  int GeneratedVectorMass::hessian_bsr(const real_t *const /*state*/,
+  int GeneratedVectorMass::hessian_bsr(const real_t *const x,
               const count_t *const rowptr,
               const idx_t *const colidx,
               real_t *const values) {
+    return hessian_bsr_typed(x, rowptr, colidx, smesh::SMESH_DEFAULT, values);
+  }
+
+  int GeneratedVectorMass::hessian_bsr_typed(const real_t *const /*state*/,
+              const count_t *const rowptr,
+              const idx_t *const colidx,
+              const enum smesh::PrimitiveType values_type,
+              void *const values) {
     SFEM_TRACE_SCOPE("GeneratedVectorMass::hessian_bsr");
     if (check_graph(impl_->bsr_graph, rowptr, colidx, impl_->space->n_dofs() / impl_->space->block_size()) != SFEM_SUCCESS) {
       SFEM_ERROR("GeneratedVectorMass::hessian_bsr: the graph is malformed; the assembly kernels assume it is not\n");
@@ -844,22 +855,22 @@ namespace sfem {
           return SFEM_FAILURE;
         }
         adjugate = reinterpret_cast<const geom_t *const *>(
-            cache->jacobian->jacobian_adjugate_SoA()->data());
+            cache->jacobian->adjugate_components());
         determinant = reinterpret_cast<const geom_t *>(
             cache->jacobian->jacobian_determinant()->data());
       }
       const int dim = mesh->spatial_dimension();
       if (dim == 2) {
         if (domain.element_type == smesh::TRI3) {
-          return vector_mass_hessian_bsr_2d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], rowptr, colidx, values);
+          return vector_mass_hessian_bsr_2d_a_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], rowptr, colidx, values);
         }
-        return vector_mass_hessian_bsr_2d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, storage[0], rowptr, colidx, values);
+        return vector_mass_hessian_bsr_2d_i_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, storage[0], rowptr, colidx, values);
       }
       else if (dim == 3) {
         if (domain.element_type == smesh::TET4) {
-          return vector_mass_hessian_bsr_3d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], rowptr, colidx, values);
+          return vector_mass_hessian_bsr_3d_a_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], rowptr, colidx, values);
         }
-        return vector_mass_hessian_bsr_3d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, storage[0], rowptr, colidx, values);
+        return vector_mass_hessian_bsr_3d_i_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, storage[0], rowptr, colidx, values);
       }
       SFEM_ERROR("vector_mass hessian_bsr does not support spatial dimension %d\n", dim);
       return SFEM_FAILURE;

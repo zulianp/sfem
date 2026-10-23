@@ -2,6 +2,7 @@
 
 extern "C" int mooney_rivlin_kelvin_voigt_total_proteus_quad4_hessian_bsr_i_msoa(
         const int scalar_bytes,
+        const int values_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -151,6 +152,7 @@ extern "C" const sfem::codegen::KernelDiagnostics * mooney_rivlin_kelvin_voigt_t
 
 extern "C" int mooney_rivlin_kelvin_voigt_total_quad4_hessian_bsr_i_msoa(
         const int scalar_bytes,
+        const int values_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
@@ -176,7 +178,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_total_quad4_hessian_bsr_i_msoa(
         elements[3],
         elements[2]
     };
-    return mooney_rivlin_kelvin_voigt_total_proteus_quad4_hessian_bsr_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, previous_stride, u0_old, u1_old, rowptr, colidx, values);
+    return mooney_rivlin_kelvin_voigt_total_proteus_quad4_hessian_bsr_i_msoa(scalar_bytes, values_bytes, nelements, nnodes, proteus_elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, previous_stride, u0_old, u1_old, rowptr, colidx, values);
 }
 
 extern "C" int mooney_rivlin_kelvin_voigt_total_quad4_jacobian_action_i_maos(

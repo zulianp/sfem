@@ -5,6 +5,7 @@
 #include <memory>
 
 #include "sfem_aliases.hpp"
+#include "smesh_exchange.hpp"
 #include "smesh_mesh.hpp"
 #include "smesh_packed_mesh.hpp"
 #include "smesh_multiblock_graph.hpp"
@@ -33,6 +34,9 @@ namespace sfem {
         //: still speaking the numbering the mesh had -- a nodeset read from a
         //: file, most of all -- is unreconstructable without it.
         SharedBuffer<idx_t> packed_node_map;
+        //: synchronize's exchanges, host and device, built on first use: packing renumbers the
+        //: nodes they name.
+        std::shared_ptr<smesh::Exchange> exchange[2];
 
         ~Impl() {}
 
@@ -336,11 +340,55 @@ namespace sfem {
         if (!probe) return SFEM_FAILURE;
         impl_->packed_node_map = probe->node_map();
 
+        // The renumbering moves the mesh's node_mapping with the nodes. A mesh read whole has none;
+        // give it the identity, so that a written mesh still says which node of its file each of
+        // its nodes is (a block-selective read already set one).
+        if (impl_->mesh->comm()->size() == 1 && !impl_->mesh->node_mapping()) {
+            const ptrdiff_t n_nodes = impl_->mesh->n_nodes();
+            auto            ids     = create_host_buffer<idx_t>(n_nodes);
+            for (ptrdiff_t i = 0; i < n_nodes; ++i) ids->data()[i] = static_cast<idx_t>(i);
+            impl_->mesh->set_node_mapping(ids);
+        }
+
         impl_->packed_mesh = FunctionSpace::PackedMesh::create(impl_->mesh, {}, true);
+        // Everything keyed by node number describes the numbering before.
+        for (auto &e : impl_->exchange) e.reset();
+        impl_->node_to_node_graph.reset();
+        impl_->dof_to_dof_graph.reset();
+        impl_->element_node_graph.reset();
         return SFEM_SUCCESS;
     }
 
     bool FunctionSpace::has_packed_mesh() const { return static_cast<bool>(impl_->packed_mesh); }
+
+    smesh::Exchange *FunctionSpace::exchange_for(const ExecutionSpace es, int *const status) {
+        auto &impl = *impl_;
+        *status    = SFEM_SUCCESS;
+        if (!impl.mesh->is_distributed() || impl.mesh->comm()->size() == 1) return nullptr;
+        auto &exchange = impl.exchange[es == EXECUTION_SPACE_DEVICE ? 1 : 0];
+        if (!exchange) {
+            exchange = smesh::Exchange::create_nodal(impl.mesh, smesh::Exchange::ExchangeScope::GhostsAndAura, es);
+            if (!exchange) *status = SFEM_FAILURE;
+        }
+        return exchange.get();
+    }
+
+    int FunctionSpace::synchronize(real_t *const x, const ExecutionSpace es) {
+        if (synchronize_begin(x, es) != SFEM_SUCCESS) return SFEM_FAILURE;
+        return synchronize_end(es);
+    }
+
+    int FunctionSpace::synchronize_begin(real_t *const x, const ExecutionSpace es) {
+        int  status   = SFEM_SUCCESS;
+        auto exchange = exchange_for(es, &status);
+        return exchange ? exchange->gather_begin(x, impl_->block_size) : status;
+    }
+
+    int FunctionSpace::synchronize_end(const ExecutionSpace es) {
+        int  status   = SFEM_SUCCESS;
+        auto exchange = exchange_for(es, &status);
+        return exchange ? exchange->gather_wait() : status;
+    }
 
     std::shared_ptr<FunctionSpace::PackedMesh> FunctionSpace::packed_mesh() { return impl_->packed_mesh; }
 

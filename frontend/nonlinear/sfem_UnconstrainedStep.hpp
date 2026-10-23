@@ -28,7 +28,8 @@ namespace sfem {
         /// CG stops at a direction of non-positive curvature and returns the descent direction it
         /// has built: a direction for a line search to scale, so only with one.
         bool stop_on_negative_curvature{true};
-        /// Bytes per stored value of an assembled BSR tangent: 2, 4 or sizeof(real_t).
+        /// Bytes per stored value of an assembled BSR tangent: 2, 4 or sizeof(real_t)
+        /// (BSRTangent::create).
         int storage_bytes{(int)sizeof(real_t)};
     };
 

@@ -15,6 +15,9 @@ namespace sfem {
 
     struct NewtonOptions {
         int max_it{30};
+        /// max_it iterations are the scheme, not a cap: the step ends after them and its state is
+        /// accepted unconverged (ITERATIONS_DONE), as a fixed number of damped iterations does.
+        bool fixed_iterations{false};
         /// Converged when the step's measure is at most max(atol, rtol * its first value).
         real_t atol{real_t(1e-9)};
         real_t rtol{real_t(1e-8)};
