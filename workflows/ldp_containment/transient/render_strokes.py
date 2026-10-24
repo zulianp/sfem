@@ -1,7 +1,8 @@
 """Frames of simulation 2 for a movie, rendered off-screen by ParaView where the run is.
 
 usage: pvbatch render_strokes.py <sim2 folder> <frames folder> [--every=N] [--size=W,H]
-                                  [--first=K] [--count=M]
+                                  [--first=K] [--count=M] [--frames=K1,K2,...] [--panels] [--sdf=folder]
+                                  [--history=file]
 
 Reads the run's raw output -- the valve mesh (<sim2>/mesh: x, y, z and blocks/<name>/i0..i3, TET4),
 every exported step (<sim2>/out/disp.<d>.<step>.float64, time.txt) and the obstacle's grid
@@ -24,6 +25,12 @@ The overview also shows the time and the chamber pressure. Frames are
 process per range (the EGL driver of the Alps nodes, 595.91.07, aborts a process after 25 frames).
 Encode them with ffmpeg, e.g.
 ffmpeg -framerate 30 -i %05d.png -c:v libx264 -pix_fmt yuv420p strokes.mp4.
+
+--history reads the charts' history from another file than <sim2>/history.csv. --sdf reads the
+obstacle's grid from another folder (a run before the fix of the playground's
+output wrote only rank 0's part of it). --frames renders the listed frames instead of a range. --panels writes each view on its own,
+--size=W,H large, without labels, scale bar or charts (a figure's caption and colour bar say what
+they show): <frames>/%05d_overview.png, _top.png, _pressure_valve.png and _suction_valve.png.
 """
 
 import bisect
@@ -135,9 +142,9 @@ def label(view, text, size):
     return source
 
 
-def history(sim):
+def history(path):
     """The run's history as columns of floats, the converged steps only."""
-    rows = [r for r in csv.DictReader(open(os.path.join(sim, "history.csv"))) if r["status"] != "initial"]
+    rows = [r for r in csv.DictReader(open(path)) if r["status"] != "initial"]
     return {k: np.array([float(r[k]) for r in rows]) for k in rows[0] if k != "status"} if rows else {}
 
 
@@ -154,8 +161,8 @@ def prony_legend(sim):
 class Charts:
     """The two history charts, drawn once; each frame moves their cursors."""
 
-    def __init__(self, sim, t_p, size):
-        h = history(sim)
+    def __init__(self, sim, t_p, size, history_path):
+        h = history(history_path)
         legend = prony_legend(sim)
         dpi = 100
         self.size = size
@@ -218,13 +225,14 @@ class Charts:
 
 def main(argv):
     args = [a for a in argv[1:] if not a.startswith("--")]
-    opts = dict(a[2:].split("=", 1) for a in argv[1:] if a.startswith("--"))
+    opts = dict((a[2:].split("=", 1) + [""])[:2] for a in argv[1:] if a.startswith("--"))
     if len(args) != 2:
         sys.exit(__doc__)
     sim, frames = args
     every = int(opts.get("every", "1"))
     first = int(opts.get("first", "0"))
     width, height = (int(v) for v in opts.get("size", "1920,1080").split(","))
+    panels = "panels" in opts
     os.makedirs(frames, exist_ok=True)
 
     X, grid, points = valve_grid(os.path.join(sim, "mesh"))
@@ -236,7 +244,7 @@ def main(argv):
 
     # The cavity wall: the zero level set, on every second grid point (60 um), once.
     image = TrivialProducer()
-    image.GetClientSideObject().SetOutput(wall_image(os.path.join(sim, "sdf"), 2))
+    image.GetClientSideObject().SetOutput(wall_image(opts.get("sdf", os.path.join(sim, "sdf")), 2))
     wall = Contour(Input=image, ContourBy=["POINTS", "sdf"], Isosurfaces=[0.0])
     wall_back = Clip(Input=wall, ClipType="Plane")
     wall_back.ClipType.Origin = [0, 0, 0]
@@ -252,7 +260,7 @@ def main(argv):
     lut = GetColorTransferFunction("uy_mm")
     lut.ApplyPreset("Cool to Warm", True)
 
-    panel = (width // 3, height // 2)
+    panel = (width, height) if panels else (width // 3, height // 2)
     views = [CreateView("RenderView") for _ in range(4)]
     for v in views:
         plain(v, *panel)
@@ -279,44 +287,52 @@ def main(argv):
     bar.Title = "vertical displacement (mm)"
     bar.ComponentTitle = ""
     bar.TitleColor = bar.LabelColor = [0, 0, 0]
-    bar.Visibility = 1
+    bar.Visibility = 0 if panels else 1
 
-    clock = label(overview, "", 22)
-    label(top, "from above", 18)
-    for v, (name, _) in zip(sections, VALVES):
-        label(v, "%s, section z = 0" % name, 18)
+    clock = None if panels else label(overview, "", 22)
+    if not panels:
+        label(top, "from above", 18)
+        for v, (name, _) in zip(sections, VALVES):
+            label(v, "%s, section z = 0" % name, 18)
 
-    # The cameras after a first render, which resets them to the data.
+    # The cameras after a first screenshot, which resets them to the data: a Render alone does not,
+    # and the first frame of each process would show the reset cameras.
+    scratch = os.path.join(frames, "panel.png")
     for v in views:
         Render(v)
+        SaveScreenshot(scratch, v, ImageResolution=list(panel))
     centre = X.mean(axis=0)
-    overview.CameraFocalPoint = list(centre)
-    overview.CameraPosition = [centre[0], centre[1] + 0.014, centre[2] + 0.065]
-    overview.CameraViewUp = [0, 1, 0]
-    overview.CameraViewAngle = 30
-    top.CameraFocalPoint = list(centre)
-    top.CameraPosition = [centre[0], centre[1] + 0.08, centre[2]]
-    top.CameraViewUp = [0, 0, -1]
-    top.CameraParallelProjection = 1
-    top.CameraParallelScale = 0.0145
-    for v, (_, x) in zip(sections, VALVES):
-        v.CameraFocalPoint = [x, -0.0008, 0]
-        v.CameraPosition = [x, -0.0008, 0.05]
-        v.CameraViewUp = [0, 1, 0]
-        v.CameraParallelProjection = 1
-        v.CameraParallelScale = 0.0055
+
+    def place_cameras():
+        overview.CameraFocalPoint = list(centre)
+        overview.CameraPosition = [centre[0], centre[1] + 0.014, centre[2] + 0.065]
+        overview.CameraViewUp = [0, 1, 0]
+        overview.CameraViewAngle = 30
+        top.CameraFocalPoint = list(centre)
+        top.CameraPosition = [centre[0], centre[1] + 0.08, centre[2]]
+        top.CameraViewUp = [0, 0, -1]
+        top.CameraParallelProjection = 1
+        top.CameraParallelScale = 0.0145
+        for v, (_, x) in zip(sections, VALVES):
+            v.CameraFocalPoint = [x, -0.0008, 0]
+            v.CameraPosition = [x, -0.0008, 0.05]
+            v.CameraViewUp = [0, 1, 0]
+            v.CameraParallelProjection = 1
+            v.CameraParallelScale = 0.0055
+
+    place_cameras()
 
     out = os.path.join(sim, "out")
     times = np.loadtxt(os.path.join(out, "time.txt")).reshape(-1)
     steps = sorted(int(p.split(".")[-2]) for p in glob.glob(os.path.join(out, "disp.0.*.float64")))
     table = os.path.join(sim, "..", "fp70_membrane_pressure.csv")
     t_p = np.loadtxt(table, delimiter=",", comments="#") if os.path.isfile(table) else None
-    charts = Charts(sim, t_p, panel)
-    scratch = os.path.join(frames, "panel.png")
+    charts = None if panels else Charts(sim, t_p, panel, opts.get("history", os.path.join(sim, "history.csv")))
 
     frames_all = steps[::every]
     count = int(opts.get("count", str(len(frames_all))))
-    for n in range(first, min(first + count, len(frames_all))):
+    chosen = [int(k) for k in opts["frames"].split(",")] if "frames" in opts else range(first, min(first + count, len(frames_all)))
+    for n in chosen:
         step = frames_all[n]
         u = np.stack([np.fromfile(os.path.join(out, "disp.%d.%09d.float64" % (d, step))) for d in range(3)], axis=1)
         points.SetData(numpy_support.numpy_to_vtk(X + u, deep=True))
@@ -331,6 +347,16 @@ def main(argv):
             i = min(max(bisect.bisect_left(t_p[:, 0], t), 1), len(t_p) - 1)
             (t0, p0), (t1, p1) = t_p[i - 1], t_p[i]
             text += "    chamber %+6.1f kPa" % ((p0 + (p1 - p0) * (t - t0) / (t1 - t0)) / 1e3)
+        # Placed again for every frame, and in panels mode a frame is rendered once before it is
+        # saved: a still of a frame far from the last one rendered could otherwise show the
+        # cameras reset to the data (seen on the refined mesh).
+        place_cameras()
+        if panels:
+            for v, name in zip(views, ("overview", "top", "pressure_valve", "suction_valve")):
+                SaveScreenshot(scratch, v, ImageResolution=list(panel))
+                place_cameras()
+                SaveScreenshot(os.path.join(frames, "%05d_%s.png" % (n, name)), v, ImageResolution=list(panel))
+            continue
         clock.Text = text
         # The four views and the two charts, placed in the frame's 3 x 2 grid.
         frame = Image.new("RGB", (3 * panel[0], 2 * panel[1]), "white")
@@ -340,8 +366,9 @@ def main(argv):
         for row, image in enumerate(charts.images(t * 1e3)):
             frame.paste(image, (2 * panel[0], row * panel[1]))
         frame.save(os.path.join(frames, "%05d.png" % n))
-    os.remove(scratch)
-    print("render_strokes.py: frames %d to %d of %d in %s" % (first, min(first + count, len(frames_all)) - 1, len(frames_all), frames))
+    if os.path.exists(scratch):
+        os.remove(scratch)
+    print("render_strokes.py: frames %s of %d in %s" % (",".join(str(n) for n in chosen), len(frames_all), frames))
 
 
 if __name__ == "__main__":
