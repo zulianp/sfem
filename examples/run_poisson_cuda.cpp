@@ -179,7 +179,7 @@ int main(int argc, char *argv[]) {
 
         if (SFEM_USE_PRECONDITIONER) {
             solver.set_preconditioner([&](const real_t *const x, real_t *const y) {
-                d_ediv(mesh.nnodes, x, d_d, y);
+                d_ediv(mesh.nnodes, x, d_d, y, nullptr);
                 d_copy_at_dirichlet_nodes_vec(
                     n_dirichlet_conditions, d_dirichlet_conditions, 1, x, y, nullptr);
             });

@@ -13,10 +13,10 @@
 namespace sfem {
 
     template <typename T>
-    std::shared_ptr<ConjugateGradient<T>> d_cg() {
+    std::shared_ptr<ConjugateGradient<T>> d_cg(const ExecutionContext& context = ExecutionContext::device()) {
         auto cg              = std::make_shared<ConjugateGradient<T>>();
-        cg->blas             = make_cuda_blas<T>();
-        CUDA_CG<T>::build(cg->impl);
+        cg->blas             = make_cuda_blas<T>(context);
+        CUDA_CG<T>::build(cg->impl, context);
         return cg;
     }
 

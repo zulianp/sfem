@@ -165,7 +165,7 @@ namespace sfem {
 
 #ifdef SFEM_ENABLE_CUDA
         if (impl_->es == EXECUTION_SPACE_DEVICE) {
-            return cu_inertia_potential_hessian_crs(ndofs, rowptr, colidx, mass, alpha, values);
+            return cu_inertia_potential_hessian_crs(ndofs, rowptr, colidx, mass, alpha, values, execution_context().stream());
         }
 #endif
 
@@ -211,7 +211,8 @@ namespace sfem {
 
 #ifdef SFEM_ENABLE_CUDA
         if (impl_->es == EXECUTION_SPACE_DEVICE) {
-            return cu_inertia_potential_hessian_bsr(n_nodes, bs, rowptr, colidx, mass, alpha, values_type, values);
+            return cu_inertia_potential_hessian_bsr(
+                    n_nodes, bs, rowptr, colidx, mass, alpha, values_type, values, execution_context().stream());
         }
 #endif
 
@@ -261,7 +262,7 @@ namespace sfem {
 #ifdef SFEM_ENABLE_CUDA
         if (impl_->es == EXECUTION_SPACE_DEVICE) {
             return cu_inertia_potential_hessian_block_diag_sym(
-                    n_nodes, bs, impl_->mass->data(), impl_->alpha, values);
+                    n_nodes, bs, impl_->mass->data(), impl_->alpha, values, execution_context().stream());
         }
 #endif
 

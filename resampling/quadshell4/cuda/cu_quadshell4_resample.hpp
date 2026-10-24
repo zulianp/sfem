@@ -24,7 +24,8 @@ int cu_quadshell4_resample_gap_local(
         const geom_t* const SFEM_RESTRICT    data,
         // Output
         real_t* const SFEM_RESTRICT  wg,
-        real_t** const SFEM_RESTRICT normals);
+        real_t** const SFEM_RESTRICT normals,
+        void* const                  stream);
 
 int cu_quadshell4_resample_gap_value_local(
         // Mesh
@@ -39,7 +40,8 @@ int cu_quadshell4_resample_gap_value_local(
         const geom_t* const SFEM_RESTRICT    delta,
         const geom_t* const SFEM_RESTRICT    data,
         // Output
-        real_t* const SFEM_RESTRICT wg);
+        real_t* const SFEM_RESTRICT wg,
+        void* const                 stream);
 
 int cu_quadshell4_resample_gap_normals_local(
         // Mesh
@@ -54,7 +56,8 @@ int cu_quadshell4_resample_gap_normals_local(
         const geom_t* const SFEM_RESTRICT    delta,
         const geom_t* const SFEM_RESTRICT    data,
         // Output
-        real_t** const SFEM_RESTRICT normals);
+        real_t** const SFEM_RESTRICT normals,
+        void* const                  stream);
 
 int cu_quadshell4_resample_weight_local(
         // Mesh
@@ -63,7 +66,8 @@ int cu_quadshell4_resample_weight_local(
         idx_t** const SFEM_RESTRICT  elems,
         geom_t** const SFEM_RESTRICT xyz,
         // Output
-        real_t* const SFEM_RESTRICT w);
+        real_t* const SFEM_RESTRICT w,
+        void* const                 stream);
 
 #ifdef __cplusplus
 }

@@ -209,14 +209,14 @@ namespace sfem {
             const int                   dim,
             const SharedBuffer<HP>     &diag,
             const SharedBuffer<mask_t> &constraints_mask,
-            const ExecutionSpace        es) {
-        SFEM_UNUSED(es);
+            const ExecutionContext     &context) {
+        SFEM_UNUSED(context);
         auto ret = std::make_shared<sfem::MixedPrecisionShiftableBlockSymJacobi<HP, LP>>();
 
 #ifdef SFEM_ENABLE_CUDA
-        if (es == EXECUTION_SPACE_DEVICE) {
-            ret->blas = make_cuda_blas<LP>();
-            ShiftableBlockSymJacobi_CUDA<HP, LP>::build(dim, ret->impl);
+        if (context.space() == EXECUTION_SPACE_DEVICE) {
+            ret->blas = make_cuda_blas<LP>(context);
+            ShiftableBlockSymJacobi_CUDA<HP, LP>::build(dim, ret->impl, context);
         } else
 #endif  // SFEM_ENABLE_CUDA
         {
@@ -233,14 +233,14 @@ namespace sfem {
     std::shared_ptr<ShiftableBlockSymJacobi<T>> create_shiftable_block_sym_jacobi(const int                   dim,
                                                                                   const SharedBuffer<T>      &diag,
                                                                                   const SharedBuffer<mask_t> &constraints_mask,
-                                                                                  const ExecutionSpace        es) {
-        SFEM_UNUSED(es);
+                                                                                  const ExecutionContext     &context) {
+        SFEM_UNUSED(context);
         auto ret = std::make_shared<sfem::ShiftableBlockSymJacobi<T>>();
 
 #ifdef SFEM_ENABLE_CUDA
-        if (es == EXECUTION_SPACE_DEVICE) {
-            ret->blas = make_cuda_blas<T>();
-            ShiftableBlockSymJacobi_CUDA<T>::build(dim, ret->impl);
+        if (context.space() == EXECUTION_SPACE_DEVICE) {
+            ret->blas = make_cuda_blas<T>(context);
+            ShiftableBlockSymJacobi_CUDA<T>::build(dim, ret->impl, context);
         } else
 #endif  // SFEM_ENABLE_CUDA
         {
@@ -978,10 +978,11 @@ namespace sfem {
     }
 
     template <typename T>
-    static std::shared_ptr<Operator<T>> create_inverse_diagonal_scaling(const SharedBuffer<T> &diag, const ExecutionSpace es) {
-        SFEM_UNUSED(es);
+    static std::shared_ptr<Operator<T>> create_inverse_diagonal_scaling(const SharedBuffer<T>  &diag,
+                                                                        const ExecutionContext &context) {
+        SFEM_UNUSED(context);
 #ifdef SFEM_ENABLE_CUDA
-        if (es == EXECUTION_SPACE_DEVICE) {
+        if (context.space() == EXECUTION_SPACE_DEVICE) {
             auto d_diag = to_device(diag);
             return sfem::make_op<T>(
                     d_diag->size(),
@@ -989,9 +990,9 @@ namespace sfem {
                     [=](const T *const x, T *const y) {
                         auto d = d_diag->data();
                         // FIXME (only supports real_t)
-                        d_ediv(d_diag->size(), x, d, y);
+                        d_ediv(d_diag->size(), x, d, y, context.stream());
                     },
-                    EXECUTION_SPACE_DEVICE);
+                    context);
         }
 #endif  // SFEM_ENABLE_CUDA
 

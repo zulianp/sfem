@@ -12,7 +12,8 @@ int cu_displace_points(const int          dim,
                        const idx_t *const idx,
                        geom_t **const     bulk_points,
                        const real_t      *disp,
-                       geom_t **const     surface_points);
+                       geom_t **const     surface_points,
+                       void *const        stream);
 
 // surface_points = surface_points_rest + disp at idx, and the displacement itself in real_t,
 // surface_disp (3 components per point, AoS, zero beyond dim).
@@ -22,7 +23,8 @@ int cu_displace_surface_points(const int          dim,
                                geom_t **const     surface_points_rest,
                                const real_t      *disp,
                                geom_t **const     surface_points,
-                               real_t *const      surface_disp);
+                               real_t *const      surface_disp,
+                               void *const        stream);
 
 #ifdef __cplusplus
 }

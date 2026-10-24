@@ -48,14 +48,14 @@ namespace sfem {
 
         template <typename T>
         struct Invert3_CUDA {
-            static void inplace_apply_AoS(const ptrdiff_t n_blocks, T* const inout) {
-                SFEM_DEBUG_SYNCHRONIZE(nullptr);
+            static void inplace_apply_AoS(const ptrdiff_t n_blocks, T* const inout, const cudaStream_t stream) {
+                SFEM_DEBUG_SYNCHRONIZE(stream);
 
                 int       kernel_block_size = 128;
                 ptrdiff_t kernel_n_blocks   = std::max(ptrdiff_t(1), (n_blocks + kernel_block_size - 1) / kernel_block_size);
-                inverse3_inplace_apply_AoS<<<kernel_n_blocks, kernel_block_size>>>(n_blocks, inout);
+                inverse3_inplace_apply_AoS<<<kernel_n_blocks, kernel_block_size, 0, stream>>>(n_blocks, inout);
 
-                SFEM_DEBUG_SYNCHRONIZE(nullptr);
+                SFEM_DEBUG_SYNCHRONIZE(stream);
             }
         };
 
@@ -86,14 +86,17 @@ namespace sfem {
 
         template <typename T>
         struct Mask3_CUDA {
-            static void apply(const ptrdiff_t n_blocks, const mask_t* const constraints_mask, T* const inout) {
-                SFEM_DEBUG_SYNCHRONIZE(nullptr);
+            static void apply(const ptrdiff_t     n_blocks,
+                              const mask_t* const constraints_mask,
+                              T* const            inout,
+                              const cudaStream_t  stream) {
+                SFEM_DEBUG_SYNCHRONIZE(stream);
 
                 int       kernel_block_size = 128;
                 ptrdiff_t kernel_n_blocks   = std::max(ptrdiff_t(1), (n_blocks + kernel_block_size - 1) / kernel_block_size);
-                mask3_apply<<<kernel_n_blocks, kernel_block_size>>>(n_blocks, constraints_mask, inout);
+                mask3_apply<<<kernel_n_blocks, kernel_block_size, 0, stream>>>(n_blocks, constraints_mask, inout);
 
-                SFEM_DEBUG_SYNCHRONIZE(nullptr);
+                SFEM_DEBUG_SYNCHRONIZE(stream);
             }
         };
 
@@ -189,14 +192,17 @@ namespace sfem {
         }
 
         template <typename In, typename Out>
-        static void SparseBlockSymOps_CUDA_add_sym_diag_to_diag(const ptrdiff_t n_blocks, const In* const in, Out* const out) {
-            SFEM_DEBUG_SYNCHRONIZE(nullptr);
+        static void SparseBlockSymOps_CUDA_add_sym_diag_to_diag(const ptrdiff_t    n_blocks,
+                                                                const In* const    in,
+                                                                Out* const         out,
+                                                                const cudaStream_t stream) {
+            SFEM_DEBUG_SYNCHRONIZE(stream);
 
             int       kernel_block_size = 128;
             ptrdiff_t kernel_n_blocks   = std::max(ptrdiff_t(1), (n_blocks + kernel_block_size - 1) / kernel_block_size);
-            sbv3_add_sym_diag_to_diag<<<kernel_n_blocks, kernel_block_size>>>(n_blocks, in, out);
+            sbv3_add_sym_diag_to_diag<<<kernel_n_blocks, kernel_block_size, 0, stream>>>(n_blocks, in, out);
 
-            SFEM_DEBUG_SYNCHRONIZE(nullptr);
+            SFEM_DEBUG_SYNCHRONIZE(stream);
         }
 
         template <typename DD, typename S, typename IVD>
@@ -204,39 +210,44 @@ namespace sfem {
                                                                        const idx_t* const idx,
                                                                        const DD* const    dd,
                                                                        const S* const     s,
-                                                                       IVD* const         ivd) {
-            SFEM_DEBUG_SYNCHRONIZE(nullptr);
+                                                                       IVD* const         ivd,
+                                                                       const cudaStream_t stream) {
+            SFEM_DEBUG_SYNCHRONIZE(stream);
 
             int       kernel_block_size = 128;
             ptrdiff_t kernel_n_blocks   = std::max(ptrdiff_t(1), (n_blocks + kernel_block_size - 1) / kernel_block_size);
-            sbv3_add_sparse_sym_diag_to_diag<<<kernel_n_blocks, kernel_block_size>>>(n_blocks, idx, dd, s, ivd);
+            sbv3_add_sparse_sym_diag_to_diag<<<kernel_n_blocks, kernel_block_size, 0, stream>>>(n_blocks, idx, dd, s, ivd);
 
-            SFEM_DEBUG_SYNCHRONIZE(nullptr);
+            SFEM_DEBUG_SYNCHRONIZE(stream);
         }
 
         template <typename In, typename Out>
-        static void SparseBlockSymOps_CUDA_sym_diag_to_diag(const ptrdiff_t n_blocks, const In* const in, Out* const out) {
-            SFEM_DEBUG_SYNCHRONIZE(nullptr);
+        static void SparseBlockSymOps_CUDA_sym_diag_to_diag(const ptrdiff_t    n_blocks,
+                                                            const In* const    in,
+                                                            Out* const         out,
+                                                            const cudaStream_t stream) {
+            SFEM_DEBUG_SYNCHRONIZE(stream);
 
             int       kernel_block_size = 128;
             ptrdiff_t kernel_n_blocks   = std::max(ptrdiff_t(1), (n_blocks + kernel_block_size - 1) / kernel_block_size);
-            sbv3_sym_diag_to_diag<<<kernel_n_blocks, kernel_block_size>>>(n_blocks, in, out);
+            sbv3_sym_diag_to_diag<<<kernel_n_blocks, kernel_block_size, 0, stream>>>(n_blocks, in, out);
 
-            SFEM_DEBUG_SYNCHRONIZE(nullptr);
+            SFEM_DEBUG_SYNCHRONIZE(stream);
         }
 
         template <typename InvDiag, typename In, typename Out>
         static void SparseBlockSymOps_CUDA_apply(const ptrdiff_t      n_blocks,
                                                  const InvDiag* const inv_diag,
                                                  const In* const      in,
-                                                 Out* const           out) {
-            SFEM_DEBUG_SYNCHRONIZE(nullptr);
+                                                 Out* const           out,
+                                                 const cudaStream_t   stream) {
+            SFEM_DEBUG_SYNCHRONIZE(stream);
 
             int       kernel_block_size = 128;
             ptrdiff_t kernel_n_blocks   = std::max(ptrdiff_t(1), (n_blocks + kernel_block_size - 1) / kernel_block_size);
-            sbv3_apply<<<kernel_n_blocks, kernel_block_size>>>(n_blocks, inv_diag, in, out);
+            sbv3_apply<<<kernel_n_blocks, kernel_block_size, 0, stream>>>(n_blocks, inv_diag, in, out);
 
-            SFEM_DEBUG_SYNCHRONIZE(nullptr);
+            SFEM_DEBUG_SYNCHRONIZE(stream);
         }
 
         template <typename HP, typename LP>
@@ -304,43 +315,52 @@ namespace sfem {
         }
 
         template <typename HP, typename LP>
-        static void SparseBlockSymOps_CUDA_sparse_update_inv_diag(const ptrdiff_t    n_sparse,
-                                                                  const idx_t* const idx,
-                                                                  const HP* const    material_diag,
-                                                                  const HP* const    sparse_dd,
-                                                                  const HP* const    scaling,
+        static void SparseBlockSymOps_CUDA_sparse_update_inv_diag(const ptrdiff_t     n_sparse,
+                                                                  const idx_t* const  idx,
+                                                                  const HP* const     material_diag,
+                                                                  const HP* const     sparse_dd,
+                                                                  const HP* const     scaling,
                                                                   const mask_t* const constraints_mask,
-                                                                  const LP           omega,
-                                                                  LP* const          inv_diag) {
+                                                                  const LP            omega,
+                                                                  LP* const           inv_diag,
+                                                                  const cudaStream_t  stream) {
             if (!n_sparse) return;
 
-            SFEM_DEBUG_SYNCHRONIZE(nullptr);
+            SFEM_DEBUG_SYNCHRONIZE(stream);
 
             int       kernel_block_size = 128;
             ptrdiff_t kernel_n_blocks   = std::max(ptrdiff_t(1), (n_sparse + kernel_block_size - 1) / kernel_block_size);
-            sbv3_sparse_update_inv_diag<<<kernel_n_blocks, kernel_block_size>>>(
+            sbv3_sparse_update_inv_diag<<<kernel_n_blocks, kernel_block_size, 0, stream>>>(
                     n_sparse, idx, material_diag, sparse_dd, scaling, constraints_mask, omega, inv_diag);
 
-            SFEM_DEBUG_SYNCHRONIZE(nullptr);
+            SFEM_DEBUG_SYNCHRONIZE(stream);
         }
 
     }  // namespace private_
 
     template <typename HP, typename LP>
-    int ShiftableBlockSymJacobi_CUDA<HP, LP>::build(const int dim, struct ShiftableBlockSymJacobi_Tpl<HP, LP>& tpl) {
+    int ShiftableBlockSymJacobi_CUDA<HP, LP>::build(const int                                   dim,
+                                                    struct ShiftableBlockSymJacobi_Tpl<HP, LP>& tpl,
+                                                    const ExecutionContext&                     context) {
         if (dim != 3) {
             SFEM_ERROR("ShiftableBlockSymJacobi_CUDA::build(dim=%d) not supported!\n", dim);
             return SFEM_FAILURE;
         }
 
-        tpl.add_sparse_sym_diag_to_diag = &private_::SparseBlockSymOps_CUDA_add_sparse_sym_diag_to_diag<HP, HP, LP>;
-        tpl.add_sym_diag_to_diag        = &private_::SparseBlockSymOps_CUDA_add_sym_diag_to_diag<HP, LP>;
-        tpl.sym_diag_to_diag            = &private_::SparseBlockSymOps_CUDA_sym_diag_to_diag<HP, LP>;
-        tpl.apply                       = &private_::SparseBlockSymOps_CUDA_apply<LP, HP, HP>;
+        // Every pass on the context's stream, bound here once.
+        const cudaStream_t s            = static_cast<cudaStream_t>(context.stream());
+        tpl.add_sparse_sym_diag_to_diag = [s](auto&&... a) {
+            private_::SparseBlockSymOps_CUDA_add_sparse_sym_diag_to_diag<HP, HP, LP>(a..., s);
+        };
+        tpl.add_sym_diag_to_diag = [s](auto&&... a) { private_::SparseBlockSymOps_CUDA_add_sym_diag_to_diag<HP, LP>(a..., s); };
+        tpl.sym_diag_to_diag     = [s](auto&&... a) { private_::SparseBlockSymOps_CUDA_sym_diag_to_diag<HP, LP>(a..., s); };
+        tpl.apply                = [s](auto&&... a) { private_::SparseBlockSymOps_CUDA_apply<LP, HP, HP>(a..., s); };
 
-        tpl.apply_mask     = &private_::Mask3_CUDA<LP>::apply;
-        tpl.inplace_invert = &private_::Invert3_CUDA<LP>::inplace_apply_AoS;
-        tpl.sparse_update_inv_diag = &private_::SparseBlockSymOps_CUDA_sparse_update_inv_diag<HP, LP>;
+        tpl.apply_mask             = [s](auto&&... a) { private_::Mask3_CUDA<LP>::apply(a..., s); };
+        tpl.inplace_invert         = [s](auto&&... a) { private_::Invert3_CUDA<LP>::inplace_apply_AoS(a..., s); };
+        tpl.sparse_update_inv_diag = [s](auto&&... a) {
+            private_::SparseBlockSymOps_CUDA_sparse_update_inv_diag<HP, LP>(a..., s);
+        };
         return SFEM_SUCCESS;
     }
 

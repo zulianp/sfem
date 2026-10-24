@@ -143,7 +143,7 @@ namespace sfem {
                 const T* const     dd  = this->sbv->data()->data();
                 const T* const     s   = this->scaling->data();
 
-                return sbv_mult3<T>(n_blocks, idx, dd, s, x, y);
+                return sbv_mult3<T>(n_blocks, idx, dd, s, x, y, this->execution_context().stream());
             };
         }
 #endif

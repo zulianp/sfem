@@ -627,7 +627,7 @@ namespace sfem {
 #ifdef SFEM_ENABLE_CUDA
         if (EXECUTION_SPACE_DEVICE == impl_->execution_space) {
             const idx_t *const idx = impl_->contact_surface->node_mapping_device()->data();
-            err                    = cu_obstacle_normal_project(dim, n, idx, normals, h, out);
+            err                    = cu_obstacle_normal_project(dim, n, idx, normals, h, out, nullptr);
         } else
 #endif
         {
@@ -656,7 +656,7 @@ namespace sfem {
         int err;
 #ifdef SFEM_ENABLE_CUDA
         if (EXECUTION_SPACE_DEVICE == impl_->execution_space) {
-            err = cu_obstacle_distribute_contact_forces(dim, n, idx, normals, m, f, out);
+            err = cu_obstacle_distribute_contact_forces(dim, n, idx, normals, m, f, out, nullptr);
         } else
 #endif
         {
@@ -681,7 +681,7 @@ namespace sfem {
 
 #ifdef SFEM_ENABLE_CUDA
         if (EXECUTION_SPACE_DEVICE == impl_->execution_space) {
-            return cu_obstacle_contact_stress(dim, n, idx, normals, m, r, s);
+            return cu_obstacle_contact_stress(dim, n, idx, normals, m, r, s, nullptr);
         }
 #endif
         return obstacle_contact_stress(dim, n, idx, normals, m, r, s);
@@ -974,7 +974,7 @@ namespace sfem {
 
 #ifdef SFEM_ENABLE_CUDA
         if (EXECUTION_SPACE_DEVICE == impl_->execution_space) {
-            return cu_obstacle_hessian_block_diag_sym(dim, n, idx, normals, m, x, values);
+            return cu_obstacle_hessian_block_diag_sym(dim, n, idx, normals, m, x, values, nullptr);
         }
 #endif
         return obstacle_hessian_block_diag_sym(dim, n, idx, normals, m, x, values);

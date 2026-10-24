@@ -190,7 +190,7 @@ namespace sfem {
             int err = SFEM_SUCCESS;
             for (auto &c : conditions) {
                 auto nodeset = c.nodeset->data();
-                err += cu_mask_nodes(c.nodeset->size(), nodeset, block_size, c.component, mask);
+                err += cu_mask_nodes(c.nodeset->size(), nodeset, block_size, c.component, mask, stream);
             }
 
             return err;

@@ -8,6 +8,7 @@
 #include "sfem_cuda_ShiftedPenalty_impl.hpp"
 
 #include "sfem_cuda_base.hpp"
+#include "sfem_cuda_reduction_scratch.hpp"
 
 #define SFEM_N_WARPS_PER_BLOCK 8
 
@@ -108,23 +109,22 @@ namespace sfem {
     }
 
     template <typename T>
-    static T sq_norm_ramp_p_tpl(const ptrdiff_t n, const T* const x, T* const ub) {
-        SFEM_DEBUG_SYNCHRONIZE(nullptr);
+    static T sq_norm_ramp_p_tpl(const ptrdiff_t n, const T* const x, T* const ub, const cudaStream_t stream) {
+        SFEM_DEBUG_SYNCHRONIZE(stream);
 
         int       kernel_block_size = SFEM_WARP_SIZE * SFEM_N_WARPS_PER_BLOCK;
         ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
 
-        T* device_value = nullptr;
+        const auto scratch      = reduction_scratch<T>(1);
+        T* const   device_value = scratch.device;
+        SFEM_CUDA_CHECK(cudaMemsetAsync(device_value, 0, sizeof(T), stream));
 
-        cudaMalloc((void**)&device_value, sizeof(T));
-        cudaMemset((void*)device_value, 0, sizeof(T));
+        sq_norm_ramp_p_kernel<<<n_blocks, kernel_block_size, 0, stream>>>(n, x, ub, device_value);
+        SFEM_DEBUG_SYNCHRONIZE(stream);
 
-        sq_norm_ramp_p_kernel<<<n_blocks, kernel_block_size>>>(n, x, ub, device_value);
-        SFEM_DEBUG_SYNCHRONIZE(nullptr);
-
-        T host_value = -1;
-        cudaMemcpy(&host_value, device_value, sizeof(T), cudaMemcpyDeviceToHost);
-        cudaFree(device_value);
+        SFEM_CUDA_CHECK(cudaMemcpyAsync(scratch.host, device_value, sizeof(T), cudaMemcpyDeviceToHost, stream));
+        SFEM_CUDA_CHECK(cudaStreamSynchronize(stream));
+        const T host_value = scratch.host[0];
 
         return host_value;
     }
@@ -147,23 +147,22 @@ namespace sfem {
     }
 
     template <typename T>
-    static T sq_norm_ramp_m_tpl(const ptrdiff_t n, const T* const x, T* const lb) {
-        SFEM_DEBUG_SYNCHRONIZE(nullptr);
+    static T sq_norm_ramp_m_tpl(const ptrdiff_t n, const T* const x, T* const lb, const cudaStream_t stream) {
+        SFEM_DEBUG_SYNCHRONIZE(stream);
 
         int       kernel_block_size = SFEM_WARP_SIZE * SFEM_N_WARPS_PER_BLOCK;
         ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
 
-        T* device_value = nullptr;
+        const auto scratch      = reduction_scratch<T>(1);
+        T* const   device_value = scratch.device;
+        SFEM_CUDA_CHECK(cudaMemsetAsync(device_value, 0, sizeof(T), stream));
 
-        cudaMalloc((void**)&device_value, sizeof(T));
-        cudaMemset((void*)device_value, 0, sizeof(T));
+        sq_norm_ramp_m_kernel<<<n_blocks, kernel_block_size, 0, stream>>>(n, x, lb, device_value);
+        SFEM_DEBUG_SYNCHRONIZE(stream);
 
-        sq_norm_ramp_m_kernel<<<n_blocks, kernel_block_size>>>(n, x, lb, device_value);
-        SFEM_DEBUG_SYNCHRONIZE(nullptr);
-
-        T host_value = -1;
-        cudaMemcpy(&host_value, device_value, sizeof(T), cudaMemcpyDeviceToHost);
-        cudaFree(device_value);
+        SFEM_CUDA_CHECK(cudaMemcpyAsync(scratch.host, device_value, sizeof(T), cudaMemcpyDeviceToHost, stream));
+        SFEM_CUDA_CHECK(cudaStreamSynchronize(stream));
+        const T host_value = scratch.host[0];
 
         return host_value;
     }
@@ -185,21 +184,22 @@ namespace sfem {
     }
 
     template <typename T>
-    static void ramp_p_tpl(const ptrdiff_t n,
-                           const T         penalty_param,
-                           const T* const  weights,
-                           const T* const  x,
-                           const T* const  ub,
-                           const T* const  lagr_ub,
-                           T* const        out) {
-        SFEM_DEBUG_SYNCHRONIZE(nullptr);
+    static void ramp_p_tpl(const ptrdiff_t    n,
+                           const T            penalty_param,
+                           const T* const     weights,
+                           const T* const     x,
+                           const T* const     ub,
+                           const T* const     lagr_ub,
+                           T* const           out,
+                           const cudaStream_t stream) {
+        SFEM_DEBUG_SYNCHRONIZE(stream);
 
         int       kernel_block_size = SFEM_WARP_SIZE * SFEM_N_WARPS_PER_BLOCK;
         ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
 
-        ramp_p_kernel<<<n_blocks, kernel_block_size>>>(n, penalty_param, weights, x, ub, lagr_ub, out);
+        ramp_p_kernel<<<n_blocks, kernel_block_size, 0, stream>>>(n, penalty_param, weights, x, ub, lagr_ub, out);
 
-        SFEM_DEBUG_SYNCHRONIZE(nullptr);
+        SFEM_DEBUG_SYNCHRONIZE(stream);
     }
 
     /////
@@ -219,21 +219,22 @@ namespace sfem {
     }
 
     template <typename T>
-    static void ramp_m_tpl(const ptrdiff_t n,
-                           const T         penalty_param,
-                           const T* const  weights,
-                           const T* const  x,
-                           const T* const  lb,
-                           const T* const  lagr_lb,
-                           T* const        out) {
-        SFEM_DEBUG_SYNCHRONIZE(nullptr);
+    static void ramp_m_tpl(const ptrdiff_t    n,
+                           const T            penalty_param,
+                           const T* const     weights,
+                           const T* const     x,
+                           const T* const     lb,
+                           const T* const     lagr_lb,
+                           T* const           out,
+                           const cudaStream_t stream) {
+        SFEM_DEBUG_SYNCHRONIZE(stream);
 
         int       kernel_block_size = SFEM_WARP_SIZE * SFEM_N_WARPS_PER_BLOCK;
         ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
 
-        ramp_m_kernel<<<n_blocks, kernel_block_size>>>(n, penalty_param, weights, x, lb, lagr_lb, out);
+        ramp_m_kernel<<<n_blocks, kernel_block_size, 0, stream>>>(n, penalty_param, weights, x, lb, lagr_lb, out);
 
-        SFEM_DEBUG_SYNCHRONIZE(nullptr);
+        SFEM_DEBUG_SYNCHRONIZE(stream);
     }
 
     /////
@@ -252,20 +253,21 @@ namespace sfem {
     }
 
     template <typename T>
-    static void update_lagr_p_tpl(const ptrdiff_t n,
-                                  const T         penalty_param,
-                                  const T* const  weights,
-                                  const T* const  x,
-                                  const T* const  ub,
-                                  T* const        lagr_ub) {
-        SFEM_DEBUG_SYNCHRONIZE(nullptr);
+    static void update_lagr_p_tpl(const ptrdiff_t    n,
+                                  const T            penalty_param,
+                                  const T* const     weights,
+                                  const T* const     x,
+                                  const T* const     ub,
+                                  T* const           lagr_ub,
+                                  const cudaStream_t stream) {
+        SFEM_DEBUG_SYNCHRONIZE(stream);
 
         int       kernel_block_size = SFEM_WARP_SIZE * SFEM_N_WARPS_PER_BLOCK;
         ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
 
-        update_lagr_p_kernel<<<n_blocks, kernel_block_size>>>(n, penalty_param, weights, x, ub, lagr_ub);
+        update_lagr_p_kernel<<<n_blocks, kernel_block_size, 0, stream>>>(n, penalty_param, weights, x, ub, lagr_ub);
 
-        SFEM_DEBUG_SYNCHRONIZE(nullptr);
+        SFEM_DEBUG_SYNCHRONIZE(stream);
     }
 
     /////
@@ -284,20 +286,21 @@ namespace sfem {
     }
 
     template <typename T>
-    static void update_lagr_m_tpl(const ptrdiff_t n,
-                                  const T         penalty_param,
-                                  const T* const  weights,
-                                  const T* const  x,
-                                  const T* const  lb,
-                                  T* const        lagr_lb) {
-        SFEM_DEBUG_SYNCHRONIZE(nullptr);
+    static void update_lagr_m_tpl(const ptrdiff_t    n,
+                                  const T            penalty_param,
+                                  const T* const     weights,
+                                  const T* const     x,
+                                  const T* const     lb,
+                                  T* const           lagr_lb,
+                                  const cudaStream_t stream) {
+        SFEM_DEBUG_SYNCHRONIZE(stream);
 
         int       kernel_block_size = SFEM_WARP_SIZE * SFEM_N_WARPS_PER_BLOCK;
         ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
 
-        update_lagr_m_kernel<<<n_blocks, kernel_block_size>>>(n, penalty_param, weights, x, lb, lagr_lb);
+        update_lagr_m_kernel<<<n_blocks, kernel_block_size, 0, stream>>>(n, penalty_param, weights, x, lb, lagr_lb);
 
-        SFEM_DEBUG_SYNCHRONIZE(nullptr);
+        SFEM_DEBUG_SYNCHRONIZE(stream);
     }
 
     template <typename T>
@@ -330,29 +333,30 @@ namespace sfem {
 
     ///
     template <typename T>
-    static void calc_J_pen_tpl(const ptrdiff_t n,
-                               const T* const  x,
-                               const T         penalty_param,
-                               const T* const  weights,
-                               const T* const  lb,
-                               const T* const  ub,
-                               const T* const  lagr_lb,
-                               const T* const  lagr_ub,
-                               T* const        result) {
-        SFEM_DEBUG_SYNCHRONIZE(nullptr);
+    static void calc_J_pen_tpl(const ptrdiff_t    n,
+                               const T* const     x,
+                               const T            penalty_param,
+                               const T* const     weights,
+                               const T* const     lb,
+                               const T* const     ub,
+                               const T* const     lagr_lb,
+                               const T* const     lagr_ub,
+                               T* const           result,
+                               const cudaStream_t stream) {
+        SFEM_DEBUG_SYNCHRONIZE(stream);
 
         int       kernel_block_size = SFEM_WARP_SIZE * SFEM_N_WARPS_PER_BLOCK;
         ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
 
         if (lb) {
-            calc_J_pen_m_kernel<<<n_blocks, kernel_block_size>>>(n, x, penalty_param, weights, lb, lagr_lb, result);
+            calc_J_pen_m_kernel<<<n_blocks, kernel_block_size, 0, stream>>>(n, x, penalty_param, weights, lb, lagr_lb, result);
         }
 
         if (ub) {
-            calc_J_pen_p_kernel<<<n_blocks, kernel_block_size>>>(n, x, penalty_param, weights, ub, lagr_ub, result);
+            calc_J_pen_p_kernel<<<n_blocks, kernel_block_size, 0, stream>>>(n, x, penalty_param, weights, ub, lagr_ub, result);
         }
 
-        SFEM_DEBUG_SYNCHRONIZE(nullptr);
+        SFEM_DEBUG_SYNCHRONIZE(stream);
     }
 
     template <typename T, bool UPPER>
@@ -375,28 +379,29 @@ namespace sfem {
     }
 
     template <typename T, bool UPPER>
-    static T sq_norm_kkt_tpl(const ptrdiff_t n,
-                             const T         penalty_param,
-                             const T* const  weights,
-                             const T* const  x,
-                             const T* const  bound,
-                             const T* const  lagr) {
-        SFEM_DEBUG_SYNCHRONIZE(nullptr);
+    static T sq_norm_kkt_tpl(const ptrdiff_t    n,
+                             const T            penalty_param,
+                             const T* const     weights,
+                             const T* const     x,
+                             const T* const     bound,
+                             const T* const     lagr,
+                             const cudaStream_t stream) {
+        SFEM_DEBUG_SYNCHRONIZE(stream);
 
         int       kernel_block_size = SFEM_WARP_SIZE * SFEM_N_WARPS_PER_BLOCK;
         ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
 
-        T* device_value = nullptr;
+        const auto scratch      = reduction_scratch<T>(1);
+        T* const   device_value = scratch.device;
+        SFEM_CUDA_CHECK(cudaMemsetAsync(device_value, 0, sizeof(T), stream));
 
-        cudaMalloc((void**)&device_value, sizeof(T));
-        cudaMemset((void*)device_value, 0, sizeof(T));
+        sq_norm_kkt_kernel<T, UPPER>
+                <<<n_blocks, kernel_block_size, 0, stream>>>(n, penalty_param, weights, x, bound, lagr, device_value);
+        SFEM_DEBUG_SYNCHRONIZE(stream);
 
-        sq_norm_kkt_kernel<T, UPPER><<<n_blocks, kernel_block_size>>>(n, penalty_param, weights, x, bound, lagr, device_value);
-        SFEM_DEBUG_SYNCHRONIZE(nullptr);
-
-        T host_value = -1;
-        cudaMemcpy(&host_value, device_value, sizeof(T), cudaMemcpyDeviceToHost);
-        cudaFree(device_value);
+        SFEM_CUDA_CHECK(cudaMemcpyAsync(scratch.host, device_value, sizeof(T), cudaMemcpyDeviceToHost, stream));
+        SFEM_CUDA_CHECK(cudaStreamSynchronize(stream));
+        const T host_value = scratch.host[0];
 
         return host_value;
     }
@@ -414,26 +419,33 @@ namespace sfem {
     }
 
     template <typename T>
-    static void scale_blocks_tpl(const ptrdiff_t n_blocks, const int block_size, const T* const scale, const T* const blocks, T* const out) {
-        SFEM_DEBUG_SYNCHRONIZE(nullptr);
+    static void scale_blocks_tpl(const ptrdiff_t    n_blocks,
+                                 const int          block_size,
+                                 const T* const     scale,
+                                 const T* const     blocks,
+                                 T* const           out,
+                                 const cudaStream_t stream) {
+        SFEM_DEBUG_SYNCHRONIZE(stream);
 
         const ptrdiff_t n                 = n_blocks * block_size;
         int             kernel_block_size = SFEM_WARP_SIZE * SFEM_N_WARPS_PER_BLOCK;
         ptrdiff_t       n_cuda_blocks     = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
 
-        scale_blocks_kernel<<<n_cuda_blocks, kernel_block_size>>>(n_blocks, block_size, scale, blocks, out);
+        scale_blocks_kernel<<<n_cuda_blocks, kernel_block_size, 0, stream>>>(n_blocks, block_size, scale, blocks, out);
 
-        SFEM_DEBUG_SYNCHRONIZE(nullptr);
+        SFEM_DEBUG_SYNCHRONIZE(stream);
     }
 
     template <typename T>
-    void CUDA_ShiftedPenalty<T>::build(struct ShiftedPenalty_Tpl<T>& tpl) {
-        tpl.sq_norm_ramp_p = &sq_norm_ramp_p_tpl<T>;
-        tpl.sq_norm_ramp_m = &sq_norm_ramp_m_tpl<T>;
-        tpl.ramp_p         = &ramp_p_tpl<T>;
-        tpl.ramp_m         = &ramp_m_tpl<T>;
-        tpl.update_lagr_p  = &update_lagr_p_tpl<T>;
-        tpl.update_lagr_m  = &update_lagr_m_tpl<T>;
+    void CUDA_ShiftedPenalty<T>::build(struct ShiftedPenalty_Tpl<T>& tpl, const ExecutionContext& context) {
+        // Every pass on the context's stream, bound here once.
+        const cudaStream_t s = static_cast<cudaStream_t>(context.stream());
+        tpl.sq_norm_ramp_p   = [s](auto&&... a) { return sq_norm_ramp_p_tpl<T>(a..., s); };
+        tpl.sq_norm_ramp_m   = [s](auto&&... a) { return sq_norm_ramp_m_tpl<T>(a..., s); };
+        tpl.ramp_p           = [s](auto&&... a) { ramp_p_tpl<T>(a..., s); };
+        tpl.ramp_m           = [s](auto&&... a) { ramp_m_tpl<T>(a..., s); };
+        tpl.update_lagr_p    = [s](auto&&... a) { update_lagr_p_tpl<T>(a..., s); };
+        tpl.update_lagr_m    = [s](auto&&... a) { update_lagr_m_tpl<T>(a..., s); };
 
         auto ramp_m    = tpl.ramp_m;
         auto ramp_p    = tpl.ramp_p;
@@ -451,10 +463,10 @@ namespace sfem {
             if (ub) ramp_p(n, penalty_param, weights, x, ub, lagr_ub, result);
         };
 
-        tpl.calc_J_pen = &calc_J_pen_tpl<T>;
-        tpl.scale_blocks = &scale_blocks_tpl<T>;
-        tpl.sq_norm_kkt_p = &sq_norm_kkt_tpl<T, true>;
-        tpl.sq_norm_kkt_m = &sq_norm_kkt_tpl<T, false>;
+        tpl.calc_J_pen    = [s](auto&&... a) { calc_J_pen_tpl<T>(a..., s); };
+        tpl.scale_blocks  = [s](auto&&... a) { scale_blocks_tpl<T>(a..., s); };
+        tpl.sq_norm_kkt_p = [s](auto&&... a) { return sq_norm_kkt_tpl<T, true>(a..., s); };
+        tpl.sq_norm_kkt_m = [s](auto&&... a) { return sq_norm_kkt_tpl<T, false>(a..., s); };
 
         assert(tpl.good());
     }

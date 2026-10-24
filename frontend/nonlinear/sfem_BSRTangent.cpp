@@ -279,7 +279,8 @@ namespace sfem {
         return impl.visit([&](const auto &values) {
 #ifdef SFEM_ENABLE_CUDA
             if (impl.context.space() == EXECUTION_SPACE_DEVICE) {
-                return d_bsr_extract_diagonal(block_rows(), impl.block_size, rowptr(), colidx(), values->data(), out);
+                return d_bsr_extract_diagonal(
+                        block_rows(), impl.block_size, rowptr(), colidx(), values->data(), out, impl.context.stream());
             }
 #endif
             bsr_extract_diagonal(block_rows(), impl.block_size, rowptr(), colidx(), values->data(), out);
@@ -297,7 +298,8 @@ namespace sfem {
             using V = std::remove_pointer_t<decltype(values->data())>;
 #ifdef SFEM_ENABLE_CUDA
             if (impl.context.space() == EXECUTION_SPACE_DEVICE) {
-                return d_bsr_max_abs_row_sum<count_t, idx_t, V, real_t>(rows, impl.block_size, rowptr(), colidx(), values->data(), scale);
+                return d_bsr_max_abs_row_sum<count_t, idx_t, V, real_t>(
+                        rows, impl.block_size, rowptr(), colidx(), values->data(), scale, impl.context.stream());
             }
 #endif
             return bsr_max_abs_row_sum<count_t, idx_t, V, real_t>(rows, impl.block_size, rowptr(), colidx(), values->data(), scale);
@@ -312,7 +314,14 @@ namespace sfem {
         return impl.visit([&](const auto &values) {
 #ifdef SFEM_ENABLE_CUDA
             if (impl.context.space() == EXECUTION_SPACE_DEVICE) {
-                return d_bsr_shift_diagonal(block_rows(), impl.block_size, rowptr(), colidx(), factor, reference, values->data());
+                return d_bsr_shift_diagonal(block_rows(),
+                                            impl.block_size,
+                                            rowptr(),
+                                            colidx(),
+                                            factor,
+                                            reference,
+                                            values->data(),
+                                            impl.context.stream());
             }
 #endif
             bsr_shift_diagonal(block_rows(), impl.block_size, rowptr(), colidx(), factor, reference, values->data());

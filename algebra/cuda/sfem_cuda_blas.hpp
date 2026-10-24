@@ -28,7 +28,7 @@ void d_copy(const ptrdiff_t n, const real_t *const src, real_t *const dest);
 
 real_t d_dot(const ptrdiff_t n, const real_t *const l, const real_t *const r);
 
-void d_ediv(const ptrdiff_t n, const real_t *const l, const real_t *const r, real_t *const result);
+void d_ediv(const ptrdiff_t n, const real_t *const l, const real_t *const r, real_t *const result, void *const stream);
 
 void d_axpby(const ptrdiff_t n, const real_t alpha, const real_t *const x, const real_t beta, real_t *const y);
 
@@ -87,11 +87,12 @@ namespace sfem {
 
     template <typename T>
     int sbv_mult3(const ptrdiff_t    n_blocks,
-                  const idx_t* const idx,
-                  const T* const     dd,
-                  const T* const     s,
-                  const T* const     x,
-                  T* const           y);
+                  const idx_t *const idx,
+                  const T *const     dd,
+                  const T *const     s,
+                  const T *const     x,
+                  T *const           y,
+                  void *const        stream);
 
 }  // namespace sfem
 

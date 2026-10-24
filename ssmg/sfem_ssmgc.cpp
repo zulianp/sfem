@@ -30,17 +30,17 @@ namespace sfem {
     static bool is_root_rank(const std::shared_ptr<Communicator> &comm) { return !comm || comm->rank() == 0; }
 
     // Packed 3x3 SPD block: [xx, xy, xz, yy, yz, zz]. hessian_diag is AOS (xx,yy,zz) per node.
-    static void pack_nodal_diag_to_block_sym6(const ptrdiff_t      n_nodes,
-                                              const real_t *const  d3,
-                                              real_t *const        d6,
-                                              const ExecutionSpace es) {
-        SFEM_UNUSED(es);
+    static void pack_nodal_diag_to_block_sym6(const ptrdiff_t         n_nodes,
+                                              const real_t *const     d3,
+                                              real_t *const           d6,
+                                              const ExecutionContext &context) {
+        SFEM_UNUSED(context);
         if (n_nodes <= 0 || !d3 || !d6) {
             return;
         }
 #ifdef SFEM_ENABLE_CUDA
-        if (es == EXECUTION_SPACE_DEVICE) {
-            pack_nodal_diag_to_block_sym6_device(n_nodes, d3, d6);
+        if (context.space() == EXECUTION_SPACE_DEVICE) {
+            pack_nodal_diag_to_block_sym6_device(n_nodes, d3, d6, context.stream());
             return;
         }
 #endif

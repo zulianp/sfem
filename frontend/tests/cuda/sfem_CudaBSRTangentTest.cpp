@@ -44,8 +44,9 @@ int test_device_diagonal_matches_host() {
     auto d_colidx = smesh::to_device(colidx);
     auto d_values = smesh::to_device(values);
     auto d_diag   = create_buffer<real_t>(rows * bs, EXECUTION_SPACE_DEVICE);
-    SFEM_TEST_ASSERT(d_bsr_extract_diagonal(rows, bs, d_rowptr->data(), d_colidx->data(), d_values->data(), d_diag->data()) ==
-                     SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(
+            d_bsr_extract_diagonal(rows, bs, d_rowptr->data(), d_colidx->data(), d_values->data(), d_diag->data(), nullptr) ==
+            SFEM_SUCCESS);
     auto from_device = smesh::to_host(d_diag);
 
     for (ptrdiff_t i = 0; i < rows * bs; ++i) {
@@ -77,13 +78,14 @@ int test_device_diagonal_matches_host() {
 
     // The largest absolute row sum, and the diagonal shifted by a fraction of a reference.
     const real_t h_sum = tangent->max_abs_row_sum();
-    const real_t d_sum = d_bsr_max_abs_row_sum<count_t, idx_t, real_t, real_t>(rows, bs, d_rowptr->data(), d_colidx->data(), d_values->data());
+    const real_t d_sum = d_bsr_max_abs_row_sum<count_t, idx_t, real_t, real_t>(
+            rows, bs, d_rowptr->data(), d_colidx->data(), d_values->data(), nullptr, nullptr);
     printf("  max |row| sum: host %.17g, device %.17g\n", (double)h_sum, (double)d_sum);
     SFEM_TEST_ASSERT(h_sum > 0 && std::abs(h_sum - d_sum) <= 1e-14 * h_sum);
 
     SFEM_TEST_ASSERT(tangent->shift_diagonal(real_t(0.25), h_diag->data()) == SFEM_SUCCESS);
-    const int shifted_status =
-            d_bsr_shift_diagonal<count_t, idx_t, real_t, real_t>(rows, bs, d_rowptr->data(), d_colidx->data(), real_t(0.25), d_diag->data(), d_values->data());
+    const int shifted_status = d_bsr_shift_diagonal<count_t, idx_t, real_t, real_t>(
+            rows, bs, d_rowptr->data(), d_colidx->data(), real_t(0.25), d_diag->data(), d_values->data(), nullptr);
     SFEM_TEST_ASSERT(shifted_status == SFEM_SUCCESS);
     auto shifted = smesh::to_host(d_values);
     for (ptrdiff_t i = 0; i < nnz * bs * bs; ++i) {

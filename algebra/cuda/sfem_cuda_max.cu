@@ -23,13 +23,14 @@ namespace sfem {
         }
     }  // namespace
 
-    real_t d_max(const ptrdiff_t n, const real_t *const x, const real_t init) {
+    real_t d_max(const ptrdiff_t n, const real_t *const x, const real_t init, void *const stream) {
         if (n <= 0) return init;
         const int  n_blocks = (int)std::min<ptrdiff_t>(1024, (n + block_size - 1) / block_size);
         const auto partial  = reduction_scratch<real_t>(n_blocks);
-        max_kernel<<<n_blocks, block_size>>>(n, x, init, partial.device);
-        SFEM_CUDA_CHECK(cudaMemcpyAsync(partial.host, partial.device, n_blocks * sizeof(real_t), cudaMemcpyDeviceToHost, 0));
-        SFEM_CUDA_CHECK(cudaStreamSynchronize(0));
+        const cudaStream_t s        = static_cast<cudaStream_t>(stream);
+        max_kernel<<<n_blocks, block_size, 0, s>>>(n, x, init, partial.device);
+        SFEM_CUDA_CHECK(cudaMemcpyAsync(partial.host, partial.device, n_blocks * sizeof(real_t), cudaMemcpyDeviceToHost, s));
+        SFEM_CUDA_CHECK(cudaStreamSynchronize(s));
         real_t m = init;
         for (int b = 0; b < n_blocks; ++b) m = std::max(m, partial.host[b]);
         return m;

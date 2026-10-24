@@ -11,6 +11,7 @@ int cu_sample_nodes(const int                         order,
                     const NodeSamplerPoints          &points,
                     const real_t *const SFEM_RESTRICT disp,
                     const NodeSamplerGrid            &grid,
-                    const NodeSamplerOutput          &out);
+                    const NodeSamplerOutput          &out,
+                    void *const                       stream);
 
 #endif  // CU_NODE_INTERPOLATE_HPP

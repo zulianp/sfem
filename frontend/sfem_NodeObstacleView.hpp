@@ -3,6 +3,7 @@
 
 #include "sfem_aliases.hpp"
 #include "sfem_base.hpp"
+#include "sfem_execution_context.hpp"
 #include "smesh_types.hpp"
 
 namespace sfem {
@@ -85,17 +86,17 @@ namespace sfem {
     // The sampled gap and normals of `size` contact nodes (in es) to what the constraints see
     // (node_obstacle_offset_gap): gap - shift + release * p0_i (p0 may be null: zero), and past
     // `cutoff` no obstacle.
-    void node_obstacle_offset_gap(const ExecutionSpace es,
-                                  const ptrdiff_t      size,
-                                  const real_t         shift,
-                                  const real_t         cutoff,
-                                  const real_t         release,
-                                  const real_t *const  p0,
-                                  real_t *const        gap,
-                                  real_t *const *const normals);
+    void node_obstacle_offset_gap(const ExecutionContext &context,
+                                  const ptrdiff_t         size,
+                                  const real_t            shift,
+                                  const real_t            cutoff,
+                                  const real_t            release,
+                                  const real_t *const     p0,
+                                  real_t *const           gap,
+                                  real_t *const *const    normals);
 
     // max(0, max_i x_i) over n values in es.
-    real_t max_or_zero(const ExecutionSpace es, const ptrdiff_t n, const real_t *const x);
+    real_t max_or_zero(const ExecutionContext &context, const ptrdiff_t n, const real_t *const x);
 
 }  // namespace sfem
 
