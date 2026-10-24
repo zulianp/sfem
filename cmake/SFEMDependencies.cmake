@@ -19,6 +19,13 @@ if(SFEM_ENABLE_CUDA)
         set(CMAKE_CUDA_STANDARD 17)
         set(CMAKE_CUDA_STANDARD_REQUIRED ON)
     endif()
+
+    # The null stream is the calling thread's default stream (cudaStreamPerThread), not the legacy
+    # one: a graph can capture it, and every launch, copy and thrust call issued without a stream
+    # stays in one order on it. nvcc takes the flag, host compilers the definition; set before smesh
+    # is added so that its kernels share the stream (sfem_execution_context.hpp).
+    string(APPEND CMAKE_CUDA_FLAGS " --default-stream per-thread")
+    add_compile_definitions(CUDA_API_PER_THREAD_DEFAULT_STREAM)
 endif()
 
 if(EXISTS "${SFEM_SMESH_PATH}/CMakeLists.txt")

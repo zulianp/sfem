@@ -11,7 +11,7 @@ namespace sfem {
     /// copies included, and they on it). Forked from and joined into the stream the work belongs
     /// to, so a graph capturing that stream takes this one's work in too.
     /// launch_stream() (sfem_cuda_base.hpp) for code that sees no CUDA types: the stream the
-    /// calling thread's launches go to (null: the legacy default stream).
+    /// calling thread's launches go to (null: the default device stream).
     void *current_launch_stream();
 
     class DeviceSideStream {
@@ -21,7 +21,7 @@ namespace sfem {
 
         void *stream() const;
         /// This stream waits for the work queued on `from` so far (a cudaStream_t; null: the
-        /// legacy default stream).
+        /// default device stream).
         void fork(void *const from);
         /// `into` waits for the work queued on this one so far.
         void join(void *const into);

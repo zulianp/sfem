@@ -322,6 +322,12 @@ target_include_directories(sfem PUBLIC ${SFEM_DEP_INCLUDES})
 # link
 
 target_link_libraries(sfem PUBLIC ${SFEM_DEP_LIBRARIES} ${CMAKE_DL_LIBS})
+
+if(SFEM_ENABLE_CUDA)
+    # Code built against the installed library shares its default stream (SFEMDependencies.cmake).
+    target_compile_definitions(sfem INTERFACE $<INSTALL_INTERFACE:CUDA_API_PER_THREAD_DEFAULT_STREAM>)
+    target_compile_options(sfem INTERFACE $<INSTALL_INTERFACE:$<$<COMPILE_LANGUAGE:CUDA>:--default-stream=per-thread>>)
+endif()
 # message(STATUS "SFEM_DEP_LIBRARIES: ${SFEM_DEP_LIBRARIES}")
 
 ######################################################

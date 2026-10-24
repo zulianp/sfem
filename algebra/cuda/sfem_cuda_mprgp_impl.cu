@@ -449,8 +449,8 @@ namespace sfem {
         // A solve's run graph: a WHILE node whose body is one CG iteration -- the operator's
         // product, the curvature pass, the step pass, the next direction -- and the decision that
         // sets its condition, captured from the launches themselves (LaunchStreamScope), so the
-        // iteration is the one the host would launch. The stream blocks: it follows the legacy
-        // stream's work and that follows it.
+        // iteration is the one the host would launch. Captured from and launched on the solver's
+        // stream, so it follows the solver's work and that follows it.
         template <typename T>
         struct RunGraph {
             cudaStream_t    stream{nullptr};
@@ -462,12 +462,11 @@ namespace sfem {
             ~RunGraph() {
                 if (exec) cudaGraphExecDestroy(exec);
                 if (graph) cudaGraphDestroy(graph);
-                if (stream) cudaStreamDestroy(stream);
                 if (host) cudaFreeHost(host);
             }
 
             bool build(const MPRGPRun<T>& r) {
-                SFEM_CUDA_CHECK(cudaStreamCreate(&stream));
+                stream = static_cast<cudaStream_t>(r.stream);
                 SFEM_CUDA_CHECK(cudaMallocHost(&host, 4 * sizeof(T)));
                 SFEM_CUDA_CHECK(cudaGraphCreate(&graph, 0));
                 cudaGraphConditionalHandle handle;
