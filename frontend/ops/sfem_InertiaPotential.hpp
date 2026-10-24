@@ -22,7 +22,7 @@ namespace sfem {
         bool energy_or_potential_based() const override { return true; }
         //! Where this operator runs, so `Function` allocates the buffers it
         //! writes on the same side.
-        ExecutionSpace execution_space() const override;
+        ExecutionContext execution_context() const override;
         bool        is_linear() const override { return true; }
 
         ptrdiff_t n_dofs_domain() const override;

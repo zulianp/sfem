@@ -443,7 +443,7 @@ namespace sfem {
 
         std::shared_ptr<CRS<R, C, TStorage, T>> transpose() const {
             SFEM_TRACE_SCOPE("CRS::transpose");
-            if (execution_space() != EXECUTION_SPACE_HOST) {
+            if (this->execution_space() != EXECUTION_SPACE_HOST) {
                 // TODO: Implement device version
                 SFEM_ERROR("Transpose is not supported for non-host execution space");
                 return nullptr;
@@ -474,7 +474,7 @@ namespace sfem {
 
         std::shared_ptr<CRS<R, C, TStorage, T>> mm(const std::shared_ptr<CRS<R, C, TStorage, T>>& other) const {
             SFEM_TRACE_SCOPE("CRS::mm");
-            if (execution_space() != EXECUTION_SPACE_HOST || other->execution_space() != EXECUTION_SPACE_HOST) {
+            if (this->execution_space() != EXECUTION_SPACE_HOST || other->execution_space() != EXECUTION_SPACE_HOST) {
                 // TODO: Implement device version
                 SFEM_ERROR("Matrix multiplication is not supported for non-host execution space");
                 return nullptr;
@@ -522,7 +522,7 @@ namespace sfem {
 
         size_t nbytes() const { return row_ptr->nbytes() + col_idx->nbytes() + values->nbytes(); }
 
-        ExecutionSpace execution_space() const override { return execution_space_; }
+        ExecutionContext execution_context() const override { return execution_space_; }
 
         void print(std::ostream& os = std::cout) const {
             if (execution_space_ == EXECUTION_SPACE_HOST) {

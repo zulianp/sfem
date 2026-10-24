@@ -92,7 +92,7 @@ namespace sfem {
         void set_verbose(const bool val) { verbose = val; }
         void set_apply_overwrites_output(const bool val) { apply_overwrites_output = val; }
 
-        ExecutionSpace execution_space() const override { return blas ? blas->execution_space() : EXECUTION_SPACE_INVALID; }
+        ExecutionContext execution_context() const override { return blas ? blas->context() : ExecutionContext(EXECUTION_SPACE_INVALID); }
 
         void set_initial_guess_zero(const bool val) override { is_initial_guess_zero = val; }
 
@@ -245,7 +245,7 @@ namespace sfem {
         inline std::ptrdiff_t cols() const override { return n_dofs; }
 
     private:
-        bool use_host_kernels() const { return execution_space() == EXECUTION_SPACE_HOST; }
+        bool use_host_kernels() const { return this->execution_space() == EXECUTION_SPACE_HOST; }
 
         void ensure_apply_buffer(const ptrdiff_t n, T* const y) const {
             if (!apply_overwrites_output) {

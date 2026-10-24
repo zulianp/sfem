@@ -51,7 +51,7 @@ namespace sfem {
         std::shared_ptr<MatrixFreeLinearSolver<T>> linear_solver_;
         SharedBuffer<T>                            lagr_lb, lagr_ub;
 
-        ExecutionSpace        execution_space() const override { return blas ? blas->execution_space() : EXECUTION_SPACE_INVALID; }
+        ExecutionContext      execution_context() const override { return blas ? blas->context() : ExecutionContext(EXECUTION_SPACE_INVALID); }
         inline std::ptrdiff_t rows() const override { return n_dofs; }
         inline std::ptrdiff_t cols() const override { return n_dofs; }
         void set_linear_solver(const std::shared_ptr<MatrixFreeLinearSolver<T>>& solver) { linear_solver_ = solver; }
@@ -100,7 +100,7 @@ namespace sfem {
 
         SharedBuffer<T> make_buffer(const ptrdiff_t n) const {
             auto blas_impl = blas;
-            return Buffer<T>::own(n, blas_impl->allocate(n), [blas_impl](void* ptr) { blas_impl->destroy(ptr); }, (enum MemorySpace)execution_space());
+            return Buffer<T>::own(n, blas_impl->allocate(n), [blas_impl](void* ptr) { blas_impl->destroy(ptr); }, (enum MemorySpace)this->execution_space());
         }
         int apply(const T* const b, T* const x) override {
             assert(good());
@@ -248,7 +248,7 @@ namespace sfem {
                                             lagr_ub ? lagr_ub->data() : nullptr,
                                             J_pen->data());
 
-                            linear_solver_->set_op_and_diag_shift(apply_op + sfem::diag_op(J_pen, execution_space()), J_pen);
+                            linear_solver_->set_op_and_diag_shift(apply_op + sfem::diag_op(J_pen, this->execution_space()), J_pen);
                         }
 
                         blas->zeros(n_dofs, c->data());

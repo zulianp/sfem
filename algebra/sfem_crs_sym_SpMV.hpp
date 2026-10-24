@@ -28,7 +28,7 @@ namespace sfem {
         ptrdiff_t cols_{0};
 
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
-        ExecutionSpace execution_space() const override { return execution_space_; }
+        ExecutionContext execution_context() const override { return execution_space_; }
 
         void apply_(const T* const x, T* const y) const {
             const ptrdiff_t nnz = this->colidx->size();

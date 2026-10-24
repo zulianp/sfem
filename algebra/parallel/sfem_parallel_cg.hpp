@@ -55,7 +55,7 @@ namespace sfem {
 
         int iterations() const override { return iterations_; }
 
-        ExecutionSpace execution_space() const override { return blas ? blas->execution_space() : EXECUTION_SPACE_INVALID; }
+        ExecutionContext execution_context() const override { return blas ? blas->context() : ExecutionContext(EXECUTION_SPACE_INVALID); }
 
         void set_atol(const T val) { atol = val; }
         void set_rtol(const T val) { rtol = val; }

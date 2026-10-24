@@ -162,7 +162,7 @@ namespace sfem {
 
         std::ptrdiff_t rows() const override { return diag_rowptr ? (diag_rowptr->size() - 1) : 0; }
         std::ptrdiff_t cols() const override { return rows(); }
-        ExecutionSpace execution_space() const override { return execution_space_; }
+        ExecutionContext execution_context() const override { return execution_space_; }
     };
 
     template <typename R, typename C, typename T, typename S = int16_t, typename TOp = T, typename TStorage = T>

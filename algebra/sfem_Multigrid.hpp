@@ -49,7 +49,7 @@ namespace sfem {
         };
 
 
-        ExecutionSpace execution_space() const override { return blas_ ? blas_->execution_space() : EXECUTION_SPACE_INVALID; }
+        ExecutionContext execution_context() const override { return blas_ ? blas_->context() : ExecutionContext(EXECUTION_SPACE_INVALID); }
 
         int apply(const T* const rhs, T* const x) override {
             SFEM_TRACE_SCOPE("Multigrid::apply");

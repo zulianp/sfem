@@ -42,7 +42,7 @@ namespace sfem {
         }
         inline std::ptrdiff_t rows() const override { return ndofs; }
         inline std::ptrdiff_t cols() const override { return ndofs; }
-        ExecutionSpace execution_space() const override { return blas ? blas->execution_space() : EXECUTION_SPACE_INVALID; }
+        ExecutionContext execution_context() const override { return blas ? blas->context() : ExecutionContext(EXECUTION_SPACE_INVALID); }
 
         /* Sparse Matrix-Vector Multiplication using SymmCOO format */
         int coo_sym_spmv_(const T* const SFEM_RESTRICT x, T* const SFEM_RESTRICT y) {

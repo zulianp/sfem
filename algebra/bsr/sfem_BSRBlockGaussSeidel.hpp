@@ -191,7 +191,7 @@ namespace sfem {
 
         std::ptrdiff_t rows() const override { return bsr_->rows(); }
         std::ptrdiff_t cols() const override { return bsr_->cols(); }
-        ExecutionSpace execution_space() const override { return EXECUTION_SPACE_HOST; }
+        ExecutionContext execution_context() const override { return EXECUTION_SPACE_HOST; }
 
     private:
         void ensure_workspace() {

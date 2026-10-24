@@ -458,10 +458,17 @@ namespace sfem {
         virtual std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> & /*space*/) { return nullptr; }
 
         /**
+         * @brief Get the execution context of this operator: where it runs and, on the device, the stream
+         * its kernels are issued on
+         * @return Execution context
+         */
+        virtual ExecutionContext execution_context() const { return EXECUTION_SPACE_HOST; }
+
+        /**
          * @brief Get the execution space of this operator
          * @return Execution space (CPU, GPU, etc.)
          */
-        virtual ExecutionSpace execution_space() const { return EXECUTION_SPACE_HOST; }
+        ExecutionSpace execution_space() const { return execution_context().space(); }
 
         /**
          * @brief Set a field for operators that depend on external fields

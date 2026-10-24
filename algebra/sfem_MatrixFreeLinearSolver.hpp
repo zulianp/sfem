@@ -167,7 +167,7 @@ namespace sfem {
 
         std::ptrdiff_t rows() const override { return n_dofs; }
         std::ptrdiff_t cols() const override { return n_dofs; }
-        ExecutionSpace execution_space() const override { return (enum ExecutionSpace)sbv->data()->mem_space(); }
+        ExecutionContext execution_context() const override { return (enum ExecutionSpace)sbv->data()->mem_space(); }
     };
 
     template <typename T>

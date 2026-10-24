@@ -67,7 +67,7 @@ namespace sfem {
         }
         inline std::ptrdiff_t rows() const override { return transposed ? fine_dim : coarse_dim; }
         inline std::ptrdiff_t cols() const override { return transposed ? coarse_dim : fine_dim; }
-        ExecutionSpace execution_space() const override { return blas ? blas->execution_space() : EXECUTION_SPACE_INVALID; }
+        ExecutionContext execution_context() const override { return blas ? blas->context() : ExecutionContext(EXECUTION_SPACE_INVALID); }
 
     private:
         // Length of `fine_dim` and values indicate coarse grid indices
