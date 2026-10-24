@@ -38,6 +38,9 @@ namespace sfem {
         T              gamma{1}, atol{0}, rtol{0}, norm_gp0{1};
         int            max_it{0};
         std::function<void(const T *const, T *const)> product;
+        /// Across the ranks of one node: the passes' sums completed on the device (empty on one
+        /// rank), on the run's stream, so the run needs no host across the ranks either.
+        MPRGPReduce<T> reduce;
     };
 
     /// How a run ended: before a proportioning step (the chopped gradient grew), at a CG decision
