@@ -1,10 +1,10 @@
 // The device BLAS in an execution context: it reports the context it was built with, every
-// operation is ordered on the context's stream (not the legacy default stream), and the reduction
+// operation is ordered on the context's stream (not the default device stream), and the reduction
 // into device memory allocates nothing and does not synchronise, so a CUDA graph can capture it.
 //
 // The stream test closes a gate on the context's stream: a host function enqueued there waits for
 // a flag. Work ordered on that stream cannot have run while the gate is closed; work that went to
-// the legacy stream instead has run once the legacy stream is synchronised, which does not wait for
+// the default stream instead has run once the default stream is synchronised, which does not wait for
 // a non-blocking stream. Both outcomes are certain, not a race.
 
 #include <atomic>
@@ -48,14 +48,15 @@ int test_blas_reports_its_context() {
 
     auto host   = sfem::blas<real_t>(sfem::EXECUTION_SPACE_HOST);
     auto device = sfem::blas<real_t>(sfem::ExecutionContext::device(s));
-    auto legacy = sfem::blas<real_t>(sfem::EXECUTION_SPACE_DEVICE);
+    auto byspace = sfem::blas<real_t>(sfem::EXECUTION_SPACE_DEVICE);
 
     SFEM_TEST_ASSERT(host->execution_space() == sfem::EXECUTION_SPACE_HOST);
     SFEM_TEST_ASSERT(host->context().stream() == nullptr);
     SFEM_TEST_ASSERT(device->execution_space() == sfem::EXECUTION_SPACE_DEVICE);
     SFEM_TEST_ASSERT(device->context().stream() == (void *)s);
-    SFEM_TEST_ASSERT(legacy->execution_space() == sfem::EXECUTION_SPACE_DEVICE);
-    SFEM_TEST_ASSERT(legacy->context().stream() == nullptr);
+    // A bare space is the default device stream: the calling thread's, never the legacy one.
+    SFEM_TEST_ASSERT(byspace->execution_space() == sfem::EXECUTION_SPACE_DEVICE);
+    SFEM_TEST_ASSERT(byspace->context().stream() == (void *)cudaStreamPerThread);
 
     cudaStreamDestroy(s);
     return SFEM_TEST_SUCCESS;
@@ -98,7 +99,7 @@ int test_blas_runs_on_its_stream() {
     blas->scal(n, 2, z);          // z = 2 (2 + x)
     blas->dot(n, x, x, d);        // d = x . x, into device memory
     blas->zeros(n, x);            // x = 0
-    // Whatever went to the legacy stream has run once it is synchronised; the context's stream is
+    // Whatever went to the default stream has run once it is synchronised; the context's stream is
     // still held by the gate.
     SFEM_TEST_ASSERT(cudaStreamSynchronize(0) == cudaSuccess);
     std::vector<real_t> early_y(n), early_x(n);

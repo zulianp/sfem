@@ -41,6 +41,9 @@ namespace sfem {
         /// Across the ranks of one node: the passes' sums completed on the device (empty on one
         /// rank), on the run's stream, so the run needs no host across the ranks either.
         MPRGPReduce<T> reduce;
+        /// The solver's stream (its context's): the run is captured from it and launched on it,
+        /// so it is ordered with the solver's other work.
+        void* stream{nullptr};
     };
 
     /// How a run ended: before a proportioning step (the chopped gradient grew), at a CG decision

@@ -476,6 +476,7 @@ namespace sfem {
             r.max_it   = max_it;
             r.product  = apply_op;
             r.reduce   = device_reduce_;
+            r.stream                 = this->blas->context().stream();
             const MPRGPRunResult run = impl.cg_run(r, iterations_, run_state_);
             if (!run.ran) return false;
             SFEM_TRACE_SCOPE("MPRGP::device_run");  // counts the runs taken on the device

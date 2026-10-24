@@ -5,15 +5,23 @@
 
 namespace sfem {
 
+    /// The stream device work goes to when nothing names another: the calling thread's default
+    /// stream (cudaStreamPerThread). The library is built with the null stream meaning that one
+    /// (`--default-stream per-thread`), so a launch, copy or thrust call without a stream joins it,
+    /// and unlike the legacy stream it can be captured into a graph. Null without CUDA.
+    void* default_device_stream();
+
     /// Where work runs and what orders it: an execution space and, on the device, the stream that
-    /// orders the work (a cudaStream_t, held without CUDA types; null is the legacy default stream).
-    /// An object is given its context when it is built, not on each call.
+    /// orders the work (a cudaStream_t, held without CUDA types; null asks for the default device
+    /// stream, which is what the context then holds). An object is given its context when it is
+    /// built, not on each call.
     ///
     /// A bare ExecutionSpace converts to the context of that space on its default stream.
     class ExecutionContext {
     public:
         ExecutionContext(const smesh::ExecutionSpace space = smesh::EXECUTION_SPACE_HOST, void* const stream = nullptr)
-            : space_(space), stream_(space == smesh::EXECUTION_SPACE_DEVICE ? stream : nullptr) {}
+            : space_(space),
+              stream_(space == smesh::EXECUTION_SPACE_DEVICE ? (stream ? stream : default_device_stream()) : nullptr) {}
 
         static ExecutionContext host() { return ExecutionContext(smesh::EXECUTION_SPACE_HOST); }
         static ExecutionContext device(void* const stream = nullptr) { return ExecutionContext(smesh::EXECUTION_SPACE_DEVICE, stream); }

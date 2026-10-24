@@ -1,7 +1,7 @@
 // The ghost exchange of a distributed space on a stream: with every rank on one node and NCCL
 // (Communicator::enable_device), synchronize_begin/end on a non-blocking stream queue the pack,
 // the messages and the unpack on that stream and return without waiting. A host-function gate
-// holds the stream: the ghosts must be unchanged while it is closed (the legacy stream, synchronised,
+// holds the stream: the ghosts must be unchanged while it is closed (the default stream, synchronised,
 // does not wait for it) and right once it opens. Without NCCL or with ranks on several nodes the
 // exchange waits for MPI on the host, and the test says so and passes.
 
