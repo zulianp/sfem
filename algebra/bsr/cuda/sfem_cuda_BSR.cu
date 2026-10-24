@@ -5,7 +5,7 @@
 
 #include <algorithm>
 
-#include "sfem_cuda_max.hpp"
+#include "sfem_cuda_reduction_scratch.hpp"
 
 
 namespace sfem {
@@ -32,13 +32,16 @@ namespace sfem {
         }
 
         template <typename R, typename C, typename TStorage, typename T>
-        __global__ void bsr_abs_row_sum_kernel(const ptrdiff_t                     block_rows,
-                                               const int                           block_size,
-                                               const R* const SFEM_RESTRICT        rowptr,
-                                               const C* const SFEM_RESTRICT        colidx,
-                                               const TStorage* const SFEM_RESTRICT values,
-                                               const T* const SFEM_RESTRICT        scale,
-                                               T* const SFEM_RESTRICT              out) {
+        __global__ void bsr_max_abs_row_sum_kernel(const ptrdiff_t                     block_rows,
+                                                   const int                           block_size,
+                                                   const R* const SFEM_RESTRICT        rowptr,
+                                                   const C* const SFEM_RESTRICT        colidx,
+                                                   const TStorage* const SFEM_RESTRICT values,
+                                                   const T* const SFEM_RESTRICT        scale,
+                                                   T* const SFEM_RESTRICT              partial) {
+            // Each thread's largest row sum, then the block's, into partial[blockIdx.x].
+            __shared__ T    cache[128];
+            T               m    = 0;
             const ptrdiff_t rows = block_rows * block_size;
             for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < rows; i += blockDim.x * gridDim.x) {
                 const ptrdiff_t row = i / block_size;
@@ -51,8 +54,15 @@ namespace sfem {
                         sum += scale ? a * scale[(ptrdiff_t)colidx[k] * block_size + c] : a;
                     }
                 }
-                out[i] = scale ? sum * scale[i] : sum;
+                m = fmax(m, scale ? sum * scale[i] : sum);
             }
+            cache[threadIdx.x] = m;
+            __syncthreads();
+            for (int s = blockDim.x / 2; s > 0; s /= 2) {
+                if (threadIdx.x < s) cache[threadIdx.x] = fmax(cache[threadIdx.x], cache[threadIdx.x + s]);
+                __syncthreads();
+            }
+            if (threadIdx.x == 0) partial[blockIdx.x] = cache[0];
         }
 
         template <typename R, typename C, typename TStorage, typename T>
@@ -176,13 +186,17 @@ namespace sfem {
                             const T* const SFEM_RESTRICT        scale) {
         const ptrdiff_t rows = block_rows * block_size;
         if (rows <= 0) return T(0);
-        T *sums = nullptr;
-        SFEM_CUDA_CHECK(cudaMalloc(&sums, rows * sizeof(T)));
-        const int       kernel_block_size = 128;
-        const ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (rows + kernel_block_size - 1) / kernel_block_size);
-        bsr_abs_row_sum_kernel<R, C, TStorage, T><<<n_blocks, kernel_block_size, 0>>>(block_rows, block_size, rowptr, colidx, values, scale, sums);
-        const T ret = d_max(rows, sums, T(0));
-        SFEM_CUDA_CHECK(cudaFree(sums));
+        // Block maxima of the row sums into the reduction scratch (the kernel's shared cache holds
+        // 128 threads), then their maximum on the host: no allocation, no array of row sums.
+        const int  kernel_block_size = 128;
+        const int  n_blocks          = (int)std::min<ptrdiff_t>(1024, (rows + kernel_block_size - 1) / kernel_block_size);
+        const auto partial           = reduction_scratch<T>(n_blocks);
+        bsr_max_abs_row_sum_kernel<R, C, TStorage, T>
+                <<<n_blocks, kernel_block_size, 0>>>(block_rows, block_size, rowptr, colidx, values, scale, partial.device);
+        SFEM_CUDA_CHECK(cudaMemcpyAsync(partial.host, partial.device, n_blocks * sizeof(T), cudaMemcpyDeviceToHost, 0));
+        SFEM_CUDA_CHECK(cudaStreamSynchronize(0));
+        T ret = 0;
+        for (int b = 0; b < n_blocks; ++b) ret = std::max(ret, partial.host[b]);
         return ret;
     }
 

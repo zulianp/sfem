@@ -3,6 +3,7 @@
 #include "sfem_cuda_blas.hpp"
 
 #include "sfem_cuda_base.hpp"
+#include "sfem_cuda_reduction_scratch.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -288,26 +289,6 @@ __global__ void tdot(const ptrdiff_t n, const T *const SFEM_RESTRICT l, const T 
     }
 }
 
-/// Where a reduction's scalar lands: one device word and one pinned host word per thread and
-/// type, allocated at the first reduction and reused by every later one, so a reduction allocates
-/// nothing. Kept for the life of the process (freeing at thread exit can follow the driver's own
-/// shutdown).
-template <typename T>
-struct ReductionSlot {
-    T *device{nullptr};
-    T *host{nullptr};
-};
-
-template <typename T>
-static ReductionSlot<T> &reduction_slot() {
-    thread_local ReductionSlot<T> slot;
-    if (!slot.device) {
-        CHECK_CUDA(cudaMalloc((void **)&slot.device, sizeof(T)));
-        CHECK_CUDA(cudaMallocHost((void **)&slot.host, sizeof(T)));
-    }
-    return slot;
-}
-
 template <typename T>
 class CUDA_BLAS_Impl {
 public:
@@ -321,9 +302,9 @@ public:
         SFEM_DEBUG_SYNCHRONIZE();
     }
 
-    /// l . r on the host: the device result through the thread's reduction slot.
+    /// l . r on the host: the device result through the thread's reduction scratch.
     static T dot(const ptrdiff_t n, const T *const l, const T *const r, cudaStream_t stream) {
-        auto &slot = reduction_slot<T>();
+        const auto slot = sfem::reduction_scratch<T>(1);
         dot(n, l, r, slot.device, stream);
         CHECK_CUDA(cudaMemcpyAsync(slot.host, slot.device, sizeof(T), cudaMemcpyDeviceToHost, stream));
         CHECK_CUDA(cudaStreamSynchronize(stream));

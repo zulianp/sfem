@@ -28,14 +28,15 @@ namespace sfem {
             return buffer;
         }
 
-        /// A host buffer where `like` lives.
-        SharedBuffer<real_t> where(const SharedBuffer<real_t> &like, const SharedBuffer<real_t> &host) {
+        /// `host`'s values into `target`, wherever it lives (no allocation).
+        void fill(const SharedBuffer<real_t> &target, const SharedBuffer<real_t> &host) {
 #ifdef SFEM_ENABLE_CUDA
-            if (like->mem_space() == MEMORY_SPACE_DEVICE) return smesh::to_device(host);
-#else
-            (void)like;
+            if (target->mem_space() == MEMORY_SPACE_DEVICE) {
+                buffer_host_to_device(host->size() * sizeof(real_t), host->data(), target->data());
+                return;
+            }
 #endif
-            return host;
+            std::copy(host->data(), host->data() + host->size(), target->data());
         }
     }  // namespace
 
@@ -91,9 +92,9 @@ namespace sfem {
                 inv->data()[i]    = root;
                 b->data()[i]      = u->data()[i] * root;
             }
-            scale         = where(upper_bound, s);
-            inverse_scale = where(upper_bound, inv);
-            scaled_bound  = where(upper_bound, b);
+            fill(scale, s);
+            fill(inverse_scale, inv);
+            fill(scaled_bound, b);
             qp->set_upper_bound(scaled_bound);
             // Converged as the unscaled QP is, on the gradient of y = S z: S^{-1} times z's.
             qp->set_norm_weight(inverse_scale);
@@ -169,7 +170,8 @@ namespace sfem {
         impl.tangent = BSRTangent::create(f, es, options.storage_bytes);
         if (!impl.tangent) return nullptr;
 
-        for (auto *buffer : {&impl.k, &impl.k_ref, &impl.projected, &impl.upper_bound, &impl.qp_rhs, &impl.framed, &impl.lift, &impl.diag, &impl.trial_r, &impl.qp_tmp}) {
+        for (auto *buffer : {&impl.k, &impl.k_ref, &impl.projected, &impl.upper_bound, &impl.qp_rhs, &impl.framed, &impl.lift, &impl.diag, &impl.trial_r, &impl.qp_tmp,
+                             &impl.scale, &impl.inverse_scale, &impl.scaled_bound}) {
             *buffer = create_buffer<real_t>(impl.ndofs, es);
         }
 
