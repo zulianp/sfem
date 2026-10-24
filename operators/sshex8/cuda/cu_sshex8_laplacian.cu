@@ -157,13 +157,8 @@ static int cu_affine_sshex8_laplacian_apply_tpl(const int                       
 
     const ptrdiff_t n_blocks = MAX(ptrdiff_t(1), (nelements + block_size - 1) / block_size);
 
-    if (stream) {
-        cudaStream_t s = *static_cast<cudaStream_t *>(stream);
-        cu_affine_sshex8_laplacian_apply_kernel<<<n_blocks, block_size, 0, s>>>(
-                level, nelements, elements, fff_stride, fff, x, y);
-    } else {
-        cu_affine_sshex8_laplacian_apply_kernel<<<n_blocks, block_size, 0>>>(level, nelements, elements, fff_stride, fff, x, y);
-    }
+    cu_affine_sshex8_laplacian_apply_kernel<<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(
+            level, nelements, elements, fff_stride, fff, x, y);
 
     SFEM_DEBUG_SYNCHRONIZE();
     return SFEM_SUCCESS;

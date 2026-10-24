@@ -594,40 +594,21 @@ static int cu_tet10_linear_elasticity_apply_tpl(const ptrdiff_t                 
 
     ptrdiff_t n_blocks = MAX(ptrdiff_t(1), (nelements + block_size - 1) / block_size);
 
-    if (stream) {
-        cudaStream_t s = *static_cast<cudaStream_t *>(stream);
-        cu_tet10_linear_elasticity_apply_kernel<<<n_blocks, block_size, 0, s>>>(nelements,
-                                                                                elements,
-                                                                                jacobian_stride,
-                                                                                jacobian_adjugate,
-                                                                                jacobian_determinant,
-                                                                                mu,
-                                                                                lambda,
-                                                                                u_stride,
-                                                                                ux,
-                                                                                uy,
-                                                                                uz,
-                                                                                out_stride,
-                                                                                outx,
-                                                                                outy,
-                                                                                outz);
-    } else {
-        cu_tet10_linear_elasticity_apply_kernel<<<n_blocks, block_size, 0>>>(nelements,
-                                                                             elements,
-                                                                             jacobian_stride,
-                                                                             jacobian_adjugate,
-                                                                             jacobian_determinant,
-                                                                             mu,
-                                                                             lambda,
-                                                                             u_stride,
-                                                                             ux,
-                                                                             uy,
-                                                                             uz,
-                                                                             out_stride,
-                                                                             outx,
-                                                                             outy,
-                                                                             outz);
-    }
+    cu_tet10_linear_elasticity_apply_kernel<<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(nelements,
+                                                                                               elements,
+                                                                                               jacobian_stride,
+                                                                                               jacobian_adjugate,
+                                                                                               jacobian_determinant,
+                                                                                               mu,
+                                                                                               lambda,
+                                                                                               u_stride,
+                                                                                               ux,
+                                                                                               uy,
+                                                                                               uz,
+                                                                                               out_stride,
+                                                                                               outx,
+                                                                                               outy,
+                                                                                               outz);
 
     SFEM_DEBUG_SYNCHRONIZE();
     return SFEM_SUCCESS;
@@ -822,32 +803,17 @@ static int cu_tet10_linear_elasticity_diag_tpl(const ptrdiff_t                  
 
     ptrdiff_t n_blocks = MAX(ptrdiff_t(1), (nelements + block_size - 1) / block_size);
 
-    if (stream) {
-        cudaStream_t s = *static_cast<cudaStream_t *>(stream);
-        cu_tet10_linear_elasticity_diag_kernel<<<n_blocks, block_size, 0, s>>>(nelements,
-                                                                               elements,
-                                                                               jacobian_stride,
-                                                                               jacobian_adjugate,
-                                                                               jacobian_determinant,
-                                                                               mu,
-                                                                               lambda,
-                                                                               diag_stride,
-                                                                               diagx,
-                                                                               diagy,
-                                                                               diagz);
-    } else {
-        cu_tet10_linear_elasticity_diag_kernel<<<n_blocks, block_size, 0>>>(nelements,
-                                                                            elements,
-                                                                            jacobian_stride,
-                                                                            jacobian_adjugate,
-                                                                            jacobian_determinant,
-                                                                            mu,
-                                                                            lambda,
-                                                                            diag_stride,
-                                                                            diagx,
-                                                                            diagy,
-                                                                            diagz);
-    }
+    cu_tet10_linear_elasticity_diag_kernel<<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(nelements,
+                                                                                              elements,
+                                                                                              jacobian_stride,
+                                                                                              jacobian_adjugate,
+                                                                                              jacobian_determinant,
+                                                                                              mu,
+                                                                                              lambda,
+                                                                                              diag_stride,
+                                                                                              diagx,
+                                                                                              diagy,
+                                                                                              diagz);
 
     SFEM_DEBUG_SYNCHRONIZE();
     return SFEM_SUCCESS;

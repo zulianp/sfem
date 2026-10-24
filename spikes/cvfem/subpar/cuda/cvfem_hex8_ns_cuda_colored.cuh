@@ -112,7 +112,7 @@ extern "C" int cvfem_cuda_coloring_attach(cvfem_cuda_ctx *ctx, int n_colors,
 
 extern "C" int cvfem_cuda_assemble_colored(cvfem_cuda_ctx *ctx, double rho, double mu,
                                            int use_sympy, int block_size, void *stream) {
-    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    cudaStream_t s = static_cast<cudaStream_t>(stream);
     return launch_colored(ctx, rho, mu, use_sympy, block_size, s);
 }
 

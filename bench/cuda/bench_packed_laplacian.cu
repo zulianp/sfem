@@ -476,7 +476,7 @@ namespace {
     }
 
     static cudaStream_t stream_from_void(void *const stream) {
-        return stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(nullptr);
+        return static_cast<cudaStream_t>(stream);
     }
 
 }  // namespace
