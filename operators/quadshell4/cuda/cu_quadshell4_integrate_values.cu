@@ -173,15 +173,8 @@ int cu_quadshell4_integrate_value_tpl(const ptrdiff_t                    nelemen
 
     ptrdiff_t n_blocks = MAX(ptrdiff_t(1), (nelements + block_size - 1) / block_size);
 
-    if (stream) {
-        cudaStream_t s = *static_cast<cudaStream_t *>(stream);
-
-        cu_quadshell4_integrate_value_kernel<T>
-                <<<n_blocks, block_size, 0, s>>>(nelements, elements, coords_stride, coords, value, vec_size, component, out);
-    } else {
-        cu_quadshell4_integrate_value_kernel<T>
-                <<<n_blocks, block_size, 0>>>(nelements, elements, coords_stride, coords, value, vec_size, component, out);
-    }
+    cu_quadshell4_integrate_value_kernel<T><<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(
+            nelements, elements, coords_stride, coords, value, vec_size, component, out);
 
     SFEM_DEBUG_SYNCHRONIZE();
     return SFEM_SUCCESS;
@@ -210,15 +203,8 @@ int cu_quadshell4_integrate_values_tpl(const ptrdiff_t                    neleme
 
     ptrdiff_t n_blocks = MAX(ptrdiff_t(1), (nelements + block_size - 1) / block_size);
 
-    if (stream) {
-        cudaStream_t s = *static_cast<cudaStream_t *>(stream);
-
-        cu_quadshell4_integrate_values_kernel<T>
-                <<<n_blocks, block_size, 0, s>>>(nelements, elements, coords_stride, coords, values, vec_size, component, out);
-    } else {
-        cu_quadshell4_integrate_values_kernel<T>
-                <<<n_blocks, block_size, 0>>>(nelements, elements, coords_stride, coords, values, vec_size, component, out);
-    }
+    cu_quadshell4_integrate_values_kernel<T><<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(
+            nelements, elements, coords_stride, coords, values, vec_size, component, out);
 
     SFEM_DEBUG_SYNCHRONIZE();
     return SFEM_SUCCESS;

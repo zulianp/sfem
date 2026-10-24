@@ -118,14 +118,8 @@ static int acu_affine_sshex8_laplacian_apply_local_mem_tpl(const ptrdiff_t      
 
     const ptrdiff_t n_blocks = MAX(ptrdiff_t(1), (nelements + block_size - 1) / block_size);
 
-    if (stream) {
-        cudaStream_t s = *static_cast<cudaStream_t *>(stream);
-        cu_affine_sshex8_laplacian_apply_local_mem_kernel<T, LEVEL>
-                <<<n_blocks, block_size, 0, s>>>(nelements, elements, fff_stride, fff, x, y);
-    } else {
-        cu_affine_sshex8_laplacian_apply_local_mem_kernel<T, LEVEL>
-                <<<n_blocks, block_size, 0>>>(nelements, elements, fff_stride, fff, x, y);
-    }
+    cu_affine_sshex8_laplacian_apply_local_mem_kernel<T, LEVEL>
+            <<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(nelements, elements, fff_stride, fff, x, y);
 
     SFEM_DEBUG_SYNCHRONIZE();
     return SFEM_SUCCESS;
@@ -274,14 +268,8 @@ static int acu_affine_sshex8_laplacian_apply_local_mem_batched_tpl(const ptrdiff
 
     const ptrdiff_t n_blocks = MAX(ptrdiff_t(1), (nelements + block_size - 1) / block_size);
 
-    if (stream) {
-        cudaStream_t s = *static_cast<cudaStream_t *>(stream);
-        cu_affine_sshex8_laplacian_apply_local_mem_batched_kernel<T, LEVEL, BATCH_SIZE>
-                <<<n_blocks, block_size, 0, s>>>(nelements, elements, fff_stride, fff, x, y);
-    } else {
-        cu_affine_sshex8_laplacian_apply_local_mem_batched_kernel<T, LEVEL, BATCH_SIZE>
-                <<<n_blocks, block_size, 0>>>(nelements, elements, fff_stride, fff, x, y);
-    }
+    cu_affine_sshex8_laplacian_apply_local_mem_batched_kernel<T, LEVEL, BATCH_SIZE>
+            <<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(nelements, elements, fff_stride, fff, x, y);
 
     SFEM_DEBUG_SYNCHRONIZE();
     return SFEM_SUCCESS;

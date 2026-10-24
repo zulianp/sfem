@@ -64,12 +64,8 @@ static int cu_tet10_laplacian_apply_tpl(const ptrdiff_t                         
 
     const ptrdiff_t n_blocks = MAX(ptrdiff_t(1), (nelements + block_size - 1) / block_size);
 
-    if (stream) {
-        cudaStream_t s = *static_cast<cudaStream_t *>(stream);
-        cu_tet10_laplacian_apply_kernel<<<n_blocks, block_size, 0, s>>>(nelements, elements, fff_stride, fff, x, y);
-    } else {
-        cu_tet10_laplacian_apply_kernel<<<n_blocks, block_size, 0>>>(nelements, elements, fff_stride, fff, x, y);
-    }
+    cu_tet10_laplacian_apply_kernel<<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(
+            nelements, elements, fff_stride, fff, x, y);
 
     return SFEM_SUCCESS;
 }

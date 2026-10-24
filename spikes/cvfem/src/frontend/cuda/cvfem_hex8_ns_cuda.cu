@@ -620,7 +620,7 @@ extern "C" int cvfem_cuda_upload_v(cvfem_cuda_ctx *ctx, const double *v) {
 
 extern "C" int cvfem_cuda_jacobian_action(cvfem_cuda_ctx *ctx, double rho, double mu,
                                           int flush_mode, int block_size, void *stream) {
-    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    cudaStream_t s = static_cast<cudaStream_t>(stream);
     return launch_jacobian_action(ctx, rho, mu, flush_mode, block_size, s);
 }
 
@@ -642,7 +642,7 @@ extern "C" double cvfem_cuda_time_jacobian_action(cvfem_cuda_ctx *ctx, double rh
 
 extern "C" int cvfem_cuda_residual(cvfem_cuda_ctx *ctx, double rho, double mu,
                                    int flush_mode, int block_size, void *stream) {
-    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    cudaStream_t s = static_cast<cudaStream_t>(stream);
     return launch_residual(ctx, rho, mu, flush_mode, block_size, s);
 }
 
@@ -681,7 +681,7 @@ extern "C" int cvfem_cuda_spmv(cvfem_cuda_ctx *ctx, void *stream) {
         cusparseSetMatType(ctx->spdesc, CUSPARSE_MATRIX_TYPE_GENERAL);
         cusparseSetMatIndexBase(ctx->spdesc, CUSPARSE_INDEX_BASE_ZERO);
     }
-    if (stream) cusparseSetStream(ctx->sp, *static_cast<cudaStream_t *>(stream));
+    cusparseSetStream(ctx->sp, static_cast<cudaStream_t>(stream));
     const double alpha = 1.0, beta = 0.0;
     const int    mb = (int)ctx->nnodes;   // block rows == nodes; 4 unknowns per node
     const cusparseStatus_t st = cusparseDbsrmv(
@@ -713,7 +713,7 @@ extern "C" double cvfem_cuda_time_spmv(cvfem_cuda_ctx *ctx, int repeat) {
 
 extern "C" int cvfem_cuda_assemble(cvfem_cuda_ctx *ctx, double rho, double mu,
                                    int variant, int block_size, void *stream) {
-    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    cudaStream_t s = static_cast<cudaStream_t>(stream);
     return launch_assemble(ctx, rho, mu, variant, block_size, s);
 }
 
@@ -728,7 +728,7 @@ extern "C" int cvfem_cuda_assemble(cvfem_cuda_ctx *ctx, double rho, double mu,
 // `variant` takes CVFEM_CUDA_JAC_HANDWRITTEN or CVFEM_CUDA_JAC_SYMPY; `geom` 0 or 1.
 extern "C" int cvfem_cuda_assemble_packed(cvfem_cuda_ctx *ctx, double rho, double mu,
                                           int variant, int geom, int block_size, void *stream) {
-    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    cudaStream_t s = static_cast<cudaStream_t>(stream);
     if (geom == CVFEM_CUDA_GEOM_ISOPARAM)
         return launch_assemble_packed<CVFEM_CUDA_JAC_HANDWRITTEN, CVFEM_CUDA_GEOM_ISOPARAM>(
                 ctx, rho, mu, block_size, s);
@@ -759,7 +759,7 @@ extern "C" double cvfem_cuda_time_assemble_packed(cvfem_cuda_ctx *ctx, double rh
 
 extern "C" int cvfem_cuda_residual_global(cvfem_cuda_ctx *ctx, double rho, double mu,
                                           int geom, int block_size, void *stream) {
-    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    cudaStream_t s = static_cast<cudaStream_t>(stream);
     return geom == CVFEM_CUDA_GEOM_ISOPARAM
                    ? launch_global_mf<CVFEM_CUDA_GEOM_ISOPARAM, false>(ctx, rho, mu, block_size, s)
                    : launch_global_mf<CVFEM_CUDA_GEOM_AFFINE, false>(ctx, rho, mu, block_size, s);
@@ -767,7 +767,7 @@ extern "C" int cvfem_cuda_residual_global(cvfem_cuda_ctx *ctx, double rho, doubl
 
 extern "C" int cvfem_cuda_jacobian_action_global(cvfem_cuda_ctx *ctx, double rho, double mu,
                                                  int geom, int block_size, void *stream) {
-    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    cudaStream_t s = static_cast<cudaStream_t>(stream);
     return geom == CVFEM_CUDA_GEOM_ISOPARAM
                    ? launch_global_mf<CVFEM_CUDA_GEOM_ISOPARAM, true>(ctx, rho, mu, block_size, s)
                    : launch_global_mf<CVFEM_CUDA_GEOM_AFFINE, true>(ctx, rho, mu, block_size, s);
@@ -821,7 +821,7 @@ extern "C" int cvfem_cuda_attach_node_to_element(cvfem_cuda_ctx *ctx,
 
 extern "C" int cvfem_cuda_residual_deterministic(cvfem_cuda_ctx *ctx, double rho, double mu,
                                                  int geom, int block_size, void *stream) {
-    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    cudaStream_t s = static_cast<cudaStream_t>(stream);
     return geom == CVFEM_CUDA_GEOM_ISOPARAM
                    ? launch_residual_deterministic<CVFEM_CUDA_GEOM_ISOPARAM>(ctx, rho, mu, block_size, s)
                    : launch_residual_deterministic<CVFEM_CUDA_GEOM_AFFINE>(ctx, rho, mu, block_size, s);
@@ -855,7 +855,7 @@ extern "C" int cvfem_cuda_attach_coords(cvfem_cuda_ctx *ctx,
 
 extern "C" int cvfem_cuda_residual_isoparam(cvfem_cuda_ctx *ctx, double rho, double mu,
                                             int flush_mode, int block_size, void *stream) {
-    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    cudaStream_t s = static_cast<cudaStream_t>(stream);
     return launch_residual_geom<CVFEM_CUDA_GEOM_ISOPARAM>(ctx, rho, mu, flush_mode, block_size, s);
 }
 
@@ -879,7 +879,7 @@ extern "C" double cvfem_cuda_time_residual_isoparam(cvfem_cuda_ctx *ctx, double 
 
 extern "C" int cvfem_cuda_jacobian_action_isoparam(cvfem_cuda_ctx *ctx, double rho, double mu,
                                                    int flush_mode, int block_size, void *stream) {
-    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    cudaStream_t s = static_cast<cudaStream_t>(stream);
     return launch_jacobian_action_geom<CVFEM_CUDA_GEOM_ISOPARAM>(ctx, rho, mu, flush_mode,
                                                                  block_size, s);
 }
@@ -905,7 +905,7 @@ extern "C" double cvfem_cuda_time_jacobian_action_isoparam(cvfem_cuda_ctx *ctx, 
 
 extern "C" int cvfem_cuda_assemble_isoparam(cvfem_cuda_ctx *ctx, double rho, double mu,
                                             int block_size, void *stream) {
-    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    cudaStream_t s = static_cast<cudaStream_t>(stream);
     return launch_assemble_isoparam(ctx, rho, mu, block_size, s);
 }
 
@@ -913,7 +913,7 @@ extern "C" int cvfem_cuda_assemble_isoparam(cvfem_cuda_ctx *ctx, double rho, dou
 // of reference shape derivatives folded in as literals rather than evaluated per element.
 extern "C" int cvfem_cuda_assemble_isoparam_sympy(cvfem_cuda_ctx *ctx, double rho, double mu,
                                                   int block_size, void *stream) {
-    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    cudaStream_t s = static_cast<cudaStream_t>(stream);
     if (!ctx->px) return 1;
     const int block = block_size > 0 ? block_size : 128;
     const int grid  = (int)((ctx->nelements + block - 1) / block);
@@ -945,7 +945,7 @@ extern "C" double cvfem_cuda_time_assemble_isoparam_sympy(cvfem_cuda_ctx *ctx, d
 
 extern "C" int cvfem_cuda_assemble_ecolored_isoparam(cvfem_cuda_ctx *ctx, double rho, double mu,
                                                      int block_size, void *stream) {
-    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    cudaStream_t s = static_cast<cudaStream_t>(stream);
     return launch_ecolored_isoparam(ctx, rho, mu, block_size, s);
 }
 
@@ -968,7 +968,7 @@ extern "C" double cvfem_cuda_time_assemble_ecolored_isoparam(cvfem_cuda_ctx *ctx
 // Build the constant half once into values_linear.
 extern "C" int cvfem_cuda_assemble_linear_isoparam(cvfem_cuda_ctx *ctx, double mu,
                                                    int block_size, void *stream) {
-    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    cudaStream_t s = static_cast<cudaStream_t>(stream);
     if (!ctx->values) return 1;
     const size_t nb = (size_t)ctx->nnz * 16 * sizeof(double);
     if (!ctx->values_linear) CVFEM_CUDA_CHECK(cudaMalloc(&ctx->values_linear, nb));
@@ -979,7 +979,7 @@ extern "C" int cvfem_cuda_assemble_linear_isoparam(cvfem_cuda_ctx *ctx, double m
 // Restore it and add only the velocity-dependent half.
 extern "C" int cvfem_cuda_assemble_nonlinear_isoparam(cvfem_cuda_ctx *ctx, double rho, double mu,
                                                       int block_size, void *stream) {
-    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    cudaStream_t s = static_cast<cudaStream_t>(stream);
     if (!ctx->values_linear) return 1;
     CVFEM_CUDA_CHECK(cudaMemcpyAsync(ctx->values, ctx->values_linear,
                                      (size_t)ctx->nnz * 16 * sizeof(double),
@@ -1045,7 +1045,7 @@ extern "C" double cvfem_cuda_time_assemble(cvfem_cuda_ctx *ctx, double rho, doub
 extern "C" int cvfem_cuda_assemble_linear(cvfem_cuda_ctx *ctx, double mu, int block_size,
                                           void *stream) {
     if (!ctx->values) return 1;
-    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    cudaStream_t s = static_cast<cudaStream_t>(stream);
     const size_t nb = (size_t)ctx->nnz * 16 * sizeof(double);
     if (!ctx->values_linear) CVFEM_CUDA_CHECK(cudaMalloc(&ctx->values_linear, nb));
     CVFEM_CUDA_CHECK(cudaMemsetAsync(ctx->values_linear, 0, nb, s));
@@ -1076,7 +1076,7 @@ static int launch_assemble_nonlinear(cvfem_cuda_ctx *ctx, double rho, double mu,
 
 extern "C" int cvfem_cuda_assemble_nonlinear(cvfem_cuda_ctx *ctx, double rho, double mu,
                                              int block_size, void *stream) {
-    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    cudaStream_t s = static_cast<cudaStream_t>(stream);
     return launch_assemble_nonlinear(ctx, rho, mu, block_size, s);
 }
 
@@ -1123,7 +1123,7 @@ extern "C" int cvfem_cuda_nonlinear_blocks_attach(cvfem_cuda_ctx *ctx, ptrdiff_t
 extern "C" int cvfem_cuda_assemble_static(cvfem_cuda_ctx *ctx, double mu, int block_size,
                                           void *stream) {
     if (!ctx->values) return 1;
-    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    cudaStream_t s = static_cast<cudaStream_t>(stream);
     CVFEM_CUDA_CHECK(cudaMemsetAsync(ctx->values, 0,
                                      (size_t)ctx->nnz * 16 * sizeof(double), s));
     const int block = block_size > 0 ? block_size : 128;
@@ -1156,7 +1156,7 @@ static int launch_assemble_dynamic(cvfem_cuda_ctx *ctx, double rho, double mu,
 
 extern "C" int cvfem_cuda_assemble_dynamic(cvfem_cuda_ctx *ctx, double rho, double mu,
                                            int block_size, void *stream) {
-    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    cudaStream_t s = static_cast<cudaStream_t>(stream);
     return launch_assemble_dynamic(ctx, rho, mu, block_size, s);
 }
 
@@ -1212,7 +1212,7 @@ static int launch_diag(cvfem_cuda_ctx *ctx, double rho, double mu, int mode,
 
 extern "C" int cvfem_cuda_assemble_diag(cvfem_cuda_ctx *ctx, double rho, double mu,
                                         int block_size, void *stream) {
-    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    cudaStream_t s = static_cast<cudaStream_t>(stream);
     // Allocate before reading ctx->diag: passing it as an argument would capture the
     // null pointer from before launch_diag's own allocation runs.
     if (cvfem_cuda_diag_alloc(ctx) != 0) return 1;
@@ -1221,7 +1221,7 @@ extern "C" int cvfem_cuda_assemble_diag(cvfem_cuda_ctx *ctx, double rho, double 
 
 extern "C" int cvfem_cuda_assemble_diag_static(cvfem_cuda_ctx *ctx, double mu, int block_size,
                                                void *stream) {
-    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    cudaStream_t s = static_cast<cudaStream_t>(stream);
     const size_t nb = (size_t)ctx->nnodes * 16 * sizeof(double);
     if (!ctx->diag_static) CVFEM_CUDA_CHECK(cudaMalloc(&ctx->diag_static, nb));
     return launch_diag(ctx, 0.0, mu, 1, ctx->diag_static, block_size, s, true);
@@ -1241,7 +1241,7 @@ static int launch_diag_dynamic(cvfem_cuda_ctx *ctx, double rho, double mu, int b
 
 extern "C" int cvfem_cuda_assemble_diag_dynamic(cvfem_cuda_ctx *ctx, double rho, double mu,
                                                 int block_size, void *stream) {
-    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    cudaStream_t s = static_cast<cudaStream_t>(stream);
     return launch_diag_dynamic(ctx, rho, mu, block_size, s);
 }
 
@@ -1254,7 +1254,7 @@ extern "C" int cvfem_cuda_download_diag(cvfem_cuda_ctx *ctx, double *diag) {
 
 extern "C" int cvfem_cuda_invert_diag(cvfem_cuda_ctx *ctx, int block_size, void *stream) {
     if (!ctx->diag) return 1;
-    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    cudaStream_t s = static_cast<cudaStream_t>(stream);
     const int block = block_size > 0 ? block_size : 128;
     const int grid  = (int)((ctx->nnodes + block - 1) / block);
     cvfem_hex8_invert_diag_kernel<<<grid, block, 0, s>>>(ctx->nnodes, nullptr, ctx->diag);
@@ -1280,7 +1280,7 @@ extern "C" double cvfem_cuda_time_assemble_diag(cvfem_cuda_ctx *ctx, double rho,
 
 extern "C" int cvfem_cuda_assemble_diag_isoparam(cvfem_cuda_ctx *ctx, double rho, double mu,
                                                  int block_size, void *stream) {
-    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    cudaStream_t s = static_cast<cudaStream_t>(stream);
     if (cvfem_cuda_diag_alloc(ctx) != 0) return 1;
     return launch_diag(ctx, rho, mu, 3, ctx->diag, block_size, s, true);
 }
@@ -1346,7 +1346,7 @@ static int launch_assemble_nonlinear_sparse(cvfem_cuda_ctx *ctx, double rho, dou
 
 extern "C" int cvfem_cuda_assemble_nonlinear_sparse(cvfem_cuda_ctx *ctx, double rho, double mu,
                                                     int block_size, void *stream) {
-    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    cudaStream_t s = static_cast<cudaStream_t>(stream);
     return launch_assemble_nonlinear_sparse(ctx, rho, mu, block_size, s);
 }
 
@@ -1412,7 +1412,7 @@ extern "C" int cvfem_cuda_element_coloring_attach(cvfem_cuda_ctx *ctx, int n_col
 
 extern "C" int cvfem_cuda_assemble_ecolored(cvfem_cuda_ctx *ctx, double rho, double mu,
                                             int variant, int block_size, void *stream) {
-    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    cudaStream_t s = static_cast<cudaStream_t>(stream);
     return launch_ecolored(ctx, rho, mu, variant, block_size, s);
 }
 
@@ -1445,24 +1445,24 @@ extern "C" int cvfem_cuda_boundary_attach(cvfem_cuda_ctx *ctx, ptrdiff_t n_bound
 extern "C" int cvfem_cuda_boundary_residual(cvfem_cuda_ctx *ctx, double rho, double mu,
                                             int block_size, void *stream) {
     if (ctx->n_boundary <= 0) return 0;
-    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    cudaStream_t s = static_cast<cudaStream_t>(stream);
     return launch_boundary<BOUNDARY_RESIDUAL>(ctx, rho, mu, block_size, s);
 }
 
 extern "C" int cvfem_cuda_boundary_jacobian_action(cvfem_cuda_ctx *ctx, double rho, double mu,
                                                    int block_size, void *stream) {
-    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    cudaStream_t s = static_cast<cudaStream_t>(stream);
     return launch_boundary<BOUNDARY_JV>(ctx, rho, mu, block_size, s);
 }
 
 extern "C" int cvfem_cuda_boundary_assemble(cvfem_cuda_ctx *ctx, double rho, double mu,
                                             int block_size, void *stream) {
-    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    cudaStream_t s = static_cast<cudaStream_t>(stream);
     return launch_boundary<BOUNDARY_ASSEMBLE>(ctx, rho, mu, block_size, s);
 }
 
 extern "C" int cvfem_cuda_nodal_p_grad(cvfem_cuda_ctx *ctx, int block_size, void *stream) {
-    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    cudaStream_t s = static_cast<cudaStream_t>(stream);
     const size_t nb = (size_t)ctx->nnodes * sizeof(double);
     if (!ctx->pgx) {
         if (cudaMalloc(&ctx->pgx, nb) != cudaSuccess || cudaMalloc(&ctx->pgy, nb) != cudaSuccess ||
@@ -1505,7 +1505,7 @@ extern "C" int cvfem_cuda_residual_rc(cvfem_cuda_ctx *ctx, double rho, double mu
                                       double rc_scale, int flush_mode, int block_size,
                                       void *stream) {
     if (!ctx->pgx || !ctx->px) return 1;
-    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    cudaStream_t s = static_cast<cudaStream_t>(stream);
     const size_t need = cvfem_cuda_residual_rc_shmem_bytes(ctx->max_pack_nodes);
     if (need > 48u * 1024u) {
         CVFEM_CUDA_CHECK(cudaFuncSetAttribute(

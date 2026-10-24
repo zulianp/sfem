@@ -119,14 +119,8 @@ static int cu_affine_hex8_laplacian_apply_tiled_tpl(const ptrdiff_t             
     size_t           shmem_size = block_size * (sizeof(T) * 4 + sizeof(idx_t) * 8 + 6 * sizeof(cu_jacobian_t));
     ptrdiff_t        n_blocks   = MAX(ptrdiff_t(1), (nelements + block_size / 8 - 1) / (block_size / 8));
 
-    if (stream) {
-        cudaStream_t s = *static_cast<cudaStream_t *>(stream);
-        cu_affine_hex8_laplacian_apply_tiled_kernel<T, block_size>
-                <<<n_blocks, block_size, shmem_size, s>>>(nelements, elements, fff_stride, fff, x, y);
-    } else {
-        cu_affine_hex8_laplacian_apply_tiled_kernel<T, block_size>
-                <<<n_blocks, block_size, shmem_size>>>(nelements, elements, fff_stride, fff, x, y);
-    }
+    cu_affine_hex8_laplacian_apply_tiled_kernel<T, block_size>
+            <<<n_blocks, block_size, shmem_size, (cudaStream_t)stream>>>(nelements, elements, fff_stride, fff, x, y);
 
     SFEM_DEBUG_SYNCHRONIZE();
 
@@ -193,12 +187,8 @@ static int cu_affine_hex8_laplacian_apply_tpl(const ptrdiff_t                   
 
     const ptrdiff_t n_blocks = MAX(ptrdiff_t(1), (nelements + block_size - 1) / block_size);
 
-    if (stream) {
-        cudaStream_t s = *static_cast<cudaStream_t *>(stream);
-        cu_affine_hex8_laplacian_apply_kernel<<<n_blocks, block_size, 0, s>>>(nelements, elements, fff_stride, fff, x, y);
-    } else {
-        cu_affine_hex8_laplacian_apply_kernel<<<n_blocks, block_size, 0>>>(nelements, elements, fff_stride, fff, x, y);
-    }
+    cu_affine_hex8_laplacian_apply_kernel<<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(
+            nelements, elements, fff_stride, fff, x, y);
 
     SFEM_DEBUG_SYNCHRONIZE();
 
@@ -326,12 +316,8 @@ static int cu_affine_hex8_laplacian_apply_taylor_tpl(const ptrdiff_t            
 
     const ptrdiff_t n_blocks = MAX(ptrdiff_t(1), (nelements + block_size - 1) / block_size);
 
-    if (stream) {
-        cudaStream_t s = *static_cast<cudaStream_t *>(stream);
-        cu_affine_hex8_laplacian_apply_taylor_kernel<<<n_blocks, block_size, 0, s>>>(nelements, elements, fff_stride, fff, x, y);
-    } else {
-        cu_affine_hex8_laplacian_apply_taylor_kernel<<<n_blocks, block_size, 0>>>(nelements, elements, fff_stride, fff, x, y);
-    }
+    cu_affine_hex8_laplacian_apply_taylor_kernel<<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(
+            nelements, elements, fff_stride, fff, x, y);
 
     SFEM_DEBUG_SYNCHRONIZE();
 
@@ -447,14 +433,8 @@ static int cu_affine_hex8_laplacian_crs_sym_tpl(const ptrdiff_t                 
 
     const ptrdiff_t n_blocks = MAX(ptrdiff_t(1), (nelements + block_size - 1) / block_size);
 
-    if (stream) {
-        cudaStream_t s = *static_cast<cudaStream_t *>(stream);
-        cu_affine_hex8_laplacian_crs_sym_kernel<<<n_blocks, block_size, 0, s>>>(
-                nelements, elements, fff_stride, fff, rowptr, colidx, diag, offdiag);
-    } else {
-        cu_affine_hex8_laplacian_crs_sym_kernel<<<n_blocks, block_size, 0>>>(
-                nelements, elements, fff_stride, fff, rowptr, colidx, diag, offdiag);
-    }
+    cu_affine_hex8_laplacian_crs_sym_kernel<<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(
+            nelements, elements, fff_stride, fff, rowptr, colidx, diag, offdiag);
 
     SFEM_DEBUG_SYNCHRONIZE();
 
@@ -562,12 +542,8 @@ static int cu_affine_hex8_laplacian_diag_tpl(const ptrdiff_t                    
 
     const ptrdiff_t n_blocks = MAX(ptrdiff_t(1), (nelements + block_size - 1) / (ptrdiff_t)block_size);
 
-    if (stream) {
-        cudaStream_t s = *static_cast<cudaStream_t *>(stream);
-        cu_affine_hex8_laplacian_diag_kernel<<<n_blocks, block_size, 0, s>>>(nelements, elements, fff_stride, fff, diag);
-    } else {
-        cu_affine_hex8_laplacian_diag_kernel<<<n_blocks, block_size, 0>>>(nelements, elements, fff_stride, fff, diag);
-    }
+    cu_affine_hex8_laplacian_diag_kernel<<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(
+            nelements, elements, fff_stride, fff, diag);
 
     SFEM_DEBUG_SYNCHRONIZE();
     return SFEM_SUCCESS;

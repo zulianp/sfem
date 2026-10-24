@@ -1268,40 +1268,21 @@ int cu_affine_sshex8_linear_elasticity_apply_local_mem_tpl(const ptrdiff_t      
 
     const ptrdiff_t n_blocks = MAX(ptrdiff_t(1), (nelements + block_size - 1) / block_size);
 
-    if (stream) {
-        cudaStream_t s = *static_cast<cudaStream_t *>(stream);
-        local_mem_kernel<T, LEVEL><<<n_blocks, block_size, 0, s>>>(nelements,
-                                                                   elements,
-                                                                   jacobian_stride,
-                                                                   jacobian_adjugate,
-                                                                   jacobian_determinant,
-                                                                   mu,
-                                                                   lambda,
-                                                                   u_stride,
-                                                                   ux,
-                                                                   uy,
-                                                                   uz,
-                                                                   out_stride,
-                                                                   outx,
-                                                                   outy,
-                                                                   outz);
-    } else {
-        local_mem_kernel<T, LEVEL><<<n_blocks, block_size, 0>>>(nelements,
-                                                                elements,
-                                                                jacobian_stride,
-                                                                jacobian_adjugate,
-                                                                jacobian_determinant,
-                                                                mu,
-                                                                lambda,
-                                                                u_stride,
-                                                                ux,
-                                                                uy,
-                                                                uz,
-                                                                out_stride,
-                                                                outx,
-                                                                outy,
-                                                                outz);
-    }
+    local_mem_kernel<T, LEVEL><<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(nelements,
+                                                                                  elements,
+                                                                                  jacobian_stride,
+                                                                                  jacobian_adjugate,
+                                                                                  jacobian_determinant,
+                                                                                  mu,
+                                                                                  lambda,
+                                                                                  u_stride,
+                                                                                  ux,
+                                                                                  uy,
+                                                                                  uz,
+                                                                                  out_stride,
+                                                                                  outx,
+                                                                                  outy,
+                                                                                  outz);
 
     SFEM_DEBUG_SYNCHRONIZE();
     return SFEM_SUCCESS;
@@ -1337,40 +1318,22 @@ int cu_affine_sshex8_linear_elasticity_apply_local_mem_original_tpl(const ptrdif
 
     const ptrdiff_t n_blocks = MAX(ptrdiff_t(1), (nelements + block_size - 1) / block_size);
 
-    if (stream) {
-        cudaStream_t s = *static_cast<cudaStream_t *>(stream);
-        cu_affine_sshex8_linear_elasticity_apply_local_mem_kernel<T, LEVEL><<<n_blocks, block_size, 0, s>>>(nelements,
-                                                                                                            elements,
-                                                                                                            jacobian_stride,
-                                                                                                            jacobian_adjugate,
-                                                                                                            jacobian_determinant,
-                                                                                                            mu,
-                                                                                                            lambda,
-                                                                                                            u_stride,
-                                                                                                            ux,
-                                                                                                            uy,
-                                                                                                            uz,
-                                                                                                            out_stride,
-                                                                                                            outx,
-                                                                                                            outy,
-                                                                                                            outz);
-    } else {
-        cu_affine_sshex8_linear_elasticity_apply_local_mem_kernel<T, LEVEL><<<n_blocks, block_size, 0>>>(nelements,
-                                                                                                         elements,
-                                                                                                         jacobian_stride,
-                                                                                                         jacobian_adjugate,
-                                                                                                         jacobian_determinant,
-                                                                                                         mu,
-                                                                                                         lambda,
-                                                                                                         u_stride,
-                                                                                                         ux,
-                                                                                                         uy,
-                                                                                                         uz,
-                                                                                                         out_stride,
-                                                                                                         outx,
-                                                                                                         outy,
-                                                                                                         outz);
-    }
+    cu_affine_sshex8_linear_elasticity_apply_local_mem_kernel<T, LEVEL>
+            <<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(nelements,
+                                                                elements,
+                                                                jacobian_stride,
+                                                                jacobian_adjugate,
+                                                                jacobian_determinant,
+                                                                mu,
+                                                                lambda,
+                                                                u_stride,
+                                                                ux,
+                                                                uy,
+                                                                uz,
+                                                                out_stride,
+                                                                outx,
+                                                                outy,
+                                                                outz);
 
     SFEM_DEBUG_SYNCHRONIZE();
     return SFEM_SUCCESS;
@@ -1399,42 +1362,22 @@ int cu_affine_sshex8_linear_elasticity_apply_shared_mem_segmented_tpl(const ptrd
     dim3 block_size(128, 1, 1);
     dim3 n_blocks(MIN(nelements, sfem_cuda_max_grid_dim_x()), 1, 1);
 
-    if (stream) {
-        cudaStream_t s = *static_cast<cudaStream_t *>(stream);
-        cu_affine_sshex8_linear_elasticity_apply_shared_mem_segmented_kernel<T, LEVEL>
-                <<<n_blocks, block_size, 0, s>>>(nelements,
-                                                 elements,
-                                                 jacobian_stride,
-                                                 jacobian_adjugate,
-                                                 jacobian_determinant,
-                                                 mu,
-                                                 lambda,
-                                                 u_stride,
-                                                 ux,
-                                                 uy,
-                                                 uz,
-                                                 out_stride,
-                                                 outx,
-                                                 outy,
-                                                 outz);
-    } else {
-        cu_affine_sshex8_linear_elasticity_apply_shared_mem_segmented_kernel<T, LEVEL>
-                <<<n_blocks, block_size, 0>>>(nelements,
-                                              elements,
-                                              jacobian_stride,
-                                              jacobian_adjugate,
-                                              jacobian_determinant,
-                                              mu,
-                                              lambda,
-                                              u_stride,
-                                              ux,
-                                              uy,
-                                              uz,
-                                              out_stride,
-                                              outx,
-                                              outy,
-                                              outz);
-    }
+    cu_affine_sshex8_linear_elasticity_apply_shared_mem_segmented_kernel<T, LEVEL>
+            <<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(nelements,
+                                                                elements,
+                                                                jacobian_stride,
+                                                                jacobian_adjugate,
+                                                                jacobian_determinant,
+                                                                mu,
+                                                                lambda,
+                                                                u_stride,
+                                                                ux,
+                                                                uy,
+                                                                uz,
+                                                                out_stride,
+                                                                outx,
+                                                                outy,
+                                                                outz);
 
     SFEM_DEBUG_SYNCHRONIZE();
     return SFEM_SUCCESS;
@@ -1462,42 +1405,22 @@ int cu_affine_sshex8_linear_elasticity_apply_tensor_product_tpl(const ptrdiff_t 
     dim3 block_size(4, 8, 4);
     dim3 n_blocks(MIN(nelements, sfem_cuda_max_grid_dim_x()), 1, 1);
 
-    if (stream) {
-        cudaStream_t s = *static_cast<cudaStream_t *>(stream);
-        cu_affine_sshex8_linear_elasticity_apply_tensor_product_matrix_kernel<T, LEVEL>
-                <<<n_blocks, block_size, 0, s>>>(nelements,
-                                                 elements,
-                                                 jacobian_stride,
-                                                 jacobian_adjugate,
-                                                 jacobian_determinant,
-                                                 mu,
-                                                 lambda,
-                                                 u_stride,
-                                                 ux,
-                                                 uy,
-                                                 uz,
-                                                 out_stride,
-                                                 outx,
-                                                 outy,
-                                                 outz);
-    } else {
-        cu_affine_sshex8_linear_elasticity_apply_tensor_product_matrix_kernel<T, LEVEL>
-                <<<n_blocks, block_size, 0>>>(nelements,
-                                              elements,
-                                              jacobian_stride,
-                                              jacobian_adjugate,
-                                              jacobian_determinant,
-                                              mu,
-                                              lambda,
-                                              u_stride,
-                                              ux,
-                                              uy,
-                                              uz,
-                                              out_stride,
-                                              outx,
-                                              outy,
-                                              outz);
-    }
+    cu_affine_sshex8_linear_elasticity_apply_tensor_product_matrix_kernel<T, LEVEL>
+            <<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(nelements,
+                                                                elements,
+                                                                jacobian_stride,
+                                                                jacobian_adjugate,
+                                                                jacobian_determinant,
+                                                                mu,
+                                                                lambda,
+                                                                u_stride,
+                                                                ux,
+                                                                uy,
+                                                                uz,
+                                                                out_stride,
+                                                                outx,
+                                                                outy,
+                                                                outz);
 
     SFEM_CUDA_CHECK(cudaPeekAtLastError());
     SFEM_DEBUG_SYNCHRONIZE();
@@ -1533,42 +1456,22 @@ int cu_affine_sshex8_linear_elasticity_apply_tensor_product_opt_tpl(
     dim3 block_size(4, 8, 4);
     dim3 n_blocks(MIN(nelements, sfem_cuda_max_grid_dim_x()), 1, 1);
 
-    if (stream) {
-        cudaStream_t s = *static_cast<cudaStream_t *>(stream);
-        cu_affine_sshex8_linear_elasticity_apply_tensor_product_matrix_opt_kernel<T, LEVEL>
-                <<<n_blocks, block_size, 0, s>>>(nelements,
-                                                 elements,
-                                                 jacobian_stride,
-                                                 jacobian_adjugate,
-                                                 jacobian_determinant,
-                                                 mu,
-                                                 lambda,
-                                                 u_stride,
-                                                 ux,
-                                                 uy,
-                                                 uz,
-                                                 out_stride,
-                                                 outx,
-                                                 outy,
-                                                 outz);
-    } else {
-        cu_affine_sshex8_linear_elasticity_apply_tensor_product_matrix_opt_kernel<T, LEVEL>
-                <<<n_blocks, block_size, 0>>>(nelements,
-                                              elements,
-                                              jacobian_stride,
-                                              jacobian_adjugate,
-                                              jacobian_determinant,
-                                              mu,
-                                              lambda,
-                                              u_stride,
-                                              ux,
-                                              uy,
-                                              uz,
-                                              out_stride,
-                                              outx,
-                                              outy,
-                                              outz);
-    }
+    cu_affine_sshex8_linear_elasticity_apply_tensor_product_matrix_opt_kernel<T, LEVEL>
+            <<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(nelements,
+                                                                elements,
+                                                                jacobian_stride,
+                                                                jacobian_adjugate,
+                                                                jacobian_determinant,
+                                                                mu,
+                                                                lambda,
+                                                                u_stride,
+                                                                ux,
+                                                                uy,
+                                                                uz,
+                                                                out_stride,
+                                                                outx,
+                                                                outy,
+                                                                outz);
 
     SFEM_CUDA_CHECK(cudaPeekAtLastError());
     SFEM_DEBUG_SYNCHRONIZE();
@@ -1602,40 +1505,22 @@ int cu_affine_sshex8_linear_elasticity_apply_level8_gather_tpl(const ptrdiff_t  
     dim3 block_size(128, 1, 1);
     dim3 n_blocks(MIN(nelements, sfem_cuda_max_grid_dim_x()), 1, 1);
 
-    if (stream) {
-        cudaStream_t s = *static_cast<cudaStream_t *>(stream);
-        cu_affine_sshex8_linear_elasticity_apply_level8_gather_kernel<T><<<n_blocks, block_size, 0, s>>>(nelements,
-                                                                                                         elements,
-                                                                                                         jacobian_stride,
-                                                                                                         jacobian_adjugate,
-                                                                                                         jacobian_determinant,
-                                                                                                         mu,
-                                                                                                         lambda,
-                                                                                                         u_stride,
-                                                                                                         ux,
-                                                                                                         uy,
-                                                                                                         uz,
-                                                                                                         out_stride,
-                                                                                                         outx,
-                                                                                                         outy,
-                                                                                                         outz);
-    } else {
-        cu_affine_sshex8_linear_elasticity_apply_level8_gather_kernel<T><<<n_blocks, block_size, 0>>>(nelements,
-                                                                                                      elements,
-                                                                                                      jacobian_stride,
-                                                                                                      jacobian_adjugate,
-                                                                                                      jacobian_determinant,
-                                                                                                      mu,
-                                                                                                      lambda,
-                                                                                                      u_stride,
-                                                                                                      ux,
-                                                                                                      uy,
-                                                                                                      uz,
-                                                                                                      out_stride,
-                                                                                                      outx,
-                                                                                                      outy,
-                                                                                                      outz);
-    }
+    cu_affine_sshex8_linear_elasticity_apply_level8_gather_kernel<T>
+            <<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(nelements,
+                                                                elements,
+                                                                jacobian_stride,
+                                                                jacobian_adjugate,
+                                                                jacobian_determinant,
+                                                                mu,
+                                                                lambda,
+                                                                u_stride,
+                                                                ux,
+                                                                uy,
+                                                                uz,
+                                                                out_stride,
+                                                                outx,
+                                                                outy,
+                                                                outz);
 
     SFEM_CUDA_CHECK(cudaPeekAtLastError());
     SFEM_DEBUG_SYNCHRONIZE();
@@ -1774,40 +1659,22 @@ int cu_affine_sshex8_linear_elasticity_apply_warp_tpl(const ptrdiff_t           
     dim3 block_size(LEVEL, LEVEL, LEVEL);
     dim3 n_blocks(MIN(nelements, sfem_cuda_max_grid_dim_x()), 1, 1);
 
-    if (stream) {
-        cudaStream_t s = *static_cast<cudaStream_t *>(stream);
-        cu_affine_sshex8_linear_elasticity_apply_warp_kernel<T, LEVEL><<<n_blocks, block_size, 0, s>>>(nelements,
-                                                                                                       elements,
-                                                                                                       jacobian_stride,
-                                                                                                       jacobian_adjugate,
-                                                                                                       jacobian_determinant,
-                                                                                                       mu,
-                                                                                                       lambda,
-                                                                                                       u_stride,
-                                                                                                       ux,
-                                                                                                       uy,
-                                                                                                       uz,
-                                                                                                       out_stride,
-                                                                                                       outx,
-                                                                                                       outy,
-                                                                                                       outz);
-    } else {
-        cu_affine_sshex8_linear_elasticity_apply_warp_kernel<T, LEVEL><<<n_blocks, block_size, 0>>>(nelements,
-                                                                                                    elements,
-                                                                                                    jacobian_stride,
-                                                                                                    jacobian_adjugate,
-                                                                                                    jacobian_determinant,
-                                                                                                    mu,
-                                                                                                    lambda,
-                                                                                                    u_stride,
-                                                                                                    ux,
-                                                                                                    uy,
-                                                                                                    uz,
-                                                                                                    out_stride,
-                                                                                                    outx,
-                                                                                                    outy,
-                                                                                                    outz);
-    }
+    cu_affine_sshex8_linear_elasticity_apply_warp_kernel<T, LEVEL>
+            <<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(nelements,
+                                                                elements,
+                                                                jacobian_stride,
+                                                                jacobian_adjugate,
+                                                                jacobian_determinant,
+                                                                mu,
+                                                                lambda,
+                                                                u_stride,
+                                                                ux,
+                                                                uy,
+                                                                uz,
+                                                                out_stride,
+                                                                outx,
+                                                                outy,
+                                                                outz);
 
     SFEM_DEBUG_SYNCHRONIZE();
     return SFEM_SUCCESS;
@@ -2229,34 +2096,18 @@ static int cu_affine_sshex8_linear_elasticity_diag_tpl(const int                
 
     const ptrdiff_t n_blocks = MAX(ptrdiff_t(1), (nelements + block_size - 1) / block_size);
 
-    if (stream) {
-        cudaStream_t s = *static_cast<cudaStream_t *>(stream);
-        cu_affine_sshex8_linear_elasticity_diag_kernel<T><<<n_blocks, block_size, 0, s>>>(level,
-                                                                                          nelements,
-                                                                                          elements,
-                                                                                          jacobian_stride,
-                                                                                          jacobian_adjugate,
-                                                                                          jacobian_determinant,
-                                                                                          mu,
-                                                                                          lambda,
-                                                                                          out_stride,
-                                                                                          outx,
-                                                                                          outy,
-                                                                                          outz);
-    } else {
-        cu_affine_sshex8_linear_elasticity_diag_kernel<T><<<n_blocks, block_size, 0>>>(level,
-                                                                                       nelements,
-                                                                                       elements,
-                                                                                       jacobian_stride,
-                                                                                       jacobian_adjugate,
-                                                                                       jacobian_determinant,
-                                                                                       mu,
-                                                                                       lambda,
-                                                                                       out_stride,
-                                                                                       outx,
-                                                                                       outy,
-                                                                                       outz);
-    }
+    cu_affine_sshex8_linear_elasticity_diag_kernel<T><<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(level,
+                                                                                                         nelements,
+                                                                                                         elements,
+                                                                                                         jacobian_stride,
+                                                                                                         jacobian_adjugate,
+                                                                                                         jacobian_determinant,
+                                                                                                         mu,
+                                                                                                         lambda,
+                                                                                                         out_stride,
+                                                                                                         outx,
+                                                                                                         outy,
+                                                                                                         outz);
 
     SFEM_DEBUG_SYNCHRONIZE();
     return SFEM_SUCCESS;
@@ -2456,40 +2307,22 @@ int cu_affine_sshex8_linear_elasticity_block_diag_sym_tpl(const int             
 
     ptrdiff_t n_blocks = MAX(ptrdiff_t(1), (nelements + block_size - 1) / block_size);
 
-    if (stream) {
-        cudaStream_t s = *static_cast<cudaStream_t *>(stream);
-        cu_affine_sshex8_linear_elasticity_block_diag_sym_kernel<T><<<n_blocks, block_size, 0, s>>>(level,
-                                                                                                    nelements,
-                                                                                                    elements,
-                                                                                                    jacobian_stride,
-                                                                                                    jacobian_adjugate,
-                                                                                                    jacobian_determinant,
-                                                                                                    mu,
-                                                                                                    lambda,
-                                                                                                    out_stride,
-                                                                                                    out0,
-                                                                                                    out1,
-                                                                                                    out2,
-                                                                                                    out3,
-                                                                                                    out4,
-                                                                                                    out5);
-    } else {
-        cu_affine_sshex8_linear_elasticity_block_diag_sym_kernel<T><<<n_blocks, block_size, 0>>>(level,
-                                                                                                 nelements,
-                                                                                                 elements,
-                                                                                                 jacobian_stride,
-                                                                                                 jacobian_adjugate,
-                                                                                                 jacobian_determinant,
-                                                                                                 mu,
-                                                                                                 lambda,
-                                                                                                 out_stride,
-                                                                                                 out0,
-                                                                                                 out1,
-                                                                                                 out2,
-                                                                                                 out3,
-                                                                                                 out4,
-                                                                                                 out5);
-    }
+    cu_affine_sshex8_linear_elasticity_block_diag_sym_kernel<T>
+            <<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(level,
+                                                                nelements,
+                                                                elements,
+                                                                jacobian_stride,
+                                                                jacobian_adjugate,
+                                                                jacobian_determinant,
+                                                                mu,
+                                                                lambda,
+                                                                out_stride,
+                                                                out0,
+                                                                out1,
+                                                                out2,
+                                                                out3,
+                                                                out4,
+                                                                out5);
 
     SFEM_DEBUG_SYNCHRONIZE();
     return SFEM_SUCCESS;
@@ -2793,9 +2626,7 @@ static ptrdiff_t cu_sshex8_isoparametric_n_blocks(const ptrdiff_t nelements, con
     return MAX(ptrdiff_t(1), (nelements + block_size - 1) / block_size);
 }
 
-static cudaStream_t cu_sshex8_isoparametric_stream(void *stream) {
-    return stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
-}
+static cudaStream_t cu_sshex8_isoparametric_stream(void *stream) { return static_cast<cudaStream_t>(stream); }
 
 // Calls f with a value of the scalar type `real_type` names.
 template <typename F>

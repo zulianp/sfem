@@ -113,14 +113,8 @@ static int cu_affine_sshex8_laplacian_apply_warp_tpl(const ptrdiff_t            
     dim3 block_size(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
     dim3 n_blocks(MIN(nelements, sfem_cuda_max_grid_dim_x()), 1, 1);
 
-    if (stream) {
-        cudaStream_t s = *static_cast<cudaStream_t *>(stream);
-        cu_affine_sshex8_laplacian_apply_kernel_warp<T, LEVEL>
-                <<<n_blocks, block_size, 0, s>>>(nelements, elements, fff_stride, fff, x, y);
-    } else {
-        cu_affine_sshex8_laplacian_apply_kernel_warp<T, LEVEL>
-                <<<n_blocks, block_size, 0>>>(nelements, elements, fff_stride, fff, x, y);
-    }
+    cu_affine_sshex8_laplacian_apply_kernel_warp<T, LEVEL>
+            <<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(nelements, elements, fff_stride, fff, x, y);
 
     SFEM_DEBUG_SYNCHRONIZE();
     return SFEM_SUCCESS;
