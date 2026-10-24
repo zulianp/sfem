@@ -14,7 +14,8 @@ int cu_obstacle_normal_project(const int                         dim,
                                const idx_t *const SFEM_RESTRICT  idx,
                                real_t **const SFEM_RESTRICT      normals,
                                const real_t *const SFEM_RESTRICT h,
-                               real_t *const SFEM_RESTRICT       out);
+                               real_t *const SFEM_RESTRICT       out,
+                               void *const                       stream);
 
 int cu_obstacle_distribute_contact_forces(const int                         dim,
                                           const ptrdiff_t                   n,
@@ -22,7 +23,8 @@ int cu_obstacle_distribute_contact_forces(const int                         dim,
                                           real_t **const SFEM_RESTRICT      normals,
                                           const real_t *const SFEM_RESTRICT m,
                                           const real_t *const               f,
-                                          real_t *const                     out);
+                                          real_t *const                     out,
+                                          void *const                       stream);
 
 int cu_obstacle_hessian_block_diag_sym(const int                         dim,
                                        const ptrdiff_t                   n,
@@ -30,7 +32,8 @@ int cu_obstacle_hessian_block_diag_sym(const int                         dim,
                                        real_t **const SFEM_RESTRICT      normals,
                                        const real_t *const SFEM_RESTRICT m,
                                        const real_t *const               x,
-                                       real_t *const                     values);
+                                       real_t *const                     values,
+                                       void *const                       stream);
 
 int cu_obstacle_contact_stress(const int                         dim,
                                const ptrdiff_t                   n,
@@ -38,7 +41,8 @@ int cu_obstacle_contact_stress(const int                         dim,
                                real_t **const SFEM_RESTRICT      normals,
                                const real_t *const SFEM_RESTRICT m,
                                const real_t *const               r,
-                               real_t *const                     s);
+                               real_t *const                     s,
+                               void *const                       stream);
 
 #ifdef __cplusplus
 }

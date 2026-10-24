@@ -11,7 +11,8 @@ int cu_mask_nodes(const ptrdiff_t                  nnodes,
                   const idx_t *const SFEM_RESTRICT nodes,
                   const int                        block_size,
                   const int                        component,
-                  mask_t *const SFEM_RESTRICT      inout);
+                  mask_t *const SFEM_RESTRICT      inout,
+                  void *const                      stream);
 
 #ifdef __cplusplus
 }

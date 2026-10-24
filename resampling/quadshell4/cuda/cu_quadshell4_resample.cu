@@ -318,17 +318,18 @@ extern "C" int cu_quadshell4_resample_gap_local(
         const geom_t* const SFEM_RESTRICT    data,
         // Output
         real_t* const SFEM_RESTRICT  wg,
-        real_t** const SFEM_RESTRICT normals) {
+        real_t** const SFEM_RESTRICT normals,
+        void* const                  stream) {
     if (!nelements) return 0;
 
-    SFEM_DEBUG_SYNCHRONIZE(nullptr);
+    SFEM_DEBUG_SYNCHRONIZE(stream);
 
     int             block_size = 128;
     const ptrdiff_t n_blocks   = MAX(ptrdiff_t(1), (nelements + block_size - 1) / block_size);
-    cu_quadshell4_resample_gap_local_kernel<<<n_blocks, block_size, 0>>>(
+    cu_quadshell4_resample_gap_local_kernel<<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(
             nelements, nnodes, elems, xyz, n, stride, origin, delta, data, wg, normals);
 
-    SFEM_DEBUG_SYNCHRONIZE(nullptr);
+    SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }
 
@@ -425,18 +426,20 @@ extern "C" int cu_quadshell4_resample_weight_local(
         idx_t** const SFEM_RESTRICT  elems,
         geom_t** const SFEM_RESTRICT xyz,
         // Output
-        real_t* const SFEM_RESTRICT w)
+        real_t* const SFEM_RESTRICT w,
+        void* const                 stream)
 
 {
     if (!nelements) return 0;
 
-    SFEM_DEBUG_SYNCHRONIZE(nullptr);
+    SFEM_DEBUG_SYNCHRONIZE(stream);
 
     int             block_size = 128;
     const ptrdiff_t n_blocks   = MAX(ptrdiff_t(1), (nelements + block_size - 1) / block_size);
-    cu_quadshell4_resample_weight_local_kernel<<<n_blocks, block_size, 0>>>(nelements, nnodes, elems, xyz, w);
+    cu_quadshell4_resample_weight_local_kernel<<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(
+            nelements, nnodes, elems, xyz, w);
 
-    SFEM_DEBUG_SYNCHRONIZE(nullptr);
+    SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }
 
@@ -577,17 +580,18 @@ extern "C" int cu_quadshell4_resample_gap_value_local(
         const geom_t* const SFEM_RESTRICT    delta,
         const geom_t* const SFEM_RESTRICT    data,
         // Output
-        real_t* const SFEM_RESTRICT wg) {
+        real_t* const SFEM_RESTRICT wg,
+        void* const                 stream) {
     if (!nelements) return 0;
 
-    SFEM_DEBUG_SYNCHRONIZE(nullptr);
+    SFEM_DEBUG_SYNCHRONIZE(stream);
 
     int             block_size = 128;
     const ptrdiff_t n_blocks   = MAX(ptrdiff_t(1), (nelements + block_size - 1) / block_size);
-    cu_quadshell4_resample_gap_value_local_kernel<<<n_blocks, block_size, 0>>>(
+    cu_quadshell4_resample_gap_value_local_kernel<<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(
             nelements, nnodes, elems, xyz, n, stride, origin, delta, data, wg);
 
-    SFEM_DEBUG_SYNCHRONIZE(nullptr);
+    SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }
 
@@ -766,16 +770,17 @@ extern "C" int cu_quadshell4_resample_gap_normals_local(
         const geom_t* const SFEM_RESTRICT    delta,
         const geom_t* const SFEM_RESTRICT    data,
         // Output
-        real_t** const SFEM_RESTRICT normals) {
+        real_t** const SFEM_RESTRICT normals,
+        void* const                  stream) {
     if (!nelements) return 0;
 
-    SFEM_DEBUG_SYNCHRONIZE(nullptr);
+    SFEM_DEBUG_SYNCHRONIZE(stream);
 
     int             block_size = 128;
     const ptrdiff_t n_blocks   = MAX(ptrdiff_t(1), (nelements + block_size - 1) / block_size);
-    cu_quadshell4_resample_gap_normals_local_kernel<<<n_blocks, block_size, 0>>>(
+    cu_quadshell4_resample_gap_normals_local_kernel<<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(
             nelements, nnodes, elems, xyz, n, stride, origin, delta, data, normals);
 
-    SFEM_DEBUG_SYNCHRONIZE(nullptr);
+    SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }

@@ -59,7 +59,7 @@ namespace sfem {
         // The spline's strides on the host, for kernels that take the grid by value.
         ptrdiff_t                   stride[3];
         bool                        variational{true};
-        enum ExecutionSpace         execution_space { EXECUTION_SPACE_HOST };
+        ExecutionContext            context{EXECUTION_SPACE_HOST};
 
         NodeSamplerGrid grid() const {
             NodeSamplerGrid g;
@@ -78,15 +78,15 @@ namespace sfem {
                                                                const std::string                   &path,
                                                                const ptrdiff_t                      nnodes,
                                                                const geom_t *const                  z,
-                                                               const enum ExecutionSpace            es) {
-        return create(smesh::Grid<geom_t>::create_from_file(comm, path.c_str()), comm, nnodes, z, es);
+                                                               const ExecutionContext              &context) {
+        return create(smesh::Grid<geom_t>::create_from_file(comm, path.c_str()), comm, nnodes, z, context);
     }
 
     std::shared_ptr<SDFObstacle> SDFObstacle::create(const std::shared_ptr<smesh::Grid<geom_t>> &sdf,
                                                      const std::shared_ptr<Communicator>        &comm,
                                                      const ptrdiff_t                             nnodes,
                                                      const geom_t *const                         z,
-                                                     const enum ExecutionSpace                   execution_space) {
+                                                     const ExecutionContext                     &context) {
         auto obs = std::make_shared<SDFObstacle>();
         for (int d = 0; d < 3; ++d) {
             obs->impl_->n[d]      = sdf->nlocal()[d];
@@ -126,12 +126,12 @@ namespace sfem {
 
         for (int d = 0; d < 3; ++d) obs->impl_->stride[d] = spline->stride->data()[d];
 #ifdef SFEM_ENABLE_CUDA
-        if (execution_space == EXECUTION_SPACE_DEVICE) {
+        if (context.space() == EXECUTION_SPACE_DEVICE) {
             spline = spline->to_device();
         }
 #endif
         obs->impl_->spline          = spline;
-        obs->impl_->execution_space = execution_space;
+        obs->impl_->context         = context;
         return obs;
     }
 
@@ -150,7 +150,7 @@ namespace sfem {
         SFEM_TRACE_SCOPE("SDFObstacle::sample");
 
 #ifdef SFEM_ENABLE_CUDA
-        if (impl_->execution_space == EXECUTION_SPACE_DEVICE) {
+        if (impl_->context.space() == EXECUTION_SPACE_DEVICE) {
             return cu_resample_gap(
                     // Mesh
                     element_type,
@@ -166,7 +166,8 @@ namespace sfem {
                     impl_->spline->origin_coefficient(),
                     // Output
                     gap,
-                    normals);
+                    normals,
+                    impl_->context.stream());
         }
 #endif
         return resample_gap(
@@ -198,7 +199,7 @@ namespace sfem {
         SFEM_TRACE_SCOPE("SDFObstacle::sample_normals");
 
 #ifdef SFEM_ENABLE_CUDA
-        if (impl_->execution_space == EXECUTION_SPACE_DEVICE) {
+        if (impl_->context.space() == EXECUTION_SPACE_DEVICE) {
             return cu_resample_gap_normals(
                     // Mesh
                     element_type,
@@ -213,7 +214,8 @@ namespace sfem {
                     impl_->delta,
                     impl_->spline->origin_coefficient(),
                     // Output
-                    normals);
+                    normals,
+                    impl_->context.stream());
         }
 #endif
         return resample_gap_normals(
@@ -288,7 +290,7 @@ namespace sfem {
         SFEM_TRACE_SCOPE("SDFObstacle::sample_value");
 
 #ifdef SFEM_ENABLE_CUDA
-        if (impl_->execution_space == EXECUTION_SPACE_DEVICE) {
+        if (impl_->context.space() == EXECUTION_SPACE_DEVICE) {
             return cu_resample_gap_value(
                     // Mesh
                     element_type,
@@ -303,7 +305,8 @@ namespace sfem {
                     impl_->delta,
                     impl_->spline->origin_coefficient(),
                     // Output
-                    gap);
+                    gap,
+                    impl_->context.stream());
         }
 #endif
         return resample_gap_value(
@@ -332,11 +335,12 @@ namespace sfem {
         SFEM_TRACE_SCOPE("SDFObstacle::sample_nodes");
 
 #ifdef SFEM_ENABLE_CUDA
-        if (impl_->execution_space == EXECUTION_SPACE_DEVICE) {
+        if (impl_->context.space() == EXECUTION_SPACE_DEVICE) {
             NodeSamplerOutput out = {gap,
                                      {normals ? normals[0] : nullptr, normals ? normals[1] : nullptr, normals ? normals[2] : nullptr},
                                      {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr}};
-            return cu_sample_nodes(1, nnodes, idx, {{points[0], points[1], points[2]}}, disp, impl_->grid(), out);
+            return cu_sample_nodes(
+                    1, nnodes, idx, {{points[0], points[1], points[2]}}, disp, impl_->grid(), out, impl_->context.stream());
         }
 #endif
         return interpolate_displaced_gap(nnodes,
@@ -360,9 +364,10 @@ namespace sfem {
         SFEM_TRACE_SCOPE("SDFObstacle::sample_nodes_curvature");
 
 #ifdef SFEM_ENABLE_CUDA
-        if (impl_->execution_space == EXECUTION_SPACE_DEVICE) {
+        if (impl_->context.space() == EXECUTION_SPACE_DEVICE) {
             NodeSamplerOutput out = {nullptr, {nullptr, nullptr, nullptr}, {curvature[0], curvature[1], curvature[2], curvature[3], curvature[4], curvature[5]}};
-            return cu_sample_nodes(2, nnodes, idx, {{points[0], points[1], points[2]}}, disp, impl_->grid(), out);
+            return cu_sample_nodes(
+                    2, nnodes, idx, {{points[0], points[1], points[2]}}, disp, impl_->grid(), out, impl_->context.stream());
         }
 #endif
         return interpolate_displaced_curvature(nnodes,

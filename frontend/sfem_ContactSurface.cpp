@@ -304,7 +304,8 @@ namespace sfem {
                                            surface_points_rest_device->data(),
                                            disp,
                                            surface_points_device->data(),
-                                           surface_displacement->data());
+                                           surface_displacement->data(),
+                                           nullptr);
                 return;
             }
 #endif
@@ -493,7 +494,8 @@ namespace sfem {
                                            surface_points_rest_device->data(),
                                            disp,
                                            surface_points_device->data(),
-                                           surface_displacement->data());
+                                           surface_displacement->data(),
+                                           nullptr);
                 return;
             }
 #endif

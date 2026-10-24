@@ -16,19 +16,21 @@ namespace sfem {
                                          const idx_t *const   colidx,
                                          const real_t *const  mass,
                                          const real_t         alpha,
-                                         real_t *const        values);
+                                         real_t *const        values,
+                                         void *const          stream);
 
     /// The same for BSR, where the diagonal of the `bs x bs` block on the
     /// diagonal takes one mass entry per component; values of `values_type`
     /// (sfem_TangentValues.hpp).
-    int cu_inertia_potential_hessian_bsr(const ptrdiff_t      n_nodes,
-                                         const int            block_size,
-                                         const count_t *const rowptr,
-                                         const idx_t *const   colidx,
-                                         const real_t *const  mass,
-                                         const real_t         alpha,
+    int cu_inertia_potential_hessian_bsr(const ptrdiff_t            n_nodes,
+                                         const int                  block_size,
+                                         const count_t *const       rowptr,
+                                         const idx_t *const         colidx,
+                                         const real_t *const        mass,
+                                         const real_t               alpha,
                                          const smesh::PrimitiveType values_type,
-                                         void *const          values);
+                                         void *const                values,
+                                         void *const                stream);
 
     /// The block-diagonal, upper-triangle-packed format.  `alpha * m * I` on
     /// each node's block, so only the packed diagonal entries are touched.
@@ -36,6 +38,7 @@ namespace sfem {
                                                     const int           block_size,
                                                     const real_t *const mass,
                                                     const real_t        alpha,
-                                                    real_t *const       values);
+                                                    real_t *const       values,
+                                                    void *const         stream);
 
 }  // namespace sfem

@@ -498,13 +498,13 @@ __global__ void tdiv(const ptrdiff_t n, const T *const l, const T *const r, T *c
     }
 }
 
-extern void d_ediv(const ptrdiff_t n, const real_t *const l, const real_t *const r, real_t *const result) {
+extern void d_ediv(const ptrdiff_t n, const real_t *const l, const real_t *const r, real_t *const result, void *const stream) {
     int       kernel_block_size = 128;
     ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
 
-    tdiv<<<n_blocks, kernel_block_size>>>(n, l, r, result);
+    tdiv<<<n_blocks, kernel_block_size, 0, (cudaStream_t)stream>>>(n, l, r, result);
 
-    SFEM_DEBUG_SYNCHRONIZE(nullptr);
+    SFEM_DEBUG_SYNCHRONIZE(stream);
 }
 
 namespace sfem {
@@ -670,14 +670,15 @@ namespace sfem {
                   const T *const     dd,
                   const T *const     s,
                   const T *const     x,
-                  T *const           y) {
-        SFEM_DEBUG_SYNCHRONIZE(nullptr);
+                  T *const           y,
+                  void *const        stream) {
+        SFEM_DEBUG_SYNCHRONIZE(stream);
 
         int       kernel_block_size = 128;
         ptrdiff_t kernel_n_blocks   = std::max(ptrdiff_t(1), (n_blocks + kernel_block_size - 1) / kernel_block_size);
-        sbv_mult3_kernel<T><<<kernel_n_blocks, kernel_block_size>>>(n_blocks, idx, dd, s, x, y);
+        sbv_mult3_kernel<T><<<kernel_n_blocks, kernel_block_size, 0, (cudaStream_t)stream>>>(n_blocks, idx, dd, s, x, y);
 
-        SFEM_DEBUG_SYNCHRONIZE(nullptr);
+        SFEM_DEBUG_SYNCHRONIZE(stream);
         return SFEM_SUCCESS;
     }
 
@@ -686,13 +687,15 @@ namespace sfem {
                                   const float *const,
                                   const float *const,
                                   const float *const,
-                                  float *const);
+                                  float *const,
+                                  void *const);
 
     template int sbv_mult3<double>(const ptrdiff_t,
                                    const idx_t *const,
                                    const double *const,
                                    const double *const,
                                    const double *const,
-                                   double *const);
+                                   double *const,
+                                   void *const);
 
 }  // namespace sfem

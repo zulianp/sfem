@@ -183,7 +183,8 @@ namespace sfem {
                             const R* const SFEM_RESTRICT        rowptr,
                             const C* const SFEM_RESTRICT        colidx,
                             const TStorage* const SFEM_RESTRICT values,
-                            const T* const SFEM_RESTRICT        scale) {
+                            const T* const SFEM_RESTRICT        scale,
+                            void* const                         stream) {
         const ptrdiff_t rows = block_rows * block_size;
         if (rows <= 0) return T(0);
         // Block maxima of the row sums into the reduction scratch (the kernel's shared cache holds
@@ -191,10 +192,11 @@ namespace sfem {
         const int  kernel_block_size = 128;
         const int  n_blocks          = (int)std::min<ptrdiff_t>(1024, (rows + kernel_block_size - 1) / kernel_block_size);
         const auto partial           = reduction_scratch<T>(n_blocks);
-        bsr_max_abs_row_sum_kernel<R, C, TStorage, T>
-                <<<n_blocks, kernel_block_size, 0>>>(block_rows, block_size, rowptr, colidx, values, scale, partial.device);
-        SFEM_CUDA_CHECK(cudaMemcpyAsync(partial.host, partial.device, n_blocks * sizeof(T), cudaMemcpyDeviceToHost, 0));
-        SFEM_CUDA_CHECK(cudaStreamSynchronize(0));
+        bsr_max_abs_row_sum_kernel<R, C, TStorage, T><<<n_blocks, kernel_block_size, 0, (cudaStream_t)stream>>>(
+                block_rows, block_size, rowptr, colidx, values, scale, partial.device);
+        SFEM_CUDA_CHECK(cudaMemcpyAsync(
+                partial.host, partial.device, n_blocks * sizeof(T), cudaMemcpyDeviceToHost, (cudaStream_t)stream));
+        SFEM_CUDA_CHECK(cudaStreamSynchronize((cudaStream_t)stream));
         T ret = 0;
         for (int b = 0; b < n_blocks; ++b) ret = std::max(ret, partial.host[b]);
         return ret;
@@ -207,11 +209,13 @@ namespace sfem {
                              const C* const SFEM_RESTRICT  colidx,
                              const T                       factor,
                              const T* const SFEM_RESTRICT  reference,
-                             TStorage* const SFEM_RESTRICT values) {
+                             TStorage* const SFEM_RESTRICT values,
+                             void* const                   stream) {
         const int       kernel_block_size = 128;
         const ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (block_rows + kernel_block_size - 1) / kernel_block_size);
-        bsr_shift_diagonal_kernel<R, C, TStorage, T><<<n_blocks, kernel_block_size, 0>>>(block_rows, block_size, rowptr, colidx, factor, reference, values);
-        SFEM_DEBUG_SYNCHRONIZE(nullptr);
+        bsr_shift_diagonal_kernel<R, C, TStorage, T><<<n_blocks, kernel_block_size, 0, (cudaStream_t)stream>>>(
+                block_rows, block_size, rowptr, colidx, factor, reference, values);
+        SFEM_DEBUG_SYNCHRONIZE(stream);
         return SFEM_SUCCESS;
     }
 
@@ -221,15 +225,16 @@ namespace sfem {
                                const R* const SFEM_RESTRICT        rowptr,
                                const C* const SFEM_RESTRICT        colidx,
                                const TStorage* const SFEM_RESTRICT values,
-                               T* const SFEM_RESTRICT              out) {
-        SFEM_DEBUG_SYNCHRONIZE(nullptr);
+                               T* const SFEM_RESTRICT              out,
+                               void* const                         stream) {
+        SFEM_DEBUG_SYNCHRONIZE(stream);
 
         const int       kernel_block_size = 128;
         const ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (block_rows + kernel_block_size - 1) / kernel_block_size);
         bsr_extract_diagonal_kernel<R, C, TStorage, T>
-                <<<n_blocks, kernel_block_size, 0>>>(block_rows, block_size, rowptr, colidx, values, out);
+                <<<n_blocks, kernel_block_size, 0, (cudaStream_t)stream>>>(block_rows, block_size, rowptr, colidx, values, out);
 
-        SFEM_DEBUG_SYNCHRONIZE(nullptr);
+        SFEM_DEBUG_SYNCHRONIZE(stream);
         return SFEM_SUCCESS;
     }
 
@@ -260,20 +265,23 @@ namespace sfem {
                                                                             const count_t* const  SFEM_RESTRICT,  \
                                                                             const idx_t* const    SFEM_RESTRICT,  \
                                                                             const TStorage* const SFEM_RESTRICT,  \
-                                                                            const real_t* const   SFEM_RESTRICT);   \
+                                                                            const real_t* const   SFEM_RESTRICT,  \
+                                                                            void* const);                         \
     template int    d_bsr_shift_diagonal<count_t, idx_t, TStorage, real_t>(const ptrdiff_t,                       \
                                                                         const int,                             \
                                                                         const count_t* const SFEM_RESTRICT,    \
                                                                         const idx_t* const   SFEM_RESTRICT,    \
                                                                         const real_t,                          \
                                                                         const real_t* const SFEM_RESTRICT,     \
-                                                                        TStorage* const     SFEM_RESTRICT);        \
+                                                                        TStorage* const     SFEM_RESTRICT,     \
+                                                                        void* const);                          \
     template int    d_bsr_extract_diagonal<count_t, idx_t, TStorage, real_t>(const ptrdiff_t,                     \
                                                                           const int,                           \
                                                                           const count_t* const  SFEM_RESTRICT, \
                                                                           const idx_t* const    SFEM_RESTRICT, \
                                                                           const TStorage* const SFEM_RESTRICT, \
-                                                                          real_t* const         SFEM_RESTRICT);
+                                                                          real_t* const         SFEM_RESTRICT, \
+                                                                          void* const);
 
     SFEM_D_BSR_INSTANTIATE(real_t)
 #if !SFEM_REAL_T_IS_FLOAT32

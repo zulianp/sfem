@@ -26,14 +26,15 @@ namespace sfem {
 
     void pack_nodal_diag_to_block_sym6_device(const ptrdiff_t     n_nodes,
                                               const real_t *const d3,
-                                              real_t *const       d6) {
+                                              real_t *const       d6,
+                                              void *const         stream) {
         if (n_nodes <= 0 || !d3 || !d6) {
             return;
         }
         const int       kernel_block_size = 128;
         const ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (n_nodes + kernel_block_size - 1) / kernel_block_size);
-        pack_nodal_diag_to_block_sym6_kernel<<<n_blocks, kernel_block_size, 0>>>(n_nodes, d3, d6);
-        SFEM_DEBUG_SYNCHRONIZE(nullptr);
+        pack_nodal_diag_to_block_sym6_kernel<<<n_blocks, kernel_block_size, 0, (cudaStream_t)stream>>>(n_nodes, d3, d6);
+        SFEM_DEBUG_SYNCHRONIZE(stream);
     }
 
 }  // namespace sfem

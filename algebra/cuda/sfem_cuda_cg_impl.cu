@@ -2,6 +2,7 @@
 
 #include "sfem_base.hpp"
 #include "sfem_cuda_base.hpp"
+#include "sfem_cuda_reduction_scratch.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -25,43 +26,6 @@ namespace sfem {
             out += __shfl_xor_sync(SFEM_WARP_FULL_MASK, out, 2, SFEM_WARP_SIZE);
             out += __shfl_xor_sync(SFEM_WARP_FULL_MASK, out, 1, SFEM_WARP_SIZE);
             return out;
-        }
-
-        /// Persistent device + pinned-host scalar to avoid per-call malloc/free and H2D of zeros.
-        template <typename T>
-        struct CGDeviceScalar {
-            T* d_{nullptr};
-            T* h_pinned_{nullptr};
-
-            void ensure() {
-                if (d_) return;
-                SFEM_CUDA_CHECK(cudaMalloc((void**)&d_, sizeof(T)));
-                SFEM_CUDA_CHECK(cudaMallocHost((void**)&h_pinned_, sizeof(T)));
-                *h_pinned_ = T(0);
-            }
-
-            void zero_async() {
-                ensure();
-                SFEM_CUDA_CHECK(cudaMemsetAsync(d_, 0, sizeof(T)));
-            }
-
-            T* device_ptr() {
-                ensure();
-                return d_;
-            }
-
-            /// Single D2H of the scalar (pinned host destination).
-            T pull() {
-                ensure();
-                SFEM_CUDA_CHECK(cudaMemcpy(h_pinned_, d_, sizeof(T), cudaMemcpyDeviceToHost));
-                return *h_pinned_;
-            }
-        };
-
-        template <typename T>
-        CGDeviceScalar<T>& cg_scalar_workspace() {
-            static CGDeviceScalar<T> ws;
-            return ws;
         }
 
         template <typename T>
@@ -135,58 +99,63 @@ namespace sfem {
         }
 
         template <typename T>
-        static T update_x_r_and_rtr(const ptrdiff_t n,
-                                    const T         alpha,
-                                    const T* const  p,
-                                    const T* const  Ap,
-                                    T* const        x,
-                                    T* const        r) {
-            auto&     ws = cg_scalar_workspace<T>();
-            int       block_size;
-            ptrdiff_t n_blocks;
+        static T update_x_r_and_rtr(const ptrdiff_t    n,
+                                    const T            alpha,
+                                    const T* const     p,
+                                    const T* const     Ap,
+                                    T* const           x,
+                                    T* const           r,
+                                    const cudaStream_t stream) {
+            const auto scratch = reduction_scratch<T>(1);
+            int        block_size;
+            ptrdiff_t  n_blocks;
             cg_launch_params(n, block_size, n_blocks);
 
-            // Zero device scalar in-place (no H2D of a host zero).
-            ws.zero_async();
-            update_x_r_and_rtr_kernel<<<n_blocks, block_size>>>(n, alpha, p, Ap, x, r, ws.device_ptr());
-            SFEM_DEBUG_SYNCHRONIZE(nullptr);
+            SFEM_CUDA_CHECK(cudaMemsetAsync(scratch.device, 0, sizeof(T), stream));
+            update_x_r_and_rtr_kernel<<<n_blocks, block_size, 0, stream>>>(n, alpha, p, Ap, x, r, scratch.device);
+            SFEM_DEBUG_SYNCHRONIZE(stream);
 
             // One scalar D2H only — required for host-side CG control (beta / convergence).
-            return ws.pull();
+            SFEM_CUDA_CHECK(cudaMemcpyAsync(scratch.host, scratch.device, sizeof(T), cudaMemcpyDeviceToHost, stream));
+            SFEM_CUDA_CHECK(cudaStreamSynchronize(stream));
+            return scratch.host[0];
         }
 
         template <typename T>
-        static void update_x_r(const ptrdiff_t n,
-                               const T         alpha,
-                               const T* const  p,
-                               const T* const  Ap,
-                               T* const        x,
-                               T* const        r) {
+        static void update_x_r(const ptrdiff_t    n,
+                               const T            alpha,
+                               const T* const     p,
+                               const T* const     Ap,
+                               T* const           x,
+                               T* const           r,
+                               const cudaStream_t stream) {
             int       block_size;
             ptrdiff_t n_blocks;
             cg_launch_params(n, block_size, n_blocks);
-            update_x_r_kernel<<<n_blocks, block_size>>>(n, alpha, p, Ap, x, r);
-            SFEM_DEBUG_SYNCHRONIZE(nullptr);
+            update_x_r_kernel<<<n_blocks, block_size, 0, stream>>>(n, alpha, p, Ap, x, r);
+            SFEM_DEBUG_SYNCHRONIZE(stream);
             // No device↔host scalar traffic.
         }
 
         template <typename T>
-        static void update_p(const ptrdiff_t n, const T beta, const T* const z, T* const p) {
+        static void update_p(const ptrdiff_t n, const T beta, const T* const z, T* const p, const cudaStream_t stream) {
             int       block_size;
             ptrdiff_t n_blocks;
             cg_launch_params(n, block_size, n_blocks);
-            update_p_kernel<<<n_blocks, block_size>>>(n, beta, z, p);
-            SFEM_DEBUG_SYNCHRONIZE(nullptr);
+            update_p_kernel<<<n_blocks, block_size, 0, stream>>>(n, beta, z, p);
+            SFEM_DEBUG_SYNCHRONIZE(stream);
             // No device↔host scalar traffic.
         }
 
     }  // namespace
 
     template <typename T>
-    void CUDA_CG<T>::build(struct CG_Tpl<T>& tpl) {
-        tpl.update_x_r_and_rtr = update_x_r_and_rtr<T>;
-        tpl.update_x_r         = update_x_r<T>;
-        tpl.update_p           = update_p<T>;
+    void CUDA_CG<T>::build(struct CG_Tpl<T>& tpl, const ExecutionContext& context) {
+        // Every pass on the context's stream, bound here once.
+        const cudaStream_t s   = static_cast<cudaStream_t>(context.stream());
+        tpl.update_x_r_and_rtr = [s](auto&&... a) { return update_x_r_and_rtr<T>(a..., s); };
+        tpl.update_x_r         = [s](auto&&... a) { update_x_r<T>(a..., s); };
+        tpl.update_p           = [s](auto&&... a) { update_p<T>(a..., s); };
     }
 
     template class CUDA_CG<float>;

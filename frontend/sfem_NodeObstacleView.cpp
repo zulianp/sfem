@@ -103,18 +103,19 @@ namespace sfem {
         }
     }
 
-    void node_obstacle_offset_gap(const ExecutionSpace es,
-                                  const ptrdiff_t      size,
-                                  const real_t         shift,
-                                  const real_t         cutoff,
-                                  const real_t         release,
-                                  const real_t *const  p0,
-                                  real_t *const        gap,
-                                  real_t *const *const normals) {
+    void node_obstacle_offset_gap(const ExecutionContext &context,
+                                  const ptrdiff_t         size,
+                                  const real_t            shift,
+                                  const real_t            cutoff,
+                                  const real_t            release,
+                                  const real_t *const     p0,
+                                  real_t *const           gap,
+                                  real_t *const *const    normals) {
 #ifdef SFEM_ENABLE_CUDA
-        if (es == EXECUTION_SPACE_DEVICE) return d_node_obstacle_offset_gap(size, shift, cutoff, release, p0, gap, normals);
+        if (context.space() == EXECUTION_SPACE_DEVICE)
+            return d_node_obstacle_offset_gap(size, shift, cutoff, release, p0, gap, normals, context.stream());
 #else
-        (void)es;
+        (void)context;
 #endif
 #pragma omp parallel for
         for (ptrdiff_t i = 0; i < size; ++i) {
@@ -222,11 +223,11 @@ namespace sfem {
         }
     }
 
-    real_t max_or_zero(const ExecutionSpace es, const ptrdiff_t n, const real_t *const x) {
+    real_t max_or_zero(const ExecutionContext &context, const ptrdiff_t n, const real_t *const x) {
 #ifdef SFEM_ENABLE_CUDA
-        if (es == EXECUTION_SPACE_DEVICE) return d_max_or_zero(n, x);
+        if (context.space() == EXECUTION_SPACE_DEVICE) return d_max_or_zero(n, x, context.stream());
 #else
-        (void)es;
+        (void)context;
 #endif
         real_t m = 0;
 #pragma omp parallel for reduction(max : m)

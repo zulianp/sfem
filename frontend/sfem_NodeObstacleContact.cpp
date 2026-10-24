@@ -45,7 +45,7 @@ namespace sfem {
           owned_dofs_(owned_dofs),
           dir_(dir) {
         const ExecutionSpace es = context.space();
-        obstacle_ = SDFObstacle::create(sdf, comm, points->extent(1), points->data()[2], es);
+        obstacle_               = SDFObstacle::create(sdf, comm, points->extent(1), points->data()[2], context);
 
         for (int d = 0; d < 3; ++d) xyz_[d] = points->data()[d];
         frame_of_ = create_host_buffer<idx_t>(ndofs / 3);
@@ -88,8 +88,7 @@ namespace sfem {
     void NodeObstacleContact::offset(const SharedBuffer<real_t> &gap, const SharedBuffer<real_t> &normals) const {
         real_t *nn[3];
         rows(normals, 3, nn);
-        node_obstacle_offset_gap(
-                context_.space(), size(), shift_, cutoff_, 1 - release_, p0_ ? p0_->data() : nullptr, gap->data(), nn);
+        node_obstacle_offset_gap(context_, size(), shift_, cutoff_, 1 - release_, p0_ ? p0_->data() : nullptr, gap->data(), nn);
     }
 
     void NodeObstacleContact::capture_penetration(const real_t *const x) {
@@ -149,7 +148,7 @@ namespace sfem {
         // rank reaches every rank through the sum.
         real_t local[2] = {blas->dot(owned_dofs_, projected, projected) +
                                    blas->dot(size(), complementarity_->data(), complementarity_->data()),
-                           max_or_zero(context_.space(), size(), penetration_->data())};
+                           max_or_zero(context_, size(), penetration_->data())};
         if (comm_->size() > 1) {
             comm_->sum(&local[0], 1, smesh::TypeToEnum<real_t>::value());
             local[1] = comm_->max(local[1]);

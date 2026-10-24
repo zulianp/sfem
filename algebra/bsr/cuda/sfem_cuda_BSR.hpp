@@ -36,7 +36,8 @@ namespace sfem {
                                const R* const SFEM_RESTRICT        rowptr,
                                const C* const SFEM_RESTRICT        colidx,
                                const TStorage* const SFEM_RESTRICT values,
-                               T* const SFEM_RESTRICT              out);
+                               T* const SFEM_RESTRICT              out,
+                               void* const                         stream);
 
     /// y = scale_output y + A x on the device, A in BSR with square blocks: one thread per scalar
     /// row, no library. scale_output 0 overwrites y. On `stream` (a cudaStream_t; null: the
@@ -67,14 +68,16 @@ namespace sfem {
                           void* const                         stream);
 
     /// Device version of `bsr_max_abs_row_sum`: max over the scalar rows of sum_j |A_ij|, of
-    /// S A S with `scale` (on the device).
+    /// S A S with `scale` (on the device, null: none). On `stream` (a cudaStream_t; null: the
+    /// default device stream), as the helpers below.
     template <typename R, typename C, typename TStorage, typename T>
     T d_bsr_max_abs_row_sum(const ptrdiff_t                     block_rows,
                             const int                           block_size,
                             const R* const SFEM_RESTRICT        rowptr,
                             const C* const SFEM_RESTRICT        colidx,
                             const TStorage* const SFEM_RESTRICT values,
-                            const T* const SFEM_RESTRICT        scale = nullptr);
+                            const T* const SFEM_RESTRICT        scale,
+                            void* const                         stream);
 
     /// Device version of `bsr_shift_diagonal`: A_dd += factor |reference_d|.
     template <typename R, typename C, typename TStorage, typename T>
@@ -84,7 +87,8 @@ namespace sfem {
                              const C* const SFEM_RESTRICT  colidx,
                              const T                       factor,
                              const T* const SFEM_RESTRICT  reference,
-                             TStorage* const SFEM_RESTRICT values);
+                             TStorage* const SFEM_RESTRICT values,
+                             void* const                   stream);
 }  // namespace sfem
 
 #endif  // SFEM_CUDA_BSR_HPP

@@ -153,9 +153,11 @@ namespace sfem {
                                     const real_t         release,
                                     const real_t *const  p0,
                                     real_t *const        gap,
-                                    real_t *const *const normals) {
-        offset_gap_kernel<<<blocks_for(size), block_size>>>(size, shift, cutoff, release, p0, gap, normals[0], normals[1], normals[2]);
-        SFEM_DEBUG_SYNCHRONIZE(nullptr);
+                                    real_t *const *const normals,
+                                    void *const          stream) {
+        offset_gap_kernel<<<blocks_for(size), block_size, 0, (cudaStream_t)stream>>>(
+                size, shift, cutoff, release, p0, gap, normals[0], normals[1], normals[2]);
+        SFEM_DEBUG_SYNCHRONIZE(stream);
     }
 
     void d_node_obstacle_kkt(const NodeObstacleView &c,
@@ -208,8 +210,6 @@ namespace sfem {
         SFEM_DEBUG_SYNCHRONIZE(c.stream);
     }
 
-    real_t d_max_or_zero(const ptrdiff_t n, const real_t *const x) {
-        return d_max(n, x, real_t(0));
-    }
+    real_t d_max_or_zero(const ptrdiff_t n, const real_t *const x, void *const stream) { return d_max(n, x, real_t(0), stream); }
 
 }  // namespace sfem

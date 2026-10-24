@@ -19,7 +19,8 @@ extern "C" int cu_resample_gap_local(
         const geom_t* const SFEM_RESTRICT    data,
         // Output
         real_t* const SFEM_RESTRICT  wg,
-        real_t** const SFEM_RESTRICT normals) {
+        real_t** const SFEM_RESTRICT normals,
+        void* const                  stream) {
     if (!nelements) return 0;
 
     smesh::ElemType st = smesh::shell_type(element_type);
@@ -32,7 +33,8 @@ extern "C" int cu_resample_gap_local(
         //     return cu_beam2_resample_gap_local(
         //             nelements, nnodes, elems, xyz, n, stride, origin, delta, data, wg, xnormal, ynormal, znormal);
         case smesh::QUADSHELL4: {
-            return cu_quadshell4_resample_gap_local(nelements, nnodes, elems, xyz, n, stride, origin, delta, data, wg, normals);
+            return cu_quadshell4_resample_gap_local(
+                    nelements, nnodes, elems, xyz, n, stride, origin, delta, data, wg, normals, stream);
         }
         default: {
             SFEM_ERROR("Invalid shell_element_type: %d from  element_type: %d\n", st, element_type);
@@ -49,7 +51,8 @@ extern "C" int cu_resample_weight_local(
         idx_t** const SFEM_RESTRICT  elems,
         geom_t** const SFEM_RESTRICT xyz,
         // Output
-        real_t* const SFEM_RESTRICT w) {
+        real_t* const SFEM_RESTRICT w,
+        void* const                 stream) {
     if (!nelements) return SFEM_SUCCESS;
 
     smesh::ElemType st = smesh::shell_type(element_type);
@@ -60,7 +63,7 @@ extern "C" int cu_resample_weight_local(
         // case BEAM2:
         //     return cu_beam2_resample_weight_local(nelements, nnodes, elems, xyz, w);
         case smesh::QUADSHELL4: {
-            return cu_quadshell4_resample_weight_local(nelements, nnodes, elems, xyz, w);
+            return cu_quadshell4_resample_weight_local(nelements, nnodes, elems, xyz, w, stream);
         }
         default: {
             SFEM_ERROR("Invalid shell_element_type: %d from  element_type: %d\n", st, element_type);
@@ -81,25 +84,26 @@ static int rescale_with_weight(const smesh::ElemType        element_type,
                                const ptrdiff_t              nnodes,
                                idx_t** const SFEM_RESTRICT  elems,
                                geom_t** const SFEM_RESTRICT xyz,
-                               real_t* const SFEM_RESTRICT  g) {
+                               real_t* const SFEM_RESTRICT  g,
+                               void* const                  stream) {
     real_t* w;
     cudaMalloc(&w, nnodes * sizeof(real_t));
     cudaMemset(w, 0, nnodes * sizeof(real_t));
 
-    if (cu_resample_weight_local(element_type, nelements, nnodes, elems, xyz, w) != SFEM_SUCCESS) {
+    if (cu_resample_weight_local(element_type, nelements, nnodes, elems, xyz, w, stream) != SFEM_SUCCESS) {
         cudaFree(w);
         return SFEM_FAILURE;
     }
 
     int             block_size = 128;
     const ptrdiff_t n_blocks   = MAX(ptrdiff_t(1), (nnodes + block_size - 1) / block_size);
-    cu_in_place_div<<<n_blocks, block_size, 0>>>(nnodes, g, w);
+    cu_in_place_div<<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(nnodes, g, w);
 
     cudaFree(w);
     return SFEM_SUCCESS;
 }
 
-static int cu_zero_normals(const ptrdiff_t nnodes, real_t** const SFEM_RESTRICT normals);
+static int cu_zero_normals(const ptrdiff_t nnodes, real_t** const SFEM_RESTRICT normals, void* const stream);
 
 extern "C" int cu_resample_gap(
         // Mesh
@@ -116,16 +120,17 @@ extern "C" int cu_resample_gap(
         const geom_t* const SFEM_RESTRICT    data,
         // Output
         real_t* const SFEM_RESTRICT  g,
-        real_t** const SFEM_RESTRICT normals) {
+        real_t** const SFEM_RESTRICT normals,
+        void* const                  stream) {
     if (!nelements) return SFEM_SUCCESS;
 
     smesh::ElemType st = smesh::shell_type(element_type);
     cudaMemset(g, 0, nnodes * sizeof(real_t));
 
-    int err = cu_zero_normals(nnodes, normals);
-    err |= cu_resample_gap_local(st, nelements, nnodes, elems, xyz, n, stride, origin, delta, data, g, normals);
-    err |= rescale_with_weight(element_type, nelements, nnodes, elems, xyz, g);
-    err |= cu_normalize(nnodes, normals);
+    int err = cu_zero_normals(nnodes, normals, stream);
+    err |= cu_resample_gap_local(st, nelements, nnodes, elems, xyz, n, stride, origin, delta, data, g, normals, stream);
+    err |= rescale_with_weight(element_type, nelements, nnodes, elems, xyz, g, stream);
+    err |= cu_normalize(nnodes, normals, stream);
 
     return err;
 }
@@ -144,14 +149,16 @@ extern "C" int cu_resample_gap_value_local(
         const geom_t* const SFEM_RESTRICT    delta,
         const geom_t* const SFEM_RESTRICT    data,
         // Output
-        real_t* const SFEM_RESTRICT g) {
+        real_t* const SFEM_RESTRICT g,
+        void* const                 stream) {
     if (!nelements) return SFEM_SUCCESS;
 
     smesh::ElemType st = smesh::shell_type(element_type);
 
     switch (st) {
         case smesh::QUADSHELL4: {
-            return cu_quadshell4_resample_gap_value_local(nelements, nnodes, elems, xyz, n, stride, origin, delta, data, g);
+            return cu_quadshell4_resample_gap_value_local(
+                    nelements, nnodes, elems, xyz, n, stride, origin, delta, data, g, stream);
         }
         default: {
             SFEM_ERROR("Invalid shell_element_type: %d from  element_type: %d\n", st, element_type);
@@ -174,13 +181,14 @@ extern "C" int cu_resample_gap_value(
         const geom_t* const SFEM_RESTRICT    delta,
         const geom_t* const SFEM_RESTRICT    data,
         // Output
-        real_t* const SFEM_RESTRICT g) {
+        real_t* const SFEM_RESTRICT g,
+        void* const                 stream) {
     if (!nelements) return SFEM_SUCCESS;
 
     smesh::ElemType st = smesh::shell_type(element_type);
     cudaMemset(g, 0, nnodes * sizeof(real_t));
-    int err = cu_resample_gap_value_local(st, nelements, nnodes, elems, xyz, n, stride, origin, delta, data, g);
-    err |= rescale_with_weight(element_type, nelements, nnodes, elems, xyz, g);
+    int err = cu_resample_gap_value_local(st, nelements, nnodes, elems, xyz, n, stride, origin, delta, data, g, stream);
+    err |= rescale_with_weight(element_type, nelements, nnodes, elems, xyz, g, stream);
     return err;
 }
 
@@ -198,7 +206,8 @@ extern "C" int cu_resample_gap_normals_local(
         const geom_t* const SFEM_RESTRICT    delta,
         const geom_t* const SFEM_RESTRICT    data,
         // Output
-        real_t** const SFEM_RESTRICT normals) {
+        real_t** const SFEM_RESTRICT normals,
+        void* const                  stream) {
     if (!nelements) return SFEM_SUCCESS;
 
     smesh::ElemType st = smesh::shell_type(element_type);
@@ -206,7 +215,7 @@ extern "C" int cu_resample_gap_normals_local(
     switch (st) {
         case smesh::QUADSHELL4: {
             return cu_quadshell4_resample_gap_normals_local(
-                    nelements, nnodes, elems, xyz, n, stride, origin, delta, data, normals);
+                    nelements, nnodes, elems, xyz, n, stride, origin, delta, data, normals, stream);
         }
         default: {
             SFEM_ERROR("Invalid shell_element_type: %d from element_type: %d\n", st, element_type);
@@ -224,13 +233,13 @@ __global__ void cu_zero_normals_kernel(const ptrdiff_t nnodes, real_t** const SF
 }
 
 // The local kernels accumulate the normals
-static int cu_zero_normals(const ptrdiff_t nnodes, real_t** const SFEM_RESTRICT normals) {
+static int cu_zero_normals(const ptrdiff_t nnodes, real_t** const SFEM_RESTRICT normals, void* const stream) {
     if (!nnodes) return SFEM_SUCCESS;
 
     int             block_size = 128;
     const ptrdiff_t n_blocks   = MAX(ptrdiff_t(1), (nnodes + block_size - 1) / block_size);
-    cu_zero_normals_kernel<<<n_blocks, block_size, 0>>>(nnodes, normals);
-    SFEM_DEBUG_SYNCHRONIZE(nullptr);
+    cu_zero_normals_kernel<<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(nnodes, normals);
+    SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }
 
@@ -250,16 +259,16 @@ __global__ void cu_normalize_kernel(const ptrdiff_t nnodes, real_t** const SFEM_
     }
 }
 
-extern "C" int cu_normalize(const ptrdiff_t nnodes, real_t** const SFEM_RESTRICT normals) {
+extern "C" int cu_normalize(const ptrdiff_t nnodes, real_t** const SFEM_RESTRICT normals, void* const stream) {
     if (!nnodes) return SFEM_SUCCESS;
 
-    SFEM_DEBUG_SYNCHRONIZE(nullptr);
+    SFEM_DEBUG_SYNCHRONIZE(stream);
 
     int             block_size = 128;
     const ptrdiff_t n_blocks   = MAX(ptrdiff_t(1), (nnodes + block_size - 1) / block_size);
-    cu_normalize_kernel<<<n_blocks, block_size, 0>>>(nnodes, normals);
+    cu_normalize_kernel<<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(nnodes, normals);
 
-    SFEM_DEBUG_SYNCHRONIZE(nullptr);
+    SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }
 
@@ -277,12 +286,13 @@ extern "C" int cu_resample_gap_normals(
         const geom_t* const SFEM_RESTRICT    delta,
         const geom_t* const SFEM_RESTRICT    data,
         // Output
-        real_t** const SFEM_RESTRICT normals) {
+        real_t** const SFEM_RESTRICT normals,
+        void* const                  stream) {
     if (!nelements) return SFEM_SUCCESS;
 
-    int err = cu_zero_normals(nnodes, normals);
+    int err = cu_zero_normals(nnodes, normals, stream);
     err |= cu_resample_gap_normals_local(
-            smesh::shell_type(element_type), nelements, nnodes, elems, xyz, n, stride, origin, delta, data, normals);
-    err |= cu_normalize(nnodes, normals);
+            smesh::shell_type(element_type), nelements, nnodes, elems, xyz, n, stride, origin, delta, data, normals, stream);
+    err |= cu_normalize(nnodes, normals, stream);
     return err;
 }

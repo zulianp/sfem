@@ -13,7 +13,7 @@ extern "C" {
 
 int cu_resample_gap_local(
         // Mesh
-        const smesh::ElemType          element_type,
+        const smesh::ElemType        element_type,
         const ptrdiff_t              nelements,
         const ptrdiff_t              nnodes,
         idx_t** const SFEM_RESTRICT  elems,
@@ -26,11 +26,12 @@ int cu_resample_gap_local(
         const geom_t* const SFEM_RESTRICT    data,
         // Output
         real_t* const SFEM_RESTRICT  wg,
-        real_t** const SFEM_RESTRICT normals);
+        real_t** const SFEM_RESTRICT normals,
+        void* const                  stream);
 
 int cu_resample_gap(
         // Mesh
-        const smesh::ElemType          element_type,
+        const smesh::ElemType        element_type,
         const ptrdiff_t              nelements,
         const ptrdiff_t              nnodes,
         idx_t** const SFEM_RESTRICT  elems,
@@ -43,11 +44,12 @@ int cu_resample_gap(
         const geom_t* const SFEM_RESTRICT    data,
         // Output
         real_t* const SFEM_RESTRICT  g,
-        real_t** const SFEM_RESTRICT normals);
+        real_t** const SFEM_RESTRICT normals,
+        void* const                  stream);
 
 int cu_resample_gap_value_local(
         // Mesh
-        const smesh::ElemType          element_type,
+        const smesh::ElemType        element_type,
         const ptrdiff_t              nelements,
         const ptrdiff_t              nnodes,
         idx_t** const SFEM_RESTRICT  elems,
@@ -59,11 +61,12 @@ int cu_resample_gap_value_local(
         const geom_t* const SFEM_RESTRICT    delta,
         const geom_t* const SFEM_RESTRICT    data,
         // Output
-        real_t* const SFEM_RESTRICT g);
+        real_t* const SFEM_RESTRICT g,
+        void* const                 stream);
 
 int cu_resample_gap_value(
         // Mesh
-        const smesh::ElemType          element_type,
+        const smesh::ElemType        element_type,
         const ptrdiff_t              nelements,
         const ptrdiff_t              nnodes,
         idx_t** const SFEM_RESTRICT  elems,
@@ -75,10 +78,11 @@ int cu_resample_gap_value(
         const geom_t* const SFEM_RESTRICT    delta,
         const geom_t* const SFEM_RESTRICT    data,
         // Output
-        real_t* const SFEM_RESTRICT g);
+        real_t* const SFEM_RESTRICT g,
+        void* const                 stream);
 
 int cu_resample_gap_normals(  // Mesh
-        const smesh::ElemType          element_type,
+        const smesh::ElemType        element_type,
         const ptrdiff_t              nelements,
         const ptrdiff_t              nnodes,
         idx_t** const SFEM_RESTRICT  elems,
@@ -90,19 +94,21 @@ int cu_resample_gap_normals(  // Mesh
         const geom_t* const SFEM_RESTRICT    delta,
         const geom_t* const SFEM_RESTRICT    data,
         // Output
-        real_t** const SFEM_RESTRICT normals);
+        real_t** const SFEM_RESTRICT normals,
+        void* const                  stream);
 
 int cu_resample_weight_local(
         // Mesh
-        const smesh::ElemType          element_type,
+        const smesh::ElemType        element_type,
         const ptrdiff_t              nelements,
         const ptrdiff_t              nnodes,
         idx_t** const SFEM_RESTRICT  elems,
         geom_t** const SFEM_RESTRICT xyz,
         // Output
-        real_t* const SFEM_RESTRICT w);
+        real_t* const SFEM_RESTRICT w,
+        void* const                 stream);
 
-int cu_normalize(const ptrdiff_t nnodes, real_t** const SFEM_RESTRICT normals);
+int cu_normalize(const ptrdiff_t nnodes, real_t** const SFEM_RESTRICT normals, void* const stream);
 
 #ifdef __cplusplus
 }
