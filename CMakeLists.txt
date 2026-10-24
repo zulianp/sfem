@@ -507,6 +507,14 @@ if(SFEM_ENABLE_TESTING)
         list(APPEND SFEM_TARGETS ${TEST_DRIVER_NAME})
     endforeach(TEST_DRIVER ${TEST_DRIVERS})
 
+    # Every device launch names its stream (scripts/testing/check_streams.py): a scan of the
+    # sources, run in every configuration.
+    find_package(Python3 COMPONENTS Interpreter QUIET)
+    if(Python3_Interpreter_FOUND)
+        add_test(NAME sfem_StreamGate
+                 COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/testing/check_streams.py ${CMAKE_CURRENT_SOURCE_DIR})
+    endif()
+
     if(TARGET sfem_MaMALTest)
         target_include_directories(sfem_MaMALTest PRIVATE external/ssdf/serial ${CMAKE_CURRENT_BINARY_DIR}/external/ssdf)
         if(TARGET ssdf)
