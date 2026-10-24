@@ -485,17 +485,25 @@ namespace sfem {
                 {
                     LaunchStreamScope scope(stream);
                     r.product(r.p, r.Ap);
-                    curvature<T>(r.n, r.lb, r.ub, r.x, r.g, r.p, r.Ap, r.infty, MPRGP_DECIDE_CG, r.params, r.control, r.work, {});
-                    step<T>(r.n, r.lb, r.ub, r.p, r.Ap, r.x, r.g, r.gf, r.eps, r.w, true, r.control, r.work, {});
+                    curvature<T>(r.n, r.lb, r.ub, r.x, r.g, r.p, r.Ap, r.infty, MPRGP_DECIDE_CG, r.params, r.control, r.work, r.reduce);
+                    step<T>(r.n, r.lb, r.ub, r.p, r.Ap, r.x, r.g, r.gf, r.eps, r.w, true, r.control, r.work, r.reduce);
                     update_direction<T>(r.n, r.gf, r.p, r.control);
                     run_decide_kernel<T><<<1, 1, 0, stream>>>(
                             handle, r.control, r.work + LOOP, r.gamma, r.atol, r.rtol, r.norm_gp0, r.max_it);
                 }
                 cudaGraph_t captured = nullptr;
                 // A launch the capture could not take (on the legacy stream, a synchronisation)
-                // leaves it invalid: the run is then the host's, iteration by iteration.
-                if (cudaStreamEndCapture(stream, &captured) != cudaSuccess || !captured ||
-                    cudaGraphInstantiate(&exec, graph, 0) != cudaSuccess) {
+                // leaves it invalid: the run is then the host's, iteration by iteration, which is
+                // said once.
+                const cudaError_t ended        = cudaStreamEndCapture(stream, &captured);
+                const cudaError_t instantiated = ended == cudaSuccess && captured ? cudaGraphInstantiate(&exec, graph, 0) : ended;
+                if (instantiated != cudaSuccess || !captured) {
+                    static bool said = false;
+                    if (!said) {
+                        fprintf(stderr, "MPRGP: the CG run could not be captured (%s); its iterations are taken from the host\n",
+                                cudaGetErrorString(instantiated));
+                        said = true;
+                    }
                     cudaGetLastError();
                     return false;
                 }

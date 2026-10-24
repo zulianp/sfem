@@ -64,8 +64,9 @@ namespace sfem {
         // before each product.
         bool op_overwrites_{false};
         // Runs of CG steps in the execution space without returning to the host between them,
-        // where the passes take them (MPRGP_Tpl::cg_run): one rank, a product that writes A p
-        // whole. Off, the host takes each step's decision. run_state_ is the loop of this solve.
+        // where the passes take them (MPRGP_Tpl::cg_run): one rank, or the ranks of one node whose
+        // sums the device completes (NCCL), and a product that writes A p whole. Off, the host
+        // takes each step's decision. run_state_ is the loop of this solve.
         bool                  device_runs_{true};
         std::shared_ptr<void> run_state_;
         int                   device_run_count_{0};
@@ -451,7 +452,8 @@ namespace sfem {
         /// them on the host; false where they cannot be taken there, nothing done.
         bool device_cg_steps(T* const x, T* const g, T* const p, T* const Ap, T* const gf, T* const work, const T norm_gp0,
                              Gradients* grads, int* count_cg_steps, bool* converged, TeamExit* exit) {
-            if (!device_runs_ || !impl.cg_run || comm_ || !op_overwrites_) return false;
+            // Across ranks only where the device completes the sums (one node, NCCL).
+            if (!device_runs_ || !impl.cg_run || (comm_ && !device_reduce_) || !op_overwrites_) return false;
             MPRGPRun<T> r;
             r.n        = n_dofs;
             r.lb       = lb();
@@ -473,8 +475,10 @@ namespace sfem {
             r.norm_gp0 = norm_gp0;
             r.max_it   = max_it;
             r.product  = apply_op;
+            r.reduce   = device_reduce_;
             const MPRGPRunResult run = impl.cg_run(r, iterations_, run_state_);
             if (!run.ran) return false;
+            SFEM_TRACE_SCOPE("MPRGP::device_run");  // counts the runs taken on the device
 
             device_run_count_++;
             iterations_ = run.iterations;
