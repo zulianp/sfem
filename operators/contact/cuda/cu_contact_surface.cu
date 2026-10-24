@@ -25,14 +25,14 @@ int cu_displace_points(const int          dim,
                        geom_t **const     bulk_points,
                        const real_t      *disp,
                        geom_t **const     surface_points) {
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(nullptr);
 
     int             block_size = 128;
     const ptrdiff_t n_blocks   = MAX(ptrdiff_t(1), (n_nodes + block_size - 1) / block_size);
 
     cu_displace_points_kernel<<<n_blocks, block_size>>>(dim, n_nodes, idx, bulk_points, disp, surface_points);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(nullptr);
     return SFEM_SUCCESS;
 }
 
@@ -63,13 +63,13 @@ int cu_displace_surface_points(const int          dim,
                                const real_t      *disp,
                                geom_t **const     surface_points,
                                real_t *const      surface_disp) {
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(nullptr);
 
     int             block_size = 128;
     const ptrdiff_t n_blocks   = MAX(ptrdiff_t(1), (n_nodes + block_size - 1) / block_size);
 
     cu_displace_surface_points_kernel<<<n_blocks, block_size>>>(dim, n_nodes, idx, surface_points_rest, disp, surface_points, surface_disp);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(nullptr);
     return SFEM_SUCCESS;
 }

@@ -1256,7 +1256,7 @@ int cu_affine_sshex8_linear_elasticity_apply_local_mem_tpl(const ptrdiff_t      
                                                            T *const SFEM_RESTRICT                   outy,
                                                            T *const SFEM_RESTRICT                   outz,
                                                            void                                    *stream) {
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
 
     int block_size = 128;
 #ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
@@ -1284,7 +1284,7 @@ int cu_affine_sshex8_linear_elasticity_apply_local_mem_tpl(const ptrdiff_t      
                                                                                   outy,
                                                                                   outz);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }
 
@@ -1305,7 +1305,7 @@ int cu_affine_sshex8_linear_elasticity_apply_local_mem_original_tpl(const ptrdif
                                                                     T *const SFEM_RESTRICT                   outy,
                                                                     T *const SFEM_RESTRICT                   outz,
                                                                     void                                    *stream) {
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
 
     int block_size = 128;
 #ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
@@ -1335,7 +1335,7 @@ int cu_affine_sshex8_linear_elasticity_apply_local_mem_original_tpl(const ptrdif
                                                                 outy,
                                                                 outz);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }
 
@@ -1357,7 +1357,7 @@ int cu_affine_sshex8_linear_elasticity_apply_shared_mem_segmented_tpl(const ptrd
                                                                       T *const SFEM_RESTRICT       outy,
                                                                       T *const SFEM_RESTRICT       outz,
                                                                       void                        *stream) {
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
 
     dim3 block_size(128, 1, 1);
     dim3 n_blocks(MIN(nelements, sfem_cuda_max_grid_dim_x()), 1, 1);
@@ -1379,7 +1379,7 @@ int cu_affine_sshex8_linear_elasticity_apply_shared_mem_segmented_tpl(const ptrd
                                                                 outy,
                                                                 outz);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }
 
@@ -1400,7 +1400,7 @@ int cu_affine_sshex8_linear_elasticity_apply_tensor_product_tpl(const ptrdiff_t 
                                                                 T *const SFEM_RESTRICT                   outy,
                                                                 T *const SFEM_RESTRICT                   outz,
                                                                 void                                    *stream) {
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
 
     dim3 block_size(4, 8, 4);
     dim3 n_blocks(MIN(nelements, sfem_cuda_max_grid_dim_x()), 1, 1);
@@ -1423,7 +1423,7 @@ int cu_affine_sshex8_linear_elasticity_apply_tensor_product_tpl(const ptrdiff_t 
                                                                 outz);
 
     SFEM_CUDA_CHECK(cudaPeekAtLastError());
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }
 
@@ -1445,7 +1445,7 @@ int cu_affine_sshex8_linear_elasticity_apply_tensor_product_opt_tpl(
         T *const SFEM_RESTRICT                   outy,
         T *const SFEM_RESTRICT                   outz,
         void                                    *stream) {
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
 
     if (LEVEL != 8) {
         SFEM_ERROR("cu_affine_sshex8_linear_elasticity_apply_tensor_product_opt_tpl: level %d not supported!\n",
@@ -1474,7 +1474,7 @@ int cu_affine_sshex8_linear_elasticity_apply_tensor_product_opt_tpl(
                                                                 outz);
 
     SFEM_CUDA_CHECK(cudaPeekAtLastError());
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }
 
@@ -1495,7 +1495,7 @@ int cu_affine_sshex8_linear_elasticity_apply_level8_gather_tpl(const ptrdiff_t  
                                                                T *const SFEM_RESTRICT                   outy,
                                                                T *const SFEM_RESTRICT                   outz,
                                                                void                                    *stream) {
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
 
     if (LEVEL != 8) {
         SFEM_ERROR("cu_affine_sshex8_linear_elasticity_apply_level8_gather_tpl: level %d not supported!\n", LEVEL);
@@ -1523,7 +1523,7 @@ int cu_affine_sshex8_linear_elasticity_apply_level8_gather_tpl(const ptrdiff_t  
                                                                 outz);
 
     SFEM_CUDA_CHECK(cudaPeekAtLastError());
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }
 
@@ -1654,7 +1654,7 @@ int cu_affine_sshex8_linear_elasticity_apply_warp_tpl(const ptrdiff_t           
                                                       T *const SFEM_RESTRICT                   outy,
                                                       T *const SFEM_RESTRICT                   outz,
                                                       void                                    *stream) {
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
 
     dim3 block_size(LEVEL, LEVEL, LEVEL);
     dim3 n_blocks(MIN(nelements, sfem_cuda_max_grid_dim_x()), 1, 1);
@@ -1676,7 +1676,7 @@ int cu_affine_sshex8_linear_elasticity_apply_warp_tpl(const ptrdiff_t           
                                                                 outy,
                                                                 outz);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }
 
@@ -2109,7 +2109,7 @@ static int cu_affine_sshex8_linear_elasticity_diag_tpl(const int                
                                                                                                          outy,
                                                                                                          outz);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }
 
@@ -2294,7 +2294,7 @@ int cu_affine_sshex8_linear_elasticity_block_diag_sym_tpl(const int             
                                                           T *const                                 out4,
                                                           T *const                                 out5,
                                                           void                                    *stream) {
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
 
     int block_size = 128;
 #ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
@@ -2324,7 +2324,7 @@ int cu_affine_sshex8_linear_elasticity_block_diag_sym_tpl(const int             
                                                                 out4,
                                                                 out5);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }
 
@@ -2681,7 +2681,7 @@ extern int cu_sshex8_linear_elasticity_apply(const int                         l
                         (T *)outx,
                         (T *)outy,
                         (T *)outz);
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(stream);
         return SFEM_SUCCESS;
     });
 }
@@ -2718,7 +2718,7 @@ static int cu_sshex8_isoparametric_block_diag(const int                         
                         (T *)out[3],
                         (T *)out[4],
                         (T *)out[5]);
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(stream);
         return SFEM_SUCCESS;
     });
 }

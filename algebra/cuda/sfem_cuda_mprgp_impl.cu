@@ -152,17 +152,22 @@ namespace sfem {
         // ranks the pass keeps them (Store), the ranks complete them on the stream (reduce), and
         // the results of all go to `result`.
         template <typename T, class Launch, class Result>
-        void run_pass(T *const work, const MPRGPReduce<T> &reduce, const bool min_last, const Launch &launch, const Result &result) {
+        void run_pass(T* const              work,
+                      const MPRGPReduce<T>& reduce,
+                      const bool            min_last,
+                      const Launch&         launch,
+                      const Result&         result,
+                      const cudaStream_t    stream) {
             if (!reduce) {
                 launch(result);
-                SFEM_DEBUG_SYNCHRONIZE();
+                SFEM_DEBUG_SYNCHRONIZE(stream);
                 return;
             }
             T *const reduced = work + REDUCED;
             launch(Store<T>{reduced});
-            reduce(reduced, N_VALUES, min_last, (void *)launch_stream());
-            apply_kernel<T, Result><<<1, 1, 0, launch_stream()>>>(reduced, result);
-            SFEM_DEBUG_SYNCHRONIZE();
+            reduce(reduced, N_VALUES, min_last, (void*)stream);
+            apply_kernel<T, Result><<<1, 1, 0, stream>>>(reduced, result);
+            SFEM_DEBUG_SYNCHRONIZE(stream);
         }
 
         // Rounded as written, never contracted: the direction update matches the BLAS's scal and
@@ -281,24 +286,25 @@ namespace sfem {
         }
 
         template <typename T>
-        void project(const ptrdiff_t n, const T* const lb, const T* const ub, T* const x) {
+        void project(const ptrdiff_t n, const T* const lb, const T* const ub, T* const x, const cudaStream_t stream) {
             with_mprgp_bounds(lb, ub, [&](const auto b) {
-                project_kernel<T, Bounds<decltype(b)>><<<n_blocks(n), N_THREADS, 0, launch_stream()>>>(n, b, x);
-                SFEM_DEBUG_SYNCHRONIZE();
+                project_kernel<T, Bounds<decltype(b)>><<<n_blocks(n), N_THREADS, 0, stream>>>(n, b, x);
+                SFEM_DEBUG_SYNCHRONIZE(stream);
             });
         }
 
         template <typename T>
-        void chopped_gradient(const ptrdiff_t n,
-                              const T* const  lb,
-                              const T* const  ub,
-                              const T* const  x,
-                              const T* const  g,
-                              T* const        gc,
-                              const T         eps) {
+        void chopped_gradient(const ptrdiff_t    n,
+                              const T* const     lb,
+                              const T* const     ub,
+                              const T* const     x,
+                              const T* const     g,
+                              T* const           gc,
+                              const T            eps,
+                              const cudaStream_t stream) {
             with_mprgp_bounds(lb, ub, [&](const auto b) {
-                chopped_gradient_kernel<T, Bounds<decltype(b)>><<<n_blocks(n), N_THREADS, 0, launch_stream()>>>(n, b, x, g, gc, eps);
-                SFEM_DEBUG_SYNCHRONIZE();
+                chopped_gradient_kernel<T, Bounds<decltype(b)>><<<n_blocks(n), N_THREADS, 0, stream>>>(n, b, x, g, gc, eps);
+                SFEM_DEBUG_SYNCHRONIZE(stream);
             });
         }
 
@@ -315,50 +321,70 @@ namespace sfem {
                        const MPRGPParams<T>& params,
                        T* const              control,
                        T* const              work,
-                       const MPRGPReduce<T>& reduce) {
+                       const MPRGPReduce<T>& reduce,
+                       const cudaStream_t    stream) {
             const int nb = n_blocks(n);
             with_mprgp_bounds(lb, ub, [&](const auto b) {
-                run_pass(work, reduce, true, [&](const auto result) {
-                    curvature_kernel<<<nb, N_THREADS, 0, launch_stream()>>>(n, b, x, g, d, Ad, infty, work, result);
-                }, CurvatureResult<T>{control, decision, params});
+                run_pass(
+                        work,
+                        reduce,
+                        true,
+                        [&](const auto result) {
+                            curvature_kernel<<<nb, N_THREADS, 0, stream>>>(n, b, x, g, d, Ad, infty, work, result);
+                        },
+                        CurvatureResult<T>{control, decision, params},
+                        stream);
             });
         }
 
         template <typename T>
-        void step(const ptrdiff_t n,
-                  const T* const  lb,
-                  const T* const  ub,
-                  const T* const  d,
-                  const T* const  Ad,
-                  T* const        x,
-                  T* const        g,
-                  T* const        gf,
-                  const T         eps,
-                  const T* const  w,
+        void step(const ptrdiff_t       n,
+                  const T* const        lb,
+                  const T* const        ub,
+                  const T* const        d,
+                  const T* const        Ad,
+                  T* const              x,
+                  T* const              g,
+                  T* const              gf,
+                  const T               eps,
+                  const T* const        w,
                   const bool            cg,
                   T* const              control,
                   T* const              work,
-                  const MPRGPReduce<T>& reduce) {
+                  const MPRGPReduce<T>& reduce,
+                  const cudaStream_t    stream) {
             const int nb = n_blocks(n);
             with_mprgp_bounds(lb, ub, [&](const auto b) {
                 using Bnd = Bounds<decltype(b)>;
                 // Across ranks, where the step along d did not run, the stale results are completed
                 // and not used.
-                run_pass(work, reduce, false, [&](const auto result) {
-                    using Res = std::decay_t<decltype(result)>;
-                    if (d) {
-                        step_kernel<T, Bnd, true, Res><<<nb, N_THREADS, 0, launch_stream()>>>(n, b, control, d, Ad, x, g, gf, eps, w, work, result);
-                    } else {
-                        step_kernel<T, Bnd, false, Res><<<nb, N_THREADS, 0, launch_stream()>>>(n, b, control, d, Ad, x, g, gf, eps, w, work, result);
-                    }
-                }, StepResult<T>{control, d != nullptr, cg});
+                run_pass(
+                        work,
+                        reduce,
+                        false,
+                        [&](const auto result) {
+                            using Res = std::decay_t<decltype(result)>;
+                            if (d) {
+                                step_kernel<T, Bnd, true, Res>
+                                        <<<nb, N_THREADS, 0, stream>>>(n, b, control, d, Ad, x, g, gf, eps, w, work, result);
+                            } else {
+                                step_kernel<T, Bnd, false, Res>
+                                        <<<nb, N_THREADS, 0, stream>>>(n, b, control, d, Ad, x, g, gf, eps, w, work, result);
+                            }
+                        },
+                        StepResult<T>{control, d != nullptr, cg},
+                        stream);
             });
         }
 
         template <typename T>
-        void update_direction(const ptrdiff_t n, const T* const gf, T* const p, const T* const control) {
-            update_direction_kernel<T><<<n_blocks(n), N_THREADS, 0, launch_stream()>>>(n, gf, p, control);
-            SFEM_DEBUG_SYNCHRONIZE();
+        void update_direction(const ptrdiff_t    n,
+                              const T* const     gf,
+                              T* const           p,
+                              const T* const     control,
+                              const cudaStream_t stream) {
+            update_direction_kernel<T><<<n_blocks(n), N_THREADS, 0, stream>>>(n, gf, p, control);
+            SFEM_DEBUG_SYNCHRONIZE(stream);
         }
 
         // The record's pinned copy on the host, one per thread: a write to the device is then
@@ -375,32 +401,34 @@ namespace sfem {
         }
 
         template <typename T>
-        void read_control(const T* const control, MPRGPControl<T>* const host) {
+        void read_control(const T* const control, MPRGPControl<T>* const host, const cudaStream_t stream) {
             MPRGPControl<T>* const s = staging<T>();
-            SFEM_CUDA_CHECK(cudaMemcpy(s, control, sizeof(MPRGPControl<T>), cudaMemcpyDeviceToHost));
+            SFEM_CUDA_CHECK(cudaMemcpyAsync(s, control, sizeof(MPRGPControl<T>), cudaMemcpyDeviceToHost, stream));
+            SFEM_CUDA_CHECK(cudaStreamSynchronize(stream));
             *host = *s;
         }
 
         template <typename T>
-        void write_control(const MPRGPControl<T>& host, T* const control) {
+        void write_control(const MPRGPControl<T>& host, T* const control, const cudaStream_t stream) {
             MPRGPControl<T>* const s = staging<T>();
             *s                       = host;
-            SFEM_CUDA_CHECK(cudaMemcpyAsync(control, s, sizeof(MPRGPControl<T>), cudaMemcpyHostToDevice, 0));
+            SFEM_CUDA_CHECK(cudaMemcpyAsync(control, s, sizeof(MPRGPControl<T>), cudaMemcpyHostToDevice, stream));
         }
 
         template <typename T>
-        void expand(const ptrdiff_t n,
-                    const T* const  lb,
-                    const T* const  ub,
-                    const T         alpha,
-                    const T         alpha_bar,
-                    const T* const  d,
-                    const T* const  Ad,
-                    T* const        x,
-                    const T* const  g) {
+        void expand(const ptrdiff_t    n,
+                    const T* const     lb,
+                    const T* const     ub,
+                    const T            alpha,
+                    const T            alpha_bar,
+                    const T* const     d,
+                    const T* const     Ad,
+                    T* const           x,
+                    const T* const     g,
+                    const cudaStream_t stream) {
             with_mprgp_bounds(lb, ub, [&](const auto b) {
-                expand_kernel<T, Bounds<decltype(b)>><<<n_blocks(n), N_THREADS, 0, launch_stream()>>>(n, b, alpha, alpha_bar, d, Ad, x, g);
-                SFEM_DEBUG_SYNCHRONIZE();
+                expand_kernel<T, Bounds<decltype(b)>><<<n_blocks(n), N_THREADS, 0, stream>>>(n, b, alpha, alpha_bar, d, Ad, x, g);
+                SFEM_DEBUG_SYNCHRONIZE(stream);
             });
         }
         // A run starts from `iterations` done, no step taken, nothing decided.
@@ -448,9 +476,10 @@ namespace sfem {
 
         // A solve's run graph: a WHILE node whose body is one CG iteration -- the operator's
         // product, the curvature pass, the step pass, the next direction -- and the decision that
-        // sets its condition, captured from the launches themselves (LaunchStreamScope), so the
-        // iteration is the one the host would launch. Captured from and launched on the solver's
-        // stream, so it follows the solver's work and that follows it.
+        // sets its condition, captured from the launches themselves, so the iteration is the one
+        // the host would launch. Captured from and launched on the solver's stream, which the
+        // operator's product runs on too (MPRGP takes device runs only then), so it follows the
+        // solver's work and that follows it.
         template <typename T>
         struct RunGraph {
             cudaStream_t    stream{nullptr};
@@ -481,15 +510,25 @@ namespace sfem {
                 cudaGraph_t body = params.conditional.phGraph_out[0];
 
                 SFEM_CUDA_CHECK(cudaStreamBeginCaptureToGraph(stream, body, nullptr, nullptr, 0, cudaStreamCaptureModeThreadLocal));
-                {
-                    LaunchStreamScope scope(stream);
-                    r.product(r.p, r.Ap);
-                    curvature<T>(r.n, r.lb, r.ub, r.x, r.g, r.p, r.Ap, r.infty, MPRGP_DECIDE_CG, r.params, r.control, r.work, r.reduce);
-                    step<T>(r.n, r.lb, r.ub, r.p, r.Ap, r.x, r.g, r.gf, r.eps, r.w, true, r.control, r.work, r.reduce);
-                    update_direction<T>(r.n, r.gf, r.p, r.control);
-                    run_decide_kernel<T><<<1, 1, 0, stream>>>(
-                            handle, r.control, r.work + LOOP, r.gamma, r.atol, r.rtol, r.norm_gp0, r.max_it);
-                }
+                r.product(r.p, r.Ap);
+                curvature<T>(r.n,
+                             r.lb,
+                             r.ub,
+                             r.x,
+                             r.g,
+                             r.p,
+                             r.Ap,
+                             r.infty,
+                             MPRGP_DECIDE_CG,
+                             r.params,
+                             r.control,
+                             r.work,
+                             r.reduce,
+                             stream);
+                step<T>(r.n, r.lb, r.ub, r.p, r.Ap, r.x, r.g, r.gf, r.eps, r.w, true, r.control, r.work, r.reduce, stream);
+                update_direction<T>(r.n, r.gf, r.p, r.control, stream);
+                run_decide_kernel<T>
+                        <<<1, 1, 0, stream>>>(handle, r.control, r.work + LOOP, r.gamma, r.atol, r.rtol, r.norm_gp0, r.max_it);
                 cudaGraph_t captured = nullptr;
                 // A launch the capture could not take (on the legacy stream, a synchronisation)
                 // leaves it invalid: the run is then the host's, iteration by iteration, which is
@@ -536,15 +575,17 @@ namespace sfem {
     }  // namespace
 
     template <typename T>
-    void CUDA_MPRGP<T>::build_mprgp(struct MPRGP_Tpl<T>& tpl) {
-        tpl.project          = project<T>;
-        tpl.chopped_gradient = chopped_gradient<T>;
-        tpl.curvature        = curvature<T>;
-        tpl.step             = step<T>;
-        tpl.expand           = expand<T>;
-        tpl.update_direction = update_direction<T>;
-        tpl.read_control     = read_control<T>;
-        tpl.write_control    = write_control<T>;
+    void CUDA_MPRGP<T>::build_mprgp(struct MPRGP_Tpl<T>& tpl, const ExecutionContext& context) {
+        // Every pass on the context's stream, bound here once.
+        const cudaStream_t s = static_cast<cudaStream_t>(context.stream());
+        tpl.project          = [s](auto&&... a) { project<T>(a..., s); };
+        tpl.chopped_gradient = [s](auto&&... a) { chopped_gradient<T>(a..., s); };
+        tpl.curvature        = [s](auto&&... a) { curvature<T>(a..., s); };
+        tpl.step             = [s](auto&&... a) { step<T>(a..., s); };
+        tpl.expand           = [s](auto&&... a) { expand<T>(a..., s); };
+        tpl.update_direction = [s](auto&&... a) { update_direction<T>(a..., s); };
+        tpl.read_control     = [s](auto&&... a) { read_control<T>(a..., s); };
+        tpl.write_control    = [s](auto&&... a) { write_control<T>(a..., s); };
         tpl.cg_run           = cg_run<T>;
         tpl.work_size        = WORK_SIZE;
     }

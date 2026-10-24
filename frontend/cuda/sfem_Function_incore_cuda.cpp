@@ -83,6 +83,8 @@ namespace sfem {
         std::shared_ptr<FunctionSpace>                     space;
         std::shared_ptr<DirichletConditions>               h_dirichlet;
         std::vector<struct DirichletConditions::Condition> conditions;
+        //! The stream every kernel call is issued on (null: the default device stream).
+        void *stream{nullptr};
 
         GPUDirichletConditions(const std::shared_ptr<DirichletConditions> &dc) : space(dc->space()), h_dirichlet(dc) {
             for (auto &c : dc->conditions()) {
@@ -103,10 +105,10 @@ namespace sfem {
             for (auto &c : conditions) {
                 if (c.values) {
                     d_constraint_nodes_to_values_vec(
-                            c.nodeset->size(), c.nodeset->data(), space->block_size(), c.component, c.values->data(), x);
+                            c.nodeset->size(), c.nodeset->data(), space->block_size(), c.component, c.values->data(), x, stream);
                 } else {
                     d_constraint_nodes_to_value_vec(
-                            c.nodeset->size(), c.nodeset->data(), space->block_size(), c.component, c.value, x);
+                            c.nodeset->size(), c.nodeset->data(), space->block_size(), c.component, c.value, x, stream);
                 }
             }
 
@@ -116,11 +118,17 @@ namespace sfem {
         int gradient(const real_t *const x, real_t *const g) override {
             for (auto &c : conditions) {
                 if (c.values) {
-                    d_constraint_gradient_nodes_to_values_vec(
-                            c.nodeset->size(), c.nodeset->data(), space->block_size(), c.component, c.values->data(), x, g);
+                    d_constraint_gradient_nodes_to_values_vec(c.nodeset->size(),
+                                                              c.nodeset->data(),
+                                                              space->block_size(),
+                                                              c.component,
+                                                              c.values->data(),
+                                                              x,
+                                                              g,
+                                                              stream);
                 } else {
                     d_constraint_gradient_nodes_to_value_vec(
-                            c.nodeset->size(), c.nodeset->data(), space->block_size(), c.component, c.value, x, g);
+                            c.nodeset->size(), c.nodeset->data(), space->block_size(), c.component, c.value, x, g, stream);
                 }
             }
 
@@ -129,7 +137,8 @@ namespace sfem {
 
         int apply_value(const real_t value, real_t *const x) override {
             for (auto &c : conditions) {
-                d_constraint_nodes_to_value_vec(c.nodeset->size(), c.nodeset->data(), space->block_size(), c.component, value, x);
+                d_constraint_nodes_to_value_vec(
+                        c.nodeset->size(), c.nodeset->data(), space->block_size(), c.component, value, x, stream);
             }
 
             return SFEM_SUCCESS;
@@ -137,7 +146,8 @@ namespace sfem {
 
         int copy_constrained_dofs(const real_t *const src, real_t *const dest) override {
             for (auto &c : conditions) {
-                d_constraint_nodes_copy_vec(c.nodeset->size(), c.nodeset->data(), space->block_size(), c.component, src, dest);
+                d_constraint_nodes_copy_vec(
+                        c.nodeset->size(), c.nodeset->data(), space->block_size(), c.component, src, dest, stream);
             }
 
             return SFEM_SUCCESS;
@@ -148,8 +158,15 @@ namespace sfem {
                         const idx_t *const   colidx,
                         real_t *const        values) override {
             for (auto &c : conditions) {
-                cu_crs_constraint_nodes_to_identity_vec(
-                        c.nodeset->size(), c.nodeset->data(), space->block_size(), c.component, 1, rowptr, colidx, values);
+                cu_crs_constraint_nodes_to_identity_vec(c.nodeset->size(),
+                                                        c.nodeset->data(),
+                                                        space->block_size(),
+                                                        c.component,
+                                                        1,
+                                                        rowptr,
+                                                        colidx,
+                                                        values,
+                                                        stream);
             }
 
             return SFEM_SUCCESS;

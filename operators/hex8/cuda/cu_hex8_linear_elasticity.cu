@@ -127,7 +127,7 @@ int cu_affine_hex8_linear_elasticity_apply_tpl(const ptrdiff_t                  
                                                T *const SFEM_RESTRICT                   outy,
                                                T *const SFEM_RESTRICT                   outz,
                                                void                                    *stream) {
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
 
     int block_size = 128;
 #ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
@@ -155,7 +155,7 @@ int cu_affine_hex8_linear_elasticity_apply_tpl(const ptrdiff_t                  
                                                                                                         outy,
                                                                                                         outz);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }
 
@@ -335,7 +335,7 @@ int cu_affine_hex8_linear_elasticity_bsr_tpl(const ptrdiff_t                    
                                              const idx_t *const SFEM_RESTRICT         colidx,
                                              T *const SFEM_RESTRICT                   values,
                                              void                                    *stream) {
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
 
     int block_size = 128;
 #ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
@@ -350,7 +350,7 @@ int cu_affine_hex8_linear_elasticity_bsr_tpl(const ptrdiff_t                    
     cu_affine_hex8_linear_elasticity_bsr_kernel<T><<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(
             nelements, elements, jacobian_stride, jacobian_adjugate, jacobian_determinant, mu, lambda, rowptr, colidx, values);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }
 
@@ -503,7 +503,7 @@ int cu_affine_hex8_linear_elasticity_block_diag_sym_tpl(const ptrdiff_t         
                                                         T *const                                 out4,
                                                         T *const                                 out5,
                                                         void                                    *stream) {
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
 
     int block_size = 128;
 #ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
@@ -532,7 +532,7 @@ int cu_affine_hex8_linear_elasticity_block_diag_sym_tpl(const ptrdiff_t         
                                                                 out4,
                                                                 out5);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }
 
@@ -666,7 +666,7 @@ static int cu_affine_hex8_linear_elasticity_diag_tpl(const ptrdiff_t            
                                                      T *const SFEM_RESTRICT                   outy,
                                                      T *const SFEM_RESTRICT                   outz,
                                                      void                                    *stream) {
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
 
     int block_size = 128;
 #ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
@@ -690,7 +690,7 @@ static int cu_affine_hex8_linear_elasticity_diag_tpl(const ptrdiff_t            
                                                                                                        outy,
                                                                                                        outz);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }
 

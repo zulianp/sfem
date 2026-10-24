@@ -25,7 +25,7 @@ int cu_sample_nodes(const int                         order,
                     const NodeSamplerOutput          &out) {
     if (!nnodes) return SFEM_SUCCESS;
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(nullptr);
     const int       block_size = 128;
     const ptrdiff_t n_blocks   = (nnodes + block_size - 1) / block_size;
     if (order == 2) {
@@ -33,6 +33,6 @@ int cu_sample_nodes(const int                         order,
     } else {
         cu_sample_nodes_kernel<1><<<n_blocks, block_size, 0>>>(nnodes, idx, points, disp, grid, out);
     }
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(nullptr);
     return SFEM_SUCCESS;
 }

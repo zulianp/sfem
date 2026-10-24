@@ -486,7 +486,7 @@ int cu_macro_tet4_linear_elasticity_apply_tpl(const ptrdiff_t                   
                                                                                                     outy,
                                                                                                     outz);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }
 

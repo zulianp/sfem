@@ -176,7 +176,7 @@ int cu_tet4_linear_elasticity_apply_tpl(const ptrdiff_t                         
                                         T *const SFEM_RESTRICT                   outy,
                                         T *const SFEM_RESTRICT                   outz,
                                         void                                    *stream) {
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
 
     int block_size = 128;
 #ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
@@ -204,7 +204,7 @@ int cu_tet4_linear_elasticity_apply_tpl(const ptrdiff_t                         
                                                                                               outy,
                                                                                               outz);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }
 

@@ -160,7 +160,7 @@ int cu_quadshell4_integrate_value_tpl(const ptrdiff_t                    nelemen
                                       const int                          component,
                                       T *const SFEM_RESTRICT             out,
                                       void                              *stream) {
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
 
     // Hand tuned
     int block_size = 128;
@@ -176,7 +176,7 @@ int cu_quadshell4_integrate_value_tpl(const ptrdiff_t                    nelemen
     cu_quadshell4_integrate_value_kernel<T><<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(
             nelements, elements, coords_stride, coords, value, vec_size, component, out);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }
 
@@ -190,7 +190,7 @@ int cu_quadshell4_integrate_values_tpl(const ptrdiff_t                    neleme
                                        const int                          component,
                                        T *const SFEM_RESTRICT             out,
                                        void                              *stream) {
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
 
     // Hand tuned
     int block_size = 128;
@@ -206,7 +206,7 @@ int cu_quadshell4_integrate_values_tpl(const ptrdiff_t                    neleme
     cu_quadshell4_integrate_values_kernel<T><<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(
             nelements, elements, coords_stride, coords, values, vec_size, component, out);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }
 

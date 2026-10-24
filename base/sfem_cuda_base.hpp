@@ -34,39 +34,24 @@ inline int sfem_cuda_max_grid_dim_x() {
 }
 
 namespace sfem {
-    namespace details {
-        inline thread_local cudaStream_t launch_stream = nullptr;
+    /// Waits for `stream` (a cudaStream_t; null: the default device stream) and reports what failed
+    /// on it, unless it is being captured into a graph, which a synchronisation would invalidate.
+    inline void debug_synchronize(const cudaStream_t stream) {
+        cudaStreamCaptureStatus status = cudaStreamCaptureStatusNone;
+        if (cudaStreamIsCapturing(stream, &status) != cudaSuccess) {
+            cudaGetLastError();
+            return;
+        }
+        if (status != cudaStreamCaptureStatusNone) return;
+        SFEM_CUDA_CHECK(cudaStreamSynchronize(stream));
+        SFEM_CUDA_CHECK(cudaPeekAtLastError());
     }
-
-    /// The stream the library's kernels launch on from the calling thread: the legacy default
-    /// stream, unless a LaunchStreamScope set another, as a graph capture does (which the legacy
-    /// stream cannot take part in).
-    inline cudaStream_t launch_stream() { return details::launch_stream; }
-
-    /// Launches from the calling thread go to `stream` while it lives.
-    class LaunchStreamScope {
-    public:
-        explicit LaunchStreamScope(cudaStream_t stream) : previous_(details::launch_stream) { details::launch_stream = stream; }
-        ~LaunchStreamScope() { details::launch_stream = previous_; }
-        LaunchStreamScope(const LaunchStreamScope &)            = delete;
-        LaunchStreamScope &operator=(const LaunchStreamScope &) = delete;
-
-    private:
-        cudaStream_t previous_;
-    };
 }  // namespace sfem
 
 #ifndef NDEBUG
-// Not inside a capture, which a device synchronisation would invalidate.
-#define SFEM_DEBUG_SYNCHRONIZE()                    \
-    do {                                            \
-        if (!sfem::launch_stream()) {               \
-            cudaDeviceSynchronize();                \
-            SFEM_CUDA_CHECK(cudaPeekAtLastError()); \
-        }                                           \
-    } while (0)
+#define SFEM_DEBUG_SYNCHRONIZE(stream) sfem::debug_synchronize((cudaStream_t)(stream))
 #else
-#define SFEM_DEBUG_SYNCHRONIZE()
+#define SFEM_DEBUG_SYNCHRONIZE(stream)
 #endif
 
 #define SFEM_ENABLE_NVTX

@@ -299,7 +299,7 @@ public:
 
         CHECK_CUDA(cudaMemsetAsync(result, 0, sizeof(T), stream));
         tdot<<<n_blocks, kernel_block_size, 0, stream>>>(n, l, r, result);
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(stream);
     }
 
     /// l . r on the host: the device result through the thread's reduction scratch.
@@ -318,7 +318,7 @@ public:
         assert(x != y);
 
         taxpby<<<n_blocks, kernel_block_size, 0, stream>>>(n, alpha, x, (T)1, y);
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(stream);
     }
 
     static void axpby(const ptrdiff_t n, const T alpha, const T *const x, const T beta, T *const y, cudaStream_t stream) {
@@ -328,7 +328,7 @@ public:
         assert(x != y);
 
         taxpby<<<n_blocks, kernel_block_size, 0, stream>>>(n, alpha, x, beta, y);
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(stream);
     }
 
     static void zaxpby(const ptrdiff_t n, const T alpha, const T *const x, const T beta, const T *const y, T *const z, cudaStream_t stream) {
@@ -340,7 +340,7 @@ public:
         assert(z != y);
 
         tzaxpby<<<n_blocks, kernel_block_size, 0, stream>>>(n, alpha, x, beta, y, z);
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(stream);
     }
 
     static void scal(const ptrdiff_t n, const T alpha, T *const x, cudaStream_t stream) {
@@ -348,7 +348,7 @@ public:
         ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
 
         tscal<<<n_blocks, kernel_block_size, 0, stream>>>(n, alpha, x);
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(stream);
     }
 
     static void nrm2(const ptrdiff_t n, const T *const x, T *const result, cudaStream_t stream) {
@@ -391,7 +391,7 @@ static void txypaz(const ptrdiff_t n, const T *const x, const T *const y, const 
     assert(z != y); 
 
     txypaz_kernel<<<n_blocks, kernel_block_size, 0, stream>>>(n, x, y, alpha, z);
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
 }
 
 template <typename T>
@@ -407,7 +407,7 @@ static void reciprocal(const ptrdiff_t n, const T alpha, T *const x, cudaStream_
     ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
 
     reciprocal_kernel<<<n_blocks, kernel_block_size, 0, stream>>>(n, alpha, x);
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
 }
 
 extern real_t *d_allocate(const std::size_t n) {
@@ -466,7 +466,7 @@ extern void *d_buffer_alloc(const size_t n) {
     cudaMalloc((void **)&ptr, n);
     cudaMemset(ptr, 0, n);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(nullptr);
     return ptr;
 }
 
@@ -479,7 +479,7 @@ extern void d_memcpy(const ptrdiff_t n, const void *const src, void *const dest)
 
 extern void d_buffer_destroy(void *a) {
     cudaFree(a);
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(nullptr);
 }
 
 extern void buffer_device_to_host(const std::size_t n, const void *const d, void *h) {
@@ -504,7 +504,7 @@ extern void d_ediv(const ptrdiff_t n, const real_t *const l, const real_t *const
 
     tdiv<<<n_blocks, kernel_block_size>>>(n, l, r, result);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(nullptr);
 }
 
 namespace sfem {
@@ -671,13 +671,13 @@ namespace sfem {
                   const T *const     s,
                   const T *const     x,
                   T *const           y) {
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(nullptr);
 
         int       kernel_block_size = 128;
         ptrdiff_t kernel_n_blocks   = std::max(ptrdiff_t(1), (n_blocks + kernel_block_size - 1) / kernel_block_size);
         sbv_mult3_kernel<T><<<kernel_n_blocks, kernel_block_size>>>(n_blocks, idx, dd, s, x, y);
 
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(nullptr);
         return SFEM_SUCCESS;
     }
 

@@ -23,12 +23,13 @@ namespace sfem {
                                                               const real_t                scale_output);
 
     std::shared_ptr<BSR<count_t, idx_t, real_t>> d_bsr_spmv(const ptrdiff_t              block_rows,
-                                                                const ptrdiff_t              block_cols,
-                                                                const int                    block_size,
-                                                                const SharedBuffer<count_t>& rowptr,
-                                                                const SharedBuffer<idx_t>&   colidx,
-                                                                const SharedBuffer<real_t>&  values,
-                                                                const real_t                 scale_output);
+                                                            const ptrdiff_t              block_cols,
+                                                            const int                    block_size,
+                                                            const SharedBuffer<count_t>& rowptr,
+                                                            const SharedBuffer<idx_t>&   colidx,
+                                                            const SharedBuffer<real_t>&  values,
+                                                            const real_t                 scale_output,
+                                                            const ExecutionContext&      context = ExecutionContext::device());
 }  // namespace sfem
 
 #endif  // SFEM_CUDA_CRSSPMV_HPP

@@ -106,7 +106,7 @@ static int cu_affine_sshex8_laplacian_apply_warp_tpl(const ptrdiff_t            
                                                      const T *const                           x,
                                                      T *const                                 y,
                                                      void                                    *stream) {
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
 
     static const int BLOCK_SIZE = LEVEL + 1;
 
@@ -116,6 +116,6 @@ static int cu_affine_sshex8_laplacian_apply_warp_tpl(const ptrdiff_t            
     cu_affine_sshex8_laplacian_apply_kernel_warp<T, LEVEL>
             <<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(nelements, elements, fff_stride, fff, x, y);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }

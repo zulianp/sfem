@@ -312,15 +312,15 @@ namespace sfem {
     }
 
     template <typename T>
-    static std::shared_ptr<MPRGP<T>> create_mprgp(const std::shared_ptr<Operator<T>> &op, const ExecutionSpace es) {
-        SFEM_UNUSED(es);
+    static std::shared_ptr<MPRGP<T>> create_mprgp(const std::shared_ptr<Operator<T>> &op, const ExecutionContext &context) {
+        SFEM_UNUSED(context);
         auto mprgp = std::make_shared<sfem::MPRGP<real_t>>();
         mprgp->set_op(op);
 
 #ifdef SFEM_ENABLE_CUDA
-        if (es == EXECUTION_SPACE_DEVICE) {
-            mprgp->blas = make_cuda_blas<T>();
-            CUDA_MPRGP<T>::build_mprgp(mprgp->impl);
+        if (context.space() == EXECUTION_SPACE_DEVICE) {
+            mprgp->blas = make_cuda_blas<T>(context);
+            CUDA_MPRGP<T>::build_mprgp(mprgp->impl, context);
 
         } else
 #endif  // SFEM_ENABLE_CUDA
@@ -1149,7 +1149,7 @@ namespace sfem {
                     op->apply(x, y);
                     f->copy_constrained_dofs(x, y);
                 },
-                op->execution_space());
+                op->execution_context());
     }
 
     static inline SharedBuffer<int> node_graph_diagonal_offsets(const std::shared_ptr<CRSGraph> &crs_graph) {

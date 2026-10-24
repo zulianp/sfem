@@ -10,9 +10,6 @@ namespace sfem {
     /// (on the legacy default stream, work waits on everything queued on any blocking stream, MPI's
     /// copies included, and they on it). Forked from and joined into the stream the work belongs
     /// to, so a graph capturing that stream takes this one's work in too.
-    /// launch_stream() (sfem_cuda_base.hpp) for code that sees no CUDA types: the stream the
-    /// calling thread's launches go to (null: the default device stream).
-    void *current_launch_stream();
 
     class DeviceSideStream {
     public:
@@ -42,7 +39,8 @@ namespace sfem {
                                T* const SFEM_RESTRICT              out);
 
     /// y = scale_output y + A x on the device, A in BSR with square blocks: one thread per scalar
-    /// row, no library. scale_output 0 overwrites y.
+    /// row, no library. scale_output 0 overwrites y. On `stream` (a cudaStream_t; null: the
+    /// default device stream).
     template <typename R, typename C, typename TStorage, typename T>
     int d_bsr_spmv_native(const ptrdiff_t                     block_rows,
                           const int                           block_size,
@@ -51,7 +49,8 @@ namespace sfem {
                           const TStorage* const SFEM_RESTRICT values,
                           const T                             scale_output,
                           const T* const SFEM_RESTRICT        x,
-                          T* const SFEM_RESTRICT              y);
+                          T* const SFEM_RESTRICT              y,
+                          void* const                         stream);
 
     /// d_bsr_spmv_native with block row i the entries [rows_begin[i], rows_end[i]) (see
     /// bsr_spmv_ranges): the whole matrix with (rowptr, rowptr + 1), or a part of each row.
@@ -65,7 +64,7 @@ namespace sfem {
                           const T                             scale_output,
                           const T* const SFEM_RESTRICT        x,
                           T* const SFEM_RESTRICT              y,
-                          void* const                         stream = nullptr);
+                          void* const                         stream);
 
     /// Device version of `bsr_max_abs_row_sum`: max over the scalar rows of sum_j |A_ij|, of
     /// S A S with `scale` (on the device).

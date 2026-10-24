@@ -442,7 +442,7 @@ namespace sfem {
         ret->row_block_size_            = ret_row_bs;
         ret->col_block_size_            = ret_col_bs;
         ret->uniform_pre_output_scaling = 0;
-        ret->execution_space_           = EXECUTION_SPACE_HOST;
+        ret->context_                   = EXECUTION_SPACE_HOST;
 
         auto c_rowptr = ret->row_ptr;
         auto c_colidx = ret->col_idx;
@@ -508,7 +508,7 @@ namespace sfem {
         ret->row_block_size_            = ret_row_bs;
         ret->col_block_size_            = ret_col_bs;
         ret->uniform_pre_output_scaling = 0;
-        ret->execution_space_           = EXECUTION_SPACE_HOST;
+        ret->context_                   = EXECUTION_SPACE_HOST;
 
         auto c_rowptr = ret->row_ptr;
         auto c_colidx = ret->col_idx;

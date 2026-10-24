@@ -100,7 +100,7 @@ static int cu_affine_sshex8_laplacian_apply_tpl(const int                       
                                                 const T *const                           x,
                                                 T *const                                 y,
                                                 void                                    *stream) {
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
 
     int SFEM_HEX8_SHARED_MEM_KERNEL = 1;
     SFEM_READ_ENV(SFEM_HEX8_SHARED_MEM_KERNEL, atoi);
@@ -160,7 +160,7 @@ static int cu_affine_sshex8_laplacian_apply_tpl(const int                       
     cu_affine_sshex8_laplacian_apply_kernel<<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(
             level, nelements, elements, fff_stride, fff, x, y);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }
 

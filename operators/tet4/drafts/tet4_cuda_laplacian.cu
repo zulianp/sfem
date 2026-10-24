@@ -552,7 +552,7 @@ extern "C" void tet4_laplacian_crs(const ptrdiff_t nelements,
     {
         laplacian_crs_kernel<<<n_blocks, block_size>>>(
             nelements, nnodes, d_elems, d_xyz, d_rowptr, d_colidx, d_values);
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(nullptr);
 
         // cudaDeviceSynchronize();
         // double ktock = MPI_Wtime();

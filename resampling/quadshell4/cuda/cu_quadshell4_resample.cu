@@ -321,14 +321,14 @@ extern "C" int cu_quadshell4_resample_gap_local(
         real_t** const SFEM_RESTRICT normals) {
     if (!nelements) return 0;
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(nullptr);
 
     int             block_size = 128;
     const ptrdiff_t n_blocks   = MAX(ptrdiff_t(1), (nelements + block_size - 1) / block_size);
     cu_quadshell4_resample_gap_local_kernel<<<n_blocks, block_size, 0>>>(
             nelements, nnodes, elems, xyz, n, stride, origin, delta, data, wg, normals);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(nullptr);
     return SFEM_SUCCESS;
 }
 
@@ -430,13 +430,13 @@ extern "C" int cu_quadshell4_resample_weight_local(
 {
     if (!nelements) return 0;
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(nullptr);
 
     int             block_size = 128;
     const ptrdiff_t n_blocks   = MAX(ptrdiff_t(1), (nelements + block_size - 1) / block_size);
     cu_quadshell4_resample_weight_local_kernel<<<n_blocks, block_size, 0>>>(nelements, nnodes, elems, xyz, w);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(nullptr);
     return SFEM_SUCCESS;
 }
 
@@ -580,14 +580,14 @@ extern "C" int cu_quadshell4_resample_gap_value_local(
         real_t* const SFEM_RESTRICT wg) {
     if (!nelements) return 0;
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(nullptr);
 
     int             block_size = 128;
     const ptrdiff_t n_blocks   = MAX(ptrdiff_t(1), (nelements + block_size - 1) / block_size);
     cu_quadshell4_resample_gap_value_local_kernel<<<n_blocks, block_size, 0>>>(
             nelements, nnodes, elems, xyz, n, stride, origin, delta, data, wg);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(nullptr);
     return SFEM_SUCCESS;
 }
 
@@ -769,13 +769,13 @@ extern "C" int cu_quadshell4_resample_gap_normals_local(
         real_t** const SFEM_RESTRICT normals) {
     if (!nelements) return 0;
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(nullptr);
 
     int             block_size = 128;
     const ptrdiff_t n_blocks   = MAX(ptrdiff_t(1), (nelements + block_size - 1) / block_size);
     cu_quadshell4_resample_gap_normals_local_kernel<<<n_blocks, block_size, 0>>>(
             nelements, nnodes, elems, xyz, n, stride, origin, delta, data, normals);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(nullptr);
     return SFEM_SUCCESS;
 }

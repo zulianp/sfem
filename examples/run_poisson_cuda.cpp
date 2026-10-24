@@ -181,7 +181,7 @@ int main(int argc, char *argv[]) {
             solver.set_preconditioner([&](const real_t *const x, real_t *const y) {
                 d_ediv(mesh.nnodes, x, d_d, y);
                 d_copy_at_dirichlet_nodes_vec(
-                    n_dirichlet_conditions, d_dirichlet_conditions, 1, x, y);
+                    n_dirichlet_conditions, d_dirichlet_conditions, 1, x, y, nullptr);
             });
         } else {
             fprintf(stderr, "[Warning] preconditioner not avaialble for selected element\n");
@@ -193,15 +193,15 @@ int main(int argc, char *argv[]) {
     solver.apply_op = [&](const real_t *const x, real_t *const y) {
         d_memset(y, 0, mesh.nnodes * sizeof(real_t));
         cuda_incore_laplacian_apply(&ctx, x, y);
-        d_copy_at_dirichlet_nodes_vec(n_dirichlet_conditions, d_dirichlet_conditions, 1, x, y);
+        d_copy_at_dirichlet_nodes_vec(n_dirichlet_conditions, d_dirichlet_conditions, 1, x, y, nullptr);
     };
 
     // -------------------------------
     // Solve
     // -------------------------------
 
-    d_apply_dirichlet_condition_vec(n_dirichlet_conditions, d_dirichlet_conditions, 1, d_x);
-    d_apply_dirichlet_condition_vec(n_dirichlet_conditions, d_dirichlet_conditions, 1, d_b);
+    d_apply_dirichlet_condition_vec(n_dirichlet_conditions, d_dirichlet_conditions, 1, d_x, nullptr);
+    d_apply_dirichlet_condition_vec(n_dirichlet_conditions, d_dirichlet_conditions, 1, d_b, nullptr);
 
     solver.apply(mesh.nnodes, d_b, d_x);
 

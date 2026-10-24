@@ -18,8 +18,8 @@ namespace sfem {
     class BSRTangent::Impl {
     public:
         std::shared_ptr<Function> f;
-        ExecutionSpace            es{EXECUTION_SPACE_HOST};
-        std::shared_ptr<CRSGraph> graph;  // in `es`
+        ExecutionContext          context;
+        std::shared_ptr<CRSGraph> graph;  // in `context`
         int                       block_size{0};
         // The values: in real_t, or in float with storage_bytes 4 (one of the two is set).
         SharedBuffer<real_t>      values;
@@ -32,7 +32,7 @@ namespace sfem {
         // Under MPI, where each owned row's entries of owned columns end: the row's local diagonal
         // block is [rowptr, split), its block of ghost and aura columns [split, rowptr + 1). The
         // two views share the assembled values, which the obstacle and the shifts change in place.
-        SharedBuffer<count_t>     split;  // in `es`
+        SharedBuffer<count_t> split;  // in `context`
 #ifdef SFEM_ENABLE_CUDA
         // The device's local diagonal block runs here, beside MPI's copies of the ghost values.
         std::shared_ptr<DeviceSideStream> side;
@@ -67,10 +67,11 @@ namespace sfem {
     BSRTangent::~BSRTangent() = default;
 
     std::shared_ptr<BSRTangent> BSRTangent::create(const std::shared_ptr<Function> &f,
-                                                   const ExecutionSpace             es,
+                                                   const ExecutionContext          &context,
                                                    const int                        storage_bytes) {
         SFEM_TRACE_SCOPE("BSRTangent::create");
 
+        const ExecutionSpace es          = context.space();
         const bool distributed = f->space()->mesh_ptr()->comm()->size() > 1;
         if (storage_bytes != (int)sizeof(real_t) && storage_bytes != 4 && storage_bytes != 2) {
             SFEM_ERROR("BSRTangent: storage_bytes %d (2, 4 or %d)\n", storage_bytes, (int)sizeof(real_t));
@@ -84,7 +85,7 @@ namespace sfem {
         std::shared_ptr<BSRTangent> ret(new BSRTangent());
         auto                       &impl = *ret->impl_;
         impl.f                           = f;
-        impl.es                          = es;
+        impl.context                     = context;
         impl.block_size                  = f->space()->block_size();
         impl.storage_bytes               = storage_bytes;
         impl.graph                       = f->space()->element_node_graph();
@@ -121,7 +122,7 @@ namespace sfem {
         auto &impl = *impl_;
         impl.visit([&](const auto &values) {
             using V = std::remove_pointer_t<decltype(values->data())>;
-            blas<V>(impl.es)->zeros(values->size(), values->data());
+            blas<V>(impl.context)->zeros(values->size(), values->data());
             return SFEM_SUCCESS;
         });
         return impl.f->hessian_bsr(x, impl.graph->rowptr()->data(), impl.graph->colidx()->data(), values_type(), values());
@@ -137,7 +138,7 @@ namespace sfem {
         const ptrdiff_t nrows = impl.graph->n_nodes();
 
 #ifdef SFEM_ENABLE_CUDA
-        if (impl.es == EXECUTION_SPACE_DEVICE) {
+        if (impl.context.space() == EXECUTION_SPACE_DEVICE) {
             if (impl.distributed) {
                 // The owned rows against every local column, y += A x, as two products: the local
                 // diagonal block (owned columns) while x's ghost and aura values travel from their
@@ -153,7 +154,8 @@ namespace sfem {
                 auto            values = stored;
                 auto            split  = impl.split;
                 if (!impl.side) impl.side = DeviceSideStream::create();
-                auto side = impl.side;
+                auto side    = impl.side;
+                auto context = impl.context;
                 return make_parallel_op<real_t>(
                         space->mesh_ptr()->comm(),
                         owned,
@@ -170,37 +172,51 @@ namespace sfem {
                             // GH200, Cray MPICH), and follow NCCL's messages, queued there. It
                             // reads only owned columns, which the unpack of the aura does not
                             // touch, so it waits only for what came before the gather.
-                            // All of it on the stream the product is launched on (a graph
-                            // run's, or the default), the exchange's copies included.
-                            void *const main = current_launch_stream();
+                            // All of it on the tangent's stream, the exchange's copies included.
+                            void *const main = context.stream();
                             side->fork(main);
-                            if (space->synchronize_begin(xs, ExecutionContext::device(main)) != SFEM_SUCCESS) return;
+                            if (space->synchronize_begin(xs, context) != SFEM_SUCCESS) return;
                             d_bsr_spmv_ranges<count_t, idx_t, V, real_t>(rows, bs, rp, sp, ci, v, scale_output, x, y, side->stream());
-                            space->synchronize_end(ExecutionContext::device(main));
+                            space->synchronize_end(context);
                             side->join(main);
                             d_bsr_spmv_ranges<count_t, idx_t, V, real_t>(rows, bs, sp, rp + 1, ci, v, 1, x, y, main);
                             f->copy_constrained_dofs(x, y);
                         },
-                        EXECUTION_SPACE_DEVICE);
+                        context);
             }
             if constexpr (std::is_same_v<V, real_t>) {
-                return compose_constraints_op(
-                        impl.f, d_bsr_spmv(nrows, nrows, impl.block_size, impl.graph->rowptr(), impl.graph->colidx(), stored, scale_output));
+                return compose_constraints_op(impl.f,
+                                              d_bsr_spmv(nrows,
+                                                         nrows,
+                                                         impl.block_size,
+                                                         impl.graph->rowptr(),
+                                                         impl.graph->colidx(),
+                                                         stored,
+                                                         scale_output,
+                                                         impl.context));
             } else {
                 // cuSPARSE multiplies no single-precision matrix into real_t vectors: the
                 // library's own kernel, as the distributed product uses.
                 auto      rowptr = impl.graph->rowptr();
                 auto      colidx = impl.graph->colidx();
                 const int bs     = impl.block_size;
+                void     *stream = impl.context.stream();
                 return compose_constraints_op(impl.f,
                                               make_op<real_t>(
                                                       nrows * bs,
                                                       nrows * bs,
                                                       [=](const real_t *const x, real_t *const y) {
-                                                          d_bsr_spmv_native<count_t, idx_t, V, real_t>(
-                                                                  nrows, bs, rowptr->data(), colidx->data(), stored->data(), scale_output, x, y);
+                                                          d_bsr_spmv_native<count_t, idx_t, V, real_t>(nrows,
+                                                                                                       bs,
+                                                                                                       rowptr->data(),
+                                                                                                       colidx->data(),
+                                                                                                       stored->data(),
+                                                                                                       scale_output,
+                                                                                                       x,
+                                                                                                       y,
+                                                                                                       stream);
                                                       },
-                                                      EXECUTION_SPACE_DEVICE));
+                                                      impl.context));
             }
         }
 #endif
@@ -262,7 +278,7 @@ namespace sfem {
         auto &impl = *impl_;
         return impl.visit([&](const auto &values) {
 #ifdef SFEM_ENABLE_CUDA
-            if (impl.es == EXECUTION_SPACE_DEVICE) {
+            if (impl.context.space() == EXECUTION_SPACE_DEVICE) {
                 return d_bsr_extract_diagonal(block_rows(), impl.block_size, rowptr(), colidx(), values->data(), out);
             }
 #endif
@@ -280,7 +296,7 @@ namespace sfem {
         const real_t    local = impl.visit([&](const auto &values) -> real_t {
             using V = std::remove_pointer_t<decltype(values->data())>;
 #ifdef SFEM_ENABLE_CUDA
-            if (impl.es == EXECUTION_SPACE_DEVICE) {
+            if (impl.context.space() == EXECUTION_SPACE_DEVICE) {
                 return d_bsr_max_abs_row_sum<count_t, idx_t, V, real_t>(rows, impl.block_size, rowptr(), colidx(), values->data(), scale);
             }
 #endif
@@ -295,7 +311,7 @@ namespace sfem {
         auto &impl = *impl_;
         return impl.visit([&](const auto &values) {
 #ifdef SFEM_ENABLE_CUDA
-            if (impl.es == EXECUTION_SPACE_DEVICE) {
+            if (impl.context.space() == EXECUTION_SPACE_DEVICE) {
                 return d_bsr_shift_diagonal(block_rows(), impl.block_size, rowptr(), colidx(), factor, reference, values->data());
             }
 #endif
@@ -316,6 +332,6 @@ namespace sfem {
             return smesh::TypeToEnum<std::remove_pointer_t<decltype(values->data())>>::value();
         });
     }
-    ExecutionSpace BSRTangent::execution_space() const { return impl_->es; }
+    ExecutionSpace BSRTangent::execution_space() const { return impl_->context.space(); }
 
 }  // namespace sfem

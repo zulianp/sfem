@@ -105,7 +105,7 @@ static int acu_affine_sshex8_laplacian_apply_local_mem_tpl(const ptrdiff_t      
                                                            const T *const                           x,
                                                            T *const                                 y,
                                                            void                                    *stream) {
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
 
     int block_size = 128;
 #ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
@@ -121,7 +121,7 @@ static int acu_affine_sshex8_laplacian_apply_local_mem_tpl(const ptrdiff_t      
     cu_affine_sshex8_laplacian_apply_local_mem_kernel<T, LEVEL>
             <<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(nelements, elements, fff_stride, fff, x, y);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }
 
@@ -252,7 +252,7 @@ static int acu_affine_sshex8_laplacian_apply_local_mem_batched_tpl(const ptrdiff
                                                                    const T *const                           x,
                                                                    T *const                                 y,
                                                                    void                                    *stream) {
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
 
     int block_size = 128;
 #ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
@@ -271,6 +271,6 @@ static int acu_affine_sshex8_laplacian_apply_local_mem_batched_tpl(const ptrdiff
     cu_affine_sshex8_laplacian_apply_local_mem_batched_kernel<T, LEVEL, BATCH_SIZE>
             <<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(nelements, elements, fff_stride, fff, x, y);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }

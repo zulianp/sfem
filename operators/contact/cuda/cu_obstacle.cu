@@ -41,13 +41,13 @@ extern int cu_obstacle_normal_project(const int                         dim,
                                       real_t **const SFEM_RESTRICT      normals,
                                       const real_t *const SFEM_RESTRICT h,
                                       real_t *const SFEM_RESTRICT       out) {
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(nullptr);
 
     int             block_size = 128;
     const ptrdiff_t n_blocks   = MAX(ptrdiff_t(1), (n + block_size - 1) / block_size);
     obstacle_normal_project_kernel<<<n_blocks, block_size, 0>>>(dim, n, idx, normals, h, out);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(nullptr);
     return SFEM_SUCCESS;
 }
 
@@ -58,13 +58,13 @@ extern int cu_obstacle_distribute_contact_forces(const int                      
                                                  const real_t *const SFEM_RESTRICT m,
                                                  const real_t *const               f,
                                                  real_t *const                     out) {
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(nullptr);
 
     int             block_size = 128;
     const ptrdiff_t n_blocks   = MAX(ptrdiff_t(1), (n + block_size - 1) / block_size);
     obstacle_distribute_contact_forces_kernel<<<n_blocks, block_size, 0>>>(dim, n, idx, normals, m, f, out);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(nullptr);
     return SFEM_SUCCESS;
 }
 
@@ -96,13 +96,13 @@ extern int cu_obstacle_hessian_block_diag_sym(const int                         
                                               const real_t *const SFEM_RESTRICT m,
                                               const real_t *const               x,
                                               real_t *const                     values) {
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(nullptr);
 
     int             block_size = 128;
     const ptrdiff_t n_blocks   = MAX(ptrdiff_t(1), (n + block_size - 1) / block_size);
     obstacle_hessian_block_diag_sym_kernel<<<n_blocks, block_size, 0>>>(dim, n, idx, normals, m, x, values);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(nullptr);
     return SFEM_SUCCESS;
 }
 
@@ -129,12 +129,12 @@ extern int cu_obstacle_contact_stress(const int                         dim,
                                       const real_t *const SFEM_RESTRICT m,
                                       const real_t *const               r,
                                       real_t *const                     s) {
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(nullptr);
 
     int             block_size = 128;
     const ptrdiff_t n_blocks   = MAX(ptrdiff_t(1), (n + block_size - 1) / block_size);
     obstacle_contact_stress_kernel<<<n_blocks, block_size, 0>>>(dim, n, idx, normals, m, r, s);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(nullptr);
     return SFEM_SUCCESS;
 }

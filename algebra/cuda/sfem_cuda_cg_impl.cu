@@ -149,7 +149,7 @@ namespace sfem {
             // Zero device scalar in-place (no H2D of a host zero).
             ws.zero_async();
             update_x_r_and_rtr_kernel<<<n_blocks, block_size>>>(n, alpha, p, Ap, x, r, ws.device_ptr());
-            SFEM_DEBUG_SYNCHRONIZE();
+            SFEM_DEBUG_SYNCHRONIZE(nullptr);
 
             // One scalar D2H only — required for host-side CG control (beta / convergence).
             return ws.pull();
@@ -166,7 +166,7 @@ namespace sfem {
             ptrdiff_t n_blocks;
             cg_launch_params(n, block_size, n_blocks);
             update_x_r_kernel<<<n_blocks, block_size>>>(n, alpha, p, Ap, x, r);
-            SFEM_DEBUG_SYNCHRONIZE();
+            SFEM_DEBUG_SYNCHRONIZE(nullptr);
             // No device↔host scalar traffic.
         }
 
@@ -176,7 +176,7 @@ namespace sfem {
             ptrdiff_t n_blocks;
             cg_launch_params(n, block_size, n_blocks);
             update_p_kernel<<<n_blocks, block_size>>>(n, beta, z, p);
-            SFEM_DEBUG_SYNCHRONIZE();
+            SFEM_DEBUG_SYNCHRONIZE(nullptr);
             // No device↔host scalar traffic.
         }
 
