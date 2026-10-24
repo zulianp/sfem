@@ -960,7 +960,6 @@ namespace sfem {
                 // FIXME this should not be here!
                 mg->blas() = make_cuda_blas<real_t>();
                 CUDA_ShiftedPenalty<real_t>::build(mg->impl());
-                mg->set_execution_space(EXECUTION_SPACE_DEVICE);
             } else
 #endif
             {

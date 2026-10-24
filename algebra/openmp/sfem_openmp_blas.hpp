@@ -77,6 +77,8 @@ namespace sfem {
     template <typename T>
     class OpenMP_BLAS final : public BLAS<T> {
     public:
+        OpenMP_BLAS() : BLAS<T>(ExecutionContext::host()) {}
+
         auto allocate(const std::size_t n) -> T* override { return (T*)calloc(n, sizeof(T)); }
 
         void destroy(void* a) override { free(a); }
@@ -98,6 +100,8 @@ namespace sfem {
 
             return ret;
         }
+
+        void dot(const ptrdiff_t n, const T* const l, const T* const r, T* const result) override { *result = dot(n, l, r); }
 
         void axpy(const ptrdiff_t n, const T alpha, const T* const x, T* const y) override {
 #pragma omp parallel for

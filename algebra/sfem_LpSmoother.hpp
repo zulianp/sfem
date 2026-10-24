@@ -12,14 +12,12 @@ namespace sfem {
     template <typename T>
     class LpSmoother final : public Operator<T> {
     public:
-        ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
         ptrdiff_t n_dofs{SFEM_PTRDIFF_INVALID};
         std::shared_ptr<BLAS<T>> blas;
         SharedBuffer<T> inv_diag;
 
         void default_init() {
             blas = make_openmp_blas<T>();
-            execution_space_ = EXECUTION_SPACE_HOST;
         }
 
         /* Operator */
@@ -29,7 +27,7 @@ namespace sfem {
         }
         inline std::ptrdiff_t rows() const override { return n_dofs; }
         inline std::ptrdiff_t cols() const override { return n_dofs; }
-        ExecutionSpace execution_space() const override { return execution_space_; }
+        ExecutionSpace execution_space() const override { return blas ? blas->execution_space() : EXECUTION_SPACE_INVALID; }
     };
 
     template <typename T>

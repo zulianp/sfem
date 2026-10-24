@@ -50,7 +50,6 @@ namespace sfem {
         // curvature), or on the first direction that direction itself scaled by |curvature|
         // (Nocedal and Wright, Algorithm 7.1). Off, the iteration runs on and loses its meaning.
         bool           stop_on_negative_curvature{false};
-        ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
 
         int iterations() const override { return iterations_; }
 
@@ -59,7 +58,7 @@ namespace sfem {
 
         void set_stop_on_negative_curvature(const bool val) { stop_on_negative_curvature = val; }
 
-        ExecutionSpace execution_space() const override { return execution_space_; }
+        ExecutionSpace execution_space() const override { return blas ? blas->execution_space() : EXECUTION_SPACE_INVALID; }
 
         void set_atol(const T val) { atol = val; }
 
@@ -135,7 +134,6 @@ namespace sfem {
         void default_init() {
             blas             = make_openmp_blas<T>();
             OpenMP_CG<T>::build(impl);
-            execution_space_ = EXECUTION_SPACE_HOST;
         }
 
         bool good() const { return blas && blas->good() && apply_op && (!fusion || impl.good()); }
