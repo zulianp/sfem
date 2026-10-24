@@ -150,7 +150,7 @@ namespace sfem {
             T*   work          = blas->allocate(this->rows());
             auto blas_impl     = blas;
             auto random_vector = Buffer<T>::own(this->rows(), work, [blas_impl](void* ptr) { blas_impl->destroy(ptr); });
-            assert(execution_space() == EXECUTION_SPACE_HOST);
+            assert(this->execution_space() == EXECUTION_SPACE_HOST);
 
             auto v = random_vector->data();
             for (ptrdiff_t i = 0; i < this->rows(); i++) {

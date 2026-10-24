@@ -87,7 +87,7 @@ namespace sfem {
         }
 
         int set_op_and_diag_shift(const std::shared_ptr<Operator<T>>& op, const SharedBuffer<T>& diag) override {
-            assert(execution_space() == (enum ExecutionSpace)diag->mem_space());
+            assert(this->execution_space() == (enum ExecutionSpace)diag->mem_space());
             set_op(op);
 
             if (preconditioner_op) {
@@ -108,7 +108,7 @@ namespace sfem {
         int set_op_and_diag_shift(const std::shared_ptr<Operator<T>>&          op,
                                   const std::shared_ptr<SparseBlockVector<T>>& sbv,
                                   const SharedBuffer<T>&                       diag) override {
-            assert(execution_space() == (enum ExecutionSpace)diag->mem_space());
+            assert(this->execution_space() == (enum ExecutionSpace)diag->mem_space());
             set_op(op);
 
             if (preconditioner_op) {
