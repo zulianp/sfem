@@ -1,9 +1,9 @@
 #include "sfem_cuda_max.hpp"
 
 #include <algorithm>
-#include <vector>
 
 #include "sfem_cuda_base.hpp"
+#include "sfem_cuda_reduction_scratch.hpp"
 
 namespace sfem {
     namespace {
@@ -25,15 +25,13 @@ namespace sfem {
 
     real_t d_max(const ptrdiff_t n, const real_t *const x, const real_t init) {
         if (n <= 0) return init;
-        const int n_blocks = (int)std::min<ptrdiff_t>(1024, (n + block_size - 1) / block_size);
-        real_t   *partial  = nullptr;
-        SFEM_CUDA_CHECK(cudaMalloc(&partial, n_blocks * sizeof(real_t)));
-        max_kernel<<<n_blocks, block_size>>>(n, x, init, partial);
-        std::vector<real_t> host(n_blocks);
-        SFEM_CUDA_CHECK(cudaMemcpy(host.data(), partial, n_blocks * sizeof(real_t), cudaMemcpyDeviceToHost));
-        SFEM_CUDA_CHECK(cudaFree(partial));
+        const int  n_blocks = (int)std::min<ptrdiff_t>(1024, (n + block_size - 1) / block_size);
+        const auto partial  = reduction_scratch<real_t>(n_blocks);
+        max_kernel<<<n_blocks, block_size>>>(n, x, init, partial.device);
+        SFEM_CUDA_CHECK(cudaMemcpyAsync(partial.host, partial.device, n_blocks * sizeof(real_t), cudaMemcpyDeviceToHost, 0));
+        SFEM_CUDA_CHECK(cudaStreamSynchronize(0));
         real_t m = init;
-        for (const real_t v : host) m = std::max(m, v);
+        for (int b = 0; b < n_blocks; ++b) m = std::max(m, partial.host[b]);
         return m;
     }
 }  // namespace sfem

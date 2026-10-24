@@ -31,6 +31,8 @@ namespace sfem {
     public:
         enum ExpansionType { EXPANSION_TYPE_ORGINAL = 0, EXPANSION_TYPE_PROJECTED_CG = 1 };
 
+        ~MPRGP() override { release_workspace(); }
+
         ExpansionType expansion_type_{EXPANSION_TYPE_ORGINAL};
         T rtol{1e-10};
         T atol{1e-16};
@@ -185,6 +187,47 @@ namespace sfem {
         T*              control_{nullptr};
         MPRGPControl<T> record_{};
         MPRGPParams<T>  params_{};
+
+        // The solve's vectors (gradient, direction, its product, free or chopped gradient, the
+        // passes' work) and control_, kept from one solve to the next: a Newton step solves a QP
+        // of the same size, and an allocation per solve cost a device synchronisation each. They
+        // are allocated again when the size or the BLAS changes, and zeroed at each solve, as a
+        // fresh allocation was.
+        std::shared_ptr<BLAS<T>> workspace_blas_;
+        ptrdiff_t                workspace_n_{-1};
+        ptrdiff_t                workspace_work_{-1};
+        T*                       workspace_[5]{};
+
+        void release_workspace() {
+            if (workspace_blas_) {
+                for (auto*& w : workspace_) {
+                    if (w) workspace_blas_->destroy(w);
+                    w = nullptr;
+                }
+                if (control_) workspace_blas_->destroy(control_);
+            }
+            control_ = nullptr;
+            workspace_blas_.reset();
+            workspace_n_ = workspace_work_ = -1;
+        }
+
+        void ensure_workspace() {
+            const ptrdiff_t n  = allocation_size();
+            const ptrdiff_t nw = impl.work_size;
+            if (workspace_blas_ != this->blas || workspace_n_ != n || workspace_work_ != nw) {
+                release_workspace();
+                workspace_blas_ = this->blas;
+                for (int k = 0; k < 4; ++k) workspace_[k] = this->blas->allocate(n);
+                workspace_[4]   = nw > 0 ? this->blas->allocate(nw) : nullptr;
+                control_        = this->blas->allocate(mprgp_control_size<T>());
+                workspace_n_    = n;
+                workspace_work_ = nw;
+                return;
+            }
+            for (int k = 0; k < 4; ++k) this->blas->zeros(n, workspace_[k]);
+            if (workspace_[4]) this->blas->zeros(nw, workspace_[4]);
+            this->blas->zeros(mprgp_control_size<T>(), control_);
+        }
 
         /// The curvature pass along d (Ad = A d), then the decision. On one rank both are the
         /// pass's; across ranks its sums are completed here and the same decision taken on the host
@@ -470,12 +513,12 @@ namespace sfem {
 
             bool converged = false;
 
-            T* g = this->blas->allocate(allocation_size());  // Gradient
-            T* p = this->blas->allocate(allocation_size());
-            T* Ap_or_Ag = this->blas->allocate(allocation_size());
-            T* gf_or_gc = this->blas->allocate(allocation_size());  // Free Gradient or Chopped Gradient
-            T* work     = impl.work_size > 0 ? this->blas->allocate(impl.work_size) : nullptr;
-            control_    = this->blas->allocate(mprgp_control_size<T>());
+            ensure_workspace();
+            T* g        = workspace_[0];  // Gradient
+            T* p        = workspace_[1];
+            T* Ap_or_Ag = workspace_[2];
+            T* gf_or_gc = workspace_[3];  // Free Gradient or Chopped Gradient
+            T* work     = workspace_[4];
 
             T alpha_bar = 1;
             if (expansion_type_ == EXPANSION_TYPE_ORGINAL) {
@@ -583,13 +626,6 @@ namespace sfem {
                 printf("#proportioning_steps\t%d\n", count_proportioning_steps);
             }
 
-            this->blas->destroy(g);
-            this->blas->destroy(p);
-            this->blas->destroy(Ap_or_Ag);
-            this->blas->destroy(gf_or_gc);
-            if (work) this->blas->destroy(work);
-            this->blas->destroy(control_);
-            control_ = nullptr;
             run_state_.reset();
             return converged ? SFEM_SUCCESS : SFEM_FAILURE;
         }
