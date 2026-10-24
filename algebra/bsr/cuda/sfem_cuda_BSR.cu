@@ -167,14 +167,16 @@ namespace sfem {
 
     void *DeviceSideStream::stream() const { return impl_->stream; }
 
-    void DeviceSideStream::wait_for_default() {
-        SFEM_CUDA_CHECK(cudaEventRecord(impl_->on_default, cudaStreamLegacy));
+    void *current_launch_stream() { return (void *)launch_stream(); }
+
+    void DeviceSideStream::fork(void *const from) {
+        SFEM_CUDA_CHECK(cudaEventRecord(impl_->on_default, from ? static_cast<cudaStream_t>(from) : cudaStreamLegacy));
         SFEM_CUDA_CHECK(cudaStreamWaitEvent(impl_->stream, impl_->on_default, 0));
     }
 
-    void DeviceSideStream::join_default() {
+    void DeviceSideStream::join(void *const into) {
         SFEM_CUDA_CHECK(cudaEventRecord(impl_->on_side, impl_->stream));
-        SFEM_CUDA_CHECK(cudaStreamWaitEvent(cudaStreamLegacy, impl_->on_side, 0));
+        SFEM_CUDA_CHECK(cudaStreamWaitEvent(into ? static_cast<cudaStream_t>(into) : cudaStreamLegacy, impl_->on_side, 0));
     }
 
     template <typename R, typename C, typename TStorage, typename T>

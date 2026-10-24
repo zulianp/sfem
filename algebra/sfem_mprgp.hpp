@@ -87,11 +87,12 @@ namespace sfem {
 #ifdef SFEM_ENABLE_CUDA
             auto device = comm_ && execution_space() == EXECUTION_SPACE_DEVICE ? comm_->device() : nullptr;
             if (device && device->whole()) {
-                return [device](T* const values, const int count, const bool min_last) {
+                // On the stream the pass launched on (a graph run's, or the default).
+                return [device](T* const values, const int count, const bool min_last, void* const stream) {
                     if (min_last) {
-                        device->sum_and_min_last(values, count, smesh::TypeToEnum<T>::value());
+                        device->sum_and_min_last(values, count, smesh::TypeToEnum<T>::value(), stream);
                     } else {
-                        device->sum(values, count, smesh::TypeToEnum<T>::value());
+                        device->sum(values, count, smesh::TypeToEnum<T>::value(), stream);
                     }
                 };
             }

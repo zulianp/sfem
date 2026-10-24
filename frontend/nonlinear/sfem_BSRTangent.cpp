@@ -170,12 +170,15 @@ namespace sfem {
                             // GH200, Cray MPICH), and follow NCCL's messages, queued there. It
                             // reads only owned columns, which the unpack of the aura does not
                             // touch, so it waits only for what came before the gather.
-                            side->wait_for_default();
-                            if (space->synchronize_begin(xs, EXECUTION_SPACE_DEVICE) != SFEM_SUCCESS) return;
+                            // All of it on the stream the product is launched on (a graph
+                            // run's, or the default), the exchange's copies included.
+                            void *const main = current_launch_stream();
+                            side->fork(main);
+                            if (space->synchronize_begin(xs, ExecutionContext::device(main)) != SFEM_SUCCESS) return;
                             d_bsr_spmv_ranges<count_t, idx_t, V, real_t>(rows, bs, rp, sp, ci, v, scale_output, x, y, side->stream());
-                            space->synchronize_end(EXECUTION_SPACE_DEVICE);
-                            side->join_default();
-                            d_bsr_spmv_ranges<count_t, idx_t, V, real_t>(rows, bs, sp, rp + 1, ci, v, 1, x, y);
+                            space->synchronize_end(ExecutionContext::device(main));
+                            side->join(main);
+                            d_bsr_spmv_ranges<count_t, idx_t, V, real_t>(rows, bs, sp, rp + 1, ci, v, 1, x, y, main);
                             f->copy_constrained_dofs(x, y);
                         },
                         EXECUTION_SPACE_DEVICE);

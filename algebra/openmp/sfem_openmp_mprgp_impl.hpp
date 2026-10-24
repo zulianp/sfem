@@ -16,10 +16,11 @@
 namespace sfem {
 
     /// Completes a pass's reductions over the ranks in the execution space, in place on `count`
-    /// values: all summed, or with `min_last` the last the minimum. Empty where the sums are
-    /// completed afterwards, from the record, or there is one rank.
+    /// values: all summed, or with `min_last` the last the minimum; on the device ordered on
+    /// `stream`, the one the pass launched on (null on the host, or the legacy default stream).
+    /// Empty where the sums are completed afterwards, from the record, or there is one rank.
     template <typename T>
-    using MPRGPReduce = std::function<void(T* const values, const int count, const bool min_last)>;
+    using MPRGPReduce = std::function<void(T* const values, const int count, const bool min_last, void* const stream)>;
 
     /// A run of MPRGP's CG steps (MPRGP::apply's CG branch and the test after it), taken where the
     /// passes run: the operands, the operator's product (Ap <- A p, written whole), and the
@@ -321,7 +322,7 @@ namespace sfem {
                 if (reduce) {
                     // The three sums and the step bound in one message.
                     T v[4] = {dAd, dd, gd, alpha};
-                    reduce(v, 4, true);
+                    reduce(v, 4, true, nullptr);
                     dAd   = v[0];
                     dd    = v[1];
                     gd    = v[2];
@@ -361,7 +362,7 @@ namespace sfem {
                 T Adgf = v[0], gf2 = v[1], gc2 = v[2], gp2 = v[3];
                 if (reduce) {
                     T v[4] = {Adgf, gf2, gc2, gp2};
-                    reduce(v, 4, false);
+                    reduce(v, 4, false, nullptr);
                     Adgf = v[0];
                     gf2  = v[1];
                     gc2  = v[2];

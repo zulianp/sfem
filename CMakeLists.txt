@@ -541,6 +541,16 @@ if(SFEM_ENABLE_TESTING)
         set_tests_properties(sfem_ParallelSSGMGTest PROPERTIES ENVIRONMENT "OMP_NUM_THREADS=1")
         list(APPEND SFEM_TARGETS sfem_ParallelSSGMGTest)
 
+        if(SFEM_ENABLE_CUDA)
+            add_executable(sfem_ParallelExchangeStreamTest frontend/tests/mpi/sfem_ParallelExchangeStreamTest.cpp)
+            target_link_libraries(sfem_ParallelExchangeStreamTest PRIVATE sfem)
+            add_test(
+                NAME sfem_ParallelExchangeStreamTest
+                COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 4 $<TARGET_FILE:sfem_ParallelExchangeStreamTest>)
+            set_tests_properties(sfem_ParallelExchangeStreamTest PROPERTIES ENVIRONMENT "OMP_NUM_THREADS=1" TIMEOUT 120)
+            list(APPEND SFEM_TARGETS sfem_ParallelExchangeStreamTest)
+        endif()
+
         if(SFEM_ENABLE_RYAML)
             add_executable(sfem_ParallelObstacleTest frontend/tests/mpi/sfem_ParallelObstacleTest.cpp)
             target_link_libraries(sfem_ParallelObstacleTest PRIVATE sfem)

@@ -150,7 +150,7 @@ namespace {
 
         // Two ranks with this rank's values: the sums doubled, the minimum as it is.
         sfem::MPRGPReduce<real_t> two_ranks() {
-            return [this](real_t *const values, const int count, const bool min_last) {
+            return [this](real_t *const values, const int count, const bool min_last, void *const /*stream*/) {
                 V h(count);
                 get(values, h);
                 for (int k = 0; k < count; ++k) {
