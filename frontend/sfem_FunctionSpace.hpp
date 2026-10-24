@@ -81,6 +81,10 @@ namespace sfem {
         /// reads only those can run while the messages travel.
         int synchronize_begin(real_t *x, ExecutionSpace es = EXECUTION_SPACE_HOST);
         int synchronize_end(ExecutionSpace es = EXECUTION_SPACE_HOST);
+        /// The reverse of synchronize: x's ghost and aura slots added to the owned entries they
+        /// copy, on the ranks that own them, for a sum over elements that only one rank holds.
+        /// Nothing on a space that is not distributed.
+        int add_to_owners(real_t *x, ExecutionSpace es = EXECUTION_SPACE_HOST);
 
         smesh::ElemType element_type(const int block = 0) const;
         std::vector<smesh::ElemType> element_types() const;

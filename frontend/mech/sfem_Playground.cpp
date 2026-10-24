@@ -4,6 +4,7 @@
 
 #include <cmath>
 #include <cstdio>
+#include <filesystem>
 #include <fstream>
 #include <list>
 #include <sstream>
@@ -187,6 +188,9 @@ namespace sfem {
         /// Whichever back-end there is, as the contact-stabilised scheme reads it.
         std::shared_ptr<ContactStabilisedNewmarkScheme::Contact> obstacle;
         std::shared_ptr<smesh::Grid<geom_t>>               obstacle_sdf;
+        // The obstacle's grid whole, on one rank, for the output: a distributed run's ranks each
+        // hold a part of it.
+        std::function<std::shared_ptr<smesh::Grid<geom_t>>()> whole_obstacle_sdf;
         std::shared_ptr<NewmarkScheme>                     newmark;
         real_t                                             extent{0};
         /// obstacle.release: the penetration of the start is captured once it is set.
@@ -561,14 +565,20 @@ namespace sfem {
         int initial_conditions(const ElasticityCase &config) {
             auto node = child(config.root(), "initial_conditions");
             if (!node.readable()) return SFEM_SUCCESS;
-            if (mesh->comm()->size() > 1) {
-                fprintf(stderr, "Playground: initial_conditions are read on one rank\n");
-                return SFEM_FAILURE;
-            }
 
             // The files speak the numbering on disk: the mesh's node_mapping names each node's entry
-            // there, after a block-selective read or packing's renumbering.
-            const auto         file_ids   = mesh->node_mapping();
+            // there, after a block-selective read or packing's renumbering. Distributed, every rank
+            // reads the whole file and takes its nodes, ghosts included, by their ids in it.
+            SharedBuffer<idx_t> file_ids = mesh->node_mapping();
+            if (mesh->comm()->size() > 1) {
+                auto ids = mesh->distributed()->node_mapping();
+                if (!ids || (ptrdiff_t)ids->size() < mesh->n_nodes()) {
+                    fprintf(stderr, "Playground: initial_conditions need the file id of every node of a distributed mesh\n");
+                    return SFEM_FAILURE;
+                }
+                file_ids = create_host_buffer<idx_t>(mesh->n_nodes());
+                std::copy(ids->data(), ids->data() + mesh->n_nodes(), file_ids->data());
+            }
             const idx_t *const file_nodes = file_ids && (ptrdiff_t)file_ids->size() == mesh->n_nodes() ? file_ids->data() : nullptr;
 
             auto read_into = [&](const ryml::ConstNodeRef &entry, real_t *const out) {
@@ -681,7 +691,9 @@ namespace sfem {
             }
 
             if (has(node, "sdf")) {
-                obstacle_sdf = smesh::Grid<geom_t>::create_from_file(m->comm(), config.resolve(read_string(child(node, "sdf"), "file", "")));
+                const auto file    = config.resolve(read_string(child(node, "sdf"), "file", ""));
+                obstacle_sdf       = smesh::Grid<geom_t>::create_from_file(m->comm(), file);
+                whole_obstacle_sdf = [file]() { return smesh::Grid<geom_t>::create_from_file(Communicator::self(), file); };
             } else {
                 auto          s = child(node, "shape");
                 ObstacleShape shape;
@@ -716,7 +728,8 @@ namespace sfem {
                     shape.has_center = true;
                     std::copy(center.begin(), center.end(), shape.center);
                 }
-                obstacle_sdf = create_obstacle_sdf(m->comm(), shape, lo, hi);
+                obstacle_sdf       = create_obstacle_sdf(m->comm(), shape, lo, hi);
+                whole_obstacle_sdf = [shape, lo, hi]() { return create_obstacle_sdf(Communicator::self(), shape, lo, hi); };
             }
             if (!obstacle_sdf) return SFEM_FAILURE;
 
@@ -1130,8 +1143,16 @@ namespace sfem {
                     }
                 }
                 stepper->add_observer(fields);
-                // The obstacle's grid: contour sdf/sdf.xdmf at 0. Every rank holds it whole.
-                if (obstacle_sdf && mesh->comm()->rank() == 0) obstacle_sdf->to_file(path / "sdf");
+                // The obstacle's grid: contour sdf/sdf.xdmf at 0. Rank 0 alone writes it, so a failure
+                // there is reported, not returned.
+                if (obstacle_sdf && mesh->comm()->rank() == 0) {
+                    auto            whole = mesh->comm()->size() > 1 ? whole_obstacle_sdf() : obstacle_sdf;
+                    std::error_code ec;
+                    std::filesystem::create_directories((path / "sdf").to_string(), ec);
+                    if (!whole || ec || whole->to_file(path / "sdf") != SMESH_SUCCESS) {
+                        fprintf(stderr, "Playground: unable to write the obstacle's grid to %s\n", (path / "sdf").c_str());
+                    }
+                }
 
                 if (read<bool>(output, "quantities", false) && mesh->comm()->size() > 1) {
                     fprintf(stderr, "Playground: output.quantities is written on one rank\n");

@@ -10,6 +10,7 @@
 #include "sfem_logger.hpp"
 #include "smesh_mesh.hpp"
 #include "smesh_sideset.hpp"
+#include "sfem_FunctionSpace.hpp"
 
 #include "integrate_values.hpp"
 #include "neumann.hpp"
@@ -706,6 +707,45 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
+    /// The dead load of `c` at value 1 on a distributed mesh, complete on the owned rows. The
+    /// sidesets keep each face on one rank (filtered to owned elements, shared faces deduplicated),
+    /// while the volume operators complete an owned row from the aura's elements: here the shares a
+    /// face leaves at the ghosts are added to their owners instead. Collective.
+    static int complete_dead_load(FunctionSpace &space, geom_t **const points, NeumannConditions::Condition &c) {
+        auto            mesh  = space.mesh_ptr();
+        const ptrdiff_t ndofs = space.n_dofs();
+        auto            load  = create_host_buffer<real_t>(ndofs);
+        std::memset(load->data(), 0, sizeof(real_t) * static_cast<size_t>(ndofs));
+        // A rank can hold none of the faces (no surface): it adds nothing, but takes part in the
+        // exchange.
+        const bool faces = c.surface && c.surface->extent(1) > 0;
+        int err = !faces ? SFEM_SUCCESS : c.values ? integrate_values(c.element_type,
+                                              c.surface->extent(1),
+                                              mesh->n_nodes(),
+                                              c.surface->data(),
+                                              points,
+                                              -1,
+                                              c.values->data(),
+                                              space.block_size(),
+                                              c.component,
+                                              load->data())
+                           : integrate_value(c.element_type,
+                                             c.surface->extent(1),
+                                             mesh->n_nodes(),
+                                             c.surface->data(),
+                                             points,
+                                             -1,
+                                             space.block_size(),
+                                             c.component,
+                                             load->data());
+        if (err != SFEM_SUCCESS || space.add_to_owners(load->data()) != SFEM_SUCCESS) {
+            SFEM_ERROR("NeumannConditions: unable to complete a load on its owned nodes\n");
+            return SFEM_FAILURE;
+        }
+        c.owned_load = load;
+        return SFEM_SUCCESS;
+    }
+
     int NeumannConditions::gradient(const real_t *const x, real_t *const out) {
         SFEM_TRACE_SCOPE("NeumannConditions::gradient");
 
@@ -716,9 +756,19 @@ namespace sfem {
         if (space->has_semi_structured_mesh()) {
             points = space->mesh().points();
         }
+        const bool distributed = mesh->is_distributed() && mesh->comm()->size() > 1;
 
         int err = 0;
         for (auto &c : impl_->conditions) {
+            if (distributed && !c.follower_pressure) {
+                if (!c.owned_load && complete_dead_load(*space, points->data(), c) != SFEM_SUCCESS) return SFEM_FAILURE;
+                const real_t *const g     = c.owned_load->data();
+                const real_t        v     = c.value;
+                const ptrdiff_t     owned = space->n_owned_dofs();
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < owned; ++i) out[i] += v * g[i];
+                continue;
+            }
             if (c.follower_pressure) {
                 const int dim = mesh->spatial_dimension();
                 if (!x || space->block_size() != dim || !is_supported_pressure_surface(c.element_type)) {

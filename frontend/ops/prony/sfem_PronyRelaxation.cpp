@@ -128,7 +128,8 @@ namespace sfem {
 
         if (series_.n_terms() == 0) {
             // Nothing relaxes: the frozen history stays the zero it was made.
-        } else if (!relaxed_stress_n) {
+        } else if (!relaxed_stress_n && n_elements_ > 0) {
+            // (A rank holding none of the block's elements has an empty stress, null on the device.)
             SFEM_ERROR("PronyRelaxation::begin_step: a series with terms needs the relaxed stress S_r^n\n");
 #ifdef SFEM_ENABLE_CUDA
         } else if (options_.execution_space == EXECUTION_SPACE_DEVICE) {
@@ -172,7 +173,7 @@ namespace sfem {
             SFEM_ERROR("PronyRelaxation::advance: no step is open; call begin_step first\n");
         }
 
-        if (series_.n_terms() > 0 && (!relaxed_stress_n || !relaxed_stress)) {
+        if (series_.n_terms() > 0 && n_elements_ > 0 && (!relaxed_stress_n || !relaxed_stress)) {
             SFEM_ERROR("PronyRelaxation::advance: a series with terms needs both relaxed stresses\n");
         }
 

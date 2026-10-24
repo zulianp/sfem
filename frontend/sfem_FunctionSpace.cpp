@@ -378,6 +378,13 @@ namespace sfem {
         return synchronize_end(es);
     }
 
+    int FunctionSpace::add_to_owners(real_t *const x, const ExecutionSpace es) {
+        int  status   = SFEM_SUCCESS;
+        auto exchange = exchange_for(es, &status);
+        if (!exchange) return status;
+        return exchange->scatter_add(x, impl_->block_size) == SMESH_SUCCESS ? SFEM_SUCCESS : SFEM_FAILURE;
+    }
+
     int FunctionSpace::synchronize_begin(real_t *const x, const ExecutionSpace es) {
         int  status   = SFEM_SUCCESS;
         auto exchange = exchange_for(es, &status);

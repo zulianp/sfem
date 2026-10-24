@@ -301,10 +301,14 @@ namespace sfem {
         public:
             ControlPoint(const std::shared_ptr<Function> &f, const std::vector<real_t> &point, const bool with_rates)
                 : f_(f), with_rates_(with_rates) {
-                auto            mesh   = f->space()->mesh_ptr();
-                const int       dim    = mesh->spatial_dimension();
-                const ptrdiff_t nnodes = mesh->n_nodes();
-                auto            xyz    = mesh->points()->data();
+                auto      mesh = f->space()->mesh_ptr();
+                const int dim  = mesh->spatial_dimension();
+                auto      xyz  = mesh->points()->data();
+                // Distributed, the nearest of the owned nodes over the ranks, sampled by its owner
+                // (the lowest rank on a tie) and summed: the history is written by rank 0, which
+                // may hold none of the body the point is in.
+                comm_                  = mesh->comm();
+                const ptrdiff_t nnodes = f->space()->n_owned_dofs() / f->space()->block_size();
 
                 double best = std::numeric_limits<double>::max();
                 for (ptrdiff_t i = 0; i < nnodes; ++i) {
@@ -317,6 +321,11 @@ namespace sfem {
                         best  = d2;
                         node_ = i;
                     }
+                }
+                if (comm_->size() > 1) {
+                    const double nearest = -comm_->max(-best);
+                    const int    rank    = best == nearest ? comm_->rank() : comm_->size();
+                    owner_               = comm_->rank() == -comm_->max(-rank);
                 }
 
                 const ptrdiff_t ndofs = f->space()->n_dofs();
@@ -340,9 +349,10 @@ namespace sfem {
                 const ptrdiff_t      ndofs = f_->space()->n_dofs();
                 const int            bs    = f_->space()->block_size();
 
-                auto u = on_host(es, record.x, ndofs);
+                const int n_values = (with_rates_ ? 3 : 1) * bs;
+                auto      u        = on_host(es, record.x, ndofs);
                 for (int d = 0; d < bs; ++d) values[d] = u->data()[node_ * bs + d];
-                if (!with_rates_) return SFEM_SUCCESS;
+                if (!with_rates_) return reduce(values, n_values);
 
                 const bool with_acceleration = record.scheme && record.scheme->has_acceleration();
                 if (record.scheme) {
@@ -354,13 +364,23 @@ namespace sfem {
                     values[bs + d]     = record.scheme ? v->data()[node_ * bs + d] : real_t(0);
                     values[2 * bs + d] = with_acceleration ? a->data()[node_ * bs + d] : real_t(0);
                 }
-                return SFEM_SUCCESS;
+                return reduce(values, n_values);
             }
 
         private:
-            std::shared_ptr<Function> f_;
-            bool                      with_rates_;
-            ptrdiff_t                 node_{0};
+            /// The owner's values on every rank.
+            int reduce(real_t *const values, const int n) const {
+                if (comm_->size() == 1) return SFEM_SUCCESS;
+                if (!owner_) std::fill(values, values + n, real_t(0));
+                comm_->sum(values, n, smesh::TypeToEnum<real_t>::value());
+                return SFEM_SUCCESS;
+            }
+
+            std::shared_ptr<Function>     f_;
+            std::shared_ptr<Communicator> comm_;
+            bool                          with_rates_;
+            bool                          owner_{true};
+            ptrdiff_t                     node_{0};
             SharedBuffer<real_t>      velocity_, acceleration_;
         };
     }  // namespace
