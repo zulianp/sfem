@@ -160,7 +160,7 @@ namespace sfem {
             }
             T *const reduced = work + REDUCED;
             launch(Store<T>{reduced});
-            reduce(reduced, N_VALUES, min_last);
+            reduce(reduced, N_VALUES, min_last, (void *)launch_stream());
             apply_kernel<T, Result><<<1, 1, 0, launch_stream()>>>(reduced, result);
             SFEM_DEBUG_SYNCHRONIZE();
         }

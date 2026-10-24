@@ -6,19 +6,25 @@
 #include <memory>
 
 namespace sfem {
-    /// A non-blocking stream for device work that must run beside the legacy default stream, not
-    /// behind it: work queued there waits on everything queued on any blocking stream, MPI's copies
-    /// included, and they on it.
+    /// A non-blocking stream for device work that must run beside another stream, not behind it
+    /// (on the legacy default stream, work waits on everything queued on any blocking stream, MPI's
+    /// copies included, and they on it). Forked from and joined into the stream the work belongs
+    /// to, so a graph capturing that stream takes this one's work in too.
+    /// launch_stream() (sfem_cuda_base.hpp) for code that sees no CUDA types: the stream the
+    /// calling thread's launches go to (null: the legacy default stream).
+    void *current_launch_stream();
+
     class DeviceSideStream {
     public:
         static std::shared_ptr<DeviceSideStream> create();
         ~DeviceSideStream();
 
         void *stream() const;
-        /// This stream waits for the work queued on the default stream so far.
-        void wait_for_default();
-        /// The default stream waits for the work queued on this one so far.
-        void join_default();
+        /// This stream waits for the work queued on `from` so far (a cudaStream_t; null: the
+        /// legacy default stream).
+        void fork(void *const from);
+        /// `into` waits for the work queued on this one so far.
+        void join(void *const into);
 
     private:
         DeviceSideStream();

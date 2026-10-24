@@ -373,9 +373,9 @@ namespace sfem {
         return exchange.get();
     }
 
-    int FunctionSpace::synchronize(real_t *const x, const ExecutionSpace es) {
-        if (synchronize_begin(x, es) != SFEM_SUCCESS) return SFEM_FAILURE;
-        return synchronize_end(es);
+    int FunctionSpace::synchronize(real_t *const x, const ExecutionContext &context) {
+        if (synchronize_begin(x, context) != SFEM_SUCCESS) return SFEM_FAILURE;
+        return synchronize_end(context);
     }
 
     int FunctionSpace::add_to_owners(real_t *const x, const ExecutionSpace es) {
@@ -385,15 +385,15 @@ namespace sfem {
         return exchange->scatter_add(x, impl_->block_size) == SMESH_SUCCESS ? SFEM_SUCCESS : SFEM_FAILURE;
     }
 
-    int FunctionSpace::synchronize_begin(real_t *const x, const ExecutionSpace es) {
+    int FunctionSpace::synchronize_begin(real_t *const x, const ExecutionContext &context) {
         int  status   = SFEM_SUCCESS;
-        auto exchange = exchange_for(es, &status);
-        return exchange ? exchange->gather_begin(x, impl_->block_size) : status;
+        auto exchange = exchange_for(context.space(), &status);
+        return exchange ? exchange->gather_begin(x, impl_->block_size, context.stream()) : status;
     }
 
-    int FunctionSpace::synchronize_end(const ExecutionSpace es) {
+    int FunctionSpace::synchronize_end(const ExecutionContext &context) {
         int  status   = SFEM_SUCCESS;
-        auto exchange = exchange_for(es, &status);
+        auto exchange = exchange_for(context.space(), &status);
         return exchange ? exchange->gather_wait() : status;
     }
 
