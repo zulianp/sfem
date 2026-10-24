@@ -27,6 +27,11 @@ Inputs (../data, copied from the jobs that produced them; README.md names the jo
                           converged, with the damped and the Armijo line search, on 4 x 72,
                           alternating per repeat, same columns as runs.csv
   machine.txt             the node and the software, key=value
+  transient_runs.csv, transient_ablation.csv, transient_history.csv
+                          FF200 through four pump strokes on one GPU per time integrator, and over
+                          the first 16 or 30 ms one change at a time (python/collect_transient.py)
+  fp70_membrane_pressure.csv
+                          the chamber pressure driving them (workflows/ldp_containment/transient)
 
 Usage:
     python3 ldp_figures.py --out ../figures --tables ../tables
@@ -807,6 +812,401 @@ def f(r, key):
 
 
 # ---------------------------------------------------------------------------------------------
+# The pump strokes (FF200, transient contact)
+# ---------------------------------------------------------------------------------------------
+
+# The four-stroke runs in the order of the text: (run, label, macro key).
+STROKE_RUNS = [
+    ("newmark", r"Newmark, $\gamma=0.6$", "Newmark"),
+    ("bdf2", "BDF2", "Bdf"),
+    ("final", "BDF2, all changes", "Final"),
+]
+# The two resolutions, each with every change: (run, label, macro key, case of summary.csv).
+RESOLUTIONS = [
+    ("final", "FF200", "Final", "FF200_ExodusMesh"),
+    ("refined", "FF200 refined", "Refined", "FF200_mesh_refined"),
+]
+ALL_RUNS = STROKE_RUNS + [("refined", "BDF2, all changes, refined", "Refined")]
+# The comparisons of one change each, in the order the changes were made:
+# (change, label, macro key, [(variant, label)]), the variant before the change first.
+CHANGES = [
+    ("finish", "Reduction end", "Finish", [("separate", "2nd kernel"), ("fused", "last block")]),
+    ("float32", "Tangent", "Float", [("float64", "float64"), ("float32", "float32")]),
+    ("runs", "CG steps", "Runs", [("steps", "one by one"), ("runs", "device runs")]),
+    ("start", "Newton's start", "Start", [("u_n", r"$u_n$"), ("u_n+dt v_n", r"$u_n+\Delta t\,v_n$"),
+                                           ("nonmonotone", r"$u_n$, n.-m.\ LS"),
+                                           ("both", r"$u_n+\Delta t\,v_n$, n.-m.\ LS")]),
+]
+STROKE = 0.045      # the pump's period (s), the pressure table's cycle
+OUTLET = 90543.0    # the outlet pressure (Pa), FP70's FSI cases
+LIFT_OPEN = 50e-6   # a valve is open while its centre is this far (m) from where it rests at t = 0
+# Frames of the final run rendered by render_strokes.py --panels (figures/stills/<frame>_<view>.png)
+# and the colour range that script fixes for the vertical displacement (mm).
+STILLS = [0, 38, 261, 276]
+# The refined run's frames at the same times (figures/stills_refined), in its numbering.
+STILLS_REFINED = [0, 42, 297, 312]
+STILL_VIEWS = [("overview", "overview"), ("top", "from above"),
+               ("pressure_valve", "pressure valve"), ("suction_valve", "suction valve")]
+UY_RANGE = (-1.4, 1.1)
+# ParaView's Cool to Warm at 0, 1/4, 1/2, 3/4 and 1 (Moreland's diverging map).
+COOL_TO_WARM = [(59, 76, 192), (141, 176, 254), (221, 221, 221), (244, 154, 123), (180, 4, 38)]
+
+
+def transient_runs():
+    runs = {r["run"]: r for r in read_csv("transient_runs.csv")}
+    for run, _, _ in ALL_RUNS:
+        if run not in runs:
+            sys.exit("ldp_figures: transient_runs.csv has no run %s" % run)
+    return runs
+
+
+def transient_ablation():
+    index = {(r["change"], r["variant"]): r for r in read_csv("transient_ablation.csv")}
+    for change, _, _, variants in CHANGES:
+        for variant, _ in variants:
+            if (change, variant) not in index:
+                sys.exit("ldp_figures: transient_ablation.csv has no %s %s" % (change, variant))
+    return index
+
+
+def transient_history():
+    """run -> its rows as floats, the start (t = 0) first."""
+    history = {}
+    for r in read_csv("transient_history.csv"):
+        history.setdefault(r["run"], []).append({k: float(v) for k, v in r.items() if k != "run"})
+    for run, _, _ in ALL_RUNS:
+        rows = history.get(run)
+        if not rows or rows[0]["t"] != 0:
+            sys.exit("ldp_figures: transient_history.csv lacks run %s or its start" % run)
+    return history
+
+
+def chamber_pressure(t_end):
+    """The pressure table (t, p) up to t_end, every 0.1 ms."""
+    rows = []
+    for line in open(os.path.join(DATA, "fp70_membrane_pressure.csv")):
+        if line.startswith("#") or not line.strip():
+            continue
+        t, p = (float(x) for x in line.split(","))
+        if t <= t_end + 1e-12:
+            rows.append((t, p))
+    return rows[::10]
+
+
+def valve_events(rows, key, sign):
+    """Per stroke, the valve's longest opening: when it opens and closes (s), its largest lift (m),
+    and how long it is open otherwise in that stroke (s). sign is +1 for a valve that opens up."""
+    rest = rows[0][key]
+    intervals, start = [], None
+    for r in rows:
+        lift = sign * (r[key] - rest)
+        if start is None and lift > LIFT_OPEN:
+            start = r["t"]
+        elif start is not None and lift <= LIFT_OPEN:
+            intervals.append((start, r["t"]))
+            start = None
+    if start is not None:
+        intervals.append((start, rows[-1]["t"]))
+    strokes = []
+    for k in range(int(round(rows[-1]["t"] / STROKE))):
+        lo, hi = k * STROKE, (k + 1) * STROKE
+        mine = [iv for iv in intervals if lo <= iv[0] < hi]
+        if not mine:
+            sys.exit("ldp_figures: %s does not open in stroke %d" % (key, k + 1))
+        main = max(mine, key=lambda iv: iv[1] - iv[0])
+        strokes.append({"open": main[0], "close": main[1],
+                        "peak": max(sign * (r[key] - rest) for r in rows if lo <= r["t"] < hi),
+                        "rebound": sum(b - a for a, b in mine if (a, b) != main)})
+    return strokes
+
+
+VALVES = [("pv_centre_uy", 1, "Pv"), ("sv_centre_uy", -1, "Sv")]
+
+
+def seconds(x):
+    """A time in seconds: whole seconds from 100 s, else three digits."""
+    return integer(x) if x >= 100 else num(x, 3)
+
+
+def per_newton(r):
+    """Time in the QP per Newton step (ms)."""
+    return 1e3 * float(r["qp_s"]) / int(r["newton"])
+
+
+def qp_iterations_per_newton(rows):
+    """QP iterations per Newton step of the converged steps (failed attempts' are not recorded)."""
+    return sum(r["linear"] for r in rows) / sum(r["newton"] for r in rows)
+
+
+def per_qp_iteration(r, rows):
+    """QP time per QP iteration (us), the failed attempts' Newton steps counted at the converged
+    steps' mean iterations."""
+    return 1e6 * float(r["qp_s"]) / (int(r["newton"]) * qp_iterations_per_newton(rows))
+
+
+def other(r):
+    """Stepping time neither in the Newton steps' QPs nor in writing the fields (s)."""
+    return float(r["stepper_s"]) - float(r["qp_s"]) - float(r["export_s"])
+
+
+def transient_macros(runs, ablation, history):
+    out = []
+    m = lambda name, value: out.append(macro(name, value))
+    final = runs["final"]
+    rows = history["final"]
+    dt = max(r["dt"] for r in rows)
+    m("trDtMs", num(dt * 1e3, 2))
+    m("trStepsNominal", integer(float(final["t_end"]) / dt))
+    m("trEnd", num(float(final["t_end"]) * 1e3, 3))
+    m("trStrokes", integer(float(final["t_end"]) / STROKE))
+    m("trStrokeMs", num(STROKE * 1e3, 2))
+    m("trContactNodes", integer(final["contact_nodes"]))
+    m("trLiftOpen", num(LIFT_OPEN * 1e6, 2))
+    # The smallest step a cut-back took; the last step ends at t_end and may be shorter.
+    m("trMinDtFinal", num(min(r["dt"] for r in rows[1:-1]) * 1e6, 2))
+    for run, _, key in ALL_RUNS:
+        r = runs[run]
+        m("trSteps" + key, integer(r["steps"]))
+        m("trFailed" + key, integer(r["failed"]))
+        m("trNewton" + key, integer(r["newton"]))
+        m("trStepping" + key, seconds(float(r["stepper_s"])))
+        m("trQp" + key, seconds(float(r["qp_s"])))
+        m("trWrite" + key, seconds(float(r["export_s"])))
+        m("trWritePerStep" + key, num(1e3 * float(r["export_s"]) / (int(r["steps"]) + 1), 2))
+        m("trOther" + key, num(other(r), 2))
+        m("trQpPerNewton" + key, num(per_newton(r), 3))
+    stepping = lambda run: float(runs[run]["stepper_s"])
+    m("trSpeedNewmark", num(stepping("newmark") / stepping("final"), 2))
+    m("trSpeedBdf", num(stepping("bdf2") / stepping("final"), 2))
+    m("trQpShareFinal", integer(100 * float(final["qp_s"]) / stepping("final")))
+
+    # The valves: the final run per stroke, and how far the other runs are from it.
+    events = {run: {key: valve_events(history[run], col, sign) for col, sign, key in VALVES}
+              for run, _, _ in ALL_RUNS}
+    for col, sign, key in VALVES:
+        peaks = [e["peak"] for e in events["final"][key]]
+        m("tr%sPeakMin" % key, num(min(peaks) * 1e3, 3))
+        m("tr%sPeakMax" % key, num(max(peaks) * 1e3, 3))
+        # Stroke to stroke: each event against the first stroke's, a period later.
+        drift = max(abs(e[w] - k * STROKE - events["final"][key][0][w])
+                    for k, e in enumerate(events["final"][key]) for w in ("open", "close"))
+        m("tr%sPeriodic" % key, num(drift * 1e3, 2))
+    m("trSvReboundMax", num(max(e["rebound"] for e in events["final"]["Sv"]) * 1e3, 2))
+    timing, peak = 0.0, 0.0
+    for run in ("newmark", "bdf2"):
+        for _, _, key in VALVES:
+            for a, b in zip(events[run][key], events["final"][key]):
+                timing = max(timing, abs(a["open"] - b["open"]), abs(a["close"] - b["close"]))
+                peak = max(peak, abs(a["peak"] - b["peak"]) / b["peak"])
+    m("trEventSpread", num(timing * 1e3, 2))
+    m("trPeakSpread", num(100 * peak, 2))
+
+    # The two resolutions: the refined mesh on several GPUs against FF200 on one.
+    dofs = {r["case"]: int(r["dofs"]) for r in read_csv("summary.csv")}
+    for run, _, key, case in RESOLUTIONS:
+        r, rows = runs[run], history[run][1:]
+        m("trGpus" + key, integer(r["gpus"]))
+        m("trQpItsPerNewton" + key, integer(qp_iterations_per_newton(rows)))
+        m("trUsPerQpIt" + key, integer(per_qp_iteration(r, rows)))
+    final, refined = runs["final"], runs["refined"]
+    m("trResDofsRatio", num(dofs["FF200_mesh_refined"] / dofs["FF200_ExodusMesh"], 2))
+    m("trResWorkPerGpu", num(dofs["FF200_mesh_refined"] / dofs["FF200_ExodusMesh"] / int(refined["gpus"]), 2))
+    # Where in a stroke the refined run's attempts fail (ms): the pressure valve's impacts.
+    phase = sorted(1e3 * (t % STROKE) for r, t in transient_failures(runs) if r == "refined")
+    m("trResFailFirst", num(phase[0], 2))
+    m("trResFailLast", num(phase[-1], 2))
+    m("trResExpectedIts", num((dofs["FF200_mesh_refined"] / dofs["FF200_ExodusMesh"]) ** (1 / 3), 2))
+    m("trResItsRatio", num(qp_iterations_per_newton(history["refined"][1:]) / qp_iterations_per_newton(history["final"][1:]), 2))
+    m("trResSteppingRatio", num(float(refined["stepper_s"]) / float(final["stepper_s"]), 2))
+    m("trResPerNewtonRatio", num(per_newton(refined) / per_newton(final), 2))
+    m("trResPerItRatio", num(per_qp_iteration(refined, history["refined"][1:]) / per_qp_iteration(final, history["final"][1:]), 2))
+    m("trResWriteRatio", num((float(refined["export_s"]) / (int(refined["steps"]) + 1)) / (float(final["export_s"]) / (int(final["steps"]) + 1)), 2))
+    timing, peak, rest = 0.0, 0.0, 0.0
+    for col, _, key in VALVES:
+        rest = max(rest, abs(history["refined"][0][col] - history["final"][0][col]))
+        for a, b in zip(events["refined"][key], events["final"][key]):
+            timing = max(timing, abs(a["open"] - b["open"]), abs(a["close"] - b["close"]))
+            peak = max(peak, abs(a["peak"] - b["peak"]) / b["peak"])
+    m("trResEventShift", num(timing * 1e3, 2))
+    m("trResPeakDiff", num(100 * peak, 2))
+    m("trResRest", num(rest * 1e6, 1))
+
+    # One change at a time; the caption names one window for all but Newton's start.
+    if len({ablation[(c, v[0][0])]["t_end"] for c, _, _, v in CHANGES if c != "start"}) != 1:
+        sys.exit("ldp_figures: the changes before Newton's start ran over different windows")
+    for change, _, key, variants in CHANGES:
+        before, after = (ablation[(change, v)] for v, _ in variants[:2])
+        m("trWindow" + key, integer(float(before["t_end"]) * 1e3))
+        if change != "start":
+            m("tr%sGain" % key, num(100 * (1 - per_newton(after) / per_newton(before)), 2))
+    for variant, key in (("u_n", "Base"), ("u_n+dt v_n", "Start"), ("nonmonotone", "Nonmono"), ("both", "Both")):
+        r = ablation[("start", variant)]
+        m("trFailed" + key + "Window", integer(r["failed"]))
+        m("trQp" + key + "Window", num(float(r["qp_s"]), 3))
+        m("trStepping" + key + "Window", num(float(r["stepper_s"]), 3))
+        m("trSteps" + key + "Window", integer(r["steps"]))
+    return "".join(out), events
+
+
+def table_strokes(runs):
+    lines = [PREAMBLE,
+             r"\begin{tabular}{@{}lrrrrrr@{}}", r"\toprule",
+             r" & & & & \multicolumn{3}{c}{Time (\si{\second})} \\", r"\cmidrule(l){5-7}",
+             r"Time integration & Steps & Failed & Newton steps & QP & Writing & Total \\", r"\midrule"]
+    for run, label, _ in STROKE_RUNS:
+        r = runs[run]
+        lines.append("%s & %s & %s & %s & %s & %s & %s \\\\" % (
+            label, integer(r["steps"]), integer(r["failed"]), integer(r["newton"]),
+            seconds(float(r["qp_s"])), seconds(float(r["export_s"])), seconds(float(r["stepper_s"]))))
+    lines += [r"\bottomrule", r"\end{tabular}"]
+    return "\n".join(lines) + "\n"
+
+
+def table_changes(ablation):
+    lines = [PREAMBLE,
+             r"\begin{tabular}{@{}llrrrr@{}}", r"\toprule",
+             r" & & & & \multicolumn{2}{c}{QP} \\", r"\cmidrule(l){5-6}",
+             r"Change & Variant & Steps & Failed & (\si{\second}) & per Newton (\si{\milli\second}) \\",
+             r"\midrule"]
+    for i, (change, label, _, variants) in enumerate(CHANGES):
+        if i:
+            lines.append(r"\addlinespace")
+        for j, (variant, vlabel) in enumerate(variants):
+            r = ablation[(change, variant)]
+            lines.append("%s & %s & %s & %s & %s & %s \\\\" % (
+                label if j == 0 else "", vlabel,
+                integer(r["steps"]), integer(r["failed"]), num(float(r["qp_s"]), 3), num(per_newton(r), 3)))
+    lines += [r"\bottomrule", r"\end{tabular}"]
+    return "\n".join(lines) + "\n"
+
+
+def table_valves(events):
+    lines = [PREAMBLE,
+             r"\begin{tabular}{@{}llrrrrrr@{}}", r"\toprule",
+             r" & & \multicolumn{3}{c}{Pressure valve} & \multicolumn{3}{c}{Suction valve} \\",
+             r"\cmidrule(lr){3-5}\cmidrule(l){6-8}",
+             r"Stroke & Mesh & opens & closes & lift & opens & closes & lift \\",
+             r" & & (\si{\milli\second}) & (\si{\milli\second}) & (\si{\milli\metre}) & (\si{\milli\second}) & (\si{\milli\second}) & (\si{\milli\metre}) \\",
+             r"\midrule"]
+    for k in range(len(events["final"]["Pv"])):
+        if k:
+            lines.append(r"\addlinespace")
+        for j, (run, label, _, _) in enumerate(RESOLUTIONS):
+            cells = []
+            for e in (events[run]["Pv"][k], events[run]["Sv"][k]):
+                cells += [r"\num{%.1f}" % (e["open"] * 1e3), r"\num{%.1f}" % (e["close"] * 1e3), r"\num{%.2f}" % (e["peak"] * 1e3)]
+            lines.append("%s & %s & %s \\\\" % (str(k + 1) if j == 0 else "", label, " & ".join(cells)))
+    lines += [r"\bottomrule", r"\end{tabular}"]
+    return "\n".join(lines) + "\n"
+
+
+def table_resolutions(runs, history):
+    dofs = {r["case"]: int(r["dofs"]) for r in read_csv("summary.csv")}
+    lines = [PREAMBLE,
+             r"\begin{tabular}{@{}lrrrrrrrrr@{}}", r"\toprule",
+             r" & & & & & & & \multicolumn{3}{c}{Time (\si{\second})} \\", r"\cmidrule(l){8-10}",
+             r"Mesh & Dofs & GPUs & Steps & Failed & \shortstack{QP its per\\Newton step} & \shortstack{\si{\micro\second} per\\QP iteration} & QP & Writing & Total \\",
+             r"\midrule"]
+    for run, label, _, case in RESOLUTIONS:
+        r, rows = runs[run], history[run][1:]
+        lines.append("%s & %s & %s & %s & %s & %s & %s & %s & %s & %s \\\\" % (
+            label, integer(dofs[case]), integer(r["gpus"]), integer(r["steps"]), integer(r["failed"]),
+            integer(qp_iterations_per_newton(rows)), integer(per_qp_iteration(r, rows)),
+            seconds(float(r["qp_s"])), seconds(float(r["export_s"])), seconds(float(r["stepper_s"]))))
+    lines += [r"\bottomrule", r"\end{tabular}"]
+    return "\n".join(lines) + "\n"
+
+
+def transient_failures(runs):
+    """(run, t) of every failed attempt, as many per run as its summary counts."""
+    failures = [(r["run"], float(r["t"])) for r in read_csv("transient_failures.csv")]
+    for run, _, _ in ALL_RUNS:
+        if sum(1 for r, _ in failures if r == run) != int(runs[run]["failed"]):
+            sys.exit("ldp_figures: transient_failures.csv does not match the failed attempts of %s" % run)
+    return failures
+
+
+def figure_strokes(runs, history, failures):
+    """The load, the valves' lift and the running count of failed attempts against time."""
+    t_end = float(runs["final"]["t_end"])
+    final = history["final"]
+    out = [PREAMBLE,
+           r"\begin{tikzpicture}",
+           r"\begin{groupplot}[group style={group size=1 by 3, vertical sep=0.35cm, xticklabels at=edge bottom},",
+           r"  width=0.96\textwidth, height=3.6cm, xmin=0, xmax=%.6g, xtick distance=%.6g, xmajorgrids, ymajorgrids," % (t_end * 1e3, STROKE * 1e3 / 3),
+           r"  tick label style={font=\scriptsize}, label style={font=\footnotesize},",
+           r"  legend style={font=\scriptsize, draw=none, fill=white, fill opacity=0.85, text opacity=1}, legend cell align=left]"]
+    p = chamber_pressure(t_end)
+    out.append(r"\nextgroupplot[ylabel={pressure (\si{\kilo\pascal})}, legend pos=south east]")
+    out.append(r"\addplot[black, thin] coordinates {%s};" % " ".join("(%.4f,%.3f)" % (t * 1e3, v / 1e3) for t, v in p))
+    out.append(r"\addlegendentry{chamber}")
+    out.append(r"\addplot[black, dashed, thin, domain=0:%.6g, samples=2] {%.4f};" % (t_end * 1e3, OUTLET / 1e3))
+    out.append(r"\addlegendentry{outlet}")
+    out.append(r"\nextgroupplot[ylabel={lift (\si{\milli\metre})}, legend pos=south east, legend columns=2]")
+    for col, sign, key, color, name in (("pv_centre_uy", 1, "Pv", "LdpD", "pressure valve"),
+                                        ("sv_centre_uy", -1, "Sv", "LdpA", "suction valve")):
+        for run, style, mesh in (("final", "semithick", ""), ("refined", "thin, densely dashed, black", ", refined")):
+            rows = history[run]
+            rest = rows[0][col]
+            out.append(r"\addplot[%s, %s] coordinates {%s};" % (
+                color, style, " ".join("(%.4f,%.5f)" % (r["t"] * 1e3, (r[col] - rest) * 1e3) for r in rows)))
+            out.append(r"\addlegendentry{%s%s}" % (name, mesh))
+    out.append(r"\nextgroupplot[ylabel={failed attempts}, xlabel={$t$ (\si{\milli\second})}, ymode=log,"
+               r" ymin=0.7, ymax=3e4, legend pos=north west, legend columns=4]")
+    for (run, label, _), color in zip(ALL_RUNS, ("LdpB", "LdpC", "black", "black, densely dashed")):
+        # Their running count, as a step function from the first.
+        times = sorted(t for r, t in failures if r == run)
+        pts = [(t, k + 1) for k, t in enumerate(times)] + [(t_end, len(times))]
+        out.append(r"\addplot[%s, semithick, const plot] coordinates {%s};" % (
+            color, " ".join("(%.4f,%d)" % (t * 1e3, k) for t, k in pts)))
+        out.append(r"\addlegendentry{%s}" % label)
+    out += [r"\end{groupplot}", r"\end{tikzpicture}"]
+    return "\n".join(out) + "\n"
+
+
+def figure_resolutions(history):
+    """FF200 and FF200 refined side by side: the overview and the pressure valve's section with that
+    valve on its cage, the suction valve's section with it on its stop."""
+    shots = [("overview", 1, "overview"), ("pressure_valve", 1, "pressure valve"), ("suction_valve", 3, "suction valve")]
+    width = r"0.315\textwidth"
+    out = [PREAMBLE, r"\setlength{\tabcolsep}{1pt}", r"\renewcommand{\arraystretch}{0.6}",
+           r"\begin{tabular}{@{}c" + "c" * len(shots) + "@{}}",
+           " & " + " & ".join(r"\footnotesize %s, $t=\SI{%.1f}{\milli\second}$" % (label, history["final"][STILLS[i]]["t"] * 1e3)
+                              for _, i, label in shots) + r" \\"]
+    for run, label, _, _ in RESOLUTIONS:
+        folder, frames = ("stills", STILLS) if run == "final" else ("stills_refined", STILLS_REFINED)
+        cells = [r"\includegraphics[width=%s]{figures/%s/%05d_%s.png}" % (width, folder, frames[i], view) for view, i, _ in shots]
+        out.append(r"\rotatebox{90}{\scriptsize\hspace{2pt}%s} & %s \\" % (label, " & ".join(cells)))
+    out.append(r"\end{tabular}")
+    return "\n".join(out) + "\n"
+
+
+def figure_stills(history):
+    """The stills of the final run: a column per frame, a row per view, and the colour bar."""
+    rows = history["final"]
+    width = r"0.235\textwidth"
+    out = [PREAMBLE, r"\setlength{\tabcolsep}{1pt}", r"\renewcommand{\arraystretch}{0.6}",
+           r"\begin{tabular}{@{}c" + "c" * len(STILLS) + "@{}}",
+           " & " + " & ".join(r"\footnotesize $t=\SI{%.1f}{\milli\second}$" % (rows[n]["t"] * 1e3) for n in STILLS) + r" \\"]
+    for view, label in STILL_VIEWS:
+        cells = [r"\includegraphics[width=%s]{figures/stills/%05d_%s.png}" % (width, n, view) for n in STILLS]
+        out.append(r"\rotatebox{90}{\scriptsize\hspace{2pt}%s} & %s \\" % (label, " & ".join(cells)))
+    out.append(r"\end{tabular}")
+    colormap = " ".join("rgb255=(%d,%d,%d)" % c for c in COOL_TO_WARM)
+    out += [r"\par\smallskip",
+            r"\begin{tikzpicture}",
+            r"\begin{axis}[hide axis, scale only axis, width=1pt, height=1pt,",
+            r"  colormap={cooltowarm}{%s}, colorbar horizontal," % colormap,
+            r"  point meta min=%g, point meta max=%g," % UY_RANGE,
+            r"  colorbar style={width=7cm, height=0.22cm, xtick={%g,-1,-0.5,0,0.5,%g}," % UY_RANGE,
+            r"    tick label style={font=\scriptsize}, xlabel={vertical displacement (\si{\milli\metre})},",
+            r"    xlabel style={font=\footnotesize}}]",
+            r"\addplot[draw=none] coordinates {(0,0)};",
+            r"\end{axis}", r"\end{tikzpicture}"]
+    return "\n".join(out) + "\n"
+
+
+# ---------------------------------------------------------------------------------------------
 # Driver
 # ---------------------------------------------------------------------------------------------
 
@@ -823,12 +1223,21 @@ def generate(out, tables):
     utopia = read_csv("utopia.csv")
     precision = precision_index(read_csv("precision.csv"))
     nccl = nccl_index(read_csv("nccl.csv"))
+    strokes, ablation, history = transient_runs(), transient_ablation(), transient_history()
+    stroke_macros, events = transient_macros(strokes, ablation, history)
     write(os.path.join(out, "ldp_macros.tex"),
           macros(index, runs, read_csv("agreement.csv"), read_csv("ab.csv"), read_csv("kkt.csv"),
                  read_csv("newton.csv"), utopia, read_csv("coordinates.csv"), read_machine(),
                  precision, read_csv("precision_runs.csv"), read_csv("precision_agreement.csv"),
                  nccl, read_csv("nccl_runs.csv"), read_csv("omp_regions.csv"),
-                 read_csv("team_cost.csv"), read_csv("release_runs.csv")))
+                 read_csv("team_cost.csv"), read_csv("release_runs.csv")) + stroke_macros)
+    write(os.path.join(out, "strokes.tex"), figure_strokes(strokes, history, transient_failures(strokes)))
+    write(os.path.join(out, "stills.tex"), figure_stills(history))
+    write(os.path.join(tables, "strokes.tex"), table_strokes(strokes))
+    write(os.path.join(tables, "changes.tex"), table_changes(ablation))
+    write(os.path.join(tables, "valves.tex"), table_valves(events))
+    write(os.path.join(tables, "resolutions.tex"), table_resolutions(strokes, history))
+    write(os.path.join(out, "resolutions.tex"), figure_resolutions(history))
     write(os.path.join(out, "ldp_colors.tex"), colors())
     write(os.path.join(out, "per_iteration.tex"), figure_per_iteration(index))
     write(os.path.join(out, "breakdown.tex"), figure_breakdown(index, "FF200_mesh_refined"))
@@ -873,6 +1282,29 @@ def selftest():
     assert len(read_csv("nccl_runs.csv")) == len(CASES) * len(NCCL_CONFIGS) * 2 * 3
     release_index(read_csv("release_runs.csv"))
     assert len(read_csv("release_runs.csv")) == len(CASES) * len(RELEASE_RULES) * len(RELEASE_STEPS) * 3
+    # The pump strokes: every run and change, the stills on disk, and the events the text names.
+    strokes, history = transient_runs(), transient_history()
+    transient_ablation()
+    transient_failures(strokes)
+    for n in STILLS:
+        for view, _ in STILL_VIEWS:
+            path = os.path.join(HERE, "..", "figures", "stills", "%05d_%s.png" % (n, view))
+            assert os.path.isfile(path), path
+        assert n < len(history["final"]), n
+    for run, _, _ in ALL_RUNS:
+        assert len(history[run]) == int(strokes[run]["steps"]) + 1, run
+    # The refined stills at the times of FF200's, to a step.
+    for a, b in zip(STILLS, STILLS_REFINED):
+        assert abs(history["final"][a]["t"] - history["refined"][b]["t"]) <= max(history["refined"][b]["dt"], 1e-12), (a, b)
+        for view in ("overview", "pressure_valve", "suction_valve"):
+            path = os.path.join(HERE, "..", "figures", "stills_refined", "%05d_%s.png" % (b, view))
+            assert os.path.isfile(path), path
+    # Open over [5, 21) ms in stroke 1; [50, 53) and, longer, [60, 71) ms in stroke 2.
+    rows = [{"t": i * 1e-3, "u": 1e-3 if 5 <= i <= 20 or 50 <= i <= 52 or 60 <= i <= 70 else 0.0}
+            for i in range(91)]
+    e = valve_events(rows, "u", 1)
+    assert [round(x["open"] * 1e3) for x in e] == [5, 60] and [round(x["close"] * 1e3) for x in e] == [21, 71], e
+    assert round(e[1]["rebound"] * 1e3) == 3 and e[0]["rebound"] == 0, e
     print("ldp_figures selftest passed")
 
 

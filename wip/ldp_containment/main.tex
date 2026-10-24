@@ -12,6 +12,7 @@
 \usepackage{tikz}
 \usepackage{pgfplots}
 \pgfplotsset{compat=1.18}
+\usepgfplotslibrary{groupplots}
 \usepackage{booktabs}
 \usepackage{siunitx}
 \sisetup{group-separator={,},group-minimum-digits=4,group-digits=integer}
@@ -60,7 +61,12 @@ relative \agreeParallel{}, and the converged solutions have a KKT residual \kktR
 latency bound at these sizes: on the three smaller meshes the fastest Grace configuration and one
 GPU solve within \graceGpuCloseMax\% of each other, and several GPUs are the fastest on the
 largest. Storing the tangent in single precision lowers the cost per QP
-iteration by up to \singleMax\% and changes the solution less than repeated runs do.
+iteration by up to \singleMax\% and changes the solution less than repeated runs do. From the
+contained state, the same solver drives the FF200 valves through \trStrokes{} pump strokes of
+transient contact with a viscoelastic material, \trStepsFinal{} steps in \trSteppingFinal\,\si{\second}
+on one GPU; on the refined mesh, \dofsFFf{} degrees of freedom on a node's \trGpusRefined{} GPUs, the
+valves open and close within \trResEventShift\,\si{\milli\second} of the coarse mesh's in
+\trSteppingRefined\,\si{\second}.
 \end{abstract}
 
 \maketitle
@@ -91,6 +97,7 @@ tolerance. The contributions are
 \end{itemize}
 
 \section{Problem and method}
+\label{sec:problem}
 
 \paragraph{Mechanics.} Each valve is a compressible neo-Hookean body (Ogden's volumetric term)
 with $E=\SI{9.174}{\mega\pascal}$ and $\nu=0.4$, discretised by linear tetrahedra. Only the valve
@@ -135,6 +142,7 @@ of the KKT residual discounts, and so stays of the size of the contact forces ho
 has converged.
 
 \section{Parallel implementation}
+\label{sec:parallel}
 
 \paragraph{Distribution.} The mesh is partitioned by elements; each rank owns a contiguous range of
 nodes and holds ghost copies of the nodes its elements share with other ranks. Every operator
@@ -367,12 +375,198 @@ $4\times72$: Newton steps (those of failed attempts included) and solve time, me
 \label{fig:per-iteration}
 \end{figure*}
 
+\section{Through four pump strokes}
+\label{sec:strokes}
+
+The contained valves are the start of a transient simulation: the pressure in the pump chamber
+lifts each valve off its seat and pushes it back. We follow the two valves of FF200
+(\dofsFFc{} dofs, \trContactNodes{} contact nodes) through \trStrokes{} strokes of
+\trStrokeMs\,\si{\milli\second} on one GPU, and those of FF200 refined (\dofsFFf{} dofs, the same
+valves meshed finer) on a full node, \trGpusRefined{} GPUs.
+
+\paragraph{Material.} The valves are EPDM, modelled as Mooney--Rivlin,
+$\psi = C_{10}(\bar I_1-3) + C_{01}(\bar I_2-3) + \tfrac{K}{2}(J-1)^2$, whose isochoric part
+relaxes by a Prony series, $\mu(t) = \mu_\infty\bigl(g_\infty + \sum_k g_k e^{-t/\tau_k}\bigr)/g_\infty$,
+with one stress-like history variable per term and quadrature point. The series is the broadband one
+of \citet{felhos2008}, 15 terms with $\tau_k$ from \SI{1.8e-27}{\second} to \SI{1610}{\second} and
+$g_\infty = \num{2.24e-3}$, with $C_{01}/C_{10}=4$. The moduli are scaled so that the relaxed
+small-strain stiffness is that of the containment runs ($E=\SI{9.174}{\mega\pascal}$, $\nu=0.4$):
+$2g_\infty(C_{10}+C_{01}) = \SI{3.276}{\mega\pascal}$, and $K=\SI{15.29}{\mega\pascal}$ does not
+relax. The density is \SI{1150}{\kilo\gram\per\cubic\metre}, with a lumped mass matrix.
+
+\paragraph{Two simulations.} The first is the containment of Section~\ref{sec:problem}
+with this material, quasi-static over four pseudo-steps of \SI{2.5e4}{\second}, far longer than
+every relaxation time, so the valves end relaxed, as when assembled long before the pump runs.
+Its obstacle is a distance field with a larger margin, which includes the pressure valve's cage
+and the suction valve's stop, so that the free valves are held at the top of their travel. The
+outlet pressure of \SI{90543}{\pascal} is ramped onto the pressure valve with the release and
+holds it on its seat. The second simulation starts at rest from that state, with the Prony
+history relaxed there. Each valve carries the pressure difference across it as a vertical
+traction on the disc of its chamber-side face inside the seat ring: the chamber pressure $p(t)$
+on both, less the outlet pressure on the pressure valve. $p(t)$ is the measured membrane pressure
+of the FP70 pump (no FF200 data exist), \trEnd\,\si{\milli\second} long
+(Figure~\ref{fig:strokes}, top). The nominal step is \trDtMs\,\si{\milli\second},
+\trStepsNominal{} steps; Newton's iteration stops when the forces are below \SI{1e-6}{\newton}
+and the penetration below \SI{1}{\nano\metre}. A step that fails is retried with half its length,
+up to eight times; the displacement of every step is written.
+
+\paragraph{Time integration.} SFEM's contact-stabilised Newmark scheme,
+damped by $\gamma=0.6$, carries the acceleration of the material forces alone from step to step.
+At a node on its seat that acceleration is balanced by the contact force it does not see, so the
+predicted velocity points into the seat, and the predicted start of the next step inverts elements
+there: its \trStepsNewmark{} steps took \trFailedNewmark{} failed attempts
+(Table~\ref{tab:strokes}). BDF2 avoids this: its velocity is derived from the displacements,
+$v_{n+1} = c_0u_{n+1} + c_1u_n + c_2u_{n-1}$, and its acceleration from the velocities with the
+same coefficients, so a reaction leaves no trace in the next step's data. With variable steps,
+$\omega = \Delta t_{n+1}/\Delta t_n$,
+\begin{equation}
+  c_0 = \frac{1+2\omega}{(1+\omega)\Delta t_{n+1}},\quad
+  c_1 = -\frac{1+\omega}{\Delta t_{n+1}},\quad
+  c_2 = \frac{\omega^2}{(1+\omega)\Delta t_{n+1}},
+\end{equation}
+the tangent is $K + c_0^2M$, and the scheme is zero-stable for $\omega < 1+\sqrt2$~\cite{grigorieff1983}:
+after a cut-back the step grows back by at most a factor of two per step. BDF2 is L-stable, so it damps
+the high frequencies the impacts excite. Newton's iteration starts at $u_n + \Delta t\,v_n$,
+the displacement the last velocity carries on to, rather than at $u_n$: a valve in flight
+otherwise starts each step as if it had stopped.
+
+\paragraph{The valves.} Table~\ref{tab:valves} and Figure~\ref{fig:strokes} give the motion; a
+valve is counted open while its centre is more than \trLiftOpen\,\si{\micro\metre} from where it
+rests at $t=0$. When the chamber pressure rises above the outlet's, the pressure valve lifts by
+\trPvPeakMin{} to \trPvPeakMax\,\si{\milli\metre} onto its cage and stays there for the
+discharge; when it falls below the suction side's, the suction valve opens by \trSvPeakMin{} to
+\trSvPeakMax\,\si{\milli\metre} onto its stop. On closing, the suction valve bounces off its seat
+and is open again for up to \trSvReboundMax\,\si{\milli\second}. The response is periodic: each
+opening and closing falls within \trPvPeriodic\,\si{\milli\second} (pressure valve) and
+\trSvPeriodic\,\si{\milli\second} (suction valve) of the first stroke's, a period later.
+Figure~\ref{fig:stills} shows the valves at rest, on the cage, both seated between discharge and
+suction, and the suction valve on its stop. The three runs of Table~\ref{tab:strokes} open and close
+the valves within \trEventSpread\,\si{\milli\second} of each other and agree on the largest lift per
+stroke to \trPeakSpread\%. A run is not reproducible to the bit, since the GPU assembles with
+atomic additions, and the impacts amplify the rounding differences.
+
+\paragraph{Cost.} Table~\ref{tab:strokes} gives the cost of the \trStrokes{} strokes on one GPU
+with \machineCores{} cores, and Table~\ref{tab:changes} the effect of each change since the first
+BDF2 run, measured over the first \trWindowFinish{} or \trWindowStart\,\si{\milli\second} against
+the build before it. In the QP, finishing each reduction in the last thread block instead of a
+second kernel saves \trFinishGain\% per Newton step, storing the tangent in float32 a further
+\trFloatGain\%, and running consecutive conjugate-gradient steps of MPRGP on the device, in a CUDA
+graph whose loop the GPU decides without returning to the host, \trRunsGain\%. Newton's start at
+$u_n+\Delta t\,v_n$ cuts the failed attempts over \trWindowStart\,\si{\milli\second} from
+\trFailedBaseWindow{} to \trFailedStartWindow{} and the QP time from \trQpBaseWindow{} to
+\trQpStartWindow\,\si{\second}; a non-monotone line search on its own fails \trFailedNonmonoWindow{}
+times and gains nothing in combination. Writing only the displacement instead of every field
+lowers the output from \trWritePerStepBdf{} to \trWritePerStepFinal\,\si{\milli\second} per step.
+Together the \trStrokes{} strokes take \trSteppingFinal\,\si{\second}, \trSpeedBdf{} times less
+than the first BDF2 run and \trSpeedNewmark{} times less than Newmark, with \trFailedFinal{} failed
+attempts in \trStepsFinal{} steps; the QP takes \trQpShareFinal\% of it, and
+\trOtherFinal\,\si{\second} are spent outside the traced Newton solve and output.
+
+\paragraph{Two resolutions.} FF200 refined has \trResDofsRatio{} times the unknowns of FF200 and runs
+on the \trGpusRefined{} GPUs of a node, a rank each, with simulation 1 on its Grace CPUs
+($4\times72$). Two parts of the set-up needed the distributed mesh: each rank reads the starting
+displacement by the ids its nodes have in the file, and a traction's share at a node that another
+rank owns is added there, since the sidesets keep each face on one rank while the volume operators
+complete an owned row from the aura's elements. The refined valves move as FF200's
+(Table~\ref{tab:valves}, Figures~\ref{fig:strokes} and~\ref{fig:resolutions}): after simulation 1
+they rest within \trResRest\,\si{\micro\metre} of FF200's positions, they open and close within
+\trResEventShift\,\si{\milli\second} of FF200's instants, and their largest lift per stroke differs
+from FF200's by at most \trResPeakDiff\%. The coarser mesh resolves the valves' motion.
+Table~\ref{tab:resolutions} compares the cost. The four strokes take \trSteppingRefined\,\si{\second},
+\trResSteppingRatio{} times as long as FF200's on one GPU. A QP needs \trResItsRatio{} times as many
+iterations per Newton step, against the \trResExpectedIts{} by which the element size shrinks, the
+growth a conjugate-gradient iteration count shows on a second-order operator. An iteration costs
+\trResPerItRatio{} times as much: each GPU holds \trResWorkPerGpu{} times FF200's unknowns, the
+ranks add a ghost exchange and two global reductions to every iteration
+(Section~\ref{sec:parallel}), and MPRGP's device runs, which need a single rank, are not used. The
+refined run fails \trFailedRefined{} attempts against \trFailedFinal{}, all of them line searches at
+the pressure valve's impacts, \trResFailFirst{} to \trResFailLast\,\si{\milli\second} into a stroke
+(Figure~\ref{fig:strokes}, bottom). Writing the displacement, gathered on rank 0, takes
+\trResWriteRatio{} times as long per step.
+
+\begin{figure*}
+\centering
+\input{figures/strokes}
+\caption{FF200 through \trStrokes{} pump strokes. Top: the chamber pressure and the outlet
+pressure. Middle: the vertical displacement of each valve's centre from its rest position, positive
+upward (BDF2, all changes), on FF200 and, dashed, on FF200 refined. Bottom: the running count of
+failed attempts of the three runs of Table~\ref{tab:strokes} and of the refined run.}
+\label{fig:strokes}
+\end{figure*}
+
+\begin{table*}
+\caption{The two resolutions through \trStrokes{} strokes: QP iterations per converged Newton step,
+QP time per QP iteration (the failed attempts' Newton steps counted at the converged steps' mean),
+and time in the QPs, in writing the displacement and in total.}
+\label{tab:resolutions}
+\small
+\input{tables/resolutions}
+\end{table*}
+
+\begin{figure*}
+\centering
+\input{figures/stills}
+\caption{The valves at four instants of the first stroke, coloured by the vertical displacement
+from the meshed geometry: at rest, the pressure valve on its cage, both valves seated, and the
+suction valve on its stop. Overview from the front with the near half of the cavity wall removed,
+the wall from above (both translucent), and each valve's section in its middle plane with the
+wall's section. Rendered by ParaView from the run's raw output.}
+\label{fig:stills}
+\end{figure*}
+
+\begin{table}
+\caption{FF200 through \trStrokes{} strokes, \trStepsNominal{} nominal steps, on one GPU:
+steps, failed attempts, Newton steps (those of failed attempts included) and time in the
+QPs, in writing the output and in total. The first two runs wrote every field, the last the
+displacement only.}
+\label{tab:strokes}
+\small
+\setlength{\tabcolsep}{3pt}
+\input{tables/strokes}
+\end{table}
+
+\begin{table}
+\caption{The valves per stroke on both meshes (BDF2, all changes): opening, closing and largest
+lift of the centre, the suction valve's bounce on closing not counted.}
+\label{tab:valves}
+\small
+\setlength{\tabcolsep}{4pt}
+\input{tables/valves}
+\end{table}
+
+\begin{table}
+\caption{One change at a time, FF200 on one GPU over the first \trWindowFinish\,\si{\milli\second}
+of the strokes (\trWindowStart\,\si{\milli\second} for Newton's start), each against the build
+before it: steps, failed attempts, QP time and QP time per Newton step. Whole runs are not
+reproducible to the bit, so their step counts can differ by a few. n.-m.\ LS: non-monotone line
+search.}
+\label{tab:changes}
+\footnotesize
+\setlength{\tabcolsep}{2.5pt}
+\input{tables/changes}
+\end{table}
+
+
+\begin{figure*}
+\centering
+\input{figures/resolutions}
+\caption{FF200 (top) and FF200 refined (bottom) at the same instants of the first stroke: the
+pressure valve on its cage, overview and its section, and the suction valve on its stop, its
+section; coloured as Figure~\ref{fig:stills}.}
+\label{fig:resolutions}
+\end{figure*}
+
+
 \section{Limitations}
 
 In the single-process runs \qpCappedClause{}. The Newton budget
 of \unconvergedCases{} ends before the KKT tolerance is reached. The comparison with utopia samples
 the distance field trilinearly for both states, so penetrations below the grid's interpolation
 error are not resolved. All measurements are on one system; utopia was not rerun on it.
+The pump strokes of Section~\ref{sec:strokes} borrow FP70's chamber pressure for FF200, apply it as
+a dead vertical traction on a disc, ignore the fluid between the valve and its seat, and hold the
+valves by the cavity alone; the split $C_{01}/C_{10}=4$ is assumed, and the strokes were run
+without a step-size study.
 
 \bibliographystyle{ACM-Reference-Format}
 \bibliography{refs}
