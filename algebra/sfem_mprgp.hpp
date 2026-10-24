@@ -47,7 +47,6 @@ namespace sfem {
         int iterations_{0};
         int iterations() const override { return iterations_; }
 
-        ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
         SharedBuffer<T> upper_bound_;
         SharedBuffer<T> lower_bound_;
         // Convergence on the projected gradient weighted entry by entry, |w g_P| (and rtol relative
@@ -84,7 +83,7 @@ namespace sfem {
 
         MPRGPReduce<T> make_device_reduce() const {
 #ifdef SFEM_ENABLE_CUDA
-            auto device = comm_ && execution_space_ == EXECUTION_SPACE_DEVICE ? comm_->device() : nullptr;
+            auto device = comm_ && execution_space() == EXECUTION_SPACE_DEVICE ? comm_->device() : nullptr;
             if (device && device->whole()) {
                 return [device](T* const values, const int count, const bool min_last) {
                     if (min_last) {
@@ -107,7 +106,7 @@ namespace sfem {
         ptrdiff_t allocation_size() const { return n_alloc_ > 0 ? n_alloc_ : n_dofs; }
         std::shared_ptr<PowerMethod<T>> power_method;
 
-        ExecutionSpace execution_space() const override { return execution_space_; }
+        ExecutionSpace execution_space() const override { return blas ? blas->execution_space() : EXECUTION_SPACE_INVALID; }
         inline std::ptrdiff_t rows() const override { return n_dofs; }
         inline std::ptrdiff_t cols() const override { return n_dofs; }
 
@@ -248,7 +247,6 @@ namespace sfem {
         void default_init() {
             blas = make_openmp_blas<T>();
             OpenMP_MPRGP<T>::build_mprgp(impl);
-            execution_space_ = EXECUTION_SPACE_HOST;
         }
 
         /// To the bound along p, then a projected step along the free gradient there (or, projected

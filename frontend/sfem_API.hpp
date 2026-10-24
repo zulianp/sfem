@@ -87,11 +87,11 @@ namespace sfem {
 namespace sfem {
 
     template <typename T>
-    auto blas(const ExecutionSpace es) {
-        SFEM_UNUSED(es);
+    auto blas(const ExecutionContext &context) {
+        SFEM_UNUSED(context);
 #ifdef SFEM_ENABLE_CUDA
-        if (es == EXECUTION_SPACE_DEVICE) {
-            return make_cuda_blas<T>();
+        if (context.space() == EXECUTION_SPACE_DEVICE) {
+            return make_cuda_blas<T>(context);
         }
 #endif  // SFEM_ENABLE_CUDA
         return make_openmp_blas<T>();
@@ -194,7 +194,6 @@ namespace sfem {
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
             ret->blas = make_cuda_blas<T>();
-            ret->execution_space_ = es;
         } else
 #endif  // SFEM_ENABLE_CUDA
         {
@@ -211,6 +210,7 @@ namespace sfem {
             const SharedBuffer<HP>     &diag,
             const SharedBuffer<mask_t> &constraints_mask,
             const ExecutionSpace        es) {
+        SFEM_UNUSED(es);
         auto ret = std::make_shared<sfem::MixedPrecisionShiftableBlockSymJacobi<HP, LP>>();
 
 #ifdef SFEM_ENABLE_CUDA
@@ -224,7 +224,6 @@ namespace sfem {
             ShiftableBlockSymJacobi_OpenMP<HP, LP>::build(dim, ret->impl);
         }
 
-        ret->execution_space_ = es;
         ret->constraints_mask = constraints_mask;
         ret->set_diag(diag);
         return ret;
@@ -235,6 +234,7 @@ namespace sfem {
                                                                                   const SharedBuffer<T>      &diag,
                                                                                   const SharedBuffer<mask_t> &constraints_mask,
                                                                                   const ExecutionSpace        es) {
+        SFEM_UNUSED(es);
         auto ret = std::make_shared<sfem::ShiftableBlockSymJacobi<T>>();
 
 #ifdef SFEM_ENABLE_CUDA
@@ -248,7 +248,6 @@ namespace sfem {
             ShiftableBlockSymJacobi_OpenMP<T>::build(dim, ret->impl);
         }
 
-        ret->execution_space_ = es;
         ret->constraints_mask = constraints_mask;
         ret->set_diag(diag);
         return ret;
@@ -267,7 +266,6 @@ namespace sfem {
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
             ret->blas = make_cuda_blas<T>();
-            ret->execution_space_ = es;
         } else
 #endif  // SFEM_ENABLE_CUDA
         {
@@ -323,7 +321,6 @@ namespace sfem {
         if (es == EXECUTION_SPACE_DEVICE) {
             mprgp->blas = make_cuda_blas<T>();
             CUDA_MPRGP<T>::build_mprgp(mprgp->impl);
-            mprgp->execution_space_ = es;
 
         } else
 #endif  // SFEM_ENABLE_CUDA

@@ -18,7 +18,6 @@ namespace sfem {
     template <typename R, typename T>
     class CooSym final : public Operator<T> {
     public:
-        ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
         std::function<void(const T* const, T* const)> apply_;
         ptrdiff_t ndofs{SFEM_PTRDIFF_INVALID};
         std::shared_ptr<BLAS<T>> blas;
@@ -31,7 +30,6 @@ namespace sfem {
 
         void default_init() {
             blas = make_openmp_blas<T>();
-            execution_space_ = EXECUTION_SPACE_HOST;
             apply_ = [=](const T* const x, T* const y) { return coo_sym_spmv_(x, y); };
         }
 
@@ -44,7 +42,7 @@ namespace sfem {
         }
         inline std::ptrdiff_t rows() const override { return ndofs; }
         inline std::ptrdiff_t cols() const override { return ndofs; }
-        ExecutionSpace execution_space() const override { return execution_space_; }
+        ExecutionSpace execution_space() const override { return blas ? blas->execution_space() : EXECUTION_SPACE_INVALID; }
 
         /* Sparse Matrix-Vector Multiplication using SymmCOO format */
         int coo_sym_spmv_(const T* const SFEM_RESTRICT x, T* const SFEM_RESTRICT y) {

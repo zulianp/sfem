@@ -81,11 +81,12 @@ void __attribute__((destructor)) sfem_blas_destroy() {
     }
 }
 
-static void sfem_blas_init() {
+static void sfem_blas_init(cudaStream_t stream) {
     if (!sfem_blas_initialized) {
         CHECK_CUBLAS(cublasCreate(&cublas_handle));
         sfem_blas_initialized = true;
     }
+    CHECK_CUBLAS(cublasSetStream(cublas_handle, stream));
 }
 
 template <typename T>
@@ -94,20 +95,20 @@ class BLASImpl {};
 template <>
 class BLASImpl<double> {
 public:
-    static double dot(const ptrdiff_t n, const double *const l, const double *const r) {
-        sfem_blas_init();
+    static double dot(const ptrdiff_t n, const double *const l, const double *const r, cudaStream_t stream) {
+        sfem_blas_init(stream);
         double ret = 0;
         CHECK_CUBLAS(cublasDdot(cublas_handle, n, l, 1, r, 1, &ret));
         return ret;
     }
 
-    static void axpy(const ptrdiff_t n, const double alpha, const double *const x, double *const y) {
-        sfem_blas_init();
+    static void axpy(const ptrdiff_t n, const double alpha, const double *const x, double *const y, cudaStream_t stream) {
+        sfem_blas_init(stream);
         CHECK_CUBLAS(cublasDaxpy(cublas_handle, n, &alpha, x, 1, y, 1));
     }
 
-    static void axpby(const ptrdiff_t n, const double alpha, const double *const x, const double beta, double *const y) {
-        sfem_blas_init();
+    static void axpby(const ptrdiff_t n, const double alpha, const double *const x, const double beta, double *const y, cudaStream_t stream) {
+        sfem_blas_init(stream);
         if (beta != 1) {
             CHECK_CUBLAS(cublasDscal(cublas_handle, n, &beta, y, 1));
         }
@@ -120,8 +121,9 @@ public:
                        const double *const x,
                        const double        beta,
                        const double *const y,
-                       double *const       z) {
-        sfem_blas_init();
+                       double *const       z,
+                       cudaStream_t        stream) {
+        sfem_blas_init(stream);
 
         if (x == z) {
             CHECK_CUBLAS(cublasDscal(cublas_handle, n, &alpha, z, 1));
@@ -131,19 +133,19 @@ public:
             CHECK_CUBLAS(cublasDscal(cublas_handle, n, &beta, z, 1));
             CHECK_CUBLAS(cublasDaxpy(cublas_handle, n, &alpha, x, 1, z, 1));
         } else {
-            cudaMemset(z, 0, n * sizeof(double));
+            CHECK_CUDA(cudaMemsetAsync(z, 0, n * sizeof(double), stream));
             CHECK_CUBLAS(cublasDaxpy(cublas_handle, n, &alpha, x, 1, z, 1));
             CHECK_CUBLAS(cublasDaxpy(cublas_handle, n, &beta, y, 1, z, 1));
         }
     }
 
-    static void scal(const ptrdiff_t n, const double alpha, double *const x) {
-        sfem_blas_init();
+    static void scal(const ptrdiff_t n, const double alpha, double *const x, cudaStream_t stream) {
+        sfem_blas_init(stream);
         CHECK_CUBLAS(cublasDscal(cublas_handle, n, &alpha, x, 1));
     }
 
-    static void nrm2(const ptrdiff_t n, const double *const x, double *const result) {
-        sfem_blas_init();
+    static void nrm2(const ptrdiff_t n, const double *const x, double *const result, cudaStream_t stream) {
+        sfem_blas_init(stream);
         CHECK_CUBLAS(cublasDnrm2(cublas_handle, n, x, 1, result));
     }
 };
@@ -151,20 +153,20 @@ public:
 template <>
 class BLASImpl<float> {
 public:
-    static float dot(const ptrdiff_t n, const float *const l, const float *const r) {
-        sfem_blas_init();
+    static float dot(const ptrdiff_t n, const float *const l, const float *const r, cudaStream_t stream) {
+        sfem_blas_init(stream);
         float ret = 0;
         CHECK_CUBLAS(cublasSdot(cublas_handle, n, l, 1, r, 1, &ret));
         return ret;
     }
 
-    static void axpy(const ptrdiff_t n, const float alpha, const float *const x, float *const y) {
-        sfem_blas_init();
+    static void axpy(const ptrdiff_t n, const float alpha, const float *const x, float *const y, cudaStream_t stream) {
+        sfem_blas_init(stream);
         CHECK_CUBLAS(cublasSaxpy(cublas_handle, n, &alpha, x, 1, y, 1));
     }
 
-    static void axpby(const ptrdiff_t n, const float alpha, const float *const x, const float beta, float *const y) {
-        sfem_blas_init();
+    static void axpby(const ptrdiff_t n, const float alpha, const float *const x, const float beta, float *const y, cudaStream_t stream) {
+        sfem_blas_init(stream);
         if (beta != 1) {
             CHECK_CUBLAS(cublasSscal(cublas_handle, n, &beta, y, 1));
         }
@@ -177,8 +179,9 @@ public:
                        const float *const x,
                        const float        beta,
                        const float *const y,
-                       float *const       z) {
-        sfem_blas_init();
+                       float *const       z,
+                       cudaStream_t        stream) {
+        sfem_blas_init(stream);
 
         if (x == z) {
             CHECK_CUBLAS(cublasSscal(cublas_handle, n, &alpha, z, 1));
@@ -188,19 +191,19 @@ public:
             CHECK_CUBLAS(cublasSscal(cublas_handle, n, &beta, z, 1));
             CHECK_CUBLAS(cublasSaxpy(cublas_handle, n, &alpha, x, 1, z, 1));
         } else {
-            cudaMemset(z, 0, n * sizeof(float));
+            CHECK_CUDA(cudaMemsetAsync(z, 0, n * sizeof(float), stream));
             CHECK_CUBLAS(cublasSaxpy(cublas_handle, n, &alpha, x, 1, z, 1));
             CHECK_CUBLAS(cublasSaxpy(cublas_handle, n, &beta, y, 1, z, 1));
         }
     }
 
-    static void scal(const ptrdiff_t n, const float alpha, float *const x) {
-        sfem_blas_init();
+    static void scal(const ptrdiff_t n, const float alpha, float *const x, cudaStream_t stream) {
+        sfem_blas_init(stream);
         CHECK_CUBLAS(cublasSscal(cublas_handle, n, &alpha, x, 1));
     }
 
-    static void nrm2(const ptrdiff_t n, const float *const x, float *const result) {
-        sfem_blas_init();
+    static void nrm2(const ptrdiff_t n, const float *const x, float *const result, cudaStream_t stream) {
+        sfem_blas_init(stream);
         CHECK_CUBLAS(cublasSnrm2(cublas_handle, n, x, 1, result));
     }
 };
@@ -285,47 +288,69 @@ __global__ void tdot(const ptrdiff_t n, const T *const SFEM_RESTRICT l, const T 
     }
 }
 
+/// Where a reduction's scalar lands: one device word and one pinned host word per thread and
+/// type, allocated at the first reduction and reused by every later one, so a reduction allocates
+/// nothing. Kept for the life of the process (freeing at thread exit can follow the driver's own
+/// shutdown).
+template <typename T>
+struct ReductionSlot {
+    T *device{nullptr};
+    T *host{nullptr};
+};
+
+template <typename T>
+static ReductionSlot<T> &reduction_slot() {
+    thread_local ReductionSlot<T> slot;
+    if (!slot.device) {
+        CHECK_CUDA(cudaMalloc((void **)&slot.device, sizeof(T)));
+        CHECK_CUDA(cudaMallocHost((void **)&slot.host, sizeof(T)));
+    }
+    return slot;
+}
+
 template <typename T>
 class CUDA_BLAS_Impl {
 public:
-    static T dot(const ptrdiff_t n, const T *const l, const T *const r) {
+    /// l . r into the device word *result, ordered on the stream, not waited for.
+    static void dot(const ptrdiff_t n, const T *const l, const T *const r, T *const result, cudaStream_t stream) {
         int       kernel_block_size = 128;
         ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
 
-        T *d_result = 0;
-        cudaMalloc((void **)&d_result, sizeof(T));
-        cudaMemset((void *)d_result, 0, sizeof(T));
-
-        tdot<<<n_blocks, kernel_block_size>>>(n, l, r, d_result);
-        SFEM_DEBUG_SYNCHRONIZE();
-
-        T ret = 0;
-        cudaMemcpy(&ret, d_result, sizeof(T), cudaMemcpyDeviceToHost);
-        cudaFree(d_result);
-        return ret;
-    }
-
-    static void axpy(const ptrdiff_t n, const T alpha, const T *const x, T *const y) {
-        int       kernel_block_size = 128;
-        ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
-
-        assert(x != y);
-
-        taxpby<<<n_blocks, kernel_block_size>>>(n, alpha, x, (T)1, y);
+        CHECK_CUDA(cudaMemsetAsync(result, 0, sizeof(T), stream));
+        tdot<<<n_blocks, kernel_block_size, 0, stream>>>(n, l, r, result);
         SFEM_DEBUG_SYNCHRONIZE();
     }
 
-    static void axpby(const ptrdiff_t n, const T alpha, const T *const x, const T beta, T *const y) {
+    /// l . r on the host: the device result through the thread's reduction slot.
+    static T dot(const ptrdiff_t n, const T *const l, const T *const r, cudaStream_t stream) {
+        auto &slot = reduction_slot<T>();
+        dot(n, l, r, slot.device, stream);
+        CHECK_CUDA(cudaMemcpyAsync(slot.host, slot.device, sizeof(T), cudaMemcpyDeviceToHost, stream));
+        CHECK_CUDA(cudaStreamSynchronize(stream));
+        return *slot.host;
+    }
+
+    static void axpy(const ptrdiff_t n, const T alpha, const T *const x, T *const y, cudaStream_t stream) {
         int       kernel_block_size = 128;
         ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
 
         assert(x != y);
 
-        taxpby<<<n_blocks, kernel_block_size>>>(n, alpha, x, beta, y);
+        taxpby<<<n_blocks, kernel_block_size, 0, stream>>>(n, alpha, x, (T)1, y);
         SFEM_DEBUG_SYNCHRONIZE();
     }
 
-    static void zaxpby(const ptrdiff_t n, const T alpha, const T *const x, const T beta, const T *const y, T *const z) {
+    static void axpby(const ptrdiff_t n, const T alpha, const T *const x, const T beta, T *const y, cudaStream_t stream) {
+        int       kernel_block_size = 128;
+        ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
+
+        assert(x != y);
+
+        taxpby<<<n_blocks, kernel_block_size, 0, stream>>>(n, alpha, x, beta, y);
+        SFEM_DEBUG_SYNCHRONIZE();
+    }
+
+    static void zaxpby(const ptrdiff_t n, const T alpha, const T *const x, const T beta, const T *const y, T *const z, cudaStream_t stream) {
         int       kernel_block_size = 128;
         ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
 
@@ -333,20 +358,20 @@ public:
         assert(x != z);
         assert(z != y);
 
-        tzaxpby<<<n_blocks, kernel_block_size>>>(n, alpha, x, beta, y, z);
+        tzaxpby<<<n_blocks, kernel_block_size, 0, stream>>>(n, alpha, x, beta, y, z);
         SFEM_DEBUG_SYNCHRONIZE();
     }
 
-    static void scal(const ptrdiff_t n, const T alpha, T *const x) {
+    static void scal(const ptrdiff_t n, const T alpha, T *const x, cudaStream_t stream) {
         int       kernel_block_size = 128;
         ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
 
-        tscal<<<n_blocks, kernel_block_size>>>(n, alpha, x);
+        tscal<<<n_blocks, kernel_block_size, 0, stream>>>(n, alpha, x);
         SFEM_DEBUG_SYNCHRONIZE();
     }
 
-    static void nrm2(const ptrdiff_t n, const T *const x, T *const result) {
-        T sq_nrm = dot(n, x, x);
+    static void nrm2(const ptrdiff_t n, const T *const x, T *const result, cudaStream_t stream) {
+        T sq_nrm = dot(n, x, x, stream);
         *result  = sqrt(sq_nrm);
     }
 };
@@ -361,11 +386,11 @@ __global__ void tvalues_kernel(const ptrdiff_t n, const T value, T *const SFEM_R
 }
 
 template <typename T>
-static void tvalues(const ptrdiff_t n, const T value, T *const x) {
+static void tvalues(const ptrdiff_t n, const T value, T *const x, cudaStream_t stream) {
     int       kernel_block_size = 128;
     ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
 
-    tvalues_kernel<<<n_blocks, kernel_block_size>>>(n, value, x);
+    tvalues_kernel<<<n_blocks, kernel_block_size, 0, stream>>>(n, value, x);
 }
 
 template <typename T>
@@ -376,7 +401,7 @@ __global__ void txypaz_kernel(const ptrdiff_t n, const T *const SFEM_RESTRICT x,
 }
 
 template <typename T>
-static void txypaz(const ptrdiff_t n, const T *const x, const T *const y, const T alpha, T *const z) {
+static void txypaz(const ptrdiff_t n, const T *const x, const T *const y, const T alpha, T *const z, cudaStream_t stream) {
     int       kernel_block_size = 128;
     ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
 
@@ -384,7 +409,7 @@ static void txypaz(const ptrdiff_t n, const T *const x, const T *const y, const 
     assert(x != z);
     assert(z != y); 
 
-    txypaz_kernel<<<n_blocks, kernel_block_size>>>(n, x, y, alpha, z);
+    txypaz_kernel<<<n_blocks, kernel_block_size, 0, stream>>>(n, x, y, alpha, z);
     SFEM_DEBUG_SYNCHRONIZE();
 }
 
@@ -396,11 +421,11 @@ __global__ void reciprocal_kernel(const ptrdiff_t n, const T alpha, T *const SFE
 }
 
 template <typename T>
-static void reciprocal(const ptrdiff_t n, const T alpha, T *const x) {
+static void reciprocal(const ptrdiff_t n, const T alpha, T *const x, cudaStream_t stream) {
     int       kernel_block_size = 128;
     ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
 
-    reciprocal_kernel<<<n_blocks, kernel_block_size>>>(n, alpha, x);
+    reciprocal_kernel<<<n_blocks, kernel_block_size, 0, stream>>>(n, alpha, x);
     SFEM_DEBUG_SYNCHRONIZE();
 }
 
@@ -426,14 +451,14 @@ extern void d_copy(const ptrdiff_t n, const real_t *const src, real_t *const des
     cudaMemcpy(dest, src, n * sizeof(real_t), cudaMemcpyDeviceToDevice);
 }
 
-extern real_t d_dot(const ptrdiff_t n, const real_t *const l, const real_t *const r) { return CUDA_BLAS_Impl<real_t>::dot(n, l, r); }
+extern real_t d_dot(const ptrdiff_t n, const real_t *const l, const real_t *const r) { return CUDA_BLAS_Impl<real_t>::dot(n, l, r, 0); }
 
 extern void d_axpby(const ptrdiff_t n, const real_t alpha, const real_t *const x, const real_t beta, real_t *const y) {
-    CUDA_BLAS_Impl<real_t>::axpby(n, alpha, x, beta, y);
+    CUDA_BLAS_Impl<real_t>::axpby(n, alpha, x, beta, y, 0);
 }
 
 extern void d_axpy(const ptrdiff_t n, const real_t alpha, const real_t *const x, real_t *const y) {
-    CUDA_BLAS_Impl<real_t>::axpy(n, alpha, x, y);
+    CUDA_BLAS_Impl<real_t>::axpy(n, alpha, x, y, 0);
 }
 
 extern void d_zaxpby(const ptrdiff_t     n,
@@ -442,14 +467,14 @@ extern void d_zaxpby(const ptrdiff_t     n,
                      const real_t        beta,
                      const real_t *const y,
                      real_t *const       z) {
-    CUDA_BLAS_Impl<real_t>::zaxpby(n, alpha, x, beta, y, z);
+    CUDA_BLAS_Impl<real_t>::zaxpby(n, alpha, x, beta, y, z, 0);
 }
 
-extern void d_scal(const ptrdiff_t n, const real_t alpha, real_t *const x) { CUDA_BLAS_Impl<real_t>::scal(n, alpha, x); }
+extern void d_scal(const ptrdiff_t n, const real_t alpha, real_t *const x) { CUDA_BLAS_Impl<real_t>::scal(n, alpha, x, 0); }
 
 extern real_t d_nrm2(const ptrdiff_t n, const real_t *const x) {
     real_t ret = 0;
-    CUDA_BLAS_Impl<real_t>::nrm2(n, x, &ret);
+    CUDA_BLAS_Impl<real_t>::nrm2(n, x, &ret, 0);
     return ret;
 }
 
@@ -528,65 +553,81 @@ namespace sfem {
         d_destroy(a);
     }
 
+    // The context's stream as CUDA's type.
+    template <typename T>
+    static cudaStream_t stream_of(const CUDA_BLAS<T> &blas) {
+        return static_cast<cudaStream_t>(blas.context().stream());
+    }
+
     template <typename T>
     void CUDA_BLAS<T>::zeros(const std::size_t size, T *const x) {
-        CHECK_CUDA(cudaMemset(x, 0, size * sizeof(T)));
+        CHECK_CUDA(cudaMemsetAsync(x, 0, size * sizeof(T), stream_of(*this)));
     }
 
     template <typename T>
     void CUDA_BLAS<T>::values(const std::size_t size, const T value, T *const x) {
-        tvalues<T>(size, value, x);
+        tvalues<T>(size, value, x, stream_of(*this));
     }
 
     template <typename T>
     void CUDA_BLAS<T>::copy(const ptrdiff_t n, const T *const src, T *const dest) {
-        CHECK_CUDA(cudaMemcpy(dest, src, n * sizeof(T), cudaMemcpyDeviceToDevice));
+        CHECK_CUDA(cudaMemcpyAsync(dest, src, n * sizeof(T), cudaMemcpyDeviceToDevice, stream_of(*this)));
     }
 
     template <typename T>
     T CUDA_BLAS<T>::dot(const ptrdiff_t n, const T *const l, const T *const r) {
-        return CUDA_BLAS_Impl<T>::dot(n, l, r);
+        return CUDA_BLAS_Impl<T>::dot(n, l, r, stream_of(*this));
+    }
+
+    template <typename T>
+    void CUDA_BLAS<T>::dot(const ptrdiff_t n, const T *const l, const T *const r, T *const result) {
+#ifdef SFEM_ENABLE_CUBLAS
+        // cuBLAS reduces into device memory in device pointer mode; the kernel path is the one built.
+        SFEM_ERROR("CUDA_BLAS::dot into device memory needs the kernel path (SFEM_ENABLE_CUBLAS is on)\n");
+#else
+        CUDA_BLAS_Impl<T>::dot(n, l, r, result, stream_of(*this));
+#endif
     }
 
     template <typename T>
     void CUDA_BLAS<T>::axpy(const ptrdiff_t n, const T alpha, const T *const x, T *const y) {
-        CUDA_BLAS_Impl<T>::axpy(n, alpha, x, y);
+        CUDA_BLAS_Impl<T>::axpy(n, alpha, x, y, stream_of(*this));
     }
 
     template <typename T>
     void CUDA_BLAS<T>::axpby(const ptrdiff_t n, const T alpha, const T *const x, const T beta, T *const y) {
-        CUDA_BLAS_Impl<T>::axpby(n, alpha, x, beta, y);
+        CUDA_BLAS_Impl<T>::axpby(n, alpha, x, beta, y, stream_of(*this));
     }
 
     template <typename T>
     void CUDA_BLAS<T>::scal(const std::ptrdiff_t n, const T alpha, T *const x) {
-        CUDA_BLAS_Impl<T>::scal(n, alpha, x);
+        CUDA_BLAS_Impl<T>::scal(n, alpha, x, stream_of(*this));
     }
 
     template <typename T>
     void CUDA_BLAS<T>::reciprocal(const std::ptrdiff_t n, const T alpha, T *const x) {
-        ::reciprocal<T>(n, alpha, x);
+        ::reciprocal<T>(n, alpha, x, stream_of(*this));
     }
 
     template <typename T>
     T CUDA_BLAS<T>::norm2(const ptrdiff_t n, const T *const x) {
         T ret = 0;
-        CUDA_BLAS_Impl<T>::nrm2(n, x, &ret);
+        CUDA_BLAS_Impl<T>::nrm2(n, x, &ret, stream_of(*this));
         return ret;
     }
 
     template <typename T>
     void CUDA_BLAS<T>::zaxpby(const ptrdiff_t n, const T alpha, const T *const x, const T beta, const T *const y, T *const z) {
-        CUDA_BLAS_Impl<T>::zaxpby(n, alpha, x, beta, y, z);
+        CUDA_BLAS_Impl<T>::zaxpby(n, alpha, x, beta, y, z, stream_of(*this));
     }
 
     template <typename T>
     void CUDA_BLAS<T>::xypaz(const ptrdiff_t n, const T *const x, const T *const y, const T alpha, T *const z) {
-        txypaz<T>(n, x, y, alpha, z);
+        txypaz<T>(n, x, y, alpha, z, stream_of(*this));
     }
 
-    template struct CUDA_BLAS<double>;
-    template struct CUDA_BLAS<float>;
+    template class CUDA_BLAS<double>;
+    template class CUDA_BLAS<float>;
 
     void device_synchronize() { CHECK_CUDA(cudaDeviceSynchronize()); }
 

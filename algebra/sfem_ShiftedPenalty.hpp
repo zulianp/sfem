@@ -38,7 +38,6 @@ namespace sfem {
         int       iterations_{0};
         int       iterations() const override { return iterations_; }
 
-        ExecutionSpace                        execution_space_{EXECUTION_SPACE_INVALID};
         SharedBuffer<T>                       upper_bound_;
         SharedBuffer<T>                       lower_bound_;
         std::shared_ptr<Operator<T>>          constraints_op_;
@@ -52,7 +51,7 @@ namespace sfem {
         std::shared_ptr<MatrixFreeLinearSolver<T>> linear_solver_;
         SharedBuffer<T>                            lagr_lb, lagr_ub;
 
-        ExecutionSpace        execution_space() const override { return execution_space_; }
+        ExecutionSpace        execution_space() const override { return blas ? blas->execution_space() : EXECUTION_SPACE_INVALID; }
         inline std::ptrdiff_t rows() const override { return n_dofs; }
         inline std::ptrdiff_t cols() const override { return n_dofs; }
         void set_linear_solver(const std::shared_ptr<MatrixFreeLinearSolver<T>>& solver) { linear_solver_ = solver; }
@@ -97,7 +96,6 @@ namespace sfem {
         void default_init() {
             blas = make_openmp_blas<T>();
             OpenMP_ShiftedPenalty<T>::build(impl);
-            execution_space_ = EXECUTION_SPACE_HOST;
         }
 
         SharedBuffer<T> make_buffer(const ptrdiff_t n) const {

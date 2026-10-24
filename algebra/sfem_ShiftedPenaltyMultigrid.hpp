@@ -95,7 +95,6 @@ namespace sfem {
      * - `monitor`: Monitors and logs the solver's progress.
      *
      * ### Private Members:
-     * - `execution_space_`: The execution space for computations (e.g., host or device).
      * - `operator_`: Operators for each level in the multigrid hierarchy.
      * - `smoother_`: Smoothers or solvers for each level.
      * - `prolongation_`: Prolongation operators for each level.
@@ -204,7 +203,7 @@ namespace sfem {
             constraints_op_x_op_.push_back(constraints_op_x_op);
         }
 
-        ExecutionSpace execution_space() const override { return execution_space_; }
+        ExecutionSpace execution_space() const override { return blas_ ? blas_->execution_space() : EXECUTION_SPACE_INVALID; }
 
         int apply(const T* const rhs, T* const x) override {
             SFEM_TRACE_SCOPE("ShiftedPenaltyMultigrid::apply");
@@ -457,7 +456,6 @@ namespace sfem {
         void default_init() {
             blas_ = make_openmp_blas<T>();
             OpenMP_ShiftedPenalty<T>::build(impl_);
-            execution_space_ = EXECUTION_SPACE_HOST;
         }
 
         void set_max_it(const int val) { max_it_ = val; }
@@ -487,7 +485,6 @@ namespace sfem {
         void enable_line_search(const bool val) { enable_line_search_ = val; }
         void collect_energy_norm_correction(const bool val) { collect_energy_norm_correction_ = val; }
         void set_debug(const int val) { debug = val; }
-        void set_execution_space(enum ExecutionSpace es) { execution_space_ = es; }
         void set_penalty_param_increase(const real_t val) { penalty_param_increase = val; }
         void set_enable_shift(const bool val) { enable_shift = val; }
 
@@ -613,7 +610,7 @@ namespace sfem {
 
             const T*        h = x;
             SharedBuffer<T> host;
-            if (execution_space_ == EXECUTION_SPACE_DEVICE) {
+            if (execution_space() == EXECUTION_SPACE_DEVICE) {
                 host = Buffer<T>::wrap(static_cast<size_t>(n), const_cast<T*>(x), MEMORY_SPACE_DEVICE);
                 host = smesh::to_host(host);
                 h    = host->data();
@@ -1202,7 +1199,6 @@ namespace sfem {
                    penalty_param);
         }
 
-        ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
 
         std::vector<std::shared_ptr<Operator<T>>>               operator_;
         std::vector<std::shared_ptr<MatrixFreeLinearSolver<T>>> smoother_;

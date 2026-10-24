@@ -28,11 +28,10 @@ namespace sfem {
 
         bool verbose{true};
 
-        ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
 
         int iterations() const override { return iterations_; }
 
-        ExecutionSpace execution_space() const override { return execution_space_; }
+        ExecutionSpace execution_space() const override { return blas ? blas->execution_space() : EXECUTION_SPACE_INVALID; }
 
         inline std::ptrdiff_t rows() const override { return n_dofs; }
         inline std::ptrdiff_t cols() const override { return n_dofs; }
@@ -69,7 +68,6 @@ namespace sfem {
 
         void default_init() {
             blas = make_openmp_blas<T>();
-            execution_space_ = EXECUTION_SPACE_HOST;
         }
 
         bool good() const {

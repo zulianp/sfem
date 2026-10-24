@@ -14,7 +14,6 @@ namespace sfem {
     template <typename HP, typename LP>
     class MixedPrecisionShiftableBlockSymJacobi final : public ShiftableOperator<HP> {
     public:
-        ExecutionSpace                      execution_space_{EXECUTION_SPACE_INVALID};
         std::shared_ptr<BLAS<LP>>           blas;
         ShiftableBlockSymJacobi_Tpl<HP, LP> impl;
 
@@ -31,7 +30,6 @@ namespace sfem {
         void default_init() {
             blas = make_openmp_blas<LP>();
             ShiftableBlockSymJacobi_OpenMP<HP, LP>::build(block_size, impl);
-            execution_space_ = EXECUTION_SPACE_HOST;
         }
 
         void set_relaxation_parameter(const HP relaxation) {
@@ -60,7 +58,7 @@ namespace sfem {
 
             assert(block_size == 3);
             assert(is_symmetric);
-            assert(execution_space_ == (enum ExecutionSpace)d->mem_space());
+            assert(execution_space() == (enum ExecutionSpace)d->mem_space());
             assert(constraints_mask);
 
             // read_sparse_update_policy();
@@ -127,7 +125,7 @@ namespace sfem {
 
         inline std::ptrdiff_t rows() const override { return diag->size(); }
         inline std::ptrdiff_t cols() const override { return diag->size(); }
-        ExecutionSpace        execution_space() const override { return execution_space_; }
+        ExecutionSpace        execution_space() const override { return blas ? blas->execution_space() : EXECUTION_SPACE_INVALID; }
     };
 
     template <typename HP, typename LP>

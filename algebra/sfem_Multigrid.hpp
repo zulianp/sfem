@@ -48,9 +48,8 @@ namespace sfem {
             ~Memory() {}
         };
 
-        ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
 
-        ExecutionSpace execution_space() const override { return execution_space_; }
+        ExecutionSpace execution_space() const override { return blas_ ? blas_->execution_space() : EXECUTION_SPACE_INVALID; }
 
         int apply(const T* const rhs, T* const x) override {
             SFEM_TRACE_SCOPE("Multigrid::apply");
@@ -101,7 +100,6 @@ namespace sfem {
 
         void default_init() {
             blas() = make_openmp_blas<T>();
-            execution_space_ = EXECUTION_SPACE_HOST;
         }
 
         inline std::shared_ptr<BLAS<T>>& blas() { return blas_; }
@@ -182,7 +180,6 @@ namespace sfem {
         std::vector<std::shared_ptr<Operator<T>>>& restrictions() { return restriction_; }
         std::vector<std::shared_ptr<Operator<T>>>  smoothers() { return smoother_; }
 
-        void set_execution_space(enum ExecutionSpace es) { execution_space_ = es; }
 
     private:
         std::vector<std::shared_ptr<Operator<T>>> operator_;

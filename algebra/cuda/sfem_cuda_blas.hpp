@@ -51,9 +51,13 @@ void d_zaxpby(const ptrdiff_t,
 
 namespace sfem {
 
+    /// The device BLAS: every operation is ordered on its context's stream, and the scalar results
+    /// of the reductions come back through a reusable pinned slot, with no allocation per call.
     template <typename T>
     class CUDA_BLAS final : public BLAS<T> {
     public:
+        explicit CUDA_BLAS(const ExecutionContext& context) : BLAS<T>(context) {}
+
         T* allocate(const std::size_t n) override;
         void destroy(void* a) override;
 
@@ -63,6 +67,7 @@ namespace sfem {
         void copy(const ptrdiff_t n, const T* const src, T* const dest) override;
 
         T dot(const ptrdiff_t n, const T* const l, const T* const r) override;
+        void dot(const ptrdiff_t n, const T* const l, const T* const r, T* const result) override;
         void axpy(const ptrdiff_t n, const T alpha, const T* const x, T* const y) override;
         void axpby(const ptrdiff_t n, const T alpha, const T* const x, const T beta, T* const y) override;
         void scal(const std::ptrdiff_t n, const T alpha, T* const x) override;
@@ -73,8 +78,8 @@ namespace sfem {
     };
 
     template <typename T>
-    std::shared_ptr<BLAS<T>> make_cuda_blas() {
-        return std::make_shared<CUDA_BLAS<T>>();
+    std::shared_ptr<BLAS<T>> make_cuda_blas(const ExecutionContext& context = ExecutionContext::device()) {
+        return std::make_shared<CUDA_BLAS<T>>(context);
     }
 
     void device_synchronize();
