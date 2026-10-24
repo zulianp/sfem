@@ -265,7 +265,7 @@ namespace sfem {
         inline ptrdiff_t n_dofs_domain() const override { return space->n_dofs(); }
         inline ptrdiff_t n_dofs_image() const override { return space->n_dofs(); }
 
-        ExecutionSpace execution_space() const override { return EXECUTION_SPACE_DEVICE; }
+        ExecutionContext execution_context() const override { return EXECUTION_SPACE_DEVICE; }
 
         std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &derefined_space) override { return no_op(); }
     };
@@ -763,7 +763,7 @@ namespace sfem {
         }
 
         int            report(const real_t *const) override { return SFEM_SUCCESS; }
-        ExecutionSpace execution_space() const override { return EXECUTION_SPACE_DEVICE; }
+        ExecutionContext execution_context() const override { return EXECUTION_SPACE_DEVICE; }
 
         std::shared_ptr<Op> clone() const override {
             auto ret       = std::make_shared<GPULaplacian>(space);
@@ -1137,7 +1137,7 @@ namespace sfem {
         }
 
         int            report(const real_t *const) override { return SFEM_SUCCESS; }
-        ExecutionSpace execution_space() const override { return EXECUTION_SPACE_DEVICE; }
+        ExecutionContext execution_context() const override { return EXECUTION_SPACE_DEVICE; }
 
         std::shared_ptr<Op> clone() const override {
             auto ret                      = std::make_shared<GPULinearElasticity>(space);
@@ -1337,7 +1337,7 @@ namespace sfem {
         }
 
         int            report(const real_t *const) override { return SFEM_SUCCESS; }
-        ExecutionSpace execution_space() const override { return EXECUTION_SPACE_DEVICE; }
+        ExecutionContext execution_context() const override { return EXECUTION_SPACE_DEVICE; }
 
         const char *name() const override { return "gpu:em:Laplacian"; }
         bool        energy_or_potential_based() const override { return true; }
@@ -1478,7 +1478,7 @@ namespace sfem {
         }
 
         int            report(const real_t *const) override { return SFEM_SUCCESS; }
-        ExecutionSpace execution_space() const override { return EXECUTION_SPACE_DEVICE; }
+        ExecutionContext execution_context() const override { return EXECUTION_SPACE_DEVICE; }
 
         const char *name() const override { return "gpu:EMWarpOp"; }
         bool        energy_or_potential_based() const override { return true; }
@@ -1624,7 +1624,7 @@ namespace sfem {
         }
 
         int            report(const real_t *const) override { return SFEM_SUCCESS; }
-        ExecutionSpace execution_space() const override { return EXECUTION_SPACE_DEVICE; }
+        ExecutionContext execution_context() const override { return EXECUTION_SPACE_DEVICE; }
 
         const char *name() const override { return "gpu:EMMultiVectorWarpOp"; }
         bool        energy_or_potential_based() const override { return true; }
@@ -1884,7 +1884,7 @@ namespace sfem {
         }
 
         int            report(const real_t *const) override { return SFEM_SUCCESS; }
-        ExecutionSpace execution_space() const override { return EXECUTION_SPACE_DEVICE; }
+        ExecutionContext execution_context() const override { return EXECUTION_SPACE_DEVICE; }
 
         const char *name() const override { return "gpu:em:LinearElasticity"; }
         bool        energy_or_potential_based() const override { return true; }

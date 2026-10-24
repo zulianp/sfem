@@ -1156,7 +1156,7 @@ namespace sfem {
     }
 
     template <typename T>
-    ExecutionSpace SSMGC<T>::execution_space() const {
+    ExecutionContext SSMGC<T>::execution_context() const {
         return impl_->mg->execution_space();
     }
 

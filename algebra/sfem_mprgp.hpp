@@ -86,7 +86,7 @@ namespace sfem {
 
         MPRGPReduce<T> make_device_reduce() const {
 #ifdef SFEM_ENABLE_CUDA
-            auto device = comm_ && execution_space() == EXECUTION_SPACE_DEVICE ? comm_->device() : nullptr;
+            auto device = comm_ && this->execution_space() == EXECUTION_SPACE_DEVICE ? comm_->device() : nullptr;
             if (device && device->whole()) {
                 // On the stream the pass launched on (a graph run's, or the default).
                 return [device](T* const values, const int count, const bool min_last, void* const stream) {
@@ -110,7 +110,7 @@ namespace sfem {
         ptrdiff_t allocation_size() const { return n_alloc_ > 0 ? n_alloc_ : n_dofs; }
         std::shared_ptr<PowerMethod<T>> power_method;
 
-        ExecutionSpace execution_space() const override { return blas ? blas->execution_space() : EXECUTION_SPACE_INVALID; }
+        ExecutionContext execution_context() const override { return blas ? blas->context() : ExecutionContext(EXECUTION_SPACE_INVALID); }
         inline std::ptrdiff_t rows() const override { return n_dofs; }
         inline std::ptrdiff_t cols() const override { return n_dofs; }
 

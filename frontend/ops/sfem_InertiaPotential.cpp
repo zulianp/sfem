@@ -84,7 +84,7 @@ namespace sfem {
 
     InertiaPotential::~InertiaPotential() = default;
 
-    ExecutionSpace InertiaPotential::execution_space() const { return impl_->es; }
+    ExecutionContext InertiaPotential::execution_context() const { return impl_->es; }
 
     ptrdiff_t InertiaPotential::n_dofs_domain() const { return impl_->space->n_dofs(); }
 

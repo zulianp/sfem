@@ -173,7 +173,7 @@ namespace sfem {
 
     std::ptrdiff_t ParallelMatrixFreeOperator::cols() const { return impl_->owned_dofs; }
 
-    ExecutionSpace ParallelMatrixFreeOperator::execution_space() const { return impl_->execution_space; }
+    ExecutionContext ParallelMatrixFreeOperator::execution_context() const { return impl_->execution_space; }
 
     std::shared_ptr<Communicator> ParallelMatrixFreeOperator::comm() const {
         return impl_->function->space()->mesh_ptr()->comm();

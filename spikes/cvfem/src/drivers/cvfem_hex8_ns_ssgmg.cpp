@@ -445,7 +445,7 @@ public:
 
     ptrdiff_t rows() const override { return p_->rows(); }
     ptrdiff_t cols() const override { return p_->cols(); }
-    sfem::ExecutionSpace execution_space() const override { return p_->execution_space(); }
+    sfem::ExecutionContext execution_context() const override { return p_->execution_context(); }
 
 private:
     std::shared_ptr<sfem::Operator<real_t>> p_;
@@ -627,7 +627,7 @@ private:
         }
         ptrdiff_t            rows() const override { return s_->rows(); }
         ptrdiff_t            cols() const override { return s_->cols(); }
-        sfem::ExecutionSpace execution_space() const override { return s_->execution_space(); }
+        sfem::ExecutionContext execution_context() const override { return s_->execution_context(); }
 
         void set_op(const std::shared_ptr<sfem::Operator<real_t>> &op) override { s_->set_op(op); }
         void set_preconditioner_op(const std::shared_ptr<sfem::Operator<real_t>> &op) override {
@@ -737,7 +737,7 @@ private:
 
         ptrdiff_t rows() const override { return nnodes_ * 4; }
         ptrdiff_t cols() const override { return nnodes_ * 4; }
-        sfem::ExecutionSpace execution_space() const override { return sfem::EXECUTION_SPACE_HOST; }
+        sfem::ExecutionContext execution_context() const override { return sfem::EXECUTION_SPACE_HOST; }
 
     private:
         ptrdiff_t           nnodes_;
@@ -837,7 +837,7 @@ private:
 
         ptrdiff_t rows() const override { return nnodes_ * 4; }
         ptrdiff_t cols() const override { return nnodes_ * 4; }
-        sfem::ExecutionSpace execution_space() const override { return sfem::EXECUTION_SPACE_HOST; }
+        sfem::ExecutionContext execution_context() const override { return sfem::EXECUTION_SPACE_HOST; }
 
     private:
         sfem::CVFEMNavierStokes &op_;
@@ -2033,7 +2033,7 @@ private:
 
         ptrdiff_t rows() const override { return n_; }
         ptrdiff_t cols() const override { return n_; }
-        sfem::ExecutionSpace execution_space() const override { return sfem::EXECUTION_SPACE_HOST; }
+        sfem::ExecutionContext execution_context() const override { return sfem::EXECUTION_SPACE_HOST; }
 
         // Number of coarse directions the factorisation could not resolve.
         ptrdiff_t                     n_dropped() const override { return n_dropped_; }
@@ -2164,7 +2164,7 @@ private:
         // local-length; the global extent is an implementation detail of the factorisation.
         ptrdiff_t            rows() const override { return n_local_; }
         ptrdiff_t            cols() const override { return n_local_; }
-        sfem::ExecutionSpace execution_space() const override { return sfem::EXECUTION_SPACE_HOST; }
+        sfem::ExecutionContext execution_context() const override { return sfem::EXECUTION_SPACE_HOST; }
 
         ptrdiff_t                     n_dropped() const override { return lu_->n_dropped(); }
         const std::vector<ptrdiff_t> &dropped() const override { return lu_->dropped(); }
@@ -4016,7 +4016,7 @@ public:
 
     std::ptrdiff_t       rows() const override { return n_; }
     std::ptrdiff_t       cols() const override { return n_; }
-    sfem::ExecutionSpace execution_space() const override { return sfem::EXECUTION_SPACE_HOST; }
+    sfem::ExecutionContext execution_context() const override { return sfem::EXECUTION_SPACE_HOST; }
 
 private:
     std::shared_ptr<sfem::Function> f_;

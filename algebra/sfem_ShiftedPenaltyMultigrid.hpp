@@ -203,7 +203,7 @@ namespace sfem {
             constraints_op_x_op_.push_back(constraints_op_x_op);
         }
 
-        ExecutionSpace execution_space() const override { return blas_ ? blas_->execution_space() : EXECUTION_SPACE_INVALID; }
+        ExecutionContext execution_context() const override { return blas_ ? blas_->context() : ExecutionContext(EXECUTION_SPACE_INVALID); }
 
         int apply(const T* const rhs, T* const x) override {
             SFEM_TRACE_SCOPE("ShiftedPenaltyMultigrid::apply");
@@ -516,7 +516,7 @@ namespace sfem {
                     n,
                     blas_impl->allocate(n),
                     [blas_impl](void* ptr) { blas_impl->destroy(ptr); },
-                    (enum MemorySpace)execution_space());
+                    (enum MemorySpace)this->execution_space());
         }
 
         inline int finest_level() const { return 0; }
@@ -610,7 +610,7 @@ namespace sfem {
 
             const T*        h = x;
             SharedBuffer<T> host;
-            if (execution_space() == EXECUTION_SPACE_DEVICE) {
+            if (this->execution_space() == EXECUTION_SPACE_DEVICE) {
                 host = Buffer<T>::wrap(static_cast<size_t>(n), const_cast<T*>(x), MEMORY_SPACE_DEVICE);
                 host = smesh::to_host(host);
                 h    = host->data();
@@ -677,7 +677,7 @@ namespace sfem {
                             fn(x_lin, h, y);
                             this->trap_finite("J:y", y, n_y);
                         },
-                        execution_space());
+                        this->execution_space());
             }
             return operator_[level];
         }
@@ -842,7 +842,7 @@ namespace sfem {
             if (constraints_op_) {
                 sop = jac + sfem::create_sparse_block_vector_mult(jac->rows(), level_op_x_op(level), level_op_x_op_weights(level));
             } else {
-                sop = jac + sfem::diag_op(memory_[level]->diag, execution_space());
+                sop = jac + sfem::diag_op(memory_[level]->diag, this->execution_space());
             }
 
             auto pop = std::dynamic_pointer_cast<ParallelOperator<T>>(operator_[level]);
@@ -1036,7 +1036,7 @@ namespace sfem {
                     }
 
                     // FIXME if we find a good reason for this add GPU support here
-                    if (project_coarse_space_correction_ && execution_space() == EXECUTION_SPACE_HOST) {
+                    if (project_coarse_space_correction_ && this->execution_space() == EXECUTION_SPACE_HOST) {
                         assert(!constraints_op_);  // FIXME not supported yet!!!
 
                         auto            c  = correction->data();

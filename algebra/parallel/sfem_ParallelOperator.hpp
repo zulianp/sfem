@@ -56,7 +56,7 @@ namespace sfem {
 
         std::ptrdiff_t rows() const override { return rows_; }
         std::ptrdiff_t cols() const override { return cols_; }
-        ExecutionSpace execution_space() const override { return execution_space_; }
+        ExecutionContext execution_context() const override { return execution_space_; }
 
         std::shared_ptr<Communicator> comm() const override { return comm_; }
         std::ptrdiff_t                row_allocation_size() const override { return row_allocation_size_; }
@@ -121,7 +121,7 @@ namespace sfem {
 
         std::ptrdiff_t rows() const override { return rows_; }
         std::ptrdiff_t cols() const override { return cols_; }
-        ExecutionSpace execution_space() const override { return EXECUTION_SPACE_HOST; }
+        ExecutionContext execution_context() const override { return EXECUTION_SPACE_HOST; }
 
         std::shared_ptr<Communicator> comm() const override { return comm_; }
         std::ptrdiff_t                row_allocation_size() const override { return row_allocation_size_; }

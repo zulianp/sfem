@@ -20,7 +20,7 @@ namespace sfem {
     //! device `gradient` then `atomicAdd`ed into.  `compute-sanitizer`:
     //! "Invalid __global__ atomic of size 8 bytes ... Address 0x3aa240f8 is
     //! out of bounds".
-    ExecutionSpace execution_space() const override { return EXECUTION_SPACE_DEVICE; }
+    ExecutionContext execution_context() const override { return ExecutionContext(EXECUTION_SPACE_DEVICE, stream); }
     bool is_linear() const override { return false; }
     ptrdiff_t n_dofs_domain() const override;
     ptrdiff_t n_dofs_image() const override;

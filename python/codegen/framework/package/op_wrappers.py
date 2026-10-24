@@ -690,7 +690,7 @@ namespace sfem {
     //! device `gradient` then `atomicAdd`ed into.  `compute-sanitizer`:
     //! "Invalid __global__ atomic of size 8 bytes ... Address 0x3aa240f8 is
     //! out of bounds".
-    ExecutionSpace execution_space() const override { return %(execution_space)s; }
+    ExecutionContext execution_context() const override { return %(execution_context)s; }
     bool is_linear() const override { return %(linear)s; }
     ptrdiff_t n_dofs_domain() const override;
     ptrdiff_t n_dofs_image() const override;
@@ -739,6 +739,7 @@ namespace sfem {
 """ % {
         "op": _op_class_name(material),
         "execution_space": current_target().execution_space(),
+        "execution_context": _op_execution_context(),
         "linear": "true" if linear else "false",
         "header_stem": _op_file_stem(material),
         "stream_member": _op_stream_member(),
@@ -2042,6 +2043,7 @@ namespace sfem {
         # every space it could legitimately be built on.
         "element_connectivity": _element_connectivity_expression(),
         "execution_space": current_target().execution_space(),
+        "execution_context": _op_execution_context(),
         "points_accessor": _points_accessor_expression(),
         "graph_host_view": _graph_host_view(),
         "geometry_memory_space": _geometry_memory_space_expression(),
@@ -3474,6 +3476,7 @@ namespace sfem {
         "parameter_lines": parameter_lines,
         "element_connectivity": _element_connectivity_expression(),
         "execution_space": current_target().execution_space(),
+        "execution_context": _op_execution_context(),
         "points_accessor": _points_accessor_expression(),
         "graph_host_view": _graph_host_view(),
         "geometry_memory_space": _geometry_memory_space_expression(),
@@ -4707,6 +4710,7 @@ namespace sfem {
         "parameter_lines": parameter_lines,
         "element_connectivity": _element_connectivity_expression(),
         "execution_space": current_target().execution_space(),
+        "execution_context": _op_execution_context(),
         "points_accessor": _points_accessor_expression(),
         "graph_host_view": _graph_host_view(),
         "geometry_memory_space": _geometry_memory_space_expression(),
@@ -4762,7 +4766,7 @@ namespace sfem {
     //! device `gradient` then `atomicAdd`ed into.  `compute-sanitizer`:
     //! "Invalid __global__ atomic of size 8 bytes ... Address 0x3aa240f8 is
     //! out of bounds".
-    ExecutionSpace execution_space() const override { return %(execution_space)s; }
+    ExecutionContext execution_context() const override { return %(execution_context)s; }
     bool is_linear() const override { return true; }
     ptrdiff_t n_dofs_domain() const override;
     ptrdiff_t n_dofs_image() const override;
@@ -4817,6 +4821,7 @@ namespace sfem {
 """ % {
         "op": _op_class_name(material),
         "execution_space": current_target().execution_space(),
+        "execution_context": _op_execution_context(),
         "value_steps": value_steps,
         "header_stem": _op_file_stem(material),
         "stream_member": _op_stream_member(),
@@ -5313,6 +5318,7 @@ namespace sfem {
         % {"op": _op_class_name(material)},
         "element_connectivity": _element_connectivity_expression(),
         "execution_space": current_target().execution_space(),
+        "execution_context": _op_execution_context(),
         "points_accessor": _points_accessor_expression(),
         "graph_host_view": _graph_host_view(),
         "geometry_memory_space": _geometry_memory_space_expression(),
@@ -6272,6 +6278,19 @@ def _op_stream_member():
     //! stream and silently undo the caller's ordering.
     void *stream{SFEM_DEFAULT_STREAM};
 """
+
+
+def _op_execution_context():
+    """What a generated `Op` answers to `execution_context()`.
+
+    The target's space and, on a target whose `Op` holds a stream, that stream:
+    the context `Function` and the solvers order their own work on, so they
+    issue it on the stream the `Op`'s kernels run on.
+    """
+    stream = current_target().op_stream_arguments()
+    if not stream:
+        return current_target().execution_space()
+    return "ExecutionContext(%s, %s)" % (current_target().execution_space(), ", ".join(stream))
 
 
 def _op_class_name(material):

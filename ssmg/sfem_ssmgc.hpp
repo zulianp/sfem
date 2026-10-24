@@ -38,7 +38,7 @@ namespace sfem {
         void           apply_curvature(const T *const x, T *const y);
         std::ptrdiff_t rows() const override;
         std::ptrdiff_t cols() const override;
-        ExecutionSpace execution_space() const override;
+        ExecutionContext execution_context() const override;
 
     private:
         class Impl;

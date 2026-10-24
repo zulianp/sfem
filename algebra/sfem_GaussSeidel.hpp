@@ -60,7 +60,7 @@ namespace sfem {
         bool verbose{false};
 
 
-        ExecutionSpace execution_space() const override { return blas ? blas->execution_space() : EXECUTION_SPACE_INVALID; }
+        ExecutionContext execution_context() const override { return blas ? blas->context() : ExecutionContext(EXECUTION_SPACE_INVALID); }
 
         void default_init() {
             blas = make_openmp_blas<T>();

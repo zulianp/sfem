@@ -311,7 +311,7 @@ namespace sfem {
 
         std::ptrdiff_t rows() const override { return n_rows; }
         std::ptrdiff_t cols() const override { return rows(); }
-        ExecutionSpace execution_space() const override { return execution_space_; }
+        ExecutionContext execution_context() const override { return execution_space_; }
     };
 
     // Converter from CRS to SELL-C (no row reordering within slices, i.e., sigma=0)

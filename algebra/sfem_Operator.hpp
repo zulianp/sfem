@@ -6,6 +6,7 @@
 
 // C++ includes
 #include "sfem_aliases.hpp"
+#include "sfem_execution_context.hpp"
 
 namespace sfem {
 
@@ -27,18 +28,20 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
 
-        virtual std::ptrdiff_t rows() const            = 0;
-        virtual std::ptrdiff_t cols() const            = 0;
-        virtual ExecutionSpace execution_space() const = 0;
+        virtual std::ptrdiff_t   rows() const              = 0;
+        virtual std::ptrdiff_t   cols() const              = 0;
+        virtual ExecutionContext execution_context() const = 0;
+        ExecutionSpace           execution_space() const { return execution_context().space(); }
     };
 
     template <typename T>
     class InPlaceOperator {
     public:
-        virtual ~InPlaceOperator()                     = default;
-        virtual int            apply(T* const y)       = 0;
-        virtual std::ptrdiff_t size() const            = 0;
-        virtual ExecutionSpace execution_space() const = 0;
+        virtual ~InPlaceOperator()                       = default;
+        virtual int              apply(T* const y)         = 0;
+        virtual std::ptrdiff_t   size() const              = 0;
+        virtual ExecutionContext execution_context() const = 0;
+        ExecutionSpace           execution_space() const { return execution_context().space(); }
     };
 
     template <typename T>
@@ -64,7 +67,7 @@ namespace sfem {
 
         std::ptrdiff_t rows() const override { return left_->rows(); }
         std::ptrdiff_t cols() const override { return left_->cols(); }
-        ExecutionSpace execution_space() const override { return left_->execution_space(); }
+        ExecutionContext execution_context() const override { return left_->execution_context(); }
 
     private:
         std::shared_ptr<L> left_;
@@ -89,7 +92,7 @@ namespace sfem {
         }
         std::ptrdiff_t rows() const override { return left_->rows(); }
         std::ptrdiff_t cols() const override { return right_->cols(); }
-        ExecutionSpace execution_space() const override { return left_->execution_space(); }
+        ExecutionContext execution_context() const override { return left_->execution_context(); }
 
     private:
         std::shared_ptr<L> left_;
@@ -109,7 +112,7 @@ namespace sfem {
         }
         std::ptrdiff_t rows() const override { return left_->size(); }
         std::ptrdiff_t cols() const override { return right_->cols(); }
-        ExecutionSpace execution_space() const override { return left_->execution_space(); }
+        ExecutionContext execution_context() const override { return left_->execution_context(); }
 
     private:
         SharedInPlaceOperator<T> left_;
@@ -132,7 +135,7 @@ namespace sfem {
 
         inline std::ptrdiff_t rows() const override { return rows_; }
         inline std::ptrdiff_t cols() const override { return cols_; }
-        inline ExecutionSpace execution_space() const override { return execution_space_; }
+        inline ExecutionContext execution_context() const override { return execution_space_; }
 
         int apply(const T* const x, T* const y) override {
             apply_(x, y);
@@ -159,7 +162,7 @@ namespace sfem {
             : size_(size), apply_(apply), execution_space_(es) {}
 
         inline std::ptrdiff_t size() const override { return size_; }
-        inline ExecutionSpace execution_space() const override { return execution_space_; }
+        inline ExecutionContext execution_context() const override { return execution_space_; }
 
         int apply(T* const x) override {
             apply_(x);
