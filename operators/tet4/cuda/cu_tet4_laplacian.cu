@@ -150,7 +150,7 @@ static int cu_tet4_laplacian_diag_tpl(const ptrdiff_t                          n
 
     cu_tet4_laplacian_diag_kernel<<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(nelements, elements, fff_stride, fff, diag);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }
 
@@ -233,7 +233,7 @@ int cu_tet4_laplacian_crs_tpl(const ptrdiff_t                          nelements
     cu_tet4_laplacian_crs_kernel<<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(
             nelements, elements, fff_stride, fff, rowptr, colidx, values);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }
 

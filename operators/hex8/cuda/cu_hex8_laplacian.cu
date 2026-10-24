@@ -112,7 +112,7 @@ static int cu_affine_hex8_laplacian_apply_tiled_tpl(const ptrdiff_t             
                                                     const T *const                           x,
                                                     T *const                                 y,
                                                     void                                    *stream) {
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
 
     // Hand tuned
     static const int block_size = 128;
@@ -122,7 +122,7 @@ static int cu_affine_hex8_laplacian_apply_tiled_tpl(const ptrdiff_t             
     cu_affine_hex8_laplacian_apply_tiled_kernel<T, block_size>
             <<<n_blocks, block_size, shmem_size, (cudaStream_t)stream>>>(nelements, elements, fff_stride, fff, x, y);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
 
     return SFEM_SUCCESS;
 }
@@ -174,7 +174,7 @@ static int cu_affine_hex8_laplacian_apply_tpl(const ptrdiff_t                   
                                               const T *const                           x,
                                               T *const                                 y,
                                               void                                    *stream) {
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
 
     // Hand tuned
     int block_size = 128;
@@ -190,7 +190,7 @@ static int cu_affine_hex8_laplacian_apply_tpl(const ptrdiff_t                   
     cu_affine_hex8_laplacian_apply_kernel<<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(
             nelements, elements, fff_stride, fff, x, y);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
 
     return SFEM_SUCCESS;
 }
@@ -301,7 +301,7 @@ static int cu_affine_hex8_laplacian_apply_taylor_tpl(const ptrdiff_t            
                                                      const T *const                           x,
                                                      T *const                                 y,
                                                      void                                    *stream) {
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
 
     cu_hex8_taylor_expansion_init();
 
@@ -319,7 +319,7 @@ static int cu_affine_hex8_laplacian_apply_taylor_tpl(const ptrdiff_t            
     cu_affine_hex8_laplacian_apply_taylor_kernel<<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(
             nelements, elements, fff_stride, fff, x, y);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
 
     return SFEM_SUCCESS;
 }
@@ -436,7 +436,7 @@ static int cu_affine_hex8_laplacian_crs_sym_tpl(const ptrdiff_t                 
     cu_affine_hex8_laplacian_crs_sym_kernel<<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(
             nelements, elements, fff_stride, fff, rowptr, colidx, diag, offdiag);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
 
     return SFEM_SUCCESS;
 }
@@ -530,7 +530,7 @@ static int cu_affine_hex8_laplacian_diag_tpl(const ptrdiff_t                    
                                              const cu_jacobian_t *const SFEM_RESTRICT fff,
                                              T *const                                 diag,
                                              void                                    *stream) {
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
 
     int block_size = 128;
 #ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
@@ -545,7 +545,7 @@ static int cu_affine_hex8_laplacian_diag_tpl(const ptrdiff_t                    
     cu_affine_hex8_laplacian_diag_kernel<<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(
             nelements, elements, fff_stride, fff, diag);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }
 

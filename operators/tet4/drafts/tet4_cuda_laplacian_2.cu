@@ -586,7 +586,7 @@ extern "C" void laplacian_crs(const ptrdiff_t                    nelements,
             local_to_global_kernel<<<n_blocks, block_size, 0, stream[1]> > >(
                     last_n, d_elems, de_matrix, d_rowptr, d_colidx, d_values);
 
-            SFEM_DEBUG_SYNCHRONIZE();
+            SFEM_DEBUG_SYNCHRONIZE(stream);
         }
 
         SFEM_CUDA_CHECK(cudaMemcpyAsync(de_xyz, he_xyz, 3 * 4 * n * sizeof(geom_t), cudaMemcpyHostToDevice, stream[0]));
@@ -610,11 +610,11 @@ extern "C" void laplacian_crs(const ptrdiff_t                    nelements,
 
         jacobian_inverse_kernel<<<n_blocks, block_size, 0, stream[0]> > >(n, de_xyz, d_jacobian_inverse);
 
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(stream);
 
         laplacian_crs_kernel<<<n_blocks, block_size, 0, stream[0]> > >(n, d_jacobian_inverse, de_matrix);
 
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(stream);
 
         last_n              = n;
         last_element_offset = element_offset;
@@ -626,7 +626,7 @@ extern "C" void laplacian_crs(const ptrdiff_t                    nelements,
         local_to_global_kernel<<<n_blocks, block_size, 0, stream[1]> > >(
                 last_n, d_elems, de_matrix, d_rowptr, d_colidx, d_values);
 
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(stream);
 
         cudaStreamSynchronize(stream[1]);
     }

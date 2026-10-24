@@ -13,6 +13,7 @@ namespace sfem {
     // says, on the host or the device.
     struct NodeObstacleView {
         ExecutionSpace es{EXECUTION_SPACE_HOST};
+        void          *stream{nullptr};  // on the device, what the kernels are issued on
         ptrdiff_t      size{0};
         const idx_t   *idx{nullptr};
         // Every node of the vectors (n_nodes, 3 dofs each) to its contact node, -1 if it is none.

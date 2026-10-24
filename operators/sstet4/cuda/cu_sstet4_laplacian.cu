@@ -442,7 +442,7 @@ static int cu_sstet4_laplacian_apply_tpl(const int                              
 
     cu_sstet4_laplacian_apply_kernel<T><<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(level, nelements, stride, fff, x, y);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }
 

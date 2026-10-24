@@ -26,7 +26,7 @@ namespace sfem {
     class BSRTangent final {
     public:
         static std::shared_ptr<BSRTangent> create(const std::shared_ptr<Function> &f,
-                                                  const ExecutionSpace             es,
+                                                  const ExecutionContext          &context,
                                                   const int                        storage_bytes = (int)sizeof(real_t));
         ~BSRTangent();
 

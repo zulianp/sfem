@@ -117,8 +117,14 @@ namespace sfem {
         void set_expansion_type(const enum ExpansionType et) { expansion_type_ = et; }
 
         void set_op(const std::shared_ptr<Operator<T>>& op) override {
-            this->apply_op = [=](const T* const x, T* const y) { op->apply(x, y); };
-            team_op_       = std::dynamic_pointer_cast<TeamParallelOperator<T>>(op);
+            // On a stream of its own the product follows the solver's work and the solver follows
+            // it, in the device runs' graph too.
+            this->apply_op = [this, op](const T* const x, T* const y) {
+                order_after(op->execution_context(), this->blas->context());
+                op->apply(x, y);
+                order_after(this->blas->context(), op->execution_context());
+            };
+            team_op_ = std::dynamic_pointer_cast<TeamParallelOperator<T>>(op);
             n_dofs = op->rows();
             comm_.reset();
             n_alloc_ = -1;

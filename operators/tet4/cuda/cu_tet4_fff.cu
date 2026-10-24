@@ -65,7 +65,7 @@ static int cu_tet4_fff_fill_tpl(const ptrdiff_t nelements,
 
     free(h_fff);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(nullptr);
     return SFEM_SUCCESS;
 }
 
@@ -113,7 +113,7 @@ extern int elements_to_device(const ptrdiff_t nelements,
         }
     }
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(nullptr);
     return SFEM_SUCCESS;
 }
 

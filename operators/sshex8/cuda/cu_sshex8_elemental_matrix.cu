@@ -120,7 +120,7 @@ int cu_affine_hex8_elemental_matrix_apply_tpl(const ptrdiff_t              nelem
                 nelements, elements, elemental_matrix, x, y);
     }
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }
 
@@ -297,7 +297,7 @@ int cu_affine_sshex8_elemental_matrix_apply_warp_tpl(const ptrdiff_t            
                                                      const T *const SFEM_RESTRICT x,
                                                      T *const SFEM_RESTRICT       y,
                                                      void                        *stream) {
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
 
     static const int BLOCK_SIZE = LEVEL + 1;
 
@@ -307,7 +307,7 @@ int cu_affine_sshex8_elemental_matrix_apply_warp_tpl(const ptrdiff_t            
     cu_affine_sshex8_elemental_matrix_apply_kernel_warp<T, LEVEL>
             <<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(nelements, elements, elemental_matrix, x, y);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }
 
@@ -350,7 +350,7 @@ int cu_affine_sshex8_elemental_matrix_apply_tpl(const int                    lev
     cu_affine_sshex8_elemental_matrix_apply_kernel<<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(
             level, nelements, elements, elemental_matrix, x, y);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }
 
@@ -494,7 +494,7 @@ int cu_affine_sshex8_elemental_matrix_apply_AoS_warp_tpl(const ptrdiff_t        
                                                          const T *const SFEM_RESTRICT     x,
                                                          T *const SFEM_RESTRICT           y,
                                                          void                            *stream) {
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
 
     static const int BLOCK_SIZE = LEVEL + 1;
 
@@ -504,7 +504,7 @@ int cu_affine_sshex8_elemental_matrix_apply_AoS_warp_tpl(const ptrdiff_t        
     cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_warp<T, LEVEL>
             <<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(nelements, elements, elemental_matrix, x, y);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }
 
@@ -679,7 +679,7 @@ int cu_affine_sshex8_elemental_matrix_apply_AoS_TC_tpl(const ptrdiff_t          
                                                        const T *const SFEM_RESTRICT     x,
                                                        T *const SFEM_RESTRICT           y,
                                                        void                            *stream) {
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
 
     int min_grid_size;
     int max_z_size;
@@ -701,7 +701,7 @@ int cu_affine_sshex8_elemental_matrix_apply_AoS_TC_tpl(const ptrdiff_t          
     cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_TC<T, LEVEL>
             <<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(nelements, elements, elemental_matrix, x, y);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }
 
@@ -882,7 +882,7 @@ int cu_affine_sshex8_elemental_matrix_apply_AoS_multivector_warp_tpl(
         const T *const SFEM_RESTRICT     x,
         T *const SFEM_RESTRICT           y,
         void                            *stream) {
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
 
     static const int BLOCK_SIZE = LEVEL + 1;
 
@@ -892,7 +892,7 @@ int cu_affine_sshex8_elemental_matrix_apply_AoS_multivector_warp_tpl(
     cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_multivector_warp<T, LEVEL, NVECS>
             <<<n_blocks, block_dim, 0, (cudaStream_t)stream>>>(nelements, elements, block_size, elemental_matrix, x, y);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }
 
@@ -1040,7 +1040,7 @@ int cu_affine_sshex8_elemental_matrix_apply_AoS_multivector_TC_tpl(
         const T *const SFEM_RESTRICT     x,
         T *const SFEM_RESTRICT           y,
         void                            *stream) {
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
 
     int min_grid_size;
     int max_z_size;
@@ -1058,7 +1058,7 @@ int cu_affine_sshex8_elemental_matrix_apply_AoS_multivector_TC_tpl(
     cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_multivector_TC<T, LEVEL, NVECS>
             <<<n_blocks, block_dim, 0, (cudaStream_t)stream>>>(nelements, elements, block_size, elemental_matrix, x, y);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }
 
@@ -1334,7 +1334,7 @@ int cu_affine_sshex8_elemental_matrix_apply_AoS_vector_warp_tpl(const ptrdiff_t 
                                                                 const T *const SFEM_RESTRICT     x,
                                                                 T *const SFEM_RESTRICT           y,
                                                                 void                            *stream) {
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
 
     static const int BLOCK_SIZE = LEVEL + 1;
 
@@ -1344,7 +1344,7 @@ int cu_affine_sshex8_elemental_matrix_apply_AoS_vector_warp_tpl(const ptrdiff_t 
     cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_vector_warp<T, LEVEL>
             <<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(nelements, elements, elemental_matrix, x, y);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }
 
@@ -1500,7 +1500,7 @@ int cu_affine_sshex8_elemental_matrix_apply_AoS_vector_TC_tpl(const ptrdiff_t   
                                                               const T *const SFEM_RESTRICT     x,
                                                               T *const SFEM_RESTRICT           y,
                                                               void                            *stream) {
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
 
     int min_grid_size;
     int max_z_size;
@@ -1522,7 +1522,7 @@ int cu_affine_sshex8_elemental_matrix_apply_AoS_vector_TC_tpl(const ptrdiff_t   
     cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_vector_TC<T, LEVEL>
             <<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(nelements, elements, elemental_matrix, x, y);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }
 

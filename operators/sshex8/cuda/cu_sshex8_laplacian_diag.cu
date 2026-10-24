@@ -71,7 +71,7 @@ static int cu_affine_sshex8_laplacian_diag_tpl(const int                        
                                                const cu_jacobian_t *const SFEM_RESTRICT fff,
                                                T *const                                 out,
                                                void                                    *stream) {
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
 
     // Hand tuned
     int block_size = 128;
@@ -87,7 +87,7 @@ static int cu_affine_sshex8_laplacian_diag_tpl(const int                        
     cu_affine_sshex8_laplacian_diag_kernel<<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(
             level, nelements, elements, fff_stride, fff, out);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }
 

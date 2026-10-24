@@ -12,6 +12,8 @@ namespace sfem {
         int n_conditions{0};
         boundary_condition_t *conditions{nullptr};
         std::shared_ptr<AxisAlignedContactConditions> h_contact_conditions;
+        //! The stream every kernel call is issued on (null: the default device stream).
+        void *stream{nullptr};
 
         GPUAxisAlignedContactConditions(const std::shared_ptr<AxisAlignedContactConditions> &dc)
             : space(dc->space()), h_contact_conditions(dc) {
@@ -34,7 +36,8 @@ namespace sfem {
                                                      space->block_size(),
                                                      conditions[i].component,
                                                      conditions[i].values,
-                                                     x);
+                                                     x,
+                                                     stream);
 
                 } else {
                     d_constraint_nodes_to_value_vec(conditions[i].local_size,
@@ -42,7 +45,8 @@ namespace sfem {
                                                     space->block_size(),
                                                     conditions[i].component,
                                                     conditions[i].value,
-                                                    x);
+                                                    x,
+                                                    stream);
                 }
             }
 
@@ -57,7 +61,8 @@ namespace sfem {
                                                          conditions[i].component,
                                                          conditions[i].value,
                                                          x,
-                                                         g);
+                                                         g,
+                                                         stream);
             }
 
             return SFEM_SUCCESS;
@@ -73,7 +78,8 @@ namespace sfem {
                                                 space->block_size(),
                                                 conditions[i].component,
                                                 value,
-                                                x);
+                                                x,
+                                                stream);
             }
 
             return SFEM_SUCCESS;
@@ -86,7 +92,8 @@ namespace sfem {
                                             space->block_size(),
                                             conditions[i].component,
                                             src,
-                                            dest);
+                                            dest,
+                                            stream);
             }
 
             return SFEM_SUCCESS;
@@ -104,7 +111,8 @@ namespace sfem {
                                                         1,
                                                         rowptr,
                                                         colidx,
-                                                        values);
+                                                        values,
+                                                        stream);
             }
 
             return SFEM_SUCCESS;

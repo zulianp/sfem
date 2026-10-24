@@ -281,7 +281,7 @@ namespace sfem {
         }
 
         void apply(const real_t* const x, real_t* const y) {
-            SFEM_DEBUG_SYNCHRONIZE();
+            SFEM_DEBUG_SYNCHRONIZE(nullptr);
             if (!initialized) {
                 initialize(x, y);
                 initialized = true;
@@ -311,7 +311,7 @@ namespace sfem {
                                         valueType,
                                         alg,
                                         dBuffer));
-            SFEM_DEBUG_SYNCHRONIZE();
+            SFEM_DEBUG_SYNCHRONIZE(nullptr);
         }
     };
 
@@ -457,11 +457,14 @@ namespace sfem {
         }
     };
 
-    std::shared_ptr<BSR<count_t, idx_t, real_t>> d_bsr_spmv(
-            const ptrdiff_t block_rows, const ptrdiff_t block_cols, const int block_size,
-            const std::shared_ptr<Buffer<count_t>>& rowptr,
-            const std::shared_ptr<Buffer<idx_t>>& colidx,
-            const std::shared_ptr<Buffer<real_t>>& values, const real_t scale_output) {
+    std::shared_ptr<BSR<count_t, idx_t, real_t>> d_bsr_spmv(const ptrdiff_t                         block_rows,
+                                                            const ptrdiff_t                         block_cols,
+                                                            const int                               block_size,
+                                                            const std::shared_ptr<Buffer<count_t>>& rowptr,
+                                                            const std::shared_ptr<Buffer<idx_t>>&   colidx,
+                                                            const std::shared_ptr<Buffer<real_t>>&  values,
+                                                            const real_t                            scale_output,
+                                                            const ExecutionContext&                 context) {
         auto ret = std::make_shared<BSR<count_t, idx_t, real_t>>();
         ret->row_ptr = rowptr;
         ret->col_idx = colidx;
@@ -469,7 +472,7 @@ namespace sfem {
         ret->block_cols_ = block_cols;
         ret->row_block_size_ = block_size;
         ret->col_block_size_ = block_size;
-        ret->execution_space_ = EXECUTION_SPACE_DEVICE;
+        ret->context_        = context;
 
         auto impl = std::make_shared<BSRImpl>(
                 block_rows, block_cols, block_size, rowptr, colidx, values, scale_output);
@@ -478,11 +481,14 @@ namespace sfem {
     }
 
 #else
-    std::shared_ptr<BSR<count_t, idx_t, real_t>> d_bsr_spmv(
-            const ptrdiff_t rows, const ptrdiff_t cols, const int block_size,
-            const std::shared_ptr<Buffer<count_t>>& rowptr,
-            const std::shared_ptr<Buffer<idx_t>>& colidx,
-            const std::shared_ptr<Buffer<real_t>>& values, const real_t scale_output) {
+    std::shared_ptr<BSR<count_t, idx_t, real_t>> d_bsr_spmv(const ptrdiff_t                         rows,
+                                                            const ptrdiff_t                         cols,
+                                                            const int                               block_size,
+                                                            const std::shared_ptr<Buffer<count_t>>& rowptr,
+                                                            const std::shared_ptr<Buffer<idx_t>>&   colidx,
+                                                            const std::shared_ptr<Buffer<real_t>>&  values,
+                                                            const real_t                            scale_output,
+                                                            const ExecutionContext&                 context) {
         assert(false);
         return nullptr;
     }
@@ -515,11 +521,14 @@ namespace sfem {
     }
 
     // Without cuSPARSE the library's own kernel (sfem_cuda_BSR.cu).
-    std::shared_ptr<BSR<count_t, idx_t, real_t>> d_bsr_spmv(
-            const ptrdiff_t rows, const ptrdiff_t cols, const int block_size,
-            const std::shared_ptr<Buffer<count_t>>& rowptr,
-            const std::shared_ptr<Buffer<idx_t>>& colidx,
-            const std::shared_ptr<Buffer<real_t>>& values, const real_t scale_output) {
+    std::shared_ptr<BSR<count_t, idx_t, real_t>> d_bsr_spmv(const ptrdiff_t                         rows,
+                                                            const ptrdiff_t                         cols,
+                                                            const int                               block_size,
+                                                            const std::shared_ptr<Buffer<count_t>>& rowptr,
+                                                            const std::shared_ptr<Buffer<idx_t>>&   colidx,
+                                                            const std::shared_ptr<Buffer<real_t>>&  values,
+                                                            const real_t                            scale_output,
+                                                            const ExecutionContext&                 context) {
         auto ret                        = std::make_shared<BSR<count_t, idx_t, real_t>>();
         ret->row_ptr                    = rowptr;
         ret->col_idx                    = colidx;
@@ -528,10 +537,10 @@ namespace sfem {
         ret->row_block_size_            = block_size;
         ret->col_block_size_            = block_size;
         ret->uniform_pre_output_scaling = scale_output;
-        ret->execution_space_           = EXECUTION_SPACE_DEVICE;
+        ret->context_                   = context;
         ret->apply_                     = [=](const real_t* const x, real_t* const y) {
             d_bsr_spmv_native<count_t, idx_t, real_t, real_t>(
-                    rows, block_size, rowptr->data(), colidx->data(), values->data(), scale_output, x, y);
+                    rows, block_size, rowptr->data(), colidx->data(), values->data(), scale_output, x, y, context.stream());
         };
         return ret;
     }

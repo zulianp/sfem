@@ -109,7 +109,7 @@ namespace sfem {
 
     template <typename T>
     static T sq_norm_ramp_p_tpl(const ptrdiff_t n, const T* const x, T* const ub) {
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(nullptr);
 
         int       kernel_block_size = SFEM_WARP_SIZE * SFEM_N_WARPS_PER_BLOCK;
         ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
@@ -120,7 +120,7 @@ namespace sfem {
         cudaMemset((void*)device_value, 0, sizeof(T));
 
         sq_norm_ramp_p_kernel<<<n_blocks, kernel_block_size>>>(n, x, ub, device_value);
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(nullptr);
 
         T host_value = -1;
         cudaMemcpy(&host_value, device_value, sizeof(T), cudaMemcpyDeviceToHost);
@@ -148,7 +148,7 @@ namespace sfem {
 
     template <typename T>
     static T sq_norm_ramp_m_tpl(const ptrdiff_t n, const T* const x, T* const lb) {
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(nullptr);
 
         int       kernel_block_size = SFEM_WARP_SIZE * SFEM_N_WARPS_PER_BLOCK;
         ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
@@ -159,7 +159,7 @@ namespace sfem {
         cudaMemset((void*)device_value, 0, sizeof(T));
 
         sq_norm_ramp_m_kernel<<<n_blocks, kernel_block_size>>>(n, x, lb, device_value);
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(nullptr);
 
         T host_value = -1;
         cudaMemcpy(&host_value, device_value, sizeof(T), cudaMemcpyDeviceToHost);
@@ -192,14 +192,14 @@ namespace sfem {
                            const T* const  ub,
                            const T* const  lagr_ub,
                            T* const        out) {
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(nullptr);
 
         int       kernel_block_size = SFEM_WARP_SIZE * SFEM_N_WARPS_PER_BLOCK;
         ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
 
         ramp_p_kernel<<<n_blocks, kernel_block_size>>>(n, penalty_param, weights, x, ub, lagr_ub, out);
 
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(nullptr);
     }
 
     /////
@@ -226,14 +226,14 @@ namespace sfem {
                            const T* const  lb,
                            const T* const  lagr_lb,
                            T* const        out) {
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(nullptr);
 
         int       kernel_block_size = SFEM_WARP_SIZE * SFEM_N_WARPS_PER_BLOCK;
         ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
 
         ramp_m_kernel<<<n_blocks, kernel_block_size>>>(n, penalty_param, weights, x, lb, lagr_lb, out);
 
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(nullptr);
     }
 
     /////
@@ -258,14 +258,14 @@ namespace sfem {
                                   const T* const  x,
                                   const T* const  ub,
                                   T* const        lagr_ub) {
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(nullptr);
 
         int       kernel_block_size = SFEM_WARP_SIZE * SFEM_N_WARPS_PER_BLOCK;
         ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
 
         update_lagr_p_kernel<<<n_blocks, kernel_block_size>>>(n, penalty_param, weights, x, ub, lagr_ub);
 
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(nullptr);
     }
 
     /////
@@ -290,14 +290,14 @@ namespace sfem {
                                   const T* const  x,
                                   const T* const  lb,
                                   T* const        lagr_lb) {
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(nullptr);
 
         int       kernel_block_size = SFEM_WARP_SIZE * SFEM_N_WARPS_PER_BLOCK;
         ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
 
         update_lagr_m_kernel<<<n_blocks, kernel_block_size>>>(n, penalty_param, weights, x, lb, lagr_lb);
 
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(nullptr);
     }
 
     template <typename T>
@@ -339,7 +339,7 @@ namespace sfem {
                                const T* const  lagr_lb,
                                const T* const  lagr_ub,
                                T* const        result) {
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(nullptr);
 
         int       kernel_block_size = SFEM_WARP_SIZE * SFEM_N_WARPS_PER_BLOCK;
         ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
@@ -352,7 +352,7 @@ namespace sfem {
             calc_J_pen_p_kernel<<<n_blocks, kernel_block_size>>>(n, x, penalty_param, weights, ub, lagr_ub, result);
         }
 
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(nullptr);
     }
 
     template <typename T, bool UPPER>
@@ -381,7 +381,7 @@ namespace sfem {
                              const T* const  x,
                              const T* const  bound,
                              const T* const  lagr) {
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(nullptr);
 
         int       kernel_block_size = SFEM_WARP_SIZE * SFEM_N_WARPS_PER_BLOCK;
         ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
@@ -392,7 +392,7 @@ namespace sfem {
         cudaMemset((void*)device_value, 0, sizeof(T));
 
         sq_norm_kkt_kernel<T, UPPER><<<n_blocks, kernel_block_size>>>(n, penalty_param, weights, x, bound, lagr, device_value);
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(nullptr);
 
         T host_value = -1;
         cudaMemcpy(&host_value, device_value, sizeof(T), cudaMemcpyDeviceToHost);
@@ -415,7 +415,7 @@ namespace sfem {
 
     template <typename T>
     static void scale_blocks_tpl(const ptrdiff_t n_blocks, const int block_size, const T* const scale, const T* const blocks, T* const out) {
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(nullptr);
 
         const ptrdiff_t n                 = n_blocks * block_size;
         int             kernel_block_size = SFEM_WARP_SIZE * SFEM_N_WARPS_PER_BLOCK;
@@ -423,7 +423,7 @@ namespace sfem {
 
         scale_blocks_kernel<<<n_cuda_blocks, kernel_block_size>>>(n_blocks, block_size, scale, blocks, out);
 
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(nullptr);
     }
 
     template <typename T>

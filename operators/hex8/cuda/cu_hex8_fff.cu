@@ -138,7 +138,7 @@ static int cu_hex8_fff_fill_tpl(const ptrdiff_t nelements,
 
     free(h_fff);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(nullptr);
     return SFEM_SUCCESS;
 }
 

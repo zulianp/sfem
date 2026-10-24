@@ -229,7 +229,7 @@ namespace sfem {
                                 real_t *const          out,
                                 void *const            stream) {
         if (n_terms > MAX_TERMS) return SFEM_FAILURE;
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(stream);
         const Weights w     = pack(n_terms, alpha, nullptr);
         const int     block = 128;
         const int     ret   = dispatch(storage, [&](auto codec) {
@@ -238,7 +238,7 @@ namespace sfem {
                     n_terms, rows, n, w, b_sum, static_cast<const typename Codec::storage_t *>(H), H_scales, S_n, out);
             return launched();
         });
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(stream);
         return ret;
     }
 
@@ -254,7 +254,7 @@ namespace sfem {
                          scaling_t *const     H_scales,
                          void *const          stream) {
         if (n_terms > MAX_TERMS) return SFEM_FAILURE;
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(stream);
         const Weights w     = pack(n_terms, alpha, b);
         const int     block = 128;
         const int     ret   = dispatch(storage, [&](auto codec) {
@@ -263,7 +263,7 @@ namespace sfem {
                     n_terms, rows, n, w, S_n, S_new, static_cast<typename Codec::storage_t *>(H), H_scales);
             return launched();
         });
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(stream);
         return ret;
     }
 
@@ -274,7 +274,7 @@ namespace sfem {
                        void *const          H,
                        scaling_t *const     H_scales,
                        void *const          stream) {
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(stream);
         const int block = 128;
         const int ret   = dispatch(storage, [&](auto codec) {
             using Codec = decltype(codec);
@@ -282,7 +282,7 @@ namespace sfem {
                     rows, n, factor, static_cast<typename Codec::storage_t *>(H), H_scales);
             return launched();
         });
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(stream);
         return ret;
     }
 
@@ -301,7 +301,7 @@ namespace sfem {
                     cudaSuccess) {
             return SFEM_FAILURE;
         }
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(stream);
         return SFEM_SUCCESS;
     }
 
@@ -317,7 +317,7 @@ namespace sfem {
             fill_scales_kernel<<<grid_for(n_scales, block), block, 0, (cudaStream_t)stream>>>(n_scales, scales);
             ret = launched();
         }
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(stream);
         return ret;
     }
 

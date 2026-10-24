@@ -1072,7 +1072,7 @@ namespace sfem {
             ret->row_block_size_            = col_block_size_;
             ret->col_block_size_            = row_block_size_;
             ret->uniform_pre_output_scaling = uniform_pre_output_scaling;
-            ret->execution_space_           = EXECUTION_SPACE_HOST;
+            ret->context_                   = EXECUTION_SPACE_HOST;
 
             const ptrdiff_t ret_block_rows = block_cols_;
             const ptrdiff_t ret_block_cols = block_rows;
@@ -1151,7 +1151,7 @@ namespace sfem {
             ret->row_block_size_            = ret_row_bs;
             ret->col_block_size_            = ret_col_bs;
             ret->uniform_pre_output_scaling = 0;
-            ret->execution_space_           = EXECUTION_SPACE_HOST;
+            ret->context_                   = EXECUTION_SPACE_HOST;
 
             auto c_rowptr = ret->row_ptr;
             auto c_colidx = ret->col_idx;
@@ -1200,9 +1200,9 @@ namespace sfem {
         ptrdiff_t block_cols_{0};
         T         uniform_pre_output_scaling{0};
 
-        ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
+        ExecutionContext context_{EXECUTION_SPACE_INVALID};
 
-        ExecutionContext execution_context() const override { return execution_space_; }
+        ExecutionContext execution_context() const override { return context_; }
 
         void print(std::ostream& os = std::cout) const {
             os << "BSR" << std::endl;
@@ -1250,7 +1250,7 @@ namespace sfem {
         ret->col_block_size_            = col_block_size;
         ret->uniform_pre_output_scaling = scale_output;
 
-        ret->execution_space_ = EXECUTION_SPACE_HOST;
+        ret->context_ = EXECUTION_SPACE_HOST;
 
         ret->apply_ = [=](const T* const x, T* const y) {
             bsr_spmv(block_rows,

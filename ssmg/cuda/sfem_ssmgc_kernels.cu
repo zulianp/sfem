@@ -33,7 +33,7 @@ namespace sfem {
         const int       kernel_block_size = 128;
         const ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (n_nodes + kernel_block_size - 1) / kernel_block_size);
         pack_nodal_diag_to_block_sym6_kernel<<<n_blocks, kernel_block_size, 0>>>(n_nodes, d3, d6);
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(nullptr);
     }
 
 }  // namespace sfem

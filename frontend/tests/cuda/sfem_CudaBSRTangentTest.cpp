@@ -62,8 +62,8 @@ int test_device_diagonal_matches_host() {
         tangent->op()->apply(v->data(), y->data());
         auto d_v = smesh::to_device(v);
         auto d_y = create_buffer<real_t>(n, EXECUTION_SPACE_DEVICE);
-        const int product_status =
-                d_bsr_spmv_native<count_t, idx_t, real_t, real_t>(rows, bs, d_rowptr->data(), d_colidx->data(), d_values->data(), real_t(0), d_v->data(), d_y->data());
+        const int product_status = d_bsr_spmv_native<count_t, idx_t, real_t, real_t>(
+                rows, bs, d_rowptr->data(), d_colidx->data(), d_values->data(), real_t(0), d_v->data(), d_y->data(), nullptr);
         SFEM_TEST_ASSERT(product_status == SFEM_SUCCESS);
         auto   from_device = smesh::to_host(d_y);
         real_t worst = 0, scale = 0;

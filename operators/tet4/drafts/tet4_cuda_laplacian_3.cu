@@ -415,7 +415,7 @@ extern "C" void tet4_laplacian_crs(const ptrdiff_t nelements,
 
             cudaEventRecord(event[3], stream[3]);
 
-            SFEM_DEBUG_SYNCHRONIZE();
+            SFEM_DEBUG_SYNCHRONIZE(stream);
         }
 
         /////////////////////////////////////////////////////////
@@ -425,7 +425,7 @@ extern "C" void tet4_laplacian_crs(const ptrdiff_t nelements,
         SFEM_CUDA_CHECK(cudaMemcpyAsync(de_xyz, he_xyz, 3 * 4 * n * sizeof(geom_t), cudaMemcpyHostToDevice, stream[0]));
         cudaEventRecord(event[0], stream[0]);
 
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(stream);
         /////////////////////////////////////////////////////////
         // Jacobian computations (stream 1)
         /////////////////////////////////////////////////////////
@@ -435,7 +435,7 @@ extern "C" void tet4_laplacian_crs(const ptrdiff_t nelements,
 
         fff_kernel<<<n_blocks, block_size, 0, stream[1]>>>(n, de_xyz, d_fff);
 
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(stream);
         /////////////////////////////////////////////////////////
         // DOF indices HtoD (stream 2)
         /////////////////////////////////////////////////////////
@@ -461,7 +461,7 @@ extern "C" void tet4_laplacian_crs(const ptrdiff_t nelements,
 
         cudaEventRecord(event[2], stream[2]);
 
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(stream);
         /////////////////////////////////////////////////////////
         // Assemble elemental matrices (stream 1)
         /////////////////////////////////////////////////////////
@@ -472,7 +472,7 @@ extern "C" void tet4_laplacian_crs(const ptrdiff_t nelements,
         laplacian_crs_kernel<<<n_blocks, block_size, 0, stream[1]>>>(n, d_fff, de_matrix);
         cudaEventRecord(event[1], stream[1]);
 
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(stream);
         /////////////////////////////////////////////////////////
 
         last_n = n;
@@ -492,7 +492,7 @@ extern "C" void tet4_laplacian_crs(const ptrdiff_t nelements,
         local_to_global_kernel<<<n_blocks, block_size, 0, stream[3]>>>(
             last_n, d_elems, de_matrix, d_rowptr, d_colidx, d_values);
 
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(stream);
 
         cudaStreamSynchronize(stream[3]);
     }
@@ -715,7 +715,7 @@ extern "C" void tet4_laplacian_assemble_gradient(const ptrdiff_t nelements,
 
             cudaEventRecord(event[3], stream[3]);
 
-            SFEM_DEBUG_SYNCHRONIZE();
+            SFEM_DEBUG_SYNCHRONIZE(stream);
         }
 
         /////////////////////////////////////////////////////////
@@ -732,8 +732,7 @@ extern "C" void tet4_laplacian_assemble_gradient(const ptrdiff_t nelements,
         pack_vector(n, element_offset, elems, u, he_u);
         SFEM_CUDA_CHECK(cudaMemcpyAsync(de_u, he_u, 4 * n * sizeof(real_t), cudaMemcpyHostToDevice, stream[0]));
 
-
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(stream);
         /////////////////////////////////////////////////////////
         // Jacobian computations (stream 1)
         /////////////////////////////////////////////////////////
@@ -743,7 +742,7 @@ extern "C" void tet4_laplacian_assemble_gradient(const ptrdiff_t nelements,
 
         fff_kernel<<<n_blocks, block_size, 0, stream[1]>>>(n, de_xyz, d_fff);
 
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(stream);
 
         /////////////////////////////////////////////////////////
         // DOF indices HtoD (stream 2)
@@ -770,7 +769,7 @@ extern "C" void tet4_laplacian_assemble_gradient(const ptrdiff_t nelements,
 
         cudaEventRecord(event[2], stream[2]);
 
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(stream);
         /////////////////////////////////////////////////////////
         // Assemble elemental vectors (stream 1)
         /////////////////////////////////////////////////////////
@@ -785,7 +784,7 @@ extern "C" void tet4_laplacian_assemble_gradient(const ptrdiff_t nelements,
         laplacian_assemble_gradient_kernel<<<n_blocks, block_size, 0, stream[1]>>>(n, d_fff, de_u, de_vector);
         cudaEventRecord(event[1], stream[1]);
 
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(stream);
         /////////////////////////////////////////////////////////
 
         last_n = n;
@@ -805,7 +804,7 @@ extern "C" void tet4_laplacian_assemble_gradient(const ptrdiff_t nelements,
         vector_local_to_global_kernel<<<n_blocks, block_size, 0, stream[3]>>>(
             last_n, d_elems, de_vector, d_values);
 
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(stream);
 
         cudaStreamSynchronize(stream[3]);
     }

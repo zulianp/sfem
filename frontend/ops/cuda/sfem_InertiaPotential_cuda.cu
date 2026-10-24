@@ -86,13 +86,13 @@ namespace sfem {
                                          const real_t *const  mass,
                                          const real_t         alpha,
                                          real_t *const        values) {
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(nullptr);
 
         const int block = 128;
         inertia_potential_crs_diagonal<<<grid_for(ndofs, block), block>>>(
                 ndofs, rowptr, colidx, mass, alpha, values);
 
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(nullptr);
         return SFEM_SUCCESS;
     }
 
@@ -104,12 +104,12 @@ namespace sfem {
                                          const real_t         alpha,
                                          const smesh::PrimitiveType values_type,
                                          void *const          values) {
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(nullptr);
 
         const int block = 128;
         return with_tangent_values(values_type, values, [&](auto *const v) {
             inertia_potential_bsr_diagonal<<<grid_for(n_nodes, block), block>>>(n_nodes, block_size, rowptr, colidx, mass, alpha, v);
-            SFEM_DEBUG_SYNCHRONIZE();
+            SFEM_DEBUG_SYNCHRONIZE(nullptr);
             return SFEM_SUCCESS;
         });
     }
@@ -119,13 +119,13 @@ namespace sfem {
                                                     const real_t *const mass,
                                                     const real_t        alpha,
                                                     real_t *const       values) {
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(nullptr);
 
         const int block = 128;
         inertia_potential_block_diag_sym<<<grid_for(n_nodes, block), block>>>(
                 n_nodes, block_size, mass, alpha, values);
 
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(nullptr);
         return SFEM_SUCCESS;
     }
 

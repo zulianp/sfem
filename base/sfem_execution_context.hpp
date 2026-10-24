@@ -37,6 +37,11 @@ namespace sfem {
         void*                 stream_;
     };
 
+    /// The work issued to `waiting` from now on runs after the work issued to `on` so far (an event
+    /// between the two streams; inside a graph capture an edge). Nothing where both are one stream
+    /// or either is not on the device.
+    void order_after(const ExecutionContext& waiting, const ExecutionContext& on);
+
 }  // namespace sfem
 
 #endif  // SFEM_EXECUTION_CONTEXT_HPP

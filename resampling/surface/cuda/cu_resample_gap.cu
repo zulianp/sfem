@@ -230,7 +230,7 @@ static int cu_zero_normals(const ptrdiff_t nnodes, real_t** const SFEM_RESTRICT 
     int             block_size = 128;
     const ptrdiff_t n_blocks   = MAX(ptrdiff_t(1), (nnodes + block_size - 1) / block_size);
     cu_zero_normals_kernel<<<n_blocks, block_size, 0>>>(nnodes, normals);
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(nullptr);
     return SFEM_SUCCESS;
 }
 
@@ -253,13 +253,13 @@ __global__ void cu_normalize_kernel(const ptrdiff_t nnodes, real_t** const SFEM_
 extern "C" int cu_normalize(const ptrdiff_t nnodes, real_t** const SFEM_RESTRICT normals) {
     if (!nnodes) return SFEM_SUCCESS;
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(nullptr);
 
     int             block_size = 128;
     const ptrdiff_t n_blocks   = MAX(ptrdiff_t(1), (nnodes + block_size - 1) / block_size);
     cu_normalize_kernel<<<n_blocks, block_size, 0>>>(nnodes, normals);
 
-    SFEM_DEBUG_SYNCHRONIZE();
+    SFEM_DEBUG_SYNCHRONIZE(nullptr);
     return SFEM_SUCCESS;
 }
 
