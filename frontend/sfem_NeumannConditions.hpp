@@ -40,6 +40,9 @@ namespace sfem {
             bool                                  follower_pressure{false};
             LoadProfile                           profile;
             bool                                  profile_initialized{false};
+            /// A dead load on a distributed mesh at value 1, complete on the owned rows: each
+            /// face is on one rank, so its share at another rank's node is added there once.
+            SharedBuffer<real_t>                  owned_load;
         };
 
         static std::shared_ptr<NeumannConditions> create_from_env(const std::shared_ptr<FunctionSpace> &space);
