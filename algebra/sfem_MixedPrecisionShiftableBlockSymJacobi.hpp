@@ -58,7 +58,7 @@ namespace sfem {
 
             assert(block_size == 3);
             assert(is_symmetric);
-            assert(execution_space() == (enum ExecutionSpace)d->mem_space());
+            assert(this->execution_space() == (enum ExecutionSpace)d->mem_space());
             assert(constraints_mask);
 
             // read_sparse_update_policy();
