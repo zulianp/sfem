@@ -88,7 +88,7 @@ namespace sfem {
     //! Mirrors GPULaplacian, which declares the same member with the same
     //! default.  A launch that ignored it would serialise onto the default
     //! stream and silently undo the caller's ordering.
-    void *stream{SFEM_DEFAULT_STREAM};
+    void *stream{nullptr};
 
   private:
     class Impl;

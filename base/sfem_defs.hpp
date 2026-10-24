@@ -46,8 +46,6 @@ namespace sfem {
         ADJOINT_REFINE_ITERATIVE,
         ADJOINT_REFINE_HYTEG_REFINEMENT
     } AdjointRefineType;
-
-    static void* SFEM_DEFAULT_STREAM = 0;
 }  // namespace sfem
 
 namespace sfem {

@@ -522,7 +522,7 @@ namespace sfem {
         std::shared_ptr<FunctionSpace> space;
         std::shared_ptr<MultiDomainOp> domains;
         enum smesh::PrimitiveType      real_type{smesh::SMESH_DEFAULT};
-        void                          *stream{SFEM_DEFAULT_STREAM};
+        void                          *stream{nullptr};
         smesh::ElemType                element_type{smesh::INVALID};
 
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
@@ -763,7 +763,7 @@ namespace sfem {
         }
 
         int            report(const real_t *const) override { return SFEM_SUCCESS; }
-        ExecutionContext execution_context() const override { return EXECUTION_SPACE_DEVICE; }
+        ExecutionContext execution_context() const override { return ExecutionContext(EXECUTION_SPACE_DEVICE, stream); }
 
         std::shared_ptr<Op> clone() const override {
             auto ret       = std::make_shared<GPULaplacian>(space);
@@ -791,7 +791,7 @@ namespace sfem {
         std::shared_ptr<FunctionSpace> space;
         std::shared_ptr<MultiDomainOp> domains;
         enum smesh::PrimitiveType      real_type{smesh::SMESH_DEFAULT};
-        void                          *stream{SFEM_DEFAULT_STREAM};
+        void                          *stream{nullptr};
         smesh::ElemType                element_type{smesh::INVALID};
         /// One Jacobian per (macro) element, as the host operator: on a semi-structured hex mesh
         /// without it the kernels evaluate the macro element's Jacobian at every quadrature point.
@@ -1137,7 +1137,7 @@ namespace sfem {
         }
 
         int            report(const real_t *const) override { return SFEM_SUCCESS; }
-        ExecutionContext execution_context() const override { return EXECUTION_SPACE_DEVICE; }
+        ExecutionContext execution_context() const override { return ExecutionContext(EXECUTION_SPACE_DEVICE, stream); }
 
         std::shared_ptr<Op> clone() const override {
             auto ret                      = std::make_shared<GPULinearElasticity>(space);
@@ -1212,6 +1212,7 @@ namespace sfem {
     public:
         std::shared_ptr<FunctionSpace> space;
         enum smesh::PrimitiveType      real_type{smesh::SMESH_DEFAULT};
+        void                          *stream{nullptr};
         std::vector<GPUEMSoABlock>     blocks;
 
         GPUEMOp(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
@@ -1298,15 +1299,10 @@ namespace sfem {
                                                                   (void **)bd.element_matrix->data(),
                                                                   h,
                                                                   out,
-                                                                  SFEM_DEFAULT_STREAM);
+                                                                  stream);
                 } else {
-                    err = cu_affine_hex8_elemental_matrix_apply(bd.n_elements,
-                                                                bd.elements->data(),
-                                                                real_type,
-                                                                (void **)bd.element_matrix->data(),
-                                                                h,
-                                                                out,
-                                                                SFEM_DEFAULT_STREAM);
+                    err = cu_affine_hex8_elemental_matrix_apply(
+                            bd.n_elements, bd.elements->data(), real_type, (void **)bd.element_matrix->data(), h, out, stream);
                 }
                 if (err != SFEM_SUCCESS) {
                     return err;
@@ -1337,7 +1333,7 @@ namespace sfem {
         }
 
         int            report(const real_t *const) override { return SFEM_SUCCESS; }
-        ExecutionContext execution_context() const override { return EXECUTION_SPACE_DEVICE; }
+        ExecutionContext execution_context() const override { return ExecutionContext(EXECUTION_SPACE_DEVICE, stream); }
 
         const char *name() const override { return "gpu:em:Laplacian"; }
         bool        energy_or_potential_based() const override { return true; }
@@ -1350,6 +1346,7 @@ namespace sfem {
     public:
         std::shared_ptr<FunctionSpace> space;
         enum smesh::PrimitiveType      real_type{smesh::SMESH_DEFAULT};
+        void                          *stream{nullptr};
         std::vector<GPUEMAoSBlock>     blocks;
         bool                           cartesian_ordering{true};
 
@@ -1441,14 +1438,8 @@ namespace sfem {
             const int level = smesh::semistructured_level(ssm);
             int       err   = SFEM_SUCCESS;
             for (const auto &bd : blocks) {
-                err = cu_affine_sshex8_elemental_matrix_apply_AoS(level,
-                                                                  bd.n_elements,
-                                                                  bd.elements->data(),
-                                                                  real_type,
-                                                                  (void *)bd.element_matrix->data(),
-                                                                  h,
-                                                                  out,
-                                                                  SFEM_DEFAULT_STREAM);
+                err = cu_affine_sshex8_elemental_matrix_apply_AoS(
+                        level, bd.n_elements, bd.elements->data(), real_type, (void *)bd.element_matrix->data(), h, out, stream);
                 if (err != SFEM_SUCCESS) {
                     return err;
                 }
@@ -1478,7 +1469,7 @@ namespace sfem {
         }
 
         int            report(const real_t *const) override { return SFEM_SUCCESS; }
-        ExecutionContext execution_context() const override { return EXECUTION_SPACE_DEVICE; }
+        ExecutionContext execution_context() const override { return ExecutionContext(EXECUTION_SPACE_DEVICE, stream); }
 
         const char *name() const override { return "gpu:EMWarpOp"; }
         bool        energy_or_potential_based() const override { return true; }
@@ -1491,6 +1482,7 @@ namespace sfem {
     public:
         std::shared_ptr<FunctionSpace> space;
         enum smesh::PrimitiveType      real_type{smesh::SMESH_DEFAULT};
+        void                          *stream{nullptr};
         std::vector<GPUEMAoSBlock>     blocks;
         bool                           cartesian_ordering{true};
 
@@ -1594,7 +1586,7 @@ namespace sfem {
                                                                               (void *)bd.element_matrix->data(),
                                                                               h,
                                                                               out,
-                                                                              SFEM_DEFAULT_STREAM);
+                                                                              stream);
                 if (err != SFEM_SUCCESS) {
                     return err;
                 }
@@ -1624,7 +1616,7 @@ namespace sfem {
         }
 
         int            report(const real_t *const) override { return SFEM_SUCCESS; }
-        ExecutionContext execution_context() const override { return EXECUTION_SPACE_DEVICE; }
+        ExecutionContext execution_context() const override { return ExecutionContext(EXECUTION_SPACE_DEVICE, stream); }
 
         const char *name() const override { return "gpu:EMMultiVectorWarpOp"; }
         bool        energy_or_potential_based() const override { return true; }
@@ -1637,6 +1629,7 @@ namespace sfem {
             ret->real_type          = real_type;
             ret->blocks             = blocks;
             ret->cartesian_ordering = cartesian_ordering;
+            ret->stream             = stream;
             return ret;
         }
     };
@@ -1645,6 +1638,7 @@ namespace sfem {
     public:
         std::shared_ptr<FunctionSpace>       space;
         enum smesh::PrimitiveType            real_type{smesh::SMESH_DEFAULT};
+        void                                *stream{nullptr};
         std::vector<GPUEMAoSBlock>           blocks;
         std::shared_ptr<GPULinearElasticity> linear_elasticity;
         real_t                               mu{1};
@@ -1834,14 +1828,8 @@ namespace sfem {
             const int level = smesh::semistructured_level(ssm);
             int       err   = SFEM_SUCCESS;
             for (const auto &bd : blocks) {
-                err = cu_affine_sshex8_elemental_matrix_apply_AoS_vector(level,
-                                                                        bd.n_elements,
-                                                                        bd.elements->data(),
-                                                                        real_type,
-                                                                        (void *)bd.element_matrix->data(),
-                                                                        h,
-                                                                        out,
-                                                                        SFEM_DEFAULT_STREAM);
+                err = cu_affine_sshex8_elemental_matrix_apply_AoS_vector(
+                        level, bd.n_elements, bd.elements->data(), real_type, (void *)bd.element_matrix->data(), h, out, stream);
                 if (err != SFEM_SUCCESS) {
                     return err;
                 }
@@ -1884,7 +1872,7 @@ namespace sfem {
         }
 
         int            report(const real_t *const) override { return SFEM_SUCCESS; }
-        ExecutionContext execution_context() const override { return EXECUTION_SPACE_DEVICE; }
+        ExecutionContext execution_context() const override { return ExecutionContext(EXECUTION_SPACE_DEVICE, stream); }
 
         const char *name() const override { return "gpu:em:LinearElasticity"; }
         bool        energy_or_potential_based() const override { return true; }
@@ -1899,6 +1887,7 @@ namespace sfem {
             ret->linear_elasticity = linear_elasticity;
             ret->mu                = mu;
             ret->lambda            = lambda;
+            ret->stream            = stream;
             return ret;
         }
 

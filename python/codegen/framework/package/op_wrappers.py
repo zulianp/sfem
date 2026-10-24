@@ -6264,7 +6264,7 @@ _HEADER_RELAXATION_DECLARATIONS = {
 def _op_stream_member():
     """The stream this Op hands every kernel, where the target has one.
 
-    `GPULaplacian` declares `void *stream{SFEM_DEFAULT_STREAM}` and passes it to
+    `GPULaplacian` declares `void *stream{nullptr}` and passes it to
     each call; a host Op has nothing to declare, so it declares nothing rather
     than a member that means nothing.
     """
@@ -6276,7 +6276,7 @@ def _op_stream_member():
     //! Mirrors GPULaplacian, which declares the same member with the same
     //! default.  A launch that ignored it would serialise onto the default
     //! stream and silently undo the caller's ordering.
-    void *stream{SFEM_DEFAULT_STREAM};
+    void *stream{nullptr};
 """
 
 

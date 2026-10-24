@@ -329,7 +329,7 @@ struct TestOutput gen_test_data(enum ExecutionSpace es) {
                                        smesh::SMESH_DEFAULT,
                                        1,
                                        restricted->data(),
-                                       SFEM_DEFAULT_STREAM);
+                                       nullptr);
         } else {
             smesh::ssquad4_restrict(fine_sides->extent(1),
                                     level,
