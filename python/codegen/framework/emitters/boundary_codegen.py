@@ -1020,28 +1020,28 @@ namespace codegen {{
 
 template <typename s_t>
 struct {function}_reference_data {{
-  static const s_t *shape_1d() {{
+  {table_accessor} const s_t *shape_1d() {{
     static const s_t data[{shape_1d_count}] = {{
 {shape_1d_values}
     }};
     return data;
   }}
 
-  static const s_t *grad_1d() {{
+  {table_accessor} const s_t *grad_1d() {{
     static const s_t data[{grad_1d_count}] = {{
 {grad_1d_values}
     }};
     return data;
   }}
 
-  static const s_t *weight_1d() {{
+  {table_accessor} const s_t *weight_1d() {{
     static const s_t data[{weight_1d_count}] = {{
 {weight_1d_values}
     }};
     return data;
   }}
 
-  static const int *shape_index() {{
+  {table_accessor} const int *shape_index() {{
     static const int data[{n_shape}] = {{
 {shape_index_values}
     }};

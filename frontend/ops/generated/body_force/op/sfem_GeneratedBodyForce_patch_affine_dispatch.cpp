@@ -22,8 +22,6 @@ extern "C" int body_force_total_tri3_merit_patch_a_msoa(
     const real_t g1,
     const int nsteps,
     const void *const RSTR steps,
-    const void *const RSTR x,
-    const void *const RSTR h,
     const void *const RSTR accumulator,
     void *const RSTR merit
 );
@@ -41,8 +39,6 @@ extern "C" int body_force_total_tet4_merit_patch_a_msoa(
     const real_t g2,
     const int nsteps,
     const void *const RSTR steps,
-    const void *const RSTR x,
-    const void *const RSTR h,
     const void *const RSTR accumulator,
     void *const RSTR merit
 );
@@ -61,8 +57,6 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int body_force_total_merit_patch_2d_a_msoa(
         const real_t g1,
         const int nsteps,
         const void *const RSTR steps,
-        const void *const RSTR x,
-        const void *const RSTR h,
         const void *const RSTR accumulator,
         void *const RSTR merit
 ) {
@@ -72,7 +66,7 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int body_force_total_merit_patch_2d_a_msoa(
           : real_type;
   switch (element_type) {
     case smesh::TRI3:
-      return body_force_total_tri3_merit_patch_a_msoa((int)resolved_real_type, n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, density, g0, g1, nsteps, steps, x, h, accumulator, merit);
+      return body_force_total_tri3_merit_patch_a_msoa((int)resolved_real_type, n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, density, g0, g1, nsteps, steps, accumulator, merit);
     default:
       break;
   }
@@ -95,8 +89,6 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int body_force_total_merit_patch_3d_a_msoa(
         const real_t g2,
         const int nsteps,
         const void *const RSTR steps,
-        const void *const RSTR x,
-        const void *const RSTR h,
         const void *const RSTR accumulator,
         void *const RSTR merit
 ) {
@@ -106,7 +98,7 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int body_force_total_merit_patch_3d_a_msoa(
           : real_type;
   switch (element_type) {
     case smesh::TET4:
-      return body_force_total_tet4_merit_patch_a_msoa((int)resolved_real_type, n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, density, g0, g1, g2, nsteps, steps, x, h, accumulator, merit);
+      return body_force_total_tet4_merit_patch_a_msoa((int)resolved_real_type, n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, density, g0, g1, g2, nsteps, steps, accumulator, merit);
     default:
       break;
   }

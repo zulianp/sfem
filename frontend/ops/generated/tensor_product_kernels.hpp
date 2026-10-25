@@ -502,6 +502,10 @@ static SFEM_INLINE void tensor_gradient_contiguous(
       ne, shape_1d, grad_1d, streams, component, gradient);
 }
 
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
 template <typename s_t, int NQ, int NS, int VS, int ND, int NC = ND>
 static SFEM_INLINE void tensor_test(
     const int ne,
@@ -513,6 +517,9 @@ static SFEM_INLINE void tensor_test(
   TensorProductWeakOps<s_t, NQ, NS, VS, ND>::template test<NC>(
       ne, shape_1d, grad_1d, flux, out_streams, component);
 }
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 
 template <typename s_t, int NQ, int NS, int ND>
 struct TensorProductWeakOpsScalar;

@@ -46,7 +46,7 @@ namespace sfem {
       bool       *flag;
     };
 
-    void material_defaults(real_t *const values) {
+    [[maybe_unused]] void material_defaults(real_t *const values) {
       values[0] = 0;
       values[1] = 0;
       values[2] = 0;
@@ -61,10 +61,12 @@ namespace sfem {
       values[11] = 0;
     }
 
+    // derefine_op copies the parameters by name, with or without YAML.
+    [[maybe_unused]] constexpr int N_DEFINED_MATERIAL_PARAMETERS = 12;
+    [[maybe_unused]] constexpr int N_MATERIAL_PARAMETERS = 12;
+    [[maybe_unused]] static const char *const MATERIAL_PARAMETER_NAMES[N_MATERIAL_PARAMETERS] = {"t0", "t0_001", "t0_010", "t0_100", "t1", "t1_001", "t1_010", "t1_100", "t2", "t2_001", "t2_010", "t2_100"};
+
 #ifdef SFEM_ENABLE_RYAML
-    constexpr int N_DEFINED_MATERIAL_PARAMETERS = 12;
-    constexpr int N_MATERIAL_PARAMETERS = 12;
-    static const char *const MATERIAL_PARAMETER_NAMES[N_MATERIAL_PARAMETERS] = {"t0", "t0_001", "t0_010", "t0_100", "t1", "t1_001", "t1_010", "t1_100", "t2", "t2_001", "t2_010", "t2_100"};
 
     bool yaml_read_real(const ryml::ConstNodeRef &node,
               const char *const key,

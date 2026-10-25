@@ -9480,10 +9480,34 @@ def _residual_hessian_dispatch_body(
     affine_elements = tuple(
         element for dim in (2, 3) for element in affine_by_dim[dim]
     )
+    # The adjugate only where an affine assembly declares it: a mass reads the
+    # determinant alone, and binding the adjugate anyway is a variable set and
+    # never read.  The kernel's signature says which, as it does for the apply.
+    reads_adjugate = any(
+        argument.startswith("adjugate[")
+        for dim in (2, 3)
+        if affine_by_dim[dim]
+        for argument in _affine_geometry_call_args(
+            kernel_sources, "%s_%s_%dd_a_msoa" % (material_name, operation, dim), dim
+        )
+    )
+    declare_adjugate = (
+        ["%sconst geom_t *const *adjugate = nullptr;" % indent]
+        if reads_adjugate
+        else []
+    )
+    bind_adjugate = (
+        [
+            "%s  adjugate = reinterpret_cast<const geom_t *const *>(" % indent,
+            "%s      cache->jacobian->adjugate_components());" % indent,
+        ]
+        if reads_adjugate
+        else []
+    )
     if affine_elements:
         lines.extend(
             [
-                "%sconst geom_t *const *adjugate = nullptr;" % indent,
+                *declare_adjugate,
                 "%sconst geom_t *determinant = nullptr;" % indent,
                 "%sif (%s) {"
                 % (indent, _element_condition("domain.element_type", affine_elements)),
@@ -9494,8 +9518,7 @@ def _residual_hessian_dispatch_body(
                 % (indent, material_name, operation),
                 "%s    return SFEM_FAILURE;" % indent,
                 "%s  }" % indent,
-                "%s  adjugate = reinterpret_cast<const geom_t *const *>(" % indent,
-                "%s      cache->jacobian->adjugate_components());" % indent,
+                *bind_adjugate,
                 "%s  determinant = reinterpret_cast<const geom_t *>(" % indent,
                 "%s      cache->jacobian->jacobian_determinant()->data());" % indent,
                 "%s}" % indent,
@@ -11342,14 +11365,16 @@ def _yaml_helpers(defaults):
       return matched;
     }
 
-    void material_defaults(real_t *const values) {
+    [[maybe_unused]] void material_defaults(real_t *const values) {
 %(default_lines)s
     }
 
+    // derefine_op copies the parameters by name, with or without YAML.
+    [[maybe_unused]] constexpr int N_DEFINED_MATERIAL_PARAMETERS = %(nparameters)d;
+    [[maybe_unused]] constexpr int N_MATERIAL_PARAMETERS = %(storage_size)d;
+    [[maybe_unused]] static const char *const MATERIAL_PARAMETER_NAMES[N_MATERIAL_PARAMETERS] = {%(names)s};
+
 #ifdef SFEM_ENABLE_RYAML
-    constexpr int N_DEFINED_MATERIAL_PARAMETERS = %(nparameters)d;
-    constexpr int N_MATERIAL_PARAMETERS = %(storage_size)d;
-    static const char *const MATERIAL_PARAMETER_NAMES[N_MATERIAL_PARAMETERS] = {%(names)s};
 
     bool yaml_read_real(const ryml::ConstNodeRef &node,
               const char *const key,

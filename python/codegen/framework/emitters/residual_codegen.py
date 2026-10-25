@@ -2097,7 +2097,7 @@ def generate_coupled_residual_sfem_files(
     operator_files = published_mesh_operator_files(
         published_here,
         published_patch_merit_kernels(
-            element_type,
+            specialization.quadrature_rule,
             unit_name,
             has_parallel_region=_target().parallel_region_pragma() is not None,
         ),
@@ -6605,7 +6605,12 @@ def _operator_source(
             specialized_block_prefix or local_prefix,
             form,
         )
-        if True:
+        # Only where the caller's streams are host memory.  The entry point
+        # runs the block on the arrays it is handed, on the calling thread; a
+        # device target would hand that loop device pointers and ignore the
+        # stream it is given, and there is no element-SoA device kernel for it
+        # to launch instead.  The diagnostics above are published either way.
+        if not _target().supports_device_kernels:
             scalar_type = "s_t"
             params = list(
                 _local_kernel_count_params(_uses_constant_p1_expansion(rule))
@@ -6794,7 +6799,7 @@ def _operator_source(
         str(parameter) for parameter in form_dependencies["residual"].parameters
     )
     for kernel in published_patch_merit_kernels(
-        rule.element_type,
+        rule,
         unit_name,
         has_parallel_region=_target().parallel_region_pragma() is not None,
     ):
@@ -9219,16 +9224,16 @@ def _element_matrix_kernel_for(strategy, kernels):
     return kernels.get(_ELEMENT_MATRIX_FALLBACK.get(strategy))
 
 
-def _assembly_geometry_stream_names(dim):
+def _assembly_geometry_stream_names(dependencies, dim):
     """The adjugate and determinant an assembly kernel stages, in ABI order.
 
-    The block kernel takes the adjugate and the determinant whatever the
-    element, so an affine assembly reads exactly those two streams; the metric
-    form is a matrix-free contraction and has no bearing here.
+    The streams the kernel it calls reads, from the plan that declares that
+    kernel: the determinant always, the adjugate where the form reads a
+    gradient.  A mass reads values alone, and an affine assembly that staged its
+    adjugate anyway filled a buffer nothing read.  The metric form is a
+    matrix-free contraction and has no bearing here.
     """
-    return tuple(
-        ["adj%d" % component for component in range(dim * dim)] + ["det0"]
-    )
+    return tuple(name for name, _ in local_geometry_streams(dependencies, dim))
 
 
 def _scalar_crs_matrix_assembly_source(*arguments, **keywords):
@@ -9352,6 +9357,17 @@ def _holding_one_element_crs_matrix_assembly_source(
     # Asked here because `kept_reference_tables` below needs it: an affine loop
     # builds no Jacobian, so it reads no reference gradient either.
     builds_its_own_jacobian = geometry_mode != AFFINE_MODE
+    # The geometry the element's matrix is built from is whatever the kernel
+    # called for it reads: the element-matrix kernel, or the block it probes.
+    geometry_streams = _assembly_geometry_stream_names(
+        assembled_matrix_dependencies(dependencies)
+        if serves_this_matrix
+        else jacobian_action_dependencies(dependencies),
+        dim,
+    )
+    # A loop that maps the element builds the adjugate on its way to the
+    # determinant; an affine one stages it only for a kernel that reads it.
+    stages_adjugate = builds_its_own_jacobian or "adj0" in geometry_streams
     element_matrix_call = (
         element_matrix_kernel.name if serves_this_matrix else None
     )
@@ -9441,7 +9457,7 @@ def _holding_one_element_crs_matrix_assembly_source(
     if is_affine_assembly:
         params.extend(
             "const geom_t *const RSTR %s" % abi_geometry_name(stream)
-            for stream in _assembly_geometry_stream_names(dim)
+            for stream in geometry_streams
         )
     else:
         params.append("const geom_t *const *const RSTR points")
@@ -9530,7 +9546,11 @@ def _holding_one_element_crs_matrix_assembly_source(
             "    idx_t ev[NS];",
             "    s_t element_matrix[%d];" % (len(row_streams) * len(column_streams)),
             *([] if is_affine_assembly else ["    s_t bcoordinates[ND * NS]%s;" % _wi_extent()]),
-            "    s_t badjugate_data[ND * ND][%s];" % _width_product("NQ"),
+            *(
+                ["    s_t badjugate_data[ND * ND][%s];" % _width_product("NQ")]
+                if stages_adjugate
+                else []
+            ),
             "    s_t bdeterminant[%s];" % _width_product("NQ"),
         ]
     )
@@ -9624,6 +9644,7 @@ def _holding_one_element_crs_matrix_assembly_source(
             "    badjugate_data[%d][0] = s_t(%s[element]);"
             % (component, abi_geometry_name("adj%d" % component))
             for component in range(dim * dim)
+            if stages_adjugate
         )
         lines.append(
             "    bdeterminant[0] = s_t(%s[element]);" % abi_geometry_name("det0")
@@ -9726,10 +9747,11 @@ def _holding_one_element_crs_matrix_assembly_source(
             if direction_lines or output_lines
             else "%s_contiguous" % block
         )
-    lines.append(
-        "    const s_t *const badjugate[ND * ND] = {%s};"
-        % ", ".join("badjugate_data[%d]" % i for i in range(dim * dim))
-    )
+    if stages_adjugate:
+        lines.append(
+            "    const s_t *const badjugate[ND * ND] = {%s};"
+            % ", ".join("badjugate_data[%d]" % i for i in range(dim * dim))
+        )
     call_args = ["1", "1"]
     call_args.extend(
         _stream_call_arguments(
@@ -10132,7 +10154,7 @@ def _holding_one_element_crs_matrix_assembly_source(
         ]
     )
     _scalar_crs_precision_entry_points(
-        tuple(abi_geometry_name(stream) for stream in _assembly_geometry_stream_names(dim))
+        tuple(abi_geometry_name(stream) for stream in geometry_streams)
         if is_affine_assembly
         else ("points",),
         dependencies,

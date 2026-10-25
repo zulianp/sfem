@@ -80,7 +80,7 @@ namespace sfem {
       return matched;
     }
 
-    void material_defaults(real_t *const values) {
+    [[maybe_unused]] void material_defaults(real_t *const values) {
       values[0] = 0.10000000000000001;
       values[1] = 0.39000000000000001;
       values[2] = 0.095000000000000001;
@@ -109,10 +109,12 @@ namespace sfem {
       values[25] = 86.400000000000006;
     }
 
+    // derefine_op copies the parameters by name, with or without YAML.
+    [[maybe_unused]] constexpr int N_DEFINED_MATERIAL_PARAMETERS = 26;
+    [[maybe_unused]] constexpr int N_MATERIAL_PARAMETERS = 26;
+    [[maybe_unused]] static const char *const MATERIAL_PARAMETER_NAMES[N_MATERIAL_PARAMETERS] = {"porosity", "S_res", "P_r", "m", "rho_w0", "kappa_T", "p_wr", "M_c", "Z", "R", "T", "mu_w", "mu_c", "C_kw1", "C_ka1", "C_ka2", "dt", "K_0", "K_1", "K_2", "K_3", "K_4", "K_5", "K_6", "K_7", "K_8"};
+
 #ifdef SFEM_ENABLE_RYAML
-    constexpr int N_DEFINED_MATERIAL_PARAMETERS = 26;
-    constexpr int N_MATERIAL_PARAMETERS = 26;
-    static const char *const MATERIAL_PARAMETER_NAMES[N_MATERIAL_PARAMETERS] = {"porosity", "S_res", "P_r", "m", "rho_w0", "kappa_T", "p_wr", "M_c", "Z", "R", "T", "mu_w", "mu_c", "C_kw1", "C_ka1", "C_ka2", "dt", "K_0", "K_1", "K_2", "K_3", "K_4", "K_5", "K_6", "K_7", "K_8"};
 
     bool yaml_read_real(const ryml::ConstNodeRef &node,
               const char *const key,
