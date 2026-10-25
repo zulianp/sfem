@@ -2,7 +2,8 @@
 #include "sfem_GeneratedModifiedMooneyRivlin_cuda_c_abi.hpp"
 
 
-#include "sfem_API.hpp"
+#include "sfem_blas_factory.hpp"
+#include "sfem_cuda_blas.hpp"
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_MultiDomainOp.hpp"
 #include "sfem_DerefinedTimeScheme.hpp"
