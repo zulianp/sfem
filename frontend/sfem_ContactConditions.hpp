@@ -130,6 +130,10 @@ namespace sfem {
         class Impl;
         std::unique_ptr<Impl> impl_;
     };
+
+    /// AxisAlignedContactConditions::create_from_env, moved to the device for EXECUTION_SPACE_DEVICE.
+    std::shared_ptr<Constraint> create_contact_conditions_from_env(const std::shared_ptr<FunctionSpace> &space,
+                                                                   const ExecutionSpace                  es);
 }  // namespace sfem
 
 #endif  // SFEM_CONTACT_CONDITIONS_HPP

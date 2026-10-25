@@ -30,8 +30,9 @@
 
 #ifdef SFEM_ENABLE_CUDA
 #include "cu_obstacle.hpp"
-#include "smesh_device_arrays.hpp"
+#include "sfem_ContactConditions_cuda.hpp"
 #include "sfem_cuda_blas.hpp"
+#include "smesh_device_arrays.hpp"
 #endif
 
 // static const sfem::ExecutionSpace es_to_be_ported = sfem::EXECUTION_SPACE_HOST;
@@ -978,6 +979,20 @@ namespace sfem {
         }
 #endif
         return obstacle_hessian_block_diag_sym(dim, n, idx, normals, m, x, values);
+    }
+
+    std::shared_ptr<Constraint> create_contact_conditions_from_env(const std::shared_ptr<FunctionSpace> &space,
+                                                                   const ExecutionSpace                  es) {
+        SFEM_UNUSED(es);
+        auto conds = AxisAlignedContactConditions::create_from_env(space);
+
+#ifdef SFEM_ENABLE_CUDA
+        if (es == EXECUTION_SPACE_DEVICE) {
+            return to_device(conds);
+        }
+#endif  // SFEM_ENABLE_CUDA
+
+        return conds;
     }
 
 }  // namespace sfem

@@ -17,6 +17,7 @@
 #include "sfem_ParallelOperator.hpp"
 #include "sfem_ShiftedPenalty_impl.hpp"
 #include "sfem_openmp_blas.hpp"
+#include "sfem_operator_factory.hpp"
 #include "sfem_tpl_blas.hpp"
 
 #include "sfem_aliases.hpp"
@@ -28,9 +29,6 @@
 // MATLAB version
 // https://bitbucket.org/hkothari/matsci/src/ab637a0655512c4ddf299914dd45fdb563ac7b34/Solvers/%2BBoxConstraints/%40PenaltyMG/PenaltyMG.m?at=restructuring
 namespace sfem {
-
-    template <typename T>
-    static std::shared_ptr<Operator<T>> diag_op(const SharedBuffer<T>& diagonal_scaling, const ExecutionSpace es);
 
     /**
      * @class ShiftedPenaltyMultigrid

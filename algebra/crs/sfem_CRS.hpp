@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <limits>
 #include <memory>
+#include <string>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -602,6 +603,9 @@ namespace sfem {
         auto g = r->mm(d);
         return g;
     }
+
+    /// Writes the graph and values as a CRS folder (matrixio layout) at path.
+    int write_crs(const std::string& path, CRSGraph& graph, sfem::Buffer<real_t>& values);
 
 }  // namespace sfem
 

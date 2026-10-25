@@ -117,6 +117,15 @@ namespace sfem {
 
     std::shared_ptr<Constraint> to_device(const std::shared_ptr<DirichletConditions> &dc);
 
+    /// DirichletConditions::create, moved to the device for EXECUTION_SPACE_DEVICE.
+    std::shared_ptr<Constraint> create_dirichlet_conditions(const std::shared_ptr<FunctionSpace>              &space,
+                                                            const std::vector<DirichletConditions::Condition> &conditions,
+                                                            const ExecutionSpace                               es);
+
+    /// DirichletConditions::create_from_env, moved to the device for EXECUTION_SPACE_DEVICE.
+    std::shared_ptr<Constraint> create_dirichlet_conditions_from_env(const std::shared_ptr<FunctionSpace> &space,
+                                                                     const ExecutionSpace                  es);
+
 }  // namespace sfem
 
 #endif  // SFEM_DIRICHLET_CONDITIONS_HPP

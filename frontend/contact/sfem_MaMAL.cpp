@@ -1,4 +1,5 @@
 #include "sfem_MaMAL.hpp"
+#include "smesh_semistructured.hpp"
 
 #include "sfem_ContactSkin.hpp"
 #include "sfem_ContactSolveKernels.hpp"
@@ -421,7 +422,7 @@ namespace sfem {
         assert(fine_surface->n_blocks() == 1);
         assert(from_level % to_level == 0);
 
-        auto      coarse_view = ssquad4_derefine_element_connectivity(from_level, to_level, fine_surface->block(0)->elements());
+        auto      coarse_view = smesh::derefine_elements(smesh::QUAD4, from_level, to_level, fine_surface->block(0)->elements());
         auto      coarse_view_data  = coarse_view->data();
         const int nxe               = coarse_view->extent(0);
         const ptrdiff_t nelements   = coarse_view->extent(1);

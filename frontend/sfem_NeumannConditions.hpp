@@ -119,6 +119,11 @@ namespace sfem {
 
     std::shared_ptr<Op> to_device(const std::shared_ptr<NeumannConditions> &nc);
 
+    /// NeumannConditions::create, moved to the device for EXECUTION_SPACE_DEVICE.
+    std::shared_ptr<Op> create_neumann_conditions(const std::shared_ptr<FunctionSpace>            &space,
+                                                  const std::vector<NeumannConditions::Condition> &conditions,
+                                                  const ExecutionSpace                             es);
+
 }  // namespace sfem
 
 #endif  // SFEM_NEUMANN_CONDITIONS_HPP
