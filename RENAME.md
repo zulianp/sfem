@@ -8,25 +8,25 @@ Scope counts come from `rg` in this worktree at `717c5cfbf`, over C/C++/CUDA/Pyt
 
 **Convention.** An object is created by a static member of its class: `X::create(...)`, returning `std::shared_ptr<X>`. The execution space is a parameter of `create`. There is no free wrapper whose only job is the `to_device` dispatch. Other sources keep the existing suffixes on the same class: `X::create_from_yaml`, `X::create_from_file`, `X::create_from_env`. Some builders assemble an object from types in another module, such as a solver built from a `Function`. Those stay free `create_<thing>` functions in the module that knows both types. A function that only wraps an existing object behind another interface is `as_<interface>(obj)`. `make_*` is retired. This is the layout the `sfem_API.hpp` reorganisation produces: the factories move next to their classes.
 
-- [ ] F1 `create_cg(op, es)` → `ConjugateGradient<T>::create(op, es)`: 35 occ/23 files (`frontend/sfem_API.hpp:149`). The algebra class owns its construction.
-- [ ] F2 `create_parallel_cg` → `ParallelConjugateGradient<T>::create`: 6/4 (`sfem_API.hpp:171`). Same as F1.
-- [ ] F3 `create_bcgs` → `BiCGStab<T>::create`: 12/9 (`sfem_API.hpp:281`). Removes the `bcgs` contraction too.
-- [ ] F4 `create_cheb3` → `Chebyshev3<T>::create`: 4/4 (`sfem_API.hpp:300`). Removes the `cheb3` contraction.
-- [ ] F5 `create_mprgp` → `MPRGP<T>::create`: 7/7 (`sfem_API.hpp:317`).
-- [ ] F6 `create_mg` → `Multigrid<T>::create`: 3/3 (`sfem_API.hpp:338`).
-- [ ] F7 `create_stationary` → `StationaryIteration<T>::create`: 9/7 (`sfem_API.hpp:258`).
-- [ ] F8 `create_shiftable_jacobi`, `create_shiftable_block_sym_jacobi`, `create_mixed_precision_shiftable_block_sym_jacobi` → `ShiftableJacobi<T>::create`, `ShiftableBlockSymJacobi<T>::create`, `MixedPrecisionShiftableBlockSymJacobi<HP, LP>::create`: 16/11, 8/5 and 4/3 (`sfem_API.hpp:190-234`).
-- [ ] F9 `create_dirichlet_conditions(space, conds, es)` and `create_dirichlet_conditions_from_env(space, es)` → `DirichletConditions::create(space, conds, es)` and `DirichletConditions::create_from_env(space, es)`: 45/25 and 6/6 (`sfem_API.hpp:355-383`). The class already has `create` and `create_from_env`; the free wrappers only add the device dispatch. That is two names for one operation.
-- [ ] F10 `create_neumann_conditions(space, conds, es)` → `NeumannConditions::create(space, conds, es)`: 4/4 (`sfem_API.hpp:384`). Same as F9.
-- [ ] F11 `create_contact_conditions_from_env(space, es)` → `AxisAlignedContactConditions::create_from_env(space, es)`: 2/2 (`sfem_API.hpp:399`). Same as F9.
+- [ ] F1 `create_cg(op, es)` → `ConjugateGradient<T>::create(op, es)`: 35 occ/23 files (`algebra/sfem_solver_factory.cpp:15`). The algebra class owns its construction.
+- [ ] F2 `create_parallel_cg` → `ParallelConjugateGradient<T>::create`: 6/4 (`sfem_solver_factory.cpp:34`). Same as F1.
+- [ ] F3 `create_bcgs` → `BiCGStab<T>::create`: 12/9 (`sfem_solver_factory.cpp:141`). Removes the `bcgs` contraction too.
+- [ ] F4 `create_cheb3` → `Chebyshev3<T>::create`: 4/4 (`sfem_solver_factory.cpp:160`). Removes the `cheb3` contraction.
+- [ ] F5 `create_mprgp` → `MPRGP<T>::create`: 7/7 (`sfem_solver_factory.cpp:177`).
+- [ ] F6 `create_mg` → `Multigrid<T>::create`: 3/3 (`sfem_solver_factory.cpp:197`).
+- [ ] F7 `create_stationary` → `StationaryIteration<T>::create`: 9/7 (`sfem_solver_factory.cpp:119`).
+- [ ] F8 `create_shiftable_jacobi`, `create_shiftable_block_sym_jacobi`, `create_mixed_precision_shiftable_block_sym_jacobi` → `ShiftableJacobi<T>::create`, `ShiftableBlockSymJacobi<T>::create`, `MixedPrecisionShiftableBlockSymJacobi<HP, LP>::create`: 16/11, 8/5 and 4/3 (`sfem_solver_factory.cpp:52-95`).
+- [ ] F9 `create_dirichlet_conditions(space, conds, es)` and `create_dirichlet_conditions_from_env(space, es)` → `DirichletConditions::create(space, conds, es)` and `DirichletConditions::create_from_env(space, es)`: 45/25 and 6/6 (`frontend/sfem_DirichletConditions.cpp:771`, `781`). The class already has `create` and `create_from_env`; the free wrappers only add the device dispatch. That is two names for one operation.
+- [ ] F10 `create_neumann_conditions(space, conds, es)` → `NeumannConditions::create(space, conds, es)`: 4/4 (`frontend/sfem_NeumannConditions.cpp:1265`). Same as F9.
+- [ ] F11 `create_contact_conditions_from_env(space, es)` → `AxisAlignedContactConditions::create_from_env(space, es)`: 2/2 (`frontend/sfem_ContactConditions.cpp:984`). Same as F9.
 - [ ] F12 `create_contact_surface(space, ...)` → `ContactSurface::create(space, ...)`: 2/2 (`frontend/sfem_ContactSurface.hpp:116`). Its implementations `MeshContactSurface` and `SSMeshContactSurface` already use `create`/`create_from_file`.
 - [ ] F13 class `sfem::Factory` → `sfem::OpFactory`. `Factory::create_op(space, name)`, `Factory::create_op_gpu(space, name)` and the free `create_op(space, name, es)` become one `OpFactory::create(space, name, es)`. Scope: 35/13, 3/2 and 136/61 (`frontend/ops/sfem_OpFactory.hpp:40,84,94,134`). The file is already `sfem_OpFactory.hpp`. Three spellings of one lookup collapse into one, and `es` replaces the `_gpu` twin.
 - [ ] F14 `Factory::create_boundary_op` → `OpFactory::create_boundary(space, elements, name, es)`: 6/5 (`sfem_OpFactory.hpp:101`). Same as F13.
 - [ ] F15 free `create_op_from_yaml(space, node, es)` → `OpFactory::create_from_yaml(space, node, es)`: 17/7 (`sfem_OpFactory.hpp:145-149`). This puts the YAML source on the factory, as for every other class. `Factory::register_op` keeps its name and only takes the new class qualifier (69/33).
 - [ ] F16 `d_op_str(name)` → internal `device_op_name(name)` in `sfem_OpFactory.cpp`: 3/2 (`sfem_OpFactory.hpp:131`). It is used only inside the factory once F13 lands.
 - [ ] F17 `make_op(rows, cols, fn, es)` → `LambdaOperator<T>::create(rows, cols, fn, es)` and `make_in_place_op` → `InPlaceLambdaOperator<T>::create`: 12/8 and 2/2 (`algebra/sfem_Operator.hpp:144,171`). `make_op` currently names two unrelated operations (F18 is the other).
-- [ ] F18 `make_op(std::shared_ptr<smesh::AbstractRestrict>)` → `as_operator(restrict)` (`sfem_API.hpp:852`). It wraps an existing object and creates no state.
-- [ ] F19 `make_linear_op(f)` and `make_linear_op_variant(f, opts)` → `as_operator(f)` and `as_operator(f, opts)`: 6/6 and 1/1 (`sfem_API.hpp:1013,1021`). Both are adapters (F18).
+- [ ] F18 `make_op(std::shared_ptr<smesh::AbstractRestrict>)` → `as_operator(restrict)` (`frontend/sfem_Transfer.cpp:171`). It wraps an existing object and creates no state.
+- [ ] F19 `make_linear_op(f)` and `make_linear_op_variant(f, opts)` → `as_operator(f)` and `as_operator(f, opts)`: 6/6 and 1/1 (`frontend/sfem_LinearOperatorFactory.cpp:385,393`). Both are adapters (F18).
 - [ ] F20 `make_parallel_op(...)` (2 overloads) → `LambdaParallelOperator<T>::create(...)`, and `make_team_op` → `TeamParallelOperator<T>::create`: 12/7 and 4/4 (`algebra/parallel/sfem_ParallelOperator.hpp:141-163`). Both construct the class they return.
 - [ ] F21 `make_openmp_blas<T>()` and `make_cuda_blas<T>()` → `OpenMPBLAS<T>::create()` and `GPUBLAS<T>::create()` (class names from B1): 29/22 and 15/7. Callers that choose by space use the existing `blas<T>(es)` (134 occ).
 - [ ] F22 member `make_buffer(n)` in `ShiftedPenalty` and `ShiftedPenaltyMultigrid` → member `create_buffer(n)`: 20 occ/2 files (`algebra/sfem_ShiftedPenalty.hpp:103`, `algebra/sfem_ShiftedPenaltyMultigrid.hpp:516`, used at `:244`). It allocates through the solver's BLAS. `create_buffer` is the library's word for this (smesh `create_buffer`, 478/92 via `frontend/sfem_aliases.hpp:43`). The test-local `static make_buffer(initializer_list)` helpers in three `algebra/*/tests` files stay; they are file-local.
@@ -89,12 +89,12 @@ The public C++ methods already use `n_dofs`/`n_nodes`/`n_elements`: no `ndofs()`
 
 **Convention.** `hessian_<format>[_sym][_<layout>]`, where `<format>` is the lowercase name of the matrix class that stores the result (`crs`, `bsr`, `coo`, `dia`, `sell`) and qualifiers are spelled out. BCRS and BSR are the same storage, block compressed rows. The library's class is `BSR` (`algebra/bsr/sfem_BSR.hpp`), and the format string `op_type::BSR_SYM` is already assembled by `hessian_bcrs_sym` (`frontend/sfem_API.hpp:1629`), so the word `bcrs` goes.
 
-- [ ] H1 `hessian_bcrs_sym` → `hessian_bsr_sym`: 31/16 (`frontend/ops/sfem_Op.hpp:173`, `sfem_API.hpp:1245`, op implementations, codegen).
+- [ ] H1 `hessian_bcrs_sym` → `hessian_bsr_sym`: 31/16 (`frontend/ops/sfem_Op.hpp:173`, `sfem_LinearOperatorFactory.cpp:108`, op implementations, codegen).
 - [ ] H2 kernels `*_bcrs_sym` (`linear_elasticity_bcrs_sym`, `neohookean_ogden_bcrs_sym`, `hex8_neohookean_ogden[_active_strain]_bcrs_sym`, `hex8_mooney_rivlin_active_strain_bcrs_sym`, `h_bcrs_sym`) → `*_bsr_sym`: 24 occ. Kernel names follow H1.
 - [ ] H3 class `BCRSSymSpMV` in `algebra/sfem_bcrs_sym_SpMV.hpp` → `BSRSymSpMV` in `sfem_BSRSymSpMV.hpp` (5/1 plus 1 include). Also `algebra/sfem_crs_sym_SpMV.hpp` → `sfem_CRSSymSpMV.hpp` (class `CRSSymSpMV`, 3 includes).
-- [ ] H4 `hessian_scrs` / class `SCRS` → `hessian_split_crs` / `SplitCRS`: 2/1 and 7/1 (`sfem_API.hpp:1474`, `algebra/crs/scrs.hpp:73`).
-- [ ] H5 `hessian_acrs` / class `ACRS` → `hessian_aligned_crs` / `AlignedCRS`: 2/1 and 7/1 (`sfem_API.hpp:1455`, `algebra/crs/acrs.hpp:23`).
-- [ ] H6 `hessian_sdacrs` / class `SDACRS` → `hessian_split_aligned_crs` / `SplitAlignedCRS`: 2/1 and 7/1 (`sfem_API.hpp:1434`, `algebra/crs/sdacrs.hpp:74`). Please confirm what "DA" expands to: the class keeps a separate diagonal block (`diag_rowptr`, `diag_colidx`, `diag_values`).
+- [ ] H4 `hessian_scrs` / class `SCRS` → `hessian_split_crs` / `SplitCRS`: 2/1 and 7/1 (`sfem_LinearOperatorFactory.cpp:340`, `algebra/crs/scrs.hpp:73`).
+- [ ] H5 `hessian_acrs` / class `ACRS` → `hessian_aligned_crs` / `AlignedCRS`: 2/1 and 7/1 (`sfem_LinearOperatorFactory.cpp:320`, `algebra/crs/acrs.hpp:23`).
+- [ ] H6 `hessian_sdacrs` / class `SDACRS` → `hessian_split_aligned_crs` / `SplitAlignedCRS`: 2/1 and 7/1 (`sfem_LinearOperatorFactory.cpp:299`, `algebra/crs/sdacrs.hpp:74`). Please confirm what "DA" expands to: the class keeps a separate diagonal block (`diag_rowptr`, `diag_colidx`, `diag_values`).
 - [ ] H7 format strings `"SPLITCRS"`, `"ALIGNEDCRS"`, `"SPLITDACRS"` (`base/sfem_defs.hpp:18-25`) → `"SPLIT_CRS"`, `"ALIGNED_CRS"`, `"SPLIT_ALIGNED_CRS"`, matching `CRS_SYM`/`BSR_SYM`/`COO_SYM`. These are user input (`solver.linear.format`, `SFEM_OPERATOR`), so: **alias**, the old strings are still accepted, with a warning.
 
 **Considered, no change:**
@@ -113,7 +113,7 @@ The public C++ methods already use `n_dofs`/`n_nodes`/`n_elements`: no `ndofs()`
 - [ ] V5 `FunctionSpace::mesh()` (returns `Mesh&`) plus `mesh_ptr()` (returns `shared_ptr`) → one `mesh()` returning `const std::shared_ptr<Mesh>&`. This takes two commits. First, the at most 144 `.mesh()`/`->mesh()` calls in 30 files (the count includes other classes' `mesh()`) become `mesh_ptr()->`. Then `mesh_ptr()` (704/117) is renamed to `mesh()`. `Function::space()` (288 calls) already returns the shared pointer under the noun.
 
 **Considered, no change:**
-- `write_crs(path, graph, values)` (`sfem_API.hpp:1539`) already conforms.
+- `write_crs(path, graph, values)` (`algebra/crs/sfem_CRS.cpp:9`) already conforms.
 - `crs_write_folder`/`crs_read_folder` are smesh's C functions; renaming them belongs in smesh.
 - `copy_to_host`/`copy_to_device` and `copy_quadrature_rule_to_device` conform.
 

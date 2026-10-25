@@ -1,4 +1,6 @@
 #include "sfem_ssmgc.hpp"
+#include "smesh_semistructured.hpp"
+#include "smesh_sshex8_graph.hpp"
 
 #include "sfem_API.hpp"
 #include "smesh_env.hpp"
@@ -288,7 +290,7 @@ namespace sfem {
             if (!sides || sides->extent(1) == 0) {
                 return n_owned;
             }
-            const ptrdiff_t max_id = sfem::ss_elements_max_node_id(sides);
+            const ptrdiff_t max_id = smesh::nxe_max_node_id(sides->extent(1), sides->extent(0), sides->data());
             if (max_id < 0) {
                 return n_owned;
             }
@@ -585,17 +587,9 @@ namespace sfem {
                 const int coarse_level =
                         coarse_space->has_semi_structured_mesh() ? smesh::semistructured_level(coarse_space->mesh()) : 1;
 
-                auto coarse_sides = fine->sides;
-                {
-                    const auto fam = smesh::ss_source_family(fine_space->element_type());
-                    if (fam == smesh::TET4) {
-                        coarse_sides = sfem::sstri_derefine_element_connectivity(level, coarse_level, host_sides[i - 1]);
-                    } else if (fam == smesh::QUAD4) {
-                        coarse_sides = sfem::ssedge_derefine_element_connectivity(level, coarse_level, host_sides[i - 1]);
-                    } else {
-                        coarse_sides = sfem::ssquad4_derefine_element_connectivity(level, coarse_level, host_sides[i - 1]);
-                    }
-                }
+                const auto fam          = smesh::ss_source_family(fine_space->element_type());
+                const auto side_family  = fam == smesh::TET4 ? smesh::TRI3 : (fam == smesh::QUAD4 ? smesh::EDGE2 : smesh::QUAD4);
+                auto       coarse_sides = smesh::derefine_elements(side_family, level, coarse_level, host_sides[i - 1]);
                 coarse->sides = coarse_sides;
                 host_sides.push_back(coarse->sides);
 

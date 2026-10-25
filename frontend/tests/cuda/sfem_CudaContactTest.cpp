@@ -1,6 +1,8 @@
 #include <memory>
 
 #include "sfem_test.hpp"
+#include "smesh_semistructured.hpp"
+#include "smesh_sshex8_graph.hpp"
 
 #include "sfem_base.hpp"
 #include "smesh_grid.hpp"
@@ -289,14 +291,15 @@ struct TestOutput gen_test_data(enum ExecutionSpace es) {
         auto  fine_sides = contact_conds->ss_sides();
 
         int  level        = smesh::semistructured_level(ssmesh);
-        auto coarse_sides = sfem::ssquad4_derefine_element_connectivity(level, coarse_level, smesh::to_host(fine_sides));
+        auto coarse_sides = smesh::derefine_elements(smesh::QUAD4, level, coarse_level, smesh::to_host(fine_sides));
 
         auto fine_mapping = contact_conds->node_mapping();
         auto count        = sfem::create_host_buffer<uint16_t>(fine_mapping->size());
         smesh::ssquad4_element_node_incidence_count(
                 level, 1, fine_sides->extent(1), smesh::to_host(fine_sides)->data(), count->data());
 
-        const ptrdiff_t n_coarse_contact_nodes = sfem::ss_elements_max_node_id(coarse_sides) + 1;
+        const ptrdiff_t n_coarse_contact_nodes =
+                smesh::nxe_max_node_id(coarse_sides->extent(1), coarse_sides->extent(0), coarse_sides->data()) + 1;
 
         auto input = sfem::create_host_buffer<real_t>(contact_conds->n_constrained_dofs());
         {

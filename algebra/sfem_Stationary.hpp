@@ -11,11 +11,9 @@
 #include "sfem_ParallelOperator.hpp"
 #include "sfem_aliases.hpp"
 #include "sfem_openmp_blas.hpp"
+#include "sfem_operator_factory.hpp"
 
 namespace sfem {
-
-    template <typename T>
-    static std::shared_ptr<Operator<T>> diag_op(const SharedBuffer<T>& diagonal_scaling, const ExecutionSpace es);
 
     template <typename T>
     class StationaryIteration final : public MatrixFreeLinearSolver<T> {

@@ -10,15 +10,13 @@
 #include <memory>
 
 #include "sfem_MatrixFreeLinearSolver.hpp"
+#include "sfem_operator_factory.hpp"
 
 #include "sfem_openmp_blas.hpp"
 #include "sfem_openmp_cg_impl.hpp"
 
 // https://en.wikipedia.org/wiki/Conjugate_gradient_method
 namespace sfem {
-
-    template <typename T>
-    static std::shared_ptr<Operator<T>> diag_op(const SharedBuffer<T>& diagonal_scaling, const ExecutionSpace es);
 
     template <typename T>
     class ConjugateGradient final : public MatrixFreeLinearSolver<T> {

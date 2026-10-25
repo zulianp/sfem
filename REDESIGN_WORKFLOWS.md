@@ -166,7 +166,13 @@ The generators cover what `python/sfem/mesh` offers (box, rectangle, cylinder, c
 **Today.**
 - **Reads.** The repository's C/C++ reads 551 distinct `SFEM_*` names (`getenv`, `Env::read`, `SFEM_READ_ENV`). 119 of them are in library code outside drivers, examples, spikes, benchmarks and tests: 68 in frontend, 32 in ssmg, 16 in operators, 4 in algebra.
 - **Knobs on the playground path:**
-  - `SFEM_ENABLE_MIXED_PRECISION`, read seven times in `frontend/sfem_API.hpp` (`:1238`, `:1260`, ...) next to the YAML key `solver.linear.storage_bytes` for the same choice;
+  - `SFEM_ENABLE_MIXED_PRECISION`, read seven times in `frontend/sfem_LinearOperatorFactory.cpp` (`:123
+307
+323
+343
+363
+533
+587`, `:`, ...) next to the YAML key `solver.linear.storage_bytes` for the same choice;
   - `SFEM_USE_PARTIAL_ASSEMBLY`, `SFEM_NEOHOOKEAN_OGDEN_USE_AOS` and `SFEM_HEX8_ASSUME_AFFINE`, alongside material YAML (which also accepts `ASSUME_AFFINE_*` keys);
   - 25 `SFEM_MAMAL_*` knobs;
   - `SFEM_SHIFTED_PENALTY_MULTIGRID_STATS_PATH`.

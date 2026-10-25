@@ -13,11 +13,9 @@
 #include "sfem_MatrixFreeLinearSolver.hpp"
 #include "sfem_ShiftedPenalty_impl.hpp"
 #include "sfem_openmp_blas.hpp"
+#include "sfem_operator_factory.hpp"
 
 namespace sfem {
-
-    template <typename T>
-    static std::shared_ptr<Operator<T>> diag_op(const SharedBuffer<T>& diagonal_scaling, const ExecutionSpace es);
 
     // From Active set expansion strategies in ShiftedPenalty algorithm, Kruzik et al. 2020
     template <typename T>

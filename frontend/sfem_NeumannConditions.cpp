@@ -1262,4 +1262,14 @@ namespace sfem {
     std::shared_ptr<Op> to_device(const std::shared_ptr<NeumannConditions> &nc) { return nc; }
 #endif
 
+    std::shared_ptr<Op> create_neumann_conditions(const std::shared_ptr<FunctionSpace>            &space,
+                                                  const std::vector<NeumannConditions::Condition> &conditions,
+                                                  const ExecutionSpace                             es) {
+        auto conds = NeumannConditions::create(space, conditions);
+        if (es == EXECUTION_SPACE_DEVICE) {
+            return to_device(conds);
+        }
+        return conds;
+    }
+
 }  // namespace sfem
