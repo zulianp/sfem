@@ -125,7 +125,7 @@ Scripts start with `source "${SFEM_ENV:?source <build>/sfem_env.sh first}"` and 
 - `exodusII_to_raw.py` (317 against 275 lines): 482 differing lines.
 - `python/sfem/grid/raw_to_xdmf.py` is identical to smesh's.
 
-`raw_to_db`, `raw_to_exodusII` and `raw_point_data_to_parent` live only in smesh. CMake installs `python/sfem` into `scripts/` (`CMakeLists.txt:637`), and `tests/sdf_obstacle/env.sh` puts `scripts/sfem/mesh` first on `PATH`. So `db_to_raw` resolves to sfem's copy there, while `run_transient.sh` calls smesh's by path. 42 files call `db_to_raw`.
+`raw_to_db`, `raw_to_exodusII` and `raw_point_data_to_parent` live only in smesh. CMake installs `python/sfem` into `scripts/` (`CMakeLists.txt:630`), and `tests/sdf_obstacle/env.sh` puts `scripts/sfem/mesh` first on `PATH`. So `db_to_raw` resolves to sfem's copy there, while `run_transient.sh` calls smesh's by path. 42 files call `db_to_raw`.
 
 **Proposal.** smesh owns mesh conversion. Reconcile the two copies by running both on the repository's test meshes and comparing outputs byte for byte, port sfem-only fixes to smesh `main`, and delete sfem's copies. sfem installs smesh's Python tools next to its own, and P4's `PATH` covers both.
 
@@ -176,7 +176,7 @@ The generators cover what `python/sfem/mesh` offers (box, rectangle, cylinder, c
   - `SFEM_USE_PARTIAL_ASSEMBLY`, `SFEM_NEOHOOKEAN_OGDEN_USE_AOS` and `SFEM_HEX8_ASSUME_AFFINE`, alongside material YAML (which also accepts `ASSUME_AFFINE_*` keys);
   - 25 `SFEM_MAMAL_*` knobs;
   - `SFEM_SHIFTED_PENALTY_MULTIGRID_STATS_PATH`.
-- **Sets.** Scripts in workflows/, tests/ and scripts/ set 118 distinct `SFEM_*` names, and 25 of them are read by no C/C++ code. For example, `hyperelasticity.sh` exports `SFEM_ELEMENTS_PER_PACK` for the playground, but only two bench drivers read it; smesh reads `SMESH_ELEMENTS_PER_PACK`. `workflows/rough/sim.sh` sets `SFEM_TRACE_FILE`, which nothing reads: the tracer reads `SMESH_TRACE_FILE`, and `cmake/SFEMOptions.cmake:47` documents the wrong one.
+- **Sets.** Scripts in workflows/, tests/ and scripts/ set 118 distinct `SFEM_*` names, and 25 of them are read by no C/C++ code. For example, `hyperelasticity.sh` exports `SFEM_ELEMENTS_PER_PACK` for the playground, but only two bench drivers read it; smesh reads `SMESH_ELEMENTS_PER_PACK`. `workflows/rough/sim.sh` sets `SFEM_TRACE_FILE`, which nothing reads: the tracer reads `SMESH_TRACE_FILE`, and `cmake/SFEMOptions.cmake:44` documents the wrong one.
 - A misspelt or renamed variable is ignored without a word (see `RENAME.md` T2).
 
 **Proposal.**

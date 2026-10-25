@@ -29,9 +29,9 @@ Evidence verified with grep/find on commit `717c5cfbf` (branch tight-api; build*
 ## Not compiled
 
 - [ ] `operators/tet20/` (`tet20_laplacian.{cpp,hpp}`): not in SFEM_MODULES. Nothing outside the folder uses the `tet20_laplacian_*` symbols. Keep `python/codegen/tet20.py`: `laplace_op.py` and 11 other codegen scripts import it (see the codegen section).
-- [ ] `operators/hex8/dg/`, `operators/quad4/dg/`, `operators/spectral_hex/dg/`: their module entries are commented out at `CMakeLists.txt:91-96` ("FIXME DG is yet to be implemented"). Nothing outside these folders includes them. `dg_hex8_symmetric_interior_penalty.hpp` is zero bytes, `dg_quad4_symmetric_interior_penalty_inline.hpp` has no includer at all, and `spectral_hex_lax_friedrichs_flux.cpp` is a single include.
+- [ ] `operators/hex8/dg/`, `operators/quad4/dg/`, `operators/spectral_hex/dg/`: their module entries are commented out at `CMakeLists.txt:101-106` ("FIXME DG is yet to be implemented"). Nothing outside these folders includes them. `dg_hex8_symmetric_interior_penalty.hpp` is zero bytes, `dg_quad4_symmetric_interior_penalty_inline.hpp` has no includer at all, and `spectral_hex_lax_friedrichs_flux.cpp` is a single include.
 - [ ] `operators/tet4/drafts/tet4_cuda_laplacian{,_2,_3}.cu`: operators/tet4 is globbed non-recursively, so these never build, and the name is referenced nowhere. `_2.cu` also holds a 326-line `#if 0` (353-678).
-- [ ] `drivers/metis/partition_mesh_based_on_operator.cpp`: `metis` is missing from SFEM_DRIVER_MODULES (`CMakeLists.txt:357`). Its only caller, `workflows/decomposition/partition_mesh_based_on_operator.sh:33`, is therefore already broken (the call in `test/test.sh:46` is commented out).
+- [ ] `drivers/metis/partition_mesh_based_on_operator.cpp`: `metis` is missing from SFEM_DRIVER_MODULES (`CMakeLists.txt:350`). Its only caller, `workflows/decomposition/partition_mesh_based_on_operator.sh:33`, is therefore already broken (the call in `test/test.sh:46` is commented out).
 - [ ] `examples/` (run_poisson.cpp, run_poisson_cuda.cpp, run_convection_diffusion.cpp and 3 .sh): the driver glob covers `drivers/examples`, which does not exist, and nothing globs top-level `examples/`. Only its own .sh files use these.
 - [ ] `viz/` (`quad4_viz.exe.cpp`, `run.sh`): in no CMake list. Only its own run.sh uses it.
 - [ ] `cuda/shuffles/width.cu`, `cuda/tensorcore/{mma_fp64_test.cu,mma_fp64_test.py,wmma_example.cu}`: standalone micro-tests. No CMake or script references them.
@@ -52,6 +52,7 @@ Evidence verified with grep/find on commit `717c5cfbf` (branch tight-api; build*
 Each line removes only the dead `#if 0` branch. Where an `#else` branch exists it stays, with its guards dropped.
 
 - [ ] `operators/tet4/tet4_neohookean_ogden.cpp:423-437`: "Old implementation" of the hessian apply. The `#else` branch at 438-478 stays.
+- [ ] `tet4_neohookean_ogden_diag` (`operators/tet4/tet4_neohookean_ogden.cpp:646`, declared at `tet4_neohookean_ogden.hpp:90`): no caller, and its element kernel was never written; it added uninitialised values to the output until Stage H made it an error.
 - [ ] `algebra/crs/sfem_CRS.hpp:366-381`: plain CRS SpMV loop. The `#else` branch at 381-419 ("20-27% faster on M1") stays.
 - [ ] `operators/tet10/tet10_laplacian_inline_cpu.hpp:43-67`: reference-gradient loop. The `#else` branch at 68-91 stays.
 - [ ] `operators/hex8/hex8_neohookean_ogden_active_strain.cpp:637-647` (centroid sampling) and `:731-738` ("Slower than other variant"). The `#else` branches at 648-682 and 739-748 stay.
@@ -67,7 +68,7 @@ No `#include` of the basename exists anywhere in C/C++/CUDA/CMake/python/binding
 - [ ] `operators/tet4/tet4_neohookean_ogden_active_strain_local.hpp` (925 lines)
 - [ ] `operators/tet4/tet4_partial_assembly_neohookean_ogden_active_strain_inline.hpp` (1359 lines)
 - [ ] `operators/tet4/cuda/cu_tet4_linear_elasticity_inline.hpp` (90 lines)
-- [ ] `operators/hex8/hex8_mooney_rivlin_visco_unique_Hi_standard.hpp` (4523 lines): the only include, at `hex8_mooney_rivlin_visco_flexible.cpp:19`, is commented out. It is output of `sr_visco_hyper_unique_Hi.py`, whose live sibling `_unique_Hi_local.hpp` stays.
+- [ ] `operators/hex8/hex8_mooney_rivlin_visco_unique_Hi_standard.hpp` (4483 lines): the only include, at `hex8_mooney_rivlin_visco_flexible.cpp:19`, is commented out. It is output of `sr_visco_hyper_unique_Hi.py`, whose live sibling `_unique_Hi_local.hpp` stays.
 - [ ] `operators/stencil/sshex8_skeleton_offdiag_stencil.hpp` (1718 lines): the only include, at `operators/sshex8/sshex8_laplacian.cpp:8`, is commented out.
 - [ ] `algebra/openmp/sfem_openmp_ShiftableJacobi_SoA.hpp` (231 lines): the name `ShiftableJacobi_SoA` appears nowhere else.
 - [ ] `algebra/sfem_MPIType.hpp` (31 lines): `MPIType` appears nowhere else.
@@ -85,7 +86,7 @@ Each name appears only at its own declaration and definition, checked across C/C
 - [ ] `operators/hex8/cuda/cu_hex8_adjugate.{cu,hpp}` (`cu_hex8_adjugate_allocate`, `cu_hex8_adjugate_fill`): the whole file is dead. Also drop the include at `sfem_Function_incore_cuda.cpp:27`.
 - [ ] `operators/tet4/tet4_adjugate.{cpp,hpp}` (`tet4_adjugate_{fill,create,destroy}`, `tet4_adjugate_t`): nothing outside the pair uses them.
 - [ ] `operators/hex8/hex8_jacobian.{cpp,hpp}`: its only function, `hex8_adjugate_and_det_fill`, has no caller. Also drop the unused includes in `frontend/sfem_DirichletConditions.cpp`, `sfem_Function.cpp` and `sfem_NeumannConditions.cpp`.
-- [ ] `operators/sstet4/cuda/` (`cu_sstet4_laplacian.{cu,hpp}`, `cu_sstet4_laplacian_apply`): the whole module is dead. Also drop `CMakeLists.txt:166`.
+- [ ] `operators/sstet4/cuda/` (`cu_sstet4_laplacian.{cu,hpp}`, `cu_sstet4_laplacian_apply`): the whole module is dead. Also drop `CMakeLists.txt:176`.
 - [ ] `operators/spectral_hex/spectral_hex_mass.{cpp,hpp}` (`spectral_hex_mass_apply`, `lagrange_hex_mass_apply`): only its own cpp includes the header.
 - [ ] `operators/quadshell4/cuda/cu_quadshell4_integrate_values.{cu,hpp}` (`cu_quadshell4_integrate_value`, `cu_quadshell4_integrate_values`): only its own cu includes the header.
 - [ ] Helpers with no caller: `create_hierarchical_restriction_from_graph` (`frontend/sfem_Transfer.cpp:477-526`), `create_hierarchical_prolongation_from_graph` (`frontend/sfem_Transfer.cpp:528-583`), `make_linear_op_variant` (`frontend/sfem_LinearOperatorFactory.cpp:393-401`), `sshex8_derefine_element_connectivity` (`frontend/sfem_API.hpp:123-186`), `create_skin_sideset` (`frontend/sfem_API.hpp:189-191`), `create_zero_constraints_op` (`frontend/sfem_LinearOperatorFactory.cpp:619-622`). `sshex8_derefine_element_connectivity` is superseded by `smesh::derefine_elements` and `smesh::sshex8_device_elements_view`.
@@ -102,10 +103,10 @@ Each name appears only at its own declaration and definition, checked across C/C
 ## Legacy implementations and drivers
 
 - [ ] Legacy tet4 NeoHookean assembly: `neohookean_assemble_{hessian,gradient,value,hessian_soa}` in `operators/tet4/tet4_neohookean.cpp`, declared in `.hpp`. None has a caller; the only call is commented out at `drivers/assemble3.exe.cpp:102`. `neohookean_assemble_hessian` is defined twice (`tet4_neohookean.cpp:921` and `vectorized/tet4_simd_neohookean.cpp:901`), and both compile under the default `SFEM_ENABLE_EXPLICIT_VECTORIZATION=ON`. Remove the 4 functions and the whole `tet4_simd_neohookean.cpp`, whose name is referenced nowhere. The stress and von Mises functions stay: drivers cauchy_stress, vonmises and cprincipal_stresses use them.
-- [ ] `drivers/assemble4.exe.cpp` together with `operators/tet4/tet4_isotropic_phasefield_for_fracture.cpp` and `operators/isotropic_phasefield_for_fracture.hpp`: no script or doc names assemble4, and only assemble4 uses the phase-field code. Also drop `assemble4` from `CMakeLists.txt:370`.
+- [ ] `drivers/assemble4.exe.cpp` together with `operators/tet4/tet4_isotropic_phasefield_for_fracture.cpp` and `operators/isotropic_phasefield_for_fracture.hpp`: no script or doc names assemble4, and only assemble4 uses the phase-field code. Also drop `assemble4` from `CMakeLists.txt:363`.
 - [ ] `drivers/bgs.exe.cpp`: no script or doc reference.
 - [ ] `drivers/crs_apply_dirichlet.exe.cpp`: no script or doc reference.
-- [ ] `drivers/sym_spmv_bench.cpp`: referenced only by the exclusion list at `CMakeLists.txt:393`.
+- [ ] `drivers/sym_spmv_bench.cpp`: referenced only by the exclusion list at `CMakeLists.txt:386`.
 - [ ] The dynamic plug-in path: `operators/generated/CMakeLists.txt`, `frontend/ops/sfem_PlugInOp.{cpp,hpp}` and the `"plugin:"` branch at `frontend/ops/sfem_OpFactory.cpp:131-136`. Its `add_subdirectory` is commented out (`CMakeLists.txt:345`), the CMake globs a `tpl/hyperelasticity` directory that does not exist at the repo root, and no `plugin:` op name is used anywhere.
 
 ## Legacy codegen scripts (python/codegen/*.py, outside framework/)
