@@ -100,6 +100,11 @@ int test_refused_cases() {
 #ifndef SFEM_ENABLE_CUDA
     SFEM_TEST_ASSERT(assemble({"execution_space=device"}) == nullptr);
 #endif
+    // NCCL on the host, or in a build without it.
+    SFEM_TEST_ASSERT(assemble({"nccl=true"}) == nullptr);
+#if defined(SFEM_ENABLE_CUDA) && !defined(SMESH_ENABLE_NCCL)
+    SFEM_TEST_ASSERT(assemble({"execution_space=device", "nccl=true"}) == nullptr);
+#endif
     return SFEM_TEST_SUCCESS;
 }
 

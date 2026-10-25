@@ -129,6 +129,7 @@ FLAG_NAMES=(
     AMG
     OPENMP
     MPI
+    NCCL
     METIS
     PYTHON
     BLAS
@@ -149,6 +150,7 @@ flag_cmake_name() {
         AMG) echo SFEM_ENABLE_AMG ;;
         OPENMP) echo SFEM_ENABLE_OPENMP ;;
         MPI) echo SFEM_ENABLE_MPI ;;
+        NCCL) echo SFEM_ENABLE_NCCL ;;
         METIS) echo SFEM_ENABLE_METIS ;;
         PYTHON) echo SFEM_ENABLE_PYTHON ;;
         BLAS) echo SFEM_ENABLE_BLAS ;;
@@ -400,7 +402,7 @@ generate_masks_quick() {
     local default_mask=0
     for i in "${!ACTIVE_FLAGS[@]}"; do
         case "${ACTIVE_FLAGS[$i]}" in
-            AMG|MPI|RYAML|EXPLICIT_VECTORIZATION) default_mask=$((default_mask | (1 << i))) ;;
+            AMG|MPI|NCCL|RYAML|EXPLICIT_VECTORIZATION) default_mask=$((default_mask | (1 << i))) ;;
         esac
     done
     GENERATED_MASKS+=("$default_mask")
