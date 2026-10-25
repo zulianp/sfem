@@ -2,7 +2,8 @@
 
 #include <cmath>
 
-#include "sfem_API.hpp"
+#include "sfem_Function.hpp"
+#include "sfem_LinearOperatorFactory.hpp"
 #include "smesh_sideset.hpp"
 
 namespace sfem {

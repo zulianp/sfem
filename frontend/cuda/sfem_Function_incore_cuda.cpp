@@ -34,9 +34,14 @@
 #include "cu_tet4_fff.hpp"
 
 // C++ includes
-#include "sfem_API.hpp"
+#include "sfem_Function.hpp"
+#include "sfem_LinearOperatorFactory.hpp"
 #include "sfem_MultiDomainOp.hpp"
+#include "sfem_blas_factory.hpp"
+#include "smesh_env.hpp"
 #include "smesh_semistructured.hpp"
+#include "smesh_sideset.hpp"
+#include "smesh_sshex8.hpp"
 
 #include "smesh_device_arrays.hpp"
 #include "smesh_device_buffer.hpp"

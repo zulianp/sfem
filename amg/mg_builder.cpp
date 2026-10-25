@@ -2,13 +2,13 @@
 #include <stdio.h>
 #include <cstddef>
 #include "partitioner.hpp"
-#include "sfem_API.hpp"
-#include "sfem_aliases.hpp"
 #include "sfem_CooSym.hpp"
 #include "sfem_LpSmoother.hpp"
 #include "sfem_Multigrid.hpp"
 #include "sfem_Stationary.hpp"
+#include "sfem_aliases.hpp"
 #include "sfem_pwc_interpolator.hpp"
+#include "sfem_solver_factory.hpp"
 #include "smoother.hpp"
 
 std::shared_ptr<sfem::Multigrid<real_t>> builder(

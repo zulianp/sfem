@@ -1,6 +1,11 @@
 #include "sfem_BSRTangent.hpp"
 
-#include "sfem_API.hpp"
+#include "sfem_LinearOperatorFactory.hpp"
+#include "sfem_blas_factory.hpp"
+#ifdef SFEM_ENABLE_CUDA
+#include "sfem_Function_incore_cuda.hpp"
+#include "sfem_cuda_crs_SpMV.hpp"
+#endif
 #include "sfem_BSR.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_ParallelOperator.hpp"

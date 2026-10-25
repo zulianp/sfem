@@ -2,8 +2,12 @@
 
 #include "sfem_aliases.hpp"
 
-#include "sfem_API.hpp"
 #include "sfem_Function.hpp"
+#include "sfem_LinearOperatorFactory.hpp"
+#include "sfem_Transfer.hpp"
+#include "sfem_solver_factory.hpp"
+#include "smesh_env.hpp"
+#include "smesh_semistructured.hpp"
 
 #include <algorithm>
 

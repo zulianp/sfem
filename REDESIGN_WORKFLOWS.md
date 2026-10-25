@@ -24,7 +24,7 @@ That is two solver runs, five Python invocations and three copied files, configu
 
 ## P1. Format conversion around every run
 
-**Today.** `run_transient.sh:31-46` makes five Python calls per case: `raw_point_data_to_parent.py` three times and `raw_to_exodusII.py` twice. The `.e` files need netCDF4 in `$PYTHON`; without it the script silently produces no `.e` files. `workflows/hyperelasticity/hyperelasticity.sh:52` converts with `raw_to_db ... --transient --n_time_steps=25`, the step count typed by hand. `workflows/prony_torsion/run_case.sh` documents a failure mode: a shorter rerun leaves higher-index field files behind, and `raw_to_db` later fails with "Invalid sequence length". The parent-mesh mapping exists because a run on `mesh.blocks` with packing writes fields in its own numbering. The playground already reads initial conditions in the file numbering through `node_mapping` (`sfem_Playground.cpp:569-572`); only its output lacks that numbering.
+**Today.** `run_transient.sh:31-46` makes five Python calls per case: `raw_point_data_to_parent.py` three times and `raw_to_exodusII.py` twice. The `.e` files need netCDF4 in `$PYTHON`; without it the script silently produces no `.e` files. `workflows/hyperelasticity/hyperelasticity.sh:52` converts with `raw_to_db ... --transient --n_time_steps=25`, the step count typed by hand. `workflows/prony_torsion/run_case.sh` documents a failure mode: a shorter rerun leaves higher-index field files behind, and `raw_to_db` later fails with "Invalid sequence length". The parent-mesh mapping exists because a run on `mesh.blocks` with packing writes fields in its own numbering. The playground already reads initial conditions in the file numbering through `node_mapping` (`sfem_Playground.cpp:573-576`); only its output lacks that numbering.
 
 **Proposal.** The playground writes a time-series XDMF beside the raw fields. It also gains an output numbering option that writes fields on the parent mesh in its file numbering, with zero outside the selected blocks. That is what `raw_point_data_to_parent.py` computes. smesh already writes a static mesh XDMF (`Mesh::write_with_xdmf`, `external/smesh/src/io/smesh_write_xdmf.cpp`). The temporal collection points at the raw binaries, so the run needs neither netCDF nor HDF5. Exodus becomes an explicit conversion on demand.
 
@@ -125,7 +125,7 @@ Scripts start with `source "${SFEM_ENV:?source <build>/sfem_env.sh first}"` and 
 - `exodusII_to_raw.py` (317 against 275 lines): 482 differing lines.
 - `python/sfem/grid/raw_to_xdmf.py` is identical to smesh's.
 
-`raw_to_db`, `raw_to_exodusII` and `raw_point_data_to_parent` live only in smesh. CMake installs `python/sfem` into `scripts/` (`CMakeLists.txt:613`), and `tests/sdf_obstacle/env.sh` puts `scripts/sfem/mesh` first on `PATH`. So `db_to_raw` resolves to sfem's copy there, while `run_transient.sh` calls smesh's by path. 42 files call `db_to_raw`.
+`raw_to_db`, `raw_to_exodusII` and `raw_point_data_to_parent` live only in smesh. CMake installs `python/sfem` into `scripts/` (`CMakeLists.txt:637`), and `tests/sdf_obstacle/env.sh` puts `scripts/sfem/mesh` first on `PATH`. So `db_to_raw` resolves to sfem's copy there, while `run_transient.sh` calls smesh's by path. 42 files call `db_to_raw`.
 
 **Proposal.** smesh owns mesh conversion. Reconcile the two copies by running both on the repository's test meshes and comparing outputs byte for byte, port sfem-only fixes to smesh `main`, and delete sfem's copies. sfem installs smesh's Python tools next to its own, and P4's `PATH` covers both.
 
@@ -196,7 +196,7 @@ The generators cover what `python/sfem/mesh` offers (box, rectangle, cylinder, c
 - **`--set` values** resolve against the case directory, not the shell's working directory. `run_transient.sh` works because it `cd`s into the copy; `bench.sbatch.sh` passes absolute paths.
 - **Cases cannot run in place.** `run_transient.sh` copies the YAML files so that `../db/solid` resolves.
 - **Stale assumptions.** The comment at `prony_torsion/run_case.sh:8` says inline Dirichlet paths resolve against the working directory, and the script is written around that.
-- **Opt-in flag.** The obstacle `meta.yaml` read by `sfem::Input` has an `rpath: true` flag to opt into relative resolution (`frontend/sfem_ContactConditions.cpp:558`).
+- **Opt-in flag.** The obstacle `meta.yaml` read by `sfem::Input` has an `rpath: true` flag to opt into relative resolution (`frontend/sfem_ContactConditions.cpp:565`).
 - **Mixed key names.** Path keys are spelt `path` (`mesh.path`, `profile.path`, Neumann `path`) or `file` (`sdf.file`, `sidesets[].file`, `fields[].file`, `initial_conditions.*.file`).
 
 **Proposal.** One rule: a path written in a file resolves against that file's directory, and a path given on the command line resolves against the working directory. The schema (P9) marks the path-typed keys, so `--set` knows which values are paths. `file:` names a single file and `path:` a folder; the old keys are aliases with a warning. `rpath` goes, because a path in `meta.yaml` is always relative to it.
@@ -279,7 +279,7 @@ u = pg.function().state("displacement")                                     # nu
 - **Per-configuration settings in `bench.sbatch.sh`.** It hard-codes CSCS's `cuPointerGetAttribute` override (`/capstor/.../cuptrgetattr_override.so`) for device runs, and `MPICH_GPU_SUPPORT_ENABLED=0` for host runs, because MPICH checks every buffer and that check has been slow since driver 590.
 - **Layout and binding.** The same script sets `OMP_PROC_BIND=true OMP_PLACES=cores` and `srun --cpu-bind=cores --distribution=block:block`, and enforces the fill-the-node rules in `parse()`.
 - **Copied settings.** `prgenv-gnu/24.11:v2` appears in 95 files, with `24.7:v3` and `25.6:v2` stragglers. `OMP_PROC_BIND` appears in 232 scripts and `~/init.sh` in 73.
-- **Settings the script has to know.** `nccl: true` requires `execution_space: device`; the playground rejects it otherwise (`sfem_Playground.cpp:1245`).
+- **Settings the script has to know.** `nccl: true` requires `execution_space: device`; the playground rejects it otherwise (`sfem_Playground.cpp:1249`).
 
 **Proposal.**
 - (a) One launcher, `scripts/alps/sfem-srun --kind host|gpu --ranks R --threads T -- playground case.yaml ...`. It:
@@ -300,7 +300,7 @@ u = pg.function().state("displacement")                                     # nu
 
 **Today.**
 - **Tracked outputs** (listed in `DEAD.md`): `smesh.trace.csv` and `spmg_stats.csv` at the root, `spikes/inexact_apply_compare/smesh.trace.csv`, `docs/partial_assembly.aux`, `wip/paper/prevs.aux`.
-- **Library defaults write to the working directory:** the tracer writes `./smesh.trace.csv` (`external/smesh/src/profile/smesh_tracer.cpp:28`), and `ShiftedPenaltyMultigrid` writes `./spmg_stats.csv` (`algebra/sfem_ShiftedPenaltyMultigrid.hpp:1157`).
+- **Library defaults write to the working directory:** the tracer writes `./smesh.trace.csv` (`external/smesh/src/profile/smesh_tracer.cpp:28`), and `ShiftedPenaltyMultigrid` writes `./spmg_stats.csv` (`algebra/sfem_ShiftedPenaltyMultigrid.hpp:1152`).
 - **Stale fields.** A rerun into the same `output.path` leaves stale field files (P1).
 - **Main checkout.** It also has untracked `*.bak_*` files and the `-h/` and `arning:p` leftovers of mistyped commands.
 

@@ -4,9 +4,10 @@
 #include <cmath>
 #include <vector>
 
-#include "sfem_API.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_OwnedReductions.hpp"
+#include "sfem_blas_factory.hpp"
+#include "sfem_operator_factory.hpp"
 
 namespace sfem {
 

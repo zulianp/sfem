@@ -12,8 +12,12 @@
 #include "smesh_crs_graph.hpp"
 #include "smesh_env.hpp"
 
-#include "sfem_API.hpp"
+#include "sfem_BSR.hpp"
+#include "sfem_blas_factory.hpp"
 #include "sfem_mask.hpp"
+#include "sfem_solver_factory.hpp"
+#include "smesh_glob.hpp"
+#include "smesh_ssquad4.hpp"
 #include "smesh_ssquad4_prolongation.hpp"
 
 #include <algorithm>

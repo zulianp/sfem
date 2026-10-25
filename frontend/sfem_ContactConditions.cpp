@@ -7,7 +7,13 @@
 
 #include "sfem_Input.hpp"
 
-#include "sfem_API.hpp"
+#include "sfem_LinearOperatorFactory.hpp"
+#include "sfem_blas_factory.hpp"
+#include "sfem_device.hpp"
+#include "smesh_sideset.hpp"
+#ifdef SFEM_ENABLE_CUDA
+#include "sfem_Function_incore_cuda.hpp"
+#endif
 
 #include "obstacle.hpp"
 //

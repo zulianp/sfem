@@ -1,6 +1,7 @@
 #include "sfem_ContactStabilisedNewmarkScheme.hpp"
 
-#include "sfem_API.hpp"
+#include "sfem_Function.hpp"
+#include "sfem_blas_factory.hpp"
 #include "sfem_defs.hpp"
 #include "sfem_logger.hpp"
 

@@ -5,9 +5,9 @@
 #include <cstdio>
 #include <limits>
 
-#include "sfem_API.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_Rotation.hpp"
+#include "sfem_blas_factory.hpp"
 
 namespace sfem {
 

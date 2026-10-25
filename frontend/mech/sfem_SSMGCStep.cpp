@@ -5,7 +5,10 @@
 #include <cstdio>
 #include <limits>
 
-#include "sfem_API.hpp"
+#include "sfem_blas_factory.hpp"
+#ifdef SFEM_ENABLE_CUDA
+#include "sfem_Function_incore_cuda.hpp"
+#endif
 #include "sfem_ContactCommon.hpp"
 #include "sfem_ContactConditions.hpp"
 #include "sfem_Function.hpp"

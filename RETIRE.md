@@ -64,7 +64,7 @@ SFEM_EXTRA_OP=GeneratedLaplace SFEM_EXTRA_OP_TYPE=MF SFEM_EXTRA_OP_BLOCK_SIZE=1 
 
 - **Host:** `frontend/ops/sfem_OpFactory.cpp:53-85`. `private_register_op` silently overwrites an existing name (:90-92).
 - **Generated host:** `frontend/ops/generated/sfem_generated_ops_registration.cpp:17-32`. Every material registers `Generated<X>` and `ss:Generated<X>`, which map to the same `create`.
-- **Device:** `register_device_ops`, `frontend/cuda/sfem_Function_incore_cuda.cpp:1948-1958`, plus `generated/cuda/sfem_generated_device_ops_registration.cpp:19-34` (`gpu:Generated<X>`, `gpu:ss:Generated<X>`).
+- **Device:** `register_device_ops`, `frontend/cuda/sfem_Function_incore_cuda.cpp:1959-1969`, plus `generated/cuda/sfem_generated_device_ops_registration.cpp:19-34` (`gpu:Generated<X>`, `gpu:ss:Generated<X>`).
 - **Name resolution:** `create_op(..., DEVICE)` adds the `gpu:` prefix (sfem_OpFactory.cpp:98-122). There is no switch between handwritten and generated; callers choose by name.
 
 ---
@@ -246,7 +246,7 @@ Not a factory entry: `bench/cuda/bench_packed_laplacian.cu` holds packed CUDA pr
 
 | Name | Line | Users by string |
 | --- | --- | --- |
-| `InertiaPotential` | OpFactory:54 | none (users construct the class directly: sfem_NewmarkScheme.cpp:37, sfem_BDF2Scheme.cpp:43, sfem_DerefinedTimeScheme.cpp:46-47) |
+| `InertiaPotential` | OpFactory:54 | none (users construct the class directly: sfem_NewmarkScheme.cpp:38, sfem_BDF2Scheme.cpp:44, sfem_DerefinedTimeScheme.cpp:46-47) |
 | `BDF2InertiaPotential` | :60 | none |
 | `NewmarkInertiaPotential` | :61 | none |
 

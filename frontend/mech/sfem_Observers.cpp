@@ -5,8 +5,9 @@
 #include <limits>
 #include <unordered_map>
 
-#include "sfem_API.hpp"
 #include "sfem_Function.hpp"
+#include "sfem_blas_factory.hpp"
+#include "smesh_glob.hpp"
 
 namespace sfem {
 
