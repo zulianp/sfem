@@ -189,10 +189,12 @@ namespace sfem {
 
         static MPRGPControl<T>& record(T* const control) { return *reinterpret_cast<MPRGPControl<T>*>(control); }
 
+        // The passes MPRGP's iteration in one region and its pass-by-pass route share are out of
+        // line (SFEM_NOINLINE): both execute one body, so they agree to the bit.
         /// The curvature pass's sums over the entries [begin, end), added to s: d.Ad, d.d, g.d and,
         /// the last, the longest feasible step x - alpha d (a minimum, from infty).
         template <typename B>
-        static void curvature_sums(const B              b,
+        SFEM_NOINLINE static void curvature_sums(const B              b,
                                    const ptrdiff_t      begin,
                                    const ptrdiff_t      end,
                                    const T* const       x,
@@ -215,7 +217,7 @@ namespace sfem {
         /// The step's update of x, g and gf over the entries [begin, end) (along d, unless null) and
         /// its sums, added to s: Ad.gf (without d none), |gf|^2, |gc|^2, |w (gf + gc)|^2.
         template <typename B>
-        static void step_sums(const B              b,
+        SFEM_NOINLINE static void step_sums(const B              b,
                               const ptrdiff_t      begin,
                               const ptrdiff_t      end,
                               const T* const       d,
@@ -260,7 +262,7 @@ namespace sfem {
         }
 
         /// p <- gf - beta p over the entries [begin, end), as the BLAS's axpby(1, gf, -beta, p).
-        static void direction(const ptrdiff_t begin, const ptrdiff_t end, const T* const gf, const T beta, T* const p) {
+        SFEM_NOINLINE static void direction(const ptrdiff_t begin, const ptrdiff_t end, const T* const gf, const T beta, T* const p) {
             const T alpha = 1, scale = -beta;
             for (ptrdiff_t i = begin; i < end; i++) {
                 p[i] = alpha * gf[i] + scale * p[i];
