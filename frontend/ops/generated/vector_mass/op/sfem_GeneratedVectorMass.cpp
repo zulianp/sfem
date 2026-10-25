@@ -54,14 +54,16 @@ namespace sfem {
       return matched;
     }
 
-    void material_defaults(real_t *const values) {
+    [[maybe_unused]] void material_defaults(real_t *const values) {
       values[0] = 1;
     }
 
+    // derefine_op copies the parameters by name, with or without YAML.
+    [[maybe_unused]] constexpr int N_DEFINED_MATERIAL_PARAMETERS = 1;
+    [[maybe_unused]] constexpr int N_MATERIAL_PARAMETERS = 1;
+    [[maybe_unused]] static const char *const MATERIAL_PARAMETER_NAMES[N_MATERIAL_PARAMETERS] = {"density"};
+
 #ifdef SFEM_ENABLE_RYAML
-    constexpr int N_DEFINED_MATERIAL_PARAMETERS = 1;
-    constexpr int N_MATERIAL_PARAMETERS = 1;
-    static const char *const MATERIAL_PARAMETER_NAMES[N_MATERIAL_PARAMETERS] = {"density"};
 
     bool yaml_read_real(const ryml::ConstNodeRef &node,
               const char *const key,
@@ -845,7 +847,6 @@ namespace sfem {
               mesh->spatial_dimension(),
               storage);
 
-      const geom_t *const *adjugate = nullptr;
       const geom_t *determinant = nullptr;
       if (domain.element_type == smesh::TET4 || domain.element_type == smesh::TRI3) {
         auto cache = std::static_pointer_cast<AffineGeometryCache>(
@@ -854,21 +855,19 @@ namespace sfem {
           SFEM_ERROR("vector_mass affine hessian_bsr requires cached geometry\n");
           return SFEM_FAILURE;
         }
-        adjugate = reinterpret_cast<const geom_t *const *>(
-            cache->jacobian->adjugate_components());
         determinant = reinterpret_cast<const geom_t *>(
             cache->jacobian->jacobian_determinant()->data());
       }
       const int dim = mesh->spatial_dimension();
       if (dim == 2) {
         if (domain.element_type == smesh::TRI3) {
-          return vector_mass_hessian_bsr_2d_a_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], rowptr, colidx, values);
+          return vector_mass_hessian_bsr_2d_a_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), determinant, storage[0], rowptr, colidx, values);
         }
         return vector_mass_hessian_bsr_2d_i_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, storage[0], rowptr, colidx, values);
       }
       else if (dim == 3) {
         if (domain.element_type == smesh::TET4) {
-          return vector_mass_hessian_bsr_3d_a_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], rowptr, colidx, values);
+          return vector_mass_hessian_bsr_3d_a_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), determinant, storage[0], rowptr, colidx, values);
         }
         return vector_mass_hessian_bsr_3d_i_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, storage[0], rowptr, colidx, values);
       }

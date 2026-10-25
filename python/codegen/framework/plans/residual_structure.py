@@ -188,7 +188,7 @@ def published_mesh_operator_files(published_forms, patch_merit_kernels=()):
     return ()
 
 
-def published_patch_merit_kernels(element_type, unit_name="", mixed=False,
+def published_patch_merit_kernels(rule, unit_name="", mixed=False,
                                   has_parallel_region=True):
     """The node-centric merit kernels this unit publishes: one, or none.
 
@@ -206,7 +206,14 @@ def published_patch_merit_kernels(element_type, unit_name="", mixed=False,
     from codegen.framework.fem.patch_orientation import supports_patch_orientation
     from codegen.framework.forms.equations import TOTAL_RESIDUAL_UNIT_NAME
 
-    if mixed or not supports_patch_orientation(element_type):
+    if mixed or not supports_patch_orientation(rule.element_type):
+        return ()
+    # And only on a one-point rule.  The kernel folds the basis at its single
+    # quadrature point into constants; a form whose rule has more points (a
+    # value times a value, as in a mass term) would read that table as one
+    # point with n_qp times the shape functions, past the end of the element's
+    # gathered values.
+    if rule.n_qp != 1:
         return ()
     # Only the unit carrying the material's whole residual.  A block unit
     # numbers its coefficients by the block's row rather than from zero, so a
@@ -243,7 +250,9 @@ def patch_merit_staged_roles(dependencies):
     roles = ["current"]
     if dependencies.previous:
         roles.append("previous")
-    return tuple(roles)
+    # A role with no quantity to stage is not carried at all: a body force reads
+    # no state, and gathering one anyway is a dead array per element.
+    return tuple(role for role in roles if patch_merit_staged_quantities(dependencies, role))
 
 
 #: Which pair of the dependency record's flags decides a role's quantities.

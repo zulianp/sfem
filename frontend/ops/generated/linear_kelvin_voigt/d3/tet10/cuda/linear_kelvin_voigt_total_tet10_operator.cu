@@ -636,36 +636,6 @@ extern "C" const sfem::codegen::KernelDiagnostics *cu_linear_kelvin_voigt_total_
   return &sfem::codegen::linear_kelvin_voigt_total_tet10_jacobian_action_esoa_diagnostics_data;
 }
 
-extern "C" int cu_linear_kelvin_voigt_total_tet10_residual_esoa(
-    const int scalar_bytes,
-    const ptrdiff_t geometry_stride,
-    const void *const RSTR determinant,
-    const void *const RSTR adjugate[9],
-    const void *const RSTR current[30],
-    const void *const RSTR previous[30],
-    const real_t eta_b,
-    const real_t eta_s,
-    const real_t lmbda,
-    const real_t mu,
-    const real_t u_dt_shift,
-    void *const RSTR output[30],
-    void *const stream
-) {
-  switch (scalar_bytes) {
-    case (int)sizeof(double): {
-        sfem::codegen::linear_kelvin_voigt_total_d3_simplex_residual_block<double, 11, 10>(geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_tet10_q11<double>::grad_ref_x(), sfem::codegen::ref_tet10_q11<double>::grad_ref_y(), sfem::codegen::ref_tet10_q11<double>::grad_ref_z(), sfem::codegen::quad_tet_q11<double>::q_weight(), (const double *const *)current, (const double *const *)previous, eta_b, eta_s, lmbda, mu, u_dt_shift, (double *const *)output);
-        return SFEM_SUCCESS;
-    }
-    case (int)sizeof(float): {
-        sfem::codegen::linear_kelvin_voigt_total_d3_simplex_residual_block<float, 11, 10>(geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_tet10_q11<float>::grad_ref_x(), sfem::codegen::ref_tet10_q11<float>::grad_ref_y(), sfem::codegen::ref_tet10_q11<float>::grad_ref_z(), sfem::codegen::quad_tet_q11<float>::q_weight(), (const float *const *)current, (const float *const *)previous, eta_b, eta_s, lmbda, mu, u_dt_shift, (float *const *)output);
-        return SFEM_SUCCESS;
-    }
-    default:
-      break;
-  }
-  return sfem::codegen::unsupported_dispatch("linear_kelvin_voigt_total_tet10_residual_esoa", -1, (int)scalar_bytes);
-}
-
 namespace sfem {
 namespace codegen {
 
@@ -1036,35 +1006,6 @@ extern "C" int cu_linear_kelvin_voigt_total_tet10_residual_i_maos(
       break;
   }
   return sfem::codegen::unsupported_dispatch("linear_kelvin_voigt_total_tet10_residual_i_maos", -1, (int)scalar_bytes);
-}
-
-extern "C" int cu_linear_kelvin_voigt_total_tet10_jacobian_action_esoa(
-    const int scalar_bytes,
-    const ptrdiff_t geometry_stride,
-    const void *const RSTR determinant,
-    const void *const RSTR adjugate[9],
-    const void *const RSTR direction[30],
-    const real_t eta_b,
-    const real_t eta_s,
-    const real_t lmbda,
-    const real_t mu,
-    const real_t u_dt_shift,
-    void *const RSTR output[30],
-    void *const stream
-) {
-  switch (scalar_bytes) {
-    case (int)sizeof(double): {
-        sfem::codegen::linear_kelvin_voigt_total_d3_simplex_jacobian_action_block<double, 11, 10>(geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_tet10_q11<double>::grad_ref_x(), sfem::codegen::ref_tet10_q11<double>::grad_ref_y(), sfem::codegen::ref_tet10_q11<double>::grad_ref_z(), sfem::codegen::quad_tet_q11<double>::q_weight(), (const double *const *)direction, eta_b, eta_s, lmbda, mu, u_dt_shift, (double *const *)output);
-        return SFEM_SUCCESS;
-    }
-    case (int)sizeof(float): {
-        sfem::codegen::linear_kelvin_voigt_total_d3_simplex_jacobian_action_block<float, 11, 10>(geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_tet10_q11<float>::grad_ref_x(), sfem::codegen::ref_tet10_q11<float>::grad_ref_y(), sfem::codegen::ref_tet10_q11<float>::grad_ref_z(), sfem::codegen::quad_tet_q11<float>::q_weight(), (const float *const *)direction, eta_b, eta_s, lmbda, mu, u_dt_shift, (float *const *)output);
-        return SFEM_SUCCESS;
-    }
-    default:
-      break;
-  }
-  return sfem::codegen::unsupported_dispatch("linear_kelvin_voigt_total_tet10_jacobian_action_esoa", -1, (int)scalar_bytes);
 }
 
 namespace sfem {

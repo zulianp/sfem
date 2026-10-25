@@ -34,7 +34,7 @@ namespace codegen {
 
 template <typename s_t>
 struct neumann_general_hex8_quadshell4_boundary_residual_soa_reference_data {
-  static const s_t *shape_1d() {
+  static __host__ __device__ __forceinline__ const s_t *shape_1d() {
     static const s_t data[4] = {
       s_t(0.78867513459481287),
       s_t(0.21132486540518708),
@@ -44,7 +44,7 @@ struct neumann_general_hex8_quadshell4_boundary_residual_soa_reference_data {
     return data;
   }
 
-  static const s_t *grad_1d() {
+  static __host__ __device__ __forceinline__ const s_t *grad_1d() {
     static const s_t data[4] = {
       s_t(-1),
       s_t(1),
@@ -54,7 +54,7 @@ struct neumann_general_hex8_quadshell4_boundary_residual_soa_reference_data {
     return data;
   }
 
-  static const s_t *weight_1d() {
+  static __host__ __device__ __forceinline__ const s_t *weight_1d() {
     static const s_t data[2] = {
       s_t(0.5),
       s_t(0.5)
@@ -62,7 +62,7 @@ struct neumann_general_hex8_quadshell4_boundary_residual_soa_reference_data {
     return data;
   }
 
-  static const int *shape_index() {
+  static __host__ __device__ __forceinline__ const int *shape_index() {
     static const int data[4] = {
     0,
     1,
