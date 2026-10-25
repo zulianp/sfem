@@ -35,7 +35,9 @@ int test_exchange_on_its_stream() {
     SFEM_TEST_ASSERT(mesh && mesh->is_distributed());
     auto space = sfem::FunctionSpace::create(mesh, 1);
 
+#ifdef SMESH_ENABLE_NCCL
     comm->enable_device();
+#endif
     auto device = comm->device();
     int  usable = device && device->whole();
     usable      = -comm->max(-usable);

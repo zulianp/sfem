@@ -1251,7 +1251,12 @@ namespace sfem {
                 fprintf(stderr, "Playground: nccl needs execution_space device\n");
                 return nullptr;
             }
+#ifdef SMESH_ENABLE_NCCL
             if (comm->size() > 1) comm->enable_device();
+#else
+            fprintf(stderr, "Playground: nccl needs a build with NCCL (SFEM_ENABLE_NCCL, NCCL_HOME)\n");
+            return nullptr;
+#endif
         }
 
         const auto regime = read_string(root, "regime", "steady");
