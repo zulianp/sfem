@@ -551,19 +551,19 @@ int hex8_mooney_rivlin_active_strain_hessian_partial_assembly(const ptrdiff_t   
                            element_uz,
                            F);
 
-                    hex8_S_ikmn_mooney_rivlin_active_strain(jacobian_adjugate,
-                                                            jacobian_determinant,
-                                                            qx[kx],
-                                                            qx[ky],
-                                                            qx[qz],
-                                                            qw[kx] * qw[ky] * qw[qz],
-                                                            F,
-                                                            lmda,
-                                                            lambda,
-                                                            mu,
-                                                            Fa_inv,
-                                                            Ja,
-                                                            S_ikmn);
+                    hex8_S_ikmn_mooney_rivlin_active_strain_add(jacobian_adjugate,
+                                                                jacobian_determinant,
+                                                                qx[kx],
+                                                                qx[ky],
+                                                                qx[qz],
+                                                                qw[kx] * qw[ky] * qw[qz],
+                                                                F,
+                                                                lmda,
+                                                                lambda,
+                                                                mu,
+                                                                Fa_inv,
+                                                                Ja,
+                                                                S_ikmn);
                 }
             }
         }

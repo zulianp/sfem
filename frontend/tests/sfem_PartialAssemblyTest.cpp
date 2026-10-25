@@ -10,6 +10,54 @@
 #include "hex8_fff.hpp"
 #include "sshex8_laplacian.hpp"
 
+#include <algorithm>
+#include <cmath>
+
+// Independent of the assembled path: the Hessian apply y = H(u) h must match the central
+// difference of the gradient, (g(u + eps h) - g(u - eps h)) / (2 eps).
+int check_apply_against_gradient_fd(const std::shared_ptr<sfem::Function> &f,
+                                    const sfem::SharedBuffer<real_t>      &u,
+                                    const sfem::SharedBuffer<real_t>      &h,
+                                    const sfem::SharedBuffer<real_t>      &y,
+                                    const sfem::ExecutionSpace             es) {
+    const ptrdiff_t ndofs = u->size();
+    const real_t    eps   = 1e-6;
+
+    auto up = sfem::create_buffer<real_t>(ndofs, es);
+    auto um = sfem::create_buffer<real_t>(ndofs, es);
+    auto gp = sfem::create_buffer<real_t>(ndofs, es);
+    auto gm = sfem::create_buffer<real_t>(ndofs, es);
+
+    {
+        auto hu  = smesh::to_host(u);
+        auto hh  = smesh::to_host(h);
+        auto hup = smesh::to_host(up);
+        auto hum = smesh::to_host(um);
+        for (ptrdiff_t i = 0; i < ndofs; ++i) {
+            hup->data()[i] = hu->data()[i] + eps * hh->data()[i];
+            hum->data()[i] = hu->data()[i] - eps * hh->data()[i];
+        }
+    }
+
+    SFEM_TEST_ASSERT(f->gradient(up->data(), gp->data()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(f->gradient(um->data(), gm->data()) == SFEM_SUCCESS);
+
+    auto hy  = smesh::to_host(y);
+    auto hgp = smesh::to_host(gp);
+    auto hgm = smesh::to_host(gm);
+
+    real_t fd_max = 0, diff_max = 0;
+    for (ptrdiff_t i = 0; i < ndofs; ++i) {
+        const real_t fd = (hgp->data()[i] - hgm->data()[i]) / (2 * eps);
+        fd_max          = std::max(fd_max, std::abs(fd));
+        diff_max        = std::max(diff_max, std::abs(hy->data()[i] - fd));
+    }
+
+    SFEM_TEST_ASSERT(fd_max > 0);
+    SFEM_TEST_APPROXEQ(diff_max / fd_max, (real_t)0, (real_t)1e-6);
+    return SFEM_TEST_SUCCESS;
+}
+
 int test_hyperelasticity_partial_assembly(const std::string &op_name) {
     auto     es   = sfem::EXECUTION_SPACE_HOST;
 
@@ -71,6 +119,9 @@ int test_hyperelasticity_partial_assembly(const std::string &op_name) {
 
     mf->apply(h->data(), y_mf->data());
     bsr->apply(h->data(), y_bsr->data());
+
+    SFEM_TEST_ASSERT(check_apply_against_gradient_fd(f, u, h, y_mf, es) == SFEM_TEST_SUCCESS);
+    SFEM_TEST_ASSERT(check_apply_against_gradient_fd(f, u, h, y_bsr, es) == SFEM_TEST_SUCCESS);
 
     auto hy_mf  = smesh::to_host(y_mf);
     auto hy_bsr = smesh::to_host(y_bsr);
@@ -168,23 +219,30 @@ int test_hyperelasticity_active_strain_partial_assembly(const std::string &op_na
     mf->apply(h->data(), y_mf->data());
     bsr->apply(h->data(), y_bsr->data());
 
+    SFEM_TEST_ASSERT(check_apply_against_gradient_fd(f, u, h, y_mf, es) == SFEM_TEST_SUCCESS);
+    SFEM_TEST_ASSERT(check_apply_against_gradient_fd(f, u, h, y_bsr, es) == SFEM_TEST_SUCCESS);
+
     auto hy_mf  = smesh::to_host(y_mf);
     auto hy_bsr = smesh::to_host(y_bsr);
+
+    // The partial-assembly tensor is stored as metric_tensor_t (float): compare relative to its precision
+    real_t y_max = 0;
+    for (ptrdiff_t i = 0; i < ndofs; ++i) y_max = std::max(y_max, std::abs(hy_bsr->data()[i]));
     for (ptrdiff_t i = 0; i < ndofs; ++i) {
-        SFEM_TEST_APPROXEQ(hy_mf->data()[i], hy_bsr->data()[i], (real_t)1e-10);
+        SFEM_TEST_APPROXEQ(hy_mf->data()[i], hy_bsr->data()[i], (real_t)1e-6 * y_max);
     }
 
     return SFEM_TEST_SUCCESS;
 }
 
 int test_hyperelasticity_partial_assembly_all() {
-    return test_hyperelasticity_partial_assembly("NeoHookeanOgden");
-    +test_hyperelasticity_partial_assembly("MooneyRivlin");
+    return test_hyperelasticity_partial_assembly("NeoHookeanOgden") +
+           test_hyperelasticity_partial_assembly("MooneyRivlin");
 }
 
 int test_hyperelasticity_active_strain_partial_assembly_all() {
-    return test_hyperelasticity_active_strain_partial_assembly("NeoHookeanOgdenActiveStrainPacked");
-    +test_hyperelasticity_active_strain_partial_assembly("MooneyRivlinActiveStrainPacked");
+    return test_hyperelasticity_active_strain_partial_assembly("NeoHookeanOgdenActiveStrainPacked") +
+           test_hyperelasticity_active_strain_partial_assembly("MooneyRivlinActiveStrainPacked");
 }
 
 int main(int argc, char *argv[]) {
