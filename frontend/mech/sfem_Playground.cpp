@@ -11,7 +11,11 @@
 #include <string>
 #include <vector>
 
-#include "sfem_API.hpp"
+#include "sfem_blas_factory.hpp"
+#include "smesh_glob.hpp"
+#ifdef SFEM_ENABLE_CUDA
+#include "sfem_Function_incore_cuda.hpp"
+#endif
 #include "sfem_BDF2Scheme.hpp"
 #include "sfem_BackwardEulerScheme.hpp"
 #include "sfem_ContactStabilisedNewmarkScheme.hpp"

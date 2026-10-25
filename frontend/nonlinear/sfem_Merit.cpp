@@ -3,8 +3,8 @@
 #include <cmath>
 #include <limits>
 
-#include "sfem_API.hpp"
 #include "sfem_Function.hpp"
+#include "sfem_blas_factory.hpp"
 
 namespace sfem {
 

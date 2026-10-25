@@ -3,7 +3,7 @@
 #include <cassert>
 #include <utility>
 
-#include "sfem_API.hpp"
+#include "sfem_blas_factory.hpp"
 #include "sfem_logger.hpp"
 
 namespace sfem {

@@ -1,6 +1,11 @@
 #include "sfem_InertiaPotential.hpp"
 
-#include "sfem_API.hpp"
+#include "sfem_Function.hpp"
+#include "sfem_LinearOperatorFactory.hpp"
+#include "sfem_blas_factory.hpp"
+#ifdef SFEM_ENABLE_CUDA
+#include "sfem_Function_incore_cuda.hpp"
+#endif
 #ifdef SFEM_ENABLE_CUDA
 #include "cuda/sfem_InertiaPotential_cuda.hpp"
 #endif

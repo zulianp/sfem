@@ -2,8 +2,6 @@
 
 #include <algorithm>
 
-#include "sfem_API.hpp"
-
 namespace sfem {
 
     namespace {

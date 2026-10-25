@@ -4,7 +4,7 @@
 #include <cassert>
 #include <limits>
 
-#include "sfem_API.hpp"
+#include "sfem_blas_factory.hpp"
 #include "sfem_logger.hpp"
 #include "sfem_prony_kernels.hpp"
 

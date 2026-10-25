@@ -14,10 +14,12 @@
 #endif
 
 // C++
-#include "sfem_API.hpp"
+#include "sfem_ContactConditions.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_Input.hpp"
+#include "sfem_blas_factory.hpp"
 #include "smesh_semistructured.hpp"
+#include "smesh_sshex8.hpp"
 
 #include "smesh_glob.hpp"
 #include "smesh_mesh.hpp"

@@ -46,7 +46,7 @@ Surveyed at `717c5cfbf` (branch `tight-api`). Read-only survey: nothing was buil
   - `hardware/opencl_devices.c`
   - `workflows/ldp_containment/omp/{region_cost,region_count,team_cost}.c` (standalone microbenchmarks)
   - smesh's vendored `external/mpi-sort`.
-  The CMake glob `drivers/cuda/*.c` (CMakeLists.txt:381) matches nothing.
+  The CMake glob `drivers/cuda/*.c` (CMakeLists.txt:387) matches nothing.
 - `project(... LANGUAGES "C" "CXX")` (CMakeLists.txt:7) still enables C, and 102 operator headers keep `#ifdef __cplusplus extern "C"` guards from the C era.
 - **Constraint:** the shared kernel headers are C++17-only. They use templates (`CMAKE_CUDA_STANDARD 17`, cmake/SFEMDependencies.cmake:18-20).
   - Each one starts with `#ifndef __cplusplus #error ... #endif`.
@@ -164,7 +164,7 @@ Notes on the inventory:
   - smesh changes land on smesh `main` (standing rule).
   - Note: `sshex8_txe` in smesh_sshex8.hpp:16 lacks `static`. Harmless, but make it consistent.
 - **The `cu_` prefix.** Micro-kernels lose it: one name, host and device. `cu_` stays for launchers and entry points, which is also the generator's convention (`CUDATarget.entry_point_name`, targets.py:1058). No aliases are kept. Every call site is renamed in the same commit (no-redundant-paths).
-- **HIP.** `SFEM_HOST_DEVICE` already covers `__HIPCC__`. The device branch macro must test `__HIP_DEVICE_COMPILE__` as well as `__CUDA_ARCH__`. The hipify shim `base/hip/{cuda_runtime,cuda,cublas_v2}.hpp` exists only untracked in the main worktree, not in `tight-api`, and `SFEM_ENABLE_HIP` is commented out (cmake/SFEMDependencies.cmake:278). Since the shared headers never include CUDA headers, the shim never matters to them.
+- **HIP.** `SFEM_HOST_DEVICE` already covers `__HIPCC__`. The device branch macro must test `__HIP_DEVICE_COMPILE__` as well as `__CUDA_ARCH__`. The hipify shim `base/hip/{cuda_runtime,cuda,cublas_v2}.hpp` exists only untracked in the main worktree, not in `tight-api`, and `SFEM_ENABLE_HIP` is commented out (cmake/SFEMDependencies.cmake:285). Since the shared headers never include CUDA headers, the shim never matters to them.
 - **Where the device really wants another shape.** Rows 4, 5 and 17 (Taylor tables split per axis, elasticity matrix per 3×3 block) are cases where the device copy was reshaped, presumably for registers. Under the device-kernels-get-their-own-variant rule, the two shapes become **two functions in the same shared header**, both `SFEM_HOST_DEVICE`, generated from one symbolic source where applicable. They are not two files with diverging copies. The rule leaves the choice of one shape to measurement.
 
 ### 2.3 Risks

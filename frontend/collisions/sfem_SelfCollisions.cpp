@@ -4,7 +4,6 @@
 #include "smesh_mesh.hpp"
 #include "smesh_tracer.hpp"
 
-#include "sfem_API.hpp"
 #include "sfem_OpFactory.hpp"
 
 #include "integrations/smesh/sccd_smesh_ccd.hpp"

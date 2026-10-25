@@ -11,7 +11,8 @@
 #include "sfem_aliases.hpp"
 #include "sfem_macros.hpp"
 
-#include "sfem_API.hpp"
+#include "sfem_CRS.hpp"
+#include "sfem_blas_factory.hpp"
 
 namespace sfem {
 

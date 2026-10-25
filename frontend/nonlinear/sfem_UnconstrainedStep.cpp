@@ -1,8 +1,15 @@
 #include "sfem_UnconstrainedStep.hpp"
 
-#include "sfem_API.hpp"
+#include "sfem_BSR.hpp"
 #include "sfem_BSRTangent.hpp"
+#include "sfem_DIA.hpp"
 #include "sfem_Function.hpp"
+#include "sfem_LinearOperatorFactory.hpp"
+#include "sfem_ShiftableJacobi.hpp"
+#include "sfem_bcgs.hpp"
+#include "sfem_blas_factory.hpp"
+#include "sfem_cg.hpp"
+#include "sfem_solver_factory.hpp"
 
 namespace sfem {
 

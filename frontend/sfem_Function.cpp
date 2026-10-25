@@ -6,10 +6,13 @@
 
 #include "utils.h"
 
+#include "sfem_LinearOperatorFactory.hpp"
+#include "sfem_blas_factory.hpp"
 #include "sfem_defs.hpp"
+#include "sfem_device.hpp"
 #include "sfem_logger.hpp"
 #include "sfem_openmp_blas.hpp"
-#include "sfem_API.hpp"
+#include "smesh_env.hpp"
 #include "smesh_glob.hpp"
 #include "smesh_mesh.hpp"
 

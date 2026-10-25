@@ -5,9 +5,9 @@
 #include <functional>
 #include <memory>
 
-#include "sfem_API.hpp"
 #include "sfem_Merit.hpp"
 #include "sfem_Observers.hpp"
+#include "sfem_tpl_blas.hpp"
 
 namespace sfem {
 

@@ -1,9 +1,11 @@
 #include "sfem_SelfContact.hpp"
 
 #include "bvh/bvh.hpp"
-#include "sfem_API.hpp"
+#include "sfem_Function.hpp"
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_OpFactory.hpp"
+#include "sfem_blas_factory.hpp"
+#include "smesh_env.hpp"
 #include "smesh_sort.hpp"
 
 #include <algorithm>

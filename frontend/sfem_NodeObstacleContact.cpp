@@ -5,7 +5,10 @@
 #include <limits>
 #include <cmath>
 
-#include "sfem_API.hpp"
+#include "sfem_blas_factory.hpp"
+#ifdef SFEM_ENABLE_CUDA
+#include "sfem_Function_incore_cuda.hpp"
+#endif
 #include "sfem_NodeObstacleView.hpp"
 #include "sfem_aliases.hpp"
 

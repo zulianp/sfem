@@ -14,9 +14,11 @@
 #include "sfem_OpTracer.hpp"
 #include "sfem_Parameters.hpp"
 
-#include "smesh_glob.hpp"
+#include "sfem_Function.hpp"
+#include "sfem_LinearOperatorFactory.hpp"
 #include "sfem_aliases.hpp"
-#include "sfem_API.hpp"
+#include "sfem_blas_factory.hpp"
+#include "smesh_glob.hpp"
 
 #include <math.h>
 #include <mpi.h>

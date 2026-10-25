@@ -22,7 +22,7 @@ Evidence verified with grep/find on commit `717c5cfbf` (branch tight-api; build*
 - [ ] `drivers/mesh_self_intersect.exe.cpp`: a 1-line stub `int main() { return 0; }` that builds a no-op exe. No script uses it.
 - [ ] Zero-byte C++: `algebra/openmp/sfem_openmp_blas.cpp` (the hpp stays), `frontend/sfem_SelfContact.cpp`, `operators/tet4/tet4_neohookean_active_strain.{cpp,hpp}` (that name is referenced nowhere).
 - [ ] `python/sfem/__main__.py`: zero bytes, so `python -m sfem` does nothing.
-- [ ] `frontend/sfem_SelfContact.hpp`: a 6-line forwarder to `contact/sfem_SelfContact.hpp`. Both includers still work without it: `frontend/contact/sfem_MaMAL.cpp:10` finds the header in its own folder, and `frontend/distances/tests/sfem_TwoBodyContactTest.exe.cpp:17` is built only with SSDF, which puts frontend/contact on the include path.
+- [ ] `frontend/sfem_SelfContact.hpp`: a 6-line forwarder to `contact/sfem_SelfContact.hpp`. Both includers still work without it: `frontend/contact/sfem_MaMAL.cpp:11` finds the header in its own folder, and `frontend/distances/tests/sfem_TwoBodyContactTest.exe.cpp:17` is built only with SSDF, which puts frontend/contact on the include path.
 - [ ] `frontend/distances/sfem_MeshDistances.{cpp,hpp}`: declares an empty `class MeshDistances {}`. The cpp holds only two includes, and `MeshDistances` appears nowhere else.
 - [ ] `resampling/data_structures/sfem_queue.hpp`: an include guard and nothing else. No includer.
 
@@ -31,14 +31,14 @@ Evidence verified with grep/find on commit `717c5cfbf` (branch tight-api; build*
 - [ ] `operators/tet20/` (`tet20_laplacian.{cpp,hpp}`): not in SFEM_MODULES. Nothing outside the folder uses the `tet20_laplacian_*` symbols. Keep `python/codegen/tet20.py`: `laplace_op.py` and 11 other codegen scripts import it (see the codegen section).
 - [ ] `operators/hex8/dg/`, `operators/quad4/dg/`, `operators/spectral_hex/dg/`: their module entries are commented out at `CMakeLists.txt:91-96` ("FIXME DG is yet to be implemented"). Nothing outside these folders includes them. `dg_hex8_symmetric_interior_penalty.hpp` is zero bytes, `dg_quad4_symmetric_interior_penalty_inline.hpp` has no includer at all, and `spectral_hex_lax_friedrichs_flux.cpp` is a single include.
 - [ ] `operators/tet4/drafts/tet4_cuda_laplacian{,_2,_3}.cu`: operators/tet4 is globbed non-recursively, so these never build, and the name is referenced nowhere. `_2.cu` also holds a 326-line `#if 0` (353-678).
-- [ ] `drivers/metis/partition_mesh_based_on_operator.cpp`: `metis` is missing from SFEM_DRIVER_MODULES (`CMakeLists.txt:351`). Its only caller, `workflows/decomposition/partition_mesh_based_on_operator.sh:33`, is therefore already broken (the call in `test/test.sh:46` is commented out).
+- [ ] `drivers/metis/partition_mesh_based_on_operator.cpp`: `metis` is missing from SFEM_DRIVER_MODULES (`CMakeLists.txt:357`). Its only caller, `workflows/decomposition/partition_mesh_based_on_operator.sh:33`, is therefore already broken (the call in `test/test.sh:46` is commented out).
 - [ ] `examples/` (run_poisson.cpp, run_poisson_cuda.cpp, run_convection_diffusion.cpp and 3 .sh): the driver glob covers `drivers/examples`, which does not exist, and nothing globs top-level `examples/`. Only its own .sh files use these.
 - [ ] `viz/` (`quad4_viz.exe.cpp`, `run.sh`): in no CMake list. Only its own run.sh uses it.
 - [ ] `cuda/shuffles/width.cu`, `cuda/tensorcore/{mma_fp64_test.cu,mma_fp64_test.py,wmma_example.cu}`: standalone micro-tests. No CMake or script references them.
 - [ ] `resampling/test_grid/`: a standalone experiment built by its own Makefile (`CC = g++-13`), outside CMake. It also commits `perf.data` and `perf.data.old`.
 - [ ] `notebook/symbtrafo/main.cpp`, `matlab/projectedSSOR.cpp`: loose sources that no build or script references.
 - [ ] CMake entries for directories that do not exist: SFEM_MODULES `operators/hierarchical` (`:69`) and `graphs` (`:142`, METIS); SFEM_UNIT_TESTS `operators/ssquad4/tests`, `operators/sshex8/tests`, `mesh/tests` (`:450-453`); SFEM_DRIVER_MODULES `mesh examples mesh_functions sdf` (`:351`).
-- [ ] The cuSPARSE and cuBLAS branches: `SFEM_ENABLE_CUSPARSE` (`configuration/sfem_config.h.in:10`) and `SFEM_ENABLE_CUBLAS` have no CMake option, so both are undefined in every build (the Alps CUDA build's `sfem_config.h` has `/* #undef SFEM_ENABLE_CUSPARSE */`). Never compiled: `algebra/cuda/sfem_cuda_crs_SpMV.cpp:13-489` (the cuSPARSE CRS, symmetric-COO and BSR SpMV, with a static handle and no stream) and `algebra/cuda/sfem_cuda_blas.cu:29-215` plus the `#ifdef` arms at 565 and 626 (cuBLAS). What is compiled instead: `d_bsr_spmv` runs the library's kernel; `d_crs_spmv` and `d_sym_coo_spmv` are `SFEM_ERROR("Not implemented!")` stubs, reached from `frontend/sfem_LinearOperatorFactory.cpp:417,452`, `drivers/bench/bench_spmv.exe.cpp` and `drivers/sym_spmv_bench.cpp`. Removing the branches also removes the `#warning "No CUSPARSE installation!"` every CUDA build prints. The alternative, an option that turns them on, is Stage H.
+- [ ] The cuSPARSE and cuBLAS branches: `SFEM_ENABLE_CUSPARSE` (`configuration/sfem_config.h.in:10`) and `SFEM_ENABLE_CUBLAS` have no CMake option, so both are undefined in every build (the Alps CUDA build's `sfem_config.h` has `/* #undef SFEM_ENABLE_CUSPARSE */`). Never compiled: `algebra/cuda/sfem_cuda_crs_SpMV.cpp:13-495` (the cuSPARSE CRS, symmetric-COO and BSR SpMV, with a static handle and no stream) and `algebra/cuda/sfem_cuda_blas.cu:30-219` plus the `#ifdef` arms at 565 and 626 (cuBLAS). What is compiled instead: `d_bsr_spmv` runs the library's kernel; `d_crs_spmv` and `d_sym_coo_spmv` are `SFEM_ERROR("Not implemented!")` stubs, reached from `frontend/sfem_LinearOperatorFactory.cpp:417,452`, `drivers/bench/bench_spmv.exe.cpp` and `drivers/sym_spmv_bench.cpp`. Removing the branches also removes the `#warning "No CUSPARSE installation!"` every CUDA build prints. The alternative, an option that turns them on, is Stage H.
 - [ ] Stale SFEM_EXCLUDED_EXEC names: `heat_equation` (listed twice, `:364`), `lapl_matrix_free` and `linear_elasticity_matrix_free` (`:387`) have no source. `run_poisson_cuda` lives only in the unglobbed examples/.
 
 ## Backups and deprecated copies
@@ -52,7 +52,7 @@ Evidence verified with grep/find on commit `717c5cfbf` (branch tight-api; build*
 Each line removes only the dead `#if 0` branch. Where an `#else` branch exists it stays, with its guards dropped.
 
 - [ ] `operators/tet4/tet4_neohookean_ogden.cpp:423-437`: "Old implementation" of the hessian apply. The `#else` branch at 438-478 stays.
-- [ ] `algebra/crs/sfem_CRS.hpp:365-380`: plain CRS SpMV loop. The `#else` branch at 381-419 ("20-27% faster on M1") stays.
+- [ ] `algebra/crs/sfem_CRS.hpp:366-381`: plain CRS SpMV loop. The `#else` branch at 381-419 ("20-27% faster on M1") stays.
 - [ ] `operators/tet10/tet10_laplacian_inline_cpu.hpp:43-67`: reference-gradient loop. The `#else` branch at 68-91 stays.
 - [ ] `operators/hex8/hex8_neohookean_ogden_active_strain.cpp:637-647` (centroid sampling) and `:731-738` ("Slower than other variant"). The `#else` branches at 648-682 and 739-748 stay.
 - [ ] `operators/hex8/hex8_neohookean_ogden.cpp:334-344` (centroid sampling) and `:426-433` ("Slower than other variant"). The `#else` branches at 345-377 and 434-443 stay.
@@ -93,20 +93,20 @@ Each name appears only at its own declaration and definition, checked across C/C
 
 ## Environment-driven factories (create_from_env) and their remaining users
 
-- [ ] `ContactConditions::create_from_env` (`frontend/sfem_ContactConditions.cpp:584`, `.hpp:87`): no caller.
+- [ ] `ContactConditions::create_from_env` (`frontend/sfem_ContactConditions.cpp:591`, `.hpp:87`): no caller.
 - [ ] `NeumannConditions::create_from_env` (`frontend/sfem_NeumannConditions.cpp:289`, `.hpp:48`): its only user is `drivers/assemble.exe.cpp:40`, which scripts still use (see "Checked, still used"), so assemble.exe must be migrated first.
 - [ ] `DirichletConditions::create_from_env` (`frontend/sfem_DirichletConditions.cpp:283`, `.hpp:47`): used by `drivers/assemble.exe.cpp:37` and by `create_dirichlet_conditions_from_env` (`frontend/sfem_DirichletConditions.cpp:781`). That wrapper is called by drivers obstacle.exe, sdf_obstacle.exe, test_galerkin_assembly, mgsolve and steady_state_sim, which must be migrated first.
-- [ ] `AxisAlignedContactConditions::create_from_env` (`frontend/sfem_ContactConditions.cpp:162`, `.hpp:18`), called through `create_contact_conditions_from_env` (`frontend/sfem_ContactConditions.cpp:984`): the only caller is `drivers/obstacle.exe.cpp`.
+- [ ] `AxisAlignedContactConditions::create_from_env` (`frontend/sfem_ContactConditions.cpp:169`, `.hpp:18`), called through `create_contact_conditions_from_env` (`frontend/sfem_ContactConditions.cpp:990`): the only caller is `drivers/obstacle.exe.cpp`.
 - For information only: `smesh::SFC::create_from_env` lives in smesh. It is used by 7 drivers/bench, `bench/cuda/bench_packed_laplacian.cpp`, `drivers/simulations/poisson.exe.cpp`, `frontend/tests/sfem_MatrixFromatsTest.cpp` and 5 spike drivers.
 
 ## Legacy implementations and drivers
 
 - [ ] Legacy tet4 NeoHookean assembly: `neohookean_assemble_{hessian,gradient,value,hessian_soa}` in `operators/tet4/tet4_neohookean.cpp`, declared in `.hpp`. None has a caller; the only call is commented out at `drivers/assemble3.exe.cpp:102`. `neohookean_assemble_hessian` is defined twice (`tet4_neohookean.cpp:921` and `vectorized/tet4_simd_neohookean.cpp:901`), and both compile under the default `SFEM_ENABLE_EXPLICIT_VECTORIZATION=ON`. Remove the 4 functions and the whole `tet4_simd_neohookean.cpp`, whose name is referenced nowhere. The stress and von Mises functions stay: drivers cauchy_stress, vonmises and cprincipal_stresses use them.
-- [ ] `drivers/assemble4.exe.cpp` together with `operators/tet4/tet4_isotropic_phasefield_for_fracture.cpp` and `operators/isotropic_phasefield_for_fracture.hpp`: no script or doc names assemble4, and only assemble4 uses the phase-field code. Also drop `assemble4` from `CMakeLists.txt:364`.
+- [ ] `drivers/assemble4.exe.cpp` together with `operators/tet4/tet4_isotropic_phasefield_for_fracture.cpp` and `operators/isotropic_phasefield_for_fracture.hpp`: no script or doc names assemble4, and only assemble4 uses the phase-field code. Also drop `assemble4` from `CMakeLists.txt:370`.
 - [ ] `drivers/bgs.exe.cpp`: no script or doc reference.
 - [ ] `drivers/crs_apply_dirichlet.exe.cpp`: no script or doc reference.
-- [ ] `drivers/sym_spmv_bench.cpp`: referenced only by the exclusion list at `CMakeLists.txt:387`.
-- [ ] The dynamic plug-in path: `operators/generated/CMakeLists.txt`, `frontend/ops/sfem_PlugInOp.{cpp,hpp}` and the `"plugin:"` branch at `frontend/ops/sfem_OpFactory.cpp:131-136`. Its `add_subdirectory` is commented out (`CMakeLists.txt:339`), the CMake globs a `tpl/hyperelasticity` directory that does not exist at the repo root, and no `plugin:` op name is used anywhere.
+- [ ] `drivers/sym_spmv_bench.cpp`: referenced only by the exclusion list at `CMakeLists.txt:393`.
+- [ ] The dynamic plug-in path: `operators/generated/CMakeLists.txt`, `frontend/ops/sfem_PlugInOp.{cpp,hpp}` and the `"plugin:"` branch at `frontend/ops/sfem_OpFactory.cpp:131-136`. Its `add_subdirectory` is commented out (`CMakeLists.txt:345`), the CMake globs a `tpl/hyperelasticity` directory that does not exist at the repo root, and no `plugin:` op name is used anywhere.
 
 ## Legacy codegen scripts (python/codegen/*.py, outside framework/)
 
@@ -121,7 +121,7 @@ The framework imports none of these. Its `fields`, `linear_elasticity`, `navier_
 
 - [ ] `resampling/test_grid/perf.data`, `perf.data.old` (tracked, 28 KB each). They are already gone if the test_grid/ item above is ticked.
 - [ ] `smesh.trace.csv` (repo root) and `spikes/inexact_apply_compare/smesh.trace.csv`: tracked trace output.
-- [ ] `spmg_stats.csv` (repo root): tracked runtime output, written to `./spmg_stats.csv` by default (`algebra/sfem_ShiftedPenaltyMultigrid.hpp:1157`).
+- [ ] `spmg_stats.csv` (repo root): tracked runtime output, written to `./spmg_stats.csv` by default (`algebra/sfem_ShiftedPenaltyMultigrid.hpp:1152`).
 - [ ] `docs/partial_assembly.aux`: tracked LaTeX build product of `docs/partial_assembly.tex`.
 
 ## Checked, still used (not for removal)
