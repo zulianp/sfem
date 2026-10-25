@@ -1,4 +1,5 @@
 #include <math.h>
+#include "smesh_base.hpp"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -40,7 +41,7 @@ int main(int argc, char* argv[]) {
     int SFEM_INTERPOLATE = 1;
     SFEM_READ_ENV(SFEM_INTERPOLATE, atoi);
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     const char* folder        = argv[1];
     ptrdiff_t   nglobal[3]    = {atol(argv[2]), atol(argv[3]), atol(argv[4])};
@@ -89,13 +90,13 @@ int main(int argc, char* argv[]) {
     ptrdiff_t nlocal[3];
 
     {
-        double ndarray_read_tick = MPI_Wtime();
+        double ndarray_read_tick = smesh::time_seconds();
 
         if (ndarray_create_from_file(comm, data_path, SFEM_MPI_GEOM_T, 3, (void**)&sdf, nlocal, nglobal)) {
             return EXIT_FAILURE;
         }
 
-        double ndarray_read_tock = MPI_Wtime();
+        double ndarray_read_tock = smesh::time_seconds();
 
         if (!rank) {
             printf("[%d] ndarray_create_from_file %g (seconds)\n", rank, ndarray_read_tock - ndarray_read_tick);
@@ -134,7 +135,7 @@ int main(int argc, char* argv[]) {
     real_t* ynormal = (real_t*)calloc(mesh->n_nodes(), sizeof(real_t));
     real_t* znormal = (real_t*)calloc(mesh->n_nodes(), sizeof(real_t));
     {
-        double resample_tick = MPI_Wtime();
+        double resample_tick = smesh::time_seconds();
 
         if (SFEM_INTERPOLATE) {
             interpolate_gap(
@@ -255,7 +256,7 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        double resample_tock = MPI_Wtime();
+        double resample_tock = smesh::time_seconds();
 
         if (!rank) {
             printf("[%d] resample %g (seconds)\n", rank, resample_tock - resample_tick);
@@ -264,7 +265,7 @@ int main(int argc, char* argv[]) {
 
     // Write result to disk
     {
-        double io_tick = MPI_Wtime();
+        double io_tick = smesh::time_seconds();
 
         char path[1024 * 10];
         snprintf(path, sizeof(path), "%s/gap.float64.raw", output_folder);
@@ -288,7 +289,7 @@ int main(int argc, char* argv[]) {
             mesh_write_nodal_field(comm, n_owned_nodes, node_mapping->data(), path, SFEM_MPI_REAL_T, g);
         }
 
-        double io_tock = MPI_Wtime();
+        double io_tock = smesh::time_seconds();
 
         if (!rank) {
             printf("[%d] write %g (seconds)\n", rank, io_tock - io_tick);
@@ -307,7 +308,7 @@ int main(int argc, char* argv[]) {
         free(znormal);
     }
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
 
     if (!rank) {
         printf("----------------------------------------\n");

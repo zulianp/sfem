@@ -1,5 +1,6 @@
 
 #include "tet4_l2_projection_p0_p1.hpp"
+#include "smesh_base.hpp"
 
 #include <mpi.h>
 #include <string.h>
@@ -90,7 +91,7 @@ void tet4_p0_p1_projection_coeffs(const ptrdiff_t nelements,
                          geom_t **const SFEM_RESTRICT xyz,
                          const real_t *const SFEM_RESTRICT p0,
                          real_t *const SFEM_RESTRICT p1) {
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     idx_t ev[4];
 
@@ -151,7 +152,7 @@ void tet4_p0_p1_projection_coeffs(const ptrdiff_t nelements,
 
     free(weights);
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
     printf("tet4_l2_projection_p0_p1.c: tet4_p0_p1_projection_coeffs\t%g seconds\n", tock - tick);
 }
 
@@ -161,7 +162,7 @@ void tet4_p0_p1_l2_projection_apply(const ptrdiff_t nelements,
                        geom_t **const SFEM_RESTRICT xyz,
                        const real_t *const SFEM_RESTRICT p0,
                        real_t *const SFEM_RESTRICT p1) {
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     idx_t ev[4];
 
@@ -211,6 +212,6 @@ void tet4_p0_p1_l2_projection_apply(const ptrdiff_t nelements,
         }
     }
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
     printf("tet4_l2_projection_p0_p1.c: tet4_p0_p1_l2_projection_apply\t%g seconds\n", tock - tick);
 }

@@ -1,4 +1,5 @@
 #include "sfem_API.hpp"
+#include "smesh_base.hpp"
 #include "sfem_DirichletConditions.hpp"
 #include "sfem_Function.hpp"
 #include "generated/sfem_generated_ops_registration.hpp"
@@ -632,7 +633,7 @@ int main(int argc, char **argv) {
 
     int info       = SFEM_FAILURE;
     int iterations = 0;
-    const double tick = MPI_Wtime();
+    const double tick = smesh::time_seconds();
     if (use_dense) {
         info = dense_generated_solve(linear_op, rhs->data(), x->data());
     } else {
@@ -643,7 +644,7 @@ int main(int argc, char **argv) {
         info       = solver->apply(rhs->data(), x->data());
         iterations = solver->iterations();
     }
-    const double solve_time = MPI_Wtime() - tick;
+    const double solve_time = smesh::time_seconds() - tick;
 
     auto residual = sfem::create_host_buffer<real_t>(fs->n_dofs());
     std::memset(residual->data(), 0, sizeof(real_t) * (size_t)fs->n_dofs());

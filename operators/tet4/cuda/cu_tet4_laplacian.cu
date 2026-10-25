@@ -90,7 +90,7 @@ extern int cu_tet4_laplacian_apply(const ptrdiff_t                 nelements,
         }
         default: {
             SFEM_ERROR("[Error] cu_tet4_laplacian_apply: not implemented for type %s (code %d)\n",
-                       smesh::to_string(real_type_xy),
+                       smesh::to_string(real_type_xy).data(),
                        real_type_xy);
             return SFEM_FAILURE;
         }
@@ -173,7 +173,7 @@ extern int cu_tet4_laplacian_diag(const ptrdiff_t                 nelements,
         }
         default: {
             SFEM_ERROR("[Error] cu_tet4_laplacian_diag: not implemented for type %s (code %d)\n",
-                       smesh::to_string(real_type_diag),
+                       smesh::to_string(real_type_diag).data(),
                        real_type_diag);
             return SFEM_FAILURE;
         }
@@ -261,7 +261,7 @@ extern int cu_tet4_laplacian_crs(const ptrdiff_t                    nelements,
         }
         default: {
             SFEM_ERROR("[Error] cu_tet4_laplacian_crs: not implemented for type %s (code %d)\n",
-                       smesh::to_string(real_type),
+                       smesh::to_string(real_type).data(),
                        real_type);
             return SFEM_FAILURE;
         }

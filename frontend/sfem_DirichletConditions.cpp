@@ -576,6 +576,8 @@ namespace sfem {
         return create_from_yaml(space, conds);
 
 #else
+        SFEM_UNUSED(space);
+        SFEM_UNUSED(yaml);
         SFEM_ERROR("This functionaly requires -DSFEM_ENABLE_RYAML=ON\n");
         return nullptr;
 #endif

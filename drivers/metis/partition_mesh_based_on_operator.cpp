@@ -1,4 +1,5 @@
 #include <math.h>
+#include "smesh_base.hpp"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -50,7 +51,7 @@ int main(int argc, char *argv[]) {
         printf("%s %s %s %d %s\n", argv[0], folder, matrix_folder, num_partitions, partition_file);
     }
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     ///////////////////////////////////////////////////////////////////////////////
     // Read data
@@ -127,7 +128,7 @@ int main(int argc, char *argv[]) {
     mesh_destroy(&mesh);
     free(node_partitions);
     free(element_partitions);
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
 
     if (!rank) {
         printf("----------------------------------------\n");

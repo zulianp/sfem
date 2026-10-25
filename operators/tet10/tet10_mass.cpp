@@ -1,4 +1,5 @@
 #include "tet10_mass.hpp"
+#include "smesh_base.hpp"
 
 #include <assert.h>
 #include <math.h>
@@ -232,7 +233,7 @@ void tet10_assemble_mass(const ptrdiff_t nelements,
                          real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     idx_t ev[10];
     idx_t ks[10];
@@ -287,7 +288,7 @@ void tet10_assemble_mass(const ptrdiff_t nelements,
         }
     }
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
     printf("tet10_mass.c: tet10_assemble_mass\t%g seconds\n", tock - tick);
 }
 
@@ -367,7 +368,7 @@ void tet10_apply_inv_lumped_mass(const ptrdiff_t nelements,
                                  geom_t **const SFEM_RESTRICT xyz,
                                  const real_t *const x,
                                  real_t *const values) {
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     idx_t ev[10];
     real_t element_x[10];
@@ -425,7 +426,8 @@ void tet10_apply_inv_lumped_mass(const ptrdiff_t nelements,
     for (ptrdiff_t i = 0; i < nelements; ++i) {
 #pragma unroll(10)
         for (int v = 0; v < 10; ++v) {
-            element_x_pre_trafo[v] = values[elems[v][i]];
+            ev[v]                  = elems[v][i];
+            element_x_pre_trafo[v] = values[ev[v]];
         }
 
         tet10_transform_kernel(element_x_pre_trafo, element_x);
@@ -436,7 +438,7 @@ void tet10_apply_inv_lumped_mass(const ptrdiff_t nelements,
         }
     }
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
     printf("tet10_mass.c: tet10_apply_inv_lumped_mass\t%g seconds\n", tock - tick);
 }
 
@@ -532,7 +534,7 @@ void tet10_assemble_lumped_mass(const ptrdiff_t nelements,
                                 real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
 #pragma omp parallel
     {
@@ -578,6 +580,6 @@ void tet10_assemble_lumped_mass(const ptrdiff_t nelements,
         }
     }
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
     printf("tet10_mass.c: tet10_assemble_lumped_mass\t%g seconds\n", tock - tick);
 }

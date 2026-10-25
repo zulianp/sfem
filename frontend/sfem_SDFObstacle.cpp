@@ -101,6 +101,7 @@ namespace sfem {
         const bool slabs = comm->size() > 1 && comm->max<ptrdiff_t>(sdf->nglobal(2) - sdf->nlocal()[2]) > 0;
 
         std::shared_ptr<SDFBSpline> spline;
+#ifdef SMESH_ENABLE_MPI
         if (slabs) {
             geom_t *view = nullptr;
             if (sdf_view_ensure_margin(comm->get(),
@@ -120,7 +121,13 @@ namespace sfem {
             }
             spline = SDFBSpline::create(obs->impl_->n, sdf->stride(), view);
             free(view);
-        } else {
+        } else
+#else
+        SFEM_UNUSED(slabs);  // one rank: the grid is whole
+        SFEM_UNUSED(nnodes);
+        SFEM_UNUSED(z);
+#endif
+        {
             spline = SDFBSpline::create(sdf);
         }
 

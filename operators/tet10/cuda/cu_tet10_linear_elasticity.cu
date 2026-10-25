@@ -692,7 +692,7 @@ extern int cu_tet10_linear_elasticity_apply(const ptrdiff_t                 nele
             SFEM_ERROR(
                     "[Error] cu_tet10_linear_elasticity_apply: not implemented for type %s "
                     "(code %d)\n",
-                    smesh::to_string(real_type),
+                    smesh::to_string(real_type).data(),
                     real_type);
             return SFEM_FAILURE;
         }
@@ -881,7 +881,7 @@ extern int cu_tet10_linear_elasticity_diag(const ptrdiff_t                 nelem
             SFEM_ERROR(
                     "[Error] cu_tet10_linear_elasticity_diag: not implemented for type %s "
                     "(code %d)\n",
-                    smesh::to_string(real_type),
+                    smesh::to_string(real_type).data(),
                     real_type);
             return SFEM_FAILURE;
         }

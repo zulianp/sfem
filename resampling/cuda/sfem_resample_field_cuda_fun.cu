@@ -83,6 +83,7 @@ void                                                               //
 copy_elems_tet4_device_unified(const idx_t**      elems,           // elements from host
                                const ptrdiff_t    nelements,       // number of elements
                                elems_tet4_device* elems_device) {  // to device
+    SFEM_UNUSED(nelements);  // unified memory: the host arrays are used in place
 
     elems_device->elems_v0 = (idx_t*)elems[0];
     elems_device->elems_v1 = (idx_t*)elems[1];
@@ -244,6 +245,7 @@ void                                                         //
 copy_xyz_tet4_device_unified(const geom_t**   xyz,           //
                              const ptrdiff_t  nnodes,        //
                              xyz_tet4_device* xyz_device) {  //
+    SFEM_UNUSED(nnodes);  // unified memory: the host arrays are used in place
                                                              //
     xyz_device->x = (geom_t*)xyz[0];
     xyz_device->y = (geom_t*)xyz[1];

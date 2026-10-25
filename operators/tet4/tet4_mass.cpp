@@ -1,4 +1,5 @@
 #include "tet4_mass.hpp"
+#include "smesh_base.hpp"
 
 #include <assert.h>
 #include <math.h>
@@ -157,7 +158,7 @@ void tet4_assemble_mass(const ptrdiff_t                    nelements,  //
                         real_t *const                      values) {                        //
     SFEM_UNUSED(nnodes);
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     idx_t ev[4];
     idx_t ks[4];
@@ -212,7 +213,7 @@ void tet4_assemble_mass(const ptrdiff_t                    nelements,  //
         }
     }
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
 #if SFEM_LOG_LEVEL >= 5
     printf("tet4_mass.c: assemble_mass\t%g seconds\n", tock - tick);
 #endif
@@ -235,7 +236,7 @@ tet4_assemble_lumped_mass(const ptrdiff_t              nelements,  //
                           real_t *const SFEM_RESTRICT  values) {    //
     SFEM_UNUSED(nnodes);
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     idx_t ev[4];
 
@@ -276,7 +277,7 @@ tet4_assemble_lumped_mass(const ptrdiff_t              nelements,  //
         }
     }
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
     printf("tet4_mass.c: tet4_assemble_lumped_mass\t%g seconds\n", tock - tick);
 }
 

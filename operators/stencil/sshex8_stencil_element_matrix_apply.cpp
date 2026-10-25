@@ -1253,28 +1253,28 @@ static void sshex8_linear_elasticity_scatter_boundary(
 //                             scalar_t  acc0 = 0, acc1 = 0, acc2 = 0;
 //                             scalar_t  t[9];
 
-// #define SSHEX8_ELASTICITY_TENSOR_BOUNDARY_ACCUMULATE(ci_, input_)                                    \
-//     do {                                                                                             \
-//         sshex8_tensor_terms_at_category(idx,                                                         \
-//                                         Lp1,                                                         \
-//                                         zstride,                                                     \
-//                                         cx,                                                          \
-//                                         cy,                                                          \
-//                                         cz,                                                          \
-//                                         dx_begin,                                                    \
-//                                         dx_end,                                                      \
-//                                         dy_begin,                                                    \
-//                                         dy_end,                                                      \
-//                                         dz_begin,                                                    \
-//                                         dz_end,                                                      \
-//                                         input_,                                                      \
-//                                         t);                                                          \
-//         const scalar_t *const SFEM_RESTRICT c0 = &tensor_coeffs[(0 * 3 + (ci_)) * 9];                \
-//         const scalar_t *const SFEM_RESTRICT c1 = &tensor_coeffs[(1 * 3 + (ci_)) * 9];                \
-//         const scalar_t *const SFEM_RESTRICT c2 = &tensor_coeffs[(2 * 3 + (ci_)) * 9];                \
-//         acc0 += c0[0] * t[0] + c0[1] * t[1] + c0[2] * t[2] + c0[3] * t[3] + c0[4] * t[4] + c0[5] * t[5] + c0[6] * t[6] + c0[7] * t[7] + c0[8] * t[8]; \
-//         acc1 += c1[0] * t[0] + c1[1] * t[1] + c1[2] * t[2] + c1[3] * t[3] + c1[4] * t[4] + c1[5] * t[5] + c1[6] * t[6] + c1[7] * t[7] + c1[8] * t[8]; \
-//         acc2 += c2[0] * t[0] + c2[1] * t[1] + c2[2] * t[2] + c2[3] * t[3] + c2[4] * t[4] + c2[5] * t[5] + c2[6] * t[6] + c2[7] * t[7] + c2[8] * t[8]; \
+// #define SSHEX8_ELASTICITY_TENSOR_BOUNDARY_ACCUMULATE(ci_, input_)
+//     do {
+//         sshex8_tensor_terms_at_category(idx,
+//                                         Lp1,
+//                                         zstride,
+//                                         cx,
+//                                         cy,
+//                                         cz,
+//                                         dx_begin,
+//                                         dx_end,
+//                                         dy_begin,
+//                                         dy_end,
+//                                         dz_begin,
+//                                         dz_end,
+//                                         input_,
+//                                         t);
+//         const scalar_t *const SFEM_RESTRICT c0 = &tensor_coeffs[(0 * 3 + (ci_)) * 9];
+//         const scalar_t *const SFEM_RESTRICT c1 = &tensor_coeffs[(1 * 3 + (ci_)) * 9];
+//         const scalar_t *const SFEM_RESTRICT c2 = &tensor_coeffs[(2 * 3 + (ci_)) * 9];
+//         acc0 += c0[0] * t[0] + c0[1] * t[1] + c0[2] * t[2] + c0[3] * t[3] + c0[4] * t[4] + c0[5] * t[5] + c0[6] * t[6] + c0[7] * t[7] + c0[8] * t[8];
+//         acc1 += c1[0] * t[0] + c1[1] * t[1] + c1[2] * t[2] + c1[3] * t[3] + c1[4] * t[4] + c1[5] * t[5] + c1[6] * t[6] + c1[7] * t[7] + c1[8] * t[8];
+//         acc2 += c2[0] * t[0] + c2[1] * t[1] + c2[2] * t[2] + c2[3] * t[3] + c2[4] * t[4] + c2[5] * t[5] + c2[6] * t[6] + c2[7] * t[7] + c2[8] * t[8];
 //     } while (0)
 
 //                             SSHEX8_ELASTICITY_TENSOR_BOUNDARY_ACCUMULATE(0, eu0);

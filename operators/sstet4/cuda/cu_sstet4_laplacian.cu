@@ -470,7 +470,7 @@ extern int cu_sstet4_laplacian_apply(const int                       level,
             SFEM_ERROR(
                     "[Error] cu_sstet4_laplacian_apply: not implemented for type %s (code "
                     "%d)\n",
-                    smesh::to_string(real_type_xy),
+                    smesh::to_string(real_type_xy).data(),
                     real_type_xy);
             return SFEM_FAILURE;
         }

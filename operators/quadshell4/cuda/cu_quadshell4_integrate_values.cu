@@ -239,7 +239,7 @@ extern int cu_quadshell4_integrate_value(const ptrdiff_t                    nele
                     "for "
                     "type %s "
                     "(code %d)\n",
-                    smesh::to_string(real_type),
+                    smesh::to_string(real_type).data(),
                     real_type);
             return SFEM_FAILURE;
         }
@@ -275,7 +275,7 @@ extern int cu_quadshell4_integrate_values(const ptrdiff_t                    nel
                     "for "
                     "type %s "
                     "(code %d)\n",
-                    smesh::to_string(real_type),
+                    smesh::to_string(real_type).data(),
                     real_type);
             return SFEM_FAILURE;
         }

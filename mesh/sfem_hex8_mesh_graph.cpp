@@ -15,11 +15,11 @@
 // #define MAX(a, b) ((a < b) ? (b) : (a))
 // #endif
 
-// #define A3SET(a, x, y, z) \
-//     do {                  \
-//         a[0] = x;         \
-//         a[1] = y;         \
-//         a[2] = z;         \
+// #define A3SET(a, x, y, z)
+//     do {
+//         a[0] = x;
+//         a[1] = y;
+//         a[2] = z;
 //     } while (0)
 
 // // According to exodus doc

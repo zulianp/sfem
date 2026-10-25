@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <type_traits>
 
 #include "sfem_cuda_base.hpp"
 
@@ -23,8 +24,13 @@ namespace sfem {
         /// One rounding to binary16, from whatever real_t is.  Going through
         /// float first would round twice and disagree with the host, which
         /// converts double to half directly.
-        __device__ inline __half to_half(const double v) { return __double2half(v); }
-        __device__ inline __half to_half(const float v) { return __float2half_rn(v); }
+        __device__ inline __half to_half(const real_t v) {
+            if constexpr (std::is_same_v<real_t, float>) {
+                return __float2half_rn(v);
+            } else {
+                return __double2half(v);
+            }
+        }
 
         // The device codecs.  The host ones (`sfem_HistoryStorage.hpp`) use the
         // host's half type and <cmath>; these spell the same encodings with the
@@ -37,7 +43,6 @@ namespace sfem {
             static constexpr bool scaled = false;
             __device__ static real_t    decode(const T s, const real_t) { return static_cast<real_t>(s); }
             __device__ static T         encode(const real_t v, const real_t) { return static_cast<T>(v); }
-            __device__ static scaling_t scale_for(const real_t) { return 1; }
         };
 
         struct DeviceHalf {
@@ -45,7 +50,6 @@ namespace sfem {
             static constexpr bool scaled = false;
             __device__ static real_t    decode(const __half s, const real_t) { return __half2float(s); }
             __device__ static __half    encode(const real_t v, const real_t) { return to_half(v); }
-            __device__ static scaling_t scale_for(const real_t) { return 1; }
         };
 
         struct DeviceScaledHalf {

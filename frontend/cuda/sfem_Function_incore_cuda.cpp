@@ -158,7 +158,7 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
 
-        int hessian_crs(const real_t *const  x,
+        int hessian_crs(const real_t *const  /*x*/,
                         const count_t *const rowptr,
                         const idx_t *const   colidx,
                         real_t *const        values) override {
@@ -235,10 +235,10 @@ namespace sfem {
         bool        residual_depends_on_state() const override { return false; }
 
         // A dead load has no tangent, in any format or precision.
-        int hessian_crs(const real_t *const  x,
-                        const count_t *const rowptr,
-                        const idx_t *const   colidx,
-                        real_t *const        values) override {
+        int hessian_crs(const real_t *const  /*x*/,
+                        const count_t *const /*rowptr*/,
+                        const idx_t *const   /*colidx*/,
+                        real_t *const        /*values*/) override {
             return SFEM_SUCCESS;
         }
         int hessian_bsr(const real_t *const, const count_t *const, const idx_t *const, real_t *const) override {
@@ -249,7 +249,7 @@ namespace sfem {
         }
         int hessian_block_diag_sym(const real_t *const, real_t *const) override { return SFEM_SUCCESS; }
 
-        int gradient(const real_t *const x, real_t *const out) override {
+        int gradient(const real_t *const /*x*/, real_t *const out) override {
             SFEM_TRACE_SCOPE("GPUNeumannConditions::gradient");
             const auto &conditions = h_neumann->conditions();
             for (size_t i = 0; i < loads.size(); ++i) {
@@ -258,7 +258,7 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
 
-        int apply(const real_t *const x, const real_t *const h, real_t *const out) override { return SFEM_SUCCESS; }
+        int apply(const real_t *const /*x*/, const real_t *const /*h*/, real_t *const /*out*/) override { return SFEM_SUCCESS; }
 
         /// The work of the tractions, linear in the state as on the host.
         int value(const real_t *x, real_t *const out) override {
@@ -289,7 +289,7 @@ namespace sfem {
 
         ExecutionContext execution_context() const override { return EXECUTION_SPACE_DEVICE; }
 
-        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &derefined_space) override { return no_op(); }
+        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &/*derefined_space*/) override { return no_op(); }
     };
 
     std::shared_ptr<Op> to_device(const std::shared_ptr<NeumannConditions> &nc) {
@@ -631,7 +631,7 @@ namespace sfem {
             return ret;
         }
 
-        int hessian_crs(const real_t *const  x,
+        int hessian_crs(const real_t *const  /*x*/,
                         const count_t *const rowptr,
                         const idx_t *const   colidx,
                         real_t *const        values) override {
@@ -683,7 +683,7 @@ namespace sfem {
             });
         }
 
-        int apply(const real_t *const x, const real_t *const h, real_t *const out, const ElementScope scope) override {
+        int apply(const real_t *const /*x*/, const real_t *const h, real_t *const out, const ElementScope scope) override {
             auto mesh = space->mesh_ptr();
             return iterate([&](const OpDomain &domain) {
                 const smesh::block_idx_t b = block_id_for_domain(*mesh, *domain.block);
@@ -779,7 +779,7 @@ namespace sfem {
             });
         }
 
-        int value(const real_t *x, real_t *const out) override {
+        int value(const real_t * /*x*/, real_t *const /*out*/) override {
             SFEM_IMPLEMENT_ME();
             return SFEM_FAILURE;
         }
@@ -951,15 +951,15 @@ namespace sfem {
             return ret;
         }
 
-        int hessian_crs(const real_t *const  x,
-                        const count_t *const rowptr,
-                        const idx_t *const   colidx,
-                        real_t *const        values) override {
+        int hessian_crs(const real_t *const  /*x*/,
+                        const count_t *const /*rowptr*/,
+                        const idx_t *const   /*colidx*/,
+                        real_t *const        /*values*/) override {
             SFEM_IMPLEMENT_ME();
             return SFEM_FAILURE;
         }
 
-        int hessian_bsr(const real_t *const  x,
+        int hessian_bsr(const real_t *const  /*x*/,
                         const count_t *const rowptr,
                         const idx_t *const   colidx,
                         real_t *const        values) override {
@@ -1070,7 +1070,7 @@ namespace sfem {
             });
         }
 
-        int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
+        int apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) override {
             return iterate([&](const OpDomain &domain) {
                 SFEM_TRACE_SCOPE_VARIANT("cu_linear_elasticity_apply_%d", smesh::elem_num_nodes(domain.element_type));
 
@@ -1113,7 +1113,7 @@ namespace sfem {
             });
         }
 
-        int hessian_block_diag_sym(const real_t *const x, real_t *const values) override {
+        int hessian_block_diag_sym(const real_t *const /*x*/, real_t *const values) override {
             SFEM_TRACE_SCOPE("LinearElasticity::hessian_block_diag_sym");
             return iterate([&](const OpDomain &domain) {
                 auto domain_op = std::static_pointer_cast<GPULinearElasticityOpData>(domain.user_data);
@@ -1153,7 +1153,7 @@ namespace sfem {
             });
         }
 
-        int value(const real_t *x, real_t *const out) override {
+        int value(const real_t * /*x*/, real_t *const /*out*/) override {
             SFEM_IMPLEMENT_ME();
             return SFEM_FAILURE;
         }
@@ -1245,12 +1245,12 @@ namespace sfem {
             return ret;
         }
 
-        std::shared_ptr<Op> lor_op(const std::shared_ptr<FunctionSpace> &space) override {
+        std::shared_ptr<Op> lor_op(const std::shared_ptr<FunctionSpace> &/*space*/) override {
             SFEM_ERROR("IMPLEMENT ME!\n");
             return nullptr;
         }
 
-        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override {
+        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &/*space*/) override {
             SFEM_ERROR("IMPLEMENT ME!\n");
             return nullptr;
         }
@@ -1334,22 +1334,22 @@ namespace sfem {
             return err;
         }
 
-        int hessian_crs(const real_t *const  x,
-                        const count_t *const rowptr,
-                        const idx_t *const   colidx,
-                        real_t *const        values) override {
+        int hessian_crs(const real_t *const  /*x*/,
+                        const count_t *const /*rowptr*/,
+                        const idx_t *const   /*colidx*/,
+                        real_t *const        /*values*/) override {
             SFEM_ERROR("[Error] GPUEMOp::hessian_crs NOT IMPLEMENTED!\n");
             return SFEM_FAILURE;
         }
 
-        int hessian_diag(const real_t *const, real_t *const out) override {
+        int hessian_diag(const real_t *const, real_t *const /*out*/) override {
             SFEM_ERROR("[Error] GPUEMOp::gradient NOT IMPLEMENTED!\n");
             return SFEM_FAILURE;
         }
 
         int gradient(const real_t *const x, real_t *const out) override { return apply(nullptr, x, out); }
 
-        int value(const real_t *x, real_t *const out) override {
+        int value(const real_t * /*x*/, real_t *const /*out*/) override {
             SFEM_ERROR("[Error] GPUEMOp::value NOT IMPLEMENTED!\n");
             return SFEM_FAILURE;
         }
@@ -1380,12 +1380,12 @@ namespace sfem {
             return ret;
         }
 
-        std::shared_ptr<Op> lor_op(const std::shared_ptr<FunctionSpace> &space) override {
+        std::shared_ptr<Op> lor_op(const std::shared_ptr<FunctionSpace> &/*space*/) override {
             SFEM_ERROR("IMPLEMENT ME!\n");
             return nullptr;
         }
 
-        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override {
+        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &/*space*/) override {
             SFEM_ERROR("IMPLEMENT ME!\n");
             return nullptr;
         }
@@ -1470,22 +1470,22 @@ namespace sfem {
             return err;
         }
 
-        int hessian_crs(const real_t *const  x,
-                        const count_t *const rowptr,
-                        const idx_t *const   colidx,
-                        real_t *const        values) override {
+        int hessian_crs(const real_t *const  /*x*/,
+                        const count_t *const /*rowptr*/,
+                        const idx_t *const   /*colidx*/,
+                        real_t *const        /*values*/) override {
             SFEM_ERROR("[Error] GPUEMWarpOp::hessian_crs NOT IMPLEMENTED!\n");
             return SFEM_FAILURE;
         }
 
-        int hessian_diag(const real_t *const, real_t *const out) override {
+        int hessian_diag(const real_t *const, real_t *const /*out*/) override {
             SFEM_ERROR("[Error] GPUEMWarpOp::gradient NOT IMPLEMENTED!\n");
             return SFEM_FAILURE;
         }
 
         int gradient(const real_t *const x, real_t *const out) override { return apply(nullptr, x, out); }
 
-        int value(const real_t *x, real_t *const out) override {
+        int value(const real_t * /*x*/, real_t *const /*out*/) override {
             SFEM_ERROR("[Error] GPUEMWarpOp::value NOT IMPLEMENTED!\n");
             return SFEM_FAILURE;
         }
@@ -1520,12 +1520,12 @@ namespace sfem {
             return ret;
         }
 
-        std::shared_ptr<Op> lor_op(const std::shared_ptr<FunctionSpace> &space) override {
+        std::shared_ptr<Op> lor_op(const std::shared_ptr<FunctionSpace> &/*space*/) override {
             SFEM_ERROR("IMPLEMENT ME!\n");
             return nullptr;
         }
 
-        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override {
+        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &/*space*/) override {
             SFEM_ERROR("IMPLEMENT ME!\n");
             return nullptr;
         }
@@ -1617,22 +1617,22 @@ namespace sfem {
             return err;
         }
 
-        int hessian_crs(const real_t *const  x,
-                        const count_t *const rowptr,
-                        const idx_t *const   colidx,
-                        real_t *const        values) override {
+        int hessian_crs(const real_t *const  /*x*/,
+                        const count_t *const /*rowptr*/,
+                        const idx_t *const   /*colidx*/,
+                        real_t *const        /*values*/) override {
             SFEM_ERROR("[Error] GPUEMMultiVectorWarpOp::hessian_crs NOT IMPLEMENTED!\n");
             return SFEM_FAILURE;
         }
 
-        int hessian_diag(const real_t *const, real_t *const out) override {
+        int hessian_diag(const real_t *const, real_t *const /*out*/) override {
             SFEM_ERROR("[Error] GPUEMMultiVectorWarpOp::gradient NOT IMPLEMENTED!\n");
             return SFEM_FAILURE;
         }
 
         int gradient(const real_t *const x, real_t *const out) override { return apply(nullptr, x, out); }
 
-        int value(const real_t *x, real_t *const out) override {
+        int value(const real_t * /*x*/, real_t *const /*out*/) override {
             SFEM_ERROR("[Error] GPUEMMultiVectorWarpOp::value NOT IMPLEMENTED!\n");
             return SFEM_FAILURE;
         }

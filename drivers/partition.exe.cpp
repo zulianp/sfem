@@ -1,4 +1,5 @@
 #include <math.h>
+#include "smesh_base.hpp"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -48,7 +49,7 @@ int main(int argc, char *argv[]) {
         printf("%s %s %s\n", argv[0], argv[1], output_folder);
     }
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     smesh::create_directory(output_folder);
 
@@ -161,16 +162,16 @@ int main(int argc, char *argv[]) {
 
     // Everyone independent
     mesh->set_comm(sfem::Communicator::self());
-    snprintf(output_path, sizeof(output_path), "%s/part_%0.5d", output_folder, rank);
+    snprintf(output_path, sizeof(output_path), "%s/part_%05d", output_folder, rank);
     mesh->write(smesh::Path(output_path));
 
-    snprintf(output_path, sizeof(output_path), "%s/part_%0.5d/frank.raw", output_folder, rank);
+    snprintf(output_path, sizeof(output_path), "%s/part_%05d/frank.raw", output_folder, rank);
     array_write(MPI_COMM_SELF, output_path, MPI_FLOAT, frank, mesh->n_nodes(), mesh->n_nodes());
 
-    snprintf(output_path, sizeof(output_path), "%s/part_%0.5d/neigh_count.raw", output_folder, rank);
+    snprintf(output_path, sizeof(output_path), "%s/part_%05d/neigh_count.raw", output_folder, rank);
     array_write(MPI_COMM_SELF, output_path, MPI_FLOAT, neigh_count, mesh->n_nodes(), mesh->n_nodes());
 
-    snprintf(output_path, sizeof(output_path), "%s/part_%0.5d/fnodeids.raw", output_folder, rank);
+    snprintf(output_path, sizeof(output_path), "%s/part_%05d/fnodeids.raw", output_folder, rank);
     array_write(MPI_COMM_SELF, output_path, MPI_FLOAT, fnodeids, mesh->n_nodes(), mesh->n_nodes());
 
     MPI_Barrier(comm);
@@ -179,7 +180,7 @@ int main(int argc, char *argv[]) {
     free(nodeids);
     free(fnodeids);
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
 
     if (!rank) {
         printf("----------------------------------------\n");

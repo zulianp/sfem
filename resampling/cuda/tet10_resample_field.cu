@@ -8,6 +8,7 @@
 
 
 #include "sfem_defs.hpp"
+#include "mesh_utils.hpp"
 #include "smesh_mesh.hpp"
 
 #include "tet10_weno_cuda.cuh"
@@ -139,7 +140,7 @@ launch_kernels_hex8_to_tet10_resample_field_local_CUDA(const int                
 int                                                                           //
 launch_kernels_hex8_to_tet10_resample_field_local_CUDA_unified(               //
         const int                            mpi_size,                        //
-        const int                            mpi_rank,                        //
+        const int                            /*mpi_rank*/,                    //
         const int                            numBlocks,                       //
         const int                            threadsPerBlock,                 //
         mesh_t*                              mesh,                            // Mesh
@@ -191,8 +192,8 @@ launch_kernels_hex8_to_tet10_resample_field_local_CUDA_unified(               //
     cudaDeviceSynchronize();
 
     if (bool_assemble_dual_mass_vector == 1) {
-        smesh::ElemType st = shell_type((ElemType)mesh->element_type);
-        if (st == INVALID) {
+        smesh::ElemType st = smesh::shell_type(mesh->element_type);
+        if (st == smesh::INVALID) {
             // Launch isoparametric_tet10_assemble_dual_mass_vector_kernel
 
             isoparametric_tet10_assemble_dual_mass_vector_kernel<<<numBlocks,                        //

@@ -581,7 +581,7 @@ namespace sfem {
                         const TeamExit exit = team_cg_steps(x, g, p, Ap_or_Ag, gf_or_gc, work, norm_gp0, &grads, &count_cg_steps, &converged);
                         if (exit == TeamExit::DONE) break;
                         if (exit == TeamExit::PROPORTIONING) continue;
-                    } else if (TeamExit exit;
+                    } else if (TeamExit exit = TeamExit::NOT_A_STEP;
                                device_cg_steps(x, g, p, Ap_or_Ag, gf_or_gc, work, norm_gp0, &grads, &count_cg_steps, &converged, &exit)) {
                         if (exit == TeamExit::DONE) break;
                         if (exit == TeamExit::PROPORTIONING) continue;

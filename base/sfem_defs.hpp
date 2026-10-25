@@ -13,21 +13,21 @@ namespace sfem {
     typedef const char* OperatorType;
 
     namespace op_type {
-        static OperatorType MATRIX_FREE = "MF";
-        static OperatorType CRS         = "CRS";
-        static OperatorType SPLITCRS    = "SPLITCRS";
-        static OperatorType ALIGNEDCRS  = "ALIGNEDCRS";
-        static OperatorType CRS_SYM     = "CRS_SYM";
-        static OperatorType BSR         = "BSR";
-        static OperatorType BSR_SYM     = "BSR_SYM";
-        static OperatorType DIA         = "DIA";
-        static OperatorType COO_SYM     = "COO_SYM";
-        static OperatorType SPLITDACRS  = "SPLITDACRS";
-        static OperatorType SELL        = "SELL";
+        inline constexpr OperatorType MATRIX_FREE = "MF";
+        inline constexpr OperatorType CRS         = "CRS";
+        inline constexpr OperatorType SPLITCRS    = "SPLITCRS";
+        inline constexpr OperatorType ALIGNEDCRS  = "ALIGNEDCRS";
+        inline constexpr OperatorType CRS_SYM     = "CRS_SYM";
+        inline constexpr OperatorType BSR         = "BSR";
+        inline constexpr OperatorType BSR_SYM     = "BSR_SYM";
+        inline constexpr OperatorType DIA         = "DIA";
+        inline constexpr OperatorType COO_SYM     = "COO_SYM";
+        inline constexpr OperatorType SPLITDACRS  = "SPLITDACRS";
+        inline constexpr OperatorType SELL        = "SELL";
         //: Partial assembly: the tangent is stored once per linearization and
         //: applied for every Krylov iteration.  Inexact wherever the tangent
         //: varies within an element, exact where it does not.
-        static OperatorType INEXACT     = "INEXACT";
+        inline constexpr OperatorType INEXACT     = "INEXACT";
     }  // namespace op_type
 
 #define SFEM_UNSUPPORTED_ELEMENT_ERROR(element_type) SFEM_ERROR("Unsupported element type %d\n", element_type);

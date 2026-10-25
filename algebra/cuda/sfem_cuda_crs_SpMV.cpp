@@ -497,7 +497,6 @@ namespace sfem {
 }  // namespace sfem
 
 #else
-#warning "No CUSPARSE installation!"
 
 namespace sfem {
     std::shared_ptr<CRS<count_t, idx_t, real_t>> d_crs_spmv(
@@ -505,6 +504,12 @@ namespace sfem {
             const std::shared_ptr<Buffer<count_t>>& rowptr,
             const std::shared_ptr<Buffer<idx_t>>& colidx,
             const std::shared_ptr<Buffer<real_t>>& values, const real_t scale_output) {
+        SFEM_UNUSED(rows);
+        SFEM_UNUSED(cols);
+        SFEM_UNUSED(rowptr);
+        SFEM_UNUSED(colidx);
+        SFEM_UNUSED(values);
+        SFEM_UNUSED(scale_output);
         SFEM_ERROR("Not implemented!\n");
         return nullptr;
     }
@@ -516,6 +521,12 @@ namespace sfem {
             const std::shared_ptr<Buffer<real_t>>& values,
             const std::shared_ptr<Buffer<real_t>>& diag_values,
             const real_t scale_output) {
+        SFEM_UNUSED(ndofs);
+        SFEM_UNUSED(rowidx);
+        SFEM_UNUSED(colidx);
+        SFEM_UNUSED(values);
+        SFEM_UNUSED(diag_values);
+        SFEM_UNUSED(scale_output);
         SFEM_ERROR("Not implemented!\n");
         return nullptr;
     }

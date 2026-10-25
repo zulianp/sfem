@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include "smesh_base.hpp"
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -52,9 +53,8 @@ int main(int argc, char* argv[]) {
         const real_t alpha       = atof(argv[1]);
         const char*  crs_folder  = argv[2];
         const char*  x_path      = argv[3];
-        const char*  output_path = argv[4];
 
-        double tick = MPI_Wtime();
+        double tick = smesh::time_seconds();
 
         char rowptr_path[1024 * 10];
         char colidx_path[1024 * 10];
@@ -65,7 +65,6 @@ int main(int argc, char* argv[]) {
         sprintf(values_path, "%s/values.raw", crs_folder);
 
         static const auto host = sfem::MEMORY_SPACE_HOST;
-        static const auto dev  = sfem::MEMORY_SPACE_DEVICE;
 
         crs_t crs;
         crs_read(comm, rowptr_path, colidx_path, values_path, SFEM_MPI_COUNT_T, SFEM_MPI_IDX_T, SFEM_MPI_REAL_T, &crs);
@@ -85,7 +84,6 @@ int main(int argc, char* argv[]) {
             }
 
         } else {
-            ptrdiff_t _nope_, x_n;
             if (array_read(comm, x_path, SFEM_MPI_REAL_T, (void*)x_host->data(), ndofs, ndofs)) {
                 return SFEM_FAILURE;
             }
@@ -242,7 +240,7 @@ int main(int argc, char* argv[]) {
         fflush(stdout);
         crs_free(&crs);
 
-        double tock = MPI_Wtime();
+        double tock = smesh::time_seconds();
         if (!rank) {
             printf("sym_spmv_bench.cpp\n");
             printf("TTS: %g seconds\n", tock - tick);
@@ -259,13 +257,13 @@ void time_operator_gpu(const std::shared_ptr<sfem::Operator<real_t>> op,
                        const real_t* const                           x,
                        real_t* const                                 y) {
     sfem::device_synchronize();
-    double spmv_tick = MPI_Wtime();
+    double spmv_tick = smesh::time_seconds();
 
     for (int repeat = 0; repeat < SFEM_REPEAT; repeat++) {
         op->apply(x, y);
     }
 
-    double spmv_tock = MPI_Wtime();
+    double spmv_tock = smesh::time_seconds();
     sfem::device_synchronize();
 
     double avg_time       = (spmv_tock - spmv_tick) / SFEM_REPEAT;
@@ -277,13 +275,13 @@ void time_operator_cpu(const std::shared_ptr<sfem::Operator<real_t>> op,
                        const char* const                             name,
                        const real_t* const                           x,
                        real_t* const                                 y) {
-    double spmv_tick = MPI_Wtime();
+    double spmv_tick = smesh::time_seconds();
 
     for (int repeat = 0; repeat < SFEM_REPEAT; repeat++) {
         op->apply(x, y);
     }
 
-    double spmv_tock = MPI_Wtime();
+    double spmv_tock = smesh::time_seconds();
 
     double avg_time       = (spmv_tock - spmv_tick) / SFEM_REPEAT;
     double avg_throughput = (op->rows() / avg_time) * 1e-9;

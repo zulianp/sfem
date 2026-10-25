@@ -452,6 +452,8 @@ namespace sfem {
         ryml::Tree tree = ryml::parse_in_place(ryml::to_substr(yaml));
         return create_from_yaml(space, tree["neumann_conditions"]);
 #else
+        SFEM_UNUSED(space);
+        SFEM_UNUSED(yaml);
         SFEM_ERROR("This functionaly requires -DSFEM_ENABLE_RYAML=ON\n");
         return nullptr;
 #endif

@@ -284,7 +284,7 @@ extern int cu_tet4_linear_elasticity_apply(const ptrdiff_t                 nelem
             SFEM_ERROR(
                     "[Error] cu_tet4_linear_elasticity_apply: not implemented for type %s "
                     "(code %d)\n",
-                    smesh::to_string(real_type),
+                    smesh::to_string(real_type).data(),
                     real_type);
             return SFEM_FAILURE;
         }
@@ -293,19 +293,19 @@ extern int cu_tet4_linear_elasticity_apply(const ptrdiff_t                 nelem
 
 // --- DIAG (TODO)
 
-extern int cu_tet4_linear_elasticity_diag(const ptrdiff_t                 nelements,
-                                          idx_t **const SFEM_RESTRICT     elements,
-                                          const ptrdiff_t                 jacobian_stride,
-                                          const void *const SFEM_RESTRICT jacobian_adjugate,
-                                          const void *const SFEM_RESTRICT jacobian_determinant,
-                                          const real_t                    mu,
-                                          const real_t                    lambda,
+extern int cu_tet4_linear_elasticity_diag(const ptrdiff_t                 /*nelements*/,
+                                          idx_t **const SFEM_RESTRICT     /*elements*/,
+                                          const ptrdiff_t                 /*jacobian_stride*/,
+                                          const void *const SFEM_RESTRICT /*jacobian_adjugate*/,
+                                          const void *const SFEM_RESTRICT /*jacobian_determinant*/,
+                                          const real_t                    /*mu*/,
+                                          const real_t                    /*lambda*/,
                                           const enum smesh::PrimitiveType             real_type,
-                                          const ptrdiff_t                 diag_stride,
-                                          void *const SFEM_RESTRICT       diagx,
-                                          void *const SFEM_RESTRICT       diagy,
-                                          void *const SFEM_RESTRICT       diagz,
-                                          void                           *stream) {
+                                          const ptrdiff_t                 /*diag_stride*/,
+                                          void *const SFEM_RESTRICT       /*diagx*/,
+                                          void *const SFEM_RESTRICT       /*diagy*/,
+                                          void *const SFEM_RESTRICT       /*diagz*/,
+                                          void                           * /*stream*/) {
     switch (real_type) {
         // case smesh::SMESH_DEFAULT: {
         //     return cu_tet4_linear_elasticity_diag_tpl(nelements,
@@ -353,7 +353,7 @@ extern int cu_tet4_linear_elasticity_diag(const ptrdiff_t                 neleme
             SFEM_ERROR(
                     "[Error] cu_tet4_linear_elasticity_diag: not implemented for type %s "
                     "(code %d)\n",
-                    smesh::to_string(real_type),
+                    smesh::to_string(real_type).data(),
                     real_type);
             return SFEM_FAILURE;
         }

@@ -146,7 +146,7 @@ extern int cu_affine_hex8_elemental_matrix_apply(const ptrdiff_t                
         }
         default: {
             SFEM_ERROR("[Error] cu_affine_hex8_elemental_matrix_apply: not implemented for type %s (code %d)\n",
-                       smesh::to_string(real_type),
+                       smesh::to_string(real_type).data(),
                        real_type);
             return SFEM_FAILURE;
         }
@@ -377,7 +377,7 @@ extern int cu_affine_sshex8_elemental_matrix_apply(const int                    
         }
         default: {
             SFEM_ERROR("[Error] cu_affine_sshex8_elemental_matrix_apply: not implemented for type %s (code %d)\n",
-                       smesh::to_string(real_type),
+                       smesh::to_string(real_type).data(),
                        real_type);
             return SFEM_FAILURE;
         }
@@ -682,9 +682,9 @@ int cu_affine_sshex8_elemental_matrix_apply_AoS_TC_tpl(const ptrdiff_t          
     SFEM_DEBUG_SYNCHRONIZE(stream);
 
     int min_grid_size;
-    int max_z_size;
-    cudaOccupancyMaxPotentialBlockSize(
-            &min_grid_size, &max_z_size, cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_TC<T, LEVEL>, 0, 0);
+    int max_z_size = 0;
+    SFEM_CUDA_CHECK(cudaOccupancyMaxPotentialBlockSize(
+            &min_grid_size, &max_z_size, cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_TC<T, LEVEL>, 0, 0));
 
     max_z_size /= 32;
     static const int Z_SIZE = (LEVEL * LEVEL * LEVEL + 8 - 1) / 8;
@@ -780,7 +780,7 @@ int cu_affine_sshex8_elemental_matrix_apply_AoS(const int                       
         }
         default: {
             SFEM_ERROR("[Error] cu_affine_sshex8_elemental_matrix_apply: not implemented for type %s (code %d)\n",
-                       smesh::to_string(real_type),
+                       smesh::to_string(real_type).data(),
                        real_type);
             return SFEM_FAILURE;
         }
@@ -1043,9 +1043,9 @@ int cu_affine_sshex8_elemental_matrix_apply_AoS_multivector_TC_tpl(
     SFEM_DEBUG_SYNCHRONIZE(stream);
 
     int min_grid_size;
-    int max_z_size;
-    cudaOccupancyMaxPotentialBlockSize(
-            &min_grid_size, &max_z_size, cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_multivector_TC<T, LEVEL, NVECS>, 0, 0);
+    int max_z_size = 0;
+    SFEM_CUDA_CHECK(cudaOccupancyMaxPotentialBlockSize(
+            &min_grid_size, &max_z_size, cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_multivector_TC<T, LEVEL, NVECS>, 0, 0));
 
     max_z_size /= 32;
     static const int Z_SIZE = (LEVEL * LEVEL * LEVEL + 8 - 1) / 8;
@@ -1219,7 +1219,7 @@ int cu_affine_sshex8_elemental_matrix_apply_AoS_multivector(const int           
         default: {
             SFEM_ERROR(
                     "[Error] cu_affine_sshex8_elemental_matrix_apply_AoS_multivector: not implemented for type %s (code %d)\n",
-                    smesh::to_string(real_type),
+                    smesh::to_string(real_type).data(),
                     real_type);
             return SFEM_FAILURE;
         }
@@ -1503,9 +1503,9 @@ int cu_affine_sshex8_elemental_matrix_apply_AoS_vector_TC_tpl(const ptrdiff_t   
     SFEM_DEBUG_SYNCHRONIZE(stream);
 
     int min_grid_size;
-    int max_z_size;
-    cudaOccupancyMaxPotentialBlockSize(
-            &min_grid_size, &max_z_size, cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_vector_TC<T, LEVEL>, 0, 0);
+    int max_z_size = 0;
+    SFEM_CUDA_CHECK(cudaOccupancyMaxPotentialBlockSize(
+            &min_grid_size, &max_z_size, cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_vector_TC<T, LEVEL>, 0, 0));
 
     max_z_size /= 32;
     static const int Z_SIZE = (LEVEL * LEVEL * LEVEL + 8 - 1) / 8;
@@ -1610,7 +1610,7 @@ int cu_affine_sshex8_elemental_matrix_apply_AoS_vector(const int                
         default: {
             SFEM_ERROR(
                     "[Error] cu_affine_sshex8_elemental_matrix_apply_AoS_vector: not implemented for type %s (code %d)\n",
-                    smesh::to_string(real_type),
+                    smesh::to_string(real_type).data(),
                     real_type);
             return SFEM_FAILURE;
         }

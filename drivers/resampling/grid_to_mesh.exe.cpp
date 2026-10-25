@@ -1,4 +1,5 @@
 #include <ctype.h>
+#include "smesh_base.hpp"
 #include <limits.h>
 #include <math.h>
 #include <mpi.h>
@@ -456,7 +457,7 @@ int main(int argc, char* argv[]) {
     int SFEM_ADJOINT = 0;
     SFEM_READ_ENV(SFEM_ADJOINT, atoi);
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     ptrdiff_t nglobal[3] = {atol(argv[1]), atol(argv[2]), atol(argv[3])};
     geom_t    origin[3]  = {(geom_t)atof(argv[4]), (geom_t)atof(argv[5]), (geom_t)atof(argv[6])};
@@ -562,7 +563,7 @@ int main(int argc, char* argv[]) {
 
     ptrdiff_t n_zyx = 0;
     {
-        double ndarray_read_tick = MPI_Wtime();
+        double ndarray_read_tick = smesh::time_seconds();
 
         if (SFEM_READ_FP32) {
             float* temp = NULL;
@@ -632,7 +633,7 @@ int main(int argc, char* argv[]) {
         //     printf("n_zyx_private     = %ld , %s:%d\n", n_zyx_private, __FILE__, __LINE__);
         // }
 
-        double ndarray_read_tock = MPI_Wtime();
+        double ndarray_read_tock = smesh::time_seconds();
 
         if (mpi_rank == 0) {
             printf("[%d] ndarray_create_from_file %g (seconds)\n", mpi_rank, ndarray_read_tock - ndarray_read_tick);
@@ -671,7 +672,7 @@ int main(int argc, char* argv[]) {
     {  // begin resample_field_mesh
         /////////////////////////////////
         MPI_Barrier(MPI_COMM_WORLD);
-        double resample_tick = MPI_Wtime();
+        double resample_tick = smesh::time_seconds();
 
         if (SFEM_INTERPOLATE) {
             printf("SFEM_INTERPOLATE = 1, %s:%d\n", __FILE__, __LINE__);
@@ -933,7 +934,7 @@ int main(int argc, char* argv[]) {
         /////////////////////////////////
 
         MPI_Barrier(MPI_COMM_WORLD);
-        double resample_tock = MPI_Wtime();
+        double resample_tock = smesh::time_seconds();
 
         // get MPI world size
         int mpi_size;
@@ -994,7 +995,7 @@ int main(int argc, char* argv[]) {
             printf("-------------------------------------------\n");
         }
 
-        double io_tick = MPI_Wtime();
+        double io_tick = smesh::time_seconds();
 
         /// DEBUG ///
         // double norm = 1.0;
@@ -1020,7 +1021,7 @@ int main(int argc, char* argv[]) {
 
         mesh_write_nodal_field_deprecated(&mesh_deprecated, output_path, SFEM_MPI_REAL_T, g);
 
-        double io_tock = MPI_Wtime();
+        double io_tock = smesh::time_seconds();
 
         if (!mpi_rank) {
             printf("[%d] write %g (seconds)\n", mpi_rank, io_tock - io_tick);
@@ -1053,7 +1054,7 @@ int main(int argc, char* argv[]) {
 
     MPI_Barrier(MPI_COMM_WORLD);
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
 
     if (!mpi_rank) {
         printf("----------------------------------------\n");

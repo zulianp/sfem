@@ -99,7 +99,7 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
 
-        int hessian_crs(const real_t *const x,
+        int hessian_crs(const real_t *const /*x*/,
                         const count_t *const rowptr,
                         const idx_t *const colidx,
                         real_t *const values) override {
@@ -130,7 +130,7 @@ namespace sfem {
             return std::make_shared<GPUAxisAlignedContactConditions>(h_derefined);
         }
 
-        int mask(mask_t *mask) override
+        int mask(mask_t * /*mask*/) override
         {
             assert(false);
             return SFEM_FAILURE;

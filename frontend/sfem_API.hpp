@@ -154,7 +154,7 @@ namespace sfem {
                     nxe,
                     nelements,
                     dev_buff_to,
-                    [nxe, host_dev_ptrs](int n, void **ptr) { d_buffer_destroy(ptr); },
+                    [nxe, host_dev_ptrs](int, void **ptr) { d_buffer_destroy(ptr); },
                     MEMORY_SPACE_DEVICE);
         }
 #endif

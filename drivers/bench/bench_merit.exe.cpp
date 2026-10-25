@@ -18,6 +18,7 @@
 //                 rather than bit for bit, and that difference is reported
 //                 rather than hidden behind a pass.
 #include "sfem_API.hpp"
+#include "smesh_base.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_OpFactory.hpp"
 #include "sfem_GeneratedMooneyRivlinKelvinVoigt_c_abi.hpp"
@@ -59,14 +60,14 @@ namespace {
             if (f->has_energy_merit()) f->energy_merit(x, &warm); else f->residual_merit(x, &warm);
         }
         sfem::device_synchronize();
-        const double t0 = MPI_Wtime();
+        const double t0 = smesh::time_seconds();
         real_t       value = 0;
         for (int i = 0; i < repeat; ++i) {
             value = 0;
             if (f->has_energy_merit()) f->energy_merit(x, &value); else f->residual_merit(x, &value);
         }
         sfem::device_synchronize();
-        const double elapsed = MPI_Wtime() - t0;
+        const double elapsed = smesh::time_seconds() - t0;
         value_out            = value;
         return elapsed;
     }
@@ -271,7 +272,7 @@ int main(int argc, char *argv[]) {
                         f->residual_merit(x_host->data(), h_host->data(), nsteps, steps.data(), values.data());
                     }
                 }
-                const double t0 = MPI_Wtime();
+                const double t0 = smesh::time_seconds();
                 for (int r = 0; r < repeat; ++r) {
                     std::fill(values.begin(), values.end(), real_t(0));
                     if (f->has_energy_merit()) {
@@ -280,7 +281,7 @@ int main(int argc, char *argv[]) {
                         f->residual_merit(x_host->data(), h_host->data(), nsteps, steps.data(), values.data());
                     }
                 }
-                const double per_call = (MPI_Wtime() - t0) / repeat;
+                const double per_call = (smesh::time_seconds() - t0) / repeat;
                 if (first == 0) {
                     first = per_call;
                 }
@@ -337,9 +338,9 @@ int main(int argc, char *argv[]) {
                                 accumulator.data(), values.data());
                     };
                     for (int r = 0; r < warmup; ++r) call();
-                    const double p0 = MPI_Wtime();
+                    const double p0 = smesh::time_seconds();
                     for (int r = 0; r < repeat; ++r) call();
-                    const double per_call = (MPI_Wtime() - p0) / repeat;
+                    const double per_call = (smesh::time_seconds() - p0) / repeat;
                     if (patch_first == 0) patch_first = per_call;
                     printf("%-34s %12d %14.6e %14.3f %26.17g\n",
                            "host_line_search_patch",
