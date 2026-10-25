@@ -6,7 +6,7 @@
 # Usage:
 #   ./scripts/testing/test_CPU_configs.sh              # quick sweep (default)
 #   ./scripts/testing/test_CPU_configs.sh --all        # full 2^N valid combinations
-#   ./scripts/testing/test_CPU_configs.sh --pairwise   # pairwise flag combinations
+#   ./scripts/testing/test_CPU_configs.sh --pairwise   # every pair of toggles in all four ON/OFF combinations (~8 builds)
 #   ./scripts/testing/test_CPU_configs.sh --list       # print configs, do not build
 #   ./scripts/testing/test_CPU_configs.sh --config 42  # build one entry from --list
 #
@@ -23,9 +23,11 @@
 #   CMAKE_BUILD_TYPE=Release
 #   MATRIXIO_DIR, METIS_DIR  # forwarded to CMake when set
 #   SFEM_USE_UENV=auto|0|1   # Alps: wrap cmake/make in CSCS uenv (default auto)
-#   UENV_IMAGE=prgenv-gnu/24.7:v3
+#   UENV_IMAGE=prgenv-gnu/24.11:v2
 #   OPENMP_DIR               # macOS Homebrew libomp prefix, e.g. /opt/homebrew/opt/libomp
-#   SKIP_MISSING_DEPS=1      # skip configs needing unavailable externals (default 1)
+#   SKIP_MISSING_DEPS=1      # leave toggles with unavailable externals out of the sweep (default 1)
+#   DEV_MODE=ON|OFF          # SFEM_ENABLE_DEV_MODE, warnings as errors (default ON)
+#   CLEAN_PASSED=0|1         # remove a passing build directory, keeping its log beside it
 #   ONLY_FLAGS=OPENMP,METIS  # limit which toggles enter the combination matrix
 #   EXCLUDE_FLAGS=PYTHON     # never turn these ON in generated configs
 #
@@ -50,8 +52,10 @@ JOBS="${JOBS:-$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)}"
 RUN_TESTS="${RUN_TESTS:-0}"
 CMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-Release}"
 SKIP_MISSING_DEPS="${SKIP_MISSING_DEPS:-1}"
+DEV_MODE="${DEV_MODE:-ON}"
+CLEAN_PASSED="${CLEAN_PASSED:-0}"
 SFEM_USE_UENV="${SFEM_USE_UENV:-auto}"
-UENV_IMAGE="${UENV_IMAGE:-prgenv-gnu/24.7:v3}"
+UENV_IMAGE="${UENV_IMAGE:-prgenv-gnu/24.11:v2}"
 DRY_RUN=0
 
 while [[ $# -gt 0 ]]; do
@@ -107,7 +111,7 @@ if [[ -n "${SLURM_CLUSTER_NAME:-}" && "${SLURM_CLUSTER_NAME}" == *daint* ]] \
 fi
 
 if [[ "$SFEM_USE_UENV" == auto ]]; then
-    if [[ "$IS_ALPS" -eq 1 ]] && command -v srun >/dev/null 2>&1; then
+    if [[ "$IS_ALPS" -eq 1 ]] && command -v uenv >/dev/null 2>&1; then
         SFEM_USE_UENV=1
     else
         SFEM_USE_UENV=0
@@ -125,7 +129,6 @@ FLAG_NAMES=(
     BLAS
     LAPACK
     RYAML
-    CODEGEN
     SCCD
     SSDF
     RESAMPLING
@@ -145,7 +148,6 @@ flag_cmake_name() {
         BLAS) echo SFEM_ENABLE_BLAS ;;
         LAPACK) echo SFEM_ENABLE_LAPACK ;;
         RYAML) echo SFEM_ENABLE_RYAML ;;
-        CODEGEN) echo SFEM_ENABLE_CODEGEN ;;
         SCCD) echo SFEM_ENABLE_SCCD ;;
         SSDF) echo SFEM_ENABLE_SSDF ;;
         RESAMPLING) echo SFEM_ENABLE_RESAMPLING ;;
@@ -209,6 +211,15 @@ have_python_bindings() {
         && python3 -c "import nanobind" >/dev/null 2>&1
 }
 
+# GCC ships omp.h in its own include directory (Alps' uenv), so ask the compiler.
+have_compiler_openmp() {
+    local cxx
+    cxx="$(command -v mpicxx || command -v "${CXX:-c++}" || true)"
+    [[ -n "$cxx" ]] || return 1
+    printf '#include <omp.h>\nint main() { return omp_get_max_threads() > 0 ? 0 : 1; }\n' \
+        | "$cxx" -fopenmp -x c++ - -o /dev/null >/dev/null 2>&1
+}
+
 have_openmp() {
     if [[ -n "${OPENMP_DIR:-}" && -f "${OPENMP_DIR}/include/omp.h" ]]; then
         return 0
@@ -219,7 +230,8 @@ have_openmp() {
     else
         [[ -f /usr/include/omp.h ]] \
             || [[ -f /usr/lib/x86_64-linux-gnu/openmp/include/omp.h ]] \
-            || { command -v brew >/dev/null 2>&1 && brew --prefix libomp >/dev/null 2>&1; }
+            || { command -v brew >/dev/null 2>&1 && brew --prefix libomp >/dev/null 2>&1; } \
+            || have_compiler_openmp
     fi
 }
 
@@ -262,6 +274,26 @@ if [[ ${#MISSING_NOTE[@]} -gt 0 ]]; then
         log "  - ${note}"
     done
 fi
+
+# A toggle whose dependency is missing leaves the sweep (SKIP_MISSING_DEPS=1) instead of skipping
+# the configurations that turn it ON, so every listed configuration is built and the pairwise
+# design stays complete over the remaining toggles.
+drop_unavailable_flags() {
+    [[ "$SKIP_MISSING_DEPS" == 1 ]] || return 0
+    local out=() name
+    for name in "${ACTIVE_FLAGS[@]}"; do
+        case "$name" in
+            METIS) have_metis || { log "Toggle METIS left out (not found)"; continue; } ;;
+            PYTHON) have_python_bindings || { log "Toggle PYTHON left out (nanobind not found)"; continue; } ;;
+            OPENMP) have_openmp || { log "Toggle OPENMP left out (not found)"; continue; } ;;
+            MPI) have_mpi || { log "Toggle MPI left out (not found)"; continue; } ;;
+        esac
+        out+=("$name")
+    done
+    ACTIVE_FLAGS=("${out[@]}")
+}
+
+drop_unavailable_flags
 
 # ---------------------------------------------------------------------------
 # Combination helpers
@@ -402,17 +434,63 @@ generate_masks_quick() {
 }
 
 generate_masks_pairwise() {
+    # A strength-2 covering array: every pair of toggles appears in all four ON/OFF combinations.
+    # Row 0 is all OFF; toggle j is ON in the rows of the j-th subset of size k = ceil(N/2) of rows
+    # 1..N-1. Two such subsets differ both ways and intersect (2k > N-1), so N rows cover every
+    # pair once C(N-1, k) reaches the number of toggles (Kleitman-Spencer). All ON is added too.
     local n=${#ACTIVE_FLAGS[@]}
-    local i j mask
+    local N=2 k s r j mask all=0
+    local -a cols=()
     GENERATED_MASKS=(0)
-    for i in $(seq 0 $((n - 1))); do
-        for j in $(seq $((i + 1)) $((n - 1))); do
-            mask=$(( (1 << i) | (1 << j) ))
-            if config_valid "$mask"; then
-                GENERATED_MASKS+=("$mask")
+    if (( n == 0 )); then
+        return 0
+    fi
+    while :; do
+        k=$(( (N + 1) / 2 ))
+        if (( $(binom $((N - 1)) "$k") >= n )); then
+            break
+        fi
+        N=$((N + 1))
+    done
+    for (( s = 0; s < (1 << (N - 1)) && ${#cols[@]} < n; s++ )); do
+        if (( $(popcount "$s") == k )); then
+            cols+=("$s")
+        fi
+    done
+    for (( r = 1; r < N; r++ )); do
+        mask=0
+        for (( j = 0; j < n; j++ )); do
+            if (( (cols[j] >> (r - 1)) & 1 )); then
+                mask=$(( mask | (1 << j) ))
             fi
         done
+        if config_valid "$mask"; then
+            GENERATED_MASKS+=("$mask")
+        fi
     done
+    for (( j = 0; j < n; j++ )); do
+        all=$(( all | (1 << j) ))
+    done
+    if config_valid "$all"; then
+        GENERATED_MASKS+=("$all")
+    fi
+}
+
+binom() {
+    local n=$1 k=$2 r=1 i
+    for (( i = 1; i <= k; i++ )); do
+        r=$(( r * (n - k + i) / i ))
+    done
+    echo "$r"
+}
+
+popcount() {
+    local x=$1 c=0
+    while (( x > 0 )); do
+        c=$(( c + (x & 1) ))
+        x=$(( x >> 1 ))
+    done
+    echo "$c"
 }
 
 generate_masks_all() {
@@ -478,7 +556,8 @@ run_cmd() {
         for arg in "$@"; do
             cmd+="$(printf '%q ' "$arg")"
         done
-        srun -u --uenv="${UENV_IMAGE}" --view=default bash -lc "${cmd% }"
+        # On the login node: compiling needs no compute node.
+        uenv run --view=default "${UENV_IMAGE}" -- bash -lc "${cmd% }"
     else
         "$@"
     fi
@@ -526,14 +605,24 @@ mpi_showme_compile() {
     if ! command -v mpicc >/dev/null 2>&1; then
         return 0
     fi
-    mpicc --showme:compile 2>/dev/null || true
+    # Open MPI answers --showme; MPICH (Cray on Alps) prints its whole command with -show.
+    mpicc --showme:compile 2>/dev/null \
+        || { mpicc -show 2>/dev/null | tr ' ' '\n' | grep -E '^-(I|D)' | tr '\n' ' '; } \
+        || true
 }
 
 mpi_showme_link() {
     if ! command -v mpicc >/dev/null 2>&1; then
         return 0
     fi
-    mpicc --showme:link 2>/dev/null || true
+    mpicc --showme:link 2>/dev/null \
+        || { mpicc -show 2>/dev/null | tr ' ' '\n' | grep -E '^-(L|l|Wl)' | tr '\n' ' '; } \
+        || true
+}
+
+# The compiler behind an MPI wrapper, for the builds without MPI: the toolchain stays the same.
+mpi_serial_compiler() {
+    "$1" --showme:command 2>/dev/null || { "$1" -show 2>/dev/null | awk '{print $1}'; }
 }
 
 mask_mpi_enabled() {
@@ -550,6 +639,7 @@ cmake_args_for_mask() {
         -DCMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE}"
         -DSFEM_ENABLE_CUDA=OFF
         -DSFEM_ENABLE_TESTING=ON
+        -DSFEM_ENABLE_DEV_MODE="${DEV_MODE}"
     )
     local i name cmake_name
 
@@ -572,7 +662,15 @@ cmake_args_for_mask() {
         fi
     else
         # MatrixIO always includes <mpi.h>; use serial compilers + MPI SDK flags.
-        local mpi_cflags mpi_ldflags
+        local mpi_cflags mpi_ldflags serial_cc serial_cxx
+        serial_cc="$(mpi_serial_compiler mpicc)"
+        serial_cxx="$(mpi_serial_compiler mpicxx)"
+        if [[ -n "$serial_cc" && -n "$serial_cxx" ]]; then
+            args+=(
+                "-DCMAKE_C_COMPILER=${serial_cc}"
+                "-DCMAKE_CXX_COMPILER=${serial_cxx}"
+            )
+        fi
         mpi_cflags="$(mpi_showme_compile)"
         mpi_ldflags="$(mpi_showme_link)"
         if [[ -n "$mpi_cflags" ]]; then
@@ -669,8 +767,7 @@ build_config() {
     fi
 
     if [[ "$RUN_TESTS" == 1 ]]; then
-        if ! run_cmd cmake --build "${build_dir}" --target test >>"${log_file}" 2>&1 \
-            || ! run_cmd ctest --test-dir "${build_dir}" --output-on-failure -j "${JOBS}" >>"${log_file}" 2>&1; then
+        if ! run_cmd ctest --test-dir "${build_dir}" --output-on-failure -j "${JOBS}" >>"${log_file}" 2>&1; then
             log "FAIL [${idx}] ctest (${label})"
             FAILED=$((FAILED + 1))
             return 0
@@ -678,6 +775,10 @@ build_config() {
     fi
 
     log "PASS [${idx}] ${label}"
+    if [[ "$CLEAN_PASSED" == 1 ]]; then
+        cp "${log_file}" "${build_dir}.log"
+        rm -rf "${build_dir}"
+    fi
     PASSED=$((PASSED + 1))
 }
 

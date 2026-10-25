@@ -3,12 +3,12 @@
 include(cmake/SFEMSanitizer.cmake)
 include(CheckCXXCompilerFlag)
 
-option(SFEM_CPU_ARCH "CPU architecture" OFF)
+set(SFEM_CPU_ARCH "" CACHE STRING "CPU for the AVX2/AVX512 build types' -march (empty: native; apple-m1 with -mcpu on Apple silicon)")
 set(SFEM_MARCH_SWITCH "-march=")
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
     check_cxx_compiler_flag("-mcpu=apple-m1" APPLE_M1)
-    if(APPLE_M1)
+    if(APPLE_M1 AND NOT SFEM_CPU_ARCH)
         set(SFEM_MARCH_SWITCH "-mcpu=")
         set(SFEM_CPU_ARCH "apple-m1")
     endif()
@@ -21,21 +21,19 @@ else()
     set(SFEM_CPU_ARCH "${SFEM_CPU_ARCH}")
 endif()
 
-option(SFEM_CUDA_MEMORY "Use CUDA memory model" OFF) ## default OFF is the host memory model
+set(SFEM_CUDA_MEMORY "host" CACHE STRING "CUDA memory model: host, managed or unified")
+if(SFEM_CUDA_MEMORY STREQUAL "OFF") # a cache from when this was a boolean, whose OFF meant host
+    set(SFEM_CUDA_MEMORY "host" CACHE STRING "CUDA memory model: host, managed or unified" FORCE)
+endif()
 
 # set a list 
 set (SFEM_ALLOWED_MEMORY_MODELS "host" "managed" "unified")
-
-if (NOT SFEM_CUDA_MEMORY)
-    set(SFEM_CUDA_MEMORY "host")
-endif()
+set_property(CACHE SFEM_CUDA_MEMORY PROPERTY STRINGS ${SFEM_ALLOWED_MEMORY_MODELS})
 
 # check if the value is in the list
 list(FIND SFEM_ALLOWED_MEMORY_MODELS "${SFEM_CUDA_MEMORY}" _index)
 if (${_index} EQUAL -1)
-    message(WARNING "SFEM_CUDA_MEMORY must be one of the following values: ${SFEM_ALLOWED_MEMORY_MODELS}")
-    message(WARNING "Setting SFEM_CUDA_MEMORY to host")
-    set(SFEM_CUDA_MEMORY "host")
+    message(FATAL_ERROR "SFEM_CUDA_MEMORY must be one of: ${SFEM_ALLOWED_MEMORY_MODELS}")
 endif()
 
 # define CUDA_UNIFIED_MEMORY 0
@@ -111,7 +109,14 @@ else()
 endif()
 
 string(REPLACE "-Xcompiler=-O3,-march=native,-mtune=native,-fPIC" "" CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS}")
-set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -O3 -use_fast_math -Xcompiler=${CMAKE_CUDA_HOST_COMPILER_FLAGS} -Xptxas=-O3,-v,-warn-spills  ")
+# -v already reports each kernel's spills; -warn-spills repeats them as warnings, which DEV_MODE's
+# --Werror=all-warnings would make fatal (spills in CUDA's own pow and double division included).
+if(SFEM_ENABLE_DEV_MODE)
+    set(SFEM_PTXAS_FLAGS "-O3,-v")
+else()
+    set(SFEM_PTXAS_FLAGS "-O3,-v,-warn-spills")
+endif()
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -O3 -use_fast_math -Xcompiler=${CMAKE_CUDA_HOST_COMPILER_FLAGS} -Xptxas=${SFEM_PTXAS_FLAGS}  ")
 
 if(SFEM_ENABLE_CUDA_LINEINFO)
     set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -lineinfo")

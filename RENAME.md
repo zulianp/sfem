@@ -158,7 +158,7 @@ The public C++ methods already use `n_dofs`/`n_nodes`/`n_elements`: no `ndofs()`
 - [ ] T1 `create_mulitbody_contact` → `create_multibody_contact`: 3/3 (`frontend/contact/sfem_SelfContact.hpp:43`).
 - [ ] T2 environment variable `SFEM_HYPERELAStICITY_USE_AOS` → `SFEM_HYPERELASTICITY_USE_AOS` (`frontend/ops/sfem_Hyperelasticity.cpp:833`). Nobody can set it by its correct spelling today. **Alias:** the misspelt name is still read, with a warning, for one release.
 - [ ] T3 `frontend/tests/sfem_MatrixFromatsTest.cpp` → `sfem_MatrixFormatsTest.cpp`.
-- [ ] T4 `cmake/SFEMOptions.cmake:47` "Eneable ... (Override with SFEM_TRACE_FILE)" → "Enable ... (override with SMESH_TRACE_FILE)". Nothing reads `SFEM_TRACE_FILE`; the tracer reads `SMESH_TRACE_FILE` (`external/smesh/src/profile/smesh_tracer.cpp:28`).
+- [ ] T4 `cmake/SFEMOptions.cmake:44` "Eneable ... (Override with SFEM_TRACE_FILE)" → "Enable ... (override with SMESH_TRACE_FILE)". Nothing reads `SFEM_TRACE_FILE`; the tracer reads `SMESH_TRACE_FILE` (`external/smesh/src/profile/smesh_tracer.cpp:28`).
 
 ---
 Items: 22 factories, 3 sizes, 8 abbreviations, 10 backend/file, 7 hessian, 5 verbs, 10 enums, 4 return codes, 4 C utilities, 4 typos: **77**.

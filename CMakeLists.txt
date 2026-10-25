@@ -24,6 +24,16 @@ include(cmake/SFEMBuildTypes.cmake)
 include(cmake/SFEMCMakeFunctions.cmake)
 include(cmake/SFEMDependencies.cmake)
 
+# SFEM_ENABLE_DEV_MODE: warnings are errors in SFEM's own sources (the library, drivers, tests and
+# bindings added below), in C, C++ and CUDA; not in the dependencies added above.
+if(SFEM_ENABLE_DEV_MODE)
+    separate_arguments(SFEM_DEV_CXX_FLAGS UNIX_COMMAND "${SFEM_DEV_FLAGS}")
+    add_compile_options(
+        "$<$<COMPILE_LANGUAGE:CXX>:${SFEM_DEV_CXX_FLAGS}>"
+        "$<$<COMPILE_LANGUAGE:C>:${SFEM_DEV_C_FLAGS}>"
+        "$<$<COMPILE_LANGUAGE:CUDA>:${SFEM_DEV_CUDA_FLAGS}>")
+endif()
+
 if(SFEM_ENABLE_PYTHON)
     include(cmake/SFEMPython.cmake)
 endif()
@@ -273,18 +283,6 @@ list(FILTER SFEM_SOURCES EXCLUDE REGEX "sfem_(Communicator|CRSGraph)\\.cpp$")
 # message(STATUS "SFEM_SOURCES: ${SFEM_SOURCES}")
 # message(STATUS "SFEM_KERNEL_SOURCES: ${SFEM_KERNEL_SOURCES}")
 
-string(TOLOWER ${CMAKE_BUILD_TYPE} LBT)
-
-if(NOT LBT STREQUAL "debug" AND NOT LBT STREQUAL "asan" AND NOT CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
-    if (SFEM_VEC_SIZE STREQUAL "4" OR SFEM_CPU_ARCH STREQUAL "aaarch64")
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS_AVX2}")
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS_AVX2}")
-    elseif (SFEM_VEC_SIZE STREQUAL "8")
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS_AVX512}")
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS_AVX512}")
-    endif()
-endif()
-
 message(STATUS "CMAKE_CXX_FLAGS: ${CMAKE_CXX_FLAGS}")
 message(STATUS "CMAKE_C_FLAGS: ${CMAKE_C_FLAGS}")
 
@@ -340,11 +338,6 @@ set_target_properties(
 
 set(SFEM_TARGETS sfem)
 
-# Optional generated operator plug-ins (not built by default)
-if(SFEM_ENABLE_CODEGEN)
-    # add_subdirectory(operators/generated)
-endif() 
-
 if(SFEM_ENABLE_CUDA)
     message(STATUS "CMAKE_CUDA_ARCHITECTURES: ${CMAKE_CUDA_ARCHITECTURES}")
 endif()
@@ -375,12 +368,22 @@ if(NOT SFEM_ENABLE_MINIMAL)
         list(APPEND SFEM_EXCLUDED_EXEC "partition")
     endif()
 
+    if(NOT SFEM_ENABLE_RYAML)
+        # The playground reads its case from YAML.
+        list(APPEND SFEM_EXCLUDED_EXEC "playground")
+    endif()
+
     if(SFEM_ENABLE_RESAMPLING)
         file(GLOB RESAMPLING_C_EXAMPLES CONFIGURE_DEPENDS "drivers/resampling/*.c")
         file(GLOB RESAMPLING_CXX_EXAMPLES CONFIGURE_DEPENDS "drivers/resampling/*.cpp")
 
         list(APPEND DRIVERS "${RESAMPLING_C_EXAMPLES}")
         list(APPEND DRIVERS "${RESAMPLING_CXX_EXAMPLES}")
+
+        if(NOT SFEM_ENABLE_MPI)
+            # Written against MPI communicators (Communicator::wrap, distributed reads).
+            list(APPEND SFEM_EXCLUDED_EXEC "gap_from_sdf;geometry_aware_gap_from_sdf;grid_to_mesh")
+        endif()
     endif()
 
     if(SFEM_ENABLE_CUDA)
@@ -499,6 +502,11 @@ if(SFEM_ENABLE_TESTING)
             continue()
         endif()
         if(TEST_DRIVER_NAME STREQUAL "sfem_TwoBodyContactTest" AND NOT SFEM_ENABLE_SCCD)
+            continue()
+        endif()
+        # Tests whose cases are YAML.
+        if(NOT SFEM_ENABLE_RYAML AND TEST_DRIVER_NAME MATCHES
+           "^sfem_(ElasticityCase|PlaygroundCases|PlaygroundContact|LoadProfile|CudaEnergyBSRAssembly)Test$")
             continue()
         endif()
         add_executable(${TEST_DRIVER_NAME} ${TEST_DRIVER})
