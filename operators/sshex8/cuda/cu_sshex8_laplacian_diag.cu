@@ -116,7 +116,7 @@ extern int cu_affine_sshex8_laplacian_diag(const int                       level
             SFEM_ERROR(
                     "[Error] cu_tet4_laplacian_diag: not implemented for type %s (code "
                     "%d)\n",
-                    smesh::to_string(real_type_out),
+                    smesh::to_string(real_type_out).data(),
                     real_type_out);
 
             return SFEM_FAILURE;

@@ -790,7 +790,7 @@ static int packed_neohookean_ogden_apply(smesh::ElemType                        
             //                                                                                  scratch);
             // }
         case smesh::TET10: {
-            scalar_t Wimpn_compressed[8];
+            scalar_t Wimpn_compressed[10];
             tet10_Wimpn_compressed(Wimpn_compressed);
             return HyperelasticityPackedApply<PackedIdxType, 10, Tet10MicroKernelApply>::apply(n_packs,
                                                                                                n_elements_per_pack,

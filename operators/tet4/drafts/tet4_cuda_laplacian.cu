@@ -1,6 +1,7 @@
 // #include "laplacian.hpp"
 
 #include <cassert>
+#include "smesh_base.hpp"
 #include <cmath>
 // #include <cstdio>
 #include <algorithm>

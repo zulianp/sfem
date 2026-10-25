@@ -42,7 +42,7 @@ void getIdealGridAndBlockSize(int& gridSize, int& blockSize, void* myKernel) {
     int numSMs = deviceProp.multiProcessorCount;
 
     // Determine optimal block size
-    int minGridSize;
+    int minGridSize = 0;
     cudaOccupancyMaxPotentialBlockSize(&minGridSize, &blockSize, myKernel, 0, 0);
 
     // Calculate grid size based on number of SMs

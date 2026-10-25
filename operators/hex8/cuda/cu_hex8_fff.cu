@@ -28,7 +28,7 @@ static int cu_hex8_fff_allocate_generic(const ptrdiff_t nelements,
         default: {
             fprintf(stderr,
                     "[Error] cu_hex8_fff_allocate: not implemented for type %s (code %d)\n",
-                    smesh::to_string(real_type),
+                    smesh::to_string(real_type).data(),
                     real_type);
             assert(0);
             *fff = 0;
@@ -163,7 +163,7 @@ static int cu_hex8_fff_fill_generic(const ptrdiff_t nelements,
         default: {
             fprintf(stderr,
                     "[Error] cu_hex8_fff_fill: not implemented for type %s (code %d)\n",
-                    smesh::to_string(real_type),
+                    smesh::to_string(real_type).data(),
                     real_type);
             assert(0);
             return SFEM_FAILURE;

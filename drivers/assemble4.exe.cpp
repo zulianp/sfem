@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include "smesh_base.hpp"
 #include <stdlib.h>
 #include <string.h>
 
@@ -66,7 +67,7 @@ int assemble4(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *a
            SFEM_INPUT);
     printf("----------------------------------------\n");
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     ///////////////////////////////////////////////////////////////////////////////
     // Read data
@@ -99,7 +100,7 @@ int assemble4(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *a
     const real_t Gc     = SFEM_FRACTURE_TOUGHNESS;
     const real_t ls     = SFEM_LENGTH_SCALE_PARAMETER;
 
-    double tack = MPI_Wtime();
+    double tack = smesh::time_seconds();
     printf("assemble4.c: read\t\t%g seconds\n", tack - tick);
 
     ///////////////////////////////////////////////////////////////////////////////
@@ -117,7 +118,7 @@ int assemble4(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *a
     values = (real_t *)malloc(nnz * mat_block_size * sizeof(real_t));
     memset(values, 0, nnz * mat_block_size * sizeof(real_t));
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
     printf("assemble4.c: build crs\t\t%g seconds\n", tock - tack);
     tack = tock;
 
@@ -139,7 +140,7 @@ int assemble4(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *a
                                                        colidx,
                                                        values);
 
-    tock = MPI_Wtime();
+    tock = smesh::time_seconds();
     printf("assemble4.c: assembly\t\t%g seconds\n", tock - tack);
     tack = tock;
 
@@ -171,7 +172,7 @@ int assemble4(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *a
     colidx = new_colidx;
     values = new_values;
 
-    tock = MPI_Wtime();
+    tock = smesh::time_seconds();
     printf("assemble4.c: block to scalar\t\t%g seconds\n", tock - tack);
     tack = tock;
 
@@ -258,7 +259,7 @@ int assemble4(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *a
         }
     }
 
-    tock = MPI_Wtime();
+    tock = smesh::time_seconds();
     printf("assemble4.c: write\t\t%g seconds\n", tock - tack);
     tack = tock;
 
@@ -270,7 +271,7 @@ int assemble4(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *a
     free(colidx);
     free(values);
 
-    tock = MPI_Wtime();
+    tock = smesh::time_seconds();
 
     if (!comm->rank()) {
         printf("----------------------------------------\n");

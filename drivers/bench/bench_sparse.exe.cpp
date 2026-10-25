@@ -1,4 +1,5 @@
 #include <algorithm>
+#include "smesh_base.hpp"
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -52,12 +53,12 @@ template <class Kernel>
 static double measure(const int repeat, Kernel kernel) {
     kernel();
 
-    const double start = MPI_Wtime();
+    const double start = smesh::time_seconds();
     for (int r = 0; r < repeat; ++r) {
         kernel();
     }
 
-    return (MPI_Wtime() - start) / repeat;
+    return (smesh::time_seconds() - start) / repeat;
 }
 
 // Convert a row-major AoS BSR value buffer into the SoA layout consumed by the BSRSoA operator:

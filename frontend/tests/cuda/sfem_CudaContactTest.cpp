@@ -34,7 +34,7 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_sphere_contact(const std::
     auto es   = f->execution_space();
 
     auto top_ss = sfem::Sideset::create_from_selector(
-            m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool { return y > (1 - 1e-5) && y < (1 + 1e-5); });
+            m, [=](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool { return y > (1 - 1e-5) && y < (1 + 1e-5); });
 
     const int n = base_resolution * (fs->has_semi_structured_mesh() ? smesh::semistructured_level(fs->mesh()) : 1);
 
@@ -46,7 +46,7 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_sphere_contact(const std::
     f->add_constraint(conds);
 
     auto bottom_ss = sfem::Sideset::create_from_selector(
-            m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool { return y > -1e-5 && y < 1e-5; });
+            m, [=](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool { return y > -1e-5 && y < 1e-5; });
 
     auto sdf = smesh::create_sdf(comm,
                                  n * 2,

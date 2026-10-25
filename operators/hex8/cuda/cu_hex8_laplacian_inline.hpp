@@ -270,7 +270,7 @@ __constant__ scalar_t hex8_H_0_y[8];
 __constant__ scalar_t hex8_H_0_z[8];
 __constant__ scalar_t hex8_diff3_0[8];
 
-static void cu_hex8_taylor_expansion_init() {
+[[maybe_unused]] static void cu_hex8_taylor_expansion_init() {
     static bool initialized = false;
     if (!initialized) {
         SFEM_CUDA_CHECK(cudaMemcpyToSymbol(hex8_g_0_x, h_hex8_g_0_x, 8 * sizeof(scalar_t)));

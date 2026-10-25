@@ -38,10 +38,6 @@
 #include "sfem_MooneyRivlinVisco.hpp"
 #include "sfem_test.hpp"
 
-#ifdef _OPENMP
-#include <omp.h>
-#endif
-
 namespace {
 
     const real_t test_C10 = 0.3;
@@ -345,18 +341,6 @@ namespace {
         return SFEM_TEST_SUCCESS;
     }
 
-    /// One thread for the length of a scope.  The standard layout scatters element
-    /// contributions with atomics, so two threaded evaluations of the same gradient
-    /// may differ in the last bit; a test that compares evaluations bitwise to show
-    /// that nothing changed between them runs where the order is fixed.
-    struct SerialScope {
-#ifdef _OPENMP
-        int threads{omp_get_max_threads()};
-        SerialScope() { omp_set_num_threads(1); }
-        ~SerialScope() { omp_set_num_threads(threads); }
-#endif
-    };
-
 }  // namespace
 
 int test_parity_elastic() { return parity(0, 0); }
@@ -516,7 +500,7 @@ int test_homogeneous_relaxation_quad4() { return homogeneous_relaxation(smesh::Q
 /// Nothing but `advance` moves the history: a trial gradient elsewhere, a repeated
 /// `begin_step`, and an apply leave the next gradient bitwise unchanged.
 int test_evaluation_is_pure() {
-    SerialScope serial;
+    sfem::test::SerialScope serial;
     Setup s    = make_setup(3, 2, 0.15, 3);
     auto  blas = sfem::blas<real_t>(sfem::EXECUTION_SPACE_HOST);
 
@@ -632,7 +616,7 @@ int test_relaxation_composes_with_every_time_scheme() {
 /// `reset_history` forgets everything: an operator with a history, reset at x0, steps exactly as
 /// a fresh one reset at x0.
 int test_reset_forgets_the_history() {
-    SerialScope serial;
+    sfem::test::SerialScope serial;
     Setup s     = make_setup(3, 2, 0.15, 4);
     auto  fresh = std::make_shared<sfem::GeneratedMooneyRivlinProny>(s.fs);
     fresh->initialize();
@@ -660,11 +644,12 @@ int test_reset_forgets_the_history() {
     return SFEM_TEST_SUCCESS;
 }
 
+#ifdef SFEM_ENABLE_RYAML
 /// YAML: a top-level relaxation for every block, and a block entry that only changes the
 /// temperature, which must keep the spectrum and shift it inherited.  The result must be the
 /// operator the same configuration builds in C++.
 int test_yaml_block_entry_overrides_only_what_it_names() {
-    SerialScope serial;
+    sfem::test::SerialScope serial;
     auto mesh  = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(), 3, 3, 3, 0, 0, 0, 1, 1, 1);
     auto fs    = sfem::FunctionSpace::create(mesh, 3);
     auto block = mesh->blocks()[0]->name();
@@ -717,6 +702,7 @@ int test_yaml_block_entry_overrides_only_what_it_names() {
     }
     return SFEM_TEST_SUCCESS;
 }
+#endif  // SFEM_ENABLE_RYAML
 
 /// The affine kernels -- quadrature_output included -- against the isoparametric ones, on an
 /// axis-aligned mesh, over committed steps.
@@ -780,7 +766,9 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_evaluation_is_pure);
     SFEM_RUN_TEST(test_relaxation_composes_with_every_time_scheme);
     SFEM_RUN_TEST(test_reset_forgets_the_history);
+#ifdef SFEM_ENABLE_RYAML
     SFEM_RUN_TEST(test_yaml_block_entry_overrides_only_what_it_names);
+#endif
     SFEM_RUN_TEST(test_affine_route_matches_isoparametric);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();

@@ -14,6 +14,9 @@
 // A linear problem with an exact inner solve converges in one iteration, whose CG run is the
 // one a direct CG solve of the same system makes.
 int test_linear_one_iteration() {
+    // Both CG runs on one thread: their dot products then sum in the same order (with threads a
+    // run could take one iteration more than the other at rtol 1e-12).
+    sfem::test::SerialScope serial;
     auto p = sfem::test::make_cube_problem("GeneratedLinearElasticity", 4, real_t(0.1));
 
     sfem::LinearSolverOptions linear;

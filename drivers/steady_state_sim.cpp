@@ -174,6 +174,10 @@ int steady_state_sim(const std::shared_ptr<sfem::Communicator> &comm, int argc, 
         solver = stat_iter;
         */
     } else
+#else
+    if (SFEM_USE_AMG) {
+        SFEM_ERROR("SFEM_USE_AMG needs a build with SFEM_ENABLE_AMG\n");
+    }
 #endif  // SFEM_ENABLE_AMG
     {
         auto linear_op = sfem::make_linear_op(f);

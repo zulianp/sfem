@@ -1,4 +1,5 @@
 #include "tri6_navier_stokes.hpp"
+#include "smesh_base.hpp"
 
 #include <assert.h>
 #include <math.h>
@@ -1767,7 +1768,7 @@ void tri6_momentum_lhs_scalar_crs(const ptrdiff_t nelements,
                                   real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
 #pragma omp parallel
     {
@@ -1820,7 +1821,7 @@ void tri6_momentum_lhs_scalar_crs(const ptrdiff_t nelements,
         }
     }
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
     printf("tri3_laplacian.c: tri3_laplacian_crs\t%g seconds\n", tock - tick);
 }
 

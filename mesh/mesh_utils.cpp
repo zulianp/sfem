@@ -2,7 +2,9 @@
 
 #include "smesh_common.hpp"
 #include "smesh_communicator.hpp"
+#ifdef SMESH_ENABLE_MPI
 #include "smesh_distributed_write.hpp"
+#endif
 #include "smesh_write.hpp"
 
 #include <algorithm>
@@ -94,6 +96,7 @@ int mesh_create_nodal_send_recv(MPI_Comm           comm,
                                 const idx_t*       ghosts,
                                 send_recv_t* const send_recv) {
     assert(send_recv);
+#ifdef SMESH_ENABLE_MPI
     send_recv->exchange = smesh::Exchange::create(smesh::Communicator::wrap(comm),
                                                   smesh::Exchange::ExchangeScope::GhostsOnly,
                                                   nnodes,
@@ -101,6 +104,16 @@ int mesh_create_nodal_send_recv(MPI_Comm           comm,
                                                   node_owner,
                                                   node_offsets,
                                                   ghosts);
+#else
+    // One rank: no ghosts, nothing to exchange.
+    SFEM_UNUSED(comm);
+    SFEM_UNUSED(nnodes);
+    SFEM_UNUSED(n_owned_nodes);
+    SFEM_UNUSED(node_owner);
+    SFEM_UNUSED(node_offsets);
+    SFEM_UNUSED(ghosts);
+    send_recv->exchange.reset();
+#endif
     return SFEM_SUCCESS;
 }
 
@@ -130,6 +143,7 @@ int exchange_add(MPI_Comm                 comm,
     SFEM_UNUSED(n_owned_nodes);
     SFEM_UNUSED(real_buffer);
     assert(send_recv);
+    if (!send_recv->exchange) return SFEM_SUCCESS;
     return send_recv->exchange->scatter_add(inout);
 }
 
@@ -156,11 +170,15 @@ int mesh_write_nodal_field(MPI_Comm           comm,
     MPI_Comm_size(comm, &size);
 
     const smesh::PrimitiveType primitive_type = primitive_type_from_mpi(data_type);
+#ifdef SMESH_ENABLE_MPI
     if (size > 1) {
         ptrdiff_t n_global_nodes = 0;
         MPI_Allreduce(&n_owned_nodes, &n_global_nodes, 1, MPI_LONG, MPI_SUM, comm);
         return smesh::write_mapped_field(comm, smesh::Path(output_path), n_owned_nodes, n_global_nodes, node_mapping, data_type, data);
     }
+#else
+    SFEM_UNUSED(node_mapping);
+#endif
 
     return smesh::array_write(smesh::Path(output_path), primitive_type, data, n_owned_nodes);
 }
@@ -173,6 +191,7 @@ int mesh_write_nodal_field_deprecated(const mesh_t* const mesh,
     MPI_Comm_size(mesh->comm, &size);
 
     const smesh::PrimitiveType primitive_type = primitive_type_from_mpi(data_type);
+#ifdef SMESH_ENABLE_MPI
     if (size > 1) {
         return smesh::write_mapped_field(mesh->comm,
                                          smesh::Path(output_path),
@@ -182,6 +201,7 @@ int mesh_write_nodal_field_deprecated(const mesh_t* const mesh,
                                          data_type,
                                          data);
     }
+#endif
 
     return smesh::array_write(smesh::Path(output_path), primitive_type, data, mesh->n_owned_nodes);
 }

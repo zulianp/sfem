@@ -446,7 +446,9 @@ int test_hex_dominant_laplacian_hex_tet_only() {
     auto space = sfem::FunctionSpace::create(mesh, 1);
     auto op    = sfem::create_op(space, "Laplacian", sfem::EXECUTION_SPACE_HOST);
     SFEM_TEST_ASSERT(op != nullptr);
-    SFEM_TEST_ASSERT(op->initialize({"hex", "tet"}) == SFEM_SUCCESS);
+    // Named: GCC 13 at -O3 misreads the inlined initializer-list temporary (-Wfree-nonheap-object).
+    const std::vector<std::string> blocks = {"hex", "tet"};
+    SFEM_TEST_ASSERT(op->initialize(blocks) == SFEM_SUCCESS);
 
     auto x = sfem::create_host_buffer<real_t>(space->n_dofs());
     auto y = sfem::create_host_buffer<real_t>(space->n_dofs());
@@ -472,7 +474,9 @@ int test_hex_dominant_ss_laplacian_hex_tet_only() {
     auto space = sfem::FunctionSpace::create(ss, 1);
     auto op    = sfem::create_op(space, "Laplacian", sfem::EXECUTION_SPACE_HOST);
     SFEM_TEST_ASSERT(op != nullptr);
-    SFEM_TEST_ASSERT(op->initialize({"hex", "tet"}) == SFEM_SUCCESS);
+    // Named: GCC 13 at -O3 misreads the inlined initializer-list temporary (-Wfree-nonheap-object).
+    const std::vector<std::string> blocks = {"hex", "tet"};
+    SFEM_TEST_ASSERT(op->initialize(blocks) == SFEM_SUCCESS);
 
     auto x = sfem::create_host_buffer<real_t>(space->n_dofs());
     auto y = sfem::create_host_buffer<real_t>(space->n_dofs());

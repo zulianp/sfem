@@ -1527,10 +1527,6 @@ int cu_affine_sshex8_linear_elasticity_apply_level8_gather_tpl(const ptrdiff_t  
     return SFEM_SUCCESS;
 }
 
-static __device__ inline bool cu_sshex8_is_interior(const int level, const int xi, const int yi, const int zi) {
-    return xi > 0 && yi > 0 && zi > 0 && xi < level && yi < level && zi < level;
-}
-
 template <typename T, int LEVEL>
 __global__ void cu_affine_sshex8_linear_elasticity_apply_warp_kernel(const ptrdiff_t                          nelements,
                                                                      idx_t **const SFEM_RESTRICT              elements,
@@ -2005,7 +2001,7 @@ extern int cu_affine_sshex8_linear_elasticity_apply(const int                   
                     "for "
                     "type %s "
                     "(code %d)\n",
-                    smesh::to_string(real_type),
+                    smesh::to_string(real_type).data(),
                     real_type);
             return SFEM_FAILURE;
         }
@@ -2179,7 +2175,7 @@ extern int cu_affine_sshex8_linear_elasticity_diag(const int                    
                     "for "
                     "type %s "
                     "(code %d)\n",
-                    smesh::to_string(real_type),
+                    smesh::to_string(real_type).data(),
                     real_type);
             return SFEM_FAILURE;
         }
@@ -2405,7 +2401,7 @@ extern int cu_affine_sshex8_linear_elasticity_block_diag_sym(const int          
                     "[Error] cu_affine_sshex8_linear_elasticity_block_diag_sym_tpl: not implemented for "
                     "type %s "
                     "(code %d)\n",
-                    smesh::to_string(real_type),
+                    smesh::to_string(real_type).data(),
                     real_type);
             return SFEM_FAILURE;
         }
@@ -2639,7 +2635,7 @@ static int cu_sshex8_with_real_type(const enum smesh::PrimitiveType real_type, c
         case smesh::SMESH_FLOAT64:
             return f(double(0));
         default:
-            SFEM_ERROR("[Error] %s: not implemented for type %s (code %d)\n", name, smesh::to_string(real_type), real_type);
+            SFEM_ERROR("[Error] %s: not implemented for type %s (code %d)\n", name, smesh::to_string(real_type).data(), real_type);
             return SFEM_FAILURE;
     }
 }

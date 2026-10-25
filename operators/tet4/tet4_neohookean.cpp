@@ -1,4 +1,5 @@
 #include "tet4_neohookean.hpp"
+#include "smesh_base.hpp"
 
 #include <assert.h>
 #include <math.h>
@@ -930,7 +931,7 @@ void neohookean_assemble_hessian(const ptrdiff_t nelements,
                                  real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     static const int block_size = 3;
     static const int mat_block_size = 3 * 3;
@@ -1028,7 +1029,7 @@ void neohookean_assemble_hessian(const ptrdiff_t nelements,
         }
     }
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
     printf("neohookean.c: neohookean_assemble_hessian\t%g seconds\n", tock - tick);
 }
 
@@ -1042,7 +1043,7 @@ void neohookean_assemble_gradient(const ptrdiff_t nelements,
                                   real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     static const int block_size = 3;
 
@@ -1112,7 +1113,7 @@ void neohookean_assemble_gradient(const ptrdiff_t nelements,
         }
     }
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
     printf("neohookean.c: neohookean_assemble_gradient\t%g seconds\n", tock - tick);
 }
 
@@ -1126,7 +1127,7 @@ void neohookean_assemble_value(const ptrdiff_t nelements,
                                real_t *const SFEM_RESTRICT value) {
     SFEM_UNUSED(nnodes);
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
     static const int block_size = 3;
 
 #pragma omp parallel
@@ -1187,7 +1188,7 @@ void neohookean_assemble_value(const ptrdiff_t nelements,
         }
     }
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
     printf("neohookean.c: neohookean_assemble_value\t%g seconds\n", tock - tick);
 }
 
@@ -1632,7 +1633,7 @@ void neohookean_assemble_hessian_soa(const ptrdiff_t nelements,
                                      real_t **const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
-    const double tick = MPI_Wtime();
+    const double tick = smesh::time_seconds();
 
     static const int block_size = 3;
 
@@ -1715,6 +1716,6 @@ void neohookean_assemble_hessian_soa(const ptrdiff_t nelements,
             }
         }
     }
-    const double tock = MPI_Wtime();
+    const double tock = smesh::time_seconds();
     printf("neohookean.c: neohookean_assemble_hessian_soa\t%g seconds\n", tock - tick);
 }

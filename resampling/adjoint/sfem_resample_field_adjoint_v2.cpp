@@ -1703,8 +1703,8 @@ in_out_field_mesh_tet4(const int                            /*mpi_size*/,   // M
     ret = tet4_field_in_out_mesh(0,                                    // Mesh
                                  mesh->nelements,                      //
                                  mesh->nnodes,                         //
-                                 (const idx_t** const)mesh->elements,  //
-                                 (const geom_t** const)mesh->points,   //
+                                 (const idx_t**)mesh->elements,  //
+                                 (const geom_t**)mesh->points,   //
                                  n,                                    // SDF
                                  stride,                               //
                                  origin,                               //

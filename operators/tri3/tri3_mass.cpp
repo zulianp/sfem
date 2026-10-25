@@ -1,4 +1,5 @@
 #include "tri3_mass.hpp"
+#include "smesh_base.hpp"
 
 #include <mpi.h>
 #include <stdio.h>
@@ -123,7 +124,7 @@ void tri3_apply_mass(const ptrdiff_t nelements,
                      real_t *const values) {
     SFEM_UNUSED(nnodes);
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
 #pragma omp parallel
     {
@@ -168,7 +169,7 @@ void tri3_apply_mass(const ptrdiff_t nelements,
         }
     }
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
     printf("tri3_mass.c: tri3_apply_mass\t%g seconds\n", tock - tick);
 }
 
@@ -181,7 +182,7 @@ void tri3_assemble_mass(const ptrdiff_t nelements,
                         real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
 #pragma omp parallel
     {
@@ -232,7 +233,7 @@ void tri3_assemble_mass(const ptrdiff_t nelements,
         }
     }
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
     printf("tri3_mass.c: assemble_mass\t%g seconds\n", tock - tick);
 }
 

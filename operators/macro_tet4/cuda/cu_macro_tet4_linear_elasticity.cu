@@ -16,55 +16,6 @@
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define POW2(a) ((a) * (a))
 
-static inline __device__ __host__ void adjugate_and_det_micro_kernel(const geom_t    px0,
-                                                                     const geom_t    px1,
-                                                                     const geom_t    px2,
-                                                                     const geom_t    px3,
-                                                                     const geom_t    py0,
-                                                                     const geom_t    py1,
-                                                                     const geom_t    py2,
-                                                                     const geom_t    py3,
-                                                                     const geom_t    pz0,
-                                                                     const geom_t    pz1,
-                                                                     const geom_t    pz2,
-                                                                     const geom_t    pz3,
-                                                                     const ptrdiff_t stride,
-                                                                     cu_jacobian_t  *adjugate,
-                                                                     cu_jacobian_t  *jacobian_determinant) {
-    // Compute jacobian in high precision
-    real_t jacobian[9];
-    jacobian[0] = -px0 + px1;
-    jacobian[1] = -px0 + px2;
-    jacobian[2] = -px0 + px3;
-    jacobian[3] = -py0 + py1;
-    jacobian[4] = -py0 + py2;
-    jacobian[5] = -py0 + py3;
-    jacobian[6] = -pz0 + pz1;
-    jacobian[7] = -pz0 + pz2;
-    jacobian[8] = -pz0 + pz3;
-
-    const real_t x0 = jacobian[4] * jacobian[8];
-    const real_t x1 = jacobian[5] * jacobian[7];
-    const real_t x2 = jacobian[1] * jacobian[8];
-    const real_t x3 = jacobian[1] * jacobian[5];
-    const real_t x4 = jacobian[2] * jacobian[4];
-
-    // Store adjugate in lower precision
-    adjugate[0 * stride] = x0 - x1;
-    adjugate[1 * stride] = jacobian[2] * jacobian[7] - x2;
-    adjugate[2 * stride] = x3 - x4;
-    adjugate[3 * stride] = -jacobian[3] * jacobian[8] + jacobian[5] * jacobian[6];
-    adjugate[4 * stride] = jacobian[0] * jacobian[8] - jacobian[2] * jacobian[6];
-    adjugate[5 * stride] = -jacobian[0] * jacobian[5] + jacobian[2] * jacobian[3];
-    adjugate[6 * stride] = jacobian[3] * jacobian[7] - jacobian[4] * jacobian[6];
-    adjugate[7 * stride] = -jacobian[0] * jacobian[7] + jacobian[1] * jacobian[6];
-    adjugate[8 * stride] = jacobian[0] * jacobian[4] - jacobian[1] * jacobian[3];
-
-    // Store determinant in lower precision
-    jacobian_determinant[0] = jacobian[0] * x0 - jacobian[0] * x1 + jacobian[2] * jacobian[3] * jacobian[7] - jacobian[3] * x2 +
-                              jacobian[6] * x3 - jacobian[6] * x4;
-}
-
 static inline __device__ __host__ void apply_micro_kernel(const scalar_t                      mu,
                                                           const scalar_t                      lambda,
                                                           const scalar_t *const SFEM_RESTRICT adjugate,
@@ -149,11 +100,11 @@ static inline __device__ __host__ void apply_micro_kernel(const scalar_t        
     }
 }
 
-static inline __device__ __host__ void diag_micro_kernel(const scalar_t                      mu,
-                                                         const scalar_t                      lambda,
-                                                         const scalar_t *const SFEM_RESTRICT adjugate,
-                                                         const scalar_t                      jacobian_determinant,
-                                                         accumulator_t *const SFEM_RESTRICT  diag) {
+static inline __device__ __host__ void diag_micro_kernel(const scalar_t                      /*mu*/,
+                                                         const scalar_t                      /*lambda*/,
+                                                         const scalar_t *const SFEM_RESTRICT /*adjugate*/,
+                                                         const scalar_t                      /*jacobian_determinant*/,
+                                                         accumulator_t *const SFEM_RESTRICT  /*diag*/) {
     // TODO
 }
 
@@ -566,7 +517,7 @@ extern int cu_macro_tet4_linear_elasticity_apply(const ptrdiff_t                
             SFEM_ERROR(
                     "[Error] cu_macro_tet4_linear_elasticity_apply: not implemented for type %s "
                     "(code %d)\n",
-                    smesh::to_string(real_type),
+                    smesh::to_string(real_type).data(),
                     real_type);
             return SFEM_FAILURE;
         }
@@ -627,25 +578,25 @@ __global__ void cu_macro_tet4_linear_elasticity_diag_kernel(const ptrdiff_t     
     }
 }
 
-extern int cu_macro_tet4_linear_elasticity_diag(const ptrdiff_t                 nelements,
-                                                idx_t **const SFEM_RESTRICT     elements,
-                                                const ptrdiff_t                 jacobian_stride,
-                                                const void *const SFEM_RESTRICT jacobian_adjugate,
-                                                const void *const SFEM_RESTRICT jacobian_determinant,
-                                                const real_t                    mu,
-                                                const real_t                    lambda,
+extern int cu_macro_tet4_linear_elasticity_diag(const ptrdiff_t                 /*nelements*/,
+                                                idx_t **const SFEM_RESTRICT     /*elements*/,
+                                                const ptrdiff_t                 /*jacobian_stride*/,
+                                                const void *const SFEM_RESTRICT /*jacobian_adjugate*/,
+                                                const void *const SFEM_RESTRICT /*jacobian_determinant*/,
+                                                const real_t                    /*mu*/,
+                                                const real_t                    /*lambda*/,
                                                 const enum smesh::PrimitiveType             real_type,
-                                                const ptrdiff_t                 diag_stride,
-                                                void *const SFEM_RESTRICT       diagx,
-                                                void *const SFEM_RESTRICT       diagy,
-                                                void *const SFEM_RESTRICT       diagz,
-                                                void                           *stream) {
+                                                const ptrdiff_t                 /*diag_stride*/,
+                                                void *const SFEM_RESTRICT       /*diagx*/,
+                                                void *const SFEM_RESTRICT       /*diagy*/,
+                                                void *const SFEM_RESTRICT       /*diagz*/,
+                                                void                           * /*stream*/) {
     switch (real_type) {
         default: {
             SFEM_ERROR(
                     "[Error] cu_macro_tet4_linear_elasticity_diag: not implemented for type %s "
                     "(code %d)\n",
-                    smesh::to_string(real_type),
+                    smesh::to_string(real_type).data(),
                     real_type);
             return SFEM_FAILURE;
         }

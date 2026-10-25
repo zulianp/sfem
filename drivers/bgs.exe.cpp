@@ -1,4 +1,5 @@
 #include <math.h>
+#include "smesh_base.hpp"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -404,7 +405,7 @@ int main(int argc, char *argv[]) {
     //     mkdir(output_path, 0700);
     // }
 
-    const double tick = MPI_Wtime();
+    const double tick = smesh::time_seconds();
 
     ///////////////////////////////////////////////////////////////////////////////
     // Read
@@ -511,7 +512,7 @@ int main(int argc, char *argv[]) {
     free(rhs);
     free(x);
 
-    const double tock = MPI_Wtime();
+    const double tock = smesh::time_seconds();
 
     if (!rank) {
         printf("bgs.c TTS: %g seconds\n", tock - tick);

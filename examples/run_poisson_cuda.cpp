@@ -1,4 +1,5 @@
 #include <math.h>
+#include "smesh_base.hpp"
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -70,7 +71,7 @@ int main(int argc, char *argv[]) {
 
     const char *output_path = argv[2];
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     // -------------------------------
     // Read inputs
@@ -237,7 +238,7 @@ int main(int argc, char *argv[]) {
     // Stats
     // -------------------------------
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
     if (!rank) {
         printf("----------------------------------------\n");
         printf("#elements %ld #nodes %ld\n", (long)nelements, (long)nnodes);

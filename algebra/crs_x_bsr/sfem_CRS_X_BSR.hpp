@@ -18,6 +18,7 @@ namespace sfem {
                           R* const SFEM_RESTRICT       c_rowptr,
                           R* const SFEM_RESTRICT       mask_workspace,
                           const int                    n_workspaces) {
+        SFEM_UNUSED(n_workspaces);  // only the OpenMP region reads it
         crs_mm_sym(
                 block_rows, c_block_cols, crs_rowptr, crs_colidx, bsr_rowptr, bsr_colidx, c_rowptr, mask_workspace, n_workspaces);
     }
@@ -58,6 +59,7 @@ namespace sfem {
                             R* const SFEM_RESTRICT              next_workspace,
                             TStorage* const SFEM_RESTRICT       acc_workspace,
                             const int                           n_workspaces) {
+        SFEM_UNUSED(n_workspaces);  // only the OpenMP region reads it
         const R init   = std::numeric_limits<R>::max();
         const R unseen = smesh::invalid_idx<R>();
 
@@ -222,6 +224,7 @@ namespace sfem {
                           R* const SFEM_RESTRICT       c_rowptr,
                           R* const SFEM_RESTRICT       mask_workspace,
                           const int                    n_workspaces) {
+        SFEM_UNUSED(n_workspaces);  // only the OpenMP region reads it
         bsr_mm_sym(
                 block_rows, c_block_cols, bsr_rowptr, bsr_colidx, crs_rowptr, crs_colidx, c_rowptr, mask_workspace, n_workspaces);
     }
@@ -242,6 +245,7 @@ namespace sfem {
                             R* const SFEM_RESTRICT              next_workspace,
                             TStorage* const SFEM_RESTRICT       acc_workspace,
                             const int                           n_workspaces) {
+        SFEM_UNUSED(n_workspaces);  // only the OpenMP region reads it
         const R init   = std::numeric_limits<R>::max();
         const R unseen = smesh::invalid_idx<R>();
 

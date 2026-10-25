@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include "smesh_base.hpp"
 
 #include "sfem_defs.hpp"
 
@@ -37,9 +38,9 @@ int lsolve(const std::shared_ptr<sfem::Function> &f, const smesh::Path &output_d
     f->apply_constraints(x->data());
     f->apply_constraints(rhs->data());
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
     cg->apply(rhs->data(), x->data());
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
 
     if (SFEM_VERBOSE) {
         printf("---------------------\n");

@@ -236,12 +236,12 @@ hex_aa_8_eval_fun_V(const vec_real                x,   //
                           _data[_indx_V[15]]}; \
     }
 
-// #define GET_INDICES(_elems_, _element_i_)                                                                                  \
-//     {                                                                                                                      \
-//         _elems_[_element_i_ + 0], _elems_[_element_i_ + 1], _elems_[_element_i_ + 2], _elems_[_element_i_ + 3],            \
-//                 _elems_[_element_i_ + 4], _elems_[_element_i_ + 5], _elems_[_element_i_ + 6], _elems_[_element_i_ + 7],    \
-//                 _elems_[_element_i_ + 8], _elems_[_element_i_ + 9], _elems_[_element_i_ + 10], _elems_[_element_i_ + 11],  \
-//                 _elems_[_element_i_ + 12], _elems_[_element_i_ + 13], _elems_[_element_i_ + 14], _elems_[_element_i_ + 15] \
+// #define GET_INDICES(_elems_, _element_i_)
+//     {
+//         _elems_[_element_i_ + 0], _elems_[_element_i_ + 1], _elems_[_element_i_ + 2], _elems_[_element_i_ + 3],
+//                 _elems_[_element_i_ + 4], _elems_[_element_i_ + 5], _elems_[_element_i_ + 6], _elems_[_element_i_ + 7],
+//                 _elems_[_element_i_ + 8], _elems_[_element_i_ + 9], _elems_[_element_i_ + 10], _elems_[_element_i_ + 11],
+//                 _elems_[_element_i_ + 12], _elems_[_element_i_ + 13], _elems_[_element_i_ + 14], _elems_[_element_i_ + 15]
 //     }
 
 #define GET_INDICES(_elems_, _element_i_)                                                                                  \
@@ -617,8 +617,8 @@ int tet4_resample_field_local_V(const ptrdiff_t                      nelements, 
         ret = ret || tet4_resample_field_local_v2(nelements_aligned,           // start_nelement: for the tail
                                                   nelements,                   // end_nelement:   for the tail
                                                   nnodes,                      //
-                                                  (const idx_t** const)elems,  //
-                                                  (const geom_t** const)xyz,   //
+                                                  (const idx_t**)elems,  //
+                                                  (const geom_t**)xyz,   //
                                                   n,                           //
                                                   stride,                      //
                                                   origin,                      //

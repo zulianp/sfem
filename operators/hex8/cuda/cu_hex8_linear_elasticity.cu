@@ -235,7 +235,7 @@ extern int cu_affine_hex8_linear_elasticity_apply(const ptrdiff_t               
             SFEM_ERROR(
                     "[Error] cu_affine_hex8_linear_elasticity_apply: not implemented for type %s "
                     "(code %d)\n",
-                    smesh::to_string(real_type),
+                    smesh::to_string(real_type).data(),
                     real_type);
             return SFEM_FAILURE;
         }
@@ -411,7 +411,7 @@ extern int cu_affine_hex8_linear_elasticity_bsr(const ptrdiff_t                 
                     "[Error] cu_affine_hex8_linear_elasticity_bsr_tpl: not implemented for "
                     "type %s "
                     "(code %d)\n",
-                    smesh::to_string(real_type),
+                    smesh::to_string(real_type).data(),
                     real_type);
             return SFEM_FAILURE;
         }
@@ -609,7 +609,7 @@ extern int cu_affine_hex8_linear_elasticity_block_diag_sym(const ptrdiff_t      
                     "[Error] cu_affine_hex8_linear_elasticity_block_diag_sym: not implemented for "
                     "type %s "
                     "(code %d)\n",
-                    smesh::to_string(real_type),
+                    smesh::to_string(real_type).data(),
                     real_type);
             return SFEM_FAILURE;
         }
@@ -752,7 +752,7 @@ extern int cu_affine_hex8_linear_elasticity_diag(const ptrdiff_t                
         }
         default: {
             SFEM_ERROR("[Error] cu_affine_hex8_linear_elasticity_diag: not implemented for type %s (code %d)\n",
-                       smesh::to_string(real_type),
+                       smesh::to_string(real_type).data(),
                        real_type);
             return SFEM_FAILURE;
         }
