@@ -65,7 +65,7 @@ namespace {
     real_t relative_difference(const std::shared_ptr<Buffer<real_t>> &host, const std::shared_ptr<Buffer<real_t>> &device) {
         auto   hd   = smesh::to_host(device);
         real_t diff = 0, norm = 0;
-        for (ptrdiff_t i = 0; i < host->size(); i++) {
+        for (ptrdiff_t i = 0; i < (ptrdiff_t)host->size(); i++) {
             if (!std::isfinite(hd->data()[i])) return 1e30;
             diff = std::max(diff, std::abs(host->data()[i] - hd->data()[i]));
             norm = std::max(norm, std::abs(host->data()[i]));
@@ -112,7 +112,9 @@ namespace {
         auto            d_h   = create_host_buffer<real_t>(ndofs);
         // Random nodal noise grown by 1.15 a step: the six tetrahedra of each cube, and TET10's
         // midside nodes, invert where a hexahedron does not, so the simplices take a fifth of it.
-        fill_pseudo_random(ndofs, element == smesh::HEX8 ? real_t(0.05) : real_t(0.01), u_h->data(), 12345);
+        // TET10 a tenth: at a fifth one of its elements turns inside out at step 6 (host value NaN).
+        const real_t noise = element == smesh::HEX8 ? real_t(0.05) : element == smesh::TET4 ? real_t(0.01) : real_t(0.005);
+        fill_pseudo_random(ndofs, noise, u_h->data(), 12345);
         fill_pseudo_random(ndofs, real_t(1), d_h->data(), 777);
         auto d_d = smesh::to_device(d_h);
 
