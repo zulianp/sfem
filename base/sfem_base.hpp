@@ -74,6 +74,15 @@
 #define SFEM_FORCE_INLINE inline
 #endif
 
+// One compiled body for all callers. Two inlined copies of one floating-point loop can round
+// differently (a compiler fuses multiply-adds per context), so a pass that must give the same
+// bits from different callers stays out of line.
+#ifndef _WIN32
+#define SFEM_NOINLINE __attribute__((noinline))
+#else
+#define SFEM_NOINLINE __declspec(noinline)
+#endif
+
 // Marks a function as callable from both host and device. Expands to nothing on
 // a host-only compiler, so the same header serves the CPU and CUDA/HIP builds.
 #if defined(__CUDACC__) || defined(__HIPCC__)
