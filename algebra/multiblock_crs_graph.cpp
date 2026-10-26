@@ -99,7 +99,7 @@
 //                     }
 //                 }
 
-//                 nneighs          = sortreduce(n2nbuff, nneighs);
+//                 nneighs          = sfem::sortreduce(n2nbuff, nneighs);
 //                 rowptr[node + 1] = nneighs;
 //             }
 //         }
@@ -136,7 +136,7 @@
 //                     }
 //                 }
 
-//                 nneighs = sortreduce(n2nbuff, nneighs);
+//                 nneighs = sfem::sortreduce(n2nbuff, nneighs);
 
 //                 for (idx_t i = 0; i < nneighs; ++i) {
 //                     colidx[rowptr[node] + i] = n2nbuff[i];
@@ -213,7 +213,7 @@
 //                         }
 //                     }
 
-//                     nneighs          = sortreduce(n2nbuff, nneighs);
+//                     nneighs          = sfem::sortreduce(n2nbuff, nneighs);
 //                     rowptr[node + 1] = nneighs;
 //                 }
 //             }
@@ -250,7 +250,7 @@
 //                             }
 //                         }
 
-//                         nneighs = sortreduce(n2nbuff, nneighs);
+//                         nneighs = sfem::sortreduce(n2nbuff, nneighs);
 
 //                         for (idx_t i = 0; i < nneighs; ++i) {
 //                             colidx[rowptr[node] + i] = n2nbuff[i];

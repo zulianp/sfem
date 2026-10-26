@@ -94,7 +94,7 @@
 //                 }
 //             }
 
-//             nneighs          = sortreduce(n2nbuff, nneighs);
+//             nneighs          = sfem::sortreduce(n2nbuff, nneighs);
 //             rowptr[node + 1] = nneighs;
 //         }
 
@@ -134,7 +134,7 @@
 //                 }
 //             }
 
-//             nneighs = sortreduce(n2nbuff, nneighs);
+//             nneighs = sfem::sortreduce(n2nbuff, nneighs);
 
 //             for (idx_t i = 0; i < nneighs; ++i) {
 //                 colidx[rowptr[node] + i] = n2nbuff[i];
@@ -215,7 +215,7 @@
 // //                 }
 // //             }
 
-// //             nneighs          = sortreduce(n2nbuff, nneighs);
+// //             nneighs          = sfem::sortreduce(n2nbuff, nneighs);
 // //             rowptr[node + 1] = nneighs;
 // //         }
 
@@ -255,7 +255,7 @@
 //         //                 }
 //         //             }
 
-//         //             nneighs = sortreduce(n2nbuff, nneighs);
+//         //             nneighs = sfem::sortreduce(n2nbuff, nneighs);
 
 //         //             for (idx_t i = 0; i < nneighs; ++i) {
 //         //                 colidx[rowptr[node] + i] = n2nbuff[i];
@@ -319,7 +319,7 @@
 //         return hex8_linear_search(key, row, lenrow);
 //     } else {
 //         // Use this for larger number of dofs per row
-//         return find_idx_binary_search(key, row, lenrow);
+//         return sfem::find_idx_binary_search(key, row, lenrow);
 //     }
 // }
 
@@ -877,7 +877,7 @@
 //                     }
 //                 }
 
-//                 nneighs          = sortreduce(n2nbuff, nneighs);
+//                 nneighs          = sfem::sortreduce(n2nbuff, nneighs);
 //                 rowptr[node + 1] = nneighs;
 //             }
 //         }
@@ -925,7 +925,7 @@
 //                     }
 //                 }
 
-//                 nneighs = sortreduce(n2nbuff, nneighs);
+//                 nneighs = sfem::sortreduce(n2nbuff, nneighs);
 //                 for (idx_t i = 0; i < nneighs; ++i) {
 //                     assert(rowptr[node] + i < nnz);
 //                     colidx[rowptr[node] + i] = n2nbuff[i];
@@ -1321,7 +1321,7 @@
 //         }
 //     }
 
-//     *n_nodes_out = sortreduce(nodes, n);
+//     *n_nodes_out = sfem::sortreduce(nodes, n);
 //     *nodes_out   = realloc(nodes, *n_nodes_out * sizeof(idx_t));
 //     return SFEM_SUCCESS;
 // }

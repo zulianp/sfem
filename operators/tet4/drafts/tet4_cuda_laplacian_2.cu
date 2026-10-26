@@ -144,7 +144,7 @@ static inline __device__ __host__ idx_t find_col(const idx_t key, const idx_t *c
     // assert(key == row[k]);
     // } else {
     //     // Use this for larger number of dofs per row
-    //     return find_idx_binary_search(key, row, lenrow);
+    //     return sfem::find_idx_binary_search(key, row, lenrow);
     // }
 }
 

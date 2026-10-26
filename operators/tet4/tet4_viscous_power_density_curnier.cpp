@@ -335,7 +335,7 @@
 //         // assert(key == row[k]);
 //     } else {
 //         // Use this for larger number of dofs per row
-//         return find_idx_binary_search(key, row, lenrow);
+//         return sfem::find_idx_binary_search(key, row, lenrow);
 //     }
 // }
 
