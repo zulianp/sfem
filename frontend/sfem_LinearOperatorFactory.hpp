@@ -18,9 +18,6 @@ namespace sfem {
 
     std::shared_ptr<Operator<real_t>> make_linear_op(const std::shared_ptr<Function> &f);
 
-    std::shared_ptr<Operator<real_t>> make_linear_op_variant(const std::shared_ptr<Function>                &f,
-                                                             const std::vector<std::pair<std::string, int>> &opts);
-
     std::shared_ptr<sfem::CRS<count_t, idx_t, real_t, real_t>> hessian_crs(sfem::Function                  &f,
                                                                            const std::shared_ptr<CRSGraph> &crs_graph,
                                                                            const sfem::ExecutionSpace       es);
@@ -45,8 +42,6 @@ namespace sfem {
                                                                    const std::shared_ptr<sfem::Function>       &f,
                                                                    const std::shared_ptr<sfem::Buffer<real_t>> &u,
                                                                    enum sfem::ExecutionSpace                    es);
-
-    SharedInPlaceOperator<real_t> create_zero_constraints_op(const std::shared_ptr<Function> &f);
 
 }  // namespace sfem
 

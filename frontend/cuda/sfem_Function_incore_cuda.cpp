@@ -24,14 +24,10 @@
 
 // GPU
 #include "boundary_condition_cuda.hpp"
-#include "hex8_adjugate_cuda.hpp"
-#include "hex8_fff_cuda.hpp"
 #include "laplacian_cuda.hpp"
 #include "linear_elasticity_cuda.hpp"
 #include "mask_cuda.hpp"
 #include "sshex8_elemental_matrix_cuda.hpp"
-#include "tet4_adjugate_cuda.hpp"
-#include "tet4_fff_cuda.hpp"
 
 // C++ includes
 #include "sfem_Function.hpp"
