@@ -17,9 +17,9 @@ namespace sfem {
     };
 
     struct NonlinearReport {
-        enum Status {
+        enum class Status {
             CONVERGED,
-            /// The merit could no longer resolve a decrease (LineSearchResult::AT_RESOLUTION).
+            /// The merit could no longer resolve a decrease (LineSearchResult::Status::AT_RESOLUTION).
             CONVERGED_AT_RESOLUTION,
             /// The iteration cap, not a tolerance, stopped it.
             MAX_IT,
@@ -34,7 +34,7 @@ namespace sfem {
             STEP_FAILED
         };
 
-        Status status{STEP_FAILED};
+        Status status{Status::STEP_FAILED};
         int    iterations{0};
         int    linear_iterations{0};
         /// Linearised solves that stopped on their cap rather than their tolerance.
@@ -43,9 +43,9 @@ namespace sfem {
         real_t final_measure{0};
         real_t min_alpha{1};
 
-        bool converged() const { return status == CONVERGED || status == CONVERGED_AT_RESOLUTION; }
+        bool converged() const { return status == Status::CONVERGED || status == Status::CONVERGED_AT_RESOLUTION; }
         /// The step's state stands: converged, or the end of a fixed-iteration scheme.
-        bool accepted() const { return converged() || status == ITERATIONS_DONE; }
+        bool accepted() const { return converged() || status == Status::ITERATIONS_DONE; }
     };
 
     const char *to_string(const NonlinearReport::Status status);

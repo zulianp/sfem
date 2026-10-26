@@ -571,7 +571,7 @@ namespace sfem {
 
         StepRecord at_start    = record;
         at_start.report        = NonlinearReport();
-        at_start.report.status = NonlinearReport::CONVERGED;
+        at_start.report.status = NonlinearReport::Status::CONVERGED;
         const bool verbose     = impl.verbose;
         impl.verbose           = false;
         const int ret          = impl.row(at_start, "initial");

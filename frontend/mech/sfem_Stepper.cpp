@@ -131,7 +131,7 @@ namespace sfem {
                 report = impl.solver->solve(context, x);
                 attempts++;
 
-                if (predicted && report.status == NonlinearReport::NON_FINITE && report.iterations == 0) {
+                if (predicted && report.status == NonlinearReport::Status::NON_FINITE && report.iterations == 0) {
                     blas->copy(ndofs, x_n->data(), x);
                     report = impl.solver->solve(context, x);
                     attempts++;

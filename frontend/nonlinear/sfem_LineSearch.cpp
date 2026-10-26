@@ -10,15 +10,15 @@ namespace sfem {
 
     const char *to_string(const LineSearchResult::Status status) {
         switch (status) {
-            case LineSearchResult::ACCEPTED:
+            case LineSearchResult::Status::ACCEPTED:
                 return "accepted";
-            case LineSearchResult::BEST_DECREASE:
+            case LineSearchResult::Status::BEST_DECREASE:
                 return "best_decrease";
-            case LineSearchResult::AT_RESOLUTION:
+            case LineSearchResult::Status::AT_RESOLUTION:
                 return "at_resolution";
-            case LineSearchResult::NO_DECREASE:
+            case LineSearchResult::Status::NO_DECREASE:
                 return "no_decrease";
-            case LineSearchResult::NON_FINITE:
+            case LineSearchResult::Status::NON_FINITE:
                 return "non_finite";
         }
         return "unknown";
@@ -35,7 +35,7 @@ namespace sfem {
 
         LineSearchResult result;
         if (!options_.enabled) {
-            result.status = LineSearchResult::ACCEPTED;
+            result.status = LineSearchResult::Status::ACCEPTED;
             result.alpha  = 1;
             result.merit  = std::numeric_limits<real_t>::quiet_NaN();
             return result;
@@ -52,13 +52,13 @@ namespace sfem {
                 merit.evaluate(x, h, 1, &s, &values_[i]);
                 result.evaluations++;
                 if (std::isfinite(values_[i])) {
-                    result.status = LineSearchResult::ACCEPTED;
+                    result.status = LineSearchResult::Status::ACCEPTED;
                     result.alpha  = s;
                     result.merit  = values_[i];
                     return result;
                 }
             }
-            result.status = LineSearchResult::NON_FINITE;
+            result.status = LineSearchResult::Status::NON_FINITE;
             result.alpha  = 0;
             result.merit  = m0;
             return result;
@@ -91,7 +91,7 @@ namespace sfem {
         }
 
         if (accepted >= 0) {
-            result.status = LineSearchResult::ACCEPTED;
+            result.status = LineSearchResult::Status::ACCEPTED;
             result.alpha  = steps[accepted];
             result.merit  = values_[accepted];
             return result;
@@ -103,7 +103,7 @@ namespace sfem {
         }
 
         if (best >= 0 && values_[best] < m0) {
-            result.status = LineSearchResult::BEST_DECREASE;
+            result.status = LineSearchResult::Status::BEST_DECREASE;
             result.alpha  = steps[best];
             result.merit  = values_[best];
             return result;
@@ -112,7 +112,7 @@ namespace sfem {
         result.alpha = 0;
         result.merit = m0;
         if (best < 0) {
-            result.status = LineSearchResult::NON_FINITE;
+            result.status = LineSearchResult::Status::NON_FINITE;
             return result;
         }
 
@@ -120,7 +120,7 @@ namespace sfem {
         // and near the solution it is not: the decrease falls with the square of the step and the
         // rounding does not move.
         const real_t floor = 64 * std::numeric_limits<real_t>::epsilon() * std::max(std::abs(m0), real_t(1));
-        result.status      = std::abs(slope) < floor ? LineSearchResult::AT_RESOLUTION : LineSearchResult::NO_DECREASE;
+        result.status      = std::abs(slope) < floor ? LineSearchResult::Status::AT_RESOLUTION : LineSearchResult::Status::NO_DECREASE;
         return result;
     }
 

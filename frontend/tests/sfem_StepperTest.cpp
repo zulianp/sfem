@@ -56,9 +56,9 @@ namespace {
             log_.push_back(fmt("solve", context.t, context.dt));
             sfem::NonlinearReport report;
             attempt_++;
-            report.status = sfem::NonlinearReport::CONVERGED;
+            report.status = sfem::NonlinearReport::Status::CONVERGED;
             for (int f : failures_) {
-                if (f == attempt_) report.status = sfem::NonlinearReport::LINE_SEARCH_FAILED;
+                if (f == attempt_) report.status = sfem::NonlinearReport::Status::LINE_SEARCH_FAILED;
             }
             report.iterations = 1;
             return report;
