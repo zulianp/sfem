@@ -60,6 +60,14 @@ namespace sfem {
         static std::shared_ptr<DirichletConditions> create(const std::shared_ptr<FunctionSpace> &space,
                                                            const std::vector<struct Condition>  &conditions);
 
+        /// create, moved to the device for EXECUTION_SPACE_DEVICE.
+        static std::shared_ptr<Constraint> create(const std::shared_ptr<FunctionSpace> &space,
+                                                  const std::vector<struct Condition>  &conditions,
+                                                  const ExecutionSpace                  es);
+
+        /// create_from_env, moved to the device for EXECUTION_SPACE_DEVICE.
+        static std::shared_ptr<Constraint> create_from_env(const std::shared_ptr<FunctionSpace> &space, const ExecutionSpace es);
+
         int apply(real_t *const x) override;
         int apply_value(const real_t value, real_t *const x) override;
         int copy_constrained_dofs(const real_t *const src, real_t *const dest) override;
@@ -118,13 +126,17 @@ namespace sfem {
     std::shared_ptr<Constraint> to_device(const std::shared_ptr<DirichletConditions> &dc);
 
     /// DirichletConditions::create, moved to the device for EXECUTION_SPACE_DEVICE.
-    std::shared_ptr<Constraint> create_dirichlet_conditions(const std::shared_ptr<FunctionSpace>              &space,
-                                                            const std::vector<DirichletConditions::Condition> &conditions,
-                                                            const ExecutionSpace                               es);
+    inline std::shared_ptr<Constraint> create_dirichlet_conditions(const std::shared_ptr<FunctionSpace>              &space,
+                                                                   const std::vector<DirichletConditions::Condition> &conditions,
+                                                                   const ExecutionSpace                               es) {
+        return DirichletConditions::create(space, conditions, es);
+    }
 
     /// DirichletConditions::create_from_env, moved to the device for EXECUTION_SPACE_DEVICE.
-    std::shared_ptr<Constraint> create_dirichlet_conditions_from_env(const std::shared_ptr<FunctionSpace> &space,
-                                                                     const ExecutionSpace                  es);
+    inline std::shared_ptr<Constraint> create_dirichlet_conditions_from_env(const std::shared_ptr<FunctionSpace> &space,
+                                                                            const ExecutionSpace                  es) {
+        return DirichletConditions::create_from_env(space, es);
+    }
 
 }  // namespace sfem
 

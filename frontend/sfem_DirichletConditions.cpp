@@ -770,9 +770,9 @@ namespace sfem {
     }
 #endif
 
-    std::shared_ptr<Constraint> create_dirichlet_conditions(const std::shared_ptr<FunctionSpace>              &space,
-                                                            const std::vector<DirichletConditions::Condition> &conditions,
-                                                            const ExecutionSpace                               es) {
+    std::shared_ptr<Constraint> DirichletConditions::create(const std::shared_ptr<FunctionSpace> &space,
+                                                            const std::vector<struct Condition>  &conditions,
+                                                            const ExecutionSpace                  es) {
         auto conds = DirichletConditions::create(space, conditions);
         if (es == EXECUTION_SPACE_DEVICE) {
             return to_device(conds);
@@ -780,7 +780,7 @@ namespace sfem {
         return conds;
     }
 
-    std::shared_ptr<Constraint> create_dirichlet_conditions_from_env(const std::shared_ptr<FunctionSpace> &space,
+    std::shared_ptr<Constraint> DirichletConditions::create_from_env(const std::shared_ptr<FunctionSpace> &space,
                                                                      const ExecutionSpace                  es) {
         auto conds = DirichletConditions::create_from_env(space);
         if (es == EXECUTION_SPACE_DEVICE) {

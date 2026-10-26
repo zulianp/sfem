@@ -50,6 +50,11 @@ namespace sfem {
         static std::shared_ptr<NeumannConditions> create(const std::shared_ptr<FunctionSpace> &space,
                                                          const std::vector<struct Condition>  &conditions);
 
+        /// create, moved to the device for EXECUTION_SPACE_DEVICE.
+        static std::shared_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space,
+                                          const std::vector<struct Condition>  &conditions,
+                                          const ExecutionSpace                  es);
+
         static std::shared_ptr<NeumannConditions> create_from_yaml(const std::shared_ptr<FunctionSpace> &space, std::string yaml);
 
 #ifdef SFEM_ENABLE_RYAML
@@ -120,9 +125,11 @@ namespace sfem {
     std::shared_ptr<Op> to_device(const std::shared_ptr<NeumannConditions> &nc);
 
     /// NeumannConditions::create, moved to the device for EXECUTION_SPACE_DEVICE.
-    std::shared_ptr<Op> create_neumann_conditions(const std::shared_ptr<FunctionSpace>            &space,
-                                                  const std::vector<NeumannConditions::Condition> &conditions,
-                                                  const ExecutionSpace                             es);
+    inline std::shared_ptr<Op> create_neumann_conditions(const std::shared_ptr<FunctionSpace>            &space,
+                                                         const std::vector<NeumannConditions::Condition> &conditions,
+                                                         const ExecutionSpace                             es) {
+        return NeumannConditions::create(space, conditions, es);
+    }
 
 }  // namespace sfem
 
