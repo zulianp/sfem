@@ -40,5 +40,3 @@ Imports point up this list and never down, enforced by `tests/test_layering.py`.
 - `ARCHITECTURE.html` — what is actually built, with the open points.
 - `INEXACT.md` — the projected (partial-assembly) apply.
 - `docs/` — worked examples: matrix formats, coupled residual, Mooney-Rivlin.
-- `retired/` — superseded design documents, kept for their reasoning. Not maintained, and not
-  cited from code.
