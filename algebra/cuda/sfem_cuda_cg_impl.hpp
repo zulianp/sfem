@@ -6,9 +6,9 @@
 
 namespace sfem {
     template <typename T>
-    struct CUDA_CG {
+    struct GPUConjugateGradientKernels {
         /// The passes on the device, ordered on `context`'s stream.
-        static void build(struct CG_Tpl<T>& tpl, const ExecutionContext& context = ExecutionContext::device());
+        static void build(struct ConjugateGradientKernels<T>& tpl, const ExecutionContext& context = ExecutionContext::device());
     };
 }  // namespace sfem
 

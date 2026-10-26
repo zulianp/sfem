@@ -38,7 +38,7 @@ namespace sfem {
         std::shared_ptr<Operator<T>>         preconditioner_op;
         std::shared_ptr<Communicator>        comm_;
         std::shared_ptr<BLAS<T>>             blas;
-        CG_Tpl<T>                            impl;
+        ConjugateGradientKernels<T>                            impl;
 
         std::function<void(T*)> interceptor;
 
@@ -136,7 +136,7 @@ namespace sfem {
 
         void default_init() {
             blas             = OpenMPBLAS<T>::create();
-            OpenMP_CG<T>::build(impl);
+            OpenMPConjugateGradientKernels<T>::build(impl);
         }
 
         bool good() const { return blas && blas->good() && apply_op && comm_ && (!fusion || impl.good()); }

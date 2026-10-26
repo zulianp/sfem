@@ -150,7 +150,7 @@ namespace sfem {
     }  // namespace
 
     template <typename T>
-    void CUDA_CG<T>::build(struct CG_Tpl<T>& tpl, const ExecutionContext& context) {
+    void GPUConjugateGradientKernels<T>::build(struct ConjugateGradientKernels<T>& tpl, const ExecutionContext& context) {
         // Every pass on the context's stream, bound here once.
         const cudaStream_t s   = static_cast<cudaStream_t>(context.stream());
         tpl.update_x_r_and_rtr = [s](auto&&... a) { return update_x_r_and_rtr<T>(a..., s); };
@@ -158,7 +158,7 @@ namespace sfem {
         tpl.update_p           = [s](auto&&... a) { update_p<T>(a..., s); };
     }
 
-    template class CUDA_CG<float>;
-    template class CUDA_CG<double>;
+    template class GPUConjugateGradientKernels<float>;
+    template class GPUConjugateGradientKernels<double>;
 
 }  // namespace sfem

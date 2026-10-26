@@ -16,7 +16,7 @@ namespace sfem {
     std::shared_ptr<ConjugateGradient<T>> d_cg(const ExecutionContext& context = ExecutionContext::device()) {
         auto cg              = std::make_shared<ConjugateGradient<T>>();
         cg->blas             = GPUBLAS<T>::create(context);
-        CUDA_CG<T>::build(cg->impl, context);
+        GPUConjugateGradientKernels<T>::build(cg->impl, context);
         return cg;
     }
 
