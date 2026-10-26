@@ -2,7 +2,7 @@
 
 #include "sfem_aliases.hpp"
 #include "sfem_base.hpp"
-#include "sfem_openmp_blas.hpp"
+#include "sfem_BLAS_openmp.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_BLAS_cuda.hpp"

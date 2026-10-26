@@ -13,8 +13,8 @@
 #include "sfem_MatrixFreeLinearSolver.hpp"
 #include "sfem_ParallelOperator.hpp"
 #include "sfem_cg.hpp"
-#include "sfem_openmp_blas.hpp"
-#include "sfem_openmp_cg_impl.hpp"
+#include "sfem_BLAS_openmp.hpp"
+#include "sfem_ConjugateGradientKernels_openmp.hpp"
 
 namespace sfem {
 

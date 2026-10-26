@@ -13,7 +13,7 @@
 #include "sfem_aliases.hpp"
 #include "sfem_base.hpp"
 #include "sfem_mask.hpp"
-#include "sfem_openmp_blas.hpp"
+#include "sfem_BLAS_openmp.hpp"
 #include "smesh_env.hpp"
 
 namespace {

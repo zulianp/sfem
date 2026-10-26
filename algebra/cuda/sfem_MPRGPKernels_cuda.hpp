@@ -2,7 +2,7 @@
 #define SFEM_CUDA_MPRGP_IMPL_HPP
 
 #include "sfem_execution_context.hpp"
-#include "sfem_openmp_mprgp_impl.hpp"
+#include "sfem_MPRGPKernels_openmp.hpp"
 
 namespace sfem {
 	template <typename T>

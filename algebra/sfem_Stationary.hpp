@@ -10,7 +10,7 @@
 #include "sfem_MatrixFreeLinearSolver.hpp"
 #include "sfem_ParallelOperator.hpp"
 #include "sfem_aliases.hpp"
-#include "sfem_openmp_blas.hpp"
+#include "sfem_BLAS_openmp.hpp"
 #include "sfem_operator_factory.hpp"
 
 namespace sfem {

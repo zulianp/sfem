@@ -6,7 +6,7 @@
 
 #include "sfem_aliases.hpp"
 #include "sfem_MatrixFreeLinearSolver.hpp"
-#include "sfem_openmp_blas.hpp"
+#include "sfem_BLAS_openmp.hpp"
 
 namespace sfem {
     template <typename T>

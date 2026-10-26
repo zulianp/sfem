@@ -1541,7 +1541,7 @@ the macro corners and its lattice index, evaluated once per node rather than onc
 incident macro-element, which removes the question rather than ordering it. This is in
 `smesh`, not here.
 
-### 2. Krylov reductions, in `algebra/openmp/sfem_openmp_blas.hpp`
+### 2. Krylov reductions, in `algebra/openmp/sfem_BLAS_openmp.hpp`
 
 `dot` and `norm2` use `reduction(+ : ret)`, which combines partial sums in an unspecified
 order over chunks whose boundaries follow the thread count. `SFEM_DETERMINISTIC_BLAS=1` now
@@ -1614,7 +1614,7 @@ changed how that sum was grouped.
 |---------|-------|---------|
 | `SMESH_DETERMINISTIC_COORDS` | smesh, `sshex8_fill_points*` | on |
 | `SFEM_SS_SCATTER` | this spike, five sshex8 kernels | on |
-| `SFEM_DETERMINISTIC_BLAS` | `algebra/openmp/sfem_openmp_blas.hpp` | on |
+| `SFEM_DETERMINISTIC_BLAS` | `algebra/openmp/sfem_BLAS_openmp.hpp` | on |
 
 All three are on by default, each opting out with `=0`.
 
@@ -3484,7 +3484,7 @@ the macro corners and its lattice index, evaluated once per node rather than onc
 incident macro-element, which removes the question rather than ordering it. This is in
 `smesh`, not here.
 
-### 2. Krylov reductions, in `algebra/openmp/sfem_openmp_blas.hpp`
+### 2. Krylov reductions, in `algebra/openmp/sfem_BLAS_openmp.hpp`
 
 `dot` and `norm2` use `reduction(+ : ret)`, which combines partial sums in an unspecified
 order over chunks whose boundaries follow the thread count. `SFEM_DETERMINISTIC_BLAS=1` now
@@ -3557,7 +3557,7 @@ changed how that sum was grouped.
 |---------|-------|---------|
 | `SMESH_DETERMINISTIC_COORDS` | smesh, `sshex8_fill_points*` | on |
 | `SFEM_SS_SCATTER` | this spike, five sshex8 kernels | on |
-| `SFEM_DETERMINISTIC_BLAS` | `algebra/openmp/sfem_openmp_blas.hpp` | on |
+| `SFEM_DETERMINISTIC_BLAS` | `algebra/openmp/sfem_BLAS_openmp.hpp` | on |
 
 All three are on by default, each opting out with `=0`.
 
@@ -5380,7 +5380,7 @@ the macro corners and its lattice index, evaluated once per node rather than onc
 incident macro-element, which removes the question rather than ordering it. This is in
 `smesh`, not here.
 
-### 2. Krylov reductions, in `algebra/openmp/sfem_openmp_blas.hpp`
+### 2. Krylov reductions, in `algebra/openmp/sfem_BLAS_openmp.hpp`
 
 `dot` and `norm2` use `reduction(+ : ret)`, which combines partial sums in an unspecified
 order over chunks whose boundaries follow the thread count. `SFEM_DETERMINISTIC_BLAS=1` now
@@ -5453,7 +5453,7 @@ changed how that sum was grouped.
 |---------|-------|---------|
 | `SMESH_DETERMINISTIC_COORDS` | smesh, `sshex8_fill_points*` | on |
 | `SFEM_SS_SCATTER` | this spike, five sshex8 kernels | on |
-| `SFEM_DETERMINISTIC_BLAS` | `algebra/openmp/sfem_openmp_blas.hpp` | on |
+| `SFEM_DETERMINISTIC_BLAS` | `algebra/openmp/sfem_BLAS_openmp.hpp` | on |
 
 All three are on by default, each opting out with `=0`.
 

@@ -34,7 +34,7 @@
 #include "sfem_BLAS_cuda.hpp"
 #include "sfem_ShiftedPenaltyKernels_cuda.hpp"
 #else
-#include "sfem_ShiftedPenalty_impl.hpp"
+#include "sfem_ShiftedPenaltyKernels_openmp.hpp"
 #endif
 
 namespace sfem {

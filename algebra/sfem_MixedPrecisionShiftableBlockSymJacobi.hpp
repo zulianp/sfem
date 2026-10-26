@@ -6,7 +6,7 @@
 #include "sfem_MatrixFreeLinearSolver.hpp"
 #include "sfem_ShiftableJacobi.hpp"
 #include "sfem_aliases.hpp"
-#include "sfem_openmp_blas.hpp"
+#include "sfem_BLAS_openmp.hpp"
 #include "smesh_env.hpp"
 
 namespace sfem {

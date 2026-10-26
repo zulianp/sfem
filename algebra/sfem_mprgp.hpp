@@ -16,9 +16,9 @@
 
 #include "sfem_PowerMethod.hpp"
 
-#include "sfem_openmp_blas.hpp"
+#include "sfem_BLAS_openmp.hpp"
 #include "sfem_mprgp_control.hpp"
-#include "sfem_openmp_mprgp_impl.hpp"
+#include "sfem_MPRGPKernels_openmp.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
 #include "smesh_device_communicator.hpp"

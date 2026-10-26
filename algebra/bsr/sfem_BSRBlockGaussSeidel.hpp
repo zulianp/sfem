@@ -3,7 +3,7 @@
 
 #include "sfem_BSR.hpp"
 #include "sfem_base.hpp"
-#include "sfem_openmp_blas.hpp"
+#include "sfem_BLAS_openmp.hpp"
 
 #include <cassert>
 #include <memory>

@@ -17,7 +17,7 @@
 #include "sfem_ParallelOperator.hpp"
 #include "sfem_aliases.hpp"
 
-#include "sfem_openmp_blas.hpp"
+#include "sfem_BLAS_openmp.hpp"
 #include "sfem_tpl_blas.hpp"
 
 // https://en.wikipedia.org/wiki/Conjugate_gradient_method
