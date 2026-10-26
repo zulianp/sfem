@@ -420,22 +420,7 @@ int tet4_neohookean_ogden_apply(const ptrdiff_t              nelements,
                                 jacobian_adjugate,
                                 &jacobian_determinant);
 
-#if 0  
-// Old implementation
-        tet4_neohookean_hessian_apply_adj(jacobian_adjugate,
-                                          jacobian_determinant,
-                                          mu,
-                                          lambda,
-                                          element_ux,
-                                          element_uy,
-                                          element_uz,
-                                          element_hx,
-                                          element_hy,
-                                          element_hz,
-                                          element_outx,
-                                          element_outy,
-                                          element_outz);
-#else  // New partial assembly implementation
+       // New partial assembly implementation
        // FUTURE: Preprocessing (once per linearization)
         scalar_t F[9] = {0};
         tet4_F(jacobian_adjugate, jacobian_determinant, element_ux, element_uy, element_uz, F);
@@ -475,7 +460,6 @@ int tet4_neohookean_ogden_apply(const ptrdiff_t              nelements,
             assert(fabs(diffz) < 1e-8);
         }
 #endif  // NDEBUG
-#endif
 
         for (int edof_i = 0; edof_i < 4; edof_i++) {
             const ptrdiff_t idx = ev[edof_i] * out_stride;
@@ -641,26 +625,6 @@ int tet4_neohookean_ogden_gradient(const ptrdiff_t                   nelements,
     }
 
     return SFEM_SUCCESS;
-}
-
-int tet4_neohookean_ogden_diag(const ptrdiff_t /*nelements*/,
-                               const ptrdiff_t /*nnodes*/,
-                               idx_t **const SFEM_RESTRICT /*elements*/,
-                               geom_t **const SFEM_RESTRICT /*points*/,
-                               const real_t /*mu*/,
-                               const real_t /*lambda*/,
-                               const ptrdiff_t /*u_stride*/,
-                               const real_t *const /*ux*/,
-                               const real_t *const /*uy*/,
-                               const real_t *const /*uz*/,
-                               const ptrdiff_t /*out_stride*/,
-                               real_t *const /*outx*/,
-                               real_t *const /*outy*/,
-                               real_t *const /*outz*/) {
-    // The element kernel was never written (tet4_neohookean_ogden_diag_adj): this used to add
-    // uninitialised element values to the output.
-    SFEM_ERROR("tet4_neohookean_ogden_diag: not implemented\n");
-    return SFEM_FAILURE;
 }
 
 int tet4_neohookean_ogden_bsr(const ptrdiff_t                    nelements,
