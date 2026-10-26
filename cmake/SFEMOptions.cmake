@@ -42,7 +42,7 @@ endif()
 
 option(SFEM_USE_OCCUPANCY_MAX_POTENTIAL "Enable usage of cudaOccupancyMaxPotentialBlockSize" OFF)
 option(SFEM_ENABLE_RESAMPLING "Enable resampling features" OFF)
-option(SFEM_ENABLE_TRACE "Eneable trace facilities and output sfem.trace.csv (Override with SFEM_TRACE_FILE in the env)" ON)
+option(SFEM_ENABLE_TRACE "Enable trace facilities: smesh writes smesh.trace.csv (override with SMESH_TRACE_FILE in the env)" ON)
 
 get_directory_property(HAS_PARENT PARENT_DIRECTORY)
 
