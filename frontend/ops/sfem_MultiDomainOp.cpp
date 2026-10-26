@@ -48,7 +48,7 @@ namespace sfem {
             std::vector<idx_t *> rows(elements->extent(0));
 #ifdef SFEM_ENABLE_CUDA
             if (elements->mem_space() == MEMORY_SPACE_DEVICE) {
-                buffer_device_to_host(rows.size() * sizeof(idx_t *), elements->data(), rows.data());
+                copy_device_to_host(rows.size() * sizeof(idx_t *), elements->data(), rows.data());
             } else
 #endif
             {
@@ -63,7 +63,7 @@ namespace sfem {
 #ifdef SFEM_ENABLE_CUDA
             if (elements->mem_space() == MEMORY_SPACE_DEVICE) {
                 auto dev = (idx_t **)d_buffer_alloc(8 * sizeof(idx_t *));
-                buffer_host_to_device(8 * sizeof(idx_t *), micro.data(), dev);
+                copy_host_to_device(8 * sizeof(idx_t *), micro.data(), dev);
                 return std::make_shared<Buffer<idx_t *>>(
                         8, nelements, dev, [keep_alive = elements](int, void **v) { d_buffer_destroy(v); },
                         MEMORY_SPACE_DEVICE);

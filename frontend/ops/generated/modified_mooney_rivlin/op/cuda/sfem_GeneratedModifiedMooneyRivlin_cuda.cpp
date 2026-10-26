@@ -803,7 +803,7 @@ namespace sfem {
         impl_->step_values = create_buffer<real_t>(nsteps, EXECUTION_SPACE_DEVICE);
         impl_->step_capacity = nsteps;
       }
-      buffer_host_to_device(nsteps * sizeof(real_t), steps, impl_->step_values->data());
+      copy_host_to_device(nsteps * sizeof(real_t), steps, impl_->step_values->data());
       if (nvalues > impl_->element_capacity) {
         impl_->element_values = create_buffer<real_t>(nvalues, EXECUTION_SPACE_DEVICE);
         impl_->element_ones = create_buffer<real_t>(nvalues, EXECUTION_SPACE_DEVICE);

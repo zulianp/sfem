@@ -36,7 +36,7 @@ namespace sfem {
         void fill(const SharedBuffer<real_t> &target, const SharedBuffer<real_t> &host) {
 #ifdef SFEM_ENABLE_CUDA
             if (target->mem_space() == MEMORY_SPACE_DEVICE) {
-                buffer_host_to_device(host->size() * sizeof(real_t), host->data(), target->data());
+                copy_host_to_device(host->size() * sizeof(real_t), host->data(), target->data());
                 return;
             }
 #endif

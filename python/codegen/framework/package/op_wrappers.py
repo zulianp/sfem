@@ -8694,7 +8694,7 @@ def _steps_staging(indent):
             "%s  impl_->step_values = create_buffer<real_t>(nsteps, %s);" % (indent, space),
             "%s  impl_->step_capacity = nsteps;" % indent,
             "%s}" % indent,
-            "%sbuffer_host_to_device(nsteps * sizeof(real_t), steps, impl_->step_values->data());"
+            "%scopy_host_to_device(nsteps * sizeof(real_t), steps, impl_->step_values->data());"
             % indent,
         )
     )
