@@ -66,38 +66,41 @@ def solve_poisson(options):
 	fun.set_output_dir(options.output_dir)
 
 	op = pysfem.create_op(fs, "Laplacian")
+	op.initialize()
 	fun.add_operator(op)
 
 	bc = pysfem.DirichletConditions(fs)
-	pysfem.add_condition(bc, sinlet, 0,  0);
-	pysfem.add_condition(bc, soutlet, 0, 1);
+	bc.add_condition(sinlet, 0,  0);
+	bc.add_condition(soutlet, 0, 1);
 	fun.add_dirichlet_conditions(bc)
 	fun.set_output_dir(options.output_dir)
 
 	# If we have surface element sideset we can use Neumann conditions
 	# nc = pysfem.NeumannConditions(fs)
-	# pysfem.add_condition(nc, soutlet, 0, 1)
+	# nc.add_condition(soutlet, 0, 1)
 	# fun.add_operator(nc)
 
 	x = np.zeros(fs.n_dofs())
 	g = np.zeros(fs.n_dofs())
 	c = np.zeros(fs.n_dofs())
+	# Buffers over the arrays: the library reads and writes x, g and c in place.
+	xb, gb, cb = pysfem.view(x), pysfem.view(g), pysfem.view(c)
 	
 	cg = pysfem.ConjugateGradient()
 	cg.default_init()
 	cg.set_max_it(30000)
 
-	lop = pysfem.make_op(fun, x)
+	lop = pysfem.make_op(fun, xb)
 	cg.set_op(lop)
 
-	pysfem.apply_constraints(fun, x)
-	pysfem.gradient(fun, x, g)
-	pysfem.apply(cg, g, c)
+	pysfem.apply_constraints(fun, xb)
+	pysfem.gradient(fun, xb, gb)
+	pysfem.apply(cg, gb, cb)
 	
 	# Apply correction 
 	x -= c
 
-	pysfem.report_solution(fun, x)
+	pysfem.report_solution(fun, xb)
 
 class Opts:
 	def __init__(self):
