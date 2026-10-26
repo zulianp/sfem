@@ -158,10 +158,8 @@ if(SFEM_ENABLE_CUDA)
         operators/cuda
         operators/hex8/cuda
         operators/macro_tet4/cuda
-        operators/quadshell4/cuda
         operators/spectral_hex/cuda
         operators/sshex8/cuda
-        operators/sstet4/cuda
         operators/tet10/cuda
         operators/tet4/cuda
         resampling/surface/cuda
