@@ -164,3 +164,18 @@ The public C++ methods already use `n_dofs`/`n_nodes`/`n_elements`: no `ndofs()`
 
 ---
 Items: 22 factories, 3 sizes, 8 abbreviations, 10 backend/file, 7 hessian, 5 verbs, 10 enums, 4 return codes, 4 C utilities, 4 typos: **77**.
+
+## Applied (2026-10-26)
+
+Every ticked item is applied, one commit each, except where items share files (F1-F8, F9-F12, F13-F14, E3-E4, E5-E7: one commit per group). Each commit builds with DEV_MODE (all options, Python bindings on) and passes ctest. Where the result differs from the text above:
+
+- F13: `create_op(space, name, es)` stays as the shorthand of `OpFactory::create` (rule above); callers of the old two-argument host lookup pass `EXECUTION_SPACE_HOST`. `create_boundary` on the device returns null with a message: there are no device boundary ops.
+- E6: `MPRGPMove` and `MPRGPDecision` are `enum class : int` at namespace scope, not nested: nested in the template `MPRGPControl<T>` they would be one type per `T`.
+- E8: kept, not retired: the resampling driver and `sfem_resample_field` use it.
+- V2: `crs_graph_host_to_device` had callers only in `operators/tet4/drafts` (not compiled), so it is removed rather than redirected.
+- V3: `elements_to_device` had no caller, so it is removed; `boundary_conditions_host_to_device` is the C++ overload `sfem::to_device(const boundary_condition_t&)`.
+- G2: smesh has no `sortreduce` and its `find_idx` is a linear scan, so sfem's functions stay, moved into `namespace sfem`.
+- G4: `python/codegen/inverse.py` cannot run (its template `tpl/inverse_tpl.c` is gone); `algebra/sfem_inverse.cpp` is edited directly.
+- B6: also `sfem_cuda_reduction_scratch.hpp` (added in Stage B) → `sfem_reduction_scratch_cuda.hpp`.
+- B9: H4-H6 are not ticked, so the class files are `sfem_SCRS.hpp`, `sfem_ACRS.hpp`, `sfem_SDACRS.hpp`; `lumped_ptdp` is `sfem_lumped_galerkin` after its functions (G3).
+- The Python bindings did not build with DEV_MODE (nanobind's sources under -Werror, and `Function::value` gone since 4d736fbe1); fixed before the renames.
