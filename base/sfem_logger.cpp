@@ -1,45 +1,45 @@
 #include "sfem_logger.hpp"
 #include "sfem_base.hpp"
 
-#include <assert.h>
+#include <stdlib.h>
 
-void log_init(logger_t *l) {
-    l->stream = 0;
-    l->buffer = 0;
-    l->len = 0;
-}
+namespace sfem {
 
-int log_is_empty(logger_t *l) { return l->stream == 0; }
+    Logger::~Logger() { close(); }
 
-int log_create_memstream(logger_t *l) {
-    l->buffer = 0;
-    l->len = 0;
-#ifdef _WIN32
-    SFEM_ERROR("IMPLEMENT ME!");
-#else
-    l->stream = open_memstream(&l->buffer, &l->len);
-    return !l->stream;
-#endif
-}
-
-int log_create_file(logger_t *l, const char *path, const char *mode) {
-    l->buffer = 0;
-    l->len = 0;
-    l->stream = fopen(path, mode);
-    return !l->stream;
-}
-
-void log_write_double(logger_t *l, const double val) {
-    fprintf(l->stream, "%g\n", val);
-    fflush(l->stream);
-}
-
-void log_destroy(logger_t *l) {
-    if (l->stream) {
-        fflush(l->stream);
-        fclose(l->stream);
-        if (l->buffer) {
-            free(l->buffer);
+    void Logger::close() {
+        if (stream_) {
+            fflush(stream_);
+            fclose(stream_);
+            if (buffer_) {
+                free(buffer_);
+            }
         }
+        stream_ = nullptr;
+        buffer_ = nullptr;
+        len_    = 0;
     }
-}
+
+    int Logger::open_memstream() {
+        close();
+#ifdef _WIN32
+        SFEM_ERROR("IMPLEMENT ME!");
+        return SFEM_FAILURE;
+#else
+        stream_ = ::open_memstream(&buffer_, &len_);
+        return stream_ ? SFEM_SUCCESS : SFEM_FAILURE;
+#endif
+    }
+
+    int Logger::open_file(const char *path, const char *mode) {
+        close();
+        stream_ = fopen(path, mode);
+        return stream_ ? SFEM_SUCCESS : SFEM_FAILURE;
+    }
+
+    void Logger::write(const double val) {
+        fprintf(stream_, "%g\n", val);
+        fflush(stream_);
+    }
+
+}  // namespace sfem
