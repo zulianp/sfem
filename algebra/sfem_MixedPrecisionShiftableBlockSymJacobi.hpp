@@ -15,7 +15,7 @@ namespace sfem {
     class MixedPrecisionShiftableBlockSymJacobi final : public ShiftableOperator<HP> {
     public:
         std::shared_ptr<BLAS<LP>>           blas;
-        ShiftableBlockSymJacobi_Tpl<HP, LP> impl;
+        ShiftableBlockSymJacobiKernels<HP, LP> impl;
 
         SharedBuffer<HP>     diag;
         SharedBuffer<LP>     inv_diag;
@@ -29,7 +29,7 @@ namespace sfem {
 
         void default_init() {
             blas = OpenMPBLAS<LP>::create();
-            ShiftableBlockSymJacobi_OpenMP<HP, LP>::build(block_size, impl);
+            OpenMPShiftableBlockSymJacobiKernels<HP, LP>::build(block_size, impl);
         }
 
         void set_relaxation_parameter(const HP relaxation) {

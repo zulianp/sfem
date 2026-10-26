@@ -11,7 +11,7 @@
 namespace sfem {
 
     template <typename HP, typename LP = HP>
-    struct ShiftableBlockSymJacobi_Tpl {
+    struct ShiftableBlockSymJacobiKernels {
         std::function<void(const ptrdiff_t, const idx_t* const, const HP* const, const HP* const, LP* const)>
                                                                                        add_sparse_sym_diag_to_diag;
 
@@ -40,7 +40,7 @@ namespace sfem {
     namespace private_ {
 
         template <typename T>
-        struct Invert3_OpenMP {
+        struct OpenMPInvert3 {
             static SFEM_INLINE void inverse3(
                     // Input
                     const T mat_0,
@@ -108,7 +108,7 @@ namespace sfem {
         };
 
         template <typename T>
-        struct Mask3_OpenMP {
+        struct OpenMPMask3 {
             static void apply(const ptrdiff_t n_blocks, const mask_t* const constraints_mask, T* const inout) {
 #pragma omp parallel for
                 for (ptrdiff_t b = 0; b < n_blocks; b++) {
@@ -277,7 +277,7 @@ namespace sfem {
                     mat[8] = 1;
                 }
 
-                Invert3_OpenMP<LP>::inverse3(mat[0],
+                OpenMPInvert3<LP>::inverse3(mat[0],
                                              mat[1],
                                              mat[2],
                                              mat[3],
@@ -305,10 +305,10 @@ namespace sfem {
     }  // namespace private_
 
     template <typename HP, typename LP = HP>
-    struct ShiftableBlockSymJacobi_OpenMP {
-        static int build(const int dim, ShiftableBlockSymJacobi_Tpl<HP, LP>& tpl) {
+    struct OpenMPShiftableBlockSymJacobiKernels {
+        static int build(const int dim, ShiftableBlockSymJacobiKernels<HP, LP>& tpl) {
             if (dim != 3) {
-                SFEM_ERROR("ShiftableBlockSymJacobi_OpenMP::build(dim=%d) not supported!\n", dim);
+                SFEM_ERROR("OpenMPShiftableBlockSymJacobiKernels::build(dim=%d) not supported!\n", dim);
                 return SFEM_FAILURE;
             }
 
@@ -317,8 +317,8 @@ namespace sfem {
             tpl.sym_diag_to_diag            = &private_::SparseBlockSymOps_OpenMP_sym_diag_to_diag<HP, LP>;
             tpl.apply                       = &private_::SparseBlockSymOps_OpenMP_apply<LP, HP, HP>;
 
-            tpl.apply_mask     = &private_::Mask3_OpenMP<LP>::apply;
-            tpl.inplace_invert = &private_::Invert3_OpenMP<LP>::inplace_apply_AoS;
+            tpl.apply_mask     = &private_::OpenMPMask3<LP>::apply;
+            tpl.inplace_invert = &private_::OpenMPInvert3<LP>::inplace_apply_AoS;
             tpl.sparse_update_inv_diag =
                     &private_::SparseBlockSymOps_OpenMP_sparse_update_inv_diag<HP, LP>;
             return SFEM_SUCCESS;

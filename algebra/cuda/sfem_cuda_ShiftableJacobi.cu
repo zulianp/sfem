@@ -339,11 +339,11 @@ namespace sfem {
     }  // namespace private_
 
     template <typename HP, typename LP>
-    int ShiftableBlockSymJacobi_CUDA<HP, LP>::build(const int                                   dim,
-                                                    struct ShiftableBlockSymJacobi_Tpl<HP, LP>& tpl,
+    int GPUShiftableBlockSymJacobiKernels<HP, LP>::build(const int                                   dim,
+                                                    struct ShiftableBlockSymJacobiKernels<HP, LP>& tpl,
                                                     const ExecutionContext&                     context) {
         if (dim != 3) {
-            SFEM_ERROR("ShiftableBlockSymJacobi_CUDA::build(dim=%d) not supported!\n", dim);
+            SFEM_ERROR("GPUShiftableBlockSymJacobiKernels::build(dim=%d) not supported!\n", dim);
             return SFEM_FAILURE;
         }
 
@@ -364,9 +364,9 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    template class ShiftableBlockSymJacobi_CUDA<double>;
-    template class ShiftableBlockSymJacobi_CUDA<float>;
-    template class ShiftableBlockSymJacobi_CUDA<double, float>;
-    // template class ShiftableBlockSymJacobi_CUDA<float, half>;
+    template class GPUShiftableBlockSymJacobiKernels<double>;
+    template class GPUShiftableBlockSymJacobiKernels<float>;
+    template class GPUShiftableBlockSymJacobiKernels<double, float>;
+    // template class GPUShiftableBlockSymJacobiKernels<float, half>;
 
 }  // namespace sfem
