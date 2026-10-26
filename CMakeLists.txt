@@ -507,6 +507,14 @@ if(SFEM_ENABLE_TESTING)
                  COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/testing/check_streams.py ${CMAKE_CURRENT_SOURCE_DIR})
     endif()
 
+    # The documentation's Playground cases pass the schema and run, and its links resolve
+    # (scripts/testing/check_docs.py).
+    if(Python3_Interpreter_FOUND AND TARGET playground)
+        add_test(NAME sfem_DocsCasesTest
+                 COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/testing/check_docs.py
+                         ${CMAKE_CURRENT_SOURCE_DIR} --playground $<TARGET_FILE:playground> --run)
+    endif()
+
     if(TARGET sfem_MaMALTest)
         target_include_directories(sfem_MaMALTest PRIVATE external/ssdf/serial ${CMAKE_CURRENT_BINARY_DIR}/external/ssdf)
         if(TARGET ssdf)
