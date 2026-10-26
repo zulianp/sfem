@@ -4,7 +4,7 @@
 #include <math.h>
 
 #include "sfem_base.hpp"
-#include "sfem_sdf_sampling.hpp"
+#include "sfem_Obstacle.hpp"
 
 // One contact node of NodeObstacleContact, for its host loops and its device kernels
 // (cuda/sfem_NodeObstacleView_cuda.cu) alike. A node's frame q is [n, t1, t2] by rows.
@@ -126,10 +126,10 @@ SFEM_HOST_DEVICE SFEM_INLINE void node_obstacle_offset_gap(const real_t  shift,
                                                            real_t *const n0,
                                                            real_t *const n1,
                                                            real_t *const n2) {
-    if (*gap >= SFEM_SDF_UNREACHABLE) return;
+    if (*gap >= sfem::obstacle_unreachable) return;
     const real_t g = *gap - shift + admitted;
     if (g > cutoff) {
-        *gap = SFEM_SDF_UNREACHABLE;
+        *gap = sfem::obstacle_unreachable;
         *n0  = 0;
         *n1  = 0;
         *n2  = 0;

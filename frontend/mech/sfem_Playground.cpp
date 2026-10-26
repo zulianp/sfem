@@ -794,7 +794,7 @@ namespace sfem {
                 return SFEM_FAILURE;
             }
             contact->set_shift(read<real_t>(node, "shift", 0));
-            contact->set_cutoff(read<real_t>(node, "cutoff", real_t(SFEM_SDF_UNREACHABLE)));
+            contact->set_cutoff(read<real_t>(node, "cutoff", real_t(obstacle_unreachable)));
             if (has(node, "release")) {
                 // A start inside the obstacle, let out of it as the profile goes from 0 to 1.
                 LoadProfile release;
