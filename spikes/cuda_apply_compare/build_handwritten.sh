@@ -16,12 +16,12 @@ MPI_INC="-I$(dirname "$(find /user-environment -name mpi.h 2>/dev/null | head -1
 NVCC="nvcc -std=c++17 -O3 -arch=sm_90 -DNDEBUG -diag-suppress 177"
 mkdir -p "$ROOT/hw"
 
-$NVCC $DEFINES $INCLUDES $MPI_INC -I "$SFEM/operators/tet4/cuda" -I "$SFEM/operators/cuda" \
-    -c "$SFEM/operators/tet4/cuda/tet4_laplacian_cuda.cu" -o "$ROOT/hw/cu_tet4_laplacian.o" \
+$NVCC $DEFINES $INCLUDES $MPI_INC -I "$SFEM/src/operators/tet4/cuda" -I "$SFEM/src/operators/cuda" \
+    -c "$SFEM/src/operators/tet4/cuda/tet4_laplacian_cuda.cu" -o "$ROOT/hw/cu_tet4_laplacian.o" \
     > "$ROOT/hw/handwritten.log" 2>&1 || { echo "FAIL hand-written laplacian"; grep -m5 error "$ROOT/hw/handwritten.log"; exit 1; }
 
-$NVCC $DEFINES $INCLUDES $MPI_INC -I "$SFEM/operators/tet4/cuda" -I "$SFEM/operators/cuda" \
-    -c "$SFEM/operators/tet4/cuda/tet4_linear_elasticity_cuda.cu" \
+$NVCC $DEFINES $INCLUDES $MPI_INC -I "$SFEM/src/operators/tet4/cuda" -I "$SFEM/src/operators/cuda" \
+    -c "$SFEM/src/operators/tet4/cuda/tet4_linear_elasticity_cuda.cu" \
     -o "$ROOT/hw/cu_tet4_linear_elasticity.o" \
     > "$ROOT/hw/handwritten_le.log" 2>&1 || { echo "FAIL hand-written elasticity"; grep -m5 error "$ROOT/hw/handwritten_le.log"; exit 1; }
 
@@ -41,12 +41,12 @@ $NVCC $DEFINES $INCLUDES $MPI_INC -I "$ROOT/cuda/laplace" \
     -o "$ROOT/hw/laplace_tet4_operator.o" > "$ROOT/hw/generated.log" 2>&1 \
     || { echo "FAIL generated kernel"; grep -m5 error "$ROOT/hw/generated.log"; exit 1; }
 
-$NVCC $DEFINES $INCLUDES $MPI_INC -I "$SFEM/operators/tet4/cuda" -I "$SFEM/operators/cuda" \
+$NVCC $DEFINES $INCLUDES $MPI_INC -I "$SFEM/src/operators/tet4/cuda" -I "$SFEM/src/operators/cuda" \
     -c "$ROOT/handwritten_compare.cu" -o "$ROOT/hw/driver.o" \
     > "$ROOT/hw/driver.log" 2>&1 || { echo "FAIL driver"; grep -m6 error "$ROOT/hw/driver.log"; exit 1; }
 
 # `sfem_abort` is the hand-written kernel's error path and calls `MPI_Abort`
-mpicxx -std=c++17 -O3 -DNDEBUG $DEFINES $INCLUDES -c "$SFEM/base/sfem_base.cpp" \
+mpicxx -std=c++17 -O3 -DNDEBUG $DEFINES $INCLUDES -c "$SFEM/src/base/sfem_base.cpp" \
     -o "$ROOT/hw/sfem_base.o" > "$ROOT/hw/base.log" 2>&1 \
     || { echo "FAIL sfem_base"; grep -m4 error "$ROOT/hw/base.log"; exit 1; }
 MPI_LIB=$(dirname "$(find /user-environment -name 'libmpi.so*' 2>/dev/null | head -1)")

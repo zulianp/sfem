@@ -19,6 +19,7 @@ def generated_output_dir(anchor_file, name, levels_to_frontend_root):
         os.path.join(
             os.path.dirname(anchor_file),
             *(("..",) * int(levels_to_frontend_root)),
+            "src",
             "frontend",
             "ops",
             "generated",

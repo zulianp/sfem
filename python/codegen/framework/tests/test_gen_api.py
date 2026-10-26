@@ -115,7 +115,7 @@ def _compile_include_only(test_case, compiler, out_dir, source, object_name):
     root = _repo_root()
     include_dirs = [
         out_dir,
-        os.path.join(root, "base"),
+        os.path.join(root, "src", "base"),
         os.path.join(root, "external", "smesh", "src", "base"),
         os.path.join(root, "external", "smesh", "src", "mesh"),
     ]
@@ -1775,7 +1775,7 @@ int main() {
 
     def test_frontend_factory_consumes_generated_op_registration_aggregate(self):
         repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
-        factory_path = os.path.join(repo_root, "frontend", "ops", "sfem_OpFactory.cpp")
+        factory_path = os.path.join(repo_root, "src", "frontend", "ops", "sfem_OpFactory.cpp")
         with open(factory_path, encoding="utf-8") as input_file:
             factory_source = input_file.read()
 

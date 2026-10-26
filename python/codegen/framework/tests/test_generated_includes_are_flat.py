@@ -17,7 +17,7 @@ def _generated_tree():
     return os.path.normpath(
         os.path.join(
             os.path.dirname(os.path.abspath(__file__)),
-            "..", "..", "..", "..", "frontend", "ops", "generated",
+            "..", "..", "..", "..", "src", "frontend", "ops", "generated",
         )
     )
 

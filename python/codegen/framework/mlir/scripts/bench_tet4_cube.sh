@@ -36,7 +36,7 @@ case "$OPENCL_OPT_STRATEGY" in
 esac
 
 SMESH_CUBE="${SMESH_CUBE:-$BUILD_DIR/external/smesh/cube}"
-GENERATED_TET4_OBJECT="${SFEM_GENERATED_TET4_OBJECT:-$BUILD_DIR/CMakeFiles/sfem.dir/frontend/ops/generated/linear_elasticity/d3/tet4/linear_elasticity_tet4_operator.cpp.o}"
+GENERATED_TET4_OBJECT="${SFEM_GENERATED_TET4_OBJECT:-$BUILD_DIR/CMakeFiles/sfem.dir/src/frontend/ops/generated/linear_elasticity/d3/tet4/linear_elasticity_tet4_operator.cpp.o}"
 CXX="${CXX:-/opt/homebrew/opt/llvm/bin/clang++}"
 if [[ ! -x "$CXX" ]]; then
     CXX="${CXX_FALLBACK:-c++}"

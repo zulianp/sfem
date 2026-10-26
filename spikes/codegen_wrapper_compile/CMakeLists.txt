@@ -74,11 +74,11 @@ function(_collect_include_dirs out_var)
 endfunction()
 
 _collect_include_dirs(SFEM_INCLUDE_DIRS
-    "${SFEM_ROOT}/base"
-    "${SFEM_ROOT}/frontend"
-    "${SFEM_ROOT}/operators"
-    "${SFEM_ROOT}/algebra"
-    "${SFEM_ROOT}/solver"
+    "${SFEM_ROOT}/src/base"
+    "${SFEM_ROOT}/src/frontend"
+    "${SFEM_ROOT}/src/operators"
+    "${SFEM_ROOT}/src/algebra"
+    "${SFEM_ROOT}/src/solver"
     "${SFEM_ROOT}/external/smesh/src"
     "${SFEM_BUILD_DIR}/_deps/ryml-src/src"
     "${SFEM_BUILD_DIR}/_deps/ryml-src/ext/c4core/src"   # c4core is vendored inside ryml

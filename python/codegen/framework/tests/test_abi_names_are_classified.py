@@ -31,7 +31,7 @@ from codegen.framework.package import op_wrappers
 GENERATED = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))),
-    "frontend", "ops", "generated",
+    "src", "frontend", "ops", "generated",
 )
 
 # The name is the last identifier before the parameter list, whatever the return
