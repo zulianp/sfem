@@ -130,7 +130,7 @@ namespace sfem {
 #ifdef SFEM_ENABLE_CUDA
         if (elements->mem_space() == MEMORY_SPACE_DEVICE) {
             std::vector<idx_t *> host_buff_from(elements->extent(0));
-            buffer_device_to_host(elements->extent(0) * sizeof(idx_t *), elements->data(), host_buff_from.data());
+            copy_device_to_host(elements->extent(0) * sizeof(idx_t *), elements->data(), host_buff_from.data());
 
             std::vector<idx_t *> host_dev_ptrs(nxe);
             for (int zi = 0; zi <= to_level; zi++) {
@@ -149,7 +149,7 @@ namespace sfem {
             }
 
             idx_t **dev_buff_to = (idx_t **)d_buffer_alloc(nxe * sizeof(idx_t *));
-            buffer_host_to_device(nxe * sizeof(idx_t *), host_dev_ptrs.data(), dev_buff_to);
+            copy_host_to_device(nxe * sizeof(idx_t *), host_dev_ptrs.data(), dev_buff_to);
             return std::make_shared<Buffer<idx_t *>>(
                     nxe,
                     nelements,

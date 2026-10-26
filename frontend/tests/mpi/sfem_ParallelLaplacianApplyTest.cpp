@@ -191,8 +191,8 @@ namespace {
 #ifdef SFEM_ENABLE_CUDA
             parallel_h = smesh::create_device_buffer<real_t>(n_x_alloc);
             parallel_y = smesh::create_device_buffer<real_t>(n_y_alloc);
-            buffer_host_to_device((size_t)n_x_alloc * sizeof(real_t), parallel_h_host->data(), parallel_h->data());
-            buffer_host_to_device((size_t)n_y_alloc * sizeof(real_t), parallel_y_host->data(), parallel_y->data());
+            copy_host_to_device((size_t)n_x_alloc * sizeof(real_t), parallel_h_host->data(), parallel_h->data());
+            copy_host_to_device((size_t)n_y_alloc * sizeof(real_t), parallel_y_host->data(), parallel_y->data());
 #else
             SFEM_TEST_ASSERT(false && "device test requires CUDA");
 #endif
@@ -205,7 +205,7 @@ namespace {
             std::fill(parallel_y_host->data(), parallel_y_host->data() + n_y_alloc, real_t(0));
             if (es == sfem::EXECUTION_SPACE_DEVICE) {
 #ifdef SFEM_ENABLE_CUDA
-                buffer_host_to_device((size_t)n_y_alloc * sizeof(real_t), parallel_y_host->data(), parallel_y->data());
+                copy_host_to_device((size_t)n_y_alloc * sizeof(real_t), parallel_y_host->data(), parallel_y->data());
 #endif
             }
         };
@@ -215,7 +215,7 @@ namespace {
 
         if (es == sfem::EXECUTION_SPACE_DEVICE) {
 #ifdef SFEM_ENABLE_CUDA
-            buffer_device_to_host((size_t)n_y_alloc * sizeof(real_t), parallel_y->data(), parallel_y_host->data());
+            copy_device_to_host((size_t)n_y_alloc * sizeof(real_t), parallel_y->data(), parallel_y_host->data());
 #endif
         }
 
@@ -232,7 +232,7 @@ namespace {
             SFEM_TEST_ASSERT(parallel_op->apply(parallel_h->data(), parallel_y->data()) == SFEM_SUCCESS);
             if (es == sfem::EXECUTION_SPACE_DEVICE) {
 #ifdef SFEM_ENABLE_CUDA
-                buffer_device_to_host((size_t)n_y_alloc * sizeof(real_t), parallel_y->data(), parallel_y_host->data());
+                copy_device_to_host((size_t)n_y_alloc * sizeof(real_t), parallel_y->data(), parallel_y_host->data());
 #endif
             }
             SFEM_TEST_ASSERT(
