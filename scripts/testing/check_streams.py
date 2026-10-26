@@ -21,9 +21,6 @@ EXCLUDED = {
     "spikes": "separate projects, built and gated on their own",
     "resampling/cuda": "host-in, host-out entry points (allocate, copy, launch, copy back): synchronous by "
     "construction; to be replaced by sresample (MIGRATION_SRESAMPLE.md)",
-    "resampling/test_grid": "a standalone experiment outside the build (DEAD.md)",
-    "operators/tet4/drafts": "never compiled (DEAD.md)",
-    "cuda": "standalone micro-tests outside the build (DEAD.md)",
     "benchmark": "not in the build",
 }
 SUFFIXES = (".cu", ".cuh", ".cpp", ".hpp", ".h", ".c")
