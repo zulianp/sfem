@@ -5,7 +5,7 @@ project(
     sfem
     VERSION 0.1.0
     LANGUAGES "C" "CXX"
-    HOMEPAGE_URL "https://bitbucket.org/zulianp/sfem"
+    HOMEPAGE_URL "https://github.com/zulianp/sfem"
     DESCRIPTION
     "SFEM: Simple FEM"
     )
@@ -168,13 +168,16 @@ if(SFEM_ENABLE_CUDA)
     endif()
 endif()
 
+# The library's sources live under src/.
+set(SFEM_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+
 foreach(MODULE ${SFEM_MODULES})
-    scan_directories(${CMAKE_CURRENT_SOURCE_DIR}/${MODULE} "." SFEM_BUILD_INCLUDES
+    scan_directories(${SFEM_SRC_DIR}/${MODULE} "." SFEM_BUILD_INCLUDES
        SFEM_HEADERS SFEM_SOURCES)
 
     if(SFEM_ENABLE_CUDA)
-        file(GLOB SFEM_MODULE_KERNEL_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${MODULE}/*.cu")
-        file(GLOB SFEM_MODULE_KERNEL_HEADERS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${MODULE}/*.cuh")
+        file(GLOB SFEM_MODULE_KERNEL_SOURCES CONFIGURE_DEPENDS "${SFEM_SRC_DIR}/${MODULE}/*.cu")
+        file(GLOB SFEM_MODULE_KERNEL_HEADERS CONFIGURE_DEPENDS "${SFEM_SRC_DIR}/${MODULE}/*.cuh")
         # message(STATUS "${MODULE} : ${SFEM_MODULE_KERNEL_SOURCES}")
     endif()
 
@@ -188,9 +191,9 @@ foreach(MODULE ${SFEM_MODULES})
 endforeach(MODULE)
 
 file(GLOB_RECURSE SFEM_GENERATED_SOURCES CONFIGURE_DEPENDS
-     "${CMAKE_CURRENT_SOURCE_DIR}/frontend/ops/generated/*.cpp")
+     "${SFEM_SRC_DIR}/frontend/ops/generated/*.cpp")
 file(GLOB_RECURSE SFEM_GENERATED_HEADERS CONFIGURE_DEPENDS
-     "${CMAKE_CURRENT_SOURCE_DIR}/frontend/ops/generated/*.hpp")
+     "${SFEM_SRC_DIR}/frontend/ops/generated/*.hpp")
 
 # The device tree's wrappers are `.cpp` -- host C++ that launches device kernels
 # -- so this glob sweeps them up whether or not CUDA is enabled.  They cannot do
@@ -211,9 +214,9 @@ list(APPEND SFEM_HEADERS ${SFEM_GENERATED_HEADERS})
 # tree nests by dimension and element rather than by module.
 if(SFEM_ENABLE_CUDA)
     file(GLOB_RECURSE SFEM_GENERATED_KERNEL_SOURCES CONFIGURE_DEPENDS
-         "${CMAKE_CURRENT_SOURCE_DIR}/frontend/ops/generated/*.cu")
+         "${SFEM_SRC_DIR}/frontend/ops/generated/*.cu")
     file(GLOB_RECURSE SFEM_GENERATED_KERNEL_HEADERS CONFIGURE_DEPENDS
-         "${CMAKE_CURRENT_SOURCE_DIR}/frontend/ops/generated/*.cuh")
+         "${SFEM_SRC_DIR}/frontend/ops/generated/*.cuh")
     list(APPEND SFEM_KERNEL_SOURCES ${SFEM_GENERATED_KERNEL_SOURCES})
     list(APPEND SFEM_KERNEL_HEADERS ${SFEM_GENERATED_KERNEL_HEADERS})
 endif()
@@ -251,10 +254,8 @@ if(SFEM_ENABLE_CUDA)
 endif()
 
 list(REMOVE_ITEM SFEM_SOURCES
-    "frontend/sfem_Communicator.cpp"
-    "frontend/sfem_CRSGraph.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/frontend/sfem_Communicator.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/frontend/sfem_CRSGraph.cpp")
+    "${SFEM_SRC_DIR}/frontend/sfem_Communicator.cpp"
+    "${SFEM_SRC_DIR}/frontend/sfem_CRSGraph.cpp")
 list(FILTER SFEM_SOURCES EXCLUDE REGEX "sfem_(Communicator|CRSGraph)\\.cpp$")
 
 # message(STATUS "SFEM_BUILD_INCLUDES: ${SFEM_BUILD_INCLUDES}")
@@ -289,7 +290,7 @@ target_include_directories(sfem BEFORE
 target_include_directories(
     sfem BEFORE
     PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    $<BUILD_INTERFACE:${SFEM_SRC_DIR}>
     $<INSTALL_INTERFACE:include>)
 
 
@@ -466,7 +467,7 @@ if(SFEM_ENABLE_TESTING)
     endif()
 
     foreach(UNIT_TEST ${SFEM_UNIT_TESTS})
-        file(GLOB CXX_UNIT_TESTS CONFIGURE_DEPENDS "${UNIT_TEST}/*.cpp")
+        file(GLOB CXX_UNIT_TESTS CONFIGURE_DEPENDS "${SFEM_SRC_DIR}/${UNIT_TEST}/*.cpp")
 
         list(APPEND TEST_DRIVERS "${CXX_UNIT_TESTS}")
 
@@ -514,7 +515,7 @@ if(SFEM_ENABLE_TESTING)
     endif()
 
     if(SFEM_ENABLE_MPI)
-        add_executable(sfem_ParallelLaplacianApplyTest frontend/tests/mpi/sfem_ParallelLaplacianApplyTest.cpp)
+        add_executable(sfem_ParallelLaplacianApplyTest ${SFEM_SRC_DIR}/frontend/tests/mpi/sfem_ParallelLaplacianApplyTest.cpp)
         target_link_libraries(sfem_ParallelLaplacianApplyTest PRIVATE sfem)
         add_test(
             NAME sfem_ParallelLaplacianApplyTest
@@ -522,7 +523,7 @@ if(SFEM_ENABLE_TESTING)
         set_tests_properties(sfem_ParallelLaplacianApplyTest PROPERTIES ENVIRONMENT "OMP_NUM_THREADS=1")
         list(APPEND SFEM_TARGETS sfem_ParallelLaplacianApplyTest)
 
-        add_executable(sfem_ParallelCGTest frontend/tests/mpi/sfem_ParallelCGTest.cpp)
+        add_executable(sfem_ParallelCGTest ${SFEM_SRC_DIR}/frontend/tests/mpi/sfem_ParallelCGTest.cpp)
         target_link_libraries(sfem_ParallelCGTest PRIVATE sfem)
         add_test(
             NAME sfem_ParallelCGTest
@@ -530,7 +531,7 @@ if(SFEM_ENABLE_TESTING)
         set_tests_properties(sfem_ParallelCGTest PROPERTIES ENVIRONMENT "OMP_NUM_THREADS=1")
         list(APPEND SFEM_TARGETS sfem_ParallelCGTest)
 
-        add_executable(sfem_ParallelFunctionSpaceTest frontend/tests/mpi/sfem_ParallelFunctionSpaceTest.cpp)
+        add_executable(sfem_ParallelFunctionSpaceTest ${SFEM_SRC_DIR}/frontend/tests/mpi/sfem_ParallelFunctionSpaceTest.cpp)
         target_link_libraries(sfem_ParallelFunctionSpaceTest PRIVATE sfem)
         add_test(
             NAME sfem_ParallelFunctionSpaceTest
@@ -538,7 +539,7 @@ if(SFEM_ENABLE_TESTING)
         set_tests_properties(sfem_ParallelFunctionSpaceTest PROPERTIES ENVIRONMENT "OMP_NUM_THREADS=1")
         list(APPEND SFEM_TARGETS sfem_ParallelFunctionSpaceTest)
 
-        add_executable(sfem_ParallelSSGMGTest frontend/tests/mpi/sfem_ParallelSSGMGTest.cpp)
+        add_executable(sfem_ParallelSSGMGTest ${SFEM_SRC_DIR}/frontend/tests/mpi/sfem_ParallelSSGMGTest.cpp)
         target_link_libraries(sfem_ParallelSSGMGTest PRIVATE sfem)
         add_test(
             NAME sfem_ParallelSSGMGTest
@@ -547,7 +548,7 @@ if(SFEM_ENABLE_TESTING)
         list(APPEND SFEM_TARGETS sfem_ParallelSSGMGTest)
 
         if(SFEM_ENABLE_CUDA)
-            add_executable(sfem_ParallelExchangeStreamTest frontend/tests/mpi/sfem_ParallelExchangeStreamTest.cpp)
+            add_executable(sfem_ParallelExchangeStreamTest ${SFEM_SRC_DIR}/frontend/tests/mpi/sfem_ParallelExchangeStreamTest.cpp)
             target_link_libraries(sfem_ParallelExchangeStreamTest PRIVATE sfem)
             add_test(
                 NAME sfem_ParallelExchangeStreamTest
@@ -557,7 +558,7 @@ if(SFEM_ENABLE_TESTING)
         endif()
 
         if(SFEM_ENABLE_RYAML AND SFEM_ENABLE_SRESAMPLE)
-            add_executable(sfem_ParallelObstacleTest frontend/tests/mpi/sfem_ParallelObstacleTest.cpp)
+            add_executable(sfem_ParallelObstacleTest ${SFEM_SRC_DIR}/frontend/tests/mpi/sfem_ParallelObstacleTest.cpp)
             target_link_libraries(sfem_ParallelObstacleTest PRIVATE sfem)
             add_test(
                 NAME sfem_ParallelObstacleTest
