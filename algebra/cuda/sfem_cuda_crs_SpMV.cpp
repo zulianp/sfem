@@ -329,7 +329,7 @@ namespace sfem {
         ret->ndofs = ndofs;
         ret->execution_space_ = EXECUTION_SPACE_DEVICE;
 
-        ret->blas = make_cuda_blas<real_t>();
+        ret->blas = GPUBLAS<real_t>::create();
         auto impl = std::make_shared<SymCooSpMVImpl>(ndofs, rowidx, colidx, values, scale_output);
         ret->apply_ = [=](const real_t* const x, real_t* const y) {
             impl->apply(x, y);

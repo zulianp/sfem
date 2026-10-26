@@ -135,7 +135,7 @@ namespace sfem {
         void set_preconditioner(std::function<void(const T* const, T* const)>&& in) { preconditioner_op = in; }
 
         void default_init() {
-            blas             = make_openmp_blas<T>();
+            blas             = OpenMPBLAS<T>::create();
             OpenMP_CG<T>::build(impl);
         }
 

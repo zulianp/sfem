@@ -53,7 +53,7 @@ namespace sfem {
         //
         // rows() is the OWNED dof count and col_allocation_size() the local one, which is the
         // distinction the workspace sizing below depends on.
-        explicit FGMRES(const std::shared_ptr<Operator<T>> &op) : op_(op), blas_(make_openmp_blas<T>()) {
+        explicit FGMRES(const std::shared_ptr<Operator<T>> &op) : op_(op), blas_(OpenMPBLAS<T>::create()) {
             if (auto pop = std::dynamic_pointer_cast<ParallelOperator<T>>(op_)) {
                 domain_.comm    = pop->comm();
                 domain_.n_owned = pop->rows();

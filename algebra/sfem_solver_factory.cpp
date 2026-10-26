@@ -55,7 +55,7 @@ namespace sfem {
 
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
-            ret->blas = make_cuda_blas<T>();
+            ret->blas = GPUBLAS<T>::create();
         } else
 #endif  // SFEM_ENABLE_CUDA
         {
@@ -77,12 +77,12 @@ namespace sfem {
 
 #ifdef SFEM_ENABLE_CUDA
         if (context.space() == EXECUTION_SPACE_DEVICE) {
-            ret->blas = make_cuda_blas<LP>(context);
+            ret->blas = GPUBLAS<LP>::create(context);
             ShiftableBlockSymJacobi_CUDA<HP, LP>::build(dim, ret->impl, context);
         } else
 #endif  // SFEM_ENABLE_CUDA
         {
-            ret->blas = make_openmp_blas<LP>();
+            ret->blas = OpenMPBLAS<LP>::create();
             ShiftableBlockSymJacobi_OpenMP<HP, LP>::build(dim, ret->impl);
         }
 
@@ -101,12 +101,12 @@ namespace sfem {
 
 #ifdef SFEM_ENABLE_CUDA
         if (context.space() == EXECUTION_SPACE_DEVICE) {
-            ret->blas = make_cuda_blas<T>(context);
+            ret->blas = GPUBLAS<T>::create(context);
             ShiftableBlockSymJacobi_CUDA<T>::build(dim, ret->impl, context);
         } else
 #endif  // SFEM_ENABLE_CUDA
         {
-            ret->blas = make_openmp_blas<T>();
+            ret->blas = OpenMPBLAS<T>::create();
             ShiftableBlockSymJacobi_OpenMP<T>::build(dim, ret->impl);
         }
 
@@ -127,7 +127,7 @@ namespace sfem {
 
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
-            ret->blas = make_cuda_blas<T>();
+            ret->blas = GPUBLAS<T>::create();
         } else
 #endif  // SFEM_ENABLE_CUDA
         {
@@ -181,7 +181,7 @@ namespace sfem {
 
 #ifdef SFEM_ENABLE_CUDA
         if (context.space() == EXECUTION_SPACE_DEVICE) {
-            mprgp->blas = make_cuda_blas<T>(context);
+            mprgp->blas = GPUBLAS<T>::create(context);
             CUDA_MPRGP<T>::build_mprgp(mprgp->impl, context);
 
         } else

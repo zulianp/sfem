@@ -959,7 +959,7 @@ namespace sfem {
 #ifdef SFEM_ENABLE_CUDA
             if (es == EXECUTION_SPACE_DEVICE) {
                 // FIXME this should not be here!
-                mg->blas() = make_cuda_blas<real_t>();
+                mg->blas() = GPUBLAS<real_t>::create();
                 CUDA_ShiftedPenalty<real_t>::build(mg->impl());
             } else
 #endif

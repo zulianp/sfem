@@ -28,7 +28,7 @@ namespace sfem {
         // bool                 sparse_update_policy_logged_{false};
 
         void default_init() {
-            blas = make_openmp_blas<LP>();
+            blas = OpenMPBLAS<LP>::create();
             ShiftableBlockSymJacobi_OpenMP<HP, LP>::build(block_size, impl);
         }
 

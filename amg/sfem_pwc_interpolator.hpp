@@ -21,7 +21,7 @@ namespace sfem {
         std::shared_ptr<BLAS<T>> blas;
 
         void default_init() {
-            blas = make_openmp_blas<T>();
+            blas = OpenMPBLAS<T>::create();
         }
 
         void transpose() { transposed = !transposed; }

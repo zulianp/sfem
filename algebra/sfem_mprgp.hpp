@@ -296,7 +296,7 @@ namespace sfem {
         }
 
         void default_init() {
-            blas = make_openmp_blas<T>();
+            blas = OpenMPBLAS<T>::create();
             OpenMP_MPRGP<T>::build_mprgp(impl);
         }
 
