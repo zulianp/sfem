@@ -40,7 +40,7 @@
 // 583.669 / 10001 = 0.0583669 (seconds) per time-step
 
 ptrdiff_t remove_p2_nodes(const ptrdiff_t n, const idx_t bound_p1, idx_t *idx) {
-    ptrdiff_t nret = sortreduce(idx, n);
+    ptrdiff_t nret = sfem::sortreduce(idx, n);
 
     for (ptrdiff_t i = 0; i < n; i++) {
         if (idx[i] >= bound_p1) {

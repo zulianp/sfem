@@ -17,9 +17,11 @@
 // Consider these:
 // HXTSort: https://git.immc.ucl.ac.be/hextreme/HXTSort/-/tree/master?ref_type=heads
 
-extern "C" void sort_idx(idx_t *arr, idx_t size) { std::sort(arr, arr + size); }
+namespace sfem {
 
-extern "C" idx_t sortreduce(idx_t *arr, idx_t size) {
+void sort_idx(idx_t *arr, idx_t size) { std::sort(arr, arr + size); }
+
+idx_t sortreduce(idx_t *arr, idx_t size) {
 #ifdef SFEM_ENABLE_AVX512_SORT
     avx512_qsort<idx_t>(arr, size);
 #else
@@ -33,15 +35,15 @@ extern "C" idx_t sortreduce(idx_t *arr, idx_t size) {
     return std::distance(arr, it);
 }
 
-extern "C" idx_t psortreduce(idx_t *arr, idx_t size) { return sortreduce(arr, size); }
+idx_t psortreduce(idx_t *arr, idx_t size) { return sortreduce(arr, size); }
 
-extern "C" idx_t find_idx_binary_search(const idx_t key, const idx_t *arr, idx_t size) {
+idx_t find_idx_binary_search(const idx_t key, const idx_t *arr, idx_t size) {
     auto low = std::lower_bound(arr, arr + size, key);
     assert(key == *low);
     return std::distance(arr, low);
 }
 
-extern "C" idx_t safe_find_idx_binary_search(const idx_t key, const idx_t *arr, idx_t size) {
+idx_t safe_find_idx_binary_search(const idx_t key, const idx_t *arr, idx_t size) {
     auto low = std::lower_bound(arr, arr + size, key);
     if (low == arr + size || key != *low) {
         return SFEM_IDX_INVALID;
@@ -49,7 +51,9 @@ extern "C" idx_t safe_find_idx_binary_search(const idx_t key, const idx_t *arr, 
     return std::distance(arr, low);
 }
 
-extern "C" ptrdiff_t lower_bound(const ptrdiff_t key, const ptrdiff_t *arr, ptrdiff_t size) {
+ptrdiff_t lower_bound(const ptrdiff_t key, const ptrdiff_t *arr, ptrdiff_t size) {
     auto low = std::lower_bound(arr, arr + size, key);
     return std::distance(arr, low);
 }
+
+}  // namespace sfem

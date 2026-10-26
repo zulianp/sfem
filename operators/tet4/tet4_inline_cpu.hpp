@@ -37,7 +37,7 @@ static SFEM_INLINE idx_t tet4_find_col(const idx_t key,
         return tet4_linear_search(key, row, lenrow);
     } else {
         // Use this for larger number of dofs per row
-        return find_idx_binary_search(key, row, lenrow);
+        return sfem::find_idx_binary_search(key, row, lenrow);
     }
 }
 

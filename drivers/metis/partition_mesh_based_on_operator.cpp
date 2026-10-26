@@ -97,7 +97,7 @@ int main(int argc, char *argv[]) {
             ranks[i] = node_partitions[ii];
         }
 
-        sort_idx(ranks, nn);
+        sfem::sort_idx(ranks, nn);
 
         memset(connects, 0, nn * sizeof(idx_t));
 

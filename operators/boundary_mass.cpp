@@ -92,7 +92,7 @@ static SFEM_INLINE idx_t find_col(const idx_t key, const idx_t *const row, const
     if (lenrow <= 32) {
         return linear_search(key, row, lenrow);
     } else {
-        return find_idx_binary_search(key, row, lenrow);
+        return sfem::find_idx_binary_search(key, row, lenrow);
     }
 }
 
