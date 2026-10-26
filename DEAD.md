@@ -142,3 +142,15 @@ The framework imports none of these. Its `fields`, `linear_elasticity`, `navier_
 - `spikes/cvfem/docs/*.pdf` are built from tracked .tex beside them and are kept as reports.
 - `spikes/cvfem/subpar/` is the intentional quarantine (gated by the `cvfem_subpar_compiles` ctest). Keep it.
 - These exist only in the main checkout (`../sfem`, untracked) and are absent from this worktree: `algebra/accelerate/`, `frontend/contact/*.bak_20260831_200801` (3 files), the root files `-h` and `arning:p`, `python/sfem/CMakeCache.txt`, `data/vtk/sfem.trace.csv`. Delete them there by hand if wanted.
+
+## Applied (2026-10-26)
+
+The ticked items are removed on branch `dead-code`, one commit per heading. Where the result differs from the lines above:
+
+- Paths after the RENAME.md file renames: the CUDA fff and adjugate fills are `operators/{tet4,hex8}/cuda/{tet4,hex8}_{fff,adjugate}_cuda.{cu,hpp}`, the sstet4 Laplacian is `sstet4_laplacian_cuda.{cu,hpp}`, the quadshell4 integrals are `quadshell4_integrate_values_cuda.{cu,hpp}`.
+- Module entries for folders the removals emptied leave `CMakeLists.txt` too: driver module `contact`, and `operators/sstet4/cuda` and `operators/quadshell4/cuda`.
+- `algebra/sfem_SparseBlockVector.hpp` now holds the live `SparseBlockVector` and `create_sparse_block_vector`, moved out of `sfem_MatrixFreeLinearSolver.hpp`, which includes it.
+- `resampling/rule_T.m` is removed with `rule56.csv`: it only reads and plots that rule.
+- The 75-script line names 70 scripts; with the five prose-only ones, 75 go.
+- A removed `#else` line's trailing comment stays as a comment line (`// 20-27% faster on M1`, `// New partial assembly implementation`).
+- Left as they are: the commented-out includes of removed headers (`hex8_mooney_rivlin_visco_flexible.cpp:19`, `sshex8_laplacian.cpp:8`), the docstring of `tests/test_plans_are_consumed.py` and the history in `ARCHITECTURE.html` that name `retired/` files, `.vscode/launch.json`'s test_grid path, and `workflows/decomposition/partition_mesh_based_on_operator.sh`, which calls the removed metis driver (it was already not built).
