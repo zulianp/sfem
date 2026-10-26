@@ -346,7 +346,7 @@ if(NOT SFEM_ENABLE_MINIMAL)
 
     if(${SFEM_SCALAR_TYPE} STREQUAL "float32")
         # FIXME these executables need to be fixed when compiling with real_t=float32
-        list (APPEND SFEM_EXCLUDED_EXEC assemble;assemble3;assemble4;cvfem_assemble;taylor_hood_navier_stokes)
+        list (APPEND SFEM_EXCLUDED_EXEC assemble;assemble3;cvfem_assemble;taylor_hood_navier_stokes)
     endif()
 
     if(NOT SFEM_ENABLE_MPI)
@@ -378,8 +378,6 @@ if(NOT SFEM_ENABLE_MINIMAL)
 
         list(APPEND DRIVERS "${CUDA_C_EXAMPLES}")
         list(APPEND DRIVERS "${CUDA_CXX_EXAMPLES}")
-    else()
-        list(APPEND SFEM_EXCLUDED_EXEC "sym_spmv_bench")
     endif()
 
 

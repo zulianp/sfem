@@ -19,7 +19,6 @@
 #include "sfem_NeoHookeanOgdenActiveStrainPacked.hpp"
 #include "sfem_NeoHookeanOgdenPacked.hpp"
 #include "sfem_PackedLaplacian.hpp"
-#include "sfem_PlugInOp.hpp"
 #include "sfem_SemiStructuredEMLaplacian.hpp"
 #include "sfem_SemiStructuredEMLinearElasticity.hpp"
 #include "sfem_SemiStructuredHyTeGLinearElasticity.hpp"
@@ -131,16 +130,6 @@ namespace sfem {
         auto  it  = ntc.find(name);
 
         if (it == ntc.end()) {
-            // Try dynamic plug-in: prefix "plugin:"
-            const std::string prefix = "plugin:";
-            std::string       requested_name = name;
-            if (requested_name.rfind(prefix, 0) == 0) {
-                std::string opname = requested_name.substr(prefix.size());
-                auto        uop    = PlugInOp::create(space, opname);
-                if (!uop) return nullptr;
-                return std::shared_ptr<Op>(uop.release());
-            }
-
             std::cerr << "Unable to find op " << name << "\n";
             return nullptr;
         }
