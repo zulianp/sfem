@@ -347,7 +347,7 @@ endif()
 # Executables
 
 if(NOT SFEM_ENABLE_MINIMAL)
-    list(APPEND SFEM_DRIVER_MODULES . mesh examples mesh_functions postprocess sdf bench ale simulations contact mech verification)
+    list(APPEND SFEM_DRIVER_MODULES . mesh examples mesh_functions postprocess sdf bench ale simulations mech verification)
 
     foreach(DRIVER_MODULE ${SFEM_DRIVER_MODULES})
         file(GLOB MODULE_C_DRIVERS CONFIGURE_DEPENDS "drivers/${DRIVER_MODULE}/*.c")
