@@ -4,6 +4,7 @@
 #include "sfem_ForwardDeclarations.hpp"
 #include "sfem_defs.hpp"
 #include "sfem_aliases.hpp"
+#include "sfem_execution_context.hpp"
 #include "smesh_semistructured.hpp"
 
 #include "smesh_packed_mesh.hpp"
@@ -43,9 +44,7 @@ namespace sfem {
         size_t n_blocks() const;
         bool is_multi_block() const;
 
-        Mesh                 &mesh();
-        const Mesh           &mesh() const;
-        std::shared_ptr<Mesh> mesh_ptr() const;
+        const std::shared_ptr<Mesh> &mesh() const;
 
         bool                has_semi_structured_mesh() const;
 
@@ -69,18 +68,23 @@ namespace sfem {
 
         int       block_size() const;
         ptrdiff_t n_dofs() const;
-        ptrdiff_t n_owned_dofs() const;
+        ptrdiff_t n_dofs_owned() const;
         ptrdiff_t n_dofs_global() const;
 
         /// The owned prefix of x (n_dofs() long) copied into its ghost and aura slots, from the
         /// ranks that own them: what every evaluation over all local elements reads. Nothing on a
-        /// space that is not distributed. x lives in `es` (on the device: GPU-aware MPI).
-        int synchronize(real_t *x, ExecutionSpace es = EXECUTION_SPACE_HOST);
+        /// space that is not distributed. x lives in the context's space (on the device: GPU-aware
+        /// MPI, or NCCL within a node), and on the device the copies are ordered on its stream.
+        int synchronize(real_t *x, const ExecutionContext &context = ExecutionContext::host());
         /// synchronize in two halves: begin sends x's owned values, end receives the ghost and
         /// aura ones into x. Between them x's owned values must stay as they are; computation that
         /// reads only those can run while the messages travel.
-        int synchronize_begin(real_t *x, ExecutionSpace es = EXECUTION_SPACE_HOST);
-        int synchronize_end(ExecutionSpace es = EXECUTION_SPACE_HOST);
+        int synchronize_begin(real_t *x, const ExecutionContext &context = ExecutionContext::host());
+        int synchronize_end(const ExecutionContext &context = ExecutionContext::host());
+        /// The reverse of synchronize: x's ghost and aura slots added to the owned entries they
+        /// copy, on the ranks that own them, for a sum over elements that only one rank holds.
+        /// Nothing on a space that is not distributed.
+        int add_to_owners(real_t *x, ExecutionSpace es = EXECUTION_SPACE_HOST);
 
         smesh::ElemType element_type(const int block = 0) const;
         std::vector<smesh::ElemType> element_types() const;

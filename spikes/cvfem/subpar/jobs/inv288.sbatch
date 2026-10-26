@@ -17,7 +17,7 @@
 # 1 to 288 ranks on a four-level, 1,098,500-dof problem -- lin_it 6 -- after four decomposition
 # defects were fixed. That was measured with coarse levels PACKED (job 4719099).
 #
-# derefine_op now clears pack_size, so no coarse level packs or renumbers. Job 4720014 re-ran
+# derefine now clears pack_size, so no coarse level packs or renumbers. Job 4720014 re-ran
 # the Vanka sweep and got 6 at 1, 8, 32 and 64 ranks -- but it stopped at 64. The top of the
 # range is precisely where the headline lives, and 288 ranks is where a rank owns so little of
 # the mesh that setup effects dominate, so it is the arm most likely to expose a coarse-level

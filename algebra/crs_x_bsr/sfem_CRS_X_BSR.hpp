@@ -18,6 +18,7 @@ namespace sfem {
                           R* const SFEM_RESTRICT       c_rowptr,
                           R* const SFEM_RESTRICT       mask_workspace,
                           const int                    n_workspaces) {
+        SFEM_UNUSED(n_workspaces);  // only the OpenMP region reads it
         crs_mm_sym(
                 block_rows, c_block_cols, crs_rowptr, crs_colidx, bsr_rowptr, bsr_colidx, c_rowptr, mask_workspace, n_workspaces);
     }
@@ -58,6 +59,7 @@ namespace sfem {
                             R* const SFEM_RESTRICT              next_workspace,
                             TStorage* const SFEM_RESTRICT       acc_workspace,
                             const int                           n_workspaces) {
+        SFEM_UNUSED(n_workspaces);  // only the OpenMP region reads it
         const R init   = std::numeric_limits<R>::max();
         const R unseen = smesh::invalid_idx<R>();
 
@@ -222,6 +224,7 @@ namespace sfem {
                           R* const SFEM_RESTRICT       c_rowptr,
                           R* const SFEM_RESTRICT       mask_workspace,
                           const int                    n_workspaces) {
+        SFEM_UNUSED(n_workspaces);  // only the OpenMP region reads it
         bsr_mm_sym(
                 block_rows, c_block_cols, bsr_rowptr, bsr_colidx, crs_rowptr, crs_colidx, c_rowptr, mask_workspace, n_workspaces);
     }
@@ -242,6 +245,7 @@ namespace sfem {
                             R* const SFEM_RESTRICT              next_workspace,
                             TStorage* const SFEM_RESTRICT       acc_workspace,
                             const int                           n_workspaces) {
+        SFEM_UNUSED(n_workspaces);  // only the OpenMP region reads it
         const R init   = std::numeric_limits<R>::max();
         const R unseen = smesh::invalid_idx<R>();
 
@@ -442,7 +446,7 @@ namespace sfem {
         ret->row_block_size_            = ret_row_bs;
         ret->col_block_size_            = ret_col_bs;
         ret->uniform_pre_output_scaling = 0;
-        ret->execution_space_           = EXECUTION_SPACE_HOST;
+        ret->context_                   = EXECUTION_SPACE_HOST;
 
         auto c_rowptr = ret->row_ptr;
         auto c_colidx = ret->col_idx;
@@ -508,7 +512,7 @@ namespace sfem {
         ret->row_block_size_            = ret_row_bs;
         ret->col_block_size_            = ret_col_bs;
         ret->uniform_pre_output_scaling = 0;
-        ret->execution_space_           = EXECUTION_SPACE_HOST;
+        ret->context_                   = EXECUTION_SPACE_HOST;
 
         auto c_rowptr = ret->row_ptr;
         auto c_colidx = ret->col_idx;

@@ -15,14 +15,14 @@ int test_derefine(const std::shared_ptr<sfem::Mesh> &m, const smesh::Path &outpu
     // Otherwise every level will construct its points
     // fs->mesh().points();
 
-    auto levels = smesh::derefinement_levels(fs->mesh());
+    auto levels = smesh::derefinement_levels(*fs->mesh());
     assert(levels[3] == L);
     assert(levels[2] == 4);
     assert(levels[1] == 2);
     assert(levels[0] == 1);
 
-    auto l2_mesh = smesh::derefine(fs->mesh_ptr(), levels[2]);
-    auto l1_mesh = smesh::derefine(fs->mesh_ptr(), levels[1]);
+    auto l2_mesh = smesh::derefine(fs->mesh(), levels[2]);
+    auto l1_mesh = smesh::derefine(fs->mesh(), levels[1]);
 
     // Recursive way
     auto l1_mesh_from_l2 = smesh::derefine(l2_mesh, levels[1]);
@@ -33,7 +33,7 @@ int test_derefine(const std::shared_ptr<sfem::Mesh> &m, const smesh::Path &outpu
     SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(l2_mesh, output_dir / "l2_mesh") == SFEM_SUCCESS);
     SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(l1_mesh, output_dir / "l1_mesh") == SFEM_SUCCESS);
     SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(l1_mesh_from_l2, output_dir / "l1_mesh_from_l2") == SFEM_SUCCESS);
-    SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(fs->mesh_ptr(), output_dir / "og_mesh") == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(fs->mesh(), output_dir / "og_mesh") == SFEM_SUCCESS);
 
     return SFEM_TEST_SUCCESS;
 }
@@ -67,7 +67,7 @@ int test_prolongation(const std::shared_ptr<sfem::Mesh> &m, const smesh::Path & 
 
     auto ssmesh = smesh::to_semistructured(L, m, true, false);
     auto fs     = sfem::FunctionSpace::create(ssmesh, 1);
-    auto levels = smesh::derefinement_levels(fs->mesh());
+    auto levels = smesh::derefinement_levels(*fs->mesh());
 
     auto coarse_fs = fs->derefine(levels[2]);  // Choose any level
 
@@ -128,7 +128,7 @@ int test_restriction(const std::shared_ptr<sfem::Mesh> &m, const smesh::Path &ou
     auto ssmesh = smesh::to_semistructured(L, m, true, false);
     auto fs     = sfem::FunctionSpace::create(ssmesh, 1);
 
-    auto levels = smesh::derefinement_levels(fs->mesh());
+    auto levels = smesh::derefinement_levels(*fs->mesh());
 
     auto coarse_fs    = fs->derefine(levels[1]);  // Choose any level
     auto restriction  = create_hierarchical_restriction(fs, coarse_fs, es);
@@ -151,8 +151,8 @@ int test_restriction(const std::shared_ptr<sfem::Mesh> &m, const smesh::Path &ou
 
     smesh::create_directory(output_dir);
     SFEM_TEST_ASSERT(m->write(output_dir / "input_mesh") == SFEM_SUCCESS);
-    SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(coarse_fs->mesh_ptr(), output_dir / "coarse") == SFEM_SUCCESS);
-    SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(fs->mesh_ptr(), output_dir / "fine") == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(coarse_fs->mesh(), output_dir / "coarse") == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(fs->mesh(), output_dir / "fine") == SFEM_SUCCESS);
 
     sfem::Output out(coarse_fs);
     out.set_output_dir(output_dir / "coarse/fields");

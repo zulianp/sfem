@@ -1,6 +1,5 @@
 #include "sfem_PatchIncidence.hpp"
 
-#include "sfem_API.hpp"
 #include "smesh_mesh.hpp"
 
 #include <limits>

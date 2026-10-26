@@ -1,5 +1,6 @@
 // The playground with a rigid obstacle: a free block dropped onto a hemisphere.
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <string>
@@ -42,23 +43,51 @@ output:
 
 // Every step converges on KKT. The block falls 0.05 in free flight, so it first touches at
 // t = sqrt(0.1 / 9.81) ~ 0.101; then the obstacle pushes it up, its reaction on the block along
-// +z.
+// +z. Under Newmark (stabilised) and under BDF2.
 int test_block_lands_on_the_hemisphere() {
-    const std::string csv = "test_block_lands_on_the_hemisphere.csv";
-    auto              pg  = assemble(DROP, {"output.history_csv=" + csv});
+    for (const std::string scheme : {"newmark", "bdf2"}) {
+        const std::string csv = "test_block_lands_on_the_hemisphere_" + scheme + ".csv";
+        auto              pg  = assemble(DROP, {"dynamics.scheme=" + scheme, "output.history_csv=" + csv});
+        SFEM_TEST_ASSERT(pg != nullptr);
+        SFEM_TEST_ASSERT(pg->run() == SFEM_SUCCESS);
+
+        auto   rows  = sfem::test::read_history(csv);
+        double first = -1, impulse = 0;
+        for (auto &row : rows) {
+            if (row["status"] < 0) continue;
+            if (row["touched"] > 0 && first < 0) first = row["t"];
+            impulse += row["reaction_z"] * row["dt"];
+        }
+        printf("  %s: first contact at t = %g, impulse along z %g\n", scheme.c_str(), first, impulse);
+        SFEM_TEST_ASSERT(first > 0.09 && first < 0.13);
+        SFEM_TEST_ASSERT(impulse > 0);
+        std::remove(csv.c_str());
+    }
+    return SFEM_TEST_SUCCESS;
+}
+
+// BDF2 retries a failed step at half its length, then grows the steps back at most twofold, the
+// ratio its variable-step formula is stable for: the block dropped at dt 0.08 (which BDF2 takes
+// whole) with Newton cut at two iterations, so that steps fail and are shortened.
+int test_bdf2_steps_grow_back_twofold() {
+    const std::string csv = "test_bdf2_steps_grow_back_twofold.csv";
+    auto              pg  = assemble(DROP,
+                                     {"dynamics.scheme=bdf2", "time.dt=0.08", "time.t_end=0.48", "solver.newton.max_it=2",
+                                      "output.history_csv=" + csv});
     SFEM_TEST_ASSERT(pg != nullptr);
     SFEM_TEST_ASSERT(pg->run() == SFEM_SUCCESS);
 
-    auto   rows  = sfem::test::read_history(csv);
-    double first = -1, impulse = 0;
-    for (auto &row : rows) {
-        if (row["status"] < 0) continue;
-        if (row["touched"] > 0 && first < 0) first = row["t"];
-        impulse += row["reaction_z"] * row["dt"];
+    double last = 0, shortest = 1;
+    int    steps = 0;
+    for (auto &row : sfem::test::read_history(csv)) {
+        if (row["status"] < 0 || row["step"] < 1) continue;
+        if (last > 0) SFEM_TEST_ASSERT(row["dt"] <= 2 * last * (1 + 1e-12));
+        shortest = std::min(shortest, row["dt"]);
+        last     = row["dt"];
+        steps++;
     }
-    printf("  first contact at t = %g, impulse along z %g\n", first, impulse);
-    SFEM_TEST_ASSERT(first > 0.09 && first < 0.13);
-    SFEM_TEST_ASSERT(impulse > 0);
+    printf("  %d steps, the shortest %g, the last %g\n", steps, shortest, last);
+    SFEM_TEST_ASSERT(shortest < 0.08 * 0.75);
     std::remove(csv.c_str());
     return SFEM_TEST_SUCCESS;
 }
@@ -199,6 +228,128 @@ int test_ssmgc_refusals() {
     return SFEM_TEST_SUCCESS;
 }
 
+// A traction of 1 on a disc of the block's top face, radius 0.3 about its centre: the plane
+// restricted by center and radius, so the obstacle carries pi 0.3^2 of load (to the staircase of
+// the faces' barycentres), not the whole face's 1. A center without a radius is refused.
+int test_disc_traction() {
+    const char *const yaml = R"(
+mesh:
+  box: {n: [20, 20, 4]}
+  sidesets:
+    - {name: top, plane: {axis: z, at: max}}
+    - {name: disc, plane: {axis: z, at: max, center: [0.5, 0.5, 1], radius: 0.3}}
+material: {type: GeneratedNeoHookeanOgden, mu: 1, lmbda: 2}
+dirichlet_conditions:
+  - {type: sideset, format: name, name: top, component: [0, 1], value: [0, 0]}
+loads:
+  neumann:
+    - {type: sideset, format: name, name: disc, component: 2, value: -1}
+obstacle: {backend: node_sdf, direction: z, shape: {type: plane, plane: 0}}
+regime: steady
+solver: {newton: {verbose: false}}
+output:
+  probes: [{type: contact}]
+)";
+    std::string no_radius = yaml;
+    no_radius.replace(no_radius.find(", radius: 0.3"), std::string(", radius: 0.3").size(), "");
+    SFEM_TEST_ASSERT(assemble(no_radius.c_str(), {}) == nullptr);
+    const std::string csv = "test_disc_traction.csv";
+    auto              pg  = assemble(yaml, {"output.history_csv=" + csv});
+    SFEM_TEST_ASSERT(pg != nullptr);
+    SFEM_TEST_ASSERT(pg->run() == SFEM_SUCCESS);
+    auto         rows = sfem::test::read_history(csv);
+    const double disc = M_PI * 0.09;
+    printf("  reaction_z %.6g, disc pi 0.3^2 = %.6g\n", rows[1]["reaction_z"], disc);
+    SFEM_TEST_ASSERT(std::abs(rows[1]["reaction_z"] - disc) < 0.05 * disc);
+    std::remove(csv.c_str());
+    return SFEM_TEST_SUCCESS;
+}
+
+// A block clamped at its top whose base starts 0.1 inside a plane, with no load: at the default
+// gap_tol Newton pushes it out onto the plane; with obstacle.gap_tol = 0.2, more than the
+// penetration, the start is admissible and stays as it is.
+int test_gap_tol() {
+    const char *const yaml = R"(
+mesh:
+  box: {n: [4, 4, 4]}
+  sidesets: [{name: top, plane: {axis: z, at: max}}]
+material: {type: GeneratedNeoHookeanOgden, mu: 1, lmbda: 2}
+dirichlet_conditions:
+  - {type: sideset, format: name, name: top, component: [0, 1, 2], value: [0, 0, 0]}
+obstacle: {backend: node_sdf, direction: z, shape: {type: plane, plane: 0.1}}
+regime: quasi_static
+time: {dt: 1, t_end: 1}
+solver: {newton: {verbose: false}}
+)";
+    real_t lowest[2] = {1, 1};
+    for (int loose = 0; loose < 2; ++loose) {
+        auto pg = assemble(yaml, loose ? std::vector<std::string>{"obstacle.gap_tol=0.2"} : std::vector<std::string>{});
+        SFEM_TEST_ASSERT(pg != nullptr);
+        SFEM_TEST_ASSERT(pg->run() == SFEM_SUCCESS);
+        auto       mesh = pg->function()->space()->mesh();
+        const auto z    = mesh->points()->data()[2];
+        const auto u    = pg->solution()->data();
+        for (ptrdiff_t i = 0; i < mesh->n_nodes(); ++i) lowest[loose] = std::min(lowest[loose], z[i] + u[i * 3 + 2]);
+    }
+    printf("  lowest point %.12g at the default gap_tol, %.12g at 0.2 (plane 0.1)\n", (double)lowest[0], (double)lowest[1]);
+    SFEM_TEST_ASSERT(std::abs(lowest[0] - real_t(0.1)) < 1e-8);
+    SFEM_TEST_ASSERT(lowest[1] == 0);
+    return SFEM_TEST_SUCCESS;
+}
+
+// A block pressed onto a plane by a traction of 0.5 on its unit top face, held there only
+// laterally: in a static step the obstacle's force is the whole reaction, and it balances the load,
+// steady and quasi-static alike.
+int test_static_reaction_balances_load() {
+    const char *const yaml = R"(
+mesh:
+  box: {n: [4, 4, 4]}
+  sidesets: [{name: top, plane: {axis: z, at: max}}]
+material: {type: GeneratedNeoHookeanOgden, mu: 1, lmbda: 2}
+dirichlet_conditions:
+  - {type: sideset, format: name, name: top, component: [0, 1], value: [0, 0]}
+loads:
+  neumann:
+    - {type: sideset, format: name, name: top, component: 2, value: -0.5}
+obstacle: {backend: node_sdf, direction: z, shape: {type: plane, plane: 0}}
+time: {dt: 1, t_end: 1}
+solver: {newton: {verbose: false}}
+output:
+  probes: [{type: contact}]
+)";
+    for (const std::string regime : {"steady", "quasi_static"}) {
+        const std::string csv = "test_static_reaction_" + regime + ".csv";
+        auto              pg  = assemble(yaml, {"regime=" + regime, "output.history_csv=" + csv});
+        SFEM_TEST_ASSERT(pg != nullptr);
+        SFEM_TEST_ASSERT(pg->run() == SFEM_SUCCESS);
+        auto rows = sfem::test::read_history(csv);
+        SFEM_TEST_ASSERT(rows.size() == 2);
+        printf("  %s: reaction_z %.12g (load 0.5)\n", regime.c_str(), rows[1]["reaction_z"]);
+        SFEM_TEST_ASSERT(std::abs(rows[1]["reaction_z"] - 0.5) < 1e-8);
+        std::remove(csv.c_str());
+    }
+    // Under inertia, loaded at once, the block rings and the scheme's dissipation settles it: then
+    // the obstacle's force is the load. BDF2's reaction is the force; damped Newmark's force is 2
+    // beta of its reaction (ContactStabilisedNewmarkScheme).
+    const std::vector<std::vector<std::string>> dynamic = {
+            {"dynamics={scheme: bdf2, density: 1}"},
+            {"dynamics={scheme: newmark, density: 1, gamma: 0.6, beta: 0.3025}"},
+    };
+    for (const auto &scheme : dynamic) {
+        const std::string csv       = "test_static_reaction_dynamic.csv";
+        auto              overrides = scheme;
+        overrides.insert(overrides.end(), {"regime=dynamic", "time={dt: 1, t_end: 120}", "output.history_csv=" + csv});
+        auto pg = assemble(yaml, overrides);
+        SFEM_TEST_ASSERT(pg != nullptr);
+        SFEM_TEST_ASSERT(pg->run() == SFEM_SUCCESS);
+        auto rows = sfem::test::read_history(csv);
+        printf("  %s: reaction_z %.12g after %zu steps (load 0.5)\n", scheme[0].c_str(), rows.back()["reaction_z"], rows.size() - 1);
+        SFEM_TEST_ASSERT(std::abs(rows.back()["reaction_z"] - 0.5) < 1e-6);
+        std::remove(csv.c_str());
+    }
+    return SFEM_TEST_SUCCESS;
+}
+
 // A block clamped at its top whose base starts 0.1 inside a plane: the release lets it out in four
 // quasi-static steps, each a converged equilibrium; at the end the base rests on the plane.
 int test_release_from_penetration() {
@@ -222,7 +373,7 @@ solver: {newton: {verbose: false}}
     SFEM_TEST_ASSERT(pg != nullptr);
     SFEM_TEST_ASSERT(pg->run() == SFEM_SUCCESS);
 
-    auto       mesh   = pg->function()->space()->mesh_ptr();
+    auto       mesh   = pg->function()->space()->mesh();
     const auto z      = mesh->points()->data()[2];
     const auto u      = pg->solution()->data();
     real_t     lowest = 1;
@@ -258,7 +409,7 @@ solver: {newton: {max_it: 4, fixed_iterations: true, verbose: false, line_search
     auto pg = assemble(yaml, {});
     SFEM_TEST_ASSERT(pg != nullptr);
     SFEM_TEST_ASSERT(pg->run() == SFEM_SUCCESS);
-    auto       mesh   = pg->function()->space()->mesh_ptr();
+    auto       mesh   = pg->function()->space()->mesh();
     const auto z      = mesh->points()->data()[2];
     const auto u      = pg->solution()->data();
     real_t     lowest = 1;
@@ -280,10 +431,14 @@ solver: {newton: {max_it: 4, fixed_iterations: true, verbose: false, line_search
     return SFEM_TEST_SUCCESS;
 }
 
-// Under inertia the obstacle stabilises Newmark: another scheme is refused. Without inertia
-// node_sdf solves steady and quasi-static contact; ssmgc does not.
+// Under inertia node_sdf takes Newmark, which it stabilises, or BDF2; backward Euler, which has no
+// inertia, is refused, and ssmgc takes Newmark alone. Without inertia node_sdf solves steady and
+// quasi-static contact; ssmgc does not.
 int test_obstacle_needs_newmark() {
-    SFEM_TEST_ASSERT(assemble(DROP, {"dynamics.scheme=bdf2"}) == nullptr);
+    SFEM_TEST_ASSERT(assemble(DROP, {"dynamics.scheme=bdf2"}) != nullptr);
+    SFEM_TEST_ASSERT(assemble(DROP, {"dynamics.scheme=backward_euler"}) == nullptr);
+    SFEM_TEST_ASSERT(assemble(DROP, {"dynamics.scheme=bdf2", "obstacle.backend=ssmgc", "mesh.refine=2",
+                                     "material={type: GeneratedLinearElasticity}"}) == nullptr);
     SFEM_TEST_ASSERT(assemble(DROP, {"regime=quasi_static"}) != nullptr);
     SFEM_TEST_ASSERT(assemble(DROP, {"regime=quasi_static", "obstacle.backend=ssmgc", "mesh.refine=2",
                                      "material={type: GeneratedLinearElasticity}"}) == nullptr);
@@ -293,8 +448,12 @@ int test_obstacle_needs_newmark() {
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_block_lands_on_the_hemisphere);
+    SFEM_RUN_TEST(test_bdf2_steps_grow_back_twofold);
     SFEM_RUN_TEST(test_single_precision_tangent);
     SFEM_RUN_TEST(test_obstacle_needs_newmark);
+    SFEM_RUN_TEST(test_static_reaction_balances_load);
+    SFEM_RUN_TEST(test_gap_tol);
+    SFEM_RUN_TEST(test_disc_traction);
     SFEM_RUN_TEST(test_release_from_penetration);
     SFEM_RUN_TEST(test_utopia_scheme);
     SFEM_RUN_TEST(test_ssmgc_free_flight_matches_node_sdf);

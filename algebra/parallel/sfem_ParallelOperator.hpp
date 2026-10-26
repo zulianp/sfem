@@ -28,20 +28,20 @@ namespace sfem {
     template <typename T>
     class LambdaParallelOperator final : public ParallelOperator<T> {
     public:
-        LambdaParallelOperator(const std::shared_ptr<Communicator>&           comm,
-                               const std::ptrdiff_t                           rows,
-                               const std::ptrdiff_t                           cols,
-                               const std::ptrdiff_t                           row_allocation_size,
-                               const std::ptrdiff_t                           col_allocation_size,
-                               std::function<void(const T* const, T* const)>  apply,
-                               const ExecutionSpace                           es)
+        LambdaParallelOperator(const std::shared_ptr<Communicator>&          comm,
+                               const std::ptrdiff_t                          rows,
+                               const std::ptrdiff_t                          cols,
+                               const std::ptrdiff_t                          row_allocation_size,
+                               const std::ptrdiff_t                          col_allocation_size,
+                               std::function<void(const T* const, T* const)> apply,
+                               const ExecutionContext&                       context)
             : comm_(comm),
               rows_(rows),
               cols_(cols),
               row_allocation_size_(row_allocation_size),
               col_allocation_size_(col_allocation_size),
               apply_(std::move(apply)),
-              execution_space_(es) {
+              context_(context) {
             assert(comm_);
             assert(rows_ >= 0);
             assert(cols_ >= 0);
@@ -56,7 +56,7 @@ namespace sfem {
 
         std::ptrdiff_t rows() const override { return rows_; }
         std::ptrdiff_t cols() const override { return cols_; }
-        ExecutionSpace execution_space() const override { return execution_space_; }
+        ExecutionContext execution_context() const override { return context_; }
 
         std::shared_ptr<Communicator> comm() const override { return comm_; }
         std::ptrdiff_t                row_allocation_size() const override { return row_allocation_size_; }
@@ -69,7 +69,7 @@ namespace sfem {
         std::ptrdiff_t                         row_allocation_size_{0};
         std::ptrdiff_t                         col_allocation_size_{0};
         std::function<void(const T* const, T* const)> apply_;
-        ExecutionSpace                         execution_space_{EXECUTION_SPACE_INVALID};
+        ExecutionContext                              context_{EXECUTION_SPACE_INVALID};
     };
 
     /// A host operator whose product runs inside a parallel region its caller opened: each thread
@@ -121,7 +121,7 @@ namespace sfem {
 
         std::ptrdiff_t rows() const override { return rows_; }
         std::ptrdiff_t cols() const override { return cols_; }
-        ExecutionSpace execution_space() const override { return EXECUTION_SPACE_HOST; }
+        ExecutionContext execution_context() const override { return EXECUTION_SPACE_HOST; }
 
         std::shared_ptr<Communicator> comm() const override { return comm_; }
         std::ptrdiff_t                row_allocation_size() const override { return row_allocation_size_; }
@@ -150,26 +150,24 @@ namespace sfem {
     }
 
     template <typename T>
-    inline std::shared_ptr<ParallelOperator<T>> make_parallel_op(
-            const std::shared_ptr<Communicator>&          comm,
-            const std::ptrdiff_t                          rows,
-            const std::ptrdiff_t                          cols,
-            std::function<void(const T* const, T* const)> op,
-            const ExecutionSpace                          es) {
-        return std::make_shared<LambdaParallelOperator<T>>(comm, rows, cols, rows, cols, std::move(op), es);
+    inline std::shared_ptr<ParallelOperator<T>> make_parallel_op(const std::shared_ptr<Communicator>&          comm,
+                                                                 const std::ptrdiff_t                          rows,
+                                                                 const std::ptrdiff_t                          cols,
+                                                                 std::function<void(const T* const, T* const)> op,
+                                                                 const ExecutionContext&                       context) {
+        return std::make_shared<LambdaParallelOperator<T>>(comm, rows, cols, rows, cols, std::move(op), context);
     }
 
     template <typename T>
-    inline std::shared_ptr<ParallelOperator<T>> make_parallel_op(
-            const std::shared_ptr<Communicator>&          comm,
-            const std::ptrdiff_t                          rows,
-            const std::ptrdiff_t                          cols,
-            const std::ptrdiff_t                          row_allocation_size,
-            const std::ptrdiff_t                          col_allocation_size,
-            std::function<void(const T* const, T* const)> op,
-            const ExecutionSpace                          es) {
+    inline std::shared_ptr<ParallelOperator<T>> make_parallel_op(const std::shared_ptr<Communicator>& comm,
+                                                                 const std::ptrdiff_t                 rows,
+                                                                 const std::ptrdiff_t                 cols,
+                                                                 const std::ptrdiff_t                 row_allocation_size,
+                                                                 const std::ptrdiff_t                 col_allocation_size,
+                                                                 std::function<void(const T* const, T* const)> op,
+                                                                 const ExecutionContext&                       context) {
         return std::make_shared<LambdaParallelOperator<T>>(
-                comm, rows, cols, row_allocation_size, col_allocation_size, std::move(op), es);
+                comm, rows, cols, row_allocation_size, col_allocation_size, std::move(op), context);
     }
 
 }  // namespace sfem

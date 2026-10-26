@@ -5,7 +5,7 @@
 #include "sfem_base.hpp"
 #include "sfem_defs.hpp"
 
-#include "sortreduce.hpp"
+#include "sfem_sortreduce.hpp"
 
 #ifdef __cplusplus
 extern "C" {

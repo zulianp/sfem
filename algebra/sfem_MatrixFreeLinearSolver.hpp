@@ -17,7 +17,7 @@
 #include <memory>
 
 #ifdef SFEM_ENABLE_CUDA
-#include "sfem_cuda_blas.hpp"
+#include "sfem_BLAS_cuda.hpp"
 #endif
 
 namespace sfem {
@@ -143,7 +143,7 @@ namespace sfem {
                 const T* const     dd  = this->sbv->data()->data();
                 const T* const     s   = this->scaling->data();
 
-                return sbv_mult3<T>(n_blocks, idx, dd, s, x, y);
+                return sbv_mult3<T>(n_blocks, idx, dd, s, x, y, this->execution_context().stream());
             };
         }
 #endif
@@ -167,7 +167,7 @@ namespace sfem {
 
         std::ptrdiff_t rows() const override { return n_dofs; }
         std::ptrdiff_t cols() const override { return n_dofs; }
-        ExecutionSpace execution_space() const override { return (enum ExecutionSpace)sbv->data()->mem_space(); }
+        ExecutionContext execution_context() const override { return (enum ExecutionSpace)sbv->data()->mem_space(); }
     };
 
     template <typename T>

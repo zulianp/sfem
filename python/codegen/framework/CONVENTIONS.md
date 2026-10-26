@@ -242,7 +242,7 @@ Renaming these breaks something outside the generator. They are not style choice
 
 | Frozen | Because |
 |---|---|
-| public `extern "C"` entry points | called from hand-written `frontend/ops/sfem_LinearElasticity.cpp` and `frontend/tests/sfem_MatrixFromatsTest.cpp`; `package/op_wrappers.py` reconstructs them by name and **silently emits a different code path** when one is missing |
+| public `extern "C"` entry points | called from hand-written `frontend/ops/sfem_LinearElasticity.cpp` and `frontend/tests/sfem_MatrixFormatsTest.cpp`; `package/op_wrappers.py` reconstructs them by name and **silently emits a different code path** when one is missing |
 | **C ABI parameter names** | `tools/reproducibility.py` seeds its test input from an FNV hash *of the parameter name string*. Renaming `kappa` changes the input data and therefore every recorded digest — indistinguishable from an arithmetic regression |
 | `sfem::codegen::` helpers in the shared headers | `operators/hex8/hex8_linear_elasticity.cpp` and `drivers/bench/neohookean_assemble.exe.cpp` call them |
 | `<material>_hessian_{2,3}d_esoa` | `drivers/bench/neohookean_assemble.exe.cpp` |

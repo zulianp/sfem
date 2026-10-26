@@ -2,6 +2,7 @@
 #define SFEM_SDFOBSTACLE_HPP
 
 #include "sfem_defs.hpp"
+#include "sfem_execution_context.hpp"
 
 #include "sfem_aliases.hpp"
 #include "smesh_grid.hpp"
@@ -138,16 +139,16 @@ namespace sfem {
         // `nnodes` points with z-coordinates `z` are where this rank will sample: a grid split
         // into z-slabs across the ranks (Grid::create_from_file under MPI) is gathered to the
         // slab they need. A grid every rank holds whole needs no points.
-        static std::shared_ptr<SDFObstacle> create_from_file(const std::shared_ptr<Communicator>& comm,
-                                                             const std::string        &path,
-                                                             const ptrdiff_t           nnodes,
-                                                             const geom_t *const       z,
-                                                             const enum ExecutionSpace es);
+        static std::shared_ptr<SDFObstacle> create_from_file(const std::shared_ptr<Communicator> &comm,
+                                                             const std::string                   &path,
+                                                             const ptrdiff_t                      nnodes,
+                                                             const geom_t *const                  z,
+                                                             const ExecutionContext              &context);
         static std::shared_ptr<SDFObstacle> create(const std::shared_ptr<smesh::Grid<geom_t>> &sdf,
                                                    const std::shared_ptr<Communicator>        &comm,
                                                    const ptrdiff_t                             nnodes,
                                                    const geom_t *const                         z,
-                                                   const enum ExecutionSpace                   es);
+                                                   const ExecutionContext                     &context);
 
     public:
         class Impl;

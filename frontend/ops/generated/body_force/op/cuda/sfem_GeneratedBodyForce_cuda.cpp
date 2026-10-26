@@ -58,17 +58,19 @@ namespace sfem {
       return matched;
     }
 
-    void material_defaults(real_t *const values) {
+    [[maybe_unused]] void material_defaults(real_t *const values) {
       values[0] = 1;
       values[1] = 0;
       values[2] = 0;
       values[3] = 0;
     }
 
+    // derefine copies the parameters by name, with or without YAML.
+    [[maybe_unused]] constexpr int N_DEFINED_MATERIAL_PARAMETERS = 4;
+    [[maybe_unused]] constexpr int N_MATERIAL_PARAMETERS = 4;
+    [[maybe_unused]] static const char *const MATERIAL_PARAMETER_NAMES[N_MATERIAL_PARAMETERS] = {"density", "g0", "g1", "g2"};
+
 #ifdef SFEM_ENABLE_RYAML
-    constexpr int N_DEFINED_MATERIAL_PARAMETERS = 4;
-    constexpr int N_MATERIAL_PARAMETERS = 4;
-    static const char *const MATERIAL_PARAMETER_NAMES[N_MATERIAL_PARAMETERS] = {"density", "g0", "g1", "g2"};
 
     bool yaml_read_real(const ryml::ConstNodeRef &node,
               const char *const key,
@@ -216,7 +218,7 @@ namespace sfem {
                                   const bool requested_jacobian,
                                   const bool requested_metric_soa,
                                   const bool requested_metric_aos) {
-      auto mesh = space->mesh_ptr();
+      auto mesh = space->mesh();
       for (auto &entry : domains.domains()) {
         const bool forced = geometry_is_forced_affine(entry.second.element_type);
         const bool needs_jacobian = requested_jacobian || forced;
@@ -337,7 +339,7 @@ namespace sfem {
 
   std::unique_ptr<Op> GPUGeneratedBodyForce::create(const std::shared_ptr<FunctionSpace> &space) {
     const ptrdiff_t expected_block_size =
-        block_size_for_dim(space->mesh_ptr()->spatial_dimension());
+        block_size_for_dim(space->mesh()->spatial_dimension());
     if (space->block_size() != expected_block_size) {
       SFEM_ERROR("GPUGeneratedBodyForce requires block_size=%ld\n",
                        static_cast<long>(expected_block_size));
@@ -369,7 +371,7 @@ namespace sfem {
       return total;
     }
 
-    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+    const int dim = impl_->space->mesh()->spatial_dimension();
     impl_->domains->iterate([&](const OpDomain &domain) {
       const ptrdiff_t nelements = domain.block->n_elements();
       if (dim == 2) {
@@ -400,7 +402,7 @@ namespace sfem {
       return total;
     }
 
-    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+    const int dim = impl_->space->mesh()->spatial_dimension();
     impl_->domains->iterate([&](const OpDomain &domain) {
       const ptrdiff_t nelements = domain.block->n_elements();
       if (dim == 2) {
@@ -431,7 +433,7 @@ namespace sfem {
       return total;
     }
 
-    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+    const int dim = impl_->space->mesh()->spatial_dimension();
     impl_->domains->iterate([&](const OpDomain &domain) {
       const ptrdiff_t nelements = domain.block->n_elements();
       if (dim == 2) {
@@ -462,7 +464,7 @@ namespace sfem {
       return total;
     }
 
-    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+    const int dim = impl_->space->mesh()->spatial_dimension();
     impl_->domains->iterate([&](const OpDomain &domain) {
       const ptrdiff_t nelements = domain.block->n_elements();
       if (dim == 2) {
@@ -538,7 +540,7 @@ namespace sfem {
     SFEM_TRACE_SCOPE("GPUGeneratedBodyForce::gradient");
 
     impl_->current = state;
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const geom_t *determinant = nullptr;
@@ -590,7 +592,7 @@ namespace sfem {
                       real_t *const /*out*/) {
     SFEM_TRACE_SCOPE("GPUGeneratedBodyForce::apply");
 
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
 
     return impl_->domains->iterate([&](const OpDomain &domain) {
       if (impl_->jacobian_action_uses_affine) {
@@ -653,8 +655,8 @@ namespace sfem {
     impl_->domains->set_value_in_block(block_name, var_name, value);
   }
 
-  std::shared_ptr<Op> GPUGeneratedBodyForce::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
-    SFEM_TRACE_SCOPE("GPUGeneratedBodyForce::derefine_op");
+  std::shared_ptr<Op> GPUGeneratedBodyForce::derefine(const std::shared_ptr<FunctionSpace> &space) {
+    SFEM_TRACE_SCOPE("GPUGeneratedBodyForce::derefine");
     auto ret = std::make_shared<GPUGeneratedBodyForce>(space);
     if (ret->initialize() != SFEM_SUCCESS) return nullptr;
     for (const auto &entry : impl_->domains->domains()) {

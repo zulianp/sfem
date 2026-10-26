@@ -1,4 +1,5 @@
 #include <memory>
+#include "smesh_base.hpp"
 #include "sfem_Function.hpp"
 
 #include "matrixio_array.h"
@@ -14,8 +15,8 @@
 
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_Function_incore_cuda.hpp"
-#include "sfem_cuda_blas.hpp"
-#include "sfem_cuda_solver.hpp"
+#include "sfem_BLAS_cuda.hpp"
+#include "sfem_solver_cuda.hpp"
 #endif
 
 #include <vector>
@@ -39,14 +40,14 @@ typedef struct OpDesc {
 
         sfem::device_synchronize();
 
-        double start = MPI_Wtime();
+        double start = smesh::time_seconds();
 
         for (int r = 0; r < repeat; r++) {
             op->apply(x, y);
         }
 
         sfem::device_synchronize();
-        double stop = MPI_Wtime();
+        double stop = smesh::time_seconds();
         rows        = op->rows();
         cols        = op->cols();
         elapsed     = (stop - start) / repeat;
@@ -262,9 +263,9 @@ int main(int argc, char *argv[]) {
         add_matrix_free_vector_ops(dim, m->element_type(0), SFEM_ELEMENT_REFINE_LEVEL > 1, es, ops);
 
         if (nnodes <= smesh::Env::read("SFEM_MAX_NODES_MATRIX", 27270901)) {
-            double start = MPI_Wtime();
+            double start = smesh::time_seconds();
             m->node_to_node_graph();
-            double stop = MPI_Wtime();
+            double stop = smesh::time_seconds();
             printf("CRS Graph creation %g [s]\n", (stop - start));
             add_matrix_based_scalar_ops(m->element_type(0), SFEM_ELEMENT_REFINE_LEVEL > 1, es, ops);
         } else {
@@ -323,7 +324,7 @@ int main(int argc, char *argv[]) {
             auto input  = sfem::create_buffer<real_t>(op->n_dofs_domain(), es);
             auto output = sfem::create_buffer<real_t>(op->n_dofs_image(), es);
 
-            double start = MPI_Wtime();
+            double start = smesh::time_seconds();
             f->update(x->data());
             //: The partially assembled tangent belongs to the linearization, so
             //: `create_linear_operator` does not build it -- a Newton step calls
@@ -335,7 +336,7 @@ int main(int argc, char *argv[]) {
                 f->inexact_update(x->data());
             }
             auto   linear_op = sfem::create_linear_operator(op_desc.type, f, x, es);
-            double stop      = MPI_Wtime();
+            double stop      = smesh::time_seconds();
             op_desc.setup    = stop - start;
 
             op_desc.measure(linear_op, input->data(), output->data(), SFEM_REPEAT);

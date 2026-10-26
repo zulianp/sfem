@@ -1,6 +1,8 @@
 #include <memory>
 
 #include "sfem_test.hpp"
+#include "smesh_semistructured.hpp"
+#include "smesh_sshex8_graph.hpp"
 
 #include "sfem_base.hpp"
 #include "smesh_grid.hpp"
@@ -17,9 +19,9 @@
 #include "sfem_ShiftedPenaltyMultigrid.hpp"
 #include "sfem_aliases.hpp"
 #include "sfem_CRS.hpp"
-#include "sfem_cuda_ShiftedPenalty_impl.hpp"
-#include "sfem_cuda_blas.hpp"
-#include "sfem_cuda_solver.hpp"
+#include "sfem_ShiftedPenaltyKernels_cuda.hpp"
+#include "sfem_BLAS_cuda.hpp"
+#include "sfem_solver_cuda.hpp"
 
 
 using namespace sfem;
@@ -27,14 +29,14 @@ using namespace sfem;
 std::shared_ptr<sfem::ContactConditions> build_cuboid_sphere_contact(const std::shared_ptr<sfem::Function> &f,
                                                                      const int                              base_resolution) {
     auto fs   = f->space();
-    auto m    = fs->mesh_ptr();
+    auto m    = fs->mesh();
     auto comm = m->comm();
     auto es   = f->execution_space();
 
     auto top_ss = sfem::Sideset::create_from_selector(
-            m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool { return y > (1 - 1e-5) && y < (1 + 1e-5); });
+            m, [=](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool { return y > (1 - 1e-5) && y < (1 + 1e-5); });
 
-    const int n = base_resolution * (fs->has_semi_structured_mesh() ? smesh::semistructured_level(fs->mesh()) : 1);
+    const int n = base_resolution * (fs->has_semi_structured_mesh() ? smesh::semistructured_level(*fs->mesh()) : 1);
 
     sfem::DirichletConditions::Condition xtop{.sidesets = {top_ss}, .value = 0, .component = 0};
     sfem::DirichletConditions::Condition ytop{.sidesets = {top_ss}, .value = -0.05, .component = 1};
@@ -44,7 +46,7 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_sphere_contact(const std::
     f->add_constraint(conds);
 
     auto bottom_ss = sfem::Sideset::create_from_selector(
-            m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool { return y > -1e-5 && y < 1e-5; });
+            m, [=](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool { return y > -1e-5 && y < 1e-5; });
 
     auto sdf = smesh::create_sdf(comm,
                                  n * 2,
@@ -228,11 +230,11 @@ struct TestOutput gen_test_data(enum ExecutionSpace es) {
     auto cc_op_t_r = sfem::create_buffer<real_t>(fs->n_dofs(), es);
     cc_op_t->apply(cc_op_x->data(), cc_op_t_r->data());
 
-    ShiftedPenalty_Tpl<real_t> impl;
+    ShiftedPenaltyKernels<real_t> impl;
     if (EXECUTION_SPACE_DEVICE == es) {
-        CUDA_ShiftedPenalty<real_t>::build(impl);
+        GPUShiftedPenaltyKernels<real_t>::build(impl);
     } else {
-        OpenMP_ShiftedPenalty<real_t>::build(impl);
+        OpenMPShiftedPenaltyKernels<real_t>::build(impl);
     }
 
     auto lagrange_ub = sfem::create_buffer<real_t>(contact_conds->n_constrained_dofs(), es);
@@ -285,18 +287,19 @@ struct TestOutput gen_test_data(enum ExecutionSpace es) {
 
         auto coarse_fs = fs->derefine(coarse_level);
 
-        auto &ssmesh     = fs->mesh();
+        auto &ssmesh     = *fs->mesh();
         auto  fine_sides = contact_conds->ss_sides();
 
         int  level        = smesh::semistructured_level(ssmesh);
-        auto coarse_sides = sfem::ssquad4_derefine_element_connectivity(level, coarse_level, smesh::to_host(fine_sides));
+        auto coarse_sides = smesh::derefine_elements(smesh::QUAD4, level, coarse_level, smesh::to_host(fine_sides));
 
         auto fine_mapping = contact_conds->node_mapping();
         auto count        = sfem::create_host_buffer<uint16_t>(fine_mapping->size());
         smesh::ssquad4_element_node_incidence_count(
                 level, 1, fine_sides->extent(1), smesh::to_host(fine_sides)->data(), count->data());
 
-        const ptrdiff_t n_coarse_contact_nodes = sfem::ss_elements_max_node_id(coarse_sides) + 1;
+        const ptrdiff_t n_coarse_contact_nodes =
+                smesh::nxe_max_node_id(coarse_sides->extent(1), coarse_sides->extent(0), coarse_sides->data()) + 1;
 
         auto input = sfem::create_host_buffer<real_t>(contact_conds->n_constrained_dofs());
         {
@@ -329,7 +332,7 @@ struct TestOutput gen_test_data(enum ExecutionSpace es) {
                                        smesh::SMESH_DEFAULT,
                                        1,
                                        restricted->data(),
-                                       SFEM_DEFAULT_STREAM);
+                                       nullptr);
         } else {
             smesh::ssquad4_restrict(fine_sides->extent(1),
                                     level,

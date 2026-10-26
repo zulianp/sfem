@@ -9,7 +9,7 @@
 #include "sfem_API.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_Function_incore_cuda.hpp"
-#include "sfem_cuda_blas.hpp"
+#include "sfem_BLAS_cuda.hpp"
 
 #include "smesh_env.hpp"
 
@@ -27,7 +27,7 @@ namespace {
     std::shared_ptr<Buffer<real_t>> make_deterministic_device_vector(const std::shared_ptr<FunctionSpace> &fs) {
         auto h = create_host_buffer<real_t>(fs->n_dofs());
         {
-            geom_t **const  pts = fs->mesh().points()->data();
+            geom_t **const  pts = fs->mesh()->points()->data();
             const ptrdiff_t nn  = fs->n_dofs() / fs->block_size();
             for (ptrdiff_t i = 0; i < nn; ++i) {
                 const real_t x       = (real_t)pts[0][i];
@@ -113,7 +113,7 @@ namespace {
 
     // Match CudaContactTest / MGSDFContactTest Dirichlet setup (top-face displacement).
     int make_top_bcs(const std::shared_ptr<FunctionSpace> &fs, std::vector<DirichletConditions::Condition> &bcs) {
-        auto m      = fs->mesh_ptr();
+        auto m      = fs->mesh();
         auto top_ss = Sideset::create_from_selector(m, [](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool {
             return y > (1 - 1e-5) && y < (1 + 1e-5);
         });

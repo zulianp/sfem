@@ -3,7 +3,7 @@
 
 namespace sfem {
   void register_GeneratedNavierStokes_cuda_generated_op() {
-    Factory::register_op("gpu:GeneratedNavierStokes", GPUGeneratedNavierStokes::create);
-    Factory::register_op("gpu:ss:GeneratedNavierStokes", GPUGeneratedNavierStokes::create);
+    OpFactory::register_op("gpu:GeneratedNavierStokes", GPUGeneratedNavierStokes::create);
+    OpFactory::register_op("gpu:ss:GeneratedNavierStokes", GPUGeneratedNavierStokes::create);
   }
 }  // namespace sfem

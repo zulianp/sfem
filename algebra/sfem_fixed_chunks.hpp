@@ -3,7 +3,7 @@
 
 #include <cstddef>
 
-// The chunks of the deterministic reductions (OpenMP_BLAS's dot, the MPRGP passes): partial sums
+// The chunks of the deterministic reductions (OpenMPBLAS's dot, the MPRGP passes): partial sums
 // over chunks fixed by the length, combined in index order.
 
 namespace sfem {

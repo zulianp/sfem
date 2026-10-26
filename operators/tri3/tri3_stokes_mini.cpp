@@ -1,8 +1,9 @@
 #include "tri3_stokes_mini.hpp"
+#include "smesh_base.hpp"
 
 #include "sfem_defs.hpp"
 #include "sfem_vec.hpp"
-#include "sortreduce.hpp"
+#include "sfem_sortreduce.hpp"
 
 #include <mpi.h>
 
@@ -59,7 +60,7 @@ static SFEM_INLINE idx_t find_col(const idx_t key, const idx_t *const row, const
         // assert(key == row[k]);
     } else {
         // Use this for larger number of dofs per row
-        return find_idx_binary_search(key, row, lenrow);
+        return sfem::find_idx_binary_search(key, row, lenrow);
     }
 }
 
@@ -392,7 +393,7 @@ void tri3_stokes_mini_assemble_hessian_soa(const ptrdiff_t nelements,
                                            real_t **const values) {
     SFEM_UNUSED(nnodes);
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     static const int n_vars = 3;
     static const int nxe = 3;
@@ -469,7 +470,7 @@ void tri3_stokes_mini_assemble_hessian_soa(const ptrdiff_t nelements,
         }
     }
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
     printf("tri3_stokes.c: tri3_stokes_assemble_hessian\t%g seconds\n", tock - tick);
 }
 
@@ -483,7 +484,7 @@ void tri3_stokes_mini_assemble_hessian_aos(const ptrdiff_t nelements,
                                            real_t *const values) {
     SFEM_UNUSED(nnodes);
 
-    const double tick = MPI_Wtime();
+    const double tick = smesh::time_seconds();
 
     static const int block_size = 3;
     static const int mat_block_size = 3 * 3;
@@ -555,7 +556,7 @@ void tri3_stokes_mini_assemble_hessian_aos(const ptrdiff_t nelements,
             }
         }
     }
-    const double tock = MPI_Wtime();
+    const double tock = smesh::time_seconds();
     printf("stokes.c: stokes_assemble_hessian_aos\t%g seconds\n", tock - tick);
 }
 
@@ -568,7 +569,7 @@ void tri3_stokes_mini_assemble_rhs_soa(const ptrdiff_t nelements,
                                        real_t **SFEM_RESTRICT forcing,
                                        real_t **const SFEM_RESTRICT rhs) {
     SFEM_UNUSED(nnodes);
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     static const int n_vars = 3;
 
@@ -640,7 +641,7 @@ void tri3_stokes_mini_assemble_rhs_soa(const ptrdiff_t nelements,
         }
     }
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
     printf("tri3_stokes.c: tri3_stokes_mini_assemble_rhs\t%g seconds\n", tock - tick);
 }
 
@@ -653,7 +654,7 @@ void tri3_stokes_mini_assemble_rhs_aos(const ptrdiff_t nelements,
                                        real_t **SFEM_RESTRICT forcing,
                                        real_t *const SFEM_RESTRICT rhs) {
     SFEM_UNUSED(nnodes);
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     static const int n_vars = 3;
 
@@ -720,7 +721,7 @@ void tri3_stokes_mini_assemble_rhs_aos(const ptrdiff_t nelements,
         }
     }
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
     printf("tri3_stokes.c: tri3_stokes_mini_assemble_rhs\t%g seconds\n", tock - tick);
 }
 
@@ -733,7 +734,7 @@ void tri3_stokes_mini_apply_aos(const ptrdiff_t nelements,
                                 const real_t *const SFEM_RESTRICT x,
                                 real_t *const SFEM_RESTRICT rhs) {
     SFEM_UNUSED(nnodes);
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     static const int n_vars = 3;
 
@@ -789,7 +790,7 @@ void tri3_stokes_mini_apply_aos(const ptrdiff_t nelements,
         }
     }
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
     printf("tri3_stokes.c: tri3_stokes_mini_apply\t%g seconds\n", tock - tick);
 }
 

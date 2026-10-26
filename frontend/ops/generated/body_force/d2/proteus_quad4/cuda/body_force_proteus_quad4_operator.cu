@@ -148,31 +148,6 @@ extern "C" const sfem::codegen::KernelDiagnostics *cu_body_force_proteus_quad4_j
   return &sfem::codegen::body_force_proteus_quad4_jacobian_action_esoa_diagnostics_data;
 }
 
-extern "C" int cu_body_force_proteus_quad4_residual_esoa(
-    const int scalar_bytes,
-    const ptrdiff_t geometry_stride,
-    const void *const RSTR determinant,
-    const real_t density,
-    const real_t g0,
-    const real_t g1,
-    void *const RSTR output[8],
-    void *const stream
-) {
-  switch (scalar_bytes) {
-    case (int)sizeof(double): {
-        sfem::codegen::body_force_d2_tensor_product_residual_block<double, 4, 4>(geometry_stride, (const double *)determinant, sfem::codegen::ref_line_p1_q2<double>::shape_1d(), sfem::codegen::quad_line_q2<double>::q_weight_1d(), density, g0, g1, (double *const *)output);
-        return SFEM_SUCCESS;
-    }
-    case (int)sizeof(float): {
-        sfem::codegen::body_force_d2_tensor_product_residual_block<float, 4, 4>(geometry_stride, (const float *)determinant, sfem::codegen::ref_line_p1_q2<float>::shape_1d(), sfem::codegen::quad_line_q2<float>::q_weight_1d(), density, g0, g1, (float *const *)output);
-        return SFEM_SUCCESS;
-    }
-    default:
-      break;
-  }
-  return sfem::codegen::unsupported_dispatch("body_force_proteus_quad4_residual_esoa", -1, (int)scalar_bytes);
-}
-
 namespace sfem {
 namespace codegen {
 

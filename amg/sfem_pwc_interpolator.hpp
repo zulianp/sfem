@@ -7,7 +7,7 @@
 #include "sfem_aliases.hpp"
 #include "sfem_CooSym.hpp"
 #include "sfem_MatrixFreeLinearSolver.hpp"
-#include "sfem_openmp_blas.hpp"
+#include "sfem_BLAS_openmp.hpp"
 
 // This class might be better off as just a sparse matrix, but the coarsen method is an optimized
 // version of the matrix triple product ptap and transposing is basically a NOP
@@ -15,15 +15,13 @@ namespace sfem {
     template <typename R, typename T>
     class PiecewiseConstantInterpolator final : public Operator<T> {
     public:
-        ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
         ptrdiff_t fine_dim{SFEM_PTRDIFF_INVALID};
         ptrdiff_t coarse_dim{SFEM_PTRDIFF_INVALID};
         bool transposed{false};
         std::shared_ptr<BLAS<T>> blas;
 
         void default_init() {
-            blas = make_openmp_blas<T>();
-            execution_space_ = EXECUTION_SPACE_HOST;
+            blas = OpenMPBLAS<T>::create();
         }
 
         void transpose() { transposed = !transposed; }
@@ -69,7 +67,7 @@ namespace sfem {
         }
         inline std::ptrdiff_t rows() const override { return transposed ? fine_dim : coarse_dim; }
         inline std::ptrdiff_t cols() const override { return transposed ? coarse_dim : fine_dim; }
-        ExecutionSpace execution_space() const override { return execution_space_; }
+        ExecutionContext execution_context() const override { return blas ? blas->context() : ExecutionContext(EXECUTION_SPACE_INVALID); }
 
     private:
         // Length of `fine_dim` and values indicate coarse grid indices

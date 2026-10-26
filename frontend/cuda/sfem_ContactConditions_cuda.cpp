@@ -2,7 +2,7 @@
 #include "sfem_Function.hpp"
 
 #include "boundary_condition.hpp"
-#include "cu_boundary_condition.hpp"
+#include "boundary_condition_cuda.hpp"
 
 namespace sfem {
 
@@ -12,6 +12,8 @@ namespace sfem {
         int n_conditions{0};
         boundary_condition_t *conditions{nullptr};
         std::shared_ptr<AxisAlignedContactConditions> h_contact_conditions;
+        //! The stream every kernel call is issued on (null: the default device stream).
+        void *stream{nullptr};
 
         GPUAxisAlignedContactConditions(const std::shared_ptr<AxisAlignedContactConditions> &dc)
             : space(dc->space()), h_contact_conditions(dc) {
@@ -22,7 +24,7 @@ namespace sfem {
                     (boundary_condition_t *)malloc(n_conditions * sizeof(boundary_condition_t));
 
             for (int d = 0; d < n_conditions; d++) {
-                boundary_conditions_host_to_device(&h_buffer[d], &conditions[d]);
+                conditions[d] = sfem::to_device(h_buffer[d]);
             }
         }
 
@@ -34,7 +36,8 @@ namespace sfem {
                                                      space->block_size(),
                                                      conditions[i].component,
                                                      conditions[i].values,
-                                                     x);
+                                                     x,
+                                                     stream);
 
                 } else {
                     d_constraint_nodes_to_value_vec(conditions[i].local_size,
@@ -42,7 +45,8 @@ namespace sfem {
                                                     space->block_size(),
                                                     conditions[i].component,
                                                     conditions[i].value,
-                                                    x);
+                                                    x,
+                                                    stream);
                 }
             }
 
@@ -57,7 +61,8 @@ namespace sfem {
                                                          conditions[i].component,
                                                          conditions[i].value,
                                                          x,
-                                                         g);
+                                                         g,
+                                                         stream);
             }
 
             return SFEM_SUCCESS;
@@ -73,7 +78,8 @@ namespace sfem {
                                                 space->block_size(),
                                                 conditions[i].component,
                                                 value,
-                                                x);
+                                                x,
+                                                stream);
             }
 
             return SFEM_SUCCESS;
@@ -86,13 +92,14 @@ namespace sfem {
                                             space->block_size(),
                                             conditions[i].component,
                                             src,
-                                            dest);
+                                            dest,
+                                            stream);
             }
 
             return SFEM_SUCCESS;
         }
 
-        int hessian_crs(const real_t *const x,
+        int hessian_crs(const real_t *const /*x*/,
                         const count_t *const rowptr,
                         const idx_t *const colidx,
                         real_t *const values) override {
@@ -104,7 +111,8 @@ namespace sfem {
                                                         1,
                                                         rowptr,
                                                         colidx,
-                                                        values);
+                                                        values,
+                                                        stream);
             }
 
             return SFEM_SUCCESS;
@@ -122,7 +130,7 @@ namespace sfem {
             return std::make_shared<GPUAxisAlignedContactConditions>(h_derefined);
         }
 
-        int mask(mask_t *mask) override
+        int mask(mask_t * /*mask*/) override
         {
             assert(false);
             return SFEM_FAILURE;

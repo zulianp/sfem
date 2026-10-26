@@ -158,7 +158,7 @@ int solve_checkerboard_ssgmg(const std::shared_ptr<sfem::Communicator> &comm) {
     auto ax = sfem::create_buffer<real_t>(fs->n_dofs(), f->execution_space());
     A->apply(x->data(), ax->data());
 
-    const ptrdiff_t n_owned  = fs->n_owned_dofs();
+    const ptrdiff_t n_owned  = fs->n_dofs_owned();
     real_t          local_r2 = 0;
     real_t          local_b2 = 0;
     auto            rh  = smesh::to_host(rhs);

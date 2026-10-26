@@ -20,7 +20,7 @@ namespace sfem {
     CVFEMMass::CVFEMMass(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
 
     int CVFEMMass::hessian_diag(const real_t *const /*x*/, real_t *const values) {
-        auto mesh = space->mesh_ptr();
+        auto mesh = space->mesh();
         cvfem_cv_volumes(
                 element_type, mesh->n_elements(), mesh->n_nodes(), mesh->elements(0)->data(), mesh->points()->data(), values);
 

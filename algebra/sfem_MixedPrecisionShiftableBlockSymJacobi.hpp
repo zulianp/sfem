@@ -6,7 +6,7 @@
 #include "sfem_MatrixFreeLinearSolver.hpp"
 #include "sfem_ShiftableJacobi.hpp"
 #include "sfem_aliases.hpp"
-#include "sfem_openmp_blas.hpp"
+#include "sfem_BLAS_openmp.hpp"
 #include "smesh_env.hpp"
 
 namespace sfem {
@@ -14,9 +14,14 @@ namespace sfem {
     template <typename HP, typename LP>
     class MixedPrecisionShiftableBlockSymJacobi final : public ShiftableOperator<HP> {
     public:
-        ExecutionSpace                      execution_space_{EXECUTION_SPACE_INVALID};
+        /// In the execution context, on the dim x dim symmetric diagonal blocks diag, stored in LP.
+        static std::shared_ptr<MixedPrecisionShiftableBlockSymJacobi<HP, LP>> create(const int                   dim,
+                                                                                     const SharedBuffer<HP>     &diag,
+                                                                                     const SharedBuffer<mask_t> &constraints_mask,
+                                                                                     const ExecutionContext     &context);
+
         std::shared_ptr<BLAS<LP>>           blas;
-        ShiftableBlockSymJacobi_Tpl<HP, LP> impl;
+        ShiftableBlockSymJacobiKernels<HP, LP> impl;
 
         SharedBuffer<HP>     diag;
         SharedBuffer<LP>     inv_diag;
@@ -29,9 +34,8 @@ namespace sfem {
         // bool                 sparse_update_policy_logged_{false};
 
         void default_init() {
-            blas = make_openmp_blas<LP>();
-            ShiftableBlockSymJacobi_OpenMP<HP, LP>::build(block_size, impl);
-            execution_space_ = EXECUTION_SPACE_HOST;
+            blas = OpenMPBLAS<LP>::create();
+            OpenMPShiftableBlockSymJacobiKernels<HP, LP>::build(block_size, impl);
         }
 
         void set_relaxation_parameter(const HP relaxation) {
@@ -60,14 +64,14 @@ namespace sfem {
 
             assert(block_size == 3);
             assert(is_symmetric);
-            assert(execution_space_ == (enum ExecutionSpace)d->mem_space());
+            assert(this->execution_space() == (enum ExecutionSpace)d->mem_space());
             assert(constraints_mask);
 
             // read_sparse_update_policy();
 
             const ptrdiff_t n_blocks = d->size() / 6;
             diag                     = d;
-            inv_diag                 = create_buffer<LP>(n_blocks * block_size * block_size, execution_space());
+            inv_diag                 = create_buffer<LP>(n_blocks * block_size * block_size, this->execution_space());
             impl.sym_diag_to_diag(n_blocks, diag->data(), inv_diag->data());
             impl.apply_mask(n_blocks, constraints_mask->data(), inv_diag->data());
             impl.inplace_invert(n_blocks, inv_diag->data());
@@ -127,7 +131,7 @@ namespace sfem {
 
         inline std::ptrdiff_t rows() const override { return diag->size(); }
         inline std::ptrdiff_t cols() const override { return diag->size(); }
-        ExecutionSpace        execution_space() const override { return execution_space_; }
+        ExecutionContext      execution_context() const override { return blas ? blas->context() : ExecutionContext(EXECUTION_SPACE_INVALID); }
     };
 
     template <typename HP, typename LP>
@@ -139,6 +143,15 @@ namespace sfem {
         ret->constraints_mask = constraints_mask;
         ret->set_diag(diag);
         return ret;
+    }
+
+    template <typename HP, typename LP>
+    std::shared_ptr<MixedPrecisionShiftableBlockSymJacobi<HP, LP>> create_mixed_precision_shiftable_block_sym_jacobi(
+            const int                   dim,
+            const SharedBuffer<HP>     &diag,
+            const SharedBuffer<mask_t> &constraints_mask,
+            const ExecutionContext     &context) {
+        return MixedPrecisionShiftableBlockSymJacobi<HP, LP>::create(dim, diag, constraints_mask, context);
     }
 
 }  // namespace sfem

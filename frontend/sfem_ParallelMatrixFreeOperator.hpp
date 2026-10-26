@@ -30,7 +30,7 @@ namespace sfem {
         int apply(const real_t *const x, real_t *const y) override;
         std::ptrdiff_t rows() const override;
         std::ptrdiff_t cols() const override;
-        ExecutionSpace execution_space() const override;
+        ExecutionContext execution_context() const override;
 
         std::shared_ptr<Communicator> comm() const override;
         std::ptrdiff_t                row_allocation_size() const override;

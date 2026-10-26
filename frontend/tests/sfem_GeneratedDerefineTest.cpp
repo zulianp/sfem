@@ -26,7 +26,7 @@ namespace {
     std::shared_ptr<sfem::Op> material(const std::shared_ptr<sfem::FunctionSpace> &fs) {
         auto op = sfem::create_op(fs, "GeneratedLinearElasticity", sfem::EXECUTION_SPACE_HOST);
         if (!op || op->initialize() != SFEM_SUCCESS) return nullptr;
-        for (const auto &block : fs->mesh_ptr()->blocks()) {
+        for (const auto &block : fs->mesh()->blocks()) {
             op->set_value_in_block(block->name(), "mu", 3);
             op->set_value_in_block(block->name(), "lmbda", 2);
         }

@@ -1,0 +1,75 @@
+# FF200 refined (FF200_FullPump_Solid_RefinedMesh.exo: the same valves, 973,812 dofs against
+# 150,525), as FF200_ExodusMesh/sim1.yaml. Simulation 1: the valves released out of the wall into
+# the cavity, at rest under the
+# outlet pressure, which holds the pressure valve on its seat. EPDM (Prony Mooney-Rivlin) with
+# four steps of 2.5e4 s, far longer than its relaxation times (88.6 s, 2091 s): they see the
+# relaxed moduli, the valves assembled long before the pump runs. Read from <case>/transient/.
+#
+# Material: the broadband EPDM of Felhos et al., eXPRESS Polymer Letters 2(3) 157-164 (2008), its
+# 15-term Prony series (Table 1, tau 1.8e-27 to 1610 s, g_inf = 2.24e-3) and C01 / C10 = 4, the
+# moduli scaled by 1.187 so that the relaxed small-strain stiffness is utopia's (E 9.174 MPa,
+# nu 0.4): mu_inf = 2 g_inf (C10 + C01) = 3.276 MPa; K = E / (3 (1 - 2 nu)), not relaxed. Its
+# effective shear modulus is 4.74 MPa over a stroke (45 ms) and 6.34 MPa over a 1e-4 s step, so
+# the strokes relax it; the terms shorter than about 1e-6 s are relaxed within any step. The
+# repository's workflows/prony_torsion/cases/epdm_torsion_newmark.yaml uses the same series
+# unscaled.
+#
+# The SDF grid (db/sdf_stops: mesh_to_sdf of the refined fluid mesh's skin with SSDF_HMAX 3e-5, as
+# FF200's, and SSDF_MARGIN 1.6e-3, the rest as prepare.sh: the same grid as FF200's)
+# reaches y from -3.27 to +1.55 mm: the pressure valve's cage (ribs from y = 0.70 mm, cover at
+# 1.5 mm) and the suction valve's stop (y = -2.85 mm), which stop the free bodies.
+execution_space: host
+mesh:
+  path: ../db/solid
+  blocks: [PRESSURE_VALVE, SUCTION_VALVE]
+  # Where the pressure difference acts: the disc of each valve's bottom face (y = -1.30 mm and
+  # -1.45 mm) inside its seat ring, centred on the valve. Outside it the same pressure is on both
+  # faces, and the attachments see no flow. The radii are the rings' inner ones, measured from the
+  # cavity's SDF: 3.84 mm under the pressure valve, 3.75 mm over the suction valve (the outer 4.65
+  # and 5.34 mm).
+  sidesets:
+    - {name: pv_disc, plane: {axis: y, at: -1.3e-3, block: PRESSURE_VALVE, center: [-0.011, -1.3e-3, 0], radius: 3.84e-3}}
+    - {name: sv_disc, plane: {axis: y, at: -1.45e-3, block: SUCTION_VALVE, center: [0.011, -1.45e-3, 0], radius: 3.75e-3}}
+material:
+  type: GeneratedMooneyRivlinProny
+  C10: 1.460e8
+  C01: 5.853e8
+  K: 1.529e7
+  relaxation:
+    iso:
+      prony:
+        - {g: 2.83e-04, tau: 1.61e+03}
+        - {g: 3.12e-04, tau: 1.29e+01}
+        - {g: 4.45e-04, tau: 1.53e-01}
+        - {g: 1.03e-03, tau: 9.89e-04}
+        - {g: 6.09e-03, tau: 1.18e-06}
+        - {g: 6.74e-02, tau: 8.51e-09}
+        - {g: 2.22e-01, tau: 1.42e-10}
+        - {g: 1.90e-01, tau: 1.80e-12}
+        - {g: 1.12e-01, tau: 1.27e-14}
+        - {g: 5.07e-02, tau: 2.00e-16}
+        - {g: 6.91e-02, tau: 1.10e-19}
+        - {g: 4.59e-02, tau: 1.38e-22}
+        - {g: 8.62e-02, tau: 1.62e-24}
+        - {g: 6.76e-02, tau: 6.62e-26}
+        - {g: 7.87e-02, tau: 1.82e-27}
+loads:
+  # The outlet's 90,543 Pa on the pressure valve's disc, downward, ramped with the release.
+  neumann:
+    - {type: sideset, format: name, name: pv_disc, component: 1, value: -90543,
+       profile: {type: linear_ramp, start_time: 0, end_time: 1e5, start_value: 0, end_value: 1}}
+obstacle:
+  backend: node_sdf
+  nodes: skin
+  sdf: {file: ../db/sdf_stops}
+  shift: 1e-5
+  cutoff: 1e-4
+  curvature: true
+  release: {type: linear_ramp, start_time: 0, end_time: 1e5, start_value: 0, end_value: 1}
+  # The QP to 1e-3 of the outer merit (inexact Newton), as the containment cases.
+  qp: {max_it: 15000, rtol: 1e-3}
+regime: quasi_static
+time: {dt: 2.5e4, t_end: 1e5, max_cutbacks: 4}
+# The release takes up to about 20 Newton steps a pseudo-step (the containment report's runs).
+solver: {newton: {max_it: 40, verbose: true}}
+output: {fields: [gap, contact_force], probes: [{type: contact}]}

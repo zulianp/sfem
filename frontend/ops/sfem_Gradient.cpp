@@ -41,7 +41,7 @@ namespace sfem {
 
     ptrdiff_t Gradient::n_dofs_domain() const { return impl_->space->n_dofs(); }
 
-    ptrdiff_t Gradient::n_dofs_image() const { return impl_->space->n_dofs() * impl_->space->mesh_ptr()->spatial_dimension(); }
+    ptrdiff_t Gradient::n_dofs_image() const { return impl_->space->n_dofs() * impl_->space->mesh()->spatial_dimension(); }
 
     int Gradient::initialize(const std::vector<std::string> &block_names) {
         SFEM_TRACE_SCOPE("Gradient::initialize");
@@ -49,7 +49,7 @@ namespace sfem {
 
         //
 
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
 
         if (impl_->space->block_size() != 1) {
             SFEM_ERROR("Gradient operator only supports single block size");
@@ -80,7 +80,7 @@ namespace sfem {
         impl_->n2e_idx = manage_host_buffer<element_idx_t>(d_n2e_ptr[mesh->n_nodes()], d_n2e_idx);
 
         ptrdiff_t max_indicence = 0;
-        ptrdiff_t nnodes        = impl_->space->mesh_ptr()->n_nodes();
+        ptrdiff_t nnodes        = impl_->space->mesh()->n_nodes();
 
         for (ptrdiff_t i = 0; i < nnodes; i++) {
             max_indicence = MAX(d_n2e_ptr[i + 1] - d_n2e_ptr[i], max_indicence);
@@ -100,15 +100,15 @@ namespace sfem {
         return ret;
     }
 
-    std::shared_ptr<Op> Gradient::lor_op(const std::shared_ptr<FunctionSpace> &space) {
+    std::shared_ptr<Op> Gradient::lor(const std::shared_ptr<FunctionSpace> &space) {
         auto ret            = std::make_shared<Gradient>(space);
-        ret->impl_->domains = impl_->domains->lor_op(space, {});
+        ret->impl_->domains = impl_->domains->lor(space, {});
         return ret;
     }
 
-    std::shared_ptr<Op> Gradient::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
+    std::shared_ptr<Op> Gradient::derefine(const std::shared_ptr<FunctionSpace> &space) {
         auto ret            = std::make_shared<Gradient>(space);
-        ret->impl_->domains = impl_->domains->derefine_op(space, {});
+        ret->impl_->domains = impl_->domains->derefine(space, {});
         return ret;
     }
 
@@ -122,7 +122,7 @@ namespace sfem {
                               real_t *const        /*values*/) {
         SFEM_TRACE_SCOPE("Gradient::hessian_crs");
 
-        //     auto mesh  = impl_->space->mesh_ptr();
+        //     auto mesh  = impl_->space->mesh();
         //     auto graph = impl_->space->dof_to_dof_graph();
         //     int  err   = SFEM_SUCCESS;
 
@@ -148,7 +148,7 @@ namespace sfem {
                                   real_t *const        /*off_diag_values*/) {
         SFEM_TRACE_SCOPE("Gradient::hessian_crs_sym");
 
-        // auto mesh = impl_->space->mesh_ptr();
+        // auto mesh = impl_->space->mesh();
         // int  err  = SFEM_SUCCESS;
 
         // impl_->iterate([&](const OpDomain &domain) {
@@ -171,7 +171,7 @@ namespace sfem {
     int Gradient::hessian_diag(const real_t *const /*x*/, real_t *const /*values*/) {
         SFEM_TRACE_SCOPE("Gradient::hessian_diag");
 
-        // auto mesh = impl_->space->mesh_ptr();
+        // auto mesh = impl_->space->mesh();
         // int  err  = SFEM_SUCCESS;
 
         // impl_->iterate([&](const OpDomain &domain) {
@@ -191,7 +191,7 @@ namespace sfem {
     int Gradient::gradient(const real_t *const /*x*/, real_t *const /*out*/) {
         SFEM_TRACE_SCOPE("Gradient::gradient");
 
-        //     auto mesh = impl_->space->mesh_ptr();
+        //     auto mesh = impl_->space->mesh();
         //     return impl_->iterate([&](const OpDomain &domain) {
         //         return laplacian_assemble_gradient(domain.element_type,
         //                                            domain.block->n_elements(),
@@ -209,7 +209,7 @@ namespace sfem {
         SFEM_TRACE_SCOPE("Gradient::apply");
         SFEM_OP_CAPTURE();
 
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         // return impl_->iterate([&](const OpDomain &domain) {
         // if (domain.user_data) {
         //     auto fff = std::static_pointer_cast<Buffer<jacobian_t>>(domain.user_data);
@@ -252,7 +252,7 @@ namespace sfem {
     int Gradient::value(const real_t * /*x*/, real_t *const /*out*/) {
         SFEM_TRACE_SCOPE("Gradient::value");
 
-        // auto mesh = impl_->space->mesh_ptr();
+        // auto mesh = impl_->space->mesh();
         // return impl_->iterate([&](const OpDomain &domain) {
         //     return laplacian_assemble_value(domain.element_type,
         //                                     domain.block->n_elements(),

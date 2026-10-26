@@ -68,6 +68,7 @@ from codegen.framework.plans.form_emission import (
     form_n_field_components,
     objective_kernel_variants,
     writes_per_shape,
+    POINTWISE_OUTPUT_KERNELS,
 )
 from codegen.framework.plans.evaluation_strategy import (
     quadrature_scope_lines,
@@ -2264,7 +2265,7 @@ def _tensor_weak_per_shape_tail(
         )
 
 
-def _append_quadrature_output_lines(lines, form, weak_form, substitutions, work_item, closing):
+def _append_quadrature_output_lines(lines, form, weak_form, substitutions, work_item, closing, n_points="NQ"):
     """Evaluate the declared tensors at this point and write them in place.
 
     Every element-type body ends here the same way: the deformation gradient of
@@ -2277,7 +2278,7 @@ def _append_quadrature_output_lines(lines, form, weak_form, substitutions, work_
     for stream in quadrature_fields.written_streams(quadrature_fields.quadrature_field_streams(form)):
         for component, expression in enumerate(outputs[stream.name]):
             expressions.append(sp.sympify(expression).xreplace(substitutions))
-            targets.append("%s =" % quadrature_fields.store_target(stream, component, work_item))
+            targets.append("%s =" % quadrature_fields.store_target(stream, component, work_item, n_points))
     _append_cse_array_assignments(lines, expressions, targets, "qp_out_tmp")
     lines.extend(closing)
 
@@ -2755,9 +2756,21 @@ def _constant_p1_weak_per_shape_tail(
     lines.extend(["      }", "    }"])
 
 
+def _constant_p1_weak_per_point_tail(
+    lines, form, weak_form, substitutions, dim, n_field_components,
+    work_item, geometry_value, reference_gradients, use_stream_arrays, closing,
+    step_gradient=None,
+):
+    """A quadrature output at the element's one point: evaluate, store."""
+    _append_quadrature_output_lines(
+        lines, form, weak_form, substitutions, work_item, closing, quadrature_fields.SINGLE_POINT
+    )
+
+
 _CONSTANT_P1_WEAK_TAIL = {
     FormAccumulation.SCALAR: _constant_p1_weak_scalar_tail,
     FormAccumulation.PER_SHAPE: _constant_p1_weak_per_shape_tail,
+    FormAccumulation.PER_POINT: _constant_p1_weak_per_point_tail,
 }
 
 
@@ -2800,6 +2813,7 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
     # loop has a single trip.  No strategy test is wanted here -- a
     # higher-order simplex never arrives, so a branch would describe a
     # case that cannot happen.
+    point_streams = quadrature_fields.quadrature_field_streams(form)
     step_loop = _objective_step_loop(
         form,
         weak_form,
@@ -2812,7 +2826,8 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
         [
             "const ptrdiff_t goff = %s;" % work_item,
             "const s_t %s = det0[goff];" % geometry_value("det", 0),
-        ],
+        ]
+        + quadrature_fields.load_lines(point_streams, "", work_item, quadrature_fields.SINGLE_POINT),
         "      ",
     )
     # No quadrature point, and so no name for one.  The rule of a lowest-order
@@ -2826,9 +2841,12 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
     # Folded as an exact rational, so the emitted constant is the same double
     # the table held and the kernel's answer is bit-identical.
     lines.append("    {")
-    lines.append(
+    # A body that does not integrate, a quadrature output, takes no weight.
+    lines.extend(
         "      const s_t qw = %s;" % _sfem_ccode(sp.nsimplify(quadrature_weight))
+        for _integrated in [candidate for candidate in (form,) if form_is_integrated(candidate)]
     )
+    lines.extend(quadrature_fields.point_base_lines(point_streams, "      ", quadrature_fields.SINGLE_POINT))
     if step_loop is not None:
         lines.extend(step_loop.buffer_lines())
     lines.extend(_work_item_loop_lines(source_builder, "      "))
@@ -2842,6 +2860,12 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
         "      const s_t %s = det0[goff];"
         % geometry_value("det", 0)
     )
+    # With steps, this loop only maps the two gradients and the step loop,
+    # which evaluates the density, reads the integration-point fields.
+    for _unstepped in [candidate for candidate in (step_loop,) if candidate is None]:
+        lines.extend(
+            quadrature_fields.load_lines(point_streams, "      ", work_item, quadrature_fields.SINGLE_POINT)
+        )
     for row in range(n_field_components):
         for col in range(dim):
             idx = row * dim + col
@@ -3011,9 +3035,19 @@ def _simplex_weak_per_shape_tail(
     lines.extend(["      }", "    }"])
 
 
+def _simplex_weak_per_point_tail(
+    lines, form, weak_form, substitutions, dim, n_field_components,
+    work_item, geometry_value, reference_gradient, source_builder, use_stream_arrays, closing,
+    step_gradient=None,
+):
+    """A quadrature output: evaluate at the point, store, nothing to contract."""
+    _append_quadrature_output_lines(lines, form, weak_form, substitutions, work_item, closing)
+
+
 _SIMPLEX_WEAK_TAIL = {
     FormAccumulation.SCALAR: _simplex_weak_scalar_tail,
     FormAccumulation.PER_SHAPE: _simplex_weak_per_shape_tail,
+    FormAccumulation.PER_POINT: _simplex_weak_per_point_tail,
 }
 
 
@@ -3050,8 +3084,10 @@ def _append_sfem_soa_weak_form_lines(
     gradient_name = _weak_gradient_name(form)
     if weak_form.dim != dim:
         raise ValueError("weak form dim does not match SoA kernel dim")
-    if form.name not in ("objective", "gradient", "apply"):
-        raise ValueError("weak form kernel name must be objective, gradient, or apply")
+    if form.name not in ("objective", "gradient", "apply") + POINTWISE_OUTPUT_KERNELS:
+        raise ValueError(
+            "weak form kernel name must be objective, gradient, apply, or %s" % ", ".join(POINTWISE_OUTPUT_KERNELS)
+        )
     if form.name == "apply" and not form.has_direction:
         raise ValueError("weak form apply kernel requires has_direction=True")
     if len(reference_inputs) != 1 or reference_inputs[0].name != "grad_ref":
@@ -3110,8 +3146,14 @@ def _append_sfem_soa_weak_form_lines(
         scalar_temporaries=True,
     )
 
+    point_streams = quadrature_fields.quadrature_field_streams(form)
     lines.append("    for (int q = 0; q < NQ; ++q) {")
-    lines.append("      const s_t qw = q_weight[q];")
+    # A body that does not integrate, a quadrature output, takes no weights.
+    lines.extend(
+        "      const s_t qw = q_weight[q];"
+        for _integrated in [candidate for candidate in (form,) if form_is_integrated(candidate)]
+    )
+    lines.extend(quadrature_fields.point_base_lines(point_streams, "      "))
     for row in range(n_field_components):
         for col in range(dim):
             idx = row * dim + col
@@ -3183,7 +3225,8 @@ def _append_sfem_soa_weak_form_lines(
         [
             "const ptrdiff_t goff = q * geometry_stride + %s;" % work_item,
             "const s_t %s = det0[goff];" % _work_item_name(source_builder, "det", 0),
-        ],
+        ]
+        + quadrature_fields.load_lines(point_streams, "", work_item),
         "      ",
     )
     if step_loop is not None:
@@ -3199,6 +3242,10 @@ def _append_sfem_soa_weak_form_lines(
         "      const s_t %s = det0[goff];"
         % geometry_value("det", 0)
     )
+    # With steps, this loop only maps the two gradients and the step loop,
+    # which evaluates the density, reads the integration-point fields.
+    for _unstepped in [candidate for candidate in (step_loop,) if candidate is None]:
+        lines.extend(quadrature_fields.load_lines(point_streams, "      ", work_item))
     for row in range(n_field_components):
         for col in range(dim):
             idx = row * dim + col
@@ -8081,6 +8128,13 @@ def _sfem_soa_direct_hessian_closed_form_assembly_lines(
             % (indent, current_target().work_item_name("det", 0)),
         ]
     )
+    point_streams = quadrature_fields.quadrature_field_streams(form)
+    lines.extend(quadrature_fields.point_base_lines(point_streams, indent, quadrature_fields.SINGLE_POINT))
+    lines.extend(
+        quadrature_fields.load_lines(
+            point_streams, indent, quadrature_fields.SINGLE_ELEMENT, quadrature_fields.SINGLE_POINT
+        )
+    )
     if uses_current:
         # The state's reference gradient is a sum over the element's nodes with
         # constant coefficients, so it needs neither a table nor a loop.  The
@@ -8436,6 +8490,11 @@ def _sfem_soa_direct_hessian_matrix_assembly_lines(
             "%s  const s_t idet = s_t(1) / %s;"
             % (indent, current_target().work_item_name("det", 0)),
         ]
+    )
+    point_streams = quadrature_fields.quadrature_field_streams(form)
+    lines.extend(quadrature_fields.point_base_lines(point_streams, "%s  " % indent))
+    lines.extend(
+        quadrature_fields.load_lines(point_streams, "%s  " % indent, quadrature_fields.SINGLE_ELEMENT)
     )
     if uses_current:
         lines.extend(

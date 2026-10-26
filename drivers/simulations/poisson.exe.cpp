@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include "smesh_base.hpp"
 
 #include "sfem_defs.hpp"
 
@@ -10,7 +11,7 @@
 int lsolve(const std::shared_ptr<sfem::Function> &f, const smesh::Path &output_dir) {
     auto es        = f->execution_space();
     auto fs        = f->space();
-    auto m         = fs->mesh_ptr();
+    auto m         = fs->mesh();
     auto linear_op = sfem::create_linear_operator(sfem::op_type::MATRIX_FREE, f, nullptr, es);
     auto cg        = sfem::create_cg<real_t>(linear_op, es);
 
@@ -37,9 +38,9 @@ int lsolve(const std::shared_ptr<sfem::Function> &f, const smesh::Path &output_d
     f->apply_constraints(x->data());
     f->apply_constraints(rhs->data());
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
     cg->apply(rhs->data(), x->data());
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
 
     if (SFEM_VERBOSE) {
         printf("---------------------\n");
@@ -58,7 +59,7 @@ int lsolve(const std::shared_ptr<sfem::Function> &f, const smesh::Path &output_d
 
         if (fs->has_semi_structured_mesh()) {
             m->write(output_dir / "coarse_mesh");
-            smesh::semistructured_export_as_standard(fs->mesh_ptr(), output_dir / "mesh");
+            smesh::semistructured_export_as_standard(fs->mesh(), output_dir / "mesh");
         } else {
             m->write(output_dir / "mesh");
         }

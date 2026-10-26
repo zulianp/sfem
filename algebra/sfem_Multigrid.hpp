@@ -17,7 +17,7 @@
 #include "sfem_ParallelOperator.hpp"
 #include "sfem_aliases.hpp"
 
-#include "sfem_openmp_blas.hpp"
+#include "sfem_BLAS_openmp.hpp"
 #include "sfem_tpl_blas.hpp"
 
 // https://en.wikipedia.org/wiki/Conjugate_gradient_method
@@ -27,14 +27,14 @@ namespace sfem {
     template <typename T>
     class Multigrid final : public Operator<T> {
     public:
+        /// Empty, for the execution space es: levels are added after.
+        static std::shared_ptr<Multigrid<T>> create(const ExecutionSpace es);
         std::shared_ptr<BLAS<T>> blas_;
         bool        verbose{true};
         bool        debug{false};
 
-        enum CycleType {
-            V_CYCLE = 1,
-            W_CYCLE = 2,
-        };
+        // The value is the cycle index, the coarse-level visits per pass: V 1, W 2 (a larger index is valid).
+        enum class CycleType : int { V = 1, W = 2 };
 
         enum CycleReturnCode { CYCLE_CONTINUE = 0, CYCLE_CONVERGED = 1, CYCLE_FAILURE = 2 };
 
@@ -48,9 +48,8 @@ namespace sfem {
             ~Memory() {}
         };
 
-        ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
 
-        ExecutionSpace execution_space() const override { return execution_space_; }
+        ExecutionContext execution_context() const override { return blas_ ? blas_->context() : ExecutionContext(EXECUTION_SPACE_INVALID); }
 
         int apply(const T* const rhs, T* const x) override {
             SFEM_TRACE_SCOPE("Multigrid::apply");
@@ -80,7 +79,7 @@ namespace sfem {
             smoother_.clear();
         }
 
-        void set_cycle_type(const int val) { cycle_type_ = val; }
+        void set_cycle_type(const CycleType val) { cycle_type_ = val; }
 
         inline int n_levels() const { return smoother_.size(); }
 
@@ -100,8 +99,7 @@ namespace sfem {
         }
 
         void default_init() {
-            blas() = make_openmp_blas<T>();
-            execution_space_ = EXECUTION_SPACE_HOST;
+            blas() = OpenMPBLAS<T>::create();
         }
 
         inline std::shared_ptr<BLAS<T>>& blas() { return blas_; }
@@ -182,7 +180,6 @@ namespace sfem {
         std::vector<std::shared_ptr<Operator<T>>>& restrictions() { return restriction_; }
         std::vector<std::shared_ptr<Operator<T>>>  smoothers() { return smoother_; }
 
-        void set_execution_space(enum ExecutionSpace es) { execution_space_ = es; }
 
     private:
         std::vector<std::shared_ptr<Operator<T>>> operator_;
@@ -197,7 +194,7 @@ namespace sfem {
 
         int  max_it_{10};
         int  iterations_{0};
-        int  cycle_type_{V_CYCLE};
+        CycleType cycle_type_{CycleType::V};
         T    atol_{1e-10};
         bool initial_guess_zero_{false};
 
@@ -313,7 +310,7 @@ namespace sfem {
             auto prolongation = prolongation_[coarser_level(level)];
             auto mem_coarse   = memory_[coarser_level(level)];
 
-            for (int k = 0; k < this->cycle_type_; k++) {
+            for (int k = 0; k < static_cast<int>(this->cycle_type_); k++) {
                 // Pre-smoothing starts from zero on a coarse level's first pass (the parent
                 // zeroed it) and on the finest level's first pass of the first cycle when the
                 // caller said so; nowhere else. Cleared again before post-smoothing, which
@@ -409,6 +406,11 @@ namespace sfem {
         auto mg = std::make_shared<Multigrid<T>>();
         mg->default_init();
         return mg;
+    }
+
+    template <typename T>
+    std::shared_ptr<Multigrid<T>> create_mg(const ExecutionSpace es) {
+        return Multigrid<T>::create(es);
     }
 
 }  // namespace sfem

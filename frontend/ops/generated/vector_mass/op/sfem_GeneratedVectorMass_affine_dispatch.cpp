@@ -15,10 +15,6 @@ extern "C" int vector_mass_tri3_hessian_bsr_a_msoa(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
-    const geom_t *const RSTR g_adj0,
-    const geom_t *const RSTR g_adj1,
-    const geom_t *const RSTR g_adj2,
-    const geom_t *const RSTR g_adj3,
     const geom_t *const RSTR g_det0,
     const real_t density,
     const count_t *const RSTR rowptr,
@@ -31,15 +27,6 @@ extern "C" int vector_mass_tet4_hessian_bsr_a_msoa(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
-    const geom_t *const RSTR g_adj0,
-    const geom_t *const RSTR g_adj1,
-    const geom_t *const RSTR g_adj2,
-    const geom_t *const RSTR g_adj3,
-    const geom_t *const RSTR g_adj4,
-    const geom_t *const RSTR g_adj5,
-    const geom_t *const RSTR g_adj6,
-    const geom_t *const RSTR g_adj7,
-    const geom_t *const RSTR g_adj8,
     const geom_t *const RSTR g_det0,
     const real_t density,
     const count_t *const RSTR rowptr,
@@ -330,10 +317,6 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int vector_mass_hessian_bsr_2d_a_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_adj0,
-        const geom_t *const RSTR g_adj1,
-        const geom_t *const RSTR g_adj2,
-        const geom_t *const RSTR g_adj3,
         const geom_t *const RSTR g_det0,
         const real_t density,
         const count_t *const RSTR rowptr,
@@ -350,7 +333,7 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int vector_mass_hessian_bsr_2d_a_msoa(
           : values_type;
   switch (element_type) {
     case smesh::TRI3:
-      return vector_mass_tri3_hessian_bsr_a_msoa((int)resolved_real_type, (int)resolved_values_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, density, rowptr, colidx, values);
+      return vector_mass_tri3_hessian_bsr_a_msoa((int)resolved_real_type, (int)resolved_values_type, nelements, nnodes, elements, g_det0, density, rowptr, colidx, values);
     default:
       break;
   }
@@ -365,15 +348,6 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int vector_mass_hessian_bsr_3d_a_msoa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const RSTR g_adj0,
-        const geom_t *const RSTR g_adj1,
-        const geom_t *const RSTR g_adj2,
-        const geom_t *const RSTR g_adj3,
-        const geom_t *const RSTR g_adj4,
-        const geom_t *const RSTR g_adj5,
-        const geom_t *const RSTR g_adj6,
-        const geom_t *const RSTR g_adj7,
-        const geom_t *const RSTR g_adj8,
         const geom_t *const RSTR g_det0,
         const real_t density,
         const count_t *const RSTR rowptr,
@@ -390,7 +364,7 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int vector_mass_hessian_bsr_3d_a_msoa(
           : values_type;
   switch (element_type) {
     case smesh::TET4:
-      return vector_mass_tet4_hessian_bsr_a_msoa((int)resolved_real_type, (int)resolved_values_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, density, rowptr, colidx, values);
+      return vector_mass_tet4_hessian_bsr_a_msoa((int)resolved_real_type, (int)resolved_values_type, nelements, nnodes, elements, g_det0, density, rowptr, colidx, values);
     default:
       break;
   }

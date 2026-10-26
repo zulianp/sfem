@@ -17,11 +17,11 @@ NVCC="nvcc -std=c++17 -O3 -arch=sm_90 -DNDEBUG -diag-suppress 177"
 mkdir -p "$ROOT/hw"
 
 $NVCC $DEFINES $INCLUDES $MPI_INC -I "$SFEM/operators/tet4/cuda" -I "$SFEM/operators/cuda" \
-    -c "$SFEM/operators/tet4/cuda/cu_tet4_laplacian.cu" -o "$ROOT/hw/cu_tet4_laplacian.o" \
+    -c "$SFEM/operators/tet4/cuda/tet4_laplacian_cuda.cu" -o "$ROOT/hw/cu_tet4_laplacian.o" \
     > "$ROOT/hw/handwritten.log" 2>&1 || { echo "FAIL hand-written laplacian"; grep -m5 error "$ROOT/hw/handwritten.log"; exit 1; }
 
 $NVCC $DEFINES $INCLUDES $MPI_INC -I "$SFEM/operators/tet4/cuda" -I "$SFEM/operators/cuda" \
-    -c "$SFEM/operators/tet4/cuda/cu_tet4_linear_elasticity.cu" \
+    -c "$SFEM/operators/tet4/cuda/tet4_linear_elasticity_cuda.cu" \
     -o "$ROOT/hw/cu_tet4_linear_elasticity.o" \
     > "$ROOT/hw/handwritten_le.log" 2>&1 || { echo "FAIL hand-written elasticity"; grep -m5 error "$ROOT/hw/handwritten_le.log"; exit 1; }
 

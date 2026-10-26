@@ -1,4 +1,5 @@
 #include <math.h>
+#include "smesh_base.hpp"
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,7 +17,7 @@
 #include "sfem_base.hpp"
 #include "sfem_defs.hpp"
 #include "sfem_vec.hpp"
-#include "sortreduce.hpp"
+#include "sfem_sortreduce.hpp"
 
 #include "mass.hpp"
 
@@ -93,7 +94,7 @@ int main(int argc, char *argv[]) {
     }
 
     char path[SFEM_MAX_PATH_LENGTH];
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     ///////////////////////////////////////////////////////////////////////////////
     // Read data
@@ -214,7 +215,7 @@ int main(int argc, char *argv[]) {
 
     int export_counter = 0;
     real_t next_check_point = SFEM_EXPORT_FREQUENCY;
-    logger_t time_logger;
+    sfem::Logger time_logger;
 
     if (SFEM_RESTART_FOLDER) {
         sprintf(path, "%s/c.%09d.raw", SFEM_RESTART_FOLDER, SFEM_RESTART_ID);
@@ -229,8 +230,8 @@ int main(int argc, char *argv[]) {
         sprintf(path, "%s/c.%09d.raw", output_folder, export_counter);
         array_write(comm, path, SFEM_MPI_REAL_T, c, mesh.nnodes, mesh.nnodes);
         sprintf(path, "%s/time.txt", output_folder);
-        log_create_file(&time_logger, path, "w");
-        log_write_double(&time_logger, 0);
+        time_logger.open_file(path, "w");
+        time_logger.write(0);
         export_counter++;
     }
 
@@ -284,7 +285,7 @@ int main(int argc, char *argv[]) {
             sprintf(path, "%s/c.%09d.raw", output_folder, export_counter);
             array_write(comm, path, SFEM_MPI_REAL_T, c, mesh.nnodes, mesh.nnodes);
 
-            log_write_double(&time_logger, t);
+            time_logger.write(t);
 
             next_check_point += SFEM_EXPORT_FREQUENCY;
             export_counter++;
@@ -314,7 +315,6 @@ int main(int argc, char *argv[]) {
     destroy_conditions(n_dirichlet_conditions, dirichlet_conditions);
     // destroy_conditions(n_neumann_conditions, neumann_conditions);
 
-    log_destroy(&time_logger);
 
     free(update);
     free(buff);
@@ -325,7 +325,7 @@ int main(int argc, char *argv[]) {
         free(vel[d]);
     }
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
     if (!rank) {
         printf("----------------------------------------\n");
         printf("#elements %ld #nodes %ld #steps %ld\n", (long)nelements, (long)nnodes, step_count);

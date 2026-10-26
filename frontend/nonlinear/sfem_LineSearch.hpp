@@ -31,7 +31,7 @@ namespace sfem {
     };
 
     struct LineSearchResult {
-        enum Status {
+        enum class Status {
             /// The first step of the schedule that satisfies Armijo.
             ACCEPTED,
             /// None does, but the best of them decreases the merit.
@@ -45,7 +45,7 @@ namespace sfem {
             NON_FINITE
         };
 
-        Status status{NO_DECREASE};
+        Status status{Status::NO_DECREASE};
         real_t alpha{0};
         real_t merit{0};
         int    evaluations{0};

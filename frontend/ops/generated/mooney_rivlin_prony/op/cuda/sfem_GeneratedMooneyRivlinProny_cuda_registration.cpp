@@ -3,7 +3,7 @@
 
 namespace sfem {
   void register_GeneratedMooneyRivlinProny_cuda_generated_op() {
-    Factory::register_op("gpu:GeneratedMooneyRivlinProny", GPUGeneratedMooneyRivlinProny::create);
-    Factory::register_op("gpu:ss:GeneratedMooneyRivlinProny", GPUGeneratedMooneyRivlinProny::create);
+    OpFactory::register_op("gpu:GeneratedMooneyRivlinProny", GPUGeneratedMooneyRivlinProny::create);
+    OpFactory::register_op("gpu:ss:GeneratedMooneyRivlinProny", GPUGeneratedMooneyRivlinProny::create);
   }
 }  // namespace sfem

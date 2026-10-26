@@ -178,7 +178,7 @@ namespace sfem {
     int PlugInOp::update(const real_t *const x) {
         SFEM_TRACE_SCOPE("PlugInOp::update");
 
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->domains->iterate([&](const OpDomain &domain) {
             auto block        = domain.block;
             auto element_type = domain.element_type;
@@ -190,7 +190,7 @@ namespace sfem {
     int PlugInOp::gradient(const real_t *const x, real_t *const out) {
         SFEM_TRACE_SCOPE("PlugInOp::gradient");
 
-        auto mesh        = impl_->space->mesh_ptr();
+        auto mesh        = impl_->space->mesh();
         int  block_size  = impl_->space->block_size();
         if (block_size != 3) {
             SFEM_ERROR("PlugInOp expects block_size=3 (vector field)\n");
@@ -233,7 +233,7 @@ namespace sfem {
     int PlugInOp::apply(const real_t *const x, const real_t *const h, real_t *const out) {
         SFEM_TRACE_SCOPE("PlugInOp::apply");
 
-        auto mesh        = impl_->space->mesh_ptr();
+        auto mesh        = impl_->space->mesh();
         int  block_size  = impl_->space->block_size();
         if (block_size != 3) {
             SFEM_ERROR("PlugInOp expects block_size=3 (vector field)\n");
@@ -289,17 +289,17 @@ namespace sfem {
         return SFEM_FAILURE;
     }
 
-    std::shared_ptr<Op> PlugInOp::lor_op(const std::shared_ptr<FunctionSpace> &space) {
+    std::shared_ptr<Op> PlugInOp::lor(const std::shared_ptr<FunctionSpace> &space) {
         auto ret            = std::shared_ptr<PlugInOp>(new PlugInOp(space, impl_->opname));
-        ret->impl_->domains = impl_->domains->lor_op(space, {});
+        ret->impl_->domains = impl_->domains->lor(space, {});
         ret->impl_->mu      = impl_->mu;
         ret->impl_->lambda  = impl_->lambda;
         return ret;
     }
 
-    std::shared_ptr<Op> PlugInOp::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
+    std::shared_ptr<Op> PlugInOp::derefine(const std::shared_ptr<FunctionSpace> &space) {
         auto ret            = std::shared_ptr<PlugInOp>(new PlugInOp(space, impl_->opname));
-        ret->impl_->domains = impl_->domains->derefine_op(space, {});
+        ret->impl_->domains = impl_->domains->derefine(space, {});
         ret->impl_->mu      = impl_->mu;
         ret->impl_->lambda  = impl_->lambda;
         return ret;

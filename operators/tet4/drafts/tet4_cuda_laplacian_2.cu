@@ -13,7 +13,7 @@ extern "C" {
 #include "cuda_crs.hpp"
 #include "sfem_base.hpp"
 #include "sfem_vec.hpp"
-#include "sortreduce.hpp"
+#include "sfem_sortreduce.hpp"
 }
 
 #include "sfem_cuda_base.hpp"
@@ -144,7 +144,7 @@ static inline __device__ __host__ idx_t find_col(const idx_t key, const idx_t *c
     // assert(key == row[k]);
     // } else {
     //     // Use this for larger number of dofs per row
-    //     return find_idx_binary_search(key, row, lenrow);
+    //     return sfem::find_idx_binary_search(key, row, lenrow);
     // }
 }
 
@@ -586,7 +586,7 @@ extern "C" void laplacian_crs(const ptrdiff_t                    nelements,
             local_to_global_kernel<<<n_blocks, block_size, 0, stream[1]> > >(
                     last_n, d_elems, de_matrix, d_rowptr, d_colidx, d_values);
 
-            SFEM_DEBUG_SYNCHRONIZE();
+            SFEM_DEBUG_SYNCHRONIZE(stream);
         }
 
         SFEM_CUDA_CHECK(cudaMemcpyAsync(de_xyz, he_xyz, 3 * 4 * n * sizeof(geom_t), cudaMemcpyHostToDevice, stream[0]));
@@ -610,11 +610,11 @@ extern "C" void laplacian_crs(const ptrdiff_t                    nelements,
 
         jacobian_inverse_kernel<<<n_blocks, block_size, 0, stream[0]> > >(n, de_xyz, d_jacobian_inverse);
 
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(stream);
 
         laplacian_crs_kernel<<<n_blocks, block_size, 0, stream[0]> > >(n, d_jacobian_inverse, de_matrix);
 
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(stream);
 
         last_n              = n;
         last_element_offset = element_offset;
@@ -626,7 +626,7 @@ extern "C" void laplacian_crs(const ptrdiff_t                    nelements,
         local_to_global_kernel<<<n_blocks, block_size, 0, stream[1]> > >(
                 last_n, d_elems, de_matrix, d_rowptr, d_colidx, d_values);
 
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(stream);
 
         cudaStreamSynchronize(stream[1]);
     }

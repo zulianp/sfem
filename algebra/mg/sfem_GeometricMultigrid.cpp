@@ -2,8 +2,16 @@
 
 #include "sfem_aliases.hpp"
 
-#include "sfem_API.hpp"
 #include "sfem_Function.hpp"
+#include "sfem_LinearOperatorFactory.hpp"
+#include "sfem_Transfer.hpp"
+#include "sfem_MixedPrecisionShiftableBlockSymJacobi.hpp"
+#include "sfem_ShiftableJacobi.hpp"
+#include "sfem_Stationary.hpp"
+#include "sfem_cg.hpp"
+#include "sfem_parallel_cg.hpp"
+#include "smesh_env.hpp"
+#include "smesh_semistructured.hpp"
 
 #include <algorithm>
 
@@ -20,7 +28,7 @@ namespace sfem {
         auto data = std::make_shared<MultigridData>();
 
         auto  es     = f->execution_space();
-        auto &ssmesh = f->space()->mesh();
+        auto &ssmesh = *f->space()->mesh();
 
         bool has_hex  = false;
         bool has_tet  = false;
@@ -135,7 +143,7 @@ namespace sfem {
 
         bool mixed_hex_tet = false;
         {
-            auto &mesh = data->functions.front()->space()->mesh();
+            auto &mesh = *data->functions.front()->space()->mesh();
             bool  has_hex = false;
             bool  has_tet = false;
             for (size_t b = 0; b < mesh.n_blocks(); ++b) {

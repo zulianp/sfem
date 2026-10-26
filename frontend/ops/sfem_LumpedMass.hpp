@@ -25,8 +25,8 @@ namespace sfem {
 
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space);
 
-        std::shared_ptr<Op> lor_op(const std::shared_ptr<FunctionSpace> &space) override;
-        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override;
+        std::shared_ptr<Op> lor(const std::shared_ptr<FunctionSpace> &space) override;
+        std::shared_ptr<Op> derefine(const std::shared_ptr<FunctionSpace> &space) override;
 
         /**
          * @brief Builds MultiDomainOp from mesh blocks (or @p block_names subset).

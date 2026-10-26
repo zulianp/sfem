@@ -193,7 +193,7 @@ int solve_obstacle(const std::shared_ptr<sfem::Communicator> &comm, int argc, ch
 
         //     auto blas = sfem::blas<real_t>(es);
         //     auto contact_surf = sfem::mesh_connectivity_from_file(comm, SFEM_OBSTACLE_SURF);
-        //     auto bop = sfem::Factory::create_boundary_op(fs, contact_surf, "BoundaryMass");
+        //     auto bop = sfem::OpFactory::create_boundary(fs, contact_surf, "BoundaryMass", sfem::EXECUTION_SPACE_HOST);
         //     auto ones = sfem::create_buffer<real_t>(ndofs, es);
         //     auto diag_bop = sfem::create_buffer<real_t>(ndofs, es);
         //     blas->values(ndofs, 1, ones->data());
@@ -218,7 +218,7 @@ int solve_obstacle(const std::shared_ptr<sfem::Communicator> &comm, int argc, ch
         auto mprgp = sfem::create_mprgp(linear_op, es);
 
         if (SFEM_USE_PROJECTED_CG) {
-            mprgp->set_expansion_type(sfem::MPRGP<real_t>::EXPANSION_TYPE_PROJECTED_CG);
+            mprgp->set_expansion_type(sfem::MPRGP<real_t>::Expansion::PROJECTED_CG);
         }
 
         mprgp->set_op(linear_op);
@@ -248,7 +248,7 @@ int solve_obstacle(const std::shared_ptr<sfem::Communicator> &comm, int argc, ch
     double tock = smesh::time_seconds();
 
     ptrdiff_t nelements = m->n_elements();
-    ptrdiff_t nnodes    = fs->mesh().n_nodes();
+    ptrdiff_t nnodes    = fs->mesh()->n_nodes();
 
     if (!comm->rank()) {
         printf("----------------------------------------\n");

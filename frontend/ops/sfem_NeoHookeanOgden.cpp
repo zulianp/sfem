@@ -82,7 +82,7 @@ namespace sfem {
     std::unique_ptr<Op> NeoHookeanOgden::create(const std::shared_ptr<FunctionSpace> &space) {
         SFEM_TRACE_SCOPE("NeoHookeanOgden::create");
 
-        assert(space->mesh_ptr()->spatial_dimension() == space->block_size());
+        assert(space->mesh()->spatial_dimension() == space->block_size());
         auto ret           = std::make_unique<NeoHookeanOgden>(space);
         ret->impl_->mu     = smesh::Env::read("SFEM_SHEAR_MODULUS", ret->impl_->mu);
         ret->impl_->lambda = smesh::Env::read("SFEM_FIRST_LAME_PARAMETER", ret->impl_->lambda);
@@ -103,7 +103,7 @@ namespace sfem {
                                      real_t *const        values) {
         SFEM_TRACE_SCOPE("NeoHookeanOgden::hessian_crs");
 
-        auto mesh  = impl_->space->mesh_ptr();
+        auto mesh  = impl_->space->mesh();
         auto graph = impl_->space->node_to_node_graph();
         return impl_->iterate([&](const OpDomain &domain) -> int {
             return neohookean_ogden_hessian_aos(domain.element_type,
@@ -123,7 +123,7 @@ namespace sfem {
     int NeoHookeanOgden::hessian_diag(const real_t *const x, real_t *const out) {
         SFEM_TRACE_SCOPE("NeoHookeanOgden::hessian_diag");
 
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) -> int {
             return neohookean_ogden_diag_aos(domain.element_type,
                                              domain.block->n_elements(),
@@ -159,7 +159,7 @@ namespace sfem {
     int NeoHookeanOgden::gradient(const real_t *const x, real_t *const out) {
         SFEM_TRACE_SCOPE("NeoHookeanOgden::gradient");
 
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) -> int {
             return neohookean_ogden_gradient_aos(domain.element_type,
                                                  domain.block->n_elements(),
@@ -176,7 +176,7 @@ namespace sfem {
     int NeoHookeanOgden::apply(const real_t *const x, const real_t *const h, real_t *const out) {
         SFEM_TRACE_SCOPE("NeoHookeanOgden::apply");
 
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) -> int {
             auto ua = std::static_pointer_cast<struct ElasticityAssemblyData>(domain.user_data);
             if (ua->partial_assembly_buffer) {
@@ -259,7 +259,7 @@ namespace sfem {
     int NeoHookeanOgden::update(const real_t *const u) {
         SFEM_TRACE_SCOPE("NeoHookeanOgden::update");
 
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
 
         for (auto &domain : impl_->domains->domains()) {
             auto assembly_data = std::static_pointer_cast<struct ElasticityAssemblyData>(domain.second.user_data);
@@ -295,7 +295,7 @@ namespace sfem {
     int NeoHookeanOgden::value(const real_t *x, real_t *const out) {
         SFEM_TRACE_SCOPE("NeoHookeanOgden::value");
 
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) -> int {
             auto ua = std::static_pointer_cast<ElasticityAssemblyData>(domain.user_data);
 
@@ -320,7 +320,7 @@ namespace sfem {
                                      real_t *const       out) {
         SFEM_TRACE_SCOPE("NeoHookeanOgden::value_steps");
 
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) -> int {
             auto ua = std::static_pointer_cast<ElasticityAssemblyData>(domain.user_data);
             return neohookean_ogden_objective_steps_aos(domain.element_type,
@@ -341,16 +341,16 @@ namespace sfem {
 
     int NeoHookeanOgden::report(const real_t *const) { return SFEM_SUCCESS; }
 
-    std::shared_ptr<Op> NeoHookeanOgden::lor_op(const std::shared_ptr<FunctionSpace> &space) {
-        SFEM_TRACE_SCOPE("NeoHookeanOgden::lor_op");
+    std::shared_ptr<Op> NeoHookeanOgden::lor(const std::shared_ptr<FunctionSpace> &space) {
+        SFEM_TRACE_SCOPE("NeoHookeanOgden::lor");
 
         if (impl_->space->has_semi_structured_mesh() && is_semistructured_type(impl_->space->element_type())) {
-            SMESH_ERROR("NeoHookeanOgden::lor_op NOT IMPLEMENTED for semi-structured mesh!\n");
+            SMESH_ERROR("NeoHookeanOgden::lor NOT IMPLEMENTED for semi-structured mesh!\n");
             return nullptr;
         }
 
         auto ret            = std::make_shared<NeoHookeanOgden>(space);
-        ret->impl_->domains = impl_->domains->lor_op(space, {});
+        ret->impl_->domains = impl_->domains->lor(space, {});
         neo_copy_material(*impl_->domains, *ret->impl_->domains);
         ret->impl_->mu                       = impl_->mu;
         ret->impl_->lambda                   = impl_->lambda;
@@ -358,8 +358,8 @@ namespace sfem {
         return ret;
     }
 
-    std::shared_ptr<Op> NeoHookeanOgden::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
-        SFEM_TRACE_SCOPE("NeoHookeanOgden::derefine_op");
+    std::shared_ptr<Op> NeoHookeanOgden::derefine(const std::shared_ptr<FunctionSpace> &space) {
+        SFEM_TRACE_SCOPE("NeoHookeanOgden::derefine");
 
         if (space->has_semi_structured_mesh() && is_semistructured_type(space->element_type())) {
             auto ret = std::make_shared<NeoHookeanOgden>(space);
@@ -383,7 +383,7 @@ namespace sfem {
         }
 
         auto ret            = std::make_shared<NeoHookeanOgden>(space);
-        ret->impl_->domains = impl_->domains->derefine_op(space, {});
+        ret->impl_->domains = impl_->domains->derefine(space, {});
         neo_copy_material(*impl_->domains, *ret->impl_->domains);
         ret->impl_->mu                       = impl_->mu;
         ret->impl_->lambda                   = impl_->lambda;
@@ -437,7 +437,7 @@ namespace sfem {
                                      real_t *const        values) {
         SFEM_TRACE_SCOPE("NeoHookeanOgden::hessian_bsr");
 
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) -> int {
             return neohookean_ogden_bsr(domain.element_type,
                                         domain.block->n_elements(),
@@ -463,7 +463,7 @@ namespace sfem {
                                           const ptrdiff_t      block_stride,
                                           real_t **const       diag_values,
                                           real_t **const       off_diag_values) {
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) -> int {
             return neohookean_ogden_bcrs_sym(domain.element_type,
                                              domain.block->n_elements(),

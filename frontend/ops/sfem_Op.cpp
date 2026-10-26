@@ -1,6 +1,8 @@
 #include "sfem_Op.hpp"
 
-#include "sfem_API.hpp"
+#include "sfem_Function.hpp"
+#include "sfem_blas_factory.hpp"
+#include "sfem_device.hpp"
 
 #include <algorithm>
 #include <vector>

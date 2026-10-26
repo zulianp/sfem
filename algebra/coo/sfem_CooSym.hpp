@@ -8,7 +8,7 @@
 #include "sfem_MatrixFreeLinearSolver.hpp"
 #include "sfem_config.h"
 #include "sfem_mask.hpp"
-#include "sfem_openmp_blas.hpp"
+#include "sfem_BLAS_openmp.hpp"
 
 
 
@@ -18,7 +18,6 @@ namespace sfem {
     template <typename R, typename T>
     class CooSym final : public Operator<T> {
     public:
-        ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
         std::function<void(const T* const, T* const)> apply_;
         ptrdiff_t ndofs{SFEM_PTRDIFF_INVALID};
         std::shared_ptr<BLAS<T>> blas;
@@ -30,8 +29,7 @@ namespace sfem {
         SharedBuffer<T> diag_values;
 
         void default_init() {
-            blas = make_openmp_blas<T>();
-            execution_space_ = EXECUTION_SPACE_HOST;
+            blas = OpenMPBLAS<T>::create();
             apply_ = [=](const T* const x, T* const y) { return coo_sym_spmv_(x, y); };
         }
 
@@ -44,7 +42,7 @@ namespace sfem {
         }
         inline std::ptrdiff_t rows() const override { return ndofs; }
         inline std::ptrdiff_t cols() const override { return ndofs; }
-        ExecutionSpace execution_space() const override { return execution_space_; }
+        ExecutionContext execution_context() const override { return blas ? blas->context() : ExecutionContext(EXECUTION_SPACE_INVALID); }
 
         /* Sparse Matrix-Vector Multiplication using SymmCOO format */
         int coo_sym_spmv_(const T* const SFEM_RESTRICT x, T* const SFEM_RESTRICT y) {

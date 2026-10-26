@@ -1,4 +1,5 @@
 #include <algorithm>
+#include "smesh_base.hpp"
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -153,12 +154,12 @@ namespace {
                          const std::shared_ptr<sfem::BLAS<real_t>> &blas) {
         blas->zeros(ndofs, out);
         sfem::device_synchronize();
-        const double t0 = MPI_Wtime();
+        const double t0 = smesh::time_seconds();
         for (int i = 0; i < repeat; ++i) {
             f->gradient(x, out);
         }
         sfem::device_synchronize();
-        return MPI_Wtime() - t0;
+        return smesh::time_seconds() - t0;
     }
 
     /// The merit -- `Function::value` -- in whichever reduction the Function
@@ -171,13 +172,13 @@ namespace {
                       const int                              repeat) {
         real_t value = 0;
         sfem::device_synchronize();
-        const double t0 = MPI_Wtime();
+        const double t0 = smesh::time_seconds();
         for (int i = 0; i < repeat; ++i) {
             value = 0;
             f->energy_merit(x, &value);
         }
         sfem::device_synchronize();
-        const double elapsed = MPI_Wtime() - t0;
+        const double elapsed = smesh::time_seconds() - t0;
         // Keep the result observable so the loop cannot be optimised away, and
         // so a layout that quietly answers something else is visible.
         printf("%-40s %24.17g\n", "  value", (double)value);
@@ -214,13 +215,13 @@ namespace {
         const std::vector<real_t> alphas = line_search_alphas();
         std::vector<real_t>       energies(alphas.size(), 0);
         sfem::device_synchronize();
-        const double t0 = MPI_Wtime();
+        const double t0 = smesh::time_seconds();
         for (int i = 0; i < repeat; ++i) {
             std::fill(energies.begin(), energies.end(), (real_t)0);
             f->energy_merit(x, h, (int)alphas.size(), alphas.data(), energies.data());
         }
         sfem::device_synchronize();
-        const double elapsed = MPI_Wtime() - t0;
+        const double elapsed = smesh::time_seconds() - t0;
         // Observable for the same reason `time_value` prints its result.
         printf("%-40s %24.17g\n", "  value_steps[0]", (double)energies.front());
         return elapsed;
@@ -234,12 +235,12 @@ namespace {
                       const std::shared_ptr<sfem::BLAS<real_t>> &blas) {
         blas->zeros(ndofs, out);
         sfem::device_synchronize();
-        const double t0 = MPI_Wtime();
+        const double t0 = smesh::time_seconds();
         for (int i = 0; i < repeat; ++i) {
             op->apply(h, out);
         }
         sfem::device_synchronize();
-        return MPI_Wtime() - t0;
+        return smesh::time_seconds() - t0;
     }
 
 }  // namespace

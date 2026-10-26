@@ -5,7 +5,10 @@
 #include <limits>
 #include <cmath>
 
-#include "sfem_API.hpp"
+#include "sfem_blas_factory.hpp"
+#ifdef SFEM_ENABLE_CUDA
+#include "sfem_Function_incore_cuda.hpp"
+#endif
 #include "sfem_NodeObstacleView.hpp"
 #include "sfem_aliases.hpp"
 
@@ -14,7 +17,8 @@ namespace sfem {
     // normals and curvature are flat: rows of n entries.
     NodeObstacleView NodeObstacleContact::view(const SharedBuffer<real_t> &normals, const SharedBuffer<real_t> &gap) const {
         NodeObstacleView c;
-        c.es   = es_;
+        c.es       = context_.space();
+        c.stream   = context_.stream();
         c.size = size();
         c.idx  = idx_->data();
         c.n_nodes  = ndofs_ / 3;
@@ -34,9 +38,17 @@ namespace sfem {
                                              const ptrdiff_t                             ndofs,
                                              const ptrdiff_t                             owned_dofs,
                                              const int                                   dir,
-                                             const ExecutionSpace                        es)
-        : nodes_(nodes), idx_(nodes), points_(points), es_(es), comm_(comm), ndofs_(ndofs), owned_dofs_(owned_dofs), dir_(dir) {
-        obstacle_ = SDFObstacle::create(sdf, comm, points->extent(1), points->data()[2], es);
+                                             const ExecutionContext                     &context)
+        : nodes_(nodes),
+          idx_(nodes),
+          points_(points),
+          context_(context),
+          comm_(comm),
+          ndofs_(ndofs),
+          owned_dofs_(owned_dofs),
+          dir_(dir) {
+        const ExecutionSpace es = context.space();
+        obstacle_               = SDFObstacle::create(sdf, comm, points->extent(1), points->data()[2], context);
 
         for (int d = 0; d < 3; ++d) xyz_[d] = points->data()[d];
         frame_of_ = create_host_buffer<idx_t>(ndofs / 3);
@@ -79,7 +91,7 @@ namespace sfem {
     void NodeObstacleContact::offset(const SharedBuffer<real_t> &gap, const SharedBuffer<real_t> &normals) const {
         real_t *nn[3];
         rows(normals, 3, nn);
-        node_obstacle_offset_gap(es_, size(), shift_, cutoff_, 1 - release_, p0_ ? p0_->data() : nullptr, gap->data(), nn);
+        node_obstacle_offset_gap(context_, size(), shift_, cutoff_, 1 - release_, p0_ ? p0_->data() : nullptr, gap->data(), nn);
     }
 
     void NodeObstacleContact::capture_penetration(const real_t *const x) {
@@ -98,7 +110,7 @@ namespace sfem {
             p0->data()[i] = std::max(real_t(0), -gaps->data()[i]);
         }
 #ifdef SFEM_ENABLE_CUDA
-        if (es_ == EXECUTION_SPACE_DEVICE) p0 = smesh::to_device(p0);
+        if (context_.space() == EXECUTION_SPACE_DEVICE) p0 = smesh::to_device(p0);
 #endif
         p0_ = p0;
         update(x);
@@ -132,14 +144,14 @@ namespace sfem {
                                              real_t *const       penetration) {
         SFEM_TRACE_SCOPE("NodeObstacleContact::kkt_residual");
 
-        auto blas = sfem::blas<real_t>(es_);
+        auto blas = sfem::blas<real_t>(context_);
         blas->copy(ndofs_, r, projected);
         node_obstacle_kkt(view(normals_, gap_), k, projected, complementarity_->data(), penetration_->data());
         // Summed over the ranks in one reduction, the penetration with them: a non-finite one on any
         // rank reaches every rank through the sum.
         real_t local[2] = {blas->dot(owned_dofs_, projected, projected) +
                                    blas->dot(size(), complementarity_->data(), complementarity_->data()),
-                           max_or_zero(es_, size(), penetration_->data())};
+                           max_or_zero(context_, size(), penetration_->data())};
         if (comm_->size() > 1) {
             comm_->sum(&local[0], 1, smesh::TypeToEnum<real_t>::value());
             local[1] = comm_->max(local[1]);
@@ -166,14 +178,14 @@ namespace sfem {
     }
 
     void NodeObstacleContact::reaction(real_t *const out) const {
-        sfem::blas<real_t>(es_)->zeros(ndofs_, out);
+        sfem::blas<real_t>(context_)->zeros(ndofs_, out);
         node_obstacle_reaction(view(normals_, gap_), out);
     }
 
     void NodeObstacleContact::project_velocity(const real_t *const x, real_t *const v, const real_t dt) {
         SFEM_TRACE_SCOPE("NodeObstacleContact::project_velocity");
 
-        sfem::blas<real_t>(es_)->zaxpby(ndofs_, 1, x, dt, v, ahead_->data());
+        sfem::blas<real_t>(context_)->zaxpby(ndofs_, 1, x, dt, v, ahead_->data());
         real_t *an[3];
         rows(ahead_normals_, 3, an);
         obstacle_->sample_nodes(size(), idx_->data(), xyz_, ahead_->data(), ahead_gap_->data(), an);
@@ -194,7 +206,7 @@ namespace sfem {
     }
 
     void NodeObstacleContact::gap_field(real_t *const out) const {
-        sfem::blas<real_t>(es_)->zeros(ndofs_, out);
+        sfem::blas<real_t>(context_)->zeros(ndofs_, out);
         node_obstacle_gap_field(view(normals_, gap_), out);
     }
 

@@ -249,7 +249,7 @@ namespace sfem {
         }
         laplacian_seed_diffusion(*impl_->domains, real_t(1));
 
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
 
         for (auto &n2d : impl_->domains->domains()) {
             OpDomain &domain = n2d.second;
@@ -298,19 +298,19 @@ namespace sfem {
         return std::make_unique<Laplacian>(space);
     }
 
-    std::shared_ptr<Op> Laplacian::lor_op(const std::shared_ptr<FunctionSpace> &space) {
+    std::shared_ptr<Op> Laplacian::lor(const std::shared_ptr<FunctionSpace> &space) {
         if (impl_->space->has_semi_structured_mesh() && is_semistructured_type(impl_->space->element_type())) {
-            SMESH_ERROR("Laplacian::lor_op NOT IMPLEMENTED for semi-structured mesh!\n");
+            SMESH_ERROR("Laplacian::lor NOT IMPLEMENTED for semi-structured mesh!\n");
             return nullptr;
         }
         auto ret            = std::make_shared<Laplacian>(space);
-        ret->impl_->domains = impl_->domains->lor_op(space, {});
+        ret->impl_->domains = impl_->domains->lor(space, {});
         laplacian_copy_diffusion(*impl_->domains, *ret->impl_->domains);
         return ret;
     }
 
-    std::shared_ptr<Op> Laplacian::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
-        SFEM_TRACE_SCOPE("Laplacian::derefine_op");
+    std::shared_ptr<Op> Laplacian::derefine(const std::shared_ptr<FunctionSpace> &space) {
+        SFEM_TRACE_SCOPE("Laplacian::derefine");
 
         if (space->has_semi_structured_mesh() && is_semistructured_type(space->element_type())) {
             auto ret = std::make_shared<Laplacian>(space);
@@ -319,7 +319,7 @@ namespace sfem {
             return ret;
         }
 
-        // SS hierarchy bottom: coarse space is standard (e.g. HEX8). MultiDomainOp::derefine_op maps
+        // SS hierarchy bottom: coarse space is standard (e.g. HEX8). MultiDomainOp::derefine maps
         // element types with macro_base_elem and aborts on HEX8 — match old SemiStructuredLaplacian.
         if (impl_->space->has_semi_structured_mesh() && is_semistructured_type(impl_->space->element_type()) &&
             !is_semistructured_type(space->element_type())) {
@@ -330,7 +330,7 @@ namespace sfem {
         }
 
         auto ret            = std::make_shared<Laplacian>(space);
-        ret->impl_->domains = impl_->domains->derefine_op(space, {});
+        ret->impl_->domains = impl_->domains->derefine(space, {});
         laplacian_copy_diffusion(*impl_->domains, *ret->impl_->domains);
         return ret;
     }
@@ -345,7 +345,7 @@ namespace sfem {
                                real_t *const        values) {
         SFEM_TRACE_SCOPE("Laplacian::hessian_crs");
 
-        auto mesh  = impl_->space->mesh_ptr();
+        auto mesh  = impl_->space->mesh();
         auto graph = impl_->space->dof_to_dof_graph();
 
         return impl_->iterate([&](const OpDomain &domain) {
@@ -367,7 +367,7 @@ namespace sfem {
                                    real_t *const        off_diag_values) {
         SFEM_TRACE_SCOPE("Laplacian::hessian_crs_sym");
 
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
 
         return impl_->iterate([&](const OpDomain &domain) {
             return laplacian_crs_sym(domain.element_type,
@@ -385,7 +385,7 @@ namespace sfem {
     int Laplacian::hessian_diag(const real_t *const /*x*/, real_t *const values) {
         SFEM_TRACE_SCOPE("Laplacian::hessian_diag");
 
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         const ptrdiff_t n = mesh->n_nodes();
 
         return impl_->iterate([&](const OpDomain &domain) {
@@ -425,21 +425,21 @@ namespace sfem {
     int Laplacian::value(const real_t *x, real_t *const out) { return value(x, out, ElementScope::ALL); }
 
     int Laplacian::gradient(const real_t *const x, real_t *const out, const ElementScope scope) {
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) {
             return laplacian_dispatch_domain_vector(domain, *mesh, x, out, domain_element_range(*mesh, domain, scope));
         });
     }
 
     int Laplacian::apply(const real_t *const /*x*/, const real_t *const h, real_t *const out, const ElementScope scope) {
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) {
             return laplacian_dispatch_domain_vector(domain, *mesh, h, out, domain_element_range(*mesh, domain, scope));
         });
     }
 
     int Laplacian::value(const real_t *x, real_t *const out, const ElementScope scope) {
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) {
             return laplacian_value_domain_range(domain, *mesh, x, out, domain_element_range(*mesh, domain, scope));
         });
@@ -458,7 +458,7 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
 
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         int  err  = SFEM_SUCCESS;
         for (const auto &slice : flat_block_element_chunks(*mesh, scope, flat_begin, flat_end)) {
             const smesh::block_idx_t block = slice.block;

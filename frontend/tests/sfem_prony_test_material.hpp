@@ -39,7 +39,7 @@ namespace sfem {
                 const PronyMooneyRivlin              &material) {
             auto op = std::make_shared<GeneratedMooneyRivlinProny>(fs);
             if (op->initialize() != SFEM_SUCCESS) return nullptr;
-            for (const auto &block : fs->mesh_ptr()->blocks()) {
+            for (const auto &block : fs->mesh()->blocks()) {
                 op->set_value_in_block(block->name(), "C10", material.C10);
                 op->set_value_in_block(block->name(), "C01", material.C01);
                 op->set_value_in_block(block->name(), "K", material.K);
@@ -56,7 +56,7 @@ namespace sfem {
 
         /// The step weight gamma of the first block's isochoric group, as of the last `begin_step`.
         inline real_t prony_gamma(GeneratedMooneyRivlinProny &op, const std::shared_ptr<FunctionSpace> &fs) {
-            return op.relaxation_groups().relaxation(fs->mesh_ptr()->blocks()[0]->name(), "iso").gamma();
+            return op.relaxation_groups().relaxation(fs->mesh()->blocks()[0]->name(), "iso").gamma();
         }
 
     }  // namespace test

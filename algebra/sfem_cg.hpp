@@ -10,25 +10,25 @@
 #include <memory>
 
 #include "sfem_MatrixFreeLinearSolver.hpp"
+#include "sfem_operator_factory.hpp"
 
-#include "sfem_openmp_blas.hpp"
-#include "sfem_openmp_cg_impl.hpp"
+#include "sfem_BLAS_openmp.hpp"
+#include "sfem_ConjugateGradientKernels_openmp.hpp"
 
 // https://en.wikipedia.org/wiki/Conjugate_gradient_method
 namespace sfem {
 
     template <typename T>
-    static std::shared_ptr<Operator<T>> diag_op(const SharedBuffer<T>& diagonal_scaling, const ExecutionSpace es);
-
-    template <typename T>
     class ConjugateGradient final : public MatrixFreeLinearSolver<T> {
     public:
+        /// Built for the execution space es, on op.
+        static std::shared_ptr<ConjugateGradient<T>> create(const std::shared_ptr<Operator<T>> &op, const ExecutionSpace es);
         // Operator
         std::shared_ptr<Operator<T>> apply_op;
         std::shared_ptr<Operator<T>> preconditioner_op;
 
         std::shared_ptr<BLAS<T>> blas;
-        CG_Tpl<T>                impl;
+        ConjugateGradientKernels<T>                impl;
 
         std::function<void(T*)> interceptor;
 
@@ -50,7 +50,6 @@ namespace sfem {
         // curvature), or on the first direction that direction itself scaled by |curvature|
         // (Nocedal and Wright, Algorithm 7.1). Off, the iteration runs on and loses its meaning.
         bool           stop_on_negative_curvature{false};
-        ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
 
         int iterations() const override { return iterations_; }
 
@@ -59,7 +58,7 @@ namespace sfem {
 
         void set_stop_on_negative_curvature(const bool val) { stop_on_negative_curvature = val; }
 
-        ExecutionSpace execution_space() const override { return execution_space_; }
+        ExecutionContext execution_context() const override { return blas ? blas->context() : ExecutionContext(EXECUTION_SPACE_INVALID); }
 
         void set_atol(const T val) { atol = val; }
 
@@ -83,7 +82,7 @@ namespace sfem {
         }
 
         int set_op_and_diag_shift(const std::shared_ptr<Operator<T>>& op, const SharedBuffer<T>& diag) override {
-            assert(execution_space() == (enum ExecutionSpace)diag->mem_space());
+            assert(this->execution_space() == (enum ExecutionSpace)diag->mem_space());
             auto J         = op;  // + sfem::diag_op(diag, execution_space());
             this->apply_op = J;
             n_dofs         = op->rows();
@@ -106,7 +105,7 @@ namespace sfem {
         int set_op_and_diag_shift(const std::shared_ptr<Operator<T>>&          op,
                                   const std::shared_ptr<SparseBlockVector<T>>& sbv,
                                   const SharedBuffer<T>&                       diag) override {
-            assert(execution_space() == (enum ExecutionSpace)diag->mem_space());
+            assert(this->execution_space() == (enum ExecutionSpace)diag->mem_space());
             this->apply_op = op;  // + sfem::create_sparse_block_vector_mult(op->rows(), sbv, diag);
 
             if (preconditioner_op) {
@@ -133,9 +132,8 @@ namespace sfem {
         void set_preconditioner(std::function<void(const T* const, T* const)>&& in) { preconditioner_op = in; }
 
         void default_init() {
-            blas             = make_openmp_blas<T>();
-            OpenMP_CG<T>::build(impl);
-            execution_space_ = EXECUTION_SPACE_HOST;
+            blas             = OpenMPBLAS<T>::create();
+            OpenMPConjugateGradientKernels<T>::build(impl);
         }
 
         bool good() const { return blas && blas->good() && apply_op && (!fusion || impl.good()); }
@@ -427,6 +425,11 @@ namespace sfem {
         cg->default_init();
         return cg;
     }
+    template <typename T>
+    std::shared_ptr<ConjugateGradient<T>> create_cg(const std::shared_ptr<Operator<T>> &op, const ExecutionSpace es) {
+        return ConjugateGradient<T>::create(op, es);
+    }
+
 }  // namespace sfem
 
 #endif  // SFEM_CG_HPP

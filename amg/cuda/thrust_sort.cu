@@ -30,7 +30,7 @@ struct CompareTuplesIndices {
     }
 };
 
-void sort_weights(count_t *sort_indices, idx_t *row_indices, idx_t *col_indices, real_t *weights,
+void sort_weights(count_t * /*sort_indices*/, idx_t *row_indices, idx_t *col_indices, real_t *weights,
                   const count_t N) {
     thrust::device_vector<idx_t> d_col_indices(col_indices, col_indices + N);
     thrust::device_vector<idx_t> d_row_indices(row_indices, row_indices + N);
@@ -48,7 +48,7 @@ void sort_weights(count_t *sort_indices, idx_t *row_indices, idx_t *col_indices,
     thrust::copy(d_values.begin(), d_values.end(), weights);
 }
 
-void sort_rows_cols(count_t *sort_indices, idx_t *row_indices, idx_t *col_indices, real_t *weights,
+void sort_rows_cols(count_t * /*sort_indices*/, idx_t *row_indices, idx_t *col_indices, real_t *weights,
                     const count_t N) {
     thrust::device_vector<idx_t> d_col_indices(col_indices, col_indices + N);
     thrust::device_vector<idx_t> d_row_indices(row_indices, row_indices + N);

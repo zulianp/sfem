@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <type_traits>
 
 #include "sfem_cuda_base.hpp"
 
@@ -23,8 +24,13 @@ namespace sfem {
         /// One rounding to binary16, from whatever real_t is.  Going through
         /// float first would round twice and disagree with the host, which
         /// converts double to half directly.
-        __device__ inline __half to_half(const double v) { return __double2half(v); }
-        __device__ inline __half to_half(const float v) { return __float2half_rn(v); }
+        __device__ inline __half to_half(const real_t v) {
+            if constexpr (std::is_same_v<real_t, float>) {
+                return __float2half_rn(v);
+            } else {
+                return __double2half(v);
+            }
+        }
 
         // The device codecs.  The host ones (`sfem_HistoryStorage.hpp`) use the
         // host's half type and <cmath>; these spell the same encodings with the
@@ -37,7 +43,6 @@ namespace sfem {
             static constexpr bool scaled = false;
             __device__ static real_t    decode(const T s, const real_t) { return static_cast<real_t>(s); }
             __device__ static T         encode(const real_t v, const real_t) { return static_cast<T>(v); }
-            __device__ static scaling_t scale_for(const real_t) { return 1; }
         };
 
         struct DeviceHalf {
@@ -45,7 +50,6 @@ namespace sfem {
             static constexpr bool scaled = false;
             __device__ static real_t    decode(const __half s, const real_t) { return __half2float(s); }
             __device__ static __half    encode(const real_t v, const real_t) { return to_half(v); }
-            __device__ static scaling_t scale_for(const real_t) { return 1; }
         };
 
         struct DeviceScaledHalf {
@@ -229,7 +233,7 @@ namespace sfem {
                                 real_t *const          out,
                                 void *const            stream) {
         if (n_terms > MAX_TERMS) return SFEM_FAILURE;
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(stream);
         const Weights w     = pack(n_terms, alpha, nullptr);
         const int     block = 128;
         const int     ret   = dispatch(storage, [&](auto codec) {
@@ -238,7 +242,7 @@ namespace sfem {
                     n_terms, rows, n, w, b_sum, static_cast<const typename Codec::storage_t *>(H), H_scales, S_n, out);
             return launched();
         });
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(stream);
         return ret;
     }
 
@@ -254,7 +258,7 @@ namespace sfem {
                          scaling_t *const     H_scales,
                          void *const          stream) {
         if (n_terms > MAX_TERMS) return SFEM_FAILURE;
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(stream);
         const Weights w     = pack(n_terms, alpha, b);
         const int     block = 128;
         const int     ret   = dispatch(storage, [&](auto codec) {
@@ -263,7 +267,7 @@ namespace sfem {
                     n_terms, rows, n, w, S_n, S_new, static_cast<typename Codec::storage_t *>(H), H_scales);
             return launched();
         });
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(stream);
         return ret;
     }
 
@@ -274,7 +278,7 @@ namespace sfem {
                        void *const          H,
                        scaling_t *const     H_scales,
                        void *const          stream) {
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(stream);
         const int block = 128;
         const int ret   = dispatch(storage, [&](auto codec) {
             using Codec = decltype(codec);
@@ -282,7 +286,7 @@ namespace sfem {
                     rows, n, factor, static_cast<typename Codec::storage_t *>(H), H_scales);
             return launched();
         });
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(stream);
         return ret;
     }
 
@@ -301,7 +305,7 @@ namespace sfem {
                     cudaSuccess) {
             return SFEM_FAILURE;
         }
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(stream);
         return SFEM_SUCCESS;
     }
 
@@ -317,7 +321,7 @@ namespace sfem {
             fill_scales_kernel<<<grid_for(n_scales, block), block, 0, (cudaStream_t)stream>>>(n_scales, scales);
             ret = launched();
         }
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(stream);
         return ret;
     }
 

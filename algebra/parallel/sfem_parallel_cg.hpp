@@ -13,8 +13,8 @@
 #include "sfem_MatrixFreeLinearSolver.hpp"
 #include "sfem_ParallelOperator.hpp"
 #include "sfem_cg.hpp"
-#include "sfem_openmp_blas.hpp"
-#include "sfem_openmp_cg_impl.hpp"
+#include "sfem_BLAS_openmp.hpp"
+#include "sfem_ConjugateGradientKernels_openmp.hpp"
 
 namespace sfem {
 
@@ -34,11 +34,13 @@ namespace sfem {
     template <typename T>
     class ParallelConjugateGradient final : public MatrixFreeLinearSolver<T> {
     public:
+        /// On the host only, for now.
+        static std::shared_ptr<ParallelConjugateGradient<T>> create(const std::shared_ptr<ParallelOperator<T>> &op);
         std::shared_ptr<ParallelOperator<T>> apply_op;
         std::shared_ptr<Operator<T>>         preconditioner_op;
         std::shared_ptr<Communicator>        comm_;
         std::shared_ptr<BLAS<T>>             blas;
-        CG_Tpl<T>                            impl;
+        ConjugateGradientKernels<T>                            impl;
 
         std::function<void(T*)> interceptor;
 
@@ -52,11 +54,10 @@ namespace sfem {
         bool           verbose{true};
         bool           apply_overwrites_output{false};
         bool           fusion{true};
-        ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
 
         int iterations() const override { return iterations_; }
 
-        ExecutionSpace execution_space() const override { return execution_space_; }
+        ExecutionContext execution_context() const override { return blas ? blas->context() : ExecutionContext(EXECUTION_SPACE_INVALID); }
 
         void set_atol(const T val) { atol = val; }
         void set_rtol(const T val) { rtol = val; }
@@ -88,7 +89,7 @@ namespace sfem {
         }
 
         int set_op_and_diag_shift(const std::shared_ptr<Operator<T>>& op, const SharedBuffer<T>& diag) override {
-            assert(execution_space() == (enum ExecutionSpace)diag->mem_space());
+            assert(this->execution_space() == (enum ExecutionSpace)diag->mem_space());
             set_op(op);
 
             if (preconditioner_op) {
@@ -109,7 +110,7 @@ namespace sfem {
         int set_op_and_diag_shift(const std::shared_ptr<Operator<T>>&          op,
                                   const std::shared_ptr<SparseBlockVector<T>>& sbv,
                                   const SharedBuffer<T>&                       diag) override {
-            assert(execution_space() == (enum ExecutionSpace)diag->mem_space());
+            assert(this->execution_space() == (enum ExecutionSpace)diag->mem_space());
             set_op(op);
 
             if (preconditioner_op) {
@@ -136,9 +137,8 @@ namespace sfem {
         void set_preconditioner(std::function<void(const T* const, T* const)>&& in) { preconditioner_op = in; }
 
         void default_init() {
-            blas             = make_openmp_blas<T>();
-            OpenMP_CG<T>::build(impl);
-            execution_space_ = EXECUTION_SPACE_HOST;
+            blas             = OpenMPBLAS<T>::create();
+            OpenMPConjugateGradientKernels<T>::build(impl);
         }
 
         bool good() const { return blas && blas->good() && apply_op && comm_ && (!fusion || impl.good()); }
@@ -429,6 +429,14 @@ namespace sfem {
         auto cg = std::make_shared<ParallelConjugateGradient<T>>();
         cg->default_init();
         return cg;
+    }
+
+    /// Parallel CG. Caller must pass @c x with @c op->col_allocation_size() entries
+    /// (owned + ghosts/aura). @c b needs at least @c op->rows(); use @c row_allocation_size()
+    /// if applying sideset Dirichlet constraints into @c b (ghost indices).
+    template <typename T>
+    std::shared_ptr<ParallelConjugateGradient<T>> create_parallel_cg(const std::shared_ptr<ParallelOperator<T>> &op) {
+        return ParallelConjugateGradient<T>::create(op);
     }
 
 }  // namespace sfem

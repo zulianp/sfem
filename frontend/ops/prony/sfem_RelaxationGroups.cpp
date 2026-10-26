@@ -3,7 +3,7 @@
 #include <cassert>
 #include <utility>
 
-#include "sfem_API.hpp"
+#include "sfem_blas_factory.hpp"
 #include "sfem_logger.hpp"
 
 namespace sfem {
@@ -189,6 +189,12 @@ namespace sfem {
         if (relaxing) this->evaluate(x, 0, evaluate);
         start_stress_current_ = relaxing;
         start_unknown_        = !relaxing;
+    }
+
+    std::vector<std::string> RelaxationGroups::block_names() const {
+        std::vector<std::string> names;
+        for (const auto &entry : blocks_) names.push_back(entry.first);
+        return names;
     }
 
     bool RelaxationGroups::relaxes() const {

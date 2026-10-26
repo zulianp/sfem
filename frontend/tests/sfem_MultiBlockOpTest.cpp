@@ -98,7 +98,7 @@ int test_multi_block_op() {
     auto space = sfem::FunctionSpace::create(mesh, 1);
 
     auto f  = sfem::Function::create(space);
-    auto op = sfem::Factory::create_op(space, "Laplacian");
+    auto op = sfem::OpFactory::create(space, "Laplacian", sfem::EXECUTION_SPACE_HOST);
     op->initialize();
     f->add_operator(op);
 
@@ -234,7 +234,7 @@ int test_hex8_tet4_laplacian_apply() {
 
     auto space = sfem::FunctionSpace::create(mesh, 1);
     auto f     = sfem::Function::create(space);
-    auto op    = sfem::Factory::create_op(space, "Laplacian");
+    auto op    = sfem::OpFactory::create(space, "Laplacian", sfem::EXECUTION_SPACE_HOST);
     SFEM_TEST_ASSERT(op != nullptr);
     SFEM_TEST_ASSERT(op->initialize() == SFEM_SUCCESS);
     f->add_operator(op);
@@ -374,13 +374,13 @@ int checkerboard_ss_to_hex8_derefine_compare(const char *op_name, const int bloc
     SFEM_TEST_EQ(cb_coarse_fs->element_type(0), smesh::HEX8);
     SFEM_TEST_EQ(cb_coarse_fs->element_type(1), smesh::HEX8);
 
-    auto cb_coarse_op   = cb_op->derefine_op(cb_coarse_fs);
-    auto cube_coarse_op = cube_op->derefine_op(cube_coarse_fs);
+    auto cb_coarse_op   = cb_op->derefine(cb_coarse_fs);
+    auto cube_coarse_op = cube_op->derefine(cube_coarse_fs);
     SFEM_TEST_ASSERT(cb_coarse_op != nullptr);
     SFEM_TEST_ASSERT(cube_coarse_op != nullptr);
 
     std::vector<ptrdiff_t> cb_to_cube;
-    SFEM_TEST_ASSERT(map_nodes_by_xyz(*cb_coarse_fs->mesh_ptr(), *cube_coarse_fs->mesh_ptr(), cb_to_cube) ==
+    SFEM_TEST_ASSERT(map_nodes_by_xyz(*cb_coarse_fs->mesh(), *cube_coarse_fs->mesh(), cb_to_cube) ==
                      SFEM_TEST_SUCCESS);
 
     auto x_cb    = sfem::create_host_buffer<real_t>(cb_coarse_fs->n_dofs());
@@ -388,11 +388,11 @@ int checkerboard_ss_to_hex8_derefine_compare(const char *op_name, const int bloc
     auto y_cb    = sfem::create_host_buffer<real_t>(cb_coarse_fs->n_dofs());
     auto y_cube  = sfem::create_host_buffer<real_t>(cube_coarse_fs->n_dofs());
     if (block_size == 1) {
-        fill_scalar_field(*cb_coarse_fs->mesh_ptr(), x_cb->data());
-        fill_scalar_field(*cube_coarse_fs->mesh_ptr(), x_cube->data());
+        fill_scalar_field(*cb_coarse_fs->mesh(), x_cb->data());
+        fill_scalar_field(*cube_coarse_fs->mesh(), x_cube->data());
     } else {
-        fill_vector_field(*cb_coarse_fs->mesh_ptr(), x_cb->data());
-        fill_vector_field(*cube_coarse_fs->mesh_ptr(), x_cube->data());
+        fill_vector_field(*cb_coarse_fs->mesh(), x_cb->data());
+        fill_vector_field(*cube_coarse_fs->mesh(), x_cube->data());
     }
     std::fill(y_cb->data(), y_cb->data() + y_cb->size(), real_t(0));
     std::fill(y_cube->data(), y_cube->data() + y_cube->size(), real_t(0));
@@ -446,7 +446,9 @@ int test_hex_dominant_laplacian_hex_tet_only() {
     auto space = sfem::FunctionSpace::create(mesh, 1);
     auto op    = sfem::create_op(space, "Laplacian", sfem::EXECUTION_SPACE_HOST);
     SFEM_TEST_ASSERT(op != nullptr);
-    SFEM_TEST_ASSERT(op->initialize({"hex", "tet"}) == SFEM_SUCCESS);
+    // Named: GCC 13 at -O3 misreads the inlined initializer-list temporary (-Wfree-nonheap-object).
+    const std::vector<std::string> blocks = {"hex", "tet"};
+    SFEM_TEST_ASSERT(op->initialize(blocks) == SFEM_SUCCESS);
 
     auto x = sfem::create_host_buffer<real_t>(space->n_dofs());
     auto y = sfem::create_host_buffer<real_t>(space->n_dofs());
@@ -472,7 +474,9 @@ int test_hex_dominant_ss_laplacian_hex_tet_only() {
     auto space = sfem::FunctionSpace::create(ss, 1);
     auto op    = sfem::create_op(space, "Laplacian", sfem::EXECUTION_SPACE_HOST);
     SFEM_TEST_ASSERT(op != nullptr);
-    SFEM_TEST_ASSERT(op->initialize({"hex", "tet"}) == SFEM_SUCCESS);
+    // Named: GCC 13 at -O3 misreads the inlined initializer-list temporary (-Wfree-nonheap-object).
+    const std::vector<std::string> blocks = {"hex", "tet"};
+    SFEM_TEST_ASSERT(op->initialize(blocks) == SFEM_SUCCESS);
 
     auto x = sfem::create_host_buffer<real_t>(space->n_dofs());
     auto y = sfem::create_host_buffer<real_t>(space->n_dofs());

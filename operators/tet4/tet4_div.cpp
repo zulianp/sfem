@@ -1,5 +1,6 @@
 
 #include <assert.h>
+#include "smesh_base.hpp"
 #include <math.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -7,7 +8,7 @@
 #include <mpi.h>
 
 
-#include "sortreduce.hpp"
+#include "sfem_sortreduce.hpp"
 
 #include "sfem_vec.hpp"
 
@@ -75,7 +76,7 @@ void tet4_div_apply(const ptrdiff_t nelements,
                real_t *const values) {
     SFEM_UNUSED(nnodes);
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     idx_t ev[4];
     real_t element_vector[4];
@@ -136,7 +137,7 @@ void tet4_div_apply(const ptrdiff_t nelements,
         }
     }
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
     printf("tet4_div.c: div_apply\t%g seconds\n", tock - tick);
 }
 
@@ -201,7 +202,7 @@ void tet4_integrate_div(const ptrdiff_t nelements,
                    real_t *const value) {
     SFEM_UNUSED(nnodes);
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     idx_t ev[4];
     real_t element_ux[4];
@@ -265,7 +266,7 @@ void tet4_integrate_div(const ptrdiff_t nelements,
         *value += element_scalar;
     }
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
     printf("tet4_div.c: integrate_div\t%g seconds\n", tock - tick);
 }
 
@@ -327,7 +328,7 @@ void tet4_cdiv(const ptrdiff_t nelements,
           real_t *const SFEM_RESTRICT div) {
     SFEM_UNUSED(nnodes);
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     idx_t ev[4];
     real_t element_ux[4];
@@ -389,7 +390,7 @@ void tet4_cdiv(const ptrdiff_t nelements,
         div[i] = element_scalar;
     }
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
     printf("tet4_div.c: cdiv\t%g seconds\n", tock - tick);
 }
 
@@ -469,7 +470,7 @@ void tet4_p1_u_dot_grad_q_apply(const ptrdiff_t nelements,
                            real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     idx_t ev[4];
     real_t element_vector[4];
@@ -530,7 +531,7 @@ void tet4_p1_u_dot_grad_q_apply(const ptrdiff_t nelements,
         }
     }
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
     printf("tet4_div.c: div_apply\t%g seconds\n", tock - tick);
 }
 
@@ -601,7 +602,7 @@ void tet4_p0_u_dot_grad_q_apply(const ptrdiff_t nelements,
                            real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     idx_t ev[4];
     real_t element_vector[4];
@@ -651,6 +652,6 @@ void tet4_p0_u_dot_grad_q_apply(const ptrdiff_t nelements,
         }
     }
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
     printf("tet4_div.c: u_dot_grad_q_apply\t%g seconds\n", tock - tick);
 }

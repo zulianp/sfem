@@ -118,7 +118,7 @@ TestResult run_hyperelastic_test(TestMode mode, double max_strain, int num_point
     printf("  WLF: disabled\n");
     
     const ptrdiff_t ndofs = fs->n_dofs();
-    const ptrdiff_t n_nodes = fs->mesh_ptr()->n_nodes();
+    const ptrdiff_t n_nodes = fs->mesh()->n_nodes();
     
     auto x_buf = sfem::create_buffer<real_t>(ndofs, es);
     auto rhs_buf = sfem::create_buffer<real_t>(ndofs, es);

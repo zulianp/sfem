@@ -38,19 +38,19 @@ namespace sfem {
         return std::make_unique<LumpedMass>(space);
     }
 
-    std::shared_ptr<Op> LumpedMass::lor_op(const std::shared_ptr<FunctionSpace> &space) {
+    std::shared_ptr<Op> LumpedMass::lor(const std::shared_ptr<FunctionSpace> &space) {
         if (impl_->space->has_semi_structured_mesh() && is_semistructured_type(impl_->space->element_type())) {
-            fprintf(stderr, "[Error] LumpedMass::lor_op NOT IMPLEMENTED for semi-structured mesh!\n");
+            fprintf(stderr, "[Error] LumpedMass::lor NOT IMPLEMENTED for semi-structured mesh!\n");
             assert(false);
             return nullptr;
         }
         auto ret            = std::make_shared<LumpedMass>(space);
-        ret->impl_->domains = impl_->domains->lor_op(space, {});
+        ret->impl_->domains = impl_->domains->lor(space, {});
         return ret;
     }
 
-    std::shared_ptr<Op> LumpedMass::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
-        SFEM_TRACE_SCOPE("LumpedMass::derefine_op");
+    std::shared_ptr<Op> LumpedMass::derefine(const std::shared_ptr<FunctionSpace> &space) {
+        SFEM_TRACE_SCOPE("LumpedMass::derefine");
 
         // TODO: can the following code be simplified?
 
@@ -68,7 +68,7 @@ namespace sfem {
         }
 
         auto ret            = std::make_shared<LumpedMass>(space);
-        ret->impl_->domains = impl_->domains->derefine_op(space, {});
+        ret->impl_->domains = impl_->domains->derefine(space, {});
         return ret;
     }
 
@@ -91,7 +91,7 @@ namespace sfem {
     int LumpedMass::hessian_diag(const real_t *const /*x*/, real_t *const values) {
         SFEM_TRACE_SCOPE("LumpedMass::hessian_diag");
 
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
 
         if (impl_->space->block_size() == 1) {
             return impl_->iterate([&](const OpDomain &domain) {

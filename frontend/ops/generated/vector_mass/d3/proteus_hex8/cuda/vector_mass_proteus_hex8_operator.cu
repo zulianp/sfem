@@ -634,30 +634,6 @@ extern "C" const sfem::codegen::KernelDiagnostics *cu_vector_mass_proteus_hex8_j
   return &sfem::codegen::vector_mass_proteus_hex8_jacobian_action_esoa_diagnostics_data;
 }
 
-extern "C" int cu_vector_mass_proteus_hex8_residual_esoa(
-    const int scalar_bytes,
-    const ptrdiff_t geometry_stride,
-    const void *const RSTR determinant,
-    const void *const RSTR current[24],
-    const real_t density,
-    void *const RSTR output[24],
-    void *const stream
-) {
-  switch (scalar_bytes) {
-    case (int)sizeof(double): {
-        sfem::codegen::vector_mass_d3_tensor_product_residual_block<double, 8, 8>(geometry_stride, (const double *)determinant, sfem::codegen::ref_line_p1_q2<double>::shape_1d(), sfem::codegen::quad_line_q2<double>::q_weight_1d(), (const double *const *)current, density, (double *const *)output);
-        return SFEM_SUCCESS;
-    }
-    case (int)sizeof(float): {
-        sfem::codegen::vector_mass_d3_tensor_product_residual_block<float, 8, 8>(geometry_stride, (const float *)determinant, sfem::codegen::ref_line_p1_q2<float>::shape_1d(), sfem::codegen::quad_line_q2<float>::q_weight_1d(), (const float *const *)current, density, (float *const *)output);
-        return SFEM_SUCCESS;
-    }
-    default:
-      break;
-  }
-  return sfem::codegen::unsupported_dispatch("vector_mass_proteus_hex8_residual_esoa", -1, (int)scalar_bytes);
-}
-
 namespace sfem {
 namespace codegen {
 
@@ -928,30 +904,6 @@ extern "C" int cu_vector_mass_proteus_hex8_residual_i_maos(
       break;
   }
   return sfem::codegen::unsupported_dispatch("vector_mass_proteus_hex8_residual_i_maos", -1, (int)scalar_bytes);
-}
-
-extern "C" int cu_vector_mass_proteus_hex8_jacobian_action_esoa(
-    const int scalar_bytes,
-    const ptrdiff_t geometry_stride,
-    const void *const RSTR determinant,
-    const void *const RSTR direction[24],
-    const real_t density,
-    void *const RSTR output[24],
-    void *const stream
-) {
-  switch (scalar_bytes) {
-    case (int)sizeof(double): {
-        sfem::codegen::vector_mass_d3_tensor_product_jacobian_action_block<double, 8, 8>(geometry_stride, (const double *)determinant, sfem::codegen::ref_line_p1_q2<double>::shape_1d(), sfem::codegen::quad_line_q2<double>::q_weight_1d(), (const double *const *)direction, density, (double *const *)output);
-        return SFEM_SUCCESS;
-    }
-    case (int)sizeof(float): {
-        sfem::codegen::vector_mass_d3_tensor_product_jacobian_action_block<float, 8, 8>(geometry_stride, (const float *)determinant, sfem::codegen::ref_line_p1_q2<float>::shape_1d(), sfem::codegen::quad_line_q2<float>::q_weight_1d(), (const float *const *)direction, density, (float *const *)output);
-        return SFEM_SUCCESS;
-    }
-    default:
-      break;
-  }
-  return sfem::codegen::unsupported_dispatch("vector_mass_proteus_hex8_jacobian_action_esoa", -1, (int)scalar_bytes);
 }
 
 namespace sfem {

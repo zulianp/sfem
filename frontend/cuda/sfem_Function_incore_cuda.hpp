@@ -5,7 +5,7 @@
 #include "sfem_Function.hpp"
 
 #include "sfem_aliases.hpp"
-#include "sfem_cuda_blas.hpp"
+#include "sfem_BLAS_cuda.hpp"
 
 #include "sfem_MatrixFreeLinearSolver.hpp"
 

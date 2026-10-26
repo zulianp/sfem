@@ -1,4 +1,5 @@
 #include "sfem_MaMAL.hpp"
+#include "smesh_semistructured.hpp"
 
 #include "sfem_ContactSkin.hpp"
 #include "sfem_ContactSolveKernels.hpp"
@@ -11,8 +12,12 @@
 #include "smesh_crs_graph.hpp"
 #include "smesh_env.hpp"
 
-#include "sfem_API.hpp"
+#include "sfem_BSR.hpp"
+#include "sfem_blas_factory.hpp"
 #include "sfem_mask.hpp"
+#include "sfem_ShiftableJacobi.hpp"
+#include "smesh_glob.hpp"
+#include "smesh_ssquad4.hpp"
 #include "smesh_ssquad4_prolongation.hpp"
 
 #include <algorithm>
@@ -421,7 +426,7 @@ namespace sfem {
         assert(fine_surface->n_blocks() == 1);
         assert(from_level % to_level == 0);
 
-        auto      coarse_view = ssquad4_derefine_element_connectivity(from_level, to_level, fine_surface->block(0)->elements());
+        auto      coarse_view = smesh::derefine_elements(smesh::QUAD4, from_level, to_level, fine_surface->block(0)->elements());
         auto      coarse_view_data  = coarse_view->data();
         const int nxe               = coarse_view->extent(0);
         const ptrdiff_t nelements   = coarse_view->extent(1);
@@ -564,7 +569,7 @@ namespace sfem {
                 return;
             }
 
-            auto mesh        = space->mesh_ptr();
+            auto mesh        = space->mesh();
             auto spatial_dim = mesh->spatial_dimension();
             auto es          = f->execution_space();
 
@@ -603,7 +608,7 @@ namespace sfem {
                 contact = create_contact(
                         space, contact_eval_surface, params.margin, params.search_radius * params.search_radius, es);
             } else {
-                contact = create_mulitbody_contact(
+                contact = create_multibody_contact(
                         space, contact_eval_surface, params.margin, params.search_radius * params.search_radius, es);
             }
 
@@ -1630,7 +1635,7 @@ namespace sfem {
             const smesh::Path root(params.output_dir);
             smesh::create_directory(root);
             smesh::create_directory(root / "out");
-            smesh::semistructured_export_as_standard(f->space()->mesh_ptr(), root / "mesh");
+            smesh::semistructured_export_as_standard(f->space()->mesh(), root / "mesh");
 
             auto out = f->output();
             out->enable_AoS_to_SoA(true);

@@ -179,11 +179,11 @@ namespace {
 
         auto serial_fs     = serial_f->space();
         auto parallel_fs   = parallel_f->space();
-        auto serial_mesh   = serial_fs->mesh_ptr();
-        auto parallel_mesh = parallel_fs->mesh_ptr();
+        auto serial_mesh   = serial_fs->mesh();
+        auto parallel_mesh = parallel_fs->mesh();
 
         const ptrdiff_t n_global = parallel_fs->n_dofs_global();
-        SFEM_TEST_EQ(comm->sum(parallel_fs->n_owned_dofs()), n_global);
+        SFEM_TEST_EQ(comm->sum(parallel_fs->n_dofs_owned()), n_global);
         SFEM_TEST_EQ(n_global, serial_fs->n_dofs_global());
 
         // MPI SS gids are not serial local indices (HO order within a layer differs), so the
@@ -222,7 +222,7 @@ namespace {
         auto ax = sfem::create_host_buffer<real_t>(parallel_fs->n_dofs());
         SFEM_TEST_ASSERT(A->apply(parallel_x->data(), ax->data()) == SFEM_SUCCESS);
 
-        const ptrdiff_t n_owned  = parallel_fs->n_owned_dofs();
+        const ptrdiff_t n_owned  = parallel_fs->n_dofs_owned();
         real_t          local_r2 = 0;
         real_t          local_b2 = 0;
         for (ptrdiff_t i = 0; i < n_owned; ++i) {
@@ -458,7 +458,7 @@ namespace {
             auto lop = sfem::create_linear_operator(sfem::op_type::MATRIX_FREE, f, nullptr, sfem::EXECUTION_SPACE_HOST);
             SFEM_TEST_ASSERT(lop != nullptr);
             SFEM_TEST_ASSERT(lop->apply(u, r->data()) == SFEM_SUCCESS);
-            const ptrdiff_t nowned = fs->n_owned_dofs();
+            const ptrdiff_t nowned = fs->n_dofs_owned();
             real_t          local  = 0;
             for (ptrdiff_t i = 0; i < nowned; ++i) {
                 const real_t d = rhs->data()[i] - r->data()[i];

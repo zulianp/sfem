@@ -1,0 +1,5 @@
+run,case,gpus,job,what,steps,failed,newton,linear,t_end,contact_nodes,stepper_s,newton_s,qp_s,export_s
+newmark,FF200_ExodusMesh,1,5131942,"contact-stabilised Newmark, gamma 0.6, every field written",2619,1699,32299,7874553,0.18000000000000002,18780,1675.02,1378.14,1349.37,219.304
+bdf2,FF200_ExodusMesh,1,5132710,"BDF2, every field written",2156,604,14484,2660426,0.18000000000000002,18780,560.078,326.672,316.258,166.916
+final,FF200_ExodusMesh,1,5133369,"BDF2 started at u_n + dt v_n, float32 tangent, MPRGP runs on the device, the displacement written",1807,10,9441,1975208,0.18000000000000002,18780,230.993,148.443,142.845,29.2502
+refined,FF200_mesh_refined,4,5135347,"as final, on the refined mesh, four ranks (MPRGP's device runs are single-rank)",1916,146,10923,3473703,0.18000000000000002,57066,1064,845.941,829.578,63.7694

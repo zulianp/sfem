@@ -26,11 +26,11 @@
 // //     return corners + edge_nodes + area_nodes;
 // // }
 
-// #define A3SET(a, x, y, z) \
-//     do {                  \
-//         a[0] = x;         \
-//         a[1] = y;         \
-//         a[2] = z;         \
+// #define A3SET(a, x, y, z)
+//     do {
+//         a[0] = x;
+//         a[1] = y;
+//         a[2] = z;
 //     } while (0)
 
 // int sshex8_surface_from_sideset(const int                                L,

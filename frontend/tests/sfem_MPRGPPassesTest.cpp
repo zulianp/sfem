@@ -18,7 +18,7 @@
 #ifdef SFEM_ENABLE_CUDA
 #include <cuda_runtime.h>
 
-#include "sfem_cuda_mprgp_impl.hpp"
+#include "sfem_MPRGPKernels_cuda.hpp"
 #endif
 
 namespace {
@@ -91,7 +91,7 @@ namespace {
 
     // Where the passes run: the host's vectors as they are, or copies on the device.
     struct Space {
-        sfem::MPRGP_Tpl<real_t>                    impl;
+        sfem::MPRGPKernels<real_t>                    impl;
         sfem::ExecutionSpace                       es;
         std::vector<sfem::SharedBuffer<real_t>>    keep;
         sfem::SharedBuffer<real_t>                 work;
@@ -150,7 +150,7 @@ namespace {
 
         // Two ranks with this rank's values: the sums doubled, the minimum as it is.
         sfem::MPRGPReduce<real_t> two_ranks() {
-            return [this](real_t *const values, const int count, const bool min_last) {
+            return [this](real_t *const values, const int count, const bool min_last, void *const /*stream*/) {
                 V h(count);
                 get(values, h);
                 for (int k = 0; k < count; ++k) {
@@ -170,7 +170,7 @@ namespace {
 
         // curvature
         const sfem::MPRGPParams<real_t> params{real_t(3), real_t(0.5), infty, std::numeric_limits<real_t>::epsilon()};
-        s.impl.curvature(n, dlb, dub, dx, dg, dd, dAd, infty, sfem::MPRGP_DECIDE_NONE, params, s.control_buffer(), s.work_buffer(), {});
+        s.impl.curvature(n, dlb, dub, dx, dg, dd, dAd, infty, sfem::MPRGPDecision::NONE, params, s.control_buffer(), s.work_buffer(), {});
         sfem::MPRGPControl<real_t> rec = s.read();
         real_t                     out[4] = {rec.dAd, rec.dd, rec.gd, rec.alpha_feas};
         real_t dAd_r = 0, dd_r = 0, gd_r = 0, alpha_r = infty;
@@ -191,7 +191,7 @@ namespace {
         SFEM_TEST_ASSERT(out[3] == alpha_r);
 
         // The decisions in the pass, from its own sums, against the same decisions taken here.
-        for (const auto decision : {sfem::MPRGP_DECIDE_CG, sfem::MPRGP_DECIDE_PROPORTIONING}) {
+        for (const auto decision : {sfem::MPRGPDecision::CG, sfem::MPRGPDecision::PROPORTIONING}) {
             s.impl.curvature(n, dlb, dub, dx, dg, dd, dAd, infty, decision, params, s.control_buffer(), s.work_buffer(), {});
             const sfem::MPRGPControl<real_t> in_pass = s.read();
             sfem::MPRGPControl<real_t>       here    = in_pass;
@@ -240,7 +240,7 @@ namespace {
             V       x1 = p.x, g1 = p.g, gf(n, 0);
             real_t *dgf = s.put(gf);
             sfem::MPRGPControl<real_t> c{};
-            c.move  = real_t(sfem::MPRGP_MOVE_STEP);
+            c.move  = real_t(sfem::MPRGPMove::STEP);
             c.alpha = alpha;
             c.dAd   = real_t(2);
             s.write(c);
@@ -339,7 +339,7 @@ namespace {
                 SFEM_TEST_ASSERT(err < 1e-14 * (1 + std::abs(rec.beta)));
 
                 c       = s.read();
-                c.move  = real_t(sfem::MPRGP_MOVE_EXPAND);
+                c.move  = real_t(sfem::MPRGPMove::EXPAND);
                 s.write(c);
                 s.impl.update_direction(n, dgf, dp, s.control_buffer());
                 V again(n);
@@ -405,7 +405,7 @@ namespace {
 int test_host_passes() {
     Space s;
     s.es = sfem::EXECUTION_SPACE_HOST;
-    sfem::OpenMP_MPRGP<real_t>::build_mprgp(s.impl);
+    sfem::OpenMPMPRGPKernels<real_t>::build_mprgp(s.impl);
     return check_space(s);
 }
 
@@ -413,7 +413,7 @@ int test_host_passes() {
 int test_device_passes() {
     Space s;
     s.es = sfem::EXECUTION_SPACE_DEVICE;
-    sfem::CUDA_MPRGP<real_t>::build_mprgp(s.impl);
+    sfem::GPUMPRGPKernels<real_t>::build_mprgp(s.impl);
     return check_space(s);
 }
 #endif

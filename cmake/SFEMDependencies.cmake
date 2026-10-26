@@ -19,6 +19,13 @@ if(SFEM_ENABLE_CUDA)
         set(CMAKE_CUDA_STANDARD 17)
         set(CMAKE_CUDA_STANDARD_REQUIRED ON)
     endif()
+
+    # The null stream is the calling thread's default stream (cudaStreamPerThread), not the legacy
+    # one: a graph can capture it, and every launch, copy and thrust call issued without a stream
+    # stays in one order on it. nvcc takes the flag, host compilers the definition; set before smesh
+    # is added so that its kernels share the stream (sfem_execution_context.hpp).
+    string(APPEND CMAKE_CUDA_FLAGS " --default-stream per-thread")
+    add_compile_definitions(CUDA_API_PER_THREAD_DEFAULT_STREAM)
 endif()
 
 if(EXISTS "${SFEM_SMESH_PATH}/CMakeLists.txt")
@@ -32,11 +39,10 @@ if(EXISTS "${SFEM_SMESH_PATH}/CMakeLists.txt")
     set(SMESH_ENABLE_LAPACK ${SFEM_ENABLE_LAPACK} CACHE BOOL "" FORCE)
     set(SMESH_ENABLE_METIS ${SFEM_ENABLE_METIS} CACHE BOOL "" FORCE)
     set(SMESH_ENABLE_MPI ${SFEM_ENABLE_MPI} CACHE BOOL "" FORCE)
+    set(SMESH_ENABLE_NCCL ${SFEM_ENABLE_NCCL} CACHE BOOL "" FORCE)
     set(SMESH_ENABLE_OPENMP ${SFEM_ENABLE_OPENMP} CACHE BOOL "" FORCE)
     set(SMESH_ENABLE_RYAML ${SFEM_ENABLE_RYAML} CACHE BOOL "" FORCE)
     set(SMESH_USE_OCCUPANCY_MAX_POTENTIAL ${SFEM_USE_OCCUPANCY_MAX_POTENTIAL} CACHE BOOL "" FORCE)
-    set(SMESH_ENABLE_CUBLAS ${SFEM_ENABLE_CUBLAS} CACHE BOOL "" FORCE)
-    set(SMESH_ENABLE_CUSPARSE ${SFEM_ENABLE_CUSPARSE} CACHE BOOL "" FORCE)
 
     if(SFEM_ENABLE_MINIMAL)
         set(SMESH_ENABLE_DRIVERS OFF CACHE BOOL "" FORCE)
@@ -210,22 +216,6 @@ if(SFEM_ENABLE_CUDA)
         include_directories($ENV{CRAY_CUDATOOLKIT_INCLUDE_OPTS})
     endif()
 
-    # Thrust is header-only (ships with the CUDA toolkit). Do not add it to
-    # SFEM_DEP_LIBRARIES: install(EXPORT) serializes the INTERFACE target as
-    # -lThrust, which does not exist and breaks downstream links.
-    find_package(Thrust CONFIG)
-    if(Thrust_FOUND)
-        if(NOT TARGET Thrust)
-            thrust_create_target(Thrust)
-        endif()
-        get_target_property(_SFEM_THRUST_INCLUDES Thrust INTERFACE_INCLUDE_DIRECTORIES)
-        if(_SFEM_THRUST_INCLUDES)
-            list(APPEND SFEM_DEP_INCLUDES ${_SFEM_THRUST_INCLUDES})
-        endif()
-        unset(_SFEM_THRUST_INCLUDES)
-    else()
-        message(STATUS "Thrust CMake package not found; using CUDA toolkit includes")
-    endif()
 endif()
 
 
@@ -298,6 +288,11 @@ if(SFEM_ENABLE_SCCD)
 
     set(SFEM_SCCD_PATH "${CMAKE_CURRENT_LIST_DIR}/../external/sccd")
     add_subdirectory("${SFEM_SCCD_PATH}" "${CMAKE_CURRENT_BINARY_DIR}/external/sccd")
+    # SCCD is header templates instantiated in sfem's sources: its headers are system headers
+    # there, so SFEM_ENABLE_DEV_MODE judges sfem's code, not SCCD's (CMake 3.25 and later).
+    if(TARGET sccd)
+        set_target_properties(sccd PROPERTIES SYSTEM ON)
+    endif()
 
     if(TARGET SCCD::sccd)
         list(APPEND SFEM_SUBMODULES SCCD::sccd)
@@ -313,6 +308,12 @@ if(SFEM_ENABLE_SSDF)
     set(SSDF_ENABLE_MPI ${SFEM_ENABLE_MPI} CACHE BOOL "" FORCE)
     set(SSDF_ENABLE_CUDA ${SFEM_ENABLE_CUDA} CACHE BOOL "" FORCE)
     set(SSDF_ENABLE_CUBIQL ${SFEM_ENABLE_CUBIQL} CACHE BOOL "" FORCE)
+    # cuBQL enables CUDA whenever it finds nvcc; a build without CUDA tells it not to.
+    if(SFEM_ENABLE_CUDA)
+        set(CUBQL_DISABLE_CUDA OFF CACHE BOOL "" FORCE)
+    else()
+        set(CUBQL_DISABLE_CUDA ON CACHE BOOL "" FORCE)
+    endif()
     set(SSDF_ENABLE_SMESH ON CACHE BOOL "" FORCE)
     
     set(SSDF_PATH "${CMAKE_CURRENT_LIST_DIR}/../external/ssdf")
@@ -326,5 +327,26 @@ if(SFEM_ENABLE_SSDF)
         list(APPEND SFEM_SUBMODULES ssdf::ssdf)
     else()
         message(FATAL_ERROR "Failed to build SSDF library, make sure to run: git submodule update --init --recursive")
+    endif()
+endif()
+
+# After the subprojects: SCCD creates its own imported Thrust target, which would clash with one
+# created here first (a subdirectory sees its parent's imported targets).
+if(SFEM_ENABLE_CUDA)
+    # Thrust is header-only (ships with the CUDA toolkit). Do not add it to
+    # SFEM_DEP_LIBRARIES: install(EXPORT) serializes the INTERFACE target as
+    # -lThrust, which does not exist and breaks downstream links.
+    find_package(Thrust CONFIG)
+    if(Thrust_FOUND)
+        if(NOT TARGET Thrust)
+            thrust_create_target(Thrust)
+        endif()
+        get_target_property(_SFEM_THRUST_INCLUDES Thrust INTERFACE_INCLUDE_DIRECTORIES)
+        if(_SFEM_THRUST_INCLUDES)
+            list(APPEND SFEM_DEP_INCLUDES ${_SFEM_THRUST_INCLUDES})
+        endif()
+        unset(_SFEM_THRUST_INCLUDES)
+    else()
+        message(STATUS "Thrust CMake package not found; using CUDA toolkit includes")
     endif()
 endif()

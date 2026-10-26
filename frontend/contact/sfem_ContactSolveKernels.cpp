@@ -11,7 +11,8 @@
 #include "sfem_aliases.hpp"
 #include "sfem_macros.hpp"
 
-#include "sfem_API.hpp"
+#include "sfem_CRS.hpp"
+#include "sfem_blas_factory.hpp"
 
 namespace sfem {
 
@@ -961,7 +962,7 @@ namespace sfem {
             auto contact_surface = cd->surface;
             auto es              = f->execution_space();
 
-            const int       dim            = f->space()->mesh_ptr()->spatial_dimension();
+            const int       dim            = f->space()->mesh()->spatial_dimension();
             const ptrdiff_t ndofs          = f->space()->n_dofs();
             const ptrdiff_t n_nodes        = ndofs / dim;
             const ptrdiff_t n_contact      = contact_surface->n_nodes();
@@ -986,7 +987,7 @@ namespace sfem {
             SFEM_TRACE_SCOPE("ContactJacobi::smooth");
 
             auto      space = cd->f->space();
-            auto      mesh  = space->mesh_ptr();
+            auto      mesh  = space->mesh();
             const int dim   = mesh->spatial_dimension();
             assert(dim == 3);
 

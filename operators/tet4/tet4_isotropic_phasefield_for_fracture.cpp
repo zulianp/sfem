@@ -1,4 +1,5 @@
 #include "isotropic_phasefield_for_fracture.hpp"
+#include "smesh_base.hpp"
 
 #include <assert.h>
 #include <math.h>
@@ -9,7 +10,7 @@
 #include <mpi.h>
 
 
-#include "sortreduce.hpp"
+#include "sfem_sortreduce.hpp"
 
 #include "sfem_vec.hpp"
 
@@ -426,7 +427,7 @@ static SFEM_INLINE idx_t find_col(const idx_t key, const idx_t *const row, const
         // assert(key == row[k]);
     } else {
         // Use this for larger number of dofs per row
-        return find_idx_binary_search(key, row, lenrow);
+        return sfem::find_idx_binary_search(key, row, lenrow);
     }
 }
 
@@ -470,7 +471,7 @@ void isotropic_phasefield_for_fracture_assemble_hessian(const ptrdiff_t nelement
                                                         real_t *const values) {
     SFEM_UNUSED(nnodes);
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     static const int block_size = 4;
     static const int mat_block_size = 4 * 4;
@@ -610,7 +611,7 @@ void isotropic_phasefield_for_fracture_assemble_hessian(const ptrdiff_t nelement
         }
     }
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
     printf("isotropic_phasefield_for_fracture.c: assemble_hessian\t%g seconds\n", tock - tick);
 }
 
@@ -626,7 +627,7 @@ void isotropic_phasefield_for_fracture_assemble_gradient(const ptrdiff_t nelemen
                                                          real_t *const values) {
     SFEM_UNUSED(nnodes);
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     static const int block_size = 4;
 
@@ -734,7 +735,7 @@ void isotropic_phasefield_for_fracture_assemble_gradient(const ptrdiff_t nelemen
         }
     }
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
     printf("isotropic_phasefield_for_fracture.c: assemble_gradient\t%g seconds\n", tock - tick);
 }
 
@@ -750,7 +751,7 @@ void isotropic_phasefield_for_fracture_assemble_value(const ptrdiff_t nelements,
                                                       real_t *const value) {
     SFEM_UNUSED(nnodes);
     
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     static const int block_size = 4;
     // static const int mat_block_size = block_size * block_size;
@@ -841,6 +842,6 @@ void isotropic_phasefield_for_fracture_assemble_value(const ptrdiff_t nelements,
         *value += element_scalar;
     }
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
     printf("isotropic_phasefield_for_fracture.c: assemble_value\t%g seconds\n", tock - tick);
 }

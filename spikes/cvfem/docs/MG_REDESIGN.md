@@ -99,7 +99,7 @@ stabilization and is inconsistent. The difference is what happens to that parame
 | coarse operator | selected by | Rhie–Chow time scale |
 |---|---|---|
 | Lethe, matrix-free rediscretization | — | τ recomputed per level; consistent by construction |
-| ours, `derefine_op` rediscretization | `SFEM_GMG_GALERKIN=0`, **the default** | recomputed at coarse `h`, then hand-corrected by `SFEM_GMG_RC_DECAY`, which defaults to 1 — i.e. uncorrected |
+| ours, `derefine` rediscretization | `SFEM_GMG_GALERKIN=0`, **the default** | recomputed at coarse `h`, then hand-corrected by `SFEM_GMG_RC_DECAY`, which defaults to 1 — i.e. uncorrected |
 | ours, element-wise Galerkin | `SFEM_GMG_GALERKIN=2` with `SFEM_GMG_EGAL=1` | frozen at the **fine** `h`; exact only under the frozen-pgrad Jacobian |
 
 ### How much of this the time-scale fix removed

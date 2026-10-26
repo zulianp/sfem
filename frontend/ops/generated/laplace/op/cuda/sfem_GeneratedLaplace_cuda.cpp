@@ -2,7 +2,8 @@
 #include "sfem_GeneratedLaplace_cuda_c_abi.hpp"
 
 
-#include "sfem_API.hpp"
+#include "sfem_blas_factory.hpp"
+#include "sfem_BLAS_cuda.hpp"
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_MultiDomainOp.hpp"
 #include "sfem_DerefinedTimeScheme.hpp"
@@ -58,14 +59,16 @@ namespace sfem {
       return matched;
     }
 
-    void material_defaults(real_t *const values) {
+    [[maybe_unused]] void material_defaults(real_t *const values) {
       values[0] = 1;
     }
 
+    // derefine copies the parameters by name, with or without YAML.
+    [[maybe_unused]] constexpr int N_DEFINED_MATERIAL_PARAMETERS = 1;
+    [[maybe_unused]] constexpr int N_MATERIAL_PARAMETERS = 1;
+    [[maybe_unused]] static const char *const MATERIAL_PARAMETER_NAMES[N_MATERIAL_PARAMETERS] = {"kappa"};
+
 #ifdef SFEM_ENABLE_RYAML
-    constexpr int N_DEFINED_MATERIAL_PARAMETERS = 1;
-    constexpr int N_MATERIAL_PARAMETERS = 1;
-    static const char *const MATERIAL_PARAMETER_NAMES[N_MATERIAL_PARAMETERS] = {"kappa"};
 
     bool yaml_read_real(const ryml::ConstNodeRef &node,
               const char *const key,
@@ -225,7 +228,7 @@ namespace sfem {
     int cache_affine_geometry(const std::shared_ptr<FunctionSpace> &space,
                                   MultiDomainOp &domains,
                                   const bool requested) {
-      auto mesh = space->mesh_ptr();
+      auto mesh = space->mesh();
       const bool needs_jacobian_aos =
           false ||
           false;
@@ -383,7 +386,7 @@ namespace sfem {
 
   std::unique_ptr<Op> GPUGeneratedLaplace::create(const std::shared_ptr<FunctionSpace> &space) {
     const ptrdiff_t expected_block_size =
-        block_size_for_dim(space->mesh_ptr()->spatial_dimension());
+        block_size_for_dim(space->mesh()->spatial_dimension());
     if (space->block_size() != expected_block_size) {
       SFEM_ERROR("GPUGeneratedLaplace requires block_size=%ld\n",
                        static_cast<long>(expected_block_size));
@@ -407,7 +410,7 @@ namespace sfem {
       return total;
     }
 
-    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+    const int dim = impl_->space->mesh()->spatial_dimension();
     impl_->domains->iterate([&](const OpDomain &domain) {
       const ptrdiff_t nelements = domain.block->n_elements();
       if (dim == 2) {
@@ -438,7 +441,7 @@ namespace sfem {
       return total;
     }
 
-    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+    const int dim = impl_->space->mesh()->spatial_dimension();
     impl_->domains->iterate([&](const OpDomain &domain) {
       const ptrdiff_t nelements = domain.block->n_elements();
       if (dim == 2) {
@@ -469,7 +472,7 @@ namespace sfem {
       return total;
     }
 
-    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+    const int dim = impl_->space->mesh()->spatial_dimension();
     impl_->domains->iterate([&](const OpDomain &domain) {
       const ptrdiff_t nelements = domain.block->n_elements();
       if (dim == 2) {
@@ -500,7 +503,7 @@ namespace sfem {
       return total;
     }
 
-    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+    const int dim = impl_->space->mesh()->spatial_dimension();
     impl_->domains->iterate([&](const OpDomain &domain) {
       const ptrdiff_t nelements = domain.block->n_elements();
       if (dim == 2) {
@@ -531,7 +534,7 @@ namespace sfem {
       return total;
     }
 
-    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+    const int dim = impl_->space->mesh()->spatial_dimension();
     impl_->domains->iterate([&](const OpDomain &domain) {
       const ptrdiff_t nelements = domain.block->n_elements();
       if (dim == 2) {
@@ -562,7 +565,7 @@ namespace sfem {
       return total;
     }
 
-    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+    const int dim = impl_->space->mesh()->spatial_dimension();
     impl_->domains->iterate([&](const OpDomain &domain) {
       const ptrdiff_t nelements = domain.block->n_elements();
       if (dim == 2) {
@@ -642,7 +645,7 @@ namespace sfem {
         return SFEM_FAILURE;
       }
     }
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const geom_t *const *adjugate = nullptr;
@@ -705,7 +708,7 @@ namespace sfem {
         return SFEM_FAILURE;
       }
     }
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const geom_t *const *adjugate = nullptr;
@@ -788,7 +791,7 @@ namespace sfem {
               const real_t *const steps,
               real_t *const out) {
     SFEM_TRACE_SCOPE("GPUGeneratedLaplace::value_steps");
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
     auto points = element_points(mesh);
     if (nsteps <= 0) {
       return SFEM_SUCCESS;
@@ -829,7 +832,7 @@ namespace sfem {
         impl_->step_values = create_buffer<real_t>(nsteps, EXECUTION_SPACE_DEVICE);
         impl_->step_capacity = nsteps;
       }
-      buffer_host_to_device(nsteps * sizeof(real_t), steps, impl_->step_values->data());
+      copy_host_to_device(nsteps * sizeof(real_t), steps, impl_->step_values->data());
       if (nvalues > impl_->element_capacity) {
         impl_->element_values = create_buffer<real_t>(nvalues, EXECUTION_SPACE_DEVICE);
         impl_->element_ones = create_buffer<real_t>(nvalues, EXECUTION_SPACE_DEVICE);
@@ -891,7 +894,7 @@ namespace sfem {
       }
     }
 
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
     return impl_->domains->iterate([&](const OpDomain &/*domain*/) {
       const int dim = mesh->spatial_dimension();
       if (dim == 2) {
@@ -930,7 +933,7 @@ namespace sfem {
       }
     }
 
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const geom_t *const *adjugate = nullptr;
@@ -977,7 +980,7 @@ namespace sfem {
       }
     }
 
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
     return impl_->domains->iterate([&](const OpDomain &/*domain*/) {
       const int dim = mesh->spatial_dimension();
       if (dim == 2) {
@@ -1024,8 +1027,8 @@ namespace sfem {
     impl_->domains->set_value_in_block(block_name, var_name, value);
   }
 
-  std::shared_ptr<Op> GPUGeneratedLaplace::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
-    SFEM_TRACE_SCOPE("GPUGeneratedLaplace::derefine_op");
+  std::shared_ptr<Op> GPUGeneratedLaplace::derefine(const std::shared_ptr<FunctionSpace> &space) {
+    SFEM_TRACE_SCOPE("GPUGeneratedLaplace::derefine");
     auto ret = std::make_shared<GPUGeneratedLaplace>(space);
     if (impl_->time_scheme) {
       auto coarse_scheme = derefine_time_scheme(impl_->time_scheme, space);

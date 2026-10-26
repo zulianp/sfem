@@ -135,6 +135,26 @@ def _work_item_loop_text(indent, index_name, simd_lines, single_work_item):
     )
 
 
+#: GCC's `-Wmaybe-uninitialized` around the lane-blocked `tensor_test`, and
+#: only there.  The caller fills the flux it passes for every point and every
+#: lane below `ne`, and `test` reads exactly those -- but in loops whose trip
+#: count is `ne`, so GCC sees a path on which nothing was written (`ne <= 0`).
+#: Where `test` is not inlined (a 64-point HEX64 block in float, GCC 13 at
+#: -O3) GCC then reports the flux as possibly uninitialised merely because its
+#: address is passed as a `const` pointer.  It is a false positive; clearing the
+#: flux to silence it would cost a store per point and lane on every call.  The
+#: scalar spelling has no `ne`, hence no such path, and keeps the warning.
+_FLUX_DIAGNOSTIC_PUSH = """#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
+"""
+_FLUX_DIAGNOSTIC_POP = """
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif"""
+
+
 def _weak_form_ops_source(
     inline_qualifier,
     work_item_index,
@@ -170,6 +190,8 @@ def _weak_form_ops_source(
         "work_item_count_6": "      const int ne,\n" if lane_blocked else "",
         "work_item_count_4": "    const int ne,\n" if lane_blocked else "",
         "ne_argument": "ne, " if lane_blocked else "",
+        "flux_diagnostic_push": _FLUX_DIAGNOSTIC_PUSH if lane_blocked else "",
+        "flux_diagnostic_pop": _FLUX_DIAGNOSTIC_POP if lane_blocked else "",
     }
     for indent_size in (12, 16, 20):
         values["work_item_loop_%d" % indent_size] = _work_item_loop_text(
@@ -716,7 +738,7 @@ static %(inline_qualifier)s void tensor_gradient_contiguous%(scalar_suffix)s(
       %(ne_argument)sshape_1d, grad_1d, streams, component, gradient);
 }
 
-template <typename s_t, int NQ, int NS%(width_param)s, int ND, int NC = ND>
+%(flux_diagnostic_push)stemplate <typename s_t, int NQ, int NS%(width_param)s, int ND, int NC = ND>
 static %(inline_qualifier)s void tensor_test%(scalar_suffix)s(
 %(work_item_count_4)s    const s_t *const RSTR shape_1d,
     const s_t *const RSTR grad_1d,
@@ -725,7 +747,7 @@ static %(inline_qualifier)s void tensor_test%(scalar_suffix)s(
     const int component) {
   %(weak_ops)s<s_t, NQ, NS%(width_arg)s, ND>::template test<NC>(
       %(ne_argument)sshape_1d, grad_1d, flux, out_streams, component);
-}'''
+}%(flux_diagnostic_pop)s'''
 
 
 _RESIDUAL_OPS_TEMPLATE = r'''template <typename s_t, int NQ, int NS%(width_param)s, int ND>

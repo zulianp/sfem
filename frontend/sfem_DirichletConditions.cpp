@@ -93,8 +93,8 @@ namespace sfem {
             return create_host_buffer<idx_t>(0);
         }
 
-        auto fm = fine_space ? fine_space->mesh_ptr() : nullptr;
-        auto cm = coarse_space ? coarse_space->mesh_ptr() : nullptr;
+        auto fm = fine_space ? fine_space->mesh() : nullptr;
+        auto cm = coarse_space ? coarse_space->mesh() : nullptr;
         if (!mesh_is_mpi_distributed(fm) || !mesh_is_mpi_distributed(cm)) {
             ptrdiff_t n   = 0;
             idx_t    *idx = nullptr;
@@ -151,7 +151,7 @@ namespace sfem {
         for (auto &c : dc->impl_->conditions) {
             if (!c.nodeset) {
                 // Per-sideset extract uses Sideset::block_id(); multi-block vectors are unioned.
-                auto mesh_for_sidesets = space->mesh_ptr();
+                auto mesh_for_sidesets = space->mesh();
                 c.nodeset              = smesh::create_nodeset_from_sidesets(mesh_for_sidesets, c.sidesets);
             }
         }
@@ -219,8 +219,8 @@ namespace sfem {
             cdc.component = conds[i].component;
             cdc.value     = as_zero ? 0 : conds[i].value;
 
-            const bool mpi = mesh_is_mpi_distributed(impl_->space->mesh_ptr()) &&
-                             mesh_is_mpi_distributed(coarse_space->mesh_ptr());
+            const bool mpi = mesh_is_mpi_distributed(impl_->space->mesh()) &&
+                             mesh_is_mpi_distributed(coarse_space->mesh());
 
             // Intermediate SS levels (e.g. PROTEUS_HEX125) are still semistructured. Recreating
             // the nodeset from sidesets calls LocalSideTable, which has no HEX-SS face tables.
@@ -298,7 +298,7 @@ namespace sfem {
 
         if (!SFEM_DIRICHLET_NODESET && !SFEM_DIRICHLET_SIDESET) return dc;
 
-        auto comm = space->mesh_ptr()->comm();
+        auto comm = space->mesh()->comm();
         int  rank = comm->rank();
 
         auto &conds = dc->impl_->conditions;
@@ -334,7 +334,7 @@ namespace sfem {
                     }
                 } else {
                     cdc.sidesets.push_back(Sideset::create_from_file(comm, smesh::Path(pch)));
-                    auto mesh_for_sidesets = space->mesh_ptr();
+                    auto mesh_for_sidesets = space->mesh();
                     cdc.nodeset            = smesh::create_nodeset_from_sidesets(mesh_for_sidesets, cdc.sidesets);
                 }
 
@@ -430,7 +430,7 @@ namespace sfem {
                 } else if (is_file) {
                     std::string path;
                     c["path"].load(&path);
-                    sidesets = {Sideset::create_from_file(space->mesh_ptr()->comm(), smesh::Path(lookup.resolve(path)))};
+                    sidesets = {Sideset::create_from_file(space->mesh()->comm(), smesh::Path(lookup.resolve(path)))};
                 } else if (is_expr) {
                     assert(c["parent"].is_seq());
                     assert(c["lfi"].is_seq());
@@ -450,11 +450,11 @@ namespace sfem {
                     }
 
                     assert(lfi_count == parent_count);
-                    sidesets = {std::make_shared<Sideset>(space->mesh_ptr()->comm(), parent, lfi)};
+                    sidesets = {std::make_shared<Sideset>(space->mesh()->comm(), parent, lfi)};
                 }
 
-                nodeset = sidesets.size() == 1 ? smesh::create_nodeset_from_sideset(space->mesh_ptr(), sidesets[0])
-                                               : smesh::create_nodeset_from_sidesets(space->mesh_ptr(), sidesets);
+                nodeset = sidesets.size() == 1 ? smesh::create_nodeset_from_sideset(space->mesh(), sidesets[0])
+                                               : smesh::create_nodeset_from_sidesets(space->mesh(), sidesets);
             } else {
                 if (is_file) {
                     std::string path;
@@ -547,7 +547,7 @@ namespace sfem {
             }
 
             LoadProfile profile;
-            if (c.has_child("profile") && LoadProfile::from_yaml(c["profile"], profile) != SFEM_SUCCESS) return nullptr;
+            if (c.has_child("profile") && LoadProfile::from_yaml(c["profile"], profile, lookup.base_dir) != SFEM_SUCCESS) return nullptr;
 
             for (size_t i = 0; i < component.size(); i++) {
                 struct Condition cdc;
@@ -576,6 +576,8 @@ namespace sfem {
         return create_from_yaml(space, conds);
 
 #else
+        SFEM_UNUSED(space);
+        SFEM_UNUSED(yaml);
         SFEM_ERROR("This functionaly requires -DSFEM_ENABLE_RYAML=ON\n");
         return nullptr;
 #endif
@@ -767,5 +769,24 @@ namespace sfem {
         return dc;
     }
 #endif
+
+    std::shared_ptr<Constraint> DirichletConditions::create(const std::shared_ptr<FunctionSpace> &space,
+                                                            const std::vector<struct Condition>  &conditions,
+                                                            const ExecutionSpace                  es) {
+        auto conds = DirichletConditions::create(space, conditions);
+        if (es == EXECUTION_SPACE_DEVICE) {
+            return to_device(conds);
+        }
+        return conds;
+    }
+
+    std::shared_ptr<Constraint> DirichletConditions::create_from_env(const std::shared_ptr<FunctionSpace> &space,
+                                                                     const ExecutionSpace                  es) {
+        auto conds = DirichletConditions::create_from_env(space);
+        if (es == EXECUTION_SPACE_DEVICE) {
+            return to_device(conds);
+        }
+        return conds;
+    }
 
 }  // namespace sfem

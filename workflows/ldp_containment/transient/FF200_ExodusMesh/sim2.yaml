@@ -1,0 +1,83 @@
+# FF200, simulation 2: four pump strokes from simulation 1's state, at rest and relaxed there.
+# Each valve takes the pressure difference across it as a vertical traction on the disc of its
+# bottom face inside its seat ring (see sim1.yaml), positive upward: the chamber pressure p(t) (FP70's measured membrane pressure,
+# fp70_membrane_pressure.csv; no FF200 data exists) on both, less the outlet's 90,543 Pa on the
+# pressure valve. Free bodies: the cavity alone holds them. Read from <case>/transient/.
+execution_space: host
+mesh:
+  path: ../db/solid
+  blocks: [PRESSURE_VALVE, SUCTION_VALVE]
+  sidesets:
+    - {name: pv_disc, plane: {axis: y, at: -1.3e-3, block: PRESSURE_VALVE, center: [-0.011, -1.3e-3, 0], radius: 3.84e-3}}
+    - {name: sv_disc, plane: {axis: y, at: -1.45e-3, block: SUCTION_VALVE, center: [0.011, -1.45e-3, 0], radius: 3.75e-3}}
+# As in sim1.yaml.
+material:
+  type: GeneratedMooneyRivlinProny
+  C10: 1.460e8
+  C01: 5.853e8
+  K: 1.529e7
+  relaxation:
+    iso:
+      prony:
+        - {g: 2.83e-04, tau: 1.61e+03}
+        - {g: 3.12e-04, tau: 1.29e+01}
+        - {g: 4.45e-04, tau: 1.53e-01}
+        - {g: 1.03e-03, tau: 9.89e-04}
+        - {g: 6.09e-03, tau: 1.18e-06}
+        - {g: 6.74e-02, tau: 8.51e-09}
+        - {g: 2.22e-01, tau: 1.42e-10}
+        - {g: 1.90e-01, tau: 1.80e-12}
+        - {g: 1.12e-01, tau: 1.27e-14}
+        - {g: 5.07e-02, tau: 2.00e-16}
+        - {g: 6.91e-02, tau: 1.10e-19}
+        - {g: 4.59e-02, tau: 1.38e-22}
+        - {g: 8.62e-02, tau: 1.62e-24}
+        - {g: 6.76e-02, tau: 6.62e-26}
+        - {g: 7.87e-02, tau: 1.82e-27}
+initial_conditions:
+  displacement:
+    components: [sim1/whole/point_data/disp_x.float64, sim1/whole/point_data/disp_y.float64,
+                 sim1/whole/point_data/disp_z.float64]
+loads:
+  neumann:
+    - {type: sideset, format: name, name: pv_disc, component: 1, value: 1,
+       profile: {type: tabulated, path: fp70_membrane_pressure.csv}}
+    - {type: sideset, format: name, name: sv_disc, component: 1, value: 1,
+       profile: {type: tabulated, path: fp70_membrane_pressure.csv}}
+    - {type: sideset, format: name, name: pv_disc, component: 1, value: -90543}
+obstacle:
+  backend: node_sdf
+  nodes: skin
+  sdf: {file: ../db/sdf_stops}
+  shift: 1e-5
+  cutoff: 1e-4
+  curvature: true
+  # Penetration resolved to 1 nm, 1e-4 of the shift (the default, 1e-10 of the mesh's extent, is
+  # 3e-12 m here and takes most of each step's Newton iterations).
+  gap_tol: 1e-9
+  # The QP to 1e-3 of the outer merit (inexact Newton), as the containment cases.
+  qp: {max_it: 15000, rtol: 1e-3}
+regime: dynamic
+# BDF2: L-stable, and its velocity is the displacements', which carries no reaction. One stroke on
+# one GPU in 209 s with 167 failed attempts; the contact-stabilised Newmark damped by gamma 0.6
+# took 462 s with 357, its predicted starts inverting elements at the nodes on a seat.
+dynamics: {scheme: bdf2, density: 1150, mass: lumped}
+time: {dt: 1e-4, t_end: 0.18, max_cutbacks: 8}
+# The step's forces to 1e-6 N, 8e-8 of the outlet's load on the pressure valve (12.4 N). The
+# tangent stored in float32: the QP 15-19% faster, the strokes the same to rounding (FF200, 16 ms).
+solver: {newton: {max_it: 20, atol: 1e-6, rtol: 0, verbose: false}, linear: {storage_bytes: 4}}
+output:
+  # Every step, to follow the material's relaxation within a stroke: the displacement only (the
+  # movie's), the contact and the rates in the history's probes.
+  export_freq: 1
+  # Each valve's centre and the two ends of its plate (x), at mid-thickness; the Prony series,
+  # each term's overstress.
+  probes:
+    - {type: contact}
+    - {type: prony}
+    - {type: control_point, name: pv_centre, at: [-0.011, -0.0008, 0]}
+    - {type: control_point, name: pv_end0, at: [-0.0159, -0.0008, 0]}
+    - {type: control_point, name: pv_end1, at: [-0.0061, -0.0008, 0]}
+    - {type: control_point, name: sv_centre, at: [0.011, -0.00095, 0]}
+    - {type: control_point, name: sv_end0, at: [0.0061, -0.00095, 0]}
+    - {type: control_point, name: sv_end1, at: [0.0159, -0.00095, 0]}

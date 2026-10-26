@@ -966,22 +966,12 @@ static SFEM_INLINE int vector_mass_tet4_hessian_crs_a_msoa_impl(
     const ptrdiff_t nelements,
     const ptrdiff_t,
     idx_t **const RSTR elements,
-    const geom_t *const RSTR g_adj0,
-    const geom_t *const RSTR g_adj1,
-    const geom_t *const RSTR g_adj2,
-    const geom_t *const RSTR g_adj3,
-    const geom_t *const RSTR g_adj4,
-    const geom_t *const RSTR g_adj5,
-    const geom_t *const RSTR g_adj6,
-    const geom_t *const RSTR g_adj7,
-    const geom_t *const RSTR g_adj8,
     const geom_t *const RSTR g_det0,
     const s_t density,
     const count_t *const RSTR rowptr,
     const idx_t *const RSTR colidx,
     v_t *const RSTR values
 ) {
-  static constexpr int ND = 3;
   static constexpr int NQ = 4;
   static constexpr int NS = 4;
   const s_t *const isoparametric_shape = sfem::codegen::ref_tet4_q4<s_t>::shape();
@@ -991,7 +981,6 @@ static SFEM_INLINE int vector_mass_tet4_hessian_crs_a_msoa_impl(
   for (ptrdiff_t element = 0; element < nelements; ++element) {
     idx_t ev[NS];
     s_t element_matrix[144];
-    s_t badjugate_data[ND * ND][NQ];
     s_t bdeterminant[NQ];
 
     for (int shape = 0; shape < NS; ++shape) {
@@ -1000,15 +989,6 @@ static SFEM_INLINE int vector_mass_tet4_hessian_crs_a_msoa_impl(
     }
 
 
-    badjugate_data[0][0] = s_t(g_adj0[element]);
-    badjugate_data[1][0] = s_t(g_adj1[element]);
-    badjugate_data[2][0] = s_t(g_adj2[element]);
-    badjugate_data[3][0] = s_t(g_adj3[element]);
-    badjugate_data[4][0] = s_t(g_adj4[element]);
-    badjugate_data[5][0] = s_t(g_adj5[element]);
-    badjugate_data[6][0] = s_t(g_adj6[element]);
-    badjugate_data[7][0] = s_t(g_adj7[element]);
-    badjugate_data[8][0] = s_t(g_adj8[element]);
     bdeterminant[0] = s_t(g_det0[element]);
 
     vector_mass_d3_simplex_hessian_block<s_t, NQ, NS>(0, bdeterminant, isoparametric_shape, isoparametric_q_weight, density, element_matrix);
@@ -1028,15 +1008,6 @@ extern "C" int vector_mass_tet4_hessian_bsr_a_msoa(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
-    const geom_t *const RSTR g_adj0,
-    const geom_t *const RSTR g_adj1,
-    const geom_t *const RSTR g_adj2,
-    const geom_t *const RSTR g_adj3,
-    const geom_t *const RSTR g_adj4,
-    const geom_t *const RSTR g_adj5,
-    const geom_t *const RSTR g_adj6,
-    const geom_t *const RSTR g_adj7,
-    const geom_t *const RSTR g_adj8,
     const geom_t *const RSTR g_det0,
     const real_t density,
     const count_t *const RSTR rowptr,
@@ -1047,10 +1018,10 @@ extern "C" int vector_mass_tet4_hessian_bsr_a_msoa(
     case (int)sizeof(double): {
       switch (values_bytes) {
         case (int)sizeof(double): {
-          return sfem::codegen::vector_mass_tet4_hessian_crs_a_msoa_impl<double, double>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, density, rowptr, colidx, (double *)values);
+          return sfem::codegen::vector_mass_tet4_hessian_crs_a_msoa_impl<double, double>(nelements, nnodes, elements, g_det0, density, rowptr, colidx, (double *)values);
         }
         case (int)sizeof(float): {
-          return sfem::codegen::vector_mass_tet4_hessian_crs_a_msoa_impl<double, float>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, density, rowptr, colidx, (float *)values);
+          return sfem::codegen::vector_mass_tet4_hessian_crs_a_msoa_impl<double, float>(nelements, nnodes, elements, g_det0, density, rowptr, colidx, (float *)values);
         }
         default:
           break;
@@ -1060,7 +1031,7 @@ extern "C" int vector_mass_tet4_hessian_bsr_a_msoa(
     case (int)sizeof(float): {
       switch (values_bytes) {
         case (int)sizeof(float): {
-          return sfem::codegen::vector_mass_tet4_hessian_crs_a_msoa_impl<float, float>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, density, rowptr, colidx, (float *)values);
+          return sfem::codegen::vector_mass_tet4_hessian_crs_a_msoa_impl<float, float>(nelements, nnodes, elements, g_det0, density, rowptr, colidx, (float *)values);
         }
         default:
           break;

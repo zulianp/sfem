@@ -12,7 +12,7 @@
 
 #include "dirichlet.hpp"
 
-#include "../algebra/inverse.cpp"
+#include "../algebra/sfem_inverse.cpp"
 #include "sfem_base.hpp"
 
 static SFEM_INLINE real_t atomic_read(const real_t *p) {
@@ -52,7 +52,7 @@ static void dinvert(const ptrdiff_t nnodes,
         }  // end for
 
         assert(diag_idx != SFEM_COUNT_INVALID);
-        inverse1(values[diag_idx], &inv_diag[i]);
+        sfem::inverse1(values[diag_idx], &inv_diag[i]);
     }
 }
 

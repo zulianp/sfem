@@ -6,12 +6,16 @@
 #include <functional>
 #include <limits>
 
-#include "sfem_API.hpp"
+#include "sfem_blas_factory.hpp"
+#include "sfem_mprgp.hpp"
+#ifdef SFEM_ENABLE_CUDA
+#include "sfem_BLAS_cuda.hpp"
+#endif
 #include "sfem_BSRTangent.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_ContactCommon.hpp"
 #include "sfem_Merit.hpp"
-#include "sfem_NewmarkScheme.hpp"
+#include "sfem_TimeScheme.hpp"
 #include "sfem_NodeObstacleContact.hpp"
 #include "sfem_OwnedReductions.hpp"
 #include "sfem_ParallelOperator.hpp"
@@ -28,14 +32,15 @@ namespace sfem {
             return buffer;
         }
 
-        /// A host buffer where `like` lives.
-        SharedBuffer<real_t> where(const SharedBuffer<real_t> &like, const SharedBuffer<real_t> &host) {
+        /// `host`'s values into `target`, wherever it lives (no allocation).
+        void fill(const SharedBuffer<real_t> &target, const SharedBuffer<real_t> &host) {
 #ifdef SFEM_ENABLE_CUDA
-            if (like->mem_space() == MEMORY_SPACE_DEVICE) return smesh::to_device(host);
-#else
-            (void)like;
+            if (target->mem_space() == MEMORY_SPACE_DEVICE) {
+                copy_host_to_device(host->size() * sizeof(real_t), host->data(), target->data());
+                return;
+            }
 #endif
-            return host;
+            std::copy(host->data(), host->data() + host->size(), target->data());
         }
     }  // namespace
 
@@ -43,7 +48,7 @@ namespace sfem {
     public:
         std::shared_ptr<Function>            f;
         std::shared_ptr<NodeObstacleContact> contact;
-        std::shared_ptr<NewmarkScheme>       newmark;
+        std::shared_ptr<TimeScheme>          scheme;
         NodeObstacleStepOptions              options;
         std::shared_ptr<BLAS<real_t>>        blas;
         ptrdiff_t                            ndofs{0};
@@ -58,6 +63,9 @@ namespace sfem {
         // operator scale Q^T K Q scale; qp_tmp holds the unscaled product.
         SharedBuffer<real_t>                 scale, inverse_scale, scaled_bound, qp_tmp;
         real_t                               k_max{0};
+        // The step length and the scheme's shift k_ref was assembled for (0: not yet).
+        real_t                               k_ref_dt{0};
+        real_t                               k_ref_shift{0};
         real_t                               tol{0};
         // The merit of the iterate measured last: the reference of the QP's forcing term.
         real_t                               merit{0};
@@ -88,9 +96,9 @@ namespace sfem {
                 inv->data()[i]    = root;
                 b->data()[i]      = u->data()[i] * root;
             }
-            scale         = where(upper_bound, s);
-            inverse_scale = where(upper_bound, inv);
-            scaled_bound  = where(upper_bound, b);
+            fill(scale, s);
+            fill(inverse_scale, inv);
+            fill(scaled_bound, b);
             qp->set_upper_bound(scaled_bound);
             // Converged as the unscaled QP is, on the gradient of y = S z: S^{-1} times z's.
             qp->set_norm_weight(inverse_scale);
@@ -140,7 +148,7 @@ namespace sfem {
 
     std::shared_ptr<NodeObstacleStep> NodeObstacleStep::create(const std::shared_ptr<Function>            &f,
                                                                const std::shared_ptr<NodeObstacleContact> &contact,
-                                                               const std::shared_ptr<NewmarkScheme>       &newmark,
+                                                               const std::shared_ptr<TimeScheme>          &scheme,
                                                                const NodeObstacleStepOptions              &options) {
         const ExecutionSpace es = f->execution_space();
         if (contact->execution_space() != es) {
@@ -152,7 +160,7 @@ namespace sfem {
         auto                             &impl = *ret->impl_;
         impl.f                                 = f;
         impl.contact                           = contact;
-        impl.newmark                           = newmark;
+        impl.scheme                            = scheme;
         impl.options                           = options;
         impl.blas                              = blas<real_t>(es);
         impl.ndofs                             = f->space()->n_dofs();
@@ -166,16 +174,9 @@ namespace sfem {
         impl.tangent = BSRTangent::create(f, es, options.storage_bytes);
         if (!impl.tangent) return nullptr;
 
-        for (auto *buffer : {&impl.k, &impl.k_ref, &impl.projected, &impl.upper_bound, &impl.qp_rhs, &impl.framed, &impl.lift, &impl.diag, &impl.trial_r, &impl.qp_tmp}) {
+        for (auto *buffer : {&impl.k, &impl.k_ref, &impl.projected, &impl.upper_bound, &impl.qp_rhs, &impl.framed, &impl.lift, &impl.diag, &impl.trial_r, &impl.qp_tmp,
+                             &impl.scale, &impl.inverse_scale, &impl.scaled_bound}) {
             *buffer = create_buffer<real_t>(impl.ndofs, es);
-        }
-
-        // Each dof's stiffness, what turns a reaction into a displacement: the tangent's diagonal
-        // at the reference configuration, where no element is inverted. Once: it only scales.
-        {
-            auto reference = create_buffer<real_t>(impl.ndofs, es);
-            if (impl.tangent->assemble(reference->data()) != SFEM_SUCCESS) return nullptr;
-            if (impl.tangent->diagonal(impl.k_ref->data()) != SFEM_SUCCESS) return nullptr;
         }
 
         // The step in the contact nodes' frames, Q^T K Q dx' = -Q^T R with dx'_n <= gap_i: the
@@ -186,13 +187,13 @@ namespace sfem {
         Impl *const self   = &impl;
         auto        framed = create_buffer<real_t>(impl.ndofs, es);
         // Under MPI the owned rows, as the tangent's product computes them.
-        const ptrdiff_t                           owned = f->space()->n_owned_dofs();
+        const ptrdiff_t                           owned = f->space()->n_dofs_owned();
         std::shared_ptr<ParallelOperator<real_t>> op;
         if (es == EXECUTION_SPACE_HOST) {
             // One region: each thread takes its nodes into the frames, then, once every thread's
             // are in, its rows of the product and back out of the frames. It reads `in` only at
             // its own nodes before the barrier (input_in_share).
-            op = make_team_op<real_t>(f->space()->mesh_ptr()->comm(),
+            op = make_team_op<real_t>(f->space()->mesh()->comm(),
                                       owned,
                                       owned,
                                       impl.ndofs,
@@ -207,7 +208,7 @@ namespace sfem {
                                       });
         } else {
             op = make_parallel_op<real_t>(
-                    f->space()->mesh_ptr()->comm(),
+                    f->space()->mesh()->comm(),
                     owned,
                     owned,
                     impl.ndofs,
@@ -233,16 +234,27 @@ namespace sfem {
 
     int NodeObstacleStep::begin_step(const StepContext &context) {
         auto &impl = *impl_;
-        if (impl.newmark && !context.scheme) {
-            fprintf(stderr, "NodeObstacleStep: a Newmark step needs its scheme\n");
+        if (impl.scheme && !context.scheme) {
+            fprintf(stderr, "NodeObstacleStep: a dynamic step needs its scheme\n");
             return SFEM_FAILURE;
         }
 
-        // The scale of each node's equation: its stiffness, plus the inertia c0 M in a dynamic step.
-        impl.blas->copy(impl.ndofs, impl.k_ref->data(), impl.k->data());
-        if (impl.newmark) {
-            impl.blas->axpy(impl.ndofs, context.scheme->weight("alpha_a"), impl.newmark->mass()->data(), impl.k->data());
+        // The scale of each node's equation, what turns a reaction into a displacement: the
+        // tangent's diagonal at the reference configuration, where no element is inverted, with
+        // the step's inertia c0 M in it in a dynamic step (the material holds the scheme). It
+        // only scales, so it is assembled again only when the step's length or the scheme's shift
+        // changes: a material with a history is as stiff as its relaxation over the step leaves it,
+        // glassy before its first step, and the inertia follows the shift (BDF2's with the ratio
+        // of the step to the last, and its backward-Euler start).
+        const real_t shift = context.scheme ? context.scheme->shift() : real_t(0);
+        if (context.dt != impl.k_ref_dt || shift != impl.k_ref_shift) {
+            auto reference = create_buffer<real_t>(impl.ndofs, impl.tangent->execution_space());
+            if (impl.tangent->assemble(reference->data()) != SFEM_SUCCESS) return SFEM_FAILURE;
+            if (impl.tangent->diagonal(impl.k_ref->data()) != SFEM_SUCCESS) return SFEM_FAILURE;
+            impl.k_ref_dt    = context.dt;
+            impl.k_ref_shift = shift;
         }
+        impl.blas->copy(impl.ndofs, impl.k_ref->data(), impl.k->data());
         // Read on the host: once per step.
         auto                host  = on_host(impl.k);
         const real_t *const k     = host->data();

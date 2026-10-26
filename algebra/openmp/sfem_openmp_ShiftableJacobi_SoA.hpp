@@ -209,7 +209,7 @@ namespace sfem {
 
     template <typename HP, typename LP = HP>
     struct ShiftableBlockSymJacobi_SoA_OpenMP {
-        static int build(const int dim, ShiftableBlockSymJacobi_Tpl<HP, LP>& tpl) {
+        static int build(const int dim, ShiftableBlockSymJacobiKernels<HP, LP>& tpl) {
             if (dim != 3) {
                 SFEM_ERROR("ShiftableBlockSymJacobi_SoA_OpenMP::build(dim=%d) not supported!\n", dim);
                 return SFEM_FAILURE;

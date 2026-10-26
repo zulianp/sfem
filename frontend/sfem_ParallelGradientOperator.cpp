@@ -36,10 +36,10 @@ namespace sfem {
         impl_->execution_space = execution_space;
 
         auto space = function->space();
-        auto mesh  = space->mesh_ptr();
+        auto mesh  = space->mesh();
 
         impl_->block_size = space->block_size();
-        impl_->owned_dofs = space->n_owned_dofs();
+        impl_->owned_dofs = space->n_dofs_owned();
         impl_->local_dofs = space->n_dofs();
 
         // The space already carries the owned/local split (FunctionSpace::initialize_dof_counts
@@ -91,7 +91,7 @@ namespace sfem {
     }
 
     std::shared_ptr<Communicator> ParallelGradientOperator::comm() const {
-        return impl_->function->space()->mesh_ptr()->comm();
+        return impl_->function->space()->mesh()->comm();
     }
 
     std::ptrdiff_t ParallelGradientOperator::owned_dofs() const { return impl_->owned_dofs; }

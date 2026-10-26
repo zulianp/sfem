@@ -760,7 +760,7 @@ namespace sfem {
             domain->second.user_data = std::static_pointer_cast<void>(std::make_shared<int>(b));
             impl_->fff[b]            = create_host_buffer<jacobian_t>(domain->second.block->n_elements() * 6);
 
-            auto mesh_ptr = impl_->space->mesh_ptr();
+            auto mesh_ptr = impl_->space->mesh();
             auto fff_src  = smesh::FFF::create_AoS(
                     mesh_ptr, smesh::MEMORY_SPACE_HOST, block_id_for_packed(*mesh_ptr, *domain->second.block));
             if (!fff_src) {
@@ -782,15 +782,15 @@ namespace sfem {
         return ret;
     }
 
-    std::shared_ptr<Op> PackedLaplacian::lor_op(const std::shared_ptr<FunctionSpace> &space) {
+    std::shared_ptr<Op> PackedLaplacian::lor(const std::shared_ptr<FunctionSpace> &space) {
         auto ret            = std::make_shared<PackedLaplacian>(space);
-        ret->impl_->domains = impl_->domains->lor_op(space, {});
+        ret->impl_->domains = impl_->domains->lor(space, {});
         return ret;
     }
 
-    std::shared_ptr<Op> PackedLaplacian::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
+    std::shared_ptr<Op> PackedLaplacian::derefine(const std::shared_ptr<FunctionSpace> &space) {
         auto ret            = std::make_shared<PackedLaplacian>(space);
-        ret->impl_->domains = impl_->domains->derefine_op(space, {});
+        ret->impl_->domains = impl_->domains->derefine(space, {});
         return ret;
     }
 
@@ -804,7 +804,7 @@ namespace sfem {
                                      real_t *const        /*values*/) {
         // SFEM_TRACE_SCOPE("PackedLaplacian::hessian_crs");
 
-        // auto mesh  = impl_->space->mesh_ptr();
+        // auto mesh  = impl_->space->mesh();
         // auto graph = impl_->space->dof_to_dof_graph();
         // int  err   = SFEM_SUCCESS;
 
@@ -831,7 +831,7 @@ namespace sfem {
                                          real_t *const        /*off_diag_values*/) {
         SFEM_TRACE_SCOPE("PackedLaplacian::hessian_crs_sym");
 
-        // auto mesh = impl_->space->mesh_ptr();
+        // auto mesh = impl_->space->mesh();
         // int  err  = SFEM_SUCCESS;
 
         // impl_->iterate([&](const OpDomain &domain) {
@@ -854,7 +854,7 @@ namespace sfem {
     int PackedLaplacian::hessian_diag(const real_t *const /*x*/, real_t *const /*values*/) {
         SFEM_TRACE_SCOPE("PackedLaplacian::hessian_diag");
 
-        // auto mesh = impl_->space->mesh_ptr();
+        // auto mesh = impl_->space->mesh();
         // int  err  = SFEM_SUCCESS;
 
         // impl_->iterate([&](const OpDomain &domain) {
@@ -874,7 +874,7 @@ namespace sfem {
     int PackedLaplacian::gradient(const real_t *const /*x*/, real_t *const /*out*/) {
         SFEM_TRACE_SCOPE("PackedLaplacian::gradient");
 
-        // auto mesh = impl_->space->mesh_ptr();
+        // auto mesh = impl_->space->mesh();
         // return impl_->iterate([&](const OpDomain &domain) {
         //     return laplacian_assemble_gradient(domain.element_type,
         //                                        domain.block->n_elements(),
@@ -946,7 +946,7 @@ namespace sfem {
     int PackedLaplacian::value(const real_t * /*x*/, real_t *const /*out*/) {
         SFEM_TRACE_SCOPE("PackedLaplacian::value");
 
-        // auto mesh = impl_->space->mesh_ptr();
+        // auto mesh = impl_->space->mesh();
         // return impl_->iterate([&](const OpDomain &domain) {
         //     return laplacian_assemble_value(domain.element_type,
         //                                     domain.block->n_elements(),

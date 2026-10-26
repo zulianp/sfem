@@ -632,35 +632,6 @@ extern "C" const sfem::codegen::KernelDiagnostics *cu_mooney_rivlin_kelvin_voigt
   return &sfem::codegen::mooney_rivlin_kelvin_voigt_total_tet4_jacobian_action_esoa_diagnostics_data;
 }
 
-extern "C" int cu_mooney_rivlin_kelvin_voigt_total_tet4_residual_esoa(
-    const int scalar_bytes,
-    const void *const RSTR determinant,
-    const void *const RSTR adjugate[9],
-    const void *const RSTR current[12],
-    const void *const RSTR previous[12],
-    const real_t eta_b,
-    const real_t eta_s,
-    const real_t lmbda,
-    const real_t mu,
-    const real_t u_dt_shift,
-    void *const RSTR output[12],
-    void *const stream
-) {
-  switch (scalar_bytes) {
-    case (int)sizeof(double): {
-        sfem::codegen::mooney_rivlin_kelvin_voigt_total_d3_simplex_tet4_residual_block<double, 1, 4>((const double *)determinant, (const double *const *)adjugate, (const double *const *)current, (const double *const *)previous, eta_b, eta_s, lmbda, mu, u_dt_shift, (double *const *)output);
-        return SFEM_SUCCESS;
-    }
-    case (int)sizeof(float): {
-        sfem::codegen::mooney_rivlin_kelvin_voigt_total_d3_simplex_tet4_residual_block<float, 1, 4>((const float *)determinant, (const float *const *)adjugate, (const float *const *)current, (const float *const *)previous, eta_b, eta_s, lmbda, mu, u_dt_shift, (float *const *)output);
-        return SFEM_SUCCESS;
-    }
-    default:
-      break;
-  }
-  return sfem::codegen::unsupported_dispatch("mooney_rivlin_kelvin_voigt_total_tet4_residual_esoa", -1, (int)scalar_bytes);
-}
-
 namespace sfem {
 namespace codegen {
 
@@ -811,36 +782,6 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_total_tet4_residual_a_msoa(
       break;
   }
   return sfem::codegen::unsupported_dispatch("mooney_rivlin_kelvin_voigt_total_tet4_residual_a_msoa", -1, (int)scalar_bytes);
-}
-
-extern "C" int cu_mooney_rivlin_kelvin_voigt_total_tet4_jacobian_action_esoa(
-    const int scalar_bytes,
-    const void *const RSTR determinant,
-    const void *const RSTR adjugate[9],
-    const void *const RSTR current[12],
-    const void *const RSTR previous[12],
-    const void *const RSTR direction[12],
-    const real_t eta_b,
-    const real_t eta_s,
-    const real_t lmbda,
-    const real_t mu,
-    const real_t u_dt_shift,
-    void *const RSTR output[12],
-    void *const stream
-) {
-  switch (scalar_bytes) {
-    case (int)sizeof(double): {
-        sfem::codegen::mooney_rivlin_kelvin_voigt_total_d3_simplex_tet4_jacobian_action_block<double, 1, 4>((const double *)determinant, (const double *const *)adjugate, (const double *const *)current, (const double *const *)previous, (const double *const *)direction, eta_b, eta_s, lmbda, mu, u_dt_shift, (double *const *)output);
-        return SFEM_SUCCESS;
-    }
-    case (int)sizeof(float): {
-        sfem::codegen::mooney_rivlin_kelvin_voigt_total_d3_simplex_tet4_jacobian_action_block<float, 1, 4>((const float *)determinant, (const float *const *)adjugate, (const float *const *)current, (const float *const *)previous, (const float *const *)direction, eta_b, eta_s, lmbda, mu, u_dt_shift, (float *const *)output);
-        return SFEM_SUCCESS;
-    }
-    default:
-      break;
-  }
-  return sfem::codegen::unsupported_dispatch("mooney_rivlin_kelvin_voigt_total_tet4_jacobian_action_esoa", -1, (int)scalar_bytes);
 }
 
 namespace sfem {

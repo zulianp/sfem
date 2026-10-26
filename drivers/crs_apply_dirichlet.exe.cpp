@@ -1,4 +1,5 @@
 #include <math.h>
+#include "smesh_base.hpp"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -47,7 +48,7 @@ int main(int argc, char *argv[]) {
 
     smesh::create_directory(output_folder);
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     char rowptr_path[1024 * 10];
     char colidx_path[1024 * 10];
@@ -140,7 +141,7 @@ int main(int argc, char *argv[]) {
 
     free(dirichlet_nodes);
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
 
     if (!rank) {
         printf("TTS: %g seconds\n", tock - tick);

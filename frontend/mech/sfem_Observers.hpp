@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "sfem_RelaxationGroups.hpp"
 #include "sfem_Stepper.hpp"
 #include "smesh_path.hpp"
 
@@ -16,9 +17,10 @@ namespace sfem {
     class Op;
     class DirichletConditions;
 
-    /// Writes the solution and its derived fields every `export_freq` committed steps, the last
-    /// step, and the initial state: `<path>/mesh`, and `<path>/out/<field>.<component>.<index>.raw` with
-    /// `<path>/out/time.txt`, one index per export shared by every field.
+    /// Writes the solution (disp) and the fields it is given (add_field), in that order, every
+    /// `export_freq` committed steps, the last step, and the initial state: `<path>/mesh`, and
+    /// `<path>/out/<field>.<component>.<index>.raw` with `<path>/out/time.txt`, one index per
+    /// export shared by every field.
     class FieldExport final : public StepObserver {
     public:
         FieldExport(const std::shared_ptr<Function> &f, const smesh::Path &path, const int export_freq);
@@ -86,6 +88,17 @@ namespace sfem {
     std::shared_ptr<Probe> create_control_point_probe(const std::shared_ptr<Function> &f,
                                                       const std::vector<real_t>       &point,
                                                       const bool                       with_rates);
+
+    /// The state of a Prony series, group by group (`relaxations`, the material's): the step's
+    /// relaxation factor gamma (<group>_gamma) and, for each term k of the series, the RMS over the
+    /// integration points of every block of |H_k|, the overstress that term carries (<group>_H<k>,
+    /// the stress's unit; the Frobenius norm of the symmetric tensor). Sampled once the step is
+    /// committed. Prints which g and tau each k is. Every block must hold the same series.
+    std::shared_ptr<Probe> create_prony_probe(RelaxationGroups &relaxations, const std::shared_ptr<Communicator> &comm);
+
+    /// The same probe with its columns prefixed by `name` and an underscore, so that several of a
+    /// kind can share one history.
+    std::shared_ptr<Probe> create_named_probe(const std::string &name, const std::shared_ptr<Probe> &probe);
 
     /// One CSV row per committed step: the step, its time, how its nonlinear solve went, and the
     /// probes' columns. Also prints the row's summary.

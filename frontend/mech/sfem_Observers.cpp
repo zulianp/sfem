@@ -5,8 +5,9 @@
 #include <limits>
 #include <unordered_map>
 
-#include "sfem_API.hpp"
 #include "sfem_Function.hpp"
+#include "sfem_blas_factory.hpp"
+#include "smesh_glob.hpp"
 
 namespace sfem {
 
@@ -39,7 +40,7 @@ namespace sfem {
         int                       export_freq{1};
         std::shared_ptr<Output>   output;  // null on the ranks that do not write
         std::vector<Field>        fields;
-        SharedBuffer<real_t>      scratch, rate;
+        SharedBuffer<real_t>      scratch;
         size_t                    index{0};
 
         // gather_to: the serial mesh (rank 0), each rank's owned values per gathered node, and
@@ -56,7 +57,7 @@ namespace sfem {
             if (!gathered) return output->write_step(name, index, values);
 
             const int bs = f->space()->block_size();
-            comm->allgatherv(values, (int)f->space()->n_owned_dofs(), all.data(), counts.data(), displs.data());
+            comm->allgatherv(values, (int)f->space()->n_dofs_owned(), all.data(), counts.data(), displs.data());
             if (!output) return SFEM_SUCCESS;
             for (size_t k = 0; k < place.size(); ++k) {
                 for (int d = 0; d < bs; ++d) serial[place[k] * bs + d] = all[k * bs + d];
@@ -71,15 +72,6 @@ namespace sfem {
             const ptrdiff_t      ndofs = f->space()->n_dofs();
 
             if (emit("disp", on_host(es, record.x, ndofs)->data()) != SFEM_SUCCESS) return SFEM_FAILURE;
-
-            if (record.scheme) {
-                const bool with_acceleration = record.scheme->has_acceleration();
-                record.scheme->carried_state(scratch->data(), with_acceleration ? rate->data() : nullptr);
-                if (emit("velocity", on_host(es, scratch->data(), ndofs)->data()) != SFEM_SUCCESS) return SFEM_FAILURE;
-                if (with_acceleration && emit("acceleration", on_host(es, rate->data(), ndofs)->data()) != SFEM_SUCCESS)
-                    return SFEM_FAILURE;
-            }
-
             for (auto &field : fields) {
                 if (field.fill(record, scratch->data()) != SFEM_SUCCESS) return SFEM_FAILURE;
                 if (emit(field.name.c_str(), on_host(es, scratch->data(), ndofs)->data()) != SFEM_SUCCESS) return SFEM_FAILURE;
@@ -99,7 +91,6 @@ namespace sfem {
 
         const ptrdiff_t ndofs = f->space()->n_dofs();
         impl_->scratch        = create_buffer<real_t>(ndofs, f->execution_space());
-        impl_->rate           = create_buffer<real_t>(ndofs, f->execution_space());
     }
 
     FieldExport::~FieldExport() = default;
@@ -111,7 +102,7 @@ namespace sfem {
     int FieldExport::gather_to(const std::shared_ptr<Mesh> &serial_mesh) {
         auto &impl = *impl_;
         auto  fs   = impl.f->space();
-        auto  mesh = fs->mesh_ptr();
+        auto  mesh = fs->mesh();
         impl.comm  = mesh->comm();
         if (impl.comm->size() == 1 || !mesh->is_distributed()) {
             SFEM_ERROR("FieldExport::gather_to: the function's mesh is not distributed\n");
@@ -126,7 +117,7 @@ namespace sfem {
         // Each rank's owned nodes, by their ids in the file.
         const int       size    = impl.comm->size();
         const int       bs      = fs->block_size();
-        const ptrdiff_t n_owned = fs->n_owned_dofs() / bs;
+        const ptrdiff_t n_owned = fs->n_dofs_owned() / bs;
         std::vector<int> node_counts(size), node_displs(size + 1, 0);
         const int        mine = (int)n_owned;
         impl.comm->allgather(&mine, node_counts.data(), 1);
@@ -192,9 +183,9 @@ namespace sfem {
 
         smesh::create_directory(impl.path);
         if (fs->has_semi_structured_mesh()) {
-            smesh::semistructured_export_as_standard(fs->mesh_ptr(), impl.path / "mesh");
+            smesh::semistructured_export_as_standard(fs->mesh(), impl.path / "mesh");
         } else {
-            fs->mesh_ptr()->write(impl.path / "mesh");
+            fs->mesh()->write(impl.path / "mesh");
         }
 
         impl.output = impl.f->output();
@@ -311,10 +302,14 @@ namespace sfem {
         public:
             ControlPoint(const std::shared_ptr<Function> &f, const std::vector<real_t> &point, const bool with_rates)
                 : f_(f), with_rates_(with_rates) {
-                auto            mesh   = f->space()->mesh_ptr();
-                const int       dim    = mesh->spatial_dimension();
-                const ptrdiff_t nnodes = mesh->n_nodes();
-                auto            xyz    = mesh->points()->data();
+                auto      mesh = f->space()->mesh();
+                const int dim  = mesh->spatial_dimension();
+                auto      xyz  = mesh->points()->data();
+                // Distributed, the nearest of the owned nodes over the ranks, sampled by its owner
+                // (the lowest rank on a tie) and summed: the history is written by rank 0, which
+                // may hold none of the body the point is in.
+                comm_                  = mesh->comm();
+                const ptrdiff_t nnodes = f->space()->n_dofs_owned() / f->space()->block_size();
 
                 double best = std::numeric_limits<double>::max();
                 for (ptrdiff_t i = 0; i < nnodes; ++i) {
@@ -327,6 +322,11 @@ namespace sfem {
                         best  = d2;
                         node_ = i;
                     }
+                }
+                if (comm_->size() > 1) {
+                    const double nearest = -comm_->max(-best);
+                    const int    rank    = best == nearest ? comm_->rank() : comm_->size();
+                    owner_               = comm_->rank() == -comm_->max(-rank);
                 }
 
                 const ptrdiff_t ndofs = f->space()->n_dofs();
@@ -350,9 +350,10 @@ namespace sfem {
                 const ptrdiff_t      ndofs = f_->space()->n_dofs();
                 const int            bs    = f_->space()->block_size();
 
-                auto u = on_host(es, record.x, ndofs);
+                const int n_values = (with_rates_ ? 3 : 1) * bs;
+                auto      u        = on_host(es, record.x, ndofs);
                 for (int d = 0; d < bs; ++d) values[d] = u->data()[node_ * bs + d];
-                if (!with_rates_) return SFEM_SUCCESS;
+                if (!with_rates_) return reduce(values, n_values);
 
                 const bool with_acceleration = record.scheme && record.scheme->has_acceleration();
                 if (record.scheme) {
@@ -364,13 +365,23 @@ namespace sfem {
                     values[bs + d]     = record.scheme ? v->data()[node_ * bs + d] : real_t(0);
                     values[2 * bs + d] = with_acceleration ? a->data()[node_ * bs + d] : real_t(0);
                 }
-                return SFEM_SUCCESS;
+                return reduce(values, n_values);
             }
 
         private:
-            std::shared_ptr<Function> f_;
-            bool                      with_rates_;
-            ptrdiff_t                 node_{0};
+            /// The owner's values on every rank.
+            int reduce(real_t *const values, const int n) const {
+                if (comm_->size() == 1) return SFEM_SUCCESS;
+                if (!owner_) std::fill(values, values + n, real_t(0));
+                comm_->sum(values, n, smesh::TypeToEnum<real_t>::value());
+                return SFEM_SUCCESS;
+            }
+
+            std::shared_ptr<Function>     f_;
+            std::shared_ptr<Communicator> comm_;
+            bool                          with_rates_;
+            bool                          owner_{true};
+            ptrdiff_t                     node_{0};
             SharedBuffer<real_t>      velocity_, acceleration_;
         };
     }  // namespace
@@ -379,6 +390,105 @@ namespace sfem {
                                                       const std::vector<real_t>       &point,
                                                       const bool                       with_rates) {
         return std::make_shared<ControlPoint>(f, point, with_rates);
+    }
+
+    namespace {
+        class PronyProbe final : public Probe {
+        public:
+            PronyProbe(RelaxationGroups &relaxations, const std::shared_ptr<Communicator> &comm)
+                : relaxations_(relaxations), comm_(comm), blocks_(relaxations.block_names()) {
+                if (blocks_.empty()) SFEM_ERROR("Prony probe: the material has no blocks\n");
+                for (const auto &d : relaxations.declarations()) {
+                    const auto &series = relaxations.relaxation(blocks_[0], d.group).series();
+                    for (const auto &b : blocks_) {
+                        if (relaxations.relaxation(b, d.group).series().n_terms() != series.n_terms()) {
+                            SFEM_ERROR("Prony probe: blocks %s and %s hold different series in %s\n",
+                                       blocks_[0].c_str(),
+                                       b.c_str(),
+                                       d.group.c_str());
+                        }
+                    }
+                    for (int k = 0; k < series.n_terms(); ++k) {
+                        if (comm->rank() == 0) {
+                            printf("Prony probe: %s_H%d is the term g = %g, tau = %g\n", d.group.c_str(), k, (double)series.g(k), (double)series.tau(k));
+                        }
+                    }
+                }
+            }
+
+            std::vector<std::string> columns() const override {
+                std::vector<std::string> names;
+                for (const auto &d : relaxations_.declarations()) {
+                    names.push_back(d.group + "_gamma");
+                    const int n = relaxations_.relaxation(blocks_[0], d.group).series().n_terms();
+                    for (int k = 0; k < n; ++k) names.push_back(d.group + "_H" + std::to_string(k));
+                }
+                return names;
+            }
+
+            int sample(const StepRecord &, real_t *const values) override {
+                int c = 0;
+                std::vector<real_t> H;
+                for (const auto &d : relaxations_.declarations()) {
+                    values[c++] = relaxations_.relaxation(blocks_[0], d.group).gamma();
+                    const int n = relaxations_.relaxation(blocks_[0], d.group).series().n_terms();
+                    // A symmetric tensor's off-diagonal components (after the diagonal ones, 3 of 6 or
+                    // 1 of 3) count twice in its Frobenius norm.
+                    const int n_diagonal = d.n_components == 6 ? 3 : d.n_components == 3 ? 2 : d.n_components;
+                    for (int k = 0; k < n; ++k) {
+                        real_t sums[2] = {0, 0};  // sum of |H|^2 over the points, how many points
+                        for (const auto &b : blocks_) {
+                            const auto     &r      = relaxations_.relaxation(b, d.group);
+                            const ptrdiff_t points = static_cast<ptrdiff_t>(r.n_qp()) * r.n_elements();
+                            H.resize(static_cast<size_t>(r.n_components()) * points);
+                            r.decode_history(k, H.data());
+                            for (int comp = 0; comp < r.n_components(); ++comp) {
+                                const real_t weight = comp < n_diagonal ? 1 : 2;
+                                const real_t *const h = &H[comp * points];
+                                real_t              s = 0;
+#pragma omp parallel for reduction(+ : s)
+                                for (ptrdiff_t q = 0; q < points; ++q) s += h[q] * h[q];
+                                sums[0] += weight * s;
+                            }
+                            sums[1] += points;
+                        }
+                        if (comm_->size() > 1) comm_->sum(sums, 2, smesh::TypeToEnum<real_t>::value());
+                        values[c++] = sums[1] > 0 ? std::sqrt(sums[0] / sums[1]) : 0;
+                    }
+                }
+                return SFEM_SUCCESS;
+            }
+
+        private:
+            RelaxationGroups             &relaxations_;
+            std::shared_ptr<Communicator> comm_;
+            std::vector<std::string>      blocks_;
+        };
+
+        class NamedProbe final : public Probe {
+        public:
+            NamedProbe(const std::string &name, const std::shared_ptr<Probe> &probe) : name_(name), probe_(probe) {}
+
+            std::vector<std::string> columns() const override {
+                auto names = probe_->columns();
+                for (auto &n : names) n = name_ + "_" + n;
+                return names;
+            }
+            int converged(const StepRecord &record) override { return probe_->converged(record); }
+            int sample(const StepRecord &record, real_t *const values) override { return probe_->sample(record, values); }
+
+        private:
+            std::string            name_;
+            std::shared_ptr<Probe> probe_;
+        };
+    }  // namespace
+
+    std::shared_ptr<Probe> create_prony_probe(RelaxationGroups &relaxations, const std::shared_ptr<Communicator> &comm) {
+        return std::make_shared<PronyProbe>(relaxations, comm);
+    }
+
+    std::shared_ptr<Probe> create_named_probe(const std::string &name, const std::shared_ptr<Probe> &probe) {
+        return std::make_shared<NamedProbe>(name, probe);
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -461,7 +571,7 @@ namespace sfem {
 
         StepRecord at_start    = record;
         at_start.report        = NonlinearReport();
-        at_start.report.status = NonlinearReport::CONVERGED;
+        at_start.report.status = NonlinearReport::Status::CONVERGED;
         const bool verbose     = impl.verbose;
         impl.verbose           = false;
         const int ret          = impl.row(at_start, "initial");

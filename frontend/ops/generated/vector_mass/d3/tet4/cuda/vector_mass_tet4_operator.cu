@@ -634,30 +634,6 @@ extern "C" const sfem::codegen::KernelDiagnostics *cu_vector_mass_tet4_jacobian_
   return &sfem::codegen::vector_mass_tet4_jacobian_action_esoa_diagnostics_data;
 }
 
-extern "C" int cu_vector_mass_tet4_residual_esoa(
-    const int scalar_bytes,
-    const ptrdiff_t geometry_stride,
-    const void *const RSTR determinant,
-    const void *const RSTR current[12],
-    const real_t density,
-    void *const RSTR output[12],
-    void *const stream
-) {
-  switch (scalar_bytes) {
-    case (int)sizeof(double): {
-        sfem::codegen::vector_mass_d3_simplex_tet4_residual_block<double, 4, 4>(geometry_stride, (const double *)determinant, sfem::codegen::ref_tet4_q4<double>::shape(), sfem::codegen::quad_tet_q4<double>::q_weight(), (const double *const *)current, density, (double *const *)output);
-        return SFEM_SUCCESS;
-    }
-    case (int)sizeof(float): {
-        sfem::codegen::vector_mass_d3_simplex_tet4_residual_block<float, 4, 4>(geometry_stride, (const float *)determinant, sfem::codegen::ref_tet4_q4<float>::shape(), sfem::codegen::quad_tet_q4<float>::q_weight(), (const float *const *)current, density, (float *const *)output);
-        return SFEM_SUCCESS;
-    }
-    default:
-      break;
-  }
-  return sfem::codegen::unsupported_dispatch("vector_mass_tet4_residual_esoa", -1, (int)scalar_bytes);
-}
-
 namespace sfem {
 namespace codegen {
 
@@ -767,30 +743,6 @@ extern "C" int cu_vector_mass_tet4_residual_a_msoa(
       break;
   }
   return sfem::codegen::unsupported_dispatch("vector_mass_tet4_residual_a_msoa", -1, (int)scalar_bytes);
-}
-
-extern "C" int cu_vector_mass_tet4_jacobian_action_esoa(
-    const int scalar_bytes,
-    const ptrdiff_t geometry_stride,
-    const void *const RSTR determinant,
-    const void *const RSTR direction[12],
-    const real_t density,
-    void *const RSTR output[12],
-    void *const stream
-) {
-  switch (scalar_bytes) {
-    case (int)sizeof(double): {
-        sfem::codegen::vector_mass_d3_simplex_tet4_jacobian_action_block<double, 4, 4>(geometry_stride, (const double *)determinant, sfem::codegen::ref_tet4_q4<double>::shape(), sfem::codegen::quad_tet_q4<double>::q_weight(), (const double *const *)direction, density, (double *const *)output);
-        return SFEM_SUCCESS;
-    }
-    case (int)sizeof(float): {
-        sfem::codegen::vector_mass_d3_simplex_tet4_jacobian_action_block<float, 4, 4>(geometry_stride, (const float *)determinant, sfem::codegen::ref_tet4_q4<float>::shape(), sfem::codegen::quad_tet_q4<float>::q_weight(), (const float *const *)direction, density, (float *const *)output);
-        return SFEM_SUCCESS;
-    }
-    default:
-      break;
-  }
-  return sfem::codegen::unsupported_dispatch("vector_mass_tet4_jacobian_action_esoa", -1, (int)scalar_bytes);
 }
 
 namespace sfem {
@@ -963,22 +915,12 @@ __global__ void vector_mass_tet4_hessian_crs_a_msoa_impl(
     const ptrdiff_t nelements,
     const ptrdiff_t,
     idx_t **const RSTR elements,
-    const geom_t *const RSTR g_adj0,
-    const geom_t *const RSTR g_adj1,
-    const geom_t *const RSTR g_adj2,
-    const geom_t *const RSTR g_adj3,
-    const geom_t *const RSTR g_adj4,
-    const geom_t *const RSTR g_adj5,
-    const geom_t *const RSTR g_adj6,
-    const geom_t *const RSTR g_adj7,
-    const geom_t *const RSTR g_adj8,
     const geom_t *const RSTR g_det0,
     const s_t density,
     const count_t *const RSTR rowptr,
     const idx_t *const RSTR colidx,
     v_t *const RSTR values
 ) {
-  static constexpr int ND = 3;
   static constexpr int NQ = 4;
   static constexpr int NS = 4;
   const s_t *const isoparametric_shape = sfem::codegen::ref_tet4_q4<s_t>::shape();
@@ -987,7 +929,6 @@ __global__ void vector_mass_tet4_hessian_crs_a_msoa_impl(
   for (ptrdiff_t element = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; element < nelements; element += (ptrdiff_t)blockDim.x * gridDim.x) {
     idx_t ev[NS];
     s_t element_matrix[144];
-    s_t badjugate_data[ND * ND][NQ];
     s_t bdeterminant[NQ];
 
     for (int shape = 0; shape < NS; ++shape) {
@@ -996,15 +937,6 @@ __global__ void vector_mass_tet4_hessian_crs_a_msoa_impl(
     }
 
 
-    badjugate_data[0][0] = s_t(g_adj0[element]);
-    badjugate_data[1][0] = s_t(g_adj1[element]);
-    badjugate_data[2][0] = s_t(g_adj2[element]);
-    badjugate_data[3][0] = s_t(g_adj3[element]);
-    badjugate_data[4][0] = s_t(g_adj4[element]);
-    badjugate_data[5][0] = s_t(g_adj5[element]);
-    badjugate_data[6][0] = s_t(g_adj6[element]);
-    badjugate_data[7][0] = s_t(g_adj7[element]);
-    badjugate_data[8][0] = s_t(g_adj8[element]);
     bdeterminant[0] = s_t(g_det0[element]);
 
     vector_mass_d3_simplex_hessian_block<s_t, NQ, NS>(0, bdeterminant, isoparametric_shape, isoparametric_q_weight, density, element_matrix);
@@ -1023,15 +955,6 @@ extern "C" int cu_vector_mass_tet4_hessian_bsr_a_msoa(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
-    const geom_t *const RSTR g_adj0,
-    const geom_t *const RSTR g_adj1,
-    const geom_t *const RSTR g_adj2,
-    const geom_t *const RSTR g_adj3,
-    const geom_t *const RSTR g_adj4,
-    const geom_t *const RSTR g_adj5,
-    const geom_t *const RSTR g_adj6,
-    const geom_t *const RSTR g_adj7,
-    const geom_t *const RSTR g_adj8,
     const geom_t *const RSTR g_det0,
     const real_t density,
     const count_t *const RSTR rowptr,
@@ -1046,14 +969,14 @@ extern "C" int cu_vector_mass_tet4_hessian_bsr_a_msoa(
           if (nelements <= 0) return SFEM_SUCCESS;
           const int block_size = 256;
           const int grid_size = (int)((nelements + block_size - 1) / block_size);
-          sfem::codegen::vector_mass_tet4_hessian_crs_a_msoa_impl<double, double><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, density, rowptr, colidx, (double *)values);
+          sfem::codegen::vector_mass_tet4_hessian_crs_a_msoa_impl<double, double><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_det0, density, rowptr, colidx, (double *)values);
           return sfem::codegen::launch_status("vector_mass_tet4_hessian_crs_a_msoa_impl");
         }
         case (int)sizeof(float): {
           if (nelements <= 0) return SFEM_SUCCESS;
           const int block_size = 256;
           const int grid_size = (int)((nelements + block_size - 1) / block_size);
-          sfem::codegen::vector_mass_tet4_hessian_crs_a_msoa_impl<double, float><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, density, rowptr, colidx, (float *)values);
+          sfem::codegen::vector_mass_tet4_hessian_crs_a_msoa_impl<double, float><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_det0, density, rowptr, colidx, (float *)values);
           return sfem::codegen::launch_status("vector_mass_tet4_hessian_crs_a_msoa_impl");
         }
         default:
@@ -1067,7 +990,7 @@ extern "C" int cu_vector_mass_tet4_hessian_bsr_a_msoa(
           if (nelements <= 0) return SFEM_SUCCESS;
           const int block_size = 256;
           const int grid_size = (int)((nelements + block_size - 1) / block_size);
-          sfem::codegen::vector_mass_tet4_hessian_crs_a_msoa_impl<float, float><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, density, rowptr, colidx, (float *)values);
+          sfem::codegen::vector_mass_tet4_hessian_crs_a_msoa_impl<float, float><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_det0, density, rowptr, colidx, (float *)values);
           return sfem::codegen::launch_status("vector_mass_tet4_hessian_crs_a_msoa_impl");
         }
         default:

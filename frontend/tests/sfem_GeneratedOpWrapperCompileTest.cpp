@@ -62,16 +62,16 @@ int test_generated_wrapper_headers_compile() {
 }
 
 int test_generated_wrapper_factory_registration() {
-    SFEM_TEST_ASSERT(sfem::Factory::create_op(hex8_space(3), "GeneratedNeoHookeanOgden") != nullptr);
-    SFEM_TEST_ASSERT(sfem::Factory::create_op(hex8_space(2), "GeneratedTwoPhaseFlow") != nullptr);
-    SFEM_TEST_ASSERT(sfem::Factory::create_op(hex8_space(3), "GeneratedNeumann") != nullptr);
-    SFEM_TEST_ASSERT(sfem::Factory::create_op(hex8_space(3), "GeneratedNeumannGeneral") != nullptr);
+    SFEM_TEST_ASSERT(sfem::OpFactory::create(hex8_space(3), "GeneratedNeoHookeanOgden", sfem::EXECUTION_SPACE_HOST) != nullptr);
+    SFEM_TEST_ASSERT(sfem::OpFactory::create(hex8_space(2), "GeneratedTwoPhaseFlow", sfem::EXECUTION_SPACE_HOST) != nullptr);
+    SFEM_TEST_ASSERT(sfem::OpFactory::create(hex8_space(3), "GeneratedNeumann", sfem::EXECUTION_SPACE_HOST) != nullptr);
+    SFEM_TEST_ASSERT(sfem::OpFactory::create(hex8_space(3), "GeneratedNeumannGeneral", sfem::EXECUTION_SPACE_HOST) != nullptr);
     return SFEM_TEST_SUCCESS;
 }
 
 int test_generated_energy_wrapper_executes() {
     auto space = hex8_space(3);
-    auto op    = sfem::Factory::create_op(space, "GeneratedNeoHookeanOgden");
+    auto op    = sfem::OpFactory::create(space, "GeneratedNeoHookeanOgden", sfem::EXECUTION_SPACE_HOST);
     SFEM_TEST_ASSERT(op != nullptr);
     op->set_option("assume_affine", true);
 
@@ -97,7 +97,7 @@ int test_generated_energy_wrapper_executes() {
 
 int test_generated_residual_wrapper_executes() {
     auto space = hex8_space(2);
-    auto op    = sfem::Factory::create_op(space, "GeneratedTwoPhaseFlow");
+    auto op    = sfem::OpFactory::create(space, "GeneratedTwoPhaseFlow", sfem::EXECUTION_SPACE_HOST);
     SFEM_TEST_ASSERT(op != nullptr);
 
     const ptrdiff_t ndofs     = space->n_dofs();
@@ -106,7 +106,7 @@ int test_generated_residual_wrapper_executes() {
     auto            direction = sfem::create_host_buffer<real_t>(ndofs);
     auto            residual  = sfem::create_host_buffer<real_t>(ndofs);
     auto            action    = sfem::create_host_buffer<real_t>(ndofs);
-    for (ptrdiff_t node = 0; node < space->mesh_ptr()->n_nodes(); ++node) {
+    for (ptrdiff_t node = 0; node < space->mesh()->n_nodes(); ++node) {
         previous->data()[2 * node + 0]  = 15.0 + 1e-3 * node;
         previous->data()[2 * node + 1]  = 15.1 + 1e-3 * node;
         current->data()[2 * node + 0]   = previous->data()[2 * node + 0] + 1e-2;
@@ -127,7 +127,7 @@ int test_generated_residual_wrapper_executes() {
 int test_generated_boundary_wrapper_executes() {
     auto mesh  = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 1, 1, 1);
     auto space = sfem::FunctionSpace::create(mesh, 3);
-    auto base  = sfem::Factory::create_op(space, "GeneratedNeumann");
+    auto base  = sfem::OpFactory::create(space, "GeneratedNeumann", sfem::EXECUTION_SPACE_HOST);
     auto op    = std::dynamic_pointer_cast<sfem::GeneratedNeumann>(base);
     SFEM_TEST_ASSERT(op != nullptr);
 
@@ -166,7 +166,7 @@ int test_node_wise_merit_includes_the_forcing() {
     // anything else, so the interior operator has to share that space.
     auto space = sfem::FunctionSpace::create(mesh, 3);
 
-    auto interior = sfem::Factory::create_op(space, "GeneratedMooneyRivlinKelvinVoigt");
+    auto interior = sfem::OpFactory::create(space, "GeneratedMooneyRivlinKelvinVoigt", sfem::EXECUTION_SPACE_HOST);
     SFEM_TEST_ASSERT(interior != nullptr);
     // No potential, so it mandates the residual merit and is the operator
     // that reduces it.
@@ -182,7 +182,7 @@ int test_node_wise_merit_includes_the_forcing() {
     interior->set_field("previous", previous, 0);
     interior->update(previous->data(), current->data());
 
-    auto base    = sfem::Factory::create_op(space, "GeneratedNeumann");
+    auto base    = sfem::OpFactory::create(space, "GeneratedNeumann", sfem::EXECUTION_SPACE_HOST);
     auto forcing = std::dynamic_pointer_cast<sfem::GeneratedNeumann>(base);
     SFEM_TEST_ASSERT(forcing != nullptr);
     auto sidesets =
@@ -243,7 +243,7 @@ int test_node_wise_merit_includes_the_forcing() {
 int test_forcing_operator_reports_its_linear_work() {
     auto mesh  = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 1, 1, 1);
     auto space = sfem::FunctionSpace::create(mesh, 3);
-    auto base  = sfem::Factory::create_op(space, "GeneratedNeumann");
+    auto base  = sfem::OpFactory::create(space, "GeneratedNeumann", sfem::EXECUTION_SPACE_HOST);
     auto op    = std::dynamic_pointer_cast<sfem::GeneratedNeumann>(base);
     SFEM_TEST_ASSERT(op != nullptr);
 
@@ -301,7 +301,7 @@ int test_body_force_matches_the_lumped_construction() {
     const real_t density = 1300.0;
     const real_t gravity[3] = {0.0, 0.0, -9.81};
 
-    auto base = sfem::Factory::create_op(space, "GeneratedBodyForce");
+    auto base = sfem::OpFactory::create(space, "GeneratedBodyForce", sfem::EXECUTION_SPACE_HOST);
     SFEM_TEST_ASSERT(base != nullptr);
     auto op = std::shared_ptr<sfem::Op>(std::move(base));
     for (auto &block : mesh->blocks()) {

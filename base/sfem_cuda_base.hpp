@@ -33,14 +33,25 @@ inline int sfem_cuda_max_grid_dim_x() {
     return max_grid_x;
 }
 
+namespace sfem {
+    /// Waits for `stream` (a cudaStream_t; null: the default device stream) and reports what failed
+    /// on it, unless it is being captured into a graph, which a synchronisation would invalidate.
+    inline void debug_synchronize(const cudaStream_t stream) {
+        cudaStreamCaptureStatus status = cudaStreamCaptureStatusNone;
+        if (cudaStreamIsCapturing(stream, &status) != cudaSuccess) {
+            cudaGetLastError();
+            return;
+        }
+        if (status != cudaStreamCaptureStatusNone) return;
+        SFEM_CUDA_CHECK(cudaStreamSynchronize(stream));
+        SFEM_CUDA_CHECK(cudaPeekAtLastError());
+    }
+}  // namespace sfem
+
 #ifndef NDEBUG
-#define SFEM_DEBUG_SYNCHRONIZE()                \
-    do {                                        \
-        cudaDeviceSynchronize();                \
-        SFEM_CUDA_CHECK(cudaPeekAtLastError()); \
-    } while (0)
+#define SFEM_DEBUG_SYNCHRONIZE(stream) sfem::debug_synchronize((cudaStream_t)(stream))
 #else
-#define SFEM_DEBUG_SYNCHRONIZE()
+#define SFEM_DEBUG_SYNCHRONIZE(stream)
 #endif
 
 #define SFEM_ENABLE_NVTX

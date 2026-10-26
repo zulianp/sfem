@@ -34,7 +34,7 @@ namespace sfem {
         }
 
         static std::shared_ptr<smesh::Mesh> element_matrix_mesh(const std::shared_ptr<FunctionSpace> &space) {
-            auto mesh = space->has_semi_structured_mesh() ? smesh::derefine(space->mesh_ptr(), 1) : space->mesh_ptr();
+            auto mesh = space->has_semi_structured_mesh() ? smesh::derefine(space->mesh(), 1) : space->mesh();
             if (mesh && mesh->element_type(0) == smesh::PROTEUS_HEX8) {
                 mesh = smesh::sshex_to_hex8(mesh);
             }
@@ -66,7 +66,7 @@ namespace sfem {
         if (SFEM_PRINT_THROUGHPUT && calls) {
             printf("SemiStructuredEMLaplacian[%d]::apply() called %ld times. Total: %g [s], "
                    "Avg: %g [s], TP %g [MDOF/s]\n",
-                   smesh::semistructured_level(space->mesh()),
+                   smesh::semistructured_level(*space->mesh()),
                    calls,
                    total_time,
                    total_time / calls,
@@ -74,13 +74,13 @@ namespace sfem {
         }
     }
 
-    std::shared_ptr<Op> SemiStructuredEMLaplacian::lor_op(const std::shared_ptr<FunctionSpace> & /*space*/) {
-        SMESH_ERROR("SemiStructuredEMLaplacian::lor_op NOT IMPLEMENTED!\n");
+    std::shared_ptr<Op> SemiStructuredEMLaplacian::lor(const std::shared_ptr<FunctionSpace> & /*space*/) {
+        SMESH_ERROR("SemiStructuredEMLaplacian::lor NOT IMPLEMENTED!\n");
         return nullptr;
     }
 
-    std::shared_ptr<Op> SemiStructuredEMLaplacian::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
-        SFEM_TRACE_SCOPE("SemiStructuredEMLaplacian::derefine_op");
+    std::shared_ptr<Op> SemiStructuredEMLaplacian::derefine(const std::shared_ptr<FunctionSpace> &space) {
+        SFEM_TRACE_SCOPE("SemiStructuredEMLaplacian::derefine");
 
         assert(space->has_semi_structured_mesh() || space->element_type() == macro_base_elem(element_type));
         if (space->has_semi_structured_mesh()) {
@@ -102,7 +102,7 @@ namespace sfem {
     const char *SemiStructuredEMLaplacian::name() const { return "em:Laplacian"; }
 
     int SemiStructuredEMLaplacian::initialize(const std::vector<std::string> &block_names) {
-        auto &ssm  = space->mesh();
+        auto &ssm  = *space->mesh();
         auto  mesh = element_matrix_mesh(space);
         if (!mesh) {
             return SFEM_FAILURE;
@@ -164,7 +164,7 @@ namespace sfem {
     int SemiStructuredEMLaplacian::hessian_diag(const real_t *const, real_t *const out) {
         SFEM_TRACE_SCOPE("SemiStructuredEMLaplacian::hessian_diag");
 
-        auto &ssm = space->mesh();
+        auto &ssm = *space->mesh();
         int   err = SFEM_SUCCESS;
         for (size_t b = 0; b < element_matrices.size(); ++b) {
             if (!element_matrices[b]) {
@@ -195,7 +195,7 @@ namespace sfem {
 
         assert(is_semistructured_type(element_type));  // REMOVEME once generalized approach
 
-        auto &ssm = space->mesh();
+        auto &ssm = *space->mesh();
 
         double tick = smesh::time_seconds();
 

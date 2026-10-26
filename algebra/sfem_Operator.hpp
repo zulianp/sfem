@@ -6,6 +6,7 @@
 
 // C++ includes
 #include "sfem_aliases.hpp"
+#include "sfem_execution_context.hpp"
 
 namespace sfem {
 
@@ -27,18 +28,20 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
 
-        virtual std::ptrdiff_t rows() const            = 0;
-        virtual std::ptrdiff_t cols() const            = 0;
-        virtual ExecutionSpace execution_space() const = 0;
+        virtual std::ptrdiff_t   rows() const              = 0;
+        virtual std::ptrdiff_t   cols() const              = 0;
+        virtual ExecutionContext execution_context() const = 0;
+        ExecutionSpace           execution_space() const { return execution_context().space(); }
     };
 
     template <typename T>
     class InPlaceOperator {
     public:
-        virtual ~InPlaceOperator()                     = default;
-        virtual int            apply(T* const y)       = 0;
-        virtual std::ptrdiff_t size() const            = 0;
-        virtual ExecutionSpace execution_space() const = 0;
+        virtual ~InPlaceOperator()                       = default;
+        virtual int              apply(T* const y)         = 0;
+        virtual std::ptrdiff_t   size() const              = 0;
+        virtual ExecutionContext execution_context() const = 0;
+        ExecutionSpace           execution_space() const { return execution_context().space(); }
     };
 
     template <typename T>
@@ -64,7 +67,7 @@ namespace sfem {
 
         std::ptrdiff_t rows() const override { return left_->rows(); }
         std::ptrdiff_t cols() const override { return left_->cols(); }
-        ExecutionSpace execution_space() const override { return left_->execution_space(); }
+        ExecutionContext execution_context() const override { return left_->execution_context(); }
 
     private:
         std::shared_ptr<L> left_;
@@ -89,7 +92,7 @@ namespace sfem {
         }
         std::ptrdiff_t rows() const override { return left_->rows(); }
         std::ptrdiff_t cols() const override { return right_->cols(); }
-        ExecutionSpace execution_space() const override { return left_->execution_space(); }
+        ExecutionContext execution_context() const override { return left_->execution_context(); }
 
     private:
         std::shared_ptr<L> left_;
@@ -109,7 +112,7 @@ namespace sfem {
         }
         std::ptrdiff_t rows() const override { return left_->size(); }
         std::ptrdiff_t cols() const override { return right_->cols(); }
-        ExecutionSpace execution_space() const override { return left_->execution_space(); }
+        ExecutionContext execution_context() const override { return left_->execution_context(); }
 
     private:
         SharedInPlaceOperator<T> left_;
@@ -122,17 +125,17 @@ namespace sfem {
         std::ptrdiff_t                                rows_{0};
         std::ptrdiff_t                                cols_{0};
         std::function<void(const T* const, T* const)> apply_;
-        ExecutionSpace                                execution_space_;
+        ExecutionContext                              context_;
 
         LambdaOperator(const std::ptrdiff_t                          rows,
                        const std::ptrdiff_t                          cols,
                        std::function<void(const T* const, T* const)> apply,
-                       const ExecutionSpace                          es)
-            : rows_(rows), cols_(cols), apply_(apply), execution_space_(es) {}
+                       const ExecutionContext&                       context)
+            : rows_(rows), cols_(cols), apply_(apply), context_(context) {}
 
-        inline std::ptrdiff_t rows() const override { return rows_; }
-        inline std::ptrdiff_t cols() const override { return cols_; }
-        inline ExecutionSpace execution_space() const override { return execution_space_; }
+        inline std::ptrdiff_t   rows() const override { return rows_; }
+        inline std::ptrdiff_t   cols() const override { return cols_; }
+        inline ExecutionContext execution_context() const override { return context_; }
 
         int apply(const T* const x, T* const y) override {
             apply_(x, y);
@@ -144,8 +147,8 @@ namespace sfem {
     inline std::shared_ptr<Operator<T>> make_op(const std::ptrdiff_t                          rows,
                                                 const std::ptrdiff_t                          cols,
                                                 std::function<void(const T* const, T* const)> op,
-                                                const ExecutionSpace                          es) {
-        return std::make_shared<LambdaOperator<T>>(rows, cols, op, es);
+                                                const ExecutionContext&                       context) {
+        return std::make_shared<LambdaOperator<T>>(rows, cols, op, context);
     }
 
     template <typename T>
@@ -153,13 +156,13 @@ namespace sfem {
     public:
         std::ptrdiff_t                size_{0};
         std::function<void(T* const)> apply_;
-        ExecutionSpace                execution_space_;
+        ExecutionContext              context_;
 
-        InPlaceLambdaOperator(const std::ptrdiff_t size, std::function<void(T* const)> apply, const ExecutionSpace es)
-            : size_(size), apply_(apply), execution_space_(es) {}
+        InPlaceLambdaOperator(const std::ptrdiff_t size, std::function<void(T* const)> apply, const ExecutionContext& context)
+            : size_(size), apply_(apply), context_(context) {}
 
-        inline std::ptrdiff_t size() const override { return size_; }
-        inline ExecutionSpace execution_space() const override { return execution_space_; }
+        inline std::ptrdiff_t   size() const override { return size_; }
+        inline ExecutionContext execution_context() const override { return context_; }
 
         int apply(T* const x) override {
             apply_(x);
@@ -170,8 +173,8 @@ namespace sfem {
     template <typename T>
     inline std::shared_ptr<InPlaceOperator<T>> make_in_place_op(const std::ptrdiff_t          size,
                                                                 std::function<void(T* const)> op,
-                                                                const ExecutionSpace          es) {
-        return std::make_shared<InPlaceLambdaOperator<T>>(size, op, es);
+                                                                const ExecutionContext&       context) {
+        return std::make_shared<InPlaceLambdaOperator<T>>(size, op, context);
     }
 
     template <typename T>

@@ -61,15 +61,15 @@ namespace sfem {
         return ret;
     }
 
-    std::shared_ptr<Op> NeoHookeanOgdenActiveStrainPacked::lor_op(const std::shared_ptr<FunctionSpace> &space) {
+    std::shared_ptr<Op> NeoHookeanOgdenActiveStrainPacked::lor(const std::shared_ptr<FunctionSpace> &space) {
         auto ret            = std::make_shared<NeoHookeanOgdenActiveStrainPacked>(space);
-        ret->impl_->domains = impl_->domains->lor_op(space, {});
+        ret->impl_->domains = impl_->domains->lor(space, {});
         return ret;
     }
 
-    std::shared_ptr<Op> NeoHookeanOgdenActiveStrainPacked::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
+    std::shared_ptr<Op> NeoHookeanOgdenActiveStrainPacked::derefine(const std::shared_ptr<FunctionSpace> &space) {
         auto ret            = std::make_shared<NeoHookeanOgdenActiveStrainPacked>(space);
-        ret->impl_->domains = impl_->domains->derefine_op(space, {});
+        ret->impl_->domains = impl_->domains->derefine(space, {});
         return ret;
     }
 
@@ -121,7 +121,7 @@ namespace sfem {
         if (impl_->Fa.empty()) {
             impl_->Fa.resize(impl_->packed->n_blocks());
             impl_->Fa_stride.resize(impl_->packed->n_blocks(), (ptrdiff_t)0);
-            int dim = impl_->space->mesh_ptr()->spatial_dimension();
+            int dim = impl_->space->mesh()->spatial_dimension();
 
             impl_->Fa[0] = sfem::create_host_buffer<real_t>(dim * dim);
             for (int d1 = 0; d1 < dim; d1++) {
@@ -153,7 +153,7 @@ namespace sfem {
 
     int NeoHookeanOgdenActiveStrainPacked::hessian_diag(const real_t *const x, real_t *const values) {
         SFEM_TRACE_SCOPE("NeoHookeanOgdenActiveStrainPacked::hessian_diag");
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) -> int {
             if (domain.element_type != smesh::HEX8) {
                 SFEM_ERROR("NeoHookeanOgdenActiveStrainPacked::hessian_diag only implemented for smesh::HEX8\n");
@@ -193,7 +193,7 @@ namespace sfem {
 
     int NeoHookeanOgdenActiveStrainPacked::update(const real_t *const u) {
         SFEM_TRACE_SCOPE("NeoHookeanOgdenActiveStrainPacked::update");
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) {
             if (domain.element_type != smesh::HEX8) {
                 SFEM_ERROR("NeoHookeanOgdenActiveStrainPacked::update only implemented for smesh::HEX8\n");
@@ -230,7 +230,7 @@ namespace sfem {
 
     int NeoHookeanOgdenActiveStrainPacked::gradient(const real_t *const x, real_t *const out) {
         SFEM_TRACE_SCOPE("NeoHookeanOgdenActiveStrainPacked::gradient");
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) {
             if (domain.element_type != smesh::HEX8) {
                 SFEM_ERROR("NeoHookeanOgdenActiveStrainPacked::gradient only implemented for smesh::HEX8\n");
@@ -270,7 +270,7 @@ namespace sfem {
 
     int NeoHookeanOgdenActiveStrainPacked::apply(const real_t *const x, const real_t *const h, real_t *const out) {
         SFEM_TRACE_SCOPE("NeoHookeanOgdenActiveStrainPacked::apply");
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) {
             if (domain.element_type != smesh::HEX8) {
                 SFEM_ERROR("NeoHookeanOgdenActiveStrainPacked::apply only implemented for smesh::HEX8\n");
@@ -330,7 +330,7 @@ namespace sfem {
 
     int NeoHookeanOgdenActiveStrainPacked::value(const real_t *x, real_t *const out) {
         SFEM_TRACE_SCOPE("NeoHookeanOgdenActiveStrainPacked::value");
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) -> int {
             if (domain.element_type != smesh::HEX8) {
                 SFEM_ERROR("NeoHookeanOgdenActiveStrainPacked::value only implemented for smesh::HEX8\n");
@@ -372,7 +372,7 @@ namespace sfem {
                                                        const real_t *const steps,
                                                        real_t *const       out) {
         SFEM_TRACE_SCOPE("NeoHookeanOgdenActiveStrainPacked::value_steps");
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) -> int {
             if (domain.element_type != smesh::HEX8) {
                 SFEM_ERROR("NeoHookeanOgdenActiveStrainPacked::value_steps only implemented for smesh::HEX8\n");
@@ -453,7 +453,7 @@ namespace sfem {
                                                        const idx_t *const   colidx,
                                                        real_t *const        values) {
         SFEM_TRACE_SCOPE("NeoHookeanOgdenActiveStrainPacked::hessian_bsr");
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) -> int {
             if (domain.element_type != smesh::HEX8) {
                 SFEM_ERROR("NeoHookeanOgdenActiveStrainPacked::hessian_bsr only implemented for smesh::HEX8\n");
@@ -495,7 +495,7 @@ namespace sfem {
                                                             real_t **const       diag_values,
                                                             real_t **const       off_diag_values) {
         SFEM_TRACE_SCOPE("NeoHookeanOgdenActiveStrainPacked::hessian_bcrs_sym");
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) -> int {
             if (domain.element_type != smesh::HEX8) {
                 SFEM_ERROR("NeoHookeanOgdenActiveStrainPacked::hessian_bcrs_sym only implemented for smesh::HEX8\n");

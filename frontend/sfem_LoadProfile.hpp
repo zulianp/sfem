@@ -19,7 +19,8 @@ namespace sfem {
         real_t value(const real_t time) const;
 
 #ifdef SFEM_ENABLE_RYAML
-        static int from_yaml(const ryml::ConstNodeRef &node, LoadProfile &profile);
+        /// A tabulated profile's relative `path` is read against `base_dir` (as written when empty).
+        static int from_yaml(const ryml::ConstNodeRef &node, LoadProfile &profile, const std::string &base_dir);
 #endif
 
     private:

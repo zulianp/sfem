@@ -177,7 +177,7 @@ def _include_flags(root, generated_dir):
         os.path.dirname(os.path.abspath(__file__)),
         os.path.join(root, "base"),
         # The simplex CPU kernels reach into SFEM proper: tet4_inline_cpu.hpp
-        # includes sortreduce.hpp, which lives here.  Without it the harness
+        # includes sfem_sortreduce.hpp, which lives here.  Without it the harness
         # cannot drive TET4 at all, which is how a whole kernel family came to
         # be outside every gate -- see ARCHITECTURE.html OP 17.
         os.path.join(root, "algebra"),

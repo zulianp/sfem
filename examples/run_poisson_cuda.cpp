@@ -1,4 +1,5 @@
 #include <math.h>
+#include "smesh_base.hpp"
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -28,7 +29,7 @@
 
 #include <vector>
 
-#include "sfem_cuda_blas.hpp"
+#include "sfem_BLAS_cuda.hpp"
 
 template <typename T>
 void sfem_cuda_init_solver(sfem::ConjugateGradient<T> &cg) {
@@ -70,7 +71,7 @@ int main(int argc, char *argv[]) {
 
     const char *output_path = argv[2];
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     // -------------------------------
     // Read inputs
@@ -137,8 +138,7 @@ int main(int argc, char *argv[]) {
             (boundary_condition_t *)malloc(n_dirichlet_conditions * sizeof(boundary_condition_t));
 
         for (int d = 0; d < n_dirichlet_conditions; d++) {
-            boundary_conditions_host_to_device(&h_dirichlet_conditions[d],
-                                               &d_dirichlet_conditions[d]);
+            d_dirichlet_conditions[d] = sfem::to_device(h_dirichlet_conditions[d]);
         }
 
         destroy_conditions(n_dirichlet_conditions, h_dirichlet_conditions);
@@ -179,9 +179,9 @@ int main(int argc, char *argv[]) {
 
         if (SFEM_USE_PRECONDITIONER) {
             solver.set_preconditioner([&](const real_t *const x, real_t *const y) {
-                d_ediv(mesh.nnodes, x, d_d, y);
+                d_ediv(mesh.nnodes, x, d_d, y, nullptr);
                 d_copy_at_dirichlet_nodes_vec(
-                    n_dirichlet_conditions, d_dirichlet_conditions, 1, x, y);
+                    n_dirichlet_conditions, d_dirichlet_conditions, 1, x, y, nullptr);
             });
         } else {
             fprintf(stderr, "[Warning] preconditioner not avaialble for selected element\n");
@@ -193,15 +193,15 @@ int main(int argc, char *argv[]) {
     solver.apply_op = [&](const real_t *const x, real_t *const y) {
         d_memset(y, 0, mesh.nnodes * sizeof(real_t));
         cuda_incore_laplacian_apply(&ctx, x, y);
-        d_copy_at_dirichlet_nodes_vec(n_dirichlet_conditions, d_dirichlet_conditions, 1, x, y);
+        d_copy_at_dirichlet_nodes_vec(n_dirichlet_conditions, d_dirichlet_conditions, 1, x, y, nullptr);
     };
 
     // -------------------------------
     // Solve
     // -------------------------------
 
-    d_apply_dirichlet_condition_vec(n_dirichlet_conditions, d_dirichlet_conditions, 1, d_x);
-    d_apply_dirichlet_condition_vec(n_dirichlet_conditions, d_dirichlet_conditions, 1, d_b);
+    d_apply_dirichlet_condition_vec(n_dirichlet_conditions, d_dirichlet_conditions, 1, d_x, nullptr);
+    d_apply_dirichlet_condition_vec(n_dirichlet_conditions, d_dirichlet_conditions, 1, d_b, nullptr);
 
     solver.apply(mesh.nnodes, d_b, d_x);
 
@@ -237,7 +237,7 @@ int main(int argc, char *argv[]) {
     // Stats
     // -------------------------------
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
     if (!rank) {
         printf("----------------------------------------\n");
         printf("#elements %ld #nodes %ld\n", (long)nelements, (long)nnodes);

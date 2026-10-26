@@ -4,7 +4,6 @@
 #include "smesh_mesh.hpp"
 #include "smesh_tracer.hpp"
 
-#include "sfem_API.hpp"
 #include "sfem_OpFactory.hpp"
 
 #include "integrations/smesh/sccd_smesh_ccd.hpp"
@@ -263,7 +262,7 @@ namespace sfem {
     // SelfContactPenalty::~SelfContactPenalty() = default;
 
     // std::shared_ptr<SelfContactPenalty> SelfContactPenalty::create(const std::shared_ptr<FunctionSpace>& space) {
-    //     auto surface = smesh::skin(space->mesh_ptr());
+    //     auto surface = smesh::skin(space->mesh());
     //     return create(space, surface);
     // }
 
@@ -275,7 +274,7 @@ namespace sfem {
     //     ret->impl_->collisions = SelfCollisions::create(surface);
 
     //     auto trace_space = FunctionSpace::create(surface, 1);
-    //     auto mass        = Factory::create_op(trace_space, "Mass");
+    //     auto mass        = OpFactory::create(trace_space, "Mass", EXECUTION_SPACE_HOST);
     //     mass->initialize();
 
     //     auto m    = create_host_buffer<real_t>(trace_space->n_dofs());
@@ -349,7 +348,7 @@ namespace sfem {
     //     const real_t* x_prev3[3] = {&x_prev[0], &x_prev[1], &x_prev[2]};
     //     const real_t* x_curr3[3] = {&x_curr[0], &x_curr[1], &x_curr[2]};
 
-    //     impl_->collisions->find(impl_->space->mesh_ptr()->spatial_dimension(), x_prev3, x_curr3);
+    //     impl_->collisions->find(impl_->space->mesh()->spatial_dimension(), x_prev3, x_curr3);
     //     impl_->toi = impl_->collisions->time_of_impact();
 
     //     impl_->collisions->discrete_detection_with_side_effects(impl_->toi);

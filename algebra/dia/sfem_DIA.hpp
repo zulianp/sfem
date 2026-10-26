@@ -95,7 +95,7 @@ namespace sfem {
         std::ptrdiff_t rows() const override { return block_rows_ * block_size_; }
         std::ptrdiff_t cols() const override { return block_cols_ * block_size_; }
 
-        ExecutionSpace execution_space() const override { return execution_space_; }
+        ExecutionContext execution_context() const override { return execution_space_; }
 
         SharedBuffer<int>      diagonal_offsets;
         SharedBuffer<TStorage> values;

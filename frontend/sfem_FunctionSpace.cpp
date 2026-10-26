@@ -277,17 +277,13 @@ namespace sfem {
         return impl_->mesh && Impl::mesh_all_semistructured(*impl_->mesh);
     }
 
-    Mesh &FunctionSpace::mesh() { return *impl_->mesh; }
-
-    const Mesh &FunctionSpace::mesh() const { return *impl_->mesh; }
-
-    std::shared_ptr<Mesh> FunctionSpace::mesh_ptr() const { return impl_->mesh; }
+    const std::shared_ptr<Mesh> &FunctionSpace::mesh() const { return impl_->mesh; }
 
     int FunctionSpace::block_size() const { return impl_->block_size; }
 
     ptrdiff_t FunctionSpace::n_dofs() const { return impl_->nlocal; }
 
-    ptrdiff_t FunctionSpace::n_owned_dofs() const { return impl_->nowned; }
+    ptrdiff_t FunctionSpace::n_dofs_owned() const { return impl_->nowned; }
 
     ptrdiff_t FunctionSpace::n_dofs_global() const { return impl_->nglobal; }
 
@@ -318,7 +314,7 @@ namespace sfem {
 
     // Helper method to get number of blocks (for internal use)
     size_t FunctionSpace::n_blocks() const {
-        assert(mesh_ptr()->n_blocks() == impl_->element_types.size());
+        assert(mesh()->n_blocks() == impl_->element_types.size());
         return impl_->element_types.size();
     }
 
@@ -373,20 +369,27 @@ namespace sfem {
         return exchange.get();
     }
 
-    int FunctionSpace::synchronize(real_t *const x, const ExecutionSpace es) {
-        if (synchronize_begin(x, es) != SFEM_SUCCESS) return SFEM_FAILURE;
-        return synchronize_end(es);
+    int FunctionSpace::synchronize(real_t *const x, const ExecutionContext &context) {
+        if (synchronize_begin(x, context) != SFEM_SUCCESS) return SFEM_FAILURE;
+        return synchronize_end(context);
     }
 
-    int FunctionSpace::synchronize_begin(real_t *const x, const ExecutionSpace es) {
+    int FunctionSpace::add_to_owners(real_t *const x, const ExecutionSpace es) {
         int  status   = SFEM_SUCCESS;
         auto exchange = exchange_for(es, &status);
-        return exchange ? exchange->gather_begin(x, impl_->block_size) : status;
+        if (!exchange) return status;
+        return exchange->scatter_add(x, impl_->block_size) == SMESH_SUCCESS ? SFEM_SUCCESS : SFEM_FAILURE;
     }
 
-    int FunctionSpace::synchronize_end(const ExecutionSpace es) {
+    int FunctionSpace::synchronize_begin(real_t *const x, const ExecutionContext &context) {
         int  status   = SFEM_SUCCESS;
-        auto exchange = exchange_for(es, &status);
+        auto exchange = exchange_for(context.space(), &status);
+        return exchange ? exchange->gather_begin(x, impl_->block_size, context.stream()) : status;
+    }
+
+    int FunctionSpace::synchronize_end(const ExecutionContext &context) {
+        int  status   = SFEM_SUCCESS;
+        auto exchange = exchange_for(context.space(), &status);
         return exchange ? exchange->gather_wait() : status;
     }
 

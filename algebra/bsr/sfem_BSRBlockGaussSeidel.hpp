@@ -3,7 +3,7 @@
 
 #include "sfem_BSR.hpp"
 #include "sfem_base.hpp"
-#include "sfem_openmp_blas.hpp"
+#include "sfem_BLAS_openmp.hpp"
 
 #include <cassert>
 #include <memory>
@@ -147,7 +147,7 @@ namespace sfem {
             assert(bsr_->rows() == bsr_->cols());
             assert(bsr_->block_size() >= 1 && bsr_->block_size() <= MAX_BLOCK_SIZE);
 
-            blas_ = make_openmp_blas<T>();
+            blas_ = OpenMPBLAS<T>::create();
             build_inv_diag();
         }
 
@@ -191,7 +191,7 @@ namespace sfem {
 
         std::ptrdiff_t rows() const override { return bsr_->rows(); }
         std::ptrdiff_t cols() const override { return bsr_->cols(); }
-        ExecutionSpace execution_space() const override { return EXECUTION_SPACE_HOST; }
+        ExecutionContext execution_context() const override { return EXECUTION_SPACE_HOST; }
 
     private:
         void ensure_workspace() {

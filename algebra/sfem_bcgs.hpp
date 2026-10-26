@@ -9,13 +9,15 @@
 #include <iostream>
 
 #include "sfem_MatrixFreeLinearSolver.hpp"
-#include "sfem_openmp_blas.hpp"
+#include "sfem_BLAS_openmp.hpp"
 
 // https://en.wikipedia.org/wiki/Biconjugate_gradient_stabilized_method
 namespace sfem {
     template <typename T>
     class BiCGStab final : public MatrixFreeLinearSolver<T> {
     public:
+        /// Built for the execution space es, on op.
+        static std::shared_ptr<BiCGStab<T>> create(const std::shared_ptr<Operator<T>> &op, const ExecutionSpace es);
         // Operator
         std::function<void(const T* const, T* const)> apply_op;
         std::function<void(const T* const, T* const)> left_preconditioner_op;
@@ -28,11 +30,10 @@ namespace sfem {
 
         bool verbose{true};
 
-        ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
 
         int iterations() const override { return iterations_; }
 
-        ExecutionSpace execution_space() const override { return execution_space_; }
+        ExecutionContext execution_context() const override { return blas ? blas->context() : ExecutionContext(EXECUTION_SPACE_INVALID); }
 
         inline std::ptrdiff_t rows() const override { return n_dofs; }
         inline std::ptrdiff_t cols() const override { return n_dofs; }
@@ -68,8 +69,7 @@ namespace sfem {
         void set_dtol(const T val) { dtol = val; }
 
         void default_init() {
-            blas = make_openmp_blas<T>();
-            execution_space_ = EXECUTION_SPACE_HOST;
+            blas = OpenMPBLAS<T>::create();
         }
 
         bool good() const {
@@ -394,6 +394,11 @@ namespace sfem {
         cg->default_init();
         return cg;
     }
+    template <typename T>
+    std::shared_ptr<BiCGStab<T>> create_bcgs(const std::shared_ptr<Operator<T>> &op, const ExecutionSpace es) {
+        return BiCGStab<T>::create(op, es);
+    }
+
 }  // namespace sfem
 
 #endif  // SFEM_BCGS_HPP

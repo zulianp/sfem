@@ -17,8 +17,8 @@
 #define SFEM_UNIT_TEST_INIT(argc, argv)            \
     auto context__ = sfem::initialize(argc, argv); \
     smesh_print_test_info();                       \
-    const int smesh_test_argc__ = argc;            \
-    char **smesh_test_argv__    = argv;            \
+    [[maybe_unused]] const int smesh_test_argc__ = argc; \
+    [[maybe_unused]] char **smesh_test_argv__    = argv; \
     int err                     = 0;
 
 #define SFEM_RUN_TEST(test_) SMESH_RUN_TEST(test_)
@@ -30,5 +30,28 @@
 #define SFEM_ASSERT_ARRAY_APPROX_EQ(n__, a__, b__, tol__) SMESH_ASSERT_ARRAY_APPROX_EQ(n__, a__, b__, tol__)
 #define SFEM_TEST_EQ(a, b) SMESH_TEST_EQ(a, b)
 #define SFEM_ASSERT_ARRAY_EQ(n__, a__, b__) SMESH_ASSERT_ARRAY_EQ(n__, a__, b__)
+
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
+namespace sfem {
+    namespace test {
+        /// One thread for the length of a scope.  The standard layout scatters element
+        /// contributions with atomics, so two threaded evaluations of the same gradient
+        /// may differ in the last bit; a test that compares evaluations bitwise to show
+        /// that nothing changed between them runs where the order is fixed.
+        /// OpenMP reductions (the solvers' dot products) combine in a varying order too.
+        struct SerialScope {
+#ifdef _OPENMP
+            int threads{omp_get_max_threads()};
+            SerialScope() { omp_set_num_threads(1); }
+            ~SerialScope() { omp_set_num_threads(threads); }
+#else
+            SerialScope() {}  // user-provided, so an unused scope does not warn
+#endif
+        };
+    }  // namespace test
+}  // namespace sfem
 
 #endif  // SFEM_TEST

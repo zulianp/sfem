@@ -18,7 +18,8 @@ namespace sfem {
                                     const real_t         release,
                                     const real_t *const  p0,
                                     real_t *const        gap,
-                                    real_t *const *const normals);
+                                    real_t *const *const normals,
+                                    void *const          stream);
 
     // projected (a copy of the residual) less the reaction, mu kept; complementarity into c and
     // -gap into penetration, per contact node.
@@ -52,7 +53,7 @@ namespace sfem {
     void d_node_obstacle_project_velocity(const NodeObstacleView &c, real_t *const v, const real_t dt);
 
     // max(0, max_i x_i) over n device values.
-    real_t d_max_or_zero(const ptrdiff_t n, const real_t *const x);
+    real_t d_max_or_zero(const ptrdiff_t n, const real_t *const x, void *const stream);
 
 }  // namespace sfem
 

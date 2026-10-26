@@ -14,6 +14,9 @@
 // A linear problem with an exact inner solve converges in one iteration, whose CG run is the
 // one a direct CG solve of the same system makes.
 int test_linear_one_iteration() {
+    // Both CG runs on one thread: their dot products then sum in the same order (with threads a
+    // run could take one iteration more than the other at rtol 1e-12).
+    sfem::test::SerialScope serial;
     auto p = sfem::test::make_cube_problem("GeneratedLinearElasticity", 4, real_t(0.1));
 
     sfem::LinearSolverOptions linear;
@@ -28,7 +31,7 @@ int test_linear_one_iteration() {
     std::copy(p.x->data(), p.x->data() + p.fs->n_dofs(), x0->data());
 
     auto report = newton.solve(sfem::StepContext(), p.x->data());
-    SFEM_TEST_ASSERT(report.status == sfem::NonlinearReport::CONVERGED);
+    SFEM_TEST_ASSERT(report.status == sfem::NonlinearReport::Status::CONVERGED);
     SFEM_TEST_ASSERT(report.iterations == 1);
 
     // The same CG on the same system.
@@ -77,7 +80,7 @@ int test_neohookean_quadratic() {
 
     auto report = newton.solve(sfem::StepContext(), p.x->data());
     printf("  %s after %d iterations\n", sfem::to_string(report.status), report.iterations);
-    SFEM_TEST_ASSERT(report.status == sfem::NonlinearReport::CONVERGED);
+    SFEM_TEST_ASSERT(report.status == sfem::NonlinearReport::Status::CONVERGED);
     SFEM_TEST_ASSERT(report.iterations <= 8);
 
     for (size_t k = 0; k + 1 < r.size(); ++k) {
@@ -148,7 +151,7 @@ int test_fails_fast() {
         auto step       = std::make_shared<ScriptedStep>(n);
         step->direction = 1;
         auto report     = run(p, step, sfem::NewtonOptions());
-        SFEM_TEST_ASSERT(report.status == sfem::NonlinearReport::LINE_SEARCH_FAILED);
+        SFEM_TEST_ASSERT(report.status == sfem::NonlinearReport::Status::LINE_SEARCH_FAILED);
         SFEM_TEST_ASSERT(report.iterations == 1);
     }
 
@@ -160,7 +163,7 @@ int test_fails_fast() {
         auto step      = std::make_shared<ScriptedStep>(n);
         step->measures = {1, 10, 1e5};
         auto report    = run(p, step, no_search);
-        SFEM_TEST_ASSERT(report.status == sfem::NonlinearReport::DIVERGED);
+        SFEM_TEST_ASSERT(report.status == sfem::NonlinearReport::Status::DIVERGED);
         SFEM_TEST_ASSERT(report.iterations == 2);
     }
 
@@ -169,7 +172,7 @@ int test_fails_fast() {
         auto step      = std::make_shared<ScriptedStep>(n);
         step->measures = {1, std::numeric_limits<real_t>::quiet_NaN()};
         auto report    = run(p, step, no_search);
-        SFEM_TEST_ASSERT(report.status == sfem::NonlinearReport::NON_FINITE);
+        SFEM_TEST_ASSERT(report.status == sfem::NonlinearReport::Status::NON_FINITE);
         SFEM_TEST_ASSERT(report.iterations == 1);
     }
 
@@ -179,7 +182,7 @@ int test_fails_fast() {
         step->measures = {1};
         no_search.max_it = 3;
         auto report      = run(p, step, no_search);
-        SFEM_TEST_ASSERT(report.status == sfem::NonlinearReport::MAX_IT);
+        SFEM_TEST_ASSERT(report.status == sfem::NonlinearReport::Status::MAX_IT);
         SFEM_TEST_ASSERT(report.iterations == 3);
         SFEM_TEST_ASSERT(!report.converged());
     }
@@ -189,7 +192,7 @@ int test_fails_fast() {
         auto step       = std::make_shared<ScriptedStep>(n);
         step->direction = std::numeric_limits<real_t>::quiet_NaN();
         auto report     = run(p, step, sfem::NewtonOptions());
-        SFEM_TEST_ASSERT(report.status == sfem::NonlinearReport::STEP_FAILED);
+        SFEM_TEST_ASSERT(report.status == sfem::NonlinearReport::Status::STEP_FAILED);
     }
     return SFEM_TEST_SUCCESS;
 }

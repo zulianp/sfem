@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import glob
+import os
 import numpy as np
 
 try:
@@ -12,6 +13,14 @@ except NameError:
     real_t = np.float64
     count_t = np.int32
     elem_idx_t = np.int32
+
+
+def _dtype_of(path, default):
+    """The array type a file name states (x.float32, i0.int32.raw), else default."""
+    for part in os.path.basename(path).split(".")[1:]:
+        if part in ("int16", "int32", "int64", "float32", "float64"):
+            return np.dtype(part)
+    return default
 
 
 class ElementDualGraph:
@@ -41,10 +50,26 @@ class Mesh:
     def read(self, path):
         self.cells = []
 
-        element_files = glob.glob(f"{path}/i*.raw", recursive=False)
-        x_file = glob.glob(f"{path}/x.raw", recursive=False)
-        y_file = glob.glob(f"{path}/y.raw", recursive=False)
-        z_file = glob.glob(f"{path}/z.raw", recursive=False)
+        # The files a meta.yaml lists (e.g. i0.int32, x.float32, as smesh's skin writes them),
+        # their types from the extension; otherwise the untyped i*.raw, x.raw, ...
+        meta = os.path.join(path, "meta.yaml")
+        if os.path.exists(meta):
+            import yaml
+
+            with open(meta) as f:
+                m = yaml.safe_load(f)
+            element_files = [os.path.join(path, list(e.values())[0]) for e in m["elements"]]
+            pts = [os.path.join(path, list(e.values())[0]) for e in m["points"]]
+            x_file, y_file = [pts[0]], [pts[1]]
+            z_file = [pts[2]] if len(pts) > 2 else []
+        else:
+            element_files = sorted(
+                glob.glob(f"{path}/i*.raw", recursive=False),
+                key=lambda f: int(os.path.basename(f)[1:].split(".")[0]),
+            )
+            x_file = glob.glob(f"{path}/x.raw", recursive=False)
+            y_file = glob.glob(f"{path}/y.raw", recursive=False)
+            z_file = glob.glob(f"{path}/z.raw", recursive=False)
 
         if len(x_file) == 0 or len(y_file) == 0 or len(z_file) == 0:
             print(
@@ -59,7 +84,7 @@ class Mesh:
 
         list_of_idx = []
         for ef in element_files:
-            idx_i = np.fromfile(ef, dtype=idx_t)
+            idx_i = np.fromfile(ef, dtype=_dtype_of(ef, idx_t))
             list_of_idx.append(idx_i)
 
         data = np.zeros((len(list_of_idx[0]), len(list_of_idx)))
@@ -74,7 +99,7 @@ class Mesh:
 
         list_of_points = []
         for pf in point_files:
-            list_of_points.append(np.fromfile(pf, dtype=geom_t))
+            list_of_points.append(np.fromfile(pf, dtype=_dtype_of(pf, geom_t)).astype(geom_t))
 
         d = 0
         coords = np.zeros((len(list_of_points[0]), len(list_of_points)))

@@ -66,7 +66,7 @@ namespace sfem {
     int Mass::hessian_crs(const real_t *const /*x*/, const count_t *const /*rowptr*/, const idx_t *const /*colidx*/, real_t *const values) {
         SFEM_TRACE_SCOPE("Mass::hessian_crs");
 
-        auto mesh  = impl_->space->mesh_ptr();
+        auto mesh  = impl_->space->mesh();
         auto graph = impl_->space->dof_to_dof_graph();
         int  err   = SFEM_SUCCESS;
 
@@ -88,7 +88,7 @@ namespace sfem {
     int Mass::gradient(const real_t *const x, real_t *const out) {
         SFEM_TRACE_SCOPE("Mass::gradient");
 
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) {
             apply_mass(domain.element_type,
                        domain.block->n_elements(),
@@ -108,7 +108,7 @@ namespace sfem {
         SFEM_TRACE_SCOPE("Mass::apply");
         SFEM_OP_CAPTURE();
 
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) {
             apply_mass(domain.element_type,
                        domain.block->n_elements(),

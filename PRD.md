@@ -418,7 +418,7 @@ public:
     int apply(const real_t* const x, const real_t* const h, real_t* const out) override {
         SFEM_TRACE_SCOPE("Laplacian::apply");
         
-        auto mesh = space->mesh_ptr();
+        auto mesh = space->mesh();
         
         // Check if this is a multi-block mesh
         if (mesh->n_blocks() > 1) {
@@ -448,7 +448,7 @@ public:
                     real_t* const values) override {
         SFEM_TRACE_SCOPE("Laplacian::hessian_crs");
         
-        auto mesh = space->mesh_ptr();
+        auto mesh = space->mesh();
         
         // Check if this is a multi-block mesh
         if (mesh->n_blocks() > 1) {
@@ -471,7 +471,7 @@ public:
 private:
     // New private methods for multi-block support
     int apply_multi_block(const real_t* const h, real_t* const out) {
-        auto mesh = space->mesh_ptr();
+        auto mesh = space->mesh();
         const ptrdiff_t n_blocks = mesh->n_blocks();
         const ptrdiff_t n_points = mesh->n_points();
         
@@ -506,7 +506,7 @@ private:
     int hessian_crs_multi_block(const count_t* const rowptr,
                                 const idx_t* const colidx,
                                 real_t* const values) {
-        auto mesh = space->mesh_ptr();
+        auto mesh = space->mesh();
         const ptrdiff_t n_blocks = mesh->n_blocks();
         const ptrdiff_t n_points = mesh->n_points();
         
