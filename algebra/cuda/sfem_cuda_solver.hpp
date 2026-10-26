@@ -2,6 +2,7 @@
 #define SFEM_CUDA_SOLVER_HPP
 
 #include "sfem_Chebyshev3.hpp"
+#include "sfem_Multigrid.hpp"
 #include "sfem_bcgs.hpp"
 #include "sfem_cg.hpp"
 #include "sfem_cuda_blas.hpp"
