@@ -6,27 +6,25 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+namespace sfem {
 
-int lumped_ptdp_crs(const ptrdiff_t                    fine_nodes,
-                    const count_t *const SFEM_RESTRICT rowptr,
-                    const idx_t *const SFEM_RESTRICT   colidx,
-                    const real_t *const SFEM_RESTRICT  values,
-                    const real_t *const SFEM_RESTRICT  diagonal,
-                    real_t *const SFEM_RESTRICT        coarse);
+    /// The row sums of P^T D P (the lumped Galerkin product) of the diagonal D, P in CRS.
+    int lumped_galerkin_crs(const ptrdiff_t                    fine_nodes,
+                            const count_t *const SFEM_RESTRICT rowptr,
+                            const idx_t *const SFEM_RESTRICT   colidx,
+                            const real_t *const SFEM_RESTRICT  values,
+                            const real_t *const SFEM_RESTRICT  diagonal,
+                            real_t *const SFEM_RESTRICT        coarse);
 
-int lumped_ptdp_crs_v(const ptrdiff_t                    fine_nodes,
-                      const count_t *const SFEM_RESTRICT rowptr,
-                      const idx_t *const SFEM_RESTRICT   colidx,
-                      const real_t *const SFEM_RESTRICT  values,
-                      const int                          block_size,
-                      const real_t *const SFEM_RESTRICT  diagonal,
-                      real_t *const SFEM_RESTRICT        coarse);
+    /// lumped_galerkin_crs for block_size components per node.
+    int lumped_galerkin_crs_vector(const ptrdiff_t                    fine_nodes,
+                                   const count_t *const SFEM_RESTRICT rowptr,
+                                   const idx_t *const SFEM_RESTRICT   colidx,
+                                   const real_t *const SFEM_RESTRICT  values,
+                                   const int                          block_size,
+                                   const real_t *const SFEM_RESTRICT  diagonal,
+                                   real_t *const SFEM_RESTRICT        coarse);
 
-#ifdef __cplusplus
-}
-#endif
+}  // namespace sfem
 
 #endif  // LUMPED_PTPD_H
