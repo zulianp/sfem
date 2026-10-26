@@ -7,7 +7,7 @@
 #include <limits>
 
 #include "sfem_blas_factory.hpp"
-#include "sfem_solver_factory.hpp"
+#include "sfem_mprgp.hpp"
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_cuda_blas.hpp"
 #endif

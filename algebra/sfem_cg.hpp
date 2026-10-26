@@ -21,6 +21,8 @@ namespace sfem {
     template <typename T>
     class ConjugateGradient final : public MatrixFreeLinearSolver<T> {
     public:
+        /// Built for the execution space es, on op.
+        static std::shared_ptr<ConjugateGradient<T>> create(const std::shared_ptr<Operator<T>> &op, const ExecutionSpace es);
         // Operator
         std::shared_ptr<Operator<T>> apply_op;
         std::shared_ptr<Operator<T>> preconditioner_op;
@@ -423,6 +425,11 @@ namespace sfem {
         cg->default_init();
         return cg;
     }
+    template <typename T>
+    std::shared_ptr<ConjugateGradient<T>> create_cg(const std::shared_ptr<Operator<T>> &op, const ExecutionSpace es) {
+        return ConjugateGradient<T>::create(op, es);
+    }
+
 }  // namespace sfem
 
 #endif  // SFEM_CG_HPP

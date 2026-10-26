@@ -14,7 +14,10 @@
 #include "sfem_Transfer.hpp"
 #include "sfem_aliases.hpp"
 #include "sfem_config.h"
-#include "sfem_solver_factory.hpp"
+#include "sfem_Chebyshev3.hpp"
+#include "sfem_ShiftableJacobi.hpp"
+#include "sfem_Stationary.hpp"
+#include "sfem_cg.hpp"
 #include "smesh_env.hpp"
 
 #ifdef SFEM_ENABLE_AMG
