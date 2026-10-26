@@ -136,7 +136,7 @@ namespace sfem {
     std::shared_ptr<CRSGraph> create_derefined_crs_graph(FunctionSpace &space) {
         auto et        = (smesh::ElemType)space.element_type();
         auto coarse_et = macro_base_elem(et);
-        auto crs_graph = space.mesh().create_node_to_node_graph(static_cast<smesh::ElemType>(coarse_et));
+        auto crs_graph = space.mesh_ptr()->create_node_to_node_graph(static_cast<smesh::ElemType>(coarse_et));
         return crs_graph;
     }
 
@@ -151,16 +151,16 @@ namespace sfem {
         const bool           to_ss   = to_space->has_semi_structured_mesh();
         const bool           from_ss = from_space->has_semi_structured_mesh();
         if (to_ss) {
-            assert_supported_ss_transfer_meshes(from_space->mesh(), to_space->mesh());
+            assert_supported_ss_transfer_meshes(*from_space->mesh_ptr(), *to_space->mesh_ptr());
         }
-        if (!to_ss && to_space->mesh().n_blocks() > 1) {
+        if (!to_ss && to_space->mesh_ptr()->n_blocks() > 1) {
             SFEM_ERROR("create_hierarchical_prolongation: unstructured multi-block is not implemented\n");
         }
 
 #ifdef SFEM_ENABLE_CUDA
         if (EXECUTION_SPACE_DEVICE == es) {
             if (to_ss) {
-                if (!ss_all_hex_family(to_space->mesh())) {
+                if (!ss_all_hex_family(*to_space->mesh_ptr())) {
                     SFEM_ERROR("create_hierarchical_prolongation: DEVICE SS transfer is implemented for HEX-family only\n");
                 }
                 if (from_ss) {
@@ -174,8 +174,8 @@ namespace sfem {
                                     [=](const real_t *const from, real_t *const to) {
                                         SFEM_TRACE_SCOPE("cu_sshex8_prolongate");
 
-                                        auto     &from_ssm   = from_space->mesh();
-                                        auto     &to_ssm     = to_space->mesh();
+                                        auto     &from_ssm   = *from_space->mesh_ptr();
+                                        auto     &to_ssm     = *to_space->mesh_ptr();
                                         const int to_level   = smesh::semistructured_level(to_ssm);
                                         const int from_level = smesh::semistructured_level(from_ssm);
 
@@ -221,7 +221,7 @@ namespace sfem {
                                                                [=](const real_t *const from, real_t *const to) {
                                                                    SFEM_TRACE_SCOPE("cu_sshex8_hierarchical_prolongation");
 
-                                                                   auto     &ssm   = to_space->mesh();
+                                                                   auto     &ssm   = *to_space->mesh_ptr();
                                                                    const int level = smesh::semistructured_level(ssm);
                                                                    for (size_t b = 0; b < ssm.n_blocks(); ++b) {
                                                                        auto            to_b = ssm.block(b);
@@ -250,13 +250,13 @@ namespace sfem {
                                                                context));
             }
 
-            if (to_space->mesh().n_blocks() != 1) {
+            if (to_space->mesh_ptr()->n_blocks() != 1) {
                 SFEM_ERROR("create_hierarchical_prolongation: DEVICE unstructured multi-block is not implemented\n");
             }
 
-            auto elements = to_space->mesh().block(0)->device_elements_SoA();
+            auto elements = to_space->mesh_ptr()->block(0)->device_elements_SoA();
 
-            const ptrdiff_t n_elements = to_space->mesh().n_elements(0);
+            const ptrdiff_t n_elements = to_space->mesh_ptr()->n_elements(0);
             return wrap_prolongation_coarse_gather(
                     from_space,
                     to_space,
@@ -288,7 +288,7 @@ namespace sfem {
                     auto       from_mesh = from_space->mesh_ptr();
                     const bool mpi_from =
                             from_mesh && from_mesh->is_distributed() && from_mesh->comm() && from_mesh->comm()->size() > 1;
-                    if (mpi_from && ss_all_hex_family(to_space->mesh())) {
+                    if (mpi_from && ss_all_hex_family(*to_space->mesh_ptr())) {
                         return wrap_prolongation_coarse_gather(
                                 from_space,
                                 to_space,
@@ -299,8 +299,8 @@ namespace sfem {
                                         [=](const real_t *const from, real_t *const to) {
                                             SFEM_TRACE_SCOPE("sshex8_prolongate_from_hex8");
 
-                                            auto     &from_m   = from_space->mesh();
-                                            auto     &to_ssm   = to_space->mesh();
+                                            auto     &from_m   = *from_space->mesh_ptr();
+                                            auto     &to_ssm   = *to_space->mesh_ptr();
                                             const int to_level = smesh::semistructured_level(to_ssm);
                                             for (size_t b = 0; b < to_ssm.n_blocks(); ++b) {
                                                 auto            from_b  = from_m.block(b);
@@ -338,7 +338,7 @@ namespace sfem {
                                     [=](const real_t *const from, real_t *const to) {
                                         SFEM_TRACE_SCOPE("ss_hierarchical_prolongation");
 
-                                        auto     &ssm   = to_space->mesh();
+                                        auto     &ssm   = *to_space->mesh_ptr();
                                         const int level = smesh::semistructured_level(ssm);
                                         for (size_t b = 0; b < ssm.n_blocks(); ++b) {
                                             auto            to_b = ssm.block(b);
@@ -366,8 +366,8 @@ namespace sfem {
                 // FunctionSpace::derefine, so that case never takes SS-to-SS at from_level == 1.
                 // Mixed HEX+TET and homogeneous QUAD/TET keep a level-1 SS coarse space;
                 // ss*_prolongate(..., from_level=1, ...) is valid.
-                assert(smesh::semistructured_level(from_space->mesh()) >= 1);
-                assert(!ss_all_hex_family(from_space->mesh()) || smesh::semistructured_level(from_space->mesh()) > 1);
+                assert(smesh::semistructured_level(*from_space->mesh_ptr()) >= 1);
+                assert(!ss_all_hex_family(*from_space->mesh_ptr()) || smesh::semistructured_level(*from_space->mesh_ptr()) > 1);
 
                 return wrap_prolongation_coarse_gather(
                         from_space,
@@ -379,8 +379,8 @@ namespace sfem {
                                 [=](const real_t *const from, real_t *const to) {
                                     SFEM_TRACE_SCOPE("ss_prolongate");
 
-                                    auto     &from_ssm   = from_space->mesh();
-                                    auto     &to_ssm     = to_space->mesh();
+                                    auto     &from_ssm   = *from_space->mesh_ptr();
+                                    auto     &to_ssm     = *to_space->mesh_ptr();
                                     const int from_level = smesh::semistructured_level(from_ssm);
                                     const int to_level   = smesh::semistructured_level(to_ssm);
                                     for (size_t b = 0; b < from_ssm.n_blocks(); ++b) {
@@ -446,7 +446,7 @@ namespace sfem {
                                         from_space->element_type(),
                                         to_space->element_type(),
                                         transfer_nelements(to_space->mesh_ptr(), to_space->mesh_ptr()->block(0)),
-                                        to_space->mesh().elements(0)->data(),
+                                        to_space->mesh_ptr()->elements(0)->data(),
                                         from_space->block_size(),
                                         from,
                                         to);
@@ -530,7 +530,7 @@ namespace sfem {
                                                                                   const SharedBuffer<idx_t>       &edges,
                                                                                   const ExecutionContext          &context) {
         SFEM_UNUSED(context);
-        const ptrdiff_t n_fine_nodes   = function->space()->mesh().n_nodes();
+        const ptrdiff_t n_fine_nodes   = function->space()->mesh_ptr()->n_nodes();
         int             block_size     = function->space()->block_size();
         const ptrdiff_t n_coarse_nodes = crs_graph->n_nodes();
 

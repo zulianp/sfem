@@ -15,7 +15,7 @@ int test_derefine(const std::shared_ptr<sfem::Mesh> &m, const smesh::Path &outpu
     // Otherwise every level will construct its points
     // fs->mesh().points();
 
-    auto levels = smesh::derefinement_levels(fs->mesh());
+    auto levels = smesh::derefinement_levels(*fs->mesh_ptr());
     assert(levels[3] == L);
     assert(levels[2] == 4);
     assert(levels[1] == 2);
@@ -67,7 +67,7 @@ int test_prolongation(const std::shared_ptr<sfem::Mesh> &m, const smesh::Path & 
 
     auto ssmesh = smesh::to_semistructured(L, m, true, false);
     auto fs     = sfem::FunctionSpace::create(ssmesh, 1);
-    auto levels = smesh::derefinement_levels(fs->mesh());
+    auto levels = smesh::derefinement_levels(*fs->mesh_ptr());
 
     auto coarse_fs = fs->derefine(levels[2]);  // Choose any level
 
@@ -128,7 +128,7 @@ int test_restriction(const std::shared_ptr<sfem::Mesh> &m, const smesh::Path &ou
     auto ssmesh = smesh::to_semistructured(L, m, true, false);
     auto fs     = sfem::FunctionSpace::create(ssmesh, 1);
 
-    auto levels = smesh::derefinement_levels(fs->mesh());
+    auto levels = smesh::derefinement_levels(*fs->mesh_ptr());
 
     auto coarse_fs    = fs->derefine(levels[1]);  // Choose any level
     auto restriction  = create_hierarchical_restriction(fs, coarse_fs, es);

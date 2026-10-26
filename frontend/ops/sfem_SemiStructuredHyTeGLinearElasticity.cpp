@@ -48,7 +48,7 @@ namespace sfem {
                                         const real_t                                   lambda,
                                         const std::vector<std::string>                &block_names,
                                         std::vector<std::shared_ptr<Buffer<scalar_t>>> &category_stencils) {
-            auto &ssm  = space->mesh();
+            auto &ssm  = *space->mesh_ptr();
             auto  mesh = element_matrix_mesh(space);
             if (!mesh) {
                 return SFEM_FAILURE;
@@ -124,7 +124,7 @@ namespace sfem {
         if (SFEM_PRINT_THROUGHPUT && calls) {
             printf("SemiStructuredHyTeGLinearElasticity[%d]::apply() called %ld times. Total: %g [s], "
                    "Avg: %g [s], TP %g [MDOF/s]\n",
-                   smesh::semistructured_level(space->mesh()),
+                   smesh::semistructured_level(*space->mesh_ptr()),
                    calls,
                    total_time,
                    total_time / calls,
@@ -185,7 +185,7 @@ namespace sfem {
     int SemiStructuredHyTeGLinearElasticity::hessian_diag(const real_t *const, real_t *const out) {
         SFEM_TRACE_SCOPE("SemiStructuredHyTeGLinearElasticity::hessian_diag");
 
-        auto &ssm = space->mesh();
+        auto &ssm = *space->mesh_ptr();
         int   err = SFEM_SUCCESS;
         for (size_t b = 0; b < category_stencils.size(); ++b) {
             if (!category_stencils[b]) {
@@ -215,7 +215,7 @@ namespace sfem {
     int SemiStructuredHyTeGLinearElasticity::hessian_block_diag_sym(const real_t *const, real_t *const values) {
         SFEM_TRACE_SCOPE("SemiStructuredHyTeGLinearElasticity::hessian_block_diag_sym");
 
-        auto &ssm = space->mesh();
+        auto &ssm = *space->mesh_ptr();
         int   err = SFEM_SUCCESS;
         for (size_t b = 0; b < category_stencils.size(); ++b) {
             if (!category_stencils[b]) {
@@ -254,7 +254,7 @@ namespace sfem {
         SFEM_TRACE_SCOPE("SemiStructuredHyTeGLinearElasticity::apply");
 
         assert(is_semistructured_type(element_type));
-        auto &ssm = space->mesh();
+        auto &ssm = *space->mesh_ptr();
 
         double tick = smesh::time_seconds();
         int    err  = SFEM_SUCCESS;

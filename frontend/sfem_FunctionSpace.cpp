@@ -277,10 +277,6 @@ namespace sfem {
         return impl_->mesh && Impl::mesh_all_semistructured(*impl_->mesh);
     }
 
-    Mesh &FunctionSpace::mesh() { return *impl_->mesh; }
-
-    const Mesh &FunctionSpace::mesh() const { return *impl_->mesh; }
-
     std::shared_ptr<Mesh> FunctionSpace::mesh_ptr() const { return impl_->mesh; }
 
     int FunctionSpace::block_size() const { return impl_->block_size; }

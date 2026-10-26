@@ -27,7 +27,7 @@ namespace {
     std::shared_ptr<Buffer<real_t>> make_deterministic_device_vector(const std::shared_ptr<FunctionSpace> &fs) {
         auto h = create_host_buffer<real_t>(fs->n_dofs());
         {
-            geom_t **const  pts = fs->mesh().points()->data();
+            geom_t **const  pts = fs->mesh_ptr()->points()->data();
             const ptrdiff_t nn  = fs->n_dofs() / fs->block_size();
             for (ptrdiff_t i = 0; i < nn; ++i) {
                 const real_t x       = (real_t)pts[0][i];

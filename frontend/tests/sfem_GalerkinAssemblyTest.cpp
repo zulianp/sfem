@@ -384,7 +384,7 @@ int test_cube() {
     printf("Fine op (%d,%s):\t%s\n", SFEM_ELEMENT_REFINE_LEVEL, type_to_string(fs->element_type()), SFEM_FINE_OP_TYPE);
     fine_op = sfem::create_linear_operator(SFEM_FINE_OP_TYPE, f, nullptr, es);
 
-    auto levels    = smesh::derefinement_levels(fs->mesh());
+    auto levels    = smesh::derefinement_levels(*fs->mesh_ptr());
     SFEM_TEST_ASSERT(SFEM_ELEMENT_DEREFINE >= 0);
     SFEM_TEST_ASSERT(SFEM_ELEMENT_DEREFINE < static_cast<int>(levels.size()));
     auto fs_coarse = fs->derefine(levels[SFEM_ELEMENT_DEREFINE]);
@@ -425,7 +425,7 @@ int test_cube() {
     {
         geom_t **points{nullptr};
         if (fs_coarse->has_semi_structured_mesh()) {
-            points = fs_coarse->mesh().points()->data();
+            points = fs_coarse->mesh_ptr()->points()->data();
         } else {
             points = fs_coarse->mesh_ptr()->points()->data();
         }

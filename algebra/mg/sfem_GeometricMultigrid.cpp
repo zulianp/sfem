@@ -24,7 +24,7 @@ namespace sfem {
         auto data = std::make_shared<MultigridData>();
 
         auto  es     = f->execution_space();
-        auto &ssmesh = f->space()->mesh();
+        auto &ssmesh = *f->space()->mesh_ptr();
 
         bool has_hex  = false;
         bool has_tet  = false;
@@ -139,7 +139,7 @@ namespace sfem {
 
         bool mixed_hex_tet = false;
         {
-            auto &mesh = data->functions.front()->space()->mesh();
+            auto &mesh = *data->functions.front()->space()->mesh_ptr();
             bool  has_hex = false;
             bool  has_tet = false;
             for (size_t b = 0; b < mesh.n_blocks(); ++b) {

@@ -31,16 +31,16 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const smesh
             SFEM_ERROR("Unable to create fff");
         }
 
-        count = sfem::create_buffer<uint16_t>(fs->mesh().n_nodes(), es);
+        count = sfem::create_buffer<uint16_t>(fs->mesh_ptr()->n_nodes(), es);
         {
             auto buff     = count->data();
-            auto elements = fs->mesh().elements(0)->data();
+            auto elements = fs->mesh_ptr()->elements(0)->data();
 
-            const int nxe = fs->mesh().n_nodes_per_element(0);
+            const int nxe = fs->mesh_ptr()->n_nodes_per_element(0);
             printf("nxe = %d\n", nxe);
 
             for (int d = 0; d < nxe; d++) {
-                for (ptrdiff_t i = 0; i < fs->mesh().n_elements(); ++i) {
+                for (ptrdiff_t i = 0; i < fs->mesh_ptr()->n_elements(); ++i) {
                     buff[elements[d][i]]++;
                 }
             }
@@ -57,9 +57,9 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const smesh
                 fs->n_dofs(),
                 [=](const real_t *x, real_t *y) {
                     SFEM_TRACE_SCOPE("affine_sshex8_laplacian_bjacobi_fff");
-                    affine_sshex8_laplacian_bjacobi_fff(smesh::semistructured_level(fs->mesh()),
-                                                        fs->mesh().n_elements(),
-                                                        fs->mesh().elements(0)->data(),
+                    affine_sshex8_laplacian_bjacobi_fff(smesh::semistructured_level(*fs->mesh_ptr()),
+                                                        fs->mesh_ptr()->n_elements(),
+                                                        fs->mesh_ptr()->elements(0)->data(),
                                                         fff->data(),
                                                         count->data(),
                                                         constraints_mask->data(),

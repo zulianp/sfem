@@ -1298,7 +1298,7 @@ private:
             const ptrdiff_t nd  = g.data->functions[0]->space()->n_dofs();
             const ptrdiff_t nn0 = nd / N_FIELDS;
 
-            auto     &m0   = g.data->functions[0]->space()->mesh();
+            auto     &m0   = *g.data->functions[0]->space()->mesh_ptr();
             auto      b0   = m0.block(0);
             const int lvl  = smesh::semistructured_level(m0);
             const int nxe0 = (lvl + 1) * (lvl + 1) * (lvl + 1);

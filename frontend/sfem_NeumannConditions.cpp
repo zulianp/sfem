@@ -629,7 +629,7 @@ namespace sfem {
         if (space->block_size() != dim || (dim != 2 && dim != 3)) return SFEM_FAILURE;
 
         auto points = mesh->points();
-        if (space->has_semi_structured_mesh()) points = space->mesh().points();
+        if (space->has_semi_structured_mesh()) points = space->mesh_ptr()->points();
 
         for (const auto &c : impl_->conditions) {
             if (!c.follower_pressure) continue;
@@ -756,7 +756,7 @@ namespace sfem {
 
         auto points = mesh->points();
         if (space->has_semi_structured_mesh()) {
-            points = space->mesh().points();
+            points = space->mesh_ptr()->points();
         }
         const bool distributed = mesh->is_distributed() && mesh->comm()->size() > 1;
 
@@ -861,7 +861,7 @@ namespace sfem {
         auto space  = impl_->space;
         auto mesh   = space->mesh_ptr();
         auto points = mesh->points();
-        if (space->has_semi_structured_mesh()) points = space->mesh().points();
+        if (space->has_semi_structured_mesh()) points = space->mesh_ptr()->points();
         for (const auto &c : impl_->conditions) {
             if (!c.follower_pressure) continue;
             const int dim = mesh->spatial_dimension();
@@ -924,7 +924,7 @@ namespace sfem {
         auto mesh   = space->mesh_ptr();
         auto points = mesh->points();
         if (space->has_semi_structured_mesh()) {
-            points = space->mesh().points();
+            points = space->mesh_ptr()->points();
         }
 
         SharedBuffer<real_t> temp;
@@ -1050,7 +1050,7 @@ namespace sfem {
         auto mesh   = space->mesh_ptr();
         auto points = mesh->points();
         if (space->has_semi_structured_mesh()) {
-            points = space->mesh().points();
+            points = space->mesh_ptr()->points();
         }
 
         const ptrdiff_t      ndofs = space->n_dofs();

@@ -464,7 +464,7 @@ namespace sfem {
             SFEM_TRACE_SCOPE("SPMG::init_discretization");
 
             auto            fs             = f->space();
-            auto           &ssmesh         = f->space()->mesh();
+            auto           &ssmesh         = *f->space()->mesh_ptr();
 
             std::vector<int> levels = smesh::derefinement_levels(ssmesh);
             this->levels.clear();
@@ -589,10 +589,10 @@ namespace sfem {
                 auto coarse = levels[i];
 
                 auto      fine_space   = fine->function->space();
-                const int level        = smesh::semistructured_level(fine_space->mesh());
+                const int level        = smesh::semistructured_level(*fine_space->mesh_ptr());
                 auto      coarse_space = coarse->function->space();
                 const int coarse_level =
-                        coarse_space->has_semi_structured_mesh() ? smesh::semistructured_level(coarse_space->mesh()) : 1;
+                        coarse_space->has_semi_structured_mesh() ? smesh::semistructured_level(*coarse_space->mesh_ptr()) : 1;
 
                 const auto fam          = smesh::ss_source_family(fine_space->element_type());
                 const auto side_family  = fam == smesh::TET4 ? smesh::TRI3 : (fam == smesh::QUAD4 ? smesh::EDGE2 : smesh::QUAD4);
@@ -881,7 +881,7 @@ namespace sfem {
             if (is_root_rank(fs->mesh_ptr()->comm())) {
                 for (int i = 0; i < nlevels; i++) {
                     auto s = levels[i]->function->space();
-                    printf("%d) \tL=%d\n", i, s->has_semi_structured_mesh() ? smesh::semistructured_level(s->mesh()) : 1);
+                    printf("%d) \tL=%d\n", i, s->has_semi_structured_mesh() ? smesh::semistructured_level(*s->mesh_ptr()) : 1);
 
                     levels[i]->function->describe(std::cout);
                 }
