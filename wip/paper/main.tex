@@ -49,6 +49,8 @@
 \input{figures/campaign_macros}
 \input{figures/packsize_macros}
 \input{figures/roofline_macros}
+\input{figures/matched_counter_macros}
+\input{reproducibility/roofline-values}
 \IfFileExists{figures/convho_macros.tex}{\input{figures/convho_macros}}{}
 \IfFileExists{figures/kmix_macros.tex}{\input{figures/kmix_macros}}{}
 \input{figures/scatter_macros}
@@ -139,9 +141,7 @@ We evaluate it on the residual and matrix-free Jacobian action of a colocated CV
 Navier--Stokes discretisation on an NVIDIA Grace CPU. On \campDofs{} degrees of freedom the
 packed residual reaches \campResPacked{}~MDOF/s against \campSpmvF{} for a sparse
 matrix--vector product with the lagged matrix. The mesh the sweep reads is \fpImpl{}~bytes per
-degree of freedom and the matrix the product streams \fpMatrixFSixFour{}; counting the sweep's
-cached geometry and field vectors as well, its arithmetic intensity is \rlMfOverSpmv{} times the
-product's. The Jacobian
+degree of freedom and the matrix the product streams \fpMatrixFSixFour{}; the matched traffic comparison includes cached geometry and field vectors as well. The Jacobian
 action is reported in both forms, since they are not the same operator: lagged, it is what the
 matrix holds, at $\jfLaggedVsF\times$ the product; differentiated, what a Newton--Krylov solve
 applies, it costs $\jfExactCost\times$ and is $\jfExactVsF\times$. A controlled residual
@@ -189,9 +189,9 @@ cost of a barrier per colour and of accumulating into the destination, which has
 before it can be added to. \emph{Assembling} a sparse matrix removes
 the problem from the inner loop entirely, but replaces a kernel that reads a mesh with a product
 that streams a matrix, at a footprint that grows with the stencil rather than with the solution.
-Both sit on the bandwidth side of the ridge, and what separates them is distance from the roof:
-\S\ref{sec:res:spmv} measures the product at \rlSpmvFSixFourPct\% of the roof binding at its
-intensity, the matrix-free sweeps at \rlResidualAtomicPct--\rlResidualPackedPct\%.
+The matched measurements in \S\ref{sec:res:spmv} show why high bandwidth
+utilisation need not give the shortest application time: the lagged matrix
+product streams substantially more data than its matrix-free equivalent.
 
 What bitwise reproducibility buys is worth stating, because it is a property of the operator
 rather than a convenience. An operator whose summation order is fixed is a function of its input,
@@ -689,8 +689,7 @@ Table~\ref{tab:jacfair} reports both; only $\Jlag$ is what the matrix holds.
 
 The assembled operator streams a matrix larger than the caches, while the
 matrix-free operator reads a smaller mesh together with cached geometry and
-field vectors. Its historical arithmetic intensity is a factor of
-\rlMfOverSpmv{} higher. These differences motivate the timing and traffic
+field vectors. It performs additional arithmetic while avoiding matrix traffic. These differences motivate the timing and traffic
 comparisons in \S\ref{sec:res:spmv}; intensity alone does not identify a
 hardware bottleneck or establish that an implementation is optimal.
 
@@ -713,39 +712,19 @@ hardware bottleneck or establish that an implementation is optimal.
     L3 shared & \SI{114}{\mega\byte} & \\
     \midrule
     Memory bandwidth & $\le\SI{500}{\giga\byte\per\second}$
-      & \SI{\streamTriad}{\giga\byte\per\second} \\
-    FP64 rate & \SI{3.55}{\tflops} peak & \SI{\rlPeak}{\giga\flops} sustained \\
+      & \SI{\matchedTriadBandwidth}{\giga\byte\per\second} \\
+    FP64 rate & \SI{3.55}{\tflops} peak & \SI{\matchedGemmUseful}{\giga\flops} \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-Every measurement in this paper was taken on the Grace CPU die of an NVIDIA GH200 Grace Hopper
-Superchip (Table~\ref{tab:platform}), at 72 OpenMP threads with threads bound to cores,
-except in the thread sweep of Figure~\ref{fig:scaling}. The memory bandwidth quoted is a STREAM triad
-measured on the same node rather than a vendor figure, because it is the bound the roofline of
-\S\ref{sec:res:spmv} is drawn against and the two must come from the same machine.
-
-\paragraph{Method.} The bandwidth is a STREAM triad,
-compiled with \texttt{gcc -O3 -fopenmp -mcmodel=large} over arrays of $80\times10^{6}$ doubles
---- about \SI{1.9}{\giga\byte} in three arrays, some sixteen times the shared L3, so the triad
-genuinely streams. The FP64 rate is the best of five timed $N=8192$ double-precision \textsc{gemm}
-calls into \emph{OpenBLAS 0.3.28}, the threaded build the same node resolves for the solver;
-at that size the operational intensity is of order $10^3$~FLOP/byte, so the kernel is
-unambiguously compute-bound and the figure is a sustained rate rather than a peak. Five
-repetitions agreed to \SI{0.2}{\percent}.
-
-\paragraph{Attained fractions.} The triad reaches \SI{\streamTriad}{\giga\byte\per\second},
-\SI{\rlBwPctSpec}{\percent} of the bandwidth the vendor quotes~\cite{NvidiaGrace2023}; the \textsc{gemm}
-rate reaches \SI{\rlPeak}{\giga\flops}, \SI{\rlPeakPctSpec}{\percent} of the \SI{3.55}{\tflops} FP64 peak of a
-single Grace die. The roofline of \S\ref{sec:res:spmv} uses the \emph{measured} pair, since the
-kernels placed on it were measured on the same node.
-
-One further detail of the bandwidth figure: it is quoted at the thread count the kernels run at,
-which is not where it peaks. The triad reaches \SI{\streamPeak}{\giga\byte\per\second} at
-\streamPeakThreads{} threads and falls to \SI{\streamTriad}{\giga\byte\per\second} at
-\streamThreads{} --- the memory system saturates before the socket does, so the last half of the
-cores add compute but no bandwidth. We use the \streamThreads{}-thread figure throughout,
-because that is the bandwidth available in the configuration being measured.
+The CPU measurements use a Grace die of an NVIDIA GH200 Grace Hopper
+Superchip (Table~\ref{tab:platform}). The matched counter campaign uses 72 bound
+OpenMP threads in one exclusive allocation. Copy and triad over $80\times10^6$
+doubles provide transported-bandwidth references; checked $N=8192$ FP64 DGEMM
+with OpenBLAS 0.3.30 provides a compute reference. These are achieved rates,
+not strict hardware ceilings or an official STREAM score. All samples are
+retained; the historical timing campaigns and their settings remain distinct.
 
 \paragraph{The case.} The operators are those of a colocated control-volume finite element
 discretisation of the incompressible Navier--Stokes equations on hexahedra. Four unknowns live
@@ -1000,7 +979,7 @@ Table~\ref{tab:jacfair}. Sparse matrix--vector products with $\Jlag$ reach
 \campSpmvF{}~MDOF/s at double precision and \campSpmvS{} at single. The lagged product streams
 \fpMatrixFSixFour{}~bytes of matrix per degree of freedom, $\fpMatrixRatioFSixFour\times$ the mesh
 the matrix-free sweeps read (Table~\ref{tab:footprint}); with their cached geometry and field
-vectors, the sweeps' intensity is a factor of \rlMfOverSpmv{} higher (\S\ref{sec:res:spmv}).
+vectors, the matched measurements quantify the resulting traffic (\S\ref{sec:res:spmv}).
 
 \subsection{Term completeness}
 \label{sec:res:ladder}
@@ -1278,18 +1257,11 @@ FP32 cached Darwish and lagged SpMV are nearly tied in this diagnostic
 All samples and practical counter screens are retained in the reproducibility
 material. These diagnostic runs do not replace Figure~\ref{fig:jacho}'s matched data.
 
-\paragraph{On the roofline.} Figure~\ref{fig:roofline} uses the historical campaign,
-not the updated timings of Figure~\ref{fig:jacho}, and the correction costs traffic as well as arithmetic. It reads a nine-component nodal
-velocity gradient the first-order flux never touches, and the packed sweep stages that field
-into pack-local order, so measured DRAM traffic rises from \foBytesPacked{} to
-\hoBytesPacked{}~bytes per degree of freedom ($\hoBytesRatioPacked\times$) packed and
-\foBytesAtomic{} to \hoBytesAtomic{} atomic. The unlimited arm sits level with the first-order
-point, at \hoAiPackedLo{} against \rlResidualPackedAi{}~FLOP/byte: the reconstruction adds
-traffic and arithmetic in about the same proportion. A limiter carries enough arithmetic to move
-the operator to the right, and Venkatakrishnan's crosses the measured ridge of \rlRidge{}
-(\hoAiPackedHi{}).
-Every arm stays far from the roof, so the correction changes where an operator sits on the
-intensity axis and leaves its distance from the machine where it was.
+\paragraph{Reconstruction cost.}
+Higher-order reconstruction adds both field traffic and arithmetic.
+The matched first-order/Darwish residual comparison in Figure~\ref{fig:roofline}
+uses the same counter definitions and measured references. It is separate from
+the newer coefficient-cache and precision campaigns of Figure~\ref{fig:jacho}.
 
 \paragraph{Inherited properties.} The packed higher-order
 sweep has the same shape as the first-order one: stage the pack's fields, accumulate into a
@@ -1323,17 +1295,6 @@ different share of the two applications, as below. The format's advantage surviv
 $\hoxLayoutLagged\times$ on $\Jex$ and $\hoxLayoutExact\times$ on $\Jhoex$. The added pass is
 itself packed, gathering pack-locally and closing through the same ghost graph the operator
 sweeps use.
-
-\paragraph{Traffic, not arithmetic.} The $\Jhoex$ schemes are the second set of
-higher-order points in Figure~\ref{fig:roofline}, and they move as the residual's do. Traffic
-rises by $\hoJacBytesRatioPacked\times$ packed (\foJacBytesPacked{} to
-\hoJacBytesPacked{}~bytes per degree of freedom), because $\Gop u(v)$ is read on top of
-$\Gop u(u)$, and that outruns the arithmetic until a limiter is
-added --- and here it outruns it at every limiter. All four arms sit to the \emph{left} of
-$\Jex$'s \rlJacobianPackedAi{}~FLOP/byte: \hoJacAiPackedLo{} unlimited, \hoJacAiPackedHi{} for
-Venkatakrishnan's derivative, which carries the most arithmetic of the four and still does not
-reach it. In both operators the correction is a traffic change first and an arithmetic change
-second, which is the same statement as the reconstruction's cost below.
 
 \paragraph{The reconstruction.} Timed on its own it is the sweep the format helps \emph{most}:
 the pressure gradient at \ngPgradPacked{} against \ngPgradAtomic{}~MDOF/s, a factor of
@@ -1388,52 +1349,46 @@ reproducibility documentation.
 
 \begin{figure}[t]
   \centering
-  \input{figures/roofline}
-  \caption{Two roof pairs: solid measured on the node the points were
-    (\SI{\rlBw}{\giga\byte\per\second} triad, \SI{\rlPeak}{\giga\flops} GEMM), dashed the vendor
-    specification (\SI{\rlSpecBw}{\giga\byte\per\second}, \SI{\rlSpecPeak}{\tflops});
-    ridges at \rlRidge{} and \rlSpecRidge{}~FLOP/byte. The six legend colours are operator and
-    layout together; within each, the round marker is first-order upwinding and the other four
-    are the higher-order schemes, named by marker. Intensity uses \emph{measured} DRAM traffic;
-    a hollow marker means the compulsory-traffic model.}
+  \definecolor{rlBlue}{RGB}{35,92,150}
+  \definecolor{rlOrange}{RGB}{210,110,30}
+  \definecolor{rlGreen}{RGB}{45,135,85}
+  \input{figures/empirical_roofline}
+  \caption{Matched empirical roofline: FP64 affine interior, $n=128$, pack
+    1024, 72 Grace cores, Rhie--Chow enabled. Small points retain all 18
+    counted captures per arm; large points are means. Dashed/dotted lines:
+    measured copy/triad bandwidth; dash-dot: counted DGEMM rate. Shading spans
+    reference samples, not confidence intervals. Residual pairs compare layouts;
+    the lagged pair compares equivalent matrix-free and assembled actions.
+    Coefficient-cached Darwish is not measured here.}
   \label{fig:roofline}
 \end{figure}
 
-\paragraph{Traffic is measured, not modelled.} A matrix-free kernel's intensity is dominated by
-data that is neither the solution nor the result, and a compulsory-traffic model of it is easy to
-get wrong. Per element the sweep reads the cached affine geometry --- nine adjugate components and
-the determinant, \SI{19.5}{\byte} per degree of freedom on this mesh --- which exceeds the
-connectivity and both field vectors combined; the connectivity itself is \SI{3.9}{\byte} per degree
-of freedom packed against \SI{7.8}{} flat, so the two layouts do not share an intensity; and nodal
-coordinates, which such a model naturally reaches for, are not read by the bare affine kernel at
-all. We therefore place the points using DRAM traffic read from the memory-system counters, with
-two captures differenced across the number of timed applies so that setup and warmup cancel. The
-measured traffic is \rlTrafficRatioLo{} to \rlTrafficRatioHi{} times the compulsory bound. The lower
-end is the standard and packed sweeps, where the balance is node re-reads at pack boundaries and
-partial-line writes; the upper end is element colouring, which accumulates into the global arrays
-and so reads every destination back.
+\paragraph{Matched measurements.}
+Job \matchedJob{} on \texttt{\matchedHost{}} brackets only repeated applications
+with acknowledged counter windows, using retained workers, 30 warmups and
+per-worker transparent huge pages disabled. Setup, assembly and checks are
+excluded; state gradients are reused and required direction gradients are timed.
+Empty controls, counter coverage, repeat-count stability and paired normal
+timing checks pass without sample deletion or background subtraction.
+The axes count speculative floating-point operations of all precisions and
+transported bytes, consistently for operators and references. The measured
+copy/triad references are \rlCompCopy/\rlCompTriad{} GB/s and counted DGEMM
+is \rlCompGemm{} Gop/s. Complete methods, ranges and action points are retained
+in the supporting material.
 
-The same captures price the coloured layout's scatter. On the identical decomposition it moves
-\colBytesPctResRc\% more per degree of freedom on $\Fres$, \colBytesPctJac\% on the bare
-Jacobian element kernel and \colBytesPctJacRc\% on $\Jlag$: the cost of accumulating into
-the global arrays rather than writing owned rows.
-
-The first-order matrix-free kernels then sit at \rlResidualAiSpan{}~FLOP/byte and
-the lagged product at $\rlSpmvFSixFourAi{}$, a factor of \rlMfOverSpmv{} lower: it reads a matrix whose
-size grows with the stencil where the matrix-free kernels read a mesh. Halving the value precision,
-moving the SpMV from $\rlSpmvFSixFourAi{}$ to $\rlSpmvFThreeTwoAi{}$, reduces
-the matrix traffic; the separate precision diagnostic tests this effect while
-retaining FP64 arithmetic.
-
-\paragraph{Attained fractions.} Every first-order matrix-free point lies below the measured
-ridge of
-\rlRidge{}~FLOP/byte, so the memory roof is the binding one --- but none of them is close to it.
-Against the roof binding at its own intensity the packed residual attains
-\rlResidualPackedPct\%, the packed Jacobian action \rlJacobianPackedPct\%, and the atomic sweeps
-\rlResidualAtomicPct\%, while the lagged SpMV attains \rlSpmvFSixFourPct\%. The lagged product reaches a larger fraction of this roof than the matrix-free kernels.
-These fractions alone do not identify the limiting mechanism: low attained bandwidth can
-also reflect latency or dependencies. The instruction counters below provide additional
-observations, without isolating the cost of scatter.
+Packing accelerates the normal first-order/Darwish residual applications by
+$\matchedFoSpeedup\times$/$\matchedDarwishSpeedup\times$ while traffic changes
+by only \matchedFoTrafficChange\%/\matchedDarwishTrafficChange\%.
+The accumulation experiment below supports the layout-cost explanation;
+roofline position alone cannot isolate atomic updates or synchronization.
+For equivalent lagged actions, packed takes \rlCompLaggedTime{} ms against
+\rlCompSpmvTime{} ms for BSR SpMV ($\rlCompSpeedup\times$), transporting
+\matchedTrafficSpmvLagged{} times less data. SpMV runs close to the streaming
+reference but still takes longer. Packed executes about
+\rlCompWorkRatio{} times as many counted operations: its
+$\rlCompRateRatio\times$ throughput ratio is therefore not its application
+speedup. None of these measurements establishes a solver speedup or an
+optimal implementation.
 
 \begin{table}[t]
   \centering
@@ -1508,12 +1463,6 @@ measurement supports accumulation as the main contributor to the gap in these pr
 without identifying an isolated atomic-instruction cost or a universal fraction of
 production runtime.
 
-\paragraph{Measured against specified.} The two roof pairs differ by more than any kernel here can
-recover: the triad attains \rlBwPctSpec\% of specified bandwidth and the \textsc{gemm}
-\rlPeakPctSpec\% of specified peak. Efficiencies above are quoted against the measured roofs, with
-the specified pair drawn for reference; quoting against the specification would understate every
-kernel by those factors.
-
 %================================================================================================
 \begin{table*}[t]
   \centering
@@ -1533,8 +1482,8 @@ kernel by those factors.
   \inputifready{tables/jacfair}{fair Jacobian comparison, jobs/jac\_fair.sbatch}
 \end{table*}
 
-\paragraph{Like-for-like.} Table~\ref{tab:jacfair} separates two questions
-the figure runs together. Against the operator the matrix encodes, the packed matrix-free action is
+\paragraph{Like-for-like.} The historical timings in Table~\ref{tab:jacfair}
+separate lagged and consistent actions. Against the operator the matrix encodes, the packed matrix-free action is
 $\jfLaggedVsF\times$ the double-precision SpMV and $\jfLaggedVsS\times$ the single-precision one;
 the atomic sweep is $\jfLaggedAtomicVsF\times$. Both beat the matrix, and the standard layout is
 lane-blocked here like the others, so that margin is the method's rather than an artefact of how
@@ -1663,8 +1612,7 @@ With one thread per pack, the result is bit-identical across the tested thread c
 Measured on the residual and matrix-free Jacobian action of a colocated CVFEM Navier--Stokes
 discretisation on one Grace socket, the format is faster than a standard atomic sweep, than a
 coloured one, and than sparse matrix--vector products with the lagged matrix, whose matrix it
-replaces with a mesh $\fpMatrixRatioFSixFour\times$ smaller per degree of freedom, at an arithmetic
-intensity a factor of \rlMfOverSpmv{} higher. The controlled residual diagnostic finds
+replaces with a mesh $\fpMatrixRatioFSixFour\times$ smaller per degree of freedom, while performing additional arithmetic. The controlled residual diagnostic finds
 substantially lower accumulation costs for the packed layout at both one and 72 threads.
 These costs account for most of the layout gap within the diagnostic, including the
 single-thread case where there is no contention between threads. The margin depends on the

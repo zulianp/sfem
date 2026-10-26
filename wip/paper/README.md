@@ -144,40 +144,20 @@ Three things the rerun turned up that are not about the kernels:
 returned, the file was fetched, and the measured lines match the transcription exactly
 (PEAK_FP64_GFLOPS 2305.3). The file is now the fetched copy and the caveat is withdrawn.
 
-## The roofline is built on measured traffic, after a model that was wrong
+## Historical roofline accounting
 
-The intensity of every matrix-free point used to come from a compulsory-traffic model, and the model
-was wrong in a way that inverted a conclusion. It counted, per dof, 16 B of field vectors plus 6.8 B
-of "mesh" (connectivity and nodal coordinates). But the bare affine kernel reads no nodal
-coordinates -- they are staged only when Rhie--Chow or the boundary closure is on -- and it does read
-the cached affine geometry, `jacobian_adjugate[9]` and `jacobian_determinant`, **ten doubles per
-element**, which is 19.5 B/dof: larger than every term the model did count. Two further faults: the
-atomic points were drawn with the *packed* connectivity width, so their intensity was identical to
-the packed points' by construction and the prose then reasoned from that identity; and the mesh
-figure was taken from the smallest problem size in the campaign rather than the n=128 the figure is
-drawn at.
+An earlier compulsory-traffic model omitted the affine geometry cache, used
+packed connectivity widths for the atomic layout and mixed mesh sizes. A later
+figure replaced that model with whole-process counter differences. Neither
+accounting recipe supplies the current main figure.
 
-Rather than repair the model, the points are now placed on **measured DRAM traffic** from the Grace
-SCF counters, differenced across two repeat counts so setup and warmup cancel exactly. Units were
-established rather than assumed: `cmem_rd_access` is exactly half `cmem_rd_data` in every row, which
-fixes `cmem_rd_data` as 32-byte flits, and the interpretation is corroborated by the atomic sweep
-reading more than the packed one in both operators and writing more on the residual, as its wider
-index, node re-reads, zeroing pass and read-modify-write updates require.
-
-Effect on the conclusions, which is why this is recorded here rather than only in the commit:
-
-| | old model | corrected model | measured |
-|---|---:|---:|---:|
-| traffic, packed residual | 22.8 B/dof | 39.5 | **51.5** |
-| intensity, packed residual | 8.1 | 4.7 | **3.6** |
-| intensity, atomic residual | 8.1 (identical by construction) | 4.2 | **3.2** |
-
-Measured intensity is below the measured ridge of 5.1 for every matrix-free arm, so the memory roof
-binds -- but each attains only 11--29% of it, while the assembled SpMV attains 92% of its own. The
-format's contribution is to need less traffic, not to use bandwidth better; the matrix-free kernels
-are limited by the element kernel's instruction mix and retain headroom, and the assembled operator
-does not. An intermediate draft of this analysis said "bandwidth-bound", which the attained
-fractions contradict; it does not.
+The new figure uses accepted application-window measurements from job5047137.
+Its source checks, counter definitions, controls, complete samples and measured
+references are documented in [the reproducibility notes](reproducibility/README.md).
+The old generated figure remains a historical input only. Earlier claims that
+repeat-count subtraction cancels setup exactly, that operation intensity alone
+identifies a bottleneck, or that the assembled implementation has no headroom
+are not supported by the current evidence and are not used in the paper.
 
 ## Claims discipline
 
@@ -812,3 +792,15 @@ not the omitted arrays. The figure reader checks this pinned archive and emits
 these ranges and the prose macros without executing archived code. Both external
 archives are required by `make jacobian-layouts`; ordinary builds use the
 committed figure/macros. No measurements from the failed job5138345 are used.
+
+
+## Matched roofline in the main paper
+
+`make empirical-roofline PY=python3` replays the external job5047137 archive
+and generates the compact main figure. Set `SFEM_MATCHED_COUNTER_ARCHIVE`
+as described in [the methods and evidence documentation](reproducibility/README.md).
+No raw captures are added to Git. The archive contains the original measurement
+sources and commands; full sample plots and tables are generated outside the
+tracked inputs. This figure uses the matched FP64 campaign, not the newer
+coefficient-cache or precision timings. The latter are not supplied with
+comparable counters and are deliberately not inserted into this roofline.
