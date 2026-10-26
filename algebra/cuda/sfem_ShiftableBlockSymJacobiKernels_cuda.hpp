@@ -2,7 +2,7 @@
 #define SFEM_CUDA_SHIFTABLE_JACOBI_HPP
 
 #include "sfem_execution_context.hpp"
-#include "sfem_openmp_ShiftableJacobi.hpp"
+#include "sfem_ShiftableBlockSymJacobiKernels_openmp.hpp"
 
 namespace sfem {
     template <typename HP, typename LP = HP>

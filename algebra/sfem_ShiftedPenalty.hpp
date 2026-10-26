@@ -11,8 +11,8 @@
 #include <memory>
 
 #include "sfem_MatrixFreeLinearSolver.hpp"
-#include "sfem_ShiftedPenalty_impl.hpp"
-#include "sfem_openmp_blas.hpp"
+#include "sfem_ShiftedPenaltyKernels_openmp.hpp"
+#include "sfem_BLAS_openmp.hpp"
 #include "sfem_operator_factory.hpp"
 
 namespace sfem {

@@ -2,7 +2,7 @@
 #define SFEM_CUDA_CG_IMPL_HPP
 
 #include "sfem_execution_context.hpp"
-#include "sfem_openmp_cg_impl.hpp"
+#include "sfem_ConjugateGradientKernels_openmp.hpp"
 
 namespace sfem {
     template <typename T>

@@ -8,7 +8,7 @@
 #include "sfem_MatrixFreeLinearSolver.hpp"
 #include "sfem_config.h"
 #include "sfem_mask.hpp"
-#include "sfem_openmp_blas.hpp"
+#include "sfem_BLAS_openmp.hpp"
 
 
 

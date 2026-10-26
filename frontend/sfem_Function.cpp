@@ -11,7 +11,7 @@
 #include "sfem_defs.hpp"
 #include "sfem_device.hpp"
 #include "sfem_logger.hpp"
-#include "sfem_openmp_blas.hpp"
+#include "sfem_BLAS_openmp.hpp"
 #include "smesh_env.hpp"
 #include "smesh_glob.hpp"
 #include "smesh_mesh.hpp"

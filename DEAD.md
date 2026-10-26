@@ -20,7 +20,7 @@ Evidence verified with grep/find on commit `717c5cfbf` (branch tight-api; build*
 - [ ] `algebra/sfem_mask.cpp`: 22 lines, 0 code. `sfem_mask.hpp` stays (15 includers).
 - [ ] `drivers/contact/self_contact.exe.cpp`: 521 lines. The only live line is `int main() { return 0; }`, so it builds a no-op exe. No script uses it.
 - [ ] `drivers/mesh_self_intersect.exe.cpp`: a 1-line stub `int main() { return 0; }` that builds a no-op exe. No script uses it.
-- [ ] Zero-byte C++: `algebra/openmp/sfem_openmp_blas.cpp` (the hpp stays), `frontend/sfem_SelfContact.cpp`, `operators/tet4/tet4_neohookean_active_strain.{cpp,hpp}` (that name is referenced nowhere).
+- [ ] Zero-byte C++: `algebra/openmp/sfem_BLAS_openmp.cpp` (the hpp stays), `frontend/sfem_SelfContact.cpp`, `operators/tet4/tet4_neohookean_active_strain.{cpp,hpp}` (that name is referenced nowhere).
 - [ ] `python/sfem/__main__.py`: zero bytes, so `python -m sfem` does nothing.
 - [ ] `frontend/sfem_SelfContact.hpp`: a 6-line forwarder to `contact/sfem_SelfContact.hpp`. Both includers still work without it: `frontend/contact/sfem_MaMAL.cpp:11` finds the header in its own folder, and `frontend/distances/tests/sfem_TwoBodyContactTest.exe.cpp:17` is built only with SSDF, which puts frontend/contact on the include path.
 - [ ] `frontend/distances/sfem_MeshDistances.{cpp,hpp}`: declares an empty `class MeshDistances {}`. The cpp holds only two includes, and `MeshDistances` appears nowhere else.

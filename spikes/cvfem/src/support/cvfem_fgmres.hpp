@@ -28,7 +28,7 @@
 
 #include "sfem_Operator.hpp"
 #include "sfem_ParallelOperator.hpp"
-#include "sfem_openmp_blas.hpp"
+#include "sfem_BLAS_openmp.hpp"
 #include "smesh_env.hpp"
 
 #include <algorithm>

@@ -27,7 +27,7 @@
 #include "sfem_ShiftedPenaltyMultigrid.hpp"
 
 // Add missing includes
-#include "openmp/sfem_openmp_blas.hpp"
+#include "openmp/sfem_BLAS_openmp.hpp"
 #include "sfem_Input.hpp"
 #include "sfem_ssmgc.hpp"
 #include "sfem_tpl_blas.hpp"

@@ -10,7 +10,7 @@
 #include <memory>
 
 #include "sfem_PowerMethod.hpp"
-#include "sfem_openmp_blas.hpp"
+#include "sfem_BLAS_openmp.hpp"
 
 #ifdef _OPENMP
 #include <omp.h>
