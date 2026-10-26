@@ -15,7 +15,7 @@ namespace sfem {
 
     /// Backend strategy for fused CG vector updates (OpenMP / CUDA).
     template <typename T>
-    struct CG_Tpl {
+    struct ConjugateGradientKernels {
         /// x ← x + alpha p;  r ← r − alpha Ap;  return (r, r)
         std::function<T(const ptrdiff_t n,
                         const T         alpha,
@@ -46,7 +46,7 @@ namespace sfem {
     };
 
     template <typename T>
-    struct OpenMP_CG {
+    struct OpenMPConjugateGradientKernels {
         static T update_x_r_and_rtr(const ptrdiff_t n,
                                     const T         alpha,
                                     const T* const  p,
@@ -90,7 +90,7 @@ namespace sfem {
             }
         }
 
-        static void build(struct CG_Tpl<T>& tpl) {
+        static void build(struct ConjugateGradientKernels<T>& tpl) {
             tpl.update_x_r_and_rtr = update_x_r_and_rtr;
             tpl.update_x_r         = update_x_r;
             tpl.update_p           = update_p;
