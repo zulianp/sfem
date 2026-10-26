@@ -608,7 +608,7 @@ namespace sfem {
                 contact = create_contact(
                         space, contact_eval_surface, params.margin, params.search_radius * params.search_radius, es);
             } else {
-                contact = create_mulitbody_contact(
+                contact = create_multibody_contact(
                         space, contact_eval_surface, params.margin, params.search_radius * params.search_radius, es);
             }
 
