@@ -6,10 +6,10 @@
 
 namespace sfem {
     template <typename HP, typename LP = HP>
-    struct ShiftableBlockSymJacobi_CUDA {
+    struct GPUShiftableBlockSymJacobiKernels {
         /// The passes on the device, ordered on `context`'s stream.
         static int build(const int                                   dim,
-                         struct ShiftableBlockSymJacobi_Tpl<HP, LP>& tpl,
+                         struct ShiftableBlockSymJacobiKernels<HP, LP>& tpl,
                          const ExecutionContext&                     context = ExecutionContext::device());
     };
     

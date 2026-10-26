@@ -78,12 +78,12 @@ namespace sfem {
 #ifdef SFEM_ENABLE_CUDA
         if (context.space() == EXECUTION_SPACE_DEVICE) {
             ret->blas = GPUBLAS<LP>::create(context);
-            ShiftableBlockSymJacobi_CUDA<HP, LP>::build(dim, ret->impl, context);
+            GPUShiftableBlockSymJacobiKernels<HP, LP>::build(dim, ret->impl, context);
         } else
 #endif  // SFEM_ENABLE_CUDA
         {
             ret->blas = OpenMPBLAS<LP>::create();
-            ShiftableBlockSymJacobi_OpenMP<HP, LP>::build(dim, ret->impl);
+            OpenMPShiftableBlockSymJacobiKernels<HP, LP>::build(dim, ret->impl);
         }
 
         ret->constraints_mask = constraints_mask;
@@ -102,12 +102,12 @@ namespace sfem {
 #ifdef SFEM_ENABLE_CUDA
         if (context.space() == EXECUTION_SPACE_DEVICE) {
             ret->blas = GPUBLAS<T>::create(context);
-            ShiftableBlockSymJacobi_CUDA<T>::build(dim, ret->impl, context);
+            GPUShiftableBlockSymJacobiKernels<T>::build(dim, ret->impl, context);
         } else
 #endif  // SFEM_ENABLE_CUDA
         {
             ret->blas = OpenMPBLAS<T>::create();
-            ShiftableBlockSymJacobi_OpenMP<T>::build(dim, ret->impl);
+            OpenMPShiftableBlockSymJacobiKernels<T>::build(dim, ret->impl);
         }
 
         ret->constraints_mask = constraints_mask;
