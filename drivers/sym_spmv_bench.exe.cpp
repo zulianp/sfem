@@ -242,7 +242,7 @@ int main(int argc, char* argv[]) {
 
         double tock = smesh::time_seconds();
         if (!rank) {
-            printf("sym_spmv_bench.cpp\n");
+            printf("sym_spmv_bench.exe.cpp\n");
             printf("TTS: %g seconds\n", tock - tick);
         }
     }

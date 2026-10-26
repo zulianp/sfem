@@ -161,7 +161,7 @@ class M10NavierStokesApplicationTest(unittest.TestCase):
         root = Path(__file__).resolve().parents[4]
         mesh_header = (root / "external/smesh/src/frontend/smesh_mesh.hpp").read_text()
         mesh_source = (root / "external/smesh/src/frontend/smesh_mesh.cpp").read_text()
-        driver_source = (root / "drivers/simulations/wall_mounted_hump.cpp").read_text()
+        driver_source = (root / "drivers/simulations/wall_mounted_hump.exe.cpp").read_text()
         high_re_script = (
             root / "drivers/simulations/run_wall_mounted_hump_high_re.sh"
         ).read_text()

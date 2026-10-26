@@ -28,7 +28,7 @@ Legacy local MMS cases remain available for comparison. Run
 
 ## Files
 
-- `generated_stokes_fvca8.cpp`: serial generated-`GeneratedStokes` driver for
+- `generated_stokes_fvca8.exe.cpp`: serial generated-`GeneratedStokes` driver for
   the paper's steady FVCA8 manufactured Stokes cases. It builds the
   Taylor-Hood generated operator, projects the paper forcing, enforces exact
   Dirichlet velocity values, constrains promoted pressure-only DOFs, and writes
