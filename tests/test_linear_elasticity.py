@@ -18,8 +18,7 @@ def solve_linear_elasticity(options):
 		idx, points = box_mesh.create(2, 1, 1, 20, 10, 10, "tet4")
 		m = sfem.create_mesh("TET4", np.array(idx), np.array(points))
 	else:
-		m = sfem.Mesh()
-		m.read(path)
+		m = sfem.Mesh.read(path)
 		# m.convert_to_macro_element_mesh()
 
 	# Clamped at x = 0, pulled at the other end of the bar.

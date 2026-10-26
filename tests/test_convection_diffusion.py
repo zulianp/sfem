@@ -55,8 +55,7 @@ def convection_diffusion(options):
 		m = pysfem.create_mesh("TET4", np.array(idx), np.array(points))
 		m.write(f"{options.output_dir}/rect_mesh")
 	else:
-		m = pysfem.Mesh()		
-		m.read(path)
+		m = pysfem.Mesh.read(path)
 		m.convert_to_macro_element_mesh()
 		sinlet = np.unique(np.fromfile(f'{path}/sidesets_aos/sinlet.raw', dtype=idx_t))
 		soutlet = np.fromfile(f'{path}/sidesets_aos/soutlet.raw', dtype=idx_t)
@@ -75,14 +74,16 @@ def convection_diffusion(options):
 	CFL += np.max(np.abs(vely))/h
 
 	mass_op = pysfem.create_op(fs, "CVFEMMass")
+	mass_op.initialize()
 	convection_op = pysfem.create_op(fs, "CVFEMUpwindConvection")
+	convection_op.initialize()
 
-	pysfem.set_field(convection_op, "velocity", 0, velx)
-	pysfem.set_field(convection_op, "velocity", 1, vely)
+	pysfem.set_field(convection_op, "velocity", 0, pysfem.view(velx))
+	pysfem.set_field(convection_op, "velocity", 1, pysfem.view(vely))
 
 	if m.spatial_dimension() == 3:
 		velz = np.zeros(fs.n_dofs());
-		pysfem.set_field(convection_op, "velocity", 2, velz)
+		pysfem.set_field(convection_op, "velocity", 2, pysfem.view(velz))
 		CFL += np.max(np.abs(velz))/h
 
 	speed = np.max(np.sqrt(acc))
@@ -90,15 +91,17 @@ def convection_diffusion(options):
 	fun.add_operator(convection_op)
 
 	# bc = pysfem.DirichletConditions(fs)
-	# pysfem.add_condition(bc, swalls,  0, 0);
+	# bc.add_condition(swalls,  0, 0);
 	# fun.add_dirichlet_conditions(bc)
 	
 	x = np.zeros(fs.n_dofs(),dtype=real_t)
 	x[sinlet] = 1
+	# Buffers over the arrays: the library reads and writes them in place.
+	xb = pysfem.view(x)
 
 	mass = np.zeros(fs.n_dofs(), dtype=real_t)
-	pysfem.hessian_diag(mass_op, x, mass)
-	pysfem.apply_constraints(fun, x)
+	pysfem.hessian_diag(mass_op, xb, pysfem.view(mass))
+	pysfem.apply_constraints(fun, xb)
 
 	dt = 0.1/(CFL * m.spatial_dimension())
 	export_freq = 0.001
@@ -107,8 +110,9 @@ def convection_diffusion(options):
 
 	next_check_point = T * export_freq
 
-	pysfem.write_time_step(out, "c", t, x)
+	pysfem.write_time_step(out, "c", t, xb)
 	buff = np.zeros(fs.n_dofs())
+	buffb = pysfem.view(buff)
 
 	domain_integral0 = np.dot(x, mass)
 	
@@ -116,12 +120,12 @@ def convection_diffusion(options):
 		t += dt
 
 		buff.fill(0)
-		pysfem.gradient(fun, x, buff)
+		pysfem.gradient(fun, xb, buffb)
 
 		x += dt * buff / mass
 
 		if t >= (next_check_point - dt / 2):
-			pysfem.write_time_step(out, "c", t, x)
+			pysfem.write_time_step(out, "c", t, xb)
 			next_check_point += export_freq
 
 			domain_integral = np.dot(x, mass)

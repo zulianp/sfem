@@ -58,8 +58,7 @@ def solve_obstacle(options):
 		m = pysfem.create_mesh(options.elem_type, np.array(idx), np.array(points))
 		m.write(f"{options.output_dir}/rect_mesh")
 	else:
-		m = pysfem.Mesh()		
-		m.read(path)
+		m = pysfem.Mesh.read(path)
 		m.convert_to_macro_element_mesh()
 		sinlet = np.unique(np.fromfile(f'{path}/sidesets_aos/sinlet.raw', dtype=idx_t))
 		soutlet = np.fromfile(f'{path}/sidesets_aos/soutlet.raw', dtype=idx_t)
@@ -70,26 +69,30 @@ def solve_obstacle(options):
 	
 	fun.set_output_dir(options.output_dir)
 	out = fun.output()
+	# The displacement is written one component per file.
+	out.enable_AoS_to_SoA(True)
 
 	linear_elasticity_op = pysfem.create_op(fs, "LinearElasticity")
+	linear_elasticity_op.initialize()
 	fun.add_operator(linear_elasticity_op)
 
 	mass_op = pysfem.create_op(fs, "LumpedMass")
+	mass_op.initialize()
 	
 	bc = pysfem.DirichletConditions(fs)
 
-	pysfem.add_condition(bc, sinlet, 0, 0.3);
-	pysfem.add_condition(bc, sinlet, 1, 0.);
-	pysfem.add_condition(bc, sinlet, 2, 0.);
+	bc.add_condition(sinlet, 0, 0.3);
+	bc.add_condition(sinlet, 1, 0.);
+	bc.add_condition(sinlet, 2, 0.);
 
-	# pysfem.add_condition(bc, soutlet, 0, 0);
-	# pysfem.add_condition(bc, soutlet, 1, 0.);
-	# pysfem.add_condition(bc, soutlet, 2, 0.);
+	# bc.add_condition(soutlet, 0, 0);
+	# bc.add_condition(soutlet, 1, 0.);
+	# bc.add_condition(soutlet, 2, 0.);
 
 	fun.add_dirichlet_conditions(bc)
 
 	# nc = pysfem.NeumannConditions(fs)
-	# pysfem.add_condition(nc, soutlet, 0, 0.01)
+	# nc.add_condition(soutlet, 0, 0.01)
 	# fun.add_operator(nc)
 
 	selector = np.ones(fs.n_dofs())
@@ -101,15 +104,18 @@ def solve_obstacle(options):
 	t = 0
 
 	x = np.zeros(fs.n_dofs())
+	# Buffers over the arrays: the library reads and writes them in place.
+	xb = pysfem.view(x)
 
 	next_check_point = export_freq
 
-	pysfem.write_time_step(out, "disp", t, x)
+	pysfem.write_time_step(out, "disp", t, xb)
 	buff = np.zeros(fs.n_dofs(), dtype=real_t)
+	buffb = pysfem.view(buff)
 	mass = np.zeros(fs.n_dofs(), dtype=real_t)
 	
-	pysfem.hessian_diag(mass_op, x, mass)
-	pysfem.apply_value(bc, 1, mass)
+	pysfem.hessian_diag(mass_op, xb, pysfem.view(mass))
+	pysfem.apply_value(bc, 1, pysfem.view(mass))
 
 	obs = np.zeros(fs.n_dofs())
 	obs[0::m.spatial_dimension()] = 1.1 - pysfem.points(m, 0)
@@ -122,13 +128,13 @@ def solve_obstacle(options):
 	while(t < T):
 		t += dt
 		buff.fill(0)
-		pysfem.gradient(fun, x, buff)
+		pysfem.gradient(fun, xb, buffb)
 		
 		penalty = np.minimum(obs - x, 0)
 		x -= dt * (buff - penalty_param * penalty) / mass
 
 		if t >= (next_check_point - dt / 2):
-			pysfem.write_time_step(out, "disp", t, x)
+			pysfem.write_time_step(out, "disp", t, xb)
 			next_check_point += export_freq
 
 			norm_disp = linalg.norm(x)
@@ -150,7 +156,7 @@ if __name__ == '__main__':
 
 	options = Opts()
 	options.input_mesh = sys.argv[1]
-	options.output = sys.argv[2]
+	options.output_dir = sys.argv[2]
 	
 	try:
 	    opts, args = getopt.getopt(

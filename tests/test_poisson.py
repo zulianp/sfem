@@ -55,8 +55,7 @@ def solve_poisson(options):
 		m = pysfem.create_mesh("TET4", np.array(idx), np.array(points))
 		m.write(f"{options.output_dir}/rect_mesh")
 	else:
-		m = pysfem.Mesh()		
-		m.read(path)
+		m = pysfem.Mesh.read(path)
 		m.convert_to_macro_element_mesh()
 		sinlet = np.unique(np.fromfile(f'{path}/sidesets_aos/sinlet.raw', dtype=idx_t))
 		soutlet = np.fromfile(f'{path}/sidesets_aos/soutlet.raw', dtype=idx_t)
