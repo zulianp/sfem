@@ -617,8 +617,7 @@ int solve_taylor_hood_navier_stokes(const std::shared_ptr<sfem::Communicator> &c
 
     int      export_counter   = 0;
     real_t   next_check_point = SFEM_EXPORT_FREQUENCY;
-    logger_t time_logger;
-    log_init(&time_logger);
+    sfem::Logger time_logger;
 
     if (SFEM_RESTART_FOLDER) {
         for (int d = 0; d < sdim; d++) {
@@ -633,7 +632,7 @@ int solve_taylor_hood_navier_stokes(const std::shared_ptr<sfem::Communicator> &c
         }
 
         // Read current time file and start from offset
-        // log_write_double()
+        // time_logger.write()
 
         export_counter = SFEM_RESTART_ID + 1;
 
@@ -649,8 +648,8 @@ int solve_taylor_hood_navier_stokes(const std::shared_ptr<sfem::Communicator> &c
         write_output_step(pressure_output, "div_pre", export_counter, p);
 
         snprintf(path, sizeof(path), "%s/time.txt", output_folder);
-        log_create_file(&time_logger, path, "w");
-        log_write_double(&time_logger, 0);
+        time_logger.open_file(path, "w");
+        time_logger.write(0);
         export_counter++;
     }
 
@@ -874,7 +873,7 @@ int solve_taylor_hood_navier_stokes(const std::shared_ptr<sfem::Communicator> &c
                 apply_inv_lumped_mass(p1_type, mesh_nelements, p1_nnodes, mesh_elements, mesh_points, buff, p);
                 write_output_step(pressure_output, "div", export_counter, p);
 
-                log_write_double(&time_logger, t);
+                time_logger.write(t);
             }
 
             next_check_point += SFEM_EXPORT_FREQUENCY;
@@ -911,7 +910,6 @@ int solve_taylor_hood_navier_stokes(const std::shared_ptr<sfem::Communicator> &c
     destroy_conditions(n_pressure_dirichlet_conditions, pressure_dirichlet_conditions);
     // destroy_conditions(n_neumann_conditions, neumann_conditions);
 
-    log_destroy(&time_logger);
 
     const double tock = smesh::time_seconds();
     if (!comm->rank()) {

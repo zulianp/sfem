@@ -87,9 +87,7 @@ namespace sfem {
         std::string                    file_format{"%s/%s.%s"};
         std::string                    time_dependent_file_format{"%s/%s.%09d.%s"};
         size_t                         export_counter{0};
-        logger_t                       time_logger;
-        Impl() { log_init(&time_logger); }
-        ~Impl() { log_destroy(&time_logger); }
+        Logger                         time_logger;
     };
 
     void Output::enable_AoS_to_SoA(const bool val) { impl_->AoS_to_SoA = val; }
@@ -143,13 +141,13 @@ namespace sfem {
     }
 
     void Output::log_time(const real_t t) {
-        if (log_is_empty(&impl_->time_logger)) {
+        if (impl_->time_logger.empty()) {
             char path[2048];
             snprintf(path, sizeof(path), "%s/time.txt", impl_->output_dir.c_str());
-            log_create_file(&impl_->time_logger, path, "w");
+            impl_->time_logger.open_file(path, "w");
         }
 
-        log_write_double(&impl_->time_logger, t);
+        impl_->time_logger.write(t);
     }
 
     int Output::write_time_step(const char *name, const real_t /*t*/, const real_t *const x) {
