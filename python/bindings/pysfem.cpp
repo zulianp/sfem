@@ -6,6 +6,7 @@
 #include <nanobind/stl/vector.h>
 
 #include <cstring>
+#include <mutex>
 #include <mpi.h>
 #include <memory>
 #include <stdexcept>
@@ -81,6 +82,11 @@ NB_MODULE(pysfem, m) {
     using SSMGC_t                   = sfem::SSMGC<real_t>;
 
     m.def("init", &SFEM_init);
+
+    // Paths are passed as Python strings.
+    nb::class_<smesh::Path>(m, "Path")
+            .def(nb::init_implicit<std::string>())
+            .def("__str__", [](const smesh::Path &path) { return path.to_string(); });
     m.def("finalize", &SFEM_finalize);
 
     nb::enum_<ExecutionSpace>(m, "ExecutionSpace")
@@ -141,15 +147,30 @@ NB_MODULE(pysfem, m) {
                         })
             .def_static("create_from_selector",
                         [](const std::shared_ptr<Mesh> &mesh, nb::callable selector, const std::vector<std::string> &block_names) {
-                            auto cpp_selector = [selector](geom_t x, geom_t y, geom_t z) -> bool {
-                                nb::object result = selector(x, y, z);
-                                const int  truth  = PyObject_IsTrue(result.ptr());
-                                if (truth < 0) {
-                                    throw nb::python_error();
+                            // The selector runs in an OpenMP loop: each call takes the GIL, which is
+                            // released for the loop, and a Python error is raised after it.
+                            std::mutex                         error_mutex;
+                            std::unique_ptr<nb::python_error> error;
+                            auto cpp_selector = [&](geom_t x, geom_t y, geom_t z) -> bool {
+                                nb::gil_scoped_acquire gil;
+                                try {
+                                    nb::object result = selector(x, y, z);
+                                    const int  truth  = PyObject_IsTrue(result.ptr());
+                                    if (truth < 0) throw nb::python_error();
+                                    return truth != 0;
+                                } catch (nb::python_error &e) {
+                                    std::lock_guard<std::mutex> lock(error_mutex);
+                                    if (!error) error = std::make_unique<nb::python_error>(std::move(e));
+                                    return false;
                                 }
-                                return truth != 0;
                             };
-                            return Sideset::create_from_selector(mesh, cpp_selector, block_names);
+                            std::vector<std::shared_ptr<Sideset>> sidesets;
+                            {
+                                nb::gil_scoped_release release;
+                                sidesets = Sideset::create_from_selector(mesh, cpp_selector, block_names);
+                            }
+                            if (error) throw std::move(*error);
+                            return sidesets;
                         },
                         nb::arg("mesh"),
                         nb::arg("selector"),
@@ -317,37 +338,33 @@ NB_MODULE(pysfem, m) {
         return sfem::Buffer<long>::wrap(v.size(), v.data(), sfem::MEMORY_SPACE_HOST);
     });
 
+    // A mesh from numpy arrays: the elements as [nodes per element][elements] and the points as
+    // [spatial dimension][nodes], the layout sfem.mesh's generators return.
     m.def("create_mesh",
-          [](const char                           *elem_type_name,
-             std::shared_ptr<sfem::Buffer<idx_t>>  idx,
-             std::shared_ptr<sfem::Buffer<geom_t>> p) -> std::shared_ptr<Mesh> {
-              size_t          n            = idx->size();
-              smesh::ElemType element_type = type_from_string(elem_type_name);
+          [](const char                                                     *elem_type_name,
+             nb::ndarray<nb::numpy, const idx_t, nb::ndim<2>, nb::c_contig>  idx,
+             nb::ndarray<nb::numpy, const geom_t, nb::ndim<2>, nb::c_contig> p) -> std::shared_ptr<Mesh> {
+              const smesh::ElemType element_type = type_from_string(elem_type_name);
+              const int             nnxe         = (int)idx.shape(0);
+              const ptrdiff_t       nelements    = (ptrdiff_t)idx.shape(1);
+              const int             spatial_dim  = (int)p.shape(0);
+              const ptrdiff_t       nnodes       = (ptrdiff_t)p.shape(1);
 
-              int       nnxe              = p->size() / n;  // Assuming p is a flattened array
-              ptrdiff_t nelements         = n;
-              int       spatial_dimension = 3;  // Assuming 3D
-              ptrdiff_t nnodes            = p->size() / spatial_dimension;
+              if (nnxe != smesh::elem_num_nodes(element_type)) {
+                  throw nb::value_error("create_mesh: the element array's rows are not the nodes of the element type");
+              }
 
               auto elements = sfem::create_host_buffer<idx_t>(nnxe, nelements);
-              auto points   = sfem::create_host_buffer<geom_t>(spatial_dimension, nnodes);
-
-              auto d_elements = elements->data();
-              auto d_points   = points->data();
+              auto points   = sfem::create_host_buffer<geom_t>(spatial_dim, nnodes);
 
               for (int d = 0; d < nnxe; d++) {
-                  for (ptrdiff_t i = 0; i < nelements; i++) {
-                      d_elements[d][i] = idx->data()[d * nelements + i];
-                  }
+                  std::memcpy(elements->data()[d], idx.data() + d * nelements, nelements * sizeof(idx_t));
               }
 
-              for (int d = 0; d < spatial_dimension; d++) {
-                  for (ptrdiff_t i = 0; i < nnodes; i++) {
-                      d_points[d][i] = p->data()[d * nnodes + i];
-                  }
+              for (int d = 0; d < spatial_dim; d++) {
+                  std::memcpy(points->data()[d], p.data() + d * nnodes, nnodes * sizeof(geom_t));
               }
 
-              // Transfer ownership to mesh
               return std::make_shared<Mesh>(sfem::Communicator::world(), element_type, elements, points);
           });
 
@@ -565,13 +582,14 @@ NB_MODULE(pysfem, m) {
                  [](std::shared_ptr<DirichletConditions> &dc, std::shared_ptr<sfem::Buffer<real_t>> x) {
                      return dc->apply(x->data());
                  })
+            // DirichletConditions owns and frees the indices it is given: they are copied here.
             .def("add_condition",
-                 [](std::shared_ptr<DirichletConditions> &dc,
-                    const ptrdiff_t                       local_size,
-                    const ptrdiff_t                       global_size,
-                    std::shared_ptr<sfem::Buffer<idx_t>>  idx,
-                    const int                             component,
-                    const real_t value) { dc->add_condition(local_size, global_size, idx->data(), component, value); });
+                 [](std::shared_ptr<DirichletConditions> &dc, nb::ndarray<idx_t> idx, const int component, const real_t value) {
+                     const ptrdiff_t n     = idx.size();
+                     auto            c_idx = (idx_t *)malloc(n * sizeof(idx_t));
+                     memcpy(c_idx, idx.data(), n * sizeof(idx_t));
+                     dc->add_condition(n, n, c_idx, component, value);
+                 });
 
     // Add DirichletConditions::Condition binding
     nb::class_<DirichletConditions::Condition>(m, "DirichletCondition")
@@ -629,6 +647,27 @@ NB_MODULE(pysfem, m) {
           });
 
     nb::class_<NeumannConditions, Op>(m, "NeumannConditions").def(nb::init<std::shared_ptr<FunctionSpace>>());
+
+    // A traction on surface sidesets: value on component (a dead load unless follower_pressure).
+    nb::class_<NeumannConditions::Condition>(m, "NeumannCondition")
+            .def(nb::init<>())
+            .def_rw("sidesets", &NeumannConditions::Condition::sidesets)
+            .def_rw("value", &NeumannConditions::Condition::value)
+            .def_rw("component", &NeumannConditions::Condition::component)
+            .def_rw("follower_pressure", &NeumannConditions::Condition::follower_pressure);
+
+    m.def("create_neumann_conditions",
+          [](const std::shared_ptr<FunctionSpace> &space, nb::list conditions_list, const enum ExecutionSpace es)
+                  -> std::shared_ptr<Op> {
+              std::vector<NeumannConditions::Condition> conditions;
+              for (size_t i = 0; i < conditions_list.size(); i++) {
+                  conditions.push_back(nb::cast<NeumannConditions::Condition>(conditions_list[i]));
+                  ptrdiff_t n_faces = 0;
+                  for (const auto &ss : conditions.back().sidesets) n_faces += ss ? ss->size() : 0;
+                  if (n_faces == 0) throw nb::value_error("create_neumann_conditions: a condition's sidesets select no faces");
+              }
+              return sfem::create_neumann_conditions(space, conditions, es);
+          });
 
     m.def("apply_value", [](std::shared_ptr<DirichletConditions> &dc, real_t value, std::shared_ptr<sfem::Buffer<real_t>> y) {
         dc->apply_value(value, y->data());
