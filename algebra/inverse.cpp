@@ -4,6 +4,8 @@
 #include "sfem_base.hpp"
 #include "sfem_vec.hpp"
 
+namespace sfem {
+
 static SFEM_INLINE void inverse1(
     // Input
     const real_t mat_0,
@@ -12,11 +14,11 @@ static SFEM_INLINE void inverse1(
     *mat_inv_0 = 1.0 / mat_0;
 }
 
-void dinvert1(const ptrdiff_t nnodes,
-              const count_t *const SFEM_RESTRICT rowptr,
-              const idx_t *const SFEM_RESTRICT colidx,
-              real_t **const SFEM_RESTRICT values,
-              real_t **const SFEM_RESTRICT inv_diag) {
+void invert_node_blocks_1(const ptrdiff_t nnodes,
+                          const count_t *const SFEM_RESTRICT rowptr,
+                          const idx_t *const SFEM_RESTRICT colidx,
+                          real_t **const SFEM_RESTRICT values,
+                          real_t **const SFEM_RESTRICT inv_diag) {
     for (ptrdiff_t i = 0; i < nnodes; i++) {
         const count_t r_begin = rowptr[i];
         const count_t r_end = rowptr[i + 1];
@@ -56,11 +58,11 @@ static SFEM_INLINE void inverse2(
     *mat_inv_3 = mat_0 * x0;
 }
 
-void dinvert2(const ptrdiff_t nnodes,
-              const count_t *const SFEM_RESTRICT rowptr,
-              const idx_t *const SFEM_RESTRICT colidx,
-              real_t **const SFEM_RESTRICT values,
-              real_t **const SFEM_RESTRICT inv_diag) {
+void invert_node_blocks_2(const ptrdiff_t nnodes,
+                          const count_t *const SFEM_RESTRICT rowptr,
+                          const idx_t *const SFEM_RESTRICT colidx,
+                          real_t **const SFEM_RESTRICT values,
+                          real_t **const SFEM_RESTRICT inv_diag) {
     for (ptrdiff_t i = 0; i < nnodes; i++) {
         const count_t r_begin = rowptr[i];
         const count_t r_end = rowptr[i + 1];
@@ -134,11 +136,11 @@ static SFEM_INLINE void inverse3(
     *mat_inv_8 = x5 * (mat_0 * mat_4 - mat_1 * mat_3);
 }
 
-void dinvert3(const ptrdiff_t nnodes,
-              const count_t *const SFEM_RESTRICT rowptr,
-              const idx_t *const SFEM_RESTRICT colidx,
-              real_t **const SFEM_RESTRICT values,
-              real_t **const SFEM_RESTRICT inv_diag) {
+void invert_node_blocks_3(const ptrdiff_t nnodes,
+                          const count_t *const SFEM_RESTRICT rowptr,
+                          const idx_t *const SFEM_RESTRICT colidx,
+                          real_t **const SFEM_RESTRICT values,
+                          real_t **const SFEM_RESTRICT inv_diag) {
     for (ptrdiff_t i = 0; i < nnodes; i++) {
         const count_t r_begin = rowptr[i];
         const count_t r_end = rowptr[i + 1];
@@ -290,11 +292,11 @@ static SFEM_INLINE void inverse4(
         x24 * (-mat_10 * x35 + mat_10 * x36 - mat_8 * x22 + mat_8 * x8 + mat_9 * x30 - mat_9 * x31);
 }
 
-void dinvert4(const ptrdiff_t nnodes,
-              const count_t *const SFEM_RESTRICT rowptr,
-              const idx_t *const SFEM_RESTRICT colidx,
-              real_t **const SFEM_RESTRICT values,
-              real_t **const SFEM_RESTRICT inv_diag) {
+void invert_node_blocks_4(const ptrdiff_t nnodes,
+                          const count_t *const SFEM_RESTRICT rowptr,
+                          const idx_t *const SFEM_RESTRICT colidx,
+                          real_t **const SFEM_RESTRICT values,
+                          real_t **const SFEM_RESTRICT inv_diag) {
     for (ptrdiff_t i = 0; i < nnodes; i++) {
         const count_t r_begin = rowptr[i];
         const count_t r_end = rowptr[i + 1];
@@ -346,3 +348,5 @@ void dinvert4(const ptrdiff_t nnodes,
                  &inv_diag[15][i]);
     }
 }
+
+}  // namespace sfem
