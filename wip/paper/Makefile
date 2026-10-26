@@ -88,3 +88,8 @@ state-gradients:
 jacobian-layouts:
 	$(PY) python/jacobian_layout_figures.py --selftest
 	$(PY) python/jacobian_layout_figures.py
+
+.PHONY: empirical-roofline
+empirical-roofline:
+	$(PY) python/matched_counter_figures.py --selftest
+	$(PY) python/matched_counter_figures.py
