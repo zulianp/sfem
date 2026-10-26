@@ -1,5 +1,9 @@
 #include "sfem_NodeObstacleContact.hpp"
 
+#ifdef SFEM_ENABLE_SRESAMPLE
+#include "sfem_SDFObstacle.hpp"
+#endif
+
 #include <algorithm>
 #include <cassert>
 #include <limits>
@@ -48,7 +52,12 @@ namespace sfem {
           owned_dofs_(owned_dofs),
           dir_(dir) {
         const ExecutionSpace es = context.space();
+#ifdef SFEM_ENABLE_SRESAMPLE
         obstacle_               = SDFObstacle::create(sdf, comm, points->extent(1), points->data()[2], context);
+#else
+        SFEM_UNUSED(sdf);
+        SFEM_ERROR("NodeObstacleContact: SDF obstacles need sfem built with SFEM_ENABLE_SRESAMPLE\n");
+#endif
 
         for (int d = 0; d < 3; ++d) xyz_[d] = points->data()[d];
         frame_of_ = create_host_buffer<idx_t>(ndofs / 3);

@@ -20,12 +20,14 @@
 
 namespace {
 
+#ifdef SFEM_ENABLE_SRESAMPLE
     // A ball of radius 0.5 touching the plane y = 0 from below at (0.5, 0, 0.5), positive inside
     geom_t ball_sdf(const geom_t x, const geom_t y, const geom_t z) {
         const geom_t cx = 0.5, cy = -0.5, cz = 0.5, radius = 0.5;
         const geom_t dx = cx - x, dy = cy - y, dz = cz - z;
         return radius - sqrt(dx * dx + dy * dy + dz * dz);
     }
+#endif
 
     std::shared_ptr<sfem::Function> make_homogeneous_checkerboard_ss_poisson(const int                          element_level,
                                                                              const std::shared_ptr<sfem::Mesh> &hex) {
@@ -371,6 +373,8 @@ namespace {
                                               smesh::Env::read("SFEM_MG_MAX_IT", 40));
     }
 
+    // The SDF obstacle cases sample with sresample.
+#ifdef SFEM_ENABLE_SRESAMPLE
     int run_parallel_ssmgc_contact(const std::shared_ptr<sfem::Mesh> &ss) {
         SFEM_TEST_ASSERT(ss != nullptr);
         auto comm = ss->comm();
@@ -587,6 +591,7 @@ namespace {
         auto ss   = smesh::to_semistructured(2, tet, true, false);
         return run_parallel_ssmgc_contact(ss);
     }
+#endif  // SFEM_ENABLE_SRESAMPLE
 
 }  // namespace
 
@@ -596,9 +601,11 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_parallel_quad4_ssgmg);
     SFEM_RUN_TEST(test_parallel_tet4_ssgmg);
     SFEM_RUN_TEST(test_parallel_hex8_tet4_ssgmg);
+#ifdef SFEM_ENABLE_SRESAMPLE
     SFEM_RUN_TEST(test_parallel_sdf_slabs);
     SFEM_RUN_TEST(test_parallel_checkerboard_ssmgc);
     SFEM_RUN_TEST(test_parallel_tet4_ssmgc);
+#endif
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }
