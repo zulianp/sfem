@@ -220,7 +220,7 @@ static SFEM_NOINLINE void apply_residual_packed(MeshData        &d,
     if (geom == GeomKind::Isoparam) {
 #pragma omp parallel
         apply_residual_packed_isoparam_range(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
-                d.nelements, d.p.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, rx, ry, rz, rc, scratch_n);
+                d.nelements, d.p.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, rx, ry, rz, rc, scratch_n, d.pgx.data(), d.pgy.data(), d.pgz.data(), cvfem_hex8_rc_config_for(d), with_rc);
     } else {
 #pragma omp parallel
         apply_residual_packed_affine_range<ScatterProbe>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
@@ -332,7 +332,7 @@ static SFEM_NOINLINE void apply_jacobian_action_packed(MeshData              &d,
     // Hoisted out of the face loops -- see Hex8RhieChowPack::coeff. Its own cache key makes
     // this free after the first call, so --warmup absorbs the build and the timed loop
     // measures what the solver's Krylov iterations measure.
-    cvfem_hex8_build_rc_coeff(d, rho, mu);
+    if (geom == GeomKind::Affine) cvfem_hex8_build_rc_coeff(d, rho, mu);
     const size_t scratch_n = packed_scratch_n(p.max_actual_nodes_per_pack);
     // Rhie-Chow staged per pack, exactly as apply_residual_packed does it and exactly as
     // the solver's own packed Jacobian does (cvfem_hex8_ns_packed.hpp). Slot 3 grows from
@@ -347,7 +347,7 @@ static SFEM_NOINLINE void apply_jacobian_action_packed(MeshData              &d,
 if (geom == GeomKind::Isoparam) {
 #pragma omp parallel
         apply_jacobian_action_packed_isoparam_range(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
-                d.elems, d.nelements, d.p.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, dir, jv, ugrad, vgrad, limiter, venkat_c, with_ho, scratch_n, slot3_n);
+                d.elems, d.nelements, d.p.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, dir, jv, ugrad, vgrad, limiter, venkat_c, with_ho, scratch_n, slot3_n, d.pgx.data(), d.pgy.data(), d.pgz.data(), d.qgx.data(), d.qgy.data(), d.qgz.data(), cvfem_hex8_rc_config_for(d), with_rc, with_qg);
     } else {
 #pragma omp parallel
         apply_jacobian_action_packed_affine_range<Cache>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),

@@ -289,13 +289,52 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_jacobian_add_slots
     }
 }
 
+// Use the same face coefficient and its velocity derivative as the scalar path.
+template <bool Action, typename T>
+static SFEM_INLINE void cvfem_hex8_isoparam_rc_flux(
+        const T rho, const T mu, const Hex8CoordPackT<T> &xyz,
+        const Hex8InputPackT<T> &u, const Hex8InputPackT<T> &du,
+        const Hex8RhieChowPackT<T> &rc, const T scale, const bool with_qg,
+        const int i, const int j, const int lane, const T ax, const T ay, const T az,
+        T &flux, T &dflux) {
+    const T half = T(0.5);
+    const T dx = xyz.x[j][lane] - xyz.x[i][lane];
+    const T dy = xyz.y[j][lane] - xyz.y[i][lane];
+    const T dz = xyz.z[j][lane] - xyz.z[i][lane];
+    const T ux = half * (u.ux[i][lane] + u.ux[j][lane]);
+    const T uy = half * (u.uy[i][lane] + u.uy[j][lane]);
+    const T uz = half * (u.uz[i][lane] + u.uz[j][lane]);
+    const T coeff = cvfem_hex8_rhie_chow_mdot_coeff(rho, mu, scale, dx, dy, dz,
+        ax, ay, az, rc.tau.u2_scale * (ux*ux + uy*uy + uz*uz), rc.tau.inv_dt_a0);
+    flux = dflux = T(0);
+    if (coeff == T(0)) return;
+    const T corr = (u.p[j][lane] - u.p[i][lane]) - half *
+        ((rc.pgx[i][lane] + rc.pgx[j][lane]) * dx +
+         (rc.pgy[i][lane] + rc.pgy[j][lane]) * dy +
+         (rc.pgz[i][lane] + rc.pgz[j][lane]) * dz);
+    flux = -coeff * corr;
+    if constexpr (Action) {
+        T qcorr = du.p[j][lane] - du.p[i][lane];
+        if (with_qg) qcorr -= half *
+            ((rc.qgx[i][lane] + rc.qgx[j][lane]) * dx +
+             (rc.qgy[i][lane] + rc.qgy[j][lane]) * dy +
+             (rc.qgz[i][lane] + rc.qgz[j][lane]) * dz);
+        const T w = cvfem_hex8_rhie_chow_du_weight(scale, ax*ax + ay*ay + az*az,
+            ax*dx + ay*dy + az*dz, dx*dx + dy*dy + dz*dz, rc.tau.u2_scale);
+        const T udotv = half * (ux * (du.ux[i][lane] + du.ux[j][lane]) +
+            uy * (du.uy[i][lane] + du.uy[j][lane]) + uz * (du.uz[i][lane] + du.uz[j][lane]));
+        dflux = -coeff * qcorr + cvfem_hex8_rhie_chow_coeff_du(coeff, w) * corr * udotv;
+    }
+}
+
 template <typename scalar_t>
 static SFEM_INLINE void cvfem_hex8_ns_upwind_residual_isoparam_simd(const scalar_t      rho_s,
                                                                    const scalar_t      mu_s,
                                                                    const Hex8CoordPackT<scalar_t> &xyz,
                                                                    const Hex8InputPackT<scalar_t> &in,
                                                                    Hex8ResidualPackT<scalar_t>    &out,
-                                               const scalar_t ueps = scalar_t(0)) {
+                                               const scalar_t ueps = scalar_t(0),
+        const Hex8RhieChowPackT<scalar_t> *rc = nullptr, const scalar_t rc_scale = scalar_t(0)) {
     const scalar_t rho  = rho_s;
     const scalar_t mu   = mu_s;
     const scalar_t half = scalar_t(0.5);
@@ -373,7 +412,10 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_residual_isoparam_simd(const scalar
             const scalar_t adv_x = half * (in.ux[i][lane] + in.ux[j][lane]);
             const scalar_t adv_y = half * (in.uy[i][lane] + in.uy[j][lane]);
             const scalar_t adv_z = half * (in.uz[i][lane] + in.uz[j][lane]);
-            const scalar_t mdot  = rho * (adv_x * ax + adv_y * ay + adv_z * az);
+            scalar_t rc_flux = 0, unused = 0;
+            if (rc) cvfem_hex8_isoparam_rc_flux<false>(rho, mu, xyz, in, in, *rc,
+                rc_scale, false, i, j, lane, ax, ay, az, rc_flux, unused);
+            const scalar_t mdot = rho * (adv_x * ax + adv_y * ay + adv_z * az) + rc_flux;
             scalar_t amdot, sgn;
             cvfem_upwind_abs(mdot, ueps, amdot, sgn);
             const scalar_t mpos  = half * (mdot + amdot);
@@ -401,7 +443,9 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_jacobian_action_isoparam_simd(const
                                                                           const Hex8InputPackT<scalar_t> &u,
                                                                           const Hex8InputPackT<scalar_t> &du,
                                                                           Hex8ResidualPackT<scalar_t>    &out,
-                                               const scalar_t ueps = scalar_t(0)) {
+                                               const scalar_t ueps = scalar_t(0),
+        const Hex8RhieChowPackT<scalar_t> *rc = nullptr, const scalar_t rc_scale = scalar_t(0),
+        const bool with_qg = false) {
     const scalar_t rho  = rho_s;
     const scalar_t mu   = mu_s;
     const scalar_t half = scalar_t(0.5);
@@ -477,7 +521,10 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_jacobian_action_isoparam_simd(const
             const scalar_t adv_x = half * (u.ux[i][lane] + u.ux[j][lane]);
             const scalar_t adv_y = half * (u.uy[i][lane] + u.uy[j][lane]);
             const scalar_t adv_z = half * (u.uz[i][lane] + u.uz[j][lane]);
-            const scalar_t mdot  = rho * (adv_x * ax + adv_y * ay + adv_z * az);
+            scalar_t rc_flux = 0, rc_dflux = 0;
+            if (rc) cvfem_hex8_isoparam_rc_flux<true>(rho, mu, xyz, u, du, *rc,
+                rc_scale, with_qg, i, j, lane, ax, ay, az, rc_flux, rc_dflux);
+            const scalar_t mdot = rho * (adv_x * ax + adv_y * ay + adv_z * az) + rc_flux;
             scalar_t amdot, sgn;
             cvfem_upwind_abs(mdot, ueps, amdot, sgn);
             const scalar_t mpos  = half * (mdot + amdot);
@@ -486,7 +533,7 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_jacobian_action_isoparam_simd(const
             const scalar_t d_neg = half * (one - sgn);
             const scalar_t dmdot = rho * half *
                                    ((du.ux[i][lane] + du.ux[j][lane]) * ax + (du.uy[i][lane] + du.uy[j][lane]) * ay +
-                                    (du.uz[i][lane] + du.uz[j][lane]) * az);
+                                    (du.uz[i][lane] + du.uz[j][lane]) * az) + rc_dflux;
             const scalar_t dpos = d_pos * dmdot;
             const scalar_t dneg = d_neg * dmdot;
             const scalar_t qmid = half * (du.p[i][lane] + du.p[j][lane]);

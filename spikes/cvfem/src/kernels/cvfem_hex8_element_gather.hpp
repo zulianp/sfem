@@ -137,7 +137,7 @@ struct Hex8ExtraScratch {
                           const scalar_t *const SFEM_RESTRICT uz_src,
                           const scalar_t *const *const SFEM_RESTRICT adj_ptr,
                           const scalar_t *const SFEM_RESTRICT        det_ptr,
-                          const Hex8Extras &opt, const ptrdiff_t e) {
+                          const Hex8Extras &opt, const ptrdiff_t e, const bool affine_edges = true) {
         if (!opt.with_rc && !opt.with_bnd) return;
         gather_element_coords(elems, points, e, x, y, z);
         if (opt.with_bnd) fmask = (int)face_mask[(size_t)e];
@@ -162,7 +162,7 @@ struct Hex8ExtraScratch {
             // while the kernel under test takes the Jacobian column, and the two disagree
             // wherever the mesh is not exactly affine in floating point -- amplified by the
             // near-cancellation in the Rhie-Chow correction into a visible error.
-            {
+            if (affine_edges) {
                 scalar_t adj_[9], det_;
                 load_hex8_adj(adj_ptr, det_ptr, e, adj_, &det_);
                 scalar_t ex_[3], ey_[3], ez_[3];
