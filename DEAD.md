@@ -98,7 +98,7 @@ Each name appears only at its own declaration and definition, checked across C/C
 - [ ] `NeumannConditions::create_from_env` (`frontend/sfem_NeumannConditions.cpp:289`, `.hpp:48`): its only user is `drivers/assemble.exe.cpp:40`, which scripts still use (see "Checked, still used"), so assemble.exe must be migrated first.
 - [ ] `DirichletConditions::create_from_env` (`frontend/sfem_DirichletConditions.cpp:283`, `.hpp:47`): used by `drivers/assemble.exe.cpp:37` and by `create_dirichlet_conditions_from_env` (`frontend/sfem_DirichletConditions.cpp:781`). That wrapper is called by drivers obstacle.exe, sdf_obstacle.exe, test_galerkin_assembly, mgsolve and steady_state_sim, which must be migrated first.
 - [ ] `AxisAlignedContactConditions::create_from_env` (`frontend/sfem_ContactConditions.cpp:169`, `.hpp:18`), called through `create_contact_conditions_from_env` (`frontend/sfem_ContactConditions.cpp:990`): the only caller is `drivers/obstacle.exe.cpp`.
-- For information only: `smesh::SFC::create_from_env` lives in smesh. It is used by 7 drivers/bench, `bench/cuda/bench_packed_laplacian.cpp`, `drivers/simulations/poisson.exe.cpp`, `frontend/tests/sfem_MatrixFromatsTest.cpp` and 5 spike drivers.
+- For information only: `smesh::SFC::create_from_env` lives in smesh. It is used by 7 drivers/bench, `bench/cuda/bench_packed_laplacian.cpp`, `drivers/simulations/poisson.exe.cpp`, `frontend/tests/sfem_MatrixFormatsTest.cpp` and 5 spike drivers.
 
 ## Legacy implementations and drivers
 
