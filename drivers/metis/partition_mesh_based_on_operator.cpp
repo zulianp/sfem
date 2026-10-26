@@ -15,7 +15,7 @@
 #include "sfem_base.hpp"
 
 
-#include "sortreduce.hpp"
+#include "sfem_sortreduce.hpp"
 
 #include "sfem_metis.h"
 

@@ -74,7 +74,7 @@ static SFEM_INLINE SFEM_HOST_DEVICE void hex8_fff(/* ... */);
 
 - `static` gives internal linkage, as the stale comment correctly prescribes.
 - `SFEM_FORCE_INLINE` is used only where the current device copy is `__forceinline__`.
-- No body may call a host-only function. That rules out `fflush`, `SFEM_ERROR`, and `find_idx_binary_search` (`extern "C"`, algebra/sortreduce.cpp:38).
+- No body may call a host-only function. That rules out `fflush`, `SFEM_ERROR`, and `find_idx_binary_search` (`extern "C"`, algebra/sfem_sortreduce.cpp:38).
   - Example: `hex8_find_cols` has an NDEBUG block with `printf` + `fflush` (hex8_inline_cpu.hpp:251-262). It becomes `assert` only.
   - nvcc only warns about such calls in a template until the template is instantiated in device code, so the device agreement test (section 4) must instantiate every function.
 

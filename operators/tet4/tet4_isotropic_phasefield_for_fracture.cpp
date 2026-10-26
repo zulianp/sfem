@@ -10,7 +10,7 @@
 #include <mpi.h>
 
 
-#include "sortreduce.hpp"
+#include "sfem_sortreduce.hpp"
 
 #include "sfem_vec.hpp"
 

@@ -12,7 +12,7 @@
 #include "line_quadrature.hpp"
 #include "sfem_macros.hpp"
 #include "sfem_vec.hpp"
-#include "sortreduce.hpp"
+#include "sfem_sortreduce.hpp"
 
 // Local inverse of 3x3 matrix and determinant (copied from smith implementation)
 static SFEM_INLINE void inverse3(

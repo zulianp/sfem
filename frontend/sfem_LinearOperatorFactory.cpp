@@ -1,9 +1,9 @@
 #include "sfem_LinearOperatorFactory.hpp"
 
-#include "acrs.hpp"
-#include "scrs.hpp"
-#include "sdacrs.hpp"
-#include "sell.hpp"
+#include "sfem_ACRS.hpp"
+#include "sfem_SCRS.hpp"
+#include "sfem_SDACRS.hpp"
+#include "sfem_sell_spmv.hpp"
 #include "sfem_BSRTangent.hpp"
 #include "sfem_CooSym.hpp"
 #include "sfem_DIA.hpp"

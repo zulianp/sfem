@@ -11,7 +11,7 @@
 
 
 #include "sfem_vec.hpp"
-#include "sortreduce.hpp"
+#include "sfem_sortreduce.hpp"
 
 static SFEM_INLINE void neohookean_value(const real_t mu,
                                          const real_t lambda,
