@@ -98,7 +98,7 @@ int test_multi_block_op() {
     auto space = sfem::FunctionSpace::create(mesh, 1);
 
     auto f  = sfem::Function::create(space);
-    auto op = sfem::Factory::create_op(space, "Laplacian");
+    auto op = sfem::OpFactory::create(space, "Laplacian", sfem::EXECUTION_SPACE_HOST);
     op->initialize();
     f->add_operator(op);
 
@@ -234,7 +234,7 @@ int test_hex8_tet4_laplacian_apply() {
 
     auto space = sfem::FunctionSpace::create(mesh, 1);
     auto f     = sfem::Function::create(space);
-    auto op    = sfem::Factory::create_op(space, "Laplacian");
+    auto op    = sfem::OpFactory::create(space, "Laplacian", sfem::EXECUTION_SPACE_HOST);
     SFEM_TEST_ASSERT(op != nullptr);
     SFEM_TEST_ASSERT(op->initialize() == SFEM_SUCCESS);
     f->add_operator(op);

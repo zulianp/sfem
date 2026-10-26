@@ -71,7 +71,7 @@ namespace {
         fx.space = sfem::FunctionSpace::create(fx.mesh, kBlock);
         fx.ndofs = fx.space->n_dofs();
 
-        fx.op = sfem::Factory::create_op(fx.space, "GeneratedMooneyRivlinKelvinVoigt");
+        fx.op = sfem::OpFactory::create(fx.space, "GeneratedMooneyRivlinKelvinVoigt", sfem::EXECUTION_SPACE_HOST);
         if (!fx.op) { fprintf(stderr, "no MooneyRivlinKelvinVoigt op\n"); std::abort(); }
         // Affine by construction for a P1 simplex, and the kernel reads the
         // cached adjugate, so it has to be built.

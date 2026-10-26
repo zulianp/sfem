@@ -48,7 +48,7 @@ namespace {
         Fixture fixture;
         fixture.mesh  = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 2, 2, 2);
         fixture.space = sfem::FunctionSpace::create(fixture.mesh, 3);
-        fixture.op    = sfem::Factory::create_op(fixture.space, "GeneratedMooneyRivlinKelvinVoigt");
+        fixture.op    = sfem::OpFactory::create(fixture.space, "GeneratedMooneyRivlinKelvinVoigt", sfem::EXECUTION_SPACE_HOST);
         fixture.ndofs = fixture.space->n_dofs();
 
         set_material_parameter(fixture.op, fixture.mesh, "mu", real_t(3));
@@ -829,7 +829,7 @@ int test_the_schemes_potential_differentiates_to_its_residual() {
 int test_an_energy_material_carries_the_schemes_potential() {
     auto mesh  = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 2, 2, 2);
     auto space = sfem::FunctionSpace::create(mesh, 3);
-    auto op    = sfem::Factory::create_op(space, "GeneratedNeoHookeanOgden");
+    auto op    = sfem::OpFactory::create(space, "GeneratedNeoHookeanOgden", sfem::EXECUTION_SPACE_HOST);
     SFEM_TEST_ASSERT(op != nullptr);
     for (const auto &block : mesh->blocks()) {
         op->set_value_in_block(block->name(), "mu", real_t(3));
@@ -936,7 +936,7 @@ int test_holding_the_scheme_equals_adding_its_operator() {
     const real_t    dt    = real_t(0.05);
 
     auto make_material = [&]() {
-        auto op = sfem::Factory::create_op(space, "GeneratedNeoHookeanOgden");
+        auto op = sfem::OpFactory::create(space, "GeneratedNeoHookeanOgden", sfem::EXECUTION_SPACE_HOST);
         for (const auto &block : mesh->blocks()) {
             op->set_value_in_block(block->name(), "mu", real_t(3));
             op->set_value_in_block(block->name(), "lmbda", real_t(1));
@@ -1036,7 +1036,7 @@ int test_holding_the_scheme_equals_adding_its_operator() {
 
         auto sym_scheme = make_scheme();
         SFEM_TEST_ASSERT(sym_scheme != nullptr);
-        auto sym_held_op = sfem::Factory::create_op(space, "GeneratedLinearElasticity");
+        auto sym_held_op = sfem::OpFactory::create(space, "GeneratedLinearElasticity", sfem::EXECUTION_SPACE_HOST);
         SFEM_TEST_ASSERT(sym_held_op != nullptr);
         std::dynamic_pointer_cast<sfem::TimeSteppable>(sym_held_op)->set_time_scheme(sym_scheme);
         auto sym_held = sfem::Function::create(space);
@@ -1045,7 +1045,7 @@ int test_holding_the_scheme_equals_adding_its_operator() {
         auto sym_pushed_scheme = make_scheme();
         SFEM_TEST_ASSERT(sym_pushed_scheme != nullptr);
         auto sym_pushed = sfem::Function::create(space);
-        sym_pushed->add_operator(sfem::Factory::create_op(space, "GeneratedLinearElasticity"));
+        sym_pushed->add_operator(sfem::OpFactory::create(space, "GeneratedLinearElasticity", sfem::EXECUTION_SPACE_HOST));
         sym_pushed->add_operator(sym_pushed_scheme->inertia_op());
 
         auto held_sym   = sfem::create_host_buffer<real_t>(n_nodes * packed);
@@ -1084,7 +1084,7 @@ int test_a_residual_material_assembles_the_schemes_term() {
     if (tet4) {
         fixture.mesh  = sfem::Mesh::create_tet4_cube(sfem::Communicator::self(), 2, 2, 2);
         fixture.space = sfem::FunctionSpace::create(fixture.mesh, 3);
-        fixture.op    = sfem::Factory::create_op(fixture.space, "GeneratedMooneyRivlinKelvinVoigt");
+        fixture.op    = sfem::OpFactory::create(fixture.space, "GeneratedMooneyRivlinKelvinVoigt", sfem::EXECUTION_SPACE_HOST);
         fixture.ndofs = fixture.space->n_dofs();
     }
     const ptrdiff_t ndofs = fixture.ndofs;

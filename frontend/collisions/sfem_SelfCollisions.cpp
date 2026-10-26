@@ -274,7 +274,7 @@ namespace sfem {
     //     ret->impl_->collisions = SelfCollisions::create(surface);
 
     //     auto trace_space = FunctionSpace::create(surface, 1);
-    //     auto mass        = Factory::create_op(trace_space, "Mass");
+    //     auto mass        = OpFactory::create(trace_space, "Mass", EXECUTION_SPACE_HOST);
     //     mass->initialize();
 
     //     auto m    = create_host_buffer<real_t>(trace_space->n_dofs());

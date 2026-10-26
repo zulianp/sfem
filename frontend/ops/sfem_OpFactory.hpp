@@ -33,11 +33,11 @@ namespace sfem {
      *
      * Usage example:
      * @code
-     * auto op = Factory::create_op(space, "Laplacian");
-     * auto boundary_op = Factory::create_boundary_op(space, boundary_elements, "BoundaryMass");
+     * auto op = OpFactory::create(space, "Laplacian", EXECUTION_SPACE_HOST);
+     * auto boundary_op = OpFactory::create_boundary(space, boundary_elements, "BoundaryMass", EXECUTION_SPACE_HOST);
      * @endcode
      */
-    class Factory {
+    class OpFactory {
     public:
         /**
          * @brief Function type for creating regular operators
@@ -58,13 +58,13 @@ namespace sfem {
         /**
          * @brief Destructor
          */
-        ~Factory();
+        ~OpFactory();
 
         /**
          * @brief Get the singleton instance of the factory
          * @return Reference to the factory instance
          */
-        static Factory &instance();
+        static OpFactory &instance();
 
         /**
          * @brief Register an operator creation function
@@ -77,38 +77,31 @@ namespace sfem {
          * @brief Create an operator by name
          * @param space Function space
          * @param name Operator name
+         * @param es Execution space; on the device the "gpu:" variant of the name is created
          * @return Shared pointer to the created operator, or nullptr if not found
-         *
-         * The factory resolves the requested operator name directly.
          */
-        static std::shared_ptr<Op> create_op(const std::shared_ptr<FunctionSpace> &space, const char *name);
-
-        /**
-         * @brief Create a GPU operator by name
-         * @param space Function space
-         * @param name Operator name (without "gpu:" prefix)
-         * @return Shared pointer to the created operator, or nullptr if not found
-         *
-         * This method automatically adds the "gpu:" prefix to the operator name.
-         */
-        static std::shared_ptr<Op> create_op_gpu(const std::shared_ptr<FunctionSpace> &space, const char *name);
+        static std::shared_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space,
+                                          const std::string                    &name,
+                                          const ExecutionSpace                  es);
 
         /**
          * @brief Create a boundary operator by name
          * @param space Function space
          * @param boundary_elements Boundary element connectivity
          * @param name Operator name
+         * @param es Execution space; boundary operators exist on the host only
          * @return Shared pointer to the created operator, or nullptr if not found
          */
-        static std::shared_ptr<Op> create_boundary_op(const std::shared_ptr<FunctionSpace>   &space,
-                                                      const std::shared_ptr<Buffer<idx_t *>> &boundary_elements,
-                                                      const char                             *name);
+        static std::shared_ptr<Op> create_boundary(const std::shared_ptr<FunctionSpace>   &space,
+                                                   const std::shared_ptr<Buffer<idx_t *>> &boundary_elements,
+                                                   const std::string                      &name,
+                                                   const ExecutionSpace                    es);
 
     private:
         /**
          * @brief Private constructor for singleton pattern
          */
-        Factory();
+        OpFactory();
 
         /**
          * @brief Private registration method
@@ -134,11 +127,7 @@ namespace sfem {
     inline std::shared_ptr<Op> create_op(const std::shared_ptr<FunctionSpace> &space,
                                          const std::string                    &name,
                                          const ExecutionSpace                  es) {
-        SFEM_UNUSED(es);
-#ifdef SFEM_ENABLE_CUDA
-        if (es == EXECUTION_SPACE_DEVICE) return sfem::Factory::create_op_gpu(space, name.c_str());
-#endif  // SFEM_ENABLE_CUDA
-        return sfem::Factory::create_op(space, name.c_str());
+        return OpFactory::create(space, name, es);
     }
 
 #ifdef SFEM_ENABLE_RYAML

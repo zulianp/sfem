@@ -1957,14 +1957,14 @@ namespace sfem {
     };
 
     void register_device_ops() {
-        Factory::register_op("gpu:LinearElasticity", &GPULinearElasticity::create);
-        Factory::register_op("gpu:Laplacian", &GPULaplacian::create);
-        Factory::register_op("gpu:em:Laplacian", &GPUEMOp::create);
-        Factory::register_op("gpu:em:LinearElasticity", &GPUEMVectorWarpOp::create);
-        Factory::register_op("gpu:EMOp", &GPUEMOp::create);
-        Factory::register_op("gpu:EMWarpOp", &GPUEMWarpOp::create);
-        Factory::register_op("gpu:EMMultiVectorWarpOp", &GPUEMMultiVectorWarpOp::create);
-        Factory::register_op("gpu:EMVectorWarpOp", &GPUEMVectorWarpOp::create);
+        OpFactory::register_op("gpu:LinearElasticity", &GPULinearElasticity::create);
+        OpFactory::register_op("gpu:Laplacian", &GPULaplacian::create);
+        OpFactory::register_op("gpu:em:Laplacian", &GPUEMOp::create);
+        OpFactory::register_op("gpu:em:LinearElasticity", &GPUEMVectorWarpOp::create);
+        OpFactory::register_op("gpu:EMOp", &GPUEMOp::create);
+        OpFactory::register_op("gpu:EMWarpOp", &GPUEMWarpOp::create);
+        OpFactory::register_op("gpu:EMMultiVectorWarpOp", &GPUEMMultiVectorWarpOp::create);
+        OpFactory::register_op("gpu:EMVectorWarpOp", &GPUEMVectorWarpOp::create);
         register_generated_device_ops();
     }
 

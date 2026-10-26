@@ -3,7 +3,7 @@
 
 namespace sfem {
   void register_GeneratedVectorMass_cuda_generated_op() {
-    Factory::register_op("gpu:GeneratedVectorMass", GPUGeneratedVectorMass::create);
-    Factory::register_op("gpu:ss:GeneratedVectorMass", GPUGeneratedVectorMass::create);
+    OpFactory::register_op("gpu:GeneratedVectorMass", GPUGeneratedVectorMass::create);
+    OpFactory::register_op("gpu:ss:GeneratedVectorMass", GPUGeneratedVectorMass::create);
   }
 }  // namespace sfem

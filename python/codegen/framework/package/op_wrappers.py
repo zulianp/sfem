@@ -8216,8 +8216,8 @@ def _registration_source(material, wrapper_header):
 
 namespace sfem {
   void %(function)s() {
-    Factory::register_op("%(registered)s", %(op)s::create);
-    Factory::register_op("%(registered_ss)s", %(op)s::create);
+    OpFactory::register_op("%(registered)s", %(op)s::create);
+    OpFactory::register_op("%(registered_ss)s", %(op)s::create);
   }
 }  // namespace sfem
 """ % {

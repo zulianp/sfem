@@ -3,7 +3,7 @@
 
 namespace sfem {
   void register_GeneratedLinearKelvinVoigt_generated_op() {
-    Factory::register_op("GeneratedLinearKelvinVoigt", GeneratedLinearKelvinVoigt::create);
-    Factory::register_op("ss:GeneratedLinearKelvinVoigt", GeneratedLinearKelvinVoigt::create);
+    OpFactory::register_op("GeneratedLinearKelvinVoigt", GeneratedLinearKelvinVoigt::create);
+    OpFactory::register_op("ss:GeneratedLinearKelvinVoigt", GeneratedLinearKelvinVoigt::create);
   }
 }  // namespace sfem

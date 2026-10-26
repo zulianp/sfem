@@ -395,7 +395,7 @@ NB_MODULE(pysfem, m) {
     m.def("create_op",
           [](const std::shared_ptr<FunctionSpace> &space, const char *name, nb::handle es_handle) {
               if (es_handle.is_none() || !es_handle.is_valid()) {
-                  return Factory::create_op(space, name);
+                  return OpFactory::create(space, name, EXECUTION_SPACE_HOST);
               }
               auto es = nb::cast<ExecutionSpace>(es_handle);
               return sfem::create_op(space, name, es);
@@ -403,7 +403,10 @@ NB_MODULE(pysfem, m) {
           nb::arg("space"),
           nb::arg("name"),
           nb::arg("es") = nb::none());
-    m.def("create_boundary_op", &Factory::create_boundary_op);
+    m.def("create_boundary_op",
+          [](const std::shared_ptr<FunctionSpace> &space, const std::shared_ptr<Buffer<idx_t *>> &boundary_elements, const char *name) {
+              return OpFactory::create_boundary(space, boundary_elements, name, EXECUTION_SPACE_HOST);
+          });
 
     nb::class_<Output>(m, "Output")
             .def("set_output_dir", &Output::set_output_dir)
