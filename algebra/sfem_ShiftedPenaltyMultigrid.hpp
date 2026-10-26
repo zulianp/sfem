@@ -42,7 +42,7 @@ namespace sfem {
      * @tparam T The data type for numerical computations (e.g., float, double).
      *
      * ### Public Enums:
-     * - `CycleType`: Defines the type of multigrid cycle (V_CYCLE, W_CYCLE).
+     * - `CycleType`: Defines the type of multigrid cycle (V, W).
      * - `CycleReturnCode`: Return codes for the multigrid cycle (CYCLE_CONTINUE, CYCLE_CONVERGED, CYCLE_FAILURE).
      *
      * ### Nested Classes:
@@ -129,10 +129,8 @@ namespace sfem {
     public:
         /// Outer iterations of the last apply.
         int iterations() const { return iterations_; }
-        enum CycleType {
-            V_CYCLE = 1,
-            W_CYCLE = 2,
-        };
+        // The value is the cycle index, the coarse-level visits per pass: V 1, W 2 (a larger index is valid).
+        enum class CycleType : int { V = 1, W = 2 };
 
         enum CycleReturnCode { CYCLE_CONTINUE = 0, CYCLE_CONVERGED = 1, CYCLE_FAILURE = 2 };
 
@@ -476,7 +474,7 @@ namespace sfem {
             if (fine_blocks_op_) fine_blocks_op_->apply(x, y);
         }
         void set_nlsmooth_steps(const int steps) { nlsmooth_steps = steps; }
-        void set_cycle_type(const int val) { cycle_type_ = val; }
+        void set_cycle_type(const CycleType val) { cycle_type_ = val; }
         void set_project_coarse_space_correction(const bool val) { project_coarse_space_correction_ = val; }
         void set_max_penalty_param(const real_t val) { max_penalty_param_ = val; }
         void set_penalty_param(const real_t val) { penalty_param_ = val; }
@@ -1099,7 +1097,7 @@ namespace sfem {
             auto prolongation = prolongation_[coarser_level(level)];
             auto mem_coarse   = memory_[coarser_level(level)];
 
-            for (int k = 0; k < this->cycle_type_; k++) {
+            for (int k = 0; k < static_cast<int>(this->cycle_type_); k++) {
                 if (constraints_op_) {
                     smoother->set_op_and_diag_shift(sop, level_op_x_op(level), level_op_x_op_weights(level));
                 } else {
@@ -1242,7 +1240,7 @@ namespace sfem {
         int count_smoothing_steps{0};
         int max_inner_it{3};
         int nlsmooth_steps{3};
-        int cycle_type_{V_CYCLE};
+        CycleType cycle_type_{CycleType::V};
         int iterations_{0};
         int max_it_{10};
 

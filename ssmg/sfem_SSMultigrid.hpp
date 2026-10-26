@@ -203,7 +203,7 @@ namespace sfem {
                SFEM_MG_CYCLE_TYPE,
                SFEM_MG_COARSE_SMOOTH_STEPS);
 
-        mg->set_cycle_type(SFEM_MG_CYCLE_TYPE);
+        mg->set_cycle_type(static_cast<typename MG::CycleType>(SFEM_MG_CYCLE_TYPE));
 
         count_t coarsest_ndofs = 500;
 

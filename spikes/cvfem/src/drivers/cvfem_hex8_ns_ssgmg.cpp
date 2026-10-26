@@ -3955,7 +3955,7 @@ private:
         // removes them. A higher cycle index visits the coarse levels more often per fine
         // sweep, which is the cheapest of the three cures to try and the only one needing no
         // new machinery.
-        g.mg->set_cycle_type(smesh::Env::read<int>("SFEM_GMG_CYCLE", 1));
+        g.mg->set_cycle_type(static_cast<sfem::Multigrid<real_t>::CycleType>(smesh::Env::read<int>("SFEM_GMG_CYCLE", 1)));
         g.mg->set_max_it(1);  // one cycle per preconditioner application
         // Every caller hands the cycle a zero vector: FGMRES clears z_j before applying the
         // preconditioner, and the SFEM_GMG_CHECK=2 probe starts from zeros. So the finest
