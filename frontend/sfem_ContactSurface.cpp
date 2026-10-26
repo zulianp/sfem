@@ -431,7 +431,7 @@ namespace sfem {
         void collect_points(std::shared_ptr<Buffer<geom_t *>> &surface_points) {
             SFEM_TRACE_SCOPE("SSMeshContactSurface::collect_points");
 
-            auto &ssmesh   = space->mesh();
+            auto &ssmesh   = *space->mesh_ptr();
             auto  sspoints = ssmesh.points();
 
             auto               mesh = space->mesh_ptr();
@@ -501,7 +501,7 @@ namespace sfem {
                 return;
             }
 #endif
-            auto &ssmesh   = space->mesh();
+            auto &ssmesh   = *space->mesh_ptr();
             auto  sspoints = ssmesh.points();
 
             const idx_t *const idx = map->data();
@@ -562,7 +562,7 @@ namespace sfem {
     std::unique_ptr<SSMeshContactSurface> SSMeshContactSurface::create(const std::shared_ptr<FunctionSpace>        &space,
                                                                        const std::vector<std::shared_ptr<Sideset>> &sidesets,
                                                                        const enum ExecutionSpace                    es) {
-        auto     &ssmesh = space->mesh();
+        auto     &ssmesh = *space->mesh_ptr();
         const int level  = smesh::semistructured_level(ssmesh);
 
         std::vector<std::shared_ptr<Buffer<idx_t *>>> parts;

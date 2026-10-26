@@ -129,7 +129,7 @@ namespace {
 int test_checkerboard_ss_gpu_laplacian_vs_host() {
     auto fs = checkerboard_ss_space(1);
     SFEM_TEST_ASSERT(fs->has_semi_structured_mesh());
-    SFEM_TEST_EQ(fs->mesh().n_blocks(), static_cast<size_t>(2));
+    SFEM_TEST_EQ(fs->mesh_ptr()->n_blocks(), static_cast<size_t>(2));
     const real_t tol = sizeof(real_t) == sizeof(double) ? real_t(1e-10) : real_t(1e-5);
     return apply_host_device(fs, "Laplacian", fill_scalar_host(*fs), tol);
 }
@@ -137,7 +137,7 @@ int test_checkerboard_ss_gpu_laplacian_vs_host() {
 int test_ss_gpu_em_laplacian_vs_host() {
     auto fs = hex_ss_space(1);
     SFEM_TEST_ASSERT(fs->has_semi_structured_mesh());
-    SFEM_TEST_EQ(fs->mesh().n_blocks(), static_cast<size_t>(1));
+    SFEM_TEST_EQ(fs->mesh_ptr()->n_blocks(), static_cast<size_t>(1));
     const real_t tol = sizeof(real_t) == sizeof(double) ? real_t(1e-10) : real_t(1e-5);
     return apply_host_device(fs, "em:Laplacian", fill_scalar_host(*fs), tol);
 }
@@ -145,7 +145,7 @@ int test_ss_gpu_em_laplacian_vs_host() {
 int test_ss_gpu_em_linear_elasticity_vs_linear_elasticity() {
     auto fs = hex_ss_space(3);
     SFEM_TEST_ASSERT(fs->has_semi_structured_mesh());
-    SFEM_TEST_EQ(fs->mesh().n_blocks(), static_cast<size_t>(1));
+    SFEM_TEST_EQ(fs->mesh_ptr()->n_blocks(), static_cast<size_t>(1));
     const real_t tol = sizeof(real_t) == sizeof(double) ? real_t(1e-8) : real_t(1e-4);
 
     auto x_host = fill_vector_host(*fs);

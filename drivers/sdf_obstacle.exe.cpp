@@ -237,7 +237,7 @@ int solve_sdf_obstacle(const std::shared_ptr<sfem::Communicator> &comm, int argc
     double tock = smesh::time_seconds();
 
     ptrdiff_t nelements = m->n_elements();
-    ptrdiff_t nnodes    = fs->mesh().n_nodes();
+    ptrdiff_t nnodes    = fs->mesh_ptr()->n_nodes();
 
     if (!comm->rank()) {
         printf("----------------------------------------\n");

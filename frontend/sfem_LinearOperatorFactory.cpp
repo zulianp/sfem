@@ -111,7 +111,7 @@ namespace sfem {
             SFEM_UNUSED(es);
             assert(es == sfem::EXECUTION_SPACE_HOST);
 
-            auto      crs_graph  = f->space()->mesh().node_to_node_graph_upper_triangular();
+            auto      crs_graph  = f->space()->mesh_ptr()->node_to_node_graph_upper_triangular();
             const int block_size = f->space()->block_size();
 
             int       nblock_entries = ((block_size + 1) * block_size) / 2;

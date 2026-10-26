@@ -148,7 +148,7 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_sphere_contact(const std::
         SFEM_ERROR("test_contact: no contact faces on any rank\n");
     }
 
-    const ptrdiff_t n  = static_cast<ptrdiff_t>(opts.base_resolution) * smesh::semistructured_level(fs->mesh());
+    const ptrdiff_t n  = static_cast<ptrdiff_t>(opts.base_resolution) * smesh::semistructured_level(*fs->mesh_ptr());
     const ptrdiff_t nx = n * resolution_ratio * 2;
     const ptrdiff_t ny = n * 2;
     const ptrdiff_t nz = n * resolution_ratio * 2;
@@ -219,7 +219,7 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_highfreq_contact(const std
     auto bottom_ss = sfem::Sideset::create_from_selector(
             m, [=](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool { return y > -1e-5 && y < 1e-5; });
 
-    const int n   = opts.base_resolution * smesh::semistructured_level(fs->mesh());
+    const int n   = opts.base_resolution * smesh::semistructured_level(*fs->mesh_ptr());
     auto      sdf = smesh::create_sdf(comm,
                                  n * resolution_ratio * 2,
                                  n * 1 * 2,
@@ -296,7 +296,7 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_multisphere_contact(const 
     auto bottom_ss = sfem::Sideset::create_from_selector(
             m, [=](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool { return y > -1e-5 && y < 1e-5; });
 
-    const int n         = opts.base_resolution * smesh::semistructured_level(fs->mesh());
+    const int n         = opts.base_resolution * smesh::semistructured_level(*fs->mesh_ptr());
     const int n_spheres = opts.n_spheres;
     auto      sdf       = smesh::create_sdf(comm,
                                  n * 5 * 2,

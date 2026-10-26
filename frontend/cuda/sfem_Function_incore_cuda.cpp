@@ -79,8 +79,8 @@ namespace sfem {
                        space->mesh_ptr()->n_blocks());
             return nullptr;
         }
-        auto nxe = space->mesh().n_nodes_per_element(0);
-        return smesh::to_device(soa_to_aos(1, nxe, space->mesh().elements(0)));
+        auto nxe = space->mesh_ptr()->n_nodes_per_element(0);
+        return smesh::to_device(soa_to_aos(1, nxe, space->mesh_ptr()->elements(0)));
     }
 
     class GPUDirichletConditions final : public Constraint {
@@ -1202,8 +1202,8 @@ namespace sfem {
 
         static std::shared_ptr<Buffer<idx_t>> create_device_elements_aos_block(const std::shared_ptr<FunctionSpace> &space,
                                                                                const smesh::block_idx_t              block_id) {
-            auto nxe = space->mesh().n_nodes_per_element(block_id);
-            return smesh::to_device(soa_to_aos(1, nxe, space->mesh().elements(block_id)));
+            auto nxe = space->mesh_ptr()->n_nodes_per_element(block_id);
+            return smesh::to_device(soa_to_aos(1, nxe, space->mesh_ptr()->elements(block_id)));
         }
 
         static std::shared_ptr<smesh::Mesh> gpu_em_element_matrix_mesh(const std::shared_ptr<FunctionSpace> &space) {
@@ -1283,7 +1283,7 @@ namespace sfem {
 
                 const auto et    = mesh->element_type(bid);
                 const bool is_ss = is_semistructured_type(et);
-                const int  level = is_ss ? smesh::semistructured_level(space->mesh()) : 1;
+                const int  level = is_ss ? smesh::semistructured_level(*space->mesh_ptr()) : 1;
 
                 auto h_element_matrix = sfem::create_host_buffer<real_t>(ne * 64);
                 err                   = sshex8_laplacian_element_matrix_cartesian(level,
@@ -1313,7 +1313,7 @@ namespace sfem {
             int err = SFEM_SUCCESS;
             for (const auto &bd : blocks) {
                 if (bd.is_ss) {
-                    const int level = smesh::semistructured_level(space->mesh());
+                    const int level = smesh::semistructured_level(*space->mesh_ptr());
                     err             = cu_affine_sshex8_elemental_matrix_apply(level,
                                                                   bd.n_elements,
                                                                   bd.elements->data(),
@@ -1396,7 +1396,7 @@ namespace sfem {
                 return SFEM_FAILURE;
             }
 
-            auto &ssm = space->mesh();
+            auto &ssm = *space->mesh_ptr();
             blocks.clear();
 
             int err = SFEM_SUCCESS;
@@ -1456,7 +1456,7 @@ namespace sfem {
                 return SFEM_FAILURE;
             }
 
-            auto     &ssm   = space->mesh();
+            auto     &ssm   = *space->mesh_ptr();
             const int level = smesh::semistructured_level(ssm);
             int       err   = SFEM_SUCCESS;
             for (const auto &bd : blocks) {
@@ -1536,7 +1536,7 @@ namespace sfem {
                 return SFEM_FAILURE;
             }
 
-            auto &ssm = space->mesh();
+            auto &ssm = *space->mesh_ptr();
             blocks.clear();
 
             int err = SFEM_SUCCESS;
@@ -1596,7 +1596,7 @@ namespace sfem {
                 return SFEM_FAILURE;
             }
 
-            auto     &ssm   = space->mesh();
+            auto     &ssm   = *space->mesh_ptr();
             const int level = smesh::semistructured_level(ssm);
             int       err   = SFEM_SUCCESS;
             for (const auto &bd : blocks) {
@@ -1703,7 +1703,7 @@ namespace sfem {
                 ret->blocks.reserve(blocks.size());
                 for (const auto &bd : blocks) {
                     GPUEMAoSBlock c = bd;
-                    c.n_elements    = derefined_space->mesh().n_elements(bd.block_id);
+                    c.n_elements    = derefined_space->mesh_ptr()->n_elements(bd.block_id);
                     c.elements      = create_device_elements_aos_block(derefined_space, bd.block_id);
                     ret->blocks.push_back(std::move(c));
                 }
@@ -1722,7 +1722,7 @@ namespace sfem {
         int assemble_block_matrix(const smesh::Mesh                 &em_mesh,
                                   const smesh::block_idx_t           bid,
                                   std::shared_ptr<Buffer<real_t>>   &out_matrix) {
-            auto     &ssm = space->mesh();
+            auto     &ssm = *space->mesh_ptr();
             const ptrdiff_t ne = em_mesh.n_elements(bid);
             auto h_element_matrix = sfem::create_host_buffer<scalar_t>(ne * 24 * 24);
 
@@ -1764,7 +1764,7 @@ namespace sfem {
                 return SFEM_FAILURE;
             }
 
-            auto &ssm = space->mesh();
+            auto &ssm = *space->mesh_ptr();
             int   err = SFEM_SUCCESS;
 
             if (create_blocks) {
@@ -1846,7 +1846,7 @@ namespace sfem {
                 return SFEM_FAILURE;
             }
 
-            auto     &ssm   = space->mesh();
+            auto     &ssm   = *space->mesh_ptr();
             const int level = smesh::semistructured_level(ssm);
             int       err   = SFEM_SUCCESS;
             for (const auto &bd : blocks) {
@@ -1916,8 +1916,8 @@ namespace sfem {
         void set_value_in_block(const std::string &block_name, const std::string &var_name, const real_t value) override {
             if (!block_name.empty()) {
                 bool exists = false;
-                for (size_t b = 0; b < space->mesh().n_blocks(); ++b) {
-                    if (space->mesh().block(b)->name() == block_name) {
+                for (size_t b = 0; b < space->mesh_ptr()->n_blocks(); ++b) {
+                    if (space->mesh_ptr()->block(b)->name() == block_name) {
                         exists = true;
                         break;
                     }

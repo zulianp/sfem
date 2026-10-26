@@ -66,7 +66,7 @@ namespace sfem {
         if (SFEM_PRINT_THROUGHPUT && calls) {
             printf("SemiStructuredEMLaplacian[%d]::apply() called %ld times. Total: %g [s], "
                    "Avg: %g [s], TP %g [MDOF/s]\n",
-                   smesh::semistructured_level(space->mesh()),
+                   smesh::semistructured_level(*space->mesh_ptr()),
                    calls,
                    total_time,
                    total_time / calls,
@@ -102,7 +102,7 @@ namespace sfem {
     const char *SemiStructuredEMLaplacian::name() const { return "em:Laplacian"; }
 
     int SemiStructuredEMLaplacian::initialize(const std::vector<std::string> &block_names) {
-        auto &ssm  = space->mesh();
+        auto &ssm  = *space->mesh_ptr();
         auto  mesh = element_matrix_mesh(space);
         if (!mesh) {
             return SFEM_FAILURE;
@@ -164,7 +164,7 @@ namespace sfem {
     int SemiStructuredEMLaplacian::hessian_diag(const real_t *const, real_t *const out) {
         SFEM_TRACE_SCOPE("SemiStructuredEMLaplacian::hessian_diag");
 
-        auto &ssm = space->mesh();
+        auto &ssm = *space->mesh_ptr();
         int   err = SFEM_SUCCESS;
         for (size_t b = 0; b < element_matrices.size(); ++b) {
             if (!element_matrices[b]) {
@@ -195,7 +195,7 @@ namespace sfem {
 
         assert(is_semistructured_type(element_type));  // REMOVEME once generalized approach
 
-        auto &ssm = space->mesh();
+        auto &ssm = *space->mesh_ptr();
 
         double tick = smesh::time_seconds();
 

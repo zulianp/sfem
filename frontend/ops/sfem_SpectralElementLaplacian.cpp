@@ -39,7 +39,7 @@ namespace sfem {
         if (SFEM_PRINT_THROUGHPUT && calls) {
             printf("SpectralElementLaplacian[%d]::apply called %ld times. Total: %g [s], "
                    "Avg: %g [s], TP %g [MDOF/s]\n",
-                   smesh::semistructured_level(space->mesh()),
+                   smesh::semistructured_level(*space->mesh_ptr()),
                    calls,
                    total_time,
                    total_time / calls,
@@ -100,7 +100,7 @@ namespace sfem {
 
         assert(is_semistructured_type(element_type));  // REMOVEME once generalized approach
 
-        auto &ssm = space->mesh();
+        auto &ssm = *space->mesh_ptr();
         if (ssm.n_blocks() != 1) {
             SFEM_ERROR("SpectralElementLaplacian::apply: multi-block is not implemented\n");
             return SFEM_FAILURE;

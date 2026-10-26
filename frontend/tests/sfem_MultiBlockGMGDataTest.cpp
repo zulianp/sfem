@@ -315,7 +315,7 @@ int test_checkerboard_create_gmg_data() {
     auto data = sfem::create_gmg_data(f);
     SFEM_TEST_ASSERT(data != nullptr);
 
-    auto levels = smesh::derefinement_levels(fs->mesh());
+    auto levels = smesh::derefinement_levels(*fs->mesh_ptr());
     SFEM_TEST_EQ(data->functions.size(), levels.size());
     SFEM_TEST_EQ(data->restrictions.size(), levels.size() - 1);
     SFEM_TEST_EQ(data->prolongations.size(), levels.size());
@@ -477,7 +477,7 @@ int test_two_block_quad4_ssgmg_residual() {
 
     auto split_data = sfem::create_gmg_data(split_f);
     SFEM_TEST_ASSERT(split_data != nullptr);
-    SFEM_TEST_EQ(split_data->functions.size(), smesh::derefinement_levels(split_f->space()->mesh()).size());
+    SFEM_TEST_EQ(split_data->functions.size(), smesh::derefinement_levels(*split_f->space()->mesh_ptr()).size());
 
     SSGMGResidual split_res;
     SSGMGResidual square_res;
@@ -512,7 +512,7 @@ int test_two_block_tet4_ssgmg_residual() {
 
     auto split_data = sfem::create_gmg_data(split_f);
     SFEM_TEST_ASSERT(split_data != nullptr);
-    SFEM_TEST_EQ(split_data->functions.size(), smesh::derefinement_levels(split_f->space()->mesh()).size());
+    SFEM_TEST_EQ(split_data->functions.size(), smesh::derefinement_levels(*split_f->space()->mesh_ptr()).size());
 
     SSGMGResidual split_res;
     SSGMGResidual cube_res;
@@ -571,7 +571,7 @@ int test_hex8_tet4_create_gmg_data() {
     auto data = sfem::create_gmg_data(f);
     SFEM_TEST_ASSERT(data != nullptr);
 
-    auto levels = smesh::derefinement_levels(fs->mesh());
+    auto levels = smesh::derefinement_levels(*fs->mesh_ptr());
     SFEM_TEST_EQ(data->functions.size(), levels.size());
     SFEM_TEST_EQ(data->restrictions.size(), levels.size() - 1);
     SFEM_TEST_EQ(data->prolongations.size(), levels.size());
@@ -613,7 +613,7 @@ int test_hex8_tet4_ssgmg_residual() {
 
     auto data = sfem::create_gmg_data(f);
     SFEM_TEST_ASSERT(data != nullptr);
-    SFEM_TEST_EQ(data->functions.size(), smesh::derefinement_levels(f->space()->mesh()).size());
+    SFEM_TEST_EQ(data->functions.size(), smesh::derefinement_levels(*f->space()->mesh_ptr()).size());
     for (size_t i = 0; i < data->functions.size(); ++i) {
         SFEM_TEST_ASSERT(data->functions[i]->space()->has_semi_structured_mesh());
         SFEM_TEST_ASSERT(assert_hex_tet_ss_types(data->functions[i]->space()->mesh_ptr()) == SFEM_TEST_SUCCESS);
