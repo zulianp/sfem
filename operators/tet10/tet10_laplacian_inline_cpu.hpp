@@ -40,32 +40,6 @@ static SFEM_INLINE void tet10_laplacian_apply_qp_fff(const scalar_t             
     tet10_laplacian_trial_operand(qx, qy, qz, qw, fff, u, trial_operand);
 
 // TODO check perf difference of two techniques
-#if 0
-    scalar_t ref_grad[10];
-
-    {  // X-components
-        tet10_ref_shape_grad_x(qx, qy, qz, ref_grad);
-#pragma unroll(10)
-        for (int i = 0; i < 10; i++) {
-            element_vector[i] += ref_grad[i] * trial_operand[0];
-        }
-    }
-    {  // Y-components
-        tet10_ref_shape_grad_y(qx, qy, qz, ref_grad);
-#pragma unroll(10)
-        for (int i = 0; i < 10; i++) {
-            element_vector[i] += ref_grad[i] * trial_operand[1];
-        }
-    }
-
-    {  // Z-components
-        tet10_ref_shape_grad_z(qx, qy, qz, ref_grad);
-#pragma unroll(10)
-        for (int i = 0; i < 10; i++) {
-            element_vector[i] += ref_grad[i] * trial_operand[2];
-        }
-    }
-#else
     const scalar_t x0  = 4 * qx;
     const scalar_t x1  = 4 * qy;
     const scalar_t x2  = 4 * qz;
@@ -88,7 +62,6 @@ static SFEM_INLINE void tet10_laplacian_apply_qp_fff(const scalar_t             
     element_vector[7] += trial_operand[2] * (-8 * qz - x1 - x9) - x10 - x11;
     element_vector[8] += x10 + x6;
     element_vector[9] += x11 + x8;
-#endif
 }
 
 static SFEM_INLINE void tet10_laplacian_apply_add_fff(const scalar_t *const SFEM_RESTRICT fff,
