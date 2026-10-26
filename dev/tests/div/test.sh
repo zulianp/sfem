@@ -6,8 +6,8 @@ SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
 PATH=$SCRIPTPATH:$PATH
 PATH=$SCRIPTPATH/../..:$PATH
-PATH=$SCRIPTPATH/../../python:$PATH
-PATH=$SCRIPTPATH/../../python/mesh:$PATH
+PATH=$SCRIPTPATH/../../../python:$PATH
+PATH=$SCRIPTPATH/../../../python/mesh:$PATH
 
 # Remove me!
 UTOPIA_EXEC=$CODE_DIR/utopia/utopia/build/utopia_exec

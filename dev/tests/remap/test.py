@@ -14,7 +14,7 @@ for i in range(0, len(x)):
 np.array(testx, dtype=np.float64).tofile("testx.raw")
 removed.tofile("removed.raw")
 
-subprocess.run("../../remap_vector testx.raw removed.raw testout.raw", shell=True, check=True, capture_output=True)
+subprocess.run("../../../remap_vector testx.raw removed.raw testout.raw", shell=True, check=True, capture_output=True)
 
 expected = np.array([0, 2, 0, 0, 5])
 actual = np.fromfile("testout.raw")

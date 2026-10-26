@@ -9,7 +9,7 @@ else
 	rm fp64/*.raw
 fi
 
-PATH=../../python:$PATH
+PATH=../../../python:$PATH
 
 fp_convert.py downloads/lhs.value.raw fp64/values.raw float32 float64
 

@@ -9,7 +9,7 @@ case_folder=/Users/patrickzulian/Desktop/code/utopia/utopia_fe/data/hydros/mesh-
 solver_exec=/Users/patrickzulian/Desktop/code/utopia/utopia/build/utopia_exec
 patsystem=/Users/patrickzulian/Desktop/code/sfem/mesh-multi-outlet-better/
 
-PATH=../../python:$PATH
+PATH=../../../python:$PATH
 
 if [ ! -d "./pat/" ]; then
 	mkdir ./pat

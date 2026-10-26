@@ -7,7 +7,7 @@ N=5
 
 SFEM_ELEMENT_REFINE_LEVEL=`grep "refine_level" input.yaml | awk '{print $2}'`
 export BOX_MESH_EXTRA_OPTIONS="--tx=-0.5 --ty=-0.5 --tz=-0.5"
-../../../../data/benchmarks/meshes/create_box_ss_mesh.sh $N $SFEM_ELEMENT_REFINE_LEVEL  
+../../../../../data/benchmarks/meshes/create_box_ss_mesh.sh $N $SFEM_ELEMENT_REFINE_LEVEL  
 box_mesh.py obstacle_mesh -x 2 -y 4 -z 4 --cell_type=TET4 --width=2 --height=4 --depth=4 --tx=-1 --ty=-2 --tz=-2
 
 skin obstacle_mesh obstacle_mesh/skin

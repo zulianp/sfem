@@ -6,16 +6,16 @@ set -e
 
 SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
-source $SCRIPTPATH/../workflows/sfem_config.sh
-export PATH=$SCRIPTPATH/../:$PATH
-export PATH=$SCRIPTPATH/../build/:$PATH
-export PATH=$SCRIPTPATH/../bin/:$PATH
+source $SCRIPTPATH/../../workflows/sfem_config.sh
+export PATH=$SCRIPTPATH/../../:$PATH
+export PATH=$SCRIPTPATH/../../build/:$PATH
+export PATH=$SCRIPTPATH/../../bin/:$PATH
 
 export PATH=$SCRIPTPATH:$PATH
 export PATH=$SCRIPTPATH/..:$PATH
-export PATH=$SCRIPTPATH/../python/sfem:$PATH
-export PATH=$SCRIPTPATH/../python/sfem/mesh:$PATH
-export PATH=$SCRIPTPATH/../data/benchmarks/meshes:$PATH
+export PATH=$SCRIPTPATH/../../python/sfem:$PATH
+export PATH=$SCRIPTPATH/../../python/sfem/mesh:$PATH
+export PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 
 TOP_FOLDER=$PWD
 BENCH_FOLDER=$PWD/db
@@ -70,7 +70,7 @@ do
 	refine sorted refined
 
 	# P2 folder
-	mesh_p1_to_p2 sorted ../p2
+	mesh_p1_to_p2 sorted ../../p2
 
 	mkdir -p matrix_scalar
 	echo "op: Laplacian" > matrix_scalar/meta.yaml
@@ -137,7 +137,7 @@ do
 	refine sorted refined
 
 	# P2 folder
-	mesh_p1_to_p2 sorted ../p2
+	mesh_p1_to_p2 sorted ../../p2
 
 	mkdir -p matrix_scalar
 	echo "op: Laplacian" > matrix_scalar/meta.yaml
