@@ -98,25 +98,6 @@ static int cu_tet4_fff_fill_generic(const ptrdiff_t nelements,
     }
 }
 
-extern int elements_to_device(const ptrdiff_t nelements,
-                       const int num_nodes_x_element,
-                       idx_t **const SFEM_RESTRICT h_elements,
-                       idx_t **const SFEM_RESTRICT d_elements) {
-    {  // Store elem indices on device
-        SFEM_CUDA_CHECK(cudaMalloc(d_elements, num_nodes_x_element * nelements * sizeof(idx_t)));
-
-        for (int d = 0; d < num_nodes_x_element; d++) {
-            SFEM_CUDA_CHECK(cudaMemcpy((*d_elements) + d * nelements,
-                                       h_elements[d],
-                                       nelements * sizeof(idx_t),
-                                       cudaMemcpyHostToDevice));
-        }
-    }
-
-    SFEM_DEBUG_SYNCHRONIZE(nullptr);
-    return SFEM_SUCCESS;
-}
-
 extern int cu_tet4_fff_allocate(const ptrdiff_t nelements, void **const SFEM_RESTRICT fff) {
     // Currently this is the only one supported
     return cu_tet4_fff_allocate_generic(nelements, smesh::SMESH_DEFAULT, fff);
