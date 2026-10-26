@@ -1,9 +1,9 @@
-#include "sfem_cuda_max.hpp"
+#include "sfem_max_cuda.hpp"
 
 #include <algorithm>
 
 #include "sfem_cuda_base.hpp"
-#include "sfem_cuda_reduction_scratch.hpp"
+#include "sfem_reduction_scratch_cuda.hpp"
 
 namespace sfem {
     namespace {

@@ -1,7 +1,7 @@
 #include "sfem_Stationary.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
-#include "sfem_cuda_blas.hpp"
+#include "sfem_BLAS_cuda.hpp"
 #endif
 
 

@@ -13,8 +13,8 @@
 #include "sfem_MatrixFreeLinearSolver.hpp"
 #include "sfem_aliases.hpp"
 #include "sfem_crs_sym_SpMV.hpp"
-#include "sfem_cuda_blas.hpp"
-#include "sfem_cuda_crs_SpMV.hpp"
+#include "sfem_BLAS_cuda.hpp"
+#include "sfem_crs_spmv_cuda.hpp"
 
 #include "sfem_base.hpp"
 

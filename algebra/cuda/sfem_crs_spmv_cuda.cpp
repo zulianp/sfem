@@ -1,4 +1,4 @@
-#include "sfem_cuda_crs_SpMV.hpp"
+#include "sfem_crs_spmv_cuda.hpp"
 
 #include <cstdio>
 #include <cstdlib>
@@ -7,8 +7,8 @@
 #include "sfem_CooSym.hpp"
 #include "sfem_config.h"
 #include "sfem_cuda_base.hpp"
-#include "sfem_cuda_blas.hpp"
-#include "sfem_cuda_BSR.hpp"
+#include "sfem_BLAS_cuda.hpp"
+#include "sfem_BSR_cuda.hpp"
 
 #ifdef SFEM_ENABLE_CUSPARSE
 
@@ -531,7 +531,7 @@ namespace sfem {
         return nullptr;
     }
 
-    // Without cuSPARSE the library's own kernel (sfem_cuda_BSR.cu).
+    // Without cuSPARSE the library's own kernel (sfem_BSR_cuda.cu).
     std::shared_ptr<BSR<count_t, idx_t, real_t>> d_bsr_spmv(const ptrdiff_t                         rows,
                                                             const ptrdiff_t                         cols,
                                                             const int                               block_size,

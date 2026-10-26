@@ -5,7 +5,7 @@
 #include "sfem_openmp_blas.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
-#include "sfem_cuda_blas.hpp"
+#include "sfem_BLAS_cuda.hpp"
 #endif
 
 namespace sfem {

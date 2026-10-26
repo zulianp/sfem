@@ -1,8 +1,8 @@
 #include "sfem_MixedPrecisionShiftableBlockSymJacobi.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
-#include "sfem_cuda_ShiftableJacobi.hpp"
-#include "sfem_cuda_blas.hpp"
+#include "sfem_ShiftableBlockSymJacobiKernels_cuda.hpp"
+#include "sfem_BLAS_cuda.hpp"
 #endif
 
 namespace sfem {

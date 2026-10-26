@@ -18,7 +18,7 @@
 #ifdef SFEM_ENABLE_CUDA
 #include <cuda_runtime.h>
 
-#include "sfem_cuda_mprgp_impl.hpp"
+#include "sfem_MPRGPKernels_cuda.hpp"
 #endif
 
 namespace {

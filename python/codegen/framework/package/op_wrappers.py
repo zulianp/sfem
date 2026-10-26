@@ -8702,7 +8702,7 @@ def _steps_staging(indent):
 
 def _element_scratch_include():
     """The headers the target's scratch needs: `blas` (`sfem_blas_factory.hpp`)
-    and the device copies (`sfem_cuda_blas.hpp`).
+    and the device copies (`sfem_BLAS_cuda.hpp`).
 
     Only a device target does: its per-element scratch is a `SharedBuffer` and
     its reduction is the library's own, so the header comes in with them rather
@@ -8710,7 +8710,7 @@ def _element_scratch_include():
     """
     if not _runs_on_device():
         return ""
-    return '#include "sfem_blas_factory.hpp"\n#include "sfem_cuda_blas.hpp"\n'
+    return '#include "sfem_blas_factory.hpp"\n#include "sfem_BLAS_cuda.hpp"\n'
 
 
 def _element_scratch_fields():

@@ -23,7 +23,7 @@
 #ifdef SFEM_ENABLE_CUDA
 #include <cuda_runtime.h>
 
-#include "sfem_cuda_crs_SpMV.hpp"
+#include "sfem_crs_spmv_cuda.hpp"
 #endif
 
 namespace {

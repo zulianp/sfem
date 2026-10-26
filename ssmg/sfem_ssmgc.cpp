@@ -34,8 +34,8 @@
 #ifdef SFEM_ENABLE_CUDA
 // #include "cu_ssquad4_interpolate.hpp"
 #include "sfem_Function_incore_cuda.hpp"
-#include "sfem_cuda_ShiftedPenalty_impl.hpp"
-#include "sfem_cuda_blas.hpp"
+#include "sfem_ShiftedPenaltyKernels_cuda.hpp"
+#include "sfem_BLAS_cuda.hpp"
 #include "sfem_ssmgc_kernels.hpp"
 #endif
 

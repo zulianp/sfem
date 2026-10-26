@@ -25,7 +25,7 @@
 #include "sfem_GeneratedMooneyRivlinProny.hpp"
 #include "sfem_GeneratedMooneyRivlinProny_cuda.hpp"
 #include "sfem_HistoryDependent.hpp"
-#include "sfem_cuda_blas.hpp"
+#include "sfem_BLAS_cuda.hpp"
 
 using namespace sfem;
 
