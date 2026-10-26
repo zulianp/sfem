@@ -79,7 +79,7 @@ namespace sfem {
      * - `set_debug`: Enables or disables debug mode.
      *
      * ### Private Methods:
-     * - `make_buffer`: Creates a memory buffer for a given size.
+     * - `create_buffer`: Creates a memory buffer for a given size.
      * - `ensure_init`: Ensures that the solver is initialized.
      * - `init`: Initializes the solver's memory and data structures.
      * - `shifted_op`: Constructs a shifted operator for a given level.
@@ -236,7 +236,7 @@ namespace sfem {
                 if (!bound) {
                     lagr = nullptr;
                 } else if (!lagr || (ptrdiff_t)lagr->size() != n_constrained_dofs) {
-                    lagr = make_buffer(n_constrained_dofs);
+                    lagr = create_buffer(n_constrained_dofs);
                     blas_->zeros(n_constrained_dofs, lagr->data());
                 }
             };
@@ -251,7 +251,7 @@ namespace sfem {
 
             SharedBuffer<T> x_old;
             if (collect_energy_norm_correction_) {
-                x_old = make_buffer(level_alloc(finest_level()));
+                x_old = create_buffer(level_alloc(finest_level()));
                 blas_->copy(n_dofs, x, x_old->data());
             }
 
@@ -506,7 +506,7 @@ namespace sfem {
         ShiftedPenalty_Tpl<T>&    impl() { return impl_; }
 
     private:
-        SharedBuffer<T> make_buffer(const ptrdiff_t n) const {
+        SharedBuffer<T> create_buffer(const ptrdiff_t n) const {
             auto blas_impl = blas_;
             return Buffer<T>::own(
                     n,
@@ -737,21 +737,21 @@ namespace sfem {
             memory_.clear();
             memory_.resize(this->n_levels());
 
-            correction = make_buffer(level_alloc(finest_level()));
+            correction = create_buffer(level_alloc(finest_level()));
             for (int l = 0; l < n_levels(); l++) {
                 memory_[l] = std::make_shared<Memory>();
 
                 const ptrdiff_t n = level_alloc(l);
                 if (l != finest_level() || !wrap_input_) {
-                    memory_[l]->solution = make_buffer(n);
-                    memory_[l]->rhs      = make_buffer(n);
+                    memory_[l]->solution = create_buffer(n);
+                    memory_[l]->rhs      = create_buffer(n);
                 }
 
-                memory_[l]->work = make_buffer(n);
+                memory_[l]->work = create_buffer(n);
                 if (constraints_op_) {
-                    memory_[l]->diag = make_buffer(constraints_op_x_op_[l]->n_blocks());
+                    memory_[l]->diag = create_buffer(constraints_op_x_op_[l]->n_blocks());
                 } else {
-                    memory_[l]->diag = make_buffer(n);
+                    memory_[l]->diag = create_buffer(n);
                 }
             }
 
@@ -760,12 +760,12 @@ namespace sfem {
             weighted_blocks_ = nullptr;
             if (restricts_weighted_blocks()) {
                 const auto fine  = constraints_op_x_op_[finest_level()];
-                weighted_blocks_ = make_buffer(fine->n_blocks() * fine->block_size());
+                weighted_blocks_ = create_buffer(fine->n_blocks() * fine->block_size());
                 penalty_op_x_op_.resize(n_levels());
                 for (int l = coarser_level(finest_level()); l < n_levels(); l = coarser_level(l)) {
                     const auto      geometric = constraints_op_x_op_[l];
                     const ptrdiff_t nb        = geometric->n_blocks();
-                    auto            blocks    = make_buffer(nb * geometric->block_size());
+                    auto            blocks    = create_buffer(nb * geometric->block_size());
                     blas_->zeros(blocks->size(), blocks->data());
                     penalty_op_x_op_[l] = sfem::create_sparse_block_vector(geometric->idx(), blocks);
                     blas_->values(nb, 1, memory_[l]->diag->data());
@@ -816,7 +816,7 @@ namespace sfem {
                            fine->block_size());
             }
             if (!unit_weights_ || (ptrdiff_t)unit_weights_->size() != nb) {
-                unit_weights_ = make_buffer(nb);
+                unit_weights_ = create_buffer(nb);
                 blas_->values(nb, 1, unit_weights_->data());
             }
             fine_blocks_    = sfem::create_sparse_block_vector(fine->idx(), fine_block_values_);

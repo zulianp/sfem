@@ -96,7 +96,7 @@ namespace sfem {
             OpenMP_ShiftedPenalty<T>::build(impl);
         }
 
-        SharedBuffer<T> make_buffer(const ptrdiff_t n) const {
+        SharedBuffer<T> create_buffer(const ptrdiff_t n) const {
             auto blas_impl = blas;
             return Buffer<T>::own(n, blas_impl->allocate(n), [blas_impl](void* ptr) { blas_impl->destroy(ptr); }, (enum MemorySpace)this->execution_space());
         }
@@ -119,14 +119,14 @@ namespace sfem {
             T* lb = (lower_bound_) ? lower_bound_->data() : nullptr;
             T* ub = (upper_bound_) ? upper_bound_->data() : nullptr;
 
-            auto c = make_buffer(n_dofs);
+            auto c = create_buffer(n_dofs);
 
             // Penalty term: -gradient/residual and Hessian/Jacobian
-            auto r_pen = make_buffer(n_dofs);
-            auto J_pen = make_buffer(n_dofs);
+            auto r_pen = create_buffer(n_dofs);
+            auto J_pen = create_buffer(n_dofs);
 
-            if (lb && !lagr_lb) lagr_lb = make_buffer(n_constrained_dofs);
-            if (ub && !lagr_ub) lagr_ub = make_buffer(n_constrained_dofs);
+            if (lb && !lagr_lb) lagr_lb = create_buffer(n_constrained_dofs);
+            if (ub && !lagr_ub) lagr_ub = create_buffer(n_constrained_dofs);
 
             T penetration_tol  = 1 / (penalty_param_ * 0.1);
 
@@ -339,7 +339,7 @@ namespace sfem {
                       const T* const /*ub*/,
                       const T* const /*lagr_lb*/,
                       const T* const /*lagr_ub*/) {
-            auto temp = make_buffer(n_dofs);
+            auto temp = create_buffer(n_dofs);
             apply_op->apply(x, temp->data());
 
             SFEM_ERROR("IMPLEMENT ME!\n");
