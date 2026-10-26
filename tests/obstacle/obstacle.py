@@ -116,25 +116,25 @@ def solve_shifted_penalty(fun, contact_surf, constrained_dofs, obs, x, out):
 	print('#ndofs ', fs.n_dofs())
 	boundary_fun = sfem.Function(fs)
 	boundary_fun.add_operator(mass_op)
-	boundary_op = sfem.make_op(boundary_fun, x)
-	sfem.apply(boundary_op, ones, mass)
+	boundary_op = sfem.make_op(boundary_fun, sfem.view(x))
+	sfem.apply(boundary_op, sfem.view(ones), sfem.view(mass))
 
 	# --------------------------------------
 	# Linear solver
 	# --------------------------------------
 	fun_diag = np.zeros(fs.n_dofs(), dtype=real_t)
-	sfem.hessian_diag(fun, x, fun_diag)
+	sfem.hessian_diag(fun, sfem.view(x), sfem.view(fun_diag))
 
 	if matrix_free:
 		# Matrix-free
-		lop = sfem.make_op(fun, x)
+		lop = sfem.make_op(fun, sfem.view(x))
 	else:
 		# Matrix-based
 		lop = assemble_crs_spmv(fun, x)
 
 	if use_cheb:
 		solver = sfem.Chebyshev3()
-		inv_diag = sfem.diag(1./np.sqrt(fun_diag))
+		inv_diag = sfem.diag(sfem.view(1./np.sqrt(fun_diag)))
 		solver.set_op(inv_diag * lop * inv_diag)
 		solver.default_init()
 		solver.init_with_ones()
@@ -155,7 +155,7 @@ def solve_shifted_penalty(fun, contact_surf, constrained_dofs, obs, x, out):
 
 	c = np.zeros(fs.n_dofs(), dtype=real_t)
 
-	sfem.apply_constraints(fun, x)
+	sfem.apply_constraints(fun, sfem.view(x))
 	s = np.zeros(fs.n_dofs(), dtype=real_t)
 	r = np.zeros(fs.n_dofs(), dtype=real_t)
 
@@ -165,7 +165,7 @@ def solve_shifted_penalty(fun, contact_surf, constrained_dofs, obs, x, out):
 	for i in range(0, MAX_NL_ITER):
 		# Material contribution
 		g[:] = 0.
-		sfem.gradient(fun, x, g)
+		sfem.gradient(fun, sfem.view(x), sfem.view(g))
 		
 		# Shifted-Penalty contribution
 		g_pen[:] = 0.
@@ -177,34 +177,34 @@ def solve_shifted_penalty(fun, contact_surf, constrained_dofs, obs, x, out):
 		dps = s
 
 		H_diag = (penalty_param * mass * active)
-		sfem.apply_zero_constraints(fun, H_diag)
-		H = sfem.diag(H_diag)
+		sfem.apply_zero_constraints(fun, sfem.view(H_diag))
+		H = sfem.diag(sfem.view(H_diag))
 		op = H + lop
 
 		g_pen = (penalty_param * mass * active * dps)
-		sfem.apply_zero_constraints(fun, g_pen)
+		sfem.apply_zero_constraints(fun, sfem.view(g_pen))
 		
 		if use_cheb:
 			# Cheb
 			diag_12 = np.sqrt(fun_diag + H_diag)
-			inv_diag = sfem.diag(1./diag_12)
+			inv_diag = sfem.diag(sfem.view(1./diag_12))
 
 			r[:] = 0.
-			sfem.apply(inv_diag, (g_pen - g), r)
+			sfem.apply(inv_diag, sfem.view(g_pen - g), sfem.view(r))
 			solver.set_op(inv_diag * op * inv_diag)
 		else:
 			# CG
-			inv_diag = sfem.diag(1./(fun_diag + H_diag))
+			inv_diag = sfem.diag(sfem.view(1./(fun_diag + H_diag)))
 			solver.set_preconditioner_op(inv_diag)
 			r = g_pen - g
 			solver.set_op(op)
 
 		c[:] = 0.
-		sfem.copy_constrained_dofs(fun, r, c)
-		sfem.apply(solver, r, c)
+		sfem.copy_constrained_dofs(fun, sfem.view(r), sfem.view(c))
+		sfem.apply(solver, sfem.view(r), sfem.view(c))
 
 		if use_cheb:
-			sfem.apply(inv_diag, c, x)
+			sfem.apply(inv_diag, sfem.view(c), sfem.view(x))
 		else:
 			x += c
 
@@ -215,11 +215,11 @@ def solve_shifted_penalty(fun, contact_surf, constrained_dofs, obs, x, out):
 		if(norm_g < 1e-8):
 			break
 
-	sfem.gradient(fun, x, g)
-	sfem.write(out, "g", g)
-	sfem.write(out, "H_diag", H_diag)
-	sfem.write(out, "violation", d * active)
-	sfem.write(out, "selector", selector)
+	sfem.gradient(fun, sfem.view(x), sfem.view(g))
+	sfem.write(out, "g", sfem.view(g))
+	sfem.write(out, "H_diag", sfem.view(H_diag))
+	sfem.write(out, "violation", sfem.view(d * active))
+	sfem.write(out, "selector", sfem.view(selector))
 	return x
 
 def solve_obstacle(problem):
@@ -240,6 +240,8 @@ def solve_obstacle(problem):
 	fs = fun.space()
 	dim = m.spatial_dimension()
 	out = fun.output()
+	# Vector fields are written one component per file.
+	out.enable_AoS_to_SoA(True)
 
 	x = np.zeros(fs.n_dofs(), dtype=real_t)
 
@@ -249,6 +251,7 @@ def solve_obstacle(problem):
 	obs = np.ones(fs.n_dofs(), dtype=real_t) * 10000
 	constrained_dofs = sobstacle[:] * fs.block_size()
 
+	sx = sfem.points(m, 0)
 	sy = sfem.points(m, 1)
 
 	if m.spatial_dimension() > 2:
@@ -256,7 +259,7 @@ def solve_obstacle(problem):
 	else:
 		sz = sy * 0
 
-	sdf = problem.sdf(sy, sz)
+	sdf = problem.sdf(sx, sy, sz)
 	obs[constrained_dofs] = sdf[sobstacle]
 
 	for d in range(1, fs.block_size()):
@@ -276,7 +279,7 @@ def solve_obstacle(problem):
 
 		if matrix_free:
 			# Matrix-free
-			lop = sfem.make_op(fun, x)
+			lop = sfem.make_op(fun, sfem.view(x))
 		else:
 			# Matrix-based
 			lop = assemble_crs_spmv(fun, x)
@@ -288,13 +291,13 @@ def solve_obstacle(problem):
 
 		for i in range(0, MAX_NL_ITER):
 			obs_diff = obs - x
-			sfem.set_upper_bound(solver, obs_diff)
+			sfem.set_upper_bound(solver, sfem.view(obs_diff))
 
 			g[:] = 0.
-			sfem.gradient(fun, x, g)
+			sfem.gradient(fun, sfem.view(x), sfem.view(g))
 			
 			c[:] = 0.
-			sfem.apply(solver, -g, c)
+			sfem.apply(solver, sfem.view(-g), sfem.view(c))
 
 			x += c
 
@@ -307,8 +310,8 @@ def solve_obstacle(problem):
 	# --------------------------------------
 	# Write output
 	# --------------------------------------
-	sfem.write(out, "obs", obs)
-	sfem.write(out, "disp", x)
+	sfem.write(out, "obs", sfem.view(obs))
+	sfem.write(out, "disp", sfem.view(x))
 
 
 class Cylinder:
@@ -317,7 +320,7 @@ class Cylinder:
 		self.output_dir = './output'
 		self.op = "LinearElasticity"
 
-	def sdf(self, sy, sz):
+	def sdf(self, sx, sy, sz):
 		radius = ((0.5 - np.sqrt(sy*sy + sz*sz)))
 		f = -0.1*np.cos(np.pi*2*radius) - 0.1
 		f += -0.05*np.cos(np.pi*8*radius)
@@ -326,15 +329,14 @@ class Cylinder:
 		wall = 0.6 # The obstacle wall is a x = 0.6
 		parabola = -indentation * f + wall
 
-		sdf = (parabola - sfem.points(m, 0)).astype(real_t)
+		sdf = (parabola - sx).astype(real_t)
 		return sdf
 
 
 	def setup(self):
 		path = self.input_mesh
 		
-		m = sfem.Mesh()		
-		m.read(path)
+		m = sfem.Mesh.read(path)
 
 		if self.op == "LinearElasticity":
 			print("Setting up LinearElasticity ...")
@@ -342,16 +344,17 @@ class Cylinder:
 			fs = sfem.FunctionSpace(m, dim)
 			fun = sfem.Function(fs)
 			elasticity = sfem.create_op(fs, "LinearElasticity")
+			elasticity.initialize()
 			fun.add_operator(elasticity)
 
 			bc = sfem.DirichletConditions(fs)
 
 			sdirichlet = np.unique(np.fromfile(f'{path}/sidesets_aos/sinlet.raw', dtype=idx_t))
-			sfem.add_condition(bc, sdirichlet, 0, 0.2);
-			sfem.add_condition(bc, sdirichlet, 1, 0.0);
+			bc.add_condition(sdirichlet, 0, 0.2);
+			bc.add_condition(sdirichlet, 1, 0.0);
 
 			if dim > 2:
-				sfem.add_condition(bc, sdirichlet, 2, 0.);
+				bc.add_condition(sdirichlet, 2, 0.);
 
 			fun.add_dirichlet_conditions(bc)
 
@@ -360,6 +363,7 @@ class Cylinder:
 		else:
 			fs = sfem.FunctionSpace(m, 1)
 			laplacian = sfem.create_op(fs, "Laplacian")
+			laplacian.initialize()
 
 			fun = sfem.Function(fs)
 			fun.add_operator(laplacian)
@@ -367,7 +371,7 @@ class Cylinder:
 			bc = sfem.DirichletConditions(fs)
 
 			sdirichlet = np.unique(np.fromfile(f'{path}/sidesets_aos/sinlet.raw', dtype=idx_t))
-			sfem.add_condition(bc, sdirichlet, 0, 1);
+			bc.add_condition(sdirichlet, 0, 1);
 			fun.add_dirichlet_conditions(bc)
 
 			self.sobstacle = np.fromfile(f'{path}/sidesets_aos/soutlet.raw', dtype=idx_t)
@@ -385,14 +389,13 @@ class Box3D:
 		self.output_dir = './output'
 		self.op = "LinearElasticity"
 
-	def sdf(self, sy, sz):
+	def sdf(self, sx, sy, sz):
 		sdf = sz * 0 + 0.1
 		return sdf
 	def setup(self):
 		path = self.input_mesh
 		
-		m = sfem.Mesh()		
-		m.read(path)
+		m = sfem.Mesh.read(path)
 
 		if self.op == "LinearElasticity":
 			print("Setting up LinearElasticity ...")
@@ -400,16 +403,17 @@ class Box3D:
 			fs = sfem.FunctionSpace(m, dim)
 			fun = sfem.Function(fs)
 			elasticity = sfem.create_op(fs, "LinearElasticity")
+			elasticity.initialize()
 			fun.add_operator(elasticity)
 
 			bc = sfem.DirichletConditions(fs)
 
 			sdirichlet = np.unique(np.fromfile(f'{path}/boundary_nodes/left.int32.raw', dtype=idx_t))
-			sfem.add_condition(bc, sdirichlet, 0, 0.2);
-			sfem.add_condition(bc, sdirichlet, 1, 0.0);
+			bc.add_condition(sdirichlet, 0, 0.2);
+			bc.add_condition(sdirichlet, 1, 0.0);
 
 			if dim > 2:
-				sfem.add_condition(bc, sdirichlet, 2, 0.);
+				bc.add_condition(sdirichlet, 2, 0.);
 
 			fun.add_dirichlet_conditions(bc)
 
@@ -423,8 +427,8 @@ class Box3D:
 
 if __name__ == '__main__':
 	print(sys.argv)
-	if len(sys.argv) < 3:
-		print(f'usage: {sys.argv[0]} <case>')
+	if len(sys.argv) < 2:
+		print(f'usage: {sys.argv[0]} <case> [--problem=<op>] [--output=<dir>]')
 		exit(1)
 
 	sfem.init()
@@ -438,8 +442,8 @@ if __name__ == '__main__':
 	
 	try:
 	    opts, args = getopt.getopt(
-	        sys.argv[3:], "ho:",
-	        ["help","output="])
+	        sys.argv[2:], "hp:o:",
+	        ["help", "problem=", "output="])
 
 	except getopt.GetoptError as err:
 	    print(err)
@@ -453,7 +457,7 @@ if __name__ == '__main__':
 	    elif opt in ('-p', '--problem'):
 	     	problem.op  = arg
 	    elif opt in ('-o', '--output'):
-	      	problem.output = arg
+	      	problem.output_dir = arg
 
 	solve_obstacle(problem)
 	sfem.finalize()

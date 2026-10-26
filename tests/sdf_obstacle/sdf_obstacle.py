@@ -30,16 +30,15 @@ def create_dirichlet_conditions(fs, config):
 		if isinstance(component, list):
 			for k in range(0, len(component)):
 				print(f'{name}: {component[k]}, {value[k]}')
-				sfem.add_condition(dirichlet_conditions, idx, component[k], value[k])
+				dirichlet_conditions.add_condition(idx, component[k], value[k])
 		else:
 			print(f'{name}: {component}, {value}')
-			sfem.add_condition(dirichlet_conditions, idx, component, value)
+			dirichlet_conditions.add_condition(idx, component, value)
 
 	return dirichlet_conditions
 
 def run(config):
-	m = sfem.Mesh()
-	m.read(config['mesh'])
+	m = sfem.Mesh.read(config['mesh'])
 
 
 	dim = m.spatial_dimension()
@@ -52,6 +51,7 @@ def run(config):
 
 	fun = sfem.Function(fs)
 	op = sfem.create_op(fs, config["operator"])
+	op.initialize()
 	fun.add_operator(op)
 
 	dirichlet_conditions = create_dirichlet_conditions(fs, config['dirichlet_conditions'])
@@ -65,20 +65,22 @@ def run(config):
 	x = np.zeros(fs.n_dofs(), dtype=real_t)
 	rhs = np.zeros(fs.n_dofs(), dtype=real_t)
 	c = np.zeros(fs.n_dofs(), dtype=real_t)
+	# Buffers over the arrays: the library reads and writes them in place.
+	xb, rhsb = sfem.view(x), sfem.view(rhs)
 
 	cc = sfem.contact_conditions_from_file(fs, str(config['obstacle']))
 	
 	# Update problem with current solution and linearize
-	sfem.update(cc, x)
+	cc.update(xb)
 	
-	op = sfem.make_op(fun, x)
+	op = sfem.make_op(fun, xb)
 	g = np.zeros(fs.n_dofs(), dtype=real_t)
-	sfem.signed_distance_for_mesh_viz(cc, x, g)
-	sfem.write(out, "gap", g)
+	cc.signed_distance_for_mesh_viz(xb, sfem.view(g))
+	sfem.write(out, "gap", sfem.view(g))
 	
 	if config['solver'] == 'MPRGP':
 		upper_bound = np.ones(fs.n_dofs(), dtype=real_t) * 1000
-		sfem.signed_distance_for_mesh_viz(cc, x, upper_bound)
+		cc.signed_distance_for_mesh_viz(xb, sfem.view(upper_bound))
 
 		solver = sfem.MPRGP()
 		solver.default_init()
@@ -86,10 +88,10 @@ def run(config):
 		solver.set_rtol(1e-6);
 		solver.set_max_it(2000)
 		solver.set_op(op)
-		sfem.set_upper_bound(solver, upper_bound)
-		sfem.apply_constraints(fun, x)
-		sfem.apply_constraints(fun, rhs)
-		sfem.apply(solver, rhs, x)
+		sfem.set_upper_bound(solver, sfem.view(upper_bound))
+		sfem.apply_constraints(fun, xb)
+		sfem.apply_constraints(fun, rhsb)
+		sfem.apply(solver, rhsb, xb)
 		
 	elif config['solver'] == "SPMG":
 		spmg = sfem.create_spmg(fun, execution_space)
@@ -102,19 +104,19 @@ def run(config):
 		# spmg.set_constraints_op(cc_op, cc_op_t)
 
 		upper_bound = np.ones(fs.n_dofs(), dtype=real_t) * 1000
-		sfem.signed_distance_for_mesh_viz(cc, x, upper_bound)
+		cc.signed_distance_for_mesh_viz(xb, sfem.view(upper_bound))
 		# print(np.min(upper_bound))
 
-		sfem.set_upper_bound(spmg, upper_bound)
+		sfem.set_upper_bound(spmg, sfem.view(upper_bound))
 		
-		sfem.apply_constraints(fun, x)
-		sfem.apply_constraints(fun, rhs)
+		sfem.apply_constraints(fun, xb)
+		sfem.apply_constraints(fun, rhsb)
 		# sfem.apply(spmg, rhs, x)
 
 	elif config['solver'] == "SP":
-		sp = sfem.ShiftedPenalty()
-		sp.set_op(op)
-		sp.default_init()
+		# The constraints, their bound at the current state and the normal products, as the
+		# library builds them; the solver settings below are this case's.
+		sp = sfem.create_shifted_penalty(fun, cc)
 
 		linear_solver = sfem.ConjugateGradient()
 		linear_solver.default_init()
@@ -123,13 +125,7 @@ def run(config):
 		linear_solver.set_max_it(100)
 		sp.set_linear_solver(linear_solver)
 
-		upper_bound = np.zeros(cc.n_constrained_dofs(), dtype=real_t)
-		sfem.signed_distance(cc, x, upper_bound)
-		cc_op = cc.linear_constraints_op()
-		cc_op_t = cc.linear_constraints_op_transpose()
 		print(f'Constrained dofs {cc.n_constrained_dofs()}/{fs.n_dofs()}')
-		sp.set_constraints_op(cc_op, cc_op_t)
-		sfem.set_upper_bound(sp, upper_bound)
 
 		sp.set_max_it(40)
 		sp.set_max_inner_it(10)
@@ -137,15 +133,15 @@ def run(config):
 		sp.set_atol(1e-8)
 		sp.set_damping(0.01)
 		# sp.enable_steepest_descent(True)
-		sfem.apply_constraints(fun, x)
-		sfem.apply_constraints(fun, rhs)
+		sfem.apply_constraints(fun, xb)
+		sfem.apply_constraints(fun, rhsb)
 
 		linear_solver.set_op(op)
-		sfem.apply(linear_solver, rhs, x)
-		sfem.apply(sp, rhs, x)
+		sfem.apply(linear_solver, rhsb, xb)
+		sfem.apply(sp, rhsb, xb)
 
-	sfem.write(out, "disp", x)
-	sfem.write(out, "rhs", rhs)
+	sfem.write(out, "disp", xb)
+	sfem.write(out, "rhs", rhsb)
 
 
 if __name__ == '__main__':
