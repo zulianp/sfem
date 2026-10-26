@@ -575,7 +575,7 @@ namespace sfem {
     }  // namespace
 
     template <typename T>
-    void CUDA_MPRGP<T>::build_mprgp(struct MPRGP_Tpl<T>& tpl, const ExecutionContext& context) {
+    void GPUMPRGPKernels<T>::build_mprgp(struct MPRGPKernels<T>& tpl, const ExecutionContext& context) {
         // Every pass on the context's stream, bound here once.
         const cudaStream_t s = static_cast<cudaStream_t>(context.stream());
         tpl.project          = [s](auto&&... a) { project<T>(a..., s); };
@@ -590,7 +590,7 @@ namespace sfem {
         tpl.work_size        = WORK_SIZE;
     }
 
-    template class CUDA_MPRGP<float>;
-    template class CUDA_MPRGP<double>;
+    template class GPUMPRGPKernels<float>;
+    template class GPUMPRGPKernels<double>;
 
 }  // namespace sfem

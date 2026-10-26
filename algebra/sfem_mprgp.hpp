@@ -64,7 +64,7 @@ namespace sfem {
         // before each product.
         bool op_overwrites_{false};
         // Runs of CG steps in the execution space without returning to the host between them,
-        // where the passes take them (MPRGP_Tpl::cg_run): one rank, or the ranks of one node whose
+        // where the passes take them (MPRGPKernels::cg_run): one rank, or the ranks of one node whose
         // sums the device completes (NCCL), and a product that writes A p whole. Off, the host
         // takes each step's decision. run_state_ is the loop of this solve.
         bool                  device_runs_{true};
@@ -72,7 +72,7 @@ namespace sfem {
         int                   device_run_count_{0};
 
         std::shared_ptr<BLAS<T>> blas;
-        MPRGP_Tpl<T> impl;
+        MPRGPKernels<T> impl;
         // Under MPI (a ParallelOperator of more than one rank): the vectors are the owned prefix
         // of space-sized buffers, n_dofs the owned length, n_alloc the buffers'; every reduction
         // spans the ranks, so every branch is taken alike on all of them.
@@ -297,7 +297,7 @@ namespace sfem {
 
         void default_init() {
             blas = OpenMPBLAS<T>::create();
-            OpenMP_MPRGP<T>::build_mprgp(impl);
+            OpenMPMPRGPKernels<T>::build_mprgp(impl);
         }
 
         /// To the bound along p, then a projected step along the free gradient there (or, projected
@@ -357,7 +357,7 @@ namespace sfem {
                                 Gradients*   grads,
                                 int*         count_cg_steps,
                                 bool*        converged) {
-            using Pass                 = OpenMP_MPRGP<T>;
+            using Pass                 = OpenMPMPRGPKernels<T>;
             const T* const w           = norm_weight_ ? norm_weight_->data() : nullptr;
             T* const       part[2]     = {work, work + 4 * blas_max_chunk_count};
             const T        no_curv[4]  = {0, 0, 0, infty};
@@ -449,7 +449,7 @@ namespace sfem {
             return exit;
         }
 
-        /// The CG steps in a row in the execution space (MPRGP_Tpl::cg_run), as team_cg_steps takes
+        /// The CG steps in a row in the execution space (MPRGPKernels::cg_run), as team_cg_steps takes
         /// them on the host; false where they cannot be taken there, nothing done.
         bool device_cg_steps(T* const x, T* const g, T* const p, T* const Ap, T* const gf, T* const work, const T norm_gp0,
                              Gradients* grads, int* count_cg_steps, bool* converged, MPRGPExit* exit) {
