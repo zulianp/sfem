@@ -316,18 +316,6 @@ int sshex8_prolongate(const ptrdiff_t                   nelements,
                         }
                     }
 
-#if 0
-printf("nodal interpolation\n");
-for (int zi = 0; zi <= to_level; zi++) {
-for (int yi = 0; yi <= to_level; yi++) {
-for (int xi = 0; xi <= to_level; xi++) {
-printf("%g ", to_coeffs[d][sshex8_lidx(to_level, xi, yi, zi)]);
-}
-printf("\n");
-}
-printf("\n");
-}
-#endif
                 }
             }
 
@@ -354,18 +342,6 @@ printf("\n");
                     }
                 }
 
-#if 0
-printf("x-axis interpolation (edge)\n");
-for (int zi = 0; zi <= to_level; zi++) {
-for (int yi = 0; yi <= to_level; yi++) {
-for (int xi = 0; xi <= to_level; xi++) {
-printf("%g ", c[sshex8_lidx(to_level, xi, yi, zi)]);
-}
-printf("\n");
-}
-printf("\n");
-}
-#endif
 
                 // Interpolate the coefficients along the y-axis (edges)
                 for (int zi = 0; zi <= from_level; zi++) {
@@ -386,18 +362,6 @@ printf("\n");
                     }
                 }
 
-#if 0
-printf("y-axis interpolation (edge)\n");
-for (int zi = 0; zi <= to_level; zi++) {
-for (int yi = 0; yi <= to_level; yi++) {
-for (int xi = 0; xi <= to_level; xi++) {
-printf("%g ", c[sshex8_lidx(to_level, xi, yi, zi)]);
-}
-printf("\n");
-}
-printf("\n");
-}
-#endif
 
                 // Interpolate the coefficients along the z-axis (edges)
                 for (int zi = 0; zi < from_level; zi++) {
@@ -418,18 +382,6 @@ printf("\n");
                     }
                 }
 
-#if 0
-printf("z-axis interpolation (edge)\n");
-for (int zi = 0; zi <= to_level; zi++) {
-for (int yi = 0; yi <= to_level; yi++) {
-for (int xi = 0; xi <= to_level; xi++) {
-printf("%g ", c[sshex8_lidx(to_level, xi, yi, zi)]);
-}
-printf("\n");
-}
-printf("\n");
-}
-#endif
 
                 // Interpolate the coefficients along the x-axis (center) in the x-y-planes
                 for (int zi = 0; zi <= from_level; zi++) {
@@ -456,18 +408,6 @@ printf("\n");
                     }
                 }
 
-#if 0
-printf("xy-plane interpolation (face)\n");
-for (int zi = 0; zi <= to_level; zi++) {
-for (int yi = 0; yi <= to_level; yi++) {
-for (int xi = 0; xi <= to_level; xi++) {
-printf("%g ", c[sshex8_lidx(to_level, xi, yi, zi)]);
-}
-printf("\n");
-}
-printf("\n");
-}
-#endif
 
                 // Interpolate the coefficients along the x-axis (center) in the x-z-planes
                 for (int zi = 0; zi < from_level; zi++) {
@@ -494,18 +434,6 @@ printf("\n");
                     }
                 }
 
-#if 0
-printf("xy-plane interpolation (face)\n");
-for (int zi = 0; zi <= to_level; zi++) {
-for (int yi = 0; yi <= to_level; yi++) {
-for (int xi = 0; xi <= to_level; xi++) {
-printf("%g ", c[sshex8_lidx(to_level, xi, yi, zi)]);
-}
-printf("\n");
-}
-printf("\n");
-}
-#endif
 
                 // Interpolate the coefficients along the y-axis (center) in the y-z-planes
                 for (int zi = 0; zi < from_level; zi++) {
@@ -532,18 +460,6 @@ printf("\n");
                     }
                 }
 
-#if 0
-printf("yz-plane interpolation (face)\n");
-for (int zi = 0; zi <= to_level; zi++) {
-for (int yi = 0; yi <= to_level; yi++) {
-for (int xi = 0; xi <= to_level; xi++) {
-printf("%g ", c[sshex8_lidx(to_level, xi, yi, zi)]);
-}
-printf("\n");
-}
-printf("\n");
-}
-#endif
 
                 // Interpolate the coefficients along the x-axis (center) in the x-y-planes
                 for (int zi = 0; zi < from_level; zi++) {
@@ -572,18 +488,6 @@ printf("\n");
                     }
                 }
 
-#if 0
-printf("interpolation (volume)\n");
-for (int zi = 0; zi <= to_level; zi++) {
-for (int yi = 0; yi <= to_level; yi++) {
-for (int xi = 0; xi <= to_level; xi++) {
-printf("%g ", c[sshex8_lidx(to_level, xi, yi, zi)]);
-}
-printf("\n");
-}
-printf("\n");
-}
-#endif
             }
 
             // Scatter elemental data
