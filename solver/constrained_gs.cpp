@@ -12,7 +12,7 @@
 
 #include "dirichlet.hpp"
 
-#include "../algebra/inverse.cpp"
+#include "../algebra/sfem_inverse.cpp"
 #include "sfem_base.hpp"
 
 static SFEM_INLINE real_t atomic_read(const real_t *p) {

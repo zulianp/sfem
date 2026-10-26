@@ -11,7 +11,7 @@
 
 #include "dirichlet.hpp"
 
-#include "inverse.cpp"
+#include "sfem_inverse.cpp"
 #include "sfem_base.hpp"
 
 #define MAX_BLOCK_SIZE 4

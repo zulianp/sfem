@@ -4,7 +4,7 @@
 #include <stdio.h>
 
 #include "sfem_base.hpp"
-#include "sortreduce.hpp"
+#include "sfem_sortreduce.hpp"
 
 #include "tri3_inline_cpu.hpp"
 #include "tri3_laplacian_inline_cpu.hpp"

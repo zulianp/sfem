@@ -21,7 +21,7 @@
 #include "smesh_sstet4.hpp"
 #include "smesh_sstri_restriction.hpp"
 
-#include "lumped_ptdp.hpp"
+#include "sfem_lumped_galerkin.hpp"
 
 #include "smesh_device_buffer.hpp"
 #include "smesh_exchange.hpp"

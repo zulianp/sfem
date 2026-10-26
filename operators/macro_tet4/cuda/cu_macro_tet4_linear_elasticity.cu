@@ -7,7 +7,7 @@
 #include "sfem_base.hpp"
 #include "sfem_defs.hpp"
 #include "sfem_vec.hpp"
-#include "sortreduce.hpp"
+#include "sfem_sortreduce.hpp"
 
 #include "sfem_cuda_base.hpp"
 

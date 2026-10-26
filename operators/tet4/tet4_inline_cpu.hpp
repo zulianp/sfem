@@ -4,7 +4,7 @@
 #include "operator_inline_cpu.hpp"
 
 #include <assert.h>
-#include "sortreduce.hpp"
+#include "sfem_sortreduce.hpp"
 
 #ifndef POW2
 #define POW2(a) ((a) * (a))

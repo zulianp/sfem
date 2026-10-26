@@ -42,9 +42,9 @@
 #include "smesh_sstet4_prolongation.hpp"
 
 // C++ includes
-#include "acrs.hpp"
-#include "scrs.hpp"
-#include "sdacrs.hpp"
+#include "sfem_ACRS.hpp"
+#include "sfem_SCRS.hpp"
+#include "sfem_SDACRS.hpp"
 #include "sfem_Chebyshev3.hpp"
 #include "sfem_ContactConditions.hpp"
 
@@ -56,7 +56,7 @@
 #include "smesh_env.hpp"
 #include "smesh_exchange.hpp"
 
-#include "sell.hpp"
+#include "sfem_sell_spmv.hpp"
 #include "sfem_BSR.hpp"
 #include "sfem_BSRTangent.hpp"
 #include "sfem_CRS.hpp"

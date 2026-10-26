@@ -10,7 +10,7 @@
 
 #include "sfem_macros.hpp"
 #include "sfem_vec.hpp"
-#include "sortreduce.hpp"
+#include "sfem_sortreduce.hpp"
 
 #include "hex8_inline_cpu.hpp"
 #include "line_quadrature.hpp"

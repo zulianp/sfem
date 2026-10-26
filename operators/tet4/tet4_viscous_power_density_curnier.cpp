@@ -8,7 +8,7 @@
 
 // 
 // #include "sfem_vec.hpp"
-// #include "sortreduce.hpp"
+// #include "sfem_sortreduce.hpp"
 
 // static SFEM_INLINE void viscous_power_density_curnier_value(const real_t mu,
 //                                                             const real_t lambda,

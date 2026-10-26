@@ -1,4 +1,4 @@
-#include "lumped_ptdp.hpp"
+#include "sfem_lumped_galerkin.hpp"
 
 namespace sfem {
 

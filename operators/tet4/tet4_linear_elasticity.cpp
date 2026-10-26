@@ -4,7 +4,7 @@
 
 #include <mpi.h>
 
-#include "sortreduce.hpp"
+#include "sfem_sortreduce.hpp"
 
 #include "hex8_linear_elasticity_inline_cpu.hpp"
 #include "sfem_vec.hpp"

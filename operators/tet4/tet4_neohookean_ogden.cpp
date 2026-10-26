@@ -7,7 +7,7 @@
 #include <mpi.h>
 
 
-#include "sortreduce.hpp"
+#include "sfem_sortreduce.hpp"
 
 #include "sfem_vec.hpp"
 #include "tet4_neohookean_ogden_inline_cpu.hpp"
