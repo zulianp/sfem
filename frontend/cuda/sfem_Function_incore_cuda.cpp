@@ -321,7 +321,7 @@ namespace sfem {
             std::shared_ptr<Buffer<idx_t *>>    elements;
             std::shared_ptr<Buffer<jacobian_t>> fff;
 
-            ptrdiff_t nelements() const {
+            ptrdiff_t n_elements() const {
                 assert(elements);
                 return elements->extent(1);
             }
@@ -373,7 +373,7 @@ namespace sfem {
             /// corners, which the isoparametric kernels evaluate the Jacobian from (null otherwise).
             std::shared_ptr<Buffer<geom_t>> corners;
 
-            ptrdiff_t nelements() const {
+            ptrdiff_t n_elements() const {
                 assert(elements);
                 return elements->extent(1);
             }
@@ -643,9 +643,9 @@ namespace sfem {
                 }
 
                 return cu_laplacian_crs(domain.element_type,
-                                        op_data->nelements(),
+                                        op_data->n_elements(),
                                         op_data->elements->data(),
-                                        op_data->nelements(),
+                                        op_data->n_elements(),
                                         op_data->fff_data(),
                                         rowptr,
                                         colidx,
@@ -659,9 +659,9 @@ namespace sfem {
             return iterate([&](const OpDomain &domain) {
                 auto op_data = std::static_pointer_cast<GPULaplacianOpData>(domain.user_data);
                 return cu_laplacian_diag(domain.element_type,
-                                         op_data->nelements(),
+                                         op_data->n_elements(),
                                          op_data->elements->data(),
-                                         op_data->nelements(),
+                                         op_data->n_elements(),
                                          op_data->fff_data(),
                                          real_type,
                                          values,
@@ -716,7 +716,7 @@ namespace sfem {
             if (range.empty()) {
                 return SFEM_SUCCESS;
             }
-            const ptrdiff_t n_block = op_data->nelements();
+            const ptrdiff_t n_block = op_data->n_elements();
             if (range.begin < 0 || range.end > n_block) {
                 SFEM_ERROR("GPULaplacian: block ElementRange out of bounds\n");
                 return SFEM_FAILURE;
@@ -766,9 +766,9 @@ namespace sfem {
                 }
 
                 return cu_laplacian_crs_sym(domain.element_type,
-                                            op_data->nelements(),
+                                            op_data->n_elements(),
                                             op_data->elements->data(),
-                                            op_data->nelements(),
+                                            op_data->n_elements(),
                                             op_data->fff_data(),
                                             rowptr,
                                             colidx,
@@ -975,9 +975,9 @@ namespace sfem {
                 auto lambda    = domain.parameters->require_real_value("lambda");
 
                 return cu_linear_elasticity_bsr(domain.element_type,
-                                                domain_op->nelements(),
+                                                domain_op->n_elements(),
                                                 domain_op->elements->data(),
-                                                domain_op->nelements(),
+                                                domain_op->n_elements(),
                                                 domain_op->jacobian_adjugate->data(),
                                                 domain_op->jacobian_determinant->data(),
                                                 mu,
@@ -999,9 +999,9 @@ namespace sfem {
 
                 if (const geom_t *const corners = isoparametric_corners(domain)) {
                     return cu_sshex8_linear_elasticity_diag(smesh::semistructured_level(domain.element_type),
-                                                            domain_op->nelements(),
+                                                            domain_op->n_elements(),
                                                             domain_op->elements->data(),
-                                                            domain_op->nelements(),
+                                                            domain_op->n_elements(),
                                                             corners,
                                                             mu,
                                                             lambda,
@@ -1014,9 +1014,9 @@ namespace sfem {
                 }
 
                 return cu_linear_elasticity_diag(domain.element_type,
-                                                 domain_op->nelements(),
+                                                 domain_op->n_elements(),
                                                  domain_op->elements->data(),
-                                                 domain_op->nelements(),
+                                                 domain_op->n_elements(),
                                                  domain_op->jacobian_adjugate->data(),
                                                  domain_op->jacobian_determinant->data(),
                                                  mu,
@@ -1037,9 +1037,9 @@ namespace sfem {
 
                 if (const geom_t *const corners = isoparametric_corners(domain)) {
                     return cu_sshex8_linear_elasticity_apply(smesh::semistructured_level(domain.element_type),
-                                                             domain_op->nelements(),
+                                                             domain_op->n_elements(),
                                                              domain_op->elements->data(),
-                                                             domain_op->nelements(),
+                                                             domain_op->n_elements(),
                                                              corners,
                                                              mu,
                                                              lambda,
@@ -1056,9 +1056,9 @@ namespace sfem {
                 }
 
                 return cu_linear_elasticity_apply(domain.element_type,
-                                                  domain_op->nelements(),
+                                                  domain_op->n_elements(),
                                                   domain_op->elements->data(),
-                                                  domain_op->nelements(),
+                                                  domain_op->n_elements(),
                                                   domain_op->jacobian_adjugate->data(),
                                                   domain_op->jacobian_determinant->data(),
                                                   mu,
@@ -1080,9 +1080,9 @@ namespace sfem {
 
                 if (const geom_t *const corners = isoparametric_corners(domain)) {
                     return cu_sshex8_linear_elasticity_apply(smesh::semistructured_level(domain.element_type),
-                                                             domain_op->nelements(),
+                                                             domain_op->n_elements(),
                                                              domain_op->elements->data(),
-                                                             domain_op->nelements(),
+                                                             domain_op->n_elements(),
                                                              corners,
                                                              mu,
                                                              lambda,
@@ -1099,9 +1099,9 @@ namespace sfem {
                 }
 
                 return cu_linear_elasticity_apply(domain.element_type,
-                                                  domain_op->nelements(),
+                                                  domain_op->n_elements(),
                                                   domain_op->elements->data(),
-                                                  domain_op->nelements(),
+                                                  domain_op->n_elements(),
                                                   domain_op->jacobian_adjugate->data(),
                                                   domain_op->jacobian_determinant->data(),
                                                   mu,
@@ -1122,9 +1122,9 @@ namespace sfem {
 
                 if (const geom_t *const corners = isoparametric_corners(domain)) {
                     return cu_sshex8_linear_elasticity_block_diag_sym(smesh::semistructured_level(domain.element_type),
-                                                                      domain_op->nelements(),
+                                                                      domain_op->n_elements(),
                                                                       domain_op->elements->data(),
-                                                                      domain_op->nelements(),
+                                                                      domain_op->n_elements(),
                                                                       corners,
                                                                       mu,
                                                                       lambda,
@@ -1140,9 +1140,9 @@ namespace sfem {
                 }
 
                 return cu_linear_elasticity_block_diag_sym_aos(domain.element_type,
-                                                               domain_op->nelements(),
+                                                               domain_op->n_elements(),
                                                                domain_op->elements->data(),
-                                                               domain_op->nelements(),
+                                                               domain_op->n_elements(),
                                                                domain_op->jacobian_adjugate->data(),
                                                                domain_op->jacobian_determinant->data(),
                                                                mu,
