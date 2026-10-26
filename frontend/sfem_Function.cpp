@@ -1010,11 +1010,20 @@ namespace sfem {
         for (int np = 0; np < n_files; np++) {
             printf("%s\n", files[np].c_str());
 
-            char path[1024 * 10];
-            snprintf(path, sizeof(path), "%s/i%d.raw", folder, np);
+            // i<np>.raw, or i<np>.<type>.raw (file_name drops the .raw): a named type is converted from.
+            char plain[1024 * 10];
+            char typed[1024 * 10];
+            snprintf(plain, sizeof(plain), "i%d", np);
+            snprintf(typed, sizeof(typed), "i%d.", np);
+            std::string path;
+            for (const auto &f : files) {
+                const std::string name = smesh::Path(f).file_name();
+                if (name == plain || name.rfind(typed, 0) == 0) path = f;
+            }
 
             idx_t *idx = 0;
-            err |= (smesh::array_read_convert_from_extension<idx_t>(smesh::Path(path), &idx, &local_size) != SMESH_SUCCESS);
+            err |= path.empty() ||
+                   (smesh::array_read_convert_from_extension<idx_t>(smesh::Path(path), &idx, &local_size) != SMESH_SUCCESS);
 
             data[np] = idx;
         }
