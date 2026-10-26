@@ -6,12 +6,14 @@
 #include "boundary_condition.hpp"
 #include "sfem_base.hpp"
 
+namespace sfem {
+    /// The condition with its indices and values copied to the device (d_destroy_conditions frees them).
+    boundary_condition_t to_device(const boundary_condition_t &host);
+}  // namespace sfem
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-void boundary_conditions_host_to_device(const boundary_condition_t *const host,
-                                        boundary_condition_t *const device);
 
 void d_constraint_nodes_copy_vec(const ptrdiff_t n_dirichlet_nodes,
                                  const idx_t    *dirichlet_nodes,

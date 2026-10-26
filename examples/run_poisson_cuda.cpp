@@ -138,8 +138,7 @@ int main(int argc, char *argv[]) {
             (boundary_condition_t *)malloc(n_dirichlet_conditions * sizeof(boundary_condition_t));
 
         for (int d = 0; d < n_dirichlet_conditions; d++) {
-            boundary_conditions_host_to_device(&h_dirichlet_conditions[d],
-                                               &d_dirichlet_conditions[d]);
+            d_dirichlet_conditions[d] = sfem::to_device(h_dirichlet_conditions[d]);
         }
 
         destroy_conditions(n_dirichlet_conditions, h_dirichlet_conditions);

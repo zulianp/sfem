@@ -3,30 +3,29 @@
 #include "cu_boundary_condition.hpp"
 #include "sfem_cuda_base.hpp"
 
-extern "C" {
+namespace sfem {
+    boundary_condition_t to_device(const boundary_condition_t &host) {
+        boundary_condition_t device;
+        device.local_size  = host.local_size;
+        device.global_size = host.global_size;
+        device.component   = host.component;
+        device.value       = host.value;
 
-void boundary_conditions_host_to_device(const boundary_condition_t *const host,
-                                        boundary_condition_t *const device) {
-    device->local_size = host->local_size;
-    device->global_size = host->global_size;
-    device->component = host->component;
-    device->value = host->value;
+        // Copy indices
+        SFEM_CUDA_CHECK(cudaMalloc(&device.idx, device.local_size * sizeof(idx_t)));
+        SFEM_CUDA_CHECK(cudaMemcpy(device.idx, host.idx, device.local_size * sizeof(idx_t), cudaMemcpyHostToDevice));
 
-    // Copy indices
-    SFEM_CUDA_CHECK(cudaMalloc(&device->idx, device->local_size * sizeof(idx_t)));
-    SFEM_CUDA_CHECK(cudaMemcpy(
-            device->idx, host->idx, device->local_size * sizeof(idx_t), cudaMemcpyHostToDevice));
-
-    if (host->values) {
-        SFEM_CUDA_CHECK(cudaMalloc(&device->values, device->local_size * sizeof(real_t)));
-        SFEM_CUDA_CHECK(cudaMemcpy(device->values,
-                                   host->values,
-                                   device->local_size * sizeof(real_t),
-                                   cudaMemcpyHostToDevice));
-    } else {
-        device->values = nullptr;
+        if (host.values) {
+            SFEM_CUDA_CHECK(cudaMalloc(&device.values, device.local_size * sizeof(real_t)));
+            SFEM_CUDA_CHECK(cudaMemcpy(device.values, host.values, device.local_size * sizeof(real_t), cudaMemcpyHostToDevice));
+        } else {
+            device.values = nullptr;
+        }
+        return device;
     }
-}
+}  // namespace sfem
+
+extern "C" {
 
 __global__ void constraint_nodes_copy_vec_kernel(const ptrdiff_t n_dirichlet_nodes,
                                                  const idx_t *dirichlet_nodes,

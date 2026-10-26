@@ -24,7 +24,7 @@ namespace sfem {
                     (boundary_condition_t *)malloc(n_conditions * sizeof(boundary_condition_t));
 
             for (int d = 0; d < n_conditions; d++) {
-                boundary_conditions_host_to_device(&h_buffer[d], &conditions[d]);
+                conditions[d] = sfem::to_device(h_buffer[d]);
             }
         }
 
