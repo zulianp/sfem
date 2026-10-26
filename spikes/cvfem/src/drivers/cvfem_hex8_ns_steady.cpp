@@ -231,7 +231,7 @@ int main(int argc, char **argv) {
                     d.packed ? "packed SIMD sumfact" : "atomic sumfact");
     }
 
-    auto blas = sfem::make_openmp_blas<scalar_t>();
+    auto blas = sfem::OpenMPBLAS<scalar_t>::create();
 
     scalar_t rho_lin = rho;
     std::shared_ptr<sfem::Operator<scalar_t>> A_bsr;

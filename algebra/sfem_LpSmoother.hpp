@@ -17,7 +17,7 @@ namespace sfem {
         SharedBuffer<T> inv_diag;
 
         void default_init() {
-            blas = make_openmp_blas<T>();
+            blas = OpenMPBLAS<T>::create();
         }
 
         /* Operator */

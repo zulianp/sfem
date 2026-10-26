@@ -15,10 +15,10 @@ namespace sfem {
         SFEM_UNUSED(context);
 #ifdef SFEM_ENABLE_CUDA
         if (context.space() == EXECUTION_SPACE_DEVICE) {
-            return make_cuda_blas<T>(context);
+            return GPUBLAS<T>::create(context);
         }
 #endif  // SFEM_ENABLE_CUDA
-        return make_openmp_blas<T>();
+        return OpenMPBLAS<T>::create();
     }
 
     template std::shared_ptr<BLAS<float>>  blas<float>(const ExecutionContext &);

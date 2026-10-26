@@ -147,7 +147,7 @@ namespace sfem {
             assert(bsr_->rows() == bsr_->cols());
             assert(bsr_->block_size() >= 1 && bsr_->block_size() <= MAX_BLOCK_SIZE);
 
-            blas_ = make_openmp_blas<T>();
+            blas_ = OpenMPBLAS<T>::create();
             build_inv_diag();
         }
 

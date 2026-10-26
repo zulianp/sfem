@@ -67,7 +67,7 @@ namespace sfem {
         void set_dtol(const T val) { dtol = val; }
 
         void default_init() {
-            blas = make_openmp_blas<T>();
+            blas = OpenMPBLAS<T>::create();
         }
 
         bool good() const {

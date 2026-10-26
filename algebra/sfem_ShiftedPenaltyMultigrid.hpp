@@ -450,7 +450,7 @@ namespace sfem {
         void add_level_apply_zero_constraints(const std::function<void(T* const)>& fn) { apply_zero_constraints_.push_back(fn); }
 
         void default_init() {
-            blas_ = make_openmp_blas<T>();
+            blas_ = OpenMPBLAS<T>::create();
             OpenMP_ShiftedPenalty<T>::build(impl_);
         }
 

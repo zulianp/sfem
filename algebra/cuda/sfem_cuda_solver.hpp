@@ -15,7 +15,7 @@ namespace sfem {
     template <typename T>
     std::shared_ptr<ConjugateGradient<T>> d_cg(const ExecutionContext& context = ExecutionContext::device()) {
         auto cg              = std::make_shared<ConjugateGradient<T>>();
-        cg->blas             = make_cuda_blas<T>(context);
+        cg->blas             = GPUBLAS<T>::create(context);
         CUDA_CG<T>::build(cg->impl, context);
         return cg;
     }
@@ -23,7 +23,7 @@ namespace sfem {
     template <typename T>
     std::shared_ptr<BiCGStab<T>> d_bcgs() {
         auto cg = std::make_shared<BiCGStab<T>>();
-        cg->blas = make_cuda_blas<T>();
+        cg->blas = GPUBLAS<T>::create();
         return cg;
     }
 
@@ -33,7 +33,7 @@ namespace sfem {
         ret->n_dofs = op->rows();
         ret->set_op(op);
 
-        ret->blas = make_cuda_blas<T>();
+        ret->blas = GPUBLAS<T>::create();
         ret->ensure_power_method();
         return ret;
     }
@@ -41,7 +41,7 @@ namespace sfem {
     template <typename T>
     std::shared_ptr<Multigrid<T>> d_mg() {
         auto mg = std::make_shared<Multigrid<T>>();
-        mg->blas() = make_cuda_blas<T>();
+        mg->blas() = GPUBLAS<T>::create();
         return mg;
     }
     

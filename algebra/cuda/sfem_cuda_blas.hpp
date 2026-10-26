@@ -58,6 +58,10 @@ namespace sfem {
     public:
         explicit GPUBLAS(const ExecutionContext& context) : BLAS<T>(context) {}
 
+        static std::shared_ptr<GPUBLAS<T>> create(const ExecutionContext& context = ExecutionContext::device()) {
+            return std::make_shared<GPUBLAS<T>>(context);
+        }
+
         T* allocate(const std::size_t n) override;
         void destroy(void* a) override;
 
@@ -76,11 +80,6 @@ namespace sfem {
         void zaxpby(const ptrdiff_t n, const T alpha, const T* const x, const T beta, const T* const y, T* const z) override;
         void xypaz(const ptrdiff_t n, const T* const x, const T* const y, const T alpha, T* const z) override;
     };
-
-    template <typename T>
-    std::shared_ptr<BLAS<T>> make_cuda_blas(const ExecutionContext& context = ExecutionContext::device()) {
-        return std::make_shared<GPUBLAS<T>>(context);
-    }
 
     void device_synchronize();
     bool is_ptr_device(const void* ptr);

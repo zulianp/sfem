@@ -23,7 +23,7 @@ namespace sfem {
         T                          relaxation_parameter{0.3};
 
         void default_init() {
-            blas = make_openmp_blas<T>();
+            blas = OpenMPBLAS<T>::create();
         }
 
         void set_relaxation_parameter(const T relaxation) {
@@ -88,7 +88,7 @@ namespace sfem {
         bool                            sparse_update_policy_logged_{false};
 
         void default_init() {
-            blas = make_openmp_blas<T>();
+            blas = OpenMPBLAS<T>::create();
             ShiftableBlockSymJacobi_OpenMP<T>::build(block_size, impl);
         }
 

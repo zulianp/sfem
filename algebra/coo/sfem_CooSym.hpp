@@ -29,7 +29,7 @@ namespace sfem {
         SharedBuffer<T> diag_values;
 
         void default_init() {
-            blas = make_openmp_blas<T>();
+            blas = OpenMPBLAS<T>::create();
             apply_ = [=](const T* const x, T* const y) { return coo_sym_spmv_(x, y); };
         }
 
