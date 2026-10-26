@@ -16,6 +16,8 @@ namespace sfem {
         std::shared_ptr<FunctionSpace> space();
 
         static std::shared_ptr<AxisAlignedContactConditions> create_from_env(const std::shared_ptr<FunctionSpace> &space);
+        /// create_from_env, moved to the device for EXECUTION_SPACE_DEVICE.
+        static std::shared_ptr<Constraint> create_from_env(const std::shared_ptr<FunctionSpace> &space, const ExecutionSpace es);
         int                                                  apply(real_t *const x) override;
         int                                                  apply_value(const real_t value, real_t *const x) override;
         int copy_constrained_dofs(const real_t *const src, real_t *const dest) override;
@@ -132,8 +134,10 @@ namespace sfem {
     };
 
     /// AxisAlignedContactConditions::create_from_env, moved to the device for EXECUTION_SPACE_DEVICE.
-    std::shared_ptr<Constraint> create_contact_conditions_from_env(const std::shared_ptr<FunctionSpace> &space,
-                                                                   const ExecutionSpace                  es);
+    inline std::shared_ptr<Constraint> create_contact_conditions_from_env(const std::shared_ptr<FunctionSpace> &space,
+                                                                          const ExecutionSpace                  es) {
+        return AxisAlignedContactConditions::create_from_env(space, es);
+    }
 }  // namespace sfem
 
 #endif  // SFEM_CONTACT_CONDITIONS_HPP

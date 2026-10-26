@@ -740,7 +740,7 @@ namespace sfem {
 
     std::shared_ptr<Buffer<idx_t *>> SSMeshContactSurface::semi_structured_elements() { return impl_->semi_structured_sides; }
 
-    std::shared_ptr<ContactSurface> create_contact_surface(const std::shared_ptr<FunctionSpace>        &space,
+    std::shared_ptr<ContactSurface> ContactSurface::create(const std::shared_ptr<FunctionSpace>        &space,
                                                            const std::vector<std::shared_ptr<Sideset>> &sidesets,
                                                            const enum ExecutionSpace                    es) {
         assert(es == sfem::EXECUTION_SPACE_HOST);
