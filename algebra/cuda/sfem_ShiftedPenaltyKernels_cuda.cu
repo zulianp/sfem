@@ -5,10 +5,10 @@
 #include <functional>
 
 #include "sfem_base.hpp"
-#include "sfem_cuda_ShiftedPenalty_impl.hpp"
+#include "sfem_ShiftedPenaltyKernels_cuda.hpp"
 
 #include "sfem_cuda_base.hpp"
-#include "sfem_cuda_reduction_scratch.hpp"
+#include "sfem_reduction_scratch_cuda.hpp"
 
 #define SFEM_N_WARPS_PER_BLOCK 8
 

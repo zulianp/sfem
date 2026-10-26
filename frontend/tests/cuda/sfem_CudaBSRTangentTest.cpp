@@ -5,7 +5,7 @@
 #include <cmath>
 
 #include "sfem_BSRTangent.hpp"
-#include "sfem_cuda_BSR.hpp"
+#include "sfem_BSR_cuda.hpp"
 #include "../sfem_elasticity_test_problem.hpp"
 #include "sfem_test.hpp"
 

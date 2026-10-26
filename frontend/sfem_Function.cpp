@@ -17,7 +17,7 @@
 #include "smesh_mesh.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
-#include "sfem_cuda_blas.hpp"
+#include "sfem_BLAS_cuda.hpp"
 #endif
 
 #include "boundary_condition.hpp"

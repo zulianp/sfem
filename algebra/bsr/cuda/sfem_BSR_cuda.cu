@@ -1,11 +1,11 @@
-#include "sfem_cuda_BSR.hpp"
+#include "sfem_BSR_cuda.hpp"
 
 #include "sfem_base.hpp"
 #include "sfem_cuda_base.hpp"
 
 #include <algorithm>
 
-#include "sfem_cuda_reduction_scratch.hpp"
+#include "sfem_reduction_scratch_cuda.hpp"
 
 
 namespace sfem {

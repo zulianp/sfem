@@ -5,8 +5,8 @@
 #include "sfem_Multigrid.hpp"
 #include "sfem_bcgs.hpp"
 #include "sfem_cg.hpp"
-#include "sfem_cuda_blas.hpp"
-#include "sfem_cuda_cg_impl.hpp"
+#include "sfem_BLAS_cuda.hpp"
+#include "sfem_ConjugateGradientKernels_cuda.hpp"
 
 #include <map>
 #include <memory>

@@ -1,8 +1,8 @@
-#include "sfem_cuda_cg_impl.hpp"
+#include "sfem_ConjugateGradientKernels_cuda.hpp"
 
 #include "sfem_base.hpp"
 #include "sfem_cuda_base.hpp"
-#include "sfem_cuda_reduction_scratch.hpp"
+#include "sfem_reduction_scratch_cuda.hpp"
 
 #include <algorithm>
 #include <cassert>

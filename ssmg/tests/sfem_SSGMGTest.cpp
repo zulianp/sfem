@@ -16,8 +16,8 @@
 
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_Function_incore_cuda.hpp"
-#include "sfem_cuda_blas.hpp"
-#include "sfem_cuda_solver.hpp"
+#include "sfem_BLAS_cuda.hpp"
+#include "sfem_solver_cuda.hpp"
 #endif
 
 #ifdef _OPENMP

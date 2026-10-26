@@ -1,7 +1,7 @@
 #include "sfem_Chebyshev3.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
-#include "sfem_cuda_solver.hpp"
+#include "sfem_solver_cuda.hpp"
 #endif
 
 

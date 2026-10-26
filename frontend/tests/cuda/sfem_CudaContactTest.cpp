@@ -19,9 +19,9 @@
 #include "sfem_ShiftedPenaltyMultigrid.hpp"
 #include "sfem_aliases.hpp"
 #include "sfem_CRS.hpp"
-#include "sfem_cuda_ShiftedPenalty_impl.hpp"
-#include "sfem_cuda_blas.hpp"
-#include "sfem_cuda_solver.hpp"
+#include "sfem_ShiftedPenaltyKernels_cuda.hpp"
+#include "sfem_BLAS_cuda.hpp"
+#include "sfem_solver_cuda.hpp"
 
 
 using namespace sfem;

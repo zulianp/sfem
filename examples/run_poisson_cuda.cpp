@@ -29,7 +29,7 @@
 
 #include <vector>
 
-#include "sfem_cuda_blas.hpp"
+#include "sfem_BLAS_cuda.hpp"
 
 template <typename T>
 void sfem_cuda_init_solver(sfem::ConjugateGradient<T> &cg) {

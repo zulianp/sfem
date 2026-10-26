@@ -1,8 +1,8 @@
 #include "sfem_mprgp.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
-#include "sfem_cuda_blas.hpp"
-#include "sfem_cuda_mprgp_impl.hpp"
+#include "sfem_BLAS_cuda.hpp"
+#include "sfem_MPRGPKernels_cuda.hpp"
 #endif
 
 

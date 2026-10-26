@@ -1,9 +1,9 @@
 
-#include "sfem_cuda_blas.hpp"
-#include "sfem_cuda_blas.hpp"
+#include "sfem_BLAS_cuda.hpp"
+#include "sfem_BLAS_cuda.hpp"
 
 #include "sfem_cuda_base.hpp"
-#include "sfem_cuda_reduction_scratch.hpp"
+#include "sfem_reduction_scratch_cuda.hpp"
 
 #include <algorithm>
 #include <cassert>

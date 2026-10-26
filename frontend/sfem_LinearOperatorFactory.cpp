@@ -15,7 +15,7 @@
 #include "smesh_env.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
-#include "sfem_cuda_crs_SpMV.hpp"
+#include "sfem_crs_spmv_cuda.hpp"
 #include "smesh_device_buffer.hpp"
 #endif
 

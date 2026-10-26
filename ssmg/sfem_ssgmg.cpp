@@ -6,7 +6,7 @@
 #include "sfem_Multigrid.hpp"
 #include "smesh_env.hpp"
 #ifdef SFEM_ENABLE_CUDA
-#include "sfem_cuda_blas.hpp"
+#include "sfem_BLAS_cuda.hpp"
 #endif
 
 namespace sfem {

@@ -4,7 +4,7 @@
 #include "sfem_blas_factory.hpp"
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_Function_incore_cuda.hpp"
-#include "sfem_cuda_crs_SpMV.hpp"
+#include "sfem_crs_spmv_cuda.hpp"
 #endif
 #include "sfem_BSR.hpp"
 #include "sfem_Function.hpp"
@@ -12,7 +12,7 @@
 #include "sfem_TangentValues.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
-#include "sfem_cuda_BSR.hpp"
+#include "sfem_BSR_cuda.hpp"
 #endif
 
 #include <algorithm>

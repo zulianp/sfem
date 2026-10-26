@@ -15,7 +15,7 @@
 #include "smesh_path.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
-#include "sfem_cuda_crs_SpMV.hpp"
+#include "sfem_crs_spmv_cuda.hpp"
 #endif
 
 static ptrdiff_t crs_num_cols(const sfem::SharedBuffer<sfem::idx_t>& colidx) {

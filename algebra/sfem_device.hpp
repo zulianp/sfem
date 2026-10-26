@@ -5,7 +5,7 @@
 
 // Device queries that compile in every build: the CUDA ones, or host stand-ins.
 #ifdef SFEM_ENABLE_CUDA
-#include "sfem_cuda_blas.hpp"
+#include "sfem_BLAS_cuda.hpp"
 #else
 namespace sfem {
     static inline void device_synchronize() {}

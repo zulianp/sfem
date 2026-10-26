@@ -2,7 +2,7 @@
 
 #include "sfem_cuda_base.hpp"
 #include "sfem_TangentValues.hpp"
-#include "sfem_cuda_max.hpp"
+#include "sfem_max_cuda.hpp"
 #include "sfem_node_obstacle_kernels.hpp"
 
 namespace sfem {

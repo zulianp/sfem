@@ -1,4 +1,4 @@
-#include "sfem_cuda_ShiftableJacobi.hpp"
+#include "sfem_ShiftableBlockSymJacobiKernels_cuda.hpp"
 
 #include "sfem_base.hpp"
 #include "sfem_cuda_base.hpp"

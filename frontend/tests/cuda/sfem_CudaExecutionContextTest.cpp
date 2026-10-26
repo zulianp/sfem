@@ -14,7 +14,7 @@
 #include <cuda_runtime.h>
 
 #include "sfem_API.hpp"
-#include "sfem_cuda_blas.hpp"
+#include "sfem_BLAS_cuda.hpp"
 #include "sfem_test.hpp"
 
 namespace {

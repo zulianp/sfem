@@ -9,7 +9,7 @@
 #include "sfem_blas_factory.hpp"
 #include "sfem_mprgp.hpp"
 #ifdef SFEM_ENABLE_CUDA
-#include "sfem_cuda_blas.hpp"
+#include "sfem_BLAS_cuda.hpp"
 #endif
 #include "sfem_BSRTangent.hpp"
 #include "sfem_Function.hpp"

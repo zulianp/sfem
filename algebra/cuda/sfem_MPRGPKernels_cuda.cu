@@ -1,5 +1,5 @@
 #include "sfem_base.hpp"
-#include "sfem_cuda_mprgp_impl.hpp"
+#include "sfem_MPRGPKernels_cuda.hpp"
 
 #include "sfem_cuda_base.hpp"
 #include "sfem_mprgp_bounds.hpp"
