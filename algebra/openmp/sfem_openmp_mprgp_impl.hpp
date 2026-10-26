@@ -50,9 +50,8 @@ namespace sfem {
     /// that is not a step (its record and A p stand, for the expansion), or with the solve over
     /// (converged, or max_it). `ran` false: the run could not be taken there, and nothing was done.
     struct MPRGPRunResult {
-        enum Exit { PROPORTIONING = 1, NOT_A_STEP = 2, DONE = 3 };
-        bool ran{false};
-        Exit exit{DONE};
+        bool      ran{false};
+        MPRGPExit exit{MPRGPExit::DONE};
         int  iterations{0};
         int  steps{0};
         bool converged{false};
@@ -80,7 +79,7 @@ namespace sfem {
 
         /// Along d, with Ad = A d: the record's d.Ad, d.d, g.d and the longest feasible step
         /// x - alpha d (infty when no bound limits it), completed over the ranks by `reduce`; then
-        /// the decision, which takes final sums (MPRGP_DECIDE_NONE where they are summed over the
+        /// the decision, which takes final sums (MPRGPDecision::NONE where they are summed over the
         /// ranks afterwards).
         std::function<void(const ptrdiff_t           n,
                            const T* const            lb,
@@ -360,7 +359,7 @@ namespace sfem {
                          T* const        work,
                          const MPRGPReduce<T>& reduce) {
             MPRGPControl<T>& c = record(control);
-            if (d && c.move != T(MPRGP_MOVE_STEP)) return;
+            if (d && c.move != T(MPRGPMove::STEP)) return;
             const T alpha = c.alpha;
             with_mprgp_bounds(lb, ub, [&](const auto b) {
                 T v[4];
@@ -423,7 +422,7 @@ namespace sfem {
             // one region takes it.
             tpl.update_direction = [](const ptrdiff_t n, const T* const gf, T* const p, const T* const control) {
                 const MPRGPControl<T>& c = *reinterpret_cast<const MPRGPControl<T>*>(control);
-                if (c.move != T(MPRGP_MOVE_STEP)) return;
+                if (c.move != T(MPRGPMove::STEP)) return;
 #pragma omp parallel
                 {
                     const Team team = Team::current(n);

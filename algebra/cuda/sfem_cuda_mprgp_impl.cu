@@ -122,7 +122,7 @@ namespace sfem {
             bool along, cg;
             __device__ void operator()(const T (&v)[N_VALUES]) const {
                 MPRGPControl<T>& c = record(control);
-                if (along && c.move != T(MPRGP_MOVE_STEP)) return;
+                if (along && c.move != T(MPRGPMove::STEP)) return;
                 c.Adgf = v[0];
                 c.gf2  = v[1];
                 c.gc2  = v[2];
@@ -233,7 +233,7 @@ namespace sfem {
             const MPRGPControl<T>& c = *reinterpret_cast<const MPRGPControl<T>*>(control);
             // The same for every thread: the step along d is the record's, or none (then no block
             // writes partials, and the result, which would not use them, is not taken).
-            if (ALONG && c.move != T(MPRGP_MOVE_STEP)) return;
+            if (ALONG && c.move != T(MPRGPMove::STEP)) return;
             const T alpha = ALONG ? c.alpha : T(0);
             T       v[N_VALUES] = {0, 0, 0, 0};
             for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
@@ -262,7 +262,7 @@ namespace sfem {
                                                 T* const SFEM_RESTRICT       p,
                                                 const T* const SFEM_RESTRICT control) {
             const MPRGPControl<T>& c = *reinterpret_cast<const MPRGPControl<T>*>(control);
-            if (c.move != T(MPRGP_MOVE_STEP)) return;
+            if (c.move != T(MPRGPMove::STEP)) return;
             const T beta = -c.beta;
             for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
                 p[i] = add_rn(gf[i], mul_rn(beta, p[i]));
@@ -454,8 +454,8 @@ namespace sfem {
                                           const int                    max_it) {
             const MPRGPControl<T>& c  = *reinterpret_cast<const MPRGPControl<T>*>(control);
             unsigned               go = 0;
-            if (c.move != T(MPRGP_MOVE_STEP)) {
-                loop[2] = T(MPRGPRunResult::NOT_A_STEP);
+            if (c.move != T(MPRGPMove::STEP)) {
+                loop[2] = T(MPRGPExit::NOT_A_STEP);
             } else {
                 loop[1] += 1;
                 const T norm_gf = sqrt(c.gf2), norm_gc = sqrt(c.gc2), norm_gp = sqrt(c.gp2);
@@ -464,9 +464,9 @@ namespace sfem {
                 loop[0] += 1;
                 loop[3] = done;
                 if (loop[0] >= T(max_it) || done) {
-                    loop[2] = T(MPRGPRunResult::DONE);
+                    loop[2] = T(MPRGPExit::DONE);
                 } else if (!(norm_gc <= gamma * norm_gf)) {
-                    loop[2] = T(MPRGPRunResult::PROPORTIONING);
+                    loop[2] = T(MPRGPExit::PROPORTIONING);
                 } else {
                     go = 1;
                 }
@@ -519,7 +519,7 @@ namespace sfem {
                              r.p,
                              r.Ap,
                              r.infty,
-                             MPRGP_DECIDE_CG,
+                             MPRGPDecision::CG,
                              r.params,
                              r.control,
                              r.work,
@@ -568,7 +568,7 @@ namespace sfem {
             result.ran        = true;
             result.iterations = int(run->host[0]);
             result.steps      = int(run->host[1]);
-            result.exit       = MPRGPRunResult::Exit(int(run->host[2]));
+            result.exit       = MPRGPExit(int(run->host[2]));
             result.converged  = run->host[3] != T(0);
             return result;
         }

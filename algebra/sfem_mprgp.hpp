@@ -29,11 +29,11 @@ namespace sfem {
     template <typename T>
     class MPRGP final : public MatrixFreeLinearSolver<T> {
     public:
-        enum ExpansionType { EXPANSION_TYPE_ORGINAL = 0, EXPANSION_TYPE_PROJECTED_CG = 1 };
+        enum class Expansion { ORIGINAL = 0, PROJECTED_CG = 1 };
 
         ~MPRGP() override { release_workspace(); }
 
-        ExpansionType expansion_type_{EXPANSION_TYPE_ORGINAL};
+        Expansion expansion_type_{Expansion::ORIGINAL};
         T rtol{1e-10};
         T atol{1e-16};
         T gamma{1};  // gamma > 0
@@ -114,7 +114,7 @@ namespace sfem {
         inline std::ptrdiff_t rows() const override { return n_dofs; }
         inline std::ptrdiff_t cols() const override { return n_dofs; }
 
-        void set_expansion_type(const enum ExpansionType et) { expansion_type_ = et; }
+        void set_expansion_type(const Expansion et) { expansion_type_ = et; }
 
         void set_op(const std::shared_ptr<Operator<T>>& op) override {
             // On a stream of its own the product follows the solver's work and the solver follows
@@ -243,7 +243,7 @@ namespace sfem {
         void curvature(const T* const x, const T* const g, const T* const d, const T* const Ad, const MPRGPDecision decision,
                        T* const work) {
             impl.curvature(
-                    n_dofs, lb(), ub(), x, g, d, Ad, infty, on_host() ? MPRGP_DECIDE_NONE : decision, params_, control_, work, device_reduce_);
+                    n_dofs, lb(), ub(), x, g, d, Ad, infty, on_host() ? MPRGPDecision::NONE : decision, params_, control_, work, device_reduce_);
             if (on_host()) {
                 impl.read_control(control_, &record_);
                 T v[4] = {record_.dAd, record_.dd, record_.gd, record_.alpha_feas};
@@ -264,7 +264,7 @@ namespace sfem {
         void step(const T* const d, const T* const Ad, T* const x, T* const g, T* const gf, const bool cg, T* const work) {
             impl.step(n_dofs, lb(), ub(), d, Ad, x, g, gf, eps, norm_weight_ ? norm_weight_->data() : nullptr, on_host() ? false : cg,
                       control_, work, device_reduce_);
-            if (on_host() && (!d || record_.move == T(MPRGP_MOVE_STEP))) {
+            if (on_host() && (!d || record_.move == T(MPRGPMove::STEP))) {
                 impl.read_control(control_, &record_);
                 T v[4] = {record_.Adgf, record_.gf2, record_.gc2, record_.gp2};
                 sum(v, 4);
@@ -307,7 +307,7 @@ namespace sfem {
                                  T* const x, T* const work) {
             const T alpha_feas = c.alpha, alpha_cg = c.alpha_cg, alpha_bar = params_.alpha_bar;
             // A flat direction (alpha_cg infty) has no CG step past the bound to project.
-            if (alpha_cg < infty && expansion_type_ == EXPANSION_TYPE_PROJECTED_CG) {
+            if (alpha_cg < infty && expansion_type_ == Expansion::PROJECTED_CG) {
                 this->blas->axpby(n_dofs, -alpha_feas, p, 1, x);
                 this->blas->axpby(n_dofs, -alpha_cg, p, 1, x);
                 this->project(x);
@@ -326,10 +326,10 @@ namespace sfem {
             impl.chopped_gradient(n_dofs, lb(), ub(), x, g, gc, eps);
 
             product(gc, Agc);
-            curvature(x, g, gc, Agc, MPRGP_DECIDE_PROPORTIONING, work);
+            curvature(x, g, gc, Agc, MPRGPDecision::PROPORTIONING, work);
             this->step(gc, Agc, x, g, p, false, work);
             const MPRGPControl<T>& c = record();
-            if (c.move == T(MPRGP_MOVE_UNBOUNDED)) return false;
+            if (c.move == T(MPRGPMove::UNBOUNDED)) return false;
             *grads = gradients(c);
             return true;
         }
@@ -339,11 +339,6 @@ namespace sfem {
             this->blas->axpby(n_dofs, -1, b, 1, g);
         }
 
-        /// How team_cg_steps returned: before a proportioning step (the chopped gradient grew),
-        /// at a CG decision that is not a step (its record and A p stand, for the expansion), or
-        /// with the solve over (converged, or max_it).
-        enum class TeamExit { PROPORTIONING, NOT_A_STEP, DONE };
-
         /// CG steps in one parallel region, as many in a row as the loop of apply() takes: its CG
         /// branch and the test after it, thread by thread over the operator's Team. Each pass takes
         /// the calling thread's chunks, and every thread, after a barrier, combines all of them in
@@ -352,16 +347,16 @@ namespace sfem {
         /// after the curvature and after the step; under MPI the operator's halo and each sum over
         /// the ranks take one more. The chunks' sums alternate between two halves of `work`: a
         /// thread still reading one half is never overwritten.
-        TeamExit team_cg_steps(T* const     x,
-                               T* const     g,
-                               T* const     p,
-                               T* const     Ap,
-                               T* const     gf,
-                               T* const     work,
-                               const T      norm_gp0,
-                               Gradients*   grads,
-                               int*         count_cg_steps,
-                               bool*        converged) {
+        MPRGPExit team_cg_steps(T* const     x,
+                                T* const     g,
+                                T* const     p,
+                                T* const     Ap,
+                                T* const     gf,
+                                T* const     work,
+                                const T      norm_gp0,
+                                Gradients*   grads,
+                                int*         count_cg_steps,
+                                bool*        converged) {
             using Pass                 = OpenMP_MPRGP<T>;
             const T* const w           = norm_weight_ ? norm_weight_->data() : nullptr;
             T* const       part[2]     = {work, work + 4 * blas_max_chunk_count};
@@ -369,7 +364,7 @@ namespace sfem {
             const T        no_step[4]  = {0, 0, 0, 0};
             const auto     type        = smesh::TypeToEnum<T>::value();
             T              by_ranks[4] = {0, 0, 0, 0};
-            TeamExit       exit        = TeamExit::PROPORTIONING;
+            MPRGPExit      exit        = MPRGPExit::PROPORTIONING;
 #pragma omp parallel
             {
                 const Team      team = team_op_->team();
@@ -377,7 +372,7 @@ namespace sfem {
                 Gradients       gr   = *grads;
                 int             it = iterations_, steps = *count_cg_steps;
                 bool            done = false;
-                TeamExit        why  = TeamExit::PROPORTIONING;
+                MPRGPExit       why  = MPRGPExit::PROPORTIONING;
                 // The ranks' sums, by thread 0, then for every thread.
                 auto over_ranks = [&](T (&v)[4], const bool min_last) {
                     if (!comm_) return;
@@ -411,9 +406,9 @@ namespace sfem {
                         c.dd         = v[1];
                         c.gd         = v[2];
                         c.alpha_feas = v[3];
-                        mprgp_decide(c, MPRGP_DECIDE_CG, params_);
-                        if (c.move != T(MPRGP_MOVE_STEP)) {
-                            why = TeamExit::NOT_A_STEP;
+                        mprgp_decide(c, MPRGPDecision::CG, params_);
+                        if (c.move != T(MPRGPMove::STEP)) {
+                            why = MPRGPExit::NOT_A_STEP;
                             break;
                         }
 
@@ -436,7 +431,7 @@ namespace sfem {
                         done                = gr.norm_gp < atol || rel_norm_gp < rtol;
                         if (team.tid == 0) monitor(it, gr.norm_gp, rel_norm_gp);
                         if (++it >= max_it || done) {
-                            why = TeamExit::DONE;
+                            why = MPRGPExit::DONE;
                             break;
                         }
                     }
@@ -457,7 +452,7 @@ namespace sfem {
         /// The CG steps in a row in the execution space (MPRGP_Tpl::cg_run), as team_cg_steps takes
         /// them on the host; false where they cannot be taken there, nothing done.
         bool device_cg_steps(T* const x, T* const g, T* const p, T* const Ap, T* const gf, T* const work, const T norm_gp0,
-                             Gradients* grads, int* count_cg_steps, bool* converged, TeamExit* exit) {
+                             Gradients* grads, int* count_cg_steps, bool* converged, MPRGPExit* exit) {
             // Across ranks only where the device completes the sums (one node, NCCL).
             if (!device_runs_ || !impl.cg_run || (comm_ && !device_reduce_) || !op_overwrites_) return false;
             MPRGPRun<T> r;
@@ -492,18 +487,8 @@ namespace sfem {
             *count_cg_steps += run.steps;
             *grads     = gradients(record());
             *converged = run.converged;
-            switch (run.exit) {
-                case MPRGPRunResult::PROPORTIONING:
-                    *exit = TeamExit::PROPORTIONING;
-                    break;
-                case MPRGPRunResult::NOT_A_STEP:
-                    *exit = TeamExit::NOT_A_STEP;
-                    break;
-                case MPRGPRunResult::DONE:
-                    *exit = TeamExit::DONE;
-                    monitor(iterations_, grads->norm_gp, grads->norm_gp / norm_gp0);
-                    break;
-            }
+            *exit      = run.exit;
+            if (run.exit == MPRGPExit::DONE) monitor(iterations_, grads->norm_gp, grads->norm_gp / norm_gp0);
             return true;
         }
 
@@ -533,7 +518,7 @@ namespace sfem {
             T* work     = workspace_[4];
 
             T alpha_bar = 1;
-            if (expansion_type_ == EXPANSION_TYPE_ORGINAL) {
+            if (expansion_type_ == Expansion::ORIGINAL) {
                 if (max_eig_ == 0) {
                     this->ensure_power_method();
                     this->blas->values(n_dofs, 1, p);
@@ -578,18 +563,18 @@ namespace sfem {
                     if (team_op_) {
                         // The CG steps in a row in one region; back here at the first that is no
                         // step, for the expansion below.
-                        const TeamExit exit = team_cg_steps(x, g, p, Ap_or_Ag, gf_or_gc, work, norm_gp0, &grads, &count_cg_steps, &converged);
-                        if (exit == TeamExit::DONE) break;
-                        if (exit == TeamExit::PROPORTIONING) continue;
-                    } else if (TeamExit exit = TeamExit::NOT_A_STEP;
+                        const MPRGPExit exit = team_cg_steps(x, g, p, Ap_or_Ag, gf_or_gc, work, norm_gp0, &grads, &count_cg_steps, &converged);
+                        if (exit == MPRGPExit::DONE) break;
+                        if (exit == MPRGPExit::PROPORTIONING) continue;
+                    } else if (MPRGPExit exit = MPRGPExit::NOT_A_STEP;
                                device_cg_steps(x, g, p, Ap_or_Ag, gf_or_gc, work, norm_gp0, &grads, &count_cg_steps, &converged, &exit)) {
-                        if (exit == TeamExit::DONE) break;
-                        if (exit == TeamExit::PROPORTIONING) continue;
+                        if (exit == MPRGPExit::DONE) break;
+                        if (exit == MPRGPExit::PROPORTIONING) continue;
                     } else {
                         product(p, Ap_or_Ag);
                         // The decision, the CG step and the next direction p <- gf - beta p, the
                         // last two only where the move is a step; then the record, read once.
-                        curvature(x, g, p, Ap_or_Ag, MPRGP_DECIDE_CG, work);
+                        curvature(x, g, p, Ap_or_Ag, MPRGPDecision::CG, work);
                         this->step(p, Ap_or_Ag, x, g, gf_or_gc, true, work);
                         impl.update_direction(n_dofs, gf_or_gc, p, control_);
                     }
@@ -598,12 +583,12 @@ namespace sfem {
                     // Without positive curvature the energy falls along -p until a bound stops
                     // it: the expansion step, at the bound. A free body's rigid motions are such
                     // directions, held only by the bounds.
-                    if (c.move == T(MPRGP_MOVE_UNBOUNDED)) {
+                    if (c.move == T(MPRGPMove::UNBOUNDED)) {
                         fprintf(stderr, "[Warning][MPRGP] No positive curvature and no bound along the search direction (%g)\n", (double)c.dAd);
                         break;
                     }
 
-                    if (c.move == T(MPRGP_MOVE_STEP)) {
+                    if (c.move == T(MPRGPMove::STEP)) {
                         grads = gradients(c);
                         count_cg_steps++;
                     } else {
