@@ -715,7 +715,7 @@ namespace sfem {
     void set_value_in_block(const std::string &block_name,
                 const std::string &var_name,
                 real_t value) override;
-    std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override;
+    std::shared_ptr<Op> derefine(const std::shared_ptr<FunctionSpace> &space) override;
 #ifdef SFEM_ENABLE_RYAML
     std::shared_ptr<Op> create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
                                              const ryml::ConstNodeRef             &node) override;
@@ -1940,7 +1940,7 @@ namespace sfem {
     SFEM_TRACE_SCOPE("%(op)s::set_value_in_block");
     impl_->domains->set_value_in_block(block_name, var_name, value);
   }
-%(derefine_op)s
+%(derefine)s
 #ifdef SFEM_ENABLE_RYAML
   std::shared_ptr<Op> %(op)s::create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
                                                  const ryml::ConstNodeRef             &node) {
@@ -2007,7 +2007,7 @@ namespace sfem {
     )
     substitutions = {
         "op": _op_class_name(material),
-        "derefine_op": _derefine_op_source(_op_class_name(material), True),
+        "derefine": _derefine_op_source(_op_class_name(material), True),
         "header_stem": _op_file_stem(material),
         "stream_member": _op_stream_member(),
         "c_abi_include": '#include "%s"' % c_abi_header if c_abi_header else "",
@@ -3351,7 +3351,7 @@ namespace sfem {
     SFEM_TRACE_SCOPE("%(op)s::set_value_in_block");
     impl_->domains->set_value_in_block(block_name, var_name, value);
   }
-%(derefine_op)s
+%(derefine)s
   void %(op)s::set_option(const std::string &name, const bool val) {
     SFEM_TRACE_SCOPE("%(op)s::set_option");
     AffineOption options[] = {
@@ -3452,7 +3452,7 @@ namespace sfem {
 """
     substitutions = {
         "op": _op_class_name(material),
-        "derefine_op": _derefine_op_source(_op_class_name(material), holds_scheme),
+        "derefine": _derefine_op_source(_op_class_name(material), holds_scheme),
         "header_stem": _op_file_stem(material),
         "stream_member": _op_stream_member(),
         "c_abi_include": '#include "%s"' % c_abi_header if c_abi_header else "",
@@ -5225,7 +5225,7 @@ namespace sfem {
     SFEM_TRACE_SCOPE("%(op)s::set_value_in_block");
     impl_->domains->set_value_in_block(block_name, var_name, value);
   }
-%(derefine_op)s
+%(derefine)s
 #ifdef SFEM_ENABLE_RYAML
   std::shared_ptr<Op> %(op)s::create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
                                                  const ryml::ConstNodeRef             &node) {
@@ -5290,7 +5290,7 @@ namespace sfem {
 %(hessian_bsr_method)s}  // namespace sfem
 """ % {
         "op": _op_class_name(material),
-        "derefine_op": _derefine_op_source(_op_class_name(material), _has_time_rate(material)),
+        "derefine": _derefine_op_source(_op_class_name(material), _has_time_rate(material)),
         "header_stem": _op_file_stem(material),
         "stream_member": _op_stream_member(),
         "hessian_bsr_method": _coupled_hessian_bsr_method(
@@ -6204,8 +6204,8 @@ _HEADER_TIME_SCHEME_INCLUDE = {False: "", True: '#include "sfem_TimeScheme.hpp"\
 #: weights, the inertia rediscretised).  Affine options are not carried: they are a speed choice,
 #: and a micro-element view reads its geometry isoparametrically.
 _DEREFINE_OP = """
-  std::shared_ptr<Op> %(op)s::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
-    SFEM_TRACE_SCOPE("%(op)s::derefine_op");
+  std::shared_ptr<Op> %(op)s::derefine(const std::shared_ptr<FunctionSpace> &space) {
+    SFEM_TRACE_SCOPE("%(op)s::derefine");
     auto ret = std::make_shared<%(op)s>(space);%(scheme)s
     if (ret->initialize() != SFEM_SUCCESS) return nullptr;
     for (const auto &entry : impl_->domains->domains()) {
@@ -11369,7 +11369,7 @@ def _yaml_helpers(defaults):
 %(default_lines)s
     }
 
-    // derefine_op copies the parameters by name, with or without YAML.
+    // derefine copies the parameters by name, with or without YAML.
     [[maybe_unused]] constexpr int N_DEFINED_MATERIAL_PARAMETERS = %(nparameters)d;
     [[maybe_unused]] constexpr int N_MATERIAL_PARAMETERS = %(storage_size)d;
     [[maybe_unused]] static const char *const MATERIAL_PARAMETER_NAMES[N_MATERIAL_PARAMETERS] = {%(names)s};

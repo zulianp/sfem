@@ -10,8 +10,8 @@ public:
     double total_time{0};
     ~SpectralElementLaplacian();
     static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space);
-    std::shared_ptr<Op> lor_op(const std::shared_ptr<FunctionSpace> &space) override;
-    std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override;
+    std::shared_ptr<Op> lor(const std::shared_ptr<FunctionSpace> &space) override;
+    std::shared_ptr<Op> derefine(const std::shared_ptr<FunctionSpace> &space) override;
     const char *name() const override;
     //! the Dirichlet energy
     bool energy_or_potential_based() const override { return true; }

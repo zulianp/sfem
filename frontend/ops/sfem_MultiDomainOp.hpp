@@ -99,7 +99,7 @@ namespace sfem {
          * @param block_names Block names for the new operator
          * @return Shared pointer to LOR operator
          */
-        std::shared_ptr<MultiDomainOp> lor_op(const std::shared_ptr<FunctionSpace> &space,
+        std::shared_ptr<MultiDomainOp> lor(const std::shared_ptr<FunctionSpace> &space,
                                               const std::vector<std::string> &block_names);
 
         /**
@@ -108,7 +108,7 @@ namespace sfem {
          * @param block_names Block names for the new operator
          * @return Shared pointer to derefined operator
          */
-        std::shared_ptr<MultiDomainOp> derefine_op(const std::shared_ptr<FunctionSpace> &space,
+        std::shared_ptr<MultiDomainOp> derefine(const std::shared_ptr<FunctionSpace> &space,
                                                    const std::vector<std::string> &block_names);
 
         /**

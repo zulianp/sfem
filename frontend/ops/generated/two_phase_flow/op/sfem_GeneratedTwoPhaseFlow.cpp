@@ -109,7 +109,7 @@ namespace sfem {
       values[25] = 86.400000000000006;
     }
 
-    // derefine_op copies the parameters by name, with or without YAML.
+    // derefine copies the parameters by name, with or without YAML.
     [[maybe_unused]] constexpr int N_DEFINED_MATERIAL_PARAMETERS = 26;
     [[maybe_unused]] constexpr int N_MATERIAL_PARAMETERS = 26;
     [[maybe_unused]] static const char *const MATERIAL_PARAMETER_NAMES[N_MATERIAL_PARAMETERS] = {"porosity", "S_res", "P_r", "m", "rho_w0", "kappa_T", "p_wr", "M_c", "Z", "R", "T", "mu_w", "mu_c", "C_kw1", "C_ka1", "C_ka2", "dt", "K_0", "K_1", "K_2", "K_3", "K_4", "K_5", "K_6", "K_7", "K_8"};
@@ -776,8 +776,8 @@ namespace sfem {
     impl_->domains->set_value_in_block(block_name, var_name, value);
   }
 
-  std::shared_ptr<Op> GeneratedTwoPhaseFlow::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
-    SFEM_TRACE_SCOPE("GeneratedTwoPhaseFlow::derefine_op");
+  std::shared_ptr<Op> GeneratedTwoPhaseFlow::derefine(const std::shared_ptr<FunctionSpace> &space) {
+    SFEM_TRACE_SCOPE("GeneratedTwoPhaseFlow::derefine");
     auto ret = std::make_shared<GeneratedTwoPhaseFlow>(space);
     if (ret->initialize() != SFEM_SUCCESS) return nullptr;
     for (const auto &entry : impl_->domains->domains()) {

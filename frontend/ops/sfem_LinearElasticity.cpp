@@ -474,25 +474,25 @@ namespace sfem {
         return ret;
     }
 
-    std::shared_ptr<Op> LinearElasticity::lor_op(const std::shared_ptr<FunctionSpace> &space) {
-        SFEM_TRACE_SCOPE("LinearElasticity::lor_op");
+    std::shared_ptr<Op> LinearElasticity::lor(const std::shared_ptr<FunctionSpace> &space) {
+        SFEM_TRACE_SCOPE("LinearElasticity::lor");
 
         if (impl_->space->has_semi_structured_mesh() && sfem::is_semistructured_type(impl_->space->element_type())) {
-            SMESH_ERROR("LinearElasticity::lor_op NOT IMPLEMENTED for semi-structured mesh!\n");
+            SMESH_ERROR("LinearElasticity::lor NOT IMPLEMENTED for semi-structured mesh!\n");
             return nullptr;
         }
 
         // FIXME: Must work for all element types and multi-block
 
         auto ret            = std::make_shared<LinearElasticity>(space);
-        ret->impl_->domains = impl_->domains->lor_op(space, {});
+        ret->impl_->domains = impl_->domains->lor(space, {});
         linear_elasticity_copy_material(*impl_->domains, *ret->impl_->domains);
         ret->impl_->use_affine_approximation = impl_->use_affine_approximation;
         return ret;
     }
 
-    std::shared_ptr<Op> LinearElasticity::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
-        SFEM_TRACE_SCOPE("LinearElasticity::derefine_op");
+    std::shared_ptr<Op> LinearElasticity::derefine(const std::shared_ptr<FunctionSpace> &space) {
+        SFEM_TRACE_SCOPE("LinearElasticity::derefine");
 
         if (space->has_semi_structured_mesh() && sfem::is_semistructured_type(space->element_type())) {
             auto ret = std::make_shared<LinearElasticity>(space);
@@ -514,7 +514,7 @@ namespace sfem {
         // FIXME: Must work for all element types and multi-block
 
         auto ret            = std::make_shared<LinearElasticity>(space);
-        ret->impl_->domains = impl_->domains->derefine_op(space, {});
+        ret->impl_->domains = impl_->domains->derefine(space, {});
         linear_elasticity_copy_material(*impl_->domains, *ret->impl_->domains);
         ret->impl_->use_affine_approximation = impl_->use_affine_approximation;
         return ret;

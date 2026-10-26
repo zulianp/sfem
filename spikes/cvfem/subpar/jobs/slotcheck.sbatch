@@ -21,7 +21,7 @@
 #
 # Why it is the suspect now. cd8db4f32 made the coarse ids come from the coarse HEX8 block's
 # element table, and that mesh IS packed (modify_mesh=true -> renumber_nodes) during
-# derefine_op -> initialize(). Restriction, prolongation and the Galerkin gid all read that same
+# derefine -> initialize(). Restriction, prolongation and the Galerkin gid all read that same
 # table, so they move TOGETHER -- which rules out a mismatch between them. But a pure permutation
 # of coarse ids cannot change the sum of absolute block values, and that sum FELL:
 #

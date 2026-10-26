@@ -44,7 +44,7 @@ namespace sfem {
         if (!fine) return nullptr;
         std::shared_ptr<InertiaPotential> inertia;
         if (auto fine_inertia = std::dynamic_pointer_cast<InertiaPotential>(fine->inertia_op())) {
-            inertia = std::dynamic_pointer_cast<InertiaPotential>(fine_inertia->derefine_op(coarse));
+            inertia = std::dynamic_pointer_cast<InertiaPotential>(fine_inertia->derefine(coarse));
             if (!inertia) return nullptr;
         } else if (fine->inertia_op()) {
             SFEM_ERROR("derefine_time_scheme: the scheme's inertia is not an InertiaPotential\n");

@@ -74,13 +74,13 @@ namespace sfem {
         }
     }
 
-    std::shared_ptr<Op> SemiStructuredEMLaplacian::lor_op(const std::shared_ptr<FunctionSpace> & /*space*/) {
-        SMESH_ERROR("SemiStructuredEMLaplacian::lor_op NOT IMPLEMENTED!\n");
+    std::shared_ptr<Op> SemiStructuredEMLaplacian::lor(const std::shared_ptr<FunctionSpace> & /*space*/) {
+        SMESH_ERROR("SemiStructuredEMLaplacian::lor NOT IMPLEMENTED!\n");
         return nullptr;
     }
 
-    std::shared_ptr<Op> SemiStructuredEMLaplacian::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
-        SFEM_TRACE_SCOPE("SemiStructuredEMLaplacian::derefine_op");
+    std::shared_ptr<Op> SemiStructuredEMLaplacian::derefine(const std::shared_ptr<FunctionSpace> &space) {
+        SFEM_TRACE_SCOPE("SemiStructuredEMLaplacian::derefine");
 
         assert(space->has_semi_structured_mesh() || space->element_type() == macro_base_elem(element_type));
         if (space->has_semi_structured_mesh()) {

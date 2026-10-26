@@ -63,7 +63,7 @@ namespace sfem {
         static std::shared_ptr<NeumannConditions> create_from_file(const std::shared_ptr<FunctionSpace> &space,
                                                                    const smesh::Path                    &path);
 
-        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &derefined_space) override;
+        std::shared_ptr<Op> derefine(const std::shared_ptr<FunctionSpace> &derefined_space) override;
 
         const char *name() const override;
         //! The work a traction does, `-g . x`, is linear in the state and so a

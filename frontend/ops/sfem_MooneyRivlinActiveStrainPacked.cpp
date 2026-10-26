@@ -63,15 +63,15 @@ namespace sfem {
         return ret;
     }
 
-    std::shared_ptr<Op> MooneyRivlinActiveStrainPacked::lor_op(const std::shared_ptr<FunctionSpace> &space) {
+    std::shared_ptr<Op> MooneyRivlinActiveStrainPacked::lor(const std::shared_ptr<FunctionSpace> &space) {
         auto ret            = std::make_shared<MooneyRivlinActiveStrainPacked>(space);
-        ret->impl_->domains = impl_->domains->lor_op(space, {});
+        ret->impl_->domains = impl_->domains->lor(space, {});
         return ret;
     }
 
-    std::shared_ptr<Op> MooneyRivlinActiveStrainPacked::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
+    std::shared_ptr<Op> MooneyRivlinActiveStrainPacked::derefine(const std::shared_ptr<FunctionSpace> &space) {
         auto ret            = std::make_shared<MooneyRivlinActiveStrainPacked>(space);
-        ret->impl_->domains = impl_->domains->derefine_op(space, {});
+        ret->impl_->domains = impl_->domains->derefine(space, {});
         return ret;
     }
 

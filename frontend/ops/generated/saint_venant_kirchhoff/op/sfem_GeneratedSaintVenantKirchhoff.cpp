@@ -64,7 +64,7 @@ namespace sfem {
       values[1] = 1;
     }
 
-    // derefine_op copies the parameters by name, with or without YAML.
+    // derefine copies the parameters by name, with or without YAML.
     [[maybe_unused]] constexpr int N_DEFINED_MATERIAL_PARAMETERS = 2;
     [[maybe_unused]] constexpr int N_MATERIAL_PARAMETERS = 2;
     [[maybe_unused]] static const char *const MATERIAL_PARAMETER_NAMES[N_MATERIAL_PARAMETERS] = {"mu", "lmbda"};
@@ -1137,8 +1137,8 @@ namespace sfem {
     impl_->domains->set_value_in_block(block_name, var_name, value);
   }
 
-  std::shared_ptr<Op> GeneratedSaintVenantKirchhoff::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
-    SFEM_TRACE_SCOPE("GeneratedSaintVenantKirchhoff::derefine_op");
+  std::shared_ptr<Op> GeneratedSaintVenantKirchhoff::derefine(const std::shared_ptr<FunctionSpace> &space) {
+    SFEM_TRACE_SCOPE("GeneratedSaintVenantKirchhoff::derefine");
     auto ret = std::make_shared<GeneratedSaintVenantKirchhoff>(space);
     if (impl_->time_scheme) {
       auto coarse_scheme = derefine_time_scheme(impl_->time_scheme, space);

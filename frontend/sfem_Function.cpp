@@ -954,9 +954,9 @@ namespace sfem {
             if (o->is_no_op()) {
                 continue;
             }
-            auto dop = o->derefine_op(space);
+            auto dop = o->derefine(space);
             if (!dop) {
-                SFEM_ERROR("derefine_op returned nullptr");
+                SFEM_ERROR("derefine returned nullptr");
                 return nullptr;
             }
             if (!dop->is_no_op()) {
@@ -980,7 +980,7 @@ namespace sfem {
         auto ret = std::make_shared<Function>(space);
 
         for (auto &o : impl_->ops) {
-            ret->impl_->ops.push_back(o->lor_op(space));
+            ret->impl_->ops.push_back(o->lor(space));
         }
 
         for (auto &c : impl_->constraints) {

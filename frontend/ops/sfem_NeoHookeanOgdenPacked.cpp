@@ -905,15 +905,15 @@ namespace sfem {
         return ret;
     }
 
-    std::shared_ptr<Op> NeoHookeanOgdenPacked::lor_op(const std::shared_ptr<FunctionSpace> &space) {
+    std::shared_ptr<Op> NeoHookeanOgdenPacked::lor(const std::shared_ptr<FunctionSpace> &space) {
         auto ret            = std::make_shared<NeoHookeanOgdenPacked>(space);
-        ret->impl_->domains = impl_->domains->lor_op(space, {});
+        ret->impl_->domains = impl_->domains->lor(space, {});
         return ret;
     }
 
-    std::shared_ptr<Op> NeoHookeanOgdenPacked::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
+    std::shared_ptr<Op> NeoHookeanOgdenPacked::derefine(const std::shared_ptr<FunctionSpace> &space) {
         auto ret            = std::make_shared<NeoHookeanOgdenPacked>(space);
-        ret->impl_->domains = impl_->domains->derefine_op(space, {});
+        ret->impl_->domains = impl_->domains->derefine(space, {});
         return ret;
     }
 

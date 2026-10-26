@@ -98,13 +98,13 @@ namespace sfem {
         }
     }
 
-    std::shared_ptr<Op> SemiStructuredEMLinearElasticity::lor_op(const std::shared_ptr<FunctionSpace> & /*space*/) {
-        SMESH_ERROR("SemiStructuredEMLinearElasticity::lor_op NOT IMPLEMENTED!\n");
+    std::shared_ptr<Op> SemiStructuredEMLinearElasticity::lor(const std::shared_ptr<FunctionSpace> & /*space*/) {
+        SMESH_ERROR("SemiStructuredEMLinearElasticity::lor NOT IMPLEMENTED!\n");
         return nullptr;
     }
 
-    std::shared_ptr<Op> SemiStructuredEMLinearElasticity::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
-        SFEM_TRACE_SCOPE("SemiStructuredEMLinearElasticity::derefine_op");
+    std::shared_ptr<Op> SemiStructuredEMLinearElasticity::derefine(const std::shared_ptr<FunctionSpace> &space) {
+        SFEM_TRACE_SCOPE("SemiStructuredEMLinearElasticity::derefine");
 
         if (space->has_semi_structured_mesh()) {
             auto ret          = std::make_shared<SemiStructuredEMLinearElasticity>(space);

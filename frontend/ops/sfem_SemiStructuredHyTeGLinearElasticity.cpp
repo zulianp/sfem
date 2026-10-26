@@ -132,14 +132,14 @@ namespace sfem {
         }
     }
 
-    std::shared_ptr<Op> SemiStructuredHyTeGLinearElasticity::lor_op(const std::shared_ptr<FunctionSpace> &) {
-        SFEM_ERROR("[Error] LinearElasticityHyTeG::lor_op NOT IMPLEMENTED!\n");
+    std::shared_ptr<Op> SemiStructuredHyTeGLinearElasticity::lor(const std::shared_ptr<FunctionSpace> &) {
+        SFEM_ERROR("[Error] LinearElasticityHyTeG::lor NOT IMPLEMENTED!\n");
         return nullptr;
     }
 
-    std::shared_ptr<Op> SemiStructuredHyTeGLinearElasticity::derefine_op(
+    std::shared_ptr<Op> SemiStructuredHyTeGLinearElasticity::derefine(
             const std::shared_ptr<FunctionSpace> &space) {
-        SFEM_TRACE_SCOPE("SemiStructuredHyTeGLinearElasticity::derefine_op");
+        SFEM_TRACE_SCOPE("SemiStructuredHyTeGLinearElasticity::derefine");
 
         if (space->has_semi_structured_mesh()) {
             auto ret          = std::make_shared<SemiStructuredHyTeGLinearElasticity>(space);

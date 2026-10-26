@@ -341,16 +341,16 @@ namespace sfem {
 
     int NeoHookeanOgden::report(const real_t *const) { return SFEM_SUCCESS; }
 
-    std::shared_ptr<Op> NeoHookeanOgden::lor_op(const std::shared_ptr<FunctionSpace> &space) {
-        SFEM_TRACE_SCOPE("NeoHookeanOgden::lor_op");
+    std::shared_ptr<Op> NeoHookeanOgden::lor(const std::shared_ptr<FunctionSpace> &space) {
+        SFEM_TRACE_SCOPE("NeoHookeanOgden::lor");
 
         if (impl_->space->has_semi_structured_mesh() && is_semistructured_type(impl_->space->element_type())) {
-            SMESH_ERROR("NeoHookeanOgden::lor_op NOT IMPLEMENTED for semi-structured mesh!\n");
+            SMESH_ERROR("NeoHookeanOgden::lor NOT IMPLEMENTED for semi-structured mesh!\n");
             return nullptr;
         }
 
         auto ret            = std::make_shared<NeoHookeanOgden>(space);
-        ret->impl_->domains = impl_->domains->lor_op(space, {});
+        ret->impl_->domains = impl_->domains->lor(space, {});
         neo_copy_material(*impl_->domains, *ret->impl_->domains);
         ret->impl_->mu                       = impl_->mu;
         ret->impl_->lambda                   = impl_->lambda;
@@ -358,8 +358,8 @@ namespace sfem {
         return ret;
     }
 
-    std::shared_ptr<Op> NeoHookeanOgden::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
-        SFEM_TRACE_SCOPE("NeoHookeanOgden::derefine_op");
+    std::shared_ptr<Op> NeoHookeanOgden::derefine(const std::shared_ptr<FunctionSpace> &space) {
+        SFEM_TRACE_SCOPE("NeoHookeanOgden::derefine");
 
         if (space->has_semi_structured_mesh() && is_semistructured_type(space->element_type())) {
             auto ret = std::make_shared<NeoHookeanOgden>(space);
@@ -383,7 +383,7 @@ namespace sfem {
         }
 
         auto ret            = std::make_shared<NeoHookeanOgden>(space);
-        ret->impl_->domains = impl_->domains->derefine_op(space, {});
+        ret->impl_->domains = impl_->domains->derefine(space, {});
         neo_copy_material(*impl_->domains, *ret->impl_->domains);
         ret->impl_->mu                       = impl_->mu;
         ret->impl_->lambda                   = impl_->lambda;

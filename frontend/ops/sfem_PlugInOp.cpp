@@ -289,17 +289,17 @@ namespace sfem {
         return SFEM_FAILURE;
     }
 
-    std::shared_ptr<Op> PlugInOp::lor_op(const std::shared_ptr<FunctionSpace> &space) {
+    std::shared_ptr<Op> PlugInOp::lor(const std::shared_ptr<FunctionSpace> &space) {
         auto ret            = std::shared_ptr<PlugInOp>(new PlugInOp(space, impl_->opname));
-        ret->impl_->domains = impl_->domains->lor_op(space, {});
+        ret->impl_->domains = impl_->domains->lor(space, {});
         ret->impl_->mu      = impl_->mu;
         ret->impl_->lambda  = impl_->lambda;
         return ret;
     }
 
-    std::shared_ptr<Op> PlugInOp::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
+    std::shared_ptr<Op> PlugInOp::derefine(const std::shared_ptr<FunctionSpace> &space) {
         auto ret            = std::shared_ptr<PlugInOp>(new PlugInOp(space, impl_->opname));
-        ret->impl_->domains = impl_->domains->derefine_op(space, {});
+        ret->impl_->domains = impl_->domains->derefine(space, {});
         ret->impl_->mu      = impl_->mu;
         ret->impl_->lambda  = impl_->lambda;
         return ret;

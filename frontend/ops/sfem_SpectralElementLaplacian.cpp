@@ -47,16 +47,16 @@ namespace sfem {
         }
     }
 
-    std::shared_ptr<Op> SpectralElementLaplacian::lor_op(const std::shared_ptr<FunctionSpace> & /*space*/) {
-        SMESH_ERROR("SpectralElementLaplacian::lor_op NOT IMPLEMENTED!\n");
+    std::shared_ptr<Op> SpectralElementLaplacian::lor(const std::shared_ptr<FunctionSpace> & /*space*/) {
+        SMESH_ERROR("SpectralElementLaplacian::lor NOT IMPLEMENTED!\n");
         return nullptr;
     }
 
-    std::shared_ptr<Op> SpectralElementLaplacian::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
-        SFEM_TRACE_SCOPE("SpectralElementLaplacian::derefine_op");
+    std::shared_ptr<Op> SpectralElementLaplacian::derefine(const std::shared_ptr<FunctionSpace> &space) {
+        SFEM_TRACE_SCOPE("SpectralElementLaplacian::derefine");
 
         if (space->n_blocks() > 1) {
-            SFEM_ERROR("SpectralElementLaplacian::derefine_op: multi-block is not implemented\n");
+            SFEM_ERROR("SpectralElementLaplacian::derefine: multi-block is not implemented\n");
             return nullptr;
         }
 

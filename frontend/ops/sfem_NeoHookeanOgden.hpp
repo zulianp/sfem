@@ -11,8 +11,8 @@ namespace sfem {
         std::shared_ptr<Op> create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
                                              const ryml::ConstNodeRef             &node) override;
 #endif
-        std::shared_ptr<Op>        lor_op(const std::shared_ptr<FunctionSpace> &space) override;
-        std::shared_ptr<Op>        derefine_op(const std::shared_ptr<FunctionSpace> &space) override;
+        std::shared_ptr<Op>        lor(const std::shared_ptr<FunctionSpace> &space) override;
+        std::shared_ptr<Op>        derefine(const std::shared_ptr<FunctionSpace> &space) override;
         const char                *name() const override { return "NeoHookeanOgden"; }
         //! a stored energy density
         bool energy_or_potential_based() const override { return true; }

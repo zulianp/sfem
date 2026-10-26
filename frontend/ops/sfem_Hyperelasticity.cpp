@@ -945,21 +945,21 @@ namespace sfem {
 
     int Hyperelasticity::report(const real_t *const) { return SFEM_SUCCESS; }
 
-    std::shared_ptr<Op> Hyperelasticity::lor_op(const std::shared_ptr<FunctionSpace> &space) {
-        SFEM_TRACE_SCOPE("Hyperelasticity::lor_op");
+    std::shared_ptr<Op> Hyperelasticity::lor(const std::shared_ptr<FunctionSpace> &space) {
+        SFEM_TRACE_SCOPE("Hyperelasticity::lor");
 
         // FIXME: Must work for all element types and multi-block
         auto ret            = std::make_shared<Hyperelasticity>(space);
-        ret->impl_->domains = impl_->domains->lor_op(space, {});
+        ret->impl_->domains = impl_->domains->lor(space, {});
         return ret;
     }
 
-    std::shared_ptr<Op> Hyperelasticity::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
-        SFEM_TRACE_SCOPE("Hyperelasticity::derefine_op");
+    std::shared_ptr<Op> Hyperelasticity::derefine(const std::shared_ptr<FunctionSpace> &space) {
+        SFEM_TRACE_SCOPE("Hyperelasticity::derefine");
 
         // FIXME: Must work for all element types and multi-block
         auto ret            = std::make_shared<Hyperelasticity>(space);
-        ret->impl_->domains = impl_->domains->derefine_op(space, {});
+        ret->impl_->domains = impl_->domains->derefine(space, {});
         return ret;
     }
 

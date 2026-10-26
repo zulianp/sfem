@@ -21,8 +21,8 @@ namespace sfem {
                                              const ryml::ConstNodeRef             &node) override;
 #endif
 
-        std::shared_ptr<Op> lor_op(const std::shared_ptr<FunctionSpace> &space) override;
-        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override;
+        std::shared_ptr<Op> lor(const std::shared_ptr<FunctionSpace> &space) override;
+        std::shared_ptr<Op> derefine(const std::shared_ptr<FunctionSpace> &space) override;
 
         int initialize(const std::vector<std::string> &block_names = {}) override;
 

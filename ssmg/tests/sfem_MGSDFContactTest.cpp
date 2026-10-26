@@ -605,7 +605,7 @@ int test_checkerboard_hex_ssmgc() {
 }
 
 // The generated material on the same problem: on a micro-element space it is the hand-written
-// operator's discretisation, and every coarse level is its derefine_op. The two solutions agree to
+// operator's discretisation, and every coarse level is its derefine. The two solutions agree to
 // the hand-written operator's single-precision Jacobians and SSMGC's tolerance. With
 // SFEM_EXECUTION_SPACE=device the generated one runs on the device against the hand-written one on
 // the host.

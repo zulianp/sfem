@@ -419,7 +419,7 @@ namespace sfem {
         return ret;
     }
 
-    std::shared_ptr<Op> InertiaPotential::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
+    std::shared_ptr<Op> InertiaPotential::derefine(const std::shared_ptr<FunctionSpace> &space) {
         auto ret = std::make_shared<InertiaPotential>(space, impl_->es);
         ret->set_density(impl_->density);
         ret->set_consistent_mass(impl_->consistent_mass);

@@ -65,14 +65,14 @@ namespace sfem {
          * @param space Function space for LOR operator
          * @return Shared pointer to LOR operator
          */
-        std::shared_ptr<Op> lor_op(const std::shared_ptr<FunctionSpace> &space) override;
+        std::shared_ptr<Op> lor(const std::shared_ptr<FunctionSpace> &space) override;
 
         /**
          * @brief Create a derefined version
          * @param space Function space for derefined operator
          * @return Shared pointer to derefined operator
          */
-        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override;
+        std::shared_ptr<Op> derefine(const std::shared_ptr<FunctionSpace> &space) override;
 
         /**
          * @brief Initialize the operator

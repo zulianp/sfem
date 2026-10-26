@@ -317,7 +317,7 @@ Not a factory entry: `bench/cuda/bench_packed_laplacian.cu` holds packed CUDA pr
 2. `drivers/simulations/poisson.exe.cpp:119` creates op `"MF"` (null) and ignores `SFEM_OPERATOR`. This breaks workflows/poisson.
 3. `em:Laplacian` coarsest derefine calls `Laplacian::override_element_types` on an uninitialised op, which dereferences null (sfem_SemiStructuredEMLaplacian.cpp:95-98; sfem_Laplacian.cpp:490-492).
 4. `LinearElasticity::hessian_{crs,bsr,bcrs_sym}` discard the `iterate` result and always return success (sfem_LinearElasticity.cpp:538-624).
-5. `ASSUME_AFFINE` set after `initialize` does nothing in `LinearElasticity`/`GPULinearElasticity`. Their `derefine_op` and YAML paths do exactly that, so coarse SS levels always run affine.
+5. `ASSUME_AFFINE` set after `initialize` does nothing in `LinearElasticity`/`GPULinearElasticity`. Their `derefine` and YAML paths do exactly that, so coarse SS levels always run affine.
 6. `GPULaplacian` ignores `k`; host `Laplacian` CRS ignores `k`.
 7. `NeoHookeanOgden(Packed)::hessian_diag` and `value_steps` pass `mesh->n_elements()` rather than the block count (suspected multi-block bug).
 8. `GeneratedNeoHookeanOgden`, `GeneratedLaplace` and `GeneratedLinearElasticity` lack `hessian_diag`; the generated ops lack CRS (except Laplace) and block-diag (Laplace). These are the main swap blockers.
