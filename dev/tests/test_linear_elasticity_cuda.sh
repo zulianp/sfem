@@ -4,19 +4,19 @@ set -e
 
 SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
-export PATH=$SCRIPTPATH/../../:$PATH
+export PATH=$SCRIPTPATH/../../../:$PATH
 
 PATH=$SCRIPTPATH:$PATH
 PATH=$SCRIPTPATH/..:$PATH
-PATH=$SCRIPTPATH/../python/sfem:$PATH
-PATH=$SCRIPTPATH/../python/sfem/mesh:$PATH
-PATH=$SCRIPTPATH/../data/benchmarks/meshes:$PATH
-PATH=$SCRIPTPATH/../../matrix.io:$PATH
+PATH=$SCRIPTPATH/../../python/sfem:$PATH
+PATH=$SCRIPTPATH/../../python/sfem/mesh:$PATH
+PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
+PATH=$SCRIPTPATH/../../../matrix.io:$PATH
 
 if [[ -z $SFEM_BIN_DIR ]]
 then
-	PATH=$SCRIPTPATH/../../build:$PATH
-	source $SCRIPTPATH/../../build/sfem_config.sh
+	PATH=$SCRIPTPATH/../../../build:$PATH
+	source $SCRIPTPATH/../../../build/sfem_config.sh
 else
 	echo "Using binaries in $SFEM_BIN_DIR"
 	PATH=$SFEM_BIN_DIR:$PATH

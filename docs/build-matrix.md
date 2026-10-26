@@ -3,6 +3,7 @@
 Every configuration below is built with `SFEM_ENABLE_DEV_MODE=ON` (warnings are errors in C, C++
 and CUDA, in SFEM's own sources), Release, testing ON, and passes its whole ctest.
 Recorded 2026-10-25 on branch tight-api (Stage H of `TIGHT_API.md`).
+(`TIGHT_API.md` was a working plan and is not in the repository.)
 
 ## Platforms
 
@@ -65,6 +66,8 @@ The managed and unified memory models are not in this sweep (`CUDA_MEMORY_MODELS
 - Removed, as they had no effect: `SFEM_ENABLE_FP16_JACOBIANS`, `SFEM_ENABLE_CODEGEN`,
   `SFEM_ENABLE_SRESAMPLE`, the forwarding of the never-defined `SFEM_ENABLE_CUBLAS` and
   `SFEM_ENABLE_CUSPARSE`, and the second (dependent) `SFEM_ENABLE_LAPACK`.
+- Since: `SFEM_ENABLE_SRESAMPLE` is back (2026-10-26), now building the sresample library
+  (default ON); the configurations above predate it.
 - `SFEM_CPU_ARCH` and `SFEM_CUDA_MEMORY` are string cache variables; an unknown memory model
   is an error (a cache holding the old boolean `OFF` maps to `host`).
 - Without RYAML the playground, and the tests whose cases are YAML, are not built. Without MPI the

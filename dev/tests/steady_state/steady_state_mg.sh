@@ -11,7 +11,7 @@ fi
 
 SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 export PATH=$SCRIPTPATH:$PATH
-export PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
+export PATH=$SCRIPTPATH/../../../data/benchmarks/meshes:$PATH
 export PATH=$SFEM_DIR/bin:$PATH
 export PATH=$SFEM_DIR/scripts/sfem/mesh:$PATH
 export PYTHONPATH=$SFEM_DIR/lib:$SFEM_DIR/scripts:$PYTHONPATH
@@ -48,7 +48,7 @@ case $CASE in
 			echo "Reusing mesh"
 		else
 			export SFEM_REFINE=4
-			$SCRIPTPATH/../../data/vtk/joint-hex.sh $SFEM_ELEMENT_REFINE_LEVEL
+			$SCRIPTPATH/../../../data/vtk/joint-hex.sh $SFEM_ELEMENT_REFINE_LEVEL
 		fi
 		sinlet=$mesh/surface/sidesets_aos/base.raw
 		soutlet=$mesh/surface/sidesets_aos/top_small.raw

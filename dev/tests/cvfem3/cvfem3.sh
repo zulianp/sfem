@@ -5,15 +5,15 @@ set -e
 SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
 PATH=$SCRIPTPATH:$PATH
-PATH=$SCRIPTPATH/../../:$PATH
-PATH=$SCRIPTPATH/../../python/sfem:$PATH
-PATH=$SCRIPTPATH/../../python/sfem/mesh:$PATH
-PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
+PATH=$SCRIPTPATH/../../../:$PATH
+PATH=$SCRIPTPATH/../../../python/sfem:$PATH
+PATH=$SCRIPTPATH/../../../python/sfem/mesh:$PATH
+PATH=$SCRIPTPATH/../../../data/benchmarks/meshes:$PATH
 
 if [[ -z $SFEM_BIN_DIR ]]
 then
-	PATH=$SCRIPTPATH/../../build:$PATH
-	source $SCRIPTPATH/../../build/sfem_config.sh
+	PATH=$SCRIPTPATH/../../../build:$PATH
+	source $SCRIPTPATH/../../../build/sfem_config.sh
 else
 	PATH=$SFEM_BIN_DIR:$PATH
 	source $SFEM_BIN_DIR/sfem_config.sh

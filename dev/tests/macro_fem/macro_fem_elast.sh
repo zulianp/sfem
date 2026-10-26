@@ -4,20 +4,20 @@ set -e
 
 SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
-source $SCRIPTPATH/../../build/sfem_config.sh
-export PATH=$SCRIPTPATH/../../:$PATH
-export PATH=$SCRIPTPATH/../../build/:$PATH
-export PATH=$SCRIPTPATH/../../bin/:$PATH
-export PATH=$SCRIPTPATH/../../../matrix.io:$PATH
+source $SCRIPTPATH/../../../build/sfem_config.sh
+export PATH=$SCRIPTPATH/../../../:$PATH
+export PATH=$SCRIPTPATH/../../../build/:$PATH
+export PATH=$SCRIPTPATH/../../../bin/:$PATH
+export PATH=$SCRIPTPATH/../../../../matrix.io:$PATH
 
 export PATH=$SCRIPTPATH:$PATH
 export PATH=$SCRIPTPATH/../..:$PATH
-export PATH=$SCRIPTPATH/../../python/sfem:$PATH
-export PATH=$SCRIPTPATH/../../python/sfem/mesh:$PATH
-export PATH=$SCRIPTPATH/../../python/sfem/grid:$PATH
-export PATH=$SCRIPTPATH/../../python/sfem/algebra:$PATH
-export PATH=$SCRIPTPATH/../../python/sfem/utils:$PATH
-export PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
+export PATH=$SCRIPTPATH/../../../python/sfem:$PATH
+export PATH=$SCRIPTPATH/../../../python/sfem/mesh:$PATH
+export PATH=$SCRIPTPATH/../../../python/sfem/grid:$PATH
+export PATH=$SCRIPTPATH/../../../python/sfem/algebra:$PATH
+export PATH=$SCRIPTPATH/../../../python/sfem/utils:$PATH
+export PATH=$SCRIPTPATH/../../../data/benchmarks/meshes:$PATH
 
 # export OMP_NUM_THREADS=16
 export OMP_NUM_THREADS=8

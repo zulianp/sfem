@@ -6,8 +6,8 @@ set -x
 case_folder=/Users/patrickzulian/Desktop/code/utopia/utopia_fe/data/hydros/mesh-multi-outlet-better
 
 PATH=/Users/patrickzulian/Desktop/code/utopia/utopia/build/:$PATH
-PATH=../../:$PATH
-PATH=../../python:$PATH
+PATH=../../../:$PATH
+PATH=../../../python:$PATH
 
 ./convert.sh
 

@@ -7,10 +7,10 @@ SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
 PATH=$SCRIPTPATH:$PATH
 PATH=$SCRIPTPATH/../..:$PATH
-PATH=$SCRIPTPATH/../../build:$PATH
-PATH=$SCRIPTPATH/../../python:$PATH
-PATH=$SCRIPTPATH/../../python/sfem/utils:$PATH
-PATH=$SCRIPTPATH/../../python/sfem/mesh:$PATH
+PATH=$SCRIPTPATH/../../../build:$PATH
+PATH=$SCRIPTPATH/../../../python:$PATH
+PATH=$SCRIPTPATH/../../../python/sfem/utils:$PATH
+PATH=$SCRIPTPATH/../../../python/sfem/mesh:$PATH
 
 
 raw_to_db()
@@ -37,7 +37,7 @@ workspace=workspace
 
 mkdir -p $workspace
 
-# case=../../data/benchmarks/2_darcy_cylinder/mesh
+# case=../../../data/benchmarks/2_darcy_cylinder/mesh
 case=meshes/3
 p1_mesh=$workspace/p1
 p2_mesh=$workspace/p2 

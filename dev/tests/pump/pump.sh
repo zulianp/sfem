@@ -10,7 +10,7 @@ fi
 
 SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 export PATH=$SCRIPTPATH:$PATH
-export PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
+export PATH=$SCRIPTPATH/../../../data/benchmarks/meshes:$PATH
 export PATH=$SFEM_DIR/bin:$PATH
 export PATH=$SFEM_DIR/scripts/sfem/mesh:$PATH
 export PYTHONPATH=$SFEM_DIR/lib:$SFEM_DIR/scripts:$PYTHONPATH
@@ -25,9 +25,9 @@ if [[ -d "$mesh" ]]
 then
 	echo "Reusing mesh $mesh!"
 else
-	$SCRIPTPATH/../../data/exodus/LeakageTest_Fluid_60K.sh
-	# $SCRIPTPATH/../../data/exodus/LeakageTest_Fluid_578K.sh
-	# $SCRIPTPATH/../../data/exodus/LeakageTest_Fluid_4624K.sh
+	$SCRIPTPATH/../../../data/exodus/LeakageTest_Fluid_60K.sh
+	# $SCRIPTPATH/../../../data/exodus/LeakageTest_Fluid_578K.sh
+	# $SCRIPTPATH/../../../data/exodus/LeakageTest_Fluid_4624K.sh
 fi
 
 sinlet=$mesh/sidesets_aos/FLUID_INLET.raw

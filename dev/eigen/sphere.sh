@@ -9,9 +9,9 @@ SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
 PATH=$SCRIPTPATH:$PATH
 PATH=$SCRIPTPATH/..:$PATH
-PATH=$SCRIPTPATH/../python:$PATH
-PATH=$SCRIPTPATH/../python/mesh:$PATH
-PATH=$SCRIPTPATH/../data/benchmarks/meshes:$PATH
+PATH=$SCRIPTPATH/../../python:$PATH
+PATH=$SCRIPTPATH/../../python/mesh:$PATH
+PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 
 set -x
 
