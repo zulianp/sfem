@@ -1557,7 +1557,7 @@ resample_field_mesh_tet10(const int                            mpi_size,  // MPI
 
     real_t* weighted_field = NULL;
 
-    if (info->use_accelerator == SFEM_ACCELERATOR_TYPE_CUDA && SFEM_TET10_CUDA) {
+    if (info->use_accelerator == Accelerator::CUDA && SFEM_TET10_CUDA) {
 #if SFEM_TET10_CUDA
         int assemble_dual_mass_vector = 1;
         // This indicates if the exchange was made in the kernel
@@ -1587,9 +1587,9 @@ resample_field_mesh_tet10(const int                            mpi_size,  // MPI
         fprintf(stderr, "SFEM_TET10_CUDA is OFF,  %s:%d\n", __FILE__, __LINE__);
         exit(EXIT_FAILURE);
 #endif
-    }  // end if info->use_accelerator == SFEM_ACCELERATOR_TYPE_CUDA && SFEM_TET10_CUDA
+    }  // end if info->use_accelerator == Accelerator::CUDA && SFEM_TET10_CUDA
 
-    if (info->use_accelerator == SFEM_ACCELERATOR_TYPE_CPU) {  // CPU
+    if (info->use_accelerator == Accelerator::CPU) {  // CPU
 
         weighted_field = (real_t*)calloc(mesh->nnodes, sizeof(real_t));
 
