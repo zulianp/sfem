@@ -22,12 +22,12 @@ namespace {
         if (mesh->is_distributed()) {
             auto dist = mesh->distributed();
             SFEM_TEST_EQ(space->n_dofs(), dist->n_nodes_local() * block_size);
-            SFEM_TEST_EQ(space->n_owned_dofs(), dist->n_nodes_owned() * block_size);
+            SFEM_TEST_EQ(space->n_dofs_owned(), dist->n_nodes_owned() * block_size);
             SFEM_TEST_EQ(space->n_dofs_global(), dist->n_nodes_global() * block_size);
         } else {
             const ptrdiff_t expected = mesh->n_nodes() * block_size;
             SFEM_TEST_EQ(space->n_dofs(), expected);
-            SFEM_TEST_EQ(space->n_owned_dofs(), expected);
+            SFEM_TEST_EQ(space->n_dofs_owned(), expected);
             SFEM_TEST_EQ(space->n_dofs_global(), expected);
         }
 
@@ -72,7 +72,7 @@ namespace {
 
             SFEM_TEST_EQ(parallel_space->n_blocks(), serial_space->n_blocks());
             SFEM_TEST_EQ(parallel_space->n_dofs_global(), serial_space->n_dofs_global());
-            SFEM_TEST_EQ(comm->sum(parallel_space->n_owned_dofs()), parallel_space->n_dofs_global());
+            SFEM_TEST_EQ(comm->sum(parallel_space->n_dofs_owned()), parallel_space->n_dofs_global());
 
             for (size_t b = 0; b < serial_space->n_blocks(); ++b) {
                 SFEM_TEST_EQ(parallel_space->element_type(static_cast<int>(b)), serial_space->element_type(static_cast<int>(b)));
@@ -136,7 +136,7 @@ int test_synchronize_after_packing() {
         const ptrdiff_t n = space->n_dofs();
         auto field        = [&](const ptrdiff_t node, const int d) { return std::sin(7 * p[0][node] + 3 * p[1][node] + d) * p[2][node]; };
         std::vector<real_t> x(n, 0);
-        for (ptrdiff_t i = 0; i < space->n_owned_dofs(); ++i) x[i] = field(i / 3, int(i % 3));
+        for (ptrdiff_t i = 0; i < space->n_dofs_owned(); ++i) x[i] = field(i / 3, int(i % 3));
         SFEM_TEST_ASSERT(space->synchronize(x.data()) == SFEM_SUCCESS);
         int wrong = 0;
         for (ptrdiff_t i = 0; i < n; ++i) wrong += std::abs(x[i] - field(i / 3, int(i % 3))) > 1e-14;
@@ -145,7 +145,7 @@ int test_synchronize_after_packing() {
 #ifdef SFEM_ENABLE_CUDA
         // The same gather of device memory, by GPU-aware MPI: the host's values, bitwise.
         std::vector<real_t> y(n, 0);
-        for (ptrdiff_t i = 0; i < space->n_owned_dofs(); ++i) y[i] = field(i / 3, int(i % 3));
+        for (ptrdiff_t i = 0; i < space->n_dofs_owned(); ++i) y[i] = field(i / 3, int(i % 3));
         auto on_device = smesh::to_device(sfem::Buffer<real_t>::wrap(n, y.data()));
         SFEM_TEST_ASSERT(space->synchronize(on_device->data(), sfem::EXECUTION_SPACE_DEVICE) == SFEM_SUCCESS);
         auto back   = smesh::to_host(on_device);

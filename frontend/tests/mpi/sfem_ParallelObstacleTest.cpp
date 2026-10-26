@@ -91,7 +91,7 @@ output: {probes: [{type: contact}]}
 
         auto                 dm    = dist->function()->space()->mesh_ptr();
         const geom_t *const *dp    = dm->points()->data();
-        const ptrdiff_t      owned = dist->function()->space()->n_owned_dofs() / 3;
+        const ptrdiff_t      owned = dist->function()->space()->n_dofs_owned() / 3;
         const real_t        *us    = serial->solution()->data();
         auto                 dsol  = dist->solution();
 #ifdef SFEM_ENABLE_CUDA

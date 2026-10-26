@@ -766,7 +766,7 @@ namespace sfem {
                 if (!c.owned_load && complete_dead_load(*space, points->data(), c) != SFEM_SUCCESS) return SFEM_FAILURE;
                 const real_t *const g     = c.owned_load->data();
                 const real_t        v     = c.value;
-                const ptrdiff_t     owned = space->n_owned_dofs();
+                const ptrdiff_t     owned = space->n_dofs_owned();
 #pragma omp parallel for
                 for (ptrdiff_t i = 0; i < owned; ++i) out[i] += v * g[i];
                 continue;

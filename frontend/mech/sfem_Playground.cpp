@@ -778,7 +778,7 @@ namespace sfem {
             }
             if (m->comm()->size() > 1) {
                 // Each node by the rank that owns it: the others' copies are not constrained twice.
-                const ptrdiff_t owned_nodes = fs->n_owned_dofs() / fs->block_size();
+                const ptrdiff_t owned_nodes = fs->n_dofs_owned() / fs->block_size();
                 std::vector<idx_t> owned;
                 for (ptrdiff_t i = 0; i < (ptrdiff_t)nodes->size(); ++i) {
                     if (nodes->data()[i] < owned_nodes) owned.push_back(nodes->data()[i]);
@@ -787,7 +787,7 @@ namespace sfem {
                 std::copy(owned.begin(), owned.end(), nodes->data());
             }
             contact  = std::make_shared<NodeObstacleContact>(
-                    obstacle_sdf, m->comm(), nodes, m->points(), fs->n_dofs(), fs->n_owned_dofs(), dir, es);
+                    obstacle_sdf, m->comm(), nodes, m->points(), fs->n_dofs(), fs->n_dofs_owned(), dir, es);
             obstacle = contact;
             if (contact->size() == 0) {
                 fprintf(stderr, "Playground: the obstacle has no contact nodes\n");
@@ -1282,7 +1282,7 @@ namespace sfem {
         ptrdiff_t n_elements = impl.mesh->n_elements(), n_dofs = impl.fs->n_dofs();
         if (comm->size() > 1) {
             n_elements = comm->sum(impl.mesh->distributed()->n_elements_owned());
-            n_dofs     = comm->sum(impl.fs->n_owned_dofs());
+            n_dofs     = comm->sum(impl.fs->n_dofs_owned());
         }
         if (comm->rank() == 0) {
             printf("Playground: %s, %s, %td elements, %td dofs, %d steps of %g%s\n",

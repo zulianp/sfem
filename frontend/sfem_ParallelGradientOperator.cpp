@@ -39,7 +39,7 @@ namespace sfem {
         auto mesh  = space->mesh_ptr();
 
         impl_->block_size = space->block_size();
-        impl_->owned_dofs = space->n_owned_dofs();
+        impl_->owned_dofs = space->n_dofs_owned();
         impl_->local_dofs = space->n_dofs();
 
         // The space already carries the owned/local split (FunctionSpace::initialize_dof_counts

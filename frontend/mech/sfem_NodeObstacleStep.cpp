@@ -187,7 +187,7 @@ namespace sfem {
         Impl *const self   = &impl;
         auto        framed = create_buffer<real_t>(impl.ndofs, es);
         // Under MPI the owned rows, as the tangent's product computes them.
-        const ptrdiff_t                           owned = f->space()->n_owned_dofs();
+        const ptrdiff_t                           owned = f->space()->n_dofs_owned();
         std::shared_ptr<ParallelOperator<real_t>> op;
         if (es == EXECUTION_SPACE_HOST) {
             // One region: each thread takes its nodes into the frames, then, once every thread's

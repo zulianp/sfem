@@ -93,7 +93,7 @@ namespace sfem {
         if (mesh_is_mpi(fine->mesh_ptr())) {
             return false;
         }
-        return coarse->n_owned_dofs() <= fine->n_owned_dofs();
+        return coarse->n_dofs_owned() <= fine->n_dofs_owned();
     }
 
     static void inject_fine_state_host(const std::shared_ptr<FunctionSpace> &fine_space,
@@ -119,7 +119,7 @@ namespace sfem {
 
         const ptrdiff_t n_fine_local   = fm->n_nodes();
         const ptrdiff_t n_coarse_local = cm->n_nodes();
-        const ptrdiff_t n_coarse_owned = coarse_space->n_owned_dofs() / bs;
+        const ptrdiff_t n_coarse_owned = coarse_space->n_dofs_owned() / bs;
         auto            fmap           = fm->distributed()->node_mapping()->data();
         auto            cmap           = cm->distributed()->node_mapping()->data();
 

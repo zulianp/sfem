@@ -287,7 +287,7 @@ namespace sfem {
 
     ptrdiff_t FunctionSpace::n_dofs() const { return impl_->nlocal; }
 
-    ptrdiff_t FunctionSpace::n_owned_dofs() const { return impl_->nowned; }
+    ptrdiff_t FunctionSpace::n_dofs_owned() const { return impl_->nowned; }
 
     ptrdiff_t FunctionSpace::n_dofs_global() const { return impl_->nglobal; }
 

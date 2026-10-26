@@ -180,12 +180,12 @@ int test_checkerboard_function_space() {
 
     const ptrdiff_t expected = mesh->n_nodes();
     SFEM_TEST_ASSERT(space->n_dofs() == expected);
-    SFEM_TEST_ASSERT(space->n_owned_dofs() == expected);
+    SFEM_TEST_ASSERT(space->n_dofs_owned() == expected);
     SFEM_TEST_ASSERT(space->n_dofs_global() == expected);
 
     auto space3 = sfem::FunctionSpace::create(mesh, 3);
     SFEM_TEST_ASSERT(space3->n_dofs() == expected * 3);
-    SFEM_TEST_ASSERT(space3->n_owned_dofs() == expected * 3);
+    SFEM_TEST_ASSERT(space3->n_dofs_owned() == expected * 3);
     SFEM_TEST_ASSERT(space3->n_dofs_global() == expected * 3);
 
     return SFEM_TEST_SUCCESS;
@@ -201,7 +201,7 @@ int test_hex8_tet4_function_space() {
 
     const ptrdiff_t expected = mesh->n_nodes();
     SFEM_TEST_ASSERT(space->n_dofs() == expected);
-    SFEM_TEST_ASSERT(space->n_owned_dofs() == expected);
+    SFEM_TEST_ASSERT(space->n_dofs_owned() == expected);
     SFEM_TEST_ASSERT(space->n_dofs_global() == expected);
     SFEM_TEST_ASSERT(space->n_dofs() != mesh->n_elements());
 
@@ -223,7 +223,7 @@ int test_packed_mesh_function_space() {
     SFEM_TEST_ASSERT(space->element_type(0) == smesh::HEX8);
     SFEM_TEST_ASSERT(space->element_type(1) == smesh::HEX8);
     SFEM_TEST_ASSERT(space->n_dofs() == mesh->n_nodes());
-    SFEM_TEST_ASSERT(space->n_owned_dofs() == mesh->n_nodes());
+    SFEM_TEST_ASSERT(space->n_dofs_owned() == mesh->n_nodes());
     SFEM_TEST_ASSERT(space->n_dofs_global() == mesh->n_nodes());
 
     auto mixed        = sfem::Mesh::create_hex8_tet4_cube(sfem::Communicator::self(), 2, 2, 2);
@@ -287,7 +287,7 @@ int test_override_element_types_multi_block() {
     SFEM_TEST_ASSERT(space->element_type(0) == smesh::HEX8);
     SFEM_TEST_ASSERT(space->element_type(1) == smesh::HEX8);
     SFEM_TEST_ASSERT(space->n_dofs() == mesh->n_nodes());
-    SFEM_TEST_ASSERT(space->n_owned_dofs() == mesh->n_nodes());
+    SFEM_TEST_ASSERT(space->n_dofs_owned() == mesh->n_nodes());
     SFEM_TEST_ASSERT(space->n_dofs_global() == mesh->n_nodes());
 
     return SFEM_TEST_SUCCESS;

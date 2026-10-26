@@ -370,7 +370,7 @@ namespace {
         function->add_operator(laplacian);
 
         const ptrdiff_t n_local  = space->n_dofs();
-        const ptrdiff_t n_owned  = space->n_owned_dofs();
+        const ptrdiff_t n_owned  = space->n_dofs_owned();
         auto            x        = sfem::create_host_buffer<real_t>(n_local);
         auto            y_all    = sfem::create_host_buffer<real_t>(n_local);
         auto            y_phased = sfem::create_host_buffer<real_t>(n_local);
