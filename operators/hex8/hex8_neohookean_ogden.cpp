@@ -331,18 +331,6 @@ int hex8_neohookean_ogden_hessian_partial_assembly(const ptrdiff_t              
         }
 
         scalar_t S_ikmn[HEX8_S_IKMN_SIZE] = {0};
-#if 0
-
-        static const scalar_t samplex = 0.5, sampley = 0.5, samplez = 0.5;
-        hex8_adjugate_and_det(lx, ly, lz, samplex, sampley, samplez, jacobian_adjugate, &jacobian_determinant);
-
-        // Sample at the centroid
-        scalar_t F[9] = {0};
-        hex8_F(jacobian_adjugate, jacobian_determinant, samplex, sampley, samplez, element_ux, element_uy, element_uz, F);
-        
-        hex8_S_ikmn_neohookean(jacobian_adjugate, jacobian_determinant, samplex, sampley, samplez,1,F, mu, lambda,  S_ikmn);
-
-#else
         for (int qz = 0; qz < n_qp; qz++) {
             for (int ky = 0; ky < n_qp; ky++) {
                 for (int kx = 0; kx < n_qp; kx++) {
@@ -374,7 +362,6 @@ int hex8_neohookean_ogden_hessian_partial_assembly(const ptrdiff_t              
                 }
             }
         }
-#endif
         metric_tensor_t *const pai = &partial_assembly[i * HEX8_S_IKMN_SIZE];
         for (int k = 0; k < HEX8_S_IKMN_SIZE; k++) {
             assert(S_ikmn[k] == S_ikmn[k]);
@@ -423,15 +410,6 @@ int hex8_neohookean_ogden_partial_assembly_apply(const ptrdiff_t                
             element_hz[v]       = hz[idx];
         }
 
-#if 0 
-    // Slower than other variant
-    scalar_t                     S_ikmn[3*3*3*3];
-    hex8_expand_S(&partial_assembly[i * HEX8_S_IKMN_SIZE], S_ikmn);
-
-    scalar_t                     Zpkmn[8*3*3*3];
-    hex8_Zpkmn(Wimpn_compressed, element_hx, element_hy, element_hz, Zpkmn);
-    hex8_SdotZ_expanded(S_ikmn, Zpkmn, eoutx, eouty, eoutz);
-#else
         const metric_tensor_t *const pai = &partial_assembly[i * HEX8_S_IKMN_SIZE];
         scalar_t                     S_ikmn[HEX8_S_IKMN_SIZE];
         for (int k = 0; k < HEX8_S_IKMN_SIZE; k++) {
@@ -440,7 +418,6 @@ int hex8_neohookean_ogden_partial_assembly_apply(const ptrdiff_t                
         }
 
         hex8_SdotHdotG(S_ikmn, Wimpn_compressed, element_hx, element_hy, element_hz, eoutx, eouty, eoutz);
-#endif
 
         for (int edof_i = 0; edof_i < 8; edof_i++) {
             const ptrdiff_t idx = ev[edof_i] * out_stride;

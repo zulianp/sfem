@@ -42,7 +42,6 @@
 // Mesh
 
 #include "hex8_fff.hpp"
-#include "hex8_jacobian.hpp"
 //
 
 #include "smesh_semistructured.hpp"

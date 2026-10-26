@@ -76,7 +76,6 @@ set(SFEM_MODULES
     operators/edgeshell3
     operators/generic
     operators/hex8
-    operators/hierarchical
     operators/macro_tet4
     operators/macro_tri3
     operators/navier_stokes
@@ -97,13 +96,6 @@ set(SFEM_MODULES
     solver
     ssmg
 )
-
-# FIXME DG is yet to be implemented 
-# list(APPEND SFEM_MODULES
-#     operators/hex8/dg
-#     operators/quad4/dg
-#     operators/spectral_hex/dg
-# )
 
 if(SFEM_ENABLE_EXPLICIT_VECTORIZATION)
     list(APPEND SFEM_MODULES operators/tet4/vectorized)
@@ -148,10 +140,6 @@ list(APPEND SFEM_MODULES
     frontend/mech
 )
 
-if(SFEM_ENABLE_METIS)
-    list(APPEND SFEM_MODULES graphs)
-endif()
-
 if(SFEM_ENABLE_SCCD AND SFEM_ENABLE_SSDF)
     list(APPEND SFEM_MODULES frontend/collisions)
 endif()
@@ -170,10 +158,8 @@ if(SFEM_ENABLE_CUDA)
         operators/cuda
         operators/hex8/cuda
         operators/macro_tet4/cuda
-        operators/quadshell4/cuda
         operators/spectral_hex/cuda
         operators/sshex8/cuda
-        operators/sstet4/cuda
         operators/tet10/cuda
         operators/tet4/cuda
         resampling/surface/cuda
@@ -347,7 +333,7 @@ endif()
 # Executables
 
 if(NOT SFEM_ENABLE_MINIMAL)
-    list(APPEND SFEM_DRIVER_MODULES . mesh examples mesh_functions postprocess sdf bench ale simulations contact mech verification)
+    list(APPEND SFEM_DRIVER_MODULES . postprocess bench ale simulations mech verification)
 
     foreach(DRIVER_MODULE ${SFEM_DRIVER_MODULES})
         file(GLOB MODULE_C_DRIVERS CONFIGURE_DEPENDS "drivers/${DRIVER_MODULE}/*.c")
@@ -360,7 +346,7 @@ if(NOT SFEM_ENABLE_MINIMAL)
 
     if(${SFEM_SCALAR_TYPE} STREQUAL "float32")
         # FIXME these executables need to be fixed when compiling with real_t=float32
-        list (APPEND SFEM_EXCLUDED_EXEC assemble;assemble3;assemble4;cvfem_assemble;heat_equation;heat_equation;taylor_hood_navier_stokes)
+        list (APPEND SFEM_EXCLUDED_EXEC assemble;assemble3;cvfem_assemble;taylor_hood_navier_stokes)
     endif()
 
     if(NOT SFEM_ENABLE_MPI)
@@ -392,8 +378,6 @@ if(NOT SFEM_ENABLE_MINIMAL)
 
         list(APPEND DRIVERS "${CUDA_C_EXAMPLES}")
         list(APPEND DRIVERS "${CUDA_CXX_EXAMPLES}")
-    else()
-        list(APPEND SFEM_EXCLUDED_EXEC "run_poisson_cuda;lapl_matrix_free;linear_elasticity_matrix_free;sym_spmv_bench")
     endif()
 
 
@@ -456,10 +440,7 @@ if(SFEM_ENABLE_TESTING)
         algebra/crs/tests
         algebra/bsr/tests
         algebra/crs_x_bsr/tests
-        operators/ssquad4/tests
-        operators/sshex8/tests
         operators/stencil/tests
-        mesh/tests
         frontend/tests
         ssmg/tests
     )

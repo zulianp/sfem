@@ -30,17 +30,6 @@ namespace sfem {
                                                                       const std::shared_ptr<FunctionSpace> &to_space,
                                                                       const ExecutionSpace                  es);
 
-    std::shared_ptr<Operator<real_t>> create_hierarchical_restriction_from_graph(const ptrdiff_t                  n_fine_nodes,
-                                                                                 const int                        block_size,
-                                                                                 const std::shared_ptr<CRSGraph> &crs_graph,
-                                                                                 const SharedBuffer<idx_t>       &edges,
-                                                                                 const ExecutionContext          &context);
-
-    std::shared_ptr<Operator<real_t>> create_hierarchical_prolongation_from_graph(const std::shared_ptr<Function> &function,
-                                                                                  const std::shared_ptr<CRSGraph> &crs_graph,
-                                                                                  const SharedBuffer<idx_t>       &edges,
-                                                                                  const ExecutionContext          &context);
-
 }  // namespace sfem
 
 #endif  // SFEM_TRANSFER_HPP

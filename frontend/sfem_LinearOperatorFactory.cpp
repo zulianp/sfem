@@ -390,16 +390,6 @@ namespace sfem {
                 f->execution_space());
     }
 
-    std::shared_ptr<Operator<real_t>> make_linear_op_variant(const std::shared_ptr<Function>                &f,
-                                                             const std::vector<std::pair<std::string, int>> &opts) {
-        auto variant = f->linear_op_variant(opts);
-        return sfem::make_op<real_t>(
-                f->space()->n_dofs(),
-                f->space()->n_dofs(),
-                [=](const real_t *const x, real_t *const y) { variant->apply(x, y); },
-                f->execution_space());
-    }
-
     std::shared_ptr<sfem::CRS<count_t, idx_t, real_t, real_t>> hessian_crs(sfem::Function                  &f,
                                                                            const std::shared_ptr<CRSGraph> &crs_graph,
                                                                            const sfem::ExecutionSpace       es) {
@@ -614,11 +604,6 @@ namespace sfem {
         }
 
         return sfem::hessian_bcrs_sym(f, u, es);
-    }
-
-    SharedInPlaceOperator<real_t> create_zero_constraints_op(const std::shared_ptr<Function> &f) {
-        return make_in_place_op<real_t>(
-                f->space()->n_dofs(), [=](real_t *const x) { f->apply_zero_constraints(x); }, f->execution_space());
     }
 
 }  // namespace sfem

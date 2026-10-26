@@ -365,23 +365,7 @@ namespace sfem {
                 y[i] = val;
             }
         } else if (scale_output == 1) {
-#if 0
-#pragma omp parallel for  // nowait
-            for (ptrdiff_t i = 0; i < rows; i++) {
-                const R row_begin = rowptr[i];
-                const R row_end   = rowptr[i + 1];
-
-                T val = y[i];
-                for (R k = row_begin; k < row_end; k++) {
-                    const C j   = colidx[k];
-                    const T aij = values[k];
-
-                    val += aij * x[j];
-                }
-
-                y[i] = val;
-            }
-#else                     // 20-27% faster on M1
+            // 20-27% faster on M1
 #pragma omp parallel for  // nowait
             for (ptrdiff_t i = 0; i < rows; i++) {
                 const R row_begin = rowptr[i];
@@ -419,7 +403,6 @@ namespace sfem {
 
                 y[i] = val;
             }
-#endif
         } else {
 #pragma omp parallel for  // nowait
             for (ptrdiff_t i = 0; i < rows; i++) {
