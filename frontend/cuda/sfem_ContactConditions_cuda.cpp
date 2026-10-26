@@ -2,7 +2,7 @@
 #include "sfem_Function.hpp"
 
 #include "boundary_condition.hpp"
-#include "cu_boundary_condition.hpp"
+#include "boundary_condition_cuda.hpp"
 
 namespace sfem {
 

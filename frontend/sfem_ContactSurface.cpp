@@ -9,7 +9,7 @@
 #include "smesh_device_buffer.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
-#include "cu_contact_surface.hpp"
+#include "contact_surface_cuda.hpp"
 #include "sfem_Function_incore_cuda.hpp"
 #endif
 

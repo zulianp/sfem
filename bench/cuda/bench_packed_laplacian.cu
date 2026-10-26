@@ -1,8 +1,8 @@
 #include "bench_packed_laplacian_cuda.hpp"
 
-#include "cu_hex8_laplacian_inline.hpp"
-#include "cu_tet10_laplacian_inline.hpp"
-#include "cu_tet4_laplacian_inline.hpp"
+#include "hex8_laplacian_inline_cuda.hpp"
+#include "tet10_laplacian_inline_cuda.hpp"
+#include "tet4_laplacian_inline_cuda.hpp"
 #include "sfem_cuda_base.hpp"
 #include "smesh_elem_type.hpp"
 

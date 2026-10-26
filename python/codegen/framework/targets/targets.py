@@ -501,7 +501,7 @@ class TargetPlatform:
 
         SFEM keeps device sources in a local `cuda/` folder beside the host
         sources of the same module: `operators/tet4/tet4_laplacian.cpp` is
-        mirrored by `operators/tet4/cuda/cu_tet4_laplacian.cu`, and the same
+        mirrored by `operators/tet4/cuda/tet4_laplacian_cuda.cu`, and the same
         shape holds in `operators/hex8`, `operators/tet10`, `algebra`,
         `resampling`, `frontend` and inside `external/smesh`.  The generated
         tree follows the repository rather than inventing its own placement.

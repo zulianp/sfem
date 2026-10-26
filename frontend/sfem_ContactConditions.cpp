@@ -35,7 +35,7 @@
 #include <vector>
 
 #ifdef SFEM_ENABLE_CUDA
-#include "cu_obstacle.hpp"
+#include "obstacle_cuda.hpp"
 #include "sfem_ContactConditions_cuda.hpp"
 #include "sfem_BLAS_cuda.hpp"
 #include "smesh_device_arrays.hpp"

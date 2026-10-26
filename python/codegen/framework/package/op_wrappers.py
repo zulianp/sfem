@@ -7691,7 +7691,7 @@ def _runtime_typed_argument(param, scalar_type):
 def _merged_pair_dispatch_function_lines(group):
     """One entry point where there were two, taking the scalar type as a value.
 
-    This is the shape ``operators/tet4/cuda/cu_tet4_laplacian.cu`` uses: the
+    This is the shape ``operators/tet4/cuda/tet4_laplacian_cuda.cu`` uses: the
     buffers cross as ``void *`` and a ``smesh::PrimitiveType`` says what they
     hold, the body switches, casts, and calls the concrete implementation.
     SFEM splits the two switches across two functions -- element type in

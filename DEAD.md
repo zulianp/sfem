@@ -67,7 +67,7 @@ No `#include` of the basename exists anywhere in C/C++/CUDA/CMake/python/binding
 - [ ] `operators/tet4/tet4_partial_assembly_pa_inline.hpp` (636 lines)
 - [ ] `operators/tet4/tet4_neohookean_ogden_active_strain_local.hpp` (925 lines)
 - [ ] `operators/tet4/tet4_partial_assembly_neohookean_ogden_active_strain_inline.hpp` (1359 lines)
-- [ ] `operators/tet4/cuda/cu_tet4_linear_elasticity_inline.hpp` (90 lines)
+- [ ] `operators/tet4/cuda/tet4_linear_elasticity_inline_cuda.hpp` (90 lines)
 - [ ] `operators/hex8/hex8_mooney_rivlin_visco_unique_Hi_standard.hpp` (4483 lines): the only include, at `hex8_mooney_rivlin_visco_flexible.cpp:19`, is commented out. It is output of `sr_visco_hyper_unique_Hi.py`, whose live sibling `_unique_Hi_local.hpp` stays.
 - [ ] `operators/stencil/sshex8_skeleton_offdiag_stencil.hpp` (1718 lines): the only include, at `operators/sshex8/sshex8_laplacian.cpp:8`, is commented out.
 - [ ] `algebra/openmp/sfem_openmp_ShiftableJacobi_SoA.hpp` (231 lines): the name `ShiftableJacobi_SoA` appears nowhere else.
