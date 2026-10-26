@@ -448,7 +448,7 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
             Path(__file__).resolve().parents[4]
             / "frontend"
             / "tests"
-            / "sfem_MatrixFromatsTest.cpp"
+            / "sfem_MatrixFormatsTest.cpp"
         ).read_text()
         self.assertIn('sfem::create_op(space, "GeneratedNeoHookeanOgden"', matrix_test_source)
         self.assertIn("neohookean_ogden_apply_packed_3d_i_msoa", matrix_test_source)
