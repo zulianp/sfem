@@ -170,7 +170,7 @@ namespace {
 
         // curvature
         const sfem::MPRGPParams<real_t> params{real_t(3), real_t(0.5), infty, std::numeric_limits<real_t>::epsilon()};
-        s.impl.curvature(n, dlb, dub, dx, dg, dd, dAd, infty, sfem::MPRGP_DECIDE_NONE, params, s.control_buffer(), s.work_buffer(), {});
+        s.impl.curvature(n, dlb, dub, dx, dg, dd, dAd, infty, sfem::MPRGPDecision::NONE, params, s.control_buffer(), s.work_buffer(), {});
         sfem::MPRGPControl<real_t> rec = s.read();
         real_t                     out[4] = {rec.dAd, rec.dd, rec.gd, rec.alpha_feas};
         real_t dAd_r = 0, dd_r = 0, gd_r = 0, alpha_r = infty;
@@ -191,7 +191,7 @@ namespace {
         SFEM_TEST_ASSERT(out[3] == alpha_r);
 
         // The decisions in the pass, from its own sums, against the same decisions taken here.
-        for (const auto decision : {sfem::MPRGP_DECIDE_CG, sfem::MPRGP_DECIDE_PROPORTIONING}) {
+        for (const auto decision : {sfem::MPRGPDecision::CG, sfem::MPRGPDecision::PROPORTIONING}) {
             s.impl.curvature(n, dlb, dub, dx, dg, dd, dAd, infty, decision, params, s.control_buffer(), s.work_buffer(), {});
             const sfem::MPRGPControl<real_t> in_pass = s.read();
             sfem::MPRGPControl<real_t>       here    = in_pass;
@@ -240,7 +240,7 @@ namespace {
             V       x1 = p.x, g1 = p.g, gf(n, 0);
             real_t *dgf = s.put(gf);
             sfem::MPRGPControl<real_t> c{};
-            c.move  = real_t(sfem::MPRGP_MOVE_STEP);
+            c.move  = real_t(sfem::MPRGPMove::STEP);
             c.alpha = alpha;
             c.dAd   = real_t(2);
             s.write(c);
@@ -339,7 +339,7 @@ namespace {
                 SFEM_TEST_ASSERT(err < 1e-14 * (1 + std::abs(rec.beta)));
 
                 c       = s.read();
-                c.move  = real_t(sfem::MPRGP_MOVE_EXPAND);
+                c.move  = real_t(sfem::MPRGPMove::EXPAND);
                 s.write(c);
                 s.impl.update_direction(n, dgf, dp, s.control_buffer());
                 V again(n);

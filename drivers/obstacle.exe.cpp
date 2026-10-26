@@ -218,7 +218,7 @@ int solve_obstacle(const std::shared_ptr<sfem::Communicator> &comm, int argc, ch
         auto mprgp = sfem::create_mprgp(linear_op, es);
 
         if (SFEM_USE_PROJECTED_CG) {
-            mprgp->set_expansion_type(sfem::MPRGP<real_t>::EXPANSION_TYPE_PROJECTED_CG);
+            mprgp->set_expansion_type(sfem::MPRGP<real_t>::Expansion::PROJECTED_CG);
         }
 
         mprgp->set_op(linear_op);
