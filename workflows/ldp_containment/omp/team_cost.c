@@ -7,7 +7,7 @@
 //             order, every thread taking the same decisions
 //   diss:     team with a dissemination barrier (release/acquire flags, one writer each)
 //   work:     team without barriers: the passes alone (timing only, its results are discarded)
-//   chunkK:   team whose sums are over K chunks fixed by n alone, as OpenMP_BLAS's deterministic
+//   chunkK:   team whose sums are over K chunks fixed by n alone, as OpenMPBLAS's deterministic
 //             dot: each thread takes whole chunks, writes a partial per chunk and, after the
 //             barrier, sums all K in index order (the result is the same for any thread count)
 // With ranks, the sums are also allreduced (team: thread 0, then one more barrier). Median of 40

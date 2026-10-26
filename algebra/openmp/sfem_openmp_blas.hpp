@@ -75,9 +75,9 @@ namespace sfem {
 
 
     template <typename T>
-    class OpenMP_BLAS final : public BLAS<T> {
+    class OpenMPBLAS final : public BLAS<T> {
     public:
-        OpenMP_BLAS() : BLAS<T>(ExecutionContext::host()) {}
+        OpenMPBLAS() : BLAS<T>(ExecutionContext::host()) {}
 
         auto allocate(const std::size_t n) -> T* override { return (T*)calloc(n, sizeof(T)); }
 
@@ -190,7 +190,7 @@ namespace sfem {
 
     template <typename T>
     std::shared_ptr<BLAS<T>> make_openmp_blas() {
-        return std::make_shared<OpenMP_BLAS<T>>();
+        return std::make_shared<OpenMPBLAS<T>>();
     }
 
 }  // namespace sfem
