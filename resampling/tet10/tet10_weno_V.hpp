@@ -19,15 +19,15 @@ namespace sfem {
 
 // #ifdef AVX512
 // #define _VL_ 8
-// #define ZEROS_VEC \
+// #define ZEROS_VEC
 //     { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 }
-// #define CONST_VEC(__X__) \
+// #define CONST_VEC(__X__)
 //     { __X__, __X__, __X__, __X__, __X__, __X__, __X__, __X__ }
 // #elif defined(AVX2)
 // #define _VL_ 4
-// #define ZEROS_VEC \
+// #define ZEROS_VEC
 //     { 0.0, 0.0, 0.0, 0.0 }
-// #define CONST_VEC(__X__) \
+// #define CONST_VEC(__X__)
 //     { __X__, __X__, __X__, __X__ }
 // #endif
 

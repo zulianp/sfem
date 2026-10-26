@@ -3827,46 +3827,6 @@ static SFEM_INLINE void hex8_mooney_rivlin_grad_hist_single(
     accumulator_t *const SFEM_RESTRICT  gz)
 {
 // Single Prony term history contribution to gradient
-scalar_t F[9];
-{
-
-// mundane ops: 267 divs: 1 sqrts: 0 
-// total ops: 275
-const scalar_t x0 = 1.0/jacobian_determinant;
-const scalar_t x1 = qy*qz;
-const scalar_t x2 = 1 - qz;
-const scalar_t x3 = qy*x2;
-const scalar_t x4 = 1 - qy;
-const scalar_t x5 = qz*x4;
-const scalar_t x6 = x2*x4;
-const scalar_t x7 = dispx[0]*x6 - dispx[1]*x6 - dispx[2]*x3 + dispx[3]*x3 + dispx[4]*x5 - dispx[5]*x5 - dispx[6]*x1 + dispx[7]*x1;
-const scalar_t x8 = qx*qz;
-const scalar_t x9 = qx*x2;
-const scalar_t x10 = 1 - qx;
-const scalar_t x11 = qz*x10;
-const scalar_t x12 = x10*x2;
-const scalar_t x13 = dispx[0]*x12 + dispx[1]*x9 - dispx[2]*x9 - dispx[3]*x12 + dispx[4]*x11 + dispx[5]*x8 - dispx[6]*x8 - dispx[7]*x11;
-const scalar_t x14 = qx*qy;
-const scalar_t x15 = qx*x4;
-const scalar_t x16 = qy*x10;
-const scalar_t x17 = x10*x4;
-const scalar_t x18 = dispx[0]*x17 + dispx[1]*x15 + dispx[2]*x14 + dispx[3]*x16 - dispx[4]*x17 - dispx[5]*x15 - dispx[6]*x14 - dispx[7]*x16;
-const scalar_t x19 = dispy[0]*x6 - dispy[1]*x6 - dispy[2]*x3 + dispy[3]*x3 + dispy[4]*x5 - dispy[5]*x5 - dispy[6]*x1 + dispy[7]*x1;
-const scalar_t x20 = dispy[0]*x12 + dispy[1]*x9 - dispy[2]*x9 - dispy[3]*x12 + dispy[4]*x11 + dispy[5]*x8 - dispy[6]*x8 - dispy[7]*x11;
-const scalar_t x21 = dispy[0]*x17 + dispy[1]*x15 + dispy[2]*x14 + dispy[3]*x16 - dispy[4]*x17 - dispy[5]*x15 - dispy[6]*x14 - dispy[7]*x16;
-const scalar_t x22 = dispz[0]*x6 - dispz[1]*x6 - dispz[2]*x3 + dispz[3]*x3 + dispz[4]*x5 - dispz[5]*x5 - dispz[6]*x1 + dispz[7]*x1;
-const scalar_t x23 = dispz[0]*x12 + dispz[1]*x9 - dispz[2]*x9 - dispz[3]*x12 + dispz[4]*x11 + dispz[5]*x8 - dispz[6]*x8 - dispz[7]*x11;
-const scalar_t x24 = dispz[0]*x17 + dispz[1]*x15 + dispz[2]*x14 + dispz[3]*x16 - dispz[4]*x17 - dispz[5]*x15 - dispz[6]*x14 - dispz[7]*x16;
-F[0] = -adjugate[0]*x0*x7 - adjugate[3]*x0*x13 - adjugate[6]*x0*x18 + 1;
-F[1] = -x0*(adjugate[1]*x7 + adjugate[4]*x13 + adjugate[7]*x18);
-F[2] = -x0*(adjugate[2]*x7 + adjugate[5]*x13 + adjugate[8]*x18);
-F[3] = -x0*(adjugate[0]*x19 + adjugate[3]*x20 + adjugate[6]*x21);
-F[4] = -adjugate[1]*x0*x19 - adjugate[4]*x0*x20 - adjugate[7]*x0*x21 + 1;
-F[5] = -x0*(adjugate[2]*x19 + adjugate[5]*x20 + adjugate[8]*x21);
-F[6] = -x0*(adjugate[0]*x22 + adjugate[3]*x23 + adjugate[6]*x24);
-F[7] = -x0*(adjugate[1]*x22 + adjugate[4]*x23 + adjugate[7]*x24);
-F[8] = -adjugate[2]*x0*x22 - adjugate[5]*x0*x23 - adjugate[8]*x0*x24 + 1;}
-
 // S_single = alpha * H_i - beta * S_dev_prev (Voigt-6)
 const scalar_t S_s00 = alpha * H_i[0] - beta * S_dev_prev[0];
 const scalar_t S_s11 = alpha * H_i[1] - beta * S_dev_prev[1];

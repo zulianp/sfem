@@ -45,7 +45,7 @@ namespace sfem {
         impl_->execution_space = execution_space;
 
         auto space = function->space();
-        auto mesh  = space->mesh_ptr();
+        auto mesh  = space->mesh();
         auto dist  = mesh->distributed();
 
         impl_->block_size = space->block_size();
@@ -91,7 +91,7 @@ namespace sfem {
 
         real_t *const       x_mut       = const_cast<real_t *>(x);
         const real_t *const state_local = impl_->state ? impl_->state->data() : nullptr;
-        auto                mesh        = impl_->function->space()->mesh_ptr();
+        auto                mesh        = impl_->function->space()->mesh();
 
         // SFEM_PARALLEL_MF_LEGACY=1: original blocking gather + full ALL apply (no ElementScope overlap).
         const bool legacy = smesh::Env::read<int>("SFEM_PARALLEL_MF_LEGACY", 0) != 0;
@@ -173,10 +173,10 @@ namespace sfem {
 
     std::ptrdiff_t ParallelMatrixFreeOperator::cols() const { return impl_->owned_dofs; }
 
-    ExecutionSpace ParallelMatrixFreeOperator::execution_space() const { return impl_->execution_space; }
+    ExecutionContext ParallelMatrixFreeOperator::execution_context() const { return impl_->execution_space; }
 
     std::shared_ptr<Communicator> ParallelMatrixFreeOperator::comm() const {
-        return impl_->function->space()->mesh_ptr()->comm();
+        return impl_->function->space()->mesh()->comm();
     }
 
     std::ptrdiff_t ParallelMatrixFreeOperator::row_allocation_size() const { return impl_->local_dofs; }
@@ -187,7 +187,7 @@ namespace sfem {
                                                                                    const std::shared_ptr<Buffer<real_t>> &state,
                                                                                    const ExecutionSpace execution_space) {
         auto space = function->space();
-        auto mesh  = space->mesh_ptr();
+        auto mesh  = space->mesh();
 
         if (mesh->comm()->size() == 1) {
             return make_parallel_op<real_t>(

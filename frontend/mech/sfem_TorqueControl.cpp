@@ -5,9 +5,9 @@
 #include <cstdio>
 #include <limits>
 
-#include "sfem_API.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_Rotation.hpp"
+#include "sfem_blas_factory.hpp"
 
 namespace sfem {
 
@@ -80,7 +80,7 @@ namespace sfem {
             if (!report.converged()) return total;
 
             if (material_torque(*impl.material, *impl.rotation, x, impl.scratch, torque) != SFEM_SUCCESS) {
-                total.status = NonlinearReport::STEP_FAILED;
+                total.status = NonlinearReport::Status::STEP_FAILED;
                 return total;
             }
             if (std::abs(torque - target) <= impl.options.tol * std::abs(target)) return total;
@@ -110,7 +110,7 @@ namespace sfem {
                 (double)target,
                 (double)impl.options.tol,
                 impl.options.max_it);
-        total.status = NonlinearReport::MAX_IT;
+        total.status = NonlinearReport::Status::MAX_IT;
         return total;
     }
 

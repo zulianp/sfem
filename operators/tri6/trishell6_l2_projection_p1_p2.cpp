@@ -1,4 +1,5 @@
 #include "trishell6_l2_projection_p1_p2.hpp"
+#include "smesh_base.hpp"
 
 #include <assert.h>
 #include <math.h>
@@ -117,7 +118,7 @@ void trishell6_ep1_p2_l2_projection_apply(const ptrdiff_t nelements,
                                           geom_t **const SFEM_RESTRICT xyz,
                                           const real_t *const SFEM_RESTRICT element_wise_p1,
                                           real_t *const SFEM_RESTRICT p2) {
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     idx_t ev[6];
     real_t element_p2[6];
@@ -159,7 +160,7 @@ void trishell6_ep1_p2_l2_projection_apply(const ptrdiff_t nelements,
         }
     }
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
     printf("trishell6_l2_projection_p1_p2.c: trishell6_p1_p2_l2_projection_apply\t%g seconds\n", tock - tick);
 }
 
@@ -169,7 +170,7 @@ void trishell6_ep1_p2_projection_coeffs(const ptrdiff_t nelements,
                                         geom_t **const SFEM_RESTRICT xyz,
                                         const real_t *const SFEM_RESTRICT element_wise_p1,
                                         real_t *const SFEM_RESTRICT p2) {
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     idx_t ev[6];
 
@@ -258,6 +259,6 @@ void trishell6_ep1_p2_projection_coeffs(const ptrdiff_t nelements,
 
     free(buff);
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
     printf("trishell6_l2_projection_p0_p1.c: trishell6_p0_p1_projection_coeffs\t%g seconds\n", tock - tick);
 }

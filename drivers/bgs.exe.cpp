@@ -1,4 +1,5 @@
 #include <math.h>
+#include "smesh_base.hpp"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,7 +11,7 @@
 
 #include "dirichlet.hpp"
 
-#include "inverse.cpp"
+#include "sfem_inverse.cpp"
 #include "sfem_base.hpp"
 
 #define MAX_BLOCK_SIZE 4
@@ -24,21 +25,21 @@ static int bgs_init(const ptrdiff_t                    nnodes,
     //
     switch (block_rows) {
         case 1: {
-            dinvert1(nnodes, rowptr, colidx, values, inv_bdiag);
+            sfem::invert_node_blocks_1(nnodes, rowptr, colidx, values, inv_bdiag);
             break;
         }
 
         case 2: {
-            dinvert2(nnodes, rowptr, colidx, values, inv_bdiag);
+            sfem::invert_node_blocks_2(nnodes, rowptr, colidx, values, inv_bdiag);
             break;
         }
 
         case 3: {
-            dinvert3(nnodes, rowptr, colidx, values, inv_bdiag);
+            sfem::invert_node_blocks_3(nnodes, rowptr, colidx, values, inv_bdiag);
             break;
         }
         case 4: {
-            dinvert4(nnodes, rowptr, colidx, values, inv_bdiag);
+            sfem::invert_node_blocks_4(nnodes, rowptr, colidx, values, inv_bdiag);
             break;
         }
         default: {
@@ -404,7 +405,7 @@ int main(int argc, char *argv[]) {
     //     mkdir(output_path, 0700);
     // }
 
-    const double tick = MPI_Wtime();
+    const double tick = smesh::time_seconds();
 
     ///////////////////////////////////////////////////////////////////////////////
     // Read
@@ -511,7 +512,7 @@ int main(int argc, char *argv[]) {
     free(rhs);
     free(x);
 
-    const double tock = MPI_Wtime();
+    const double tock = smesh::time_seconds();
 
     if (!rank) {
         printf("bgs.c TTS: %g seconds\n", tock - tick);

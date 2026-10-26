@@ -1,4 +1,5 @@
 #include "boundary_mass.hpp"
+#include "smesh_base.hpp"
 
 #include <assert.h>
 #include <math.h>
@@ -7,7 +8,7 @@
 #include <mpi.h>
 
 
-#include "sortreduce.hpp"
+#include "sfem_sortreduce.hpp"
 
 #include "sfem_vec.hpp"
 
@@ -91,7 +92,7 @@ static SFEM_INLINE idx_t find_col(const idx_t key, const idx_t *const row, const
     if (lenrow <= 32) {
         return linear_search(key, row, lenrow);
     } else {
-        return find_idx_binary_search(key, row, lenrow);
+        return sfem::find_idx_binary_search(key, row, lenrow);
     }
 }
 
@@ -124,7 +125,7 @@ void assemble_boundary_mass(const ptrdiff_t nelements,
                             real_t *const values) {
     SFEM_UNUSED(nnodes);
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     idx_t ev[3];
     idx_t ks[3];
@@ -175,7 +176,7 @@ void assemble_boundary_mass(const ptrdiff_t nelements,
         }
     }
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
     printf("boundary_mass.c: assemble_boundary_mass\t%g seconds\n", tock - tick);
 }
 
@@ -187,7 +188,7 @@ void assemble_lumped_boundary_mass(const ptrdiff_t nelements,
 {
     SFEM_UNUSED(nnodes);
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     idx_t ev[3];
 
@@ -224,6 +225,6 @@ void assemble_lumped_boundary_mass(const ptrdiff_t nelements,
         }
     }
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
     printf("boundary_mass.c: assemble_lumped_boundary_mass\t%g seconds\n", tock - tick);
 }

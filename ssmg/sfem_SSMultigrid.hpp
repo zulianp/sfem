@@ -6,11 +6,19 @@
 #include <csignal>
 #include <cstdio>
 
-#include "sfem_API.hpp"
-#include "sfem_aliases.hpp"
+#include "sfem_CooSym.hpp"
+#include "sfem_Function.hpp"
+#include "sfem_LinearOperatorFactory.hpp"
 #include "sfem_ShiftableJacobi.hpp"
 #include "sfem_Stationary.hpp"
+#include "sfem_Transfer.hpp"
+#include "sfem_aliases.hpp"
 #include "sfem_config.h"
+#include "sfem_Chebyshev3.hpp"
+#include "sfem_ShiftableJacobi.hpp"
+#include "sfem_Stationary.hpp"
+#include "sfem_cg.hpp"
+#include "smesh_env.hpp"
 
 #ifdef SFEM_ENABLE_AMG
 
@@ -23,10 +31,10 @@
 #include "sfem_ShiftedPenaltyMultigrid.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
-#include "sfem_cuda_blas.hpp"
-#include "sfem_cuda_ShiftedPenalty_impl.hpp"
+#include "sfem_BLAS_cuda.hpp"
+#include "sfem_ShiftedPenaltyKernels_cuda.hpp"
 #else
-#include "sfem_ShiftedPenalty_impl.hpp"
+#include "sfem_ShiftedPenaltyKernels_openmp.hpp"
 #endif
 
 namespace sfem {
@@ -111,13 +119,12 @@ namespace sfem {
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
             // FIXME this should not be here!
-            mg->blas() = make_cuda_blas<real_t>();
+            mg->blas() = GPUBLAS<real_t>::create();
 
             if (spmg) {
-                CUDA_ShiftedPenalty<real_t>::build(spmg->impl());
+                GPUShiftedPenaltyKernels<real_t>::build(spmg->impl());
             }
 
-            mg->set_execution_space(EXECUTION_SPACE_DEVICE);
         } else
 #endif
         {
@@ -129,7 +136,7 @@ namespace sfem {
 #ifdef SFEM_ENABLE_AMG
         // TODO could probably abstract this part and make it a function somewhere...
         // I just don't know where
-        auto crs_graph = f_coarse->space()->mesh_ptr()->node_to_node_graph_upper_triangular();
+        auto crs_graph = f_coarse->space()->mesh()->node_to_node_graph_upper_triangular();
         auto diag_values = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), es);
         auto off_diag_values = sfem::create_buffer<real_t>(crs_graph->nnz(), es);
         auto off_diag_rows = sfem::create_buffer<idx_t>(crs_graph->nnz(), es);
@@ -199,7 +206,7 @@ namespace sfem {
                SFEM_MG_CYCLE_TYPE,
                SFEM_MG_COARSE_SMOOTH_STEPS);
 
-        mg->set_cycle_type(SFEM_MG_CYCLE_TYPE);
+        mg->set_cycle_type(static_cast<typename MG::CycleType>(SFEM_MG_CYCLE_TYPE));
 
         count_t coarsest_ndofs = 500;
 

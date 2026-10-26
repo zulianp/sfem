@@ -364,36 +364,6 @@ extern "C" const sfem::codegen::KernelDiagnostics *cu_linear_kelvin_voigt_total_
   return &sfem::codegen::linear_kelvin_voigt_total_proteus_quad4_jacobian_action_esoa_diagnostics_data;
 }
 
-extern "C" int cu_linear_kelvin_voigt_total_proteus_quad4_residual_esoa(
-    const int scalar_bytes,
-    const ptrdiff_t geometry_stride,
-    const void *const RSTR determinant,
-    const void *const RSTR adjugate[4],
-    const void *const RSTR current[8],
-    const void *const RSTR previous[8],
-    const real_t eta_b,
-    const real_t eta_s,
-    const real_t lmbda,
-    const real_t mu,
-    const real_t u_dt_shift,
-    void *const RSTR output[8],
-    void *const stream
-) {
-  switch (scalar_bytes) {
-    case (int)sizeof(double): {
-        sfem::codegen::linear_kelvin_voigt_total_d2_tensor_product_residual_block<double, 4, 4>(geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_line_p1_q2<double>::shape_1d(), sfem::codegen::ref_line_p1_q2<double>::grad_1d(), sfem::codegen::quad_line_q2<double>::q_weight_1d(), (const double *const *)current, (const double *const *)previous, eta_b, eta_s, lmbda, mu, u_dt_shift, (double *const *)output);
-        return SFEM_SUCCESS;
-    }
-    case (int)sizeof(float): {
-        sfem::codegen::linear_kelvin_voigt_total_d2_tensor_product_residual_block<float, 4, 4>(geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_line_p1_q2<float>::shape_1d(), sfem::codegen::ref_line_p1_q2<float>::grad_1d(), sfem::codegen::quad_line_q2<float>::q_weight_1d(), (const float *const *)current, (const float *const *)previous, eta_b, eta_s, lmbda, mu, u_dt_shift, (float *const *)output);
-        return SFEM_SUCCESS;
-    }
-    default:
-      break;
-  }
-  return sfem::codegen::unsupported_dispatch("linear_kelvin_voigt_total_proteus_quad4_residual_esoa", -1, (int)scalar_bytes);
-}
-
 namespace sfem {
 namespace codegen {
 
@@ -704,35 +674,6 @@ extern "C" int cu_linear_kelvin_voigt_total_proteus_quad4_residual_i_maos(
       break;
   }
   return sfem::codegen::unsupported_dispatch("linear_kelvin_voigt_total_proteus_quad4_residual_i_maos", -1, (int)scalar_bytes);
-}
-
-extern "C" int cu_linear_kelvin_voigt_total_proteus_quad4_jacobian_action_esoa(
-    const int scalar_bytes,
-    const ptrdiff_t geometry_stride,
-    const void *const RSTR determinant,
-    const void *const RSTR adjugate[4],
-    const void *const RSTR direction[8],
-    const real_t eta_b,
-    const real_t eta_s,
-    const real_t lmbda,
-    const real_t mu,
-    const real_t u_dt_shift,
-    void *const RSTR output[8],
-    void *const stream
-) {
-  switch (scalar_bytes) {
-    case (int)sizeof(double): {
-        sfem::codegen::linear_kelvin_voigt_total_d2_tensor_product_jacobian_action_block<double, 4, 4>(geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_line_p1_q2<double>::shape_1d(), sfem::codegen::ref_line_p1_q2<double>::grad_1d(), sfem::codegen::quad_line_q2<double>::q_weight_1d(), (const double *const *)direction, eta_b, eta_s, lmbda, mu, u_dt_shift, (double *const *)output);
-        return SFEM_SUCCESS;
-    }
-    case (int)sizeof(float): {
-        sfem::codegen::linear_kelvin_voigt_total_d2_tensor_product_jacobian_action_block<float, 4, 4>(geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_line_p1_q2<float>::shape_1d(), sfem::codegen::ref_line_p1_q2<float>::grad_1d(), sfem::codegen::quad_line_q2<float>::q_weight_1d(), (const float *const *)direction, eta_b, eta_s, lmbda, mu, u_dt_shift, (float *const *)output);
-        return SFEM_SUCCESS;
-    }
-    default:
-      break;
-  }
-  return sfem::codegen::unsupported_dispatch("linear_kelvin_voigt_total_proteus_quad4_jacobian_action_esoa", -1, (int)scalar_bytes);
 }
 
 namespace sfem {

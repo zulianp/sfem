@@ -1,8 +1,10 @@
 
 
 #include <cooperative_groups.h>
+#include "smesh_base.hpp"
 #include <cuda_profiler_api.h>
 #include <stdio.h>
+#include <string.h>
 #include <time.h>
 
 #include "sfem_base.hpp"
@@ -14,6 +16,7 @@
 #define MY_RESTRICT __restrict__
 
 #include "mass.hpp"
+#include "mesh_utils.hpp"
 #include "smesh_mesh.hpp"
 #include "sfem_resample_field_cuda_kernel.cuh"
 
@@ -385,7 +388,7 @@ tet4_assemble_lumped_mass(const ptrdiff_t              nelements,  //
  */
 int                                                                                                //
 launch_kernels_tet4_resample_field_CUDA_unified(const int         mpi_size,                        //
-                                                const int         mpi_rank,                        //
+                                                const int         /*mpi_rank*/,                    //
                                                 const int         numBlocks,                       //
                                                 const int         threadsPerBlock,                 //
                                                 const mesh_t*     mesh,                            // Mesh
@@ -394,7 +397,7 @@ launch_kernels_tet4_resample_field_CUDA_unified(const int         mpi_size,     
                                                 ptrdiff_t         nnodes,                          //
                                                 elems_tet4_device elems_device,                    //
                                                 xyz_tet4_device   xyz_device,                      //
-                                                const ptrdiff_t* const SFEM_RESTRICT n,            //
+                                                const ptrdiff_t* const SFEM_RESTRICT /*n*/,        //
                                                 const ptrdiff_t* const SFEM_RESTRICT stride,       //
                                                 const geom_t* const SFEM_RESTRICT    origin,       //
                                                 const geom_t* const SFEM_RESTRICT    delta,        //
@@ -709,9 +712,9 @@ tet4_resample_field_local_reduce_CUDA(const int                          mpi_siz
     if (SFEM_LOG_LEVEL >= 5) {
         printf("============================================================================\n");
         printf("GPU:    Launching the kernel Reduce \n");
-        printf("GPU:    Number of blocks:            %ld\n", numBlocks);
-        printf("GPU:    Number of threads per block: %ld\n", threadsPerBlock);
-        printf("GPU:    Total number of threads:     %ld\n", (numBlocks * threadsPerBlock));
+        printf("GPU:    Number of blocks:            %d\n", numBlocks);
+        printf("GPU:    Number of threads per block: %d\n", threadsPerBlock);
+        printf("GPU:    Total number of threads:     %d\n", (numBlocks * threadsPerBlock));
         printf("GPU:    Number of elements:          %ld\n", nelements);
         printf("GPU:    Tile size:                   %d\n", __TET4_TILE_SIZE__);
         printf("============================================================================\n");
@@ -944,6 +947,9 @@ tet4_resample_field_local_reduce_CUDA_Unified(const int     mpi_size,           
     cudaEventDestroy(start);
     cudaEventDestroy(stop);
 
+    // Copy the result to the caller, as the managed variant does.
+    memcpy(g_host, weighted_field_device, mesh->nnodes * sizeof(real_type));
+
     // Free memory on the device
     free(mass_vector);
     mass_vector = NULL;
@@ -1095,7 +1101,7 @@ tet4_resample_field_local_reduce_CUDA_Managed(const int     mpi_size,           
     if (mpi_rank == 0) {
         printf("GPU: =======================================================\n");
         printf("GPU: Function: %s, file: %s:%d\n", __FUNCTION__, __FILE__, __LINE__);
-        printf("GPU: Number of elements:               %ld\n", tot_nelements);
+        printf("GPU: Number of elements:               %d\n", tot_nelements);
         printf("GPU: Elapsed time:                     %e s\n", seconds);
         printf("GPU: Elapsed time:                     %e ms\n", clock_ms);
         printf("GPU: Elements/second:                  %e\n", elements_per_second);

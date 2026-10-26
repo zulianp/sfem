@@ -714,7 +714,7 @@ namespace sfem {
     std::unique_ptr<Op> Hyperelasticity::create(const std::shared_ptr<FunctionSpace> &space) {
         SFEM_TRACE_SCOPE("Hyperelasticity::create");
 
-        assert(space->mesh_ptr()->spatial_dimension() == space->block_size());
+        assert(space->mesh()->spatial_dimension() == space->block_size());
         auto ret           = std::make_unique<Hyperelasticity>(space);
         // Register smesh::HEX8 kernels
         ret->impl_->kernels[smesh::HEX8] = std::make_shared<hex8::NeoHookeanOgden>();
@@ -733,7 +733,7 @@ namespace sfem {
                                      real_t *const        values) {
         SFEM_TRACE_SCOPE("Hyperelasticity::hessian_crs");
 
-        auto mesh  = impl_->space->mesh_ptr();
+        auto mesh  = impl_->space->mesh();
         auto graph = impl_->space->node_to_node_graph();
         return impl_->iterate([&](const OpDomain &domain) -> int {
             auto kernels = impl_->find_kernels(domain);
@@ -751,7 +751,7 @@ namespace sfem {
     int Hyperelasticity::hessian_diag(const real_t *const x, real_t *const out) {
         SFEM_TRACE_SCOPE("Hyperelasticity::hessian_diag");
 
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) -> int {
             auto kernels = impl_->find_kernels(domain);
             return kernels->hessian_diag_aos(
@@ -762,7 +762,7 @@ namespace sfem {
     int Hyperelasticity::gradient(const real_t *const x, real_t *const out) {
         SFEM_TRACE_SCOPE("Hyperelasticity::gradient");
 
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) -> int {
             auto kernels = impl_->find_kernels(domain);
             return kernels->gradient_aos(domain.block->n_elements(),
@@ -777,7 +777,7 @@ namespace sfem {
     int Hyperelasticity::apply(const real_t *const x, const real_t *const h, real_t *const out) {
         SFEM_TRACE_SCOPE("Hyperelasticity::apply");
 
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) -> int {
             auto ua = std::static_pointer_cast<struct HyperelasticityAssemblyData>(domain.user_data);
             if (ua->partial_assembly_buffer) {
@@ -854,7 +854,7 @@ namespace sfem {
     int Hyperelasticity::update(const real_t *const u) {
         SFEM_TRACE_SCOPE("Hyperelasticity::update");
 
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
 
         for (auto &domain : impl_->domains->domains()) {
             auto assembly_data = std::static_pointer_cast<struct HyperelasticityAssemblyData>(domain.second.user_data);
@@ -889,7 +889,7 @@ namespace sfem {
     int Hyperelasticity::value(const real_t *x, real_t *const out) {
         SFEM_TRACE_SCOPE("Hyperelasticity::value");
 
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) -> int {
             auto ua = std::static_pointer_cast<HyperelasticityAssemblyData>(domain.user_data);
 
@@ -915,7 +915,7 @@ namespace sfem {
                                      real_t *const       out) {
         SFEM_TRACE_SCOPE("Hyperelasticity::value_steps");
 
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) -> int {
             auto ua = std::static_pointer_cast<HyperelasticityAssemblyData>(domain.user_data);
             if (domain.element_type == smesh::HEX8) {
@@ -945,21 +945,21 @@ namespace sfem {
 
     int Hyperelasticity::report(const real_t *const) { return SFEM_SUCCESS; }
 
-    std::shared_ptr<Op> Hyperelasticity::lor_op(const std::shared_ptr<FunctionSpace> &space) {
-        SFEM_TRACE_SCOPE("Hyperelasticity::lor_op");
+    std::shared_ptr<Op> Hyperelasticity::lor(const std::shared_ptr<FunctionSpace> &space) {
+        SFEM_TRACE_SCOPE("Hyperelasticity::lor");
 
         // FIXME: Must work for all element types and multi-block
         auto ret            = std::make_shared<Hyperelasticity>(space);
-        ret->impl_->domains = impl_->domains->lor_op(space, {});
+        ret->impl_->domains = impl_->domains->lor(space, {});
         return ret;
     }
 
-    std::shared_ptr<Op> Hyperelasticity::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
-        SFEM_TRACE_SCOPE("Hyperelasticity::derefine_op");
+    std::shared_ptr<Op> Hyperelasticity::derefine(const std::shared_ptr<FunctionSpace> &space) {
+        SFEM_TRACE_SCOPE("Hyperelasticity::derefine");
 
         // FIXME: Must work for all element types and multi-block
         auto ret            = std::make_shared<Hyperelasticity>(space);
-        ret->impl_->domains = impl_->domains->derefine_op(space, {});
+        ret->impl_->domains = impl_->domains->derefine(space, {});
         return ret;
     }
 

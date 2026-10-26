@@ -15,8 +15,9 @@
 
 #include "sfem_MatrixFreeLinearSolver.hpp"
 #include "sfem_ParallelOperator.hpp"
-#include "sfem_ShiftedPenalty_impl.hpp"
-#include "sfem_openmp_blas.hpp"
+#include "sfem_ShiftedPenaltyKernels_openmp.hpp"
+#include "sfem_BLAS_openmp.hpp"
+#include "sfem_operator_factory.hpp"
 #include "sfem_tpl_blas.hpp"
 
 #include "sfem_aliases.hpp"
@@ -28,9 +29,6 @@
 // MATLAB version
 // https://bitbucket.org/hkothari/matsci/src/ab637a0655512c4ddf299914dd45fdb563ac7b34/Solvers/%2BBoxConstraints/%40PenaltyMG/PenaltyMG.m?at=restructuring
 namespace sfem {
-
-    template <typename T>
-    static std::shared_ptr<Operator<T>> diag_op(const SharedBuffer<T>& diagonal_scaling, const ExecutionSpace es);
 
     /**
      * @class ShiftedPenaltyMultigrid
@@ -44,7 +42,7 @@ namespace sfem {
      * @tparam T The data type for numerical computations (e.g., float, double).
      *
      * ### Public Enums:
-     * - `CycleType`: Defines the type of multigrid cycle (V_CYCLE, W_CYCLE).
+     * - `CycleType`: Defines the type of multigrid cycle (V, W).
      * - `CycleReturnCode`: Return codes for the multigrid cycle (CYCLE_CONTINUE, CYCLE_CONVERGED, CYCLE_FAILURE).
      *
      * ### Nested Classes:
@@ -81,7 +79,7 @@ namespace sfem {
      * - `set_debug`: Enables or disables debug mode.
      *
      * ### Private Methods:
-     * - `make_buffer`: Creates a memory buffer for a given size.
+     * - `create_buffer`: Creates a memory buffer for a given size.
      * - `ensure_init`: Ensures that the solver is initialized.
      * - `init`: Initializes the solver's memory and data structures.
      * - `shifted_op`: Constructs a shifted operator for a given level.
@@ -95,7 +93,6 @@ namespace sfem {
      * - `monitor`: Monitors and logs the solver's progress.
      *
      * ### Private Members:
-     * - `execution_space_`: The execution space for computations (e.g., host or device).
      * - `operator_`: Operators for each level in the multigrid hierarchy.
      * - `smoother_`: Smoothers or solvers for each level.
      * - `prolongation_`: Prolongation operators for each level.
@@ -132,10 +129,8 @@ namespace sfem {
     public:
         /// Outer iterations of the last apply.
         int iterations() const { return iterations_; }
-        enum CycleType {
-            V_CYCLE = 1,
-            W_CYCLE = 2,
-        };
+        // The value is the cycle index, the coarse-level visits per pass: V 1, W 2 (a larger index is valid).
+        enum class CycleType : int { V = 1, W = 2 };
 
         enum CycleReturnCode { CYCLE_CONTINUE = 0, CYCLE_CONVERGED = 1, CYCLE_FAILURE = 2 };
 
@@ -204,7 +199,7 @@ namespace sfem {
             constraints_op_x_op_.push_back(constraints_op_x_op);
         }
 
-        ExecutionSpace execution_space() const override { return execution_space_; }
+        ExecutionContext execution_context() const override { return blas_ ? blas_->context() : ExecutionContext(EXECUTION_SPACE_INVALID); }
 
         int apply(const T* const rhs, T* const x) override {
             SFEM_TRACE_SCOPE("ShiftedPenaltyMultigrid::apply");
@@ -241,7 +236,7 @@ namespace sfem {
                 if (!bound) {
                     lagr = nullptr;
                 } else if (!lagr || (ptrdiff_t)lagr->size() != n_constrained_dofs) {
-                    lagr = make_buffer(n_constrained_dofs);
+                    lagr = create_buffer(n_constrained_dofs);
                     blas_->zeros(n_constrained_dofs, lagr->data());
                 }
             };
@@ -256,7 +251,7 @@ namespace sfem {
 
             SharedBuffer<T> x_old;
             if (collect_energy_norm_correction_) {
-                x_old = make_buffer(level_alloc(finest_level()));
+                x_old = create_buffer(level_alloc(finest_level()));
                 blas_->copy(n_dofs, x, x_old->data());
             }
 
@@ -455,9 +450,8 @@ namespace sfem {
         void add_level_apply_zero_constraints(const std::function<void(T* const)>& fn) { apply_zero_constraints_.push_back(fn); }
 
         void default_init() {
-            blas_ = make_openmp_blas<T>();
-            OpenMP_ShiftedPenalty<T>::build(impl_);
-            execution_space_ = EXECUTION_SPACE_HOST;
+            blas_ = OpenMPBLAS<T>::create();
+            OpenMPShiftedPenaltyKernels<T>::build(impl_);
         }
 
         void set_max_it(const int val) { max_it_ = val; }
@@ -480,14 +474,13 @@ namespace sfem {
             if (fine_blocks_op_) fine_blocks_op_->apply(x, y);
         }
         void set_nlsmooth_steps(const int steps) { nlsmooth_steps = steps; }
-        void set_cycle_type(const int val) { cycle_type_ = val; }
+        void set_cycle_type(const CycleType val) { cycle_type_ = val; }
         void set_project_coarse_space_correction(const bool val) { project_coarse_space_correction_ = val; }
         void set_max_penalty_param(const real_t val) { max_penalty_param_ = val; }
         void set_penalty_param(const real_t val) { penalty_param_ = val; }
         void enable_line_search(const bool val) { enable_line_search_ = val; }
         void collect_energy_norm_correction(const bool val) { collect_energy_norm_correction_ = val; }
         void set_debug(const int val) { debug = val; }
-        void set_execution_space(enum ExecutionSpace es) { execution_space_ = es; }
         void set_penalty_param_increase(const real_t val) { penalty_param_increase = val; }
         void set_enable_shift(const bool val) { enable_shift = val; }
 
@@ -510,16 +503,16 @@ namespace sfem {
         }
 
         std::shared_ptr<BLAS<T>>& blas() { return blas_; }
-        ShiftedPenalty_Tpl<T>&    impl() { return impl_; }
+        ShiftedPenaltyKernels<T>&    impl() { return impl_; }
 
     private:
-        SharedBuffer<T> make_buffer(const ptrdiff_t n) const {
+        SharedBuffer<T> create_buffer(const ptrdiff_t n) const {
             auto blas_impl = blas_;
             return Buffer<T>::own(
                     n,
                     blas_impl->allocate(n),
                     [blas_impl](void* ptr) { blas_impl->destroy(ptr); },
-                    (enum MemorySpace)execution_space());
+                    (enum MemorySpace)this->execution_space());
         }
 
         inline int finest_level() const { return 0; }
@@ -613,7 +606,7 @@ namespace sfem {
 
             const T*        h = x;
             SharedBuffer<T> host;
-            if (execution_space_ == EXECUTION_SPACE_DEVICE) {
+            if (this->execution_space() == EXECUTION_SPACE_DEVICE) {
                 host = Buffer<T>::wrap(static_cast<size_t>(n), const_cast<T*>(x), MEMORY_SPACE_DEVICE);
                 host = smesh::to_host(host);
                 h    = host->data();
@@ -680,7 +673,7 @@ namespace sfem {
                             fn(x_lin, h, y);
                             this->trap_finite("J:y", y, n_y);
                         },
-                        execution_space());
+                        this->execution_space());
             }
             return operator_[level];
         }
@@ -744,21 +737,21 @@ namespace sfem {
             memory_.clear();
             memory_.resize(this->n_levels());
 
-            correction = make_buffer(level_alloc(finest_level()));
+            correction = create_buffer(level_alloc(finest_level()));
             for (int l = 0; l < n_levels(); l++) {
                 memory_[l] = std::make_shared<Memory>();
 
                 const ptrdiff_t n = level_alloc(l);
                 if (l != finest_level() || !wrap_input_) {
-                    memory_[l]->solution = make_buffer(n);
-                    memory_[l]->rhs      = make_buffer(n);
+                    memory_[l]->solution = create_buffer(n);
+                    memory_[l]->rhs      = create_buffer(n);
                 }
 
-                memory_[l]->work = make_buffer(n);
+                memory_[l]->work = create_buffer(n);
                 if (constraints_op_) {
-                    memory_[l]->diag = make_buffer(constraints_op_x_op_[l]->n_blocks());
+                    memory_[l]->diag = create_buffer(constraints_op_x_op_[l]->n_blocks());
                 } else {
-                    memory_[l]->diag = make_buffer(n);
+                    memory_[l]->diag = create_buffer(n);
                 }
             }
 
@@ -767,12 +760,12 @@ namespace sfem {
             weighted_blocks_ = nullptr;
             if (restricts_weighted_blocks()) {
                 const auto fine  = constraints_op_x_op_[finest_level()];
-                weighted_blocks_ = make_buffer(fine->n_blocks() * fine->block_size());
+                weighted_blocks_ = create_buffer(fine->n_blocks() * fine->block_size());
                 penalty_op_x_op_.resize(n_levels());
                 for (int l = coarser_level(finest_level()); l < n_levels(); l = coarser_level(l)) {
                     const auto      geometric = constraints_op_x_op_[l];
                     const ptrdiff_t nb        = geometric->n_blocks();
-                    auto            blocks    = make_buffer(nb * geometric->block_size());
+                    auto            blocks    = create_buffer(nb * geometric->block_size());
                     blas_->zeros(blocks->size(), blocks->data());
                     penalty_op_x_op_[l] = sfem::create_sparse_block_vector(geometric->idx(), blocks);
                     blas_->values(nb, 1, memory_[l]->diag->data());
@@ -823,7 +816,7 @@ namespace sfem {
                            fine->block_size());
             }
             if (!unit_weights_ || (ptrdiff_t)unit_weights_->size() != nb) {
-                unit_weights_ = make_buffer(nb);
+                unit_weights_ = create_buffer(nb);
                 blas_->values(nb, 1, unit_weights_->data());
             }
             fine_blocks_    = sfem::create_sparse_block_vector(fine->idx(), fine_block_values_);
@@ -845,7 +838,7 @@ namespace sfem {
             if (constraints_op_) {
                 sop = jac + sfem::create_sparse_block_vector_mult(jac->rows(), level_op_x_op(level), level_op_x_op_weights(level));
             } else {
-                sop = jac + sfem::diag_op(memory_[level]->diag, execution_space());
+                sop = jac + sfem::diag_op(memory_[level]->diag, this->execution_space());
             }
 
             auto pop = std::dynamic_pointer_cast<ParallelOperator<T>>(operator_[level]);
@@ -1039,7 +1032,7 @@ namespace sfem {
                     }
 
                     // FIXME if we find a good reason for this add GPU support here
-                    if (project_coarse_space_correction_ && execution_space() == EXECUTION_SPACE_HOST) {
+                    if (project_coarse_space_correction_ && this->execution_space() == EXECUTION_SPACE_HOST) {
                         assert(!constraints_op_);  // FIXME not supported yet!!!
 
                         auto            c  = correction->data();
@@ -1104,7 +1097,7 @@ namespace sfem {
             auto prolongation = prolongation_[coarser_level(level)];
             auto mem_coarse   = memory_[coarser_level(level)];
 
-            for (int k = 0; k < this->cycle_type_; k++) {
+            for (int k = 0; k < static_cast<int>(this->cycle_type_); k++) {
                 if (constraints_op_) {
                     smoother->set_op_and_diag_shift(sop, level_op_x_op(level), level_op_x_op_weights(level));
                 } else {
@@ -1202,7 +1195,6 @@ namespace sfem {
                    penalty_param);
         }
 
-        ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
 
         std::vector<std::shared_ptr<Operator<T>>>               operator_;
         std::vector<std::shared_ptr<MatrixFreeLinearSolver<T>>> smoother_;
@@ -1248,7 +1240,7 @@ namespace sfem {
         int count_smoothing_steps{0};
         int max_inner_it{3};
         int nlsmooth_steps{3};
-        int cycle_type_{V_CYCLE};
+        CycleType cycle_type_{CycleType::V};
         int iterations_{0};
         int max_it_{10};
 
@@ -1267,7 +1259,7 @@ namespace sfem {
         std::vector<struct Stats> stats;
 
         std::shared_ptr<BLAS<T>> blas_;
-        ShiftedPenalty_Tpl<T>    impl_;
+        ShiftedPenaltyKernels<T>    impl_;
     };
 
     template <typename T>

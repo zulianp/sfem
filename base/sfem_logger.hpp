@@ -1,29 +1,32 @@
 #ifndef SFEM_LOGGER_H
 #define SFEM_LOGGER_H
 
+#include <stddef.h>
 #include <stdio.h>
-#include <stdlib.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+namespace sfem {
 
-typedef struct {
-    FILE *stream;
-    char *buffer;
-    size_t len;
-    // off_t eob;
-} logger_t;
+    /// A log of doubles, one per line, to a file or to memory. The stream closes with the logger.
+    class Logger {
+    public:
+        Logger() = default;
+        ~Logger();
+        Logger(const Logger &)            = delete;
+        Logger &operator=(const Logger &) = delete;
 
-void log_init(logger_t *l);
-int log_is_empty(logger_t *l);
-void log_write_double(logger_t *l, const double val);
-int log_create_memstream(logger_t *l);
-int log_create_file(logger_t *l, const char *path, const char *mode);
-void log_destroy(logger_t *l);
+        int  open_file(const char *path, const char *mode);
+        int  open_memstream();
+        void write(const double val);
+        bool empty() const { return stream_ == nullptr; }
 
-#ifdef __cplusplus
-}
-#endif
+    private:
+        void close();
+
+        FILE  *stream_{nullptr};
+        char  *buffer_{nullptr};
+        size_t len_{0};
+    };
+
+}  // namespace sfem
 
 #endif  // SFEM_LOGGER_H

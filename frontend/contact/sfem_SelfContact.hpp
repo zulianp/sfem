@@ -40,7 +40,7 @@ namespace sfem {
                                             ExecutionSpace                        es);
 #endif
 
-    std::shared_ptr<Contact> create_mulitbody_contact(const std::shared_ptr<FunctionSpace>& space,
+    std::shared_ptr<Contact> create_multibody_contact(const std::shared_ptr<FunctionSpace>& space,
                                                       const std::shared_ptr<smesh::Mesh>&   surface,
                                                       real_t                                margin,
                                                       real_t                                search_radius_sqr,

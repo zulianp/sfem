@@ -2,7 +2,7 @@
 
 #include "sfem_cuda_base.hpp"
 #include "sfem_TangentValues.hpp"
-#include "sfem_cuda_max.hpp"
+#include "sfem_max_cuda.hpp"
 #include "sfem_node_obstacle_kernels.hpp"
 
 namespace sfem {
@@ -127,24 +127,24 @@ namespace sfem {
     }  // namespace
 
     void d_node_obstacle_frames(const NodeObstacleView &c, const int dir) {
-        frames_kernel<<<blocks_for(c.size), block_size>>>(c, dir);
-        SFEM_DEBUG_SYNCHRONIZE();
+        frames_kernel<<<blocks_for(c.size), block_size, 0, (cudaStream_t)c.stream>>>(c, dir);
+        SFEM_DEBUG_SYNCHRONIZE(c.stream);
     }
 
     void d_node_obstacle_to_frame(const NodeObstacleView &c, const real_t *const s, const real_t *const in, real_t *const out) {
-        to_frame_kernel<<<blocks_for(c.n_nodes), block_size>>>(c, s, in, out);
-        SFEM_DEBUG_SYNCHRONIZE();
+        to_frame_kernel<<<blocks_for(c.n_nodes), block_size, 0, (cudaStream_t)c.stream>>>(c, s, in, out);
+        SFEM_DEBUG_SYNCHRONIZE(c.stream);
     }
 
     void d_node_obstacle_from_frame(const NodeObstacleView &c, const real_t *const s, const real_t *const in, real_t *const out) {
-        from_frame_kernel<<<blocks_for(c.n_nodes), block_size>>>(c, s, in, out);
-        SFEM_DEBUG_SYNCHRONIZE();
+        from_frame_kernel<<<blocks_for(c.n_nodes), block_size, 0, (cudaStream_t)c.stream>>>(c, s, in, out);
+        SFEM_DEBUG_SYNCHRONIZE(c.stream);
     }
 
     void d_node_obstacle_upper_bound(const NodeObstacleView &c, const ptrdiff_t ndofs, const real_t unbounded, real_t *const ub) {
-        fill_kernel<<<blocks_for(ndofs), block_size>>>(ndofs, unbounded, ub);
-        upper_bound_kernel<<<blocks_for(c.size), block_size>>>(c, ub);
-        SFEM_DEBUG_SYNCHRONIZE();
+        fill_kernel<<<blocks_for(ndofs), block_size, 0, (cudaStream_t)c.stream>>>(ndofs, unbounded, ub);
+        upper_bound_kernel<<<blocks_for(c.size), block_size, 0, (cudaStream_t)c.stream>>>(c, ub);
+        SFEM_DEBUG_SYNCHRONIZE(c.stream);
     }
 
     void d_node_obstacle_offset_gap(const ptrdiff_t      size,
@@ -153,9 +153,11 @@ namespace sfem {
                                     const real_t         release,
                                     const real_t *const  p0,
                                     real_t *const        gap,
-                                    real_t *const *const normals) {
-        offset_gap_kernel<<<blocks_for(size), block_size>>>(size, shift, cutoff, release, p0, gap, normals[0], normals[1], normals[2]);
-        SFEM_DEBUG_SYNCHRONIZE();
+                                    real_t *const *const normals,
+                                    void *const          stream) {
+        offset_gap_kernel<<<blocks_for(size), block_size, 0, (cudaStream_t)stream>>>(
+                size, shift, cutoff, release, p0, gap, normals[0], normals[1], normals[2]);
+        SFEM_DEBUG_SYNCHRONIZE(stream);
     }
 
     void d_node_obstacle_kkt(const NodeObstacleView &c,
@@ -163,8 +165,8 @@ namespace sfem {
                              real_t *const             projected,
                              real_t *const             complementarity,
                              real_t *const             penetration) {
-        kkt_kernel<<<blocks_for(c.size), block_size>>>(c, k, projected, complementarity, penetration);
-        SFEM_DEBUG_SYNCHRONIZE();
+        kkt_kernel<<<blocks_for(c.size), block_size, 0, (cudaStream_t)c.stream>>>(c, k, projected, complementarity, penetration);
+        SFEM_DEBUG_SYNCHRONIZE(c.stream);
     }
 
     void d_node_obstacle_curvature_bsr(const NodeObstacleView &c,
@@ -177,8 +179,9 @@ namespace sfem {
                                    const smesh::PrimitiveType values_type,
                                    void *const               values) {
         with_tangent_values(values_type, values, [&](auto *const v) {
-            curvature_kernel<<<blocks_for(c.size), block_size>>>(c, r, k, capped, sign, rowptr, colidx, v);
-            SFEM_DEBUG_SYNCHRONIZE();
+            curvature_kernel<<<blocks_for(c.size), block_size, 0, (cudaStream_t)c.stream>>>(
+                    c, r, k, capped, sign, rowptr, colidx, v);
+            SFEM_DEBUG_SYNCHRONIZE(c.stream);
             return SFEM_SUCCESS;
         });
     }
@@ -188,27 +191,25 @@ namespace sfem {
                                           const real_t *const     k,
                                           const bool              capped,
                                           real_t *const           blocks) {
-        curvature_blocks_kernel<<<blocks_for(c.size), block_size>>>(c, r, k, capped, blocks);
-        SFEM_DEBUG_SYNCHRONIZE();
+        curvature_blocks_kernel<<<blocks_for(c.size), block_size, 0, (cudaStream_t)c.stream>>>(c, r, k, capped, blocks);
+        SFEM_DEBUG_SYNCHRONIZE(c.stream);
     }
 
     void d_node_obstacle_reaction(const NodeObstacleView &c, real_t *const out) {
-        reaction_kernel<<<blocks_for(c.size), block_size>>>(c, out);
-        SFEM_DEBUG_SYNCHRONIZE();
+        reaction_kernel<<<blocks_for(c.size), block_size, 0, (cudaStream_t)c.stream>>>(c, out);
+        SFEM_DEBUG_SYNCHRONIZE(c.stream);
     }
 
     void d_node_obstacle_gap_field(const NodeObstacleView &c, real_t *const out) {
-        gap_field_kernel<<<blocks_for(c.size), block_size>>>(c, out);
-        SFEM_DEBUG_SYNCHRONIZE();
+        gap_field_kernel<<<blocks_for(c.size), block_size, 0, (cudaStream_t)c.stream>>>(c, out);
+        SFEM_DEBUG_SYNCHRONIZE(c.stream);
     }
 
     void d_node_obstacle_project_velocity(const NodeObstacleView &c, real_t *const v, const real_t dt) {
-        project_velocity_kernel<<<blocks_for(c.size), block_size>>>(c, v, dt);
-        SFEM_DEBUG_SYNCHRONIZE();
+        project_velocity_kernel<<<blocks_for(c.size), block_size, 0, (cudaStream_t)c.stream>>>(c, v, dt);
+        SFEM_DEBUG_SYNCHRONIZE(c.stream);
     }
 
-    real_t d_max_or_zero(const ptrdiff_t n, const real_t *const x) {
-        return d_max(n, x, real_t(0));
-    }
+    real_t d_max_or_zero(const ptrdiff_t n, const real_t *const x, void *const stream) { return d_max(n, x, real_t(0), stream); }
 
 }  // namespace sfem

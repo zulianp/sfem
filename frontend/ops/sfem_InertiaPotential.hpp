@@ -22,7 +22,7 @@ namespace sfem {
         bool energy_or_potential_based() const override { return true; }
         //! Where this operator runs, so `Function` allocates the buffers it
         //! writes on the same side.
-        ExecutionSpace execution_space() const override;
+        ExecutionContext execution_context() const override;
         bool        is_linear() const override { return true; }
 
         ptrdiff_t n_dofs_domain() const override;
@@ -67,7 +67,7 @@ namespace sfem {
         std::shared_ptr<Op> clone() const override;
         /// The same potential on a coarser space: its density, mass kind and alpha, the mass
         /// rediscretised there. No predictor (a coarse level applies and assembles only).
-        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override;
+        std::shared_ptr<Op> derefine(const std::shared_ptr<FunctionSpace> &space) override;
 
         void set_alpha(real_t alpha);
         void set_density(real_t density);

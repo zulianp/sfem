@@ -16,8 +16,8 @@
 
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_Function_incore_cuda.hpp"
-#include "sfem_cuda_blas.hpp"
-#include "sfem_cuda_solver.hpp"
+#include "sfem_BLAS_cuda.hpp"
+#include "sfem_solver_cuda.hpp"
 #endif
 
 #ifdef _OPENMP
@@ -41,7 +41,7 @@ int test_linear_problem(const std::shared_ptr<sfem::Function> &f, const smesh::P
     if (SFEM_ENABLE_OUTPUT) {
         smesh::create_directory(name);
         smesh::create_directory(name / "fields");
-        smesh::semistructured_export_as_standard(fs->mesh_ptr(), name / "mesh");
+        smesh::semistructured_export_as_standard(fs->mesh(), name / "mesh");
 
         sfem::Output out(fs);
         out.enable_AoS_to_SoA(true);

@@ -13,7 +13,7 @@
 
 # DOES THE COARSE-PACKING FIX HOLD UNDER MPI, AND IS THE ONE SLOWER ARM NOISE?
 #
-# The fix: derefine_op clears pack_size, so a coarse level never packs and therefore never
+# The fix: derefine clears pack_size, so a coarse level never packs and therefore never
 # renumbers the mesh that the hierarchy's transfers index by fine macro-corner id. Confirmed
 # serially at 1,098,500 dof with the stock SFEM_PACK_SIZE=2048:
 #

@@ -21,7 +21,7 @@ namespace sfem {
     //! device `gradient` then `atomicAdd`ed into.  `compute-sanitizer`:
     //! "Invalid __global__ atomic of size 8 bytes ... Address 0x3aa240f8 is
     //! out of bounds".
-    ExecutionSpace execution_space() const override { return EXECUTION_SPACE_HOST; }
+    ExecutionContext execution_context() const override { return EXECUTION_SPACE_HOST; }
     bool is_linear() const override { return false; }
     ptrdiff_t n_dofs_domain() const override;
     ptrdiff_t n_dofs_image() const override;
@@ -70,7 +70,7 @@ namespace sfem {
     void set_value_in_block(const std::string &block_name,
                 const std::string &var_name,
                 real_t value) override;
-    std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override;
+    std::shared_ptr<Op> derefine(const std::shared_ptr<FunctionSpace> &space) override;
 #ifdef SFEM_ENABLE_RYAML
     std::shared_ptr<Op> create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
                                              const ryml::ConstNodeRef             &node) override;

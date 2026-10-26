@@ -41,14 +41,14 @@ namespace sfem {
                             const ptrdiff_t                             ndofs,
                             const ptrdiff_t                             owned_dofs,
                             const int                                   dir,
-                            const ExecutionSpace                        es = EXECUTION_SPACE_HOST);
+                            const ExecutionContext                     &context = EXECUTION_SPACE_HOST);
 
         ptrdiff_t                   size() const { return nodes_->size(); }
         // On the host, whatever the execution space.
         const SharedBuffer<idx_t>  &nodes() const { return nodes_; }
         // In the execution space.
         const SharedBuffer<real_t> &gap() const { return gap_; }
-        ExecutionSpace              execution_space() const { return es_; }
+        ExecutionSpace              execution_space() const { return context_.space(); }
 
         // Samples the gap, the normals and the frames with the nodes displaced by x.
         void update(const real_t *const x);
@@ -145,7 +145,7 @@ namespace sfem {
         // SharedBuffer<T *> keeps its row pointers on the device, where the host cannot read them.
         std::vector<SharedBuffer<geom_t>> point_rows_;
         geom_t                           *xyz_[3];
-        ExecutionSpace               es_;
+        ExecutionContext                  context_;
         SharedBuffer<real_t>         complementarity_, penetration_;
         std::shared_ptr<Communicator> comm_;
         ptrdiff_t                    ndofs_;

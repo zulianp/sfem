@@ -7,6 +7,7 @@
 #include <sstream>
 
 #include "sfem_logger.hpp"
+#include "smesh_path.hpp"
 
 namespace sfem {
 
@@ -102,7 +103,7 @@ namespace sfem {
         }
     }  // namespace
 
-    int LoadProfile::from_yaml(const ryml::ConstNodeRef &node, LoadProfile &profile) {
+    int LoadProfile::from_yaml(const ryml::ConstNodeRef &node, LoadProfile &profile, const std::string &base_dir) {
         if (node.invalid() || !node.is_map() || !node.has_child("type")) {
             SFEM_ERROR("A load profile must be a mapping with a type\n");
             return SFEM_FAILURE;
@@ -172,7 +173,9 @@ namespace sfem {
                 return SFEM_FAILURE;
             }
             profile.type_ = Type::TABULATED;
-            return read_table(yaml_string(node["path"]), profile.times_, profile.values_);
+            std::string path = yaml_string(node["path"]);
+            if (!base_dir.empty() && !path.empty() && path[0] != '/') path = (smesh::Path(base_dir) / path).to_string();
+            return read_table(path, profile.times_, profile.values_);
         }
 
         SFEM_ERROR("Unsupported load profile type %s\n", type.c_str());

@@ -12,7 +12,7 @@
 #include "sfem_MatrixFreeLinearSolver.hpp"
 #include "sfem_CRS.hpp"
 
-#include "sfem_openmp_blas.hpp"
+#include "sfem_BLAS_openmp.hpp"
 
 namespace sfem {
     template <typename T>
@@ -59,13 +59,11 @@ namespace sfem {
         int check_each{100};
         bool verbose{false};
 
-        ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
 
-        ExecutionSpace execution_space() const override { return execution_space_; }
+        ExecutionContext execution_context() const override { return blas ? blas->context() : ExecutionContext(EXECUTION_SPACE_INVALID); }
 
         void default_init() {
-            blas = make_openmp_blas<T>();
-            execution_space_ = EXECUTION_SPACE_HOST;
+            blas = OpenMPBLAS<T>::create();
         }
 
         bool good() const {

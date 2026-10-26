@@ -147,8 +147,6 @@ extern "C" int body_force_total_merit_patch_2d_a_msoa(
         const real_t g1,
         const int nsteps,
         const void *const RSTR steps,
-        const void *const RSTR x,
-        const void *const RSTR h,
         const void *const RSTR accumulator,
         void *const RSTR merit
 );
@@ -168,8 +166,6 @@ extern "C" int body_force_total_merit_patch_3d_a_msoa(
         const real_t g2,
         const int nsteps,
         const void *const RSTR steps,
-        const void *const RSTR x,
-        const void *const RSTR h,
         const void *const RSTR accumulator,
         void *const RSTR merit
 );

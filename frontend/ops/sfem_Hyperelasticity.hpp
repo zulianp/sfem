@@ -5,8 +5,8 @@ namespace sfem {
     class Hyperelasticity final : public Op {
     public:
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space);
-        std::shared_ptr<Op>        lor_op(const std::shared_ptr<FunctionSpace> &space) override;
-        std::shared_ptr<Op>        derefine_op(const std::shared_ptr<FunctionSpace> &space) override;
+        std::shared_ptr<Op>        lor(const std::shared_ptr<FunctionSpace> &space) override;
+        std::shared_ptr<Op>        derefine(const std::shared_ptr<FunctionSpace> &space) override;
         const char                *name() const override { return "Hyperelasticity"; }
         //! a stored energy density
         bool energy_or_potential_based() const override { return true; }

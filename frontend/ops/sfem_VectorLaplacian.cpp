@@ -85,7 +85,7 @@ namespace sfem {
             return SFEM_FAILURE;
         }
 
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
 
         int SFEM_VECTOR_LAPLACIAN_FFF = 1;
         SFEM_READ_ENV(SFEM_VECTOR_LAPLACIAN_FFF, atoi);
@@ -120,21 +120,21 @@ namespace sfem {
         return std::make_unique<VectorLaplacian>(space);
     }
 
-    std::shared_ptr<Op> VectorLaplacian::lor_op(const std::shared_ptr<FunctionSpace> &space) {
-        SFEM_TRACE_SCOPE("VectorLaplacian::lor_op");
+    std::shared_ptr<Op> VectorLaplacian::lor(const std::shared_ptr<FunctionSpace> &space) {
+        SFEM_TRACE_SCOPE("VectorLaplacian::lor");
 
         if (impl_->space->has_semi_structured_mesh() && is_semistructured_type(impl_->space->element_type())) {
-            SMESH_ERROR("VectorLaplacian::lor_op NOT IMPLEMENTED for semi-structured mesh!\n");
+            SMESH_ERROR("VectorLaplacian::lor NOT IMPLEMENTED for semi-structured mesh!\n");
             return nullptr;
         }
 
         auto ret              = std::make_shared<VectorLaplacian>(space);
-        ret->impl_->domains = impl_->domains->lor_op(space, {});
+        ret->impl_->domains = impl_->domains->lor(space, {});
         return ret;
     }
 
-    std::shared_ptr<Op> VectorLaplacian::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
-        SFEM_TRACE_SCOPE("VectorLaplacian::derefine_op");
+    std::shared_ptr<Op> VectorLaplacian::derefine(const std::shared_ptr<FunctionSpace> &space) {
+        SFEM_TRACE_SCOPE("VectorLaplacian::derefine");
 
         if (space->has_semi_structured_mesh() && is_semistructured_type(space->element_type())) {
             auto ret = std::make_shared<VectorLaplacian>(space);
@@ -150,7 +150,7 @@ namespace sfem {
         }
 
         auto ret              = std::make_shared<VectorLaplacian>(space);
-        ret->impl_->domains = impl_->domains->derefine_op(space, {});
+        ret->impl_->domains = impl_->domains->derefine(space, {});
         return ret;
     }
 
@@ -202,7 +202,7 @@ namespace sfem {
             vec_out[d] = &out[d];
         }
 
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) {
             return vector_laplacian_dispatch_apply(domain, *mesh, block_size, vec_in.data(), vec_out.data());
         });

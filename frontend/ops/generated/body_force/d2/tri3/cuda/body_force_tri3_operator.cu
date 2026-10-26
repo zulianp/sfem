@@ -146,30 +146,6 @@ extern "C" const sfem::codegen::KernelDiagnostics *cu_body_force_tri3_jacobian_a
   return &sfem::codegen::body_force_tri3_jacobian_action_esoa_diagnostics_data;
 }
 
-extern "C" int cu_body_force_tri3_residual_esoa(
-    const int scalar_bytes,
-    const void *const RSTR determinant,
-    const real_t density,
-    const real_t g0,
-    const real_t g1,
-    void *const RSTR output[6],
-    void *const stream
-) {
-  switch (scalar_bytes) {
-    case (int)sizeof(double): {
-        sfem::codegen::body_force_d2_simplex_tri3_residual_block<double, 1, 3>((const double *)determinant, density, g0, g1, (double *const *)output);
-        return SFEM_SUCCESS;
-    }
-    case (int)sizeof(float): {
-        sfem::codegen::body_force_d2_simplex_tri3_residual_block<float, 1, 3>((const float *)determinant, density, g0, g1, (float *const *)output);
-        return SFEM_SUCCESS;
-    }
-    default:
-      break;
-  }
-  return sfem::codegen::unsupported_dispatch("body_force_tri3_residual_esoa", -1, (int)scalar_bytes);
-}
-
 namespace sfem {
 namespace codegen {
 

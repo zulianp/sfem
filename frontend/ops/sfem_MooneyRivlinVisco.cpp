@@ -14,9 +14,11 @@
 #include "sfem_OpTracer.hpp"
 #include "sfem_Parameters.hpp"
 
-#include "smesh_glob.hpp"
+#include "sfem_Function.hpp"
+#include "sfem_LinearOperatorFactory.hpp"
 #include "sfem_aliases.hpp"
-#include "sfem_API.hpp"
+#include "sfem_blas_factory.hpp"
+#include "smesh_glob.hpp"
 
 #include <math.h>
 #include <mpi.h>
@@ -190,7 +192,7 @@ namespace sfem {
             blas->zeros(total_size, new_history_buffer->data());
             
             // Allocate prev_u buffer
-            ptrdiff_t ndofs = space->mesh_ptr()->n_nodes() * 3;
+            ptrdiff_t ndofs = space->mesh()->n_nodes() * 3;
             prev_u_buffer = smesh::create_buffer<real_t>(ndofs, sfem::EXECUTION_SPACE_HOST);
             blas->zeros(ndofs, prev_u_buffer->data());
         }
@@ -201,7 +203,7 @@ namespace sfem {
         
         void save_prev_u(const real_t *x) {
             if (prev_u_buffer) {
-                ptrdiff_t ndofs = space->mesh_ptr()->n_nodes() * 3;
+                ptrdiff_t ndofs = space->mesh()->n_nodes() * 3;
                 memcpy(prev_u_buffer->data(), x, ndofs * sizeof(real_t));
             }
         }
@@ -288,7 +290,7 @@ namespace sfem {
                                        const idx_t *const colidx,
                                        real_t *const values) {
         SFEM_TRACE_SCOPE("MooneyRivlinVisco::hessian_bsr");
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         
         if(!impl_->history_buffer) {
             SFEM_ERROR("History buffer not initialized! Call initialize_history() first.");
@@ -330,7 +332,7 @@ namespace sfem {
 
     int MooneyRivlinVisco::hessian_diag(const real_t *const x, real_t *const out) {
         SFEM_TRACE_SCOPE("MooneyRivlinVisco::hessian_diag");
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         
         if(!impl_->history_buffer) {
             SFEM_ERROR("History buffer not initialized! Call initialize_history() first.");
@@ -372,7 +374,7 @@ namespace sfem {
 
     int MooneyRivlinVisco::gradient(const real_t *const x, real_t *const out) {
         SFEM_TRACE_SCOPE("MooneyRivlinVisco::gradient");
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         
         if(!impl_->history_buffer) {
             SFEM_ERROR("History buffer not initialized! Call initialize_history() first.");
@@ -414,7 +416,7 @@ namespace sfem {
 
     int MooneyRivlinVisco::update_history(const real_t *const x) {
         SFEM_TRACE_SCOPE("MooneyRivlinVisco::update_history");
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         
         if(!impl_->history_buffer || !impl_->new_history_buffer) {
             SFEM_ERROR("History buffers not initialized!");

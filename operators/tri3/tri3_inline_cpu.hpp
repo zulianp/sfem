@@ -4,7 +4,7 @@
 #include "operator_inline_cpu.hpp"
 
 #include <assert.h>
-#include "sortreduce.hpp"
+#include "sfem_sortreduce.hpp"
 
 #ifndef POW2
 #define POW2(a) ((a) * (a))
@@ -29,7 +29,7 @@ static SFEM_INLINE idx_t tri3_find_col(const idx_t key, const idx_t *const SFEM_
         return tri3_linear_search(key, row, lenrow);
     } else {
         // Use this for larger number of dofs per row
-        return find_idx_binary_search(key, row, lenrow);
+        return sfem::find_idx_binary_search(key, row, lenrow);
     }
 }
 

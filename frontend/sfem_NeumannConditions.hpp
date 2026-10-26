@@ -40,12 +40,20 @@ namespace sfem {
             bool                                  follower_pressure{false};
             LoadProfile                           profile;
             bool                                  profile_initialized{false};
+            /// A dead load on a distributed mesh at value 1, complete on the owned rows: each
+            /// face is on one rank, so its share at another rank's node is added there once.
+            SharedBuffer<real_t>                  owned_load;
         };
 
         static std::shared_ptr<NeumannConditions> create_from_env(const std::shared_ptr<FunctionSpace> &space);
 
         static std::shared_ptr<NeumannConditions> create(const std::shared_ptr<FunctionSpace> &space,
                                                          const std::vector<struct Condition>  &conditions);
+
+        /// create, moved to the device for EXECUTION_SPACE_DEVICE.
+        static std::shared_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space,
+                                          const std::vector<struct Condition>  &conditions,
+                                          const ExecutionSpace                  es);
 
         static std::shared_ptr<NeumannConditions> create_from_yaml(const std::shared_ptr<FunctionSpace> &space, std::string yaml);
 
@@ -60,7 +68,7 @@ namespace sfem {
         static std::shared_ptr<NeumannConditions> create_from_file(const std::shared_ptr<FunctionSpace> &space,
                                                                    const smesh::Path                    &path);
 
-        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &derefined_space) override;
+        std::shared_ptr<Op> derefine(const std::shared_ptr<FunctionSpace> &derefined_space) override;
 
         const char *name() const override;
         //! The work a traction does, `-g . x`, is linear in the state and so a
@@ -115,6 +123,13 @@ namespace sfem {
     };
 
     std::shared_ptr<Op> to_device(const std::shared_ptr<NeumannConditions> &nc);
+
+    /// NeumannConditions::create, moved to the device for EXECUTION_SPACE_DEVICE.
+    inline std::shared_ptr<Op> create_neumann_conditions(const std::shared_ptr<FunctionSpace>            &space,
+                                                         const std::vector<NeumannConditions::Condition> &conditions,
+                                                         const ExecutionSpace                             es) {
+        return NeumannConditions::create(space, conditions, es);
+    }
 
 }  // namespace sfem
 

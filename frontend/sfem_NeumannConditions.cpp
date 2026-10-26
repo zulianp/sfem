@@ -10,6 +10,7 @@
 #include "sfem_logger.hpp"
 #include "smesh_mesh.hpp"
 #include "smesh_sideset.hpp"
+#include "sfem_FunctionSpace.hpp"
 
 #include "integrate_values.hpp"
 #include "neumann.hpp"
@@ -303,7 +304,7 @@ namespace sfem {
 
         if (!SFEM_NEUMANN_SURFACE && !SFEM_NEUMANN_SIDESET) return neumann_conditions;
 
-        auto comm = space->mesh_ptr()->comm();
+        auto comm = space->mesh()->comm();
         int  rank = comm->rank();
 
         auto &conds = neumann_conditions->impl_->conditions;
@@ -371,10 +372,10 @@ namespace sfem {
                     cneumann_conditions.surface      = manage_host_buffer(nnxs, nse, surface);
 
                 } else {
-                    auto sideset = Sideset::create_from_file(space->mesh_ptr()->comm(), smesh::Path(pch));
+                    auto sideset = Sideset::create_from_file(space->mesh()->comm(), smesh::Path(pch));
                     cneumann_conditions.sidesets.push_back(sideset);
 
-                    auto mesh_for_surface            = space->mesh_ptr();
+                    auto mesh_for_surface            = space->mesh();
                     auto surface                     = smesh::create_surface_from_sideset(mesh_for_surface, sideset);
                     cneumann_conditions.element_type = surface.first;
                     cneumann_conditions.surface      = surface.second;
@@ -451,6 +452,8 @@ namespace sfem {
         ryml::Tree tree = ryml::parse_in_place(ryml::to_substr(yaml));
         return create_from_yaml(space, tree["neumann_conditions"]);
 #else
+        SFEM_UNUSED(space);
+        SFEM_UNUSED(yaml);
         SFEM_ERROR("This functionaly requires -DSFEM_ENABLE_RYAML=ON\n");
         return nullptr;
 #endif
@@ -488,7 +491,7 @@ namespace sfem {
             } else if (is_file) {
                 std::string path;
                 c["path"].load(&path);
-                sidesets = {Sideset::create_from_file(space->mesh_ptr()->comm(), smesh::Path(lookup.resolve(path)))};
+                sidesets = {Sideset::create_from_file(space->mesh()->comm(), smesh::Path(lookup.resolve(path)))};
             } else if (is_expr) {
                 assert(c["parent"].is_seq());
                 assert(c["lfi"].is_seq());
@@ -508,7 +511,7 @@ namespace sfem {
                 }
 
                 assert(lfi_count == parent_count);
-                sidesets = {std::make_shared<Sideset>(space->mesh_ptr()->comm(), parent, lfi)};
+                sidesets = {std::make_shared<Sideset>(space->mesh()->comm(), parent, lfi)};
             }
 
             std::vector<int>     component;
@@ -525,7 +528,7 @@ namespace sfem {
                 nc.sidesets = sidesets;
                 node_value.load(&nc.value);
                 nc.follower_pressure = true;
-                if (c.has_child("profile") && LoadProfile::from_yaml(c["profile"], nc.profile) != SFEM_SUCCESS) {
+                if (c.has_child("profile") && LoadProfile::from_yaml(c["profile"], nc.profile, lookup.base_dir) != SFEM_SUCCESS) {
                     return nullptr;
                 }
                 conditions.push_back(nc);
@@ -572,7 +575,7 @@ namespace sfem {
             }
 
             LoadProfile profile;
-            if (c.has_child("profile") && LoadProfile::from_yaml(c["profile"], profile) != SFEM_SUCCESS) return nullptr;
+            if (c.has_child("profile") && LoadProfile::from_yaml(c["profile"], profile, lookup.base_dir) != SFEM_SUCCESS) return nullptr;
 
             for (size_t i = 0; i < component.size(); i++) {
                 struct Condition nc;
@@ -621,12 +624,12 @@ namespace sfem {
         SFEM_TRACE_SCOPE("NeumannConditions::hessian_bsr");
 
         auto      space = impl_->space;
-        auto      mesh  = space->mesh_ptr();
+        auto      mesh  = space->mesh();
         const int dim   = mesh->spatial_dimension();
         if (space->block_size() != dim || (dim != 2 && dim != 3)) return SFEM_FAILURE;
 
         auto points = mesh->points();
-        if (space->has_semi_structured_mesh()) points = space->mesh().points();
+        if (space->has_semi_structured_mesh()) points = space->mesh()->points();
 
         for (const auto &c : impl_->conditions) {
             if (!c.follower_pressure) continue;
@@ -706,19 +709,68 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
+    /// The dead load of `c` at value 1 on a distributed mesh, complete on the owned rows. The
+    /// sidesets keep each face on one rank (filtered to owned elements, shared faces deduplicated),
+    /// while the volume operators complete an owned row from the aura's elements: here the shares a
+    /// face leaves at the ghosts are added to their owners instead. Collective.
+    static int complete_dead_load(FunctionSpace &space, geom_t **const points, NeumannConditions::Condition &c) {
+        auto            mesh  = space.mesh();
+        const ptrdiff_t ndofs = space.n_dofs();
+        auto            load  = create_host_buffer<real_t>(ndofs);
+        std::memset(load->data(), 0, sizeof(real_t) * static_cast<size_t>(ndofs));
+        // A rank can hold none of the faces (no surface): it adds nothing, but takes part in the
+        // exchange.
+        const bool faces = c.surface && c.surface->extent(1) > 0;
+        int err = !faces ? SFEM_SUCCESS : c.values ? integrate_values(c.element_type,
+                                              c.surface->extent(1),
+                                              mesh->n_nodes(),
+                                              c.surface->data(),
+                                              points,
+                                              -1,
+                                              c.values->data(),
+                                              space.block_size(),
+                                              c.component,
+                                              load->data())
+                           : integrate_value(c.element_type,
+                                             c.surface->extent(1),
+                                             mesh->n_nodes(),
+                                             c.surface->data(),
+                                             points,
+                                             -1,
+                                             space.block_size(),
+                                             c.component,
+                                             load->data());
+        if (err != SFEM_SUCCESS || space.add_to_owners(load->data()) != SFEM_SUCCESS) {
+            SFEM_ERROR("NeumannConditions: unable to complete a load on its owned nodes\n");
+            return SFEM_FAILURE;
+        }
+        c.owned_load = load;
+        return SFEM_SUCCESS;
+    }
+
     int NeumannConditions::gradient(const real_t *const x, real_t *const out) {
         SFEM_TRACE_SCOPE("NeumannConditions::gradient");
 
         auto space = impl_->space;
-        auto mesh  = space->mesh_ptr();
+        auto mesh  = space->mesh();
 
         auto points = mesh->points();
         if (space->has_semi_structured_mesh()) {
-            points = space->mesh().points();
+            points = space->mesh()->points();
         }
+        const bool distributed = mesh->is_distributed() && mesh->comm()->size() > 1;
 
         int err = 0;
         for (auto &c : impl_->conditions) {
+            if (distributed && !c.follower_pressure) {
+                if (!c.owned_load && complete_dead_load(*space, points->data(), c) != SFEM_SUCCESS) return SFEM_FAILURE;
+                const real_t *const g     = c.owned_load->data();
+                const real_t        v     = c.value;
+                const ptrdiff_t     owned = space->n_dofs_owned();
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < owned; ++i) out[i] += v * g[i];
+                continue;
+            }
             if (c.follower_pressure) {
                 const int dim = mesh->spatial_dimension();
                 if (!x || space->block_size() != dim || !is_supported_pressure_surface(c.element_type)) {
@@ -807,9 +859,9 @@ namespace sfem {
         SFEM_TRACE_SCOPE("NeumannConditions::apply");
 
         auto space  = impl_->space;
-        auto mesh   = space->mesh_ptr();
+        auto mesh   = space->mesh();
         auto points = mesh->points();
-        if (space->has_semi_structured_mesh()) points = space->mesh().points();
+        if (space->has_semi_structured_mesh()) points = space->mesh()->points();
         for (const auto &c : impl_->conditions) {
             if (!c.follower_pressure) continue;
             const int dim = mesh->spatial_dimension();
@@ -869,10 +921,10 @@ namespace sfem {
         SFEM_TRACE_SCOPE("NeumannConditions::value");
 
         auto space  = impl_->space;
-        auto mesh   = space->mesh_ptr();
+        auto mesh   = space->mesh();
         auto points = mesh->points();
         if (space->has_semi_structured_mesh()) {
-            points = space->mesh().points();
+            points = space->mesh()->points();
         }
 
         SharedBuffer<real_t> temp;
@@ -995,10 +1047,10 @@ namespace sfem {
         SFEM_TRACE_SCOPE("NeumannConditions::value_steps");
 
         auto space  = impl_->space;
-        auto mesh   = space->mesh_ptr();
+        auto mesh   = space->mesh();
         auto points = mesh->points();
         if (space->has_semi_structured_mesh()) {
-            points = space->mesh().points();
+            points = space->mesh()->points();
         }
 
         const ptrdiff_t      ndofs = space->n_dofs();
@@ -1141,7 +1193,7 @@ namespace sfem {
             if (!c.surface) {
                 auto it = sideset_to_surface.find(c.sidesets[0]);
                 if (it == sideset_to_surface.end()) {
-                    auto mesh_for_surface             = space->mesh_ptr();
+                    auto mesh_for_surface             = space->mesh();
                     auto surface                      = smesh::create_surface_from_sidesets(mesh_for_surface, c.sidesets);
                     c.element_type                    = surface.first;
                     c.surface                         = surface.second;
@@ -1151,7 +1203,7 @@ namespace sfem {
                     c.surface      = it->second.second;
                 }
             }
-            if (c.follower_pressure && space->mesh_ptr()->spatial_dimension() == 3) {
+            if (c.follower_pressure && space->mesh()->spatial_dimension() == 3) {
                 if (c.element_type == smesh::TRISHELL3) {
                     c.element_type = smesh::TRI3;
                 } else if (c.element_type == smesh::QUADSHELL4) {
@@ -1168,7 +1220,7 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    std::shared_ptr<Op> NeumannConditions::derefine_op(const std::shared_ptr<FunctionSpace> & /*derefined_space*/) {
+    std::shared_ptr<Op> NeumannConditions::derefine(const std::shared_ptr<FunctionSpace> & /*derefined_space*/) {
         // std::map<  //
         //         std::shared_ptr<Sideset>,
         //         std::shared_ptr<Buffer<idx_t *>>>
@@ -1211,5 +1263,15 @@ namespace sfem {
 #ifndef SFEM_ENABLE_CUDA
     std::shared_ptr<Op> to_device(const std::shared_ptr<NeumannConditions> &nc) { return nc; }
 #endif
+
+    std::shared_ptr<Op> NeumannConditions::create(const std::shared_ptr<FunctionSpace>            &space,
+                                                  const std::vector<NeumannConditions::Condition> &conditions,
+                                                  const ExecutionSpace                             es) {
+        auto conds = NeumannConditions::create(space, conditions);
+        if (es == EXECUTION_SPACE_DEVICE) {
+            return to_device(conds);
+        }
+        return conds;
+    }
 
 }  // namespace sfem

@@ -41,7 +41,7 @@ namespace {
 int test_generated_two_phase_flow_operator() {
     auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 2, 2, 2);
     auto space = sfem::FunctionSpace::create(mesh, 2);
-    auto base = sfem::Factory::create_op(space, "GeneratedTwoPhaseFlow");
+    auto base = sfem::OpFactory::create(space, "GeneratedTwoPhaseFlow", sfem::EXECUTION_SPACE_HOST);
     auto op = std::dynamic_pointer_cast<sfem::GeneratedTwoPhaseFlow>(base);
     SFEM_TEST_ASSERT(op != nullptr);
 

@@ -690,7 +690,7 @@ namespace sfem {
     //! device `gradient` then `atomicAdd`ed into.  `compute-sanitizer`:
     //! "Invalid __global__ atomic of size 8 bytes ... Address 0x3aa240f8 is
     //! out of bounds".
-    ExecutionSpace execution_space() const override { return %(execution_space)s; }
+    ExecutionContext execution_context() const override { return %(execution_context)s; }
     bool is_linear() const override { return %(linear)s; }
     ptrdiff_t n_dofs_domain() const override;
     ptrdiff_t n_dofs_image() const override;
@@ -715,7 +715,7 @@ namespace sfem {
     void set_value_in_block(const std::string &block_name,
                 const std::string &var_name,
                 real_t value) override;
-    std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override;
+    std::shared_ptr<Op> derefine(const std::shared_ptr<FunctionSpace> &space) override;
 #ifdef SFEM_ENABLE_RYAML
     std::shared_ptr<Op> create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
                                              const ryml::ConstNodeRef             &node) override;
@@ -739,6 +739,7 @@ namespace sfem {
 """ % {
         "op": _op_class_name(material),
         "execution_space": current_target().execution_space(),
+        "execution_context": _op_execution_context(),
         "linear": "true" if linear else "false",
         "header_stem": _op_file_stem(material),
         "stream_member": _op_stream_member(),
@@ -980,7 +981,7 @@ def _inexact_definitions(
 
   int %%(op)s::inexact_update(const real_t *const %(update_state_parameter)s) {
     SFEM_TRACE_SCOPE("%%(op)s::inexact_update");
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
     const int dim = mesh->spatial_dimension();
     return impl_->domains->iterate([&](const OpDomain &domain) {
       auto cache = std::static_pointer_cast<AffineGeometryCache>(domain.user_data);
@@ -1020,7 +1021,7 @@ def _inexact_definitions(
 
   int %%(op)s::inexact_apply(const real_t *const h, real_t *const out) {
     SFEM_TRACE_SCOPE("%%(op)s::inexact_apply");
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
     const int dim = mesh->spatial_dimension();
     return impl_->domains->iterate([&](const OpDomain &domain) {
       auto cache = std::static_pointer_cast<AffineGeometryCache>(domain.user_data);
@@ -1075,7 +1076,7 @@ def _hyperelastic_op(
     if (impl_->space->has_packed_mesh()) {
       auto packed = impl_->space->packed_mesh();
       const ptrdiff_t max_nodes_per_pack = packed->max_nodes_per_pack();
-      const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+      const int dim = impl_->space->mesh()->spatial_dimension();
       const size_t scratch_size = (size_t)dim * (size_t)max_nodes_per_pack;
       sfem::codegen::prealloc_thread_scratch<real_t>(0, scratch_size);
       sfem::codegen::prealloc_thread_scratch<real_t>(1, scratch_size);
@@ -1512,7 +1513,7 @@ namespace sfem {
     int cache_affine_geometry(const std::shared_ptr<FunctionSpace> &space,
                                   MultiDomainOp &domains,
                                   const bool requested) {
-      auto mesh = space->mesh_ptr();
+      auto mesh = space->mesh();
       const bool needs_jacobian_aos =
           %(gradient_affine_uses_jacobian_aos)s ||
           %(apply_affine_uses_jacobian_aos)s;
@@ -1645,7 +1646,7 @@ namespace sfem {
 
   std::unique_ptr<Op> %(op)s::create(const std::shared_ptr<FunctionSpace> &space) {
     const ptrdiff_t expected_block_size =
-        block_size_for_dim(space->mesh_ptr()->spatial_dimension());
+        block_size_for_dim(space->mesh()->spatial_dimension());
     if (space->block_size() != expected_block_size) {
       SFEM_ERROR("%(op)s requires block_size=%%ld\\n",
                        static_cast<long>(expected_block_size));
@@ -1718,7 +1719,7 @@ namespace sfem {
         return SFEM_FAILURE;
       }
     }
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const geom_t *const *adjugate = nullptr;
@@ -1757,7 +1758,7 @@ namespace sfem {
         return SFEM_FAILURE;
       }
     }
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const geom_t *const *adjugate = nullptr;
@@ -1816,7 +1817,7 @@ namespace sfem {
               const real_t *const steps,
               real_t *const out) {
     SFEM_TRACE_SCOPE("%(op)s::value_steps");
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
     auto points = element_points(mesh);
     if (nsteps <= 0) {
       return SFEM_SUCCESS;
@@ -1874,7 +1875,7 @@ namespace sfem {
       }
     }
 %(hessian_crs_current_prologue)s
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
 %(hessian_crs_points_alias)s    return impl_->domains->iterate([&](const OpDomain &%(hessian_crs_domain_parameter)s) {
 %(hessian_crs_dispatch_body)s
     });
@@ -1892,7 +1893,7 @@ namespace sfem {
       }
     }
 %(hessian_bsr_current_prologue)s
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
 %(hessian_bsr_points_alias)s    return impl_->domains->iterate([&](const OpDomain &%(hessian_bsr_domain_parameter)s) {
 %(hessian_bsr_dispatch_body)s
     });
@@ -1910,7 +1911,7 @@ namespace sfem {
       }
     }
 %(hessian_block_diag_sym_current_prologue)s
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
 %(hessian_block_diag_sym_points_alias)s    return impl_->domains->iterate([&](const OpDomain &%(hessian_block_diag_sym_domain_parameter)s) {
 %(hessian_block_diag_sym_dispatch_body)s
     });
@@ -1939,7 +1940,7 @@ namespace sfem {
     SFEM_TRACE_SCOPE("%(op)s::set_value_in_block");
     impl_->domains->set_value_in_block(block_name, var_name, value);
   }
-%(derefine_op)s
+%(derefine)s
 #ifdef SFEM_ENABLE_RYAML
   std::shared_ptr<Op> %(op)s::create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
                                                  const ryml::ConstNodeRef             &node) {
@@ -2006,7 +2007,7 @@ namespace sfem {
     )
     substitutions = {
         "op": _op_class_name(material),
-        "derefine_op": _derefine_op_source(_op_class_name(material), True),
+        "derefine": _derefine_op_source(_op_class_name(material), True),
         "header_stem": _op_file_stem(material),
         "stream_member": _op_stream_member(),
         "c_abi_include": '#include "%s"' % c_abi_header if c_abi_header else "",
@@ -2042,6 +2043,7 @@ namespace sfem {
         # every space it could legitimately be built on.
         "element_connectivity": _element_connectivity_expression(),
         "execution_space": current_target().execution_space(),
+        "execution_context": _op_execution_context(),
         "points_accessor": _points_accessor_expression(),
         "graph_host_view": _graph_host_view(),
         "geometry_memory_space": _geometry_memory_space_expression(),
@@ -2834,7 +2836,7 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
         """        if (impl_->space->has_packed_mesh()) {
       auto packed = impl_->space->packed_mesh();
       const ptrdiff_t max_nodes_per_pack = packed->max_nodes_per_pack();
-      const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+      const int dim = impl_->space->mesh()->spatial_dimension();
       sfem::codegen::prealloc_thread_scratch<real_t>(
           0, (size_t)dim * (size_t)max_nodes_per_pack);
       sfem::codegen::prealloc_thread_scratch<real_t>(
@@ -3078,7 +3080,7 @@ namespace sfem {
                                   const bool requested_jacobian,
                                   const bool requested_metric_soa,
                                   const bool requested_metric_aos) {
-      auto mesh = space->mesh_ptr();
+      auto mesh = space->mesh();
       for (auto &entry : domains.domains()) {
         const bool forced = geometry_is_forced_affine(entry.second.element_type);
         const bool needs_jacobian = requested_jacobian || forced;
@@ -3231,7 +3233,7 @@ namespace sfem {
 
   std::unique_ptr<Op> %(op)s::create(const std::shared_ptr<FunctionSpace> &space) {
     const ptrdiff_t expected_block_size =
-        block_size_for_dim(space->mesh_ptr()->spatial_dimension());
+        block_size_for_dim(space->mesh()->spatial_dimension());
     if (space->block_size() != expected_block_size) {
       SFEM_ERROR("%(op)s requires block_size=%%ld\\n",
                        static_cast<long>(expected_block_size));
@@ -3302,7 +3304,7 @@ namespace sfem {
     SFEM_TRACE_SCOPE("%(op)s::gradient");
 %(gradient_previous_check)s%(scheme_gradient_term)s
     impl_->current = state;
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
 %(gradient_affine_geometry)s      real_t storage[MAX_PARAMETERS];
@@ -3319,7 +3321,7 @@ namespace sfem {
                       real_t *const %(apply_out_parameter)s) {
     SFEM_TRACE_SCOPE("%(op)s::apply");
 %(apply_current_alias)s%(apply_state_check)s%(scheme_apply_term)s
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
 %(apply_points_alias)s%(laplace_packed_apply_fast_path)s
     return impl_->domains->iterate([&](const OpDomain &domain) {
 %(apply_affine_geometry)s      real_t storage[MAX_PARAMETERS];
@@ -3349,7 +3351,7 @@ namespace sfem {
     SFEM_TRACE_SCOPE("%(op)s::set_value_in_block");
     impl_->domains->set_value_in_block(block_name, var_name, value);
   }
-%(derefine_op)s
+%(derefine)s
   void %(op)s::set_option(const std::string &name, const bool val) {
     SFEM_TRACE_SCOPE("%(op)s::set_option");
     AffineOption options[] = {
@@ -3450,7 +3452,7 @@ namespace sfem {
 """
     substitutions = {
         "op": _op_class_name(material),
-        "derefine_op": _derefine_op_source(_op_class_name(material), holds_scheme),
+        "derefine": _derefine_op_source(_op_class_name(material), holds_scheme),
         "header_stem": _op_file_stem(material),
         "stream_member": _op_stream_member(),
         "c_abi_include": '#include "%s"' % c_abi_header if c_abi_header else "",
@@ -3474,6 +3476,7 @@ namespace sfem {
         "parameter_lines": parameter_lines,
         "element_connectivity": _element_connectivity_expression(),
         "execution_space": current_target().execution_space(),
+        "execution_context": _op_execution_context(),
         "points_accessor": _points_accessor_expression(),
         "graph_host_view": _graph_host_view(),
         "geometry_memory_space": _geometry_memory_space_expression(),
@@ -3557,7 +3560,7 @@ namespace sfem {
             # it is the static one, and Newton on it stalls once the mass
             # dominates (small dt).
             "%s"
-            "    auto mesh = impl_->space->mesh_ptr();\n"
+            "    auto mesh = impl_->space->mesh();\n"
             "    auto points = element_points(mesh);\n"
             "    return impl_->domains->iterate([&](const OpDomain &domain) {\n"
             "      real_t storage[MAX_PARAMETERS];\n"
@@ -3603,7 +3606,7 @@ namespace sfem {
             # it is the static one, and Newton on it stalls once the mass
             # dominates (small dt).
             "%s"
-            "    auto mesh = impl_->space->mesh_ptr();\n"
+            "    auto mesh = impl_->space->mesh();\n"
             "    auto points = element_points(mesh);\n"
             "    return impl_->domains->iterate([&](const OpDomain &domain) {\n"
             "      real_t storage[MAX_PARAMETERS];\n"
@@ -4425,7 +4428,7 @@ namespace sfem {
         }
         const std::string path = yaml_read_string(node["path"]);
         return smesh::Sideset::create_from_file(
-            space->mesh_ptr()->comm(), smesh::Path(path));
+            space->mesh()->comm(), smesh::Path(path));
       }
 
       if (is_expr || (node.has_child("parent") && node.has_child("lfi"))) {
@@ -4454,7 +4457,7 @@ namespace sfem {
         }
 
         return std::make_shared<smesh::Sideset>(
-            space->mesh_ptr()->comm(), parent, lfi);
+            space->mesh()->comm(), parent, lfi);
       }
 
       SFEM_ERROR("%(op)s neumann condition requires format=file or format=expr\\n");
@@ -4535,7 +4538,7 @@ namespace sfem {
 
   std::unique_ptr<Op> %(op)s::create(const std::shared_ptr<FunctionSpace> &space) {
     const ptrdiff_t expected_block_size =
-        block_size_for_dim(space->mesh_ptr()->spatial_dimension());
+        block_size_for_dim(space->mesh()->spatial_dimension());
     if (space->block_size() != expected_block_size) {
       SFEM_ERROR("%(op)s requires block_size=%%ld\\n",
                        static_cast<long>(expected_block_size));
@@ -4595,7 +4598,7 @@ namespace sfem {
     if (impl_->conditions.empty()) {
       return SFEM_SUCCESS;
     }
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const smesh::block_idx_t block_id = block_id_for_domain(*mesh, *domain.block);
@@ -4707,6 +4710,7 @@ namespace sfem {
         "parameter_lines": parameter_lines,
         "element_connectivity": _element_connectivity_expression(),
         "execution_space": current_target().execution_space(),
+        "execution_context": _op_execution_context(),
         "points_accessor": _points_accessor_expression(),
         "graph_host_view": _graph_host_view(),
         "geometry_memory_space": _geometry_memory_space_expression(),
@@ -4762,7 +4766,7 @@ namespace sfem {
     //! device `gradient` then `atomicAdd`ed into.  `compute-sanitizer`:
     //! "Invalid __global__ atomic of size 8 bytes ... Address 0x3aa240f8 is
     //! out of bounds".
-    ExecutionSpace execution_space() const override { return %(execution_space)s; }
+    ExecutionContext execution_context() const override { return %(execution_context)s; }
     bool is_linear() const override { return true; }
     ptrdiff_t n_dofs_domain() const override;
     ptrdiff_t n_dofs_image() const override;
@@ -4817,6 +4821,7 @@ namespace sfem {
 """ % {
         "op": _op_class_name(material),
         "execution_space": current_target().execution_space(),
+        "execution_context": _op_execution_context(),
         "value_steps": value_steps,
         "header_stem": _op_file_stem(material),
         "stream_member": _op_stream_member(),
@@ -4917,7 +4922,7 @@ namespace sfem {
 
     int cache_affine_geometry(const std::shared_ptr<FunctionSpace> &space,
                                   MultiDomainOp &domains) {
-      auto mesh = space->mesh_ptr();
+      auto mesh = space->mesh();
       for (auto &entry : domains.domains()) {
         if (entry.second.user_data) {
           continue;
@@ -5051,7 +5056,7 @@ namespace sfem {
 
   std::unique_ptr<Op> %(op)s::create(const std::shared_ptr<FunctionSpace> &space) {
     const ptrdiff_t expected_block_size =
-        block_size_for_dim(space->mesh_ptr()->spatial_dimension());
+        block_size_for_dim(space->mesh()->spatial_dimension());
     if (space->block_size() != expected_block_size) {
       SFEM_ERROR("%(op)s requires block_size=%%ld\\n",
                        static_cast<long>(expected_block_size));
@@ -5078,7 +5083,7 @@ namespace sfem {
     // elements, which these kernels assemble as HEX8.
     impl_->domains->set_micro_elements(impl_->space->micro_elements());
     seed_material(*impl_->domains);
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
     const bool needs_affine_geometry =
         impl_->objective_uses_affine ||
         impl_->gradient_uses_affine ||
@@ -5122,7 +5127,7 @@ namespace sfem {
     SFEM_TRACE_SCOPE("%(op)s::gradient");
 %(gradient_previous_check)s
     impl_->current = state;
-%(scheme_gradient)s    auto mesh = impl_->space->mesh_ptr();
+%(scheme_gradient)s    auto mesh = impl_->space->mesh();
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const geom_t *const *adjugate = nullptr;
@@ -5159,7 +5164,7 @@ namespace sfem {
 %(scheme_apply)s
     const real_t *const current = state ? state : impl_->current;
 %(apply_state_check)s
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const geom_t *const *adjugate = nullptr;
@@ -5220,7 +5225,7 @@ namespace sfem {
     SFEM_TRACE_SCOPE("%(op)s::set_value_in_block");
     impl_->domains->set_value_in_block(block_name, var_name, value);
   }
-%(derefine_op)s
+%(derefine)s
 #ifdef SFEM_ENABLE_RYAML
   std::shared_ptr<Op> %(op)s::create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
                                                  const ryml::ConstNodeRef             &node) {
@@ -5285,7 +5290,7 @@ namespace sfem {
 %(hessian_bsr_method)s}  // namespace sfem
 """ % {
         "op": _op_class_name(material),
-        "derefine_op": _derefine_op_source(_op_class_name(material), _has_time_rate(material)),
+        "derefine": _derefine_op_source(_op_class_name(material), _has_time_rate(material)),
         "header_stem": _op_file_stem(material),
         "stream_member": _op_stream_member(),
         "hessian_bsr_method": _coupled_hessian_bsr_method(
@@ -5313,6 +5318,7 @@ namespace sfem {
         % {"op": _op_class_name(material)},
         "element_connectivity": _element_connectivity_expression(),
         "execution_space": current_target().execution_space(),
+        "execution_context": _op_execution_context(),
         "points_accessor": _points_accessor_expression(),
         "graph_host_view": _graph_host_view(),
         "geometry_memory_space": _geometry_memory_space_expression(),
@@ -5939,7 +5945,7 @@ def _coupled_hessian_bsr_method(op_name, scheme_argument, scheme_hessian_bsr, he
       SFEM_ERROR("%(op)s::hessian_bsr requires current and previous states\\n");
       return SFEM_FAILURE;
     }
-%(scheme_hessian_bsr)s    auto mesh = impl_->space->mesh_ptr();
+%(scheme_hessian_bsr)s    auto mesh = impl_->space->mesh();
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       real_t storage[MAX_PARAMETERS];
@@ -6198,8 +6204,8 @@ _HEADER_TIME_SCHEME_INCLUDE = {False: "", True: '#include "sfem_TimeScheme.hpp"\
 #: weights, the inertia rediscretised).  Affine options are not carried: they are a speed choice,
 #: and a micro-element view reads its geometry isoparametrically.
 _DEREFINE_OP = """
-  std::shared_ptr<Op> %(op)s::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
-    SFEM_TRACE_SCOPE("%(op)s::derefine_op");
+  std::shared_ptr<Op> %(op)s::derefine(const std::shared_ptr<FunctionSpace> &space) {
+    SFEM_TRACE_SCOPE("%(op)s::derefine");
     auto ret = std::make_shared<%(op)s>(space);%(scheme)s
     if (ret->initialize() != SFEM_SUCCESS) return nullptr;
     for (const auto &entry : impl_->domains->domains()) {
@@ -6248,6 +6254,7 @@ _HEADER_RELAXATION_DECLARATIONS = {
     void reset_history(const real_t *const x) override;
     //! The relaxation state: spectra, time-temperature shift, storage.
     RelaxationGroups &relaxation_groups();
+    RelaxationGroups *relaxation_state() override { return &relaxation_groups(); }
     //! Evaluate the material's integration-point outputs at `x` into workspace
     //! slot `slot` of the relaxation, which has to be holding one.
     int quadrature_output(const real_t *const x, const int slot);""",
@@ -6257,7 +6264,7 @@ _HEADER_RELAXATION_DECLARATIONS = {
 def _op_stream_member():
     """The stream this Op hands every kernel, where the target has one.
 
-    `GPULaplacian` declares `void *stream{SFEM_DEFAULT_STREAM}` and passes it to
+    `GPULaplacian` declares `void *stream{nullptr}` and passes it to
     each call; a host Op has nothing to declare, so it declares nothing rather
     than a member that means nothing.
     """
@@ -6269,8 +6276,21 @@ def _op_stream_member():
     //! Mirrors GPULaplacian, which declares the same member with the same
     //! default.  A launch that ignored it would serialise onto the default
     //! stream and silently undo the caller's ordering.
-    void *stream{SFEM_DEFAULT_STREAM};
+    void *stream{nullptr};
 """
+
+
+def _op_execution_context():
+    """What a generated `Op` answers to `execution_context()`.
+
+    The target's space and, on a target whose `Op` holds a stream, that stream:
+    the context `Function` and the solvers order their own work on, so they
+    issue it on the stream the `Op`'s kernels run on.
+    """
+    stream = current_target().op_stream_arguments()
+    if not stream:
+        return current_target().execution_space()
+    return "ExecutionContext(%s, %s)" % (current_target().execution_space(), ", ".join(stream))
 
 
 def _op_class_name(material):
@@ -6590,7 +6610,7 @@ def _relaxation_fragments(
     }
 """ % {"declaration_cases": declaration_cases, "point_cases": point_cases, "op": op}
     setup = """    impl_->relaxation = std::make_shared<RelaxationGroups>(
-        relaxation_declarations(impl_->space->mesh_ptr()->spatial_dimension()),
+        relaxation_declarations(impl_->space->mesh()->spatial_dimension()),
         impl_->space->n_dofs(),
         %(execution_space)s);
     for (auto &entry : impl_->domains->domains()) {
@@ -6632,7 +6652,7 @@ def _relaxation_fragments(
 
   int %(op)s::quadrature_output(const real_t *const x, const int slot) {
     SFEM_TRACE_SCOPE("%(op)s::quadrature_output");
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const geom_t *const *adjugate = nullptr;
@@ -7671,7 +7691,7 @@ def _runtime_typed_argument(param, scalar_type):
 def _merged_pair_dispatch_function_lines(group):
     """One entry point where there were two, taking the scalar type as a value.
 
-    This is the shape ``operators/tet4/cuda/cu_tet4_laplacian.cu`` uses: the
+    This is the shape ``operators/tet4/cuda/tet4_laplacian_cuda.cu`` uses: the
     buffers cross as ``void *`` and a ``smesh::PrimitiveType`` says what they
     hold, the body switches, casts, and calls the concrete implementation.
     SFEM splits the two switches across two functions -- element type in
@@ -8196,8 +8216,8 @@ def _registration_source(material, wrapper_header):
 
 namespace sfem {
   void %(function)s() {
-    Factory::register_op("%(registered)s", %(op)s::create);
-    Factory::register_op("%(registered_ss)s", %(op)s::create);
+    OpFactory::register_op("%(registered)s", %(op)s::create);
+    OpFactory::register_op("%(registered_ss)s", %(op)s::create);
   }
 }  // namespace sfem
 """ % {
@@ -8674,14 +8694,15 @@ def _steps_staging(indent):
             "%s  impl_->step_values = create_buffer<real_t>(nsteps, %s);" % (indent, space),
             "%s  impl_->step_capacity = nsteps;" % indent,
             "%s}" % indent,
-            "%sbuffer_host_to_device(nsteps * sizeof(real_t), steps, impl_->step_values->data());"
+            "%scopy_host_to_device(nsteps * sizeof(real_t), steps, impl_->step_values->data());"
             % indent,
         )
     )
 
 
 def _element_scratch_include():
-    """`sfem_API.hpp`, where the target's scratch needs `create_buffer` and `blas`.
+    """The headers the target's scratch needs: `blas` (`sfem_blas_factory.hpp`)
+    and the device copies (`sfem_BLAS_cuda.hpp`).
 
     Only a device target does: its per-element scratch is a `SharedBuffer` and
     its reduction is the library's own, so the header comes in with them rather
@@ -8689,7 +8710,7 @@ def _element_scratch_include():
     """
     if not _runs_on_device():
         return ""
-    return '#include "sfem_API.hpp"\n'
+    return '#include "sfem_blas_factory.hpp"\n#include "sfem_BLAS_cuda.hpp"\n'
 
 
 def _element_scratch_fields():
@@ -9101,7 +9122,7 @@ def _performance_flops_method(op_name, method, cases):
       return total;
     }
 
-    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+    const int dim = impl_->space->mesh()->spatial_dimension();
     impl_->domains->iterate([&](const OpDomain &domain) {
       const ptrdiff_t nelements = domain.block->n_elements();
 %(cases)s
@@ -9125,7 +9146,7 @@ def _performance_bytes_method(op_name, method, cases):
       return total;
     }
 
-    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+    const int dim = impl_->space->mesh()->spatial_dimension();
     impl_->domains->iterate([&](const OpDomain &domain) {
       const ptrdiff_t nelements = domain.block->n_elements();
 %(cases)s
@@ -9459,10 +9480,34 @@ def _residual_hessian_dispatch_body(
     affine_elements = tuple(
         element for dim in (2, 3) for element in affine_by_dim[dim]
     )
+    # The adjugate only where an affine assembly declares it: a mass reads the
+    # determinant alone, and binding the adjugate anyway is a variable set and
+    # never read.  The kernel's signature says which, as it does for the apply.
+    reads_adjugate = any(
+        argument.startswith("adjugate[")
+        for dim in (2, 3)
+        if affine_by_dim[dim]
+        for argument in _affine_geometry_call_args(
+            kernel_sources, "%s_%s_%dd_a_msoa" % (material_name, operation, dim), dim
+        )
+    )
+    declare_adjugate = (
+        ["%sconst geom_t *const *adjugate = nullptr;" % indent]
+        if reads_adjugate
+        else []
+    )
+    bind_adjugate = (
+        [
+            "%s  adjugate = reinterpret_cast<const geom_t *const *>(" % indent,
+            "%s      cache->jacobian->adjugate_components());" % indent,
+        ]
+        if reads_adjugate
+        else []
+    )
     if affine_elements:
         lines.extend(
             [
-                "%sconst geom_t *const *adjugate = nullptr;" % indent,
+                *declare_adjugate,
                 "%sconst geom_t *determinant = nullptr;" % indent,
                 "%sif (%s) {"
                 % (indent, _element_condition("domain.element_type", affine_elements)),
@@ -9473,8 +9518,7 @@ def _residual_hessian_dispatch_body(
                 % (indent, material_name, operation),
                 "%s    return SFEM_FAILURE;" % indent,
                 "%s  }" % indent,
-                "%s  adjugate = reinterpret_cast<const geom_t *const *>(" % indent,
-                "%s      cache->jacobian->adjugate_components());" % indent,
+                *bind_adjugate,
                 "%s  determinant = reinterpret_cast<const geom_t *>(" % indent,
                 "%s      cache->jacobian->jacobian_determinant()->data());" % indent,
                 "%s}" % indent,
@@ -11321,14 +11365,16 @@ def _yaml_helpers(defaults):
       return matched;
     }
 
-    void material_defaults(real_t *const values) {
+    [[maybe_unused]] void material_defaults(real_t *const values) {
 %(default_lines)s
     }
 
+    // derefine copies the parameters by name, with or without YAML.
+    [[maybe_unused]] constexpr int N_DEFINED_MATERIAL_PARAMETERS = %(nparameters)d;
+    [[maybe_unused]] constexpr int N_MATERIAL_PARAMETERS = %(storage_size)d;
+    [[maybe_unused]] static const char *const MATERIAL_PARAMETER_NAMES[N_MATERIAL_PARAMETERS] = {%(names)s};
+
 #ifdef SFEM_ENABLE_RYAML
-    constexpr int N_DEFINED_MATERIAL_PARAMETERS = %(nparameters)d;
-    constexpr int N_MATERIAL_PARAMETERS = %(storage_size)d;
-    static const char *const MATERIAL_PARAMETER_NAMES[N_MATERIAL_PARAMETERS] = {%(names)s};
 
     bool yaml_read_real(const ryml::ConstNodeRef &node,
               const char *const key,

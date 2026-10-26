@@ -1,4 +1,5 @@
 #include "tet4_mass.hpp"
+#include "smesh_base.hpp"
 
 #include <assert.h>
 #include <math.h>
@@ -8,7 +9,7 @@
 #include <mpi.h>
 
 
-#include "sortreduce.hpp"
+#include "sfem_sortreduce.hpp"
 
 #include "sfem_vec.hpp"
 
@@ -113,7 +114,7 @@ static SFEM_INLINE idx_t find_col(const idx_t key, const idx_t *const row, const
         // assert(key == row[k]);
     } else {
         // Use this for larger number of dofs per row
-        return find_idx_binary_search(key, row, lenrow);
+        return sfem::find_idx_binary_search(key, row, lenrow);
     }
 }
 
@@ -157,7 +158,7 @@ void tet4_assemble_mass(const ptrdiff_t                    nelements,  //
                         real_t *const                      values) {                        //
     SFEM_UNUSED(nnodes);
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     idx_t ev[4];
     idx_t ks[4];
@@ -212,7 +213,7 @@ void tet4_assemble_mass(const ptrdiff_t                    nelements,  //
         }
     }
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
 #if SFEM_LOG_LEVEL >= 5
     printf("tet4_mass.c: assemble_mass\t%g seconds\n", tock - tick);
 #endif
@@ -235,7 +236,7 @@ tet4_assemble_lumped_mass(const ptrdiff_t              nelements,  //
                           real_t *const SFEM_RESTRICT  values) {    //
     SFEM_UNUSED(nnodes);
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     idx_t ev[4];
 
@@ -276,7 +277,7 @@ tet4_assemble_lumped_mass(const ptrdiff_t              nelements,  //
         }
     }
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
     printf("tet4_mass.c: tet4_assemble_lumped_mass\t%g seconds\n", tock - tick);
 }
 

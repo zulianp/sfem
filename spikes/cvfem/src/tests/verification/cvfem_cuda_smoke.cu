@@ -54,7 +54,7 @@ __global__ void smoke_residual_kernel(const size_t nelements, const T rho, const
 template <typename T>
 int run_residual(size_t nelements, T rho, T mu, const T *adj, T det, const T *ux,
                  const T *uy, const T *uz, const T *p, T *r_out, void *stream) {
-    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    cudaStream_t s = static_cast<cudaStream_t>(stream);
 
     T *d_adj = nullptr, *d_ux = nullptr, *d_uy = nullptr, *d_uz = nullptr;
     T *d_p = nullptr, *d_r = nullptr;

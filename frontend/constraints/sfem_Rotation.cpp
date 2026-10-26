@@ -2,7 +2,8 @@
 
 #include <cmath>
 
-#include "sfem_API.hpp"
+#include "sfem_Function.hpp"
+#include "sfem_LinearOperatorFactory.hpp"
 #include "smesh_sideset.hpp"
 
 namespace sfem {
@@ -43,8 +44,8 @@ namespace sfem {
         impl.profile                   = profile;
         for (int d = 0; d < 3; ++d) impl.center[d] = center[d];
 
-        impl.nodeset = sidesets.size() == 1 ? smesh::create_nodeset_from_sideset(space->mesh_ptr(), sidesets[0])
-                                            : smesh::create_nodeset_from_sidesets(space->mesh_ptr(), sidesets);
+        impl.nodeset = sidesets.size() == 1 ? smesh::create_nodeset_from_sideset(space->mesh(), sidesets[0])
+                                            : smesh::create_nodeset_from_sidesets(space->mesh(), sidesets);
         impl.u0      = create_host_buffer<real_t>(impl.nodeset->size());
         impl.u1      = create_host_buffer<real_t>(impl.nodeset->size());
 

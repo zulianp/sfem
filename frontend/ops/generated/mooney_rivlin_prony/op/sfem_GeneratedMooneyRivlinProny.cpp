@@ -30,6 +30,8 @@ namespace sfem {
     //! The relaxation groups the material declares, per spatial dimension.
     std::vector<RelaxationGroupDeclaration> relaxation_declarations(const int dim) {
       switch (dim) {
+        case 2:
+          return {{"iso", "iso_history", "iso_stress", 3}};
         case 3:
           return {{"iso", "iso_history", "iso_stress", 6}};
         default:
@@ -44,8 +46,18 @@ namespace sfem {
     //! the history the energy kernels read is the one the output kernel wrote.
     int quadrature_points(const smesh::ElemType element_type) {
       switch (element_type) {
+        case smesh::TRI3:
+          return 1;
+        case smesh::QUAD4:
+          return 4;
+        case smesh::TET4:
+          return 1;
+        case smesh::TET10:
+          return 11;
         case smesh::HEX8:
           return 8;
+        case smesh::PROTEUS_QUAD4:
+          return 4;
         case smesh::PROTEUS_HEX8:
           return 8;
         default:
@@ -89,16 +101,18 @@ namespace sfem {
       return matched;
     }
 
-    void material_defaults(real_t *const values) {
+    [[maybe_unused]] void material_defaults(real_t *const values) {
       values[0] = 0;
       values[1] = 1;
       values[2] = 1;
     }
 
+    // derefine copies the parameters by name, with or without YAML.
+    [[maybe_unused]] constexpr int N_DEFINED_MATERIAL_PARAMETERS = 3;
+    [[maybe_unused]] constexpr int N_MATERIAL_PARAMETERS = 3;
+    [[maybe_unused]] static const char *const MATERIAL_PARAMETER_NAMES[N_MATERIAL_PARAMETERS] = {"C01", "C10", "K"};
+
 #ifdef SFEM_ENABLE_RYAML
-    constexpr int N_DEFINED_MATERIAL_PARAMETERS = 3;
-    constexpr int N_MATERIAL_PARAMETERS = 3;
-    static const char *const MATERIAL_PARAMETER_NAMES[N_MATERIAL_PARAMETERS] = {"C01", "C10", "K"};
 
     bool yaml_read_real(const ryml::ConstNodeRef &node,
               const char *const key,
@@ -242,6 +256,10 @@ namespace sfem {
     //! paying for geometry it never reads.
     bool geometry_is_forced_affine(const smesh::ElemType element_type) {
       switch (element_type) {
+        case smesh::TET4:
+          return true;
+        case smesh::TRI3:
+          return true;
         default:
           return false;
       }
@@ -263,7 +281,7 @@ namespace sfem {
     int cache_affine_geometry(const std::shared_ptr<FunctionSpace> &space,
                                   MultiDomainOp &domains,
                                   const bool requested) {
-      auto mesh = space->mesh_ptr();
+      auto mesh = space->mesh();
       const bool needs_jacobian_aos =
           false ||
           false;
@@ -313,6 +331,7 @@ namespace sfem {
 
     ptrdiff_t block_size_for_dim(const int dim) {
       switch (dim) {
+        case 2: return 2;
         case 3: return 3;
         default:
           SFEM_ERROR("unsupported spatial dimension %d for generated block size\n", dim);
@@ -404,7 +423,7 @@ namespace sfem {
 
   std::unique_ptr<Op> GeneratedMooneyRivlinProny::create(const std::shared_ptr<FunctionSpace> &space) {
     const ptrdiff_t expected_block_size =
-        block_size_for_dim(space->mesh_ptr()->spatial_dimension());
+        block_size_for_dim(space->mesh()->spatial_dimension());
     if (space->block_size() != expected_block_size) {
       SFEM_ERROR("GeneratedMooneyRivlinProny requires block_size=%ld\n",
                        static_cast<long>(expected_block_size));
@@ -428,9 +447,17 @@ namespace sfem {
       return total;
     }
 
-    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+    const int dim = impl_->space->mesh()->spatial_dimension();
     impl_->domains->iterate([&](const OpDomain &domain) {
       const ptrdiff_t nelements = domain.block->n_elements();
+      if (dim == 2) {
+        {
+          const sfem::codegen::KernelDiagnostics *const diagnostics = mooney_rivlin_prony_objective_2d_soa_diagnostics(domain.element_type);
+          if (diagnostics) {
+            total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(diagnostics, nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(diagnostics, nelements);
+          }
+        }
+      }
       if (dim == 3) {
         {
           const sfem::codegen::KernelDiagnostics *const diagnostics = mooney_rivlin_prony_objective_3d_soa_diagnostics(domain.element_type);
@@ -451,9 +478,17 @@ namespace sfem {
       return total;
     }
 
-    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+    const int dim = impl_->space->mesh()->spatial_dimension();
     impl_->domains->iterate([&](const OpDomain &domain) {
       const ptrdiff_t nelements = domain.block->n_elements();
+      if (dim == 2) {
+        {
+          const sfem::codegen::KernelDiagnostics *const diagnostics = mooney_rivlin_prony_objective_2d_soa_diagnostics(domain.element_type);
+          if (diagnostics) {
+            total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+          }
+        }
+      }
       if (dim == 3) {
         {
           const sfem::codegen::KernelDiagnostics *const diagnostics = mooney_rivlin_prony_objective_3d_soa_diagnostics(domain.element_type);
@@ -474,9 +509,17 @@ namespace sfem {
       return total;
     }
 
-    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+    const int dim = impl_->space->mesh()->spatial_dimension();
     impl_->domains->iterate([&](const OpDomain &domain) {
       const ptrdiff_t nelements = domain.block->n_elements();
+      if (dim == 2) {
+        {
+          const sfem::codegen::KernelDiagnostics *const diagnostics = mooney_rivlin_prony_gradient_2d_soa_diagnostics(domain.element_type);
+          if (diagnostics) {
+            total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(diagnostics, nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(diagnostics, nelements);
+          }
+        }
+      }
       if (dim == 3) {
         {
           const sfem::codegen::KernelDiagnostics *const diagnostics = mooney_rivlin_prony_gradient_3d_soa_diagnostics(domain.element_type);
@@ -497,9 +540,17 @@ namespace sfem {
       return total;
     }
 
-    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+    const int dim = impl_->space->mesh()->spatial_dimension();
     impl_->domains->iterate([&](const OpDomain &domain) {
       const ptrdiff_t nelements = domain.block->n_elements();
+      if (dim == 2) {
+        {
+          const sfem::codegen::KernelDiagnostics *const diagnostics = mooney_rivlin_prony_gradient_2d_soa_diagnostics(domain.element_type);
+          if (diagnostics) {
+            total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+          }
+        }
+      }
       if (dim == 3) {
         {
           const sfem::codegen::KernelDiagnostics *const diagnostics = mooney_rivlin_prony_gradient_3d_soa_diagnostics(domain.element_type);
@@ -520,9 +571,17 @@ namespace sfem {
       return total;
     }
 
-    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+    const int dim = impl_->space->mesh()->spatial_dimension();
     impl_->domains->iterate([&](const OpDomain &domain) {
       const ptrdiff_t nelements = domain.block->n_elements();
+      if (dim == 2) {
+        {
+          const sfem::codegen::KernelDiagnostics *const diagnostics = mooney_rivlin_prony_apply_2d_soa_diagnostics(domain.element_type);
+          if (diagnostics) {
+            total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(diagnostics, nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(diagnostics, nelements);
+          }
+        }
+      }
       if (dim == 3) {
         {
           const sfem::codegen::KernelDiagnostics *const diagnostics = mooney_rivlin_prony_apply_3d_soa_diagnostics(domain.element_type);
@@ -543,9 +602,17 @@ namespace sfem {
       return total;
     }
 
-    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+    const int dim = impl_->space->mesh()->spatial_dimension();
     impl_->domains->iterate([&](const OpDomain &domain) {
       const ptrdiff_t nelements = domain.block->n_elements();
+      if (dim == 2) {
+        {
+          const sfem::codegen::KernelDiagnostics *const diagnostics = mooney_rivlin_prony_apply_2d_soa_diagnostics(domain.element_type);
+          if (diagnostics) {
+            total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+          }
+        }
+      }
       if (dim == 3) {
         {
           const sfem::codegen::KernelDiagnostics *const diagnostics = mooney_rivlin_prony_apply_3d_soa_diagnostics(domain.element_type);
@@ -591,7 +658,7 @@ namespace sfem {
       return SFEM_FAILURE;
     }
     impl_->relaxation = std::make_shared<RelaxationGroups>(
-        relaxation_declarations(impl_->space->mesh_ptr()->spatial_dimension()),
+        relaxation_declarations(impl_->space->mesh()->spatial_dimension()),
         impl_->space->n_dofs(),
         EXECUTION_SPACE_HOST);
     for (auto &entry : impl_->domains->domains()) {
@@ -604,7 +671,7 @@ namespace sfem {
     if (impl_->space->has_packed_mesh()) {
       auto packed = impl_->space->packed_mesh();
       const ptrdiff_t max_nodes_per_pack = packed->max_nodes_per_pack();
-      const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+      const int dim = impl_->space->mesh()->spatial_dimension();
       const size_t scratch_size = (size_t)dim * (size_t)max_nodes_per_pack;
       sfem::codegen::prealloc_thread_scratch<real_t>(0, scratch_size);
       sfem::codegen::prealloc_thread_scratch<real_t>(1, scratch_size);
@@ -663,12 +730,12 @@ namespace sfem {
 
   int GeneratedMooneyRivlinProny::quadrature_output(const real_t *const x, const int slot) {
     SFEM_TRACE_SCOPE("GeneratedMooneyRivlinProny::quadrature_output");
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const geom_t *const *adjugate = nullptr;
       const geom_t *determinant = nullptr;
-      if (impl_->gradient_uses_affine) {
+      if (impl_->gradient_uses_affine || domain.element_type == smesh::TET4 || domain.element_type == smesh::TRI3) {
         auto cache = std::static_pointer_cast<AffineGeometryCache>(domain.user_data);
         if (!cache || !cache->jacobian_soa) {
           SFEM_ERROR("GeneratedMooneyRivlinProny affine quadrature output requires cached geometry\n");
@@ -680,6 +747,12 @@ namespace sfem {
             cache->jacobian_soa->jacobian_determinant()->data());
       }
       const int dim = mesh->spatial_dimension();
+      if (dim == 2) {
+        if (adjugate) {
+          return mooney_rivlin_prony_quadrature_output_2d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("C01"), domain.parameters->require_real_value("C10"), impl_->relaxation->stress_scratch(domain.block->name(), "iso_stress", slot), 2, x + 0, x + 1);
+        }
+        return mooney_rivlin_prony_quadrature_output_2d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("C01"), domain.parameters->require_real_value("C10"), impl_->relaxation->stress_scratch(domain.block->name(), "iso_stress", slot), 2, x + 0, x + 1);
+      }
       if (dim == 3) {
         if (adjugate) {
           return mooney_rivlin_prony_quadrature_output_3d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("C01"), domain.parameters->require_real_value("C10"), impl_->relaxation->stress_scratch(domain.block->name(), "iso_stress", slot), 3, x + 0, x + 1, x + 2);
@@ -698,12 +771,12 @@ namespace sfem {
         return SFEM_FAILURE;
       }
     }
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const geom_t *const *adjugate = nullptr;
       const geom_t *determinant = nullptr;
-            if (impl_->gradient_uses_affine) {
+            if (impl_->gradient_uses_affine || domain.element_type == smesh::TET4 || domain.element_type == smesh::TRI3) {
         auto cache = std::static_pointer_cast<AffineGeometryCache>(
             domain.user_data);
         if (!cache || !cache->jacobian_soa) {
@@ -723,7 +796,7 @@ namespace sfem {
               cache->jacobian_aos->jacobian_determinant()->data());
         }
             }
-      if ((impl_->gradient_uses_affine) && impl_->space->has_packed_mesh()) {
+      if ((impl_->gradient_uses_affine || domain.element_type == smesh::TET4 || domain.element_type == smesh::TRI3) && impl_->space->has_packed_mesh()) {
         auto packed = impl_->space->packed_mesh();
         const int packed_block = packed_block_id_for_domain(*packed, *domain.block);
         if (packed_block >= 0) {
@@ -744,7 +817,7 @@ namespace sfem {
           }
         }
       }
-      if (!(impl_->gradient_uses_affine) && impl_->space->has_packed_mesh()) {
+      if (!(impl_->gradient_uses_affine || domain.element_type == smesh::TET4 || domain.element_type == smesh::TRI3) && impl_->space->has_packed_mesh()) {
         auto packed = impl_->space->packed_mesh();
         const int packed_block = packed_block_id_for_domain(*packed, *domain.block);
         if (packed_block >= 0) {
@@ -766,8 +839,14 @@ namespace sfem {
         }
       }
       const int dim = mesh->spatial_dimension();
-      if (dim == 3) {
-        if (impl_->gradient_uses_affine) {
+      if (dim == 2) {
+        if ((impl_->gradient_uses_affine || domain.element_type == smesh::TRI3) && (domain.element_type == smesh::TRI3)) {
+          return mooney_rivlin_prony_gradient_2d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("C01"), domain.parameters->require_real_value("C10"), domain.parameters->require_real_value("K"), impl_->relaxation->gamma(domain.block->name(), "iso"), impl_->relaxation->history(domain.block->name(), "iso_history"), 2, x + 0, x + 1, 2, out + 0, out + 1);
+        }
+        return mooney_rivlin_prony_gradient_2d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("C01"), domain.parameters->require_real_value("C10"), domain.parameters->require_real_value("K"), impl_->relaxation->gamma(domain.block->name(), "iso"), impl_->relaxation->history(domain.block->name(), "iso_history"), 2, x + 0, x + 1, 2, out + 0, out + 1);
+      }
+      else if (dim == 3) {
+        if (impl_->gradient_uses_affine || domain.element_type == smesh::TET4) {
           return mooney_rivlin_prony_gradient_3d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("C01"), domain.parameters->require_real_value("C10"), domain.parameters->require_real_value("K"), impl_->relaxation->gamma(domain.block->name(), "iso"), impl_->relaxation->history(domain.block->name(), "iso_history"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
         }
         return mooney_rivlin_prony_gradient_3d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("C01"), domain.parameters->require_real_value("C10"), domain.parameters->require_real_value("K"), impl_->relaxation->gamma(domain.block->name(), "iso"), impl_->relaxation->history(domain.block->name(), "iso_history"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
@@ -786,12 +865,12 @@ namespace sfem {
         return SFEM_FAILURE;
       }
     }
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const geom_t *const *adjugate = nullptr;
       const geom_t *determinant = nullptr;
-            if (impl_->apply_uses_affine) {
+            if (impl_->apply_uses_affine || domain.element_type == smesh::TET4 || domain.element_type == smesh::TRI3) {
         auto cache = std::static_pointer_cast<AffineGeometryCache>(
             domain.user_data);
         if (!cache || !cache->jacobian_soa) {
@@ -813,15 +892,13 @@ namespace sfem {
             }
       const int dim = mesh->spatial_dimension();
       if (dim == 2) {
-        if (impl_->apply_uses_affine) {
-          SFEM_ERROR("mooney_rivlin_prony affine apply 2d dispatch was not generated\n");
-          return SFEM_FAILURE;
+        if ((impl_->apply_uses_affine || domain.element_type == smesh::TRI3) && (domain.element_type == smesh::TRI3)) {
+          return mooney_rivlin_prony_apply_2d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("C01"), domain.parameters->require_real_value("C10"), domain.parameters->require_real_value("K"), impl_->relaxation->gamma(domain.block->name(), "iso"), impl_->relaxation->history(domain.block->name(), "iso_history"), 2, x + 0, x + 1, 2, h + 0, h + 1, 2, out + 0, out + 1);
         }
-        SFEM_ERROR("mooney_rivlin_prony isoparametric apply 2d dispatch was not generated\n");
-        return SFEM_FAILURE;
+        return mooney_rivlin_prony_apply_2d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("C01"), domain.parameters->require_real_value("C10"), domain.parameters->require_real_value("K"), impl_->relaxation->gamma(domain.block->name(), "iso"), impl_->relaxation->history(domain.block->name(), "iso_history"), 2, x + 0, x + 1, 2, h + 0, h + 1, 2, out + 0, out + 1);
       }
       else if (dim == 3) {
-        if (impl_->apply_uses_affine) {
+        if (impl_->apply_uses_affine || domain.element_type == smesh::TET4) {
           if (impl_->space->has_packed_mesh()) {
             auto packed = impl_->space->packed_mesh();
             const int packed_block = packed_block_id_for_domain(*packed, *domain.block);
@@ -897,7 +974,7 @@ namespace sfem {
               const real_t *const steps,
               real_t *const out) {
     SFEM_TRACE_SCOPE("GeneratedMooneyRivlinProny::value_steps");
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
     auto points = element_points(mesh);
     if (nsteps <= 0) {
       return SFEM_SUCCESS;
@@ -915,7 +992,7 @@ namespace sfem {
       const ptrdiff_t nvalues = (ptrdiff_t)nsteps * nelements;
       const geom_t *const *adjugate = nullptr;
       const geom_t *determinant = nullptr;
-            if (impl_->objective_uses_affine) {
+            if (impl_->objective_uses_affine || domain.element_type == smesh::TET4 || domain.element_type == smesh::TRI3) {
         auto cache = std::static_pointer_cast<AffineGeometryCache>(
             domain.user_data);
         if (!cache || !cache->jacobian_soa) {
@@ -936,7 +1013,7 @@ namespace sfem {
                       impl_->element_values.get() + nvalues,
                       real_t(0));
       int status = SFEM_FAILURE;
-      if ((impl_->objective_uses_affine) && impl_->space->has_packed_mesh()) {
+      if ((impl_->objective_uses_affine || domain.element_type == smesh::TET4 || domain.element_type == smesh::TRI3) && impl_->space->has_packed_mesh()) {
         auto packed = impl_->space->packed_mesh();
         const int packed_block = packed_block_id_for_domain(*packed, *domain.block);
         if (packed_block >= 0) {
@@ -951,7 +1028,7 @@ namespace sfem {
           }
         }
       }
-      if (!(impl_->objective_uses_affine) && impl_->space->has_packed_mesh()) {
+      if (!(impl_->objective_uses_affine || domain.element_type == smesh::TET4 || domain.element_type == smesh::TRI3) && impl_->space->has_packed_mesh()) {
         auto packed = impl_->space->packed_mesh();
         const int packed_block = packed_block_id_for_domain(*packed, *domain.block);
         if (packed_block >= 0) {
@@ -968,14 +1045,21 @@ namespace sfem {
       }
       if (status == SFEM_FAILURE) {
         const int dim = mesh->spatial_dimension();
-        if (dim == 3) {
-          if (impl_->objective_uses_affine) {
+        if (dim == 2) {
+          if ((impl_->objective_uses_affine || domain.element_type == smesh::TRI3) && (domain.element_type == smesh::TRI3)) {
+            status = mooney_rivlin_prony_objective_steps_2d_a_msoa(domain.element_type, real_type, nelements, mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("C01"), domain.parameters->require_real_value("C10"), domain.parameters->require_real_value("K"), impl_->relaxation->gamma(domain.block->name(), "iso"), impl_->relaxation->history(domain.block->name(), "iso_history"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get());
+          } else {
+            status = mooney_rivlin_prony_objective_steps_2d_i_msoa(domain.element_type, real_type, nelements, mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("C01"), domain.parameters->require_real_value("C10"), domain.parameters->require_real_value("K"), impl_->relaxation->gamma(domain.block->name(), "iso"), impl_->relaxation->history(domain.block->name(), "iso_history"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get());
+          }
+        }
+        else if (dim == 3) {
+          if (impl_->objective_uses_affine || domain.element_type == smesh::TET4) {
             status = mooney_rivlin_prony_objective_steps_3d_a_msoa(domain.element_type, real_type, nelements, mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("C01"), domain.parameters->require_real_value("C10"), domain.parameters->require_real_value("K"), impl_->relaxation->gamma(domain.block->name(), "iso"), impl_->relaxation->history(domain.block->name(), "iso_history"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get());
           } else {
             status = mooney_rivlin_prony_objective_steps_3d_i_msoa(domain.element_type, real_type, nelements, mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("C01"), domain.parameters->require_real_value("C10"), domain.parameters->require_real_value("K"), impl_->relaxation->gamma(domain.block->name(), "iso"), impl_->relaxation->history(domain.block->name(), "iso_history"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get());
           }
         }
-        if (dim != 3) {
+        if (dim != 2 && dim != 3) {
           SFEM_ERROR("mooney_rivlin_prony objective_steps does not support spatial dimension %d\n", dim);
           return SFEM_FAILURE;
         }
@@ -1012,7 +1096,7 @@ namespace sfem {
       SFEM_ERROR("GeneratedMooneyRivlinProny::hessian_crs requires a current state\n");
       return SFEM_FAILURE;
     }
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
     return impl_->domains->iterate([&](const OpDomain &/*domain*/) {
       const int dim = mesh->spatial_dimension();
       if (dim == 2) {
@@ -1055,15 +1139,34 @@ namespace sfem {
       SFEM_ERROR("GeneratedMooneyRivlinProny::hessian_bsr requires a current state\n");
       return SFEM_FAILURE;
     }
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
+      const geom_t *const *adjugate = nullptr;
+      const geom_t *determinant = nullptr;
+      if (domain.element_type == smesh::TET4 || domain.element_type == smesh::TRI3) {
+        auto cache = std::static_pointer_cast<AffineGeometryCache>(
+            domain.user_data);
+        if (!cache || !cache->jacobian_soa) {
+          SFEM_ERROR("mooney_rivlin_prony affine hessian_bsr requires cached geometry\n");
+          return SFEM_FAILURE;
+        }
+        adjugate = reinterpret_cast<const geom_t *const *>(
+            cache->jacobian_soa->adjugate_components());
+        determinant = reinterpret_cast<const geom_t *>(
+            cache->jacobian_soa->jacobian_determinant()->data());
+      }
       const int dim = mesh->spatial_dimension();
       if (dim == 2) {
-        SFEM_ERROR("mooney_rivlin_prony hessian_bsr 2d dispatch was not generated\n");
-        return SFEM_FAILURE;
+        if (domain.element_type == smesh::TRI3) {
+          return mooney_rivlin_prony_hessian_bsr_2d_a_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("C01"), domain.parameters->require_real_value("C10"), domain.parameters->require_real_value("K"), impl_->relaxation->gamma(domain.block->name(), "iso"), impl_->relaxation->history(domain.block->name(), "iso_history"), 2, current + 0, current + 1, rowptr, colidx, values);
+        }
+        return mooney_rivlin_prony_hessian_bsr_2d_i_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("C01"), domain.parameters->require_real_value("C10"), domain.parameters->require_real_value("K"), impl_->relaxation->gamma(domain.block->name(), "iso"), impl_->relaxation->history(domain.block->name(), "iso_history"), 2, current + 0, current + 1, rowptr, colidx, values);
       }
       else if (dim == 3) {
+        if (domain.element_type == smesh::TET4) {
+          return mooney_rivlin_prony_hessian_bsr_3d_a_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("C01"), domain.parameters->require_real_value("C10"), domain.parameters->require_real_value("K"), impl_->relaxation->gamma(domain.block->name(), "iso"), impl_->relaxation->history(domain.block->name(), "iso_history"), 3, current + 0, current + 1, current + 2, rowptr, colidx, values);
+        }
         return mooney_rivlin_prony_hessian_bsr_3d_i_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("C01"), domain.parameters->require_real_value("C10"), domain.parameters->require_real_value("K"), impl_->relaxation->gamma(domain.block->name(), "iso"), impl_->relaxation->history(domain.block->name(), "iso_history"), 3, current + 0, current + 1, current + 2, rowptr, colidx, values);
       }
       SFEM_ERROR("mooney_rivlin_prony hessian_bsr does not support spatial dimension %d\n", dim);
@@ -1087,7 +1190,7 @@ namespace sfem {
       SFEM_ERROR("GeneratedMooneyRivlinProny::hessian_block_diag_sym requires a current state\n");
       return SFEM_FAILURE;
     }
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
     return impl_->domains->iterate([&](const OpDomain &/*domain*/) {
       const int dim = mesh->spatial_dimension();
       if (dim == 2) {
@@ -1134,8 +1237,8 @@ namespace sfem {
     impl_->domains->set_value_in_block(block_name, var_name, value);
   }
 
-  std::shared_ptr<Op> GeneratedMooneyRivlinProny::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
-    SFEM_TRACE_SCOPE("GeneratedMooneyRivlinProny::derefine_op");
+  std::shared_ptr<Op> GeneratedMooneyRivlinProny::derefine(const std::shared_ptr<FunctionSpace> &space) {
+    SFEM_TRACE_SCOPE("GeneratedMooneyRivlinProny::derefine");
     auto ret = std::make_shared<GeneratedMooneyRivlinProny>(space);
     if (impl_->time_scheme) {
       auto coarse_scheme = derefine_time_scheme(impl_->time_scheme, space);

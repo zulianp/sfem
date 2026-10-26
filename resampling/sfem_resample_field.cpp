@@ -1,4 +1,5 @@
 #include <float.h>  // Include for FLT_MAX, DBL_MAX
+#include "smesh_base.hpp"
 #include <math.h>
 #include <stddef.h>
 #include <stddef.h>  // Add this for ptrdiff_t type
@@ -1491,8 +1492,8 @@ resample_field_mesh_adjoint_tet10(const int                            /*mpi_siz
     hex8_to_isoparametric_tet10_resample_field_iterative_ref_adjoint(0,                                    //
                                                                      mesh->nelements,                      //
                                                                      mesh->nnodes,                         //
-                                                                     (const idx_t** const)mesh->elements,  //
-                                                                     (const geom_t** const)mesh->points,   //
+                                                                     (const idx_t**)mesh->elements,  //
+                                                                     (const geom_t**)mesh->points,   //
                                                                      n,                                    //
                                                                      stride,                               //
                                                                      origin,                               //
@@ -1556,7 +1557,7 @@ resample_field_mesh_tet10(const int                            mpi_size,  // MPI
 
     real_t* weighted_field = NULL;
 
-    if (info->use_accelerator == SFEM_ACCELERATOR_TYPE_CUDA && SFEM_TET10_CUDA) {
+    if (info->use_accelerator == Accelerator::CUDA && SFEM_TET10_CUDA) {
 #if SFEM_TET10_CUDA
         int assemble_dual_mass_vector = 1;
         // This indicates if the exchange was made in the kernel
@@ -1586,9 +1587,9 @@ resample_field_mesh_tet10(const int                            mpi_size,  // MPI
         fprintf(stderr, "SFEM_TET10_CUDA is OFF,  %s:%d\n", __FILE__, __LINE__);
         exit(EXIT_FAILURE);
 #endif
-    }  // end if info->use_accelerator == SFEM_ACCELERATOR_TYPE_CUDA && SFEM_TET10_CUDA
+    }  // end if info->use_accelerator == Accelerator::CUDA && SFEM_TET10_CUDA
 
-    if (info->use_accelerator == SFEM_ACCELERATOR_TYPE_CPU) {  // CPU
+    if (info->use_accelerator == Accelerator::CPU) {  // CPU
 
         weighted_field = (real_t*)calloc(mesh->nnodes, sizeof(real_t));
 
@@ -1832,7 +1833,7 @@ field_view_ensure_margin(MPI_Comm                             comm,          //
         return 1;
     }
 
-    double field_view_tick = MPI_Wtime();
+    double field_view_tick = smesh::time_seconds();
 
     geom_t zmin, zmax;
     field_minmax(nnodes, z_coordinate, &zmin, &zmax);
@@ -1868,7 +1869,7 @@ field_view_ensure_margin(MPI_Comm                             comm,          //
     *z_nlocal_out = pnlocal_z;
     *z_origin_out = origin[2] + field_start * delta[2];
 
-    double field_view_tock = MPI_Wtime();
+    double field_view_tock = smesh::time_seconds();
 
     if (!rank) {
         printf("[%d] field_view %g (seconds)\n", rank, field_view_tock - field_view_tick);

@@ -9,7 +9,7 @@
 namespace sfem {
 
     class Function;
-    class NewmarkScheme;
+    class TimeScheme;
     class NodeObstacleContact;
 
     struct NodeObstacleStepOptions {
@@ -43,8 +43,8 @@ namespace sfem {
     /// complementarity as forces, penetration as a length).
     ///
     /// Complementarity is scaled by each dof's stiffness k: the diagonal of the tangent at the
-    /// reference configuration, plus the inertia c0 M of the Newmark the step's scheme composes
-    /// when there is one (`newmark` null: a steady or quasi-static step). When MPRGP stops (an
+    /// reference configuration, plus the inertia c0 M of the step's time scheme when there is one
+    /// (`scheme` null: a steady or quasi-static step). When MPRGP stops (an
     /// indefinite tangent during an impact) the step is solved again with the curvature term
     /// capped, then with the tangent's diagonal shifted by a growing fraction of itself. It runs
     /// where the function does.
@@ -52,7 +52,7 @@ namespace sfem {
     public:
         static std::shared_ptr<NodeObstacleStep> create(const std::shared_ptr<Function>            &f,
                                                         const std::shared_ptr<NodeObstacleContact> &contact,
-                                                        const std::shared_ptr<NewmarkScheme>       &newmark,
+                                                        const std::shared_ptr<TimeScheme>          &scheme,
                                                         const NodeObstacleStepOptions              &options);
         ~NodeObstacleStep() override;
 

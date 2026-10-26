@@ -11,17 +11,16 @@ option(SFEM_ENABLE_CUDA "Enable CUDA support" OFF)
 option(SFEM_ENABLE_CUDA_LINEINFO "Enable cuda line info for profiling" OFF)
 option(SFEM_ENABLE_DEV_MODE "Add additional flags for more strict compilation" OFF)
 option(SFEM_ENABLE_EXPLICIT_VECTORIZATION "Enable explicit vectorization kernels" ON)
-option(SFEM_ENABLE_FP16_JACOBIANS "Enable half precision jacobians when using Cuda" ON)
 option(SFEM_ENABLE_GLIBCXX_DEBUG "uses flags -D_GLIBCXX_DEBUG when compiling in debug mode" OFF)
 option(SFEM_ENABLE_LAPACK "Enable Lapck support" OFF)
 option(SFEM_ENABLE_MEM_DIAGNOSTICS "Enable mem diagonstics" ON)
 option(SFEM_ENABLE_METIS "Enable METIS graph-partitioning" OFF)
 option(SFEM_ENABLE_MINIMAL "Build only the SFEM library (no drivers, no tests)" OFF)
 option(SFEM_ENABLE_MPI "Enable MPI support" ON)
+option(SFEM_ENABLE_NCCL "NCCL for device communication within a node, in builds with MPI and CUDA (off when not found)" ON)
 option(SFEM_ENABLE_OPENMP "Enable OpenMP support" OFF)
 option(SFEM_ENABLE_PYTHON "Enable python bindings for SFEM" OFF)
 option(SFEM_ENABLE_RYAML "Enable YAML input files with RapidYAML" ON)
-option(SFEM_ENABLE_CODEGEN "Enable code generation" OFF)
 option(SFEM_ENABLE_AGGRESSIVE_OPT "Enable aggressive optimizations" OFF)
 option(SFEM_ENABLE_SCCD "Enable SCCD library" OFF)
 option(SFEM_SCCD_BUILD_SHARED_LIBS "Build bundled SCCD as a shared library" OFF)
@@ -33,7 +32,6 @@ if(SFEM_ENABLE_SSDF AND NOT SFEM_ENABLE_CUBIQL)
     message(STATUS "SFEM_ENABLE_CUBIQL enabled because SFEM_ENABLE_SSDF is ON")
     set(SFEM_ENABLE_CUBIQL ON CACHE BOOL "Enable cuBQL acceleration in SSDF" FORCE)
 endif()
-option(SFEM_ENABLE_SRESAMPLE "Enable resampling library" OFF) # TODO
 
 if(WIN32)        
     set(SFEM_ENABLE_EXPLICIT_VECTORIZATION
@@ -44,7 +42,7 @@ endif()
 
 option(SFEM_USE_OCCUPANCY_MAX_POTENTIAL "Enable usage of cudaOccupancyMaxPotentialBlockSize" OFF)
 option(SFEM_ENABLE_RESAMPLING "Enable resampling features" OFF)
-option(SFEM_ENABLE_TRACE "Eneable trace facilities and output sfem.trace.csv (Override with SFEM_TRACE_FILE in the env)" ON)
+option(SFEM_ENABLE_TRACE "Enable trace facilities: smesh writes smesh.trace.csv (override with SMESH_TRACE_FILE in the env)" ON)
 
 get_directory_property(HAS_PARENT PARENT_DIRECTORY)
 
@@ -69,10 +67,6 @@ message(STATUS "SFEM_ENABLE_MINIMAL: ${SFEM_ENABLE_MINIMAL}")
 include(CMakeDependentOption)
 # cmake_dependent_option(BUILD_SHARED_LIBS "Build shared libraries" OFF
 #                        "NOT USE_XSDK_DEFAULTS" ON)
-
-# FIXME: LAPACK supporting long double?
-cmake_dependent_option(SFEM_ENABLE_LAPACK "Enable
-Lapack for dense matrix operations" ON "NOT SFEM_HAVE_QUAD_PRECISION" OFF)
 
 # MPI is required cmake_dependent_option(SFEM_ENABLE_MPI "Enable MPI
 # support" ON "NOT TPL_ENABLE_MPI" OFF)
@@ -108,6 +102,21 @@ if(SFEM_ENABLE_DEV_MODE)
     set(SFEM_DEV_FLAGS
         "-Wall -Wextra -pedantic -Werror -Werror=enum-compare -Werror=delete-non-virtual-dtor -Werror=reorder -Werror=return-type" # -Werror=uninitialized
     )
+    # Two exceptions to -pedantic, as in smesh: unknown pragmas warn without failing (#pragma unroll
+    # under GCC, #pragma omp without OpenMP), and designated initializers, the C++20 feature the
+    # sources use throughout in C++17 (every compiler here accepts it as an extension), whose
+    # members left out take their defaults by design (GCC's missing-field-initializers).
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        set(SFEM_DEV_DESIGNATOR_FLAG -Wno-c++20-designator)
+    else()
+        set(SFEM_DEV_DESIGNATOR_FLAG -Wno-c++20-extensions)
+    endif()
+    set(SFEM_DEV_FLAGS "${SFEM_DEV_FLAGS} -Wno-error=unknown-pragmas ${SFEM_DEV_DESIGNATOR_FLAG} -Wno-missing-field-initializers")
+    # The same for C, without the C++-only checks, and for CUDA: nvcc's own warnings and the host
+    # compiler's on the code nvcc hands it.
+    set(SFEM_DEV_C_FLAGS -Wall -Wextra -pedantic -Werror -Werror=return-type -Wno-error=unknown-pragmas)
+    set(SFEM_DEV_CUDA_FLAGS --Werror=all-warnings
+        "-Xcompiler=-Wall,-Wextra,-Werror,-Wno-error=unknown-pragmas,${SFEM_DEV_DESIGNATOR_FLAG},-Wno-missing-field-initializers")
 endif()
 
 if(SFEM_ENABLE_GLIBCXX_DEBUG)
@@ -116,7 +125,6 @@ if(SFEM_ENABLE_GLIBCXX_DEBUG)
 endif()
 
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SFEM_DEV_FLAGS}")
 set(CMAKE_CXX_FLAGS_DEBUG
     "${CMAKE_CXX_FLAGS_DEBUG} ${SFEM_SPECIAL_DEBUG_FLAGS}")
 

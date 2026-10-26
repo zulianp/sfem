@@ -10,7 +10,7 @@
 #include <memory>
 
 #include "sfem_PowerMethod.hpp"
-#include "sfem_openmp_blas.hpp"
+#include "sfem_BLAS_openmp.hpp"
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -56,6 +56,8 @@ namespace sfem {
     template <typename T>
     class Chebyshev3 : public MatrixFreeLinearSolver<T> {
     public:
+        /// Built for the execution space es, on op.
+        static std::shared_ptr<Chebyshev3<T>> create(const std::shared_ptr<Operator<T>> &op, const ExecutionSpace es);
         // Operator
         std::function<void(const T* const, T* const)> apply_op;
         std::function<void(const T* const, T* const)> preconditioner_op;
@@ -83,7 +85,6 @@ namespace sfem {
         // Default false: most ops accumulate (y += Ax); zeros() before each apply_op.
         bool apply_overwrites_output{false};
 
-        ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
 
         int iterations() const override { return iterations_; }
 
@@ -93,7 +94,7 @@ namespace sfem {
         void set_verbose(const bool val) { verbose = val; }
         void set_apply_overwrites_output(const bool val) { apply_overwrites_output = val; }
 
-        ExecutionSpace execution_space() const override { return execution_space_; }
+        ExecutionContext execution_context() const override { return blas ? blas->context() : ExecutionContext(EXECUTION_SPACE_INVALID); }
 
         void set_initial_guess_zero(const bool val) override { is_initial_guess_zero = val; }
 
@@ -107,9 +108,8 @@ namespace sfem {
         void set_preconditioner(std::function<void(const T* const, T* const)>&& in) { preconditioner_op = in; }
 
         void default_init() {
-            this->blas = make_openmp_blas<T>();
+            this->blas = OpenMPBLAS<T>::create();
             ensure_power_method();
-            execution_space_ = EXECUTION_SPACE_HOST;
         }
 
         void ensure_power_method() {
@@ -152,7 +152,7 @@ namespace sfem {
             T*   work          = blas->allocate(this->rows());
             auto blas_impl     = blas;
             auto random_vector = Buffer<T>::own(this->rows(), work, [blas_impl](void* ptr) { blas_impl->destroy(ptr); });
-            assert(execution_space_ == EXECUTION_SPACE_HOST);
+            assert(this->execution_space() == EXECUTION_SPACE_HOST);
 
             auto v = random_vector->data();
             for (ptrdiff_t i = 0; i < this->rows(); i++) {
@@ -247,7 +247,7 @@ namespace sfem {
         inline std::ptrdiff_t cols() const override { return n_dofs; }
 
     private:
-        bool use_host_kernels() const { return execution_space_ == EXECUTION_SPACE_HOST; }
+        bool use_host_kernels() const { return this->execution_space() == EXECUTION_SPACE_HOST; }
 
         void ensure_apply_buffer(const ptrdiff_t n, T* const y) const {
             if (!apply_overwrites_output) {
@@ -310,6 +310,11 @@ namespace sfem {
         ret->default_init();
         return ret;
     }
+    template <typename T>
+    std::shared_ptr<Chebyshev3<T>> create_cheb3(const std::shared_ptr<Operator<T>> &op, const ExecutionSpace es) {
+        return Chebyshev3<T>::create(op, es);
+    }
+
 }  // namespace sfem
 
 #endif  // SFEM_CHEB3_HPP

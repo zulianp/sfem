@@ -23,7 +23,7 @@
 # THE STANDING LOCAL GATE, WHICH THIS TREE HAS NEVER BEEN RUN AGAINST.
 #
 # The CVFEM spike is gated by ctest locally and by Alps batch scripts. Roughly 300 lines of
-# changed code sit in this tree -- the coarse-packing fix in derefine_op plus the earlier
+# changed code sit in this tree -- the coarse-packing fix in derefine plus the earlier
 # decomposition fixes (GlobalDenseLU's scatter-then-sum gather, the level parallel face, the
 # collective colour count, the lattice-row exchange, the stencil and coarse-BSR completions) --
 # and ctest has not been run against any of it in this session.

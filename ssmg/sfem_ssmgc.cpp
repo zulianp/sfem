@@ -1,14 +1,27 @@
 #include "sfem_ssmgc.hpp"
+#include "smesh_semistructured.hpp"
+#include "smesh_sshex8_graph.hpp"
 
-#include "sfem_API.hpp"
+#include "sfem_BSR.hpp"
+#include "sfem_ContactConditions.hpp"
+#include "sfem_Function.hpp"
+#include "sfem_LinearOperatorFactory.hpp"
+#include "sfem_Transfer.hpp"
+#include "sfem_blas_factory.hpp"
+#include "sfem_MixedPrecisionShiftableBlockSymJacobi.hpp"
+#include "sfem_ShiftableJacobi.hpp"
+#include "sfem_Stationary.hpp"
+#include "sfem_cg.hpp"
+#include "sfem_parallel_cg.hpp"
 #include "smesh_env.hpp"
 #include "smesh_ssedge_restriction.hpp"
+#include "smesh_ssquad4.hpp"
 #include "smesh_ssquad4_prolongation.hpp"
 #include "smesh_ssquad4_restriction.hpp"
 #include "smesh_sstet4.hpp"
 #include "smesh_sstri_restriction.hpp"
 
-#include "lumped_ptdp.hpp"
+#include "sfem_lumped_galerkin.hpp"
 
 #include "smesh_device_buffer.hpp"
 #include "smesh_exchange.hpp"
@@ -21,8 +34,8 @@
 #ifdef SFEM_ENABLE_CUDA
 // #include "cu_ssquad4_interpolate.hpp"
 #include "sfem_Function_incore_cuda.hpp"
-#include "sfem_cuda_ShiftedPenalty_impl.hpp"
-#include "sfem_cuda_blas.hpp"
+#include "sfem_ShiftedPenaltyKernels_cuda.hpp"
+#include "sfem_BLAS_cuda.hpp"
 #include "sfem_ssmgc_kernels.hpp"
 #endif
 
@@ -30,17 +43,17 @@ namespace sfem {
     static bool is_root_rank(const std::shared_ptr<Communicator> &comm) { return !comm || comm->rank() == 0; }
 
     // Packed 3x3 SPD block: [xx, xy, xz, yy, yz, zz]. hessian_diag is AOS (xx,yy,zz) per node.
-    static void pack_nodal_diag_to_block_sym6(const ptrdiff_t      n_nodes,
-                                              const real_t *const  d3,
-                                              real_t *const        d6,
-                                              const ExecutionSpace es) {
-        SFEM_UNUSED(es);
+    static void pack_nodal_diag_to_block_sym6(const ptrdiff_t         n_nodes,
+                                              const real_t *const     d3,
+                                              real_t *const           d6,
+                                              const ExecutionContext &context) {
+        SFEM_UNUSED(context);
         if (n_nodes <= 0 || !d3 || !d6) {
             return;
         }
 #ifdef SFEM_ENABLE_CUDA
-        if (es == EXECUTION_SPACE_DEVICE) {
-            pack_nodal_diag_to_block_sym6_device(n_nodes, d3, d6);
+        if (context.space() == EXECUTION_SPACE_DEVICE) {
+            pack_nodal_diag_to_block_sym6_device(n_nodes, d3, d6, context.stream());
             return;
         }
 #endif
@@ -81,10 +94,10 @@ namespace sfem {
         if (!fine || !coarse) {
             return false;
         }
-        if (mesh_is_mpi(fine->mesh_ptr())) {
+        if (mesh_is_mpi(fine->mesh())) {
             return false;
         }
-        return coarse->n_owned_dofs() <= fine->n_owned_dofs();
+        return coarse->n_dofs_owned() <= fine->n_dofs_owned();
     }
 
     static void inject_fine_state_host(const std::shared_ptr<FunctionSpace> &fine_space,
@@ -95,8 +108,8 @@ namespace sfem {
         const ptrdiff_t n_coarse_dofs  = coarse_space->n_dofs();
         const ptrdiff_t n_coarse_nodes = n_coarse_dofs / bs;
 
-        auto fm = fine_space->mesh_ptr();
-        auto cm = coarse_space->mesh_ptr();
+        auto fm = fine_space->mesh();
+        auto cm = coarse_space->mesh();
         if (!mesh_is_mpi(fm) || !cm || !cm->distributed() || !fm->distributed() || !fm->distributed()->node_mapping() ||
             !cm->distributed()->node_mapping()) {
             auto b = sfem::blas<real_t>(EXECUTION_SPACE_HOST);
@@ -110,7 +123,7 @@ namespace sfem {
 
         const ptrdiff_t n_fine_local   = fm->n_nodes();
         const ptrdiff_t n_coarse_local = cm->n_nodes();
-        const ptrdiff_t n_coarse_owned = coarse_space->n_owned_dofs() / bs;
+        const ptrdiff_t n_coarse_owned = coarse_space->n_dofs_owned() / bs;
         auto            fmap           = fm->distributed()->node_mapping()->data();
         auto            cmap           = cm->distributed()->node_mapping()->data();
 
@@ -158,7 +171,7 @@ namespace sfem {
 
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
-            auto            fm    = fine_space->mesh_ptr();
+            auto            fm    = fine_space->mesh();
             const int       bs    = fine_space->block_size();
             const ptrdiff_t n_f   = static_cast<ptrdiff_t>(fm->n_nodes()) * bs;
             const ptrdiff_t n_c   = coarse_space->n_dofs();
@@ -288,7 +301,7 @@ namespace sfem {
             if (!sides || sides->extent(1) == 0) {
                 return n_owned;
             }
-            const ptrdiff_t max_id = sfem::ss_elements_max_node_id(sides);
+            const ptrdiff_t max_id = smesh::nxe_max_node_id(sides->extent(1), sides->extent(0), sides->data());
             if (max_id < 0) {
                 return n_owned;
             }
@@ -380,8 +393,8 @@ namespace sfem {
                            (long)n_coarse_contact);
             }
 
-            auto       fm  = fine_space ? fine_space->mesh_ptr() : nullptr;
-            auto       cm  = coarse_space ? coarse_space->mesh_ptr() : nullptr;
+            auto       fm  = fine_space ? fine_space->mesh() : nullptr;
+            auto       cm  = coarse_space ? coarse_space->mesh() : nullptr;
             const bool mpi = fm && fm->is_distributed() && fm->comm() && fm->comm()->size() > 1 && fm->distributed() &&
                              fm->distributed()->node_mapping() && cm && cm->is_distributed() && cm->distributed() &&
                              cm->distributed()->node_mapping();
@@ -455,7 +468,7 @@ namespace sfem {
             SFEM_TRACE_SCOPE("SPMG::init_discretization");
 
             auto            fs             = f->space();
-            auto           &ssmesh         = f->space()->mesh();
+            auto           &ssmesh         = *f->space()->mesh();
 
             std::vector<int> levels = smesh::derefinement_levels(ssmesh);
             this->levels.clear();
@@ -580,22 +593,14 @@ namespace sfem {
                 auto coarse = levels[i];
 
                 auto      fine_space   = fine->function->space();
-                const int level        = smesh::semistructured_level(fine_space->mesh());
+                const int level        = smesh::semistructured_level(*fine_space->mesh());
                 auto      coarse_space = coarse->function->space();
                 const int coarse_level =
-                        coarse_space->has_semi_structured_mesh() ? smesh::semistructured_level(coarse_space->mesh()) : 1;
+                        coarse_space->has_semi_structured_mesh() ? smesh::semistructured_level(*coarse_space->mesh()) : 1;
 
-                auto coarse_sides = fine->sides;
-                {
-                    const auto fam = smesh::ss_source_family(fine_space->element_type());
-                    if (fam == smesh::TET4) {
-                        coarse_sides = sfem::sstri_derefine_element_connectivity(level, coarse_level, host_sides[i - 1]);
-                    } else if (fam == smesh::QUAD4) {
-                        coarse_sides = sfem::ssedge_derefine_element_connectivity(level, coarse_level, host_sides[i - 1]);
-                    } else {
-                        coarse_sides = sfem::ssquad4_derefine_element_connectivity(level, coarse_level, host_sides[i - 1]);
-                    }
-                }
+                const auto fam          = smesh::ss_source_family(fine_space->element_type());
+                const auto side_family  = fam == smesh::TET4 ? smesh::TRI3 : (fam == smesh::QUAD4 ? smesh::EDGE2 : smesh::QUAD4);
+                auto       coarse_sides = smesh::derefine_elements(side_family, level, coarse_level, host_sides[i - 1]);
                 coarse->sides = coarse_sides;
                 host_sides.push_back(coarse->sides);
 
@@ -604,7 +609,7 @@ namespace sfem {
                 coarse->mapping =
                         remap_contact_mapping_to_coarse(fine->mapping, n_coarse_contact_nodes, fine_space, coarse_space);
                 {
-                    auto cm = coarse_space->mesh_ptr();
+                    auto cm = coarse_space->mesh();
                     if (cm && cm->is_distributed() && cm->comm() && cm->comm()->size() > 1 && cm->distributed()) {
                         coarse->mapping = filter_owned_volume_idx(coarse->mapping, cm->distributed()->n_nodes_owned());
                     }
@@ -720,7 +725,7 @@ namespace sfem {
             std::string fine_op_type = op_type::MATRIX_FREE;
 
             if (in) {
-                if (is_root_rank(f->space()->mesh_ptr()->comm())) {
+                if (is_root_rank(f->space()->mesh()->comm())) {
                     printf("SPMG: Reading Input\n");
                 }
                 in->get("atol", atol);
@@ -759,7 +764,7 @@ namespace sfem {
 
             // Assembled BSR is serial-only. MPI coarse contact must be matrix-free so the
             // coarse solver is ParallelCG with allocation-sized (owned+ghost) buffers.
-            if (fs->mesh_ptr()->comm() && fs->mesh_ptr()->comm()->size() > 1) {
+            if (fs->mesh()->comm() && fs->mesh()->comm()->size() > 1) {
                 if (coarse_op_type == op_type::BSR || coarse_op_type == op_type::BSR_SYM) {
                     coarse_op_type = op_type::MATRIX_FREE;
                 }
@@ -877,10 +882,10 @@ namespace sfem {
 
             smoothers_or_solver.push_back(coarse_solver);
 
-            if (is_root_rank(fs->mesh_ptr()->comm())) {
+            if (is_root_rank(fs->mesh()->comm())) {
                 for (int i = 0; i < nlevels; i++) {
                     auto s = levels[i]->function->space();
-                    printf("%d) \tL=%d\n", i, s->has_semi_structured_mesh() ? smesh::semistructured_level(s->mesh()) : 1);
+                    printf("%d) \tL=%d\n", i, s->has_semi_structured_mesh() ? smesh::semistructured_level(*s->mesh()) : 1);
 
                     levels[i]->function->describe(std::cout);
                 }
@@ -958,9 +963,8 @@ namespace sfem {
 #ifdef SFEM_ENABLE_CUDA
             if (es == EXECUTION_SPACE_DEVICE) {
                 // FIXME this should not be here!
-                mg->blas() = make_cuda_blas<real_t>();
-                CUDA_ShiftedPenalty<real_t>::build(mg->impl());
-                mg->set_execution_space(EXECUTION_SPACE_DEVICE);
+                mg->blas() = GPUBLAS<real_t>::create();
+                GPUShiftedPenaltyKernels<real_t>::build(mg->impl());
             } else
 #endif
             {
@@ -969,7 +973,7 @@ namespace sfem {
 
             mg->set_nodal_block_size(block_size);
             for (int i = 0; i < nlevels; i++) {
-                auto                             mesh = levels[i]->function->space()->mesh_ptr();
+                auto                             mesh = levels[i]->function->space()->mesh();
                 std::shared_ptr<smesh::Exchange> ex;
                 if (mesh && mesh->is_distributed() && mesh->comm() && mesh->comm()->size() > 1) {
                     ex = smesh::Exchange::create_nodal(mesh, smesh::Exchange::ExchangeScope::GhostsAndAura);
@@ -1099,7 +1103,7 @@ namespace sfem {
                                                const std::shared_ptr<Input>            &in) {
         auto ret = std::make_shared<SSMGC<T>>();
         ret->impl_->init(f, contact_conds, in);
-        if (is_root_rank(f->space()->mesh_ptr()->comm())) {
+        if (is_root_rank(f->space()->mesh()->comm())) {
             int ll = 0;
             for (auto l : ret->impl_->levels) {
                 std::cout << "-----------------------\n";
@@ -1157,7 +1161,7 @@ namespace sfem {
     }
 
     template <typename T>
-    ExecutionSpace SSMGC<T>::execution_space() const {
+    ExecutionContext SSMGC<T>::execution_context() const {
         return impl_->mg->execution_space();
     }
 

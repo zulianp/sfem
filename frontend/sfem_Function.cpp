@@ -6,15 +6,18 @@
 
 #include "utils.h"
 
+#include "sfem_LinearOperatorFactory.hpp"
+#include "sfem_blas_factory.hpp"
 #include "sfem_defs.hpp"
+#include "sfem_device.hpp"
 #include "sfem_logger.hpp"
-#include "sfem_openmp_blas.hpp"
-#include "sfem_API.hpp"
+#include "sfem_BLAS_openmp.hpp"
+#include "smesh_env.hpp"
 #include "smesh_glob.hpp"
 #include "smesh_mesh.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
-#include "sfem_cuda_blas.hpp"
+#include "sfem_BLAS_cuda.hpp"
 #endif
 
 #include "boundary_condition.hpp"
@@ -84,9 +87,7 @@ namespace sfem {
         std::string                    file_format{"%s/%s.%s"};
         std::string                    time_dependent_file_format{"%s/%s.%09d.%s"};
         size_t                         export_counter{0};
-        logger_t                       time_logger;
-        Impl() { log_init(&time_logger); }
-        ~Impl() { log_destroy(&time_logger); }
+        Logger                         time_logger;
     };
 
     void Output::enable_AoS_to_SoA(const bool val) { impl_->AoS_to_SoA = val; }
@@ -98,7 +99,7 @@ namespace sfem {
         SFEM_READ_ENV(SFEM_OUTPUT_DIR, );
         impl_->output_dir = smesh::Path(SFEM_OUTPUT_DIR);
 
-        impl_->smesh_output = smesh::Output::create(space->mesh_ptr(), smesh::Path(impl_->output_dir));
+        impl_->smesh_output = smesh::Output::create(space->mesh(), smesh::Path(impl_->output_dir));
     }
 
     Output::~Output() = default;
@@ -106,7 +107,7 @@ namespace sfem {
     void Output::clear() { impl_->export_counter = 0; }
 
     void Output::set_output_dir(const smesh::Path &path) {
-        impl_->smesh_output = smesh::Output::create(impl_->space->mesh_ptr(), smesh::Path(path));
+        impl_->smesh_output = smesh::Output::create(impl_->space->mesh(), smesh::Path(path));
         impl_->output_dir   = path;
     }
 
@@ -140,13 +141,13 @@ namespace sfem {
     }
 
     void Output::log_time(const real_t t) {
-        if (log_is_empty(&impl_->time_logger)) {
+        if (impl_->time_logger.empty()) {
             char path[2048];
             snprintf(path, sizeof(path), "%s/time.txt", impl_->output_dir.c_str());
-            log_create_file(&impl_->time_logger, path, "w");
+            impl_->time_logger.open_file(path, "w");
         }
 
-        log_write_double(&impl_->time_logger, t);
+        impl_->time_logger.write(t);
     }
 
     int Output::write_time_step(const char *name, const real_t /*t*/, const real_t *const x) {
@@ -951,9 +952,9 @@ namespace sfem {
             if (o->is_no_op()) {
                 continue;
             }
-            auto dop = o->derefine_op(space);
+            auto dop = o->derefine(space);
             if (!dop) {
-                SFEM_ERROR("derefine_op returned nullptr");
+                SFEM_ERROR("derefine returned nullptr");
                 return nullptr;
             }
             if (!dop->is_no_op()) {
@@ -977,7 +978,7 @@ namespace sfem {
         auto ret = std::make_shared<Function>(space);
 
         for (auto &o : impl_->ops) {
-            ret->impl_->ops.push_back(o->lor_op(space));
+            ret->impl_->ops.push_back(o->lor(space));
         }
 
         for (auto &c : impl_->constraints) {
@@ -1009,11 +1010,20 @@ namespace sfem {
         for (int np = 0; np < n_files; np++) {
             printf("%s\n", files[np].c_str());
 
-            char path[1024 * 10];
-            snprintf(path, sizeof(path), "%s/i%d.raw", folder, np);
+            // i<np>.raw, or i<np>.<type>.raw (file_name drops the .raw): a named type is converted from.
+            char plain[1024 * 10];
+            char typed[1024 * 10];
+            snprintf(plain, sizeof(plain), "i%d", np);
+            snprintf(typed, sizeof(typed), "i%d.", np);
+            std::string path;
+            for (const auto &f : files) {
+                const std::string name = smesh::Path(f).file_name();
+                if (name == plain || name.rfind(typed, 0) == 0) path = f;
+            }
 
             idx_t *idx = 0;
-            err |= (smesh::array_read_convert_from_extension<idx_t>(smesh::Path(path), &idx, &local_size) != SMESH_SUCCESS);
+            err |= path.empty() ||
+                   (smesh::array_read_convert_from_extension<idx_t>(smesh::Path(path), &idx, &local_size) != SMESH_SUCCESS);
 
             data[np] = idx;
         }

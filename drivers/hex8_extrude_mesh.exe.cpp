@@ -1,6 +1,7 @@
 #include "sfem_API.hpp"
+#include "smesh_base.hpp"
 
-#include "sortreduce.hpp"
+#include "sfem_sortreduce.hpp"
 
 static SFEM_INLINE void normalize(real_t* const vec3) {
     const real_t len = sqrt(vec3[0] * vec3[0] + vec3[1] * vec3[1] + vec3[2] * vec3[2]);
@@ -35,7 +36,7 @@ void extrude(const ptrdiff_t              nsides,
              const geom_t                 height,
              idx_t** const SFEM_RESTRICT  extruded_elements,
              geom_t** const SFEM_RESTRICT extruded_points) {
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     geom_t** pseudo_normals = (geom_t**)malloc(3 * sizeof(geom_t*));
     for (int d = 0; d < 3; d++) {
@@ -96,7 +97,7 @@ void extrude(const ptrdiff_t              nsides,
 
     free(pseudo_normals);
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
     printf("extrude.c: extrude\t%g seconds\n", tock - tick);
 }
 

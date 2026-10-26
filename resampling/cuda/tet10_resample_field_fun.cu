@@ -100,6 +100,8 @@ copy_elems_tet10_managed(const ptrdiff_t     nelements,  //
         printf("ERROR: copying elements to device: %s\n", cudaGetErrorString(cudaGetLastError()));
         return cudaGetLastError();
     }
+
+    return cudaSuccess;
 }
 
 void                                                   //
@@ -137,7 +139,7 @@ free_elems_tet10_managed(elems_tet10_device* elems) {  //
 // make_xyz_tet10_device_unified
 //////////////////////////////////////////////////////////
 xyz_tet10_device                                         //
-make_xyz_tet10_device_unified(const ptrdiff_t nnodes) {  //
+make_xyz_tet10_device_unified(const ptrdiff_t /*nnodes*/) {  //
                                                          //
     xyz_tet10_device xyz;
 
@@ -153,7 +155,7 @@ make_xyz_tet10_device_unified(const ptrdiff_t nnodes) {  //
 // copy_xyz_tet10_device_unified
 //////////////////////////////////////////////////////////
 void                                                     //
-copy_xyz_tet10_device_unified(const ptrdiff_t   nnodes,  //
+copy_xyz_tet10_device_unified(const ptrdiff_t   /*nnodes*/,  //
                               xyz_tet10_device* xyz,     //
                               const geom_t**     xyz_host) {  //
                                                          //
@@ -361,7 +363,7 @@ void free_elems_tet10_device(elems_tet10_device* elems) {  //
  * @return elems_tet10_device
  */
 elems_tet10_device                                            //
-make_elems_tet10_device_unified(const ptrdiff_t nelements) {  //
+make_elems_tet10_device_unified(const ptrdiff_t /*nelements*/) {  //
                                                               //
     elems_tet10_device elems;
     elems.elems_v0 = NULL;
@@ -386,7 +388,7 @@ make_elems_tet10_device_unified(const ptrdiff_t nelements) {  //
  * @return cudaError_t
  */
 cudaError_t                                                     //
-copy_elems_tet10_device_unified(const ptrdiff_t     nelements,  //
+copy_elems_tet10_device_unified(const ptrdiff_t     /*nelements*/,  //
                                 elems_tet10_device* elems,      //
                                 const idx_t**       elems_host) {
     elems->elems_v0 = (idx_t*)elems_host[0];

@@ -37,16 +37,18 @@ namespace sfem {
       bool       *flag;
     };
 
-    void material_defaults(real_t *const values) {
+    [[maybe_unused]] void material_defaults(real_t *const values) {
       values[0] = 0;
       values[1] = 0;
       values[2] = 0;
     }
 
+    // derefine copies the parameters by name, with or without YAML.
+    [[maybe_unused]] constexpr int N_DEFINED_MATERIAL_PARAMETERS = 3;
+    [[maybe_unused]] constexpr int N_MATERIAL_PARAMETERS = 3;
+    [[maybe_unused]] static const char *const MATERIAL_PARAMETER_NAMES[N_MATERIAL_PARAMETERS] = {"t0", "t1", "t2"};
+
 #ifdef SFEM_ENABLE_RYAML
-    constexpr int N_DEFINED_MATERIAL_PARAMETERS = 3;
-    constexpr int N_MATERIAL_PARAMETERS = 3;
-    static const char *const MATERIAL_PARAMETER_NAMES[N_MATERIAL_PARAMETERS] = {"t0", "t1", "t2"};
 
     bool yaml_read_real(const ryml::ConstNodeRef &node,
               const char *const key,
@@ -165,7 +167,7 @@ namespace sfem {
         }
         const std::string path = yaml_read_string(node["path"]);
         return smesh::Sideset::create_from_file(
-            space->mesh_ptr()->comm(), smesh::Path(path));
+            space->mesh()->comm(), smesh::Path(path));
       }
 
       if (is_expr || (node.has_child("parent") && node.has_child("lfi"))) {
@@ -194,7 +196,7 @@ namespace sfem {
         }
 
         return std::make_shared<smesh::Sideset>(
-            space->mesh_ptr()->comm(), parent, lfi);
+            space->mesh()->comm(), parent, lfi);
       }
 
       SFEM_ERROR("GeneratedNeumann neumann condition requires format=file or format=expr\n");
@@ -222,7 +224,7 @@ namespace sfem {
 
   std::unique_ptr<Op> GeneratedNeumann::create(const std::shared_ptr<FunctionSpace> &space) {
     const ptrdiff_t expected_block_size =
-        block_size_for_dim(space->mesh_ptr()->spatial_dimension());
+        block_size_for_dim(space->mesh()->spatial_dimension());
     if (space->block_size() != expected_block_size) {
       SFEM_ERROR("GeneratedNeumann requires block_size=%ld\n",
                        static_cast<long>(expected_block_size));
@@ -304,7 +306,7 @@ namespace sfem {
     if (impl_->conditions.empty()) {
       return SFEM_SUCCESS;
     }
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const smesh::block_idx_t block_id = block_id_for_domain(*mesh, *domain.block);

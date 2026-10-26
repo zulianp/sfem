@@ -48,7 +48,7 @@ int test_first_armijo_step() {
     Parabola lazy(0.3, false), batched(0.3, true);
     auto     l = search(lazy);
     auto     b = search(batched);
-    SFEM_TEST_ASSERT(l.status == sfem::LineSearchResult::ACCEPTED);
+    SFEM_TEST_ASSERT(l.status == sfem::LineSearchResult::Status::ACCEPTED);
     SFEM_TEST_ASSERT(l.alpha == real_t(0.5));
     SFEM_TEST_ASSERT(b.status == l.status && b.alpha == l.alpha && b.merit == l.merit);
     SFEM_TEST_ASSERT(l.evaluations == 2 && lazy.calls == 2);
@@ -63,7 +63,7 @@ int test_batching_can_be_switched_off() {
     sfem::LineSearchOptions options;
     options.batched = false;
     auto r          = search(m, options);
-    SFEM_TEST_ASSERT(r.status == sfem::LineSearchResult::ACCEPTED && r.alpha == real_t(0.5));
+    SFEM_TEST_ASSERT(r.status == sfem::LineSearchResult::Status::ACCEPTED && r.alpha == real_t(0.5));
     SFEM_TEST_ASSERT(m.calls == 2 && r.evaluations == 2);
     return SFEM_TEST_SUCCESS;
 }
@@ -73,11 +73,11 @@ int test_non_finite_trials_are_skipped() {
     Parabola m(1, false);
     m.unevaluable = {real_t(1), real_t(0.5)};
     auto r        = search(m);
-    SFEM_TEST_ASSERT(r.status == sfem::LineSearchResult::ACCEPTED);
+    SFEM_TEST_ASSERT(r.status == sfem::LineSearchResult::Status::ACCEPTED);
     SFEM_TEST_ASSERT(r.alpha == real_t(0.25));
 
     for (real_t s : sfem::LineSearchOptions().steps) m.unevaluable.insert(s);
-    SFEM_TEST_ASSERT(search(m).status == sfem::LineSearchResult::NON_FINITE);
+    SFEM_TEST_ASSERT(search(m).status == sfem::LineSearchResult::Status::NON_FINITE);
     return SFEM_TEST_SUCCESS;
 }
 
@@ -85,7 +85,7 @@ int test_non_finite_trials_are_skipped() {
 int test_ascent_direction_fails() {
     Parabola m(-1, true);
     auto     r = search(m);
-    SFEM_TEST_ASSERT(r.status == sfem::LineSearchResult::NO_DECREASE);
+    SFEM_TEST_ASSERT(r.status == sfem::LineSearchResult::Status::NO_DECREASE);
     SFEM_TEST_ASSERT(r.alpha == 0);
     return SFEM_TEST_SUCCESS;
 }
@@ -93,7 +93,7 @@ int test_ascent_direction_fails() {
 // A predicted decrease below the merit's rounding is convergence, not failure.
 int test_at_resolution() {
     Parabola m(1e-16, true);
-    SFEM_TEST_ASSERT(search(m).status == sfem::LineSearchResult::AT_RESOLUTION);
+    SFEM_TEST_ASSERT(search(m).status == sfem::LineSearchResult::Status::AT_RESOLUTION);
     return SFEM_TEST_SUCCESS;
 }
 
@@ -102,7 +102,7 @@ int test_best_decrease() {
     Parabola         m(0.3, true);
     sfem::LineSearch ls;
     auto             r = ls.search(m, nullptr, nullptr, m.at(nullptr, nullptr), 0);
-    SFEM_TEST_ASSERT(r.status == sfem::LineSearchResult::BEST_DECREASE);
+    SFEM_TEST_ASSERT(r.status == sfem::LineSearchResult::Status::BEST_DECREASE);
     SFEM_TEST_ASSERT(r.alpha == real_t(0.25));
     return SFEM_TEST_SUCCESS;
 }
@@ -115,14 +115,14 @@ int test_damped_ignores_the_merit() {
     options.rule    = sfem::LineSearchOptions::Rule::DAMPED;
     options.damping = real_t(0.8);
     auto r          = search(m, options);
-    SFEM_TEST_ASSERT(r.status == sfem::LineSearchResult::ACCEPTED && r.alpha == real_t(0.8) && r.evaluations == 1);
+    SFEM_TEST_ASSERT(r.status == sfem::LineSearchResult::Status::ACCEPTED && r.alpha == real_t(0.8) && r.evaluations == 1);
 
     m.unevaluable = {real_t(0.8)};
     r             = search(m, options);
-    SFEM_TEST_ASSERT(r.status == sfem::LineSearchResult::ACCEPTED && r.alpha == real_t(0.4));
+    SFEM_TEST_ASSERT(r.status == sfem::LineSearchResult::Status::ACCEPTED && r.alpha == real_t(0.4));
 
     for (real_t s : sfem::LineSearchOptions().steps) m.unevaluable.insert(real_t(0.8) * s);
-    SFEM_TEST_ASSERT(search(m, options).status == sfem::LineSearchResult::NON_FINITE);
+    SFEM_TEST_ASSERT(search(m, options).status == sfem::LineSearchResult::Status::NON_FINITE);
     return SFEM_TEST_SUCCESS;
 }
 
@@ -131,7 +131,7 @@ int test_disabled_takes_the_full_step() {
     sfem::LineSearchOptions options;
     options.enabled = false;
     auto r          = search(m, options);
-    SFEM_TEST_ASSERT(r.status == sfem::LineSearchResult::ACCEPTED && r.alpha == 1);
+    SFEM_TEST_ASSERT(r.status == sfem::LineSearchResult::Status::ACCEPTED && r.alpha == 1);
     SFEM_TEST_ASSERT(m.calls == 0);
     return SFEM_TEST_SUCCESS;
 }

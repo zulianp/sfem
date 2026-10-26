@@ -1,4 +1,5 @@
 #include "tet10_grad.hpp"
+#include "smesh_base.hpp"
 
 #include <mpi.h>
 #include <stdio.h>
@@ -162,7 +163,7 @@ void tet10_grad(const ptrdiff_t nelements,
                 real_t *const SFEM_RESTRICT dfdz) {
     SFEM_UNUSED(nnodes);
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     idx_t ev[10];
     real_t element_f[10];
@@ -223,6 +224,6 @@ void tet10_grad(const ptrdiff_t nelements,
         }
     }
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
     printf("cgrad.c: cgrad3\t%g seconds\n", tock - tick);
 }

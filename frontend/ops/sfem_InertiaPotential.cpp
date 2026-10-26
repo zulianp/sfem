@@ -1,6 +1,11 @@
 #include "sfem_InertiaPotential.hpp"
 
-#include "sfem_API.hpp"
+#include "sfem_Function.hpp"
+#include "sfem_LinearOperatorFactory.hpp"
+#include "sfem_blas_factory.hpp"
+#ifdef SFEM_ENABLE_CUDA
+#include "sfem_Function_incore_cuda.hpp"
+#endif
 #ifdef SFEM_ENABLE_CUDA
 #include "cuda/sfem_InertiaPotential_cuda.hpp"
 #endif
@@ -57,7 +62,7 @@ namespace sfem {
 
         void sync_consistent() {
             if (!consistent) return;
-            for (const auto &block : space->mesh_ptr()->blocks()) {
+            for (const auto &block : space->mesh()->blocks()) {
                 consistent->set_value_in_block(block->name(), "density", alpha * density);
             }
         }
@@ -84,7 +89,7 @@ namespace sfem {
 
     InertiaPotential::~InertiaPotential() = default;
 
-    ExecutionSpace InertiaPotential::execution_space() const { return impl_->es; }
+    ExecutionContext InertiaPotential::execution_context() const { return impl_->es; }
 
     ptrdiff_t InertiaPotential::n_dofs_domain() const { return impl_->space->n_dofs(); }
 
@@ -165,7 +170,7 @@ namespace sfem {
 
 #ifdef SFEM_ENABLE_CUDA
         if (impl_->es == EXECUTION_SPACE_DEVICE) {
-            return cu_inertia_potential_hessian_crs(ndofs, rowptr, colidx, mass, alpha, values);
+            return cu_inertia_potential_hessian_crs(ndofs, rowptr, colidx, mass, alpha, values, execution_context().stream());
         }
 #endif
 
@@ -211,7 +216,8 @@ namespace sfem {
 
 #ifdef SFEM_ENABLE_CUDA
         if (impl_->es == EXECUTION_SPACE_DEVICE) {
-            return cu_inertia_potential_hessian_bsr(n_nodes, bs, rowptr, colidx, mass, alpha, values_type, values);
+            return cu_inertia_potential_hessian_bsr(
+                    n_nodes, bs, rowptr, colidx, mass, alpha, values_type, values, execution_context().stream());
         }
 #endif
 
@@ -261,7 +267,7 @@ namespace sfem {
 #ifdef SFEM_ENABLE_CUDA
         if (impl_->es == EXECUTION_SPACE_DEVICE) {
             return cu_inertia_potential_hessian_block_diag_sym(
-                    n_nodes, bs, impl_->mass->data(), impl_->alpha, values);
+                    n_nodes, bs, impl_->mass->data(), impl_->alpha, values, execution_context().stream());
         }
 #endif
 
@@ -413,7 +419,7 @@ namespace sfem {
         return ret;
     }
 
-    std::shared_ptr<Op> InertiaPotential::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
+    std::shared_ptr<Op> InertiaPotential::derefine(const std::shared_ptr<FunctionSpace> &space) {
         auto ret = std::make_shared<InertiaPotential>(space, impl_->es);
         ret->set_density(impl_->density);
         ret->set_consistent_mass(impl_->consistent_mass);

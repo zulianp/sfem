@@ -68,8 +68,6 @@ static int body_force_total_tri3_merit_patch(
     const s_t g1,
     const int nsteps,
     const s_t *const RSTR,
-    const s_t *const RSTR x,
-    const s_t *const RSTR h,
     const s_t *const RSTR accumulator,
     s_t *const RSTR merit
 ) {
@@ -112,15 +110,6 @@ static int body_force_total_tri3_merit_patch(
           for (int lane = 0; lane < ne; ++lane) {
             const idx_t element = pm_incident[lane];
             const int *const RSTR perm = pm_orientation[pm_local_node[lane]];
-            s_t state[6];
-            s_t direction[6];
-            for (int j = 0; j < NS; ++j) {
-              const idx_t node = elements[perm[j]][element];
-              for (int c = 0; c < NC; ++c) {
-                state[j * NC + c] = x[node * NC + c];
-                direction[j * NC + c] = h[node * NC + c];
-              }
-            }
             // The Jacobian of the *permuted* element: its columns are the
             // edges from the visited node, which the permutation put at
             // slot 0.  Constant over the cell, because the orientation
@@ -134,11 +123,6 @@ static int body_force_total_tri3_merit_patch(
               }
             }
             const s_t det = jac[0] * jac[3] - jac[1] * jac[2];
-            s_t adj[4];
-            adj[0] =  jac[3];
-            adj[1] = -jac[1];
-            adj[2] = -jac[2];
-            adj[3] =  jac[0];
             // the fixed basis function's quantities, and the
             // integration weight.  Both are what the orientation buys:
             // `phi_0` is the same function in every element and at
@@ -197,17 +181,15 @@ extern "C" int body_force_total_tri3_merit_patch_a_msoa(
     const real_t g1,
     const int nsteps,
     const void *const RSTR steps,
-    const void *const RSTR x,
-    const void *const RSTR h,
     const void *const RSTR accumulator,
     void *const RSTR merit
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        return sfem::codegen::body_force_total_tri3_merit_patch<double, geom_t, 1, 3, 16>(n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, density, g0, g1, nsteps, (const double *)steps, (const double *)x, (const double *)h, (const double *)accumulator, (double *)merit);
+        return sfem::codegen::body_force_total_tri3_merit_patch<double, geom_t, 1, 3, 16>(n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, density, g0, g1, nsteps, (const double *)steps, (const double *)accumulator, (double *)merit);
     }
     case (int)sizeof(float): {
-        return sfem::codegen::body_force_total_tri3_merit_patch<float, geom_t, 1, 3, 16>(n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, density, g0, g1, nsteps, (const float *)steps, (const float *)x, (const float *)h, (const float *)accumulator, (float *)merit);
+        return sfem::codegen::body_force_total_tri3_merit_patch<float, geom_t, 1, 3, 16>(n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, density, g0, g1, nsteps, (const float *)steps, (const float *)accumulator, (float *)merit);
     }
     default:
       break;

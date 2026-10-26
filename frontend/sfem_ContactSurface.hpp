@@ -13,6 +13,11 @@
 namespace sfem {
     class ContactSurface {
     public:
+        /// The mesh's or the semi-structured mesh's surface, as the space has.
+        static std::shared_ptr<ContactSurface> create(const std::shared_ptr<FunctionSpace>        &space,
+                                                      const std::vector<std::shared_ptr<Sideset>> &sidesets,
+                                                      const enum ExecutionSpace                    es);
+
         virtual ~ContactSurface()                           = default;
         virtual SharedBuffer<geom_t *> points()             = 0;
         virtual SharedBuffer<idx_t *>  elements()           = 0;
@@ -113,9 +118,11 @@ namespace sfem {
         std::unique_ptr<Impl> impl_;
     };
 
-    std::shared_ptr<ContactSurface> create_contact_surface(const std::shared_ptr<FunctionSpace>        &space,
-                                                           const std::vector<std::shared_ptr<Sideset>> &sidesets,
-                                                           const enum ExecutionSpace                    es);
+    inline std::shared_ptr<ContactSurface> create_contact_surface(const std::shared_ptr<FunctionSpace>        &space,
+                                                                  const std::vector<std::shared_ptr<Sideset>> &sidesets,
+                                                                  const enum ExecutionSpace                    es) {
+        return ContactSurface::create(space, sidesets, es);
+    }
 }  // namespace sfem
 
 #endif  // SFEM_CONTACT_SURFACE_HPP

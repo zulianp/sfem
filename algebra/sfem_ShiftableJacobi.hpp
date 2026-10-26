@@ -6,9 +6,9 @@
 
 #include "sfem_aliases.hpp"
 #include "sfem_MatrixFreeLinearSolver.hpp"
-#include "sfem_openmp_blas.hpp"
+#include "sfem_BLAS_openmp.hpp"
 
-#include "sfem_openmp_ShiftableJacobi.hpp"
+#include "sfem_ShiftableBlockSymJacobiKernels_openmp.hpp"
 #include "smesh_env.hpp"
 
 namespace sfem {
@@ -16,7 +16,9 @@ namespace sfem {
     template <typename T>
     class ShiftableJacobi final : public ShiftableOperator<T> {
     public:
-        ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
+        /// For the execution space es, on the diagonal diag.
+        static std::shared_ptr<ShiftableJacobi<T>> create(const SharedBuffer<T> &diag, const ExecutionSpace es);
+
         std::shared_ptr<BLAS<T>> blas;
 
         SharedBuffer<T> diag;
@@ -24,8 +26,7 @@ namespace sfem {
         T                          relaxation_parameter{0.3};
 
         void default_init() {
-            blas = make_openmp_blas<T>();
-            execution_space_ = EXECUTION_SPACE_HOST;
+            blas = OpenMPBLAS<T>::create();
         }
 
         void set_relaxation_parameter(const T relaxation) {
@@ -38,7 +39,7 @@ namespace sfem {
 
         void set_diag(const SharedBuffer<T>& d) {
             diag     = d;
-            inv_diag = create_buffer<T>(d->size(), execution_space());
+            inv_diag = create_buffer<T>(d->size(), this->execution_space());
             blas->copy(diag->size(), diag->data(), inv_diag->data());
             blas->reciprocal(inv_diag->size(), relaxation_parameter, inv_diag->data());
         }
@@ -62,7 +63,7 @@ namespace sfem {
 
         inline std::ptrdiff_t rows() const override { return diag->size(); }
         inline std::ptrdiff_t cols() const override { return diag->size(); }
-        ExecutionSpace        execution_space() const override { return execution_space_; }
+        ExecutionContext      execution_context() const override { return blas ? blas->context() : ExecutionContext(EXECUTION_SPACE_INVALID); }
     };
 
     template <typename T>
@@ -76,9 +77,14 @@ namespace sfem {
     template <typename T>
     class ShiftableBlockSymJacobi final : public ShiftableOperator<T> {
     public:
-        ExecutionSpace                 execution_space_{EXECUTION_SPACE_INVALID};
+        /// In the execution context, on the dim x dim symmetric diagonal blocks diag.
+        static std::shared_ptr<ShiftableBlockSymJacobi<T>> create(const int                   dim,
+                                                                  const SharedBuffer<T>      &diag,
+                                                                  const SharedBuffer<mask_t> &constraints_mask,
+                                                                  const ExecutionContext     &context);
+
         std::shared_ptr<BLAS<T>> blas;
-        ShiftableBlockSymJacobi_Tpl<T> impl;
+        ShiftableBlockSymJacobiKernels<T> impl;
 
         SharedBuffer<T>      diag;
         SharedBuffer<T>      inv_diag;
@@ -91,9 +97,8 @@ namespace sfem {
         bool                            sparse_update_policy_logged_{false};
 
         void default_init() {
-            blas = make_openmp_blas<T>();
-            ShiftableBlockSymJacobi_OpenMP<T>::build(block_size, impl);
-            execution_space_ = EXECUTION_SPACE_HOST;
+            blas = OpenMPBLAS<T>::create();
+            OpenMPShiftableBlockSymJacobiKernels<T>::build(block_size, impl);
         }
 
         void set_relaxation_parameter(const T relaxation) {
@@ -121,14 +126,14 @@ namespace sfem {
 
             assert(block_size == 3);
             assert(is_symmetric);
-            assert(execution_space_ == (enum ExecutionSpace)d->mem_space());
+            assert(this->execution_space() == (enum ExecutionSpace)d->mem_space());
             assert(constraints_mask);
 
             read_sparse_update_policy();
 
             const ptrdiff_t n_blocks = d->size() / 6;
             diag                     = d;
-            inv_diag                 = create_buffer<T>(n_blocks * block_size * block_size, execution_space());
+            inv_diag                 = create_buffer<T>(n_blocks * block_size * block_size, this->execution_space());
             impl.sym_diag_to_diag(n_blocks, diag->data(), inv_diag->data());
             impl.apply_mask(n_blocks, constraints_mask->data(), inv_diag->data());
             impl.inplace_invert(n_blocks, inv_diag->data());
@@ -188,7 +193,7 @@ namespace sfem {
 
         inline std::ptrdiff_t rows() const override { return diag->size(); }
         inline std::ptrdiff_t cols() const override { return diag->size(); }
-        ExecutionSpace        execution_space() const override { return execution_space_; }
+        ExecutionContext      execution_context() const override { return blas ? blas->context() : ExecutionContext(EXECUTION_SPACE_INVALID); }
     };
 
     template <typename T>
@@ -201,6 +206,19 @@ namespace sfem {
         ret->set_diag(diag);
         return ret;
     }
+    template <typename T>
+    std::shared_ptr<ShiftableJacobi<T>> create_shiftable_jacobi(const SharedBuffer<T> &diag, const ExecutionSpace es) {
+        return ShiftableJacobi<T>::create(diag, es);
+    }
+
+    template <typename T>
+    std::shared_ptr<ShiftableBlockSymJacobi<T>> create_shiftable_block_sym_jacobi(const int                   dim,
+                                                                                  const SharedBuffer<T>      &diag,
+                                                                                  const SharedBuffer<mask_t> &constraints_mask,
+                                                                                  const ExecutionContext     &context) {
+        return ShiftableBlockSymJacobi<T>::create(dim, diag, constraints_mask, context);
+    }
+
 }  // namespace sfem
 
 #endif  // SFEM_SHIFTABLE_JACOBI_HPP

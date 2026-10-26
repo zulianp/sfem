@@ -50,10 +50,14 @@ def run_amg_test(mesh, name_op):
 	restriction =  sfem.create_hierarchical_restriction(space, coarse_space, execution_space)
 	
 	function = sfem.Function(space)
-	function.add_operator(sfem.create_op(space, name_op, execution_space))
+	op = sfem.create_op(space, name_op, execution_space)
+	op.initialize()
+	function.add_operator(op)
 	
 	coarse_function = sfem.Function(coarse_space)
-	coarse_function.add_operator(sfem.create_op(coarse_space, name_op, execution_space))
+	coarse_op = sfem.create_op(coarse_space, name_op, execution_space)
+	coarse_op.initialize()
+	coarse_function.add_operator(coarse_op)
 	
 	x = np.zeros(space.n_dofs(), dtype=sfem.real_t)
 	r = np.zeros(space.n_dofs(), dtype=sfem.real_t)
@@ -84,7 +88,6 @@ if __name__ == '__main__':
 	else:
 		path_mesh = sys.argv[1]
 		name_op = sys.argv[2]
-		mesh = sfem.Mesh()
-		mesh.read(path_mesh)
+		mesh = sfem.Mesh.read(path_mesh)
 		run_amg_test(mesh, name_op)
 	sfem.finalize()

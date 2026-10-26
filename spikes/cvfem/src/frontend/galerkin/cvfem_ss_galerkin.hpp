@@ -739,8 +739,8 @@ namespace cvfem_ss {
     inline void galerkin_gid_from_spaces(const std::shared_ptr<sfem::FunctionSpace> &from_space,  // coarse
                                          const std::shared_ptr<sfem::FunctionSpace> &to_space,    // fine, level 0
                                          GalerkinLevel                              &g) {
-        auto &to_m   = to_space->mesh();
-        auto &from_m = from_space->mesh();
+        auto &to_m   = *to_space->mesh();
+        auto &from_m = *from_space->mesh();
 
         if (!to_space->has_semi_structured_mesh())
             SFEM_ERROR("galerkin_gid_from_spaces: the fine space must be semi-structured\n");

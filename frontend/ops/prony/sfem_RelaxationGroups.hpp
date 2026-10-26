@@ -93,6 +93,8 @@ namespace sfem {
 
         void set_temperature(const std::string &block, const std::string &group, const real_t temperature);
 
+        /// The blocks registered, in name order.
+        std::vector<std::string> block_names() const;
         PronyRelaxation       &relaxation(const std::string &block, const std::string &group);
         const PronyRelaxation &relaxation(const std::string &block, const std::string &group) const;
 

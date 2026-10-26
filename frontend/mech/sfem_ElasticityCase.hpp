@@ -22,7 +22,8 @@ namespace sfem {
     /// execution_space: host                  # host | device
     /// nccl: false                            # device runs under MPI: within a node, the exchange and
     ///                                        # the QP's reductions by NCCL (its set-up costs ~3 s
-    ///                                        # once; pays from ~90,000 QP iterations on Alps)
+    ///                                        # once; pays from ~90,000 QP iterations on Alps);
+    ///                                        # a build with SFEM_ENABLE_NCCL that found NCCL
     /// mesh:
     ///   path: mesh                           # or box: {n: [8, 8, 8], min: [0, 0, 0], max: [1, 1, 1]}
     ///   blocks: [valve]                      # only these blocks of path, and only their nodes (default

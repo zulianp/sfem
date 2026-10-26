@@ -42,7 +42,7 @@ namespace {
         std::dynamic_pointer_cast<sfem::TimeSteppable>(op)->set_time_scheme(scheme);
         // After initialize, which sets every block to the defaults.
         if (op->initialize() != SFEM_SUCCESS) return nullptr;
-        for (const auto &block : fs->mesh_ptr()->blocks()) {
+        for (const auto &block : fs->mesh()->blocks()) {
             op->set_value_in_block(block->name(), "mu", k / 2);
             op->set_value_in_block(block->name(), "lmbda", K - k / 3);
             op->set_value_in_block(block->name(), "eta_s", eta / 2);
@@ -54,7 +54,7 @@ namespace {
     std::shared_ptr<sfem::Op> hand_written(const std::shared_ptr<sfem::FunctionSpace> &fs, const real_t mu, const real_t lambda) {
         auto op = sfem::create_op(fs, "LinearElasticity", sfem::EXECUTION_SPACE_HOST);
         if (!op || op->initialize() != SFEM_SUCCESS) return nullptr;
-        for (const auto &block : fs->mesh_ptr()->blocks()) {
+        for (const auto &block : fs->mesh()->blocks()) {
             op->set_value_in_block(block->name(), "mu", mu);
             op->set_value_in_block(block->name(), "lambda", lambda);
         }

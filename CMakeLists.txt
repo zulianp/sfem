@@ -24,6 +24,16 @@ include(cmake/SFEMBuildTypes.cmake)
 include(cmake/SFEMCMakeFunctions.cmake)
 include(cmake/SFEMDependencies.cmake)
 
+# SFEM_ENABLE_DEV_MODE: warnings are errors in SFEM's own sources (the library, drivers, tests and
+# bindings added below), in C, C++ and CUDA; not in the dependencies added above.
+if(SFEM_ENABLE_DEV_MODE)
+    separate_arguments(SFEM_DEV_CXX_FLAGS UNIX_COMMAND "${SFEM_DEV_FLAGS}")
+    add_compile_options(
+        "$<$<COMPILE_LANGUAGE:CXX>:${SFEM_DEV_CXX_FLAGS}>"
+        "$<$<COMPILE_LANGUAGE:C>:${SFEM_DEV_C_FLAGS}>"
+        "$<$<COMPILE_LANGUAGE:CUDA>:${SFEM_DEV_CUDA_FLAGS}>")
+endif()
+
 if(SFEM_ENABLE_PYTHON)
     include(cmake/SFEMPython.cmake)
 endif()
@@ -273,18 +283,6 @@ list(FILTER SFEM_SOURCES EXCLUDE REGEX "sfem_(Communicator|CRSGraph)\\.cpp$")
 # message(STATUS "SFEM_SOURCES: ${SFEM_SOURCES}")
 # message(STATUS "SFEM_KERNEL_SOURCES: ${SFEM_KERNEL_SOURCES}")
 
-string(TOLOWER ${CMAKE_BUILD_TYPE} LBT)
-
-if(NOT LBT STREQUAL "debug" AND NOT LBT STREQUAL "asan" AND NOT CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
-    if (SFEM_VEC_SIZE STREQUAL "4" OR SFEM_CPU_ARCH STREQUAL "aaarch64")
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS_AVX2}")
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS_AVX2}")
-    elseif (SFEM_VEC_SIZE STREQUAL "8")
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS_AVX512}")
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS_AVX512}")
-    endif()
-endif()
-
 message(STATUS "CMAKE_CXX_FLAGS: ${CMAKE_CXX_FLAGS}")
 message(STATUS "CMAKE_C_FLAGS: ${CMAKE_C_FLAGS}")
 
@@ -322,6 +320,12 @@ target_include_directories(sfem PUBLIC ${SFEM_DEP_INCLUDES})
 # link
 
 target_link_libraries(sfem PUBLIC ${SFEM_DEP_LIBRARIES} ${CMAKE_DL_LIBS})
+
+if(SFEM_ENABLE_CUDA)
+    # Code built against the installed library shares its default stream (SFEMDependencies.cmake).
+    target_compile_definitions(sfem INTERFACE $<INSTALL_INTERFACE:CUDA_API_PER_THREAD_DEFAULT_STREAM>)
+    target_compile_options(sfem INTERFACE $<INSTALL_INTERFACE:$<$<COMPILE_LANGUAGE:CUDA>:--default-stream=per-thread>>)
+endif()
 # message(STATUS "SFEM_DEP_LIBRARIES: ${SFEM_DEP_LIBRARIES}")
 
 ######################################################
@@ -333,11 +337,6 @@ set_target_properties(
     SOVERSION ${SFEM_VERSION_MAJOR})
 
 set(SFEM_TARGETS sfem)
-
-# Optional generated operator plug-ins (not built by default)
-if(SFEM_ENABLE_CODEGEN)
-    # add_subdirectory(operators/generated)
-endif() 
 
 if(SFEM_ENABLE_CUDA)
     message(STATUS "CMAKE_CUDA_ARCHITECTURES: ${CMAKE_CUDA_ARCHITECTURES}")
@@ -369,12 +368,22 @@ if(NOT SFEM_ENABLE_MINIMAL)
         list(APPEND SFEM_EXCLUDED_EXEC "partition")
     endif()
 
+    if(NOT SFEM_ENABLE_RYAML)
+        # The playground reads its case from YAML.
+        list(APPEND SFEM_EXCLUDED_EXEC "playground")
+    endif()
+
     if(SFEM_ENABLE_RESAMPLING)
         file(GLOB RESAMPLING_C_EXAMPLES CONFIGURE_DEPENDS "drivers/resampling/*.c")
         file(GLOB RESAMPLING_CXX_EXAMPLES CONFIGURE_DEPENDS "drivers/resampling/*.cpp")
 
         list(APPEND DRIVERS "${RESAMPLING_C_EXAMPLES}")
         list(APPEND DRIVERS "${RESAMPLING_CXX_EXAMPLES}")
+
+        if(NOT SFEM_ENABLE_MPI)
+            # Written against MPI communicators (Communicator::wrap, distributed reads).
+            list(APPEND SFEM_EXCLUDED_EXEC "gap_from_sdf;geometry_aware_gap_from_sdf;grid_to_mesh")
+        endif()
     endif()
 
     if(SFEM_ENABLE_CUDA)
@@ -495,11 +504,24 @@ if(SFEM_ENABLE_TESTING)
         if(TEST_DRIVER_NAME STREQUAL "sfem_TwoBodyContactTest" AND NOT SFEM_ENABLE_SCCD)
             continue()
         endif()
+        # Tests whose cases are YAML.
+        if(NOT SFEM_ENABLE_RYAML AND TEST_DRIVER_NAME MATCHES
+           "^sfem_(ElasticityCase|PlaygroundCases|PlaygroundContact|LoadProfile|CudaEnergyBSRAssembly)Test$")
+            continue()
+        endif()
         add_executable(${TEST_DRIVER_NAME} ${TEST_DRIVER})
         target_link_libraries(${TEST_DRIVER_NAME} PRIVATE sfem)
         add_test(NAME ${TEST_DRIVER_NAME} COMMAND ${TEST_DRIVER_NAME})
         list(APPEND SFEM_TARGETS ${TEST_DRIVER_NAME})
     endforeach(TEST_DRIVER ${TEST_DRIVERS})
+
+    # Every device launch names its stream (scripts/testing/check_streams.py): a scan of the
+    # sources, run in every configuration.
+    find_package(Python3 COMPONENTS Interpreter QUIET)
+    if(Python3_Interpreter_FOUND)
+        add_test(NAME sfem_StreamGate
+                 COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/testing/check_streams.py ${CMAKE_CURRENT_SOURCE_DIR})
+    endif()
 
     if(TARGET sfem_MaMALTest)
         target_include_directories(sfem_MaMALTest PRIVATE external/ssdf/serial ${CMAKE_CURRENT_BINARY_DIR}/external/ssdf)
@@ -540,6 +562,16 @@ if(SFEM_ENABLE_TESTING)
             COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 4 $<TARGET_FILE:sfem_ParallelSSGMGTest>)
         set_tests_properties(sfem_ParallelSSGMGTest PROPERTIES ENVIRONMENT "OMP_NUM_THREADS=1")
         list(APPEND SFEM_TARGETS sfem_ParallelSSGMGTest)
+
+        if(SFEM_ENABLE_CUDA)
+            add_executable(sfem_ParallelExchangeStreamTest frontend/tests/mpi/sfem_ParallelExchangeStreamTest.cpp)
+            target_link_libraries(sfem_ParallelExchangeStreamTest PRIVATE sfem)
+            add_test(
+                NAME sfem_ParallelExchangeStreamTest
+                COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 4 $<TARGET_FILE:sfem_ParallelExchangeStreamTest>)
+            set_tests_properties(sfem_ParallelExchangeStreamTest PROPERTIES ENVIRONMENT "OMP_NUM_THREADS=1" TIMEOUT 120)
+            list(APPEND SFEM_TARGETS sfem_ParallelExchangeStreamTest)
+        endif()
 
         if(SFEM_ENABLE_RYAML)
             add_executable(sfem_ParallelObstacleTest frontend/tests/mpi/sfem_ParallelObstacleTest.cpp)

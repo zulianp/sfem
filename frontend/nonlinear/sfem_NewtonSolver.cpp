@@ -4,29 +4,30 @@
 #include <cmath>
 #include <vector>
 
-#include "sfem_API.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_OwnedReductions.hpp"
+#include "sfem_blas_factory.hpp"
+#include "sfem_operator_factory.hpp"
 
 namespace sfem {
 
     const char *to_string(const NonlinearReport::Status status) {
         switch (status) {
-            case NonlinearReport::CONVERGED:
+            case NonlinearReport::Status::CONVERGED:
                 return "converged";
-            case NonlinearReport::CONVERGED_AT_RESOLUTION:
+            case NonlinearReport::Status::CONVERGED_AT_RESOLUTION:
                 return "converged_at_resolution";
-            case NonlinearReport::MAX_IT:
+            case NonlinearReport::Status::MAX_IT:
                 return "max_it";
-            case NonlinearReport::ITERATIONS_DONE:
+            case NonlinearReport::Status::ITERATIONS_DONE:
                 return "iterations_done";
-            case NonlinearReport::DIVERGED:
+            case NonlinearReport::Status::DIVERGED:
                 return "diverged";
-            case NonlinearReport::NON_FINITE:
+            case NonlinearReport::Status::NON_FINITE:
                 return "non_finite";
-            case NonlinearReport::LINE_SEARCH_FAILED:
+            case NonlinearReport::Status::LINE_SEARCH_FAILED:
                 return "line_search_failed";
-            case NonlinearReport::STEP_FAILED:
+            case NonlinearReport::Status::STEP_FAILED:
                 return "step_failed";
         }
         return "unknown";
@@ -112,13 +113,13 @@ namespace sfem {
         NonlinearReport report;
         // Every failure below is decided by all ranks together (OwnedReductions::all).
         if (!impl.reductions->all(impl.step->begin_step(context) == SFEM_SUCCESS)) {
-            report.status = NonlinearReport::STEP_FAILED;
+            report.status = NonlinearReport::Status::STEP_FAILED;
             return report;
         }
         // Every evaluation reads x over all local elements: its ghost and aura copies from their
         // owners, once; the steps then keep them.
         if (impl.f->space()->synchronize(x, impl.f->execution_space()) != SFEM_SUCCESS) {
-            report.status = NonlinearReport::STEP_FAILED;
+            report.status = NonlinearReport::Status::STEP_FAILED;
             return report;
         }
 
@@ -126,7 +127,7 @@ namespace sfem {
         if (opts.line_search.enabled) {
             merit = impl.merit();
             if (!merit) {
-                report.status = NonlinearReport::STEP_FAILED;
+                report.status = NonlinearReport::Status::STEP_FAILED;
                 return report;
             }
         }
@@ -148,7 +149,7 @@ namespace sfem {
             for (int it = 0;; ++it) {
                 log.iteration = count;
 
-                if (impl.residual(x, log.measure, known) != SFEM_SUCCESS) return NonlinearReport::STEP_FAILED;
+                if (impl.residual(x, log.measure, known) != SFEM_SUCCESS) return NonlinearReport::Status::STEP_FAILED;
                 report.final_measure = log.measure.value;
                 if (count == 0) {
                     report.reference = log.measure.reference;
@@ -157,14 +158,14 @@ namespace sfem {
                 log.tolerance = tol;
                 impl.notify(log);
 
-                if (!std::isfinite(log.measure.value)) return NonlinearReport::NON_FINITE;
-                if ((log.measure.value <= tol || solved) && log.measure.admissible) return NonlinearReport::CONVERGED;
-                if (log.measure.value > opts.divergence_factor * std::max(report.reference, tol)) return NonlinearReport::DIVERGED;
-                if (it == opts.max_it) return opts.fixed_iterations ? NonlinearReport::ITERATIONS_DONE : NonlinearReport::MAX_IT;
+                if (!std::isfinite(log.measure.value)) return NonlinearReport::Status::NON_FINITE;
+                if ((log.measure.value <= tol || solved) && log.measure.admissible) return NonlinearReport::Status::CONVERGED;
+                if (log.measure.value > opts.divergence_factor * std::max(report.reference, tol)) return NonlinearReport::Status::DIVERGED;
+                if (it == opts.max_it) return opts.fixed_iterations ? NonlinearReport::Status::ITERATIONS_DONE : NonlinearReport::Status::MAX_IT;
 
                 {
                     SFEM_TRACE_SCOPE("NewtonSolver::linearize");
-                    if (!impl.reductions->all(impl.step->linearize(x, r) == SFEM_SUCCESS)) return NonlinearReport::STEP_FAILED;
+                    if (!impl.reductions->all(impl.step->linearize(x, r) == SFEM_SUCCESS)) return NonlinearReport::Status::STEP_FAILED;
                 }
 
                 {
@@ -173,13 +174,13 @@ namespace sfem {
                     log.linear_capped = !impl.reductions->all(impl.step->solve(x, r, dx) == SFEM_SUCCESS);
                 }
                 // The solve sets the owned rows; x + s dx keeps every copy consistent from here.
-                if (impl.f->space()->synchronize(dx, impl.f->execution_space()) != SFEM_SUCCESS) return NonlinearReport::STEP_FAILED;
+                if (impl.f->space()->synchronize(dx, impl.f->execution_space()) != SFEM_SUCCESS) return NonlinearReport::Status::STEP_FAILED;
                 log.linear_iterations = impl.step->iterations();
                 report.linear_iterations += log.linear_iterations;
                 report.capped_linear_solves += log.linear_capped;
                 report.iterations = ++count;
 
-                if (!std::isfinite(impl.reductions->norm2(dx))) return NonlinearReport::STEP_FAILED;
+                if (!std::isfinite(impl.reductions->norm2(dx))) return NonlinearReport::Status::STEP_FAILED;
 
                 if (merit) {
                     const real_t m0    = merit->at(x, r);
@@ -187,19 +188,19 @@ namespace sfem {
                     log.line_search    = line_search.search(*merit, x, dx, m0, slope);
                 } else {
                     log.line_search        = LineSearchResult();
-                    log.line_search.status = LineSearchResult::ACCEPTED;
+                    log.line_search.status = LineSearchResult::Status::ACCEPTED;
                     log.line_search.alpha  = 1;
                 }
 
                 switch (log.line_search.status) {
-                    case LineSearchResult::ACCEPTED:
-                    case LineSearchResult::BEST_DECREASE:
+                    case LineSearchResult::Status::ACCEPTED:
+                    case LineSearchResult::Status::BEST_DECREASE:
                         break;
-                    case LineSearchResult::AT_RESOLUTION:
-                        return NonlinearReport::CONVERGED_AT_RESOLUTION;
-                    case LineSearchResult::NO_DECREASE:
-                    case LineSearchResult::NON_FINITE:
-                        return NonlinearReport::LINE_SEARCH_FAILED;
+                    case LineSearchResult::Status::AT_RESOLUTION:
+                        return NonlinearReport::Status::CONVERGED_AT_RESOLUTION;
+                    case LineSearchResult::Status::NO_DECREASE:
+                    case LineSearchResult::Status::NON_FINITE:
+                        return NonlinearReport::Status::LINE_SEARCH_FAILED;
                 }
 
                 report.min_alpha = std::min(report.min_alpha, log.line_search.alpha);
@@ -232,17 +233,17 @@ namespace sfem {
         impl.blas->copy(ndofs, x, start);
         impl.f->apply_constraints(start);
         if (impl.residual(start, log.measure) != SFEM_SUCCESS) {
-            report.status = NonlinearReport::STEP_FAILED;
+            report.status = NonlinearReport::Status::STEP_FAILED;
             return report;
         }
         report.reference = log.measure.reference;
         StepMeasure at_x;
         if (impl.residual(x, at_x) != SFEM_SUCCESS) {
-            report.status = NonlinearReport::STEP_FAILED;
+            report.status = NonlinearReport::Status::STEP_FAILED;
             return report;
         }
         if (!std::isfinite(at_x.value)) {
-            report.status = NonlinearReport::NON_FINITE;
+            report.status = NonlinearReport::Status::NON_FINITE;
             return report;
         }
         if (!std::isfinite(report.reference)) report.reference = at_x.reference;
@@ -261,13 +262,13 @@ namespace sfem {
             const real_t s = std::min(fraction, 1 - done);
 
             if (impl.residual(x, at_x) != SFEM_SUCCESS) {
-                report.status = NonlinearReport::STEP_FAILED;
+                report.status = NonlinearReport::Status::STEP_FAILED;
                 return report;
             }
             {
                 SFEM_TRACE_SCOPE("NewtonSolver::linearize");
                 if (!impl.reductions->all(impl.step->linearize(x, r) == SFEM_SUCCESS)) {
-                    report.status = NonlinearReport::STEP_FAILED;
+                    report.status = NonlinearReport::Status::STEP_FAILED;
                     return report;
                 }
             }
@@ -277,7 +278,7 @@ namespace sfem {
                 log.linear_capped = !impl.reductions->all(impl.step->solve(x, r, dx) == SFEM_SUCCESS);
             }
             if (impl.f->space()->synchronize(dx, impl.f->execution_space()) != SFEM_SUCCESS) {
-                report.status = NonlinearReport::STEP_FAILED;
+                report.status = NonlinearReport::Status::STEP_FAILED;
                 return report;
             }
             log.linear_iterations = impl.step->iterations();
@@ -285,19 +286,19 @@ namespace sfem {
             report.capped_linear_solves += log.linear_capped;
             report.iterations = count;
             if (!std::isfinite(impl.reductions->norm2(dx))) {
-                report.status = NonlinearReport::STEP_FAILED;
+                report.status = NonlinearReport::Status::STEP_FAILED;
                 return report;
             }
 
             impl.blas->axpy(ndofs, 1, dx, x);
             if (done + s == 1) impl.f->apply_constraints(x);
             log.line_search        = LineSearchResult();
-            log.line_search.status = LineSearchResult::ACCEPTED;
+            log.line_search.status = LineSearchResult::Status::ACCEPTED;
             log.line_search.alpha  = 1;
 
             const auto status = iterate(linear && !log.linear_capped);
-            if (status == NonlinearReport::CONVERGED || status == NonlinearReport::CONVERGED_AT_RESOLUTION ||
-                status == NonlinearReport::ITERATIONS_DONE) {
+            if (status == NonlinearReport::Status::CONVERGED || status == NonlinearReport::Status::CONVERGED_AT_RESOLUTION ||
+                status == NonlinearReport::Status::ITERATIONS_DONE) {
                 done += s;
                 if (done == 1) {
                     report.status = status;

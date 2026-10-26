@@ -7,7 +7,7 @@
 namespace sfem {
 
     std::unique_ptr<Op> CVFEMUpwindConvection::create(const std::shared_ptr<FunctionSpace> &space) {
-        auto mesh = space->mesh_ptr();
+        auto mesh = space->mesh();
 
         assert(1 == space->block_size());
 
@@ -21,7 +21,7 @@ namespace sfem {
         SFEM_READ_ENV(SFEM_VELY, );
         SFEM_READ_ENV(SFEM_VELZ, );
 
-        if (!SFEM_VELX || !SFEM_VELY || (!SFEM_VELZ && space->mesh_ptr()->spatial_dimension() == 3)) {
+        if (!SFEM_VELX || !SFEM_VELY || (!SFEM_VELZ && space->mesh()->spatial_dimension() == 3)) {
             ret->element_type = (smesh::ElemType)space->element_type();
             return ret;
         }
@@ -60,7 +60,7 @@ namespace sfem {
                                            const count_t *const /*rowptr*/,
                                            const idx_t *const   /*colidx*/,
                                            real_t *const        /*values*/) {
-        // auto mesh = space->mesh_ptr();
+        // auto mesh = space->mesh();
 
         // auto graph = space->dof_to_dof_graph();
 
@@ -82,7 +82,7 @@ namespace sfem {
     int CVFEMUpwindConvection::gradient(const real_t *const x, real_t *const out) { return apply(nullptr, x, out); }
 
     int CVFEMUpwindConvection::apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) {
-        auto mesh = space->mesh_ptr();
+        auto mesh = space->mesh();
 
         real_t *vel_[3] = {nullptr, nullptr, nullptr};
 
@@ -105,7 +105,7 @@ namespace sfem {
     }
 
     int CVFEMUpwindConvection::value(const real_t * /*x*/, real_t *const /*out*/) {
-        // auto mesh = space->mesh_ptr();
+        // auto mesh = space->mesh();
 
         // cvfem_convection_assemble_value(element_type,
         //                          mesh->nelements,

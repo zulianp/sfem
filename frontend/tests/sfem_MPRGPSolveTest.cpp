@@ -21,7 +21,9 @@
 #include "sfem_test.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
-#include "sfem_cuda_crs_SpMV.hpp"
+#include <cuda_runtime.h>
+
+#include "sfem_crs_spmv_cuda.hpp"
 #endif
 
 namespace {
@@ -79,7 +81,20 @@ namespace {
 
     enum class HostOp { LIBRARY, ROWS, TEAM };
 
-    int solve(const sfem::ExecutionSpace es, uint64_t *const sum = nullptr, const HostOp host_op = HostOp::LIBRARY) {
+    // On the device, how the CG steps run: the product adds into its output and each step returns
+    // to the host (ADDS); the product writes it whole and the steps return to the host one by one
+    // (STEPS) or run in the execution space until the run ends (RUNS, MPRGPKernels::cg_run).
+    enum class DeviceCg { ADDS, STEPS, RUNS };
+
+    int solve(const sfem::ExecutionSpace es,
+              uint64_t *const            sum        = nullptr,
+              const HostOp               host_op    = HostOp::LIBRARY,
+              const DeviceCg             device     = DeviceCg::ADDS,
+              int *const                 iterations = nullptr,
+              int *const                 runs       = nullptr,
+              void *const                op_stream  = nullptr,
+              void *const                qp_stream  = nullptr) {
+        SFEM_UNUSED(op_stream);  // the device product's
         sfem::SharedBuffer<count_t> rowptr;
         sfem::SharedBuffer<idx_t>   colidx;
         sfem::SharedBuffer<real_t>  values;
@@ -122,7 +137,14 @@ namespace {
 #ifdef SFEM_ENABLE_CUDA
         else {
             // The library's own BSR kernel (1 x 1 blocks): row by row, a fixed summation order.
-            op    = sfem::d_bsr_spmv(m, m, 1, smesh::to_device(rowptr), smesh::to_device(colidx), smesh::to_device(values), real_t(1));
+            op    = sfem::d_bsr_spmv(m,
+                                  m,
+                                  1,
+                                  smesh::to_device(rowptr),
+                                  smesh::to_device(colidx),
+                                  smesh::to_device(values),
+                                  device == DeviceCg::ADDS ? real_t(1) : real_t(0),
+                                  sfem::ExecutionContext::device(op_stream));
             lower = smesh::to_device(lower);
             upper = smesh::to_device(upper);
             b     = smesh::to_device(b);
@@ -130,8 +152,11 @@ namespace {
         }
 #endif
 
-        auto qp        = sfem::create_mprgp(op, es);
+        auto qp = sfem::create_mprgp(
+                op, es == sfem::EXECUTION_SPACE_DEVICE ? sfem::ExecutionContext::device(qp_stream) : sfem::ExecutionContext(es));
         qp->verbose    = true;
+        qp->set_op_overwrites(device != DeviceCg::ADDS);
+        qp->set_device_runs(device == DeviceCg::RUNS);
         qp->check_each = 1 << 30;
         qp->set_upper_bound(upper);
         qp->set_lower_bound(lower);
@@ -142,7 +167,10 @@ namespace {
         SFEM_TEST_ASSERT(qp->apply(b->data(), x->data()) == SFEM_SUCCESS);
 
 #ifdef SFEM_ENABLE_CUDA
-        if (es != sfem::EXECUTION_SPACE_HOST) x = smesh::to_host(x);
+        if (es != sfem::EXECUTION_SPACE_HOST) {
+            cudaDeviceSynchronize();  // the solve's stream may not be the default one
+            x = smesh::to_host(x);
+        }
 #endif
         V xs(x->data(), x->data() + m);
 
@@ -176,6 +204,8 @@ namespace {
         SFEM_TEST_ASSERT(on_lb > 0 && on_ub > 0);
         SFEM_TEST_ASSERT(std::sqrt(kkt) < 1e-10 * std::sqrt(scale));
         if (sum) *sum = checksum(xs);
+        if (iterations) *iterations = qp->iterations();
+        if (runs) *runs = qp->device_run_count();
         return SFEM_TEST_SUCCESS;
     }
 }  // namespace
@@ -218,6 +248,48 @@ int test_host_team_solve() {
 
 #ifdef SFEM_ENABLE_CUDA
 int test_device_solve() { return solve(sfem::EXECUTION_SPACE_DEVICE); }
+
+// The CG steps in runs on the device, without returning to the host between them (a CUDA graph
+// whose loop the device's decision continues), against the same steps returning to it one by one:
+// the same bits, the same iterations, and the runs taken there.
+int test_device_runs() {
+    uint64_t steps = 0, runs = 0;
+    int      it_steps = 0, it_runs = 0, n_steps = 0, n_runs = 0;
+    SFEM_TEST_ASSERT(solve(sfem::EXECUTION_SPACE_DEVICE, &steps, HostOp::LIBRARY, DeviceCg::STEPS, &it_steps, &n_steps) == SFEM_TEST_SUCCESS);
+    SFEM_TEST_ASSERT(solve(sfem::EXECUTION_SPACE_DEVICE, &runs, HostOp::LIBRARY, DeviceCg::RUNS, &it_runs, &n_runs) == SFEM_TEST_SUCCESS);
+    printf("  steps one by one: %d iterations; in runs: %d iterations in %d runs\n", it_steps, it_runs, n_runs);
+    SFEM_TEST_ASSERT(n_steps == 0 && n_runs > 0);
+    SFEM_TEST_ASSERT(it_runs == it_steps);
+    SFEM_TEST_ASSERT(runs == steps);
+    return SFEM_TEST_SUCCESS;
+}
+
+// The product on a stream of its own, the solver on another (the default) or on the same: MPRGP
+// orders the two, so each way the runs are taken and give the same bits as the steps one by one.
+int test_device_runs_across_streams() {
+    cudaStream_t s;
+    SFEM_TEST_ASSERT(cudaStreamCreateWithFlags(&s, cudaStreamNonBlocking) == cudaSuccess);
+    uint64_t steps = 0, apart = 0, together = 0;
+    int      it = 0, n_steps = 0, n_apart = 0, n_together = 0;
+    SFEM_TEST_ASSERT(solve(sfem::EXECUTION_SPACE_DEVICE, &steps, HostOp::LIBRARY, DeviceCg::STEPS, &it, &n_steps) ==
+                     SFEM_TEST_SUCCESS);
+    SFEM_TEST_ASSERT(
+            solve(sfem::EXECUTION_SPACE_DEVICE, &apart, HostOp::LIBRARY, DeviceCg::RUNS, &it, &n_apart, (void *)s, nullptr) ==
+            SFEM_TEST_SUCCESS);
+    SFEM_TEST_ASSERT(solve(sfem::EXECUTION_SPACE_DEVICE,
+                           &together,
+                           HostOp::LIBRARY,
+                           DeviceCg::RUNS,
+                           &it,
+                           &n_together,
+                           (void *)s,
+                           (void *)s) == SFEM_TEST_SUCCESS);
+    printf("  product on its own stream: %d runs; product and solver on one: %d runs\n", n_apart, n_together);
+    cudaStreamDestroy(s);
+    SFEM_TEST_ASSERT(n_apart > 0 && n_together > 0);
+    SFEM_TEST_ASSERT(apart == steps && together == steps);
+    return SFEM_TEST_SUCCESS;
+}
 #endif
 
 int main(int argc, char *argv[]) {
@@ -226,6 +298,8 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_host_team_solve);
 #ifdef SFEM_ENABLE_CUDA
     SFEM_RUN_TEST(test_device_solve);
+    SFEM_RUN_TEST(test_device_runs);
+    SFEM_RUN_TEST(test_device_runs_across_streams);
 #endif
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();

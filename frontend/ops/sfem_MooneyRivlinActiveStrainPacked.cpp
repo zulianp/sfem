@@ -63,15 +63,15 @@ namespace sfem {
         return ret;
     }
 
-    std::shared_ptr<Op> MooneyRivlinActiveStrainPacked::lor_op(const std::shared_ptr<FunctionSpace> &space) {
+    std::shared_ptr<Op> MooneyRivlinActiveStrainPacked::lor(const std::shared_ptr<FunctionSpace> &space) {
         auto ret            = std::make_shared<MooneyRivlinActiveStrainPacked>(space);
-        ret->impl_->domains = impl_->domains->lor_op(space, {});
+        ret->impl_->domains = impl_->domains->lor(space, {});
         return ret;
     }
 
-    std::shared_ptr<Op> MooneyRivlinActiveStrainPacked::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
+    std::shared_ptr<Op> MooneyRivlinActiveStrainPacked::derefine(const std::shared_ptr<FunctionSpace> &space) {
         auto ret            = std::make_shared<MooneyRivlinActiveStrainPacked>(space);
-        ret->impl_->domains = impl_->domains->derefine_op(space, {});
+        ret->impl_->domains = impl_->domains->derefine(space, {});
         return ret;
     }
 
@@ -123,7 +123,7 @@ namespace sfem {
         if (impl_->Fa.empty()) {
             impl_->Fa.resize(impl_->packed->n_blocks());
             impl_->Fa_stride.resize(impl_->packed->n_blocks(), (ptrdiff_t)0);
-            int dim = impl_->space->mesh_ptr()->spatial_dimension();
+            int dim = impl_->space->mesh()->spatial_dimension();
 
             impl_->Fa[0] = sfem::create_host_buffer<real_t>(dim*dim);
             for(int d1 = 0; d1 < dim; d1++) {
@@ -155,7 +155,7 @@ namespace sfem {
 
     int MooneyRivlinActiveStrainPacked::hessian_diag(const real_t *const x, real_t *const values) {
         SFEM_TRACE_SCOPE("MooneyRivlinActiveStrainPacked::hessian_diag");
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) -> int {
             if (domain.element_type != smesh::HEX8) {
                 SFEM_ERROR("MooneyRivlinActiveStrainPacked::hessian_diag only implemented for smesh::HEX8\n");
@@ -196,7 +196,7 @@ namespace sfem {
 
     int MooneyRivlinActiveStrainPacked::update(const real_t *const u) {
         SFEM_TRACE_SCOPE("MooneyRivlinActiveStrainPacked::update");
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) {
             if (domain.element_type != smesh::HEX8) {
                 SFEM_ERROR("MooneyRivlinActiveStrainPacked::update only implemented for smesh::HEX8\n");
@@ -234,7 +234,7 @@ namespace sfem {
 
     int MooneyRivlinActiveStrainPacked::gradient(const real_t *const x, real_t *const out) {
         SFEM_TRACE_SCOPE("MooneyRivlinActiveStrainPacked::gradient");
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) {
             if (domain.element_type != smesh::HEX8) {
                 SFEM_ERROR("MooneyRivlinActiveStrainPacked::gradient only implemented for smesh::HEX8\n");
@@ -300,7 +300,7 @@ namespace sfem {
 
     int MooneyRivlinActiveStrainPacked::value(const real_t *x, real_t *const out) {
         SFEM_TRACE_SCOPE("MooneyRivlinActiveStrainPacked::value");
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) -> int {
             if (domain.element_type != smesh::HEX8) {
                 SFEM_ERROR("MooneyRivlinActiveStrainPacked::value only implemented for smesh::HEX8\n");
@@ -343,7 +343,7 @@ namespace sfem {
                                                        const real_t *const steps,
                                                        real_t *const       out) {
         SFEM_TRACE_SCOPE("MooneyRivlinActiveStrainPacked::value_steps");
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) -> int {
             if (domain.element_type != smesh::HEX8) {
                 SFEM_ERROR("MooneyRivlinActiveStrainPacked::value_steps only implemented for smesh::HEX8\n");
@@ -423,7 +423,7 @@ namespace sfem {
                                                        const idx_t *const   colidx,
                                                        real_t *const        values) {
         SFEM_TRACE_SCOPE("MooneyRivlinActiveStrainPacked::hessian_bsr");
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) -> int {
             if (domain.element_type != smesh::HEX8) {
                 SFEM_ERROR("MooneyRivlinActiveStrainPacked::hessian_bsr only implemented for smesh::HEX8\n");
@@ -466,7 +466,7 @@ namespace sfem {
                                                             real_t **const       diag_values,
                                                             real_t **const       off_diag_values) {
         SFEM_TRACE_SCOPE("MooneyRivlinActiveStrainPacked::hessian_bcrs_sym");
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) -> int {
             if (domain.element_type != smesh::HEX8) {
                 SFEM_ERROR("MooneyRivlinActiveStrainPacked::hessian_bcrs_sym only implemented for smesh::HEX8\n");

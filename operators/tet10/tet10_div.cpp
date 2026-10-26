@@ -1,4 +1,5 @@
 #include <assert.h>
+#include "smesh_base.hpp"
 #include <stddef.h>
 #include <stdio.h>
 
@@ -424,7 +425,7 @@ void tet10_div_apply(const ptrdiff_t nelements,
                      real_t *const values) {
     SFEM_UNUSED(nnodes);
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     idx_t ev[10];
     real_t element_vector[10];
@@ -486,7 +487,7 @@ void tet10_div_apply(const ptrdiff_t nelements,
         }
     }
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
     printf("tet10_div.c: tet10_div_apply\t%g seconds\n", tock - tick);
 }
 
@@ -574,7 +575,7 @@ void tet10_integrate_div(const ptrdiff_t nelements,
                          real_t *const value) {
         SFEM_UNUSED(nnodes);
 
-        double tick = MPI_Wtime();
+        double tick = smesh::time_seconds();
 
         idx_t ev[10];
         real_t element_ux[10];
@@ -638,7 +639,7 @@ void tet10_integrate_div(const ptrdiff_t nelements,
             *value += element_scalar;
         }
 
-        double tock = MPI_Wtime();
+        double tock = smesh::time_seconds();
         printf("tet10_div.c: tet10_integrate_div\t%g seconds\n", tock - tick);
 }
 

@@ -1,8 +1,9 @@
 #include "cvfem_tri3_convection.hpp"
+#include "smesh_base.hpp"
 
 #include "sfem_base.hpp"
 #include "sfem_vec.hpp"
-#include "sortreduce.hpp"
+#include "sfem_sortreduce.hpp"
 
 #include <assert.h>
 #include <mpi.h>
@@ -121,7 +122,7 @@ static SFEM_INLINE idx_t find_col(const idx_t key, const idx_t *const row, const
         // assert(key == row[k]);
     } else {
         // Use this for larger number of dofs per row
-        return find_idx_binary_search(key, row, lenrow);
+        return sfem::find_idx_binary_search(key, row, lenrow);
     }
 }
 
@@ -158,7 +159,7 @@ void cvfem_tri3_convection_assemble_hessian(const ptrdiff_t nelements,
                                             real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
 #pragma omp parallel
     {
@@ -218,7 +219,7 @@ void cvfem_tri3_convection_assemble_hessian(const ptrdiff_t nelements,
         }
     }
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
     printf("cvfem_tri3_convection.c: cvfem_tri3_convection_assemble_hessian\t%g seconds\n",
            tock - tick);
 }

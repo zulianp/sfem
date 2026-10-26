@@ -220,7 +220,7 @@ int test_two_body_contact() {
 
     auto      f     = create_function(env, es, env);
     auto      space = f->space();
-    auto      mesh  = space->mesh_ptr();
+    auto      mesh  = space->mesh();
 
     auto displacement     = sfem::create_buffer<real_t>(space->n_dofs(), es);
     auto rhs              = sfem::create_buffer<real_t>(space->n_dofs(), es);

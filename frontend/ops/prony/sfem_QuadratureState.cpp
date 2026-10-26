@@ -2,10 +2,13 @@
 
 #include <algorithm>
 #include <cstring>
+#include <vector>
 
 #include "sfem_prony_kernels.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
+#include <cuda_runtime_api.h>
+
 #include "sfem_prony_kernels_cuda.hpp"
 #endif
 
@@ -134,14 +137,31 @@ namespace sfem {
     }
 
     void QuadratureState::decode(const int t, real_t *const values) const {
-        if (es_ != EXECUTION_SPACE_HOST) SFEM_ERROR("QuadratureState::decode is a host convenience\n");
+        const ptrdiff_t  tensor_bytes = values_per_tensor() * n_elements_ * bytes_per_value(storage_);
+        const uint8_t   *data         = data_->data() + t * tensor_bytes;
+        const scaling_t *s            = scales_->data() + t * n_elements_;
+        // On the device the encoded tensor and its scales come to the host, which decodes them
+        // as it does its own.
+        std::vector<uint8_t>   host_data;
+        std::vector<scaling_t> host_scales;
+        if (es_ != EXECUTION_SPACE_HOST) {
+#ifdef SFEM_ENABLE_CUDA
+            host_data.resize(tensor_bytes);
+            host_scales.resize(n_elements_);
+            if (cudaMemcpy(host_data.data(), data, tensor_bytes, cudaMemcpyDeviceToHost) != cudaSuccess ||
+                cudaMemcpy(host_scales.data(), s, n_elements_ * sizeof(scaling_t), cudaMemcpyDeviceToHost) != cudaSuccess) {
+                SFEM_ERROR("QuadratureState::decode: copying the tensor from the device failed\n");
+            }
+            data = host_data.data();
+            s    = host_scales.data();
+#else
+            SFEM_ERROR("QuadratureState::decode: device state without CUDA\n");
+#endif
+        }
         dispatch_history_codec(storage_, [&](auto codec) {
             using Codec = decltype(codec);
-            prony::decode<Codec>(values_per_tensor(),
-                                 n_elements_,
-                                 &data<Codec>()[t * values_per_tensor() * n_elements_],
-                                 &scales()[t * n_elements_],
-                                 values);
+            prony::decode<Codec>(
+                    values_per_tensor(), n_elements_, reinterpret_cast<const typename Codec::storage_t *>(data), s, values);
             return 0;
         });
     }

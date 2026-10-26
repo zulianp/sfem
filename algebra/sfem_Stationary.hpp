@@ -10,17 +10,18 @@
 #include "sfem_MatrixFreeLinearSolver.hpp"
 #include "sfem_ParallelOperator.hpp"
 #include "sfem_aliases.hpp"
-#include "sfem_openmp_blas.hpp"
+#include "sfem_BLAS_openmp.hpp"
+#include "sfem_operator_factory.hpp"
 
 namespace sfem {
 
     template <typename T>
-    static std::shared_ptr<Operator<T>> diag_op(const SharedBuffer<T>& diagonal_scaling, const ExecutionSpace es);
-
-    template <typename T>
     class StationaryIteration final : public MatrixFreeLinearSolver<T> {
     public:
-        ExecutionSpace               execution_space_{EXECUTION_SPACE_INVALID};
+        /// Built for the execution space es: op preconditioned by preconditioner.
+        static std::shared_ptr<StationaryIteration<T>> create(const std::shared_ptr<Operator<T>> &op,
+                                                              const std::shared_ptr<Operator<T>> &preconditioner,
+                                                              const ExecutionSpace                es);
         ptrdiff_t                    n_dofs{SFEM_PTRDIFF_INVALID};
         ptrdiff_t                    n_alloc{SFEM_PTRDIFF_INVALID};
         int                          max_it{3};
@@ -56,8 +57,7 @@ namespace sfem {
         }
 
         void default_init() {
-            blas = make_openmp_blas<T>();
-            execution_space_ = EXECUTION_SPACE_HOST;
+            blas = OpenMPBLAS<T>::create();
         }
 
         /* Operator */
@@ -94,7 +94,7 @@ namespace sfem {
         }
         inline std::ptrdiff_t rows() const override { return n_dofs; }
         inline std::ptrdiff_t cols() const override { return n_dofs; }
-        ExecutionSpace        execution_space() const override { return execution_space_; }
+        ExecutionContext      execution_context() const override { return blas ? blas->context() : ExecutionContext(EXECUTION_SPACE_INVALID); }
 
         /* MatrixFreeLinearSolver */
         void set_op(const std::shared_ptr<Operator<T>>& op) override {
@@ -152,6 +152,13 @@ namespace sfem {
         solver->default_init();
         return solver;
     }
+    template <typename T>
+    std::shared_ptr<StationaryIteration<T>> create_stationary(const std::shared_ptr<Operator<T>> &op,
+                                                              const std::shared_ptr<Operator<T>> &preconditioner,
+                                                              const ExecutionSpace                es) {
+        return StationaryIteration<T>::create(op, preconditioner, es);
+    }
+
 }  // namespace sfem
 
 #endif  // SFEM_STATIONARY_HPP

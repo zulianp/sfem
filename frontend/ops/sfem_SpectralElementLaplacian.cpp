@@ -39,7 +39,7 @@ namespace sfem {
         if (SFEM_PRINT_THROUGHPUT && calls) {
             printf("SpectralElementLaplacian[%d]::apply called %ld times. Total: %g [s], "
                    "Avg: %g [s], TP %g [MDOF/s]\n",
-                   smesh::semistructured_level(space->mesh()),
+                   smesh::semistructured_level(*space->mesh()),
                    calls,
                    total_time,
                    total_time / calls,
@@ -47,16 +47,16 @@ namespace sfem {
         }
     }
 
-    std::shared_ptr<Op> SpectralElementLaplacian::lor_op(const std::shared_ptr<FunctionSpace> & /*space*/) {
-        SMESH_ERROR("SpectralElementLaplacian::lor_op NOT IMPLEMENTED!\n");
+    std::shared_ptr<Op> SpectralElementLaplacian::lor(const std::shared_ptr<FunctionSpace> & /*space*/) {
+        SMESH_ERROR("SpectralElementLaplacian::lor NOT IMPLEMENTED!\n");
         return nullptr;
     }
 
-    std::shared_ptr<Op> SpectralElementLaplacian::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
-        SFEM_TRACE_SCOPE("SpectralElementLaplacian::derefine_op");
+    std::shared_ptr<Op> SpectralElementLaplacian::derefine(const std::shared_ptr<FunctionSpace> &space) {
+        SFEM_TRACE_SCOPE("SpectralElementLaplacian::derefine");
 
         if (space->n_blocks() > 1) {
-            SFEM_ERROR("SpectralElementLaplacian::derefine_op: multi-block is not implemented\n");
+            SFEM_ERROR("SpectralElementLaplacian::derefine: multi-block is not implemented\n");
             return nullptr;
         }
 
@@ -100,7 +100,7 @@ namespace sfem {
 
         assert(is_semistructured_type(element_type));  // REMOVEME once generalized approach
 
-        auto &ssm = space->mesh();
+        auto &ssm = *space->mesh();
         if (ssm.n_blocks() != 1) {
             SFEM_ERROR("SpectralElementLaplacian::apply: multi-block is not implemented\n");
             return SFEM_FAILURE;

@@ -61,7 +61,7 @@ namespace sfem {
       return matched;
     }
 
-    void material_defaults(real_t *const values) {
+    [[maybe_unused]] void material_defaults(real_t *const values) {
       values[0] = 1;
       values[1] = 0.001;
       values[2] = 1;
@@ -71,10 +71,12 @@ namespace sfem {
       values[6] = 0;
     }
 
+    // derefine copies the parameters by name, with or without YAML.
+    [[maybe_unused]] constexpr int N_DEFINED_MATERIAL_PARAMETERS = 7;
+    [[maybe_unused]] constexpr int N_MATERIAL_PARAMETERS = 7;
+    [[maybe_unused]] static const char *const MATERIAL_PARAMETER_NAMES[N_MATERIAL_PARAMETERS] = {"rho", "nu", "dt", "convection_scale", "f0", "f1", "f2"};
+
 #ifdef SFEM_ENABLE_RYAML
-    constexpr int N_DEFINED_MATERIAL_PARAMETERS = 7;
-    constexpr int N_MATERIAL_PARAMETERS = 7;
-    static const char *const MATERIAL_PARAMETER_NAMES[N_MATERIAL_PARAMETERS] = {"rho", "nu", "dt", "convection_scale", "f0", "f1", "f2"};
 
     bool yaml_read_real(const ryml::ConstNodeRef &node,
               const char *const key,
@@ -218,7 +220,7 @@ namespace sfem {
                                   const bool requested_jacobian,
                                   const bool requested_metric_soa,
                                   const bool requested_metric_aos) {
-      auto mesh = space->mesh_ptr();
+      auto mesh = space->mesh();
       for (auto &entry : domains.domains()) {
         const bool forced = geometry_is_forced_affine(entry.second.element_type);
         const bool needs_jacobian = requested_jacobian || forced;
@@ -345,7 +347,7 @@ namespace sfem {
 
   std::unique_ptr<Op> GeneratedNavierStokes::create(const std::shared_ptr<FunctionSpace> &space) {
     const ptrdiff_t expected_block_size =
-        block_size_for_dim(space->mesh_ptr()->spatial_dimension());
+        block_size_for_dim(space->mesh()->spatial_dimension());
     if (space->block_size() != expected_block_size) {
       SFEM_ERROR("GeneratedNavierStokes requires block_size=%ld\n",
                        static_cast<long>(expected_block_size));
@@ -377,7 +379,7 @@ namespace sfem {
       return total;
     }
 
-    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+    const int dim = impl_->space->mesh()->spatial_dimension();
     impl_->domains->iterate([&](const OpDomain &domain) {
       const ptrdiff_t nelements = domain.block->n_elements();
       if (dim == 2) {
@@ -408,7 +410,7 @@ namespace sfem {
       return total;
     }
 
-    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+    const int dim = impl_->space->mesh()->spatial_dimension();
     impl_->domains->iterate([&](const OpDomain &domain) {
       const ptrdiff_t nelements = domain.block->n_elements();
       if (dim == 2) {
@@ -439,7 +441,7 @@ namespace sfem {
       return total;
     }
 
-    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+    const int dim = impl_->space->mesh()->spatial_dimension();
     impl_->domains->iterate([&](const OpDomain &domain) {
       const ptrdiff_t nelements = domain.block->n_elements();
       if (dim == 2) {
@@ -470,7 +472,7 @@ namespace sfem {
       return total;
     }
 
-    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+    const int dim = impl_->space->mesh()->spatial_dimension();
     impl_->domains->iterate([&](const OpDomain &domain) {
       const ptrdiff_t nelements = domain.block->n_elements();
       if (dim == 2) {
@@ -549,7 +551,7 @@ namespace sfem {
       return SFEM_FAILURE;
     }
     impl_->current = state;
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const geom_t *const *adjugate = nullptr;
@@ -617,7 +619,7 @@ namespace sfem {
       SFEM_ERROR("GeneratedNavierStokes requires a previous state\n");
       return SFEM_FAILURE;
     }
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
     auto points = element_points(mesh);
 
     return impl_->domains->iterate([&](const OpDomain &domain) {
@@ -697,8 +699,8 @@ namespace sfem {
     impl_->domains->set_value_in_block(block_name, var_name, value);
   }
 
-  std::shared_ptr<Op> GeneratedNavierStokes::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
-    SFEM_TRACE_SCOPE("GeneratedNavierStokes::derefine_op");
+  std::shared_ptr<Op> GeneratedNavierStokes::derefine(const std::shared_ptr<FunctionSpace> &space) {
+    SFEM_TRACE_SCOPE("GeneratedNavierStokes::derefine");
     auto ret = std::make_shared<GeneratedNavierStokes>(space);
     if (ret->initialize() != SFEM_SUCCESS) return nullptr;
     for (const auto &entry : impl_->domains->domains()) {

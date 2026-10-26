@@ -35,7 +35,7 @@ namespace sfem {
         static smesh::ElemType standard_base_elem(const smesh::ElemType element_type) { return macro_base_elem(element_type); }
 
         static std::shared_ptr<smesh::Mesh> element_matrix_mesh(const std::shared_ptr<FunctionSpace> &space) {
-            auto mesh = space->has_semi_structured_mesh() ? smesh::derefine(space->mesh_ptr(), 1) : space->mesh_ptr();
+            auto mesh = space->has_semi_structured_mesh() ? smesh::derefine(space->mesh(), 1) : space->mesh();
             if (mesh && mesh->element_type(0) == smesh::PROTEUS_HEX8) {
                 mesh = smesh::sshex_to_hex8(mesh);
             }
@@ -48,7 +48,7 @@ namespace sfem {
                                         const real_t                                   lambda,
                                         const std::vector<std::string>                &block_names,
                                         std::vector<std::shared_ptr<Buffer<scalar_t>>> &category_stencils) {
-            auto &ssm  = space->mesh();
+            auto &ssm  = *space->mesh();
             auto  mesh = element_matrix_mesh(space);
             if (!mesh) {
                 return SFEM_FAILURE;
@@ -124,7 +124,7 @@ namespace sfem {
         if (SFEM_PRINT_THROUGHPUT && calls) {
             printf("SemiStructuredHyTeGLinearElasticity[%d]::apply() called %ld times. Total: %g [s], "
                    "Avg: %g [s], TP %g [MDOF/s]\n",
-                   smesh::semistructured_level(space->mesh()),
+                   smesh::semistructured_level(*space->mesh()),
                    calls,
                    total_time,
                    total_time / calls,
@@ -132,14 +132,14 @@ namespace sfem {
         }
     }
 
-    std::shared_ptr<Op> SemiStructuredHyTeGLinearElasticity::lor_op(const std::shared_ptr<FunctionSpace> &) {
-        SFEM_ERROR("[Error] LinearElasticityHyTeG::lor_op NOT IMPLEMENTED!\n");
+    std::shared_ptr<Op> SemiStructuredHyTeGLinearElasticity::lor(const std::shared_ptr<FunctionSpace> &) {
+        SFEM_ERROR("[Error] LinearElasticityHyTeG::lor NOT IMPLEMENTED!\n");
         return nullptr;
     }
 
-    std::shared_ptr<Op> SemiStructuredHyTeGLinearElasticity::derefine_op(
+    std::shared_ptr<Op> SemiStructuredHyTeGLinearElasticity::derefine(
             const std::shared_ptr<FunctionSpace> &space) {
-        SFEM_TRACE_SCOPE("SemiStructuredHyTeGLinearElasticity::derefine_op");
+        SFEM_TRACE_SCOPE("SemiStructuredHyTeGLinearElasticity::derefine");
 
         if (space->has_semi_structured_mesh()) {
             auto ret          = std::make_shared<SemiStructuredHyTeGLinearElasticity>(space);
@@ -185,7 +185,7 @@ namespace sfem {
     int SemiStructuredHyTeGLinearElasticity::hessian_diag(const real_t *const, real_t *const out) {
         SFEM_TRACE_SCOPE("SemiStructuredHyTeGLinearElasticity::hessian_diag");
 
-        auto &ssm = space->mesh();
+        auto &ssm = *space->mesh();
         int   err = SFEM_SUCCESS;
         for (size_t b = 0; b < category_stencils.size(); ++b) {
             if (!category_stencils[b]) {
@@ -215,7 +215,7 @@ namespace sfem {
     int SemiStructuredHyTeGLinearElasticity::hessian_block_diag_sym(const real_t *const, real_t *const values) {
         SFEM_TRACE_SCOPE("SemiStructuredHyTeGLinearElasticity::hessian_block_diag_sym");
 
-        auto &ssm = space->mesh();
+        auto &ssm = *space->mesh();
         int   err = SFEM_SUCCESS;
         for (size_t b = 0; b < category_stencils.size(); ++b) {
             if (!category_stencils[b]) {
@@ -254,7 +254,7 @@ namespace sfem {
         SFEM_TRACE_SCOPE("SemiStructuredHyTeGLinearElasticity::apply");
 
         assert(is_semistructured_type(element_type));
-        auto &ssm = space->mesh();
+        auto &ssm = *space->mesh();
 
         double tick = smesh::time_seconds();
         int    err  = SFEM_SUCCESS;

@@ -293,7 +293,7 @@ namespace sfem {
 
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
 
-        ExecutionSpace execution_space() const override { return execution_space_; }
+        ExecutionContext execution_context() const override { return execution_space_; }
 
         void print(std::ostream& os = std::cout) const {
             os << "BSRSoA" << std::endl;

@@ -3,7 +3,7 @@
 
 namespace sfem {
   void register_GeneratedNeumann_cuda_generated_op() {
-    Factory::register_op("gpu:GeneratedNeumann", GPUGeneratedNeumann::create);
-    Factory::register_op("gpu:ss:GeneratedNeumann", GPUGeneratedNeumann::create);
+    OpFactory::register_op("gpu:GeneratedNeumann", GPUGeneratedNeumann::create);
+    OpFactory::register_op("gpu:ss:GeneratedNeumann", GPUGeneratedNeumann::create);
   }
 }  // namespace sfem

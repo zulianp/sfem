@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import pysfem as sfem
+import sfem.mesh.box_mesh as box_mesh
 import numpy as np
 from numpy import linalg
 from time import perf_counter
@@ -12,58 +13,68 @@ idx_t = np.int32
 def solve_linear_elasticity(options):
 	tick = perf_counter()
 
-	sfem.init()
-	m = sfem.Mesh()
-
 	path = options.input_mesh
-	m.read(path)
-	# m.convert_to_macro_element_mesh()
+	if path == "gen:box":
+		idx, points = box_mesh.create(2, 1, 1, 20, 10, 10, "tet4")
+		m = sfem.create_mesh("TET4", np.array(idx), np.array(points))
+	else:
+		m = sfem.Mesh.read(path)
+		# m.convert_to_macro_element_mesh()
 
-	sinlet = np.fromfile(f'{path}/sidesets_aos/sinlet.raw', dtype=idx_t)
-	soutlet = np.fromfile(f'{path}/sidesets_aos/soutlet.raw', dtype=idx_t)
+	# Clamped at x = 0, pulled at the other end of the bar.
+	x_max = float(np.max(sfem.points(m, 0)))
+	eps = 1e-6 * x_max
+	sinlet = sfem.Sideset.create_from_selector(m, lambda x, y, z: x < eps)
+	soutlet = sfem.Sideset.create_from_selector(m, lambda x, y, z: x > x_max - eps)
 
 	fs = sfem.FunctionSpace(m, m.spatial_dimension())
 	fun = sfem.Function(fs)
 	fun.set_output_dir(options.output_dir)
+	# The displacement is written one component per file.
+	fun.output().enable_AoS_to_SoA(True)
 
 	# op = sfem.create_op(fs, "LinearElasticity")
 	op = sfem.create_op(fs, "NeoHookeanOgden")
+	op.initialize()
 	fun.add_operator(op)
 
-	bc = sfem.DirichletConditions(fs)
+	conditions = []
+	for component in range(0, m.spatial_dimension()):
+		c = sfem.DirichletCondition()
+		c.sidesets = sinlet
+		c.component = component
+		c.value = 0.
+		conditions.append(c)
+	bc = sfem.create_dirichlet_conditions(fs, conditions, sfem.ExecutionSpace.EXECUTION_SPACE_HOST)
+	fun.add_constraint(bc)
 
-	sfem.add_condition(bc, sinlet, 0, 0.);
-	sfem.add_condition(bc, sinlet, 1, 0.);
-	sfem.add_condition(bc, sinlet, 2, 0.);
-
-	# sfem.add_condition(bc, soutlet, 0, 1);
-	# sfem.add_condition(bc, soutlet, 1, 0.);
-	# sfem.add_condition(bc, soutlet, 2, 0.);
-
-	fun.add_dirichlet_conditions(bc)
-
-	nc = sfem.NeumannConditions(fs)
-	sfem.add_condition(nc, soutlet, 0, 1)
-	fun.add_operator(nc)
+	traction = sfem.NeumannCondition()
+	traction.sidesets = soutlet
+	traction.component = 0
+	traction.value = 1
+	fun.add_operator(sfem.create_neumann_conditions(fs, [traction], sfem.ExecutionSpace.EXECUTION_SPACE_HOST))
 
 	x = np.zeros(fs.n_dofs())
+	# A Buffer over x: the library reads and writes it in place.
+	xb = sfem.view(x)
+
 	cg = sfem.ConjugateGradient()
 	cg.default_init()
 	cg.set_max_it(50)
 	cg.set_rtol(1e-2)
 	cg.set_atol(1e-12)
 	cg.set_verbose(False)
-	
+
 	damping = 1
 
 	# use_prec = True
 	use_prec = False
 	if use_prec:
 		d = np.zeros(fs.n_dofs())
-		sfem.hessian_diag(fun, x, d)
-		prec = sfem.diag(1./d)
+		sfem.hessian_diag(fun, xb, sfem.view(d))
+		prec = sfem.diag(sfem.view(1./d))
 		cg.set_preconditioner_op(prec)
-	
+
 		print(np.max(d))
 		print(np.min(d))
 		print(np.max(np.abs(d)))
@@ -72,17 +83,20 @@ def solve_linear_elasticity(options):
 	# Newton iteration
 	g = np.zeros(fs.n_dofs())
 	c = np.zeros(fs.n_dofs())
+	gb, cb = sfem.view(g), sfem.view(c)
 	for i in range(0, 100):
 		g[:] = 0
-		sfem.gradient(fun, x, g)
-		
+		sfem.apply_constraints(fun, xb)
+		sfem.gradient(fun, xb, gb)
+		sfem.apply_zero_constraints(fun, gb)
+
 		# As the pointer of x is used not necessary to be in the loop
 		# But maybe there will be some side effect in the future
-		lop = sfem.make_op(fun, x)
+		lop = sfem.make_op(fun, xb)
 		cg.set_op(lop)
 
 		c[:] = 0
-		sfem.apply(cg, g, c)
+		sfem.apply(cg, gb, cb)
 		x -= damping * c
 
 		norm_g = linalg.norm(g)
@@ -91,10 +105,9 @@ def solve_linear_elasticity(options):
 			break
 
 	# Write result to disk
-	sfem.report_solution(fun, x)
+	sfem.report_solution(fun, xb)
 
 	tock = perf_counter()
-
 	print(f'Summary: {fs.n_dofs()} dofs, {round(tock - tick, 4)} seconds')
 
 class Opts:
@@ -110,7 +123,7 @@ if __name__ == '__main__':
 
 	options = Opts()
 	options.input_mesh = sys.argv[1]
-	options.output = sys.argv[2]
+	options.output_dir = sys.argv[2]
 	
 	try:
 	    opts, args = getopt.getopt(
@@ -127,4 +140,6 @@ if __name__ == '__main__':
 	        print(usage)
 	        sys.exit()
 
+	sfem.init()
 	solve_linear_elasticity(options)
+	sfem.finalize()

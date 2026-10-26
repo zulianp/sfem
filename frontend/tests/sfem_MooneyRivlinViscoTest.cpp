@@ -43,9 +43,9 @@ std::shared_ptr<sfem::Output> create_output(const std::shared_ptr<sfem::Function
     output->set_output_dir(output_dir);
 
     if (fs->has_semi_structured_mesh()) {
-        smesh::semistructured_export_as_standard(fs->mesh_ptr(), output_dir);
+        smesh::semistructured_export_as_standard(fs->mesh(), output_dir);
     } else {
-        fs->mesh_ptr()->write(output_dir);
+        fs->mesh()->write(output_dir);
     }
     return output;
 }
@@ -169,8 +169,8 @@ int test_mooney_rivlin_visco_relaxation() {
     // BC: use mesh bounds in x-direction
     geom_t          x_min    = 1e30;
     geom_t          x_max    = -1e30;
-    const ptrdiff_t n_nodes  = fs->mesh_ptr()->n_nodes();
-    const geom_t   *x_coords = fs->mesh_ptr()->points()->data()[0];
+    const ptrdiff_t n_nodes  = fs->mesh()->n_nodes();
+    const geom_t   *x_coords = fs->mesh()->points()->data()[0];
     for (ptrdiff_t i = 0; i < n_nodes; ++i) {
         const geom_t x = x_coords[i];
         if (x < x_min) x_min = x;
@@ -280,7 +280,7 @@ int test_mooney_rivlin_visco_relaxation() {
         lower_bound = sfem::create_buffer<real_t>(ndofs, es);
 
         // Get contact boundary nodes
-        auto            mesh_for_sideset = fs->mesh_ptr();
+        auto            mesh_for_sideset = fs->mesh();
         auto            lnodes           = smesh::create_nodeset_from_sideset(mesh_for_sideset, left_sideset[0]);
         const ptrdiff_t nbnodes          = lnodes->size();
         contact_node_indices.resize(nbnodes);

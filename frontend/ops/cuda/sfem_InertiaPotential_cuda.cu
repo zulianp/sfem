@@ -85,31 +85,34 @@ namespace sfem {
                                          const idx_t *const   colidx,
                                          const real_t *const  mass,
                                          const real_t         alpha,
-                                         real_t *const        values) {
-        SFEM_DEBUG_SYNCHRONIZE();
+                                         real_t *const        values,
+                                         void *const          stream) {
+        SFEM_DEBUG_SYNCHRONIZE(stream);
 
         const int block = 128;
-        inertia_potential_crs_diagonal<<<grid_for(ndofs, block), block>>>(
+        inertia_potential_crs_diagonal<<<grid_for(ndofs, block), block, 0, (cudaStream_t)stream>>>(
                 ndofs, rowptr, colidx, mass, alpha, values);
 
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(stream);
         return SFEM_SUCCESS;
     }
 
-    int cu_inertia_potential_hessian_bsr(const ptrdiff_t      n_nodes,
-                                         const int            block_size,
-                                         const count_t *const rowptr,
-                                         const idx_t *const   colidx,
-                                         const real_t *const  mass,
-                                         const real_t         alpha,
+    int cu_inertia_potential_hessian_bsr(const ptrdiff_t            n_nodes,
+                                         const int                  block_size,
+                                         const count_t *const       rowptr,
+                                         const idx_t *const         colidx,
+                                         const real_t *const        mass,
+                                         const real_t               alpha,
                                          const smesh::PrimitiveType values_type,
-                                         void *const          values) {
-        SFEM_DEBUG_SYNCHRONIZE();
+                                         void *const                values,
+                                         void *const                stream) {
+        SFEM_DEBUG_SYNCHRONIZE(stream);
 
         const int block = 128;
         return with_tangent_values(values_type, values, [&](auto *const v) {
-            inertia_potential_bsr_diagonal<<<grid_for(n_nodes, block), block>>>(n_nodes, block_size, rowptr, colidx, mass, alpha, v);
-            SFEM_DEBUG_SYNCHRONIZE();
+            inertia_potential_bsr_diagonal<<<grid_for(n_nodes, block), block, 0, (cudaStream_t)stream>>>(
+                    n_nodes, block_size, rowptr, colidx, mass, alpha, v);
+            SFEM_DEBUG_SYNCHRONIZE(stream);
             return SFEM_SUCCESS;
         });
     }
@@ -118,14 +121,15 @@ namespace sfem {
                                                     const int           block_size,
                                                     const real_t *const mass,
                                                     const real_t        alpha,
-                                                    real_t *const       values) {
-        SFEM_DEBUG_SYNCHRONIZE();
+                                                    real_t *const       values,
+                                                    void *const         stream) {
+        SFEM_DEBUG_SYNCHRONIZE(stream);
 
         const int block = 128;
-        inertia_potential_block_diag_sym<<<grid_for(n_nodes, block), block>>>(
+        inertia_potential_block_diag_sym<<<grid_for(n_nodes, block), block, 0, (cudaStream_t)stream>>>(
                 n_nodes, block_size, mass, alpha, values);
 
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(stream);
         return SFEM_SUCCESS;
     }
 

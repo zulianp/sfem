@@ -3,7 +3,7 @@
 
 namespace sfem {
   void register_GeneratedMooneyRivlinKelvinVoigt_cuda_generated_op() {
-    Factory::register_op("gpu:GeneratedMooneyRivlinKelvinVoigt", GPUGeneratedMooneyRivlinKelvinVoigt::create);
-    Factory::register_op("gpu:ss:GeneratedMooneyRivlinKelvinVoigt", GPUGeneratedMooneyRivlinKelvinVoigt::create);
+    OpFactory::register_op("gpu:GeneratedMooneyRivlinKelvinVoigt", GPUGeneratedMooneyRivlinKelvinVoigt::create);
+    OpFactory::register_op("gpu:ss:GeneratedMooneyRivlinKelvinVoigt", GPUGeneratedMooneyRivlinKelvinVoigt::create);
   }
 }  // namespace sfem

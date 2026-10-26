@@ -148,50 +148,6 @@ extern "C" const sfem::codegen::KernelDiagnostics *cu_two_phase_flow_form_1_p_w_
   return &sfem::codegen::two_phase_flow_form_1_p_w_proteus_hex8_jacobian_action_esoa_diagnostics_data;
 }
 
-extern "C" int cu_two_phase_flow_form_1_p_w_proteus_hex8_residual_esoa(
-    const int scalar_bytes,
-    const ptrdiff_t geometry_stride,
-    const void *const RSTR determinant,
-    const void *const RSTR adjugate[9],
-    const void *const RSTR current[16],
-    const void *const RSTR previous[16],
-    const real_t C_kw1,
-    const real_t K_0,
-    const real_t K_1,
-    const real_t K_2,
-    const real_t K_3,
-    const real_t K_4,
-    const real_t K_5,
-    const real_t K_6,
-    const real_t K_7,
-    const real_t K_8,
-    const real_t P_r,
-    const real_t S_res,
-    const real_t dt,
-    const real_t kappa_T,
-    const real_t m,
-    const real_t mu_w,
-    const real_t p_wr,
-    const real_t porosity,
-    const real_t rho_w0,
-    void *const RSTR output[16],
-    void *const stream
-) {
-  switch (scalar_bytes) {
-    case (int)sizeof(double): {
-        sfem::codegen::two_phase_flow_form_1_p_w_d3_tensor_product_residual_block<double, 27, 8>(geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_line_p1_q3<double>::shape_1d(), sfem::codegen::ref_line_p1_q3<double>::grad_1d(), sfem::codegen::quad_line_q3<double>::q_weight_1d(), (const double *const *)current, (const double *const *)previous, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, (double *const *)output);
-        return SFEM_SUCCESS;
-    }
-    case (int)sizeof(float): {
-        sfem::codegen::two_phase_flow_form_1_p_w_d3_tensor_product_residual_block<float, 27, 8>(geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_line_p1_q3<float>::shape_1d(), sfem::codegen::ref_line_p1_q3<float>::grad_1d(), sfem::codegen::quad_line_q3<float>::q_weight_1d(), (const float *const *)current, (const float *const *)previous, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, (float *const *)output);
-        return SFEM_SUCCESS;
-    }
-    default:
-      break;
-  }
-  return sfem::codegen::unsupported_dispatch("two_phase_flow_form_1_p_w_proteus_hex8_residual_esoa", -1, (int)scalar_bytes);
-}
-
 namespace sfem {
 namespace codegen {
 

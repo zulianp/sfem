@@ -7,7 +7,13 @@
 
 #include "sfem_Input.hpp"
 
-#include "sfem_API.hpp"
+#include "sfem_LinearOperatorFactory.hpp"
+#include "sfem_blas_factory.hpp"
+#include "sfem_device.hpp"
+#include "smesh_sideset.hpp"
+#ifdef SFEM_ENABLE_CUDA
+#include "sfem_Function_incore_cuda.hpp"
+#endif
 
 #include "obstacle.hpp"
 //
@@ -29,9 +35,10 @@
 #include <vector>
 
 #ifdef SFEM_ENABLE_CUDA
-#include "cu_obstacle.hpp"
+#include "obstacle_cuda.hpp"
+#include "sfem_ContactConditions_cuda.hpp"
+#include "sfem_BLAS_cuda.hpp"
 #include "smesh_device_arrays.hpp"
-#include "sfem_cuda_blas.hpp"
 #endif
 
 // static const sfem::ExecutionSpace es_to_be_ported = sfem::EXECUTION_SPACE_HOST;
@@ -70,7 +77,7 @@ namespace sfem {
         auto space = impl_->space;
 
         const ptrdiff_t max_coarse_idx = max_node_id(
-                coarse_space->element_type(), space->mesh_ptr()->n_elements(), space->mesh_ptr()->elements(0)->data());
+                coarse_space->element_type(), space->mesh()->n_elements(), space->mesh()->elements(0)->data());
 
         auto coarse = std::make_shared<AxisAlignedContactConditions>(coarse_space);
 
@@ -166,7 +173,7 @@ namespace sfem {
 
         SFEM_ERROR("REFACTOR ME!\n");
 
-        // read_dirichlet_conditions(space->mesh_ptr(),
+        // read_dirichlet_conditions(space->mesh(),
         //                           SFEM_CONTACT_NODESET,
         //                           SFEM_CONTACT_VALUE,
         //                           SFEM_CONTACT_COMPONENT,
@@ -287,7 +294,7 @@ namespace sfem {
         ~Impl() {}
 
         bool is_mpi() const {
-            auto mesh = space->mesh_ptr();
+            auto mesh = space->mesh();
             return mesh && mesh->is_distributed() && mesh->comm() && mesh->comm()->size() > 1 && mesh->distributed();
         }
 
@@ -296,7 +303,7 @@ namespace sfem {
                 return nullptr;
             }
             if (!volume_ex_) {
-                volume_ex_ = smesh::Exchange::create_nodal(space->mesh_ptr(), smesh::Exchange::ExchangeScope::GhostsAndAura);
+                volume_ex_ = smesh::Exchange::create_nodal(space->mesh(), smesh::Exchange::ExchangeScope::GhostsAndAura);
             }
             return volume_ex_.get();
         }
@@ -308,7 +315,7 @@ namespace sfem {
             if (!ex) {
                 return;
             }
-            auto            mesh    = space->mesh_ptr();
+            auto            mesh    = space->mesh();
             const ptrdiff_t n_local = mesh->distributed()->n_nodes_local();
             auto            vol     = create_host_buffer<real_t>(n_local);
             auto            vd      = vol->data();
@@ -416,10 +423,10 @@ namespace sfem {
             } else {
                 auto st = contact_surface->element_type();
                 auto surface_mesh = std::make_shared<Mesh>(
-                        space->mesh_ptr()->comm(), st, contact_surface->elements(), contact_surface->points());
+                        space->mesh()->comm(), st, contact_surface->elements(), contact_surface->points());
 
                 auto trace_space = std::make_shared<FunctionSpace>(surface_mesh, 1);
-                auto bop         = sfem::Factory::create_op(trace_space, "Mass");
+                auto bop         = sfem::OpFactory::create(trace_space, "Mass", sfem::EXECUTION_SPACE_HOST);
                 bop->initialize();
 
                 mass_vector = create_host_buffer<real_t>(trace_space->n_dofs());
@@ -464,7 +471,7 @@ namespace sfem {
 #endif
             }
 
-            auto comm = space->mesh_ptr() ? space->mesh_ptr()->comm() : nullptr;
+            auto comm = space->mesh() ? space->mesh()->comm() : nullptr;
             if (comm) {
                 area = comm->sum(area);
             }
@@ -519,7 +526,7 @@ namespace sfem {
         auto cc = std::make_unique<ContactConditions>(space);
         {
             // The mesh's z-range bounds where the contact surface samples the obstacle
-            auto mesh = space->mesh_ptr();
+            auto mesh = space->mesh();
             const bool has_z = mesh->spatial_dimension() == 3;
             cc->impl_->obstacles.push_back(SDFObstacle::create(sdf,
                                                                mesh->comm(),
@@ -553,7 +560,7 @@ namespace sfem {
         SFEM_TRACE_SCOPE("ContactConditions::create_from_file");
 
         auto in   = YAMLNoIndent::create_from_file(path + "/meta.yaml");
-        auto mesh = space->mesh_ptr();
+        auto mesh = space->mesh();
 
         bool rpath = false;
         in->get("rpath", rpath);
@@ -590,7 +597,7 @@ namespace sfem {
 
     int ContactConditions::signed_distance_for_mesh_viz(const real_t *const x, real_t *const g) const {
         const ptrdiff_t n   = impl_->contact_surface->node_mapping()->size();
-        const int       dim = impl_->space->mesh_ptr()->spatial_dimension();
+        const int       dim = impl_->space->mesh()->spatial_dimension();
         auto            gap = create_host_buffer<real_t>(n > 0 ? n : 0);
         auto *          self = const_cast<ContactConditions *>(this);
         const int       err  = self->signed_distance(x, n > 0 ? gap->data() : nullptr);
@@ -620,14 +627,14 @@ namespace sfem {
         SFEM_TRACE_SCOPE("ContactConditions::normal_project");
 
         const ptrdiff_t n       = impl_->contact_surface->node_mapping()->size();
-        const int       dim     = impl_->space->mesh_ptr()->spatial_dimension();
+        const int       dim     = impl_->space->mesh()->spatial_dimension();
         auto            normals = impl_->normals->data();
 
         int err;
 #ifdef SFEM_ENABLE_CUDA
         if (EXECUTION_SPACE_DEVICE == impl_->execution_space) {
             const idx_t *const idx = impl_->contact_surface->node_mapping_device()->data();
-            err                    = cu_obstacle_normal_project(dim, n, idx, normals, h, out);
+            err                    = cu_obstacle_normal_project(dim, n, idx, normals, h, out, nullptr);
         } else
 #endif
         {
@@ -649,14 +656,14 @@ namespace sfem {
         const ptrdiff_t    n   = impl_->contact_surface->node_mapping()->size();
         const idx_t *const idx = impl_->contact_surface->node_mapping()->data();
 
-        const int dim     = impl_->space->mesh_ptr()->spatial_dimension();
+        const int dim     = impl_->space->mesh()->spatial_dimension();
         auto      normals = impl_->normals->data();
         auto      m       = impl_->mass_vector->data();
 
         int err;
 #ifdef SFEM_ENABLE_CUDA
         if (EXECUTION_SPACE_DEVICE == impl_->execution_space) {
-            err = cu_obstacle_distribute_contact_forces(dim, n, idx, normals, m, f, out);
+            err = cu_obstacle_distribute_contact_forces(dim, n, idx, normals, m, f, out, nullptr);
         } else
 #endif
         {
@@ -676,12 +683,12 @@ namespace sfem {
         const ptrdiff_t    n       = impl_->contact_surface->node_mapping()->size();
         const idx_t *const idx     = impl_->contact_surface->node_mapping()->data();
         auto               m       = impl_->mass_vector->data();
-        const int          dim     = impl_->space->mesh_ptr()->spatial_dimension();
+        const int          dim     = impl_->space->mesh()->spatial_dimension();
         auto               normals = impl_->normals->data();
 
 #ifdef SFEM_ENABLE_CUDA
         if (EXECUTION_SPACE_DEVICE == impl_->execution_space) {
-            return cu_obstacle_contact_stress(dim, n, idx, normals, m, r, s);
+            return cu_obstacle_contact_stress(dim, n, idx, normals, m, r, s, nullptr);
         }
 #endif
         return obstacle_contact_stress(dim, n, idx, normals, m, r, s);
@@ -703,7 +710,7 @@ namespace sfem {
             return impl_->sample_nodes(n_geom, nullptr, impl_->normals);
         }
         if (mpi && impl_->normals) {
-            const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+            const int dim = impl_->space->mesh()->spatial_dimension();
             for (int d = 0; d < dim; ++d) {
                 if (impl_->normals->data()[d] && n_geom > 0) {
                     std::memset(impl_->normals->data()[d], 0, sizeof(real_t) * static_cast<size_t>(n_geom));
@@ -756,7 +763,7 @@ namespace sfem {
         }
 
         if (mpi && impl_->normals) {
-            const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+            const int dim = impl_->space->mesh()->spatial_dimension();
             for (int d = 0; d < dim; ++d) {
                 impl_->complete_surface_nodal(impl_->normals->data()[d], n_geom);
             }
@@ -967,17 +974,31 @@ namespace sfem {
         }
         const idx_t *const idx = impl_->contact_surface->node_mapping()->data();
 
-        const int dim     = impl_->space->mesh_ptr()->spatial_dimension();
+        const int dim     = impl_->space->mesh()->spatial_dimension();
         auto      normals = impl_->normals->data();
 
         auto m = impl_->mass_vector->data();
 
 #ifdef SFEM_ENABLE_CUDA
         if (EXECUTION_SPACE_DEVICE == impl_->execution_space) {
-            return cu_obstacle_hessian_block_diag_sym(dim, n, idx, normals, m, x, values);
+            return cu_obstacle_hessian_block_diag_sym(dim, n, idx, normals, m, x, values, nullptr);
         }
 #endif
         return obstacle_hessian_block_diag_sym(dim, n, idx, normals, m, x, values);
+    }
+
+    std::shared_ptr<Constraint> AxisAlignedContactConditions::create_from_env(const std::shared_ptr<FunctionSpace> &space,
+                                                                              const ExecutionSpace                  es) {
+        SFEM_UNUSED(es);
+        auto conds = AxisAlignedContactConditions::create_from_env(space);
+
+#ifdef SFEM_ENABLE_CUDA
+        if (es == EXECUTION_SPACE_DEVICE) {
+            return to_device(conds);
+        }
+#endif  // SFEM_ENABLE_CUDA
+
+        return conds;
     }
 
 }  // namespace sfem

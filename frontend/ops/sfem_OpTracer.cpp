@@ -1,4 +1,5 @@
 #include "sfem_OpTracer.hpp"
+#include "smesh_base.hpp"
 #include "sfem_FunctionSpace.hpp"
 
 namespace sfem {
@@ -17,10 +18,10 @@ namespace sfem {
         }
     }
 
-    OpTracer::ScopedCapture::ScopedCapture(OpTracer &profiler) : profiler(profiler) { start_time = MPI_Wtime(); }
+    OpTracer::ScopedCapture::ScopedCapture(OpTracer &profiler) : profiler(profiler) { start_time = smesh::time_seconds(); }
 
     OpTracer::ScopedCapture::~ScopedCapture() {
-        double end_time = MPI_Wtime();
+        double end_time = smesh::time_seconds();
         profiler.calls++;
         profiler.total_time += end_time - start_time;
     }

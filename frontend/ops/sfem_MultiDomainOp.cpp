@@ -6,7 +6,7 @@
 #include "sfem_logger.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
-#include "sfem_cuda_blas.hpp"
+#include "sfem_BLAS_cuda.hpp"
 #endif
 
 #include <vector>
@@ -15,13 +15,13 @@ namespace sfem {
 
     MultiDomainOp::MultiDomainOp(const std::shared_ptr<FunctionSpace> &space, const std::vector<std::string> &block_names) {
         if (block_names.empty()) {
-            for (auto &block : space->mesh_ptr()->blocks()) {
+            for (auto &block : space->mesh()->blocks()) {
                 domains_[block->name()] =
                         OpDomain{block->element_type(), block, std::make_shared<Parameters>(), nullptr};
             }
         } else {
             for (auto &block_name : block_names) {
-                auto block = space->mesh_ptr()->find_block(block_name);
+                auto block = space->mesh()->find_block(block_name);
                 if (!block) {
                     SFEM_ERROR("Block %s not found", block_name.c_str());
                 }
@@ -48,7 +48,7 @@ namespace sfem {
             std::vector<idx_t *> rows(elements->extent(0));
 #ifdef SFEM_ENABLE_CUDA
             if (elements->mem_space() == MEMORY_SPACE_DEVICE) {
-                buffer_device_to_host(rows.size() * sizeof(idx_t *), elements->data(), rows.data());
+                copy_device_to_host(rows.size() * sizeof(idx_t *), elements->data(), rows.data());
             } else
 #endif
             {
@@ -63,7 +63,7 @@ namespace sfem {
 #ifdef SFEM_ENABLE_CUDA
             if (elements->mem_space() == MEMORY_SPACE_DEVICE) {
                 auto dev = (idx_t **)d_buffer_alloc(8 * sizeof(idx_t *));
-                buffer_host_to_device(8 * sizeof(idx_t *), micro.data(), dev);
+                copy_host_to_device(8 * sizeof(idx_t *), micro.data(), dev);
                 return std::make_shared<Buffer<idx_t *>>(
                         8, nelements, dev, [keep_alive = elements](int, void **v) { d_buffer_destroy(v); },
                         MEMORY_SPACE_DEVICE);
@@ -158,7 +158,7 @@ namespace sfem {
         }
     }
 
-    std::shared_ptr<MultiDomainOp> MultiDomainOp::lor_op(const std::shared_ptr<FunctionSpace> &space,
+    std::shared_ptr<MultiDomainOp> MultiDomainOp::lor(const std::shared_ptr<FunctionSpace> &space,
                                                          const std::vector<std::string>       &block_names) {
         auto ret = std::make_shared<MultiDomainOp>(space, block_names);
 
@@ -169,7 +169,7 @@ namespace sfem {
         return ret;
     }
 
-    std::shared_ptr<MultiDomainOp> MultiDomainOp::derefine_op(const std::shared_ptr<FunctionSpace> &space,
+    std::shared_ptr<MultiDomainOp> MultiDomainOp::derefine(const std::shared_ptr<FunctionSpace> &space,
                                                               const std::vector<std::string>       &block_names) {
         auto ret = std::make_shared<MultiDomainOp>(space, block_names);
 

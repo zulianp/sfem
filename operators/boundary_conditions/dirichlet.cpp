@@ -1,7 +1,7 @@
 #include "dirichlet.hpp"
 
 #include "sfem_vec.hpp"
-#include "sortreduce.hpp"
+#include "sfem_sortreduce.hpp"
 
 #include <assert.h>
 #include <string.h>
@@ -34,7 +34,7 @@ static SFEM_INLINE idx_t find_col(const idx_t key, const idx_t *const row, const
         // assert(key == row[k]);
     } else {
         // Use this for larger number of dofs per row
-        return find_idx_binary_search(key, row, lenrow);
+        return sfem::find_idx_binary_search(key, row, lenrow);
     }
 }
 

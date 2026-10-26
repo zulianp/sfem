@@ -22,7 +22,7 @@ typedef struct {
     ptrdiff_t         quad_nodes_cnt;       // Number of quadrature points
     ptrdiff_t         nelements;            // Number of elements
     smesh::ElemType     element_type;         // Element type
-    AcceleratorsType  use_accelerator;      // Use accelerator such as CUDA
+    Accelerator       use_accelerator;      // Use accelerator such as CUDA
     AdjointRefineType adjoint_refine_type;  // Adjoint refine type
     int               max_iterations;       // Maximum number of iterations
     real_t            alpha_th;             // Threshold for adjoint refinement

@@ -1,6 +1,7 @@
 // #include "laplacian.hpp"
 
 #include <cassert>
+#include "smesh_base.hpp"
 #include <cmath>
 // #include <cstdio>
 #include <algorithm>
@@ -14,7 +15,7 @@ extern "C" {
 
 #include "sfem_base.hpp"
 #include "sfem_vec.hpp"
-#include "sortreduce.hpp"
+#include "sfem_sortreduce.hpp"
 }
 
 #include "sfem_cuda_base.hpp"
@@ -399,7 +400,7 @@ static inline __device__ int find_col(const idx_t key, const idx_t *const row, c
     // assert(key == row[k]);
     // } else {
     //     // Use this for larger number of dofs per row
-    //     return find_idx_binary_search(key, row, lenrow);
+    //     return sfem::find_idx_binary_search(key, row, lenrow);
     // }
 }
 
@@ -552,7 +553,7 @@ extern "C" void tet4_laplacian_crs(const ptrdiff_t nelements,
     {
         laplacian_crs_kernel<<<n_blocks, block_size>>>(
             nelements, nnodes, d_elems, d_xyz, d_rowptr, d_colidx, d_values);
-        SFEM_DEBUG_SYNCHRONIZE();
+        SFEM_DEBUG_SYNCHRONIZE(nullptr);
 
         // cudaDeviceSynchronize();
         // double ktock = MPI_Wtime();

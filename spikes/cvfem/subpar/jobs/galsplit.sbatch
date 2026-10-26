@@ -15,7 +15,7 @@
 #
 # Established: cd8db4f32 is the first bad commit (bisected, f276b554b..50d9c6cf1). It replaced
 # a read of the FINE macro-corner slots with a read of the COARSE block's element table. The
-# coarse HEX8 mesh is packed with modify_mesh=true during derefine_op -> initialize(), so its
+# coarse HEX8 mesh is packed with modify_mesh=true during derefine -> initialize(), so its
 # node ids are renumbered whenever there is more than one pack; the fine SS mesh is never packed
 # (SFEM_SS_PACK_SIZE defaults to 0). Hence the new read moves with pack count and the old one
 # does not. Measured serially at cavity N=8 refine 4 (512 elements):

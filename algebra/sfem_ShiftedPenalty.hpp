@@ -11,13 +11,11 @@
 #include <memory>
 
 #include "sfem_MatrixFreeLinearSolver.hpp"
-#include "sfem_ShiftedPenalty_impl.hpp"
-#include "sfem_openmp_blas.hpp"
+#include "sfem_ShiftedPenaltyKernels_openmp.hpp"
+#include "sfem_BLAS_openmp.hpp"
+#include "sfem_operator_factory.hpp"
 
 namespace sfem {
-
-    template <typename T>
-    static std::shared_ptr<Operator<T>> diag_op(const SharedBuffer<T>& diagonal_scaling, const ExecutionSpace es);
 
     // From Active set expansion strategies in ShiftedPenalty algorithm, Kruzik et al. 2020
     template <typename T>
@@ -38,7 +36,6 @@ namespace sfem {
         int       iterations_{0};
         int       iterations() const override { return iterations_; }
 
-        ExecutionSpace                        execution_space_{EXECUTION_SPACE_INVALID};
         SharedBuffer<T>                       upper_bound_;
         SharedBuffer<T>                       lower_bound_;
         std::shared_ptr<Operator<T>>          constraints_op_;
@@ -47,12 +44,12 @@ namespace sfem {
         std::shared_ptr<Operator<T>>          apply_op;
 
         std::shared_ptr<BLAS<T>> blas;
-        ShiftedPenalty_Tpl<T> impl;
+        ShiftedPenaltyKernels<T> impl;
 
         std::shared_ptr<MatrixFreeLinearSolver<T>> linear_solver_;
         SharedBuffer<T>                            lagr_lb, lagr_ub;
 
-        ExecutionSpace        execution_space() const override { return execution_space_; }
+        ExecutionContext      execution_context() const override { return blas ? blas->context() : ExecutionContext(EXECUTION_SPACE_INVALID); }
         inline std::ptrdiff_t rows() const override { return n_dofs; }
         inline std::ptrdiff_t cols() const override { return n_dofs; }
         void set_linear_solver(const std::shared_ptr<MatrixFreeLinearSolver<T>>& solver) { linear_solver_ = solver; }
@@ -95,14 +92,13 @@ namespace sfem {
         }
 
         void default_init() {
-            blas = make_openmp_blas<T>();
-            OpenMP_ShiftedPenalty<T>::build(impl);
-            execution_space_ = EXECUTION_SPACE_HOST;
+            blas = OpenMPBLAS<T>::create();
+            OpenMPShiftedPenaltyKernels<T>::build(impl);
         }
 
-        SharedBuffer<T> make_buffer(const ptrdiff_t n) const {
+        SharedBuffer<T> create_buffer(const ptrdiff_t n) const {
             auto blas_impl = blas;
-            return Buffer<T>::own(n, blas_impl->allocate(n), [blas_impl](void* ptr) { blas_impl->destroy(ptr); }, (enum MemorySpace)execution_space());
+            return Buffer<T>::own(n, blas_impl->allocate(n), [blas_impl](void* ptr) { blas_impl->destroy(ptr); }, (enum MemorySpace)this->execution_space());
         }
         int apply(const T* const b, T* const x) override {
             assert(good());
@@ -123,14 +119,14 @@ namespace sfem {
             T* lb = (lower_bound_) ? lower_bound_->data() : nullptr;
             T* ub = (upper_bound_) ? upper_bound_->data() : nullptr;
 
-            auto c = make_buffer(n_dofs);
+            auto c = create_buffer(n_dofs);
 
             // Penalty term: -gradient/residual and Hessian/Jacobian
-            auto r_pen = make_buffer(n_dofs);
-            auto J_pen = make_buffer(n_dofs);
+            auto r_pen = create_buffer(n_dofs);
+            auto J_pen = create_buffer(n_dofs);
 
-            if (lb && !lagr_lb) lagr_lb = make_buffer(n_constrained_dofs);
-            if (ub && !lagr_ub) lagr_ub = make_buffer(n_constrained_dofs);
+            if (lb && !lagr_lb) lagr_lb = create_buffer(n_constrained_dofs);
+            if (ub && !lagr_ub) lagr_ub = create_buffer(n_constrained_dofs);
 
             T penetration_tol  = 1 / (penalty_param_ * 0.1);
 
@@ -250,7 +246,7 @@ namespace sfem {
                                             lagr_ub ? lagr_ub->data() : nullptr,
                                             J_pen->data());
 
-                            linear_solver_->set_op_and_diag_shift(apply_op + sfem::diag_op(J_pen, execution_space()), J_pen);
+                            linear_solver_->set_op_and_diag_shift(apply_op + sfem::diag_op(J_pen, this->execution_space()), J_pen);
                         }
 
                         blas->zeros(n_dofs, c->data());
@@ -343,7 +339,7 @@ namespace sfem {
                       const T* const /*ub*/,
                       const T* const /*lagr_lb*/,
                       const T* const /*lagr_ub*/) {
-            auto temp = make_buffer(n_dofs);
+            auto temp = create_buffer(n_dofs);
             apply_op->apply(x, temp->data());
 
             SFEM_ERROR("IMPLEMENT ME!\n");

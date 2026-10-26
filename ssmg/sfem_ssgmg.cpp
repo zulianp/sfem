@@ -2,7 +2,12 @@
 
 #include "sfem_GeometricMultigrid.hpp"
 
-#include "sfem_API.hpp"
+#include "sfem_Function.hpp"
+#include "sfem_Multigrid.hpp"
+#include "smesh_env.hpp"
+#ifdef SFEM_ENABLE_CUDA
+#include "sfem_BLAS_cuda.hpp"
+#endif
 
 namespace sfem {
 
@@ -32,8 +37,7 @@ namespace sfem {
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
             // FIXME this should not be here!
-            mg->blas() = make_cuda_blas<real_t>();
-            mg->execution_space_ = EXECUTION_SPACE_DEVICE;
+            mg->blas() = GPUBLAS<real_t>::create();
         } else
 #endif
         {

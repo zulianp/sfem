@@ -59,14 +59,14 @@ namespace sfem {
          * @param space Function space for LOR operator
          * @return Shared pointer to LOR operator
          */
-        std::shared_ptr<Op> lor_op(const std::shared_ptr<FunctionSpace> &space) override;
+        std::shared_ptr<Op> lor(const std::shared_ptr<FunctionSpace> &space) override;
 
         /**
          * @brief Create a derefined version
          * @param space Function space for derefined operator
          * @return Shared pointer to derefined operator
          */
-        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override;
+        std::shared_ptr<Op> derefine(const std::shared_ptr<FunctionSpace> &space) override;
 
         /**
          * @brief Initialize the operator
@@ -123,7 +123,7 @@ namespace sfem {
 
         /**
          * Per-block diffusion coefficient. Use var_name `"k"` (default 1). Copied through
-         * `derefine_op` so SS GMG levels keep heterogeneous coefficients.
+         * `derefine` so SS GMG levels keep heterogeneous coefficients.
          */
         void set_value_in_block(const std::string &block_name, const std::string &var_name, const real_t value) override;
         void override_element_types(const std::vector<smesh::ElemType> &element_types) override;

@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <limits>
 #include <memory>
+#include <string>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -88,6 +89,7 @@ namespace sfem {
                     R* const SFEM_RESTRICT       c_rowptr,
                     R* const SFEM_RESTRICT       mask_workspace,
                     const int                    n_workspaces) {
+        SFEM_UNUSED(n_workspaces);  // only the OpenMP region reads it
         const R unseen = smesh::invalid_idx<R>();
 
         c_rowptr[0] = 0;
@@ -154,6 +156,7 @@ namespace sfem {
                       R* const SFEM_RESTRICT       next_workspace,
                       T* const SFEM_RESTRICT       acc_workspace,
                       const int                    n_workspaces) {
+        SFEM_UNUSED(n_workspaces);  // only the OpenMP region reads it
         const R init   = std::numeric_limits<R>::max();
         const R unseen = smesh::invalid_idx<R>();
 
@@ -443,7 +446,7 @@ namespace sfem {
 
         std::shared_ptr<CRS<R, C, TStorage, T>> transpose() const {
             SFEM_TRACE_SCOPE("CRS::transpose");
-            if (execution_space() != EXECUTION_SPACE_HOST) {
+            if (this->execution_space() != EXECUTION_SPACE_HOST) {
                 // TODO: Implement device version
                 SFEM_ERROR("Transpose is not supported for non-host execution space");
                 return nullptr;
@@ -474,7 +477,7 @@ namespace sfem {
 
         std::shared_ptr<CRS<R, C, TStorage, T>> mm(const std::shared_ptr<CRS<R, C, TStorage, T>>& other) const {
             SFEM_TRACE_SCOPE("CRS::mm");
-            if (execution_space() != EXECUTION_SPACE_HOST || other->execution_space() != EXECUTION_SPACE_HOST) {
+            if (this->execution_space() != EXECUTION_SPACE_HOST || other->execution_space() != EXECUTION_SPACE_HOST) {
                 // TODO: Implement device version
                 SFEM_ERROR("Matrix multiplication is not supported for non-host execution space");
                 return nullptr;
@@ -522,7 +525,7 @@ namespace sfem {
 
         size_t nbytes() const { return row_ptr->nbytes() + col_idx->nbytes() + values->nbytes(); }
 
-        ExecutionSpace execution_space() const override { return execution_space_; }
+        ExecutionContext execution_context() const override { return execution_space_; }
 
         void print(std::ostream& os = std::cout) const {
             if (execution_space_ == EXECUTION_SPACE_HOST) {
@@ -602,6 +605,9 @@ namespace sfem {
         auto g = r->mm(d);
         return g;
     }
+
+    /// Writes the graph and values as a CRS folder (matrixio layout) at path.
+    int write_crs(const std::string& path, CRSGraph& graph, sfem::Buffer<real_t>& values);
 
 }  // namespace sfem
 
