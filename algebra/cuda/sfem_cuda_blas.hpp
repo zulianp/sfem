@@ -54,9 +54,9 @@ namespace sfem {
     /// The device BLAS: every operation is ordered on its context's stream, and the scalar results
     /// of the reductions come back through a reusable pinned slot, with no allocation per call.
     template <typename T>
-    class CUDA_BLAS final : public BLAS<T> {
+    class GPUBLAS final : public BLAS<T> {
     public:
-        explicit CUDA_BLAS(const ExecutionContext& context) : BLAS<T>(context) {}
+        explicit GPUBLAS(const ExecutionContext& context) : BLAS<T>(context) {}
 
         T* allocate(const std::size_t n) override;
         void destroy(void* a) override;
@@ -79,7 +79,7 @@ namespace sfem {
 
     template <typename T>
     std::shared_ptr<BLAS<T>> make_cuda_blas(const ExecutionContext& context = ExecutionContext::device()) {
-        return std::make_shared<CUDA_BLAS<T>>(context);
+        return std::make_shared<GPUBLAS<T>>(context);
     }
 
     void device_synchronize();

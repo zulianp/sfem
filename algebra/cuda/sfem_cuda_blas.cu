@@ -510,7 +510,7 @@ extern void d_ediv(const ptrdiff_t n, const real_t *const l, const real_t *const
 namespace sfem {
 
     template <typename T>
-    T *CUDA_BLAS<T>::allocate(const std::size_t n) {
+    T *GPUBLAS<T>::allocate(const std::size_t n) {
         T *ptr = nullptr;
         cudaMalloc((void **)&ptr, n * sizeof(T));
 
@@ -530,85 +530,85 @@ namespace sfem {
     }
 
     template <typename T>
-    void CUDA_BLAS<T>::destroy(void *a) {
+    void GPUBLAS<T>::destroy(void *a) {
         d_destroy(a);
     }
 
     // The context's stream as CUDA's type.
     template <typename T>
-    static cudaStream_t stream_of(const CUDA_BLAS<T> &blas) {
+    static cudaStream_t stream_of(const GPUBLAS<T> &blas) {
         return static_cast<cudaStream_t>(blas.context().stream());
     }
 
     template <typename T>
-    void CUDA_BLAS<T>::zeros(const std::size_t size, T *const x) {
+    void GPUBLAS<T>::zeros(const std::size_t size, T *const x) {
         CHECK_CUDA(cudaMemsetAsync(x, 0, size * sizeof(T), stream_of(*this)));
     }
 
     template <typename T>
-    void CUDA_BLAS<T>::values(const std::size_t size, const T value, T *const x) {
+    void GPUBLAS<T>::values(const std::size_t size, const T value, T *const x) {
         tvalues<T>(size, value, x, stream_of(*this));
     }
 
     template <typename T>
-    void CUDA_BLAS<T>::copy(const ptrdiff_t n, const T *const src, T *const dest) {
+    void GPUBLAS<T>::copy(const ptrdiff_t n, const T *const src, T *const dest) {
         CHECK_CUDA(cudaMemcpyAsync(dest, src, n * sizeof(T), cudaMemcpyDeviceToDevice, stream_of(*this)));
     }
 
     template <typename T>
-    T CUDA_BLAS<T>::dot(const ptrdiff_t n, const T *const l, const T *const r) {
+    T GPUBLAS<T>::dot(const ptrdiff_t n, const T *const l, const T *const r) {
         return CUDA_BLAS_Impl<T>::dot(n, l, r, stream_of(*this));
     }
 
     template <typename T>
-    void CUDA_BLAS<T>::dot(const ptrdiff_t n, const T *const l, const T *const r, T *const result) {
+    void GPUBLAS<T>::dot(const ptrdiff_t n, const T *const l, const T *const r, T *const result) {
 #ifdef SFEM_ENABLE_CUBLAS
         // cuBLAS reduces into device memory in device pointer mode; the kernel path is the one built.
-        SFEM_ERROR("CUDA_BLAS::dot into device memory needs the kernel path (SFEM_ENABLE_CUBLAS is on)\n");
+        SFEM_ERROR("GPUBLAS::dot into device memory needs the kernel path (SFEM_ENABLE_CUBLAS is on)\n");
 #else
         CUDA_BLAS_Impl<T>::dot(n, l, r, result, stream_of(*this));
 #endif
     }
 
     template <typename T>
-    void CUDA_BLAS<T>::axpy(const ptrdiff_t n, const T alpha, const T *const x, T *const y) {
+    void GPUBLAS<T>::axpy(const ptrdiff_t n, const T alpha, const T *const x, T *const y) {
         CUDA_BLAS_Impl<T>::axpy(n, alpha, x, y, stream_of(*this));
     }
 
     template <typename T>
-    void CUDA_BLAS<T>::axpby(const ptrdiff_t n, const T alpha, const T *const x, const T beta, T *const y) {
+    void GPUBLAS<T>::axpby(const ptrdiff_t n, const T alpha, const T *const x, const T beta, T *const y) {
         CUDA_BLAS_Impl<T>::axpby(n, alpha, x, beta, y, stream_of(*this));
     }
 
     template <typename T>
-    void CUDA_BLAS<T>::scal(const std::ptrdiff_t n, const T alpha, T *const x) {
+    void GPUBLAS<T>::scal(const std::ptrdiff_t n, const T alpha, T *const x) {
         CUDA_BLAS_Impl<T>::scal(n, alpha, x, stream_of(*this));
     }
 
     template <typename T>
-    void CUDA_BLAS<T>::reciprocal(const std::ptrdiff_t n, const T alpha, T *const x) {
+    void GPUBLAS<T>::reciprocal(const std::ptrdiff_t n, const T alpha, T *const x) {
         ::reciprocal<T>(n, alpha, x, stream_of(*this));
     }
 
     template <typename T>
-    T CUDA_BLAS<T>::norm2(const ptrdiff_t n, const T *const x) {
+    T GPUBLAS<T>::norm2(const ptrdiff_t n, const T *const x) {
         T ret = 0;
         CUDA_BLAS_Impl<T>::nrm2(n, x, &ret, stream_of(*this));
         return ret;
     }
 
     template <typename T>
-    void CUDA_BLAS<T>::zaxpby(const ptrdiff_t n, const T alpha, const T *const x, const T beta, const T *const y, T *const z) {
+    void GPUBLAS<T>::zaxpby(const ptrdiff_t n, const T alpha, const T *const x, const T beta, const T *const y, T *const z) {
         CUDA_BLAS_Impl<T>::zaxpby(n, alpha, x, beta, y, z, stream_of(*this));
     }
 
     template <typename T>
-    void CUDA_BLAS<T>::xypaz(const ptrdiff_t n, const T *const x, const T *const y, const T alpha, T *const z) {
+    void GPUBLAS<T>::xypaz(const ptrdiff_t n, const T *const x, const T *const y, const T alpha, T *const z) {
         txypaz<T>(n, x, y, alpha, z, stream_of(*this));
     }
 
-    template class CUDA_BLAS<double>;
-    template class CUDA_BLAS<float>;
+    template class GPUBLAS<double>;
+    template class GPUBLAS<float>;
 
     void device_synchronize() { CHECK_CUDA(cudaDeviceSynchronize()); }
 
