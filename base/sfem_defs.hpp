@@ -32,13 +32,7 @@ namespace sfem {
 
 #define SFEM_UNSUPPORTED_ELEMENT_ERROR(element_type) SFEM_ERROR("Unsupported element type %d\n", element_type);
 
-    typedef enum {
-        SFEM_ACCELERATOR_TYPE_CPU     = 0,
-        SFEM_ACCELERATOR_TYPE_CUDA    = 1,
-        SFEM_ACCELERATOR_TYPE_OPENCL  = 2,
-        SFEM_ACCELERATOR_TYPE_OPENACC = 3,
-        SFEM_ACCELERATOR_TYPE_HIP     = 4
-    } AcceleratorsType;
+    enum class Accelerator { CPU = 0, CUDA = 1, OPENCL = 2, OPENACC = 3, HIP = 4 };
 
     typedef enum {
         ADJOINT_BASE = 0,
@@ -76,12 +70,7 @@ using sfem::ADJOINT_REFINE_HYTEG_REFINEMENT;
 using sfem::ADJOINT_REFINE_ITERATIVE;
 using sfem::ADJOINT_REFINE_ONE_STEP;
 using sfem::AdjointRefineType;
-using sfem::AcceleratorsType;
-using sfem::SFEM_ACCELERATOR_TYPE_CPU;
-using sfem::SFEM_ACCELERATOR_TYPE_CUDA;
-using sfem::SFEM_ACCELERATOR_TYPE_HIP;
-using sfem::SFEM_ACCELERATOR_TYPE_OPENACC;
-using sfem::SFEM_ACCELERATOR_TYPE_OPENCL;
+using sfem::Accelerator;
 #endif
 
 #endif  // SFEM_DEFS_H

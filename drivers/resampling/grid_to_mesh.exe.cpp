@@ -480,16 +480,16 @@ int main(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
-    info.use_accelerator = SFEM_ACCELERATOR_TYPE_CPU;
+    info.use_accelerator = Accelerator::CPU;
 
 #ifdef SFEM_ENABLE_CUDA
 
     if (check_string_in_args(argc, (const char**)argv, "CUDA", mpi_rank == 0)) {
-        info.use_accelerator = SFEM_ACCELERATOR_TYPE_CUDA;
+        info.use_accelerator = Accelerator::CUDA;
         if (mpi_rank == 0) printf("info.use_accelerator = 1\n");
 
     } else if (check_string_in_args(argc, (const char**)argv, "CPU", mpi_rank == 0)) {
-        info.use_accelerator = SFEM_ACCELERATOR_TYPE_CPU;
+        info.use_accelerator = Accelerator::CPU;
         if (mpi_rank == 0) printf("info.use_accelerator = 0\n");
 
     } else {
