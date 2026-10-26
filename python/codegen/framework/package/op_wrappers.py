@@ -981,7 +981,7 @@ def _inexact_definitions(
 
   int %%(op)s::inexact_update(const real_t *const %(update_state_parameter)s) {
     SFEM_TRACE_SCOPE("%%(op)s::inexact_update");
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
     const int dim = mesh->spatial_dimension();
     return impl_->domains->iterate([&](const OpDomain &domain) {
       auto cache = std::static_pointer_cast<AffineGeometryCache>(domain.user_data);
@@ -1021,7 +1021,7 @@ def _inexact_definitions(
 
   int %%(op)s::inexact_apply(const real_t *const h, real_t *const out) {
     SFEM_TRACE_SCOPE("%%(op)s::inexact_apply");
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
     const int dim = mesh->spatial_dimension();
     return impl_->domains->iterate([&](const OpDomain &domain) {
       auto cache = std::static_pointer_cast<AffineGeometryCache>(domain.user_data);
@@ -1076,7 +1076,7 @@ def _hyperelastic_op(
     if (impl_->space->has_packed_mesh()) {
       auto packed = impl_->space->packed_mesh();
       const ptrdiff_t max_nodes_per_pack = packed->max_nodes_per_pack();
-      const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+      const int dim = impl_->space->mesh()->spatial_dimension();
       const size_t scratch_size = (size_t)dim * (size_t)max_nodes_per_pack;
       sfem::codegen::prealloc_thread_scratch<real_t>(0, scratch_size);
       sfem::codegen::prealloc_thread_scratch<real_t>(1, scratch_size);
@@ -1513,7 +1513,7 @@ namespace sfem {
     int cache_affine_geometry(const std::shared_ptr<FunctionSpace> &space,
                                   MultiDomainOp &domains,
                                   const bool requested) {
-      auto mesh = space->mesh_ptr();
+      auto mesh = space->mesh();
       const bool needs_jacobian_aos =
           %(gradient_affine_uses_jacobian_aos)s ||
           %(apply_affine_uses_jacobian_aos)s;
@@ -1646,7 +1646,7 @@ namespace sfem {
 
   std::unique_ptr<Op> %(op)s::create(const std::shared_ptr<FunctionSpace> &space) {
     const ptrdiff_t expected_block_size =
-        block_size_for_dim(space->mesh_ptr()->spatial_dimension());
+        block_size_for_dim(space->mesh()->spatial_dimension());
     if (space->block_size() != expected_block_size) {
       SFEM_ERROR("%(op)s requires block_size=%%ld\\n",
                        static_cast<long>(expected_block_size));
@@ -1719,7 +1719,7 @@ namespace sfem {
         return SFEM_FAILURE;
       }
     }
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const geom_t *const *adjugate = nullptr;
@@ -1758,7 +1758,7 @@ namespace sfem {
         return SFEM_FAILURE;
       }
     }
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const geom_t *const *adjugate = nullptr;
@@ -1817,7 +1817,7 @@ namespace sfem {
               const real_t *const steps,
               real_t *const out) {
     SFEM_TRACE_SCOPE("%(op)s::value_steps");
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
     auto points = element_points(mesh);
     if (nsteps <= 0) {
       return SFEM_SUCCESS;
@@ -1875,7 +1875,7 @@ namespace sfem {
       }
     }
 %(hessian_crs_current_prologue)s
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
 %(hessian_crs_points_alias)s    return impl_->domains->iterate([&](const OpDomain &%(hessian_crs_domain_parameter)s) {
 %(hessian_crs_dispatch_body)s
     });
@@ -1893,7 +1893,7 @@ namespace sfem {
       }
     }
 %(hessian_bsr_current_prologue)s
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
 %(hessian_bsr_points_alias)s    return impl_->domains->iterate([&](const OpDomain &%(hessian_bsr_domain_parameter)s) {
 %(hessian_bsr_dispatch_body)s
     });
@@ -1911,7 +1911,7 @@ namespace sfem {
       }
     }
 %(hessian_block_diag_sym_current_prologue)s
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
 %(hessian_block_diag_sym_points_alias)s    return impl_->domains->iterate([&](const OpDomain &%(hessian_block_diag_sym_domain_parameter)s) {
 %(hessian_block_diag_sym_dispatch_body)s
     });
@@ -2836,7 +2836,7 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
         """        if (impl_->space->has_packed_mesh()) {
       auto packed = impl_->space->packed_mesh();
       const ptrdiff_t max_nodes_per_pack = packed->max_nodes_per_pack();
-      const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+      const int dim = impl_->space->mesh()->spatial_dimension();
       sfem::codegen::prealloc_thread_scratch<real_t>(
           0, (size_t)dim * (size_t)max_nodes_per_pack);
       sfem::codegen::prealloc_thread_scratch<real_t>(
@@ -3080,7 +3080,7 @@ namespace sfem {
                                   const bool requested_jacobian,
                                   const bool requested_metric_soa,
                                   const bool requested_metric_aos) {
-      auto mesh = space->mesh_ptr();
+      auto mesh = space->mesh();
       for (auto &entry : domains.domains()) {
         const bool forced = geometry_is_forced_affine(entry.second.element_type);
         const bool needs_jacobian = requested_jacobian || forced;
@@ -3233,7 +3233,7 @@ namespace sfem {
 
   std::unique_ptr<Op> %(op)s::create(const std::shared_ptr<FunctionSpace> &space) {
     const ptrdiff_t expected_block_size =
-        block_size_for_dim(space->mesh_ptr()->spatial_dimension());
+        block_size_for_dim(space->mesh()->spatial_dimension());
     if (space->block_size() != expected_block_size) {
       SFEM_ERROR("%(op)s requires block_size=%%ld\\n",
                        static_cast<long>(expected_block_size));
@@ -3304,7 +3304,7 @@ namespace sfem {
     SFEM_TRACE_SCOPE("%(op)s::gradient");
 %(gradient_previous_check)s%(scheme_gradient_term)s
     impl_->current = state;
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
 %(gradient_affine_geometry)s      real_t storage[MAX_PARAMETERS];
@@ -3321,7 +3321,7 @@ namespace sfem {
                       real_t *const %(apply_out_parameter)s) {
     SFEM_TRACE_SCOPE("%(op)s::apply");
 %(apply_current_alias)s%(apply_state_check)s%(scheme_apply_term)s
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
 %(apply_points_alias)s%(laplace_packed_apply_fast_path)s
     return impl_->domains->iterate([&](const OpDomain &domain) {
 %(apply_affine_geometry)s      real_t storage[MAX_PARAMETERS];
@@ -3560,7 +3560,7 @@ namespace sfem {
             # it is the static one, and Newton on it stalls once the mass
             # dominates (small dt).
             "%s"
-            "    auto mesh = impl_->space->mesh_ptr();\n"
+            "    auto mesh = impl_->space->mesh();\n"
             "    auto points = element_points(mesh);\n"
             "    return impl_->domains->iterate([&](const OpDomain &domain) {\n"
             "      real_t storage[MAX_PARAMETERS];\n"
@@ -3606,7 +3606,7 @@ namespace sfem {
             # it is the static one, and Newton on it stalls once the mass
             # dominates (small dt).
             "%s"
-            "    auto mesh = impl_->space->mesh_ptr();\n"
+            "    auto mesh = impl_->space->mesh();\n"
             "    auto points = element_points(mesh);\n"
             "    return impl_->domains->iterate([&](const OpDomain &domain) {\n"
             "      real_t storage[MAX_PARAMETERS];\n"
@@ -4428,7 +4428,7 @@ namespace sfem {
         }
         const std::string path = yaml_read_string(node["path"]);
         return smesh::Sideset::create_from_file(
-            space->mesh_ptr()->comm(), smesh::Path(path));
+            space->mesh()->comm(), smesh::Path(path));
       }
 
       if (is_expr || (node.has_child("parent") && node.has_child("lfi"))) {
@@ -4457,7 +4457,7 @@ namespace sfem {
         }
 
         return std::make_shared<smesh::Sideset>(
-            space->mesh_ptr()->comm(), parent, lfi);
+            space->mesh()->comm(), parent, lfi);
       }
 
       SFEM_ERROR("%(op)s neumann condition requires format=file or format=expr\\n");
@@ -4538,7 +4538,7 @@ namespace sfem {
 
   std::unique_ptr<Op> %(op)s::create(const std::shared_ptr<FunctionSpace> &space) {
     const ptrdiff_t expected_block_size =
-        block_size_for_dim(space->mesh_ptr()->spatial_dimension());
+        block_size_for_dim(space->mesh()->spatial_dimension());
     if (space->block_size() != expected_block_size) {
       SFEM_ERROR("%(op)s requires block_size=%%ld\\n",
                        static_cast<long>(expected_block_size));
@@ -4598,7 +4598,7 @@ namespace sfem {
     if (impl_->conditions.empty()) {
       return SFEM_SUCCESS;
     }
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const smesh::block_idx_t block_id = block_id_for_domain(*mesh, *domain.block);
@@ -4922,7 +4922,7 @@ namespace sfem {
 
     int cache_affine_geometry(const std::shared_ptr<FunctionSpace> &space,
                                   MultiDomainOp &domains) {
-      auto mesh = space->mesh_ptr();
+      auto mesh = space->mesh();
       for (auto &entry : domains.domains()) {
         if (entry.second.user_data) {
           continue;
@@ -5056,7 +5056,7 @@ namespace sfem {
 
   std::unique_ptr<Op> %(op)s::create(const std::shared_ptr<FunctionSpace> &space) {
     const ptrdiff_t expected_block_size =
-        block_size_for_dim(space->mesh_ptr()->spatial_dimension());
+        block_size_for_dim(space->mesh()->spatial_dimension());
     if (space->block_size() != expected_block_size) {
       SFEM_ERROR("%(op)s requires block_size=%%ld\\n",
                        static_cast<long>(expected_block_size));
@@ -5083,7 +5083,7 @@ namespace sfem {
     // elements, which these kernels assemble as HEX8.
     impl_->domains->set_micro_elements(impl_->space->micro_elements());
     seed_material(*impl_->domains);
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
     const bool needs_affine_geometry =
         impl_->objective_uses_affine ||
         impl_->gradient_uses_affine ||
@@ -5127,7 +5127,7 @@ namespace sfem {
     SFEM_TRACE_SCOPE("%(op)s::gradient");
 %(gradient_previous_check)s
     impl_->current = state;
-%(scheme_gradient)s    auto mesh = impl_->space->mesh_ptr();
+%(scheme_gradient)s    auto mesh = impl_->space->mesh();
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const geom_t *const *adjugate = nullptr;
@@ -5164,7 +5164,7 @@ namespace sfem {
 %(scheme_apply)s
     const real_t *const current = state ? state : impl_->current;
 %(apply_state_check)s
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const geom_t *const *adjugate = nullptr;
@@ -5945,7 +5945,7 @@ def _coupled_hessian_bsr_method(op_name, scheme_argument, scheme_hessian_bsr, he
       SFEM_ERROR("%(op)s::hessian_bsr requires current and previous states\\n");
       return SFEM_FAILURE;
     }
-%(scheme_hessian_bsr)s    auto mesh = impl_->space->mesh_ptr();
+%(scheme_hessian_bsr)s    auto mesh = impl_->space->mesh();
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       real_t storage[MAX_PARAMETERS];
@@ -6610,7 +6610,7 @@ def _relaxation_fragments(
     }
 """ % {"declaration_cases": declaration_cases, "point_cases": point_cases, "op": op}
     setup = """    impl_->relaxation = std::make_shared<RelaxationGroups>(
-        relaxation_declarations(impl_->space->mesh_ptr()->spatial_dimension()),
+        relaxation_declarations(impl_->space->mesh()->spatial_dimension()),
         impl_->space->n_dofs(),
         %(execution_space)s);
     for (auto &entry : impl_->domains->domains()) {
@@ -6652,7 +6652,7 @@ def _relaxation_fragments(
 
   int %(op)s::quadrature_output(const real_t *const x, const int slot) {
     SFEM_TRACE_SCOPE("%(op)s::quadrature_output");
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const geom_t *const *adjugate = nullptr;
@@ -9122,7 +9122,7 @@ def _performance_flops_method(op_name, method, cases):
       return total;
     }
 
-    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+    const int dim = impl_->space->mesh()->spatial_dimension();
     impl_->domains->iterate([&](const OpDomain &domain) {
       const ptrdiff_t nelements = domain.block->n_elements();
 %(cases)s
@@ -9146,7 +9146,7 @@ def _performance_bytes_method(op_name, method, cases):
       return total;
     }
 
-    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+    const int dim = impl_->space->mesh()->spatial_dimension();
     impl_->domains->iterate([&](const OpDomain &domain) {
       const ptrdiff_t nelements = domain.block->n_elements();
 %(cases)s

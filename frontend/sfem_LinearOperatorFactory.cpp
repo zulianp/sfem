@@ -111,7 +111,7 @@ namespace sfem {
             SFEM_UNUSED(es);
             assert(es == sfem::EXECUTION_SPACE_HOST);
 
-            auto      crs_graph  = f->space()->mesh_ptr()->node_to_node_graph_upper_triangular();
+            auto      crs_graph  = f->space()->mesh()->node_to_node_graph_upper_triangular();
             const int block_size = f->space()->block_size();
 
             int       nblock_entries = ((block_size + 1) * block_size) / 2;
@@ -186,7 +186,7 @@ namespace sfem {
                                                           const SharedBuffer<real_t>            &x,
                                                           const sfem::ExecutionSpace             es) {
             auto fs        = f->space();
-            auto crs_graph = fs->mesh_ptr()->node_to_node_graph_upper_triangular();
+            auto crs_graph = fs->mesh()->node_to_node_graph_upper_triangular();
 
             auto diag_values     = sfem::create_buffer<real_t>(fs->n_dofs(), es);
             auto off_diag_values = sfem::create_buffer<real_t>(crs_graph->nnz(), es);
@@ -245,7 +245,7 @@ namespace sfem {
                                                           const std::shared_ptr<Buffer<real_t>> &x,
                                                           const sfem::ExecutionSpace             es) {
             auto fs              = f->space();
-            auto crs_graph       = fs->mesh_ptr()->node_to_node_graph_upper_triangular();
+            auto crs_graph       = fs->mesh()->node_to_node_graph_upper_triangular();
             auto diag_values     = sfem::create_buffer<real_t>(fs->n_dofs(), es);
             auto off_diag_values = sfem::create_buffer<real_t>(crs_graph->nnz(), es);
 

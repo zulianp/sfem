@@ -257,7 +257,7 @@ namespace sfem {
     int cache_affine_geometry(const std::shared_ptr<FunctionSpace> &space,
                                   MultiDomainOp &domains,
                                   const bool requested) {
-      auto mesh = space->mesh_ptr();
+      auto mesh = space->mesh();
       const bool needs_jacobian_aos =
           false ||
           false;
@@ -398,7 +398,7 @@ namespace sfem {
 
   std::unique_ptr<Op> GeneratedSaintVenantKirchhoff::create(const std::shared_ptr<FunctionSpace> &space) {
     const ptrdiff_t expected_block_size =
-        block_size_for_dim(space->mesh_ptr()->spatial_dimension());
+        block_size_for_dim(space->mesh()->spatial_dimension());
     if (space->block_size() != expected_block_size) {
       SFEM_ERROR("GeneratedSaintVenantKirchhoff requires block_size=%ld\n",
                        static_cast<long>(expected_block_size));
@@ -422,7 +422,7 @@ namespace sfem {
       return total;
     }
 
-    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+    const int dim = impl_->space->mesh()->spatial_dimension();
     impl_->domains->iterate([&](const OpDomain &domain) {
       const ptrdiff_t nelements = domain.block->n_elements();
       if (dim == 2) {
@@ -453,7 +453,7 @@ namespace sfem {
       return total;
     }
 
-    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+    const int dim = impl_->space->mesh()->spatial_dimension();
     impl_->domains->iterate([&](const OpDomain &domain) {
       const ptrdiff_t nelements = domain.block->n_elements();
       if (dim == 2) {
@@ -484,7 +484,7 @@ namespace sfem {
       return total;
     }
 
-    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+    const int dim = impl_->space->mesh()->spatial_dimension();
     impl_->domains->iterate([&](const OpDomain &domain) {
       const ptrdiff_t nelements = domain.block->n_elements();
       if (dim == 2) {
@@ -515,7 +515,7 @@ namespace sfem {
       return total;
     }
 
-    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+    const int dim = impl_->space->mesh()->spatial_dimension();
     impl_->domains->iterate([&](const OpDomain &domain) {
       const ptrdiff_t nelements = domain.block->n_elements();
       if (dim == 2) {
@@ -546,7 +546,7 @@ namespace sfem {
       return total;
     }
 
-    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+    const int dim = impl_->space->mesh()->spatial_dimension();
     impl_->domains->iterate([&](const OpDomain &domain) {
       const ptrdiff_t nelements = domain.block->n_elements();
       if (dim == 2) {
@@ -577,7 +577,7 @@ namespace sfem {
       return total;
     }
 
-    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+    const int dim = impl_->space->mesh()->spatial_dimension();
     impl_->domains->iterate([&](const OpDomain &domain) {
       const ptrdiff_t nelements = domain.block->n_elements();
       if (dim == 2) {
@@ -637,7 +637,7 @@ namespace sfem {
     if (impl_->space->has_packed_mesh()) {
       auto packed = impl_->space->packed_mesh();
       const ptrdiff_t max_nodes_per_pack = packed->max_nodes_per_pack();
-      const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+      const int dim = impl_->space->mesh()->spatial_dimension();
       const size_t scratch_size = (size_t)dim * (size_t)max_nodes_per_pack;
       sfem::codegen::prealloc_thread_scratch<real_t>(0, scratch_size);
       sfem::codegen::prealloc_thread_scratch<real_t>(1, scratch_size);
@@ -671,7 +671,7 @@ namespace sfem {
         return SFEM_FAILURE;
       }
     }
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const geom_t *const *adjugate = nullptr;
@@ -765,7 +765,7 @@ namespace sfem {
         return SFEM_FAILURE;
       }
     }
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const geom_t *const *adjugate = nullptr;
@@ -874,7 +874,7 @@ namespace sfem {
               const real_t *const steps,
               real_t *const out) {
     SFEM_TRACE_SCOPE("GeneratedSaintVenantKirchhoff::value_steps");
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
     auto points = element_points(mesh);
     if (nsteps <= 0) {
       return SFEM_SUCCESS;
@@ -996,7 +996,7 @@ namespace sfem {
       SFEM_ERROR("GeneratedSaintVenantKirchhoff::hessian_crs requires a current state\n");
       return SFEM_FAILURE;
     }
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
     return impl_->domains->iterate([&](const OpDomain &/*domain*/) {
       const int dim = mesh->spatial_dimension();
       if (dim == 2) {
@@ -1039,7 +1039,7 @@ namespace sfem {
       SFEM_ERROR("GeneratedSaintVenantKirchhoff::hessian_bsr requires a current state\n");
       return SFEM_FAILURE;
     }
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const geom_t *const *adjugate = nullptr;
@@ -1090,7 +1090,7 @@ namespace sfem {
       SFEM_ERROR("GeneratedSaintVenantKirchhoff::hessian_block_diag_sym requires a current state\n");
       return SFEM_FAILURE;
     }
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
     return impl_->domains->iterate([&](const OpDomain &/*domain*/) {
       const int dim = mesh->spatial_dimension();
       if (dim == 2) {

@@ -928,7 +928,7 @@ namespace sfem {
                                            real_t *const        /*values*/) {
         // SFEM_TRACE_SCOPE("NeoHookeanOgdenPacked::hessian_crs");
 
-        // auto mesh  = impl_->space->mesh_ptr();
+        // auto mesh  = impl_->space->mesh();
         // auto graph = impl_->space->dof_to_dof_graph();
         // int  err   = SFEM_SUCCESS;
 
@@ -955,7 +955,7 @@ namespace sfem {
                                                real_t *const        /*off_diag_values*/) {
         SFEM_TRACE_SCOPE("NeoHookeanOgdenPacked::hessian_crs_sym");
 
-        // auto mesh = impl_->space->mesh_ptr();
+        // auto mesh = impl_->space->mesh();
         // int  err  = SFEM_SUCCESS;
 
         // impl_->iterate([&](const OpDomain &domain) {
@@ -978,7 +978,7 @@ namespace sfem {
     int NeoHookeanOgdenPacked::hessian_diag(const real_t *const x, real_t *const values) {
         SFEM_TRACE_SCOPE("NeoHookeanOgdenPacked::hessian_diag");
 
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) -> int {
             return neohookean_ogden_diag_aos(domain.element_type,
                                              mesh->n_elements(),
@@ -1014,7 +1014,7 @@ namespace sfem {
     int NeoHookeanOgdenPacked::update(const real_t *const u) {
         SFEM_TRACE_SCOPE("NeoHookeanOgdenPacked::update");
 
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) {
             auto b             = *std::static_pointer_cast<int>(domain.user_data);
             auto assembly_data = impl_->assembly_data[b];
@@ -1040,7 +1040,7 @@ namespace sfem {
     int NeoHookeanOgdenPacked::gradient(const real_t *const x, real_t *const out) {
         SFEM_TRACE_SCOPE("NeoHookeanOgdenPacked::gradient");
 
-        auto mesh   = impl_->space->mesh_ptr();
+        auto mesh   = impl_->space->mesh();
         auto points = mesh->points();
         return impl_->iterate([&](const OpDomain &domain) {
             auto b               = *std::static_pointer_cast<int>(domain.user_data);
@@ -1085,7 +1085,7 @@ namespace sfem {
     int NeoHookeanOgdenPacked::apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) {
         SFEM_TRACE_SCOPE("NeoHookeanOgdenPacked::apply");
 
-        auto mesh   = impl_->space->mesh_ptr();
+        auto mesh   = impl_->space->mesh();
         auto points = mesh->points();
         return impl_->iterate([&](const OpDomain &domain) {
             auto b               = *std::static_pointer_cast<int>(domain.user_data);
@@ -1126,7 +1126,7 @@ namespace sfem {
     int NeoHookeanOgdenPacked::value(const real_t *x, real_t *const out) {
         SFEM_TRACE_SCOPE("NeoHookeanOgdenPacked::value");
 
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) -> int {
             auto b             = *std::static_pointer_cast<int>(domain.user_data);
             auto assembly_data = impl_->assembly_data[b];
@@ -1151,7 +1151,7 @@ namespace sfem {
                                            real_t *const       out) {
         SFEM_TRACE_SCOPE("NeoHookeanOgdenPacked::value_steps");
 
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) -> int {
             auto b             = *std::static_pointer_cast<int>(domain.user_data);
             auto assembly_data = impl_->assembly_data[b];
@@ -1198,7 +1198,7 @@ namespace sfem {
                                            real_t *const        values) {
         SFEM_TRACE_SCOPE("NeoHookeanOgdenPacked::hessian_bsr");
 
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) -> int {
             return neohookean_ogden_bsr(domain.element_type,
                                         domain.block->n_elements(),
@@ -1224,7 +1224,7 @@ namespace sfem {
                                                 const ptrdiff_t      block_stride,
                                                 real_t **const       diag_values,
                                                 real_t **const       off_diag_values) {
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) -> int {
             return neohookean_ogden_bcrs_sym(domain.element_type,
                                              domain.block->n_elements(),

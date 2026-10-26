@@ -31,8 +31,8 @@ namespace {
     void fill_state_and_direction(const std::shared_ptr<sfem::FunctionSpace> &space,
                                   std::vector<real_t>                        &state,
                                   std::vector<real_t>                        &direction) {
-        geom_t **const  points = space->mesh_ptr()->points()->data();
-        const ptrdiff_t nnodes = space->mesh_ptr()->n_nodes();
+        geom_t **const  points = space->mesh()->points()->data();
+        const ptrdiff_t nnodes = space->mesh()->n_nodes();
 
         for (ptrdiff_t node = 0; node < nnodes; ++node) {
             const real_t x = points[0][node];

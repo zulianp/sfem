@@ -157,8 +157,8 @@ static int test_hierarchical_transfer_scaling(
 
     const ptrdiff_t fine_n_dofs   = fine_space->n_dofs();
     const ptrdiff_t coarse_n_dofs = coarse_space->n_dofs();
-    const ptrdiff_t fine_n_nodes  = fine_space->mesh_ptr()->n_nodes();
-    const ptrdiff_t coarse_n_nodes = coarse_space->mesh_ptr()->n_nodes();
+    const ptrdiff_t fine_n_nodes  = fine_space->mesh()->n_nodes();
+    const ptrdiff_t coarse_n_nodes = coarse_space->mesh()->n_nodes();
     const int       block_size    = fine_space->block_size();
 
     SFEM_TEST_ASSERT(block_size == coarse_space->block_size());
@@ -188,8 +188,8 @@ static int test_hierarchical_transfer_scaling(
         }
     }
 
-    geom_t **fine_points   = fine_space->mesh_ptr()->points()->data();
-    geom_t **coarse_points = coarse_space->mesh_ptr()->points()->data();
+    geom_t **fine_points   = fine_space->mesh()->points()->data();
+    geom_t **coarse_points = coarse_space->mesh()->points()->data();
 
     for (ptrdiff_t i = 0; i < coarse_n_nodes; ++i) {
         const real_t x = coarse_points[0][i];
@@ -384,7 +384,7 @@ int test_cube() {
     printf("Fine op (%d,%s):\t%s\n", SFEM_ELEMENT_REFINE_LEVEL, type_to_string(fs->element_type()), SFEM_FINE_OP_TYPE);
     fine_op = sfem::create_linear_operator(SFEM_FINE_OP_TYPE, f, nullptr, es);
 
-    auto levels    = smesh::derefinement_levels(*fs->mesh_ptr());
+    auto levels    = smesh::derefinement_levels(*fs->mesh());
     SFEM_TEST_ASSERT(SFEM_ELEMENT_DEREFINE >= 0);
     SFEM_TEST_ASSERT(SFEM_ELEMENT_DEREFINE < static_cast<int>(levels.size()));
     auto fs_coarse = fs->derefine(levels[SFEM_ELEMENT_DEREFINE]);
@@ -425,12 +425,12 @@ int test_cube() {
     {
         geom_t **points{nullptr};
         if (fs_coarse->has_semi_structured_mesh()) {
-            points = fs_coarse->mesh_ptr()->points()->data();
+            points = fs_coarse->mesh()->points()->data();
         } else {
-            points = fs_coarse->mesh_ptr()->points()->data();
+            points = fs_coarse->mesh()->points()->data();
         }
 
-        ptrdiff_t n    = fs_coarse->mesh_ptr()->n_nodes();
+        ptrdiff_t n    = fs_coarse->mesh()->n_nodes();
         auto      data = h_input->data();
         for (ptrdiff_t i = 0; i < n; i++) {
             for (int b = 0; b < SFEM_BLOCK_SIZE; b++) {
@@ -532,7 +532,7 @@ int test_cube() {
                 smesh::create_directory(smesh::Path("galerkin/fields"));
 
                 {  // COARSE
-                    SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(fs_coarse->mesh_ptr(), smesh::Path("galerkin")) ==
+                    SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(fs_coarse->mesh(), smesh::Path("galerkin")) ==
                                      SFEM_SUCCESS);
 
                     sfem::Output out(fs_coarse);
@@ -548,7 +548,7 @@ int test_cube() {
                 {  // FINE
                     smesh::create_directory("galerkin_fine");
                     smesh::create_directory("galerkin_fine/fields");
-                    SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(fs->mesh_ptr(), smesh::Path("galerkin_fine")) ==
+                    SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(fs->mesh(), smesh::Path("galerkin_fine")) ==
                                      SFEM_SUCCESS);
 
                     sfem::Output out(fs);

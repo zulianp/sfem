@@ -262,7 +262,7 @@ namespace sfem {
     // SelfContactPenalty::~SelfContactPenalty() = default;
 
     // std::shared_ptr<SelfContactPenalty> SelfContactPenalty::create(const std::shared_ptr<FunctionSpace>& space) {
-    //     auto surface = smesh::skin(space->mesh_ptr());
+    //     auto surface = smesh::skin(space->mesh());
     //     return create(space, surface);
     // }
 
@@ -348,7 +348,7 @@ namespace sfem {
     //     const real_t* x_prev3[3] = {&x_prev[0], &x_prev[1], &x_prev[2]};
     //     const real_t* x_curr3[3] = {&x_curr[0], &x_curr[1], &x_curr[2]};
 
-    //     impl_->collisions->find(impl_->space->mesh_ptr()->spatial_dimension(), x_prev3, x_curr3);
+    //     impl_->collisions->find(impl_->space->mesh()->spatial_dimension(), x_prev3, x_curr3);
     //     impl_->toi = impl_->collisions->time_of_impact();
 
     //     impl_->collisions->discrete_detection_with_side_effects(impl_->toi);

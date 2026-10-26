@@ -100,12 +100,12 @@ int test_hyperelasticity_partial_assembly(const std::string &op_name) {
         auto     dh = smesh::to_host(h);
         geom_t **pts{nullptr};
         if (fs->has_semi_structured_mesh()) {
-            pts = fs->mesh_ptr()->points()->data();
+            pts = fs->mesh()->points()->data();
         } else {
-            pts = fs->mesh_ptr()->points()->data();
+            pts = fs->mesh()->points()->data();
         }
 
-        const ptrdiff_t nn = fs->mesh_ptr()->n_nodes();
+        const ptrdiff_t nn = fs->mesh()->n_nodes();
         for (ptrdiff_t i = 0; i < nn; ++i) {
             for (int b = 0; b < dim; ++b) {
                 dh->data()[i * dim + b] = (real_t)((b + 1) * pts[0][i] * pts[0][i]);
@@ -199,12 +199,12 @@ int test_hyperelasticity_active_strain_partial_assembly(const std::string &op_na
         auto     dh = smesh::to_host(h);
         geom_t **pts{nullptr};
         if (fs->has_semi_structured_mesh()) {
-            pts = fs->mesh_ptr()->points()->data();
+            pts = fs->mesh()->points()->data();
         } else {
-            pts = fs->mesh_ptr()->points()->data();
+            pts = fs->mesh()->points()->data();
         }
 
-        const ptrdiff_t nn = fs->mesh_ptr()->n_nodes();
+        const ptrdiff_t nn = fs->mesh()->n_nodes();
         for (ptrdiff_t i = 0; i < nn; ++i) {
             for (int b = 0; b < dim; ++b) {
                 dh->data()[i * dim + b] = (real_t)((b + 1) * pts[0][i] * pts[0][i]);

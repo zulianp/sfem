@@ -114,9 +114,9 @@ std::shared_ptr<sfem::Output> create_output(const std::shared_ptr<sfem::Function
     output->set_output_dir(output_dir);
 
     if (fs->has_semi_structured_mesh()) {
-        smesh::semistructured_export_as_standard(fs->mesh_ptr(), output_dir);
+        smesh::semistructured_export_as_standard(fs->mesh(), output_dir);
     } else {
-        fs->mesh_ptr()->write(output_dir);
+        fs->mesh()->write(output_dir);
     }
     return output;
 }
@@ -127,7 +127,7 @@ int test_explicit_euler() {
     auto output          = create_output(f, smesh::Path("explicit_euler"));
 
     auto fs = f->space();
-    auto m  = fs->mesh_ptr();
+    auto m  = fs->mesh();
     auto es = f->execution_space();
 
     auto blas = sfem::blas<real_t>(es);
@@ -184,7 +184,7 @@ int test_newmark() {
     auto output      = create_output(f, smesh::Path("test_newmark"));
 
     auto fs = f->space();
-    auto m  = fs->mesh_ptr();
+    auto m  = fs->mesh();
     auto es = f->execution_space();
 
     auto blas = sfem::blas<real_t>(es);

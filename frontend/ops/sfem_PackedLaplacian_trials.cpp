@@ -439,12 +439,12 @@
 //             if (domain->second.element_type == smesh::HEX8 || domain->second.element_type == SSHEX8) {
 //                 hex8_fff_fill(domain->second.block->n_elements(),
 //                               domain->second.block->elements()->data(),
-//                               impl_->space->mesh_ptr()->points()->data(),
+//                               impl_->space->mesh()->points()->data(),
 //                               impl_->fff[b]->data());
 //             } else {
 //                 tet4_fff_fill(domain->second.block->n_elements(),
 //                               domain->second.block->elements()->data(),
-//                               impl_->space->mesh_ptr()->points()->data(),
+//                               impl_->space->mesh()->points()->data(),
 //                               impl_->fff[b]->data());
 //             }
 //         }
@@ -483,7 +483,7 @@
 //                                      real_t *const        values) {
 //         // SFEM_TRACE_SCOPE("PackedLaplacian::hessian_crs");
 
-//         // auto mesh  = impl_->space->mesh_ptr();
+//         // auto mesh  = impl_->space->mesh();
 //         // auto graph = impl_->space->dof_to_dof_graph();
 //         // int  err   = SFEM_SUCCESS;
 
@@ -510,7 +510,7 @@
 //                                          real_t *const        off_diag_values) {
 //         SFEM_TRACE_SCOPE("PackedLaplacian::hessian_crs_sym");
 
-//         // auto mesh = impl_->space->mesh_ptr();
+//         // auto mesh = impl_->space->mesh();
 //         // int  err  = SFEM_SUCCESS;
 
 //         // impl_->iterate([&](const OpDomain &domain) {
@@ -533,7 +533,7 @@
 //     int PackedLaplacian::hessian_diag(const real_t *const /*x*/, real_t *const values) {
 //         SFEM_TRACE_SCOPE("PackedLaplacian::hessian_diag");
 
-//         // auto mesh = impl_->space->mesh_ptr();
+//         // auto mesh = impl_->space->mesh();
 //         // int  err  = SFEM_SUCCESS;
 
 //         // impl_->iterate([&](const OpDomain &domain) {
@@ -553,7 +553,7 @@
 //     int PackedLaplacian::gradient(const real_t *const x, real_t *const out) {
 //         SFEM_TRACE_SCOPE("PackedLaplacian::gradient");
 
-//         // auto mesh = impl_->space->mesh_ptr();
+//         // auto mesh = impl_->space->mesh();
 //         // return impl_->iterate([&](const OpDomain &domain) {
 //         //     return laplacian_assemble_gradient(domain.element_type,
 //         //                                        domain.block->n_elements(),
@@ -614,7 +614,7 @@
 //     int PackedLaplacian::value(const real_t *x, real_t *const out) {
 //         SFEM_TRACE_SCOPE("PackedLaplacian::value");
 
-//         // auto mesh = impl_->space->mesh_ptr();
+//         // auto mesh = impl_->space->mesh();
 //         // return impl_->iterate([&](const OpDomain &domain) {
 //         //     return laplacian_assemble_value(domain.element_type,
 //         //                                     domain.block->n_elements(),

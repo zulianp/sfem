@@ -44,7 +44,7 @@ namespace sfem {
         size_t n_blocks() const;
         bool is_multi_block() const;
 
-        std::shared_ptr<Mesh> mesh_ptr() const;
+        const std::shared_ptr<Mesh> &mesh() const;
 
         bool                has_semi_structured_mesh() const;
 

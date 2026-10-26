@@ -102,7 +102,7 @@ namespace sfem {
 
     std::shared_ptr<Merit> create_merit(const std::shared_ptr<Function> &f, const std::string &choice) {
         // Both sum over the local elements, the aura's among them, which another rank sums too.
-        if (f->space()->mesh_ptr()->comm()->size() > 1) {
+        if (f->space()->mesh()->comm()->size() > 1) {
             fprintf(stderr, "create_merit: the energy and residual merits are serial; a distributed step brings its own\n");
             return nullptr;
         }

@@ -133,7 +133,7 @@ namespace sfem {
 #ifdef SFEM_ENABLE_AMG
         // TODO could probably abstract this part and make it a function somewhere...
         // I just don't know where
-        auto crs_graph = f_coarse->space()->mesh_ptr()->node_to_node_graph_upper_triangular();
+        auto crs_graph = f_coarse->space()->mesh()->node_to_node_graph_upper_triangular();
         auto diag_values = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), es);
         auto off_diag_values = sfem::create_buffer<real_t>(crs_graph->nnz(), es);
         auto off_diag_rows = sfem::create_buffer<idx_t>(crs_graph->nnz(), es);

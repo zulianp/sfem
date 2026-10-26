@@ -569,7 +569,7 @@ namespace sfem {
                 return;
             }
 
-            auto mesh        = space->mesh_ptr();
+            auto mesh        = space->mesh();
             auto spatial_dim = mesh->spatial_dimension();
             auto es          = f->execution_space();
 
@@ -1635,7 +1635,7 @@ namespace sfem {
             const smesh::Path root(params.output_dir);
             smesh::create_directory(root);
             smesh::create_directory(root / "out");
-            smesh::semistructured_export_as_standard(f->space()->mesh_ptr(), root / "mesh");
+            smesh::semistructured_export_as_standard(f->space()->mesh(), root / "mesh");
 
             auto out = f->output();
             out->enable_AoS_to_SoA(true);

@@ -249,7 +249,7 @@ namespace sfem {
         }
         laplacian_seed_diffusion(*impl_->domains, real_t(1));
 
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
 
         for (auto &n2d : impl_->domains->domains()) {
             OpDomain &domain = n2d.second;
@@ -345,7 +345,7 @@ namespace sfem {
                                real_t *const        values) {
         SFEM_TRACE_SCOPE("Laplacian::hessian_crs");
 
-        auto mesh  = impl_->space->mesh_ptr();
+        auto mesh  = impl_->space->mesh();
         auto graph = impl_->space->dof_to_dof_graph();
 
         return impl_->iterate([&](const OpDomain &domain) {
@@ -367,7 +367,7 @@ namespace sfem {
                                    real_t *const        off_diag_values) {
         SFEM_TRACE_SCOPE("Laplacian::hessian_crs_sym");
 
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
 
         return impl_->iterate([&](const OpDomain &domain) {
             return laplacian_crs_sym(domain.element_type,
@@ -385,7 +385,7 @@ namespace sfem {
     int Laplacian::hessian_diag(const real_t *const /*x*/, real_t *const values) {
         SFEM_TRACE_SCOPE("Laplacian::hessian_diag");
 
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         const ptrdiff_t n = mesh->n_nodes();
 
         return impl_->iterate([&](const OpDomain &domain) {
@@ -425,21 +425,21 @@ namespace sfem {
     int Laplacian::value(const real_t *x, real_t *const out) { return value(x, out, ElementScope::ALL); }
 
     int Laplacian::gradient(const real_t *const x, real_t *const out, const ElementScope scope) {
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) {
             return laplacian_dispatch_domain_vector(domain, *mesh, x, out, domain_element_range(*mesh, domain, scope));
         });
     }
 
     int Laplacian::apply(const real_t *const /*x*/, const real_t *const h, real_t *const out, const ElementScope scope) {
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) {
             return laplacian_dispatch_domain_vector(domain, *mesh, h, out, domain_element_range(*mesh, domain, scope));
         });
     }
 
     int Laplacian::value(const real_t *x, real_t *const out, const ElementScope scope) {
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) {
             return laplacian_value_domain_range(domain, *mesh, x, out, domain_element_range(*mesh, domain, scope));
         });
@@ -458,7 +458,7 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
 
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         int  err  = SFEM_SUCCESS;
         for (const auto &slice : flat_block_element_chunks(*mesh, scope, flat_begin, flat_end)) {
             const smesh::block_idx_t block = slice.block;

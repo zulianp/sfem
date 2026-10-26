@@ -131,7 +131,7 @@ int test_synchronize_after_packing() {
         if (packed) SFEM_TEST_ASSERT(space->initialize_packed_mesh() == SFEM_SUCCESS);
 
         // A smooth field of the coordinates: on the owned nodes, then expected everywhere.
-        auto            m = space->mesh_ptr();
+        auto            m = space->mesh();
         auto            p = m->points()->data();
         const ptrdiff_t n = space->n_dofs();
         auto field        = [&](const ptrdiff_t node, const int d) { return std::sin(7 * p[0][node] + 3 * p[1][node] + d) * p[2][node]; };

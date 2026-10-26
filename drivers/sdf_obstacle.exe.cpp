@@ -224,7 +224,7 @@ int solve_sdf_obstacle(const std::shared_ptr<sfem::Communicator> &comm, int argc
 
     if (fs->has_semi_structured_mesh()) {
         smesh::Path path = output_path / "ssmesh";
-        smesh::semistructured_export_as_standard(fs->mesh_ptr(), path);
+        smesh::semistructured_export_as_standard(fs->mesh(), path);
     }
 
     auto output = f->output();
@@ -237,7 +237,7 @@ int solve_sdf_obstacle(const std::shared_ptr<sfem::Communicator> &comm, int argc
     double tock = smesh::time_seconds();
 
     ptrdiff_t nelements = m->n_elements();
-    ptrdiff_t nnodes    = fs->mesh_ptr()->n_nodes();
+    ptrdiff_t nnodes    = fs->mesh()->n_nodes();
 
     if (!comm->rank()) {
         printf("----------------------------------------\n");

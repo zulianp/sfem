@@ -197,7 +197,7 @@ int run_strain_rate_test(double strain_rate, double max_strain, const char* labe
     
     auto fs = sfem::FunctionSpace::create(mesh, 3);
     const ptrdiff_t ndofs = fs->n_dofs();
-    const ptrdiff_t n_nodes = fs->mesh_ptr()->n_nodes();
+    const ptrdiff_t n_nodes = fs->mesh()->n_nodes();
     
     // Calculate appropriate time step
     // We want strain increment per step to be small enough

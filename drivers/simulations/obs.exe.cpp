@@ -108,8 +108,8 @@ int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int 
     // Output to disk
     smesh::create_directory(output_path);
 
-    fs->mesh_ptr()->write(output_path / "coarse_mesh");
-    smesh::semistructured_export_as_standard(fs->mesh_ptr(), output_path / "mesh");
+    fs->mesh()->write(output_path / "coarse_mesh");
+    smesh::semistructured_export_as_standard(fs->mesh(), output_path / "mesh");
 
     auto out = f->output();
 

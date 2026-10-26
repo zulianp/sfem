@@ -84,12 +84,12 @@ output: {probes: [{type: contact}]}
         dist->newton().add_monitor([&](const sfem::NewtonIteration &it) { iterations[1] += it.iteration > 0; });
         if (serial->run() != SFEM_SUCCESS || dist->run() != SFEM_SUCCESS) return SFEM_FAILURE;
 
-        auto                 sm = serial->function()->space()->mesh_ptr();
+        auto                 sm = serial->function()->space()->mesh();
         const geom_t *const *sp = sm->points()->data();
         std::map<Key, ptrdiff_t> at;
         for (ptrdiff_t i = 0; i < sm->n_nodes(); ++i) at[key(sp[0][i], sp[1][i], sp[2][i])] = i;
 
-        auto                 dm    = dist->function()->space()->mesh_ptr();
+        auto                 dm    = dist->function()->space()->mesh();
         const geom_t *const *dp    = dm->points()->data();
         const ptrdiff_t      owned = dist->function()->space()->n_dofs_owned() / 3;
         const real_t        *us    = serial->solution()->data();

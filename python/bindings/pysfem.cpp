@@ -157,7 +157,7 @@ NB_MODULE(pysfem, m) {
             .def("size", &Sideset::size)
             .def("node_indices",
                  [](const std::shared_ptr<Sideset> &sideset, const std::shared_ptr<FunctionSpace> &fs) {
-                     return create_nodeset_from_sideset(fs->mesh_ptr(), sideset);
+                     return create_nodeset_from_sideset(fs->mesh(), sideset);
                  })
             .def("parent", &Sideset::parent)
             .def("lfi", &Sideset::lfi)
@@ -367,7 +367,7 @@ NB_MODULE(pysfem, m) {
             .def(nb::init<std::shared_ptr<Mesh>>())
             .def(nb::init<std::shared_ptr<Mesh>, const int>())
             .def("derefine", &FunctionSpace::derefine)
-            .def("mesh", &FunctionSpace::mesh_ptr)
+            .def("mesh", &FunctionSpace::mesh)
             .def("n_dofs", &FunctionSpace::n_dofs)
             .def("block_size", &FunctionSpace::block_size)
             .def("n_blocks", &FunctionSpace::n_blocks);

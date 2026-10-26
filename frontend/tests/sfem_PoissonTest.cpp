@@ -13,7 +13,7 @@
 int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const smesh::Path &output_dir) {
     auto es        = f->execution_space();
     auto fs        = f->space();
-    auto m         = fs->mesh_ptr();
+    auto m         = fs->mesh();
     auto linear_op = sfem::create_linear_operator(sfem::op_type::MATRIX_FREE, f, nullptr, es);
 
     std::shared_ptr<sfem::Operator<real_t>> bjacobi;
@@ -22,25 +22,25 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const smesh
     std::shared_ptr<sfem::Buffer<uint16_t>> count;
 
     if (fs->has_semi_structured_mesh()) {
-        auto fff = sfem::create_host_buffer<jacobian_t>(fs->mesh_ptr()->n_elements() * 6);
+        auto fff = sfem::create_host_buffer<jacobian_t>(fs->mesh()->n_elements() * 6);
 
-        if (SFEM_SUCCESS != hex8_fff_fill(fs->mesh_ptr()->n_elements(),
-                                          fs->mesh_ptr()->elements(0)->data(),
-                                          fs->mesh_ptr()->points()->data(),
+        if (SFEM_SUCCESS != hex8_fff_fill(fs->mesh()->n_elements(),
+                                          fs->mesh()->elements(0)->data(),
+                                          fs->mesh()->points()->data(),
                                           fff->data())) {
             SFEM_ERROR("Unable to create fff");
         }
 
-        count = sfem::create_buffer<uint16_t>(fs->mesh_ptr()->n_nodes(), es);
+        count = sfem::create_buffer<uint16_t>(fs->mesh()->n_nodes(), es);
         {
             auto buff     = count->data();
-            auto elements = fs->mesh_ptr()->elements(0)->data();
+            auto elements = fs->mesh()->elements(0)->data();
 
-            const int nxe = fs->mesh_ptr()->n_nodes_per_element(0);
+            const int nxe = fs->mesh()->n_nodes_per_element(0);
             printf("nxe = %d\n", nxe);
 
             for (int d = 0; d < nxe; d++) {
-                for (ptrdiff_t i = 0; i < fs->mesh_ptr()->n_elements(); ++i) {
+                for (ptrdiff_t i = 0; i < fs->mesh()->n_elements(); ++i) {
                     buff[elements[d][i]]++;
                 }
             }
@@ -57,9 +57,9 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const smesh
                 fs->n_dofs(),
                 [=](const real_t *x, real_t *y) {
                     SFEM_TRACE_SCOPE("affine_sshex8_laplacian_bjacobi_fff");
-                    affine_sshex8_laplacian_bjacobi_fff(smesh::semistructured_level(*fs->mesh_ptr()),
-                                                        fs->mesh_ptr()->n_elements(),
-                                                        fs->mesh_ptr()->elements(0)->data(),
+                    affine_sshex8_laplacian_bjacobi_fff(smesh::semistructured_level(*fs->mesh()),
+                                                        fs->mesh()->n_elements(),
+                                                        fs->mesh()->elements(0)->data(),
                                                         fff->data(),
                                                         count->data(),
                                                         constraints_mask->data(),
@@ -105,7 +105,7 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const smesh
 
     if (fs->has_semi_structured_mesh()) {
         SFEM_TEST_ASSERT(m->write(output_dir / "coarse_mesh") == SFEM_SUCCESS);
-        SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(fs->mesh_ptr(), output_dir / "mesh") == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(fs->mesh(), output_dir / "mesh") == SFEM_SUCCESS);
     } else {
         SFEM_TEST_ASSERT(m->write(output_dir / "mesh") == SFEM_SUCCESS);
     }
@@ -128,7 +128,7 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const smesh
 int test_linear_function(const std::shared_ptr<sfem::Function> &f, const smesh::Path &output_dir) {
     auto es        = f->execution_space();
     auto fs        = f->space();
-    auto m         = fs->mesh_ptr();
+    auto m         = fs->mesh();
     auto linear_op = sfem::create_linear_operator(sfem::op_type::MATRIX_FREE, f, nullptr, es);
     auto cg        = sfem::create_cg<real_t>(linear_op, es);
     cg->verbose    = smesh::Env::read<bool>("SFEM_SOLVER_VERBOSE", false);
@@ -175,7 +175,7 @@ int test_linear_function(const std::shared_ptr<sfem::Function> &f, const smesh::
 
         if (fs->has_semi_structured_mesh()) {
             SFEM_TEST_ASSERT(m->write(output_dir / "coarse_mesh") == SFEM_SUCCESS);
-            SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(fs->mesh_ptr(), output_dir / "mesh") == SFEM_SUCCESS);
+            SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(fs->mesh(), output_dir / "mesh") == SFEM_SUCCESS);
         } else {
             SFEM_TEST_ASSERT(m->write(output_dir / "mesh") == SFEM_SUCCESS);
         }
@@ -397,7 +397,7 @@ int test_generic_operator_with_boundary_conditions(const std::string            
                                                    std::shared_ptr<sfem::Op>                                op,
                                                    const std::vector<sfem::DirichletConditions::Condition> &boundary_conditions,
                                                    int                                                      refine_level = 1) {
-    auto mesh = fs->mesh_ptr();
+    auto mesh = fs->mesh();
     if (refine_level > 1) {
         mesh = smesh::to_semistructured(refine_level, mesh, true, false);
     }

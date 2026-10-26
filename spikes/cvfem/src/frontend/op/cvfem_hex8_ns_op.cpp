@@ -275,7 +275,7 @@ namespace sfem {
         SFEM_TRACE_SCOPE("CVFEMNavierStokes::initialize");
 
         auto &d    = impl_->d;
-        auto  mesh = impl_->space->mesh_ptr();
+        auto  mesh = impl_->space->mesh();
 
         if (impl_->space->has_semi_structured_mesh()) {
             // Affine macro-elements only; see the note on is_semi_structured(). `geom` is
@@ -844,7 +844,7 @@ namespace sfem {
         SFEM_TRACE_SCOPE("CVFEMNavierStokes::sideset_flux_weighted");
         out = 0;
         if (!impl_->initialized) return SFEM_FAILURE;
-        auto mesh  = impl_->space->mesh_ptr();
+        auto mesh  = impl_->space->mesh();
         auto named = mesh->sidesets(sideset);
         if (named.empty() || !named.front()) {
             SFEM_ERROR("CVFEMNavierStokes::sideset_flux_weighted: sideset '%s' not found\n", sideset.c_str());
@@ -1342,8 +1342,8 @@ namespace sfem {
         // pairs address the same faces at every level. That level-invariance is the property
         // that makes sidesets the right carrier here -- a coordinate test would have to be
         // re-evaluated per level, and a node-indexed set would have to be filtered.
-        auto fine_mesh   = impl_->space->mesh_ptr();
-        auto coarse_mesh = space->mesh_ptr();
+        auto fine_mesh   = impl_->space->mesh();
+        auto coarse_mesh = space->mesh();
         if (fine_mesh && coarse_mesh) {
             for (const auto &kv : fine_mesh->sidesets()) coarse_mesh->add_sideset(kv.first, kv.second);
         }

@@ -180,7 +180,7 @@ namespace sfem {
 
     //     assert((int)paths.size() == nxe);
 
-    //     auto mesh = space->mesh_ptr();
+    //     auto mesh = space->mesh();
 
     //     for (int d = 0; d < nxe; d++) {
     //         idx_t    *idx   = nullptr;
@@ -245,7 +245,7 @@ namespace sfem {
         void collect_points(std::shared_ptr<Buffer<geom_t *>> &surface_points) {
             SFEM_TRACE_SCOPE("MeshContactSurface::collect_points");
 
-            auto               mesh = space->mesh_ptr();
+            auto               mesh = space->mesh();
             const ptrdiff_t    n    = node_mapping->size();
             const idx_t *const idx  = node_mapping->data();
             const int          dim  = mesh->spatial_dimension();
@@ -288,7 +288,7 @@ namespace sfem {
         void displace_points(const real_t *disp) {
             SFEM_TRACE_SCOPE("ContactConditions::displace_points");
 
-            auto            mesh = space->mesh_ptr();
+            auto            mesh = space->mesh();
             const ptrdiff_t n    = node_mapping->size();
             const int       dim  = mesh->spatial_dimension();
 
@@ -357,13 +357,13 @@ namespace sfem {
     std::unique_ptr<MeshContactSurface> MeshContactSurface::create(const std::shared_ptr<FunctionSpace>        &space,
                                                                    const std::vector<std::shared_ptr<Sideset>> &sidesets,
                                                                    const enum ExecutionSpace                    es) {
-        auto            mesh = space->mesh_ptr();
+        auto            mesh = space->mesh();
         smesh::ElemType st   = side_type(space->element_type());
         if (st == smesh::INVALID) {
             SFEM_ERROR("Invalid element type: %d\n", space->element_type());
         }
 
-        auto mesh_for_surface = space->mesh_ptr();
+        auto mesh_for_surface = space->mesh();
         auto sides = smesh::create_surface_from_sidesets(mesh_for_surface, sidesets).second;
 
         idx_t    *idx          = nullptr;
@@ -402,7 +402,7 @@ namespace sfem {
                                                                              const std::string                    &path,
                                                                              const enum ExecutionSpace             es) {
         SFEM_TRACE_SCOPE("MeshContactSurface::create_from_file");
-        auto sideset = Sideset::create_from_file(space->mesh_ptr()->comm(), smesh::Path(path));
+        auto sideset = Sideset::create_from_file(space->mesh()->comm(), smesh::Path(path));
         return create(space, {sideset}, es);
     }
 
@@ -431,10 +431,10 @@ namespace sfem {
         void collect_points(std::shared_ptr<Buffer<geom_t *>> &surface_points) {
             SFEM_TRACE_SCOPE("SSMeshContactSurface::collect_points");
 
-            auto &ssmesh   = *space->mesh_ptr();
+            auto &ssmesh   = *space->mesh();
             auto  sspoints = ssmesh.points();
 
-            auto               mesh = space->mesh_ptr();
+            auto               mesh = space->mesh();
             auto               map  = geometry_node_mapping ? geometry_node_mapping : node_mapping;
             const ptrdiff_t    n    = map->size();
             const idx_t *const idx  = map->data();
@@ -478,7 +478,7 @@ namespace sfem {
         void displace_points(const real_t *disp) {
             SFEM_TRACE_SCOPE("ContactConditions::displace_points_semistructured");
 
-            auto            mesh = space->mesh_ptr();
+            auto            mesh = space->mesh();
             auto            map  = geometry_node_mapping ? geometry_node_mapping : node_mapping;
             const ptrdiff_t n    = map->size();
             const int       dim  = mesh->spatial_dimension();
@@ -501,7 +501,7 @@ namespace sfem {
                 return;
             }
 #endif
-            auto &ssmesh   = *space->mesh_ptr();
+            auto &ssmesh   = *space->mesh();
             auto  sspoints = ssmesh.points();
 
             const idx_t *const idx = map->data();
@@ -562,7 +562,7 @@ namespace sfem {
     std::unique_ptr<SSMeshContactSurface> SSMeshContactSurface::create(const std::shared_ptr<FunctionSpace>        &space,
                                                                        const std::vector<std::shared_ptr<Sideset>> &sidesets,
                                                                        const enum ExecutionSpace                    es) {
-        auto     &ssmesh = *space->mesh_ptr();
+        auto     &ssmesh = *space->mesh();
         const int level  = smesh::semistructured_level(ssmesh);
 
         std::vector<std::shared_ptr<Buffer<idx_t *>>> parts;
@@ -586,7 +586,7 @@ namespace sfem {
             if (ss->parent()->size() == 0) {
                 continue;
             }
-            auto extracted = smesh::create_surface_from_sideset(space->mesh_ptr(), ss);
+            auto extracted = smesh::create_surface_from_sideset(space->mesh(), ss);
             if (!extracted.second) {
                 SFEM_ERROR("Unable to extract surface from sideset!\n");
             }
@@ -682,7 +682,7 @@ namespace sfem {
         }
 
         SharedBuffer<idx_t> geometry_node_mapping = node_mapping;
-        pack_owned_contact_nodes(space->mesh_ptr(), node_mapping, semi_structured_sides, geometry_node_mapping);
+        pack_owned_contact_nodes(space->mesh(), node_mapping, semi_structured_sides, geometry_node_mapping);
 
         int  nnxs = 4;
         int  nexs = level * level;

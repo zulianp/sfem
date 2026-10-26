@@ -91,7 +91,7 @@ namespace sfem {
     int LumpedMass::hessian_diag(const real_t *const /*x*/, real_t *const values) {
         SFEM_TRACE_SCOPE("LumpedMass::hessian_diag");
 
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
 
         if (impl_->space->block_size() == 1) {
             return impl_->iterate([&](const OpDomain &domain) {

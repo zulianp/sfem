@@ -101,7 +101,7 @@ namespace sfem {
         SFEM_READ_ENV(SFEM_OUTPUT_DIR, );
         impl_->output_dir = smesh::Path(SFEM_OUTPUT_DIR);
 
-        impl_->smesh_output = smesh::Output::create(space->mesh_ptr(), smesh::Path(impl_->output_dir));
+        impl_->smesh_output = smesh::Output::create(space->mesh(), smesh::Path(impl_->output_dir));
     }
 
     Output::~Output() = default;
@@ -109,7 +109,7 @@ namespace sfem {
     void Output::clear() { impl_->export_counter = 0; }
 
     void Output::set_output_dir(const smesh::Path &path) {
-        impl_->smesh_output = smesh::Output::create(impl_->space->mesh_ptr(), smesh::Path(path));
+        impl_->smesh_output = smesh::Output::create(impl_->space->mesh(), smesh::Path(path));
         impl_->output_dir   = path;
     }
 

@@ -304,7 +304,7 @@ namespace sfem {
 
         if (!SFEM_NEUMANN_SURFACE && !SFEM_NEUMANN_SIDESET) return neumann_conditions;
 
-        auto comm = space->mesh_ptr()->comm();
+        auto comm = space->mesh()->comm();
         int  rank = comm->rank();
 
         auto &conds = neumann_conditions->impl_->conditions;
@@ -372,10 +372,10 @@ namespace sfem {
                     cneumann_conditions.surface      = manage_host_buffer(nnxs, nse, surface);
 
                 } else {
-                    auto sideset = Sideset::create_from_file(space->mesh_ptr()->comm(), smesh::Path(pch));
+                    auto sideset = Sideset::create_from_file(space->mesh()->comm(), smesh::Path(pch));
                     cneumann_conditions.sidesets.push_back(sideset);
 
-                    auto mesh_for_surface            = space->mesh_ptr();
+                    auto mesh_for_surface            = space->mesh();
                     auto surface                     = smesh::create_surface_from_sideset(mesh_for_surface, sideset);
                     cneumann_conditions.element_type = surface.first;
                     cneumann_conditions.surface      = surface.second;
@@ -491,7 +491,7 @@ namespace sfem {
             } else if (is_file) {
                 std::string path;
                 c["path"].load(&path);
-                sidesets = {Sideset::create_from_file(space->mesh_ptr()->comm(), smesh::Path(lookup.resolve(path)))};
+                sidesets = {Sideset::create_from_file(space->mesh()->comm(), smesh::Path(lookup.resolve(path)))};
             } else if (is_expr) {
                 assert(c["parent"].is_seq());
                 assert(c["lfi"].is_seq());
@@ -511,7 +511,7 @@ namespace sfem {
                 }
 
                 assert(lfi_count == parent_count);
-                sidesets = {std::make_shared<Sideset>(space->mesh_ptr()->comm(), parent, lfi)};
+                sidesets = {std::make_shared<Sideset>(space->mesh()->comm(), parent, lfi)};
             }
 
             std::vector<int>     component;
@@ -624,12 +624,12 @@ namespace sfem {
         SFEM_TRACE_SCOPE("NeumannConditions::hessian_bsr");
 
         auto      space = impl_->space;
-        auto      mesh  = space->mesh_ptr();
+        auto      mesh  = space->mesh();
         const int dim   = mesh->spatial_dimension();
         if (space->block_size() != dim || (dim != 2 && dim != 3)) return SFEM_FAILURE;
 
         auto points = mesh->points();
-        if (space->has_semi_structured_mesh()) points = space->mesh_ptr()->points();
+        if (space->has_semi_structured_mesh()) points = space->mesh()->points();
 
         for (const auto &c : impl_->conditions) {
             if (!c.follower_pressure) continue;
@@ -714,7 +714,7 @@ namespace sfem {
     /// while the volume operators complete an owned row from the aura's elements: here the shares a
     /// face leaves at the ghosts are added to their owners instead. Collective.
     static int complete_dead_load(FunctionSpace &space, geom_t **const points, NeumannConditions::Condition &c) {
-        auto            mesh  = space.mesh_ptr();
+        auto            mesh  = space.mesh();
         const ptrdiff_t ndofs = space.n_dofs();
         auto            load  = create_host_buffer<real_t>(ndofs);
         std::memset(load->data(), 0, sizeof(real_t) * static_cast<size_t>(ndofs));
@@ -752,11 +752,11 @@ namespace sfem {
         SFEM_TRACE_SCOPE("NeumannConditions::gradient");
 
         auto space = impl_->space;
-        auto mesh  = space->mesh_ptr();
+        auto mesh  = space->mesh();
 
         auto points = mesh->points();
         if (space->has_semi_structured_mesh()) {
-            points = space->mesh_ptr()->points();
+            points = space->mesh()->points();
         }
         const bool distributed = mesh->is_distributed() && mesh->comm()->size() > 1;
 
@@ -859,9 +859,9 @@ namespace sfem {
         SFEM_TRACE_SCOPE("NeumannConditions::apply");
 
         auto space  = impl_->space;
-        auto mesh   = space->mesh_ptr();
+        auto mesh   = space->mesh();
         auto points = mesh->points();
-        if (space->has_semi_structured_mesh()) points = space->mesh_ptr()->points();
+        if (space->has_semi_structured_mesh()) points = space->mesh()->points();
         for (const auto &c : impl_->conditions) {
             if (!c.follower_pressure) continue;
             const int dim = mesh->spatial_dimension();
@@ -921,10 +921,10 @@ namespace sfem {
         SFEM_TRACE_SCOPE("NeumannConditions::value");
 
         auto space  = impl_->space;
-        auto mesh   = space->mesh_ptr();
+        auto mesh   = space->mesh();
         auto points = mesh->points();
         if (space->has_semi_structured_mesh()) {
-            points = space->mesh_ptr()->points();
+            points = space->mesh()->points();
         }
 
         SharedBuffer<real_t> temp;
@@ -1047,10 +1047,10 @@ namespace sfem {
         SFEM_TRACE_SCOPE("NeumannConditions::value_steps");
 
         auto space  = impl_->space;
-        auto mesh   = space->mesh_ptr();
+        auto mesh   = space->mesh();
         auto points = mesh->points();
         if (space->has_semi_structured_mesh()) {
-            points = space->mesh_ptr()->points();
+            points = space->mesh()->points();
         }
 
         const ptrdiff_t      ndofs = space->n_dofs();
@@ -1193,7 +1193,7 @@ namespace sfem {
             if (!c.surface) {
                 auto it = sideset_to_surface.find(c.sidesets[0]);
                 if (it == sideset_to_surface.end()) {
-                    auto mesh_for_surface             = space->mesh_ptr();
+                    auto mesh_for_surface             = space->mesh();
                     auto surface                      = smesh::create_surface_from_sidesets(mesh_for_surface, c.sidesets);
                     c.element_type                    = surface.first;
                     c.surface                         = surface.second;
@@ -1203,7 +1203,7 @@ namespace sfem {
                     c.surface      = it->second.second;
                 }
             }
-            if (c.follower_pressure && space->mesh_ptr()->spatial_dimension() == 3) {
+            if (c.follower_pressure && space->mesh()->spatial_dimension() == 3) {
                 if (c.element_type == smesh::TRISHELL3) {
                     c.element_type = smesh::TRI3;
                 } else if (c.element_type == smesh::QUADSHELL4) {

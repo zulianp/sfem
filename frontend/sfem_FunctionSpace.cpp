@@ -277,7 +277,7 @@ namespace sfem {
         return impl_->mesh && Impl::mesh_all_semistructured(*impl_->mesh);
     }
 
-    std::shared_ptr<Mesh> FunctionSpace::mesh_ptr() const { return impl_->mesh; }
+    const std::shared_ptr<Mesh> &FunctionSpace::mesh() const { return impl_->mesh; }
 
     int FunctionSpace::block_size() const { return impl_->block_size; }
 
@@ -314,7 +314,7 @@ namespace sfem {
 
     // Helper method to get number of blocks (for internal use)
     size_t FunctionSpace::n_blocks() const {
-        assert(mesh_ptr()->n_blocks() == impl_->element_types.size());
+        assert(mesh()->n_blocks() == impl_->element_types.size());
         return impl_->element_types.size();
     }
 

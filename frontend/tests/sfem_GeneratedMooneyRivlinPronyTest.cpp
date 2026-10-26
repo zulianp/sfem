@@ -379,7 +379,7 @@ namespace {
         auto op = std::make_shared<sfem::GeneratedMooneyRivlinProny>(fs);
         if (affine) op->set_option("ASSUME_AFFINE", true);
         op->initialize();
-        for (const auto &block : fs->mesh_ptr()->blocks()) {
+        for (const auto &block : fs->mesh()->blocks()) {
             op->set_value_in_block(block->name(), "C10", C10);
             op->set_value_in_block(block->name(), "C01", C01);
             op->set_value_in_block(block->name(), "K", K);
@@ -406,7 +406,7 @@ namespace {
                                                       const real_t *const              u,
                                                       const int                        n_steps,
                                                       const real_t                     dt) {
-        const auto                       &mesh = *fs.mesh_ptr();
+        const auto                       &mesh = *fs.mesh();
         const int                         dim  = mesh.spatial_dimension();
         std::vector<real_t>               gradient(fs.n_dofs());
         std::vector<std::vector<real_t>>  forces;

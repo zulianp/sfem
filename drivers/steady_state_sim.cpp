@@ -101,7 +101,7 @@ int steady_state_sim(const std::shared_ptr<sfem::Communicator> &comm, int argc, 
         solver = ssmg;
 
     } else if (SFEM_USE_AMG) {
-        auto crs_graph = f->space()->mesh_ptr()->node_to_node_graph_upper_triangular();
+        auto crs_graph = f->space()->mesh()->node_to_node_graph_upper_triangular();
 
         auto diag_values     = sfem::create_buffer<real_t>(fs->n_dofs(), es);
         auto off_diag_values = sfem::create_buffer<real_t>(crs_graph->nnz(), es);

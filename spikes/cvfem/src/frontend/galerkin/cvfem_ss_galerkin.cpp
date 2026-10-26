@@ -98,7 +98,7 @@ namespace cvfem_ss {
         if (!ss) SFEM_ERROR("assemble_coarse_operator: the operator is not semi-structured\n");
 
         const int Lf = ss->level;
-        const int Lc = coarse->has_semi_structured_mesh() ? smesh::semistructured_level(*coarse->mesh_ptr()) : 1;
+        const int Lc = coarse->has_semi_structured_mesh() ? smesh::semistructured_level(*coarse->mesh()) : 1;
         if (Lc < 1 || Lf % Lc) SFEM_ERROR("assemble_coarse_operator: level %d does not divide %d\n", Lc, Lf);
 
         GalerkinLevel gl;
@@ -579,7 +579,7 @@ namespace cvfem_ss {
         {
             const int Lf = ss->level;
             const int Lc = spaces[1]->has_semi_structured_mesh()
-                                   ? smesh::semistructured_level(*spaces[1]->mesh_ptr())
+                                   ? smesh::semistructured_level(*spaces[1]->mesh())
                                    : 1;
             if (Lc < 1 || Lf % Lc) SFEM_ERROR("assemble_hierarchy: level %d does not divide %d\n", Lc, Lf);
             lv[1] = std::make_shared<GalerkinLevel>();
@@ -593,7 +593,7 @@ namespace cvfem_ss {
         // that level's own constraints.
         for (int i = 2; i < nlevels; ++i) {
             auto nxt    = std::make_shared<GalerkinLevel>();
-            nxt->Lc     = spaces[i]->has_semi_structured_mesh() ? smesh::semistructured_level(*spaces[i]->mesh_ptr()) : 1;
+            nxt->Lc     = spaces[i]->has_semi_structured_mesh() ? smesh::semistructured_level(*spaces[i]->mesh()) : 1;
             nxt->q      = lv[i - 1]->Lc / nxt->Lc;
             nxt->nc     = (nxt->Lc + 1) * (nxt->Lc + 1) * (nxt->Lc + 1);
             nxt->nmacro = lv[i - 1]->nmacro;
@@ -635,7 +635,7 @@ namespace cvfem_ss {
                 // reuses pat.pos, which already maps (e, a, s) to a BSR block, so the
                 // (node, lattice direction) key needs nothing new.
                 if (spaces[(size_t)i]) {
-                    auto cm = spaces[(size_t)i]->mesh_ptr();
+                    auto cm = spaces[(size_t)i]->mesh();
                     if (cm && cm->is_distributed() && cm->comm() && cm->comm()->size() > 1) {
                         const GalerkinLevel &gl  = *lv[(size_t)i];
                         GalerkinPattern     &pat = galerkin_pattern(gl);
@@ -709,7 +709,7 @@ namespace cvfem_ss {
         if (!ss) SFEM_ERROR("make_element_matrix_level: the operator is not semi-structured\n");
 
         const int Lf = ss->level;
-        const int Lc = coarse->has_semi_structured_mesh() ? smesh::semistructured_level(*coarse->mesh_ptr()) : 1;
+        const int Lc = coarse->has_semi_structured_mesh() ? smesh::semistructured_level(*coarse->mesh()) : 1;
         if (Lc < 1 || Lf % Lc) SFEM_ERROR("make_element_matrix_level: level %d does not divide %d\n", Lc, Lf);
 
         // Held for the operator's lifetime rather than chunked: this IS the level's storage,

@@ -106,7 +106,7 @@ static real_t max_penetration(const std::shared_ptr<sfem::ContactConditions> &co
 std::shared_ptr<sfem::ContactConditions> build_cuboid_sphere_contact(const std::shared_ptr<sfem::Function> &f,
                                                                      const EnvOptions                      &opts) {
     auto         fs               = f->space();
-    auto         m                = fs->mesh_ptr();
+    auto         m                = fs->mesh();
     auto         comm             = m->comm();
     auto         es               = f->execution_space();
     const real_t disp_y           = opts.disp_y;
@@ -148,7 +148,7 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_sphere_contact(const std::
         SFEM_ERROR("test_contact: no contact faces on any rank\n");
     }
 
-    const ptrdiff_t n  = static_cast<ptrdiff_t>(opts.base_resolution) * smesh::semistructured_level(*fs->mesh_ptr());
+    const ptrdiff_t n  = static_cast<ptrdiff_t>(opts.base_resolution) * smesh::semistructured_level(*fs->mesh());
     const ptrdiff_t nx = n * resolution_ratio * 2;
     const ptrdiff_t ny = n * 2;
     const ptrdiff_t nz = n * resolution_ratio * 2;
@@ -185,7 +185,7 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_sphere_contact(const std::
 std::shared_ptr<sfem::ContactConditions> build_cuboid_highfreq_contact(const std::shared_ptr<sfem::Function> &f,
                                                                        const EnvOptions                      &opts) {
     auto         fs               = f->space();
-    auto         m                = fs->mesh_ptr();
+    auto         m                = fs->mesh();
     auto         comm             = m->comm();
     auto         es               = f->execution_space();
     const real_t disp_y           = opts.disp_y;
@@ -219,7 +219,7 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_highfreq_contact(const std
     auto bottom_ss = sfem::Sideset::create_from_selector(
             m, [=](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool { return y > -1e-5 && y < 1e-5; });
 
-    const int n   = opts.base_resolution * smesh::semistructured_level(*fs->mesh_ptr());
+    const int n   = opts.base_resolution * smesh::semistructured_level(*fs->mesh());
     auto      sdf = smesh::create_sdf(comm,
                                  n * resolution_ratio * 2,
                                  n * 1 * 2,
@@ -263,7 +263,7 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_highfreq_contact(const std
 std::shared_ptr<sfem::ContactConditions> build_cuboid_multisphere_contact(const std::shared_ptr<sfem::Function> &f,
                                                                           const EnvOptions                      &opts) {
     auto         fs     = f->space();
-    auto         m      = fs->mesh_ptr();
+    auto         m      = fs->mesh();
     auto         comm   = m->comm();
     auto         es     = f->execution_space();
     const real_t disp_y = opts.disp_y;
@@ -296,7 +296,7 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_multisphere_contact(const 
     auto bottom_ss = sfem::Sideset::create_from_selector(
             m, [=](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool { return y > -1e-5 && y < 1e-5; });
 
-    const int n         = opts.base_resolution * smesh::semistructured_level(*fs->mesh_ptr());
+    const int n         = opts.base_resolution * smesh::semistructured_level(*fs->mesh());
     const int n_spheres = opts.n_spheres;
     auto      sdf       = smesh::create_sdf(comm,
                                  n * 5 * 2,
@@ -424,7 +424,7 @@ int test_contact() {
     if (opts.enable_output) {
         contact_conds->update(x->data());
 
-        if (smesh::semistructured_export_as_standard(fs->mesh_ptr(), smesh::Path("test_contact/mesh")) != SFEM_SUCCESS) {
+        if (smesh::semistructured_export_as_standard(fs->mesh(), smesh::Path("test_contact/mesh")) != SFEM_SUCCESS) {
             SFEM_ERROR("test_contact: failed to export mesh\n");
         }
 
@@ -552,7 +552,7 @@ static int run_ssmgc_on_ss_mesh(const std::shared_ptr<sfem::Mesh>               
         smesh::create_directory(root);
         contact_conds->update(x->data());
 
-        if (smesh::semistructured_export_as_standard(fs->mesh_ptr(), root / "mesh") != SFEM_SUCCESS) {
+        if (smesh::semistructured_export_as_standard(fs->mesh(), root / "mesh") != SFEM_SUCCESS) {
             SFEM_ERROR("run_ssmgc_on_ss_mesh: failed to export mesh to %s\n", out_dir);
         }
         if (sdf && (!comm || comm->rank() == 0)) {

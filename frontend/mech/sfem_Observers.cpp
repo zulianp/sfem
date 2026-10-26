@@ -102,7 +102,7 @@ namespace sfem {
     int FieldExport::gather_to(const std::shared_ptr<Mesh> &serial_mesh) {
         auto &impl = *impl_;
         auto  fs   = impl.f->space();
-        auto  mesh = fs->mesh_ptr();
+        auto  mesh = fs->mesh();
         impl.comm  = mesh->comm();
         if (impl.comm->size() == 1 || !mesh->is_distributed()) {
             SFEM_ERROR("FieldExport::gather_to: the function's mesh is not distributed\n");
@@ -183,9 +183,9 @@ namespace sfem {
 
         smesh::create_directory(impl.path);
         if (fs->has_semi_structured_mesh()) {
-            smesh::semistructured_export_as_standard(fs->mesh_ptr(), impl.path / "mesh");
+            smesh::semistructured_export_as_standard(fs->mesh(), impl.path / "mesh");
         } else {
-            fs->mesh_ptr()->write(impl.path / "mesh");
+            fs->mesh()->write(impl.path / "mesh");
         }
 
         impl.output = impl.f->output();
@@ -302,7 +302,7 @@ namespace sfem {
         public:
             ControlPoint(const std::shared_ptr<Function> &f, const std::vector<real_t> &point, const bool with_rates)
                 : f_(f), with_rates_(with_rates) {
-                auto      mesh = f->space()->mesh_ptr();
+                auto      mesh = f->space()->mesh();
                 const int dim  = mesh->spatial_dimension();
                 auto      xyz  = mesh->points()->data();
                 // Distributed, the nearest of the owned nodes over the ranks, sampled by its owner
