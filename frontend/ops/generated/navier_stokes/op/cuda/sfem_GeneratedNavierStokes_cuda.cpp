@@ -71,7 +71,7 @@ namespace sfem {
       values[6] = 0;
     }
 
-    // derefine_op copies the parameters by name, with or without YAML.
+    // derefine copies the parameters by name, with or without YAML.
     [[maybe_unused]] constexpr int N_DEFINED_MATERIAL_PARAMETERS = 7;
     [[maybe_unused]] constexpr int N_MATERIAL_PARAMETERS = 7;
     [[maybe_unused]] static const char *const MATERIAL_PARAMETER_NAMES[N_MATERIAL_PARAMETERS] = {"rho", "nu", "dt", "convection_scale", "f0", "f1", "f2"};
@@ -699,8 +699,8 @@ namespace sfem {
     impl_->domains->set_value_in_block(block_name, var_name, value);
   }
 
-  std::shared_ptr<Op> GPUGeneratedNavierStokes::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
-    SFEM_TRACE_SCOPE("GPUGeneratedNavierStokes::derefine_op");
+  std::shared_ptr<Op> GPUGeneratedNavierStokes::derefine(const std::shared_ptr<FunctionSpace> &space) {
+    SFEM_TRACE_SCOPE("GPUGeneratedNavierStokes::derefine");
     auto ret = std::make_shared<GPUGeneratedNavierStokes>(space);
     if (ret->initialize() != SFEM_SUCCESS) return nullptr;
     for (const auto &entry : impl_->domains->domains()) {

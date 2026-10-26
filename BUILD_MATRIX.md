@@ -86,7 +86,7 @@ The managed and unified memory models are not in this sweep (`CUDA_MEMORY_MODELS
   5 runs: 2.17-2.66 s before, 2.19-2.41 s after.
 - CUDA resampling, unified memory: the result was never copied back to the caller. Fixed, not
   covered by this sweep (host memory model only).
-- Generated ops without RYAML: the material parameter names are needed by `derefine_op` either way
+- Generated ops without RYAML: the material parameter names are needed by `derefine` either way
   (generator fix, regenerated).
 - SCCD (branch tight-api): uninitialized midpoint lanes in `sccd_narrowphase_tight.hpp`, and its
   ctypes binding test skipped for a static library.

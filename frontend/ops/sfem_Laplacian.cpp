@@ -298,19 +298,19 @@ namespace sfem {
         return std::make_unique<Laplacian>(space);
     }
 
-    std::shared_ptr<Op> Laplacian::lor_op(const std::shared_ptr<FunctionSpace> &space) {
+    std::shared_ptr<Op> Laplacian::lor(const std::shared_ptr<FunctionSpace> &space) {
         if (impl_->space->has_semi_structured_mesh() && is_semistructured_type(impl_->space->element_type())) {
-            SMESH_ERROR("Laplacian::lor_op NOT IMPLEMENTED for semi-structured mesh!\n");
+            SMESH_ERROR("Laplacian::lor NOT IMPLEMENTED for semi-structured mesh!\n");
             return nullptr;
         }
         auto ret            = std::make_shared<Laplacian>(space);
-        ret->impl_->domains = impl_->domains->lor_op(space, {});
+        ret->impl_->domains = impl_->domains->lor(space, {});
         laplacian_copy_diffusion(*impl_->domains, *ret->impl_->domains);
         return ret;
     }
 
-    std::shared_ptr<Op> Laplacian::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
-        SFEM_TRACE_SCOPE("Laplacian::derefine_op");
+    std::shared_ptr<Op> Laplacian::derefine(const std::shared_ptr<FunctionSpace> &space) {
+        SFEM_TRACE_SCOPE("Laplacian::derefine");
 
         if (space->has_semi_structured_mesh() && is_semistructured_type(space->element_type())) {
             auto ret = std::make_shared<Laplacian>(space);
@@ -319,7 +319,7 @@ namespace sfem {
             return ret;
         }
 
-        // SS hierarchy bottom: coarse space is standard (e.g. HEX8). MultiDomainOp::derefine_op maps
+        // SS hierarchy bottom: coarse space is standard (e.g. HEX8). MultiDomainOp::derefine maps
         // element types with macro_base_elem and aborts on HEX8 — match old SemiStructuredLaplacian.
         if (impl_->space->has_semi_structured_mesh() && is_semistructured_type(impl_->space->element_type()) &&
             !is_semistructured_type(space->element_type())) {
@@ -330,7 +330,7 @@ namespace sfem {
         }
 
         auto ret            = std::make_shared<Laplacian>(space);
-        ret->impl_->domains = impl_->domains->derefine_op(space, {});
+        ret->impl_->domains = impl_->domains->derefine(space, {});
         laplacian_copy_diffusion(*impl_->domains, *ret->impl_->domains);
         return ret;
     }

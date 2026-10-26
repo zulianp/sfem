@@ -288,7 +288,7 @@ namespace sfem {
         // it refuses on the flat path, which has no block-split kernel.
         int apply_blocks(const real_t *const x, const real_t *const h, real_t *const out, const int blocks);
 
-        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override;
+        std::shared_ptr<Op> derefine(const std::shared_ptr<FunctionSpace> &space) override;
 
         // The operator this one produced for the next coarser level, or null. Function
         // owns the coarse Function and does not hand its operators back, but a multigrid
@@ -344,7 +344,7 @@ namespace sfem {
         int pack_size{1024};
 
     private:
-        // Shared by clone() and derefine_op(): same parameters, different space.
+        // Shared by clone() and derefine(): same parameters, different space.
         std::shared_ptr<Op> clone_onto(const std::shared_ptr<FunctionSpace> &space) const;
 
         class Impl;

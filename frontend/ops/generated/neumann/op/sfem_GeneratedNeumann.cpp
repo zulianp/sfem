@@ -43,7 +43,7 @@ namespace sfem {
       values[2] = 0;
     }
 
-    // derefine_op copies the parameters by name, with or without YAML.
+    // derefine copies the parameters by name, with or without YAML.
     [[maybe_unused]] constexpr int N_DEFINED_MATERIAL_PARAMETERS = 3;
     [[maybe_unused]] constexpr int N_MATERIAL_PARAMETERS = 3;
     [[maybe_unused]] static const char *const MATERIAL_PARAMETER_NAMES[N_MATERIAL_PARAMETERS] = {"t0", "t1", "t2"};

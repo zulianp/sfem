@@ -1094,7 +1094,7 @@ private:
     // Semi-structured geometric multigrid, as a preconditioner for the Jacobian solve.
     //
     // sfem::create_gmg_data builds the hierarchy: it derefines the Function level by level,
-    // which calls derefine_op on the CVFEM operator, which reassembles itself on the coarse
+    // which calls derefine on the CVFEM operator, which reassembles itself on the coarse
     // space. That is rediscretisation rather than Galerkin coarsening, and it has to be --
     // the Rhie-Chow coefficient carries h^2/(2 mu), so the coarse pressure operator differs
     // from the fine one by about 8x per level in 3D and P^T A P would inherit the wrong one.
@@ -1868,7 +1868,7 @@ private:
     // Is the derefined coarse operator the same operator as one built directly on the
     // coarse space?
     //
-    // The coarse operators come from derefine_op, walking down from the fine one. A driver
+    // The coarse operators come from derefine, walking down from the fine one. A driver
     // run at that refine level would instead construct the operator on that space from
     // scratch. Those two ought to be the same object, and if they are not, the hierarchy is
     // not solving a coarse version of the problem at all -- which would be a defect rather

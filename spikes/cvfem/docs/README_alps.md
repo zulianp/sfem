@@ -532,7 +532,7 @@ parameter, and the result it produces says the smoother is the wrong one.
 `Function` owns the coarse `Function`s that `create_gmg_data` derefines but does not hand
 their operators back, and every level here needs two things a linear problem would not
 need: the state to linearise about, and its own block diagonal. So `CVFEMNavierStokes`
-records the operator it produced in `derefine_op` and exposes it as `coarser()`, and the
+records the operator it produced in `derefine` and exposes it as `coarser()`, and the
 driver walks that chain from the finest level. Per level it holds a state buffer, restricted
 from the fine state with the averaging restriction; a matrix-free operator bound to that
 buffer; and a 4x4 block-Jacobi smoother built from `hessian_block_diag`. The coarse level is
@@ -901,7 +901,7 @@ and removes only forty percent of a coarse-smooth pressure error. Rediscretisati
 entire fault; nothing else in the cycle is.
 
 Two checks close off the alternatives. The derefined coarse operator is bit-identical to one
-built directly on the coarse space -- `derefine_op` is not the problem. And the disagreement
+built directly on the coarse space -- `derefine` is not the problem. And the disagreement
 is not a scaling: removing each component's own best-fit scale still leaves 0.68, 0.52, 0.52
 and 0.40 relative error in ux, uy, uz and p. That is why `SFEM_GMG_PSCALE`, `SFEM_GMG_CGC`
 and `SFEM_GMG_RC_DECAY` all failed -- the entire family of scaling knobs was addressing a
@@ -2475,7 +2475,7 @@ parameter, and the result it produces says the smoother is the wrong one.
 `Function` owns the coarse `Function`s that `create_gmg_data` derefines but does not hand
 their operators back, and every level here needs two things a linear problem would not
 need: the state to linearise about, and its own block diagonal. So `CVFEMNavierStokes`
-records the operator it produced in `derefine_op` and exposes it as `coarser()`, and the
+records the operator it produced in `derefine` and exposes it as `coarser()`, and the
 driver walks that chain from the finest level. Per level it holds a state buffer, restricted
 from the fine state with the averaging restriction; a matrix-free operator bound to that
 buffer; and a 4x4 block-Jacobi smoother built from `hessian_block_diag`. The coarse level is
@@ -2844,7 +2844,7 @@ and removes only forty percent of a coarse-smooth pressure error. Rediscretisati
 entire fault; nothing else in the cycle is.
 
 Two checks close off the alternatives. The derefined coarse operator is bit-identical to one
-built directly on the coarse space -- `derefine_op` is not the problem. And the disagreement
+built directly on the coarse space -- `derefine` is not the problem. And the disagreement
 is not a scaling: removing each component's own best-fit scale still leaves 0.68, 0.52, 0.52
 and 0.40 relative error in ux, uy, uz and p. That is why `SFEM_GMG_PSCALE`, `SFEM_GMG_CGC`
 and `SFEM_GMG_RC_DECAY` all failed -- the entire family of scaling knobs was addressing a
@@ -4371,7 +4371,7 @@ parameter, and the result it produces says the smoother is the wrong one.
 `Function` owns the coarse `Function`s that `create_gmg_data` derefines but does not hand
 their operators back, and every level here needs two things a linear problem would not
 need: the state to linearise about, and its own block diagonal. So `CVFEMNavierStokes`
-records the operator it produced in `derefine_op` and exposes it as `coarser()`, and the
+records the operator it produced in `derefine` and exposes it as `coarser()`, and the
 driver walks that chain from the finest level. Per level it holds a state buffer, restricted
 from the fine state with the averaging restriction; a matrix-free operator bound to that
 buffer; and a 4x4 block-Jacobi smoother built from `hessian_block_diag`. The coarse level is
@@ -4740,7 +4740,7 @@ and removes only forty percent of a coarse-smooth pressure error. Rediscretisati
 entire fault; nothing else in the cycle is.
 
 Two checks close off the alternatives. The derefined coarse operator is bit-identical to one
-built directly on the coarse space -- `derefine_op` is not the problem. And the disagreement
+built directly on the coarse space -- `derefine` is not the problem. And the disagreement
 is not a scaling: removing each component's own best-fit scale still leaves 0.68, 0.52, 0.52
 and 0.40 relative error in ux, uy, uz and p. That is why `SFEM_GMG_PSCALE`, `SFEM_GMG_CGC`
 and `SFEM_GMG_RC_DECAY` all failed -- the entire family of scaling knobs was addressing a

@@ -289,7 +289,7 @@ namespace sfem {
 
         ExecutionContext execution_context() const override { return EXECUTION_SPACE_DEVICE; }
 
-        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &/*derefined_space*/) override { return no_op(); }
+        std::shared_ptr<Op> derefine(const std::shared_ptr<FunctionSpace> &/*derefined_space*/) override { return no_op(); }
     };
 
     std::shared_ptr<Op> to_device(const std::shared_ptr<NeumannConditions> &nc) {
@@ -603,7 +603,7 @@ namespace sfem {
             return ret;
         }
 
-        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &derefined_space) override {
+        std::shared_ptr<Op> derefine(const std::shared_ptr<FunctionSpace> &derefined_space) override {
             const auto block_names = selected_block_names();
 
             if (derefined_space->has_semi_structured_mesh() && is_semistructured_type(derefined_space->element_type())) {
@@ -619,7 +619,7 @@ namespace sfem {
             }
 
             auto ret     = std::make_shared<GPULaplacian>(derefined_space);
-            ret->domains = domains->derefine_op(derefined_space, block_names);
+            ret->domains = domains->derefine(derefined_space, block_names);
             for (auto &n2d : ret->domains->domains()) {
                 OpDomain &domain    = n2d.second;
                 auto      domain_op = create_gpu_laplacian_op_data(derefined_space, domain);
@@ -841,7 +841,7 @@ namespace sfem {
             return domain_op && domain_op->corners ? domain_op->corners->data() : nullptr;
         }
 
-        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &derefined_space) override {
+        std::shared_ptr<Op> derefine(const std::shared_ptr<FunctionSpace> &derefined_space) override {
             const auto block_names = selected_block_names();
 
             if (derefined_space->has_semi_structured_mesh() && is_semistructured_type(derefined_space->element_type())) {
@@ -868,7 +868,7 @@ namespace sfem {
 
             auto ret                      = std::make_shared<GPULinearElasticity>(derefined_space);
             ret->use_affine_approximation = use_affine_approximation;
-            ret->domains                  = domains->derefine_op(derefined_space, block_names);
+            ret->domains                  = domains->derefine(derefined_space, block_names);
             gpu_linear_elasticity_copy_material(*domains, *ret->domains);
 
             for (auto &n2d : ret->domains->domains()) {
@@ -1245,12 +1245,12 @@ namespace sfem {
             return ret;
         }
 
-        std::shared_ptr<Op> lor_op(const std::shared_ptr<FunctionSpace> &/*space*/) override {
+        std::shared_ptr<Op> lor(const std::shared_ptr<FunctionSpace> &/*space*/) override {
             SFEM_ERROR("IMPLEMENT ME!\n");
             return nullptr;
         }
 
-        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &/*space*/) override {
+        std::shared_ptr<Op> derefine(const std::shared_ptr<FunctionSpace> &/*space*/) override {
             SFEM_ERROR("IMPLEMENT ME!\n");
             return nullptr;
         }
@@ -1380,12 +1380,12 @@ namespace sfem {
             return ret;
         }
 
-        std::shared_ptr<Op> lor_op(const std::shared_ptr<FunctionSpace> &/*space*/) override {
+        std::shared_ptr<Op> lor(const std::shared_ptr<FunctionSpace> &/*space*/) override {
             SFEM_ERROR("IMPLEMENT ME!\n");
             return nullptr;
         }
 
-        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &/*space*/) override {
+        std::shared_ptr<Op> derefine(const std::shared_ptr<FunctionSpace> &/*space*/) override {
             SFEM_ERROR("IMPLEMENT ME!\n");
             return nullptr;
         }
@@ -1520,12 +1520,12 @@ namespace sfem {
             return ret;
         }
 
-        std::shared_ptr<Op> lor_op(const std::shared_ptr<FunctionSpace> &/*space*/) override {
+        std::shared_ptr<Op> lor(const std::shared_ptr<FunctionSpace> &/*space*/) override {
             SFEM_ERROR("IMPLEMENT ME!\n");
             return nullptr;
         }
 
-        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &/*space*/) override {
+        std::shared_ptr<Op> derefine(const std::shared_ptr<FunctionSpace> &/*space*/) override {
             SFEM_ERROR("IMPLEMENT ME!\n");
             return nullptr;
         }
@@ -1679,19 +1679,19 @@ namespace sfem {
             return ret;
         }
 
-        std::shared_ptr<Op> lor_op(const std::shared_ptr<FunctionSpace> &lor_space) override {
-            SFEM_TRACE_SCOPE("GPUEMVectorWarpOp::lor_op");
+        std::shared_ptr<Op> lor(const std::shared_ptr<FunctionSpace> &lor_space) override {
+            SFEM_TRACE_SCOPE("GPUEMVectorWarpOp::lor");
             assert(linear_elasticity);
-            return linear_elasticity->lor_op(lor_space);
+            return linear_elasticity->lor(lor_space);
         }
 
-        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &derefined_space) override {
-            SFEM_TRACE_SCOPE("GPUEMVectorWarpOp::derefine_op");
+        std::shared_ptr<Op> derefine(const std::shared_ptr<FunctionSpace> &derefined_space) override {
+            SFEM_TRACE_SCOPE("GPUEMVectorWarpOp::derefine");
 
             assert(!blocks.empty());
             assert(linear_elasticity);
             if (blocks.empty() || !linear_elasticity) {
-                SFEM_ERROR("GPUEMVectorWarpOp::derefine_op requires initialized operator\n");
+                SFEM_ERROR("GPUEMVectorWarpOp::derefine requires initialized operator\n");
                 return nullptr;
             }
 
@@ -1708,7 +1708,7 @@ namespace sfem {
                     ret->blocks.push_back(std::move(c));
                 }
                 ret->linear_elasticity =
-                        std::static_pointer_cast<GPULinearElasticity>(linear_elasticity->derefine_op(derefined_space));
+                        std::static_pointer_cast<GPULinearElasticity>(linear_elasticity->derefine(derefined_space));
                 if (!ret->linear_elasticity) {
                     return nullptr;
                 }
@@ -1716,7 +1716,7 @@ namespace sfem {
             }
 
             // Coarsest level: fall back to matrix-free GPU LinearElasticity
-            return linear_elasticity->derefine_op(derefined_space);
+            return linear_elasticity->derefine(derefined_space);
         }
 
         int assemble_block_matrix(const smesh::Mesh                 &em_mesh,

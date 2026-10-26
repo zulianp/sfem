@@ -448,14 +448,14 @@ namespace sfem {
          * @param space Function space for the LOR operator
          * @return Shared pointer to the LOR operator, or nullptr if not supported
          */
-        virtual std::shared_ptr<Op> lor_op(const std::shared_ptr<FunctionSpace> & /*space*/) { return nullptr; }
+        virtual std::shared_ptr<Op> lor(const std::shared_ptr<FunctionSpace> & /*space*/) { return nullptr; }
 
         /**
          * @brief Create a derefined version of this operator
          * @param space Function space for the derefined operator
          * @return Shared pointer to the derefined operator, or nullptr if not supported
          */
-        virtual std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> & /*space*/) { return nullptr; }
+        virtual std::shared_ptr<Op> derefine(const std::shared_ptr<FunctionSpace> & /*space*/) { return nullptr; }
 
         /**
          * @brief Get the execution context of this operator: where it runs and, on the device, the stream
@@ -548,7 +548,7 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
         std::shared_ptr<Op> clone() const override { return std::make_shared<NoOp>(); }
-        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> & /*space*/) override { return std::make_shared<NoOp>(); }
+        std::shared_ptr<Op> derefine(const std::shared_ptr<FunctionSpace> & /*space*/) override { return std::make_shared<NoOp>(); }
         bool                is_no_op() const override { return true; }
         ptrdiff_t           n_dofs_domain() const override { return -1; };
         ptrdiff_t           n_dofs_image() const override { return -1; };

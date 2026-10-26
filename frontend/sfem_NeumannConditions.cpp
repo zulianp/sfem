@@ -1220,7 +1220,7 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    std::shared_ptr<Op> NeumannConditions::derefine_op(const std::shared_ptr<FunctionSpace> & /*derefined_space*/) {
+    std::shared_ptr<Op> NeumannConditions::derefine(const std::shared_ptr<FunctionSpace> & /*derefined_space*/) {
         // std::map<  //
         //         std::shared_ptr<Sideset>,
         //         std::shared_ptr<Buffer<idx_t *>>>

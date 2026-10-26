@@ -374,8 +374,8 @@ int checkerboard_ss_to_hex8_derefine_compare(const char *op_name, const int bloc
     SFEM_TEST_EQ(cb_coarse_fs->element_type(0), smesh::HEX8);
     SFEM_TEST_EQ(cb_coarse_fs->element_type(1), smesh::HEX8);
 
-    auto cb_coarse_op   = cb_op->derefine_op(cb_coarse_fs);
-    auto cube_coarse_op = cube_op->derefine_op(cube_coarse_fs);
+    auto cb_coarse_op   = cb_op->derefine(cb_coarse_fs);
+    auto cube_coarse_op = cube_op->derefine(cube_coarse_fs);
     SFEM_TEST_ASSERT(cb_coarse_op != nullptr);
     SFEM_TEST_ASSERT(cube_coarse_op != nullptr);
 
