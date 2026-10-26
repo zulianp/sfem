@@ -37,18 +37,18 @@
 
 namespace sfem {
 
-    class Factory::Impl {
+    class OpFactory::Impl {
     public:
         std::map<std::string, FactoryFunction>         name_to_create;
         std::map<std::string, FactoryFunctionBoundary> name_to_create_boundary;
     };
 
-    Factory::Factory() : impl_(std::make_unique<Impl>()) {}
+    OpFactory::OpFactory() : impl_(std::make_unique<Impl>()) {}
 
-    Factory::~Factory() = default;
+    OpFactory::~OpFactory() = default;
 
-    Factory &Factory::instance() {
-        static Factory instance_;
+    OpFactory &OpFactory::instance() {
+        static OpFactory instance_;
 
         if (instance_.impl_->name_to_create.empty()) {
             instance_.private_register_op("InertiaPotential", InertiaPotential::create);
@@ -87,41 +87,44 @@ namespace sfem {
         return instance_;
     }
 
-    void Factory::private_register_op(const std::string &name, FactoryFunction factory_function) {
+    void OpFactory::private_register_op(const std::string &name, FactoryFunction factory_function) {
         impl_->name_to_create[name] = factory_function;
     }
 
-    void Factory::register_op(const std::string &name, FactoryFunction factory_function) {
+    void OpFactory::register_op(const std::string &name, FactoryFunction factory_function) {
         instance().private_register_op(name, factory_function);
     }
 
-    std::shared_ptr<Op> Factory::create_op_gpu(const std::shared_ptr<FunctionSpace> &space, const char *name) {
+    std::shared_ptr<Op> OpFactory::create(const std::shared_ptr<FunctionSpace> &space,
+                                          const std::string                    &name,
+                                          const ExecutionSpace                  es) {
+        SFEM_UNUSED(es);
 #ifdef SFEM_ENABLE_CUDA
-        static bool registered_device_ops = false;
-        if (!registered_device_ops) {
-            sfem::register_device_ops();
-            registered_device_ops = true;
+        if (es == EXECUTION_SPACE_DEVICE) {
+            static bool registered_device_ops = false;
+            if (!registered_device_ops) {
+                sfem::register_device_ops();
+                registered_device_ops = true;
+            }
+
+            assert(instance().impl_);
+
+            std::string m_name = name;
+            if (m_name.rfind("gpu:", 0) != 0) {
+                m_name = d_op_str(m_name);
+            }
+
+            auto &ntc = instance().impl_->name_to_create;
+            auto  it  = ntc.find(m_name);
+            if (it == ntc.end()) {
+                std::cerr << "Unable to find op " << m_name << "\n";
+                return nullptr;
+            }
+
+            return it->second(space);
         }
-#endif
+#endif  // SFEM_ENABLE_CUDA
 
-        assert(instance().impl_);
-
-        std::string m_name = name;
-        if (m_name.rfind("gpu:", 0) != 0) {
-            m_name = d_op_str(m_name);
-        }
-
-        auto &ntc = instance().impl_->name_to_create;
-        auto  it  = ntc.find(m_name);
-        if (it == ntc.end()) {
-            std::cerr << "Unable to find op " << m_name << "\n";
-            return nullptr;
-        }
-
-        return it->second(space);
-    }
-
-    std::shared_ptr<Op> Factory::create_op(const std::shared_ptr<FunctionSpace> &space, const char *name) {
         assert(instance().impl_);
 
         auto &ntc = instance().impl_->name_to_create;
@@ -145,9 +148,15 @@ namespace sfem {
         return it->second(space);
     }
 
-    std::shared_ptr<Op> Factory::create_boundary_op(const std::shared_ptr<FunctionSpace>   &space,
-                                                    const std::shared_ptr<Buffer<idx_t *>> &boundary_elements,
-                                                    const char                             *name) {
+    std::shared_ptr<Op> OpFactory::create_boundary(const std::shared_ptr<FunctionSpace>   &space,
+                                                   const std::shared_ptr<Buffer<idx_t *>> &boundary_elements,
+                                                   const std::string                      &name,
+                                                   const ExecutionSpace                    es) {
+        if (es != EXECUTION_SPACE_HOST) {
+            std::cerr << "Boundary op " << name << " exists on the host only\n";
+            return nullptr;
+        }
+
         assert(instance().impl_);
 
         auto &ntc = instance().impl_->name_to_create_boundary;

@@ -426,7 +426,7 @@ namespace sfem {
                         space->mesh()->comm(), st, contact_surface->elements(), contact_surface->points());
 
                 auto trace_space = std::make_shared<FunctionSpace>(surface_mesh, 1);
-                auto bop         = sfem::Factory::create_op(trace_space, "Mass");
+                auto bop         = sfem::OpFactory::create(trace_space, "Mass", sfem::EXECUTION_SPACE_HOST);
                 bop->initialize();
 
                 mass_vector = create_host_buffer<real_t>(trace_space->n_dofs());

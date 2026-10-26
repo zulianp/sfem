@@ -43,7 +43,7 @@ namespace {
 
     void drive(const std::string &op_name, const std::string &mesh, const int block_size, const bool affine) {
         auto space = space_for(mesh, block_size);
-        auto op    = sfem::Factory::create_op(space, op_name.c_str());
+        auto op    = sfem::OpFactory::create(space, op_name.c_str(), sfem::EXECUTION_SPACE_HOST);
         if (!op) {
             fprintf(stderr, "%s: no op on %s\n", op_name.c_str(), mesh.c_str());
             ++failures;

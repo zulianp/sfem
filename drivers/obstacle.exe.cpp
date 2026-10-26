@@ -193,7 +193,7 @@ int solve_obstacle(const std::shared_ptr<sfem::Communicator> &comm, int argc, ch
 
         //     auto blas = sfem::blas<real_t>(es);
         //     auto contact_surf = sfem::mesh_connectivity_from_file(comm, SFEM_OBSTACLE_SURF);
-        //     auto bop = sfem::Factory::create_boundary_op(fs, contact_surf, "BoundaryMass");
+        //     auto bop = sfem::OpFactory::create_boundary(fs, contact_surf, "BoundaryMass", sfem::EXECUTION_SPACE_HOST);
         //     auto ones = sfem::create_buffer<real_t>(ndofs, es);
         //     auto diag_bop = sfem::create_buffer<real_t>(ndofs, es);
         //     blas->values(ndofs, 1, ones->data());

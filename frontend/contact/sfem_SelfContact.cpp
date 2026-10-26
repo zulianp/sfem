@@ -463,7 +463,7 @@ namespace sfem {
 
         private:
             void assemble_mass_vector() {
-                auto bop = sfem::Factory::create_op(trace_space_, "Mass");
+                auto bop = sfem::OpFactory::create(trace_space_, "Mass", sfem::EXECUTION_SPACE_HOST);
                 bop->initialize();
 
                 auto ones = create_host_buffer<real_t>(trace_space_->n_dofs());
@@ -1341,7 +1341,7 @@ namespace sfem {
                         surface_->comm(), element_type, elements, smesh::astype<geom_t>(current_points));
 
                 auto trace_space = std::make_shared<FunctionSpace>(deformed, 1);
-                auto bop         = sfem::Factory::create_op(trace_space, "Mass");
+                auto bop         = sfem::OpFactory::create(trace_space, "Mass", sfem::EXECUTION_SPACE_HOST);
                 bop->initialize();
 
                 auto ones = create_host_buffer<real_t>(trace_space->n_dofs());

@@ -145,7 +145,7 @@ class M10NavierStokesApplicationTest(unittest.TestCase):
             ).read_text()
             self.assertIn("constexpr int MAX_PARAMETERS = 7;", wrapper_source)
             self.assertIn(
-                'Factory::register_op("ss:GeneratedNavierStokes"',
+                'OpFactory::register_op("ss:GeneratedNavierStokes"',
                 registration_source,
             )
             self.assertIn(

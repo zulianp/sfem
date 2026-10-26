@@ -55,7 +55,7 @@ namespace {
     /// traction, which has one and does not move with the state.
     std::shared_ptr<sfem::Function> make_residual_system(const Fixture &fixture,
                                                          const bool     material_first) {
-        auto material = sfem::Factory::create_op(fixture.space, "GeneratedMooneyRivlinKelvinVoigt");
+        auto material = sfem::OpFactory::create(fixture.space, "GeneratedMooneyRivlinKelvinVoigt", sfem::EXECUTION_SPACE_HOST);
         if (!material) { fprintf(stderr, "no MooneyRivlinKelvinVoigt op\n"); std::abort(); }
         for (const auto &block : fixture.mesh->blocks()) {
             material->set_value_in_block(block->name(), "mu", real_t(3));
@@ -69,7 +69,7 @@ namespace {
         material->set_field("previous", previous, 0);
 
         auto forcing = std::dynamic_pointer_cast<sfem::GeneratedNeumann>(
-                sfem::Factory::create_op(fixture.space, "GeneratedNeumann"));
+                sfem::OpFactory::create(fixture.space, "GeneratedNeumann", sfem::EXECUTION_SPACE_HOST));
         if (!forcing) { fprintf(stderr, "no GeneratedNeumann op\n"); std::abort(); }
         auto sidesets = sfem::Sideset::create_from_selector(
                 fixture.mesh, [](const geom_t x, const geom_t, const geom_t) { return x < 1e-8; });
@@ -156,7 +156,7 @@ namespace {
         std::vector<real_t> merits(4, 0);
         SFEM_TEST_ASSERT(with->residual_merit(x->data(), h->data(), 4, kSteps, merits.data()) == SFEM_SUCCESS);
 
-        auto material = sfem::Factory::create_op(fixture.space, "GeneratedMooneyRivlinKelvinVoigt");
+        auto material = sfem::OpFactory::create(fixture.space, "GeneratedMooneyRivlinKelvinVoigt", sfem::EXECUTION_SPACE_HOST);
         auto previous = sfem::create_host_buffer<real_t>(fixture.ndofs);
         seed(fixture.ndofs, 9, previous->data());
         material->set_field("previous", previous, 0);
@@ -255,7 +255,7 @@ namespace {
     /// system has.
     int test_an_energy_system_offers_both_merits() {
         auto fixture = make_fixture();
-        auto op      = sfem::Factory::create_op(fixture.space, "GeneratedNeoHookeanOgden");
+        auto op      = sfem::OpFactory::create(fixture.space, "GeneratedNeoHookeanOgden", sfem::EXECUTION_SPACE_HOST);
         SFEM_TEST_ASSERT(op != nullptr);
         for (const auto &block : fixture.mesh->blocks()) {
             op->set_value_in_block(block->name(), "mu", real_t(3));
@@ -290,7 +290,7 @@ namespace {
     /// test holds both that it runs and that the identity is exact.
     int test_a_body_force_can_be_line_searched() {
         auto fixture = make_fixture();
-        auto op      = sfem::Factory::create_op(fixture.space, "GeneratedBodyForce");
+        auto op      = sfem::OpFactory::create(fixture.space, "GeneratedBodyForce", sfem::EXECUTION_SPACE_HOST);
         SFEM_TEST_ASSERT(op != nullptr);
         for (auto &block : fixture.mesh->blocks()) {
             op->set_value_in_block(block->name(), "density", real_t(1300));

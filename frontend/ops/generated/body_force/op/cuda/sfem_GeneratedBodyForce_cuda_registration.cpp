@@ -3,7 +3,7 @@
 
 namespace sfem {
   void register_GeneratedBodyForce_cuda_generated_op() {
-    Factory::register_op("gpu:GeneratedBodyForce", GPUGeneratedBodyForce::create);
-    Factory::register_op("gpu:ss:GeneratedBodyForce", GPUGeneratedBodyForce::create);
+    OpFactory::register_op("gpu:GeneratedBodyForce", GPUGeneratedBodyForce::create);
+    OpFactory::register_op("gpu:ss:GeneratedBodyForce", GPUGeneratedBodyForce::create);
   }
 }  // namespace sfem

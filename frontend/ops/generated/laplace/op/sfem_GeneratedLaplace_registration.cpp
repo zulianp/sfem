@@ -3,7 +3,7 @@
 
 namespace sfem {
   void register_GeneratedLaplace_generated_op() {
-    Factory::register_op("GeneratedLaplace", GeneratedLaplace::create);
-    Factory::register_op("ss:GeneratedLaplace", GeneratedLaplace::create);
+    OpFactory::register_op("GeneratedLaplace", GeneratedLaplace::create);
+    OpFactory::register_op("ss:GeneratedLaplace", GeneratedLaplace::create);
   }
 }  // namespace sfem

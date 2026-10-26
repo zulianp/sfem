@@ -1249,7 +1249,7 @@ class GenApiTest(unittest.TestCase):
                 encoding="utf-8",
             ) as stream:
                 registration = stream.read()
-            self.assertIn('Factory::register_op("GeneratedNeoHookeanOgden"', registration)
+            self.assertIn('OpFactory::register_op("GeneratedNeoHookeanOgden"', registration)
 
     def test_generated_op_dispatch_sources_split_by_geometry_layout(self):
         class Material:
