@@ -9,10 +9,9 @@
 #include "matrixio_ndarray.h"
 
 
-#include "node_interpolate.hpp"
 
 
-#include "sfem_resample_gap.hpp"
+#include "sresample_gap_calls.hpp"
 
 #include "mesh_utils.hpp"
 

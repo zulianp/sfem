@@ -40,6 +40,10 @@ if(@SFEM_ENABLE_SSDF@)
     _sfem_find_colocated_dependency(ssdf ssdf)
 endif()
 
+if(@SFEM_ENABLE_SRESAMPLE@)
+    _sfem_find_colocated_dependency(SRESAMPLE sresample)
+endif()
+
 if(@SFEM_ENABLE_OPENMP@)
     find_dependency(OpenMP COMPONENTS C CXX)
 endif()

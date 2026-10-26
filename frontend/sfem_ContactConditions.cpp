@@ -23,8 +23,11 @@
 
 #include "sfem_ContactSurface.hpp"
 #include "sfem_Function.hpp"
+#include "sfem_Obstacle.hpp"
+
+#ifdef SFEM_ENABLE_SRESAMPLE
 #include "sfem_SDFObstacle.hpp"
-#include "sfem_resample_gap.hpp"
+#endif
 
 #include "smesh_restriction.hpp"
 
@@ -435,13 +438,15 @@ namespace sfem {
                                                                   : contact_surface->node_mapping()->size();
 
                 if (variational) {
-                    resample_weight_local(
-                            st,
-                            contact_surface->elements()->extent(1),
-                            n_geom,
-                            contact_surface->elements()->data(),
-                            contact_surface->points()->data(),
-                            mass_vector->data());
+                    if (obstacles.empty()) {
+                        SFEM_ERROR("ContactConditions: the variational surface mass needs an obstacle\n");
+                    }
+                    obstacles.front()->sample_weights_accumulate(st,
+                                                                 contact_surface->elements()->extent(1),
+                                                                 n_geom,
+                                                                 contact_surface->elements()->data(),
+                                                                 contact_surface->points()->data(),
+                                                                 mass_vector->data());
 
                     SMESH_CHECK_NANS(mass_vector);
 
@@ -525,6 +530,7 @@ namespace sfem {
                                                                  const enum ExecutionSpace                    es) {
         auto cc = std::make_unique<ContactConditions>(space);
         {
+#ifdef SFEM_ENABLE_SRESAMPLE
             // The mesh's z-range bounds where the contact surface samples the obstacle
             auto mesh = space->mesh();
             const bool has_z = mesh->spatial_dimension() == 3;
@@ -533,6 +539,10 @@ namespace sfem {
                                                                has_z ? mesh->n_nodes() : 0,
                                                                has_z ? mesh->points()->data()[2] : nullptr,
                                                                es));
+#else
+            SFEM_UNUSED(sdf);
+            SFEM_ERROR("ContactConditions: SDF obstacles need sfem built with SFEM_ENABLE_SRESAMPLE\n");
+#endif
         }
 
         if (space->has_semi_structured_mesh()) {
@@ -725,32 +735,26 @@ namespace sfem {
                 assert(is_ptr_device(cs->node_mapping_device()->data()));
                 assert(is_ptr_device(impl_->normals->data()));
 
+                // The obstacle takes the rows on the host (their entries stay on the device)
+                real_t *rows[3] = {nullptr, nullptr, nullptr};
+                Impl::host_rows(impl_->normals, rows);
                 err += obs->sample_normals(cs->element_type(),
                                            cs->elements()->extent(1),
                                            cs->node_mapping_device()->size(),
                                            cs->elements_device()->data(),
                                            cs->points_device()->data(),
-                                           impl_->normals->data());
+                                           rows);
                 continue;
             }
 #endif
             if (mpi) {
-                if (auto sdf_obs = std::dynamic_pointer_cast<SDFObstacle>(obs)) {
-                    if (n_geom > 0 && cs->elements() && cs->points()) {
-                        err += sdf_obs->sample_normals_accumulate(cs->element_type(),
-                                                                  cs->elements()->extent(1),
-                                                                  n_geom,
-                                                                  cs->elements()->data(),
-                                                                  cs->points()->data(),
-                                                                  impl_->normals->data());
-                    }
-                } else if (n_geom > 0 && cs->elements() && cs->points()) {
-                    err += obs->sample_normals(cs->element_type(),
-                                               cs->elements()->extent(1),
-                                               n_geom,
-                                               cs->elements()->data(),
-                                               cs->points()->data(),
-                                               impl_->normals->data());
+                if (n_geom > 0 && cs->elements() && cs->points()) {
+                    err += obs->sample_normals_accumulate(cs->element_type(),
+                                                          cs->elements()->extent(1),
+                                                          n_geom,
+                                                          cs->elements()->data(),
+                                                          cs->points()->data(),
+                                                          impl_->normals->data());
                 }
             } else {
                 err += obs->sample_normals(cs->element_type(),
@@ -877,22 +881,13 @@ namespace sfem {
             }
 #endif
             if (mpi) {
-                if (auto sdf_obs = std::dynamic_pointer_cast<SDFObstacle>(obs)) {
-                    if (n_geom > 0 && cs->elements() && cs->points()) {
-                        err += sdf_obs->sample_value_accumulate(cs->element_type(),
-                                                                cs->elements()->extent(1),
-                                                                n_geom,
-                                                                cs->elements()->data(),
-                                                                cs->points()->data(),
-                                                                gap);
-                    }
-                } else if (n_geom > 0 && cs->elements() && cs->points()) {
-                    err += obs->sample_value(cs->element_type(),
-                                             cs->elements()->extent(1),
-                                             n_geom,
-                                             cs->elements()->data(),
-                                             cs->points()->data(),
-                                             gap);
+                if (n_geom > 0 && cs->elements() && cs->points()) {
+                    err += obs->sample_value_accumulate(cs->element_type(),
+                                                        cs->elements()->extent(1),
+                                                        n_geom,
+                                                        cs->elements()->data(),
+                                                        cs->points()->data(),
+                                                        gap);
                 }
             } else {
                 err += obs->sample_value(cs->element_type(),
@@ -911,13 +906,13 @@ namespace sfem {
             if (w) {
                 std::memset(w, 0, sizeof(real_t) * static_cast<size_t>(n_geom));
             }
-            if (n_geom > 0 && cs->elements() && cs->points()) {
-                resample_weight_local(cs->element_type(),
-                                      cs->elements()->extent(1),
-                                      n_geom,
-                                      cs->elements()->data(),
-                                      cs->points()->data(),
-                                      w);
+            if (n_geom > 0 && cs->elements() && cs->points() && !impl_->obstacles.empty()) {
+                impl_->obstacles.front()->sample_weights_accumulate(cs->element_type(),
+                                                                    cs->elements()->extent(1),
+                                                                    n_geom,
+                                                                    cs->elements()->data(),
+                                                                    cs->points()->data(),
+                                                                    w);
             }
             impl_->complete_surface_nodal(w, n_geom);
             for (ptrdiff_t i = 0; i < n_geom; ++i) {

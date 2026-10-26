@@ -124,14 +124,6 @@ if(SFEM_ENABLE_RESAMPLING)
 endif()
 
 list(APPEND SFEM_MODULES 
-    resampling/interpolate
-    resampling/quadshell4
-    resampling/trishell3
-    resampling/beam2
-    resampling/surface
-    )
-
-list(APPEND SFEM_MODULES 
     frontend
     frontend/constraints
     frontend/ops
@@ -148,6 +140,10 @@ if(SFEM_ENABLE_SSDF)
     list(APPEND SFEM_MODULES frontend/distances frontend/contact)
 endif()
 
+if(SFEM_ENABLE_SRESAMPLE)
+    list(APPEND SFEM_MODULES frontend/sdf_contact)
+endif()
+
 if(SFEM_ENABLE_CUDA)
      list(APPEND SFEM_MODULES
         algebra/cuda
@@ -162,9 +158,6 @@ if(SFEM_ENABLE_CUDA)
         operators/sshex8/cuda
         operators/tet10/cuda
         operators/tet4/cuda
-        resampling/surface/cuda
-        resampling/quadshell4/cuda
-        resampling/interpolate/cuda
         ssmg/cuda
         frontend/ops/cuda
         frontend/ops/prony/cuda
@@ -370,6 +363,10 @@ if(NOT SFEM_ENABLE_MINIMAL)
             # Written against MPI communicators (Communicator::wrap, distributed reads).
             list(APPEND SFEM_EXCLUDED_EXEC "gap_from_sdf;geometry_aware_gap_from_sdf;grid_to_mesh")
         endif()
+        if(NOT SFEM_ENABLE_SRESAMPLE)
+            # They sample an SDF with sresample.
+            list(APPEND SFEM_EXCLUDED_EXEC "gap_from_sdf;geometry_aware_gap_from_sdf")
+        endif()
     endif()
 
     if(SFEM_ENABLE_CUDA)
@@ -485,6 +482,11 @@ if(SFEM_ENABLE_TESTING)
         if(TEST_DRIVER_NAME STREQUAL "sfem_TwoBodyContactTest" AND NOT SFEM_ENABLE_SCCD)
             continue()
         endif()
+        # Tests that sample SDF obstacles (sresample).
+        if(NOT SFEM_ENABLE_SRESAMPLE AND TEST_DRIVER_NAME MATCHES
+           "^sfem_(SDFSampling|NodeObstacleContact|PlaygroundContact|MGSDFContact|CudaContact)Test$")
+            continue()
+        endif()
         # Tests whose cases are YAML.
         if(NOT SFEM_ENABLE_RYAML AND TEST_DRIVER_NAME MATCHES
            "^sfem_(ElasticityCase|PlaygroundCases|PlaygroundContact|LoadProfile|CudaEnergyBSRAssembly)Test$")
@@ -554,7 +556,7 @@ if(SFEM_ENABLE_TESTING)
             list(APPEND SFEM_TARGETS sfem_ParallelExchangeStreamTest)
         endif()
 
-        if(SFEM_ENABLE_RYAML)
+        if(SFEM_ENABLE_RYAML AND SFEM_ENABLE_SRESAMPLE)
             add_executable(sfem_ParallelObstacleTest frontend/tests/mpi/sfem_ParallelObstacleTest.cpp)
             target_link_libraries(sfem_ParallelObstacleTest PRIVATE sfem)
             add_test(
