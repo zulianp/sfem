@@ -31,10 +31,8 @@ namespace sfem {
         bool        verbose{true};
         bool        debug{false};
 
-        enum CycleType {
-            V_CYCLE = 1,
-            W_CYCLE = 2,
-        };
+        // The value is the cycle index, the coarse-level visits per pass: V 1, W 2 (a larger index is valid).
+        enum class CycleType : int { V = 1, W = 2 };
 
         enum CycleReturnCode { CYCLE_CONTINUE = 0, CYCLE_CONVERGED = 1, CYCLE_FAILURE = 2 };
 
@@ -79,7 +77,7 @@ namespace sfem {
             smoother_.clear();
         }
 
-        void set_cycle_type(const int val) { cycle_type_ = val; }
+        void set_cycle_type(const CycleType val) { cycle_type_ = val; }
 
         inline int n_levels() const { return smoother_.size(); }
 
@@ -194,7 +192,7 @@ namespace sfem {
 
         int  max_it_{10};
         int  iterations_{0};
-        int  cycle_type_{V_CYCLE};
+        CycleType cycle_type_{CycleType::V};
         T    atol_{1e-10};
         bool initial_guess_zero_{false};
 
@@ -310,7 +308,7 @@ namespace sfem {
             auto prolongation = prolongation_[coarser_level(level)];
             auto mem_coarse   = memory_[coarser_level(level)];
 
-            for (int k = 0; k < this->cycle_type_; k++) {
+            for (int k = 0; k < static_cast<int>(this->cycle_type_); k++) {
                 // Pre-smoothing starts from zero on a coarse level's first pass (the parent
                 // zeroed it) and on the finest level's first pass of the first cycle when the
                 // caller said so; nowhere else. Cleared again before post-smoothing, which
