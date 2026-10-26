@@ -10,12 +10,7 @@
 // These sweeps derive the Jacobian per sub-control surface from the element's node
 // coordinates, which the pack stages for them -- so they take `points` and no adjugate table.
 //
-// SIX PARAMETERS FEWER THAN THE TEMPLATED SWEEP THEY CAME FROM, which is the clause the
-// template could not satisfy: "the signatures of the functions are lean-and-mean only arguments
-// that are acually used are passed". The isoparametric SIMD kernels carry no Rhie-Chow term --
-// it was never put into them -- so the driver refuses --rhie-chow on this geometry for any
-// pack-based layout, and with_rc was dead here. Gone with it: adj_ptr, det_ptr, pgx, pgy, pgz,
-// rhie_chow_scale and the staging call that filled a pressure gradient nothing read.
+// Rhie-Chow uses each surface geometry and the staged nodal pressure gradients.
 
 #include "kernels/packed/cvfem_hex8_best_packed.hpp"
 #include "kernels/packed/cvfem_hex8_best_store.hpp"
@@ -47,11 +42,13 @@ static SFEM_NOINLINE void apply_residual_packed_isoparam_range(
         scalar_t *const SFEM_RESTRICT ry,
         scalar_t *const SFEM_RESTRICT rz,
         scalar_t *const SFEM_RESTRICT rc,
-        const size_t scratch_n) {
+        const size_t scratch_n,
+        const scalar_t *pgx, const scalar_t *pgy, const scalar_t *pgz,
+        const Hex8RcConfigT<scalar_t> &rc_cfg, const int with_rc) {
         scalar_t *const SFEM_RESTRICT pack_u   = thread_scratch<scalar_t>(0, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(1, scratch_n);
         // Coordinates always: this geometry derives its Jacobian from them.
-        const Hex8PackCoordsT<scalar_t> pk = cvfem_hex8_pack_coords<scalar_t>(true, 0, max_actual_nodes_per_pack);
+        const Hex8PackCoordsT<scalar_t> pk = cvfem_hex8_pack_coords<scalar_t>(true, with_rc, max_actual_nodes_per_pack);
 
 
 
@@ -63,7 +60,8 @@ static SFEM_NOINLINE void apply_residual_packed_isoparam_range(
 
             fill_pack_fields(owned_nodes_ptr, ux, uy, uz, pres, pack, x.n_contiguous, x.n_ghost, x.ghosts, pack_u);
 
-            fill_pack_xyz(owned_nodes_ptr, points, pack, x.n_contiguous, x.n_ghost, x.ghosts, pk.x, pk.y, pk.z);
+            cvfem_hex8_fill_pack_xyz_pgrad(owned_nodes_ptr, points, pgx, pgy, pgz, with_rc,
+                pack, x.n_contiguous, x.n_ghost, x.ghosts, pk.x, pk.y, pk.z, pk.pgx, pk.pgy, pk.pgz);
             // THE LANE LOOP IS WRITTEN OUT HERE, AND IN THE PACK-COLOURED SWEEP BELOW, AND
             // THE REASON IS NOT THE ONE THIS COMMENT USED TO GIVE.
             //
@@ -89,11 +87,15 @@ static SFEM_NOINLINE void apply_residual_packed_isoparam_range(
                 Hex8InputPackT<scalar_t>    in;
                 Hex8CoordPackT<scalar_t>    xyz;
                 Hex8ResidualPackT<scalar_t> outp;
+                Hex8RhieChowPackT<scalar_t> rcp;
             for (ptrdiff_t begin = x.e_start; begin < x.e_end; begin += cvfem_hex8_vec_size<scalar_t>) {
                 const int nlanes = int(MIN((ptrdiff_t)cvfem_hex8_vec_size<scalar_t>, x.e_end - begin));
                 gather_hex8_isoparam_simd_from_pack(pack_elems, pack_u, pk.x, pk.y, pk.z, begin, nlanes,
                                                     in, xyz);
-                cvfem_hex8_ns_upwind_residual_isoparam_simd(rho, mu, xyz, in, outp);
+                if (with_rc) cvfem_hex8_gather_rc_from_pack(pack_elems, pk.pgx, pk.pgy, pk.pgz,
+                    begin, nlanes, rcp, rc_cfg.tau);
+                cvfem_hex8_ns_upwind_residual_isoparam_simd(rho, mu, xyz, in, outp,
+                    scalar_t(0), with_rc ? &rcp : nullptr, rc_cfg.scale);
                 scatter_hex8_simd_to_pack(pack_elems, pack_out, begin, nlanes, outp);
             }
 
@@ -105,12 +107,7 @@ static SFEM_NOINLINE void apply_residual_packed_isoparam_range(
 // The ISOPARAMETRIC Jacobian action. It derives the Jacobian per sub-control surface from the
 // element's node coordinates, which the pack stages for it.
 //
-// TWELVE PARAMETERS FEWER than the templated sweep it came from. Its SIMD kernel takes the
-// coordinates and the two lane packs and nothing else: no Rhie-Chow term (never put into the
-// isoparametric kernels, which is why the driver refuses --rhie-chow on this geometry for a
-// pack-based layout), no staged direction gradient, no adjugate table, no boundary extras. All
-// of that was dead in this half of the `if constexpr` and had to be in the signature anyway,
-// because a sweep templated on the geometry takes the union of both halves' needs.
+// State gradients are reused; direction gradients change with each action.
 template <typename scalar_t, typename idx_t, typename pack_idx_t, typename geom_t, typename grad_t>
 static SFEM_NOINLINE void apply_jacobian_action_packed_isoparam_range(
         const cvfem_range packs,
@@ -142,7 +139,10 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_isoparam_range(
         const scalar_t venkat_c,
         const bool with_ho,
         const size_t scratch_n,
-        const size_t slot3_n) {
+        const size_t slot3_n,
+        const scalar_t *pgx, const scalar_t *pgy, const scalar_t *pgz,
+        const scalar_t *qgx, const scalar_t *qgy, const scalar_t *qgz,
+        const Hex8RcConfigT<scalar_t> &rc_cfg, const int with_rc, const bool with_qg) {
         // The breakdown covered packed assembly and the colored matvec but not this one --
         // the operator the solver's Krylov loop actually applies. Without it nothing here
         // could be attributed to a phase.
@@ -151,7 +151,8 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_isoparam_range(
         scalar_t *const SFEM_RESTRICT pack_dir = thread_scratch<scalar_t>(1, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(2, scratch_n);
         const Hex8PackCoordsT<scalar_t> pk =
-                cvfem_hex8_pack_coords<scalar_t>(/*want_xyz=*/true, /*with_rc=*/0, max_actual_nodes_per_pack);
+                cvfem_hex8_pack_coords<scalar_t>(/*want_xyz=*/true, with_rc, max_actual_nodes_per_pack);
+        const auto qg = cvfem_hex8_pack_qgrad<scalar_t>(with_qg, max_actual_nodes_per_pack);
 
 
 
@@ -166,19 +167,15 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_isoparam_range(
             fill_pack_fields(owned_nodes_ptr, ux, uy, uz, pres, pack, x.n_contiguous, x.n_ghost, x.ghosts, pack_u);
             fill_pack_interleaved(owned_nodes_ptr, pack, x.n_contiguous, x.n_ghost, x.ghosts, dir, pack_dir);
 
-            Hex8RhieChowPackT<scalar_t> rcp;
-            // The two gradient packs, staged exactly as apply_residual_packed_defcor stages its
-            // one. The limiter and eps^2 live on the state pack because that is where the
-            // correction's own kernel reads them; the direction pack carries only the field.
-            Hex8UGradPackT<scalar_t>    hop, hovp;
-            hop.limiter  = limiter;
-            hop.venkat_c = venkat_c;
             // Coordinates always: this geometry derives its Jacobian from them.
-                fill_pack_xyz(owned_nodes_ptr, points, pack, x.n_contiguous, x.n_ghost, x.ghosts, pk.x, pk.y, pk.z);
+                cvfem_hex8_fill_pack_xyz_pgrad(owned_nodes_ptr, points, pgx, pgy, pgz, with_rc,
+                pack, x.n_contiguous, x.n_ghost, x.ghosts, pk.x, pk.y, pk.z, pk.pgx, pk.pgy, pk.pgz);
+            if (with_qg) cvfem_hex8_fill_pack_qgrad(owned_nodes_ptr, qgx, qgy, qgz,
+                pack, x.n_contiguous, x.n_ghost, x.ghosts, qg.x, qg.y, qg.z);
             CVFEM_PHASE_MARK(acc, _t, PH_GATHER);
 
             cvfem_hex8_action_lanes_isoparam(x, pk, pack_elems, pack_u, pack_dir, pack_out,
-                                             rho, mu);
+                                             rho, mu, &qg, &rc_cfg, with_rc, with_qg);
             CVFEM_PHASE_MARK(acc, _t, PH_KERNEL);
 
             cvfem_hex8_drain_pack_aos(x, pack_out, n_ghost_entries, ghost_buf, jv);

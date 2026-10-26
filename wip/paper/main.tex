@@ -55,6 +55,8 @@
 \input{tables/darwish_cache_macros}
 \input{tables/consistent_matrix_macros}
 \input{figures/state_gradient_macros}
+\input{figures/unstructured_macros}
+\input{figures/mms_macros}
 \IfFileExists{figures/jacho_macros.tex}{\input{figures/jacho_macros}}{}
 \IfFileExists{figures/meshfoot_macros.tex}{\input{figures/meshfoot_macros}}{}
 \IfFileExists{figures/jacfair_macros.tex}{\input{figures/jacfair_macros}}{}
@@ -753,12 +755,12 @@ at each node --- three velocity components and pressure --- and fluxes are integ
 sub-control-surfaces of the dual mesh. The discretisation itself is not the subject of this
 paper, but \emph{which} operator is being measured is, so the variants are set out explicitly.
 
-\paragraph{Geometry.} Every rate in this paper is for \emph{affine} element geometry: one
+\paragraph{Geometry.} The cube campaigns use \emph{affine} element geometry: one
 Jacobian per element, its adjugate and determinant built once at setup, which is exact on the
-structured hexahedral meshes measured. The isoparametric variant is implemented and selectable but
-is not measured here, and no rate below applies to it; the gap is largest on the nodal
-reconstruction of \S\ref{sec:res:hoexact}, where per-element geometry is exactly the work the
-affine sweep amortises over all its fields.
+structured hexahedral meshes measured. The separate irregular-mesh study in \S\ref{sec:res:unstructured} evaluates
+trilinear geometry in each sweep. Cube rates do not apply to that path.
+The affine nodal reconstruction of \S\ref{sec:res:hoexact} amortises
+per-element geometry over all its fields.
 
 \paragraph{Convective schemes, reconstruction, and the consistent Jacobian.} The baseline flux is
 \emph{first-order upwinding with a hard donor switch}: the face value is taken from whichever
@@ -1632,6 +1634,51 @@ reference-construction costs, not timings of an optimised direct assembler.
 The result concerns fixed-state applications with these SFEM sparse kernels,
 subject to the perturbed-state limitation above; solver speedup and universal
 superiority over assembled implementations are not established.
+
+\subsection{Irregular meshes and spatial refinement}
+\label{sec:res:unstructured}
+
+The public irregular-mesh study uses graded box-with-hole HEX8 meshes made by
+subdividing Gmsh 4.15.0 Delaunay tetrahedra. Node incidence is irregular and
+cells are non-affine; both layouts start from SFC ordering with matched physical
+inputs. First-order steady interior Rhie--Chow operators use $\rho=1.3$ and
+$\mu=0.027$, evaluating trilinear geometry at each sub-control-surface.
+Residuals reconstruct pressure gradients; Jacobian actions reuse state gradients
+and reconstruct direction gradients. Linear-pressure, conservation, layout and
+whole-vector derivative checks pass; omitted pressure-direction gradients fail.
+The scalar reference now uses physical edges, and the packed non-affine kernels
+include the same Rhie--Chow flux and its consistent derivative.
+
+\begin{table}[t]
+  \centering\small
+  \setlength{\tabcolsep}{3pt}
+  \caption{Irregular-mesh FP64 operators on \unstrThreads{} Grace cores.
+    M/L: \num{\unstrMediumCells}/\num{\unstrLargeCells} cells.
+    Ratios are mean atomic/packed times; brackets span all \unstrBlocks{}
+    paired ratios, not confidence intervals. Each arm uses \unstrWarmup{}
+    warmups and \unstrRepeat{} timed applications.}
+  \label{tab:unstructured}
+  \input{tables/unstructured}
+\end{table}
+
+Pack size 256 benefits both operators on both meshes (Table~\ref{tab:unstructured}).
+At size 1024 the medium-mesh action is \unstrMediumBigSlowdown{}\% slower:
+only \unstrMediumBigPacks{} packs serve \unstrThreads{} threads, although this
+experiment does not separate parallelism from locality effects. Complete
+one-/72-thread samples, setup times and array storage are retained externally.
+These are interior-operator timings, not solution accuracy or solver speedups.
+
+\paragraph{Separate affine refinement check.}
+For the steady manufactured solution on $[0,2]^3$ with density one and viscosity
+0.01, FP64 FGMRES with node-block Jacobi solves all five schemes on
+$n=16,24,32,40$. All \mmsCases{} final nonlinear targets are met.
+At $n=\mmsFineN$, the four reconstructed schemes meet the fixed maximum
+velocity-error target \num{\mmsAccuracyTol}; first-order upwind does not.
+Their finest-interval velocity-$L^2$ rates span
+\mmsReconstructedMinRate--\mmsReconstructedMaxRate, so these observations do
+not establish a common second order. All failed accuracy gates and the full
+refinement table are retained in the reproducibility material. This affine
+solve study does not establish convergence on the irregular meshes above.
 
 \section{Discussion and limitations}
 \label{sec:discussion}
