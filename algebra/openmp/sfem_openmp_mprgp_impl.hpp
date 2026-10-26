@@ -63,7 +63,7 @@ namespace sfem {
     /// passes after them read their scalars from there. `work` is a buffer of work_size() entries
     /// in the execution space.
     template <typename T>
-    struct MPRGP_Tpl {
+    struct MPRGPKernels {
         /// x <- P(x)
         std::function<void(const ptrdiff_t n, const T* const lb, const T* const ub, T* const x)> project;
 
@@ -161,7 +161,7 @@ namespace sfem {
     };
 
     template <typename T>
-    struct OpenMP_MPRGP {
+    struct OpenMPMPRGPKernels {
         static void project(const ptrdiff_t n, const T* const lb, const T* const ub, T* const x) {
             with_mprgp_bounds(lb, ub, [&](const auto b) {
 #pragma omp parallel for
@@ -411,7 +411,7 @@ namespace sfem {
             });
         }
 
-        static void build_mprgp(struct MPRGP_Tpl<T>& tpl) {
+        static void build_mprgp(struct MPRGPKernels<T>& tpl) {
             tpl.project          = project;
             tpl.chopped_gradient = chopped_gradient;
             tpl.curvature        = curvature;

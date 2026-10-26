@@ -182,7 +182,7 @@ namespace sfem {
 #ifdef SFEM_ENABLE_CUDA
         if (context.space() == EXECUTION_SPACE_DEVICE) {
             mprgp->blas = GPUBLAS<T>::create(context);
-            CUDA_MPRGP<T>::build_mprgp(mprgp->impl, context);
+            GPUMPRGPKernels<T>::build_mprgp(mprgp->impl, context);
 
         } else
 #endif  // SFEM_ENABLE_CUDA

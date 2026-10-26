@@ -6,9 +6,9 @@
 
 namespace sfem {
 	template <typename T>
-	struct CUDA_MPRGP {
+	struct GPUMPRGPKernels {
             /// The passes on the device, ordered on `context`'s stream.
-            static void build_mprgp(struct MPRGP_Tpl<T>& tpl, const ExecutionContext& context = ExecutionContext::device());
+            static void build_mprgp(struct MPRGPKernels<T>& tpl, const ExecutionContext& context = ExecutionContext::device());
         };
 }
 

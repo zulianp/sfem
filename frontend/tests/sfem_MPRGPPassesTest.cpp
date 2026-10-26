@@ -91,7 +91,7 @@ namespace {
 
     // Where the passes run: the host's vectors as they are, or copies on the device.
     struct Space {
-        sfem::MPRGP_Tpl<real_t>                    impl;
+        sfem::MPRGPKernels<real_t>                    impl;
         sfem::ExecutionSpace                       es;
         std::vector<sfem::SharedBuffer<real_t>>    keep;
         sfem::SharedBuffer<real_t>                 work;
@@ -405,7 +405,7 @@ namespace {
 int test_host_passes() {
     Space s;
     s.es = sfem::EXECUTION_SPACE_HOST;
-    sfem::OpenMP_MPRGP<real_t>::build_mprgp(s.impl);
+    sfem::OpenMPMPRGPKernels<real_t>::build_mprgp(s.impl);
     return check_space(s);
 }
 
@@ -413,7 +413,7 @@ int test_host_passes() {
 int test_device_passes() {
     Space s;
     s.es = sfem::EXECUTION_SPACE_DEVICE;
-    sfem::CUDA_MPRGP<real_t>::build_mprgp(s.impl);
+    sfem::GPUMPRGPKernels<real_t>::build_mprgp(s.impl);
     return check_space(s);
 }
 #endif

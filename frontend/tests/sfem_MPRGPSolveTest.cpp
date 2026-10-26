@@ -83,7 +83,7 @@ namespace {
 
     // On the device, how the CG steps run: the product adds into its output and each step returns
     // to the host (ADDS); the product writes it whole and the steps return to the host one by one
-    // (STEPS) or run in the execution space until the run ends (RUNS, MPRGP_Tpl::cg_run).
+    // (STEPS) or run in the execution space until the run ends (RUNS, MPRGPKernels::cg_run).
     enum class DeviceCg { ADDS, STEPS, RUNS };
 
     int solve(const sfem::ExecutionSpace es,
