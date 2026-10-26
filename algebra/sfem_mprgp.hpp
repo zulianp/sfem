@@ -29,6 +29,8 @@ namespace sfem {
     template <typename T>
     class MPRGP final : public MatrixFreeLinearSolver<T> {
     public:
+        /// Built in the execution context, on op.
+        static std::shared_ptr<MPRGP<T>> create(const std::shared_ptr<Operator<T>> &op, const ExecutionContext &context);
         enum class Expansion { ORIGINAL = 0, PROJECTED_CG = 1 };
 
         ~MPRGP() override { release_workspace(); }
@@ -627,6 +629,11 @@ namespace sfem {
             return converged ? SFEM_SUCCESS : SFEM_FAILURE;
         }
     };
+    template <typename T>
+    std::shared_ptr<MPRGP<T>> create_mprgp(const std::shared_ptr<Operator<T>> &op, const ExecutionContext &context) {
+        return MPRGP<T>::create(op, context);
+    }
+
 }  // namespace sfem
 
 #endif  // SFEM_MPRGP_HPP

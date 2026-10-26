@@ -14,6 +14,12 @@ namespace sfem {
     template <typename HP, typename LP>
     class MixedPrecisionShiftableBlockSymJacobi final : public ShiftableOperator<HP> {
     public:
+        /// In the execution context, on the dim x dim symmetric diagonal blocks diag, stored in LP.
+        static std::shared_ptr<MixedPrecisionShiftableBlockSymJacobi<HP, LP>> create(const int                   dim,
+                                                                                     const SharedBuffer<HP>     &diag,
+                                                                                     const SharedBuffer<mask_t> &constraints_mask,
+                                                                                     const ExecutionContext     &context);
+
         std::shared_ptr<BLAS<LP>>           blas;
         ShiftableBlockSymJacobiKernels<HP, LP> impl;
 
@@ -137,6 +143,15 @@ namespace sfem {
         ret->constraints_mask = constraints_mask;
         ret->set_diag(diag);
         return ret;
+    }
+
+    template <typename HP, typename LP>
+    std::shared_ptr<MixedPrecisionShiftableBlockSymJacobi<HP, LP>> create_mixed_precision_shiftable_block_sym_jacobi(
+            const int                   dim,
+            const SharedBuffer<HP>     &diag,
+            const SharedBuffer<mask_t> &constraints_mask,
+            const ExecutionContext     &context) {
+        return MixedPrecisionShiftableBlockSymJacobi<HP, LP>::create(dim, diag, constraints_mask, context);
     }
 
 }  // namespace sfem

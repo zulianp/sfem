@@ -16,6 +16,8 @@ namespace sfem {
     template <typename T>
     class BiCGStab final : public MatrixFreeLinearSolver<T> {
     public:
+        /// Built for the execution space es, on op.
+        static std::shared_ptr<BiCGStab<T>> create(const std::shared_ptr<Operator<T>> &op, const ExecutionSpace es);
         // Operator
         std::function<void(const T* const, T* const)> apply_op;
         std::function<void(const T* const, T* const)> left_preconditioner_op;
@@ -392,6 +394,11 @@ namespace sfem {
         cg->default_init();
         return cg;
     }
+    template <typename T>
+    std::shared_ptr<BiCGStab<T>> create_bcgs(const std::shared_ptr<Operator<T>> &op, const ExecutionSpace es) {
+        return BiCGStab<T>::create(op, es);
+    }
+
 }  // namespace sfem
 
 #endif  // SFEM_BCGS_HPP

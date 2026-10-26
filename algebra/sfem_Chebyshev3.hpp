@@ -56,6 +56,8 @@ namespace sfem {
     template <typename T>
     class Chebyshev3 : public MatrixFreeLinearSolver<T> {
     public:
+        /// Built for the execution space es, on op.
+        static std::shared_ptr<Chebyshev3<T>> create(const std::shared_ptr<Operator<T>> &op, const ExecutionSpace es);
         // Operator
         std::function<void(const T* const, T* const)> apply_op;
         std::function<void(const T* const, T* const)> preconditioner_op;
@@ -308,6 +310,11 @@ namespace sfem {
         ret->default_init();
         return ret;
     }
+    template <typename T>
+    std::shared_ptr<Chebyshev3<T>> create_cheb3(const std::shared_ptr<Operator<T>> &op, const ExecutionSpace es) {
+        return Chebyshev3<T>::create(op, es);
+    }
+
 }  // namespace sfem
 
 #endif  // SFEM_CHEB3_HPP

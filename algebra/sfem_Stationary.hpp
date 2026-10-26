@@ -18,6 +18,10 @@ namespace sfem {
     template <typename T>
     class StationaryIteration final : public MatrixFreeLinearSolver<T> {
     public:
+        /// Built for the execution space es: op preconditioned by preconditioner.
+        static std::shared_ptr<StationaryIteration<T>> create(const std::shared_ptr<Operator<T>> &op,
+                                                              const std::shared_ptr<Operator<T>> &preconditioner,
+                                                              const ExecutionSpace                es);
         ptrdiff_t                    n_dofs{SFEM_PTRDIFF_INVALID};
         ptrdiff_t                    n_alloc{SFEM_PTRDIFF_INVALID};
         int                          max_it{3};
@@ -148,6 +152,13 @@ namespace sfem {
         solver->default_init();
         return solver;
     }
+    template <typename T>
+    std::shared_ptr<StationaryIteration<T>> create_stationary(const std::shared_ptr<Operator<T>> &op,
+                                                              const std::shared_ptr<Operator<T>> &preconditioner,
+                                                              const ExecutionSpace                es) {
+        return StationaryIteration<T>::create(op, preconditioner, es);
+    }
+
 }  // namespace sfem
 
 #endif  // SFEM_STATIONARY_HPP

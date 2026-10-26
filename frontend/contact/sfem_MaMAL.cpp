@@ -15,7 +15,7 @@
 #include "sfem_BSR.hpp"
 #include "sfem_blas_factory.hpp"
 #include "sfem_mask.hpp"
-#include "sfem_solver_factory.hpp"
+#include "sfem_ShiftableJacobi.hpp"
 #include "smesh_glob.hpp"
 #include "smesh_ssquad4.hpp"
 #include "smesh_ssquad4_prolongation.hpp"

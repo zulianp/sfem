@@ -34,6 +34,8 @@ namespace sfem {
     template <typename T>
     class ParallelConjugateGradient final : public MatrixFreeLinearSolver<T> {
     public:
+        /// On the host only, for now.
+        static std::shared_ptr<ParallelConjugateGradient<T>> create(const std::shared_ptr<ParallelOperator<T>> &op);
         std::shared_ptr<ParallelOperator<T>> apply_op;
         std::shared_ptr<Operator<T>>         preconditioner_op;
         std::shared_ptr<Communicator>        comm_;
@@ -427,6 +429,14 @@ namespace sfem {
         auto cg = std::make_shared<ParallelConjugateGradient<T>>();
         cg->default_init();
         return cg;
+    }
+
+    /// Parallel CG. Caller must pass @c x with @c op->col_allocation_size() entries
+    /// (owned + ghosts/aura). @c b needs at least @c op->rows(); use @c row_allocation_size()
+    /// if applying sideset Dirichlet constraints into @c b (ghost indices).
+    template <typename T>
+    std::shared_ptr<ParallelConjugateGradient<T>> create_parallel_cg(const std::shared_ptr<ParallelOperator<T>> &op) {
+        return ParallelConjugateGradient<T>::create(op);
     }
 
 }  // namespace sfem

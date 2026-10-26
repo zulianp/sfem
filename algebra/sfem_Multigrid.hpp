@@ -27,6 +27,8 @@ namespace sfem {
     template <typename T>
     class Multigrid final : public Operator<T> {
     public:
+        /// Empty, for the execution space es: levels are added after.
+        static std::shared_ptr<Multigrid<T>> create(const ExecutionSpace es);
         std::shared_ptr<BLAS<T>> blas_;
         bool        verbose{true};
         bool        debug{false};
@@ -404,6 +406,11 @@ namespace sfem {
         auto mg = std::make_shared<Multigrid<T>>();
         mg->default_init();
         return mg;
+    }
+
+    template <typename T>
+    std::shared_ptr<Multigrid<T>> create_mg(const ExecutionSpace es) {
+        return Multigrid<T>::create(es);
     }
 
 }  // namespace sfem

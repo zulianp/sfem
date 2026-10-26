@@ -8,7 +8,9 @@
 #include "sfem_Stationary.hpp"
 #include "sfem_aliases.hpp"
 #include "sfem_pwc_interpolator.hpp"
-#include "sfem_solver_factory.hpp"
+#include "sfem_ShiftableJacobi.hpp"
+#include "sfem_Stationary.hpp"
+#include "sfem_cg.hpp"
 #include "smoother.hpp"
 
 std::shared_ptr<sfem::Multigrid<real_t>> builder(

@@ -16,6 +16,9 @@ namespace sfem {
     template <typename T>
     class ShiftableJacobi final : public ShiftableOperator<T> {
     public:
+        /// For the execution space es, on the diagonal diag.
+        static std::shared_ptr<ShiftableJacobi<T>> create(const SharedBuffer<T> &diag, const ExecutionSpace es);
+
         std::shared_ptr<BLAS<T>> blas;
 
         SharedBuffer<T> diag;
@@ -74,6 +77,12 @@ namespace sfem {
     template <typename T>
     class ShiftableBlockSymJacobi final : public ShiftableOperator<T> {
     public:
+        /// In the execution context, on the dim x dim symmetric diagonal blocks diag.
+        static std::shared_ptr<ShiftableBlockSymJacobi<T>> create(const int                   dim,
+                                                                  const SharedBuffer<T>      &diag,
+                                                                  const SharedBuffer<mask_t> &constraints_mask,
+                                                                  const ExecutionContext     &context);
+
         std::shared_ptr<BLAS<T>> blas;
         ShiftableBlockSymJacobiKernels<T> impl;
 
@@ -197,6 +206,19 @@ namespace sfem {
         ret->set_diag(diag);
         return ret;
     }
+    template <typename T>
+    std::shared_ptr<ShiftableJacobi<T>> create_shiftable_jacobi(const SharedBuffer<T> &diag, const ExecutionSpace es) {
+        return ShiftableJacobi<T>::create(diag, es);
+    }
+
+    template <typename T>
+    std::shared_ptr<ShiftableBlockSymJacobi<T>> create_shiftable_block_sym_jacobi(const int                   dim,
+                                                                                  const SharedBuffer<T>      &diag,
+                                                                                  const SharedBuffer<mask_t> &constraints_mask,
+                                                                                  const ExecutionContext     &context) {
+        return ShiftableBlockSymJacobi<T>::create(dim, diag, constraints_mask, context);
+    }
+
 }  // namespace sfem
 
 #endif  // SFEM_SHIFTABLE_JACOBI_HPP

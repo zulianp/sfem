@@ -9,7 +9,9 @@
 #include "sfem_bcgs.hpp"
 #include "sfem_blas_factory.hpp"
 #include "sfem_cg.hpp"
-#include "sfem_solver_factory.hpp"
+#include "sfem_ShiftableJacobi.hpp"
+#include "sfem_bcgs.hpp"
+#include "sfem_cg.hpp"
 
 namespace sfem {
 

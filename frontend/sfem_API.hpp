@@ -2,7 +2,8 @@
 #define SFEM_API_HPP
 
 // An umbrella over the library. What it used to define lives with the module that owns it:
-//   algebra:  sfem_blas_factory.hpp, sfem_operator_factory.hpp, sfem_solver_factory.hpp, sfem_device.hpp
+//   algebra:  sfem_blas_factory.hpp, sfem_operator_factory.hpp, sfem_device.hpp, and the solver factories
+//             in each solver class header (sfem_cg.hpp, sfem_mprgp.hpp, ...)
 //   frontend: sfem_Transfer.hpp, sfem_LinearOperatorFactory.hpp, and the condition factories in
 //             sfem_DirichletConditions.hpp, sfem_NeumannConditions.hpp, sfem_ContactConditions.hpp
 //   smesh:    derefine_elements (smesh_semistructured.hpp)
@@ -12,7 +13,15 @@
 #include "sfem_blas_factory.hpp"
 #include "sfem_device.hpp"
 #include "sfem_operator_factory.hpp"
-#include "sfem_solver_factory.hpp"
+#include "sfem_Chebyshev3.hpp"
+#include "sfem_MixedPrecisionShiftableBlockSymJacobi.hpp"
+#include "sfem_Multigrid.hpp"
+#include "sfem_ShiftableJacobi.hpp"
+#include "sfem_Stationary.hpp"
+#include "sfem_bcgs.hpp"
+#include "sfem_cg.hpp"
+#include "sfem_mprgp.hpp"
+#include "sfem_parallel_cg.hpp"
 
 // C includes
 #include "matrixio_array.h"
