@@ -6,9 +6,9 @@
 
 namespace sfem {
 	template <typename T>
-	struct CUDA_ShiftedPenalty {
+	struct GPUShiftedPenaltyKernels {
             /// The passes on the device, ordered on `context`'s stream.
-            static void build(struct ShiftedPenalty_Tpl<T>& tpl, const ExecutionContext& context = ExecutionContext::device());
+            static void build(struct ShiftedPenaltyKernels<T>& tpl, const ExecutionContext& context = ExecutionContext::device());
         };
 }
 

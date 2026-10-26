@@ -230,11 +230,11 @@ struct TestOutput gen_test_data(enum ExecutionSpace es) {
     auto cc_op_t_r = sfem::create_buffer<real_t>(fs->n_dofs(), es);
     cc_op_t->apply(cc_op_x->data(), cc_op_t_r->data());
 
-    ShiftedPenalty_Tpl<real_t> impl;
+    ShiftedPenaltyKernels<real_t> impl;
     if (EXECUTION_SPACE_DEVICE == es) {
-        CUDA_ShiftedPenalty<real_t>::build(impl);
+        GPUShiftedPenaltyKernels<real_t>::build(impl);
     } else {
-        OpenMP_ShiftedPenalty<real_t>::build(impl);
+        OpenMPShiftedPenaltyKernels<real_t>::build(impl);
     }
 
     auto lagrange_ub = sfem::create_buffer<real_t>(contact_conds->n_constrained_dofs(), es);

@@ -960,7 +960,7 @@ namespace sfem {
             if (es == EXECUTION_SPACE_DEVICE) {
                 // FIXME this should not be here!
                 mg->blas() = GPUBLAS<real_t>::create();
-                CUDA_ShiftedPenalty<real_t>::build(mg->impl());
+                GPUShiftedPenaltyKernels<real_t>::build(mg->impl());
             } else
 #endif
             {

@@ -451,7 +451,7 @@ namespace sfem {
 
         void default_init() {
             blas_ = OpenMPBLAS<T>::create();
-            OpenMP_ShiftedPenalty<T>::build(impl_);
+            OpenMPShiftedPenaltyKernels<T>::build(impl_);
         }
 
         void set_max_it(const int val) { max_it_ = val; }
@@ -503,7 +503,7 @@ namespace sfem {
         }
 
         std::shared_ptr<BLAS<T>>& blas() { return blas_; }
-        ShiftedPenalty_Tpl<T>&    impl() { return impl_; }
+        ShiftedPenaltyKernels<T>&    impl() { return impl_; }
 
     private:
         SharedBuffer<T> create_buffer(const ptrdiff_t n) const {
@@ -1259,7 +1259,7 @@ namespace sfem {
         std::vector<struct Stats> stats;
 
         std::shared_ptr<BLAS<T>> blas_;
-        ShiftedPenalty_Tpl<T>    impl_;
+        ShiftedPenaltyKernels<T>    impl_;
     };
 
     template <typename T>

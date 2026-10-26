@@ -44,7 +44,7 @@ namespace sfem {
         std::shared_ptr<Operator<T>>          apply_op;
 
         std::shared_ptr<BLAS<T>> blas;
-        ShiftedPenalty_Tpl<T> impl;
+        ShiftedPenaltyKernels<T> impl;
 
         std::shared_ptr<MatrixFreeLinearSolver<T>> linear_solver_;
         SharedBuffer<T>                            lagr_lb, lagr_ub;
@@ -93,7 +93,7 @@ namespace sfem {
 
         void default_init() {
             blas = OpenMPBLAS<T>::create();
-            OpenMP_ShiftedPenalty<T>::build(impl);
+            OpenMPShiftedPenaltyKernels<T>::build(impl);
         }
 
         SharedBuffer<T> create_buffer(const ptrdiff_t n) const {

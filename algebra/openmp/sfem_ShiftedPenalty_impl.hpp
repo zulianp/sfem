@@ -12,7 +12,7 @@
 namespace sfem {
 
     template <typename T>
-    struct ShiftedPenalty_Tpl {
+    struct ShiftedPenaltyKernels {
         std::function<T(const ptrdiff_t, const T* const, T* const)>                                               sq_norm_ramp_p;
         std::function<T(const ptrdiff_t, const T* const, T* const)>                                               sq_norm_ramp_m;
         // The penalty of row i is penalty_param * weights[i] (weights null: penalty_param).
@@ -64,8 +64,8 @@ namespace sfem {
     };
 
     template <typename T>
-    struct OpenMP_ShiftedPenalty {
-        static void build(struct ShiftedPenalty_Tpl<T>& tpl) {
+    struct OpenMPShiftedPenaltyKernels {
+        static void build(struct ShiftedPenaltyKernels<T>& tpl) {
             tpl.sq_norm_ramp_p = [](const ptrdiff_t n, const T* const x, T* const ub) -> T {
                 T ret = 0;
 #pragma omp parallel for reduction(+ : ret)
@@ -152,7 +152,7 @@ namespace sfem {
                                               const T* const  lagr_lb,
                                               const T* const  lagr_ub,
                                               T*              result) {
-                SFEM_TRACE_SCOPE("OpenMP_ShiftedPenalty::calc_r_pen");
+                SFEM_TRACE_SCOPE("OpenMPShiftedPenaltyKernels::calc_r_pen");
 
                 // Ramp negative and positive parts
                 if (lb) ramp_m(n, penalty_param, weights, x, lb, lagr_lb, result);
@@ -168,7 +168,7 @@ namespace sfem {
                                 const T* const  lagr_lb,
                                 const T* const  lagr_ub,
                                 T* const        result) {
-                SFEM_TRACE_SCOPE("OpenMP_ShiftedPenalty::calc_J_pen");
+                SFEM_TRACE_SCOPE("OpenMPShiftedPenaltyKernels::calc_J_pen");
 
                 if (lb) {
 #pragma omp parallel for
