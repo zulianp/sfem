@@ -141,7 +141,7 @@ int test_shift_cutoff_release() {
     for (ptrdiff_t i = 0; i < f.nnodes; ++i) {
         const real_t g = f.contact->gap()->data()[i];
         if (z[i] - shift > cutoff) {
-            SFEM_TEST_ASSERT(g >= real_t(SFEM_SDF_UNREACHABLE));
+            SFEM_TEST_ASSERT(g >= real_t(sfem::obstacle_unreachable));
         } else {
             SFEM_TEST_ASSERT(std::abs(g - (z[i] - shift)) < 1e-6);
         }

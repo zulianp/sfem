@@ -4,55 +4,13 @@
 #include "sfem_defs.hpp"
 #include "sfem_execution_context.hpp"
 
+#include "sfem_Obstacle.hpp"
 #include "sfem_aliases.hpp"
 #include "smesh_grid.hpp"
 
-#include <mpi.h>
 #include <memory>
 
 namespace sfem {
-    class Obstacle {
-    public:
-        virtual ~Obstacle()                                 = default;
-        virtual int sample(smesh::ElemType                element_type,
-                           const ptrdiff_t              nelements,
-                           const ptrdiff_t              nnodes,
-                           idx_t **const SFEM_RESTRICT  elements,
-                           geom_t **const SFEM_RESTRICT points,
-                           real_t **const SFEM_RESTRICT normals,
-                           real_t *const SFEM_RESTRICT  gap) = 0;
-
-        virtual int sample_normals(smesh::ElemType                element_type,
-                                   const ptrdiff_t              nelements,
-                                   const ptrdiff_t              nnodes,
-                                   idx_t **const SFEM_RESTRICT  elements,
-                                   geom_t **const SFEM_RESTRICT points,
-                                   real_t **const SFEM_RESTRICT normals) = 0;
-
-        virtual int sample_value(smesh::ElemType                element_type,
-                                 const ptrdiff_t              nelements,
-                                 const ptrdiff_t              nnodes,
-                                 idx_t **const SFEM_RESTRICT  elements,
-                                 geom_t **const SFEM_RESTRICT points,
-                                 real_t *const SFEM_RESTRICT  gap) = 0;
-
-        // At nodes: the gap and unit normals (3 rows; either output may be null) at the points
-        // X[idx[i]] + disp[3 idx[i] + d] (idx and disp may be null), in the obstacle's memory space.
-        virtual int sample_nodes(const ptrdiff_t                   nnodes,
-                                 const idx_t *const SFEM_RESTRICT  idx,
-                                 geom_t **const SFEM_RESTRICT      points,
-                                 const real_t *const SFEM_RESTRICT disp,
-                                 real_t *const SFEM_RESTRICT       gap,
-                                 real_t **const SFEM_RESTRICT      normals) = 0;
-
-        // At the same points: the curvature of the gap's constraint (6 packed rows [xx, xy, xz, yy,
-        // yz, zz]), minus the Hessian of -sdf / |grad sdf|.
-        virtual int sample_nodes_curvature(const ptrdiff_t                   nnodes,
-                                           const idx_t *const SFEM_RESTRICT  idx,
-                                           geom_t **const SFEM_RESTRICT      points,
-                                           const real_t *const SFEM_RESTRICT disp,
-                                           real_t **const SFEM_RESTRICT      curvature) = 0;
-    };
 
     // The interpolating cubic B-spline coefficients of an SDF grid (sfem_sdf_sampling.hpp), padded
     // by one node on every side, so the sampler's four-node stencil stays in the array for every
@@ -78,13 +36,15 @@ namespace sfem {
         ptrdiff_t offset_{0};
     };
 
+    // An obstacle given by a signed distance field on a regular grid, sampled by sresample
+    // (sdf/sresample_surface_sample.hpp on contact surfaces, sdf/sresample_node_sample.hpp at nodes).
     class SDFObstacle final : public Obstacle {
     public:
         SDFObstacle();
         ~SDFObstacle();
 
         void set_variational(const bool enabled);
-        int  sample(smesh::ElemType                element_type,
+        int  sample(smesh::ElemType              element_type,
                     const ptrdiff_t              nelements,
                     const ptrdiff_t              nnodes,
                     idx_t **const SFEM_RESTRICT  elements,
@@ -92,34 +52,38 @@ namespace sfem {
                     real_t **const SFEM_RESTRICT normals,
                     real_t *const SFEM_RESTRICT  gap) override;
 
-        int sample_normals(smesh::ElemType                element_type,
+        int sample_normals(smesh::ElemType              element_type,
                            const ptrdiff_t              nelements,
                            const ptrdiff_t              nnodes,
                            idx_t **const SFEM_RESTRICT  elements,
                            geom_t **const SFEM_RESTRICT points,
                            real_t **const SFEM_RESTRICT normals) override;
 
-        int sample_value(smesh::ElemType                element_type,
+        int sample_value(smesh::ElemType              element_type,
                          const ptrdiff_t              nelements,
                          const ptrdiff_t              nnodes,
                          idx_t **const SFEM_RESTRICT  elements,
                          geom_t **const SFEM_RESTRICT points,
                          real_t *const SFEM_RESTRICT  gap) override;
 
-        // Local assembly only (no lumped-mass divide / unit normalize). MPI callers
-        // scatter-add then finish the average themselves.
         int sample_normals_accumulate(smesh::ElemType              element_type,
                                       const ptrdiff_t              nelements,
                                       const ptrdiff_t              nnodes,
                                       idx_t **const SFEM_RESTRICT  elements,
                                       geom_t **const SFEM_RESTRICT points,
-                                      real_t **const SFEM_RESTRICT normals);
+                                      real_t **const SFEM_RESTRICT normals) override;
         int sample_value_accumulate(smesh::ElemType              element_type,
                                     const ptrdiff_t              nelements,
                                     const ptrdiff_t              nnodes,
                                     idx_t **const SFEM_RESTRICT  elements,
                                     geom_t **const SFEM_RESTRICT points,
-                                    real_t *const SFEM_RESTRICT  gap);
+                                    real_t *const SFEM_RESTRICT  gap) override;
+        int sample_weights_accumulate(smesh::ElemType              element_type,
+                                      const ptrdiff_t              nelements,
+                                      const ptrdiff_t              nnodes,
+                                      idx_t **const SFEM_RESTRICT  elements,
+                                      geom_t **const SFEM_RESTRICT points,
+                                      real_t *const SFEM_RESTRICT  w) override;
 
         // At nodes: the gap, unit normals (3 rows) and curvature (6 rows) of node_interpolate.hpp
         // at the points X[idx[i]] + disp[3 idx[i] + d] (idx and disp may be null). Host only.

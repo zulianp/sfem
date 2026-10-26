@@ -6,9 +6,8 @@
 
 #include "sfem_ContactStabilisedNewmarkScheme.hpp"
 #include "sfem_NodeObstacleView.hpp"
-#include "sfem_SDFObstacle.hpp"
+#include "sfem_Obstacle.hpp"
 #include "sfem_Team.hpp"
-#include "sfem_sdf_sampling.hpp"
 #include "sfem_aliases.hpp"
 #include "smesh_grid.hpp"
 
@@ -136,7 +135,7 @@ namespace sfem {
         real_t min_gap() const;
 
     private:
-        std::shared_ptr<SDFObstacle> obstacle_;
+        std::shared_ptr<Obstacle>    obstacle_;
         SharedBuffer<idx_t>          nodes_;
         SharedBuffer<idx_t>          idx_;  // nodes_ in the execution space
         SharedBuffer<idx_t>          frame_of_;  // per node of the vectors its contact node, -1 if none
@@ -162,7 +161,7 @@ namespace sfem {
         SharedBuffer<real_t>         ahead_normals_;  // 3 rows
         SharedBuffer<real_t>         p0_;             // null until capture_penetration
         real_t                       shift_{0};
-        real_t                       cutoff_{SFEM_SDF_UNREACHABLE};
+        real_t                       cutoff_{obstacle_unreachable};
         real_t                       release_{1};
 
         // The sampled gap and normals to what the constraints see.

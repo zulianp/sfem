@@ -11,8 +11,7 @@
 
 
 
-#include "sfem_resample_gap.hpp"
-#include "node_interpolate.hpp"
+#include "sresample_gap_calls.hpp"
 
 #include "mass.hpp"
 

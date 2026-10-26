@@ -330,6 +330,34 @@ if(SFEM_ENABLE_SSDF)
     endif()
 endif()
 
+if(SFEM_ENABLE_SRESAMPLE)
+    set(SRESAMPLE_ENABLE_OPENMP ${SFEM_ENABLE_OPENMP} CACHE BOOL "" FORCE)
+    set(SRESAMPLE_ENABLE_MPI ${SFEM_ENABLE_MPI} CACHE BOOL "" FORCE)
+    set(SRESAMPLE_ENABLE_CUDA ${SFEM_ENABLE_CUDA} CACHE BOOL "" FORCE)
+    set(SRESAMPLE_ENABLE_TESTING ${SFEM_ENABLE_TESTING} CACHE BOOL "" FORCE)
+    # sresample is ours: sfem's DEV_MODE judges it too, through its own option.
+    set(SRESAMPLE_ENABLE_DEV_MODE ${SFEM_ENABLE_DEV_MODE} CACHE BOOL "" FORCE)
+    # Its demos read meshes with smesh, which sfem always has.
+    if(SFEM_ENABLE_MINIMAL)
+        set(SRESAMPLE_ENABLE_SMESH OFF CACHE BOOL "" FORCE)
+    else()
+        set(SRESAMPLE_ENABLE_SMESH ON CACHE BOOL "" FORCE)
+    endif()
+    # The templates are instantiated for sfem's real_t, geom_t and idx_t too.
+    set(SRESAMPLE_INSTANTIATIONS
+        "float64,float32,int32,float32;float64,float32,int32,float64;float32,float32,int32,float32;${SFEM_REAL_TYPE},${SFEM_GEOM_TYPE},${SFEM_IDX_TYPE},${SFEM_GEOM_TYPE}"
+        CACHE STRING "" FORCE)
+
+    set(SFEM_SRESAMPLE_PATH "${CMAKE_CURRENT_LIST_DIR}/../external/sresample")
+    add_subdirectory("${SFEM_SRESAMPLE_PATH}" "${CMAKE_CURRENT_BINARY_DIR}/external/sresample")
+
+    if(TARGET sresample)
+        list(APPEND SFEM_SUBMODULES sresample)
+    else()
+        message(FATAL_ERROR "Failed to build sresample, make sure to run: git submodule update --init --recursive")
+    endif()
+endif()
+
 # After the subprojects: SCCD creates its own imported Thrust target, which would clash with one
 # created here first (a subdirectory sees its parent's imported targets).
 if(SFEM_ENABLE_CUDA)
