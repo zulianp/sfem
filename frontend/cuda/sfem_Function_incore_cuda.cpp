@@ -20,18 +20,18 @@
 #include "sshex8_laplacian.hpp"
 #include "sshex8.hpp"
 #include "sshex8_linear_elasticity.hpp"
-#include "cu_sshex8_linear_elasticity.hpp"
+#include "sshex8_linear_elasticity_cuda.hpp"
 
 // GPU
-#include "cu_boundary_condition.hpp"
-#include "cu_hex8_adjugate.hpp"
-#include "cu_hex8_fff.hpp"
-#include "cu_laplacian.hpp"
-#include "cu_linear_elasticity.hpp"
-#include "cu_mask.hpp"
-#include "cu_sshex8_elemental_matrix.hpp"
-#include "cu_tet4_adjugate.hpp"
-#include "cu_tet4_fff.hpp"
+#include "boundary_condition_cuda.hpp"
+#include "hex8_adjugate_cuda.hpp"
+#include "hex8_fff_cuda.hpp"
+#include "laplacian_cuda.hpp"
+#include "linear_elasticity_cuda.hpp"
+#include "mask_cuda.hpp"
+#include "sshex8_elemental_matrix_cuda.hpp"
+#include "tet4_adjugate_cuda.hpp"
+#include "tet4_fff_cuda.hpp"
 
 // C++ includes
 #include "sfem_Function.hpp"

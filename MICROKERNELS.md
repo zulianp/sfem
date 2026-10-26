@@ -60,10 +60,10 @@ These go in `base/sfem_base.hpp` (or a new `base/sfem_kernel_macros.hpp` that sf
 2. `sfem_atomic_add(T *p, T v)`, a `SFEM_HOST_DEVICE` template:
    - device: `atomicAdd`
    - host: `#pragma omp atomic update`
-   It replaces the split between `tet4_local_to_global` (tet4_inline_cpu.hpp:67, `#pragma omp atomic update`) and `cu_tet4_local_to_global` (cu_tet4_inline.hpp:170, `atomicAdd`).
+   It replaces the split between `tet4_local_to_global` (tet4_inline_cpu.hpp:67, `#pragma omp atomic update`) and `cu_tet4_local_to_global` (tet4_inline_cuda.hpp:170, `atomicAdd`).
 3. Reorder `base/sfem_unroll.hpp`: test `__CUDACC__`/`__HIPCC__` **before** `_OPENMP >= 202011`. Today the OpenMP-5.1 branch wins whenever `_OPENMP` is set, so a host-device body would get `omp unroll` in nvcc's host pass. Replace the clang-only `#pragma unroll(8)` (hex8_inline_cpu.hpp, `hex8_find_cols`) with `SFEM_UNROLL_N(8)`: gcc ignores `#pragma unroll(8)`.
 4. Guard `SFEM_RESTRICT`/`SFEM_INLINE` in sfem_base.hpp with `#ifndef`, or (preferred) make the generator stop defining them whenever sfem_base.hpp is present (section 3.4).
-5. Remove private `MIN`/`MAX`/`POW2` fallbacks from shared code. `cu_tet4_inline.hpp:4-14` defines `MIN`/`MAX` with `<`/`>` under `#ifndef`, while `base/sfem_macros.hpp:7,11` uses `<=`/`>=`. Whichever header comes first wins. Shared headers include `sfem_macros.hpp` instead.
+5. Remove private `MIN`/`MAX`/`POW2` fallbacks from shared code. `tet4_inline_cuda.hpp:4-14` defines `MIN`/`MAX` with `<`/`>` under `#ifndef`, while `base/sfem_macros.hpp:7,11` uses `<=`/`>=`. Whichever header comes first wins. Shared headers include `sfem_macros.hpp` instead.
 
 Function form used throughout:
 
@@ -95,55 +95,55 @@ static SFEM_INLINE SFEM_HOST_DEVICE void hex8_fff(/* ... */);
 
 | # | Host | Device (and smesh) | Lines h/d | Class |
 | --- | --- | --- | --- | --- |
-| 1 | `hex8_laplacian_diag_fff_integral` hex8/hex8_laplacian_inline_cpu.hpp:445 | `cu_…` hex8/cuda/cu_hex8_laplacian_inline.hpp:443 | 25/26 | A |
+| 1 | `hex8_laplacian_diag_fff_integral` hex8/hex8_laplacian_inline_cpu.hpp:445 | `cu_…` hex8/cuda/hex8_laplacian_inline_cuda.hpp:443 | 25/26 | A |
 | 2 | `hex8_laplacian_apply_fff_integral` :332 | :130 | 112/113 | A |
 | 3 | `hex8_laplacian_matrix_fff_integral` :213 | :10 | 118/119 | B: host has 15 extra `(scalar_t)` casts; one device temporary is `accumulator_t` |
 | 4 | `hex8_laplacian_matrix_ij_taylor` :471 | :288 | 35/43 | D: host takes `H[3]` arrays, device takes `Hx,Hy,Hz` scalars |
 | 5 | `hex8_laplacian_matrix_fff_taylor` :507 | :332 | 18/52 | D: host table `hex8_g_0[i][3]`, device split tables `hex8_g_0_x/_y/_z` |
 | 6 | `hex8_laplacian_apply_fff_taylor` :526 | :385 | 41/57 | B (casts) + calls #4 |
-| 7 | `hex8_adjugate_and_det` hex8/hex8_inline_cpu.hpp:90 | cu_hex8_inline.hpp:52; smesh_hex8_inline.hpp:106 | 61/63 | C. The smesh copy is already `template` + `SMESH_HOST_DEVICE` and takes scalar corner arguments |
-| 8 | `hex8_fff` hex8_inline_cpu.hpp:13 | hex8/cuda/cu_hex8_fff.cu:41; smesh_hex8_inline.hpp:13 | | C. The smesh copy writes `fff0..fff5` through separate pointers, which serves any stride |
-| 9 | `hex8_linear_search` hex8_inline_cpu.hpp:211 | cu_hex8_inline.hpp:8 | 13/14 | A. Also identical to the tet4, tri3, tri6 and tet10 copies |
+| 7 | `hex8_adjugate_and_det` hex8/hex8_inline_cpu.hpp:90 | hex8_inline_cuda.hpp:52; smesh_hex8_inline.hpp:106 | 61/63 | C. The smesh copy is already `template` + `SMESH_HOST_DEVICE` and takes scalar corner arguments |
+| 8 | `hex8_fff` hex8_inline_cpu.hpp:13 | hex8/cuda/hex8_fff_cuda.cu:41; smesh_hex8_inline.hpp:13 | | C. The smesh copy writes `fff0..fff5` through separate pointers, which serves any stride |
+| 9 | `hex8_linear_search` hex8_inline_cpu.hpp:211 | hex8_inline_cuda.hpp:8 | 13/14 | A. Also identical to the tet4, tri3, tri6 and tet10 copies |
 | 10 | `hex8_find_col` :225 | :23 | 3/4 | A |
 | 11 | `hex8_find_cols` :229 | :28 | 34/23 | A apart from the host NDEBUG printout |
-| 12 | `hex8_ref_shape_grad` hex8_inline_cpu.hpp:383 | cu_hex8_linear_elasticity_matrix_inline.hpp:54 | | A (`0` vs `false`) |
-| 13 | `hex8_ref_shape_grad_{x,y,z}` hex8_inline_cpu.hpp:459/480/501 | cu_hex8_linear_elasticity_inline.hpp:7/28/49 | 20 each | A (host has `SFEM_UNUSED`) |
-| 14 | `hex8_linear_elasticity_diag` hex8/hex8_linear_elasticity_inline_cpu.hpp:3236 | cu_hex8_linear_elasticity_inline.hpp:2673 | 274/280 | A |
-| 15 | `linear_elasticity_matrix_sym` …_inline_cpu.hpp:3180 | cu_hex8_linear_elasticity_matrix_inline.hpp:306 | 55/56 | A |
-| 16 | `hex8_linear_elasticity_apply_adj` :152 | cu_hex8_linear_elasticity_inline.hpp:70 | 21(+94 helper)/130 | D: different formulation |
-| 17 | `hex8_linear_elasticity_matrix` :207 (affine, integrated) | `cu_hex8_linear_elasticity_integral_matrix_block_{i}_{j}` cu_hex8_linear_elasticity_integral_inline.hpp:10… (9 functions) | 2249/3166 | D: same closed form, split per 3×3 block, separate CSE |
-| 18 | none | `cu_hex8_linear_elasticity_matrix_block_{i}_{j}` (per qp) cu_hex8_linear_elasticity_inline.hpp:205… | –/2467 | Device only (cu_sshex8_linear_elasticity.cu:315,507) |
-| 19 | `tet4_fff` tet4/tet4_inline_cpu.hpp:224 | cu_tet4_inline.hpp:68; smesh_tet4_inline.hpp:18 | 55/57 | C |
+| 12 | `hex8_ref_shape_grad` hex8_inline_cpu.hpp:383 | hex8_linear_elasticity_matrix_inline_cuda.hpp:54 | | A (`0` vs `false`) |
+| 13 | `hex8_ref_shape_grad_{x,y,z}` hex8_inline_cpu.hpp:459/480/501 | hex8_linear_elasticity_inline_cuda.hpp:7/28/49 | 20 each | A (host has `SFEM_UNUSED`) |
+| 14 | `hex8_linear_elasticity_diag` hex8/hex8_linear_elasticity_inline_cpu.hpp:3236 | hex8_linear_elasticity_inline_cuda.hpp:2673 | 274/280 | A |
+| 15 | `linear_elasticity_matrix_sym` …_inline_cpu.hpp:3180 | hex8_linear_elasticity_matrix_inline_cuda.hpp:306 | 55/56 | A |
+| 16 | `hex8_linear_elasticity_apply_adj` :152 | hex8_linear_elasticity_inline_cuda.hpp:70 | 21(+94 helper)/130 | D: different formulation |
+| 17 | `hex8_linear_elasticity_matrix` :207 (affine, integrated) | `cu_hex8_linear_elasticity_integral_matrix_block_{i}_{j}` hex8_linear_elasticity_integral_inline_cuda.hpp:10… (9 functions) | 2249/3166 | D: same closed form, split per 3×3 block, separate CSE |
+| 18 | none | `cu_hex8_linear_elasticity_matrix_block_{i}_{j}` (per qp) hex8_linear_elasticity_inline_cuda.hpp:205… | –/2467 | Device only (sshex8_linear_elasticity_cuda.cu:315,507) |
+| 19 | `tet4_fff` tet4/tet4_inline_cpu.hpp:224 | tet4_inline_cuda.hpp:68; smesh_tet4_inline.hpp:18 | 55/57 | C |
 | 20 | `tet4_adjugate_and_det` :285 | :17; smesh_tet4_inline.hpp:82 | 49/50 | C |
 | 21 | `tet4_linear_search` :17 | :126 | 15/14 | A |
 | 22 | `tet4_find_col` :33 | :141 | 10/4 | D: the host switches to `find_idx_binary_search` above 32 entries (host-only `extern "C"`) |
 | 23 | `tet4_find_cols` :44 | :146 | 22/23 | A |
 | 24 | `tet4_local_to_global` :67 | :170 | 25/24 | D: `omp atomic` vs `atomicAdd`, `#pragma unroll(4)` |
-| 25 | `tet4_laplacian_apply_fff` tet4/tet4_laplacian_inline_cpu.hpp:54 | cu_tet4_laplacian_inline.hpp:7 | 20/20 | C: host also takes `u0..u3` scalars |
+| 25 | `tet4_laplacian_apply_fff` tet4/tet4_laplacian_inline_cpu.hpp:54 | tet4_laplacian_inline_cuda.hpp:7 | 20/20 | C: host also takes `u0..u3` scalars |
 | 26 | `tet4_laplacian_diag_fff` :32 | :28 | 10/11 | C: host also writes `e0..e3` |
-| 27 | `tet4_linear_elasticity_apply_adj` tet4_linear_elasticity_inline_cpu.hpp:63 | tet4/cuda/cu_tet4_linear_elasticity.cu:16 | | D |
-| 28 | `tet10_laplacian_trial_operand` tet10/tet10_laplacian_inline_cpu.hpp:6 | cu_tet10_laplacian_inline.hpp:7 | 23/25 | C |
-| 29 | `lagrange_hex_triad_interpolate` spectral_hex/lagrange_hex_laplacian_inline.hpp:14 | cu_lagrange_hex_laplacian_inline.hpp:7 | 64/69 | B: device hoists row pointers. Summation order to be checked |
+| 27 | `tet4_linear_elasticity_apply_adj` tet4_linear_elasticity_inline_cpu.hpp:63 | tet4/cuda/tet4_linear_elasticity_cuda.cu:16 | | D |
+| 28 | `tet10_laplacian_trial_operand` tet10/tet10_laplacian_inline_cpu.hpp:6 | tet10_laplacian_inline_cuda.hpp:7 | 23/25 | C |
+| 29 | `lagrange_hex_triad_interpolate` spectral_hex/lagrange_hex_laplacian_inline.hpp:14 | lagrange_hex_laplacian_inline_cuda.hpp:7 | 64/69 | B: device hoists row pointers. Summation order to be checked |
 | 30 | `lagrange_hex_triad_integrate_add` :79 | :77 | 66/66 | B (as #29) |
 | 31 | `lagrange_hex_laplacian_apply` :146 | :144 | 109/46 | D |
-| 32 | `spectral_hex_laplacian_apply` spectral_hex_laplacian_inline.hpp:70 | cu_spectral_hex_laplacian_inline.hpp:7 | 77/77 | A |
-| 33 | `sshex8_{nxe,txe,lidx}` sshex8/sshex8.hpp:8/16/18 | cu_sshex8_inline.hpp:21/29/31; smesh_sshex8.hpp:8/16/21; smesh/…/cuda/smesh_sshex.cuh:21/29/31 | 7/1/7 | A, **4 copies** |
-| 34 | `hex8_sub_adj_0` sshex8.hpp:26 | cu_hex8_inline.hpp:116; smesh_sshex8.hpp:50 | 17/19 | C, 3 copies (smesh: `template` + `SMESH_HOST_DEVICE`) |
-| 35 | `hex8_sub_fff_0` sshex8/sshex8_laplacian.cpp:19 | cu_sshex8_inline.hpp:9; smesh_sshex.cuh:9 | | C, 3 copies |
-| 36 | `sstet4_sub_fff_{0..5}` sstet4/sstet4_laplacian.cpp:33,45,64,82,106,124 | sstet4/cuda/cu_sstet4_laplacian.cu:51,64,84,103,128,147 | | A, except that `L` is `scalar_t` on the host and `int` on the device |
-| 37 | `sstet4_{nxe,txe}` sstet4_laplacian.cpp:15/31 | cu_sstet4_laplacian.cu:32/48; smesh_sstet4.hpp:24/27 | | B: `floor`, `pow` vs `POW3` |
-| 38 | `tet4_sub_fff_0` macro_tet4/macro_tet4_inline_cpu.hpp:8 | `cu_macro_tet4_sub_fff_0` macro_tet4/cuda/cu_macro_tet4_inline.hpp:7 | | C |
-| 39 | `subtet_gather`/`subtet_scatter_add` macro_tet4_linear_elasticity.cpp:26/35 | cu_macro_tet4_linear_elasticity.cu:196/257 | | D: table loop vs 4 explicit indices |
-| 40 | `quadshell_4_integrate` quadshell4/quadshell4_integrate_values.cpp:8 | cuda/cu_quadshell4_integrate_values.cu:9 | | A (`scalar_t`→`T`) |
+| 32 | `spectral_hex_laplacian_apply` spectral_hex_laplacian_inline.hpp:70 | spectral_hex_laplacian_inline_cuda.hpp:7 | 77/77 | A |
+| 33 | `sshex8_{nxe,txe,lidx}` sshex8/sshex8.hpp:8/16/18 | sshex8_inline_cuda.hpp:21/29/31; smesh_sshex8.hpp:8/16/21; smesh/…/cuda/smesh_sshex.cuh:21/29/31 | 7/1/7 | A, **4 copies** |
+| 34 | `hex8_sub_adj_0` sshex8.hpp:26 | hex8_inline_cuda.hpp:116; smesh_sshex8.hpp:50 | 17/19 | C, 3 copies (smesh: `template` + `SMESH_HOST_DEVICE`) |
+| 35 | `hex8_sub_fff_0` sshex8/sshex8_laplacian.cpp:19 | sshex8_inline_cuda.hpp:9; smesh_sshex.cuh:9 | | C, 3 copies |
+| 36 | `sstet4_sub_fff_{0..5}` sstet4/sstet4_laplacian.cpp:33,45,64,82,106,124 | sstet4/cuda/sstet4_laplacian_cuda.cu:51,64,84,103,128,147 | | A, except that `L` is `scalar_t` on the host and `int` on the device |
+| 37 | `sstet4_{nxe,txe}` sstet4_laplacian.cpp:15/31 | sstet4_laplacian_cuda.cu:32/48; smesh_sstet4.hpp:24/27 | | B: `floor`, `pow` vs `POW3` |
+| 38 | `tet4_sub_fff_0` macro_tet4/macro_tet4_inline_cpu.hpp:8 | `cu_macro_tet4_sub_fff_0` macro_tet4/cuda/macro_tet4_inline_cuda.hpp:7 | | C |
+| 39 | `subtet_gather`/`subtet_scatter_add` macro_tet4_linear_elasticity.cpp:26/35 | macro_tet4_linear_elasticity_cuda.cu:196/257 | | D: table loop vs 4 explicit indices |
+| 40 | `quadshell_4_integrate` quadshell4/quadshell4_integrate_values.cpp:8 | cuda/quadshell4_integrate_values_cuda.cu:9 | | A (`scalar_t`→`T`) |
 
 Notes on the inventory:
 
-- **`smesh_sshex.cuh` is an orphan copy.** `external/smesh/src/mesh/semistructured/cuda/smesh_sshex.cuh` (283 lines) is byte-identical to `operators/sshex8/cuda/cu_sshex8_inline.hpp` apart from includes and guard. Nothing in smesh or SFEM includes it. It has no namespace, so a TU that included both would get redefinition errors.
-- **The same lookup in 7 headers.** `*_linear_search`, `*_find_col` and `*_find_cols` are copied in `hex8`, `tet4`, `tri3`, `tri6` and `tet10` `*_inline_cpu.hpp` plus `cu_hex8_inline.hpp` and `cu_tet4_inline.hpp`: 21 definitions. They differ only in the node count (`8`, `4`, `10`, ...). That is three templates on `<int N, typename idx_t>`.
+- **`smesh_sshex.cuh` is an orphan copy.** `external/smesh/src/mesh/semistructured/cuda/smesh_sshex.cuh` (283 lines) is byte-identical to `operators/sshex8/cuda/sshex8_inline_cuda.hpp` apart from includes and guard. Nothing in smesh or SFEM includes it. It has no namespace, so a TU that included both would get redefinition errors.
+- **The same lookup in 7 headers.** `*_linear_search`, `*_find_col` and `*_find_cols` are copied in `hex8`, `tet4`, `tri3`, `tri6` and `tet10` `*_inline_cpu.hpp` plus `hex8_inline_cuda.hpp` and `tet4_inline_cuda.hpp`: 21 definitions. They differ only in the node count (`8`, `4`, `10`, ...). That is three templates on `<int N, typename idx_t>`.
 - **The HEX8 elasticity file mostly is not duplicated in the device tree.** `hex8_linear_elasticity_inline_cpu.hpp` (3,723 lines) is dominated by two functions:
   - `hex8_linear_elasticity_matrix` (2,249)
   - `hex8_linear_elasticity_matrix_coord_taylor_sym` (722). It is referenced only from commented-out calls (hex8_linear_elasticity.cpp:908,980), so it belongs in DEAD.md, not here.
-  The device side is cu_hex8_linear_elasticity_inline.hpp (2,953 lines: per-qp blocks + diag) and cu_hex8_linear_elasticity_integral_inline.hpp (3,166 lines: the integrated blocks, used only at cu_sshex8_linear_elasticity.cu:309).
+  The device side is hex8_linear_elasticity_inline_cuda.hpp (2,953 lines: per-qp blocks + diag) and hex8_linear_elasticity_integral_inline_cuda.hpp (3,166 lines: the integrated blocks, used only at sshex8_linear_elasticity_cuda.cu:309).
 - **The real layout split.** Rows 7, 8, 19, 20, 25, 26, 28, 34, 35 and 38 differ only because device code reads the per-element geometry in SoA (`fff[k * stride]`), while the host first copies it into a local `fff[6]`. That is not a numerical difference, and it is the one design decision of the plan (section 2.2).
 
 ### 2.2 Layout of the shared headers
@@ -154,7 +154,7 @@ Notes on the inventory:
   - `operators/sfem_crs_kernels.hpp`: the element-agnostic CRS lookup and `local_to_global`.
 - **Why outside `cuda/`.** The host-only build never puts `operators/*/cuda` on the include path (the module list at CMakeLists.txt:162-183 is CUDA-only). So the shared header must sit next to the host sources. The `cuda/` folder keeps the `.cu` launchers, in line with the rule that CUDA sources live in local `cuda/` folders.
 - **Unique names.** File names must be unique across the tree, because install flattens headers into one `include/` (the CMakeLists.txt comment at the generated-include block says the same for generated files).
-- **Includes.** A shared header includes only `sfem_base.hpp` and `sfem_macros.hpp`. Never `sfem_cuda_base.hpp`, `<cuda_runtime.h>` or `<omp.h>`: today `cu_hex8_laplacian_inline.hpp:4` pulls in `sfem_cuda_base.hpp`, which a `.cpp` cannot include in a host-only build.
+- **Includes.** A shared header includes only `sfem_base.hpp` and `sfem_macros.hpp`. Never `sfem_cuda_base.hpp`, `<cuda_runtime.h>` or `<omp.h>`: today `hex8_laplacian_inline_cuda.hpp:4` pulls in `sfem_cuda_base.hpp`, which a `.cpp` cannot include in a host-only build.
 - **Templates.** Every function is a template on every type it computes with (`geom_t`, `scalar_t`, `accumulator_t`, `idx_t`), per the standing rule. Host call sites today rely on the global typedefs from `configuration/sfem_config.h.in:46-77`. A template parameter of the same name shadows them, and deduction from the argument pointers keeps call sites unchanged in most cases.
 - **SoA vs AoS.** Each geometry or per-element function takes a `const ptrdiff_t stride` (the device's current signature). Host callers pass the literal `1`, which constant-folds after inlining. This choice must be confirmed by the timing gate, not assumed. The alternative is smesh's per-component output pointers (`fff0..fff5`); that is preferred for the geometry functions, because smesh already has them (next bullet).
 - **smesh copies: single source in smesh.**
@@ -181,7 +181,7 @@ Notes on the inventory:
   - Host before vs after: bitwise identical for A- and C-class rows. The expression order and types are unchanged, and C only changes addressing.
   - B and D rows: tolerance-based. State the tolerance in the test.
   - Host vs device: never bitwise. CUDA builds with `-use_fast_math` (cmake/SFEMBuildTypes.cmake:114) and FMA contraction. The host may add `-ffast-math` under `SFEM_ENABLE_AGGRESSIVE_OPT` (:124).
-- **The HEX8→PROTEUS_HEX8 delegation item** (TIGHT_API.md) removes host users of some `hex8_*` kernels. Rows 1-6 and 14-17 are also called by the sshex8 kernels (e.g. cu_sshex8_laplacian.cu:29 calls `cu_hex8_laplacian_matrix_fff_integral`), so they stay needed either way. Do the micro-kernel merge first; it makes the delegation smaller.
+- **The HEX8→PROTEUS_HEX8 delegation item** (TIGHT_API.md) removes host users of some `hex8_*` kernels. Rows 1-6 and 14-17 are also called by the sshex8 kernels (e.g. sshex8_laplacian_cuda.cu:29 calls `cu_hex8_laplacian_matrix_fff_integral`), so they stay needed either way. Do the micro-kernel merge first; it makes the delegation smaller.
 
 ## 3. Generated code
 

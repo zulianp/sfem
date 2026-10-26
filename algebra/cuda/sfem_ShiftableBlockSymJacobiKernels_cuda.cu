@@ -5,7 +5,7 @@
 
 #include "sfem_mask.hpp"
 
-#include "cu_mask.cuh"
+#include "mask_cuda.cuh"
 
 namespace sfem {
     namespace private_ {

@@ -6,7 +6,7 @@
 #include "sfem_sdf_sampling.hpp"
 
 // One node of the nodal sampling, for the host loop (node_interpolate.cpp) and the device kernel
-// (cuda/cu_node_interpolate.cu) alike: everything it reads or writes is passed by value.
+// (cuda/node_interpolate_cuda.cu) alike: everything it reads or writes is passed by value.
 
 // The SDF's B-spline as sdf_sample reads it: n nodes per axis from `origin`, spaced `delta`, and
 // the coefficients `data` with strides `stride` (the coefficient of the grid's node (0, 0, 0)).

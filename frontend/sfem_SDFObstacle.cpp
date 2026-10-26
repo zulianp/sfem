@@ -8,8 +8,8 @@
 #include <stdlib.h>
 
 #ifdef SFEM_ENABLE_CUDA
-#include "cu_node_interpolate.hpp"
-#include "cu_resample_gap.hpp"
+#include "node_interpolate_cuda.hpp"
+#include "resample_gap_cuda.hpp"
 #endif
 
 namespace sfem {
