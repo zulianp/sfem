@@ -68,7 +68,6 @@ NB_MODULE(pysfem, m) {
     using namespace sfem;
 
     using Grid_t                    = smesh::Grid<geom_t>;
-    using LambdaOperator_t          = sfem::LambdaOperator<real_t>;
     using MatrixFreeLinearSolver_t  = sfem::MatrixFreeLinearSolver<real_t>;
     using Operator_t                = sfem::Operator<real_t>;
     using Multigrid_t               = sfem::Multigrid<real_t>;
@@ -79,8 +78,6 @@ NB_MODULE(pysfem, m) {
     using Chebyshev3_t              = sfem::Chebyshev3<real_t>;
     using MPRGP_t                   = sfem::MPRGP<real_t>;
     using IdxBuffer2D               = sfem::Buffer<idx_t *>;
-    using IdxBuffer                 = sfem::Buffer<idx_t>;
-    using CountBuffer               = sfem::Buffer<count_t>;
     using SSMGC_t                   = sfem::SSMGC<real_t>;
 
     m.def("init", &SFEM_init);
@@ -525,7 +522,7 @@ NB_MODULE(pysfem, m) {
 
     m.def("value", [](std::shared_ptr<Function> &fun, std::shared_ptr<sfem::Buffer<real_t>> x) -> real_t {
         real_t value = 0;
-        fun->value(x->data(), &value);
+        fun->energy_merit(x->data(), &value);
         return value;
     });
 
