@@ -25,21 +25,21 @@ static int bgs_init(const ptrdiff_t                    nnodes,
     //
     switch (block_rows) {
         case 1: {
-            dinvert1(nnodes, rowptr, colidx, values, inv_bdiag);
+            sfem::invert_node_blocks_1(nnodes, rowptr, colidx, values, inv_bdiag);
             break;
         }
 
         case 2: {
-            dinvert2(nnodes, rowptr, colidx, values, inv_bdiag);
+            sfem::invert_node_blocks_2(nnodes, rowptr, colidx, values, inv_bdiag);
             break;
         }
 
         case 3: {
-            dinvert3(nnodes, rowptr, colidx, values, inv_bdiag);
+            sfem::invert_node_blocks_3(nnodes, rowptr, colidx, values, inv_bdiag);
             break;
         }
         case 4: {
-            dinvert4(nnodes, rowptr, colidx, values, inv_bdiag);
+            sfem::invert_node_blocks_4(nnodes, rowptr, colidx, values, inv_bdiag);
             break;
         }
         default: {

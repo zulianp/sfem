@@ -52,7 +52,7 @@ static void dinvert(const ptrdiff_t nnodes,
         }  // end for
 
         assert(diag_idx != SFEM_COUNT_INVALID);
-        inverse1(values[diag_idx], &inv_diag[i]);
+        sfem::inverse1(values[diag_idx], &inv_diag[i]);
     }
 }
 
