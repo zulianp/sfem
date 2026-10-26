@@ -57,7 +57,7 @@ namespace sfem {
             if (!gathered) return output->write_step(name, index, values);
 
             const int bs = f->space()->block_size();
-            comm->allgatherv(values, (int)f->space()->n_owned_dofs(), all.data(), counts.data(), displs.data());
+            comm->allgatherv(values, (int)f->space()->n_dofs_owned(), all.data(), counts.data(), displs.data());
             if (!output) return SFEM_SUCCESS;
             for (size_t k = 0; k < place.size(); ++k) {
                 for (int d = 0; d < bs; ++d) serial[place[k] * bs + d] = all[k * bs + d];
@@ -117,7 +117,7 @@ namespace sfem {
         // Each rank's owned nodes, by their ids in the file.
         const int       size    = impl.comm->size();
         const int       bs      = fs->block_size();
-        const ptrdiff_t n_owned = fs->n_owned_dofs() / bs;
+        const ptrdiff_t n_owned = fs->n_dofs_owned() / bs;
         std::vector<int> node_counts(size), node_displs(size + 1, 0);
         const int        mine = (int)n_owned;
         impl.comm->allgather(&mine, node_counts.data(), 1);
@@ -309,7 +309,7 @@ namespace sfem {
                 // (the lowest rank on a tie) and summed: the history is written by rank 0, which
                 // may hold none of the body the point is in.
                 comm_                  = mesh->comm();
-                const ptrdiff_t nnodes = f->space()->n_owned_dofs() / f->space()->block_size();
+                const ptrdiff_t nnodes = f->space()->n_dofs_owned() / f->space()->block_size();
 
                 double best = std::numeric_limits<double>::max();
                 for (ptrdiff_t i = 0; i < nnodes; ++i) {

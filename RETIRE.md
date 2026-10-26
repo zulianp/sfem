@@ -253,7 +253,7 @@ Not a factory entry: `bench/cuda/bench_packed_laplacian.cu` holds packed CUDA pr
 - One class: frontend/ops/sfem_InertiaPotential.cpp, with device kernels in frontend/ops/cuda/sfem_InertiaPotential_cuda.cu.
 - The comment at :55-59 says the old keys stay "because drivers and env vars resolve operators by string". A grep of `*.cpp/*.hpp/*.py/*.yaml/*.sh` finds no such string user.
 
-- [ ] retire `BDF2InertiaPotential` and `NewmarkInertiaPotential` names (keep `InertiaPotential`) — evidence: no string users (grep). Measurement: none (same class).
+- [x] retire `BDF2InertiaPotential` and `NewmarkInertiaPotential` names (keep `InertiaPotential`) — evidence: no string users (grep). Measurement: none (same class).
 
 ## 6. HEX8 vs SSHEX8: what HEX8 → PROTEUS_HEX8 delegation needs
 

@@ -105,7 +105,7 @@ namespace sfem {
         } else {
             impl.values = create_buffer<real_t>(nvalues, es);
         }
-        impl.owned_rows  = f->space()->n_owned_dofs() / impl.block_size;
+        impl.owned_rows  = f->space()->n_dofs_owned() / impl.block_size;
         impl.distributed = distributed;
         if (impl.distributed) {
             auto host  = f->space()->element_node_graph();

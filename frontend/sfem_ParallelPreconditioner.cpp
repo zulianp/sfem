@@ -37,7 +37,7 @@ namespace sfem {
         }
 
         const int            block_size = space->block_size();
-        const std::ptrdiff_t owned_dofs = space->n_owned_dofs();
+        const std::ptrdiff_t owned_dofs = space->n_dofs_owned();
         const std::ptrdiff_t local_dofs = space->n_dofs();
 
         // GhostsAndAura: a patch anchored on an aura element reads nodes beyond this rank's

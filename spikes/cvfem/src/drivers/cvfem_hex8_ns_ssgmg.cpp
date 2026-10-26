@@ -1710,7 +1710,7 @@ private:
                     cvfem::Domain d;
                     auto          m = sp->mesh_ptr();
                     if (m && m->is_distributed() && m->comm() && m->comm()->size() > 1) d.comm = m->comm();
-                    d.n_owned = sp->n_owned_dofs();
+                    d.n_owned = sp->n_dofs_owned();
                     d.n_local = sp->n_dofs();
                     return d;
                 };
@@ -2293,7 +2293,7 @@ private:
                                                mesh->comm(),
                                                std::move(l2g_copy),
                                                n_local_dofs,
-                                               space->n_owned_dofs(),
+                                               space->n_dofs_owned(),
                                                n_global);
     }
 
@@ -2561,7 +2561,7 @@ private:
         {
             auto m = f_coarse->space()->mesh_ptr();
             if (m && m->is_distributed() && m->comm() && m->comm()->size() > 1) probe_dom.comm = m->comm();
-            probe_dom.n_owned = f_coarse->space()->n_owned_dofs();
+            probe_dom.n_owned = f_coarse->space()->n_dofs_owned();
             probe_dom.n_local = f_coarse->space()->n_dofs();
         }
         const int ncolors = cvfem::max(probe_dom, 1 + *std::max_element(color.begin(), color.end()));
@@ -3703,7 +3703,7 @@ private:
                                 "level_owned_would_be %td  true_owned %td  n_local %td\n",
                                 i, face ? 1 : 0, lvl_op->rows(), lvl_sm->rows(),
                                 face ? lvl_op->rows() : lvl_sm->rows(),
-                                fi->space()->n_owned_dofs(), fi->space()->n_dofs());
+                                fi->space()->n_dofs_owned(), fi->space()->n_dofs());
                 }
 
                 g.mg->add_level(lvl_op,
@@ -4993,7 +4993,7 @@ int main(int argc, char **argv) {
     // reach a number the space already publishes. The space is created with block_size
     // N_FIELDS, so the two agree by construction.
     const ptrdiff_t n_owned_nodes   = mesh->is_distributed() ? mesh->distributed()->n_nodes_owned() : nnodes;
-    const ptrdiff_t ndof_owned      = f->space()->n_owned_dofs();
+    const ptrdiff_t ndof_owned      = f->space()->n_dofs_owned();
     domain.n_owned                  = ndof_owned;
     domain.n_local                  = ndof;
     std::vector<real_t> p_exact;

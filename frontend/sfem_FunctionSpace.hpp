@@ -70,7 +70,7 @@ namespace sfem {
 
         int       block_size() const;
         ptrdiff_t n_dofs() const;
-        ptrdiff_t n_owned_dofs() const;
+        ptrdiff_t n_dofs_owned() const;
         ptrdiff_t n_dofs_global() const;
 
         /// The owned prefix of x (n_dofs() long) copied into its ghost and aura slots, from the

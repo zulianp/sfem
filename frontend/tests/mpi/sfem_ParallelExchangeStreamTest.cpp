@@ -48,7 +48,7 @@ int test_exchange_on_its_stream() {
 
     // Each node's value is its id in the mesh plus one; the ghosts start at -1.
     const ptrdiff_t      n     = space->n_dofs();
-    const ptrdiff_t      owned = space->n_owned_dofs();
+    const ptrdiff_t      owned = space->n_dofs_owned();
     auto                 ids   = mesh->distributed()->node_mapping();
     std::vector<real_t>  expected(n), start(n);
     for (ptrdiff_t i = 0; i < n; ++i) {
