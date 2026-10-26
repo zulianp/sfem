@@ -243,7 +243,7 @@ namespace sfem {
                                   const bool requested_jacobian,
                                   const bool requested_metric_soa,
                                   const bool requested_metric_aos) {
-      auto mesh = space->mesh_ptr();
+      auto mesh = space->mesh();
       for (auto &entry : domains.domains()) {
         const bool forced = geometry_is_forced_affine(entry.second.element_type);
         const bool needs_jacobian = requested_jacobian || forced;
@@ -431,7 +431,7 @@ namespace sfem {
 
   std::unique_ptr<Op> GeneratedMooneyRivlinKelvinVoigt::create(const std::shared_ptr<FunctionSpace> &space) {
     const ptrdiff_t expected_block_size =
-        block_size_for_dim(space->mesh_ptr()->spatial_dimension());
+        block_size_for_dim(space->mesh()->spatial_dimension());
     if (space->block_size() != expected_block_size) {
       SFEM_ERROR("GeneratedMooneyRivlinKelvinVoigt requires block_size=%ld\n",
                        static_cast<long>(expected_block_size));
@@ -463,7 +463,7 @@ namespace sfem {
       return total;
     }
 
-    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+    const int dim = impl_->space->mesh()->spatial_dimension();
     impl_->domains->iterate([&](const OpDomain &domain) {
       const ptrdiff_t nelements = domain.block->n_elements();
       if (dim == 2) {
@@ -494,7 +494,7 @@ namespace sfem {
       return total;
     }
 
-    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+    const int dim = impl_->space->mesh()->spatial_dimension();
     impl_->domains->iterate([&](const OpDomain &domain) {
       const ptrdiff_t nelements = domain.block->n_elements();
       if (dim == 2) {
@@ -525,7 +525,7 @@ namespace sfem {
       return total;
     }
 
-    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+    const int dim = impl_->space->mesh()->spatial_dimension();
     impl_->domains->iterate([&](const OpDomain &domain) {
       const ptrdiff_t nelements = domain.block->n_elements();
       if (dim == 2) {
@@ -556,7 +556,7 @@ namespace sfem {
       return total;
     }
 
-    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+    const int dim = impl_->space->mesh()->spatial_dimension();
     impl_->domains->iterate([&](const OpDomain &domain) {
       const ptrdiff_t nelements = domain.block->n_elements();
       if (dim == 2) {
@@ -641,7 +641,7 @@ namespace sfem {
     }
 
     impl_->current = state;
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const geom_t *const *adjugate = nullptr;
@@ -710,7 +710,7 @@ namespace sfem {
       }
     }
 
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
     auto points = element_points(mesh);
 
     return impl_->domains->iterate([&](const OpDomain &domain) {
@@ -944,7 +944,7 @@ namespace sfem {
         return SFEM_FAILURE;
       }
     }
-    auto mesh = impl_->space->mesh_ptr();
+    auto mesh = impl_->space->mesh();
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       real_t storage[MAX_PARAMETERS];

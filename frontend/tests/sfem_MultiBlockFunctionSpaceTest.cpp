@@ -29,7 +29,7 @@ int test_single_block_mesh() {
     SFEM_TEST_ASSERT(space->block_size() == 1);
     
     // Test mesh properties
-    SFEM_TEST_ASSERT(space->mesh_ptr() == mesh);
+    SFEM_TEST_ASSERT(space->mesh() == mesh);
     SFEM_TEST_ASSERT(!space->has_semi_structured_mesh());
     
     return SFEM_TEST_SUCCESS;
@@ -112,7 +112,7 @@ int test_lor_function_space() {
 
     auto lor_space = space->lor();
     SFEM_TEST_ASSERT(lor_space != nullptr);
-    SFEM_TEST_ASSERT(lor_space->mesh_ptr() == space->mesh_ptr());
+    SFEM_TEST_ASSERT(lor_space->mesh() == space->mesh());
     SFEM_TEST_ASSERT(lor_space->block_size() == space->block_size());
     SFEM_TEST_EQ(lor_space->n_blocks(), static_cast<size_t>(2));
     SFEM_TEST_EQ(lor_space->element_type(0), smesh::HEX8);

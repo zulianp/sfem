@@ -74,13 +74,13 @@ namespace sfem {
     std::shared_ptr<Buffer<idx_t>> create_device_elements_AoS(const std::shared_ptr<FunctionSpace> &space,
                                                               const smesh::ElemType                 element_type) {
         (void)element_type;
-        if (space->mesh_ptr()->n_blocks() != 1) {
+        if (space->mesh()->n_blocks() != 1) {
             SFEM_ERROR("create_device_elements_AoS: multi-block requires per-block AoS (n_blocks=%zu)\n",
-                       space->mesh_ptr()->n_blocks());
+                       space->mesh()->n_blocks());
             return nullptr;
         }
-        auto nxe = space->mesh_ptr()->n_nodes_per_element(0);
-        return smesh::to_device(soa_to_aos(1, nxe, space->mesh_ptr()->elements(0)));
+        auto nxe = space->mesh()->n_nodes_per_element(0);
+        return smesh::to_device(soa_to_aos(1, nxe, space->mesh()->elements(0)));
     }
 
     class GPUDirichletConditions final : public Constraint {
@@ -336,12 +336,12 @@ namespace sfem {
                                                                             const smesh::block_idx_t              block_id) {
             constexpr ptrdiff_t fff_size = 6;
 
-            auto fff_src = smesh::FFF::create_SoA(space->mesh_ptr(), smesh::MEMORY_SPACE_HOST, block_id);
+            auto fff_src = smesh::FFF::create_SoA(space->mesh(), smesh::MEMORY_SPACE_HOST, block_id);
             if (!fff_src || !fff_src->fff_SoA()) {
                 return nullptr;
             }
 
-            const auto nelements = space->mesh_ptr()->n_elements(block_id);
+            const auto nelements = space->mesh()->n_elements(block_id);
             auto       flat_fff  = sfem::create_host_buffer<jacobian_t>(fff_size * nelements);
 
             auto *const       dst = flat_fff->data();
@@ -359,7 +359,7 @@ namespace sfem {
             ret->element_type = domain.element_type;
             ret->elements     = domain.block->device_elements_SoA();
 
-            const auto block_id = block_id_for_domain(*space->mesh_ptr(), *domain.block);
+            const auto block_id = block_id_for_domain(*space->mesh(), *domain.block);
             ret->fff            = create_gpu_laplacian_fff(space, block_id);
             return ret;
         }
@@ -384,12 +384,12 @@ namespace sfem {
             constexpr ptrdiff_t adjugate_size = 9;
 
             auto jac_src =
-                    smesh::JacobianAdjugateAndDeterminant::create_SoA(space->mesh_ptr(), smesh::MEMORY_SPACE_HOST, block_id);
+                    smesh::JacobianAdjugateAndDeterminant::create_SoA(space->mesh(), smesh::MEMORY_SPACE_HOST, block_id);
             if (!jac_src || !jac_src->jacobian_adjugate_SoA()) {
                 return nullptr;
             }
 
-            const auto nelements = space->mesh_ptr()->n_elements(block_id);
+            const auto nelements = space->mesh()->n_elements(block_id);
             auto       flat_adj  = sfem::create_host_buffer<jacobian_t>(adjugate_size * nelements);
 
             auto *const       dst = flat_adj->data();
@@ -404,7 +404,7 @@ namespace sfem {
         static std::shared_ptr<Buffer<geom_t>> create_gpu_jacobian_determinant(const std::shared_ptr<FunctionSpace> &space,
                                                                                const smesh::block_idx_t              block_id) {
             auto jac_src =
-                    smesh::JacobianAdjugateAndDeterminant::create_SoA(space->mesh_ptr(), smesh::MEMORY_SPACE_HOST, block_id);
+                    smesh::JacobianAdjugateAndDeterminant::create_SoA(space->mesh(), smesh::MEMORY_SPACE_HOST, block_id);
             if (!jac_src || !jac_src->jacobian_determinant()) {
                 return nullptr;
             }
@@ -437,7 +437,7 @@ namespace sfem {
             auto ret      = std::make_shared<GPULinearElasticityOpData>();
             ret->elements = domain.block->device_elements_SoA();
 
-            const auto block_id       = block_id_for_domain(*space->mesh_ptr(), *domain.block);
+            const auto block_id       = block_id_for_domain(*space->mesh(), *domain.block);
             ret->jacobian_adjugate    = create_gpu_jacobian_adjugate(space, block_id);
             ret->jacobian_determinant = create_gpu_jacobian_determinant(space, block_id);
             return ret;
@@ -470,7 +470,7 @@ namespace sfem {
             const int       level     = smesh::semistructured_level(domain.element_type);
             const ptrdiff_t nelements = domain.block->n_elements();
             idx_t **const   elements  = domain.block->elements()->data();
-            geom_t **const  xyz       = space->mesh_ptr()->points()->data();
+            geom_t **const  xyz       = space->mesh()->points()->data();
             const int       corner[8] = {sshex8_lidx(level, 0, 0, 0),
                                          sshex8_lidx(level, level, 0, 0),
                                          sshex8_lidx(level, level, level, 0),
@@ -676,7 +676,7 @@ namespace sfem {
         }
 
         int gradient(const real_t *const x, real_t *const out, const ElementScope scope) override {
-            auto mesh = space->mesh_ptr();
+            auto mesh = space->mesh();
             return iterate([&](const OpDomain &domain) {
                 const smesh::block_idx_t b = block_id_for_domain(*mesh, *domain.block);
                 return gpu_laplacian_block_vector(domain, x, out, element_range(*mesh, b, scope));
@@ -684,7 +684,7 @@ namespace sfem {
         }
 
         int apply(const real_t *const /*x*/, const real_t *const h, real_t *const out, const ElementScope scope) override {
-            auto mesh = space->mesh_ptr();
+            auto mesh = space->mesh();
             return iterate([&](const OpDomain &domain) {
                 const smesh::block_idx_t b = block_id_for_domain(*mesh, *domain.block);
                 return gpu_laplacian_block_vector(domain, h, out, element_range(*mesh, b, scope));
@@ -701,7 +701,7 @@ namespace sfem {
                 return SFEM_SUCCESS;
             }
 
-            auto mesh = space->mesh_ptr();
+            auto mesh = space->mesh();
             int  err  = SFEM_SUCCESS;
             for (const auto &slice : flat_block_element_chunks(*mesh, scope, flat_begin, flat_end)) {
                 if (gpu_laplacian_apply_block(*mesh, slice.block, slice.range, h, out) != SFEM_SUCCESS) {
@@ -820,7 +820,7 @@ namespace sfem {
         bool use_affine_approximation{true};
 
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
-            assert(space->mesh_ptr()->spatial_dimension() == space->block_size());
+            assert(space->mesh()->spatial_dimension() == space->block_size());
             auto ret = std::make_unique<GPULinearElasticity>(space);
 
             int SFEM_HEX8_ASSUME_AFFINE = ret->use_affine_approximation ? 1 : 0;
@@ -1202,12 +1202,12 @@ namespace sfem {
 
         static std::shared_ptr<Buffer<idx_t>> create_device_elements_aos_block(const std::shared_ptr<FunctionSpace> &space,
                                                                                const smesh::block_idx_t              block_id) {
-            auto nxe = space->mesh_ptr()->n_nodes_per_element(block_id);
-            return smesh::to_device(soa_to_aos(1, nxe, space->mesh_ptr()->elements(block_id)));
+            auto nxe = space->mesh()->n_nodes_per_element(block_id);
+            return smesh::to_device(soa_to_aos(1, nxe, space->mesh()->elements(block_id)));
         }
 
         static std::shared_ptr<smesh::Mesh> gpu_em_element_matrix_mesh(const std::shared_ptr<FunctionSpace> &space) {
-            auto mesh = space->has_semi_structured_mesh() ? smesh::derefine(space->mesh_ptr(), 1) : space->mesh_ptr();
+            auto mesh = space->has_semi_structured_mesh() ? smesh::derefine(space->mesh(), 1) : space->mesh();
             if (mesh && mesh->element_type(0) == smesh::PROTEUS_HEX8) {
                 mesh = smesh::sshex_to_hex8(mesh);
             }
@@ -1256,7 +1256,7 @@ namespace sfem {
         }
 
         int initialize(const std::vector<std::string> &block_names = {}) override {
-            auto mesh    = space->mesh_ptr();
+            auto mesh    = space->mesh();
             auto em_mesh = gpu_em_element_matrix_mesh(space);
             if (!em_mesh) {
                 SFEM_ERROR("GPUEMOp: sshex_to_hex8(derefine) failed\n");
@@ -1283,7 +1283,7 @@ namespace sfem {
 
                 const auto et    = mesh->element_type(bid);
                 const bool is_ss = is_semistructured_type(et);
-                const int  level = is_ss ? smesh::semistructured_level(*space->mesh_ptr()) : 1;
+                const int  level = is_ss ? smesh::semistructured_level(*space->mesh()) : 1;
 
                 auto h_element_matrix = sfem::create_host_buffer<real_t>(ne * 64);
                 err                   = sshex8_laplacian_element_matrix_cartesian(level,
@@ -1313,7 +1313,7 @@ namespace sfem {
             int err = SFEM_SUCCESS;
             for (const auto &bd : blocks) {
                 if (bd.is_ss) {
-                    const int level = smesh::semistructured_level(*space->mesh_ptr());
+                    const int level = smesh::semistructured_level(*space->mesh());
                     err             = cu_affine_sshex8_elemental_matrix_apply(level,
                                                                   bd.n_elements,
                                                                   bd.elements->data(),
@@ -1396,7 +1396,7 @@ namespace sfem {
                 return SFEM_FAILURE;
             }
 
-            auto &ssm = *space->mesh_ptr();
+            auto &ssm = *space->mesh();
             blocks.clear();
 
             int err = SFEM_SUCCESS;
@@ -1456,7 +1456,7 @@ namespace sfem {
                 return SFEM_FAILURE;
             }
 
-            auto     &ssm   = *space->mesh_ptr();
+            auto     &ssm   = *space->mesh();
             const int level = smesh::semistructured_level(ssm);
             int       err   = SFEM_SUCCESS;
             for (const auto &bd : blocks) {
@@ -1536,7 +1536,7 @@ namespace sfem {
                 return SFEM_FAILURE;
             }
 
-            auto &ssm = *space->mesh_ptr();
+            auto &ssm = *space->mesh();
             blocks.clear();
 
             int err = SFEM_SUCCESS;
@@ -1596,7 +1596,7 @@ namespace sfem {
                 return SFEM_FAILURE;
             }
 
-            auto     &ssm   = *space->mesh_ptr();
+            auto     &ssm   = *space->mesh();
             const int level = smesh::semistructured_level(ssm);
             int       err   = SFEM_SUCCESS;
             for (const auto &bd : blocks) {
@@ -1703,7 +1703,7 @@ namespace sfem {
                 ret->blocks.reserve(blocks.size());
                 for (const auto &bd : blocks) {
                     GPUEMAoSBlock c = bd;
-                    c.n_elements    = derefined_space->mesh_ptr()->n_elements(bd.block_id);
+                    c.n_elements    = derefined_space->mesh()->n_elements(bd.block_id);
                     c.elements      = create_device_elements_aos_block(derefined_space, bd.block_id);
                     ret->blocks.push_back(std::move(c));
                 }
@@ -1722,7 +1722,7 @@ namespace sfem {
         int assemble_block_matrix(const smesh::Mesh                 &em_mesh,
                                   const smesh::block_idx_t           bid,
                                   std::shared_ptr<Buffer<real_t>>   &out_matrix) {
-            auto     &ssm = *space->mesh_ptr();
+            auto     &ssm = *space->mesh();
             const ptrdiff_t ne = em_mesh.n_elements(bid);
             auto h_element_matrix = sfem::create_host_buffer<scalar_t>(ne * 24 * 24);
 
@@ -1764,7 +1764,7 @@ namespace sfem {
                 return SFEM_FAILURE;
             }
 
-            auto &ssm = *space->mesh_ptr();
+            auto &ssm = *space->mesh();
             int   err = SFEM_SUCCESS;
 
             if (create_blocks) {
@@ -1846,7 +1846,7 @@ namespace sfem {
                 return SFEM_FAILURE;
             }
 
-            auto     &ssm   = *space->mesh_ptr();
+            auto     &ssm   = *space->mesh();
             const int level = smesh::semistructured_level(ssm);
             int       err   = SFEM_SUCCESS;
             for (const auto &bd : blocks) {
@@ -1916,8 +1916,8 @@ namespace sfem {
         void set_value_in_block(const std::string &block_name, const std::string &var_name, const real_t value) override {
             if (!block_name.empty()) {
                 bool exists = false;
-                for (size_t b = 0; b < space->mesh_ptr()->n_blocks(); ++b) {
-                    if (space->mesh_ptr()->block(b)->name() == block_name) {
+                for (size_t b = 0; b < space->mesh()->n_blocks(); ++b) {
+                    if (space->mesh()->block(b)->name() == block_name) {
                         exists = true;
                         break;
                     }

@@ -85,7 +85,7 @@ namespace sfem {
             return SFEM_FAILURE;
         }
 
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
 
         int SFEM_VECTOR_LAPLACIAN_FFF = 1;
         SFEM_READ_ENV(SFEM_VECTOR_LAPLACIAN_FFF, atoi);
@@ -202,7 +202,7 @@ namespace sfem {
             vec_out[d] = &out[d];
         }
 
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) {
             return vector_laplacian_dispatch_apply(domain, *mesh, block_size, vec_in.data(), vec_out.data());
         });

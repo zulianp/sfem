@@ -380,7 +380,7 @@ int checkerboard_ss_to_hex8_derefine_compare(const char *op_name, const int bloc
     SFEM_TEST_ASSERT(cube_coarse_op != nullptr);
 
     std::vector<ptrdiff_t> cb_to_cube;
-    SFEM_TEST_ASSERT(map_nodes_by_xyz(*cb_coarse_fs->mesh_ptr(), *cube_coarse_fs->mesh_ptr(), cb_to_cube) ==
+    SFEM_TEST_ASSERT(map_nodes_by_xyz(*cb_coarse_fs->mesh(), *cube_coarse_fs->mesh(), cb_to_cube) ==
                      SFEM_TEST_SUCCESS);
 
     auto x_cb    = sfem::create_host_buffer<real_t>(cb_coarse_fs->n_dofs());
@@ -388,11 +388,11 @@ int checkerboard_ss_to_hex8_derefine_compare(const char *op_name, const int bloc
     auto y_cb    = sfem::create_host_buffer<real_t>(cb_coarse_fs->n_dofs());
     auto y_cube  = sfem::create_host_buffer<real_t>(cube_coarse_fs->n_dofs());
     if (block_size == 1) {
-        fill_scalar_field(*cb_coarse_fs->mesh_ptr(), x_cb->data());
-        fill_scalar_field(*cube_coarse_fs->mesh_ptr(), x_cube->data());
+        fill_scalar_field(*cb_coarse_fs->mesh(), x_cb->data());
+        fill_scalar_field(*cube_coarse_fs->mesh(), x_cube->data());
     } else {
-        fill_vector_field(*cb_coarse_fs->mesh_ptr(), x_cb->data());
-        fill_vector_field(*cube_coarse_fs->mesh_ptr(), x_cube->data());
+        fill_vector_field(*cb_coarse_fs->mesh(), x_cb->data());
+        fill_vector_field(*cube_coarse_fs->mesh(), x_cube->data());
     }
     std::fill(y_cb->data(), y_cb->data() + y_cb->size(), real_t(0));
     std::fill(y_cube->data(), y_cube->data() + y_cube->size(), real_t(0));

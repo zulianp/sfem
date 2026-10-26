@@ -15,13 +15,13 @@ namespace sfem {
 
     MultiDomainOp::MultiDomainOp(const std::shared_ptr<FunctionSpace> &space, const std::vector<std::string> &block_names) {
         if (block_names.empty()) {
-            for (auto &block : space->mesh_ptr()->blocks()) {
+            for (auto &block : space->mesh()->blocks()) {
                 domains_[block->name()] =
                         OpDomain{block->element_type(), block, std::make_shared<Parameters>(), nullptr};
             }
         } else {
             for (auto &block_name : block_names) {
-                auto block = space->mesh_ptr()->find_block(block_name);
+                auto block = space->mesh()->find_block(block_name);
                 if (!block) {
                     SFEM_ERROR("Block %s not found", block_name.c_str());
                 }

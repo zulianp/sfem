@@ -670,7 +670,7 @@ namespace sfem {
                         "steady or quasi_static)\n");
                 return SFEM_FAILURE;
             }
-            if (backend == "ssmgc" && fs->mesh_ptr()->comm()->size() > 1) {
+            if (backend == "ssmgc" && fs->mesh()->comm()->size() > 1) {
                 fprintf(stderr, "Playground: the ssmgc obstacle runs on one rank\n");
                 return SFEM_FAILURE;
             }
@@ -679,7 +679,7 @@ namespace sfem {
                 return SFEM_FAILURE;
             }
 
-            auto      m   = fs->mesh_ptr();
+            auto      m   = fs->mesh();
             const int dir = axis_of(read_string(node, "direction", "z"));
             if (dir < 0 || m->spatial_dimension() != 3) {
                 fprintf(stderr, "Playground: obstacle.direction must be x, y or z of a three-dimensional mesh\n");

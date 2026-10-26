@@ -90,7 +90,7 @@ namespace sfem {
         if (!fine || !coarse) {
             return false;
         }
-        if (mesh_is_mpi(fine->mesh_ptr())) {
+        if (mesh_is_mpi(fine->mesh())) {
             return false;
         }
         return coarse->n_dofs_owned() <= fine->n_dofs_owned();
@@ -104,8 +104,8 @@ namespace sfem {
         const ptrdiff_t n_coarse_dofs  = coarse_space->n_dofs();
         const ptrdiff_t n_coarse_nodes = n_coarse_dofs / bs;
 
-        auto fm = fine_space->mesh_ptr();
-        auto cm = coarse_space->mesh_ptr();
+        auto fm = fine_space->mesh();
+        auto cm = coarse_space->mesh();
         if (!mesh_is_mpi(fm) || !cm || !cm->distributed() || !fm->distributed() || !fm->distributed()->node_mapping() ||
             !cm->distributed()->node_mapping()) {
             auto b = sfem::blas<real_t>(EXECUTION_SPACE_HOST);
@@ -167,7 +167,7 @@ namespace sfem {
 
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
-            auto            fm    = fine_space->mesh_ptr();
+            auto            fm    = fine_space->mesh();
             const int       bs    = fine_space->block_size();
             const ptrdiff_t n_f   = static_cast<ptrdiff_t>(fm->n_nodes()) * bs;
             const ptrdiff_t n_c   = coarse_space->n_dofs();
@@ -389,8 +389,8 @@ namespace sfem {
                            (long)n_coarse_contact);
             }
 
-            auto       fm  = fine_space ? fine_space->mesh_ptr() : nullptr;
-            auto       cm  = coarse_space ? coarse_space->mesh_ptr() : nullptr;
+            auto       fm  = fine_space ? fine_space->mesh() : nullptr;
+            auto       cm  = coarse_space ? coarse_space->mesh() : nullptr;
             const bool mpi = fm && fm->is_distributed() && fm->comm() && fm->comm()->size() > 1 && fm->distributed() &&
                              fm->distributed()->node_mapping() && cm && cm->is_distributed() && cm->distributed() &&
                              cm->distributed()->node_mapping();
@@ -464,7 +464,7 @@ namespace sfem {
             SFEM_TRACE_SCOPE("SPMG::init_discretization");
 
             auto            fs             = f->space();
-            auto           &ssmesh         = *f->space()->mesh_ptr();
+            auto           &ssmesh         = *f->space()->mesh();
 
             std::vector<int> levels = smesh::derefinement_levels(ssmesh);
             this->levels.clear();
@@ -589,10 +589,10 @@ namespace sfem {
                 auto coarse = levels[i];
 
                 auto      fine_space   = fine->function->space();
-                const int level        = smesh::semistructured_level(*fine_space->mesh_ptr());
+                const int level        = smesh::semistructured_level(*fine_space->mesh());
                 auto      coarse_space = coarse->function->space();
                 const int coarse_level =
-                        coarse_space->has_semi_structured_mesh() ? smesh::semistructured_level(*coarse_space->mesh_ptr()) : 1;
+                        coarse_space->has_semi_structured_mesh() ? smesh::semistructured_level(*coarse_space->mesh()) : 1;
 
                 const auto fam          = smesh::ss_source_family(fine_space->element_type());
                 const auto side_family  = fam == smesh::TET4 ? smesh::TRI3 : (fam == smesh::QUAD4 ? smesh::EDGE2 : smesh::QUAD4);
@@ -605,7 +605,7 @@ namespace sfem {
                 coarse->mapping =
                         remap_contact_mapping_to_coarse(fine->mapping, n_coarse_contact_nodes, fine_space, coarse_space);
                 {
-                    auto cm = coarse_space->mesh_ptr();
+                    auto cm = coarse_space->mesh();
                     if (cm && cm->is_distributed() && cm->comm() && cm->comm()->size() > 1 && cm->distributed()) {
                         coarse->mapping = filter_owned_volume_idx(coarse->mapping, cm->distributed()->n_nodes_owned());
                     }
@@ -721,7 +721,7 @@ namespace sfem {
             std::string fine_op_type = op_type::MATRIX_FREE;
 
             if (in) {
-                if (is_root_rank(f->space()->mesh_ptr()->comm())) {
+                if (is_root_rank(f->space()->mesh()->comm())) {
                     printf("SPMG: Reading Input\n");
                 }
                 in->get("atol", atol);
@@ -760,7 +760,7 @@ namespace sfem {
 
             // Assembled BSR is serial-only. MPI coarse contact must be matrix-free so the
             // coarse solver is ParallelCG with allocation-sized (owned+ghost) buffers.
-            if (fs->mesh_ptr()->comm() && fs->mesh_ptr()->comm()->size() > 1) {
+            if (fs->mesh()->comm() && fs->mesh()->comm()->size() > 1) {
                 if (coarse_op_type == op_type::BSR || coarse_op_type == op_type::BSR_SYM) {
                     coarse_op_type = op_type::MATRIX_FREE;
                 }
@@ -878,10 +878,10 @@ namespace sfem {
 
             smoothers_or_solver.push_back(coarse_solver);
 
-            if (is_root_rank(fs->mesh_ptr()->comm())) {
+            if (is_root_rank(fs->mesh()->comm())) {
                 for (int i = 0; i < nlevels; i++) {
                     auto s = levels[i]->function->space();
-                    printf("%d) \tL=%d\n", i, s->has_semi_structured_mesh() ? smesh::semistructured_level(*s->mesh_ptr()) : 1);
+                    printf("%d) \tL=%d\n", i, s->has_semi_structured_mesh() ? smesh::semistructured_level(*s->mesh()) : 1);
 
                     levels[i]->function->describe(std::cout);
                 }
@@ -969,7 +969,7 @@ namespace sfem {
 
             mg->set_nodal_block_size(block_size);
             for (int i = 0; i < nlevels; i++) {
-                auto                             mesh = levels[i]->function->space()->mesh_ptr();
+                auto                             mesh = levels[i]->function->space()->mesh();
                 std::shared_ptr<smesh::Exchange> ex;
                 if (mesh && mesh->is_distributed() && mesh->comm() && mesh->comm()->size() > 1) {
                     ex = smesh::Exchange::create_nodal(mesh, smesh::Exchange::ExchangeScope::GhostsAndAura);
@@ -1099,7 +1099,7 @@ namespace sfem {
                                                const std::shared_ptr<Input>            &in) {
         auto ret = std::make_shared<SSMGC<T>>();
         ret->impl_->init(f, contact_conds, in);
-        if (is_root_rank(f->space()->mesh_ptr()->comm())) {
+        if (is_root_rank(f->space()->mesh()->comm())) {
             int ll = 0;
             for (auto l : ret->impl_->levels) {
                 std::cout << "-----------------------\n";

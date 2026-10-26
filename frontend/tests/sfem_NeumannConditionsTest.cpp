@@ -17,7 +17,7 @@ namespace {
     int verify_derivatives(const std::shared_ptr<sfem::NeumannConditions> &op,
                            const std::shared_ptr<sfem::FunctionSpace>     &space) {
         const ptrdiff_t ndofs  = space->n_dofs();
-        const ptrdiff_t nnodes = space->mesh_ptr()->n_nodes();
+        const ptrdiff_t nnodes = space->mesh()->n_nodes();
         auto            x      = sfem::create_host_buffer<real_t>(ndofs);
         auto            h      = sfem::create_host_buffer<real_t>(ndofs);
         auto            xp     = sfem::create_host_buffer<real_t>(ndofs);

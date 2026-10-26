@@ -179,8 +179,8 @@ namespace {
 
         auto serial_fs     = serial_f->space();
         auto parallel_fs   = parallel_f->space();
-        auto serial_mesh   = serial_fs->mesh_ptr();
-        auto parallel_mesh = parallel_fs->mesh_ptr();
+        auto serial_mesh   = serial_fs->mesh();
+        auto parallel_mesh = parallel_fs->mesh();
 
         const ptrdiff_t n_global = parallel_fs->n_dofs_global();
         SFEM_TEST_EQ(comm->sum(parallel_fs->n_dofs_owned()), n_global);

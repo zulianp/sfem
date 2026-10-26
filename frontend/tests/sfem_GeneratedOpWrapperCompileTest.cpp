@@ -106,7 +106,7 @@ int test_generated_residual_wrapper_executes() {
     auto            direction = sfem::create_host_buffer<real_t>(ndofs);
     auto            residual  = sfem::create_host_buffer<real_t>(ndofs);
     auto            action    = sfem::create_host_buffer<real_t>(ndofs);
-    for (ptrdiff_t node = 0; node < space->mesh_ptr()->n_nodes(); ++node) {
+    for (ptrdiff_t node = 0; node < space->mesh()->n_nodes(); ++node) {
         previous->data()[2 * node + 0]  = 15.0 + 1e-3 * node;
         previous->data()[2 * node + 1]  = 15.1 + 1e-3 * node;
         current->data()[2 * node + 0]   = previous->data()[2 * node + 0] + 1e-2;

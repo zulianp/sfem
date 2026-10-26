@@ -77,7 +77,7 @@ namespace sfem {
         SFEM_TRACE_SCOPE("BSRTangent::create");
 
         const ExecutionSpace es          = context.space();
-        const bool distributed = f->space()->mesh_ptr()->comm()->size() > 1;
+        const bool distributed = f->space()->mesh()->comm()->size() > 1;
         if (storage_bytes != (int)sizeof(real_t) && storage_bytes != 4 && storage_bytes != 2) {
             SFEM_ERROR("BSRTangent: storage_bytes %d (2, 4 or %d)\n", storage_bytes, (int)sizeof(real_t));
             return nullptr;
@@ -162,7 +162,7 @@ namespace sfem {
                 auto side    = impl.side;
                 auto context = impl.context;
                 return make_parallel_op<real_t>(
-                        space->mesh_ptr()->comm(),
+                        space->mesh()->comm(),
                         owned,
                         owned,
                         space->n_dofs(),
@@ -244,7 +244,7 @@ namespace sfem {
             auto            rowptr = impl.graph->rowptr();
             auto            colidx = impl.graph->colidx();
             auto            split  = impl.split;
-            return make_team_op<real_t>(space->mesh_ptr()->comm(),
+            return make_team_op<real_t>(space->mesh()->comm(),
                                         rows * bs,
                                         rows * bs,
                                         halo ? space->n_dofs() : rows * bs,
@@ -309,7 +309,7 @@ namespace sfem {
 #endif
             return bsr_max_abs_row_sum<count_t, idx_t, V, real_t>(rows, impl.block_size, rowptr(), colidx(), values->data(), scale);
         });
-        return impl.distributed ? impl.f->space()->mesh_ptr()->comm()->max(local) : local;
+        return impl.distributed ? impl.f->space()->mesh()->comm()->max(local) : local;
     }
 
     int BSRTangent::shift_diagonal(const real_t factor, const real_t *const reference) {

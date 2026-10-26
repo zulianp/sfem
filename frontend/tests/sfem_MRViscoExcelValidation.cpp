@@ -178,7 +178,7 @@ TestResult run_visco_test(TestMode mode, const RefData& ref, double dt, double t
     printf("  Time step: %.4f s\n", dt);
     
     const ptrdiff_t ndofs = fs->n_dofs();
-    const ptrdiff_t n_nodes = fs->mesh_ptr()->n_nodes();
+    const ptrdiff_t n_nodes = fs->mesh()->n_nodes();
     
     auto x_buf = sfem::create_buffer<real_t>(ndofs, es);
     auto rhs_buf = sfem::create_buffer<real_t>(ndofs, es);

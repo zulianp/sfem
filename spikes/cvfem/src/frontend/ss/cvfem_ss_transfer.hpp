@@ -126,8 +126,8 @@ namespace cvfem_ss {
     inline void build_from_spaces(const std::shared_ptr<sfem::FunctionSpace> &from_space,  // coarse
                                   const std::shared_ptr<sfem::FunctionSpace> &to_space,    // fine
                                   ProlongationPattern                        &out) {
-        auto &to_m   = *to_space->mesh_ptr();
-        auto &from_m = *from_space->mesh_ptr();
+        auto &to_m   = *to_space->mesh();
+        auto &from_m = *from_space->mesh();
 
         if (!to_space->has_semi_structured_mesh())
             SFEM_ERROR("build_from_spaces: the fine space must be semi-structured\n");

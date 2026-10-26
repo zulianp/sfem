@@ -71,7 +71,7 @@ namespace sfem {
     int BoundaryMass::apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) {
         SFEM_TRACE_SCOPE("BoundaryMass::apply");
 
-        auto mesh = space->mesh_ptr();
+        auto mesh = space->mesh();
 
         int block_size = space->block_size();
 

@@ -62,7 +62,7 @@ namespace sfem {
 
         void sync_consistent() {
             if (!consistent) return;
-            for (const auto &block : space->mesh_ptr()->blocks()) {
+            for (const auto &block : space->mesh()->blocks()) {
                 consistent->set_value_in_block(block->name(), "density", alpha * density);
             }
         }

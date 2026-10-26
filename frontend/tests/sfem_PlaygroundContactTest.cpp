@@ -286,7 +286,7 @@ solver: {newton: {verbose: false}}
         auto pg = assemble(yaml, loose ? std::vector<std::string>{"obstacle.gap_tol=0.2"} : std::vector<std::string>{});
         SFEM_TEST_ASSERT(pg != nullptr);
         SFEM_TEST_ASSERT(pg->run() == SFEM_SUCCESS);
-        auto       mesh = pg->function()->space()->mesh_ptr();
+        auto       mesh = pg->function()->space()->mesh();
         const auto z    = mesh->points()->data()[2];
         const auto u    = pg->solution()->data();
         for (ptrdiff_t i = 0; i < mesh->n_nodes(); ++i) lowest[loose] = std::min(lowest[loose], z[i] + u[i * 3 + 2]);
@@ -373,7 +373,7 @@ solver: {newton: {verbose: false}}
     SFEM_TEST_ASSERT(pg != nullptr);
     SFEM_TEST_ASSERT(pg->run() == SFEM_SUCCESS);
 
-    auto       mesh   = pg->function()->space()->mesh_ptr();
+    auto       mesh   = pg->function()->space()->mesh();
     const auto z      = mesh->points()->data()[2];
     const auto u      = pg->solution()->data();
     real_t     lowest = 1;
@@ -409,7 +409,7 @@ solver: {newton: {max_it: 4, fixed_iterations: true, verbose: false, line_search
     auto pg = assemble(yaml, {});
     SFEM_TEST_ASSERT(pg != nullptr);
     SFEM_TEST_ASSERT(pg->run() == SFEM_SUCCESS);
-    auto       mesh   = pg->function()->space()->mesh_ptr();
+    auto       mesh   = pg->function()->space()->mesh();
     const auto z      = mesh->points()->data()[2];
     const auto u      = pg->solution()->data();
     real_t     lowest = 1;

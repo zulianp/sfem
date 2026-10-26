@@ -193,7 +193,7 @@ namespace sfem {
             // One region: each thread takes its nodes into the frames, then, once every thread's
             // are in, its rows of the product and back out of the frames. It reads `in` only at
             // its own nodes before the barrier (input_in_share).
-            op = make_team_op<real_t>(f->space()->mesh_ptr()->comm(),
+            op = make_team_op<real_t>(f->space()->mesh()->comm(),
                                       owned,
                                       owned,
                                       impl.ndofs,
@@ -208,7 +208,7 @@ namespace sfem {
                                       });
         } else {
             op = make_parallel_op<real_t>(
-                    f->space()->mesh_ptr()->comm(),
+                    f->space()->mesh()->comm(),
                     owned,
                     owned,
                     impl.ndofs,

@@ -48,7 +48,7 @@ solver: {newton: {verbose: false, rtol: 1e-12}}
 
     const real_t A[3][3] = {{0.01, 0.02, -0.01}, {0.0, -0.015, 0.005}, {0.02, 0.0, 0.01}};
     auto         f       = pg->function();
-    auto         mesh    = f->space()->mesh_ptr();
+    auto         mesh    = f->space()->mesh();
     auto         xyz     = mesh->points()->data();
     const auto   n       = mesh->n_nodes();
 
@@ -108,7 +108,7 @@ int test_quasi_static_stretch() {
     SFEM_TEST_ASSERT(pg != nullptr);
     SFEM_TEST_ASSERT(pg->run() == SFEM_SUCCESS);
 
-    auto       mesh = pg->function()->space()->mesh_ptr();
+    auto       mesh = pg->function()->space()->mesh();
     auto       xyz  = mesh->points()->data();
     const auto u    = pg->solution()->data();
     real_t worst = 0;
@@ -151,7 +151,7 @@ solver: {newton: {verbose: false}}
     SFEM_TEST_ASSERT(pg != nullptr);
     SFEM_TEST_ASSERT(pg->run() == SFEM_SUCCESS);
 
-    auto mesh = pg->function()->space()->mesh_ptr();
+    auto mesh = pg->function()->space()->mesh();
     SFEM_TEST_EQ(mesh->n_nodes(), (ptrdiff_t)(4 * 4 * 4));
     auto map = mesh->node_mapping();
     SFEM_TEST_ASSERT(map != nullptr);
@@ -171,7 +171,7 @@ solver: {newton: {verbose: false}}
     // Read whole, the packed mesh still maps its nodes to the file's.
     auto whole = assemble((std::string("mesh: {path: ") + dir + "/bar}\nmaterial: {type: GeneratedNeoHookeanOgden, mu: 1, lmbda: 2}\n").c_str());
     SFEM_TEST_ASSERT(whole != nullptr);
-    auto wm   = whole->function()->space()->mesh_ptr();
+    auto wm   = whole->function()->space()->mesh();
     auto wmap = wm->node_mapping();
     SFEM_TEST_ASSERT(wmap != nullptr);
     SFEM_TEST_EQ(wm->n_nodes(), bar->n_nodes());
@@ -197,7 +197,7 @@ solver: {newton: {verbose: false}}
                 (std::string("mesh: {path: ") + dir + "/bar" + blocks + "}\nmaterial: {type: GeneratedNeoHookeanOgden, mu: 1, lmbda: 2}\n" + ic)
                         .c_str());
         SFEM_TEST_ASSERT(read != nullptr);
-        auto       rm  = read->function()->space()->mesh_ptr();
+        auto       rm  = read->function()->space()->mesh();
         const auto ids = rm->node_mapping()->data();
         const auto x   = read->solution()->data();
         for (ptrdiff_t i = 0; i < rm->n_nodes(); ++i) {
@@ -238,7 +238,7 @@ solver: {newton: {verbose: false}}
     auto pg = assemble(case_for("near").c_str());
     SFEM_TEST_ASSERT(pg != nullptr);
     SFEM_TEST_ASSERT(pg->run() == SFEM_SUCCESS);
-    auto       mesh = pg->function()->space()->mesh_ptr();
+    auto       mesh = pg->function()->space()->mesh();
     auto       xyz  = mesh->points()->data();
     const auto u    = pg->solution()->data();
     int        held = 0, free = 0;
@@ -404,7 +404,7 @@ solver: {newton: {verbose: false}}
         SFEM_TEST_ASSERT(pg != nullptr);
         SFEM_TEST_ASSERT(pg->run() == SFEM_SUCCESS);
         const auto x    = pg->solution();
-        auto       mesh = pg->function()->space()->mesh_ptr();
+        auto       mesh = pg->function()->space()->mesh();
         auto       map  = mesh->node_mapping();
         u[packed].assign(x->size(), 0);
         for (ptrdiff_t i = 0; i < mesh->n_nodes(); ++i) {
@@ -453,7 +453,7 @@ solver: {newton: {verbose: false}}
         SFEM_TEST_ASSERT(pg != nullptr);
         SFEM_TEST_ASSERT(pg->run() == SFEM_SUCCESS);
 
-        auto   mesh = pg->function()->space()->mesh_ptr();
+        auto   mesh = pg->function()->space()->mesh();
         auto   xyz  = mesh->points()->data();
         real_t tip  = 0;
         for (ptrdiff_t i = 0; i < mesh->n_nodes(); ++i) {
@@ -544,7 +544,7 @@ solver: {newton: {verbose: false}}
     SFEM_TEST_ASSERT(pg != nullptr);
     SFEM_TEST_ASSERT(pg->run() == SFEM_SUCCESS);
 
-    auto         mesh = pg->function()->space()->mesh_ptr();
+    auto         mesh = pg->function()->space()->mesh();
     auto         xyz  = mesh->points()->data();
     const auto   u    = pg->solution()->data();
     const real_t c = std::cos(real_t(0.3)), s = std::sin(real_t(0.3));
@@ -582,7 +582,7 @@ solver: {newton: {verbose: false}}
     SFEM_TEST_ASSERT(pg->run() == SFEM_SUCCESS);
 
     // At t = 3 the angle is 0.3 sin(3 pi / 2) = -0.3.
-    auto         mesh = pg->function()->space()->mesh_ptr();
+    auto         mesh = pg->function()->space()->mesh();
     auto         xyz  = mesh->points()->data();
     const auto   u    = pg->solution()->data();
     const real_t c = std::cos(real_t(-0.3)), s = std::sin(real_t(-0.3));
@@ -764,7 +764,7 @@ time: {dt: 1, steps: 1}
     SFEM_TEST_ASSERT(pg != nullptr);
     SFEM_TEST_ASSERT(pg->run() == SFEM_SUCCESS);
 
-    auto         mesh = pg->function()->space()->mesh_ptr();
+    auto         mesh = pg->function()->space()->mesh();
     auto         xyz  = mesh->points()->data();
     const auto   u    = pg->solution()->data();
     const real_t c = std::cos(real_t(0.24)), s = std::sin(real_t(0.24));
@@ -804,7 +804,7 @@ solver: {newton: {verbose: false}}
     SFEM_TEST_ASSERT(pg != nullptr);
     SFEM_TEST_ASSERT(pg->run() == SFEM_SUCCESS);
 
-    auto         mesh = pg->function()->space()->mesh_ptr();
+    auto         mesh = pg->function()->space()->mesh();
     auto         xyz  = mesh->points()->data();
     const auto   u    = pg->solution()->data();
     const real_t c = std::cos(real_t(0.3)), s = std::sin(real_t(0.3));

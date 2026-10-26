@@ -1298,7 +1298,7 @@ private:
             const ptrdiff_t nd  = g.data->functions[0]->space()->n_dofs();
             const ptrdiff_t nn0 = nd / N_FIELDS;
 
-            auto     &m0   = *g.data->functions[0]->space()->mesh_ptr();
+            auto     &m0   = *g.data->functions[0]->space()->mesh();
             auto      b0   = m0.block(0);
             const int lvl  = smesh::semistructured_level(m0);
             const int nxe0 = (lvl + 1) * (lvl + 1) * (lvl + 1);
@@ -1708,7 +1708,7 @@ private:
 
                 auto dom_of = [](const std::shared_ptr<sfem::FunctionSpace> &sp) {
                     cvfem::Domain d;
-                    auto          m = sp->mesh_ptr();
+                    auto          m = sp->mesh();
                     if (m && m->is_distributed() && m->comm() && m->comm()->size() > 1) d.comm = m->comm();
                     d.n_owned = sp->n_dofs_owned();
                     d.n_local = sp->n_dofs();
@@ -2184,7 +2184,7 @@ private:
             const std::shared_ptr<GmgLevels::BSR_t>    &a,
             const std::shared_ptr<sfem::FunctionSpace> &space,
             const ptrdiff_t                             n_local_dofs) {
-        auto mesh = space->mesh_ptr();
+        auto mesh = space->mesh();
 
         // SFEM_GMG_COARSE_MAT_SUM=1: is the matrix handed to the coarse factorisation the same
         // matrix however the domain was cut?
@@ -2559,7 +2559,7 @@ private:
         // itself is made global.
         cvfem::Domain probe_dom;
         {
-            auto m = f_coarse->space()->mesh_ptr();
+            auto m = f_coarse->space()->mesh();
             if (m && m->is_distributed() && m->comm() && m->comm()->size() > 1) probe_dom.comm = m->comm();
             probe_dom.n_owned = f_coarse->space()->n_dofs_owned();
             probe_dom.n_local = f_coarse->space()->n_dofs();
@@ -2811,7 +2811,7 @@ private:
         if (smesh::Env::read<int>("SFEM_GMG_STATE_SUM", 0)) {
             for (int i = 0; i < nlevels; ++i) {
                 auto      sp = g.data->functions[i]->space();
-                auto      me = sp->mesh_ptr();
+                auto      me = sp->mesh();
                 const int bs = sp->block_size();
                 const bool dd = me->is_distributed() && me->comm() && me->comm()->size() > 1;
                 const ptrdiff_t nown = dd ? me->distributed()->n_nodes_owned() : sp->n_dofs() / bs;
@@ -3050,7 +3050,7 @@ private:
                     // are incomparable across partitions, and the ghost entries this rank
                     // also stores belong to somebody else.
                     if (smesh::Env::read<int>("SFEM_GMG_DIAG_OWNED_SUM", 0) && !galerkin_diag.empty()) {
-                        auto       cm   = fi->space()->mesh_ptr();
+                        auto       cm   = fi->space()->mesh();
                         const bool dist = cm && cm->is_distributed() && cm->comm() && cm->comm()->size() > 1;
                         const ptrdiff_t nown = dist ? cm->distributed()->n_nodes_owned() : nn;
 
@@ -3099,7 +3099,7 @@ private:
                     // sits on different nodes, which the plain sum would hide; the absolute sum
                     // moves when contributions cancel, which both of the others would hide.
                     if (smesh::Env::read<int>("SFEM_GMG_APPLY_OWNED_SUM", 0) && a_c) {
-                        auto              cm = fi->space()->mesh_ptr();
+                        auto              cm = fi->space()->mesh();
                         const auto *const px = fi->space()->points()->data()[0];
                         const auto *const py = fi->space()->points()->data()[1];
                         const auto *const pz = fi->space()->points()->data()[2];
@@ -3550,7 +3550,7 @@ private:
                 // is exonerated and the difference lives elsewhere in the cycle.
                 if (smesh::Env::read<int>("SFEM_SMOOTHER_APPLY_SUM", 0) && prec_op) {
                     auto              sp  = fi->space();
-                    auto              cm  = sp->mesh_ptr();
+                    auto              cm  = sp->mesh();
                     const auto *const px  = sp->points()->data()[0];
                     const auto *const py  = sp->points()->data()[1];
                     const auto *const pz  = sp->points()->data()[2];
@@ -3629,7 +3629,7 @@ private:
                 // Galerkin assembly consumes it as A_above and must not see the wrapper.
                 auto mg_op = lop;
                 {
-                    auto       me   = fi->space()->mesh_ptr();
+                    auto       me   = fi->space()->mesh();
                     const bool dist = me && me->is_distributed() && me->comm() && me->comm()->size() > 1;
                     if (dist && !std::dynamic_pointer_cast<sfem::ParallelOperator<real_t>>(lop))
                         mg_op = sfem::create_parallel_preconditioner(lop, fi->space(),
@@ -3695,7 +3695,7 @@ private:
                 if (smesh::Env::read<int>("SFEM_GMG_FACE_CHECK", 0)) {
                     auto       pop  = std::dynamic_pointer_cast<sfem::ParallelOperator<real_t>>(lvl_op);
                     const bool face = pop && pop->comm() && pop->comm()->size() > 1;
-                    auto       me   = fi->space()->mesh_ptr();
+                    auto       me   = fi->space()->mesh();
                     const bool dist = me && me->is_distributed() && me->comm() && me->comm()->size() > 1;
                     if (!dist || me->comm()->rank() == 0)
                         std::printf(
@@ -3832,7 +3832,7 @@ private:
                     // factorisation that allgathers and the serial dense one are the same
                     // object to this probe, which is what makes 1 and 8 comparable at all.
                     if (smesh::Env::read<int>("SFEM_GMG_SOLVE_OWNED_SUM", 0) && lu) {
-                        auto              cm  = fi->space()->mesh_ptr();
+                        auto              cm  = fi->space()->mesh();
                         const auto *const px  = fi->space()->points()->data()[0];
                         const auto *const py  = fi->space()->points()->data()[1];
                         const auto *const pz  = fi->space()->points()->data()[2];
@@ -3912,7 +3912,7 @@ private:
                     // the local length, so level_alloc is unchanged.
                     auto coarse_mg_op = lop;
                     {
-                        auto       me   = fi->space()->mesh_ptr();
+                        auto       me   = fi->space()->mesh();
                         const bool dist = me && me->is_distributed() && me->comm() && me->comm()->size() > 1;
                         if (dist && !std::dynamic_pointer_cast<sfem::ParallelOperator<real_t>>(lop))
                             coarse_mg_op = sfem::create_parallel_preconditioner(lop, fi->space(),
@@ -7730,7 +7730,7 @@ int main(int argc, char **argv) {
         // unreadable.
         if (!wrote_step_mesh) {
             if (fs->has_semi_structured_mesh())
-                smesh::semistructured_export_as_standard(fs->mesh_ptr(), smesh::Path(out_folder) / "mesh");
+                smesh::semistructured_export_as_standard(fs->mesh(), smesh::Path(out_folder) / "mesh");
             else
                 mesh->write(smesh::Path(out_folder) / "mesh");
             wrote_step_mesh = true;
@@ -8087,7 +8087,7 @@ int main(int argc, char **argv) {
         smesh::create_directory(out_dir);
         if (fs->has_semi_structured_mesh()) {
             mesh->write(out_dir / "coarse_mesh");
-            smesh::semistructured_export_as_standard(fs->mesh_ptr(), out_dir / "mesh");
+            smesh::semistructured_export_as_standard(fs->mesh(), out_dir / "mesh");
         } else {
             mesh->write(out_dir / "mesh");
         }

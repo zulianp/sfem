@@ -434,7 +434,7 @@ namespace sfem {
         SFEM_READ_ENV(SFEM_FIRST_LAME_PARAMETER, atof);
         linear_elasticity_seed_material(*impl_->domains, SFEM_SHEAR_MODULUS, SFEM_FIRST_LAME_PARAMETER);
 
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
 
         for (auto &n2d : impl_->domains->domains()) {
             OpDomain &domain = n2d.second;
@@ -533,7 +533,7 @@ namespace sfem {
                                       real_t *const        values) {
         SFEM_TRACE_SCOPE("LinearElasticity::hessian_crs");
 
-        auto mesh  = impl_->space->mesh_ptr();
+        auto mesh  = impl_->space->mesh();
         auto graph = impl_->space->node_to_node_graph();
         int  err   = SFEM_SUCCESS;
 
@@ -564,7 +564,7 @@ namespace sfem {
                                       real_t *const        values) {
         SFEM_TRACE_SCOPE("LinearElasticity::hessian_bsr");
 
-        auto mesh  = impl_->space->mesh_ptr();
+        auto mesh  = impl_->space->mesh();
         auto graph = impl_->space->node_to_node_graph();
         int  err   = SFEM_SUCCESS;
 
@@ -597,8 +597,8 @@ namespace sfem {
                                            real_t **const       off_diag_values) {
         SFEM_TRACE_SCOPE("LinearElasticity::hessian_bcrs_sym");
 
-        auto mesh  = impl_->space->mesh_ptr();
-        auto graph = impl_->space->mesh_ptr()->node_to_node_graph_upper_triangular();
+        auto mesh  = impl_->space->mesh();
+        auto graph = impl_->space->mesh()->node_to_node_graph_upper_triangular();
         int  err   = SFEM_SUCCESS;
 
         impl_->iterate([&](const OpDomain &domain) {
@@ -627,7 +627,7 @@ namespace sfem {
     int LinearElasticity::hessian_block_diag_sym(const real_t *const /*x*/, real_t *const values) {
         SFEM_TRACE_SCOPE("LinearElasticity::hessian_block_diag_sym");
 
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         int  err  = SFEM_SUCCESS;
 
         impl_->iterate([&](const OpDomain &domain) {
@@ -680,7 +680,7 @@ namespace sfem {
     int LinearElasticity::hessian_block_diag_sym_soa(const real_t *const /*x*/, real_t **const values) {
         SFEM_TRACE_SCOPE("LinearElasticity::hessian_block_diag_sym_soa");
 
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         int  err  = SFEM_SUCCESS;
 
         impl_->iterate([&](const OpDomain &domain) {
@@ -722,7 +722,7 @@ namespace sfem {
     int LinearElasticity::hessian_diag(const real_t *const, real_t *const out) {
         SFEM_TRACE_SCOPE("LinearElasticity::hessian_diag");
 
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         int  err  = SFEM_SUCCESS;
 
         impl_->iterate([&](const OpDomain &domain) {
@@ -771,7 +771,7 @@ namespace sfem {
     int LinearElasticity::gradient(const real_t *const x, real_t *const out, const ElementScope scope) {
         SFEM_TRACE_SCOPE("LinearElasticity::gradient");
 
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) {
             auto lambda = domain.parameters->require_real_value("lambda");
             auto mu     = domain.parameters->require_real_value("mu");
@@ -784,7 +784,7 @@ namespace sfem {
                                 const real_t *const h,
                                 real_t *const       out,
                                 const ElementScope  scope) {
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) {
             auto lambda = domain.parameters->require_real_value("lambda");
             auto mu     = domain.parameters->require_real_value("mu");
@@ -806,7 +806,7 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
 
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         int  err  = SFEM_SUCCESS;
         for (const auto &slice : flat_block_element_chunks(*mesh, scope, flat_begin, flat_end)) {
             const smesh::block_idx_t block = slice.block;
@@ -828,7 +828,7 @@ namespace sfem {
     int LinearElasticity::value(const real_t *x, real_t *const out) {
         SFEM_TRACE_SCOPE("LinearElasticity::value");
 
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) {
             auto lambda = domain.parameters->require_real_value("lambda");
             auto mu     = domain.parameters->require_real_value("mu");
@@ -852,7 +852,7 @@ namespace sfem {
                                       const real_t *const steps,
                                       real_t *const       out) {
         SFEM_TRACE_SCOPE("LinearElasticity::value_steps");
-        auto mesh = impl_->space->mesh_ptr();
+        auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) {
             auto lambda = domain.parameters->require_real_value("lambda");
             auto mu     = domain.parameters->require_real_value("mu");

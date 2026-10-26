@@ -16,7 +16,7 @@ namespace sfem {
             return nullptr;
         }
 
-        auto mesh = space->mesh_ptr();
+        auto mesh = space->mesh();
 
         // One rank: no ghosts, no aura, nothing to gather. Hand back the inner operator's own
         // apply so the serial path is untouched rather than merely equivalent.

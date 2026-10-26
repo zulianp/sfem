@@ -29,14 +29,14 @@ using namespace sfem;
 std::shared_ptr<sfem::ContactConditions> build_cuboid_sphere_contact(const std::shared_ptr<sfem::Function> &f,
                                                                      const int                              base_resolution) {
     auto fs   = f->space();
-    auto m    = fs->mesh_ptr();
+    auto m    = fs->mesh();
     auto comm = m->comm();
     auto es   = f->execution_space();
 
     auto top_ss = sfem::Sideset::create_from_selector(
             m, [=](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool { return y > (1 - 1e-5) && y < (1 + 1e-5); });
 
-    const int n = base_resolution * (fs->has_semi_structured_mesh() ? smesh::semistructured_level(*fs->mesh_ptr()) : 1);
+    const int n = base_resolution * (fs->has_semi_structured_mesh() ? smesh::semistructured_level(*fs->mesh()) : 1);
 
     sfem::DirichletConditions::Condition xtop{.sidesets = {top_ss}, .value = 0, .component = 0};
     sfem::DirichletConditions::Condition ytop{.sidesets = {top_ss}, .value = -0.05, .component = 1};
@@ -287,7 +287,7 @@ struct TestOutput gen_test_data(enum ExecutionSpace es) {
 
         auto coarse_fs = fs->derefine(coarse_level);
 
-        auto &ssmesh     = *fs->mesh_ptr();
+        auto &ssmesh     = *fs->mesh();
         auto  fine_sides = contact_conds->ss_sides();
 
         int  level        = smesh::semistructured_level(ssmesh);

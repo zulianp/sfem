@@ -20,7 +20,7 @@ namespace {
     constexpr geom_t k_x_max = 1;
 
     void add_left_right_dirichlet(const std::shared_ptr<sfem::Function> &f) {
-        auto mesh = f->space()->mesh_ptr();
+        auto mesh = f->space()->mesh();
 
         // Use global geometry bounds (not local AABB): required for distributed meshes.
         // Keep the mesh axis-aligned so face barycenters stay on x=±1.

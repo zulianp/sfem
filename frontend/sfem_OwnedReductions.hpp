@@ -15,7 +15,7 @@ namespace sfem {
     class OwnedReductions {
     public:
         OwnedReductions(const std::shared_ptr<FunctionSpace> &space, const ExecutionSpace es)
-            : comm_(space->mesh_ptr()->comm()), blas_(blas<real_t>(es)), n_owned_(space->n_dofs_owned()) {}
+            : comm_(space->mesh()->comm()), blas_(blas<real_t>(es)), n_owned_(space->n_dofs_owned()) {}
 
         real_t dot(const real_t *const x, const real_t *const y) const { return sum(blas_->dot(n_owned_, x, y)); }
         real_t norm2(const real_t *const x) const { return std::sqrt(dot(x, x)); }

@@ -250,7 +250,7 @@ int test_checkerboard_prolong_ones() {
 
     auto pair = make_ss_pair(mesh);
     SFEM_TEST_ASSERT(pair.fine->has_semi_structured_mesh());
-    SFEM_TEST_EQ(pair.fine->mesh_ptr()->n_blocks(), static_cast<size_t>(2));
+    SFEM_TEST_EQ(pair.fine->mesh()->n_blocks(), static_cast<size_t>(2));
 
     auto prolongation = sfem::create_hierarchical_prolongation(pair.coarse, pair.fine, sfem::EXECUTION_SPACE_HOST);
     auto coarse_field = sfem::create_host_buffer<real_t>(pair.coarse->n_dofs());
@@ -298,8 +298,8 @@ int test_checkerboard_vs_cube() {
 
     std::vector<ptrdiff_t> fine_cb2cube;
     std::vector<ptrdiff_t> coarse_cb2cube;
-    SFEM_TEST_ASSERT(map_nodes_by_xyz(*cb_pair.fine->mesh_ptr(), *cube_pair.fine->mesh_ptr(), fine_cb2cube) == SFEM_TEST_SUCCESS);
-    SFEM_TEST_ASSERT(map_nodes_by_xyz(*cb_pair.coarse->mesh_ptr(), *cube_pair.coarse->mesh_ptr(), coarse_cb2cube) ==
+    SFEM_TEST_ASSERT(map_nodes_by_xyz(*cb_pair.fine->mesh(), *cube_pair.fine->mesh(), fine_cb2cube) == SFEM_TEST_SUCCESS);
+    SFEM_TEST_ASSERT(map_nodes_by_xyz(*cb_pair.coarse->mesh(), *cube_pair.coarse->mesh(), coarse_cb2cube) ==
                      SFEM_TEST_SUCCESS);
 
     auto es = sfem::EXECUTION_SPACE_HOST;
@@ -319,8 +319,8 @@ int test_checkerboard_vs_cube() {
         SFEM_TEST_ASSERT(p_cube->apply(c_cube->data(), f_cube->data()) == SFEM_SUCCESS);
         SFEM_TEST_ASSERT(compare_mapped(f_cb, f_cube, fine_cb2cube) == SFEM_TEST_SUCCESS);
 
-        fill_linear(*cb_pair.coarse->mesh_ptr(), c_cb);
-        fill_linear(*cube_pair.coarse->mesh_ptr(), c_cube);
+        fill_linear(*cb_pair.coarse->mesh(), c_cb);
+        fill_linear(*cube_pair.coarse->mesh(), c_cube);
         SFEM_TEST_ASSERT(p_cb->apply(c_cb->data(), f_cb->data()) == SFEM_SUCCESS);
         SFEM_TEST_ASSERT(p_cube->apply(c_cube->data(), f_cube->data()) == SFEM_SUCCESS);
         SFEM_TEST_ASSERT(compare_mapped(f_cb, f_cube, fine_cb2cube) == SFEM_TEST_SUCCESS);
@@ -341,8 +341,8 @@ int test_checkerboard_vs_cube() {
         SFEM_TEST_ASSERT(r_cube->apply(f_cube->data(), c_cube->data()) == SFEM_SUCCESS);
         SFEM_TEST_ASSERT(compare_mapped(c_cb, c_cube, coarse_cb2cube) == SFEM_TEST_SUCCESS);
 
-        fill_linear(*cb_pair.fine->mesh_ptr(), f_cb);
-        fill_linear(*cube_pair.fine->mesh_ptr(), f_cube);
+        fill_linear(*cb_pair.fine->mesh(), f_cb);
+        fill_linear(*cube_pair.fine->mesh(), f_cube);
         c_cb   = sfem::create_host_buffer<real_t>(cb_pair.coarse->n_dofs());
         c_cube = sfem::create_host_buffer<real_t>(cube_pair.coarse->n_dofs());
         SFEM_TEST_ASSERT(r_cb->apply(f_cb->data(), c_cb->data()) == SFEM_SUCCESS);
@@ -370,8 +370,8 @@ int test_two_block_quad4_vs_square() {
     std::vector<ptrdiff_t> fine_split2square;
     std::vector<ptrdiff_t> coarse_split2square;
     SFEM_TEST_ASSERT(
-            map_nodes_by_xyz(*split_pair.fine->mesh_ptr(), *square_pair.fine->mesh_ptr(), fine_split2square) == SFEM_TEST_SUCCESS);
-    SFEM_TEST_ASSERT(map_nodes_by_xyz(*split_pair.coarse->mesh_ptr(), *square_pair.coarse->mesh_ptr(), coarse_split2square) ==
+            map_nodes_by_xyz(*split_pair.fine->mesh(), *square_pair.fine->mesh(), fine_split2square) == SFEM_TEST_SUCCESS);
+    SFEM_TEST_ASSERT(map_nodes_by_xyz(*split_pair.coarse->mesh(), *square_pair.coarse->mesh(), coarse_split2square) ==
                      SFEM_TEST_SUCCESS);
 
     auto es = sfem::EXECUTION_SPACE_HOST;
@@ -391,8 +391,8 @@ int test_two_block_quad4_vs_square() {
         SFEM_TEST_ASSERT(p_square->apply(c_square->data(), f_square->data()) == SFEM_SUCCESS);
         SFEM_TEST_ASSERT(compare_mapped(f_split, f_square, fine_split2square) == SFEM_TEST_SUCCESS);
 
-        fill_linear(*split_pair.coarse->mesh_ptr(), c_split);
-        fill_linear(*square_pair.coarse->mesh_ptr(), c_square);
+        fill_linear(*split_pair.coarse->mesh(), c_split);
+        fill_linear(*square_pair.coarse->mesh(), c_square);
         SFEM_TEST_ASSERT(p_split->apply(c_split->data(), f_split->data()) == SFEM_SUCCESS);
         SFEM_TEST_ASSERT(p_square->apply(c_square->data(), f_square->data()) == SFEM_SUCCESS);
         SFEM_TEST_ASSERT(compare_mapped(f_split, f_square, fine_split2square) == SFEM_TEST_SUCCESS);
@@ -413,8 +413,8 @@ int test_two_block_quad4_vs_square() {
         SFEM_TEST_ASSERT(r_square->apply(f_square->data(), c_square->data()) == SFEM_SUCCESS);
         SFEM_TEST_ASSERT(compare_mapped(c_split, c_square, coarse_split2square) == SFEM_TEST_SUCCESS);
 
-        fill_linear(*split_pair.fine->mesh_ptr(), f_split);
-        fill_linear(*square_pair.fine->mesh_ptr(), f_square);
+        fill_linear(*split_pair.fine->mesh(), f_split);
+        fill_linear(*square_pair.fine->mesh(), f_square);
         c_split  = sfem::create_host_buffer<real_t>(split_pair.coarse->n_dofs());
         c_square = sfem::create_host_buffer<real_t>(square_pair.coarse->n_dofs());
         SFEM_TEST_ASSERT(r_split->apply(f_split->data(), c_split->data()) == SFEM_SUCCESS);
@@ -441,8 +441,8 @@ int test_two_block_tet4_vs_cube() {
 
     std::vector<ptrdiff_t> fine_split2cube;
     std::vector<ptrdiff_t> coarse_split2cube;
-    SFEM_TEST_ASSERT(map_nodes_by_xyz(*split_pair.fine->mesh_ptr(), *cube_pair.fine->mesh_ptr(), fine_split2cube) == SFEM_TEST_SUCCESS);
-    SFEM_TEST_ASSERT(map_nodes_by_xyz(*split_pair.coarse->mesh_ptr(), *cube_pair.coarse->mesh_ptr(), coarse_split2cube) ==
+    SFEM_TEST_ASSERT(map_nodes_by_xyz(*split_pair.fine->mesh(), *cube_pair.fine->mesh(), fine_split2cube) == SFEM_TEST_SUCCESS);
+    SFEM_TEST_ASSERT(map_nodes_by_xyz(*split_pair.coarse->mesh(), *cube_pair.coarse->mesh(), coarse_split2cube) ==
                      SFEM_TEST_SUCCESS);
 
     auto es = sfem::EXECUTION_SPACE_HOST;
@@ -462,8 +462,8 @@ int test_two_block_tet4_vs_cube() {
         SFEM_TEST_ASSERT(p_cube->apply(c_cube->data(), f_cube->data()) == SFEM_SUCCESS);
         SFEM_TEST_ASSERT(compare_mapped(f_split, f_cube, fine_split2cube) == SFEM_TEST_SUCCESS);
 
-        fill_linear(*split_pair.coarse->mesh_ptr(), c_split);
-        fill_linear(*cube_pair.coarse->mesh_ptr(), c_cube);
+        fill_linear(*split_pair.coarse->mesh(), c_split);
+        fill_linear(*cube_pair.coarse->mesh(), c_cube);
         SFEM_TEST_ASSERT(p_split->apply(c_split->data(), f_split->data()) == SFEM_SUCCESS);
         SFEM_TEST_ASSERT(p_cube->apply(c_cube->data(), f_cube->data()) == SFEM_SUCCESS);
         SFEM_TEST_ASSERT(compare_mapped(f_split, f_cube, fine_split2cube) == SFEM_TEST_SUCCESS);
@@ -484,8 +484,8 @@ int test_two_block_tet4_vs_cube() {
         SFEM_TEST_ASSERT(r_cube->apply(f_cube->data(), c_cube->data()) == SFEM_SUCCESS);
         SFEM_TEST_ASSERT(compare_mapped(c_split, c_cube, coarse_split2cube) == SFEM_TEST_SUCCESS);
 
-        fill_linear(*split_pair.fine->mesh_ptr(), f_split);
-        fill_linear(*cube_pair.fine->mesh_ptr(), f_cube);
+        fill_linear(*split_pair.fine->mesh(), f_split);
+        fill_linear(*cube_pair.fine->mesh(), f_cube);
         c_split = sfem::create_host_buffer<real_t>(split_pair.coarse->n_dofs());
         c_cube  = sfem::create_host_buffer<real_t>(cube_pair.coarse->n_dofs());
         SFEM_TEST_ASSERT(r_split->apply(f_split->data(), c_split->data()) == SFEM_SUCCESS);
@@ -511,10 +511,10 @@ int test_hex8_tet4_ss_vs_split_blocks() {
     SFEM_TEST_ASSERT(smesh::is_hex_ss_family(mixed.coarse->element_type(0)));
     SFEM_TEST_ASSERT(smesh::is_tet_ss_family(mixed.coarse->element_type(1)));
 
-    auto hex_fine   = sfem::FunctionSpace::create(mesh_from_single_block(mixed.fine->mesh_ptr(), 0), 1);
-    auto hex_coarse = sfem::FunctionSpace::create(mesh_from_single_block(mixed.coarse->mesh_ptr(), 0), 1);
-    auto tet_fine   = sfem::FunctionSpace::create(mesh_from_single_block(mixed.fine->mesh_ptr(), 1), 1);
-    auto tet_coarse = sfem::FunctionSpace::create(mesh_from_single_block(mixed.coarse->mesh_ptr(), 1), 1);
+    auto hex_fine   = sfem::FunctionSpace::create(mesh_from_single_block(mixed.fine->mesh(), 0), 1);
+    auto hex_coarse = sfem::FunctionSpace::create(mesh_from_single_block(mixed.coarse->mesh(), 0), 1);
+    auto tet_fine   = sfem::FunctionSpace::create(mesh_from_single_block(mixed.fine->mesh(), 1), 1);
+    auto tet_coarse = sfem::FunctionSpace::create(mesh_from_single_block(mixed.coarse->mesh(), 1), 1);
     SFEM_TEST_EQ(hex_fine->n_dofs(), mixed.fine->n_dofs());
     SFEM_TEST_EQ(tet_fine->n_dofs(), mixed.fine->n_dofs());
     SFEM_TEST_EQ(hex_coarse->n_dofs(), mixed.coarse->n_dofs());
@@ -524,10 +524,10 @@ int test_hex8_tet4_ss_vs_split_blocks() {
     std::vector<char> tet_fine_nodes((size_t)mixed.fine->n_dofs(), 0);
     std::vector<char> hex_coarse_nodes((size_t)mixed.coarse->n_dofs(), 0);
     std::vector<char> tet_coarse_nodes((size_t)mixed.coarse->n_dofs(), 0);
-    mark_block_nodes(mixed.fine->mesh_ptr()->block(0), hex_fine_nodes);
-    mark_block_nodes(mixed.fine->mesh_ptr()->block(1), tet_fine_nodes);
-    mark_block_nodes(mixed.coarse->mesh_ptr()->block(0), hex_coarse_nodes);
-    mark_block_nodes(mixed.coarse->mesh_ptr()->block(1), tet_coarse_nodes);
+    mark_block_nodes(mixed.fine->mesh()->block(0), hex_fine_nodes);
+    mark_block_nodes(mixed.fine->mesh()->block(1), tet_fine_nodes);
+    mark_block_nodes(mixed.coarse->mesh()->block(0), hex_coarse_nodes);
+    mark_block_nodes(mixed.coarse->mesh()->block(1), tet_coarse_nodes);
 
     std::vector<char> hex_exclusive_coarse = hex_coarse_nodes;
     std::vector<char> tet_exclusive_coarse = tet_coarse_nodes;

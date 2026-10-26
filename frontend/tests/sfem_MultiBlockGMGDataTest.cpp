@@ -39,9 +39,9 @@ namespace {
 
     int export_level_mesh(const std::shared_ptr<sfem::FunctionSpace> &fs, const smesh::Path &path) {
         if (fs->has_semi_structured_mesh()) {
-            SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(fs->mesh_ptr(), path) == SFEM_SUCCESS);
+            SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(fs->mesh(), path) == SFEM_SUCCESS);
         } else {
-            SFEM_TEST_ASSERT(fs->mesh_ptr()->write(path) == SFEM_SUCCESS);
+            SFEM_TEST_ASSERT(fs->mesh()->write(path) == SFEM_SUCCESS);
         }
         return SFEM_TEST_SUCCESS;
     }
@@ -237,7 +237,7 @@ namespace {
     int assert_heterogeneous_apply(const std::shared_ptr<sfem::Function> &f) {
         auto fs = f->space();
         auto x  = sfem::create_host_buffer<real_t>(fs->n_dofs());
-        fill_x2(*fs->mesh_ptr(), x->data());
+        fill_x2(*fs->mesh(), x->data());
 
         auto            y_het = sfem::create_host_buffer<real_t>(fs->n_dofs());
         auto            y_hom = sfem::create_host_buffer<real_t>(fs->n_dofs());
@@ -279,13 +279,13 @@ int test_checkerboard_derefine_keeps_blocks() {
     auto ss   = smesh::to_semistructured(4, hex, true, false);
     auto fine = sfem::FunctionSpace::create(ss, 1);
     SFEM_TEST_ASSERT(fine->has_semi_structured_mesh());
-    SFEM_TEST_ASSERT(assert_named_hex_blocks(fine->mesh_ptr()) == SFEM_TEST_SUCCESS);
+    SFEM_TEST_ASSERT(assert_named_hex_blocks(fine->mesh()) == SFEM_TEST_SUCCESS);
 
     auto mid = fine->derefine(2);
     SFEM_TEST_ASSERT(mid != nullptr);
     SFEM_TEST_ASSERT(mid->has_semi_structured_mesh());
     SFEM_TEST_EQ(mid->n_blocks(), static_cast<size_t>(2));
-    SFEM_TEST_ASSERT(assert_named_hex_blocks(mid->mesh_ptr()) == SFEM_TEST_SUCCESS);
+    SFEM_TEST_ASSERT(assert_named_hex_blocks(mid->mesh()) == SFEM_TEST_SUCCESS);
     SFEM_TEST_ASSERT(smesh::is_semistructured_type(mid->element_type(0)));
     SFEM_TEST_ASSERT(smesh::is_semistructured_type(mid->element_type(1)));
 
@@ -293,7 +293,7 @@ int test_checkerboard_derefine_keeps_blocks() {
     SFEM_TEST_ASSERT(coarse != nullptr);
     SFEM_TEST_ASSERT(!coarse->has_semi_structured_mesh());
     SFEM_TEST_EQ(coarse->n_blocks(), static_cast<size_t>(2));
-    SFEM_TEST_ASSERT(assert_named_hex_blocks(coarse->mesh_ptr()) == SFEM_TEST_SUCCESS);
+    SFEM_TEST_ASSERT(assert_named_hex_blocks(coarse->mesh()) == SFEM_TEST_SUCCESS);
     SFEM_TEST_EQ(coarse->element_type(0), smesh::HEX8);
     SFEM_TEST_EQ(coarse->element_type(1), smesh::HEX8);
 
@@ -315,7 +315,7 @@ int test_checkerboard_create_gmg_data() {
     auto data = sfem::create_gmg_data(f);
     SFEM_TEST_ASSERT(data != nullptr);
 
-    auto levels = smesh::derefinement_levels(*fs->mesh_ptr());
+    auto levels = smesh::derefinement_levels(*fs->mesh());
     SFEM_TEST_EQ(data->functions.size(), levels.size());
     SFEM_TEST_EQ(data->restrictions.size(), levels.size() - 1);
     SFEM_TEST_EQ(data->prolongations.size(), levels.size());
@@ -325,7 +325,7 @@ int test_checkerboard_create_gmg_data() {
         auto space = data->functions[i]->space();
         SFEM_TEST_ASSERT(space != nullptr);
         SFEM_TEST_EQ(space->n_blocks(), static_cast<size_t>(2));
-        SFEM_TEST_ASSERT(assert_named_hex_blocks(space->mesh_ptr()) == SFEM_TEST_SUCCESS);
+        SFEM_TEST_ASSERT(assert_named_hex_blocks(space->mesh()) == SFEM_TEST_SUCCESS);
         SFEM_TEST_ASSERT(assert_heterogeneous_apply(data->functions[i]) == SFEM_TEST_SUCCESS);
     }
 
@@ -477,7 +477,7 @@ int test_two_block_quad4_ssgmg_residual() {
 
     auto split_data = sfem::create_gmg_data(split_f);
     SFEM_TEST_ASSERT(split_data != nullptr);
-    SFEM_TEST_EQ(split_data->functions.size(), smesh::derefinement_levels(*split_f->space()->mesh_ptr()).size());
+    SFEM_TEST_EQ(split_data->functions.size(), smesh::derefinement_levels(*split_f->space()->mesh()).size());
 
     SSGMGResidual split_res;
     SSGMGResidual square_res;
@@ -512,7 +512,7 @@ int test_two_block_tet4_ssgmg_residual() {
 
     auto split_data = sfem::create_gmg_data(split_f);
     SFEM_TEST_ASSERT(split_data != nullptr);
-    SFEM_TEST_EQ(split_data->functions.size(), smesh::derefinement_levels(*split_f->space()->mesh_ptr()).size());
+    SFEM_TEST_EQ(split_data->functions.size(), smesh::derefinement_levels(*split_f->space()->mesh()).size());
 
     SSGMGResidual split_res;
     SSGMGResidual cube_res;
@@ -542,17 +542,17 @@ int test_hex8_tet4_derefine_keeps_blocks() {
     auto ss   = smesh::to_semistructured(4, mixed, true, false);
     auto fine = sfem::FunctionSpace::create(ss, 1);
     SFEM_TEST_ASSERT(fine->has_semi_structured_mesh());
-    SFEM_TEST_ASSERT(assert_hex_tet_ss_types(fine->mesh_ptr()) == SFEM_TEST_SUCCESS);
+    SFEM_TEST_ASSERT(assert_hex_tet_ss_types(fine->mesh()) == SFEM_TEST_SUCCESS);
 
     auto mid = fine->derefine(2);
     SFEM_TEST_ASSERT(mid != nullptr);
     SFEM_TEST_ASSERT(mid->has_semi_structured_mesh());
-    SFEM_TEST_ASSERT(assert_hex_tet_ss_types(mid->mesh_ptr()) == SFEM_TEST_SUCCESS);
+    SFEM_TEST_ASSERT(assert_hex_tet_ss_types(mid->mesh()) == SFEM_TEST_SUCCESS);
 
     auto coarse = fine->derefine(1);
     SFEM_TEST_ASSERT(coarse != nullptr);
     SFEM_TEST_ASSERT(coarse->has_semi_structured_mesh());
-    SFEM_TEST_ASSERT(assert_hex_tet_ss_types(coarse->mesh_ptr()) == SFEM_TEST_SUCCESS);
+    SFEM_TEST_ASSERT(assert_hex_tet_ss_types(coarse->mesh()) == SFEM_TEST_SUCCESS);
 
     return SFEM_TEST_SUCCESS;
 }
@@ -571,7 +571,7 @@ int test_hex8_tet4_create_gmg_data() {
     auto data = sfem::create_gmg_data(f);
     SFEM_TEST_ASSERT(data != nullptr);
 
-    auto levels = smesh::derefinement_levels(*fs->mesh_ptr());
+    auto levels = smesh::derefinement_levels(*fs->mesh());
     SFEM_TEST_EQ(data->functions.size(), levels.size());
     SFEM_TEST_EQ(data->restrictions.size(), levels.size() - 1);
     SFEM_TEST_EQ(data->prolongations.size(), levels.size());
@@ -581,7 +581,7 @@ int test_hex8_tet4_create_gmg_data() {
         auto space = data->functions[i]->space();
         SFEM_TEST_ASSERT(space != nullptr);
         SFEM_TEST_ASSERT(space->has_semi_structured_mesh());
-        SFEM_TEST_ASSERT(assert_hex_tet_ss_types(space->mesh_ptr()) == SFEM_TEST_SUCCESS);
+        SFEM_TEST_ASSERT(assert_hex_tet_ss_types(space->mesh()) == SFEM_TEST_SUCCESS);
     }
 
     for (size_t i = 0; i < data->restrictions.size(); ++i) {
@@ -613,10 +613,10 @@ int test_hex8_tet4_ssgmg_residual() {
 
     auto data = sfem::create_gmg_data(f);
     SFEM_TEST_ASSERT(data != nullptr);
-    SFEM_TEST_EQ(data->functions.size(), smesh::derefinement_levels(*f->space()->mesh_ptr()).size());
+    SFEM_TEST_EQ(data->functions.size(), smesh::derefinement_levels(*f->space()->mesh()).size());
     for (size_t i = 0; i < data->functions.size(); ++i) {
         SFEM_TEST_ASSERT(data->functions[i]->space()->has_semi_structured_mesh());
-        SFEM_TEST_ASSERT(assert_hex_tet_ss_types(data->functions[i]->space()->mesh_ptr()) == SFEM_TEST_SUCCESS);
+        SFEM_TEST_ASSERT(assert_hex_tet_ss_types(data->functions[i]->space()->mesh()) == SFEM_TEST_SUCCESS);
     }
 
     SSGMGResidual res;
