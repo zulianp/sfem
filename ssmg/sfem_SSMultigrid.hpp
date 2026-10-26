@@ -119,7 +119,7 @@ namespace sfem {
             mg->blas() = GPUBLAS<real_t>::create();
 
             if (spmg) {
-                CUDA_ShiftedPenalty<real_t>::build(spmg->impl());
+                GPUShiftedPenaltyKernels<real_t>::build(spmg->impl());
             }
 
         } else

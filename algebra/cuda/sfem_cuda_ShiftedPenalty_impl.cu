@@ -437,7 +437,7 @@ namespace sfem {
     }
 
     template <typename T>
-    void CUDA_ShiftedPenalty<T>::build(struct ShiftedPenalty_Tpl<T>& tpl, const ExecutionContext& context) {
+    void GPUShiftedPenaltyKernels<T>::build(struct ShiftedPenaltyKernels<T>& tpl, const ExecutionContext& context) {
         // Every pass on the context's stream, bound here once.
         const cudaStream_t s = static_cast<cudaStream_t>(context.stream());
         tpl.sq_norm_ramp_p   = [s](auto&&... a) { return sq_norm_ramp_p_tpl<T>(a..., s); };
@@ -471,7 +471,7 @@ namespace sfem {
         assert(tpl.good());
     }
 
-    template class CUDA_ShiftedPenalty<float>;
-    template class CUDA_ShiftedPenalty<double>;
+    template class GPUShiftedPenaltyKernels<float>;
+    template class GPUShiftedPenaltyKernels<double>;
 
 }  // namespace sfem
