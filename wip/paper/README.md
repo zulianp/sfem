@@ -621,6 +621,49 @@ Printed Jacobian terminology uses "consistent" throughout. Historical source
 flags, record keys, filenames and macro identifiers containing "exact" stay
 unchanged so regeneration and source references remain valid.
 
+## Irregular meshes and affine refinement
+
+These are separate studies: job 5052301 checks first-order interior operators
+on irregular, non-affine HEX8 meshes; jobs 5077627 and 5077906 solve an affine
+manufactured problem on four grids. Their combination does not establish
+unstructured solver convergence. The scalar physical-edge correction and packed
+Rhie–Chow flux/derivative are the geometry fixes needed by the first study.
+The refinement results are retained measurements of the identified historical
+solver binary, not a new solve of this branch. No transient or boundary fix is
+claimed by this extraction.
+
+The external archive `pasc27-mesh-validation.zip` contains all three datasets,
+original source/binary manifests, launch settings, logs, failed accuracy gates
+and replay scripts. SHA256:
+`44baa5b5943bd4a72f750d3aa390d2aba0bd4a9671bd7b86efa4de43cb0f4ec3`.
+The reader verifies the whole archive before loading its captured MMS analysis,
+then replays every case and checks recorded manifests, scopes and results.
+Raw evidence is deliberately outside the review diff.
+
+From `wip/paper`:
+
+```sh
+export SFEM_VALIDATION_ARCHIVE=/path/to/pasc27-mesh-validation.zip
+make mesh-validation PY=python3
+make check PY=python3
+```
+
+Ordinary PDF builds use the generated inputs and do not need the archive.
+The complete refinement table is [here](reproducibility/mms-refinement.md).
+The irregular-mesh procedure, formulas and gates are documented in
+[unstructured_study.md](../../spikes/cvfem/docs/unstructured_study.md).
+Its archive `raw/study/summary.md` retains all one-/72-thread timings and ranges;
+`records.json` retains all samples, setup and explicit array capacities.
+
+If the external archive is unavailable, its 117 files remain in the original
+review commit `fd4e81f1`, under `wip/paper/data/{unstructured_5052301,mms_5077627,mms_5077906}`.
+To recreate the exact ZIP, use the sorted `git ls-tree -r --name-only` list of
+those three directories, read each blob with `git show fd4e81f1:PATH`, remove
+the `wip/paper/data/` prefix, and write with Python `zipfile.ZipInfo` timestamp
+`(2026,10,17,0,0,0)`, `ZIP_DEFLATED` and `external_attr=0o100644<<16`.
+Verify the SHA256 above before replay. This recovery uses local Git history;
+no public archive download URL is assumed.
+
 ## Matched Jacobian layouts and precisions (job 5138025)
 
 Figure 9 now uses the complete Grace job 5138025 on nid006022, GNU 14.3.0,
