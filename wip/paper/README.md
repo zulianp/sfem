@@ -547,7 +547,7 @@ retained and independently rechecked; later vectors were fully compared and
 hashed before release. This does not check every intermediate direction in the
 timed loop or resolve the known unperturbed-state discrepancy.
 
-The paper's historical exact-action tables remain rebuild-mode measurements. This separate
+The paper's historical consistent-action tables remain rebuild-mode measurements. This separate
 study quantifies the standalone benchmark correction; solver code already had
 fixed-state reuse. Its rotating-vector, fresh-process recipe differs from the
 later retained-worker coefficient-cache campaign, so multiplying the two
@@ -591,3 +591,224 @@ python3 state-gradients-5114021/kit/study.py replay state-gradients-5114021/capt
 
 Full replay rechecks the retained vectors as well as every log/CSV. The remaining
 pair checks retain their original errors and vector hashes, not the released arrays.
+
+
+### Storage columns in the Jacobian comparisons
+
+The two timing tables include matrix-array storage and additional Darwish
+coefficient-cache storage as separate columns, in GiB (2^30 bytes). A dash means
+that representation does not require that component. It does not mean zero
+memory: mesh topology, geometry, fixed-state gradients, field vectors, scratch,
+assembly maps and allocator overhead are outside these columns. The allocation
+control retains the cache even though it does not read it. The consistent-matrix
+timing workers retain both matrices and the cache in all arms; the columns are
+representation costs, not each worker's live or peak memory.
+
+The consistent CSR/BSR and coefficient-cache sizes come from the pinned logs.
+The lagged timing session did not print matrix bytes. Its 7.02 GiB is instead
+an exact array-ledger calculation for the n=128 Cartesian HEX8 fixture:
+129^3 = 2,146,689 node rows and (3*128+1)^3 = 57,066,625 node-neighbour blocks.
+The lagged BSR allocates all 16 FP64 entries per block, including structural
+zeros, with 32-bit column indices and row offsets:
+`57,066,625*(16*8+4) + (2,146,689+1)*4 = 7,541,381,260 bytes`.
+This follows `make_bsr4` in `spikes/cvfem/src/frontend/op/cvfem_hex8_ns_core.hpp`
+and the tensor-grid adjacency; it is labelled as calculated in the table.
+The consistent BSR log's retained-block count and byte ledger independently
+agree with these index widths. No lagged scalar-CSR footprint or performance
+was measured in this campaign.
+
+Printed Jacobian terminology uses "consistent" throughout. Historical source
+flags, record keys, filenames and macro identifiers containing "exact" stay
+unchanged so regeneration and source references remain valid.
+
+## Matched Jacobian layouts and precisions (job 5138025)
+
+Figure 9 now uses the complete Grace job 5138025 on nid006022, GNU 14.3.0,
+72 cores on NUMA 0. It preserves the original five scheme groups, three layout
+colours, solid FP64/light FP32 bars and two lagged SpMV reference lines.
+Figure 8 remains the earlier residual measurement. Other historical Jacobian
+throughput tables and roofline points retain their original measurement scope;
+this run collected application times, not hardware counters.
+
+The committed source is `177d423a3c32358d4b60f8bac8350a64e3679475` (155 source
+and CMake files independently compared with Git); the later PR61 merge changes
+only paper files. All five schemes use fixed-state gradient reuse. Packed
+Darwish uses the checked coefficient cache, while its direct arm is retained
+below. Thus its displayed advantage includes coefficient reuse as well as the
+layout. The cached arm is faster than direct in every pair in both precisions;
+no sample was excluded to choose it.
+
+The fixture is affine interior, n=128, pack 1024, Rhie--Chow enabled,
+perturbation 0.017, with THP disabled per worker. Six fresh-process blocks
+rotate/reverse arm order; each precision pair runs three times in each order.
+Every window uses 30 warmups, 70 applications and seven rotating live direction
+vectors, initialized by local vector index. Packing changes node numbering,
+so these are not a common coordinate-based direction across layouts; the
+in-process checks compare each layout with its correctly mapped atomic action.
+Direction gradients remain timed; setup, validation, output and intervening
+vector churn are excluded. Both precisions use their own vector,
+geometry and arithmetic types. SpMV uses the existing lagged BSR operator with
+matching scalar precision; it is not equivalent to the consistent action.
+
+All 204 windows and 102 precision comparisons are retained in the accounting.
+Six CTests pass. Per-capture layout checks and twelve checks per cached Darwish
+capture pass. All 34 retained block-zero vectors were retrieved and their
+17 precision comparisons independently rerun. Later vectors were completely
+compared and hashed on Grace before release. Smooth FP32 checks require a
+maximum error below 2e-5 scaled by the FP64 maximum. Limited Jacobians retain
+the existing criterion of fewer than 1% of entries exceeding 1e-4: precision-
+dependent limiter switch bands allow exceptions. This is not entrywise close
+agreement everywhere or resolution of the known unperturbed-state discrepancy.
+
+Rates are 8,586,756 scalar degrees of freedom divided by the mean application
+time, not element visits. Ranges contain every sample and are not confidence
+intervals. Pairing is by block. Direct/cached Darwish compares the same checked
+operator; Darwish/lagged SpMV compares different operators. The new run supports
+an FP64 cached Darwish advantage against lagged SpMV, but FP32 cached Darwish
+is slower than its FP32 SpMV reference in all six pairs. The earlier equivalent
+consistent CSR/BSR campaign remains a separate result; samples and speedups
+from different campaigns are not pooled.
+
+<!-- BEGIN GENERATED JACOBIAN LAYOUT RESULTS -->
+
+| Scheme | Layout | Coefficients | Precision | Mean ms [range] | MDOF/s from mean time |
+|---|---|---|---|---|---:|
+| upwind | packed | direct | f64 | 9.352746 [9.245038, 9.389627] | 918.100 |
+| upwind | packed | direct | f32 | 5.871592 [5.788767, 5.968688] | 1462.424 |
+| upwind | ecolor | direct | f64 | 17.024925 [16.781400, 17.255020] | 504.364 |
+| upwind | ecolor | direct | f32 | 7.640448 [7.510660, 7.894579] | 1123.855 |
+| upwind | atomic | direct | f64 | 17.323005 [17.101850, 17.535880] | 495.685 |
+| upwind | atomic | direct | f32 | 14.303573 [14.130110, 14.670580] | 600.322 |
+| unlimited | packed | direct | f64 | 16.746982 [16.577470, 16.904490] | 512.735 |
+| unlimited | packed | direct | f32 | 10.544333 [10.405590, 10.680780] | 814.348 |
+| unlimited | ecolor | direct | f64 | 40.085872 [39.666410, 40.451600] | 214.209 |
+| unlimited | ecolor | direct | f32 | 18.635335 [18.320390, 18.903630] | 460.778 |
+| unlimited | atomic | direct | f64 | 37.247128 [36.895080, 37.736030] | 230.535 |
+| unlimited | atomic | direct | f32 | 31.446802 [31.033670, 31.812210] | 273.057 |
+| barth | packed | direct | f64 | 19.993658 [19.660500, 20.589710] | 429.474 |
+| barth | packed | direct | f32 | 12.159962 [11.989900, 12.378780] | 706.150 |
+| barth | ecolor | direct | f64 | 42.391295 [41.904780, 42.669240] | 202.559 |
+| barth | ecolor | direct | f32 | 19.889530 [19.682340, 20.244730] | 431.722 |
+| barth | atomic | direct | f64 | 40.470652 [40.119910, 40.835170] | 212.172 |
+| barth | atomic | direct | f32 | 32.937128 [32.798350, 33.161140] | 260.701 |
+| venkat | packed | direct | f64 | 24.522590 [24.342720, 24.696630] | 350.157 |
+| venkat | packed | direct | f32 | 14.315792 [14.170210, 14.411290] | 599.810 |
+| venkat | ecolor | direct | f64 | 45.745985 [45.423620, 46.444310] | 187.705 |
+| venkat | ecolor | direct | f32 | 21.546757 [21.366150, 21.731040] | 398.517 |
+| venkat | atomic | direct | f64 | 44.903040 [44.501670, 45.538180] | 191.229 |
+| venkat | atomic | direct | f32 | 34.969340 [34.753690, 35.230290] | 245.551 |
+| darwish | packed | cached | f64 | 17.418922 [17.246620, 17.665900] | 492.956 |
+| darwish | packed | cached | f32 | 11.053917 [10.809040, 11.256540] | 776.807 |
+| darwish | ecolor | direct | f64 | 45.371560 [44.697250, 45.675610] | 189.254 |
+| darwish | ecolor | direct | f32 | 21.759772 [21.413600, 22.114190] | 394.616 |
+| darwish | atomic | direct | f64 | 44.555583 [44.336090, 44.938570] | 192.720 |
+| darwish | atomic | direct | f32 | 34.862913 [34.481180, 35.260080] | 246.301 |
+| darwish | packed | direct | f64 | 24.113418 [23.951310, 24.223830] | 356.099 |
+| darwish | packed | direct | f32 | 14.330593 [14.143260, 14.465250] | 599.191 |
+| spmv | packed | direct | f64 | 19.429913 [19.353260, 19.505740] | 441.935 |
+| spmv | packed | direct | f32 | 10.250167 [10.162070, 10.323380] | 837.719 |
+
+| Comparison (numerator / cached Darwish) | Precision | Ratio of mean times | Paired range | Pairs above one |
+|---|---|---:|---|---:|
+| Direct Darwish | f64 | 1.384323 | [1.366286, 1.397558] | 6/6 |
+| Direct Darwish | f32 | 1.296427 | [1.263220, 1.335706] | 6/6 |
+| Lagged SpMV (different operator) | f64 | 1.115449 | [1.100781, 1.126565] | 6/6 |
+| Lagged SpMV (different operator) | f32 | 0.927288 | [0.910869, 0.947914] | 0/6 |
+
+<!-- END GENERATED JACOBIAN LAYOUT RESULTS -->
+
+The external evidence archive is `pasc27-jacobian-layouts-5138025.zip`, SHA256
+`f6414f76657344d9d5b1e3041fd49010d3152355b22655237fc2e28eb3117e26`.
+It contains the complete kit (`kit/RUN.md`), source archive, source/dependency/
+binary hashes, binding/compiler metadata, CTest log, all captures and checks,
+and independent verification record. Raw vectors stay in the retained result
+directory and author-held local evidence copy; the archive retains their hashes
+and comparison results. Table/figure regeneration checks the pinned archive,
+complete coverage, commands, numerical records and log hashes; it does not
+execute archived code or reread the omitted vectors.
+
+```bash
+export SFEM_JACOBIAN_LAYOUT_ARCHIVE=/path/to/pasc27-jacobian-layouts-5138025.zip
+export SFEM_PRECISION_ARCHIVE=/path/to/pasc27-precision-5140975.zip
+make jacobian-layouts PY=python3
+```
+
+Ordinary PDF builds use the committed generated figure/macros. `make figures`
+regenerates this figure from the external archive after the historical plots.
+The incomplete job 5130300 is retained separately and supplies no samples here.
+Neither this run nor its figure establishes solver performance or a globally
+optimal implementation.
+
+
+## Precision diagnostic: matrix traffic and coefficient reuse
+
+Job `5140975` on `nid005555` is a separate diagnostic, not a replacement for
+Figure 9's layout campaign. It uses 72 Grace cores, affine interior n=128,
+pack=1024, RC on, perturb=0.017, fixed-state gradient reuse and worker-only THP
+disabling. Six blocks retain all 182 operator captures and 18 copy/triad
+controls. Fresh processes use 30 warmups and 70 applications. Normal no-live
+windows use a fixed direction; live7 windows retain the seven rotating vectors
+and exclude intervening churn. SCF and core counters use separate no-live runs;
+setup, assembly, cache construction, checks and warmups are excluded.
+
+The SCF counters cover the socket once on its representative CPU; core cycles,
+retired instructions and L1/L2 refill events cover the 72 allocated CPUs.
+Read traffic is 32 times `cmem_rd_data`; writes use `cmem_wr_total_bytes`, with
+the write-component identity checked. Counters are unscaled, fully scheduled
+and retained without subtraction. All 84 operator screens pass: counter/loop
+windows, empty traffic, mean instrumentation overhead and sample stability.
+The copy/triad controls and raw counter definitions are in the external kit's
+`RUN.md`; passing these practical screens does not establish absolute accuracy.
+
+<!-- BEGIN GENERATED PRECISION DIAGNOSTIC -->
+
+| Arm | Normal ms [range] | Live7 ms [range] | Transported GB/apply [range] | Transported GB/s [range] | Retired instructions, billions/apply [range] |
+|---|---|---|---|---|---|
+| cached64 | 16.225048 [16.125180, 16.511660] | 16.210203 [16.143290, 16.296890] | 5.355670 [5.345345, 5.364012] | 330.672009 [328.200230, 331.849879] | 7.419606 [7.401016, 7.431270] |
+| cached32 | 10.191145 [9.960243, 10.513050] | 10.148408 [10.050070, 10.197860] | 2.674909 [2.665188, 2.681678] | 263.294529 [258.120384, 267.222616] | 4.824030 [4.817342, 4.834410] |
+| direct64 | 22.840252 [22.547650, 23.423920] | 22.916803 [22.725590, 23.091240] | 2.972977 [2.953790, 2.989968] | 130.696400 [129.840112, 131.215283] | 16.384558 [16.372327, 16.400429] |
+| direct32 | 13.037377 [12.951510, 13.192180] | 13.262225 [13.137170, 13.485900] | 1.485110 [1.482554, 1.486165] | 114.017755 [113.795649, 114.222150] | 9.433029 [9.427911, 9.438639] |
+| spmv64 | 19.123137 [18.924260, 19.369090] | 19.224082 [19.162820, 19.315450] | 7.709718 [7.706338, 7.712195] | 403.410828 [398.702721, 408.084061] | 2.438383 [2.434212, 2.441687] |
+| spmv32 | 9.851928 [9.821878, 9.884289] | 10.111917 [10.055550, 10.151480] | 3.915667 [3.911148, 3.918603] | 394.376149 [386.385822, 399.372216] | 2.192130 [2.189563, 2.194868] |
+| spmv_mixed | 10.199885 [10.025760, 10.293400] | 10.045245 [9.906893, 10.285070] | 4.036181 [4.034643, 4.039437] | 398.190260 [393.778778, 408.559290] | 3.373748 [3.372589, 3.375114] |
+
+<!-- END GENERATED PRECISION DIAGNOSTIC -->
+
+Ranges are sample variation, not confidence intervals. Normal timings and
+counter measurements above come from separate captures. `spmv_mixed` stores
+rounded FP32 matrix values but retains FP64 vectors and arithmetic. It adds
+conversion work and retains the original double matrix allocation; it is not a
+pure bandwidth intervention or a total-memory saving. It reaches nearly pure
+FP32 speed while executing more retired instructions than FP64 SpMV. Together
+with approximately halved traffic and similar bandwidth, this supports reduced
+matrix traffic as the main explanation for this fixture's SpMV precision gain.
+
+Cached Darwish also halves traffic, but attains lower bandwidth in FP32.
+Its additional instruction/gradient work does not identify a unique hardware
+stall or vectorization bottleneck. Relative to direct coefficients, caching
+moves about 1.80 times as many bytes while reducing instructions and time:
+this is a measured storage/traffic versus recomputation tradeoff. Core counts
+include runtime/background activity and are not useful floating-point work.
+
+With live7 vectors, FP32 cached Darwish and lagged SpMV are nearly tied in this
+run; the paired cached/SpMV ratios span 0.998030--1.008597, with cached faster
+in two of six pairs. The earlier figure's FP32 deficit is therefore specific
+to that campaign. These compare different operators; the equivalent consistent
+CSR/BSR study remains separate. No solver speedup or universal ordering follows.
+
+All 15 kit payload hashes and 155 reconstructed source hashes were verified,
+as were the 182 capture records, 146 numerical/identity checks, 18 controls,
+recorded binary identities and the four passing Grace CTests. The numerical
+kernels match source177d423a; only driver counter-window hooks were added.
+Binary files and large output arrays were not downloaded/recomputed locally;
+numerical validation relies on the recorded comparisons and log hashes.
+Block-zero arrays remain on the cluster. Limited FP32 checks retain their
+existing subgradient-band exceptions, not entrywise or general PDE guarantees.
+
+External archive: `pasc27-precision-5140975.zip`, SHA256
+`71e9ea6fc5163313dda2d55ffcd63c7ae3b1ba130e3baa013c7d3115eff22a48`.
+It contains the source/kit, commands, raw text counters, checks and review record,
+not the omitted arrays. The figure reader checks this pinned archive and emits
+these ranges and the prose macros without executing archived code. Both external
+archives are required by `make jacobian-layouts`; ordinary builds use the
+committed figure/macros. No measurements from the failed job5138345 are used.
