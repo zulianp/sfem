@@ -80,8 +80,8 @@
 \newcommand{\Fres}{\mathcal{F}}
 \newcommand{\Fho}{\mathcal{F}^{\mathrm{ho}}}
 \newcommand{\Jlag}{\mathcal{J}_{\mathrm{lagged}}}
-\newcommand{\Jex}{\mathcal{J}_{\mathrm{exact}}}
-\newcommand{\Jhoex}{\mathcal{J}^{\mathrm{ho}}_{\mathrm{exact}}}
+\newcommand{\Jex}{\mathcal{J}_{\mathrm{consistent}}}
+\newcommand{\Jhoex}{\mathcal{J}^{\mathrm{ho}}_{\mathrm{consistent}}}
 \newcommand{\provwarn}{\ifnum\campProvisional=1 \textbf{[PROVISIONAL: pipeline-validation data from \campHost, not this paper's campaign]} \fi}
 
 \begin{document}
@@ -678,7 +678,7 @@ Table~\ref{tab:footprint} puts the gap at more than two orders of magnitude, ess
 independent of problem size.
 
 \paragraph{Operator equivalence.}
-An assembled Jacobian cannot carry the Rhie--Chow pressure-gradient sensitivity: the exact
+The one-ring assembled Jacobian used in the historical comparisons omits the Rhie--Chow pressure-gradient sensitivity: the consistent
 Jacobian differentiates through the nodal gradient reconstruction, so it needs the reconstructed
 gradient of the \emph{direction}, and putting that into a matrix would couple pressures beyond
 nearest neighbours and destroy the one-ring sparsity the matrix is built on. The matrix therefore
@@ -687,12 +687,12 @@ matrix encodes, and comparing the two as one operator overstates the \textsc{bsr
 effectiveness. The two forms are $\Jex$ and $\Jlag$ of \S\ref{sec:setup}, and
 Table~\ref{tab:jacfair} reports both; only $\Jlag$ is what the matrix holds.
 
-Two consequences follow. The assembled operator is bandwidth-bound at a footprint that fits no
-level of cache, which is why halving the value precision is close to its only lever; and the
-matrix-free operator, whose mesh is a hundredth of the matrix but which also reads cached geometry
-and the field vectors, has intensity a factor of \rlMfOverSpmv{} higher and is limited by the
-element kernel instead. \S\ref{sec:res:spmv} reports how far that leaves it from
-either roof.
+The assembled operator streams a matrix larger than the caches, while the
+matrix-free operator reads a smaller mesh together with cached geometry and
+field vectors. Its historical arithmetic intensity is a factor of
+\rlMfOverSpmv{} higher. These differences motivate the timing and traffic
+comparisons in \S\ref{sec:res:spmv}; intensity alone does not identify a
+hardware bottleneck or establish that an implementation is optimal.
 
 %================================================================================================
 \section{Experimental setup}
@@ -760,7 +760,7 @@ is not measured here, and no rate below applies to it; the gap is largest on the
 reconstruction of \S\ref{sec:res:hoexact}, where per-element geometry is exactly the work the
 affine sweep amortises over all its fields.
 
-\paragraph{Convective schemes, reconstruction, and the exact Jacobian.} The baseline flux is
+\paragraph{Convective schemes, reconstruction, and the consistent Jacobian.} The baseline flux is
 \emph{first-order upwinding with a hard donor switch}: the face value is taken from whichever
 side the mass flux comes from, with no blending band.
 
@@ -784,7 +784,7 @@ fixed --- \emph{lagged} one Newton step --- the gradient is an input to the appl
 than part of it. Differentiated, the Jacobian action needs the reconstructed gradient of the
 \emph{direction} and not only of the state, which is one further pass per operator
 application. All four
-combinations are implemented and measured (\S\ref{sec:res:hoexact}). Here ``exact'' means
+combinations are implemented and measured (\S\ref{sec:res:hoexact}). Here ``consistent'' means
 that all reconstruction and flux sensitivities are retained on differentiable branches.
 At limiter ties or a zero mass flux, the action uses the implemented tie conventions;
 a classical Jacobian need not exist. In particular, writing a convective flux as
@@ -807,8 +807,8 @@ deferred correction. Both carry the Rhie--Chow coupling and so read $\Gop p(u)$;
 $\Gop u(u)$ as well.
 
 Three Jacobian actions are measured. $\Jex(u)\,v$ is
-the exact Jacobian of $\Fres$: it differentiates the coupling through the reconstruction and so
-rebuilds $\Gop p(v)$ on every application. $\Jhoex(u)\,v$ is the exact Jacobian of $\Fho$, adding
+the consistent Jacobian of $\Fres$: it differentiates the coupling through the reconstruction and so
+rebuilds $\Gop p(v)$ on every application. $\Jhoex(u)\,v$ is the consistent Jacobian of $\Fho$, adding
 the differentiated correction and the derivative of the limiter, and rebuilding $\Gop u(v)$ with
 it --- in the same sweep as $\Gop p(v)$, since the two read different fields of one array at one
 stride. $\Jlag(u)\,v$ lags both: it evaluates the coupling with $\Gop p(u)$, drops its
@@ -826,14 +826,14 @@ increment at $\Gop u(u)$, which needs no direction reconstruction, and the incre
 derivative at $\Gop u(v)$, which does, and keeping only the first is neither form measured here.
 
 With the higher-order correction treated as an explicit source, $\Jex$ is also the
-correction-lagged, RC-exact action. It is an approximate derivative of $\Fho$, and an exact
+correction-lagged, RC-consistent action. It is an approximate derivative of $\Fho$, and a consistent
 derivative of the surrogate residual with that source held fixed.
 
 Caching a reconstruction at the current state is distinct from dropping its sensitivity.
 For $F(u)=\mathcal{R}(u,g(u))$, differentiation gives
 $F'(u)v=\mathcal{R}_u v+\mathcal{R}_g g'(u)v$ wherever the derivatives exist.
 During a Krylov solve, $u$ is fixed: $g(u)$ can be reused while $g'(u)v$ is evaluated for
-each direction. Both terms are retained in the exact action. The state cache must be
+each direction. Both terms are retained in the consistent action. The state cache must be
 refreshed when the state or geometry changes.
 
 For the consistent Darwish correction, further fixed-state work can be reused.
@@ -861,9 +861,9 @@ records which one ran.
 \label{alg:jacaction}
 \begin{algorithmic}[1]
 \Require state $u$, direction $v$; $\Gop p(u)$, and $\Gop u(u)$ when the correction is carried,
-         both hoisted from the Newton step. Exact by default
+         both hoisted from the Newton step. Consistent by default
 \Ensure $\Jex(u)\,v$, or $\Jhoex(u)\,v$ when the correction is carried; $\Jlag(u)\,v$ when lagged
-\If{exact}
+\If{consistent}
   \State $q, g_v \gets \Gop p(v)$, and $\Gop u(v)$ if the correction is carried
          \Comment{\emph{one} sweep of Algorithm~\ref{alg:apply}: $1$ scalar field, or $4$ at the same
                   stride}
@@ -881,7 +881,7 @@ records which one ran.
          limiter's included --- at $g_v$
 \EndIf
 \State add the boundary closure and the transient term, each an extra sweep
-\Statex The exact forms require one reconstruction of the \emph{direction} per operator application:
+\Statex The consistent forms require one reconstruction of the \emph{direction} per operator application:
         $\Gop p(u)$ and $\Gop u(u)$ are hoisted across
         the Krylov solve because $u$ is fixed there, while $\Gop p(v)$ and $\Gop u(v)$ change
         every iteration and cannot be cached across different directions.
@@ -932,14 +932,14 @@ $\Jlag$ in Table~\ref{tab:passes}, as well as derivative arithmetic in the flux 
   \end{tabular}
 \end{table}
 
-Table~\ref{tab:passes} describes the cached-state implementation. Each exact action has one
+Table~\ref{tab:passes} describes the cached-state implementation. Each consistent action has one
 reconstruction sweep: one scalar input field for $\Jex$, or four for $\Jhoex$. The latter
 fuses the direction's pressure and three velocity components. $\Jlag$ omits the direction
 reconstruction because it drops that sensitivity, not because it caches the state.
 The assembled matrix performs no element sweep per application but pays for assembly once
 per Newton step.
 
-The historical exact-action timings in the original campaign were obtained with the
+The historical consistent-action timings in the original campaign were obtained with the
 earlier implementation, which also rebuilt the state gradients inside each application:
 two scalar input fields for $\Jex$ and eight for $\Jhoex$, fused in one sweep. The benchmark
 retains this scope through \texttt{--rebuild-state-gradients}; its default now caches the
@@ -1183,13 +1183,14 @@ to it.
 \begin{figure}[t]
   \centering
   \inputifready{figures/jacho}{Jacobian scheme arms, jobs/jac\_ho\_bench.sbatch}
-  \caption{The same five schemes for $\Jhoex$, matching the $\Jhoex$ rows of
-    Table~\ref{tab:jacfair}; the \texttt{upwind} bar is $\Jex$, which has no correction to
-    differentiate. Lagging the correction returns $\Jex$ and reproduces that bar to the last
-    bit, at \jachoLaggedPacked{}~MDOF/s packed. Unlike Figure~\ref{fig:convho}, the layout ratio rises
-    before it falls, $\jachoFirstLayoutRatio$ to $\jachoUnlimLayoutRatio$ to
-    $\jachoDmLayoutRatio\times$. Light segments: the \texttt{f32} gain, as in
-    Figure~\ref{fig:convho}. Dashed: the same SpMV references.}
+  \caption{Consistent Jacobian actions on 72 Grace cores, $n=128$, packs of
+    1024, affine interior, Rhie--Chow enabled, perturbation 0.017.
+    All arms reuse state gradients; packed Darwish also caches coefficients.
+    Solid bars: FP64; light segments: FP32 gain. Rates use mean application
+    time over six windows, including required direction gradients.
+    Dashed lines: newly measured lagged BSR SpMV, a different operator.
+    Setup and warmup are excluded; full sample ranges are in the reproducibility
+    documentation.}
   \label{fig:jacho}
 \end{figure}
 
@@ -1236,22 +1237,49 @@ together, $\hoLimCostPackedLo\times$ to $\hoLimCostPackedHi\times$ packed, and t
 unlimited reconstruction to the cheapest of them is about the size of the spread among them: all
 three share the reconstruction and differ only in the function applied to the increment.
 
-\paragraph{The same schemes in the Jacobian.} Figure~\ref{fig:jacho} repeats the sweep for the
-action, which is the operator a Newton--Krylov solve applies once per linear iteration against one
-residual per step. Two things differ from the residual. The absolute cost of differentiating the
-correction is large --- \jachoFirstPacked{} to \jachoUnlimPacked{}~MDOF/s packed on the unlimited
-arm alone, before any limiter --- because $\Jhoex$ reconstructs $\Gop u(v)$ on every
-application,
-nine components against the three $\Gop p(v)$ that $\Jex$ already rebuilds. And the format's margin moves the other way: it rises from
-$\jachoFirstLayoutRatio\times$ to $\jachoUnlimLayoutRatio\times$ before the limiters pull it back
-to $\jachoDmLayoutRatio$--$\jachoClipLayoutRatio\times$, since the added reconstruction is
-itself packed and is the sweep the layout helps most, whereas a limiter derivative is arithmetic
-at a sub-control surface that no layout can help with. Lagging the correction is the control
-on all of this: that arm reproduces $\Jex$ to the last bit, at \jachoLaggedPacked{}~MDOF/s,
-which is what a deferred correction means --- it reaches the residual and not the Jacobian.
+\paragraph{The same schemes in the Jacobian.} Figure~\ref{fig:jacho} uses a
+new matched campaign with state-gradient reuse throughout. The packed
+first-order and unlimited actions reach \jachoFirstPacked{} and
+\jachoUnlimPacked{}~MDOF/s in FP64. Their atomic/packed time ratios are
+\jachoFirstLayoutRatio{} and \jachoUnlimLayoutRatio; the Darwish ratio is
+\jachoDmLayoutRatio{} with coefficient caching and
+\jachoDmDoubleDirectLayoutRatio{} without it. The displayed Darwish advantage
+therefore includes both the packed layout and coefficient reuse.
+Caching reduces Darwish application time by \jachoDmDoubleCacheSaved\% in FP64
+and \jachoDmSingleCacheSaved\% in FP32, retaining all six pairs per precision.
+The cached action takes \jachoDmDoubleCacheMs{}\,ms versus
+\jachoDmDoubleSpmvMs{}\,ms for lagged SpMV in FP64; in FP32 it takes
+\jachoDmSingleCacheMs{}\,ms versus \jachoDmSingleSpmvMs{}\,ms, so it does
+not beat that reference in this campaign. These SpMV comparisons involve different operators;
+the equivalent consistent-matrix comparison is reported separately below.
+Each fresh process performs 30 warmups and 70 timed applications with seven
+rotating live vectors; vector churn is excluded. Limited FP32 checks permit
+the documented precision-dependent subgradient-band exceptions.
 
-\paragraph{On the roofline.} Figure~\ref{fig:roofline} places the same arms against the
-machine, and the correction costs traffic as well as arithmetic. It reads a nine-component nodal
+\paragraph{Why the precision gains differ.}
+A separate diagnostic on 72 Grace cores ($128^3$ cells, pack size 1024,
+Rhie--Chow enabled) measures fixed-direction applications without intervening
+vector activity. Lagged SpMV takes \pdSpmvDoubleMs{} and
+\pdSpmvSingleMs{}\,ms in FP64 and FP32, transporting
+\pdSpmvDoubleGB{} and \pdSpmvSingleGB{}\,GB per application at similar
+bandwidth. Narrowing only the matrix values, with FP64 vectors and arithmetic,
+takes \pdSpmvMixedMs{}\,ms and transports \pdSpmvMixedGB{}\,GB.
+This supports reduced matrix traffic as the main explanation for SpMV's gain
+in this fixture, although conversion work and cache behaviour also change.
+Cached Darwish likewise halves traffic but attains
+\pdCachedDoubleBandwidth{} versus \pdCachedSingleBandwidth{}\,GB/s, yielding
+$\pdCachedSpeedup\times$ acceleration; these observations do not identify a
+unique hardware bottleneck. Compared with direct Darwish, caching moves about
+\pdDoubleTrafficExtra\% more bytes in FP64 while reducing retired instructions by
+\pdDoubleInstructionsSaved\%/\pdSingleInstructionsSaved\% (FP64/FP32),
+exchanging traffic for less repeated computation. With seven live vectors,
+FP32 cached Darwish and lagged SpMV are nearly tied in this diagnostic
+(\pdCachedLiveMs{} versus \pdSpmvLiveMs{}\,ms); their ordering is not universal.
+All samples and practical counter screens are retained in the reproducibility
+material. These diagnostic runs do not replace Figure~\ref{fig:jacho}'s matched data.
+
+\paragraph{On the roofline.} Figure~\ref{fig:roofline} uses the historical campaign,
+not the updated timings of Figure~\ref{fig:jacho}, and the correction costs traffic as well as arithmetic. It reads a nine-component nodal
 velocity gradient the first-order flux never touches, and the packed sweep stages that field
 into pack-local order, so measured DRAM traffic rises from \foBytesPacked{} to
 \hoBytesPacked{}~bytes per degree of freedom ($\hoBytesRatioPacked\times$) packed and
@@ -1275,7 +1303,7 @@ than by checksum: the residual of this state sums to order \num{1e-14} and is al
 cancellation, so a term can be present at every node and absent from the total. They agree to
 \num{2e-17} on every arm, with and without the Rhie--Chow coupling.
 
-\subsection{$\Jhoex$, the exact higher-order Jacobian action}
+\subsection{$\Jhoex$, the consistent higher-order Jacobian action}
 \label{sec:res:hoexact}
 
 With the correction left an explicit source, $\Jex$ approximates the derivative of $\Fho$
@@ -1393,8 +1421,9 @@ the global arrays rather than writing owned rows.
 The first-order matrix-free kernels then sit at \rlResidualAiSpan{}~FLOP/byte and
 the lagged product at $\rlSpmvFSixFourAi{}$, a factor of \rlMfOverSpmv{} lower: it reads a matrix whose
 size grows with the stencil where the matrix-free kernels read a mesh. Halving the value precision,
-moving the SpMV from $\rlSpmvFSixFourAi{}$ to $\rlSpmvFThreeTwoAi{}$, is close to the lagged
-operator's only lever.
+moving the SpMV from $\rlSpmvFSixFourAi{}$ to $\rlSpmvFThreeTwoAi{}$, reduces
+the matrix traffic; the separate precision diagnostic tests this effect while
+retaining FP64 arithmetic.
 
 \paragraph{Attained fractions.} Every first-order matrix-free point lies below the measured
 ridge of
@@ -1488,7 +1517,7 @@ kernel by those factors.
 %================================================================================================
 \begin{table*}[t]
   \centering
-  \caption{The Jacobian action, each form fully exact or fully lagged, on the three matrix-free
+  \caption{The Jacobian action, each form fully consistent or fully lagged, on the three matrix-free
     layouts against the double-precision product (the \texttt{f64} row, which the ratios divide
     by and which has no layout of its own). \emph{col.} is the \emph{element}-coloured layout,
     not the pack colouring; it reads the standard mesh as \emph{standard} does but changes
@@ -1498,7 +1527,7 @@ kernel by those factors.
     matrix in this historical table; its $\Jhoex$ rows have no measured matrix counterpart. The limiters are the
     cheapest and among the dearest, so they bracket what one costs. The \texttt{f32} group is the
     single-precision build in the same allocation, against its own SpMV, whose matrix and vectors
-    are both float. Exact-action rows are historical rebuild-mode measurements;
+    are both float. Consistent-action rows are historical rebuild-mode measurements;
     they do not measure the new cached-state benchmark.}
   \label{tab:jacfair}
   \inputifready{tables/jacfair}{fair Jacobian comparison, jobs/jac\_fair.sbatch}
@@ -1517,7 +1546,7 @@ appearing as throughput. Quoting $\Jex$ against the SpMV would report $\jfExactV
 than $\jfLaggedVsF\times$, understating the matrix-free side by more than a quarter while
 appearing to favour it; both are given because they answer different questions.
 
-The historical rebuild-mode $\Jhoex$ rows are slower than double-precision
+In the historical rebuild mode, $\Jhoex$ is slower than FP64
 SpMV under both limiters: throughput ratios $\jfClipExactVsF\times$
 (Barth--Jespersen) and $\jfHoExactVsF\times$ (Darwish--Moukalled).
 These rows do not measure the coefficient-cached action below. The matrix
@@ -1538,7 +1567,7 @@ less time than the assembled \emph{lagged} SpMV. This is a cost comparison of
 different operators; within that table, only the packed lagged action and SpMV
 encode the same one.
 
-\begin{table}[t]
+\begin{table*}[t]
   \centering
   \small
   \caption{Matched FP64 application times on 72 Grace cores: affine interior,
@@ -1548,7 +1577,8 @@ encode the same one.
     work where required; setup, assembly, checks and warmups are excluded.}
   \label{tab:darwishcache}
   \input{tables/darwish_cache}
-\end{table}
+\par\smallskip\footnotesize Matrix columns count values, column indices and row offsets only; cache is the additional Darwish coefficient array. --- means that component is not required by the arm, not zero total memory. Mesh, geometry, state gradients, vectors and workspaces are excluded. $^{\dagger}$Lagged BSR storage is calculated from the fixture connectivity and array widths, not measured process memory.
+\end{table*}
 
 Each block retains one worker per arm. Directions are defined from node
 coordinates, with 30 warmups before each capture and transparent huge pages disabled. All six
@@ -1580,7 +1610,7 @@ windows favours the cached action against both matrices. Caching itself reduces
 the direct matrix-free time by \cmTimeReduction\% in this run, corroborating
 the separate \dcTimeReduction\% result in Table~\ref{tab:darwishcache}.
 
-\begin{table}[t]
+\begin{table*}[t]
   \centering
   \small
   \caption{Equivalent consistent Darwish applications: FP64, 72 Grace cores,
@@ -1591,9 +1621,10 @@ the separate \dcTimeReduction\% result in Table~\ref{tab:darwishcache}.
     setup and checks excluded. Ranges are not confidence intervals.}
   \label{tab:consistentmatrix}
   \input{tables/consistent_matrix}
-\end{table}
+\par\smallskip\footnotesize Matrix columns count values, column indices and row offsets only; cache is the additional Darwish coefficient array. --- means that component is not required by the arm, not zero total memory. Mesh, geometry, state gradients, vectors and workspaces are excluded. Columns describe the representation used by each arm; both matrices and the cache stayed allocated in every timing worker.
+\end{table*}
 
-The cache adds \cmCacheGiB{}\,GiB; CSR and BSR store \cmCsrGiB{} and
+For the lagged operator, the BSR arrays occupy \dcLaggedGiB{}\,GiB on the same mesh; the packed lagged action requires neither those matrix arrays nor the Darwish coefficient cache. The consistent cache adds \cmCacheGiB{}\,GiB; CSR and BSR store \cmCsrGiB{} and
 \cmBsrGiB{}\,GiB respectively in matrix arrays, not total solver footprints.
 Cache setup takes \cmCacheSetup{}\,s. Matrix probing and compaction take
 \cmAssembly{}\,s, plus \cmConversion{}\,s for CSR conversion; these are

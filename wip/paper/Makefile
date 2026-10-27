@@ -12,7 +12,7 @@ TABDIR   = tables
 # No extensions are granted, so this is a gate rather than a guideline.
 PAGELIMIT ?= 10
 
-.PHONY: all figures check clean selftest darwish-cache consistent-matrix state-gradients
+.PHONY: all figures check clean selftest darwish-cache consistent-matrix state-gradients jacobian-layouts
 
 all: main.pdf
 
@@ -28,6 +28,7 @@ figures:
 	@if [ -f python/perf_figures.py ]; then \
 	  $(PY) python/perf_figures.py --out $(FIGDIR) --tables $(TABDIR); \
 	fi
+	$(PY) python/jacobian_layout_figures.py
 
 selftest:
 	$(PY) python/state_gradient_figures.py --selftest
@@ -82,3 +83,8 @@ consistent-matrix:
 # Regenerate only the isolated state-gradient study from its external archive.
 state-gradients:
 	$(PY) python/state_gradient_figures.py
+
+# Preserve the scheme figure layout while updating the measured data.
+jacobian-layouts:
+	$(PY) python/jacobian_layout_figures.py --selftest
+	$(PY) python/jacobian_layout_figures.py
