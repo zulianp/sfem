@@ -49,7 +49,7 @@ llvm)/bin/clang -DCMAKE_CXX_COMPILER=$(brew --prefix llvm)/bin/clang++`) works w
 | `SFEM_ENABLE_TRACE` | ON | Timings of the main phases, written to `smesh.trace.csv`. |
 | `SFEM_ENABLE_EXPLICIT_VECTORIZATION` | ON | Hand-vectorised kernels. |
 | `SFEM_ENABLE_AVX2`, `SFEM_ENABLE_AVX512` | OFF | x86 intrinsics. |
-| `BUILD_SHARED_LIBS` | OFF | |
+| `BUILD_SHARED_LIBS` | ON | libsfem and the libraries built with it (smesh, sresample, SCCD, SSDF, RapidYAML) are shared; executables load them at run time. OFF links everything statically into each executable. |
 
 Number types: `SFEM_REAL_TYPE` (float64), `SFEM_GEOM_TYPE` (float32), `SFEM_IDX_TYPE` (int32),
 and `SFEM_SCALAR_TYPE`, `SFEM_COUNT_TYPE`, `SFEM_ELEMENT_IDX_TYPE`, `SFEM_LOCAL_IDX_TYPE`
@@ -69,6 +69,33 @@ cmake -S . -B build -DSFEM_ENABLE_PYTHON=ON -DCMAKE_INSTALL_PREFIX=$PWD/install
 cmake --build build -j 8 --target install
 export PYTHONPATH=$PWD/install/lib:$PWD/install/scripts:$PYTHONPATH
 python3 -c "import pysfem"
+```
+
+## Using SFEM from another project
+
+Install SFEM first (`cmake --install build --prefix <prefix>`). The installed executables,
+libraries and the `pysfem` module find the shared libraries in `<prefix>/lib` on their own;
+`LD_LIBRARY_PATH` is not needed.
+
+**CMake**: point `SFEM_DIR` at `<prefix>/lib/cmake` and link `SFEM::sfem`, which brings its
+include directories, flags and dependencies:
+
+```cmake
+find_package(SFEM REQUIRED)            # cmake -DSFEM_DIR=<prefix>/lib/cmake ...
+add_executable(my_app main.cpp)
+target_link_libraries(my_app PRIVATE SFEM::sfem)
+```
+
+**Makefiles**: `cmake --build build --target install_all` also writes
+`<prefix>/config/sfem-config.makefile`, with SFEM's compilers (`SFEM_C_COMPILER`,
+`SFEM_CXX_COMPILER`), `SFEM_INCLUDES`, `SFEM_CXXFLAGS` and `SFEM_LIBRARIES` (the libraries with
+an rpath to their directory):
+
+```make
+include <prefix>/config/sfem-config.makefile
+
+my_app: main.cpp
+	$(SFEM_CXX_COMPILER) -std=c++17 $(SFEM_CXXFLAGS) $(SFEM_INCLUDES) $< -o $@ $(SFEM_LIBRARIES)
 ```
 
 ## Alps (CSCS)
