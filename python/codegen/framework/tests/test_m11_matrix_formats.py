@@ -78,6 +78,7 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
     def test_generated_neohookean_hex8_hessian_assembly_reuses_sum_factorization(self):
         generated_root = (
             Path(__file__).resolve().parents[4]
+            / "src"
             / "frontend"
             / "ops"
             / "generated"
@@ -446,6 +447,7 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
     def test_bsr_coverage_includes_vector_action_and_taylor_hood_velocity_plan(self):
         matrix_test_source = (
             Path(__file__).resolve().parents[4]
+            / "src"
             / "frontend"
             / "tests"
             / "sfem_MatrixFormatsTest.cpp"
@@ -454,7 +456,7 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
         self.assertIn("neohookean_ogden_apply_packed_3d_i_msoa", matrix_test_source)
         self.assertIn('assert_close_action("generated NeoHookean packed hessian action"', matrix_test_source)
         frontend_api_source = (
-            Path(__file__).resolve().parents[4] / "frontend" / "sfem_API.hpp"
+            Path(__file__).resolve().parents[4] / "src" / "frontend" / "sfem_API.hpp"
         ).read_text()
         self.assertIn("#include \"sfem_DIA.hpp\"", frontend_api_source)
 

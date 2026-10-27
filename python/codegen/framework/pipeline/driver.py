@@ -2914,7 +2914,7 @@ def _repo_root():
     """
     path = os.path.dirname(os.path.abspath(__file__))
     while True:
-        if os.path.isdir(os.path.join(path, "base")) and os.path.isdir(
+        if os.path.isdir(os.path.join(path, "src", "base")) and os.path.isdir(
             os.path.join(path, "python")
         ):
             return path
@@ -2930,7 +2930,7 @@ def _compile_operators(paths):
         raise RuntimeError("C++ compiler is not available")
     repo_root = _repo_root()
     include_dirs = [
-        os.path.join(repo_root, "base"),
+        os.path.join(repo_root, "src", "base"),
     ]
     include_dirs.extend(generated_include_dirs(paths))
     include_dirs.extend(_smesh_source_include_dirs(repo_root))

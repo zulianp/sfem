@@ -113,7 +113,7 @@ def shipped_tree():
     """
     here = os.path.dirname(os.path.abspath(__file__))
     repository = os.path.abspath(os.path.join(here, "..", "..", "..", ".."))
-    return os.path.join(repository, "frontend", "ops", "generated")
+    return os.path.join(repository, "src", "frontend", "ops", "generated")
 
 
 def snapshot_root(base_dir):
@@ -479,11 +479,11 @@ def main(argv=None):
     check_tree = subparsers.add_parser(
         "check-tree",
         parents=[common],
-        help="Regenerate and compare against frontend/ops/generated, the tree the build compiles.",
+        help="Regenerate and compare against src/frontend/ops/generated, the tree the build compiles.",
     )
     check_tree.add_argument(
         "--tree",
-        help="Generated tree to compare against (default: frontend/ops/generated).",
+        help="Generated tree to compare against (default: src/frontend/ops/generated).",
     )
     check_tree.add_argument(
         "--keep",

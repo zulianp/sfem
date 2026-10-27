@@ -34,7 +34,7 @@ import unittest
 GENERATED = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))),
-    "frontend", "ops", "generated",
+    "src", "frontend", "ops", "generated",
 )
 
 _DEFINITION = re.compile(r'extern "C"[^;{()]*?([A-Za-z_][A-Za-z0-9_]*)\s*\(')

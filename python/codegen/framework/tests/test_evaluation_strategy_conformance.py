@@ -49,6 +49,7 @@ def _generated_tree():
             "..",
             "..",
             "..",
+            "src",
             "frontend",
             "ops",
             "generated",
