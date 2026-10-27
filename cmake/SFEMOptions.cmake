@@ -1,7 +1,9 @@
 # SFEMOptions
 
 # ##############################################################################
-option(BUILD_SHARED_LIBS "build shared libraries" OFF)
+# libsfem and the libraries built with it (smesh, sresample, SCCD, SSDF, ryml) are shared by
+# default: every driver and test links them at run time instead of carrying its own copy.
+option(BUILD_SHARED_LIBS "build shared libraries" ON)
 option(SFEM_ENABLE_AMG "Enable AMG solver" ON)
 option(SFEM_ENABLE_AVX2 "Enable AVX2 intrinsics" OFF)
 option(SFEM_ENABLE_AVX512 "Enable AVX512 intrinsics" OFF)
@@ -23,7 +25,7 @@ option(SFEM_ENABLE_PYTHON "Enable python bindings for SFEM" OFF)
 option(SFEM_ENABLE_RYAML "Enable YAML input files with RapidYAML" ON)
 option(SFEM_ENABLE_AGGRESSIVE_OPT "Enable aggressive optimizations" OFF)
 option(SFEM_ENABLE_SCCD "Enable SCCD library" OFF)
-option(SFEM_SCCD_BUILD_SHARED_LIBS "Build bundled SCCD as a shared library" OFF)
+option(SFEM_SCCD_BUILD_SHARED_LIBS "Build bundled SCCD as a shared library" ${BUILD_SHARED_LIBS})
 option(SFEM_ENABLE_SSDF "Enable SSDF library" OFF)
 option(SFEM_ENABLE_SRESAMPLE "Enable the sresample library: SDF obstacles and grid/mesh transfer" ON)
 set(_SFEM_ENABLE_CUBIQL_DEFAULT ${SFEM_ENABLE_SSDF})

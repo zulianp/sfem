@@ -11,6 +11,7 @@ add_custom_target(
     COMMAND
         ${CMAKE_COMMAND} -DSFEM_DIR=${CMAKE_INSTALL_PREFIX}/lib/cmake/
         -DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}
+        -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER} -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
         ${CMAKE_CURRENT_SOURCE_DIR}/cmake/utils
     COMMAND ${CMAKE_COMMAND} --build . --target all
     COMMAND ${CMAKE_COMMAND} -P cmake_install.cmake
