@@ -1,108 +1,84 @@
-# Simple FEM #
+# SFEM
 
-This libary is not meant for exteral use. For the moment it is my personal sketch pad!
-Use at your own risk. Selected functionalities will be made available through utopia (https://github.com/zulianp/utopia).
+SFEM is a C++/CUDA finite element library for large solid mechanics simulations on CPUs and
+GPUs. Its operators are matrix-free or partially assembled, on unstructured and semi-structured
+(refined) meshes, and most are generated from symbolic descriptions of the material.
 
-# Requirements
+- **Materials**: linear elasticity, NeoHookean-Ogden, Mooney-Rivlin with Prony-series
+  viscoelasticity, linear and Mooney-Rivlin Kelvin-Voigt, Laplacian and flow operators.
+- **Elements**: TET4, TET10, HEX8, semi-structured HEX8 and TET4, shells and beams.
+- **Solvers**: Newton with line search, CG and BiCGStab, Chebyshev, geometric and algebraic
+  multigrid, MPRGP for bound constraints.
+- **Contact**: rigid obstacles given as signed distance fields, solved per Newton step or by a
+  shifted-penalty multigrid.
+- **Time integration**: quasi-static stepping, Newmark, BDF2, backward Euler.
+- **Execution**: OpenMP, CUDA (with streams and graphs), MPI, NCCL within a node.
+- **Code generation**: `python/codegen/framework` writes the operators' CPU and GPU kernels.
 
-SFEM depends on the following base technologies
+## Quick start
 
-- C/C++ Compiler
-- CMake				(e.g., `brew install cmake`)
-- MPI 				(e.g., `brew install open-mpi`)
-- Python 3 			(e.g., `brew install python@3.12`)
+Requirements: a C++17 compiler, CMake 3.20+, MPI; optionally OpenMP, CUDA and Python 3.
 
-The following technologies are also supported
-- OpenMP 			(e.g., `brew install libomp`)
-
-# Installation guide
-
-First we install the `C` code base
-Go to a directory of your choosing and type
-
-```bash
-git clone https://github.com/zulianp/sfem.git && \
-cd sfem && git submodule update --init --recursive && \
-mkdir build && cd build && cmake .. -DSFEM_ENABLE_OPENMP=ON && make
+```sh
+git clone --recursive https://github.com/zulianp/sfem.git
+cd sfem
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DSFEM_ENABLE_OPENMP=ON
+cmake --build build -j 8
+(cd build && ctest -j 8)
 ```
 
+On macOS with Apple Clang add `-DOPENMP_DIR=$(brew --prefix libomp)`; for a GPU build add
+`-DSFEM_ENABLE_CUDA=ON`. [Building](docs/building.md) lists the options, the dependencies CMake
+fetches, the Python bindings and the Alps (CSCS) setup.
 
-In the `sfem` folder
+## Run a simulation
 
-- Enter `python3 -m venv venv` (**Optional/Recommended**)
-- Enter `source venv/bin/activate` (to be activated for every new command-line window) (**Optional/Recommended**)
+The Playground runs a simulation described by one YAML file:
 
-- Type:
- ``` pip install -r python/requirements.txt -r ./python/requirements_cu12.txt```
- For CUDA 12 support, use the `requirements_cu12.txt`
-- Or Type:
- ``` pip install -r python/requirements.txt -r ./python/requirements_cu11.txt```
-For CUDA 11 support, use the `requirements_cu11.txt`
-
- (Python 3 is assumed here) to install `Python3` dependencies.
-
-Both makefiles allow to pass options such as 
-`MPICC=<path_to_your_mpicc_compiler>` and `MPICXX=<path_to_your_mpicxx_compiler>`.
-
-
-# Installing the Python frontend
-
-1. downloading sfem and submodules and installing the python env requirements.
-2. Activate python env
-3. Install nanobind in the environment `pip install nanobind`
-
-Then compile and install sfem
-```
-export INSTALL_DIR=<path_to_your_libs>
-mkdir -p build && \
-cd build && \
-cmake .. -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR/sfem -DSFEM_ENABLE_PYTHON=ON && \
-make && make install
-export PYTHONPATH=$INSTALL_DIR/sfem/lib:$INSTALL_DIR/sfem/scripts:$PYTHONPATH
+```sh
+build/playground workflows/kelvin_voigt/case.yaml --set output.path=$PWD/kv
 ```
 
-# New Piz daint
+[The Playground documentation](docs/playground/overview.md) explains cases, every key, outputs,
+and parallel and GPU runs; `workflows/` holds example cases.
 
-Install the `uenv` machinery (https://confluence.cscs.ch/display/KB/UENV+user+environments)
+## Documentation
 
-```bash
-uenv image pull prgenv-gnu/24.7:v3
-uenv start --view=default prgenv-gnu/24.7:v3
-# uenv start prgenv-gnu/25.6:v2 --view=modules # Aternatively load the desired modules yourself
+- [Building](docs/building.md) and [testing](docs/testing.md)
+- [The Playground](docs/playground/overview.md): [case reference](docs/playground/case-reference.md),
+  [examples](docs/playground/examples.md), [outputs](docs/playground/outputs.md),
+  [parallel and GPU runs](docs/playground/parallel-and-gpu.md)
+- [All documents](docs/README.md)
+- [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/zulianp/sfem) (generated)
 
-# In the sfem folder
-mkdir build && \
-cd build && \
-cmake .. -DSFEM_ENABLE_CUDA=ON -DSFEM_ENABLE_PYTHON=ON -DSFEM_ENABLE_OPENMP=ON -DCMAKE_C_COMPILER=mpicc -DCMAKE_CXX_COMPILER=mpicxx && \
-make -j12
-```
+## Repository layout
 
+| Folder | Content |
+|---|---|
+| `src/` | The library: `base`, `algebra`, `mesh`, `operators`, `frontend` (functions, operators, nonlinear solvers, contact, the Playground), `ssmg` and `amg` (multigrid), `resampling`, `solver`, `matrix`, `pizzastack`. Unit tests are in each module's `tests/`. |
+| `drivers/` | Executables, including `drivers/mech/playground.exe.cpp`. |
+| `python/` | The `pysfem` bindings, the `sfem` Python tools, and the code generator. |
+| `workflows/` | Example cases and pipelines. |
+| `verification_and_validation/` | Cases checked against analytic solutions. |
+| `docs/` | Documentation. |
+| `data/` | Small meshes used by examples. |
+| `scripts/` | Build-matrix and maintenance scripts. |
+| `spikes/` | Separate research projects built on SFEM. |
+| `external/` | Submodules: smesh, sresample, sccd, ssdf, x86-simd-sort. |
+| `dev/` | Development notes, plans, papers and lab experiments. |
 
-# OLD Piz Daint (XC50/XC40)
-
-On Piz Daint the ideal environment is obtained with
-```bash
-source $APPS/UES/anfink/gpu/environment
-```
-
-# Cite SFEM
-
-Cite SFEM if you use it for your work:
+## Citing SFEM
 
 ```bibtex
 @misc{sfemgit,
 	author = {Zulian, Patrick and Riva, Simone and Yang, Haoyu},
 	title = {{SFEM}: Simple {FEM}},
-	url = {https://bitbucket.org/zulianp/sfem},
-	howpublished = {https://bitbucket.org/zulianp/sfem},
+	url = {https://github.com/zulianp/sfem},
+	howpublished = {https://github.com/zulianp/sfem},
 	year = {2024}
 }
 ```
 
-# AI Generated docs
+## License
 
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/zulianp/sfem)
-
-https://deepwiki.com/zulianp/sfem
-
-
+BSD 3-Clause; see [LICENSE](LICENSE).

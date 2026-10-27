@@ -144,7 +144,7 @@ NOT_COVERED = {}
 def _repo_root():
     path = os.path.dirname(os.path.abspath(__file__))
     while True:
-        if os.path.isdir(os.path.join(path, "base")) and os.path.isdir(
+        if os.path.isdir(os.path.join(path, "src", "base")) and os.path.isdir(
             os.path.join(path, "python")
         ):
             return path
@@ -175,12 +175,12 @@ def _include_flags(root, generated_dir):
         # `packed_layout.inc` sits beside this module, shared with the
         # inexact-apply spike.
         os.path.dirname(os.path.abspath(__file__)),
-        os.path.join(root, "base"),
+        os.path.join(root, "src", "base"),
         # The simplex CPU kernels reach into SFEM proper: tet4_inline_cpu.hpp
         # includes sfem_sortreduce.hpp, which lives here.  Without it the harness
         # cannot drive TET4 at all, which is how a whole kernel family came to
         # be outside every gate -- see ARCHITECTURE.html OP 17.
-        os.path.join(root, "algebra"),
+        os.path.join(root, "src", "algebra"),
         os.path.join(root, "build"),
         os.path.join(root, "build", "external", "smesh"),
         os.path.join(root, "external", "smesh", "src"),
@@ -191,7 +191,7 @@ def _include_flags(root, generated_dir):
             for current, subdirs, _files in os.walk(material_dir):
                 subdirs[:] = [d for d in subdirs if d not in ("cuda", "CMakeFiles")]
                 dirs.append(current)
-    operators_root = os.path.join(root, "operators")
+    operators_root = os.path.join(root, "src", "operators")
     if os.path.isdir(operators_root):
         for current, subdirs, _files in os.walk(operators_root):
             subdirs[:] = [d for d in subdirs if d not in ("cuda", "CMakeFiles")]

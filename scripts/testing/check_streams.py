@@ -19,9 +19,9 @@ import sys
 EXCLUDED = {
     "external": "submodules, gated in their own repositories",
     "spikes": "separate projects, built and gated on their own",
-    "resampling/cuda": "host-in, host-out entry points (allocate, copy, launch, copy back): synchronous by "
+    "src/resampling/cuda": "host-in, host-out entry points (allocate, copy, launch, copy back): synchronous by "
     "construction; to be replaced by sresample (MIGRATION_SRESAMPLE.md)",
-    "benchmark": "not in the build",
+    "dev": "development notes and lab experiments, not in the build",
 }
 SUFFIXES = (".cu", ".cuh", ".cpp", ".hpp", ".h", ".c")
 RETIRED = re.compile(r"\b(launch_stream\s*\(|LaunchStreamScope|current_launch_stream|SFEM_DEFAULT_STREAM)\b|SFEM_DEBUG_SYNCHRONIZE\(\s*\)")

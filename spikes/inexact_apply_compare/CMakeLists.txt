@@ -184,9 +184,9 @@ target_include_directories(spike_common INTERFACE
     "${SPIKE_GEN_DIR}"
     "${SPIKE_GEN_ROOT}/${SPIKE_MATERIAL}"
     "${SPIKE_GEN_ROOT}/${SPIKE_MATERIAL}/d3"
-    "${SPIKE_SFEM}/base"
-    "${SPIKE_SFEM}/algebra"
-    "${SPIKE_SFEM}/operators"
+    "${SPIKE_SFEM}/src/base"
+    "${SPIKE_SFEM}/src/algebra"
+    "${SPIKE_SFEM}/src/operators"
     "${SPIKE_SFEM_BUILD}"
     "${SPIKE_SFEM_BUILD}/external/smesh"
     ${SPIKE_SMESH_INCLUDES})
@@ -368,11 +368,11 @@ endforeach()
 # step and no exported target set -- so they are collected from the checkout.
 # The alternative the shell scripts used was to `sed` 111 `-I` flags out of
 # `CMakeFiles/bench_op.dir/flags.make`, which breaks when that target is renamed.
-set(SPIKE_SFEM_SOURCE_INCLUDES "${SPIKE_SFEM}")
+set(SPIKE_SFEM_SOURCE_INCLUDES "${SPIKE_SFEM}/src")
 foreach(_root algebra base frontend mesh operators resampling solver graphs io parametrize)
-    if(IS_DIRECTORY "${SPIKE_SFEM}/${_root}")
-        list(APPEND SPIKE_SFEM_SOURCE_INCLUDES "${SPIKE_SFEM}/${_root}")
-        file(GLOB_RECURSE _sub LIST_DIRECTORIES true "${SPIKE_SFEM}/${_root}/*")
+    if(IS_DIRECTORY "${SPIKE_SFEM}/src/${_root}")
+        list(APPEND SPIKE_SFEM_SOURCE_INCLUDES "${SPIKE_SFEM}/src/${_root}")
+        file(GLOB_RECURSE _sub LIST_DIRECTORIES true "${SPIKE_SFEM}/src/${_root}/*")
         foreach(_dir IN LISTS _sub)
             if(IS_DIRECTORY "${_dir}")
                 list(APPEND SPIKE_SFEM_SOURCE_INCLUDES "${_dir}")

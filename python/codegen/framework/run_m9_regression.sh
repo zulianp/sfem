@@ -63,7 +63,7 @@ fi
 # frontend/ops/generated -- the tree CMake compiles into libsfem -- is what the
 # generator produces today.  CI runs this one.
 if [[ "${SFEM_CODEGEN_TREE:-0}" == "1" ]]; then
-    echo "Shipped-tree gate: comparing frontend/ops/generated against a fresh generation"
+    echo "Shipped-tree gate: comparing src/frontend/ops/generated against a fresh generation"
     "$PYTHON_BIN" -m codegen.framework.tools.codegen_snapshot check-tree --quiet
 else
     echo "Shipped-tree gate: skipped; set SFEM_CODEGEN_TREE=1 to run it (~6 min)"

@@ -16,7 +16,7 @@ from codegen.framework.tools import roofline
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 GENERATED = os.path.abspath(os.path.join(HERE, "..", "..", "..", "..",
-                                         "frontend", "ops", "generated"))
+                                         "src", "frontend", "ops", "generated"))
 #: The lexicographic element, because that is the one that owns the
 #: micro-kernel: a HEX8 mesh reaches this body through a forwarding wrapper
 #: that permutes the connectivity and nothing else, so the traffic and the

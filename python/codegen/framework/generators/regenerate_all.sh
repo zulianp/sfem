@@ -164,11 +164,11 @@ fi
 # never called, which is a device Op the factory cannot hand out.
 if [[ "${SFEM_GENERATE_CUDA:-1}" == "1" ]]; then
     printf '==> device op_registration\n'
-    DEVICE_MANIFESTS=("$ROOT_DIR"/frontend/ops/generated/*/op/cuda/sfem_*_manifest.json)
+    DEVICE_MANIFESTS=("$ROOT_DIR"/src/frontend/ops/generated/*/op/cuda/sfem_*_manifest.json)
     if [[ -e "${DEVICE_MANIFESTS[0]}" ]]; then
         if ! "$PYTHON" -m codegen.framework.generators.op_registration \
                 "${DEVICE_MANIFESTS[@]}" \
-                --out-dir "$ROOT_DIR/frontend/ops/generated/cuda" \
+                --out-dir "$ROOT_DIR/src/frontend/ops/generated/cuda" \
                 --function-name register_generated_device_ops; then
             printf '==> device op_registration FAILED\n'
             exit 1
