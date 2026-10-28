@@ -36,7 +36,13 @@
 #endif
 #include "smesh_sfc.impl.hpp"
 
-#if defined(ELEMENT_HEX8)
+#if defined(ELEMENT_PROTEUS_HEX27)
+#define NXE 27
+#define ELEMENT_NAME "PROTEUS_HEX27"
+#ifndef SIZES
+#define SIZES {4, 8, 12, 16, 20}
+#endif
+#elif defined(ELEMENT_HEX8)
 #define NXE 8
 #define ELEMENT_NAME "HEX8"
 #ifndef SIZES
@@ -173,7 +179,33 @@ static void reorder_mesh(Mesh &m, const char *ordering) {
     finalise_element_pointers(m);
 }
 
-#if defined(ELEMENT_HEX8)
+#if defined(ELEMENT_PROTEUS_HEX27)
+// A uniform grid of triquadratic cubes, nodes in the lexicographic order of the PROTEUS basis:
+// local node i + 3 j + 9 k sits at (i, j, k) / 2 of the cell.  The map is affine.
+static Mesh build_unordered(int n) {
+    Mesh m;
+    const int nn = 2 * n + 1;
+    const double h = 1.0 / n;
+    m.nnodes = (ptrdiff_t)nn * nn * nn;
+    m.nelements = (ptrdiff_t)n * n * n;
+    m.ev.assign(NXE, std::vector<idx_t>(m.nelements));
+    auto nid = [&](int i, int j, int k) { return (idx_t)((k * nn + j) * nn + i); };
+    ptrdiff_t e = 0;
+    for (int c = 0; c < n; ++c) for (int b = 0; b < n; ++b) for (int a = 0; a < n; ++a, ++e)
+        for (int k = 0; k < 3; ++k) for (int j = 0; j < 3; ++j) for (int i = 0; i < 3; ++i)
+            m.ev[i + 3 * j + 9 * k][e] = nid(2 * a + i, 2 * b + j, 2 * c + k);
+    m.adj.assign(9, std::vector<geom_t>(m.nelements, 0));
+    m.det.assign(m.nelements, (geom_t)(h*h*h));
+    for (ptrdiff_t i = 0; i < m.nelements; ++i) { m.adj[0][i]=(geom_t)(h*h); m.adj[4][i]=(geom_t)(h*h); m.adj[8][i]=(geom_t)(h*h); }
+    m.px.resize(m.nnodes); m.py.resize(m.nnodes); m.pz.resize(m.nnodes);
+    for (int k = 0; k < nn; ++k) for (int j = 0; j < nn; ++j) for (int i = 0; i < nn; ++i) {
+        const ptrdiff_t v = nid(i,j,k);
+        m.px[v] = i*h/2; m.py[v] = j*h/2; m.pz[v] = k*h/2;
+    }
+    finalise_element_pointers(m);
+    return m;
+}
+#elif defined(ELEMENT_HEX8)
 static Mesh build_unordered(int n) {
     Mesh m;
     const int nn = n + 1;
