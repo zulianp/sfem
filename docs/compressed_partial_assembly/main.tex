@@ -1163,7 +1163,8 @@ The comparison depends on the problem size, and Figure~\ref{fig:sweep} shows how
 matrix fits in the last-level cache --- up to about half a million degrees of freedom for the
 elements here --- the BSR product runs at two to three times its bandwidth bound, and no element
 operator comes close: the compressed stores are compute-bound at every size, and their throughput
-only saturates once every thread has enough packs.  The penalty is therefore at small problem
+only saturates once every thread has enough packs.  The quantized matrix trails BSR there as well and overtakes it
+between a few $10^5$ and $10^6$ degrees of freedom.  The penalty is therefore at small problem
 sizes, and the regime in which the compressed store competes is the one the cost model was written
 for, where the sparse matrix streams from memory.  At about $10^7$ degrees of freedom on HEX8
 (Figure~\ref{fig:tts}) the half-precision store solves in $\timeQpHalfHexEight\times$ and the
