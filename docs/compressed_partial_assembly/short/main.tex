@@ -97,9 +97,9 @@ The question this paper answers is which format, with which encoding, gives the 
 solution and the smallest memory for a Newton--Krylov hyperelasticity solve, and why.  The answer
 depends on three things the formats share: the bytes each streams per degree of freedom, the
 arithmetic and gathering each performs, and the perturbation each encoding makes to the tangent,
-which the Newton iteration either absorbs or pays for in iterations.  An element-constant
-projection of the tangent~\cite{ZulianPA}, the smallest partial-assembly store, already shows the
-last effect: it costs $\newtonPzeroExtraHexEight\%$ more Newton iterations on trilinear hexahedra and
+which the Newton iteration either absorbs or pays for in iterations.  The smallest
+partial-assembly store, the element-constant projection of the tangent (Section~3.1), already shows
+the last effect: it costs $\newtonPzeroExtraHexEight\%$ more Newton iterations on trilinear hexahedra and
 $\newtonPzeroExtraTetTen\%$ more on quadratic tetrahedra in our study.
 
 The contributions are:
@@ -168,10 +168,19 @@ the gradient spaces, and whichever is smaller --- the $n_q$ point values or a ba
 reproduces \eqref{eq:action} exactly (Table~\ref{tab:stores}).  On quadratic tetrahedra (TET10) the
 ten $P_2$ moments $\Mab=\sum_q\lambda_a(\xhat_q)\lambda_b(\xhat_q)\Sq$ replace the eleven points of
 the degree-$4$ rule~\cite{Keast1986}; on trilinear (HEX8) and triquadratic (HEX27) hexahedra the
-point values are minimal.  Replacing $\Sq$ by its element mean $\Sbar$ gives the projected store
-of~\cite{ZulianPA}, $45$ numbers per element and a Kronecker-rank-one approximation of the element
-operator; the exact store differs from it by the deviations $\Sq-w_q\Sbar$, which is what makes a
-mean-and-deviation encoding natural.  The store is laid out per block of $V$ elements, ordered
+point values are minimal.
+
+The smallest store replaces the tangent by its element average, its $L^2$ projection onto the
+constants $\Sbar=\sum_q\Sq/|\widehat K|$.  Substituting $\Sq\approx w_q\Sbar$ into \eqref{eq:action}
+leaves $(\mathcal{H}h)_{ip}\approx\sum_{k,m,n}\Sbar_{ikmn}\sum_j W_{jm,pn}h_{kj}$ with the reference
+tensor $W_{jm,pn}=\sum_q w_q\,\partial_m\varphi_j\,\partial_n\varphi_p$ at $\xhat_q$, integrated exactly
+when the kernel is generated.  $W$ has the rank of the gradient spaces, $W=C^{\mathsf T}XC$ with $C$ the
+map from nodal values to modal gradient coefficients and $X$ their Gram matrix, so this projected
+store is applied in four stages with folded constants --- compress $P=Ch$, apply $X$ and the $45$
+numbers of $\Sbar$, expand with $C^{\mathsf T}$ --- and reads no geometry, state or material.  It is
+exact on linear tetrahedra (one point) and a first-order approximation elsewhere: a
+Kronecker-rank-one approximation $X\otimes\Sbar$ of the element operator.  The exact store differs
+from it by the deviations $\Sq-w_q\Sbar$, which is what makes a mean-and-deviation encoding natural.  The store is laid out per block of $V$ elements, ordered
 point, component, lane (Figure~\ref{fig:fmtpoints}).
 
 \begin{table}[t]
@@ -344,8 +353,10 @@ come from the logs of runs on the machine above; no number in the results is typ
 \begin{figure*}[t]
 \centering
 \includegraphics[width=0.85\textwidth]{throughput.pdf}
-\caption{Application throughput, $\benchdofHexEight$~dof, $72$ threads.  TET4 has no
-mean-and-deviation encodings: one point per element leaves no deviation.}
+\caption{Application throughput, $\benchdofHexEight$~dof, $72$ threads.  All figures show the same
+eight formats in the same order: BSR (\texttt{fp64}, \texttt{fp32}), the quantized matrix, the
+element matrix and the quadrature-point store (each \texttt{fp16} and \texttt{int8}).  TET4 has no
+\texttt{int8} mean-and-deviation bar: one point per element leaves no deviation.}
 \Description{Grouped bar chart of million degrees of freedom per second for each format and
 element.}
 \label{fig:throughput}
@@ -385,15 +396,19 @@ $\QbsrEightRateHexTwentySeven$~MDOF/s).
 \begin{figure*}[t]
 \centering
 \includegraphics[width=0.85\textwidth]{newton_iterations.pdf}
-\caption{Newton and CG iterations, about $10^6$~dof, log scale.  BSR in both precisions, the
-matrix-free operator and the double-precision store have identical counts, shown once.  Encodings
-with one \texttt{int8} scale per element are left out; their counts are in the text.}
+\caption{Newton and CG iterations, about $10^6$~dof, log scale, the formats of
+Figure~\ref{fig:throughput}.  Matrix-free application and the double-precision store have the counts
+of BSR; the projected store and the encodings with one \texttt{int8} scale per element are not shown,
+their counts are in the text.}
 \Description{Grouped bar charts of Newton and conjugate-gradient iteration counts.}
 \label{fig:newton}
 \end{figure*}
 
 The iteration counts follow \eqref{eq:forcing} (Figure~\ref{fig:newton}).  The projected store costs
-$\newtonPzeroExtraHexEight\%$ more Newton iterations on HEX8 and $\newtonPzeroExtraTetTen\%$ on TET10.
+$\newtonPzeroExtraHexEight\%$ more Newton iterations on HEX8 and $\newtonPzeroExtraTetTen\%$ on TET10, and
+at $10^7$ degrees of freedom it solves in $\timePzeroHexEight$ and $\timePzeroTetTen$ of the time of
+single-precision BSR, behind the exact compressed formats; we do not propose it as an option and
+leave it out of the figures.
 \texttt{int8} with one scale per element is not usable: the point store needs
 $\newtonQpEightElTetTen$ Newton iterations on TET10 and $\newtonQpEightElHexEight$ on HEX8, against
 $\newtonExactTetTen$ and $\newtonExactHexEight$.  The \texttt{int8} mean-and-deviation store keeps the
@@ -412,7 +427,8 @@ as the element matrix with a scale per node pair.
 \includegraphics[width=0.85\textwidth]{time_to_solution.pdf}
 \caption{Newton time to solution relative to single-precision BSR (log scale, below one is faster),
 stretch at $10^6$ and $10^7$~dof and twist at $10^6$~dof; labels give the ratio and the Newton
-iterations.  Failed load-step attempts are included in the time.}
+iterations.  Failed load-step attempts are included in the time; the formats of
+Figure~\ref{fig:throughput}.}
 \Description{Bar charts of time to solution relative to single-precision BSR for three cases.}
 \label{fig:tts}
 \end{figure*}
