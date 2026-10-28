@@ -289,17 +289,20 @@ def main():
         logs = newton_logs(case)
         if not logs:
             continue
-        ops = ["exact", "P0", "qp f16", "qp f16md", "qp i8md", "qp i8", "ea full f16", "ea diff f16", "ea diff i8",
-               "ea pair i8", "qbsr f16", "qbsr i8"]
+        # The encodings with one int8 scale per element are left out: they fail as Newton operators,
+        # and the text quotes their counts.  Log scale, so that the usable ones read next to BSR.
+        ops = ["exact", "P0", "qp f16", "qp f16md", "qp i8md", "ea full f16", "ea diff f16", "ea pair i8",
+               "qbsr f16", "qbsr i8"]
 
         def it(field):
             return lambda o, el: (logs.get(el, {}).get(NEWTON_KEY[o]) or {}).get(field)
 
         els = [el for el in ELEMENTS if el in logs]
         fig, axes = plt.subplots(1, 2, figsize=(TEXTWIDTH, 2.6))
-        bars(axes[0], ops, it("newton"), "Newton iterations", elements=els)
+        bars(axes[0], ops, it("newton"), "Newton iterations", elements=els, log=True)
+        plain_log_axis(axes[0])
         axes[0].set_title(f"Newton iterations, {title}")
-        bars(axes[1], ops, it("linear"), "CG iterations", annotate=None, elements=els)
+        bars(axes[1], ops, it("linear"), "CG iterations", annotate=None, elements=els, log=True)
         axes[1].set_title(f"CG iterations, {title}")
         fig.tight_layout(rect=(0, 0.12, 1, 1))
         legend_below(fig, axes)
@@ -316,7 +319,7 @@ def main():
     cases = [(l, t) for l, t in cases if l]
     if cases:
         ops = ["BSR f64", "BSR f32", "MF", "P0", "qp f16", "qp f16md", "qp i8md", "ea full f16", "ea diff f16",
-               "ea diff i8", "ea pair i8", "qbsr f16", "qbsr i8"]
+               "ea pair i8", "qbsr f16", "qbsr i8"]
         fig, axes = plt.subplots(len(cases), 1, figsize=(TEXTWIDTH, 2.25 * len(cases)), squeeze=False)
         for ax, (logs, title) in zip(axes[:, 0], cases):
             def rel(o, el, logs=logs):
