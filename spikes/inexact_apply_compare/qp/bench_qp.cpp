@@ -6,7 +6,6 @@
 // Environment:
 //   QP_NU       Poisson ratio (E = 1); unset keeps the spike's mu = 2.3333, lambda = 2.2
 //   QP_WARP     amplitude w of the nonlinear part of the state u = L x + w N(x)   (default 0.4)
-//   QP_SHIFT    whitening regularisation, relative to trace/9                     (default 1e-3)
 //   QP_ONLY     substring filters on the variant names, separated by '|'
 //   QP_PACK     elements per pack, or auto                (default auto: about 20 packs per thread)
 //   QP_BREAKDOWN  also time the traversal alone and the element kernel alone, per packed variant
@@ -175,11 +174,10 @@ static bool selected(const char *name) {
 }
 
 template <class St, typename tau, qp::Form FORM = qp::Form::Lanes>
-static void run_variant(const char *name, Problem &P, int repeats, double shift) {
+static void run_variant(const char *name, Problem &P, int repeats) {
     if (!selected(name)) return;
     Mesh &m = P.m;
     St st(m.nelements);
-    if constexpr (!St::is_element_matrix) st.whitening_shift = shift;
     auto setup = [&] {
         qp::qp_setup_impl<double, geom_t, St, St::VS>(
             m.nelements, m.kevp.data(), m.adj[0].data(), m.adj[1].data(), m.adj[2].data(), m.adj[3].data(),
@@ -308,7 +306,6 @@ int main(int argc, char **argv) {
     const int n = argc > 1 ? std::atoi(argv[1]) : sizes[2];
     const int repeats = argc > 2 ? std::atoi(argv[2]) : 10;
     const double warp = std::getenv("QP_WARP") ? std::atof(std::getenv("QP_WARP")) : 0.4;
-    const double shift = std::getenv("QP_SHIFT") ? std::atof(std::getenv("QP_SHIFT")) : 1e-3;
     int threads = 1;
 #ifdef _OPENMP
     threads = omp_get_max_threads();
@@ -559,21 +556,21 @@ int main(int argc, char **argv) {
     // (lanes: lane loop innermost; regs: one lane loop around decode and contraction).
     // Uncompressed references and the SoA layout first, then the candidates.
     using qp::Form;
-    run_variant<StoreT<double, Scheme::Plain, Layout::SoA>, double>("qp f64 soa a64", P, repeats, shift);
-    run_variant<StoreT<float, Scheme::Plain, Layout::Blocked>, float>("qp f32 blk a32", P, repeats, shift);
-    run_variant<StoreT<half_t, Scheme::Plain, Layout::SoA>, float>("qp f16 soa a32", P, repeats, shift);
-    run_variant<StoreT<int8_t, Scheme::Plain, Layout::SoA>, float>("qp i8/el soa a32", P, repeats, shift);
-    run_variant<StoreT<half_t, Scheme::Plain, Layout::Blocked>, double>("qp f16 blk a64", P, repeats, shift);
-    run_variant<StoreT<half_t, Scheme::Plain, Layout::Blocked>, float>("qp f16 blk a32 lanes", P, repeats, shift);
-    run_variant<StoreT<half_t, Scheme::Plain, Layout::Blocked>, float, Form::Registers>("qp f16 blk a32 regs", P, repeats, shift);
-    run_variant<StoreT<int8_t, Scheme::Plain, Layout::Blocked>, float>("qp i8/el blk a32 lanes", P, repeats, shift);
-    run_variant<StoreT<int8_t, Scheme::Plain, Layout::Blocked>, float, Form::Registers>("qp i8/el blk a32 regs", P, repeats, shift);
+    run_variant<StoreT<double, Scheme::Plain, Layout::SoA>, double>("qp f64 soa a64", P, repeats);
+    run_variant<StoreT<float, Scheme::Plain, Layout::Blocked>, float>("qp f32 blk a32", P, repeats);
+    run_variant<StoreT<half_t, Scheme::Plain, Layout::SoA>, float>("qp f16 soa a32", P, repeats);
+    run_variant<StoreT<int8_t, Scheme::Plain, Layout::SoA>, float>("qp i8/el soa a32", P, repeats);
+    run_variant<StoreT<half_t, Scheme::Plain, Layout::Blocked>, double>("qp f16 blk a64", P, repeats);
+    run_variant<StoreT<half_t, Scheme::Plain, Layout::Blocked>, float>("qp f16 blk a32 lanes", P, repeats);
+    run_variant<StoreT<half_t, Scheme::Plain, Layout::Blocked>, float, Form::Registers>("qp f16 blk a32 regs", P, repeats);
+    run_variant<StoreT<int8_t, Scheme::Plain, Layout::Blocked>, float>("qp i8/el blk a32 lanes", P, repeats);
+    run_variant<StoreT<int8_t, Scheme::Plain, Layout::Blocked>, float, Form::Registers>("qp i8/el blk a32 regs", P, repeats);
     if constexpr (El::NV > 1) {
-        run_variant<StoreT<int8_t, Scheme::PerComponent, Layout::Blocked>, float>("qp i8/comp blk a32 lanes", P, repeats, shift);
-        run_variant<StoreT<int8_t, Scheme::MeanDeviation, Layout::Blocked>, double>("qp i8 mean+dev blk a64 lanes", P, repeats, shift);
-        run_variant<StoreT<int8_t, Scheme::MeanDeviation, Layout::Blocked>, float>("qp i8 mean+dev blk a32 lanes", P, repeats, shift);
-        run_variant<StoreT<int8_t, Scheme::MeanDeviation, Layout::Blocked>, float, Form::Registers>("qp i8 mean+dev blk a32 regs", P, repeats, shift);
-        run_variant<StoreT<half_t, Scheme::MeanDeviation, Layout::Blocked>, float>("qp f16 mean+dev blk a32 lanes", P, repeats, shift);
+        run_variant<StoreT<int8_t, Scheme::PerComponent, Layout::Blocked>, float>("qp i8/comp blk a32 lanes", P, repeats);
+        run_variant<StoreT<int8_t, Scheme::MeanDeviation, Layout::Blocked>, double>("qp i8 mean+dev blk a64 lanes", P, repeats);
+        run_variant<StoreT<int8_t, Scheme::MeanDeviation, Layout::Blocked>, float>("qp i8 mean+dev blk a32 lanes", P, repeats);
+        run_variant<StoreT<int8_t, Scheme::MeanDeviation, Layout::Blocked>, float, Form::Registers>("qp i8 mean+dev blk a32 regs", P, repeats);
+        run_variant<StoreT<half_t, Scheme::MeanDeviation, Layout::Blocked>, float>("qp f16 mean+dev blk a32 lanes", P, repeats);
     }
     // Packed two-pass: the scatter the library's fastest operators use.
     // QP_PACK overrides the pack size: the library sizes packs to its 16-bit node indices, not
@@ -698,9 +695,7 @@ int main(int argc, char **argv) {
     run_variant_packed<qp::EaStore<El, half_t, EaForm::Difference, LANE_VS>, float>("ea diff f16 packed", P, pk, repeats);
     run_variant_packed<qp::EaStore<El, int8_t, EaForm::Difference, LANE_VS>, float>("ea diff i8 packed", P, pk, repeats);
     run_variant_packed<qp::EaStore<El, int8_t, EaForm::PairScale, LANE_VS>, float>("ea diff i8 pair packed", P, pk, repeats);
-    run_variant<qp::EaStore<El, half_t, EaForm::Difference, LANE_VS>, float>("ea diff f16 atomic", P, repeats, shift);
+    run_variant<qp::EaStore<El, half_t, EaForm::Difference, LANE_VS>, float>("ea diff f16 atomic", P, repeats);
 
-    if (std::getenv("QP_WHITENED"))
-        run_variant<StoreT<int8_t, Scheme::Whitened, Layout::Blocked>, float>("qp i8 whitened blk a32 lanes", P, repeats, shift);
     return 0;
 }

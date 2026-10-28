@@ -524,12 +524,7 @@ def emit_contract():
         L.append(f"  for (int lane = 0; lane < ne; ++lane) Y[{r}][lane] += {terms};")
     L.append("}")
     L.append("")
-    L.append("// The packed identity: 1 on the diagonal slots.")
-    diag = [0] * NC
-    for r in range(9):
-        diag[slot(r, r)] = 1
-    L.append(f"static constexpr double PACKED_IDENTITY[45] = {{{', '.join(str(d) for d in diag)}}};")
-    L.append("// Row r, column c of the packed tangent, for the factorisations of the set-up.")
+    L.append("// Row r, column c of the packed tangent, for the set-up.")
     L.append("static constexpr int SLOT[9][9] = {" +
              ", ".join("{" + ", ".join(str(slot(r, c)) for c in range(9)) + "}" for r in range(9)) + "};")
     L.append("}  // namespace qp")

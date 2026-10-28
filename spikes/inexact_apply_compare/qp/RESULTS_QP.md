@@ -10,7 +10,7 @@ given (then E = 1).
 | file | what |
 |---|---|
 | `make_qp_kernels.py` | Emits, per element, the fixed stages of the application (`qp_element.hpp`), the 81-term contraction (`qp_contract.hpp`), and the set-up kernel (`qp_setup.hpp`). The set-up kernel is the generated P0 tangent kernel with its point sum replaced by per-point writes (or P2-moment accumulation) and a call to the encoder. |
-| `qp_store.hpp` | The store: codes (f64, f32, f16, int8), schemes (plain, per component, mean + deviation, whitened), layouts (SoA, blocked), and the fused encoder. |
+| `qp_store.hpp` | The store: codes (f64, f32, f16, int8), schemes (plain, per component, mean + deviation), layouts (SoA, blocked), and the fused encoder. |
 | `qp_apply.hpp` | The application: one element-block body, an atomic scatter (`apply`) and the packed two-pass scatter (`apply_packed`). Two loop forms, `Lanes` (lane loop innermost) and `Registers`. |
 | `bsr_quant.hpp` | The assembled matrix (BSR) with quantised values: int8 with an f32 scale per block, or f16 with one power-of-two scale; full, difference or upper-only form; SELL-C-sigma layout (16 rows side by side); upper-only with int32 columns or uint16 offsets plus a remainder, encodable in place over the f32 values. |
 | `bench_qp.cpp` | Throughput, set-up time, memory and errors of every variant against BSR f64/f32, exact MF and P0. |
@@ -42,20 +42,17 @@ other TET10 stores.
 
 Relative energy error |h^T (H~ - H) h| / h^T H h, white-noise h, warp 0.4, laptop, small meshes.
 
-| element | nu | f16 | int8 / element | int8 / component | int8 mean+dev | int8 whitened | P0 |
-|---|---|---|---|---|---|---|---|
-| HEX8 | 0.30 | 8.4e-06 | 4.8e-04 | 7.0e-04 | 6.5e-09 | 5.5e-06 | 6.1e-07 |
-| HEX8 | 0.45 | 1.8e-07 | 1.2e-03 | 6.7e-04 | 6.6e-08 | 1.6e-06 | 1.3e-06 |
-| HEX8 | 0.49 | 5.8e-07 | 5.6e-03 | 6.7e-04 | 1.6e-07 | nan | 1.7e-06 |
-| TET10 (4-pt) | 0.30 | 4.6e-06 | 1.1e-04 | 1.0e-04 | 3.7e-07 | 1.3e-05 | 5.2e-05 |
-| TET10 (4-pt) | 0.45 | 4.2e-06 | 2.6e-04 | 1.7e-04 | 6.3e-07 | 1.4e-05 | 1.0e-04 |
-| TET10 (4-pt) | 0.49 | 4.0e-06 | 4.6e-04 | 2.3e-04 | 8.5e-07 | nan | 1.4e-04 |
+| element | nu | f16 | int8 / element | int8 / component | int8 mean+dev | P0 |
+|---|---|---|---|---|---|---|
+| HEX8 | 0.30 | 8.4e-06 | 4.8e-04 | 7.0e-04 | 6.5e-09 | 6.1e-07 |
+| HEX8 | 0.45 | 1.8e-07 | 1.2e-03 | 6.7e-04 | 6.6e-08 | 1.3e-06 |
+| HEX8 | 0.49 | 5.8e-07 | 5.6e-03 | 6.7e-04 | 1.6e-07 | 1.7e-06 |
+| TET10 (4-pt) | 0.30 | 4.6e-06 | 1.1e-04 | 1.0e-04 | 3.7e-07 | 5.2e-05 |
+| TET10 (4-pt) | 0.45 | 4.2e-06 | 2.6e-04 | 1.7e-04 | 6.3e-07 | 1.0e-04 |
+| TET10 (4-pt) | 0.49 | 4.0e-06 | 4.6e-04 | 2.3e-04 | 8.5e-07 | 1.4e-04 |
 
 - int8 with one scale per element grows with lambda/mu, as the error model predicts.
 - f16 and mean + deviation do not.
-- **Whitening is withdrawn.** The element mean is near-singular on rotations; with a small shift the
-  factor amplifies the rounding (4.9e7 on HEX8 at w = 0.4, nan at nu = 0.49), with a large one it is
-  no better than mean + deviation. It stays in the code behind `QP_WHITENED` and out of the runs.
 - Per-component scales cost 45 floats per element and lose to mean + deviation at the same size.
 
 ## Throughput on Grace
@@ -198,12 +195,12 @@ BSR f32 at 10M dof and the element matrices come from `measured/`.
 
 Application, 10.3M dof, 72 threads (MDOF/s, B/dof):
 
-| element | BSR f32 | BSR i8 diff | BSR i8 full | BSR f16 diff | BSR f16 full | ea f16 diff | ea i8 pair |
-|---|---|---|---|---|---|---|---|
-| HEX8  | 1021, 357 | 1874, 147 | 1808, 153 | 1625, 190 | 1715, 197 | 1537, 166 | 1719, 93 |
-| TET4  | 1867, 199 | 3433, 80  | 3182, 86  | 3005, 103 | 3015, 110 | 1129, 220 | 1159, 126 |
-| TET10 | 1058, 380 | 1736, 161 | 1676, 166 | 1568, 208 | 1559, 215 | 1398, 200 | 1526, 111 |
-| HEX27 | 461, 842  | 809, 356  | 828, 362  | 791, 461  | 753, 468  | 1403, 258 | 1629, 144 |
+| element | BSR f32 | BSR i8 diff | BSR i8 full | BSR f16 diff | BSR f16 full | ea i8 pair |
+|---|---|---|---|---|---|---|
+| HEX8  | 1021, 357 | 1874, 147 | 1808, 153 | 1625, 190 | 1715, 197 | 1719, 93 |
+| TET4  | 1867, 199 | 3433, 80  | 3182, 86  | 3005, 103 | 3015, 110 | 1159, 126 |
+| TET10 | 1058, 380 | 1736, 161 | 1676, 166 | 1568, 208 | 1559, 215 | 1526, 111 |
+| HEX27 | 461, 842  | 809, 356  | 828, 362  | 791, 461  | 753, 468  | 1629, 144 |
 
 Relative l2 error of the application: int8 3.3e-3 to 4.2e-3, f16 1.1e-4 to 2.5e-4. Set-up: f32
 assembly plus 10-40% for the encoding. The Newton driver keeps the f32 values between updates,
