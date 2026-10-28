@@ -45,24 +45,6 @@ static SFEM_INLINE void element_block(const St &st,
         tau P[R][9][VS];
         El::template stage_in<double, tau, VS>(ne, bh, P);
 
-        if constexpr (St::scheme == Scheme::Whitened) {
-            // P_a <- L^T P_a
-#pragma omp simd
-            for (int lane = 0; lane < ne; ++lane) {
-                tau Lp[45];
-                st.template load_factor<tau>(evb, lane, Lp);
-                for (int a = 0; a < R; ++a) {
-                    tau g[9];
-                    for (int c = 0; c < 9; ++c) {
-                        tau acc = 0;
-                        for (int r = c; r < 9; ++r) acc += Lp[tri(r, c)] * P[a][r][lane];
-                        g[c] = acc;
-                    }
-                    for (int c = 0; c < 9; ++c) P[a][c][lane] = g[c];
-                }
-            }
-        }
-
         tau Y[R][9][VS];
         for (int r = 0; r < R; ++r)
             for (int c = 0; c < 9; ++c)
@@ -82,7 +64,7 @@ static SFEM_INLINE void element_block(const St &st,
 #pragma omp simd
                 for (int lane = 0; lane < ne; ++lane) A[c][lane] = tau(src[st.comp_index(evb, lane, c)]);
         }
-        if constexpr (SCH == Scheme::MeanDeviation || SCH == Scheme::Whitened) {
+        if constexpr (SCH == Scheme::MeanDeviation) {
 #pragma omp simd
             for (int lane = 0; lane < ne; ++lane) sc[lane] = tau(st.scales[(size_t)evb + lane]);
         }
@@ -104,10 +86,8 @@ static SFEM_INLINE void element_block(const St &st,
                             Sl[c] = v;
                         } else if constexpr (SCH == Scheme::PerComponent) {
                             Sl[c] = A[c][lane] * v;
-                        } else if constexpr (SCH == Scheme::MeanDeviation) {
-                            Sl[c] = xj * A[c][lane] + sc[lane] * v;
                         } else {
-                            Sl[c] = xj * tau(PACKED_IDENTITY[c]) + sc[lane] * v;
+                            Sl[c] = xj * A[c][lane] + sc[lane] * v;
                         }
                     }
                     tau g[9], y[9];
@@ -139,33 +119,13 @@ static SFEM_INLINE void element_block(const St &st,
                         S[c][lane] = v;
                     } else if constexpr (SCH == Scheme::PerComponent) {
                         S[c][lane] = A[c][lane] * v;
-                    } else if constexpr (SCH == Scheme::MeanDeviation) {
-                        S[c][lane] = xj * A[c][lane] + sc[lane] * v;
                     } else {
-                        S[c][lane] = xj * tau(PACKED_IDENTITY[c]) + sc[lane] * v;
+                        S[c][lane] = xj * A[c][lane] + sc[lane] * v;
                     }
                 }
             }
             contract_lanes<tau, VS>(ne, S, P[a], Y[b]);
             if (a != b) contract_lanes<tau, VS>(ne, S, P[b], Y[a]);
-        }
-
-        if constexpr (St::scheme == Scheme::Whitened) {
-            // Y_b <- L Y_b
-#pragma omp simd
-            for (int lane = 0; lane < ne; ++lane) {
-                tau Lp[45];
-                st.template load_factor<tau>(evb, lane, Lp);
-                for (int a = 0; a < R; ++a) {
-                    tau y[9];
-                    for (int r = 0; r < 9; ++r) {
-                        tau acc = 0;
-                        for (int c = 0; c <= r; ++c) acc += Lp[tri(r, c)] * Y[a][c][lane];
-                        y[r] = acc;
-                    }
-                    for (int r = 0; r < 9; ++r) Y[a][r][lane] = y[r];
-                }
-            }
         }
 
         El::template stage_out<tau, double, VS>(ne, Y, out);

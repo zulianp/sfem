@@ -8,7 +8,6 @@
 //   Scheme  Plain               one scale per element, applied to the element's outputs
 //           PerComponent        one scale per (element, component), applied when decoding
 //           MeanDeviation       element mean in f32 plus encoded deviations, one scale per element
-//           Whitened            deviations in the coordinates of the (regularised) element mean
 //   Layout  SoA                 one array per (tensor, component) over the elements
 //           Blocked             all numbers of a block of VS elements contiguous: tensor,
 //                               component, lane
@@ -28,7 +27,7 @@
 
 namespace qp {
 
-enum class Scheme { Plain, PerComponent, MeanDeviation, Whitened };
+enum class Scheme { Plain, PerComponent, MeanDeviation };
 enum class Layout { SoA, Blocked };
 
 template <typename code_t>
@@ -50,9 +49,6 @@ struct CodeTraits<int8_t> {
     static int8_t encode(double v, double inv) { return sfem::Int8Codec::encode((real_t)v, (real_t)inv); }
 };
 
-// Packed lower triangle of a 9x9 matrix, row-major: entry (r, c), c <= r.
-static constexpr int tri(int r, int c) { return r * (r + 1) / 2 + c; }
-
 template <class El, typename code_t, Scheme SCH, Layout LAY, int VS_>
 struct Store {
     using Element = El;
@@ -64,16 +60,15 @@ struct Store {
     static constexpr bool scaled = CodeTraits<code_t>::scaled;
     // Only the plain scaled codecs leave the scale to the outputs.
     static constexpr bool scale_on_outputs = scaled && SCH == Scheme::Plain;
-    static constexpr bool has_aux = SCH == Scheme::MeanDeviation || SCH == Scheme::Whitened;
+    static constexpr bool has_aux = SCH == Scheme::MeanDeviation;
     static constexpr bool per_component = SCH == Scheme::PerComponent;
     static constexpr bool is_element_matrix = false;
     static_assert(SCH == Scheme::Plain || scaled, "the deviation and per-component schemes need a scaled code");
 
     ptrdiff_t nelements = 0, stride = 0, nblocks = 0;
-    double whitening_shift = 1e-3;  // relative regularisation of the element mean (Whitened)
     std::vector<code_t> codes;
     std::vector<float> scales;  // per element, or per (element, component)
-    std::vector<float> aux;     // mean, or packed Cholesky factor, per (element, component)
+    std::vector<float> aux;     // mean, per (element, component)
 
     explicit Store(ptrdiff_t ne) : nelements(ne) {
         nblocks = (ne + VS - 1) / VS;
@@ -131,14 +126,10 @@ struct Store {
                     for (int j = 0; j < NV; ++j) acc += El::MULT[j] * T[j][c];
                     mean[c] = acc / El::KVOL;
                 }
-                if constexpr (SCH == Scheme::MeanDeviation) {
-                    for (int c = 0; c < 45; ++c) {
-                        const float mf = (float)mean[c];
-                        aux[comp_index(evb, lane, c)] = mf;
-                        for (int j = 0; j < NV; ++j) T[j][c] -= El::X[j] * (double)mf;
-                    }
-                } else {
-                    whiten(evb, lane, mean, T);
+                for (int c = 0; c < 45; ++c) {
+                    const float mf = (float)mean[c];
+                    aux[comp_index(evb, lane, c)] = mf;
+                    for (int j = 0; j < NV; ++j) T[j][c] -= El::X[j] * (double)mf;
                 }
             }
 
@@ -169,63 +160,7 @@ struct Store {
         }
     }
 
-    // W_j = L^{-1} T_j L^{-T} - X_j I with L the Cholesky factor of the mean shifted by
-    // whitening_shift * trace / 9 (the mean is singular on rotations at a stress-free state).
-    // L is rounded to single precision first and the transform uses the rounded factor, so
-    // that the application, which reads the rounded one, inverts exactly this.
-    void whiten(const ptrdiff_t evb, const int lane, const double mean[45], double T[NV][45]) {
-        double A[9][9];
-        double tr = 0;
-        for (int r = 0; r < 9; ++r) tr += mean[SLOT[r][r]];
-        const double shift = whitening_shift * tr / 9;
-        for (int r = 0; r < 9; ++r)
-            for (int c = 0; c < 9; ++c) A[r][c] = mean[SLOT[r][c]] + (r == c ? shift : 0.0);
-        double L[9][9] = {};
-        for (int c = 0; c < 9; ++c) {
-            double d = A[c][c];
-            for (int k = 0; k < c; ++k) d -= L[c][k] * L[c][k];
-            if (!(d > 0)) d = shift > 0 ? shift : 1e-300;  // indefinite mean: clamp the pivot
-            L[c][c] = std::sqrt(d);
-            for (int r = c + 1; r < 9; ++r) {
-                double v = A[r][c];
-                for (int k = 0; k < c; ++k) v -= L[r][k] * L[c][k];
-                L[r][c] = v / L[c][c];
-            }
-        }
-        for (int r = 0; r < 9; ++r)
-            for (int c = 0; c <= r; ++c) {
-                const float lf = (float)L[r][c];
-                aux[comp_index(evb, lane, tri(r, c))] = lf;
-                L[r][c] = (double)lf;
-            }
-        for (int j = 0; j < NV; ++j) {
-            double M[9][9];
-            for (int r = 0; r < 9; ++r)
-                for (int c = 0; c < 9; ++c) M[r][c] = T[j][SLOT[r][c]];
-            // M <- L^{-1} M  (forward substitution on columns), then M <- M L^{-T} (on rows).
-            for (int c = 0; c < 9; ++c)
-                for (int r = 0; r < 9; ++r) {
-                    double v = M[r][c];
-                    for (int k = 0; k < r; ++k) v -= L[r][k] * M[k][c];
-                    M[r][c] = v / L[r][r];
-                }
-            for (int r = 0; r < 9; ++r)
-                for (int c = 0; c < 9; ++c) {
-                    double v = M[r][c];
-                    for (int k = 0; k < c; ++k) v -= M[r][k] * L[c][k];
-                    M[r][c] = v / L[c][c];
-                }
-            for (int r = 0; r < 9; ++r)
-                for (int c = r; c < 9; ++c) T[j][SLOT[r][c]] = 0.5 * (M[r][c] + M[c][r]) - (r == c ? El::X[j] : 0.0);
-        }
-    }
-
     // ------------------------------------------------------------- application side
-
-    template <typename tau>
-    SFEM_INLINE void load_factor(const ptrdiff_t e0, const int lane, tau Lp[45]) const {
-        for (int c = 0; c < 45; ++c) Lp[c] = tau(aux[comp_index(e0, lane, c)]);
-    }
 
     SFEM_INLINE double output_scale(const ptrdiff_t e) const { return scales[(size_t)e]; }
 };
