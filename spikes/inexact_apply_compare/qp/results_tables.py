@@ -284,7 +284,8 @@ def write_macros(src, outdir, extras=()):
             m[f"newtonPzero{tag}"] = str(p0["newton"])
             m[f"newtonPzeroExtra{tag}"] = f"{100 * (p0['newton'] / ex['newton'] - 1):.0f}"
         for k, op in (("EaDiffEight", "qp eadi8"), ("EaPairEight", "qp eadi8p"), ("EaDiffHalf", "qp ead16"),
-                      ("QbsrHalf", "qp bsro16"), ("QbsrEight", "qp bsroi8")):
+                      ("QbsrHalf", "qp bsro16"), ("QbsrEight", "qp bsroi8"), ("QpEightEl", "qp i8"),
+                      ("QpEightMd", "qp i8md")):
             if op in runs:
                 m[f"newton{k}{tag}"] = str(runs[op]["newton"])
         m[f"newtonDof{tag}"] = fmt(mm["dof"])
@@ -293,7 +294,8 @@ def write_macros(src, outdir, extras=()):
     for el, (runs, mm) in newton_case(src, extras, "twist").items():
         tag = tags[el]
         for k, op in (("Exact", "BSR f32"), ("EaDiffEight", "qp eadi8"), ("EaPairEight", "qp eadi8p"),
-                      ("EaDiffHalf", "qp ead16"), ("QbsrHalf", "qp bsro16"), ("QbsrEight", "qp bsroi8")):
+                      ("EaDiffHalf", "qp ead16"), ("QbsrHalf", "qp bsro16"), ("QbsrEight", "qp bsroi8"),
+                      ("QpEightEl", "qp i8"), ("QpEightMd", "qp i8md")):
             if op in runs:
                 m[f"twist{k}{tag}"] = str(runs[op]["newton"])
         ref = runs.get("BSR f32")
@@ -314,11 +316,40 @@ def write_macros(src, outdir, extras=()):
             if op in runs:
                 m[f"tenmNewton{k}{tag}"] = str(runs[op]["newton"])
         m[f"timeDof{tag}"] = fmt(mm["dof"])
+    write_summary(rows, newton_case(src, extras, "10M"), outdir)
     m.update(qbsr_macros(src, extras))
     with open(os.path.join(outdir, "results_macros.tex"), "w") as f:
         for k, v in sorted(m.items()):
             f.write(f"\\newcommand{{\\{k}}}{{{v}}}\n")
     return m
+
+
+# The evaluation's summary: time to solution at about 10M dof relative to single-precision BSR, and
+# the operator memory it saves, per format and element; the fastest format of each element in bold.
+SUMMARY_COLUMNS = [("qp bsro16", "BSR f16 upper u16"), ("qp bsroi8", "BSR i8/blk upper u16"),
+                   ("qp ead16", "ea diff f16 packed"), ("qp eadi8p", "ea diff i8 pair packed"),
+                   ("qp f16", "qp f16 blk a32 lanes packed"), ("qp i8md", "qp i8 mean+dev blk a32 lanes packed")]
+
+
+def write_summary(rows, tenm, outdir):
+    with open(os.path.join(outdir, "summary.tex"), "w") as f:
+        for el in ELEMENTS:
+            runs = tenm.get(el, ({}, {}))[0]
+            ref, b32 = runs.get("BSR f32"), rows.get(el, {}).get("BSR f32")
+            cells = []
+            for op, key in SUMMARY_COLUMNS:
+                r, b = runs.get(op), rows.get(el, {}).get(key)
+                cells.append((r["seconds"] / ref["seconds"], b32["bytes_per_dof"] / b["bytes_per_dof"])
+                             if r and ref and b and b32 else None)
+            best = min((c[0] for c in cells if c), default=None)
+            out = []
+            for c in cells:
+                if not c:
+                    out.append("---")
+                    continue
+                t = f"{c[0]:.2f}"
+                out.append((f"\\textbf{{{t}}}" if c[0] == best else t) + f" ({c[1]:.1f})")
+            f.write(f"{NAMES.get(el, el)} & " + " & ".join(out) + " \\\\\n")
 
 
 def qbsr_macros(src, extras):
