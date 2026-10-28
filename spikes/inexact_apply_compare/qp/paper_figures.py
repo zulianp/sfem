@@ -25,7 +25,7 @@ import shutil
 from matplotlib.ticker import FuncFormatter, LogLocator, NullFormatter
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from results_tables import (ELEMENTS, NAMES, bench_rows, newton_case, operator_name,  # noqa: E402
+from results_tables import (ELEMENTS, NAMES, REFERENCE_BSR, bench_rows, newton_case, operator_name,  # noqa: E402
                            parse_bench_sweep, parse_newton, parse_newton_sweep)
 
 TEXTWIDTH = 6.27  # inches, a4paper with 1in margins
@@ -55,39 +55,34 @@ def dof_axis(ax):
     ax.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v / 1e6:g}M" if v >= 1e6 else f"{v / 1e3:g}k"))
     ax.xaxis.set_minor_formatter(NullFormatter())
 
-# One colour per operator family, kept across every figure.
+# The formats every figure shows, in this order: the references, then the compressed formats from the
+# assembled end to the quadrature points.  One colour family per format, darker for fp16.
+FORMATS = ["BSR f64", "BSR f32", "qbsr f16", "qbsr i8", "ea diff f16", "ea pair i8", "qp f16", "qp i8md"]
 STYLE = {
     "BSR f64": dict(label="BSR, fp64", color="#252525", hatch=None, marker="o", ls="-"),
-    "exact": dict(label="exact (BSR = matrix-free = fp64 store)", color="#252525", hatch=None, marker="o", ls="-"),
     "BSR f32": dict(label="BSR, fp32", color="#8c8c8c", hatch=None, marker="o", ls="--"),
-    "MF": dict(label="matrix-free (exact)", color="#b15928", hatch="xx", marker="h", ls="-."),
-    "P0": dict(label="projected (approx.)", color="#d95f02", hatch="///", marker="s", ls=":"),
-    "qp f16": dict(label="points/moments, fp16", color="#1b9e77", hatch=None, marker="^", ls="-"),
-    "qp f16md": dict(label="points/moments, fp16 mean+dev.", color="#66a61e", hatch=None, marker="v", ls="-"),
-    "qp i8md": dict(label="points/moments, int8 mean+dev.", color="#7570b3", hatch=None, marker="d", ls="-"),
-    "qp i8": dict(label="points/moments, int8 per element", color="#e7298a", hatch="..", marker="x", ls=":"),
-    "ea diff f16": dict(label="element matrix, fp16 diff.", color="#1f78b4", hatch=None, marker="P", ls="-"),
-    "ea diff i8": dict(label="element matrix, int8 diff.", color="#a6cee3", hatch=None, marker="X", ls="-"),
-    "ea full f16": dict(label="element matrix, fp16 full", color="#6a3d9a", hatch="\\\\\\", marker="*", ls="--"),
-    "ea pair i8": dict(label="element matrix, int8 diff., pair scale", color="#08306b", hatch=None, marker="D",
-                       ls="-"),
-    "qbsr f16": dict(label="quantized BSR, fp16", color="#e6ab02", hatch=None, marker="<", ls="-"),
-    "qbsr i8": dict(label="quantized BSR, int8", color="#a6761d", hatch=None, marker=">", ls="-"),
+    "qbsr f16": dict(label="quantized BSR, fp16", color="#a6761d", hatch=None, marker="<", ls="-"),
+    "qbsr i8": dict(label="quantized BSR, int8", color="#e6ab02", hatch=None, marker=">", ls="--"),
+    "ea diff f16": dict(label="element matrix, fp16", color="#1f78b4", hatch=None, marker="P", ls="-"),
+    "ea pair i8": dict(label="element matrix, int8 (pair scale)", color="#a6cee3", hatch=None, marker="D", ls="--"),
+    "qp f16": dict(label="quadrature points, fp16", color="#1b9e77", hatch=None, marker="^", ls="-"),
+    "qp i8md": dict(label="quadrature points, int8 mean+dev.", color="#99d8a8", hatch=None, marker="d", ls="--"),
 }
-# The bench rows behind each operator (packed scatter for the element operators).
+# The bench rows behind each format (packed scatter for the element formats).
 BENCH_KEY = {
-    "MF": "exact matrix-free packed two-pass", "BSR f64": "BSR f64", "BSR f32": "BSR f32", "P0": "projected P0 f32 packed",
-    "qp f16": "qp f16 blk a32 lanes packed", "qp f16md": "qp f16 mean+dev blk a32 lanes packed",
-    "qp i8md": "qp i8 mean+dev blk a32 lanes packed", "qp i8": "qp i8/el blk a32 lanes packed",
-    "ea diff f16": "ea diff f16 packed", "ea diff i8": "ea diff i8 packed", "ea full f16": "ea full f16 packed",
-    "ea pair i8": "ea diff i8 pair packed", "qbsr f16": "BSR f16 upper u16", "qbsr i8": "BSR i8/blk upper u16",
+    "BSR f64": "BSR f64", "BSR f32": "BSR f32", "qbsr f16": "BSR f16 upper u16", "qbsr i8": "BSR i8/blk upper u16",
+    "ea diff f16": "ea diff f16 packed", "ea pair i8": "ea diff i8 pair packed",
+    "qp f16": "qp f16 blk a32 lanes packed", "qp i8md": "qp i8 mean+dev blk a32 lanes packed",
 }
-# The Newton labels behind each operator.
+# Their set-up rows (the element matrix's set-up is timed with the atomic scatter).
+SETUP_KEY = {
+    "BSR f64": "BSR f64", "BSR f32": "BSR f32", "qbsr f16": "BSR f16 upper u16", "qbsr i8": "BSR i8/blk upper u16",
+    "ea diff f16": "ea diff f16 atomic", "qp f16": "qp f16 blk a32 lanes", "qp i8md": "qp i8 mean+dev blk a32 lanes",
+}
+# The Newton labels behind each format.
 NEWTON_KEY = {
-    "MF": "matrix-free", "exact": "BSR f64", "BSR f64": "BSR f64", "BSR f32": "BSR f32", "P0": "P0 projected", "qp f16": "qp f16",
-    "qp f16md": "qp f16md", "qp i8md": "qp i8md", "qp i8": "qp i8", "ea diff f16": "qp ead16",
-    "ea diff i8": "qp eadi8", "ea full f16": "qp eaf16", "ea pair i8": "qp eadi8p", "qbsr f16": "qp bsro16",
-    "qbsr i8": "qp bsroi8",
+    "BSR f64": "BSR f64", "BSR f32": "BSR f32", "qbsr f16": "qp bsro16", "qbsr i8": "qp bsroi8",
+    "ea diff f16": "qp ead16", "ea pair i8": "qp eadi8p", "qp f16": "qp f16", "qp i8md": "qp i8md",
 }
 # Nodes per element: the pair-scaled store's side data is one byte per node pair.
 NODES = {"TET4": 4, "TET10": 10, "HEX8": 8, "PROTEUS_HEX27": 27}
@@ -132,29 +127,26 @@ def bars(ax, ops, value, ylabel, log=False, annotate="{:.0f}", elements=ELEMENTS
 
 
 def legend_below(fig, axes, ncol=4):
+    """One legend for all panels, in the order of FORMATS (one column per family)."""
     handles, labels = [], []
     for ax in np.atleast_1d(axes).flat:
         for h, l in zip(*ax.get_legend_handles_labels()):
             if l not in labels:
                 handles.append(h)
                 labels.append(l)
-    fig.legend(handles, labels, loc="lower center", ncol=ncol, bbox_to_anchor=(0.5, -0.02))
+    order = {STYLE[o]["label"]: k for k, o in enumerate(FORMATS)}
+    pairs = sorted(zip(handles, labels), key=lambda hl: order.get(hl[1], len(order)))
+    fig.legend([h for h, _ in pairs], [l for _, l in pairs], loc="lower center", ncol=ncol,
+               bbox_to_anchor=(0.5, -0.02))
 
 
-MEMORY_OPS = [
-    # label, bench row, kind, code bytes, extras
-    ("BSR, fp64", "BSR f64", "bsr", 8, None),
-    ("BSR, fp32", "BSR f32", "bsr", 4, None),
-    ("points/moments, fp16", "qp f16 blk a32 lanes packed", "store", 2, "scale"),
-    ("points/moments, fp16 mean+dev.", "qp f16 mean+dev blk a32 lanes packed", "store", 2, "mean"),
-    ("points/moments, int8 mean+dev.", "qp i8 mean+dev blk a32 lanes packed", "store", 1, "mean"),
-    ("element matrix, fp16 full", "ea full f16 packed", "store", 2, "scale"),
-    ("element matrix, fp16 diff.", "ea diff f16 packed", "store", 2, "scale"),
-    ("element matrix, int8 diff.", "ea diff i8 packed", "store", 1, "scale"),
-    ("element matrix, int8 diff., pair scale", "ea diff i8 pair packed", "store", 1, "pair"),
-    ("quantized BSR, fp16", "BSR f16 upper u16", "qbsr", 2, None),
-    ("quantized BSR, int8", "BSR i8/blk upper u16", "qbsr", 1, None),
-]
+# How each format's bytes split: kind, code bytes, side data.
+MEMORY_KIND = {
+    "BSR f64": ("bsr", 8, None), "BSR f32": ("bsr", 4, None), "qbsr f16": ("qbsr", 2, None),
+    "qbsr i8": ("qbsr", 1, None), "ea diff f16": ("store", 2, "scale"), "ea pair i8": ("store", 1, "pair"),
+    "qp f16": ("store", 2, "scale"), "qp i8md": ("store", 1, "mean"),
+}
+MEMORY_OPS = [(STYLE[o]["label"], BENCH_KEY[o]) + MEMORY_KIND[o] for o in FORMATS]
 PART_COLOURS = {"values": "#4d4d4d", "indices": "#b3b3b3", "codes": "#1b9e77", "scales": "#e6ab02",
                 "mean": "#7570b3"}
 
@@ -244,12 +236,9 @@ def main():
     def bench(field):
         return lambda o, el: rows.get(el, {}).get(BENCH_KEY[o], {}).get(field)
 
-    apply_ops = ["BSR f64", "BSR f32", "MF", "P0", "qp f16", "qp i8md", "ea diff f16", "ea diff i8", "ea pair i8",
-                 "qbsr f16", "qbsr i8"]
-
     # Figure: throughput and memory at saturation.
     fig, ax = plt.subplots(figsize=(TEXTWIDTH, 2.6))
-    bars(ax, apply_ops, bench("mdofs"), "MDOF/s (higher is better)")
+    bars(ax, FORMATS, bench("mdofs"), "MDOF/s (higher is better)")
     fig.tight_layout(rect=(0, 0.12, 1, 1))
     legend_below(fig, [ax])
     fig.savefig(os.path.join(out, "throughput.pdf"))
@@ -261,16 +250,11 @@ def main():
     memory_figure({el: dict(r) for el, r in rows.items()}, meta, out, src)
 
     # Figure: set-up per Newton step, and the operator error.
-    setup_key = {"BSR f64": "BSR f64", "BSR f32": "BSR f32", "P0": "projected P0 f32",
-                 "qp f16": "qp f16 blk a32 lanes", "qp i8md": "qp i8 mean+dev blk a32 lanes",
-                 "ea diff f16": "ea diff f16 atomic", "qbsr i8": "BSR i8/blk upper u16"}
-    err_ops = ["P0", "qp f16", "qp f16md", "qp i8md", "qp i8", "ea full f16", "ea diff f16", "ea diff i8",
-               "ea pair i8", "qbsr f16", "qbsr i8"]
     fig, axes = plt.subplots(1, 2, figsize=(TEXTWIDTH, 2.7))
-    bars(axes[0], list(setup_key), lambda o, el: rows.get(el, {}).get(setup_key[o], {}).get("setup_ms"),
+    bars(axes[0], FORMATS, lambda o, el: rows.get(el, {}).get(SETUP_KEY.get(o), {}).get("setup_ms") or None,
          "ms per Newton step")
     axes[0].set_title("Set-up (lower is better)")
-    bars(axes[1], err_ops, bench("energy"), "relative energy error", log=True, annotate=None)
+    bars(axes[1], FORMATS, bench("energy"), "relative energy error", log=True, annotate=None)
     axes[1].yaxis.set_major_locator(LogLocator(base=10, numticks=12))
     axes[1].yaxis.set_minor_formatter(NullFormatter())
     axes[1].set_title("Operator error, mild state, white-noise increment")
@@ -289,10 +273,7 @@ def main():
         logs = newton_logs(case)
         if not logs:
             continue
-        # The encodings with one int8 scale per element are left out: they fail as Newton operators,
-        # and the text quotes their counts.  Log scale, so that the usable ones read next to BSR.
-        ops = ["exact", "P0", "qp f16", "qp f16md", "qp i8md", "ea full f16", "ea diff f16", "ea pair i8",
-               "qbsr f16", "qbsr i8"]
+        ops = FORMATS
 
         def it(field):
             return lambda o, el: (logs.get(el, {}).get(NEWTON_KEY[o]) or {}).get(field)
@@ -318,8 +299,7 @@ def main():
     cases = [(newton_logs(p), t) for p, t in cases]
     cases = [(l, t) for l, t in cases if l]
     if cases:
-        ops = ["BSR f64", "BSR f32", "MF", "P0", "qp f16", "qp f16md", "qp i8md", "ea full f16", "ea diff f16",
-               "ea pair i8", "qbsr f16", "qbsr i8"]
+        ops = FORMATS
         fig, axes = plt.subplots(len(cases), 1, figsize=(TEXTWIDTH, 2.25 * len(cases)), squeeze=False)
         for ax, (logs, title) in zip(axes[:, 0], cases):
             def rel(o, el, logs=logs):
@@ -348,11 +328,18 @@ def main():
     for path in sorted(glob.glob(os.path.join(src, "bsweep_*.out"))) + auto:
         for el, dof, r in parse_bench_sweep(path):
             sweep.setdefault(el, {}).setdefault(dof, {}).update(r)
+    # The quantized BSR rows come from their own sweep in the extras, at the same sizes.
+    for d in extras:
+        for path in sorted(glob.glob(os.path.join(d, "ubsweep_*.out"))):
+            for el, dof, r in parse_bench_sweep(path):
+                for k, v in r.items():
+                    if k.startswith("BSR ") and k not in REFERENCE_BSR:
+                        sweep.setdefault(el, {}).setdefault(dof, {}).setdefault(k, v)
     if sweep:
         fig, axes = plt.subplots(2, 2, figsize=(TEXTWIDTH, 4.4), sharey=True)
         for ax, el in zip(axes.flat, ELEMENTS):
             pts = sorted(sweep.get(el, {}).items())
-            for o in ["BSR f64", "BSR f32", "MF", "P0", "qp f16", "qp i8md", "ea diff f16"]:
+            for o in FORMATS:
                 xs = [d for d, r in pts if BENCH_KEY[o] in r]
                 ys = [r[BENCH_KEY[o]]["mdofs"] for d, r in pts if BENCH_KEY[o] in r]
                 if xs:
@@ -377,12 +364,19 @@ def main():
         el = {"HEX27": "PROTEUS_HEX27"}.get(el, el)
         for dof, runs in parse_newton_sweep(path):
             nsweep.setdefault(el, {})[dof] = runs
+    # The quantized BSR runs come from their own sweep in the extras, at the same sizes.
+    for d in extras:
+        for path in sorted(glob.glob(os.path.join(d, "unsweep_*.out"))):
+            el = re.search(r"unsweep_(\w+?)_", os.path.basename(path)).group(1).upper()
+            el = {"HEX27": "PROTEUS_HEX27"}.get(el, el)
+            for dof, runs in parse_newton_sweep(path):
+                for op, r in runs.items():
+                    if op.startswith("qp bsr") and r["seconds"] is not None:
+                        nsweep.setdefault(el, {}).setdefault(dof, {}).setdefault(op, r)
     # The saturated runs extend the sweep, unless the reference operators themselves took different
     # Newton paths (step cuts that depend on rounding), which makes the run a comparison of paths.
-    for path in sorted(glob.glob(os.path.join(src, "newton_*_10M_*.out"))):
-        runs, m = parse_newton(path)
-        runs = {operator_name(l): r for l, r in runs.items() if r["seconds"] is not None}
-        nsweep.setdefault(m["element"], {}).setdefault(m["dof"], {}).update(runs)
+    for el, (runs, m) in newton_case(src, extras, "10M").items():
+        nsweep.setdefault(el, {}).setdefault(m["dof"], {}).update(runs)
     for el in nsweep:
         nsweep[el] = {d: r for d, r in nsweep[el].items() if not (
             r.get("BSR f64") and r.get("BSR f32") and r["BSR f64"]["newton"] != r["BSR f32"]["newton"])}
@@ -390,7 +384,7 @@ def main():
         fig, axes = plt.subplots(2, 2, figsize=(TEXTWIDTH, 4.4), sharey=True)
         for ax, el in zip(axes.flat, ELEMENTS):
             pts = sorted(nsweep.get(el, {}).items())
-            for o in ["BSR f64", "P0", "qp f16", "qp f16md", "qp i8md", "ea diff f16", "ea pair i8"]:
+            for o in FORMATS:
                 xs, ys = [], []
                 for dof, runs in pts:
                     r, ref = runs.get(NEWTON_KEY[o]), runs.get("BSR f32")

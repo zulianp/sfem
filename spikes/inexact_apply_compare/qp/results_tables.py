@@ -268,7 +268,7 @@ def write_macros(src, outdir, extras=()):
         if "qp f64 soa a64" in r:
             m[f"corrQpSixtyFour{tag}"] = sci(r["qp f64 soa a64"]["l2"])
         for k, key in (("EaDiffEight", "ea diff i8 packed"), ("EaPairEight", "ea diff i8 pair packed"),
-                       ("EaDiffHalf", "ea diff f16 packed")):
+                       ("EaDiffHalf", "ea diff f16 packed"), ("EaFullHalf", "ea full f16 packed")):
             if key in r:
                 m[f"err{k}{tag}"] = sci(r[key]["energy"])
         a, b = r.get("ea diff i8 packed"), r.get("ea diff i8 pair packed")
@@ -285,7 +285,7 @@ def write_macros(src, outdir, extras=()):
             m[f"newtonPzeroExtra{tag}"] = f"{100 * (p0['newton'] / ex['newton'] - 1):.0f}"
         for k, op in (("EaDiffEight", "qp eadi8"), ("EaPairEight", "qp eadi8p"), ("EaDiffHalf", "qp ead16"),
                       ("QbsrHalf", "qp bsro16"), ("QbsrEight", "qp bsroi8"), ("QpEightEl", "qp i8"),
-                      ("QpEightMd", "qp i8md")):
+                      ("QpEightMd", "qp i8md"), ("EaFullHalf", "qp eaf16")):
             if op in runs:
                 m[f"newton{k}{tag}"] = str(runs[op]["newton"])
         m[f"newtonDof{tag}"] = fmt(mm["dof"])
@@ -295,7 +295,7 @@ def write_macros(src, outdir, extras=()):
         tag = tags[el]
         for k, op in (("Exact", "BSR f32"), ("EaDiffEight", "qp eadi8"), ("EaPairEight", "qp eadi8p"),
                       ("EaDiffHalf", "qp ead16"), ("QbsrHalf", "qp bsro16"), ("QbsrEight", "qp bsroi8"),
-                      ("QpEightEl", "qp i8"), ("QpEightMd", "qp i8md")):
+                      ("QpEightEl", "qp i8"), ("QpEightMd", "qp i8md"), ("EaFullHalf", "qp eaf16")):
             if op in runs:
                 m[f"twist{k}{tag}"] = str(runs[op]["newton"])
         ref = runs.get("BSR f32")
@@ -309,7 +309,7 @@ def write_macros(src, outdir, extras=()):
         ref = runs.get("BSR f32")
         for k, op in (("QpHalf", "qp f16"), ("QpEightMd", "qp i8md"), ("BsrSixtyFour", "BSR f64"),
                       ("EaDiffHalf", "qp ead16"), ("EaPairEight", "qp eadi8p"), ("QbsrHalf", "qp bsro16"),
-                      ("QbsrEight", "qp bsroi8")):
+                      ("QbsrEight", "qp bsroi8"), ("Pzero", "P0 projected")):
             if ref and op in runs:
                 m[f"time{k}{tag}"] = f"{runs[op]['seconds'] / ref['seconds']:.2f}"
         for k, op in (("Exact", "BSR f32"), ("QbsrHalf", "qp bsro16"), ("QbsrEight", "qp bsroi8")):
