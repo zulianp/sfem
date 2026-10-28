@@ -62,7 +62,7 @@ stores the pulled-back material tangent at the quadrature points.
 For the quadrature-point stores we identify what the quadrature can see of the tangent: its moments
 against products of the element's gradient functions, $\storeTetTen$ numbers per quadratic
 tetrahedron and $\storeHexEight$ per trilinear hexahedron, which reproduce the exact application to
-the rounding of the store.  The element-constant projection of earlier work is the
+the rounding of the store.  The element-constant projection, the smallest such store, is the
 Kronecker-rank-one approximation of the same object; it costs $\newtonPzeroExtraHexEight\%$ more Newton
 iterations on trilinear hexahedra and $\newtonPzeroExtraTetTen\%$ more on quadratic tetrahedra.  All
 formats share \texttt{fp16} and \texttt{int8} encodings decoded inside the application, and the
@@ -100,11 +100,11 @@ within the step.  Moving along this range trades stored bytes against arithmetic
 stored numbers shifts the trade for every format at once.
 
 Partial assembly sits between the element matrix and the matrix-free application: it stores a per-element object that captures geometry,
-state and material, and applies it by a small tensor contraction.  In a companion
-paper~\cite{ZulianPA} we replaced the pulled-back material tangent by its element average --- its
-$L^2$ projection onto the constants --- which removes the quadrature loop from the application
-altogether: the stored object is $45$ numbers per element and the reference-element tensor that
-remains is integrated exactly at code-generation time.  The application is fast, but it is an
+state and material, and applies it by a small tensor contraction.  Its smallest form replaces the
+pulled-back material tangent by its element average --- its $L^2$ projection onto the constants
+(Section~\ref{sec:kronecker}) --- which removes the quadrature loop from the application altogether:
+the stored object is $45$ numbers per element and the reference-element tensor that remains is
+integrated exactly when the kernel is generated.  The application is fast, but it is an
 approximation away from affine simplices.  At a moderate distortion the projected operator differs
 from the exact one by $10^{-2}$ on quadratic tetrahedra and by $10^{-4}$ on trilinear hexahedra,
 and the error is first order in the element size.
@@ -134,7 +134,7 @@ absorbs or pays for in iterations.  The contributions are:
   functions; storing those moments, or the point values where they are fewer, reproduces the exact
   application to rounding: $\storeTetTen$ numbers per quadratic tetrahedron against
   $\perpointTetTen$ point values, while on trilinear hexahedra the $\storeHexEight$ point values are
-  already minimal.  The constant projection of the companion paper is its Kronecker-rank-one
+  already minimal.  The element-constant projection, the smallest store, is its Kronecker-rank-one
   approximation, and contraction schedules with operation counts follow for each element
   (Section~\ref{sec:schedules}).
 \item \textbf{Element matrices in difference form} (Section~\ref{sec:elementmatrix}), built from the
@@ -175,8 +175,7 @@ materials, $27$ numbers per point besides the geometry, at no cost over hand-wri
 Kronbichler and Kormann~\cite{KronbichlerKormann2019} make the same trade for the geometry alone,
 from mapping support points to merged coefficients.  Every one of these stores its data in double
 precision; we found no prior work that quantises quadrature-point data, or that stores what the
-quadrature can see of it rather than its point values.  The companion paper~\cite{ZulianPA}
-stores the pulled-back tangent, projected onto the constants.
+quadrature can see of it rather than its point values.
 
 \paragraph{Reduced-precision storage.}  Decoupling the storage precision of operator data from the
 arithmetic precision is established in sparse linear algebra: block-Jacobi preconditioners whose
@@ -231,7 +230,8 @@ Equation~\eqref{eq:action} is the exact matrix-free action, quadrature included.
 except $\Sq$ belongs to the reference element.  For a material derived from a strain energy the
 tangent has the major symmetry $\Sq_{ikmn}=\Sq_{kinm}$, under exchange of (output component, test
 direction) with (increment component, increment direction), so each point carries $45$ independent
-numbers in three dimensions; a residual-based material carries $81$ \cite{ZulianPA}.  Storing
+numbers in three dimensions; a material defined by its residual has no major symmetry and carries
+$81$.  Storing
 $\Sq$ for every point makes the application exact and independent of geometry, state and
 material, at $45\,n_q$ numbers per element.
 
@@ -277,8 +277,8 @@ spaces have dimension $9$ or $12$ and the $8$ point values are minimal.}
 \label{tab:stores}
 \end{table}
 
-On TET4 the single point value is the element constant, and the companion paper's projection is
-already exact.  On TET10, write $\lambda_a$ for the barycentric coordinates.  The reference
+On TET4 the single point value is the element constant, and the projected store of
+Section~\ref{sec:kronecker} is already exact.  On TET10, write $\lambda_a$ for the barycentric coordinates.  The reference
 derivatives are linear, $\partial_m h_k = \sum_{a} \lambda_a P_{kma}$ with $P_{kma}$ the derivative
 at vertex $a$, and similarly $\partial_n\varphi_p = \sum_b \lambda_b G_{pnb}$ with rational
 constants $G$.  Substituting into \eqref{eq:action} gives
@@ -293,15 +293,36 @@ Bernstein basis.  Each $\Mab$ is a positively weighted local average of the tang
 weights are positive, which matters for the encodings of Section~\ref{sec:compression}; the
 $11$-point rule has one negative weight, so this holds approximately.
 
-\subsection{The projection as a Kronecker-rank-one approximation}
+\subsection{The projected store}
 \label{sec:kronecker}
+
+The smallest quadrature-point store replaces the tangent by its element average, its $L^2$
+projection onto the constants, $\Sbar = \sum_q \Sq/|\refcell|$; since $\Sq$ carries the weight $w_q$,
+$\Sbar$ is the weighted mean of the pointwise tangent.  Substituting $\Sq\approx w_q\Sbar$ into
+\eqref{eq:action} gives
+\begin{equation}
+  (\mathcal{H} h)_{ip} \;\approx\; \sum_{k,m,n} \Sbar_{ikmn} \sum_j W_{jm,pn}\, h_{kj} ,
+  \qquad
+  W_{jm,pn} = \sum_q w_q\, \partial_m\varphi_j(\xhat_q)\, \partial_n\varphi_p(\xhat_q) ,
+  \label{eq:projected}
+\end{equation}
+where $W$ belongs to the reference element and is integrated exactly when the kernel is generated.
+It has the rank of the gradient spaces: with $C$ the map from nodal values to the $r$ modal
+coefficients of the reference gradient in each direction ($r=1$, $4$ and $7$ on TET4, TET10 and
+HEX8; on TET10 the derivatives at the vertices) and $X$ the Gram matrix of the modal basis,
+$W = C^{\mathsf T} X C$.  The application therefore runs in four stages, with the rational constants of
+$C$ and $X$ folded into the code: compress the increment into modal gradient coefficients, $P=Ch$;
+apply $X$ to the modal index and the $45$ stored numbers of $\Sbar$ to the components and directions;
+expand, $\mathrm{out}=C^{\mathsf T}Y$.  It reads $45$ numbers per element and no geometry, state or
+material.  It is exact on TET4, whose single point makes the mean the tangent, and an approximation
+elsewhere, with an error first order in the element size.
 
 Read as a matrix on the index pairs $(i,n,b)$ and $(k,m,a)$, the element operator of
 \eqref{eq:tet10moments} is $\sum_{a,b} E_{ab}\otimes\Mab$, where $E_{ab}$ are the elementary
 matrices on the modal index; for HEX8 the same holds with the point values in place of the moments
 and the rank-one matrices $\psi_q\psi_q^{\mathsf T}$ in place of $E_{ab}$, where $\psi_q$ holds the
 values at $\xhat_q$ of a basis of the $r=7$ dimensional gradient space.
-Replacing $\Sq$ by its element mean $\Sbar$, as the companion paper does, gives
+Replacing $\Sq$ by its element mean $\Sbar$ gives
 \begin{equation}
   \Mab \;\approx\; X_{ab}\,\Sbar ,
   \qquad X_{ab}=\sum_q w_q\lambda_a(\xhat_q)\lambda_b(\xhat_q) ,
@@ -309,7 +330,7 @@ Replacing $\Sq$ by its element mean $\Sbar$, as the companion paper does, gives
   \label{eq:kronecker}
 \end{equation}
 a single Kronecker product of the reference Gram matrix $X$ and a tangent --- precisely the
-factorisation that let the companion paper fold $X$ into the kernel as constants.  The projection
+factorisation that lets the projected kernel fold $X$ into the code as constants.  The projection
 is therefore a Kronecker-rank-one approximation of the exact element operator, and the exact store
 differs from it by the deviations $D^{ab}=\Mab-X_{ab}\Sbar$ (or $\Sq-w_q\Sbar$ at points), which sum
 to zero.  Where the tangent varies little over the element the deviations are small relative to
@@ -331,11 +352,11 @@ numbers as opaque inputs, are in Table~\ref{tab:flops}.
   scatter stages jointly across points recovers the sharing of a tensor-product element, which on
   HEX8 is what sum factorisation would make explicit.
 \item[Modal, per point.]  Compress the increment once into the $9r$ modal gradient coefficients,
-  as the companion paper's first stage does with folded rational constants; evaluate each point's
+  as the projected kernel's first stage does with folded rational constants; evaluate each point's
   gradient from the modes; apply the tangent; accumulate back to modes; expand.  On TET10 the
   modes are the vertex derivatives and the evaluation is barycentric interpolation.
 \item[Moment.]  Equation~\eqref{eq:tet10moments}: compress, apply the $r^2$ blocks $\Mab$ to the
-  modal coefficients, expand.  This is the companion paper's four-stage schedule with the
+  modal coefficients, expand.  This is the projected kernel's four-stage schedule with the
   Kronecker product of \eqref{eq:kronecker} expanded, and on TET4 ($r=1$) it is that schedule.
 \end{description}
 
@@ -349,7 +370,7 @@ element & projected & direct & modal & moment & selected & flop/dof \\
 \bottomrule
 \end{tabular}
 \caption{Floating-point operations per element application after common-subexpression
-elimination.  ``Projected'' is the companion paper's constant-projection kernel, an approximation
+elimination.  ``Projected'' is the constant-projection kernel of Section~\ref{sec:kronecker}, an approximation
 except on TET4.  The selected schedule is the one that reads the minimal store of
 Table~\ref{tab:stores}; on TET10 the moment schedule is within $1.3\%$ of the cheapest per-point
 schedule and reads $10\%$ fewer numbers.  Symbolic counts, not measured run times.}
@@ -451,7 +472,7 @@ $(\lambda+2\mu)/\mu = 2(1-\nu)/(1-2\nu)$: $3.5$ at Poisson ratio $\nu=0.3$, $11$
 at $0.49$.  An encoding that rounds the bulk-dominated entries at their own magnitude perturbs the
 shear modes by that much, and the plain codecs lose a factor of the conditioning.  The
 mean-and-deviation encoding reduces $\sigma$ to the variation of the tangent over the element,
-which for TET10 at the distortions of the companion paper is about $10^{-2}$ of its magnitude, but
+which for TET10 at a moderate distortion is about $10^{-2}$ of its magnitude, but
 keeps the conditioning factor.
 
 \paragraph{Rotations.}  The element-wise bound \eqref{eq:eps} is finite only when the encoding
@@ -478,7 +499,7 @@ machine precision but with the Krylov forcing term, which is the subject of the 
 \label{sec:meandev}
 
 Splitting the store into a mean and a deviation also splits the application.  The mean part is
-exactly the projected application of the companion paper, with its folded reference tensor and its
+exactly the projected application of Section~\ref{sec:kronecker}, with its folded reference tensor and its
 $45$-number store; the deviation part is the schedule of Section~\ref{sec:schedules} applied to the
 encoded deviations.  The two can be fused, decoding $w_q\Sbar + s\,c^q$ in registers as above, or
 kept separate, in which case the projected application is available unchanged as a cheaper
@@ -896,8 +917,8 @@ element & f64 & f32 & f32 & f64 & f32 & f16 & i8/el & i8/comp & i8 mean+dev \\
 \rows{tables/footprint.tex}
 \bottomrule
 \end{tabular}
-\caption{Operator memory in bytes per degree of freedom.  ``Projected'' is the companion paper's
-approximate store.  The exact store in double precision is larger than the BSR matrix on every
+\caption{Operator memory in bytes per degree of freedom.  ``Projected'' is the
+approximate store of Section~\ref{sec:kronecker}.  The exact store in double precision is larger than the BSR matrix on every
 element; encoded in \texttt{fp16} it is $\ratiohalfTetFour$--$\ratiohalfTetTen\times$ smaller than
 BSR in double precision, and in \texttt{int8} per element $\ratiointTetFour$--$\ratiointTetTen\times$
 smaller.  The per-component and mean-and-deviation encodings are not meaningful with one point
@@ -945,7 +966,7 @@ arithmetic (Table~\ref{tab:roofline}).  On TET4, with two elements per degree of
 \texttt{fp16} store is bandwidth-bound below BSR in single precision, and only \texttt{int8} clears
 it.  Matching BSR in single precision requires about $20\%$ of the nominal
 double-precision peak, or $10\%$ of the single-precision peak.  For calibration, the projected
-HEX8 kernel of the companion paper sustains $\PzeroHexRate$~GFLOP/s on the same machine,
+HEX8 kernel sustains $\PzeroHexRate$~GFLOP/s on the same machine,
 $\PzeroHexPeak\%$ of the double-precision peak, at $\PzeroHexMdofs$~MDOF/s.  The model therefore
 predicts that a double-precision contraction lands near BSR in single precision and a
 single-precision contraction (Section~\ref{sec:precision}) clears it, while using
@@ -1033,11 +1054,13 @@ the element matrices built from the store do the same.
 \begin{figure}[t]
 \centering
 \includegraphics[width=\textwidth]{figures/throughput.pdf}
-\caption{Application throughput against BSR, \benchdofHexEight{}~dof, Grace, $72$ threads.  The
-element operators (matrix-free, projected, compressed stores, element matrices) use the packed
-two-pass scatter; BSR is a row-parallel block product, the quantized matrix the product of
-Section~\ref{sec:qbsr} (\texttt{int8} with a scale per block, \texttt{fp16} with one scale).  Missing bars: the mean-and-deviation
-encodings need more than one stored tensor per element, which TET4 does not have.}
+\caption{Application throughput against BSR, \benchdofHexEight{}~dof, Grace, $72$ threads.  This and
+every following figure show the same eight formats in the same order: BSR in double and single
+precision, the quantized matrix of Section~\ref{sec:qbsr} (\texttt{fp16}; \texttt{int8} with a scale
+per block), the element matrix in difference form (\texttt{fp16}; \texttt{int8} with a scale per node
+pair) and the quadrature-point store (\texttt{fp16}; \texttt{int8} mean and deviation).  The element
+formats use the packed two-pass scatter, BSR a row-parallel block product.  TET4 has no int8
+mean-and-deviation bar: one point per element leaves no deviation to encode.}
 \label{fig:throughput}
 \end{figure}
 
@@ -1074,8 +1097,9 @@ small and the element loop is not.
 \begin{figure}[t]
 \centering
 \includegraphics[width=\textwidth]{figures/setup_error.pdf}
-\caption{Left: set-up of the operator once per Newton step, \benchdofHexEight{}~dof.  Right:
-relative error in the energy of the operator against the exact one, at the mild state of the
+\caption{Left: set-up of the operator once per Newton step, \benchdofHexEight{}~dof; the pair-scaled
+element matrix shares the set-up kernel of the half-precision one and is not timed separately.
+Right: relative error in the energy of the operator against the exact one, at the mild state of the
 application study, white-noise increment.}
 \label{fig:setup}
 \end{figure}
@@ -1090,9 +1114,9 @@ assembly without the element-matrix contraction and without the scatter into the
 \centering
 \includegraphics[width=\textwidth]{figures/newton_iterations.pdf}
 \caption{Newton and conjugate-gradient iterations to solution, about $1.08\times10^6$~dof, four
-load steps (TET10: sixteen).  BSR in both precisions, the matrix-free operator and the
-double-precision store have identical counts, shown once.  Log scale.  The encodings with one
-\texttt{int8} scale per element fail as Newton operators and are left out; their counts are in the
+load steps (TET10: sixteen); log scale.  The matrix-free operator and the double-precision store
+have the counts of BSR.  Formats outside the common set (the projected store, the encodings with
+one \texttt{int8} scale per element, the full element matrix) are not shown; their counts are in the
 text.}
 \label{fig:newton}
 \end{figure}
@@ -1111,15 +1135,15 @@ TET10 (\texttt{int8} mean and deviation: $\newtonQpEightMdTetTen$ and $\newtonQp
 Under large deformation (a $90^\circ$ twist, Figure~\ref{fig:twist}) the same ordering holds,
 and the element matrices separate by form: in half precision the difference form keeps the exact
 count while the full matrix, whose rounding does not preserve the rigid translations, costs
-iterations, and \texttt{int8} with one scale per element costs iterations in either form (counts in
-the next subsection).
+iterations ($\twistEaFullHalfHexEight$ against $\twistExactHexEight$ on HEX8, $\twistEaFullHalfTetTen$
+against $\twistExactTetTen$ on TET10), and \texttt{int8} with one scale per element costs iterations in
+either form (counts in the next subsection).
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\textwidth]{figures/newton_twist.pdf}
 \caption{Newton and conjugate-gradient iterations for a $90^\circ$ twist of the cube in sixteen load
-steps; log scale, the encodings with one \texttt{int8} scale per element left out as in
-Figure~\ref{fig:newton}.}
+steps; log scale, the formats of Figure~\ref{fig:newton}.}
 \label{fig:twist}
 \end{figure}}{}
 
@@ -1162,9 +1186,8 @@ detected decides the comparison there.
 faster): the stretch case at about $10^6$ and $10^7$~dof and the twist at about $10^6$~dof.  Each
 bar is labelled with the ratio and, in parentheses, the Newton iterations of the run; a count that
 differs from BSR's marks a run that took a different load-step path.  Failed load-step attempts
-are not counted in the iterations but are included in the time.  TET4 has no mean-and-deviation
-bars: with one point per element there is no deviation to encode.  The element matrix with one
-\texttt{int8} scale per element is left out, as in Figure~\ref{fig:newton}.}
+are not counted in the iterations but are included in the time.  The formats of
+Figure~\ref{fig:throughput}.}
 \label{fig:tts}
 \end{figure}
 
@@ -1192,6 +1215,14 @@ quantized matrix and the element matrix with a scale per node pair are close; on
 format is ahead of the quantized matrix, the pair-scaled element matrix first and the
 quadrature-point stores close behind.
 
+The projected store is not among the formats compared.  Its application is fast, but away from
+linear tetrahedra it costs Newton iterations ($\newtonPzeroExtraHexEight\%$ more on HEX8 and
+$\newtonPzeroExtraTetTen\%$ on TET10 at about $10^6$ degrees of freedom), its accuracy depends on the
+element size and distortion, and at about $10^7$ degrees of freedom it solves in
+$\timePzeroHexEight$ and $\timePzeroTetTen$ of the time of single-precision BSR on HEX8 and TET10 ---
+behind the exact compressed formats of Table~\ref{tab:summary} --- and in $\timePzeroTetFour$ on TET4,
+where it is exact.  We do not propose it as an option.
+
 \subsection{Element matrices}
 
 The element matrices of Section~\ref{sec:elementmatrix} are built by the same set-up kernel and
@@ -1203,9 +1234,10 @@ single-precision BSR from $\EaDiffHalfMemVsThirtyTwoHexEight\times$ and
 $\EaDiffHalfMemVsThirtyTwoTetTen\times$ less memory (Figure~\ref{fig:memory}); in \texttt{int8} the
 factors grow to $\EaDiffEightVsThirtyTwoHexEight\times$ and $\EaDiffEightVsThirtyTwoTetTen\times$ in
 speed.  The difference form is faster than the full matrix and, as designed, more accurate under
-the same encoding (Figure~\ref{fig:setup}, right); in the Newton study its half-precision encoding
-keeps the exact iteration counts where the full matrix in half precision does not
-(Figure~\ref{fig:twist}).  Their set-up contracts the stored tensors per element, vectorised over the lanes of a
+the same encoding (energy error \errEaDiffHalfHexEight{} against \errEaFullHalfHexEight{} on HEX8 in
+half precision); in the Newton study its half-precision encoding keeps the exact iteration counts
+where the full matrix in half precision does not ($\newtonEaFullHalfTetTen$ Newton iterations on
+TET10 at about $10^6$ degrees of freedom, against $\newtonExactTetTen$).  Their set-up contracts the stored tensors per element, vectorised over the lanes of a
 block of elements and computing only the blocks above the diagonal ($\SetupEaDiffHalfHexEight$~ms on
 HEX8 against $\SetupQpHalfHexEight$ for the half-precision point store and
 $\SetupBsrThirtyTwoHexEight$ for single-precision BSR assembly; $\SetupEaDiffHalfTetTen$,
@@ -1481,12 +1513,6 @@ M.~Wichrowski, M.~Rezaee-Hajidehi, J.~Korelc, M.~Kronbichler, S.~Stupkiewicz.
 \newblock Matrix-free methods for finite-strain elasticity: automatic code generation with no
 performance overhead.
 \newblock arXiv:2505.15535, 2025.
-
-\bibitem{ZulianPA}
-P.~Zulian.
-\newblock Partial assembly by $L^2$-projection: node-level performance of generated inexact
-tangent kernels for finite-strain elasticity.
-\newblock In preparation.
 
 \end{thebibliography}
 
