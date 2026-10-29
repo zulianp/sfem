@@ -160,12 +160,12 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
         self.assertNotIn("missing block graph entry", bsr_scatter)
         self.assertIn("neohookean_ogden_proteus_hex8_hessian_i_msoa_find_cols(ev, cols, lenrow, ks);", bsr_scatter)
         self.assertIn("entries[i * NS + j] = row_begin + ks[j];", bsr_scatter)
-        self.assertIn("v_t *const block = &values[entries[i * NS + j] * NC * NC];", bsr_scatter)
+        self.assertIn("v_t *const block = &values[(ptrdiff_t)entries[i * NS + j] * NC * NC];", bsr_scatter)
         # Into the values' own type: a single-precision tangent is assembled in place.
         self.assertIn("block[bi * NC + bj] += v_t(element_matrix[row * (NC * NS) + col]);", bsr_scatter)
         self.assertLess(
             bsr_scatter.index("entries[i * NS + j] = row_begin + ks[j];"),
-            bsr_scatter.index("v_t *const block = &values[entries[i * NS + j] * NC * NC];"),
+            bsr_scatter.index("v_t *const block = &values[(ptrdiff_t)entries[i * NS + j] * NC * NC];"),
         )
         self.assertNotIn("std::vector", bsr_scatter)
         # The requested matrix format is settled at compile time: the kernel
@@ -179,7 +179,7 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
         )
         self.assertNotIn("unsupported_matrix_format", source)
         self.assertNotIn("reduction(|:", source)
-        self.assertIn("values[entries[i * NS + j] * NC * NC]", source)
+        self.assertIn("values[(ptrdiff_t)entries[i * NS + j] * NC * NC]", source)
         for matrix_format in ("crs", "dia", "coo", "patch"):
             self.assertNotIn(
                 "neohookean_ogden_proteus_hex8_hessian_i_msoa_scatter_%s"

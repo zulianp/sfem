@@ -14,7 +14,8 @@ namespace sfem {
     /// A rigid rotation of the nodes of a sideset about the line through `center` along one
     /// coordinate axis, by `angle * profile(t)` radians. The rotation acts in the plane of the
     /// two other axes, in increasing order (y-z about x, x-z about y, x-y about z), carrying the
-    /// first into the second. Host only: the prescribed values move with time.
+    /// first into the second. The prescribed values move with time; on the device a copy of
+    /// `conditions()` is refreshed after each `set_time` (`refresh_device`).
     class Rotation final : public Constraint {
     public:
         static std::shared_ptr<Rotation> create(const std::shared_ptr<FunctionSpace>        &space,
@@ -33,6 +34,9 @@ namespace sfem {
         int set_angle(const real_t angle);
         /// The angle prescribed last.
         real_t angle() const;
+
+        /// The Dirichlet conditions the rotation prescribes through (the values `set_angle` writes).
+        std::shared_ptr<DirichletConditions> conditions() const;
 
         /// The moment about the axis exerted by `force` on the rotated nodes, with the lever
         /// arms in the configuration displaced by `x`: sum_n (p_a0 f_a1 - p_a1 f_a0). With the
