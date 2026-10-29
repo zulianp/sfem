@@ -8,6 +8,12 @@
 #include "sfem_reduction_scratch_cuda.hpp"
 
 
+// Threads per block row of the device BSR product (d_bsr_spmv_grouped), from the GPU kernel-shape
+// measurements of the qp spike (spikes/inexact_apply_compare/qp/RESULTS_QP.md).
+#ifndef D_BSR_SPMV_GROUP
+#define D_BSR_SPMV_GROUP 16
+#endif
+
 namespace sfem {
     namespace {
         template <typename R, typename C, typename TStorage, typename T>
@@ -107,7 +113,119 @@ namespace sfem {
                 y[i] = (scale_output == T(0) ? T(0) : scale_output * y[i]) + acc;
             }
         }
+
+        // G threads per block row: each reads whole blocks, consecutive threads consecutive blocks (so a
+        // warp's loads of the values are contiguous), and the G partial sums are added by shuffles in a
+        // fixed order.  Accumulation in T, as the kernel above.
+        template <int BS, int G, typename R, typename C, typename TStorage, typename T>
+        __global__ void bsr_spmv_group_kernel(const ptrdiff_t                     block_rows,
+                                              const R* const SFEM_RESTRICT        rows_begin,
+                                              const R* const SFEM_RESTRICT        rows_end,
+                                              const C* const SFEM_RESTRICT        colidx,
+                                              const TStorage* const SFEM_RESTRICT values,
+                                              const T                             scale_output,
+                                              const T* const SFEM_RESTRICT        x,
+                                              T* const SFEM_RESTRICT              y) {
+            const ptrdiff_t t      = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x;
+            const ptrdiff_t row    = t / G;
+            const int       lane   = (int)(t % G);
+            const bool      active = row < block_rows;
+            T               acc[BS];
+#pragma unroll
+            for (int r = 0; r < BS; ++r) acc[r] = 0;
+            if (active) {
+                for (R k = rows_begin[row] + lane; k < rows_end[row]; k += G) {
+                    const TStorage* const B  = &values[(ptrdiff_t)k * BS * BS];
+                    const T* const        xj = &x[(ptrdiff_t)colidx[k] * BS];
+                    T                     xv[BS];
+#pragma unroll
+                    for (int c = 0; c < BS; ++c) xv[c] = xj[c];
+#pragma unroll
+                    for (int r = 0; r < BS; ++r)
+#pragma unroll
+                        for (int c = 0; c < BS; ++c) acc[r] += (T)B[r * BS + c] * xv[c];
+                }
+            }
+            if constexpr (G > 1) {
+#pragma unroll
+                for (int r = 0; r < BS; ++r)
+#pragma unroll
+                    for (int o = G / 2; o > 0; o /= 2) acc[r] += __shfl_down_sync(0xffffffffu, acc[r], o, G);
+            }
+            if (active && lane == 0) {
+#pragma unroll
+                for (int r = 0; r < BS; ++r) {
+                    T* const yr = &y[row * BS + r];
+                    *yr         = (scale_output == T(0) ? T(0) : scale_output * *yr) + acc[r];
+                }
+            }
+        }
+
+        template <int BS, int G, typename R, typename C, typename TStorage, typename T>
+        void launch_group(const ptrdiff_t                     block_rows,
+                          const R* const SFEM_RESTRICT        rows_begin,
+                          const R* const SFEM_RESTRICT        rows_end,
+                          const C* const SFEM_RESTRICT        colidx,
+                          const TStorage* const SFEM_RESTRICT values,
+                          const T                             scale_output,
+                          const T* const SFEM_RESTRICT        x,
+                          T* const SFEM_RESTRICT              y,
+                          void* const                         stream) {
+            const int       kernel_block_size = 128;
+            const ptrdiff_t n_blocks          = (block_rows * G + kernel_block_size - 1) / kernel_block_size;
+            bsr_spmv_group_kernel<BS, G, R, C, TStorage, T><<<n_blocks, kernel_block_size, 0, (cudaStream_t)stream>>>(
+                    block_rows, rows_begin, rows_end, colidx, values, scale_output, x, y);
+        }
+
+        template <int BS, typename R, typename C, typename TStorage, typename T>
+        int launch_group_size(const int                           group,
+                              const ptrdiff_t                     block_rows,
+                              const R* const SFEM_RESTRICT        rows_begin,
+                              const R* const SFEM_RESTRICT        rows_end,
+                              const C* const SFEM_RESTRICT        colidx,
+                              const TStorage* const SFEM_RESTRICT values,
+                              const T                             scale_output,
+                              const T* const SFEM_RESTRICT        x,
+                              T* const SFEM_RESTRICT              y,
+                              void* const                         stream) {
+            switch (group) {
+                case 1: launch_group<BS, 1>(block_rows, rows_begin, rows_end, colidx, values, scale_output, x, y, stream); break;
+                case 2: launch_group<BS, 2>(block_rows, rows_begin, rows_end, colidx, values, scale_output, x, y, stream); break;
+                case 4: launch_group<BS, 4>(block_rows, rows_begin, rows_end, colidx, values, scale_output, x, y, stream); break;
+                case 8: launch_group<BS, 8>(block_rows, rows_begin, rows_end, colidx, values, scale_output, x, y, stream); break;
+                case 16: launch_group<BS, 16>(block_rows, rows_begin, rows_end, colidx, values, scale_output, x, y, stream); break;
+                case 32: launch_group<BS, 32>(block_rows, rows_begin, rows_end, colidx, values, scale_output, x, y, stream); break;
+                default: return SFEM_FAILURE;
+            }
+            return SFEM_SUCCESS;
+        }
     }  // namespace
+
+    template <typename R, typename C, typename TStorage, typename T>
+    int d_bsr_spmv_grouped(const ptrdiff_t                     block_rows,
+                           const int                           block_size,
+                           const R* const SFEM_RESTRICT        rows_begin,
+                           const R* const SFEM_RESTRICT        rows_end,
+                           const C* const SFEM_RESTRICT        colidx,
+                           const TStorage* const SFEM_RESTRICT values,
+                           const T                             scale_output,
+                           const T* const SFEM_RESTRICT        x,
+                           T* const SFEM_RESTRICT              y,
+                           const int                           group,
+                           void* const                         stream) {
+        if (block_rows <= 0) return SFEM_SUCCESS;
+        const int g = group > 0 ? group : D_BSR_SPMV_GROUP;
+        int       status;
+        switch (block_size) {
+            case 1: status = launch_group_size<1>(g, block_rows, rows_begin, rows_end, colidx, values, scale_output, x, y, stream); break;
+            case 2: status = launch_group_size<2>(g, block_rows, rows_begin, rows_end, colidx, values, scale_output, x, y, stream); break;
+            case 3: status = launch_group_size<3>(g, block_rows, rows_begin, rows_end, colidx, values, scale_output, x, y, stream); break;
+            case 4: status = launch_group_size<4>(g, block_rows, rows_begin, rows_end, colidx, values, scale_output, x, y, stream); break;
+            default: return SFEM_FAILURE;
+        }
+        SFEM_DEBUG_SYNCHRONIZE(stream);
+        return status;
+    }
 
     template <typename R, typename C, typename TStorage, typename T>
     int d_bsr_spmv_ranges(const ptrdiff_t                     block_rows,
@@ -122,6 +240,9 @@ namespace sfem {
                           void* const                         stream) {
         const ptrdiff_t rows = block_rows * block_size;
         if (rows <= 0) return SFEM_SUCCESS;
+        // Small blocks: whole blocks per thread, a group of threads per block row (d_bsr_spmv_grouped).
+        if (block_size >= 1 && block_size <= 4)
+            return d_bsr_spmv_grouped(block_rows, block_size, rows_begin, rows_end, colidx, values, scale_output, x, y, 0, stream);
         const int       kernel_block_size = 128;
         const ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (rows + kernel_block_size - 1) / kernel_block_size);
         bsr_spmv_kernel<R, C, TStorage, T><<<n_blocks, kernel_block_size, 0, (cudaStream_t)stream>>>(
@@ -241,6 +362,17 @@ namespace sfem {
     // The tangent's values in real_t or, assembled in single precision, in float; the vectors in
     // real_t.
 #define SFEM_D_BSR_INSTANTIATE(TStorage)                                                                          \
+    template int    d_bsr_spmv_grouped<count_t, idx_t, TStorage, real_t>(const ptrdiff_t,                         \
+                                                                      const int,                               \
+                                                                      const count_t* const  SFEM_RESTRICT,     \
+                                                                      const count_t* const  SFEM_RESTRICT,     \
+                                                                      const idx_t* const    SFEM_RESTRICT,     \
+                                                                      const TStorage* const SFEM_RESTRICT,     \
+                                                                      const real_t,                            \
+                                                                      const real_t* const SFEM_RESTRICT,       \
+                                                                      real_t* const       SFEM_RESTRICT,       \
+                                                                      const int,                               \
+                                                                      void* const);                            \
     template int    d_bsr_spmv_ranges<count_t, idx_t, TStorage, real_t>(const ptrdiff_t,                          \
                                                                      const int,                                \
                                                                      const count_t* const  SFEM_RESTRICT,      \

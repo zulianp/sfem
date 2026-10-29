@@ -39,8 +39,9 @@ namespace sfem {
                                T* const SFEM_RESTRICT              out,
                                void* const                         stream);
 
-    /// y = scale_output y + A x on the device, A in BSR with square blocks: one thread per scalar
-    /// row, no library. scale_output 0 overwrites y. On `stream` (a cudaStream_t; null: the
+    /// y = scale_output y + A x on the device, A in BSR with square blocks, no library: a group of
+    /// threads per block row for blocks up to 4x4 (d_bsr_spmv_grouped), one thread per scalar row
+    /// otherwise. scale_output 0 overwrites y. On `stream` (a cudaStream_t; null: the
     /// default device stream).
     template <typename R, typename C, typename TStorage, typename T>
     int d_bsr_spmv_native(const ptrdiff_t                     block_rows,
@@ -52,6 +53,23 @@ namespace sfem {
                           const T* const SFEM_RESTRICT        x,
                           T* const SFEM_RESTRICT              y,
                           void* const                         stream);
+
+    /// d_bsr_spmv_ranges with `group` threads per block row (1, 2, 4, 8, 16 or 32; 0: the library's
+    /// default), each reading whole blocks, consecutive threads consecutive blocks, their partial sums
+    /// added in a fixed order.  Blocks of size 1 to 4; SFEM_FAILURE otherwise.  What
+    /// d_bsr_spmv_ranges and d_bsr_spmv_native run for those block sizes.
+    template <typename R, typename C, typename TStorage, typename T>
+    int d_bsr_spmv_grouped(const ptrdiff_t                     block_rows,
+                           const int                           block_size,
+                           const R* const SFEM_RESTRICT        rows_begin,
+                           const R* const SFEM_RESTRICT        rows_end,
+                           const C* const SFEM_RESTRICT        colidx,
+                           const TStorage* const SFEM_RESTRICT values,
+                           const T                             scale_output,
+                           const T* const SFEM_RESTRICT        x,
+                           T* const SFEM_RESTRICT              y,
+                           const int                           group,
+                           void* const                         stream);
 
     /// d_bsr_spmv_native with block row i the entries [rows_begin[i], rows_end[i]) (see
     /// bsr_spmv_ranges): the whole matrix with (rowptr, rowptr + 1), or a part of each row.
