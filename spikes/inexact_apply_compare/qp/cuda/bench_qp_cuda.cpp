@@ -289,6 +289,152 @@ static void store_row(const std::string &name, const char *variant, const qpd::G
     fflush(stdout);
 }
 
+// cuSPARSE's generic product (cusparseSpMV) on the BSR values, as a second reference: the matrix as
+// BSR (cusparseCreateBsr), and expanded to scalar CSR (nine values and nine column indices per
+// block) with the default algorithm and with CSR_ALG2.  Vectors and computation in V, as bsrmv's.  A
+// format or algorithm cuSPARSE refuses is reported, not timed.
+template <typename V>
+static void generic_rows(const Problem &P, const DeviceProblem &D, const V *values, const double setup_s,
+                         const int repeats) {
+    const BsrGraph &g = D.graph;
+    const char *prec = sizeof(V) == 8 ? "f64" : "f32";
+    const std::string bname = std::string("cusparse SpMV BSR ") + prec;
+    const std::string cname1 = std::string("cusparse SpMV CSR ") + prec;
+    const std::string cname2 = std::string("cusparse SpMV CSR alg2 ") + prec;
+    if (!selected(bname.c_str()) && !selected(cname1.c_str()) && !selected(cname2.c_str())) return;
+    const cudaDataType vt = sizeof(V) == 8 ? CUDA_R_64F : CUDA_R_32F;
+    const size_t nv = (size_t)g.n_rows * 3, nnzb = (size_t)g.nnz();
+    V *hv = nullptr, *ov = nullptr;
+    CHECK_CUDA(cudaMalloc(&hv, nv * sizeof(V)));
+    CHECK_CUDA(cudaMalloc(&ov, nv * sizeof(V)));
+    {
+        std::vector<double> hh(nv);
+        CHECK_CUDA(cudaMemcpy(hh.data(), D.h, nv * sizeof(double), cudaMemcpyDeviceToHost));
+        std::vector<V> hc(hh.begin(), hh.end());
+        CHECK_CUDA(cudaMemcpy(hv, hc.data(), nv * sizeof(V), cudaMemcpyHostToDevice));
+    }
+    cusparseHandle_t handle;
+    cusparseCreate(&handle);
+    cusparseDnVecDescr_t vx, vy;
+    cusparseCreateDnVec(&vx, (int64_t)nv, hv, vt);
+    cusparseCreateDnVec(&vy, (int64_t)nv, ov, vt);
+    const V one = 1, zero = 0;
+    auto run = [&](const std::string &name, cusparseSpMatDescr_t A, const cusparseSpMVAlg_t alg, const double bytes) {
+        if (!selected(name.c_str())) return;
+        size_t size = 0;
+        cusparseStatus_t st = cusparseSpMV_bufferSize(handle, CUSPARSE_OPERATION_NON_TRANSPOSE, &one, A, vx, &zero, vy,
+                                                      vt, alg, &size);
+        void *buffer = nullptr;
+        if (st == CUSPARSE_STATUS_SUCCESS) {
+            CHECK_CUDA(cudaMalloc(&buffer, std::max<size_t>(1, size)));
+            st = cusparseSpMV_preprocess(handle, CUSPARSE_OPERATION_NON_TRANSPOSE, &one, A, vx, &zero, vy, vt, alg,
+                                         buffer);
+        }
+        if (st == CUSPARSE_STATUS_SUCCESS)
+            st = cusparseSpMV(handle, CUSPARSE_OPERATION_NON_TRANSPOSE, &one, A, vx, &zero, vy, vt, alg, buffer);
+        if (st != CUSPARSE_STATUS_SUCCESS) {
+            printf("  %-34s not supported: %s\n", name.c_str(), cusparseGetErrorString(st));
+            cudaFree(buffer);
+            return;
+        }
+        CHECK_CUDA(cudaDeviceSynchronize());
+        {
+            std::vector<V> oc(nv);
+            CHECK_CUDA(cudaMemcpy(oc.data(), ov, nv * sizeof(V), cudaMemcpyDeviceToHost));
+            std::vector<double> od(oc.begin(), oc.end());
+            CHECK_CUDA(cudaMemcpy(D.out, od.data(), nv * sizeof(double), cudaMemcpyHostToDevice));
+        }
+        Row row;
+        row.name = name;
+        row.setup_s = setup_s;
+        device_errors(P, D.out, row);
+        row.apply_s = best_of_three([&] {
+                          for (int r = 0; r < repeats; ++r)
+                              must(cusparseSpMV(handle, CUSPARSE_OPERATION_NON_TRANSPOSE, &one, A, vx, &zero, vy, vt,
+                                                alg, buffer) != CUSPARSE_STATUS_SUCCESS,
+                                   name);
+                          CHECK_CUDA(cudaDeviceSynchronize());
+                      }) /
+                      repeats;
+        row.bytes = bytes;
+        print_row(P, row);
+        cudaFree(buffer);
+    };
+    const double graph_bytes = g.colidx.size() * sizeof(idx_t) + g.rowptr.size() * sizeof(count_t);
+    if (selected(bname.c_str())) {
+        cusparseSpMatDescr_t A;
+        const cusparseIndexType_t it = sizeof(count_t) == 8 ? CUSPARSE_INDEX_64I : CUSPARSE_INDEX_32I;
+        const cusparseIndexType_t jt = sizeof(idx_t) == 8 ? CUSPARSE_INDEX_64I : CUSPARSE_INDEX_32I;
+        cusparseStatus_t st = cusparseCreateBsr(&A, g.n_rows, g.n_rows, (int64_t)nnzb, 3, 3, D.rowptr, D.colidx,
+                                                (void *)values, it, jt, CUSPARSE_INDEX_BASE_ZERO, vt,
+                                                CUSPARSE_ORDER_ROW);
+        if (st != CUSPARSE_STATUS_SUCCESS)
+            printf("  %-34s not supported: %s\n", bname.c_str(), cusparseGetErrorString(st));
+        else {
+            run(bname, A, CUSPARSE_SPMV_ALG_DEFAULT, graph_bytes + (double)nnzb * 9 * sizeof(V));
+            cusparseDestroySpMat(A);
+        }
+    }
+    if (selected(cname1.c_str()) || selected(cname2.c_str())) {
+        // Scalar row 3 i + r: block row i's blocks in order, each contributing its row r.
+        const size_t nnz = nnzb * 9;
+        const bool wide = nnz > (size_t)INT32_MAX;
+        std::vector<V> bv(nnz), cv(nnz);
+        CHECK_CUDA(cudaMemcpy(bv.data(), values, nnz * sizeof(V), cudaMemcpyDeviceToHost));
+        std::vector<int64_t> rp(nv + 1);
+        std::vector<int64_t> ci(nnz);
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < g.n_rows; ++i) {
+            const int64_t b0 = g.rowptr[i], b1 = g.rowptr[i + 1];
+            for (int r = 0; r < 3; ++r) {
+                int64_t e = 9 * b0 + 3 * r * (b1 - b0);
+                rp[(size_t)i * 3 + r] = e;
+                for (int64_t k = b0; k < b1; ++k)
+                    for (int c = 0; c < 3; ++c, ++e) {
+                        ci[e] = 3 * (int64_t)g.colidx[k] + c;
+                        cv[e] = bv[(size_t)k * 9 + r * 3 + c];
+                    }
+            }
+        }
+        rp[nv] = (int64_t)nnz;
+        const size_t isz = wide ? 8 : 4;
+        void *drp = nullptr, *dci = nullptr;
+        V *dcv = nullptr;
+        CHECK_CUDA(cudaMalloc(&drp, (nv + 1) * isz));
+        CHECK_CUDA(cudaMalloc(&dci, nnz * isz));
+        CHECK_CUDA(cudaMalloc(&dcv, nnz * sizeof(V)));
+        if (wide) {
+            CHECK_CUDA(cudaMemcpy(drp, rp.data(), (nv + 1) * 8, cudaMemcpyHostToDevice));
+            CHECK_CUDA(cudaMemcpy(dci, ci.data(), nnz * 8, cudaMemcpyHostToDevice));
+        } else {
+            std::vector<int32_t> rp32(rp.begin(), rp.end()), ci32(ci.begin(), ci.end());
+            CHECK_CUDA(cudaMemcpy(drp, rp32.data(), (nv + 1) * 4, cudaMemcpyHostToDevice));
+            CHECK_CUDA(cudaMemcpy(dci, ci32.data(), nnz * 4, cudaMemcpyHostToDevice));
+        }
+        CHECK_CUDA(cudaMemcpy(dcv, cv.data(), nnz * sizeof(V), cudaMemcpyHostToDevice));
+        const cusparseIndexType_t xt = wide ? CUSPARSE_INDEX_64I : CUSPARSE_INDEX_32I;
+        // A descriptor per algorithm: cusparseSpMV_preprocess keeps its analysis in the descriptor.
+        const double bytes = (double)(nv + 1) * isz + (double)nnz * (isz + sizeof(V));
+        for (const auto &[name, alg] : {std::pair<std::string, cusparseSpMVAlg_t>{cname1, CUSPARSE_SPMV_CSR_ALG1},
+                                        std::pair<std::string, cusparseSpMVAlg_t>{cname2, CUSPARSE_SPMV_CSR_ALG2}}) {
+            cusparseSpMatDescr_t A;
+            must(cusparseCreateCsr(&A, (int64_t)nv, (int64_t)nv, (int64_t)nnz, drp, dci, dcv, xt, xt,
+                                   CUSPARSE_INDEX_BASE_ZERO, vt) != CUSPARSE_STATUS_SUCCESS,
+                 name);
+            run(name, A, alg, bytes);
+            cusparseDestroySpMat(A);
+        }
+        cudaFree(drp);
+        cudaFree(dci);
+        cudaFree(dcv);
+    }
+    cusparseDestroyDnVec(vx);
+    cusparseDestroyDnVec(vy);
+    cusparseDestroy(handle);
+    cudaFree(hv);
+    cudaFree(ov);
+}
+
 int main(int argc, char **argv) {
     static const int sizes[] = SIZES;
     const int n = argc > 1 ? std::atoi(argv[1]) : sizes[2];
@@ -389,6 +535,7 @@ int main(int argc, char **argv) {
             cusparseDestroyMatDescr(descr);
             cusparseDestroy(handle);
         }
+        generic_rows<V>(P, D, values, row.setup_s, repeats);
         cudaFree(values);
         fflush(stdout);
     };

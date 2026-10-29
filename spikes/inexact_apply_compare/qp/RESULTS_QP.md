@@ -366,6 +366,9 @@ G = 16 is the default (within 3% of the best G for f32 everywhere, within about 
 the previous kernel, about 3.1-3.6 TB/s, and within 10% of the same values in the SELL layout
 (ahead of it on TET10 and HEX27).  cuSPARSE's bsrmv is measured beside it (bench_qp_cuda).
 
+The comparison with cuSPARSE in detail (`bsrmv`, the generic SpMV on BSR and on scalar CSR, and
+Nsight Compute counters for why): `CUSPARSE_BSR.md`.
+
 ### The campaign on the tuned baseline (current)
 
 `measured_gpu/` (Alps jobs 5195091-5195130, 5195780-5195783; the first campaign, on the previous
