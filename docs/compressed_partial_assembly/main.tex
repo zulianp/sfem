@@ -1534,30 +1534,46 @@ BSR.
 mesh & elements & dof & blocks/row & BSR \texttt{fp32} & qBSR \texttt{int8} & EM \texttt{fp16} & QP \texttt{fp16}
  & BSR \texttt{fp32} & qBSR \texttt{int8} & EM \texttt{fp16} & QP \texttt{fp16} \\
 \midrule
+\multicolumn{12}{l}{\emph{TET4}} \\
 \rows{tables/appmesh.tex}
+\midrule
+\multicolumn{12}{l}{\emph{TET10, the meshes as given promoted}} \\
+\rows{tables/appmesh_tet10.tex}
 \bottomrule
 \end{tabular}
-\caption{The application benchmark on unstructured TET4 meshes of valves from two pump simulations,
-as given and refined once.  BSR in single precision in MDOF/s; the quantized matrix in \texttt{int8}
-(qBSR), the element matrix in half precision and difference form (EM) and the half-precision point
-store (QP) as multiples of its speed on the same machine.}
+\caption{The application benchmark on unstructured meshes of valves from two pump simulations: TET4
+as given and refined once, and TET10 promoted from the meshes as given.  BSR in single precision in
+MDOF/s; the quantized matrix in \texttt{int8} (qBSR), the element matrix in half precision and
+difference form (EM) and the half-precision point store (QP) as multiples of its speed on the same
+machine.}
 \label{tab:appmesh}
 \end{table*}
 
 \begin{figure*}[t]
 \centering
-\includegraphics[width=0.8\textwidth]{figures/appmesh.pdf}
-\Description{Two bar charts, Grace above and H100 below, of the speed of each format relative to
-single-precision BSR on eight unstructured valve meshes, as given and refined once.}
-\caption{Application throughput against BSR in single precision on the meshes of
-Table~\ref{tab:appmesh} (V: valve, P: pump valves; 1 coarse, 2 fine, + refined once), Grace above and
-the H100 below; the formats of Figure~\ref{fig:throughput} without the mean-and-deviation store,
-which TET4 does not have.}
+\includegraphics[width=0.74\textwidth]{figures/appmesh.pdf}
+\Description{Two grouped bar charts, Grace above and H100 below, of million degrees of freedom per
+second for each format on eight unstructured valve meshes, as given and refined once.}
+\caption{Application throughput on the meshes of Table~\ref{tab:appmesh} (V: valve, P: pump valves;
+1 coarse, 2 fine, + refined once), Grace with $72$ threads above and the H100 below; the formats of
+Figure~\ref{fig:throughput} without the mean-and-deviation store, which TET4 does not have.}
 \label{fig:appmesh}
 \end{figure*}
 
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.74\textwidth]{figures/appmesh_tet10.pdf}
+\Description{Two grouped bar charts, Grace above and H100 below, of million degrees of freedom per
+second for each format on four unstructured valve meshes promoted to TET10.}
+\caption{Application throughput on the TET10 meshes of Table~\ref{tab:appmesh}, promoted from the
+TET4 meshes as given (labels as in Figure~\ref{fig:appmesh}), Grace with $72$ threads above and the
+H100 below; the formats of Figure~\ref{fig:throughput}.}
+\label{fig:appmeshtet10}
+\end{figure*}
+
 The cubes of the previous subsections give every node the same neighbourhood.  The application
-benchmark therefore also runs on four unstructured TET4 meshes of valves from two pump simulations,
+benchmark therefore also runs on four unstructured meshes of valves from two pump simulations, in TET4
+and in TET10.  The TET4 meshes are
 scaled to unit extent and numbered along a Morton curve as the cubes are, as given
 ($\appDofGivenMin$--$\appDofGivenMax$~dof) and refined once
 ($\appDofRefinedMin$--$\appDofRefinedMax$~dof), with the state, increment and material of the
@@ -1586,6 +1602,24 @@ its speed (on the cube $\gpuQbsrEightVsThirtyTwoTetFour\times$), at
 $\appGpuQbsrEightVsGivenMin$--$\appGpuQbsrEightVsGivenMax\times$ on the meshes as given, which are too
 small to fill the device.  The element formats stay at
 $\appGpuEaPairEightVsGivenMin$--$\appGpuQpHalfVsGivenMax\times$ on every mesh, as on the cube.
+
+The TET10 meshes are the meshes as given promoted by smesh's \texttt{mesh\_promote}, with straight
+edges as on the TET10 cube: the nodes of the TET4 meshes refined once,
+$\appTenDofGivenMin$--$\appTenDofGivenMax$~dof, with $\appTenBlocksPumpCoarseGiven$--$\appTenBlocksValveFineGiven$
+blocks per row against $\blocksTetTen$ on the TET10 cube (Table~\ref{tab:appmesh},
+Figure~\ref{fig:appmeshtet10}).  On Grace they rank the formats as the TET10 cube does: BSR in single
+precision streams at $\appTenCpuBsrThirtyTwoGbsGivenMin$--$\appTenCpuBsrThirtyTwoGbsGivenMax$~GB/s, the
+\texttt{int8} quantized matrix applies at $\appTenCpuQbsrEightVsGivenMin$--$\appTenCpuQbsrEightVsGivenMax\times$
+its speed (on the cube $\QbsrEightVsThirtyTwoTetTen\times$), the half-precision element matrix at
+$\appTenCpuEaDiffHalfVsGivenMin$--$\appTenCpuEaDiffHalfVsGivenMax\times$ ($\EaDiffHalfVsThirtyTwoTetTen\times$)
+and the half-precision point store at $\appTenCpuQpHalfVsGivenMin$--$\appTenCpuQpHalfVsGivenMax\times$
+($\QpHalfVsThirtyTwoTetTen\times$).  On the H100 BSR streams at
+$\appTenGpuBsrThirtyTwoGbsGivenMin$--$\appTenGpuBsrThirtyTwoGbsGivenMax$~GB/s (on the cube
+$\gpuBsrThirtyTwoGbsTetTen$), and the element formats are ahead of it on every mesh, unlike on the
+TET4 meshes, at $\appTenGpuQpHalfVsGivenMin$--$\appTenGpuEaDiffHalfVsGivenMax\times$ its speed,
+the \texttt{int8} quantized matrix at $\appTenGpuQbsrEightVsGivenMin$--$\appTenGpuQbsrEightVsGivenMax\times$
+(on the cube $\gpuQbsrEightVsThirtyTwoTetTen\times$).  The quantized matrix leads on the two larger
+meshes; on the two smaller ones the half-precision element matrix applies fastest.
 
 %% ===================================================================================================
 \section{Discussion and limitations}
@@ -1641,7 +1675,7 @@ tangent costs iterations, one whose error is set by the variation of the tangent
 or which keeps the rigid translations exact, does not.
 
 \paragraph{Limitations.}  The study uses one material, structured meshes for the Newton runs (the
-application benchmark also on unstructured TET4 meshes, Section~\ref{sec:appmesh}), and a Krylov method
+application benchmark also on unstructured TET4 and TET10 meshes, Section~\ref{sec:appmesh}), and a Krylov method
 without preconditioner, chosen so that every operator runs the same iteration; with a
 preconditioner built from the operator, the encodings change the preconditioner too.  Materials
 defined by a residual carry $81$ numbers per point.  The packed traversal is sensitive to the number
