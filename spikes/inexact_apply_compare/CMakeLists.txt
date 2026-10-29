@@ -522,3 +522,18 @@ set(SPIKE_LANE_VS "" CACHE STRING "LANE_VS for bench_qp; empty keeps the source 
 if(TARGET bench_qp AND SPIKE_LANE_VS)
   target_compile_definitions(bench_qp PRIVATE LANE_VS=${SPIKE_LANE_VS})
 endif()
+
+# ------------------------------------------------------- the qp formats on the GPU (qp/cuda)
+#
+# Off by default, so the CPU build is untouched.  Needs a CUDA-enabled libsfem as SPIKE_SFEM_BUILD.
+option(SPIKE_ENABLE_CUDA "Build the GPU drivers of the qp spike (qp/cuda)" OFF)
+if(SPIKE_ENABLE_CUDA AND TARGET bench_qp)
+    if(NOT SPIKE_SFEM_LIBRARY)
+        message(FATAL_ERROR "SPIKE_ENABLE_CUDA needs libsfem under ${SPIKE_SFEM_BUILD}")
+    endif()
+    if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+        set(CMAKE_CUDA_ARCHITECTURES 90)
+    endif()
+    enable_language(CUDA)
+    add_subdirectory(qp/cuda)
+endif()

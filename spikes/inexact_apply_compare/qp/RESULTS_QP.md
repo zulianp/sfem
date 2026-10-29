@@ -179,7 +179,7 @@ benchmarks and in Newton (`SMESH_ELEMENTS_PER_PACK` = max(16, min(8192, elements
 down to 16). The earlier logs, including those the tables above quote, are in `measured/pre_opt/`.
 The paper's tables, macros and figures are generated from `measured/`:
 
-    python results_tables.py measured/ ../../../docs/compressed_partial_assembly/tables
+    python results_tables.py measured/ ../../../docs/compressed_partial_assembly/tables measured_qsym measured_qbsr
     python paper_figures.py measured/ ../../../docs/compressed_partial_assembly/figures
 
 Newton at 10M dof is split over several logs per element (one per group of operators); the
@@ -276,3 +276,136 @@ Fastest time to solution per element and case (Newton iterations, speed-up over 
   BSR peak follows BSR f32 (+10%): the full-pattern f32 assembly and the construction of the node
   graph set it, not the store.  On TET4 every operator adds about 3 GB during the run (not yet
   attributed).
+
+## GPU: one H100 of a GH200 node (Alps)
+
+`measured_gpu/`.  Device code in `cuda/`, built in `build-spike-cuda-<element>` against the CUDA
+libsfem (`build-cuda`), on the kernels the CPU trees generated.
+
+### Device Newton with the library's operators (gate G0)
+
+Time-dependent Dirichlet conditions and rotations now run on the device (the host conditions'
+`set_time`, then `refresh_device`), and the device Dirichlet constraint has `value`, `value_steps`
+and typed BSR identity rows (it had none, so a device Newton with an energy line search aborted).
+`g0_small_5190028.out`: HEX8 and PROTEUS_HEX27 at 512 elements, stretch and 90 degree twist, BSR
+f64 and f32: Newton counts identical to the host in every step, CG within 3 (the host's own
+run-to-run spread), final displacements within 3e-11 relative.  `g0_bsr_1M_5190179.out`: device
+BSR f64 and f32 on the CPU campaign's 1M-dof stretch cases reproduce the CPU logs' per-step
+Newton and CG counts exactly (HEX27's step halvings included), except TET10 f32's last three steps
+(CG within 17).  The library's device BSR is its own kernel, one thread per scalar row (cuSPARSE is
+not built: `SFEM_ENABLE_CUSPARSE` has no CMake option); cuSPARSE `bsrmv` f64 is slower than it.
+
+### Quantised BSR layout (kernel-shape test, `qshape_*`)
+
+`cuda/qbsr_shape`: the node graph of each element at 10.3M dof, random symmetric blocks quantised
+once, every layout SELL-32 (one warp per group of rows), sigma = 1024 rows; the upper columns are
+int16-offset packed records.  MDOF/s (B/dof):
+
+| element | library BSR f32 | f32 full i32 (scalar) | i8 full off16 packed | i8 full i32 packed | i8 upper atomic | i8 upper gather | f16 full off16 packed | f16 full i32 packed |
+|---|---|---|---|---|---|---|---|---|
+| HEX8  | 5457 (357) | 9232 (344) | 18623 (140) | 17362 (173) | 6379 (72)  | 9750 (152)  | 14534 (175) | 14719 (207) |
+| TET4  | 10021 (199) | 16668 (186) | 32648 (76) | 30031 (94)  | 11797 (39) | 28588 (60)  | 27306 (95)  | 26093 (112) |
+| TET10 | 4222 (380) | 7237 (377) | 12477 (153) | 12642 (189) | 5740 (79)  | 7269 (139)  | 10374 (191) | 10653 (227) |
+| HEX27 | 2004 (842) | 3405 (838) | 5714 (342)  | 6069 (420)  | 2593 (177) | 2633 (336)  | 4804 (428)  | 5071 (503)  |
+
+- The GPU reverses the CPU's choice: the full difference form (each pair stored twice, no scatter)
+  is 2-3x faster than the upper form with `atomicAdd` and 1.3-2.2x faster than the upper form that
+  gathers the lower blocks from their partner's record.  Every layout is deterministic except the
+  atomic one (bitwise repeats held here, but the order of the atomics is not fixed).
+- Packed records (int8: codes, the int16 offset and the scale in 16 bytes, one 128-bit load; f16:
+  20 bytes) beat one load per entry by 1.2-1.3x.
+- int16 offsets plus a remainder (3-6% of the blocks) against int32 columns: 7-9% faster on HEX8 and
+  TET4, within 3% on TET10 (smaller, so chosen), 6% slower on HEX27 (rows of 125 blocks, 6%
+  remainder).  Decision: full difference form, packed records, sigma = 1024 rows, int16 offsets
+  on TET4, TET10 and HEX8, int32 columns on HEX27.
+- The library's BSR f32 kernel moves 2.0 TB/s; the same values in the SELL layout move 3.4 TB/s
+  (1.7x), the int8 records another 2x on top.  The BSR f32 Newton baseline on the GPU is the
+  library's kernel (what a device Newton runs); the SELL f32 row says how much of a quantised
+  format's gain is layout rather than bytes.
+
+### Element stores on the GPU (`bench_qp_cuda`, `eshape_*`)
+
+`cuda/qp_device.cu`: the stores' host layouts with blocks of 32 elements (one warp).  TET4, TET10 and
+HEX8 run one thread per element on the generated stages with one lane; PROTEUS_HEX27 runs one thread
+per point (point stores, codes [element][component][point]) or one block of 128 threads per element
+(element matrices).  The set-up runs on the device, in double, and gives the host's codes bit for
+bit (TET10 element matrices: 1 code in 10^9 differs by one step).  The application's shape was
+measured at 10.3M dof: atomicAdd per element node against a block-local scatter (the block of 128
+elements gathers its distinct nodes into shared memory, accumulates there, and adds each node once),
+and 1, 2 or 4 resident blocks per SM (the register cap).  MDOF/s:
+
+| element | qp f16 | qp i8 mean+dev | ea f16 | ea i8 pair |
+|---|---|---|---|---|
+| HEX8, atomic / best | 8348 / 8897 (block, 4) | 8166 (atomic, 1) | 9738 / 11281 (block, 4) | 9709 (atomic, 1) |
+| TET4, atomic / best | 3370 / 5101 (block, 1) | - | 3305 / 4942 (block, 1) | 3269 / 4074 (block, 1) |
+| TET10, atomic / best | 8344 / 8807 (block, 4) | 8213 (atomic, 1) | 8701 (atomic, 1) | 8374 (atomic, 1) |
+
+The block-local scatter pays where many elements share a node (TET4: six elements per node, 12
+atomics per element); elsewhere it trades the global atomics for shared-memory atomics and a
+gather through shared memory, and wins only with the register cap.  The stores take these shapes
+(`create_for` in `qp_device.cu`).  The element stores reach 1.2-1.9 TB/s against the quantised
+BSR's 2.9-3.0: latency and atomics, not bytes, limit them on the GPU.
+
+### The library's device BSR product (`bsrgroup_*`)
+
+The BSR f32 baseline on the GPU is the library's product, tuned for it: `sfem::d_bsr_spmv_grouped`
+(`src/algebra/bsr/cuda/sfem_BSR_cuda.cu`), a group of G threads per block row, each reading whole
+3x3 blocks (consecutive threads consecutive blocks, so a warp's loads of the values are
+contiguous) and the partial sums added by shuffles in a fixed order; `d_bsr_spmv_native` and
+`d_bsr_spmv_ranges` run it for blocks up to 4x4, so the device BSR tangent uses it.  The previous
+kernel ran one thread per scalar row.  MDOF/s at 10.3M dof, f32 values (f64 in parentheses):
+
+| element | previous kernel | G = 4 | G = 8 | G = 16 | G = 32 | SELL f32 (qshape) |
+|---|---|---|---|---|---|---|
+| HEX8  | 5457 (3278) | 7750 (3836) | 7688 (4383) | 8344 (5170) | 7701 (5175) | 9232 |
+| TET4  | 10021 (6051) | 12461 (6342) | 15003 (8776) | 14619 (9090) | 9625 (8054) | 16668 |
+| TET10 | 4222 (2862) | 7133 (4196) | 7567 (4484) | 7738 (4837) | 6997 (4899) | 7237 |
+| HEX27 | 2004 (1316) | 3096 (1675) | 3386 (1816) | 4022 (2139) | 3725 (2256) | 3405 |
+
+G = 16 is the default (within 3% of the best G for f32 everywhere, within about 5% for f64): 1.5-2.0x
+the previous kernel, about 3.1-3.6 TB/s, and within 10% of the same values in the SELL layout
+(ahead of it on TET10 and HEX27).  cuSPARSE's bsrmv is measured beside it (bench_qp_cuda).
+
+### The campaign on the tuned baseline (current)
+
+`measured_gpu/` (Alps jobs 5195091-5195130, 5195780-5195783; the first campaign, on the previous
+BSR kernel, is in `measured_gpu/v1/`): the bench, the application sweep, Newton stretch at 1M and
+10M dof, the twist and the Newton sweep, every format, against the G = 16 library BSR, with
+cuSPARSE `bsrmv` f64 and f32 rows beside it in the bench.  The paper's tables, macros and figures:
+
+    python results_tables.py --machine gpu measured_gpu/ ../../../docs/compressed_partial_assembly/tables
+    python paper_figures.py --machine gpu measured_gpu/ ../../../docs/compressed_partial_assembly/figures
+
+- The library BSR runs at 3.0-3.5 TB/s and 1.9-3.8x the speed of cuSPARSE at the same precision.
+  cuSPARSE's f32 product takes f32 vectors only.
+- Newton counts against Grace: identical per step in every format on the 1M stretch (TET4's int8
+  element matrix one Newton step fewer in its last load step), and on HEX27 at 10M.  Runs with
+  rejected load steps (twist, TET4 and TET10 at 10M) take other paths, BSR f64 included: the
+  device's summation order differs.  Every run ends with status 0.
+- Time to solution at 10M against BSR f32 (`summary_gpu.tex`): quantized BSR fastest on TET4 (f16)
+  and HEX8 (i8), the point stores on TET10 (f16) and HEX27 (i8 mean+dev).  The quantized matrix's
+  set-up (f32 assembly and encoding) is 18-22% of its run on HEX8, TET10 and HEX27, against 7-9% on
+  Grace; the point stores' about 1%.
+- Inside Newton the products run at 0.88-0.92 of the bench rate on HEX8 (same mesh).  On TET4 the
+  Newton mesh (`meshes/tet4_120`, twelve tetrahedra per cell around a centre node) is not the
+  bench's six-tetrahedra box.  `meshbench_tet4_120_5196246.out` is the bench on that mesh
+  (`QP_MESH=<folder>`, morton3 as the Newton case): every operator is slower there (int8 quantized
+  BSR 0.78 of its box rate, BSR f32 0.84, the element formats 0.80-0.81), the quantized matrix still
+  1.60x BSR f32 (1.72 on the box).  The mesh, not the Newton run, makes the gap.
+- The HEX27 application sweep first stopped at n = 75: n = 100 segfaulted in the host BSR assembly.
+  The generated BSR scatter formed the value offset `entries[...] * NC * NC` in `count_t` (int32),
+  which overflows past 2^31 / 9 = 2.39e8 blocks (n = 75: 2.28e8; n = 100: 5.1e8).  Fixed in the
+  generator (`energy_codegen.py`, `residual_codegen.py`: `(ptrdiff_t)entries[...]`); all operators
+  regenerated, the diff is exactly that line in 114 files; the spike's own kernel copies were
+  regenerated beside the old ones (`build-spike-<E>/gen2` on Alps, one line differing per element)
+  and the CUDA trees point at them.  HEX8 n = 200 (2.2e8 blocks) and TET10 n = 100 (2.3e8) were just
+  under the limit.  The CPU trees' `gen/` still has the 32-bit offset; no CPU size reaches it.
+  cuSPARSE's legacy `bsrmv` indexes values with 32 bits as well: the bench skips it beyond 2^31
+  values and says so.  Sweep log: `bsweepauto_hex27_5196335.out` (the failed one is in
+  `measured_gpu/superseded/`).
+- The bench checks the status of every timed call (set-up, assembly, product, cuSPARSE) and stops on
+  a failure instead of timing it.
+- nid005669 gives illegal memory accesses in any job (three runs lost in this campaign, one in
+  the first); `gpu_campaign.sh` excludes it.  Its runs are listed in `gpu_ids_failed.txt` on Alps
+  and not fetched.
+
