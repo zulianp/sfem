@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <string>
 
 // Mesh ordering.  The default is `morton3` because that is what SFEM runs:
 // `smesh::SFC::create_from_env()` defaults to it and `drivers/bench/*` reorder
@@ -238,6 +239,33 @@ static Mesh build_unordered(int n) {
 // is still affine and the adjugate is still the tetrahedron's -- what makes
 // TET10 a genuine test of the projection is that its reference gradients vary
 // over the element, not that its geometry is curved.
+// The vertices' adjugate and determinant of every tetrahedron, positively oriented: a negative
+// one swaps its second and third vertices.
+static void tet_geometry(Mesh &m, const std::vector<std::vector<geom_t>> &pts) {
+    m.adj.assign(9, std::vector<geom_t>(m.nelements, 0));
+    m.det.assign(m.nelements, 0);
+    for (ptrdiff_t e = 0; e < m.nelements; ++e) {
+        idx_t v[4];
+        for (int c = 0; c < 4; ++c) v[c] = m.ev[c][e];
+        double J[9];
+        for (int c = 0; c < 3; ++c) for (int d = 0; d < 3; ++d)
+            J[d*3+c] = (double)pts[d][v[c+1]] - (double)pts[d][v[0]];
+        double D = J[0]*(J[4]*J[8]-J[5]*J[7]) - J[1]*(J[3]*J[8]-J[5]*J[6]) + J[2]*(J[3]*J[7]-J[4]*J[6]);
+        if (D < 0) { std::swap(v[1], v[2]);
+            for (int c = 0; c < 3; ++c) for (int d = 0; d < 3; ++d)
+                J[d*3+c] = (double)pts[d][v[c+1]] - (double)pts[d][v[0]];
+            D = -D; }
+        for (int c = 0; c < 4; ++c) m.ev[c][e] = v[c];
+        m.adj[0][e]=(geom_t)(J[4]*J[8]-J[5]*J[7]); m.adj[1][e]=(geom_t)(J[2]*J[7]-J[1]*J[8]); m.adj[2][e]=(geom_t)(J[1]*J[5]-J[2]*J[4]);
+        m.adj[3][e]=(geom_t)(J[5]*J[6]-J[3]*J[8]); m.adj[4][e]=(geom_t)(J[0]*J[8]-J[2]*J[6]); m.adj[5][e]=(geom_t)(J[2]*J[3]-J[0]*J[5]);
+        m.adj[6][e]=(geom_t)(J[3]*J[7]-J[4]*J[6]); m.adj[7][e]=(geom_t)(J[1]*J[6]-J[0]*J[7]); m.adj[8][e]=(geom_t)(J[0]*J[4]-J[1]*J[3]);
+        m.det[e] = (geom_t)D;
+    }
+    m.px.assign(pts[0].begin(), pts[0].end());
+    m.py.assign(pts[1].begin(), pts[1].end());
+    m.pz.assign(pts[2].begin(), pts[2].end());
+}
+
 static Mesh build_unordered(int n) {
     Mesh m;
     const int nn = n + 1;
@@ -251,33 +279,14 @@ static Mesh build_unordered(int n) {
         pts[0][nid(i,j,k)] = (geom_t)(i * h); pts[1][nid(i,j,k)] = (geom_t)(j * h); pts[2][nid(i,j,k)] = (geom_t)(k * h);
     }
     static const int tets[6][4] = {{0,1,3,7},{0,1,5,7},{0,4,5,7},{0,4,6,7},{0,2,6,7},{0,2,3,7}};
-    m.adj.assign(9, std::vector<geom_t>(m.nelements, 0));
-    m.det.assign(m.nelements, 0);
     ptrdiff_t e = 0;
     for (int k = 0; k < n; ++k) for (int j = 0; j < n; ++j) for (int i = 0; i < n; ++i)
-        for (int t = 0; t < 6; ++t, ++e) {
-            idx_t v[4];
+        for (int t = 0; t < 6; ++t, ++e)
             for (int c = 0; c < 4; ++c) {
                 const int b = tets[t][c];
-                v[c] = nid(i + (b & 1), j + ((b >> 1) & 1), k + ((b >> 2) & 1));
+                m.ev[c][e] = nid(i + (b & 1), j + ((b >> 1) & 1), k + ((b >> 2) & 1));
             }
-            double J[9];
-            for (int c = 0; c < 3; ++c) for (int d = 0; d < 3; ++d)
-                J[d*3+c] = (double)pts[d][v[c+1]] - (double)pts[d][v[0]];
-            double D = J[0]*(J[4]*J[8]-J[5]*J[7]) - J[1]*(J[3]*J[8]-J[5]*J[6]) + J[2]*(J[3]*J[7]-J[4]*J[6]);
-            if (D < 0) { std::swap(v[1], v[2]);
-                for (int c = 0; c < 3; ++c) for (int d = 0; d < 3; ++d)
-                    J[d*3+c] = (double)pts[d][v[c+1]] - (double)pts[d][v[0]];
-                D = -D; }
-            for (int c = 0; c < 4; ++c) m.ev[c][e] = v[c];
-            m.adj[0][e]=(geom_t)(J[4]*J[8]-J[5]*J[7]); m.adj[1][e]=(geom_t)(J[2]*J[7]-J[1]*J[8]); m.adj[2][e]=(geom_t)(J[1]*J[5]-J[2]*J[4]);
-            m.adj[3][e]=(geom_t)(J[5]*J[6]-J[3]*J[8]); m.adj[4][e]=(geom_t)(J[0]*J[8]-J[2]*J[6]); m.adj[5][e]=(geom_t)(J[2]*J[3]-J[0]*J[5]);
-            m.adj[6][e]=(geom_t)(J[3]*J[7]-J[4]*J[6]); m.adj[7][e]=(geom_t)(J[1]*J[6]-J[0]*J[7]); m.adj[8][e]=(geom_t)(J[0]*J[4]-J[1]*J[3]);
-            m.det[e] = (geom_t)D;
-        }
-    m.px.assign(pts[0].begin(), pts[0].end());
-    m.py.assign(pts[1].begin(), pts[1].end());
-    m.pz.assign(pts[2].begin(), pts[2].end());
+    tet_geometry(m, pts);
 #if NXE == 10
     // One node per distinct edge, keyed on the sorted vertex pair.
     static const int edges[6][2] = {{0,1},{1,2},{0,2},{0,3},{1,3},{2,3}};
@@ -307,7 +316,54 @@ static Mesh build_unordered(int n) {
 }
 #endif
 
+#if NXE == 4 && !defined(ELEMENT_HEX8) && !defined(ELEMENT_PROTEUS_HEX27)
+template <typename T>
+static std::vector<T> read_raw(const std::string &path) {
+    std::vector<T> v;
+    if (FILE *f = std::fopen(path.c_str(), "rb")) {
+        std::fseek(f, 0, SEEK_END);
+        v.resize((size_t)std::ftell(f) / sizeof(T));
+        std::fseek(f, 0, SEEK_SET);
+        if (std::fread(v.data(), sizeof(T), v.size(), f) != v.size()) v.clear();
+        std::fclose(f);
+    }
+    if (v.empty()) {
+        std::fprintf(stderr, "cannot read %s\n", path.c_str());
+        std::abort();
+    }
+    return v;
+}
+
+// A TET4 mesh in smesh's raw layout (i0..i3.int32, x/y/z.float32), as the Newton study reads it.
+static Mesh read_unordered(const std::string &dir) {
+    Mesh m;
+    std::vector<std::vector<geom_t>> pts(3);
+    const char *xyz[3] = {"x", "y", "z"};
+    for (int d = 0; d < 3; ++d) {
+        const std::vector<float> p = read_raw<float>(dir + "/" + xyz[d] + ".float32");
+        pts[d].assign(p.begin(), p.end());
+    }
+    m.nnodes = (ptrdiff_t)pts[0].size();
+    for (int c = 0; c < 4; ++c) {
+        const std::vector<int32_t> ic = read_raw<int32_t>(dir + "/i" + std::to_string(c) + ".int32");
+        m.ev.emplace_back(ic.begin(), ic.end());
+    }
+    m.nelements = (ptrdiff_t)m.ev[0].size();
+    tet_geometry(m, pts);
+    finalise_element_pointers(m);
+    return m;
+}
+#endif
+
+// QP_MESH=<folder> reads a TET4 mesh instead of building the cube of n cells.
 static Mesh build(int n) {
+#if NXE == 4 && !defined(ELEMENT_HEX8) && !defined(ELEMENT_PROTEUS_HEX27)
+    if (const char *dir = std::getenv("QP_MESH")) {
+        Mesh m = read_unordered(dir);
+        reorder_mesh(m, MESH_ORDER);
+        return m;
+    }
+#endif
     Mesh m = build_unordered(n);
     reorder_mesh(m, MESH_ORDER);
     return m;

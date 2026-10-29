@@ -1,7 +1,10 @@
-"""The article's figures, from the Grace logs in measured/.
+"""The article's figures, from the Grace logs in measured/ and the H100 logs in measured_gpu/.
 
     python paper_figures.py measured/ ../../../docs/compressed_partial_assembly/figures \
         measured_qsym/ measured_qbsr/
+    python paper_figures.py --machine gpu measured_gpu/ ../../../docs/compressed_partial_assembly/figures
+
+The GPU's figures are the same figures, the files named *_gpu.pdf.
 
 The further directories hold the quantized-BSR campaigns (results_tables.py).
 
@@ -25,8 +28,15 @@ import shutil
 from matplotlib.ticker import FuncFormatter, LogLocator, NullFormatter
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from results_tables import (ELEMENTS, NAMES, REFERENCE_BSR, bench_rows, newton_case, operator_name,  # noqa: E402
-                           parse_bench_sweep, parse_newton, parse_newton_sweep)
+from results_tables import (ELEMENTS, GPU_BENCH, NAMES, REFERENCE_BSR, bench_rows, newton_case,  # noqa: E402
+                           operator_name, parse_bench_sweep, parse_newton, parse_newton_sweep)
+
+# "cpu" (Grace) or "gpu" (H100): which campaign the figures are drawn from.
+MACHINE = "cpu"
+
+
+def figure_name(name):
+    return name if MACHINE == "cpu" else name.replace(".pdf", "_gpu.pdf")
 
 TEXTWIDTH = 6.27  # inches, a4paper with 1in margins
 plt.rcParams.update({
@@ -179,10 +189,13 @@ def memory_figure(rows, meta, out, src=None):
                 p = {"values": vals, "indices": total - vals}
             elif kind == "qbsr":
                 # per stored block: 9 codes, a 4-byte scale (int8) and a 2-byte column offset; the
-                # remainder's indices, the halo and the row order are counted with the offsets
+                # remainder's indices, the halo and the row order are counted with the offsets.  The
+                # GPU's packed records: int8 16 bytes (a byte of padding), f16 20; on HEX27 a 4-byte
+                # column besides.
                 sc = 4 if cb == 1 else 0
-                codes = total * 9 * cb / (9 * cb + sc + 2)
-                scales = total * sc / (9 * cb + sc + 2)
+                idx = 2 if MACHINE == "cpu" else (3 if cb == 1 else 2) + (4 if el == "PROTEUS_HEX27" else 0)
+                codes = total * 9 * cb / (9 * cb + sc + idx)
+                scales = total * sc / (9 * cb + sc + idx)
                 p = {"codes": codes, "scales": scales, "indices": total - codes - scales}
             else:
                 pairs = NODES[el] * (NODES[el] - 1) / 2
@@ -224,14 +237,34 @@ def memory_figure(rows, meta, out, src=None):
                 ("scales", PART_COLOURS["scales"]))]
     fig.tight_layout(rect=(0, 0.05, 1, 1))
     fig.legend(handles=handles, loc="lower center", ncol=3, bbox_to_anchor=(0.5, -0.02))
-    fig.savefig(os.path.join(out, "memory_footprint.pdf"))
+    fig.savefig(os.path.join(out, figure_name("memory_footprint.pdf")))
     plt.close(fig)
 
 
+def file_gpu_rows(r):
+    """The GPU's rows of one benchmark, also under the CPU's keys, so every figure reads them alike."""
+    for o in FORMATS:
+        for cand in GPU_BENCH[o]:
+            if cand in r:
+                r.setdefault(BENCH_KEY[o], r[cand])
+                if o in SETUP_KEY:
+                    r.setdefault(SETUP_KEY[o], r[cand])
+                break
+    return r
+
+
 def main():
-    src, out, extras = sys.argv[1], sys.argv[2], sys.argv[3:]
+    global MACHINE
+    args = sys.argv[1:]
+    if args[0] == "--machine":
+        MACHINE = args[1]
+        args = args[2:]
+    src, out, extras = args[0], args[1], args[2:]
     os.makedirs(out, exist_ok=True)
     rows, meta = bench_rows(src, extras)
+    if MACHINE == "gpu":
+        for r in rows.values():
+            file_gpu_rows(r)
 
     def bench(field):
         return lambda o, el: rows.get(el, {}).get(BENCH_KEY[o], {}).get(field)
@@ -241,7 +274,7 @@ def main():
     bars(ax, FORMATS, bench("mdofs"), "MDOF/s (higher is better)")
     fig.tight_layout(rect=(0, 0.12, 1, 1))
     legend_below(fig, [ax])
-    fig.savefig(os.path.join(out, "throughput.pdf"))
+    fig.savefig(os.path.join(out, figure_name("throughput.pdf")))
     plt.close(fig)
 
     # Figure: operator memory, decomposed.  Totals are the measured bytes; the split follows the
@@ -260,7 +293,7 @@ def main():
     axes[1].set_title("Operator error, mild state, white-noise increment")
     fig.tight_layout(rect=(0, 0.15, 1, 1))
     legend_below(fig, axes)
-    fig.savefig(os.path.join(out, "setup_error.pdf"))
+    fig.savefig(os.path.join(out, figure_name("setup_error.pdf")))
     plt.close(fig)
 
     # Figure: Newton and CG iterations at about 1M dof (stretch case) and the twist case.
@@ -287,7 +320,7 @@ def main():
         axes[1].set_title(f"CG iterations, {title}")
         fig.tight_layout(rect=(0, 0.12, 1, 1))
         legend_below(fig, axes)
-        fig.savefig(os.path.join(out, name))
+        fig.savefig(os.path.join(out, figure_name(name)))
         plt.close(fig)
 
     # Figure: time to solution relative to BSR f32, for every case with timings: the stretch at about
@@ -319,7 +352,7 @@ def main():
             ax.set_title(f"Newton time to solution, {title}")
         fig.tight_layout(rect=(0, 0.07, 1, 1))
         legend_below(fig, axes, ncol=4)
-        fig.savefig(os.path.join(out, "time_to_solution.pdf"))
+        fig.savefig(os.path.join(out, figure_name("time_to_solution.pdf")))
         plt.close(fig)
 
     # Figures: resolution sweeps.
@@ -327,7 +360,7 @@ def main():
     auto = sorted(glob.glob(os.path.join(src, "bsweepauto_*.out")))
     for path in sorted(glob.glob(os.path.join(src, "bsweep_*.out"))) + auto:
         for el, dof, r in parse_bench_sweep(path):
-            sweep.setdefault(el, {}).setdefault(dof, {}).update(r)
+            sweep.setdefault(el, {}).setdefault(dof, {}).update(file_gpu_rows(r) if MACHINE == "gpu" else r)
     # The quantized BSR rows come from their own sweep in the extras, at the same sizes.
     for d in extras:
         for path in sorted(glob.glob(os.path.join(d, "ubsweep_*.out"))):
@@ -354,7 +387,7 @@ def main():
             a.set_ylabel("application, MDOF/s")
         fig.tight_layout(rect=(0, 0.07, 1, 1))
         legend_below(fig, axes, ncol=4)
-        fig.savefig(os.path.join(out, "sweep_throughput.pdf"))
+        fig.savefig(os.path.join(out, figure_name("sweep_throughput.pdf")))
         plt.close(fig)
 
     nsweep = {}
@@ -406,7 +439,7 @@ def main():
             a.set_ylabel("time to solution / BSR fp32")
         fig.tight_layout(rect=(0, 0.07, 1, 1))
         legend_below(fig, axes, ncol=4)
-        fig.savefig(os.path.join(out, "sweep_newton.pdf"))
+        fig.savefig(os.path.join(out, figure_name("sweep_newton.pdf")))
         plt.close(fig)
     print("figures written to", out)
 

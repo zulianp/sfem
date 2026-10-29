@@ -2,7 +2,7 @@
 
     python make_qp_kernels.py ELEMENT GENERATED_INLINE_HEADER OUT_DIR
 
-Writes two headers into OUT_DIR:
+Writes into OUT_DIR:
 
   qp_element.hpp  the reference-element stages of the application, as straight-line code:
                   `stage_in` forms the R gradient vectors the stored tensors contract with
@@ -15,6 +15,12 @@ Writes two headers into OUT_DIR:
                   block scratch (points) or accumulated into the P2 moments (TET10), and the
                   block is then handed to the store's encoder.  Everything that evaluates the
                   material -- gather, gradients, pullback -- is the generated code unchanged.
+  qp_point.hpp    the same kernel's pointwise body alone, the weighted point tangent from the
+                  reference gradient and the affine geometry, for the GPU set-up (cuda/).
+  qp_device_tables.cuh  the element's tables in constant memory, for the GPU kernels.
+
+The stages and the contraction are __host__ __device__ under nvcc (QP_HD), so the GPU kernels run
+the same straight-line code with one lane.
 
 This is the prototype the spike optimises by hand; what eventually ships is the emitter change
 in the code generator (docs/compressed_partial_assembly, Section "The set-up and application
@@ -29,6 +35,15 @@ from fractions import Fraction as Fr
 
 D = 3
 NC = 45
+
+# __host__ __device__ under nvcc: the GPU kernels call the stages with one lane.
+QPHD = """#ifndef QP_HD
+#if defined(__CUDACC__)
+#define QP_HD __host__ __device__
+#else
+#define QP_HD
+#endif
+#endif"""
 
 
 def slot(r, c):
@@ -198,7 +213,7 @@ def tensor_stages(n1, q1, B, Dd):
     node = lambda sx, sy, sz: sx + n1 * (sy + n1 * sz)
     L = []
     L.append("  template <typename h_t, typename t_out, int VS>")
-    L.append(f"  static SFEM_INLINE void stage_in(const int ne, const h_t h[3][{N}][VS], t_out P[{NQ}][9][VS]) {{")
+    L.append(f"  static QP_HD SFEM_INLINE void stage_in(const int ne, const h_t h[3][{N}][VS], t_out P[{NQ}][9][VS]) {{")
     L.append("    using t = t_out;")
     L.append(f"    t u[{N}][VS], v[{q1}][{n1}][{n1}][VS], d[{q1}][{n1}][{n1}][VS];")
     L.append(f"    t vv[{q1}][{q1}][{n1}][VS], dv[{q1}][{q1}][{n1}][VS], vd[{q1}][{q1}][{n1}][VS];")
@@ -243,7 +258,7 @@ def tensor_stages(n1, q1, B, Dd):
     L.append("  }")
     L.append("")
     L.append("  template <typename y_t, typename out_t, int VS>")
-    L.append(f"  static SFEM_INLINE void stage_out(const int ne, const y_t Y[{NQ}][9][VS], out_t out[3][{N}][VS]) {{")
+    L.append(f"  static QP_HD SFEM_INLINE void stage_out(const int ne, const y_t Y[{NQ}][9][VS], out_t out[3][{N}][VS]) {{")
     L.append("    using t = y_t;")
     L.append(f"    t ax[{q1}][{q1}][{n1}][VS], ay[{q1}][{q1}][{n1}][VS], az[{q1}][{q1}][{n1}][VS];")
     L.append(f"    t bx[{q1}][{n1}][{n1}][VS], c[{q1}][{n1}][{n1}][VS];")
@@ -323,7 +338,7 @@ def hex8_sum_factorised_stages():
     G0, G1 = repr(g[0]), repr(g[1])
     L = []
     L.append("  template <typename h_t, typename t_out, int VS>")
-    L.append("  static SFEM_INLINE void stage_in(const int ne, const h_t h[3][8][VS], t_out P[8][9][VS]) {")
+    L.append("  static QP_HD SFEM_INLINE void stage_in(const int ne, const h_t h[3][8][VS], t_out P[8][9][VS]) {")
     L.append("    using t = h_t;")
     L.append(f"    const t g0 = t({G0}), g1 = t({G1});")
     L.append("#pragma omp simd")
@@ -362,7 +377,7 @@ def hex8_sum_factorised_stages():
     # Transpose: out[i][s] = sum_q (dphi_s/dx Y_qx + dphi_s/dy Y_qy + dphi_s/dz Y_qz)
     L.append("")
     L.append("  template <typename y_t, typename out_t, int VS>")
-    L.append("  static SFEM_INLINE void stage_out(const int ne, const y_t Y[8][9][VS], out_t out[3][8][VS]) {")
+    L.append("  static QP_HD SFEM_INLINE void stage_out(const int ne, const y_t Y[8][9][VS], out_t out[3][8][VS]) {")
     L.append("    using t = out_t;")
     L.append(f"    const t g0 = t({G0}), g1 = t({G1});")
     L.append("#pragma omp simd")
@@ -425,12 +440,91 @@ def hex8_sum_factorised_stages():
     return L
 
 
+def setup_weights(e):
+    if e["kind"] == "moments":
+        return keast11()[1]
+    return e["X"]
+
+
+def setup_stage(e):
+    """`setup_in`: the reference gradient at the set-up's points, G[q][k*3+m].  The stored points
+    are the set-up's own except for the moments (TET10), which integrate over the 11-point rule."""
+    N = e["N"]
+    L = ["", "  // The reference gradient at the set-up's quadrature points: G[q][k*3+m].",
+         "  template <typename h_t, typename t_out, int VS>",
+         f"  static QP_HD SFEM_INLINE void setup_in(const int ne, const h_t h[3][{N}][VS], t_out G[NQ][9][VS]) {{"]
+    if e["kind"] != "moments":
+        L += ["    stage_in<h_t, t_out, VS>(ne, h, G);", "  }"]
+        return L
+    pts = keast11()[0]
+    L += ["    using t = h_t;", "#pragma omp simd", "    for (int lane = 0; lane < ne; ++lane) {"]
+    for k in range(3):
+        for j in range(N):
+            L.append(f"      const t h{k}_{j} = h[{k}][{j}][lane];")
+    for q, p in enumerate(pts):
+        g = tet10_basis_grad(p)
+        for k in range(3):
+            for m in range(3):
+                expr = linear_combination([(g[j][m], f"h{k}_{j}") for j in range(N)])
+                L.append(f"      G[{q}][{k * 3 + m}][lane] = t_out({expr});")
+    L += ["    }", "  }"]
+    return L
+
+
+def emit_device_tables(name, e):
+    """The element's tables in constant memory, for the GPU kernels (one translation unit)."""
+    N, R, D_ = e["N"], e["R"], e["D"]
+    NV, NQ = len(e["pairs"]), e["nq"]
+    NP = N * (N - 1) // 2
+    pairs = [(a, b) for a in range(N) for b in range(a + 1, N)]
+    flat = lambda xs: ", ".join(xs)
+    L = [f"// Emitted by make_qp_kernels.py for {name}; do not edit.", "#pragma once",
+         "// The element's tables for the GPU kernels: reads uniform across a warp come from the constant cache.",
+         "namespace qp {", "namespace dev {"]
+    L.append(f"static __constant__ double DT[{R * 3 * N}] = {{{flat(lit(D_[r][m][j]) for r in range(R) for m in range(3) for j in range(N))}}};")
+    L.append(f"static __constant__ int PA[{NV}] = {{{flat(str(a) for a, _ in e['pairs'])}}};")
+    L.append(f"static __constant__ int PB[{NV}] = {{{flat(str(b) for _, b in e['pairs'])}}};")
+    L.append(f"static __constant__ double X[{NV}] = {{{flat(lit(x) for x in e['X'])}}};")
+    L.append(f"static __constant__ double MULT[{NV}] = {{{flat(lit(x) for x in e['mult'])}}};")
+    L.append(f"static __constant__ double QW[{NQ}] = {{{flat(lit(w) for w in setup_weights(e))}}};")
+    if e["moment_factor"] is not None:
+        L.append(f"static __constant__ double FACTOR[{NQ * NV}] = {{{flat(lit(v) for row in e['moment_factor'] for v in row)}}};")
+    else:
+        L.append("static __constant__ double FACTOR[1] = {0};  // points: no moments, never read")
+    # The reference gradients at the set-up's points, SG[q][m][j]: the stored points' own (DT) except
+    # for the moments, which integrate over the 11-point rule.
+    if e["kind"] == "moments":
+        sg = [tet10_basis_grad(p) for p in keast11()[0]]
+        L.append("constexpr bool SG_IS_DT = false;")
+        L.append(f"static __constant__ double SG[{NQ * 3 * N}] = {{{flat(lit(sg[q][j][m]) for q in range(NQ) for m in range(3) for j in range(N))}}};")
+    else:
+        L.append("constexpr bool SG_IS_DT = true;")
+        L.append("static __constant__ double SG[1] = {0};  // the set-up's points are DT's")
+    L.append(f"static __constant__ int SLOT[81] = {{{flat(str(slot(r, c)) for r in range(9) for c in range(9))}}};")
+    # Tensor-product elements: the one-dimensional values and derivatives at the points, B1[q][s] and
+    # D1[q][s], from which the point-parallel kernels form the reference gradients.
+    if "B1" in e:
+        q1, n1 = len(e["B1"]), len(e["B1"][0])
+        L.append(f"constexpr int Q1 = {q1}, S1 = {n1};")
+        L.append(f"static __constant__ double B1[{q1 * n1}] = {{{flat(lit(v) for row in e['B1'] for v in row)}}};")
+        L.append(f"static __constant__ double D1[{q1 * n1}] = {{{flat(lit(v) for row in e['D1'] for v in row)}}};")
+    else:
+        L.append("constexpr int Q1 = 1, S1 = 1;  // not a tensor-product element: never read")
+        L.append("static __constant__ double B1[1] = {0};")
+        L.append("static __constant__ double D1[1] = {0};")
+    L.append(f"static __constant__ int PAIR_P[{NP}] = {{{flat(str(a) for a, _ in pairs)}}};")
+    L.append(f"static __constant__ int PAIR_Q[{NP}] = {{{flat(str(b) for _, b in pairs)}}};")
+    L += ["}  // namespace dev", "}  // namespace qp"]
+    return "\n".join(L) + "\n"
+
+
 def emit_element(name, e):
     N, R, D_ = e["N"], e["R"], e["D"]
     NV = len(e["pairs"])
     L = []
     L.append(f"// Emitted by make_qp_kernels.py for {name}; do not edit.")
     L.append("#pragma once")
+    L += QPHD.split("\n")
     L.append("namespace qp {")
     L.append(f"struct Element{name} {{")
     L.append(f'  static constexpr const char *name = "{name}";')
@@ -454,9 +548,12 @@ def emit_element(name, e):
     if e["moment_factor"] is not None:
         rows = ", ".join("{" + ", ".join(lit(v) for v in row) + "}" for row in e["moment_factor"])
         L.append(f"  static constexpr double FACTOR[NQ][NV] = {{{rows}}};")
+    # The set-up's quadrature weights: the stored points' own (X) or, for the moments, the rule's.
+    L.append(f"  static constexpr double QW[NQ] = {{{', '.join(lit(w) for w in setup_weights(e))}}};")
     if name in ("HEX8", "PROTEUS_HEX27"):
         L.append("")
         L += hex8_sum_factorised_stages() if name == "HEX8" else tensor_stages(3, 4, e["B1"], e["D1"])
+        L += setup_stage(e)
         L.append("};")
         L.append("")
         L.append(f"using Element = Element{name};")
@@ -467,7 +564,7 @@ def emit_element(name, e):
     L.append("  // P[r][k*3+m] = sum_j dphi_j/dxi_m (at r) h[k][j]: in the vector's precision, then")
     L.append("  // rounded to the arithmetic type, so differences of nodal values are formed first.")
     L.append("  template <typename h_t, typename t_out, int VS>")
-    L.append(f"  static SFEM_INLINE void stage_in(const int ne, const h_t h[3][{N}][VS], t_out P[{R}][9][VS]) {{")
+    L.append(f"  static QP_HD SFEM_INLINE void stage_in(const int ne, const h_t h[3][{N}][VS], t_out P[{R}][9][VS]) {{")
     L.append("    using t = h_t;")
     L.append("#pragma omp simd")
     L.append("    for (int lane = 0; lane < ne; ++lane) {")
@@ -485,7 +582,7 @@ def emit_element(name, e):
     L.append("")
     L.append("  // out[i][p] = sum_r sum_n dphi_p/dxi_n (at r) Y[r][i*3+n], accumulated in out_t.")
     L.append("  template <typename y_t, typename out_t, int VS>")
-    L.append(f"  static SFEM_INLINE void stage_out(const int ne, const y_t Y[{R}][9][VS], out_t out[3][{N}][VS]) {{")
+    L.append(f"  static QP_HD SFEM_INLINE void stage_out(const int ne, const y_t Y[{R}][9][VS], out_t out[3][{N}][VS]) {{")
     L.append("    using t = out_t;")
     L.append("#pragma omp simd")
     L.append("    for (int lane = 0; lane < ne; ++lane) {")
@@ -498,6 +595,7 @@ def emit_element(name, e):
             L.append(f"      out[{i}][{p}][lane] = {expr};")
     L.append("    }")
     L.append("  }")
+    L += setup_stage(e)
     L.append("};")
     L.append("")
     L.append(f"using Element = Element{name};")
@@ -506,10 +604,10 @@ def emit_element(name, e):
 
 
 def emit_contract():
-    L = ["// Emitted by make_qp_kernels.py; do not edit.", "#pragma once", "namespace qp {",
+    L = ["// Emitted by make_qp_kernels.py; do not edit.", "#pragma once"] + QPHD.split("\n") + ["namespace qp {",
          "// y[r] += sum_c S[slot(r,c)] g[c] for the packed symmetric 9x9 tangent: 81 multiply-adds.",
          "template <typename t>",
-         "static SFEM_INLINE void contract(const t *const S, const t *const g, t *const y) {"]
+         "static QP_HD SFEM_INLINE void contract(const t *const S, const t *const g, t *const y) {"]
     for r in range(9):
         terms = " + ".join(f"S[{slot(r, c)}]*g[{c}]" for c in range(9))
         L.append(f"  y[{r}] += {terms};")
@@ -517,7 +615,7 @@ def emit_contract():
     L.append("")
     L.append("// The same for a block of lanes, lane loop innermost: Y[r] += sum_c S[slot(r,c)] G[c].")
     L.append("template <typename t, int VS>")
-    L.append("static SFEM_INLINE void contract_lanes(const int ne, const t S[45][VS], const t G[9][VS], t Y[9][VS]) {")
+    L.append("static QP_HD SFEM_INLINE void contract_lanes(const int ne, const t S[45][VS], const t G[9][VS], t Y[9][VS]) {")
     for r in range(9):
         terms = " + ".join(f"S[{slot(r, c)}][lane]*G[{c}][lane]" for c in range(9))
         L.append("#pragma omp simd")
@@ -622,6 +720,49 @@ def emit_setup(name, header_text):
     return "\n".join(out) + "\n"
 
 
+HELPERS = {"pow_m1", "pow_m2", "pow_m3", "pow_2", "pow_3", "pow_4", "sfem_log1p", "sqrt", "log", "exp", "s_t",
+           "const", "fabs", "pow"}
+
+
+def emit_point(name, header_text):
+    """The tangent kernel's pointwise body: from the reference gradient (after its last component is
+    formed) to the 45th tangent entry, minus the quadrature weight.  Its free names must be the
+    gradient, the geometry and the material parameters, which the function takes as arguments."""
+    if name == "PROTEUS_HEX27":
+        header_text = hex8_to_hex27(header_text)
+    m = re.search(r"template <typename s_t, typename g_t, typename tangent_t, int VS>\n"
+                  r"static SFEM_INLINE int (\w+)_inexact_apply_tangent_a_msoa_impl\((.*?)\n^}\n",
+                  header_text, re.S | re.M)
+    if not m:
+        raise SystemExit("no tangent kernel in the generated header")
+    lines = m.group(0).split("\n")
+    i0 = next(i for i, l in enumerate(lines) if re.match(r"\s*const s_t gu_ref_2_2 = ", l))
+    i1 = next(i for i in range(i0, len(lines)) if re.match(r"\s*const s_t (integrand|tangent)44 = ", lines[i]))
+    out = re.match(r"\s*const s_t (integrand|tangent)44 = ", lines[i1]).group(1)
+    seg = [l.strip() for l in lines[i0 + 1:i1 + 1] if not re.match(r"\s*const s_t qw = ", l)]
+    assert not any("[lane]" in l or "qw" in l for l in seg), "pointwise body reads lanes or the weight"
+    declared = {re.match(r"const s_t (\w+) = ", l).group(1) for l in seg}
+    used = set(re.findall(r"\b[A-Za-z_]\w*\b", " ".join(re.sub(r"^const s_t \w+ = ", "", l) for l in seg)))
+    args = {f"gu_ref_{k}_{c}" for k in range(3) for c in range(3)} | {f"adjugate{c}" for c in range(9)} | {"determinant", "lmbda", "mu"}
+    free = used - declared - args - HELPERS
+    assert not free, f"pointwise body has free names {sorted(free)}"
+    L = ["// Emitted by make_qp_kernels.py from the generated P0 tangent kernel's pointwise body; do not edit.",
+         "#pragma once"] + QPHD.split("\n") + [
+         "// The tangent at one point, unweighted: T[c], c the packed index of the symmetric 9x9 tangent.",
+         "// The includer supplies the math helpers in sfem::codegen (kernel_math.hpp, or .cuh on the device).",
+         "namespace sfem {", "namespace codegen {", "template <typename s_t>",
+         "static QP_HD SFEM_INLINE void qp_point_tangent(const s_t *const RSTR gu_ref, const s_t *const RSTR adj,",
+         "                                               const s_t determinant, const s_t lmbda, const s_t mu,",
+         "                                               s_t *const RSTR T) {"]
+    L += [f"  const s_t gu_ref_{k}_{c} = gu_ref[{k * 3 + c}];" for k in range(3) for c in range(3)]
+    L += [f"  const s_t adjugate{c} = adj[{c}];" for c in range(9)]
+    L += ["  " + l for l in seg]
+    L += [f"  T[{c}] = {out}{c};" for c in range(NC)]
+    L += ["}", "}  // namespace codegen", "}  // namespace sfem", "namespace qp {",
+          "using sfem::codegen::qp_point_tangent;", "}  // namespace qp"]
+    return "\n".join(L) + "\n"
+
+
 def main():
     name, header, out_dir = sys.argv[1], sys.argv[2], sys.argv[3]
     import os
@@ -635,6 +776,10 @@ def main():
         text = f.read()
     with open(os.path.join(out_dir, "qp_setup.hpp"), "w") as f:
         f.write(emit_setup(name, text))
+    with open(os.path.join(out_dir, "qp_point.hpp"), "w") as f:
+        f.write(emit_point(name, text))
+    with open(os.path.join(out_dir, "qp_device_tables.cuh"), "w") as f:
+        f.write(emit_device_tables(name, e))
 
 
 if __name__ == "__main__":

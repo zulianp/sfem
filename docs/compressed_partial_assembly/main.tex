@@ -23,6 +23,7 @@
 \input{tables/constants.tex}
 \input{tables/results_macros.tex}
 \input{tables/grace_meta.tex}
+\input{tables/results_macros_gpu.tex}
 % Table bodies through the primitive \input: the LaTeX one leaves a token behind the last row
 % that \bottomrule then refuses.
 \makeatletter
@@ -80,6 +81,14 @@ Element matrices come close to it on trilinear hexahedra and are ahead on triqua
 the quadrature-point stores follow closely, and the element formats keep the lowest peak memory,
 since they need no assembled matrix.  The gains require the operator to stream from memory: while
 the matrix fits in cache, BSR is faster.
+
+On one H100 GPU of the same node, against a BSR product that runs at
+$\gpuBsrThirtyTwoVsCusparseHexEight$--$\gpuBsrThirtyTwoVsCusparseHexTwentySeven\times$ the speed of
+cuSPARSE, the quantized sparse matrix is the fastest format on linear tetrahedra and trilinear
+hexahedra ($\gpuTenmTimeQbsrHalfTetFour$ and $\gpuTenmTimeQbsrEightHexEight$ of the time of
+single-precision BSR) and the quadrature-point stores on quadratic tetrahedra and triquadratic
+hexahedra ($\gpuTenmTimeQpHalfTetTen$ and $\gpuTenmTimeQpEightMdHexTwentySeven$): the GPU speeds up
+the product more than the assembly, so the matrices' set-up weighs more than on the CPU.
 \end{abstract}
 
 \tableofcontents
@@ -146,10 +155,11 @@ absorbs or pays for in iterations.  The contributions are:
 \item \textbf{A cost model against BSR} (Section~\ref{sec:model}): operator memory, compulsory
   traffic and operation counts per degree of freedom for each element and encoding, and the
   arithmetic rate an element format must sustain to match BSR.
-\item \textbf{An evaluation on one Grace CPU} (Section~\ref{sec:results}) for four element types up
-  to $10^7$ degrees of freedom: throughput, operator and peak memory, set-up, Newton iteration counts
-  and time to solution of every format against BSR in double and single precision, across problem
-  sizes, and the resulting choice of format per element (Table~\ref{tab:summary}).
+\item \textbf{An evaluation on one Grace CPU and one H100 GPU} (Section~\ref{sec:results}) for four
+  element types up to $10^7$ degrees of freedom: throughput, operator and peak memory, set-up, Newton
+  iteration counts and time to solution of every format against BSR in double and single precision,
+  across problem sizes, and the resulting choice of format per element and machine
+  (Table~\ref{tab:summary}).
 \end{enumerate}
 
 %% ===================================================================================================
@@ -606,7 +616,8 @@ one element per vector lane; a translation, $h_q=h_p$, gives $d=0$ whatever the 
 
 \begin{table}[ht]
 \centering
-\small
+\footnotesize
+\setlength{\tabcolsep}{4pt}
 \begin{tabular}{lrrrrrrrrrr}
 \toprule
  & \multicolumn{3}{c}{stored numbers per element} & \multicolumn{3}{c}{flop per application} &
@@ -995,7 +1006,9 @@ tangent --- the condition $\eps\ll\eta$ of Section~\ref{sec:newton}.
 Neoverse-V2 cores, LPDDR5X memory; GCC~13.3 with \texttt{-O3 -mcpu=neoverse-v2}, OpenMP with
 $72$ threads bound one per core (\texttt{OMP\_PROC\_BIND=true}, \texttt{OMP\_PLACES=cores}).
 Vectors and the residual are in double precision throughout; the contraction of the compressed
-stores runs in single precision (Section~\ref{sec:precision}).
+stores runs in single precision (Section~\ref{sec:precision}).  The GPU runs use one H100 of the same
+node type (\gpuDevice{}), CUDA~12.6 with \texttt{-O3} for \texttt{sm\_90}, the whole Newton
+iteration on the device.
 
 \paragraph{Operators.}  Every comparison is against BSR with double- and with single-precision
 values, assembled by the same code generator and applied by a row-parallel block product.  The
@@ -1006,6 +1019,22 @@ projected operator is applied through the same layout, and the quantized matrice
 Section~\ref{sec:qbsr}.  Every packed operator uses packs of about a
 twentieth of a thread's share of the elements (at least $16$), so that each thread has about twenty
 packs.
+
+\paragraph{Operators on the GPU.}  BSR is assembled by the library's device kernels from the same
+generator and applied by its block product, a group of sixteen threads per block row whose partial
+sums are added by warp shuffles in a fixed order; cuSPARSE's \texttt{bsrmv} on the same matrix is
+measured beside it as a reference (in single precision with single-precision vectors, which it
+requires).  The compressed stores keep their host layouts with blocks of $32$ elements, one warp, and
+are set up on the device: the codes equal the host's bit for bit, except a handful of element-matrix
+codes on TET10 that differ by one rounding step.  The application runs one thread per element on
+TET4, TET10 and HEX8, scattering with atomic additions, or on TET4 and in half precision on HEX8
+through a block-local scatter that accumulates a block's nodes in shared memory, whichever measured
+faster.  On HEX27 the point stores run one thread per quadrature point with the sum-factorised
+schedule and the element matrices one warp per element, a lane per node.  The quantized matrix is
+held in the full difference form, each pair of blocks stored twice: storing the pair once needs a
+scatter of the transposed block, which on the GPU costs more than the bytes it saves.  Its rows are
+in SELL-$32$-$1024$ with the codes, column offset and scale of a block in one record, and with
+$16$-bit column offsets except on HEX27, whose long rows leave too many columns out of their range.
 
 \paragraph{Problems.}  The application study uses structured meshes of the unit cube at
 \benchdofHexEight{}~degrees of freedom for each element (TET4 and TET10 on the Freudenthal split),
@@ -1201,12 +1230,17 @@ Figure~\ref{fig:throughput}.}
 \cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
 element & \texttt{fp16} & \texttt{int8} & \texttt{fp16} diff. & \texttt{int8} pair & \texttt{fp16} & \texttt{int8} mean+dev \\
 \midrule
+\multicolumn{7}{l}{\emph{Grace, $72$ cores}} \\
 \rows{tables/summary.tex}
+\midrule
+\multicolumn{7}{l}{\emph{H100}} \\
+\rows{tables/summary_gpu.tex}
 \bottomrule
 \end{tabular}
 \caption{The evaluation in one table: Newton time to solution at about $10^7$ degrees of freedom
-relative to single-precision BSR (stretch case), and in parentheses the factor by which the operator
-is smaller than single-precision BSR.  The fastest format of each element in bold.}
+relative to single-precision BSR on the same machine (stretch case), and in parentheses the factor
+by which the operator is smaller than single-precision BSR.  The fastest format of each element and
+machine in bold.}
 \label{tab:summary}
 \end{table}
 
@@ -1308,11 +1342,124 @@ element matrix with a scale per node pair (on TET4: $\peakQbsrEightTetFour$, $\p
 and $\peakEaPairEightTetFour$~GiB).  The single-precision assembly and the node graph it is built on set
 the peak, not the store; assembling and encoding the matrix in chunks of rows would remove the first.
 
+\subsection{On the GPU}
+\label{sec:gpu}
+
+\begin{table}[t]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lrrrrrrrr}
+\toprule
+ & \multicolumn{4}{c}{MDOF/s} & \multicolumn{4}{c}{bytes per dof} \\
+\cmidrule(lr){2-5}\cmidrule(lr){6-9}
+operator & TET4 & TET10 & HEX8 & HEX27 & TET4 & TET10 & HEX8 & HEX27 \\
+\midrule
+\rows{tables/h100_throughput.tex}
+\midrule
+\rows{tables/h100_cusparse.tex}
+\bottomrule
+\end{tabular}
+\caption{Application throughput on the H100 at \gpuBenchDofHexEight{}~dof, the problem of
+Figure~\ref{fig:throughput}.  Below the rule, for reference, cuSPARSE's \texttt{bsrmv} on the
+library's BSR matrix; its single-precision row uses single-precision vectors.}
+\label{tab:gputhroughput}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/throughput_gpu.pdf}\\[1ex]
+\includegraphics[width=\textwidth]{figures/setup_error_gpu.pdf}
+\caption{The H100: application throughput (top), set-up per Newton step and operator error
+(bottom), \gpuBenchDofHexEight{}~dof; the formats and measures of Figures~\ref{fig:throughput}
+and~\ref{fig:setup}.}
+\label{fig:gputhroughput}
+\end{figure}
+
+The device runs reproduce the Grace iteration: in the stretch case at about $10^6$ degrees of
+freedom every format takes the per-step Newton counts it takes on Grace, on all four elements, except
+the \texttt{int8} element matrix on TET4 in its last step.  Where a run meets rejected load steps ---
+the twist, and TET4 and TET10 at about $10^7$ degrees of freedom --- the order of the device's atomic
+additions and block sums changes which steps are rejected, for double-precision BSR as for the
+compressed formats, and the runs follow other load-step paths than on Grace; the comparisons there
+are within one machine.
+
+The library's BSR product moves $\gpuBsrThirtyTwoGbsTetFour$--$\gpuBsrThirtyTwoGbsHexTwentySeven$~GB/s in
+single precision and $\gpuBsrSixtyFourGbsTetFour$--$\gpuBsrSixtyFourGbsHexEight$~GB/s in double
+(Table~\ref{tab:gputhroughput}), $\gpuBsrThirtyTwoVsCusparseHexEight$--%
+$\gpuBsrThirtyTwoVsCusparseHexTwentySeven\times$ and $\gpuBsrSixtyFourVsCusparseHexEight$--%
+$\gpuBsrSixtyFourVsCusparseTetFour\times$ the speed of cuSPARSE on the same matrices.  Against a
+product at the memory bandwidth every compressed format gains less than on Grace
+(Figure~\ref{fig:gputhroughput}).  The quantized matrix keeps most of its gain: in \texttt{int8} it
+applies at $\gpuQbsrEightVsThirtyTwoTetFour$, $\gpuQbsrEightVsThirtyTwoTetTen$,
+$\gpuQbsrEightVsThirtyTwoHexEight$ and $\gpuQbsrEightVsThirtyTwoHexTwentySeven\times$ the speed of
+single-precision BSR on TET4, TET10, HEX8 and HEX27 ($\QbsrEightVsThirtyTwoTetFour$,
+$\QbsrEightVsThirtyTwoTetTen$, $\QbsrEightVsThirtyTwoHexEight$ and $\QbsrEightVsThirtyTwoHexTwentySeven$ on
+Grace), moving $\gpuQbsrEightGbsHexEight$~GB/s of stored data on HEX8 against
+$\gpuBsrThirtyTwoGbsHexEight$ for single-precision BSR.  The element formats keep less: they move
+$\gpuEaDiffHalfGbsHexEight$~GB/s on HEX8 in half precision, limited by their gathers, atomic
+scatters and per-element latency rather than by bytes.  The half-precision point store applies at
+$\gpuQpHalfVsThirtyTwoHexEight$, $\gpuQpHalfVsThirtyTwoTetTen$ and
+$\gpuQpHalfVsThirtyTwoHexTwentySeven\times$ the speed of single-precision BSR on HEX8, TET10 and HEX27 ---
+the fastest operator on HEX27, where the element matrices, the fastest on Grace, fall to
+$\gpuEaDiffHalfVsThirtyTwoHexTwentySeven$ and $\gpuEaPairEightVsThirtyTwoHexTwentySeven$ --- and on TET4
+every element format stays behind BSR ($\gpuQpHalfVsThirtyTwoTetFour$ for the point store).
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/time_to_solution_gpu.pdf}
+\caption{Newton time to solution on the H100 relative to single-precision BSR on the H100, the cases
+and conventions of Figure~\ref{fig:tts}.}
+\label{fig:gputts}
+\end{figure}
+
+The set-up weighs more than on Grace, because the GPU speeds up the products more than the
+assembly.  At about $10^7$ degrees of freedom the set-up of the half-precision quantized matrix ---
+single-precision assembly and encoding --- takes $\gpuTenmSetupShareQbsrHalfHexEight$,
+$\gpuTenmSetupShareQbsrHalfTetTen$ and $\gpuTenmSetupShareQbsrHalfHexTwentySeven\%$ of the Newton run on
+HEX8, TET10 and HEX27, against $\tenmSetupShareQbsrHalfHexEight$, $\tenmSetupShareQbsrHalfTetTen$ and
+$\tenmSetupShareQbsrHalfHexTwentySeven\%$ on Grace, while the point stores' set-up stays at about
+$\gpuTenmSetupShareQpHalfTetTen\%$.  Time to solution follows (Figure~\ref{fig:gputts},
+Table~\ref{tab:summary}): the quantized matrix is the fastest format on TET4 and HEX8
+($\gpuTenmTimeQbsrHalfTetFour$ of the time of single-precision BSR in \texttt{fp16} on TET4,
+$\gpuTenmTimeQbsrEightHexEight$ in \texttt{int8} on HEX8), the quadrature-point stores on TET10 and HEX27
+($\gpuTenmTimeQpHalfTetTen$ and $\gpuTenmTimeQpEightMdTetTen$ on TET10, $\gpuTenmTimeQpHalfHexTwentySeven$
+and $\gpuTenmTimeQpEightMdHexTwentySeven$ on HEX27), where the matrices' assembly and, in \texttt{int8},
+their extra Newton iterations cost what their faster application gains.  The stores have the bytes
+of Figure~\ref{fig:memory}; the device peak of the Newton runs at about $10^7$ degrees of freedom on
+HEX8 is $\gpuTenmPeakQpHalfHexEight$~GiB for the half-precision point store and
+$\gpuTenmPeakEaPairEightHexEight$~GiB for the pair-scaled element matrix, against
+$\gpuTenmPeakBsrThirtyTwoHexEight$~GiB for single-precision BSR and $\gpuTenmPeakQbsrEightHexEight$~GiB for
+the \texttt{int8} quantized matrix, whose device encoder keeps the assembled values beside the records.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/sweep_throughput_gpu.pdf}\\[1ex]
+\includegraphics[width=\textwidth]{figures/sweep_newton_gpu.pdf}
+\caption{Against problem size on the H100, up to \gpuSweepMaxDofHexTwentySeven{}~dof; the measures of
+Figure~\ref{fig:sweep}.}
+\label{fig:gpusweep}
+\end{figure}
+
+Against problem size (Figure~\ref{fig:gpusweep}) the GPU has no small-problem regime in which BSR
+leads every element format, as the last-level cache gives it on Grace: on HEX27 the point stores solve
+faster than single-precision BSR at every size measured, and on HEX8 and TET10 the element formats
+draw level with it from about $10^5$ degrees of freedom.  The quantized matrix needs the most degrees
+of freedom to pay, since its set-up is BSR's assembly.  Inside the Newton runs the applications reach
+$\gpuTenmApplyVsBenchQbsrEightHexEight$--$\gpuTenmApplyVsBenchEaPairEightHexEight$ of the rates of
+Table~\ref{tab:gputhroughput} on HEX8, whose mesh is the same.  On TET4 the Newton mesh has twelve
+tetrahedra per cell instead of six, and the mesh, not the Newton run, lowers the rates: on that mesh
+(\gpuMeshDofTetFour{}~dof) the \texttt{int8} quantized matrix applies at
+$\gpuMeshQbsrEightVsBoxTetFour$ and single-precision BSR at $\gpuMeshBsrThirtyTwoVsBoxTetFour$ of their
+rates on the box, the quantized matrix still at $\gpuMeshQbsrEightVsThirtyTwoTetFour\times$ the speed of
+BSR.
+
 %% ===================================================================================================
 \section{Discussion and limitations}
 \label{sec:discussion}
 
-\paragraph{The choice of format.}  It follows the element (Table~\ref{tab:summary}).  Where a matrix
+\paragraph{The choice of format.}  It follows the element (Table~\ref{tab:summary}), and on the
+quadratic elements the machine (Section~\ref{sec:gpu}).  On Grace, where a matrix
 row has few blocks and the element formats repeat each coupling in every element that shares it ---
 linear and quadratic tetrahedra --- the quantized assembled matrix is the fastest format.  Where
 rows are long and elements large --- triquadratic hexahedra --- the element formats win, because they
@@ -1331,6 +1478,16 @@ two to three times faster than its bandwidth bound; no element operator, compres
 competes there.  In a distributed run this is a statement about the problem size per node.  The
 set-up, where the compressed stores are cheapest, is a small part of a Newton step at the Krylov
 tolerances used here; it matters more when the Krylov iteration is short.
+
+\paragraph{On the GPU.}  The bytes decide less than on Grace.  The BSR product runs at the memory
+bandwidth, and every compressed format turns less of its byte saving into speed than on Grace: the
+quantized matrix, which streams its records as BSR streams its values, keeps most of it; the
+element formats, held back by their gathers, atomic scatters and per-element latency, keep least,
+and on triquadratic hexahedra the element matrices fall behind BSR.  The set-up weighs more: the
+assembly that the quantized matrix shares with BSR speeds up less than the products, so where it is
+expensive --- quadratic tetrahedra and triquadratic hexahedra --- the quadrature-point stores, whose
+set-up is about $\gpuTenmSetupShareQpHalfTetTen\%$ of the run, solve fastest.  On linear tetrahedra and
+trilinear hexahedra the quantized matrix remains the choice.
 
 
 \paragraph{Points or element matrices.}  At the orders studied the element matrix is no larger than
@@ -1371,7 +1528,9 @@ average removes the Newton iterations the projection costs.  On one Grace CPU at
 freedom the quantized assembled matrix is the fastest format on linear and quadratic tetrahedra, the
 element matrices come close to it on trilinear hexahedra and lead on triquadratic ones, and the
 element formats keep the lowest peak memory.  All of them need the operator to stream from memory:
-while the matrix fits in cache, BSR is faster.
+while the matrix fits in cache, BSR is faster.  On one H100 the quantized matrix leads on linear
+tetrahedra and trilinear hexahedra and the quadrature-point stores on quadratic tetrahedra and
+triquadratic hexahedra, where the assembly the matrices need weighs more than on the CPU.
 
 \begin{thebibliography}{99}
 

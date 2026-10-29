@@ -1,7 +1,8 @@
-"""The paper's results tables, from the Grace logs in measured/.
+"""The paper's results tables, from the Grace logs in measured/ and the H100 logs in measured_gpu/.
 
     python results_tables.py measured/ ../../../docs/compressed_partial_assembly/tables \
         measured_qsym/ measured_qbsr/
+    python results_tables.py --machine gpu measured_gpu/ ../../../docs/compressed_partial_assembly/tables
 
 Reads the `bench_qp` logs (one per element; a packed-only log may be split off) and the
 `newton.sbatch` logs, and writes LaTeX table bodies and macros, so no measured number is typed
@@ -27,11 +28,12 @@ def parse_bench(paths):
     for path in paths:
         el = None
         for line in open(path):
-            m = re.match(r"neohookean_ogden (\w+): n=(\d+), (\d+) elements, (\d+) nodes, (\d+) dof, (\d+) threads", line)
+            # Grace: "<k> threads"; the GPU: the device's name.
+            m = re.match(r"neohookean_ogden (\w+): n=(\d+), (\d+) elements, (\d+) nodes, (\d+) dof, (?:(\d+) threads|([^,]+))", line)
             if m:
                 el = m.group(1)
                 meta[el] = dict(n=int(m.group(2)), elements=int(m.group(3)), dof=int(m.group(5)),
-                                threads=int(m.group(6)))
+                                threads=int(m.group(6)) if m.group(6) else None, device=m.group(7))
                 rows.setdefault(el, {})
                 continue
             m = re.match(r"\s{2}(\S.*?)\s{2,}([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+(\S+)\s+(\S+)\s*$", line)
@@ -43,7 +45,9 @@ def parse_bench(paths):
 
 
 def parse_newton(path):
-    """runs[label] = dict(newton, linear, seconds, status, store_mb, peak_mb); meta = (element, dof)."""
+    """runs[label] = dict(newton, linear, seconds, status, store_mb, peak_mb, update_seconds,
+    applies, apply_seconds);
+    meta = (element, dof)."""
     runs, label, meta = {}, None, {}
     for line in open(path):
         if line.startswith("node "):
@@ -54,7 +58,8 @@ def parse_newton(path):
             meta["elements"] = int(m.group(1))
         if line.startswith("== "):
             label = line[3:].strip()
-            runs[label] = dict(newton=0, linear=0, seconds=None, status=None, store_mb=None, peak_mb=None)
+            runs[label] = dict(newton=0, linear=0, seconds=None, status=None, store_mb=None, peak_mb=None,
+                               device_peak_mb=None)
             continue
         if label is None:
             continue
@@ -69,9 +74,15 @@ def parse_newton(path):
         m = re.match(r"newton_qp: peak resident ([\d.]+) MB", line)
         if m:
             runs[label]["peak_mb"] = float(m.group(1))
-        m = re.match(r"qp: \w+ store ([\d.]+) MB", line)
+        m = re.match(r"newton_qp: device peak ([\d.]+) MB", line)
+        if m:
+            runs[label]["device_peak_mb"] = float(m.group(1))
+        m = re.match(r"qp: \w+ store ([\d.]+) MB, \d+ updates ([\d.]+) s, (\d+) applies ([\d.]+) s", line)
         if m:
             runs[label]["store_mb"] = float(m.group(1))
+            runs[label]["update_seconds"] = float(m.group(2))
+            runs[label]["applies"] = int(m.group(3))
+            runs[label]["apply_seconds"] = float(m.group(4))
     return runs, meta
 
 
@@ -315,6 +326,11 @@ def write_macros(src, outdir, extras=()):
         for k, op in (("Exact", "BSR f32"), ("QbsrHalf", "qp bsro16"), ("QbsrEight", "qp bsroi8")):
             if op in runs:
                 m[f"tenmNewton{k}{tag}"] = str(runs[op]["newton"])
+        # The share of the run spent setting the store up (assembly and encoding, for the matrices).
+        for k, op in (("QpHalf", "qp f16"), ("QpEightMd", "qp i8md"), ("EaDiffHalf", "qp ead16"),
+                      ("EaPairEight", "qp eadi8p"), ("QbsrHalf", "qp bsro16"), ("QbsrEight", "qp bsroi8")):
+            if runs.get(op, {}).get("update_seconds") is not None:
+                m[f"tenmSetupShare{k}{tag}"] = f"{100 * runs[op]['update_seconds'] / runs[op]['seconds']:.0f}"
         m[f"timeDof{tag}"] = fmt(mm["dof"])
     write_summary(rows, newton_case(src, extras, "10M"), outdir)
     m.update(qbsr_macros(src, extras))
@@ -395,7 +411,171 @@ def qbsr_macros(src, extras):
     return m
 
 
+# ------------------------------------------------------------------------------------- the GPU
+#
+# measured_gpu/ holds the H100 campaign with the CPU campaign's log stems (bench_qp_cuda,
+# newton_qp_cuda).  Its rows name the GPU's layouts: the quantized BSR is the full difference form in
+# packed records, with int16 offsets or, on HEX27, int32 columns.
+
+# The bench rows behind each format on the GPU (the first present; the set-up is the same row).
+GPU_BENCH = {"BSR f64": ["BSR f64"], "BSR f32": ["BSR f32"],
+             "qbsr f16": ["BSR f16 full off16 packed", "BSR f16 full i32 packed"],
+             "qbsr i8": ["BSR i8/blk full off16 packed", "BSR i8/blk full i32 packed"],
+             "ea diff f16": ["ea diff f16"], "ea pair i8": ["ea diff i8 pair"],
+             "qp f16": ["qp f16"], "qp i8md": ["qp i8 mean+dev"]}
+GPU_NEWTON = {"BSR f64": "BSR f64", "BSR f32": "BSR f32", "qbsr f16": "qp bsro16", "qbsr i8": "qp bsroi8",
+              "ea diff f16": "qp ead16", "ea pair i8": "qp eadi8p", "qp f16": "qp f16", "qp i8md": "qp i8md"}
+GPU_NAMES = {"BSR f64": "BSR, \\texttt{fp64}", "BSR f32": "BSR, \\texttt{fp32}",
+             "qbsr f16": "quantized BSR, \\texttt{fp16}", "qbsr i8": "quantized BSR, \\texttt{int8}",
+             "ea diff f16": "element matrix, \\texttt{fp16}", "ea pair i8": "element matrix, \\texttt{int8} (pair)",
+             "qp f16": "quadrature points, \\texttt{fp16}", "qp i8md": "quadrature points, \\texttt{int8} mean+dev"}
+GPU_FORMATS = list(GPU_NAMES)
+# Macro stems of the formats, as the CPU macros name them.
+GPU_TAGS = {"BSR f64": "BsrSixtyFour", "BSR f32": "BsrThirtyTwo", "qbsr f16": "QbsrHalf", "qbsr i8": "QbsrEight",
+            "ea diff f16": "EaDiffHalf", "ea pair i8": "EaPairEight", "qp f16": "QpHalf", "qp i8md": "QpEightMd"}
+# cuSPARSE's BSR product on the library's values, a reference only (its f32 row has f32 vectors): the
+# bench row, its name in the tables, its macro stem and the library row it is compared with.
+GPU_CUSPARSE = {"cusparse BSR f64": ("cuSPARSE BSR, \\texttt{fp64}", "CusparseSixtyFour", "BSR f64"),
+                "cusparse BSR f32": ("cuSPARSE BSR, \\texttt{fp32}", "CusparseThirtyTwo", "BSR f32")}
+
+
+def gpu_row(rows, el, fmt_):
+    for key in GPU_BENCH[fmt_]:
+        if key in rows.get(el, {}):
+            return rows[el][key]
+    return None
+
+
+def write_gpu(src, outdir):
+    """The GPU's tables (h100_*.tex, summary_gpu.tex) and macros (results_macros_gpu.tex, \\gpu...)."""
+    os.makedirs(outdir, exist_ok=True)
+    rows, meta = parse_bench(logs(src, MAIN_GLOBS["bench"]))
+    newton = {c: newton_case(src, (), c) for c in ("1M", "twist", "10M")}
+    with open(os.path.join(outdir, "h100_throughput.tex"), "w") as f:
+        for o in GPU_FORMATS:
+            rs = [gpu_row(rows, el, o) for el in ELEMENTS]
+            cells = [fmt(r["mdofs"]) if r else "---" for r in rs] + [fmt(r["bytes_per_dof"]) if r else "---" for r in rs]
+            f.write(f"{GPU_NAMES[o]} & " + " & ".join(cells) + " \\\\\n")
+    with open(os.path.join(outdir, "h100_cusparse.tex"), "w") as f:
+        for key, (name, _, _) in GPU_CUSPARSE.items():
+            rs = [rows.get(el, {}).get(key) for el in ELEMENTS]
+            cells = [fmt(r["mdofs"]) if r else "---" for r in rs] + [fmt(r["bytes_per_dof"]) if r else "---" for r in rs]
+            f.write(f"{name} & " + " & ".join(cells) + " \\\\\n")
+    with open(os.path.join(outdir, "h100_setup.tex"), "w") as f:
+        for o in GPU_FORMATS:
+            rs = [gpu_row(rows, el, o) for el in ELEMENTS]
+            f.write(f"{GPU_NAMES[o]} & " + " & ".join(fmt(r["setup_ms"], 1) if r else "---" for r in rs) + " \\\\\n")
+    with open(os.path.join(outdir, "h100_newton.tex"), "w") as f:
+        for o in GPU_FORMATS:
+            cells = []
+            for el in ELEMENTS:
+                run = newton["1M"].get(el, ({}, {}))[0].get(GPU_NEWTON[o])
+                cells += [f"{run['newton']}", fmt(run["linear"]), fmt(run["seconds"], 1)] if run else ["---"] * 3
+            f.write(f"{GPU_NAMES[o]} & " + " & ".join(cells) + " \\\\\n")
+    # The summary: time to solution at about 10M dof relative to BSR fp32, with the memory factor.
+    with open(os.path.join(outdir, "summary_gpu.tex"), "w") as f:
+        for el in ELEMENTS:
+            runs = newton["10M"].get(el, ({}, {}))[0]
+            ref, b32 = runs.get("BSR f32"), gpu_row(rows, el, "BSR f32")
+            cells = []
+            for o in GPU_FORMATS[2:]:
+                r, b = runs.get(GPU_NEWTON[o]), gpu_row(rows, el, o)
+                cells.append((r["seconds"] / ref["seconds"], b32["bytes_per_dof"] / b["bytes_per_dof"])
+                             if r and ref and b and b32 else None)
+            best = min((c[0] for c in cells if c), default=None)
+            out = ["---" if not c else (f"\\textbf{{{c[0]:.2f}}}" if c[0] == best else f"{c[0]:.2f}") + f" ({c[1]:.1f})"
+                   for c in cells]
+            f.write(f"{NAMES.get(el, el)} & " + " & ".join(out) + " \\\\\n")
+    m = {}
+    for el, tag in TAGS.items():
+        if el in meta:
+            m[f"gpuBenchDof{tag}"] = fmt(meta[el]["dof"])
+            m["gpuDevice"] = meta[el]["device"] or ""
+        b32, b64 = gpu_row(rows, el, "BSR f32"), gpu_row(rows, el, "BSR f64")
+        for o in GPU_FORMATS:
+            r = gpu_row(rows, el, o)
+            if not r:
+                continue
+            k = GPU_TAGS[o]
+            m[f"gpu{k}Rate{tag}"] = fmt(r["mdofs"])
+            m[f"gpu{k}Setup{tag}"] = fmt(r["setup_ms"], 1)
+            m[f"gpu{k}Gbs{tag}"] = fmt(r["mdofs"] * r["bytes_per_dof"] / 1e3)
+            if b32:
+                m[f"gpu{k}VsThirtyTwo{tag}"] = f"{r['mdofs'] / b32['mdofs']:.2f}"
+            if b64:
+                m[f"gpu{k}VsSixtyFour{tag}"] = f"{r['mdofs'] / b64['mdofs']:.2f}"
+        for key, (_, k, lib) in GPU_CUSPARSE.items():
+            r, b = rows.get(el, {}).get(key), gpu_row(rows, el, lib)
+            if not r:
+                continue
+            m[f"gpu{k}Rate{tag}"] = fmt(r["mdofs"])
+            if b:
+                m[f"gpu{GPU_TAGS[lib]}VsCusparse{tag}"] = f"{b['mdofs'] / r['mdofs']:.2f}"
+        for case, stem in (("1M", "Newton"), ("twist", "Twist"), ("10M", "Tenm")):
+            runs, mm = newton[case].get(el, ({}, {}))
+            ref = runs.get("BSR f32")
+            for o in GPU_FORMATS:
+                r = runs.get(GPU_NEWTON[o])
+                if not r:
+                    continue
+                k = GPU_TAGS[o]
+                m[f"gpu{stem}It{k}{tag}"] = str(r["newton"])
+                m[f"gpu{stem}Seconds{k}{tag}"] = fmt(r["seconds"], 1)
+                if ref:
+                    m[f"gpu{stem}Time{k}{tag}"] = f"{r['seconds'] / ref['seconds']:.2f}"
+                if r["device_peak_mb"]:
+                    m[f"gpu{stem}Peak{k}{tag}"] = f"{r['device_peak_mb'] / 1024:.1f}"
+                if r.get("update_seconds") is not None and case == "10M":
+                    m[f"gpu{stem}SetupShare{k}{tag}"] = f"{100 * r['update_seconds'] / r['seconds']:.0f}"
+                # The rate of the applications inside the Newton run, and against the bench's.
+                if r.get("applies") and case == "10M":
+                    rate = mm["dof"] * r["applies"] / r["apply_seconds"] / 1e6
+                    m[f"gpu{stem}Apply{k}{tag}"] = fmt(rate)
+                    b = gpu_row(rows, el, o)
+                    if b:
+                        m[f"gpu{stem}ApplyVsBench{k}{tag}"] = f"{rate / b['mdofs']:.2f}"
+            if mm.get("dof"):
+                m[f"gpu{stem}Dof{tag}"] = fmt(mm["dof"])
+    # The bench on the Newton study's TET4 mesh (twelve tetrahedra per cell), against the box's.
+    mrows, mmeta = parse_bench(logs(src, ["meshbench_tet4_*.out"]))
+    for el, rr in mrows.items():
+        tag = TAGS[el]
+        for o in GPU_FORMATS:
+            for key in GPU_BENCH[o]:
+                if key in rr:
+                    m[f"gpuMesh{GPU_TAGS[o]}Rate{tag}"] = fmt(rr[key]["mdofs"])
+                    b = gpu_row(rows, el, o)
+                    if b:
+                        m[f"gpuMesh{GPU_TAGS[o]}VsBox{tag}"] = f"{rr[key]['mdofs'] / b['mdofs']:.2f}"
+                    break
+        b32 = rr.get("BSR f32")
+        for o in GPU_FORMATS:
+            r = next((rr[k] for k in GPU_BENCH[o] if k in rr), None)
+            if r and b32:
+                m[f"gpuMesh{GPU_TAGS[o]}VsThirtyTwo{tag}"] = f"{r['mdofs'] / b32['mdofs']:.2f}"
+        m[f"gpuMeshDof{tag}"] = fmt(mmeta[el]["dof"])
+    # The largest size of each element's application sweep.
+    for path in logs(src, ["bsweepauto_*.out"]):
+        for line in open(path):
+            mt = re.match(r"\S+ (\w+): n=\d+, \d+ elements, \d+ nodes, (\d+) dof", line)
+            if mt and mt.group(1) in TAGS:
+                key = f"gpuSweepMaxDof{TAGS[mt.group(1)]}"
+                if int(mt.group(2)) > int(m.get(key, "0").replace("{,}", "")):
+                    m[key] = fmt(int(mt.group(2)))
+    with open(os.path.join(outdir, "results_macros_gpu.tex"), "w") as f:
+        for k, v in sorted(m.items()):
+            f.write(f"\\newcommand{{\\{k}}}{{{v}}}\n")
+    for el in ELEMENTS:
+        print(el, len(rows.get(el, {})), "bench rows,", {c: len(newton[c].get(el, ({}, {}))[0]) for c in newton}, "newton runs")
+    return m
+
+
 def main():
+    if sys.argv[1] == "--machine":
+        if sys.argv[2] != "gpu":
+            raise SystemExit("--machine gpu, or the Grace arguments")
+        write_gpu(sys.argv[3], sys.argv[4])
+        return
     src, outdir, extras = sys.argv[1], sys.argv[2], sys.argv[3:]
     rows, meta = bench_rows(src, extras)
     write(rows, meta, {el: r for el, r in newton_case(src, extras, "1M").items()}, outdir)
