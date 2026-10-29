@@ -291,8 +291,8 @@ static void store_row(const std::string &name, const char *variant, const qpd::G
 
 // cuSPARSE's generic product (cusparseSpMV) on the BSR values, as a second reference: the matrix as
 // BSR (cusparseCreateBsr), and expanded to scalar CSR (nine values and nine column indices per
-// block) with the default algorithm and with CSR_ALG2.  Vectors and computation in V, as bsrmv's.  A
-// format or algorithm cuSPARSE refuses is reported, not timed.
+// block) with the default algorithm and with CSR_ALG2.  Vectors and computation in V, as bsrmv's, and
+// y += A x (beta 1), as ours.  A format or algorithm cuSPARSE refuses is reported, not timed.
 template <typename V>
 static void generic_rows(const Problem &P, const DeviceProblem &D, const V *values, const double setup_s,
                          const int repeats) {
@@ -318,22 +318,30 @@ static void generic_rows(const Problem &P, const DeviceProblem &D, const V *valu
     cusparseDnVecDescr_t vx, vy;
     cusparseCreateDnVec(&vx, (int64_t)nv, hv, vt);
     cusparseCreateDnVec(&vy, (int64_t)nv, ov, vt);
-    const V one = 1, zero = 0;
+    const V one = 1;
     auto run = [&](const std::string &name, cusparseSpMatDescr_t A, const cusparseSpMVAlg_t alg, const double bytes) {
         if (!selected(name.c_str())) return;
+        CHECK_CUDA(cudaMemset(ov, 0, nv * sizeof(V)));
         size_t size = 0;
-        cusparseStatus_t st = cusparseSpMV_bufferSize(handle, CUSPARSE_OPERATION_NON_TRANSPOSE, &one, A, vx, &zero, vy,
+        const char *step = "cusparseSpMV_bufferSize";
+        cusparseStatus_t st = cusparseSpMV_bufferSize(handle, CUSPARSE_OPERATION_NON_TRANSPOSE, &one, A, vx, &one, vy,
                                                       vt, alg, &size);
         void *buffer = nullptr;
         if (st == CUSPARSE_STATUS_SUCCESS) {
             CHECK_CUDA(cudaMalloc(&buffer, std::max<size_t>(1, size)));
-            st = cusparseSpMV_preprocess(handle, CUSPARSE_OPERATION_NON_TRANSPOSE, &one, A, vx, &zero, vy, vt, alg,
+            step = "cusparseSpMV_preprocess";
+            st = cusparseSpMV_preprocess(handle, CUSPARSE_OPERATION_NON_TRANSPOSE, &one, A, vx, &one, vy, vt, alg,
                                          buffer);
         }
-        if (st == CUSPARSE_STATUS_SUCCESS)
-            st = cusparseSpMV(handle, CUSPARSE_OPERATION_NON_TRANSPOSE, &one, A, vx, &zero, vy, vt, alg, buffer);
+        if (st == CUSPARSE_STATUS_SUCCESS) {
+            step = "cusparseSpMV";
+            st = cusparseSpMV(handle, CUSPARSE_OPERATION_NON_TRANSPOSE, &one, A, vx, &one, vy, vt, alg, buffer);
+        }
         if (st != CUSPARSE_STATUS_SUCCESS) {
-            printf("  %-34s not supported: %s\n", name.c_str(), cusparseGetErrorString(st));
+            size_t free_now = 0, total_now = 0;
+            cudaMemGetInfo(&free_now, &total_now);
+            printf("  %-34s failed: %s returned %s (buffer %.2f GB, %.1f GB free)\n", name.c_str(), step,
+                   cusparseGetErrorString(st), size / 1e9, free_now / 1e9);
             cudaFree(buffer);
             return;
         }
@@ -350,7 +358,7 @@ static void generic_rows(const Problem &P, const DeviceProblem &D, const V *valu
         device_errors(P, D.out, row);
         row.apply_s = best_of_three([&] {
                           for (int r = 0; r < repeats; ++r)
-                              must(cusparseSpMV(handle, CUSPARSE_OPERATION_NON_TRANSPOSE, &one, A, vx, &zero, vy, vt,
+                              must(cusparseSpMV(handle, CUSPARSE_OPERATION_NON_TRANSPOSE, &one, A, vx, &one, vy, vt,
                                                 alg, buffer) != CUSPARSE_STATUS_SUCCESS,
                                    name);
                           CHECK_CUDA(cudaDeviceSynchronize());
@@ -375,10 +383,28 @@ static void generic_rows(const Problem &P, const DeviceProblem &D, const V *valu
             cusparseDestroySpMat(A);
         }
     }
-    if (selected(cname1.c_str()) || selected(cname2.c_str())) {
+    // cuSPARSE 12.5's CSR product returns an internal error past 2^31 values, with 64-bit indices
+    // and memory to spare (HEX27 at 1.8e7 dof, 3.4e9 values: preprocess and product both); 64-bit
+    // indices below that work (QP_CSR_INDEX64).  The scalar copy also has to fit beside the BSR
+    // matrix: at 2.4e7 HEX27 dof in f64 it does not.
+    size_t free_bytes = 0, total_bytes = 0;
+    CHECK_CUDA(cudaMemGetInfo(&free_bytes, &total_bytes));
+    const size_t csr_isz = nnzb * 9 > (size_t)INT32_MAX || std::getenv("QP_CSR_INDEX64") ? 8 : 4;
+    const double csr_bytes = (double)(nv + 1) * csr_isz + (double)nnzb * 9 * (csr_isz + sizeof(V));
+    if ((selected(cname1.c_str()) || selected(cname2.c_str())) && nnzb * 9 > (size_t)INT32_MAX) {
+        for (const std::string &name : {cname1, cname2})
+            if (selected(name.c_str()))
+                printf("  %-34s skipped: %zu values, past the 2^31 its CSR product handles\n", name.c_str(),
+                       nnzb * 9);
+    } else if ((selected(cname1.c_str()) || selected(cname2.c_str())) && csr_bytes > (double)free_bytes) {
+        for (const std::string &name : {cname1, cname2})
+            if (selected(name.c_str()))
+                printf("  %-34s skipped: its %.1f GB scalar copy exceeds the %.1f GB free\n", name.c_str(),
+                       csr_bytes / 1e9, free_bytes / 1e9);
+    } else if (selected(cname1.c_str()) || selected(cname2.c_str())) {
         // Scalar row 3 i + r: block row i's blocks in order, each contributing its row r.
         const size_t nnz = nnzb * 9;
-        const bool wide = nnz > (size_t)INT32_MAX;
+        const bool wide = csr_isz == 8;
         std::vector<V> bv(nnz), cv(nnz);
         CHECK_CUDA(cudaMemcpy(bv.data(), values, nnz * sizeof(V), cudaMemcpyDeviceToHost));
         std::vector<int64_t> rp(nv + 1);
@@ -463,11 +489,13 @@ int main(int argc, char **argv) {
         Row row;
         row.name = name;
         row.setup_s = best_of_three([&] { must(assemble<V>(P, D, D.u, values), std::string(name) + " assembly"); });
+        // y += A x, the contract inside Newton (BSRTangent::op's default scale 1) and the stores'.
         auto product = [&] {
-            must(sfem::d_bsr_spmv_native<count_t, idx_t, V, double>(g.n_rows, 3, D.rowptr, D.colidx, values, 0.0, D.h,
-                                                                     D.out, nullptr),
+            must(sfem::d_bsr_spmv_native<count_t, idx_t, V, double>(g.n_rows, 3, D.rowptr, D.colidx, values, 1.0,
+                                                                     D.h, D.out, nullptr),
                  name);
         };
+        CHECK_CUDA(cudaMemset(D.out, 0, (size_t)D.nnodes * 3 * sizeof(double)));
         product();
         CHECK_CUDA(cudaDeviceSynchronize());
         device_errors(P, D.out, row);
@@ -500,15 +528,17 @@ int main(int argc, char **argv) {
                 std::vector<V> hc(hh.begin(), hh.end());
                 CHECK_CUDA(cudaMemcpy(hv, hc.data(), nv * sizeof(V), cudaMemcpyHostToDevice));
             }
-            const V one = 1, zero = 0;
+            // y += A x (beta 1), as ours.
+            const V one = 1;
+            CHECK_CUDA(cudaMemset(ov, 0, nv * sizeof(V)));
             auto cproduct = [&] {
                 cusparseStatus_t st;
                 if constexpr (sizeof(V) == 8)
                     st = cusparseDbsrmv(handle, CUSPARSE_DIRECTION_ROW, CUSPARSE_OPERATION_NON_TRANSPOSE, (int)g.n_rows,
-                                        (int)g.n_rows, (int)g.nnz(), &one, descr, values, D.rowptr, D.colidx, 3, hv, &zero, ov);
+                                        (int)g.n_rows, (int)g.nnz(), &one, descr, values, D.rowptr, D.colidx, 3, hv, &one, ov);
                 else
                     st = cusparseSbsrmv(handle, CUSPARSE_DIRECTION_ROW, CUSPARSE_OPERATION_NON_TRANSPOSE, (int)g.n_rows,
-                                        (int)g.n_rows, (int)g.nnz(), &one, descr, values, D.rowptr, D.colidx, 3, hv, &zero, ov);
+                                        (int)g.n_rows, (int)g.nnz(), &one, descr, values, D.rowptr, D.colidx, 3, hv, &one, ov);
                 must(st != CUSPARSE_STATUS_SUCCESS, cname);
             };
             cproduct();
@@ -544,8 +574,7 @@ int main(int argc, char **argv) {
 
     // Quantized BSR: the f32 assembly encoded on the device; set-up is both.
     for (const char *variant : {"bsro16", "bsroi8"}) {
-        const std::string name = std::string(variant[4] == '1' ? "BSR f16 full " : "BSR i8/blk full ") +
-                                 (ELEMENT_TYPE == smesh::PROTEUS_HEX27 ? "i32 packed" : "off16 packed");
+        const std::string name = std::string(variant[4] == '1' ? "BSR f16 full " : "BSR i8/blk full ") + "i32 packed";
         if (!selected(name.c_str())) continue;
         qpd::Assembly a;
         a.n_rows = g.n_rows;

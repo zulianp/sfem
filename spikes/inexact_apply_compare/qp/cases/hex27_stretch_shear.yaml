@@ -18,7 +18,7 @@ dirichlet_conditions:
     value: [0.25, 0.15, 0.1]
     profile: {type: linear_ramp, start_time: 0, end_time: 1, start_value: 0, end_value: 1}
 regime: quasi_static
-time: {dt: 0.25, t_end: 1}
+time: {dt: 0.125, t_end: 1}   # the step every format converges in without retries at about 1e6 dof
 solver:
   newton: {max_it: 30, rtol: 1e-8, atol: 1e-12}
   linear: {type: cg, format: BSR, preconditioner: none, rtol: 1e-3, max_it: 5000}

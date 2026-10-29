@@ -245,7 +245,9 @@ int main(int argc, char **argv) {
             Row row;
             row.name = name;
             row.setup_s = best_seconds(1, assemble);
-            bsr_apply_typed<V>(g, values.data(), xi.data(), yi.data());
+            // y += A x, as every operator applies inside Newton (BSRTangent::op's default scale 1).
+            std::fill(yi.begin(), yi.end(), 0.0);
+            bsr_apply_typed<V, true>(g, values.data(), xi.data(), yi.data());
             std::vector<double> x(m.nnodes), y(m.nnodes), z(m.nnodes);
             for (ptrdiff_t v = 0; v < m.nnodes; ++v) {
                 x[v] = yi[(size_t)v * 3 + 0];
@@ -253,7 +255,7 @@ int main(int argc, char **argv) {
                 z[v] = yi[(size_t)v * 3 + 2];
             }
             errors(P, x, y, z, row);
-            row.apply_s = best_seconds(repeats, [&] { bsr_apply_typed<V>(g, values.data(), xi.data(), yi.data()); });
+            row.apply_s = best_seconds(repeats, [&] { bsr_apply_typed<V, true>(g, values.data(), xi.data(), yi.data()); });
             row.bytes = (double)values.size() * sizeof(V) + g.colidx.size() * sizeof(idx_t) +
                         g.rowptr.size() * sizeof(count_t);
             print_row(P, row);
@@ -282,7 +284,9 @@ int main(int argc, char **argv) {
             row.name = name;
             row.setup_s = best_seconds(1, setup);
             if (!in_place) std::vector<float>().swap(values);
-            q.template apply<float, false>(xi.data(), yi.data());
+            // y += A x, as in Newton (newton_qp.exe.cpp).
+            std::fill(yi.begin(), yi.end(), 0.0);
+            q.template apply<float, true>(xi.data(), yi.data());
             std::vector<double> x(m.nnodes), y(m.nnodes), z(m.nnodes);
             for (ptrdiff_t v = 0; v < m.nnodes; ++v) {
                 x[v] = yi[(size_t)v * 3 + 0];
@@ -290,7 +294,7 @@ int main(int argc, char **argv) {
                 z[v] = yi[(size_t)v * 3 + 2];
             }
             errors(P, x, y, z, row);
-            row.apply_s = best_seconds(repeats, [&] { q.template apply<float, false>(xi.data(), yi.data()); });
+            row.apply_s = best_seconds(repeats, [&] { q.template apply<float, true>(xi.data(), yi.data()); });
             row.bytes = (double)q.bytes();
             print_row(P, row);
         };

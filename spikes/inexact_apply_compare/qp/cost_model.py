@@ -315,13 +315,8 @@ PEAK_F32 = 2 * PEAK_F64
 IDX_BYTES = 4
 VEC_BYTES_PER_DOF = 16  # read the input, write the output, once each per dof
 
-# The projected (P0) kernels, operation counts after elimination: docs/partial_assembly.tex,
-# Table "ordering" (selected schedule; TET4 staged, TET10 staged, HEX8 direct).
-P0_FLOPS = {"TET4": 207, "TET10": 1380, "HEX8": 1801, "HEX27": None}  # no projected kernel for HEX27
-
-# The P0 HEX8 apply (packed layout) on the same machine: 2.757 ms on 2738019 dof, 72 threads
-# (RESULTS.md, same section as BANDWIDTH): the flop rate a stored-tangent kernel already reaches.
-P0_HEX8_SECONDS, P0_HEX8_DOF = 2.757e-3, 2738019
+# The HEX8 mesh of the BSR measurement below (RESULTS.md, same section as BANDWIDTH).
+HEX8_DOF = 2738019
 # The BSR product on the same mesh and machine, f64 and f32 values (same section).
 BSR_HEX8_SECONDS = {"f64": 4.758e-3, "f32": 2.661e-3}
 
@@ -379,7 +374,7 @@ def analyse():
                       ea_pair_bytes=ea_pair_bytes)
         out[name] = dict(**out_ea, nq=nq, r=r, dims=sorted(set(dims.values())), per_point=NC * nq, minimal=minimal,
                          store=store, direct=direct, modal=modal, moments=moments, flops=flops,
-                         pzero=P0_FLOPS[name], blocks=nb / nnodes, el_per_dof=el_per_dof, bsr=bsr, pa=pa,
+                         blocks=nb / nnodes, el_per_dof=el_per_dof, bsr=bsr, pa=pa,
                          conn=conn, flop_per_dof=flops * el_per_dof)
     return out
 
@@ -409,13 +404,12 @@ def write_tables(res, outdir):
         for e in E:
             d = res[e]
             dash = "---"
-            f.write(f"{e} & {d['pzero'] or dash} & {d['direct']} & {d['modal'] or dash} & {d['moments'] or dash} & "
+            f.write(f"{e} & {d['direct']} & {d['modal'] or dash} & {d['moments'] or dash} & "
                     f"\\textbf{{{d['flops']}}} & {fmt(d['flop_per_dof'])} \\\\\n")
     with open(os.path.join(outdir, "footprint.tex"), "w") as f:
         for e in E:
             d = res[e]
-            row = [fmt(d["bsr"]["f64"]), fmt(d["bsr"]["f32"]),
-                   fmt(45 * 4 * d["el_per_dof"]) if d["pzero"] else "---"]
+            row = [fmt(d["bsr"]["f64"]), fmt(d["bsr"]["f32"])]
             # With one point there is nothing to share a scale across and no deviation from the
             # mean: the per-component and mean + deviation stores are not meaningful on TET4.
             single = d["nq"] == 1
@@ -436,18 +430,14 @@ def write_tables(res, outdir):
         f.write(f"\\newcommand{{\\MachineBandwidth}}{{{fmt(BANDWIDTH / 1e9)}}}\n")
         f.write(f"\\newcommand{{\\MachinePeakFsixtyfour}}{{{fmt(PEAK_F64 / 1e9)}}}\n")
         f.write(f"\\newcommand{{\\MachinePeakFthirtytwo}}{{{fmt(PEAK_F32 / 1e9)}}}\n")
-        p0_rate = P0_FLOPS["HEX8"] / 3 * P0_HEX8_DOF / P0_HEX8_SECONDS
-        f.write(f"\\newcommand{{\\PzeroHexRate}}{{{fmt(p0_rate / 1e9)}}}\n")
-        f.write(f"\\newcommand{{\\PzeroHexPeak}}{{{fmt(100 * p0_rate / PEAK_F64)}}}\n")
-        f.write(f"\\newcommand{{\\PzeroHexMdofs}}{{{fmt(P0_HEX8_DOF / P0_HEX8_SECONDS / 1e6)}}}\n")
-        f.write(f"\\newcommand{{\\MeasuredDof}}{{{P0_HEX8_DOF / 1e6:.2f}\\times10^{{6}}}}\n")
+        f.write(f"\\newcommand{{\\MeasuredDof}}{{{HEX8_DOF / 1e6:.2f}\\times10^{{6}}}}\n")
         h = res["HEX8"]
         for lab, tag in (("f64", "Sixtyfour"), ("f32", "Thirtytwo")):
-            f.write(f"\\newcommand{{\\BsrMeasured{tag}}}{{{fmt(P0_HEX8_DOF / BSR_HEX8_SECONDS[lab] / 1e6)}}}\n")
+            f.write(f"\\newcommand{{\\BsrMeasured{tag}}}{{{fmt(HEX8_DOF / BSR_HEX8_SECONDS[lab] / 1e6)}}}\n")
             f.write(f"\\newcommand{{\\BsrBound{tag}}}{{{fmt(BANDWIDTH / (h['bsr'][lab] + VEC_BYTES_PER_DOF) / 1e6)}}}\n")
         for e, tag in (("TET4", "TetFour"), ("TET10", "TetTen"), ("HEX8", "HexEight"), ("HEX27", "HexTwentySeven")):
             d = res[e]
-            for key in ("nq", "r", "per_point", "minimal", "store", "flops", "direct", "pzero"):
+            for key in ("nq", "r", "per_point", "minimal", "store", "flops", "direct"):
                 macro = key.replace("_", "")
                 f.write(f"\\newcommand{{\\{macro}{tag}}}{{{d[key] if d[key] is not None else '---'}}}\n")
             f.write(f"\\newcommand{{\\blocks{tag}}}{{{fmt(d['blocks'], 0)}}}\n")
