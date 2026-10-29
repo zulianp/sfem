@@ -3,7 +3,7 @@
 %% measured number arrives through ../tables/results_macros.tex or a generated table.  Build: make.
 %% Review copy: `anonymous` hides the author block and the self-citation; drop it for the final
 %% version, which also takes the ACM rights block in place of the \setcopyright{none} below.
-\documentclass[sigconf,review,anonymous]{acmart}
+\documentclass[sigconf,review]{acmart}
 
 \usepackage{booktabs}
 \usepackage{placeins}
@@ -31,7 +31,7 @@
 
 \begin{document}
 
-\title{Compressed Operator Formats for Newton--Krylov Hyperelasticity: Quadrature Points, Element
+\title{Compressed Operator Formats for Newton--Krylov Hyperelasticity: Partial Assembly, Element
 Matrices and Sparse Matrices Compared}
 
 \author{Patrick Zulian}
@@ -57,7 +57,7 @@ operator, and how that operator is stored decides both the time and the memory o
 evaluate compressed formats along the whole range from the assembled matrix to matrix-free
 application: block sparse (BSR) matrices quantized per block, element matrices quantized per node
 pair, and partial assembly that stores the pulled-back material tangent at the quadrature points
-(on quadratic tetrahedra its $P_2$ moments, all the quadrature sees), against BSR in double and
+(on quadratic tetrahedra the ten weighted sums of it that the application uses), against BSR in double and
 single precision.  The formats share \texttt{fp16} and \texttt{int8} encodings decoded inside the
 application, and a difference form that keeps rigid translations in the kernel of the encoded
 element and assembled matrices whatever the rounding.  An encoding error enters inexact Newton as an
@@ -93,8 +93,7 @@ in block sparse row (BSR) form for a vector problem, pays one assembly per step 
 the speed of memory: on the machine used here a BSR product sustains $\MachineBandwidth$~GB/s,
 $81\%$ of the nominal bandwidth.  Element matrices store each element's dense block and apply it
 with a gather and a scatter.  Partial assembly stores less --- the material tangent at the
-quadrature points, or an average of it --- and applies it by a contraction with the reference
-element; at the far end, a matrix-free application re-evaluates the constitutive law every time.
+quadrature points --- and applies it by a contraction with the reference element; at the far end, a matrix-free application re-evaluates the constitutive law every time.
 Moving along this range trades stored bytes against arithmetic, and quantizing the stored numbers
 shifts the trade for every format at once.
 
@@ -102,10 +101,7 @@ The question this paper answers is which format, with which encoding, gives the 
 solution and the smallest memory for a Newton--Krylov hyperelasticity solve, and why.  The answer
 depends on three things the formats share: the bytes each streams per degree of freedom, the
 arithmetic and gathering each performs, and the perturbation each encoding makes to the tangent,
-which the Newton iteration either absorbs or pays for in iterations.  The smallest
-partial-assembly store, the element-constant projection of the tangent (Section~3.1), already shows
-the last effect: it costs $\newtonPzeroExtraHexEight\%$ more Newton iterations on trilinear hexahedra and
-$\newtonPzeroExtraTetTen\%$ more on quadratic tetrahedra in our study.
+which the Newton iteration either absorbs or pays for in iterations.
 
 The contributions are:
 \begin{itemize}
@@ -118,9 +114,6 @@ The contributions are:
   exactly in the kernel of an encoded element or assembled matrix, with a scale per node pair for
   element matrices and, for the assembled matrix, each pair of blocks stored once in a
   SELL-C-$\sigma$ layout applied without atomics;
-\item a minimal exact quadrature-point store: the tangent at the points or, where fewer, its moments
-  against products of gradient functions ($\storeTetTen$ numbers per quadratic tetrahedron against
-  $\perpointTetTen$ point values);
 \item an evaluation on one Grace CPU and one H100 GPU for four element types up to $10^7$ degrees of
   freedom: throughput, operator and peak memory, Newton iteration counts and time to solution against
   BSR in double and single precision, and the resulting choice of format per element and machine.
@@ -146,20 +139,25 @@ block.  We found no comparison of quantized formats across the assembled, elemen
 levels, no quantization of a stiffness matrix to eight bits, and no encoding that keeps the rigid
 translations in the kernel of the encoded operator.  Inexact Newton methods converge at a rate set
 by the forcing term~\cite{DemboEisenstatSteihaug1982}, to which a Jacobian error
-adds~\cite{Kelley2018}.
+adds~\cite{Kelley2018,Catinas2001}; Jacobians stored in reduced precision have been analysed in this
+way~\cite{Kelley2022}.
 
 %% ===================================================================================================
 \section{Formats}
 
-All formats represent the same element action.  For reference basis $\{\varphi_p\}$, quadrature
-points $\xhat_q$ with weights $w_q$, and a hyperelastic tangent $A_{ijkl}=\partial P_{ij}/\partial
-F_{kl}$~\cite{BonetWood2008}, the pulled-back tangent with the weight folded in is $\Sq_{ikmn} =
-w_q\sum_{j,l} A_{ijkl}\,J^{-1}_{nj} J^{-1}_{ml}\det J$ at $\xhat_q$, and
+All formats represent the same element action.  On an element with reference basis functions
+$\varphi_p$ (one per node $p$), quadrature points $\xhat_q$ with weights $w_q$ and $J$ the Jacobian of
+the map from the reference element, let $A_{ijkl}=\partial P_{ij}/\partial F_{kl}$ be the hyperelastic
+tangent, the derivative of the first Piola--Kirchhoff stress $P$ with respect to the deformation
+gradient $F$~\cite{BonetWood2008}.  Pulled back to the reference element with the weight folded in,
+it is $\Sq_{ikmn} = w_q\sum_{j,l} A_{ijkl}\,J^{-1}_{nj} J^{-1}_{ml}\det J$ at $\xhat_q$, and the tangent
+operator $\mathcal{H}$ applied to an increment $h$ gives at node $p$, component $i$,
 \begin{equation}
   (\mathcal{H} h)_{ip} = \sum_{q}\sum_{k,m,n} \Sq_{ikmn}\, \partial_m h_k(\xhat_q)\,
-  \partial_n\varphi_p(\xhat_q) .
+  \partial_n\varphi_p(\xhat_q) ,
   \label{eq:action}
 \end{equation}
+with $i,k$ the displacement components and $m,n$ the reference coordinates.
 The formats differ in how much of \eqref{eq:action} is precomputed once per Newton step and stored:
 the tangent at the points (partial assembly), the element matrix it produces, or the assembled
 matrix.
@@ -167,26 +165,17 @@ matrix.
 \subsection{Quadrature-point stores}
 
 Everything in \eqref{eq:action} except $\Sq$ belongs to the reference element; with the major
-symmetry of an energy each point carries $45$ numbers.  The tangent enters only through products
-of reference gradients, so it is seen through its moments against the product spaces $\Pi_{mn}$ of
-the gradient spaces, and whichever is smaller --- the $n_q$ point values or a basis of moments ---
-reproduces \eqref{eq:action} exactly (Table~\ref{tab:stores}).  On quadratic tetrahedra (TET10) the
-ten $P_2$ moments $\Mab=\sum_q\lambda_a(\xhat_q)\lambda_b(\xhat_q)\Sq$ replace the eleven points of
-the degree-$4$ rule~\cite{Keast1986}; on trilinear (HEX8) and triquadratic (HEX27) hexahedra the
-point values are minimal.
-
-The smallest store replaces the tangent by its element average, its $L^2$ projection onto the
-constants $\Sbar=\sum_q\Sq/|\widehat K|$.  Substituting $\Sq\approx w_q\Sbar$ into \eqref{eq:action}
-leaves $(\mathcal{H}h)_{ip}\approx\sum_{k,m,n}\Sbar_{ikmn}\sum_j W_{jm,pn}h_{kj}$ with the reference
-tensor $W_{jm,pn}=\sum_q w_q\,\partial_m\varphi_j\,\partial_n\varphi_p$ at $\xhat_q$, integrated exactly
-when the kernel is generated.  $W$ has the rank of the gradient spaces, $W=C^{\mathsf T}XC$ with $C$ the
-map from nodal values to modal gradient coefficients and $X$ their Gram matrix, so this projected
-store is applied in four stages with folded constants --- compress $P=Ch$, apply $X$ and the $45$
-numbers of $\Sbar$, expand with $C^{\mathsf T}$ --- and reads no geometry, state or material.  It is
-exact on linear tetrahedra (one point) and a first-order approximation elsewhere: a
-Kronecker-rank-one approximation $X\otimes\Sbar$ of the element operator.  The exact store differs
-from it by the deviations $\Sq-w_q\Sbar$, which is what makes a mean-and-deviation encoding natural.  The store is laid out per block of $V$ elements, ordered
-point, component, lane (Figure~\ref{fig:fmtpoints}).
+symmetry of an energy each point carries $45$ numbers.  The tangent enters only through the products
+$\partial_m\varphi_j\,\partial_n\varphi_p$ of reference gradients, so the application sees only its
+weighted sums against them, its moments against the space $\Pi_{mn}$ these products span.  Whichever
+is smaller --- the values at the $n_q$ quadrature points or one moment per basis function of
+$\Pi_{mn}$ --- reproduces \eqref{eq:action} exactly (Table~\ref{tab:stores}).  On quadratic tetrahedra
+(TET10) the gradients are linear and their products quadratic, so the ten moments
+$\Mab=\sum_q\lambda_a(\xhat_q)\lambda_b(\xhat_q)\Sq$ against products of the barycentric coordinates
+$\lambda_a$ replace the eleven points of the degree-$4$ rule~\cite{Keast1986}; on trilinear (HEX8) and
+triquadratic (HEX27) hexahedra the point values are already the fewest.  The store is laid out per
+block of $V$ elements, one per vector lane, ordered point, component, lane
+(Figure~\ref{fig:fmtpoints}).
 
 \begin{table}[t]
 \centering
@@ -218,16 +207,18 @@ memory layout of codes, scales and means, and the steps of the application.}
 
 \subsection{Element matrices in difference form}
 
-Contracting the stored tensors with the basis derivatives once per Newton step gives each element's
-$3N\times3N$ matrix, directly and without probing.  An element matrix annihilates rigid
-translations, so each diagonal node block is minus the sum of its row's off-diagonal blocks.
-Storing only $K_{pq}$, $p<q$, and applying $y_p=\sum_{q\ne p}K_{pq}(h_q-h_p)$ keeps the translations
-in the kernel of the \emph{encoded} matrix whatever the rounding.  One \texttt{int8} scale per
-element spends its range on the largest node-pair block, which on higher-order elements exceeds the
-smallest by orders of magnitude; each pair therefore carries an $8$-bit factor
-$r_{pq}=2^{-E}(1+m/8)\le1$ relative to the element scale $s_e$, $K_{pq}\approx s_e r_{pq}C_{pq}$
-with $C_{pq}$ nine \texttt{int8} codes (Figure~\ref{fig:fmtelement}), as in microscaling
-formats~\cite{Rouhani2023} with the node pair as the block.
+Contracting the stored tensors with the basis derivatives once per Newton step gives the
+$3N\times3N$ matrix of an element of $N$ nodes, directly and without probing.  An element matrix
+annihilates rigid translations, so each diagonal node block is minus the sum of its row's
+off-diagonal blocks.  Storing only the $3\times3$ blocks $K_{pq}$ that couple nodes $p<q$, and applying
+$y_p=\sum_{q\ne p}K_{pq}(h_q-h_p)$, with $h_q$ the increment at node $q$ and $y_p$ the result at node
+$p$, keeps the translations in the kernel of the \emph{encoded} matrix whatever the rounding.  One
+\texttt{int8} scale per element spends its range on the largest node-pair block, which on
+higher-order elements exceeds the smallest by orders of magnitude.  Each pair therefore carries an
+$8$-bit factor $r_{pq}=2^{-E}(1+m/8)\le1$, with a $5$-bit exponent $E$ and a $3$-bit mantissa $m$,
+relative to the element scale $s_e$: $K_{pq}\approx s_e r_{pq}C_{pq}$ with $C_{pq}$ its nine
+\texttt{int8} codes (Figure~\ref{fig:fmtelement}), as in microscaling formats~\cite{Rouhani2023} with
+the node pair as the block.
 
 \begin{figure*}[t]
 \centering
@@ -250,8 +241,9 @@ BSR stores each node coupling once, as a $3\times3$ block with a column index
 quantize its blocks after the generated single-precision assembly, in \texttt{int8} with a
 single-precision scale per block or in \texttt{fp16} with one power-of-two scale.  The rows of the
 assembled tangent also annihilate translations, so the difference form holds with $p,q$ ranging over
-the nodes and the diagonal blocks are neither stored nor indexed.  Each pair $i<j$ is stored once:
-with $d=x_j-x_i$ the block adds $K_{ij}d$ to $y_i$ and $-K_{ij}^{\mathsf T}d$ to $y_j$, so the
+the nodes and the diagonal blocks are neither stored nor indexed.  Each pair of nodes $i<j$ is stored once: in the product $y=Kx$, with $x_i$ and $y_i$ the
+three entries of node $i$ and $d=x_j-x_i$, its block adds $K_{ij}d$ to $y_i$ and $-K_{ij}^{\mathsf T}d$
+to $y_j$, so the
 encoded matrix is symmetric by construction, which the assembled one is only to the rounding of its
 summation order.
 
@@ -301,18 +293,21 @@ Every format is encoded once per Newton step, fused into its set-up, and decoded
 inside the application; no full-precision copy of a quadrature-point or element store exists.
 \texttt{fp16} carries a power-of-two scale (per element, or per matrix for BSR).  \texttt{int8} maps
 the largest magnitude of its block --- an element, a node pair or a matrix block --- to $127$.
-Mean and deviation stores the element mean $\Sbar$ of a quadrature-point store in single precision
-and the deviations in \texttt{int8} or \texttt{fp16}.
+Mean and deviation stores the element mean $\Sbar=\sum_q\Sq/|\widehat K|$ of a quadrature-point
+store ($|\widehat K|$ the reference element's volume) in single precision and the deviations
+$\Sq-w_q\Sbar$ in \texttt{int8} or \texttt{fp16}.
 
 Let $\eps$ bound the encoding error $\Delta\mathcal{H}$ in the energy of the exact operator,
-$|x^{\mathsf T}\Delta\mathcal{H}x|\le\eps\,x^{\mathsf T}\mathcal{H}x$.  If the Krylov solves stop at
-relative residual $\eta$, the step satisfies
+$|x^{\mathsf T}\Delta\mathcal{H}x|\le\eps\,x^{\mathsf T}\mathcal{H}x$.  If the Krylov solves for the
+Newton step $s$, $\mathcal{H}s=-f$ with $f$ the residual, stop at relative residual $\eta$, the step
+satisfies
 \begin{equation}
   \frac{\|f+\mathcal{H}s\|_{\mathcal{H}^{-1}}}{\|f\|_{\mathcal{H}^{-1}}}
   \le \eta\sqrt{\tfrac{1+\eps}{1-\eps}} + \tfrac{\eps(1+\eta)}{1-\eps} = \eta+\eps+O(\eps(\eta+\eps)),
   \label{eq:forcing}
 \end{equation}
-so the encoding adds to the forcing term: invisible for $\eps\ll\eta$, rate-determining for
+so the encoding adds to the forcing term~\cite{Catinas2001}, here in the energy norms of
+affine-conjugate Newton methods~\cite{Deuflhard2004}: invisible for $\eps\ll\eta$, rate-determining for
 $\eps\gg\eta$.  A codec rounds each number in proportion to the magnitude it scales by, and an
 element tangent is close to singular on infinitesimal rotations at a stress-free state, so through
 Korn's inequality what bounds $\eps$ is the \emph{absolute} rounding against the shear modulus.  Two
@@ -325,50 +320,56 @@ operator on them, which the difference form removes.
 %% ===================================================================================================
 \section{Implementation and setup}
 
-\paragraph{Kernels.}  The element formats traverse the mesh in blocks of $V$ elements, one per vector
+\paragraph{Kernels}  The element formats traverse the mesh in blocks of $V$ elements, one per vector
 lane, with the reference element's constants folded into generated code.  The application gathers
 the increment, forms gradients or differences in the vector's precision, rounds them to single
 precision, contracts with the decoded store ($81$ multiply--adds per point or moment), and scatters
-through a packed two-pass layout: packs of elements with local node numbering accumulate without
+through a packed two-pass layout~\cite{PackedMesh}: packs of elements with local node numbering accumulate without
 atomics and shared nodes are reduced in a second pass.  Single-precision arithmetic adds a relative
 error of $2^{-24}$, far below either encoding.  BSR is applied row-parallel, the quantized matrix as
-in Section~3.3.
+in Section~3.3.  Every operator, BSR included, is applied as $y \leftarrow y + Ax$, its use inside
+Newton.
 
-\paragraph{On the GPU.}  The whole Newton iteration runs on the device.  BSR is assembled by the
-library's device kernels and applied with sixteen threads per block row; cuSPARSE's \texttt{bsrmv}
+\paragraph{On the GPU}  The whole Newton iteration runs on the device.  BSR is assembled by
+our code's device kernels and applied with sixteen threads per block row; cuSPARSE's \texttt{bsrmv}
 and its generic product on the matrix expanded to scalar CSR, its fastest path, are measured beside
 it.  The compressed stores keep their layouts with blocks of $32$ elements, one
 warp, and are set up on the device, giving the host's codes.  TET4, TET10 and HEX8 apply one thread
 per element with atomic scatters or a block-local scatter in shared memory, whichever is faster;
 HEX27 applies one thread per point (point stores) or one warp per element (element matrices).  The
-quantized matrix stores both blocks of a pair: storing it once needs a transposed scatter, which on
-the GPU costs more than it saves.
+quantized matrix stores both blocks of a pair, since storing it once needs a transposed scatter, and
+full $32$-bit columns, since $16$-bit offsets send the blocks out of their reach to a slower
+remainder kernel: on the GPU both cost more than they save.
 
-\paragraph{Machine and problems.}  One Grace CPU of an NVIDIA GH200 node (CSCS Alps), $72$
+\paragraph{Machine and problems}  One Grace CPU of an NVIDIA GH200 node (CSCS Alps), $72$
 Neoverse-V2 cores, LPDDR5X; GCC~13.3, \texttt{-O3 -mcpu=neoverse-v2}, $72$ OpenMP threads bound one
 per core; vectors and residuals in double precision.  Neo-Hookean material on unit-cube meshes of
 linear (TET4) and quadratic (TET10) tetrahedra, twelve per cell, and trilinear (HEX8) and
 triquadratic (HEX27, $4^3$ Gauss points) hexahedra.  The application study uses $\benchdofHexEight$
 degrees of freedom, a warped state and a white-noise increment.  The Newton study clamps one face
-and displaces the opposite one in four load steps (TET10: sixteen) at about $10^6$ and $10^7$
-degrees of freedom, and twists the cube by $90^\circ$ in sixteen steps at $10^6$; Newton to a
-relative residual of $10^{-8}$, unpreconditioned conjugate gradients to $10^{-3}$ for every format.
+and displaces the opposite one at about $10^6$ and $10^7$ degrees of freedom, and twists the cube by
+$90^\circ$ at $10^6$, in load steps that no format rejects (four to $32$ for the stretch, $16$ to
+$256$ for the twist, by element and size); Newton to a relative residual of $10^{-8}$,
+unpreconditioned conjugate gradients to $10^{-3}$ for every format.
 The GPU is one H100 of the same node type, CUDA~12.6.
 
-\paragraph{Use of AI.}  An AI coding assistant (Claude Code, Anthropic) helped write and run the
+\paragraph{Use of AI}  An AI coding assistant (Claude Code, Anthropic) helped write and run the
 benchmark and Newton drivers, the hand-optimised kernels, the job scripts, the log parsing behind the
 tables and figures, and the format diagrams, under the author's direction.  All reported numbers are
 generated from the run logs.
 
 %% ===================================================================================================
-\section{Results}
+\section{Results on the Grace CPU}
+
+All numbers in this section are measured on Grace with $72$ threads; Section~\ref{sec:gpu} gives
+the H100.
 
 \subsection{Throughput and memory}
 
 \begin{figure*}[t]
 \centering
 \includegraphics[width=0.85\textwidth]{throughput.pdf}
-\caption{Application throughput, $\benchdofHexEight$~dof, $72$ threads.  All figures show the same
+\caption{Application throughput on Grace, $\benchdofHexEight$~dof, $72$ threads.  All figures show the same
 eight formats in the same order: BSR (\texttt{fp64}, \texttt{fp32}), the quantized matrix, the
 element matrix and the quadrature-point store (each \texttt{fp16} and \texttt{int8}).  TET4 has no
 \texttt{int8} mean-and-deviation bar: one point per element leaves no deviation.}
@@ -379,7 +380,7 @@ element.}
 
 \begin{figure*}[t]
 \centering
-\includegraphics[width=0.8\textwidth]{memory_footprint.pdf}
+\includegraphics[width=0.76\textwidth]{memory_footprint.pdf}
 \caption{Operator memory in bytes per degree of freedom (top axis: gigabytes at
 $\benchdofHexEight$~dof), split into encoded numbers, indices and scales.}
 \Description{Horizontal bar charts of operator memory per element type.}
@@ -411,19 +412,15 @@ $\QbsrEightRateHexTwentySeven$~MDOF/s).
 \begin{figure*}[t]
 \centering
 \includegraphics[width=0.85\textwidth]{newton_iterations.pdf}
-\caption{Newton and CG iterations, about $10^6$~dof, log scale, the formats of
+\caption{Newton and CG iterations on Grace, about $10^6$~dof, log scale, the formats of
 Figure~\ref{fig:throughput}.  Matrix-free application and the double-precision store have the counts
-of BSR; the projected store and the encodings with one \texttt{int8} scale per element are not shown,
-their counts are in the text.}
+of BSR; the encodings with one \texttt{int8} scale per element are not shown, their counts are in
+the text.}
 \Description{Grouped bar charts of Newton and conjugate-gradient iteration counts.}
 \label{fig:newton}
 \end{figure*}
 
-The iteration counts follow \eqref{eq:forcing} (Figure~\ref{fig:newton}).  The projected store costs
-$\newtonPzeroExtraHexEight\%$ more Newton iterations on HEX8 and $\newtonPzeroExtraTetTen\%$ on TET10, and
-at $10^7$ degrees of freedom it solves in $\timePzeroHexEight$ and $\timePzeroTetTen$ of the time of
-single-precision BSR, behind the exact compressed formats; we do not propose it as an option and
-leave it out of the figures.
+The iteration counts follow \eqref{eq:forcing} (Figure~\ref{fig:newton}).
 \texttt{int8} with one scale per element is not usable: the point store needs
 $\newtonQpEightElTetTen$ Newton iterations on TET10 and $\newtonQpEightElHexEight$ on HEX8, against
 $\newtonExactTetTen$ and $\newtonExactHexEight$.  The \texttt{int8} mean-and-deviation store keeps the
@@ -440,10 +437,9 @@ as the element matrix with a scale per node pair.
 \begin{figure*}[t]
 \centering
 \includegraphics[width=0.85\textwidth]{time_to_solution.pdf}
-\caption{Newton time to solution relative to single-precision BSR (log scale, below one is faster),
-stretch at $10^6$ and $10^7$~dof and twist at $10^6$~dof; labels give the ratio and the Newton
-iterations.  Failed load-step attempts are included in the time; the formats of
-Figure~\ref{fig:throughput}.}
+\caption{Newton time to solution on Grace relative to single-precision BSR (log scale, below one is
+faster), stretch at $10^6$ and $10^7$~dof and twist at $10^6$~dof; labels give the ratio and the
+Newton iterations; the formats of Figure~\ref{fig:throughput}.}
 \Description{Bar charts of time to solution relative to single-precision BSR for three cases.}
 \label{fig:tts}
 \end{figure*}
@@ -475,7 +471,7 @@ quantized, \texttt{int8} & $\gpuQbsrEightRateTetFour$ & $\gpuQbsrEightRateTetTen
 points, \texttt{fp16} & $\gpuQpHalfRateTetFour$ & $\gpuQpHalfRateTetTen$ & $\gpuQpHalfRateHexEight$ & $\gpuQpHalfRateHexTwentySeven$ \\
 \bottomrule
 \end{tabular}
-\caption{Application throughput on the H100 in MDOF/s, $\gpuBenchDofHexEight$~dof: the library's BSR
+\caption{Application throughput on the H100 in MDOF/s, $\gpuBenchDofHexEight$~dof: our BSR
 product against cuSPARSE's \texttt{bsrmv} on the same matrix and its generic product on the matrix
 expanded to scalar CSR (their \texttt{fp32} rows with single-precision vectors), and two compressed
 formats.}
@@ -506,36 +502,42 @@ machine in bold.}
 \end{table*}
 
 Table~\ref{tab:summary} and Figure~\ref{fig:tts} summarise the evaluation at about $10^7$ degrees of
-freedom.  On the tetrahedra the \texttt{fp16} quantized matrix is the fastest format, at
+freedom.  On Grace, on the tetrahedra the \texttt{fp16} quantized matrix is the fastest format, at
 $\timeQbsrHalfTetFour$ and $\timeQbsrHalfTetTen$ of the time of single-precision BSR; on TET10 it needs
 $\tenmNewtonQbsrHalfTetTen$ Newton iterations against $\tenmNewtonExactTetTen$ and still wins on
-application speed.  On HEX8 the \texttt{int8} quantized matrix and the element matrix with a scale per
+application speed.  The extra iterations are a threshold, not an error: BSR ends most load steps
+after three iterations just below the tolerance, and half precision's perturbation leaves the third
+iterate just above it.  On HEX8 the \texttt{int8} quantized matrix and the element matrix with a scale per
 node pair are close ($\timeQbsrEightHexEight$ and $\timeEaPairEightHexEight$).  On HEX27 every element
-format beats the quantized matrix, and the pair-scaled element matrix is fastest at
-$\timeEaPairEightHexTwentySeven$, with the quadrature-point stores close behind.
+format beats the quantized matrix, and the half-precision element matrix is fastest at
+$\timeEaDiffHalfHexTwentySeven$, with the quadrature-point stores close behind.
 
-Operator memory is not peak memory.  The quantized matrix's application reads
+Operator memory is not peak memory.  On Grace the quantized matrix's application reads
 $\storeQbsrEightHexEight$~GiB on HEX8 at $\peakDofHexEight$ degrees of freedom, but the whole Newton
 run peaks at $\peakQbsrEightHexEight$~GiB against $\peakBsrThirtyTwoHexEight$ for single-precision BSR
 and $\peakEaPairEightHexEight$ for the \texttt{int8} element matrix: the single-precision assembly and
 the node graph it is built on set the peak.  The element formats need neither.
 
-\subsection{On the GPU}
+%% ===================================================================================================
+\section{Results on the H100 GPU}
+\label{sec:gpu}
 
-On the H100 the library's BSR product runs at the memory bandwidth
+On the H100 our BSR product runs at the memory bandwidth
 ($\gpuBsrThirtyTwoGbsTetFour$--$\gpuBsrThirtyTwoGbsHexTwentySeven$~GB/s in single precision),
 $\gpuBsrThirtyTwoVsCusparseHexEight$--$\gpuBsrThirtyTwoVsCusparseHexTwentySeven\times$ faster than
 cuSPARSE's \texttt{bsrmv} and $\gpuBsrThirtyTwoVsCsrMin$--$\gpuBsrThirtyTwoVsCsrMax\times$ faster than
 its CSR product, which streams as fast but reads
 $\gpuCsrThirtyTwoBytesVsBsrMin$--$\gpuCsrThirtyTwoBytesVsBsrMax\times$ the bytes
-(Table~\ref{tab:gpu}).  Every compressed format gains less against it than on Grace: the \texttt{int8}
-quantized matrix applies at $\gpuQbsrEightVsThirtyTwoTetFour$, $\gpuQbsrEightVsThirtyTwoTetTen$,
-$\gpuQbsrEightVsThirtyTwoHexEight$ and $\gpuQbsrEightVsThirtyTwoHexTwentySeven\times$ its speed, the element
-formats, limited by gathers, atomics and latency rather than bytes, less --- on HEX27 the element
-matrices fall behind BSR and the half-precision point store, at
-$\gpuQpHalfVsThirtyTwoHexTwentySeven\times$, is the fastest operator.  The Newton iteration counts at
-about $10^6$ degrees of freedom are those of Grace for every format; runs that meet rejected load
-steps follow other paths, as the order of the device's sums differs.
+(Table~\ref{tab:gpu}).  The \texttt{int8} quantized matrix, which streams its records as BSR streams
+its values, keeps its Grace gain and on three elements exceeds it, at $\gpuQbsrEightVsThirtyTwoTetFour$,
+$\gpuQbsrEightVsThirtyTwoTetTen$, $\gpuQbsrEightVsThirtyTwoHexEight$ and
+$\gpuQbsrEightVsThirtyTwoHexTwentySeven\times$ BSR's speed; the element formats, limited by gathers,
+atomics and latency rather than bytes, gain less than on Grace --- on HEX27 the element matrices fall
+to BSR's speed or below and the half-precision point store, at
+$\gpuQpHalfVsThirtyTwoHexTwentySeven\times$, is the fastest operator.  The Newton iteration counts
+are those of Grace, exactly for BSR and within a tenth for the \texttt{int8} formats, whose iteration
+the order of the device's sums perturbs most; only the HEX27 twist spreads by a tenth on either
+machine, BSR included.
 
 The set-up weighs more, since the GPU speeds up the products more than the assembly: at about $10^7$
 degrees of freedom the half-precision quantized matrix spends $\gpuTenmSetupShareQbsrHalfHexEight$,
@@ -544,8 +546,9 @@ HEX8, TET10 and HEX27 in assembly and encoding ($\tenmSetupShareQbsrHalfHexEight
 $\tenmSetupShareQbsrHalfTetTen$ and $\tenmSetupShareQbsrHalfHexTwentySeven\%$ on Grace), the point stores
 about $\gpuTenmSetupShareQpHalfTetTen\%$.  The quantized matrix stays fastest on TET4
 ($\gpuTenmTimeQbsrHalfTetFour$ of single-precision BSR's time) and HEX8 ($\gpuTenmTimeQbsrEightHexEight$),
-while on TET10 and HEX27 the quadrature-point stores lead ($\gpuTenmTimeQpHalfTetTen$ and
-$\gpuTenmTimeQpEightMdHexTwentySeven$; Figure~\ref{fig:gputts}, Table~\ref{tab:summary}).
+while on TET10 and HEX27 the quadrature-point stores lead ($\gpuTenmTimeQpEightMdTetTen$ in
+\texttt{int8} mean and deviation and $\gpuTenmTimeQpHalfHexTwentySeven$ in \texttt{fp16};
+Figure~\ref{fig:gputts}, Table~\ref{tab:summary}).
 
 %% ===================================================================================================
 \section{Discussion and conclusions}
@@ -564,8 +567,7 @@ Two properties decide which encodings are usable in a Newton iteration, for ever
 rounding must follow the values or their variation over the element, not the largest entry of the
 element, and the encoded operator must keep the rigid translations in its kernel.  Half precision and
 \texttt{int8} mean-plus-deviation satisfy the first; the difference form provides the second and is
-what makes \texttt{int8} usable for element and assembled matrices.  Storing what the quadrature sees
-of the tangent, rather than its element average, removes the iterations the projection costs.
+what makes \texttt{int8} usable for element and assembled matrices.
 
 The gains need the operator to stream from memory: while the matrix fits in the last-level cache,
 BSR is faster.  The study uses one material, structured meshes and an unpreconditioned Krylov
@@ -573,6 +575,6 @@ method; with a preconditioner built from the operator, the encodings change the 
 
 \FloatBarrier
 \bibliographystyle{ACM-Reference-Format}
-\bibliography{refs}
+\bibliography{../refs}
 
 \end{document}

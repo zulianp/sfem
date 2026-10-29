@@ -5,8 +5,9 @@ PYTHON ?= python3
 # The format diagrams: TikZ sources in figures/formats, built to figures/fmt_*.pdf.
 FORMATS := $(patsubst figures/formats/%.tex,figures/%.pdf,$(wildcard figures/formats/fmt_*.tex))
 
-main.pdf: main.tex $(wildcard tables/*.tex) $(wildcard figures/*.pdf) $(FORMATS)
+main.pdf: main.tex refs.bib $(wildcard tables/*.tex) $(wildcard figures/*.pdf) $(FORMATS)
 	pdflatex -interaction=nonstopmode -halt-on-error main.tex >/dev/null
+	bibtex main >/dev/null
 	pdflatex -interaction=nonstopmode -halt-on-error main.tex >/dev/null
 	pdflatex -interaction=nonstopmode -halt-on-error main.tex | grep -E "Warning|Error" || true
 
