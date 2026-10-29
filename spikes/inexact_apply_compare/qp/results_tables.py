@@ -595,8 +595,10 @@ def write_gpu(src, outdir):
 #
 # measured_real/: bench_qp (Grace) and bench_qp_cuda (H100) on the TET4 meshes of the valves of two
 # pump simulations (qp/real_meshes.py, QP_MESH), each as given (level 0) and refined once (level 1):
-# realcpu_<job>/cpu_<mesh>_<level>.out and realgpu_<job>/gpu_<mesh>_<level>.out.  A row's rate is
-# the best over the jobs that measured it (superseded/ is not read).
+# realcpu_<job>/cpu_<mesh>_<level>.out and realgpu_<job>/gpu_<mesh>_<level>.out.  The meshes as given,
+# promoted to TET10 by smesh's mesh_promote: realcpu10_<job>/ and realgpu10_<job>/, same names; the
+# logs say which element they ran.  A row's rate is the best over the jobs that measured it
+# (superseded/ is not read).
 
 REAL_MESHES = [("fp70c", "Valve, coarse", "ValveCoarse"), ("fp70", "Valve, fine", "ValveFine"),
                ("ff200", "Pump valves, coarse", "PumpCoarse"), ("ff200r", "Pump valves, fine", "PumpFine")]
@@ -608,20 +610,27 @@ CPU_BENCH = {"BSR f64": "BSR f64", "BSR f32": "BSR f32", "qbsr f16": "BSR f16 up
              "qp i8md": "qp i8 mean+dev blk a32 lanes packed"}
 # The formats the application meshes show: TET4 has one point, so no mean+deviation store.
 REAL_FORMATS = [o for o in GPU_FORMATS if o != "qp i8md"]
+# Per element: its formats, the levels it runs, its table and its macros' prefix.
+REAL_ELEMENTS = {"TET4": (REAL_FORMATS, REAL_LEVELS, "appmesh.tex", "app"),
+                 "TET10": (GPU_FORMATS, {0: "Given"}, "appmesh_tet10.tex", "appTen")}
 
 
-def real_rows(src):
-    """{machine: {(mesh, level): {format: row}}} and {(mesh, level): meta}, best over the jobs."""
+def real_rows(src, element="TET4"):
+    """{machine: {(mesh, level): {format: row}}} and {(mesh, level): meta} of one element, best over
+    the jobs."""
+    formats = REAL_ELEMENTS[element][0]
     out, meta = {"cpu": {}, "gpu": {}}, {}
     for machine in out:
         for path in sorted(glob.glob(os.path.join(src, f"real{machine}*", f"{machine}_*_*.out"))):
             m = re.match(rf"{machine}_(\w+)_(\d)\.out", os.path.basename(path))
             key = (m.group(1), int(m.group(2)))
             rows, mm = parse_bench([path])
-            r = rows.get("TET4", {})
-            meta[key] = mm.get("TET4", meta.get(key))
+            if element not in mm:
+                continue
+            r = rows.get(element, {})
+            meta[key] = mm[element]
             got = out[machine].setdefault(key, {})
-            for o in REAL_FORMATS:
+            for o in formats:
                 cands = [CPU_BENCH[o]] if machine == "cpu" else GPU_BENCH[o]
                 row = next((r[c] for c in cands if c in r), None)
                 if row and (o not in got or row["mdofs"] > got[o]["mdofs"]):
@@ -630,10 +639,19 @@ def real_rows(src):
 
 
 def write_real(src, outdir):
-    """The application meshes: appmesh.tex (sizes, BSR fp32 rates and three formats against it on
-    both machines) and results_macros_real.tex (\\app... macros)."""
-    rows, meta = real_rows(src)
+    """The application meshes: per element a table (sizes, BSR fp32 rates and three formats against
+    it on both machines), and results_macros_real.tex (\\app... for TET4, \\appTen... for TET10)."""
     m = {}
+    for element in REAL_ELEMENTS:
+        real_tables(src, outdir, element, m)
+    with open(os.path.join(outdir, "results_macros_real.tex"), "w") as f:
+        for k, v in sorted(m.items()):
+            f.write(f"\\newcommand{{\\{k}}}{{{v}}}\n")
+
+
+def real_tables(src, outdir, element, m):
+    formats, levels, table, app = REAL_ELEMENTS[element]
+    rows, meta = real_rows(src, element)
 
     def blocks_per_row(key):
         # BSR fp32: 36 + 4 bytes per block and 4 per row pointer, over 3 dof per row.
@@ -641,9 +659,9 @@ def write_real(src, outdir):
         return (3 * r["bytes_per_dof"] - 4) / 40 if r else None
 
     shown = ["qbsr i8", "ea diff f16", "qp f16"]
-    with open(os.path.join(outdir, "appmesh.tex"), "w") as f:
+    with open(os.path.join(outdir, table), "w") as f:
         for mesh, label, tag in REAL_MESHES:
-            for lv, lvname in REAL_LEVELS.items():
+            for lv, lvname in levels.items():
                 key = (mesh, lv)
                 if key not in meta:
                     continue
@@ -656,39 +674,35 @@ def write_real(src, outdir):
                     cells.append(fmt(b["mdofs"]) if b else "---")
                     cells += [f"{r[o]['mdofs'] / b['mdofs']:.2f}" if b and o in r else "---" for o in shown]
                 f.write(" & ".join(cells) + " \\\\\n")
-                m[f"appDof{tag}{lvname}"] = fmt(d["dof"])
-                m[f"appElements{tag}{lvname}"] = fmt(d["elements"])
-                m[f"appBlocks{tag}{lvname}"] = f"{blocks_per_row(key):.1f}"
+                m[f"{app}Dof{tag}{lvname}"] = fmt(d["dof"])
+                m[f"{app}Elements{tag}{lvname}"] = fmt(d["elements"])
+                m[f"{app}Blocks{tag}{lvname}"] = f"{blocks_per_row(key):.1f}"
     # Ranges over the meshes, per machine, level and format: the rate against BSR fp32, and BSR
     # fp32's own GB/s; the dof per level; the error of each format over all meshes (Grace logs).
     num = lambda v: float(v.replace("{,}", ""))
-    for lv, lvname in REAL_LEVELS.items():
+    for lv, lvname in levels.items():
         keys = [(mesh, lv) for mesh, _, _ in REAL_MESHES if (mesh, lv) in meta]
         dofs = [meta[k]["dof"] for k in keys]
         if dofs:
-            m[f"appDof{lvname}Min"], m[f"appDof{lvname}Max"] = fmt(min(dofs)), fmt(max(dofs))
+            m[f"{app}Dof{lvname}Min"], m[f"{app}Dof{lvname}Max"] = fmt(min(dofs)), fmt(max(dofs))
         for machine, mtag in (("cpu", "Cpu"), ("gpu", "Gpu")):
             gbs = [rows[machine][k]["BSR f32"] for k in keys if "BSR f32" in rows[machine].get(k, {})]
             if gbs:
                 v = [r["mdofs"] * r["bytes_per_dof"] / 1e3 for r in gbs]
-                m[f"app{mtag}BsrThirtyTwoGbs{lvname}Min"], m[f"app{mtag}BsrThirtyTwoGbs{lvname}Max"] = fmt(min(v)), fmt(max(v))
-            for o in REAL_FORMATS:
+                m[f"{app}{mtag}BsrThirtyTwoGbs{lvname}Min"], m[f"{app}{mtag}BsrThirtyTwoGbs{lvname}Max"] = fmt(min(v)), fmt(max(v))
+            for o in formats:
                 if o == "BSR f32":
                     continue
                 v = [rows[machine][k][o]["mdofs"] / rows[machine][k]["BSR f32"]["mdofs"] for k in keys
                      if o in rows[machine].get(k, {}) and "BSR f32" in rows[machine].get(k, {})]
                 if v:
-                    m[f"app{mtag}{GPU_TAGS[o]}Vs{lvname}Min"] = f"{min(v):.2f}"
-                    m[f"app{mtag}{GPU_TAGS[o]}Vs{lvname}Max"] = f"{max(v):.2f}"
-    for o in REAL_FORMATS[2:]:
+                    m[f"{app}{mtag}{GPU_TAGS[o]}Vs{lvname}Min"] = f"{min(v):.2f}"
+                    m[f"{app}{mtag}{GPU_TAGS[o]}Vs{lvname}Max"] = f"{max(v):.2f}"
+    for o in formats[2:]:
         v = [rows["cpu"][k][o]["l2"] for k in rows["cpu"] if o in rows["cpu"][k]]
         if v:
-            m[f"appErr{GPU_TAGS[o]}Min"], m[f"appErr{GPU_TAGS[o]}Max"] = sci(min(v)), sci(max(v))
-    with open(os.path.join(outdir, "results_macros_real.tex"), "w") as f:
-        for k, v in sorted(m.items()):
-            f.write(f"\\newcommand{{\\{k}}}{{{v}}}\n")
-    print(len(meta), "application meshes,", {k: len(v) for k, v in rows.items()}, "machine rows")
-    return rows, meta
+            m[f"{app}Err{GPU_TAGS[o]}Min"], m[f"{app}Err{GPU_TAGS[o]}Max"] = sci(min(v)), sci(max(v))
+    print(element, len(meta), "application meshes,", {k: len(v) for k, v in rows.items()}, "machine rows")
 
 
 def main():

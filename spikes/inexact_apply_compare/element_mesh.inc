@@ -252,6 +252,9 @@ static void tet_geometry(Mesh &m, const std::vector<std::vector<geom_t>> &pts) {
             J[d*3+c] = (double)pts[d][v[c+1]] - (double)pts[d][v[0]];
         double D = J[0]*(J[4]*J[8]-J[5]*J[7]) - J[1]*(J[3]*J[8]-J[5]*J[6]) + J[2]*(J[3]*J[7]-J[4]*J[6]);
         if (D < 0) { std::swap(v[1], v[2]);
+            // A TET10 read from disk carries its edge nodes: the swap exchanges edges (0,1) and (0,2),
+            // and (1,3) and (2,3).
+            if (m.ev.size() == 10) { std::swap(m.ev[4][e], m.ev[6][e]); std::swap(m.ev[8][e], m.ev[9][e]); }
             for (int c = 0; c < 3; ++c) for (int d = 0; d < 3; ++d)
                 J[d*3+c] = (double)pts[d][v[c+1]] - (double)pts[d][v[0]];
             D = -D; }
@@ -316,7 +319,7 @@ static Mesh build_unordered(int n) {
 }
 #endif
 
-#if NXE == 4 && !defined(ELEMENT_HEX8) && !defined(ELEMENT_PROTEUS_HEX27)
+#if (NXE == 4 || NXE == 10) && !defined(ELEMENT_HEX8) && !defined(ELEMENT_PROTEUS_HEX27)
 template <typename T>
 static std::vector<T> read_raw(const std::string &path) {
     std::vector<T> v;
@@ -334,7 +337,8 @@ static std::vector<T> read_raw(const std::string &path) {
     return v;
 }
 
-// A TET4 mesh in smesh's raw layout (i0..i3.int32, x/y/z.float32), as the Newton study reads it.
+// A TET4 or TET10 mesh in smesh's raw layout (i0..i<NXE-1>.int32, x/y/z.float32), as the Newton study
+// reads it; a TET10 one from smesh's mesh_promote.
 static Mesh read_unordered(const std::string &dir) {
     Mesh m;
     std::vector<std::vector<geom_t>> pts(3);
@@ -344,7 +348,7 @@ static Mesh read_unordered(const std::string &dir) {
         pts[d].assign(p.begin(), p.end());
     }
     m.nnodes = (ptrdiff_t)pts[0].size();
-    for (int c = 0; c < 4; ++c) {
+    for (int c = 0; c < NXE; ++c) {
         const std::vector<int32_t> ic = read_raw<int32_t>(dir + "/i" + std::to_string(c) + ".int32");
         m.ev.emplace_back(ic.begin(), ic.end());
     }
@@ -355,9 +359,9 @@ static Mesh read_unordered(const std::string &dir) {
 }
 #endif
 
-// QP_MESH=<folder> reads a TET4 mesh instead of building the cube of n cells.
+// QP_MESH=<folder> reads a TET4 or TET10 mesh instead of building the cube of n cells.
 static Mesh build(int n) {
-#if NXE == 4 && !defined(ELEMENT_HEX8) && !defined(ELEMENT_PROTEUS_HEX27)
+#if (NXE == 4 || NXE == 10) && !defined(ELEMENT_HEX8) && !defined(ELEMENT_PROTEUS_HEX27)
     if (const char *dir = std::getenv("QP_MESH")) {
         Mesh m = read_unordered(dir);
         reorder_mesh(m, MESH_ORDER);

@@ -494,3 +494,12 @@ move to `superseded/` in their folders.
     the current sources; a smoke run of the rebuilt HEX27 benches at 1.1e6 dof reproduces
     `bsweepauto_hex27_5199798` and `_5202324` within 4%, errors identical.
   - The sweep reruns complete (job 5202324, `measured_gpu/bsweepauto_hex27_5202324.out`).
+
+**The application meshes in TET10** (Alps job 5204436, `measured_real/realcpu10_5204436/`,
+`realgpu10_5204436/`): the four TET4 meshes as given, promoted by smesh's `mesh_promote TET10`
+(straight edges; its edge order is the benches', checked to 0 on every midpoint), read through
+`QP_MESH` (the reader now takes TET10 and keeps the edge nodes when it reorients a tetrahedron).
+1.1-7.4e6 dof, 27-28 blocks per row.  Grace ranks the formats as the TET10 cube does (int8 quantized
+1.39-1.67x BSR f32, fp16 element matrix 1.09-1.27x, fp16 points 0.88-0.92x).  On the H100 every
+element format is ahead of BSR f32 (1.03-1.31x); the int8 quantized matrix leads on the two larger
+meshes (1.48, 1.60x), the fp16 element matrix on the two smaller ones.
