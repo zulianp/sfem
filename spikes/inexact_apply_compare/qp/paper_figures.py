@@ -3,6 +3,7 @@
     python paper_figures.py measured/ ../../../docs/compressed_partial_assembly/figures \
         measured_qsym/ measured_qbsr/
     python paper_figures.py --machine gpu measured_gpu/ ../../../docs/compressed_partial_assembly/figures
+    python paper_figures.py --machine real measured_real/ ../../../docs/compressed_partial_assembly/figures
 
 The GPU's figures are the same figures, the files named *_gpu.pdf.
 
@@ -28,8 +29,9 @@ import shutil
 from matplotlib.ticker import FuncFormatter, LogLocator, NullFormatter
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from results_tables import (ELEMENTS, GPU_BENCH, NAMES, REFERENCE_BSR, bench_rows, newton_case,  # noqa: E402
-                           operator_name, parse_bench_sweep, parse_newton, parse_newton_sweep)
+from results_tables import (ELEMENTS, GPU_BENCH, NAMES, REAL_FORMATS, REAL_LEVELS, REAL_MESHES,  # noqa: E402
+                           REFERENCE_BSR, bench_rows, newton_case, operator_name, parse_bench_sweep,
+                           parse_newton, parse_newton_sweep, real_rows)
 
 # "cpu" (Grace) or "gpu" (H100): which campaign the figures are drawn from.
 MACHINE = "cpu"
@@ -253,6 +255,29 @@ def file_gpu_rows(r):
     return r
 
 
+def application_figure(src, out):
+    """appmesh.pdf: each format's rate against BSR fp32 on the application meshes, as given and
+    refined once, Grace above and the H100 below."""
+    rows, meta = real_rows(src)
+    keys = [(mesh, lv) for mesh, _, _ in REAL_MESHES for lv in REAL_LEVELS if (mesh, lv) in meta]
+    short = {"fp70c": "V1", "fp70": "V2", "ff200": "P1", "ff200r": "P2"}
+    labels = [f"{short[mesh]}{'' if lv == 0 else '+'}\n{meta[(mesh, lv)]['dof'] / 1e6:.2g}M" for mesh, lv in keys]
+    ops = [o for o in REAL_FORMATS if o != "BSR f32"]
+    fig, axes = plt.subplots(2, 1, figsize=(TEXTWIDTH, 4.6), sharex=True)
+    for ax, (machine, title) in zip(axes, (("cpu", "Grace CPU, 72 threads"), ("gpu", "H100 GPU"))):
+        def value(o, key, machine=machine):
+            r = rows[machine].get(key, {})
+            return r[o]["mdofs"] / r["BSR f32"]["mdofs"] if o in r and "BSR f32" in r else None
+        bars(ax, ops, value, "speed against BSR fp32", annotate=None, elements=keys)
+        ax.axhline(1.0, color="#8c8c8c", lw=0.8, ls="--")
+        ax.set_title(title)
+        ax.set_xticks(np.arange(len(keys)), labels)
+    fig.tight_layout(rect=(0, 0.08, 1, 1))
+    legend_below(fig, axes, ncol=4)
+    fig.savefig(os.path.join(out, "appmesh.pdf"))
+    plt.close(fig)
+
+
 def main():
     global MACHINE
     args = sys.argv[1:]
@@ -260,6 +285,10 @@ def main():
         MACHINE = args[1]
         args = args[2:]
     src, out, extras = args[0], args[1], args[2:]
+    if MACHINE == "real":
+        os.makedirs(out, exist_ok=True)
+        application_figure(src, out)
+        return
     os.makedirs(out, exist_ok=True)
     rows, meta = bench_rows(src, extras)
     if MACHINE == "gpu":
@@ -395,8 +424,9 @@ def main():
     for path in sorted(glob.glob(os.path.join(src, "nsweep_*.out"))) + auto:
         el = re.search(r"nsweep(?:auto)?_(\w+?)_", os.path.basename(path)).group(1).upper()
         el = {"HEX27": "PROTEUS_HEX27"}.get(el, el)
+        # A later log of the same size (one rerunning some operators) updates those operators.
         for dof, runs in parse_newton_sweep(path):
-            nsweep.setdefault(el, {})[dof] = runs
+            nsweep.setdefault(el, {}).setdefault(dof, {}).update(runs)
     # The quantized BSR runs come from their own sweep in the extras, at the same sizes.
     for d in extras:
         for path in sorted(glob.glob(os.path.join(d, "unsweep_*.out"))):

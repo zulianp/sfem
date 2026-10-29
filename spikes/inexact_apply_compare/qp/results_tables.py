@@ -3,6 +3,7 @@
     python results_tables.py measured/ ../../../docs/compressed_partial_assembly/tables \
         measured_qsym/ measured_qbsr/
     python results_tables.py --machine gpu measured_gpu/ ../../../docs/compressed_partial_assembly/tables
+    python results_tables.py --machine real measured_real/ ../../../docs/compressed_partial_assembly/tables
 
 Reads the `bench_qp` logs (one per element; a packed-only log may be split off) and the
 `newton.sbatch` logs, and writes LaTeX table bodies and macros, so no measured number is typed
@@ -154,7 +155,6 @@ def sci(x):
 THROUGHPUT_ROWS = [
     ("BSR f64", "BSR, \\texttt{fp64}"),
     ("BSR f32", "BSR, \\texttt{fp32}"),
-    ("projected P0 f32 packed", "projected (approximate)"),
     ("qp f32 blk a32 packed", "exact, \\texttt{fp32}"),
     ("qp f16 blk a32 lanes packed", "exact, \\texttt{fp16}"),
     ("qp f16 mean+dev blk a32 lanes packed", "exact, \\texttt{fp16} mean+dev"),
@@ -186,7 +186,7 @@ def write(rows, meta, newton, outdir):
             f.write(f"{label} & " + " & ".join(cells) + " \\\\\n")
     with open(os.path.join(outdir, "grace_setup.tex"), "w") as f:
         for key, label in (("BSR f64", "BSR, \\texttt{fp64}"), ("BSR f32", "BSR, \\texttt{fp32}"),
-                           ("projected P0 f32", "projected"), ("qp f16 blk a32 lanes", "exact, \\texttt{fp16}"),
+                           ("qp f16 blk a32 lanes", "exact, \\texttt{fp16}"),
                            ("qp i8 mean+dev blk a32 lanes", "exact, \\texttt{int8} mean+dev"),
                            ("BSR f16 upper u16", "quantized BSR, \\texttt{fp16}"),
                            ("BSR i8/blk upper u16", "quantized BSR, \\texttt{int8}")):
@@ -197,10 +197,10 @@ def write(rows, meta, newton, outdir):
             if el in meta:
                 f.write(f"\\newcommand{{\\benchdof{tag}}}{{{fmt(meta[el]['dof'])}}}\n")
                 f.write(f"\\newcommand{{\\benchn{tag}}}{{{meta[el]['n']}}}\n")
-    order = ["BSR f64", "BSR f32", "matrix-free", "P0 projected", "qp f64", "qp f16", "qp f16md", "qp i8md", "qp i8",
+    order = ["BSR f64", "BSR f32", "matrix-free", "qp f64", "qp f16", "qp f16md", "qp i8md", "qp i8",
              "qp bsro16", "qp bsroi8"]
     names = {"BSR f64": "BSR, \\texttt{fp64}", "BSR f32": "BSR, \\texttt{fp32}", "matrix-free": "matrix-free",
-             "P0 projected": "projected", "qp f64": "exact, \\texttt{fp64}", "qp f16": "exact, \\texttt{fp16}",
+             "qp f64": "exact, \\texttt{fp64}", "qp f16": "exact, \\texttt{fp16}",
              "qp f16md": "exact, \\texttt{fp16} mean+dev", "qp i8md": "exact, \\texttt{int8} mean+dev",
              "qp i8": "exact, \\texttt{int8} per element", "qp bsro16": "quantized BSR, \\texttt{fp16}",
              "qp bsroi8": "quantized BSR, \\texttt{int8}"}
@@ -227,7 +227,7 @@ def write_macros(src, outdir, extras=()):
     tags = TAGS
     keys = {"QpHalf": "qp f16 blk a32 lanes packed", "QpEightMd": "qp i8 mean+dev blk a32 lanes packed",
             "QpHalfMd": "qp f16 mean+dev blk a32 lanes packed", "EaDiffHalf": "ea diff f16 packed",
-            "EaDiffEight": "ea diff i8 packed", "Pzero": "projected P0 f32 packed",
+            "EaDiffEight": "ea diff i8 packed",
             "EaFullHalf": "ea full f16 packed", "Mf": "exact matrix-free packed two-pass",
             "EaPairEight": "ea diff i8 pair packed", "QbsrHalf": "BSR f16 upper u16",
             "QbsrEight": "BSR i8/blk upper u16", "QbsrEightDiff": "BSR i8/blk diff", "QbsrEightFull": "BSR i8/blk full",
@@ -239,7 +239,7 @@ def write_macros(src, outdir, extras=()):
             continue
         for k, key in (("SetupBsrThirtyTwo", "BSR f32"), ("SetupBsrSixtyFour", "BSR f64"),
                        ("SetupQpHalf", "qp f16 blk a32 lanes"), ("SetupEaDiffHalf", "ea diff f16 atomic"),
-                       ("SetupPzero", "projected P0 f32"), ("SetupQbsrEight", "BSR i8/blk upper u16"),
+                       ("SetupQbsrEight", "BSR i8/blk upper u16"),
                        ("SetupQbsrEightDiff", "BSR i8/blk diff")):
             if key in r:
                 m[f"{k}{tag}"] = fmt(r[key]["setup_ms"])
@@ -288,12 +288,9 @@ def write_macros(src, outdir, extras=()):
             m[f"pairErrGain{tag}"] = f"{a['energy'] / b['energy']:.0f}"
     for el, (runs, mm) in newton_case(src, extras, "1M").items():
         tag = tags[el]
-        ex, p0 = runs.get("BSR f64"), runs.get("P0 projected")
+        ex = runs.get("BSR f64")
         if ex:
             m[f"newtonExact{tag}"] = str(ex["newton"])
-        if ex and p0:
-            m[f"newtonPzero{tag}"] = str(p0["newton"])
-            m[f"newtonPzeroExtra{tag}"] = f"{100 * (p0['newton'] / ex['newton'] - 1):.0f}"
         for k, op in (("EaDiffEight", "qp eadi8"), ("EaPairEight", "qp eadi8p"), ("EaDiffHalf", "qp ead16"),
                       ("QbsrHalf", "qp bsro16"), ("QbsrEight", "qp bsroi8"), ("QpEightEl", "qp i8"),
                       ("QpEightMd", "qp i8md"), ("EaFullHalf", "qp eaf16")):
@@ -320,7 +317,7 @@ def write_macros(src, outdir, extras=()):
         ref = runs.get("BSR f32")
         for k, op in (("QpHalf", "qp f16"), ("QpEightMd", "qp i8md"), ("BsrSixtyFour", "BSR f64"),
                       ("EaDiffHalf", "qp ead16"), ("EaPairEight", "qp eadi8p"), ("QbsrHalf", "qp bsro16"),
-                      ("QbsrEight", "qp bsroi8"), ("Pzero", "P0 projected")):
+                      ("QbsrEight", "qp bsroi8")):
             if ref and op in runs:
                 m[f"time{k}{tag}"] = f"{runs[op]['seconds'] / ref['seconds']:.2f}"
         for k, op in (("Exact", "BSR f32"), ("QbsrHalf", "qp bsro16"), ("QbsrEight", "qp bsroi8")):
@@ -401,7 +398,7 @@ def qbsr_macros(src, extras):
             runs, mm = parse_newton(path)
             tag = TAGS[mm["element"]]
             for l, r in runs.items():
-                k = {"BSR f32": "BsrThirtyTwo", "P0 projected": "Pzero", "qp bsroi8": "QbsrEight",
+                k = {"BSR f32": "BsrThirtyTwo", "qp bsroi8": "QbsrEight",
                      "qp bsro16": "QbsrHalf", "qp ead16": "EaDiffHalf", "qp eadi8p": "EaPairEight"}.get(operator_name(l))
                 if k and r["peak_mb"]:
                     m[f"peak{k}{tag}"] = f"{r['peak_mb'] / 1024:.1f}"
@@ -438,7 +435,7 @@ GPU_TAGS = {"BSR f64": "BsrSixtyFour", "BSR f32": "BsrThirtyTwo", "qbsr f16": "Q
 GPU_CUSPARSE = {"cusparse BSR f64": ("cuSPARSE BSR, \\texttt{fp64}", "CusparseSixtyFour", "BSR f64"),
                 "cusparse BSR f32": ("cuSPARSE BSR, \\texttt{fp32}", "CusparseThirtyTwo", "BSR f32")}
 # cuSPARSE's generic product on the matrix expanded to scalar CSR, its fastest path (its generic
-# product does not take BSR): from the cusparse_*.out logs, compared with those runs' own BSR rows.
+# product does not take BSR): bench rows, compared with the same run's BSR rows.
 GPU_CUSPARSE_CSR = {"cusparse SpMV CSR f64": ("cuSPARSE CSR, \\texttt{fp64}", "CsrSixtyFour", "BSR f64"),
                     "cusparse SpMV CSR f32": ("cuSPARSE CSR, \\texttt{fp32}", "CsrThirtyTwo", "BSR f32")}
 
@@ -454,7 +451,6 @@ def write_gpu(src, outdir):
     """The GPU's tables (h100_*.tex, summary_gpu.tex) and macros (results_macros_gpu.tex, \\gpu...)."""
     os.makedirs(outdir, exist_ok=True)
     rows, meta = parse_bench(logs(src, MAIN_GLOBS["bench"]))
-    crows, _ = parse_bench(logs(src, ["cusparse_*.out"]))
     newton = {c: newton_case(src, (), c) for c in ("1M", "twist", "10M")}
     with open(os.path.join(outdir, "h100_throughput.tex"), "w") as f:
         for o in GPU_FORMATS:
@@ -467,7 +463,7 @@ def write_gpu(src, outdir):
             cells = [fmt(r["mdofs"]) if r else "---" for r in rs] + [fmt(r["bytes_per_dof"]) if r else "---" for r in rs]
             f.write(f"{name} & " + " & ".join(cells) + " \\\\\n")
         for key, (name, _, _) in GPU_CUSPARSE_CSR.items():
-            rs = [crows.get(el, {}).get(key) for el in ELEMENTS]
+            rs = [rows.get(el, {}).get(key) for el in ELEMENTS]
             cells = [fmt(r["mdofs"]) if r else "---" for r in rs] + [fmt(r["bytes_per_dof"]) if r else "---" for r in rs]
             f.write(f"{name} & " + " & ".join(cells) + " \\\\\n")
     with open(os.path.join(outdir, "h100_setup.tex"), "w") as f:
@@ -521,7 +517,7 @@ def write_gpu(src, outdir):
             if b:
                 m[f"gpu{GPU_TAGS[lib]}VsCusparse{tag}"] = f"{b['mdofs'] / r['mdofs']:.2f}"
         for key, (_, k, lib) in GPU_CUSPARSE_CSR.items():
-            r, b = crows.get(el, {}).get(key), crows.get(el, {}).get(lib)
+            r, b = rows.get(el, {}).get(key), rows.get(el, {}).get(lib)
             if not r:
                 continue
             m[f"gpu{k}Rate{tag}"] = fmt(r["mdofs"])
@@ -595,11 +591,111 @@ def write_gpu(src, outdir):
     return m
 
 
+# ------------------------------------------------------------------------------ application meshes
+#
+# measured_real/: bench_qp (Grace) and bench_qp_cuda (H100) on the TET4 meshes of the valves of two
+# pump simulations (qp/real_meshes.py, QP_MESH), each as given (level 0) and refined once (level 1):
+# realcpu_<job>/cpu_<mesh>_<level>.out and realgpu_<job>/gpu_<mesh>_<level>.out.  A row's rate is
+# the best over the jobs that measured it (superseded/ is not read).
+
+REAL_MESHES = [("fp70c", "Valve, coarse", "ValveCoarse"), ("fp70", "Valve, fine", "ValveFine"),
+               ("ff200", "Pump valves, coarse", "PumpCoarse"), ("ff200r", "Pump valves, fine", "PumpFine")]
+REAL_LEVELS = {0: "Given", 1: "Refined"}
+# The bench rows behind each format on Grace (packed scatter for the element formats).
+CPU_BENCH = {"BSR f64": "BSR f64", "BSR f32": "BSR f32", "qbsr f16": "BSR f16 upper u16",
+             "qbsr i8": "BSR i8/blk upper u16", "ea diff f16": "ea diff f16 packed",
+             "ea pair i8": "ea diff i8 pair packed", "qp f16": "qp f16 blk a32 lanes packed",
+             "qp i8md": "qp i8 mean+dev blk a32 lanes packed"}
+# The formats the application meshes show: TET4 has one point, so no mean+deviation store.
+REAL_FORMATS = [o for o in GPU_FORMATS if o != "qp i8md"]
+
+
+def real_rows(src):
+    """{machine: {(mesh, level): {format: row}}} and {(mesh, level): meta}, best over the jobs."""
+    out, meta = {"cpu": {}, "gpu": {}}, {}
+    for machine in out:
+        for path in sorted(glob.glob(os.path.join(src, f"real{machine}*", f"{machine}_*_*.out"))):
+            m = re.match(rf"{machine}_(\w+)_(\d)\.out", os.path.basename(path))
+            key = (m.group(1), int(m.group(2)))
+            rows, mm = parse_bench([path])
+            r = rows.get("TET4", {})
+            meta[key] = mm.get("TET4", meta.get(key))
+            got = out[machine].setdefault(key, {})
+            for o in REAL_FORMATS:
+                cands = [CPU_BENCH[o]] if machine == "cpu" else GPU_BENCH[o]
+                row = next((r[c] for c in cands if c in r), None)
+                if row and (o not in got or row["mdofs"] > got[o]["mdofs"]):
+                    got[o] = row
+    return out, meta
+
+
+def write_real(src, outdir):
+    """The application meshes: appmesh.tex (sizes, BSR fp32 rates and three formats against it on
+    both machines) and results_macros_real.tex (\\app... macros)."""
+    rows, meta = real_rows(src)
+    m = {}
+
+    def blocks_per_row(key):
+        # BSR fp32: 36 + 4 bytes per block and 4 per row pointer, over 3 dof per row.
+        r = rows["cpu"].get(key, {}).get("BSR f32") or rows["gpu"].get(key, {}).get("BSR f32")
+        return (3 * r["bytes_per_dof"] - 4) / 40 if r else None
+
+    shown = ["qbsr i8", "ea diff f16", "qp f16"]
+    with open(os.path.join(outdir, "appmesh.tex"), "w") as f:
+        for mesh, label, tag in REAL_MESHES:
+            for lv, lvname in REAL_LEVELS.items():
+                key = (mesh, lv)
+                if key not in meta:
+                    continue
+                d = meta[key]
+                cells = [label if lv == 0 else "\\quad refined once", fmt(d["elements"]), fmt(d["dof"]),
+                         f"{blocks_per_row(key):.1f}"]
+                for machine in ("cpu", "gpu"):
+                    r = rows[machine].get(key, {})
+                    b = r.get("BSR f32")
+                    cells.append(fmt(b["mdofs"]) if b else "---")
+                    cells += [f"{r[o]['mdofs'] / b['mdofs']:.2f}" if b and o in r else "---" for o in shown]
+                f.write(" & ".join(cells) + " \\\\\n")
+                m[f"appDof{tag}{lvname}"] = fmt(d["dof"])
+                m[f"appElements{tag}{lvname}"] = fmt(d["elements"])
+                m[f"appBlocks{tag}{lvname}"] = f"{blocks_per_row(key):.1f}"
+    # Ranges over the meshes, per machine, level and format: the rate against BSR fp32, and BSR
+    # fp32's own GB/s; the dof per level; the error of each format over all meshes (Grace logs).
+    num = lambda v: float(v.replace("{,}", ""))
+    for lv, lvname in REAL_LEVELS.items():
+        keys = [(mesh, lv) for mesh, _, _ in REAL_MESHES if (mesh, lv) in meta]
+        dofs = [meta[k]["dof"] for k in keys]
+        if dofs:
+            m[f"appDof{lvname}Min"], m[f"appDof{lvname}Max"] = fmt(min(dofs)), fmt(max(dofs))
+        for machine, mtag in (("cpu", "Cpu"), ("gpu", "Gpu")):
+            gbs = [rows[machine][k]["BSR f32"] for k in keys if "BSR f32" in rows[machine].get(k, {})]
+            if gbs:
+                v = [r["mdofs"] * r["bytes_per_dof"] / 1e3 for r in gbs]
+                m[f"app{mtag}BsrThirtyTwoGbs{lvname}Min"], m[f"app{mtag}BsrThirtyTwoGbs{lvname}Max"] = fmt(min(v)), fmt(max(v))
+            for o in REAL_FORMATS:
+                if o == "BSR f32":
+                    continue
+                v = [rows[machine][k][o]["mdofs"] / rows[machine][k]["BSR f32"]["mdofs"] for k in keys
+                     if o in rows[machine].get(k, {}) and "BSR f32" in rows[machine].get(k, {})]
+                if v:
+                    m[f"app{mtag}{GPU_TAGS[o]}Vs{lvname}Min"] = f"{min(v):.2f}"
+                    m[f"app{mtag}{GPU_TAGS[o]}Vs{lvname}Max"] = f"{max(v):.2f}"
+    for o in REAL_FORMATS[2:]:
+        v = [rows["cpu"][k][o]["l2"] for k in rows["cpu"] if o in rows["cpu"][k]]
+        if v:
+            m[f"appErr{GPU_TAGS[o]}Min"], m[f"appErr{GPU_TAGS[o]}Max"] = sci(min(v)), sci(max(v))
+    with open(os.path.join(outdir, "results_macros_real.tex"), "w") as f:
+        for k, v in sorted(m.items()):
+            f.write(f"\\newcommand{{\\{k}}}{{{v}}}\n")
+    print(len(meta), "application meshes,", {k: len(v) for k, v in rows.items()}, "machine rows")
+    return rows, meta
+
+
 def main():
     if sys.argv[1] == "--machine":
-        if sys.argv[2] != "gpu":
-            raise SystemExit("--machine gpu, or the Grace arguments")
-        write_gpu(sys.argv[3], sys.argv[4])
+        if sys.argv[2] not in ("gpu", "real"):
+            raise SystemExit("--machine gpu|real, or the Grace arguments")
+        (write_gpu if sys.argv[2] == "gpu" else write_real)(sys.argv[3], sys.argv[4])
         return
     src, outdir, extras = sys.argv[1], sys.argv[2], sys.argv[3:]
     rows, meta = bench_rows(src, extras)

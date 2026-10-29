@@ -1,18 +1,27 @@
-# The library's BSR product against cuSPARSE on the H100
+# Our BSR product against cuSPARSE on the H100
 
 The comparison: `sfem::d_bsr_spmv_grouped` (G = 16, `src/algebra/bsr/cuda/sfem_BSR_cuda.cu`), the
 BSR product the paper uses as its GPU baseline, against every cuSPARSE path that takes the same
 matrix.
 
-**In short:**
-- cuSPARSE's BSR product, `bsrmv`, runs at 0.8–1.8 TB/s. It executes 8–12× more warp
+**In short** (every product applied as y += A x, the contract inside Newton; cuSPARSE with
+beta = 1):
+- cuSPARSE's BSR product, `bsrmv`, runs at 0.8–1.7 TB/s. It executes 8–12× more warp
   instructions per block than ours, so it is limited by instruction issue, not by memory. Ours
-  reads the same bytes from DRAM and runs at 3.0–3.5 TB/s: **1.9–2.5× faster in f64, 2.8–3.8×
-  in f32.**
+  reads the same bytes from DRAM and runs at 3.0–3.4 TB/s in f64 on the bench's box meshes:
+  **1.9–2.4× faster in f64, 2.5–3.7× in f32.**
 - cuSPARSE's generic `cusparseSpMV` does not take BSR (cuSPARSE 12.5.2). Its tuned path is scalar
-  CSR, and that kernel is as efficient as ours: 3.1–3.5 TB/s. It loses only because CSR stores a
+  CSR, and that kernel is as efficient as ours: 3.0–3.4 TB/s. It loses because CSR stores a
   column index per scalar. With 1.4–1.8× more bytes per product, it is **1.4–1.5× slower in f64 and
-  1.6–1.8× slower in f32.** Against cuSPARSE's deterministic CSR algorithm the gap is 1.9–2.8×.
+  1.5–1.7× slower in f32.** Against cuSPARSE's deterministic CSR algorithm the gap is 1.8–2.6×.
+- On application meshes (unstructured TET4 valve meshes, 0.15–7.4 M dof) the order holds: ours is
+  2.0–2.2× faster than `bsrmv` in f64 and 2.4–3.1× in f32, and 1.25–1.39× faster than CSR in
+  f64 and 1.26–1.74× in f32. There our kernel streams less than on the box (2.3–2.9 TB/s in f64,
+  2.0–2.3 in f32, against CSR f32's 2.1–3.0), so the speed-up over CSR falls short of the byte ratio
+  (see "On application meshes").
+- Adding into y costs our product more than it costs CSR: on the box our f32 rate is 14–17% below
+  the y = A x rate of the first version of this document (HEX27 4%), and our f32 kernel streams
+  2.5–2.6 TB/s of matrix on TET4, HEX8 and TET10 (3.3 on HEX27), against CSR f32's 3.0–3.4.
 
 So we do not reach more bandwidth than the vendor can. The vendor's BSR kernel spends too many
 instructions on 3×3 blocks to reach it, and its kernel that does reach it needs a format with more
@@ -21,8 +30,9 @@ bytes.
 ## Set-up
 
 - **Machine:** one H100 of an Alps GH200 node, CUDA 12.6 (cuSPARSE 12.5.2).
-- **Matrices:** the neo-Hookean tangent at the bench state, 10,328,853 dof (3,442,951 block rows
-  of 3×3), assembled on the device by the library. The same values go into every product.
+- **Matrices:** the neo-Hookean tangent at the bench state on the bench's structured box meshes,
+  10,328,853 dof (3,442,951 block rows of 3×3), assembled on the device by our code. The same
+  values go into every product. Application meshes: their own section below.
 
   | element | blocks | blocks per row |
   |---|---|---|
@@ -55,9 +65,11 @@ bytes.
   the clock lock; the rates below come from the bench, the counters from `ncu`.
 
 Logs:
-- `measured_gpu/cusparse_5198662.out`: rates.
-- `measured_gpu/ncu_{TET4,PROTEUS_HEX27}_5198662.csv`: counters, untracked.
-- The paper's campaign (`bench_*_51950xx.out`) agrees within 1%.
+- `measured_gpu/bench_{tet4,hex8,tet10,hex27}_51998xx.out`: rates, y += A x (Alps jobs
+  5199822–5199828, the paper's campaign).
+- `measured_gpu/ncu_{TET4,PROTEUS_HEX27}_5198662.csv`: counters, untracked. Taken with y = A x
+  (`measured_gpu/superseded/pre_rerun/cusparse_5198662.out`); the instruction counts and the
+  limits they show do not depend on the read of y.
 
 ## Rates
 
@@ -67,30 +79,31 @@ MDOF/s, with GB/s in parentheses, and our speed-up over each product:
 
 | element | B/dof BSR / CSR | ours | bsrmv | × | SpMV CSR | × | SpMV CSR alg2 | × |
 |---|---|---|---|---|---|---|---|---|
-| TET4  | 377 / 538   | 9061 (3419) | 3606 (1361) | 2.51 | 6068 (3266) | 1.49 | 4408 (2373) | 2.06 |
-| HEX8  | 676 / 963   | 5177 (3501) | 2678 (1811) | 1.93 | 3460 (3333) | 1.50 | 2514 (2422) | 2.06 |
-| TET10 | 721 / 1027  | 4842 (3491) | 1959 (1412) | 2.47 | 3309 (3397) | 1.46 | 2362 (2425) | 2.05 |
-| HEX27 | 1599 / 2274 | 2136 (3414) |  989 (1581) | 2.16 | 1524 (3466) | 1.40 | 1116 (2539) | 1.91 |
+| TET4 | 377 / 538 | 7941 (2996) | 3456 (1304) | 2.30 | 5744 (3092) | 1.38 | 4335 (2334) | 1.83 |
+| HEX8 | 676 / 963 | 4737 (3204) | 2497 (1689) | 1.90 | 3260 (3140) | 1.45 | 2420 (2331) | 1.96 |
+| TET10 | 721 / 1027 | 4470 (3223) | 1893 (1365) | 2.36 | 3117 (3200) | 1.43 | 2305 (2366) | 1.94 |
+| HEX27 | 1599 / 2274 | 2134 (3412) | 976 (1561) | 2.19 | 1489 (3386) | 1.43 | 1091 (2480) | 1.96 |
 
 **f32 values** (ours with f64 vectors, cuSPARSE with f32 vectors)
 
 | element | B/dof BSR / CSR | ours | bsrmv | × | SpMV CSR | × | SpMV CSR alg2 | × |
 |---|---|---|---|---|---|---|---|---|
-| TET4  | 199 / 360   | 14958 (2980) | 4081 (813)  | 3.67 | 8497 (3061) | 1.76 | 5870 (2114) | 2.55 |
-| HEX8  | 357 / 644   |  8685 (3097) | 3077 (1097) | 2.82 | 5052 (3251) | 1.72 | 3296 (2121) | 2.64 |
-| TET10 | 380 / 686   |  7898 (3002) | 2126 (808)  | 3.72 | 4816 (3303) | 1.64 | 3060 (2099) | 2.58 |
-| HEX27 | 842 / 1517  |  4073 (3429) | 1081 (910)  | 3.77 | 2326 (3528) | 1.75 | 1437 (2181) | 2.83 |
+| TET4 | 199 / 360 | 12399 (2470) | 3843 (766) | 3.23 | 8227 (2963) | 1.51 | 5802 (2090) | 2.14 |
+| HEX8 | 357 / 644 | 7292 (2600) | 2941 (1049) | 2.48 | 4844 (3117) | 1.51 | 3354 (2158) | 2.17 |
+| TET10 | 380 / 686 | 6812 (2589) | 2061 (783) | 3.31 | 4559 (3127) | 1.49 | 3180 (2181) | 2.14 |
+| HEX27 | 842 / 1517 | 3907 (3290) | 1065 (897) | 3.67 | 2261 (3431) | 1.73 | 1507 (2287) | 2.59 |
 
-Against CSR ALG1, the speed-up follows the byte ratio:
-- f64: CSR/BSR bytes 1.42–1.43, speed-up 1.40–1.50.
-- f32: CSR/BSR bytes 1.80–1.81, speed-up 1.64–1.76.
-
-Both kernels run at the same bandwidth; the format makes the difference.
+Against CSR ALG1:
+- f64: CSR/BSR bytes 1.42–1.43, speed-up 1.38–1.45. Both kernels run at the same bandwidth; the
+  format makes the difference.
+- f32: CSR/BSR bytes 1.80–1.81, speed-up 1.49–1.73. Ours reads and writes y in f64 and gathers x in
+  f64 (8 + 16 bytes per dof beside 199–842 of matrix), CSR f32 in f32; with the read of y our f32
+  kernel streams less than CSR's except on HEX27, whose long rows hide it.
 
 ## Profile
 
-TET4 n=150 and HEX27 n=75. Columns: ours, `bsrmv` (kernel `bsrmv_tiny_core<T,2,3,2,5,0>`), and
-CSR ALG1 (`csrmv_v3_kernel`):
+TET4 n=150 and HEX27 n=75, y = A x (job 5198662; see Logs). Columns: ours, `bsrmv` (kernel
+`bsrmv_tiny_core<T,2,3,2,5,0>`), and CSR ALG1 (`csrmv_v3_kernel`):
 
 | | ours f64 | bsrmv f64 | CSR f64 | ours f32 | bsrmv f32 | CSR f32 |
 |---|---|---|---|---|---|---|
@@ -139,7 +152,7 @@ What the counters show:
 
 ## Why a specialised kernel can beat the vendor here
 
-The kernel is about 25 lines (`bsr_spmv_group_kernel`). Its design keeps the instruction count per
+The kernel is 42 lines (`bsr_spmv_group_kernel`). Its design keeps the instruction count per
 block low enough that only memory limits it, with the one shape that fits these matrices chosen by
 measurement:
 
@@ -151,8 +164,8 @@ measurement:
   a 3-value shuffle reduction per row. Consecutive threads take consecutive blocks, so the warp's 9
   value loads cover one contiguous stretch of 32 blocks. The L1 absorbs the strides: 68–85% hits,
   and every byte is fetched from DRAM once.
-- **G was measured, not guessed** (`bsrgroup_*_51935xx.out`, MDOF/s f32 and the bandwidth it
-  reaches):
+- **G was measured, not guessed** (`bsrgroup_*_51935xx.out`, y = A x, MDOF/s f32 and the bandwidth
+  it reaches):
 
   | element | G = 1 | G = 4 | G = 8 | G = 16 | G = 32 |
   |---|---|---|---|---|---|
@@ -162,8 +175,11 @@ measurement:
   | HEX27 | 1364 (1.17 TB/s) | 3096 | 3386 | 4022 (3.45 TB/s) | 3725 |
 
   One thread per block row (G = 1) lands where `bsrmv` is, at 1.0–1.4 TB/s. A warp per row
-  (G = 32, `bsrmv`'s shape) leaves lanes idle on TET4's 15-block rows. G = 16 is within 3% of the
-  best G everywhere in f32 and within about 5% in f64.
+  (G = 32, `bsrmv`'s launch shape) leaves lanes idle on TET4's 15-block rows. On these box meshes
+  G = 16 is within 3% of the best G in f32 and within about 5% in f64. On the application meshes
+  (TET4, 14–15 blocks per row) G = 8 is 1–4% faster than the better of two G = 16 measurements
+  in the same run (`measured_real/realqs_5199067.out`), and those two differ by up to 5.5%: G = 8
+  may suit TET4 better, which a dedicated repeat would have to settle.
 - **Nothing outside the product.** There is no analysis or preprocessing step and no workspace, and
   each product is one kernel launch. Each block row is written once, by one thread.
 - **Deterministic at full speed.** The G partial sums are added in a fixed shuffle order with no
@@ -174,24 +190,59 @@ measurement:
   9–10e-8 (TET10 and HEX27). cuSPARSE has no f32-matrix/f64-vector mode for either `bsrmv` or SpMV, so
   its f32 rows also round the vectors.
 
-None of this is specific to SFEM's matrices beyond small square blocks and short rows, which every
-vector-valued finite-element tangent has. The library uses the kernel for every block size from 1
-to 4 (`d_bsr_spmv_ranges`, `d_bsr_spmv_native`).
+None of this relies on the box meshes: the application meshes below keep the order against
+`bsrmv` and CSR. Our code uses the kernel for every block size from 1 to 4
+(`d_bsr_spmv_ranges`, `d_bsr_spmv_native`).
+
+## On application meshes
+
+The same bench on unstructured TET4 meshes from two pump simulations, the parts their cases
+compute: one valve (`fp70c`, `fp70`, two resolutions) and a pressure and a suction valve
+(`ff200`, `ff200r`, two resolutions). Each mesh as given (0) and refined once (1, each tetrahedron
+split into eight), coordinates scaled to a unit largest extent (`qp/real_meshes.py`, `QP_MESH`), at
+13–15 blocks per row. Logs: `measured_real/realgpu_5199831/gpu_<mesh>_<level>.out` (Alps job
+5199831, y += A x). MDOF/s of ours (TB/s of matrix), and our speed-up over each cuSPARSE product:
+
+| mesh | dof | ours f64 | × bsrmv | × CSR | × CSR alg2 | ours f32 | × bsrmv | × CSR | × CSR alg2 | CSR f32 TB/s |
+|---|---|---|---|---|---|---|---|---|---|---|
+| ff200 0 | 150,525 | 6622 (2.26) | 2.03 | 1.33 | 2.10 | 11118 (2.00) | 2.43 | 1.74 | 2.73 | 2.09 |
+| fp70c 0 | 223,332 | 6647 (2.34) | 2.03 | 1.26 | 1.91 | 10512 (1.96) | 2.50 | 1.49 | 2.30 | 2.37 |
+| fp70 0 | 526,809 | 7405 (2.67) | 2.15 | 1.25 | 1.78 | 10356 (1.97) | 2.71 | 1.28 | 1.84 | 2.79 |
+| ff200r 0 | 973,812 | 7636 (2.77) | 2.19 | 1.27 | 1.88 | 10849 (2.08) | 2.81 | 1.26 | 1.87 | 2.97 |
+| ff200 1 | 1,084,416 | 7751 (2.79) | 2.21 | 1.26 | 1.72 | 11455 (2.18) | 2.90 | 1.31 | 1.85 | 3.00 |
+| fp70c 1 | 1,659,165 | 7822 (2.86) | 2.24 | 1.34 | 1.84 | 11573 (2.24) | 2.98 | 1.34 | 1.87 | 3.01 |
+| fp70 1 | 4,000,896 | 7879 (2.92) | 2.24 | 1.39 | 1.86 | 11812 (2.31) | 3.07 | 1.44 | 2.04 | 2.90 |
+| ff200r 1 | 7,423,662 | 7827 (2.91) | 2.23 | 1.38 | 1.82 | 11778 (2.31) | 3.02 | 1.42 | 2.04 | 2.94 |
+
+- **f64:** ours streams 2.8–2.9 TB/s from 10⁶ dof, below its 3.0–3.4 on the box, and the
+  speed-up over CSR (1.26–1.39) falls short of the byte ratio (1.43).
+- **f32:** ours streams 2.2–2.3 TB/s from 10⁶ dof while CSR f32 keeps 2.9–3.0. The speed-up over
+  CSR (1.31–1.44) falls short of the byte ratio (1.81). Under Nsight Compute on the largest mesh
+  (`measured_real/ncu/ff200r_1.csv`, y = A x) our f32 kernel reads 11% more L2 sectors per dof than
+  on the box and reaches 55% of DRAM peak against 62%. Our f32 product gathers f64 vectors and adds
+  into an f64 y, CSR f32 uses f32 ones, so the gathers of x on an unstructured graph cost ours more;
+  that is the likely cause, not a measured one.
+- **Below 10⁶ dof** every product runs short of the bandwidth (launch and tail effects at 13–110
+  µs per product); the order is unchanged.
 
 ## Limits of the comparison
 
 - **One cuSPARSE version (12.5.2, CUDA 12.6) and one GPU.** `bsrmv` is the legacy interface. A
   later cuSPARSE that takes BSR in `cusparseSpMV` should be measured when available.
 - **`bsrmv` indexes values with 32 bits.** It faults beyond 2³¹ values (HEX27 at 2.4×10⁷ dof); the
-  bench skips it there. The generic API takes 64-bit indices.
+  bench skips it there. The generic API takes 64-bit indices, but its CSR product fails past 2³¹
+  values too: with 64-bit indices and memory to spare, HEX27 at 1.8×10⁷ dof (3.4×10⁹ values)
+  returns an internal error from both preprocess and product, while 64-bit indices below 2³¹ work.
+  The bench skips the CSR rows there.
 - **The f32 rows differ in vector precision.** cuSPARSE's read f32 vectors (fewer bytes) and are
   still slower.
-- **The CSR expansion is the bench's, not the library's.** A CSR tangent would cost 1.4–1.8× the
-  memory of BSR. The library stores vector problems in BSR only.
+- **The CSR expansion is the bench's, not our code's.** A CSR tangent would cost 1.4–1.8× the
+  memory of BSR. Our code stores vector problems in BSR only.
 
 ## Reproduce
 
-On one GH200 GPU (Alps job 5198662), with the sizes TET4 150, HEX8 150, TET10 75 and HEX27 75:
+On one GH200 GPU (Alps jobs 5199822–5199828 for the rates, 5198662 for the counters), with the
+sizes TET4 150, HEX8 150, TET10 75 and HEX27 75:
 
 ```
 QP_ONLY="BSR f64|BSR f32|cusparse" bench_qp_cuda <n> 10

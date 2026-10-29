@@ -69,9 +69,10 @@ static double best_seconds(int repeats, F &&fn) {
     return best;
 }
 
-// y = A x with values of type V, components interleaved.  The harness's BSR product in
-// double, generalised to single-precision values with double vectors and accumulation.
-template <typename V>
+// y = A x with values of type V, components interleaved, or y += A x with ADD (the contract of
+// the operators inside Newton).  The harness's BSR product in double, generalised to
+// single-precision values with double vectors and accumulation.
+template <typename V, bool ADD = false>
 static void bsr_apply_typed(const BsrGraph &g, const V *const RSTR values, const double *const RSTR x,
                             double *const RSTR y) {
 #pragma omp parallel for
@@ -83,7 +84,7 @@ static void bsr_apply_typed(const BsrGraph &g, const V *const RSTR values, const
             for (int i = 0; i < 3; ++i)
                 for (int j = 0; j < 3; ++j) acc[i] += (double)b[i * 3 + j] * xv[j];
         }
-        for (int i = 0; i < 3; ++i) y[(size_t)row * 3 + i] = acc[i];
+        for (int i = 0; i < 3; ++i) y[(size_t)row * 3 + i] = (ADD ? y[(size_t)row * 3 + i] : 0.0) + acc[i];
     }
 }
 

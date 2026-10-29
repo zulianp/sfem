@@ -412,3 +412,85 @@ cuSPARSE `bsrmv` f64 and f32 rows beside it in the bench.  The paper's tables, m
   the first); `gpu_campaign.sh` excludes it.  Its runs are listed in `gpu_ids_failed.txt` on Alps
   and not fetched.
 
+
+## The rerun of 2026-10-29: one output contract, int32 columns on the GPU, no retried load steps
+
+Three faults in the campaigns above, found while profiling on application meshes; the rerun (Alps
+jobs 5199790-5199848, `rerun_campaign.sh`) replaces every log they affect, and the replaced logs
+move to `superseded/` in their folders.
+
+- **The benches timed the matrices writing y, the stores adding into it.**  Inside Newton every
+  operator applies y += A x (`BSRTangent::op`'s default scale 1; `newton_qp` calls the quantized
+  matrix with ADD; the stores scatter into y).  `bench_qp` and `bench_qp_cuda` timed BSR (and the
+  Grace quantized matrix) as y = A x, which skips the read of y.  On the H100 that read costs the
+  library BSR product 12-17% (HEX27 4%), the quantized matrix 20-30%: the GPU throughput table
+  understated the compressed formats (TET4 int8 quantized 1.71x BSR f32 as measured, 2.07x with both
+  adding).  Both benches now time every format as y += A x (output zeroed before the first call), and
+  cuSPARSE with beta = 1.
+- **The GPU quantized matrix's layout was chosen writing y.**  `qbsr_shape` measured int16 offsets
+  plus a remainder by row ahead of int32 columns; with y += A x (`QS_ACCUMULATE=1`) int32 columns
+  are ahead on every mesh measured: +8% on the TET4 box, +15-30% on the application meshes, whose
+  morton-ordered unstructured graphs send 4-11% of the blocks to the slower remainder kernel
+  (`measured_real/realqs_5199067.out`, job 5199166).  The device format (`cuda/qp_device.cu`) now has
+  int32 columns only, as HEX27 had.
+- **Several Newton cases retried most load steps.**  The step control retries the full dt after a
+  halved step succeeds, so a case whose dt is too large fails and halves on every step: TET10 at 1e7
+  31 failed attempts per run (about 300 discarded Newton iterations against about 100 counted),
+  HEX27 at 1e6 and 1e7, and the TET4, TET10 and HEX27 twists (the TET10 twist 229 failed attempts per
+  run).  The counts reported converged steps only, and the time to solution was mostly retries.  The
+  cases now take a step every format converges in, from the smallest step the old runs needed:
+  HEX27 stretch dt 1/8 (case file; 1e7: `DT=1/32`), TET4 and TET10 stretch at 1e7 `DT=1/8` and
+  `1/32`, twists TET4 1/128, TET10 1/256, HEX27 1/32 (case files).  HEX8 and the 1e6 stretch cases of
+  TET4 and TET10 never retried and are unchanged.
+- The TET10 fp16 formats' extra Newton iterations at 1e7 (116-123 against 99) were a threshold
+  effect: with CG at 1e-3 each Newton iteration gains about three digits, so BSR's third iterate lands
+  at 0.44-0.98 of the 1e-8 tolerance and an encoding error near 1e-4 puts it just above, costing a
+  fourth iteration in most steps.
+
+**What the rerun gave** (logs in `measured/`, `measured_gpu/`, `measured_real/realcpu_5199799/`,
+`realcpu_5199881/`, `realgpu_5199831/`; the replaced ones in each folder's `superseded/pre_rerun/`):
+
+- No run of the paper's eight formats rejects a load step.  The only retries left are formats
+  outside them: the element matrix with one int8 scale per element (HEX27 stretch at 1e6, five
+  failed attempts; the HEX27 twist fails, status 1) and the full fp16 element matrix (TET10 twist,
+  two failed attempts).  The full int8 quantized matrix fails as before, by design.
+- The H100 now takes Grace's Newton counts: exactly for BSR and int8 mean+dev, within a few
+  iterations for the other fp16 formats, within a tenth for the int8 matrices.  The HEX27 twist
+  (32 steps) spreads by about a tenth between formats on either machine, BSR f64 against f32
+  included (145 against 136 on Grace).
+- The threshold effect holds at 32 steps: TET10 at 1e7 on Grace, BSR ends 29 of 32 steps after three
+  Newton iterations at 0.44-0.98 of the tolerance; the fp16 point store takes four in 24 steps
+  (125 against 99), the int8 mean+dev store stays at 99.
+- Time to solution at 1e7 against BSR f32 (the summary table): the old TET4 and TET10 figures were
+  flattered by BSR's retries.  Grace: TET4 quantized fp16 0.73 (was 0.46), TET10 0.92 (0.80); HEX27
+  now led by the fp16 element matrix (0.42).  H100: TET4 quantized fp16 0.73, HEX8 quantized int8
+  0.59, TET10 int8 mean+dev point store 0.73, HEX27 fp16 point store 0.62.
+- With y += A x the H100 int8 quantized matrix applies at 2.24, 1.80, 2.28 and 1.45x BSR f32 (TET4,
+  TET10, HEX8, HEX27), more than on Grace except on HEX27; our BSR against cuSPARSE: CUSPARSE_BSR.md.
+- The remainder share of the Grace quantized matrix comes from the `upper store:` diagnostic, which
+  only the ubench logs print; it is a property of the layout, not of the output contract, so
+  `measured_qsym/ubench_*.out` stay in place for it (their rates are shadowed by the new benches,
+  checked: no other macro changes).
+- Two faults behind the HEX27 bench sweep's crash at 2.4e7 dof (n=100), both fixed:
+  - **The spike's kernel copies were stale.**  CMake generated `build-spike-<E>/gen/` only when it
+    was missing, so the generator's 64-bit BSR offsets (de7dac7ac) never reached it: the reference
+    BSR assembly computed `values[entries * 9]` in 32-bit int and, past 2^31 values, wrote out of
+    bounds (SIGSEGV in `hessian_i_msoa_assemble_impl`; job 5199829 survived it by luck).  The spike
+    now stamps `gen/` with a hash of the generator's sources and regenerates when it changes.  The
+    regenerated kernels of all four elements differ from the old ones in that cast only, so no
+    measured log changes (every other run stays below 2^31 values).
+  - **The GPU trees could link a stale libsfem.**  `build_spike_cuda.sh` defaulted to `build-cuda`
+    (built 2026-10-28 16:24), which predates the grouped device BSR product; the campaign's
+    binaries linked `build-cuda-2`, but a rebuild with the default linked the old product (HEX27
+    BSR f32 1,925 MDOF/s against 3,786) and `qbsr_shape` failed to link.  The default is now
+    `build-cuda-2`; the logs of jobs 5201474 and 5201532 (stale library) are in
+    `superseded/pre_rerun/`.
+  - cuSPARSE 12.5's CSR product fails past 2^31 values: with 64-bit indices and 22.6 GB free, HEX27 at
+    1.8e7 dof (3.4e9 values) returns an internal error from both `cusparseSpMV_preprocess` and
+    `cusparseSpMV`, while 64-bit indices below 2^31 work (`QP_CSR_INDEX64=1` at n=35 and n=75).
+    `bench_qp_cuda` skips the CSR rows past 2^31 values, and where the scalar copy does not fit the
+    free device memory, saying which; a cuSPARSE failure now names the call and the free memory.
+  - The Alps library trees `build` (Grace) and `build-cuda` predated de7dac7ac and are rebuilt from
+    the current sources; a smoke run of the rebuilt HEX27 benches at 1.1e6 dof reproduces
+    `bsweepauto_hex27_5199798` and `_5202324` within 4%, errors identical.
+  - The sweep reruns complete (job 5202324, `measured_gpu/bsweepauto_hex27_5202324.out`).

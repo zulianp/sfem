@@ -1317,14 +1317,13 @@ private:
 // ---------------------------------------------------------------------------- quantized BSR
 //
 // The layout the GPU kernel-shape test chose (RESULTS_QP.md): full difference form, packed records,
-// sigma = 1024 rows; int16 offsets plus a remainder by row, except on HEX27 (rows of 125 blocks),
-// where int32 columns are faster.  The structure is built once on the host and uploaded; each
+// sigma = 1024 rows, int32 columns: applied as y += A x, the Newton operator's contract, they are
+// faster than int16 offsets plus a remainder by row on every mesh measured.  The structure is built once on the host and uploaded; each
 // update encodes the device f32 assembly into the records, each block from the symmetrised
 // (K_ij + K_ji^T) / 2 as on the host, its position and its transpose's found by binary search in the
 // sorted rows.
 
-constexpr bool BSR_OFFSETS = N != 27;
-constexpr ptrdiff_t BSR_SIGMA = 1024, BSR_REACH = 32767;
+constexpr ptrdiff_t BSR_SIGMA = 1024;
 
 __device__ __forceinline__ int64_t find(const int32_t *RSTR rp, const int32_t *RSTR ci, const int32_t i, const int32_t j) {
     int64_t lo = rp[i], hi = rp[i + 1];
@@ -1391,37 +1390,13 @@ __global__ void bsr_encode_kernel(const qbsr::Sell s, const int32_t *RSTR rp, co
     for (int64_t step = s.group_ptr[gr]; step < s.group_ptr[gr + 1]; ++step) {
         const size_t slot = (size_t)step * qbsr::C + lane;
         rec_t *const r = reinterpret_cast<rec_t *>(records) + slot;
-        int32_t j;
-        if constexpr (BSR_OFFSETS) {
-            if constexpr (std::is_same<CODEC, I8>::value)
-                j = i + (int32_t)(int16_t)(uint16_t)(r->off_lo | (r->off_hi << 8));
-            else
-                j = i + (int32_t)(int16_t)r->off;
-        } else {
-            j = reinterpret_cast<const int32_t *>(s.cols)[slot];
-        }
+        const int32_t j = reinterpret_cast<const int32_t *>(s.cols)[slot];
         if (i < 0 || j == i) continue;  // padding: zero codes from the structure
         double S[9];
         block_of(rp, ci, v, i, j, S);
         float sc = 1;
         encode_block<CODEC>(S, matrix_inv, reinterpret_cast<typename CODEC::storage *>(r->codes), 1, &sc);
         if constexpr (std::is_same<CODEC, I8>::value) r->scale = sc;
-    }
-}
-
-template <class CODEC>
-__global__ void bsr_encode_remainder_kernel(const qbsr::Sell s, const int32_t *RSTR rp, const int32_t *RSTR ci,
-                                            const float *RSTR v, const double matrix_inv,
-                                            typename CODEC::storage *RSTR codes, float *RSTR scales) {
-    const ptrdiff_t r = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x;
-    if (r >= s.n_rem_rows) return;
-    const int32_t i = s.rem_rows[r];
-    for (int64_t e = s.rem_rowptr[r]; e < s.rem_rowptr[r + 1]; ++e) {
-        double S[9];
-        block_of(rp, ci, v, i, s.rem_col[e], S);
-        float sc = 1;
-        encode_block<CODEC>(S, matrix_inv, codes + (size_t)e * 9, 1, &sc);
-        if (scales) scales[e] = sc;
     }
 }
 
@@ -1434,14 +1409,11 @@ public:
     BsrStore(const Assembly &a, void *stream) : a_(a), st_((cudaStream_t)stream) {
         const ptrdiff_t n = a.n_rows;
         const int32_t *rp = a.h_rowptr, *ci = a.h_colidx;
-        auto in_sell = [&](const ptrdiff_t i, const ptrdiff_t j) {
-            return j != i && (!BSR_OFFSETS || std::abs(j - i) <= BSR_REACH);
-        };
         std::vector<int32_t> len((size_t)n);
 #pragma omp parallel for
         for (ptrdiff_t i = 0; i < n; ++i) {
             int32_t c = 0;
-            for (int32_t k = rp[i]; k < rp[i + 1]; ++k) c += in_sell(i, ci[k]);
+            for (int32_t k = rp[i]; k < rp[i + 1]; ++k) c += ci[k] != i;
             len[(size_t)i] = c;
         }
         std::vector<int32_t> order((size_t)n);
@@ -1463,57 +1435,25 @@ public:
             gp[(size_t)g + 1] = gp[(size_t)g] + m;
         }
         const size_t slots = (size_t)gp[(size_t)ng] * qbsr::C;
-        // Records with the offsets set and zero codes (padding stays so); columns when not offsets.
+        // Records with zero codes (padding stays so), and the columns; padding is the row's own.
         std::vector<rec_t> records(slots);
         std::memset(records.data(), 0, slots * sizeof(rec_t));
-        std::vector<int32_t> cols(BSR_OFFSETS ? 0 : slots);
+        std::vector<int32_t> cols(slots);
 #pragma omp parallel for schedule(dynamic, 64)
         for (ptrdiff_t g = 0; g < ng; ++g)
             for (int l = 0; l < qbsr::C; ++l) {
                 const int32_t i = rows[(size_t)g * qbsr::C + l];
                 size_t step = (size_t)gp[(size_t)g];
                 if (i >= 0)
-                    for (int32_t k = rp[i]; k < rp[i + 1]; ++k) {
-                        if (!in_sell(i, ci[k])) continue;
-                        const size_t slot = step++ * qbsr::C + l;
-                        if constexpr (BSR_OFFSETS) {
-                            const uint16_t off = (uint16_t)(int16_t)(ci[k] - i);
-                            if constexpr (I8CODE) {
-                                records[slot].off_lo = (uint8_t)(off & 0xff);
-                                records[slot].off_hi = (uint8_t)(off >> 8);
-                            } else {
-                                records[slot].off = off;
-                            }
-                        } else {
-                            cols[slot] = ci[k];
-                        }
-                    }
+                    for (int32_t k = rp[i]; k < rp[i + 1]; ++k)
+                        if (ci[k] != i) cols[step++ * qbsr::C + l] = ci[k];
                 const int32_t self = i >= 0 ? i : rows[(size_t)g * qbsr::C];
-                for (; step < (size_t)gp[(size_t)g + 1]; ++step)
-                    if (!BSR_OFFSETS) cols[step * qbsr::C + l] = self;
-            }
-        std::vector<int64_t> rem_rowptr(1, 0);
-        std::vector<int32_t> rem_rows, rem_col;
-        if (BSR_OFFSETS)
-            for (ptrdiff_t i = 0; i < n; ++i) {
-                const size_t before = rem_col.size();
-                for (int32_t k = rp[i]; k < rp[i + 1]; ++k)
-                    if (ci[k] != i && !in_sell(i, ci[k])) rem_col.push_back(ci[k]);
-                if (rem_col.size() > before) {
-                    rem_rows.push_back((int32_t)i);
-                    rem_rowptr.push_back((int64_t)rem_col.size());
-                }
+                for (; step < (size_t)gp[(size_t)g + 1]; ++step) cols[step * qbsr::C + l] = self;
             }
         put(rows, rows_);
         put(gp, gp_);
         put(records, records_);
         put(cols, cols_);
-        put(rem_rowptr, rem_rowptr_);
-        put(rem_rows, rem_rows_);
-        put(rem_col, rem_col_);
-        rem_codes_ = device_alloc<typename CODEC::storage>(rem_col.size() * 9);
-        if (I8CODE) rem_scales_ = device_alloc<float>(rem_col.size());
-        bytes_ += rem_col.size() * 9 * sizeof(typename CODEC::storage) + (I8CODE ? rem_col.size() * sizeof(float) : 0);
         values_ = device_alloc<float>((size_t)a.h_rowptr[n] * 9);
         top_ = device_alloc<int>(1);
         s_.n_rows = n;
@@ -1522,19 +1462,10 @@ public:
         s_.group_ptr = gp_;
         s_.cols = cols_;
         s_.codes = records_;
-        s_.n_rem = (ptrdiff_t)rem_col.size();
-        s_.n_rem_rows = (ptrdiff_t)rem_rows.size();
-        s_.rem_rowptr = rem_rowptr_;
-        s_.rem_rows = rem_rows_;
-        s_.rem_col = rem_col_;
-        s_.rem_codes = rem_codes_;
-        s_.rem_scales = rem_scales_;
         s_.accumulate = true;
     }
     ~BsrStore() override {
         for (void *p : owned_) cudaFree(p);
-        cudaFree(rem_codes_);
-        cudaFree(rem_scales_);
         cudaFree(values_);
         cudaFree(top_);
     }
@@ -1556,16 +1487,13 @@ public:
         }
         bsr_encode_kernel<CODEC><<<grid(s_.n_groups * qbsr::C), THREADS, 0, st_>>>(
                 s_, a_.rowptr, a_.colidx, values_, matrix_inv, reinterpret_cast<uint8_t *>(records_));
-        if (s_.n_rem_rows > 0)
-            bsr_encode_remainder_kernel<CODEC><<<grid(s_.n_rem_rows), THREADS, 0, st_>>>(
-                    s_, a_.rowptr, a_.colidx, values_, matrix_inv, rem_codes_, rem_scales_);
         QPD_CHECK(cudaGetLastError());
         QPD_CHECK(cudaStreamSynchronize(st_));
         return 0;
     }
     int apply(const double *h, double *out) override {
         if (qbsr::apply(I8CODE ? qbsr::Code::I8 : qbsr::Code::F16, qbsr::Form::Full,
-                        BSR_OFFSETS ? qbsr::Cols::Off16 : qbsr::Cols::I32, qbsr::Rec::Packed, s_, h, out, st_))
+                        qbsr::Cols::I32, qbsr::Rec::Packed, s_, h, out, st_))
             return 1;
         QPD_CHECK(cudaStreamSynchronize(st_));
         return 0;
@@ -1585,11 +1513,10 @@ private:
     qbsr::Sell s_;
     std::vector<void *> owned_;
     size_t bytes_ = 0;
-    int32_t *rows_ = nullptr, *cols_ = nullptr, *rem_rows_ = nullptr, *rem_col_ = nullptr;
-    int64_t *gp_ = nullptr, *rem_rowptr_ = nullptr;
+    int32_t *rows_ = nullptr, *cols_ = nullptr;
+    int64_t *gp_ = nullptr;
     rec_t *records_ = nullptr;
-    typename CODEC::storage *rem_codes_ = nullptr;
-    float *rem_scales_ = nullptr, *values_ = nullptr;
+    float *values_ = nullptr;
     int *top_ = nullptr;
 };
 

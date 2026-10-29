@@ -347,6 +347,8 @@ static void build(const BsrGraph &g, const Quantized &q, const Layout &L, Built 
     }
     s.n_rem = (ptrdiff_t)out.remainder;
     s.n_rem_rows = (ptrdiff_t)rem_rows.size();
+    // QS_ACCUMULATE: y += A x, as the device format applies it (cuda/qp_device.cu), instead of y = A x.
+    s.accumulate = std::getenv("QS_ACCUMULATE") != nullptr;
     s.rem_rowptr = out.dev.put(rem_rowptr);
     s.rem_rows = out.dev.put(rem_rows);
     s.rem_row = out.dev.put(rem_row);
