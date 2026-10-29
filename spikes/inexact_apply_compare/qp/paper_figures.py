@@ -29,7 +29,7 @@ import shutil
 from matplotlib.ticker import FuncFormatter, LogLocator, NullFormatter
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from results_tables import (ELEMENTS, GPU_BENCH, NAMES, REAL_FORMATS, REAL_LEVELS, REAL_MESHES,  # noqa: E402
+from results_tables import (ELEMENTS, GPU_BENCH, NAMES, REAL_ELEMENTS, REAL_MESHES,  # noqa: E402
                            REFERENCE_BSR, bench_rows, newton_case, operator_name, parse_bench_sweep,
                            parse_newton, parse_newton_sweep, real_rows)
 
@@ -255,26 +255,27 @@ def file_gpu_rows(r):
     return r
 
 
-def application_figure(src, out):
-    """appmesh.pdf: each format's rate against BSR fp32 on the application meshes, as given and
-    refined once, Grace above and the H100 below."""
-    rows, meta = real_rows(src)
-    keys = [(mesh, lv) for mesh, _, _ in REAL_MESHES for lv in REAL_LEVELS if (mesh, lv) in meta]
+def application_figure(src, out, element="TET4"):
+    """appmesh.pdf (TET4) and appmesh_tet10.pdf: each format's application throughput on the
+    application meshes, Grace above and the H100 below, in the form of throughput.pdf."""
+    formats, levels, _, _ = REAL_ELEMENTS[element]
+    rows, meta = real_rows(src, element)
+    keys = [(mesh, lv) for mesh, _, _ in REAL_MESHES for lv in levels if (mesh, lv) in meta]
+    if not keys:
+        return
     short = {"fp70c": "V1", "fp70": "V2", "ff200": "P1", "ff200r": "P2"}
     labels = [f"{short[mesh]}{'' if lv == 0 else '+'}\n{meta[(mesh, lv)]['dof'] / 1e6:.2g}M" for mesh, lv in keys]
-    ops = [o for o in REAL_FORMATS if o != "BSR f32"]
-    fig, axes = plt.subplots(2, 1, figsize=(TEXTWIDTH, 4.6), sharex=True)
+    fig, axes = plt.subplots(2, 1, figsize=(TEXTWIDTH, 5.2), sharex=True)
     for ax, (machine, title) in zip(axes, (("cpu", "Grace CPU, 72 threads"), ("gpu", "H100 GPU"))):
         def value(o, key, machine=machine):
             r = rows[machine].get(key, {})
-            return r[o]["mdofs"] / r["BSR f32"]["mdofs"] if o in r and "BSR f32" in r else None
-        bars(ax, ops, value, "speed against BSR fp32", annotate=None, elements=keys)
-        ax.axhline(1.0, color="#8c8c8c", lw=0.8, ls="--")
+            return r[o]["mdofs"] if o in r else None
+        bars(ax, formats, value, "MDOF/s (higher is better)", elements=keys)
         ax.set_title(title)
         ax.set_xticks(np.arange(len(keys)), labels)
     fig.tight_layout(rect=(0, 0.08, 1, 1))
     legend_below(fig, axes, ncol=4)
-    fig.savefig(os.path.join(out, "appmesh.pdf"))
+    fig.savefig(os.path.join(out, "appmesh.pdf" if element == "TET4" else f"appmesh_{element.lower()}.pdf"))
     plt.close(fig)
 
 
@@ -287,7 +288,8 @@ def main():
     src, out, extras = args[0], args[1], args[2:]
     if MACHINE == "real":
         os.makedirs(out, exist_ok=True)
-        application_figure(src, out)
+        for element in REAL_ELEMENTS:
+            application_figure(src, out, element)
         return
     os.makedirs(out, exist_ok=True)
     rows, meta = bench_rows(src, extras)
