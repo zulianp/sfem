@@ -69,8 +69,8 @@ is the fastest format on tetrahedra, solving in $\timeQbsrHalfTetFour$--$\timeQb
 time of single-precision BSR from $\QbsrHalfMemVsThirtyTwoTetTen$--$\QbsrHalfMemVsThirtyTwoTetFour\times$
 less operator memory; element matrices come close to it on trilinear and are ahead on triquadratic
 hexahedra, and they keep the lowest peak memory, since they need no assembled matrix.  On one H100
-GPU, against a BSR product $\gpuBsrThirtyTwoVsCusparseHexEight$--$\gpuBsrThirtyTwoVsCusparseHexTwentySeven\times$
-faster than cuSPARSE, the quantized matrix leads on linear tetrahedra and trilinear hexahedra and the
+GPU, against a BSR product $\gpuBsrThirtyTwoVsCsrMin$--$\gpuBsrThirtyTwoVsCsrMax\times$ faster than
+cuSPARSE's fastest product, the quantized matrix leads on linear tetrahedra and trilinear hexahedra and the
 quadrature-point stores on the quadratic elements, since the matrices' assembly weighs more there.
 \end{abstract}
 
@@ -336,7 +336,8 @@ in Section~3.3.
 
 \paragraph{On the GPU.}  The whole Newton iteration runs on the device.  BSR is assembled by the
 library's device kernels and applied with sixteen threads per block row; cuSPARSE's \texttt{bsrmv}
-is measured beside it.  The compressed stores keep their layouts with blocks of $32$ elements, one
+and its generic product on the matrix expanded to scalar CSR, its fastest path, are measured beside
+it.  The compressed stores keep their layouts with blocks of $32$ elements, one
 warp, and are set up on the device, giving the host's codes.  TET4, TET10 and HEX8 apply one thread
 per element with atomic scatters or a block-local scatter in shared memory, whichever is faster;
 HEX27 applies one thread per point (point stores) or one warp per element (element matrices).  The
@@ -465,16 +466,19 @@ single-precision BSR on the H100.}
 operator & TET4 & TET10 & HEX8 & HEX27 \\
 \midrule
 BSR, \texttt{fp64} & $\gpuBsrSixtyFourRateTetFour$ & $\gpuBsrSixtyFourRateTetTen$ & $\gpuBsrSixtyFourRateHexEight$ & $\gpuBsrSixtyFourRateHexTwentySeven$ \\
-cuSPARSE, \texttt{fp64} & $\gpuCusparseSixtyFourRateTetFour$ & $\gpuCusparseSixtyFourRateTetTen$ & $\gpuCusparseSixtyFourRateHexEight$ & $\gpuCusparseSixtyFourRateHexTwentySeven$ \\
+cuSPARSE BSR, \texttt{fp64} & $\gpuCusparseSixtyFourRateTetFour$ & $\gpuCusparseSixtyFourRateTetTen$ & $\gpuCusparseSixtyFourRateHexEight$ & $\gpuCusparseSixtyFourRateHexTwentySeven$ \\
+cuSPARSE CSR, \texttt{fp64} & $\gpuCsrSixtyFourRateTetFour$ & $\gpuCsrSixtyFourRateTetTen$ & $\gpuCsrSixtyFourRateHexEight$ & $\gpuCsrSixtyFourRateHexTwentySeven$ \\
 BSR, \texttt{fp32} & $\gpuBsrThirtyTwoRateTetFour$ & $\gpuBsrThirtyTwoRateTetTen$ & $\gpuBsrThirtyTwoRateHexEight$ & $\gpuBsrThirtyTwoRateHexTwentySeven$ \\
-cuSPARSE, \texttt{fp32} & $\gpuCusparseThirtyTwoRateTetFour$ & $\gpuCusparseThirtyTwoRateTetTen$ & $\gpuCusparseThirtyTwoRateHexEight$ & $\gpuCusparseThirtyTwoRateHexTwentySeven$ \\
+cuSPARSE BSR, \texttt{fp32} & $\gpuCusparseThirtyTwoRateTetFour$ & $\gpuCusparseThirtyTwoRateTetTen$ & $\gpuCusparseThirtyTwoRateHexEight$ & $\gpuCusparseThirtyTwoRateHexTwentySeven$ \\
+cuSPARSE CSR, \texttt{fp32} & $\gpuCsrThirtyTwoRateTetFour$ & $\gpuCsrThirtyTwoRateTetTen$ & $\gpuCsrThirtyTwoRateHexEight$ & $\gpuCsrThirtyTwoRateHexTwentySeven$ \\
 quantized, \texttt{int8} & $\gpuQbsrEightRateTetFour$ & $\gpuQbsrEightRateTetTen$ & $\gpuQbsrEightRateHexEight$ & $\gpuQbsrEightRateHexTwentySeven$ \\
 points, \texttt{fp16} & $\gpuQpHalfRateTetFour$ & $\gpuQpHalfRateTetTen$ & $\gpuQpHalfRateHexEight$ & $\gpuQpHalfRateHexTwentySeven$ \\
 \bottomrule
 \end{tabular}
 \caption{Application throughput on the H100 in MDOF/s, $\gpuBenchDofHexEight$~dof: the library's BSR
-product against cuSPARSE's \texttt{bsrmv} on the same matrix (its \texttt{fp32} row with
-single-precision vectors), and two compressed formats.}
+product against cuSPARSE's \texttt{bsrmv} on the same matrix and its generic product on the matrix
+expanded to scalar CSR (their \texttt{fp32} rows with single-precision vectors), and two compressed
+formats.}
 \label{tab:gpu}
 \end{table}
 
@@ -520,7 +524,10 @@ the node graph it is built on set the peak.  The element formats need neither.
 
 On the H100 the library's BSR product runs at the memory bandwidth
 ($\gpuBsrThirtyTwoGbsTetFour$--$\gpuBsrThirtyTwoGbsHexTwentySeven$~GB/s in single precision),
-$\gpuBsrThirtyTwoVsCusparseHexEight$--$\gpuBsrThirtyTwoVsCusparseHexTwentySeven\times$ faster than cuSPARSE
+$\gpuBsrThirtyTwoVsCusparseHexEight$--$\gpuBsrThirtyTwoVsCusparseHexTwentySeven\times$ faster than
+cuSPARSE's \texttt{bsrmv} and $\gpuBsrThirtyTwoVsCsrMin$--$\gpuBsrThirtyTwoVsCsrMax\times$ faster than
+its CSR product, which streams as fast but reads
+$\gpuCsrThirtyTwoBytesVsBsrMin$--$\gpuCsrThirtyTwoBytesVsBsrMax\times$ the bytes
 (Table~\ref{tab:gpu}).  Every compressed format gains less against it than on Grace: the \texttt{int8}
 quantized matrix applies at $\gpuQbsrEightVsThirtyTwoTetFour$, $\gpuQbsrEightVsThirtyTwoTetTen$,
 $\gpuQbsrEightVsThirtyTwoHexEight$ and $\gpuQbsrEightVsThirtyTwoHexTwentySeven\times$ its speed, the element

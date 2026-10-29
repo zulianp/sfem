@@ -437,6 +437,10 @@ GPU_TAGS = {"BSR f64": "BsrSixtyFour", "BSR f32": "BsrThirtyTwo", "qbsr f16": "Q
 # bench row, its name in the tables, its macro stem and the library row it is compared with.
 GPU_CUSPARSE = {"cusparse BSR f64": ("cuSPARSE BSR, \\texttt{fp64}", "CusparseSixtyFour", "BSR f64"),
                 "cusparse BSR f32": ("cuSPARSE BSR, \\texttt{fp32}", "CusparseThirtyTwo", "BSR f32")}
+# cuSPARSE's generic product on the matrix expanded to scalar CSR, its fastest path (its generic
+# product does not take BSR): from the cusparse_*.out logs, compared with those runs' own BSR rows.
+GPU_CUSPARSE_CSR = {"cusparse SpMV CSR f64": ("cuSPARSE CSR, \\texttt{fp64}", "CsrSixtyFour", "BSR f64"),
+                    "cusparse SpMV CSR f32": ("cuSPARSE CSR, \\texttt{fp32}", "CsrThirtyTwo", "BSR f32")}
 
 
 def gpu_row(rows, el, fmt_):
@@ -450,6 +454,7 @@ def write_gpu(src, outdir):
     """The GPU's tables (h100_*.tex, summary_gpu.tex) and macros (results_macros_gpu.tex, \\gpu...)."""
     os.makedirs(outdir, exist_ok=True)
     rows, meta = parse_bench(logs(src, MAIN_GLOBS["bench"]))
+    crows, _ = parse_bench(logs(src, ["cusparse_*.out"]))
     newton = {c: newton_case(src, (), c) for c in ("1M", "twist", "10M")}
     with open(os.path.join(outdir, "h100_throughput.tex"), "w") as f:
         for o in GPU_FORMATS:
@@ -459,6 +464,10 @@ def write_gpu(src, outdir):
     with open(os.path.join(outdir, "h100_cusparse.tex"), "w") as f:
         for key, (name, _, _) in GPU_CUSPARSE.items():
             rs = [rows.get(el, {}).get(key) for el in ELEMENTS]
+            cells = [fmt(r["mdofs"]) if r else "---" for r in rs] + [fmt(r["bytes_per_dof"]) if r else "---" for r in rs]
+            f.write(f"{name} & " + " & ".join(cells) + " \\\\\n")
+        for key, (name, _, _) in GPU_CUSPARSE_CSR.items():
+            rs = [crows.get(el, {}).get(key) for el in ELEMENTS]
             cells = [fmt(r["mdofs"]) if r else "---" for r in rs] + [fmt(r["bytes_per_dof"]) if r else "---" for r in rs]
             f.write(f"{name} & " + " & ".join(cells) + " \\\\\n")
     with open(os.path.join(outdir, "h100_setup.tex"), "w") as f:
@@ -511,6 +520,15 @@ def write_gpu(src, outdir):
             m[f"gpu{k}Rate{tag}"] = fmt(r["mdofs"])
             if b:
                 m[f"gpu{GPU_TAGS[lib]}VsCusparse{tag}"] = f"{b['mdofs'] / r['mdofs']:.2f}"
+        for key, (_, k, lib) in GPU_CUSPARSE_CSR.items():
+            r, b = crows.get(el, {}).get(key), crows.get(el, {}).get(lib)
+            if not r:
+                continue
+            m[f"gpu{k}Rate{tag}"] = fmt(r["mdofs"])
+            m[f"gpu{k}Gbs{tag}"] = fmt(r["mdofs"] * r["bytes_per_dof"] / 1e3)
+            if b:
+                m[f"gpu{GPU_TAGS[lib]}VsCsr{tag}"] = f"{b['mdofs'] / r['mdofs']:.2f}"
+                m[f"gpu{k}BytesVsBsr{tag}"] = f"{r['bytes_per_dof'] / b['bytes_per_dof']:.2f}"
         for case, stem in (("1M", "Newton"), ("twist", "Twist"), ("10M", "Tenm")):
             runs, mm = newton[case].get(el, ({}, {}))
             ref = runs.get("BSR f32")
@@ -562,6 +580,13 @@ def write_gpu(src, outdir):
                 key = f"gpuSweepMaxDof{TAGS[mt.group(1)]}"
                 if int(mt.group(2)) > int(m.get(key, "0").replace("{,}", "")):
                     m[key] = fmt(int(mt.group(2)))
+    # Ranges over the elements of the CSR comparison: <stem>Min and <stem>Max.
+    for stem in ("gpuBsrSixtyFourVsCsr", "gpuBsrThirtyTwoVsCsr", "gpuCsrSixtyFourGbs", "gpuCsrThirtyTwoGbs",
+                 "gpuCsrSixtyFourBytesVsBsr", "gpuCsrThirtyTwoBytesVsBsr"):
+        vs = [m[stem + tag] for tag in TAGS.values() if stem + tag in m]
+        if vs:
+            num = lambda v: float(v.replace("{,}", ""))
+            m[stem + "Min"], m[stem + "Max"] = min(vs, key=num), max(vs, key=num)
     with open(os.path.join(outdir, "results_macros_gpu.tex"), "w") as f:
         for k, v in sorted(m.items()):
             f.write(f"\\newcommand{{\\{k}}}{{{v}}}\n")

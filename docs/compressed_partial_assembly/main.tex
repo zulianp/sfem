@@ -83,8 +83,8 @@ since they need no assembled matrix.  The gains require the operator to stream f
 the matrix fits in cache, BSR is faster.
 
 On one H100 GPU of the same node, against a BSR product that runs at
-$\gpuBsrThirtyTwoVsCusparseHexEight$--$\gpuBsrThirtyTwoVsCusparseHexTwentySeven\times$ the speed of
-cuSPARSE, the quantized sparse matrix is the fastest format on linear tetrahedra and trilinear
+$\gpuBsrThirtyTwoVsCsrMin$--$\gpuBsrThirtyTwoVsCsrMax\times$ the speed of cuSPARSE's fastest product
+on the same matrix, the quantized sparse matrix is the fastest format on linear tetrahedra and trilinear
 hexahedra ($\gpuTenmTimeQbsrHalfTetFour$ and $\gpuTenmTimeQbsrEightHexEight$ of the time of
 single-precision BSR) and the quadrature-point stores on quadratic tetrahedra and triquadratic
 hexahedra ($\gpuTenmTimeQpHalfTetTen$ and $\gpuTenmTimeQpEightMdHexTwentySeven$): the GPU speeds up
@@ -1022,9 +1022,10 @@ packs.
 
 \paragraph{Operators on the GPU.}  BSR is assembled by the library's device kernels from the same
 generator and applied by its block product, a group of sixteen threads per block row whose partial
-sums are added by warp shuffles in a fixed order; cuSPARSE's \texttt{bsrmv} on the same matrix is
-measured beside it as a reference (in single precision with single-precision vectors, which it
-requires).  The compressed stores keep their host layouts with blocks of $32$ elements, one warp, and
+sums are added by warp shuffles in a fixed order.  cuSPARSE's products on the same matrix are
+measured beside it as references: \texttt{bsrmv}, and its generic product on the matrix expanded to
+scalar CSR, its fastest path, since the generic product does not take BSR.  Both take vectors in the
+matrix's precision.  The compressed stores keep their host layouts with blocks of $32$ elements, one warp, and
 are set up on the device: the codes equal the host's bit for bit, except a handful of element-matrix
 codes on TET10 that differ by one rounding step.  The application runs one thread per element on
 TET4, TET10 and HEX8, scattering with atomic additions, or on TET4 and in half precision on HEX8
@@ -1362,7 +1363,9 @@ operator & TET4 & TET10 & HEX8 & HEX27 & TET4 & TET10 & HEX8 & HEX27 \\
 \end{tabular}
 \caption{Application throughput on the H100 at \gpuBenchDofHexEight{}~dof, the problem of
 Figure~\ref{fig:throughput}.  Below the rule, for reference, cuSPARSE's \texttt{bsrmv} on the
-library's BSR matrix; its single-precision row uses single-precision vectors.}
+library's BSR matrix, and its generic product on the same matrix expanded to scalar CSR (a column
+index per value; a separate run of the bench).  Their single-precision rows use single-precision
+vectors.}
 \label{tab:gputhroughput}
 \end{table}
 
@@ -1388,7 +1391,14 @@ The library's BSR product moves $\gpuBsrThirtyTwoGbsTetFour$--$\gpuBsrThirtyTwoG
 single precision and $\gpuBsrSixtyFourGbsTetFour$--$\gpuBsrSixtyFourGbsHexEight$~GB/s in double
 (Table~\ref{tab:gputhroughput}), $\gpuBsrThirtyTwoVsCusparseHexEight$--%
 $\gpuBsrThirtyTwoVsCusparseHexTwentySeven\times$ and $\gpuBsrSixtyFourVsCusparseHexEight$--%
-$\gpuBsrSixtyFourVsCusparseTetFour\times$ the speed of cuSPARSE on the same matrices.  Against a
+$\gpuBsrSixtyFourVsCusparseTetFour\times$ the speed of cuSPARSE's \texttt{bsrmv} on the same
+matrices, which reads the same bytes but is limited by instruction issue rather than by memory
+(Nsight Compute).  cuSPARSE's CSR product streams as fast
+($\gpuCsrThirtyTwoGbsMin$--$\gpuCsrThirtyTwoGbsMax$~GB/s in single precision) but reads a column index
+per value, $\gpuCsrThirtyTwoBytesVsBsrMin$--$\gpuCsrThirtyTwoBytesVsBsrMax\times$ the bytes of BSR in
+single precision and $\gpuCsrSixtyFourBytesVsBsrMin$--$\gpuCsrSixtyFourBytesVsBsrMax\times$ in double;
+the BSR product is $\gpuBsrThirtyTwoVsCsrMin$--$\gpuBsrThirtyTwoVsCsrMax\times$ and
+$\gpuBsrSixtyFourVsCsrMin$--$\gpuBsrSixtyFourVsCsrMax\times$ faster than it.  Against a
 product at the memory bandwidth every compressed format gains less than on Grace
 (Figure~\ref{fig:gputhroughput}).  The quantized matrix keeps most of its gain: in \texttt{int8} it
 applies at $\gpuQbsrEightVsThirtyTwoTetFour$, $\gpuQbsrEightVsThirtyTwoTetTen$,
