@@ -713,18 +713,20 @@ def _lane_contraction_lines(dim, n_slots, slot, q):
     order = dim * dim
     lines = [
         "",
-        "  // The same for a block of lanes, one loop over them.",
+        "  // The same for a block of lanes, a loop over them per row.",
         "  template <typename t${W}>",
         "  %s void contract_lanes(${NE}const t S[%d]${E}, const t G[%d]${E}, t Y[%d]${E}) {"
         % (q, n_slots, order, order),
     ]
-    lines.append("    ${LOOP}")
+    # A loop per row, not one loop for all nine: one loop reloads less but gcc on Grace runs the
+    # point stores 5-20% slower with it (A/B against the spike, 2026-10-30; lean_audit records it).
     for r in range(order):
-        lines.append(
+        lines += [
+            "    ${LOOP}",
             "      Y[%d]${L} += %s;"
-            % (r, " + ".join("S[%d]${L}*G[%d]${L}" % (slot(r, c), c) for c in range(order)))
-        )
-    lines.append("    }")
+            % (r, " + ".join("S[%d]${L}*G[%d]${L}" % (slot(r, c), c) for c in range(order))),
+            "    }",
+        ]
     lines += [
         "  }",
         "",
@@ -735,15 +737,13 @@ def _lane_contraction_lines(dim, n_slots, slot, q):
     ]
     for mask in range(1 << dim):
         lines.append("    %s constexpr (MASK == %d) {" % ("if" if mask == 0 else "} else if", mask))
-        lines.append("      ${LOOP}")
         for r in range(order):
             terms = " + ".join(
                 "S[%d]${L}*G[%d]${L}" % (slot(r, c), c)
                 for c in range(order)
                 if not (r % dim == c % dim and (mask >> (r % dim)) & 1)
             )
-            lines.append("        Y[%d]${L} += %s;" % (r, terms))
-        lines.append("      }")
+            lines += ["      ${LOOP}", "        Y[%d]${L} += %s;" % (r, terms), "      }"]
     lines += [
         "    }",
         "  }",

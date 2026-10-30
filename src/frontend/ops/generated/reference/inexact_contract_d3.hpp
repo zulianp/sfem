@@ -27,19 +27,43 @@ struct inexact_contract_d3<true> {
     y[8] += S[8]*g[0] + S[16]*g[1] + S[23]*g[2] + S[29]*g[3] + S[34]*g[4] + S[38]*g[5] + S[41]*g[6] + S[43]*g[7] + S[44]*g[8];
   }
 
-  // The same for a block of lanes, one loop over them.
+  // The same for a block of lanes, a loop over them per row.
   template <typename t, int VS>
   static SFEM_INLINE void contract_lanes(const int ne, const t S[45][VS], const t G[9][VS], t Y[9][VS]) {
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       Y[0][lane] += S[0][lane]*G[0][lane] + S[1][lane]*G[1][lane] + S[2][lane]*G[2][lane] + S[3][lane]*G[3][lane] + S[4][lane]*G[4][lane] + S[5][lane]*G[5][lane] + S[6][lane]*G[6][lane] + S[7][lane]*G[7][lane] + S[8][lane]*G[8][lane];
+    }
+    #pragma omp simd
+    for (int lane = 0; lane < ne; ++lane) {
       Y[1][lane] += S[1][lane]*G[0][lane] + S[9][lane]*G[1][lane] + S[10][lane]*G[2][lane] + S[11][lane]*G[3][lane] + S[12][lane]*G[4][lane] + S[13][lane]*G[5][lane] + S[14][lane]*G[6][lane] + S[15][lane]*G[7][lane] + S[16][lane]*G[8][lane];
+    }
+    #pragma omp simd
+    for (int lane = 0; lane < ne; ++lane) {
       Y[2][lane] += S[2][lane]*G[0][lane] + S[10][lane]*G[1][lane] + S[17][lane]*G[2][lane] + S[18][lane]*G[3][lane] + S[19][lane]*G[4][lane] + S[20][lane]*G[5][lane] + S[21][lane]*G[6][lane] + S[22][lane]*G[7][lane] + S[23][lane]*G[8][lane];
+    }
+    #pragma omp simd
+    for (int lane = 0; lane < ne; ++lane) {
       Y[3][lane] += S[3][lane]*G[0][lane] + S[11][lane]*G[1][lane] + S[18][lane]*G[2][lane] + S[24][lane]*G[3][lane] + S[25][lane]*G[4][lane] + S[26][lane]*G[5][lane] + S[27][lane]*G[6][lane] + S[28][lane]*G[7][lane] + S[29][lane]*G[8][lane];
+    }
+    #pragma omp simd
+    for (int lane = 0; lane < ne; ++lane) {
       Y[4][lane] += S[4][lane]*G[0][lane] + S[12][lane]*G[1][lane] + S[19][lane]*G[2][lane] + S[25][lane]*G[3][lane] + S[30][lane]*G[4][lane] + S[31][lane]*G[5][lane] + S[32][lane]*G[6][lane] + S[33][lane]*G[7][lane] + S[34][lane]*G[8][lane];
+    }
+    #pragma omp simd
+    for (int lane = 0; lane < ne; ++lane) {
       Y[5][lane] += S[5][lane]*G[0][lane] + S[13][lane]*G[1][lane] + S[20][lane]*G[2][lane] + S[26][lane]*G[3][lane] + S[31][lane]*G[4][lane] + S[35][lane]*G[5][lane] + S[36][lane]*G[6][lane] + S[37][lane]*G[7][lane] + S[38][lane]*G[8][lane];
+    }
+    #pragma omp simd
+    for (int lane = 0; lane < ne; ++lane) {
       Y[6][lane] += S[6][lane]*G[0][lane] + S[14][lane]*G[1][lane] + S[21][lane]*G[2][lane] + S[27][lane]*G[3][lane] + S[32][lane]*G[4][lane] + S[36][lane]*G[5][lane] + S[39][lane]*G[6][lane] + S[40][lane]*G[7][lane] + S[41][lane]*G[8][lane];
+    }
+    #pragma omp simd
+    for (int lane = 0; lane < ne; ++lane) {
       Y[7][lane] += S[7][lane]*G[0][lane] + S[15][lane]*G[1][lane] + S[22][lane]*G[2][lane] + S[28][lane]*G[3][lane] + S[33][lane]*G[4][lane] + S[37][lane]*G[5][lane] + S[40][lane]*G[6][lane] + S[42][lane]*G[7][lane] + S[43][lane]*G[8][lane];
+    }
+    #pragma omp simd
+    for (int lane = 0; lane < ne; ++lane) {
       Y[8][lane] += S[8][lane]*G[0][lane] + S[16][lane]*G[1][lane] + S[23][lane]*G[2][lane] + S[29][lane]*G[3][lane] + S[34][lane]*G[4][lane] + S[38][lane]*G[5][lane] + S[41][lane]*G[6][lane] + S[43][lane]*G[7][lane] + S[44][lane]*G[8][lane];
     }
   }
@@ -51,104 +75,296 @@ struct inexact_contract_d3<true> {
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
         Y[0][lane] += S[0][lane]*G[0][lane] + S[1][lane]*G[1][lane] + S[2][lane]*G[2][lane] + S[3][lane]*G[3][lane] + S[4][lane]*G[4][lane] + S[5][lane]*G[5][lane] + S[6][lane]*G[6][lane] + S[7][lane]*G[7][lane] + S[8][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[1][lane] += S[1][lane]*G[0][lane] + S[9][lane]*G[1][lane] + S[10][lane]*G[2][lane] + S[11][lane]*G[3][lane] + S[12][lane]*G[4][lane] + S[13][lane]*G[5][lane] + S[14][lane]*G[6][lane] + S[15][lane]*G[7][lane] + S[16][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[2][lane] += S[2][lane]*G[0][lane] + S[10][lane]*G[1][lane] + S[17][lane]*G[2][lane] + S[18][lane]*G[3][lane] + S[19][lane]*G[4][lane] + S[20][lane]*G[5][lane] + S[21][lane]*G[6][lane] + S[22][lane]*G[7][lane] + S[23][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[3][lane] += S[3][lane]*G[0][lane] + S[11][lane]*G[1][lane] + S[18][lane]*G[2][lane] + S[24][lane]*G[3][lane] + S[25][lane]*G[4][lane] + S[26][lane]*G[5][lane] + S[27][lane]*G[6][lane] + S[28][lane]*G[7][lane] + S[29][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[4][lane] += S[4][lane]*G[0][lane] + S[12][lane]*G[1][lane] + S[19][lane]*G[2][lane] + S[25][lane]*G[3][lane] + S[30][lane]*G[4][lane] + S[31][lane]*G[5][lane] + S[32][lane]*G[6][lane] + S[33][lane]*G[7][lane] + S[34][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[5][lane] += S[5][lane]*G[0][lane] + S[13][lane]*G[1][lane] + S[20][lane]*G[2][lane] + S[26][lane]*G[3][lane] + S[31][lane]*G[4][lane] + S[35][lane]*G[5][lane] + S[36][lane]*G[6][lane] + S[37][lane]*G[7][lane] + S[38][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[6][lane] += S[6][lane]*G[0][lane] + S[14][lane]*G[1][lane] + S[21][lane]*G[2][lane] + S[27][lane]*G[3][lane] + S[32][lane]*G[4][lane] + S[36][lane]*G[5][lane] + S[39][lane]*G[6][lane] + S[40][lane]*G[7][lane] + S[41][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[7][lane] += S[7][lane]*G[0][lane] + S[15][lane]*G[1][lane] + S[22][lane]*G[2][lane] + S[28][lane]*G[3][lane] + S[33][lane]*G[4][lane] + S[37][lane]*G[5][lane] + S[40][lane]*G[6][lane] + S[42][lane]*G[7][lane] + S[43][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[8][lane] += S[8][lane]*G[0][lane] + S[16][lane]*G[1][lane] + S[23][lane]*G[2][lane] + S[29][lane]*G[3][lane] + S[34][lane]*G[4][lane] + S[38][lane]*G[5][lane] + S[41][lane]*G[6][lane] + S[43][lane]*G[7][lane] + S[44][lane]*G[8][lane];
       }
     } else if constexpr (MASK == 1) {
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
         Y[0][lane] += S[1][lane]*G[1][lane] + S[2][lane]*G[2][lane] + S[4][lane]*G[4][lane] + S[5][lane]*G[5][lane] + S[7][lane]*G[7][lane] + S[8][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[1][lane] += S[1][lane]*G[0][lane] + S[9][lane]*G[1][lane] + S[10][lane]*G[2][lane] + S[11][lane]*G[3][lane] + S[12][lane]*G[4][lane] + S[13][lane]*G[5][lane] + S[14][lane]*G[6][lane] + S[15][lane]*G[7][lane] + S[16][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[2][lane] += S[2][lane]*G[0][lane] + S[10][lane]*G[1][lane] + S[17][lane]*G[2][lane] + S[18][lane]*G[3][lane] + S[19][lane]*G[4][lane] + S[20][lane]*G[5][lane] + S[21][lane]*G[6][lane] + S[22][lane]*G[7][lane] + S[23][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[3][lane] += S[11][lane]*G[1][lane] + S[18][lane]*G[2][lane] + S[25][lane]*G[4][lane] + S[26][lane]*G[5][lane] + S[28][lane]*G[7][lane] + S[29][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[4][lane] += S[4][lane]*G[0][lane] + S[12][lane]*G[1][lane] + S[19][lane]*G[2][lane] + S[25][lane]*G[3][lane] + S[30][lane]*G[4][lane] + S[31][lane]*G[5][lane] + S[32][lane]*G[6][lane] + S[33][lane]*G[7][lane] + S[34][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[5][lane] += S[5][lane]*G[0][lane] + S[13][lane]*G[1][lane] + S[20][lane]*G[2][lane] + S[26][lane]*G[3][lane] + S[31][lane]*G[4][lane] + S[35][lane]*G[5][lane] + S[36][lane]*G[6][lane] + S[37][lane]*G[7][lane] + S[38][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[6][lane] += S[14][lane]*G[1][lane] + S[21][lane]*G[2][lane] + S[32][lane]*G[4][lane] + S[36][lane]*G[5][lane] + S[40][lane]*G[7][lane] + S[41][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[7][lane] += S[7][lane]*G[0][lane] + S[15][lane]*G[1][lane] + S[22][lane]*G[2][lane] + S[28][lane]*G[3][lane] + S[33][lane]*G[4][lane] + S[37][lane]*G[5][lane] + S[40][lane]*G[6][lane] + S[42][lane]*G[7][lane] + S[43][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[8][lane] += S[8][lane]*G[0][lane] + S[16][lane]*G[1][lane] + S[23][lane]*G[2][lane] + S[29][lane]*G[3][lane] + S[34][lane]*G[4][lane] + S[38][lane]*G[5][lane] + S[41][lane]*G[6][lane] + S[43][lane]*G[7][lane] + S[44][lane]*G[8][lane];
       }
     } else if constexpr (MASK == 2) {
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
         Y[0][lane] += S[0][lane]*G[0][lane] + S[1][lane]*G[1][lane] + S[2][lane]*G[2][lane] + S[3][lane]*G[3][lane] + S[4][lane]*G[4][lane] + S[5][lane]*G[5][lane] + S[6][lane]*G[6][lane] + S[7][lane]*G[7][lane] + S[8][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[1][lane] += S[1][lane]*G[0][lane] + S[10][lane]*G[2][lane] + S[11][lane]*G[3][lane] + S[13][lane]*G[5][lane] + S[14][lane]*G[6][lane] + S[16][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[2][lane] += S[2][lane]*G[0][lane] + S[10][lane]*G[1][lane] + S[17][lane]*G[2][lane] + S[18][lane]*G[3][lane] + S[19][lane]*G[4][lane] + S[20][lane]*G[5][lane] + S[21][lane]*G[6][lane] + S[22][lane]*G[7][lane] + S[23][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[3][lane] += S[3][lane]*G[0][lane] + S[11][lane]*G[1][lane] + S[18][lane]*G[2][lane] + S[24][lane]*G[3][lane] + S[25][lane]*G[4][lane] + S[26][lane]*G[5][lane] + S[27][lane]*G[6][lane] + S[28][lane]*G[7][lane] + S[29][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[4][lane] += S[4][lane]*G[0][lane] + S[19][lane]*G[2][lane] + S[25][lane]*G[3][lane] + S[31][lane]*G[5][lane] + S[32][lane]*G[6][lane] + S[34][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[5][lane] += S[5][lane]*G[0][lane] + S[13][lane]*G[1][lane] + S[20][lane]*G[2][lane] + S[26][lane]*G[3][lane] + S[31][lane]*G[4][lane] + S[35][lane]*G[5][lane] + S[36][lane]*G[6][lane] + S[37][lane]*G[7][lane] + S[38][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[6][lane] += S[6][lane]*G[0][lane] + S[14][lane]*G[1][lane] + S[21][lane]*G[2][lane] + S[27][lane]*G[3][lane] + S[32][lane]*G[4][lane] + S[36][lane]*G[5][lane] + S[39][lane]*G[6][lane] + S[40][lane]*G[7][lane] + S[41][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[7][lane] += S[7][lane]*G[0][lane] + S[22][lane]*G[2][lane] + S[28][lane]*G[3][lane] + S[37][lane]*G[5][lane] + S[40][lane]*G[6][lane] + S[43][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[8][lane] += S[8][lane]*G[0][lane] + S[16][lane]*G[1][lane] + S[23][lane]*G[2][lane] + S[29][lane]*G[3][lane] + S[34][lane]*G[4][lane] + S[38][lane]*G[5][lane] + S[41][lane]*G[6][lane] + S[43][lane]*G[7][lane] + S[44][lane]*G[8][lane];
       }
     } else if constexpr (MASK == 3) {
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
         Y[0][lane] += S[1][lane]*G[1][lane] + S[2][lane]*G[2][lane] + S[4][lane]*G[4][lane] + S[5][lane]*G[5][lane] + S[7][lane]*G[7][lane] + S[8][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[1][lane] += S[1][lane]*G[0][lane] + S[10][lane]*G[2][lane] + S[11][lane]*G[3][lane] + S[13][lane]*G[5][lane] + S[14][lane]*G[6][lane] + S[16][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[2][lane] += S[2][lane]*G[0][lane] + S[10][lane]*G[1][lane] + S[17][lane]*G[2][lane] + S[18][lane]*G[3][lane] + S[19][lane]*G[4][lane] + S[20][lane]*G[5][lane] + S[21][lane]*G[6][lane] + S[22][lane]*G[7][lane] + S[23][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[3][lane] += S[11][lane]*G[1][lane] + S[18][lane]*G[2][lane] + S[25][lane]*G[4][lane] + S[26][lane]*G[5][lane] + S[28][lane]*G[7][lane] + S[29][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[4][lane] += S[4][lane]*G[0][lane] + S[19][lane]*G[2][lane] + S[25][lane]*G[3][lane] + S[31][lane]*G[5][lane] + S[32][lane]*G[6][lane] + S[34][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[5][lane] += S[5][lane]*G[0][lane] + S[13][lane]*G[1][lane] + S[20][lane]*G[2][lane] + S[26][lane]*G[3][lane] + S[31][lane]*G[4][lane] + S[35][lane]*G[5][lane] + S[36][lane]*G[6][lane] + S[37][lane]*G[7][lane] + S[38][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[6][lane] += S[14][lane]*G[1][lane] + S[21][lane]*G[2][lane] + S[32][lane]*G[4][lane] + S[36][lane]*G[5][lane] + S[40][lane]*G[7][lane] + S[41][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[7][lane] += S[7][lane]*G[0][lane] + S[22][lane]*G[2][lane] + S[28][lane]*G[3][lane] + S[37][lane]*G[5][lane] + S[40][lane]*G[6][lane] + S[43][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[8][lane] += S[8][lane]*G[0][lane] + S[16][lane]*G[1][lane] + S[23][lane]*G[2][lane] + S[29][lane]*G[3][lane] + S[34][lane]*G[4][lane] + S[38][lane]*G[5][lane] + S[41][lane]*G[6][lane] + S[43][lane]*G[7][lane] + S[44][lane]*G[8][lane];
       }
     } else if constexpr (MASK == 4) {
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
         Y[0][lane] += S[0][lane]*G[0][lane] + S[1][lane]*G[1][lane] + S[2][lane]*G[2][lane] + S[3][lane]*G[3][lane] + S[4][lane]*G[4][lane] + S[5][lane]*G[5][lane] + S[6][lane]*G[6][lane] + S[7][lane]*G[7][lane] + S[8][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[1][lane] += S[1][lane]*G[0][lane] + S[9][lane]*G[1][lane] + S[10][lane]*G[2][lane] + S[11][lane]*G[3][lane] + S[12][lane]*G[4][lane] + S[13][lane]*G[5][lane] + S[14][lane]*G[6][lane] + S[15][lane]*G[7][lane] + S[16][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[2][lane] += S[2][lane]*G[0][lane] + S[10][lane]*G[1][lane] + S[18][lane]*G[3][lane] + S[19][lane]*G[4][lane] + S[21][lane]*G[6][lane] + S[22][lane]*G[7][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[3][lane] += S[3][lane]*G[0][lane] + S[11][lane]*G[1][lane] + S[18][lane]*G[2][lane] + S[24][lane]*G[3][lane] + S[25][lane]*G[4][lane] + S[26][lane]*G[5][lane] + S[27][lane]*G[6][lane] + S[28][lane]*G[7][lane] + S[29][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[4][lane] += S[4][lane]*G[0][lane] + S[12][lane]*G[1][lane] + S[19][lane]*G[2][lane] + S[25][lane]*G[3][lane] + S[30][lane]*G[4][lane] + S[31][lane]*G[5][lane] + S[32][lane]*G[6][lane] + S[33][lane]*G[7][lane] + S[34][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[5][lane] += S[5][lane]*G[0][lane] + S[13][lane]*G[1][lane] + S[26][lane]*G[3][lane] + S[31][lane]*G[4][lane] + S[36][lane]*G[6][lane] + S[37][lane]*G[7][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[6][lane] += S[6][lane]*G[0][lane] + S[14][lane]*G[1][lane] + S[21][lane]*G[2][lane] + S[27][lane]*G[3][lane] + S[32][lane]*G[4][lane] + S[36][lane]*G[5][lane] + S[39][lane]*G[6][lane] + S[40][lane]*G[7][lane] + S[41][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[7][lane] += S[7][lane]*G[0][lane] + S[15][lane]*G[1][lane] + S[22][lane]*G[2][lane] + S[28][lane]*G[3][lane] + S[33][lane]*G[4][lane] + S[37][lane]*G[5][lane] + S[40][lane]*G[6][lane] + S[42][lane]*G[7][lane] + S[43][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[8][lane] += S[8][lane]*G[0][lane] + S[16][lane]*G[1][lane] + S[29][lane]*G[3][lane] + S[34][lane]*G[4][lane] + S[41][lane]*G[6][lane] + S[43][lane]*G[7][lane];
       }
     } else if constexpr (MASK == 5) {
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
         Y[0][lane] += S[1][lane]*G[1][lane] + S[2][lane]*G[2][lane] + S[4][lane]*G[4][lane] + S[5][lane]*G[5][lane] + S[7][lane]*G[7][lane] + S[8][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[1][lane] += S[1][lane]*G[0][lane] + S[9][lane]*G[1][lane] + S[10][lane]*G[2][lane] + S[11][lane]*G[3][lane] + S[12][lane]*G[4][lane] + S[13][lane]*G[5][lane] + S[14][lane]*G[6][lane] + S[15][lane]*G[7][lane] + S[16][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[2][lane] += S[2][lane]*G[0][lane] + S[10][lane]*G[1][lane] + S[18][lane]*G[3][lane] + S[19][lane]*G[4][lane] + S[21][lane]*G[6][lane] + S[22][lane]*G[7][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[3][lane] += S[11][lane]*G[1][lane] + S[18][lane]*G[2][lane] + S[25][lane]*G[4][lane] + S[26][lane]*G[5][lane] + S[28][lane]*G[7][lane] + S[29][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[4][lane] += S[4][lane]*G[0][lane] + S[12][lane]*G[1][lane] + S[19][lane]*G[2][lane] + S[25][lane]*G[3][lane] + S[30][lane]*G[4][lane] + S[31][lane]*G[5][lane] + S[32][lane]*G[6][lane] + S[33][lane]*G[7][lane] + S[34][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[5][lane] += S[5][lane]*G[0][lane] + S[13][lane]*G[1][lane] + S[26][lane]*G[3][lane] + S[31][lane]*G[4][lane] + S[36][lane]*G[6][lane] + S[37][lane]*G[7][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[6][lane] += S[14][lane]*G[1][lane] + S[21][lane]*G[2][lane] + S[32][lane]*G[4][lane] + S[36][lane]*G[5][lane] + S[40][lane]*G[7][lane] + S[41][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[7][lane] += S[7][lane]*G[0][lane] + S[15][lane]*G[1][lane] + S[22][lane]*G[2][lane] + S[28][lane]*G[3][lane] + S[33][lane]*G[4][lane] + S[37][lane]*G[5][lane] + S[40][lane]*G[6][lane] + S[42][lane]*G[7][lane] + S[43][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[8][lane] += S[8][lane]*G[0][lane] + S[16][lane]*G[1][lane] + S[29][lane]*G[3][lane] + S[34][lane]*G[4][lane] + S[41][lane]*G[6][lane] + S[43][lane]*G[7][lane];
       }
     } else if constexpr (MASK == 6) {
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
         Y[0][lane] += S[0][lane]*G[0][lane] + S[1][lane]*G[1][lane] + S[2][lane]*G[2][lane] + S[3][lane]*G[3][lane] + S[4][lane]*G[4][lane] + S[5][lane]*G[5][lane] + S[6][lane]*G[6][lane] + S[7][lane]*G[7][lane] + S[8][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[1][lane] += S[1][lane]*G[0][lane] + S[10][lane]*G[2][lane] + S[11][lane]*G[3][lane] + S[13][lane]*G[5][lane] + S[14][lane]*G[6][lane] + S[16][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[2][lane] += S[2][lane]*G[0][lane] + S[10][lane]*G[1][lane] + S[18][lane]*G[3][lane] + S[19][lane]*G[4][lane] + S[21][lane]*G[6][lane] + S[22][lane]*G[7][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[3][lane] += S[3][lane]*G[0][lane] + S[11][lane]*G[1][lane] + S[18][lane]*G[2][lane] + S[24][lane]*G[3][lane] + S[25][lane]*G[4][lane] + S[26][lane]*G[5][lane] + S[27][lane]*G[6][lane] + S[28][lane]*G[7][lane] + S[29][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[4][lane] += S[4][lane]*G[0][lane] + S[19][lane]*G[2][lane] + S[25][lane]*G[3][lane] + S[31][lane]*G[5][lane] + S[32][lane]*G[6][lane] + S[34][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[5][lane] += S[5][lane]*G[0][lane] + S[13][lane]*G[1][lane] + S[26][lane]*G[3][lane] + S[31][lane]*G[4][lane] + S[36][lane]*G[6][lane] + S[37][lane]*G[7][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[6][lane] += S[6][lane]*G[0][lane] + S[14][lane]*G[1][lane] + S[21][lane]*G[2][lane] + S[27][lane]*G[3][lane] + S[32][lane]*G[4][lane] + S[36][lane]*G[5][lane] + S[39][lane]*G[6][lane] + S[40][lane]*G[7][lane] + S[41][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[7][lane] += S[7][lane]*G[0][lane] + S[22][lane]*G[2][lane] + S[28][lane]*G[3][lane] + S[37][lane]*G[5][lane] + S[40][lane]*G[6][lane] + S[43][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[8][lane] += S[8][lane]*G[0][lane] + S[16][lane]*G[1][lane] + S[29][lane]*G[3][lane] + S[34][lane]*G[4][lane] + S[41][lane]*G[6][lane] + S[43][lane]*G[7][lane];
       }
     } else if constexpr (MASK == 7) {
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
         Y[0][lane] += S[1][lane]*G[1][lane] + S[2][lane]*G[2][lane] + S[4][lane]*G[4][lane] + S[5][lane]*G[5][lane] + S[7][lane]*G[7][lane] + S[8][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[1][lane] += S[1][lane]*G[0][lane] + S[10][lane]*G[2][lane] + S[11][lane]*G[3][lane] + S[13][lane]*G[5][lane] + S[14][lane]*G[6][lane] + S[16][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[2][lane] += S[2][lane]*G[0][lane] + S[10][lane]*G[1][lane] + S[18][lane]*G[3][lane] + S[19][lane]*G[4][lane] + S[21][lane]*G[6][lane] + S[22][lane]*G[7][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[3][lane] += S[11][lane]*G[1][lane] + S[18][lane]*G[2][lane] + S[25][lane]*G[4][lane] + S[26][lane]*G[5][lane] + S[28][lane]*G[7][lane] + S[29][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[4][lane] += S[4][lane]*G[0][lane] + S[19][lane]*G[2][lane] + S[25][lane]*G[3][lane] + S[31][lane]*G[5][lane] + S[32][lane]*G[6][lane] + S[34][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[5][lane] += S[5][lane]*G[0][lane] + S[13][lane]*G[1][lane] + S[26][lane]*G[3][lane] + S[31][lane]*G[4][lane] + S[36][lane]*G[6][lane] + S[37][lane]*G[7][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[6][lane] += S[14][lane]*G[1][lane] + S[21][lane]*G[2][lane] + S[32][lane]*G[4][lane] + S[36][lane]*G[5][lane] + S[40][lane]*G[7][lane] + S[41][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[7][lane] += S[7][lane]*G[0][lane] + S[22][lane]*G[2][lane] + S[28][lane]*G[3][lane] + S[37][lane]*G[5][lane] + S[40][lane]*G[6][lane] + S[43][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[8][lane] += S[8][lane]*G[0][lane] + S[16][lane]*G[1][lane] + S[29][lane]*G[3][lane] + S[34][lane]*G[4][lane] + S[41][lane]*G[6][lane] + S[43][lane]*G[7][lane];
       }
     }
@@ -188,19 +404,43 @@ struct inexact_contract_d3<false> {
     y[8] += S[72]*g[0] + S[73]*g[1] + S[74]*g[2] + S[75]*g[3] + S[76]*g[4] + S[77]*g[5] + S[78]*g[6] + S[79]*g[7] + S[80]*g[8];
   }
 
-  // The same for a block of lanes, one loop over them.
+  // The same for a block of lanes, a loop over them per row.
   template <typename t, int VS>
   static SFEM_INLINE void contract_lanes(const int ne, const t S[81][VS], const t G[9][VS], t Y[9][VS]) {
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
       Y[0][lane] += S[0][lane]*G[0][lane] + S[1][lane]*G[1][lane] + S[2][lane]*G[2][lane] + S[3][lane]*G[3][lane] + S[4][lane]*G[4][lane] + S[5][lane]*G[5][lane] + S[6][lane]*G[6][lane] + S[7][lane]*G[7][lane] + S[8][lane]*G[8][lane];
+    }
+    #pragma omp simd
+    for (int lane = 0; lane < ne; ++lane) {
       Y[1][lane] += S[9][lane]*G[0][lane] + S[10][lane]*G[1][lane] + S[11][lane]*G[2][lane] + S[12][lane]*G[3][lane] + S[13][lane]*G[4][lane] + S[14][lane]*G[5][lane] + S[15][lane]*G[6][lane] + S[16][lane]*G[7][lane] + S[17][lane]*G[8][lane];
+    }
+    #pragma omp simd
+    for (int lane = 0; lane < ne; ++lane) {
       Y[2][lane] += S[18][lane]*G[0][lane] + S[19][lane]*G[1][lane] + S[20][lane]*G[2][lane] + S[21][lane]*G[3][lane] + S[22][lane]*G[4][lane] + S[23][lane]*G[5][lane] + S[24][lane]*G[6][lane] + S[25][lane]*G[7][lane] + S[26][lane]*G[8][lane];
+    }
+    #pragma omp simd
+    for (int lane = 0; lane < ne; ++lane) {
       Y[3][lane] += S[27][lane]*G[0][lane] + S[28][lane]*G[1][lane] + S[29][lane]*G[2][lane] + S[30][lane]*G[3][lane] + S[31][lane]*G[4][lane] + S[32][lane]*G[5][lane] + S[33][lane]*G[6][lane] + S[34][lane]*G[7][lane] + S[35][lane]*G[8][lane];
+    }
+    #pragma omp simd
+    for (int lane = 0; lane < ne; ++lane) {
       Y[4][lane] += S[36][lane]*G[0][lane] + S[37][lane]*G[1][lane] + S[38][lane]*G[2][lane] + S[39][lane]*G[3][lane] + S[40][lane]*G[4][lane] + S[41][lane]*G[5][lane] + S[42][lane]*G[6][lane] + S[43][lane]*G[7][lane] + S[44][lane]*G[8][lane];
+    }
+    #pragma omp simd
+    for (int lane = 0; lane < ne; ++lane) {
       Y[5][lane] += S[45][lane]*G[0][lane] + S[46][lane]*G[1][lane] + S[47][lane]*G[2][lane] + S[48][lane]*G[3][lane] + S[49][lane]*G[4][lane] + S[50][lane]*G[5][lane] + S[51][lane]*G[6][lane] + S[52][lane]*G[7][lane] + S[53][lane]*G[8][lane];
+    }
+    #pragma omp simd
+    for (int lane = 0; lane < ne; ++lane) {
       Y[6][lane] += S[54][lane]*G[0][lane] + S[55][lane]*G[1][lane] + S[56][lane]*G[2][lane] + S[57][lane]*G[3][lane] + S[58][lane]*G[4][lane] + S[59][lane]*G[5][lane] + S[60][lane]*G[6][lane] + S[61][lane]*G[7][lane] + S[62][lane]*G[8][lane];
+    }
+    #pragma omp simd
+    for (int lane = 0; lane < ne; ++lane) {
       Y[7][lane] += S[63][lane]*G[0][lane] + S[64][lane]*G[1][lane] + S[65][lane]*G[2][lane] + S[66][lane]*G[3][lane] + S[67][lane]*G[4][lane] + S[68][lane]*G[5][lane] + S[69][lane]*G[6][lane] + S[70][lane]*G[7][lane] + S[71][lane]*G[8][lane];
+    }
+    #pragma omp simd
+    for (int lane = 0; lane < ne; ++lane) {
       Y[8][lane] += S[72][lane]*G[0][lane] + S[73][lane]*G[1][lane] + S[74][lane]*G[2][lane] + S[75][lane]*G[3][lane] + S[76][lane]*G[4][lane] + S[77][lane]*G[5][lane] + S[78][lane]*G[6][lane] + S[79][lane]*G[7][lane] + S[80][lane]*G[8][lane];
     }
   }
@@ -212,104 +452,296 @@ struct inexact_contract_d3<false> {
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
         Y[0][lane] += S[0][lane]*G[0][lane] + S[1][lane]*G[1][lane] + S[2][lane]*G[2][lane] + S[3][lane]*G[3][lane] + S[4][lane]*G[4][lane] + S[5][lane]*G[5][lane] + S[6][lane]*G[6][lane] + S[7][lane]*G[7][lane] + S[8][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[1][lane] += S[9][lane]*G[0][lane] + S[10][lane]*G[1][lane] + S[11][lane]*G[2][lane] + S[12][lane]*G[3][lane] + S[13][lane]*G[4][lane] + S[14][lane]*G[5][lane] + S[15][lane]*G[6][lane] + S[16][lane]*G[7][lane] + S[17][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[2][lane] += S[18][lane]*G[0][lane] + S[19][lane]*G[1][lane] + S[20][lane]*G[2][lane] + S[21][lane]*G[3][lane] + S[22][lane]*G[4][lane] + S[23][lane]*G[5][lane] + S[24][lane]*G[6][lane] + S[25][lane]*G[7][lane] + S[26][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[3][lane] += S[27][lane]*G[0][lane] + S[28][lane]*G[1][lane] + S[29][lane]*G[2][lane] + S[30][lane]*G[3][lane] + S[31][lane]*G[4][lane] + S[32][lane]*G[5][lane] + S[33][lane]*G[6][lane] + S[34][lane]*G[7][lane] + S[35][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[4][lane] += S[36][lane]*G[0][lane] + S[37][lane]*G[1][lane] + S[38][lane]*G[2][lane] + S[39][lane]*G[3][lane] + S[40][lane]*G[4][lane] + S[41][lane]*G[5][lane] + S[42][lane]*G[6][lane] + S[43][lane]*G[7][lane] + S[44][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[5][lane] += S[45][lane]*G[0][lane] + S[46][lane]*G[1][lane] + S[47][lane]*G[2][lane] + S[48][lane]*G[3][lane] + S[49][lane]*G[4][lane] + S[50][lane]*G[5][lane] + S[51][lane]*G[6][lane] + S[52][lane]*G[7][lane] + S[53][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[6][lane] += S[54][lane]*G[0][lane] + S[55][lane]*G[1][lane] + S[56][lane]*G[2][lane] + S[57][lane]*G[3][lane] + S[58][lane]*G[4][lane] + S[59][lane]*G[5][lane] + S[60][lane]*G[6][lane] + S[61][lane]*G[7][lane] + S[62][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[7][lane] += S[63][lane]*G[0][lane] + S[64][lane]*G[1][lane] + S[65][lane]*G[2][lane] + S[66][lane]*G[3][lane] + S[67][lane]*G[4][lane] + S[68][lane]*G[5][lane] + S[69][lane]*G[6][lane] + S[70][lane]*G[7][lane] + S[71][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[8][lane] += S[72][lane]*G[0][lane] + S[73][lane]*G[1][lane] + S[74][lane]*G[2][lane] + S[75][lane]*G[3][lane] + S[76][lane]*G[4][lane] + S[77][lane]*G[5][lane] + S[78][lane]*G[6][lane] + S[79][lane]*G[7][lane] + S[80][lane]*G[8][lane];
       }
     } else if constexpr (MASK == 1) {
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
         Y[0][lane] += S[1][lane]*G[1][lane] + S[2][lane]*G[2][lane] + S[4][lane]*G[4][lane] + S[5][lane]*G[5][lane] + S[7][lane]*G[7][lane] + S[8][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[1][lane] += S[9][lane]*G[0][lane] + S[10][lane]*G[1][lane] + S[11][lane]*G[2][lane] + S[12][lane]*G[3][lane] + S[13][lane]*G[4][lane] + S[14][lane]*G[5][lane] + S[15][lane]*G[6][lane] + S[16][lane]*G[7][lane] + S[17][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[2][lane] += S[18][lane]*G[0][lane] + S[19][lane]*G[1][lane] + S[20][lane]*G[2][lane] + S[21][lane]*G[3][lane] + S[22][lane]*G[4][lane] + S[23][lane]*G[5][lane] + S[24][lane]*G[6][lane] + S[25][lane]*G[7][lane] + S[26][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[3][lane] += S[28][lane]*G[1][lane] + S[29][lane]*G[2][lane] + S[31][lane]*G[4][lane] + S[32][lane]*G[5][lane] + S[34][lane]*G[7][lane] + S[35][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[4][lane] += S[36][lane]*G[0][lane] + S[37][lane]*G[1][lane] + S[38][lane]*G[2][lane] + S[39][lane]*G[3][lane] + S[40][lane]*G[4][lane] + S[41][lane]*G[5][lane] + S[42][lane]*G[6][lane] + S[43][lane]*G[7][lane] + S[44][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[5][lane] += S[45][lane]*G[0][lane] + S[46][lane]*G[1][lane] + S[47][lane]*G[2][lane] + S[48][lane]*G[3][lane] + S[49][lane]*G[4][lane] + S[50][lane]*G[5][lane] + S[51][lane]*G[6][lane] + S[52][lane]*G[7][lane] + S[53][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[6][lane] += S[55][lane]*G[1][lane] + S[56][lane]*G[2][lane] + S[58][lane]*G[4][lane] + S[59][lane]*G[5][lane] + S[61][lane]*G[7][lane] + S[62][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[7][lane] += S[63][lane]*G[0][lane] + S[64][lane]*G[1][lane] + S[65][lane]*G[2][lane] + S[66][lane]*G[3][lane] + S[67][lane]*G[4][lane] + S[68][lane]*G[5][lane] + S[69][lane]*G[6][lane] + S[70][lane]*G[7][lane] + S[71][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[8][lane] += S[72][lane]*G[0][lane] + S[73][lane]*G[1][lane] + S[74][lane]*G[2][lane] + S[75][lane]*G[3][lane] + S[76][lane]*G[4][lane] + S[77][lane]*G[5][lane] + S[78][lane]*G[6][lane] + S[79][lane]*G[7][lane] + S[80][lane]*G[8][lane];
       }
     } else if constexpr (MASK == 2) {
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
         Y[0][lane] += S[0][lane]*G[0][lane] + S[1][lane]*G[1][lane] + S[2][lane]*G[2][lane] + S[3][lane]*G[3][lane] + S[4][lane]*G[4][lane] + S[5][lane]*G[5][lane] + S[6][lane]*G[6][lane] + S[7][lane]*G[7][lane] + S[8][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[1][lane] += S[9][lane]*G[0][lane] + S[11][lane]*G[2][lane] + S[12][lane]*G[3][lane] + S[14][lane]*G[5][lane] + S[15][lane]*G[6][lane] + S[17][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[2][lane] += S[18][lane]*G[0][lane] + S[19][lane]*G[1][lane] + S[20][lane]*G[2][lane] + S[21][lane]*G[3][lane] + S[22][lane]*G[4][lane] + S[23][lane]*G[5][lane] + S[24][lane]*G[6][lane] + S[25][lane]*G[7][lane] + S[26][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[3][lane] += S[27][lane]*G[0][lane] + S[28][lane]*G[1][lane] + S[29][lane]*G[2][lane] + S[30][lane]*G[3][lane] + S[31][lane]*G[4][lane] + S[32][lane]*G[5][lane] + S[33][lane]*G[6][lane] + S[34][lane]*G[7][lane] + S[35][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[4][lane] += S[36][lane]*G[0][lane] + S[38][lane]*G[2][lane] + S[39][lane]*G[3][lane] + S[41][lane]*G[5][lane] + S[42][lane]*G[6][lane] + S[44][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[5][lane] += S[45][lane]*G[0][lane] + S[46][lane]*G[1][lane] + S[47][lane]*G[2][lane] + S[48][lane]*G[3][lane] + S[49][lane]*G[4][lane] + S[50][lane]*G[5][lane] + S[51][lane]*G[6][lane] + S[52][lane]*G[7][lane] + S[53][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[6][lane] += S[54][lane]*G[0][lane] + S[55][lane]*G[1][lane] + S[56][lane]*G[2][lane] + S[57][lane]*G[3][lane] + S[58][lane]*G[4][lane] + S[59][lane]*G[5][lane] + S[60][lane]*G[6][lane] + S[61][lane]*G[7][lane] + S[62][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[7][lane] += S[63][lane]*G[0][lane] + S[65][lane]*G[2][lane] + S[66][lane]*G[3][lane] + S[68][lane]*G[5][lane] + S[69][lane]*G[6][lane] + S[71][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[8][lane] += S[72][lane]*G[0][lane] + S[73][lane]*G[1][lane] + S[74][lane]*G[2][lane] + S[75][lane]*G[3][lane] + S[76][lane]*G[4][lane] + S[77][lane]*G[5][lane] + S[78][lane]*G[6][lane] + S[79][lane]*G[7][lane] + S[80][lane]*G[8][lane];
       }
     } else if constexpr (MASK == 3) {
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
         Y[0][lane] += S[1][lane]*G[1][lane] + S[2][lane]*G[2][lane] + S[4][lane]*G[4][lane] + S[5][lane]*G[5][lane] + S[7][lane]*G[7][lane] + S[8][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[1][lane] += S[9][lane]*G[0][lane] + S[11][lane]*G[2][lane] + S[12][lane]*G[3][lane] + S[14][lane]*G[5][lane] + S[15][lane]*G[6][lane] + S[17][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[2][lane] += S[18][lane]*G[0][lane] + S[19][lane]*G[1][lane] + S[20][lane]*G[2][lane] + S[21][lane]*G[3][lane] + S[22][lane]*G[4][lane] + S[23][lane]*G[5][lane] + S[24][lane]*G[6][lane] + S[25][lane]*G[7][lane] + S[26][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[3][lane] += S[28][lane]*G[1][lane] + S[29][lane]*G[2][lane] + S[31][lane]*G[4][lane] + S[32][lane]*G[5][lane] + S[34][lane]*G[7][lane] + S[35][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[4][lane] += S[36][lane]*G[0][lane] + S[38][lane]*G[2][lane] + S[39][lane]*G[3][lane] + S[41][lane]*G[5][lane] + S[42][lane]*G[6][lane] + S[44][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[5][lane] += S[45][lane]*G[0][lane] + S[46][lane]*G[1][lane] + S[47][lane]*G[2][lane] + S[48][lane]*G[3][lane] + S[49][lane]*G[4][lane] + S[50][lane]*G[5][lane] + S[51][lane]*G[6][lane] + S[52][lane]*G[7][lane] + S[53][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[6][lane] += S[55][lane]*G[1][lane] + S[56][lane]*G[2][lane] + S[58][lane]*G[4][lane] + S[59][lane]*G[5][lane] + S[61][lane]*G[7][lane] + S[62][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[7][lane] += S[63][lane]*G[0][lane] + S[65][lane]*G[2][lane] + S[66][lane]*G[3][lane] + S[68][lane]*G[5][lane] + S[69][lane]*G[6][lane] + S[71][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[8][lane] += S[72][lane]*G[0][lane] + S[73][lane]*G[1][lane] + S[74][lane]*G[2][lane] + S[75][lane]*G[3][lane] + S[76][lane]*G[4][lane] + S[77][lane]*G[5][lane] + S[78][lane]*G[6][lane] + S[79][lane]*G[7][lane] + S[80][lane]*G[8][lane];
       }
     } else if constexpr (MASK == 4) {
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
         Y[0][lane] += S[0][lane]*G[0][lane] + S[1][lane]*G[1][lane] + S[2][lane]*G[2][lane] + S[3][lane]*G[3][lane] + S[4][lane]*G[4][lane] + S[5][lane]*G[5][lane] + S[6][lane]*G[6][lane] + S[7][lane]*G[7][lane] + S[8][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[1][lane] += S[9][lane]*G[0][lane] + S[10][lane]*G[1][lane] + S[11][lane]*G[2][lane] + S[12][lane]*G[3][lane] + S[13][lane]*G[4][lane] + S[14][lane]*G[5][lane] + S[15][lane]*G[6][lane] + S[16][lane]*G[7][lane] + S[17][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[2][lane] += S[18][lane]*G[0][lane] + S[19][lane]*G[1][lane] + S[21][lane]*G[3][lane] + S[22][lane]*G[4][lane] + S[24][lane]*G[6][lane] + S[25][lane]*G[7][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[3][lane] += S[27][lane]*G[0][lane] + S[28][lane]*G[1][lane] + S[29][lane]*G[2][lane] + S[30][lane]*G[3][lane] + S[31][lane]*G[4][lane] + S[32][lane]*G[5][lane] + S[33][lane]*G[6][lane] + S[34][lane]*G[7][lane] + S[35][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[4][lane] += S[36][lane]*G[0][lane] + S[37][lane]*G[1][lane] + S[38][lane]*G[2][lane] + S[39][lane]*G[3][lane] + S[40][lane]*G[4][lane] + S[41][lane]*G[5][lane] + S[42][lane]*G[6][lane] + S[43][lane]*G[7][lane] + S[44][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[5][lane] += S[45][lane]*G[0][lane] + S[46][lane]*G[1][lane] + S[48][lane]*G[3][lane] + S[49][lane]*G[4][lane] + S[51][lane]*G[6][lane] + S[52][lane]*G[7][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[6][lane] += S[54][lane]*G[0][lane] + S[55][lane]*G[1][lane] + S[56][lane]*G[2][lane] + S[57][lane]*G[3][lane] + S[58][lane]*G[4][lane] + S[59][lane]*G[5][lane] + S[60][lane]*G[6][lane] + S[61][lane]*G[7][lane] + S[62][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[7][lane] += S[63][lane]*G[0][lane] + S[64][lane]*G[1][lane] + S[65][lane]*G[2][lane] + S[66][lane]*G[3][lane] + S[67][lane]*G[4][lane] + S[68][lane]*G[5][lane] + S[69][lane]*G[6][lane] + S[70][lane]*G[7][lane] + S[71][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[8][lane] += S[72][lane]*G[0][lane] + S[73][lane]*G[1][lane] + S[75][lane]*G[3][lane] + S[76][lane]*G[4][lane] + S[78][lane]*G[6][lane] + S[79][lane]*G[7][lane];
       }
     } else if constexpr (MASK == 5) {
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
         Y[0][lane] += S[1][lane]*G[1][lane] + S[2][lane]*G[2][lane] + S[4][lane]*G[4][lane] + S[5][lane]*G[5][lane] + S[7][lane]*G[7][lane] + S[8][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[1][lane] += S[9][lane]*G[0][lane] + S[10][lane]*G[1][lane] + S[11][lane]*G[2][lane] + S[12][lane]*G[3][lane] + S[13][lane]*G[4][lane] + S[14][lane]*G[5][lane] + S[15][lane]*G[6][lane] + S[16][lane]*G[7][lane] + S[17][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[2][lane] += S[18][lane]*G[0][lane] + S[19][lane]*G[1][lane] + S[21][lane]*G[3][lane] + S[22][lane]*G[4][lane] + S[24][lane]*G[6][lane] + S[25][lane]*G[7][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[3][lane] += S[28][lane]*G[1][lane] + S[29][lane]*G[2][lane] + S[31][lane]*G[4][lane] + S[32][lane]*G[5][lane] + S[34][lane]*G[7][lane] + S[35][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[4][lane] += S[36][lane]*G[0][lane] + S[37][lane]*G[1][lane] + S[38][lane]*G[2][lane] + S[39][lane]*G[3][lane] + S[40][lane]*G[4][lane] + S[41][lane]*G[5][lane] + S[42][lane]*G[6][lane] + S[43][lane]*G[7][lane] + S[44][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[5][lane] += S[45][lane]*G[0][lane] + S[46][lane]*G[1][lane] + S[48][lane]*G[3][lane] + S[49][lane]*G[4][lane] + S[51][lane]*G[6][lane] + S[52][lane]*G[7][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[6][lane] += S[55][lane]*G[1][lane] + S[56][lane]*G[2][lane] + S[58][lane]*G[4][lane] + S[59][lane]*G[5][lane] + S[61][lane]*G[7][lane] + S[62][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[7][lane] += S[63][lane]*G[0][lane] + S[64][lane]*G[1][lane] + S[65][lane]*G[2][lane] + S[66][lane]*G[3][lane] + S[67][lane]*G[4][lane] + S[68][lane]*G[5][lane] + S[69][lane]*G[6][lane] + S[70][lane]*G[7][lane] + S[71][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[8][lane] += S[72][lane]*G[0][lane] + S[73][lane]*G[1][lane] + S[75][lane]*G[3][lane] + S[76][lane]*G[4][lane] + S[78][lane]*G[6][lane] + S[79][lane]*G[7][lane];
       }
     } else if constexpr (MASK == 6) {
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
         Y[0][lane] += S[0][lane]*G[0][lane] + S[1][lane]*G[1][lane] + S[2][lane]*G[2][lane] + S[3][lane]*G[3][lane] + S[4][lane]*G[4][lane] + S[5][lane]*G[5][lane] + S[6][lane]*G[6][lane] + S[7][lane]*G[7][lane] + S[8][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[1][lane] += S[9][lane]*G[0][lane] + S[11][lane]*G[2][lane] + S[12][lane]*G[3][lane] + S[14][lane]*G[5][lane] + S[15][lane]*G[6][lane] + S[17][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[2][lane] += S[18][lane]*G[0][lane] + S[19][lane]*G[1][lane] + S[21][lane]*G[3][lane] + S[22][lane]*G[4][lane] + S[24][lane]*G[6][lane] + S[25][lane]*G[7][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[3][lane] += S[27][lane]*G[0][lane] + S[28][lane]*G[1][lane] + S[29][lane]*G[2][lane] + S[30][lane]*G[3][lane] + S[31][lane]*G[4][lane] + S[32][lane]*G[5][lane] + S[33][lane]*G[6][lane] + S[34][lane]*G[7][lane] + S[35][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[4][lane] += S[36][lane]*G[0][lane] + S[38][lane]*G[2][lane] + S[39][lane]*G[3][lane] + S[41][lane]*G[5][lane] + S[42][lane]*G[6][lane] + S[44][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[5][lane] += S[45][lane]*G[0][lane] + S[46][lane]*G[1][lane] + S[48][lane]*G[3][lane] + S[49][lane]*G[4][lane] + S[51][lane]*G[6][lane] + S[52][lane]*G[7][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[6][lane] += S[54][lane]*G[0][lane] + S[55][lane]*G[1][lane] + S[56][lane]*G[2][lane] + S[57][lane]*G[3][lane] + S[58][lane]*G[4][lane] + S[59][lane]*G[5][lane] + S[60][lane]*G[6][lane] + S[61][lane]*G[7][lane] + S[62][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[7][lane] += S[63][lane]*G[0][lane] + S[65][lane]*G[2][lane] + S[66][lane]*G[3][lane] + S[68][lane]*G[5][lane] + S[69][lane]*G[6][lane] + S[71][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[8][lane] += S[72][lane]*G[0][lane] + S[73][lane]*G[1][lane] + S[75][lane]*G[3][lane] + S[76][lane]*G[4][lane] + S[78][lane]*G[6][lane] + S[79][lane]*G[7][lane];
       }
     } else if constexpr (MASK == 7) {
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
         Y[0][lane] += S[1][lane]*G[1][lane] + S[2][lane]*G[2][lane] + S[4][lane]*G[4][lane] + S[5][lane]*G[5][lane] + S[7][lane]*G[7][lane] + S[8][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[1][lane] += S[9][lane]*G[0][lane] + S[11][lane]*G[2][lane] + S[12][lane]*G[3][lane] + S[14][lane]*G[5][lane] + S[15][lane]*G[6][lane] + S[17][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[2][lane] += S[18][lane]*G[0][lane] + S[19][lane]*G[1][lane] + S[21][lane]*G[3][lane] + S[22][lane]*G[4][lane] + S[24][lane]*G[6][lane] + S[25][lane]*G[7][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[3][lane] += S[28][lane]*G[1][lane] + S[29][lane]*G[2][lane] + S[31][lane]*G[4][lane] + S[32][lane]*G[5][lane] + S[34][lane]*G[7][lane] + S[35][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[4][lane] += S[36][lane]*G[0][lane] + S[38][lane]*G[2][lane] + S[39][lane]*G[3][lane] + S[41][lane]*G[5][lane] + S[42][lane]*G[6][lane] + S[44][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[5][lane] += S[45][lane]*G[0][lane] + S[46][lane]*G[1][lane] + S[48][lane]*G[3][lane] + S[49][lane]*G[4][lane] + S[51][lane]*G[6][lane] + S[52][lane]*G[7][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[6][lane] += S[55][lane]*G[1][lane] + S[56][lane]*G[2][lane] + S[58][lane]*G[4][lane] + S[59][lane]*G[5][lane] + S[61][lane]*G[7][lane] + S[62][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[7][lane] += S[63][lane]*G[0][lane] + S[65][lane]*G[2][lane] + S[66][lane]*G[3][lane] + S[68][lane]*G[5][lane] + S[69][lane]*G[6][lane] + S[71][lane]*G[8][lane];
+      }
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
         Y[8][lane] += S[72][lane]*G[0][lane] + S[73][lane]*G[1][lane] + S[75][lane]*G[3][lane] + S[76][lane]*G[4][lane] + S[78][lane]*G[6][lane] + S[79][lane]*G[7][lane];
       }
     }
