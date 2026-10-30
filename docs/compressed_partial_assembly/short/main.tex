@@ -58,12 +58,12 @@ assembled matrix has the largest memory footprint and is limited by memory bandw
 application stores no tangent but is limited by arithmetic.  A compressed tangent reduces both the
 footprint and the bytes each application streams, but its encoding perturbs the operator, and the
 effect on the Newton and Krylov iteration counts must be assessed with the speed-up.  We develop
-three compressed formats across this range: the quantized block sparse (BSR) matrix, the element
-matrix quantized per node pair, and the quadrature-point store, which keeps the pulled-back material
-tangent at the quadrature points or, on quadratic tetrahedra, the ten weighted sums of it that the
-application uses.  They share \texttt{fp16}, \texttt{int8} and \texttt{int8} mean-plus-deviation
-encodings decoded inside the application, and the matrix formats a difference form that keeps rigid
-translations exactly in the kernel of the encoded operator.  We show that an encoding error enters
+three compressed formats across this range, the quantized block sparse (BSR) matrix, the quantized
+element matrix and the quadrature-point store, and one set of measures that reduces their memory:
+exact reductions that drop what the application does not need, the symmetry of the tangent, the
+values its quadrature cannot distinguish and, in a difference form that keeps rigid translations
+exactly in the kernel, the diagonal node blocks of the matrices; then \texttt{fp16}, \texttt{int8}
+and \texttt{int8} mean-plus-deviation encodings, decoded inside the application.  We show that an encoding error enters
 inexact Newton as an additive forcing term.  On linear and quadratic tetrahedra and trilinear and
 triquadratic hexahedra at $10^7$ degrees of freedom, half precision and \texttt{int8} mean plus
 deviation keep the exact Newton iteration counts.  On a 72-core Arm Neoverse-V2 CPU the quantized
@@ -111,14 +111,15 @@ which the Newton iteration either absorbs or pays for in iterations.
 
 The contributions are:
 \begin{itemize}
-\item a common framework for the formats: each is a store written once per Newton step and an
-  application that decodes it in registers, under the same \texttt{fp16} and \texttt{int8}
-  encodings, with an error model in which what matters is the absolute rounding on smooth, nearly
-  rigid modes, and its consequence for inexact Newton --- the encoding error adds to the forcing
-  term;
-\item the difference form, which stores only off-diagonal node blocks and keeps rigid translations
-  exactly in the kernel of an encoded element or assembled matrix, with a scale per node pair for
-  element matrices and, for the assembled matrix, each pair of blocks stored once in a
+\item one set of memory measures in two steps: exact reductions --- the symmetry of the tangent, a
+  quadrature-point store sized to the rank of what the quadrature sees (moments on quadratic
+  tetrahedra, point values folded along lines of points on hexahedra), and the difference form,
+  which keeps rigid translations exactly in the kernel of an encoded matrix --- then \texttt{fp16}
+  and \texttt{int8} encodings, with a scale per node pair for element matrices;
+\item an error model in which what matters is the absolute rounding on smooth, nearly rigid modes,
+  and its consequence for inexact Newton: the encoding error adds to the forcing term;
+\item the formats built from these measures: each a store written once per Newton step and an
+  application that decodes it, the assembled matrix with each pair of blocks stored once in a
   SELL-C-$\sigma$ layout applied without atomics;
 \item an evaluation on one Grace CPU and one H100 GPU for four element types up to $10^7$ degrees of
   freedom: throughput, operator and peak memory, Newton iteration counts and time to solution against
@@ -301,7 +302,7 @@ and value arrays, and one row of the matrix-vector product.}
 
 \begin{figure*}[t]
 \centering
-\includegraphics[width=0.92\textwidth]{fmt_qbsr.pdf}
+\includegraphics[width=0.9\textwidth]{fmt_qbsr.pdf}
 \caption{The quantized assembled matrix, drawn with $C=3$ ($16$ in the code) on the mesh of
 Figure~\ref{fig:fmtbsr}.  (a) Stored upper blocks; the diagonal blocks are minus the row sums.
 (b) Rows in groups of $C$, sorted by length within windows of $\sigma$ rows, one step per block
@@ -469,7 +470,7 @@ as the element matrix with a scale per node pair.
 
 \begin{figure*}[t]
 \centering
-\includegraphics[width=0.85\textwidth]{time_to_solution.pdf}
+\includegraphics[width=0.8\textwidth]{time_to_solution.pdf}
 \caption{Newton time to solution on Grace relative to single-precision BSR (log scale, below one is
 faster), stretch at $10^6$ and $10^7$~dof and twist at $10^6$~dof; labels give the ratio and the
 Newton iterations; the formats of Figure~\ref{fig:throughput}.}
@@ -479,7 +480,7 @@ Newton iterations; the formats of Figure~\ref{fig:throughput}.}
 
 \begin{figure*}[t]
 \centering
-\includegraphics[width=0.85\textwidth]{time_to_solution_gpu.pdf}
+\includegraphics[width=0.8\textwidth]{time_to_solution_gpu.pdf}
 \caption{The H100 version of Figure~\ref{fig:tts}: Newton time to solution relative to
 single-precision BSR on the H100.}
 \Description{Bar charts of time to solution on the GPU relative to single-precision BSR.}
@@ -587,6 +588,11 @@ Figure~\ref{fig:gputts}, Table~\ref{tab:summary}).
 %% ===================================================================================================
 \section{Discussion and conclusions}
 
+Memory is saved in two steps for every format: the exact reductions leave the operator unchanged
+and remove about half of each format's numbers ($\exactQpPctHexEight\%$, $\exactEaPctHexEight\%$ and
+$\exactBsrPctHexEight\%$ on trilinear hexahedra), and the encodings store the rest in two to eight
+times fewer bytes; only they perturb the tangent.
+
 The choice of format follows the element.  Where a matrix row has few blocks and the element formats
 repeat each coupling in every element sharing it --- linear and quadratic tetrahedra --- the quantized
 assembled matrix is the fastest format.  Where rows are long and elements large --- triquadratic
@@ -606,6 +612,11 @@ what makes \texttt{int8} usable for element and assembled matrices.
 The gains need the operator to stream from memory: while the matrix fits in the last-level cache,
 BSR is faster.  The study uses one material, structured meshes and an unpreconditioned Krylov
 method; with a preconditioner built from the operator, the encodings change the preconditioner too.
+
+\begin{acks}
+The author thanks the Swiss National Science Foundation (project no.~215627), the PASC Program
+(``XSES-FSI'') and USI's Fondo Istituzionale per la Ricerca; computations on Alps at CSCS.
+\end{acks}
 
 \FloatBarrier
 \bibliographystyle{ACM-Reference-Format}

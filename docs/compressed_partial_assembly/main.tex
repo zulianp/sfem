@@ -81,15 +81,18 @@ encoding perturbs the tangent, however, and its effect on the Newton and Krylov 
 must be assessed together with the speed-up it buys.
 
 We develop three compressed formats of the tangent that span this range: the quantized block
-sparse (BSR) matrix, the assembled matrix with its $3\times3$ blocks encoded and each pair of blocks
-stored once; the quantized element matrix, with one scale per node pair; and the quadrature-point
-store, which keeps the pulled-back material tangent at the quadrature points or, where fewer, its
-moments against products of the element's gradient functions --- $\storeTetTen$ numbers per
-quadratic tetrahedron and $\storeHexEight$ per trilinear hexahedron, which reproduce the exact
-application to the rounding of the store.  The formats share three encodings, scaled
-\texttt{fp16}, \texttt{int8}, and \texttt{int8} mean plus deviation, decoded inside the
-application, and the two matrix formats a difference form that omits the diagonal node blocks, so
-that rigid translations stay exactly in the kernel of the encoded operator.  We show that an
+sparse (BSR) matrix, the quantized element matrix, and the quadrature-point store, which keeps the
+pulled-back material tangent where the quadrature evaluates it.  One set of measures reduces their
+memory in two steps.  Exact reductions drop the numbers the application does not need: the symmetry
+of the tangent leaves $45$ numbers per quadrature point and stores each pair of matrix blocks once;
+the quadrature leaves only the values its rule can distinguish, moments against products of
+gradient functions on quadratic tetrahedra and point values folded along the lines of quadrature
+points on hexahedra, $\storeTetTen$ numbers per quadratic tetrahedron and $\storeHexEight$ per
+trilinear hexahedron; and a difference form leaves out the diagonal node blocks of the matrix
+formats, so that rigid translations stay exactly in the kernel of the encoded operator.  Encodings
+then store what is left in fewer bits: scaled \texttt{fp16}, \texttt{int8}, and \texttt{int8} mean
+plus deviation, with a scale per node pair for the element matrix, decoded inside the application.
+We show that an
 encoding error enters inexact Newton as an additive forcing term, set by the absolute rounding on
 smooth, nearly rigid modes, which makes the choice of encoding a quantitative criterion, and we
 model the bytes and operations per degree of freedom of each format against BSR.
@@ -143,7 +146,9 @@ stored numbers shifts the trade for every format at once.
 Partial assembly sits between the element matrix and the matrix-free application: it stores a
 per-element object that captures geometry, state and material, and applies it by a small tensor
 contraction.  Stored at every quadrature point, the pulled-back material tangent makes the
-application exact, at $45$ numbers per point; quantizing those numbers saves bytes and perturbs the
+application exact, at $45$ numbers per point, and the quadrature sees fewer than that.  Memory can
+therefore be saved in two ways, for every format: exactly, by not storing what the application does
+not need, and approximately, by storing the rest in fewer bits.  Only the second perturbs the
 tangent.
 
 That perturbation matters for the nonlinear iteration.  Section~\ref{sec:newton} shows that a
@@ -160,21 +165,31 @@ each performs, and the perturbation each encoding makes to the tangent, which th
 absorbs or pays for in iterations.  The contributions are:
 
 \begin{enumerate}[leftmargin=1.5em,itemsep=2pt]
+\item \textbf{Exact reductions of the stored tangent} (Sections~\ref{sec:formulation},
+  \ref{sec:elementmatrix} and~\ref{sec:qbsr}), which hold whatever the encoding.  The major symmetry
+  of the tangent leaves $45$ numbers per quadrature point, the upper triangle of an element matrix
+  and one block per pair of nodes of the assembled matrix.  The quadrature leaves fewer: per
+  component the application sees only as many values as the rank of the products of reference
+  derivatives at the points, which we derive for each element and attain, with moments on quadratic
+  tetrahedra and, on hexahedra, a fold of the point values along the lines of quadrature points that
+  also removes multiply--adds.  The difference form leaves out the diagonal node blocks of the
+  element and assembled matrices, implied by their row sums, and keeps rigid translations exactly in
+  the kernel of the encoded operator.  On trilinear hexahedra the reductions remove
+  $\exactQpPctHexEight\%$ of the numbers of the point store, $\exactEaPctHexEight\%$ of the element
+  matrix and $\exactBsrPctHexEight\%$ of the assembled matrix (Table~\ref{tab:measures}).
 \item \textbf{Encodings, an error model and the Newton consequence} (Sections~\ref{sec:compression}
   and~\ref{sec:newton}), common to the formats: scaled \texttt{fp16} and \texttt{int8} and
-  mean-plus-deviation encodings, decoded inside the application.  The error that matters is the
-  absolute rounding on the smooth, nearly rigid modes, bounded through Korn's inequality, and it
-  enters inexact Newton as an additive forcing term, which turns the choice of codec into a
-  quantitative criterion.
-\item \textbf{Element matrices in difference form} (Section~\ref{sec:elementmatrix}), built from the
-  same stored tensors, storing only the off-diagonal node blocks so that rigid translations stay
-  exactly in the kernel of the encoded operator, with a scale per node pair.
-\item \textbf{Quantized assembled matrices} (Section~\ref{sec:qbsr}): the same encodings and
-  difference form applied to the BSR matrix, with each pair of blocks stored once in a
-  SELL-C-$\sigma$ layout and applied without atomics.
-\item \textbf{A cost model against BSR} (Section~\ref{sec:model}): operator memory, compulsory
-  traffic and operation counts per degree of freedom for each element and encoding, and the
-  arithmetic rate an element format must sustain to match BSR.
+  mean-plus-deviation encodings, and a scale per node pair for element matrices, decoded inside the
+  application.  The error that matters is the absolute rounding on the smooth, nearly rigid modes,
+  bounded through Korn's inequality, and it enters inexact Newton as an additive forcing term, which
+  turns the choice of codec into a quantitative criterion.
+\item \textbf{Three formats built from these measures} (Sections~\ref{sec:elementmatrix}
+  to~\ref{sec:kernels}): the quadrature-point store with its set-up and application kernels, element
+  matrices built from the same stored tensors, and the quantized assembled matrix in a
+  SELL-C-$\sigma$ layout applied without atomics.
+\item \textbf{A cost model against BSR} (Section~\ref{sec:model}): operator memory after each
+  measure, compulsory traffic and operation counts per degree of freedom for each element and
+  encoding, and the arithmetic rate an element format must sustain to match BSR.
 \item \textbf{An evaluation on one Grace CPU and one H100 GPU} (Sections~\ref{sec:results}--\ref{sec:appmesh}) for four
   element types up to $10^7$ degrees of freedom: throughput, operator and peak memory, set-up, Newton
   iteration counts and time to solution of every format against BSR in double and single precision,
@@ -1143,6 +1158,34 @@ connectivity and the increment; geometry, state and material parameters are not 
 
 \subsection{Operator memory}
 
+The measures of Sections~\ref{sec:formulation}--\ref{sec:qbsr} act in two steps.  The exact
+reductions decide how many numbers a format stores; Table~\ref{tab:measures} counts them after each
+reduction, per element for the element formats and per node for the assembled matrix.  Symmetry
+roughly halves every format.  What the quadrature sees removes a further tenth of the point store on
+TET10 and HEX27 and a fifth on HEX8, where the fold keeps the components with $m=n$ at half the
+points.  The difference form removes the diagonal node blocks: about a third of the element matrix on
+TET4, a sixth on TET10 and HEX8 and a twentieth on HEX27, and with each pair of blocks stored once
+it halves the assembled matrix.  The encodings then decide how many bytes each number takes.
+
+\begin{table}[t]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lrrrr}
+\toprule
+ & TET4 & TET10 & HEX8 & HEX27 \\
+\midrule
+\rows{tables/measures.tex}
+\bottomrule
+\end{tabular}
+\caption{Numbers stored after each exact reduction, for each format: per element for the
+quadrature-point store and the element matrix, per node for the assembled matrix, with $b$ the
+blocks per node row.  The encodings then store each number in $8$, $4$, $2$ or $1$ bytes
+(Table~\ref{tab:footprint}).  On the GPU the quantized matrix stores both blocks of a pair
+(Section~\ref{sec:plan}).}
+\label{tab:measures}
+\end{table}
+
 Table~\ref{tab:footprint} gives the memory of the operator per degree of freedom: for BSR
 (Figure~\ref{fig:fmtbsr}), the
 $3\times3$ blocks, their column indices and the row pointers, counted on the structured meshes of
@@ -1896,6 +1939,14 @@ degrees of freedom on 72 threads; the measurements set it for every operator ali
 %% ===================================================================================================
 \section{Conclusions}
 
+Memory is saved by one set of measures in two steps, for every format.  Exact reductions come
+first and cost no accuracy: the symmetry of the tangent, a store sized to what the quadrature can
+see --- moments on tetrahedra, point values folded along the lines of quadrature points on
+hexahedra --- and the difference form remove $\exactQpPctHexEight\%$ of the point store,
+$\exactEaPctHexEight\%$ of the element matrix and $\exactBsrPctHexEight\%$ of the assembled matrix
+on trilinear hexahedra, and the fold also removes arithmetic.  Encodings then divide what is left by
+two to eight, and only they perturb the tangent.
+
 Which compressed format of the tangent pays in a Newton--Krylov hyperelasticity solve depends on the
 element, and two properties decide which encodings are usable at all.  The rounding must follow the
 stored values or their variation over the element, not the largest entry of the element: half
@@ -1909,6 +1960,11 @@ element formats keep the lowest peak memory.  On Grace all of them need the oper
 memory: while the matrix fits in the last-level cache, BSR is faster.  On one H100 the quantized matrix leads on linear
 tetrahedra and trilinear hexahedra and the quadrature-point stores on quadratic tetrahedra and
 triquadratic hexahedra, where the assembly the matrices need weighs more than on the CPU.
+
+\begin{acks}
+The author thanks the Swiss National Science Foundation (project no.~215627), the PASC Program
+(``XSES-FSI'') and USI's Fondo Istituzionale per la Ricerca; computations on Alps at CSCS.
+\end{acks}
 
 \FloatBarrier
 \bibliographystyle{ACM-Reference-Format}
