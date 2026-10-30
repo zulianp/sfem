@@ -189,7 +189,8 @@ $\lambda_a$ replace the eleven points of the degree-$4$ rule~\cite{Keast1986}.  
 triquadratic (HEX27) hexahedra the components with $m=n$ need fewer numbers than points, since their
 products do not vary, or vary quadratically, along $\xi_m$: one point per line of points in
 direction $m$ passes its $m=n$ components to the line's other points, weighted by their Lagrange
-polynomials at it, and the application skips the dropped terms.  The folded stores hold the minima,
+polynomials at it, and the application skips the dropped terms (Figure~\ref{fig:fmtpoints}, bottom).  The folded
+stores hold the minima,
 $\minimalHexEight$ and $\minimalHexTwentySeven$ numbers instead of $\perpointHexEight$ and
 $\perpointHexTwentySeven$ point values, exactly, and apply faster on Grace for every encoding
 (\texttt{fp16} by $\foldGainHalfHexEight\%$ on HEX8, $\foldGainHalfHexTwentySeven\%$ on HEX27).
@@ -215,13 +216,20 @@ dimension of the reference derivatives, $\dim\Pi_{mn}$ and the rank $\rho_{mn}$ 
 
 \begin{figure*}[t]
 \centering
-\includegraphics[width=0.92\textwidth]{fmt_points.pdf}
-\caption{The quadrature-point store.  (a) The pulled-back tangent at a point, a symmetric $9\times9$
-matrix of $45$ numbers.  (b) The blocked layout of $V$ elements: point, component, lane, one
-vector load per component; a scale per element; the single-precision mean of the
-mean-and-deviation encodings.  (c) The application, one element per vector lane.}
-\Description{Three panels: an element with quadrature points and the stored tangent, the blocked
-memory layout of codes, scales and means, and the steps of the application.}
+\includegraphics[width=0.92\textwidth]{fmt_points.pdf}\\[1.5ex]
+\includegraphics[width=0.92\textwidth]{fmt_points_fold.pdf}
+\caption{The quadrature-point store.  Top: (a) the pulled-back tangent at a point, a symmetric
+$9\times9$ matrix of $45$ numbers; (b) the blocked layout of $V$ elements: point, component, lane,
+one vector load per component; a scale per element; the single-precision mean of the
+mean-and-deviation encodings; (c) the application, one element per vector lane.  Bottom, the folded
+store of HEX8: (a) on each line of points in direction $d$ one point passes its $m=n=d$ components
+to the other; (b) a point keeps $45$, $39$, $33$ or $27$ numbers (blank: dropped), and the
+application skips the dropped terms; (c) the blocked layout, $\storeHexEight$ rows per element
+instead of $\perpointHexEight$.}
+\Description{Two rows of three panels.  Top: an element with quadrature points and the stored
+tangent, the blocked memory layout of codes, scales and means, and the steps of the application.
+Bottom: a hexahedron with its eight points and arrows along the lines of points, a point's tangent
+with the dropped components blank, and the folded blocked layout.}
 \label{fig:fmtpoints}
 \end{figure*}
 

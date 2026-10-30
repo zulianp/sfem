@@ -350,7 +350,7 @@ $\rho_{mn}=64=n_q$, a minimum of $\minimalHexTwentySeven$ against $\storeHexTwen
 
 The kernels of this paper hold the minimum on every element: the moments on TET10, which have a
 schedule of their own (below), and on HEX8 and HEX27 the point values folded along the lines of
-points.  A component with $m=n$ multiplies, along each line of points in direction $m$, a
+points (Figure~\ref{fig:fmtfold}).  A component with $m=n$ multiplies, along each line of points in direction $m$, a
 polynomial of degree $2(p-1)$ in $\xi_m$ --- constant on HEX8, quadratic on HEX27 --- which $q_1-1$
 of the line's $q_1$ points determine.  One point per line, at the same position on every line,
 therefore drops its $m=n$ components and passes them to the line's other points, weighted by their
@@ -868,14 +868,30 @@ write a block in one pass (Figure~\ref{fig:fmtpoints}).  Both layouts are measur
 \Description{Three panels: an element with quadrature points and the stored tangent, the blocked
 memory layout of codes, scales and means, and the steps of the application.}
 \caption{The compressed point store.  (a) The pulled-back tangent at each quadrature point, a
-symmetric $9\times9$ matrix of $45$ numbers: HEX8 has $8$ points, of which the fold of
-Section~\ref{sec:minimal} keeps $27$ to $45$ numbers each, TET10 stores its $10$ $P_2$ moments, TET4 its
-single point.  (b) The blocked layout of a block of $V$ elements, contiguous: point,
+symmetric $9\times9$ matrix of $45$ numbers: HEX8 has $8$ points, TET10 stores its $10$ $P_2$ moments,
+TET4 its single point; the hexahedra store fewer, folded (Figure~\ref{fig:fmtfold}).  (b) The blocked layout of a block of $V$ elements, contiguous: point,
 component, lane, one vector load of \texttt{int8} or \texttt{fp16} codes per component; one scale per
 element; for the mean-and-deviation encodings, the single-precision mean.  (c) The application, one
 element per vector lane: gather, gradients at the points, the stored tangent decoded on the fly,
 accumulation, and scatter through the packed two-pass layout.}
 \label{fig:fmtpoints}
+\end{figure*}
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/fmt_points_fold.pdf}
+\Description{Three panels: a hexahedron with its eight quadrature points and arrows along the lines
+of points in the three directions, the stored tangent of a point with the components it drops left
+blank, and the blocked layout with fewer rows per point.}
+\caption{The folded point store of the hexahedra (Section~\ref{sec:minimal}), drawn for HEX8.  (a) On
+each line of points in direction $d$ the point at index $0$ passes its components with $m=n=d$ to
+the other point, exactly: their products do not vary along the line.  (b) A point keeps $45$, $39$,
+$33$ or $27$ numbers as it drops none, one, two or all three directions (blank: dropped), and the
+application skips the dropped terms, $81-9d_q$ multiply--adds.  (c) The blocked layout: the points'
+rows, $\storeHexEight$ per element instead of $\perpointHexEight$, then the scales and the $45$ means,
+unchanged.  HEX27 folds alike, the four points of a line passing one point's values to the other
+three: $\storeHexTwentySeven$ numbers instead of $\perpointHexTwentySeven$.}
+\label{fig:fmtfold}
 \end{figure*}
 
 %% ===================================================================================================
