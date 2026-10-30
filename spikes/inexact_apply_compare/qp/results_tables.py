@@ -286,6 +286,13 @@ def write_macros(src, outdir, extras=()):
         if a and b:
             m[f"pairSlowdown{tag}"] = f"{100 * (1 - b['mdofs'] / a['mdofs']):.0f}"
             m[f"pairErrGain{tag}"] = f"{a['energy'] / b['energy']:.0f}"
+        # The folded point store against the 45 numbers per point it replaced (HEX8, HEX27): the
+        # throughput gain in percent, per encoding.
+        for k, key in (("ThirtyTwo", "qp f32 blk a32"), ("Half", "qp f16 blk a32 lanes"),
+                       ("EightEl", "qp i8/el blk a32 lanes"), ("EightMd", "qp i8 mean+dev blk a32 lanes")):
+            a, b = r.get(f"{key} nofold packed"), r.get(f"{key} packed")
+            if a and b:
+                m[f"foldGain{k}{tag}"] = f"{100 * (b['mdofs'] / a['mdofs'] - 1):.0f}"
     for el, (runs, mm) in newton_case(src, extras, "1M").items():
         tag = tags[el]
         ex = runs.get("BSR f64")

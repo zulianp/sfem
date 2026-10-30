@@ -8,6 +8,11 @@
 // rule's points (setup_in), the pointwise tangent, the weighted points or moments, then the
 // store's encoding (the host's encode_block, line by line).  Application: one thread per element,
 // tau = float (double for the f64 reference), atomicAdd scatter.
+//
+// The HEX8 point store is folded as the host's (Element::MASK; qp_store.hpp): a point stores only the
+// components its mask keeps, NS numbers per element.  HEX27's point-parallel kernels keep all 45 per
+// point: their threads' masks differ within a warp, so the fold saves no multiply-add there and its
+// decode cost more than the bytes it saves (RESULTS_QP.md).
 #include <cuda_fp16.h>
 #include <cuda_runtime.h>
 
@@ -179,11 +184,28 @@ __device__ void tangents(const Geometry &g, const ptrdiff_t e, const double *RST
     }
 }
 
-// Point store: codes [block][j][c][lane], scales [element], means [block][c][lane] (MD).
+// Point j's fold (Element::MASK) in shared memory, for the point-parallel set-up whose threads read
+// it at their own points (a constant-memory read at a different address per thread is serialised
+// across the warp): the directions it drops, where its codes start, and for each direction it keeps
+// the point it receives from and the weight.  The block's threads load it; the caller's next barrier
+// makes it visible.
+struct FoldTables {
+    int mask[NV], off[NV + 1], src[NV * 3];
+    double coef[NV * 3];
+    __device__ void load() {
+        for (int i = threadIdx.x; i < NV; i += blockDim.x) mask[i] = qp::dev::FMASK[i];
+        for (int i = threadIdx.x; i <= NV; i += blockDim.x) off[i] = qp::dev::FOFF[i];
+        for (int i = threadIdx.x; i < NV * 3; i += blockDim.x) src[i] = qp::dev::FSRC[i], coef[i] = qp::dev::FCOEF[i];
+    }
+};
+
+// Point store: codes [block][j][c][lane], scales [element], means [block][c][lane] (MD).  The folded
+// stores (HEX8, HEX27) are set up point-parallel.
 template <class CODEC, bool MD>
 __global__ void __launch_bounds__(THREADS) setup_points(const Geometry g, const double *RSTR x,
                                                         typename CODEC::storage *RSTR codes, float *RSTR scales,
                                                         float *RSTR aux) {
+    static_assert(!El::foldable || sizeof(CODEC) == 0, "the folded stores are set up point-parallel");
     const ptrdiff_t e = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x;
     if (e >= g.nelements) return;
     double T[NV][45];
@@ -347,9 +369,11 @@ __global__ void __launch_bounds__(EPB *NQ) setup_points_coop(const Geometry g, c
     __shared__ double us[EPB][3][N];
     __shared__ double Ts[EPB][NQ][45];
     __shared__ double tops[EPB][NQ];
+    __shared__ FoldTables ft;
     const int le = threadIdx.x / NQ, q = threadIdx.x % NQ;
     const ptrdiff_t e = (ptrdiff_t)blockIdx.x * EPB + le;
     const bool active = e < g.nelements;
+    ft.load();  // made visible by coop_tangents' barriers
     coop_tangents<EPB>(g, x, Ts, us, sg, le, q, e, active);
     const size_t blk = (size_t)(e / V), lane = (size_t)(e % V);
     if constexpr (MD) {
@@ -363,17 +387,52 @@ __global__ void __launch_bounds__(EPB *NQ) setup_points_coop(const Geometry g, c
             }
         __syncthreads();
     }
-    double inv = 1;
-    if constexpr (CODEC::scaled) {
-        double mine = 0;
-        for (int i = q; i < NV * 45; i += NQ) mine = fmax(mine, fabs(Ts[le][i / 45][i % 45]));
-        const double s = CODEC::scale_for(coop_max<EPB>(tops, le, q, mine));
-        if (active && q == 0) scales[e] = (float)s;
-        inv = 1.0 / (double)(float)s;
+    if constexpr (El::foldable) {
+        // The folded store (HEX8, a thread per point): thread q folds, measures and encodes its own
+        // point's components, unrolled with their directions known, in the store's order within the
+        // point.  The values it reads from other points are dropped points', which nobody changes.
+        const bool own = active && q < NV;
+        const int mask = own ? ft.mask[q] : 0;
+        if (own)
+            static_for<0, 45>([&](auto C) {
+                constexpr int c = decltype(C)::value, d = El::DIR[c];
+                if constexpr (d >= 0)
+                    if (!((mask >> d) & 1)) Ts[le][q][c] += ft.coef[q * 3 + d] * Ts[le][ft.src[q * 3 + d]][c];
+            });
+        const auto keeps = [&](const int d) { return d < 0 || !((mask >> d) & 1); };
+        double inv = 1;
+        if constexpr (CODEC::scaled) {
+            double mine = 0;
+            if (own)
+                static_for<0, 45>([&](auto C) {
+                    constexpr int c = decltype(C)::value, d = El::DIR[c];
+                    if (keeps(d)) mine = fmax(mine, fabs(Ts[le][q][c]));
+                });
+            const double s = CODEC::scale_for(coop_max<EPB>(tops, le, q, mine));
+            if (active && q == 0) scales[e] = (float)s;
+            inv = 1.0 / (double)(float)s;
+        }
+        if (own) {
+            typename CODEC::storage *const out = codes + (blk * El::NS + ft.off[q]) * V + lane;
+            int k = 0;
+            static_for<0, 45>([&](auto C) {
+                constexpr int c = decltype(C)::value, d = El::DIR[c];
+                if (keeps(d)) out[(size_t)(k++) * V] = CODEC::encode(Ts[le][q][c], inv);
+            });
+        }
+    } else {
+        double inv = 1;
+        if constexpr (CODEC::scaled) {
+            double mine = 0;
+            for (int i = q; i < NV * 45; i += NQ) mine = fmax(mine, fabs(Ts[le][i / 45][i % 45]));
+            const double s = CODEC::scale_for(coop_max<EPB>(tops, le, q, mine));
+            if (active && q == 0) scales[e] = (float)s;
+            inv = 1.0 / (double)(float)s;
+        }
+        if (active)
+            for (int i = q; i < NV * 45; i += NQ)
+                codes[((blk * NV + i / 45) * 45 + i % 45) * V + lane] = CODEC::encode(Ts[le][i / 45][i % 45], inv);
     }
-    if (active)
-        for (int i = q; i < NV * 45; i += NQ)
-            codes[((blk * NV + i / 45) * 45 + i % 45) * V + lane] = CODEC::encode(Ts[le][i / 45][i % 45], inv);
 }
 
 template <class CODEC, bool PAIR, int EPB>
@@ -557,19 +616,28 @@ __global__ void __launch_bounds__(THREADS, MINB) apply_points(const Geometry g, 
     static_for<0, NV>([&](auto J) {
         constexpr int j = decltype(J)::value;
         constexpr int a = El::PA[j], b = El::PB[j];
-        constexpr double xj = El::X[j];
-        const typename CODEC::storage *const cj = codes + (blk * NV + j) * 45 * V + lane;
-        tau S[45];
-#pragma unroll
-        for (int c = 0; c < 45; ++c) {
-            const tau v = CODEC::decode(__ldg(&cj[c * V]));
+        // Compile-time copies: the element's tables are host arrays, readable on the device only as
+        // constants.
+        constexpr int mask = El::MASK[j], off = El::OFF[j];
+        const typename CODEC::storage *const cj = codes + (blk * El::NS + off) * V + lane;
+        // The components point j keeps (all 45 unless folded), in their slots.
+        tau S[45][1];
+        static_for<0, El::NKEEP[mask]>([&](auto K) {
+            constexpr int k = decltype(K)::value, c = El::KEEP[mask][k];
+            constexpr double xc = El::XC[j][c];
+            const tau v = CODEC::decode(__ldg(&cj[k * V]));
             if constexpr (MD)
-                S[c] = tau(xj) * A[c] + sc * v;
+                S[c][0] = tau(xc) * A[c] + sc * v;
             else
-                S[c] = v;
+                S[c][0] = v;
+        });
+        if constexpr (mask == 0) {
+            qp::contract(&S[0][0], &P[a][0][0], &Y[b][0][0]);
+            if constexpr (a != b) qp::contract(&S[0][0], &P[b][0][0], &Y[a][0][0]);
+        } else {
+            static_assert(a == b, "the fold is a point store's");
+            qp::contract_lanes_masked<mask, tau, 1>(1, S, P[a], Y[b]);
         }
-        qp::contract(S, &P[a][0][0], &Y[b][0][0]);
-        if constexpr (a != b) qp::contract(S, &P[b][0][0], &Y[a][0][0]);
     });
     El::template stage_out<tau, double, 1>(1, Y, o);
     if constexpr (CODEC::scaled && !MD) {
@@ -680,7 +748,7 @@ public:
     };
     PointStore(const Geometry &g, void *stream, const int minb) : g_(g), st_((cudaStream_t)stream), minb_(min_blocks(minb)) {
         const size_t padded = (size_t)((g.nelements + V - 1) / V) * V;
-        codes_ = device_alloc<storage>(padded * NV * 45);
+        codes_ = device_alloc<storage>(padded * El::NS);
         if (CODEC::scaled) scales_ = device_alloc<float>(padded);
         if (MD) aux_ = device_alloc<float>(padded * 45);
     }
@@ -711,11 +779,11 @@ public:
     // As the host store counts it (bytes_per_element, no padding).
     size_t bytes() const override {
         return (size_t)g_.nelements *
-               ((size_t)NV * 45 * sizeof(storage) + (CODEC::scaled ? sizeof(float) : 0) + (MD ? 45 * sizeof(float) : 0));
+               ((size_t)El::NS * sizeof(storage) + (CODEC::scaled ? sizeof(float) : 0) + (MD ? 45 * sizeof(float) : 0));
     }
     int download(std::vector<uint8_t> &codes, std::vector<float> &scales, std::vector<uint8_t> &extra) const override {
         const size_t padded = (size_t)((g_.nelements + V - 1) / V) * V;
-        codes.resize(padded * NV * 45 * sizeof(storage));
+        codes.resize(padded * El::NS * sizeof(storage));
         QPD_CHECK(cudaMemcpy(codes.data(), codes_, codes.size(), cudaMemcpyDeviceToHost));
         scales.assign(CODEC::scaled ? padded : 0, 0.0f);
         if (CODEC::scaled) QPD_CHECK(cudaMemcpy(scales.data(), scales_, padded * sizeof(float), cudaMemcpyDeviceToHost));

@@ -262,6 +262,19 @@ def count_sumfact(n1, nq1):
     return dict(grad=grad, contract=contract, scatter=grad, total=2 * grad + contract)
 
 
+def fold(name):
+    """The folded store of the tensor-product elements (make_qp_kernels.py, qp_store.hpp): along each
+    line of points in direction d one point drops its 6 m = n = d components (the 3x3 block over
+    (i, k), symmetric), and the contraction skips their 9 multiply-adds.  Returns (point-direction
+    pairs dropped, stored numbers saved, flops saved); nothing off the hexahedra."""
+    if name not in ("HEX8", "HEX27"):
+        return 0, 0, 0
+    nq = len(ELEMENTS[name]["rule"]()[0])
+    q1 = round(nq ** (1 / 3))
+    dropped = D * nq // q1  # one point per line, q1^2 lines per direction
+    return dropped, 6 * dropped, 2 * 9 * dropped
+
+
 def count_dense(name):
     """Direct schedule without elimination: nonzeros of the tabulated gradients."""
     el = ELEMENTS[name]
@@ -368,14 +381,16 @@ def analyse():
         ndof = 3 * nnodes
         el_per_dof = ne / ndof
         N = len(ELEMENTS[name]["basis"]())
-        # Selected representation: the smaller exact store that has a schedule.  Only TET10's
-        # moments have one; the hexahedra keep their point values, above the minimum.
+        # Selected representation: the minimal store, which every element's kernels hold -- the
+        # moments on TET10, the folded point values on the hexahedra, the point values on TET4.
+        _, fold_numbers, fold_flops = fold(name)
         if moments is not None and minimal < NC * nq:
             store, flops = minimal, moments
         elif name == "HEX27":
-            store, flops = NC * nq, count_sumfact(3, 4)["total"]
+            store, flops = NC * nq - fold_numbers, count_sumfact(3, 4)["total"] - fold_flops
         else:
-            store, flops = NC * nq, min(x for x in (direct, modal) if x is not None)
+            store, flops = NC * nq - fold_numbers, min(x for x in (direct, modal) if x is not None) - fold_flops
+        assert store == minimal, f"{name}: the kernels' store {store} is not the minimal {minimal}"
         bsr = {lab: (nb * (9 * vb + IDX_BYTES) + nnodes * 8) / ndof for lab, vb in (("f64", 8), ("f32", 4))}
         pa = {c: b * el_per_dof for c, b in codecs(store).items()}
         conn = N * IDX_BYTES * el_per_dof

@@ -540,3 +540,45 @@ constant (eight instantiations, unrolled) was worse on every row (job 5211502,
 over the kept components with the mask read at run time.  The fold is the default store of HEX8 and
 HEX27 wherever it applies (blocked, one scale per element); `bench_qp` keeps the 45-number store as
 the `nofold` rows, and the Registers form, which the folded store does not have, reads it.
+
+**The Grace campaign on the folded store** (Alps jobs 5211729-5211740, `fold_campaign.sh`; the
+logs they replace in `measured/superseded/pre_fold/`; the HEX27 Newton sweep reran the point stores
+and its BSR references only, so the old log stays and the new one overrides those runs).
+- The bench's same-job comparison (`nofold` rows, `\foldGain*` macros) gives smaller gains than job
+  5211427: HEX8 f32 +9%, f16 +1%, int8 per element +4%, int8 mean+dev +2%, f16 mean+dev +4%; HEX27
+  +10, +5, +5, +4, +1%.  Both the folded and the 45-number rates moved by about 5% between the two
+  nodes (HEX8 f16 folded 1166 -> 1095, unfolded 1050 -> 1085 MDOF/s), so the gain is between those
+  figures; the fold is ahead on every row of all three jobs.
+- Newton and CG counts are unchanged for f16, f16 mean+dev and int8 mean+dev (HEX8 stretch at 1e6
+  and 1e7, twist; HEX27 stretch at 1e6 and 1e7; within a few linear iterations in a thousand).  Time
+  to solution: HEX8 1e6 f16 3.25 s (was 3.61), int8 mean+dev 3.65 (3.78), f64 7.00 (8.36); 1e7 f16
+  95.4 (96.7), int8 mean+dev 97.8 (100.0); HEX27 1e7 f16 725 (754), int8 mean+dev 750 (746).
+- int8 with one scale per element, outside the paper's formats, needs more iterations on HEX27:
+  the folded values set a larger element scale (stretch at 1e6 46 Newton against 42, twist 221
+  against 177; HEX8 unchanged at 20).
+- The HEX27 twist spreads by about a tenth between runs for every format, BSR f32 included (142
+  against 136 Newton iterations).
+
+**On the H100** (`cuda/qp_device.cu`; A/B on one node against the tree before the device fold,
+`measured_fold/gpu_ab_*.out`, 1.03e7 dof, MDOF/s):
+
+| | HEX8 45 numbers | folded | | HEX27 45 numbers | folded | |
+|---|---|---|---|---|---|---|
+| f64 | 3,692 | 4,498 | +22% | 3,161 | 3,252 | +3% |
+| f16 | 8,795 | 10,013 | +14% | 6,317 | 5,551 | -12% |
+| int8 mean+dev | 8,110 | 8,803 | +9% | 5,517 | 4,813 | -13% |
+
+- HEX8 (one thread per element, the point's mask known at compile time) gains as on Grace.  Its
+  point-parallel set-up first took 2.4x as long (13.4 against 5.5 ms): Nsight Compute
+  (`measured_fold/gpu_setup_ncu_*`) showed the same occupancy and traffic but 2.7x the
+  instructions, from the fold's tables indexed per component at run time and the encode spread
+  over the element's threads.  A thread per point with the components unrolled brings it to 6.6 ms
+  (+18%), against about 7 ms the apply saves per Newton step.
+- HEX27 (one thread per point) loses with every variant tried: the threads of a warp have
+  different masks, so no multiply-add is skipped, and the decode's extra instructions and registers
+  (72 -> 89 for int8 mean+dev, five resident blocks instead of seven; capping at 72 spills) cost more
+  than 10% fewer bytes in a kernel that is not bound by them (f16 at about 1.5 of 4 TB/s).  Reading
+  the fold's tables from constant memory at per-thread addresses first cost far more (int8 mean+dev
+  -61%): such reads serialise across the warp.  The HEX27 device store therefore keeps 45 numbers
+  per point (the code before the fold), and `bench_qp_cuda`'s set-up gate compares it with the
+  45-number host store; HEX8's device codes equal the folded host store's bit for bit.
