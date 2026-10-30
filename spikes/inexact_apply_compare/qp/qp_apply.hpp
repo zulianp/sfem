@@ -72,6 +72,31 @@ static SFEM_INLINE void element_block(const St &st,
         const ptrdiff_t cs = blocked ? (ptrdiff_t)VS : st.stride;
         for (int j = 0; j < El::NV; ++j) {
             const int a = El::PA[j], b = El::PB[j];
+            if constexpr (St::folded) {
+                // The folded store (points, a == b): decode the numbers point j keeps into their slots
+                // and contract without the terms it does not store.
+                static_assert(FORM == Form::Lanes, "the folded store has the lane form only");
+                const int mask = El::MASK[j];
+                const code_t *const RSTR cf =
+                        st.codes.data() + ((size_t)(evb / VS) * St::NSE + El::OFF[j]) * VS + (size_t)(evb % VS);
+                tau S[45][VS];
+                for (int k = 0; k < El::NKEEP[mask]; ++k) {
+                    const int c = El::KEEP[mask][k];
+                    const code_t *const RSTR ck = cf + (size_t)k * VS;
+                    const tau xc = tau(El::XC[j][c]);
+#pragma omp simd
+                    for (int lane = 0; lane < ne; ++lane) {
+                        const tau v = tau(ck[lane]);
+                        if constexpr (SCH == Scheme::MeanDeviation) {
+                            S[c][lane] = xc * A[c][lane] + sc[lane] * v;
+                        } else {
+                            S[c][lane] = v;
+                        }
+                    }
+                }
+                contract_lanes_masked<tau, VS>(mask, ne, S, P[a], Y[b]);
+                continue;
+            }
             const tau xj = tau(El::X[j]);
             const code_t *const RSTR cj =
                     st.codes.data() + (blocked ? ((size_t)(evb / VS) * El::NV + j) * 45 * VS + (size_t)(evb % VS)

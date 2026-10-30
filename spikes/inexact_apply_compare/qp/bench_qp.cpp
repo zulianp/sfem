@@ -172,6 +172,29 @@ using StoreT = qp::Store<El, code_t, S, L, LANE_VS>;
 using qp::Layout;
 using qp::Scheme;
 
+// The 45-number store of a blocked layout: what the folded store (Element::MASK, the default on
+// the tensor-product elements) is compared with, and the store of the Registers form, which the
+// folded store does not have.
+template <typename code_t, qp::Scheme S>
+using StoreU = qp::Store<El, code_t, S, qp::Layout::Blocked, LANE_VS, false>;
+
+// The packed rows again on the 45-number store, named "nofold", on the elements whose default store
+// is folded: the comparison that made the fold the default.
+template <class E>
+static void run_unfolded(Problem &P, PackedMeshView &pk, int repeats) {
+    if constexpr (E::foldable) {
+        run_variant_packed<StoreU<float, Scheme::Plain>, float>("qp f32 blk a32 nofold packed", P, pk, repeats);
+        run_variant_packed<StoreU<half_t, Scheme::Plain>, float>("qp f16 blk a32 lanes nofold packed", P, pk, repeats);
+        run_variant_packed<StoreU<int8_t, Scheme::Plain>, float>("qp i8/el blk a32 lanes nofold packed", P, pk, repeats);
+        run_variant_packed<StoreU<int8_t, Scheme::MeanDeviation>, float>("qp i8 mean+dev blk a32 lanes nofold packed", P,
+                                                                          pk, repeats);
+        run_variant_packed<StoreU<half_t, Scheme::MeanDeviation>, float>("qp f16 mean+dev blk a32 lanes nofold packed", P,
+                                                                          pk, repeats);
+    } else {
+        (void)P, (void)pk, (void)repeats;
+    }
+}
+
 int main(int argc, char **argv) {
     static const int sizes[] = SIZES;
     const int n = argc > 1 ? std::atoi(argv[1]) : sizes[2];
@@ -349,14 +372,14 @@ int main(int argc, char **argv) {
     run_variant<StoreT<int8_t, Scheme::Plain, Layout::SoA>, float>("qp i8/el soa a32", P, repeats);
     run_variant<StoreT<half_t, Scheme::Plain, Layout::Blocked>, double>("qp f16 blk a64", P, repeats);
     run_variant<StoreT<half_t, Scheme::Plain, Layout::Blocked>, float>("qp f16 blk a32 lanes", P, repeats);
-    run_variant<StoreT<half_t, Scheme::Plain, Layout::Blocked>, float, Form::Registers>("qp f16 blk a32 regs", P, repeats);
+    run_variant<StoreU<half_t, Scheme::Plain>, float, Form::Registers>("qp f16 blk a32 regs", P, repeats);
     run_variant<StoreT<int8_t, Scheme::Plain, Layout::Blocked>, float>("qp i8/el blk a32 lanes", P, repeats);
-    run_variant<StoreT<int8_t, Scheme::Plain, Layout::Blocked>, float, Form::Registers>("qp i8/el blk a32 regs", P, repeats);
+    run_variant<StoreU<int8_t, Scheme::Plain>, float, Form::Registers>("qp i8/el blk a32 regs", P, repeats);
     if constexpr (El::NV > 1) {
         run_variant<StoreT<int8_t, Scheme::PerComponent, Layout::Blocked>, float>("qp i8/comp blk a32 lanes", P, repeats);
         run_variant<StoreT<int8_t, Scheme::MeanDeviation, Layout::Blocked>, double>("qp i8 mean+dev blk a64 lanes", P, repeats);
         run_variant<StoreT<int8_t, Scheme::MeanDeviation, Layout::Blocked>, float>("qp i8 mean+dev blk a32 lanes", P, repeats);
-        run_variant<StoreT<int8_t, Scheme::MeanDeviation, Layout::Blocked>, float, Form::Registers>("qp i8 mean+dev blk a32 regs", P, repeats);
+        run_variant<StoreU<int8_t, Scheme::MeanDeviation>, float, Form::Registers>("qp i8 mean+dev blk a32 regs", P, repeats);
         run_variant<StoreT<half_t, Scheme::MeanDeviation, Layout::Blocked>, float>("qp f16 mean+dev blk a32 lanes", P, repeats);
     }
     // Packed two-pass: the scatter the library's fastest operators use.
@@ -463,13 +486,14 @@ int main(int argc, char **argv) {
     }
     run_variant_packed<StoreT<float, Scheme::Plain, Layout::Blocked>, float>("qp f32 blk a32 packed", P, pk, repeats);
     run_variant_packed<StoreT<half_t, Scheme::Plain, Layout::Blocked>, float>("qp f16 blk a32 lanes packed", P, pk, repeats);
-    run_variant_packed<StoreT<half_t, Scheme::Plain, Layout::Blocked>, float, Form::Registers>("qp f16 blk a32 regs packed", P, pk, repeats);
+    run_variant_packed<StoreU<half_t, Scheme::Plain>, float, Form::Registers>("qp f16 blk a32 regs packed", P, pk, repeats);
     run_variant_packed<StoreT<int8_t, Scheme::Plain, Layout::Blocked>, float>("qp i8/el blk a32 lanes packed", P, pk, repeats);
     if constexpr (El::NV > 1)
     {
         run_variant_packed<StoreT<int8_t, Scheme::MeanDeviation, Layout::Blocked>, float>("qp i8 mean+dev blk a32 lanes packed", P, pk, repeats);
         run_variant_packed<StoreT<half_t, Scheme::MeanDeviation, Layout::Blocked>, float>("qp f16 mean+dev blk a32 lanes packed", P, pk, repeats);
     }
+    run_unfolded<El>(P, pk, repeats);
 
     // Element matrices, from the same set-up kernel, quantized like the point store.
     using qp::EaForm;

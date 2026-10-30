@@ -628,10 +628,10 @@ int main(int argc, char **argv) {
         }
         const qpd::Geometry &gg = D.gb;
         const std::string sfx = shape.empty() ? "" : " " + shape;
-        store_row<qp::Store<El, double, Scheme::Plain, Layout::Blocked, 32>>("qp f64" + sfx, "f64", gg, P, D, repeats);
-        store_row<qp::Store<El, half_t, Scheme::Plain, Layout::Blocked, 32>>("qp f16" + sfx, "f16", gg, P, D, repeats);
+        store_row<qp::Store<El, double, Scheme::Plain, Layout::Blocked, 32, false>>("qp f64" + sfx, "f64", gg, P, D, repeats);
+        store_row<qp::Store<El, half_t, Scheme::Plain, Layout::Blocked, 32, false>>("qp f16" + sfx, "f16", gg, P, D, repeats);
         if constexpr (El::NV > 1)
-            store_row<qp::Store<El, int8_t, Scheme::MeanDeviation, Layout::Blocked, 32>>("qp i8 mean+dev" + sfx, "i8md", gg,
+            store_row<qp::Store<El, int8_t, Scheme::MeanDeviation, Layout::Blocked, 32, false>>("qp i8 mean+dev" + sfx, "i8md", gg,
                                                                                          P, D, repeats);
         store_row<qp::EaStore<El, half_t, EaForm::Difference, 32>>("ea diff f16" + sfx, "ead16", gg, P, D, repeats);
         store_row<qp::EaStore<El, int8_t, EaForm::PairScale, 32>>("ea diff i8 pair" + sfx, "eadi8p", gg, P, D, repeats);

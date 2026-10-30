@@ -155,7 +155,7 @@ def hex8():
         D_.append(rows)
     pairs = [(q, q) for q in range(8)]
     return dict(N=8, R=8, D=D_, pairs=pairs, X=[0.125] * 8, nq=8, kvol=1.0, mult=[1] * 8,
-                moment_factor=None, kind="points")
+                moment_factor=None, kind="points", x1=g)
 
 
 # TET10 integrates with the 11-point rule its residual, matrix-free and BSR operators use, and
@@ -195,7 +195,7 @@ def proteus_hex27():
                 D_.append(rows)
                 X.append(w[qx] * w[qy] * w[qz])
     return dict(N=27, R=64, D=D_, pairs=[(q, q) for q in range(64)], X=X, nq=64, kvol=1.0, mult=[1] * 64,
-                moment_factor=None, kind="points", B1=B, D1=Dd)
+                moment_factor=None, kind="points", B1=B, D1=Dd, x1=g)
 
 
 def tensor_stages(n1, q1, B, Dd):
@@ -440,6 +440,84 @@ def hex8_sum_factorised_stages():
     return L
 
 
+def slot_direction():
+    """DIR[s]: the direction d of packed slot s when its increment and test directions agree (m = n = d),
+    else -1."""
+    dirs = [-1] * NC
+    for r in range(9):
+        for c in range(r, 9):
+            if r % 3 == c % 3:
+                dirs[slot(r, c)] = r % 3
+    return dirs
+
+
+def fold_tables(e):
+    """The folded point store of a tensor-product element (docs/compressed_partial_assembly, Section
+    "What the quadrature can see").  A component with m = n = d multiplies a product of two
+    d-derivatives, along every line of points in direction d a polynomial of degree 2 (p - 1) in xi_d
+    (0 on HEX8, 2 on HEX27), which q1 - 1 of the line's q1 points determine.  The dropped point's value
+    therefore moves exactly to the kept points, weighted by their Lagrange polynomials at the dropped
+    point; the dropped index is the one with the smallest weights.  The point whose d-index is DROP
+    stores no m = n = d components (bit d of its mask)."""
+    x1 = e.get("x1")
+    if x1 is None:
+        return None
+    q1 = len(x1)
+    best = None
+    for drop in range(q1):
+        keep = [k for k in range(q1) if k != drop]
+        coef = [math.prod((x1[drop] - x1[keep[i]]) / (x1[keep[k]] - x1[keep[i]]) for i in range(len(keep)) if i != k)
+                for k in range(len(keep))]
+        if best is None or max(map(abs, coef)) < best[2] - 1e-12:
+            best = (drop, keep, max(map(abs, coef)), coef)
+    drop, keep, _, coef = best
+    nq = q1 ** 3
+    pt = lambda c: c[0] + q1 * (c[1] + q1 * c[2])
+    mask, src, fc = [], [], []
+    for q in range(nq):
+        c = [q % q1, (q // q1) % q1, q // (q1 * q1)]
+        mask.append(sum(1 << d for d in range(3) if c[d] == drop))
+        s_, f_ = [], []
+        for d in range(3):
+            if c[d] == drop:
+                s_.append(-1); f_.append(0.0)
+            else:
+                c2 = list(c); c2[d] = drop
+                s_.append(pt(c2)); f_.append(coef[keep.index(c[d])])
+        src.append(s_); fc.append(f_)
+    return dict(drop=drop, mask=mask, src=src, coef=fc)
+
+
+def fold_lines(e):
+    t = fold_tables(e)
+    if t is None:
+        return ["", "  static constexpr bool foldable = false;", "  static constexpr int NS = NV * 45;  // stored numbers per element"]
+    dirs = slot_direction()
+    NV = len(e["pairs"])
+    keep = [[s_ for s_ in range(NC) if not (dirs[s_] >= 0 and (m_ >> dirs[s_]) & 1)] for m_ in range(8)]
+    off = [0]
+    for j in range(NV):
+        off.append(off[-1] + len(keep[t["mask"][j]]))
+    X = e["X"]
+    xc = [[X[j] if dirs[s_] < 0 or (t["mask"][j] >> dirs[s_]) & 1 else X[j] + t["coef"][j][dirs[s_]] * X[t["src"][j][dirs[s_]]]
+           for s_ in range(NC)] for j in range(NV)]
+    row = lambda xs: "{" + ", ".join(xs) + "}"
+    L = ["", "  // The folded store: point j stores no m = n = d components when bit d of MASK[j] is set; the",
+         "  // dropped point's values move to the kept points of its line, T_j += FCOEF[j][d] * T_FSRC[j][d].",
+         "  static constexpr bool foldable = true;",
+         f"  static constexpr int MASK[NV] = {row(str(m_) for m_ in t['mask'])};",
+         f"  static constexpr int DIR[45] = {row(str(d) for d in dirs)};",
+         f"  static constexpr int NKEEP[8] = {row(str(len(k)) for k in keep)};",
+         "  static constexpr int KEEP[8][45] = {" + ", ".join(row(str(v) for v in k + [0] * (NC - len(k))) for k in keep) + "};",
+         f"  static constexpr int OFF[NV + 1] = {row(str(o) for o in off)};",
+         f"  static constexpr int NS = {off[-1]};  // stored numbers per element",
+         "  static constexpr int FSRC[NV][3] = {" + ", ".join(row(str(v) for v in r) for r in t["src"]) + "};",
+         "  static constexpr double FCOEF[NV][3] = {" + ", ".join(row(lit(v) for v in r) for r in t["coef"]) + "};",
+         "  // The reference weight of each stored number after the fold (what mean + deviation subtracts).",
+         "  static constexpr double XC[NV][45] = {" + ", ".join(row(lit(v) for v in r) for r in xc) + "};"]
+    return L
+
+
 def setup_weights(e):
     if e["kind"] == "moments":
         return keast11()[1]
@@ -554,6 +632,7 @@ def emit_element(name, e):
         L.append("")
         L += hex8_sum_factorised_stages() if name == "HEX8" else tensor_stages(3, 4, e["B1"], e["D1"])
         L += setup_stage(e)
+        L += fold_lines(e)
         L.append("};")
         L.append("")
         L.append(f"using Element = Element{name};")
@@ -596,6 +675,7 @@ def emit_element(name, e):
     L.append("    }")
     L.append("  }")
     L += setup_stage(e)
+    L += fold_lines(e)
     L.append("};")
     L.append("")
     L.append(f"using Element = Element{name};")
@@ -620,6 +700,28 @@ def emit_contract():
         terms = " + ".join(f"S[{slot(r, c)}][lane]*G[{c}][lane]" for c in range(9))
         L.append("#pragma omp simd")
         L.append(f"  for (int lane = 0; lane < ne; ++lane) Y[{r}][lane] += {terms};")
+    L.append("}")
+    L.append("")
+    L.append("// The folded store's contraction: bit d of MASK drops the m = n = d terms, which the point does not")
+    L.append("// store (Element::MASK).")
+    L.append("template <int MASK, typename t, int VS>")
+    L.append("static QP_HD SFEM_INLINE void contract_lanes_masked(const int ne, const t S[45][VS], const t G[9][VS], t Y[9][VS]) {")
+    for mask in range(8):
+        L.append(f"  {'if' if mask == 0 else '} else if'} constexpr (MASK == {mask}) {{")
+        for r in range(9):
+            terms = " + ".join(f"S[{slot(r, c)}][lane]*G[{c}][lane]" for c in range(9)
+                               if not (r % 3 == c % 3 and (mask >> (r % 3)) & 1))
+            L.append("#pragma omp simd")
+            L.append(f"    for (int lane = 0; lane < ne; ++lane) Y[{r}][lane] += {terms};")
+    L.append("  }")
+    L.append("}")
+    L.append("")
+    L.append("template <typename t, int VS>")
+    L.append("static QP_HD SFEM_INLINE void contract_lanes_masked(const int mask, const int ne, const t S[45][VS], const t G[9][VS], t Y[9][VS]) {")
+    L.append("  switch (mask) {")
+    for mask in range(8):
+        L.append(f"    case {mask}: contract_lanes_masked<{mask}, t, VS>(ne, S, G, Y); break;")
+    L.append("  }")
     L.append("}")
     L.append("")
     L.append("// Row r, column c of the packed tangent, for the set-up.")
