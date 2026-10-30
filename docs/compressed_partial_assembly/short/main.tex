@@ -53,25 +53,29 @@ Matrices and Sparse Matrices Compared}
 
 \begin{abstract}
 Newton--Krylov solvers for finite-strain elasticity spend most of their time applying the tangent
-operator, and how that operator is stored decides both the time and the memory of a solve.  We
-evaluate compressed formats along the whole range from the assembled matrix to matrix-free
-application: block sparse (BSR) matrices quantized per block, element matrices quantized per node
-pair, and partial assembly that stores the pulled-back material tangent at the quadrature points
-(on quadratic tetrahedra the ten weighted sums of it that the application uses), against BSR in double and
-single precision.  The formats share \texttt{fp16} and \texttt{int8} encodings decoded inside the
-application, and a difference form that keeps rigid translations in the kernel of the encoded
-element and assembled matrices whatever the rounding.  An encoding error enters inexact Newton as an
-additive forcing term; half precision and \texttt{int8} mean-plus-deviation keep the exact
-iteration counts, \texttt{int8} with one scale per element does not, and the quantized matrix fails
-without the difference form.  On a 72-core Arm Neoverse-V2 CPU at $10^7$ degrees of freedom, for
-linear and quadratic tetrahedra and trilinear and triquadratic hexahedra, the quantized sparse matrix
-is the fastest format on tetrahedra, solving in $\timeQbsrHalfTetFour$--$\timeQbsrHalfTetTen$ of the
-time of single-precision BSR from $\QbsrHalfMemVsThirtyTwoTetTen$--$\QbsrHalfMemVsThirtyTwoTetFour\times$
-less operator memory; element matrices come close to it on trilinear and are ahead on triquadratic
-hexahedra, and they keep the lowest peak memory, since they need no assembled matrix.  On one H100
-GPU, against a BSR product $\gpuBsrThirtyTwoVsCsrMin$--$\gpuBsrThirtyTwoVsCsrMax\times$ faster than
-cuSPARSE's fastest product, the quantized matrix leads on linear tetrahedra and trilinear hexahedra and the
-quadrature-point stores on the quadratic elements, since the matrices' assembly weighs more there.
+operator, and how that operator is stored decides both the time and the memory of a solve.  The
+assembled matrix has the largest memory footprint and is limited by memory bandwidth; matrix-free
+application stores no tangent but is limited by arithmetic.  A compressed tangent reduces both the
+footprint and the bytes each application streams, but its encoding perturbs the operator, and the
+effect on the Newton and Krylov iteration counts must be assessed with the speed-up.  We develop
+three compressed formats across this range: the quantized block sparse (BSR) matrix, the element
+matrix quantized per node pair, and the quadrature-point store, which keeps the pulled-back material
+tangent at the quadrature points or, on quadratic tetrahedra, the ten weighted sums of it that the
+application uses.  They share \texttt{fp16}, \texttt{int8} and \texttt{int8} mean-plus-deviation
+encodings decoded inside the application, and the matrix formats a difference form that keeps rigid
+translations exactly in the kernel of the encoded operator.  We show that an encoding error enters
+inexact Newton as an additive forcing term.  On linear and quadratic tetrahedra and trilinear and
+triquadratic hexahedra at $10^7$ degrees of freedom, half precision and \texttt{int8} mean plus
+deviation keep the exact Newton iteration counts.  On a 72-core Arm Neoverse-V2 CPU the quantized
+BSR matrix is the fastest format on tetrahedra and trilinear hexahedra, solving in
+$\timePctQbsrEightHexEight$--$\timePctQbsrHalfTetTen\%$ of the time of single-precision BSR from
+$\QbsrHalfMemVsThirtyTwoTetTen$--$\QbsrEightMemVsThirtyTwoHexEight\times$ less operator memory, and
+the element matrix on triquadratic hexahedra, solving in $\timePctEaDiffHalfHexTwentySeven\%$ of that time.  On one H100 GPU,
+against our tuned BSR product $\gpuBsrThirtyTwoVsCsrMin$--$\gpuBsrThirtyTwoVsCsrMax\times$ faster than
+cuSPARSE's for our problems of interest, the quantized matrix is the fastest on linear tetrahedra and trilinear hexahedra,
+solving in $\gpuTenmTimePctQbsrHalfTetFour\%$ and $\gpuTenmTimePctQbsrEightHexEight\%$ of the time of single-precision BSR, and the
+quadrature-point stores on the quadratic elements, solving in $\gpuTenmTimePctQpEightMdTetTen\%$ and
+$\gpuTenmTimePctQpHalfHexTwentySeven\%$.
 \end{abstract}
 
 %% CCS concepts: take the XML from the ACM CCS tool for the final version.
@@ -90,8 +94,10 @@ sparse matrix--vector product, finite-strain elasticity, inexact Newton, Arm Neo
 Newton--Krylov solvers for finite-strain elasticity apply the tangent operator tens to hundreds of
 times per Newton step.  Three families of formats compete for that operator.  An assembled matrix,
 in block sparse row (BSR) form for a vector problem, pays one assembly per step and then applies at
-the speed of memory: on the machine used here a BSR product sustains $\MachineBandwidth$~GB/s,
-$81\%$ of the nominal bandwidth.  Element matrices store each element's dense block and apply it
+the speed of memory: our BSR product in double precision sustains $\MachineBandwidth$~GB/s on the
+Grace CPU, $\MachineBandwidthPct\%$ of its nominal $\MachineNominalBandwidth$~GB/s, and
+$\gpuBsrSixtyFourGbsMin$--$\gpuBsrSixtyFourGbsMax$~GB/s on the H100 GPU,
+$\gpuBsrSixtyFourPctMin$--$\gpuBsrSixtyFourPctMax\%$ of its nominal $\gpuNominalBandwidth$~GB/s.  Element matrices store each element's dense block and apply it
 with a gather and a scatter.  Partial assembly stores less --- the material tangent at the
 quadrature points --- and applies it by a contraction with the reference element; at the far end, a matrix-free application re-evaluates the constitutive law every time.
 Moving along this range trades stored bytes against arithmetic, and quantizing the stored numbers
@@ -342,7 +348,7 @@ full $32$-bit columns, since $16$-bit offsets send the blocks out of their reach
 remainder kernel: on the GPU both cost more than they save.
 
 \paragraph{Machine and problems}  One Grace CPU of an NVIDIA GH200 node (CSCS Alps), $72$
-Neoverse-V2 cores, LPDDR5X; GCC~13.3, \texttt{-O3 -mcpu=neoverse-v2}, $72$ OpenMP threads bound one
+Neoverse-V2 cores, LPDDR5X at a nominal $\MachineNominalBandwidth$~GB/s; GCC~13.3, \texttt{-O3 -mcpu=neoverse-v2}, $72$ OpenMP threads bound one
 per core; vectors and residuals in double precision.  Neo-Hookean material on unit-cube meshes of
 linear (TET4) and quadratic (TET10) tetrahedra, twelve per cell, and trilinear (HEX8) and
 triquadratic (HEX27, $4^3$ Gauss points) hexahedra.  The application study uses $\benchdofHexEight$
@@ -351,7 +357,8 @@ and displaces the opposite one at about $10^6$ and $10^7$ degrees of freedom, an
 $90^\circ$ at $10^6$, in load steps that no format rejects (four to $32$ for the stretch, $16$ to
 $256$ for the twist, by element and size); Newton to a relative residual of $10^{-8}$,
 unpreconditioned conjugate gradients to $10^{-3}$ for every format.
-The GPU is one H100 of the same node type, CUDA~12.6.
+The GPU is one H100 of the same node type, $96$~GB of HBM3 at a nominal $\gpuNominalBandwidth$~GB/s,
+CUDA~12.6.
 
 \paragraph{Use of AI}  An AI coding assistant (Claude Code, Anthropic) helped write and run the
 benchmark and Newton drivers, the hand-optimised kernels, the job scripts, the log parsing behind the
@@ -523,7 +530,8 @@ the node graph it is built on set the peak.  The element formats need neither.
 \label{sec:gpu}
 
 On the H100 our BSR product runs at the memory bandwidth
-($\gpuBsrThirtyTwoGbsTetFour$--$\gpuBsrThirtyTwoGbsHexTwentySeven$~GB/s in single precision),
+($\gpuBsrThirtyTwoGbsMin$--$\gpuBsrThirtyTwoGbsMax$~GB/s in single precision, of a nominal
+$\gpuNominalBandwidth$~GB/s),
 $\gpuBsrThirtyTwoVsCusparseHexEight$--$\gpuBsrThirtyTwoVsCusparseHexTwentySeven\times$ faster than
 cuSPARSE's \texttt{bsrmv} and $\gpuBsrThirtyTwoVsCsrMin$--$\gpuBsrThirtyTwoVsCsrMax\times$ faster than
 its CSR product, which streams as fast but reads
