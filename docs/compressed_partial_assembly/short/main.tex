@@ -178,13 +178,18 @@ matrix.
 Everything in \eqref{eq:action} except $\Sq$ belongs to the reference element; with the major
 symmetry of an energy each point carries $45$ numbers.  The tangent enters only through the products
 $\partial_m\varphi_j\,\partial_n\varphi_p$ of reference gradients, so the application sees only its
-weighted sums against them, its moments against the space $\Pi_{mn}$ these products span.  Whichever
-is smaller --- the values at the $n_q$ quadrature points or one moment per basis function of
-$\Pi_{mn}$ --- reproduces \eqref{eq:action} exactly (Table~\ref{tab:stores}).  On quadratic tetrahedra
+weighted sums against them, its moments against the space $\Pi_{mn}$ these products span: as many
+numbers per component as the rank $\rho_{mn}$ of the matrix of the products' values at the points,
+at most $\min(n_q,\dim\Pi_{mn})$, reproduce \eqref{eq:action} exactly.  Table~\ref{tab:stores} lists
+$r$, the dimension of the space the reference derivatives span, which fixes $\dim\Pi_{mn}$, and
+$\rho_{mn}$, which sets the count.  On quadratic tetrahedra
 (TET10) the gradients are linear and their products quadratic, so the ten moments
 $\Mab=\sum_q\lambda_a(\xhat_q)\lambda_b(\xhat_q)\Sq$ against products of the barycentric coordinates
-$\lambda_a$ replace the eleven points of the degree-$4$ rule~\cite{Keast1986}; on trilinear (HEX8) and
-triquadratic (HEX27) hexahedra the point values are already the fewest.  The store is laid out per
+$\lambda_a$ replace the eleven points of the degree-$4$ rule~\cite{Keast1986}.  On trilinear (HEX8) and
+triquadratic (HEX27) hexahedra the components with $m=n$ need fewer numbers than points, since their
+products do not vary, or vary quadratically, along $\xi_m$; our hexahedral stores keep the point
+values, $\storeHexEight$ and $\storeHexTwentySeven$ numbers against minima of $\minimalHexEight$ and
+$\minimalHexTwentySeven$.  The store is laid out per
 block of $V$ elements, one per vector lane, ordered point, component, lane
 (Figure~\ref{fig:fmtpoints}).
 
@@ -192,15 +197,15 @@ block of $V$ elements, one per vector lane, ordered point, component, lane
 \centering
 \small
 \setlength{\tabcolsep}{3.5pt}
-\begin{tabular}{lrrrrr}
+\begin{tabular}{lrrrrrr}
 \toprule
-element & $n_q$ & rank & $\dim\Pi_{mn}$ & points & minimal \\
+element & $n_q$ & $r$ & $\dim\Pi_{mn}$ & $\rho_{mn}$ & points & min. \\
 \midrule
 \rows{../tables/stores.tex}
 \bottomrule
 \end{tabular}
-\caption{Numbers per element of an exact quadrature-point store (symmetric tangent); ``rank'' is
-that of the reference gradients.}
+\caption{Numbers per element of an exact quadrature-point store (symmetric tangent): $r$ the
+dimension of the reference derivatives, $\dim\Pi_{mn}$ and the rank $\rho_{mn}$ for $m=n$/$m\ne n$.}
 \label{tab:stores}
 \end{table}
 
@@ -255,8 +260,9 @@ assembled tangent also annihilate translations, so the difference form holds wit
 the nodes and the diagonal blocks are neither stored nor indexed.  Each pair of nodes $i<j$ is stored once: in the product $y=Kx$, with $x_i$ and $y_i$ the
 three entries of node $i$ and $d=x_j-x_i$, its block adds $K_{ij}d$ to $y_i$ and $-K_{ij}^{\mathsf T}d$
 to $y_j$, so the
-encoded matrix is symmetric by construction, which the assembled one is only to the rounding of its
-summation order.
+off-diagonal blocks of the encoded matrix are symmetric by construction, which the assembled ones are
+only to the rounding of its summation order; the implied diagonal blocks are symmetric only to the
+encoding error.
 
 Rows are held in the SELL-C-$\sigma$ format~\cite{Kreutzer2014}: $C=16$ rows side by side, sorted by
 length within windows of $\sigma=32C$ rows and padded per group, so that one block position of $16$
@@ -309,7 +315,9 @@ store ($|\widehat K|$ the reference element's volume) in single precision and th
 $\Sq-w_q\Sbar$ in \texttt{int8} or \texttt{fp16}.
 
 Let $\eps$ bound the encoding error $\Delta\mathcal{H}$ in the energy of the exact operator,
-$|x^{\mathsf T}\Delta\mathcal{H}x|\le\eps\,x^{\mathsf T}\mathcal{H}x$.  If the Krylov solves for the
+$|x^{\mathsf T}\Delta\mathcal{H}x|\le\eps\,x^{\mathsf T}\mathcal{H}x$; for the matrix difference
+forms, whose implied diagonal blocks are symmetric only to the encoding error, in the norm
+$\|\mathcal{H}^{-1/2}\Delta\mathcal{H}\,\mathcal{H}^{-1/2}\|_2\le\eps$.  If the Krylov solves for the
 Newton step $s$, $\mathcal{H}s=-f$ with $f$ the residual, stop at relative residual $\eta$, the step
 satisfies
 \begin{equation}

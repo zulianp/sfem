@@ -8,8 +8,10 @@
 //               stay in the kernel of the encoded operator whatever the rounding.  The diagonal
 //               blocks are neither stored nor indexed.
 //   Upper       the difference form with each pair i < j stored once: d = x_j - x_i, y_i += K_ij d,
-//               y_j -= K_ij^T d.  Symmetric by construction, so K_ij is encoded as assembled and the
-//               lower block is never read.  The rows are cut into parts of whole sorting windows,
+//               y_j -= K_ij^T d.  The off-diagonal blocks are symmetric by construction, so K_ij is
+//               encoded as assembled and the lower block is never read; the implied diagonal blocks,
+//               -sum_{j != i} K_ij, add independently rounded blocks and are symmetric only to the
+//               encoding error.  The rows are cut into parts of whole sorting windows,
 //               one per thread.  The SELL layout holds the blocks whose column lies in the part's
 //               own rows and, with offset columns, within reach of the offset type; the others go
 //               to the part's remainder (row, column, codes), applied after the SELL steps.  A
@@ -21,7 +23,8 @@
 // Codes: int8 with one f32 scale per block (the block's largest entry maps to 127), or f16 with one
 // power-of-two scale for the whole matrix.  K_ij and K_ji are encoded from the same symmetrised
 // block (K_ij + K_ji^T) / 2, so they share the scale and their codes are transposes: the encoded
-// operator is symmetric whatever order the assembly summed in.
+// off-diagonal blocks are symmetric whatever order the assembly summed in.  In the difference form
+// the implied diagonal blocks are symmetric only to the encoding error.
 //
 // Layout: VS rows side by side (SELL-C-sigma).  The rows are sorted by length, longest first, within
 // windows of SIGMA rows, cut into groups of VS, and each group is padded to its longest row; a step
