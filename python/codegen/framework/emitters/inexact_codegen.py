@@ -19,6 +19,8 @@ rather than to its size; every sweep contains a derivative, which annihilates
 the constant.
 """
 
+from string import Template
+
 import sympy as sp
 
 from codegen.framework.emitters.cprinter import _sfem_ccode
@@ -109,6 +111,34 @@ def _simd():
     return [pragma] if pragma else []
 
 
+def _work_item_lines(lines):
+    """The stages' work item, as the bound target spells it.
+
+    The stages are written once, over the work item's placeholders: a lane of a
+    block of VS elements on the CPU (`${E}` the `[VS]` extent, `${L}` the `[lane]`
+    subscript, `${LOOP}` the vectorised lane loop, `${NE}`/`${NA}` the lane count
+    parameter and argument, `${W}`/`${V}` the width template parameter and
+    argument), the element itself on a device thread, where all of them are empty
+    and the loop is a plain scope.
+    """
+    target = current_target()
+    width = target.kernel_vector_width()
+    spelled = dict(
+        E=target.work_item_extent(),
+        L=target.work_item_subscript(),
+        W="".join(", int %s" % w for w in (width,) if w),
+        V="".join(", %s" % w for w in (width,) if w),
+        NE="".join("const int ne, " for _w in (width,) if _w),
+        NA="".join("ne, " for _w in (width,) if _w),
+    )
+    out = []
+    for line in lines:
+        indent = line[: len(line) - len(line.lstrip())]
+        loop = {"${LOOP}": lambda: list(target.work_item_loop_lines(indent))}
+        out += loop.get(line.strip(), lambda: [Template(line).substitute(spelled)])()
+    return out
+
+
 def _assignment_lines(assignments, prefix, indent="  "):
     """Common subexpressions first, then the named values, as C declarations.
 
@@ -154,36 +184,34 @@ def _simplex_stage_lines(plan):
         "",
         "  // P[r][k*%d+m] = sum_j dphi_j/dxi_m (at r) h[k][j]: in the vector's precision, then" % dim,
         "  // rounded to the arithmetic type, so differences of nodal values are formed first.",
-        "  template <typename h_t, typename t_out, int VS>",
-        "  %s void stage_in(const int ne, const h_t h[%d][%d][VS], t_out P[%d][%d][VS]) {"
+        "  template <typename h_t, typename t_out${W}>",
+        "  %s void stage_in(${NE}const h_t h[%d][%d]${E}, t_out P[%d][%d]${E}) {"
         % (q, dim, n, r_count, order),
         "    using t = h_t;",
     ]
-    lines += ["    %s" % p for p in _simd()]
-    lines.append("    for (int lane = 0; lane < ne; ++lane) {")
+    lines.append("    ${LOOP}")
     for k in range(dim):
         for j in range(n):
-            lines.append("      const t h%d_%d = h[%d][%d][lane];" % (k, j, k, j))
+            lines.append("      const t h%d_%d = h[%d][%d]${L};" % (k, j, k, j))
     for r in range(r_count):
         for k in range(dim):
             for m in range(dim):
                 expression = _linear_combination(
                     [(gradients[r][m][j], "h%d_%d" % (k, j)) for j in range(n)]
                 )
-                lines.append("      P[%d][%d][lane] = t_out(%s);" % (r, k * dim + m, expression))
+                lines.append("      P[%d][%d]${L} = t_out(%s);" % (r, k * dim + m, expression))
     lines += ["    }", "  }", ""]
     lines += [
         "  // out[i][p] = sum_r sum_n dphi_p/dxi_n (at r) Y[r][i*%d+n], accumulated in out_t." % dim,
-        "  template <typename y_t, typename out_t, int VS>",
-        "  %s void stage_out(const int ne, const y_t Y[%d][%d][VS], out_t out[%d][%d][VS]) {"
+        "  template <typename y_t, typename out_t${W}>",
+        "  %s void stage_out(${NE}const y_t Y[%d][%d]${E}, out_t out[%d][%d]${E}) {"
         % (q, r_count, order, dim, n),
         "    using t = out_t;",
     ]
-    lines += ["    %s" % p for p in _simd()]
-    lines.append("    for (int lane = 0; lane < ne; ++lane) {")
+    lines.append("    ${LOOP}")
     for r in range(r_count):
         for c in range(order):
-            lines.append("      const t y%d_%d = t(Y[%d][%d][lane]);" % (r, c, r, c))
+            lines.append("      const t y%d_%d = t(Y[%d][%d]${L});" % (r, c, r, c))
     for i in range(dim):
         for p in range(n):
             expression = _linear_combination(
@@ -193,7 +221,7 @@ def _simplex_stage_lines(plan):
                     for nn in range(dim)
                 ]
             )
-            lines.append("      out[%d][%d][lane] = %s;" % (i, p, expression))
+            lines.append("      out[%d][%d]${L} = %s;" % (i, p, expression))
     lines += ["    }", "  }"]
     return lines
 
@@ -216,16 +244,15 @@ def _linear_hex_stage_lines(plan):
     q = _qualifier()
     lines = [
         "",
-        "  template <typename h_t, typename t_out, int VS>",
-        "  %s void stage_in(const int ne, const h_t h[3][8][VS], t_out P[8][9][VS]) {" % q,
+        "  template <typename h_t, typename t_out${W}>",
+        "  %s void stage_in(${NE}const h_t h[3][8]${E}, t_out P[8][9]${E}) {" % q,
         "    using t = h_t;",
         "    const t g0 = t(%s), g1 = t(%s);" % (g0, g1),
     ]
-    lines += ["    %s" % p for p in _simd()]
-    lines.append("    for (int lane = 0; lane < ne; ++lane) {")
+    lines.append("    ${LOOP}")
     for k in range(3):
         def u(sx, sy, sz, k=k):
-            return "h[%d][%d][lane]" % (k, sx + 2 * sy + 4 * sz)
+            return "h[%d][%d]${L}" % (k, sx + 2 * sy + 4 * sz)
 
         p = "c%d_" % k
         for sy in (0, 1):
@@ -258,18 +285,17 @@ def _linear_hex_stage_lines(plan):
                     gx = "%sdxy%d0 + %s*(%sdxy%d1 - %sdxy%d0)" % (p, qy, gq, p, qy, p, qy)
                     gy = "%sdy%d0 + %s*(%sdy%d1 - %sdy%d0)" % (p, qx, gq, p, qx, p, qx)
                     gz = "%svxy%d%d1 - %svxy%d%d0" % (p, qx, qy, p, qx, qy)
-                    lines.append("      P[%d][%d][lane] = t_out(%s);" % (point, k * 3 + 0, gx))
-                    lines.append("      P[%d][%d][lane] = t_out(%s);" % (point, k * 3 + 1, gy))
-                    lines.append("      P[%d][%d][lane] = t_out(%s);" % (point, k * 3 + 2, gz))
+                    lines.append("      P[%d][%d]${L} = t_out(%s);" % (point, k * 3 + 0, gx))
+                    lines.append("      P[%d][%d]${L} = t_out(%s);" % (point, k * 3 + 1, gy))
+                    lines.append("      P[%d][%d]${L} = t_out(%s);" % (point, k * 3 + 2, gz))
     lines += ["    }", "  }", ""]
     lines += [
-        "  template <typename y_t, typename out_t, int VS>",
-        "  %s void stage_out(const int ne, const y_t Y[8][9][VS], out_t out[3][8][VS]) {" % q,
+        "  template <typename y_t, typename out_t${W}>",
+        "  %s void stage_out(${NE}const y_t Y[8][9]${E}, out_t out[3][8]${E}) {" % q,
         "    using t = out_t;",
         "    const t g0 = t(%s), g1 = t(%s);" % (g0, g1),
     ]
-    lines += ["    %s" % p for p in _simd()]
-    lines.append("    for (int lane = 0; lane < ne; ++lane) {")
+    lines.append("    ${LOOP}")
 
     def transposed(a0, a1, name):
         # The transpose of the interpolation: n1 = g0 a0 + g1 a1, n0 = (a0 + a1) - n1.
@@ -282,7 +308,7 @@ def _linear_hex_stage_lines(plan):
         p = "o%d_" % i
 
         def yv(qx, qy, qz, nn, i=i):
-            return "t(Y[%d][%d][lane])" % (qx + 2 * qy + 4 * qz, i * 3 + nn)
+            return "t(Y[%d][%d]${L})" % (qx + 2 * qy + 4 * qz, i * 3 + nn)
 
         accumulated = {s: [] for s in range(8)}
         for qy in (0, 1):
@@ -324,7 +350,7 @@ def _linear_hex_stage_lines(plan):
         for s in range(8):
             expression = " ".join(accumulated[s])
             expression = expression[2:] if expression.startswith("+ ") else "-" + expression[2:]
-            lines.append("      out[%d][%d][lane] = %s;" % (i, s, expression))
+            lines.append("      out[%d][%d]${L} = %s;" % (i, s, expression))
     lines += ["    }", "  }"]
     return lines
 
@@ -350,121 +376,120 @@ def _tensor_stage_lines(plan):
 
     lines = [
         "",
-        "  template <typename h_t, typename t_out, int VS>",
-        "  %s void stage_in(const int ne, const h_t h[3][%d][VS], t_out P[%d][9][VS]) {" % (q, n, n_points),
+        "  template <typename h_t, typename t_out${W}>",
+        "  %s void stage_in(${NE}const h_t h[3][%d]${E}, t_out P[%d][9]${E}) {" % (q, n, n_points),
         "    using t = t_out;",
-        "    t u[%d][VS], v[%d][%d][%d][VS], d[%d][%d][%d][VS];" % (n, q1, n1, n1, q1, n1, n1),
-        "    t vv[%d][%d][%d][VS], dv[%d][%d][%d][VS], vd[%d][%d][%d][VS];"
+        "    t u[%d]${E}, v[%d][%d][%d]${E}, d[%d][%d][%d]${E};" % (n, q1, n1, n1, q1, n1, n1),
+        "    t vv[%d][%d][%d]${E}, dv[%d][%d][%d]${E}, vd[%d][%d][%d]${E};"
         % (q1, q1, n1, q1, q1, n1, q1, q1, n1),
         "    for (int k = 0; k < 3; ++k) {",
     ]
-    simd = ["      %s" % p for p in _simd()]
-    lines += simd + ["      for (int lane = 0; lane < ne; ++lane) {"]
+    lines.append("      ${LOOP}")
     for s in range(n):
-        lines.append("        u[%d][lane] = t(h[k][%d][lane] - h[k][0][lane]);" % (s, s))
+        lines.append("        u[%d]${L} = t(h[k][%d]${L} - h[k][0]${L});" % (s, s))
     lines.append("      }")
-    lines += simd + ["      for (int lane = 0; lane < ne; ++lane) {"]
+    lines.append("      ${LOOP}")
     for sz in range(n1):
         for sy in range(n1):
             for qx in range(q1):
-                us = ["u[%d][lane]" % node(sx, sy, sz) for sx in range(n1)]
+                us = ["u[%d]${L}" % node(sx, sy, sz) for sx in range(n1)]
                 lines.append(
-                    "        v[%d][%d][%d][lane] = %s;"
+                    "        v[%d][%d][%d]${L} = %s;"
                     % (qx, sy, sz, " + ".join("%s*%s" % (lit(values[qx][sx]), us[sx]) for sx in range(n1)))
                 )
                 lines.append(
-                    "        d[%d][%d][%d][lane] = %s;"
+                    "        d[%d][%d][%d]${L} = %s;"
                     % (qx, sy, sz, " + ".join("%s*%s" % (lit(derivatives[qx][sx]), us[sx]) for sx in range(n1)))
                 )
     lines.append("      }")
-    lines += simd + ["      for (int lane = 0; lane < ne; ++lane) {"]
+    lines.append("      ${LOOP}")
     for sz in range(n1):
         for qx in range(q1):
             for qy in range(q1):
                 for name, table, source in (("vv", values, "v"), ("dv", values, "d"), ("vd", derivatives, "v")):
                     lines.append(
-                        "        %s[%d][%d][%d][lane] = %s;"
+                        "        %s[%d][%d][%d]${L} = %s;"
                         % (
                             name, qx, qy, sz,
                             " + ".join(
-                                "%s*%s[%d][%d][%d][lane]" % (lit(table[qy][sy]), source, qx, sy, sz)
+                                "%s*%s[%d][%d][%d]${L}" % (lit(table[qy][sy]), source, qx, sy, sz)
                                 for sy in range(n1)
                             ),
                         )
                     )
     lines.append("      }")
-    lines += simd + ["      for (int lane = 0; lane < ne; ++lane) {"]
+    lines.append("      ${LOOP}")
     for qz in range(q1):
         for qy in range(q1):
             for qx in range(q1):
                 point = qx + q1 * (qy + q1 * qz)
-                gx = " + ".join("%s*dv[%d][%d][%d][lane]" % (lit(values[qz][sz]), qx, qy, sz) for sz in range(n1))
-                gy = " + ".join("%s*vd[%d][%d][%d][lane]" % (lit(values[qz][sz]), qx, qy, sz) for sz in range(n1))
-                gz = " + ".join("%s*vv[%d][%d][%d][lane]" % (lit(derivatives[qz][sz]), qx, qy, sz) for sz in range(n1))
-                lines.append("        P[%d][k * 3 + 0][lane] = %s;" % (point, gx))
-                lines.append("        P[%d][k * 3 + 1][lane] = %s;" % (point, gy))
-                lines.append("        P[%d][k * 3 + 2][lane] = %s;" % (point, gz))
+                gx = " + ".join("%s*dv[%d][%d][%d]${L}" % (lit(values[qz][sz]), qx, qy, sz) for sz in range(n1))
+                gy = " + ".join("%s*vd[%d][%d][%d]${L}" % (lit(values[qz][sz]), qx, qy, sz) for sz in range(n1))
+                gz = " + ".join("%s*vv[%d][%d][%d]${L}" % (lit(derivatives[qz][sz]), qx, qy, sz) for sz in range(n1))
+                lines.append("        P[%d][k * 3 + 0]${L} = %s;" % (point, gx))
+                lines.append("        P[%d][k * 3 + 1]${L} = %s;" % (point, gy))
+                lines.append("        P[%d][k * 3 + 2]${L} = %s;" % (point, gz))
     lines += ["      }", "    }", "  }", ""]
 
     def yq(qx, qy, qz, nn):
-        return "Y[%d][i * 3 + %d][lane]" % (qx + q1 * (qy + q1 * qz), nn)
+        return "Y[%d][i * 3 + %d]${L}" % (qx + q1 * (qy + q1 * qz), nn)
 
     lines += [
-        "  template <typename y_t, typename out_t, int VS>",
-        "  %s void stage_out(const int ne, const y_t Y[%d][9][VS], out_t out[3][%d][VS]) {" % (q, n_points, n),
+        "  template <typename y_t, typename out_t${W}>",
+        "  %s void stage_out(${NE}const y_t Y[%d][9]${E}, out_t out[3][%d]${E}) {" % (q, n_points, n),
         "    using t = y_t;",
-        "    t ax[%d][%d][%d][VS], ay[%d][%d][%d][VS], az[%d][%d][%d][VS];"
+        "    t ax[%d][%d][%d]${E}, ay[%d][%d][%d]${E}, az[%d][%d][%d]${E};"
         % (q1, q1, n1, q1, q1, n1, q1, q1, n1),
-        "    t bx[%d][%d][%d][VS], c[%d][%d][%d][VS];" % (q1, n1, n1, q1, n1, n1),
+        "    t bx[%d][%d][%d]${E}, c[%d][%d][%d]${E};" % (q1, n1, n1, q1, n1, n1),
         "    for (int i = 0; i < 3; ++i) {",
     ]
-    lines += simd + ["      for (int lane = 0; lane < ne; ++lane) {"]
+    lines.append("      ${LOOP}")
     for qx in range(q1):
         for qy in range(q1):
             for sz in range(n1):
                 lines.append(
-                    "        ax[%d][%d][%d][lane] = %s;"
+                    "        ax[%d][%d][%d]${L} = %s;"
                     % (qx, qy, sz, " + ".join("%s*%s" % (lit(values[qz][sz]), yq(qx, qy, qz, 0)) for qz in range(q1)))
                 )
                 lines.append(
-                    "        ay[%d][%d][%d][lane] = %s;"
+                    "        ay[%d][%d][%d]${L} = %s;"
                     % (qx, qy, sz, " + ".join("%s*%s" % (lit(values[qz][sz]), yq(qx, qy, qz, 1)) for qz in range(q1)))
                 )
                 lines.append(
-                    "        az[%d][%d][%d][lane] = %s;"
+                    "        az[%d][%d][%d]${L} = %s;"
                     % (qx, qy, sz, " + ".join("%s*%s" % (lit(derivatives[qz][sz]), yq(qx, qy, qz, 2)) for qz in range(q1)))
                 )
     lines.append("      }")
-    lines += simd + ["      for (int lane = 0; lane < ne; ++lane) {"]
+    lines.append("      ${LOOP}")
     for qx in range(q1):
         for sy in range(n1):
             for sz in range(n1):
                 lines.append(
-                    "        bx[%d][%d][%d][lane] = %s;"
-                    % (qx, sy, sz, " + ".join("%s*ax[%d][%d][%d][lane]" % (lit(values[qy][sy]), qx, qy, sz) for qy in range(q1)))
+                    "        bx[%d][%d][%d]${L} = %s;"
+                    % (qx, sy, sz, " + ".join("%s*ax[%d][%d][%d]${L}" % (lit(values[qy][sy]), qx, qy, sz) for qy in range(q1)))
                 )
                 lines.append(
-                    "        c[%d][%d][%d][lane] = %s;"
+                    "        c[%d][%d][%d]${L} = %s;"
                     % (
                         qx, sy, sz,
                         " + ".join(
-                            "%s*ay[%d][%d][%d][lane] + %s*az[%d][%d][%d][lane]"
+                            "%s*ay[%d][%d][%d]${L} + %s*az[%d][%d][%d]${L}"
                             % (lit(derivatives[qy][sy]), qx, qy, sz, lit(values[qy][sy]), qx, qy, sz)
                             for qy in range(q1)
                         ),
                     )
                 )
     lines.append("      }")
-    lines += simd + ["      for (int lane = 0; lane < ne; ++lane) {"]
+    lines.append("      ${LOOP}")
     for sz in range(n1):
         for sy in range(n1):
             for sx in range(n1):
                 expression = " + ".join(
-                    "%s*bx[%d][%d][%d][lane] + %s*c[%d][%d][%d][lane]"
+                    "%s*bx[%d][%d][%d]${L} + %s*c[%d][%d][%d]${L}"
                     % (lit(derivatives[qx][sx]), qx, sy, sz, lit(values[qx][sx]), qx, sy, sz)
                     for qx in range(q1)
                 )
-                lines.append("        out[i][%d][lane] = out_t(%s);" % (node(sx, sy, sz), expression))
+                lines.append("        out[i][%d]${L} = out_t(%s);" % (node(sx, sy, sz), expression))
     lines += ["      }", "    }", "  }"]
     return lines
 
@@ -488,30 +513,29 @@ def _setup_stage_lines(plan):
     lines = [
         "",
         "  // The reference gradient at the set-up's points: G[q][k*%d+m]." % dim,
-        "  template <typename h_t, typename t_out, int VS>",
-        "  %s void setup_in(const int ne, const h_t h[%d][%d][VS], t_out G[NQ][%d][VS]) {"
+        "  template <typename h_t, typename t_out${W}>",
+        "  %s void setup_in(${NE}const h_t h[%d][%d]${E}, t_out G[NQ][%d]${E}) {"
         % (q, dim, n, dim * dim),
     ]
     return lines + _SETUP_BODY_BY_FORM[plan.setup_form](plan)
 
 
 def _setup_from_the_stages(plan):
-    return ["    stage_in<h_t, t_out, VS>(ne, h, G);", "  }"]
+    return ["    stage_in<h_t, t_out${V}>(${NA}h, G);", "  }"]
 
 
 def _setup_from_the_rule(plan):
     n, dim = plan.n_nodes, plan.dim
     lines = ["    using t = h_t;"]
-    lines += ["    %s" % p for p in _simd()]
-    lines.append("    for (int lane = 0; lane < ne; ++lane) {")
+    lines.append("    ${LOOP}")
     for k in range(dim):
         for j in range(n):
-            lines.append("      const t h%d_%d = h[%d][%d][lane];" % (k, j, k, j))
+            lines.append("      const t h%d_%d = h[%d][%d]${L};" % (k, j, k, j))
     for point, gradient in enumerate(plan.setup_gradients):
         for k in range(dim):
             for m in range(dim):
                 expression = _linear_combination([(gradient[m][j], "h%d_%d" % (k, j)) for j in range(n)])
-                lines.append("      G[%d][%d][lane] = t_out(%s);" % (point, k * dim + m, expression))
+                lines.append("      G[%d][%d]${L} = t_out(%s);" % (point, k * dim + m, expression))
     lines += ["    }", "  }"]
     return lines
 
@@ -565,6 +589,28 @@ def _fold_lines(plan):
 _FOLD_BY_FOLDABILITY = {True: _fold_lines, False: lambda plan: []}
 
 
+def _line_table_lines(plan):
+    """The one-dimensional basis at the line's points, for the device's cooperative sweeps.
+
+    A device thread per point cannot run the sum-factorised stages, which sweep a
+    whole element; the element's threads run the sweeps together from these.
+    """
+    line = plan.line
+    return [
+        "",
+        "  // The line's basis at its points, for the device's cooperative sweeps: B1[q][s] = phi_s(x_q),",
+        "  // D1[q][s] = phi_s'(x_q).",
+        "  static constexpr int S1 = %d;" % line.n_shape,
+        "  static constexpr double B1[Q1][S1] = {%s};" % ", ".join(_row(_double(v) for v in row) for row in line.values),
+        "  static constexpr double D1[Q1][S1] = {%s};"
+        % ", ".join(_row(_double(v) for v in row) for row in line.derivatives),
+    ]
+
+
+#: Only the device reads the line's tables, and only where the host sweeps.
+_LINE_TABLES = {("sweeps", True): _line_table_lines}
+
+
 def _pair_lines(plan):
     """The moments' pairing: which gradient each stored tensor reads and writes, and how often
     it occurs in the symmetric sum."""
@@ -594,7 +640,7 @@ _SHAPE_ORDER_BY_REORDERING = {True: _shape_order_lines, False: lambda plan: []}
 def element_header_source(plan):
     """The element's struct: its constants, data tables, stages and fold."""
     n, dim = plan.n_nodes, plan.dim
-    guard = "SFEM_CODEGEN_INEXACT_%s_HPP" % plan.rule_key.upper()
+    guard = "SFEM_CODEGEN_INEXACT_%s_%s" % (plan.rule_key.upper(), current_target().header_guard_suffix())
     gradients = ", ".join(
         _row(_row(_double(plan.gradients[r][m][j]) for j in range(n)) for m in range(dim))
         for r in range(plan.n_gradients)
@@ -629,9 +675,11 @@ def element_header_source(plan):
         "  static constexpr double QW[NQ] = %s;" % _row(_double(w) for w in plan.setup_weights),
     ]
     lines += _PAIRS_BY_KIND[plan.kind](plan)
-    lines += _STAGES_BY_FORM[plan.stage_form](plan)
-    lines += _setup_stage_lines(plan)
+    lines += _work_item_lines(_STAGES_BY_FORM[plan.stage_form](plan) + _setup_stage_lines(plan))
     lines += _FOLD_BY_FOLDABILITY[plan.foldable](plan)
+    lines += _LINE_TABLES.get(
+        (plan.stage_form, current_target().kernel_vector_width() is None), lambda plan: []
+    )(plan)
     lines += ["};", "", "}  // namespace codegen", "}  // namespace sfem", "", "#endif", ""]
     return "\n".join(lines)
 
@@ -660,6 +708,86 @@ def _full_slot_lines(order, slot, qualifier):
 _SLOT_LINES_BY_SYMMETRY = {True: _symmetric_slot_lines, False: _full_slot_lines}
 
 
+def _lane_contraction_lines(dim, n_slots, slot, q):
+    """The contraction for a block of lanes, lane loop innermost, and its folded forms."""
+    order = dim * dim
+    lines = [
+        "",
+        "  // The same for a block of lanes, one loop over them.",
+        "  template <typename t${W}>",
+        "  %s void contract_lanes(${NE}const t S[%d]${E}, const t G[%d]${E}, t Y[%d]${E}) {"
+        % (q, n_slots, order, order),
+    ]
+    lines.append("    ${LOOP}")
+    for r in range(order):
+        lines.append(
+            "      Y[%d]${L} += %s;"
+            % (r, " + ".join("S[%d]${L}*G[%d]${L}" % (slot(r, c), c) for c in range(order)))
+        )
+    lines.append("    }")
+    lines += [
+        "  }",
+        "",
+        "  // The folded store's contraction: bit d of MASK drops the m = n = d terms.",
+        "  template <int MASK, typename t${W}>",
+        "  %s void contract_lanes_masked(${NE}const t S[%d]${E}, const t G[%d]${E}, t Y[%d]${E}) {"
+        % (q, n_slots, order, order),
+    ]
+    for mask in range(1 << dim):
+        lines.append("    %s constexpr (MASK == %d) {" % ("if" if mask == 0 else "} else if", mask))
+        lines.append("      ${LOOP}")
+        for r in range(order):
+            terms = " + ".join(
+                "S[%d]${L}*G[%d]${L}" % (slot(r, c), c)
+                for c in range(order)
+                if not (r % dim == c % dim and (mask >> (r % dim)) & 1)
+            )
+            lines.append("        Y[%d]${L} += %s;" % (r, terms))
+        lines.append("      }")
+    lines += [
+        "    }",
+        "  }",
+        "",
+        "  template <typename t${W}>",
+        "  %s void contract_lanes_masked(const int mask, ${NE}const t S[%d]${E}, const t G[%d]${E}, t Y[%d]${E}) {"
+        % (q, n_slots, order, order),
+        "    switch (mask) {",
+    ]
+    for mask in range(1 << dim):
+        lines.append("      case %d: contract_lanes_masked<%d, t${V}>(${NA}S, G, Y); break;" % (mask, mask))
+    return _work_item_lines(lines + ["    }", "  }"])
+
+
+def _scalar_masked_contraction_lines(dim, n_slots, slot, q):
+    """A device thread's folded contraction: bit d of MASK drops the m = n = d terms.
+
+    A thread holds one element, so there are no lanes; the unmasked contraction
+    is `contract` itself.
+    """
+    order = dim * dim
+    lines = [
+        "",
+        "  // The folded store's contraction: bit d of MASK drops the m = n = d terms.",
+        "  template <int MASK, typename t>",
+        "  %s void contract_masked(const t *const S, const t *const g, t *const y) {" % q,
+    ]
+    for mask in range(1 << dim):
+        lines.append("    %s constexpr (MASK == %d) {" % ("if" if mask == 0 else "} else if", mask))
+        for r in range(order):
+            terms = " + ".join(
+                "S[%d]*g[%d]" % (slot(r, c), c)
+                for c in range(order)
+                if not (r % dim == c % dim and (mask >> (r % dim)) & 1)
+            )
+            lines.append("      y[%d] += %s;" % (r, terms))
+    return lines + ["    }", "  }"]
+
+
+#: A target whose work item is a lane of a block gets the lane forms; a device
+#: thread holds one element and contracts it with `contract` and `contract_masked`.
+_WORK_ITEM_CONTRACTIONS = {False: _lane_contraction_lines, True: _scalar_masked_contraction_lines}
+
+
 def contract_header_source(dim):
     """`y[r] += sum_c S[slot(r, c)] g[c]` for one stored tangent, both packings.
 
@@ -669,7 +797,7 @@ def contract_header_source(dim):
     """
     order = dim * dim
     q = _qualifier()
-    guard = "SFEM_CODEGEN_INEXACT_CONTRACT_D%d_HPP" % dim
+    guard = "SFEM_CODEGEN_INEXACT_CONTRACT_D%d_%s" % (dim, current_target().header_guard_suffix())
     lines = [
         "#ifndef %s" % guard,
         "#define %s" % guard,
@@ -700,52 +828,11 @@ def contract_header_source(dim):
             lines.append(
                 "    y[%d] += %s;" % (r, " + ".join("S[%d]*g[%d]" % (slot(r, c), c) for c in range(order)))
             )
-        lines += [
-            "  }",
-            "",
-            "  // The same for a block of lanes, lane loop innermost.",
-            "  template <typename t, int VS>",
-            "  %s void contract_lanes(const int ne, const t S[%d][VS], const t G[%d][VS], t Y[%d][VS]) {"
-            % (q, n_slots, order, order),
-        ]
-        for r in range(order):
-            lines += ["    %s" % p for p in _simd()]
-            lines.append(
-                "    for (int lane = 0; lane < ne; ++lane) Y[%d][lane] += %s;"
-                % (r, " + ".join("S[%d][lane]*G[%d][lane]" % (slot(r, c), c) for c in range(order)))
-            )
-        lines += [
-            "  }",
-            "",
-            "  // The folded store's contraction: bit d of MASK drops the m = n = d terms.",
-            "  template <int MASK, typename t, int VS>",
-            "  %s void contract_lanes_masked(const int ne, const t S[%d][VS], const t G[%d][VS], t Y[%d][VS]) {"
-            % (q, n_slots, order, order),
-        ]
-        for mask in range(1 << dim):
-            lines.append("    %s constexpr (MASK == %d) {" % ("if" if mask == 0 else "} else if", mask))
-            for r in range(order):
-                terms = " + ".join(
-                    "S[%d][lane]*G[%d][lane]" % (slot(r, c), c)
-                    for c in range(order)
-                    if not (r % dim == c % dim and (mask >> (r % dim)) & 1)
-                )
-                lines += ["      %s" % p for p in _simd()]
-                lines.append("      for (int lane = 0; lane < ne; ++lane) Y[%d][lane] += %s;" % (r, terms))
-        lines += [
-            "    }",
-            "  }",
-            "",
-            "  template <typename t, int VS>",
-            "  %s void contract_lanes_masked(const int mask, const int ne, const t S[%d][VS], const t G[%d][VS], t Y[%d][VS]) {"
-            % (q, n_slots, order, order),
-            "    switch (mask) {",
-        ]
-        for mask in range(1 << dim):
-            lines.append(
-                "      case %d: contract_lanes_masked<%d, t, VS>(ne, S, G, Y); break;" % (mask, mask)
-            )
-        lines += ["    }", "  }", "};"]
+        lines += ["  }"]
+        lines += _WORK_ITEM_CONTRACTIONS[current_target().kernel_vector_width() is None](
+            dim, n_slots, slot, q
+        )
+        lines += ["};"]
     lines += ["", "}  // namespace codegen", "}  // namespace sfem", "", "#endif", ""]
     return "\n".join(lines)
 
@@ -817,6 +904,15 @@ def _point_lines(plan, units, parameters, element_type):
     return lines, reads_state, reads_previous
 
 
+#: Each integration-point field's component count, where the tangent reads any.
+_QUADRATURE_COMPONENT_LINES = {
+    True: lambda fields: [
+        "  static constexpr int quadrature_components[%d] = %s;" % (len(fields), _row(str(c) for _n, c in fields))
+    ],
+    False: lambda fields: [],
+}
+
+
 def unit_header_source(unit_name, element_plan, units, parameters):
     """The material's tangent at one point, bound to its element.
 
@@ -830,13 +926,13 @@ def unit_header_source(unit_name, element_plan, units, parameters):
         plan, units, parameters, element_plan.element_type
     )
     struct = "%s_%s_inexact" % (unit_name, element_plan.element_type.lower())
-    guard = "SFEM_CODEGEN_%s_HPP" % struct.upper()
+    guard = "SFEM_CODEGEN_%s_%s" % (struct.upper(), current_target().header_guard_suffix())
     q = _qualifier()
     lines = [
         "#ifndef %s" % guard,
         "#define %s" % guard,
         "",
-        '#include "kernel_math.hpp"',
+        '#include "%s"' % current_target().header_name("kernel_math"),
         '#include "%s"' % element_header_path(element_plan).rsplit("/", 1)[-1],
         '#include "%s"' % contract_header_path(plan.dim).rsplit("/", 1)[-1],
         "",
@@ -856,8 +952,9 @@ def unit_header_source(unit_name, element_plan, units, parameters):
         "  static constexpr int n_parameters = %d;" % len(parameters),
         "  // The integration-point fields the tangent reads, and their components.",
         "  static constexpr int n_quadrature_fields = %d;" % len(fields),
-        "  static constexpr int quadrature_components[%d] = %s;"
-        % (max(1, len(fields)), _row(str(c) for _n, c in fields) if fields else "{0}"),
+    ]
+    lines += _QUADRATURE_COMPONENT_LINES[bool(fields)](fields)
+    lines += [
         "  static constexpr int max_quadrature_components = %d;" % max([c for _n, c in fields] + [1]),
         "",
         "  // The tangent at one point, unweighted: `gu_ref` (and `gz_ref`, the previous state's) is the",
@@ -914,14 +1011,57 @@ def inexact_files(unit_name, element_type, rule, units, parameters):
     return _FILES_BY_APPLICABILITY[plans is not None](unit_name, plans, units, parameters)
 
 
+def device_store_factory(struct):
+    """The declaration of a device unit's store factory, which its generated source defines."""
+    return (
+        "std::unique_ptr<InexactStore> %s_store(const ptrdiff_t nelements, "
+        "const InexactOptions &options, void *const stream)" % struct
+    )
+
+
+def _device_store_source(struct):
+    """The library's device stores, instantiated for one unit on one element.
+
+    The operator is host code and cannot instantiate device templates, so each
+    unit's stores are compiled here and reached through `<unit>_store`.
+    """
+    return "\n".join(
+        [
+            '#include "%s"' % current_target().header_name(struct),
+            '#include "sfem_cuda_InexactStore.cuh"',
+            "",
+            "namespace sfem {",
+            "namespace codegen {",
+            "",
+            "%s {" % device_store_factory(struct),
+            "  return inexact::cuda::create_store<%s>(nelements, options, stream);" % struct,
+            "}",
+            "",
+            "}  // namespace codegen",
+            "}  // namespace sfem",
+            "",
+        ]
+    )
+
+
+#: A device unit's stores are compiled in a source of their own; the host's are
+#: instantiated by the operator.
+_STORE_SOURCES = {
+    True: lambda struct: (
+        ("%s_store.%s" % (struct, current_target().mesh_source_extension()), _device_store_source(struct)),
+    ),
+    False: lambda struct: (),
+}
+
+
 def _unit_files(unit_name, plans, units, parameters):
     element_plan, plan = plans
-    _struct, unit_source = unit_header_source(unit_name, element_plan, units, parameters)
+    struct, unit_source = unit_header_source(unit_name, element_plan, units, parameters)
     return (
-        ("%s_%s_inexact.hpp" % (unit_name, element_plan.element_type.lower()), unit_source),
+        (current_target().header_name(struct), unit_source),
         (element_header_path(element_plan), element_header_source(element_plan)),
         (contract_header_path(plan.dim), contract_header_source(plan.dim)),
-    )
+    ) + _STORE_SOURCES[current_target().kernel_vector_width() is None](struct)
 
 
 #: Whether the plans cover this unit on this element decides whether there are files.

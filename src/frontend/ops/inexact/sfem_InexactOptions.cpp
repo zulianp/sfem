@@ -136,14 +136,14 @@ namespace sfem {
     }
 
 #ifdef SFEM_ENABLE_RYAML
-    InexactOptions InexactOptions::from_yaml(const ryml::ConstNodeRef &node) {
+    InexactOptions inexact_options_from_yaml(const ryml::ConstNodeRef &node) {
         const auto read = [&](const char *const key, const char *const fallback) {
             if (!node.has_child(ryml::to_csubstr(key))) return std::string(fallback);
             const auto value = node[ryml::to_csubstr(key)].val();
             return std::string(value.str, value.len);
         };
         InexactOptions defaults;
-        return from_strings(read("store", to_string(defaults.store)),
+        return InexactOptions::from_strings(read("store", to_string(defaults.store)),
                             read("encoding", to_string(defaults.encoding)),
                             read("fold", to_string(defaults.fold)),
                             read("traversal", to_string(defaults.traversal)));

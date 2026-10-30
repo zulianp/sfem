@@ -525,14 +525,14 @@ class WorkItemAccessorTest(unittest.TestCase):
 
 
 class InexactFamilyUnderACudaTargetTest(unittest.TestCase):
-    """The stored-tangent family under a CUDA target, stated as it stands.
+    """The stored-tangent family under a CUDA target.
 
     The family's generated half is per-element headers -- the material at one
-    point, the element's stages and tables -- and its traversals are library
-    code (`src/frontend/ops/inexact/`).  The device variant of the stages has no
-    work-item width and is its own generated shape; until it exists the CUDA
-    backend publishes nothing for the family, and the CPU emission keeps its
-    lanes.
+    point, the element's stages and tables, the contraction -- and its stores
+    and traversals are library code (`src/frontend/ops/inexact/`, and `cuda/`
+    for the device).  Under CUDA the same emitters print the device twins: the
+    work item is the element, so nothing spells a lane, and a source per unit
+    instantiates the library's device stores for it.
     """
 
     @staticmethod
@@ -552,11 +552,22 @@ class InexactFamilyUnderACudaTargetTest(unittest.TestCase):
         with use_target(target):
             return dict(inexact_unit_files(unit_material, unit, context)), unit_material, unit, context
 
-    def test_the_cuda_backend_publishes_no_stored_tangent_yet(self):
+    def test_the_cuda_backend_publishes_the_device_twins(self):
         from codegen.framework.backends.cuda import CUDASoABackend
 
         _emitted, material, unit, context = self._emit(OpenMPTarget())
-        self.assertEqual(CUDASoABackend(CUDATarget()).emit_inexact(material, unit, context), ())
+        files = CUDASoABackend(CUDATarget()).emit_inexact(material, unit, context)
+        paths = sorted(generated.path for generated in files)
+        self.assertEqual(
+            [p.rsplit(".", 1)[-1] for p in paths], ["cuh", "cu", "cuh", "cuh"],
+            "the unit, its store source, and the shared contraction and element: %s" % paths,
+        )
+        for generated in files:
+            self.assertNotIn("lane", generated.source, generated.path)
+            self.assertNotIn("SFEM_INLINE", generated.source, generated.path)
+        store = [g for g in files if g.path.endswith("_store.cu")]
+        self.assertEqual(len(store), 1)
+        self.assertIn("inexact::cuda::create_store<", store[0].source)
 
     def test_the_cpu_emission_spells_lanes(self):
         emitted, _material, _unit, _context = self._emit(OpenMPTarget())

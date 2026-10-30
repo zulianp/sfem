@@ -945,7 +945,7 @@ namespace sfem {
             linear.atol           = read<real_t>(ln, "atol", linear.atol);
             linear.max_it         = read<int>(ln, "max_it", linear.max_it);
             linear.storage_bytes  = read<int>(ln, "storage_bytes", linear.storage_bytes);
-            if (has(ln, "inexact")) linear.inexact = InexactOptions::from_yaml(ln["inexact"]);
+            if (has(ln, "inexact")) linear.inexact = inexact_options_from_yaml(ln["inexact"]);
             // A truncated direction needs the line search to scale it.
             linear.stop_on_negative_curvature = newton_options.line_search.enabled;
             // A linear problem is solved by one Newton step, so its linear solve goes as far as

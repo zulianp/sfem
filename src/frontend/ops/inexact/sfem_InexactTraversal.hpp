@@ -6,27 +6,11 @@
 
 #include "packed_thread_scratch.hpp"
 #include "sfem_InexactElement.hpp"
+#include "sfem_InexactInterface.hpp"
 #include "sfem_base.hpp"
 
 namespace sfem {
     namespace inexact {
-
-        /// One block of the packed mesh, as the two-pass traversal reads it (`smesh::PackedMesh`).
-        struct PackedView {
-            ptrdiff_t                 n_packs{0};
-            ptrdiff_t                 n_elements_per_pack{0};
-            ptrdiff_t                 max_nodes_per_pack{0};
-            const uint16_t *const    *elements{nullptr};  // [node][element], pack-local
-            const ptrdiff_t          *owned_nodes_ptr{nullptr};
-            ptrdiff_t                 n_ghost_entries{0};
-            const ptrdiff_t          *ghost_ptr{nullptr};
-            const idx_t              *ghost_idx{nullptr};
-            ptrdiff_t                 n_ghost_reduce_rows{0};
-            const ptrdiff_t          *ghost_reduce_ptr{nullptr};
-            const ptrdiff_t          *ghost_reduce_idx{nullptr};
-            const idx_t              *ghost_reduce_dest{nullptr};
-            real_t                   *ghost_buf{nullptr};  // 3 * n_ghost_entries
-        };
 
         /// Unordered traversal, atomic scatter: `out += A h` over the elements of one block.
         template <class Store, typename tau>

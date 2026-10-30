@@ -972,10 +972,6 @@ class CUDATarget(TargetPlatform):
     def execution_space(self):
         return "EXECUTION_SPACE_DEVICE"
 
-    def supports_inexact_apply(self):
-        #: `CUDASoABackend.emit_inexact` returns no files -- the family has not
-        #: been lowered for a device target -- so nothing may be declared for it.
-        return False
 
     def source_subdirectory(self):
         return "cuda"
@@ -1123,6 +1119,11 @@ class HIPTarget(CUDATarget):
 
     def mesh_source_extension(self):
         return "hip"
+
+    def supports_inexact_apply(self):
+        #: The device stores the generated units instantiate are CUDA
+        #: (`frontend/ops/inexact/cuda`); no HIP build of them exists.
+        return False
 
     def source_subdirectory(self):
         #: The repository has no `hip/` folder to follow, so this names the
