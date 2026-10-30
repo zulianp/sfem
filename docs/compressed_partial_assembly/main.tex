@@ -350,19 +350,7 @@ $\rho_{mn}=64=n_q$, a minimum of $\minimalHexTwentySeven$ against $\storeHexTwen
 
 The kernels of this paper hold the minimum on every element: the moments on TET10, which have a
 schedule of their own (below), and on HEX8 and HEX27 the point values folded along the lines of
-points (Figure~\ref{fig:fmtfold}).  A component with $m=n$ multiplies, along each line of points in direction $m$, a
-polynomial of degree $2(p-1)$ in $\xi_m$ --- constant on HEX8, quadratic on HEX27 --- which $q_1-1$
-of the line's $q_1$ points determine.  One point per line, at the same position on every line,
-therefore drops its $m=n$ components and passes them to the line's other points, weighted by their
-Lagrange polynomials at the dropped point: $1$ on HEX8, and on HEX27 $0.39$, $1$ and $-0.39$ with an
-interior point dropped (an end point would weigh $2.53$).  The fold is exact and linear, so it
-commutes with the element mean of Section~\ref{sec:mean}, and the application skips the dropped
-terms: a point that drops $d$ directions contracts $81-9d$ multiply--adds instead of $81$.  The
-stores are $\minimalHexEight$ and $\minimalHexTwentySeven$ numbers, and on Grace the folded
-application is faster than the one over all $45\,n_q$ point values for every encoding, by
-$\foldGainHalfHexEight\%$ (\texttt{fp16}) and $\foldGainEightMdHexEight\%$ (\texttt{int8} mean and
-deviation) on HEX8 and $\foldGainHalfHexTwentySeven\%$ and $\foldGainEightMdHexTwentySeven\%$ on
-HEX27, at about $10^7$ degrees of freedom.
+points (Section~\ref{sec:fold}).
 
 On TET10, write $\lambda_a$ for the barycentric coordinates.  The reference
 derivatives are linear, $\partial_m h_k = \sum_{a} \lambda_a P_{kma}$ with $P_{kma}$ the derivative
@@ -392,6 +380,88 @@ $X_{ab}=\sum_q w_q\lambda_a(\xhat_q)\lambda_b(\xhat_q)$ the Gram matrix of the b
 coordinates, and the deviations are $D^{ab}=\Mab-X_{ab}\Sbar$.  Both sets sum to zero over the
 element.  Where the tangent varies little over the element the deviations are small relative to
 $\Sbar$, which is what makes them cheap to encode (Section~\ref{sec:meandev}).
+
+\subsection{The fold on the hexahedra}
+\label{sec:fold}
+
+On a tensor-product element the minimum of Table~\ref{tab:stores} has an explicit form that keeps
+the point values and drops some of them.  Let the element carry Lagrange polynomials of degree $p$
+in each reference direction, integrated with the $q_1^3$-point Gauss rule, whose points in one
+direction are $x_0<\dots<x_{q_1-1}$: HEX8 has $p=1$, $q_1=2$, HEX27 has $p=2$, $q_1=4$.  Fix a direction
+$d$ and a component $\Sq_{ikmn}$ with $m=n=d$.  In \eqref{eq:action} it multiplies the value at
+$\xhat_q$ of $\chi=\partial_d h_k\,\partial_d\varphi_p$.  A derivative in $\xi_d$ lowers the degree in
+$\xi_d$ by one, so on a line of points in direction $d$ --- the $q_1$ points that share their other
+two coordinates --- $\chi$ is a polynomial of degree $2(p-1)$ in $\xi_d$: constant on HEX8,
+quadratic on HEX27.  Both satisfy $2(p-1)\le q_1-2$, so the values of $\chi$ at any $q_1-1$ of the
+line's points determine it.  With $D$ the index of the point left out and $\ell_j$ the Lagrange
+polynomials of the others, $\chi(x_D)=\sum_{j\ne D}\ell_j(x_D)\,\chi(x_j)$, and the line's share of
+the action is
+\begin{equation}
+  \begin{gathered}
+  \sum_{j} \widehat S^{q_j}_{ikdd}\,\chi(x_j) \;=\; \sum_{j\ne D} T^{q_j}_{ikdd}\,\chi(x_j),\\
+  T^{q_j}_{ikdd} \;=\; \widehat S^{q_j}_{ikdd} + \ell_j(x_D)\,\widehat S^{q_D}_{ikdd} ,
+  \end{gathered}
+  \label{eq:fold}
+\end{equation}
+where $q_j$ is the point of the line with index $j$ in direction $d$.  The identity holds for every
+increment and every test function, so storing $T$ at the line's other points and nothing at $q_D$
+leaves the application exact, whatever the tangent, the geometry or the state.  We call this the
+fold.  Each line keeps $q_1-1$ values of each such component, and there are $q_1^2$ lines in each
+direction: $(q_1-1)q_1^2$ values, the rank $\rho_{dd}$ of Table~\ref{tab:stores} ($4$ on HEX8, $48$ on
+HEX27).  The fold is therefore one choice of the minimal functionals of \eqref{eq:moments}: point
+values of a modified tangent, so the stages that form the gradients at the points and return the
+outputs from them are unchanged.
+
+The other components do not fold.  For $m\ne n$ the product $\partial_m h_k\,\partial_n\varphi_p$ has
+degree $(p-1)+p=2p-1=q_1-1$ in $\xi_m$ and in $\xi_n$, and $2p$ in the third direction, so every
+point of every line is needed: $\rho_{mn}=n_q$, as Table~\ref{tab:stores} lists.  The folded
+components are those whose test and increment directions agree: on the pairing of
+Section~\ref{sec:formulation} they form, for each $d$, the $3\times3$ block over $(i,k)$ of the $9\times9$
+tangent with $n=m=d$, symmetric, six packed numbers.  We drop the point with the same index $D$ on
+every line, so a point drops direction $d$ exactly when its index in direction $d$ is $D$.  Writing
+$d_q$ for the number of directions point $q$ drops, it stores $45-6d_q$ numbers and its
+contraction loses the nine entries of each dropped block, $81-9d_q$ multiply--adds instead of $81$.
+Over the element $3q_1^2$ point--direction pairs drop: the store holds $45n_q-18q_1^2$ numbers,
+$\minimalHexEight$ on HEX8 and $\minimalHexTwentySeven$ on HEX27 instead of $\perpointHexEight$ and
+$\perpointHexTwentySeven$, and the contraction saves $27q_1^2$ of its $81n_q$ multiply--adds, $108$ of
+$648$ and $432$ of $5184$.  Figure~\ref{fig:fmtfold} shows HEX8: a point keeps $45$, $39$, $33$ or $27$
+numbers.
+
+\paragraph{Which point to drop.}  The weights $\ell_j(x_D)$ enter the stored values, and the
+encodings scale by their largest magnitude.  On HEX8 the line has two points and the weight is $1$:
+the kept point stores the sum of the two.  On HEX27 dropping an end point extrapolates, with
+weights $1$, $-2.53$, $2.53$ on the other three points; dropping an interior point interpolates, with
+weights $0.39$, $1$, $-0.39$.  We drop the second point of each line, so every folded value is at
+most twice the largest point value, $|T|\le(1+|\ell_j|)\max_q|\Sq|\le 2\max_q|\Sq|$, on either
+element.
+
+\paragraph{The encodings.}  The fold is linear, so it commutes with the split of
+Section~\ref{sec:mean}: it is applied to the deviations, and a folded component of point $q_j$
+carries the reference weight $X_{j\alpha}=X_{q_j}+\ell_j(x_D)\,X_{q_D}$ in place of $X_{q_j}$, which is
+the weight \eqref{eq:decode} decodes with.  The element mean and its $45$ numbers are unchanged.
+Since the folded values reach up to twice the point values, the element scale can double, and the
+encoding error with it.  The half-precision and mean-and-deviation stores keep their Newton and
+Krylov counts (Section~\ref{sec:newtonresults}); \texttt{int8} with one scale per element, already
+unusable as a Newton operator, needs a few more iterations on HEX27.
+
+\paragraph{The kernels.}  The set-up (Algorithm~\ref{alg:setup}) evaluates the tangent at all
+$q_1^3$ points as before, folds the block's point values in scratch after the mean is removed, takes
+the scale over the kept values and encodes only those, point by point in the store's order.  The
+application (Algorithm~\ref{alg:applypoints}) decodes the components a point keeps into their slots
+and contracts with one of eight generated contractions, one per set of dropped directions.  Since
+the vector lanes are elements and every element drops the same components at the same point, the
+set is uniform across the lanes and the skipped multiply--adds are saved.  On Grace the folded
+application is faster than the one over all $45\,n_q$ point values for every encoding, by
+$\foldGainHalfHexEight\%$ (\texttt{fp16}) and $\foldGainEightMdHexEight\%$ (\texttt{int8} mean and
+deviation) on HEX8 and $\foldGainHalfHexTwentySeven\%$ and $\foldGainEightMdHexTwentySeven\%$ on HEX27
+at about $10^7$ degrees of freedom; selecting the contraction per point at run time measured faster
+than unrolling all points with their sets fixed at compile time.  On the GPU the HEX8 application
+runs a thread per element and saves the same work.  The HEX27 one runs a thread per point
+(Section~\ref{sec:plan}), whose threads in a warp drop different directions: a warp executes one
+instruction stream, so the dropped terms are multiplied by zero rather than skipped, and the fold
+saves only a tenth of the bytes, which do not bound that kernel, while its addressing and the folded
+weights cost instructions and registers.  The HEX27 device store therefore keeps all $45\,n_q$
+point values.
 
 %% ===================================================================================================
 \section{Contraction schedules}
@@ -435,7 +505,8 @@ schedule and reads $10\%$ fewer numbers.  Symbolic counts, not measured run time
 \end{table*}
 
 On every element the dominant term is the tangent contraction, $81$ multiply--adds per point or
-moment ($r^2=16$ blocks on TET10).  It is not reducible by symmetry, since a symmetric matrix--vector product still touches every entry, and it is
+moment ($r^2=16$ blocks on TET10), fewer at the points the fold drops components from
+(Section~\ref{sec:fold}).  It is not reducible by symmetry, since a symmetric matrix--vector product still touches every entry, and it is
 the reason the arithmetic precision is a design parameter (Section~\ref{sec:precision}).
 
 \subsection{Arithmetic precision}
@@ -883,7 +954,7 @@ accumulation, and scatter through the packed two-pass layout.}
 \Description{Three panels: a hexahedron with its eight quadrature points and arrows along the lines
 of points in the three directions, the stored tangent of a point with the components it drops left
 blank, and the blocked layout with fewer rows per point.}
-\caption{The folded point store of the hexahedra (Section~\ref{sec:minimal}), drawn for HEX8.  (a) On
+\caption{The folded point store of the hexahedra (Section~\ref{sec:fold}), drawn for HEX8.  (a) On
 each line of points in direction $d$ the point at index $0$ passes its components with $m=n=d$ to
 the other point, exactly: their products do not vary along the line.  (b) A point keeps $45$, $39$,
 $33$ or $27$ numbers as it drops none, one, two or all three directions (blank: dropped), and the
@@ -913,7 +984,7 @@ components each: the point tangents $\Sq$ ($n_v=n_q$), or the moments $\Mab$, $a
 ($n_v=10$ on TET10).  Each carries a reference weight $X_j$ --- $w_q$ for a point, $X_{ab}$ of
 Section~\ref{sec:mean} for a moment --- with which the element mean is
 $\Sbar = \sum_j T_j/|\refcell|$ and the deviations are $T_j - X_j\Sbar$.  On the hexahedra the
-fold of Section~\ref{sec:minimal} leaves point $j$ the components $\alpha\in\mathcal{A}_j$; a
+fold of Section~\ref{sec:fold} leaves point $j$ the components $\alpha\in\mathcal{A}_j$; a
 component it receives from the dropped point $j'$ of its line with weight $\ell$ has the reference
 weight $X_{j\alpha}=X_j+\ell X_{j'}$, and $X_{j\alpha}=X_j$ otherwise.  Elsewhere $\mathcal{A}_j$ is
 all $45$ components.  The component $\alpha$ of
@@ -971,7 +1042,7 @@ because the action is linear in the store, it multiplies the element's outputs o
   \EndIf
   \If{the store is folded}
     \State $T_{j\alpha} \gets T_{j\alpha} + \ell\,T_{j'\alpha}$ for $\alpha\in\mathcal{A}_j$ received from
-           $j'$ \Comment{Section~\ref{sec:minimal}; exact}
+           $j'$ \Comment{\eqref{eq:fold}; exact}
   \EndIf
   \State $\sigma \gets \max_{j,\alpha\in\mathcal{A}_j}|T_{j\alpha}|$ \textbf{or}
          $\sigma_\alpha \gets \max_j |T_{j\alpha}|$ \Comment{per element or per component}
@@ -1318,6 +1389,7 @@ encoding the point tangents costs a fraction of assembling the matrix, because i
 assembly without the element-matrix contraction and without the scatter into the sparse pattern.
 
 \subsection{Accuracy and the Newton iteration}
+\label{sec:newtonresults}
 
 \begin{figure*}[t]
 \centering
