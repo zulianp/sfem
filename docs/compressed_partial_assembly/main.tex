@@ -290,38 +290,70 @@ geometry.
 \subsection{What the quadrature can see}
 \label{sec:minimal}
 
-The tangent enters \eqref{eq:action} only multiplied by products of gradients of the basis.  Let
-$V_m=\mathrm{span}\{\partial_m\varphi_j\}_j$ be the space of reference derivatives in direction
-$m$ and $\Pi_{mn}=\mathrm{span}\{u\,v : u\in V_m,\ v\in V_n\}$ the product space of a direction
-pair.  Then the component $\Sq_{ikmn}$ enters the action only through the functionals
+The tangent enters \eqref{eq:action} only multiplied by products of reference derivatives of the
+basis.  Let $V_m=\mathrm{span}\{\partial_m\varphi_j\}_j$ be the space of reference derivatives in
+direction $m$, $r=\dim(V_1+V_2+V_3)$ the dimension of all of them together, and
+$\Pi_{mn}=\mathrm{span}\{u\,v : u\in V_m,\ v\in V_n\}$ the product space of a direction pair.  In
+\eqref{eq:action} the component $\Sq_{ikmn}$ is multiplied by $\partial_m h_k(\xhat_q)\,
+\partial_n\varphi_p(\xhat_q)$, the value at $\xhat_q$ of a function in $\Pi_{mn}$, so it enters the
+action only through the functionals
 \begin{equation}
   \ell_\chi\bigl(S_{ikmn}\bigr) \;=\; \sum_{q} \chi(\xhat_q)\, \Sq_{ikmn} ,
-  \qquad \chi \in \Pi_{mn} ,
+  \qquad \chi \in \Pi_{mn} .
   \label{eq:moments}
 \end{equation}
-and their number is the rank of the evaluation map $\chi\mapsto(\chi(\xhat_q))_q$, at most
-$\min(n_q,\dim\Pi_{mn})$.  Whichever of the two descriptions is smaller --- the $n_q$ point values,
-or a basis of moments \eqref{eq:moments} --- reproduces \eqref{eq:action} exactly.
-Table~\ref{tab:stores} lists the counts.
+Write $s\in\mathbb{R}^{n_q}$ for the point values of one component and $E_{mn}$ for the evaluation
+matrix whose rows are the values $(\chi(\xhat_q))_q$ of the products
+$\chi=\partial_m\varphi_a\,\partial_n\varphi_b$ that span $\Pi_{mn}$.  The functionals
+\eqref{eq:moments} are the entries of $E_{mn}s$, so the action depends on $s$ only through its
+projection onto the row space of $E_{mn}$: any $\rho_{mn}=\operatorname{rank}E_{mn}$ functionals whose
+rows span that space reproduce \eqref{eq:action} exactly, and no fewer do.  Since $E_{mn}$ has $n_q$
+columns and its row space is the image of $\Pi_{mn}$, $\rho_{mn}\le\min(n_q,\dim\Pi_{mn})$.  The
+minimal exact store is $\sum\rho_{mn}$ over the $45$ independent components; Table~\ref{tab:stores}
+lists $r$, $\dim\Pi_{mn}$ and $\rho_{mn}$, computed by the cost model of Section~\ref{sec:model} from
+the reference basis and the rule.
 
 \begin{table*}[t]
 \centering
-\begin{tabular}{lrrrrr}
+\begin{tabular}{lrrrrrr}
 \toprule
-element & $n_q$ & rank $r$ of $\{\partial_m\varphi_j\}$ & $\dim\Pi_{mn}$ & point values & minimal \\
+element & $n_q$ & $r$ & $\dim\Pi_{mn}$ & $\rho_{mn}$ & point values & minimum \\
 \midrule
 \rows{tables/stores.tex}
 \bottomrule
 \end{tabular}
-\caption{Stored numbers per element for an exact application (symmetric tangent, three
-dimensions).  TET10 uses the $11$-point degree-$4$ rule \cite{Keast1986}, HEX8 the $2^3$-point
-Gauss rule.  On TET10 the gradient space is $P_1$ in every direction and its products span $P_2$,
-so the $10$ moments per component are fewer than the $11$ point values.  On HEX8 the product
-spaces have dimension $9$ or $12$ and the $8$ point values are minimal.}
+\caption{Numbers per element for an exact application (symmetric tangent, three dimensions): $r$
+the dimension of the reference derivatives, $\dim\Pi_{mn}$ and $\rho_{mn}=\operatorname{rank}E_{mn}$
+for $m=n$ and $m\ne n$ (one value where they agree), the point values $45\,n_q$, and the minimum
+$\sum\rho_{mn}$ over the $45$ components.  TET10 uses the $11$-point degree-$4$ rule
+\cite{Keast1986}, HEX8 and HEX27 the $2^3$- and $4^3$-point Gauss rules.}
 \label{tab:stores}
 \end{table*}
 
-On TET4 the single point value is the whole store.  On TET10, write $\lambda_a$ for the barycentric coordinates.  The reference
+The counts follow from the shape of the derivatives.  On TET4 the derivatives are constant
+($r=1$) and the single point is the whole store.  On TET10 the derivatives of the quadratic basis
+are the linear functions ($r=4$) in every direction, and their products span $P_2$,
+$\dim\Pi_{mn}=10$.  The $11$-point rule integrates degree $4$ exactly, so a $\chi\in P_2$ that
+vanishes at every point has $\int\chi^2=\sum_q w_q\chi(\xhat_q)^2=0$ and is zero, whatever the sign
+of the weights: $E_{mn}$ is injective on $P_2$, $\rho_{mn}=10$, and ten moments replace eleven point
+values.  On HEX8 the derivative in direction $m$ is constant in $\xi_m$: $V_1=\mathrm{span}\{1,\xi_2,
+\xi_3,\xi_2\xi_3\}$, and the three directions together span every trilinear monomial but
+$\xi_1\xi_2\xi_3$ ($r=7$).  For $m\ne n$ the products span $12$ functions, which the $2^3$ Gauss
+points distinguish only as far as the trilinear ones, $\rho_{mn}=8$.  For $m=n$ the products do not
+depend on $\xi_m$ ($\dim\Pi_{mm}=9$), and the Gauss points come in pairs that differ only in
+$\xi_m$, so the action sees only the sum of each pair: $\rho_{mm}=4$.  Of the $45$ components $18$
+have $m=n$, and the minimum is $18\cdot4+27\cdot8=\minimalHexEight$ against $\storeHexEight$ point
+values.  On HEX27 the derivative in direction $m$ is linear in $\xi_m$ ($r=26$, every triquadratic
+monomial but $\xi_1^2\xi_2^2\xi_3^2$); for $m=n$ the products are quadratic in $\xi_m$, and the four
+Gauss points of a line see three moments along it, $\rho_{mm}=3\cdot4^2=48$, while for $m\ne n$
+$\rho_{mn}=64=n_q$, a minimum of $\minimalHexTwentySeven$ against $\storeHexTwentySeven$.
+
+The kernels of this paper store the moments on TET10, where they have a schedule of their own
+(below), and the point values on HEX8 and HEX27, $\storeHexEight$ and $\storeHexTwentySeven$ numbers
+against minima of $\minimalHexEight$ and $\minimalHexTwentySeven$: summing the paired points of the
+$m=n$ components would save the difference but needs a schedule we have not written.
+
+On TET10, write $\lambda_a$ for the barycentric coordinates.  The reference
 derivatives are linear, $\partial_m h_k = \sum_{a} \lambda_a P_{kma}$ with $P_{kma}$ the derivative
 at vertex $a$, and similarly $\partial_n\varphi_p = \sum_b \lambda_b G_{pnb}$ with rational
 constants $G$.  Substituting into \eqref{eq:action} gives
@@ -385,8 +417,8 @@ element & direct & modal & moment & selected & flop/dof \\
 \bottomrule
 \end{tabular}
 \caption{Floating-point operations per element application after common-subexpression
-elimination.  The selected schedule is the one that reads the minimal store of
-Table~\ref{tab:stores}; on TET10 the moment schedule is within $1.3\%$ of the cheapest per-point
+elimination.  The selected schedule is the one that reads the store the kernels hold
+(Section~\ref{sec:minimal}); on TET10 the moment schedule is within $1.3\%$ of the cheapest per-point
 schedule and reads $10\%$ fewer numbers.  Symbolic counts, not measured run times.}
 \label{tab:flops}
 \end{table*}
@@ -520,6 +552,15 @@ values.
 
 Let $\mathcal{H}$ be the exact tangent at the current iterate, symmetric positive definite, and
 $\widetilde{\mathcal{H}}=\mathcal{H}+\Delta\mathcal{H}$ the encoded one, with \eqref{eq:eps}.
+The quadrature-point stores encode a symmetric $\Sq$ and give a symmetric $\widetilde{\mathcal{H}}$.
+The element and assembled matrices in difference form do not quite: their off-diagonal blocks are
+symmetric, but the implied diagonal blocks sum independently rounded blocks and carry an
+antisymmetric part of the size of the encoding error (Section~\ref{sec:qbsr}), which
+\eqref{eq:eps}, a bound on $x^{\mathsf T}\Delta\mathcal{H}x$, does not see.  For them we read $\eps$
+as the bound $\|\mathcal{H}^{-1/2}\Delta\mathcal{H}\,\mathcal{H}^{-1/2}\|_2\le\eps$, which reduces
+to \eqref{eq:eps} for a symmetric error, the two-sided bounds below as bounds on the symmetric part
+of $\widetilde{\mathcal{H}}$, and conjugate gradients runs on an operator symmetric only to that
+error; the Newton study measures the two together.
 Krylov iterations on $\widetilde{\mathcal{H}}s=-f$ stop at a step with relative residual $\eta$.
 measured in the norm $\|\cdot\|_{\widetilde{\mathcal{H}}^{-1}}$ that conjugate gradients
 controls.  By \eqref{eq:eps}, $(1-\eps)\mathcal{H}\preceq\widetilde{\mathcal{H}}\preceq(1+\eps)
@@ -590,6 +631,35 @@ one that matters for smooth modes.  The differences are formed in the vector's p
 contraction, as for the gradients of the quadrature-point schedules.  The form is that of edge-based
 schemes \cite{Lohner2008}; here it serves the encoding.
 
+\begin{proposition}
+\label{prop:translations}
+Let $\tilde K_{pq}$, $p<q$, be any $3\times3$ matrices --- the decoded blocks of any encoding ---
+with $\tilde K_{qp}=\tilde K_{pq}^{\mathsf T}$, and let $\tilde{\mathcal H}$ apply
+\eqref{eq:difference} with them.  Then
+(i) $\tilde{\mathcal H}h=0$ for every rigid translation, $h_q=t$ at every node $q$;
+(ii) the encoding error $\Delta=\tilde{\mathcal H}-\mathcal H$ acts as
+$(\Delta h)_p=\sum_{q\ne p}(\tilde K_{pq}-K_{pq})(h_q-h_p)$; and
+(iii) the computed $\tilde{\mathcal H}h$ of a translation is exactly zero in floating-point
+arithmetic.
+\end{proposition}
+
+\begin{proof}
+The basis is a partition of unity, $\sum_j\varphi_j=1$, so $\sum_j\partial_m\varphi_j=0$ and a
+translation has zero gradient at every point; by \eqref{eq:action}, $\mathcal Ht=0$, that is
+$\sum_q K_{pq}t=0$ for every $t$, and hence $K_{pp}=-\sum_{q\ne p}K_{pq}$ and
+$(\mathcal Hh)_p=\sum_{q\ne p}K_{pq}(h_q-h_p)$: the exact element matrix has the form
+\eqref{eq:difference}.  (i) For a translation every difference $h_q-h_p=t-t$ vanishes, and with it
+every term of \eqref{eq:difference}, whatever the $\tilde K_{pq}$.  (ii) Subtract the exact form
+from the encoded one term by term.  (iii) $h_q$ and $h_p$ are the same floating-point numbers, so
+their computed difference is exactly zero, and so are the products and sums formed from it.
+\end{proof}
+
+Encoding the full matrix instead gives $(\tilde{\mathcal H}t)_p=\sum_q(\tilde K_{pq}-K_{pq})\,t$,
+the sum of a row's encoding errors, which rounding each block on its own does not cancel.  The
+proposition does not extend to infinitesimal rotations, $h_q=\omega\times x_q$, whose differences
+$\omega\times(x_q-x_p)$ do not vanish; the exact tangent annihilates them only at a stress-free state
+(Section~\ref{sec:errormodel}).
+
 \paragraph{A scale per node pair.}  One int8 scale per element spends the code range on the
 largest block: the blocks $K_{pq}$ of one element differ in magnitude by orders on higher-order
 elements (vertex--vertex against vertex--midside couplings).  Each pair therefore carries a factor
@@ -638,7 +708,7 @@ element & qp & full & diff. & qp & full & diff. & qp f16 & diff. f16 & diff. i8 
 \rows{tables/element_matrix.tex}
 \bottomrule
 \end{tabular}
-\caption{The quadrature-point store (minimal, Table~\ref{tab:stores}) against element matrices, full
+\caption{The quadrature-point store the kernels hold (Section~\ref{sec:minimal}) against element matrices, full
 and in difference form; ``i8 pair'' is the int8 difference form with a scale per node pair,
 \eqref{eq:pairscale}.  On HEX8 and TET10 the element matrix is no larger than the point store and
 needs 37--47\% fewer operations; on TET4 the single point wins; on HEX27 the element matrix is the
@@ -649,7 +719,7 @@ larger store but still the cheaper application.}
 The comparison runs against the method of this paper at low order (Table~\ref{tab:elementmatrix}):
 on HEX8 and TET10 the element matrix is the smaller and the cheaper object, and the same encodings
 apply to it.  It loses where the element matrix grows faster than the point store --- with
-polynomial degree, since the matrix grows as $N^2$ and the minimal point store as the number of
+polynomial degree, since the matrix grows as $N^2$ and the point store as the number of
 quadrature points or moments, and on TET4, whose single point carries 45 numbers against 54.  Its
 set-up costs one contraction \eqref{eq:elementmatrix} more than the point store's.
 
@@ -679,12 +749,15 @@ block streams once, and $x_j$ is gathered once per block.}
 \paragraph{Difference form and symmetry.}  The rows of the assembled tangent annihilate the rigid
 translations as the element matrices do, so \eqref{eq:difference} holds with $p$ and $q$ ranging over
 the nodes: the diagonal blocks are neither stored nor indexed, and the translations stay in the kernel
-of the encoded matrix.  Encoding the full matrix does not survive the Newton study: in \texttt{int8}
+of the encoded matrix by Proposition~\ref{prop:translations}, whose proof uses only the form.  Encoding the full matrix does not survive the Newton study: in \texttt{int8}
 $\fullEightFailed$ of the $\fullEightTried$ runs we made with it failed in the first load step.  Each
 pair $i<j$ is stored once: with $d=h_j-h_i$, the block $K_{ij}$ adds $K_{ij}d$ to $y_i$ and
-$-K_{ij}^{\mathsf T}d$ to $y_j$.  The encoded matrix is then symmetric by construction, which the
-assembled one is only to the rounding of its summation order --- a difference that quantization can
-turn into a whole code step --- and it costs the operations of the full difference form from half of
+$-K_{ij}^{\mathsf T}d$ to $y_j$.  The off-diagonal blocks of the encoded matrix are then symmetric
+by construction, $\tilde K_{ji}=\tilde K_{ij}^{\mathsf T}$, which the assembled ones are only to the
+rounding of its summation order --- a difference that quantization can turn into a whole code step.
+The implied diagonal blocks, $-\sum_{j\ne i}\tilde K_{ij}$, sum independently rounded blocks and are
+symmetric only to the encoding error, as in the element difference form.  Storing each pair once
+costs the operations of the full difference form from half of
 its bytes.
 
 \paragraph{Layout and application.}  The rows are held in the SELL-$C$-$\sigma$
@@ -1684,7 +1757,7 @@ trilinear hexahedra the quantized matrix remains the choice.
 
 
 \paragraph{Points or element matrices.}  At the orders studied the element matrix is no larger than
-the minimal point store on HEX8 and TET10 and cheaper to apply, so it is the better compressed
+the point store on HEX8 and TET10 and cheaper to apply, so it is the better compressed
 object there, provided its set-up is as efficient as the point store's.  The point store wins on
 TET4, whose single point is smaller than its matrix, and wherever the element matrix grows faster
 than the quadrature --- with polynomial degree, since the matrix grows as the square of the node

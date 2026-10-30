@@ -243,8 +243,10 @@ continuation (the twists take different paths per operator, so their time is the
 ## Upper-only quantised BSR, offsets, in-place encoding (Grace)
 
 `measured_qsym/` (Alps jobs 5185726-5185750; memory runs 5186030-5186031).  Upper only: each pair
-i < j stored once, d = x_j - x_i, y_i += K_ij d, y_j -= K_ij^T d; symmetric by construction, no
-symmetrisation.  Rows cut into one part per thread; blocks whose column lies beyond the part, or
+i < j stored once, d = x_j - x_i, y_i += K_ij d, y_j -= K_ij^T d; off-diagonal blocks symmetric by
+construction, no symmetrisation (the implied diagonal blocks are symmetric only to the encoding
+error, about 4e-3 of the largest entry in int8 on a small test operator, the size of the encoding
+error itself).  Rows cut into one part per thread; blocks whose column lies beyond the part, or
 beyond the reach of uint16 offsets, go to a per-part remainder (5-9% of the blocks at 10M with 72
 parts); updates beyond the part go to halo slots added after a barrier.  Deterministic, no atomics.
 

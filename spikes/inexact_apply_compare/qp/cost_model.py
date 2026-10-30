@@ -194,13 +194,27 @@ def product_space_dim(name):
     return dims
 
 
+def evaluation_rank(name):
+    """Rank of the evaluation map chi -> (chi(xhat_q))_q on the product space of each (m, n) pair:
+    the number of independent functionals sum_q chi(xhat_q) S^q, at most min(nq, dim Pi_mn)."""
+    el = ELEMENTS[name]
+    basis = el["basis"]()
+    pts, _ = el["rule"]()
+    G = [np.array([[float(sp.diff(f, X[m]).subs(dict(zip(X, p)))) for p in pts] for f in basis])
+         for m in range(D)]
+    ranks = {}
+    for m in range(D):
+        for n in range(D):
+            E = np.array([G[m][a] * G[n][b] for a in range(len(basis)) for b in range(len(basis))])
+            ranks[(m, n)] = int(np.linalg.matrix_rank(E, tol=1e-10 * np.abs(E).max()))
+    return ranks
+
+
 def moment_store(name):
     """Values per element if each stored component keeps only what the quadrature can see:
-    min(nq, dim of the product space of its (m, n) pair), summed over the 45 components."""
-    el = ELEMENTS[name]
-    pts, _ = el["rule"]()
-    nq = len(pts)
+    the rank of the evaluation map of its (m, n) pair, summed over the 45 components."""
     dims = product_space_dim(name)
+    ranks = evaluation_rank(name)
     total = 0
     seen = set()
     for i, k, m, n in itertools.product(range(D), repeat=4):
@@ -208,8 +222,8 @@ def moment_store(name):
         if s in seen:
             continue
         seen.add(s)
-        total += min(nq, dims[(m, n)])
-    return total, dims
+        total += ranks[(m, n)]
+    return total, dims, ranks
 
 
 def count_modal(name):
@@ -344,7 +358,7 @@ def analyse():
         pts, _ = ELEMENTS[name]["rule"]()
         nq = len(pts)
         r, _ = gradient_span(name)
-        minimal, dims = moment_store(name)
+        minimal, dims, ranks = moment_store(name)
         # HEX27: elimination over 64 points is out of reach; the direct count is the dense one,
         # and the schedule the sum-factorised one.
         direct = count_dense(name)["total"] if name == "HEX27" else count_direct(name)["total"]
@@ -354,8 +368,9 @@ def analyse():
         ndof = 3 * nnodes
         el_per_dof = ne / ndof
         N = len(ELEMENTS[name]["basis"]())
-        # Selected representation: the smaller exact store; its schedule.
-        if minimal < NC * nq:
+        # Selected representation: the smaller exact store that has a schedule.  Only TET10's
+        # moments have one; the hexahedra keep their point values, above the minimum.
+        if moments is not None and minimal < NC * nq:
             store, flops = minimal, moments
         elif name == "HEX27":
             store, flops = NC * nq, count_sumfact(3, 4)["total"]
@@ -375,6 +390,7 @@ def analyse():
         out_ea = dict(ea_full=ea_full, ea_diff=ea_diff, ea_full_flops=ea_full_flops, ea_diff_flops=ea_diff_flops,
                       ea_pair_bytes=ea_pair_bytes)
         out[name] = dict(**out_ea, nq=nq, r=r, dims=sorted(set(dims.values())), per_point=NC * nq, minimal=minimal,
+                         rank_diag=ranks[(0, 0)], rank_off=ranks[(0, 1)],
                          store=store, direct=direct, modal=modal, moments=moments, flops=flops,
                          blocks=nb / nnodes, el_per_dof=el_per_dof, bsr=bsr, pa=pa,
                          conn=conn, flop_per_dof=flops * el_per_dof)
@@ -401,7 +417,9 @@ def write_tables(res, outdir):
         for e in E:
             d = res[e]
             dims = "/".join(str(x) for x in d["dims"])
-            f.write(f"{e} & {d['nq']} & {d['r']} & {dims} & {d['per_point']} & {d['minimal']} \\\\\n")
+            ranks = (f"{d['rank_diag']}" if d["rank_diag"] == d["rank_off"]
+                     else f"{d['rank_diag']}/{d['rank_off']}")
+            f.write(f"{e} & {d['nq']} & {d['r']} & {dims} & {ranks} & {d['per_point']} & {d['minimal']} \\\\\n")
     with open(os.path.join(outdir, "flops.tex"), "w") as f:
         for e in E:
             d = res[e]
@@ -441,7 +459,7 @@ def write_tables(res, outdir):
             f.write(f"\\newcommand{{\\BsrBound{tag}}}{{{fmt(BANDWIDTH / (h['bsr'][lab] + VEC_BYTES_PER_DOF) / 1e6)}}}\n")
         for e, tag in (("TET4", "TetFour"), ("TET10", "TetTen"), ("HEX8", "HexEight"), ("HEX27", "HexTwentySeven")):
             d = res[e]
-            for key in ("nq", "r", "per_point", "minimal", "store", "flops", "direct"):
+            for key in ("nq", "r", "per_point", "minimal", "store", "flops", "direct", "rank_diag", "rank_off"):
                 macro = key.replace("_", "")
                 f.write(f"\\newcommand{{\\{macro}{tag}}}{{{d[key] if d[key] is not None else '---'}}}\n")
             f.write(f"\\newcommand{{\\blocks{tag}}}{{{fmt(d['blocks'], 0)}}}\n")
