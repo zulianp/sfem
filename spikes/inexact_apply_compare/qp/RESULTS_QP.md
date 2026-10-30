@@ -587,3 +587,16 @@ and its BSR references only, so the old log stays and the new one overrides thos
   the Newton logs override the point stores' runs): Newton and CG counts unchanged; time to solution
   at 1e7 dof f16 11.80 s (was 12.96), int8 mean+dev 11.89 (12.69); at 1e6 0.77 (0.81) and 0.75
   (0.79); twist 4.23 (4.53) and 4.30 (4.51).
+
+**What the fold left as it was, checked** (`measured_fold/gpu_check_5212806.out`,
+`pack_check_5212807.out`), so no other log needs a rerun:
+- The H100 TET4 and TET10 point stores, whose device code changed in form only (the decode loop, the
+  set-up loading the fold's tables): current tree against the one before the fold, alternating on
+  one node, twice: the same rates and set-up times within noise (TET10 f16 8,651-8,659 against
+  8,657 MDOF/s, int8 mean+dev 8,122-8,137 against 8,148-8,172, set-up 13.3 ms both).  Their GPU logs
+  stand.
+- The folded HEX8 device store's shape: block-local scatter with four resident blocks stays the
+  fastest for f16 (10,106 MDOF/s; atomics 9,129-9,209, block with one or two 8,166-8,214), atomics
+  with one block for int8 mean+dev (8,865; four blocks 5,708-6,011).  The choices stand.
+- The pack size on Grace: the default (about 20 packs per thread; 2336 elements on HEX8, 288 on HEX27
+  at 1e7 dof) is within 1% of the best of 1168-8192 and 144-1152 for both stores.
