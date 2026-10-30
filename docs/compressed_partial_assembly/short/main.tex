@@ -187,9 +187,13 @@ $\rho_{mn}$, which sets the count.  On quadratic tetrahedra
 $\Mab=\sum_q\lambda_a(\xhat_q)\lambda_b(\xhat_q)\Sq$ against products of the barycentric coordinates
 $\lambda_a$ replace the eleven points of the degree-$4$ rule~\cite{Keast1986}.  On trilinear (HEX8) and
 triquadratic (HEX27) hexahedra the components with $m=n$ need fewer numbers than points, since their
-products do not vary, or vary quadratically, along $\xi_m$; our hexahedral stores keep the point
-values, $\storeHexEight$ and $\storeHexTwentySeven$ numbers against minima of $\minimalHexEight$ and
-$\minimalHexTwentySeven$.  The store is laid out per
+products do not vary, or vary quadratically, along $\xi_m$: one point per line of points in
+direction $m$ passes its $m=n$ components to the line's other points, weighted by their Lagrange
+polynomials at it, and the application skips the dropped terms.  The folded stores hold the minima,
+$\minimalHexEight$ and $\minimalHexTwentySeven$ numbers instead of $\perpointHexEight$ and
+$\perpointHexTwentySeven$ point values, exactly, and apply faster on Grace for every encoding
+(\texttt{fp16} by $\foldGainHalfHexEight\%$ on HEX8, $\foldGainHalfHexTwentySeven\%$ on HEX27).
+The store is laid out per
 block of $V$ elements, one per vector lane, ordered point, component, lane
 (Figure~\ref{fig:fmtpoints}).
 
@@ -355,7 +359,8 @@ and its generic product on the matrix expanded to scalar CSR, its fastest path, 
 it.  The compressed stores keep their layouts with blocks of $32$ elements, one
 warp, and are set up on the device, giving the host's codes.  TET4, TET10 and HEX8 apply one thread
 per element with atomic scatters or a block-local scatter in shared memory, whichever is faster;
-HEX27 applies one thread per point (point stores) or one warp per element (element matrices).  The
+HEX27 applies one thread per point (point stores) or one warp per element (element matrices), its
+point store unfolded, since the threads of a warp would fold differently and save no work.  The
 quantized matrix stores both blocks of a pair, since storing it once needs a transposed scatter, and
 full $32$-bit columns, since $16$-bit offsets send the blocks out of their reach to a slower
 remainder kernel: on the GPU both cost more than they save.

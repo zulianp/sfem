@@ -488,12 +488,13 @@ def fold_tables(e):
     return dict(drop=drop, mask=mask, src=src, coef=fc)
 
 
-def fold_lines(e):
-    t = fold_tables(e)
-    if t is None:
-        return ["", "  static constexpr bool foldable = false;", "  static constexpr int NS = NV * 45;  // stored numbers per element"]
-    dirs = slot_direction()
+def fold_layout(e):
+    """The fold's tables for every element: the identity (no point drops anything) off the
+    tensor-product elements, so the kernels have one form."""
     NV = len(e["pairs"])
+    t = fold_tables(e) or dict(drop=None, mask=[0] * NV, src=[[-1] * 3 for _ in range(NV)],
+                                coef=[[0.0] * 3 for _ in range(NV)])
+    dirs = slot_direction()
     keep = [[s_ for s_ in range(NC) if not (dirs[s_] >= 0 and (m_ >> dirs[s_]) & 1)] for m_ in range(8)]
     off = [0]
     for j in range(NV):
@@ -501,10 +502,17 @@ def fold_lines(e):
     X = e["X"]
     xc = [[X[j] if dirs[s_] < 0 or (t["mask"][j] >> dirs[s_]) & 1 else X[j] + t["coef"][j][dirs[s_]] * X[t["src"][j][dirs[s_]]]
            for s_ in range(NC)] for j in range(NV)]
+    return dict(t=t, dirs=dirs, keep=keep, off=off, xc=xc)
+
+
+def fold_lines(e):
+    f = fold_layout(e)
+    t, dirs, keep, off, xc = f["t"], f["dirs"], f["keep"], f["off"], f["xc"]
     row = lambda xs: "{" + ", ".join(xs) + "}"
     L = ["", "  // The folded store: point j stores no m = n = d components when bit d of MASK[j] is set; the",
          "  // dropped point's values move to the kept points of its line, T_j += FCOEF[j][d] * T_FSRC[j][d].",
-         "  static constexpr bool foldable = true;",
+         "  // Off the tensor-product elements no point drops anything.",
+         f"  static constexpr bool foldable = {'true' if t['drop'] is not None else 'false'};",
          f"  static constexpr int MASK[NV] = {row(str(m_) for m_ in t['mask'])};",
          f"  static constexpr int DIR[45] = {row(str(d) for d in dirs)};",
          f"  static constexpr int NKEEP[8] = {row(str(len(k)) for k in keep)};",
@@ -590,6 +598,12 @@ def emit_device_tables(name, e):
         L.append("constexpr int Q1 = 1, S1 = 1;  // not a tensor-product element: never read")
         L.append("static __constant__ double B1[1] = {0};")
         L.append("static __constant__ double D1[1] = {0};")
+    f = fold_layout(e)
+    L.append("// The fold (Element::MASK, FSRC, FCOEF, OFF), for the point-parallel set-up's run-time indices.")
+    L.append(f"static __constant__ int FMASK[{NV}] = {{{flat(str(m_) for m_ in f['t']['mask'])}}};")
+    L.append(f"static __constant__ int FSRC[{NV * 3}] = {{{flat(str(v) for r in f['t']['src'] for v in r)}}};")
+    L.append(f"static __constant__ double FCOEF[{NV * 3}] = {{{flat(lit(v) for r in f['t']['coef'] for v in r)}}};")
+    L.append(f"static __constant__ int FOFF[{NV + 1}] = {{{flat(str(v) for v in f['off'])}}};")
     L.append(f"static __constant__ int PAIR_P[{NP}] = {{{flat(str(a) for a, _ in pairs)}}};")
     L.append(f"static __constant__ int PAIR_Q[{NP}] = {{{flat(str(b) for _, b in pairs)}}};")
     L += ["}  // namespace dev", "}  // namespace qp"]

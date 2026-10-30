@@ -348,10 +348,21 @@ monomial but $\xi_1^2\xi_2^2\xi_3^2$); for $m=n$ the products are quadratic in $
 Gauss points of a line see three moments along it, $\rho_{mm}=3\cdot4^2=48$, while for $m\ne n$
 $\rho_{mn}=64=n_q$, a minimum of $\minimalHexTwentySeven$ against $\storeHexTwentySeven$.
 
-The kernels of this paper store the moments on TET10, where they have a schedule of their own
-(below), and the point values on HEX8 and HEX27, $\storeHexEight$ and $\storeHexTwentySeven$ numbers
-against minima of $\minimalHexEight$ and $\minimalHexTwentySeven$: summing the paired points of the
-$m=n$ components would save the difference but needs a schedule we have not written.
+The kernels of this paper hold the minimum on every element: the moments on TET10, which have a
+schedule of their own (below), and on HEX8 and HEX27 the point values folded along the lines of
+points.  A component with $m=n$ multiplies, along each line of points in direction $m$, a
+polynomial of degree $2(p-1)$ in $\xi_m$ --- constant on HEX8, quadratic on HEX27 --- which $q_1-1$
+of the line's $q_1$ points determine.  One point per line, at the same position on every line,
+therefore drops its $m=n$ components and passes them to the line's other points, weighted by their
+Lagrange polynomials at the dropped point: $1$ on HEX8, and on HEX27 $0.39$, $1$ and $-0.39$ with an
+interior point dropped (an end point would weigh $2.53$).  The fold is exact and linear, so it
+commutes with the element mean of Section~\ref{sec:mean}, and the application skips the dropped
+terms: a point that drops $d$ directions contracts $81-9d$ multiply--adds instead of $81$.  The
+stores are $\minimalHexEight$ and $\minimalHexTwentySeven$ numbers, and on Grace the folded
+application is faster than the one over all $45\,n_q$ point values for every encoding, by
+$\foldGainHalfHexEight\%$ (\texttt{fp16}) and $\foldGainEightMdHexEight\%$ (\texttt{int8} mean and
+deviation) on HEX8 and $\foldGainHalfHexTwentySeven\%$ and $\foldGainEightMdHexTwentySeven\%$ on
+HEX27, at about $10^7$ degrees of freedom.
 
 On TET10, write $\lambda_a$ for the barycentric coordinates.  The reference
 derivatives are linear, $\partial_m h_k = \sum_{a} \lambda_a P_{kma}$ with $P_{kma}$ the derivative
@@ -711,7 +722,7 @@ element & qp & full & diff. & qp & full & diff. & qp f16 & diff. f16 & diff. i8 
 \caption{The quadrature-point store the kernels hold (Section~\ref{sec:minimal}) against element matrices, full
 and in difference form; ``i8 pair'' is the int8 difference form with a scale per node pair,
 \eqref{eq:pairscale}.  On HEX8 and TET10 the element matrix is no larger than the point store and
-needs 37--47\% fewer operations; on TET4 the single point wins; on HEX27 the element matrix is the
+needs 37--41\% fewer operations; on TET4 the single point wins; on HEX27 the element matrix is the
 larger store but still the cheaper application.}
 \label{tab:elementmatrix}
 \end{table*}
@@ -884,7 +895,11 @@ $\mathcal{C}$ is the storage type of the encoding --- \texttt{int8} or \texttt{f
 components each: the point tangents $\Sq$ ($n_v=n_q$), or the moments $\Mab$, $a\le b$
 ($n_v=10$ on TET10).  Each carries a reference weight $X_j$ --- $w_q$ for a point, $X_{ab}$ of
 Section~\ref{sec:mean} for a moment --- with which the element mean is
-$\Sbar = \sum_j T_j/|\refcell|$ and the deviations are $T_j - X_j\Sbar$.  The component $\alpha$ of
+$\Sbar = \sum_j T_j/|\refcell|$ and the deviations are $T_j - X_j\Sbar$.  On the hexahedra the
+fold of Section~\ref{sec:minimal} leaves point $j$ the components $\alpha\in\mathcal{A}_j$; a
+component it receives from the dropped point $j'$ of its line with weight $\ell$ has the reference
+weight $X_{j\alpha}=X_j+\ell X_{j'}$, and $X_{j\alpha}=X_j$ otherwise.  Elsewhere $\mathcal{A}_j$ is
+all $45$ components.  The component $\alpha$ of
 a packed tensor holds $T_{ikmn}$ for $\alpha=\mathrm{slot}(i,k,m,n)$, the upper-triangle index of
 the pair $\bigl((i,n),(k,m)\bigr)$ of Section~\ref{sec:formulation}; read as a $9\times9$
 symmetric matrix on that pairing, a tensor acts on the nine-vector of a gradient indexed by
@@ -897,7 +912,7 @@ $s_\alpha$ (per component), and $\tau$ is the arithmetic type of the contraction
     \tau(c_{j\alpha}) & \text{\texttt{fp16} scaled, \texttt{int8} per element}\\
                       & \text{\quad (scale on the outputs),}\\
     s_\alpha\,\tau(c_{j\alpha}) & \text{\texttt{int8} per component,}\\
-    X_j\,\Sbar_\alpha + s\,\tau(c_{j\alpha}) & \text{\texttt{int8} mean and deviation,}
+    X_{j\alpha}\,\Sbar_\alpha + s\,\tau(c_{j\alpha}) & \text{\texttt{int8} mean and deviation,}
   \end{cases}
   \label{eq:decode}
 \end{equation}
@@ -937,11 +952,15 @@ because the action is linear in the store, it multiplies the element's outputs o
   \If{mean and deviation}
     \State write $\Sbar$ in single precision;\quad $T_j \gets T_j - X_j\Sbar$
   \EndIf
-  \State $\sigma \gets \max_{j,\alpha}|T_{j\alpha}|$ \textbf{or}
+  \If{the store is folded}
+    \State $T_{j\alpha} \gets T_{j\alpha} + \ell\,T_{j'\alpha}$ for $\alpha\in\mathcal{A}_j$ received from
+           $j'$ \Comment{Section~\ref{sec:minimal}; exact}
+  \EndIf
+  \State $\sigma \gets \max_{j,\alpha\in\mathcal{A}_j}|T_{j\alpha}|$ \textbf{or}
          $\sigma_\alpha \gets \max_j |T_{j\alpha}|$ \Comment{per element or per component}
   \State $s \gets \mathrm{scale}(\sigma)$ \Comment{\texttt{int8}: $\sigma/127$;
          \texttt{fp16}: $2^{\lceil\log_2\sigma\rceil-14}$}
-  \State $c_{j\alpha} \gets \mathrm{encode}(T_{j\alpha}/s)$ for all $j,\alpha$;\quad write $c$ and $s$
+  \State $c_{j\alpha} \gets \mathrm{encode}(T_{j\alpha}/s)$ for all $j$, $\alpha\in\mathcal{A}_j$;\quad write $c$ and $s$
          \Comment{block layout: $j$, $\alpha$, lane}
 \EndFor
 \end{algorithmic}
@@ -1007,10 +1026,10 @@ constants folded into the code; the middle stage performs the sixteen block cont
          \Comment{one-dimensional sweeps shared across points}
   \State $g \gets \tau(g)$
   \For{$q = 1,\dots,n_q$}
-    \State $\widehat S_\alpha \gets \mathrm{dec}(c_{q\alpha})$, $\alpha=1,\dots,45$
+    \State $\widehat S_\alpha \gets \mathrm{dec}(c_{q\alpha})$, $\alpha\in\mathcal{A}_q$
            \Comment{\eqref{eq:decode}, in registers}
-    \State $y^q_{in} \gets \sum_{k,m} \widehat S_{\mathrm{slot}(i,k,m,n)}\, g^q_{km}$
-           \Comment{$81$ multiply--adds}
+    \State $y^q_{in} \gets \sum_{k,m} \widehat S_{\mathrm{slot}(i,k,m,n)}\, g^q_{km}$ over the stored slots
+           \Comment{$81-9d_q$ multiply--adds}
   \EndFor
   \State $\mathrm{out}_{ip} \gets \sum_q \sum_n \partial_n\varphi_p(\xhat_q)\, y^q_{in}$
          \Comment{transposed sweeps; vector precision}
@@ -1024,7 +1043,8 @@ In Algorithm~\ref{alg:applypoints} the gradient and output stages are eliminated
 the points, which on a tensor-product element is what sum factorisation makes explicit: the
 derivative in one direction is a difference of nodal values interpolated in the other two, and the
 interpolations are shared between directions.  The point loop holds one decoded tangent at a time,
-$45$ values in registers, with the nine-entry gradient and output of that point.  In both
+at most $45$ values in registers, with the nine-entry gradient and output of that point; $d_q$ is
+the number of directions in which point $q$ is the dropped point of its line.  In both
 application kernels the only per-element data read are the encoded store, its scales (and, for the
 mean-and-deviation encodings, the $45$-entry single-precision mean), the
 connectivity and the increment; geometry, state and material parameters are not read.
@@ -1155,7 +1175,10 @@ codes on TET10 that differ by one rounding step.  The application runs one threa
 TET4, TET10 and HEX8, scattering with atomic additions, or on TET4 and in half precision on HEX8
 through a block-local scatter that accumulates a block's nodes in shared memory, whichever measured
 faster.  On HEX27 the point stores run one thread per quadrature point with the sum-factorised
-schedule and the element matrices one warp per element, a lane per node.  The quantized matrix is
+schedule and the element matrices one warp per element, a lane per node.  The HEX8 point store is
+folded as on Grace; the HEX27 one keeps all $\perpointHexTwentySeven$ point values, since one thread
+per point gives the threads of a warp different folds, so the fold saves no multiply--add there,
+and its decoding costs more than the bytes it saves, which do not bound that application.  The quantized matrix is
 held in the full difference form, each pair of blocks stored twice: storing the pair once needs a
 scatter of the transposed block, which on the GPU costs more than the bytes it saves.  Its rows are
 in SELL-$32$-$1024$ with the codes, column and scale of a block in one record.  Columns are full
