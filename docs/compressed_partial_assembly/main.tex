@@ -868,8 +868,9 @@ write a block in one pass (Figure~\ref{fig:fmtpoints}).  Both layouts are measur
 \Description{Three panels: an element with quadrature points and the stored tangent, the blocked
 memory layout of codes, scales and means, and the steps of the application.}
 \caption{The compressed point store.  (a) The pulled-back tangent at each quadrature point, a
-symmetric $9\times9$ matrix of $45$ numbers: HEX8 has $8$ points, TET10 stores its $10$ $P_2$ moments,
-TET4 its single point.  (b) The blocked layout of a block of $V$ elements, contiguous: point,
+symmetric $9\times9$ matrix of $45$ numbers: HEX8 has $8$ points, of which the fold of
+Section~\ref{sec:minimal} keeps $27$ to $45$ numbers each, TET10 stores its $10$ $P_2$ moments, TET4 its
+single point.  (b) The blocked layout of a block of $V$ elements, contiguous: point,
 component, lane, one vector load of \texttt{int8} or \texttt{fp16} codes per component; one scale per
 element; for the mean-and-deviation encodings, the single-precision mean.  (c) The application, one
 element per vector lane: gather, gradients at the points, the stored tangent decoded on the fly,
@@ -1271,10 +1272,10 @@ model predicts ($\bsrSixtyFourRateHexEight$ and $\bsrThirtyTwoRateHexEight$~MDOF
 double and single precision).  On HEX8 and TET10 the half-precision store applies at
 $\QpHalfVsThirtyTwoHexEight\times$ and $\QpHalfVsThirtyTwoTetTen\times$ the speed of single-precision
 BSR and $\QpHalfVsSixtyFourHexEight\times$ and $\QpHalfVsSixtyFourTetTen\times$ that of double-precision
-BSR, from $\QpHalfMemVsThirtyTwoHexEight$--$\QpHalfMemVsThirtyTwoTetTen\times$ less memory than the
-former and $\QpHalfMemVsSixtyFourHexEight$--$\QpHalfMemVsSixtyFourTetTen\times$ less than the latter.
-The \texttt{int8} mean-and-deviation store trades a further $\QpEightMdMemVsThirtyTwoHexEight$--%
-$\QpEightMdMemVsThirtyTwoTetTen\times$ memory reduction against single-precision BSR for
+BSR, from $\QpHalfMemVsThirtyTwoHexEight\times$ and $\QpHalfMemVsThirtyTwoTetTen\times$ less memory than
+the former and $\QpHalfMemVsSixtyFourHexEight\times$ and $\QpHalfMemVsSixtyFourTetTen\times$ less than the
+latter.  The \texttt{int8} mean-and-deviation store trades a further $\QpEightMdMemVsThirtyTwoHexEight\times$
+and $\QpEightMdMemVsThirtyTwoTetTen\times$ memory reduction against single-precision BSR for
 $\QpEightMdVsThirtyTwoHexEight$ and $\QpEightMdVsThirtyTwoTetTen$ of its speed.  On HEX27, with
 $\blocksHexTwentySeven$ blocks per matrix row, BSR is at its slowest
 ($\bsrThirtyTwoRateHexTwentySeven$~MDOF/s in single precision) and the half-precision store applies at
