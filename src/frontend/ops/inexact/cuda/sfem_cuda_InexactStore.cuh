@@ -20,6 +20,7 @@
 // `M` is a generated device unit (`<unit>_<element>_inexact.cuh`); a generated source per unit and
 // element instantiates `create_store<M>` (emitters/inexact_codegen.py).
 
+#include "sfem_InexactBlockMap.hpp"
 #include "sfem_cuda_InexactSetup.cuh"
 
 namespace sfem {
@@ -76,34 +77,12 @@ namespace sfem {
                     for (int s = 0; s < N; ++s)
                         check(cudaMemcpy(conn[s].data(), pointers[ElementTables<El>::shape_node(s)], ne * sizeof(idx_t), cudaMemcpyDeviceToHost),
                               "connectivity");
-                    const ptrdiff_t                  nblocks = (ne + THREADS - 1) / THREADS;
-                    std::vector<std::vector<idx_t>> nodes((size_t)nblocks);
-                    std::vector<uint16_t>            local((size_t)N * ne);
-#pragma omp parallel for schedule(dynamic, 16)
-                    for (ptrdiff_t b = 0; b < nblocks; ++b) {
-                        auto           &v  = nodes[(size_t)b];
-                        const ptrdiff_t e0 = b * THREADS, e1 = std::min(ne, e0 + THREADS);
-                        for (int s = 0; s < N; ++s)
-                            for (ptrdiff_t e = e0; e < e1; ++e) v.push_back(conn[s][e]);
-                        std::sort(v.begin(), v.end());
-                        v.erase(std::unique(v.begin(), v.end()), v.end());
-                        for (int s = 0; s < N; ++s)
-                            for (ptrdiff_t e = e0; e < e1; ++e)
-                                local[(size_t)s * ne + e] = (uint16_t)(std::lower_bound(v.begin(), v.end(), conn[s][e]) - v.begin());
-                    }
-                    std::vector<int32_t> ptr((size_t)nblocks + 1, 0);
-                    int                  most = 0;
-                    for (ptrdiff_t b = 0; b < nblocks; ++b) {
-                        ptr[(size_t)b + 1] = ptr[(size_t)b] + (int32_t)nodes[(size_t)b].size();
-                        most               = std::max(most, (int)nodes[(size_t)b].size());
-                    }
-                    std::vector<idx_t> flat((size_t)ptr[(size_t)nblocks]);
-                    for (ptrdiff_t b = 0; b < nblocks; ++b) std::copy(nodes[(size_t)b].begin(), nodes[(size_t)b].end(), flat.begin() + ptr[(size_t)b]);
+                    BlockLocalMap host = block_local_map(ne, N, conn, THREADS);
                     auto map              = std::make_unique<BlockMap>();
-                    map->ptr_             = DeviceArray<int32_t>::from(ptr);
-                    map->nodes_           = DeviceArray<idx_t>::from(flat);
-                    map->local_           = DeviceArray<uint16_t>::from(local);
-                    map->max_block_nodes_ = most;
+                    map->ptr_             = DeviceArray<int32_t>::from(host.ptr);
+                    map->nodes_           = DeviceArray<idx_t>::from(host.nodes);
+                    map->local_           = DeviceArray<uint16_t>::from(host.local);
+                    map->max_block_nodes_ = host.max_block_nodes;
                     return map;
                 }
 
@@ -132,7 +111,7 @@ namespace sfem {
                 real_t              *hs{nullptr}, *acc{nullptr};  // block: [local node][component]
                 int32_t              nb{0};
                 const idx_t         *bn{nullptr};
-                ptrdiff_t            node[N];
+                idx_t                node[N];
 
                 __device__ Traversal(const ApplyArgs &a_, const real_t *const RSTR h, real_t *const smem)
                     : a(a_), e((ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x), active(e < a_.nelements) {
@@ -156,14 +135,14 @@ namespace sfem {
                         constexpr int s = decltype(S)::value;
                         if constexpr (BLOCK) {
                             node[s] = a.local[(size_t)s * a.nelements + e];
-                            for (int k = 0; k < 3; ++k) hh[k][s] = hs[node[s] * 3 + k];
+                            for (int k = 0; k < 3; ++k) hh[k][s] = hs[(ptrdiff_t)node[s] * 3 + k];
                         } else if constexpr (El::reordered) {
                             constexpr int sn = El::SHAPE_ORDER[s];
                             node[s]          = a.elements[sn][e];
-                            for (int k = 0; k < 3; ++k) hh[k][s] = h[node[s] * a.stride + k];
+                            for (int k = 0; k < 3; ++k) hh[k][s] = h[(ptrdiff_t)node[s] * a.stride + k];
                         } else {
                             node[s] = a.elements[s][e];
-                            for (int k = 0; k < 3; ++k) hh[k][s] = h[node[s] * a.stride + k];
+                            for (int k = 0; k < 3; ++k) hh[k][s] = h[(ptrdiff_t)node[s] * a.stride + k];
                         }
                     });
                 }
@@ -172,7 +151,7 @@ namespace sfem {
                     if constexpr (BLOCK) {
                         if (active)
                             for (int s = 0; s < N; ++s)
-                                for (int k = 0; k < 3; ++k) atomicAdd(&acc[node[s] * 3 + k], o[k][s]);
+                                for (int k = 0; k < 3; ++k) atomicAdd(&acc[(ptrdiff_t)node[s] * 3 + k], o[k][s]);
                         __syncthreads();
                         for (int l = threadIdx.x; l < nb; l += blockDim.x) {
                             const ptrdiff_t v = (ptrdiff_t)bn[l] * a.stride;
@@ -181,7 +160,7 @@ namespace sfem {
                     } else {
                         if (!active) return;
                         for (int s = 0; s < N; ++s)
-                            for (int k = 0; k < 3; ++k) atomicAdd(&out[node[s] * a.stride + k], o[k][s]);
+                            for (int k = 0; k < 3; ++k) atomicAdd(&out[(ptrdiff_t)node[s] * a.stride + k], o[k][s]);
                     }
                 }
             };
@@ -634,16 +613,18 @@ namespace sfem {
                     tau Y[3][N];
                     for (int k = 0; k < 3; ++k)
                         for (int p = 0; p < N; ++p) Y[k][p] = 0;
+                    const typename C::storage *const RSTR c0 = st.codes + st.code_index(e, 0);
+                    [[maybe_unused]] const uint8_t *const RSTR f0 = PAIR ? st.factors + st.factor_index(e, 0) : nullptr;
                     static_for<0, Codes::NB>([&](auto KK) {
                         constexpr int k = decltype(KK)::value, p = T::block_row(k), q = T::block_col(k);
                         // Differences in the vector's precision, so a translation cancels exactly.
                         tau d0 = tau(hh[0][q] - hh[0][p]), d1 = tau(hh[1][q] - hh[1][p]), d2 = tau(hh[2][q] - hh[2][p]);
                         if constexpr (PAIR) {
-                            const tau r = tau(PairFactor::value(__ldg(&st.factors[st.factor_index(e, k)])));
+                            const tau r = tau(PairFactor::value(__ldg(&f0[k * V])));
                             d0 *= r, d1 *= r, d2 *= r;
                         }
                         tau K[9];
-                        for (int y = 0; y < 9; ++y) K[y] = C::decode(__ldg(&st.codes[st.code_index(e, k * 9 + y)]));
+                        for (int y = 0; y < 9; ++y) K[y] = C::decode(__ldg(&c0[(k * 9 + y) * V]));
                         Y[0][p] += K[0] * d0 + K[1] * d1 + K[2] * d2;
                         Y[1][p] += K[3] * d0 + K[4] * d1 + K[5] * d2;
                         Y[2][p] += K[6] * d0 + K[7] * d1 + K[8] * d2;
