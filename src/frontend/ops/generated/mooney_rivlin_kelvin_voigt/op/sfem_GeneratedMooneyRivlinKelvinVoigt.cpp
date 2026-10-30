@@ -10,6 +10,11 @@
 #include "sfem_Parameters.hpp"
 #include "smesh_kernel_data.hpp"
 #include "smesh_mesh.hpp"
+#include "sfem_InexactStore.hpp"
+#include "mooney_rivlin_kelvin_voigt_total_hex8_inexact.hpp"
+#include "mooney_rivlin_kelvin_voigt_total_proteus_hex8_inexact.hpp"
+#include "mooney_rivlin_kelvin_voigt_total_tet10_inexact.hpp"
+#include "mooney_rivlin_kelvin_voigt_total_tet4_inexact.hpp"
 
 #include <cstring>
 #include <vector>
@@ -212,6 +217,16 @@ namespace sfem {
       }
       SFEM_ERROR("GeneratedMooneyRivlinKelvinVoigt: mesh block pointer not found in mesh.blocks()\n");
       return 0;
+    }
+
+    int packed_block_id_for_domain(const FunctionSpace::PackedMesh &packed,
+                                       const smesh::Mesh::Block &block) {
+      for (ptrdiff_t i = 0; i < packed.n_blocks(); ++i) {
+        if (packed.block_name(i) == block.name()) {
+          return static_cast<int>(i);
+        }
+      }
+      return -1;
     }
 
     struct AffineGeometryCache {
@@ -421,6 +436,7 @@ namespace sfem {
     bool jacobian_action_uses_affine{false};
     CheckedGraph crs_graph;
     CheckedGraph bsr_graph;
+    inexact::OpState inexact;
 
     //! The history the form reads: the scheme's when one is attached, and the
     //! buffer a caller set otherwise.
@@ -1002,5 +1018,152 @@ namespace sfem {
     // rather than handed a number that is wrong by however much the rest of
     // the system contributes.
     return SFEM_FAILURE;
+  }
+
+  namespace {
+    //! The store for a domain's element: the generated unit of that element, the
+    //! library's container for the options' encoding.
+    std::unique_ptr<InexactStore> create_inexact_store(const smesh::ElemType element_type,
+                                                       const ptrdiff_t nelements,
+                                                       const InexactOptions &options) {
+      switch (element_type) {
+        case smesh::HEX8:
+          return inexact::create_store<codegen::mooney_rivlin_kelvin_voigt_total_hex8_inexact>(nelements, options);
+        case smesh::PROTEUS_HEX8:
+          return inexact::create_store<codegen::mooney_rivlin_kelvin_voigt_total_proteus_hex8_inexact>(nelements, options);
+        case smesh::TET10:
+          return inexact::create_store<codegen::mooney_rivlin_kelvin_voigt_total_tet10_inexact>(nelements, options);
+        case smesh::TET4:
+          return inexact::create_store<codegen::mooney_rivlin_kelvin_voigt_total_tet4_inexact>(nelements, options);
+        default:
+          return nullptr;
+      }
+    }
+
+    bool inexact_element(const smesh::ElemType element_type) {
+      switch (element_type) {
+        case smesh::HEX8:
+        case smesh::PROTEUS_HEX8:
+        case smesh::TET10:
+        case smesh::TET4:
+          return true;
+        default:
+          return false;
+      }
+    }
+  }  // namespace
+
+  bool GeneratedMooneyRivlinKelvinVoigt::inexact_supported() const {
+    if (impl_->space->mesh()->spatial_dimension() != 3) return false;
+    for (const auto &entry : impl_->domains->domains()) {
+      if (!inexact_element(entry.second.element_type)) return false;
+    }
+    return true;
+  }
+
+  bool GeneratedMooneyRivlinKelvinVoigt::tangent_is_symmetric() const { return false; }
+
+  void GeneratedMooneyRivlinKelvinVoigt::set_inexact_options(const InexactOptions &options) {
+    options.validate();
+    impl_->inexact.options = options;
+    impl_->inexact.stores.clear();
+    impl_->inexact.bsr.reset();
+  }
+
+  std::size_t GeneratedMooneyRivlinKelvinVoigt::inexact_bytes() const { return impl_->inexact.bytes(); }
+
+  int GeneratedMooneyRivlinKelvinVoigt::inexact_diag(real_t *const diag) {
+    SFEM_TRACE_SCOPE("GeneratedMooneyRivlinKelvinVoigt::inexact_diag");
+    if (impl_->inexact.assembled()) return impl_->inexact.diagonal_bsr(diag);
+    if (auto term = time_scheme_term(impl_->time_scheme)) {
+      if (term->hessian_diag(impl_->inexact.state, diag) != SFEM_SUCCESS) {
+        return SFEM_FAILURE;
+      }
+    }
+    return impl_->domains->iterate([&](const OpDomain &domain) {
+      auto store = impl_->inexact.stores.find(domain.block.get());
+      if (store == impl_->inexact.stores.end() || !store->second) {
+        SFEM_ERROR("GeneratedMooneyRivlinKelvinVoigt::inexact_diag requires inexact_update first\n");
+        return SFEM_FAILURE;
+      }
+      store->second->diagonal(domain.block->n_elements(), element_connectivity(domain), 3, diag);
+      return SFEM_SUCCESS;
+    });
+  }
+
+  int GeneratedMooneyRivlinKelvinVoigt::inexact_update(const real_t *const x) {
+    SFEM_TRACE_SCOPE("GeneratedMooneyRivlinKelvinVoigt::inexact_update");
+    auto mesh = impl_->space->mesh();
+    impl_->inexact.state = x;
+    if (impl_->inexact.assembled()) {
+      return impl_->inexact.update_bsr(
+          impl_->space->element_node_graph(),
+          tangent_is_symmetric(),
+          [&](const count_t *rowptr, const idx_t *colidx, smesh::PrimitiveType type, void *values) {
+            return hessian_bsr_typed(x, rowptr, colidx, type, values);
+          });
+    }
+    return impl_->domains->iterate([&](const OpDomain &domain) {
+      auto &store = impl_->inexact.stores[domain.block.get()];
+      if (!store) {
+        store = create_inexact_store(domain.element_type, domain.block->n_elements(), impl_->inexact.options);
+        if (!store) {
+          SFEM_ERROR("GeneratedMooneyRivlinKelvinVoigt::inexact_update has no stored tangent for element %d\n", (int)domain.element_type);
+          return SFEM_FAILURE;
+        }
+      }
+      const real_t parameters[5] = {
+          domain.parameters->require_real_value("eta_b"),
+          domain.parameters->require_real_value("eta_s"),
+          domain.parameters->require_real_value("lmbda"),
+          domain.parameters->require_real_value("mu"),
+          impl_->time_scheme ? impl_->time_scheme->shift() : domain.parameters->require_real_value("u_dt_shift")};
+      inexact::SetupInput input;
+      input.nelements = domain.block->n_elements();
+      input.elements = element_connectivity(domain);
+      auto cache = std::static_pointer_cast<AffineGeometryCache>(domain.user_data);
+      if ((impl_->jacobian_action_uses_affine || domain.element_type == smesh::TET4) && cache && cache->jacobian) {
+        input.adjugate = reinterpret_cast<const geom_t *const *>(cache->jacobian->adjugate_components());
+        input.determinant = reinterpret_cast<const geom_t *>(cache->jacobian->jacobian_determinant()->data());
+      } else {
+        input.points = element_points(mesh);
+      }
+      input.parameters = parameters;
+      input.u_stride = 3;
+      input.u = x;
+      input.z = impl_->previous_state();
+      store->update(input);
+      return SFEM_SUCCESS;
+    });
+  }
+
+  int GeneratedMooneyRivlinKelvinVoigt::inexact_apply(const real_t *const h, real_t *const out) {
+    SFEM_TRACE_SCOPE("GeneratedMooneyRivlinKelvinVoigt::inexact_apply");
+    // The assembled store holds the whole tangent, inertia included.
+    if (impl_->inexact.assembled()) return impl_->inexact.apply_bsr(h, out);
+    if (auto term = time_scheme_term(impl_->time_scheme)) {
+      if (term->apply(impl_->inexact.state, h, out) != SFEM_SUCCESS) {
+        return SFEM_FAILURE;
+      }
+    }
+    return impl_->domains->iterate([&](const OpDomain &domain) {
+      auto store = impl_->inexact.stores.find(domain.block.get());
+      if (store == impl_->inexact.stores.end() || !store->second) {
+        SFEM_ERROR("GeneratedMooneyRivlinKelvinVoigt::inexact_apply requires inexact_update first\n");
+        return SFEM_FAILURE;
+      }
+      inexact::PackedView view;
+      const inexact::PackedView *packed = nullptr;
+      if (impl_->space->has_packed_mesh()) {
+        auto mesh = impl_->space->packed_mesh();
+        const int block = packed_block_id_for_domain(*mesh, *domain.block);
+        if (block >= 0) {
+          view = impl_->inexact.packed_view(*mesh, block, 3);
+          packed = &view;
+        }
+      }
+      store->second->apply(domain.block->n_elements(), element_connectivity(domain), packed, 3, h, out);
+      return SFEM_SUCCESS;
+    });
   }
 }  // namespace sfem

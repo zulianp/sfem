@@ -74,6 +74,7 @@ material = gen.CodeGenerator(
         ("eta_b", 0.0),
         ("u_dt_shift", 1.0),
     ),
+    inexact_apply=True,
 )
 
 
