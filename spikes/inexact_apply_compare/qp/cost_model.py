@@ -310,6 +310,8 @@ def bsr_blocks(name, n=6):
 # on this machine (403 GB/s on 2738019 dof, spikes/inexact_apply_compare/RESULTS.md, "Is the BSR
 # implementation any good?").  Peaks are nominal, from the microarchitecture.
 BANDWIDTH = 403e9
+# Grace's nominal LPDDR5X bandwidth, the 100% that BANDWIDTH is a fraction of.
+NOMINAL_BANDWIDTH = 500e9
 PEAK_F64 = 3571e9
 PEAK_F32 = 2 * PEAK_F64
 IDX_BYTES = 4
@@ -428,6 +430,8 @@ def write_tables(res, outdir):
                     f"{fmt(100 * need / PEAK_F32)}\\% \\\\\n")
     with open(os.path.join(outdir, "constants.tex"), "w") as f:
         f.write(f"\\newcommand{{\\MachineBandwidth}}{{{fmt(BANDWIDTH / 1e9)}}}\n")
+        f.write(f"\\newcommand{{\\MachineNominalBandwidth}}{{{fmt(NOMINAL_BANDWIDTH / 1e9)}}}\n")
+        f.write(f"\\newcommand{{\\MachineBandwidthPct}}{{{fmt(100 * BANDWIDTH / NOMINAL_BANDWIDTH)}}}\n")
         f.write(f"\\newcommand{{\\MachinePeakFsixtyfour}}{{{fmt(PEAK_F64 / 1e9)}}}\n")
         f.write(f"\\newcommand{{\\MachinePeakFthirtytwo}}{{{fmt(PEAK_F32 / 1e9)}}}\n")
         f.write(f"\\newcommand{{\\MeasuredDof}}{{{HEX8_DOF / 1e6:.2f}\\times10^{{6}}}}\n")

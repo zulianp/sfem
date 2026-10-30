@@ -320,6 +320,7 @@ def write_macros(src, outdir, extras=()):
                       ("QbsrEight", "qp bsroi8")):
             if ref and op in runs:
                 m[f"time{k}{tag}"] = f"{runs[op]['seconds'] / ref['seconds']:.2f}"
+                m[f"timePct{k}{tag}"] = f"{100 * runs[op]['seconds'] / ref['seconds']:.0f}"
         for k, op in (("Exact", "BSR f32"), ("QbsrHalf", "qp bsro16"), ("QbsrEight", "qp bsroi8")):
             if op in runs:
                 m[f"tenmNewton{k}{tag}"] = str(runs[op]["newton"])
@@ -436,6 +437,8 @@ GPU_CUSPARSE = {"cusparse BSR f64": ("cuSPARSE BSR, \\texttt{fp64}", "CusparseSi
                 "cusparse BSR f32": ("cuSPARSE BSR, \\texttt{fp32}", "CusparseThirtyTwo", "BSR f32")}
 # cuSPARSE's generic product on the matrix expanded to scalar CSR, its fastest path (its generic
 # product does not take BSR): bench rows, compared with the same run's BSR rows.
+# The H100 of a GH200 node: 96 GB of HBM3 at a nominal 4.0 TB/s (NVIDIA's GH200 datasheet).
+GPU_NOMINAL_BANDWIDTH = 4.0e12
 GPU_CUSPARSE_CSR = {"cusparse SpMV CSR f64": ("cuSPARSE CSR, \\texttt{fp64}", "CsrSixtyFour", "BSR f64"),
                     "cusparse SpMV CSR f32": ("cuSPARSE CSR, \\texttt{fp32}", "CsrThirtyTwo", "BSR f32")}
 
@@ -537,6 +540,7 @@ def write_gpu(src, outdir):
                 m[f"gpu{stem}Seconds{k}{tag}"] = fmt(r["seconds"], 1)
                 if ref:
                     m[f"gpu{stem}Time{k}{tag}"] = f"{r['seconds'] / ref['seconds']:.2f}"
+                    m[f"gpu{stem}TimePct{k}{tag}"] = f"{100 * r['seconds'] / ref['seconds']:.0f}"
                 if r["device_peak_mb"]:
                     m[f"gpu{stem}Peak{k}{tag}"] = f"{r['device_peak_mb'] / 1024:.1f}"
                 if r.get("update_seconds") is not None and case == "10M":
@@ -576,9 +580,17 @@ def write_gpu(src, outdir):
                 key = f"gpuSweepMaxDof{TAGS[mt.group(1)]}"
                 if int(mt.group(2)) > int(m.get(key, "0").replace("{,}", "")):
                     m[key] = fmt(int(mt.group(2)))
-    # Ranges over the elements of the CSR comparison: <stem>Min and <stem>Max.
+    # The H100's nominal HBM3 bandwidth (GH200, 96 GB), and the share of it BSR sustains.
+    m["gpuNominalBandwidth"] = fmt(GPU_NOMINAL_BANDWIDTH / 1e9)
+    for el, tag in TAGS.items():
+        for k in ("BsrSixtyFour", "BsrThirtyTwo"):
+            if f"gpu{k}Gbs{tag}" in m:
+                gbs = float(m[f"gpu{k}Gbs{tag}"].replace("{,}", ""))
+                m[f"gpu{k}Pct{tag}"] = fmt(100 * gbs * 1e9 / GPU_NOMINAL_BANDWIDTH)
+    # Ranges over the elements: <stem>Min and <stem>Max.
     for stem in ("gpuBsrSixtyFourVsCsr", "gpuBsrThirtyTwoVsCsr", "gpuCsrSixtyFourGbs", "gpuCsrThirtyTwoGbs",
-                 "gpuCsrSixtyFourBytesVsBsr", "gpuCsrThirtyTwoBytesVsBsr"):
+                 "gpuCsrSixtyFourBytesVsBsr", "gpuCsrThirtyTwoBytesVsBsr", "gpuBsrSixtyFourGbs",
+                 "gpuBsrThirtyTwoGbs", "gpuBsrSixtyFourPct", "gpuBsrThirtyTwoPct"):
         vs = [m[stem + tag] for tag in TAGS.values() if stem + tag in m]
         if vs:
             num = lambda v: float(v.replace("{,}", ""))
