@@ -450,6 +450,30 @@ def write_tables(res, outdir):
             single = d["nq"] == 1
             row += ["---" if single and ("component" in c or "mean" in c) else fmt(v) for c, v in d["pa"].items()]
             f.write(f"{e} & " + " & ".join(row) + " \\\\\n")
+    # The exact reductions, one after the other: numbers per element for the point store and the
+    # element matrix, per node (block row) for the assembled matrix.  The encodings then store what is
+    # left in fewer bits (footprint.tex).
+    def measure_rows():
+        rows = []
+        cnt = {e: dict(N=len(ELEMENTS[e]["basis"]()), b=res[e]["blocks"]) for e in E}
+        rows.append(("\\emph{quadrature-point store, per element}", None))
+        rows.append(("all entries, $81\\,n_q$", [81 * res[e]["nq"] for e in E]))
+        rows.append(("major symmetry, $45\\,n_q$", [res[e]["per_point"] for e in E]))
+        rows.append(("quadrature: moments, fold", [res[e]["minimal"] for e in E]))
+        rows.append(("\\emph{element matrix, per element}", None))
+        rows.append(("dense, $(3N)^2$", [(3 * cnt[e]["N"]) ** 2 for e in E]))
+        rows.append(("symmetry, upper triangle", [res[e]["ea_full"] for e in E]))
+        rows.append(("difference form", [res[e]["ea_diff"] for e in E]))
+        rows.append(("\\emph{assembled matrix, per node}", None))
+        rows.append(("BSR, $9b$", [9 * cnt[e]["b"] for e in E]))
+        rows.append(("difference form, pairs once", [9 * (cnt[e]["b"] - 1) / 2 for e in E]))
+        return rows
+    with open(os.path.join(outdir, "measures.tex"), "w") as f:
+        for label, vals in measure_rows():
+            if vals is None:
+                f.write(f"\\multicolumn{{5}}{{l}}{{{label}}} \\\\\n")
+            else:
+                f.write(f"\\quad {label} & " + " & ".join(fmt(v, 0 if float(v).is_integer() else 1) for v in vals) + " \\\\\n")
     with open(os.path.join(outdir, "roofline.tex"), "w") as f:
         for e in E:
             d = res[e]
@@ -484,6 +508,11 @@ def write_tables(res, outdir):
             f.write(f"\\newcommand{{\\pafsixteen{tag}}}{{{fmt(d['pa']['f16, scaled'])}}}\n")
             f.write(f"\\newcommand{{\\ratioint{tag}}}{{{d['bsr']['f64'] / d['pa']['int8, per element']:.1f}}}\n")
             f.write(f"\\newcommand{{\\ratiohalf{tag}}}{{{d['bsr']['f64'] / d['pa']['f16, scaled']:.1f}}}\n")
+            # The share of the numbers the exact reductions remove, per format (measures.tex).
+            N = len(ELEMENTS[e]["basis"]())
+            f.write(f"\\newcommand{{\\exactQpPct{tag}}}{{{fmt(100 * (1 - d['minimal'] / (81 * d['nq'])))}}}\n")
+            f.write(f"\\newcommand{{\\exactEaPct{tag}}}{{{fmt(100 * (1 - d['ea_diff'] / (3 * N) ** 2))}}}\n")
+            f.write(f"\\newcommand{{\\exactBsrPct{tag}}}{{{fmt(100 * (1 - (d['blocks'] - 1) / (2 * d['blocks'])))}}}\n")
 
 
 def main():
