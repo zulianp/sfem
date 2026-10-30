@@ -198,4 +198,5 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_curved_tet10);
     SFEM_RUN_TEST(test_linear_elasticity);
     SFEM_UNIT_TEST_FINALIZE();
+    return SFEM_UNIT_TEST_ERR();
 }

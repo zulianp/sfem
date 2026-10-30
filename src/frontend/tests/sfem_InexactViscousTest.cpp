@@ -126,4 +126,5 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_kelvin_voigt_stored_tangent);
     SFEM_RUN_TEST(test_kelvin_voigt_refuses_cg);
     SFEM_UNIT_TEST_FINALIZE();
+    return SFEM_UNIT_TEST_ERR();
 }

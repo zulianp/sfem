@@ -5,36 +5,16 @@
 
 #include "packed_thread_scratch.hpp"
 #include "sfem_InexactElement.hpp"
+#include "sfem_InexactInterface.hpp"
 #include "sfem_base.hpp"
 
 namespace sfem {
     namespace inexact {
 
-        /// What the set-up reads: the state, the geometry and the material.  The geometry is the
-        /// element's affine adjugate and determinant (SoA, one per element) when the operator
-        /// caches them, or the node coordinates otherwise, from which the set-up forms the
-        /// Jacobian at every point -- the stored tangent is pulled back per point, so a curved
-        /// element is stored exactly as the exact operator integrates it.
-        struct SetupInput {
-            ptrdiff_t                nelements{0};
-            const idx_t *const      *elements{nullptr};     // [node][element], mesh order
-            const geom_t *const     *adjugate{nullptr};     // [9][element], affine
-            const geom_t            *determinant{nullptr};  // [element], affine
-            const geom_t *const     *points{nullptr};       // [3][node], isoparametric
-            const real_t            *parameters{nullptr};   // the unit's material constants, in its order
-            ptrdiff_t                u_stride{3};
-            const real_t            *u{nullptr};            // current state, interleaved
-            const real_t            *z{nullptr};            // previous state, when the unit reads one
-            // The integration-point fields the unit reads (a relaxation group's history), one base
-            // pointer each, laid out [component][point][element] at `quadrature_stride` per point.
-            const real_t *const     *quadrature{nullptr};
-            ptrdiff_t                quadrature_stride{0};
-        };
-
         namespace detail {
             /// adj = det * J^{-1} for J[a][m] = dx_a/dxi_m, so that du_c/dx_a = sum_m du_c/dxi_m adj[m][a] / det.
             template <typename s_t>
-            static SFEM_INLINE void adjugate_and_determinant(const s_t J[9], s_t adj[9], s_t &det) {
+            static SFEM_INLINE SFEM_HOST_DEVICE void adjugate_and_determinant(const s_t J[9], s_t adj[9], s_t &det) {
                 adj[0] = J[4] * J[8] - J[5] * J[7];
                 adj[1] = J[2] * J[7] - J[1] * J[8];
                 adj[2] = J[1] * J[5] - J[2] * J[4];
@@ -150,10 +130,12 @@ namespace sfem {
                             // The integration-point fields at this point, component by component.
                             real_t        qf[NF > 0 ? NF : 1][MC];
                             const real_t *qp[NF > 0 ? NF : 1];
-                            for (int f = 0; f < NF; ++f) {
-                                for (int c = 0; c < M::quadrature_components[f]; ++c)
-                                    qf[f][c] = in.quadrature[f][((ptrdiff_t)c * NQ + q) * in.quadrature_stride + evb + lane];
-                                qp[f] = qf[f];
+                            if constexpr (NF > 0) {
+                                for (int f = 0; f < NF; ++f) {
+                                    for (int c = 0; c < M::quadrature_components[f]; ++c)
+                                        qf[f][c] = in.quadrature[f][((ptrdiff_t)c * NQ + q) * in.quadrature_stride + evb + lane];
+                                    qp[f] = qf[f];
+                                }
                             }
                             real_t T[NC];
                             M::template point<real_t>(in.parameters, gu, gz, adj, det, qp, T);

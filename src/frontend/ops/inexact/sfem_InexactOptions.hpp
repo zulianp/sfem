@@ -4,7 +4,10 @@
 
 #include "sfem_config.h"
 
-#ifdef SFEM_ENABLE_RYAML
+// Not in device code: nvcc cannot read what ryml includes on some hosts (arm_neon.h on Grace),
+// and nothing on the device reads the options from YAML.
+#if defined(SFEM_ENABLE_RYAML) && !defined(__CUDACC__)
+#define SFEM_INEXACT_OPTIONS_YAML
 #include <ryml.hpp>
 #endif
 
@@ -46,11 +49,12 @@ namespace sfem {
                                            const std::string &encoding,
                                            const std::string &fold      = "auto",
                                            const std::string &traversal = "auto");
-#ifdef SFEM_ENABLE_RYAML
-        /// `solver.linear.inexact: {store, encoding, fold, traversal}`; absent keys keep the defaults.
-        static InexactOptions from_yaml(const ryml::ConstNodeRef &node);
-#endif
         std::string describe() const;
     };
+
+#ifdef SFEM_INEXACT_OPTIONS_YAML
+    /// `solver.linear.inexact: {store, encoding, fold, traversal}`; absent keys keep the defaults.
+    InexactOptions inexact_options_from_yaml(const ryml::ConstNodeRef &node);
+#endif
 
 }  // namespace sfem

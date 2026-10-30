@@ -7,37 +7,18 @@
 #include <memory>
 #include <string>
 #include <vector>
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
+#include "sfem_InexactInterface.hpp"
 #include "sfem_QuantBSR.hpp"
 #include "sfem_aliases.hpp"
 #include "smesh_crs_graph.hpp"
-#include "sfem_aliases.hpp"
 #include "smesh_types.hpp"
 
 namespace sfem {
     namespace inexact {
-
-        /// What a BSR store asks of its operator: the operator's tangent assembled into the given
-        /// node graph, in the given value type (`Op::hessian_bsr_typed`).
-        using AssembleBSR = std::function<int(const count_t *rowptr, const idx_t *colidx, smesh::PrimitiveType type, void *values)>;
-
-        /// The quantized assembled operator (`store: bsr`): the operator's own tangent, assembled in
-        /// single precision on the space's node graph and encoded in place (sfem_QuantBSR.hpp).
-        ///
-        /// The difference form is exact for an operator that annihilates translations.  One that
-        /// does not -- a time scheme's inertia, whose mass matrix rows sum to the lumped mass --
-        /// keeps the rows whose blocks do not sum to zero as a correction, `y_i += R_i x_i` with
-        /// `R_i = sum_j K_ij` in single precision: exact for any operator, and empty in a
-        /// quasi-static solve, where the sums are the assembly's rounding.
-        class BsrStore {
-        public:
-            virtual ~BsrStore() = default;
-            virtual int         update(const AssembleBSR &assemble)                    = 0;
-            virtual void        apply(const real_t *const x, real_t *const y) const    = 0;  // y += A x
-            virtual void        add_diagonal(real_t *const diag) const                 = 0;
-            virtual std::size_t bytes() const                                          = 0;
-            virtual std::string describe() const                                       = 0;
-        };
 
         template <class Q>
         class BsrStoreImpl final : public BsrStore {
@@ -105,25 +86,46 @@ namespace sfem {
             std::vector<idx_t>               rows_;
             std::vector<float>               blocks_;
 
-            /// The rows whose blocks do not sum to zero beyond the assembly's rounding.
+            /// The rows whose blocks do not sum to zero beyond the assembly's rounding, in row order:
+            /// each thread collects its own rows' sums, then they are joined in thread order.
             void correction(const count_t *const rp, const float *const v) {
                 rows_.clear();
                 blocks_.clear();
-                for (ptrdiff_t i = 0; i < n_; ++i) {
-                    double R[9] = {0}, top = 0;
-                    for (count_t k = rp[i]; k < rp[i + 1]; ++k)
-                        for (int x = 0; x < 9; ++x) {
-                            R[x] += (double)v[(size_t)k * 9 + x];
-                            top = std::max(top, std::fabs((double)v[(size_t)k * 9 + x]));
-                        }
-                    double sum = 0;
-                    for (int x = 0; x < 9; ++x) sum = std::max(sum, std::fabs(R[x]));
-                    // Single-precision sums of a row's few dozen blocks round to about 1e-6 of
-                    // its largest entry; anything above that is a term that does not annihilate
-                    // translations.
-                    if (!(sum > 64 * FLT_EPSILON * top)) continue;
-                    rows_.push_back((idx_t)i);
-                    for (int x = 0; x < 9; ++x) blocks_.push_back((float)R[x]);
+                std::vector<std::vector<idx_t>> rows;
+                std::vector<std::vector<float>> blocks;
+#pragma omp parallel
+                {
+#ifdef _OPENMP
+                    const int nt = omp_get_num_threads(), t = omp_get_thread_num();
+#else
+                    const int nt = 1, t = 0;
+#endif
+#pragma omp single
+                    {
+                        rows.resize((size_t)nt);
+                        blocks.resize(rows.size());
+                    }
+#pragma omp for schedule(static)
+                    for (ptrdiff_t i = 0; i < n_; ++i) {
+                        double R[9] = {0}, top = 0;
+                        for (count_t k = rp[i]; k < rp[i + 1]; ++k)
+                            for (int x = 0; x < 9; ++x) {
+                                R[x] += (double)v[(size_t)k * 9 + x];
+                                top = std::max(top, std::fabs((double)v[(size_t)k * 9 + x]));
+                            }
+                        double sum = 0;
+                        for (int x = 0; x < 9; ++x) sum = std::max(sum, std::fabs(R[x]));
+                        // Single-precision sums of a row's few dozen blocks round to about 1e-6 of
+                        // its largest entry; anything above that is a term that does not annihilate
+                        // translations.
+                        if (!(sum > 64 * FLT_EPSILON * top)) continue;
+                        rows[(size_t)t].push_back((idx_t)i);
+                        for (int x = 0; x < 9; ++x) blocks[(size_t)t].push_back((float)R[x]);
+                    }
+                }
+                for (size_t t = 0; t < rows.size(); ++t) {
+                    rows_.insert(rows_.end(), rows[t].begin(), rows[t].end());
+                    blocks_.insert(blocks_.end(), blocks[t].begin(), blocks[t].end());
                 }
             }
         };

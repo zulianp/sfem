@@ -69,16 +69,10 @@ namespace sfem {
             }
 
             /// Block `k`'s row and column node: p < q first, then (symmetric excepted) q > p.
+            static constexpr NodePairs<N> PAIRS{};
             static SFEM_INLINE void block_nodes(const int k, int &row, int &col) {
-                const int pair = k < NP ? k : k - NP;
-                int       p = 0, rem = pair;
-                while (rem >= N - 1 - p) {
-                    rem -= N - 1 - p;
-                    ++p;
-                }
-                const int q = p + 1 + rem;
-                row         = k < NP ? p : q;
-                col         = k < NP ? q : p;
+                row = PAIRS.row[k];
+                col = PAIRS.col[k];
             }
 
             // ---------------------------------------------------------------- set-up side

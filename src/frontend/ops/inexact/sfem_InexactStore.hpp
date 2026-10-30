@@ -8,41 +8,18 @@
 #include <type_traits>
 
 #include "sfem_ElementMatrixStore.hpp"
+#include "sfem_InexactInterface.hpp"
 #include "sfem_InexactOptions.hpp"
 #include "sfem_InexactSetup.hpp"
 #include "sfem_InexactTraversal.hpp"
 #include "sfem_PointStore.hpp"
 #include "sfem_QuantBSRStore.hpp"
 
+#ifdef SFEM_ENABLE_CUDA
+#include "sfem_cuda_QuantBSRStore.hpp"
+#endif
+
 namespace sfem {
-
-    /// One domain's stored tangent, whatever its encoding: what a generated operator holds
-    /// between `inexact_update` and the applies of a Newton step.
-    class InexactStore {
-    public:
-        virtual ~InexactStore() = default;
-
-        /// Evaluates the tangent at every point from the state and encodes it.
-        virtual void update(const inexact::SetupInput &input) = 0;
-
-        /// `out += A h`, interleaved vectors of `stride` components.  Packed when `packed` is
-        /// given and the options allow it, atomic otherwise.
-        virtual void apply(const ptrdiff_t                  nelements,
-                           const idx_t *const *const        elements,
-                           const inexact::PackedView *const packed,
-                           const ptrdiff_t                  stride,
-                           const real_t *const              h,
-                           real_t *const                    out) const = 0;
-
-        /// diag += the stored operator's diagonal, interleaved with `stride` components.
-        virtual void diagonal(const ptrdiff_t           nelements,
-                              const idx_t *const *const elements,
-                              const ptrdiff_t           stride,
-                              real_t *const             diag) const = 0;
-
-        virtual std::size_t bytes() const    = 0;
-        virtual std::string describe() const = 0;
-    };
 
     namespace inexact {
 
@@ -186,6 +163,9 @@ namespace sfem {
         /// What a generated operator holds for its stored tangent: the options, one store per
         /// domain, the state the stores were built at, and the packed traversal's ghost buffers.
         struct OpState {
+            /// Where the operator runs: a device operator's stores are the device's, on its stream.
+            ExecutionSpace                                             space{EXECUTION_SPACE_HOST};
+            void                                                      *stream{nullptr};
             InexactOptions                                             options;
             std::map<const void *, std::unique_ptr<InexactStore>>      stores;
             std::map<int, SharedBuffer<real_t>>                        ghost;
@@ -203,8 +183,19 @@ namespace sfem {
             /// The `bsr` store: the operator's whole tangent on the space's node graph, its inertia
             /// term included, so the caller adds nothing to its apply.
             int update_bsr(const std::shared_ptr<CRSGraph> &graph, const bool symmetric, const AssembleBSR &assemble) {
-                if (!bsr) bsr = create_bsr_store(graph, options.encoding == InexactOptions::Encoding::I8_BLOCK, symmetric);
+                if (!bsr) bsr = make_bsr(graph, options.encoding == InexactOptions::Encoding::I8_BLOCK, symmetric);
                 return bsr->update(assemble);
+            }
+
+            std::unique_ptr<BsrStore> make_bsr(const std::shared_ptr<CRSGraph> &graph, const bool int8, const bool symmetric) const {
+                if (space == EXECUTION_SPACE_DEVICE) {
+#ifdef SFEM_ENABLE_CUDA
+                    return cuda::create_bsr_store(graph, int8, symmetric, stream);
+#else
+                    SFEM_ERROR("inexact: a device bsr store in a build without CUDA\n");
+#endif
+                }
+                return create_bsr_store(graph, int8, symmetric);
             }
 
             int diagonal_bsr(real_t *const diag) const {

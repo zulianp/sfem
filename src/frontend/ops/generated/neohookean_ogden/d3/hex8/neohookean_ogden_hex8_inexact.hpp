@@ -20,7 +20,6 @@ struct neohookean_ogden_hex8_inexact {
   static constexpr int n_parameters = 2;
   // The integration-point fields the tangent reads, and their components.
   static constexpr int n_quadrature_fields = 0;
-  static constexpr int quadrature_components[1] = {0};
   static constexpr int max_quadrature_components = 1;
 
   // The tangent at one point, unweighted: `gu_ref` (and `gz_ref`, the previous state's) is the

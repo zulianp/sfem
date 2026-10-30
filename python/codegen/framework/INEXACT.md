@@ -39,9 +39,25 @@ What the rule can see decides what is stored (`plans/inexact_element.py`):
 | the element | generated, `reference/inexact_<element>_q<n>.hpp` | stages (`stage_in`, `stage_out`, `setup_in`), weights, moment factors, fold tables, the node order the stages read |
 | the contraction | generated, `reference/inexact_contract_d3.hpp` | one stored tangent against nine gradients, 45 (symmetric) or 81 numbers, masked forms for the fold |
 | everything else | library, `src/frontend/ops/inexact/` | encodings, the point store, element matrices, the set-up loop, the traversals (atomic, packed two-pass), the Op state |
+| the device stores | library, `src/frontend/ops/inexact/cuda/` | the same encodings in the GPU layouts and kernel shapes; `<unit>_<element>_inexact_store.cu` (generated) instantiates them per unit |
 
 The element and contraction headers are material-independent and shared through the reference
 family, so two materials on one element emit them byte for byte.
+
+## The device
+
+Under the CUDA target the same emitters print the device twins (`d3/<element>/cuda/*.cuh`,
+`reference/cuda/`): the stages for one element per thread (no lane width, no lane loop), the
+contraction with its masked forms, and for HEX27 the line's basis, which the point threads sweep
+cooperatively. The device operator reaches each unit's stores through the factory its generated
+source defines; its other methods are the host's.
+
+The shapes are the ones measured on the H100 (`spikes/inexact_apply_compare/qp/RESULTS_QP.md`):
+a thread per element on TET4, TET10 and HEX8 (block-local or atomic scatter, as measured per
+store), a thread per point for HEX27's point store and a warp per element for its element
+matrices. HEX8 folds; HEX27 does not on the device. The set-up runs a thread per element and point
+in double and encodes in the host's order, so the device codes are the host's up to the rounding of
+the arithmetic. `store: bsr` is the full difference form in SELL-32 with int32 columns.
 
 ## Symmetry
 
@@ -77,7 +93,7 @@ updating is an error.
 
 `solver.linear.format: INEXACT` with `solver.linear.inexact: {store, encoding, fold, traversal}`:
 `points` (f64, f32, f16, i8md) or `element_matrix` (f64, f32, f16, i8pair); `fold: auto|on|off`;
-`traversal: auto|packed|atomic`. int8 with one scale per element is not offered: it is not a
+`traversal: auto|packed|atomic` (the device chooses its own: `auto` only). int8 with one scale per element is not offered: it is not a
 usable Newton operator.
 
 ## Opt-in
@@ -93,4 +109,5 @@ overrides nothing, so `Op`'s refusing defaults stand.
 | the stored action is the exact one (curved cells, moments, fold) | `tests/test_inexact_point_tangent.py` against direct integration |
 | the packing pairs `(i,n)` with `(k,m)` | the same test, and the packing tests beside it |
 | the library operator is the exact one | `sfem_InexactOperatorTest`: f64 to 1e-15, each encoding within its rounding, packed equals atomic, fold equals no fold |
+| the device operator is the host's | `sfem_CudaInexactOperatorTest` (every element and store against the device's exact apply and the host's stored apply and diagonal), `sfem_CudaInexactViscousTest` (Prony, Kelvin–Voigt, Newton with every family) |
 | nothing changes unless asked | `tests/test_inexact_apply_generation.py` |

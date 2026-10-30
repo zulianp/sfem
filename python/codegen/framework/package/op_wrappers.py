@@ -764,19 +764,9 @@ namespace sfem {
     }
 
 
-def _inexact_affine_elements(material, kernel_sources):
-    """The elements the stored tangent forces an affine cache for: none.
-
-    The set-up forms the Jacobian at every point from the coordinates, unless
-    the operator caches the affine geometry for its own reasons -- an affine
-    option, or a constant-P1 simplex -- in which case it reads that, the same
-    geometry the exact apply reads.
-    """
-    return ()
-
-
-#: A per-element stored-tangent header, `d3/<element>/<unit>_<element>_inexact.hpp`.
-_INEXACT_UNIT_HEADER = re.compile(r"^d3/([a-z0-9_]+)/([a-z0-9_]+_inexact)\.hpp$")
+#: A per-element stored-tangent header, `d3/<element>/<unit>_<element>_inexact.hpp`, or its
+#: device twin in the element's `cuda/` folder.
+_INEXACT_UNIT_HEADER = re.compile(r"^d3/([a-z0-9_]+)/(?:cuda/)?([a-z0-9_]+_inexact)\.(?:hpp|cuh)$")
 
 
 def _inexact_units(kernel_sources):
@@ -802,15 +792,43 @@ def _inexact_includes(material, kernel_sources):
     if not units:
         return ""
     lines = ['#include "sfem_InexactStore.hpp"']
-    lines.extend('#include "%s.hpp"' % struct for _label, struct, _symmetric in units)
+    lines.extend(_INEXACT_UNIT_ACCESS[_runs_on_device()](units))
     return "\n".join(lines) + "\n"
+
+
+def _host_unit_includes(units):
+    return ['#include "%s.hpp"' % struct for _label, struct, _symmetric in units]
+
+
+def _device_unit_declarations(units):
+    """A device operator is host code: it reaches each unit's stores through the
+    factory its generated source defines (`emitters/inexact_codegen.py`)."""
+    from codegen.framework.emitters.inexact_codegen import device_store_factory
+
+    return (
+        ["", "namespace sfem {", "  namespace codegen {"]
+        + ["    %s;" % device_store_factory(struct) for _label, struct, _symmetric in units]
+        + ["  }  // namespace codegen", "}  // namespace sfem"]
+    )
+
+
+#: How the operator reaches a unit's stores: their templates on the host, their
+#: compiled factory on the device.
+_INEXACT_UNIT_ACCESS = {False: _host_unit_includes, True: _device_unit_declarations}
 
 
 def _inexact_impl_field(material, kernel_sources):
     """The stored tangents, one per domain, and the options they are built with."""
     if not _emits_inexact_apply(material) or not _inexact_units(kernel_sources):
         return ""
-    return "    inexact::OpState inexact;\n"
+    return _INEXACT_STATE_FIELD[_runs_on_device()]
+
+
+#: A device operator's stores are the device's.
+_INEXACT_STATE_FIELD = {
+    False: "    inexact::OpState inexact;\n",
+    True: "    inexact::OpState inexact{EXECUTION_SPACE_DEVICE};\n",
+}
 
 
 def _inexact_parameter_value(name, holds_scheme):
@@ -872,9 +890,10 @@ def _inexact_definitions(
         raise ValueError("%s: the elements disagree on the tangent's symmetry" % material.name)
     op = _op_class_name(material)
 
+    device = _runs_on_device()
     cases = "\n".join(
         "        case smesh::%s:\n"
-        "          return inexact::create_store<codegen::%s>(nelements, options);" % (label.upper(), struct)
+        "          return %s;" % (label.upper(), _INEXACT_STORE_CALL[device] % struct)
         for label, struct, _symmetric in units
     )
     supported = "\n".join("        case smesh::%s:" % label.upper() for label, _struct, _symmetric in units)
@@ -931,7 +950,7 @@ def _inexact_definitions(
     //! library's container for the options' encoding.
     std::unique_ptr<InexactStore> create_inexact_store(const smesh::ElemType element_type,
                                                        const ptrdiff_t nelements,
-                                                       const InexactOptions &options) {
+                                                       const InexactOptions &options%(stream_parameter)s) {
       switch (element_type) {
 %(cases)s
         default:
@@ -986,7 +1005,7 @@ def _inexact_definitions(
     SFEM_TRACE_SCOPE("%(op)s::inexact_update");
     auto mesh = impl_->space->mesh();
     impl_->inexact.state = x;
-    if (impl_->inexact.assembled()) {
+%(stream_binding)s    if (impl_->inexact.assembled()) {
       return impl_->inexact.update_bsr(
           impl_->space->element_node_graph(),
           tangent_is_symmetric(),
@@ -997,7 +1016,7 @@ def _inexact_definitions(
     return impl_->domains->iterate([&](const OpDomain &domain) {
       auto &store = impl_->inexact.stores[domain.block.get()];
       if (!store) {
-        store = create_inexact_store(domain.element_type, domain.block->n_elements(), impl_->inexact.options);
+        store = create_inexact_store(domain.element_type, domain.block->n_elements(), impl_->inexact.options%(stream_argument)s);
         if (!store) {
           SFEM_ERROR("%(op)s::inexact_update has no stored tangent for element %%d\\n", (int)domain.element_type);
           return SFEM_FAILURE;
@@ -1031,17 +1050,7 @@ def _inexact_definitions(
         SFEM_ERROR("%(op)s::inexact_apply requires inexact_update first\\n");
         return SFEM_FAILURE;
       }
-      inexact::PackedView view;
-      const inexact::PackedView *packed = nullptr;
-      if (impl_->space->has_packed_mesh()) {
-        auto mesh = impl_->space->packed_mesh();
-        const int block = packed_block_id_for_domain(*mesh, *domain.block);
-        if (block >= 0) {
-          view = impl_->inexact.packed_view(*mesh, block, 3);
-          packed = &view;
-        }
-      }
-      store->second->apply(domain.block->n_elements(), element_connectivity(domain), packed, 3, h, out);
+%(packed_view)s      store->second->apply(domain.block->n_elements(), element_connectivity(domain), packed, 3, h, out);
       return SFEM_SUCCESS;
     });
   }""" % {
@@ -1056,7 +1065,39 @@ def _inexact_definitions(
         "previous": previous,
         "inertia": inertia,
         "inertia_diagonal": inertia_diagonal,
+        "stream_parameter": _INEXACT_STREAM_PARAMETER[device],
+        "stream_argument": _INEXACT_STREAM_ARGUMENT[device],
+        "stream_binding": _INEXACT_STREAM_BINDING[device],
+        "packed_view": _INEXACT_PACKED_VIEW[device],
     }
+
+
+#: How a domain's store is made: the unit's host templates, or its device factory
+#: on the operator's stream.
+_INEXACT_STORE_CALL = {
+    False: "inexact::create_store<codegen::%s>(nelements, options)",
+    True: "codegen::%s_store(nelements, options, stream)",
+}
+_INEXACT_STREAM_PARAMETER = {False: "", True: ",\n                                                       void *const stream"}
+_INEXACT_STREAM_ARGUMENT = {False: "", True: ", stream"}
+_INEXACT_STREAM_BINDING = {False: "", True: "    impl_->inexact.stream = stream;\n"}
+
+#: The host stores traverse the packed mesh when the space has one; the device
+#: stores choose their own traversal.
+_INEXACT_PACKED_VIEW = {
+    False: """      inexact::PackedView view;
+      const inexact::PackedView *packed = nullptr;
+      if (impl_->space->has_packed_mesh()) {
+        auto mesh = impl_->space->packed_mesh();
+        const int block = packed_block_id_for_domain(*mesh, *domain.block);
+        if (block >= 0) {
+          view = impl_->inexact.packed_view(*mesh, block, 3);
+          packed = &view;
+        }
+      }
+""",
+    True: "      const inexact::PackedView *const packed = nullptr;\n",
+}
 
 
 def _append_inexact_definitions(source, definitions):
@@ -1068,8 +1109,11 @@ def _append_inexact_definitions(source, definitions):
     """
     if not definitions:
         return source
+    # The last close: a device operator declares its units' store factories in a
+    # namespace block of their own above the operator.
     marker = "\n}  // namespace sfem"
-    return source.replace(marker, definitions + marker, 1)
+    head, found, tail = source.rpartition(marker)
+    return head + definitions + found + tail
 
 
 def _hyperelastic_op(
@@ -1518,19 +1562,6 @@ namespace sfem {
       }
     }
 
-    //! Whether the stored-tangent path assembles this element.
-    //!
-    //! Its tangent is built from the cached adjugate, so the cache is built for
-    //! these elements whether or not an affine option is on -- and only for
-    //! these: smesh has no adjugate fill for every element (HEX27, for one),
-    //! and asking for one it cannot fill aborts inside `initialize`.
-    bool geometry_assembles_inexact(const smesh::ElemType element_type) {
-      switch (element_type) {
-%(inexact_affine_element_cases)s        default:
-          return false;
-      }
-    }
-
     int cache_affine_geometry(const std::shared_ptr<FunctionSpace> &space,
                                   MultiDomainOp &domains,
                                   const bool requested) {
@@ -1539,8 +1570,7 @@ namespace sfem {
           %(gradient_affine_uses_jacobian_aos)s ||
           %(apply_affine_uses_jacobian_aos)s;
       for (auto &entry : domains.domains()) {
-        if (!requested && !geometry_is_forced_affine(entry.second.element_type) &&
-            !geometry_assembles_inexact(entry.second.element_type)) {
+        if (!requested && !geometry_is_forced_affine(entry.second.element_type)) {
           continue;
         }
         const smesh::block_idx_t block_id =
@@ -2211,9 +2241,6 @@ namespace sfem {
         ),
         "inexact_include": _inexact_includes(material, kernel_sources),
         "inexact_impl_field": _inexact_impl_field(material, kernel_sources),
-        "inexact_affine_element_cases": _forced_affine_element_cases(
-            _inexact_affine_elements(material, kernel_sources)
-        ),
         "performance_methods": _performance_methods(_op_class_name(material), material.name, elements, performance_cases),
         "affine_options": _affine_option_entries(
             "objective_uses_affine",

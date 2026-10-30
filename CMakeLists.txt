@@ -162,6 +162,7 @@ if(SFEM_ENABLE_CUDA)
         ssmg/cuda
         frontend/ops/cuda
         frontend/ops/prony/cuda
+        frontend/ops/inexact/cuda
     )
 
     if(SFEM_ENABLE_AMG)
@@ -491,7 +492,7 @@ if(SFEM_ENABLE_TESTING)
         endif()
         # Tests whose cases are YAML.
         if(NOT SFEM_ENABLE_RYAML AND TEST_DRIVER_NAME MATCHES
-           "^sfem_(ElasticityCase|PlaygroundCases|PlaygroundContact|LoadProfile|CudaEnergyBSRAssembly|InexactViscous)Test$")
+           "^sfem_(ElasticityCase|PlaygroundCases|PlaygroundContact|LoadProfile|CudaEnergyBSRAssembly|InexactViscous|CudaInexactViscous)Test$")
             continue()
         endif()
         add_executable(${TEST_DRIVER_NAME} ${TEST_DRIVER})

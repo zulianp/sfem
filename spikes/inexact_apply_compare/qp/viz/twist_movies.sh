@@ -2,7 +2,7 @@
 # Movies and stills of the 90 degree twist for TET4, TET10, HEX8 and HEX27 (the Newton study's
 # large-deformation case at a resolution that shows the elements), exact operator.
 #   sh twist_movies.sh OUT_DIR
-# Needs the spike builds build-spike-{TET4,TET10,HEX8,HEX27} in the repository root, the venv's
+# Needs the library build (build/playground) in the repository root, the venv's
 # python (numpy), ParaView's pvbatch and ffmpeg.  OUT_DIR gets the raw output, XDMF time series
 # (case.xdmf, edges.xdmf; open in ParaView), the frames, twist_<element>.mp4/.png and the 2x2 composites.
 set -e
@@ -13,7 +13,7 @@ PY=${PY:-python3}
 PV=${PV:-/Applications/ParaView-6.1.0.app/Contents/bin/pvbatch}
 C=$ROOT/spikes/inexact_apply_compare/qp/cases
 export OMP_NUM_THREADS=${OMP_NUM_THREADS:-8}
-run() { "$ROOT/build-spike-$1/newton_qp" "$2" "$3" "$4" --set solver.linear.format=BSR --set output.path="$OUT/$5" --set output.export_freq=1 | grep "newton_qp: run"; }
+run() { "$ROOT/build/playground" "$2" "$3" "$4" --set solver.linear.format=BSR --set output.path="$OUT/$5" --set output.export_freq=1 > /dev/null; }
 "$ROOT/build/external/smesh/cube" TET4 8 8 8 0 0 0 1 1 1 "$OUT/tet4_8" > /dev/null
 "$ROOT/build/external/smesh/cube" TET4 6 6 6 0 0 0 1 1 1 "$OUT/tet4_6" > /dev/null
 run HEX8 "$C/hex8_twist.yaml" --set "mesh.box.n=[12,12,12]" hex8

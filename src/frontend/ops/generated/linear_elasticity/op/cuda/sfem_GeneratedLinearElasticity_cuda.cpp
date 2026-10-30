@@ -11,6 +11,18 @@
 #include "sfem_Parameters.hpp"
 #include "smesh_kernel_data.hpp"
 #include "smesh_mesh.hpp"
+#include "sfem_InexactStore.hpp"
+
+namespace sfem {
+  namespace codegen {
+    std::unique_ptr<InexactStore> linear_elasticity_hex27_inexact_store(const ptrdiff_t nelements, const InexactOptions &options, void *const stream);
+    std::unique_ptr<InexactStore> linear_elasticity_hex8_inexact_store(const ptrdiff_t nelements, const InexactOptions &options, void *const stream);
+    std::unique_ptr<InexactStore> linear_elasticity_proteus_hex27_inexact_store(const ptrdiff_t nelements, const InexactOptions &options, void *const stream);
+    std::unique_ptr<InexactStore> linear_elasticity_proteus_hex8_inexact_store(const ptrdiff_t nelements, const InexactOptions &options, void *const stream);
+    std::unique_ptr<InexactStore> linear_elasticity_tet10_inexact_store(const ptrdiff_t nelements, const InexactOptions &options, void *const stream);
+    std::unique_ptr<InexactStore> linear_elasticity_tet4_inexact_store(const ptrdiff_t nelements, const InexactOptions &options, void *const stream);
+  }  // namespace codegen
+}  // namespace sfem
 
 #include <algorithm>
 #include <cstring>
@@ -232,19 +244,6 @@ namespace sfem {
       }
     }
 
-    //! Whether the stored-tangent path assembles this element.
-    //!
-    //! Its tangent is built from the cached adjugate, so the cache is built for
-    //! these elements whether or not an affine option is on -- and only for
-    //! these: smesh has no adjugate fill for every element (HEX27, for one),
-    //! and asking for one it cannot fill aborts inside `initialize`.
-    bool geometry_assembles_inexact(const smesh::ElemType element_type) {
-      switch (element_type) {
-        default:
-          return false;
-      }
-    }
-
     int cache_affine_geometry(const std::shared_ptr<FunctionSpace> &space,
                                   MultiDomainOp &domains,
                                   const bool requested) {
@@ -253,8 +252,7 @@ namespace sfem {
           true ||
           true;
       for (auto &entry : domains.domains()) {
-        if (!requested && !geometry_is_forced_affine(entry.second.element_type) &&
-            !geometry_assembles_inexact(entry.second.element_type)) {
+        if (!requested && !geometry_is_forced_affine(entry.second.element_type)) {
           continue;
         }
         const smesh::block_idx_t block_id =
@@ -397,6 +395,7 @@ namespace sfem {
     std::vector<SharedBuffer<real_t>> packed_ghost_buf;
     CheckedGraph crs_graph;
     CheckedGraph bsr_graph;
+    inexact::OpState inexact{EXECUTION_SPACE_DEVICE};
   };
 
   std::unique_ptr<Op> GPUGeneratedLinearElasticity::create(const std::shared_ptr<FunctionSpace> &space) {
@@ -1114,4 +1113,146 @@ namespace sfem {
     return ret;
   }
 #endif  // SFEM_ENABLE_RYAML
+
+  namespace {
+    //! The store for a domain's element: the generated unit of that element, the
+    //! library's container for the options' encoding.
+    std::unique_ptr<InexactStore> create_inexact_store(const smesh::ElemType element_type,
+                                                       const ptrdiff_t nelements,
+                                                       const InexactOptions &options,
+                                                       void *const stream) {
+      switch (element_type) {
+        case smesh::HEX27:
+          return codegen::linear_elasticity_hex27_inexact_store(nelements, options, stream);
+        case smesh::HEX8:
+          return codegen::linear_elasticity_hex8_inexact_store(nelements, options, stream);
+        case smesh::PROTEUS_HEX27:
+          return codegen::linear_elasticity_proteus_hex27_inexact_store(nelements, options, stream);
+        case smesh::PROTEUS_HEX8:
+          return codegen::linear_elasticity_proteus_hex8_inexact_store(nelements, options, stream);
+        case smesh::TET10:
+          return codegen::linear_elasticity_tet10_inexact_store(nelements, options, stream);
+        case smesh::TET4:
+          return codegen::linear_elasticity_tet4_inexact_store(nelements, options, stream);
+        default:
+          return nullptr;
+      }
+    }
+
+    bool inexact_element(const smesh::ElemType element_type) {
+      switch (element_type) {
+        case smesh::HEX27:
+        case smesh::HEX8:
+        case smesh::PROTEUS_HEX27:
+        case smesh::PROTEUS_HEX8:
+        case smesh::TET10:
+        case smesh::TET4:
+          return true;
+        default:
+          return false;
+      }
+    }
+  }  // namespace
+
+  bool GPUGeneratedLinearElasticity::inexact_supported() const {
+    if (impl_->space->mesh()->spatial_dimension() != 3) return false;
+    for (const auto &entry : impl_->domains->domains()) {
+      if (!inexact_element(entry.second.element_type)) return false;
+    }
+    return true;
+  }
+
+  bool GPUGeneratedLinearElasticity::tangent_is_symmetric() const { return true; }
+
+  void GPUGeneratedLinearElasticity::set_inexact_options(const InexactOptions &options) {
+    options.validate();
+    impl_->inexact.options = options;
+    impl_->inexact.stores.clear();
+    impl_->inexact.bsr.reset();
+  }
+
+  std::size_t GPUGeneratedLinearElasticity::inexact_bytes() const { return impl_->inexact.bytes(); }
+
+  int GPUGeneratedLinearElasticity::inexact_diag(real_t *const diag) {
+    SFEM_TRACE_SCOPE("GPUGeneratedLinearElasticity::inexact_diag");
+    if (impl_->inexact.assembled()) return impl_->inexact.diagonal_bsr(diag);
+    if (auto term = time_scheme_term(impl_->time_scheme)) {
+      if (term->hessian_diag(impl_->inexact.state, diag) != SFEM_SUCCESS) {
+        return SFEM_FAILURE;
+      }
+    }
+    return impl_->domains->iterate([&](const OpDomain &domain) {
+      auto store = impl_->inexact.stores.find(domain.block.get());
+      if (store == impl_->inexact.stores.end() || !store->second) {
+        SFEM_ERROR("GPUGeneratedLinearElasticity::inexact_diag requires inexact_update first\n");
+        return SFEM_FAILURE;
+      }
+      store->second->diagonal(domain.block->n_elements(), element_connectivity(domain), 3, diag);
+      return SFEM_SUCCESS;
+    });
+  }
+
+  int GPUGeneratedLinearElasticity::inexact_update(const real_t *const x) {
+    SFEM_TRACE_SCOPE("GPUGeneratedLinearElasticity::inexact_update");
+    auto mesh = impl_->space->mesh();
+    impl_->inexact.state = x;
+    impl_->inexact.stream = stream;
+    if (impl_->inexact.assembled()) {
+      return impl_->inexact.update_bsr(
+          impl_->space->element_node_graph(),
+          tangent_is_symmetric(),
+          [&](const count_t *rowptr, const idx_t *colidx, smesh::PrimitiveType type, void *values) {
+            return hessian_bsr_typed(x, rowptr, colidx, type, values);
+          });
+    }
+    return impl_->domains->iterate([&](const OpDomain &domain) {
+      auto &store = impl_->inexact.stores[domain.block.get()];
+      if (!store) {
+        store = create_inexact_store(domain.element_type, domain.block->n_elements(), impl_->inexact.options, stream);
+        if (!store) {
+          SFEM_ERROR("GPUGeneratedLinearElasticity::inexact_update has no stored tangent for element %d\n", (int)domain.element_type);
+          return SFEM_FAILURE;
+        }
+      }
+      const real_t parameters[2] = {
+          domain.parameters->require_real_value("lmbda"),
+          domain.parameters->require_real_value("mu")};
+      inexact::SetupInput input;
+      input.nelements = domain.block->n_elements();
+      input.elements = element_connectivity(domain);
+      auto cache = std::static_pointer_cast<AffineGeometryCache>(domain.user_data);
+      if ((impl_->apply_uses_affine || geometry_is_forced_affine(domain.element_type)) && cache && cache->jacobian_soa) {
+        input.adjugate = reinterpret_cast<const geom_t *const *>(cache->jacobian_soa->adjugate_components());
+        input.determinant = reinterpret_cast<const geom_t *>(cache->jacobian_soa->jacobian_determinant()->data());
+      } else {
+        input.points = element_points(mesh);
+      }
+      input.parameters = parameters;
+      input.u_stride = 3;
+      input.u = x;
+      store->update(input);
+      return SFEM_SUCCESS;
+    });
+  }
+
+  int GPUGeneratedLinearElasticity::inexact_apply(const real_t *const h, real_t *const out) {
+    SFEM_TRACE_SCOPE("GPUGeneratedLinearElasticity::inexact_apply");
+    // The assembled store holds the whole tangent, inertia included.
+    if (impl_->inexact.assembled()) return impl_->inexact.apply_bsr(h, out);
+    if (auto term = time_scheme_term(impl_->time_scheme)) {
+      if (term->apply(impl_->inexact.state, h, out) != SFEM_SUCCESS) {
+        return SFEM_FAILURE;
+      }
+    }
+    return impl_->domains->iterate([&](const OpDomain &domain) {
+      auto store = impl_->inexact.stores.find(domain.block.get());
+      if (store == impl_->inexact.stores.end() || !store->second) {
+        SFEM_ERROR("GPUGeneratedLinearElasticity::inexact_apply requires inexact_update first\n");
+        return SFEM_FAILURE;
+      }
+      const inexact::PackedView *const packed = nullptr;
+      store->second->apply(domain.block->n_elements(), element_connectivity(domain), packed, 3, h, out);
+      return SFEM_SUCCESS;
+    });
+  }
 }  // namespace sfem

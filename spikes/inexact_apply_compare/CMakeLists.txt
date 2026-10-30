@@ -358,45 +358,6 @@ if(EXISTS "${SPIKE_KERNEL_DIR}/${SPIKE_MATERIAL}_${SPIKE_KERNEL_ELEMENT_LOWER}_i
         STORED_APPLY=sfem::codegen::${_stem}_inexact_apply_stored_a_msoa_impl
         COMPRESSED_APPLY=sfem::codegen::${_stem}_inexact_apply_compressed_a_msoa_impl)
     message(STATUS "bench_split, warp_sweep: ${SPIKE_MATERIAL} on ${SPIKE_ELEMENT}")
-
-    # The compressed quadrature-point store (qp/).  Its element stages and its set-up kernel
-    # are emitted from the generated P0 tangent kernel at configure time, like the kernels.
-    # TET10 stores the P2 moments of the 11-point rule, which its residual, matrix-free and BSR
-    # operators integrate with; TET10Q4 stores the point values of the 4-point affine rule.
-    set(SPIKE_QP_ELEMENT "${SPIKE_ELEMENT}" CACHE STRING "Element variant of the qp store")
-    set(_qp_gen "${CMAKE_CURRENT_BINARY_DIR}/qp_gen")
-    execute_process(
-        COMMAND "${SPIKE_PYTHON}" "${CMAKE_CURRENT_SOURCE_DIR}/qp/make_qp_kernels.py"
-                "${SPIKE_QP_ELEMENT}" "${SPIKE_KERNEL_DIR}/${_kstem}_inexact_apply_inline.hpp" "${_qp_gen}"
-        RESULT_VARIABLE _qp_status)
-    if(NOT _qp_status EQUAL 0)
-        message(FATAL_ERROR "make_qp_kernels.py failed (${_qp_status})")
-    endif()
-    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
-        "${CMAKE_CURRENT_SOURCE_DIR}/qp/make_qp_kernels.py")
-    add_executable(bench_qp qp/bench_qp.cpp $<TARGET_OBJECTS:spike_kernels>)
-    target_link_libraries(bench_qp PRIVATE spike_common)
-    target_include_directories(bench_qp PRIVATE "${_qp_gen}" "${CMAKE_CURRENT_SOURCE_DIR}/qp"
-        "${SPIKE_SFEM}/src/frontend/ops/prony")
-    # The assembled Jacobian's entry point is the affine one (adjugates) where the element has an
-    # affine geometry cache, and the isoparametric one (points) otherwise.
-    file(GLOB _qp_ops "${SPIKE_GEN_DIR}/*_operator.cpp")
-    set(_qp_bsr "${_stem}_hessian_bsr_i_msoa")
-    foreach(_op IN LISTS _qp_ops)
-        file(STRINGS "${_op}" _hit REGEX "${_stem}_hessian_bsr_a_msoa\\(")
-        if(_hit)
-            set(_qp_bsr "${_stem}_hessian_bsr_a_msoa")
-            target_compile_definitions(bench_qp PRIVATE BSR_AFFINE)
-        endif()
-    endforeach()
-    target_compile_definitions(bench_qp PRIVATE ${_single_macros} MESH_ORDER=\"${SPIKE_MESH_ORDER}\"
-        MATERIAL_HESSIAN_BSR=${_qp_bsr})
-    # The reference is the operator that integrates with the same rule as the store: the affine
-    # exact apply, except for the 11-point TET10 store, whose rule only BSR shares.
-    if(SPIKE_QP_ELEMENT STREQUAL "TET10" OR SPIKE_QP_ELEMENT STREQUAL "TET10P11")
-        target_compile_definitions(bench_qp PRIVATE QP_REFERENCE_BSR)
-    endif()
-    message(STATUS "bench_qp: ${SPIKE_MATERIAL} on ${SPIKE_ELEMENT}")
 endif()
 
 # `scale_probe.cpp` is deliberately not a target: it names one kernel header
@@ -405,35 +366,8 @@ endif()
 # and compiled the same way, which is why it stayed useful when the harnesses
 # were the thing under suspicion.
 
-# PROTEUS_HEX27: the qp store and the element matrices only.  The references integrate with the
-# same 4^3 rule as the store: the isoparametric exact apply and BSR.
-if(_spike_no_p0)
-    set(_stem "${SPIKE_MATERIAL}_${SPIKE_ELEMENT_LOWER}")
-    set(_single_macros MATERIAL_LABEL=\"${SPIKE_MATERIAL}\" NO_P0 EXACT_ISO
-        EXACT_APPLY=${_stem}_apply_i_msoa EXACT_TAKES_STATE)
-    set(SPIKE_QP_ELEMENT "${SPIKE_ELEMENT}" CACHE STRING "Element variant of the qp store")
-    set(_qp_gen "${CMAKE_CURRENT_BINARY_DIR}/qp_gen")
-    execute_process(
-        COMMAND "${SPIKE_PYTHON}" "${CMAKE_CURRENT_SOURCE_DIR}/qp/make_qp_kernels.py" "${SPIKE_QP_ELEMENT}"
-                "${SPIKE_SFEM}/src/frontend/ops/generated/${SPIKE_MATERIAL}/d3/proteus_hex8/${SPIKE_MATERIAL}_proteus_hex8_inexact_apply_inline.hpp"
-                "${_qp_gen}"
-        RESULT_VARIABLE _qp_status)
-    if(NOT _qp_status EQUAL 0)
-        message(FATAL_ERROR "make_qp_kernels.py failed (${_qp_status})")
-    endif()
-    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
-        "${CMAKE_CURRENT_SOURCE_DIR}/qp/make_qp_kernels.py")
-    add_executable(bench_qp qp/bench_qp.cpp $<TARGET_OBJECTS:spike_kernels>)
-    target_link_libraries(bench_qp PRIVATE spike_common)
-    target_include_directories(bench_qp PRIVATE "${_qp_gen}" "${CMAKE_CURRENT_SOURCE_DIR}/qp"
-        "${SPIKE_SFEM}/src/frontend/ops/prony" "${SPIKE_SFEM}/src/frontend/ops/generated/reference")
-    target_compile_definitions(bench_qp PRIVATE ${_single_macros} MESH_ORDER=\"${SPIKE_MESH_ORDER}\"
-        MATERIAL_HESSIAN_BSR=${_stem}_hessian_bsr_i_msoa QP_REFERENCE_BSR
-        PACKED_EXACT_APPLY=${_stem}_apply_packed_two_pass_i_msoa)
-    message(STATUS "bench_qp: ${SPIKE_MATERIAL} on ${SPIKE_ELEMENT} (no projected path)")
-endif()
 
-if(NOT TARGET bench_split AND NOT TARGET bench_mixed AND NOT TARGET bench_qp)
+if(NOT TARGET bench_split AND NOT TARGET bench_mixed)
     message(FATAL_ERROR
         "no harness matched the generated kernels in ${SPIKE_GEN_DIR}: "
         "expected <material>_<element>_inexact_apply_inline.hpp or the "
@@ -526,39 +460,8 @@ elseif(NOT SPIKE_SFEM_LIBRARY)
         "op_inexact_check, which go through the Op wrappers rather than the kernels")
 endif()
 
-# ------------------------------------------------ Newton with the qp store (needs libsfem)
+# ------------------------------------------------------------------- the qp store
 #
-# The case runs as the playground runs it, with the material's inexact pair replaced by the qp
-# kernels of this build's element (qp/newton_qp.exe.cpp).
-if(SPIKE_SFEM_LIBRARY AND TARGET bench_qp)
-    find_library(SPIKE_SMESH_LIBRARY NAMES smesh HINTS "${SPIKE_SFEM_BUILD}/external/smesh" NO_DEFAULT_PATH)
-    find_library(SPIKE_RYML_LIBRARY NAMES ryml HINTS "${SPIKE_SFEM_BUILD}/_deps/ryml-build" NO_DEFAULT_PATH)
-    add_executable(newton_qp qp/newton_qp.exe.cpp)
-    target_link_libraries(newton_qp PRIVATE spike_common "${SPIKE_SFEM_LIBRARY}" ${SPIKE_SMESH_LIBRARY}
-        ${SPIKE_RYML_LIBRARY})
-    target_include_directories(newton_qp PRIVATE "${_qp_gen}" "${CMAKE_CURRENT_SOURCE_DIR}/qp"
-        "${SPIKE_SFEM}/src/frontend/ops/prony" ${SPIKE_SFEM_SOURCE_INCLUDES} ${SPIKE_SFEM_DEP_INCLUDES})
-    target_compile_definitions(newton_qp PRIVATE ${_single_macros})
-    message(STATUS "newton_qp: linked against ${SPIKE_SFEM_LIBRARY}")
-endif()
-
-# Lane width of the qp bench's stores and kernels (an experiment axis; the source default is 16).
-set(SPIKE_LANE_VS "" CACHE STRING "LANE_VS for bench_qp; empty keeps the source default")
-if(TARGET bench_qp AND SPIKE_LANE_VS)
-  target_compile_definitions(bench_qp PRIVATE LANE_VS=${SPIKE_LANE_VS})
-endif()
-
-# ------------------------------------------------------- the qp formats on the GPU (qp/cuda)
-#
-# Off by default, so the CPU build is untouched.  Needs a CUDA-enabled libsfem as SPIKE_SFEM_BUILD.
-option(SPIKE_ENABLE_CUDA "Build the GPU drivers of the qp spike (qp/cuda)" OFF)
-if(SPIKE_ENABLE_CUDA AND TARGET bench_qp)
-    if(NOT SPIKE_SFEM_LIBRARY)
-        message(FATAL_ERROR "SPIKE_ENABLE_CUDA needs libsfem under ${SPIKE_SFEM_BUILD}")
-    endif()
-    if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
-        set(CMAKE_CUDA_ARCHITECTURES 90)
-    endif()
-    enable_language(CUDA)
-    add_subdirectory(qp/cuda)
-endif()
+# The compressed formats (qp/) are library features now (src/frontend/ops/inexact/, and cuda/):
+# Newton runs them through the playground (solver.linear.format: INEXACT) and
+# drivers/bench/bench_inexact.exe.cpp measures them.  This spike's own copies are at 0644f59ac.
