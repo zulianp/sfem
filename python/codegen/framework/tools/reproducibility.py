@@ -283,21 +283,6 @@ _MET_PATTERN = r"%s(\d+)" % re.escape(conventions.abi_geometry_name("geom_metric
 _MET_AOS = conventions.abi_geometry_name("geom_metric")
 
 #: Pointer element types that name a field the kernel reads or writes.
-#: The most components an element tangent can have: 3x3x3x3 with no symmetry.
-#: The store is over-allocated to this rather than sized from the plan, because
-#: the plan's answer depends on the material's flux form and this harness reads
-#: only emitted text.  Over-allocating is safe -- the kernel touches the slots it
-#: was generated for -- and the untouched tail is deterministic zeros, so the
-#: digest stays stable and still moves when the kernel does.
-TANGENT_SLOTS = 81
-
-#: The stored element tangent, which is element-indexed rather than node-indexed
-#: and therefore sized and seeded differently from every other buffer here.  The
-#: compressed store is deliberately absent: it is `half_t`, which this driver has
-#: no arithmetic for, and no Op calls that entry point.
-STORE_IN_FIELDS = ("const metric_tensor_t *const %s" % _RSTR,)
-STORE_OUT_FIELDS = ("metric_tensor_t *const %s" % _RSTR,)
-
 IN_FIELDS = (
     "const double *const %s" % _RSTR,
     "const float *const %s" % _RSTR,
@@ -341,12 +326,6 @@ def _scalar_type(ctype):
     if "void" in ctype:
         # Driven at SMESH_FLOAT64, so the buffer behind the void is a double.
         return "double"
-    # The store's own type, before the generic scalars: `metric_tensor_t` is a
-    # `float` typedef and matching on the word would size the buffer right and
-    # name the type wrong.
-    for name in ("metric_tensor_t",):
-        if name in ctype:
-            return name
     for name in ("double", "float", "real_t"):
         if name in ctype:
             return name
@@ -480,22 +459,6 @@ def _bind(params, element, components, block_values=None):
             args.append("graph.rowptr.data()")
         elif name == "colidx" and "idx_t" in ctype:
             args.append("graph.colidx.data()")
-        elif ctype in STORE_OUT_FIELDS:
-            # Element-indexed, so its length is the element count and not the
-            # node count, and it is seeded by index rather than through the
-            # packed permutation -- packing renumbers nodes and never elements,
-            # so element e is element e in both layouts.
-            scalar = _scalar_type(ctype)
-            buffer = "out_%s_%s" % (scalar, name)
-            length = "(size_t)%s.nelements * %d" % (mesh, TANGENT_SLOTS)
-            outputs.append((buffer, scalar, name, components, extent, length))
-            args.append("%s.data()" % buffer)
-        elif ctype in STORE_IN_FIELDS:
-            scalar = _scalar_type(ctype)
-            buffer = "in_%s_%s" % (scalar, name)
-            length = "(size_t)%s.nelements * %d" % (mesh, TANGENT_SLOTS)
-            inputs.append((buffer, scalar, name, components, extent, length))
-            args.append("%s.data()" % buffer)
         elif ctype in OUT_FIELDS:
             scalar = _scalar_type(ctype)
             buffer = "out_%s_%s" % (scalar, name)
@@ -1497,12 +1460,10 @@ def _unpacked_twin(name):
     That spelling only ever matched the one-pass kernels: a two-pass name
     carries `_packed_two_pass_`, and removing `_packed_` from it leaves
     `_two_pass_`, which names nothing -- so every two-pass kernel in the tree
-    silently paired with nothing and went unchecked. The qualifier slot can also
-    hold a store *and* a traversal, as a packed inexact apply does, and only the
-    traversal is what the twin lacks.
+    silently paired with nothing and went unchecked.
     """
     try:
-        traversal = conventions.abi_traversal(conventions.abi_qualifier(name))
+        traversal = conventions.abi_qualifier(name)
     except ValueError:
         return None
     if not traversal:

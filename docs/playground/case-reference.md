@@ -275,8 +275,34 @@ obstacle:
 | `linear.atol` | `1e-16` | |
 | `linear.max_it` | `2000` | |
 | `linear.storage_bytes` | `8` | `4` stores the BSR tangent in single precision (`node_sdf`'s too); `2` in half precision (host, without constraints or obstacle). |
+| `linear.inexact.store` | `points` | With `format: INEXACT`, what the material's operator stores of its tangent: `points` (the tangent at every quadrature point, moments on TET10), `element_matrix` (element matrices in difference form), or `bsr` (its assembled tangent, quantized). |
+| `linear.inexact.encoding` | `f32` | `points`: `f64`, `f32`, `f16`, `i8md` (int8 deviations from an f32 element mean). `element_matrix`: `f64`, `f32`, `f16`, `i8pair` (int8 with a factor per node pair). `bsr`: `f16`, `i8` (a scale per block). |
+| `linear.inexact.fold` | `auto` | The folded point store of the hexahedra (exact, fewer numbers): `auto`, `on`, `off`. |
+| `linear.inexact.traversal` | `auto` | `packed` (the packed mesh, deterministic) when the space has one, `atomic` otherwise. |
 
 With an obstacle, the obstacle's step replaces the linear solver.
+
+`format: INEXACT` applies the stored tangent of every operator that has one (GeneratedNeoHookeanOgden,
+GeneratedLinearElasticity, GeneratedLinearKelvinVoigt, GeneratedMooneyRivlinKelvinVoigt,
+GeneratedMooneyRivlinProny, on the 3D elements each is generated for) and the exact apply of the
+others. The
+stored tangent is the exact one up to its encoding's rounding: `f64` gives BSR's iterations. A
+material whose tangent is not symmetric (Mooney-Rivlin Kelvin-Voigt) needs `linear.type: bcgs`.
+
+```yaml playground
+mesh:
+  box: {n: [4, 4, 4]}
+  sidesets:
+    - {name: left, plane: {axis: x, at: min}}
+    - {name: right, plane: {axis: x, at: max}}
+material: {type: GeneratedNeoHookeanOgden, young_modulus: 1, poisson_ratio: 0.3}
+dirichlet_conditions:
+  - {type: sideset, format: name, name: left, component: [0, 1, 2], value: [0, 0, 0]}
+  - {type: sideset, format: name, name: right, component: [0], value: [0.1]}
+regime: steady
+solver:
+  linear: {format: INEXACT, preconditioner: none, inexact: {store: points, encoding: f16}}
+```
 
 ## output
 
@@ -326,5 +352,4 @@ Every `profile` (and `loads.profile`, `obstacle.release`) is a map with a **requ
 
 **On the device** (`execution_space: device`):
 
-- `constraints` are not available;
-- Dirichlet conditions with a `profile` are not available.
+- a torque-controlled or released rotation is not available.

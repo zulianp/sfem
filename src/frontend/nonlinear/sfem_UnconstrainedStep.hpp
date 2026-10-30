@@ -4,6 +4,7 @@
 #include <memory>
 #include <string>
 
+#include "sfem_InexactOptions.hpp"
 #include "sfem_LinearizedStep.hpp"
 #include "sfem_defs.hpp"
 
@@ -31,6 +32,8 @@ namespace sfem {
         /// Bytes per stored value of an assembled BSR tangent: 2, 4 or sizeof(real_t)
         /// (BSRTangent::create).
         int storage_bytes{(int)sizeof(real_t)};
+        /// What format INEXACT stores (`solver.linear.inexact`).
+        InexactOptions inexact;
     };
 
     /// The linearised step without constraints beyond the Dirichlet rows: K dx = -r by a Krylov

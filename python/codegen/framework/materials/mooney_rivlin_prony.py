@@ -71,6 +71,9 @@ material = gen.CodeGenerator(
         ("K", 1.0),
     ),
     matrix_formats=("bsr",),
+    # The stored tangent reads the relaxation's step weight and its history at the same points
+    # the history lives at, which are the rule's.
+    inexact_apply=True,
 )
 
 

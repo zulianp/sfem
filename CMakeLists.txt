@@ -128,6 +128,7 @@ list(APPEND SFEM_MODULES
     frontend/constraints
     frontend/ops
     frontend/ops/prony
+    frontend/ops/inexact
     frontend/nonlinear
     frontend/mech
 )
@@ -490,7 +491,7 @@ if(SFEM_ENABLE_TESTING)
         endif()
         # Tests whose cases are YAML.
         if(NOT SFEM_ENABLE_RYAML AND TEST_DRIVER_NAME MATCHES
-           "^sfem_(ElasticityCase|PlaygroundCases|PlaygroundContact|LoadProfile|CudaEnergyBSRAssembly)Test$")
+           "^sfem_(ElasticityCase|PlaygroundCases|PlaygroundContact|LoadProfile|CudaEnergyBSRAssembly|InexactViscous)Test$")
             continue()
         endif()
         add_executable(${TEST_DRIVER_NAME} ${TEST_DRIVER})
