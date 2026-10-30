@@ -582,3 +582,8 @@ and its BSR references only, so the old log stays and the new one overrides thos
   -61%): such reads serialise across the warp.  The HEX27 device store therefore keeps 45 numbers
   per point (the code before the fold), and `bench_qp_cuda`'s set-up gate compares it with the
   45-number host store; HEX8's device codes equal the folded host store's bit for bit.
+- The H100 HEX8 jobs with a point store were rerun on the folded store (5212318-5212323,
+  `gfold_campaign.sh`; the replaced bench and bench-sweep logs in `measured_gpu/superseded/pre_fold/`,
+  the Newton logs override the point stores' runs): Newton and CG counts unchanged; time to solution
+  at 1e7 dof f16 11.80 s (was 12.96), int8 mean+dev 11.89 (12.69); at 1e6 0.77 (0.81) and 0.75
+  (0.79); twist 4.23 (4.53) and 4.30 (4.51).
