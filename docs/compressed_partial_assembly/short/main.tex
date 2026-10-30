@@ -141,9 +141,14 @@ for sparse matrix--vector products the precision has been chosen per non-zero~\c
 per row~\cite{Tezcan2022} among floating-point formats, and matrix-free multigrid runs in single
 precision inside a double-precision iteration~\cite{KronbichlerLjungkvist2019}.  Fixed-rate
 compression~\cite{Lindstrom2014} and microscaling formats~\cite{Rouhani2023} share a scale per small
-block.  We found no comparison of quantized formats across the assembled, element and quadrature
-levels, no quantization of a stiffness matrix to eight bits, and no encoding that keeps the rigid
-translations in the kernel of the encoded operator.  Inexact Newton methods converge at a rate set
+block.  Adaptive-precision products store the smallest entries of a sparse matrix in as few as
+eight bits~\cite{Graillat2024}; finite-element solvers have run their products in mixed $16$- to
+$64$-bit formats~\cite{Ichimura2018} and on INT8 tensor cores with an exactly represented element
+matrix~\cite{Ichimura2024}, and computed element matrices in mixed single and half
+precision~\cite{CrociWells2024}.  We found no comparison of reduced-precision formats across the
+assembled, element and quadrature levels, no stiffness matrix with every entry encoded in eight
+bits, and no encoding that keeps the rigid translations in the kernel of the encoded operator,
+although the difference form itself is that of edge-based schemes~\cite{Lohner2008}.  Inexact Newton methods converge at a rate set
 by the forcing term~\cite{DemboEisenstatSteihaug1982}, to which a Jacobian error
 adds~\cite{Kelley2018,Catinas2001}; Jacobians stored in reduced precision have been analysed in this
 way~\cite{Kelley2022}.

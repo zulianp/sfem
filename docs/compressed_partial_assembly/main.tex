@@ -213,9 +213,19 @@ blocks are stored in half, single or double precision chosen per block \cite{Anz
 accessors that hide the storage format of a sparse product behind its loads
 \cite{Gruetzmacher2023}; see \cite{HighamMary2022,Abdelfattah2021} for surveys.  For sparse
 matrix--vector products the precision has been chosen per non-zero \cite{Ahmad2019} or per row
-\cite{Tezcan2022} by the magnitude of the entries, among floating-point formats; we found no
-quantization of a stiffness matrix to eight bits, nor one that keeps the rigid translations in its
-kernel.  Matrix-free
+\cite{Tezcan2022} by the magnitude of the entries, among floating-point formats; adaptive-precision
+products go down to an eight-bit format, but only for the smallest entries, the bulk staying in $16$
+to $64$ bits \cite{Graillat2024}.  Finite-element solvers have run their matrix--vector products in a
+mix of $16$-, $21$-, $32$- and $64$-bit formats \cite{Ichimura2018} and on INT8 tensor cores, with a
+constant voxel element matrix held exactly in eight-bit integers and the vectors split into
+eight-bit digits to double-precision accuracy \cite{Ichimura2024}, and the rounding error of cell
+kernels and assembly in mixed single and half precision has been analysed
+\cite{CrociWells2024}.  We found no comparison of reduced-precision formats across the assembled,
+element and quadrature levels, and no stiffness matrix with every entry encoded in eight bits.
+Storing the matrices of a multigrid hierarchy in low precision can make them indefinite
+\cite{Tamstorf2021}; writing each row as a sum of differences, as edge-based schemes do
+\cite{Lohner2008}, keeps constants in the kernel, but we found no encoding that uses it to keep the
+rigid translations in the kernel of the encoded operator.  Matrix-free
 multigrid runs its V-cycle in single precision inside a double-precision outer iteration
 \cite{KronbichlerLjungkvist2019}.  Fixed-rate block compression with a shared exponent per block
 and a decorrelating transform \cite{Lindstrom2014} motivates two of our design choices: one scale
@@ -577,7 +587,8 @@ saves the diagonal and, more importantly, keeps the translations in the kernel o
 \emph{encoded} operator whatever the rounding: the encoding error multiplies differences of the
 increment, not the increment, which is the property Section~\ref{sec:errormodel} identifies as the
 one that matters for smooth modes.  The differences are formed in the vector's precision before the
-contraction, as for the gradients of the quadrature-point schedules.
+contraction, as for the gradients of the quadrature-point schedules.  The form is that of edge-based
+schemes \cite{Lohner2008}; here it serves the encoding.
 
 \paragraph{A scale per node pair.}  One int8 scale per element spends the code range on the
 largest block: the blocks $K_{pq}$ of one element differ in magnitude by orders on higher-order
@@ -1565,7 +1576,7 @@ machine.}
 
 \begin{figure*}[t]
 \centering
-\includegraphics[width=0.74\textwidth]{figures/appmesh.pdf}
+\includegraphics[width=0.72\textwidth]{figures/appmesh.pdf}
 \Description{Two grouped bar charts, Grace above and H100 below, of million degrees of freedom per
 second for each format on eight unstructured valve meshes, as given and refined once.}
 \caption{Application throughput on the meshes of Table~\ref{tab:appmesh} (V: valve, P: pump valves;
@@ -1576,7 +1587,7 @@ Figure~\ref{fig:throughput} without the mean-and-deviation store, which TET4 doe
 
 \begin{figure*}[t]
 \centering
-\includegraphics[width=0.74\textwidth]{figures/appmesh_tet10.pdf}
+\includegraphics[width=0.72\textwidth]{figures/appmesh_tet10.pdf}
 \Description{Two grouped bar charts, Grace above and H100 below, of million degrees of freedom per
 second for each format on four unstructured valve meshes promoted to TET10.}
 \caption{Application throughput on the TET10 meshes of Table~\ref{tab:appmesh}, promoted from the
