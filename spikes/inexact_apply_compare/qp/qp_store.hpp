@@ -11,6 +11,11 @@
 //   Layout  SoA                 one array per (tensor, component) over the elements
 //           Blocked             all numbers of a block of VS elements contiguous: tensor,
 //                               component, lane
+//   FOLD    true                the folded store of the tensor-product elements (Element::MASK):
+//                               a point stores only the components its mask keeps.  The default
+//                               wherever it applies (blocked, one scale per element): it is exact
+//                               and measured faster for every encoding on Grace (RESULTS_QP.md)
+//           false               45 numbers per point
 //
 // Decoding returns the value the contraction needs (eq. "decode" of the paper); for the plain
 // scaled codecs the scale is left to the caller, which multiplies the outputs.
@@ -49,7 +54,8 @@ struct CodeTraits<int8_t> {
     static int8_t encode(double v, double inv) { return sfem::Int8Codec::encode((real_t)v, (real_t)inv); }
 };
 
-template <class El, typename code_t, Scheme SCH, Layout LAY, int VS_>
+template <class El, typename code_t, Scheme SCH, Layout LAY, int VS_,
+          bool FOLD = El::foldable && LAY == Layout::Blocked && SCH != Scheme::PerComponent>
 struct Store {
     using Element = El;
     using code_type = code_t;
@@ -63,7 +69,12 @@ struct Store {
     static constexpr bool has_aux = SCH == Scheme::MeanDeviation;
     static constexpr bool per_component = SCH == Scheme::PerComponent;
     static constexpr bool is_element_matrix = false;
+    static constexpr bool folded = FOLD;
+    // Stored numbers per element.
+    static constexpr int NSE = FOLD ? El::NS : NV * 45;
     static_assert(SCH == Scheme::Plain || scaled, "the deviation and per-component schemes need a scaled code");
+    static_assert(!FOLD || (El::foldable && LAY == Layout::Blocked && SCH != Scheme::PerComponent),
+                  "the folded store is blocked, on a tensor-product element, with one scale per element");
 
     ptrdiff_t nelements = 0, stride = 0, nblocks = 0;
     std::vector<code_t> codes;
@@ -73,7 +84,7 @@ struct Store {
     explicit Store(ptrdiff_t ne) : nelements(ne) {
         nblocks = (ne + VS - 1) / VS;
         stride = LAY == Layout::SoA ? ne + 64 : nblocks * VS;
-        codes.assign((size_t)NV * 45 * stride, code_t(0));
+        codes.assign((size_t)NSE * stride, code_t(0));
         if (scaled) scales.assign((size_t)(per_component ? 45 : 1) * stride, 1.0f);
         if (has_aux) aux.assign((size_t)45 * stride, 0.0f);
     }
@@ -83,7 +94,7 @@ struct Store {
     }
     // Bytes per element as the model counts them, without padding.
     static constexpr std::size_t bytes_per_element() {
-        return (std::size_t)NV * 45 * sizeof(code_t) + (scaled ? (per_component ? 45 : 1) * sizeof(float) : 0) +
+        return (std::size_t)NSE * sizeof(code_t) + (scaled ? (per_component ? 45 : 1) * sizeof(float) : 0) +
                (has_aux ? 45 * sizeof(float) : 0);
     }
 
@@ -93,6 +104,11 @@ struct Store {
         const ptrdiff_t e = e0 + lane;
         if (LAY == Layout::SoA) return (size_t)(j * 45 + c) * stride + e;
         return ((size_t)(e / VS) * NV + j) * 45 * VS + (size_t)c * VS + (size_t)(e % VS);
+    }
+    // The folded store: the k-th number point j keeps.
+    SFEM_INLINE std::size_t fold_index(ptrdiff_t e0, int lane, int j, int k) const {
+        const ptrdiff_t e = e0 + lane;
+        return ((size_t)(e / VS) * NSE + El::OFF[j] + k) * VS + (size_t)(e % VS);
     }
     SFEM_INLINE std::size_t comp_index(ptrdiff_t e0, int lane, int c) const {
         const ptrdiff_t e = e0 + lane;
@@ -133,6 +149,24 @@ struct Store {
                 }
             }
 
+            if constexpr (FOLD) {
+                fold(T);
+                double top = 0;
+                for (int j = 0; j < NV; ++j)
+                    for (int k = 0; k < El::NKEEP[El::MASK[j]]; ++k)
+                        top = std::max(top, std::fabs(T[j][El::KEEP[El::MASK[j]][k]]));
+                double inv = 1;
+                if constexpr (scaled) {
+                    const double s = CodeTraits<code_t>::scale_for(top);
+                    scales[(size_t)evb + lane] = (float)s;
+                    inv = 1.0 / (double)(float)s;
+                }
+                for (int j = 0; j < NV; ++j)
+                    for (int k = 0; k < El::NKEEP[El::MASK[j]]; ++k)
+                        codes[fold_index(evb, lane, j, k)] = CodeTraits<code_t>::encode(T[j][El::KEEP[El::MASK[j]][k]], inv);
+                continue;
+            }
+
             if constexpr (scaled) {
                 if constexpr (per_component) {
                     for (int c = 0; c < 45; ++c) {
@@ -157,6 +191,18 @@ struct Store {
                 for (int j = 0; j < NV; ++j)
                     for (int c = 0; c < 45; ++c) codes[code_index(evb, lane, j, c)] = (code_t)T[j][c];
             }
+        }
+    }
+
+    // The fold (Element::MASK): along each line in direction d, the dropped point's m = n = d
+    // components move to the line's kept points.  Linear, so it commutes with removing the mean.
+    static void fold(double T[NV][45]) {
+        if constexpr (FOLD) {
+            for (int j = 0; j < NV; ++j)
+                for (int c = 0; c < 45; ++c) {
+                    const int d = El::DIR[c];
+                    if (d >= 0 && !((El::MASK[j] >> d) & 1)) T[j][c] += El::FCOEF[j][d] * T[El::FSRC[j][d]][c];
+                }
         }
     }
 

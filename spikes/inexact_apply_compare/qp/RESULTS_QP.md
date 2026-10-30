@@ -505,3 +505,38 @@ move to `superseded/` in their folders.
 1.39-1.67x BSR f32, fp16 element matrix 1.09-1.27x, fp16 points 0.88-0.92x).  On the H100 every
 element format is ahead of BSR f32 (1.03-1.31x); the int8 quantized matrix leads on the two larger
 meshes (1.48, 1.60x), the fp16 element matrix on the two smaller ones.
+
+## The folded point store on HEX8 and HEX27 (2026-10-30)
+
+A component with m = n = d (increment and test derivative along the same direction) multiplies a
+product of two d-derivatives; along a line of points in direction d that product is a polynomial of
+degree 2(p - 1) in xi_d, so q1 - 1 of the line's q1 points determine it.  The folded store
+(`Element::MASK`, `qp::Store`'s `FOLD`) drops those 18 components at one point per line and adds
+them to the line's other points with the Lagrange weights of the kept points at the dropped one: 1 on
+HEX8, (0.39, 1, -0.39) on HEX27 with an interior point dropped (dropping an end point would weigh
+2.53).  The application skips the dropped terms.  Per element: HEX8 360 -> 288 stored numbers, 648 ->
+540 multiply-adds in the contraction; HEX27 2880 -> 2592 and 5184 -> 4752.  These are the rank counts
+of Table 1, so the stores now hold the minimal number of values.
+
+Exact: the f64 store's error equals the 45-number store's (HEX8 2.19e-16, HEX27 2.45e-6 against the
+exact matrix-free apply, the HEX27 figure being the rule's).  The quantized errors grow by 1.2-1.5x in
+l2, the folded values being larger and setting the element scale (int8 mean+dev HEX8 2.7e-7 ->
+4.1e-7, HEX27 3.3e-6 -> 3.8e-6).
+
+Grace, 72 threads, 1.03e7 dof, packed two-pass, two repetitions alternating (Alps job 5211427,
+`measured_fold/fold_5211427.out`), MDOF/s, folded against 45 numbers:
+
+| store | HEX8 | | HEX27 | |
+|---|---|---|---|---|
+| f32 | 747 -> 887 | +19% | 783 -> 856 | +9% |
+| f16 | 1050 -> 1166 | +11% | 1123 -> 1169 | +4% |
+| int8 per element | 1169 -> 1298 | +11% | 1215 -> 1249 | +3% |
+| int8 mean+dev | 925 -> 990 | +7% | 1053 -> 1074 | +2% |
+| f16 mean+dev | 834 -> 912 | +9% | 1005 -> 1024 | +2% |
+
+(the second repetition within 1% of these gains).  The decode with the point's mask as a compile-time
+constant (eight instantiations, unrolled) was worse on every row (job 5211502,
+`measured_fold/fold_ctmask_5211502.out`: HEX8 f16 +2%, HEX27 int8 mean+dev -1%), so the decode loops
+over the kept components with the mask read at run time.  The fold is the default store of HEX8 and
+HEX27 wherever it applies (blocked, one scale per element); `bench_qp` keeps the 45-number store as
+the `nofold` rows, and the Registers form, which the folded store does not have, reads it.
