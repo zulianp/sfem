@@ -105,15 +105,20 @@ namespace sfem {
                             for (int lane = 0; lane < ne; ++lane) {
                                 const uint16_t v = nodes[evb + lane];
                                 bev[s][lane]     = v;
-                                for (int c = 0; c < D; ++c) bh[c][s][lane] = ph[D * v + c];
+                                // The node's offset once, in ptrdiff_t: the components are then
+                                // constant offsets from it.  `D * v + c` in int has gcc build a
+                                // sign-extended index vector per component and move every lane
+                                // out of it (TET4 f16 points on Grace: the traversal 9% slower).
+                                const ptrdiff_t at = D * (ptrdiff_t)v;
+                                for (int c = 0; c < D; ++c) bh[c][s][lane] = ph[at + c];
                             }
                         }
                         real_t bout[D][N][VS];
                         st.template block<tau>(evb, ne, bh, bout);
                         for (int s = 0; s < N; ++s)
                             for (int lane = 0; lane < ne; ++lane) {
-                                const uint16_t v = bev[s][lane];
-                                for (int c = 0; c < D; ++c) po[D * v + c] += bout[c][s][lane];
+                                const ptrdiff_t at = D * (ptrdiff_t)bev[s][lane];
+                                for (int c = 0; c < D; ++c) po[at + c] += bout[c][s][lane];
                             }
                         evb += ne;
                     }
