@@ -508,6 +508,7 @@ def survey(generated, device=False):
     """Every measurement, over one generated tree -- its host sources, or its device ones."""
     dead = []
     runs = collections.Counter()
+    runs_by_file = collections.defaultdict(list)
     wrappers = []
     constants = []
     parameters = []
@@ -539,10 +540,13 @@ def survey(generated, device=False):
         )
         for length in lane_loop_runs(source):
             runs[length] += 1
+            if length > 1:
+                runs_by_file[relative].append(length)
         wrappers.extend((relative, name) for name in wrapped_helper_entry_points(source))
     return {
         "dead": dead,
         "lane_loop_runs": runs,
+        "lane_loop_runs_by_file": dict(runs_by_file),
         "wrapped_helpers": wrappers,
         "unused_constants": constants,
         "unused_parameters": parameters,

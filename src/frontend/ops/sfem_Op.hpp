@@ -11,6 +11,7 @@
 
 #include "sfem_ElementScope.hpp"
 #include "sfem_ForwardDeclarations.hpp"
+#include "sfem_InexactOptions.hpp"
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_TangentValues.hpp"
 #include "sfem_aliases.hpp"
@@ -78,11 +79,41 @@ namespace sfem {
          *
          * An operator that supports it can have its tangent assembled once, at
          * a state, and then applied many times without touching the state or
-         * the geometry again -- partial assembly.  The apply that follows is
-         * inexact wherever the tangent varies within an element, and exact
-         * where it does not, which for a linear simplex is everywhere.
+         * the geometry again -- partial assembly.  The tangent is stored at the
+         * points of the rule the exact apply integrates with, so the stored
+         * apply is the exact one up to the rounding of its encoding
+         * (`InexactOptions`).
          */
         virtual bool inexact_supported() const { return false; }
+
+        /**
+         * @brief Whether the stored tangent has the major symmetry
+         *
+         * A tangent from an energy is a Hessian and symmetric; a residual's is
+         * a Jacobian and generally not (Kelvin-Voigt viscosity).  A solver on
+         * the stored operator asks, because CG on an unsymmetric operator is
+         * not a method.
+         */
+        virtual bool tangent_is_symmetric() const { return true; }
+
+        /**
+         * @brief What the stored tangent stores and how it is applied
+         *
+         * Takes effect at the next `inexact_update`; an operator without the
+         * stored path ignores it.
+         */
+        virtual void set_inexact_options(const InexactOptions & /*options*/) {}
+
+        /** @brief Bytes held by the stored tangent, 0 before `inexact_update`. */
+        virtual std::size_t inexact_bytes() const { return 0; }
+
+        /**
+         * @brief diag += the stored operator's diagonal, for a Jacobi preconditioner on it
+         *
+         * Computed from what is stored -- the tensors, the element matrices or the assembled
+         * blocks -- and so the diagonal of the operator `inexact_apply` applies.
+         */
+        virtual int inexact_diag(real_t *const /*diag*/) { return SFEM_FAILURE; }
 
         /**
          * @brief Assemble the stored tangent at x, for the applies that follow

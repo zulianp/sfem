@@ -15,7 +15,6 @@ from codegen.framework.package.op_wrappers import (
     generate_op_files,
     generate_op_registration_files,
 )
-from codegen.framework.emitters.inexact_apply_codegen import inexact_apply_files
 from codegen.framework.emitters.artifacts import (
     GeneratedKernelFile,
 )
@@ -307,10 +306,10 @@ class CodeGenerator:
     matrix_mesh_layouts: tuple = ("standard",)
     matrix_packed_passes: tuple = ("one_pass", "two_pass")
     matrix_patch_node_index_filter: bool = False
-    #: Opt in to the projected apply of `plans.inexact_apply`.  Off by default
-    #: and additive when on: it publishes an extra entry point beside the exact
-    #: one rather than replacing it, because on anything but an affine simplex
-    #: it computes a deliberately different operator.
+    #: Opt in to the stored-tangent apply (`plans.point_tangent`,
+    #: `plans.inexact_element`).  Off by default and additive when on: the
+    #: exact apply is untouched, and the stored one is reached only through
+    #: `inexact_update` and `inexact_apply`.
     inexact_apply: bool = False
 
     def __post_init__(self):
@@ -802,7 +801,9 @@ class CodeGenerationStage:
                         backend.target.source_subdirectory(),
                     ),
                 )
-                if _publishes_inexact_apply(unit.unit_name, wants_inexact):
+                if _publishes_inexact_apply(
+                    unit.unit_name, wants_inexact, unit.mixes_energy_and_residual
+                ):
                     _merge_files(
                         outputs,
                         _layout_codegen_files(
@@ -1887,12 +1888,12 @@ def _tensor_product_proteus_alias(element_name, proteus_name, dim, n_shape):
         # delegating to the PROTEUS twin the way it does on the host.
         "source_suffixes": tuple(
             "_%s_%s.%s" % (element_name, kind, extension)
-            for kind in ("operator", "boundary_operator", "inexact_apply_operator")
+            for kind in ("operator", "boundary_operator")
         ),
         "suffix_pairs": tuple(
             ("_%s_%s.%s" % (element_name, kind, extension),
              "_%s_%s.%s" % (proteus_name, kind, extension))
-            for kind in ("inexact_apply_operator", "operator", "boundary_operator")
+            for kind in ("operator", "boundary_operator")
         ),
     }
 

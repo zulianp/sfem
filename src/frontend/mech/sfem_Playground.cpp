@@ -436,11 +436,15 @@ namespace sfem {
                 if (!dirichlet) return SFEM_FAILURE;
 #ifdef SFEM_ENABLE_CUDA
                 if (es == EXECUTION_SPACE_DEVICE) {
+                    // The host conditions keep the profile; the device copy is refreshed after it.
+                    auto d = to_device(dirichlet);
+                    f->add_constraint(d);
                     if (has_profile(list)) {
-                        fprintf(stderr, "Playground: time-dependent Dirichlet conditions are host only\n");
-                        return SFEM_FAILURE;
+                        time_dependent.push_back([dirichlet, d](const real_t t) {
+                            if (dirichlet->set_time(t) != SFEM_SUCCESS) return SFEM_FAILURE;
+                            return refresh_device(*d);
+                        });
                     }
-                    f->add_constraint(to_device(dirichlet));
                 } else
 #endif
                 {
@@ -462,11 +466,6 @@ namespace sfem {
                     fprintf(stderr, "Playground: unknown constraint \"%s\" (rotation)\n", type.c_str());
                     return SFEM_FAILURE;
                 }
-                if (es != EXECUTION_SPACE_HOST) {
-                    fprintf(stderr, "Playground: rotation constraints are host only\n");
-                    return SFEM_FAILURE;
-                }
-
                 const auto name     = read_string(c, "sideset", "");
                 auto       sidesets = lookup.find(name);
                 const int  axis     = axis_of(read_string(c, "axis", ""));
@@ -483,6 +482,21 @@ namespace sfem {
 
                 auto rotation = Rotation::create(fs, sidesets, axis, center.data(), read<real_t>(c, "angle", 0), profile);
                 if (!rotation) return SFEM_FAILURE;
+                if (es != EXECUTION_SPACE_HOST) {
+                    // On the device the rotation prescribes through a device copy of its conditions,
+                    // refreshed after each set_time.  The torque is computed on host vectors.
+                    if (torque || has(c, "release")) {
+                        fprintf(stderr, "Playground: a torque-controlled or released rotation is host only\n");
+                        return SFEM_FAILURE;
+                    }
+                    auto d = to_device(rotation->conditions());
+                    f->add_constraint(d);
+                    time_dependent.push_back([rotation, d](const real_t t) {
+                        if (rotation->set_time(t) != SFEM_SUCCESS) return SFEM_FAILURE;
+                        return refresh_device(*d);
+                    });
+                    continue;
+                }
                 f->add_constraint(rotation);
                 rotations.push_back(rotation);
                 if (torque) {
@@ -931,6 +945,7 @@ namespace sfem {
             linear.atol           = read<real_t>(ln, "atol", linear.atol);
             linear.max_it         = read<int>(ln, "max_it", linear.max_it);
             linear.storage_bytes  = read<int>(ln, "storage_bytes", linear.storage_bytes);
+            if (has(ln, "inexact")) linear.inexact = inexact_options_from_yaml(ln["inexact"]);
             // A truncated direction needs the line search to scale it.
             linear.stop_on_negative_curvature = newton_options.line_search.enabled;
             // A linear problem is solved by one Newton step, so its linear solve goes as far as

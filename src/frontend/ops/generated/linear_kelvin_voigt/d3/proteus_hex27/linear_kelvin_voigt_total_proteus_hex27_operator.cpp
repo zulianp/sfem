@@ -1390,7 +1390,7 @@ static SFEM_INLINE void linear_kelvin_voigt_total_proteus_hex27_hessian_crs_i_ms
       const s_t *const RSTR row = &element_matrix[(bi * NS + row_shape) * N_COL_STREAMS];
       for (int bj = 0; bj < NC; ++bj) {
         for (int col_shape = 0; col_shape < NS; ++col_shape) {
-          v_t *const block = &values[entries[row_shape * NS + col_shape] * NC * NC];
+          v_t *const block = &values[(ptrdiff_t)entries[row_shape * NS + col_shape] * NC * NC];
 #pragma omp atomic update
           block[bi * NC + bj] += v_t(row[bj * NS + col_shape]);
         }

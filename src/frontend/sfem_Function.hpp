@@ -11,6 +11,7 @@
 
 #include "sfem_base.hpp"
 #include "sfem_defs.hpp"
+#include "sfem_InexactOptions.hpp"
 
 #include "sfem_mask.hpp"
 
@@ -122,6 +123,16 @@ namespace sfem {
          * keeps its exact apply, which is the same operator either way.
          */
         bool inexact_supported() const;
+
+        /// Whether every stored tangent has the major symmetry.
+        bool tangent_is_symmetric() const;
+
+        /// The stored tangent's format, for every operator that stores one.
+        void set_inexact_options(const InexactOptions &options);
+
+        /// The diagonal of the operator `inexact_apply` applies: the stored ones, and the exact
+        /// diagonal of the operators that store nothing; the constrained rows are 1.
+        int inexact_diag(const real_t *const x, real_t *const values);
 
         /**
          * @brief Assemble the stored tangent of every operator that has one

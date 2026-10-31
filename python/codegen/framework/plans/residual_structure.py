@@ -136,7 +136,9 @@ def published_block_kernels(unit_name, blocks):
     return tuple(blocks)
 
 
-def publishes_inexact_apply(unit_name, material_publishes_inexact_apply):
+def publishes_inexact_apply(
+    unit_name, material_publishes_inexact_apply, mixes_energy_and_residual=False
+):
     """Whether this unit publishes the projected (inexact) Jacobian action.
 
     The projected apply is a *variant* of the Jacobian action, so a unit that
@@ -147,7 +149,10 @@ def publishes_inexact_apply(unit_name, material_publishes_inexact_apply):
     tangent for a Jacobian nobody publishes -- twelve files per vector
     material, standing behind a merit kernel that does not use them.
     """
-    if unit_exists_for_the_merit(unit_name):
+    # The same unit as the Jacobian action it stores: the material's own unit,
+    # or -- for a material mixing an energy with a residual, whose parts mean
+    # nothing alone -- the unit carrying the whole residual.
+    if unit_exists_for_the_merit(unit_name) != bool(mixes_energy_and_residual):
         return False
     return bool(material_publishes_inexact_apply)
 

@@ -118,13 +118,12 @@ namespace sfem {
         if (impl.is_bsr()) {
             impl.tangent = BSRTangent::create(f, es, options.storage_bytes);
             if (!impl.tangent) return nullptr;
-        } else if (options.format == op_type::MATRIX_FREE ||
-                   (options.format == op_type::INEXACT && !f->inexact_supported())) {
+        } else if (options.format == op_type::MATRIX_FREE) {
             // Reads the iterate the Newton loop handed to `Function::update`; built once.
             impl.op = create_linear_operator(op_type::MATRIX_FREE, f, impl.state, es);
-        } else if (options.format == op_type::INEXACT) {
-            impl.op = create_linear_operator(op_type::INEXACT, f, impl.state, es);
         }
+        // INEXACT is built at the first linearisation: an operator that stores a tangent may join
+        // the function after the step is created.
 
         return ret;
     }
@@ -147,14 +146,32 @@ namespace sfem {
             impl.op = impl.tangent->op();
             if (impl.jacobi && impl.tangent->diagonal(impl.diag->data()) != SFEM_SUCCESS) return SFEM_FAILURE;
         } else {
-            if (impl.options.format == op_type::INEXACT && impl.f->inexact_supported()) {
-                if (impl.f->inexact_update(x) != SFEM_SUCCESS) return SFEM_FAILURE;
+            if (impl.options.format == op_type::INEXACT) {
+                if (impl.f->inexact_supported()) {
+                    if (!impl.op) {
+                        // Before the first store is built: the options decide its type.
+                        impl.f->set_inexact_options(impl.options.inexact);
+                        if (impl.options.type == "cg" && !impl.f->tangent_is_symmetric()) {
+                            fprintf(stderr,
+                                    "UnconstrainedStep: the stored tangent is not symmetric (a residual's Jacobian), "
+                                    "and CG needs a symmetric operator; use solver.linear.type bcgs\n");
+                            return SFEM_FAILURE;
+                        }
+                    }
+                    if (impl.f->inexact_update(x) != SFEM_SUCCESS) return SFEM_FAILURE;
+                }
+                // Matrix-free when no operator stores a tangent (create_linear_operator says so).
+                if (!impl.op) impl.op = create_linear_operator(op_type::INEXACT, impl.f, impl.state, impl.es);
             } else if (impl.options.format != op_type::MATRIX_FREE && impl.options.format != op_type::INEXACT) {
                 impl.op = create_linear_operator(impl.options.format, impl.f, impl.state, impl.es);
                 if (!impl.op) return SFEM_FAILURE;
             }
 
-            if (impl.jacobi) {
+            if (impl.jacobi && impl.options.format == op_type::INEXACT && impl.f->inexact_supported()) {
+                // The diagonal of the stored operator, the one the Krylov method applies.
+                impl.blas->zeros(impl.ndofs, impl.diag->data());
+                if (impl.f->inexact_diag(x, impl.diag->data()) != SFEM_SUCCESS) return SFEM_FAILURE;
+            } else if (impl.jacobi) {
                 impl.blas->zeros(impl.ndofs, impl.diag->data());
                 if (impl.f->hessian_diag(x, impl.diag->data()) != SFEM_SUCCESS) {
                     fprintf(stderr,

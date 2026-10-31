@@ -32,7 +32,7 @@ from codegen.framework.plans.energy import energy_soa_kernel_emission_plan
 from codegen.framework.plans.reference_data import reference_data_plan_from_emission_plan
 from codegen.framework.emitters.boundary_codegen import generate_boundary_residual_sfem_files
 from codegen.framework.emitters.artifacts import GeneratedKernelFile
-from codegen.framework.emitters.inexact_apply_codegen import inexact_apply_files
+from codegen.framework.emitters.inexact_codegen import inexact_unit_files
 from codegen.framework.plans.residual_model import (
     diagonal_block_emission_model,
     residual_emission_model,
@@ -149,7 +149,7 @@ class SoABackend:
         with use_target(self.target):
             return tuple(
                 GeneratedKernelFile(path, source)
-                for path, source in inexact_apply_files(material, unit, context)
+                for path, source in inexact_unit_files(material, unit, context)
             )
 
     def emit(self, unit, context):

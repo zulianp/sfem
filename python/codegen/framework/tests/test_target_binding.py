@@ -525,31 +525,22 @@ class WorkItemAccessorTest(unittest.TestCase):
 
 
 class InexactFamilyUnderACudaTargetTest(unittest.TestCase):
-    """The narrow, true claim about CUDA -- and it is worth stating narrowly.
+    """The stored-tangent family under a CUDA target.
 
-    `backends/cuda.py` refuses an emitted file that contains the substring
-    `lane`, and `CUDASoABackend.emit_inexact` returned nothing because of it.
-    That rule is what this conversion is about, so it is what gets asserted:
-    emitted under a bound `CUDATarget`, the inexact family no longer spells a
-    work item or an OpenMP pragma.
-
-    It does *not* assert that the backend accepts the family, and it should not.
-    `_validate_cuda_source_contract` also wants a file whose name ends
-    `_operator.cu` containing `__global__ void`, and this emitter writes
-    `%s_operator.cpp` with host `extern "C"` functions around an OpenMP mesh
-    loop.  Reaching that needs the mesh-loop lowering -- `.cu` naming, a
-    grid-stride kernel, a host launcher, atomic scatters -- which the energy
-    family already has and this one does not.
-
-    This is also the only thing in the repository that evaluates the SIMT arm of
-    the work-item accessors through a real emitter rather than in isolation.
+    The family's generated half is per-element headers -- the material at one
+    point, the element's stages and tables, the contraction -- and its stores
+    and traversals are library code (`src/frontend/ops/inexact/`, and `cuda/`
+    for the device).  Under CUDA the same emitters print the device twins: the
+    work item is the element, so nothing spells a lane, and a source per unit
+    instantiates the library's device stores for it.
     """
 
-    def test_it_spells_no_work_item_and_no_openmp_pragma(self):
+    @staticmethod
+    def _emit(target):
         import dataclasses
 
         from sfem import gen
-        from codegen.framework.emitters.inexact_apply_codegen import inexact_apply_files
+        from codegen.framework.emitters.inexact_codegen import inexact_unit_files
         from codegen.framework.materials.linear_elasticity import material
 
         unit_material = dataclasses.replace(material, inexact_apply=True)
@@ -558,34 +549,28 @@ class InexactFamilyUnderACudaTargetTest(unittest.TestCase):
         plan = gen.SpecializedFormManipulationStage(user_input, form_evaluation).run()
         context = user_input.element_contexts[0]
         unit = list(plan.emission_kernels_for_context(context))[0]
+        with use_target(target):
+            return dict(inexact_unit_files(unit_material, unit, context)), unit_material, unit, context
 
-        with use_target(CUDATarget()):
-            emitted = dict(inexact_apply_files(unit_material, unit, context))
+    def test_the_cuda_backend_publishes_the_device_twins(self):
+        from codegen.framework.backends.cuda import CUDASoABackend
 
-        self.assertTrue(emitted)
-        for path, source in sorted(emitted.items()):
-            with self.subTest(generated=os.path.basename(path)):
-                self.assertNotIn("lane", source)
-                self.assertNotIn("#pragma omp", source)
+        _emitted, material, unit, context = self._emit(OpenMPTarget())
+        files = CUDASoABackend(CUDATarget()).emit_inexact(material, unit, context)
+        paths = sorted(generated.path for generated in files)
+        self.assertEqual(
+            [p.rsplit(".", 1)[-1] for p in paths], ["cuh", "cu", "cuh", "cuh"],
+            "the unit, its store source, and the shared contraction and element: %s" % paths,
+        )
+        for generated in files:
+            self.assertNotIn("lane", generated.source, generated.path)
+            self.assertNotIn("SFEM_INLINE", generated.source, generated.path)
+        store = [g for g in files if g.path.endswith("_store.cu")]
+        self.assertEqual(len(store), 1)
+        self.assertIn("inexact::cuda::create_store<", store[0].source)
 
-    def test_the_same_emitter_still_spells_lanes_for_a_cpu_target(self):
-        """The conversion is a lowering, not a deletion."""
-        import dataclasses
-
-        from sfem import gen
-        from codegen.framework.emitters.inexact_apply_codegen import inexact_apply_files
-        from codegen.framework.materials.linear_elasticity import material
-
-        unit_material = dataclasses.replace(material, inexact_apply=True)
-        user_input = gen.UserInputStage.create(unit_material, ("TET4",), 8, None)
-        form_evaluation = gen._evaluate_forms(user_input)
-        plan = gen.SpecializedFormManipulationStage(user_input, form_evaluation).run()
-        context = user_input.element_contexts[0]
-        unit = list(plan.emission_kernels_for_context(context))[0]
-
-        with use_target(OpenMPTarget()):
-            emitted = dict(inexact_apply_files(unit_material, unit, context))
-
+    def test_the_cpu_emission_spells_lanes(self):
+        emitted, _material, _unit, _context = self._emit(OpenMPTarget())
         self.assertTrue(any("lane" in source for source in emitted.values()))
 
 

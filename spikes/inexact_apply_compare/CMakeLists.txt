@@ -123,9 +123,47 @@ if(NOT SPIKE_KERNEL_ELEMENT STREQUAL SPIKE_ELEMENT)
         "(node order ${SPIKE_SHAPE_ORDER})")
 endif()
 
+# Elements the projected (P0) path does not cover are generated without it.  The qp store needs
+# nothing from that path but the pointwise tangent body, which it takes from PROTEUS_HEX8's.
+set(_spike_no_p0 FALSE)
+if(SPIKE_ELEMENT STREQUAL "PROTEUS_HEX27")
+    set(_spike_no_p0 TRUE)
+endif()
+if(_spike_no_p0)
+    set(_spike_gen_mode "no-p0")
+else()
+    set(_spike_gen_mode "p0")
+endif()
+
 # A material with several units names its kernels after the unit, so the file
 # that proves generation ran is not always the material's own.
-file(GLOB _spike_inline_headers "${SPIKE_KERNEL_DIR}/*_inexact_apply_inline.hpp")
+if(_spike_no_p0)
+    file(GLOB _spike_inline_headers "${SPIKE_KERNEL_DIR}/*_operator.cpp")
+else()
+    file(GLOB _spike_inline_headers "${SPIKE_KERNEL_DIR}/*_inexact_apply_inline.hpp")
+endif()
+# Kernels found in the tree are reused only if the generator that wrote them is the current one: a
+# fix in python/ (the 64-bit BSR offsets of de7dac7ac) otherwise never reaches an existing tree.
+# The stamp is a hash of the generator's sources; a tree without one predates it and regenerates.
+file(GLOB_RECURSE _spike_generator_sources
+     "${SPIKE_WORKTREE}/python/sfem/*.py" "${SPIKE_WORKTREE}/python/codegen/framework/*.py")
+list(FILTER _spike_generator_sources EXCLUDE REGEX "/generated/")
+list(SORT _spike_generator_sources)
+set(_spike_generator_hashes "${_spike_gen_mode}")
+foreach(_spike_source IN LISTS _spike_generator_sources)
+    file(SHA256 "${_spike_source}" _spike_source_hash)
+    string(APPEND _spike_generator_hashes "${_spike_source_hash}")
+endforeach()
+string(SHA256 _spike_generator_stamp "${_spike_generator_hashes}")
+set(_spike_stamp_file "${SPIKE_GEN_ROOT}/${SPIKE_MATERIAL}/.generator_stamp_${SPIKE_ELEMENT_LOWER}")
+set(_spike_found_stamp "")
+if(EXISTS "${_spike_stamp_file}")
+    file(READ "${_spike_stamp_file}" _spike_found_stamp)
+endif()
+if(_spike_inline_headers AND NOT _spike_found_stamp STREQUAL _spike_generator_stamp)
+    message(STATUS "${SPIKE_MATERIAL} ${SPIKE_ELEMENT} kernels predate the generator: regenerating")
+    set(_spike_inline_headers "")
+endif()
 if(NOT _spike_inline_headers)
     message(STATUS "Generating ${SPIKE_MATERIAL} ${SPIKE_ELEMENT} kernels (this is slow)")
     execute_process(
@@ -135,18 +173,25 @@ import dataclasses, sys
 from sfem import gen
 from importlib import import_module
 material = import_module('codegen.framework.materials.' + sys.argv[1]).material
-gen.generate(dataclasses.replace(material, inexact_apply=True),
+gen.generate(dataclasses.replace(material, inexact_apply=(sys.argv[4] == 'p0')),
              sys.argv[2], elements=(sys.argv[3],), clean=False)
-" "${SPIKE_MATERIAL}" "${SPIKE_GEN_ROOT}/${SPIKE_MATERIAL}" "${SPIKE_ELEMENT}"
+" "${SPIKE_MATERIAL}" "${SPIKE_GEN_ROOT}/${SPIKE_MATERIAL}" "${SPIKE_ELEMENT}" "${_spike_gen_mode}"
         WORKING_DIRECTORY "${SPIKE_WORKTREE}"
         RESULT_VARIABLE _spike_gen_status)
     if(NOT _spike_gen_status EQUAL 0)
         message(FATAL_ERROR "kernel generation failed (${_spike_gen_status})")
     endif()
-    file(GLOB _spike_inline_headers "${SPIKE_KERNEL_DIR}/*_inexact_apply_inline.hpp")
+    if(_spike_no_p0)
+        file(GLOB _spike_inline_headers "${SPIKE_KERNEL_DIR}/*_operator.cpp")
+    else()
+        file(GLOB _spike_inline_headers "${SPIKE_KERNEL_DIR}/*_inexact_apply_inline.hpp")
+    endif()
+    if(_spike_inline_headers)
+        file(WRITE "${_spike_stamp_file}" "${_spike_generator_stamp}")
+    endif()
 endif()
 if(NOT _spike_inline_headers)
-    message(FATAL_ERROR "no inexact-apply headers in ${SPIKE_KERNEL_DIR}")
+    message(FATAL_ERROR "no generated kernels in ${SPIKE_KERNEL_DIR}")
 endif()
 
 # The operator sources, minus the inexact ones: those are headers' worth of
@@ -184,6 +229,9 @@ target_include_directories(spike_common INTERFACE
     "${SPIKE_GEN_DIR}"
     "${SPIKE_GEN_ROOT}/${SPIKE_MATERIAL}"
     "${SPIKE_GEN_ROOT}/${SPIKE_MATERIAL}/d3"
+    # The generator writes its reference tables and the Op's C ABI header beside the kernels.
+    "${SPIKE_GEN_ROOT}/${SPIKE_MATERIAL}/reference"
+    "${SPIKE_GEN_ROOT}/${SPIKE_MATERIAL}/op"
     "${SPIKE_SFEM}/src/base"
     "${SPIKE_SFEM}/src/algebra"
     "${SPIKE_SFEM}/src/operators"
@@ -318,6 +366,7 @@ endif()
 # and compiled the same way, which is why it stayed useful when the harnesses
 # were the thing under suspicion.
 
+
 if(NOT TARGET bench_split AND NOT TARGET bench_mixed)
     message(FATAL_ERROR
         "no harness matched the generated kernels in ${SPIKE_GEN_DIR}: "
@@ -410,3 +459,9 @@ elseif(NOT SPIKE_SFEM_LIBRARY)
         "libsfem not found under ${SPIKE_SFEM_BUILD}: skipping bench_op_split and "
         "op_inexact_check, which go through the Op wrappers rather than the kernels")
 endif()
+
+# ------------------------------------------------------------------- the qp store
+#
+# The compressed formats (qp/) are library features now (src/frontend/ops/inexact/, and cuda/):
+# Newton runs them through the playground (solver.linear.format: INEXACT) and
+# drivers/bench/bench_inexact.exe.cpp measures them.  This spike's own copies are at 0644f59ac.

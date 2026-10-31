@@ -125,44 +125,39 @@ namespace sfem {
             return true;
         }
 
-        int initialize_dof_to_dof_graph(const int block_size) {
+        int initialize_node_to_node_graph() {
+            if (node_to_node_graph) return SFEM_SUCCESS;
             if (mesh && mesh_all_semistructured(*mesh)) {
-                if (!node_to_node_graph) {
-                    node_to_node_graph = mesh->node_to_node_graph();
-                }
-                if (block_size == 1) {
-                    dof_to_dof_graph = node_to_node_graph;
-                } else if (!dof_to_dof_graph) {
-                    dof_to_dof_graph = node_to_node_graph->block_to_scalar(block_size);
-                }
+                node_to_node_graph = mesh->node_to_node_graph();
                 return SFEM_SUCCESS;
             }
 
             // This is for nodal discretizations (CG)
-            if (!node_to_node_graph) {
-                bool types_match_mesh = true;
-                for (size_t b = 0; b < element_types.size(); ++b) {
-                    if (element_types[b] != mesh->element_type(static_cast<smesh::block_idx_t>(b))) {
-                        types_match_mesh = false;
-                        break;
-                    }
-                }
-                if (types_match_mesh) {
-                    node_to_node_graph = mesh->node_to_node_graph();
-                } else {
-                    node_to_node_graph = mesh->create_node_to_node_graph(
-                            static_cast<smesh::ElemType>(get_element_type_for_block(0)));
+            bool types_match_mesh = true;
+            for (size_t b = 0; b < element_types.size(); ++b) {
+                if (element_types[b] != mesh->element_type(static_cast<smesh::block_idx_t>(b))) {
+                    types_match_mesh = false;
+                    break;
                 }
             }
+            if (types_match_mesh) {
+                node_to_node_graph = mesh->node_to_node_graph();
+            } else {
+                node_to_node_graph =
+                        mesh->create_node_to_node_graph(static_cast<smesh::ElemType>(get_element_type_for_block(0)));
+            }
+            return SFEM_SUCCESS;
+        }
 
+        /// The scalar graph of the dofs: the node graph expanded per component, built only when
+        /// asked for (a block operator reads the node graph, at a ninth of the column indices).
+        int initialize_dof_to_dof_graph(const int block_size) {
+            initialize_node_to_node_graph();
             if (block_size == 1) {
                 dof_to_dof_graph = node_to_node_graph;
-            } else {
-                if (!dof_to_dof_graph) {
-                    dof_to_dof_graph = node_to_node_graph->block_to_scalar(block_size);
-                }
+            } else if (!dof_to_dof_graph) {
+                dof_to_dof_graph = node_to_node_graph->block_to_scalar(block_size);
             }
-
             return SFEM_SUCCESS;
         }
     };
@@ -173,7 +168,7 @@ namespace sfem {
     }
 
     std::shared_ptr<CRSGraph> FunctionSpace::node_to_node_graph() {
-        impl_->initialize_dof_to_dof_graph(this->block_size());
+        impl_->initialize_node_to_node_graph();
 
         return impl_->node_to_node_graph;
     }

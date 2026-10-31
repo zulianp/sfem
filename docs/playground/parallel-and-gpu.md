@@ -26,8 +26,10 @@ split into z-slabs; each rank gathers the slab its nodes need.
 ## GPU
 
 `execution_space: device` (or `--set execution_space=device`) runs the assembly, the solvers and
-the contact QP on the GPU, in a build with `SFEM_ENABLE_CUDA=ON`. On the device, rotations
-(`constraints`) and Dirichlet conditions with a profile are not available.
+the contact QP on the GPU, in a build with `SFEM_ENABLE_CUDA=ON`. Dirichlet conditions with a
+profile and rotations (`constraints`) work on the device: the host keeps the profile and the device
+copy of the values is refreshed at each load step. Torque-controlled and released rotations are host
+only.
 
 With MPI each rank uses one GPU. Within a node, `nccl: true` lets the exchange between ranks and
 the contact QP's reductions go through NCCL instead of MPI. NCCL's set-up costs about 3 s, which

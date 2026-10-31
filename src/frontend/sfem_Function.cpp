@@ -558,6 +558,33 @@ namespace sfem {
         return false;
     }
 
+    bool Function::tangent_is_symmetric() const {
+        for (auto &op : impl_->ops) {
+            if (op->inexact_supported() && !op->tangent_is_symmetric()) return false;
+        }
+        return true;
+    }
+
+    void Function::set_inexact_options(const InexactOptions &options) {
+        for (auto &op : impl_->ops) op->set_inexact_options(options);
+    }
+
+    int Function::inexact_diag(const real_t *const x, real_t *const values) {
+        SFEM_TRACE_SCOPE("Function::inexact_diag");
+        for (auto &op : impl_->ops) {
+            if (!op->residual_depends_on_state() && !op->inexact_supported()) continue;
+            const int status = op->inexact_supported() ? op->inexact_diag(values) : op->hessian_diag(x, values);
+            if (status != SFEM_SUCCESS) {
+                std::cerr << "Failed inexact_diag in op: " << op->name() << "\n";
+                return SFEM_FAILURE;
+            }
+        }
+        if (impl_->handle_constraints) {
+            for (auto &c : impl_->constraints) c->apply_value(1, values);
+        }
+        return SFEM_SUCCESS;
+    }
+
     int Function::inexact_update(const real_t *const x) {
         SFEM_TRACE_SCOPE("Function::inexact_update");
 

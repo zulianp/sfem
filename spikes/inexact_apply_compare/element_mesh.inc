@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <string>
 
 // Mesh ordering.  The default is `morton3` because that is what SFEM runs:
 // `smesh::SFC::create_from_env()` defaults to it and `drivers/bench/*` reorder
@@ -36,7 +37,13 @@
 #endif
 #include "smesh_sfc.impl.hpp"
 
-#if defined(ELEMENT_HEX8)
+#if defined(ELEMENT_PROTEUS_HEX27)
+#define NXE 27
+#define ELEMENT_NAME "PROTEUS_HEX27"
+#ifndef SIZES
+#define SIZES {4, 8, 12, 16, 20}
+#endif
+#elif defined(ELEMENT_HEX8)
 #define NXE 8
 #define ELEMENT_NAME "HEX8"
 #ifndef SIZES
@@ -173,7 +180,33 @@ static void reorder_mesh(Mesh &m, const char *ordering) {
     finalise_element_pointers(m);
 }
 
-#if defined(ELEMENT_HEX8)
+#if defined(ELEMENT_PROTEUS_HEX27)
+// A uniform grid of triquadratic cubes, nodes in the lexicographic order of the PROTEUS basis:
+// local node i + 3 j + 9 k sits at (i, j, k) / 2 of the cell.  The map is affine.
+static Mesh build_unordered(int n) {
+    Mesh m;
+    const int nn = 2 * n + 1;
+    const double h = 1.0 / n;
+    m.nnodes = (ptrdiff_t)nn * nn * nn;
+    m.nelements = (ptrdiff_t)n * n * n;
+    m.ev.assign(NXE, std::vector<idx_t>(m.nelements));
+    auto nid = [&](int i, int j, int k) { return (idx_t)((k * nn + j) * nn + i); };
+    ptrdiff_t e = 0;
+    for (int c = 0; c < n; ++c) for (int b = 0; b < n; ++b) for (int a = 0; a < n; ++a, ++e)
+        for (int k = 0; k < 3; ++k) for (int j = 0; j < 3; ++j) for (int i = 0; i < 3; ++i)
+            m.ev[i + 3 * j + 9 * k][e] = nid(2 * a + i, 2 * b + j, 2 * c + k);
+    m.adj.assign(9, std::vector<geom_t>(m.nelements, 0));
+    m.det.assign(m.nelements, (geom_t)(h*h*h));
+    for (ptrdiff_t i = 0; i < m.nelements; ++i) { m.adj[0][i]=(geom_t)(h*h); m.adj[4][i]=(geom_t)(h*h); m.adj[8][i]=(geom_t)(h*h); }
+    m.px.resize(m.nnodes); m.py.resize(m.nnodes); m.pz.resize(m.nnodes);
+    for (int k = 0; k < nn; ++k) for (int j = 0; j < nn; ++j) for (int i = 0; i < nn; ++i) {
+        const ptrdiff_t v = nid(i,j,k);
+        m.px[v] = i*h/2; m.py[v] = j*h/2; m.pz[v] = k*h/2;
+    }
+    finalise_element_pointers(m);
+    return m;
+}
+#elif defined(ELEMENT_HEX8)
 static Mesh build_unordered(int n) {
     Mesh m;
     const int nn = n + 1;
@@ -206,6 +239,36 @@ static Mesh build_unordered(int n) {
 // is still affine and the adjugate is still the tetrahedron's -- what makes
 // TET10 a genuine test of the projection is that its reference gradients vary
 // over the element, not that its geometry is curved.
+// The vertices' adjugate and determinant of every tetrahedron, positively oriented: a negative
+// one swaps its second and third vertices.
+static void tet_geometry(Mesh &m, const std::vector<std::vector<geom_t>> &pts) {
+    m.adj.assign(9, std::vector<geom_t>(m.nelements, 0));
+    m.det.assign(m.nelements, 0);
+    for (ptrdiff_t e = 0; e < m.nelements; ++e) {
+        idx_t v[4];
+        for (int c = 0; c < 4; ++c) v[c] = m.ev[c][e];
+        double J[9];
+        for (int c = 0; c < 3; ++c) for (int d = 0; d < 3; ++d)
+            J[d*3+c] = (double)pts[d][v[c+1]] - (double)pts[d][v[0]];
+        double D = J[0]*(J[4]*J[8]-J[5]*J[7]) - J[1]*(J[3]*J[8]-J[5]*J[6]) + J[2]*(J[3]*J[7]-J[4]*J[6]);
+        if (D < 0) { std::swap(v[1], v[2]);
+            // A TET10 read from disk carries its edge nodes: the swap exchanges edges (0,1) and (0,2),
+            // and (1,3) and (2,3).
+            if (m.ev.size() == 10) { std::swap(m.ev[4][e], m.ev[6][e]); std::swap(m.ev[8][e], m.ev[9][e]); }
+            for (int c = 0; c < 3; ++c) for (int d = 0; d < 3; ++d)
+                J[d*3+c] = (double)pts[d][v[c+1]] - (double)pts[d][v[0]];
+            D = -D; }
+        for (int c = 0; c < 4; ++c) m.ev[c][e] = v[c];
+        m.adj[0][e]=(geom_t)(J[4]*J[8]-J[5]*J[7]); m.adj[1][e]=(geom_t)(J[2]*J[7]-J[1]*J[8]); m.adj[2][e]=(geom_t)(J[1]*J[5]-J[2]*J[4]);
+        m.adj[3][e]=(geom_t)(J[5]*J[6]-J[3]*J[8]); m.adj[4][e]=(geom_t)(J[0]*J[8]-J[2]*J[6]); m.adj[5][e]=(geom_t)(J[2]*J[3]-J[0]*J[5]);
+        m.adj[6][e]=(geom_t)(J[3]*J[7]-J[4]*J[6]); m.adj[7][e]=(geom_t)(J[1]*J[6]-J[0]*J[7]); m.adj[8][e]=(geom_t)(J[0]*J[4]-J[1]*J[3]);
+        m.det[e] = (geom_t)D;
+    }
+    m.px.assign(pts[0].begin(), pts[0].end());
+    m.py.assign(pts[1].begin(), pts[1].end());
+    m.pz.assign(pts[2].begin(), pts[2].end());
+}
+
 static Mesh build_unordered(int n) {
     Mesh m;
     const int nn = n + 1;
@@ -219,33 +282,14 @@ static Mesh build_unordered(int n) {
         pts[0][nid(i,j,k)] = (geom_t)(i * h); pts[1][nid(i,j,k)] = (geom_t)(j * h); pts[2][nid(i,j,k)] = (geom_t)(k * h);
     }
     static const int tets[6][4] = {{0,1,3,7},{0,1,5,7},{0,4,5,7},{0,4,6,7},{0,2,6,7},{0,2,3,7}};
-    m.adj.assign(9, std::vector<geom_t>(m.nelements, 0));
-    m.det.assign(m.nelements, 0);
     ptrdiff_t e = 0;
     for (int k = 0; k < n; ++k) for (int j = 0; j < n; ++j) for (int i = 0; i < n; ++i)
-        for (int t = 0; t < 6; ++t, ++e) {
-            idx_t v[4];
+        for (int t = 0; t < 6; ++t, ++e)
             for (int c = 0; c < 4; ++c) {
                 const int b = tets[t][c];
-                v[c] = nid(i + (b & 1), j + ((b >> 1) & 1), k + ((b >> 2) & 1));
+                m.ev[c][e] = nid(i + (b & 1), j + ((b >> 1) & 1), k + ((b >> 2) & 1));
             }
-            double J[9];
-            for (int c = 0; c < 3; ++c) for (int d = 0; d < 3; ++d)
-                J[d*3+c] = (double)pts[d][v[c+1]] - (double)pts[d][v[0]];
-            double D = J[0]*(J[4]*J[8]-J[5]*J[7]) - J[1]*(J[3]*J[8]-J[5]*J[6]) + J[2]*(J[3]*J[7]-J[4]*J[6]);
-            if (D < 0) { std::swap(v[1], v[2]);
-                for (int c = 0; c < 3; ++c) for (int d = 0; d < 3; ++d)
-                    J[d*3+c] = (double)pts[d][v[c+1]] - (double)pts[d][v[0]];
-                D = -D; }
-            for (int c = 0; c < 4; ++c) m.ev[c][e] = v[c];
-            m.adj[0][e]=(geom_t)(J[4]*J[8]-J[5]*J[7]); m.adj[1][e]=(geom_t)(J[2]*J[7]-J[1]*J[8]); m.adj[2][e]=(geom_t)(J[1]*J[5]-J[2]*J[4]);
-            m.adj[3][e]=(geom_t)(J[5]*J[6]-J[3]*J[8]); m.adj[4][e]=(geom_t)(J[0]*J[8]-J[2]*J[6]); m.adj[5][e]=(geom_t)(J[2]*J[3]-J[0]*J[5]);
-            m.adj[6][e]=(geom_t)(J[3]*J[7]-J[4]*J[6]); m.adj[7][e]=(geom_t)(J[1]*J[6]-J[0]*J[7]); m.adj[8][e]=(geom_t)(J[0]*J[4]-J[1]*J[3]);
-            m.det[e] = (geom_t)D;
-        }
-    m.px.assign(pts[0].begin(), pts[0].end());
-    m.py.assign(pts[1].begin(), pts[1].end());
-    m.pz.assign(pts[2].begin(), pts[2].end());
+    tet_geometry(m, pts);
 #if NXE == 10
     // One node per distinct edge, keyed on the sorted vertex pair.
     static const int edges[6][2] = {{0,1},{1,2},{0,2},{0,3},{1,3},{2,3}};
@@ -275,7 +319,55 @@ static Mesh build_unordered(int n) {
 }
 #endif
 
+#if (NXE == 4 || NXE == 10) && !defined(ELEMENT_HEX8) && !defined(ELEMENT_PROTEUS_HEX27)
+template <typename T>
+static std::vector<T> read_raw(const std::string &path) {
+    std::vector<T> v;
+    if (FILE *f = std::fopen(path.c_str(), "rb")) {
+        std::fseek(f, 0, SEEK_END);
+        v.resize((size_t)std::ftell(f) / sizeof(T));
+        std::fseek(f, 0, SEEK_SET);
+        if (std::fread(v.data(), sizeof(T), v.size(), f) != v.size()) v.clear();
+        std::fclose(f);
+    }
+    if (v.empty()) {
+        std::fprintf(stderr, "cannot read %s\n", path.c_str());
+        std::abort();
+    }
+    return v;
+}
+
+// A TET4 or TET10 mesh in smesh's raw layout (i0..i<NXE-1>.int32, x/y/z.float32), as the Newton study
+// reads it; a TET10 one from smesh's mesh_promote.
+static Mesh read_unordered(const std::string &dir) {
+    Mesh m;
+    std::vector<std::vector<geom_t>> pts(3);
+    const char *xyz[3] = {"x", "y", "z"};
+    for (int d = 0; d < 3; ++d) {
+        const std::vector<float> p = read_raw<float>(dir + "/" + xyz[d] + ".float32");
+        pts[d].assign(p.begin(), p.end());
+    }
+    m.nnodes = (ptrdiff_t)pts[0].size();
+    for (int c = 0; c < NXE; ++c) {
+        const std::vector<int32_t> ic = read_raw<int32_t>(dir + "/i" + std::to_string(c) + ".int32");
+        m.ev.emplace_back(ic.begin(), ic.end());
+    }
+    m.nelements = (ptrdiff_t)m.ev[0].size();
+    tet_geometry(m, pts);
+    finalise_element_pointers(m);
+    return m;
+}
+#endif
+
+// QP_MESH=<folder> reads a TET4 or TET10 mesh instead of building the cube of n cells.
 static Mesh build(int n) {
+#if (NXE == 4 || NXE == 10) && !defined(ELEMENT_HEX8) && !defined(ELEMENT_PROTEUS_HEX27)
+    if (const char *dir = std::getenv("QP_MESH")) {
+        Mesh m = read_unordered(dir);
+        reorder_mesh(m, MESH_ORDER);
+        return m;
+    }
+#endif
     Mesh m = build_unordered(n);
     reorder_mesh(m, MESH_ORDER);
     return m;
