@@ -35,7 +35,7 @@ run() {  # run <label> <binary> <args...>
   echo "== $label $*"
   srun --cpu-bind=none -n 1 -c 72 uenv run --view=default prgenv-gnu/24.11:v2 -- $bin $C --set "$M" ${DT:+--set time.dt=$DT} "$@" 2>&1 \
     | grep --line-buffered -E "^Playground|^step [0-9]|newton_qp|^qp:|Abort|rror"
-  [ -f smesh.trace.csv ] && grep -E "::inexact_(update|apply)|BSRTangent::assemble|ConjugateGradient::apply|Newton" smesh.trace.csv | sed 's/^/  trace /'
+  [ -f smesh.trace.csv ] && grep -E "::inexact_(update|apply)|inexact::|BSRTangent::assemble|ConjugateGradient::apply|Newton" smesh.trace.csv | sed 's/^/  trace /'
   cd $W
 }
 run bsr32-lib $B --set solver.linear.format=BSR --set solver.linear.storage_bytes=4
