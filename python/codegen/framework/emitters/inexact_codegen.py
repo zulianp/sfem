@@ -547,6 +547,29 @@ def _setup_from_the_rule(plan):
 
 _SETUP_BODY_BY_FORM = {"stages": _setup_from_the_stages, "explicit": _setup_from_the_rule}
 
+#: The host's set-up runs `setup_in` over a block of elements.  A device thread differentiates
+#: at its own point instead, from a table of the shape derivatives there (`DT`, or `DQ` where the
+#: set-up's points are not the stored ones): one thread sweeping the element's points would
+#: leave the others waiting.
+_SETUP_STAGE_BY_DEVICE = {False: _setup_stage_lines, True: lambda plan: []}
+
+
+def _setup_gradient_lines(plan):
+    """The shape derivatives at the set-up's points, where those are the rule's own (the moments)."""
+    n, dim = plan.n_nodes, plan.dim
+    gradients = ", ".join(
+        _row(_row(_double(plan.setup_gradients[q][m][j]) for j in range(n)) for m in range(dim))
+        for q in range(plan.n_setup_points)
+    )
+    return [
+        "  // DQ[q][m][j] = dphi_j/dxi_m at set-up point q.",
+        "  static constexpr double DQ[NQ][%d][N] = {%s};" % (dim, gradients),
+    ]
+
+
+#: Only a device thread reads the set-up's points from a table; at the stored points it reads `DT`.
+_SETUP_GRADIENTS = {("explicit", True): _setup_gradient_lines}
+
 
 def _fold_struct_lines(plan, symmetric):
     """The folded store's tables for a tangent of one packing.
@@ -679,12 +702,12 @@ def element_header_source(plan):
         "  static constexpr double X[NV] = %s;" % _row(_double(x) for x in plan.reference_weight),
         "  static constexpr double QW[NQ] = %s;" % _row(_double(w) for w in plan.setup_weights),
     ]
+    device = current_target().kernel_vector_width() is None
+    lines += _SETUP_GRADIENTS.get((plan.setup_form, device), lambda plan: [])(plan)
     lines += _PAIRS_BY_KIND[plan.kind](plan)
-    lines += _work_item_lines(_STAGES_BY_FORM[plan.stage_form](plan) + _setup_stage_lines(plan))
+    lines += _work_item_lines(_STAGES_BY_FORM[plan.stage_form](plan) + _SETUP_STAGE_BY_DEVICE[device](plan))
     lines += _FOLD_BY_FOLDABILITY[plan.foldable](plan)
-    lines += _LINE_TABLES.get(
-        (plan.stage_form, current_target().kernel_vector_width() is None), lambda plan: []
-    )(plan)
+    lines += _LINE_TABLES.get((plan.stage_form, device), lambda plan: [])(plan)
     lines += ["};", "", "}  // namespace codegen", "}  // namespace sfem", "", "#endif", ""]
     return "\n".join(lines)
 

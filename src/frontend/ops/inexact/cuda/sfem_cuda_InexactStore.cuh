@@ -57,7 +57,7 @@ namespace sfem {
             /// element's nodes, in staging order, as indices into its block's list.
             struct ApplyArgs {
                 ptrdiff_t           nelements{0};
-                const idx_t *const *elements{nullptr};
+                Connectivity        elements;
                 ptrdiff_t           stride{3};
                 const int32_t      *block_ptr{nullptr};
                 const idx_t        *block_nodes{nullptr};
@@ -67,16 +67,13 @@ namespace sfem {
 
             class BlockMap {
             public:
-                /// From the device connectivity `elements` (mesh order) and the staging order.
+                /// From the device connectivity in the staging order.
                 template <class El>
-                static std::unique_ptr<BlockMap> build(const ptrdiff_t ne, const idx_t *const *const elements) {
+                static std::unique_ptr<BlockMap> build(const ptrdiff_t ne, const Connectivity &elements) {
                     static constexpr int N = El::N;
-                    std::vector<idx_t *>             pointers(N);
                     std::vector<std::vector<idx_t>> conn(N, std::vector<idx_t>((size_t)ne));
-                    check(cudaMemcpy(pointers.data(), elements, N * sizeof(idx_t *), cudaMemcpyDeviceToHost), "connectivity");
                     for (int s = 0; s < N; ++s)
-                        check(cudaMemcpy(conn[s].data(), pointers[ElementTables<El>::shape_node(s)], ne * sizeof(idx_t), cudaMemcpyDeviceToHost),
-                              "connectivity");
+                        check(cudaMemcpy(conn[s].data(), elements.node[s], ne * sizeof(idx_t), cudaMemcpyDeviceToHost), "connectivity");
                     BlockLocalMap host = block_local_map(ne, N, conn, THREADS);
                     auto map              = std::make_unique<BlockMap>();
                     map->ptr_             = DeviceArray<int32_t>::from(host.ptr);
@@ -138,12 +135,8 @@ namespace sfem {
                         if constexpr (BLOCK) {
                             node[s] = a.local[(size_t)s * a.nelements + e];
                             for (int k = 0; k < 3; ++k) hh[k][s] = hs[node[s] * 3 + k];
-                        } else if constexpr (El::reordered) {
-                            constexpr int sn = El::SHAPE_ORDER[s];
-                            node[s]          = a.elements[sn][e];
-                            for (int k = 0; k < 3; ++k) hh[k][s] = h[(ptrdiff_t)node[s] * a.stride + k];
                         } else {
-                            node[s] = a.elements[s][e];
+                            node[s] = a.elements.node[s][e];
                             for (int k = 0; k < 3; ++k) hh[k][s] = h[(ptrdiff_t)node[s] * a.stride + k];
                         }
                     });
@@ -268,6 +261,13 @@ namespace sfem {
                         for (int j = q; j < NV; j += NQ) {
                             const int mask = t.mask[j];
                             for (int k = 0; k < t.nkeep[mask]; ++k) codes[index(t, e, j, k)] = C::encode(S[j][t.keep[mask * NC + k]], inv);
+                        }
+                    } else if constexpr (POINT_MAJOR) {
+                        // In the codes' own order, [component][point]: a warp's stores are contiguous
+                        // (in the tensors' order they are a point apart, NV codes).
+                        for (int l = q; l < NV * NC; l += NQ) {
+                            const int c = l / NV, j = l % NV;
+                            codes[point_index(e, j, c)] = C::encode(S[j][c], inv);
                         }
                     } else {
                         for (int i = q; i < NV * NC; i += NQ) codes[index(t, e, i / NC, i % NC)] = C::encode(S[i / NC][i % NC], inv);
@@ -411,7 +411,7 @@ namespace sfem {
                     D[threadIdx.x] = tau(t.d1[threadIdx.x]);
                 }
                 if (active && j < N) {
-                    const idx_t node = a.elements[t.shape_node[j]][e];
+                    const idx_t node = a.elements.node[j][e];
                     nodes[le][j]     = node;
                     #pragma unroll
                     for (int k = 0; k < 3; ++k) hs[le][k][j] = h[(ptrdiff_t)node * a.stride + k];
@@ -700,7 +700,7 @@ namespace sfem {
                 if (e >= a.nelements) return;
                 idx_t node = 0;
                 if (p < N) {
-                    node = a.elements[t.shape_node[p]][e];
+                    node = a.elements.node[p][e];
                     for (int k = 0; k < 3; ++k) hs[w][k][p] = h[(ptrdiff_t)node * a.stride + k];
                 }
                 __syncwarp();
@@ -767,7 +767,7 @@ namespace sfem {
                 }
                 const double s = Codes::scaled && !Codes::has_mean ? (double)st.scales[e] : 1.0;
                 for (int p = 0; p < N; ++p) {
-                    const ptrdiff_t node = a.elements[t.shape_node[p]][e];
+                    const ptrdiff_t node = a.elements.node[p][e];
                     for (int i = 0; i < 3; ++i) atomicAdd(&diag[node * a.stride + i], (real_t)(s * d[i][p]));
                 }
             }
@@ -796,7 +796,7 @@ namespace sfem {
                     }
                 }
                 for (int p = 0; p < N; ++p) {
-                    const ptrdiff_t node = a.elements[t.shape_node[p]][e];
+                    const ptrdiff_t node = a.elements.node[p][e];
                     for (int i = 0; i < 3; ++i) atomicAdd(&diag[node * a.stride + i], (real_t)d[i][p]);
                 }
             }
@@ -828,8 +828,9 @@ namespace sfem {
                     if (in.nelements != nelements_) {
                         SFEM_ERROR("inexact (device): the store holds %ld elements, the set-up has %ld\n", (long)nelements_, (long)in.nelements);
                     }
-                    if (SHAPE.block && !POINT_MAJOR && !map_) map_ = BlockMap::build<El>(nelements_, in.elements);
-                    launch_setup<M>(setup_args<M>(in), tables_.view(), codes_view_, stream_);
+                    const Connectivity &elements = connectivity_.bind(in.elements);
+                    if (SHAPE.block && !POINT_MAJOR && !map_) map_ = BlockMap::build<El>(nelements_, elements);
+                    launch_setup<M>(setup_args<M>(in, elements), tables_.view(), codes_view_, stream_);
                 }
 
                 void apply(const ptrdiff_t           nelements,
@@ -840,7 +841,7 @@ namespace sfem {
                            real_t *const             out) const override {
                     ApplyArgs a;
                     a.nelements = nelements;
-                    a.elements  = elements;
+                    a.elements  = connectivity_(elements);
                     a.stride    = stride;
                     if (nelements == 0) return;
                     if constexpr (POINT_MAJOR) {
@@ -861,7 +862,7 @@ namespace sfem {
                 void diagonal(const ptrdiff_t nelements, const idx_t *const *const elements, const ptrdiff_t stride, real_t *const diag) const override {
                     ApplyArgs a;
                     a.nelements = nelements;
-                    a.elements  = elements;
+                    a.elements  = connectivity_(elements);
                     a.stride    = stride;
                     if (nelements == 0) return;
                     diagonal_points_kernel<M, Codes><<<grid(nelements, THREADS), THREADS, 0, stream_>>>(a, codes_view_, tables_.view(), diag);
@@ -881,6 +882,7 @@ namespace sfem {
                 DeviceArray<float>                         scales_, means_;
                 Codes                                      codes_view_;
                 std::unique_ptr<BlockMap>                  map_;
+                StagedConnectivity<El>                     connectivity_;
             };
 
             /// The element matrices on the device.
@@ -907,8 +909,9 @@ namespace sfem {
                     if (in.nelements != nelements_) {
                         SFEM_ERROR("inexact (device): the store holds %ld elements, the set-up has %ld\n", (long)nelements_, (long)in.nelements);
                     }
-                    if (SHAPE.block && !ELEMENT_MAJOR && !map_) map_ = BlockMap::build<El>(nelements_, in.elements);
-                    launch_setup<M>(setup_args<M>(in), tables_.view(), view_, stream_);
+                    const Connectivity &elements = connectivity_.bind(in.elements);
+                    if (SHAPE.block && !ELEMENT_MAJOR && !map_) map_ = BlockMap::build<El>(nelements_, elements);
+                    launch_setup<M>(setup_args<M>(in, elements), tables_.view(), view_, stream_);
                 }
 
                 void apply(const ptrdiff_t           nelements,
@@ -919,7 +922,7 @@ namespace sfem {
                            real_t *const             out) const override {
                     ApplyArgs a;
                     a.nelements = nelements;
-                    a.elements  = elements;
+                    a.elements  = connectivity_(elements);
                     a.stride    = stride;
                     if (nelements == 0) return;
                     if constexpr (ELEMENT_MAJOR) {
@@ -939,7 +942,7 @@ namespace sfem {
                 void diagonal(const ptrdiff_t nelements, const idx_t *const *const elements, const ptrdiff_t stride, real_t *const diag) const override {
                     ApplyArgs a;
                     a.nelements = nelements;
-                    a.elements  = elements;
+                    a.elements  = connectivity_(elements);
                     a.stride    = stride;
                     if (nelements == 0) return;
                     diagonal_matrices_kernel<M, Codes><<<grid(nelements, THREADS), THREADS, 0, stream_>>>(a, view_, tables_.view(), diag);
@@ -960,6 +963,7 @@ namespace sfem {
                 DeviceArray<uint8_t>                    factors_;
                 Codes                                   view_;
                 std::unique_ptr<BlockMap>               map_;
+                StagedConnectivity<El>                  connectivity_;
             };
 
             template <class M, bool FOLD>

@@ -4,7 +4,7 @@
 // where a kernel indexes them at run time, and the set-up.
 //
 // The set-up runs a thread per element and point in double: the element's reference gradients at
-// the points (the generated `setup_in`), the material's point tangent (the generated `M::point`),
+// the points (each thread its own, from the generated derivative table), the material's point tangent (the generated `M::point`),
 // the weighted points or moments in shared memory, then the store's encoding (its `Sink`) in the
 // host's order, split over the element's threads.
 
@@ -38,6 +38,7 @@ namespace sfem {
             static constexpr int MAX_PARAMS = 32;
             static constexpr int MAX_FIELDS = 4;
             static constexpr int MAX_FIELD_COMPONENTS = 9;
+            static constexpr int MAX_NODES  = 27;
 
             template <int B, int E, class F>
             __device__ __forceinline__ void static_for(F &&f) {
@@ -52,6 +53,40 @@ namespace sfem {
             inline void check(const cudaError_t e, const char *const what) {
                 if (e != cudaSuccess) SFEM_ERROR("inexact (device): %s: %s\n", what, cudaGetErrorString(e));
             }
+
+            /// The element's node arrays in the staging order, by value: a kernel reads a node's
+            /// index with one load (through the mesh-order device array and the permutation, it
+            /// was three dependent loads ahead of the first barrier: HEX27 points on the H100 2%).
+            struct Connectivity {
+                const idx_t *node[MAX_NODES]{};
+            };
+
+            /// `Connectivity` from the device array of device arrays (mesh order) the operator
+            /// passes: bound at the set-up, its N pointers copied to the host once per array.
+            template <class El>
+            class StagedConnectivity {
+            public:
+                static_assert(El::N <= MAX_NODES, "more nodes per element than a kernel's connectivity carries");
+
+                const Connectivity &bind(const idx_t *const *const elements) {
+                    if (elements != bound_) {
+                        const idx_t *pointers[El::N];
+                        check(cudaMemcpy(pointers, elements, El::N * sizeof(idx_t *), cudaMemcpyDeviceToHost), "connectivity");
+                        for (int s = 0; s < El::N; ++s) staged_.node[s] = pointers[ElementTables<El>::shape_node(s)];
+                        bound_ = elements;
+                    }
+                    return staged_;
+                }
+
+                const Connectivity &operator()(const idx_t *const *const elements) const {
+                    if (elements != bound_) SFEM_ERROR("inexact (device): applied on another connectivity than the set-up's\n");
+                    return staged_;
+                }
+
+            private:
+                const idx_t *const *bound_{nullptr};
+                Connectivity        staged_;
+            };
 
             // ------------------------------------------------------------------- codes
 
@@ -162,12 +197,12 @@ namespace sfem {
             /// diagonal, HEX27's point threads): a device copy of the generated header's constants.
             /// The unrolled kernels read the header's own constants, as constant expressions.
             struct TablesView {
-                const int    *shape_node{nullptr};   // [N]
                 const double *qw{nullptr};           // [NQ]
                 const double *factor{nullptr};       // [NQ][NV], moments
                 const double *mult{nullptr};         // [NV]
                 const double *x{nullptr};            // [NV]
                 const double *dt{nullptr};           // [R][3][N]
+                const double *dq{nullptr};           // [NQ][3][N], at the set-up's points
                 const int    *pa{nullptr}, *pb{nullptr};  // [NV]
                 const int    *slot{nullptr};         // [9][9]
                 const int    *mask{nullptr};         // [NV], folded
@@ -194,23 +229,34 @@ namespace sfem {
                     std::vector<int>    i;
                     auto add_d = [&](std::size_t &at, const std::vector<double> &v) { at = d.size(), d.insert(d.end(), v.begin(), v.end()); };
                     auto add_i = [&](std::size_t &at, const std::vector<int> &v) { at = i.size(), i.insert(i.end(), v.begin(), v.end()); };
-                    std::vector<int>    shape(N), pa(NV), pb(NV), slot(81);
-                    std::vector<double> qw(NQ), mult(NV), x(NV), dt((size_t)R * 3 * N), factor;
-                    for (int s = 0; s < N; ++s) shape[s] = T::shape_node(s);
+                    std::vector<int>    pa(NV), pb(NV), slot(81);
+                    std::vector<double> qw(NQ), mult(NV), x(NV), dt((size_t)R * 3 * N), dq((size_t)NQ * 3 * N), factor;
                     for (int q = 0; q < NQ; ++q) qw[q] = El::QW[q];
                     for (int j = 0; j < NV; ++j) pa[j] = T::pa(j), pb[j] = T::pb(j), mult[j] = T::mult(j), x[j] = El::X[j];
                     for (int r = 0; r < R; ++r)
                         for (int m = 0; m < 3; ++m)
                             for (int s = 0; s < N; ++s) dt[((size_t)r * 3 + m) * N + s] = El::DT[r][m][s];
+                    // The set-up's points are the stored ones but for the moments, which integrate
+                    // over the rule's own (`DQ`).
+                    static_assert(El::moments || El::R == NQ, "a point store's set-up points are its gradient points");
+                    for (int q = 0; q < NQ; ++q)
+                        for (int m = 0; m < 3; ++m)
+                            for (int s = 0; s < N; ++s) {
+                                if constexpr (El::moments) {
+                                    dq[((size_t)q * 3 + m) * N + s] = El::DQ[q][m][s];
+                                } else {
+                                    dq[((size_t)q * 3 + m) * N + s] = El::DT[q][m][s];
+                                }
+                            }
                     for (int r = 0; r < 9; ++r)
                         for (int c = 0; c < 9; ++c) slot[r * 9 + c] = M::contraction::slot(r, c);
                     if constexpr (El::moments) {
                         for (int q = 0; q < NQ; ++q)
                             for (int j = 0; j < NV; ++j) factor.push_back(El::FACTOR[q][j]);
                     }
-                    std::size_t o_shape, o_pa, o_pb, o_slot, o_qw, o_mult, o_x, o_dt, o_factor;
-                    add_i(o_shape, shape), add_i(o_pa, pa), add_i(o_pb, pb), add_i(o_slot, slot);
-                    add_d(o_qw, qw), add_d(o_mult, mult), add_d(o_x, x), add_d(o_dt, dt), add_d(o_factor, factor);
+                    std::size_t o_pa, o_pb, o_slot, o_qw, o_mult, o_x, o_dt, o_dq, o_factor;
+                    add_i(o_pa, pa), add_i(o_pb, pb), add_i(o_slot, slot);
+                    add_d(o_qw, qw), add_d(o_mult, mult), add_d(o_x, x), add_d(o_dt, dt), add_d(o_dq, dq), add_d(o_factor, factor);
                     std::size_t o_mask = 0, o_source = 0, o_coef = 0, o_dir = 0, o_off = 0, o_nkeep = 0, o_keep = 0, o_xc = 0;
                     if constexpr (FOLD) {
                         std::vector<int>    mask(NV), source((size_t)NV * 3), dir(NC), off(NV + 1), nkeep(8), keep((size_t)8 * NC, -1);
@@ -242,8 +288,8 @@ namespace sfem {
                     ints_    = DeviceArray<int>::from(i);
                     const double *D = doubles_.data;
                     const int    *I = ints_.data;
-                    view_.shape_node = I + o_shape, view_.pa = I + o_pa, view_.pb = I + o_pb, view_.slot = I + o_slot;
-                    view_.qw = D + o_qw, view_.mult = D + o_mult, view_.x = D + o_x, view_.dt = D + o_dt;
+                    view_.pa = I + o_pa, view_.pb = I + o_pb, view_.slot = I + o_slot;
+                    view_.qw = D + o_qw, view_.mult = D + o_mult, view_.x = D + o_x, view_.dt = D + o_dt, view_.dq = D + o_dq;
                     view_.factor = El::moments ? D + o_factor : nullptr;
                     if constexpr (FOLD) {
                         view_.mask = I + o_mask, view_.source = I + o_source, view_.dir = I + o_dir, view_.off = I + o_off;
@@ -265,7 +311,7 @@ namespace sfem {
             /// What the set-up kernel reads, by value.
             struct SetupArgs {
                 ptrdiff_t             nelements{0};
-                const idx_t *const   *elements{nullptr};  // device array of device arrays, mesh order
+                Connectivity          elements;
                 const geom_t *const  *points{nullptr};    // device array, when not affine
                 const geom_t         *adjugate[9]{};      // affine
                 const geom_t         *determinant{nullptr};
@@ -280,13 +326,13 @@ namespace sfem {
             };
 
             template <class M>
-            SetupArgs setup_args(const SetupInput &in) {
+            SetupArgs setup_args(const SetupInput &in, const Connectivity &elements) {
                 static_assert(M::n_parameters <= MAX_PARAMS, "more material constants than the set-up carries");
                 static_assert(M::n_quadrature_fields <= MAX_FIELDS && M::max_quadrature_components <= MAX_FIELD_COMPONENTS,
                               "more integration-point fields than the set-up carries");
                 SetupArgs a;
                 a.nelements = in.nelements;
-                a.elements  = in.elements;
+                a.elements  = elements;
                 a.affine    = in.adjugate != nullptr;
                 if (a.affine) {
                     for (int c = 0; c < 9; ++c) a.adjugate[c] = in.adjugate[c];
@@ -315,23 +361,38 @@ namespace sfem {
             }
 
             /// The set-up's shared memory per element, in doubles: the gathered state, previous
-            /// state and coordinates, their reference gradients at the points, the weighted point
-            /// tangents, the stored tensors (the moments, on TET10), the partial maxima, then the
-            /// store's own (`Sink::extra_doubles`).  The gathered values and their gradients are dead
-            /// once the point tangents are written: the store's scratch (`Sink::scratch_doubles`)
-            /// reuses them.
+            /// state and coordinates, the weighted point tangents, the stored tensors (the moments,
+            /// on TET10), the partial maxima, then the store's own (`Sink::extra_doubles`).  The
+            /// gathered values are dead once the point tangents are written: the store's scratch
+            /// (`Sink::scratch_doubles`) reuses them.
             template <class M, class Sink>
             struct SetupShared {
                 using El               = typename M::element;
                 static constexpr int N = El::N, NQ = El::NQ, NV = El::NV, NC = M::NC;
                 static constexpr int H        = 0;
-                static constexpr int G        = H + 9 * N;
-                static constexpr int TS       = std::max(G + 27 * NQ, H + Sink::scratch_doubles);
+                static constexpr int TS       = H + std::max(9 * N, Sink::scratch_doubles);
                 static constexpr int S        = TS + NQ * NC;
                 static constexpr int TOPS     = S + (El::moments ? NV * NC : 0);
                 static constexpr int EXTRA    = TOPS + NQ;
                 static constexpr int per_element = EXTRA + Sink::extra_doubles;
             };
+
+            /// The reference gradient at one point, G[k*3+m], from the shape derivatives there
+            /// (`d[m][j]`), in the stages' difference form: the nodal values less the first.
+            template <int N>
+            __device__ __forceinline__ void point_gradient(const double *const RSTR d, const double (*const h)[N], real_t G[9]) {
+#pragma unroll
+                for (int k = 0; k < 3; ++k) {
+                    const double h0 = h[k][0];
+#pragma unroll
+                    for (int m = 0; m < 3; ++m) {
+                        double acc = 0;
+#pragma unroll
+                        for (int j = 1; j < N; ++j) acc += d[m * N + j] * (h[k][j] - h0);
+                        G[k * 3 + m] = acc;
+                    }
+                }
+            }
 
             template <class M, class Sink>
             __global__ void setup_kernel(const SetupArgs a, const TablesView t, const Sink sink) {
@@ -347,16 +408,13 @@ namespace sfem {
                 double(*const hu)[N]   = reinterpret_cast<double(*)[N]>(base + L::H);
                 double(*const hz)[N]   = hu + 3;
                 double(*const hx)[N]   = hz + 3;
-                double(*const G)[9]    = reinterpret_cast<double(*)[9]>(base + L::G);
-                double(*const GZ)[9]   = G + NQ;
-                double(*const GX)[9]   = GZ + NQ;
                 double(*const Ts)[NC]  = reinterpret_cast<double(*)[NC]>(base + L::TS);
                 double(*const S)[NC]   = El::moments ? reinterpret_cast<double(*)[NC]>(base + L::S) : Ts;
                 double *const tops     = base + L::TOPS;
 
                 if (active) {
                     for (int s = q; s < N; s += NQ) {
-                        const ptrdiff_t node = a.elements[t.shape_node[s]][e];
+                        const ptrdiff_t node = a.elements.node[s][e];
                         for (int k = 0; k < 3; ++k) {
                             if constexpr (M::reads_state) hu[k][s] = a.u[node * a.u_stride + k];
                             if constexpr (M::reads_previous) hz[k][s] = a.z[node * a.u_stride + k];
@@ -365,24 +423,18 @@ namespace sfem {
                     }
                 }
                 __syncthreads();
-                if (active && q == 0) {
-                    if constexpr (M::reads_state) El::template setup_in<double, double>(hu, G);
-                    if constexpr (M::reads_previous) El::template setup_in<double, double>(hz, GZ);
-                    if (!a.affine) El::template setup_in<double, double>(hx, GX);
-                }
-                __syncthreads();
                 if (active) {
-                    real_t gu[9], gz[9], adj[9], det;
-                    for (int c = 0; c < 9; ++c) {
-                        gu[c] = M::reads_state ? G[q][c] : real_t(0);
-                        gz[c] = M::reads_previous ? GZ[q][c] : real_t(0);
-                    }
+                    // Each thread differentiates at its own point.
+                    const double *const RSTR d = t.dq + (size_t)q * 3 * N;
+                    real_t                   gu[9] = {0}, gz[9] = {0}, adj[9], det;
+                    if constexpr (M::reads_state) point_gradient<N>(d, hu, gu);
+                    if constexpr (M::reads_previous) point_gradient<N>(d, hz, gz);
                     if (a.affine) {
                         for (int c = 0; c < 9; ++c) adj[c] = (real_t)a.adjugate[c][e];
                         det = (real_t)a.determinant[e];
                     } else {
                         real_t J[9];
-                        for (int c = 0; c < 9; ++c) J[c] = GX[q][c];
+                        point_gradient<N>(d, hx, J);
                         detail::adjugate_and_determinant(J, adj, det);
                     }
                     real_t        qf[MAX_FIELDS][MAX_FIELD_COMPONENTS];
