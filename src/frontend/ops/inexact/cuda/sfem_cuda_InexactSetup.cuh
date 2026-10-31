@@ -147,11 +147,12 @@ namespace sfem {
                 ~DeviceArray() {
                     if (data) cudaFree(data);
                 }
-                static DeviceArray from(const std::vector<T> &v) {
-                    DeviceArray a(v.size());
-                    if (!v.empty()) check(cudaMemcpy(a.data, v.data(), v.size() * sizeof(T), cudaMemcpyHostToDevice), "upload");
+                static DeviceArray from(const T *const v, const std::size_t n) {
+                    DeviceArray a(n);
+                    if (n) check(cudaMemcpy(a.data, v, n * sizeof(T), cudaMemcpyHostToDevice), "upload");
                     return a;
                 }
+                static DeviceArray from(const std::vector<T> &v) { return from(v.data(), v.size()); }
                 std::size_t bytes() const { return size * sizeof(T); }
             };
 

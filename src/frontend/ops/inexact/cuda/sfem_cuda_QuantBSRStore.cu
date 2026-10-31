@@ -276,8 +276,8 @@ namespace sfem {
                         gp_      = DeviceArray<int64_t>::from(gp);
                         cols_    = DeviceArray<int32_t>::from(cols);
                         records_ = DeviceArray<rec_t>(slots);  // zero: the padding's codes
-                        rp_      = DeviceArray<count_t>::from(std::vector<count_t>(rp, rp + n_ + 1));
-                        ci_      = DeviceArray<idx_t>::from(std::vector<idx_t>(ci, ci + rp[n_]));
+                        rp_      = DeviceArray<count_t>::from(rp, (std::size_t)n_ + 1);
+                        ci_      = DeviceArray<idx_t>::from(ci, (std::size_t)rp[n_]);
                         values_  = DeviceArray<float>((size_t)rp[n_] * 9);
                         top_     = DeviceArray<int>(1);
                         count_   = DeviceArray<int>(1);
