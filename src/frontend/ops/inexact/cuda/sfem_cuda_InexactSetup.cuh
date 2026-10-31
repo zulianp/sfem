@@ -202,7 +202,7 @@ namespace sfem {
                 const double *mult{nullptr};         // [NV]
                 const double *x{nullptr};            // [NV]
                 const double *dt{nullptr};           // [R][3][N]
-                const double *dq{nullptr};           // [NQ][3][N], at the set-up's points
+                const double *dq{nullptr};           // [NQ][N][4], at the set-up's points (the 4th zero)
                 const int    *pa{nullptr}, *pb{nullptr};  // [NV]
                 const int    *slot{nullptr};         // [9][9]
                 const int    *mask{nullptr};         // [NV], folded
@@ -230,7 +230,7 @@ namespace sfem {
                     auto add_d = [&](std::size_t &at, const std::vector<double> &v) { at = d.size(), d.insert(d.end(), v.begin(), v.end()); };
                     auto add_i = [&](std::size_t &at, const std::vector<int> &v) { at = i.size(), i.insert(i.end(), v.begin(), v.end()); };
                     std::vector<int>    pa(NV), pb(NV), slot(81);
-                    std::vector<double> qw(NQ), mult(NV), x(NV), dt((size_t)R * 3 * N), dq((size_t)NQ * 3 * N), factor;
+                    std::vector<double> qw(NQ), mult(NV), x(NV), dt((size_t)R * 3 * N), dq((size_t)NQ * N * 4), factor;
                     for (int q = 0; q < NQ; ++q) qw[q] = El::QW[q];
                     for (int j = 0; j < NV; ++j) pa[j] = T::pa(j), pb[j] = T::pb(j), mult[j] = T::mult(j), x[j] = El::X[j];
                     for (int r = 0; r < R; ++r)
@@ -243,9 +243,9 @@ namespace sfem {
                         for (int m = 0; m < 3; ++m)
                             for (int s = 0; s < N; ++s) {
                                 if constexpr (El::moments) {
-                                    dq[((size_t)q * 3 + m) * N + s] = El::DQ[q][m][s];
+                                    dq[((size_t)q * N + s) * 4 + m] = El::DQ[q][m][s];
                                 } else {
-                                    dq[((size_t)q * 3 + m) * N + s] = El::DT[q][m][s];
+                                    dq[((size_t)q * N + s) * 4 + m] = El::DT[q][m][s];
                                 }
                             }
                     for (int r = 0; r < 9; ++r)
@@ -256,7 +256,9 @@ namespace sfem {
                     }
                     std::size_t o_pa, o_pb, o_slot, o_qw, o_mult, o_x, o_dt, o_dq, o_factor;
                     add_i(o_pa, pa), add_i(o_pb, pb), add_i(o_slot, slot);
-                    add_d(o_qw, qw), add_d(o_mult, mult), add_d(o_x, x), add_d(o_dt, dt), add_d(o_dq, dq), add_d(o_factor, factor);
+                    add_d(o_qw, qw), add_d(o_mult, mult), add_d(o_x, x), add_d(o_dt, dt);
+                    d.resize((d.size() + 1) / 2 * 2);  // 16-byte aligned: a node's derivatives load as double2
+                    add_d(o_dq, dq), add_d(o_factor, factor);
                     std::size_t o_mask = 0, o_source = 0, o_coef = 0, o_dir = 0, o_off = 0, o_nkeep = 0, o_keep = 0, o_xc = 0;
                     if constexpr (FOLD) {
                         std::vector<int>    mask(NV), source((size_t)NV * 3), dir(NC), off(NV + 1), nkeep(8), keep((size_t)8 * NC, -1);
@@ -378,20 +380,27 @@ namespace sfem {
             };
 
             /// The reference gradient at one point, G[k*3+m], from the shape derivatives there
-            /// (`d[m][j]`), in the stages' difference form: the nodal values less the first.
+            /// (`d[j][m]`, padded to four), in the stages' difference form: the nodal values less the first.  A
+            /// node's derivatives and differences are read once (with the node innermost, each
+            /// was read per direction and per component: HEX27 a quarter of the set-up's
+            /// instructions); every entry sums over the nodes in the same order.
             template <int N>
             __device__ __forceinline__ void point_gradient(const double *const RSTR d, const double (*const h)[N], real_t G[9]) {
+                double acc[9] = {0};
 #pragma unroll
-                for (int k = 0; k < 3; ++k) {
-                    const double h0 = h[k][0];
+                for (int j = 1; j < N; ++j) {
+                    const double2 w01 = reinterpret_cast<const double2 *>(d)[2 * j];
+                    const double  w0 = w01.x, w1 = w01.y, w2 = d[4 * j + 2];
 #pragma unroll
-                    for (int m = 0; m < 3; ++m) {
-                        double acc = 0;
-#pragma unroll
-                        for (int j = 1; j < N; ++j) acc += d[m * N + j] * (h[k][j] - h0);
-                        G[k * 3 + m] = acc;
+                    for (int k = 0; k < 3; ++k) {
+                        const double v = h[k][j] - h[k][0];
+                        acc[k * 3 + 0] += w0 * v;
+                        acc[k * 3 + 1] += w1 * v;
+                        acc[k * 3 + 2] += w2 * v;
                     }
                 }
+#pragma unroll
+                for (int c = 0; c < 9; ++c) G[c] = acc[c];
             }
 
             template <class M, class Sink>
@@ -425,7 +434,7 @@ namespace sfem {
                 __syncthreads();
                 if (active) {
                     // Each thread differentiates at its own point.
-                    const double *const RSTR d = t.dq + (size_t)q * 3 * N;
+                    const double *const RSTR d = t.dq + (size_t)q * N * 4;
                     real_t                   gu[9] = {0}, gz[9] = {0}, adj[9], det;
                     if constexpr (M::reads_state) point_gradient<N>(d, hu, gu);
                     if constexpr (M::reads_previous) point_gradient<N>(d, hz, gz);
@@ -464,14 +473,25 @@ namespace sfem {
                 sink.encode(t, e, active, q, S, tops, base + L::EXTRA, base + L::H);
             }
 
-            /// The element's largest magnitude over its threads' partial maxima.
+            /// The element's largest magnitude over its threads' partial maxima.  Whole warps per
+            /// element (HEX27) reduce by shuffles, then over the element's warps; otherwise each
+            /// thread reads the element's partial maxima.
             template <int NQ>
-            __device__ __forceinline__ double element_max(double *const tops, const int q, const double mine) {
-                tops[q] = mine;
-                __syncthreads();
-                double top = 0;
-                for (int p = 0; p < NQ; ++p) top = fmax(top, tops[p]);
-                return top;
+            __device__ __forceinline__ double element_max(double *const tops, const int q, double mine) {
+                if constexpr (NQ % 32 == 0) {
+                    for (int o = 16; o > 0; o /= 2) mine = fmax(mine, __shfl_xor_sync(0xffffffffu, mine, o));
+                    if (q % 32 == 0) tops[q / 32] = mine;
+                    __syncthreads();
+                    double top = 0;
+                    for (int w = 0; w < NQ / 32; ++w) top = fmax(top, tops[w]);
+                    return top;
+                } else {
+                    tops[q] = mine;
+                    __syncthreads();
+                    double top = 0;
+                    for (int p = 0; p < NQ; ++p) top = fmax(top, tops[p]);
+                    return top;
+                }
             }
 
             /// Launches the set-up with as many elements per block as fit, up to `THREADS` threads.
