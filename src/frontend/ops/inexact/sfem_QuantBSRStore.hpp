@@ -36,10 +36,17 @@ namespace sfem {
                 const idx_t *const   ci = graph_->colidx()->data();
                 float *const         v  = values_->data();
                 const ptrdiff_t      nv = (ptrdiff_t)values_->size();
+                {
+                    SFEM_TRACE_SCOPE("inexact::BsrStore::assemble");
 #pragma omp parallel for
-                for (ptrdiff_t k = 0; k < nv; ++k) v[k] = 0;
-                if (assemble(rp, ci, smesh::SMESH_FLOAT32, v) != SFEM_SUCCESS) return SFEM_FAILURE;
-                correction(rp, v);
+                    for (ptrdiff_t k = 0; k < nv; ++k) v[k] = 0;
+                    if (assemble(rp, ci, smesh::SMESH_FLOAT32, v) != SFEM_SUCCESS) return SFEM_FAILURE;
+                }
+                {
+                    SFEM_TRACE_SCOPE("inexact::BsrStore::correction");
+                    correction(rp, v);
+                }
+                SFEM_TRACE_SCOPE("inexact::BsrStore::encode");
                 if constexpr (Q::upper) {
                     quant_.encode_in_place(rp, ci, v);
                 } else {

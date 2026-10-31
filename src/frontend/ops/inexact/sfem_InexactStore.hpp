@@ -184,6 +184,7 @@ namespace sfem {
             /// The `bsr` store: the operator's whole tangent on the space's node graph, its inertia
             /// term included, so the caller adds nothing to its apply.
             int update_bsr(const std::shared_ptr<CRSGraph> &graph, const bool symmetric, const AssembleBSR &assemble) {
+                SFEM_TRACE_SCOPE("inexact::update_bsr");
                 if (!bsr) {
                     SFEM_TRACE_SCOPE("inexact::make_bsr");
                     bsr = make_bsr(graph, options.encoding == InexactOptions::Encoding::I8_BLOCK, symmetric);
