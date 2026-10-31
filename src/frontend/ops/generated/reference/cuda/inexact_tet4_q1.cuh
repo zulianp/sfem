@@ -80,12 +80,6 @@ struct inexact_tet4_q1 {
       out[2][3] = y0_8;
     }
   }
-
-  // The reference gradient at the set-up's points: G[q][k*3+m].
-  template <typename h_t, typename t_out>
-  static __host__ __device__ __forceinline__ void setup_in(const h_t h[3][4], t_out G[NQ][9]) {
-    stage_in<h_t, t_out>(h, G);
-  }
 };
 
 }  // namespace codegen

@@ -16,7 +16,7 @@ A_TREE=/ritom/scratch/cscs/zulianp/sfem-pa-qp
 B_TREE=/ritom/scratch/cscs/zulianp/sfem-pa-lib
 E=$1; K=$2; M=$3
 A=$A_TREE/build-spike-cuda-$E/qp/cuda/newton_qp_cuda
-B=$B_TREE/build-cuda/playground
+B=$B_TREE/${B_BUILD-build-cuda}/playground
 C=$B_TREE/spikes/inexact_apply_compare/qp/cases/$(echo $E | tr A-Z a-z | sed s/proteus_//)_$K.yaml
 for x in $A $B; do [ -x $x ] || { echo "missing $x: build on the login node"; exit 1; }; done
 export OMP_NUM_THREADS=72 OMP_PROC_BIND=true OMP_PLACES=cores
