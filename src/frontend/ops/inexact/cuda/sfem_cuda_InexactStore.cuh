@@ -247,7 +247,8 @@ namespace sfem {
                                 for (int k = 0; k < t.nkeep[mask]; ++k) mine = fmax(mine, fabs(S[j][t.keep[mask * NC + k]]));
                             }
                         } else {
-                            for (int i = q; i < NV * NC; i += NQ) mine = fmax(mine, fabs(S[i / NC][i % NC]));
+                            const double *const flat = &S[0][0];
+                            for (int i = q; i < NV * NC; i += NQ) mine = fmax(mine, fabs(flat[i]));
                         }
                     }
                     double inv = 1;

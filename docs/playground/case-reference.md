@@ -79,8 +79,8 @@ For the generated materials:
   elasticity, NeoHookean-Ogden and the Kelvin-Voigt materials (mixing the two pairs is an error);
 - `blocks: [{name: B, <parameters>}]` overrides parameters per block, and restricts the operator to
   the listed blocks;
-- `assume_affine: true` (and `assume_affine_objective`, `_gradient`, `_hessian_action`, `_apply`)
-  selects the affine-element kernels.
+- `assume_affine: true` (and `objective_assume_affine`, `gradient_assume_affine`,
+  `hessian_action_assume_affine`, `apply_assume_affine`) selects the affine-element kernels.
 
 Unknown parameters are ignored: check their spelling.
 
