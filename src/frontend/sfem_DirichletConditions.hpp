@@ -125,6 +125,11 @@ namespace sfem {
 
     std::shared_ptr<Constraint> to_device(const std::shared_ptr<DirichletConditions> &dc);
 
+    /// Copies the current values of the host conditions a device constraint was made from by
+    /// `to_device` (after their `set_time` moved them).  A host constraint is its own conditions
+    /// and needs nothing.
+    int refresh_device(Constraint &constraint);
+
     /// DirichletConditions::create, moved to the device for EXECUTION_SPACE_DEVICE.
     inline std::shared_ptr<Constraint> create_dirichlet_conditions(const std::shared_ptr<FunctionSpace>              &space,
                                                                    const std::vector<DirichletConditions::Condition> &conditions,

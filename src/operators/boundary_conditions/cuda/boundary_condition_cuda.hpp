@@ -9,6 +9,35 @@
 namespace sfem {
     /// The condition with its indices and values copied to the device (d_destroy_conditions frees them).
     boundary_condition_t to_device(const boundary_condition_t &host);
+
+    /// The device bsr_constraint_nodes_to_identity_vec (dirichlet.hpp): the rows of `component` at
+    /// the nodes, of BSR values of type V, diag_value on the diagonal and zero elsewhere.
+    template <typename V>
+    int d_bsr_constraint_nodes_to_identity_vec(const ptrdiff_t                    n_dirichlet_nodes,
+                                               const idx_t *const SFEM_RESTRICT   dirichlet_nodes,
+                                               const int                          block_size,
+                                               const int                          component,
+                                               const real_t                       diag_value,
+                                               const count_t *const SFEM_RESTRICT rowptr,
+                                               const idx_t *const SFEM_RESTRICT   colidx,
+                                               V *const SFEM_RESTRICT             values,
+                                               void *const                        stream);
+
+    /// out[s] += sum over the nodes of (x_i + steps[s] h_i - v_i)^2, v_i the node's entry of
+    /// `values` or, when that is null, `value`; h null: x alone.  x, h, values and the nodes on the
+    /// device, steps and out on the host (the host constraint_objective_nodes_to_value(s)_vec_steps).
+    int d_constraint_objective_vec_steps(const ptrdiff_t                   n_dirichlet_nodes,
+                                         const idx_t *const SFEM_RESTRICT  dirichlet_nodes,
+                                         const int                         block_size,
+                                         const int                         component,
+                                         const real_t                      value,
+                                         const real_t *const SFEM_RESTRICT values,
+                                         const real_t *const SFEM_RESTRICT x,
+                                         const real_t *const SFEM_RESTRICT h,
+                                         const int                         nsteps,
+                                         const real_t *const               steps,
+                                         real_t *const                     out,
+                                         void *const                       stream);
 }  // namespace sfem
 
 #ifdef __cplusplus
