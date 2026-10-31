@@ -9,7 +9,7 @@ namespace sfem {
 namespace codegen {
 
 // neohookean_ogden on PROTEUS_HEX27: the weighted tangent the stored-tangent operator keeps at every point.
-struct neohookean_ogden_proteus_hex27_inexact {
+struct __attribute__((visibility("hidden"))) neohookean_ogden_proteus_hex27_inexact {
   using element = inexact_proteus_hex27_q64;
   using contraction = inexact_contract_d3<true>;
   static constexpr int DIM = 3;

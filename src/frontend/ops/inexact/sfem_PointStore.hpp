@@ -60,6 +60,9 @@ namespace sfem {
                 codes_   = create_host_buffer<code_t>((size_t)NSE * nblocks_ * VS);
                 if (scaled) scales_ = create_host_buffer<float>((size_t)nblocks_ * VS);
                 if (has_mean) means_ = create_host_buffer<float>((size_t)NC * nblocks_ * VS);
+                codes_p_  = codes_->data();
+                scales_p_ = scales_ ? scales_->data() : nullptr;
+                means_p_  = means_ ? means_->data() : nullptr;
             }
 
             ptrdiff_t nelements() const { return nelements_; }
@@ -86,9 +89,9 @@ namespace sfem {
 
             template <typename s_t>
             void encode_block(const ptrdiff_t evb, const int ne, const s_t bT[NV][NC][VS]) {
-                code_t *const RSTR codes  = codes_->data();
-                float *const RSTR  scales = scales_ ? scales_->data() : nullptr;
-                float *const RSTR  means  = means_ ? means_->data() : nullptr;
+                code_t *const RSTR codes  = codes_p_;
+                float *const RSTR  scales = scales_p_;
+                float *const RSTR  means  = means_p_;
                 for (int lane = 0; lane < ne; ++lane) {
                     double T[NV][NC];
                     for (int j = 0; j < NV; ++j)
@@ -155,11 +158,11 @@ namespace sfem {
             /// back, the components a folded point does not store left at zero.  Unscaled when the
             /// scale goes on the outputs.
             void decode(const ptrdiff_t e, const int j, double S[NC]) const {
-                const code_t *const RSTR codes = codes_->data();
-                const double             mean_scale = has_mean ? (double)scales_->data()[(size_t)e] : 1.0;
+                const code_t *const RSTR codes = codes_p_;
+                const double             mean_scale = has_mean ? (double)scales_p_[(size_t)e] : 1.0;
                 for (int c = 0; c < NC; ++c) S[c] = 0;
                 auto value = [&](const int c, const double code, const double x) {
-                    return has_mean ? x * (double)means_->data()[mean_index(e, 0, c)] + mean_scale * code : code;
+                    return has_mean ? x * (double)means_p_[mean_index(e, 0, c)] + mean_scale * code : code;
                 };
                 if constexpr (FOLD) {
                     const int mask = Fold::mask(j);
@@ -196,7 +199,7 @@ namespace sfem {
                                 }
                         }
                     }
-                    const double s = scale_on_output ? (double)scales_->data()[(size_t)e] : 1.0;
+                    const double s = scale_on_output ? (double)scales_p_[(size_t)e] : 1.0;
                     for (int i = 0; i < DIM; ++i)
                         for (int p = 0; p < Element::N; ++p) out[i][p][lane] = (real_t)(s * d[i][p]);
                 }
@@ -210,7 +213,7 @@ namespace sfem {
                                    const int         ne,
                                    const real_t      bh[DIM][Element::N][VS],
                                    real_t            out[DIM][Element::N][VS]) const {
-                const code_t *const RSTR codes = codes_->data();
+                const code_t *const RSTR codes = codes_p_;
 
                 tau P[Element::R][ORDER][VS];
                 Element::template stage_in<real_t, tau, VS>(ne, bh, P);
@@ -226,8 +229,8 @@ namespace sfem {
                 tau A[has_mean ? NC : 1][VS];
                 tau sc[VS];
                 if constexpr (has_mean) {
-                    const float *const RSTR means  = means_->data();
-                    const float *const RSTR scales = scales_->data();
+                    const float *const RSTR means  = means_p_;
+                    const float *const RSTR scales = scales_p_;
                     for (int c = 0; c < NC; ++c)
 #pragma omp simd
                         for (int lane = 0; lane < ne; ++lane) A[c][lane] = tau(means[mean_index(evb, lane, c)]);
@@ -284,7 +287,7 @@ namespace sfem {
                 Element::template stage_out<tau, real_t, VS>(ne, Y, out);
 
                 if constexpr (scale_on_output) {
-                    const float *const RSTR scales = scales_->data();
+                    const float *const RSTR scales = scales_p_;
                     for (int i = 0; i < DIM; ++i)
                         for (int p = 0; p < Element::N; ++p)
 #pragma omp simd
@@ -297,6 +300,10 @@ namespace sfem {
             SharedBuffer<code_t> codes_;
             SharedBuffer<float>  scales_;  // per element
             SharedBuffer<float>  means_;   // per (element, component), blocked
+            // The buffers' storage, resolved once: Buffer::data() is an out-of-line call into
+            // smesh, and the blocks run per VS elements.
+            code_t *codes_p_{nullptr};
+            float  *scales_p_{nullptr}, *means_p_{nullptr};
 
             SFEM_INLINE std::size_t code_index(const ptrdiff_t e0, const int lane, const int j, const int c) const {
                 const ptrdiff_t e = e0 + lane;

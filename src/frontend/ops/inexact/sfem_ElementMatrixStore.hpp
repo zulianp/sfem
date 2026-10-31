@@ -57,6 +57,9 @@ namespace sfem {
                 codes_   = create_host_buffer<code_t>((size_t)NE * nblocks_ * VS);
                 if (scaled) scales_ = create_host_buffer<float>((size_t)nblocks_ * VS);
                 if (PAIR) factors_ = create_host_buffer<uint8_t>((size_t)NB * nblocks_ * VS);
+                codes_p_   = codes_->data();
+                scales_p_  = scales_ ? scales_->data() : nullptr;
+                factors_p_ = factors_ ? factors_->data() : nullptr;
             }
 
             ptrdiff_t nelements() const { return nelements_; }
@@ -144,12 +147,12 @@ namespace sfem {
             /// minus the off-diagonal blocks of their row (K_pp = -sum_{q != p} K_pq), so their
             /// diagonal entries are minus the stored blocks' diagonals touching p.
             void diagonal_block(const ptrdiff_t evb, const int ne, real_t out[DIM][N][VS]) const {
-                const code_t *const RSTR  codes   = codes_->data();
-                const uint8_t *const RSTR factors = PAIR ? factors_->data() : nullptr;
+                const code_t *const RSTR  codes   = codes_p_;
+                const uint8_t *const RSTR factors = PAIR ? factors_p_ : nullptr;
                 for (int lane = 0; lane < ne; ++lane) {
                     const ptrdiff_t e = evb + lane;
                     double          d[DIM][N] = {{0}};
-                    const double    s = scaled ? (double)scales_->data()[(size_t)e] : 1.0;
+                    const double    s = scaled ? (double)scales_p_[(size_t)e] : 1.0;
                     for (int k = 0; k < NB; ++k) {
                         int p, q;
                         block_nodes(k, p, q);
@@ -169,9 +172,9 @@ namespace sfem {
             /// Elements evb .. evb + ne, inside one store block.
             template <typename tau>
             SFEM_INLINE void block(const ptrdiff_t evb, const int ne, const real_t bh[DIM][N][VS], real_t out[DIM][N][VS]) const {
-                const code_t *const RSTR  c0 = codes_->data() + (size_t)(evb / VS) * NE * VS + (size_t)(evb % VS);
+                const code_t *const RSTR  c0 = codes_p_ + (size_t)(evb / VS) * NE * VS + (size_t)(evb % VS);
                 const uint8_t *const RSTR r0 =
-                        PAIR ? factors_->data() + (size_t)(evb / VS) * NB * VS + (size_t)(evb % VS) : nullptr;
+                        PAIR ? factors_p_ + (size_t)(evb / VS) * NB * VS + (size_t)(evb % VS) : nullptr;
                 tau Y[DIM * N][VS];
                 for (int r = 0; r < DIM * N; ++r)
 #pragma omp simd
@@ -205,7 +208,7 @@ namespace sfem {
                         }
                     }
                 }
-                const float *const RSTR scales = scales_ ? scales_->data() : nullptr;
+                const float *const RSTR scales = scales_p_;
                 for (int i = 0; i < DIM; ++i)
                     for (int p = 0; p < N; ++p)
 #pragma omp simd
@@ -221,6 +224,11 @@ namespace sfem {
             SharedBuffer<code_t>  codes_;    // [block][entry][lane]
             SharedBuffer<float>   scales_;   // per element
             SharedBuffer<uint8_t> factors_;  // [block][node block][lane]
+            // The buffers' storage, resolved once: Buffer::data() is an out-of-line call into
+            // smesh, and the blocks run per VS elements.
+            code_t  *codes_p_{nullptr};
+            float   *scales_p_{nullptr};
+            uint8_t *factors_p_{nullptr};
 
             SFEM_INLINE std::size_t code_index(const ptrdiff_t e, const int entry) const {
                 return ((size_t)(e / VS) * NE + entry) * VS + (size_t)(e % VS);
@@ -228,17 +236,17 @@ namespace sfem {
 
             /// Scale and encode one element's stored numbers.
             void encode_values(const ptrdiff_t e, const double *const vals) {
-                code_t *const RSTR codes = codes_->data();
+                code_t *const RSTR codes = codes_p_;
                 double             inv   = 1;
                 double             top   = 0;
                 if constexpr (scaled) {
                     for (int k = 0; k < NE; ++k) top = std::max(top, std::fabs(vals[k]));
                     const double s           = CodeTraits<code_t>::scale_for(top);
-                    scales_->data()[(size_t)e] = (float)s;
+                    scales_p_[(size_t)e] = (float)s;
                     inv                        = 1.0 / (double)(float)s;
                 }
                 if constexpr (PAIR) {
-                    uint8_t *const RSTR factors = factors_->data();
+                    uint8_t *const RSTR factors = factors_p_;
                     for (int k = 0; k < NB; ++k) {
                         double pt = 0;
                         for (int y = 0; y < ORDER; ++y) pt = std::max(pt, std::fabs(vals[k * ORDER + y]));

@@ -776,7 +776,7 @@ def _inexact_units(kernel_sources):
         match = _INEXACT_UNIT_HEADER.match(str(path).replace(os.sep, "/"))
         if not match:
             continue
-        struct = re.search(r"^struct (\w+) \{", source, re.M)
+        struct = re.search(r"^struct (?:__attribute__\(\(.*\)\) )?(\w+) \{", source, re.M)
         if struct is None or struct.group(1) != match.group(2):
             raise ValueError("%s does not define struct %s" % (path, match.group(2)))
         symmetric = "static constexpr bool symmetric = true;" in source

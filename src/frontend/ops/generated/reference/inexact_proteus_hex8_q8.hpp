@@ -5,7 +5,7 @@ namespace sfem {
 namespace codegen {
 
 // The stored tangent's element half for PROTEUS_HEX8 on its 8-point rule (plans/inexact_element.py).
-struct inexact_proteus_hex8_q8 {
+struct __attribute__((visibility("hidden"))) inexact_proteus_hex8_q8 {
   static constexpr const char *name = "proteus_hex8_q8";
   static constexpr int DIM = 3;
   static constexpr int N = 8;   // nodes

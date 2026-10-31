@@ -8,7 +8,7 @@ template <bool SYM>
 struct inexact_contract_d3;
 
 template <>
-struct inexact_contract_d3<true> {
+struct __attribute__((visibility("hidden"))) inexact_contract_d3<true> {
   static constexpr int NC = 45;
   // Row r, column c of the packed tangent.
   static constexpr int SLOT[9][9] = {{0, 1, 2, 3, 4, 5, 6, 7, 8}, {1, 9, 10, 11, 12, 13, 14, 15, 16}, {2, 10, 17, 18, 19, 20, 21, 22, 23}, {3, 11, 18, 24, 25, 26, 27, 28, 29}, {4, 12, 19, 25, 30, 31, 32, 33, 34}, {5, 13, 20, 26, 31, 35, 36, 37, 38}, {6, 14, 21, 27, 32, 36, 39, 40, 41}, {7, 15, 22, 28, 33, 37, 40, 42, 43}, {8, 16, 23, 29, 34, 38, 41, 43, 44}};
@@ -386,7 +386,7 @@ struct inexact_contract_d3<true> {
 };
 
 template <>
-struct inexact_contract_d3<false> {
+struct __attribute__((visibility("hidden"))) inexact_contract_d3<false> {
   static constexpr int NC = 81;
   // Row r, column c of the packed tangent.
   static constexpr int SLOT[9][9] = {{0, 1, 2, 3, 4, 5, 6, 7, 8}, {9, 10, 11, 12, 13, 14, 15, 16, 17}, {18, 19, 20, 21, 22, 23, 24, 25, 26}, {27, 28, 29, 30, 31, 32, 33, 34, 35}, {36, 37, 38, 39, 40, 41, 42, 43, 44}, {45, 46, 47, 48, 49, 50, 51, 52, 53}, {54, 55, 56, 57, 58, 59, 60, 61, 62}, {63, 64, 65, 66, 67, 68, 69, 70, 71}, {72, 73, 74, 75, 76, 77, 78, 79, 80}};

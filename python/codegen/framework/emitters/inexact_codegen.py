@@ -105,6 +105,11 @@ def _qualifier():
     return "static %s" % current_target().inline_qualifier()
 
 
+def _struct(name):
+    """The opening of a generated struct, local to the library that compiles it."""
+    return "struct %s%s {" % (current_target().library_local_type_prefix(), name)
+
+
 def _simd():
     """The bound target's vectorisation pragma, or nothing."""
     pragma = current_target().vectorize_pragma()
@@ -654,7 +659,7 @@ def element_header_source(plan):
         "",
         "// The stored tangent's element half for %s on its %d-point rule (plans/inexact_element.py)."
         % (plan.element_type, plan.n_setup_points),
-        "struct %s {" % plan.struct_name,
+        _struct(plan.struct_name),
         '  static constexpr const char *name = "%s";' % plan.rule_key,
         "  static constexpr int DIM = %d;" % dim,
         "  static constexpr int N = %d;   // nodes" % n,
@@ -807,7 +812,7 @@ def contract_header_source(dim):
         lines += [
             "",
             "template <>",
-            "struct inexact_contract_d%d<%s> {" % (dim, _CPP_BOOL[symmetric]),
+            _struct("inexact_contract_d%d<%s>" % (dim, _CPP_BOOL[symmetric])),
             "  static constexpr int NC = %d;" % n_slots,
         ] + _slot_lines(order, slot) + [
             "",
@@ -945,7 +950,7 @@ def unit_header_source(unit_name, element_plan, units, parameters):
         "",
         "// %s on %s: the weighted tangent the stored-tangent operator keeps at every point."
         % (unit_name, element_plan.element_type),
-        "struct %s {" % struct,
+        _struct(struct),
         "  using element = %s;" % element_plan.struct_name,
         "  using contraction = inexact_contract_d%d<%s>;" % (plan.dim, _CPP_BOOL[plan.symmetric]),
         "  static constexpr int DIM = %d;" % plan.dim,

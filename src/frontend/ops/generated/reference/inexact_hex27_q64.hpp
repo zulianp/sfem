@@ -5,7 +5,7 @@ namespace sfem {
 namespace codegen {
 
 // The stored tangent's element half for HEX27 on its 64-point rule (plans/inexact_element.py).
-struct inexact_hex27_q64 {
+struct __attribute__((visibility("hidden"))) inexact_hex27_q64 {
   static constexpr const char *name = "hex27_q64";
   static constexpr int DIM = 3;
   static constexpr int N = 27;   // nodes
