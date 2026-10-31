@@ -316,14 +316,16 @@ namespace sfem {
             /// The set-up's shared memory per element, in doubles: the gathered state, previous
             /// state and coordinates, their reference gradients at the points, the weighted point
             /// tangents, the stored tensors (the moments, on TET10), the partial maxima, then the
-            /// store's own (`Sink::extra_doubles`).
+            /// store's own (`Sink::extra_doubles`).  The gathered values and their gradients are dead
+            /// once the point tangents are written: the store's scratch (`Sink::scratch_doubles`)
+            /// reuses them.
             template <class M, class Sink>
             struct SetupShared {
                 using El               = typename M::element;
                 static constexpr int N = El::N, NQ = El::NQ, NV = El::NV, NC = M::NC;
                 static constexpr int H        = 0;
                 static constexpr int G        = H + 9 * N;
-                static constexpr int TS       = G + 27 * NQ;
+                static constexpr int TS       = std::max(G + 27 * NQ, H + Sink::scratch_doubles);
                 static constexpr int S        = TS + NQ * NC;
                 static constexpr int TOPS     = S + (El::moments ? NV * NC : 0);
                 static constexpr int EXTRA    = TOPS + NQ;
@@ -406,7 +408,7 @@ namespace sfem {
                             }
                     __syncthreads();
                 }
-                sink.encode(t, e, active, q, S, tops, base + L::EXTRA);
+                sink.encode(t, e, active, q, S, tops, base + L::EXTRA, base + L::H);
             }
 
             /// The element's largest magnitude over its threads' partial maxima.

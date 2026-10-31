@@ -30,9 +30,8 @@ struct mooney_rivlin_kelvin_voigt_total_tet10_inexact {
                     const s_t *const RSTR gz_ref,
                     const s_t *const RSTR adjugate,
                     const s_t determinant,
-                    const s_t *const *const RSTR quadrature,
+                    const s_t *const *const RSTR /*quadrature*/,
                     s_t *const RSTR tangent) {
-    (void)quadrature;
     const s_t eta_b = parameters[0];
     const s_t eta_s = parameters[1];
     const s_t lmbda = parameters[2];

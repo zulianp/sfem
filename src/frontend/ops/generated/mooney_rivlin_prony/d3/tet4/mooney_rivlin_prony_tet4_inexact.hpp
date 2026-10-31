@@ -28,12 +28,11 @@ struct mooney_rivlin_prony_tet4_inexact {
   template <typename s_t>
   static SFEM_INLINE void point(const s_t *const RSTR parameters,
                     const s_t *const RSTR gu_ref,
-                    const s_t *const RSTR gz_ref,
+                    const s_t *const RSTR /*gz_ref*/,
                     const s_t *const RSTR adjugate,
                     const s_t determinant,
                     const s_t *const *const RSTR quadrature,
                     s_t *const RSTR tangent) {
-    (void)gz_ref;
     const s_t C01 = parameters[0];
     const s_t C10 = parameters[1];
     const s_t K = parameters[2];

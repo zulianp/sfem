@@ -687,25 +687,15 @@ def element_header_source(plan):
 # --------------------------------------------------------------- the contraction
 
 
-def _symmetric_slot_lines(order, slot, qualifier):
-    """Row r, column c of the upper-triangle packing: data, so a table."""
+def _slot_lines(order, slot):
+    """Row r, column c of the packing (upper triangle or row-major): data, so a table, which device
+    code reads as a constant (it cannot call the host's constexpr slot())."""
     return [
         "  // Row r, column c of the packed tangent.",
         "  static constexpr int SLOT[%d][%d] = {%s};"
         % (order, order, ", ".join(_row(str(slot(r, c)) for c in range(order)) for r in range(order))),
         "  static constexpr int slot(const int r, const int c) { return SLOT[r][c]; }",
     ]
-
-
-def _full_slot_lines(order, slot, qualifier):
-    """Row r, column c of the full packing: row-major."""
-    return [
-        "  // Row r, column c of the packed tangent.",
-        "  static constexpr int slot(const int r, const int c) { return r * %d + c; }" % order,
-    ]
-
-
-_SLOT_LINES_BY_SYMMETRY = {True: _symmetric_slot_lines, False: _full_slot_lines}
 
 
 def _lane_contraction_lines(dim, n_slots, slot, q):
@@ -819,7 +809,7 @@ def contract_header_source(dim):
             "template <>",
             "struct inexact_contract_d%d<%s> {" % (dim, _CPP_BOOL[symmetric]),
             "  static constexpr int NC = %d;" % n_slots,
-        ] + _SLOT_LINES_BY_SYMMETRY[symmetric](order, slot, q) + [
+        ] + _slot_lines(order, slot) + [
             "",
             "  template <typename t>",
             "  %s void contract(const t *const S, const t *const g, t *const y) {" % q,
@@ -892,8 +882,6 @@ def _point_lines(plan, units, parameters, element_type):
     for index in range(dim * dim):
         if "adjugate%d" % index in used:
             lines.append("  const s_t adjugate%d = adjugate[%d];" % (index, index))
-    if "determinant" not in used:
-        lines.append("  (void)determinant;")
     lines.extend(_assignment_lines(stage, "gradient"))
     prefix = _INTEGRAND_PREFIX[evaluation_strategy(element_type)]
     names = [sp.Symbol("%s%d" % (prefix, slot)) for slot in range(plan.tangent_components)]
@@ -901,7 +889,20 @@ def _point_lines(plan, units, parameters, element_type):
     lines.extend(
         "  tangent[%d] = %s%d;" % (slot, prefix, slot) for slot in range(plan.tangent_components)
     )
-    return lines, reads_state, reads_previous
+    # The arguments the body reads; the others stay unnamed.
+    reads = {
+        "parameters": bool(parameters),
+        "gu_ref": reads_state,
+        "gz_ref": reads_previous,
+        "adjugate": any("adjugate%d" % index in used for index in range(dim * dim)),
+        "determinant": "determinant" in used,
+        "quadrature": bool(point_tangent_quadrature_fields(form for form, _ in units)),
+    }
+    return lines, reads
+
+
+#: An argument's name in the signature: written where the body reads it, a comment otherwise.
+_ARGUMENT_NAME = {True: lambda name: name, False: lambda name: "/*%s*/" % name}
 
 
 #: Each integration-point field's component count, where the tangent reads any.
@@ -922,9 +923,12 @@ def unit_header_source(unit_name, element_plan, units, parameters):
     """
     plan = point_tangent_plan(form for form, _ in units)
     fields = point_tangent_quadrature_fields(form for form, _ in units)
-    body, reads_state, reads_previous = _point_lines(
-        plan, units, parameters, element_plan.element_type
-    )
+    body, reads = _point_lines(plan, units, parameters, element_plan.element_type)
+    reads_state, reads_previous = reads["gu_ref"], reads["gz_ref"]
+
+    def argument(name):
+        return _ARGUMENT_NAME[reads[name]](name)
+
     struct = "%s_%s_inexact" % (unit_name, element_plan.element_type.lower())
     guard = "SFEM_CODEGEN_%s_%s" % (struct.upper(), current_target().header_guard_suffix())
     q = _qualifier()
@@ -960,22 +964,14 @@ def unit_header_source(unit_name, element_plan, units, parameters):
         "  // The tangent at one point, unweighted: `gu_ref` (and `gz_ref`, the previous state's) is the",
         "  // reference gradient there, `adjugate` and `determinant` the geometry's.",
         "  template <typename s_t>",
-        "  %s void point(const s_t *const RSTR parameters," % q,
-        "                    const s_t *const RSTR gu_ref,",
-        "                    const s_t *const RSTR gz_ref,",
-        "                    const s_t *const RSTR adjugate,",
-        "                    const s_t determinant,",
-        "                    const s_t *const *const RSTR quadrature,",
+        "  %s void point(const s_t *const RSTR %s," % (q, argument("parameters")),
+        "                    const s_t *const RSTR %s," % argument("gu_ref"),
+        "                    const s_t *const RSTR %s," % argument("gz_ref"),
+        "                    const s_t *const RSTR %s," % argument("adjugate"),
+        "                    const s_t %s," % argument("determinant"),
+        "                    const s_t *const *const RSTR %s," % argument("quadrature"),
         "                    s_t *const RSTR tangent) {",
     ]
-    if not fields:
-        lines.append("    (void)quadrature;")
-    if not reads_state:
-        lines.append("    (void)gu_ref;")
-    if not reads_previous:
-        lines.append("    (void)gz_ref;")
-    if not parameters:
-        lines.append("    (void)parameters;")
     lines += ["  " + line for line in body]
     lines += ["  }", "};", "", "}  // namespace codegen", "}  // namespace sfem", "", "#endif", ""]
     return struct, "\n".join(lines)

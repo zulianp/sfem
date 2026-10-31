@@ -27,13 +27,11 @@ struct neohookean_ogden_proteus_hex27_inexact {
   template <typename s_t>
   static __host__ __device__ __forceinline__ void point(const s_t *const RSTR parameters,
                     const s_t *const RSTR gu_ref,
-                    const s_t *const RSTR gz_ref,
+                    const s_t *const RSTR /*gz_ref*/,
                     const s_t *const RSTR adjugate,
                     const s_t determinant,
-                    const s_t *const *const RSTR quadrature,
+                    const s_t *const *const RSTR /*quadrature*/,
                     s_t *const RSTR tangent) {
-    (void)quadrature;
-    (void)gz_ref;
     const s_t lmbda = parameters[0];
     const s_t mu = parameters[1];
     const s_t gu_ref_0_0 = gu_ref[0];

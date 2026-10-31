@@ -26,15 +26,12 @@ struct linear_elasticity_hex8_inexact {
   // reference gradient there, `adjugate` and `determinant` the geometry's.
   template <typename s_t>
   static __host__ __device__ __forceinline__ void point(const s_t *const RSTR parameters,
-                    const s_t *const RSTR gu_ref,
-                    const s_t *const RSTR gz_ref,
+                    const s_t *const RSTR /*gu_ref*/,
+                    const s_t *const RSTR /*gz_ref*/,
                     const s_t *const RSTR adjugate,
                     const s_t determinant,
-                    const s_t *const *const RSTR quadrature,
+                    const s_t *const *const RSTR /*quadrature*/,
                     s_t *const RSTR tangent) {
-    (void)quadrature;
-    (void)gu_ref;
-    (void)gz_ref;
     const s_t lmbda = parameters[0];
     const s_t mu = parameters[1];
     const s_t adjugate0 = adjugate[0];
