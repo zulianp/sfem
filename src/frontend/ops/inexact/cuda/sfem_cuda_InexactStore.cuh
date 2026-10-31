@@ -129,13 +129,15 @@ namespace sfem {
                     }
                 }
 
+                // The block's shared arrays are indexed in 32 bits: 64-bit indices cost the TET4 element
+                // matrices 14 registers and a resident block per SM.
                 __device__ __forceinline__ void gather(const real_t *const RSTR h, real_t hh[3][N]) {
                     if (!active) return;
                     static_for<0, N>([&](auto S) {
                         constexpr int s = decltype(S)::value;
                         if constexpr (BLOCK) {
                             node[s] = a.local[(size_t)s * a.nelements + e];
-                            for (int k = 0; k < 3; ++k) hh[k][s] = hs[(ptrdiff_t)node[s] * 3 + k];
+                            for (int k = 0; k < 3; ++k) hh[k][s] = hs[node[s] * 3 + k];
                         } else if constexpr (El::reordered) {
                             constexpr int sn = El::SHAPE_ORDER[s];
                             node[s]          = a.elements[sn][e];
@@ -151,7 +153,7 @@ namespace sfem {
                     if constexpr (BLOCK) {
                         if (active)
                             for (int s = 0; s < N; ++s)
-                                for (int k = 0; k < 3; ++k) atomicAdd(&acc[(ptrdiff_t)node[s] * 3 + k], o[k][s]);
+                                for (int k = 0; k < 3; ++k) atomicAdd(&acc[node[s] * 3 + k], o[k][s]);
                         __syncthreads();
                         for (int l = threadIdx.x; l < nb; l += blockDim.x) {
                             const ptrdiff_t v = (ptrdiff_t)bn[l] * a.stride;
@@ -188,7 +190,7 @@ namespace sfem {
                 static constexpr int  NSE     = stored_numbers_device<FOLD, Fold>(NV * NC);
                 static constexpr bool scaled  = C::scaled;
                 static constexpr bool has_mean = MD;
-                static constexpr int  extra_doubles = 0;
+                static constexpr int  extra_doubles = 0, scratch_doubles = 0;
                 static_assert(!(POINT_MAJOR && FOLD), "a thread per point does not fold");
 
                 typename C::storage *codes{nullptr};
@@ -225,6 +227,7 @@ namespace sfem {
                                        const int         q,
                                        double (*const S)[NC],
                                        double *const     tops,
+                                       double *const,
                                        double *const) const {
                     if constexpr (MD) {
                         if (active)
@@ -344,11 +347,11 @@ namespace sfem {
                             // The numbers point j keeps, in their slots; the contraction skips the others.
                             constexpr int mask = Fold::mask(j);
                             static_for<0, Fold::NKEEP[mask]>([&](auto K) {
-                                constexpr int    k = decltype(K)::value, c = Fold::KEEP[mask][k], slot = Fold::OFF[j] + k;
-                                constexpr double xc = Fold::XC[j][c];
-                                const tau        v  = C::decode(__ldg(&st.codes[st.code_index(e, slot)]));
+                                constexpr int k = decltype(K)::value, c = Fold::KEEP[mask][k], slot = Fold::OFF[j] + k;
+                                const tau     v = C::decode(__ldg(&st.codes[st.code_index(e, slot)]));
                                 if constexpr (MD) {
-                                    S[c] = tau(xc) * A[c] + sc * v;
+                                    constexpr double xc = Fold::XC[j][c];
+                                    S[c]                = tau(xc) * A[c] + sc * v;
                                 } else {
                                     S[c] = v;
                                 }
@@ -356,11 +359,11 @@ namespace sfem {
                             Contraction::template contract_masked<mask, tau>(S, P[pa], Y[pb]);
                         } else {
                             static_for<0, NC>([&](auto CC) {
-                                constexpr int    c  = decltype(CC)::value;
-                                constexpr double xj = El::X[j];
-                                const tau        v  = C::decode(__ldg(&st.codes[st.code_index(e, j * NC + c)]));
+                                constexpr int c = decltype(CC)::value;
+                                const tau     v = C::decode(__ldg(&st.codes[st.code_index(e, j * NC + c)]));
                                 if constexpr (MD) {
-                                    S[c] = tau(xj) * A[c] + sc * v;
+                                    constexpr double xj = El::X[j];
+                                    S[c]                = tau(xj) * A[c] + sc * v;
                                 } else {
                                     S[c] = v;
                                 }
@@ -415,15 +418,22 @@ namespace sfem {
                 __syncthreads();
                 if (active) {
                     const int jx = j % Q1, jy = (j / Q1) % Q1, jz = j / (Q1 * Q1);
-                    tau       P[9], Y[9];
+                    // The point's line-table rows in registers, read once.
+                    tau bx_[S1], dx_[S1], by_[S1], dy_[S1], bz_[S1], dz_[S1];
+                    for (int u = 0; u < S1; ++u) {
+                        bx_[u] = B[jx * S1 + u], dx_[u] = D[jx * S1 + u];
+                        by_[u] = B[jy * S1 + u], dy_[u] = D[jy * S1 + u];
+                        bz_[u] = B[jz * S1 + u], dz_[u] = D[jz * S1 + u];
+                    }
+                    tau P[9], Y[9];
                     for (int c = 0; c < 9; ++c) P[c] = 0, Y[c] = 0;
                     for (int sz = 0; sz < S1; ++sz)
                         for (int sy = 0; sy < S1; ++sy)
                             for (int sx = 0; sx < S1; ++sx) {
                                 const int sn = sx + S1 * (sy + S1 * sz);
-                                const tau w0 = D[jx * S1 + sx] * B[jy * S1 + sy] * B[jz * S1 + sz];
-                                const tau w1 = B[jx * S1 + sx] * D[jy * S1 + sy] * B[jz * S1 + sz];
-                                const tau w2 = B[jx * S1 + sx] * B[jy * S1 + sy] * D[jz * S1 + sz];
+                                const tau w0 = dx_[sx] * by_[sy] * bz_[sz];
+                                const tau w1 = bx_[sx] * dy_[sy] * bz_[sz];
+                                const tau w2 = bx_[sx] * by_[sy] * dz_[sz];
                                 for (int k = 0; k < 3; ++k) {
                                     const tau v = tau(hs[le][k][sn] - hs[le][k][0]);
                                     P[k * 3 + 0] += w0 * v;
@@ -506,6 +516,9 @@ namespace sfem {
                 static constexpr int  NB       = symmetric ? NP : 2 * NP;
                 static constexpr int  NE       = NB * 9;
                 static constexpr int  extra_doubles = (int)((NE * sizeof(w_t) + sizeof(double) - 1) / sizeof(double));
+                // The tangents in the arithmetic type, converted once.
+                static constexpr bool converts        = !std::is_same_v<w_t, double>;
+                static constexpr int  scratch_doubles = converts ? (int)((NV * NC * sizeof(w_t) + sizeof(double) - 1) / sizeof(double)) : 0;
                 static_assert(!PAIR || C::scaled, "pair factors need a scaled code");
 
                 typename C::storage *codes{nullptr};
@@ -536,9 +549,22 @@ namespace sfem {
                                        const int         q,
                                        double (*const S)[NC],
                                        double *const     tops,
-                                       double *const     extra) const {
-                    w_t *const Kd   = reinterpret_cast<w_t *>(extra);
-                    double     mine = 0;
+                                       double *const     extra,
+                                       double *const     scratch) const {
+                    using Contraction = typename M::contraction;
+                    w_t *const Kd     = reinterpret_cast<w_t *>(extra);
+                    double     mine   = 0;
+                    // The tangents in the arithmetic type, as the host rounds them when it reads them.
+                    const w_t(*W)[NC] = nullptr;
+                    if constexpr (converts) {
+                        w_t(*const Wc)[NC] = reinterpret_cast<w_t(*)[NC]>(scratch);
+                        if (active)
+                            for (int i = q; i < NV * NC; i += NQ) Wc[i / NC][i % NC] = w_t(S[i / NC][i % NC]);
+                        __syncthreads();
+                        W = Wc;
+                    } else {
+                        W = S;
+                    }
                     if (active)
                         for (int k = q; k < NB; k += NQ) {
                             const int p = T::block_row(k), qq = T::block_col(k);
@@ -553,11 +579,12 @@ namespace sfem {
                                     const w_t e0 = w_t(t.dt[(gb * 3 + 0) * N + p]), e1 = w_t(t.dt[(gb * 3 + 1) * N + p]),
                                               e2 = w_t(t.dt[(gb * 3 + 2) * N + p]);
                                     w_t T3[27];
-                                    for (int in = 0; in < 9; ++in)
-                                        for (int kk = 0; kk < 3; ++kk)
-                                            T3[in * 3 + kk] = d0 * w_t(S[j][t.slot[in * 9 + kk * 3 + 0]]) +
-                                                              d1 * w_t(S[j][t.slot[in * 9 + kk * 3 + 1]]) +
-                                                              d2 * w_t(S[j][t.slot[in * 9 + kk * 3 + 2]]);
+                                    static_for<0, 27>([&](auto R) {
+                                        constexpr int r = decltype(R)::value, in = r / 3, kk = r % 3;
+                                        constexpr int s0 = Contraction::SLOT[in][kk * 3 + 0], s1 = Contraction::SLOT[in][kk * 3 + 1],
+                                                      s2 = Contraction::SLOT[in][kk * 3 + 2];
+                                        T3[r] = d0 * W[j][s0] + d1 * W[j][s1] + d2 * W[j][s2];
+                                    });
                                     for (int i = 0; i < 3; ++i)
                                         for (int kk = 0; kk < 3; ++kk)
                                             acc[i * 3 + kk] += e0 * T3[(i * 3 + 0) * 3 + kk] + e1 * T3[(i * 3 + 1) * 3 + kk] +
