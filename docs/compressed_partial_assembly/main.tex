@@ -4,8 +4,7 @@
 %%         make tables     (regenerate tables/ from the cost model)
 %%
 %% Every derived number in the cost-model sections arrives through \input{tables/...}, written by
-%% spikes/inexact_apply_compare/qp/cost_model.py; none is typed in.  Measured results are not yet
-%% part of this draft: Section~\ref{sec:plan} states what will be measured.
+%% spikes/inexact_apply_compare/qp/cost_model.py; none is typed in.
 \documentclass[sigconf,balance=false]{acmart}
 
 \usepackage{booktabs}
@@ -165,7 +164,7 @@ each performs, and the perturbation each encoding makes to the tangent, which th
 absorbs or pays for in iterations.  The contributions are:
 
 \begin{enumerate}[leftmargin=1.5em,itemsep=2pt]
-\item \textbf{Exact reductions of the stored tangent} (Sections~\ref{sec:formulation},
+\item \emph{Exact reductions of the stored tangent} (Sections~\ref{sec:formulation},
   \ref{sec:elementmatrix} and~\ref{sec:qbsr}), which hold whatever the encoding.  The major symmetry
   of the tangent leaves $45$ numbers per quadrature point, the upper triangle of an element matrix
   and one block per pair of nodes of the assembled matrix.  The quadrature leaves fewer: per
@@ -177,20 +176,20 @@ absorbs or pays for in iterations.  The contributions are:
   the kernel of the encoded operator.  On trilinear hexahedra the reductions remove
   $\exactQpPctHexEight\%$ of the numbers of the point store, $\exactEaPctHexEight\%$ of the element
   matrix and $\exactBsrPctHexEight\%$ of the assembled matrix (Table~\ref{tab:measures}).
-\item \textbf{Encodings, an error model and the Newton consequence} (Sections~\ref{sec:compression}
+\item \emph{Encodings, an error model and the Newton consequence} (Sections~\ref{sec:compression}
   and~\ref{sec:newton}), common to the formats: scaled \texttt{fp16} and \texttt{int8} and
   mean-plus-deviation encodings, and a scale per node pair for element matrices, decoded inside the
   application.  The error that matters is the absolute rounding on the smooth, nearly rigid modes,
   bounded through Korn's inequality, and it enters inexact Newton as an additive forcing term, which
   turns the choice of codec into a quantitative criterion.
-\item \textbf{Three formats built from these measures} (Sections~\ref{sec:elementmatrix}
-  to~\ref{sec:kernels}): the quadrature-point store with its set-up and application kernels, element
+\item \emph{Three formats built from these measures} (Sections~\ref{sec:elementmatrix}
+  to~\ref{sec:gpukernels}): the quadrature-point store with its set-up and application kernels, element
   matrices built from the same stored tensors, and the quantized assembled matrix in a
-  SELL-C-$\sigma$ layout applied without atomics.
-\item \textbf{A cost model against BSR} (Section~\ref{sec:model}): operator memory after each
+  SELL-C-$\sigma$ layout applied without atomics, each on the CPU and the GPU.
+\item \emph{A cost model against BSR} (Section~\ref{sec:model}): operator memory after each
   measure, compulsory traffic and operation counts per degree of freedom for each element and
   encoding, and the arithmetic rate an element format must sustain to match BSR.
-\item \textbf{An evaluation on one Grace CPU and one H100 GPU} (Sections~\ref{sec:results}--\ref{sec:appmesh}) for four
+\item \emph{An evaluation on one Grace CPU and one H100 GPU} (Sections~\ref{sec:results}--\ref{sec:appmesh}) for four
   element types up to $10^7$ degrees of freedom: throughput, operator and peak memory, set-up, Newton
   iteration counts and time to solution of every format against BSR in double and single precision,
   across problem sizes, and the resulting choice of format per element and machine
@@ -260,6 +259,43 @@ Newton methods measure residuals and steps in the energy norm of the tangent
 \cite{Deuflhard2004}, the norm conjugate gradients controls.  Section~\ref{sec:newton} gives the specific form
 this takes when the perturbation is an element-wise relative error of a symmetric positive
 definite tangent.
+
+%% ===================================================================================================
+\section{Operator formats}
+\label{sec:overview}
+
+All formats of this paper apply the same operator, the tangent of the hyperelastic residual at the
+current Newton iterate; they differ in how much of it the set-up computes once per Newton step and
+how much every application recomputes (Figure~\ref{fig:overview}).  Matrix-free application stores
+nothing and evaluates the material law and its derivative at every quadrature point of every element
+in every Krylov iteration.  The quadrature-point store (Section~\ref{sec:formulation}) keeps the
+pulled-back tangent at the points, so that an application forms the gradients of the increment,
+decodes and contracts.  The element matrix (Section~\ref{sec:elementmatrix}) contracts the stored
+tangent with the basis once per step, so that an application is one dense product per element.  The
+assembled matrix (Section~\ref{sec:qbsr}) sums the element matrices into the pattern of node
+couplings, each coupling once, so that an application is one block product per matrix row.
+
+The memory of the three stored formats is reduced in two steps (Figure~\ref{fig:overview}b).  Exact
+reductions remove numbers the application does not need and leave the operator unchanged: the major
+symmetry of the tangent; the quadrature, which sees only some functionals of the point values
+(Section~\ref{sec:minimal}); and the difference form, which leaves out the diagonal node blocks of the
+matrices (Section~\ref{sec:elementmatrix}).  Encodings then store what remains in fewer bits
+(Section~\ref{sec:compression}); only they perturb the operator, and Section~\ref{sec:newton} relates
+the perturbation to the Krylov tolerance.  Sections~\ref{sec:kernels} and~\ref{sec:gpukernels} give
+the kernels on the CPU and the GPU, Section~\ref{sec:model} a cost model against BSR, and
+Sections~\ref{sec:results}--\ref{sec:appmesh} the measurements.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/fmt_overview.pdf}
+\Description{Top: four operator formats from matrix-free application to the assembled matrix, with
+what the set-up computes once per Newton step and what each application does.  Bottom: a chain of
+reductions of the stored tangent, three exact ones followed by the encodings.}
+\caption{(a) The formats of the tangent, from matrix-free application to the assembled matrix.  (b)
+The measures that shrink the stored formats: exact reductions, which leave the application unchanged,
+then encodings.}
+\label{fig:overview}
+\end{figure*}
 
 %% ===================================================================================================
 \section{Quadrature-point stores}
@@ -364,8 +400,11 @@ Gauss points of a line see three moments along it, $\rho_{mm}=3\cdot4^2=48$, whi
 $\rho_{mn}=64=n_q$, a minimum of $\minimalHexTwentySeven$ against $\storeHexTwentySeven$.
 
 The kernels of this paper hold the minimum on every element: the moments on TET10, which have a
-schedule of their own (below), and on HEX8 and HEX27 the point values folded along the lines of
-points (Section~\ref{sec:fold}).
+schedule of their own (Section~\ref{sec:moments}), and on HEX8 and HEX27 the point values folded
+along the lines of points (Section~\ref{sec:fold}).
+
+\subsection{Moments on quadratic tetrahedra}
+\label{sec:moments}
 
 On TET10, write $\lambda_a$ for the barycentric coordinates.  The reference
 derivatives are linear, $\partial_m h_k = \sum_{a} \lambda_a P_{kma}$ with $P_{kma}$ the derivative
@@ -382,6 +421,24 @@ with $\Mab=M^{ba}$: ten tensors of $45$ numbers, the $P_2$ moments of the tangen
 Bernstein basis.  Each $\Mab$ is a positively weighted local average of the tangent when the rule's
 weights are positive, which matters for the encodings of Section~\ref{sec:compression}; the
 $11$-point rule has one negative weight, so this holds approximately.
+
+The moments change the schedule as well as the store (Figure~\ref{fig:moments}).  The application
+compresses the increment into its derivatives at the four vertices, $P_{akm}$, with rational
+constants; each stored moment is decoded once and applied to both $(a,b)$ and $(b,a)$, sixteen
+$9\times9$ block contractions in all; and the result is expanded to the ten nodes with the transposed
+constants (Algorithm~\ref{alg:applymoments}).  No gradient is formed at a quadrature point.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/fmt_moments.pdf}
+\Description{Three panels: a tetrahedron with eleven quadrature points and four vertices, a four by
+four grid of the ten stored moments with the lower triangle hatched, and the four stages of the
+moment schedule.}
+\caption{The $P_2$ moments of the tangent on TET10.  (a) The eleven points of the degree-$4$ rule and
+the barycentric coordinates $\lambda_a$ of the four vertices.  (b) The ten stored moments $\Mab$,
+$a\le b$, of \eqref{eq:tet10moments}.  (c) The moment schedule of one element.}
+\label{fig:moments}
+\end{figure*}
 
 \subsection{The element mean and the deviations}
 \label{sec:mean}
@@ -450,95 +507,8 @@ weights $0.39$, $1$, $-0.39$.  We drop the second point of each line, so every f
 most twice the largest point value, $|T|\le(1+|\ell_j|)\max_q|\Sq|\le 2\max_q|\Sq|$, on either
 element.
 
-\paragraph{The encodings.}  The fold is linear, so it commutes with the split of
-Section~\ref{sec:mean}: it is applied to the deviations, and a folded component of point $q_j$
-carries the reference weight $X_{j\alpha}=X_{q_j}+\ell_j(x_D)\,X_{q_D}$ in place of $X_{q_j}$, which is
-the weight \eqref{eq:decode} decodes with.  The element mean and its $45$ numbers are unchanged.
-Since the folded values reach up to twice the point values, the element scale can double, and the
-encoding error with it.  The half-precision and mean-and-deviation stores keep their Newton and
-Krylov counts (Section~\ref{sec:newtonresults}); \texttt{int8} with one scale per element, already
-unusable as a Newton operator, needs a few more iterations on HEX27.
-
-\paragraph{The kernels.}  The set-up (Algorithm~\ref{alg:setup}) evaluates the tangent at all
-$q_1^3$ points as before, folds the block's point values in scratch after the mean is removed, takes
-the scale over the kept values and encodes only those, point by point in the store's order.  The
-application (Algorithm~\ref{alg:applypoints}) decodes the components a point keeps into their slots
-and contracts with one of eight generated contractions, one per set of dropped directions.  Since
-the vector lanes are elements and every element drops the same components at the same point, the
-set is uniform across the lanes and the skipped multiply--adds are saved.  On Grace the folded
-application is faster than the one over all $45\,n_q$ point values for every encoding, by
-$\foldGainHalfHexEight\%$ (\texttt{fp16}) and $\foldGainEightMdHexEight\%$ (\texttt{int8} mean and
-deviation) on HEX8 and $\foldGainHalfHexTwentySeven\%$ and $\foldGainEightMdHexTwentySeven\%$ on HEX27
-at about $10^7$ degrees of freedom; selecting the contraction per point at run time measured faster
-than unrolling all points with their sets fixed at compile time.  On the GPU the HEX8 application
-runs a thread per element and saves the same work.  The HEX27 one runs a thread per point
-(Section~\ref{sec:plan}), whose threads in a warp drop different directions: a warp executes one
-instruction stream, so the dropped terms are multiplied by zero rather than skipped, and the fold
-saves only a tenth of the bytes, which do not bound that kernel, while its addressing and the folded
-weights cost instructions and registers.  The HEX27 device store therefore keeps all $45\,n_q$
-point values.
-
 %% ===================================================================================================
-\section{Contraction schedules}
-\label{sec:schedules}
-
-Without a symbolic reference tensor there is nothing to integrate at code-generation time, but
-the rank structure of the gradient spaces survives and determines the schedule.  Three schedules
-are considered; their operation counts, after common-subexpression elimination with the stored
-numbers as opaque inputs, are in Table~\ref{tab:flops}.
-
-\begin{description}[leftmargin=1.5em]
-\item[Direct, per point.]  For each point, form the $3\times3$ reference gradient of the increment
-  from tabulated basis derivatives, apply the decoded $9\times9$ symmetric tangent ($81$
-  multiply--adds), and scatter through the transposed table.  Eliminating the gradient and
-  scatter stages jointly across points recovers the sharing of a tensor-product element, which on
-  HEX8 is what sum factorisation would make explicit.
-\item[Modal, per point.]  Compress the increment once into its $9r$ modal gradient coefficients
-  --- the coefficients of its reference gradient in a basis of the $r$-dimensional gradient space
-  of each direction, through a map $C$ whose rational constants are folded into the code ---;
-  evaluate each point's gradient from the modes; apply the tangent; accumulate back to modes;
-  expand with $C^{\mathsf T}$.  On TET10 the
-  modes are the vertex derivatives and the evaluation is barycentric interpolation.
-\item[Moment.]  Equation~\eqref{eq:tet10moments}: compress, apply the $r^2$ blocks $\Mab$ to the
-  modal coefficients, expand.
-\end{description}
-
-\begin{table*}[t]
-\centering
-\begin{tabular}{lrrrrrr}
-\toprule
-element & direct & modal & moment & selected & flop/dof \\
-\midrule
-\rows{tables/flops.tex}
-\bottomrule
-\end{tabular}
-\caption{Floating-point operations per element application after common-subexpression
-elimination.  The selected schedule is the one that reads the store the kernels hold
-(Section~\ref{sec:minimal}); on TET10 the moment schedule is within $1.3\%$ of the cheapest per-point
-schedule and reads $10\%$ fewer numbers.  Symbolic counts, not measured run times.}
-\label{tab:flops}
-\end{table*}
-
-On every element the dominant term is the tangent contraction, $81$ multiply--adds per point or
-moment ($r^2=16$ blocks on TET10), fewer at the points the fold drops components from
-(Section~\ref{sec:fold}).  It is not reducible by symmetry, since a symmetric matrix--vector product still touches every entry, and it is
-the reason the arithmetic precision is a design parameter (Section~\ref{sec:precision}).
-
-\subsection{Arithmetic precision}
-\label{sec:precision}
-
-The stored numbers carry at most eleven significant bits (\texttt{fp16}) or eight (\texttt{int8}),
-so carrying the contraction in double precision buys nothing: single-precision arithmetic
-contributes a relative error of $2^{-24}$, three orders of magnitude below either encoding, and
-doubles the vector width.  The gradient stage is kept in the vector's precision, because it forms
-differences of nodal values whose common part can be large compared with the increment's
-variation over the element; the gradients are rounded to single precision only after the
-differences are formed.  Outputs are accumulated in the vector's precision.  The arithmetic type is
-a template parameter of the kernels, independent of the storage type, so both precisions remain
-measurable.
-
-%% ===================================================================================================
-\section{Compression}
+\section{Encodings and their error}
 \label{sec:compression}
 
 \subsection{Encodings}
@@ -567,9 +537,38 @@ magnitudes the codec needs, and writes the encoded values.
   half precision relative to each deviation rather than to the largest.
 \end{description}
 
+Figure~\ref{fig:codecs} draws what each encoding keeps of one component over an element's points.
+Half precision rounds every number relative to itself; \texttt{int8} with one scale per element rounds
+every number to a step set by the element's largest; the mean-and-deviation encodings code only the
+variation of the tangent over the element.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/fmt_codecs.pdf}
+\Description{Four panels of number lines: the representable values of half precision on a logarithmic
+scale, of int8 with one scale per element, of int8 deviations from the element mean, and the pair
+factors of the element matrix as levels above bars of block magnitudes; below each, the bits of a
+code.}
+\caption{The encodings, drawn for one component of the tangent over an element's points (dots) on the
+grid of values the encoding represents; $\sigma$ is the element's largest stored magnitude.  (a)
+\texttt{fp16} under a power-of-two scale.  (b) \texttt{int8} with one scale per element.  (c)
+\texttt{int8} deviations from the \texttt{fp32} element mean.  (d) The element matrix's factor per node
+pair, \eqref{eq:pairscale}.  Below each panel, the bits of a code and what accompanies it.}
+\label{fig:codecs}
+\end{figure*}
+
 The codecs are those already used for compressed history variables in viscoelastic constitutive
 updates in our code, so the encoders, scale rules and device implementations exist; what
 is new is decoding inside the application rather than in a separate pass.
+
+\paragraph{The fold and the encodings.}  The fold of Section~\ref{sec:fold} is linear, so it commutes with the split of
+Section~\ref{sec:mean}: it is applied to the deviations, and a folded component of point $q_j$
+carries the reference weight $X_{j\alpha}=X_{q_j}+\ell_j(x_D)\,X_{q_D}$ in place of $X_{q_j}$, which is
+the weight \eqref{eq:decode} decodes with.  The element mean and its $45$ numbers are unchanged.
+Since the folded values reach up to twice the point values, the element scale can double, and the
+encoding error with it.  The half-precision and mean-and-deviation stores keep their Newton and
+Krylov counts (Section~\ref{sec:newtonresults}); \texttt{int8} with one scale per element, already
+unusable as a Newton operator, needs a few more iterations on HEX27.
 
 \subsection{Error model}
 \label{sec:errormodel}
@@ -635,10 +634,7 @@ predicted to be adequate for compressible materials and to degrade with the bulk
 so the study sweeps the Poisson ratio.  And the predicted errors are to be compared not with
 machine precision but with the Krylov forcing term, which is the subject of the next section.
 
-\subsection{Mean and deviation in the application}
-\label{sec:meandev}
-
-The mean-and-deviation encodings change the decoding, not the schedule: each stored number is
+\paragraph{Mean and deviation in the application.}\label{sec:meandev}  The mean-and-deviation encodings change the decoding, not the schedule: each stored number is
 decoded as $w_q\Sbar + s\,c^q$ (or $X_{ab}\Sbar + s\,c^{ab}$) in registers, with $c$ the code and $s$
 the element's scale, and the schedule of Section~\ref{sec:schedules} runs unchanged on the decoded
 values.
@@ -728,40 +724,27 @@ one that matters for smooth modes.  The differences are formed in the vector's p
 contraction, as for the gradients of the quadrature-point schedules.  The form is that of edge-based
 schemes \cite{Lohner2008}; here it serves the encoding.
 
-\begin{proposition}
-\label{prop:translations}
-Let $\tilde K_{pq}$, $p<q$, be any $3\times3$ matrices --- the decoded blocks of any encoding ---
-with $\tilde K_{qp}=\tilde K_{pq}^{\mathsf T}$, and let $\tilde{\mathcal H}$ apply
-\eqref{eq:difference} with them.  Then
-(i) $\tilde{\mathcal H}h=0$ for every rigid translation, $h_q=t$ at every node $q$;
-(ii) the encoding error $\Delta=\tilde{\mathcal H}-\mathcal H$ acts as
-$(\Delta h)_p=\sum_{q\ne p}(\tilde K_{pq}-K_{pq})(h_q-h_p)$; and
-(iii) the computed $\tilde{\mathcal H}h$ of a translation is exactly zero in floating-point
-arithmetic.
-\end{proposition}
-
-\begin{proof}
-The basis is a partition of unity, $\sum_j\varphi_j=1$, so $\sum_j\partial_m\varphi_j=0$ and a
-translation has zero gradient at every point; by \eqref{eq:action}, $\mathcal Ht=0$, that is
-$\sum_q K_{pq}t=0$ for every $t$, and hence $K_{pp}=-\sum_{q\ne p}K_{pq}$ and
-$(\mathcal Hh)_p=\sum_{q\ne p}K_{pq}(h_q-h_p)$: the exact element matrix has the form
-\eqref{eq:difference}.  (i) For a translation every difference $h_q-h_p=t-t$ vanishes, and with it
-every term of \eqref{eq:difference}, whatever the $\tilde K_{pq}$.  (ii) Subtract the exact form
-from the encoded one term by term.  (iii) $h_q$ and $h_p$ are the same floating-point numbers, so
-their computed difference is exactly zero, and so are the products and sums formed from it.
-\end{proof}
+The property needs nothing of the stored blocks but $\tilde K_{qp}=\tilde K_{pq}^{\mathsf T}$.  The
+basis is a partition of unity, $\sum_j\varphi_j=1$, so a rigid translation, $h_q=t$ at every node, has
+zero gradient at every point and $\mathcal Ht=0$ by \eqref{eq:action}; hence
+$K_{pp}=-\sum_{q\ne p}K_{pq}$, and the exact element matrix has the form \eqref{eq:difference}.  Let
+$\tilde{\mathcal H}$ apply \eqref{eq:difference} with the decoded blocks $\tilde K_{pq}$ of any
+encoding.  For a translation every difference $h_q-h_p$ vanishes, so $\tilde{\mathcal H}t=0$ whatever
+the blocks, and exactly in floating-point arithmetic, since $h_q$ and $h_p$ are the same numbers.  The
+encoding error acts only through the differences, $(\Delta h)_p=\sum_{q\ne p}(\tilde K_{pq}-K_{pq})
+(h_q-h_p)$.
 
 Encoding the full matrix instead gives $(\tilde{\mathcal H}t)_p=\sum_q(\tilde K_{pq}-K_{pq})\,t$,
-the sum of a row's encoding errors, which rounding each block on its own does not cancel.  The
-proposition does not extend to infinitesimal rotations, $h_q=\omega\times x_q$, whose differences
-$\omega\times(x_q-x_p)$ do not vanish; the exact tangent annihilates them only at a stress-free state
+the sum of a row's encoding errors, which rounding each block on its own does not cancel.
+Infinitesimal rotations, $h_q=\omega\times x_q$, have the differences $\omega\times(x_q-x_p)$, so the
+encoding error reaches them; the exact tangent annihilates them only at a stress-free state
 (Section~\ref{sec:errormodel}).
 
 \paragraph{A scale per node pair.}  One int8 scale per element spends the code range on the
 largest block: the blocks $K_{pq}$ of one element differ in magnitude by orders on higher-order
 elements (vertex--vertex against vertex--midside couplings).  Each pair therefore carries a factor
 $r_{pq}\le1$ relative to the element scale $s_e$, an 8-bit float with five exponent and three
-mantissa bits, $r=2^{-E}(1+m/8)$, rounded up so that the pair's largest entry still fits the
+mantissa bits (Figure~\ref{fig:codecs}d), $r=2^{-E}(1+m/8)$, rounded up so that the pair's largest entry still fits the
 largest code:
 \begin{equation}
   \begin{gathered}
@@ -846,7 +829,7 @@ block streams once, and $x_j$ is gathered once per block.}
 \paragraph{Difference form and symmetry.}  The rows of the assembled tangent annihilate the rigid
 translations as the element matrices do, so \eqref{eq:difference} holds with $p$ and $q$ ranging over
 the nodes: the diagonal blocks are neither stored nor indexed, and the translations stay in the kernel
-of the encoded matrix by Proposition~\ref{prop:translations}, whose proof uses only the form.  Encoding the full matrix does not survive the Newton study: in \texttt{int8}
+of the encoded matrix by the argument of Section~\ref{sec:elementmatrix}, which uses only the form.  Encoding the full matrix does not survive the Newton study: in \texttt{int8}
 $\fullEightFailed$ of the $\fullEightTried$ runs we made with it failed in the first load step.  Each
 pair $i<j$ is stored once: with $d=h_j-h_i$, the block $K_{ij}$ adds $K_{ij}d$ to $y_i$ and
 $-K_{ij}^{\mathsf T}d$ to $y_j$.  The off-diagonal blocks of the encoded matrix are then symmetric
@@ -934,7 +917,49 @@ block (top), and the slots through which updates of another thread's rows are ad
 \end{figure*}
 
 %% ===================================================================================================
-\section{Data layout}
+\section{Kernels on the CPU}
+\label{sec:kernels}
+
+The set-up and the applications of the element formats traverse the mesh in blocks of $V$ elements,
+one element per vector lane, and every statement in Algorithms~\ref{alg:setup}--\ref{alg:applyelement}
+is a vector operation over the lanes: the lane loop is innermost and is not written.  The quantized
+matrix has a traversal of its own (Algorithm~\ref{alg:qbsr}).  Constants of the reference element ---
+quadrature points and weights, the tabulated derivatives $\partial_m\varphi_j(\xhat_q)$, the vertex
+derivatives $G$ of \eqref{eq:tet10moments}, the barycentric values $\lambda_a(\xhat_q)$ --- are
+compile-time literals.
+
+\paragraph{Notation.}  The mesh has $n_e$ elements of $N$ nodes and $n_n$ nodes; $E(e,p)$ is
+the global node of local node $p$ of element $e$, and vectors are indexed by node and component.
+$\mathcal{C}$ is the storage type of the encoding --- \texttt{int8} or \texttt{fp16}, or
+\texttt{fp32}/\texttt{fp64} for the uncompressed references.  An element stores $n_v$ tensors $T_1,\dots,T_{n_v}$ of $45$ packed
+components each: the point tangents $\Sq$ ($n_v=n_q$), or the moments $\Mab$, $a\le b$
+($n_v=10$ on TET10).  Each carries a reference weight $X_j$ --- $w_q$ for a point, $X_{ab}$ of
+Section~\ref{sec:mean} for a moment --- with which the element mean is
+$\Sbar = \sum_j T_j/|\refcell|$ and the deviations are $T_j - X_j\Sbar$.  On the hexahedra the
+fold of Section~\ref{sec:fold} leaves point $j$ the components $\alpha\in\mathcal{A}_j$; a
+component it receives from the dropped point $j'$ of its line with weight $\ell$ has the reference
+weight $X_{j\alpha}=X_j+\ell X_{j'}$, and $X_{j\alpha}=X_j$ otherwise.  Elsewhere $\mathcal{A}_j$ is
+all $45$ components.  The component $\alpha$ of
+a packed tensor holds $T_{ikmn}$ for $\alpha=\mathrm{slot}(i,k,m,n)$, the upper-triangle index of
+the pair $\bigl((i,n),(k,m)\bigr)$ of Section~\ref{sec:formulation}; read as a $9\times9$
+symmetric matrix on that pairing, a tensor acts on the nine-vector of a gradient indexed by
+$(k,m)$.  The encoded value of
+component $\alpha$ of tensor $j$ is $c_{j\alpha}$, the block's scales are $s$ (per element) or
+$s_\alpha$ (per component), and $\tau$ is the arithmetic type of the contraction.  Decoding returns
+\begin{equation}
+  \mathrm{dec}(c_{j\alpha}) \;=\;
+  \begin{cases}
+    \tau(c_{j\alpha}) & \text{\texttt{fp16} scaled, \texttt{int8} per element}\\
+                      & \text{\quad (scale on the outputs),}\\
+    s_\alpha\,\tau(c_{j\alpha}) & \text{\texttt{int8} per component,}\\
+    X_{j\alpha}\,\Sbar_\alpha + s\,\tau(c_{j\alpha}) & \text{\texttt{int8} mean and deviation,}
+  \end{cases}
+  \label{eq:decode}
+\end{equation}
+Only the first case leaves a scale to be applied;
+because the action is linear in the store, it multiplies the element's outputs once.
+
+\subsection{Data layout}
 \label{sec:layout}
 
 A store of $45$ numbers per element can be held as $45$ separate arrays over the elements, each read
@@ -980,47 +1005,8 @@ three: $\storeHexTwentySeven$ numbers instead of $\perpointHexTwentySeven$.}
 \label{fig:fmtfold}
 \end{figure*}
 
-%% ===================================================================================================
-\section{The set-up and application kernels}
-\label{sec:kernels}
-
-Both kernels traverse the mesh in blocks of $V$ elements, one element per vector lane, and every
-statement in Algorithms~\ref{alg:setup}--\ref{alg:applypoints} is a vector operation over the
-lanes: the lane loop is innermost and is not written.  Constants of the reference element ---
-quadrature points and weights, the tabulated derivatives $\partial_m\varphi_j(\xhat_q)$, the vertex
-derivatives $G$ of \eqref{eq:tet10moments}, the barycentric values $\lambda_a(\xhat_q)$ --- are
-compile-time literals.
-
-\paragraph{Notation.}  The mesh has $n_e$ elements of $N$ nodes and $n_n$ nodes; $E(e,p)$ is
-the global node of local node $p$ of element $e$, and vectors are indexed by node and component.
-$\mathcal{C}$ is the storage type of the encoding --- \texttt{int8} or \texttt{fp16}, or
-\texttt{fp32}/\texttt{fp64} for the uncompressed references.  An element stores $n_v$ tensors $T_1,\dots,T_{n_v}$ of $45$ packed
-components each: the point tangents $\Sq$ ($n_v=n_q$), or the moments $\Mab$, $a\le b$
-($n_v=10$ on TET10).  Each carries a reference weight $X_j$ --- $w_q$ for a point, $X_{ab}$ of
-Section~\ref{sec:mean} for a moment --- with which the element mean is
-$\Sbar = \sum_j T_j/|\refcell|$ and the deviations are $T_j - X_j\Sbar$.  On the hexahedra the
-fold of Section~\ref{sec:fold} leaves point $j$ the components $\alpha\in\mathcal{A}_j$; a
-component it receives from the dropped point $j'$ of its line with weight $\ell$ has the reference
-weight $X_{j\alpha}=X_j+\ell X_{j'}$, and $X_{j\alpha}=X_j$ otherwise.  Elsewhere $\mathcal{A}_j$ is
-all $45$ components.  The component $\alpha$ of
-a packed tensor holds $T_{ikmn}$ for $\alpha=\mathrm{slot}(i,k,m,n)$, the upper-triangle index of
-the pair $\bigl((i,n),(k,m)\bigr)$ of Section~\ref{sec:formulation}; read as a $9\times9$
-symmetric matrix on that pairing, a tensor acts on the nine-vector of a gradient indexed by
-$(k,m)$.  The encoded value of
-component $\alpha$ of tensor $j$ is $c_{j\alpha}$, the block's scales are $s$ (per element) or
-$s_\alpha$ (per component), and $\tau$ is the arithmetic type of the contraction.  Decoding returns
-\begin{equation}
-  \mathrm{dec}(c_{j\alpha}) \;=\;
-  \begin{cases}
-    \tau(c_{j\alpha}) & \text{\texttt{fp16} scaled, \texttt{int8} per element}\\
-                      & \text{\quad (scale on the outputs),}\\
-    s_\alpha\,\tau(c_{j\alpha}) & \text{\texttt{int8} per component,}\\
-    X_{j\alpha}\,\Sbar_\alpha + s\,\tau(c_{j\alpha}) & \text{\texttt{int8} mean and deviation,}
-  \end{cases}
-  \label{eq:decode}
-\end{equation}
-Only the first case leaves a scale to be applied;
-because the action is linear in the store, it multiplies the element's outputs once.
+\subsection{Set-up}
+\label{sec:setupkernel}
 
 \begin{algorithm*}[t]
 \caption{Set-up: evaluate, reduce and encode the store (once per Newton step)}
@@ -1071,7 +1057,55 @@ because the action is linear in the store, it multiplies the element's outputs o
 
 Algorithm~\ref{alg:setup} keeps the block's $n_v$ tensors in scratch until its scale is known, so
 encoding is a second pass over data still in cache rather than over memory, and no full-precision
-copy of the store exists outside the block.
+copy of the store exists outside the block.  The element matrices take the block's tensors through one
+more contraction, \eqref{eq:elementmatrix}, in the same scratch: vectorised over the lanes, it forms only
+the blocks $K_{pq}$ above the diagonal, then the element scale, the pair factors \eqref{eq:pairscale}
+and the codes as above.
+
+\subsection{Application schedules}
+\label{sec:schedules}
+
+Without a symbolic reference tensor there is nothing to integrate at code-generation time, but
+the rank structure of the gradient spaces survives and determines the schedule.  Three schedules
+are considered; their operation counts, after common-subexpression elimination with the stored
+numbers as opaque inputs, are in Table~\ref{tab:flops}.
+
+\begin{description}[leftmargin=1.5em]
+\item[Direct, per point.]  For each point, form the $3\times3$ reference gradient of the increment
+  from tabulated basis derivatives, apply the decoded $9\times9$ symmetric tangent ($81$
+  multiply--adds), and scatter through the transposed table.  Eliminating the gradient and
+  scatter stages jointly across points recovers the sharing of a tensor-product element, which on
+  HEX8 is what sum factorisation would make explicit.
+\item[Modal, per point.]  Compress the increment once into its $9r$ modal gradient coefficients
+  --- the coefficients of its reference gradient in a basis of the $r$-dimensional gradient space
+  of each direction, through a map $C$ whose rational constants are folded into the code ---;
+  evaluate each point's gradient from the modes; apply the tangent; accumulate back to modes;
+  expand with $C^{\mathsf T}$.  On TET10 the
+  modes are the vertex derivatives and the evaluation is barycentric interpolation.
+\item[Moment.]  Equation~\eqref{eq:tet10moments}: compress, apply the $r^2$ blocks $\Mab$ to the
+  modal coefficients, expand.
+\end{description}
+
+\begin{table*}[t]
+\centering
+\begin{tabular}{lrrrrrr}
+\toprule
+element & direct & modal & moment & selected & flop/dof \\
+\midrule
+\rows{tables/flops.tex}
+\bottomrule
+\end{tabular}
+\caption{Floating-point operations per element application after common-subexpression
+elimination.  The selected schedule is the one that reads the store the kernels hold
+(Section~\ref{sec:minimal}); on TET10 the moment schedule is within $1.3\%$ of the cheapest per-point
+schedule and reads $10\%$ fewer numbers.  Symbolic counts, not measured run times.}
+\label{tab:flops}
+\end{table*}
+
+On every element the dominant term is the tangent contraction, $81$ multiply--adds per point or
+moment ($r^2=16$ blocks on TET10), fewer at the points the fold drops components from
+(Section~\ref{sec:fold}).  It is not reducible by symmetry, since a symmetric matrix--vector product still touches every entry, and it is
+the reason the arithmetic precision is a design parameter (Section~\ref{sec:precision}).
 
 \begin{algorithm*}[t]
 \caption{Application, moment schedule (TET10; TET4 with $r=1$)}
@@ -1152,6 +1186,147 @@ application kernels the only per-element data read are the encoded store, its sc
 mean-and-deviation encodings, the $45$-entry single-precision mean), the
 connectivity and the increment; geometry, state and material parameters are not read.
 
+\begin{algorithm*}[t]
+\caption{Application, element matrix in difference form}
+\label{alg:applyelement}
+\begin{algorithmic}[1]
+\Require connectivity $E\in\mathbb{N}^{n_e\times N}$; increment $h\in\R^{3n_n}$; per element the codes
+  $C_{pq}\in\mathcal{C}^{3\times3}$ of each node pair $p<q$, its factor $r_{pq}$ (\texttt{int8} with a
+  factor per pair; $r_{pq}=1$ otherwise) and the element scale $s_e$; output vector $y\in\R^{3n_n}$
+\Constants the $N(N-1)/2$ node pairs; the arithmetic type $\tau$
+\Ensure $y \gets y + \widetilde{\mathcal{H}}h$, accumulated in place \Comment{no geometry, state or material read}
+\ForAll{blocks $B$ of $V$ elements \textbf{in parallel}}
+  \State gather $h$ at the nodes $E(B,\cdot)$ \Comment{vector precision}
+  \State $\mathrm{out}_p \gets 0$ for $p=1,\dots,N$
+  \ForAll{pairs $p<q$}
+    \State $d \gets r_{pq}\,\tau(h_q - h_p)$ \Comment{the difference in vector precision, then rounded}
+    \State $K \gets \tau(C_{pq})$ \Comment{nine codes, widened in registers}
+    \State $\mathrm{out}_p \gets \mathrm{out}_p + K d$;\quad $\mathrm{out}_q \gets \mathrm{out}_q - K^{\mathsf T} d$
+           \Comment{\eqref{eq:difference}, both nodes of the pair}
+  \EndFor
+  \State $y_{E(B,p)} \gets y_{E(B,p)} + s_e\,\mathrm{out}_p$ \Comment{packed two-pass}
+\EndFor
+\end{algorithmic}
+\end{algorithm*}
+
+Algorithm~\ref{alg:applyelement} reads each stored block once and applies it to both nodes of its pair,
+$18$ multiply--adds for nine codes, and forms no gradient: the element matrix trades the point store's
+gradient and output stages for a larger store (Table~\ref{tab:elementmatrix}).  A translation gives
+$d=0$ in every pair and leaves $y$ unchanged whatever the codes (Figure~\ref{fig:fmtelement}d).
+
+\paragraph{The folded kernels.}  The set-up (Algorithm~\ref{alg:setup}) evaluates the tangent at all
+$q_1^3$ points as before, folds the block's point values in scratch after the mean is removed, takes
+the scale over the kept values and encodes only those, point by point in the store's order.  The
+application (Algorithm~\ref{alg:applypoints}) decodes the components a point keeps into their slots
+and contracts with one of eight generated contractions, one per set of dropped directions.  Since
+the vector lanes are elements and every element drops the same components at the same point, the
+set is uniform across the lanes and the skipped multiply--adds are saved.  On Grace the folded
+application is faster than the one over all $45\,n_q$ point values for every encoding, by
+$\foldGainHalfHexEight\%$ (\texttt{fp16}) and $\foldGainEightMdHexEight\%$ (\texttt{int8} mean and
+deviation) on HEX8 and $\foldGainHalfHexTwentySeven\%$ and $\foldGainEightMdHexTwentySeven\%$ on HEX27
+at about $10^7$ degrees of freedom; selecting the contraction per point at run time measured faster
+than unrolling all points with their sets fixed at compile time.
+
+\subsection{Arithmetic precision}
+\label{sec:precision}
+
+The stored numbers carry at most eleven significant bits (\texttt{fp16}) or eight (\texttt{int8}),
+so carrying the contraction in double precision buys nothing: single-precision arithmetic
+contributes a relative error of $2^{-24}$, three orders of magnitude below either encoding, and
+doubles the vector width.  The gradient stage is kept in the vector's precision, because it forms
+differences of nodal values whose common part can be large compared with the increment's
+variation over the element; the gradients are rounded to single precision only after the
+differences are formed.  Outputs are accumulated in the vector's precision.  The arithmetic type is
+a template parameter of the kernels, independent of the storage type, so both precisions remain
+measurable.
+
+\subsection{The packed two-pass traversal}
+\label{sec:packed}
+
+An element operator adds its outputs to nodes that neighbouring elements share, which the threads of
+a parallel loop must not update concurrently.  Atomic additions resolve the conflict but make the
+result depend on the order of the threads.  The element formats are therefore applied through the
+packed layout of our code \cite{PackedMesh} (Figure~\ref{fig:packed}).  Elements are grouped into
+packs whose nodes are numbered locally in $16$ bits.  Each node is owned by one pack, and the nodes a
+pack owns form a contiguous range of the global numbering; the nodes it shares with the packs that own
+them are its ghosts.  The first pass runs the packs as the iterations of a parallel loop: a pack
+gathers the increment at its owned nodes and its ghosts into node-major scratch of its thread, its
+blocks of $V$ elements read the scratch through the local indices and accumulate into it, and the pack
+adds its owned nodes into the result, which no other pack writes, and its ghost contributions into
+slots of their own.  The second pass sums, for each node with slots, its slots in a fixed order.
+Neither pass uses atomics, so the result is bitwise reproducible.  The scratch keeps a node's
+components in one cache line for the gather and the scatter, and each thread keeps it across packs and
+applications; the local indices halve the connectivity an element reads against $32$-bit global ones.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/fmt_packed.pdf}
+\Description{Three panels: a quadrilateral mesh in four coloured packs with nodes coloured by their
+owning pack and the ghosts of one pack ringed, the stages of the first pass for one pack, and the
+second pass summing the slots of shared nodes.}
+\caption{The packed two-pass traversal of the element operators on the CPU.  (a) Packs of elements;
+each node is owned by one pack (its colour), and a pack's ghosts are nodes it shares with their
+owners.  (b) The first pass, a pack per iteration of a parallel loop.  (c) The second pass over the
+shared nodes.  No atomics; the result does not depend on the threads' order.}
+\label{fig:packed}
+\end{figure*}
+
+%% ===================================================================================================
+\section{Kernels on the GPU}
+\label{sec:gpukernels}
+
+The device keeps the stores of the CPU and maps its threads to them differently
+(Figure~\ref{fig:gpu}).  The compressed stores keep their host layouts with blocks of $32$ elements,
+one warp, and are set up on the device: the codes equal the host's bit for bit, except a handful of
+element-matrix codes on TET10 that differ by one rounding step.
+
+\paragraph{A thread per element.}  On TET4, TET10 and HEX8 the application runs one thread per
+element, so a warp holds the $32$ elements of a store block and every code load of the blocked layout
+is coalesced.  The thread adds its outputs with atomic additions, or on TET4 and in half precision on
+HEX8 through a block-local scatter, whichever measured faster: the block's distinct nodes are read
+into shared memory, its elements gather and accumulate there, and the block adds each of its nodes into
+the result once.  The HEX8 point store is folded as on Grace, and its threads skip the same terms.
+
+\paragraph{A thread per point.}  A HEX27 element has $64$ points and $27$ nodes, more state than one
+thread holds.  Its point store runs a thread per quadrature point, two warps per element, with the
+sum-factorised schedule: the element's increment is staged in shared memory, the gradients at the
+points are formed by one-dimensional sweeps along the lines of points that the element's threads run
+together, each thread decodes and contracts its own point, and the transposed sweeps return the
+outputs.  The set-up maps its threads alike.  This store keeps all $\perpointHexTwentySeven$ point
+values: the threads of a warp would drop different directions, a warp executes one instruction stream,
+so the dropped terms would be multiplied by zero rather than skipped; the fold would save only a tenth
+of the bytes, which do not bound this kernel, while its addressing and folded weights cost
+instructions and registers.
+
+\paragraph{A warp per element.}  The HEX27 element matrix runs one warp per element, a lane per node:
+lane $p$ reads the increment from shared memory, forms its row of the difference form
+\eqref{eq:difference} with the pair factors, and adds it to its node.
+
+\paragraph{The quantized matrix.}  On the device the quantized matrix is held in the full difference
+form, each pair of blocks stored twice: storing a pair once needs a scatter of the transposed block,
+which costs more than the bytes it saves.  Its rows are in SELL-$32$-$1024$, a thread per row, with the
+codes, column and scale of a block in one record, so each thread writes its own row once and no
+atomics are needed.  Columns are full $32$-bit indices: $16$-bit offsets, as on Grace, store fewer bytes
+but send the blocks out of their reach to a slower remainder kernel, and applied as
+$y \leftarrow y + Ax$ they are slower on every mesh measured.
+
+\paragraph{BSR.}  BSR is assembled by our code's device kernels from the same generator and applied by
+its block product, a group of sixteen threads per block row whose partial sums are added by warp
+shuffles in a fixed order.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/fmt_gpu.pdf}
+\Description{Four panels: threads mapped one per element over a store block with a shared-memory node
+buffer; a HEX27 element with one thread per quadrature point and sweeps along lines of points; a
+27-node element with one lane per node and its couplings; SELL slices with one thread per row and
+padding.}
+\caption{How the device kernels map threads to the formats.  (a) A thread per element (TET4, TET10,
+HEX8).  (b) A thread per quadrature point for the HEX27 point store.  (c) A warp per element for the
+HEX27 element matrix.  (d) A thread per row of SELL-$32$-$1024$ slices for the quantized matrix.}
+\label{fig:gpu}
+\end{figure*}
+
 %% ===================================================================================================
 \section{Cost model against BSR}
 \label{sec:model}
@@ -1182,7 +1357,7 @@ it halves the assembled matrix.  The encodings then decide how many bytes each n
 quadrature-point store and the element matrix, per node for the assembled matrix, with $b$ the
 blocks per node row.  The encodings then store each number in $8$, $4$, $2$ or $1$ bytes
 (Table~\ref{tab:footprint}).  On the GPU the quantized matrix stores both blocks of a pair
-(Section~\ref{sec:plan}).}
+(Section~\ref{sec:gpukernels}).}
 \label{tab:measures}
 \end{table}
 
@@ -1287,35 +1462,16 @@ iteration on the device.
 
 \paragraph{Operators.}  Every comparison is against BSR with double- and with single-precision
 values, assembled by the same code generator and applied by a row-parallel block product.  The
-compressed stores and the element matrices are applied through the packed layout's two-pass
-scatter \cite{PackedMesh}: elements are grouped into packs whose nodes are numbered locally, each
-pack accumulates into thread-local storage without atomics, and shared nodes are reduced in a second
-pass.  The quantized matrices are applied as in Section~\ref{sec:qbsr}.  Every operator, BSR included, is
+compressed stores and the element matrices are applied through the packed two-pass traversal of
+Section~\ref{sec:packed}.  The quantized matrices are applied as in Section~\ref{sec:qbsr}.  Every operator, BSR included, is
 applied as $y \leftarrow y + Ax$, its use inside Newton, in the benchmarks as in the Newton runs.  Every packed operator uses packs of about a
 twentieth of a thread's share of the elements (at least $16$), so that each thread has about twenty
 packs.
 
-\paragraph{Operators on the GPU.}  BSR is assembled by our code's device kernels from the same
-generator and applied by its block product, a group of sixteen threads per block row whose partial
-sums are added by warp shuffles in a fixed order.  cuSPARSE's products on the same matrix are
-measured beside it as references: \texttt{bsrmv}, and its generic product on the matrix expanded to
-scalar CSR, its fastest path, since the generic product does not take BSR.  Both take vectors in the
-matrix's precision.  The compressed stores keep their host layouts with blocks of $32$ elements, one warp, and
-are set up on the device: the codes equal the host's bit for bit, except a handful of element-matrix
-codes on TET10 that differ by one rounding step.  The application runs one thread per element on
-TET4, TET10 and HEX8, scattering with atomic additions, or on TET4 and in half precision on HEX8
-through a block-local scatter that accumulates a block's nodes in shared memory, whichever measured
-faster.  On HEX27 the point stores run one thread per quadrature point with the sum-factorised
-schedule and the element matrices one warp per element, a lane per node.  The HEX8 point store is
-folded as on Grace; the HEX27 one keeps all $\perpointHexTwentySeven$ point values, since one thread
-per point gives the threads of a warp different folds, so the fold saves no multiply--add there,
-and its decoding costs more than the bytes it saves, which do not bound that application.  The quantized matrix is
-held in the full difference form, each pair of blocks stored twice: storing the pair once needs a
-scatter of the transposed block, which on the GPU costs more than the bytes it saves.  Its rows are
-in SELL-$32$-$1024$ with the codes, column and scale of a block in one record.  Columns are full
-$32$-bit indices: $16$-bit offsets, as on Grace, store fewer bytes but send the blocks out of their
-reach to a slower remainder kernel, and applied as $y \leftarrow y + Ax$ they are slower on every
-mesh measured.
+\paragraph{Operators on the GPU.}  The device kernels are those of Section~\ref{sec:gpukernels}.
+cuSPARSE's products on the same BSR matrix are measured beside ours as references: \texttt{bsrmv}, and
+its generic product on the matrix expanded to scalar CSR, its fastest path, since the generic product
+does not take BSR.  Both take vectors in the matrix's precision.
 
 \paragraph{Problems.}  The application study uses structured meshes of the unit cube at
 \benchdofHexEight{}~degrees of freedom for each element (TET4 and TET10 on the Freudenthal split),
