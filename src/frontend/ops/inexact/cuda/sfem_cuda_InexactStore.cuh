@@ -413,27 +413,35 @@ namespace sfem {
                 if (active && j < N) {
                     const idx_t node = a.elements[t.shape_node[j]][e];
                     nodes[le][j]     = node;
+                    #pragma unroll
                     for (int k = 0; k < 3; ++k) hs[le][k][j] = h[(ptrdiff_t)node * a.stride + k];
                 }
                 __syncthreads();
                 if (active) {
                     const int jx = j % Q1, jy = (j / Q1) % Q1, jz = j / (Q1 * Q1);
-                    // The point's line-table rows in registers, read once.
+                    // The point's line-table rows in registers, read once.  The fixed loops are unrolled
+                    // explicitly: left to the compiler, f16 and int8 keep a 24-byte stack frame.
                     tau bx_[S1], dx_[S1], by_[S1], dy_[S1], bz_[S1], dz_[S1];
+                    #pragma unroll
                     for (int u = 0; u < S1; ++u) {
                         bx_[u] = B[jx * S1 + u], dx_[u] = D[jx * S1 + u];
                         by_[u] = B[jy * S1 + u], dy_[u] = D[jy * S1 + u];
                         bz_[u] = B[jz * S1 + u], dz_[u] = D[jz * S1 + u];
                     }
                     tau P[9], Y[9];
+                    #pragma unroll
                     for (int c = 0; c < 9; ++c) P[c] = 0, Y[c] = 0;
+                    #pragma unroll
                     for (int sz = 0; sz < S1; ++sz)
+                        #pragma unroll
                         for (int sy = 0; sy < S1; ++sy)
+                            #pragma unroll
                             for (int sx = 0; sx < S1; ++sx) {
                                 const int sn = sx + S1 * (sy + S1 * sz);
                                 const tau w0 = dx_[sx] * by_[sy] * bz_[sz];
                                 const tau w1 = bx_[sx] * dy_[sy] * bz_[sz];
                                 const tau w2 = bx_[sx] * by_[sy] * dz_[sz];
+                                #pragma unroll
                                 for (int k = 0; k < 3; ++k) {
                                     const tau v = tau(hs[le][k][sn] - hs[le][k][0]);
                                     P[k * 3 + 0] += w0 * v;
@@ -444,6 +452,7 @@ namespace sfem {
                     tau S[NC], sc = 1;
                     if constexpr (MD) sc = tau(__ldg(&st.scales[e]));
                     const tau xj = tau(t.x[j]);
+                    #pragma unroll
                     for (int c = 0; c < NC; ++c) {
                         const tau v = C::decode(__ldg(&st.codes[st.point_index(e, j, c)]));
                         if constexpr (MD) {
@@ -453,6 +462,7 @@ namespace sfem {
                         }
                     }
                     Contraction::template contract<tau>(S, P, Y);
+                    #pragma unroll
                     for (int c = 0; c < 9; ++c) Ys[le][j][c] = Y[c];
                 }
                 __syncthreads();
@@ -461,6 +471,7 @@ namespace sfem {
                         const int i = idx / (Q1 * Q1 * S1), r = idx % (Q1 * Q1 * S1);
                         const int qx = r % Q1, qy = (r / Q1) % Q1, sz = r / (Q1 * Q1);
                         tau       sx_ = 0, sy_ = 0, sz_ = 0;
+                        #pragma unroll
                         for (int qz = 0; qz < Q1; ++qz) {
                             const int q = qx + Q1 * (qy + Q1 * qz);
                             sx_ += B[qz * S1 + sz] * Ys[le][q][i * 3 + 0];
@@ -475,6 +486,7 @@ namespace sfem {
                         const int i = idx / (Q1 * S1 * S1), r = idx % (Q1 * S1 * S1);
                         const int qx = r % Q1, sy = (r / Q1) % S1, sz = r / (Q1 * S1);
                         tau       b_ = 0, c_ = 0;
+                        #pragma unroll
                         for (int qy = 0; qy < Q1; ++qy) {
                             const int s = qx + Q1 * (qy + Q1 * sz);
                             b_ += B[qy * S1 + sy] * ax[le][i][s];
@@ -489,6 +501,7 @@ namespace sfem {
                     const int i = idx / N, node = idx % N;
                     const int sx = node % S1, sy = (node / S1) % S1, sz = node / (S1 * S1);
                     tau       o  = 0;
+                    #pragma unroll
                     for (int qx = 0; qx < Q1; ++qx) {
                         const int r = qx + Q1 * (sy + S1 * sz);
                         o += D[qx * S1 + sx] * bx[le][i][r] + B[qx * S1 + sx] * cc[le][i][r];
