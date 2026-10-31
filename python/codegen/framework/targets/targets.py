@@ -115,6 +115,11 @@ class TargetPlatform:
     def inline_qualifier(self):
         return "inline"
 
+    def library_local_type_prefix(self):
+        """What a header-only type's declaration starts with so that its members bind
+        inside the library that compiles them, or nothing."""
+        return ""
+
     def inline_definition_lines(self, inline_definition="inline"):
         return ()
 
@@ -720,6 +725,11 @@ class OpenMPTarget(TargetPlatform):
 
     def inline_qualifier(self):
         return "SFEM_INLINE"
+
+    def library_local_type_prefix(self):
+        # In a shared libsfem a member the compiler leaves out of line is otherwise called
+        # through the PLT: the lane contraction, once per block of the stored-tangent apply.
+        return '__attribute__((visibility("hidden"))) '
 
     def inline_definition_lines(self, inline_definition="inline"):
         return (

@@ -5,7 +5,7 @@ namespace sfem {
 namespace codegen {
 
 // The stored tangent's element half for TET10 on its 11-point rule (plans/inexact_element.py).
-struct inexact_tet10_q11 {
+struct __attribute__((visibility("hidden"))) inexact_tet10_q11 {
   static constexpr const char *name = "tet10_q11";
   static constexpr int DIM = 3;
   static constexpr int N = 10;   // nodes

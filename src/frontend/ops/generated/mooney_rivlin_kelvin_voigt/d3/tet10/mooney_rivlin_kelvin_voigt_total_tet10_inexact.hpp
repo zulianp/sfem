@@ -9,7 +9,7 @@ namespace sfem {
 namespace codegen {
 
 // mooney_rivlin_kelvin_voigt_total on TET10: the weighted tangent the stored-tangent operator keeps at every point.
-struct mooney_rivlin_kelvin_voigt_total_tet10_inexact {
+struct __attribute__((visibility("hidden"))) mooney_rivlin_kelvin_voigt_total_tet10_inexact {
   using element = inexact_tet10_q11;
   using contraction = inexact_contract_d3<false>;
   static constexpr int DIM = 3;

@@ -9,7 +9,7 @@ namespace sfem {
 namespace codegen {
 
 // linear_elasticity on TET4: the weighted tangent the stored-tangent operator keeps at every point.
-struct linear_elasticity_tet4_inexact {
+struct __attribute__((visibility("hidden"))) linear_elasticity_tet4_inexact {
   using element = inexact_tet4_q1;
   using contraction = inexact_contract_d3<true>;
   static constexpr int DIM = 3;
