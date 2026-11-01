@@ -8,12 +8,14 @@
 #include <functional>
 #include <iostream>
 #include <memory>
+#include <vector>
 
 #include "sfem_MatrixFreeLinearSolver.hpp"
 #include "sfem_operator_factory.hpp"
 
 #include "sfem_BLAS_openmp.hpp"
 #include "sfem_ConjugateGradientKernels_openmp.hpp"
+#include "sfem_SolverExec.hpp"
 
 // https://en.wikipedia.org/wiki/Conjugate_gradient_method
 namespace sfem {
@@ -147,15 +149,38 @@ namespace sfem {
             }
         }
 
+        /// One iteration, written once for its executor (sfem_SolverExec.hpp): on the host, when
+        /// the operator (and the preconditioner) have a team form, the whole run in one region;
+        /// otherwise vector by vector through the BLAS.
         int apply(const ptrdiff_t n, const T* const b, T* const x) {
             SFEM_TRACE_SCOPE("ConjugateGradient::apply");
             negative_curvature_ = false;
-
-            if (preconditioner_op) {
-                return aux_apply_precond(n, b, x);
-            } else {
-                return aux_apply_basic(n, b, x);
+            if (!good()) {
+                assert(0);
+                return SFEM_FAILURE;
             }
+            ensure_workspace(n, preconditioner_op != nullptr);
+
+            auto team_op   = std::dynamic_pointer_cast<TeamOperator<T>>(apply_op);
+            auto team_prec = std::dynamic_pointer_cast<TeamOperator<T>>(preconditioner_op);
+            if (team_op && (!preconditioner_op || team_prec) && this->execution_space() == EXECUTION_SPACE_HOST) {
+                if (team_op->prepare() != SFEM_SUCCESS) return SFEM_FAILURE;
+                if (team_prec && team_prec->prepare() != SFEM_SUCCESS) return SFEM_FAILURE;
+                T* const buffer = team_reduction_buffer(team_sums_, n);
+                int      info   = SFEM_FAILURE;
+#pragma omp parallel
+                {
+                    TeamReduction<T, 1> sums(buffer, team_chunk_count(n));
+                    const Team          team = team_op->team();
+                    TeamExec<T>         e(team, sums);
+                    const int r = preconditioner_op ? run_precond(e, *team_op, *team_prec, n, b, x) : run_basic(e, *team_op, n, b, x);
+                    if (team.leader()) info = r;
+                }
+                return info;
+            }
+
+            BlasExec<T> e(*blas, n);
+            return preconditioner_op ? run_precond(e, *apply_op, *preconditioner_op, n, b, x) : run_basic(e, *apply_op, n, b, x);
         }
 
         int apply(const T* const b, T* const x) override {
@@ -179,14 +204,10 @@ namespace sfem {
         T*        work_p_{nullptr};
         T*        work_Ap_{nullptr};
         ptrdiff_t work_n_{-1};
+        // The sums of a run in one region (TeamReduction).
+        std::vector<T> team_sums_;
 
         bool use_fusion() const { return fusion && impl.good(); }
-
-        void ensure_apply_buffer(const ptrdiff_t n, T* const y) const {
-            if (!apply_overwrites_output) {
-                blas->zeros(n, y);
-            }
-        }
 
         void destroy_workspace() {
             if (!blas) {
@@ -257,24 +278,58 @@ namespace sfem {
             }
         }
 
-        int aux_apply_basic(const ptrdiff_t n, const T* const b, T* const x) {
-            if (!good()) {
-                assert(0);
-                return SFEM_FAILURE;
-            }
+        // x += alpha p; r -= alpha Ap, and with_rtr (r, r): the BLAS's fused kernels or, in a
+        // region, one pass over the thread's entries.
+        T x_r(BlasExec<T>&, const ptrdiff_t n, const T alpha, const T* const p, const T* const Ap, T* const x, T* const r, const bool with_rtr) {
+            return update_x_r(n, alpha, p, Ap, x, r, with_rtr);
+        }
 
-            ensure_workspace(n, false);
+        T x_r(TeamExec<T>& e, const ptrdiff_t, const T alpha, const T* const p, const T* const Ap, T* const x, T* const r, const bool with_rtr) {
+            if (!with_rtr) {
+                const Team& team = e.team();
+                for (ptrdiff_t i = team.begin; i < team.end; i++) {
+                    x[i] = alpha * p[i] + x[i];
+                    r[i] = -alpha * Ap[i] + r[i];
+                }
+                return T(0);
+            }
+            return e.sweep_sum([=](const ptrdiff_t i) {
+                x[i] = alpha * p[i] + x[i];
+                r[i] = -alpha * Ap[i] + r[i];
+                return r[i] * r[i];
+            });
+        }
+
+        // p <- z + beta p.
+        void z_p(BlasExec<T>&, const ptrdiff_t n, const T beta, const T* const z, T* const p) { update_p(n, beta, z, p); }
+        void z_p(TeamExec<T>& e, const ptrdiff_t, const T beta, const T* const z, T* const p) { e.axpby(T(1), z, beta, p); }
+
+        // The leader's: what the iteration says and keeps.
+        template <class E>
+        void say(E& e, const int iter, const T residual, const T relative, const T alpha) {
+            if (e.leader()) monitor(iter, residual, relative, alpha);
+        }
+
+        template <class E>
+        void intercept(E& e, T* const x) {
+            if (!interceptor) return;
+            e.barrier();
+            if (e.leader()) interceptor(x);
+            e.barrier();
+        }
+
+        template <class E, class Op>
+        int run_basic(E& e, Op& A, const ptrdiff_t n, const T* const b, T* const x) {
             T* r  = work_r_;
             T* p  = work_p_;
             T* Ap = work_Ap_;
 
-            ensure_apply_buffer(n, r);
-            apply_op->apply(x, r);
-            blas->axpby(n, T(1), b, T(-1), r);
+            e.apply(A, x, r, apply_overwrites_output);
+            e.axpby(T(1), b, T(-1), r);
 
-            const T rtr0    = blas->dot(n, r, r);
+            const T rtr0    = e.dot(r, r);
             const T r_norm0 = sqrt(rtr0);
-            monitor(0, r_norm0, 1, 0);
+            say(e, 0, r_norm0, 1, 0);
 
             T rtr = rtr0;
             assert(rtr0 == rtr0);
@@ -283,18 +338,19 @@ namespace sfem {
                 return SFEM_SUCCESS;
             }
 
-            blas->copy(n, r, p);
+            e.copy(r, p);
 
             int info = SFEM_FAILURE;
-            for (iterations_ = 0; iterations_ < max_it; iterations_++) {
-                ensure_apply_buffer(n, Ap);
-                apply_op->apply(p, Ap);
+            int it   = 0;
+            for (; it < max_it; it++) {
+                e.apply(A, p, Ap, apply_overwrites_output);
 
-                const T ptAp  = blas->dot(n, p, Ap);
+                const T ptAp = e.dot(p, Ap);
                 if (stop_on_negative_curvature && !(ptAp > 0)) {
-                    negative_curvature_ = true;
-                    if (iterations_ == 0) blas->axpby(n, rtr / std::abs(ptAp), p, T(1), x);
-                    return SFEM_SUCCESS;
+                    if (e.leader()) negative_curvature_ = true;
+                    if (it == 0) e.axpby(rtr / std::abs(ptAp), p, T(1), x);
+                    info = SFEM_SUCCESS;
+                    break;
                 }
                 const T alpha = rtr / ptAp;
 
@@ -304,59 +360,50 @@ namespace sfem {
                 assert(rtr == rtr);
 
                 // Fuse x/r updates + (r,r) into one backend pass
-                const T rtr_new = update_x_r(n, alpha, p, Ap, x, r, true);
+                const T rtr_new = x_r(e, n, alpha, p, Ap, x, r, true);
                 const T beta    = rtr_new / rtr;
                 rtr             = rtr_new;
-                update_p(n, beta, r, p);
+                z_p(e, n, beta, r, p);
 
                 T r_norm = sqrt(rtr_new);
                 assert(r_norm == r_norm);
 
-                monitor(iterations_ + 1, r_norm, r_norm / r_norm0, alpha);
+                say(e, it + 1, r_norm, r_norm / r_norm0, alpha);
                 if (r_norm < atol || rtr_new == 0 || r_norm / r_norm0 < rtol) {
                     info = SFEM_SUCCESS;
                     break;
                 }
 
-                if (interceptor) {
-                    interceptor(x);
-                }
+                intercept(e, x);
             }
-
+            if (e.leader()) iterations_ = it;
             return info;
         }
 
-        int aux_apply_precond(const ptrdiff_t n, const T* const b, T* const x) {
-            if (!good()) {
-                return SFEM_FAILURE;
-            }
-
-            ensure_workspace(n, true);
+        template <class E, class Op, class Prec>
+        int run_precond(E& e, Op& A, Prec& M, const ptrdiff_t n, const T* const b, T* const x) {
             T* r  = work_r_;
             T* z  = work_z_;
             T* p  = work_p_;
             T* Ap = work_Ap_;
 
-            ensure_apply_buffer(n, r);
-            apply_op->apply(x, r);
-            blas->axpby(n, T(1), b, T(-1), r);
+            e.apply(A, x, r, apply_overwrites_output);
+            e.axpby(T(1), b, T(-1), r);
 
-            const T rtr0    = blas->dot(n, r, r);
+            const T rtr0    = e.dot(r, r);
             const T r_norm0 = sqrt(rtr0);
-            monitor(0, r_norm0, 1, 0);
+            say(e, 0, r_norm0, 1, 0);
 
             if (rtr0 == 0) {
                 return SFEM_SUCCESS;
             }
 
-            ensure_apply_buffer(n, z);
-            preconditioner_op->apply(r, z);
-            blas->copy(n, z, p);
+            e.apply(M, r, z, apply_overwrites_output);
+            e.copy(z, p);
 
-            ensure_apply_buffer(n, Ap);
-            apply_op->apply(p, Ap);
+            e.apply(A, p, Ap, apply_overwrites_output);
 
-            const T rtz0 = blas->dot(n, r, z);
+            const T rtz0 = e.dot(r, z);
             T       rtz  = rtz0;
 
             if (rtz == 0) {
@@ -364,57 +411,57 @@ namespace sfem {
             }
 
             {
-                const T ptAp  = blas->dot(n, p, Ap);
+                const T ptAp = e.dot(p, Ap);
                 if (stop_on_negative_curvature && !(ptAp > 0)) {
-                    negative_curvature_ = true;
-                    iterations_         = 0;
-                    blas->axpby(n, rtz / std::abs(ptAp), p, T(1), x);
+                    if (e.leader()) {
+                        negative_curvature_ = true;
+                        iterations_         = 0;
+                    }
+                    e.axpby(rtz / std::abs(ptAp), p, T(1), x);
                     return SFEM_SUCCESS;
                 }
                 assert(ptAp != 0);
                 const T alpha = rtz / ptAp;
-                update_x_r(n, alpha, p, Ap, x, r, false);
+                x_r(e, n, alpha, p, Ap, x, r, false);
             }
 
             int info = SFEM_FAILURE;
-            for (iterations_ = 0; iterations_ < max_it; iterations_++) {
-                ensure_apply_buffer(n, z);
-                preconditioner_op->apply(r, z);
+            int it   = 0;
+            for (; it < max_it; it++) {
+                e.apply(M, r, z, apply_overwrites_output);
 
-                const T rtz_new = blas->dot(n, r, z);
+                const T rtz_new = e.dot(r, z);
 
                 assert(rtz != 0);
                 const T beta = rtz_new / rtz;
                 rtz          = rtz_new;
 
-                update_p(n, beta, z, p);
+                z_p(e, n, beta, z, p);
 
-                ensure_apply_buffer(n, Ap);
-                apply_op->apply(p, Ap);
+                e.apply(A, p, Ap, apply_overwrites_output);
 
-                const T ptAp  = blas->dot(n, p, Ap);
+                const T ptAp = e.dot(p, Ap);
                 if (stop_on_negative_curvature && !(ptAp > 0)) {
-                    negative_curvature_ = true;
-                    return SFEM_SUCCESS;
+                    if (e.leader()) negative_curvature_ = true;
+                    info = SFEM_SUCCESS;
+                    break;
                 }
                 const T alpha = rtz / ptAp;
 
-                update_x_r(n, alpha, p, Ap, x, r, false);
+                x_r(e, n, alpha, p, Ap, x, r, false);
 
                 auto anorm = sqrt(rtz);
                 auto rnorm = anorm / sqrt(rtz0);
 
-                monitor(iterations_ + 1, anorm, rnorm, alpha);
+                say(e, it + 1, anorm, rnorm, alpha);
                 if (anorm < atol || rnorm < rtol) {
                     info = SFEM_SUCCESS;
                     break;
                 }
 
-                if (interceptor) {
-                    interceptor(x);
-                }
+                intercept(e, x);
             }
-
+            if (e.leader()) iterations_ = it;
             return info;
         }
     };
