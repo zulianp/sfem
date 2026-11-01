@@ -16,6 +16,7 @@ from codegen.framework.plans.conventions import (
     classify_abi_name,
     dimension_markers,
     restrict_prelude,
+    ABI_TEAM_TAIL,
 )
 import collections
 import json
@@ -542,7 +543,102 @@ def _emits_inexact_apply(material):
     return bool(getattr(material, "inexact_apply", False)) and current_target().supports_inexact_apply()
 
 
-def _inexact_declarations(material, publishes_inexact):
+#: The products on the threads of a caller's region (`Op::team_supported`), where the
+#: operator's kernels have `_team` twins (`_team_product`).
+_HEADER_TEAM_METHODS = {
+    False: "",
+    True: """
+    bool team_supported() const override;
+    int team_prepare() override;
+    int team_apply(const Team &team,
+                   const real_t *const x,
+                   const real_t *const h,
+                   real_t *const out) override;""",
+}
+
+
+def _hyperelastic_apply_head(op, team, publishes_inexact):
+    """The pieces of the hyperelastic `apply` that differ for a team: the method's head, how it
+    reaches the inertia (and waits for it: the kernels write other threads' rows), and the
+    methods a team operator adds -- the plain `apply` one region around `team_apply`."""
+    if not team:
+        return {
+            "apply_head": """  int %s::apply(const real_t *const x,
+                      const real_t *const h,
+                      real_t *const out) {
+    SFEM_TRACE_SCOPE("%s::apply");""" % (op, op),
+            "apply_term_call": "term->apply(x, h, out)",
+            "apply_term_barrier": "",
+            "apply_team_methods": "",
+        }
+    prepare_inexact = _TEAM_PREPARE_INEXACT[bool(publishes_inexact)]
+    return {
+        "apply_head": """  int %s::team_apply(const Team &team,
+                      const real_t *const x,
+                      const real_t *const h,
+                      real_t *const out) {""" % op,
+        "apply_term_call": "term->team_apply(team, x, h, out)",
+        "apply_term_barrier": "\n      team.barrier();",
+        "apply_team_methods": """
+  int %(op)s::apply(const real_t *const x,
+                      const real_t *const h,
+                      real_t *const out) {
+    SFEM_TRACE_SCOPE("%(op)s::apply");
+    return op_team_region(*this, impl_->space->n_dofs(), [&](const Team &team) { return team_apply(team, x, h, out); });
+  }
+
+  bool %(op)s::team_supported() const {
+    auto term = time_scheme_term(impl_->time_scheme);
+    return !term || term->team_supported();
+  }
+
+  int %(op)s::team_prepare() {
+    impl_->domains->prepare_views();
+    if (auto term = time_scheme_term(impl_->time_scheme)) {
+      if (term->team_prepare() != SFEM_SUCCESS) return SFEM_FAILURE;
+    }
+%(prepare_inexact)s    return SFEM_SUCCESS;
+  }
+""" % {"op": op, "prepare_inexact": prepare_inexact},
+    }
+
+
+#: The packed views the stored-tangent traversal reads, made before the region: making
+#: one allocates its ghost buffer.
+_TEAM_PREPARE_INEXACT = {
+    False: "",
+    True: """    if (!impl_->inexact.assembled() && impl_->space->has_packed_mesh()) {
+      auto mesh = impl_->space->packed_mesh();
+      impl_->domains->iterate([&](const OpDomain &domain) {
+        const int block = packed_block_id_for_domain(*mesh, *domain.block);
+        if (block >= 0) impl_->inexact.packed_view(*mesh, block, 3);
+        return SFEM_SUCCESS;
+      });
+    }
+""",
+}
+
+
+def _team_product(plain, team, what):
+    """Whether an operator's product is published for a team: its body with the `_team`
+    twins (`team`) against the plain one.  The twins are found by name, and a missing name
+    sends a dispatch body quietly down another path (`_c_abi_function_exists`), so the team
+    body must be the plain one call for call: anything else is a generator defect.  Asked on
+    a target that has team regions only; elsewhere there are no twins to call."""
+    if team == plain:
+        return False
+    stripped = team.replace(ABI_TEAM_TAIL + "(", "(")
+    if stripped != plain:
+        import difflib
+
+        raise ValueError(
+            "%s: the team product does not call the plain one's kernels:\n%s"
+            % (what, "\n".join(difflib.unified_diff(plain.splitlines(), stripped.splitlines(), lineterm="", n=1)))
+        )
+    return True
+
+
+def _inexact_declarations(material, publishes_inexact, team=False):
     """The stored-tangent methods, where the material generates the kernels for them.
 
     `Op` declares them with defaults that refuse, so an Op that does not
@@ -562,7 +658,14 @@ def _inexact_declarations(material, publishes_inexact):
     int inexact_update(const real_t *const x) override;
     int inexact_apply(const real_t *const h, real_t *const out) override;
     std::size_t inexact_bytes() const override;
-    int inexact_diag(real_t *const diag) override;"""
+    int inexact_diag(real_t *const diag) override;""" + _INEXACT_TEAM_DECLARATION[bool(team)]
+
+
+_INEXACT_TEAM_DECLARATION = {
+    False: "",
+    True: """
+    int team_inexact_apply(const Team &team, const real_t *const h, real_t *const out) override;""",
+}
 
 
 def _tangent_is_constant(form_collections):
@@ -599,7 +702,7 @@ def _tangent_is_constant(form_collections):
 
 def _header(material, residual, publishes_value_steps=None, node_wise=False,
             holds_time_scheme=None, relaxes=False, state_independent=False, linear=False,
-            publishes_inexact=False):
+            publishes_inexact=False, team=False):
     """The Op's declared interface.
 
     ``publishes_value_steps`` says whether this Op offers the Newton
@@ -713,7 +816,7 @@ namespace sfem {
     int gradient(const real_t *const x, real_t *const out) override;
     int apply(const real_t *const x,
                   const real_t *const h,
-                  real_t *const out) override;
+                  real_t *const out) override;%(team_methods)s
     int value(const real_t *x, real_t *const out) override;%(value_steps)s%(inexact_methods)s%(relaxation_declarations)s
     int hessian_crs(const real_t *const x,
             const count_t *const rowptr,
@@ -757,7 +860,8 @@ namespace sfem {
         "time_scheme_include": _HEADER_TIME_SCHEME_INCLUDE[holds_scheme],
         "value_steps": value_steps,
         "matrix_methods": matrix_methods,
-        "inexact_methods": _inexact_declarations(material, publishes_inexact),
+        "inexact_methods": _inexact_declarations(material, publishes_inexact, team),
+        "team_methods": _HEADER_TEAM_METHODS[bool(team)],
         "relaxation_include": _HEADER_RELAXATION_INCLUDE[bool(relaxes)],
         "relaxation_base": _HEADER_RELAXATION_BASE[bool(relaxes)],
         "relaxation_declarations": _HEADER_RELAXATION_DECLARATIONS[bool(relaxes)],
@@ -854,6 +958,7 @@ def _inexact_definitions(
     affine_cache,
     holds_scheme,
     previous_state,
+    team=False,
 ):
     """The stored-tangent methods, delegating to the library's stores.
 
@@ -1040,20 +1145,7 @@ def _inexact_definitions(
     });
   }
 
-  int %(op)s::inexact_apply(const real_t *const h, real_t *const out) {
-    SFEM_TRACE_SCOPE("%(op)s::inexact_apply");
-    // The assembled store holds the whole tangent, inertia included.
-    if (impl_->inexact.assembled()) return impl_->inexact.apply_bsr(h, out);
-%(inertia)s    return impl_->domains->iterate([&](const OpDomain &domain) {
-      auto store = impl_->inexact.stores.find(domain.block.get());
-      if (store == impl_->inexact.stores.end() || !store->second) {
-        SFEM_ERROR("%(op)s::inexact_apply requires inexact_update first\\n");
-        return SFEM_FAILURE;
-      }
-%(packed_view)s      store->second->apply(domain.block->n_elements(), element_connectivity(domain), packed, 3, h, out);
-      return SFEM_SUCCESS;
-    });
-  }""" % {
+%(inexact_apply_methods)s""" % {
         "op": op,
         "cases": cases,
         "supported": supported,
@@ -1069,7 +1161,69 @@ def _inexact_definitions(
         "stream_argument": _INEXACT_STREAM_ARGUMENT[device],
         "stream_binding": _INEXACT_STREAM_BINDING[device],
         "packed_view": _INEXACT_PACKED_VIEW[device],
+        "inexact_apply_methods": _INEXACT_APPLY_METHODS[bool(team) and not device] % {
+            "op": op,
+            "inertia": inertia,
+            "team_inertia": _INEXACT_TEAM_INERTIA[bool(holds_scheme)],
+            "packed_view": _INEXACT_PACKED_VIEW[device],
+        },
     }
+
+
+#: `inexact_apply`: the stores applied in turn, or -- for an operator published for a team
+#: -- by the threads of the caller's region (`team_inexact_apply`), the plain method one region
+#: around it.  A domain's store writes other threads' rows, so it waits for the one before;
+#: the inertia writes the thread's own and goes first, as it does in the plain order.
+_INEXACT_APPLY_METHODS = {
+    False: """  int %(op)s::inexact_apply(const real_t *const h, real_t *const out) {
+    SFEM_TRACE_SCOPE("%(op)s::inexact_apply");
+    // The assembled store holds the whole tangent, inertia included.
+    if (impl_->inexact.assembled()) return impl_->inexact.apply_bsr(h, out);
+%(inertia)s    return impl_->domains->iterate([&](const OpDomain &domain) {
+      auto store = impl_->inexact.stores.find(domain.block.get());
+      if (store == impl_->inexact.stores.end() || !store->second) {
+        SFEM_ERROR("%(op)s::inexact_apply requires inexact_update first\\n");
+        return SFEM_FAILURE;
+      }
+%(packed_view)s      store->second->apply(domain.block->n_elements(), element_connectivity(domain), packed, 3, h, out);
+      return SFEM_SUCCESS;
+    });
+  }""",
+    True: """  int %(op)s::team_inexact_apply(const Team &team, const real_t *const h, real_t *const out) {
+    // The assembled store holds the whole tangent, inertia included.
+    if (impl_->inexact.assembled()) {
+      impl_->inexact.team_apply_bsr(team, h, out);
+      return SFEM_SUCCESS;
+    }
+%(team_inertia)s    int domain_index = 0;
+    return impl_->domains->iterate([&](const OpDomain &domain) {
+      auto store = impl_->inexact.stores.find(domain.block.get());
+      if (store == impl_->inexact.stores.end() || !store->second) {
+        SFEM_ERROR("%(op)s::inexact_apply requires inexact_update first\\n");
+        return SFEM_FAILURE;
+      }
+      if (domain_index++ > 0) team.barrier();
+%(packed_view)s      store->second->team_apply(team, domain.block->n_elements(), element_connectivity(domain), packed, 3, h, out);
+      return SFEM_SUCCESS;
+    });
+  }
+
+  int %(op)s::inexact_apply(const real_t *const h, real_t *const out) {
+    SFEM_TRACE_SCOPE("%(op)s::inexact_apply");
+    return op_team_region(*this, impl_->space->n_dofs(), [&](const Team &team) { return team_inexact_apply(team, h, out); });
+  }""",
+}
+
+_INEXACT_TEAM_INERTIA = {
+    False: "",
+    True: """    if (auto term = time_scheme_term(impl_->time_scheme)) {
+      if (term->team_apply(team, impl_->inexact.state, h, out) != SFEM_SUCCESS) {
+        return SFEM_FAILURE;
+      }
+      team.barrier();
+    }
+""",
+}
 
 
 #: How a domain's store is made: the unit's host templates, or its device factory
@@ -1800,14 +1954,11 @@ namespace sfem {
     });
   }
 
-  int %(op)s::apply(const real_t *const x,
-                      const real_t *const h,
-                      real_t *const out) {
-    SFEM_TRACE_SCOPE("%(op)s::apply");
+%(apply_head)s
     if (auto term = time_scheme_term(impl_->time_scheme)) {
-      if (term->apply(x, h, out) != SFEM_SUCCESS) {
+      if (%(apply_term_call)s != SFEM_SUCCESS) {
         return SFEM_FAILURE;
-      }
+      }%(apply_term_barrier)s
     }
     auto mesh = impl_->space->mesh();
     auto points = element_points(mesh);
@@ -1837,7 +1988,7 @@ namespace sfem {
 %(apply_dispatch_body)s
     });
   }
-
+%(apply_team_methods)s
   int %(op)s::value(const real_t *x, real_t *const out) {
     SFEM_TRACE_SCOPE("%(op)s::value");
     // The objective is the 0-form at one step of length zero.  `value_steps`
@@ -2056,6 +2207,23 @@ namespace sfem {
         form_collections,
         n_field_components_by_dim,
     )
+    # The product is published for a team when its kernels have `_team` twins: the same
+    # dispatch, the twins called (`_team_product`).
+    apply_dispatch_bodies = tuple(
+        _hyperelastic_apply_dispatch_body(
+            material.name,
+            kernel_sources,
+            {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
+            indent="      ",
+            n_field_components_by_dim=n_field_components_by_dim,
+            tail=tail,
+        )
+        for tail in ("", ABI_TEAM_TAIL)
+    )
+    team = current_target().team_region_pragma() is not None and _team_product(
+        *apply_dispatch_bodies, what=material.name
+    )
+    apply_dispatch_body = apply_dispatch_bodies[team]
     substitutions = {
         "op": _op_class_name(material),
         "derefine": _derefine_op_source(_op_class_name(material), True),
@@ -2143,13 +2311,8 @@ namespace sfem {
         "objective_steps_cases": "\n".join(objective_steps_cases),
         "hessian_crs_cases": "\n".join(hessian_crs_cases),
         "hessian_bsr_cases": "\n".join(hessian_bsr_cases),
-        "apply_dispatch_body": _hyperelastic_apply_dispatch_body(
-            material.name,
-            kernel_sources,
-            {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
-            indent="      ",
-            n_field_components_by_dim=n_field_components_by_dim,
-        ),
+        "apply_dispatch_body": apply_dispatch_body,
+        **_hyperelastic_apply_head(_op_class_name(material), team, bool(_inexact_units(kernel_sources))),
         "gradient_packed_dispatch_body": _hyperelastic_gradient_packed_dispatch_body(
             material.name,
             kernel_sources,
@@ -2269,6 +2432,7 @@ namespace sfem {
             affine_cache="jacobian_soa",
             holds_scheme=True,
             previous_state=None,
+            team=team,
         ),
     )
     return (
@@ -2279,6 +2443,7 @@ namespace sfem {
             relaxes=bool(relaxation),
             linear=_tangent_is_constant(form_collections),
             publishes_inexact=bool(_inexact_units(kernel_sources)),
+            team=team,
         ),
         source,
     )
@@ -10731,7 +10896,7 @@ def _hyperelastic_objective_steps_dispatch_body(material_name, kernel_sources, o
     return "\n".join(lines)
 
 
-def _hyperelastic_apply_dispatch_body(material_name, kernel_sources, apply_dependencies_by_dim, indent, n_field_components_by_dim=None):
+def _hyperelastic_apply_dispatch_body(material_name, kernel_sources, apply_dependencies_by_dim, indent, n_field_components_by_dim=None, tail=""):
     lines = [
         "%sconst int dim = mesh->spatial_dimension();" % indent,
     ]
@@ -10747,10 +10912,10 @@ def _hyperelastic_apply_dispatch_body(material_name, kernel_sources, apply_depen
         current_args = ([str(n_components)] + ["x + %d" % d for d in range(n_components)]) if uses_current else []
         direction_args = ([str(n_components)] + ["h + %d" % d for d in range(n_components)]) if uses_direction else []
         output_args = [str(n_components)] + ["out + %d" % d for d in range(n_components)]
-        affine = "%s_apply_%dd_a_msoa" % (material_name, dim)
-        isop = "%s_apply_%dd_i_msoa" % (material_name, dim)
-        packed = "%s_apply_packed_%dd_i_msoa" % (material_name, dim)
-        packed_affine = "%s_apply_packed_%dd_a_msoa" % (material_name, dim)
+        affine = "%s_apply_%dd_a_msoa%s" % (material_name, dim, tail)
+        isop = "%s_apply_%dd_i_msoa%s" % (material_name, dim, tail)
+        packed = "%s_apply_packed_%dd_i_msoa%s" % (material_name, dim, tail)
+        packed_affine = "%s_apply_packed_%dd_a_msoa%s" % (material_name, dim, tail)
         lines.append("%s%s (dim == %d) {" % (indent, prefix, dim))
         lines.append(
             "%s  if (%s) {"

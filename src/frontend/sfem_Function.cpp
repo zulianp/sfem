@@ -638,6 +638,73 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
+    bool Function::team_supported() const {
+        for (auto &op : impl_->ops) {
+            if (op->residual_depends_on_state() && !op->team_supported()) return false;
+        }
+        if (impl_->handle_constraints) {
+            for (auto &c : impl_->constraints) {
+                if (!c->team_supported()) return false;
+            }
+        }
+        return true;
+    }
+
+    bool Function::team_inexact_supported() const {
+        for (auto &op : impl_->ops) {
+            if (!op->residual_depends_on_state() && !op->inexact_supported()) continue;
+            if (!op->team_supported()) return false;
+        }
+        if (impl_->handle_constraints) {
+            for (auto &c : impl_->constraints) {
+                if (!c->team_supported()) return false;
+            }
+        }
+        return true;
+    }
+
+    int Function::team_prepare() {
+        for (auto &op : impl_->ops) {
+            if (op->team_supported() && op->team_prepare() != SFEM_SUCCESS) return SFEM_FAILURE;
+        }
+        if (impl_->handle_constraints) {
+            for (auto &c : impl_->constraints) {
+                if (c->team_supported() && c->team_prepare() != SFEM_SUCCESS) return SFEM_FAILURE;
+            }
+        }
+        return SFEM_SUCCESS;
+    }
+
+    // An operator's last phase may still write other threads' rows when the next begins:
+    // each waits for the one before. The constraints' copy writes the calling thread's own.
+    int Function::team_apply(const Team &team, const real_t *const x, const real_t *const h, real_t *const out) {
+        int applied = 0;
+        for (auto &op : impl_->ops) {
+            if (!op->residual_depends_on_state()) continue;
+            if (applied++ > 0) team.barrier();
+            if (op->team_apply(team, x, h, out) != SFEM_SUCCESS) return SFEM_FAILURE;
+        }
+        if (impl_->handle_constraints) {
+            for (auto &c : impl_->constraints) c->team_copy_constrained_dofs(team, h, out);
+        }
+        return SFEM_SUCCESS;
+    }
+
+    int Function::team_inexact_apply(const Team &team, const real_t *const h, real_t *const out) {
+        int applied = 0;
+        for (auto &op : impl_->ops) {
+            if (!op->residual_depends_on_state() && !op->inexact_supported()) continue;
+            if (applied++ > 0) team.barrier();
+            const int status = op->inexact_supported() ? op->team_inexact_apply(team, h, out)
+                                                       : op->team_apply(team, nullptr, h, out);
+            if (status != SFEM_SUCCESS) return SFEM_FAILURE;
+        }
+        if (impl_->handle_constraints) {
+            for (auto &c : impl_->constraints) c->team_copy_constrained_dofs(team, h, out);
+        }
+        return SFEM_SUCCESS;
+    }
+
     int Function::apply(const real_t *const x, const real_t *const h, real_t *const out, const ElementScope scope) {
         SFEM_TRACE_SCOPE("Function::apply");
 

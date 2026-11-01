@@ -233,6 +233,9 @@ namespace sfem {
                 return SFEM_SUCCESS;
             }
 
+            /// apply_bsr by the threads of a region (BsrStore::team_apply); inexact_update first.
+            void team_apply_bsr(const Team &team, const real_t *const h, real_t *const out) const { bsr->team_apply(team, h, out); }
+
             /// One packed block as the traversal reads it, with this state's ghost buffer.
             template <class PackedMesh>
             PackedView packed_view(const PackedMesh &mesh, const int block, const int components) {

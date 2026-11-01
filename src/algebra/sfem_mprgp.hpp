@@ -490,6 +490,10 @@ namespace sfem {
 
             bool converged = false;
 
+            // The team operator's checks and scratch, before the runs of CG steps take its
+            // products inside their regions (each plain product prepares itself).
+            if (team_op_ && team_op_->prepare() != SFEM_SUCCESS) return SFEM_FAILURE;
+
             ensure_workspace();
             T* g        = workspace_[0];  // Gradient
             T* p        = workspace_[1];

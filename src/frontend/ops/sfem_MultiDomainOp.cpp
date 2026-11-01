@@ -100,6 +100,12 @@ namespace sfem {
         return micro_views_[name] = std::move(views);
     }
 
+    void MultiDomainOp::prepare_views() {
+        for (auto &domain : domains_) {
+            if (micro_ && splits_into_micro_elements(domain.second.element_type)) micro_views(domain.first, domain.second);
+        }
+    }
+
     int MultiDomainOp::iterate(const std::function<int(const OpDomain &)> &func) {
         for (auto &domain : domains_) {
             if (micro_ && splits_into_micro_elements(domain.second.element_type)) {

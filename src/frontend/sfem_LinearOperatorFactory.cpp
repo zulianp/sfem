@@ -548,6 +548,18 @@ namespace sfem {
             // because this object outlives the state it would have been
             // assembled at.
             const ptrdiff_t ndofs = f->space()->n_dofs();
+            auto            comm  = f->space()->mesh()->comm();
+            if (es == sfem::EXECUTION_SPACE_HOST && comm->size() == 1 && f->team_inexact_supported()) {
+                return sfem::make_team_op<real_t>(
+                        comm,
+                        ndofs,
+                        ndofs,
+                        ndofs,
+                        ndofs,
+                        false,
+                        [f](const sfem::Team &team, const real_t *const h, real_t *const out) { f->team_inexact_apply(team, h, out); },
+                        [f] { return f->team_prepare(); });
+            }
             return sfem::make_op<real_t>(
                     ndofs, ndofs, [f](const real_t *const h, real_t *const out) { f->inexact_apply(h, out); }, es);
         }

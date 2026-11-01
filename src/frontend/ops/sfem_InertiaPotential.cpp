@@ -322,6 +322,21 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
+    bool InertiaPotential::team_supported() const { return !impl_->consistent_mass && impl_->es == EXECUTION_SPACE_HOST; }
+
+    int InertiaPotential::team_prepare() { return impl_->ensure_state(); }
+
+    int InertiaPotential::team_apply(const Team &team,
+                                     const real_t *const,
+                                     const real_t *const SFEM_RESTRICT h,
+                                     real_t *const SFEM_RESTRICT       out) {
+        // out += alpha m h on the calling thread's rows, as apply's scal and xypaz compute it.
+        const real_t *const SFEM_RESTRICT mass  = impl_->mass->data();
+        const real_t                      alpha = impl_->alpha;
+        for (ptrdiff_t i = team.begin; i < team.end; ++i) out[i] = mass[i] * (alpha * h[i]) + 1 * out[i];
+        return SFEM_SUCCESS;
+    }
+
     int InertiaPotential::value(const real_t *const SFEM_RESTRICT x, real_t *const out) {
         SFEM_TRACE_SCOPE("InertiaPotential::value");
 

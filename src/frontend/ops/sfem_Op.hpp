@@ -14,6 +14,7 @@
 #include "sfem_InexactOptions.hpp"
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_TangentValues.hpp"
+#include "sfem_Team.hpp"
 #include "sfem_aliases.hpp"
 #include "sfem_defs.hpp"
 #include "sfem_logger.hpp"
@@ -152,6 +153,35 @@ namespace sfem {
          * signature says so.
          */
         virtual int inexact_apply(const real_t *const /*h*/, real_t *const /*out*/) { return SFEM_FAILURE; }
+
+        /**
+         * @brief Whether the products (`team_apply`, `team_inexact_apply`) run on the threads
+         * of a parallel region their caller opened (sfem_TeamOperator.hpp).
+         *
+         * Every thread of the region calls them with the same arguments and its own team; on
+         * return the calling thread's share of the rows is complete. `apply` and
+         * `inexact_apply` are then one region around them.
+         */
+        virtual bool team_supported() const { return false; }
+
+        /// Outside any region, before the team products of a region: what can fail or
+        /// allocate (states, caches, scratch). The plain products call it themselves.
+        virtual int team_prepare() { return SFEM_SUCCESS; }
+
+        /// `apply` by the threads of the caller's region (team_supported).
+        virtual int team_apply(const Team & /*team*/,
+                               const real_t *const /*x*/,
+                               const real_t *const /*h*/,
+                               real_t *const /*out*/) {
+            SFEM_ERROR("%s has no team apply\n", name());
+            return SFEM_FAILURE;
+        }
+
+        /// `inexact_apply` by the threads of the caller's region (team_supported).
+        virtual int team_inexact_apply(const Team & /*team*/, const real_t *const /*h*/, real_t *const /*out*/) {
+            SFEM_ERROR("%s has no team inexact apply\n", name());
+            return SFEM_FAILURE;
+        }
 
         /**
          * @brief Assemble the Hessian matrix in CRS format
@@ -603,5 +633,23 @@ namespace sfem {
     /// reduce the same vector differently.  Deterministic because a line search
     /// compares these numbers across runs.
     real_t squared_residual_norm(const ptrdiff_t ndofs, const int block_size, const real_t *const values);
+
+    /// The plain product of a team operator: op.team_prepare(), then one region of n rows in
+    /// which every thread calls f(team), its own Team; the first failure any thread met.
+    template <typename F>
+    int op_team_region(Op &op, const ptrdiff_t n, F f) {
+        const int prepared = op.team_prepare();
+        if (prepared != SFEM_SUCCESS) return prepared;
+        int ret = SFEM_SUCCESS;
+#pragma omp parallel
+        {
+            const int err = f(Team::current(n));
+            if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+                ret = err;
+            }
+        }
+        return ret;
+    }
 
 }  // namespace sfem
