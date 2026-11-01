@@ -5,6 +5,7 @@
 #include <functional>
 #include <string>
 
+#include "sfem_Team.hpp"
 #include "sfem_aliases.hpp"
 #include "sfem_base.hpp"
 #include "smesh_types.hpp"
@@ -56,6 +57,7 @@ namespace sfem {
             const ptrdiff_t          *ghost_reduce_idx{nullptr};
             const idx_t              *ghost_reduce_dest{nullptr};
             real_t                   *ghost_buf{nullptr};  // 3 * n_ghost_entries
+            ptrdiff_t                 n_nodes{0};          // the mesh's, which the outputs span
         };
 
         /// What a BSR store asks of its operator: the operator's tangent assembled into the given
@@ -75,6 +77,12 @@ namespace sfem {
             virtual ~BsrStore() = default;
             virtual int         update(const AssembleBSR &assemble)                    = 0;
             virtual void        apply(const real_t *const x, real_t *const y) const    = 0;  // y += A x
+            /// y += A x by the threads of a region (sfem_TeamOperator.hpp): on return the calling
+            /// thread's rows, team's share of the 3 n entries, are complete. The host's.
+            virtual void team_apply(const Team &team, const real_t *const x, real_t *const y) const {
+                (void)team, (void)x, (void)y;
+                SFEM_ERROR("inexact: this bsr store has no team apply\n");
+            }
             virtual void        add_diagonal(real_t *const diag) const                 = 0;
             virtual std::size_t bytes() const                                          = 0;
             virtual std::string describe() const                                       = 0;
@@ -99,6 +107,19 @@ namespace sfem {
                            const ptrdiff_t                  stride,
                            const real_t *const              h,
                            real_t *const                    out) const = 0;
+
+        /// The same, by the threads of a region: on return the calling thread's share of the rows,
+        /// team's of the space's `stride` n entries, is complete. The host's.
+        virtual void team_apply(const Team                      &team,
+                                const ptrdiff_t                  nelements,
+                                const idx_t *const *const        elements,
+                                const inexact::PackedView *const packed,
+                                const ptrdiff_t                  stride,
+                                const real_t *const              h,
+                                real_t *const                    out) const {
+            (void)team, (void)nelements, (void)elements, (void)packed, (void)stride, (void)h, (void)out;
+            SFEM_ERROR("inexact: this store has no team apply\n");
+        }
 
         /// diag += the stored operator's diagonal, interleaved with `stride` components.
         virtual void diagonal(const ptrdiff_t           nelements,

@@ -55,6 +55,7 @@
 #include <vector>
 
 #include "sfem_InexactCodecs.hpp"
+#include "sfem_Team.hpp"
 #include "sfem_base.hpp"
 
 namespace sfem {
@@ -399,19 +400,37 @@ struct QuantBsr {
         }
     }
 
-    // y = A x, or y += A x with ADD; components interleaved, arithmetic in tau.
+    // y = A x, or y += A x with ADD; components interleaved, arithmetic in tau. One region around
+    // team_apply.
     template <typename tau, bool ADD>
     void apply(const double *const RSTR x, double *const RSTR y) const {
+#pragma omp parallel
+        team_apply<tau, ADD>(Team::current(n_rows * 3), x, y, [](const ptrdiff_t, const ptrdiff_t) {});
+    }
+
+    // The same by the threads of a region: each takes its share of the parts (Upper) or of the
+    // groups (Difference); rows_done(b, e) is called by one thread once rows [b, e) are complete,
+    // then it adds what else it has for those rows (the store's corrections). The rows a thread
+    // writes are not its team share, so it ends on a barrier.
+    template <typename tau, bool ADD, typename Done>
+    void team_apply(const Team &team, const double *const RSTR x, double *const RSTR y, Done rows_done) const {
         if constexpr (upper) {
-            apply_upper<tau, ADD>(x, y);
-            return;
+            team_apply_upper<tau, ADD>(team, x, y, rows_done);
+        } else {
+            team_apply_difference<tau, ADD>(team, x, y, rows_done);
         }
+        team.barrier();
+    }
+
+    template <typename tau, bool ADD, typename Done>
+    void team_apply_difference(const Team &team, const double *const RSTR x, double *const RSTR y, Done rows_done) const {
         const idx_t *const RSTR rw = rows.data();
         const count_t *const RSTR gp = group_ptr.data();
         const col_t *const RSTR ci = colidx.data();
         const tau out_scale = per_block ? tau(1) : tau(scale);
-#pragma omp parallel for schedule(static)
-        for (ptrdiff_t g = 0; g < n_groups; ++g) {
+        ptrdiff_t first, last;
+        team.share(n_groups, 1, &first, &last);
+        for (ptrdiff_t g = first; g < last; ++g) {
             const idx_t *const RSTR r = &rw[(size_t)g * VS];
             double xi0[VS], xi1[VS], xi2[VS];
             tau a0[VS], a1[VS], a2[VS];
@@ -455,10 +474,14 @@ struct QuantBsr {
                 }
             }
         }
+        // A group's rows are anywhere in its window: the others' groups first.
+        team.barrier();
+        team.share(n_rows, 1, &first, &last);
+        if (first < last) rows_done(first, last);
     }
 
-    template <typename tau, bool ADD>
-    void apply_upper(const double *const RSTR x, double *const RSTR y) const {
+    template <typename tau, bool ADD, typename Done>
+    void team_apply_upper(const Team &team, const double *const RSTR x, double *const RSTR y, Done rows_done) const {
         const idx_t *const RSTR rw = rows.data();
         const count_t *const RSTR gp = group_ptr.data();
         const col_t *const RSTR ci = colidx.data();
@@ -466,10 +489,12 @@ struct QuantBsr {
         const ptrdiff_t parts = (ptrdiff_t)part_row.size() - 1;
         const idx_t *const RSTR hr = halo_row.data();
         double *const RSTR hy = halo_y.data();
-#pragma omp parallel
+        // A part's rows and its halo slots are its own, and parts were cut one per thread: the
+        // calling thread's share of them.
+        ptrdiff_t first_part, last_part;
+        team.share(parts, 1, &first_part, &last_part);
         {
-#pragma omp for schedule(static, 1)
-            for (ptrdiff_t p = 0; p < parts; ++p) {
+            for (ptrdiff_t p = first_part; p < last_part; ++p) {
                 const ptrdiff_t end = part_row[(size_t)p + 1];
                 if constexpr (!ADD)
                     for (ptrdiff_t v = part_row[(size_t)p] * 3; v < end * 3; ++v) y[v] = 0;
@@ -548,13 +573,15 @@ struct QuantBsr {
                     q[2] -= (double)(c2 * d0 + c5 * d1 + c8 * d2);
                 }
             }
-            // The slots that point into this part's rows.
-#pragma omp for schedule(static, 1)
-            for (ptrdiff_t p = 0; p < parts; ++p)
+            // The slots that point into this part's rows, once every part has filled its own.
+            team.barrier();
+            for (ptrdiff_t p = first_part; p < last_part; ++p) {
                 for (count_t e = halo_in_ptr[(size_t)p]; e < halo_in_ptr[(size_t)p + 1]; ++e) {
                     const size_t t = (size_t)halo_in[(size_t)e], i = (size_t)hr[t];
                     for (int c = 0; c < 3; ++c) y[i * 3 + c] += hy[t * 3 + c];
                 }
+                if (part_row[(size_t)p] < part_row[(size_t)p + 1]) rows_done(part_row[(size_t)p], part_row[(size_t)p + 1]);
+            }
         }
     }
 };
