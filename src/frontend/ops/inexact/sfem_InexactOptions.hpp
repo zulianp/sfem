@@ -56,11 +56,14 @@ namespace sfem {
         ///
         ///                  host (Grace)          device (H100)
         ///   TET4           bsr f16               bsr f16
-        ///   TET10          bsr f16               points i8md
+        ///   TET10          bsr f16               bsr i8
         ///   HEX8           bsr i8                bsr i8
         ///   HEX27          element_matrix f16    points f16
         ///
-        /// points f32 for any other element. Options that are not `auto` are returned as they are.
+        /// Device TET10 was points i8md, the fastest to one Newton solution with its set-up; a
+        /// contact QP applies the tangent thousands of times per set-up, and there bsr i8 is 15%
+        /// faster per QP iteration with the same Newton counts and utopia metrics (LDP
+        /// FF200_mesh_refined on TET10, 8.5M dof).  points f32 for any other element. Options that are not `auto` are returned as they are.
         InexactOptions resolve(const smesh::ElemType element, const smesh::ExecutionSpace space) const;
 
         static InexactOptions from_strings(const std::string &store,

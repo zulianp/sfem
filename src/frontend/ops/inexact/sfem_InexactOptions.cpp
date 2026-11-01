@@ -145,7 +145,7 @@ namespace sfem {
                 break;
             case smesh::TET10:
                 if (device)
-                    set(Store::POINTS, Encoding::I8_MEAN_DEVIATION);
+                    set(Store::BSR, Encoding::I8_BLOCK);
                 else
                     set(Store::BSR, Encoding::F16);
                 break;
