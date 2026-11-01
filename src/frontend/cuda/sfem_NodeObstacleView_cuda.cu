@@ -104,6 +104,22 @@ namespace sfem {
             }
         }
 
+        __global__ void apply_blocks_kernel(const NodeObstacleView c, const real_t *const blocks, const real_t *const in, real_t *const out) {
+            SFEM_NODE_LOOP(i, c.size) {
+                const ptrdiff_t node = c.idx[i];
+                ::node_obstacle_packed_sym_apply(&blocks[6 * i], &in[node * 3], &out[node * 3]);
+            }
+        }
+
+        __global__ void blocks_diagonal_kernel(const NodeObstacleView c, const real_t *const blocks, real_t *const d) {
+            SFEM_NODE_LOOP(i, c.size) {
+                const ptrdiff_t node = c.idx[i];
+                d[node * 3] += blocks[6 * i];
+                d[node * 3 + 1] += blocks[6 * i + 3];
+                d[node * 3 + 2] += blocks[6 * i + 5];
+            }
+        }
+
         __global__ void reaction_kernel(const NodeObstacleView c, real_t *const out) {
             SFEM_NODE_LOOP(i, c.size) {
                 for (int d = 0; d < 3; ++d) out[(ptrdiff_t)c.idx[i] * 3 + d] = -c.mu[i] * c.normals[d][i];
@@ -192,6 +208,16 @@ namespace sfem {
                                           const bool              capped,
                                           real_t *const           blocks) {
         curvature_blocks_kernel<<<blocks_for(c.size), block_size, 0, (cudaStream_t)c.stream>>>(c, r, k, capped, blocks);
+        SFEM_DEBUG_SYNCHRONIZE(c.stream);
+    }
+
+    void d_node_obstacle_apply_blocks(const NodeObstacleView &c, const real_t *const blocks, const real_t *const in, real_t *const out) {
+        apply_blocks_kernel<<<blocks_for(c.size), block_size, 0, (cudaStream_t)c.stream>>>(c, blocks, in, out);
+        SFEM_DEBUG_SYNCHRONIZE(c.stream);
+    }
+
+    void d_node_obstacle_blocks_diagonal(const NodeObstacleView &c, const real_t *const blocks, real_t *const d) {
+        blocks_diagonal_kernel<<<blocks_for(c.size), block_size, 0, (cudaStream_t)c.stream>>>(c, blocks, d);
         SFEM_DEBUG_SYNCHRONIZE(c.stream);
     }
 

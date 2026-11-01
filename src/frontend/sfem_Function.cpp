@@ -602,6 +602,8 @@ namespace sfem {
         SFEM_TRACE_SCOPE("Function::inexact_apply");
 
         for (auto &op : impl_->ops) {
+            // A residual that does not read the state (a load) has no tangent.
+            if (!op->residual_depends_on_state() && !op->inexact_supported()) continue;
             // An operator with no stored tangent is applied exactly.  Its state
             // is whatever its own `update` last saw, which is the state this
             // function's tangent was assembled at -- a Newton step drives both
