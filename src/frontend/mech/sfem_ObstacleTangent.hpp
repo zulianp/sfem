@@ -56,6 +56,8 @@ namespace sfem {
         virtual std::shared_ptr<Operator<real_t>> op() const = 0;
         /// op() as a product a caller's region can run (host BSR), or null.
         virtual std::shared_ptr<TeamOperator<real_t>> team() const { return nullptr; }
+        /// Whether team() is there once assembled: the product runs on a region's threads.
+        virtual bool team_capable() const { return false; }
     };
 
 }  // namespace sfem
