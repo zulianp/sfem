@@ -23,7 +23,7 @@ namespace sfem {
             std::shared_ptr<BSRTangent>                   tangent;
             std::shared_ptr<NodeObstacleContact>          contact;
             std::shared_ptr<Operator<real_t>>             product;
-            std::shared_ptr<TeamParallelOperator<real_t>> team_product;
+            std::shared_ptr<TeamOperator<real_t>> team_product;
             // The curvature the values carry (set_curvature), to take back before another.
             bool curved{false};
             bool capped{false};
@@ -34,7 +34,7 @@ namespace sfem {
                 // y = K x: the QP's product writes its output whole.
                 product = tangent->op(0);
                 if (tangent->execution_space() == EXECUTION_SPACE_HOST) {
-                    team_product = std::dynamic_pointer_cast<TeamParallelOperator<real_t>>(product);
+                    team_product = std::dynamic_pointer_cast<TeamOperator<real_t>>(product);
                     if (!team_product) SFEM_ERROR("ObstacleTangent: the host tangent has no product for a region of its caller\n");
                 }
                 return SFEM_SUCCESS;
@@ -57,7 +57,7 @@ namespace sfem {
             real_t max_eig(const real_t *const scale) const override { return tangent->max_abs_row_sum(scale); }
 
             std::shared_ptr<Operator<real_t>>             op() const override { return product; }
-            std::shared_ptr<TeamParallelOperator<real_t>> team() const override { return team_product; }
+            std::shared_ptr<TeamOperator<real_t>> team() const override { return team_product; }
 
         private:
             void add(const real_t *const x, const real_t *const r, const real_t *const k, const bool capped_term, const real_t sign) {

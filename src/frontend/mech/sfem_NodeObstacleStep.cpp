@@ -57,7 +57,7 @@ namespace sfem {
         std::shared_ptr<ObstacleTangent>     tangent;
         std::shared_ptr<Operator<real_t>>    tangent_op;
         // tangent_op on the host, whose product the QP's runs inside its own region.
-        std::shared_ptr<TeamParallelOperator<real_t>> tangent_team;
+        std::shared_ptr<TeamOperator<real_t>> tangent_team;
         std::shared_ptr<MPRGP<real_t>>       qp;
         // The QP's operator, and the power method that bounds its spectrum when the tangent has no
         // bound to offer: its vector kept from one solve to the next.

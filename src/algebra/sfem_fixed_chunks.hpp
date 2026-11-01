@@ -3,29 +3,23 @@
 
 #include <cstddef>
 
-// The chunks of the deterministic reductions (OpenMPBLAS's dot, the MPRGP passes): partial sums
-// over chunks fixed by the length, combined in index order.
+// The chunks of the deterministic reductions (TeamReduction: OpenMPBLAS's dot, the MPRGP passes):
+// partial sums over chunks fixed by the length, combined in index order.
 
 namespace sfem {
 
-    // Chunk count, a function of the length alone and never of the thread count -- that is
-    // what makes the result identical however many threads run it.
-    //
-    // Below a few thousand elements the range is summed serially: a thread team costs more
-    // than the arithmetic, which is the same effect that made small multigrid levels slower
-    // on more cores. Above that the count grows with the length so a chunk stays around
-    // 8192 elements, which keeps each chunk's serial error bounded rather than letting it
-    // grow with the problem. The result is partially pairwise and so more accurate than a
-    // plain serial sum, which is why a deterministic single-threaded solve can converge
+    // The chunk count is a function of the length alone and never of the thread count -- that is
+    // what makes the result identical however many threads run it. It grows with the length so a
+    // chunk stays around 8192 elements, which keeps each chunk's serial error bounded rather than
+    // letting it grow with the problem. The result is partially pairwise and so more accurate
+    // than a plain serial sum, which is why a deterministic single-threaded solve can converge
     // where a non-deterministic one stagnates.
     constexpr ptrdiff_t blas_max_chunk_count = 65536;
 
-    inline ptrdiff_t blas_chunk_count(const ptrdiff_t n) {
-        if (n < 4096) return 1;
-        ptrdiff_t nc = 256;
-        while (nc < blas_max_chunk_count && n / nc > 8192) nc *= 2;
-        return nc;
-    }
+    // Below this many entries a reduction outside a solver's region is summed by the calling
+    // thread, chunk by chunk (the same result): a thread team costs more than the arithmetic,
+    // which is the same effect that made small multigrid levels slower on more cores.
+    constexpr ptrdiff_t blas_serial_below = 4096;
 
     // Team chunks start at multiples of team_chunk_align entries: a whole number of blocks for
     // blocks of 1, 2, 3, 4 and 6 entries, so a thread's share is whole blocks whatever they are.

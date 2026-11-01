@@ -8,6 +8,7 @@
 #include <memory>
 
 #include "sfem_Team.hpp"
+#include "sfem_TeamReduction.hpp"
 #include "sfem_fixed_chunks.hpp"
 #include "sfem_mprgp_bounds.hpp"
 #include "sfem_mprgp_control.hpp"
@@ -268,43 +269,29 @@ namespace sfem {
             }
         }
 
-        /// The calling thread's chunks of `team`, each pass(b, e, v) from `init` into its four
-        /// entries of `part`.
-        template <typename F>
-        static void team_sums(const Team& team, const T (&init)[4], T* const part, F pass) {
-            for (ptrdiff_t c = team.first_chunk; c < team.end_chunk; c++) {
-                ptrdiff_t b, e;
-                team.chunk_entries(c, &b, &e);
-                T v[4] = {init[0], init[1], init[2], init[3]};
-                pass(b, e, v);
-                for (int k = 0; k < 4; k++) part[4 * c + k] = v[k];
-            }
-        }
+        /// The four sums of an iteration's pass (TeamReduction over `work`, work_size entries).
+        using Sums = TeamReduction<T, 4>;
 
-        /// The chunks' sums in `part` combined in index order from `init`: summed, with `min_last`
-        /// the last the minimum.
-        static void combine(const ptrdiff_t chunks, const T* const part, const T (&init)[4], const bool min_last, T (&out)[4]) {
-            for (int k = 0; k < 4; k++) out[k] = init[k];
-            for (ptrdiff_t c = 0; c < chunks; c++) {
-                for (int k = 0; k < 3; k++) out[k] += part[4 * c + k];
-                const T last = part[4 * c + 3];
-                out[3]       = min_last ? (last < out[3] ? last : out[3]) : out[3] + last;
-            }
-        }
-
-        /// A pass's four sums over the chunks of n a Team splits (sfem_Team.hpp), in a region of
-        /// its own, then combined: the result does not depend on the number of threads, and is the
-        /// one a region of the caller's takes (MPRGP's iteration in one region).
+        /// A pass's four sums over the chunks of n a Team splits, in a region of its own (by the
+        /// calling thread below blas_serial_below): the result does not depend on the number of
+        /// threads, and is the one a region of the caller's takes (MPRGP's iteration in one region).
         template <typename F>
-        static void chunked(const ptrdiff_t n, const T (&init)[4], const bool min_last, T* const part, T (&out)[4], F pass) {
-            assert(part);
-            if (team_chunk_count(n) == 1) {
-                team_sums(Team::of(n, 0, 1), init, part, pass);
-            } else {
+        static void chunked(const ptrdiff_t n, const T (&init)[4], const bool min_last, T* const work, T (&out)[4], F pass) {
+            assert(work);
+            if (n < blas_serial_below) {
+                Sums sums(work, blas_max_chunk_count);
+                sums.sum(Team::of(n, 0, 1), init, min_last, pass, out);
+                return;
+            }
 #pragma omp parallel
-                team_sums(Team::current(n), init, part, pass);
+            {
+                Sums       sums(work, blas_max_chunk_count);
+                const Team team = Team::current(n);
+                T          v[4];
+                sums.sum(team, init, min_last, pass, v);
+                if (team.leader())
+                    for (int k = 0; k < 4; k++) out[k] = v[k];
             }
-            combine(team_chunk_count(n), part, init, min_last, out);
         }
 
         static void curvature(const ptrdiff_t       n,
@@ -431,9 +418,9 @@ namespace sfem {
             };
             tpl.read_control     = read_control;
             tpl.write_control    = write_control;
-            // The passes' sums, four per chunk, twice: the curvature's and the step's, which the
-            // iteration in one region keeps apart (MPRGP).
-            tpl.work_size        = 8 * blas_max_chunk_count;
+            // The passes' sums (TeamReduction's two halves: the curvature's and the step's in the
+            // iteration in one region, MPRGP).
+            tpl.work_size        = Sums::buffer_size(blas_max_chunk_count);
         }
     };
 
