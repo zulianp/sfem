@@ -6,7 +6,8 @@ usage: ab_utopia.py <case> [--output=output] [--sdf=db/sdf] [--blocks=A,B] [--sh
 
   <case>/db/solid           the whole solid mesh (exodusII_to_raw layout)
   <case>/db/utopia          the utopia result converted the same way (point_data/disp_*)
-  <case>/<output>           the playground output: mesh/ (node_mapping), out/disp.{0,1,2}.<step>
+  <case>/<output>           the playground output: mesh/ (node_mapping), out/disp.{0,1,2}.<step>;
+                            a run on db/solid_p2 (prepare.sh ORDER=2) is compared at its corners
   --sdf                     the grid both states are measured on (positive inside the obstacle)
   --blocks                  the blocks SFEM computed (default all)
 
@@ -71,9 +72,12 @@ def sfem_displacement(output, n_parent):
             mapping = np.fromfile(os.path.join(mesh, e), dtype=np.dtype(e.split(".")[-1])).astype(np.int64)
     if mapping is None:
         mapping = np.arange(len(comps[0]))
+    # A run on the mesh promoted to TET10 (mesh_promote): its corner nodes keep the parent's ids,
+    # its mid-edge nodes follow them and are not compared.
+    keep = mapping < n_parent
     u = np.zeros((3, n_parent))
     for c in range(3):
-        u[c, mapping] = comps[c]
+        u[c, mapping[keep]] = comps[c][keep]
     return u, step
 
 
