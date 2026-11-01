@@ -188,6 +188,53 @@ int test_linear_elasticity() {
     return check(space(mesh), "GeneratedLinearElasticity", "HEX8 linear");
 }
 
+// The Prony material's stored tangent on TET10, its history at the 11 points of its rule.
+int test_tet10_prony() {
+    auto mesh = sfem::Mesh::create_tet4_cube(sfem::Communicator::self(), 2, 2, 2, 0, 0, 0, 1, 1, 1);
+    return check(space(smesh::promote_to(smesh::TET10, mesh)), "GeneratedMooneyRivlinProny", "TET10 Prony");
+}
+
+// `auto` takes the format tabled for the element and the execution space; anything else is kept.
+int test_auto() {
+    using O        = sfem::InexactOptions;
+    const auto a   = O::from_strings("auto", "auto");
+    const auto has = [](const O &o, const char *const store, const char *const encoding) {
+        const auto expected = O::from_strings(store, encoding);
+        return o.store == expected.store && o.encoding == expected.encoding;
+    };
+    const auto host   = smesh::EXECUTION_SPACE_HOST;
+    const auto device = smesh::EXECUTION_SPACE_DEVICE;
+    SFEM_TEST_ASSERT(has(a.resolve(smesh::TET4, host), "bsr", "f16"));
+    SFEM_TEST_ASSERT(has(a.resolve(smesh::TET4, device), "bsr", "f16"));
+    SFEM_TEST_ASSERT(has(a.resolve(smesh::TET10, host), "bsr", "f16"));
+    SFEM_TEST_ASSERT(has(a.resolve(smesh::TET10, device), "points", "i8md"));
+    SFEM_TEST_ASSERT(has(a.resolve(smesh::HEX8, host), "bsr", "i8"));
+    SFEM_TEST_ASSERT(has(a.resolve(smesh::HEX8, device), "bsr", "i8"));
+    SFEM_TEST_ASSERT(has(a.resolve(smesh::PROTEUS_HEX27, host), "element_matrix", "f16"));
+    SFEM_TEST_ASSERT(has(a.resolve(smesh::HEX27, device), "points", "f16"));
+    SFEM_TEST_ASSERT(has(O::from_strings("points", "f64").resolve(smesh::TET4, host), "points", "f64"));
+
+    // Through the function, on a TET10 space: the bsr store, f16.
+    auto mesh = smesh::promote_to(smesh::TET10, sfem::Mesh::create_tet4_cube(sfem::Communicator::self(), 2, 2, 2, 0, 0, 0, 1, 1, 1));
+    auto fs   = space(mesh);
+    auto f    = sfem::Function::create(fs);
+    auto op   = sfem::create_op(fs, "GeneratedNeoHookeanOgden", sfem::EXECUTION_SPACE_HOST);
+    SFEM_TEST_ASSERT(op->initialize() == SFEM_SUCCESS);
+    f->add_operator(op);
+    f->set_inexact_options(a);
+    const ptrdiff_t           ndofs = fs->n_dofs();
+    const std::vector<real_t> u     = pseudo_random(ndofs, 0.05, 7);
+    const std::vector<real_t> h     = pseudo_random(ndofs, 1, 11);
+    std::vector<real_t>       exact(ndofs, 0), stored(ndofs, 0);
+    SFEM_TEST_ASSERT(op->apply(u.data(), h.data(), exact.data()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(f->inexact_update(u.data()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(f->inexact_apply(h.data(), stored.data()) == SFEM_SUCCESS);
+    const real_t error = relative_difference(stored, exact);
+    printf("auto on TET10 (host): rel diff %.3e\n", (double)error);
+    SFEM_TEST_ASSERT(error < 5e-3);
+    return SFEM_TEST_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_hex8);
@@ -197,6 +244,8 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_curved_hex8);
     SFEM_RUN_TEST(test_curved_tet10);
     SFEM_RUN_TEST(test_linear_elasticity);
+    SFEM_RUN_TEST(test_tet10_prony);
+    SFEM_RUN_TEST(test_auto);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }

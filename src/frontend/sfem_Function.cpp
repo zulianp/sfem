@@ -566,7 +566,22 @@ namespace sfem {
     }
 
     void Function::set_inexact_options(const InexactOptions &options) {
-        for (auto &op : impl_->ops) op->set_inexact_options(options);
+        InexactOptions resolved = options;
+        if (options.is_auto()) {
+            // One element type for the space: `auto` picks one format for every operator.
+            const auto types = impl_->space->element_types();
+            for (auto type : types) {
+                if (type != types.front()) {
+                    SFEM_ERROR("Function: inexact store auto on a space of several element types; name the store\n");
+                }
+            }
+            resolved = options.resolve(types.front(), execution_space());
+            printf("inexact store auto: %s on %s (%s)\n",
+                   resolved.describe().c_str(),
+                   type_to_string(types.front()),
+                   execution_space() == EXECUTION_SPACE_DEVICE ? "device" : "host");
+        }
+        for (auto &op : impl_->ops) op->set_inexact_options(resolved);
     }
 
     int Function::inexact_diag(const real_t *const x, real_t *const values) {

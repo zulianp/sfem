@@ -275,8 +275,8 @@ obstacle:
 | `linear.atol` | `1e-16` | |
 | `linear.max_it` | `2000` | |
 | `linear.storage_bytes` | `8` | `4` stores the BSR tangent in single precision (`node_sdf`'s too); `2` in half precision (host, without constraints or obstacle). |
-| `linear.inexact.store` | `points` | With `format: INEXACT`, what the material's operator stores of its tangent: `points` (the tangent at every quadrature point, moments on TET10), `element_matrix` (element matrices in difference form), or `bsr` (its assembled tangent, quantized). |
-| `linear.inexact.encoding` | `f32` | `points`: `f64`, `f32`, `f16`, `i8md` (int8 deviations from an f32 element mean). `element_matrix`: `f64`, `f32`, `f16`, `i8pair` (int8 with a factor per node pair). `bsr`: `f16`, `i8` (a scale per block). |
+| `linear.inexact.store` | `points` | With `format: INEXACT`, what the material's operator stores of its tangent: `points` (the tangent at every quadrature point, moments on TET10), `element_matrix` (element matrices in difference form), or `bsr` (its assembled tangent, quantized). `auto` (with `encoding: auto`) takes the format measured fastest to a Newton solution for the element and the execution space: `bsr f16` on TET4 and on host TET10, `points i8md` on device TET10, `bsr i8` on HEX8, `element_matrix f16` on host HEX27, `points f16` on device HEX27; it is printed at the first linearisation. |
+| `linear.inexact.encoding` | `f32` | `auto` with `store: auto`. `points`: `f64`, `f32`, `f16`, `i8md` (int8 deviations from an f32 element mean). `element_matrix`: `f64`, `f32`, `f16`, `i8pair` (int8 with a factor per node pair). `bsr`: `f16`, `i8` (a scale per block). |
 | `linear.inexact.fold` | `auto` | The folded point store of the hexahedra (exact, fewer numbers): `auto`, `on`, `off`. On the device only HEX8 folds. |
 | `linear.inexact.traversal` | `auto` | `packed` (the packed mesh, deterministic) when the space has one, `atomic` otherwise. On the device the store chooses (`auto` only). |
 
