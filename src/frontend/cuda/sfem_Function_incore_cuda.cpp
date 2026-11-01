@@ -99,6 +99,22 @@ namespace sfem {
             }
         }
 
+        // The host conditions' current values, after their set_time moved them.  Kernels still
+        // reading the previous values finish first.
+        int refresh() {
+            auto &hc = h_dirichlet->conditions();
+            if (hc.size() != conditions.size()) return SFEM_FAILURE;
+            if (cudaDeviceSynchronize() != cudaSuccess) return SFEM_FAILURE;
+            for (size_t i = 0; i < hc.size(); ++i) {
+                conditions[i].value = hc[i].value;
+                if (hc[i].values) {
+                    if (!conditions[i].values || conditions[i].values->size() != hc[i].values->size()) return SFEM_FAILURE;
+                    smesh::device::host_to_device(hc[i].values->size(), hc[i].values->data(), conditions[i].values->data());
+                }
+            }
+            return SFEM_SUCCESS;
+        }
+
         // A condition carries either one value or one value per node, as on the
         // host; the per-node values were copied to the device above and are the
         // ones prescribed when present.
@@ -154,6 +170,61 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
 
+        /// The conditions' algebraic energy, as on the host: half the squared distance of the
+        /// constrained entries from their values.
+        int value(const real_t *const x, real_t *const out) override {
+            const real_t zero = 0;
+            real_t       acc  = 0;
+            for (auto &c : conditions) {
+                if (d_constraint_objective_vec_steps(c.nodeset->size(), c.nodeset->data(), space->block_size(), c.component,
+                                                     c.value, c.values ? c.values->data() : nullptr, x, nullptr, 1, &zero,
+                                                     &acc, stream) != SFEM_SUCCESS) {
+                    return SFEM_FAILURE;
+                }
+            }
+            *out += acc / 2;
+            return SFEM_SUCCESS;
+        }
+
+        /// At x + steps[s] h, as the host's value_steps sums it (steps and out on the host).
+        int value_steps(const real_t *x, const real_t *h, const int nsteps, const real_t *const steps, real_t *const out) override {
+            for (auto &c : conditions) {
+                if (d_constraint_objective_vec_steps(c.nodeset->size(), c.nodeset->data(), space->block_size(), c.component,
+                                                     c.value, c.values ? c.values->data() : nullptr, x, h, nsteps, steps,
+                                                     out, stream) != SFEM_SUCCESS) {
+                    return SFEM_FAILURE;
+                }
+            }
+            return SFEM_SUCCESS;
+        }
+
+        int hessian_bsr(const real_t *const x, const count_t *const rowptr, const idx_t *const colidx, real_t *const values) override {
+            return hessian_bsr_typed(x, rowptr, colidx, smesh::SMESH_DEFAULT, values);
+        }
+
+        /// Identity rows at the constrained entries, in the tangent's value type.
+        int hessian_bsr_typed(const real_t *const /*x*/,
+                              const count_t *const         rowptr,
+                              const idx_t *const           colidx,
+                              const smesh::PrimitiveType values_type,
+                              void *const                  values) override {
+            const smesh::PrimitiveType t = tangent_values_type(values_type);
+            for (auto &c : conditions) {
+                int err = SFEM_FAILURE;
+                if (t == smesh::SMESH_FLOAT64) {
+                    err = d_bsr_constraint_nodes_to_identity_vec<double>(c.nodeset->size(), c.nodeset->data(), space->block_size(),
+                                                                         c.component, 1, rowptr, colidx,
+                                                                         static_cast<double *>(values), stream);
+                } else if (t == smesh::SMESH_FLOAT32) {
+                    err = d_bsr_constraint_nodes_to_identity_vec<float>(c.nodeset->size(), c.nodeset->data(), space->block_size(),
+                                                                        c.component, 1, rowptr, colidx,
+                                                                        static_cast<float *>(values), stream);
+                }
+                if (err != SFEM_SUCCESS) return SFEM_FAILURE;
+            }
+            return SFEM_SUCCESS;
+        }
+
         int hessian_crs(const real_t *const  /*x*/,
                         const count_t *const rowptr,
                         const idx_t *const   colidx,
@@ -202,6 +273,11 @@ namespace sfem {
 
     std::shared_ptr<Constraint> to_device(const std::shared_ptr<DirichletConditions> &dc) {
         return std::make_shared<GPUDirichletConditions>(dc);
+    }
+
+    int refresh_device(Constraint &constraint) {
+        auto *gpu = dynamic_cast<GPUDirichletConditions *>(&constraint);
+        return gpu ? gpu->refresh() : SFEM_SUCCESS;
     }
 
     /// The tractions are dead loads: each condition's load is one vector, assembled once on the

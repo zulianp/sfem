@@ -62,6 +62,8 @@ namespace sfem {
 
     real_t Rotation::angle() const { return impl_->prescribed; }
 
+    std::shared_ptr<DirichletConditions> Rotation::conditions() const { return impl_->conditions; }
+
     int Rotation::set_angle(const real_t angle) {
         auto           &impl  = *impl_;
         impl.prescribed       = angle;

@@ -767,6 +767,8 @@ namespace sfem {
     std::shared_ptr<Constraint> to_device(const std::shared_ptr<DirichletConditions> &dc) {
         return dc;
     }
+
+    int refresh_device(Constraint &) { return SFEM_SUCCESS; }
 #endif
 
     std::shared_ptr<Constraint> DirichletConditions::create(const std::shared_ptr<FunctionSpace> &space,

@@ -8740,7 +8740,7 @@ def _block_scatter_loop_lines(n_shape, n_fields, row_streams, column_streams):
         + [
             "        for (int col_shape = 0; col_shape < NS; ++col_shape) {",
             "          v_t *const block = "
-            "&values[entries[row_shape * NS + col_shape] * NC * NC];",
+            "&values[(ptrdiff_t)entries[row_shape * NS + col_shape] * NC * NC];",
         ]
         + [
             line

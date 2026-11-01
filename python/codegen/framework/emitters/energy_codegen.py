@@ -9779,7 +9779,7 @@ def _sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes, assembly=No
                             "v_t *const",
                             "block",
                             (),
-                            expr_ref("&%s[entries[i * NS + j] * NC * NC]" % value_stream),
+                            expr_ref("&%s[(ptrdiff_t)entries[i * NS + j] * NC * NC]" % value_stream),
                         ),
                         _counting_loop(
                             "bi",

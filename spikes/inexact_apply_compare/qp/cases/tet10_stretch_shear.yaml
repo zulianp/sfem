@@ -1,0 +1,23 @@
+# Stretch (25%) and shear of a box: the Newton study of the compressed quadrature-point store.
+# Mesh with --set mesh.path=<TET4 cube>; operator with --set solver.linear.format=BSR|MF|INEXACT.
+mesh:
+  path: tet4_cube   # a TET4 cube from smesh: cube TET4 n n n 0 0 0 1 1 1 <path>
+  reorder: morton3
+  promote_to_p2: true
+  sidesets:
+    - {name: left, plane: {axis: x, at: min}}
+    - {name: right, plane: {axis: x, at: max}}
+material: {type: GeneratedNeoHookeanOgden, young_modulus: 1, poisson_ratio: 0.3}
+dirichlet_conditions:
+  - {type: sideset, format: name, name: left, component: [0, 1, 2], value: [0, 0, 0]}
+  - type: sideset
+    format: name
+    name: right
+    component: [0, 1, 2]
+    value: [0.25, 0.15, 0.1]
+    profile: {type: linear_ramp, start_time: 0, end_time: 1, start_value: 0, end_value: 1}
+regime: quasi_static
+time: {dt: 0.0625, t_end: 1}   # coarser increments diverge from the boundary jump on fine P2 meshes
+solver:
+  newton: {max_it: 30, rtol: 1e-8, atol: 1e-12}
+  linear: {type: cg, format: BSR, preconditioner: none, rtol: 1e-3, max_it: 5000}
