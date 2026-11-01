@@ -128,6 +128,7 @@ list(APPEND SFEM_MODULES
     frontend/constraints
     frontend/ops
     frontend/ops/prony
+    frontend/ops/inexact
     frontend/nonlinear
     frontend/mech
 )
@@ -161,6 +162,7 @@ if(SFEM_ENABLE_CUDA)
         ssmg/cuda
         frontend/ops/cuda
         frontend/ops/prony/cuda
+        frontend/ops/inexact/cuda
     )
 
     if(SFEM_ENABLE_AMG)
@@ -251,6 +253,17 @@ list(REMOVE_DUPLICATES SFEM_HEADERS)
 if(SFEM_ENABLE_CUDA)
     list(APPEND SFEM_SOURCES "${SFEM_KERNEL_SOURCES}")
     list(APPEND SFEM_HEADERS "${SFEM_KERNEL_HEADERS}")
+endif()
+
+# The stored tangent's device stores (frontend/ops/inexact/cuda and each unit's generated
+# `_inexact_store.cu`) keep IEEE single precision under the build's -use_fast_math: flush-to-zero
+# puts a denormal test on every double-to-float conversion of an increment difference (18 per
+# element in the TET4 element-matrix apply, 18% slower), and the set-up then rounds as the host's.
+if(SFEM_ENABLE_CUDA)
+    set(SFEM_INEXACT_DEVICE_SOURCES ${SFEM_KERNEL_SOURCES})
+    list(FILTER SFEM_INEXACT_DEVICE_SOURCES INCLUDE REGEX "(_inexact_store|/frontend/ops/inexact/cuda/[^/]*)\\.cu$")
+    set_source_files_properties(${SFEM_INEXACT_DEVICE_SOURCES} PROPERTIES
+        COMPILE_OPTIONS "--ftz=false;--prec-div=true;--prec-sqrt=true")
 endif()
 
 list(REMOVE_ITEM SFEM_SOURCES
@@ -490,7 +503,7 @@ if(SFEM_ENABLE_TESTING)
         endif()
         # Tests whose cases are YAML.
         if(NOT SFEM_ENABLE_RYAML AND TEST_DRIVER_NAME MATCHES
-           "^sfem_(ElasticityCase|PlaygroundCases|PlaygroundContact|LoadProfile|CudaEnergyBSRAssembly)Test$")
+           "^sfem_(ElasticityCase|PlaygroundCases|PlaygroundContact|LoadProfile|CudaEnergyBSRAssembly|InexactViscous|CudaInexactViscous)Test$")
             continue()
         endif()
         add_executable(${TEST_DRIVER_NAME} ${TEST_DRIVER})

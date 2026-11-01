@@ -11,6 +11,7 @@ They are ratchets: a change that lowers one should lower the number here too,
 and a change that raises one has to say why.
 """
 
+import collections
 import os
 import unittest
 
@@ -106,6 +107,15 @@ DEAD_ASSIGNMENT_BUDGET = 2
 #: this is a floor that has been reached rather than a ratchet with room left.
 LONGEST_LANE_LOOP_RUN = 1
 LANE_LOOP_RUNS_LONGER_THAN_ONE = 0
+
+#: Runs a measurement keeps.  The stored tangent's lane contraction opens a loop
+#: per row: merged into one loop of nine statements, gcc on Grace ran the point
+#: stores 5-20% slower (f64 1.15-1.20, i8md 1.05-1.13 against the spike's
+#: per-row form, 2026-10-30, ab_library.sbatch).  Each must still be there: an
+#: exception that no longer applies is removed, not kept.
+MEASURED_LANE_LOOP_RUNS = {
+    os.path.join("reference", "inexact_contract_d3.hpp"),
+}
 
 #: `(void)name;` statements, and the declarations that made them necessary.
 #:
@@ -295,8 +305,14 @@ class KernelsAreLeanTest(unittest.TestCase):
         )
 
     def test_lane_loops_are_not_opened_one_per_component(self):
-        runs = self.survey["lane_loop_runs"]
+        runs = collections.Counter(self.survey["lane_loop_runs"])
         self.assertTrue(runs, "no lane loops were found; the survey is not reading the tree")
+        by_file = self.survey["lane_loop_runs_by_file"]
+        for path in sorted(MEASURED_LANE_LOOP_RUNS):
+            self.assertIn(path, by_file, "%s no longer opens a loop per row; drop its exception" % path)
+            for length in by_file[path]:
+                runs[length] -= 1
+        runs = +runs
         longest = max(runs)
         self.assertLessEqual(longest, LONGEST_LANE_LOOP_RUN)
         # The count matters more than the maximum: one long run left in a
