@@ -442,7 +442,9 @@ void tet10_apply_inv_lumped_mass(const ptrdiff_t nelements,
     printf("tet10_mass.c: tet10_apply_inv_lumped_mass\t%g seconds\n", tock - tick);
 }
 
-static SFEM_INLINE void tet10_hrz_lumped_mass_kernel(const real_t px0,
+// The row sums of the consistent mass: corners -V/20, mid-edge nodes V/5. The commented code is
+// HRZ's (tet10_hrz_lumped_mass_kernel).
+static SFEM_INLINE void tet10_row_sum_lumped_mass_kernel(const real_t px0,
                                                      const real_t px1,
                                                      const real_t px2,
                                                      const real_t px3,
@@ -527,12 +529,37 @@ static SFEM_INLINE void tet10_hrz_lumped_mass_kernel(const real_t px0,
     element_matrix_diag[9] = x16;
 }
 
-void tet10_assemble_lumped_mass(const ptrdiff_t nelements,
-                                const ptrdiff_t nnodes,
-                                idx_t **const SFEM_RESTRICT elems,
-                                geom_t **const SFEM_RESTRICT xyz,
-                                real_t *const SFEM_RESTRICT values) {
-    SFEM_UNUSED(nnodes);
+// HRZ lumping (Hinton, Rock and Zienkiewicz 1976): the consistent mass's diagonal scaled to the
+// element's volume, so every weight is positive. On a straight-sided element the diagonal is
+// V/70 at the corners and 8V/105 at the mid-edge nodes, which scale to V/36 and 4V/27.
+static SFEM_INLINE void tet10_hrz_lumped_mass_kernel(const real_t px0,
+                                                     const real_t px1,
+                                                     const real_t px2,
+                                                     const real_t px3,
+                                                     const real_t py0,
+                                                     const real_t py1,
+                                                     const real_t py2,
+                                                     const real_t py3,
+                                                     const real_t pz0,
+                                                     const real_t pz1,
+                                                     const real_t pz2,
+                                                     const real_t pz3,
+                                                     real_t *const SFEM_RESTRICT element_matrix_diag) {
+    const real_t ax = px1 - px0, ay = py1 - py0, az = pz1 - pz0;
+    const real_t bx = px2 - px0, by = py2 - py0, bz = pz2 - pz0;
+    const real_t cx = px3 - px0, cy = py3 - py0, cz = pz3 - pz0;
+    const real_t det = ax * (by * cz - bz * cy) - ay * (bx * cz - bz * cx) + az * (bx * cy - by * cx);
+    const real_t volume = (det < 0 ? -det : det) / 6;
+    for (int v = 0; v < 4; ++v) element_matrix_diag[v] = volume / 36;
+    for (int v = 4; v < 10; ++v) element_matrix_diag[v] = 4 * volume / 27;
+}
+
+template <class Kernel>
+static void tet10_assemble_lumped(const ptrdiff_t nelements,
+                                  idx_t **const SFEM_RESTRICT elems,
+                                  geom_t **const SFEM_RESTRICT xyz,
+                                  real_t *const SFEM_RESTRICT values,
+                                  Kernel kernel) {
 
     double tick = smesh::time_seconds();
 
@@ -554,7 +581,7 @@ void tet10_assemble_lumped_mass(const ptrdiff_t nelements,
             const idx_t i2 = ev[2];
             const idx_t i3 = ev[3];
 
-            tet10_hrz_lumped_mass_kernel(
+            kernel(
                 // X-coordinates
                 xyz[0][i0],
                 xyz[0][i1],
@@ -582,4 +609,22 @@ void tet10_assemble_lumped_mass(const ptrdiff_t nelements,
 
     double tock = smesh::time_seconds();
     printf("tet10_mass.c: tet10_assemble_lumped_mass\t%g seconds\n", tock - tick);
+}
+
+void tet10_assemble_lumped_mass(const ptrdiff_t nelements,
+                                const ptrdiff_t nnodes,
+                                idx_t **const SFEM_RESTRICT elems,
+                                geom_t **const SFEM_RESTRICT xyz,
+                                real_t *const SFEM_RESTRICT values) {
+    SFEM_UNUSED(nnodes);
+    tet10_assemble_lumped(nelements, elems, xyz, values, tet10_row_sum_lumped_mass_kernel);
+}
+
+void tet10_assemble_hrz_lumped_mass(const ptrdiff_t nelements,
+                                    const ptrdiff_t nnodes,
+                                    idx_t **const SFEM_RESTRICT elems,
+                                    geom_t **const SFEM_RESTRICT xyz,
+                                    real_t *const SFEM_RESTRICT values) {
+    SFEM_UNUSED(nnodes);
+    tet10_assemble_lumped(nelements, elems, xyz, values, tet10_hrz_lumped_mass_kernel);
 }

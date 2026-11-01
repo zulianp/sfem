@@ -178,6 +178,8 @@ namespace sfem {
         bool                                               verbose{true};
         bool                                               packed{true};
         bool                                               renumber{true};
+        // mesh.promote_to_p2: the promoted mesh has no file ids (node_mapping) for its nodes.
+        bool                                               promoted{false};
         FunctionSpace::SemiStructuredBasis                 basis{FunctionSpace::SemiStructuredBasis::MICRO};
         std::shared_ptr<DirichletConditions>               host_dirichlet;
         std::vector<std::pair<std::shared_ptr<Constraint>, real_t>> releases;
@@ -241,7 +243,8 @@ namespace sfem {
                     fprintf(stderr, "Playground: mesh.promote_to_p2 and mesh.refine exclude each other\n");
                     return SFEM_FAILURE;
                 }
-                mesh = smesh::promote_to(smesh::TET10, mesh);
+                mesh     = smesh::promote_to(smesh::TET10, mesh);
+                promoted = true;
             } else if (refine > 0) {
                 mesh = smesh::to_semistructured(refine, mesh, true, false);
             }
@@ -583,6 +586,14 @@ namespace sfem {
         int initial_conditions(const ElasticityCase &config) {
             auto node = child(config.root(), "initial_conditions");
             if (!node.readable()) return SFEM_SUCCESS;
+            if (promoted) {
+                // Its nodes have no ids in the file's numbering: the fields would be read into the
+                // wrong nodes. A mesh promoted on disk (mesh_promote TET10) keeps one numbering.
+                fprintf(stderr,
+                        "Playground: initial_conditions on a mesh promoted here (mesh.promote_to_p2); promote the "
+                        "mesh file instead (mesh_promote TET10 <in> <out>)\n");
+                return SFEM_FAILURE;
+            }
 
             // The files speak the numbering on disk: the mesh's node_mapping names each node's entry
             // there, after a block-selective read or packing's renumbering. Distributed, every rank
