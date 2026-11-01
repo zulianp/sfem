@@ -44,6 +44,12 @@ namespace sfem {
     int apply(const real_t *const x,
                   const real_t *const h,
                   real_t *const out) override;
+    bool team_supported() const override;
+    int team_prepare() override;
+    int team_apply(const Team &team,
+                   const real_t *const x,
+                   const real_t *const h,
+                   real_t *const out) override;
     int value(const real_t *x, real_t *const out) override;
     int value_steps(const real_t *x,
             const real_t *h,
@@ -58,6 +64,7 @@ namespace sfem {
     int inexact_apply(const real_t *const h, real_t *const out) override;
     std::size_t inexact_bytes() const override;
     int inexact_diag(real_t *const diag) override;
+    int team_inexact_apply(const Team &team, const real_t *const h, real_t *const out) override;
     int hessian_crs(const real_t *const x,
             const count_t *const rowptr,
             const idx_t *const colidx,

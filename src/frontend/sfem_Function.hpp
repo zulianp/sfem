@@ -158,6 +158,18 @@ namespace sfem {
                   const real_t *const h,
                   real_t *const       out,
                   const ElementScope  scope = ElementScope::ALL);
+
+        /// Whether `apply` and `inexact_apply` run on the threads of a region their caller
+        /// opened (sfem_TeamOperator.hpp): every operator and constraint has a team form.
+        /// The team's rows are the space's dofs.
+        bool team_supported() const;
+        bool team_inexact_supported() const;
+        /// Outside any region, before its team products.
+        int team_prepare();
+        /// apply (scope ALL) and inexact_apply by every thread of the caller's region, each
+        /// with its Team; on return the calling thread's rows are complete.
+        int team_apply(const Team &team, const real_t *const x, const real_t *const h, real_t *const out);
+        int team_inexact_apply(const Team &team, const real_t *const h, real_t *const out);
         /**
          * @brief The sum of the operators' potentials at each trial step.
          *

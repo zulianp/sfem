@@ -65,6 +65,9 @@ namespace sfem {
          * The function should take a const OpDomain& parameter and return int.
          */
         int iterate(const std::function<int(const OpDomain &)> &func);
+        /// The views iterate() makes on first use (micro elements), made now: before the
+        /// threads of a region iterate together (Op::team_prepare).
+        void prepare_views();
 
         /**
          * @brief Hand a semi-structured hex domain to `iterate` as its micro elements

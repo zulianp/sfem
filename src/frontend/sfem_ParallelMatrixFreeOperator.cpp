@@ -189,6 +189,21 @@ namespace sfem {
         auto space = function->space();
         auto mesh  = space->mesh();
 
+        if (mesh->comm()->size() == 1 && execution_space == EXECUTION_SPACE_HOST && function->team_supported()) {
+            const ptrdiff_t n = space->n_dofs();
+            return make_team_op<real_t>(
+                    mesh->comm(),
+                    n,
+                    n,
+                    n,
+                    n,
+                    false,
+                    [=](const Team &team, const real_t *const x, real_t *const y) {
+                        function->team_apply(team, state ? state->data() : nullptr, x, y);
+                    },
+                    [=] { return function->team_prepare(); });
+        }
+
         if (mesh->comm()->size() == 1) {
             return make_parallel_op<real_t>(
                     mesh->comm(),
