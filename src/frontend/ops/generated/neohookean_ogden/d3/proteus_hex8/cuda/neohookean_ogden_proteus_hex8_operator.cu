@@ -1266,7 +1266,7 @@ __host__ __device__ __forceinline__ void neohookean_ogden_proteus_hex8_hessian_i
   }
   for (int i = 0; i < NS; ++i) {
     for (int j = 0; j < NS; ++j) {
-      v_t *const block = &values[entries[i * NS + j] * NC * NC];
+      v_t *const block = &values[(ptrdiff_t)entries[i * NS + j] * NC * NC];
       for (int bi = 0; bi < NC; ++bi) {
         const int row = bi * NS + i;
         for (int bj = 0; bj < NC; ++bj) {

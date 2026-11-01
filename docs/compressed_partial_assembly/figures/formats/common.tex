@@ -1,0 +1,39 @@
+% Shared preamble of the format diagrams: colours of the paper's figures (paper_figures.py) and
+% the drawing styles.  Each diagram is a standalone document built to a PDF of the text width.
+\usepackage{amsmath,amssymb}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,calc,decorations.pathreplacing,patterns,positioning}
+
+\definecolor{cindex}{HTML}{BDBDBD}  % column indices, offsets, row pointers
+\definecolor{cvalue}{HTML}{6E6E6E}  % floating-point values (BSR)
+\definecolor{cpoint}{HTML}{1B9E77}  % quadrature-point store
+\definecolor{celem}{HTML}{1F78B4}   % element matrix
+\definecolor{cqbsr}{HTML}{A6761D}   % quantized BSR
+\definecolor{cscale}{HTML}{E6AB02}  % scales
+\definecolor{cmean}{HTML}{7570B3}   % f32 element mean
+
+\tikzset{
+  >={Stealth[length=4pt]},
+  grid/.style={draw=black!45, line width=0.25pt},
+  frame/.style={draw=black!70, line width=0.5pt},
+  title/.style={font=\small\bfseries, anchor=west, inner sep=0pt},
+  lab/.style={font=\footnotesize, inner sep=1pt},
+  note/.style={font=\scriptsize, text=black!75, inner sep=1pt, execute at begin node={\hyphenpenalty=10000\exhyphenpenalty=10000}},
+  num/.style={font=\tiny, inner sep=0pt},
+  brace/.style={decorate, decoration={brace, amplitude=3pt, raise=1pt}, line width=0.4pt},
+  arr/.style={->, line width=0.5pt, black!70},
+  pad/.style={pattern=north east lines, pattern color=black!30},
+}
+
+% \cell{x}{y}{w}{h}{fill}: a filled rectangle with a thin outline, lower-left corner at (x,y).
+\newcommand{\cell}[5]{\filldraw[fill=#5, grid] (#1,#2) rectangle ++(#3,#4);}
+% \blk{x}{y}{s}{fill}: a 3x3 block of side s with its 3x3 entry grid.
+\newcommand{\blk}[4]{%
+  \filldraw[fill=#4, grid] (#1,#2) rectangle ++(#3,#3);
+  \draw[draw=white, line width=0.25pt] (#1,#2) ++(#3/3,0) -- ++(0,#3) ++(#3/3,0) -- ++(0,-#3);
+  \draw[draw=white, line width=0.25pt] (#1,#2) ++(0,#3/3) -- ++(#3,0) ++(0,#3/3) -- ++(-#3,0);
+  \draw[grid] (#1,#2) rectangle ++(#3,#3);}
+% \vthree{x}{y}{fill}: a 3-vector (one node's components) as three small cells, left end at (x,y).
+\newcommand{\vthree}[3]{\foreach \k in {0,1,2} \filldraw[fill=#3, grid] (#1+\k*0.14,#2) rectangle ++(0.14,0.14);}
+% \op{x}{y}{symbol}: an operation in a small circle.
+\newcommand{\op}[3]{\node[circle, draw=black!70, line width=0.4pt, inner sep=0.5pt, minimum size=9pt, font=\tiny] at (#1,#2) {#3};}
