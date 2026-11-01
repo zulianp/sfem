@@ -892,7 +892,7 @@ static SFEM_INLINE int laplace_tet4_apply_a_msoa_impl(
         s_t *const RSTR outx
 ) {
 
-  #pragma omp parallel for schedule(static)
+  #pragma omp for schedule(static)
   for (ptrdiff_t element = 0; element < nelements; ++element) {
     const idx_t ev0 = elements[0][element];
     const idx_t ev1 = elements[1][element];
@@ -934,7 +934,7 @@ static SFEM_INLINE int laplace_tet4_apply_a_msoa_impl(
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int laplace_tet4_apply_a_msoa(
+extern "C" int laplace_tet4_apply_a_msoa_team(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -962,6 +962,42 @@ extern "C" int laplace_tet4_apply_a_msoa(
       break;
   }
   return sfem::codegen::unsupported_dispatch("laplace_tet4_apply_a_msoa", -1, (int)scalar_bytes);
+}
+
+extern "C" int laplace_tet4_apply_a_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_met0,
+        const geom_t *const RSTR g_met1,
+        const geom_t *const RSTR g_met2,
+        const geom_t *const RSTR g_met3,
+        const geom_t *const RSTR g_met4,
+        const geom_t *const RSTR g_met5,
+        const real_t kappa,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double):
+    case (int)sizeof(float):
+      break;
+    default:
+      return sfem::codegen::unsupported_dispatch("laplace_tet4_apply_a_msoa", -1, (int)scalar_bytes);
+  }
+  int ret = SFEM_SUCCESS;
+#pragma omp parallel
+  {
+    const int err = laplace_tet4_apply_a_msoa_team(scalar_bytes, nelements, nnodes, elements, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, h_stride, hx, out_stride, outx);
+    if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+      ret = err;
+    }
+  }
+  return ret;
 }
 
 namespace sfem {
@@ -994,7 +1030,6 @@ static SFEM_INLINE int laplace_tet4_apply_packed_a_msoa_impl(
   static constexpr int NC = 1;
 
 
-#pragma omp parallel
   {
     s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
     s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
@@ -1082,7 +1117,7 @@ static SFEM_INLINE int laplace_tet4_apply_packed_a_msoa_impl(
   return SFEM_SUCCESS;
 }
 
-extern "C" int laplace_tet4_apply_packed_a_msoa(
+extern "C" int laplace_tet4_apply_packed_a_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
@@ -1119,6 +1154,49 @@ extern "C" int laplace_tet4_apply_packed_a_msoa(
   return sfem::codegen::unsupported_dispatch("laplace_tet4_apply_packed_a_msoa", -1, (int)scalar_bytes);
 }
 
+extern "C" int laplace_tet4_apply_packed_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const geom_t *const RSTR g_met0,
+    const geom_t *const RSTR g_met1,
+    const geom_t *const RSTR g_met2,
+    const geom_t *const RSTR g_met3,
+    const geom_t *const RSTR g_met4,
+    const geom_t *const RSTR g_met5,
+    const real_t kappa,
+    const ptrdiff_t h_stride,
+    const void *const RSTR hx,
+    const ptrdiff_t out_stride,
+    void *const RSTR outx
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double):
+    case (int)sizeof(float):
+      break;
+    default:
+      return sfem::codegen::unsupported_dispatch("laplace_tet4_apply_packed_a_msoa", -1, (int)scalar_bytes);
+  }
+  int ret = SFEM_SUCCESS;
+#pragma omp parallel
+  {
+    const int err = laplace_tet4_apply_packed_a_msoa_team(scalar_bytes, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, h_stride, hx, out_stride, outx);
+    if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+      ret = err;
+    }
+  }
+  return ret;
+}
+
 template <typename s_t>
 static SFEM_INLINE int laplace_tet4_apply_packed_two_pass_a_msoa_impl(
     const ptrdiff_t n_packs,
@@ -1152,7 +1230,6 @@ static SFEM_INLINE int laplace_tet4_apply_packed_two_pass_a_msoa_impl(
   static constexpr int NC = 1;
 
 
-#pragma omp parallel
   {
     s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
     s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
@@ -1233,7 +1310,7 @@ static SFEM_INLINE int laplace_tet4_apply_packed_two_pass_a_msoa_impl(
   }
 
   s_t *const out_components[NC] = {outx};
-#pragma omp parallel for schedule(static)
+#pragma omp for schedule(static)
   for (ptrdiff_t row = 0; row < n_ghost_reduce_rows; ++row) {
     const idx_t dest = ghost_reduce_dest[row];
     const ptrdiff_t begin = ghost_reduce_ptr[row];
@@ -1250,7 +1327,7 @@ static SFEM_INLINE int laplace_tet4_apply_packed_two_pass_a_msoa_impl(
   return SFEM_SUCCESS;
 }
 
-extern "C" int laplace_tet4_apply_packed_two_pass_a_msoa(
+extern "C" int laplace_tet4_apply_packed_two_pass_a_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
@@ -1291,6 +1368,55 @@ extern "C" int laplace_tet4_apply_packed_two_pass_a_msoa(
       break;
   }
   return sfem::codegen::unsupported_dispatch("laplace_tet4_apply_packed_two_pass_a_msoa", -1, (int)scalar_bytes);
+}
+
+extern "C" int laplace_tet4_apply_packed_two_pass_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const ptrdiff_t n_ghost_entries,
+    const ptrdiff_t n_ghost_reduce_rows,
+    const ptrdiff_t *const RSTR ghost_reduce_ptr,
+    const ptrdiff_t *const RSTR ghost_reduce_idx,
+    const idx_t *const RSTR ghost_reduce_dest,
+    void *const RSTR ghost_buf,
+    const geom_t *const RSTR g_met0,
+    const geom_t *const RSTR g_met1,
+    const geom_t *const RSTR g_met2,
+    const geom_t *const RSTR g_met3,
+    const geom_t *const RSTR g_met4,
+    const geom_t *const RSTR g_met5,
+    const real_t kappa,
+    const ptrdiff_t h_stride,
+    const void *const RSTR hx,
+    const ptrdiff_t out_stride,
+    void *const RSTR outx
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double):
+    case (int)sizeof(float):
+      break;
+    default:
+      return sfem::codegen::unsupported_dispatch("laplace_tet4_apply_packed_two_pass_a_msoa", -1, (int)scalar_bytes);
+  }
+  int ret = SFEM_SUCCESS;
+#pragma omp parallel
+  {
+    const int err = laplace_tet4_apply_packed_two_pass_a_msoa_team(scalar_bytes, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, h_stride, hx, out_stride, outx);
+    if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+      ret = err;
+    }
+  }
+  return ret;
 }
 
 } // namespace codegen

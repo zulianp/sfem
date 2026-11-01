@@ -539,7 +539,7 @@ static SFEM_INLINE int linear_elasticity_proteus_quad4_apply_i_msoa_impl(
   const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
   const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
 
-#pragma omp parallel for schedule(static)
+#pragma omp for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
     const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
     idx_t ev[VS * NS];
@@ -637,7 +637,7 @@ static SFEM_INLINE int linear_elasticity_proteus_quad4_apply_i_msoa_impl(
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int linear_elasticity_proteus_quad4_apply_i_msoa(
+extern "C" int linear_elasticity_proteus_quad4_apply_i_msoa_team(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -663,6 +663,40 @@ extern "C" int linear_elasticity_proteus_quad4_apply_i_msoa(
       break;
   }
   return sfem::codegen::unsupported_dispatch("linear_elasticity_proteus_quad4_apply_i_msoa", -1, (int)scalar_bytes);
+}
+
+extern "C" int linear_elasticity_proteus_quad4_apply_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t lmbda,
+        const real_t mu,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx,
+        void *const RSTR outy
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double):
+    case (int)sizeof(float):
+      break;
+    default:
+      return sfem::codegen::unsupported_dispatch("linear_elasticity_proteus_quad4_apply_i_msoa", -1, (int)scalar_bytes);
+  }
+  int ret = SFEM_SUCCESS;
+#pragma omp parallel
+  {
+    const int err = linear_elasticity_proteus_quad4_apply_i_msoa_team(scalar_bytes, nelements, nnodes, elements, points, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy);
+    if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+      ret = err;
+    }
+  }
+  return ret;
 }
 
 

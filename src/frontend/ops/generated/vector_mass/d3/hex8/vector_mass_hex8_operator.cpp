@@ -38,6 +38,22 @@ extern "C" int vector_mass_proteus_hex8_jacobian_action_i_msoa(
         void *const RSTR u1_out,
         void *const RSTR u2_out
 );
+extern "C" int vector_mass_proteus_hex8_jacobian_action_i_msoa_team(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t density,
+        const ptrdiff_t direction_stride,
+        const void *const RSTR u0_direction,
+        const void *const RSTR u1_direction,
+        const void *const RSTR u2_direction,
+        const ptrdiff_t out_stride,
+        void *const RSTR u0_out,
+        void *const RSTR u1_out,
+        void *const RSTR u2_out
+);
 extern "C" int vector_mass_proteus_hex8_residual_i_maos(
         const int scalar_bytes,
         const ptrdiff_t nelements,
@@ -65,6 +81,22 @@ extern "C" int vector_mass_proteus_hex8_residual_i_msoa(
         void *const RSTR u2_out
 );
 extern "C" int vector_mass_proteus_hex8_jacobian_action_a_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_det0,
+        const real_t density,
+        const ptrdiff_t direction_stride,
+        const void *const RSTR u0_direction,
+        const void *const RSTR u1_direction,
+        const void *const RSTR u2_direction,
+        const ptrdiff_t out_stride,
+        void *const RSTR u0_out,
+        void *const RSTR u1_out,
+        void *const RSTR u2_out
+);
+extern "C" int vector_mass_proteus_hex8_jacobian_action_a_msoa_team(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -180,6 +212,35 @@ extern "C" int vector_mass_hex8_jacobian_action_i_msoa(
     return vector_mass_proteus_hex8_jacobian_action_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, density, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
 }
 
+extern "C" int vector_mass_hex8_jacobian_action_i_msoa_team(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t density,
+        const ptrdiff_t direction_stride,
+        const void *const RSTR u0_direction,
+        const void *const RSTR u1_direction,
+        const void *const RSTR u2_direction,
+        const ptrdiff_t out_stride,
+        void *const RSTR u0_out,
+        void *const RSTR u1_out,
+        void *const RSTR u2_out
+) {
+    idx_t *proteus_elements[8] = {
+        elements[0],
+        elements[1],
+        elements[3],
+        elements[2],
+        elements[4],
+        elements[5],
+        elements[7],
+        elements[6]
+    };
+    return vector_mass_proteus_hex8_jacobian_action_i_msoa_team(scalar_bytes, nelements, nnodes, proteus_elements, points, density, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
+}
+
 extern "C" int vector_mass_hex8_residual_i_maos(
         const int scalar_bytes,
         const ptrdiff_t nelements,
@@ -259,6 +320,35 @@ extern "C" int vector_mass_hex8_jacobian_action_a_msoa(
         elements[6]
     };
     return vector_mass_proteus_hex8_jacobian_action_a_msoa(scalar_bytes, nelements, nnodes, proteus_elements, g_det0, density, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
+}
+
+extern "C" int vector_mass_hex8_jacobian_action_a_msoa_team(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_det0,
+        const real_t density,
+        const ptrdiff_t direction_stride,
+        const void *const RSTR u0_direction,
+        const void *const RSTR u1_direction,
+        const void *const RSTR u2_direction,
+        const ptrdiff_t out_stride,
+        void *const RSTR u0_out,
+        void *const RSTR u1_out,
+        void *const RSTR u2_out
+) {
+    idx_t *proteus_elements[8] = {
+        elements[0],
+        elements[1],
+        elements[3],
+        elements[2],
+        elements[4],
+        elements[5],
+        elements[7],
+        elements[6]
+    };
+    return vector_mass_proteus_hex8_jacobian_action_a_msoa_team(scalar_bytes, nelements, nnodes, proteus_elements, g_det0, density, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
 }
 
 extern "C" int vector_mass_hex8_residual_a_msoa(

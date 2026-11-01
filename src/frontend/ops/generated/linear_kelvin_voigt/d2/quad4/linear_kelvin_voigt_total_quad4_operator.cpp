@@ -44,6 +44,24 @@ extern "C" int linear_kelvin_voigt_total_proteus_quad4_jacobian_action_i_msoa(
         void *const RSTR u0_out,
         void *const RSTR u1_out
 );
+extern "C" int linear_kelvin_voigt_total_proteus_quad4_jacobian_action_i_msoa_team(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t eta_b,
+        const real_t eta_s,
+        const real_t lmbda,
+        const real_t mu,
+        const real_t u_dt_shift,
+        const ptrdiff_t direction_stride,
+        const void *const RSTR u0_direction,
+        const void *const RSTR u1_direction,
+        const ptrdiff_t out_stride,
+        void *const RSTR u0_out,
+        void *const RSTR u1_out
+);
 extern "C" int linear_kelvin_voigt_total_proteus_quad4_residual_i_maos(
         const int scalar_bytes,
         const ptrdiff_t nelements,
@@ -77,6 +95,28 @@ extern "C" int linear_kelvin_voigt_total_proteus_quad4_residual_i_msoa(
         void *const RSTR u1_out
 );
 extern "C" int linear_kelvin_voigt_total_proteus_quad4_jacobian_action_a_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
+        const real_t eta_b,
+        const real_t eta_s,
+        const real_t lmbda,
+        const real_t mu,
+        const real_t u_dt_shift,
+        const ptrdiff_t direction_stride,
+        const void *const RSTR u0_direction,
+        const void *const RSTR u1_direction,
+        const ptrdiff_t out_stride,
+        void *const RSTR u0_out,
+        void *const RSTR u1_out
+);
+extern "C" int linear_kelvin_voigt_total_proteus_quad4_jacobian_action_a_msoa_team(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -201,6 +241,33 @@ extern "C" int linear_kelvin_voigt_total_quad4_jacobian_action_i_msoa(
     return linear_kelvin_voigt_total_proteus_quad4_jacobian_action_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, direction_stride, u0_direction, u1_direction, out_stride, u0_out, u1_out);
 }
 
+extern "C" int linear_kelvin_voigt_total_quad4_jacobian_action_i_msoa_team(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t eta_b,
+        const real_t eta_s,
+        const real_t lmbda,
+        const real_t mu,
+        const real_t u_dt_shift,
+        const ptrdiff_t direction_stride,
+        const void *const RSTR u0_direction,
+        const void *const RSTR u1_direction,
+        const ptrdiff_t out_stride,
+        void *const RSTR u0_out,
+        void *const RSTR u1_out
+) {
+    idx_t *proteus_elements[4] = {
+        elements[0],
+        elements[1],
+        elements[3],
+        elements[2]
+    };
+    return linear_kelvin_voigt_total_proteus_quad4_jacobian_action_i_msoa_team(scalar_bytes, nelements, nnodes, proteus_elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, direction_stride, u0_direction, u1_direction, out_stride, u0_out, u1_out);
+}
+
 extern "C" int linear_kelvin_voigt_total_quad4_residual_i_maos(
         const int scalar_bytes,
         const ptrdiff_t nelements,
@@ -280,6 +347,37 @@ extern "C" int linear_kelvin_voigt_total_quad4_jacobian_action_a_msoa(
         elements[2]
     };
     return linear_kelvin_voigt_total_proteus_quad4_jacobian_action_a_msoa(scalar_bytes, nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, direction_stride, u0_direction, u1_direction, out_stride, u0_out, u1_out);
+}
+
+extern "C" int linear_kelvin_voigt_total_quad4_jacobian_action_a_msoa_team(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
+        const real_t eta_b,
+        const real_t eta_s,
+        const real_t lmbda,
+        const real_t mu,
+        const real_t u_dt_shift,
+        const ptrdiff_t direction_stride,
+        const void *const RSTR u0_direction,
+        const void *const RSTR u1_direction,
+        const ptrdiff_t out_stride,
+        void *const RSTR u0_out,
+        void *const RSTR u1_out
+) {
+    idx_t *proteus_elements[4] = {
+        elements[0],
+        elements[1],
+        elements[3],
+        elements[2]
+    };
+    return linear_kelvin_voigt_total_proteus_quad4_jacobian_action_a_msoa_team(scalar_bytes, nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, direction_stride, u0_direction, u1_direction, out_stride, u0_out, u1_out);
 }
 
 extern "C" int linear_kelvin_voigt_total_quad4_residual_a_msoa(

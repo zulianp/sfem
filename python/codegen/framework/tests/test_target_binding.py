@@ -260,8 +260,8 @@ class HardcodedPragmaRatchetTest(unittest.TestCase):
     #: loop, the parallel-region pairs and the three non-BSR matrix scatters
     #: described above.
     BUDGET = {
-        "residual_codegen.py": 8,
-        "energy_codegen.py": 9,
+        "residual_codegen.py": 3,
+        "energy_codegen.py": 7,
     }
 
     def _literal_pragmas(self, name):

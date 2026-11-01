@@ -19,6 +19,25 @@ extern "C" int modified_mooney_rivlin_proteus_quad4_apply_i_msoa(
         void *const RSTR outx,
         void *const RSTR outy
 );
+extern "C" int modified_mooney_rivlin_proteus_quad4_apply_i_msoa_team(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx,
+        void *const RSTR outy
+);
 extern "C" int modified_mooney_rivlin_proteus_quad4_gradient_i_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
@@ -107,6 +126,34 @@ extern "C" int modified_mooney_rivlin_quad4_apply_i_msoa(
         elements[2]
     };
     return modified_mooney_rivlin_proteus_quad4_apply_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, c1, c2, kappa, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
+}
+
+extern "C" int modified_mooney_rivlin_quad4_apply_i_msoa_team(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx,
+        void *const RSTR outy
+) {
+    idx_t *proteus_elements[4] = {
+        elements[0],
+        elements[1],
+        elements[3],
+        elements[2]
+    };
+    return modified_mooney_rivlin_proteus_quad4_apply_i_msoa_team(scalar_bytes, nelements, nnodes, proteus_elements, points, c1, c2, kappa, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
 }
 
 extern "C" int modified_mooney_rivlin_quad4_gradient_i_msoa(

@@ -594,7 +594,7 @@ static SFEM_INLINE int neohookean_ogden_tri6_apply_i_msoa_impl(
   const s_t *const isoparametric_grad_ref_y = sfem::codegen::ref_tri6_q6<s_t>::grad_ref_y();
   const s_t *const isoparametric_q_weight = sfem::codegen::quad_tri_q6<s_t>::q_weight();
 
-#pragma omp parallel for schedule(static)
+#pragma omp for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
     const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
     idx_t ev[VS * NS];
@@ -725,7 +725,7 @@ static SFEM_INLINE int neohookean_ogden_tri6_apply_i_msoa_impl(
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int neohookean_ogden_tri6_apply_i_msoa(
+extern "C" int neohookean_ogden_tri6_apply_i_msoa_team(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -754,6 +754,43 @@ extern "C" int neohookean_ogden_tri6_apply_i_msoa(
       break;
   }
   return sfem::codegen::unsupported_dispatch("neohookean_ogden_tri6_apply_i_msoa", -1, (int)scalar_bytes);
+}
+
+extern "C" int neohookean_ogden_tri6_apply_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t lmbda,
+        const real_t mu,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx,
+        void *const RSTR outy
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double):
+    case (int)sizeof(float):
+      break;
+    default:
+      return sfem::codegen::unsupported_dispatch("neohookean_ogden_tri6_apply_i_msoa", -1, (int)scalar_bytes);
+  }
+  int ret = SFEM_SUCCESS;
+#pragma omp parallel
+  {
+    const int err = neohookean_ogden_tri6_apply_i_msoa_team(scalar_bytes, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
+    if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+      ret = err;
+    }
+  }
+  return ret;
 }
 
 

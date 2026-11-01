@@ -2124,7 +2124,7 @@ static SFEM_INLINE int laplace_proteus_hex8_apply_a_msoa_impl(
   const s_t *const affine_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
   const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
 
-#pragma omp parallel for schedule(static)
+#pragma omp for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
     const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
     idx_t ev[VS * NS];
@@ -2222,7 +2222,7 @@ static SFEM_INLINE int laplace_proteus_hex8_apply_a_msoa_impl(
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int laplace_proteus_hex8_apply_a_msoa(
+extern "C" int laplace_proteus_hex8_apply_a_msoa_team(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -2254,6 +2254,46 @@ extern "C" int laplace_proteus_hex8_apply_a_msoa(
       break;
   }
   return sfem::codegen::unsupported_dispatch("laplace_proteus_hex8_apply_a_msoa", -1, (int)scalar_bytes);
+}
+
+extern "C" int laplace_proteus_hex8_apply_a_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
+        const real_t kappa,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double):
+    case (int)sizeof(float):
+      break;
+    default:
+      return sfem::codegen::unsupported_dispatch("laplace_proteus_hex8_apply_a_msoa", -1, (int)scalar_bytes);
+  }
+  int ret = SFEM_SUCCESS;
+#pragma omp parallel
+  {
+    const int err = laplace_proteus_hex8_apply_a_msoa_team(scalar_bytes, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, h_stride, hx, out_stride, outx);
+    if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+      ret = err;
+    }
+  }
+  return ret;
 }
 
 namespace sfem {
@@ -2296,7 +2336,6 @@ static SFEM_INLINE int laplace_proteus_hex8_apply_packed_a_msoa_impl(
   const s_t *const affine_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
   const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
 
-#pragma omp parallel
   {
     s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
     s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
@@ -2425,7 +2464,7 @@ static SFEM_INLINE int laplace_proteus_hex8_apply_packed_a_msoa_impl(
   return SFEM_SUCCESS;
 }
 
-extern "C" int laplace_proteus_hex8_apply_packed_a_msoa(
+extern "C" int laplace_proteus_hex8_apply_packed_a_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
@@ -2464,6 +2503,53 @@ extern "C" int laplace_proteus_hex8_apply_packed_a_msoa(
       break;
   }
   return sfem::codegen::unsupported_dispatch("laplace_proteus_hex8_apply_packed_a_msoa", -1, (int)scalar_bytes);
+}
+
+extern "C" int laplace_proteus_hex8_apply_packed_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t kappa,
+    const ptrdiff_t h_stride,
+    const void *const RSTR hx,
+    const ptrdiff_t out_stride,
+    void *const RSTR outx
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double):
+    case (int)sizeof(float):
+      break;
+    default:
+      return sfem::codegen::unsupported_dispatch("laplace_proteus_hex8_apply_packed_a_msoa", -1, (int)scalar_bytes);
+  }
+  int ret = SFEM_SUCCESS;
+#pragma omp parallel
+  {
+    const int err = laplace_proteus_hex8_apply_packed_a_msoa_team(scalar_bytes, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, h_stride, hx, out_stride, outx);
+    if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+      ret = err;
+    }
+  }
+  return ret;
 }
 
 template <typename s_t>
@@ -2509,7 +2595,6 @@ static SFEM_INLINE int laplace_proteus_hex8_apply_packed_two_pass_a_msoa_impl(
   const s_t *const affine_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
   const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
 
-#pragma omp parallel
   {
     s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
     s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
@@ -2631,7 +2716,7 @@ static SFEM_INLINE int laplace_proteus_hex8_apply_packed_two_pass_a_msoa_impl(
   }
 
   s_t *const out_components[NC] = {outx};
-#pragma omp parallel for schedule(static)
+#pragma omp for schedule(static)
   for (ptrdiff_t row = 0; row < n_ghost_reduce_rows; ++row) {
     const idx_t dest = ghost_reduce_dest[row];
     const ptrdiff_t begin = ghost_reduce_ptr[row];
@@ -2648,7 +2733,7 @@ static SFEM_INLINE int laplace_proteus_hex8_apply_packed_two_pass_a_msoa_impl(
   return SFEM_SUCCESS;
 }
 
-extern "C" int laplace_proteus_hex8_apply_packed_two_pass_a_msoa(
+extern "C" int laplace_proteus_hex8_apply_packed_two_pass_a_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
@@ -2695,6 +2780,59 @@ extern "C" int laplace_proteus_hex8_apply_packed_two_pass_a_msoa(
   return sfem::codegen::unsupported_dispatch("laplace_proteus_hex8_apply_packed_two_pass_a_msoa", -1, (int)scalar_bytes);
 }
 
+extern "C" int laplace_proteus_hex8_apply_packed_two_pass_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const ptrdiff_t n_ghost_entries,
+    const ptrdiff_t n_ghost_reduce_rows,
+    const ptrdiff_t *const RSTR ghost_reduce_ptr,
+    const ptrdiff_t *const RSTR ghost_reduce_idx,
+    const idx_t *const RSTR ghost_reduce_dest,
+    void *const RSTR ghost_buf,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t kappa,
+    const ptrdiff_t h_stride,
+    const void *const RSTR hx,
+    const ptrdiff_t out_stride,
+    void *const RSTR outx
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double):
+    case (int)sizeof(float):
+      break;
+    default:
+      return sfem::codegen::unsupported_dispatch("laplace_proteus_hex8_apply_packed_two_pass_a_msoa", -1, (int)scalar_bytes);
+  }
+  int ret = SFEM_SUCCESS;
+#pragma omp parallel
+  {
+    const int err = laplace_proteus_hex8_apply_packed_two_pass_a_msoa_team(scalar_bytes, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, h_stride, hx, out_stride, outx);
+    if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+      ret = err;
+    }
+  }
+  return ret;
+}
+
 } // namespace codegen
 } // namespace sfem
 
@@ -2725,7 +2863,7 @@ static SFEM_INLINE int laplace_proteus_hex8_apply_i_msoa_impl(
   const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
   const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
 
-#pragma omp parallel for schedule(static)
+#pragma omp for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
     const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
     idx_t ev[VS * NS];
@@ -2831,7 +2969,7 @@ static SFEM_INLINE int laplace_proteus_hex8_apply_i_msoa_impl(
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int laplace_proteus_hex8_apply_i_msoa(
+extern "C" int laplace_proteus_hex8_apply_i_msoa_team(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -2854,6 +2992,37 @@ extern "C" int laplace_proteus_hex8_apply_i_msoa(
       break;
   }
   return sfem::codegen::unsupported_dispatch("laplace_proteus_hex8_apply_i_msoa", -1, (int)scalar_bytes);
+}
+
+extern "C" int laplace_proteus_hex8_apply_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t kappa,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double):
+    case (int)sizeof(float):
+      break;
+    default:
+      return sfem::codegen::unsupported_dispatch("laplace_proteus_hex8_apply_i_msoa", -1, (int)scalar_bytes);
+  }
+  int ret = SFEM_SUCCESS;
+#pragma omp parallel
+  {
+    const int err = laplace_proteus_hex8_apply_i_msoa_team(scalar_bytes, nelements, nnodes, elements, points, kappa, h_stride, hx, out_stride, outx);
+    if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+      ret = err;
+    }
+  }
+  return ret;
 }
 
 namespace sfem {
@@ -2891,7 +3060,6 @@ static SFEM_INLINE int laplace_proteus_hex8_apply_packed_i_msoa_impl(
   const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
   const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
 
-#pragma omp parallel
   {
     s_t *const RSTR pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);
     s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
@@ -3029,7 +3197,7 @@ static SFEM_INLINE int laplace_proteus_hex8_apply_packed_i_msoa_impl(
   return SFEM_SUCCESS;
 }
 
-extern "C" int laplace_proteus_hex8_apply_packed_i_msoa(
+extern "C" int laplace_proteus_hex8_apply_packed_i_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
@@ -3059,6 +3227,44 @@ extern "C" int laplace_proteus_hex8_apply_packed_i_msoa(
       break;
   }
   return sfem::codegen::unsupported_dispatch("laplace_proteus_hex8_apply_packed_i_msoa", -1, (int)scalar_bytes);
+}
+
+extern "C" int laplace_proteus_hex8_apply_packed_i_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const geom_t *const *const RSTR points,
+    const real_t kappa,
+    const ptrdiff_t h_stride,
+    const void *const RSTR hx,
+    const ptrdiff_t out_stride,
+    void *const RSTR outx
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double):
+    case (int)sizeof(float):
+      break;
+    default:
+      return sfem::codegen::unsupported_dispatch("laplace_proteus_hex8_apply_packed_i_msoa", -1, (int)scalar_bytes);
+  }
+  int ret = SFEM_SUCCESS;
+#pragma omp parallel
+  {
+    const int err = laplace_proteus_hex8_apply_packed_i_msoa_team(scalar_bytes, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, kappa, h_stride, hx, out_stride, outx);
+    if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+      ret = err;
+    }
+  }
+  return ret;
 }
 
 template <typename s_t>
@@ -3099,7 +3305,6 @@ static SFEM_INLINE int laplace_proteus_hex8_apply_packed_two_pass_i_msoa_impl(
   const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
   const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
 
-#pragma omp parallel
   {
     s_t *const RSTR pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);
     s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
@@ -3230,7 +3435,7 @@ static SFEM_INLINE int laplace_proteus_hex8_apply_packed_two_pass_i_msoa_impl(
   }
 
   s_t *const out_components[NC] = {outx};
-#pragma omp parallel for schedule(static)
+#pragma omp for schedule(static)
   for (ptrdiff_t row = 0; row < n_ghost_reduce_rows; ++row) {
     const idx_t dest = ghost_reduce_dest[row];
     const ptrdiff_t begin = ghost_reduce_ptr[row];
@@ -3247,7 +3452,7 @@ static SFEM_INLINE int laplace_proteus_hex8_apply_packed_two_pass_i_msoa_impl(
   return SFEM_SUCCESS;
 }
 
-extern "C" int laplace_proteus_hex8_apply_packed_two_pass_i_msoa(
+extern "C" int laplace_proteus_hex8_apply_packed_two_pass_i_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
@@ -3283,6 +3488,50 @@ extern "C" int laplace_proteus_hex8_apply_packed_two_pass_i_msoa(
       break;
   }
   return sfem::codegen::unsupported_dispatch("laplace_proteus_hex8_apply_packed_two_pass_i_msoa", -1, (int)scalar_bytes);
+}
+
+extern "C" int laplace_proteus_hex8_apply_packed_two_pass_i_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const ptrdiff_t n_ghost_entries,
+    const ptrdiff_t n_ghost_reduce_rows,
+    const ptrdiff_t *const RSTR ghost_reduce_ptr,
+    const ptrdiff_t *const RSTR ghost_reduce_idx,
+    const idx_t *const RSTR ghost_reduce_dest,
+    void *const RSTR ghost_buf,
+    const geom_t *const *const RSTR points,
+    const real_t kappa,
+    const ptrdiff_t h_stride,
+    const void *const RSTR hx,
+    const ptrdiff_t out_stride,
+    void *const RSTR outx
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double):
+    case (int)sizeof(float):
+      break;
+    default:
+      return sfem::codegen::unsupported_dispatch("laplace_proteus_hex8_apply_packed_two_pass_i_msoa", -1, (int)scalar_bytes);
+  }
+  int ret = SFEM_SUCCESS;
+#pragma omp parallel
+  {
+    const int err = laplace_proteus_hex8_apply_packed_two_pass_i_msoa_team(scalar_bytes, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, kappa, h_stride, hx, out_stride, outx);
+    if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+      ret = err;
+    }
+  }
+  return ret;
 }
 
 } // namespace codegen

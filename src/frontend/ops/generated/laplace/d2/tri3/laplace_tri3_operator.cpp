@@ -383,7 +383,7 @@ static SFEM_INLINE int laplace_tri3_apply_a_msoa_impl(
         s_t *const RSTR outx
 ) {
 
-  #pragma omp parallel for schedule(static)
+  #pragma omp for schedule(static)
   for (ptrdiff_t element = 0; element < nelements; ++element) {
     const idx_t ev0 = elements[0][element];
     const idx_t ev1 = elements[1][element];
@@ -415,7 +415,7 @@ static SFEM_INLINE int laplace_tri3_apply_a_msoa_impl(
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int laplace_tri3_apply_a_msoa(
+extern "C" int laplace_tri3_apply_a_msoa_team(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -440,6 +440,39 @@ extern "C" int laplace_tri3_apply_a_msoa(
       break;
   }
   return sfem::codegen::unsupported_dispatch("laplace_tri3_apply_a_msoa", -1, (int)scalar_bytes);
+}
+
+extern "C" int laplace_tri3_apply_a_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_met0,
+        const geom_t *const RSTR g_met1,
+        const geom_t *const RSTR g_met2,
+        const real_t kappa,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double):
+    case (int)sizeof(float):
+      break;
+    default:
+      return sfem::codegen::unsupported_dispatch("laplace_tri3_apply_a_msoa", -1, (int)scalar_bytes);
+  }
+  int ret = SFEM_SUCCESS;
+#pragma omp parallel
+  {
+    const int err = laplace_tri3_apply_a_msoa_team(scalar_bytes, nelements, nnodes, elements, g_met0, g_met1, g_met2, kappa, h_stride, hx, out_stride, outx);
+    if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+      ret = err;
+    }
+  }
+  return ret;
 }
 
 

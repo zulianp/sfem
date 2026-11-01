@@ -89,6 +89,18 @@ class TargetPlatform:
     #: constant, no `[VS]` extent, no work-item loop, no slot to index and the
     #: scalar rendering of the shared micro-kernels.
     work_item_holds_a_block: bool = True
+    #: Whether the kernel body being emitted runs on the threads of a parallel
+    #: region its caller opened (a solver's region, sfem_TeamOperator.hpp) rather
+    #: than opening one.  Its loops are then shared out by worksharing constructs
+    #: that bind to that region -- `omp for` without `parallel` -- and a block
+    #: that would open a region is one every thread runs.  The kernel's entry
+    #: point opens the region itself (`team_region_pragma`) for a caller outside
+    #: one, and its `_team` twin is the call from inside.
+    team_body: bool = False
+
+    def running_in_a_team(self):
+        """This target for a body that runs on its caller's region (`team_body`)."""
+        return dataclass_replace(self, team_body=True)
 
     def holding_one_element(self):
         """This target with the block taken away.
@@ -151,6 +163,17 @@ class TargetPlatform:
 
     def worksharing_for_pragma(self, schedule=None):
         """The pragma sharing a loop's iterations inside an open region."""
+        return None
+
+    def team_region_pragma(self):
+        """The pragma a team kernel's entry point opens its region with, or `None`.
+
+        Not `parallel_region_pragma`: that one answers for the body being
+        emitted, which in a team body opens none.
+        """
+        return None
+
+    def atomic_write_pragma(self):
         return None
 
     def vectorize_pragma(self):
@@ -742,6 +765,12 @@ class OpenMPTarget(TargetPlatform):
         return "RSTR"
 
     def parallel_for_pragma(self, schedule=None, reduction=None):
+        if self.team_body:
+            # A reduction into the body's locals would be private to each thread
+            # of the caller's region; a team body takes none.
+            if reduction:
+                raise ValueError("a team body takes no reduction clause (%s)" % reduction)
+            return self.worksharing_for_pragma(schedule)
         pragma = "#pragma omp parallel for"
         if schedule:
             pragma += " schedule(%s)" % str(schedule)
@@ -750,7 +779,13 @@ class OpenMPTarget(TargetPlatform):
         return pragma
 
     def parallel_region_pragma(self):
+        return None if self.team_body else "#pragma omp parallel"
+
+    def team_region_pragma(self):
         return "#pragma omp parallel"
+
+    def atomic_write_pragma(self):
+        return "#pragma omp atomic write"
 
     def worksharing_for_pragma(self, schedule=None):
         pragma = "#pragma omp for"

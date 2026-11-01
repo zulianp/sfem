@@ -473,7 +473,7 @@ static SFEM_INLINE int two_phase_flow_form_2_p_c_p_c_proteus_hex8_jacobian_actio
   const s_t *const affine_grad_1d = sfem::codegen::ref_line_p1_q3<s_t>::grad_1d();
   const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q3<s_t>::q_weight_1d();
 
-#pragma omp parallel for schedule(static)
+#pragma omp for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
     const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
     s_t bcurrent[NC * NS][VS];
@@ -536,7 +536,7 @@ static SFEM_INLINE int two_phase_flow_form_2_p_c_p_c_proteus_hex8_jacobian_actio
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int two_phase_flow_form_2_p_c_p_c_proteus_hex8_jacobian_action_a_msoa(
+extern "C" int two_phase_flow_form_2_p_c_p_c_proteus_hex8_jacobian_action_a_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
@@ -595,6 +595,71 @@ extern "C" int two_phase_flow_form_2_p_c_p_c_proteus_hex8_jacobian_action_a_msoa
   return sfem::codegen::unsupported_dispatch("two_phase_flow_form_2_p_c_p_c_proteus_hex8_jacobian_action_a_msoa", -1, (int)scalar_bytes);
 }
 
+extern "C" int two_phase_flow_form_2_p_c_p_c_proteus_hex8_jacobian_action_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t C_ka1,
+    const real_t C_ka2,
+    const real_t K_0,
+    const real_t K_1,
+    const real_t K_2,
+    const real_t K_3,
+    const real_t K_4,
+    const real_t K_5,
+    const real_t K_6,
+    const real_t K_7,
+    const real_t K_8,
+    const real_t M_c,
+    const real_t P_r,
+    const real_t R,
+    const real_t S_res,
+    const real_t T,
+    const real_t Z,
+    const real_t dt,
+    const real_t m,
+    const real_t mu_c,
+    const real_t porosity,
+    const ptrdiff_t current_stride,
+    const void *const RSTR p_w,
+    const void *const RSTR p_c,
+    const ptrdiff_t direction_stride,
+    const void *const RSTR p_w_direction,
+    const void *const RSTR p_c_direction,
+    const ptrdiff_t out_stride,
+    void *const RSTR p_w_out,
+    void *const RSTR p_c_out
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double):
+    case (int)sizeof(float):
+      break;
+    default:
+      return sfem::codegen::unsupported_dispatch("two_phase_flow_form_2_p_c_p_c_proteus_hex8_jacobian_action_a_msoa", -1, (int)scalar_bytes);
+  }
+  int ret = SFEM_SUCCESS;
+#pragma omp parallel
+  {
+    const int err = two_phase_flow_form_2_p_c_p_c_proteus_hex8_jacobian_action_a_msoa_team(scalar_bytes, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
+    if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+      ret = err;
+    }
+  }
+  return ret;
+}
+
 namespace sfem {
 namespace codegen {
 
@@ -644,7 +709,7 @@ static SFEM_INLINE int two_phase_flow_form_2_p_c_p_c_proteus_hex8_jacobian_actio
   const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q3<s_t>::grad_1d();
   const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q3<s_t>::q_weight_1d();
 
-#pragma omp parallel for schedule(static)
+#pragma omp for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
     const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
     s_t bcoordinates[3 * NS][VS];
@@ -728,7 +793,7 @@ static SFEM_INLINE int two_phase_flow_form_2_p_c_p_c_proteus_hex8_jacobian_actio
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int two_phase_flow_form_2_p_c_p_c_proteus_hex8_jacobian_action_i_msoa(
+extern "C" int two_phase_flow_form_2_p_c_p_c_proteus_hex8_jacobian_action_i_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
@@ -776,6 +841,62 @@ extern "C" int two_phase_flow_form_2_p_c_p_c_proteus_hex8_jacobian_action_i_msoa
       break;
   }
   return sfem::codegen::unsupported_dispatch("two_phase_flow_form_2_p_c_p_c_proteus_hex8_jacobian_action_i_msoa", -1, (int)scalar_bytes);
+}
+
+extern "C" int two_phase_flow_form_2_p_c_p_c_proteus_hex8_jacobian_action_i_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const real_t C_ka1,
+    const real_t C_ka2,
+    const real_t K_0,
+    const real_t K_1,
+    const real_t K_2,
+    const real_t K_3,
+    const real_t K_4,
+    const real_t K_5,
+    const real_t K_6,
+    const real_t K_7,
+    const real_t K_8,
+    const real_t M_c,
+    const real_t P_r,
+    const real_t R,
+    const real_t S_res,
+    const real_t T,
+    const real_t Z,
+    const real_t dt,
+    const real_t m,
+    const real_t mu_c,
+    const real_t porosity,
+    const ptrdiff_t current_stride,
+    const void *const RSTR p_w,
+    const void *const RSTR p_c,
+    const ptrdiff_t direction_stride,
+    const void *const RSTR p_w_direction,
+    const void *const RSTR p_c_direction,
+    const ptrdiff_t out_stride,
+    void *const RSTR p_w_out,
+    void *const RSTR p_c_out
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double):
+    case (int)sizeof(float):
+      break;
+    default:
+      return sfem::codegen::unsupported_dispatch("two_phase_flow_form_2_p_c_p_c_proteus_hex8_jacobian_action_i_msoa", -1, (int)scalar_bytes);
+  }
+  int ret = SFEM_SUCCESS;
+#pragma omp parallel
+  {
+    const int err = two_phase_flow_form_2_p_c_p_c_proteus_hex8_jacobian_action_i_msoa_team(scalar_bytes, nelements, nnodes, elements, points, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
+    if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+      ret = err;
+    }
+  }
+  return ret;
 }
 
 extern "C" int two_phase_flow_form_2_p_c_p_c_proteus_hex8_jacobian_action_i_maos(

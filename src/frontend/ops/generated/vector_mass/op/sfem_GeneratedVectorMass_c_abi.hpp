@@ -120,6 +120,22 @@ extern "C" int vector_mass_jacobian_action_2d_a_msoa(
         void *const RSTR u1_out
 );
 
+extern "C" int vector_mass_jacobian_action_2d_a_msoa_team(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_det0,
+        const real_t density,
+        const ptrdiff_t direction_stride,
+        const void *const RSTR u0_direction,
+        const void *const RSTR u1_direction,
+        const ptrdiff_t out_stride,
+        void *const RSTR u0_out,
+        void *const RSTR u1_out
+);
+
 extern "C" const sfem::codegen::KernelDiagnostics *vector_mass_jacobian_action_2d_esoa_diagnostics(
     const smesh::ElemType element_type);
 
@@ -136,6 +152,22 @@ extern "C" int vector_mass_jacobian_action_2d_i_maos(
 );
 
 extern "C" int vector_mass_jacobian_action_2d_i_msoa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t density,
+        const ptrdiff_t direction_stride,
+        const void *const RSTR u0_direction,
+        const void *const RSTR u1_direction,
+        const ptrdiff_t out_stride,
+        void *const RSTR u0_out,
+        void *const RSTR u1_out
+);
+
+extern "C" int vector_mass_jacobian_action_2d_i_msoa_team(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -169,6 +201,24 @@ extern "C" int vector_mass_jacobian_action_3d_a_msoa(
         void *const RSTR u2_out
 );
 
+extern "C" int vector_mass_jacobian_action_3d_a_msoa_team(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_det0,
+        const real_t density,
+        const ptrdiff_t direction_stride,
+        const void *const RSTR u0_direction,
+        const void *const RSTR u1_direction,
+        const void *const RSTR u2_direction,
+        const ptrdiff_t out_stride,
+        void *const RSTR u0_out,
+        void *const RSTR u1_out,
+        void *const RSTR u2_out
+);
+
 extern "C" const sfem::codegen::KernelDiagnostics *vector_mass_jacobian_action_3d_esoa_diagnostics(
     const smesh::ElemType element_type);
 
@@ -185,6 +235,24 @@ extern "C" int vector_mass_jacobian_action_3d_i_maos(
 );
 
 extern "C" int vector_mass_jacobian_action_3d_i_msoa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t density,
+        const ptrdiff_t direction_stride,
+        const void *const RSTR u0_direction,
+        const void *const RSTR u1_direction,
+        const void *const RSTR u2_direction,
+        const ptrdiff_t out_stride,
+        void *const RSTR u0_out,
+        void *const RSTR u1_out,
+        void *const RSTR u2_out
+);
+
+extern "C" int vector_mass_jacobian_action_3d_i_msoa_team(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
