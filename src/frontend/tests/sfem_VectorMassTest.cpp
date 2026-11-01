@@ -91,10 +91,35 @@ int test_semi_structured() {
     return check("SSHEX8 level 2, high-order", mesh, volume_of_box, false, true);
 }
 
+// TET10: the consistent mass's total is the body's, but its row sums are negative at the corners
+// (-V/20 per element), not a mass an inertia can lump. LumpedMass takes HRZ's weights instead:
+// every one positive, V/36 at the corners and 4V/27 at the mid-edge nodes, the same total.
+int test_tet10() {
+    auto mesh = smesh::promote_to(smesh::TET10, sfem::Mesh::create_tet4_cube(sfem::Communicator::self(), 2, 2, 2, 0, 0, 0, 1, real_t(0.7), real_t(0.5)));
+    SFEM_TEST_ASSERT(check("TET10", mesh, volume_of_box, false) == SFEM_TEST_SUCCESS);
+
+    auto fs = sfem::FunctionSpace::create(mesh, 3);
+    sfem::LumpedMass lumped(fs);
+    SFEM_TEST_ASSERT(lumped.initialize() == SFEM_SUCCESS);
+    const ptrdiff_t     n = fs->n_dofs();
+    std::vector<real_t> diag(n, 0);
+    SFEM_TEST_ASSERT(lumped.hessian_diag(nullptr, diag.data()) == SFEM_SUCCESS);
+    real_t total = 0, smallest = diag[0];
+    for (auto v : diag) {
+        total += v;
+        smallest = std::min(smallest, v);
+    }
+    printf("  TET10 lumped (HRZ): total %.12g (expected %.12g), smallest %.3g\n", (double)total, (double)(3 * volume_of_box), (double)smallest);
+    SFEM_TEST_ASSERT(smallest > 0);
+    SFEM_TEST_ASSERT(std::abs(total - 3 * volume_of_box) <= 1e-12 * 3 * volume_of_box);
+    return SFEM_TEST_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_hex8);
     SFEM_RUN_TEST(test_tet4);
+    SFEM_RUN_TEST(test_tet10);
     SFEM_RUN_TEST(test_semi_structured);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();

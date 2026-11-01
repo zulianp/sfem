@@ -1,6 +1,7 @@
 #include "sfem_LumpedMass.hpp"
 
 #include "mass.hpp"
+#include "tet10_mass.hpp"
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_MultiDomainOp.hpp"
 #include "sfem_defs.hpp"
@@ -88,6 +89,23 @@ namespace sfem {
         return SFEM_FAILURE;
     }
 
+    namespace {
+        // The mass an inertia lumps: assemble_lumped_mass, except on TET10, whose row sums are
+        // negative at the corners (a mass that pushes back), where HRZ's positive weights.
+        void assemble_inertia_lumped_mass(const int                    element_type,
+                                          const ptrdiff_t              nelements,
+                                          const ptrdiff_t              nnodes,
+                                          idx_t **const SFEM_RESTRICT  elements,
+                                          geom_t **const SFEM_RESTRICT points,
+                                          real_t *const SFEM_RESTRICT  values) {
+            if (element_type == smesh::TET10) {
+                tet10_assemble_hrz_lumped_mass(nelements, nnodes, elements, points, values);
+                return;
+            }
+            assemble_lumped_mass(element_type, nelements, nnodes, elements, points, values);
+        }
+    }  // namespace
+
     int LumpedMass::hessian_diag(const real_t *const /*x*/, real_t *const values) {
         SFEM_TRACE_SCOPE("LumpedMass::hessian_diag");
 
@@ -95,12 +113,12 @@ namespace sfem {
 
         if (impl_->space->block_size() == 1) {
             return impl_->iterate([&](const OpDomain &domain) {
-                assemble_lumped_mass(static_cast<int>(domain.element_type),
-                                     domain.block->n_elements(),
-                                     mesh->n_nodes(),
-                                     domain.block->elements()->data(),
-                                     mesh->points()->data(),
-                                     values);
+                assemble_inertia_lumped_mass(static_cast<int>(domain.element_type),
+                                             domain.block->n_elements(),
+                                             mesh->n_nodes(),
+                                             domain.block->elements()->data(),
+                                             mesh->points()->data(),
+                                             values);
                 return SFEM_SUCCESS;
             });
         }
@@ -112,12 +130,12 @@ namespace sfem {
         }
 
         const int err = impl_->iterate([&](const OpDomain &domain) {
-            assemble_lumped_mass(static_cast<int>(domain.element_type),
-                                 domain.block->n_elements(),
-                                 n_nodes,
-                                 domain.block->elements()->data(),
-                                 mesh->points()->data(),
-                                 temp);
+            assemble_inertia_lumped_mass(static_cast<int>(domain.element_type),
+                                         domain.block->n_elements(),
+                                         n_nodes,
+                                         domain.block->elements()->data(),
+                                         mesh->points()->data(),
+                                         temp);
             return SFEM_SUCCESS;
         });
 
