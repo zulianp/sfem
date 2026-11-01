@@ -533,7 +533,6 @@ ABI_VERBS = (
     "merit",
     "jacobian_action",
     "matrix_assembly",
-    "inexact_apply",
     "hessian_bsr",
     "hessian_crs",
     "objective",
@@ -544,11 +543,6 @@ ABI_VERBS = (
     "apply",
 )
 
-#: The store an inexact apply reads, which occupies the same slot a traversal
-#: does.  See `INEXACT.md`.
-ABI_INEXACT_MODES = ("tangent", "stored", "compressed")
-
-
 def unit_output_name(material_name, unit_name):
     """What a material's unit publishes its kernels under.
 
@@ -558,48 +552,12 @@ def unit_output_name(material_name, unit_name):
 
     This runs once, in `pipeline/driver.py`, as a unit is turned into an
     emission kernel.  Everything downstream reads the composed name off that
-    kernel rather than composing again -- `_unit_name` in
-    `emitters/inexact_apply_codegen.py` looks like a second spelling of this and
-    is not one, because what it is handed is the result, not the parts.
-    Composing twice yields `neohookean_ogden_neohookean_ogden_tet4`.
+    kernel rather than composing again.  Composing twice yields
+    `neohookean_ogden_neohookean_ogden_tet4`.
     """
     if unit_name:
         return "%s_%s" % (material_name, unit_name)
     return str(material_name)
-
-
-#: The verb phrase the inexact-apply family publishes under.  Two words, because
-#: the kernel is an apply and `inexact` says which apply it is.
-ABI_INEXACT_VERB_PHRASE = "inexact_apply"
-
-
-def inexact_apply_name(prefix, mode, traversal="", geometry="affine"):
-    """The published name of one inexact-apply kernel.
-
-    Thirteen sites in `emitters/inexact_apply_codegen.py` built this by
-    formatting `"%s_inexact_apply_%s_a_msoa"`, spelling three separate pieces of
-    ABI at each of them -- the verb phrase, the mode, and the mesh-SoA tail --
-    while `abi_qualifier` below parses that same name back out of the shipped
-    tree.  A name written in thirteen places and read in one is a name whose two
-    halves can disagree, and the reader is the half that raises.
-
-    `mode` is one of `ABI_INEXACT_MODES` and `traversal` is the optional second
-    occupant of the qualifier slot, the pair `abi_traversal` splits apart again.
-    Rejecting an unknown mode here is the point: the emitter used to interpolate
-    whatever it was handed, so a typo became a kernel nothing could route to.
-    """
-    if mode not in ABI_INEXACT_MODES:
-        raise ValueError(
-            "%r is not an inexact-apply mode; the family publishes %s"
-            % (mode, ", ".join(ABI_INEXACT_MODES))
-        )
-    qualifier = "%s_%s" % (mode, traversal) if traversal else mode
-    return "%s_%s_%s_%s" % (
-        prefix,
-        ABI_INEXACT_VERB_PHRASE,
-        qualifier,
-        abi_mesh_fragment(geometry),
-    )
 
 
 def abi_qualifier(name):
@@ -613,7 +571,7 @@ def abi_qualifier(name):
     error, and an empty slot is a plain kernel.
 
     The parse is total over the tree -- every published mesh-kernel name has a
-    verb from `ABI_VERBS`, and the slot after it holds one of six things.
+    verb from `ABI_VERBS`, and the slot after it holds a traversal or nothing.
     """
     classified = classify_abi_name(name)
     if classified is None or classified[0] != "mesh":
@@ -628,16 +586,7 @@ def abi_qualifier(name):
         if not slot:
             return ""
         traversals = tuple(short for _, short in ABI_TRAVERSAL_SPELLING)
-        # The slot may hold a store, a traversal, or -- since the inexact apply
-        # grew a packed variant -- a store followed by a traversal.  Two
-        # occupants, because they answer different questions about the same
-        # kernel: which store it reads, and how it walks the mesh.
-        known = tuple(
-            "%s_%s" % (mode, traversal)
-            for mode in ABI_INEXACT_MODES
-            for traversal in traversals
-        ) + traversals + ABI_INEXACT_MODES
-        for candidate in known:
+        for candidate in traversals:
             if slot == "_%s" % candidate:
                 return candidate
         raise ValueError(
@@ -645,21 +594,6 @@ def abi_qualifier(name):
             "geometry; the naming table and the emitters disagree" % (name, slot)
         )
     raise ValueError("no verb from the table appears in %s" % name)
-
-
-def abi_traversal(qualifier):
-    """The traversal half of a qualifier slot, or `""` when it holds none.
-
-    `stored_packed_two_pass` is one slot with two occupants; everything that
-    routes by traversal wants only the second.  Splitting it here rather than at
-    each consumer is what keeps the pair in one place.
-    """
-    for mode in ABI_INEXACT_MODES:
-        if qualifier == mode:
-            return ""
-        if qualifier.startswith("%s_" % mode):
-            return qualifier[len(mode) + 1 :]
-    return qualifier
 
 
 def abi_geometry(name):

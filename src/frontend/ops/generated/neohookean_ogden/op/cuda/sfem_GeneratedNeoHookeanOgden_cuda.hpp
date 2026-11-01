@@ -51,6 +51,13 @@ namespace sfem {
             const real_t *const steps,
             real_t *const out) override;
     bool energy_or_potential_based() const override { return true; }
+    bool inexact_supported() const override;
+    bool tangent_is_symmetric() const override;
+    void set_inexact_options(const InexactOptions &options) override;
+    int inexact_update(const real_t *const x) override;
+    int inexact_apply(const real_t *const h, real_t *const out) override;
+    std::size_t inexact_bytes() const override;
+    int inexact_diag(real_t *const diag) override;
     int hessian_crs(const real_t *const x,
             const count_t *const rowptr,
             const idx_t *const colidx,
