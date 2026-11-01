@@ -4,10 +4,12 @@
 usage: ab_utopia.py <case> [--output=output] [--sdf=db/sdf] [--blocks=A,B] [--shift=1e-5]
                     [--young=9.174e6] [--poisson=0.4] [--csv=ab.csv] [--label=name]
 
-  <case>/db/solid           the whole solid mesh (exodusII_to_raw layout)
+  <case>/db/solid_exodus    the whole solid mesh in the Exodus numbering (exodusII_to_raw layout)
   <case>/db/utopia          the utopia result converted the same way (point_data/disp_*)
-  <case>/<output>           the playground output: mesh/ (node_mapping), out/disp.{0,1,2}.<step>;
-                            a run on db/solid_p2 (prepare.sh ORDER=2) is compared at its corners
+  <case>/<output>           the playground output: mesh/, out/disp.{0,1,2}.<step>.  Its nodes are
+                            matched to the Exodus nodes by their coordinates (in float32), so any
+                            numbering of the run's mesh compares (prepare.sh reorders db/solid); a
+                            run on db/solid_p2 (prepare.sh ORDER=2) is compared at its corners
   --sdf                     the grid both states are measured on (positive inside the obstacle)
   --blocks                  the blocks SFEM computed (default all)
 
@@ -55,7 +57,12 @@ def load_blocks(solid, blocks):
     return out
 
 
-def sfem_displacement(output, n_parent):
+def float32_keys(x):
+    """One sortable key per node: its coordinates rounded to float32, as bytes."""
+    return np.ascontiguousarray(x.astype(np.float32).T).view(np.dtype((np.void, 12))).ravel()
+
+
+def sfem_displacement(output, x_parent):
     out = os.path.join(output, "out")
     pat = re.compile(r"^disp\.(\d)\.(\d{9})\.(float\d+)$")
     files = {}
@@ -66,19 +73,23 @@ def sfem_displacement(output, n_parent):
     step = max(files)
     comps = [np.fromfile(files[step][c][0], dtype=np.dtype(files[step][c][1])) for c in range(3)]
     mesh = os.path.join(output, "mesh")
-    mapping = None
-    for e in os.listdir(mesh):
-        if e.startswith("node_mapping."):
-            mapping = np.fromfile(os.path.join(mesh, e), dtype=np.dtype(e.split(".")[-1])).astype(np.int64)
-    if mapping is None:
-        mapping = np.arange(len(comps[0]))
-    # A run on the mesh promoted to TET10 (mesh_promote): its corner nodes keep the parent's ids,
-    # its mid-edge nodes follow them and are not compared.
-    keep = mapping < n_parent
-    u = np.zeros((3, n_parent))
+    parent = float32_keys(x_parent)
+    order = np.argsort(parent)
+    parent = parent[order]
+    if np.any(parent[1:] == parent[:-1]):
+        sys.exit("ab_utopia: two Exodus nodes share their float32 coordinates")
+    run = float32_keys(np.vstack([read_axis(mesh, c) for c in "xyz"]))
+    pos = np.minimum(np.searchsorted(parent, run), len(parent) - 1)
+    # A mid-edge node of a run on the mesh promoted to TET10 matches no Exodus node and is not
+    # compared.
+    keep = parent[pos] == run
+    mapping = order[pos]
+    u = np.zeros((3, x_parent.shape[1]))
     for c in range(3):
         u[c, mapping[keep]] = comps[c][keep]
-    return u, step
+    matched = np.zeros(x_parent.shape[1], dtype=bool)
+    matched[mapping[keep]] = True
+    return u, step, matched
 
 
 def rigid_residual(x, a, b):
@@ -126,15 +137,17 @@ def main(argv):
     E, nu = float(o["young"]), float(o["poisson"])
     mu, lmbda = E / (2 * (1 + nu)), E * nu / ((1 + nu) * (1 - 2 * nu))
 
-    solid = os.path.join(case, "db", "solid")
+    solid = os.path.join(case, "db", "solid_exodus")
     x = np.vstack([read_axis(solid, c).astype(np.float64) for c in "xyz"])
     blocks = load_blocks(solid, [b for b in o["blocks"].split(",") if b])
     uU = np.vstack([np.fromfile(os.path.join(case, "db", "utopia", "point_data", f"disp_{c}.float64")) for c in "xyz"])
-    uS, step = sfem_displacement(os.path.join(case, o["output"]), x.shape[1])
+    uS, step, matched = sfem_displacement(os.path.join(case, o["output"]), x)
     grid = Grid(os.path.join(case, o["sdf"]))
 
     row = {"case": os.path.basename(os.path.abspath(case)), "label": o["label"], "step": step}
     all_nodes = np.unique(np.concatenate([t.ravel() for t in blocks.values()]))
+    if not matched[all_nodes].all():
+        sys.exit(f"ab_utopia: {np.sum(~matched[all_nodes])} nodes of the blocks are not in the run's mesh")
     d = uS[:, all_nodes] - uU[:, all_nodes]
     nU = np.linalg.norm(uU[:, all_nodes], axis=0)
     row["nodes"] = len(all_nodes)
