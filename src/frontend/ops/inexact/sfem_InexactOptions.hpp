@@ -3,6 +3,8 @@
 #include <string>
 
 #include "sfem_config.h"
+#include "smesh_elem_type.hpp"
+#include "smesh_spaces.hpp"
 
 // Not in device code: nvcc cannot read what ryml includes on some hosts (arm_neon.h on Grace),
 // and nothing on the device reads the options from YAML.
@@ -29,11 +31,14 @@ namespace sfem {
     ///   fold      auto, on, off   the folded point store of the tensor-product elements (exact)
     ///   traversal auto, packed, atomic
     ///
+    /// store and encoding `auto` (both or neither) take the format measured fastest to a Newton
+    /// solution for the element and the execution space (`resolve`).
+    ///
     /// int8 with one scale per element is not offered: it is not a usable Newton operator
     /// (docs/compressed_partial_assembly, RESULTS_QP.md).
     struct InexactOptions {
-        enum class Store { POINTS, ELEMENT_MATRIX, BSR };
-        enum class Encoding { F64, F32, F16, I8_MEAN_DEVIATION, I8_PAIR_SCALE, I8_BLOCK };
+        enum class Store { AUTO, POINTS, ELEMENT_MATRIX, BSR };
+        enum class Encoding { AUTO, F64, F32, F16, I8_MEAN_DEVIATION, I8_PAIR_SCALE, I8_BLOCK };
         enum class Switch { AUTO, ON, OFF };
         enum class Traversal { AUTO, PACKED, ATOMIC };
 
@@ -44,6 +49,19 @@ namespace sfem {
 
         /// Refuses a combination the stores do not offer.
         void validate() const;
+
+        bool is_auto() const { return store == Store::AUTO; }
+        /// `auto` made concrete for an element and an execution space: the fastest format to a
+        /// Newton solution at about 1e7 dof (docs/compressed_partial_assembly, tables/summary*.tex):
+        ///
+        ///                  host (Grace)          device (H100)
+        ///   TET4           bsr f16               bsr f16
+        ///   TET10          bsr f16               points i8md
+        ///   HEX8           bsr i8                bsr i8
+        ///   HEX27          element_matrix f16    points f16
+        ///
+        /// points f32 for any other element. Options that are not `auto` are returned as they are.
+        InexactOptions resolve(const smesh::ElemType element, const smesh::ExecutionSpace space) const;
 
         static InexactOptions from_strings(const std::string &store,
                                            const std::string &encoding,
