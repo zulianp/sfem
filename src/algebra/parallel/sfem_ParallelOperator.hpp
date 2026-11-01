@@ -3,6 +3,7 @@
 
 #include "sfem_Operator.hpp"
 #include "sfem_Team.hpp"
+#include "sfem_TeamOperator.hpp"
 #include "sfem_aliases.hpp"
 
 #include <cassert>
@@ -72,15 +73,10 @@ namespace sfem {
         ExecutionContext                              context_{EXECUTION_SPACE_INVALID};
     };
 
-    /// A host operator whose product runs inside a parallel region its caller opened: each thread
-    /// of the region calls team_apply with its team(), may wait for the others (team.barrier())
-    /// and, on return, has computed the rows of its share, [team.begin, team.end). apply() is one
-    /// region around it. Under MPI thread 0 takes no rows: it keeps the messages moving (a
-    /// rendezvous advances only while a thread is in MPI). With input_in_share() team_apply reads
-    /// x beyond the calling thread's share only after a barrier of its own, so a caller that has
-    /// just written its share of x need not wait for the other threads first.
+    /// A team operator (sfem_TeamOperator.hpp) from a function of the team, the rows its shares
+    /// split (the owned rows; under MPI thread 0 takes none).
     template <typename T>
-    class TeamParallelOperator final : public ParallelOperator<T> {
+    class TeamParallelOperator final : public ParallelOperator<T>, public TeamOperator<T> {
     public:
         using TeamApply = std::function<void(const Team&, const T* const, T* const)>;
 
@@ -105,19 +101,13 @@ namespace sfem {
             assert(col_allocation_size_ >= cols_);
         }
 
-        int apply(const T* const x, T* const y) override {
-#pragma omp parallel
-            team_apply_(team(), x, y);
-            return SFEM_SUCCESS;
-        }
+        int apply(const T* const x, T* const y) override { return team_region_apply<T>(*this, x, y); }
 
-        /// Inside a region, the calling thread's share of the rows.
-        Team team() const { return Team::current(rows_, comm_->size() > 1); }
+        Team team() const override { return Team::current(rows_, comm_->size() > 1); }
 
-        /// From inside a region, every thread with its own team().
-        void team_apply(const Team& team, const T* const x, T* const y) const { team_apply_(team, x, y); }
+        void team_apply(const Team& team, const T* const x, T* const y) const override { team_apply_(team, x, y); }
 
-        bool input_in_share() const { return input_in_share_; }
+        bool input_in_share() const override { return input_in_share_; }
 
         std::ptrdiff_t rows() const override { return rows_; }
         std::ptrdiff_t cols() const override { return cols_; }

@@ -55,7 +55,7 @@ namespace sfem {
         /// y = K x, y overwritten. Taken again after each assemble.
         virtual std::shared_ptr<Operator<real_t>> op() const = 0;
         /// op() as a product a caller's region can run (host BSR), or null.
-        virtual std::shared_ptr<TeamParallelOperator<real_t>> team() const { return nullptr; }
+        virtual std::shared_ptr<TeamOperator<real_t>> team() const { return nullptr; }
     };
 
 }  // namespace sfem
