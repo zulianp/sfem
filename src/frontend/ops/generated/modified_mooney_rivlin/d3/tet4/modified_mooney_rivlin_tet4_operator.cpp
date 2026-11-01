@@ -1234,7 +1234,7 @@ static SFEM_INLINE int modified_mooney_rivlin_tet4_apply_a_msoa_impl(
   static constexpr int NC = 3;
   static constexpr int NS = 4;
 
-#pragma omp parallel for schedule(static)
+#pragma omp for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
     const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
     idx_t ev[VS * NS];
@@ -1340,7 +1340,7 @@ static SFEM_INLINE int modified_mooney_rivlin_tet4_apply_a_msoa_impl(
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int modified_mooney_rivlin_tet4_apply_a_msoa(
+extern "C" int modified_mooney_rivlin_tet4_apply_a_msoa_team(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -1382,6 +1382,56 @@ extern "C" int modified_mooney_rivlin_tet4_apply_a_msoa(
       break;
   }
   return sfem::codegen::unsupported_dispatch("modified_mooney_rivlin_tet4_apply_a_msoa", -1, (int)scalar_bytes);
+}
+
+extern "C" int modified_mooney_rivlin_tet4_apply_a_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double):
+    case (int)sizeof(float):
+      break;
+    default:
+      return sfem::codegen::unsupported_dispatch("modified_mooney_rivlin_tet4_apply_a_msoa", -1, (int)scalar_bytes);
+  }
+  int ret = SFEM_SUCCESS;
+#pragma omp parallel
+  {
+    const int err = modified_mooney_rivlin_tet4_apply_a_msoa_team(scalar_bytes, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+      ret = err;
+    }
+  }
+  return ret;
 }
 
 namespace sfem {
@@ -1430,7 +1480,6 @@ static SFEM_INLINE int modified_mooney_rivlin_tet4_apply_packed_a_msoa_impl(
   static constexpr int VS = 16;
 
 
-#pragma omp parallel
   {
     s_t *const RSTR pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
     s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
@@ -1572,7 +1621,7 @@ static SFEM_INLINE int modified_mooney_rivlin_tet4_apply_packed_a_msoa_impl(
   return SFEM_SUCCESS;
 }
 
-extern "C" int modified_mooney_rivlin_tet4_apply_packed_a_msoa(
+extern "C" int modified_mooney_rivlin_tet4_apply_packed_a_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
@@ -1621,6 +1670,63 @@ extern "C" int modified_mooney_rivlin_tet4_apply_packed_a_msoa(
       break;
   }
   return sfem::codegen::unsupported_dispatch("modified_mooney_rivlin_tet4_apply_packed_a_msoa", -1, (int)scalar_bytes);
+}
+
+extern "C" int modified_mooney_rivlin_tet4_apply_packed_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t c1,
+    const real_t c2,
+    const real_t kappa,
+    const ptrdiff_t u_stride,
+    const void *const RSTR ux,
+    const void *const RSTR uy,
+    const void *const RSTR uz,
+    const ptrdiff_t h_stride,
+    const void *const RSTR hx,
+    const void *const RSTR hy,
+    const void *const RSTR hz,
+    const ptrdiff_t out_stride,
+    void *const RSTR outx,
+    void *const RSTR outy,
+    void *const RSTR outz
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double):
+    case (int)sizeof(float):
+      break;
+    default:
+      return sfem::codegen::unsupported_dispatch("modified_mooney_rivlin_tet4_apply_packed_a_msoa", -1, (int)scalar_bytes);
+  }
+  int ret = SFEM_SUCCESS;
+#pragma omp parallel
+  {
+    const int err = modified_mooney_rivlin_tet4_apply_packed_a_msoa_team(scalar_bytes, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+      ret = err;
+    }
+  }
+  return ret;
 }
 
 template <typename s_t>
@@ -1672,7 +1778,6 @@ static SFEM_INLINE int modified_mooney_rivlin_tet4_apply_packed_two_pass_a_msoa_
   static constexpr int VS = 16;
 
 
-#pragma omp parallel
   {
     s_t *const RSTR pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
     s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
@@ -1807,7 +1912,7 @@ static SFEM_INLINE int modified_mooney_rivlin_tet4_apply_packed_two_pass_a_msoa_
   }
 
   s_t *const out_components[NC] = {outx, outy, outz};
-#pragma omp parallel for schedule(static)
+#pragma omp for schedule(static)
   for (ptrdiff_t row = 0; row < n_ghost_reduce_rows; ++row) {
     const idx_t dest = ghost_reduce_dest[row];
     const ptrdiff_t begin = ghost_reduce_ptr[row];
@@ -1824,7 +1929,7 @@ static SFEM_INLINE int modified_mooney_rivlin_tet4_apply_packed_two_pass_a_msoa_
   return SFEM_SUCCESS;
 }
 
-extern "C" int modified_mooney_rivlin_tet4_apply_packed_two_pass_a_msoa(
+extern "C" int modified_mooney_rivlin_tet4_apply_packed_two_pass_a_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
@@ -1879,6 +1984,69 @@ extern "C" int modified_mooney_rivlin_tet4_apply_packed_two_pass_a_msoa(
       break;
   }
   return sfem::codegen::unsupported_dispatch("modified_mooney_rivlin_tet4_apply_packed_two_pass_a_msoa", -1, (int)scalar_bytes);
+}
+
+extern "C" int modified_mooney_rivlin_tet4_apply_packed_two_pass_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const ptrdiff_t n_ghost_entries,
+    const ptrdiff_t n_ghost_reduce_rows,
+    const ptrdiff_t *const RSTR ghost_reduce_ptr,
+    const ptrdiff_t *const RSTR ghost_reduce_idx,
+    const idx_t *const RSTR ghost_reduce_dest,
+    void *const RSTR ghost_buf,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t c1,
+    const real_t c2,
+    const real_t kappa,
+    const ptrdiff_t u_stride,
+    const void *const RSTR ux,
+    const void *const RSTR uy,
+    const void *const RSTR uz,
+    const ptrdiff_t h_stride,
+    const void *const RSTR hx,
+    const void *const RSTR hy,
+    const void *const RSTR hz,
+    const ptrdiff_t out_stride,
+    void *const RSTR outx,
+    void *const RSTR outy,
+    void *const RSTR outz
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double):
+    case (int)sizeof(float):
+      break;
+    default:
+      return sfem::codegen::unsupported_dispatch("modified_mooney_rivlin_tet4_apply_packed_two_pass_a_msoa", -1, (int)scalar_bytes);
+  }
+  int ret = SFEM_SUCCESS;
+#pragma omp parallel
+  {
+    const int err = modified_mooney_rivlin_tet4_apply_packed_two_pass_a_msoa_team(scalar_bytes, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+      ret = err;
+    }
+  }
+  return ret;
 }
 
 } // namespace codegen

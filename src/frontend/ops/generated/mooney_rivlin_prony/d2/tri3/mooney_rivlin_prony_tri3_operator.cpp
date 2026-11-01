@@ -524,7 +524,7 @@ static SFEM_INLINE int mooney_rivlin_prony_tri3_apply_a_msoa_impl(
   static constexpr int NC = 2;
   static constexpr int NS = 3;
 
-#pragma omp parallel for schedule(static)
+#pragma omp for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
     const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
     idx_t ev[VS * NS];
@@ -615,7 +615,7 @@ static SFEM_INLINE int mooney_rivlin_prony_tri3_apply_a_msoa_impl(
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int mooney_rivlin_prony_tri3_apply_a_msoa(
+extern "C" int mooney_rivlin_prony_tri3_apply_a_msoa_team(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -651,6 +651,50 @@ extern "C" int mooney_rivlin_prony_tri3_apply_a_msoa(
       break;
   }
   return sfem::codegen::unsupported_dispatch("mooney_rivlin_prony_tri3_apply_a_msoa", -1, (int)scalar_bytes);
+}
+
+extern "C" int mooney_rivlin_prony_tri3_apply_a_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
+        const real_t C01,
+        const real_t C10,
+        const real_t K,
+        const real_t iso_relaxation_gamma,
+        const void *const RSTR iso_history,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx,
+        void *const RSTR outy
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double):
+    case (int)sizeof(float):
+      break;
+    default:
+      return sfem::codegen::unsupported_dispatch("mooney_rivlin_prony_tri3_apply_a_msoa", -1, (int)scalar_bytes);
+  }
+  int ret = SFEM_SUCCESS;
+#pragma omp parallel
+  {
+    const int err = mooney_rivlin_prony_tri3_apply_a_msoa_team(scalar_bytes, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C01, C10, K, iso_relaxation_gamma, iso_history, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
+    if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+      ret = err;
+    }
+  }
+  return ret;
 }
 
 

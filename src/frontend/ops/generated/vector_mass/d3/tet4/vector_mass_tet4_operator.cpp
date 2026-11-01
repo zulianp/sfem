@@ -823,7 +823,7 @@ static SFEM_INLINE int vector_mass_tet4_jacobian_action_a_msoa_impl(
   const s_t *const affine_shape = sfem::codegen::ref_tet4_q4<s_t>::shape();
   const s_t *const affine_q_weight = sfem::codegen::quad_tet_q4<s_t>::q_weight();
 
-#pragma omp parallel for schedule(static)
+#pragma omp for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
     const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
     s_t bdirection[NC * NS][VS];
@@ -877,7 +877,7 @@ static SFEM_INLINE int vector_mass_tet4_jacobian_action_a_msoa_impl(
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int vector_mass_tet4_jacobian_action_a_msoa(
+extern "C" int vector_mass_tet4_jacobian_action_a_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
@@ -904,6 +904,41 @@ extern "C" int vector_mass_tet4_jacobian_action_a_msoa(
       break;
   }
   return sfem::codegen::unsupported_dispatch("vector_mass_tet4_jacobian_action_a_msoa", -1, (int)scalar_bytes);
+}
+
+extern "C" int vector_mass_tet4_jacobian_action_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const RSTR g_det0,
+    const real_t density,
+    const ptrdiff_t direction_stride,
+    const void *const RSTR u0_direction,
+    const void *const RSTR u1_direction,
+    const void *const RSTR u2_direction,
+    const ptrdiff_t out_stride,
+    void *const RSTR u0_out,
+    void *const RSTR u1_out,
+    void *const RSTR u2_out
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double):
+    case (int)sizeof(float):
+      break;
+    default:
+      return sfem::codegen::unsupported_dispatch("vector_mass_tet4_jacobian_action_a_msoa", -1, (int)scalar_bytes);
+  }
+  int ret = SFEM_SUCCESS;
+#pragma omp parallel
+  {
+    const int err = vector_mass_tet4_jacobian_action_a_msoa_team(scalar_bytes, nelements, nnodes, elements, g_det0, density, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
+    if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+      ret = err;
+    }
+  }
+  return ret;
 }
 
 namespace sfem {

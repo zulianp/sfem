@@ -120,6 +120,72 @@ extern "C" int linear_kelvin_voigt_total_tri3_jacobian_action_a_msoa(
     void *const RSTR u0_out,
     void *const RSTR u1_out
 );
+extern "C" int linear_kelvin_voigt_total_proteus_quad4_jacobian_action_a_msoa_team(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_det0,
+    const real_t eta_b,
+    const real_t eta_s,
+    const real_t lmbda,
+    const real_t mu,
+    const real_t u_dt_shift,
+    const ptrdiff_t direction_stride,
+    const void *const RSTR u0_direction,
+    const void *const RSTR u1_direction,
+    const ptrdiff_t out_stride,
+    void *const RSTR u0_out,
+    void *const RSTR u1_out
+);
+extern "C" int linear_kelvin_voigt_total_quad4_jacobian_action_a_msoa_team(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_det0,
+    const real_t eta_b,
+    const real_t eta_s,
+    const real_t lmbda,
+    const real_t mu,
+    const real_t u_dt_shift,
+    const ptrdiff_t direction_stride,
+    const void *const RSTR u0_direction,
+    const void *const RSTR u1_direction,
+    const ptrdiff_t out_stride,
+    void *const RSTR u0_out,
+    void *const RSTR u1_out
+);
+extern "C" int linear_kelvin_voigt_total_tri3_jacobian_action_a_msoa_team(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_det0,
+    const real_t eta_b,
+    const real_t eta_s,
+    const real_t lmbda,
+    const real_t mu,
+    const real_t u_dt_shift,
+    const ptrdiff_t direction_stride,
+    const void *const RSTR u0_direction,
+    const void *const RSTR u1_direction,
+    const ptrdiff_t out_stride,
+    void *const RSTR u0_out,
+    void *const RSTR u1_out
+);
 extern "C" int linear_kelvin_voigt_total_hex27_jacobian_action_a_msoa(
     const int scalar_bytes,
     const ptrdiff_t nelements,
@@ -266,6 +332,180 @@ extern "C" int linear_kelvin_voigt_total_tet10_jacobian_action_a_msoa(
     void *const RSTR u2_out
 );
 extern "C" int linear_kelvin_voigt_total_tet4_jacobian_action_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t eta_b,
+    const real_t eta_s,
+    const real_t lmbda,
+    const real_t mu,
+    const real_t u_dt_shift,
+    const ptrdiff_t direction_stride,
+    const void *const RSTR u0_direction,
+    const void *const RSTR u1_direction,
+    const void *const RSTR u2_direction,
+    const ptrdiff_t out_stride,
+    void *const RSTR u0_out,
+    void *const RSTR u1_out,
+    void *const RSTR u2_out
+);
+extern "C" int linear_kelvin_voigt_total_hex27_jacobian_action_a_msoa_team(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t eta_b,
+    const real_t eta_s,
+    const real_t lmbda,
+    const real_t mu,
+    const real_t u_dt_shift,
+    const ptrdiff_t direction_stride,
+    const void *const RSTR u0_direction,
+    const void *const RSTR u1_direction,
+    const void *const RSTR u2_direction,
+    const ptrdiff_t out_stride,
+    void *const RSTR u0_out,
+    void *const RSTR u1_out,
+    void *const RSTR u2_out
+);
+extern "C" int linear_kelvin_voigt_total_hex8_jacobian_action_a_msoa_team(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t eta_b,
+    const real_t eta_s,
+    const real_t lmbda,
+    const real_t mu,
+    const real_t u_dt_shift,
+    const ptrdiff_t direction_stride,
+    const void *const RSTR u0_direction,
+    const void *const RSTR u1_direction,
+    const void *const RSTR u2_direction,
+    const ptrdiff_t out_stride,
+    void *const RSTR u0_out,
+    void *const RSTR u1_out,
+    void *const RSTR u2_out
+);
+extern "C" int linear_kelvin_voigt_total_proteus_hex27_jacobian_action_a_msoa_team(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t eta_b,
+    const real_t eta_s,
+    const real_t lmbda,
+    const real_t mu,
+    const real_t u_dt_shift,
+    const ptrdiff_t direction_stride,
+    const void *const RSTR u0_direction,
+    const void *const RSTR u1_direction,
+    const void *const RSTR u2_direction,
+    const ptrdiff_t out_stride,
+    void *const RSTR u0_out,
+    void *const RSTR u1_out,
+    void *const RSTR u2_out
+);
+extern "C" int linear_kelvin_voigt_total_proteus_hex8_jacobian_action_a_msoa_team(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t eta_b,
+    const real_t eta_s,
+    const real_t lmbda,
+    const real_t mu,
+    const real_t u_dt_shift,
+    const ptrdiff_t direction_stride,
+    const void *const RSTR u0_direction,
+    const void *const RSTR u1_direction,
+    const void *const RSTR u2_direction,
+    const ptrdiff_t out_stride,
+    void *const RSTR u0_out,
+    void *const RSTR u1_out,
+    void *const RSTR u2_out
+);
+extern "C" int linear_kelvin_voigt_total_tet10_jacobian_action_a_msoa_team(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t eta_b,
+    const real_t eta_s,
+    const real_t lmbda,
+    const real_t mu,
+    const real_t u_dt_shift,
+    const ptrdiff_t direction_stride,
+    const void *const RSTR u0_direction,
+    const void *const RSTR u1_direction,
+    const void *const RSTR u2_direction,
+    const ptrdiff_t out_stride,
+    void *const RSTR u0_out,
+    void *const RSTR u1_out,
+    void *const RSTR u2_out
+);
+extern "C" int linear_kelvin_voigt_total_tet4_jacobian_action_a_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
@@ -692,6 +932,47 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_kelvin_voigt_total_jacobian_acti
       "linear_kelvin_voigt_total_jacobian_action_2d_a_msoa", (int)element_type, (int)real_type);
 }
 
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_kelvin_voigt_total_jacobian_action_2d_a_msoa_team(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
+        const real_t eta_b,
+        const real_t eta_s,
+        const real_t lmbda,
+        const real_t mu,
+        const real_t u_dt_shift,
+        const ptrdiff_t direction_stride,
+        const void *const RSTR u0_direction,
+        const void *const RSTR u1_direction,
+        const ptrdiff_t out_stride,
+        void *const RSTR u0_out,
+        void *const RSTR u1_out
+) {
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::PROTEUS_QUAD4:
+      return linear_kelvin_voigt_total_proteus_quad4_jacobian_action_a_msoa_team((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, direction_stride, u0_direction, u1_direction, out_stride, u0_out, u1_out);
+    case smesh::QUAD4:
+      return linear_kelvin_voigt_total_quad4_jacobian_action_a_msoa_team((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, direction_stride, u0_direction, u1_direction, out_stride, u0_out, u1_out);
+    case smesh::TRI3:
+      return linear_kelvin_voigt_total_tri3_jacobian_action_a_msoa_team((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, direction_stride, u0_direction, u1_direction, out_stride, u0_out, u1_out);
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch(
+      "linear_kelvin_voigt_total_jacobian_action_2d_a_msoa_team", (int)element_type, (int)real_type);
+}
+
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_kelvin_voigt_total_jacobian_action_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
@@ -744,6 +1025,60 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_kelvin_voigt_total_jacobian_acti
   }
   return sfem::codegen::unsupported_dispatch(
       "linear_kelvin_voigt_total_jacobian_action_3d_a_msoa", (int)element_type, (int)real_type);
+}
+
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_kelvin_voigt_total_jacobian_action_3d_a_msoa_team(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
+        const real_t eta_b,
+        const real_t eta_s,
+        const real_t lmbda,
+        const real_t mu,
+        const real_t u_dt_shift,
+        const ptrdiff_t direction_stride,
+        const void *const RSTR u0_direction,
+        const void *const RSTR u1_direction,
+        const void *const RSTR u2_direction,
+        const ptrdiff_t out_stride,
+        void *const RSTR u0_out,
+        void *const RSTR u1_out,
+        void *const RSTR u2_out
+) {
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::HEX27:
+      return linear_kelvin_voigt_total_hex27_jacobian_action_a_msoa_team((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
+    case smesh::HEX8:
+      return linear_kelvin_voigt_total_hex8_jacobian_action_a_msoa_team((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
+    case smesh::PROTEUS_HEX27:
+      return linear_kelvin_voigt_total_proteus_hex27_jacobian_action_a_msoa_team((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
+    case smesh::PROTEUS_HEX8:
+      return linear_kelvin_voigt_total_proteus_hex8_jacobian_action_a_msoa_team((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
+    case smesh::TET10:
+      return linear_kelvin_voigt_total_tet10_jacobian_action_a_msoa_team((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
+    case smesh::TET4:
+      return linear_kelvin_voigt_total_tet4_jacobian_action_a_msoa_team((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch(
+      "linear_kelvin_voigt_total_jacobian_action_3d_a_msoa_team", (int)element_type, (int)real_type);
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_kelvin_voigt_total_residual_2d_a_msoa(

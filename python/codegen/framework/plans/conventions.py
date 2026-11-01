@@ -477,6 +477,13 @@ def diagnostics_tail(name):
             return tail
     return None
 
+#: The tail of a kernel's team entry point: the same kernel run by the threads of
+#: a parallel region its caller opened (a solver's region), every thread calling
+#: it with the same arguments.  The plain name opens that region around it.  A
+#: tail after the layout, so the name parses as its plain twin's and the
+#: dimension-generic dispatch carries it through (`..._3d_a_msoa_team`).
+ABI_TEAM_TAIL = "_team"
+
 #: The traversal a kernel name announces before its geometry token.  Unabbreviated
 #: for now: it is 0.08% of the tree and `packed` is the word every driver flag,
 #: plan field and benchmark column already uses.

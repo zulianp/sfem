@@ -1,3 +1,4 @@
+import contextlib
 from dataclasses import dataclass
 import sympy as sp
 
@@ -33,7 +34,7 @@ from codegen.framework.plans.affine_element_kernel import (
     p1_simplex_metric_apply_plan,
 )
 from codegen.framework.plans.form_transformations import stabilise_constant_cancellation
-from codegen.framework.plans.geometry_variants import geometry_variant_plan
+from codegen.framework.plans.geometry_variants import geometry_variant_plan, kernel_target
 from codegen.framework.plans import quadrature_fields
 from codegen.framework.emitters.kernel_diagnostics_record import (
     STRUCT_NAME,
@@ -4147,25 +4148,26 @@ def _sfem_soa_operator_source(
             for _affine_mode in variants.affine_modes:
                 if "plain" in objective_variants:
                     lines.append("")
-                    lines.extend(
-                        _sfem_soa_mesh_operator_function(
-                            form,
-                            prefix,
-                            dim,
-                            n_nodes,
-                            affine_rule.n_qp,
-                            vector_size,
-                            local_prefix,
-                            array_inputs,
-                            affine_rule,
-                            basis_family,
-                            geometry_family,
-                            use_shared_weak_local,
-                            geometry_mode="affine",
-                            matrix_format_plan=matrix_format_plan,
-                            source_builder=source_builder,
+                    with _product_in_a_team(form, source_builder) as builder:
+                        lines.extend(
+                            _sfem_soa_mesh_operator_function(
+                                form,
+                                prefix,
+                                dim,
+                                n_nodes,
+                                affine_rule.n_qp,
+                                vector_size,
+                                local_prefix,
+                                array_inputs,
+                                affine_rule,
+                                basis_family,
+                                geometry_family,
+                                use_shared_weak_local,
+                                geometry_mode="affine",
+                                matrix_format_plan=matrix_format_plan,
+                                source_builder=builder,
+                            )
                         )
-                    )
                 fast_aos_unit_lines = _tet4_linear_elasticity_aos_unit_mesh_operator_function(
                     form,
                     prefix,
@@ -4200,25 +4202,26 @@ def _sfem_soa_operator_source(
             for _isoparametric_mode in variants.isoparametric_modes:
                 if "plain" in objective_variants:
                     lines.append("")
-                    lines.extend(
-                        _sfem_soa_mesh_operator_function(
-                            form,
-                            prefix,
-                            dim,
-                            n_nodes,
-                            n_qp,
-                            vector_size,
-                            local_prefix,
-                            array_inputs,
-                            quadrature_rule,
-                            basis_family,
-                            geometry_family,
-                            use_shared_weak_local,
-                            geometry_mode="isoparametric",
-                            matrix_format_plan=matrix_format_plan,
-                            source_builder=source_builder,
+                    with _product_in_a_team(form, source_builder) as builder:
+                        lines.extend(
+                            _sfem_soa_mesh_operator_function(
+                                form,
+                                prefix,
+                                dim,
+                                n_nodes,
+                                n_qp,
+                                vector_size,
+                                local_prefix,
+                                array_inputs,
+                                quadrature_rule,
+                                basis_family,
+                                geometry_family,
+                                use_shared_weak_local,
+                                geometry_mode="isoparametric",
+                                matrix_format_plan=matrix_format_plan,
+                                source_builder=builder,
+                            )
                         )
-                    )
                 if "steps" in objective_variants:
                     lines.append("")
                     lines.extend(
@@ -5787,6 +5790,22 @@ def _target_scatter_add_lines(source_builder):
 
 
 
+@contextlib.contextmanager
+def _product_in_a_team(form, source_builder):
+    """The builder the operator's product is emitted with.
+
+    The product (form `apply`) is what a solver applies in its Krylov loop, on
+    the threads of the region the solver opened (sfem_TeamOperator.hpp): its
+    bodies are team bodies (`TargetPlatform.team_body`), and its entry points
+    come as the region-opening name and its `_team` twin
+    (`runtime_typed_entry_point_lines`).  Every other form, and a target without
+    regions, keeps the builder it was given (`kernel_target`).
+    """
+    target = kernel_target(form, source_builder.target)
+    with use_target(target):
+        yield dataclass_replace(source_builder, target=target)
+
+
 def _sfem_soa_mesh_operator_function(
     form,
     prefix,
@@ -6518,7 +6537,7 @@ def _sfem_soa_packed_apply_public_wrappers(
             lines.extend(
                 [
                     "",
-                    "#pragma omp parallel",
+                    *source_builder.parallel_region_lines(),
                     "  {",
                 ]
             )
@@ -6538,7 +6557,7 @@ def _sfem_soa_packed_apply_public_wrappers(
                 [
                     "    s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);",
                     "",
-                    "#pragma omp for schedule(static)",
+                    *source_builder.worksharing_for_lines("static"),
                     "    for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {",
                     "      const ptrdiff_t e_start = pack * n_elements_per_pack;",
                     "      const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);",
