@@ -207,7 +207,7 @@ int test_auto() {
     SFEM_TEST_ASSERT(has(a.resolve(smesh::TET4, host), "bsr", "f16"));
     SFEM_TEST_ASSERT(has(a.resolve(smesh::TET4, device), "bsr", "f16"));
     SFEM_TEST_ASSERT(has(a.resolve(smesh::TET10, host), "bsr", "f16"));
-    SFEM_TEST_ASSERT(has(a.resolve(smesh::TET10, device), "points", "i8md"));
+    SFEM_TEST_ASSERT(has(a.resolve(smesh::TET10, device), "bsr", "i8"));
     SFEM_TEST_ASSERT(has(a.resolve(smesh::HEX8, host), "bsr", "i8"));
     SFEM_TEST_ASSERT(has(a.resolve(smesh::HEX8, device), "bsr", "i8"));
     SFEM_TEST_ASSERT(has(a.resolve(smesh::PROTEUS_HEX27, host), "element_matrix", "f16"));
