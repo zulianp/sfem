@@ -195,8 +195,9 @@ namespace sfem {
         impl.reductions                        = std::make_unique<OwnedReductions>(f->space(), es);
         impl.tangent = ObstacleTangent::create(f, contact, options.tangent);
         if (!impl.tangent) return nullptr;
-        // The assembled host tangent's product runs inside the QP's region (team()).
-        const bool in_region = es == EXECUTION_SPACE_HOST && options.tangent.format == op_type::BSR;
+        // The tangent's product runs inside the QP's region where it has a team form (team()): the
+        // assembled host tangent, and the composed one over a team material (sfem_TeamOperator.hpp).
+        const bool in_region = impl.tangent->team_capable();
 
         for (auto *buffer : {&impl.k, &impl.k_ref, &impl.projected, &impl.upper_bound, &impl.qp_rhs, &impl.framed, &impl.lift, &impl.diag, &impl.trial_r, &impl.qp_tmp,
                              &impl.scale, &impl.inverse_scale, &impl.scaled_bound}) {
@@ -229,7 +230,8 @@ namespace sfem {
                                           team.barrier();
                                           self->tangent_team->team_apply(team, framed->data(), tmp);
                                           self->contact->to_frame(team, self->scale->data(), tmp, out);
-                                      });
+                                      },
+                                      [self] { return self->tangent_team ? self->tangent_team->prepare() : SFEM_SUCCESS; });
         } else {
             op = make_parallel_op<real_t>(
                     f->space()->mesh()->comm(),

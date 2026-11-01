@@ -9,6 +9,7 @@
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_LinearOperatorFactory.hpp"
 #include "sfem_NodeObstacleContact.hpp"
+#include "sfem_TeamBLAS.hpp"
 #include "sfem_blas_factory.hpp"
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_BLAS_cuda.hpp"
@@ -58,6 +59,7 @@ namespace sfem {
 
             std::shared_ptr<Operator<real_t>>             op() const override { return product; }
             std::shared_ptr<TeamOperator<real_t>> team() const override { return team_product; }
+            bool team_capable() const override { return tangent->execution_space() == EXECUTION_SPACE_HOST; }
 
         private:
             void add(const real_t *const x, const real_t *const r, const real_t *const k, const bool capped_term, const real_t sign) {
@@ -78,6 +80,8 @@ namespace sfem {
             SharedBuffer<real_t>                 state;
             std::shared_ptr<Operator<real_t>>    material;
             std::shared_ptr<Operator<real_t>>    product;
+            // The product on a region's threads, where the material has one (host).
+            std::shared_ptr<TeamOperator<real_t>> team_product;
             // 6 per contact node (node_obstacle_curvature_blocks), when `curved`.
             SharedBuffer<real_t>                 blocks;
             bool                                 curved{false};
@@ -130,12 +134,38 @@ namespace sfem {
             real_t max_eig(const real_t *const) const override { return 0; }
 
             std::shared_ptr<Operator<real_t>> op() const override { return product; }
+            std::shared_ptr<TeamOperator<real_t>> team() const override { return team_product; }
+            bool team_capable() const override { return team_product != nullptr; }
 
             void build() {
                 // The material's product accumulates (Function::inexact_apply, Function::apply), its
                 // constrained rows the identity: written over a zeroed output.
                 material          = create_linear_operator(format, f, state, es);
                 ComposedTangent *self = this;
+                if (auto material_team = std::dynamic_pointer_cast<TeamOperator<real_t>>(material)) {
+                    // Each thread zeroes its rows and, once all have (the material writes anyone's),
+                    // adds the material's product; the curvature and the shift are its own rows.
+                    team_product = make_team_op<real_t>(
+                            f->space()->mesh()->comm(),
+                            ndofs,
+                            ndofs,
+                            ndofs,
+                            ndofs,
+                            false,
+                            [self, material_team](const Team &team, const real_t *const in, real_t *const out) {
+                                team_blas::zeros(team.begin, team.end, out);
+                                team.barrier();
+                                material_team->team_apply(team, in, out);
+                                if (self->curved) self->contact->apply_blocks(team, self->blocks->data(), in, out);
+                                if (self->shift != 0) {
+                                    const real_t *const d = self->reference->data();
+                                    for (ptrdiff_t i = team.begin; i < team.end; ++i) out[i] += self->shift * (d[i] * in[i]);
+                                }
+                            },
+                            [material_team] { return material_team->prepare(); });
+                    product = team_product_operator();
+                    return;
+                }
                 product           = make_op<real_t>(
                         ndofs,
                         ndofs,
@@ -152,6 +182,10 @@ namespace sfem {
             }
 
         private:
+            std::shared_ptr<Operator<real_t>> team_product_operator() const {
+                return std::dynamic_pointer_cast<Operator<real_t>>(team_product);
+            }
+
             // out = |d|, wherever the vectors live: once per shifted solve.
             void absolute_value(const real_t *const d, real_t *const out) const {
                 std::vector<real_t> host(ndofs);

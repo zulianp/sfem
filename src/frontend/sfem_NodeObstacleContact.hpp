@@ -122,6 +122,8 @@ namespace sfem {
         // blocks_diagonal their diagonals to d.
         void curvature_blocks(const real_t *const x, const real_t *const r, const real_t *const k, const bool capped, real_t *const blocks);
         void apply_blocks(const real_t *const blocks, const real_t *const in, real_t *const out) const;
+        // The same at the contact nodes of the calling thread's rows (a region's Team, the host).
+        void apply_blocks(const Team &team, const real_t *const blocks, const real_t *const in, real_t *const out) const;
         void blocks_diagonal(const real_t *const blocks, real_t *const d) const;
 
         // -mu_i n_i at the contact nodes, with mu_i of the last kkt_residual, zero elsewhere: the
