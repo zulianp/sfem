@@ -186,6 +186,27 @@ namespace sfem {
         node_obstacle_curvature_bsr(view(normals_, gap_), r, k, capped, sign, rowptr, colidx, values_type, values);
     }
 
+    void NodeObstacleContact::curvature_blocks(const real_t *const x,
+                                               const real_t *const r,
+                                               const real_t *const k,
+                                               const bool          capped,
+                                               real_t *const       blocks) {
+        SFEM_TRACE_SCOPE("NodeObstacleContact::curvature_blocks");
+
+        real_t *Crows[6];
+        rows(curvature_, 6, Crows);
+        obstacle_->sample_nodes_curvature(size(), idx_->data(), xyz_, x, Crows);
+        node_obstacle_curvature_blocks(view(normals_, gap_), r, k, capped, blocks);
+    }
+
+    void NodeObstacleContact::apply_blocks(const real_t *const blocks, const real_t *const in, real_t *const out) const {
+        node_obstacle_apply_blocks(view(normals_, gap_), blocks, in, out);
+    }
+
+    void NodeObstacleContact::blocks_diagonal(const real_t *const blocks, real_t *const d) const {
+        node_obstacle_blocks_diagonal(view(normals_, gap_), blocks, d);
+    }
+
     void NodeObstacleContact::reaction(real_t *const out) const {
         sfem::blas<real_t>(context_)->zeros(ndofs_, out);
         node_obstacle_reaction(view(normals_, gap_), out);

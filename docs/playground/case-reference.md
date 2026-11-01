@@ -280,7 +280,12 @@ obstacle:
 | `linear.inexact.fold` | `auto` | The folded point store of the hexahedra (exact, fewer numbers): `auto`, `on`, `off`. On the device only HEX8 folds. |
 | `linear.inexact.traversal` | `auto` | `packed` (the packed mesh, deterministic) when the space has one, `atomic` otherwise. On the device the store chooses (`auto` only). |
 
-With an obstacle, the obstacle's step replaces the linear solver.
+With an obstacle, the obstacle's step replaces the linear solver; of `linear` it reads `format`,
+`inexact` and `storage_bytes`. `BSR` assembles the QP's tangent with the obstacle's curvature in
+it. `INEXACT` and `MF` apply it term by term: the material through its stored tangent (or
+matrix-free, which needs an operator with a diagonal: the generated materials have none), the
+curvature as a 3x3 block per contact node, its spectrum bounded by the power method instead of
+Gershgorin's rows. They run on one process, host or device.
 
 `format: INEXACT` applies the stored tangent of every operator that has one (GeneratedNeoHookeanOgden,
 GeneratedLinearElasticity, GeneratedLinearKelvinVoigt, GeneratedMooneyRivlinKelvinVoigt,
