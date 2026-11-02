@@ -207,17 +207,7 @@ namespace sfem {
         void team_apply(const Team& team, const T* const x, T* const y) const override {
             static_assert(team_chunk_align % 3 == 0, "a team share is whole blocks of 3");
             const T* const inv = inv_diag->data();
-            for (ptrdiff_t i = team.begin / 3; i < team.end / 3; i++) {
-                const T* const xi = &x[i * 3];
-                T* const       yi = &y[i * 3];
-                const T* const di = &inv[i * 3 * 3];
-
-                for (int d1 = 0; d1 < 3; d1++) {
-                    for (int d2 = 0; d2 < 3; d2++) {
-                        yi[d1] += di[d1 * 3 + d2] * xi[d2];
-                    }
-                }
-            }
+            for (ptrdiff_t i = team.begin / 3; i < team.end / 3; i++) block_sym_jacobi_apply_block(i, inv, x, y);
         }
         Team team() const override { return Team::current(inv_diag->size() / block_size); }
         bool input_in_share() const override { return true; }

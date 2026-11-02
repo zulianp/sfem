@@ -37,6 +37,24 @@ namespace sfem {
                 sparse_update_inv_diag;
     };
 
+    /// out += inv_diag in on block i (3 x 3, row-major): the body of every block Jacobi product,
+    /// the region's loop and a team's share alike.
+    template <typename InvDiag, typename In, typename Out>
+    inline void block_sym_jacobi_apply_block(const ptrdiff_t      i,
+                                             const InvDiag* const inv_diag,
+                                             const In* const      in,
+                                             Out* const           out) {
+        const auto* const xi = &in[i * 3];
+        auto* const       yi = &out[i * 3];
+        const auto* const di = &inv_diag[i * 3 * 3];
+
+        for (int d1 = 0; d1 < 3; d1++) {
+            for (int d2 = 0; d2 < 3; d2++) {
+                yi[d1] += di[d1 * 3 + d2] * xi[d2];
+            }
+        }
+    }
+
     namespace private_ {
 
         template <typename T>
@@ -221,15 +239,7 @@ namespace sfem {
                                                    Out* const           out) {
 #pragma omp parallel for
             for (ptrdiff_t i = 0; i < n_blocks; i++) {
-                const auto* const xi = &in[i * 3];
-                auto* const       yi = &out[i * 3];
-                const auto* const di = &inv_diag[i * 3 * 3];
-
-                for (int d1 = 0; d1 < 3; d1++) {
-                    for (int d2 = 0; d2 < 3; d2++) {
-                        yi[d1] += di[d1 * 3 + d2] * xi[d2];
-                    }
-                }
+                block_sym_jacobi_apply_block(i, inv_diag, in, out);
             }
         }
 
