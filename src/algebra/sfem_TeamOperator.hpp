@@ -51,6 +51,10 @@ namespace sfem {
 
         /// Outside any region, before the products of a region: checks and scratch.
         virtual int prepare() { return SFEM_SUCCESS; }
+
+        /// After the region, a solver's outcome of its last team_apply (its leader's to write), as
+        /// its plain apply returns it.
+        virtual int team_status() const { return SFEM_SUCCESS; }
     };
 
     /// y = A x from outside a region: the one way a team operator is applied there, one region

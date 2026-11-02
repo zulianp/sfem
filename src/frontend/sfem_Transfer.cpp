@@ -440,4 +440,35 @@ namespace sfem {
                 op->execution_space());
     }
 
+    std::shared_ptr<Operator<real_t>> create_constrained_transfer(const std::shared_ptr<Operator<real_t>> &transfer,
+                                                                  const std::shared_ptr<Function>         &f,
+                                                                  const std::ptrdiff_t                     cols,
+                                                                  const ExecutionSpace                     es) {
+        const std::ptrdiff_t rows          = f->space()->n_dofs();
+        auto                 team_transfer = std::dynamic_pointer_cast<TeamOperator<real_t>>(transfer);
+        if (es == EXECUTION_SPACE_HOST && team_transfer && f->team_constraints_supported()) {
+            return make_team_lambda_op<real_t>(
+                    rows,
+                    cols,
+                    mesh_is_mpi(f->space()->mesh()),
+                    [team_transfer, f](const Team &team, const real_t *const from, real_t *const to) {
+                        team_transfer->team_apply(team, from, to);
+                        f->team_apply_zero_constraints(team, to);
+                    },
+                    [team_transfer, f]() {
+                        if (team_transfer->prepare() != SFEM_SUCCESS) return SFEM_FAILURE;
+                        return f->team_prepare_constraints();
+                    });
+        }
+
+        return sfem::make_op<real_t>(
+                rows,
+                cols,
+                [transfer, f](const real_t *const from, real_t *const to) {
+                    transfer->apply(from, to);
+                    f->apply_zero_constraints(to);
+                },
+                es);
+    }
+
 }  // namespace sfem

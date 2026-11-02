@@ -887,17 +887,25 @@ namespace sfem {
                 SFEM_TRACE_SCOPE("create_ssgmg::construct");
                 // Construct actual multigrid
 
-                auto restriction_unconstr =
-                        sfem::create_hierarchical_restriction(levels[0]->function->space(), levels[1]->function->space(), es);
-                auto f_coarse    = levels[1]->function;
-                auto restriction = sfem::make_op<real_t>(
-                        restriction_unconstr->rows(),
-                        restriction_unconstr->cols(),
-                        [=](const real_t *const from, real_t *const to) {
-                            restriction_unconstr->apply(from, to);
-                            f_coarse->apply_zero_constraints(to);
-                        },
-                        es);
+                // A transfer, then the constrained dofs of the space it maps into zeroed.
+                auto restriction_between = [&](const int fine, const int coarse) {
+                    return sfem::create_constrained_transfer(
+                            sfem::create_hierarchical_restriction(
+                                    levels[fine]->function->space(), levels[coarse]->function->space(), es),
+                            levels[coarse]->function,
+                            levels[fine]->function->space()->n_dofs(),
+                            es);
+                };
+                auto prolongation_between = [&](const int coarse, const int fine) {
+                    return sfem::create_constrained_transfer(
+                            sfem::create_hierarchical_prolongation(
+                                    levels[coarse]->function->space(), levels[fine]->function->space(), es),
+                            levels[fine]->function,
+                            levels[coarse]->function->space()->n_dofs(),
+                            es);
+                };
+
+                auto restriction = restriction_between(0, 1);
 
                 mg->add_level(operators[0], smoothers_or_solver[0], nullptr, restriction);
 
@@ -905,44 +913,13 @@ namespace sfem {
                 // Intermediate levels
                 // ----------------------------------
                 for (int i = 1; i < nlevels - 1; i++) {
-                    auto restriction_unconstr = sfem::create_hierarchical_restriction(
-                            levels[i]->function->space(), levels[i + 1]->function->space(), es);
-                    auto f_coarse    = levels[i + 1]->function;
-                    auto restriction = sfem::make_op<real_t>(
-                            restriction_unconstr->rows(),
-                            restriction_unconstr->cols(),
-                            [=](const real_t *const from, real_t *const to) {
-                                restriction_unconstr->apply(from, to);
-                                f_coarse->apply_zero_constraints(to);
-                            },
-                            es);
-
-                    auto prolong_unconstr = sfem::create_hierarchical_prolongation(
-                            levels[i]->function->space(), levels[i - 1]->function->space(), es);
-
-                    auto prolongation = sfem::make_op<real_t>(
-                            prolong_unconstr->rows(),
-                            prolong_unconstr->cols(),
-                            [prolong_unconstr, f = levels[i - 1]->function](const real_t *const from, real_t *const to) {
-                                prolong_unconstr->apply(from, to);
-                                f->apply_zero_constraints(to);
-                            },
-                            es);
+                    auto restriction  = restriction_between(i, i + 1);
+                    auto prolongation = prolongation_between(i, i - 1);
 
                     mg->add_level(operators[i], smoothers_or_solver[i], prolongation, restriction);
                 }
 
-                auto prolong_unconstr = sfem::create_hierarchical_prolongation(
-                        levels.back()->function->space(), levels[nlevels - 2]->function->space(), es);
-
-                auto prolongation = sfem::make_op<real_t>(
-                        prolong_unconstr->rows(),
-                        prolong_unconstr->cols(),
-                        [prolong_unconstr, f = levels[nlevels - 2]->function](const real_t *const from, real_t *const to) {
-                            prolong_unconstr->apply(from, to);
-                            f->apply_zero_constraints(to);
-                        },
-                        es);
+                auto prolongation = prolongation_between(nlevels - 1, nlevels - 2);
 
                 // ----------------------------------
                 // Coarse level

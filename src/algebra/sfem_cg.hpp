@@ -213,6 +213,7 @@ namespace sfem {
         void team_apply(const Team& team, const T* const b, T* const x) const override {
             const_cast<ConjugateGradient*>(this)->team_run(team, n_dofs, b, x);
         }
+        int team_status() const override { return team_info_; }
 
         ~ConjugateGradient() { destroy_workspace(); }
 

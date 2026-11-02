@@ -30,6 +30,14 @@ namespace sfem {
                                                                       const std::shared_ptr<FunctionSpace> &to_space,
                                                                       const ExecutionSpace                  es);
 
+    /// A transfer into f's space (rows: f's n dofs, from cols), then f's constrained dofs zeroed: on
+    /// the host in team form where the transfer and the constraints have one (the constrained dofs
+    /// in the calling thread's rows), otherwise vector by vector.
+    std::shared_ptr<Operator<real_t>> create_constrained_transfer(const std::shared_ptr<Operator<real_t>> &transfer,
+                                                                  const std::shared_ptr<Function>         &f,
+                                                                  const std::ptrdiff_t                     cols,
+                                                                  const ExecutionSpace                     es);
+
 }  // namespace sfem
 
 #endif  // SFEM_TRANSFER_HPP
