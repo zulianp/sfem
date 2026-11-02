@@ -69,8 +69,11 @@ namespace sfem {
 
         void set_initial_guess_zero(const bool val) override { is_initial_guess_zero = val; }
 
+        /// A distributed operator makes the smoother distributed (SolveSpan): its power method's
+        /// norms are over the ranks.
         void set_op(const std::shared_ptr<Operator<T>>& op) override {
             n_dofs         = op->rows();
+            span_          = SolveSpan<T>::of(*op);
             this->apply_op = [=](const T* const x, T* const y) { op->apply(x, y); };
             op_            = op;
             team_op_       = std::dynamic_pointer_cast<TeamOperator<T>>(op);
@@ -83,7 +86,7 @@ namespace sfem {
         }
         int prepare() override { return team_op_ ? team_op_->prepare() : SFEM_SUCCESS; }
         void team_apply(const Team& team, const T* const rhs, T* const x) const override {
-            TeamReduction<T, 1> sums(team_sums_.data(), team_chunk_count(n_dofs));
+            TeamReduction<T, 1> sums(team_sums_.data(), team_chunk_count(n_dofs), span_.ranks());
             TeamExec<T>         e(team, sums);
             run(e, *team_op_, rhs, x, p_->data(), temp_->data());
         }
@@ -99,9 +102,12 @@ namespace sfem {
 
         void ensure_power_method() {
             if (!power_method) {
-                auto blas_impl      = this->blas;
-                power_method        = std::make_shared<PowerMethod<T>>();
-                power_method->norm2 = [blas_impl](const std::ptrdiff_t n, const T* const x) { return blas_impl->norm2(n, x); };
+                auto blas_impl           = this->blas;
+                power_method             = std::make_shared<PowerMethod<T>>();
+                const SolveSpan<T>* span = &span_;
+                power_method->norm2      = [blas_impl, span](const std::ptrdiff_t n, const T* const x) {
+                    return std::sqrt(span->sum(blas_impl->dot(n, x, x)));
+                };
                 power_method->scal  = [blas_impl](const std::ptrdiff_t n, const T alpha, T* const x) {
                     blas_impl->scal(n, alpha, x);
                 };
@@ -112,6 +118,7 @@ namespace sfem {
         bool good() const { return blas->good() && apply_op; }
 
         void monitor(const int iter, const T residual) {
+            if (!span_.root()) return;
             if (iter == max_it || iter % 100 == 0 || residual < atol) {
                 std::cout << iter << ": " << residual << "\n";
             }
@@ -148,15 +155,19 @@ namespace sfem {
         }
 
         void init(const T* const guess_eigenvector) {
-            T* eigenvector = blas->allocate(this->rows());
-            T* work        = blas->allocate(this->rows());
+            // The products' vectors: a distributed operator's allocation, zero beyond the rows.
+            const ptrdiff_t n           = span_.size(this->rows());
+            T*              eigenvector = blas->allocate(n);
+            T*              work        = blas->allocate(n);
+            blas->zeros(n, eigenvector);
+            blas->zeros(n, work);
             blas->copy(this->rows(), guess_eigenvector, eigenvector);
 
             eig_max = max_eigen_value(eigenvector, work);
 
             auto blas_impl = blas;
-            p_             = Buffer<T>::own(this->rows(), work, [blas_impl](void* ptr) { blas_impl->destroy(ptr); });
-            temp_          = Buffer<T>::own(this->rows(), eigenvector, [blas_impl](void* ptr) { blas_impl->destroy(ptr); });
+            p_             = Buffer<T>::own(n, work, [blas_impl](void* ptr) { blas_impl->destroy(ptr); });
+            temp_          = Buffer<T>::own(n, eigenvector, [blas_impl](void* ptr) { blas_impl->destroy(ptr); });
         }
 
         int apply(const T* const b, T* const x) override {
@@ -166,7 +177,7 @@ namespace sfem {
                 team_reduction_buffer(team_sums_, n_dofs);
                 return team_region_apply<T>(*this, b, x);
             }
-            BlasExec<T> e(*blas, n_dofs);
+            BlasExec<T> e(*blas, n_dofs, span_.allocation, span_.ranks());
             run(e, *op_, b, x, p_->data(), temp_->data());
             return 0;
         }
@@ -179,6 +190,7 @@ namespace sfem {
     private:
         std::shared_ptr<Operator<T>>     op_;
         std::shared_ptr<TeamOperator<T>> team_op_;
+        SolveSpan<T>                     span_;
         // The executor's sums (Chebyshev takes none; TeamExec is built over them).
         mutable std::vector<T> team_sums_;
 

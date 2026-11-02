@@ -1,11 +1,14 @@
 #ifndef SFEM_SOLVER_EXEC_HPP
 #define SFEM_SOLVER_EXEC_HPP
 
+#include <algorithm>
 #include <cstddef>
 #include <functional>
+#include <memory>
 #include <vector>
 
 #include "sfem_Operator.hpp"
+#include "sfem_ParallelOperator.hpp"
 #include "sfem_Team.hpp"
 #include "sfem_TeamBLAS.hpp"
 #include "sfem_TeamOperator.hpp"
@@ -25,6 +28,33 @@
 // operator overwrites it, and the input is complete when the product reads it.
 
 namespace sfem {
+
+    /// What a solve on `op` spans: a distributed operator's (ParallelOperator, more than one rank)
+    /// owned rows are its unknowns, its vectors span its allocation (owned, ghost and aura
+    /// entries: the products gather into x and scatter into y there), and its sums are over the
+    /// ranks. On one rank the rows alone.
+    template <typename T>
+    struct SolveSpan {
+        std::shared_ptr<smesh::Communicator> comm;  // null on one rank
+        ptrdiff_t                            allocation{-1};
+
+        static SolveSpan of(const Operator<T> &op) {
+            SolveSpan ret;
+            if (auto parallel = dynamic_cast<const ParallelOperator<T> *>(&op)) {
+                if (parallel->comm() && parallel->comm()->size() > 1) ret.comm = parallel->comm();
+                ret.allocation = std::max(parallel->row_allocation_size(), parallel->col_allocation_size());
+            }
+            return ret;
+        }
+
+        /// A work vector's length for `rows` unknowns.
+        ptrdiff_t size(const ptrdiff_t rows) const { return std::max(rows, allocation); }
+        const smesh::Communicator *ranks() const { return comm.get(); }
+        /// Whether this rank reports.
+        bool root() const { return !comm || comm->rank() == 0; }
+        /// The ranks' sum of a value each computed over its rows.
+        T sum(const T local) const { return comm ? T(comm->sum(local)) : local; }
+    };
 
     template <typename T>
     class BlasExec {

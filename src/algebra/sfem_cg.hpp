@@ -16,7 +16,6 @@
 
 #include "sfem_BLAS_openmp.hpp"
 #include "sfem_ConjugateGradientKernels_openmp.hpp"
-#include "sfem_ParallelOperator.hpp"
 #include "sfem_SolverExec.hpp"
 
 // https://en.wikipedia.org/wiki/Conjugate_gradient_method
@@ -148,7 +147,7 @@ namespace sfem {
 
         void monitor(const int iter, const T residual, const T relative_residual, const T alpha) {
             if (!verbose) return;
-            if (comm_ && comm_->rank() != 0) return;
+            if (!span_.root()) return;
 
             if (iter == max_it || iter == 0 || iter % check_each == 0 || relative_residual < rtol) {
                 std::cout << iter << ": residual abs: " << residual << ", rel: " << relative_residual << " (rtol = " << rtol
@@ -178,7 +177,7 @@ namespace sfem {
                 int      info   = SFEM_FAILURE;
 #pragma omp parallel
                 {
-                    TeamReduction<T, 1> sums(buffer, team_chunk_count(n), comm_.get());
+                    TeamReduction<T, 1> sums(buffer, team_chunk_count(n), span_.ranks());
                     const Team          team = team_op->team();
                     TeamExec<T>         e(team, sums);
                     const int r = preconditioner_op ? run_precond(e, *team_op, *team_prec, n, b, x) : run_basic(e, *team_op, n, b, x);
@@ -187,7 +186,7 @@ namespace sfem {
                 return info;
             }
 
-            BlasExec<T> e(*blas, n, allocation_, comm_.get());
+            BlasExec<T> e(*blas, n, span_.allocation, span_.ranks());
             return preconditioner_op ? run_precond(e, *apply_op, *preconditioner_op, n, b, x) : run_basic(e, *apply_op, n, b, x);
         }
 
@@ -207,9 +206,7 @@ namespace sfem {
 
     private:
         bool      negative_curvature_{false};
-        // Distributed (adopt): the ranks the sums are over, and the vectors' allocation.
-        std::shared_ptr<Communicator> comm_;
-        ptrdiff_t                     allocation_{-1};
+        SolveSpan<T> span_;
         T*        work_r_{nullptr};
         T*        work_z_{nullptr};
         T*        work_p_{nullptr};
@@ -246,15 +243,13 @@ namespace sfem {
         }
 
         void adopt(const Operator<T>& op) {
-            n_dofs        = op.rows();
-            auto parallel = dynamic_cast<const ParallelOperator<T>*>(&op);
-            comm_         = parallel && parallel->comm() && parallel->comm()->size() > 1 ? parallel->comm() : nullptr;
-            allocation_   = parallel ? std::max(parallel->row_allocation_size(), parallel->col_allocation_size()) : -1;
+            n_dofs = op.rows();
+            span_  = SolveSpan<T>::of(op);
         }
 
         void ensure_workspace(const ptrdiff_t n_owned, const bool need_z) {
             // The ghost and aura entries of a distributed product's vectors: zero, and scratch.
-            const ptrdiff_t n = std::max(n_owned, allocation_);
+            const ptrdiff_t n = span_.size(n_owned);
             if (work_n_ == n && work_r_ && work_p_ && work_Ap_ && (!need_z || work_z_)) {
                 return;
             }

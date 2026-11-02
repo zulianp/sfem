@@ -43,9 +43,9 @@ namespace sfem {
 
         void configure_sizes_from_op() {
             n_dofs = op ? op->rows() : SFEM_PTRDIFF_INVALID;
-            auto pop = std::dynamic_pointer_cast<ParallelOperator<T>>(op);
-            if (pop && pop->comm() && pop->comm()->size() > 1) {
-                n_alloc = std::max(pop->row_allocation_size(), pop->col_allocation_size());
+            span_  = op ? SolveSpan<T>::of(*op) : SolveSpan<T>{};
+            if (span_.comm) {
+                n_alloc = span_.allocation;
             } else if (n_alloc < n_dofs) {
                 n_alloc = n_dofs;
             }
@@ -71,7 +71,7 @@ namespace sfem {
                 team_reduction_buffer(team_sums_, n_dofs);
                 return team_region_apply<T>(*this, b, x);
             }
-            BlasExec<T> e(*blas, n_dofs, workspace->size());
+            BlasExec<T> e(*blas, n_dofs, workspace->size(), span_.ranks());
             run(e, *op, *preconditioner, b, x);
             return SFEM_SUCCESS;
         }
@@ -92,7 +92,7 @@ namespace sfem {
             return P ? P->prepare() : SFEM_SUCCESS;
         }
         void team_apply(const Team& team, const T* const b, T* const x) const override {
-            TeamReduction<T, 1> sums(team_sums_.data(), team_chunk_count(n_dofs));
+            TeamReduction<T, 1> sums(team_sums_.data(), team_chunk_count(n_dofs), span_.ranks());
             TeamExec<T>         e(team, sums);
             run(e, *team_op(), *team_prec(), b, x);
         }
@@ -147,6 +147,7 @@ namespace sfem {
 
     private:
         mutable std::vector<T> team_sums_;
+        SolveSpan<T>           span_;
 
         // The operator and the preconditioner in team form (the fields are public, set directly).
         std::shared_ptr<TeamOperator<T>> team_op() const { return std::dynamic_pointer_cast<TeamOperator<T>>(op); }
@@ -167,7 +168,7 @@ namespace sfem {
                 e.axpby(T(1), b, T(-1), r);
                 if (verbose) {
                     const T norm_residual = std::sqrt(e.dot(r, r));
-                    if (e.leader()) printf("%d : %f\n", it, (double)norm_residual);
+                    if (e.leader() && span_.root()) printf("%d : %f\n", it, (double)norm_residual);
                 }
                 e.apply(P, r, x, true);
                 if (interceptor) {
