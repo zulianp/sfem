@@ -17,6 +17,7 @@
 #include "sfem_Chebyshev3.hpp"
 #include "sfem_ShiftableJacobi.hpp"
 #include "sfem_Stationary.hpp"
+#include "sfem_bcgs.hpp"
 #include "sfem_cg.hpp"
 #include "sfem_test.hpp"
 #include "smesh_env.hpp"
@@ -192,11 +193,49 @@ int test_team_stationary_iteration() {
     return SFEM_TEST_SUCCESS;
 }
 
+// BiCGStab, plain and right-preconditioned by Jacobi, in one region against vector by vector.
+int test_team_bicgstab() {
+    const Problem p    = elasticity_cube(6);
+    auto          diag = sfem::create_host_buffer<real_t>(p.n);
+    auto          zero = sfem::create_host_buffer<real_t>(p.n);
+    p.f->set_inexact_options(sfem::InexactOptions::from_strings("points", "f64"));
+    SFEM_TEST_ASSERT(p.f->inexact_update(zero->data()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(p.f->inexact_diag(zero->data(), diag->data()) == SFEM_SUCCESS);
+    auto jacobi = sfem::h_shiftable_jacobi<real_t>(diag);
+
+    for (const bool precond : {false, true}) {
+        std::vector<std::vector<real_t>> x(2, std::vector<real_t>((size_t)p.n, 0));
+        int                              its[2];
+        for (int k = 0; k < 2; ++k) {
+            auto solver     = sfem::create_bcgs<real_t>(k ? p.A : plain(p.A), sfem::EXECUTION_SPACE_HOST);
+            solver->verbose = false;
+            solver->set_rtol(1e-10);
+            solver->set_atol(0);
+            solver->set_max_it(5000);
+            if (precond) solver->set_preconditioner_op(k ? std::shared_ptr<sfem::Operator<real_t>>(jacobi) : plain(jacobi));
+            p.f->apply_constraints(x[k].data());
+            SFEM_TEST_ASSERT(solver->apply(p.rhs->data(), x[k].data()) == SFEM_SUCCESS);
+            its[k] = solver->iterations();
+        }
+        double num = 0, den = 0;
+        for (size_t i = 0; i < x[0].size(); ++i) {
+            num += (x[1][i] - x[0][i]) * (x[1][i] - x[0][i]);
+            den += x[0][i] * x[0][i];
+        }
+        printf("  BiCGStab%s: team %d, plain %d iterations, |x_team - x_plain| / |x_plain| = %.2e\n",
+               precond ? " (Jacobi)" : "", its[1], its[0], std::sqrt(num / den));
+        SFEM_TEST_ASSERT(std::abs(its[1] - its[0]) <= 2);
+        SFEM_TEST_ASSERT(std::sqrt(num / den) < 1e-7);
+    }
+    return SFEM_TEST_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_team_cg_matches_the_vector_by_vector_run);
     SFEM_RUN_TEST(test_team_preconditioned_cg);
     SFEM_RUN_TEST(test_team_stationary_iteration);
+    SFEM_RUN_TEST(test_team_bicgstab);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }

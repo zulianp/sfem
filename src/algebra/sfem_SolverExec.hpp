@@ -2,6 +2,7 @@
 #define SFEM_SOLVER_EXEC_HPP
 
 #include <cstddef>
+#include <functional>
 #include <vector>
 
 #include "sfem_Operator.hpp"
@@ -34,6 +35,9 @@ namespace sfem {
 
         T    dot(const T *const a, const T *const b) { return blas_.dot(n_, a, b); }
         void axpby(const T alpha, const T *const x, const T beta, T *const y) { blas_.axpby(n_, alpha, x, beta, y); }
+        void zaxpby(const T alpha, const T *const x, const T beta, const T *const y, T *const z) {
+            blas_.zaxpby(n_, alpha, x, beta, y, z);
+        }
         void copy(const T *const src, T *const dest) { blas_.copy(n_, src, dest); }
         void zeros(T *const y) { blas_.zeros(allocation_, y); }
         /// y <- alpha x
@@ -44,6 +48,13 @@ namespace sfem {
         int apply(Operator<T> &op, const T *const in, T *const out, const bool overwrites) {
             if (!overwrites) zeros(out);
             return op.apply(in, out);
+        }
+
+        /// A product given as a function (a solver's preconditioner set so).
+        int apply(const std::function<void(const T *const, T *const)> &op, const T *const in, T *const out, const bool overwrites) {
+            if (!overwrites) zeros(out);
+            op(in, out);
+            return SFEM_SUCCESS;
         }
 
         void barrier() const {}
@@ -63,6 +74,9 @@ namespace sfem {
         T    dot(const T *const a, const T *const b) { return team_blas::dot(team_, sums_, a, b); }
         void axpby(const T alpha, const T *const x, const T beta, T *const y) {
             team_blas::axpby(team_.begin, team_.end, alpha, x, beta, y);
+        }
+        void zaxpby(const T alpha, const T *const x, const T beta, const T *const y, T *const z) {
+            team_blas::zaxpby(team_.begin, team_.end, alpha, x, beta, y, z);
         }
         void copy(const T *const src, T *const dest) { team_blas::copy(team_.begin, team_.end, src, dest); }
         void zeros(T *const y) { team_blas::zeros(team_.begin, team_.end, y); }
