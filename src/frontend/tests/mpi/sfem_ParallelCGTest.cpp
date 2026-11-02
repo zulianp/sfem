@@ -101,7 +101,7 @@ namespace {
             SFEM_TEST_ASSERT(comm->sum(local_x2) > real_t(0));
         }
 
-        auto parallel_cg = sfem::create_parallel_cg<real_t>(parallel_op);
+        auto parallel_cg = sfem::create_cg<real_t>(parallel_op, sfem::EXECUTION_SPACE_HOST);
         SFEM_TEST_ASSERT(parallel_cg != nullptr);
         parallel_cg->set_verbose(verbose);
         parallel_cg->set_max_it(5000);

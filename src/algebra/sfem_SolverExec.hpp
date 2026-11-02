@@ -30,10 +30,13 @@ namespace sfem {
     class BlasExec {
     public:
         /// n entries; an output zeroed before a product spans `allocation` (under MPI the ghosts too).
-        BlasExec(BLAS<T> &blas, const ptrdiff_t n, const ptrdiff_t allocation = -1)
-            : blas_(blas), n_(n), allocation_(allocation > n ? allocation : n) {}
+        /// With `comm` (more than one rank) a sum is over the ranks' n entries.
+        BlasExec(BLAS<T> &blas, const ptrdiff_t n, const ptrdiff_t allocation = -1, const smesh::Communicator *const comm = nullptr)
+            : blas_(blas), n_(n), allocation_(allocation > n ? allocation : n), comm_(comm && comm->size() > 1 ? comm : nullptr) {}
 
-        T    dot(const T *const a, const T *const b) { return blas_.dot(n_, a, b); }
+        T    dot(const T *const a, const T *const b) { return sum(blas_.dot(n_, a, b)); }
+        /// The ranks' sum of a value each computed over its entries.
+        T    sum(const T local) const { return comm_ ? comm_->sum(local) : local; }
         void axpby(const T alpha, const T *const x, const T beta, T *const y) { blas_.axpby(n_, alpha, x, beta, y); }
         void zaxpby(const T alpha, const T *const x, const T beta, const T *const y, T *const z) {
             blas_.zaxpby(n_, alpha, x, beta, y, z);
@@ -61,9 +64,10 @@ namespace sfem {
         bool leader() const { return true; }
 
     private:
-        BLAS<T>        &blas_;
-        const ptrdiff_t n_;
-        const ptrdiff_t allocation_;
+        BLAS<T>                          &blas_;
+        const ptrdiff_t                   n_;
+        const ptrdiff_t                   allocation_;
+        const smesh::Communicator *const comm_;
     };
 
     template <typename T>
