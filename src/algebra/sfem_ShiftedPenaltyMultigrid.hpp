@@ -834,6 +834,8 @@ namespace sfem {
 
         std::shared_ptr<Operator<T>> shifted_op(const int level) {
             std::shared_ptr<Operator<T>> jac = level_jacobian(level);
+            if (auto team = team_shifted_op(level, jac)) return team;
+
             std::shared_ptr<Operator<T>> sop;
             if (constraints_op_) {
                 sop = jac + sfem::create_sparse_block_vector_mult(jac->rows(), level_op_x_op(level), level_op_x_op_weights(level));
@@ -860,6 +862,58 @@ namespace sfem {
                         pop->execution_space());
             }
             return sop;
+        }
+
+        // The shifted operator in team form, where the Jacobian has one (null otherwise), so that a
+        // smoother or the coarse solver over it runs in one region. Under MPI the leader first
+        // brings x's ghosts. The contact blocks go first: their loop splits blocks, not rows, and its
+        // barrier keeps them apart from the Jacobian's writes; a diagonal shift goes after, on the
+        // thread's own rows.
+        std::shared_ptr<Operator<T>> team_shifted_op(const int level, const std::shared_ptr<Operator<T>>& jac) {
+            if (this->execution_space() != EXECUTION_SPACE_HOST) return nullptr;
+            auto tjac = std::dynamic_pointer_cast<TeamOperator<T>>(jac);
+            if (!tjac || !tjac->team_capable()) return nullptr;
+
+            std::shared_ptr<ScaledBlockVectorMult<T>> blocks;
+            SharedBuffer<T>                           diag;
+            if (constraints_op_) {
+                blocks = std::make_shared<ScaledBlockVectorMult<T>>();
+                blocks->n_dofs  = jac->rows();
+                blocks->sbv     = level_op_x_op(level);
+                blocks->scaling = level_op_x_op_weights(level);
+                blocks->init();
+            } else {
+                diag = memory_[level]->diag;
+            }
+
+            auto*     ex  = level_exchange(level);
+            const int bs  = nodal_block_size_;
+            auto      pop = std::dynamic_pointer_cast<ParallelOperator<T>>(operator_[level]);
+            const bool distributed = pop && pop->comm() && pop->comm()->size() > 1;
+            auto apply = [tjac, blocks, diag, ex, bs, distributed](const Team& team, const T* const x, T* const y) {
+                if (distributed && ex) {
+                    if (team.leader()) ex->gather(const_cast<T*>(x), bs);
+                    team.barrier();
+                }
+                if (blocks) blocks->team_apply(team, x, y);
+                tjac->team_apply(team, x, y);
+                if (diag) team_blas::xypaz(team.begin, team.end, x, diag->data(), T(1), y);
+            };
+            auto prepare = [tjac, blocks]() -> int {
+                if (tjac->prepare() != SFEM_SUCCESS) return SFEM_FAILURE;
+                return blocks ? blocks->prepare() : SFEM_SUCCESS;
+            };
+            if (distributed) {
+                return make_team_op<T>(pop->comm(),
+                                       pop->rows(),
+                                       pop->cols(),
+                                       pop->row_allocation_size(),
+                                       pop->col_allocation_size(),
+                                       false,
+                                       std::move(apply),
+                                       std::move(prepare));
+            }
+            return make_team_lambda_op<T>(jac->rows(), jac->cols(), false, std::move(apply), std::move(prepare));
         }
 
         void eval_residual_and_jacobian() {
