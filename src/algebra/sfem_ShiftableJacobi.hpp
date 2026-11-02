@@ -7,6 +7,7 @@
 #include "sfem_aliases.hpp"
 #include "sfem_MatrixFreeLinearSolver.hpp"
 #include "sfem_BLAS_openmp.hpp"
+#include "sfem_TeamOperator.hpp"
 
 #include "sfem_ShiftableBlockSymJacobiKernels_openmp.hpp"
 #include "smesh_env.hpp"
@@ -14,7 +15,7 @@
 namespace sfem {
 
     template <typename T>
-    class ShiftableJacobi final : public ShiftableOperator<T> {
+    class ShiftableJacobi final : public ShiftableOperator<T>, public TeamOperator<T> {
     public:
         /// For the execution space es, on the diagonal diag.
         static std::shared_ptr<ShiftableJacobi<T>> create(const SharedBuffer<T> &diag, const ExecutionSpace es);
@@ -56,10 +57,19 @@ namespace sfem {
         /* Operator */
         int apply(const T* const b, T* const x) override {
             SFEM_TRACE_SCOPE("ShiftableJacobi::apply");
-
+            if (team_capable()) return team_region_apply<T>(*this, b, x);
             blas->xypaz(inv_diag->size(), inv_diag->data(), b, 1, x);
             return SFEM_SUCCESS;
         }
+
+        /// x += D^{-1} b on the calling thread's rows, as xypaz computes it: it reads b there only.
+        void team_apply(const Team& team, const T* const b, T* const x) const override {
+            const T* const d = inv_diag->data();
+            for (ptrdiff_t i = team.begin; i < team.end; i++) x[i] = d[i] * b[i] + 1 * x[i];
+        }
+        Team team() const override { return Team::current(rows()); }
+        bool input_in_share() const override { return true; }
+        bool team_capable() const override { return this->execution_space() == EXECUTION_SPACE_HOST; }
 
         inline std::ptrdiff_t rows() const override { return diag->size(); }
         inline std::ptrdiff_t cols() const override { return diag->size(); }

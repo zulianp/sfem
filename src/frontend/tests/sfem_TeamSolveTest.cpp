@@ -14,6 +14,9 @@
 #include "sfem_API.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_TeamOperator.hpp"
+#include "sfem_Chebyshev3.hpp"
+#include "sfem_ShiftableJacobi.hpp"
+#include "sfem_Stationary.hpp"
 #include "sfem_cg.hpp"
 #include "sfem_test.hpp"
 #include "smesh_env.hpp"
@@ -73,8 +76,18 @@ namespace {
         return p;
     }
 
-    std::vector<real_t> solve(const Problem &p, const std::shared_ptr<sfem::Operator<real_t>> &A, int *iterations, double *seconds) {
+    std::shared_ptr<sfem::Operator<real_t>> plain(const std::shared_ptr<sfem::Operator<real_t>> &op) {
+        return sfem::make_op<real_t>(
+                op->rows(), op->cols(), [op](const real_t *const x, real_t *const y) { op->apply(x, y); }, sfem::EXECUTION_SPACE_HOST);
+    }
+
+    std::vector<real_t> solve(const Problem                                 &p,
+                              const std::shared_ptr<sfem::Operator<real_t>> &A,
+                              int                                           *iterations,
+                              double                                        *seconds,
+                              const std::shared_ptr<sfem::Operator<real_t>> &M = nullptr) {
         auto cg     = sfem::create_cg<real_t>(A, sfem::EXECUTION_SPACE_HOST);
+        if (M) cg->set_preconditioner_op(M);
         cg->verbose = false;
         cg->set_rtol(1e-10);
         cg->set_atol(0);
@@ -94,13 +107,11 @@ int test_team_cg_matches_the_vector_by_vector_run() {
     SFEM_TEST_ASSERT(std::dynamic_pointer_cast<sfem::TeamOperator<real_t>>(p.A) != nullptr);
 
     // The same product behind a plain operator: CG takes its BLAS route.
-    auto A     = p.A;
-    auto plain = sfem::make_op<real_t>(
-            p.n, p.n, [A](const real_t *const x, real_t *const y) { A->apply(x, y); }, sfem::EXECUTION_SPACE_HOST);
+    auto plain_A = plain(p.A);
 
     int        it_team = 0, it_plain = 0;
     double     t_team = 0, t_plain = 0;
-    const auto x_plain = solve(p, plain, &it_plain, &t_plain);
+    const auto x_plain = solve(p, plain_A, &it_plain, &t_plain);
     const auto x_team  = solve(p, p.A, &it_team, &t_team);
     SFEM_TEST_ASSERT(it_team > 10);
     SFEM_TEST_ASSERT(std::abs(it_team - it_plain) <= 1);
@@ -116,9 +127,76 @@ int test_team_cg_matches_the_vector_by_vector_run() {
     return SFEM_TEST_SUCCESS;
 }
 
+namespace {
+    int compare(const char *what, const Problem &p, const std::shared_ptr<sfem::Operator<real_t>> &M) {
+        SFEM_TEST_ASSERT(std::dynamic_pointer_cast<sfem::TeamOperator<real_t>>(M) != nullptr);
+        int        it_team = 0, it_plain = 0;
+        double     t_team = 0, t_plain = 0;
+        const auto x_plain = solve(p, plain(p.A), &it_plain, &t_plain, plain(M));
+        const auto x_team  = solve(p, p.A, &it_team, &t_team, M);
+        double     num = 0, den = 0;
+        for (size_t i = 0; i < x_team.size(); ++i) {
+            num += (x_team[i] - x_plain[i]) * (x_team[i] - x_plain[i]);
+            den += x_plain[i] * x_plain[i];
+        }
+        printf("  %s, %ld dofs: team PCG %d iterations %.4f s, plain %d %.4f s, |x_team - x_plain| / |x_plain| = %.2e\n",
+               what, (long)p.n, it_team, t_team, it_plain, t_plain, std::sqrt(num / den));
+        SFEM_TEST_ASSERT(it_team > 2);
+        SFEM_TEST_ASSERT(std::abs(it_team - it_plain) <= 1);
+        SFEM_TEST_ASSERT(std::sqrt(num / den) < 1e-8);
+        return SFEM_TEST_SUCCESS;
+    }
+}  // namespace
+
+// Preconditioned: Jacobi and a Chebyshev smoother as team operators in CG's region.
+int test_team_preconditioned_cg() {
+    const Problem p    = elasticity_cube(smesh::Env::read<int>("SFEM_TEAM_SOLVE_CELLS", 8));
+    // The generated materials have no hessian_diag: the stored tangent's (exact in f64).
+    auto diag = sfem::create_host_buffer<real_t>(p.n);
+    auto zero = sfem::create_host_buffer<real_t>(p.n);
+    p.f->set_inexact_options(sfem::InexactOptions::from_strings("points", "f64"));
+    SFEM_TEST_ASSERT(p.f->inexact_update(zero->data()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(p.f->inexact_diag(zero->data(), diag->data()) == SFEM_SUCCESS);
+    auto jacobi = sfem::h_shiftable_jacobi<real_t>(diag);
+    if (compare("Jacobi", p, jacobi) != SFEM_TEST_SUCCESS) return SFEM_TEST_FAILURE;
+
+    auto cheb = sfem::create_cheb3<real_t>(p.A, sfem::EXECUTION_SPACE_HOST);
+    cheb->verbose = false;
+    cheb->set_max_it(3);
+    cheb->set_initial_guess_zero(true);
+    cheb->init_with_ones();
+    return compare("Chebyshev(3)", p, cheb);
+}
+
+// A Jacobi smoother's sweeps (StationaryIteration) in one region against the same sweeps over
+// plain operators: no sums, so the same bits.
+int test_team_stationary_iteration() {
+    const Problem p    = elasticity_cube(6);
+    auto          diag = sfem::create_host_buffer<real_t>(p.n);
+    auto          zero = sfem::create_host_buffer<real_t>(p.n);
+    p.f->set_inexact_options(sfem::InexactOptions::from_strings("points", "f64"));
+    SFEM_TEST_ASSERT(p.f->inexact_update(zero->data()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(p.f->inexact_diag(zero->data(), diag->data()) == SFEM_SUCCESS);
+    auto jacobi = sfem::h_shiftable_jacobi<real_t>(diag);
+    jacobi->set_relaxation_parameter(real_t(2) / 3);
+
+    std::vector<std::vector<real_t>> x(2, std::vector<real_t>((size_t)p.n, 0));
+    for (int k = 0; k < 2; ++k) {
+        auto smoother = sfem::create_stationary<real_t>(k ? p.A : plain(p.A), k ? jacobi : plain(jacobi), sfem::EXECUTION_SPACE_HOST);
+        smoother->set_max_it(30);
+        SFEM_TEST_ASSERT((std::dynamic_pointer_cast<sfem::TeamOperator<real_t>>(smoother)->team_capable()) == (k == 1));
+        p.f->apply_constraints(x[k].data());
+        smoother->apply(p.rhs->data(), x[k].data());
+    }
+    for (size_t i = 0; i < x[0].size(); ++i) SFEM_TEST_ASSERT(x[0][i] == x[1][i]);
+    return SFEM_TEST_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_team_cg_matches_the_vector_by_vector_run);
+    SFEM_RUN_TEST(test_team_preconditioned_cg);
+    SFEM_RUN_TEST(test_team_stationary_iteration);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }

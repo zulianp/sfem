@@ -34,6 +34,10 @@ namespace sfem {
 
         virtual bool input_in_share() const { return false; }
 
+        /// Whether team_apply may be taken now: an operator whose team form rests on another's
+        /// (a smoother over its operator) has one only where that one has.
+        virtual bool team_capable() const { return true; }
+
         /// Outside any region, before the products of a region: checks and scratch.
         virtual int prepare() { return SFEM_SUCCESS; }
     };

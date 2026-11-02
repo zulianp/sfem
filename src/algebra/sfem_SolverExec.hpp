@@ -28,12 +28,18 @@ namespace sfem {
     template <typename T>
     class BlasExec {
     public:
-        BlasExec(BLAS<T> &blas, const ptrdiff_t n) : blas_(blas), n_(n) {}
+        /// n entries; an output zeroed before a product spans `allocation` (under MPI the ghosts too).
+        BlasExec(BLAS<T> &blas, const ptrdiff_t n, const ptrdiff_t allocation = -1)
+            : blas_(blas), n_(n), allocation_(allocation > n ? allocation : n) {}
 
         T    dot(const T *const a, const T *const b) { return blas_.dot(n_, a, b); }
         void axpby(const T alpha, const T *const x, const T beta, T *const y) { blas_.axpby(n_, alpha, x, beta, y); }
         void copy(const T *const src, T *const dest) { blas_.copy(n_, src, dest); }
-        void zeros(T *const y) { blas_.zeros(n_, y); }
+        void zeros(T *const y) { blas_.zeros(allocation_, y); }
+        /// y <- alpha x
+        void scale_into(const T alpha, const T *const x, T *const y) { blas_.zaxpby(n_, alpha, x, T(0), x, y); }
+        BLAS<T> &blas() { return blas_; }
+        ptrdiff_t size() const { return n_; }
 
         int apply(Operator<T> &op, const T *const in, T *const out, const bool overwrites) {
             if (!overwrites) zeros(out);
@@ -46,6 +52,7 @@ namespace sfem {
     private:
         BLAS<T>        &blas_;
         const ptrdiff_t n_;
+        const ptrdiff_t allocation_;
     };
 
     template <typename T>
@@ -59,12 +66,17 @@ namespace sfem {
         }
         void copy(const T *const src, T *const dest) { team_blas::copy(team_.begin, team_.end, src, dest); }
         void zeros(T *const y) { team_blas::zeros(team_.begin, team_.end, y); }
+        /// y <- alpha x
+        void scale_into(const T alpha, const T *const x, T *const y) {
+            for (ptrdiff_t i = team_.begin; i < team_.end; i++) y[i] = alpha * x[i];
+        }
 
         /// The input's entries are the threads' own until the product reads them: one barrier, after
-        /// this thread's share of the output is zeroed, covers both.
+        /// this thread's share of the output is zeroed, covers both -- none where the operator reads
+        /// beyond the thread's share only after a barrier of its own and nothing was zeroed.
         int apply(TeamOperator<T> &op, const T *const in, T *const out, const bool overwrites) {
             if (!overwrites) zeros(out);
-            team_.barrier();
+            if (!overwrites || !op.input_in_share()) team_.barrier();
             op.team_apply(team_, in, out);
             return SFEM_SUCCESS;
         }
