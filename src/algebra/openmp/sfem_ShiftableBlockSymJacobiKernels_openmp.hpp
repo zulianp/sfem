@@ -55,6 +55,35 @@ namespace sfem {
         }
     }
 
+    /// Block idx[i]'s inverse rebuilt from its material diagonal block plus scaling[i] times sparse
+    /// block i (masked rows set to the identity), times omega: one contact node of the sparse update.
+    template <typename HP, typename LP>
+    inline void block_sym_jacobi_sparse_update_block(const ptrdiff_t     i,
+                                                     const idx_t* const  idx,
+                                                     const HP* const     material_diag,
+                                                     const HP* const     sparse_dd,
+                                                     const HP* const     scaling,
+                                                     const mask_t* const constraints_mask,
+                                                     const LP            omega,
+                                                     LP* const           inv_diag);
+
+    /// The sparse update from inside a region, by every thread of it (orphaned worksharing): the
+    /// contact nodes split among them (each block is one node's), ending on the loop's barrier.
+    template <typename HP, typename LP>
+    void block_sym_jacobi_sparse_update_team(const ptrdiff_t     n_sparse,
+                                             const idx_t* const  idx,
+                                             const HP* const     material_diag,
+                                             const HP* const     sparse_dd,
+                                             const HP* const     scaling,
+                                             const mask_t* const constraints_mask,
+                                             const LP            omega,
+                                             LP* const           inv_diag) {
+#pragma omp for
+        for (ptrdiff_t i = 0; i < n_sparse; i++) {
+            block_sym_jacobi_sparse_update_block(i, idx, material_diag, sparse_dd, scaling, constraints_mask, omega, inv_diag);
+        }
+    }
+
     namespace private_ {
 
         template <typename T>
@@ -252,67 +281,77 @@ namespace sfem {
                                                                     const mask_t* const constraints_mask,
                                                                     const LP           omega,
                                                                     LP* const          inv_diag) {
-#pragma omp parallel for
-            for (ptrdiff_t i = 0; i < n_sparse; i++) {
-                const HP        si  = scaling[i];
-                const ptrdiff_t b   = idx[i];
-                const auto* const di = &material_diag[b * 6];
-                const auto* const dd = &sparse_dd[i * 6];
-                auto* const       ivi = &inv_diag[b * 9];
-
-                LP mat[9];
-                mat[0] = (LP)(di[0] + si * dd[0]);
-                mat[1] = (LP)(di[1] + si * dd[1]);
-                mat[2] = (LP)(di[2] + si * dd[2]);
-                mat[3] = (LP)(di[1] + si * dd[1]);
-                mat[4] = (LP)(di[3] + si * dd[3]);
-                mat[5] = (LP)(di[4] + si * dd[4]);
-                mat[6] = (LP)(di[2] + si * dd[2]);
-                mat[7] = (LP)(di[4] + si * dd[4]);
-                mat[8] = (LP)(di[5] + si * dd[5]);
-
-                if (mask_get(b * 3 + 0, constraints_mask)) {
-                    mat[0] = 1;
-                    mat[1] = 0;
-                    mat[2] = 0;
-                }
-                if (mask_get(b * 3 + 1, constraints_mask)) {
-                    mat[3] = 0;
-                    mat[4] = 1;
-                    mat[5] = 0;
-                }
-                if (mask_get(b * 3 + 2, constraints_mask)) {
-                    mat[6] = 0;
-                    mat[7] = 0;
-                    mat[8] = 1;
-                }
-
-                OpenMPInvert3<LP>::inverse3(mat[0],
-                                             mat[1],
-                                             mat[2],
-                                             mat[3],
-                                             mat[4],
-                                             mat[5],
-                                             mat[6],
-                                             mat[7],
-                                             mat[8],
-                                             &ivi[0],
-                                             &ivi[1],
-                                             &ivi[2],
-                                             &ivi[3],
-                                             &ivi[4],
-                                             &ivi[5],
-                                             &ivi[6],
-                                             &ivi[7],
-                                             &ivi[8]);
-
-                for (int k = 0; k < 9; k++) {
-                    ivi[k] *= omega;
-                }
-            }
+#pragma omp parallel
+            block_sym_jacobi_sparse_update_team(n_sparse, idx, material_diag, sparse_dd, scaling, constraints_mask, omega, inv_diag);
         }
 
     }  // namespace private_
+
+    template <typename HP, typename LP>
+    inline void block_sym_jacobi_sparse_update_block(const ptrdiff_t     i,
+                                                     const idx_t* const  idx,
+                                                     const HP* const     material_diag,
+                                                     const HP* const     sparse_dd,
+                                                     const HP* const     scaling,
+                                                     const mask_t* const constraints_mask,
+                                                     const LP            omega,
+                                                     LP* const           inv_diag) {
+        const HP        si  = scaling[i];
+        const ptrdiff_t b   = idx[i];
+        const auto* const di = &material_diag[b * 6];
+        const auto* const dd = &sparse_dd[i * 6];
+        auto* const       ivi = &inv_diag[b * 9];
+
+        LP mat[9];
+        mat[0] = (LP)(di[0] + si * dd[0]);
+        mat[1] = (LP)(di[1] + si * dd[1]);
+        mat[2] = (LP)(di[2] + si * dd[2]);
+        mat[3] = (LP)(di[1] + si * dd[1]);
+        mat[4] = (LP)(di[3] + si * dd[3]);
+        mat[5] = (LP)(di[4] + si * dd[4]);
+        mat[6] = (LP)(di[2] + si * dd[2]);
+        mat[7] = (LP)(di[4] + si * dd[4]);
+        mat[8] = (LP)(di[5] + si * dd[5]);
+
+        if (mask_get(b * 3 + 0, constraints_mask)) {
+            mat[0] = 1;
+            mat[1] = 0;
+            mat[2] = 0;
+        }
+        if (mask_get(b * 3 + 1, constraints_mask)) {
+            mat[3] = 0;
+            mat[4] = 1;
+            mat[5] = 0;
+        }
+        if (mask_get(b * 3 + 2, constraints_mask)) {
+            mat[6] = 0;
+            mat[7] = 0;
+            mat[8] = 1;
+        }
+
+        private_::OpenMPInvert3<LP>::inverse3(mat[0],
+                                     mat[1],
+                                     mat[2],
+                                     mat[3],
+                                     mat[4],
+                                     mat[5],
+                                     mat[6],
+                                     mat[7],
+                                     mat[8],
+                                     &ivi[0],
+                                     &ivi[1],
+                                     &ivi[2],
+                                     &ivi[3],
+                                     &ivi[4],
+                                     &ivi[5],
+                                     &ivi[6],
+                                     &ivi[7],
+                                     &ivi[8]);
+
+        for (int k = 0; k < 9; k++) {
+            ivi[k] *= omega;
+        }
+    }
 
     template <typename HP, typename LP = HP>
     struct OpenMPShiftableBlockSymJacobiKernels {

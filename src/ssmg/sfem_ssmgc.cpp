@@ -970,7 +970,13 @@ namespace sfem {
                 }
                 mg->add_level_exchange(ex);
                 auto f = levels[i]->function;
-                mg->add_level_apply_zero_constraints([f](real_t *const x) { f->apply_zero_constraints(x); });
+                if (es == EXECUTION_SPACE_HOST && f->team_constraints_supported()) {
+                    mg->add_level_apply_zero_constraints([f](real_t *const x) { f->apply_zero_constraints(x); },
+                                                         [f](const Team &team, real_t *const x) { f->team_apply_zero_constraints(team, x); },
+                                                         [f] { return f->team_prepare_constraints(); });
+                } else {
+                    mg->add_level_apply_zero_constraints([f](real_t *const x) { f->apply_zero_constraints(x); });
+                }
             }
 
             if (nonlinear) {

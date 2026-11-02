@@ -87,6 +87,9 @@ namespace sfem {
             adopt(*op);
         }
 
+        std::shared_ptr<ShiftableOperator<T>> shiftable_preconditioner() const override {
+            return std::dynamic_pointer_cast<ShiftableOperator<T>>(preconditioner_op);
+        }
         int set_op_and_diag_shift(const std::shared_ptr<Operator<T>>& op, const SharedBuffer<T>& diag) override {
             assert(this->execution_space() == (enum ExecutionSpace)diag->mem_space());
             auto J         = op;  // + sfem::diag_op(diag, execution_space());

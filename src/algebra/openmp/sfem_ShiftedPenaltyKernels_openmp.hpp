@@ -2,6 +2,7 @@
 #define SFEM_ShiftedPenalty_IMPL_HPP
 
 #include "sfem_aliases.hpp"
+#include "sfem_team.h"
 
 #include <algorithm>
 #include <cassert>
@@ -63,6 +64,110 @@ namespace sfem {
         }
     };
 
+    /// The penalty's element-wise kernels on the rows [b, e): a thread's share, the bodies of the
+    /// OpenMP kernels below (one region each) and of a team's (ShiftedPenaltyMultigrid's step).
+    namespace shifted_penalty_team {
+        // Adds to negative gradient (i.e., residual)
+        template <typename T>
+        void ramp_p(const ptrdiff_t b,
+                    const ptrdiff_t e,
+                    const T         penalty_param,
+                    const T* const  weights,
+                    const T* const  x,
+                    const T* const  ub,
+                    const T* const  lagr_ub,
+                    T* const        out) {
+            for (ptrdiff_t i = b; i < e; i++) {
+                const T rho = weights ? penalty_param * weights[i] : penalty_param;
+                out[i] -= std::max(T(0), rho * (x[i] - ub[i]) + lagr_ub[i]);
+            }
+        }
+
+        template <typename T>
+        void ramp_m(const ptrdiff_t b,
+                    const ptrdiff_t e,
+                    const T         penalty_param,
+                    const T* const  weights,
+                    const T* const  x,
+                    const T* const  lb,
+                    const T* const  lagr_lb,
+                    T* const        out) {
+            for (ptrdiff_t i = b; i < e; i++) {
+                const T rho = weights ? penalty_param * weights[i] : penalty_param;
+                out[i] -= std::min(T(0), rho * (x[i] - lb[i]) + lagr_lb[i]);
+            }
+        }
+
+        // Ramp negative and positive parts
+        template <typename T>
+        void calc_r_pen(const ptrdiff_t b,
+                        const ptrdiff_t e,
+                        const T* const  x,
+                        const T         penalty_param,
+                        const T* const  weights,
+                        const T* const  lb,
+                        const T* const  ub,
+                        const T* const  lagr_lb,
+                        const T* const  lagr_ub,
+                        T* const        result) {
+            if (lb) ramp_m(b, e, penalty_param, weights, x, lb, lagr_lb, result);
+            if (ub) ramp_p(b, e, penalty_param, weights, x, ub, lagr_ub, result);
+        }
+
+        template <typename T>
+        void calc_J_pen(const ptrdiff_t b,
+                        const ptrdiff_t e,
+                        const T* const  x,
+                        const T         penalty_param,
+                        const T* const  weights,
+                        const T* const  lb,
+                        const T* const  ub,
+                        const T* const  lagr_lb,
+                        const T* const  lagr_ub,
+                        T* const        result) {
+            if (lb) {
+                for (ptrdiff_t i = b; i < e; i++) {
+                    const T rho = weights ? penalty_param * weights[i] : penalty_param;
+                    result[i] += ((rho * (x[i] - lb[i]) + lagr_lb[i]) <= 0) * rho;
+                }
+            }
+
+            if (ub) {
+                for (ptrdiff_t i = b; i < e; i++) {
+                    const T rho = weights ? penalty_param * weights[i] : penalty_param;
+                    result[i] += ((rho * (x[i] - ub[i]) + lagr_ub[i]) >= 0) * rho;
+                }
+            }
+        }
+
+        // out[i * block_size + k] = scale[i] * blocks[i * block_size + k], blocks [b, e)
+        template <typename T>
+        void scale_blocks(const ptrdiff_t b,
+                          const ptrdiff_t e,
+                          const int       block_size,
+                          const T* const  scale,
+                          const T* const  blocks,
+                          T* const        out) {
+            for (ptrdiff_t i = b; i < e; i++) {
+                for (int k = 0; k < block_size; k++) {
+                    out[i * block_size + k] = scale[i] * blocks[i * block_size + k];
+                }
+            }
+        }
+
+        // One region, f(b, e) on every thread's static share of the n entries.
+        template <typename F>
+        void over_shares(const ptrdiff_t n, F f) {
+#pragma omp parallel
+            {
+                const sfem_team_t team = sfem_team_current(0);
+                ptrdiff_t         b, e;
+                sfem_team_share(&team, n, 1, 0, &b, &e);
+                f(b, e);
+            }
+        }
+    }  // namespace shifted_penalty_team
+
     template <typename T>
     struct OpenMPShiftedPenaltyKernels {
         static void build(struct ShiftedPenaltyKernels<T>& tpl) {
@@ -94,11 +199,9 @@ namespace sfem {
                             const T* const  ub,
                             const T* const  lagr_ub,
                             T* const        out) {
-#pragma omp parallel for
-                for (ptrdiff_t i = 0; i < n; i++) {
-                    const T rho = weights ? penalty_param * weights[i] : penalty_param;
-                    out[i] -= std::max(T(0), rho * (x[i] - ub[i]) + lagr_ub[i]);
-                }
+                shifted_penalty_team::over_shares(n, [=](const ptrdiff_t b, const ptrdiff_t e) {
+                    shifted_penalty_team::ramp_p(b, e, penalty_param, weights, x, ub, lagr_ub, out);
+                });
             };
 
             tpl.ramp_m = [](const ptrdiff_t n,
@@ -108,11 +211,9 @@ namespace sfem {
                             const T* const  lb,
                             const T* const  lagr_lb,
                             T* const        out) {
-#pragma omp parallel for
-                for (ptrdiff_t i = 0; i < n; i++) {
-                    const T rho = weights ? penalty_param * weights[i] : penalty_param;
-                    out[i] -= std::min(T(0), rho * (x[i] - lb[i]) + lagr_lb[i]);
-                }
+                shifted_penalty_team::over_shares(n, [=](const ptrdiff_t b, const ptrdiff_t e) {
+                    shifted_penalty_team::ramp_m(b, e, penalty_param, weights, x, lb, lagr_lb, out);
+                });
             };
 
             tpl.update_lagr_p = [](const ptrdiff_t n,
@@ -141,22 +242,19 @@ namespace sfem {
                 }
             };
 
-            auto ramp_m    = tpl.ramp_m;
-            auto ramp_p    = tpl.ramp_p;
-            tpl.calc_r_pen = [ramp_m, ramp_p](const ptrdiff_t n,
-                                              T* const        x,
-                                              const T         penalty_param,
-                                              const T* const  weights,
-                                              const T* const  lb,
-                                              const T* const  ub,
-                                              const T* const  lagr_lb,
-                                              const T* const  lagr_ub,
-                                              T*              result) {
+            tpl.calc_r_pen = [](const ptrdiff_t n,
+                                T* const        x,
+                                const T         penalty_param,
+                                const T* const  weights,
+                                const T* const  lb,
+                                const T* const  ub,
+                                const T* const  lagr_lb,
+                                const T* const  lagr_ub,
+                                T*              result) {
                 SFEM_TRACE_SCOPE("OpenMPShiftedPenaltyKernels::calc_r_pen");
-
-                // Ramp negative and positive parts
-                if (lb) ramp_m(n, penalty_param, weights, x, lb, lagr_lb, result);
-                if (ub) ramp_p(n, penalty_param, weights, x, ub, lagr_ub, result);
+                shifted_penalty_team::over_shares(n, [=](const ptrdiff_t b, const ptrdiff_t e) {
+                    shifted_penalty_team::calc_r_pen(b, e, x, penalty_param, weights, lb, ub, lagr_lb, lagr_ub, result);
+                });
             };
 
             tpl.calc_J_pen = [](const ptrdiff_t n,
@@ -169,22 +267,9 @@ namespace sfem {
                                 const T* const  lagr_ub,
                                 T* const        result) {
                 SFEM_TRACE_SCOPE("OpenMPShiftedPenaltyKernels::calc_J_pen");
-
-                if (lb) {
-#pragma omp parallel for
-                    for (ptrdiff_t i = 0; i < n; i++) {
-                        const T rho = weights ? penalty_param * weights[i] : penalty_param;
-                        result[i] += ((rho * (x[i] - lb[i]) + lagr_lb[i]) <= 0) * rho;
-                    }
-                }
-
-                if (ub) {
-#pragma omp parallel for
-                    for (ptrdiff_t i = 0; i < n; i++) {
-                        const T rho = weights ? penalty_param * weights[i] : penalty_param;
-                        result[i] += ((rho * (x[i] - ub[i]) + lagr_ub[i]) >= 0) * rho;
-                    }
-                }
+                shifted_penalty_team::over_shares(n, [=](const ptrdiff_t b, const ptrdiff_t e) {
+                    shifted_penalty_team::calc_J_pen(b, e, x, penalty_param, weights, lb, ub, lagr_lb, lagr_ub, result);
+                });
             };
 
             tpl.sq_norm_kkt_p = [](const ptrdiff_t n,
@@ -220,12 +305,9 @@ namespace sfem {
             };
 
             tpl.scale_blocks = [](const ptrdiff_t n_blocks, const int block_size, const T* const scale, const T* const blocks, T* const out) {
-#pragma omp parallel for
-                for (ptrdiff_t i = 0; i < n_blocks; i++) {
-                    for (int k = 0; k < block_size; k++) {
-                        out[i * block_size + k] = scale[i] * blocks[i * block_size + k];
-                    }
-                }
+                shifted_penalty_team::over_shares(n_blocks, [=](const ptrdiff_t b, const ptrdiff_t e) {
+                    shifted_penalty_team::scale_blocks(b, e, block_size, scale, blocks, out);
+                });
             };
 
             assert(tpl.good());

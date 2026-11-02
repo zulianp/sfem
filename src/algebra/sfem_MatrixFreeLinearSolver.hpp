@@ -151,6 +151,10 @@ namespace sfem {
             SFEM_ERROR("[Error] ShiftableOperator::shift(block_diag, scaling) not implemented!\n");
             return SFEM_FAILURE;
         }
+        /// shift(block_diag, scaling) from inside a region, by every thread of it, ending on a
+        /// barrier: where team_shift_capable() (host, the update touching only the blocks' nodes).
+        virtual bool team_shift_capable() const { return false; }
+        virtual void team_shift(const std::shared_ptr<SparseBlockVector<T>>& /*block_diag*/, const SharedBuffer<T>& /*scaling*/) {}
     };
 
     template <typename T>
@@ -163,6 +167,8 @@ namespace sfem {
         virtual void set_n_dofs(const ptrdiff_t n)                                 = 0;
         virtual void set_initial_guess_zero(const bool /*val*/) {}
         virtual int  iterations() const = 0;
+        /// The preconditioner set_op_and_diag_shift shifts, where it is one (null otherwise).
+        virtual std::shared_ptr<ShiftableOperator<T>> shiftable_preconditioner() const { return nullptr; }
         virtual int  set_op_and_diag_shift(const std::shared_ptr<Operator<T>>& /*op*/, const SharedBuffer<T>& /*diag*/) {
             SFEM_ERROR(
                     "set_op_and_diag_shift: not implemented for subclass of "

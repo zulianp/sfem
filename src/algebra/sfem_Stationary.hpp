@@ -116,6 +116,9 @@ namespace sfem {
         void set_max_it(const int it) override { max_it = it; }
         void set_n_dofs(const ptrdiff_t n) override { this->n_dofs = n; }
 
+        std::shared_ptr<ShiftableOperator<T>> shiftable_preconditioner() const override {
+            return std::dynamic_pointer_cast<ShiftableOperator<T>>(preconditioner);
+        }
         int set_op_and_diag_shift(const std::shared_ptr<Operator<T>>& op, const SharedBuffer<T>& diag) override {
             this->op = op;
             configure_sizes_from_op();
