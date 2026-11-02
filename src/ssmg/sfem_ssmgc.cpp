@@ -12,7 +12,6 @@
 #include "sfem_ShiftableJacobi.hpp"
 #include "sfem_Stationary.hpp"
 #include "sfem_cg.hpp"
-#include "sfem_parallel_cg.hpp"
 #include "smesh_env.hpp"
 #include "smesh_ssedge_restriction.hpp"
 #include "smesh_ssquad4.hpp"
@@ -839,7 +838,7 @@ namespace sfem {
             auto linear_op = sfem::create_linear_operator(coarse_op_type.c_str(), f_coarse, nullptr, es);
             operators.push_back(linear_op);
 
-            // Coarse-grid solver. MPI uses ParallelCG on matrix-free A; serial uses CG on BSR.
+            // Coarse-grid solver: CG, distributed under MPI, on the coarse operator.
             // Both get the same block-Jacobi PC so the coarse correction matches serial rates.
             std::shared_ptr<sfem::Operator<real_t>> sj_coarse;
             if (enable_coarse_space_preconditioner && block_size == 3) {
@@ -858,19 +857,10 @@ namespace sfem {
                 }
             }
 
+            // Distributed where the coarse operator is (ConjugateGradient::set_op).
             std::shared_ptr<sfem::MatrixFreeLinearSolver<real_t>> coarse_solver;
-            auto coarse_pop = std::dynamic_pointer_cast<sfem::ParallelOperator<real_t>>(linear_op);
-            if (coarse_pop && coarse_pop->comm() && coarse_pop->comm()->size() > 1) {
-                auto pcg = sfem::create_parallel_cg<real_t>(coarse_pop);
-                pcg->set_max_it(max_coarse_it);
-                pcg->verbose = coarse_solver_verbose;
-                pcg->set_rtol(coarse_rtol);
-                if (sj_coarse) {
-                    pcg->set_preconditioner_op(sj_coarse);
-                }
-                coarse_solver = pcg;
-            } else {
-                auto cg = sfem::create_cg<real_t>(operators.back(), es);
+            {
+                auto cg = sfem::create_cg<real_t>(linear_op, es);
                 cg->set_max_it(max_coarse_it);
                 cg->verbose = coarse_solver_verbose;
                 cg->set_rtol(coarse_rtol);
