@@ -84,11 +84,17 @@ namespace sfem {
         bool team_capable() const override {
             return team_op_ && team_op_->team_capable() && this->execution_space() == EXECUTION_SPACE_HOST;
         }
-        int prepare() override { return team_op_ ? team_op_->prepare() : SFEM_SUCCESS; }
+        int prepare() override {
+            team_reduction_buffer(team_sums_, n_dofs);
+            return team_op_ ? team_op_->prepare() : SFEM_SUCCESS;
+        }
         void team_apply(const Team& team, const T* const rhs, T* const x) const override {
+            team_solve(team, rhs, x, is_initial_guess_zero);
+        }
+        void team_solve(const Team& team, const T* const rhs, T* const x, const bool zero_guess) const override {
             TeamReduction<T, 1> sums(team_sums_.data(), team_chunk_count(n_dofs), span_.ranks());
             TeamExec<T>         e(team, sums);
-            run(e, *team_op_, rhs, x, p_->data(), temp_->data());
+            run(e, *team_op_, rhs, x, p_->data(), temp_->data(), zero_guess);
         }
 
         void set_preconditioner_op(const std::shared_ptr<Operator<T>>&) override { assert(false); }
@@ -173,12 +179,9 @@ namespace sfem {
         int apply(const T* const b, T* const x) override {
             SFEM_TRACE_SCOPE("Chebyshev3::apply");
             if (!good()) return SFEM_FAILURE;
-            if (team_capable()) {
-                team_reduction_buffer(team_sums_, n_dofs);
-                return team_region_apply<T>(*this, b, x);
-            }
+            if (team_capable()) return team_region_apply<T>(*this, b, x);
             BlasExec<T> e(*blas, n_dofs, span_.allocation, span_.ranks());
-            run(e, *op_, b, x, p_->data(), temp_->data());
+            run(e, *op_, b, x, p_->data(), temp_->data(), is_initial_guess_zero);
             return 0;
         }
 
@@ -216,9 +219,10 @@ namespace sfem {
         static void step_x(BlasExec<T>& e, const T alpha, const T* const p, T* const x) { e.blas().axpy(e.size(), -alpha, p, x); }
         static void step_x(TeamExec<T>& e, const T alpha, const T* const p, T* const x) { e.axpby(-alpha, p, T(1), x); }
 
-        /// The iterations, written once for their executor (sfem_SolverExec.hpp).
+        /// The iterations, written once for their executor (sfem_SolverExec.hpp); x zero on entry
+        /// with zero_guess.
         template <class E, class Op>
-        void run(E& e, Op& A, const T* const rhs, T* const x, T* const p, T* const temp) const {
+        void run(E& e, Op& A, const T* const rhs, T* const x, T* const p, T* const temp, const bool zero_guess) const {
             if (max_it <= 0) {
                 if (e.leader()) iterations_ = 0;
                 return;
@@ -234,7 +238,7 @@ namespace sfem {
             T dea   = 0;
 
             // Iteration 0: p = A x - rhs (or p = -rhs if x==0), then x -= alpha p
-            if (is_initial_guess_zero) {
+            if (zero_guess) {
                 e.scale_into(T(-1), rhs, p);
             } else {
                 e.apply(A, x, p, apply_overwrites_output);

@@ -74,6 +74,7 @@ namespace sfem {
         bool team_supported() const override { return true; }
         int  team_prepare() override;
         int  team_copy_constrained_dofs(const Team &team, const real_t *const src, real_t *const dest) override;
+        int  team_apply_zero(const Team &team, real_t *const x) override;
         int mask(mask_t *mask) override;
 
         int value(const real_t *const x, real_t *const out) override;

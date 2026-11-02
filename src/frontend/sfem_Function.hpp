@@ -177,6 +177,12 @@ namespace sfem {
                        const ElementScope  scope = ElementScope::ALL);
         /// copy_constrained_dofs on the calling thread's rows.
         void team_copy_constrained_dofs(const Team &team, const real_t *const src, real_t *const dest);
+        /// Whether every constraint has a team form, and their set-up outside the region (whether
+        /// or not the function handles its constraints in its products).
+        bool team_constraints_supported() const;
+        int  team_prepare_constraints();
+        /// apply_zero_constraints on the calling thread's rows (after team_prepare_constraints).
+        void team_apply_zero_constraints(const Team &team, real_t *const x);
         int team_inexact_apply(const Team         &team,
                                const real_t *const h,
                                real_t *const       out,

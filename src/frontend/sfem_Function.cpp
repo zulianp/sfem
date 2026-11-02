@@ -667,10 +667,20 @@ namespace sfem {
         for (auto &op : impl_->ops) {
             if (op->team_supported() && op->team_prepare() != SFEM_SUCCESS) return SFEM_FAILURE;
         }
-        if (impl_->handle_constraints) {
-            for (auto &c : impl_->constraints) {
-                if (c->team_supported() && c->team_prepare() != SFEM_SUCCESS) return SFEM_FAILURE;
-            }
+        if (impl_->handle_constraints) return team_prepare_constraints();
+        return SFEM_SUCCESS;
+    }
+
+    bool Function::team_constraints_supported() const {
+        for (auto &c : impl_->constraints) {
+            if (!c->team_supported()) return false;
+        }
+        return true;
+    }
+
+    int Function::team_prepare_constraints() {
+        for (auto &c : impl_->constraints) {
+            if (c->team_supported() && c->team_prepare() != SFEM_SUCCESS) return SFEM_FAILURE;
         }
         return SFEM_SUCCESS;
     }
@@ -695,6 +705,10 @@ namespace sfem {
     void Function::team_copy_constrained_dofs(const Team &team, const real_t *const src, real_t *const dest) {
         if (!impl_->handle_constraints) return;
         for (auto &c : impl_->constraints) c->team_copy_constrained_dofs(team, src, dest);
+    }
+
+    void Function::team_apply_zero_constraints(const Team &team, real_t *const x) {
+        for (auto &c : impl_->constraints) c->team_apply_zero(team, x);
     }
 
     int Function::team_inexact_apply(const Team         &team,
