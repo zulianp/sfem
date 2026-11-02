@@ -549,6 +549,14 @@ namespace sfem {
             // assembled at.
             const ptrdiff_t ndofs = f->space()->n_dofs();
             auto            comm  = f->space()->mesh()->comm();
+            if (es == sfem::EXECUTION_SPACE_HOST && comm->size() > 1 && f->team_inexact_supported()) {
+                return sfem::create_distributed_team_operator(
+                        f,
+                        [f](const sfem::Team &team, const real_t *const h, real_t *const out, const sfem::ElementScope scope) {
+                            f->team_inexact_apply(team, h, out, scope);
+                        },
+                        [f] { return f->team_prepare(); });
+            }
             if (es == sfem::EXECUTION_SPACE_HOST && comm->size() == 1 && f->team_inexact_supported()) {
                 return sfem::make_team_op<real_t>(
                         comm,

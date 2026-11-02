@@ -1375,20 +1375,27 @@ namespace sfem {
     });
   }
 
-  int GeneratedLinearElasticity::team_inexact_apply(const Team &team, const real_t *const h, real_t *const out) {
-    // The assembled store holds the whole tangent, inertia included.
+  int GeneratedLinearElasticity::team_inexact_apply(const Team &team,
+                      const real_t *const h,
+                      real_t *const out,
+                      const ElementScope scope) {
+    // The assembled store holds the whole tangent, inertia included. Its rows read every
+    // column, so the halves of a distributed product take it with the interface, once the
+    // halo is in.
     if (impl_->inexact.assembled()) {
-      impl_->inexact.team_apply_bsr(team, h, out);
+      if (scope != ElementScope::OWNED_NOT_SHARED) impl_->inexact.team_apply_bsr(team, h, out);
       return SFEM_SUCCESS;
     }
-    if (auto term = time_scheme_term(impl_->time_scheme)) {
-      if (term->team_apply(team, impl_->inexact.state, h, out, ElementScope::ALL) != SFEM_SUCCESS) {
+    if (auto term = time_scheme_term(impl_->time_scheme); term && scope != ElementScope::SHARED_AND_AURA) {
+      if (term->team_apply(team, impl_->inexact.state, h, out, scope) != SFEM_SUCCESS) {
         return SFEM_FAILURE;
       }
       team.barrier();
     }
+    auto mesh = impl_->space->mesh();
     int domain_index = 0;
     return impl_->domains->iterate([&](const OpDomain &domain) {
+      const ElementRange range = element_range(*mesh, *domain.block, scope);
       auto store = impl_->inexact.stores.find(domain.block.get());
       if (store == impl_->inexact.stores.end() || !store->second) {
         SFEM_ERROR("GeneratedLinearElasticity::inexact_apply requires inexact_update first\n");
@@ -1405,13 +1412,16 @@ namespace sfem {
           packed = &view;
         }
       }
-      store->second->team_apply(team, domain.block->n_elements(), element_connectivity(domain), packed, 3, h, out);
+      store->second->team_apply(
+          team, domain.block->n_elements(), range.begin, range.end, element_connectivity(domain), packed, 3, h, out);
       return SFEM_SUCCESS;
     });
   }
 
   int GeneratedLinearElasticity::inexact_apply(const real_t *const h, real_t *const out) {
     SFEM_TRACE_SCOPE("GeneratedLinearElasticity::inexact_apply");
-    return op_team_region(*this, impl_->space->n_dofs(), [&](const Team &team) { return team_inexact_apply(team, h, out); });
+    return op_team_region(*this, impl_->space->n_dofs(), [&](const Team &team) {
+      return team_inexact_apply(team, h, out, ElementScope::ALL);
+    });
   }
 }  // namespace sfem

@@ -697,16 +697,19 @@ namespace sfem {
         for (auto &c : impl_->constraints) c->team_copy_constrained_dofs(team, src, dest);
     }
 
-    int Function::team_inexact_apply(const Team &team, const real_t *const h, real_t *const out) {
+    int Function::team_inexact_apply(const Team         &team,
+                                     const real_t *const h,
+                                     real_t *const       out,
+                                     const ElementScope  scope) {
         int applied = 0;
         for (auto &op : impl_->ops) {
             if (!op->residual_depends_on_state() && !op->inexact_supported()) continue;
             if (applied++ > 0) team.barrier();
-            const int status = op->inexact_supported() ? op->team_inexact_apply(team, h, out)
-                                                       : op->team_apply(team, nullptr, h, out, ElementScope::ALL);
+            const int status = op->inexact_supported() ? op->team_inexact_apply(team, h, out, scope)
+                                                       : op->team_apply(team, nullptr, h, out, scope);
             if (status != SFEM_SUCCESS) return SFEM_FAILURE;
         }
-        team_copy_constrained_dofs(team, h, out);
+        if (scope == ElementScope::ALL) team_copy_constrained_dofs(team, h, out);
         return SFEM_SUCCESS;
     }
 

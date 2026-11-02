@@ -5,6 +5,7 @@
 #include "sfem_ParallelOperator.hpp"
 #include "sfem_aliases.hpp"
 
+#include <functional>
 #include <memory>
 
 namespace sfem {
@@ -40,6 +41,18 @@ namespace sfem {
         class Impl;
         std::unique_ptr<Impl> impl_;
     };
+
+    /// A function's product on the owned rows of a distributed mesh (y += A x, A over every local
+    /// element, aura included, so that the owned rows need no reduction) by the threads of the
+    /// caller's region. Thread 0 sends x's owned values and posts the receives of its ghost and
+    /// aura values, the team applies the elements away from the interface (`apply` with
+    /// OWNED_NOT_SHARED), thread 0 waits for the messages, and once every thread sees them the
+    /// team applies the others (SHARED_AND_AURA) and copies the constrained rows. x and y span
+    /// col/row_allocation_size(); y's rows beyond the owned ones are scratch.
+    using ScopedTeamApply = std::function<void(const Team &, const real_t *const, real_t *const, const ElementScope)>;
+    std::shared_ptr<ParallelOperator<real_t>> create_distributed_team_operator(const std::shared_ptr<Function> &function,
+                                                                               ScopedTeamApply                  apply,
+                                                                               std::function<int()>             prepare);
 
     std::shared_ptr<ParallelOperator<real_t>> create_parallel_matrix_free_operator(
             const std::shared_ptr<Function>       &function,

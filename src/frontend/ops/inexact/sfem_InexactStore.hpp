@@ -54,20 +54,23 @@ namespace sfem {
                 }
                 const ptrdiff_t rows = packed ? packed->n_nodes * stride : 0;
 #pragma omp parallel
-                team_apply(Team::current(rows), nelements, elements, packed, stride, h, out);
+                team_apply(Team::current(rows), nelements, 0, nelements, elements, packed, stride, h, out);
             }
 
             void team_apply(const Team               &team,
                             const ptrdiff_t           nelements,
+                            const ptrdiff_t           element_begin,
+                            const ptrdiff_t           element_end,
                             const idx_t *const *const elements,
                             const PackedView *const   packed,
                             const ptrdiff_t           stride,
                             const real_t *const       h,
                             real_t *const             out) const override {
-                if (packed && options_.traversal != InexactOptions::Traversal::ATOMIC) {
+                const bool whole = element_begin == 0 && element_end == nelements;
+                if (whole && packed && options_.traversal != InexactOptions::Traversal::ATOMIC) {
                     team_apply_packed<Store, tau>(team, store_, *packed, nelements, stride, h, out);
                 } else {
-                    team_apply_atomic<Store, tau>(team, store_, nelements, elements, stride, h, out);
+                    team_apply_atomic<Store, tau>(team, store_, element_begin, element_end, elements, stride, h, out);
                 }
             }
 
