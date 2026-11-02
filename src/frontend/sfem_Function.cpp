@@ -732,24 +732,6 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    int Function::apply_scope_flat_range(const real_t *const x,
-                                         const real_t *const h,
-                                         real_t *const       out,
-                                         const ElementScope  scope,
-                                         const ptrdiff_t     flat_begin,
-                                         const ptrdiff_t     flat_end) {
-        SFEM_TRACE_SCOPE("Function::apply_scope_flat_range");
-
-        for (auto &op : impl_->ops) {
-            if (op->apply_scope_flat_range(x, h, out, scope, flat_begin, flat_end) != SFEM_SUCCESS) {
-                std::cerr << "Failed apply_scope_flat_range in op: " << op->name() << "\n";
-                return SFEM_FAILURE;
-            }
-        }
-
-        return SFEM_SUCCESS;
-    }
-
     std::shared_ptr<Operator<real_t>> Function::linear_op_variant(const std::vector<std::pair<std::string, int>> &options) {
         std::vector<std::shared_ptr<Op>> cloned_ops;
 

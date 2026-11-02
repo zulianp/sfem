@@ -32,6 +32,13 @@ int tet4_laplacian_assemble_value(const ptrdiff_t nelements,
  * @param[in] u Array of size nnodes containing the solution vector 'u'.
  * @param[out] values Array of size nnodes where the assembled gradient vector will be stored.
  */
+int tet4_laplacian_apply_team(const ptrdiff_t nelements,
+                              const ptrdiff_t nnodes,
+                              idx_t **const SFEM_RESTRICT elements,
+                              geom_t **const SFEM_RESTRICT points,
+                              const real_t *const SFEM_RESTRICT u,
+                              real_t *const SFEM_RESTRICT values);
+
 int tet4_laplacian_apply(const ptrdiff_t nelements,
                          const ptrdiff_t nnodes,
                          idx_t **const SFEM_RESTRICT elements,
@@ -52,6 +59,12 @@ int tet4_laplacian_diag(const ptrdiff_t nelements,
                         idx_t **const SFEM_RESTRICT elements,
                         geom_t **const SFEM_RESTRICT points,
                         real_t *const SFEM_RESTRICT diag);
+
+int tet4_laplacian_apply_opt_team(const ptrdiff_t nelements,
+                                  idx_t **const SFEM_RESTRICT elements,
+                                  const jacobian_t *const SFEM_RESTRICT fff,
+                                  const real_t *const SFEM_RESTRICT u,
+                                  real_t *const SFEM_RESTRICT values);
 
 int tet4_laplacian_apply_opt(const ptrdiff_t nelements,
                              idx_t **const SFEM_RESTRICT elements,

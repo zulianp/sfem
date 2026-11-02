@@ -131,12 +131,13 @@ namespace sfem {
         int gradient(const real_t *const x, real_t *const out, const ElementScope scope) override;
         int apply(const real_t *const x, const real_t *const h, real_t *const out, const ElementScope scope) override;
 
-        int apply_scope_flat_range(const real_t *const x,
-                                   const real_t *const h,
-                                   real_t *const       out,
-                                   const ElementScope  scope,
-                                   const ptrdiff_t     flat_begin,
-                                   const ptrdiff_t     flat_end) override;
+        bool team_supported() const override;
+        int  team_prepare() override;
+        int  team_apply(const Team         &team,
+                        const real_t *const x,
+                        const real_t *const h,
+                        real_t *const       out,
+                        const ElementScope  scope) override;
 
         int value_steps(const real_t       *x,
                         const real_t       *h,

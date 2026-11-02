@@ -231,22 +231,6 @@ namespace {
                         comm, parallel_mesh, parallel_y_host->data(), serial_y->data(), n_owned_dofs, n_serial_dofs, tol, bs) ==
                 SFEM_TEST_SUCCESS);
 
-        {
-            setenv("SFEM_PARALLEL_MF_LEGACY", "1", 1);
-            reset_parallel_output();
-            SFEM_TEST_ASSERT(parallel_op->apply(parallel_h->data(), parallel_y->data()) == SFEM_SUCCESS);
-            if (es == sfem::EXECUTION_SPACE_DEVICE) {
-#ifdef SFEM_ENABLE_CUDA
-                copy_device_to_host((size_t)n_y_alloc * sizeof(real_t), parallel_y->data(), parallel_y_host->data());
-#endif
-            }
-            SFEM_TEST_ASSERT(
-                    compare_owned_to_serial(
-                            comm, parallel_mesh, parallel_y_host->data(), serial_y->data(), n_owned_dofs, n_serial_dofs, tol, bs) ==
-                    SFEM_TEST_SUCCESS);
-            setenv("SFEM_PARALLEL_MF_LEGACY", "0", 1);
-        }
-
         if (!bench) {
             return SFEM_TEST_SUCCESS;
         }
@@ -254,8 +238,7 @@ namespace {
         const int bench_reps  = smesh::Env::read<int>("SFEM_PARALLEL_LAPLACIAN_BENCH_REPS", 40);
         const int warmup_reps = smesh::Env::read<int>("SFEM_PARALLEL_LAPLACIAN_WARMUP_REPS", 3);
 
-        auto time_parallel_apply = [&](const char *legacy_env) -> double {
-            setenv("SFEM_PARALLEL_MF_LEGACY", legacy_env, 1);
+        auto time_parallel_apply = [&]() -> double {
             comm->barrier();
             for (int r = 0; r < warmup_reps; ++r) {
                 SFEM_TEST_ASSERT(parallel_op->apply(parallel_h->data(), parallel_y->data()) == SFEM_SUCCESS);
@@ -284,14 +267,12 @@ namespace {
             serial_elapsed = smesh::time_seconds() - tick;
         }
 
-        const double legacy_elapsed  = time_parallel_apply("1");
-        const double overlap_elapsed = time_parallel_apply("0");
+        const double parallel_elapsed = time_parallel_apply();
 
         if (comm->rank() == 0) {
             const ptrdiff_t n_global_dofs = (comm->size() > 1) ? parallel_mesh->distributed()->n_nodes_global() * bs : n_serial_dofs;
             const double    serial_rate   = static_cast<double>(n_serial_dofs) * static_cast<double>(bench_reps) / serial_elapsed;
-            const double    legacy_rate   = static_cast<double>(n_global_dofs) * static_cast<double>(bench_reps) / legacy_elapsed;
-            const double    overlap_rate = static_cast<double>(n_global_dofs) * static_cast<double>(bench_reps) / overlap_elapsed;
+            const double    parallel_rate = static_cast<double>(n_global_dofs) * static_cast<double>(bench_reps) / parallel_elapsed;
 #ifdef _OPENMP
             const int omp_max = omp_get_max_threads();
 #else
@@ -300,8 +281,7 @@ namespace {
             std::printf(
                     "%s apply(%ld) [%s] ranks=%d omp_max_threads=%d reps=%d n_blocks=%ld\n"
                     "  serial:  %.6e dof/s  (%.6f s)\n"
-                    "  legacy:  %.6e dof/s  (%.6f s)  speedup_vs_serial %.3f\n"
-                    "  overlap: %.6e dof/s  (%.6f s)  speedup_vs_serial %.3f  vs_legacy %.3fx\n",
+                    "  parallel: %.6e dof/s  (%.6f s)  speedup_vs_serial %.3f\n",
                     op_name,
                     (long)n_global_dofs,
                     es == sfem::EXECUTION_SPACE_DEVICE ? "device" : "host",
@@ -311,16 +291,11 @@ namespace {
                     (long)parallel_mesh->n_blocks(),
                     serial_rate,
                     serial_elapsed,
-                    legacy_rate,
-                    legacy_elapsed,
-                    legacy_rate / serial_rate,
-                    overlap_rate,
-                    overlap_elapsed,
-                    overlap_rate / serial_rate,
-                    legacy_elapsed / overlap_elapsed);
+                    parallel_rate,
+                    parallel_elapsed,
+                    parallel_rate / serial_rate);
         }
 
-        setenv("SFEM_PARALLEL_MF_LEGACY", "0", 1);
         comm->barrier();
         return SFEM_TEST_SUCCESS;
     }
